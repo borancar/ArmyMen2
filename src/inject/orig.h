@@ -8657,10 +8657,33 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_TILE_RING8            0x0053C480u /* int32_t[17] */
 #define ADDR_REGIONS               0x00514EF0u
 #define AM2_REGION_SIZE            44
+/* The two words in front of it, written in the same three instructions by
+ * BuildRegionGraph and read nowhere yet: the region's own id, and the TILE
+ * that first claimed it. Named from that writer. */
+#define REGION_OFF_ID              0u   /* int16_t */
+#define REGION_OFF_TILE            2u   /* int16_t */
 #define REGION_OFF_ACTIVE          4u   /* int32_t; 0x0042BAD4 sets it to 1 */
 #define REGION_OFF_NLINKS          8u   /* uint8_t */
 #define REGION_OFF_LINKS           0x0Cu
 #define ADDR_ADD_REGION_LINK       0x0042B860u  /* void(int32_t, int32_t) */
+/* 0x0042B9A0, one caller -- the state-2 entry. THE FUNCTION THAT BUILDS
+ * EVERYTHING THE ROUTING READS: it walks the map's interior, drops the region
+ * off any tile whose weight has reached AM2_BLOCK_FULL, grows and activates
+ * the region array, links each tile to the four neighbours in a different
+ * region, and finishes by allocating the two stride-squared matrices
+ * ADDR_REGION_NEXT and ADDR_REGION_COST and stamping the generation to 1.
+ * So AiRouteToward's all-pairs tables exist because of this. Reconstructed.
+ *
+ * It shares its log line with ADDR_ACTIVATE_REGION, which orig.h already
+ * notes: "Activating Region %d" is logged here at 0x0042BAFB beside the very
+ * same store. */
+#define ADDR_BUILD_REGION_GRAPH    0x0042B9A0u  /* void(void) */
+#define AM2_STR_ACTIVATING_REGION  0x004862BCu  /* "Activating Region %d\n" */
+/* The map's outermost two tiles are skipped in both directions, so the sweep
+ * runs 2..w-3 and 2..h-3 and every link it makes has four neighbours to look
+ * at without a bounds test. NOT AM2_EDGE_MARGIN, which is five and belongs to
+ * SealMapEdges. */
+#define AM2_REGION_MARGIN          2
 /* THE REGION ROUTING TABLES. Two square byte matrices of the same stride, and
  * 0x00406460 is what makes them legible: it indexes both as
  * `m[from * stride + to]`, tests the first against a sentinel byte, and walks

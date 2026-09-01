@@ -97,6 +97,153 @@ void __cdecl AddRegionLink(int32_t cell, int32_t neighbour)
         orig_log("Added Region link from %d to %d\n", a, b);
 }
 
+
+/* BuildRegionGraph -- original 0x0042B9A0, one caller: the state-2 entry, so
+ * it runs once as a mission starts. It is what BUILDS everything the routing
+ * reads, and reconstructing AiRouteToward first is what made it legible:
+ * every table that function indexes is allocated or filled here.
+ *
+ * FOUR THINGS, IN ONE SWEEP AND A TAIL:
+ *
+ *   IT DROPS A REGION OFF A BLOCKED TILE. Any tile whose ADDR_CELL_WEIGHTS
+ *   entry has reached AM2_BLOCK_FULL has its ADDR_REGION_OF_CELL byte cleared
+ *   and is skipped -- so "region 0" and "impassable" are made the same thing
+ *   here rather than being two facts that have to agree later.
+ *
+ *   IT GROWS THE REGION ARRAY ON DEMAND, by realloc to exactly (id + 1)
+ *   records with no slack, zeroing only the new tail, and moves
+ *   ADDR_REGION_STRIDE up. A map whose region ids arrive in ascending order
+ *   therefore reallocs once per region.
+ *
+ *   IT ACTIVATES EACH REGION ONCE, writing its id and the TILE that claimed
+ *   it into the two words in front of REGION_OFF_ACTIVE -- which is where
+ *   those two fields come from -- and logging under -tracePF.
+ *
+ *   AND IT LINKS THE FOUR NEIGHBOURS: up, left, right, down, each linked when
+ *   its region differs from this tile's and its weight is under
+ *   AM2_BLOCK_FULL. AddRegionLink is one-way and its own comment says callers
+ *   wanting both directions call twice; this one does not, and gets the
+ *   reverse edge when the sweep reaches the other tile.
+ *
+ * THE TAIL IS WHY THE MATRICES ARE SQUARE. Both are malloc'd at stride *
+ * stride and zeroed, and ADDR_REGION_STAMP is set to 1 -- so every pair reads
+ * as unsolved on the first frame, which is exactly what AiRouteToward's
+ * `cost != stamp` test wants.
+ *
+ * IT SKIPS THE OUTERMOST TWO TILES IN BOTH DIRECTIONS, which is what lets the
+ * four-neighbour walk run with no bounds test at all. A map narrower than five
+ * tiles either way is swept not at all and still gets its matrices.
+ *
+ * TileToXY IS CALLED AND ITS ANSWER DISCARDED. Two stack slots take the x and
+ * y and nothing reads them again. It has no side effect, so the call is dead
+ * as written; reproduced, because deleting it is a decision about the
+ * original and this function is not where that gets made.
+ */
+void __cdecl BuildRegionGraph(void)
+{
+    int32_t x, y;
+    int32_t tile;
+
+    const int8_t *weights;
+
+    if (!kRegionOfCell
+        || !*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
+        return;
+
+    weights = *(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
+
+    tile = *(const int32_t *)AM2_IMAGE(ADDR_MAP_TILES_W) * AM2_REGION_MARGIN
+           + AM2_REGION_MARGIN;
+
+    for (y = AM2_REGION_MARGIN;
+         y < *(const int32_t *)AM2_IMAGE(ADDR_MAP_TILES_H) - AM2_REGION_MARGIN;
+         y++, tile += AM2_REGION_MARGIN * 2) {
+        for (x = AM2_REGION_MARGIN;
+             x < *(const int32_t *)AM2_IMAGE(ADDR_MAP_TILES_W)
+                 - AM2_REGION_MARGIN;
+             x++, tile++) {
+            uint32_t at = (uint32_t)tile & 0xFFFFu;
+            int32_t  region = kRegionOfCell[at];
+            int32_t  ox = 0, oy = 0;
+            uint8_t *r;
+            int32_t  w;
+            int32_t  n;
+
+            /* Called for nothing -- see the note above. */
+            TileToXY(tile, &ox, &oy);
+
+            if (weights[at] >= AM2_BLOCK_FULL) {
+                kRegionOfCell[at] = 0;
+                continue;
+            }
+
+            MarkOpenTile((uint16_t)tile);
+            if (!region)
+                continue;
+
+            if (region >= *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE)) {
+                int32_t old = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
+
+                kRegions = (uint8_t *)am2_realloc(kRegions,
+                    (size_t)(region + 1) * AM2_REGION_SIZE);
+                memset(kRegions + (uint32_t)old * AM2_REGION_SIZE, 0,
+                       (size_t)(region - old + 1) * AM2_REGION_SIZE);
+                *(int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE) =
+                    (int16_t)(region + 1);
+            }
+
+            r = kRegions + (uint32_t)region * AM2_REGION_SIZE;
+            if (!*(const int32_t *)(r + REGION_OFF_ACTIVE)) {
+                *(int32_t *)(r + REGION_OFF_ACTIVE) = 1;
+                *(int16_t *)(r + REGION_OFF_ID)     = (int16_t)region;
+                *(int16_t *)(r + REGION_OFF_TILE)   = (int16_t)tile;
+
+                if (kTracePF)
+                    orig_log((const char *)
+                             AM2_IMAGE(AM2_STR_ACTIVATING_REGION), region);
+            }
+
+            /* Up, left, right, down -- four inlined tests in the original
+             * and four here, in its order. Each is linked when its region
+             * differs and its weight is under AM2_BLOCK_FULL. */
+            w = *(const int32_t *)AM2_IMAGE(ADDR_MAP_TILES_W);
+
+            n = (int32_t)(at - (uint32_t)w);
+            if ((int32_t)kRegionOfCell[n] != region
+                && weights[n] < AM2_BLOCK_FULL)
+                AddRegionLink((int32_t)at, n);
+
+            n = (int32_t)at - 1;
+            if ((int32_t)kRegionOfCell[n] != region
+                && weights[n] < AM2_BLOCK_FULL)
+                AddRegionLink((int32_t)at, n);
+
+            n = (int32_t)at + 1;
+            if ((int32_t)kRegionOfCell[n] != region
+                && weights[n] < AM2_BLOCK_FULL)
+                AddRegionLink((int32_t)at, n);
+
+            n = (int32_t)(at + (uint32_t)w);
+            if ((int32_t)kRegionOfCell[n] != region
+                && weights[n] < AM2_BLOCK_FULL)
+                AddRegionLink((int32_t)at, n);
+        }
+    }
+
+    {
+        int32_t stride = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
+        size_t  bytes  = (size_t)(stride * stride);
+
+        kRegionNext = (uint8_t *)am2_malloc(bytes);
+        memset(kRegionNext, 0, bytes);
+
+        kRegionCost = (uint8_t *)am2_malloc(bytes);
+        memset(kRegionCost, 0, bytes);
+
+        *(uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP) = 1;
+    }
+}
+
 /* 0x00437E00, four callers -- and one of them is ADDR_SETTLE_POINT_IN_REGION
  * itself, which installs the rule and then dispatches through it in the same
  * breath. Choose which of three rules a point gets settled under, from the
@@ -4932,6 +5079,9 @@ int region_install(void)
                         "Type2PlayerStep", 1);
     rc |= patch_replace(ADDR_AI_ROUTE_TOWARD, (const void *)AiRouteToward,
                         "AiRouteToward", 9);
+    rc |= patch_replace(ADDR_BUILD_REGION_GRAPH,
+                        (const void *)BuildRegionGraph,
+                        "BuildRegionGraph", 1);
     rc |= patch_replace(ADDR_AI_APPROACH_LEADER,
                         (const void *)AiApproachLeader,
                         "AiApproachLeader", 2);

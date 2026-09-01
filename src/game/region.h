@@ -227,6 +227,13 @@ void __cdecl TileCoverSub(uint16_t tile);
  * that comes up short. Always answers 0. */
 int32_t __cdecl MarkOpenTile(uint16_t tile);
 
+/* 0x0042B9A0, one caller -- the state-2 entry. Build the whole region graph
+ * for the loaded map: clear the region off every blocked tile, grow and
+ * activate the region array, link neighbouring tiles in different regions,
+ * then allocate the two stride-squared routing matrices AiRouteToward reads
+ * and stamp the generation to 1. */
+void __cdecl BuildRegionGraph(void);
+
 /* 0x00438DF0, two callers. Turn a rectangle in pixels into a scratch tile
  * mask: clamp each edge into the map, pad by two tiles, and fill the padded
  * rectangle with 2 and the box itself with 3. `out` is a TILEMASK record.
