@@ -2484,6 +2484,202 @@ typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
 #define orig_ai_trooper_step \
     ((AM2_AiTrooperStepFn)(uintptr_t)ADDR_AI_TROOPER_STEP)
 
+/* The same promote-and-engage block in the SIGHTC base rather than the SIGHT
+ * one -- four bytes higher on every field. AiApproachLeader inlines it twice,
+ * for the reason AM2_ROACH_PROMOTE_FOUND's comment already gives. */
+#define AM2_SIGHTC_PROMOTE_FOUND(o_, c_)                                      \
+    do {                                                                      \
+        uint8_t *found_ = *(uint8_t **)((c_) + SIGHTC_OFF_FOUND);             \
+        *(uint32_t *)((o_) + OBJ_OFF_TARGET_UID) =                            \
+            *(const uint32_t *)(found_ + OBJ_OFF_OWNER);                      \
+        *(void **)((c_) + SIGHTC_OFF_OBSERVER) =                              \
+            *(void **)((c_) + SIGHTC_OFF_FOUND);                              \
+        *(int32_t *)((c_) + SIGHTC_OFF_RANGE) =                               \
+            *(const int32_t *)((c_) + SIGHTC_OFF_FOUND_RANGE);                \
+        *((c_) + SIGHTC_OFF_BEARING) = *((c_) + SIGHTC_OFF_FOUND_BEARING);    \
+    } while (0)
+
+/* AiApproachLeader -- original 0x00405DB0, two callers: SargeAiStep and
+ * TrooperAiStep, the two per-frame AI steps. So this is the arm they both
+ * run, and what it decides is what to do about SIGHTC_OFF_LEADER -- the
+ * object TrooperBuildContext resolved out of OBJ_OFF_FOLLOW_UID.
+ *
+ * IT IS NOT ONLY A LEADER. The first thing every arm does is ask ObjIsItem,
+ * so the field can hold a thing to walk to and pick up as easily as a soldier
+ * to follow, and the four arms below are the cross product of that question
+ * with "are we allied with it".
+ *
+ * TWO HALVES ON A COUNTER. OBJ_OFF_FIELD_110 counts the frames on which
+ * ArmyAlliedWithObj said no, and once it is positive the whole function
+ * switches to a second, shorter set of arms. So an object that has been
+ * un-allied even once behaves differently from then on -- the counter is
+ * never reset here.
+ *
+ * FOUR DISTANCE BANDS, all on SIGHTC_OFF_LEAD_RANGE:
+ *
+ *   past AM2_AI_LEAD_FAR       walk, and stop thinking about it
+ *   under AM2_AI_LEAD_NEAR     hand over to AiHitReact
+ *   the two-way test in the middle decides between walking and turning: the
+ *   range against the measured distance plus AM2_AI_LEAD_CLOSE, then both
+ *   against AM2_AI_LEAD_SPREAD.
+ *
+ * THE PROMOTE BLOCK APPEARS TWICE, once inside the AiHitReact arm and once in
+ * the shared tail. It is AM2_ROACH_PROMOTE_FOUND spelled in the SIGHTC base
+ * rather than the SIGHT one, and it is written out at both sites for the
+ * reason that macro's comment already gives: the original inlines it, and
+ * "the original does it twice" is a fact about the original.
+ *
+ * IT IS ALSO WHAT IDENTIFIES SIGHTC_OFF_FOUND. That field was
+ * SIGHTC_OFF_FIELD_20, "gates the turn in AiWalkStep"; here it is copied into
+ * the OBSERVER/RANGE/BEARING triple with the found object's uid going to
+ * OBJ_OFF_TARGET_UID, which is the same three-field promotion region.cpp
+ * already writes from SIGHT_OFF_FOUND. The old name was right about what it
+ * gates and could not say why.
+ *
+ * ITS FIRST ACT IS TO CLEAR OBJ_OFF_SCRIPT_STATE from ADDR_ZERO_POINT, which
+ * makes it the FOURTH function seen to do that after Type2ActionB,
+ * PointActionA and EnterVehicle. orig.h records that field as unresolved
+ * because its writers put a POINT there and its readers compare an int32;
+ * this is another writer of a zero and settles nothing.
+ *
+ * The two arms that turn rather than walk share one tail through a `jmp` into
+ * the middle of the first -- the same arm-ends-inside-another shape found
+ * twice already today.
+ */
+void __cdecl AiApproachLeader(void *obj, void *out, void *ctx)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *w = (uint8_t *)out;
+    uint8_t *c = (uint8_t *)ctx;
+    uint8_t *lead;
+    int32_t  range;
+    int32_t  d;
+
+    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+    lead = *(uint8_t **)(c + SIGHTC_OFF_LEADER);
+    if (!lead)
+        goto hitreact;
+
+    if (!ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), lead, 1))
+        *(int32_t *)(o + OBJ_OFF_FIELD_110) += 1;
+
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_110) > 0)
+        goto provoked;
+
+    /* ---- not provoked ---- */
+    if (ObjIsItem((const AM2_Object *)lead)
+        && ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), lead, 0)) {
+        if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE) <= AM2_AI_LEAD_NEAR)
+            goto hitreact;
+
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(c + SIGHTC_OFF_DEST);
+        orig_ai_trooper_step(obj, out, ctx);
+
+        if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE) <= AM2_AI_LEAD_CLOSE
+            && *(const int32_t *)(o + OBJ_OFF_FIELD_584) == 2)
+            *(int32_t *)(o + OBJ_OFF_FIELD_584) = 3;
+        goto promote;
+    }
+
+    if (ObjsAreAllied(obj, lead, 0)) {
+        d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                       (const AM2_Point *)(lead + OBJ_OFF_POS));
+        range = *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
+
+        if (range > AM2_AI_LEAD_FAR)
+            goto walk;
+
+        if ((range > d + AM2_AI_LEAD_CLOSE && range > AM2_AI_LEAD_CLOSE)
+            || (d > AM2_AI_LEAD_SPREAD && range > AM2_AI_LEAD_SPREAD)) {
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+                *(const uint32_t *)(c + SIGHTC_OFF_DEST);
+            goto step;
+        }
+
+        if (!PointsDiffer(*(const uint32_t *)(lead + OBJ_OFF_POS),
+                          *(const uint32_t *)(lead + OBJ_OFF_PREV_POS)))
+            goto hitreact;
+
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(c + SIGHTC_OFF_DEST);
+        orig_ai_trooper_step(obj, out, ctx);
+        goto turn;
+    }
+
+    d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                   (const AM2_Point *)(lead + OBJ_OFF_POS));
+    if (d < AM2_AI_LEAD_CLOSE)
+        goto hitreact;
+    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+        *(const uint32_t *)(c + SIGHTC_OFF_DEST);
+    goto step;
+
+provoked:
+    if (ObjIsItem((const AM2_Object *)lead)
+        && ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), lead, 0)) {
+        range = *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
+        if (range > AM2_AI_LEAD_FAR || range <= AM2_AI_LEAD_NEAR)
+            goto hitreact;
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(c + SIGHTC_OFF_DEST);
+        goto step;
+    }
+
+    if (ObjsAreAllied(obj, lead, 1)) {
+        if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE) > AM2_AI_LEAD_FAR) {
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+                *(const uint32_t *)(c + SIGHTC_OFF_DEST);
+            goto step;
+        }
+
+        if (!PointsDiffer(*(const uint32_t *)(lead + OBJ_OFF_POS),
+                          *(const uint32_t *)(lead + OBJ_OFF_PREV_POS)))
+            goto hitreact;
+
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(c + SIGHTC_OFF_DEST);
+        orig_ai_trooper_step(obj, out, ctx);
+        goto turn;
+    }
+
+    d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                   (const AM2_Point *)(lead + OBJ_OFF_POS));
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_EC))
+        goto walk;
+    if (d < *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE))
+        goto hitreact;
+    if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE) > AM2_AI_LEAD_CLOSE)
+        goto walk;
+    /* falls into hitreact */
+
+hitreact:
+    AiHitReact(obj, out, ctx);
+    AM2_SIGHTC_PROMOTE_FOUND(o, c);
+    AiKeepRange(obj, out, ctx);
+    goto promote;
+
+turn:
+    if (*(const int32_t *)(w + 8) != 2 && *(const int32_t *)(w + 8) != 3) {
+        w[4] = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+                            (const AM2_Point *)(c + SIGHTC_OFF_DEST));
+        *(int32_t *)(w + 8) = 2;
+    }
+    goto promote;
+
+walk:
+    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+        *(const uint32_t *)(c + SIGHTC_OFF_DEST);
+step:
+    orig_ai_trooper_step(obj, out, ctx);
+
+promote:
+    AM2_SIGHTC_PROMOTE_FOUND(o, c);
+    ConsiderSightingC(obj, out, ctx);
+}
+
 /* AiHitReact -- original 0x00405050, TEN call sites across the trooper AI
  * band. What a unit does about having been hit: choose a pose, turn toward the
  * hit if it is not already watching something, and consume OBJ_OFF_HIT_DIR.
@@ -2689,7 +2885,7 @@ void __cdecl AiWalkStep(void *obj, void *out, void *ctx)
 
     AiHitReact(obj, out, ctx);
 
-    if (*(const int32_t *)(c + SIGHTC_OFF_FIELD_20)
+    if (*(const int32_t *)(c + SIGHTC_OFF_FOUND)
         && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
            - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0)
            >= AM2_AI_TURN_DELAY_MS)
@@ -3198,7 +3394,7 @@ void __cdecl RegionSolvePair(int32_t from, int32_t to)
 typedef void (__cdecl *AM2_AiArmFn)(void *obj, void *out, void *ctx);
 typedef void (__cdecl *AM2_AiFillFn)(void *obj, void *ctx, int32_t sarge);
 #define orig_ai_arm0   ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_BIG_4057D0))
-#define orig_ai_arm3   ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_AI_405DB0))
+/* Arm 3 is AiApproachLeader, reconstructed above and called by name. */
 #define orig_ai_arm6   ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_AI_406B30))
 #define orig_ai_deflt  ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_BIG_405220))
 
@@ -3234,7 +3430,7 @@ static void AiStepReactAndDispatch(void *obj, void *out, uint8_t *ctx)
     switch (*(const int32_t *)(o + OBJ_OFF_AI_MODE)) {
     case 0:  orig_ai_arm0(obj, out, ctx);  break;
     case 2:  AiWalkStep(obj, out, ctx);    break;
-    case 3:  orig_ai_arm3(obj, out, ctx);  break;
+    case 3:  AiApproachLeader(obj, out, ctx);  break;
     case 6:  orig_ai_arm6(obj, out, ctx);  break;
     case 7:  Call405220((int32_t)(intptr_t)obj, (int32_t)(intptr_t)out,
                         (int32_t)(intptr_t)ctx);
@@ -3276,7 +3472,7 @@ static void AiStepRecordRegion(uint8_t *o)
  * them is about the rest of the tree.
  *
  * SARGE'S PROLOGUE IS AN ITEM PICKUP. Choose the best weapon, take whatever
- * candidate the fill left at SIGHTC_OFF_FIELD_20, and if ObjIsType4 says it is
+ * candidate the fill left at SIGHTC_OFF_FOUND, and if ObjIsType4 says it is
  * a weapon: copy its position into the goal point, keep its +4 in
  * OBJ_OFF_PICKUP_AFTER, settle that point into a region the unit can stand in,
  * record the distance, and clear the candidate so nothing picks it twice.
@@ -3306,7 +3502,7 @@ void __cdecl SargeAiStep(void *obj, void *out)
     TrooperBuildContext(obj, ctx, 1);
     UnitWeaponInfo(obj, ctx);
 
-    item = *(uint8_t **)(ctx + SIGHTC_OFF_FIELD_20);
+    item = *(uint8_t **)(ctx + SIGHTC_OFF_FOUND);
     if (item && ObjIsType4((const AM2_Object *)item)) {
         uint32_t *goal = (uint32_t *)(o + OBJ_OFF_SCRIPT_FRAME);
 
@@ -3321,7 +3517,7 @@ void __cdecl SargeAiStep(void *obj, void *out)
             ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
                        (const AM2_Point *)goal);
 
-        *(uint32_t *)(ctx + SIGHTC_OFF_FIELD_20) = 0;
+        *(uint32_t *)(ctx + SIGHTC_OFF_FOUND) = 0;
     }
 
     AiStepReactAndDispatch(obj, out, ctx);
@@ -3962,7 +4158,7 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
 
     if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
         >= *(const uint32_t *)(o + OBJ_OFF_FIELD_FC))
-        *(int32_t *)(c + SIGHTC_OFF_FIELD_20) =
+        *(int32_t *)(c + SIGHTC_OFF_FOUND) =
             orig_scan_403b40(obj, c + SIGHTC_OFF_FOUND_RANGE,
                              c + SIGHTC_OFF_FOUND_BEARING,
                              o + OBJ_OFF_FIELD_114, o + OBJ_OFF_FIELD_110,
@@ -4736,6 +4932,9 @@ int region_install(void)
                         "Type2PlayerStep", 1);
     rc |= patch_replace(ADDR_AI_ROUTE_TOWARD, (const void *)AiRouteToward,
                         "AiRouteToward", 9);
+    rc |= patch_replace(ADDR_AI_APPROACH_LEADER,
+                        (const void *)AiApproachLeader,
+                        "AiApproachLeader", 2);
     rc |= patch_replace(ADDR_ROACH_ROUTE_TOWARD,
                         (const void *)RoachRouteToward,
                         "RoachRouteToward", 3);

@@ -3237,15 +3237,23 @@
  *     0        -> ADDR_BIG_4057D0
  *     1, 4, 5  -> ADDR_BIG_405220        (5 is `evade`)
  *     2        -> AiWalkStep             (`ignore`)
- *     3        -> ADDR_AI_405DB0
+ *     3        -> AiApproachLeader      (`follow`, see below)
  *     6        -> ADDR_AI_406B30         (`attack`)
  *     7        -> ADDR_CALL_405220       (`defend`, a thunk on the default)
  *
  * Reading the bodies top to bottom gives 2, 0, 3, 6, 7, default and gets four
  * of the eight wrong. Same shape as the 0x0040803C table, different arms.
  *
+ * MODE 3 IS FOLLOW, and two functions reconstructed the same day say so
+ * together. Type2PlayerStep sets OBJ_OFF_AI_MODE to 3 on every other selected
+ * unit before attaching it to the one the player is commanding; arm 3 is
+ * AiApproachLeader, whose whole job is to walk to SIGHTC_OFF_LEADER. Neither
+ * reading says it alone -- CLAUDE.md's list of modes (attack 6, defend 7,
+ * ignore 2, evade 5) has no 3 in it, because no shipped script writes one.
+ * It is set by the SELECTION, not by a script.
+ *
  * SARGE'S EXTRA PROLOGUE IS AN ITEM PICKUP: SelectBestWeapon, then a candidate
- * out of SIGHTC_OFF_FIELD_20 that ObjIsType4 confirms is a weapon, its
+ * out of SIGHTC_OFF_FOUND that ObjIsType4 confirms is a weapon, its
  * position into the goal point, its +4 into OBJ_OFF_PICKUP_AFTER, the point
  * settled into a walkable region, and the distance recorded at SIGHTC +0x38.
  *
@@ -3281,7 +3289,13 @@
  *
  * Reconstructed as TrooperBuildContext. */
 #define ADDR_TROOPER_BUILD_CONTEXT 0x00404730u /* void(obj, ctx, int32 sarge) */
-#define ADDR_AI_405DB0         0x00405DB0u  /* void(obj, out, ctx) */
+/* READ. The arm SargeAiStep and TrooperAiStep both run: what to do about
+ * SIGHTC_OFF_LEADER, which can be an ITEM to walk to as easily as a soldier
+ * to follow. Four arms -- the cross product of "is it an item" with "are we
+ * allied with it" -- doubled by a counter at OBJ_OFF_FIELD_110 that never
+ * resets, so an object un-allied even once behaves differently from then on.
+ * Reconstructed as AiApproachLeader. */
+#define ADDR_AI_APPROACH_LEADER 0x00405DB0u  /* void(obj, out, ctx) */
 #define ADDR_AI_406B30         0x00406B30u  /* void(obj, out, ctx) */
 #define AM2_SIGHTC_BYTES       0x58   /* the frame both dispatchers reserve */
 /* 0x00407BF0, one caller -- the `ignore` arm, mode 2. Reconstructed. */
@@ -3359,7 +3373,30 @@
  * SIGHTC_OFF_MAX_RANGE at 0x50, which is the range beyond which
  * ConsiderSightingC stops looking. +0x00 and +0x3C gate the pose write and
  * nothing read so far says what either holds. */
-#define SIGHTC_OFF_FIELD_20      0x20u  /* gates the turn in AiWalkStep */
+/* IT IS THE FOUND OBJECT, and AiApproachLeader is what says so: it copies
+ * +0x20, +0x24 and +0x28 into SIGHTC_OFF_OBSERVER, _RANGE and _BEARING and
+ * stamps the found object's uid into OBJ_OFF_TARGET_UID -- which is exactly
+ * AM2_ROACH_PROMOTE_FOUND, the block region.cpp already writes out four times
+ * from SIGHT_OFF_FOUND, four bytes lower in the other base. So the old name
+ * was right that it gates a turn and could not say why: a non-null found
+ * object is something to turn toward. Renamed, not aliased, and the two
+ * fields beside it named with it. */
+#define SIGHTC_OFF_FOUND         0x20u  /* object *, and gates AiWalkStep */
+/* AND FOUR MORE OF THIS FAMILY WERE ALREADY DEFINED, one screen down --
+ * _FOUND_RANGE, _FOUND_BEARING, _LEAD_RANGE and _DEST, with a comment saying
+ * "plus the four-byte head shift", which is the SAME relationship I had just
+ * derived from scratch out of AiApproachLeader. checkoffsets refused all four
+ * as identical redefinitions. Fourth time today that ratchet has caught its
+ * author, and the first where what it caught was a rediscovery rather than a
+ * duplicate name: the fact was in the file and the grep that would have found
+ * it was for the OFFSET, not for the prefix. */
+/* AiApproachLeader's distance bands. FAR is where it stops thinking and just
+ * walks; NEAR ends the approach; CLOSE and the 0x20 either side of it are the
+ * two-way test that decides whether to walk or to turn and shoot. */
+#define AM2_AI_LEAD_FAR          0xF0
+#define AM2_AI_LEAD_NEAR         8
+#define AM2_AI_LEAD_CLOSE        0xC
+#define AM2_AI_LEAD_SPREAD       0x20
 #define SIGHTC_OFF_DEST_DIST     0x34u  /* to OBJ_OFF_FIELD_C0, as +0x28 is
                                          * in the vehicle record */
 #define SIGHTC_OFF_WANT_RANGE    0x4Cu
