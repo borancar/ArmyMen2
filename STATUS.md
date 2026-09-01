@@ -23,6 +23,29 @@ spot, and itself confirmation the chain is ours. **The A/B does not compare
 it**: `bootcamp` and `campaign` both stop at a dialog and neither clicks a
 unit, so their clean runs say only that nothing else regressed.
 
+## Next: 0x00459DA0 is read and not written, and why
+
+The pick of four records in a SECOND `{pick, action, kind, flags}` table --
+16-byte records at 0x00489AB0 and around it, distinct from the pointer-mode
+table. Refuse a null object or one not of our army, find our leader through the
+dead helper below, then two arms: a VEHICLE with a free seat shows overlay row
+8 and answers **0** -- a hover hint, never a yes -- and a TROOPER within
+`ApproxDist` of the leader shows row 0x12 and answers 1.
+
+The vehicle test is `OBJ_OFF_POSE_PENDING < VEHICLE_OFF_SEATS`, which is the
+same pair `EnterVehicle` refuses on: seats used against seats. That is the
+writer/reader pair the layout needed, so the reading is settled.
+
+**It is not written because three of its globals cannot be named yet, and that
+is the rule rather than laziness.** 0x0048549C has ELEVEN touchers and
+0x004854B8 FIFTEEN -- naming either from this one use is the call-site mistake
+this project records five times over -- and the two range thresholds have
+exactly ONE toucher each, which is the "a table with one consumer is a table
+you cannot name" case. Reading 0x00426FDF, 0x0044ABC1 and 0x00413E94 settles
+the first two; finding the table's consumer settles the rest. Recorded in
+`orig.h` in full, the way LoadType2, CreateTrooper, CreateVehicle and
+RegionFindPath were before each came back and went in quickly.
+
 ## The pointer-mode family shares a dead helper, eight times over
 
 Worth having written down before the rest of that band is transcribed, because

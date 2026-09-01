@@ -941,6 +941,43 @@
  * the one SetPointerMode's note records a driven mission actually reaching, so
  * unlike the rest of this family it is on a live path. */
 #define ADDR_POINTER_SELECT    0x00458ED0u  /* void(void *obj, uint32_t at) */
+/* A SECOND {pick, action, kind, flags} TABLE, 16-byte records at 0x00489AB0
+ * and around it, distinct from the pointer-mode table above. Empty slots are
+ * {0, 0, -1, 0}; four consecutive records share {0x00459DA0, 0x00458D70, 3, 0}
+ * and two share {0, 0x00446E70, 1, 1}. Its base and its consumer are NOT
+ * established -- the records were found from the functions' xrefs rather than
+ * from a loop, which is the wrong way round and is why nothing here is named
+ * for it yet. */
+/* 0x00459DA0, 320 bytes, READ AND NOT RECONSTRUCTED. Recorded the way
+ * LoadType2, CreateTrooper, CreateVehicle and RegionFindPath were before they
+ * were taken -- all four came back and went in quickly once the neighbouring
+ * work was done.
+ *
+ * WHAT IS SETTLED. It is the PICK of those four records: refuse a null object,
+ * refuse one whose army byte is not ADDR_DEFAULT_OWNER, find our leader
+ * through the dead-fallback helper described above, and then two arms.
+ *
+ * A VEHICLE WITH A FREE SEAT -- type 3, OBJ_OFF_FIELD_94 clear, and
+ * OBJ_OFF_POSE_PENDING < VEHICLE_OFF_SEATS, which is the same pair EnterVehicle
+ * refuses on and is what settles the reading: seats used against seats. It
+ * shows overlay row 8 and stores the object's uid, and then ANSWERS 0 -- so the
+ * vehicle arm is a hover hint and never a yes.
+ *
+ * A TROOPER within ApproxDist of the leader shows overlay row 0x12 and answers
+ * 1. Everything else answers 0.
+ *
+ * THE HINT IS SUPPRESSED WHILE THE BUTTON HAS BEEN DOWN A WHILE: with
+ * ADDR_MOUSE_BUTTON set, the overlay is skipped unless GetTickCount() less a
+ * timestamp is under 500. So a click-and-hold stops re-arming the hint.
+ *
+ * WHAT IS NOT: three globals it reads, and the reason they are unnamed is the
+ * rule rather than laziness. 0x0048549C has ELEVEN touchers and 0x004854B8
+ * FIFTEEN, so naming either from this one use is the call-site mistake this
+ * file records five times over; and the two range thresholds it compares
+ * ApproxDist against -- 0x0066275C here, 0x00662450 in its neighbour -- have
+ * exactly ONE toucher each, which is the "a table with one consumer is a table
+ * you cannot name" case. Reading 0x00426FDF, 0x0044ABC1 and 0x00413E94 is what
+ * would settle the first two. */
 #define MODE_OFF_PICK          0x00u  /* int32(obj) -- may the pointer take it */
 #define MODE_OFF_ACTION        0x04u  /* void(obj, packed point) on release */
 #define MODE_OFF_OVERLAY       0x0Cu  /* OverlayPrepare's row, 0..0x12 */
