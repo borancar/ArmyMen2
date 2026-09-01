@@ -29,6 +29,11 @@ void __cdecl SendVehicleExit(void *vehicle, void *occupant);
  * armymsg.cpp. */
 void __cdecl ItemPostCreate(int32_t army, uint32_t where);
 
+/* 0x0042AB50, four callers, all of them creators. Declared here now that
+ * CreateItem is reconstructed and calls it by name; it had no header
+ * declaration for as long as its only C++ caller was in armymsg.cpp itself. */
+void __cdecl SendItemCreate(void *obj);
+
 /* 0x0044C480, one caller. The SENDER of the kind-0x16 batch RecvTroopBatch
  * receives: walk one comm slot's army object list and append every live
  * trooper's state to one message, flushing whenever another record would not

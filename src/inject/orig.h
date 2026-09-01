@@ -11389,6 +11389,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * outright, and 0x0045B090 logs "Vehicle aai entry not found for type %d" --
  * which is what fixes the mapping and, with it, the other two. */
 #define ADDR_CREATE_ITEM         0x00433980u  /* type 1 */
+/* What CreateItem allocates and zeroes for one type-1 object. NOT
+ * AM2_MISSILE_BYTES, which is 0xB8 -- the two were checked against each other
+ * before this name went in. */
+#define AM2_ITEM_BYTES           0xC0u
+/* The "%s-%d" CreateItem names a composite's children with, and the 64-byte
+ * stack buffer it formats into. The suffix is a SEPARATE string from
+ * AM2_STR_UNIQUE_SUFFIX at the top of this file -- that one is "%s_%d", an
+ * underscore, and it is ObjInitCommon's de-duplicator. Grepped before naming,
+ * and the buffer likewise: AM2_SCRIPT_UNIQUE_BUF is also 0x40, and is also a
+ * stack buffer a name is built in, but it is a different buffer in a different
+ * function. Two names for two buffers, not two names for one number. */
+#define AM2_STR_CHILD_SUFFIX     0x00487400u  /* "%s-%d" */
+#define AM2_CHILD_NAME_BUF       0x40u
 #define ADDR_CREATE_TROOPER      0x00447620u  /* type 2 */
 #define ADDR_CREATE_VEHICLE      0x0045B090u  /* type 3 */
 #define ADDR_CREATE_WEAPON       0x0045F0C0u  /* type 4; names itself */
@@ -11798,6 +11811,22 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Found by reading 0x00458070 BEFORE writing the three handlers that call it,
  * which is the order STATUS.md argued for; the names had already gone in two
  * commits earlier without the qualification. */
+/* AND THE TRIPLE'S THIRD MEMBER, written by CreateItem three lines from the
+ * other two: the CHILD's +0xA4 takes the PARENT's uid, the parent's +0xA8
+ * takes the first child's, and the previous child's +0xAC takes this one's.
+ * So the item vocabulary covers 0xA4..0xAC and not just the pair above.
+ *
+ * IT IS THE SAME THREE DWORDS AS OBJ_OFF_PTR_LIST, and army.cpp settled the
+ * other half already: for types 2, 3 and 8 the block is a sub-list header, so
+ * 0xA4 + SUBREC_OFF_COUNT is 0xA8 and + SUBREC_OFF_ROWS is 0xAC. Two
+ * vocabularies over one union arm each, which is what that note asked for --
+ * the type-dependence is DISSOLVED by spelling each type its own way rather
+ * than worked around.
+ *
+ * This is the alias checkoffsets' baseline went from 15 to 16 for, and it is
+ * bought with a writer that touches all three: the 0xA0 case one screen down
+ * was DECLINED on the same trade because nothing had read it whole. */
+#define OBJ_OFF_CHAIN_PARENT_UID   0xA4u   /* uint32_t, item: its parent */
 #define OBJ_OFF_CHAIN_UID          0xA8u   /* uint32_t, item: head of the chain */
 #define OBJ_OFF_CHAIN_NEXT_UID     0xACu   /* uint32_t, item: the next link */
 /* 656 bytes, six callers, still original -- the item-only half of the common
@@ -11981,6 +12010,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * is not allied with; still original. */
 #define ADDR_SHOOTER_REACT         0x00457DA0u /* void(shooter, target) */
 #define OBJ_OFF_FORMATION_SLOT     0xA0u   /* int32_t, index into the above */
+/* FOURTH READING, and it is the one that makes the type-1 answer plain rather
+ * than likely: CreateItem's LEAF arm ends by storing the sprite FRAME it
+ * unpacked out of the key here -- `key & 0x7F`, KeyFieldC, the third field of
+ * the sprite triple. So on a type 1 this offset holds a frame index, written
+ * by the creator and replayed by LoadType1, and the twelve-entry formation
+ * table below belongs to some other arm of the union. Three readings called
+ * that likely; a WRITER settles it. */
 /* THIRD READING, and it strengthens the type-dependence note below rather
  * than settling it: LoadType1 replays this field through ChangeObjectFrame
  * with flag 1, exactly as it replays OBJ_OFF_REPAIR_FRAME with flag 0. So on

@@ -736,12 +736,9 @@ int32_t __cdecl SaveType1(am2_FILE *fp, void *obj)
     WriteSaveTag(fp, *(const uint32_t *)(*(uint8_t *const *)rec + 8));
     return 1;
 }
-/* CreateItem stays original: it is the type-1 arm of the four creators, and
- * the same one RecvItemCreate reaches. */
-typedef void *(__cdecl *AM2_CreateItemFn)(const char *name, int32_t army,
-                                          int32_t kind, int32_t at,
-                                          int32_t c, int32_t d, uint32_t uid);
-#define orig_create_item ((AM2_CreateItemFn)(uintptr_t)ADDR_CREATE_ITEM)
+/* CreateItem is reconstructed, in item.cpp, and reached by name -- the
+ * typedef and orig_ macro that used to sit here named the type-1 arm of the
+ * four creators and would now resolve to our own detour. */
 
 
 /* ResetLevelState -- original 0x00424E80, one caller: the level start.
@@ -1202,7 +1199,7 @@ void *__cdecl LoadType1(am2_FILE *fp, const void *hdr)
     orig_fread(rec, AM2_TYPE1_RECORD_SIZE, 1, fp);
     orig_fread(&tag, 4, 1, fp);
 
-    obj = (uint8_t *)orig_create_item(
+    obj = (uint8_t *)CreateItem(
         (char *)AM2_IMAGE(ADDR_DIR_SCRATCH), AM2_ARMY_NEUTRAL,
         (int32_t)tag,
         *(const int32_t *)((const uint8_t *)hdr + OBJ_OFF_POS),

@@ -10437,10 +10437,181 @@ void __cdecl StepType6(void *obj)
     ObjMoveAlongFacing(o, *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET), 0, 0);
 }
 
+/* CreateItem -- original 0x00433980, 672 bytes, NINE callers. The type-1 arm
+ * of the four creators, and the one SendItemCreate's own note names first.
+ *
+ * IT IS TWO FUNCTIONS SHARING A GATE. DefFindLink decides which: a `key` that
+ * the LINK table knows is a COMPOSITE, and this recurses to build a parent and
+ * its numbered children; a key with no link is a LEAF, and this allocates the
+ * object, fills it from the AAI record and registers its rows. The composite
+ * arm never allocates anything itself -- every object it produces comes back
+ * out of a recursive call that took the leaf arm.
+ *
+ * THE AUTHORITY GATE IS THE SAME TEST AT BOTH ENDS, read in opposite senses.
+ * On entry: in a multiplayer session, with `remote` zero, a machine that
+ * CommMustBroadcast refuses may not create the object at all. On exit: with
+ * `remote` zero and CommMustBroadcast agreeing, the object is announced with
+ * SendItemCreate. So `remote` means "this creation came from somewhere else",
+ * and BOTH surviving call sites in this tree pass 1 -- RecvItemCreate, which
+ * is the network, and LoadType1, which is the savegame. Neither is the game
+ * deciding to make something.
+ *
+ * THE POSITION IS OFFSET IN THE ARGUMENT'S OWN SLOT. The original copies the
+ * caller's packed point into the fifth argument's stack slot and adds the
+ * link record's +0x0C and +0x0E to its two halves there, which is why a linear
+ * read makes the flags argument look like it is being modified. It is not:
+ * `orFlags` is loaded into ebx BEFORE the slot is scratched and every
+ * recursive call gets the caller's value. The adds are 16-bit and wrap, and
+ * are written that way.
+ *
+ * THE PARENT AND THE CHILDREN DIFFER IN EXACTLY TWO ARGUMENTS. A child gets
+ * the formatted "%s-%d" name and a uid of ZERO -- so it is allocated a fresh
+ * one -- where the parent gets the caller's name and the caller's uid. Every
+ * other argument is passed through unchanged, the link record's `child` key
+ * standing in for the composite key.
+ *
+ * A NULL NAME IS AN EMPTY STRING, NOT A NULL. The child arm formats when the
+ * caller supplied a name and writes a single NUL when it did not, so the
+ * recursive call always gets a valid buffer. The buffer is 64 bytes and
+ * unbounded, exactly like MovieBuildName's -- a long enough name in a mission
+ * script would smash this frame. That is the original's behaviour and is kept.
+ *
+ * THE CHAIN IS THREE FIELDS AND THIS IS THEIR WRITER. See
+ * OBJ_OFF_CHAIN_PARENT_UID in orig.h: the child points back at the parent, the
+ * parent points at its first child, and each child points at the next.
+ * Nothing is unlinked here, and the "first" test is on the parent's head field
+ * rather than on a counter -- so a child that fails to be created leaves the
+ * chain shorter without leaving a hole.
+ *
+ * THE LEAF UNPACKS THE KEY INLINE rather than through KeyFieldA/B/C, which is
+ * what the original does; the three fields are the sprite set, index and
+ * frame, and the low one is stored on the object afterwards.
+ *
+ * A CONCEAL REQUEST ARRIVES AS A FLAG AND LEAVES AS A CALL. OBJ_FLAG_CONCEALED
+ * in `orFlags` is OR'd into the object by InitObjFromAai, then CLEARED here and
+ * replaced with ObjConceal(obj, 1) -- so the caller cannot set the bit
+ * directly and skip the bookkeeping the function does.
+ *
+ * ItemPostCreate is gated on ObjIsWatchedKind and on the ARMY being under 4,
+ * read back off the object rather than from the argument, with a signed
+ * compare on the byte.
+ */
+void *__cdecl CreateItem(char *name, int32_t army, int32_t key, uint32_t at,
+                         int32_t orFlags, int32_t remote, uint32_t uid)
+{
+    AM2_DefLink *rec;
+    uint8_t     *parent = (uint8_t *)0;
+    uint8_t     *prev   = (uint8_t *)0;
+    int32_t      n      = 0;
+    uint8_t     *o;
+    int32_t      slot;
+    int32_t      i;
+    int32_t      set, index, frame;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION && remote == 0
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)army))
+        return (void *)0;
+
+    rec = DefFindLink(key, 0);
+    if (rec) {
+        char child[AM2_CHILD_NAME_BUF];
+
+        do {
+            uint16_t px = (uint16_t)((uint16_t)at + (uint16_t)rec->a);
+            uint16_t py = (uint16_t)((uint16_t)(at >> 16) + (uint16_t)rec->b);
+            uint32_t pt = (uint32_t)px | ((uint32_t)py << 16);
+
+            if (!parent) {
+                parent = (uint8_t *)CreateItem(name, army, rec->child, pt,
+                                               orFlags, remote, uid);
+                if (parent && (rec->c & 1))
+                    *(uint32_t *)(parent + OBJ_OFF_FLAGS) |= OBJ_FLAG_NO_FRAME;
+            } else {
+                uint8_t *made;
+
+                if (name)
+                    am2_sprintf(child,
+                                (const char *)AM2_IMAGE(AM2_STR_CHILD_SUFFIX),
+                                name, n);
+                else
+                    child[0] = '\0';
+
+                made = (uint8_t *)CreateItem(child, army, rec->child, pt,
+                                             orFlags, remote, 0);
+                if (made) {
+                    *(uint32_t *)(made + OBJ_OFF_CHAIN_PARENT_UID) =
+                        ((const AM2_Object *)parent)->uid;
+
+                    if (!*(const uint32_t *)(parent + OBJ_OFF_CHAIN_UID))
+                        *(uint32_t *)(parent + OBJ_OFF_CHAIN_UID) =
+                            ((const AM2_Object *)made)->uid;
+                    else if (prev)
+                        *(uint32_t *)(prev + OBJ_OFF_CHAIN_NEXT_UID) =
+                            ((const AM2_Object *)made)->uid;
+
+                    if (rec->c & 1)
+                        *(uint32_t *)(made + OBJ_OFF_FLAGS) |= OBJ_FLAG_NO_FRAME;
+
+                    prev = made;
+                }
+            }
+
+            n++;
+            rec = DefFindLink(key, n);
+        } while (rec);
+
+        return parent;
+    }
+
+    /* The leaf. KeyFieldA/B/C written out, the way the original has them. */
+    set   = (int32_t)(((uint32_t)key >> AM2_OBJREC_SHIFT_B) & AM2_OBJREC_MASK_B);
+    index = (int32_t)(((uint32_t)key >> AM2_OBJREC_SHIFT_A) & AM2_OBJREC_MASK_A);
+    frame = (int32_t)((uint32_t)key & AM2_OBJREC_MASK_B);
+
+    slot = EnsureSpriteAaiRecord(set, index, frame);
+    if (slot < 0)
+        return (void *)0;
+
+    o = (uint8_t *)am2_malloc(AM2_ITEM_BYTES);
+    memset(o, 0, AM2_ITEM_BYTES);
+
+    if (!InitObjFromAai(o, name, army, slot, at, orFlags, remote,
+                        (int32_t)uid, 0)) {
+        am2_free(o);
+        return (void *)0;
+    }
+
+    for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++)
+        RowUpdate(*(uint8_t **)(o + OBJ_OFF_ROWS)
+                      + (uint32_t)i * AM2_OBJ_ROW_STRIDE,
+                  0, (void *)(uintptr_t)ADDR_MAP_DESC);
+
+    if (orFlags & OBJ_FLAG_CONCEALED) {
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_CONCEALED;
+        ObjConceal(o, 1);
+    }
+
+    if (ObjIsWatchedKind(o) && *(const int8_t *)(o + OBJ_OFF_ARMY) < 4)
+        ItemPostCreate((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
+                       *(const uint32_t *)(o + OBJ_OFF_POS));
+
+    *(int32_t *)(o + OBJ_OFF_FORMATION_SLOT) = frame;
+
+    if (remote == 0
+        && CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                             (int16_t)army))
+        SendItemCreate(o);
+
+    return o;
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
                   "ItemIsReady", 1);
+    patch_replace(ADDR_CREATE_ITEM, (const void *)CreateItem,
+                  "CreateItem", 9);
     patch_replace(ADDR_ITEM_TYPE_NAME, (const void *)ItemTypeName,
                   "ItemTypeName", 1);
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,

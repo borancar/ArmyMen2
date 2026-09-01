@@ -928,8 +928,7 @@ void __cdecl RecvDamage(void *msg)
                  attacker, dir, 1);
 }
 
-typedef void *(__cdecl *AM2_CreateItemFn)(const char *, int32_t, int32_t,
-                                          int32_t, int32_t, int32_t, uint32_t);
+/* CreateItem is reconstructed and called by name; its typedef went with it. */
 typedef void *(__cdecl *AM2_CreateTrooperFn)(const char *, int32_t, int32_t,
                                              int32_t, int32_t, int32_t,
                                              int32_t, uint32_t, int32_t,
@@ -1022,7 +1021,6 @@ void __cdecl ItemPostCreate(int32_t army, uint32_t where)
     }
 }
 
-#define orig_create_item     ((AM2_CreateItemFn)(uintptr_t)ADDR_CREATE_ITEM)
 #define orig_create_trooper  ((AM2_CreateTrooperFn)(uintptr_t)ADDR_CREATE_TROOPER)
 #define orig_create_vehicle  ((AM2_CreateVehicleFn)(uintptr_t)ADDR_CREATE_VEHICLE)
 #define orig_create_weapon   ((AM2_CreateWeaponFn)(uintptr_t)ADDR_CREATE_WEAPON)
@@ -1192,11 +1190,14 @@ void __cdecl RecvItemCreate(void *msg)
 
     switch (*(const int16_t *)(m + MSG_CREATE_OFF_TYPE)) {
     case 1:
-        made = orig_create_item(name, army,
-                                *(const int32_t *)(m + MSG_CREATE_OFF_D),
-                                *(const int32_t *)(m + MSG_CREATE_OFF_A),
-                                *(const int32_t *)(m + MSG_CREATE_OFF_C),
-                                1, uid);
+        /* The const goes away because ObjInitCommon lower-cases the name in
+         * place two levels down -- so this really does rewrite the RECEIVED
+         * MESSAGE's own bytes, which is what the original does. */
+        made = CreateItem((char *)(uintptr_t)name, army,
+                          *(const int32_t *)(m + MSG_CREATE_OFF_D),
+                          (uint32_t)*(const int32_t *)(m + MSG_CREATE_OFF_A),
+                          *(const int32_t *)(m + MSG_CREATE_OFF_C),
+                          1, uid);
         if (*(const int32_t *)(m + MSG_CREATE_OFF_D)
             != *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND)
             return;

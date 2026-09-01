@@ -326,6 +326,18 @@ int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
  * record carries the type id in ADDR_CREATE_WATCHED_KIND? */
 int32_t __cdecl ObjIsWatchedKind(const void *obj);
 
+/* 0x00433980, nine callers. The type-1 creator: a composite key builds a
+ * parent and its numbered children by recursion, a leaf key allocates one
+ * object and fills it from its AAI record. `remote` non-zero means the
+ * creation came from the network or a savegame and must not be re-announced;
+ * `uid` of zero has one allocated. Answers the object, or NULL when this
+ * machine is not allowed to create it or the sprite record cannot be built.
+ *
+ * `name` is NOT const: ObjInitCommon lower-cases the caller's buffer in
+ * place, two levels down. */
+void *__cdecl CreateItem(char *name, int32_t army, int32_t key, uint32_t at,
+                         int32_t orFlags, int32_t remote, uint32_t uid);
+
 /* 0x0045B700, two callers. Does `from` run into `obj`? Height first, then a
  * flag-and-vehicle-kind shortcut, then the type 2/3/8 rules -- of which the
  * one worth knowing is that a vehicle the PLAYER is driving stops for
