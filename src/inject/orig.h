@@ -11409,6 +11409,49 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * and each loader turns that into a real object, RETURNING it. */
 #define ADDR_LOAD_ITEM_HEADER 0x004289B0u  /* int32_t(FILE *, void *hdr) */
 #define ADDR_LOAD_TYPE1       0x00433D60u
+/* READ FAR ENOUGH TO BE WORTH WRITING DOWN AND NOT RECONSTRUCTED. It is the
+ * hardest of the nine loaders and the notes below are so the next attempt
+ * starts where this one stopped rather than at the disassembly again.
+ *
+ * WHAT IS SETTLED:
+ *
+ *   The signature is (FILE *, hdr, int32) -- ARG1 at [esp+0x600] and ARG3 at
+ *   [esp+0x608] with a frame depth of 1532, which is 12 bytes of SEH record
+ *   plus 0x5E0 of locals plus four saved registers.
+ *
+ *   It freads a 0x53C-byte record and then a 4-byte tag, and the record is
+ *   the whole of the trooper's saved state: memcpy'd to obj+0x94 as 0x14F
+ *   dwords, which is 0x53C exactly.
+ *
+ *   ARG3 SELECTS WHICH CreateTrooper CALL, and the two differ in ONE
+ *   argument: with ARG3 set the uid goes in as 0 and the pair
+ *   UidRemapAdd(hdr->uid, made->uid) / hdr->uid = made->uid follows, which is
+ *   the remap LoadType1 does not need; with it clear the header's own uid is
+ *   passed straight through. Ten arguments either way.
+ *
+ *   THE HEALTH IS RESCALED THROUGH THE RANK TABLE, in x87: the fraction
+ *   health/maxHealth is taken BEFORE SetMaxHealth is given
+ *   ADDR_RANK_RECORDS[rank] + RANK_REC_OFF_MAX_HEALTH -- the base arithmetic
+ *   is `[rank*28 + 0x473DD4]`, which is that field exactly -- and the result
+ *   is multiplied back, _ftol'd and Clamped to 1..new. Same shape as
+ *   LoadType8's roach rescale, different table.
+ *
+ *   THE C++ LOCAL WITH A CONSTRUCTOR IS INSIDE THE RECORD. InitPtrList runs
+ *   on rec+0x10 before the fread, which then overwrites it, and the matching
+ *   destructor runs on the same address AFTER the three fields have been
+ *   explicitly zeroed -- so the constructor is dead and the destructor frees
+ *   nothing. That is what the MSVC SEH prologue is there for, and CLAUDE.md's
+ *   standing decision not to reproduce such a frame applies.
+ *
+ *   Its {capacity, count, items} at rec+0x10 supplies the COUNT for a loop
+ *   that freads one uid at a time into a stack slot and PtrListPushes each
+ *   into the OBJECT's own list at +0xA4 -- but only when ARG3 is clear.
+ *
+ * WHAT IS NOT: the exact identity of four small stack locals around
+ * SoldierKindForWeapon and the Type2Action arms, where a first pass produced
+ * two readings four bytes apart. That is the class of mistake this file has
+ * caught twice today by reading siblings, and guessing it at the end of a
+ * long session is how the third one would get written instead of found. */
 #define ADDR_LOAD_TYPE2       0x004471D0u  /* takes a THIRD argument */
 #define ADDR_LOAD_TYPE3       0x0045A120u
 #define ADDR_LOAD_TYPE4       0x0045EF50u
