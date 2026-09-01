@@ -3755,7 +3755,13 @@
  * ids 0x23..0x26 all mean Disguise. */
 #define ADDR_SPEAK_ITEM_PICKUP     0x00448380u  /* void(int32 item, int32 own) */
 #define ADDR_TROOPER_PICKUP_ITEM   0x00448540u
-#define ADDR_TROOPER_HOST_PICKUP   0x004488C0u
+/* 0x004488C0, 608 bytes, one caller. IT NAMES ITSELF seven times:
+ * TrooperHostApprovedPickupItem, the HOST half of the pickup pair whose other
+ * half is ADDR_TROOPER_REMOTE_PICKUP. The host CONSUMES and ANNOUNCES --
+ * DestroyByType and a SpeakLine on every arm -- where the remote respawns and
+ * says nothing; and the host sets no pickup cooldown and plays no sound,
+ * because the local path already did. Reconstructed. */
+#define ADDR_TROOPER_HOST_APPROVED 0x004488C0u /* void(troop,item,slot,ammo) */
 /* MSVC's rand, the LCG at 0x00464420 with its state in 0x0048CC1C. Named
  * here because game code that draws from it must draw from THIS one -- the
  * sequence is the image's, and libc's would leave it standing still. */

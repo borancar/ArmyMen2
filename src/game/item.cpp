@@ -58,6 +58,14 @@ typedef void (__cdecl *AM2_DecalFn)(int32_t x, int32_t y, int32_t variant);
 extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
                                     int32_t unused, int32_t x, int32_t y);
 
+/* The two speech entry points, same file and same reason. BOTH are inside
+ * audio.h's extern "C" block, unlike LoadAudioSection, so both get C linkage
+ * here. They are not interchangeable: SpeakLine takes a GROUP and
+ * SpeakItemPickupLine an item KIND which it maps to a group through its own
+ * two dispatch tables. The call sites look identical. */
+extern "C" void __cdecl SpeakLine(int32_t group, int32_t owner);
+extern "C" void __cdecl SpeakItemPickupLine(int32_t item, int32_t owner);
+
 
 /* 0x0042A7A0, 18 call sites.
  *
@@ -8468,6 +8476,145 @@ void __cdecl SelectionClick(void)
     OnSelectionChanged(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
 }
 
+/* TrooperHostApprovedPickupItem -- original 0x004488C0, 608 bytes, one caller.
+ * The HOST half of the pickup pair: what happens on the machine that decided
+ * the pickup was allowed. TrooperRemotePickupItem, 0x00448B20, is the other
+ * half and this is written against it.
+ *
+ * IT NAMES ITSELF, seven times, and so does its twin. orig.h had these as
+ * ADDR_TROOPER_HOST_PICKUP and ADDR_TROOPER_PAIR_APPLY -- names for which
+ * message carries them rather than for what they do.
+ *
+ * THE HOST CONSUMES AND ANNOUNCES; THE REMOTE RECONCILES AND STAYS QUIET.
+ * That is the whole difference and it holds across every arm, which is why
+ * reading the two together is worth more than reading either twice:
+ *
+ *   replace     DestroyByType here, WeaponRespawn there. The displaced weapon
+ *               is also marked OBJ_FLAG_OVERDUE here and is not there;
+ *   ammo        SpeakLine 0x15 here, and only when the held weapon is NOT
+ *               already full -- the test is before the transfer, so a topped
+ *               up weapon says nothing. There, nothing is said at all;
+ *   new weapon  DestroyByType and a line here, WeaponRespawn there;
+ *   medkit      SpeakLine 0x1A here; there, CommMustBroadcast on the ITEM's
+ *               army decides whether it leaves the map;
+ *   hot target  DestroyByType on both.
+ *
+ * AND THE HOST SETS NO COOLDOWN AND PLAYS NO SOUND. The twin opens by
+ * stamping OBJ_OFF_PICKUP_AFTER and playing AM2_SND_PICKUP; this one goes
+ * straight to NotifyPickedUp. On the machine that approved it, the local
+ * pickup path has already done both.
+ *
+ * THE SPEECH GROUPS WERE ALL NAMED ALREADY and they identify the weapon
+ * kinds for free: kind 8 speaks AM2_SPEAK_HEAVYMACGUN, kind 10
+ * AM2_SPEAK_AUTORIFLE and kind 29 AM2_SPEAK_VULCANGUN, the ammo arm
+ * AM2_SPEAK_MOREAMMO and the medkit AM2_SPEAK_HITSSPOT -- "hits the spot",
+ * which is what a medkit line would be. Five greps, five existing names.
+ *
+ * THE THREE SPEECH GROUPS COME FROM A CHAINED COMPARE -- `sub 8 / sub 2 /
+ * sub 0x13` -- so the kinds are 8, 10 and 29 and the groups 9, 2 and 0x13.
+ * Reading the subtractions as absolute values gives 8, 2, 0x13 for the kinds
+ * and is wrong about two of the three. */
+void __cdecl TrooperHostApprovedPickupItem(void *troop, void *item,
+                                           int32_t slot, int32_t ammo)
+{
+    uint8_t *t = (uint8_t *)troop;
+    uint8_t *w = (uint8_t *)item;
+    uint8_t *comm;
+    int32_t  kind;
+    uint8_t *held;
+
+    NotifyPickedUp(item, troop);
+
+    comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        orig_log("TrooperHostApprovedPickupItem %x\n",
+                 ((const AM2_Object *)w)->uid);
+
+    kind = **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0);
+
+    if (kind == AM2_ITEM_KIND_HOT_TARGET) {
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log("\tTrooperHostApprovedPickupItem: HotTarget\n");
+        DestroyByType(item);
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log("TrooperHostApprovedPickupItem %x\n",
+                     ((const AM2_Object *)w)->uid);
+        return;
+    }
+
+    if (kind == AM2_ITEM_KIND_MEDKIT) {
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log("\tTrooperHostApprovedPickupItem:Medkit\n");
+        ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
+                          (void (__cdecl *)(void *))(uintptr_t)
+                              ADDR_MEDKIT_HEAL_ONE);
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log("TrooperHostApprovedPickupItem %x\n",
+                     ((const AM2_Object *)w)->uid);
+        SpeakLine(AM2_SPEAK_HITSSPOT, *(const int8_t *)(t + OBJ_OFF_ARMY));
+        return;
+    }
+
+    if (!*(const uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4)) {
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log("\tTrooperHostApprovedPickupItem: new weapon\n");
+        *(int32_t *)(w + ITEM_OFF_AMMO) = ammo;
+        *(uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4) =
+            ((const AM2_Object *)w)->uid;
+        *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
+        DestroyByType(item);
+        /* SpeakItemPickup, not SpeakLine: it takes the item KIND and maps it
+         * through its own two tables. The swap arm below speaks GROUPS
+         * directly instead, which is why the two look alike and are not. */
+        SpeakItemPickupLine(**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0),
+                        *(const int8_t *)(t + OBJ_OFF_ARMY));
+        return;
+    }
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        orig_log("\tTrooperHostApprovedPickupItem: we've got somthing in "
+                 "that slot\n");
+
+    held = (uint8_t *)WeaponByUid(
+               *(const uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4));
+
+    if (KindInSetB(**(const int32_t *const *)(held + OBJ_OFF_FIELD_C0))
+        && KindInSetB(**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))) {
+        int32_t k = **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0);
+
+        if (k == 8)
+            SpeakLine(AM2_SPEAK_HEAVYMACGUN, *(const int8_t *)(t + OBJ_OFF_ARMY));
+        else if (k == 10)
+            SpeakLine(AM2_SPEAK_AUTORIFLE, *(const int8_t *)(t + OBJ_OFF_ARMY));
+        else if (k == 29)
+            SpeakLine(AM2_SPEAK_VULCANGUN, *(const int8_t *)(t + OBJ_OFF_ARMY));
+
+        *(uint32_t *)(held + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        *(uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4) =
+            ((const AM2_Object *)w)->uid;
+        *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
+        DestroyByType(item);
+        return;
+    }
+
+    /* Not a swap: take the ammo instead. The line is spoken only when there
+     * is room for it, and the test is made BEFORE the transfer. */
+    if (*(const int32_t *)(held + ITEM_OFF_AMMO)
+        < (*(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))
+              [ITEMTYPE_OFF_CAPACITY / 4])
+        SpeakLine(AM2_SPEAK_MOREAMMO, *(const int8_t *)(t + OBJ_OFF_ARMY));
+
+    {
+        int32_t cap = (*(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))
+                          [ITEMTYPE_OFF_CAPACITY / 4];
+        int32_t now = *(const int32_t *)(held + ITEM_OFF_AMMO) + ammo;
+
+        *(int32_t *)(held + ITEM_OFF_AMMO) = now;
+        if (now > cap)
+            *(int32_t *)(held + ITEM_OFF_AMMO) = cap;
+    }
+}
+
 /* TrooperRemotePickupItem -- original 0x00448B20, 576 bytes, one caller: the
  * kind 0x18 comm message. What a trooper does with an item somebody ELSE told
  * us it picked up.
@@ -10322,6 +10469,9 @@ void item_install(void)
     patch_replace(ADDR_TROOPER_REMOTE_PICKUP,
                   (const void *)TrooperRemotePickupItem,
                   "TrooperRemotePickupItem", 4);
+    patch_replace(ADDR_TROOPER_HOST_APPROVED,
+                  (const void *)TrooperHostApprovedPickupItem,
+                  "TrooperHostApprovedPickupItem", 4);
     patch_replace(ADDR_NOTIFY_DROPPED, (const void *)NotifyDropped,
                   "NotifyDropped", 1);
     patch_replace(ADDR_WEAPON_POSE_INDEX, (const void *)WeaponPoseIndex,

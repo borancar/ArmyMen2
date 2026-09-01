@@ -728,6 +728,13 @@ void __cdecl SelectionClick(void);
 void __cdecl TrooperRemotePickupItem(void *troop, void *item, int32_t slot,
                                      int32_t ammo);
 
+/* 0x004488C0, one caller. The HOST half of the same pair: what happens on the
+ * machine that approved the pickup. Same shape, but it destroys the item and
+ * speaks a line on every arm where the remote respawns and stays quiet, and
+ * it sets no pickup cooldown and plays no sound. */
+void __cdecl TrooperHostApprovedPickupItem(void *troop, void *item,
+                                           int32_t slot, int32_t ammo);
+
 /* 0x004572A0, two callers. Clear a type 2's working block and stamp its
  * facing into the copy at +0xF8. */
 void __cdecl ResetType2Fields(void *obj);

@@ -684,6 +684,18 @@ extern "C" AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t, int32_t, int32_t)
     return 0;
 }
 
+/* The two speech entry points, which item.cpp's pickup pair reaches. They
+ * live in win32/audio.cpp with the rest of the sound code, so the same
+ * reasoning as PreloadSprite applies -- and here the caveat is weaker, since
+ * both return void and a vector that reached one would simply say nothing. */
+extern "C" void __cdecl SpeakLine(int32_t, int32_t)
+{
+}
+
+extern "C" void __cdecl SpeakItemPickupLine(int32_t, int32_t)
+{
+}
+
 /* event.cpp's two bitmap triggers reach FreeBitmap, which is in win32/sprite.cpp
  * with the rest of the sprite code. Same reasoning as PreloadSprite above.
  *
