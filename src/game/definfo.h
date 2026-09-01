@@ -40,6 +40,12 @@ int32_t __cdecl DefParseNumber(int32_t *out, const char *tok);
  * and the value stored before the check either way. */
 int32_t __cdecl DefParseFloat(float *out, const char *tok);
 
+/* 0x0041A2D0. The boolean twin: TRUE/true/True/T/t/1 against
+ * FALSE/false/False/F/f/0, twelve inlined strcmps in the original. A null
+ * token returns 0 in silence and leaves *out alone; anything unrecognised
+ * complains and stores 0. */
+int32_t __cdecl DefParseBoolean(int32_t *out, const char *tok);
+
 int32_t __cdecl DefFindKeyword(const char *name);
 
 /* 0x0041A6B0. Read an open .aai file, dispatching each line through the

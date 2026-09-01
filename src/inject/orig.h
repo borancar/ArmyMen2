@@ -6471,6 +6471,31 @@ typedef struct {
 #define MSG_PAUSE_OFF_FLAGS        0x0Cu
 #define ADDR_STR_TRUE              0x00475C20u
 #define ADDR_STR_FALSE             0x00475C18u
+/* DefParseBoolean's other ten spellings, and the two above are the first of
+ * each set -- shared with the pause logger, which is why they were already
+ * named and why grepping the address before inventing a name mattered here.
+ *
+ * Two contiguous runs in the order the compiler laid the literals out, which
+ * is NOT the order the function tests them: it asks TRUE, true, True, T, t, 1
+ * and then FALSE, false, False, F, f, 0. Nothing turns on the order -- the
+ * twelve are distinct -- but reading the addresses top to bottom gives the
+ * reverse of the code, which is the string-table version of the jump-table
+ * trap. */
+#define ADDR_STR_BOOL_0            0x0047795Cu /* "0" */
+#define ADDR_STR_BOOL_LF           0x00477960u /* "f" */
+#define ADDR_STR_BOOL_UF           0x00477964u /* "F" */
+#define ADDR_STR_BOOL_FALSE_CAP    0x00477968u /* "False" */
+#define ADDR_STR_BOOL_FALSE_LOW    0x00477970u /* "false" */
+#define ADDR_STR_BOOL_1            0x00477978u /* "1" */
+#define ADDR_STR_BOOL_LT           0x0047797Cu /* "t" */
+#define ADDR_STR_BOOL_UT           0x00477980u /* "T" */
+#define ADDR_STR_BOOL_TRUE_CAP     0x00477984u /* "True" */
+#define ADDR_STR_BOOL_TRUE_LOW     0x0047798Cu /* "true" */
+#define ADDR_STR_BAD_BOOLEAN       0x00477944u /* "Bad or missing Boolean\n" */
+/* 0x0041A2D0, three callers -- the third of DefParseNumber's family, sitting
+ * between the integer form and DefParseInfoFile in the same band. Twelve
+ * inlined strcmps and nothing else. */
+#define ADDR_DEF_PARSE_BOOLEAN     0x0041A2D0u /* int32(int32 *out, const char *) */
 /* The outgoing packet. 0x004FAA68 is its base and 0x004FAA6C is base+4 -- the
  * packet's own length field, which doubles as the write cursor. Flush resets
  * it to 0x14, so the packet header is twenty bytes and the first message lands

@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **24** analysis
+**`make check` runs everything that does not need the game.** **25** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -511,6 +511,16 @@ it was the numbered headings in the EULA that ships beside the scripts, which
 the corpus includes because it takes every `.txt` under the prefix and not only
 the ones the game loads. **Take the whole corpus, including the parts that are
 not input.**
+
+**A CORPUS DERIVED FROM THE MODEL UNDER TEST CANNOT FAIL AGAINST IT.**
+`tools/boolcheck.py` built its token list from the same two tuples its
+`expected()` answers from, so deleting a word from the model deleted it from
+the corpus in the same stroke: dropping `"T"` reported "1292 distinct tokens,
+all identical" instead of one failure. The vocabulary is a SECOND literal now
+and the mutation names the token. Caught only because the mutation was tried --
+which is the rule this file already states as "a test that cannot fail has not
+passed", one level further in: check that the mutation reached the CORPUS, not
+just that it reached the code.
 
 **Say which mutations the corpus does NOT catch.** Making `/` not end a line
 fails on every `// comment`, and stopping `>` from pairing splits `<>` in the

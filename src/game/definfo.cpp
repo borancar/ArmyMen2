@@ -97,6 +97,65 @@ int32_t __cdecl DefParseFloat(float *out, const char *tok)
     return 1;
 }
 
+/* DefParseBoolean -- original 0x0041A2D0, three callers. The third of
+ * DefParseNumber's family, and it sits between the integer form and
+ * DefParseInfoFile in the image as well as here.
+ *
+ * TWELVE INLINED strcmp's AND NOTHING ELSE. Eight hundred bytes of the same
+ * six-byte compare loop repeated twelve times, against TRUE/true/True/T/t/1
+ * and then FALSE/false/False/F/f/0. VC6 inlines strcmp at /O2 and this is what
+ * it costs; there is no table in the image to read the words out of, so they
+ * are written out here as the two arrays the original does not have.
+ *
+ * ITS SIGNATURE IS (out, text) AND THE CALL SITES READ BACKWARDS. Both push
+ * the string LAST -- `push eax` straight from strtok, then the out pointer --
+ * so the string is argument two, and the body agrees: [esp+0x14] before any
+ * further push is the text, [esp+0x10] the destination. Same order as
+ * DefParseNumber and DefParseFloat above, which is the check that matters.
+ *
+ * AND THE `add esp, 0x10` AT EACH CALL SITE IS NOT FOUR ARGUMENTS. It cleans
+ * this call's two AND the strtok above it, which is the same merged cleanup
+ * PlacementScreenClick's by-value RECT turned on. Counting the cleanup alone
+ * gives a four-argument function with two arguments never read, which is what
+ * a first pass here produced.
+ *
+ * TWO FAILURES, ONE QUIET -- the family's shape exactly. A null token returns
+ * 0 without a word and leaves *out alone, which is how a line simply running
+ * out of fields is handled; a token that is not a boolean complains and stores
+ * 0. The two siblings above store their parse result either way and this one
+ * has nothing to store, so the arms differ in form and not in effect. */
+int32_t __cdecl DefParseBoolean(int32_t *out, const char *tok)
+{
+    static const uint32_t kTrue[] = {
+        ADDR_STR_TRUE, ADDR_STR_BOOL_TRUE_LOW, ADDR_STR_BOOL_TRUE_CAP,
+        ADDR_STR_BOOL_UT, ADDR_STR_BOOL_LT, ADDR_STR_BOOL_1
+    };
+    static const uint32_t kFalse[] = {
+        ADDR_STR_FALSE, ADDR_STR_BOOL_FALSE_LOW, ADDR_STR_BOOL_FALSE_CAP,
+        ADDR_STR_BOOL_UF, ADDR_STR_BOOL_LF, ADDR_STR_BOOL_0
+    };
+    uint32_t i;
+
+    if (tok == (const char *)0)
+        return 0;
+
+    for (i = 0; i < sizeof kTrue / sizeof kTrue[0]; i++)
+        if (strcmp(tok, (const char *)AM2_IMAGE(kTrue[i])) == 0) {
+            *out = 1;
+            return 1;
+        }
+
+    for (i = 0; i < sizeof kFalse / sizeof kFalse[0]; i++)
+        if (strcmp(tok, (const char *)AM2_IMAGE(kFalse[i])) == 0) {
+            *out = 0;
+            return 1;
+        }
+
+    orig_log((const char *)AM2_IMAGE(ADDR_STR_BAD_BOOLEAN));
+    *out = 0;
+    return 0;
+}
+
 /* 0x0041A640. Find a keyword's index in the .aai vocabulary.
  *
  * Walks entries until one has an empty name; there is no count. The original
@@ -345,6 +404,8 @@ int definfo_install(void)
 
     rc |= patch_replace(ADDR_LOAD_DEF_TABLES, (const void *)LoadDefTables,
                         "LoadDefTables", 1);
+    rc |= patch_replace(ADDR_DEF_PARSE_BOOLEAN,
+                        (const void *)DefParseBoolean, "DefParseBoolean", 3);
     rc |= patch_replace(ADDR_DEF_PARSE_NUMBER, (const void *)DefParseNumber,
                         "DefParseNumber", 2);
     rc |= patch_replace(ADDR_DEF_PARSE_FLOAT, (const void *)DefParseFloat,

@@ -9,7 +9,42 @@ Last updated: **2026-09-01**, at `ba116b4`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,368 patches.**
+Nothing uncommitted. **1,369 patches.**
+
+**`DefParseBoolean` (`0x0041A2D0`)** -- the third of `DefParseNumber`'s family,
+and it sits between the integer form and `DefParseInfoFile` in the image as
+well as in `definfo.cpp`. Eight hundred bytes of nothing but twelve inlined
+`strcmp`s, against TRUE/true/True/T/t/1 and FALSE/false/False/F/f/0.
+
+**Its `add esp, 0x10` is not four arguments.** Both call sites clean sixteen
+bytes after pushing two, which reads as a four-argument function with two
+arguments never read -- and that is what a first pass produced. It cleans this
+call's two AND the `strtok` above it, the same merged cleanup
+`PlacementScreenClick`'s by-value `RECT` turned on a few commits ago. The body
+settles it: `[esp+0x14]` before any further push is the text and `[esp+0x10]`
+the destination, which is `(out, tok)` -- the same order as the two siblings,
+and that agreement is the check that matters.
+
+**`tools/boolcheck.py` is the oracle**, on the pattern `scriptcheck` set: every
+distinct whitespace/`;`/`,`-delimited token in every shipped `.aai` file, plus
+the twelve words and twenty-five near-misses, plus the null POINTER, which
+cannot go through a string corpus and is the one case that must leave `*out`
+alone. 1,293 distinct tokens, all identical.
+
+**And its first version could not fail, which the mutation found.** The corpus
+was generated from the same two tuples `expected()` answers from, so deleting a
+word from the model deleted it from the corpus in the same stroke: dropping
+`"T"` reported "1292 distinct tokens, all identical" instead of one failure.
+The vocabulary is a second literal now and the mutation names the token. Three
+directions checked -- a dropped word (1 token), a flipped false arm (6), and
+the null case.
+
+**Only four of the twelve appear in the shipped data at all**: `0` 11,428
+times, `1` 6,117, `False` 102 and `True` 74. The other eight spellings --
+TRUE, true, T, t, FALSE, false, F, f -- are reached by that explicit list or by
+nothing, which is exactly why it has to be independent of the model.
+
+`make check` runs 25 tools now.
 
 **`BuildTileDeltas` (`0x00437B60`) and the three POINT RULES** -- four
 functions in one 672-byte entry, all in `region.cpp` beside the walkers that
@@ -3920,14 +3955,14 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,196 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 43
-outstanding, which is 1,239 minus 1,196 -- from 1,368 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,197 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 42
+outstanding, which is 1,239 minus 1,197 -- from 1,369 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and thirty-five batches have gone in and NOTHING SMALL IS LEFT: the
-43 entries outstanding start at **672 bytes** -- `0x00447620`, which is
+small ones in batches. A hundred and thirty-six batches have gone in and NOTHING SMALL IS LEFT: the
+42 entries outstanding start at **672 bytes** -- `0x00447620`, which is
 `CreateTrooper` and is deferred rather than unread -- and the median is
 **1,168**.
 The sentence here used to say they started at 96 and name the MSVC static-init
