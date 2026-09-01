@@ -4760,13 +4760,263 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
  * SpawnAt was a macro over the image here; the function is CreateExplosion and
  * is reconstructed further down, so the call sites below name it. */
 #define SpawnAt CreateExplosion
-#define orig_damage_trooper   ((AM2_DamageTypeFn)(uintptr_t)ADDR_DAMAGE_TROOPER)
 
 typedef void (__cdecl *AM2_HitEffectFn)(const void *at, int32_t slot,
                                         int32_t dir, int32_t height);
 
 #define orig_spawn_hit_effect \
     ((AM2_HitEffectFn)(uintptr_t)ADDR_SPAWN_HIT_EFFECT)
+
+
+/* DamageTrooper -- original 0x00447A40, 1040 bytes, one caller, which is
+ * DamageObject's type-2 arm. It names itself: "DamageTrooper: droping armor
+ * uid:%x", the misspelling included. The sibling of DamageVehicle above and the
+ * same five arguments, and the two share a prologue almost line for line -- the
+ * hit direction clamped up to 1, the hit stamped with the clock, a rolled hit
+ * effect -- and then diverge completely.
+ *
+ * ARMOUR IS AN INVENTORY ITEM, and finding it is the first thing this does
+ * after the network gate: walk the six UNIT_OFF_INVENTORY slots, resolve each
+ * uid through WeaponByUid, and take the first whose type record's kind is
+ * AM2_ITEM_TYPE_ARMOR. What it then does is worth stating because the order
+ * matters: the damage is HALVED whether or not the armour survives, the
+ * armour's ITEM_OFF_AMMO absorbs it, and only when that goes to zero or below
+ * is the armour removed, dropped on the wire and marked WEAPON_FLAG_DEAD.
+ *
+ * TWO SOLDIER KINDS GET A DISCOUNT BEFORE THAT. Kind 3 takes one off the
+ * damage, and takes a SECOND off when the damage kind is 1 -- nested, so the
+ * second is only ever reached by kind 3.
+ *
+ * THE HIT EFFECT HAS TWO ARMS AND THEY DIFFER IN THE RECORD. Soldier kind 7
+ * passes a RANDOM one of the first four ADDR_OBJ_TABLE_RECORDS -- `rand() % 4`,
+ * spelled as the compiler's signed remainder -- where everything else passes
+ * the trooper's own OBJ_OFF_TABLE_REC_KIND.
+ *
+ * THE DEATH TAIL DROPS THE INVENTORY AROUND THE CORPSE, one item per step of a
+ * five-entry (dx, dy) table at 0x00489DE8: on the spot, then forty units east,
+ * south, west and north. The loop condition is the SECOND inventory slot still
+ * being occupied, which works because dropping compacts the array -- and it has
+ * no bound, so a trooper carrying more than five items walks off the end of the
+ * table. Reproduced; nothing in this environment can carry that many.
+ *
+ * ITS LAST BLOCK IS A ONE-IN-256 GORE ROLL for soldier kind 3, gated on the hit
+ * arriving from roughly the front -- AngleDelta at or under 0x40, or under 0xFF
+ * (which is every angle) when the damage kind is 1 or 3, and then rand() & 0xFF
+ * under 1 or under 10. So the common case is one chance in 256 and the special
+ * one is ten.
+ *
+ * The original hands AngleDelta a dword whose low byte is the facing and whose
+ * top three are the direction argument's, the same MSVC byte-into-a-register
+ * idiom TrooperFire has; AngleDelta masks both arguments with 0xFF, so the byte
+ * is passed clean here.
+ */
+void __cdecl DamageTrooper(void *obj, int32_t amount, int32_t d, int32_t kind,
+                           uint32_t attacker)
+{
+    uint8_t  *o = (uint8_t *)obj;
+    uint8_t  *armour = (uint8_t *)0;
+    uint32_t  at;
+    int32_t   slot = -1;
+    int32_t   left = 0;      /* the armour's remaining ITEM_OFF_AMMO */
+    int32_t   i;
+    int32_t   flags;
+    int32_t   limit;
+    int32_t   odds;
+
+    if (o == (uint8_t *)0)
+        return;
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
+        return;
+
+    *(o + OBJ_OFF_HIT_DIR) = (uint8_t)((d & 0xFF) < 1 ? 1 : (d & 0xFF));
+    *(uint32_t *)(o + OBJ_OFF_HIT_TIME) =
+        *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+    /* The effect goes at the trooper's position raised by its own height. */
+    at = *(const uint32_t *)(o + OBJ_OFF_POS);
+    at = (at & 0xFFFFu)
+       | ((uint32_t)(uint16_t)((int16_t)(at >> 16) - (int16_t)ObjHeight(o))
+          << 16);
+
+    if (kind != 1 && orig_game_rand() % 255 <= AM2_HIT_EFFECT_CHANCE) {
+        int32_t rec;
+
+        if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)
+            == AM2_SOLDIER_KIND_ACTION_A) {
+            int32_t pick = orig_game_rand() & 0x80000003;
+
+            if (pick < 0)
+                pick = ((pick - 1) | ~3) + 1;
+            rec = (int32_t)(uintptr_t)AM2_IMAGE(ADDR_OBJ_TABLE_RECORDS)
+                + pick * AM2_OBJ_TABLE_REC_SIZE;
+        } else {
+            rec = *(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND);
+        }
+
+        orig_spawn_hit_effect(&at, rec, *(const uint8_t *)(o + OBJ_OFF_HIT_DIR),
+                              *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+        return;
+
+    for (i = 0; i < AM2_INVENTORY_SLOTS; i++) {
+        uint32_t uid = ((const uint32_t *)(o + UNIT_OFF_INVENTORY))[i];
+        uint8_t *w;
+
+        if (uid == 0)
+            continue;
+        w = (uint8_t *)WeaponByUid((int32_t)uid);
+        if (w == (uint8_t *)0)
+            continue;
+        if (**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)
+            == (int32_t)AM2_ITEM_TYPE_ARMOR) {
+            armour = w;
+            left   = *(const int32_t *)(w + ITEM_OFF_AMMO);
+            slot   = i;
+            break;
+        }
+    }
+
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == AM2_SOLDIER_KIND_3) {
+        if (amount > 0)
+            amount--;
+        if (kind == 1 && amount > 0)
+            amount--;
+    }
+
+    if (left > 0) {
+        /* HALVED WHETHER OR NOT THE ARMOUR SURVIVES, and before the slot is
+         * looked at. `>>` rather than `/`, because the original is `sar` and
+         * the two differ for a negative amount. */
+        amount >>= 1;
+
+        /* Dead in practice: `left` is only positive when the search found
+         * armour, and that sets the slot too. The original tests it anyway. */
+        if (slot >= 0) {
+        left  -= amount;
+
+        if (left > 0) {
+            *(int32_t *)(armour + ITEM_OFF_AMMO) -= amount;
+        } else {
+            RemoveInventoryItem(o, slot);
+
+            if (CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                  (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))) {
+                const uint8_t *comm =
+                    *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+
+                if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                    orig_log((const char *)AM2_IMAGE(ADDR_STR_DROPPING_ARMOR),
+                             *(const uint32_t *)(armour + OBJ_OFF_UID));
+
+                TrooperDropItemSend(o, armour, slot, 0,
+                                    *(const uint32_t *)(o + OBJ_OFF_POS));
+            }
+
+            *(uint32_t *)(armour + WEAPON_OFF_FLAGS) |= WEAPON_FLAG_DEAD;
+        }
+        }
+    }
+
+    if (amount > *(const int16_t *)(o + OBJ_OFF_HEALTH))
+        amount = *(const int16_t *)(o + OBJ_OFF_HEALTH);
+
+    /* Two of 256 rolls under 0x40, zero otherwise -- and it is a FLAGS word to
+     * PlaySoundAt, not a volume. The original spells it setge/dec/and 2. */
+    flags = (orig_game_rand() & 0xFF) < AM2_HIT_EFFECT_CHANCE ? 2 : 0;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && *(const int32_t *)(uintptr_t)ADDR_CHEAT_INVULNERABLE
+        && (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
+           == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+        return;
+
+    if (*(const int32_t *)(o + OBJ_OFF_SARGE) != 0) {
+        if (amount > 0)
+            SpeakLine(AM2_SPEECH_SARGE_HURT,
+                      *(const int8_t *)(o + OBJ_OFF_ARMY));
+    } else {
+        PlaySoundAt(*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)
+                        == AM2_SOLDIER_KIND_ACTION_A
+                    ? AM2_SND_HURT_KIND7 : AM2_SND_HURT,
+                    flags, 0,
+                    *(const int16_t *)(o + OBJ_OFF_X),
+                    *(const int16_t *)(o + OBJ_OFF_Y));
+    }
+
+    *(int16_t *)(o + OBJ_OFF_HEALTH) =
+        (int16_t)(*(const int16_t *)(o + OBJ_OFF_HEALTH) - (int16_t)amount);
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0) {
+        if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0) {
+            ItemPreDestroyAlias(o, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
+            *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_BIT0;
+        }
+
+        if (*(const int32_t *)(o + OBJ_OFF_FIELD_5A4) != 0) {
+            uint8_t *killer = (uint8_t *)LookupByUID(attacker);
+            int32_t  army   = killer != (uint8_t *)0
+                            ? (int32_t)*(const int8_t *)(killer + OBJ_OFF_ARMY)
+                            : AM2_ARMY_NEUTRAL;
+
+            CreateExplosion(*(const int16_t *)(o + OBJ_OFF_X),
+                            *(const int16_t *)(o + OBJ_OFF_Y),
+                            AM2_EXPL_TROOPER_GORE, army, 0,
+                            *(const int32_t *)(uintptr_t)ADDR_SPAWN_EXTRA_6628D4,
+                            0, 0, 0, 0);
+        }
+
+        TrooperDiedTail(o, kind);
+
+        /* Sarge's inventory goes on the ground around him, one item per step
+         * of the table, and the loop has no bound past its five entries. */
+        if (*(const int32_t *)(o + OBJ_OFF_SARGE) != 0
+            && *(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0) {
+            const int16_t *step = (const int16_t *)AM2_IMAGE(ADDR_DROP_RING);
+
+            while (((const uint32_t *)(o + UNIT_OFF_INVENTORY))
+                       [AM2_TROOPER_DROP_SLOT] != 0) {
+                uint32_t where =
+                    (uint32_t)(uint16_t)(int16_t)(step[0]
+                        + *(const int16_t *)(o + OBJ_OFF_X))
+                    | ((uint32_t)(uint16_t)(int16_t)(step[1]
+                        + *(const int16_t *)(o + OBJ_OFF_Y)) << 16);
+
+                TrooperDropItem(o, AM2_TROOPER_DROP_SLOT, where);
+                step += 2;
+            }
+        }
+    }
+
+    if (amount <= 0)
+        return;
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) != AM2_SOLDIER_KIND_3)
+        return;
+
+    limit = AM2_GORE_ANGLE;
+    odds  = AM2_GORE_ODDS;
+    if (kind == 3 || kind == 1) {
+        limit = 0xFF;
+        odds  = AM2_GORE_ODDS_KIND13;
+    }
+
+    if ((uint8_t)d == 0)
+        return;
+    if (AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING), (uint32_t)d) > limit)
+        return;
+    if ((orig_game_rand() & 0xFF) >= odds)
+        return;
+
+    CreateExplosion(*(const int16_t *)(o + OBJ_OFF_X),
+                    *(const int16_t *)(o + OBJ_OFF_Y),
+                    AM2_EXPL_TROOPER_GORE, (int32_t)UidArmy(attacker),
+                    attacker,
+                    *(const int32_t *)(uintptr_t)ADDR_SPAWN_EXTRA_6628D4,
+                    0, 0, 0, 0);
+}
 
 /* DamageVehicle -- original 0x0045B4D0, one caller, which is DamageObject's
  * type-3 arm. Take `amount` off a vehicle, and if that empties it, empty the
@@ -5238,7 +5488,7 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
         DamageItem(obj, amount, extra, kind, attackerUid, 0);
         break;
     case 2:
-        orig_damage_trooper(obj, amount, extra, kind, attackerUid);
+        DamageTrooper(obj, amount, extra, kind, attackerUid);
         break;
     case 3:
         DamageVehicle(obj, amount, extra, kind, attackerUid);
@@ -12378,6 +12628,8 @@ void item_install(void)
     patch_replace(ADDR_VEHICLE_BLOCK_WEIGHT,
                   (const void *)VehicleBlockWeight,
                   "VehicleBlockWeight", 3);
+    patch_replace(ADDR_DAMAGE_TROOPER, (const void *)DamageTrooper,
+                  "DamageTrooper", 1);
     patch_replace(ADDR_CREATE_EXPLOSION, (const void *)CreateExplosion,
                   "CreateExplosion", 23);
     patch_replace(ADDR_CAN_PICK_UP_WEAPON, (const void *)CanPickUpWeapon,

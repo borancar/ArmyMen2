@@ -5604,7 +5604,37 @@ typedef struct {
 #define ADDR_DAMAGE_TROOPER      0x00447A40u  /* type 2 -- and this one
                                                * is NOT a guess: it logs
                                                * "DamageTrooper: droping armor
-                                               * uid:%x" */
+                                               * uid:%x". Reconstructed. */
+#define ADDR_STR_DROPPING_ARMOR  0x0048A248u  /* the misspelling is the
+                                               * original's */
+/* Its own constants. The soldier kind is left as a NUMBER: 3 gets a damage
+ * discount here and is the only kind the gore roll applies to, and neither
+ * says what it is -- the three kinds LoadType2 gives their own arm are 6, 7
+ * and 8, and this is none of them. */
+#define AM2_SOLDIER_KIND_3       3
+#define AM2_SPEECH_SARGE_HURT    0x19
+#define AM2_SND_HURT             4
+#define AM2_SND_HURT_KIND7       0x35
+#define AM2_EXPL_TROOPER_GORE    0x95
+/* The gore roll: the hit must arrive within this many eighths of a turn of the
+ * facing, and then one draw in 256 -- or, when the damage kind is 1 or 3, any
+ * angle at all and ten draws in 256. */
+#define AM2_GORE_ANGLE           0x40
+#define AM2_GORE_ODDS            1
+#define AM2_GORE_ODDS_KIND13     0xA
+/* Half the time, near enough, the hurt sound goes out with flag bit 1 set.
+ * Same VALUE as AM2_HIT_EFFECT_CHANCE and a different question, so a different
+ * name -- the lesson three collapsed duplicates in this file already teach in
+ * the other direction. */
+#define AM2_TROOPER_SOUND_ODDS   0x40
+/* Five (dx, dy) int16 pairs: on the spot, then forty units each way. Sarge's
+ * inventory is dropped one item per step, and the loop is bounded by the
+ * inventory rather than by the table -- a sixth item walks off the end. */
+#define ADDR_DROP_RING           0x00489DE8u  /* int16[5][2] */
+#define AM2_DROP_RING_STEPS      5
+/* The slot the death drop empties, over and over: dropping compacts the array,
+ * so slot 1 refills until the inventory is empty. */
+#define AM2_TROOPER_DROP_SLOT    1
 #define ADDR_DAMAGE_VEHICLE      0x0045B4D0u  /* type 3 -- reconstructed */
 /* 0x00461BA0, two callers, and they are DamageTrooper and DamageVehicle. The
  * mark a hit leaves at a point: both damage handlers roll for it the same way

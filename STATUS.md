@@ -5,57 +5,53 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `54c7e2c`. Working tree clean.
+Last updated: **2026-09-01**, at `0047901`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,381 patches.**
+Nothing uncommitted. **1,382 patches.**
 
-**`VehicleBlockWeight` (`0x0045BC70`, 992 B, three callers) is reconstructed** --
-how blocked a vehicle is at a point facing a way, and, when its fourth argument
-says so, RUNNING OVER whatever is standing there.
+**`DamageTrooper` (`0x00447A40`, 1040 B, one caller) is reconstructed** -- the
+type-2 arm of `DamageObject`, and it names itself in "DamageTrooper: droping
+armor uid:%x", the misspelling included. It and `DamageVehicle` share a
+prologue almost line for line -- the hit direction clamped up to 1, the clock
+stamped, a rolled hit effect -- and then diverge completely.
 
-**It is two nearly identical mask loops and the differences are the finding.**
-One serves `AM2_VEHICLE_KIND_BOAT` and one everything else; written out rather
-than merged, because four of the five differences are asymmetries a merged loop
-would quietly lose:
+**ARMOUR IS AN INVENTORY ITEM**, and finding it is the first thing this does
+past the network gate: walk the six `UNIT_OFF_INVENTORY` slots, resolve each
+uid, take the first whose type record is `AM2_ITEM_TYPE_ARMOR`. The order then
+matters: the damage is HALVED whether or not the armour survives, the armour's
+`ITEM_OFF_AMMO` absorbs it, and only when that reaches zero is the armour
+removed, dropped on the wire and marked `WEAPON_FLAG_DEAD`.
 
-| | boat | everything else |
-|---|---|---|
-| per-point weight | `BlockWeightChain` | `BlockWeightTroops` |
-| heavier-damage speed | 0x28 | 0x3C |
-| objects sampled at | **the vehicle's own point** | the mask point |
-| empty mask | returns 0 | falls into the tail |
-| crush sound | never | speed- and rank-gated |
+**Two things it does that reading past would lose.** Soldier kind 3 takes one
+off the damage, and a SECOND off when the damage kind is 1 -- nested, so the
+second is only ever reached by kind 3. And the hit effect has two arms that
+differ only in the record: soldier kind 7 passes a RANDOM one of the first four
+`ADDR_OBJ_TABLE_RECORDS` where everything else passes the trooper's own.
 
-**The third row is one byte.** The two loops are byte-identical for twenty-six
-bytes except `8d 44 24 28` against `8d 44 24 24` -- a `lea` of the argument slot
-holding the caller's point against a `lea` of the scratch the offset point was
-just written into. Both loops hand the OFFSET point to the weight helper, so
-only the `ObjectsAtPoint` call differs. Reproduced, not corrected: it is one
-byte in the original and nothing here could show it was intended.
+**The death tail drops Sarge's inventory around the corpse**, one item per step
+of a five-entry (dx, dy) table at `0x00489DE8` -- on the spot, then forty units
+east, south, west and north. The loop condition is the SECOND inventory slot
+still being occupied, which works because dropping compacts the array, and it
+has NO BOUND past the table's five entries: a trooper carrying more would walk
+off the end. Reproduced.
 
-**The crush sound's `y` argument straddles two arguments.** All three arms read
-a DWORD at the caller's point PLUS TWO -- that point's high word with the low
-word of the fourth argument above it -- and the sound only ever plays when that
-argument is non-zero, so the straddle is never harmless padding. Written out as
-the arithmetic it is, because two adjacent cdecl slots make it exactly
-reproducible.
+**Its last block is a one-in-256 gore roll**, for soldier kind 3 only, gated on
+the hit arriving within `AngleDelta` 0x40 of the facing -- or any angle at all,
+at ten in 256, when the damage kind is 1 or 3.
 
-**The caption table named the sounds.** `0x00419A18` gives JEEP, TANK, H|T,
-CONV, ???, BOAT for kinds 0 to 5, so the three sound ids are the tank's, the
-jeep's and everything else's rather than three numbers.
+**No new offset name was needed for the drop slot.** `0x550` is
+`UNIT_OFF_INVENTORY[1]`, not the vehicle field that shares the offset, so it is
+indexed as the array it is -- which is also the one displacement
+`tools/checkoffsetuse.py` reports unnamed, the composed-offset blind spot its
+docstring lists. 18 of 19 named and the one gap explained.
 
-**`tools/checkoffsetuse.py` says the sets AGREE** -- all seven of the original's
-displacements are named in the C and there are none the C invents. That is the
-first function this session where it reports a clean match with nothing to
-explain away.
-
-**Cold in every configuration here, and the counter can say so.** Two of its
-three callers are still original, so the counter is not blind -- and it reads 0
-through a Boot Camp load. Verified by reading and by an A/B that says nothing
-else moved: `bootcamp` identical 1,610-line state dump and 13-message log at 22
-pixels, `campaign` identical 35-node widget tree and 14-message log at 2 pixels.
+**Blind and cold**: its only caller is `DamageObject`, which is ours, so the
+counter cannot move, and nothing in a Boot Camp drive shoots anything anyway.
+Verified by reading and by the offset check; `bootcamp` identical 1,610-line
+state dump and 13-message log at 22 pixels, `campaign` identical 35-node widget
+tree and 14-message log at 2 pixels.
 
 ## Stop condition
 

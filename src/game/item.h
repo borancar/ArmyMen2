@@ -442,6 +442,13 @@ int32_t __cdecl ObjCollidesWith(void *from, void *obj);
  * being RELEASED. */
 void __cdecl NextInventorySlot(void *obj);
 
+/* 0x00447A40, one caller -- DamageObject's type-2 arm, and it names itself in
+ * "DamageTrooper: droping armor uid:%x". Take `amount` off a trooper, through
+ * its ARMOUR if it is carrying any, and run the death tail if that empties it.
+ * `d` is the direction the hit came from. */
+void __cdecl DamageTrooper(void *obj, int32_t amount, int32_t d, int32_t kind,
+                           uint32_t attacker);
+
 void __cdecl DamageVehicle(void *obj, int32_t amount, int32_t d, int32_t kind,
                            uint32_t attacker);
 
