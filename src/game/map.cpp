@@ -5,10 +5,11 @@
 #include <string.h>
 
 #include "gamedir.h"
-#include "misc.h"      /* CompareDword -- reconstructed */
+#include "misc.h"      /* CompareDword, TitleCaseName -- reconstructed */
 #include "definfo.h"   /* DefParseInfoFile -- reconstructed */
 #include "crt.h"       /* am2_log, am2_free */
 #include "map.h"
+#define kMapSep ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
 #include "savetag.h"
 #include "image.h"
 #include "../inject/orig.h"
@@ -824,6 +825,138 @@ void __cdecl AddLevelRecord(const void *record)
     *(int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT) = count + 1;
 }
 
+/* The `rules` / `rulemap` trio -- originals 0x0043EA30, 0x0043EAC0 and
+ * 0x0043EBD0, one docs/functions.tsv entry of 592 bytes holding all three.
+ *
+ * THEIR NAMES ARE THE PROGRAM'S, and finding that out cost one dump. The
+ * keyword table at 0x00477448 is {name, value, handler} triples -- the same
+ * AM2_DefKeyword shape definfo.h already declares -- and 0x0043EAC0 is
+ * `rules` while 0x0043EBD0 is `rulemap`. A first reading of that table was
+ * four bytes out and made `map` the LINK parser's keyword; what fixed it was
+ * two anchors already in orig.h, `link` landing on ADDR_DEF_LINK_PARSE and
+ * `place` on ADDR_PARSE_PLACE_LINE. Second time today that dumping a table
+ * settled a name I would otherwise have invented.
+ *
+ * WHAT THEY BUILD IS THE 0xCC-BYTE NAME RECORD, and between them they account
+ * for every byte of it: `rules` writes three 0x40 tokens at +0, +0x40 and
+ * +0x80, and the appender uses +0xC0, +0xC4 and +0xC8 as {capacity, count,
+ * items} over 0x40-byte entries. 3 * 0x40 + 12 is 0xCC to the byte. That is
+ * the tiling argument this project already uses for the trig tables: a
+ * mis-sized field could not close.
+ *
+ * THE APPENDER IS THE THIRD USER OF THE TWELVE-THEN-SIX POLICY. AddLevelRecord
+ * and AddNameRecord grow the two TABLES that way; this grows a list INSIDE one
+ * record the same way, with the same absence of any allocation check. The
+ * initial malloc is 0x300, which is 12 * 0x40, so the constants are the ones
+ * already in orig.h rather than new ones.
+ *
+ * ALL THREE ERROR CODES ARE POSITIONAL. `rules` answers 2, 3 or 4 for a line
+ * that runs out of tokens at the first, second or third; `rulemap` answers 2
+ * for a missing or unknown list name and 3 for a missing map name. Zero is
+ * success. Nothing here logs.
+ *
+ * BOTH TAKE THE LINE AS THEIR SECOND ARGUMENT and ignore the first, which is
+ * the shape every other handler in this keyword table already has --
+ * DefLinkParse, DefObjLine and ParsePlaceLine are all `int32(cmd, line)`. The
+ * depth arithmetic says so on its own (`[esp+0xe0]` at a depth of 216 is
+ * frame+8), and the three siblings agree.
+ *
+ * `rulemap` LOOKS UP ITS LIST BY NAME AND SILENTLY DROPS A LINE THAT NAMES
+ * ONE THAT DOES NOT EXIST -- ScriptListFind's NULL and a missing first token
+ * share the return 2, so the caller cannot tell them apart. Reproduced.
+ *
+ * THE THIRD `rules` TOKEN IS TitleCaseName'd AND THE OTHER TWO ARE NOT, which
+ * is what says it is the one shown to a player. ScriptListFind lower-cases
+ * what it is given and compares against +0, so the first stays as written.
+ */
+void __cdecl NameRecAddMap(void *rec, const void *entry)
+{
+    uint8_t *r = (uint8_t *)rec;
+
+    if (!*(void **)(r + NAMEREC_OFF_MAPS)) {
+        *(void **)(r + NAMEREC_OFF_MAPS) =
+            am2_malloc((size_t)AM2_LEVEL_TABLE_FIRST * AM2_NAMEREC_FIELD);
+        *(int32_t *)(r + NAMEREC_OFF_CAP) = AM2_LEVEL_TABLE_FIRST;
+    }
+
+    if (*(const int32_t *)(r + NAMEREC_OFF_COUNT)
+        >= *(const int32_t *)(r + NAMEREC_OFF_CAP)) {
+        int32_t cap = *(const int32_t *)(r + NAMEREC_OFF_CAP)
+                      + AM2_LEVEL_TABLE_GROW;
+
+        *(int32_t *)(r + NAMEREC_OFF_CAP) = cap;
+        *(void **)(r + NAMEREC_OFF_MAPS) =
+            am2_realloc(*(void **)(r + NAMEREC_OFF_MAPS),
+                        (size_t)cap * AM2_NAMEREC_FIELD);
+    }
+
+    memcpy(*(uint8_t **)(r + NAMEREC_OFF_MAPS)
+               + (uint32_t)*(const int32_t *)(r + NAMEREC_OFF_COUNT)
+                 * AM2_NAMEREC_FIELD,
+           entry, AM2_NAMEREC_FIELD);
+
+    *(int32_t *)(r + NAMEREC_OFF_COUNT) += 1;
+}
+
+/* 0x0043EAC0. One `rules` line: three tokens into a fresh name record, the
+ * third title-cased, and the record appended to the table ScriptListFind
+ * searches. */
+int32_t __cdecl DefRulesLine(int32_t cmd, char *line)
+{
+    uint8_t rec[AM2_NAME_RECORD_SIZE];
+    char   *tok;
+
+    (void)cmd;
+    memset(rec, 0, sizeof rec);
+
+    tok = am2_strtok(line, kMapSep);
+    if (!tok)
+        return 2;
+    strcpy((char *)rec + NAMEREC_OFF_NAME, tok);
+
+    tok = am2_strtok((char *)0, kMapSep);
+    if (!tok)
+        return 3;
+    strcpy((char *)rec + NAMEREC_OFF_NAME2, tok);
+
+    tok = am2_strtok((char *)0, kMapSep);
+    if (!tok)
+        return 4;
+    strcpy((char *)rec + NAMEREC_OFF_NAME3, tok);
+
+    TitleCaseName((char *)rec + NAMEREC_OFF_NAME3);
+    AddNameRecord(rec);
+    return 0;
+}
+
+/* 0x0043EBD0. One `rulemap` line: a list name and a map name, the second
+ * appended to the list the first finds. */
+int32_t __cdecl DefRuleMapLine(int32_t cmd, char *line)
+{
+    char  entry[AM2_NAMEREC_FIELD];
+    char *tok;
+    void *rec;
+
+    (void)cmd;
+    memset(entry, 0, sizeof entry);
+
+    tok = am2_strtok(line, kMapSep);
+    if (!tok)
+        return 2;
+
+    rec = ScriptListFind(tok);
+    if (!rec)
+        return 2;
+
+    tok = am2_strtok((char *)0, kMapSep);
+    if (!tok)
+        return 3;
+    strcpy(entry, tok);
+
+    NameRecAddMap(rec, entry);
+    return 0;
+}
+
 /* AddNameRecord -- original 0x0043E9A0, one caller, and AddLevelRecord's twin.
  *
  * The same function over the other table DefParseInfoFile fills: 0xCC-byte
@@ -1027,6 +1160,12 @@ void map_install(void)
                   "AddNameRecord", 1);
     patch_replace(ADDR_TRACE_TILE_LINE, (const void *)TraceTileLine,
                         "TraceTileLine", 7);
+    patch_replace(ADDR_NAMEREC_ADD_MAP, (const void *)NameRecAddMap,
+                  "NameRecAddMap", 1);
+    patch_replace(ADDR_DEF_RULES_LINE, (const void *)DefRulesLine,
+                  "DefRulesLine", 1);
+    patch_replace(ADDR_DEF_RULEMAP_LINE, (const void *)DefRuleMapLine,
+                  "DefRuleMapLine", 1);
     patch_replace(ADDR_SCRIPT_LIST_FIND, (const void *)ScriptListFind,
                   "ScriptListFind", 5);
     patch_replace(ADDR_TILE_TO_XY, (const void *)TileToXY,

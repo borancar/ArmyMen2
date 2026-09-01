@@ -120,6 +120,16 @@ void __cdecl AddLevelRecord(const void *record);
  * records. */
 void __cdecl AddNameRecord(const void *record);
 
+/* The `rules` / `rulemap` trio, originals 0x0043EA30, 0x0043EAC0 and
+ * 0x0043EBD0 -- one 592-byte entry. The two line handlers are named from the
+ * keyword table at 0x00477448, which is the program's own vocabulary; the
+ * appender extends the list a name record carries at +0xC0. Both handlers
+ * take the line as their SECOND argument and ignore the first, like every
+ * other handler in that table. */
+void __cdecl NameRecAddMap(void *rec, const void *entry);
+int32_t __cdecl DefRulesLine(int32_t cmd, char *line);
+int32_t __cdecl DefRuleMapLine(int32_t cmd, char *line);
+
 /* 0x0042C350, one caller. The map's stored checksum, read out of the first
  * CSUM chunk of its `.amm` file. The second argument is pushed by the call
  * site and ignored by the body -- see the definition. */

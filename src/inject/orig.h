@@ -8005,6 +8005,42 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * so the first search is also the load. */
 #define ADDR_SCRIPT_LIST_FIND    0x0043E900u  /* void *(char *name) */
 #define AM2_NAME_RECORD_SIZE     0xCCu
+/* AND THE 0xCC IS ACCOUNTED FOR, FIELD BY FIELD. The `rules` line handler
+ * zeroes 0x33 dwords and writes three tokens at +0, +0x40 and +0x80; the
+ * appender the `rulemap` handler calls uses +0xC0, +0xC4 and +0xC8 as a
+ * {capacity, count, items} triple over 0x40-byte entries. 3 * 0x40 + 12 is
+ * 0xCC exactly, which is the same kind of proof a file format gives when it
+ * consumes its input to the last byte -- a mis-sized field could not tile.
+ *
+ * ScriptListFind compares against +0, so NAME is the searchable one. The
+ * other two are what the `rules` line carries beside it, the third
+ * TitleCaseName'd on the way in.
+ *
+ * 0x40 IS AM2_AMM_NAME_BYTES' 0x40 and AM2_SCRIPT_UNIQUE_BUF's, grepped
+ * before this name went in. Three buffers of one size in three structures;
+ * one name each, not one name shared. */
+#define NAMEREC_OFF_NAME         0x00u
+#define NAMEREC_OFF_NAME2        0x40u
+#define NAMEREC_OFF_NAME3        0x80u
+#define NAMEREC_OFF_CAP          0xC0u
+#define NAMEREC_OFF_COUNT        0xC4u
+#define NAMEREC_OFF_MAPS         0xC8u
+#define AM2_NAMEREC_FIELD        0x40u
+/* 0x0043EA30, one caller -- the `rulemap` handler below. Append one 0x40-byte
+ * name to a name record's own list, on the SAME twelve-then-six policy
+ * AddLevelRecord and AddNameRecord use for the two tables above; the
+ * constants are AM2_LEVEL_TABLE_FIRST and AM2_LEVEL_TABLE_GROW and this is
+ * the third user of them. Reconstructed. */
+#define ADDR_NAMEREC_ADD_MAP     0x0043EA30u  /* void(rec, const char *) */
+/* The two `.txt` line handlers beside it, and their names are the PROGRAM'S:
+ * the keyword table at 0x00477448 is {name, value, handler} triples and these
+ * two are `rules` (value 0x61) and `rulemap` (0x62), with `link` -> the LINK
+ * parser and `place` -> ADDR_PARSE_PLACE_LINE either side of them as the two
+ * anchors that fix the layout. A first reading took the rows four bytes out
+ * and made `map` the LINK parser's keyword; those two anchors are what said
+ * so. Both reconstructed. */
+#define ADDR_DEF_RULES_LINE      0x0043EAC0u  /* int32(cmd, char *line) */
+#define ADDR_DEF_RULEMAP_LINE    0x0043EBD0u  /* int32(cmd, char *line) */
 /* 0x0043E9A0, one caller -- AddLevelRecord's twin for the OTHER table the same
  * `.txt` fills, with 0xCC-byte records instead of 0x30C-byte ones. Same first
  * twelve, same growth of six, same absence of any allocation check. */
