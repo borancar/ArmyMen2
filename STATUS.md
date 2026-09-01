@@ -9,7 +9,29 @@ Last updated: **2026-09-02**, at `969936a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,399 patches**, **30** analysis tools in `make check`.
+Nothing uncommitted. **1,400 patches**, **30** analysis tools in `make check`.
+
+**`SetWeaponTargetAimed` (`0x00458D70`, 192 B) is reconstructed**, and reading
+it settled two older things.
+
+**The second table is the WEAPON HANDLER table**, base 0x00489A00 -- the
+previous commit recorded its base and consumer as unestablished. This function
+is column 1 of four consecutive records whose column 0 is `PointerPickBoard`,
+and `ADDR_SET_WEAPON_TARGET`'s own note already described that table. It was in
+the file the whole time; the two ends were not put side by side.
+
+**`ADDR_PERF_WORD_A/B/C` are `ADDR_AIM_X/Y/Z`.** Three int16 beside the
+performance-counter globals that `InitTimer` clears together, so they were named
+from the site that ZEROES them -- the weakest possible toucher. They have seven
+readers, and every one copies the triple straight into `UNIT_OFF_FIRE_X`, `_Y`
+and `_Z`. They are the aim point a fire order is given.
+
+**The function is `ADDR_SET_WEAPON_TARGET`'s sibling** and differs in three
+ways: it gates on the weapon's `ITEMTYPE_OFF_KIND` being 0x23..0x26 -- the same
+field the handler table is indexed by, re-checked at runtime -- it refuses a
+null target where the sibling has a whole arm for firing at a bare point, and it
+aims at `ADDR_AIM_X/Y/Z` where the sibling zeroes the position when it has an
+object.
 
 **`PointerPickWatchedItem` (`0x00459EE0`, 208 B) is reconstructed** -- another
 PICK in the second table: four refusals then a yes. A null object; one that is
@@ -87,7 +109,7 @@ that holds **seventeen** functions and patching any one of them credits all of
 it. The same effect inflates the entry count.
 
     entry-generous   1,220 of 1,239 entries, 89.5% of sub-CRT bytes
-    split-aware      1,356 of 1,530 real functions, 79.9% of sub-CRT bytes
+    split-aware      1,357 of 1,530 real functions, 79.9% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -98,8 +120,8 @@ ceiling rather than a floor -- ten percentage points of ceiling, measured.
 The loop's `completion_promise` is now **every game function below the CRT
 line (0x0045C000) patched**. Measured: **1,220 of 1,239** entries in
 `docs/functions.tsv` below that address have a patch inside them -- so 19
-outstanding, which is 1,239 minus 1,220 -- from 1,399 patched addresses, and
-**89.5% of the sub-CRT bytes**. Split-aware that is **1,356 of 1,530** real
+outstanding, which is 1,239 minus 1,220 -- from 1,400 patched addresses, and
+**89.5% of the sub-CRT bytes**. Split-aware that is **1,357 of 1,530** real
 functions and **79.9%** of the bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 

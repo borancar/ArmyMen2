@@ -1621,6 +1621,10 @@ int32_t __cdecl PointerPickBoard(void *obj);
  * kind, within our leader's reach. */
 int32_t __cdecl PointerPickWatchedItem(void *obj);
 
+/* 0x00458D70. ADDR_SET_WEAPON_TARGET's sibling: record a fire request aimed at
+ * ADDR_AIM_X/Y/Z, for the weapon kinds 0x23..0x26. */
+void __cdecl SetWeaponTargetAimed(void *target, uint32_t at);
+
 /* 0x004144A0. Append one line to the HUD's message log. A non-zero colour is
  * written as a '^' escape ahead of the text. */
 void __cdecl HudMessage(const char *text, int32_t colour);

@@ -160,9 +160,9 @@ void __cdecl InitTimer(void)
 {
     int64_t *freq = (int64_t *)(uintptr_t)ADDR_PERF_FREQ;
 
-    *(int16_t *)(uintptr_t)ADDR_PERF_WORD_A = 0;
-    *(int16_t *)(uintptr_t)ADDR_PERF_WORD_B = 0;
-    *(int16_t *)(uintptr_t)ADDR_PERF_WORD_C = 0;
+    *(int16_t *)(uintptr_t)ADDR_AIM_X = 0;
+    *(int16_t *)(uintptr_t)ADDR_AIM_Y = 0;
+    *(int16_t *)(uintptr_t)ADDR_AIM_Z = 0;
 
     if (QueryPerformanceFrequency((LARGE_INTEGER *)freq)) {
         QueryPerformanceCounter((LARGE_INTEGER *)(uintptr_t)ADDR_PERF_START);

@@ -977,6 +977,12 @@
 #define ADDR_PICK_REACH_66275C   0x0066275Cu  /* int32_t */
 #define ADDR_POINTER_PICK_BOARD  0x00459DA0u  /* int32_t(void *obj) */
 #define ADDR_POINTER_PICK_WATCHED 0x00459EE0u /* int32_t(void *obj) */
+/* 0x00458D70, column 1 of the four weapon-handler records at 0x00489AB0..AE0 --
+ * ADDR_SET_WEAPON_TARGET's sibling, for the kinds below. */
+#define ADDR_SET_WEAPON_TARGET_AIMED 0x00458D70u /* void(void *, uint32_t) */
+/* The weapon kinds those four records cover, re-checked inside the handler. */
+#define AM2_WEAPON_KIND_AIMED_LO 0x23
+#define AM2_WEAPON_KIND_AIMED_HI 0x26
 /* 0x00459DA0, 320 bytes. Reconstructed as PointerPickBoard. It is the PICK of those four records: refuse a null object,
  * refuse one whose army byte is not ADDR_DEFAULT_OWNER, find our leader
  * through the dead-fallback helper described above, and then two arms.
@@ -10718,9 +10724,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_PERF_FREQ           0x00512350u  /* int64, QueryPerformanceFrequency */
 #define ADDR_PERF_START          0x00512578u  /* int64, the startup counter */
 #define ADDR_PERF_PERIOD         0x00512570u  /* double, milliseconds per tick */
-#define ADDR_PERF_WORD_A         0x00512568u  /* three int16 cleared with it */
-#define ADDR_PERF_WORD_B         0x0051256Au
-#define ADDR_PERF_WORD_C         0x0051256Cu
+/* THREE int16 THAT ARE NOT TIMER STATE, and the old names said they were.
+ * They sat beside ADDR_PERF_FREQ and friends and InitTimer clears all three, so
+ * they went in as ADDR_PERF_WORD_A/B/C -- named from the site that ZEROES them,
+ * which this file already calls the weakest possible toucher.
+ *
+ * They have seven readers. Five are weapon-handler actions in the pointer band
+ * and two more sit at 0x0045D0F6 and 0x0045D6F0, and every one copies the
+ * triple straight into UNIT_OFF_FIRE_X, _Y and _Z. So they are the AIM POINT a
+ * fire order is given, cleared once at startup. Renamed from the readers. */
+#define ADDR_AIM_X               0x00512568u  /* int16_t -> UNIT_OFF_FIRE_X */
+#define ADDR_AIM_Y               0x0051256Au  /* int16_t -> UNIT_OFF_FIRE_Y */
+#define ADDR_AIM_Z               0x0051256Cu  /* int16_t -> UNIT_OFF_FIRE_Z */
 #define ADDR_DBL_MS_PER_SEC      0x0046F990u  /* 1000.0 */
 #define ADDR_DBL_MAX_PERIOD      0x0046F988u  /* 1.0 -- worse than 1 kHz loses */
 #define ADDR_STR_HIGH_PERF       0x00485438u  /* "Using High Performance Counter\n" */

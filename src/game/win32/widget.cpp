@@ -9001,6 +9001,82 @@ static uint8_t *OurLeader(void)
         *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
 }
 
+/* SetWeaponTargetAimed -- original 0x00458D70, 192 bytes. Column 1 -- the
+ * ACTION -- of four consecutive weapon-handler records at 0x00489AB0..0x00489AE0,
+ * whose column 0 is PointerPickBoard above.
+ *
+ * IT IS ADDR_SET_WEAPON_TARGET'S SIBLING and item.cpp already has that one.
+ * Both record a fire request on the unit ADDR_WEAPON_OWNER_ID names, in the
+ * same UNIT_OFF_FIRE_* block, and neither fires anything -- the block is for
+ * whoever reads it next. Three things differ, and they are the function:
+ *
+ *   - It gates on the WEAPON KIND, which the other does not: the held weapon's
+ *     ITEMTYPE_OFF_KIND must be in 0x23..0x26. That is the same field the
+ *     handler table is indexed by, so this re-checks at runtime what the
+ *     registration already implies.
+ *   - It refuses a NULL target outright, where the other has a whole arm for
+ *     firing at a bare point.
+ *   - It aims at ADDR_AIM_X/Y/Z as well as naming the target, where the other
+ *     zeroes the position when it has an object. So this is "fire at that
+ *     thing, from this aim", and the sibling is "fire at that thing" or "fire
+ *     at that spot".
+ *
+ * THOSE THREE GLOBALS WERE CALLED ADDR_PERF_WORD_A/B/C until this function was
+ * read. They sit beside the performance-counter globals and InitTimer clears
+ * all three, so they were named from the site that zeroes them -- and this is
+ * one of seven readers that copy the triple into UNIT_OFF_FIRE_X, _Y and _Z.
+ * Renamed; see orig.h.
+ *
+ * Not exercised. ADDR_SET_WEAPON_TARGET's own note records it measured at 0
+ * because its call sites are the pointer-mode action paths and no drive here
+ * installs a mode above 0; the same holds for this one. Verified by reading. */
+void __cdecl SetWeaponTargetAimed(void *target, uint32_t at)
+{
+    uint8_t       *u;
+    const uint8_t *weapon;
+
+    (void)at;
+
+    if (!target)
+        return;
+
+    u = (uint8_t *)LookupByUID(
+            *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
+    if (!u)
+        return;
+    if (!ObjIsType2((const AM2_Object *)u))
+        return;
+
+    weapon = (const uint8_t *)WeaponByUid(
+        *(const uint32_t *)(u + UNIT_OFF_INVENTORY
+            + (uint32_t)*(const int32_t *)(uintptr_t)ADDR_WEAPON_SLOT * 4));
+    if (!weapon)
+        return;
+
+    {
+        int32_t kind = *(const int32_t *)
+            (*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
+             + ITEMTYPE_OFF_KIND);
+
+        if (kind < AM2_WEAPON_KIND_AIMED_LO || kind > AM2_WEAPON_KIND_AIMED_HI)
+            return;
+    }
+
+    *(int32_t *)(u + UNIT_OFF_FIRE_ACTIVE) = 1;
+    *(uint8_t *)(u + UNIT_OFF_FIRE_F40)    = *(const uint8_t *)(u + 0x40);
+    *(int32_t *)(u + UNIT_OFF_FIRE_F588)   = 1;
+    *(int32_t *)(u + UNIT_OFF_FIRE_F58C)   = 1;
+
+    *(int16_t *)(u + UNIT_OFF_FIRE_X) = *(const int16_t *)(uintptr_t)ADDR_AIM_X;
+    *(int16_t *)(u + UNIT_OFF_FIRE_Y) = *(const int16_t *)(uintptr_t)ADDR_AIM_Y;
+    *(int16_t *)(u + UNIT_OFF_FIRE_Z) = *(const int16_t *)(uintptr_t)ADDR_AIM_Z;
+
+    *(uint32_t *)(u + UNIT_OFF_FIRE_UID) =
+        *(const uint32_t *)((const uint8_t *)target + OBJ_OFF_UID);
+    *(int32_t *)(u + UNIT_OFF_FIRE_MODE) =
+        *(const int32_t *)(u + OBJ_OFF_POSE);
+}
+
 /* PointerPickWatchedItem -- original 0x00459EE0, 208 bytes, one reference: the
  * PICK slot of a record in the second {pick, action, kind, flags} table.
  *
@@ -10353,6 +10429,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_POINTER_PICK_WATCHED,
                         (const void *)PointerPickWatchedItem,
                         "PointerPickWatchedItem", 1);
+    rc |= patch_replace(ADDR_SET_WEAPON_TARGET_AIMED,
+                        (const void *)SetWeaponTargetAimed,
+                        "SetWeaponTargetAimed", 4);
     rc |= patch_replace(ADDR_HUD_MESSAGE, (const void *)HudMessage,
                         "HudMessage", 46);
     rc |= patch_replace(ADDR_CLOSE_SCREEN, (const void *)CloseScreen,
