@@ -5,53 +5,36 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `0047901`. Working tree clean.
+Last updated: **2026-09-01**, at `2757f94`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted. **1,382 patches.**
 
-**`DamageTrooper` (`0x00447A40`, 1040 B, one caller) is reconstructed** -- the
-type-2 arm of `DamageObject`, and it names itself in "DamageTrooper: droping
-armor uid:%x", the misspelling included. It and `DamageVehicle` share a
-prologue almost line for line -- the hit direction clamped up to 1, the clock
-stamped, a rolled hit effect -- and then diverge completely.
+**`ObjHitMaskAction` (`0x004389D0`) is READ AND NOT WRITTEN**, and the reading is
+in `orig.h` rather than in a draft. That is the fourth time this session the
+call has been made and the third that was later taken up and finished, so the
+record is the point of it.
 
-**ARMOUR IS AN INVENTORY ITEM**, and finding it is the first thing this does
-past the network gate: walk the six `UNIT_OFF_INVENTORY` slots, resolve each
-uid, take the first whose type record is `AM2_ITEM_TYPE_ARMOR`. The order then
-matters: the damage is HALVED whether or not the armour survives, the armour's
-`ITEM_OFF_AMMO` absorbs it, and only when that reaches zero is the armour
-removed, dropped on the wire and marked `WEAPON_FLAG_DEAD`.
+**What is settled.** Its only callee is `Clamp` -- 1,056 bytes of arithmetic and
+one call, which is why it looks harder than it is. Two refusals, both answering
+0. The mask header is four int16s and a cell pointer at +0x0C. It clamps TWICE
+where `BoxAction` clamps once, first against `ADDR_MAP_EXTENT_X/Y` with a
+sixteen-unit margin and then against the tile bounds with the usual two, and it
+writes the four `TILEMASK_OFF_RECT` edges in `BoxAction`'s own order.
 
-**Two things it does that reading past would lose.** Soldier kind 3 takes one
-off the damage, and a SECOND off when the damage kind is 1 -- nested, so the
-second is only ever reached by kind 3. And the hit effect has two arms that
-differ only in the record: soldier kind 7 passes a RANDOM one of the first four
-`ADDR_OBJ_TABLE_RECORDS` where everything else passes the trooper's own.
+**And there is a SECOND neighbour table.** Twenty dwords at `0x00554B84`,
+immediately past `ADDR_TILE_RING4`'s four, computed per call from the
+TILEMASK's stride the way `ADDR_TILE_NEIGHBOURS` is computed from the map's --
+so the game keeps two of these and `BuildTileDeltas` fills only one. The inner
+loop ORs 3 into the cell it lands on and 2 into each of the twenty, which is
+`ShiftTileCover`'s "this cell and its ring" shape again.
 
-**The death tail drops Sarge's inventory around the corpse**, one item per step
-of a five-entry (dx, dy) table at `0x00489DE8` -- on the spot, then forty units
-east, south, west and north. The loop condition is the SECOND inventory slot
-still being occupied, which works because dropping compacts the array, and it
-has NO BOUND past the table's five entries: a trooper carrying more would walk
-off the end. Reproduced.
+**What is not:** the walk. It tests one BIT per cell through the
+bits-from-position-n table at `0x00487814` and selects between an eight-step
+and a sixteen-step stride on a parity test against a value saved earlier. That
+is the whole of the mask walk and it is not read.
 
-**Its last block is a one-in-256 gore roll**, for soldier kind 3 only, gated on
-the hit arriving within `AngleDelta` 0x40 of the facing -- or any angle at all,
-at ten in 256, when the damage kind is 1 or 3.
-
-**No new offset name was needed for the drop slot.** `0x550` is
-`UNIT_OFF_INVENTORY[1]`, not the vehicle field that shares the offset, so it is
-indexed as the array it is -- which is also the one displacement
-`tools/checkoffsetuse.py` reports unnamed, the composed-offset blind spot its
-docstring lists. 18 of 19 named and the one gap explained.
-
-**Blind and cold**: its only caller is `DamageObject`, which is ours, so the
-counter cannot move, and nothing in a Boot Camp drive shoots anything anyway.
-Verified by reading and by the offset check; `bootcamp` identical 1,610-line
-state dump and 13-message log at 22 pixels, `campaign` identical 35-node widget
-tree and 14-message log at 2 pixels.
 
 ## Stop condition
 

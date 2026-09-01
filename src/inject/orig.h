@@ -1553,6 +1553,38 @@
  * all of them. Still original; region.cpp records that ObjBoxAction and
  * BoxAction both read 0 on a full combat run for exactly that reason. */
 #define ADDR_OBJ_HIT_MASK_ACTION 0x004389D0u  /* int32_t(void *obj, void *) */
+/* READ AND NOT RECONSTRUCTED, recorded the way LoadType2, CreateTrooper and
+ * CreateVehicle were before they were taken -- all three of which came back
+ * and went in once the neighbouring arithmetic had been done twice.
+ *
+ * WHAT IS SETTLED. Its only callee is Clamp: 1,056 bytes of arithmetic and one
+ * function call, which is why it looks harder than it is. Two refusals, both
+ * answering 0 -- no OBJ_OFF_HIT_MASK at all, and a mask whose cell pointer at
+ * +0x0C is null. The mask header is four int16s, a left, a top, a width and a
+ * height, with that pointer at +0x0C.
+ *
+ * IT CLAMPS TWICE WHERE BoxAction CLAMPS ONCE: first the object's
+ * OBJ_OFF_HIT_RECT offset by the mask's own rect against ADDR_MAP_EXTENT_X/Y
+ * with a SIXTEEN-unit margin, then the same values shifted down four against
+ * ADDR_MAP_TILES_W/H with the usual AM2_TILEMASK_MARGIN of two. Then it writes
+ * the four TILEMASK_OFF_RECT edges in BoxAction's own order -- right, bottom,
+ * left, top -- and memsets the cells to ZERO where BoxAction fills them with
+ * AM2_TILEMASK_PAD_CELL.
+ *
+ * THERE IS A SECOND NEIGHBOUR TABLE AND THIS IS WHAT BUILDS IT. Twenty dwords
+ * at 0x00554B84, immediately past ADDR_TILE_RING4's four, computed from the
+ * TILEMASK's stride the way ADDR_TILE_NEIGHBOURS is computed from the map's.
+ * So the game keeps two of these and BuildTileDeltas fills only one of them.
+ * The inner loop ORs 3 into the cell it lands on and 2 into each of the
+ * twenty, which is the same "this cell and its ring" shape ShiftTileCover has.
+ *
+ * WHAT IS NOT: the walk itself. It tests one BIT per cell through the table at
+ * 0x00487814 -- 0x80, 0xC0 ... 0xFF, 0x7F, 0x3F ... 0x00, the ordinary
+ * bits-from-position-n mask -- and it selects between an eight-step and a
+ * sixteen-step stride on a PARITY test of the row against a value saved
+ * earlier. Which is the whole of the mask walk, and it is not read. */
+#define ADDR_TILEMASK_NEIGHBOURS 0x00554B84u  /* int32_t[20], built per call */
+#define ADDR_BIT_FROM_N          0x00487814u  /* uint8_t[16] */
 /* The scratch record's size, from the one caller that puts it on the STACK:
  * CanPlaceAt reserves 0x1018 bytes and the cells run from TILEMASK_OFF_CELLS
  * to the end of that frame less two locals. BoxAction clamps into the map, so
