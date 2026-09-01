@@ -5,80 +5,65 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `f91becc`. Working tree clean.
+Last updated: **2026-09-01**, at `6213e8d`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,379 patches.**
+Nothing uncommitted. **1,380 patches.**
 
-**`TrooperFire` (`0x00449FD0`, 976 B, two callers) is reconstructed** -- the
-trooper's shot, and it names itself in "FIRE  trooper: %x  weapon: %x
-ammo: %d". Given a trooper, the weapon in hand and the sight record the AI has
-just filled in: pick the weapon (the sight may override the one held), end the
-trooper's state unless the weapon is one of the seven that do not, check the
-cooldown, aim, and hand it to `0x0045F460`.
+**`CreateVehicle` (`0x0045B090`, 992 B, four callers) is reconstructed** -- the
+type-3 arm, the LAST of the four creators, and the deferral this file recorded
+two commits ago rather than guessing at. All five of the unknowns that deferred
+it were `esp` displacements and all five are settled.
 
-**Its nineteen-arm jump table has TWO arms**, which is the table trap in its
-purest form: codes 0x14..0x26 index a byte table selecting one of exactly two
-targets, so the switch is a FILTER. MSWP, MEDI, the four DISG kinds and 0x16
-leave the trooper's state alone; everything else -- including every code
-outside the range, which the `ja` sends to the same arm -- ends it. Reading the
-arms would have found two behaviours and no idea which code took which.
+**What settled them was the THISCALL rule, not more staring.** `push eax; call
+CommMustBroadcast` with no cleanup at all, followed by `pop ebp; pop ebx; ret`,
+reads as a function returning to its own argument -- until you remember that
+MSVC thiscall is CALLEE-cleanup for the stack arguments. Four sites here, and
+mis-reading one shifts every displacement after it. On top of that the compiler
+defers three cleanups: the malloc's `0x5DC` is still on the stack eight
+instructions later and goes with `ObjIsFriendly`'s `this`, and ObjInitCommon's
+seven pushes are cleaned in one `add esp, 0x1C` after the two stores that
+follow the call.
 
-**The item captions are the program's own names for these numbers.** The
-25-entry table at `0x00419A30`, indexed by the 41-byte table at `0x00419A94`,
-gives GREN, FLAM, BAZ, MORT, HvMG, RIFLE, AUTO, MINE, EXPL, FLAG, MSWP, MEDI,
-AIRS, PARA, RECO, NOTE, FLAK, VULC, SNIP, DISG, MAG, AERO, WREN, M80. Decoding
-it is what turned this function's seven exempt codes and `ObjCodeUnmapped`'s
-five into sentences.
+**Argument 1's slot is reused TWICE** -- for the packed point, assembled as two
+`mov word` stores under two different `esp` values, and then for the turret
+record pointer once the point has been consumed. Argument 10's slot becomes the
+row count. Fourth and fifth functions in this tree to do that.
 
-**`ObjCodeUnmapped` was about to be reconstructed a second time**, under a name
-taken from the one thing this caller does with it. `checkpatches` refused the
-build -- fifth near-miss of that shape, and the first where the function was
-already reconstructed under a name I would not have looked for. What this
-caller adds is the MEANING: its table answers 0 for AIRS, PARA, RECO, MAG and
-AERO, and the answer decides whether the trooper TURNS to face the point the
-sight named. An air strike does not swing the soldier round; a rifle does.
+**A vehicle's SECOND ROW is its turret**, and `ADDR_TURRET_ANIMS[kind]` being
+non-empty is the whole of what decides whether it has one.
 
-**Nothing needed a new object offset.** The state-ending block writes
-`OBJ_OFF_TABLE_REC_KIND`, `_SLOT` and `OBJ_OFF_FIELD_530`, and 5 is the value
-`AM2_OPERAND_TROOP_STATE` already documents from the other end -- the testvar
-operand answers 5 for anything that is not a troop. This function is the WRITER
-that sentence never had. Grepping the offset found all three.
+**Its six-arm weapon table is NOT in layout order**: the arms read 6, 7, 8,
+0x1D top to bottom while the table says kind 0 takes 7 and kind 1 takes 6.
+Reading the bodies in order gets the first two backwards.
 
-**The heading is passed as a byte where the original passes a dword**, and the
-three high bytes it carries are the top of the `sight` POINTER: MSVC put the
-local in argument 3's home, wrote only `al`, and reloaded the whole dword. Not
-reproduced, on the same footing as the SEH prologue -- it is the code
-generator's, not the program's. `Cos8` and `Sin8` mask with `& 0xFF` and
-FireWeapon does `and eax, 0xff` at `0x0045F567`; the one gap, said plainly, is
-that FireWeapon also forwards the unmasked dword to `0x0043B9B0`, which has not
-been read.
+**`+0x94` is the start of the per-type RECORD, not a pointer.** gameproc.cpp's
+loaders memcpy `AM2_TYPE3_RECORD_SIZE` bytes over it, so the `1` written here
+is that record's first field. Reading it as the pointer item.cpp dereferences
+elsewhere would have been a fault waiting for the first vehicle.
 
-**`0x00449AB0` is called and its answer thrown away** -- `mov eax, [esp+0x30]`
-overwrites `eax` on the very next instruction, so 1,088 bytes of per-weapon-kind
-dispatch run for their side effects alone. Still original; recorded, not tidied.
+**`tools/checkoffsetuse.py` is what checked the result**: 36 of the original's
+38 displacements are named in the C, and the two that are not are the turret
+row's, reached as `rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_*` where the original
+folds both into one displacement -- a blind spot that tool's own docstring
+lists. The same check run over the two functions before this one came back
+clean.
 
-**Cold, and said plainly.** Nothing in a Boot Camp drive shoots, so this is
-verified by reading and by a clean A/B saying nothing else moved. Closing the
-seam also blinded `TrooperFireSend`'s counter, which is the standing cost of
-finishing a layer.
+**Its counter reads 0 and it runs FOUR TIMES per Boot Camp load**, which is the
+count-of-0 blind spot in its purest form -- all four of its callers are
+reconstructed and reach it by name. What settles it is the object-state dump:
+`bootcamp` has four `type=3` objects and they come back byte for byte identical
+from the original and from us.
 
-**`ab.sh mission`'s FRAMES GATE FAILED, AND THE PARENT COMMIT FAILS IT WORSE.**
-7,883 frames against 588 on this change; the parent, stashed and rebuilt and
-run on the same configuration minutes later, gave 25,662 against 638. So the
-gate carries no verdict here and the difference is not this function's --
-which is the procedure this file already prescribes, and reaching for the
-parent rather than a fourth re-roll is what made it a five-minute question.
-
-Worth recording beyond that one run: the RECON half read about 600 frames in
-BOTH runs while the ORIG half read 7,883 and 25,662. That is not noise around
-a mean, it is the second half of a `mission` run being starved consistently.
-Nothing here has explained it and it is older than this change.
-
-`bootcamp` and `campaign` are clean on the same build -- identical logs, an
-identical 1,610-line state dump, an identical 35-node widget tree, 22 and 2
-pixels.
+That dump is a far better oracle here than "A/B clean", because it shows the
+fields this function writes. `box=-48,-48,48,48` is ADDR_VEHICLE_BOX exactly;
+`flags=2099233` is 0x200721, which is the `0x21` this function ORs in, plus
+OBJ_FLAG_CONCEALED from the conceal path, plus OBJ_FLAG_FOOTPRINT_ON from
+ObjSetFootprint at the very bottom; and the four `health=` pairs read
+138,138 / 256,256 / 210,210 / 160,160 -- three distinct definition values, each
+copied to the current health AFTER SetMaxHealth rather than before, which is the
+one ordering in this function that is easy to get backwards.
 
 ## Stop condition
 

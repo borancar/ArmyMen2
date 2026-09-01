@@ -13073,6 +13073,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_VEHICLE_DROP_OCCUPANT 0x0045E3C0u  /* void(vehicle, occupant) */
 #define ADDR_DAMAGE_BROADCAST      0x0042A880u  /* void(obj,uid,int,int,pt,int) */
 #define VEHICLE_OFF_KIND           0x52Cu  /* 2 and 3 skip the damage entirely */
+/* CreateVehicle's own constants. The size is what its malloc is given -- a
+ * `rep stosd` of 0x177 dwords zeroes exactly that, which is the check that
+ * neither number is guessed. The rank is a plain literal into OBJ_OFF_RANK and
+ * the weapon flags a plain 4 into CreateWeapon's fifth argument. */
+#define AM2_VEHICLE_BYTES          0x5DCu
+#define AM2_VEHICLE_RANK           6
+#define AM2_VEHICLE_WEAPON_FLAGS   4
+#define ADDR_STR_VEHICLE_NO_AAI    0x0048BFB0u /* "Vehicle aai entry not found
+                                                * for type %d" */
+/* Two more bits of a ROW's flags word, named for the bit as ROW_FLAG_BIT8 is
+ * and for the same reason: CreateVehicle sets 6 and 8 together on the hull row
+ * and 5 alone on the turret, and nothing read so far says what any of them
+ * mean. */
+#define ROW_FLAG_BIT5              0x20u
+#define ROW_FLAG_BIT6              0x40u
 
 /* FORMATION. 0x00404400 places a follower relative to whatever it is
  * following, and the table it indexes is what identifies the whole cluster:

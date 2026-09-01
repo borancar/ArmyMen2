@@ -301,11 +301,12 @@ void __cdecl ObjSetRoachFootprint(void *obj);
  * Allocate a roach, seed it from the ROACH_* constants aai/game.aai names,
  * run the common init and the row set, and lay its footprint down unless the
  * state has already been entered. */
-/* CreateVehicle and the vehicle-definition bsearch, both still the original's
- * and both wanted by two modules now -- armymsg.cpp for the item-create
- * message and gameproc.cpp for LoadType3. The typedef is HERE rather than in
- * either of them, for the reason the five copies of CreateExplosion's made
- * plain: a second private typedef is a second place to be wrong. */
+/* The vehicle-definition bsearch, still the original's and wanted by two
+ * modules -- armymsg.cpp for the item-create message and gameproc.cpp for
+ * LoadType3. The typedef is HERE rather than in either of them, for the reason
+ * the five copies of CreateExplosion's made plain: a second private typedef is
+ * a second place to be wrong. CreateVehicle itself is reconstructed now and
+ * declared below. */
 /* CreateWeapon, still original -- the type-4 arm of the item-create message,
  * and it names itself in its own log line. Eight arguments.
  *
@@ -320,12 +321,17 @@ typedef void *(__cdecl *AM2_CreateWeaponFn)(const char *name, int32_t army,
                                             int32_t g, int32_t h);
 #define CreateWeapon (*(AM2_CreateWeaponFn)AM2_IMAGE(ADDR_CREATE_WEAPON))
 
-typedef void *(__cdecl *AM2_CreateVehicleFn)(int32_t kind, const char *name,
-                                             int32_t x, int32_t y, int32_t a5,
-                                             int32_t army, int32_t flags,
-                                             int32_t remote, uint32_t uid,
-                                             int32_t a10);
-#define CreateVehicle  (*(AM2_CreateVehicleFn)AM2_IMAGE(ADDR_CREATE_VEHICLE))
+/* 0x0045B090, four callers, and formerly deferred -- the LAST of the four
+ * creators. Make a type-3 VEHICLE. Answers null when a network session refuses
+ * a local creation for an army this machine must not broadcast for, and again
+ * when the kind has no aai definition, which it says so in the log.
+ *
+ * `table` indexes the 256-byte records at ADDR_OBJ_TABLE_RECORDS and `facing`
+ * lands in three fields at once. A second ROW is built, and given the turret
+ * animation table, exactly when ADDR_TURRET_ANIMS[kind] is non-empty. */
+void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
+                            int32_t table, int32_t army, int32_t flags,
+                            int32_t remote, uint32_t uid, int32_t facing);
 
 typedef void *(__cdecl *AM2_VehicleDefFindFn)(int32_t kind);
 #define VehicleDefFind (*(AM2_VehicleDefFindFn)AM2_IMAGE(ADDR_VEHICLE_DEF_FIND))

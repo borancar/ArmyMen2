@@ -2254,6 +2254,22 @@ Adding a constant asks "does this code run", which is the question you actually
 need answered first. **Ask whether the code runs before asking whether the term
 matters.**
 
+**THISCALL CLEANS ITS OWN STACK ARGUMENTS, and forgetting that makes a
+function unreadable.** `CreateVehicle` opens with `push eax; call
+CommMustBroadcast` and then, with no `add esp` anywhere, `pop ebp; pop ebx;
+ret` -- which read literally is a function returning into its own argument.
+MSVC thiscall is CALLEE-cleanup for whatever is on the stack, so those pushes
+are gone by the time the call returns. Four sites in that one function, and
+mis-reading one shifts every `esp` displacement after it; it was the single
+thing that had deferred the function.
+
+The three shapes to hold together when tracking `esp` through one of these
+bodies, all three present in that one function: a thiscall whose argument the
+CALLEE pops, a cdecl call whose arguments the compiler cleans LATER and
+together with a later call's, and an ARGUMENT SLOT reused as a local once its
+argument has been consumed. Any one of them read wrong moves everything below
+it, which is why these functions look impossible rather than merely long.
+
 **A count of 0 does not mean "broken" and does not mean "never called".** When a
 reconstructed function's callers are *also* reconstructed, the direct call
 bypasses the patched entry point and the counter never moves. The two cases are

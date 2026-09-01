@@ -672,7 +672,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
         int32_t i;
 
         made = (uint8_t *)CreateVehicle(
-                   kind, (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                   kind, (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
                    (int16_t)where, (int16_t)(where >> 16), slot,
                    CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT, slot),
                    0, 0, 0, facing);

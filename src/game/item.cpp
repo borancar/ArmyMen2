@@ -11054,6 +11054,237 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
     return o;
 }
 
+
+/* CreateVehicle -- original 0x0045B090, 992 bytes, four callers. The type-3
+ * arm of the four creators, and the LAST of them; it was read and deliberately
+ * NOT written one session ago, with the gap recorded in orig.h rather than
+ * guessed at. Every one of the five unknowns that deferred it was an `esp`
+ * displacement, and every one is settled below.
+ *
+ * WHAT DEFERRED IT, AND WHAT SETTLED IT. The function makes three calls whose
+ * arguments the compiler CLEANS LATER, with other pushes in between -- the
+ * malloc's 0x5DC is still on the stack through eight instructions and goes
+ * with ObjIsFriendly's `this`, and ObjInitCommon's seven pushes are cleaned in
+ * one `add esp, 0x1C` after the two stores that follow it. Tracking `esp`
+ * through those is the whole difficulty.
+ *
+ * THE FOUR THISCALLS ARE WHY IT LOOKED IMPOSSIBLE. `push eax; call
+ * CommMustBroadcast` with no cleanup at all, followed by `pop ebp; pop ebx;
+ * ret`, reads as a function that returns to its own argument. It does not:
+ * MSVC thiscall is CALLEE-cleanup for the stack arguments, so those pushes are
+ * gone by the time the call returns. Four sites here, and mis-reading one of
+ * them shifts every displacement after it.
+ *
+ * ARGUMENT 1'S SLOT IS REUSED TWICE -- first for the packed point, assembled
+ * as two `mov word` stores at [esp+0x18] and [esp+0x1E] under two different
+ * `esp` values, and then for the TURRET record pointer once the point has been
+ * handed to ObjInitCommon. Argument 10's slot becomes the ROW COUNT. Fourth
+ * and fifth functions in this tree to do that.
+ *
+ * A VEHICLE GETS A SECOND ROW exactly when ADDR_TURRET_ANIMS[kind] has a
+ * non-empty first dword, and that second row is the TURRET: its
+ * ROW_OFF_ANIM_CUR is the turret table, its ROW_OFF_FIELD_26 is copied from
+ * row 0, and it takes ROW_FLAG_BIT5 where row 0 takes BIT8 and BIT6.
+ *
+ * THE SIX-ARM WEAPON TABLE IS NOT IN LAYOUT ORDER. The arms read 6, 7, 8,
+ * 0x1D top to bottom; the table at 0x0045B450 says kind 0 takes 7, kind 1
+ * takes 6, kind 2 takes 8 and kind 5 takes 0x1D, with kinds 3 and 4 -- and
+ * every kind above 5, which the unsigned `ja` sends to the same place --
+ * skipping the weapon outright. Reading the bodies in order gets the first two
+ * backwards, which is the trap this project records for the sub-state table
+ * and for WeaponClassOf.
+ *
+ * ITS WEAPON'S NAME IS ADDR_DIR_SCRATCH, a shared char buffer, and its `at` is
+ * the dword at ADDR_ZERO_POINT. Both are the original's; the weapon is looked
+ * up by KEY, so the name is not what identifies it.
+ *
+ * +0x94 IS THE START OF THE PER-TYPE RECORD, not a pointer. gameproc.cpp's
+ * three loaders memcpy AM2_TYPE3_RECORD_SIZE bytes over it, so the `1` written
+ * here is that record's first field -- set unless this army is the player's in
+ * a single-player game, or has a live player in its comm slot. */
+void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
+                            int32_t table, int32_t army, int32_t flags,
+                            int32_t remote, uint32_t uid, int32_t facing)
+{
+    uint8_t       *o;
+    const uint8_t *def;
+    uint8_t       *rows;
+    const uint8_t *turret;
+    uint32_t       at;
+    int32_t        rowCount;
+    int32_t        weaponKind;
+    int32_t        i;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION && !remote
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)army))
+        return (void *)0;
+
+    def = (const uint8_t *)VehicleDefFind(kind);
+    if (def == (const uint8_t *)0) {
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_VEHICLE_NO_AAI), kind);
+        return (void *)0;
+    }
+
+    o = (uint8_t *)am2_malloc(AM2_VEHICLE_BYTES);
+    memset(o, 0, AM2_VEHICLE_BYTES);
+
+    at = (uint32_t)(uint16_t)(int16_t)x
+       | ((uint32_t)(uint16_t)(int16_t)y << 16);
+
+    *(uint8_t *)(o + OBJ_OFF_FACING)      = (uint8_t)facing;
+    *(uint8_t *)(o + TROOPER_OFF_FACING2) = (uint8_t)facing;
+    /* A BYTE store into the field the troop state lives in, where CreateTrooper
+     * writes a whole dword. The memset has just zeroed it, so the upper three
+     * bytes are zero either way; reproduced as the byte it is. */
+    *(uint8_t *)(o + OBJ_OFF_FIELD_530)   = (uint8_t)facing;
+
+    /* `or al, 0x21` touches only the low byte of the flags argument, and both
+     * bits are inside it. */
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) |=
+        (uint32_t)flags | OBJ_FLAG_BIT0 | OBJ_FLAG_SNAP_HEADING;
+
+    *(int8_t *)(o + OBJ_OFF_ARMY) = (int8_t)army;
+    *(int32_t *)(o + OBJ_OFF_RANK) = AM2_VEHICLE_RANK;
+
+    if (ObjIsFriendly(o))
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REVEALED;
+
+    /* Not the player's own. Two different questions depending on the session:
+     * without one it is the army against ADDR_DEFAULT_OWNER, with one it is
+     * whether that comm slot holds a live player. */
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) {
+        if (!CommSlotHasPlayer(*(void **)(uintptr_t)ADDR_COMM_OBJECT, army))
+            *(int32_t *)(o + OBJ_OFF_FIELD_94) = 1;
+    } else if ((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
+               != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
+        *(int32_t *)(o + OBJ_OFF_FIELD_94) = 1;
+    }
+
+    *(int32_t *)(o + VEHICLE_OFF_KIND) = kind;
+    /* An int32 table read one byte at a time -- all six values fit. */
+    *(uint8_t *)(o + OBJ_OFF_HEIGHT_ADJ) = (uint8_t)
+        ((const int32_t *)AM2_IMAGE(ADDR_VEHICLE_HEIGHT_BY_KIND))[kind];
+
+    ObjInitCommon(o, name, AM2_OBJ_TYPE_VEHICLE, at,
+                  (const int32_t *)AM2_IMAGE(ADDR_VEHICLE_BOX), remote, uid);
+
+    *(uint32_t *)(o + TROOPER_OFF_SPAWN_POS) =
+        *(const uint32_t *)(o + OBJ_OFF_POS);
+    *(const void **)(o + OBJ_OFF_TABLE_REC_SLOT) =
+        (const uint8_t *)AM2_IMAGE(ADDR_OBJ_TABLE_RECORDS)
+        + (uint32_t)table * AM2_OBJ_TABLE_REC_SIZE;
+
+    turret = (const uint8_t *)AM2_IMAGE(ADDR_TURRET_ANIMS)
+           + (uint32_t)kind * AM2_ANIM_TABLE_BYTES;
+    rowCount = (*(const int32_t *)turret > 0) ? 2 : 1;
+
+    BuildRowSet(o + OBJ_OFF_SUBRECORD, rowCount,
+                (const void *)AM2_IMAGE(ADDR_VEHICLE_ROW_SPEC), x, y,
+                (const void *)AM2_IMAGE(ADDR_VEHICLE_BOX));
+    SetFieldInAll(o + OBJ_OFF_SUBRECORD,
+                  *(void **)(o + OBJ_OFF_TABLE_REC_SLOT));
+
+    PtrListPush(((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[army],
+                *(void **)(o + OBJ_OFF_UID));
+
+    *(int32_t *)(o + VEHICLE_OFF_SEATS) =
+        *(const int32_t *)(def + VEHDEF_OFF_SEATS);
+    *(int32_t *)(o + VEHICLE_OFF_FIELD_558) =
+        *(const int32_t *)(def + VEHDEF_OFF_FIELD_08);
+    *(int32_t *)(o + VEHICLE_OFF_FIELD_55C) =
+        *(const int32_t *)(def + VEHDEF_OFF_FIELD_0C);
+    *(int32_t *)(o + VEHICLE_OFF_FIELD_560) =
+        *(const int32_t *)(def + VEHDEF_OFF_FIELD_10);
+    *(int32_t *)(o + VEHICLE_OFF_FIELD_564) =
+        *(const int32_t *)(def + VEHDEF_OFF_FIELD_14);
+
+    *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
+        (int16_t)*(const int32_t *)(def + VEHDEF_OFF_HEALTH);
+    SetMaxHealth(o, *(const int32_t *)(def + VEHDEF_OFF_HEALTH));
+    /* Re-read AFTER the call, which is the original's order and the whole
+     * reason the two stores are not one: SetMaxHealth scales it. */
+    *(int16_t *)(o + OBJ_OFF_HEALTH) = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
+
+    *(int32_t *)(o + OBJ_OFF_FIELD_568) =
+        *(const int32_t *)(def + VEHDEF_OFF_FIELD_1C);
+    *(int32_t *)(o + VEHICLE_OFF_ARMOUR) =
+        *(const int32_t *)(def + VEHDEF_OFF_ARMOUR);
+    *(uint8_t *)(o + OBJ_OFF_HEIGHT_SET) =
+        HeightAtPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
+
+    weaponKind = -1;
+    if ((uint32_t)kind <= 5u) {
+        switch (kind) {
+        case 0:  weaponKind = AM2_VEHICLE_WEAPON_KIND0; break;
+        case 1:  weaponKind = AM2_VEHICLE_WEAPON_KIND1; break;
+        case 2:  weaponKind = AM2_VEHICLE_WEAPON_KIND2; break;
+        case 5:  weaponKind = AM2_VEHICLE_WEAPON_KIND5; break;
+        default: break;              /* kinds 3 and 4 carry no weapon */
+        }
+    }
+
+    if (weaponKind >= 0
+        && (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+            || CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                 (int16_t)army))) {
+        void *w = CreateWeapon((char *)AM2_IMAGE(ADDR_DIR_SCRATCH), army,
+                               KeyLookupTriple(AM2_WEAPON_KEY_KIND,
+                                               (uint32_t)weaponKind, 0),
+                               *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
+                               AM2_VEHICLE_WEAPON_FLAGS, -1, remote, 0);
+
+        if (w != (void *)0)
+            *(int32_t *)(o + VEHICLE_OFF_WEAPON_UID) =
+                *(const int32_t *)((const uint8_t *)w + OBJ_OFF_UID);
+    }
+
+    if (!remote
+        && CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                             (int16_t)army))
+        SendItemCreate(o);
+
+    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    *(const void **)(rows + ROW_OFF_ANIM_CUR) =
+        (const uint8_t *)AM2_IMAGE(ADDR_VEHICLE_ANIMS)
+        + (uint32_t)kind * AM2_ANIM_TABLE_BYTES;
+    *(int16_t *)(rows + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
+    *(uint32_t *)rows |= ROW_FLAG_BIT8 | ROW_FLAG_BIT6;
+    *(uint32_t *)(rows + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
+
+    if (rowCount > 1) {
+        uint8_t *turretRow = rows + AM2_OBJ_ROW_STRIDE;
+
+        *(const void **)(turretRow + ROW_OFF_ANIM_CUR) = turret;
+        *(int16_t *)(turretRow + ROW_OFF_FIELD_26) =
+            *(const int16_t *)(rows + ROW_OFF_FIELD_26);
+        *(uint32_t *)turretRow |= ROW_FLAG_BIT5;
+    }
+
+    if ((flags & (int32_t)OBJ_FLAG_CONCEALED) || !ObjIsFriendly(o))
+        ObjConceal(o, 0);
+
+    SetKindFrames(o, 1);
+    RowUpdate(rows, 1, (void *)(uintptr_t)ADDR_MAP_DESC);
+
+    /* Every row past the first is placed at the object's position plus the
+     * FIRST row's sprite attachment point -- rows[0]'s sprite, not its own. */
+    for (i = 1; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
+        uint8_t       *r   = rows + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
+        const uint8_t *spr = *(const uint8_t *const *)(rows + ROW_OFF_SPRITE);
+
+        *(uint32_t *)(r + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
+        *(int16_t *)(r + ROW_OFF_X) += *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X);
+        *(int16_t *)(r + ROW_OFF_Y) += *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y);
+        RowUpdate(r, 1, (void *)(uintptr_t)ADDR_MAP_DESC);
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_STATE_ENTERED == 0)
+        ObjSetFootprint(o);
+
+    return o;
+}
+
 /* CreateItem -- original 0x00433980, 672 bytes, NINE callers. The type-1 arm
  * of the four creators, and the one SendItemCreate's own note names first.
  *
@@ -11915,6 +12146,8 @@ void item_install(void)
     patch_replace(ADDR_STEP_TYPE6, (const void *)StepType6, "StepType6", 1);
     patch_replace(ADDR_CREATE_TROOPER, (const void *)CreateTrooper,
                   "CreateTrooper", 1);
+    patch_replace(ADDR_CREATE_VEHICLE, (const void *)CreateVehicle,
+                  "CreateVehicle", 4);
     patch_replace(ADDR_CREATE_EXPLOSION, (const void *)CreateExplosion,
                   "CreateExplosion", 23);
     patch_replace(ADDR_CAN_PICK_UP_WEAPON, (const void *)CanPickUpWeapon,
