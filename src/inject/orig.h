@@ -8900,6 +8900,33 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MP_COMMIT_POINTS    0x004322E0u  /* void(AM2_Widget *) */
 #define MPFIELD_OFF_EDIT         0x58u  /* the edit child holding the digits */
 #define MPFIELD_OFF_ROW          0x70u  /* which army, for the points field */
+/* The SPINNER: an edit box showing a number with an up and a down arrow. Three
+ * handlers share it -- 0x00456580 when a typed value is committed, 0x004565D0
+ * and 0x00456660 for the two arrows -- and all three read the same five fields
+ * off it, which is what makes them one class rather than three functions.
+ *
+ * The two arrows do the same thing in opposite directions and clamp against
+ * opposite ends, and neither clamps the other way: up cannot go below the
+ * minimum only because it was already at or above it. The commit handler is
+ * the one that clamps BOTH ways, because it is the only one a user can hand an
+ * arbitrary number to.
+ *
+ * And only the arrows repaint and play a sound; the commit does neither, so a
+ * typed value that gets clamped shows its new value on the next repaint from
+ * somewhere else. Reproduced. */
+#define SPIN_OFF_EDIT            0x58u  /* the edit box child */
+#define SPIN_OFF_MIN             0x64u
+#define SPIN_OFF_MAX             0x68u
+#define SPIN_OFF_STEP            0x6Cu  /* what one arrow press moves */
+#define SPIN_OFF_HANDLER         0x80u  /* void(spinner *), or null */
+/* Back-pointers to the spinner, and the two CHILDREN keep it at different
+ * offsets -- the arrows at 0x78 and the edit at 0x7C. Read off the three
+ * bodies; which field the constructor writes is not established here. */
+#define SPINCHILD_OFF_SPIN_ARROW 0x78u
+#define SPINCHILD_OFF_SPIN_EDIT  0x7Cu
+#define ADDR_SPIN_COMMIT         0x00456580u  /* void(AM2_Widget *) */
+#define ADDR_SPIN_UP             0x004565D0u
+#define ADDR_SPIN_DOWN           0x00456660u
 #define ADDR_DECLARE_RULE_VARS   0x00421C70u  /* greenwins, tanwins, ...  */
 
 /* The five score variables' names, as `char *` in the image. Only the four

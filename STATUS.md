@@ -9,51 +9,54 @@ Last updated: **2026-09-01**, at `cb4f349`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,386 patches**, **29** analysis tools in `make check`.
+Nothing uncommitted. **1,389 patches**, **29** analysis tools in `make check`.
 
-**`MpCommitScore` and `MpCommitPoints` (`0x004322B0` and `0x004322E0`) are
-reconstructed** -- the multiplayer lobby's two typed numbers. 48 and 64 bytes,
-and they are the same function twice: read the edit child's text, `atoi` it,
-store it, broadcast with `SendPlayerMsg`. The only difference is where the
-number lands -- `ADDR_SCORE_LIMIT` for one, `ADDR_ARMY_POINTS[row]` for the
-other -- which is why the original wrote them out rather than passing a
-destination.
+**The spinner trio is reconstructed** -- `SpinCommit` (`0x00456580`, 80 B),
+`SpinUp` (`0x004565D0`) and `SpinDown` (`0x00456660`). A spinner is an edit box
+with two arrows beside it, and all three handlers read the same five fields off
+the spinner widget: the edit child at `SPIN_OFF_EDIT`, the range at
+`SPIN_OFF_MIN`/`SPIN_OFF_MAX`, the arrow step at `SPIN_OFF_STEP`, and an
+optional `void(spinner *)` notify at `SPIN_OFF_HANDLER`.
 
-**Both are gated on `COMM_OFF_IS_HOST` and neither tells the user**: a client
-can type in the box and nothing happens, not even a repaint. Same host-only rule
-the four row buttons beside them follow.
+**They are one class rather than three functions, and the differences are the
+part worth writing down.** The arrows clamp against ONE END EACH -- up clamps
+to max and never touches min, down the reverse -- because an arrow cannot
+cross the far end in a single step. The commit clamps BOTH ways, because it is
+the only one of the three a user can hand an arbitrary number to. And only the
+ARROWS repaint and play a sound: a value typed into the box and then clamped
+keeps showing what was typed until something else repaints it. Merging the
+three into one helper would have lost all three of those.
 
-**They were found by SPLITTING the outstanding entries, not by reading the
-list.** `docs/functions.tsv` shows 28 unpatched entries and the smallest is
-1,008 bytes; `tools/merges.py` splits those same entries into 34 real functions,
-of which the smallest are 16, 16, 48, 64 and 80 bytes. A hand-read of the
-outstanding list finds only the big merged entries and never these -- worth
-knowing with 27 left, because the remainder is not as uniformly large as the
-entry sizes suggest.
+**The two children sit at different offsets on the spinner** -- arrows at
+`SPINCHILD_OFF_SPIN_ARROW` (0x78), edit at `SPINCHILD_OFF_SPIN_EDIT` (0x7C) --
+and that was read off the three bodies rather than off the constructor, which
+is the more usual source. Three handlers agreeing about a layout is as good as
+a constructor stating it.
 
-**The compiler caught a duplicate offset name.** `EDIT_OFF_TEXT` was defined
-fresh in `orig.h` and already existed in `widget.h` at the same 0x58 -- the
-"grep the OFFSET before naming it" rule, enforced this time by a redefinition
-warning rather than by `checkoffsets`, which only reads `orig.h`. The surviving
-definition now records why 0x58 means two things one level apart: `AM2_Widget`'s
-own fields end there, so every subclass starts at 0x58.
+**`checkoffsets` caught a duplicate name, the second in two commits.**
+`ADDR_FMT_INT` was defined fresh and already existed in `orig.h`; the previous
+commit had the compiler catch `EDIT_OFF_TEXT` the same way. Two different
+mechanisms catching the same class of mistake in consecutive units is the
+argument for the ratchets, not against the rule -- the grep still costs one
+command and would have caught both before either tool ran.
 
-`tools/checkoffsetuse.py` says **"sets agree"** for both. A/B clean --
-`bootcamp` identical 1,610-line state dump and 13-message log at 22 pixels,
-`multi` identical 9-node widget tree and 7-message log at 54.
-
+**A/B: `bootcamp` 22 pixels, `multi` 0, `controls` 0 on the dialog frame**, all
+widget dumps and logs identical. `controls` is the configuration that compares
+the menu widget layer at all.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,205 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 34
-outstanding, which is 1,239 minus 1,205 -- from 1,377 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,214 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 25
+outstanding, which is 1,239 minus 1,214 -- from 1,389 patched addresses, and
+**86.3% of the sub-CRT bytes**. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and forty-four batches have gone in and NOTHING SMALL IS LEFT: the
-34 entries outstanding start at **928 bytes** and the median is **1,288**. The
+small ones in batches. A hundred and forty-five batches have gone in and NOTHING SMALL IS LEFT: the
+25 entries outstanding start at **1,056 bytes** -- `ObjHitMaskAction` at
+`0x004389D0` -- and the median is **1,424**. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred
 rather than unread; it is done, and with it the last thing under 900 bytes.
 The sentence here used to say they started at 96 and name the MSVC static-init

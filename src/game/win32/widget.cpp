@@ -9307,12 +9307,118 @@ void __cdecl MpCommitPoints(AM2_Widget *w)
     SendPlayerMsg(0);
 }
 
+/* SpinCommit, SpinUp and SpinDown -- original 0x00456580, 0x004565D0 and
+ * 0x00456660, one caller each: the constructor two hundred bytes above, which
+ * installs all three by `push imm32` alongside the spinner they belong to.
+ *
+ * A SPINNER IS AN EDIT BOX AND TWO ARROWS, and these are its three ways in. All
+ * three read the same five fields off the spinner, which is what makes them one
+ * class rather than three functions; the differences are worth stating because
+ * a merged version would lose every one of them:
+ *
+ *   the arrows clamp against ONE end each, up against the maximum and down
+ *   against the minimum, and neither clamps the other way -- up cannot fall
+ *   below the minimum only because it was already at or above it;
+ *
+ *   the COMMIT clamps both ways, because it is the only one a user can hand an
+ *   arbitrary number to;
+ *
+ *   and only the arrows repaint and play a sound. A typed value that gets
+ *   clamped therefore keeps showing what was typed until something else
+ *   repaints the box. Reproduced.
+ *
+ * The children keep the spinner at different offsets -- the arrows at 0x78 and
+ * the edit at 0x7C -- which is read off the three bodies and not from the
+ * constructor.
+ */
+static void SpinApply(AM2_Widget *spin, int32_t value)
+{
+    char *text = *(char *const *)((uint8_t *)
+                     *(AM2_Widget *const *)((uint8_t *)spin + SPIN_OFF_EDIT)
+                     + EDIT_OFF_TEXT);
+    void (__cdecl *fn)(AM2_Widget *);
+
+    orig_sprintf(text, (const char *)AM2_IMAGE(ADDR_FMT_INT), value);
+
+    fn = *(void (__cdecl **)(AM2_Widget *))((uint8_t *)spin + SPIN_OFF_HANDLER);
+    if (fn)
+        fn(spin);
+}
+
+static void SpinRepaint(AM2_Widget *spin)
+{
+    AM2_Widget *edit =
+        *(AM2_Widget *const *)((uint8_t *)spin + SPIN_OFF_EDIT);
+
+    ((AM2_WidgetPaintFn *)edit->vtable)[WIDGET_VSLOT_PAINT](edit, edit->rect);
+    PlaySoundAt(0, 0, 0, 0, 0);
+}
+
+void __cdecl SpinCommit(AM2_Widget *w)
+{
+    AM2_Widget *spin =
+        *(AM2_Widget *const *)((uint8_t *)w + SPINCHILD_OFF_SPIN_EDIT);
+    AM2_Widget *edit =
+        *(AM2_Widget *const *)((uint8_t *)spin + SPIN_OFF_EDIT);
+    int32_t     v = orig_atoi(*(const char *const *)((const uint8_t *)edit
+                                                     + EDIT_OFF_TEXT));
+    int32_t     hi = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MAX);
+    int32_t     lo = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MIN);
+
+    if (v > hi)
+        v = hi;
+    else if (v < lo)
+        v = lo;
+
+    SpinApply(spin, v);
+}
+
+void __cdecl SpinUp(AM2_Widget *w)
+{
+    AM2_Widget *spin =
+        *(AM2_Widget *const *)((uint8_t *)w + SPINCHILD_OFF_SPIN_ARROW);
+    AM2_Widget *edit =
+        *(AM2_Widget *const *)((uint8_t *)spin + SPIN_OFF_EDIT);
+    int32_t     v = orig_atoi(*(const char *const *)((const uint8_t *)edit
+                                                     + EDIT_OFF_TEXT))
+                  + *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_STEP);
+    int32_t     hi = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MAX);
+
+    if (v > hi)
+        v = hi;
+
+    SpinApply(spin, v);
+    SpinRepaint(spin);
+}
+
+void __cdecl SpinDown(AM2_Widget *w)
+{
+    AM2_Widget *spin =
+        *(AM2_Widget *const *)((uint8_t *)w + SPINCHILD_OFF_SPIN_ARROW);
+    AM2_Widget *edit =
+        *(AM2_Widget *const *)((uint8_t *)spin + SPIN_OFF_EDIT);
+    int32_t     v = orig_atoi(*(const char *const *)((const uint8_t *)edit
+                                                     + EDIT_OFF_TEXT))
+                  - *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_STEP);
+    int32_t     lo = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MIN);
+
+    if (v < lo)
+        v = lo;
+
+    SpinApply(spin, v);
+    SpinRepaint(spin);
+}
+
 int widget_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_HUD_UPDATE, (const void *)HudUpdate,
                         "HudUpdate", 0);
+    rc |= patch_replace(ADDR_SPIN_COMMIT, (const void *)SpinCommit,
+                        "SpinCommit", 1);
+    rc |= patch_replace(ADDR_SPIN_UP, (const void *)SpinUp, "SpinUp", 1);
+    rc |= patch_replace(ADDR_SPIN_DOWN, (const void *)SpinDown, "SpinDown", 1);
     rc |= patch_replace(ADDR_MP_COMMIT_SCORE, (const void *)MpCommitScore,
                         "MpCommitScore", 1);
     rc |= patch_replace(ADDR_MP_COMMIT_POINTS, (const void *)MpCommitPoints,

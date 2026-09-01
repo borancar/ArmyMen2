@@ -1654,4 +1654,11 @@ void __cdecl AimInit(void);
 void __cdecl MpCommitScore(AM2_Widget *w);
 void __cdecl MpCommitPoints(AM2_Widget *w);
 
+/* 0x00456580, 0x004565D0 and 0x00456660 -- a SPINNER's three ways in: a typed
+ * value committed, and the two arrows. The arrows clamp against one end each
+ * and repaint and play a sound; the commit clamps both ways and does neither. */
+void __cdecl SpinCommit(AM2_Widget *w);
+void __cdecl SpinUp(AM2_Widget *w);
+void __cdecl SpinDown(AM2_Widget *w);
+
 #endif /* AM2_WIDGET_H */
