@@ -9248,12 +9248,75 @@ void __cdecl PlacementScreenClick(uint32_t at)
         HudRepaintOne();
 }
 
+/* The CRT's own atoi, reached by address: the port replaces the CRT with libc
+ * wholesale and this is one narrow seam, the same standing src/game/crt.h's
+ * allocator trio has. */
+typedef int32_t (__cdecl *AM2_AtoiFn)(const char *);
+#define orig_atoi ((AM2_AtoiFn)(uintptr_t)ADDR_CRT_ATOI)
+
+/* MpCommitScore and MpCommitPoints -- original 0x004322B0 and 0x004322E0, one
+ * caller each and both installed as an edit field's handler by `push imm32`.
+ * The lobby's two typed numbers.
+ *
+ * THEY ARE THE SAME FUNCTION TWICE, forty-eight and sixty-four bytes: read the
+ * edit child's text, `atoi` it, store it, broadcast with SendPlayerMsg. The
+ * only difference is where the number lands -- ADDR_SCORE_LIMIT for one, and
+ * ADDR_ARMY_POINTS indexed by the widget's own row for the other -- which is
+ * why the original wrote them out rather than passing a destination.
+ *
+ * BOTH ARE GATED ON COMM_OFF_IS_HOST and neither says so to the user: a client
+ * can type in the box and nothing at all happens, not even a repaint. That is
+ * the original's, and it is the same host-only rule the four row buttons
+ * beside them follow.
+ *
+ * orig.h already recorded that "0x00431E10 sets ADDR_ARMY_POINTS from a lobby
+ * field through atoi". This is that field; the entry at 0x00431E10 is the
+ * panel holding it. */
+void __cdecl MpCommitScore(AM2_Widget *w)
+{
+    const uint8_t *comm = (const uint8_t *)g_commObject;
+    const AM2_Widget *edit;
+
+    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        return;
+
+    edit = *(const AM2_Widget *const *)((const uint8_t *)w + MPFIELD_OFF_EDIT);
+    *(int32_t *)(uintptr_t)ADDR_SCORE_LIMIT =
+        orig_atoi(*(const char *const *)((const uint8_t *)edit
+                                         + EDIT_OFF_TEXT));
+    SendPlayerMsg(0);
+}
+
+void __cdecl MpCommitPoints(AM2_Widget *w)
+{
+    const uint8_t *comm = (const uint8_t *)g_commObject;
+    const AM2_Widget *edit;
+    int32_t           row;
+
+    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        return;
+
+    edit = *(const AM2_Widget *const *)((const uint8_t *)w + MPFIELD_OFF_EDIT);
+    /* The row is read AFTER the atoi, which matters not at all -- but the
+     * original reads it there and nothing between the two touches it. */
+    row  = *(const int32_t *)((const uint8_t *)w + MPFIELD_OFF_ROW);
+
+    ((int32_t *)(uintptr_t)ADDR_ARMY_POINTS)[row] =
+        orig_atoi(*(const char *const *)((const uint8_t *)edit
+                                         + EDIT_OFF_TEXT));
+    SendPlayerMsg(0);
+}
+
 int widget_install(void)
 {
     int rc = 0;
 
     rc |= patch_replace(ADDR_HUD_UPDATE, (const void *)HudUpdate,
                         "HudUpdate", 0);
+    rc |= patch_replace(ADDR_MP_COMMIT_SCORE, (const void *)MpCommitScore,
+                        "MpCommitScore", 1);
+    rc |= patch_replace(ADDR_MP_COMMIT_POINTS, (const void *)MpCommitPoints,
+                        "MpCommitPoints", 1);
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);

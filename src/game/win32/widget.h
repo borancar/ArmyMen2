@@ -931,7 +931,11 @@ AM2_Widget *__attribute__((thiscall)) ButtonDelete(AM2_Widget *w,
  * unfocused one, and in FocusLabel it is 0x0065 focused and 0x0064 not.
  * Different classes, so there is no contradiction -- but it is the sharpest
  * illustration yet of why these tails must not be merged. */
-#define EDIT_OFF_TEXT       0x58   /* char *, the current contents */
+/* char *, the current contents. MPFIELD_OFF_EDIT in orig.h is the SAME number
+ * one level up -- the pointer to this edit box -- because AM2_Widget's own
+ * fields end at 0x58 and every subclass starts there. A second name for the
+ * text here was written and the compiler refused it. */
+#define EDIT_OFF_TEXT       0x58
 #define EDIT_OFF_FONT       0x60   /* int32_t */
 #define EDIT_OFF_INK_FOCUS  0x64   /* uint8_t, ink while focused */
 #define EDIT_OFF_INK        0x65   /* uint8_t, ink while not focused */
@@ -1642,5 +1646,12 @@ void __cdecl AimStart(uint32_t uid, int8_t army, uint32_t at);
 void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at);
 
 void __cdecl AimInit(void);
+
+/* 0x004322B0 and 0x004322E0, one caller each -- the lobby's two typed numbers,
+ * installed as an edit field's handler. The same function twice apart from
+ * where the number lands, and both gated on COMM_OFF_IS_HOST without saying so
+ * to the user. */
+void __cdecl MpCommitScore(AM2_Widget *w);
+void __cdecl MpCommitPoints(AM2_Widget *w);
 
 #endif /* AM2_WIDGET_H */

@@ -8885,6 +8885,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MAP_FOLDER          0x00511AC8u  /* the map's own directory */
 #define ADDR_RULES_DIR_STR       0x00485110u  /* a `char *` to "rules"    */
 #define ADDR_SCORE_LIMIT         0x00515FF0u  /* seeds `gamescorelimit`   */
+/* The two lobby fields that commit a typed number, 0x004322B0 and 0x004322E0,
+ * and they are the same forty-eight bytes twice over: read the edit child's
+ * text, atoi it, store it, and broadcast with SendPlayerMsg. Both are gated on
+ * COMM_OFF_IS_HOST, so a client typing in the box changes nothing -- which is
+ * what makes them a matched pair rather than one function with a flag. The
+ * only difference is where the number lands: ADDR_SCORE_LIMIT for one, and
+ * ADDR_ARMY_POINTS indexed by the widget's own row for the other.
+ *
+ * orig.h already recorded that "0x00431E10 sets it from a lobby field through
+ * atoi"; this is that field, and the entry at 0x00431E10 is the panel holding
+ * it. */
+#define ADDR_MP_COMMIT_SCORE     0x004322B0u  /* void(AM2_Widget *) */
+#define ADDR_MP_COMMIT_POINTS    0x004322E0u  /* void(AM2_Widget *) */
+#define MPFIELD_OFF_EDIT         0x58u  /* the edit child holding the digits */
+#define MPFIELD_OFF_ROW          0x70u  /* which army, for the points field */
 #define ADDR_DECLARE_RULE_VARS   0x00421C70u  /* greenwins, tanwins, ...  */
 
 /* The five score variables' names, as `char *` in the image. Only the four

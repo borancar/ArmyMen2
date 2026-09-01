@@ -5,40 +5,42 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `854b01e`. Working tree clean.
+Last updated: **2026-09-01**, at `cb4f349`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,384 patches**, **29** analysis tools in `make check`.
+Nothing uncommitted. **1,386 patches**, **29** analysis tools in `make check`.
 
-**`tools/regioncheck.py` is the oracle `orig.h` asked for by name.** That file
-says of this neighbourhood that "region routing feeds the AI, which no drive
-reaches, so a wrong next-hop table would pass every configuration in
-`tools/ab.sh`", and that what it wants is an oracle. This is it: 36 cases, and
-every one compares the WHOLE 12x12 next and cost matrices, with untouched cells
-left at 0xAA and 0xBB so a stray write fails as loudly as a missing one.
+**`MpCommitScore` and `MpCommitPoints` (`0x004322B0` and `0x004322E0`) are
+reconstructed** -- the multiplayer lobby's two typed numbers. 48 and 64 bytes,
+and they are the same function twice: read the edit child's text, `atoi` it,
+store it, broadcast with `SendPlayerMsg`. The only difference is where the
+number lands -- `ADDR_SCORE_LIMIT` for one, `ADDR_ARMY_POINTS[row]` for the
+other -- which is why the original wrote them out rather than passing a
+destination.
 
-**`RegionFindPath` is HOOKED, which is the point rather than a shortcut.** It is
-1,168 bytes of A* over the region graph and still the original's; hooking it to
-hand back a chosen path means the SEARCH is not under test and no graph has to
-be seeded for it. What is under test is the two nested double loops that turn
-one path into next-hop entries for every prefix and suffix, in both directions,
-and the asymmetric no-path exit.
+**Both are gated on `COMM_OFF_IS_HOST` and neither tells the user**: a client
+can type in the box and nothing happens, not even a repaint. Same host-only rule
+the four row buttons beside them follow.
 
-**Five mutations, all of which fail, and one of them is the whole reason to have
-this.** Making the no-path exit SYMMETRIC -- writing `cost[to][from]` beside
-`cost[from][to]` -- fails 2 cases. That asymmetry is one line of C that looks
-exactly like a typo, `orig.h` documents it as deliberate, and until now nothing
-could tell the two apart. The other four: forward next-hop off by one fails 14,
-the reverse loop bound 14, the reverse next-hop off by one 14, and dropping the
-inactive-target refusal 16.
+**They were found by SPLITTING the outstanding entries, not by reading the
+list.** `docs/functions.tsv` shows 28 unpatched entries and the smallest is
+1,008 bytes; `tools/merges.py` splits those same entries into 34 real functions,
+of which the smallest are 16, 16, 48, 64 and 80 bytes. A hand-read of the
+outstanding list finds only the big merged entries and never these -- worth
+knowing with 27 left, because the remainder is not as uniformly large as the
+entry sizes suggest.
 
-**It checks the MODEL, not the C, and that line is principled.**
-`tests/fireposevec.h` can replay against the C because `SelectFirePose` reaches
-nothing that is still the image's; this one cannot, because `RegionSolvePair`
-calls the original `RegionFindPath` and giving the C the same hook would put
-test scaffolding into production code. CLAUDE.md now says which kind a new
-oracle is and how to tell.
+**The compiler caught a duplicate offset name.** `EDIT_OFF_TEXT` was defined
+fresh in `orig.h` and already existed in `widget.h` at the same 0x58 -- the
+"grep the OFFSET before naming it" rule, enforced this time by a redefinition
+warning rather than by `checkoffsets`, which only reads `orig.h`. The surviving
+definition now records why 0x58 means two things one level apart: `AM2_Widget`'s
+own fields end there, so every subclass starts at 0x58.
+
+`tools/checkoffsetuse.py` says **"sets agree"** for both. A/B clean --
+`bootcamp` identical 1,610-line state dump and 13-message log at 22 pixels,
+`multi` identical 9-node widget tree and 7-message log at 54.
 
 
 ## Stop condition
