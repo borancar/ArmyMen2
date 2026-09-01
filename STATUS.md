@@ -9,7 +9,54 @@ Last updated: **2026-09-01**, at `ba116b4`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,370 patches.**
+Nothing uncommitted. **1,371 patches.**
+
+**`LoadType3` (`0x0045A120`)** -- the VEHICLE member of the per-type savegame
+loader family, and the last of the eight that was small enough to take.
+`LoadType8` is its near twin and was read beside it the whole way; what follows
+is the diff.
+
+**It rebuilds two lists and one pointer out of saved counts.** A vehicle
+carries a `{capacity, count, items}` record at `OBJ_OFF_PTR_LIST` and a second
+at `VEHICLE_OFF_PTR_LIST`, and pointers do not survive a reload -- so the file
+holds a COUNT for each and that many uids after the record, read one at a time
+and pushed. The third rebuild beside them is the same trade `LoadType5` makes
+with the missile defs: `OBJ_OFF_TABLE_REC_SLOT` is written from a saved comm
+SLOT, `ADDR_OBJ_TABLE_RECORDS + (slot << 8)`, where the object holds a pointer.
+
+**Every field the record hands over lands on a name this project already had**
+-- the kind on `VEHICLE_OFF_KIND`, the slot on `OBJ_OFF_TABLE_REC_SLOT`, the
+two lists on the two `*_PTR_LIST`. So the type-3 record is the object's own
+tail written out, and only one of the seven fields it reads was unnamed.
+
+**And its last write is `OBJ_FLAG_FOOTPRINT_ON`, which the ratchet proved.** It
+went in as a structural `OBJ_FLAG_BIT21` with "what it gates is unestablished",
+and `tools/checkoffsets.py` refused it as a second name on a flag that already
+existed -- the same clear `LoadType8` makes, so the loaded vehicle lays its
+footprint down again rather than trusting one the file supplied. The sibling
+reading predicted it; the ratchet is what proved it.
+
+**The two stack records are emptied on purpose** so the destructors at the end
+free nothing -- the items they name are now the object's. `LoadType8` does this
+with its one record; there are two here.
+
+**The health rescale is `LoadType8`'s with one difference that matters**: the
+new maximum comes from the vehicle DEFINITION rather than a global, through a
+bsearch that can MISS, and the whole rescale is skipped when it does -- so a
+vehicle whose type has no `.aai` entry keeps the health the file gave it. That
+bsearch is `ADDR_VEHICLE_DEF_FIND`, `ADDR_MISSILE_DEF_FIND`'s twin, named with
+its table and count.
+
+**The dead-vehicle arm runs FIRST and that makes the two exclusive by
+construction.** A vehicle arriving without `OBJ_FLAG_BIT0`, or with no health,
+is forced to `BIT0` set and `DESTROYED` clear, handed to `DestroyByType` and
+zeroed -- before the rescale, which then sees zero health and does nothing.
+
+**A sixth private typedef of a creator, avoided.** `CreateVehicle`'s ten-
+argument typedef was in `armymsg.cpp`; rather than copy it, it moved to
+`item.h` where `CreateRoach` and `CreateItem` are declared. Its argument order
+was written before this function was read and matches the disassembly exactly,
+which is what made the first four arguments free.
 
 **`CreateExplosion` (`0x00422860`)** -- twenty-three callers, one of them
 itself, and it was `ADDR_SPAWN_AT` with `orig.h` saying of it and its
@@ -4013,16 +4060,16 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,198 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 41
-outstanding, which is 1,239 minus 1,198 -- from 1,370 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,199 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 40
+outstanding, which is 1,239 minus 1,199 -- from 1,371 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and thirty-seven batches have gone in and NOTHING SMALL IS LEFT: the
-41 entries outstanding start at **672 bytes** -- `0x00447620`, which is
+small ones in batches. A hundred and thirty-eight batches have gone in and NOTHING SMALL IS LEFT: the
+40 entries outstanding start at **672 bytes** -- `0x00447620`, which is
 `CreateTrooper` and is deferred rather than unread -- and the median is
-**1,168**.
+**1,192**.
 The sentence here used to say they started at 96 and name the MSVC static-init
 glue at `0x004248A0` as the smallest; that entry is gone and so is the whole
 band under 480. What is left is real functions, so the strategy that ranked by

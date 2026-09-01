@@ -141,6 +141,11 @@ int32_t __cdecl SaveType3(am2_FILE *fp, void *obj);
 
 /* 0x00435500. The type 7 loader, and the only one that reads no file. */
 void *__cdecl LoadType6(am2_FILE *fp, const void *hdr);
+
+/* 0x0045A120, one caller. The VEHICLE loader: rebuild two pointer lists and
+ * one table-record pointer out of counts and a comm slot the file carries,
+ * then rescale the health against the vehicle definition. */
+void *__cdecl LoadType3(am2_FILE *fp, const void *hdr);
 void *__cdecl LoadType7(am2_FILE *fp, const void *hdr);
 
 void gameproc_install(void);

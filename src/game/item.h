@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include "../inject/orig.h"   /* am2_FILE, for the savegame pair */
+#include "image.h"       /* AM2_IMAGE -- the two seams below */
 
 #ifdef __cplusplus
 extern "C" {
@@ -280,6 +281,21 @@ void __cdecl ObjSetRoachFootprint(void *obj);
  * Allocate a roach, seed it from the ROACH_* constants aai/game.aai names,
  * run the common init and the row set, and lay its footprint down unless the
  * state has already been entered. */
+/* CreateVehicle and the vehicle-definition bsearch, both still the original's
+ * and both wanted by two modules now -- armymsg.cpp for the item-create
+ * message and gameproc.cpp for LoadType3. The typedef is HERE rather than in
+ * either of them, for the reason the five copies of CreateExplosion's made
+ * plain: a second private typedef is a second place to be wrong. */
+typedef void *(__cdecl *AM2_CreateVehicleFn)(int32_t kind, const char *name,
+                                             int32_t x, int32_t y, int32_t a5,
+                                             int32_t army, int32_t flags,
+                                             int32_t remote, uint32_t uid,
+                                             int32_t a10);
+#define CreateVehicle  (*(AM2_CreateVehicleFn)AM2_IMAGE(ADDR_CREATE_VEHICLE))
+
+typedef void *(__cdecl *AM2_VehicleDefFindFn)(int32_t kind);
+#define VehicleDefFind (*(AM2_VehicleDefFindFn)AM2_IMAGE(ADDR_VEHICLE_DEF_FIND))
+
 void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
                           int32_t army, int32_t flags, int32_t a7,
                           int32_t uid);

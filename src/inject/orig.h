@@ -11712,7 +11712,42 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * caught twice today by reading siblings, and guessing it at the end of a
  * long session is how the third one would get written instead of found. */
 #define ADDR_LOAD_TYPE2       0x004471D0u  /* takes a THIRD argument */
-#define ADDR_LOAD_TYPE3       0x0045A120u
+#define ADDR_LOAD_TYPE3       0x0045A120u  /* reconstructed */
+/* The type-3 record's fields LoadType3 reads BEFORE the memcpy puts the whole
+ * thing at OBJ_OFF_FIELD_94. Each is that offset plus 0x94, and every one of
+ * those lands on a field this file already names -- +0x10 on OBJ_OFF_PTR_LIST,
+ * +0x498 on VEHICLE_OFF_KIND, +0x4A0 on OBJ_OFF_TABLE_REC_SLOT and +0x4A4 on
+ * VEHICLE_OFF_PTR_LIST. So the record is the object's own tail written out,
+ * and the loader's job is to turn its two SAVED COUNTS and one SAVED SLOT back
+ * into pointers, which is the same index-for-a-pointer trade LoadType5 makes
+ * with the missile defs. */
+#define TYPE3_REC_OFF_LIST         0x10u   /* {capacity, count, items} */
+#define TYPE3_REC_OFF_LIST_COUNT   0x14u   /* how many uids follow the record */
+#define TYPE3_REC_OFF_ARG5         0x494u  /* CreateVehicle's fifth argument */
+#define TYPE3_REC_OFF_KIND         0x498u  /* -> VEHICLE_OFF_KIND */
+#define TYPE3_REC_OFF_SLOT         0x4A0u  /* a comm slot, not a pointer */
+#define TYPE3_REC_OFF_PTR_LIST     0x4A4u  /* -> VEHICLE_OFF_PTR_LIST */
+#define TYPE3_REC_OFF_PTR_COUNT    0x4A8u
+/* What LoadType3 forces into OBJ_OFF_RANK after copying the record over it, so
+ * the file's own value is discarded. Nothing read so far says what a rank of 5
+ * means to a vehicle. */
+#define AM2_TYPE3_LOAD_RANK        5
+/* LoadType3's last write is `flags &= ~0x200000`, which went in as
+ * OBJ_FLAG_BIT21 with "what it gates is unestablished" -- and
+ * tools/checkoffsets.py refused it as a second name on OBJ_FLAG_FOOTPRINT_ON.
+ * It is the same clear LoadType8 makes for the same reason: the loaded object
+ * lays its footprint down again rather than trusting a flag the file supplied.
+ * The sibling predicted it and the ratchet is what proved it. */
+/* 0x0045EBF0, and it is ADDR_MISSILE_DEF_FIND's twin: a bsearch of the vehicle
+ * definition table with ADDR_COMPARE_DWORD, so the id is the record's first
+ * dword. The pointer and the count are two adjacent globals the parser fills.
+ * Returns null for a type with no entry, which is the case 0x0045B090 logs as
+ * "Vehicle aai entry not found for type %d". */
+#define ADDR_VEHICLE_DEF_FIND      0x0045EBF0u /* rec *(int32 kind) */
+#define ADDR_VEHICLE_DEFS          0x00662024u /* rec * */
+#define ADDR_VEHICLE_DEF_COUNT     0x00662028u /* int32_t */
+#define AM2_VEHICLE_DEF_BYTES      0x24
+#define VEHDEF_OFF_HEALTH          0x18u  /* what SetMaxHealth is given */
 #define ADDR_LOAD_TYPE4       0x0045EF50u
 #define ADDR_LOAD_TYPE5       0x0043B870u
 #define ADDR_LOAD_TYPE6       0x00422780u

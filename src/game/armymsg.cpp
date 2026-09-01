@@ -933,10 +933,7 @@ typedef void *(__cdecl *AM2_CreateTrooperFn)(const char *, int32_t, int32_t,
                                              int32_t, int32_t, int32_t,
                                              int32_t, uint32_t, int32_t,
                                              int32_t);
-typedef void *(__cdecl *AM2_CreateVehicleFn)(int32_t, const char *, int32_t,
-                                             int32_t, int32_t, int32_t,
-                                             int32_t, int32_t, uint32_t,
-                                             int32_t);
+/* AM2_CreateVehicleFn moved to item.h -- gameproc.cpp wants it too. */
 typedef void *(__cdecl *AM2_CreateWeaponFn)(const char *, int32_t, int32_t,
                                             int32_t, int32_t, int32_t,
                                             int32_t, uint32_t);
@@ -1022,7 +1019,7 @@ void __cdecl ItemPostCreate(int32_t army, uint32_t where)
 }
 
 #define orig_create_trooper  ((AM2_CreateTrooperFn)(uintptr_t)ADDR_CREATE_TROOPER)
-#define orig_create_vehicle  ((AM2_CreateVehicleFn)(uintptr_t)ADDR_CREATE_VEHICLE)
+#define orig_create_vehicle  CreateVehicle
 #define orig_create_weapon   ((AM2_CreateWeaponFn)(uintptr_t)ADDR_CREATE_WEAPON)
 
 /* SendItemCreate -- original 0x0042AB50, FOUR callers, and they are the four

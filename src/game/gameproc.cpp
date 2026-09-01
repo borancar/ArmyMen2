@@ -1153,6 +1153,159 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
     return o;
 }
 
+/* LoadType3 -- original 0x0045A120, one caller, and the VEHICLE member of the
+ * per-type savegame loader family. LoadType8 above is its near twin and was
+ * read beside it the whole way; what follows is the diff.
+ *
+ * IT REBUILDS TWO LISTS AND ONE POINTER OUT OF SAVED COUNTS. A vehicle carries
+ * a {capacity, count, items} record at OBJ_OFF_PTR_LIST and a second at
+ * VEHICLE_OFF_PTR_LIST, and pointers do not survive a reload -- so the file
+ * holds a COUNT for each and that many uids after the record, and this reads
+ * them one at a time and PtrListPushes each. Same trade as the third rebuild
+ * beside them: OBJ_OFF_TABLE_REC_SLOT is written from a saved comm SLOT,
+ * `ADDR_OBJ_TABLE_RECORDS + (slot << 8)`, where the object holds a pointer.
+ *
+ * THE TWO STACK RECORDS ARE THE FILE'S COPIES AND ARE DELIBERATELY EMPTIED. It
+ * zeroes both {capacity, count, items} triples on the stack before the
+ * destructors run, so the frees at the end free nothing -- the items they name
+ * are now the object's. LoadType8 does exactly this with its one record; there
+ * are two here.
+ *
+ * THE ARG5 IT PASSES CreateVehicle IS THE ONE FIELD OF THE SEVEN THAT IS NOT
+ * ALREADY NAMED. Everything else the record hands over lands on a field this
+ * file names -- the kind, the slot, the two lists -- so the record is the
+ * object's own tail written out. See TYPE3_REC_OFF_ARG5.
+ *
+ * IT FORCES OBJ_OFF_RANK TO 5 AFTER copying the record over it, so whatever
+ * the file said there is discarded. Reproduced; nothing read says what a rank
+ * of 5 means to a vehicle.
+ *
+ * THE HEALTH RESCALE IS LoadType8's, with one difference that matters: the new
+ * maximum comes from the vehicle DEFINITION rather than a global, through a
+ * bsearch that can MISS -- and the whole rescale is skipped when it does, so a
+ * vehicle whose type has no .aai entry keeps the health the file gave it.
+ *
+ * AND THE DEAD-VEHICLE ARM RUNS FIRST. A vehicle arriving without
+ * OBJ_FLAG_BIT0, or with no health left, is forced to BIT0 set and
+ * OBJ_FLAG_DESTROYED clear, handed to DestroyByType, and zeroed to no health
+ * -- before the rescale, which then sees a health of zero and does nothing.
+ * So the two are exclusive by construction rather than by a test.
+ *
+ * AND ITS LAST WRITE IS OBJ_FLAG_FOOTPRINT_ON, which went in as a structural
+ * "bit 21" with nothing said about it -- and tools/checkoffsets.py refused the
+ * new name as a second one on a flag that already existed. It is the same
+ * clear LoadType8 makes. The sibling reading predicted it and the ratchet is
+ * what proved it.
+ *
+ * DELIBERATE DEVIATION -- the MSVC structured-exception frame is not
+ * reproduced, per the standing decision in CLAUDE.md and for the reason
+ * LoadType8 already records: nothing in this program throws.
+ */
+void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
+{
+    uint8_t        rec[AM2_TYPE3_RECORD_SIZE];
+    const uint8_t *h = (const uint8_t *)hdr;
+    uint8_t       *o;
+    const uint8_t *def;
+    int32_t        i, n;
+    uint32_t       uid;
+    float          part;
+
+    InitPtrList(rec + TYPE3_REC_OFF_LIST);
+    InitPtrList(rec + TYPE3_REC_OFF_PTR_LIST);
+
+    orig_fread(rec, AM2_TYPE3_RECORD_SIZE, 1, fp);
+
+    o = (uint8_t *)CreateVehicle(*(const int32_t *)(rec + TYPE3_REC_OFF_KIND),
+                                 (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                                 *(const int16_t *)(h + OBJ_OFF_POS),
+                                 *(const int16_t *)(h + OBJ_OFF_POS + 2),
+                                 *(const int32_t *)(rec + TYPE3_REC_OFF_ARG5),
+                                 *(const int8_t *)(h + OBJ_OFF_ARMY),
+                                 *(const int32_t *)(h + OBJ_OFF_FLAGS), 1,
+                                 *(const int32_t *)(h + 4), 0);
+
+    memcpy(o, h, (size_t)*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE);
+
+    ClearPtrList(o + OBJ_OFF_PTR_LIST);
+    ClearPtrList(o + VEHICLE_OFF_PTR_LIST);
+
+    memcpy(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE3_RECORD_SIZE);
+
+    *(int32_t *)(o + OBJ_OFF_RANK) = AM2_TYPE3_LOAD_RANK;
+    *(const uint8_t **)(o + OBJ_OFF_TABLE_REC_SLOT) =
+        (const uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+        + (*(const int32_t *)(rec + TYPE3_REC_OFF_SLOT)
+           * AM2_OBJ_TABLE_REC_SIZE);
+
+    *(int32_t *)(o + OBJ_OFF_PTR_LIST)     = 0;
+    *(int32_t *)(o + OBJ_OFF_PTR_LIST + 4) = 0;
+    *(int32_t *)(o + OBJ_OFF_PTR_LIST + 8) = 0;
+
+    n = *(const int32_t *)(rec + TYPE3_REC_OFF_LIST_COUNT);
+    for (i = 0; i < n; i++) {
+        orig_fread(&uid, 4, 1, fp);
+        PtrListPush(o + OBJ_OFF_PTR_LIST, (void *)(uintptr_t)uid);
+        n = *(const int32_t *)(rec + TYPE3_REC_OFF_LIST_COUNT);
+    }
+
+    *(int32_t *)(o + VEHICLE_OFF_PTR_LIST)     = 0;
+    *(int32_t *)(o + VEHICLE_OFF_PTR_LIST + 4) = 0;
+    *(int32_t *)(o + VEHICLE_OFF_PTR_LIST + 8) = 0;
+
+    n = *(const int32_t *)(rec + TYPE3_REC_OFF_PTR_COUNT);
+    for (i = 0; i < n; i++) {
+        orig_fread(&uid, 4, 1, fp);
+        PtrListPush(o + VEHICLE_OFF_PTR_LIST, (void *)(uintptr_t)uid);
+        n = *(const int32_t *)(rec + TYPE3_REC_OFF_PTR_COUNT);
+    }
+
+    /* Both stack records emptied so the destructors below free nothing. */
+    *(int32_t *)(rec + TYPE3_REC_OFF_LIST)          = 0;
+    *(int32_t *)(rec + TYPE3_REC_OFF_LIST + 4)      = 0;
+    *(int32_t *)(rec + TYPE3_REC_OFF_LIST + 8)      = 0;
+    *(int32_t *)(rec + TYPE3_REC_OFF_PTR_LIST)      = 0;
+    *(int32_t *)(rec + TYPE3_REC_OFF_PTR_LIST + 4)  = 0;
+    *(int32_t *)(rec + TYPE3_REC_OFF_PTR_LIST + 8)  = 0;
+
+    ResetObjOnCof(o);
+
+    if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0)
+        || *(const int16_t *)(o + OBJ_OFF_HEALTH) <= 0) {
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) =
+            (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & ~(uint32_t)OBJ_FLAG_DESTROYED)
+            | OBJ_FLAG_BIT0;
+        DestroyByType(o);
+        *(int16_t *)(o + OBJ_OFF_HEALTH) = 0;
+    }
+
+    def = (const uint8_t *)VehicleDefFind(
+              *(const int32_t *)(o + VEHICLE_OFF_KIND));
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0 && def) {
+        int32_t now;
+
+        part = (float)((double)*(const int16_t *)(o + OBJ_OFF_HEALTH)
+                       / (double)*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH));
+        SetMaxHealth(o, *(const int32_t *)(def + VEHDEF_OFF_HEALTH));
+
+        now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
+        *(int16_t *)(o + OBJ_OFF_HEALTH) =
+            (int16_t)(int32_t)((double)now * (double)part);
+        *(int16_t *)(o + OBJ_OFF_HEALTH) =
+            (int16_t)Clamp(*(const int16_t *)(o + OBJ_OFF_HEALTH), 1, now);
+    }
+
+    /* The same clear LoadType8 makes, and for the same reason: the loaded
+     * vehicle's footprint gets laid down again rather than being assumed
+     * present from a flag the file supplied. */
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
+
+    ClearPtrListAlias(rec + TYPE3_REC_OFF_PTR_LIST);
+    ClearPtrListAlias(rec + TYPE3_REC_OFF_LIST);
+    return o;
+}
+
 /* LoadType1 -- original 0x00433D60, one caller, and SaveType1's counterpart.
  *
  * The saver writes the 0x2C-byte type record and then a TAG taken from the
@@ -1518,7 +1671,6 @@ typedef int32_t (__cdecl *AM2_LoadHdrFn)(am2_FILE *fp, void *hdr);
 typedef void *(__cdecl *AM2_LoadObjFn)(am2_FILE *fp, void *hdr);
 typedef void *(__cdecl *AM2_LoadObj3Fn)(am2_FILE *fp, void *hdr, int32_t a);
 #define orig_load_type2  ((AM2_LoadObj3Fn)(uintptr_t)ADDR_LOAD_TYPE2)
-#define orig_load_type3  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE3)
 #define orig_load_type4  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE4)
 
 /* 0x004289E0, SaveOneItem's counterpart. Reads a header onto the stack and
@@ -1566,7 +1718,7 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
     switch (*(const int32_t *)hdr) {
     case 1:  made = (uint8_t *)LoadType1(fp, hdr);            break;
     case 2:  made = (uint8_t *)orig_load_type2(fp, hdr, arg); break;
-    case 3:  made = (uint8_t *)orig_load_type3(fp, hdr);      break;
+    case 3:  made = (uint8_t *)LoadType3(fp, hdr);      break;
     case 4:  made = (uint8_t *)orig_load_type4(fp, hdr);      break;
     case 5:  made = (uint8_t *)LoadType5(fp, hdr);      break;
     case 6:  made = (uint8_t *)LoadType6(fp, hdr);      break;
@@ -2048,6 +2200,7 @@ void gameproc_install(void)
     patch_replace(ADDR_SAVE_TYPE3, (const void *)SaveType3, "SaveType3", 1);
     patch_replace(ADDR_LOAD_TYPE7, (const void *)LoadType7, "LoadType7", 1);
     patch_replace(ADDR_LOAD_TYPE6, (const void *)LoadType6, "LoadType6", 1);
+    patch_replace(ADDR_LOAD_TYPE3, (const void *)LoadType3, "LoadType3", 1);
     patch_replace(ADDR_SEL_LIST_INIT, (const void *)SelListInit,
                   "SelListInit", 1);
     patch_replace(ADDR_SEL_LIST_CTOR_THUNK, (const void *)SelListConstructThunk,
