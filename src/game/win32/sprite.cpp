@@ -558,10 +558,172 @@ typedef int32_t (__cdecl *am2_findfirst_fn)(const char *pattern, void *data);
 typedef int32_t (__cdecl *am2_findclose_fn)(int32_t handle);
 
 #define orig_sprintf        ((am2_sprintf_fn)AM2_IMAGE(ADDR_GAME_SPRINTF))
-#define orig_load_shadow    ((am2_load_shadow_fn)AM2_IMAGE(ADDR_LOAD_SHADOW_BMP))
+/* LoadShadowBmp is reconstructed above and called by name. */
 #define orig_findfirst      ((am2_findfirst_fn)AM2_IMAGE(ADDR_CRT_FINDFIRST))
 #define orig_findclose      ((am2_findclose_fn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
 #define g_spriteSetDirs     ((const char *const *)AM2_IMAGE(ADDR_SPRITE_SET_DIRS))
+
+/* LoadShadowBmp -- original 0x00423300, one caller: SpriteLoadTriple's loose
+ * `.sha` half, so it runs only under -df. orig.h had it as "a 1-bit DIB read
+ * into spr->overlay", which is where it ENDS; what it does on the way is
+ * RUN-LENGTH ENCODE the bitmap.
+ *
+ * THE STREAM IT BUILDS, and every part of it is invented by this function:
+ *
+ *   int16  width
+ *   int16  height
+ *   int16  offset[height]   -- from the stream's own start to that row's runs
+ *   uint8  runs[]           -- alternating counts of clear and set pixels,
+ *                              each capped at AM2_RLE_RUN_MAX
+ *
+ * Every row starts with a CLEAR run, which may be zero, so the parity is
+ * fixed and no run needs a tag. A row ends when the cursor reaches width - 1,
+ * not width, which is the sort of off-by-one worth reproducing exactly.
+ *
+ * IT IS ALL BUILT IN A 32 KB STACK BUFFER and then copied into a malloc of
+ * exactly the length used, which is also what it returns. Nothing bounds the
+ * encoder against that buffer: a bitmap whose rows alternate every pixel
+ * needs width bytes per row, so a sprite wider than about 32,000 pixels total
+ * would smash the frame. The original's, and kept.
+ *
+ * THE DIB HEADER IS READ AS RAW OFFSETS, the way LoadDibFlipped reads its
+ * own, so nothing here names a Win32 structure. Two of the fields are not
+ * used for what a bitmap reader would expect:
+ *
+ *   THE STRIDE IS biSizeImage / biHeight, computed rather than derived from
+ *   the width -- so a .sha whose biSizeImage is wrong reads garbage rather
+ *   than failing, and a biSizeImage of zero is what the "invalid file size"
+ *   message catches.
+ *
+ *   THE HOT SPOT COMES OUT OF biXPelsPerMeter AND biYPelsPerMeter, low word
+ *   of each. AM2_Sprite's own comment already records that smuggling from the
+ *   reader's end -- "it has only biXPelsPerMeter and biYPelsPerMeter to
+ *   smuggle them through and splits them by axis" -- and this is the writer.
+ *
+ * THE HOT SPOT IS CLAMPED AND THE CLAMP IS SIGNED. Outside +/-0x800 on either
+ * axis the value is dropped to zero, per axis, with word compares -- so a
+ * negative hot spot is fine and a wild one is discarded rather than refused.
+ *
+ * IT ONLY TOUCHES THE REST OF THE SPRITE WHEN THERE IS NO IMAGE YET. With
+ * spr->image already set, the overlay and its palette go in and the bounds,
+ * hot spot, format and flag are left alone -- so a .sha loaded over a sprite
+ * that already has its bitmap adds a layer without redefining it.
+ *
+ * ftell IS CALLED ON A FILE JUST OPENED and its answer added to bfOffBits.
+ * That is zero for a plain fopen; it is reproduced because the sum is what
+ * the seek uses and a reader who drops it would be surprised by an archive.
+ */
+int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
+{
+    uint8_t   fileHdr[AM2_BMPFILE_HDR_BYTES];
+    uint8_t   infoHdr[AM2_BMPINFO_HDR_BYTES];
+    uint8_t   palette[0x400];
+    uint8_t   stream[0x8000];
+    am2_FILE *fp;
+    int32_t   base;
+    uint8_t  *pixels;
+    uint8_t  *out;
+    uint8_t  *rowTable;
+    int32_t   width, height, stride, bytes;
+    int32_t   row, x, len;
+
+    if (!spr)
+        return 0;
+
+    spr->overlay = (AM2_Rle16 *)0;
+
+    fp = orig_fopen(path, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    if (!fp)
+        return 0;
+
+    base = (int32_t)orig_ftell(fp);
+    orig_fread(fileHdr, AM2_BMPFILE_HDR_BYTES, 1, fp);
+    orig_fread(infoHdr, AM2_BMPINFO_HDR_BYTES, 1, fp);
+
+    if (*(const int16_t *)(infoHdr + BMPINFO_OFF_BITCOUNT) != 1) {
+        orig_fclose(fp);
+        orig_log((const char *)AM2_IMAGE(AM2_STR_SHA_NOT_1BIT), path);
+        return 0;
+    }
+
+    orig_fread(palette, (size_t)*(const int32_t *)(infoHdr + BMPINFO_OFF_HEIGHT)
+                        * 4, 1, fp);
+    orig_fseek(fp, *(const int32_t *)(fileHdr + BMPFILE_OFF_BITS) + base, 0);
+
+    bytes = *(const int32_t *)(infoHdr + BMPINFO_OFF_SIZEIMAGE);
+    if (bytes <= 0) {
+        orig_fclose(fp);
+        orig_log((const char *)AM2_IMAGE(AM2_STR_SHA_BAD_SIZE), path);
+        return 0;
+    }
+
+    pixels = (uint8_t *)am2_malloc((size_t)bytes);
+    orig_fread(pixels, (size_t)bytes, 1, fp);
+    orig_fclose(fp);
+
+    height = *(const int32_t *)(infoHdr + BMPINFO_OFF_HEIGHT);
+    width  = *(const int32_t *)(infoHdr + BMPINFO_OFF_WIDTH);
+    stride = bytes / height;
+
+    *(int16_t *)(stream + 0) = (int16_t)width;
+    *(int16_t *)(stream + 2) = (int16_t)height;
+
+    rowTable = stream + 4;
+    out      = stream + 4 + (uint32_t)height * 2;
+
+    for (row = 0; row < height; row++, rowTable += 2) {
+        *(int16_t *)rowTable = (int16_t)(out - stream);
+
+        x = 0;
+        do {
+            uint8_t n = 0;
+
+            while (x < width && n < AM2_RLE_RUN_MAX
+                   && !BitmapBitSet(pixels, x, row, height, stride)) {
+                x++;
+                n++;
+            }
+            *out++ = n;
+
+            n = 0;
+            while (x < width && n < AM2_RLE_RUN_MAX
+                   && BitmapBitSet(pixels, x, row, height, stride)) {
+                x++;
+                n++;
+            }
+            *out++ = n;
+        } while (x < width - 1);
+    }
+
+    am2_free(pixels);
+
+    len = (int32_t)(out - stream);
+    spr->overlay = (AM2_Rle16 *)am2_malloc((size_t)len);
+    memcpy(spr->overlay, stream, (size_t)len);
+    spr->palette = *(void *const *)(uintptr_t)ADDR_DEFAULT_PALETTE;
+
+    if (!spr->image.surface) {
+        int16_t hx = *(const int16_t *)(infoHdr + BMPINFO_OFF_XPELS);
+        int16_t hy = *(const int16_t *)(infoHdr + BMPINFO_OFF_YPELS);
+
+        spr->bounds.left   = 0;
+        spr->bounds.top    = 0;
+        spr->bounds.right  = width;
+        spr->bounds.bottom = height;
+
+        spr->hotX = hx;
+        spr->hotY = hy;
+        if (!(hx <= AM2_SHA_HOT_LIMIT && hx >= -AM2_SHA_HOT_LIMIT))
+            spr->hotX = 0;
+        if (!(hy <= AM2_SHA_HOT_LIMIT && hy >= -AM2_SHA_HOT_LIMIT))
+            spr->hotY = 0;
+
+        spr->format = AM2_SPR_FORMAT_SHADOW;
+        spr->flags |= SPR_FLAG_HAS_OVERLAY;
+    }
+
+    return len;
+}
 
 /* 0x004457E0. Fill a sprite record from {set, index, frame}.
  *
@@ -631,7 +793,7 @@ int32_t __cdecl SpriteLoadTriple(AM2_Sprite *spr, int32_t set, int32_t index,
     if (handle == -1) {
         spr->overlay = 0;
     } else {
-        orig_load_shadow((const char *)(found + AM2_FIND_OFF_NAME), spr);
+        LoadShadowBmp((const char *)(found + AM2_FIND_OFF_NAME), spr);
         orig_findclose(handle);
     }
 
@@ -2105,6 +2267,8 @@ int sprite_install(void)
     rc |= patch_replace(ADDR_DRAW_SPRITE, (const void *)DrawSprite, "DrawSprite", 4);
     rc |= patch_replace(ADDR_SPRITE_REGISTER, (const void *)SpriteRegister,
                         "SpriteRegister", 2);
+    rc |= patch_replace(ADDR_LOAD_SHADOW_BMP, (const void *)LoadShadowBmp,
+                        "LoadShadowBmp", 1);
     rc |= patch_replace(ADDR_SPRITE_LOAD_TRIPLE, (const void *)SpriteLoadTriple,
                         "SpriteLoadTriple", 2);
     rc |= patch_replace(ADDR_SPRITE_SET_FOR_KEY, (const void *)SpriteSetForKey,

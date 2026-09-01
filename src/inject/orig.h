@@ -5037,7 +5037,40 @@ typedef struct {
 #define ADDR_SPRITE_LOAD_DF       0x00423FE0u  /* int32(spr,set,idx,frm,flags) */
 /* The .sha half of a loose sprite: a 1-bit DIB read into spr->overlay. Named
  * from its own "ERROR: %s not in 1-bit mode\n". */
-#define ADDR_LOAD_SHADOW_BMP      0x00423300u  /* void(const char *, spr) */
+/* READ, and it does more than load: it RUN-LENGTH ENCODES the 1-bit DIB into
+ * the sprite's overlay, one stream with a {width, height} header, a table of
+ * per-row 16-bit offsets, and alternating zero/one run lengths capped at 255.
+ * The whole thing is built in a 32 KB stack buffer and then copied into a
+ * malloc of exactly the length used. Reconstructed; see win32/sprite.cpp.
+ *
+ * Its three failure messages are its own: "ERROR: %s not in 1-bit mode",
+ * "ERROR: invalid file size in %s.", and silence for a file that will not
+ * open. It answers the encoded length, or 0. */
+#define ADDR_LOAD_SHADOW_BMP      0x00423300u  /* int32(const char *, spr) */
+/* Where the .sha's own header fields land. The DIB is read as raw offsets,
+ * the way LoadDibFlipped reads its own, so that nothing here has to name a
+ * Win32 structure -- and the two that matter are not where a bitmap reader
+ * would look for them: biSizeImage divided by biHeight is the STRIDE, and
+ * biXPelsPerMeter and biYPelsPerMeter carry the sprite's HOT SPOT. The
+ * AM2_Sprite comment already records that smuggling from the other end. */
+#define BMPFILE_OFF_BITS           10u   /* bfOffBits */
+#define BMPINFO_OFF_WIDTH          4u
+#define BMPINFO_OFF_HEIGHT         8u
+#define BMPINFO_OFF_BITCOUNT       14u
+#define BMPINFO_OFF_SIZEIMAGE      20u
+#define BMPINFO_OFF_XPELS          24u
+#define BMPINFO_OFF_YPELS          28u
+#define AM2_BMPFILE_HDR_BYTES      14u
+#define AM2_BMPINFO_HDR_BYTES      0x28u
+/* The clamp the hot spot gets on the way in: anything outside this either way
+ * is dropped to zero, per axis. Signed word compares. */
+#define AM2_SHA_HOT_LIMIT          0x800
+/* What a .sha leaves the sprite as. */
+#define AM2_SPR_FORMAT_SHADOW      4
+#define SPR_FLAG_HAS_OVERLAY       0x20u
+#define AM2_RLE_RUN_MAX            0xFF
+#define AM2_STR_SHA_NOT_1BIT       0x00478A34u /* "ERROR: %s not in 1-bit mode\n" */
+#define AM2_STR_SHA_BAD_SIZE       0x00478A10u /* "ERROR: invalid file size in %s.\n" */
 /* One directory name per sprite SET, indexed by the set number. Sets 0..19 are
  * the fixed ones -- "00-cursors", "01-title", "10-dash", "19-other" -- and
  * 20 and up are the map's own art, which is why those get the loaded map's
