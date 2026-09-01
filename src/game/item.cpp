@@ -9250,10 +9250,237 @@ void __cdecl ToggleSelect(void *obj)
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
 }
 
-typedef int32_t (__cdecl *AM2_VehicleBlockFn)(void *veh, int32_t facing,
-                                              uint32_t at, int32_t unused);
-#define orig_vehicle_block_weight \
-    ((AM2_VehicleBlockFn)(uintptr_t)ADDR_VEHICLE_BLOCK_WEIGHT)
+
+/* VehicleBlockWeight -- original 0x0045BC70, 992 bytes, three callers. How
+ * blocked is this vehicle, at this point, facing this way -- and, when the
+ * fourth argument says so, RUN THE THINGS OVER. It is the vehicle counterpart
+ * of RoachMaskWeight, and the two loops in it are the mask walk.
+ *
+ * IT IS TWO NEARLY IDENTICAL LOOPS, one for AM2_VEHICLE_KIND_BOAT and one for
+ * everything else, and the differences between them are the whole finding.
+ * Written out rather than merged, because four of the five are asymmetries a
+ * merged loop would quietly lose:
+ *
+ *   the per-point weight comes from BlockWeightChain for the boat and from
+ *   BlockWeightTroops for everything else;
+ *
+ *   the damage threshold on OBJ_OFF_FIELD_44 -- the speed the animation
+ *   supplies -- is 0x28 for the boat and 0x3C for the rest, so a boat starts
+ *   doing its heavier damage at a lower speed;
+ *
+ *   THE BOAT SAMPLES THE OBJECTS AT ITS OWN POINT, NOT AT THE MASK POINT. The
+ *   two loops are byte-identical for twenty-six bytes except one: `8d 44 24 28`
+ *   against `8d 44 24 24`, a `lea` of the argument slot holding the caller's
+ *   point against a `lea` of the scratch the offset point was just written
+ *   into. Both loops hand the OFFSET point to the weight helper, so only the
+ *   ObjectsAtPoint call differs. Reproduced, not corrected: it is one byte in
+ *   the original and there is nothing here that could show it was intended;
+ *
+ *   an EMPTY MASK returns 0 outright on the boat path and falls into the tail
+ *   on the other, so a boat with no mask never reaches the final sample, the
+ *   0x40 clamp or the sound;
+ *
+ *   and the boat path has no sound and no `sound` bookkeeping at all -- it
+ *   returns before the tail.
+ *
+ * THE SOUND'S `y` ARGUMENT STRADDLES TWO ARGUMENTS. All three arms read a
+ * DWORD at the caller's point PLUS TWO, which is that point's high word with
+ * the low word of the FOURTH argument above it -- and the sound only ever
+ * plays when that argument is non-zero, so the straddle is never harmless
+ * padding. Written out as the arithmetic it is, because the two adjacent cdecl
+ * slots make it exactly reproducible and guessing at a plain int16 would not
+ * be the same bits.
+ *
+ * The record index is recomputed from OBJ_OFF_TABLE_REC_KIND at the bottom of
+ * each loop rather than latched, which is the original's spelling; for the
+ * boat loop that is the same 5 it entered with.
+ */
+int32_t __cdecl VehicleBlockWeight(void *veh, int32_t facing, uint32_t at,
+                                   int32_t apply)
+{
+    uint8_t       *v       = (uint8_t *)veh;
+    const int32_t *counts  = (const int32_t *)AM2_IMAGE(ADDR_VEHICLE_MASK_COUNT);
+    const uint8_t *masks   = (const uint8_t *)AM2_IMAGE(ADDR_VEHICLE_MASK);
+    uint32_t       base    = at;    /* argument 3's slot, and the boat's sample */
+    uint32_t       pt      = 0;     /* argument 2's, once the facing is copied */
+    int32_t        weight  = 0;
+    int32_t        sound   = 0;
+    int32_t        facing8 = facing & 0xFF;
+    int32_t        answer;
+    int32_t        i;
+    int32_t        rec;
+    void          *list;
+    uint8_t       *o;
+
+#define AM2_MASK_REC(n) \
+    (*(const int32_t *)((const uint8_t *)counts + (uint32_t)(n) \
+                        * AM2_VEHICLE_MASK_STRIDE))
+#define AM2_MASK_PT(n, k) \
+    ((const int16_t *)(masks + (uint32_t)(n) * AM2_VEHICLE_MASK_STRIDE \
+                       + (uint32_t)(k) * 4))
+
+    if (*(const int32_t *)(v + VEHICLE_OFF_KIND) == AM2_VEHICLE_KIND_BOAT) {
+        rec = AM2_VEHICLE_KIND_BOAT * AM2_VEHICLE_MASK_DIRS + facing8;
+        if (AM2_MASK_REC(rec) <= 0)
+            return 0;
+
+        i = 0;
+        do {
+            const int16_t *p = AM2_MASK_PT(rec, i);
+
+            pt = (uint32_t)(uint16_t)(int16_t)(p[0] + (int16_t)base)
+               | ((uint32_t)(uint16_t)(int16_t)(p[1] + (int16_t)(base >> 16))
+                  << 16);
+
+            /* &base, and that is the one byte the two loops differ in. */
+            list = ObjectsAtPoint(&base,
+                                  (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+            weight += BlockWeightChain(v, pt, list, base);
+
+            if (apply && list) {
+                for (o = (uint8_t *)list; o != (uint8_t *)0;
+                     o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
+                    int32_t hp;
+                    int32_t speed;
+
+                    if (o == v)
+                        continue;
+                    if (!ObjCollidesWith(v, o))
+                        continue;
+                    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                        <= *(const uint32_t *)(v + OBJ_OFF_DEADLINE_58))
+                        continue;
+
+                    *(uint32_t *)(v + OBJ_OFF_DEADLINE_58) =
+                        *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                        + AM2_VEHICLE_HIT_COOLDOWN;
+
+                    hp    = *(const int32_t *)(v + OBJ_OFF_FIELD_568);
+                    speed = *(const int32_t *)(v + OBJ_OFF_FIELD_44);
+                    if (speed < 0)
+                        speed = -speed;
+
+                    if (ObjIsType2((const AM2_Object *)o))
+                        ;                       /* a trooper takes all of it */
+                    else if (speed > AM2_BOAT_CRUSH_SPEED)
+                        hp /= 3;
+                    else
+                        hp /= 6;
+
+                    DamageObject(o, hp, AM2_DAMAGE_KIND_RUN_OVER,
+                                 *(const uint32_t *)(v + OBJ_OFF_UID), 0, 0);
+                }
+            }
+
+            i++;
+            rec = (*(const int32_t *)(v + VEHICLE_OFF_KIND)
+                   * AM2_VEHICLE_MASK_DIRS) + facing8;
+        } while (i < AM2_MASK_REC(rec));
+
+        return weight;
+    }
+
+    rec = (*(const int32_t *)(v + VEHICLE_OFF_KIND) * AM2_VEHICLE_MASK_DIRS)
+        + facing8;
+
+    if (AM2_MASK_REC(rec) > 0) {
+        i = 0;
+        do {
+            const int16_t *p = AM2_MASK_PT(rec, i);
+
+            pt = (uint32_t)(uint16_t)(int16_t)(p[0] + (int16_t)base)
+               | ((uint32_t)(uint16_t)(int16_t)(p[1] + (int16_t)(base >> 16))
+                  << 16);
+
+            list = ObjectsAtPoint(&pt,
+                                  (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+            weight += BlockWeightTroops(v, pt, list, base);
+
+            if (apply && list) {
+                for (o = (uint8_t *)list; o != (uint8_t *)0;
+                     o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
+                    int32_t speed = *(const int32_t *)(v + OBJ_OFF_FIELD_44);
+
+                    if (o == v)
+                        continue;
+
+                    if (ObjCollidesWith(v, o)
+                        && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                           > *(const uint32_t *)(v + OBJ_OFF_DEADLINE_58)) {
+                        int32_t hp = *(const int32_t *)(v + OBJ_OFF_FIELD_568);
+                        int32_t s  = speed < 0 ? -speed : speed;
+
+                        *(uint32_t *)(v + OBJ_OFF_DEADLINE_58) =
+                            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                            + AM2_VEHICLE_HIT_COOLDOWN;
+
+                        if (ObjIsType2((const AM2_Object *)o))
+                            ;
+                        else if (s > AM2_VEHICLE_CRUSH_SPEED)
+                            hp /= 3;
+                        else
+                            hp /= 6;
+
+                        DamageObject(o, hp, AM2_DAMAGE_KIND_RUN_OVER,
+                                     *(const uint32_t *)(v + OBJ_OFF_UID),
+                                     0, 0);
+
+                        /* Only reached when something was actually hit: fast
+                         * always, and otherwise one time in sixteen. The
+                         * original wraps the `setg` in the compiler's abs(),
+                         * which on a 0/1 value is a no-op. */
+                        if (speed > AM2_VEHICLE_NOISY_SPEED
+                            || (orig_game_rand() & 0xFF) < AM2_VEHICLE_NOISE_ODDS)
+                            sound = 1;
+                    }
+
+                    /* Reached whether or not it was hit. */
+                    speed = speed < 0 ? -speed : speed;
+                    if (speed > AM2_VEHICLE_NOISY_SPEED
+                        && (ObjIsType3((const AM2_Object *)o)
+                            || (ObjIsItem((const AM2_Object *)o)
+                                && *(const int8_t *)(o + OBJ_OFF_RANK)
+                                   >= (int8_t)AM2_VEHICLE_NOISY_RANK)))
+                        sound = 1;
+                }
+            }
+
+            i++;
+            rec = (*(const int32_t *)(v + VEHICLE_OFF_KIND)
+                   * AM2_VEHICLE_MASK_DIRS) + facing8;
+        } while (i < AM2_MASK_REC(rec));
+    }
+
+    answer = weight;
+
+    /* One last sample, at the vehicle's own point, and a weight at or above
+     * AM2_BLOCK_CLEAR replaces everything the mask accumulated. */
+    pt   = base;
+    list = ObjectsAtPoint(&pt, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+    if (BlockWeightTroops(v, pt, list, base) >= AM2_BLOCK_CLEAR)
+        answer = weight = AM2_VEHICLE_BLOCKED_WEIGHT;
+
+    if (sound) {
+        int32_t kind = *(const int32_t *)(v + VEHICLE_OFF_KIND);
+        int32_t sx   = (int32_t)base;
+        /* The DWORD at base+2: the point's y with `apply`'s low word above it.
+         * See this function's note. */
+        int32_t sy   = (int32_t)(((uint32_t)base >> 16)
+                                 | (((uint32_t)apply & 0xFFFFu) << 16));
+
+        if (kind == AM2_VEHICLE_KIND_TANK)
+            PlaySoundAt(AM2_SND_CRUSH_TANK, 2, 0, sx, sy);
+        else if (kind == AM2_VEHICLE_KIND_JEEP)
+            PlaySoundAt(AM2_SND_CRUSH_JEEP, 2, 0, sx, sy);
+        else
+            PlaySoundAt(AM2_SND_CRUSH_OTHER, 2, 0, sx, sy);
+    }
+
+    return answer;
+
+#undef AM2_MASK_REC
+#undef AM2_MASK_PT
+}
 
 /* NearestClearVehiclePoint -- original 0x0045B930, one caller. The same square
  * spiral NearestClearPoint above walks, asking a different question at each
@@ -9295,7 +9522,7 @@ void __cdecl NearestClearVehiclePoint(void *veh, int32_t facing, uint32_t from,
         const uint8_t *entry;
 
         if (PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT), out)
-            && orig_vehicle_block_weight(veh, snapped,
+            && VehicleBlockWeight(veh, snapped,
                                          *(const uint32_t *)out, 0)
                < AM2_VEHICLE_CLEAR_WEIGHT)
             return;
@@ -12148,6 +12375,9 @@ void item_install(void)
                   "CreateTrooper", 1);
     patch_replace(ADDR_CREATE_VEHICLE, (const void *)CreateVehicle,
                   "CreateVehicle", 4);
+    patch_replace(ADDR_VEHICLE_BLOCK_WEIGHT,
+                  (const void *)VehicleBlockWeight,
+                  "VehicleBlockWeight", 3);
     patch_replace(ADDR_CREATE_EXPLOSION, (const void *)CreateExplosion,
                   "CreateExplosion", 23);
     patch_replace(ADDR_CAN_PICK_UP_WEAPON, (const void *)CanPickUpWeapon,

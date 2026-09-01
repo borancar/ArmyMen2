@@ -5,65 +5,57 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `6213e8d`. Working tree clean.
+Last updated: **2026-09-01**, at `54c7e2c`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,380 patches.**
+Nothing uncommitted. **1,381 patches.**
 
-**`CreateVehicle` (`0x0045B090`, 992 B, four callers) is reconstructed** -- the
-type-3 arm, the LAST of the four creators, and the deferral this file recorded
-two commits ago rather than guessing at. All five of the unknowns that deferred
-it were `esp` displacements and all five are settled.
+**`VehicleBlockWeight` (`0x0045BC70`, 992 B, three callers) is reconstructed** --
+how blocked a vehicle is at a point facing a way, and, when its fourth argument
+says so, RUNNING OVER whatever is standing there.
 
-**What settled them was the THISCALL rule, not more staring.** `push eax; call
-CommMustBroadcast` with no cleanup at all, followed by `pop ebp; pop ebx; ret`,
-reads as a function returning to its own argument -- until you remember that
-MSVC thiscall is CALLEE-cleanup for the stack arguments. Four sites here, and
-mis-reading one shifts every displacement after it. On top of that the compiler
-defers three cleanups: the malloc's `0x5DC` is still on the stack eight
-instructions later and goes with `ObjIsFriendly`'s `this`, and ObjInitCommon's
-seven pushes are cleaned in one `add esp, 0x1C` after the two stores that
-follow the call.
+**It is two nearly identical mask loops and the differences are the finding.**
+One serves `AM2_VEHICLE_KIND_BOAT` and one everything else; written out rather
+than merged, because four of the five differences are asymmetries a merged loop
+would quietly lose:
 
-**Argument 1's slot is reused TWICE** -- for the packed point, assembled as two
-`mov word` stores under two different `esp` values, and then for the turret
-record pointer once the point has been consumed. Argument 10's slot becomes the
-row count. Fourth and fifth functions in this tree to do that.
+| | boat | everything else |
+|---|---|---|
+| per-point weight | `BlockWeightChain` | `BlockWeightTroops` |
+| heavier-damage speed | 0x28 | 0x3C |
+| objects sampled at | **the vehicle's own point** | the mask point |
+| empty mask | returns 0 | falls into the tail |
+| crush sound | never | speed- and rank-gated |
 
-**A vehicle's SECOND ROW is its turret**, and `ADDR_TURRET_ANIMS[kind]` being
-non-empty is the whole of what decides whether it has one.
+**The third row is one byte.** The two loops are byte-identical for twenty-six
+bytes except `8d 44 24 28` against `8d 44 24 24` -- a `lea` of the argument slot
+holding the caller's point against a `lea` of the scratch the offset point was
+just written into. Both loops hand the OFFSET point to the weight helper, so
+only the `ObjectsAtPoint` call differs. Reproduced, not corrected: it is one
+byte in the original and nothing here could show it was intended.
 
-**Its six-arm weapon table is NOT in layout order**: the arms read 6, 7, 8,
-0x1D top to bottom while the table says kind 0 takes 7 and kind 1 takes 6.
-Reading the bodies in order gets the first two backwards.
+**The crush sound's `y` argument straddles two arguments.** All three arms read
+a DWORD at the caller's point PLUS TWO -- that point's high word with the low
+word of the fourth argument above it -- and the sound only ever plays when that
+argument is non-zero, so the straddle is never harmless padding. Written out as
+the arithmetic it is, because two adjacent cdecl slots make it exactly
+reproducible.
 
-**`+0x94` is the start of the per-type RECORD, not a pointer.** gameproc.cpp's
-loaders memcpy `AM2_TYPE3_RECORD_SIZE` bytes over it, so the `1` written here
-is that record's first field. Reading it as the pointer item.cpp dereferences
-elsewhere would have been a fault waiting for the first vehicle.
+**The caption table named the sounds.** `0x00419A18` gives JEEP, TANK, H|T,
+CONV, ???, BOAT for kinds 0 to 5, so the three sound ids are the tank's, the
+jeep's and everything else's rather than three numbers.
 
-**`tools/checkoffsetuse.py` is what checked the result**: 36 of the original's
-38 displacements are named in the C, and the two that are not are the turret
-row's, reached as `rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_*` where the original
-folds both into one displacement -- a blind spot that tool's own docstring
-lists. The same check run over the two functions before this one came back
-clean.
+**`tools/checkoffsetuse.py` says the sets AGREE** -- all seven of the original's
+displacements are named in the C and there are none the C invents. That is the
+first function this session where it reports a clean match with nothing to
+explain away.
 
-**Its counter reads 0 and it runs FOUR TIMES per Boot Camp load**, which is the
-count-of-0 blind spot in its purest form -- all four of its callers are
-reconstructed and reach it by name. What settles it is the object-state dump:
-`bootcamp` has four `type=3` objects and they come back byte for byte identical
-from the original and from us.
-
-That dump is a far better oracle here than "A/B clean", because it shows the
-fields this function writes. `box=-48,-48,48,48` is ADDR_VEHICLE_BOX exactly;
-`flags=2099233` is 0x200721, which is the `0x21` this function ORs in, plus
-OBJ_FLAG_CONCEALED from the conceal path, plus OBJ_FLAG_FOOTPRINT_ON from
-ObjSetFootprint at the very bottom; and the four `health=` pairs read
-138,138 / 256,256 / 210,210 / 160,160 -- three distinct definition values, each
-copied to the current health AFTER SetMaxHealth rather than before, which is the
-one ordering in this function that is easy to get backwards.
+**Cold in every configuration here, and the counter can say so.** Two of its
+three callers are still original, so the counter is not blind -- and it reads 0
+through a Boot Camp load. Verified by reading and by an A/B that says nothing
+else moved: `bootcamp` identical 1,610-line state dump and 13-message log at 22
+pixels, `campaign` identical 35-node widget tree and 14-message log at 2 pixels.
 
 ## Stop condition
 

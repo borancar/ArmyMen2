@@ -1116,6 +1116,21 @@ That table also confirms what this file worked out by probing: arm 34 is index
 12 and calls `0x00425DA0`, the in-mission ESCAPE handler, and ordinary play
 sits in 33. Two independent routes to the same fact.
 
+**TWO NEARLY IDENTICAL LOOPS ARE WORTH DIFFING BYTE FOR BYTE.**
+`VehicleBlockWeight` walks the vehicle mask twice, once for the boat and once
+for everything else, and the two bodies are the same to the eye. They are not
+the same to `cmp`: one twenty-six-byte run differs in exactly ONE byte,
+`8d 44 24 28` against `8d 44 24 24`, which is the boat sampling the objects at
+its OWN point where every other kind samples at the mask point. Four other
+differences sit around it -- a different weight helper, a different damage
+threshold, a different empty-mask exit, and no sound at all -- so merging the
+two into one parameterised loop would have lost five things and looked tidier
+for it.
+
+Reading them side by side is not enough; `img.read` on both and comparing the
+hex is, and it takes one command. Where the original repeats itself, diff the
+BYTES before believing the repetition.
+
 **And a fourth: A TABLE WITH NINETEEN INDICES AND TWO ARMS.** `TrooperFire`'s
 switch at `0x0044A360` covers codes 0x14..0x26 through a byte table whose
 entries are only 0 and 1, so it is a FILTER rather than a dispatch -- seven

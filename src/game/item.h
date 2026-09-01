@@ -277,6 +277,14 @@ int32_t __cdecl BlockWeightRoute(void *from, uint32_t at, void *chain,
 int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
                                  uint32_t ref);
 
+/* 0x0045BC70, three callers. How blocked is this vehicle, at this point,
+ * facing this way -- and when `apply` is non-zero, run over whatever is
+ * standing there. TWO nearly identical mask loops, one for the boat and one
+ * for everything else, differing in five ways that a merged loop would lose;
+ * see the note on the definition. */
+int32_t __cdecl VehicleBlockWeight(void *veh, int32_t facing, uint32_t at,
+                                   int32_t apply);
+
 /* 0x0043CF70. The FOURTH variant, and the only one with a side effect: the
  * same walk as BlockWeightChain, with AM2_TILE_BLOCKS instead of
  * AM2_TILE_OPEN, with BlockWeightAt's height step, and DAMAGING every object

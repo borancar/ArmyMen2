@@ -7218,6 +7218,27 @@ typedef struct {
 #define AM2_VEHICLE_CLEAR_WEIGHT  0x1E  /* below this and the vehicle fits */
 #define AM2_VEHICLE_FACING_BITS   5     /* the facing is rounded to 32 */
 #define AM2_BLOCK_CLEAR          0x0F  /* a weight below this is passable */
+/* VehicleBlockWeight's own constants, all of them literals in its two loops.
+ * The three speeds are OBJ_OFF_FIELD_44, which ADDR_STEP_OBJ_ROWS fills from
+ * the row's animation -- so these are all "how fast is it moving". The two
+ * CRUSH speeds differ between the boat's loop and everyone else's, which is
+ * the sort of thing a merged loop loses. */
+#define AM2_VEHICLE_HIT_COOLDOWN   0x64  /* ms added to OBJ_OFF_DEADLINE_58 */
+#define AM2_BOAT_CRUSH_SPEED       0x28  /* above this a BOAT does damage/3 */
+#define AM2_VEHICLE_CRUSH_SPEED    0x3C  /* above this everything else does */
+#define AM2_VEHICLE_NOISY_SPEED    0x50  /* above this it always makes a noise */
+#define AM2_VEHICLE_NOISE_ODDS     0x10  /* else 16 of 256 GameRand draws do */
+#define AM2_VEHICLE_NOISY_RANK     0x0F  /* an ITEM under this stays quiet */
+#define AM2_VEHICLE_BLOCKED_WEIGHT 0x40  /* the final sample's verdict */
+#define AM2_DAMAGE_KIND_RUN_OVER   4
+/* The three crush sounds, picked on the vehicle kind. Named from the caption
+ * table at 0x00419A18, which is the program's own vocabulary for these
+ * numbers: JEEP, TANK, H|T, CONV, ???, BOAT for kinds 0 to 5. */
+#define AM2_SND_CRUSH_TANK         0x23
+#define AM2_SND_CRUSH_JEEP         0x24
+#define AM2_SND_CRUSH_OTHER        0x25
+#define AM2_VEHICLE_KIND_JEEP      0
+#define AM2_VEHICLE_KIND_TANK      1
 #define OBJ_OFF_SCRIPT_FRAME     0xB8u
 #define OBJ_OFF_SCRIPT_NEXT      0xBCu   /* deadline, compared against 0x00511E04 */
 /* A second deadline on the same clock, at +0x58. It had "0x004355D0 is the
