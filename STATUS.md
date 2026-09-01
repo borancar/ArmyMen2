@@ -9,7 +9,32 @@ Last updated: **2026-09-02**, at `969936a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,404 patches**, **30** analysis tools in `make check`.
+Nothing uncommitted. **1,404 patches** plus three REGISTERED, **30** analysis
+tools in `make check`.
+
+**`MedkitHealOne` (`0x00458AB0`, 160 B) is reconstructed** -- the callback
+`ForEachArmyObject` applies for a medkit: heal one trooper by the MEDKIT
+definition's percentage, crediting our leader as the source.
+
+**Its third argument is hidden by a batched cleanup.** The original pushes the
+leader, calls the definition bsearch with ONE argument and cleans only that, so
+the leader is still on the stack when `HealObject`'s own two go down and a
+single `add esp, 0xc` cleans all three. Read literally it looks like a stray
+push; it is `HealObject`'s `src`.
+
+**It is REGISTERED, not patched** -- all four references are the reconstructed
+pickup paths, so a detour would install a jump nothing in the image can reach.
+Third entry beside `WndProc` and `AudioTimerProc`.
+
+**The alias ratchet caught it going in under a second name.** I named the
+address `ADDR_MEDKIT_HEAL`; it had been `ADDR_MEDKIT_HEAL_ONE` all along, with a
+comment that already said what the function does. `checkpatches` refused it as a
+22nd alias. Grep the ADDRESS first -- the ratchet is the mechanism, not the
+backstop.
+
+`OurLeaderUnit` was promoted out of `widget.cpp` so this could live with its
+callers, and `AM2_DefFindFn` out of `definfo.cpp` -- a second private typedef
+for one function is where a signature goes wrong unseen.
 
 **Four more weapon-handler actions** -- `0x00458B50`, `0x00458C00`,
 `0x00458CB0`, `0x00458E30` -- **transcribed from a DIFF rather than read one at

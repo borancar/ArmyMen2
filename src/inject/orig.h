@@ -10064,8 +10064,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_SND_PICKUP           0x37
 #define AM2_ITEM_KIND_HOT_TARGET 0x0E    /* destroyed outright when taken */
 #define AM2_ITEM_KIND_MEDKIT     0x16    /* heals the whole ARMY, not the taker */
-/* What the medkit applies to every object ForEachArmyObject reaches. Still
- * original, passed by address as that helper's callback. */
+/* What the medkit applies to every object ForEachArmyObject reaches, passed as
+ * that helper's callback. RECONSTRUCTED as MedkitHealOne, and NOT patched: all
+ * four references are the reconstructed pickup paths, so a detour would install
+ * a jump nothing in the image can reach. Listed in tools/coverage.py's
+ * REGISTERED beside WndProc and AudioTimerProc, for the same reason.
+ *
+ * It went in for one build under a second name, ADDR_MEDKIT_HEAL, which
+ * checkpatches refused as a 22nd alias -- the address had been named here all
+ * along, with a comment that already said what the function does. Grep the
+ * ADDRESS first; the ratchet is the mechanism, not the backstop. */
 #define ADDR_MEDKIT_HEAL_ONE     0x00458AB0u  /* void(void *obj) */
 
 /* IT NAMES ITSELF -- "-->Trooper Want Item Received" -- so this is the
@@ -12993,6 +13001,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* CreateMissile reads this as the vertical speed when it is positive; when it
  * is not, the missile derives one from the height difference instead. Named
  * field-numbered, as its neighbour is, since one reader is not a meaning. */
+/* The heal percentage MedkitHeal reads out of the MEDKIT definition. The
+ * record is not missile-specific and neither is the bsearch that finds it --
+ * ADDR_MISSILE_DEF_FIND is a plain by-id lookup over the definition table, and
+ * both names come from the first use anyone read. Noted rather than renamed on
+ * the strength of one more site. */
+#define MISSILEDEF_OFF_HEAL_PCT  0x20u
 #define MISSILEDEF_OFF_FIELD_0C  0x0Cu
 #define MISSILEDEF_OFF_FIELD_30  0x30u
 /* A weapon's own script-name index, used to look the name up in

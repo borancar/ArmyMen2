@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "definfo.h"  /* AM2_DefFindFn -- MedkitHeal */
 #include "item.h"
 #include "misc.h"      /* ClearPtrList */
 #include "defparse.h"  /* DefFindObjRec -- reconstructed */
@@ -4660,6 +4661,86 @@ static void __cdecl NotifyHealed(void *obj, void *src)
 
 /* Defined below, beside the rest of the animation family. */
 int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag);
+
+/* Our leader, the way every pointer handler in this band gets it -- including
+ * the fallback that cannot run. See ADDR_POINTER_SELECT's note in orig.h: the
+ * original inlines this at eight sites and VC6 folds the second load of
+ * ADDR_DEFAULT_OWNER, so the scan is unreachable at every one of them. Written
+ * once here rather than eight times, which is the one liberty taken with it.
+ *
+ * NOT A FUNCTION IN THE ORIGINAL -- it is inlined at all eight sites, so there
+ * is no address to patch and nothing to install. It lives here rather than in
+ * widget.cpp because the medkit heal below needs it as well. */
+uint8_t *__cdecl OurLeaderUnit(void)
+{
+    int32_t owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+
+    if (owner != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
+        /* Dead. The NULL check lives in here, which is why the live path
+         * below has none. */
+        const uint8_t *list;
+        int32_t        i;
+
+        if (owner < 0 || owner >= AM2_COMM_SLOTS)
+            return (uint8_t *)0;
+
+        list = (const uint8_t *)
+            ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
+
+        for (i = 0; i < *(const int32_t *)(list + LIST_OFF_COUNT); i++) {
+            uint8_t *o = (uint8_t *)LookupByUID(
+                (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
+
+            if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
+                && *(const int32_t *)(o + OBJ_OFF_SARGE))
+                return o;
+
+            list = (const uint8_t *)
+                ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
+        }
+        return (uint8_t *)0;
+    }
+
+    return (uint8_t *)LookupByUID(
+        *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
+}
+
+/* MedkitHealOne -- original 0x00458AB0, 160 bytes, four call sites in the trooper
+ * band. Heal one trooper by the MEDKIT definition's percentage.
+ *
+ * THE THIRD ARGUMENT IS HIDDEN BY A BATCHED CLEANUP, which is the whole reason
+ * this needed care. The original pushes our leader, then calls the definition
+ * bsearch with ONE argument and cleans only that one -- so the leader is still
+ * on the stack when HealObject's own two arguments go down, and the single
+ * `add esp, 0xc` at the end cleans all three. Read as written it looks like a
+ * stray push; it is HealObject's `src`, the unit credited with the heal.
+ *
+ * THE DEFINITION IT LOOKS UP IS AM2_ITEM_KIND_MEDKIT, which orig.h already
+ * records as the kind that "heals the whole ARMY, not the taker". So the
+ * percentage is the medkit's, wherever the heal was triggered from.
+ *
+ * The lookup is ADDR_MISSILE_DEF_FIND, and the MISSILE in that name is from its
+ * first-seen use: it is a plain bsearch over the definition table by id, and
+ * here it is asked for a medkit. Not renamed on one more use site, but noted.
+ *
+ * NO NULL CHECK ON THE LEADER. OurLeaderUnit can answer NULL, and the original
+ * hands the answer straight to HealObject -- which does test its `src`. So the
+ * absence is safe rather than latent, and it is reproduced either way. */
+void __cdecl MedkitHealOne(void *obj)
+{
+    const uint8_t *def;
+
+    if (!obj)
+        return;
+    if (*(const int32_t *)obj != AM2_OBJ_TYPE_TROOPER)
+        return;
+
+    def = (const uint8_t *)((AM2_DefFindFn)AM2_IMAGE(ADDR_MISSILE_DEF_FIND))(
+              AM2_ITEM_KIND_MEDKIT);
+
+    HealObject(obj, *(const int32_t *)(def + MISSILEDEF_OFF_HEAL_PCT),
+               OurLeaderUnit());
+}
 
 /* 0x00428370, eight callers. Heal `obj` by `pct` percent of its MAXIMUM
  * health and notify. `src` is the other party, passed straight through to the
@@ -9382,8 +9463,7 @@ void __cdecl TrooperHostApprovedPickupItem(void *troop, void *item,
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log("\tTrooperHostApprovedPickupItem:Medkit\n");
         ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
-                          (void (__cdecl *)(void *))(uintptr_t)
-                              ADDR_MEDKIT_HEAL_ONE);
+                          MedkitHealOne);
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log("TrooperHostApprovedPickupItem %x\n",
                      ((const AM2_Object *)w)->uid);
@@ -9542,8 +9622,7 @@ void __cdecl TrooperRemotePickupItem(void *troop, void *item, int32_t slot,
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log("\tTrooperRemotePickupItem:Medkit\n");
         ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
-                          (void (__cdecl *)(void *))(uintptr_t)
-                              ADDR_MEDKIT_HEAL_ONE);
+                          MedkitHealOne);
 
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log("\tTrooperRemotePickupItem %x\n",
@@ -12353,8 +12432,7 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
 
     if (kind == AM2_ITEM_KIND_MEDKIT) {
         ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
-                          (void (__cdecl *)(void *))(uintptr_t)
-                              ADDR_MEDKIT_HEAL_ONE);
+                          MedkitHealOne);
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log((const char *)AM2_IMAGE(AM2_STR_TROOPER_PICKUP),
                      ((const AM2_Object *)w)->uid);
@@ -12477,8 +12555,7 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
 
     if (kind == AM2_ITEM_KIND_MEDKIT) {
         ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
-                          (void (__cdecl *)(void *))(uintptr_t)
-                              ADDR_MEDKIT_HEAL_ONE);
+                          MedkitHealOne);
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log((const char *)AM2_IMAGE(AM2_STR_TROOPER_PICKUP),
                      ((const AM2_Object *)w)->uid);

@@ -32,6 +32,11 @@ typedef struct {
 /* 0x0041A250. Parse one token as a number into *out. Returns 1 on success and
  * 0 for a null token or a token that is not a number -- complaining only in
  * the second case. 48 callers. */
+/* 0x004602C0, still the original's: a bsearch over the definition table by id.
+ * The MISSILE in ADDR_MISSILE_DEF_FIND's name is from its first-seen use --
+ * MedkitHeal asks it for AM2_ITEM_KIND_MEDKIT. */
+typedef void *(__cdecl *AM2_DefFindFn)(int32_t id);
+
 int32_t __cdecl DefParseNumber(int32_t *out, const char *tok);
 
 /* 0x0041A640. The index of `name` in the vocabulary table, or -1. That index

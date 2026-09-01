@@ -53,6 +53,7 @@ CRT_START = 0x0045C000
 REGISTERED = {
     "ADDR_WND_PROC",          # into the WNDCLASS, by InitApplication
     "ADDR_AUDIO_TIMER_PROC",  # into timeSetEvent, by StartAudioStream
+    "ADDR_MEDKIT_HEAL_ONE",   # into ForEachArmyObject, by the pickup paths
 }
 
 # COM interface pointers known to be DirectX, identified in docs/comcalls.tsv by

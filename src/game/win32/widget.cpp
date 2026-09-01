@@ -8963,44 +8963,8 @@ typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
 typedef void (__cdecl *AM2_PointerActionFn)(void *obj, uint32_t at);
 
 /* Our leader, the way every pointer handler in this band gets it -- including
- * the fallback that cannot run. See ADDR_POINTER_SELECT's note in orig.h: the
- * original inlines this at eight sites and VC6 folds the second load of
- * ADDR_DEFAULT_OWNER, so the scan is unreachable at every one of them. Written
- * once here rather than eight times, which is the one liberty taken with it. */
-static uint8_t *OurLeader(void)
-{
-    int32_t owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
-
-    if (owner != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
-        /* Dead. The NULL check lives in here, which is why the live path
-         * below has none. */
-        const uint8_t *list;
-        int32_t        i;
-
-        if (owner < 0 || owner >= AM2_COMM_SLOTS)
-            return (uint8_t *)0;
-
-        list = (const uint8_t *)
-            ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
-
-        for (i = 0; i < *(const int32_t *)(list + LIST_OFF_COUNT); i++) {
-            uint8_t *o = (uint8_t *)LookupByUID(
-                (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
-
-            if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
-                && *(const int32_t *)(o + OBJ_OFF_SARGE))
-                return o;
-
-            list = (const uint8_t *)
-                ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
-        }
-        return (uint8_t *)0;
-    }
-
-    return (uint8_t *)LookupByUID(
-        *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
-}
-
+ * the fallback that cannot run. Promoted to item.cpp once the medkit heal
+ * needed it too; see OurLeaderUnit there for the dead-scan note. */
 /* The tail FIVE handlers in this band share, byte for byte: mark the unit
  * firing, copy its +0x40, set the two ones, aim at ADDR_AIM_X/Y/Z and name the
  * target. `withMode` is the ONE thing that varies -- 0x00458E30 omits the
@@ -9247,7 +9211,7 @@ int32_t __cdecl PointerPickWatchedItem(void *obj)
     if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_CONCEALED)
         return 0;
 
-    leader = OurLeader();
+    leader = OurLeaderUnit();
     if (!leader)
         return 0;
 
@@ -9302,7 +9266,7 @@ int32_t __cdecl PointerPickBoard(void *obj)
         != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
         return 0;
 
-    leader = OurLeader();
+    leader = OurLeaderUnit();
     if (!leader)
         return 0;
 

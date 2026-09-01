@@ -16,7 +16,9 @@
  * ADDR_RANK_DEF_FIND, now DefFindTrooperRec in defparse.cpp and called by
  * name. */
 typedef void    (__cdecl *AM2_VoidFn)(void);
-typedef void   *(__cdecl *AM2_DefFindFn)(int32_t id);
+/* AM2_DefFindFn is definfo.h's now -- item.cpp's MedkitHeal needs the same
+ * lookup, and a second private typedef for one function is where a signature
+ * goes wrong unseen. */
 
 #define orig_free_list_662024  ((AM2_VoidFn)AM2_IMAGE(ADDR_FREE_LIST_662024))
 #define orig_free_list_662928  ((AM2_VoidFn)AM2_IMAGE(ADDR_FREE_LIST_662928))

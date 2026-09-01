@@ -158,6 +158,14 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
  * the percentage and go to full; nothing at or below zero health is healed. */
 void __cdecl HealObject(void *obj, int32_t pct, void *src);
 
+/* NOT a function in the original -- it is inlined at eight sites, dead fallback
+ * and all. Our leader, or NULL. See item.cpp. */
+uint8_t *__cdecl OurLeaderUnit(void);
+
+/* 0x00458AB0, four call sites. Heal a trooper by the MEDKIT definition's
+ * percentage, crediting our leader as the source. */
+void __cdecl MedkitHeal(void *obj);
+
 void __cdecl RemoveInventoryItem(void *unit, int32_t slot);
 
 /* 0x00448D60, and it names itself in both log lines. Drop one inventory slot
