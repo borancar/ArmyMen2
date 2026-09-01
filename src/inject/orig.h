@@ -3006,8 +3006,15 @@
 #define OBJ_TABLE_REC_OFF_INK    0x01u  /* uint8_t, the army's text colour */
 /* NOT a sprite anything. 0x00457820 walks every object an army owns and calls
  * the SECOND argument on each -- `call ebp`, where ebp is that argument. It
- * went in as ADDR_SPRITE_DROP_NAMED from the one call site, which passes
- * 0x0045A030; that is a function too, not a sprite. See src/game/army.h. */
+ * went in as ADDR_SPRITE_DROP_NAMED from a call site passing 0x0045A030; that
+ * is a function too, not a sprite. See src/game/army.h.
+ *
+ * "THE ONE CALL SITE" WAS WRONG AND THIS NOTE SAID IT TWICE. There are SEVEN
+ * -- 0x40AB76, 0x417DBB, 0x44857D, 0x448802, 0x448A94, 0x448CDD and 0x457988
+ * -- each verified by decoding its `e8` displacement back to this address
+ * rather than by trusting a tool. The rename was right and the count beside
+ * it was never re-measured; seven distinct callbacks through one helper is
+ * better evidence for the name than the single site ever was. */
 #define ADDR_FOR_EACH_ARMY_OBJECT 0x00457820u /* void(army, void(*)(void*)) */
 /* 0x004074A0, four callers. One observer against one object: range, bearing,
  * and then -- if the observer belongs to us -- reveal what it saw for two
@@ -8758,11 +8765,26 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * ADDR_OBJ_IS_TYPE4's own error string -- and then the pair goes to
  * ADDR_TROOPER_PAIR_APPLY. */
 #define ADDR_RECV_TROOP_PAIR     0x0044C960u  /* 0x18, already named */
-/* 0x00448B20, 576 bytes, one caller. What a kind 0x18 does with its pair: it
- * stamps `now + 2000` into the trooper's +0xC8 and plays sound 0x37 at the
- * weapon's position, among a good deal else. The name is the pairing, not the
- * effect -- 576 bytes is more than one verb and none of it is read yet. */
-#define ADDR_TROOPER_PAIR_APPLY  0x00448B20u  /* void(troop, weapon, a, b) */
+/* 0x00448B20, 576 bytes, one caller: what a kind 0x18 message does with its
+ * pair. IT NAMES ITSELF, six times, in log lines that all open
+ * `TrooperRemotePickupItem` -- the old name here, ADDR_TROOPER_PAIR_APPLY,
+ * described the message pairing and said so honestly ("the name is the
+ * pairing, not the effect ... none of it is read yet").
+ *
+ * AND THAT NOTE HAD THE TWO OBJECTS THE WRONG WAY ROUND. It said the stamp
+ * goes into "the trooper's +0xC8" and the sound plays "at the weapon's
+ * position". It is the other way: `now + 2000` lands on the ITEM -- and
+ * +0xC8's own name, OBJ_OFF_PICKUP_AFTER, says what that is -- while the
+ * sound plays where the TROOPER is. NotifyPickedUp(item, taker) taking
+ * (arg2, arg1) is what pins the two down. Reconstructed. */
+#define ADDR_TROOPER_REMOTE_PICKUP 0x00448B20u /* void(troop,item,slot,ammo) */
+#define AM2_PICKUP_HOLD_MS       0x7D0   /* 2000, into OBJ_OFF_PICKUP_AFTER */
+#define AM2_SND_PICKUP           0x37
+#define AM2_ITEM_KIND_HOT_TARGET 0x0E    /* destroyed outright when taken */
+#define AM2_ITEM_KIND_MEDKIT     0x16    /* heals the whole ARMY, not the taker */
+/* What the medkit applies to every object ForEachArmyObject reaches. Still
+ * original, passed by address as that helper's callback. */
+#define ADDR_MEDKIT_HEAL_ONE     0x00458AB0u  /* void(void *obj) */
 
 #define ADDR_RECV_TROOP_19       0x0044C680u
 /* Reconstructed. The receiver for the message TrooperDropItemSend sends, so

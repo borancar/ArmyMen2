@@ -909,7 +909,7 @@ int32_t __cdecl UidObjKind(uint32_t uid)
 typedef void *(__cdecl *AM2_TroopSubFn)(const void *at, int32_t army);
 typedef void (__cdecl *AM2_PairApplyFn)(void *a, void *b, int32_t x, int32_t y);
 #define orig_trooper_pair_apply \
-    ((AM2_PairApplyFn)(uintptr_t)ADDR_TROOPER_PAIR_APPLY)
+    TrooperRemotePickupItem
 
 /* RecvTroopBatch -- original 0x0044CC90, one caller. Message kind 0x16.
  *
@@ -1118,7 +1118,7 @@ void __cdecl RecvTrooperDropItem(void *msg)
  *
  * Two uids and two dwords. The first uid must resolve; the second must
  * resolve AND be a type 4, which ADDR_OBJ_IS_TYPE4's own error string calls a
- * WEAPON. Then the pair and both dwords go to ADDR_TROOPER_PAIR_APPLY.
+ * WEAPON. Then the pair and both dwords go to TrooperRemotePickupItem.
  *
  * THE TWO UIDS ARE LOOKED UP BY DIFFERENT FUNCTIONS, which is not a
  * transcription slip: the first goes through ObjByUidAlias and the second

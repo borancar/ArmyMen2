@@ -8468,6 +8468,158 @@ void __cdecl SelectionClick(void)
     OnSelectionChanged(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
 }
 
+/* TrooperRemotePickupItem -- original 0x00448B20, 576 bytes, one caller: the
+ * kind 0x18 comm message. What a trooper does with an item somebody ELSE told
+ * us it picked up.
+ *
+ * THE NAME IS THE FUNCTION'S OWN, six times over. orig.h called this
+ * ADDR_TROOPER_PAIR_APPLY and said so honestly -- "the name is the pairing,
+ * not the effect ... none of it is read yet" -- and every one of its log lines
+ * opens `TrooperRemotePickupItem`. Renamed from the body, which is what the
+ * strings were there for.
+ *
+ * AND THAT NOTE HAD THE TWO OBJECTS THE WRONG WAY ROUND. It said the function
+ * "stamps `now + 2000` into the trooper's +0xC8 and plays sound 0x37 at the
+ * weapon's position". It is the other way: the stamp lands on the ITEM and the
+ * sound plays where the TROOPER is. NotifyPickedUp(item, taker) is what pins
+ * it down -- the original passes (arg2, arg1) -- and the difference matters,
+ * because two seconds on the item is a pickup cooldown while two seconds on
+ * the trooper would be something else entirely.
+ *
+ * FIVE ARMS, and the two special kinds leave before the slot logic is reached:
+ *
+ *   kind 0x0E, HotTarget -- destroy the item outright;
+ *   kind 0x16, Medkit    -- apply 0x00458AB0 to EVERY object of the trooper's
+ *                           army, so a medkit heals the whole side and not
+ *                           just whoever walked over it;
+ *   empty slot           -- take it: ammo in, uid into the slot, army copied
+ *                           across, and the item respawns;
+ *   slot full, both weapons in KindInSetB -- REPLACE: the new uid goes in the
+ *                           slot and the item respawns, the old one simply
+ *                           dropping out of the array;
+ *   slot full, otherwise -- transfer the AMMO instead, capped at the item
+ *                           def's +0x18, and respawn the emptied item only if
+ *                           it is army 4 and the comm object says so.
+ *
+ * ADDR_WEAPON_RESPAWN, not a free: an item that has been taken goes back to
+ * wherever it spawns rather than being destroyed, which is what makes the
+ * replace arm coherent -- the weapon you dropped is not gone.
+ *
+ * EVERY OFFSET THIS NEEDED WAS ALREADY NAMED, and two of the names are the
+ * evidence for the correction above. OBJ_OFF_PICKUP_AFTER is what +0xC8 is
+ * called -- the field was named right and only the prose beside this address
+ * had it on the wrong object. ITEM_OFF_AMMO is 0xCC, which is
+ * OBJ_OFF_TARGET_UID on other types; and item->OBJ_OFF_FIELD_C0 is an ITEMTYPE
+ * record, so the kind switched on below is ITEMTYPE_OFF_KIND and the ammo cap
+ * is ITEMTYPE_OFF_CAPACITY. Overloading by type, as at 0x52C and 0x538.
+ *
+ * Every debug line is gated on the comm object's COMM_OFF_VERBOSE, so none of
+ * them appears in an ordinary run.
+ *
+ * checkoffsetuse FOUND CODE I HAD NOT TRANSCRIBED, which is the first time it
+ * has caught an omission rather than a wrong name. It reported +0x08 read by
+ * the original and named nowhere here: both respawn arms follow
+ * WeaponRespawn with `item->flags |= OBJ_FLAG_OVERDUE`, and the medkit arm
+ * has a whole tail -- a CommMustBroadcast on the ITEM's army deciding whether
+ * the medkit leaves the map at all -- that I had stopped short of. Roughly
+ * fifteen instructions, invisible to every other check, and an A/B could not
+ * have shown it either: nothing here runs without a second player. */
+void __cdecl TrooperRemotePickupItem(void *troop, void *item, int32_t slot,
+                                     int32_t ammo)
+{
+    uint8_t *t = (uint8_t *)troop;
+    uint8_t *w = (uint8_t *)item;
+    uint8_t *comm;
+    int32_t  kind;
+    uint8_t *held;
+
+    *(uint32_t *)(w + OBJ_OFF_PICKUP_AFTER) =
+        *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + AM2_PICKUP_HOLD_MS;
+
+    PlaySoundAt(AM2_SND_PICKUP, 0, 0,
+                *(const int16_t *)(t + OBJ_OFF_POS),
+                *(const int16_t *)(t + OBJ_OFF_POS + 2));
+    NotifyPickedUp(item, troop);
+
+    comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        orig_log("TrooperRemotePickupItem %x\n",
+                 ((const AM2_Object *)w)->uid);
+
+    kind = **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0);
+
+    if (kind == AM2_ITEM_KIND_HOT_TARGET) {
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log("\tTrooperRemotePickupItem: HotTarget\n");
+        DestroyByType(item);
+        return;
+    }
+
+    if (kind == AM2_ITEM_KIND_MEDKIT) {
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log("\tTrooperRemotePickupItem:Medkit\n");
+        ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
+                          (void (__cdecl *)(void *))(uintptr_t)
+                              ADDR_MEDKIT_HEAL_ONE);
+
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log("\tTrooperRemotePickupItem %x\n",
+                     ((const AM2_Object *)w)->uid);
+
+        /* The medkit is taken off the map only when this side is the one that
+         * should say so -- CommMustBroadcast on the ITEM's army, not the
+         * trooper's. */
+        if (CommMustBroadcast(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)*(const int8_t *)(w + OBJ_OFF_ARMY))) {
+            WeaponRespawn(item);
+            *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        }
+        return;
+    }
+
+    if (!*(const uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4)) {
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log("\tTrooperRemotePickupItem: new weapon\n");
+        *(int32_t *)(w + ITEM_OFF_AMMO) = ammo;
+        *(uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4) =
+            ((const AM2_Object *)w)->uid;
+        *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
+        WeaponRespawn(item);
+        return;
+    }
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        orig_log("\tTrooperRemotePickupItem: we've got somthing in that slot\n");
+
+    held = (uint8_t *)WeaponByUid(*(const uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4));
+
+    if (KindInSetB(**(const int32_t *const *)(held + OBJ_OFF_FIELD_C0))
+        && KindInSetB(**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))) {
+        *(uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4) =
+            ((const AM2_Object *)w)->uid;
+        *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
+        WeaponRespawn(item);
+        return;
+    }
+
+    {
+        int32_t cap = (*(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))
+                          [ITEMTYPE_OFF_CAPACITY / 4];
+        int32_t now = *(const int32_t *)(held + ITEM_OFF_AMMO) + ammo;
+
+        *(int32_t *)(held + ITEM_OFF_AMMO) = now;
+        if (now > cap)
+            *(int32_t *)(held + ITEM_OFF_AMMO) = cap;
+    }
+
+    if (!*(const int32_t *)(w + ITEM_OFF_AMMO)
+        && *(const int8_t *)(w + OBJ_OFF_ARMY) == 4   /* the neutral army; item.cpp spells it as the literal */
+        && *(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+        WeaponRespawn(item);
+        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+    }
+}
+
 /* ToggleSelect -- original 0x00413710, one caller.
  *
  * Add an object to the selection, or take it out if it is already in -- and
@@ -10167,6 +10319,9 @@ void item_install(void)
                   "NotifyDamaged", 2);
     patch_replace(ADDR_NOTIFY_PICKED_UP, (const void *)NotifyPickedUp,
                   "NotifyPickedUp", 1);
+    patch_replace(ADDR_TROOPER_REMOTE_PICKUP,
+                  (const void *)TrooperRemotePickupItem,
+                  "TrooperRemotePickupItem", 4);
     patch_replace(ADDR_NOTIFY_DROPPED, (const void *)NotifyDropped,
                   "NotifyDropped", 1);
     patch_replace(ADDR_WEAPON_POSE_INDEX, (const void *)WeaponPoseIndex,

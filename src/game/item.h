@@ -721,6 +721,13 @@ int32_t __cdecl SelectIfOwn(void *obj);
  * what is under a plain click -- with CONTROL turning select into toggle. */
 void __cdecl SelectionClick(void);
 
+/* 0x00448B20, one caller: the kind 0x18 comm message. What a trooper does
+ * with an item somebody else told us it picked up -- HotTarget is destroyed,
+ * a Medkit heals the whole army, and a weapon either fills an empty slot,
+ * replaces what is there, or hands over its ammo. */
+void __cdecl TrooperRemotePickupItem(void *troop, void *item, int32_t slot,
+                                     int32_t ammo);
+
 /* 0x004572A0, two callers. Clear a type 2's working block and stamp its
  * facing into the copy at +0xF8. */
 void __cdecl ResetType2Fields(void *obj);
