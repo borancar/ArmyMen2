@@ -1187,12 +1187,11 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
  * up here rather than being written a second time -- its fifth argument is a
  * uid at that other site, which is why it is uint32_t and why this caller
  * passes a plain 0 rather than inventing a name for it. */
-typedef void (__cdecl *AM2_DiedTailFn)(void *obj, int32_t a);
+/* AM2_DiedTailFn went with its seam: TrooperDiedTail is ours now. */
 typedef void (__cdecl *AM2_SpawnAtFn)(int32_t x, int32_t y, int32_t kind,
                                       int32_t army, uint32_t uid, int32_t extra,
                                       int32_t e, int32_t f, int32_t g,
                                       int32_t h);
-#define orig_trooper_died_tail ((AM2_DiedTailFn)(uintptr_t)ADDR_TROOPER_DIED_TAIL)
 #define orig_spawn_at          ((AM2_SpawnAtFn)(uintptr_t)ADDR_SPAWN_AT)
 
 /* ApplyHeightItem -- original 0x00433C20, three callers.
@@ -1513,7 +1512,7 @@ void __cdecl TrooperDied(void *obj, int32_t a, uint32_t by)
                       0, 0, 0, 0);
     }
 
-    orig_trooper_died_tail(o, a);
+    TrooperDiedTail(o, a);
 }
 
 /* 0x0045B630, one caller. A vehicle has died: mark it, hide its second row,
@@ -8476,6 +8475,133 @@ void __cdecl SelectionClick(void)
     OnSelectionChanged(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
 }
 
+/* TrooperDiedTail's two helpers stay original: both are above the CRT line,
+ * so neither is in the 1,239 and reconstructing them would not move it. */
+typedef void (__cdecl *AM2_DiedEffectAFn)(void *obj);
+typedef void (__cdecl *AM2_DiedEffectBFn)(const AM2_Point *at, int32_t facing,
+                                          int32_t kind, int32_t height);
+#define orig_died_reset ((AM2_DiedEffectAFn)AM2_IMAGE(ADDR_DIED_EFFECT_A))
+#define orig_died_burst ((AM2_DiedEffectBFn)AM2_IMAGE(ADDR_DIED_EFFECT_B))
+
+/* TrooperDiedTail -- original 0x00447EE0, 512 bytes, two callers. The shared
+ * tail of TrooperDied: choose the death ANIMATION and the noise that goes
+ * with it. Its caller handles the spawn and who gets credited; this is the
+ * presentation.
+ *
+ * ITS ARGUMENT IS THE ONE TrooperDied PASSES STRAIGHT THROUGH. orig.h says of
+ * that function "its middle argument is passed straight through to the tail
+ * and read nowhere here" -- this is where it is read, and it is a death KIND
+ * of 1..5 driving a five-arm jump table.
+ *
+ * READ THE TABLE AS DATA. The arms are laid out 0x447F12, 0x447F4E, 0x447FAF,
+ * 0x447FEA, 0x44800A and the table at 0x004480C8 orders them 1 -> 0x447FAF,
+ * 2 -> 0x447F4E, 3 -> 0x447F12, 4 -> 0x447FEA, 5 -> 0x44800A. KINDS 1 AND 3
+ * ARE SWAPPED against the layout, so numbering the bodies top to bottom gets
+ * two of five wrong. Same failure this file records for the state-2 sub-states
+ * and for WeaponClassOf.
+ *
+ * KIND 3'S ARM IS REACHED TWO WAYS -- through the table, and by falling out of
+ * the OBJ_OFF_FIELD_5A4 test above it, which is why that block sits before the
+ * dispatch rather than with the other arms.
+ *
+ * EVERY ARM ANSWERS THE SAME TWO QUESTIONS: which animation goes into
+ * OBJ_OFF_FIELD_584, and which sound index survives into the tail. The
+ * threshold is OBJ_OFF_SOLDIER_KIND against 6, held in ebx and reused by
+ * every arm, which is why the arms look like they end abruptly -- they are
+ * all falling into one tail.
+ *
+ * SARGE CRIES OUT AND EVERYONE ELSE JUST MAKES A NOISE. With OBJ_OFF_SARGE set
+ * and the index not 6, the tail speaks AM2_SPEAK_AAH -- four lines -- instead
+ * of playing a sound at the body. Kind 1 sets the index to 6 precisely so that
+ * arm keeps the sound even for Sarge. Both paths end in the same SetUnitPose.
+ *
+ * THE ANIMATION TABLE IS THREE ENTRIES, {0x21, 0x22, 0x23}, indexed by
+ * ClassifyCode74, which answers 0, 1 or 2 off the row's +0x4C. They are
+ * consecutive and it would be shorter to write `0x21 + code`; the original
+ * indexes a table, so a table read is what is written.
+ *
+ * The function ends at 0x004480C4. What tools/disasm.py shows after that --
+ * `scasd`, `jg`, `add byte ptr` -- is the jump table decoded as instructions,
+ * which is the linear-disassembly desync this file warns about. */
+void __cdecl TrooperDiedTail(void *obj, int32_t kind)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  anim;
+    int32_t  noise = 5;
+    int32_t  big = 6;                     /* ebx, the soldier-kind threshold */
+
+    if (!o)
+        return;
+    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        return;
+
+    /* THE CLEAR IS NOT PART OF THE ARM. +0x5A4 being set clears it and falls
+     * into kind 3's block at 0x447F12; kind 3 reached through the TABLE enters
+     * at 0x447F12 directly and does NOT clear it. Writing the two as one
+     * condition clears the field on a path the original leaves alone. */
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_5A4)) {
+        *(int32_t *)(o + OBJ_OFF_FIELD_5A4) = 0;
+        goto arm3;
+    }
+
+    switch (kind) {
+    case 3:
+    arm3:
+        *(int32_t *)(o + OBJ_OFF_FIELD_584) = 0;
+        *(int32_t *)(o + OBJ_OFF_SIGHT_OUT_T2) = 1;
+        noise = 5;
+        orig_died_reset(o);
+        goto tail;
+
+    case 1:
+        anim = (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= big)
+                   ? 0x21 : 0x20;
+        noise = big;
+        break;
+    case 2: {
+        anim = ((const int32_t *)AM2_IMAGE(ADDR_DEATH_ANIM_BY_CODE))
+                   [ClassifyByCode74(o)];
+        noise = 5;
+        if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) < big && anim == 0x21)
+            orig_died_burst((const AM2_Point *)(o + OBJ_OFF_POS),
+                            *(const uint8_t *)(o + OBJ_OFF_FACING),
+                            *(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND),
+                            *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
+        break;
+    }
+    case 4:
+        anim = (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= big)
+                   ? 0x21 : 0x24;
+        break;
+    case 5:
+        anim = (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= big)
+                   ? 0x21
+                   : ((const int32_t *)AM2_IMAGE(ADDR_DEATH_ANIM_BY_CODE))
+                         [ClassifyByCode74(o)];
+        break;
+    default:
+        anim = ((const int32_t *)AM2_IMAGE(ADDR_DEATH_ANIM_BY_CODE))
+                   [ClassifyByCode74(o)];
+        break;
+    }
+
+    *(int32_t *)(o + OBJ_OFF_FIELD_584) = anim;
+    *(int32_t *)(o + OBJ_OFF_SIGHT_OUT_T2) = 1;
+
+tail:
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 7)
+        noise = 0x36;
+
+    if (*(const int32_t *)(o + OBJ_OFF_SARGE) && noise != big)
+        SpeakLine(AM2_SPEAK_AAH, *(const int8_t *)(o + OBJ_OFF_ARMY));
+    else
+        PlaySoundAt(noise, 0, 0,
+                    *(const int16_t *)(o + OBJ_OFF_POS),
+                    *(const int16_t *)(o + OBJ_OFF_POS + 2));
+
+    SetUnitPose(o, *(const int32_t *)(o + OBJ_OFF_FIELD_584));
+}
+
 /* TrooperHostApprovedPickupItem -- original 0x004488C0, 608 bytes, one caller.
  * The HOST half of the pickup pair: what happens on the machine that decided
  * the pickup was allowed. TrooperRemotePickupItem, 0x00448B20, is the other
@@ -10472,6 +10598,8 @@ void item_install(void)
     patch_replace(ADDR_TROOPER_HOST_APPROVED,
                   (const void *)TrooperHostApprovedPickupItem,
                   "TrooperHostApprovedPickupItem", 4);
+    patch_replace(ADDR_TROOPER_DIED_TAIL, (const void *)TrooperDiedTail,
+                  "TrooperDiedTail", 2);
     patch_replace(ADDR_NOTIFY_DROPPED, (const void *)NotifyDropped,
                   "NotifyDropped", 1);
     patch_replace(ADDR_WEAPON_POSE_INDEX, (const void *)WeaponPoseIndex,

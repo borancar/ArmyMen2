@@ -735,6 +735,11 @@ void __cdecl TrooperRemotePickupItem(void *troop, void *item, int32_t slot,
 void __cdecl TrooperHostApprovedPickupItem(void *troop, void *item,
                                            int32_t slot, int32_t ammo);
 
+/* 0x00447EE0, two callers. TrooperDied's shared tail: pick the death
+ * animation and the noise. Its argument is the death KIND, 1..5, dispatched
+ * through a table whose order is NOT the arms' layout order. */
+void __cdecl TrooperDiedTail(void *obj, int32_t kind);
+
 /* 0x004572A0, two callers. Clear a type 2's working block and stamp its
  * facing into the copy at +0xF8. */
 void __cdecl ResetType2Fields(void *obj);

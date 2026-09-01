@@ -11214,7 +11214,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Its middle argument is passed straight through to the tail at 0x00447EE0
  * and read nowhere here. */
 #define ADDR_TROOPER_DIED        0x00447E50u  /* void(obj, int32, uint32 by) */
-#define ADDR_TROOPER_DIED_TAIL   0x00447EE0u  /* void(obj, int32), 2 callers */
+/* Three entries, {0x21, 0x22, 0x23}, indexed by ADDR_CLASSIFY_CODE74's answer
+ * of 0, 1 or 2. Consecutive, so `0x21 + code` would do -- the original indexes
+ * a table and so does the reconstruction. */
+/* TrooperDiedTail's two helpers, both ABOVE the CRT line and so outside the
+ * 1,239 -- they stay original behind seams. THE NAMES ARE OURS AND THEY COME
+ * FROM THE ONE CALL SITE, which this file warns is how ADDR_SPRITE_DROP_NAMED
+ * and AttachPalette went wrong; neither body is read. What is evidenced is
+ * only that the first is handed the dying object and the second its position,
+ * facing, OBJ_OFF_TABLE_REC_KIND and OBJ_OFF_HEIGHT_SET, and that the second
+ * runs only for a small soldier whose death animation is 0x21. Read them
+ * before relying on the names. */
+#define ADDR_DIED_EFFECT_A       0x00461B20u  /* void(void *obj) */
+#define ADDR_DIED_EFFECT_B       0x00461C30u  /* void(pt*, facing, kind, h) */
+#define ADDR_DEATH_ANIM_BY_CODE  0x0047518Cu  /* int32_t[3] */
+#define AM2_DEATH_ANIMS          3
+/* Its ARGUMENT is the one TrooperDied passes straight through and never reads:
+ * a death KIND of 1..5, dispatched through a five-entry table at 0x004480C8.
+ * READ THAT TABLE AS DATA -- it orders the arms 1 -> 0x447FAF, 2 -> 0x447F4E,
+ * 3 -> 0x447F12, 4 -> 0x447FEA, 5 -> 0x44800A, so KINDS 1 AND 3 ARE SWAPPED
+ * against the layout and numbering the bodies top to bottom gets two of five
+ * wrong. Kind 3's arm is also fallen into from the OBJ_OFF_FIELD_5A4 test
+ * above the dispatch -- but that path CLEARS the field first and the table
+ * path does not, so the two are not one condition. Reconstructed. */
+#define ADDR_TROOPER_DIED_TAIL   0x00447EE0u  /* void(obj, int32 kind) */
 #define AM2_SPAWN_KIND_95        0x95     /* what a dead trooper leaves */
 #define AM2_ARMY_NEUTRAL         4
 /* Read at three sites in the trooper band and passed straight through as an
