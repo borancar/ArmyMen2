@@ -3183,7 +3183,198 @@ void __cdecl ShooterReact(void *shooter, void *target)
 typedef int32_t (__cdecl *AM2_ShotHitsObjFn)(void *target, int32_t code,
                                              int32_t army, int32_t height,
                                              void *shot, int32_t *out);
-#define orig_shot_hits_obj ((AM2_ShotHitsObjFn)(uintptr_t)ADDR_SHOT_HITS_OBJ)
+/* THE SET OF CODES THE IMAGE SPELLS AS A JUMP TABLE. Two of them, in fact,
+ * with IDENTICAL thirty-byte index arrays at 0x0043BFB0 and 0x0043BFD8 and
+ * different pairs of targets -- so the compiler built the same membership
+ * test twice for the same `switch` written twice. Thirty bytes to ask one
+ * question; written here as the question. */
+static int32_t ShotCodeChecksArmour(int32_t code)
+{
+    return (code == 1 || code == 7 || code == 8 || code == 9 || code == 10
+            || code == 21 || code == 29 || code == 30) ? 1 : 0;
+}
+
+/* Does the shot get through `target`'s armour? Only the eight codes above ask;
+ * everything else is stopped. Both jump tables end here, once returning 1 for
+ * "stopped" and once 0, which is the only difference between them. */
+static int32_t ShotPiercesArmour(const uint8_t *target, const uint8_t *shot)
+{
+    const uint8_t *rec;
+    uint8_t        need;
+
+    if (!ObjIsItem((const AM2_Object *)target))
+        return 1;
+
+    rec  = *(const uint8_t *const *)(target + OBJ_OFF_FIELD_94);
+    need = *(const uint8_t *)(rec + TYPEREC_OFF_FIELD_3C);
+    if (!need)
+        return 1;
+
+    return *(const uint8_t *)(shot + OBJ_OFF_SCRIPT_ID) >= need ? 1 : 0;
+}
+
+/* The two exits that ask what the target's class makes of the shot: a class 1
+ * needs AM2_SHOT_PIERCE_CLASS1 and a class 2 AM2_SHOT_PIERCE_CLASS2, both
+ * UNSIGNED against the shot's own +0xB0, and anything else is hit outright.
+ * The original writes this out twice, once in each height branch, from the
+ * same `sbb`/`neg` idiom. */
+static int32_t ShotBeatsClass(const uint8_t *target, const uint8_t *shot)
+{
+    uint8_t power = *(const uint8_t *)(shot + OBJ_OFF_SCRIPT_ID);
+
+    switch (ClassifyByCode74(target)) {
+    case 1:  return power > AM2_SHOT_PIERCE_CLASS1 ? 1 : 0;
+    case 2:  return power > AM2_SHOT_PIERCE_CLASS2 ? 1 : 0;
+    default: return 1;
+    }
+}
+
+/* Is the target facing within AM2_SHOT_FACING_ARC of the shot? The original
+ * takes the absolute value with the `cdq`/`xor`/`sub` idiom, in both height
+ * branches, with the arguments in the same order each time. */
+static int32_t ShotFacingArc(const uint8_t *target, const uint8_t *shot)
+{
+    int32_t d = AngleDelta(*(const uint8_t *)(target + OBJ_OFF_FACING),
+                           *(const uint8_t *)(shot + OBJ_OFF_FACING));
+
+    if (d < 0)
+        d = -d;
+    return d < AM2_SHOT_FACING_ARC ? 1 : 0;
+}
+
+/* ShotHitsObj -- original 0x0043BCD0, one caller: ShotStrike, for every object
+ * at the point a shot arrived. orig.h said "nothing in it says what it is, so
+ * the name is from what ShotStrike does with the answer", and the body agrees
+ * with that name.
+ *
+ * IT IS A LADDER OF REFUSALS. Ten exits answer 0 and six answer 1, and the
+ * order matters more than any single test:
+ *
+ *   FRIENDLY FIRE FIRST. An object of the shot's own army carrying
+ *   OBJ_FLAG_SHOT_PROOF is missed outright. Otherwise, still on its own army,
+ *   a trooper is missed unless it has Type2Field5A4Set, or is Sarge in a
+ *   multiplayer game, or the code is AM2_SHOT_CODE_RANDOM -- and anything
+ *   else of types 2, 3 and 8 is missed if it is the SHOOTER, which is what
+ *   the shot's own +0x98 holds.
+ *
+ *   THEN HEIGHT, and it is the whole geometry. ObjHeight under the shot's
+ *   means the object is below it and may still be reached within
+ *   AM2_SHOT_OVER_UNDER; at or above means the shot is below and reaches
+ *   within AM2_SHOT_UNDER_OVER. Eight apart, and asymmetric.
+ *
+ *   THEN WHAT IS ALREADY HIT. A shot whose +0xA0 is set has struck something
+ *   already and passes through everything after it -- and the two "hit"
+ *   exits in the LOW branch set that flag while the two in the HIGH branch do
+ *   not, so a shot that hits something above it can go on to hit again.
+ *
+ *   AND THE OUT PARAMETER IS A FACING, NOT A RESULT. It is set when the
+ *   target is a trooper facing within AM2_SHOT_FACING_ARC of the shot, which
+ *   ShotStrike reads to decide the hit's kind. It is zeroed on the first
+ *   instruction, so every exit answers it.
+ *
+ * CODE 2 AND CODE 5 ARE REFUSED IN THE LOW BRANCH ONLY -- named in orig.h as
+ * AM2_SHOT_STRUCK_HARD and its neighbour -- and code AM2_SHOT_CODE_RANDOM
+ * gets its own arm that ignores whether the object is allied.
+ *
+ * ObjHeight AND ArmyAlliedWithObj ARE BOTH CALLED BEFORE EITHER IS USED, with
+ * the height kept in a register across the second call. Reproduced as two
+ * plain calls; nothing depends on the order and the original simply
+ * interleaved them.
+ */
+int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
+                            int32_t height, void *shot, int32_t *out)
+{
+    uint8_t *t = (uint8_t *)target;
+    uint8_t *s = (uint8_t *)shot;
+    int32_t  objH;
+    int32_t  allied;
+
+    *out = 0;
+
+    if (*(const int8_t *)(t + OBJ_OFF_ARMY) == army) {
+        if (*(const uint32_t *)(t + OBJ_OFF_FLAGS) & OBJ_FLAG_SHOT_PROOF)
+            return 0;
+
+        if (ObjIsTypeIn238((const AM2_Object *)t)) {
+            if (ObjIsType2((const AM2_Object *)t)) {
+                int32_t sarge = 0;
+
+                if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+                    && *(const int32_t *)(t + OBJ_OFF_SOLDIER_KIND)
+                       == AM2_SARGE_SOLDIER_KIND)
+                    sarge = 1;
+
+                if (!Type2Field5A4Set((const AM2_Object *)t) && !sarge
+                    && code != AM2_SHOT_CODE_RANDOM)
+                    return 0;
+            } else if (*(const uint32_t *)(s + OBJ_OFF_RANK)
+                       == ((const AM2_Object *)t)->uid) {
+                return 0;       /* the shooter never hits itself */
+            }
+        }
+    }
+
+    if (!*(const int8_t *)(t + OBJ_OFF_HEIGHT_ADJ))
+        return 0;
+
+    objH   = ObjHeight(t);
+    allied = ArmyAlliedWithObj(army, t, 0);
+
+    if (objH < height) {
+        /* The object is BELOW the shot. */
+        /* Code 2 has no name in orig.h and gets none here; 5 is
+         * AM2_SHOT_STRUCK_HARD. Both are refused in this branch only. */
+        if (code == 2 || code == AM2_SHOT_STRUCK_HARD)
+            return 0;
+
+        if (code == AM2_SHOT_CODE_RANDOM
+            && *(const int16_t *)(t + OBJ_OFF_HEALTH) > 0) {
+            if (objH >= height + AM2_SHOT_OVER_UNDER)
+                return 0;
+            if (*(const int32_t *)(s + OBJ_OFF_FORMATION_SLOT))
+                return 0;
+            return 1;
+        }
+
+        if (!allied && *(const int16_t *)(t + OBJ_OFF_HEALTH) > 0) {
+            if (objH >= height + AM2_SHOT_OVER_UNDER)
+                return 0;
+            if (*(const int32_t *)(s + OBJ_OFF_FORMATION_SLOT))
+                return 0;
+            if (!ObjIsType2((const AM2_Object *)t))
+                return 1;
+
+            if (ShotFacingArc(t, s))
+                *out = 1;
+
+            return ShotBeatsClass(t, s);
+        }
+
+        /* Allied, or already dead. */
+        if (objH <= height + AM2_SHOT_UNDER_OVER)
+            return 0;
+
+        if (ShotCodeChecksArmour(code) && !ShotPiercesArmour(t, s))
+            return 0;
+
+        *(int32_t *)(s + OBJ_OFF_FORMATION_SLOT) = 1;
+        return 1;
+    }
+
+    /* The object is at or ABOVE the shot. */
+    if (!allied && *(const int16_t *)(t + OBJ_OFF_HEALTH) > 0
+        && ObjIsType2((const AM2_Object *)t)) {
+        if (ShotFacingArc(t, s))
+            *out = 1;
+
+        return ShotBeatsClass(t, s);
+    }
+
+    if (ShotCodeChecksArmour(code) && !ShotPiercesArmour(t, s))
+        return 0;
+
+    return 1;
+}
 
 /* ShotStrike -- original 0x0043C000, one caller, which is the type-5 stepper.
  * What a shot does when it arrives somewhere: damage everything at that point
@@ -3237,7 +3428,7 @@ int32_t __cdecl ShotStrike(void *shot, uint32_t at, int32_t height)
             == *(const uint32_t *)(s + OBJ_OFF_RANK))
             continue;
 
-        if (!orig_shot_hits_obj(o, code,
+        if (!ShotHitsObj(o, code,
                                 *(const int8_t *)(s + OBJ_OFF_ARMY),
                                 height, shot, &scratch))
             continue;
@@ -10920,6 +11111,8 @@ void item_install(void)
                   "ShooterReact", 1);
     patch_replace(ADDR_DAMAGE_ITEM, (const void *)DamageItem,
                   "DamageItem", 3);
+    patch_replace(ADDR_SHOT_HITS_OBJ, (const void *)ShotHitsObj,
+                  "ShotHitsObj", 1);
     patch_replace(ADDR_ITEM_TYPE_NAME, (const void *)ItemTypeName,
                   "ItemTypeName", 1);
     patch_replace(ADDR_ITEM_PRE_DESTROY, (const void *)ItemPreDestroy,

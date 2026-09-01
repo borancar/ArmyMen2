@@ -12374,6 +12374,32 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_SHOT_DAMAGE_KIND       2
 #define AM2_SHOT_DAMAGE_KIND_RAND  1
 #define AM2_SHOT_DIR_BIAS          0x80   /* added to OBJ_OFF_FACING */
+/* ShotHitsObj's own vocabulary, all of it read off the body.
+ *
+ * THE HEIGHT BANDS ARE THE WHOLE SHAPE. A shot at height H hits an object
+ * whose ObjHeight is under H only while that object reaches within
+ * AM2_SHOT_OVER_UNDER of it, and one at or above H only while the shot
+ * reaches within AM2_SHOT_UNDER_OVER. Two constants, eight apart, and the
+ * asymmetry is the original's.
+ *
+ * THE EIGHT CODES ARE A SET, NOT A RANGE, and the image spells it as a
+ * two-level jump table -- a byte index per code and two targets -- built
+ * TWICE with identical index bytes and different targets. Written here as a
+ * membership test, which is what those thirty bytes are.
+ *
+ * THE PIERCE LIMITS ARE COMPARED UNSIGNED against the SHOT's own +0xB0. What
+ * that byte is called is OBJ_OFF_SCRIPT_ID, which is another type-dependent
+ * field: on a type 5 it is how much the shot can get through. Recorded, not
+ * aliased, exactly as 0x98 and 0xA0 already are. Same for +0xA0, which this
+ * function uses on a shot as "has already struck something" -- a FIFTH
+ * reading of OBJ_OFF_FORMATION_SLOT's offset. */
+#define OBJ_FLAG_SHOT_PROOF        0x2000000u /* same-army shots pass through */
+#define AM2_SHOT_OVER_UNDER        0x10
+#define AM2_SHOT_UNDER_OVER        8
+#define AM2_SHOT_FACING_ARC        0x30   /* AngleDelta under this sets *out */
+#define AM2_SHOT_PIERCE_CLASS1     0x5C
+#define AM2_SHOT_PIERCE_CLASS2     0xA6
+#define AM2_SARGE_SOLDIER_KIND     7
 /* 0x00457DA0, one caller. What the shooter does once it has hit something it
  * is not allied with: award it experience. Reconstructed; see item.cpp. */
 #define ADDR_SHOOTER_REACT         0x00457DA0u /* void(shooter, target) */
