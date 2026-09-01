@@ -10901,20 +10901,25 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_LISTHDR_BYTES        0x30u
 #define AM2_LIST_RECORD_BYTES    0x0Cu
 #define LISTHDR_OFF_INDEX        0x04u   /* its slot in ADDR_RECORD_LISTS */
-/* A second pointer in the header, at +0x1C. It went in as LISTHDR_OFF_EXTRA,
- * with "what it points at is not established", because the only reader in
- * sight was the free -- which tells you a thing is owned and nothing about
- * what it is.
+/* A WHOLE MASK RECORD IS EMBEDDED HERE, and finding that retired a name.
  *
- * ITS SECOND READER SETTLES IT. 0x0043A6D0 tests it to choose between two
- * markers over the same header: set goes to 0x004385A0, which walks a
- * bitmask, and clear goes to ListBoxAction, which has only the box. That is
- * the same test OBJ_OFF_HIT_MASK gets one structure over, choosing between
- * 0x004389D0 and ObjBoxAction -- so this field plays the same part and gets
- * the same name. Renamed, not aliased.
+ * +0x1C went in as LISTHDR_OFF_EXTRA, with "what it points at is not
+ * established", because the only reader in sight was the free. Its second
+ * reader -- 0x0043A6D0, testing it to choose between the two markers -- got it
+ * renamed to LISTHDR_OFF_HIT_MASK, on the strength of playing the same part
+ * OBJ_OFF_HIT_MASK plays one structure over. Both readings were of a CALL
+ * SITE, and neither was of the callee.
  *
- * A field named from one of two readers is a field named from a call site. */
-#define LISTHDR_OFF_HIT_MASK     0x1Cu
+ * ListMaskAction is the callee and it settles it: it does `lea edi,[hdr+0x10]`
+ * and then reads [edi], [edi+2], [edi+4], [edi+6] and [edi+0xC] -- which is
+ * OBJMASK_OFF_* exactly. So the list header CONTAINS an object mask at +0x10,
+ * and +0x1C is that record's bits pointer rather than a field of the header at
+ * all. The name is gone; the field is reached as LISTHDR_OFF_MASK plus
+ * OBJMASK_OFF_BITS, which is what it is.
+ *
+ * Third time a name off a call site has been wrong about its own field, and
+ * the cure was the same each time: read the callee. */
+#define LISTHDR_OFF_MASK         0x10u  /* an OBJMASK_OFF_* record, embedded */
 /* The four edges of the header's own box, in world units, added to the point
  * the caller supplies. The same fallback shape OBJ_OFF_BOX_LEFT and the three
  * after it give an object, and read by the same one function. They are inside
@@ -10933,7 +10938,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * object: the same three exits, the same 0x1C flag test, the same box offset
  * by a point -- except the point is an ARGUMENT here rather than a field. */
 #define ADDR_LIST_BOX_ACTION     0x00438F10u /* int32_t(uint32 at, hdr, mask) */
-/* Its bitmask twin, the one LISTHDR_OFF_HIT_MASK selects when it is SET --
+/* Its bitmask twin, the one the embedded mask's bits pointer selects --
  * the same relation ADDR_OBJ_MASK_ACTION has to ObjBoxAction one structure
  * over. Named at last, by the function that chooses between the two. */
 #define ADDR_LIST_MASK_ACTION    0x004385A0u /* int32_t(uint32 at, hdr, mask) */

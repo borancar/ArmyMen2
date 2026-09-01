@@ -2153,12 +2153,12 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
  * answer 0; a sprite whose flags say "not a software blit" answers 1, meaning
  * nothing to do; and the real answer, when there is one, is BoxAction's.
  *
- * ITS CALLER IS WHAT NAMED LISTHDR_OFF_HIT_MASK. 0x0043A6D0 tests that field
- * and goes to the bitmask walker at 0x004385A0 when it is set and here when it
- * is not -- the same choice OBJ_OFF_HIT_MASK drives one structure over. The
- * field had been LISTHDR_OFF_EXTRA, named from the only reader anyone had
- * found, which was the free; a field named from one of its two readers is a
- * field named from a call site.
+ * ITS CALLER IS WHAT ONCE NAMED THE FIELD BESIDE IT. 0x0043A6D0 tests +0x1C
+ * and goes to ListMaskAction when it is set and here when it is not -- the
+ * same choice OBJ_OFF_HIT_MASK drives one structure over. That got +0x1C
+ * called LISTHDR_OFF_HIT_MASK, which was a name off a call site and wrong:
+ * ListMaskAction reads an OBJMASK record embedded at +0x10, so +0x1C is that
+ * record's BITS pointer. See orig.h.
  *
  * Not exercised, for the same reason BoxAction is not -- see the note there.
  */
@@ -2189,11 +2189,212 @@ int32_t __cdecl ListBoxAction(uint32_t at, void *list, void *out)
                      out);
 }
 
-/* The bitmask twin of ListBoxAction, still original: LISTHDR_OFF_HIT_MASK
- * chooses between the two and this is the arm taken when it is SET. */
-typedef int32_t (__cdecl *AM2_ListMaskFn)(uint32_t at, void *hdr, void *out);
-#define orig_list_mask_action \
-    ((AM2_ListMaskFn)(uintptr_t)ADDR_LIST_MASK_ACTION)
+/* ListMaskAction -- original 0x004385A0, 1,072 bytes, one caller.
+ *
+ * ObjHitMaskAction for a RECORD-LIST HEADER instead of an object, and it is
+ * that function line for line: the same eight clamps, the same bottom /right/
+ * top/left store order, the same zero memset, the same twenty ring deltas, the
+ * same rowbits arithmetic, the same `% 16` phase and the same two half-byte
+ * tables with the same one-past index. Everything written up over there
+ * applies here and is not repeated.
+ *
+ * THREE THINGS DIFFER, and all three are about where the mask comes from.
+ *
+ * THE MASK RECORD IS EMBEDDED, not pointed at. The original does
+ * `lea edi,[hdr+0x10]` and then reads the five OBJMASK_OFF_* fields off that,
+ * which is what settled LISTHDR_OFF_MASK and retired the name +0x1C used to
+ * carry -- see orig.h. The header CONTAINS a mask; it does not hold one.
+ *
+ * SO THE FIRST GUARD IS VACUOUS. ObjHitMaskAction tests its object's mask
+ * pointer for null and means it; here the same test survives against an
+ * ADDRESS-OF, so `test edi,edi` can only fail for a header at -0x10. One
+ * function written twice, and the copy's guard went dead the moment the
+ * pointer became an address. Reproduced, because the instruction is there.
+ *
+ * THE ORIGIN IS A POINT ARGUMENT LESS THE FIRST RECORD'S SPRITE HOTSPOT,
+ * where the object version uses the object's own OBJ_OFF_HIT_RECT. Same
+ * "the first record speaks for the whole list" shape ListBoxAction has, and
+ * the same argument-supplied point. That the offset subtracted is SPR_OFF_HOTX
+ * and SPR_OFF_HOTY is worth stating: it makes the sign of the mask origin here
+ * read as "hotspot-relative, plus the mask's own offset", which is the more
+ * defensible of the two conventions orig.h records the two readers disagreeing
+ * about.
+ *
+ * THREE ARGUMENT SLOTS ARE REUSED AS LOCALS -- the bits pointer over `hdr`,
+ * the split index over `at`, the parity flag over `out` -- which is safe only
+ * because `out` is already in a register and there is no call after the eight
+ * Clamps. Worth knowing when reading the disassembly, where an argument being
+ * written looks like a mistake.
+ *
+ * COLD, AND PROBED WITH A CONTROL THIS TIME. Its counter is blind and so are
+ * CanPlaceAt's and ListBoxAction's -- tools/blindspots.py says every caller of
+ * each is reconstructed -- so the three zeros a live mission reports are worth
+ * nothing on their own. An am2_log at each of the two markers and one after
+ * the branch that chooses between them, with a CONTROL at ObjAfterMove's top
+ * that must fire: the control reads 1,598 and all three of the others read 0.
+ * So CanPlaceAt never reaches the marker pair on a live Boot Camp mission.
+ *
+ * That is the second family in a row where the pair is unreached rather than
+ * one arm being taken, and both were nearly written up from blind counters.
+ * The rule is the one CLAUDE.md already states and the addition is the
+ * control: a probe whose control cannot fire is a test that cannot fail. */
+int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
+{
+    const uint8_t  *h     = (const uint8_t *)hdr;
+    uint8_t        *rec   = (uint8_t *)out;
+    int32_t        *box   = (int32_t *)(rec + TILEMASK_OFF_RECT);
+    uint8_t        *cells = rec + TILEMASK_OFF_CELLS;
+    int32_t        *ring  = (int32_t *)(uintptr_t)ADDR_TILEMASK_NEIGHBOURS;
+    const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
+                                AM2_IMAGE(ADDR_BIT_FROM_N);
+    const uint8_t  *m;
+    const uint8_t  *bits;
+    const uint8_t  *spr;
+    int32_t         ox;
+    int32_t         oy;
+    int32_t         mx;
+    int32_t         my;
+    int32_t         lw;
+    int32_t         rw;
+    int32_t         tw;
+    int32_t         bw;
+    int32_t         w;
+    int32_t         rowbits;
+    int32_t         rowbytes;
+    int32_t         phase;
+    int32_t         splitOdd;
+    int32_t         k;
+    int32_t         tilew;
+    int32_t         y;
+    int32_t         marked = 0;
+
+    /* The address-of that cannot be null -- see above. */
+    m = h + LISTHDR_OFF_MASK;
+    if (!m)
+        return 0;
+    bits = *(const uint8_t *const *)(m + OBJMASK_OFF_BITS);
+    if (!bits)
+        return 0;
+
+    spr = *(const uint8_t *const *)
+              (*(const uint8_t *const *)(h + LISTHDR_OFF_RECORDS)
+               + LISTREC_OFF_SPRITE);
+
+    ox = (int32_t)(int16_t)(at & 0xFFFFu)
+         - *(const int16_t *)(spr + SPR_OFF_HOTX);
+    oy = (int32_t)(int16_t)(at >> 16)
+         - *(const int16_t *)(spr + SPR_OFF_HOTY);
+
+    mx = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X);
+    my = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y);
+
+    lw = Clamp(ox + mx, 1 << AM2_TILE_SHIFT,
+               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
+                   - (1 << AM2_TILE_SHIFT));
+    rw = Clamp(ox + mx + *(const int16_t *)(m + OBJMASK_OFF_WIDTH) - 1,
+               1 << AM2_TILE_SHIFT,
+               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
+                   - (1 << AM2_TILE_SHIFT));
+    tw = Clamp(oy + my, 1 << AM2_TILE_SHIFT,
+               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y
+                   - (1 << AM2_TILE_SHIFT));
+    bw = Clamp(oy + my + *(const int16_t *)(m + OBJMASK_OFF_HEIGHT) - 1,
+               1 << AM2_TILE_SHIFT,
+               *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y
+                   - (1 << AM2_TILE_SHIFT));
+
+    box[3] = Clamp(bw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+                       - AM2_TILEMASK_MARGIN) + AM2_TILEMASK_MARGIN;
+    box[2] = Clamp(rw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+                       - AM2_TILEMASK_MARGIN) + AM2_TILEMASK_MARGIN;
+    box[1] = Clamp(tw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+                       - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
+    box[0] = Clamp(lw >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+                   *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+                       - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
+
+    w = box[2] - box[0] + 1;
+    memset(cells, 0, (size_t)((box[3] - box[1] + 1) * w));
+
+    ring[0]  = -2 * w - 1;
+    ring[1]  = -2 * w;
+    ring[2]  = -2 * w + 1;
+    ring[3]  = -w - 2;
+    ring[4]  = -w - 1;
+    ring[5]  = -w;
+    ring[6]  = -w + 1;
+    ring[7]  = -w + 2;
+    ring[8]  = -2;
+    ring[9]  = -1;
+    ring[10] = 1;
+    ring[11] = 2;
+    ring[12] = w - 2;
+    ring[13] = w - 1;
+    ring[14] = w;
+    ring[15] = w + 1;
+    ring[16] = w + 2;
+    ring[17] = 2 * w - 1;
+    ring[18] = 2 * w;
+    ring[19] = 2 * w + 1;
+
+    rowbits  = (rw - lw) + 31 - ((rw - lw + 31) % 32);
+    rowbytes = rowbits >> 3;
+    if (rowbits == 0)
+        return 0;
+
+    phase = lw % (1 << AM2_TILE_SHIFT);
+    if (phase >= 8) {
+        splitOdd = 0;
+        k        = (1 << AM2_TILE_SHIFT) - phase;
+    } else {
+        splitOdd = 1;
+        k        = 8 - phase;
+    }
+
+    tilew = (box[2] - AM2_TILEMASK_MARGIN)
+            - (box[0] + AM2_TILEMASK_MARGIN) + 1;
+
+    for (y = tw; y < bw; y += 8) {
+        int32_t off = (y - my - oy) * rowbytes;
+        int32_t end = off + rowbytes;
+        int32_t col = AM2_TILEMASK_MARGIN;
+        int32_t idx = ((y >> AM2_TILE_SHIFT) - box[1]) * w
+                      + AM2_TILEMASK_MARGIN;
+
+        for (; off < end; off++) {
+            if (splitOdd != off % 2) {
+                if (bits[off]) {
+                    cells[idx] |= AM2_TILEMASK_BOX_CELL;
+                    marked = 1;
+                    MarkTileRing(cells, ring, idx);
+                }
+                continue;
+            }
+
+            if (bits[off] & tab[k]) {
+                cells[idx] |= AM2_TILEMASK_BOX_CELL;
+                marked = 1;
+                MarkTileRing(cells, ring, idx);
+            }
+
+            col++;
+            idx++;
+            if (col == tilew + AM2_TILEMASK_MARGIN)
+                break;
+
+            if (bits[off] & tab[k + AM2_BIT_FROM_N_LOW]) {
+                cells[idx] |= AM2_TILEMASK_BOX_CELL;
+                marked = 1;
+                MarkTileRing(cells, ring, idx);
+            }
+        }
+    }
+
+    return marked;
+}
 
 /* UnitWeaponInfo -- original 0x004045E0, three callers. Fill the six fields of
  * a sight context that describe the weapon a unit is HOLDING: the object, its
@@ -2306,7 +2507,7 @@ void __cdecl UnitWeaponInfo(void *unit, void *out)
  * and then used to index ADDR_AAI_RECORDS -- so those two arrays are PARALLEL,
  * one count over both, which nothing in the file said before.
  *
- * The mask comes from whichever of the two markers LISTHDR_OFF_HIT_MASK
+ * The mask comes from whichever of the two markers the embedded mask's bits
  * selects, and BoxAction underneath fills the margin with
  * AM2_TILEMASK_PAD_CELL and the box itself with AM2_TILEMASK_BOX_CELL. So
  * `cell & 1` is exactly "inside the box rather than the padding", which is
@@ -2346,8 +2547,9 @@ int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind)
     hdr = ((void *const *)*(void *const *)(uintptr_t)ADDR_RECORD_LISTS)
               [*(const int32_t *)(rec + AAI_OFF_DEF_INDEX)];
 
-    if (*(const int32_t *)((const uint8_t *)hdr + LISTHDR_OFF_HIT_MASK))
-        orig_list_mask_action(at, hdr, &mask);
+    if (*(const void *const *)((const uint8_t *)hdr + LISTHDR_OFF_MASK
+                               + OBJMASK_OFF_BITS))
+        ListMaskAction(at, hdr, &mask);
     else
         ListBoxAction(at, hdr, &mask);
 
@@ -6002,6 +6204,8 @@ int region_install(void)
                         "BoxAction", 5);
     rc |= patch_replace(ADDR_LIST_BOX_ACTION, (const void *)ListBoxAction,
                         "ListBoxAction", 3);
+    rc |= patch_replace(ADDR_LIST_MASK_ACTION, (const void *)ListMaskAction,
+                        "ListMaskAction", 3);
     rc |= patch_replace(ADDR_CAN_PLACE_AT, (const void *)CanPlaceAt,
                         "CanPlaceAt", 6);
     rc |= patch_replace(ADDR_UNIT_WEAPON_INFO, (const void *)UnitWeaponInfo,

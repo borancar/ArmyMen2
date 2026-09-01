@@ -447,7 +447,7 @@ int32_t __cdecl FindRecordList(uint32_t owner)
  * ADDR_RECORD_LISTS, so this is MakeRecordList's counterpart.
  *
  * Free the header's records array, free a SECOND pointer at
- * LISTHDR_OFF_HIT_MASK, then free the header. Each is tested first, so a header
+ * the embedded mask's bits, then free the header. Each is tested first, so a header
  * with either pointer null is fine.
  *
  * THAT SECOND POINTER IS NOT MakeRecordList'S. The maker zeroes the 0x30 bytes
@@ -475,7 +475,7 @@ void __cdecl FreeRecordList(void *list)
     if (!list)
         return;
 
-    p = *(void *const *)(h + LISTHDR_OFF_HIT_MASK);
+    p = *(void *const *)(h + LISTHDR_OFF_MASK + OBJMASK_OFF_BITS);
     if (p)
         am2_free(p);
 
@@ -861,9 +861,9 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
     *(int16_t *)(entry + 6) = 0;
 
     list = (uint8_t *)MakeRecordList(1, entry, (void *)(uintptr_t)key);
-    LoadMask(list + 0x10, set, index, frame);
+    LoadMask(list + LISTHDR_OFF_MASK, set, index, frame);
 
-    if (!*(const int32_t *)(list + LISTHDR_OFF_HIT_MASK)) {
+    if (!*(const int32_t *)(list + LISTHDR_OFF_MASK + OBJMASK_OFF_BITS)) {
         AM2_Rect box;
 
         RectSet(&box, -0x10, -0x10, 0x10, 0x10);
@@ -1056,7 +1056,7 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
  * EnsureSpriteAaiRecord's miss path almost instruction for instruction --
  * PreloadSprite, a twelve-byte entry, MakeRecordList(1, entry, key),
  * LoadMask into +0x10, the RectSet(-16,-16,16,16) fallback when
- * LISTHDR_OFF_HIT_MASK came back null, AddRecordList -- and the field copying
+ * the embedded mask had no bits, AddRecordList -- and the field copying
  * is InitObjFromAai's with a different record. That is why it needed six
  * offset names and no new function name at all.
  *
@@ -1160,9 +1160,9 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
             *(const int32_t *)(rec + DEF_OBJ_REC_OFF_DEPTH);
 
         list = (uint8_t *)MakeRecordList(1, entry, (void *)(uintptr_t)key);
-        LoadMask(list + 0x10, set, index, frame);
+        LoadMask(list + LISTHDR_OFF_MASK, set, index, frame);
 
-        if (!*(const int32_t *)(list + LISTHDR_OFF_HIT_MASK)) {
+        if (!*(const int32_t *)(list + LISTHDR_OFF_MASK + OBJMASK_OFF_BITS)) {
             AM2_Rect box;
 
             RectSet(&box, -0x10, -0x10, 0x10, 0x10);

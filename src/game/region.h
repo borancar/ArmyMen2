@@ -289,6 +289,11 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage);
  * argument rather than a field. */
 int32_t __cdecl ListBoxAction(uint32_t at, void *list, void *out);
 
+/* 0x004385A0, the bitmask twin of the above -- and ObjHitMaskAction's twin in
+ * the other direction, which is the one to read for how the walk works. The
+ * mask record is embedded in the header at LISTHDR_OFF_MASK. */
+int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out);
+
 /* 0x0043A6D0, six callers. Could the thing described by key-table slot `slot`
  * stand at world point `at`? Build its tile mask there and answer 0 the moment
  * a cell of it is covered, is the wrong ADDR_TILE_KIND, or has an object on

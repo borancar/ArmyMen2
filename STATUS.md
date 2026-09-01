@@ -5,71 +5,67 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `4577d00`. Working tree clean.
+Last updated: **2026-09-01**, at `5b1b66a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,390 patches**, **29** analysis tools in `make check`.
+Nothing uncommitted. **1,391 patches**, **29** analysis tools in `make check`.
 
-**`ObjHitMaskAction` (`0x004389D0`, 1,056 bytes) is reconstructed** -- the arm
-`ItemTeardown` and `ObjAfterMove` take when an object has a per-pixel
-`OBJ_OFF_HIT_MASK`, where `ObjBoxAction` is the no-mask fallback. Its only
-callee is `Clamp`; the other thousand bytes are arithmetic, which is why it
-reads as harder than it is.
+**`ListMaskAction` (`0x004385A0`, 1,072 bytes) is reconstructed** -- the twin
+of `ObjHitMaskAction`, which landed in the commit before it and is the one to
+read for how the walk works. The two are the same function line for line: the
+same eight clamps, the same store order, the same zero memset, the same twenty
+ring deltas, the same one-past split index. Three things differ and all three
+are about where the mask comes from.
 
-**The walk is a half-tile step in both directions.** A tile is 16 world units,
-one bitmap bit is one unit, so a tile is two bytes of a mask row. Rows are
-sampled every eight units and the byte that STRADDLES a tile boundary is the
-one that advances the output cell: its high part goes to the current cell, its
-low part to the next. Every other byte is tested whole and advances nothing.
-Two bytes make one cell, which is what makes the two branches add up.
+**A WHOLE MASK RECORD IS EMBEDDED IN THE LIST HEADER at +0x10, and finding
+that retired a name.** `+0x1C` had been `LISTHDR_OFF_EXTRA` (from the free,
+its only known reader), then `LISTHDR_OFF_HIT_MASK` (from the branch that
+chooses between the two markers). Both readings were of a CALL SITE.
+`ListMaskAction` is the callee and it reads `[hdr+0x10]`, `[+0x12]`, `[+0x14]`,
+`[+0x16]` and `[+0x1C]` -- which is `OBJMASK_OFF_*` exactly. So `+0x1C` is that
+record's bits pointer and not a field of the header at all. Four uses across
+two files now say `LISTHDR_OFF_MASK + OBJMASK_OFF_BITS`.
 
-**The split index is one past the entry the split wants**, so the pixel exactly
-on a 16-unit boundary is credited to the tile on its left. Where `left` is a
-multiple of 8 there is no straddle at all and the index is 8, which walks the
-first eight-entry table into the second (0x7F) and the second into the eight
-0xFF bytes after it. Transcribed, not corrected.
+**And the answer had been sitting in the tree unnamed.** `objtype.cpp` calls
+`LoadMask(list + 0x10, ...)` in two places, a bare literal, which is
+independent confirmation of the embedded record and was written before either
+name was argued about. Grepping the tree for what already answers a question is
+cheaper than reading a third call site.
 
-**The neighbour ring's bounds check is a BREAK, not a skip.** The twenty deltas
-ascend, so a cell in the top two rows has a negative first delta and loses its
-entire ring rather than the two rows above it -- and there is no upper bound at
-all. Both reproduced.
+**The copy's first guard is VACUOUS.** `ObjHitMaskAction` tests its object's
+mask pointer for null and means it; here the same test survives against an
+address-of, so it can only fail for a header at `-0x10`. One function written
+twice, and the guard went dead the moment the pointer became an address.
 
-**The two readers of the hit mask disagree about the sign of its origin.**
-`ObjMaskBitAt` places the mask at `hitRect.topLeft - origin` and this one at
-`+ origin`. Each is internally consistent with the row index it then computes,
-so they agree only where the origin is zero. Recorded in `orig.h` rather than
-resolved; neither is corrected.
+**The origin is a point argument less the FIRST RECORD'S SPRITE HOTSPOT**,
+where the object version uses the object's own `OBJ_OFF_HIT_RECT`. That makes
+the sign convention here read as "hotspot-relative plus the mask's own offset",
+which is the more defensible of the two the mask's two readers disagree about.
 
-**COLD, and it took three attempts to measure that rather than assume it.**
-All four of the family's counters are BLIND -- `tools/blindspots.py` says
-every caller of each is reconstructed -- so a live mission reading 0 on all
-four says nothing. Then the probe itself proved nothing: an `am2_log` fired 0
-times and so did a CONTROL at the top of `region_install`, which must run,
-because `crt.cpp` binds `am2_log` after the install. Moved to the call sites it
-works: `ObjAfterMove` is entered **1,598** times on a live Boot Camp mission,
-**1,436** get past the flag guards and every one is an ITEM, and the marker
-pair runs **zero** times. So neither marker is reached, and `region.cpp`'s
-older note explaining `ObjBoxAction`'s zero by "everything has a mask" is true
-and beside the point.
+**Probed WITH A CONTROL, which is the addition.** `ListMaskAction`,
+`ListBoxAction` and `CanPlaceAt` are all blind counters, so their zeros say
+nothing. An `am2_log` at each of the two markers and one after the branch that
+chooses between them, plus a control at `ObjAfterMove`'s top that must fire:
+the control reads **1,598** and all three others read **0**. So `CanPlaceAt`
+never reaches the marker pair on a live Boot Camp mission -- the second family
+in a row where the pair is unreached rather than one arm being taken.
 
-**A/B clean on `bootcamp` (22 pixels) and `campaign` (2, and 0 on the dialog).**
-`mission`'s frames gate failed at 25822/634 -- the standing behaviour of that
-configuration, and this function is now measured not to run on it at all.
+**A/B clean on `bootcamp` (22 pixels) and `campaign` (2).**
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,215 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 24
-outstanding, which is 1,239 minus 1,215 -- from 1,390 patched addresses, and
-**86.6% of the sub-CRT bytes**. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,216 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 23
+outstanding, which is 1,239 minus 1,216 -- from 1,391 patched addresses, and
+**86.9% of the sub-CRT bytes**. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and forty-six batches have gone in and NOTHING SMALL IS LEFT: the
-24 entries outstanding start at **1,072 bytes** -- `ListMaskAction` at
-`0x004385A0`, this one's twin -- and the median is **1,504**. The
+small ones in batches. A hundred and forty-seven batches have gone in and NOTHING SMALL IS LEFT: the
+23 entries outstanding start at **1,120 bytes** -- `0x00434700` -- and the
+median is **1,504**. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred
 rather than unread; it is done, and with it the last thing under 900 bytes.
 The sentence here used to say they started at 96 and name the MSVC static-init
