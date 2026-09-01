@@ -7612,6 +7612,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * ADDR_OBJ_BLOCK_WEIGHT is reached from here and not only in principle. The
  * other picks between this and 0x0045B7E0 on a value being 5. Counter measured
  * at 0 -- not blind, just unreached -- so it is verified by reading. */
+/* 0x00448FB0, three call sites, all inside ADDR_AI_44AFB0. The sixth member
+ * of the block-weight family: the walk inlined WITH BlockWeightAt's height
+ * step, no trooper arm, a strictly-greater distance test where Troops uses >=,
+ * and a fourth argument that is an OUT-POINTER rather than the family's `ref`
+ * -- it reports whether the object's current route leg falls inside anything,
+ * and on saturation the route advances or is dropped. */
+#define ADDR_BLOCK_WEIGHT_ROUTE  0x00448FB0u  /* int32(obj,at,chain,int32*) */
 #define ADDR_BLOCK_WEIGHT_CHAIN    0x0045B690u /* int32_t(void*,uint32,void*,uint32) */
 /* The UID REMAP TABLE, and what it is comes from the one function that READS
  * it. 0x004276F0 walks a unit's six UNIT_OFF_INVENTORY slots and, for each,

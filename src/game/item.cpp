@@ -2870,6 +2870,153 @@ int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
     return total;
 }
 
+/* BlockWeightRoute -- original 0x00448FB0, three call sites, all inside
+ * ADDR_AI_44AFB0. THE SIXTH MEMBER of the block-weight family and the fifth
+ * spelling of one walk; the other five are reconstructed already:
+ *
+ *   BlockWeightAt        0x00448F00  tile bit and a height step
+ *   BlockWeightChain     0x0045B690  pre-collected chain, AM2_TILE_OPEN
+ *   BlockWeightTroops    0x0045B7E0  walk INLINED, plus a trooper arm
+ *   BlockWeightDamaging  0x0043CF70  and damages what it walks
+ *   RoachMaskWeight      0x0043D050  the roach's
+ *
+ * Written against BlockWeightTroops, which is the same inlined walk, rather
+ * than transcribed independently -- a sixth private version of one loop is how
+ * a difference stops being visible. What makes this one ITS OWN variant is
+ * four things, and every one would be invisible in a from-scratch reading:
+ *
+ *   - it carries BlockWeightAt's HEIGHT STEP: a hit whose OBJ_OFF_HEIGHT_SET
+ *     differs from ours by more than 16 counts nothing. The original takes the
+ *     absolute value with `cdq / xor / sub`, so it is symmetric -- something
+ *     far below blocks as little as something far above;
+ *   - it has NO trooper arm. Where Troops splits type 2 out to ask whether the
+ *     hit is an enemy, this asks ObjIsTypeIn238 once and treats 2, 3 and 8
+ *     alike;
+ *   - the distance test is STRICTLY greater where Troops uses >=. Two
+ *     otherwise identical tests, and the boundary case goes the other way;
+ *   - it reports CONTAINMENT through an out-parameter, which no other variant
+ *     has, and that is what the fourth argument is. The others take `ref`
+ *     there by value; this writes through it.
+ *
+ * THE ROUTE POINT IS NOT THE REFERENCE POINT. `at` is the family's ref -- what
+ * ApproxDist measures against and whose tile is charged at the end -- while
+ * PointInRect is asked about the current LEG, taken from the planned route at
+ * OBJ_OFF_MOVE_FROM indexed by OBJ_OFF_MOVE_AT, or OBJ_OFF_FIELD_C0 when the
+ * route is spent. I first read that array as a weapon inventory, having
+ * carried +0xC0's meaning across from CreateMissile where it IS a missile def;
+ * it is a packed point here, and PointsEqual being handed it BY VALUE is what
+ * settled that -- overloading by type, as at 0x52C and 0x538.
+ *
+ * ON SATURATION the route advances, and only if the leg point was actually
+ * inside something: OBJ_OFF_MOVE_AT steps on while it is short of the last
+ * waypoint, and at the last it clears OBJ_OFF_FIELD_C0. With no route at all
+ * it clears +0xC0 and OBJ_OFF_SCRIPT_STATE together, but only when those two
+ * already agree.
+ *
+ * Two argument slots are recycled as scratch in the original and one has its
+ * address taken afterwards; nothing observes the frame, so this uses named
+ * locals rather than reproducing that. */
+int32_t __cdecl BlockWeightRoute(void *from, uint32_t at, void *chain,
+                                 int32_t *inside)
+{
+    uint8_t *o = (uint8_t *)chain;
+    uint8_t *f = (uint8_t *)from;
+    int32_t  total = 0;
+    uint32_t leg;
+    uint32_t tile;
+
+    *inside = 0;
+
+    if (*(const uint16_t *)(f + OBJ_OFF_MOVE_AT)
+        < *(const uint16_t *)(f + OBJ_OFF_MOVE_COUNT))
+        leg = ((const uint32_t *)(f + OBJ_OFF_MOVE_FROM))
+                  [*(const uint16_t *)(f + OBJ_OFF_MOVE_AT)];
+    else
+        leg = *(const uint32_t *)(f + OBJ_OFF_FIELD_C0);
+
+    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
+        int32_t w = AM2_BLOCK_FULL;
+        int32_t ask = 1;
+        int32_t dh;
+
+        if (o == f) {
+            w = 0;
+            ask = 0;
+        } else if (f
+                   && (dh = *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
+                            - *(const int8_t *)(f + OBJ_OFF_HEIGHT_SET),
+                       (dh < 0 ? -dh : dh) > AM2_BLOCK_HEIGHT_STEP)) {
+            w = 0;
+            ask = 0;
+        } else if (ObjIsItem((const AM2_Object *)o)) {
+            w = *(const int8_t *)(o + OBJ_OFF_RANK);
+            ask = w >= AM2_BLOCK_FULL;
+        } else if (f && ObjIsTypeIn238((const AM2_Object *)o)
+                   && ApproxDist((const AM2_Point *)&at,
+                                 (const AM2_Point *)(o + OBJ_OFF_POS))
+                      > ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
+                                   (const AM2_Point *)(o + OBJ_OFF_POS))) {
+            w = 0;
+            ask = 0;
+        }
+
+        if (ask)
+            *inside = PointInRect((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT),
+                                  (const AM2_Point *)&leg);
+
+        total += w;
+        if (total >= AM2_BLOCK_FULL) {
+            if (*inside) {
+                uint16_t cur = *(const uint16_t *)(f + OBJ_OFF_MOVE_AT);
+                uint16_t cnt = *(const uint16_t *)(f + OBJ_OFF_MOVE_COUNT);
+
+                if (cur < cnt) {
+                    if (cur < (uint16_t)(cnt - 1))
+                        *(uint16_t *)(f + OBJ_OFF_MOVE_AT) =
+                            (uint16_t)(cur + 1);
+                    else
+                        *(uint32_t *)(f + OBJ_OFF_FIELD_C0) =
+                            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+                } else if (PointsEqual(
+                               *(const uint32_t *)(f + OBJ_OFF_FIELD_C0),
+                               *(const uint32_t *)(f + OBJ_OFF_SCRIPT_STATE))) {
+                    *(uint32_t *)(f + OBJ_OFF_FIELD_C0) =
+                            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+                    *(uint32_t *)(f + OBJ_OFF_SCRIPT_STATE) =
+                            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+                }
+            }
+            return total;
+        }
+    }
+
+    tile = (uint32_t)TileOfPoint(at);
+    /* The original's guard, on the low 16 bits and before the mask -- vacuous,
+     * exactly as in BlockWeightChain, and kept for the same reason. */
+    if ((tile & 0xFFFFu) > 0xFFFFu)
+        return 0xFF;
+    tile &= 0xFFFFu;
+
+    if (g_tileFlags[tile] & AM2_TILE_BLOCKS)
+        total += AM2_BLOCK_FULL;
+
+    /* The second tile term is gated on the MULTIPLAYER session or on this
+     * being the player's own army, and it fires only when the destination
+     * tile has bit 1 and OUR tile does not -- so crossing into that kind of
+     * tile costs, standing in one already does not. */
+    if ((*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+         || *(const int8_t *)(f + OBJ_OFF_ARMY) == (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+        && (g_tileFlags[tile] & 2)
+        && !(g_tileFlags[*(const uint16_t *)(f + OBJ_OFF_TILE)] & 2))
+        total += AM2_BLOCK_FULL;
+
+    if ((uint32_t)TileOfPoint(*(const uint32_t *)(f + OBJ_OFF_FIELD_C0))
+        == tile)
+        *inside = 1;
+
+    return total;
+}
+
 /* 0x0045B690, two callers, 112 bytes. The sibling of BlockWeightAt above, and
  * the two differences are the whole of it.
  *
@@ -9939,6 +10086,8 @@ void item_install(void)
                   "BlockWeightAt", 3);
     patch_replace(ADDR_BLOCK_WEIGHT_CHAIN, (const void *)BlockWeightChain,
                   "BlockWeightChain", 2);
+    patch_replace(ADDR_BLOCK_WEIGHT_ROUTE, (const void *)BlockWeightRoute,
+                  "BlockWeightRoute", 3);
     patch_replace(ADDR_BLOCK_WEIGHT_TROOPS, (const void *)BlockWeightTroops,
                   "BlockWeightTroops", 3);
     patch_replace(ADDR_MASK_BLOCK_WEIGHT, (const void *)MaskBlockWeight,

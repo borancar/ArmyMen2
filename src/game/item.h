@@ -234,6 +234,14 @@ int32_t __cdecl TileAttrAt(uint32_t tile);
  * `ref` is the reference point ObjBlockWeight compares distances against. */
 int32_t __cdecl BlockWeightAt(void *from, uint32_t at, uint32_t ref);
 
+/* 0x00448FB0, three call sites, all in ADDR_AI_44AFB0. The SIXTH variant:
+ * the walk inlined, WITH BlockWeightAt's height step, no trooper arm, a
+ * strictly-greater distance test where Troops uses >=, and an out-parameter
+ * saying whether the object's current route leg falls inside anything. On
+ * saturation it advances the route or drops it. */
+int32_t __cdecl BlockWeightRoute(void *from, uint32_t at, void *chain,
+                                 int32_t *inside);
+
 /* 0x0045B690. The same total for a chain the caller has already collected,
  * with the tile term on AM2_TILE_OPEN and no height step. */
 int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
