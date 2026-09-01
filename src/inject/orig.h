@@ -4774,6 +4774,14 @@ typedef struct {
 #define AM2_MENU_REQUEST_ENTER_NAME    0x04u
 #define AM2_MENU_REQUEST_LOAD_GAME     0x05u
 #define AM2_MENU_REQUEST_DEL_PLAYER    0x14u
+/* THREE MORE, AND THE JUMP TABLE IS WHAT SAYS WHICH IS WHICH. The arms at
+ * 0x00426435.. are laid out 1, 2, 3, 4, 5, 6, 10, 11, 12, 7, 8, 9, 13 -- so
+ * reading them top to bottom and numbering as you go puts the war menu, the
+ * battle name and the battle browser three places early. Taken from the table
+ * at 0x00426518, exactly as CLAUDE.md says to. */
+#define AM2_MENU_REQUEST_WAR_MENU     0x0Au
+#define AM2_MENU_REQUEST_BATTLE_NAME  0x0Bu
+#define AM2_MENU_REQUEST_BATTLE_JOIN  0x0Cu
 #define AM2_MENU_MODE_DEL_PLAYER       0x1Au
 #define AM2_GAME_OVER_CREDITS         0x04u
 /* 0x0043ED00: reload the Boot Camp level table -- it frees whatever is there,
@@ -4954,9 +4962,35 @@ typedef struct {
 #define AM2_ENTER_NAME_MAX       0x18
 #define ADDR_ON_ENTER_NAME_OK    0x00451990u
 #define ADDR_ON_ENTER_NAME_CANCEL 0x00451AC0u
-#define ADDR_OPEN_CD_PROMPT      0x0042F440u  /* void(void) */
-#define ADDR_CD_PROMPT_CTOR      0x0042EED0u  /* thiscall obj *(obj, bmp) */
-#define AM2_CD_PROMPT_SIZE       0x64u
+/* THE WAR MENU -- START A WAR, JOIN A WAR, CANCEL. This was ADDR_OPEN_CD_PROMPT
+ * and the constructor below was ADDR_CD_PROMPT_CTOR, on the strength of
+ * "Copy Protection" and "The ARMYMEN2 CD must be in the drive to play Army
+ * Men II." Those two strings are in 0x0042F290, which is the START A WAR
+ * BUTTON's handler; the constructor pushes neither, and what it does push is
+ * three bitmap triples called host, join and cancel. Named from a call site
+ * once more, and the screen is what COMM. CHANNEL SELECT's SELECT reaches.
+ *
+ * ITS TWO BUTTONS DIFFER BY ONE FIELD AND IT IS COMM_OFF_IS_HOST. START A WAR
+ * asks for AM2_MENU_REQUEST_BATTLE_NAME with it set; JOIN A WAR asks for
+ * AM2_MENU_REQUEST_BATTLE_JOIN with it clear. That is what settles which
+ * bitmap belongs to which, rather than the y coordinates -- though those
+ * agree: 222 and 262 are the two centres tools/ab.sh multi already clicks. */
+#define ADDR_OPEN_WAR_MENU       0x0042F440u  /* void(void) */
+#define ADDR_WAR_MENU_CTOR       0x0042EED0u  /* thiscall obj *(obj, bmp) */
+#define AM2_WAR_MENU_SIZE        0x64u
+#define VTABLE_WAR_MENU          0x0046F9E4u
+/* Still original: it is one of the three MessageBoxA sites docs/boundary.md
+ * reports, and the CD check in front of it is patched to jump past. */
+#define ADDR_ON_START_WAR        0x0042F290u  /* void(AM2_Widget *) */
+#define AM2_BMP_HOST0            0x00486F54u /* 03_107_0N_host.bmp */
+#define AM2_BMP_HOST1            0x00486F68u
+#define AM2_BMP_HOST2            0x00486F7Cu
+#define AM2_BMP_JOIN0            0x00486F18u /* 03_108_0N_join.bmp */
+#define AM2_BMP_JOIN1            0x00486F2Cu
+#define AM2_BMP_JOIN2            0x00486F40u
+#define AM2_BMP_CANCEL0          0x00486ED0u /* 03_110_0N_cancel.bmp */
+#define AM2_BMP_CANCEL1          0x00486EE8u
+#define AM2_BMP_CANCEL2          0x00486F00u
 #define ADDR_OPEN_BATTLE_NAME    0x0042FF60u  /* void(void) */
 #define ADDR_BATTLE_NAME_CTOR    0x0042FB00u  /* thiscall obj *(obj, bmp) */
 #define AM2_BATTLE_NAME_SIZE     0xA4u

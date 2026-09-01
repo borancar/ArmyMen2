@@ -53,6 +53,9 @@
 #define kOnMovies       AM2_BUTTON_HANDLER(OnMovies)
 #define kOnCredits      AM2_BUTTON_HANDLER(OnCredits)
 #define kOnQuit         AM2_BUTTON_HANDLER(OnQuit)
+/* JOIN A WAR on the war menu. startgame.cpp declares it void(void), which is
+ * what its body is. */
+#define kOnStartMultiplayer AM2_BUTTON_HANDLER(StartMultiplayerGame)
 /* These already take the widget, so the cast only spells out the type the
  * table field wants. */
 #define kOnMenuBack       OnMenuBack
@@ -4290,11 +4293,11 @@ void __cdecl OpenEnterName(void)
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
-void __cdecl OpenCdPrompt(void)
+void __cdecl OpenWarMenu(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_CD_PROMPT_SIZE,
-               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_CD_PROMPT_CTOR),
+    OpenScreen(AM2_WAR_MENU_SIZE,
+               (AM2_ScreenCtorFn)WarMenuConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
@@ -4723,6 +4726,102 @@ static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
 
     *(AM2_Widget **)((uint8_t *)text + TYPER_OFF_BLINKER) = dot;
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)cancelHandler;
+    return w;
+}
+
+/* WarMenuConstruct -- original 0x0042EED0, thiscall, `ret 4`. START A WAR,
+ * JOIN A WAR and CANCEL over a blank panel, and the screen COMM. CHANNEL
+ * SELECT's SELECT reaches.
+ *
+ * IT WAS CALLED THE CD PROMPT AND THE NAME CAME FROM A BUTTON. `orig.h` and
+ * `widget.h` both said this screen "pushes 'Copy Protection' and 'The
+ * ARMYMEN2 CD must be in the drive to play Army Men II.'" It pushes neither.
+ * Those two strings are in 0x0042F290, which is what the FIRST button fires,
+ * and the constructor's own evidence is three bitmap triples called host,
+ * join and cancel. Fourth or fifth instance of naming a function from a call
+ * site rather than its body, and the cure was the same: read the callee.
+ *
+ * WHICH BUTTON IS WHICH IS SETTLED BY COMM_OFF_IS_HOST, not by the bitmap
+ * names and not by the geometry. 0x0042F290 sets it to 1 and asks for
+ * AM2_MENU_REQUEST_BATTLE_NAME; StartMultiplayerGame clears it and asks for
+ * AM2_MENU_REQUEST_BATTLE_JOIN. The other two agree -- host.bmp on the one
+ * that hosts, and y centres of 222 and 262, which are the coordinates
+ * tools/ab.sh multi has been clicking as START A WAR and JOIN A WAR all
+ * along.
+ *
+ * THE FIRST BUTTON IS THE DEFAULT FOCUS AND IS MARKED DIRTY. `w->focusedChild
+ * = host` and `host->flag44 = 1`, in that order, after it is added.
+ *
+ * AND THE `flag44` WRITE IS NOT GUARDED. The original tests the allocation
+ * before constructing the button and substitutes a null on failure, then
+ * writes through that null two instructions later. Reproduced: VC6's operator
+ * new answers null rather than throwing, so the path exists, and it is the
+ * original's behaviour rather than something to tidy.
+ *
+ * DELIBERATE DEVIATION -- the MSVC structured-exception frame around the body,
+ * with its four unwind state indices, is not reproduced. See the note on
+ * StartMultiplayerGame in startgame.cpp: nothing in this program throws, VC6's
+ * operator new returns null and the original tests it, so the registered frame
+ * is never consulted. */
+AM2_Widget *__attribute__((thiscall)) WarMenuConstruct(AM2_Widget *w,
+                                                       const char *bmp)
+{
+    AM2_Widget *panel;
+    AM2_Widget *host;
+    AM2_Widget *join;
+    AM2_Widget *cancel;
+    AM2_Rect    box;
+
+    ScreenBaseConstruct(w, bmp, 1);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_WAR_MENU);
+
+    /* Every dialog constructor in this family opens with this, and
+     * ADDR_DIR_SCRATCH is uninitialised at load -- so unless something has
+     * written it the call is SetGameDir(""), back to the base. Ours. */
+    SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+
+    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
+    if (panel) {
+        RectSet(&box, 0xBD, 0x48, 0x106, 0x35);
+        panel = PanelConstruct(panel,
+                               (const char *)AM2_IMAGE(ADDR_STR_BLANK_BMP),
+                               1, box);
+    }
+    WidgetAddChild(w, panel);
+
+    host = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    if (host) {
+        RectSet(&box, 0xF4, 0xD2, 0x98, 0x19);
+        host = ButtonConstruct(host, (const char *)AM2_IMAGE(AM2_BMP_HOST0),
+                               (const char *)AM2_IMAGE(AM2_BMP_HOST1),
+                               (const char *)AM2_IMAGE(AM2_BMP_HOST2), 1, box,
+                               kImageHandler(ADDR_ON_START_WAR), 0);
+    }
+    WidgetAddChild(w, host);
+    w->focusedChild = host;
+    host->flag44    = 1;   /* unguarded in the original -- see above */
+
+    join = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    if (join) {
+        RectSet(&box, 0xF4, 0xFA, 0x98, 0x19);
+        join = ButtonConstruct(join, (const char *)AM2_IMAGE(AM2_BMP_JOIN0),
+                               (const char *)AM2_IMAGE(AM2_BMP_JOIN1),
+                               (const char *)AM2_IMAGE(AM2_BMP_JOIN2), 1, box,
+                               kOnStartMultiplayer, 0);
+    }
+    WidgetAddChild(w, join);
+
+    cancel = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    if (cancel) {
+        RectSet(&box, 0xF4, 0x122, 0x98, 0x19);
+        cancel = ButtonConstruct(cancel,
+                                 (const char *)AM2_IMAGE(AM2_BMP_CANCEL0),
+                                 (const char *)AM2_IMAGE(AM2_BMP_CANCEL1),
+                                 (const char *)AM2_IMAGE(AM2_BMP_CANCEL2), 1,
+                                 box, OnMenuBack, 0);
+    }
+    WidgetAddChild(w, cancel);
+
     return w;
 }
 
@@ -9247,8 +9346,10 @@ int widget_install(void)
                         "OpenSelectPlayer", 0);
     rc |= patch_replace(ADDR_OPEN_ENTER_NAME, (const void *)OpenEnterName,
                         "OpenEnterName", 0);
-    rc |= patch_replace(ADDR_OPEN_CD_PROMPT, (const void *)OpenCdPrompt,
-                        "OpenCdPrompt", 0);
+    rc |= patch_replace(ADDR_OPEN_WAR_MENU, (const void *)OpenWarMenu,
+                        "OpenWarMenu", 0);
+    rc |= patch_replace(ADDR_WAR_MENU_CTOR, (const void *)WarMenuConstruct,
+                        "WarMenuConstruct", 1);
     rc |= patch_replace(ADDR_OPEN_BATTLE_NAME, (const void *)OpenBattleName,
                         "OpenBattleName", 0);
     rc |= patch_replace(ADDR_OPEN_BATTLE_JOIN, (const void *)OpenBattleJoin,

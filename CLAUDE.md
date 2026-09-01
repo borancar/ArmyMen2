@@ -1029,6 +1029,14 @@ existence test; that alias is gone too and the ratchet is 38.
 comm bookkeeping steps around the state handler, and all five per-state
 handlers, in `src/game/win32/frame.cpp`. One level further down stays original.
 
+**A CONFIRMATION of the rule below rather than another breach of it.** The
+menu-request dispatch at `0x00426400` lays its arms out 1, 2, 3, 4, 5, 6, 10,
+11, 12, 7, 8, 9, 13 -- so reading them top to bottom and numbering as you go
+puts the war menu, ENTER BATTLE NAME and the battle browser three places early.
+`frame.cpp`'s `kMenuScreens` already has them right, because it was built from
+the table at `0x00426518` and not from the layout. Worth recording that the
+rule held where it was followed, not only the places it was not.
+
 **A jump table's order is not the order its arms are laid out in.** State 2's
 thirteen sub-state arms are nine of one shape -- repaint if the overlay is
 dirty, then `DrawMenuOverlay` -- differing only in which painter they call, so
@@ -1536,6 +1544,17 @@ which is why the list is empirical rather than aspirational.
    on any drive reaching the function. Read its docstring for the eight blind
    spots; four produce false positives, which is why it is a report and not a
    gate.
+
+   **It matched only `__cdecl` definitions, so it had never seen a thiscall
+   one -- which is the entire menu widget layer.** Every `*Construct` and every
+   vtable slot answered `no definition of <name>`, and that reads like a typo
+   in the invocation rather than a gap in the tool, so it was never chased.
+   Found by pointing it at a new constructor and then at one written long
+   before, which gave the same non-answer. The regex takes
+   `__attribute__((thiscall))` now. What it reports on those is dominated by
+   STRUCT MEMBERS, already one of its documented blind spots: `AM2_Widget`'s
+   `x`/`y`/`w`/`h` at 0x4/0x8/0xc turn up in every constructor in the family,
+   because a `RECT` passed by value is copied a dword at a time.
 5. **`tools/ab.sh`, and read the STATE artifact rather than the verdict line.**
    `bootcamp`'s state dump is 1,610 lines of object fields diffed with no
    budget, and it is what catches a wrong field where the pixels and the log

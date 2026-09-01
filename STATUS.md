@@ -9,7 +9,67 @@ Last updated: **2026-09-01**, at `ba116b4`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,363 patches.**
+Nothing uncommitted. **1,364 patches.**
+
+**`WarMenuConstruct` (`0x0042EED0`)** -- START A WAR, JOIN A WAR and CANCEL
+over a blank panel: the screen COMM. CHANNEL SELECT's SELECT reaches, and the
+smallest entry that was outstanding.
+
+**It was called the CD PROMPT and the name came from a button.** `orig.h` and
+`widget.h` both said this screen "pushes 'Copy Protection' and 'The ARMYMEN2
+CD must be in the drive to play Army Men II.'" It pushes neither. Those two
+strings are in `0x0042F290`, which is what its FIRST BUTTON fires, and what
+the constructor actually pushes is three bitmap triples called host, join and
+cancel. Renamed rather than aliased, through `ADDR_OPEN_WAR_MENU`,
+`ADDR_WAR_MENU_CTOR`, `AM2_WAR_MENU_SIZE` and `OpenWarMenu`.
+
+**Which button is which is settled by `COMM_OFF_IS_HOST`**, not by the bitmap
+names and not by the geometry. `0x0042F290` sets it to 1 and asks for menu
+request 0x0B; `StartMultiplayerGame` clears it and asks for 0x0C. The other
+two agree -- and the y centres are 222 and 262, which are exactly the
+coordinates `tools/ab.sh multi` has been clicking as START A WAR and JOIN A
+WAR all along.
+
+**Three menu requests named from the jump table, and the layout would have
+misled.** The dispatch at `0x00426400` emits its arms 1, 2, 3, 4, 5, 6, 10,
+11, 12, 7, 8, 9, 13, so numbering them top to bottom puts the war menu, ENTER
+BATTLE NAME and the battle browser three places early. `frame.cpp`'s
+`kMenuScreens` already had them right, having been built from the table at
+`0x00426518` -- a confirmation of the rule rather than another breach of it.
+`AM2_MENU_REQUEST_WAR_MENU`, `_BATTLE_NAME` and `_BATTLE_JOIN` now exist, and
+`startgame.cpp`'s private `REQUEST_MULTIPLAYER 0x0C` is gone in favour of the
+shared one.
+
+**`tools/checkoffsetuse.py` had never checked a thiscall function**, which is
+the whole menu widget layer. It matched only `__cdecl` definitions and
+answered `no definition of <name>` for every `*Construct` and every vtable
+slot -- a message that reads like a typo in the invocation rather than a gap
+in the tool. Found by pointing it at this constructor and then at
+`DifficultyDialogConstruct`, written long before, which gave the same
+non-answer. Widened, and what it reports on the family is dominated by struct
+members, already one of its documented blind spots.
+
+**The `flag44` write is not guarded and that is the original's.** It tests the
+button allocation, substitutes a null on failure, and writes through that null
+two instructions later. Reproduced.
+
+**Both counters read 0 and that is the blind spot, not a cold path.**
+`frame.cpp`'s `kMenuScreens` names `OpenWarMenu`, and `OpenWarMenu` now names
+`WarMenuConstruct`, so neither crosses a patched entry. Resolved with a probe
+rather than by guessing, as CLAUDE.md requires: driving MULTI-PLAYER ->
+TCP/IP -> SELECT puts the screen up, `ctl widgets` shows five nodes under
+`vt=46f9e4` -- the panel at 189,72,451,125 and three buttons at 244,210,
+244,250 and 244,290, which is `RectSet(x, y, w, h)` applied to the immediates
+-- with `foc=2` and `dirty=1` on the first button, exactly what the two writes
+after the first `WidgetAddChild` say. **And the screenshot has the game's own
+captions on those three buttons: START A WAR, JOIN A WAR, CANCEL.** The
+argument from bitmap names and menu requests was already sound; the frame is
+what makes it unarguable.
+
+`tools/ab.sh multi` passes through this screen and clicks its first button --
+(321,222), which is inside 244,210,396,235 -- to reach ENTER BATTLE NAME. So
+it is compared and not merely built: 9 identical widget nodes, 7 identical
+messages, 0 of 786,432 pixels.
 
 **`PlacementScreenClick` (`0x00413BC0`)** -- the manual placement screen's
 click handler, and the layer directly above the three functions place.cpp
@@ -3774,15 +3834,14 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,194 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 45
-outstanding, which is 1,239 minus 1,194 -- from 1,363 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,195 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 44
+outstanding, which is 1,239 minus 1,195 -- from 1,364 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and thirty-three batches have gone in and NOTHING SMALL IS LEFT: the
-45 entries outstanding start at **592 bytes** -- `0x0042EED0`, the
-START A WAR / JOIN A WAR screen's constructor -- and the median is **1,168**.
+small ones in batches. A hundred and thirty-four batches have gone in and NOTHING SMALL IS LEFT: the
+44 entries outstanding start at **672 bytes**, and the median is **1,168**.
 The sentence here used to say they started at 96 and name the MSVC static-init
 glue at `0x004248A0` as the smallest; that entry is gone and so is the whole
 band under 480. What is left is real functions, so the strategy that ranked by

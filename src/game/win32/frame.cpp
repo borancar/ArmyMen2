@@ -529,7 +529,7 @@ static AM2_OpenScreenFn const kMenuScreens[AM2_MENU_MODE_MAX] = {
     OpenMpHost,        /*  7 */
     OpenMpOptions,     /*  8 */
     OpenMpJoin,        /*  9 */
-    OpenCdPrompt,      /* 10 */
+    OpenWarMenu,       /* 10 */
     OpenBattleName,    /* 11 */
     OpenBattleJoin,    /* 12 */
     OpenMovies,        /* 13 */

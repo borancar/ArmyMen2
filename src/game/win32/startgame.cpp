@@ -172,7 +172,6 @@ typedef int32_t (__attribute__((thiscall)) *am2_enum_sessions_fn)(void *, void *
 #define g_ddraw          (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
 #define g_sessionObject  (*(void **)(uintptr_t)ADDR_SESSION_OBJECT)
 
-#define REQUEST_MULTIPLAYER 0x0C
 #define SESSION_OBJECT_SIZE 0x0C
 
 void __cdecl StartMultiplayerGame(void)
@@ -194,7 +193,7 @@ void __cdecl StartMultiplayerGame(void)
         return;
     }
 
-    g_menuRequest    = REQUEST_MULTIPLAYER;
+    g_menuRequest    = AM2_MENU_REQUEST_BATTLE_JOIN;
     g_menuRequestSet = 1;
     orig_apply_game_settings();
     ClearMenuMsgs();

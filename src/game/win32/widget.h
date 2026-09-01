@@ -1065,11 +1065,16 @@ void __cdecl OpenSelectPlayer(void);
 /* Original: 0x00451E10. ENTER NAME -- the edit box RECRUIT opens. */
 void __cdecl OpenEnterName(void);
 
-/* Original: 0x0042F440. the CD prompt: its constructor pushes "Copy Protection" and
- * "The ARMYMEN2 CD must be in the drive to play Army Men II." This build
- * has the five CD checks patched to jump past their MessageBoxA, but this
- * screen is a different mechanism and is reached through the menu table. */
-void __cdecl OpenCdPrompt(void);
+/* Original: 0x0042F440. THE WAR MENU -- START A WAR, JOIN A WAR, CANCEL, which
+ * COMM. CHANNEL SELECT's SELECT reaches. This was OpenCdPrompt, named for the
+ * "Copy Protection" MessageBox that is in one of its BUTTONS rather than in
+ * the screen; see ADDR_OPEN_WAR_MENU in orig.h. */
+void __cdecl OpenWarMenu(void);
+
+/* Original: 0x0042EED0, thiscall, `ret 4`. The war menu's constructor: a
+ * blank panel and the three buttons. */
+AM2_Widget *__attribute__((thiscall)) WarMenuConstruct(AM2_Widget *w,
+                                                       const char *bmp);
 
 /* Original: 0x0042FF60. ENTER BATTLE NAME -- two text fields and an OK, which ab.sh multi drives. */
 void __cdecl OpenBattleName(void);

@@ -120,7 +120,13 @@ def c_offsets(path, func):
     src = open(path if os.path.isabs(path) else os.path.join(REPO, path),
                encoding='utf-8',
                errors='surrogateescape').read()
-    m = re.search(r'^\w[\w \*]*__cdecl\s+' + func + r'\(', src, re.M)
+    # THISCALL COUNTS TOO, and matching only __cdecl meant every widget
+    # constructor and every vtable slot in the tree -- the whole menu layer --
+    # answered "no definition of" and was never checked by this tool at all.
+    # Found by pointing it at WarMenuConstruct; DifficultyDialogConstruct,
+    # written long before, had the same non-answer.
+    m = re.search(r'^\w[\w \*]*(?:__cdecl|__attribute__\(\(thiscall\)\))\s+'
+                  + func + r'\(', src, re.M)
     if not m:
         raise SystemExit('no definition of ' + func)
     i = m.start()
