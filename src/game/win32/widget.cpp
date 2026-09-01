@@ -8962,6 +8962,120 @@ void __cdecl HudMessage(const char *text, int32_t colour)
 typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
 typedef void (__cdecl *AM2_PointerActionFn)(void *obj, uint32_t at);
 
+/* Our leader, the way every pointer handler in this band gets it -- including
+ * the fallback that cannot run. See ADDR_POINTER_SELECT's note in orig.h: the
+ * original inlines this at eight sites and VC6 folds the second load of
+ * ADDR_DEFAULT_OWNER, so the scan is unreachable at every one of them. Written
+ * once here rather than eight times, which is the one liberty taken with it. */
+static uint8_t *OurLeader(void)
+{
+    int32_t owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+
+    if (owner != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
+        /* Dead. The NULL check lives in here, which is why the live path
+         * below has none. */
+        const uint8_t *list;
+        int32_t        i;
+
+        if (owner < 0 || owner >= AM2_COMM_SLOTS)
+            return (uint8_t *)0;
+
+        list = (const uint8_t *)
+            ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
+
+        for (i = 0; i < *(const int32_t *)(list + LIST_OFF_COUNT); i++) {
+            uint8_t *o = (uint8_t *)LookupByUID(
+                (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
+
+            if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
+                && *(const int32_t *)(o + OBJ_OFF_SARGE))
+                return o;
+
+            list = (const uint8_t *)
+                ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
+        }
+        return (uint8_t *)0;
+    }
+
+    return (uint8_t *)LookupByUID(
+        *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
+}
+
+/* PointerPickBoard -- original 0x00459DA0, 320 bytes. The PICK half of four
+ * consecutive records in the second {pick, action, kind, flags} table, whose
+ * ACTION is 0x00458D70 in all four.
+ *
+ * "Can the pointer do this to that object": refuse a null one, refuse one whose
+ * OBJ_OFF_ARMY is not ours, find our leader, then two arms.
+ *
+ * A VEHICLE WITH A FREE SEAT SHOWS A HINT AND STILL ANSWERS 0. Type 3,
+ * OBJ_OFF_FIELD_94 clear, and OBJ_OFF_POSE_PENDING < VEHICLE_OFF_SEATS -- which
+ * is the same pair EnterVehicle refuses on, seats used against seats, and is
+ * what settles that reading rather than one comparison settling it. It calls
+ * OverlayPrepare and stores the uid, and then returns 0 like every refusal. So
+ * the vehicle case is a hover hint, never a yes; a reader who takes the
+ * hint-setting as success gets it backwards.
+ *
+ * A TROOPER within ApproxDist of the leader shows a different overlay row and
+ * answers 1. Everything else answers 0.
+ *
+ * THE HINT IS SUPPRESSED BY A HELD BUTTON. With ADDR_MOUSE_BUTTON set, the
+ * overlay is skipped unless GetTickCount() less ADDR_MOUSE_PRESS_MS is under
+ * AM2_CLICK_MS -- so a click-and-hold stops re-arming it, which is the same
+ * 500 ms click-versus-drag window the rest of the image uses.
+ *
+ * THE REACH IT COMPARES AGAINST READS ZERO in the image and has no direct
+ * writer, so on the face of it the trooper arm passes only at zero distance.
+ * That is not established -- see ADDR_PICK_REACH_66275C for why a write through
+ * a base pointer would be invisible to the scan that says so.
+ *
+ * NOT EXERCISED: nothing in this band runs except mode 0's action, and the
+ * table this belongs to has no identified consumer yet. Verified by reading. */
+int32_t __cdecl PointerPickBoard(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *leader;
+    int32_t  type;
+
+    if (!o)
+        return 0;
+    if (*(const int8_t *)(o + OBJ_OFF_ARMY)
+        != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+        return 0;
+
+    leader = OurLeader();
+    if (!leader)
+        return 0;
+
+    type = *(const int32_t *)o;
+
+    if (type == AM2_OBJ_TYPE_VEHICLE
+        && !*(const int32_t *)(o + OBJ_OFF_FIELD_94)
+        && *(const int32_t *)(o + OBJ_OFF_POSE_PENDING)
+               < *(const int32_t *)(o + VEHICLE_OFF_SEATS)) {
+        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+            || GetTickCount()
+                   - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS
+                   < AM2_CLICK_MS) {
+            OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 1);
+            *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
+                *(const uint32_t *)(o + OBJ_OFF_UID);
+        }
+        return 0;   /* a hint, not a yes -- see above */
+    }
+
+    if (type != AM2_OBJ_TYPE_TROOPER)
+        return 0;
+
+    if (ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
+                   (const AM2_Point *)(o + OBJ_OFF_X))
+        > *(const int32_t *)(uintptr_t)ADDR_PICK_REACH_66275C)
+        return 0;
+
+    OverlayPrepare(AM2_OVERLAY_ROW_REACH, 1);
+    return 1;
+}
+
 /* PointerSelect -- original 0x00458ED0, sixteen bytes, and its only reference
  * is the ACTION slot of pointer mode 0. Drop the point and hand the object to
  * SelectIfOwn, which item.cpp already has.
@@ -10186,6 +10300,9 @@ int widget_install(void)
                         "PointerDropItem", 0);
     rc |= patch_replace(ADDR_POINTER_SELECT, (const void *)PointerSelect,
                         "PointerSelect", 0);
+    rc |= patch_replace(ADDR_POINTER_PICK_BOARD,
+                        (const void *)PointerPickBoard,
+                        "PointerPickBoard", 4);
     rc |= patch_replace(ADDR_HUD_MESSAGE, (const void *)HudMessage,
                         "HudMessage", 46);
     rc |= patch_replace(ADDR_CLOSE_SCREEN, (const void *)CloseScreen,

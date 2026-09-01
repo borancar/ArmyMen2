@@ -1612,6 +1612,11 @@ void __cdecl PointerDropItem(void *obj, uint32_t at);
  * one ordinary play reaches: hand the object to SelectIfOwn, drop the point. */
 void __cdecl PointerSelect(void *obj, uint32_t at);
 
+/* 0x00459DA0. The PICK half of four records in the second {pick, action, kind,
+ * flags} table: can the pointer act on this object. A vehicle with a free seat
+ * shows a hint and still answers 0; a trooper in reach answers 1. */
+int32_t __cdecl PointerPickBoard(void *obj);
+
 /* 0x004144A0. Append one line to the HUD's message log. A non-zero colour is
  * written as a '^' escape ahead of the text. */
 void __cdecl HudMessage(const char *text, int32_t colour);

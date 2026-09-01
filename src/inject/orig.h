@@ -457,6 +457,15 @@
 /* The cursor row the placement screen shows over a unit it could sell. Row 0
  * is what it asks for over anything else, including empty ground. */
 #define AM2_OVERLAY_ROW_SELL      0x11
+/* Two more rows, each from the one pick that asks for it: the vehicle-boarding
+ * hint and the "your leader can reach this" hint. Named from their use sites,
+ * which is all the evidence there is -- the rows themselves are just indices
+ * into the cursor sheet OverlayPrepare selects from. */
+#define AM2_OVERLAY_ROW_BOARD     8
+#define AM2_OVERLAY_ROW_REACH     0x12
+/* The click-versus-drag window, in GetTickCount ticks. Every test of it in the
+ * image is `GetTickCount() - ADDR_MOUSE_PRESS_MS < this`. */
+#define AM2_CLICK_MS              500
 /* Actions 0..3 are up, down, left and right -- W/S/A/D with the arrow keys as
  * the alternates, read straight out of the binding table at 0x004854BC. The
  * placement screen rotates its facing with the last two. */
@@ -948,12 +957,26 @@
  * established -- the records were found from the functions' xrefs rather than
  * from a loop, which is the wrong way round and is why nothing here is named
  * for it yet. */
-/* 0x00459DA0, 320 bytes, READ AND NOT RECONSTRUCTED. Recorded the way
- * LoadType2, CreateTrooper, CreateVehicle and RegionFindPath were before they
- * were taken -- all four came back and went in quickly once the neighbouring
- * work was done.
+/* THE PICKS' REACH THRESHOLDS, and these are placeholders on purpose.
  *
- * WHAT IS SETTLED. It is the PICK of those four records: refuse a null object,
+ * Each pointer PICK compares ApproxDist against one of five globals --
+ * 0x00662450, 0x006624EC, 0x0066275C, 0x00662894, 0x006628C8 -- and each has
+ * exactly ONE toucher, the pick that reads it. All five read 0 in the image
+ * and sit in the BSS tail of `.data`, so if nothing writes them every one of
+ * these reach tests passes only at zero distance.
+ *
+ * THAT IS NOT ESTABLISHED, and the reason is the scan's limit rather than the
+ * evidence. `refs_to` finds an address as a literal dword, which catches
+ * `mov [0x66275C], eax` -- but the five are spaced irregularly and look like
+ * FIELDS of records reached through a base pointer, and a write through a base
+ * is invisible to it. So "no direct writer" is what was measured; "no writer"
+ * is not. Settling it means finding the record they belong to.
+ *
+ * Named for what they do at their one use and nothing more. */
+#define ADDR_PICK_REACH_662450   0x00662450u  /* int32_t */
+#define ADDR_PICK_REACH_66275C   0x0066275Cu  /* int32_t */
+#define ADDR_POINTER_PICK_BOARD  0x00459DA0u  /* int32_t(void *obj) */
+/* 0x00459DA0, 320 bytes. Reconstructed as PointerPickBoard. It is the PICK of those four records: refuse a null object,
  * refuse one whose army byte is not ADDR_DEFAULT_OWNER, find our leader
  * through the dead-fallback helper described above, and then two arms.
  *
@@ -970,14 +993,9 @@
  * ADDR_MOUSE_BUTTON set, the overlay is skipped unless GetTickCount() less a
  * timestamp is under 500. So a click-and-hold stops re-arming the hint.
  *
- * WHAT IS NOT: three globals it reads, and the reason they are unnamed is the
- * rule rather than laziness. 0x0048549C has ELEVEN touchers and 0x004854B8
- * FIFTEEN, so naming either from this one use is the call-site mistake this
- * file records five times over; and the two range thresholds it compares
- * ApproxDist against -- 0x0066275C here, 0x00662450 in its neighbour -- have
- * exactly ONE toucher each, which is the "a table with one consumer is a table
- * you cannot name" case. Reading 0x00426FDF, 0x0044ABC1 and 0x00413E94 is what
- * would settle the first two. */
+ * Its three unnamed globals are named now: ADDR_MOUSE_PRESS_MS and
+ * ADDR_POINTER_HOVER_UID from their writer/reader pairs, and the reach
+ * threshold as a placeholder -- see above. */
 #define MODE_OFF_PICK          0x00u  /* int32(obj) -- may the pointer take it */
 #define MODE_OFF_ACTION        0x04u  /* void(obj, packed point) on release */
 #define MODE_OFF_OVERLAY       0x0Cu  /* OverlayPrepare's row, 0..0x12 */
@@ -10633,6 +10651,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* Three {point, tick} pairs, one per button, stamped when that button goes
  * down. The point is the packed dword above, not a pair of ints. */
 #define ADDR_MOUSE_PRESS         0x00485498u
+/* The TIME the button went down, beside the point it went down at. The pair is
+ * written together by the mouse handler at 0x00426FD8 and read together by
+ * every click-versus-drag test in the image -- `GetTickCount() - this < 500`
+ * and then ApproxDist(ADDR_MOUSE_PRESS, ADDR_CURSOR_POINT). Named from that
+ * writer/reader pair; eleven sites touch it and naming it from any one of them
+ * would have been the call-site mistake. */
+#define ADDR_MOUSE_PRESS_MS      0x0048549Cu  /* uint32_t, GetTickCount ticks */
+/* The uid of the object the pointer is OVER, or 0. Cleared once a frame at
+ * 0x00413E92, immediately before the mouse-selection interface runs, and set
+ * by every pointer PICK that shows a hover overlay -- fourteen setters and one
+ * clear, which is what makes it a hover slot rather than a selection. */
+#define ADDR_POINTER_HOVER_UID   0x004854B8u  /* uint32_t */
 #define ADDR_MOUSE_ACTIVITY      0x004854B0u  /* set from ADDR_GAME_CLOCK_MS on
                                                * any movement or button change */
 /* The click ARBITER, and "nothing here reads it" was wrong -- 32 sites do.

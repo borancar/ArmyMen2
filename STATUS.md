@@ -5,46 +5,45 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-02**, at `8318011`. Working tree clean.
+Last updated: **2026-09-02**, at `969936a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,397 patches**, **30** analysis tools in `make check`.
+Nothing uncommitted. **1,398 patches**, **30** analysis tools in `make check`.
 
-**`PointerSelect` (`0x00458ED0`, 16 B) is reconstructed** -- the ACTION slot of
-pointer mode 0, sixteen bytes that drop the point and hand the object to
-`SelectIfOwn`, which `item.cpp` already had.
+**`PointerPickBoard` (`0x00459DA0`, 320 B) is reconstructed** -- the PICK half
+of four records in the second `{pick, action, kind, flags}` table. The previous
+commit read it and deliberately stopped, because three of its globals could not
+be named from one use site each. Reading their other touchers settled two of
+them outright, so it went in.
 
-**It is the one member of this family that actually runs**, and that is
-measured: three clicks on Sarge in a live Boot Camp mission give
-`PointerSelect=3`. So this is what happens when the player selects a unit.
-`SelectIfOwn` reads 0 beside it because this now calls it by name -- the blind
-spot, and itself confirmation the chain is ours. **The A/B does not compare
-it**: `bootcamp` and `campaign` both stop at a dialog and neither clicks a
-unit, so their clean runs say only that nothing else regressed.
+**`ADDR_MOUSE_PRESS_MS`** (0x0048549C) is the time the button went down, beside
+the already-named `ADDR_MOUSE_PRESS` point: the pair is written together at
+0x00426FD8 and read together by every click-versus-drag test in the image --
+`GetTickCount() - this < 500`, then `ApproxDist(press, cursor)`. Eleven
+touchers, and a writer/reader pair rather than any one of them.
 
-## Next: 0x00459DA0 is read and not written, and why
+**`ADDR_POINTER_HOVER_UID`** (0x004854B8) is the uid of the object the pointer
+is over. Cleared once a frame at 0x00413E92, immediately before the
+mouse-selection interface runs, and set by every pick that shows a hover
+overlay -- **fourteen setters and one clear**, which is what makes it a hover
+slot rather than a selection.
 
-The pick of four records in a SECOND `{pick, action, kind, flags}` table --
-16-byte records at 0x00489AB0 and around it, distinct from the pointer-mode
-table. Refuse a null object or one not of our army, find our leader through the
-dead helper below, then two arms: a VEHICLE with a free seat shows overlay row
-8 and answers **0** -- a hover hint, never a yes -- and a TROOPER within
-`ApproxDist` of the leader shows row 0x12 and answers 1.
+**The reach thresholds stay placeholders, and the caveat is the finding.** All
+five read 0 in the image and have exactly one toucher, which reads as "no
+writer, so these tests pass only at zero distance". That is *not* established:
+they are spaced irregularly and look like fields of a record reached through a
+base pointer, and a write through a base is invisible to the address scan that
+says so. **"No direct writer" is what was measured; "no writer" is not.**
 
-The vehicle test is `OBJ_OFF_POSE_PENDING < VEHICLE_OFF_SEATS`, which is the
-same pair `EnterVehicle` refuses on: seats used against seats. That is the
-writer/reader pair the layout needed, so the reading is settled.
+**The function's own shape:** a vehicle with a free seat shows a hint and still
+answers **0** -- a reader who takes the hint-setting for success gets it
+backwards -- while a trooper in reach answers 1. The vehicle test is
+`OBJ_OFF_POSE_PENDING < VEHICLE_OFF_SEATS`, the same pair `EnterVehicle`
+refuses on.
 
-**It is not written because three of its globals cannot be named yet, and that
-is the rule rather than laziness.** 0x0048549C has ELEVEN touchers and
-0x004854B8 FIFTEEN -- naming either from this one use is the call-site mistake
-this project records five times over -- and the two range thresholds have
-exactly ONE toucher each, which is the "a table with one consumer is a table
-you cannot name" case. Reading 0x00426FDF, 0x0044ABC1 and 0x00413E94 settles
-the first two; finding the table's consumer settles the rest. Recorded in
-`orig.h` in full, the way LoadType2, CreateTrooper, CreateVehicle and
-RegionFindPath were before each came back and went in quickly.
+A/B clean on `bootcamp` and `campaign`; nothing in this band runs except mode
+0's action, so that says only that nothing else regressed.
 
 ## The pointer-mode family shares a dead helper, eight times over
 
@@ -75,7 +74,7 @@ that holds **seventeen** functions and patching any one of them credits all of
 it. The same effect inflates the entry count.
 
     entry-generous   1,220 of 1,239 entries, 89.5% of sub-CRT bytes
-    split-aware      1,354 of 1,530 real functions, 79.7% of sub-CRT bytes
+    split-aware      1,355 of 1,530 real functions, 79.8% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -86,9 +85,9 @@ ceiling rather than a floor -- ten percentage points of ceiling, measured.
 The loop's `completion_promise` is now **every game function below the CRT
 line (0x0045C000) patched**. Measured: **1,220 of 1,239** entries in
 `docs/functions.tsv` below that address have a patch inside them -- so 19
-outstanding, which is 1,239 minus 1,220 -- from 1,397 patched addresses, and
-**89.5% of the sub-CRT bytes**. Split-aware that is **1,354 of 1,530** real
-functions and **79.7%** of the bytes; see the section above. That figure counts merged entries generously and is a
+outstanding, which is 1,239 minus 1,220 -- from 1,398 patched addresses, and
+**89.5% of the sub-CRT bytes**. Split-aware that is **1,355 of 1,530** real
+functions and **79.8%** of the bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
