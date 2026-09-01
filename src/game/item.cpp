@@ -2112,6 +2112,11 @@ void __cdecl ObjClearFootprint(void *obj)
  * mapdraw.h reaches win32.h. Neither of its parameters names a Win32 type. */
 void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc);
 
+/* Its predicate-taking sibling, same file and same reason for being declared
+ * here rather than included. */
+void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
+                            int32_t (__cdecl *keep)(void *obj));
+
 /* CreateWeapon, still original -- the type-4 arm of the item-create message,
  * and it names itself in its own log line. Eight arguments. */
 typedef void *(__cdecl *AM2_CreateWeaponFn)(const char *name, int32_t type,
@@ -8297,6 +8302,172 @@ void __cdecl RemapInventoryUids(void)
  * nothing out, so the declaration needs no types this side cannot name. */
 extern "C" void __cdecl SetPointerMode(int32_t mode);
 
+/* SelectionClick -- original 0x004137D0, one caller. The whole mouse-selection
+ * interface, in one function with four gestures and no arguments: it reads the
+ * cursor and the drag state out of globals and answers nothing.
+ *
+ * FOUR PATHS, and which one runs is decided by two globals before anything
+ * else happens:
+ *
+ *   ADDR_VIEW_RECT_ON  -- a rubber band was being dragged and has been let go:
+ *                         clear the flag, sweep ObjectsInRect over
+ *                         ADDR_VIEW_RECT, and select what comes back;
+ *   ADDR_DRAG_ACTIVE   -- a drag is in progress: renormalise ADDR_VIEW_RECT
+ *                         from the anchor and the cursor and return;
+ *   neither            -- a plain click: WalkCellAtPoint under the cursor.
+ *
+ * and inside the last two, CTRL held turns "select" into "toggle".
+ *
+ * THE CURSOR IS CONVERTED BY ADDING THE VIEW ORIGIN, which is what makes the
+ * rectangle world-space while ADDR_CURSOR_POINT stays screen-space. The x term
+ * is a full int32 add and the y term a 16-bit one, so they are not written the
+ * same way; reproduced as found.
+ *
+ * CTRL WILL NOT EMPTY THE SELECTION. The toggle removes a uid only when more
+ * than one is selected -- `cmp edx, 1; jle` -- so ctrl-clicking your last unit
+ * leaves it selected. That is a rule no A/B would ever show, since both sides
+ * would refuse identically.
+ *
+ * THE SELECTION LIST IS A SUB-LIST HEADER and PtrListPush is handed its
+ * ADDRESS as `this`: ADDR_SELECTED_UIDS is {capacity, count, items}, so
+ * ADDR_SELECTED_COUNT and ADDR_SELECTED_ITEMS are its +4 and +8 and not three
+ * separate globals. Spelled through the header, as ObjAttachTo spells an
+ * object's own list.
+ *
+ * The plain-click path is gated on the cursor being inside ADDR_BLIT_RECT --
+ * the drawn viewport -- so a click on the HUD reaches none of this. */
+void __cdecl SelectionClick(void)
+{
+    uint32_t  world;
+    int16_t   wx = (int16_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X
+                             + *(const int32_t *)(uintptr_t)ADDR_CURSOR_POINT);
+    int16_t   wy = (int16_t)(*(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
+                             + *(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT
+                                                             + 2));
+    uint8_t  *e;
+
+    ((int16_t *)&world)[0] = wx;
+    ((int16_t *)&world)[1] = wy;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON) {
+        /* No rubber band at all: a plain click. The three guards are in the
+         * original's order -- inside the viewport, no drag under way, clicking
+         * enabled -- and all three are pure tests, so the order is kept for
+         * fidelity rather than because it can be observed. */
+        if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT,
+                         (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+            return;
+        if (*(const int32_t *)(uintptr_t)ADDR_DRAG_ACTIVE)
+            return;
+        if (!*(const int32_t *)(uintptr_t)ADDR_CLICK_ENABLED)
+            return;
+
+        e = (uint8_t *)WalkCellAtPoint(
+                &world, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+                (int32_t (__cdecl *)(void *))(uintptr_t)ADDR_SELECTABLE_PRED);
+        if (!e)
+            return;
+
+        if (IsKeyDown(AM2_DIK_LCONTROL) || IsKeyDown(AM2_DIK_RCONTROL)) {
+            int32_t n = *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT;
+            int32_t i;
+
+            for (i = 0; i < n; i++) {
+                if ((*(uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]
+                    != ((const AM2_Object *)e)->uid)
+                    continue;
+
+                /* Found: drop it, unless it is the only one left. */
+                if (n <= 1)
+                    return;
+                ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+                *(uint32_t *)(e + OBJ_OFF_FLAGS) &=
+                    ~(uint32_t)OBJ_FLAG_SELECTED;
+                /* DESELECTING DETACHES. `push 0; push esi; call 0x458070` is
+                 * ObjAttachTo with a null target -- its pure-detach case -- so
+                 * a unit ctrl-clicked out of the selection also leaves
+                 * whatever it was following. Omitting it leaves the object
+                 * attached with nothing selecting it, which the A/B would show
+                 * only if something later walked that list. */
+                ObjAttachTo(e, (void *)0);
+                OnSelectionChanged(
+                    *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+                return;
+            }
+        } else {
+            DeselectAll();
+            SetObjContext(e);
+        }
+
+        PtrListPush((void *)(uintptr_t)ADDR_SELECTED_UIDS,
+                    (void *)(uintptr_t)((const AM2_Object *)e)->uid);
+        *(uint32_t *)(e + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
+        OnSelectionChanged(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+        return;
+    }
+
+    /* A rubber band exists. While the drag is still under way this only
+     * renormalises the rectangle from the anchor and the cursor -- the min of
+     * each axis into left/top and the max into right/bottom -- and returns. */
+    if (*(const int32_t *)(uintptr_t)ADDR_DRAG_ACTIVE) {
+        int16_t ax = *(const int16_t *)(uintptr_t)ADDR_DRAG_ANCHOR;
+        int16_t ay = *(const int16_t *)(uintptr_t)(ADDR_DRAG_ANCHOR + 2);
+        AM2_Rect *r = (AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT;
+
+        r->left   = (ax < wx) ? ax : wx;
+        r->right  = (ax > wx) ? ax : wx;
+        r->top    = (ay < wy) ? ay : wy;
+        r->bottom = (ay > wy) ? ay : wy;
+        return;
+    }
+
+    /* The drag has been let go. */
+    *(int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON = 0;
+
+    e = (uint8_t *)ObjectsInRect(
+            (const AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT,
+            (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+            (int32_t (__cdecl *)(void *))(uintptr_t)ADDR_SELECTABLE_PRED);
+    if (!e)
+        return;
+
+    if (!IsKeyDown(AM2_DIK_LCONTROL) && !IsKeyDown(AM2_DIK_RCONTROL))
+        DeselectAll();
+
+    for (; e; e = *(uint8_t *const *)(e + OBJ_OFF_QUERY_NEXT)) {
+        int32_t n = *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT;
+        int32_t i;
+        int32_t seen = 0;
+
+        for (i = 0; i < n; i++)
+            if ((*(uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]
+                == ((const AM2_Object *)e)->uid) {
+                seen = 1;
+                break;
+            }
+
+        if (seen)
+            continue;
+
+        /* A type 2/3/8 whose OBJ_OFF_FIELD_94 is set is skipped ENTIRELY --
+         * the original's `jne` goes past the push to the loop advance, not
+         * merely past the call below it. Reading it as "skip the call and add
+         * anyway" selects things the original does not, and no static check
+         * would see the difference. */
+        if (ObjIsTypeIn238((const AM2_Object *)e)) {
+            if (*(const void *const *)(e + OBJ_OFF_FIELD_94))
+                continue;
+            ObjType2Field548((const AM2_Object *)e);
+        }
+
+        PtrListPush((void *)(uintptr_t)ADDR_SELECTED_UIDS,
+                    (void *)(uintptr_t)((const AM2_Object *)e)->uid);
+        *(uint32_t *)(e + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
+    }
+
+    OnSelectionChanged(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+}
+
 /* ToggleSelect -- original 0x00413710, one caller.
  *
  * Add an object to the selection, or take it out if it is already in -- and
@@ -10046,6 +10217,8 @@ void item_install(void)
                   "RemapInventoryUids", 1);
     patch_replace(ADDR_TOGGLE_SELECT, (const void *)ToggleSelect,
                   "ToggleSelect", 1);
+    patch_replace(ADDR_SELECTION_CLICK, (const void *)SelectionClick,
+                  "SelectionClick", 1);
     patch_replace(ADDR_SET_OBJ_CONTEXT, (const void *)SetObjContext,
                   "SetObjContext", 3);
     patch_replace(ADDR_NEAREST_CLEAR_POINT, (const void *)NearestClearPoint,

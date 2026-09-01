@@ -9402,6 +9402,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * group" is the reading. ShutdownSubsystems empties it, which is all the old
  * name knew. */
 #define ADDR_SELECTED_UIDS       0x00512308u  /* {capacity, count, items} */
+/* 0x004137D0, one caller. The whole mouse-selection interface: a three-way
+ * branch on the two globals below picks between letting a rubber band GO,
+ * UPDATING one, and a plain CLICK, and inside the last two a CONTROL key
+ * turns select into toggle. Its toggle inlines ToggleSelect's logic rather
+ * than calling it, and differs: CONTROL is tested AFTER the pick here and
+ * first there, and the non-toggle path also calls SetObjContext. */
+#define ADDR_SELECTION_CLICK     0x004137D0u  /* void(void) */
+/* The rubber band's other corner, in world space, and the flag that says one
+ * is being dragged. ADDR_VIEW_RECT_ON says a band EXISTS; this says the mouse
+ * is still down on it. Both are named from 0x004137D0's branch on them. */
+#define ADDR_DRAG_ANCHOR         0x004FCF68u  /* two int16, world space */
+#define ADDR_DRAG_ACTIVE         0x00485474u  /* int32_t */
+/* Gates the plain-click path only -- the two drag paths do not read it. */
+#define ADDR_CLICK_ENABLED       0x00485480u  /* int32_t */
+/* The predicate ObjectsInRect and WalkCellAtPoint are handed to decide what a
+ * click may pick. Still original, and passed by address. */
+#define ADDR_SELECTABLE_PRED     0x00413690u
 /* And ADDR_SELECTED_UIDS is a MEMBER of the gameproc block rather than a
  * global of its own: it is ADDR_GAMEPROC_BLOCK + GAMEPROC_OFF_SELECTED, which
  * is what the second static-initialiser group builds. The constructor runs
