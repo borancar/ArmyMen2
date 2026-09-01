@@ -9,8 +9,8 @@ Last updated: **2026-09-02**, at `969936a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,404 patches** plus three REGISTERED, **30** analysis
-tools in `make check`.
+Nothing uncommitted. **1,402 patches plus 3 REGISTERED = 1,405 reconstructed
+addresses**, **30** analysis tools in `make check`.
 
 **`MedkitHealOne` (`0x00458AB0`, 160 B) is reconstructed** -- the callback
 `ForEachArmyObject` applies for a medkit: heal one trooper by the MEDKIT
@@ -160,7 +160,7 @@ that holds **seventeen** functions and patching any one of them credits all of
 it. The same effect inflates the entry count.
 
     entry-generous   1,220 of 1,239 entries, 89.5% of sub-CRT bytes
-    split-aware      1,361 of 1,530 real functions, 80.1% of sub-CRT bytes
+    split-aware      1,362 of 1,530 real functions, 80.1% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -171,9 +171,10 @@ ceiling rather than a floor -- ten percentage points of ceiling, measured.
 The loop's `completion_promise` is now **every game function below the CRT
 line (0x0045C000) patched**. Measured: **1,220 of 1,239** entries in
 `docs/functions.tsv` below that address have a patch inside them -- so 19
-outstanding, which is 1,239 minus 1,220 -- from 1,404 patched addresses, and
-**89.5% of the sub-CRT bytes**. Split-aware that is **1,361 of 1,530** real
-functions and **80.1%** of the bytes; see the section above. That figure counts merged entries generously and is a
+outstanding, which is 1,239 minus 1,220 -- from 1,405 reconstructed addresses
+(1,402 patched plus 3 registered), and **89.5% of the sub-CRT bytes**.
+Split-aware that is **1,362 of 1,530** real functions and **80.1%** of the
+bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
