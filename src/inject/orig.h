@@ -11859,7 +11859,33 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_VEHICLE_DEFS          0x00662024u /* rec * */
 #define ADDR_VEHICLE_DEF_COUNT     0x00662028u /* int32_t */
 #define AM2_VEHICLE_DEF_BYTES      0x24
+/* The rest of the record, named by the object field each lands in --
+ * CreateVehicle copies eight of them straight across and that is the only
+ * thing in the image that reads any of them. */
+#define VEHDEF_OFF_SEATS           0x04u  /* -> VEHICLE_OFF_SEATS */
+#define VEHDEF_OFF_FIELD_08        0x08u  /* -> obj +0x558 */
+#define VEHDEF_OFF_FIELD_0C        0x0Cu  /* -> obj +0x55C */
+#define VEHDEF_OFF_FIELD_10        0x10u  /* -> obj +0x560 */
+#define VEHDEF_OFF_FIELD_14        0x14u  /* -> obj +0x564 */
 #define VEHDEF_OFF_HEALTH          0x18u  /* what SetMaxHealth is given */
+#define VEHDEF_OFF_FIELD_1C        0x1Cu  /* -> OBJ_OFF_FIELD_568 */
+#define VEHDEF_OFF_ARMOUR          0x20u  /* -> VEHICLE_OFF_ARMOUR */
+/* The three per-KIND tables CreateVehicle indexes, all six entries long. The
+ * height is an int32 read as a BYTE -- 24, 32, 24, 24, 24, 33 -- and the two
+ * animation tables are .bss, filled when the .ani files load. A vehicle whose
+ * TURRET table entry is non-empty gets a SECOND row; that is the whole of what
+ * decides a vehicle's row count. */
+#define ADDR_VEHICLE_HEIGHT_BY_KIND 0x0048BDF8u /* int32[6], read as a byte */
+#define ADDR_VEHICLE_BOX            0x0048BE10u /* AM2_Rect (-48,-48,48,48) */
+#define ADDR_VEHICLE_ROW_SPEC       0x0048BE20u /* one AM2_ROW_SPEC_BYTES spec */
+#define AM2_VEHICLE_KIND_COUNT      6
+/* What weapon kind each vehicle kind is given, from the six-arm jump table at
+ * 0x0045B450: kinds 3 and 4 get none at all and share the arm that skips the
+ * whole CreateWeapon block. */
+#define AM2_VEHICLE_WEAPON_KIND0    7
+#define AM2_VEHICLE_WEAPON_KIND1    6
+#define AM2_VEHICLE_WEAPON_KIND2    8
+#define AM2_VEHICLE_WEAPON_KIND5    0x1D
 #define ADDR_LOAD_TYPE4       0x0045EF50u
 #define ADDR_LOAD_TYPE5       0x0043B870u
 #define ADDR_LOAD_TYPE6       0x00422780u
@@ -12284,6 +12310,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_TROOPER_BOX         0x00489850u  /* AM2_Rect {-16,-32,16,16} */
 #define ADDR_TROOPER_ROW_SPEC    0x00489860u  /* one AM2_ROW_SPEC_BYTES spec */
 #define ADDR_CREATE_VEHICLE      0x0045B090u  /* type 3 */
+/* READ AND NOT RECONSTRUCTED, and recorded the way LoadType2 and CreateTrooper
+ * were before they were taken -- both of which came back and went in once the
+ * neighbouring arithmetic had been done twice.
+ *
+ * WHAT IS SETTLED, and the macros above and below carry it: the six-arm jump
+ * table at 0x0045B450 mapping vehicle kind to weapon kind (7, 6, 8, none,
+ * none, 0x1D), the three per-kind tables, the eight definition fields it
+ * copies straight across, and the two refusals -- the network gate
+ * CreateTrooper also has, and the definition lookup that logs "Vehicle aai
+ * entry not found for type %d". A vehicle gets a SECOND row exactly when its
+ * ADDR_TURRET_ANIMS entry is non-empty, which is the whole of what decides a
+ * vehicle's row count. The packed point is built in ARGUMENT 1'S SLOT, the
+ * third function today to reuse a slot that way. The ten-argument signature
+ * needs no re-derivation at all: armymsg.cpp's typedef, LoadType3 and
+ * MakePlacedUnit all agree, and it is in item.h.
+ *
+ * WHAT IS NOT: which argument reaches CommSlotHasPlayer, which reaches the
+ * army-object list and OBJ_OFF_TABLE_REC_SLOT, ObjInitCommon's last two
+ * arguments here, and the sense of the `test ah, 2` before the conceal. Those
+ * are five esp-relative reads at four different depths, and a first pass
+ * produced a version with three of them guessed. Written down rather than
+ * written out: this file's rule is that a reconstruction which can be shown
+ * wrong is worse than none, and today's two revived deferrals are the argument
+ * for recording the gap precisely instead. */
 #define ADDR_CREATE_WEAPON       0x0045F0C0u  /* type 4; names itself */
 /* 0x00448280, 256 bytes, EIGHT callers -- the multiplayer weapon RESPAWN, read
  * but not reconstructed. Its four gates are all guards and each one is worth
@@ -12807,6 +12857,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * family rather than aliased onto that one, the way OBJ_OFF_FIELD_540 is
  * kept apart from its second use. */
 #define VEHICLE_OFF_SEATS          0x554u
+/* The four beside it, all written by CreateVehicle from the def record and
+ * read nowhere that has been looked at. Spelled VEHICLE_ because the same
+ * offsets carry UNIT_OFF_INVENTORY_LAST and UNIT_OFF_LAST_DROPPED on a
+ * trooper -- one union arm each, which is what this file already does for
+ * 0xA4 and 0x94 rather than aliasing. */
+#define VEHICLE_OFF_FIELD_558      0x558u
+#define VEHICLE_OFF_FIELD_55C      0x55Cu
+#define VEHICLE_OFF_FIELD_560      0x560u
+#define VEHICLE_OFF_FIELD_564      0x564u
 /* A uid, and that is all that is evidenced. 0x00404730 resolves it through
  * the uid lookup and stores the object it gets; EnterVehicle clears it. Two
  * readers, neither of which says what it is FOR, so the name says only what

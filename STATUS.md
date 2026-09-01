@@ -11,6 +11,31 @@ Last updated: **2026-09-01**, at `ba116b4`. Working tree clean.
 
 Nothing uncommitted. **1,377 patches.**
 
+**`CreateVehicle` (`0x0045B090`) is READ AND NOT WRITTEN**, and the draft was
+backed out rather than committed. That is the same call `orig.h` recorded for
+`LoadType2` and `CreateTrooper`, both of which came back and went in today once
+the neighbouring arithmetic had been done twice.
+
+**What is settled** and now in `orig.h`: the six-arm jump table mapping vehicle
+kind to weapon kind (7, 6, 8, none, none, 0x1D -- kinds 3 and 4 share the arm
+that skips the weapon block outright), the three per-kind tables, the eight
+definition fields it copies straight across, and its two refusals -- the
+network gate `CreateTrooper` also has, and the definition lookup that logs
+"Vehicle aai entry not found for type %d". A vehicle gets a SECOND row exactly
+when its `ADDR_TURRET_ANIMS` entry is non-empty, which is the whole of what
+decides a vehicle's row count. Its ten-argument signature needed no
+re-derivation: `armymsg.cpp`'s typedef, `LoadType3` and `MakePlacedUnit` all
+agree and it lives in `item.h`.
+
+**What is not**: which argument reaches `CommSlotHasPlayer`, which reaches the
+army-object list and `OBJ_OFF_TABLE_REC_SLOT`, `ObjInitCommon`'s last two here,
+and the sense of the `test ah, 2` before the conceal. Five esp-relative reads
+at four different depths -- and a first pass produced a version with three of
+them guessed, which is why it was reverted. The rule this file already states
+is that a reconstruction which can be shown wrong is worse than none; today's
+two revived deferrals are the argument for recording the gap precisely rather
+than filling it in.
+
 **`LoadType2` (`0x004471D0`)** -- the TROOPER savegame loader, and the SECOND
 deferral revisited today. `orig.h` had recorded its ten-argument creator and
 then said "what is NOT established: the exact identity of four small stack
