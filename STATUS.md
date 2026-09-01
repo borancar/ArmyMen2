@@ -5,67 +5,71 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `5b1b66a`. Working tree clean.
+Last updated: **2026-09-01**, at `8066a12`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,391 patches**, **29** analysis tools in `make check`.
+Nothing uncommitted. **1,393 patches**, **29** analysis tools in `make check`.
 
-**`ListMaskAction` (`0x004385A0`, 1,072 bytes) is reconstructed** -- the twin
-of `ObjHitMaskAction`, which landed in the commit before it and is the one to
-read for how the walk works. The two are the same function line for line: the
-same eight clamps, the same store order, the same zero memset, the same twenty
-ring deltas, the same one-past split index. Three things differ and all three
-are about where the mask comes from.
+**`FindLevelByName` (`0x0043E230`, 144 B) and `DefMapLine` (`0x0043E2C0`,
+1,520 B) are reconstructed** -- both functions of one `docs/functions.tsv`
+entry, so taking them together closed it. They are the level table's by-name
+search and the parser for one `MAP` line of `campaign.txt`, `bootcamp.txt` or
+`mpmaps.txt`.
 
-**A WHOLE MASK RECORD IS EMBEDDED IN THE LIST HEADER at +0x10, and finding
-that retired a name.** `+0x1C` had been `LISTHDR_OFF_EXTRA` (from the free,
-its only known reader), then `LISTHDR_OFF_HIT_MASK` (from the branch that
-chooses between the two markers). Both readings were of a CALL SITE.
-`ListMaskAction` is the callee and it reads `[hdr+0x10]`, `[+0x12]`, `[+0x14]`,
-`[+0x16]` and `[+0x1C]` -- which is `OBJMASK_OFF_*` exactly. So `+0x1C` is that
-record's bits pointer and not a field of the header at all. Four uses across
-two files now say `LISTHDR_OFF_MASK + OBJMASK_OFF_BITS`.
+**`FindLevelByName` is the name `map.cpp` tried to use once and could not.**
+`ScriptListFind`'s comment records the rename being refused because
+`AM2_LEVEL_RECORD_SIZE` already meant 0x30C while that table's records are
+0xCC. The name was right and the address was wrong; this is the function that
+walks the 0x30C records.
 
-**And the answer had been sitting in the tree unnamed.** `objtype.cpp` calls
-`LoadMask(list + 0x10, ...)` in two places, a bare literal, which is
-independent confirmation of the embedded record and was written before either
-name was argued about. Grepping the tree for what already answers a question is
-cheaper than reading a third call site.
+**THE GAME'S OWN DATA FILE NAMES THE LEVEL RECORD'S FIELDS, and five of them
+had been spelled after their offsets because nobody had opened it.** The three
+level files begin with a comment line that is the column header --
+`map_name map_text folder victorycin "load screen" loadmusic briefing briefsfx
+stratmap "cycle?" losemovie1 losemovie2 losemovie3` -- and `DefMapLine`
+consumes the columns in exactly that order. `LEVEL_OFF_STR_1C4`, `_204`,
+`_248`, `_2C8` and `LEVEL_OFF_RESERVE10` are gone.
 
-**The copy's first guard is VACUOUS.** `ObjHitMaskAction` tests its object's
-mask pointer for null and means it; here the same test survives against an
-address-of, so it can only fail for a header at `-0x10`. One function written
-twice, and the guard went dead the moment the pointer became an address.
+**Two of those names settle open questions elsewhere.** `briefsfx` is the
+column that fills the buffer `StopNamedSound`'s only call site guards on, and
+`bootcamp.txt` writes `none` there, which `DefMapLine` maps to the empty
+`ADDR_DIR_SCRATCH` -- so that is WHY the buffer is empty all mission, which was
+an observation without a cause. And `cycle?` is what feeds
+`ADDR_TILESET_RESERVE`, the gate `palette.cpp` had to POKE to reach the
+palette-cycling body: Boot Camp's line says `FALSE`, so the shimmer is off for
+that map by the data's own choice.
 
-**The origin is a point argument less the FIRST RECORD'S SPRITE HOTSPOT**,
-where the object version uses the object's own `OBJ_OFF_HIT_RECT`. That makes
-the sign convention here read as "hotspot-relative plus the mask's own offset",
-which is the more defensible of the two the mask's two readers disagree about.
+**`TitleCaseName` was about to be written a second time.** The original inlines
+it here rather than calling it, and the body it inlines is `misc.cpp`'s
+instruction for instruction. Fourth near-miss of that kind and the first caught
+by reading rather than by a tool.
 
-**Probed WITH A CONTROL, which is the addition.** `ListMaskAction`,
-`ListBoxAction` and `CanPlaceAt` are all blind counters, so their zeros say
-nothing. An `am2_log` at each of the two markers and one after the branch that
-chooses between them, plus a control at `ObjAfterMove`'s top that must fire:
-the control reads **1,598** and all three others read **0**. So `CanPlaceAt`
-never reaches the marker pair on a live Boot Camp mission -- the second family
-in a row where the pair is unreached rather than one arm being taken.
+**The compiler caught a duplicate offset name** -- `LEVEL_OFF_ID` was private
+to `startgame.cpp` with the same value. Third duplicate-name catch in three
+commits, each by a different mechanism.
 
-**A/B clean on `bootcamp` (22 pixels) and `campaign` (2).**
+**A/B clean on `bootcamp`, `campaign` and `multi`** -- all three level files.
+**And measured in both directions**: dropping the `"data\"` prefix from the
+folder puts `bootcamp` at 293,671 pixels with four extra log lines, so the run
+really does cover this function. What it does NOT catch is swapping the
+`briefing` and `stratmap` columns -- zero pixels, identical log -- so any pair
+of same-typed columns is verified by the file's header and by reading.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,216 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 23
-outstanding, which is 1,239 minus 1,216 -- from 1,391 patched addresses, and
-**86.9% of the sub-CRT bytes**. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,217 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 22
+outstanding, which is 1,239 minus 1,217 -- from 1,393 patched addresses, and
+**87.4% of the sub-CRT bytes**. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and forty-seven batches have gone in and NOTHING SMALL IS LEFT: the
-23 entries outstanding start at **1,120 bytes** -- `0x00434700` -- and the
-median is **1,504**. The
+small ones in batches. A hundred and forty-eight batches have gone in and NOTHING SMALL IS LEFT: the
+22 entries outstanding start at **1,120 bytes** -- `0x00434700` -- and the
+median is **1,504**. Read them through `tools/merges.py`, which splits those 22
+into 42 real functions whose smallest are 16, 144 and 160 bytes. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred
 rather than unread; it is done, and with it the last thing under 900 bytes.
 The sentence here used to say they started at 96 and name the MSVC static-init

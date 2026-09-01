@@ -323,7 +323,8 @@ typedef void  *(__cdecl *am2_find_level_fn)(int32_t id);
  * id the lookup keys on -- so this reads it back out rather than reusing the
  * literal, which is what the original does too. */
 #define BOOTCAMP_LEVEL_ID  1
-#define LEVEL_OFF_ID       0
+/* LEVEL_OFF_ID was defined here too, with the same 0, until DefMapLine needed
+ * a name for the field it writes; it is orig.h's now. */
 
 void __cdecl OnSinglePlayer(void)
 {

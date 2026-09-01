@@ -116,6 +116,16 @@ void __cdecl FreeScenarios(void);
  * first use and growing it when full. */
 void __cdecl AddLevelRecord(const void *record);
 
+/* 0x0043E230, six callers. The LEVEL table's by-name search: lower-cases its
+ * argument in place, then walks the 0x30C records comparing LEVEL_OFF_MAP_NAME.
+ * Linear, because the table is sorted by id and not by name. */
+void *__cdecl FindLevelByName(char *name);
+
+/* 0x0043E2C0. The parser table's handler for the `MAP` command: one line of
+ * campaign.txt, bootcamp.txt or mpmaps.txt into a level record. Returns 0, or
+ * the number of the column that was missing. */
+int32_t __cdecl DefMapLine(int32_t cmd, char *line);
+
 /* 0x0043E9A0, one caller. AddLevelRecord's twin over the 0xCC-byte name
  * records. */
 void __cdecl AddNameRecord(const void *record);

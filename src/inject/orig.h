@@ -4924,16 +4924,51 @@ typedef struct {
  * staying all-zero for an entire Boot Camp mission. It stays zero because
  * THIS is what fills it and Boot Camp's level record leaves it empty -- not
  * because nothing writes it. */
-#define LEVEL_OFF_MAP_NAME        0x004u  /* -> ADDR_MAP_NAME; NOT
-                                           * LEVEL_OFF_NAME, which is the
-                                           * DISPLAY name at +0x44 */
-#define LEVEL_OFF_FOLDER          0x084u  /* -> ADDR_MAP_FOLDER */
-#define LEVEL_OFF_STR_1C4         0x1C4u  /* -> ADDR_LEVEL_STR_A */
-#define LEVEL_OFF_STR_204         0x204u  /* -> ADDR_LEVEL_STR_B */
-#define LEVEL_OFF_RESERVE10       0x244u  /* -> ADDR_TILESET_RESERVE */
-#define LEVEL_OFF_STR_248         0x248u  /* -> ADDR_LEVEL_STR_C */
-#define LEVEL_OFF_SOUND_NAME      0x288u  /* -> ADDR_LEVEL_SOUND_NAME */
-#define LEVEL_OFF_STR_2C8         0x2C8u  /* -> ADDR_LEVEL_STR_D */
+/* THE GAME'S OWN DATA FILE NAMES THESE, and five of them used to be spelled
+ * after their offsets because nobody had looked. campaign.txt, bootcamp.txt
+ * and mpmaps.txt open with a comment line that is the column header:
+ *
+ *   #command map_name map_text folder victorycin "load screen" loadmusic
+ *            briefing briefsfx stratmap "cycle?" losemovie1 losemovie2
+ *            losemovie3
+ *
+ * and DefMapLine consumes the columns in exactly that order. So the names
+ * below are the program's own vocabulary rather than ours, on the same footing
+ * as the script keywords -- which is the strongest kind of name this project
+ * gets. LEVEL_OFF_STR_1C4, _204, _248, _2C8 and LEVEL_OFF_RESERVE10 are gone.
+ *
+ * Two of them settle open questions elsewhere. `briefsfx` is the column that
+ * fills the buffer StopNamedSound's only call site guards on, and bootcamp.txt
+ * writes `none` there -- which DefMapLine maps to the empty ADDR_DIR_SCRATCH.
+ * That is WHY the buffer is empty all mission, which CLAUDE.md had as an
+ * observation without a cause. And `cycle?` is what feeds ADDR_TILESET_RESERVE,
+ * the gate palette.cpp had to POKE to reach the palette-cycling body: Boot
+ * Camp's line says FALSE, so the shimmer is off for that whole map by the
+ * data's own choice rather than by anything the port does. */
+#define LEVEL_OFF_MAP_NAME        0x004u  /* map_name -> ADDR_MAP_NAME; NOT
+                                           * LEVEL_OFF_NAME, which is map_text,
+                                           * the DISPLAY name at +0x44 */
+#define LEVEL_OFF_FOLDER          0x084u  /* folder -> ADDR_MAP_FOLDER */
+#define LEVEL_OFF_LOAD_MUSIC      0x1C4u  /* loadmusic -> ADDR_LEVEL_STR_A */
+#define LEVEL_OFF_LOAD_SCREEN     0x204u  /* load screen -> ADDR_LEVEL_STR_B */
+#define LEVEL_OFF_CYCLE           0x244u  /* cycle? -> ADDR_TILESET_RESERVE */
+#define LEVEL_OFF_BRIEFING        0x248u  /* briefing -> ADDR_LEVEL_STR_C */
+#define LEVEL_OFF_BRIEF_SFX       0x288u  /* briefsfx -> ADDR_LEVEL_SOUND_NAME */
+#define LEVEL_OFF_STRAT_MAP       0x2C8u  /* stratmap -> ADDR_LEVEL_STR_D */
+#define LEVEL_OFF_ID              0x000u  /* the bsearch key: count + 1 */
+/* 0x0043E230, six callers, 144 bytes. The linear by-name search over the LEVEL
+ * table -- lower-cases its argument in place, then compares LEVEL_OFF_MAP_NAME.
+ * This is the function map.cpp tried to call FindLevelByName once and could
+ * not, because it was reading 0x0043E900, which is the other table. */
+#define ADDR_FIND_LEVEL_BY_NAME   0x0043E230u  /* void *(char *mapName) */
+/* 0x0043E2C0, 1,520 bytes, referenced only from the parser table at 0x00477468
+ * as the handler for `MAP` -- command 0x60. */
+#define ADDR_DEF_MAP_LINE         0x0043E2C0u  /* int32_t(int32_t cmd, char *) */
+#define ADDR_STR_NONE_LOWER       0x0048540Cu  /* "none"; ADDR_STR_NONE is
+                                                * "None" and a different
+                                                * string in a different table */
+#define ADDR_STR_DATA_BACKSLASH   0x00487C2Cu  /* "data\\"; ADDR_STR_DATA_DIR
+                                                * is "data" with no separator */
 #define ADDR_LEVEL_STR_A          0x00511C48u  /* char[0x40] */
 #define ADDR_LEVEL_STR_B          0x00511C88u  /* char[0x40] */
 #define ADDR_LEVEL_STR_C          0x00511D18u  /* char[0x40] */
@@ -5188,6 +5223,7 @@ typedef struct {
  * from at random; +0xC4 is the single one a win plays. */
 #define LEVEL_OFF_WIN_MOVIE      0x0C4u  /* char[0x40] */
 #define LEVEL_OFF_LOSE_MOVIES    0x104u  /* char[3][0x40] */
+#define AM2_LEVEL_MOVIE_BYTES    0x40u   /* the stride of that array */
 #define LEVEL_OFF_MOVIE_INDEX    0x308u  /* int32_t, maxed into ADDR_MOVIE_COUNT */
 #define AM2_LOSE_MOVIE_COUNT     3
 #define AM2_LEVEL_STR_BYTES      0x40u  /* the record's string field size */

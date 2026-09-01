@@ -208,14 +208,14 @@ void __cdecl SelectLevel(const void *record)
 
     strcpy((char *)AM2_IMAGE(ADDR_MAP_NAME),          r + LEVEL_OFF_MAP_NAME);
     strcpy((char *)AM2_IMAGE(ADDR_MAP_FOLDER),        r + LEVEL_OFF_FOLDER);
-    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_B),       r + LEVEL_OFF_STR_204);
-    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_A),       r + LEVEL_OFF_STR_1C4);
-    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_C),       r + LEVEL_OFF_STR_248);
-    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_SOUND_NAME),  r + LEVEL_OFF_SOUND_NAME);
-    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_D),       r + LEVEL_OFF_STR_2C8);
+    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_B),       r + LEVEL_OFF_LOAD_SCREEN);
+    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_A),       r + LEVEL_OFF_LOAD_MUSIC);
+    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_C),       r + LEVEL_OFF_BRIEFING);
+    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_SOUND_NAME),  r + LEVEL_OFF_BRIEF_SFX);
+    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_D),       r + LEVEL_OFF_STRAT_MAP);
 
     *(int32_t *)AM2_IMAGE(ADDR_TILESET_RESERVE) =
-        *(const int32_t *)(r + LEVEL_OFF_RESERVE10);
+        *(const int32_t *)(r + LEVEL_OFF_CYCLE);
 }
 
 /* 0x0043E8B0 -- empty both level tables. Two {base, count, capacity} triples
@@ -303,6 +303,210 @@ void __cdecl ReadBootcampLevels(void)
  * declared above. */
 typedef char *(__cdecl *AM2_StrlwrFn)(char *);
 #define orig_strlwr       ((AM2_StrlwrFn)AM2_IMAGE(ADDR_CRT_STRLWR))
+
+/* FindLevelByName -- original 0x0043E230, six callers, 144 bytes. The LEVEL
+ * table's by-name search, and the name ScriptListFind below could not have.
+ *
+ * That comment records a rename being refused: I called 0x0043E900
+ * `FindLevelByName` on the strength of "loaded from the same .txt by the same
+ * reader", and the compiler stopped it because AM2_LEVEL_RECORD_SIZE already
+ * meant 0x30C while those records are 0xCC. The name was right and the address
+ * was wrong. This is the one that walks the 0x30C records.
+ *
+ * It is LINEAR where FindLevelRecord's search by ID is a bsearch, which is
+ * consistent rather than odd: the table is sorted by the id at
+ * LEVEL_OFF_ID, so a name search cannot binary-search it.
+ *
+ * It lower-cases its argument IN PLACE, the same as ScriptListFind, so every
+ * caller must pass a buffer and the table's own names must already be lower
+ * case -- which they are, because DefMapLine copies map_name through
+ * unchanged and the shipped files spell it lower case.
+ *
+ * The count is re-read every iteration. Fourth function in this tree to do
+ * that, so it is the compiler's habit and not any of them allowing the body to
+ * change it.
+ */
+void *__cdecl FindLevelByName(char *name)
+{
+    char   *base;
+    int32_t i;
+
+    if (!name)
+        return (void *)0;
+
+    orig_strlwr(name);
+
+    for (i = 0; i < *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT); i++) {
+        base = *(char **)AM2_IMAGE(ADDR_LEVEL_TABLE);
+        if (!strcmp(base + (uint32_t)i * AM2_LEVEL_RECORD_SIZE
+                        + LEVEL_OFF_MAP_NAME,
+                    name))
+            return base + (uint32_t)i * AM2_LEVEL_RECORD_SIZE;
+    }
+
+    return (void *)0;
+}
+
+/* One column of a MAP line: the next token, with "none" meaning the empty
+ * string, copied into the record. Written once because the original writes it
+ * eight times.
+ *
+ * THE SUBSTITUTE FOR "none" IS ADDR_DIR_SCRATCH, which is a .bss char[] and
+ * not a string literal. orig.h says of that buffer "whether anything ever
+ * writes it is NOT established"; this is a seventh site that only makes sense
+ * if it is empty, and the first where being empty is the whole point -- the
+ * column means "there isn't one". Evidence, not proof.
+ */
+static int32_t TakeMapColumn(char *dst)
+{
+    char *tok = am2_strtok((char *)0,
+                           (const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS));
+
+    if (!tok)
+        return 0;
+    if (!strcmp(tok, (const char *)AM2_IMAGE(ADDR_STR_NONE_LOWER)))
+        tok = (char *)AM2_IMAGE(ADDR_DIR_SCRATCH);
+    strcpy(dst, tok);
+    return 1;
+}
+
+/* DefMapLine -- original 0x0043E2C0, 1,520 bytes, and its only reference in
+ * the image is the parser table at 0x00477468: it is the handler for the
+ * `MAP` command, number 0x60. Same `int32(cmd, line)` shape as DefObjLine,
+ * DefLinkParse and ParsePlaceLine, and `cmd` is unused.
+ *
+ * One line of campaign.txt, bootcamp.txt or mpmaps.txt into a 0x30C level
+ * record, appended to the table with AddLevelRecord. Every column is a strtok
+ * over ADDR_DEF_SEPARATORS and the columns are the ones the file's own header
+ * comment names -- see LEVEL_OFF_* in orig.h, which is now spelled from that
+ * header rather than from offsets.
+ *
+ * THE RETURN IS A COLUMN NUMBER, not a boolean. 0 is success and 2..14 say
+ * which column was missing, counting from `map_name` as 2. The caller turns it
+ * into "Couldn't parse %s!". Nothing distinguishes "the line ran out" from
+ * "the file is a different format"; the number is how far it got.
+ *
+ * THE FIELDS ARE NOT WRITTEN IN OFFSET ORDER and that is the file's doing:
+ * the columns run map_name(0x004), map_text(0x044), folder(0x084),
+ * victorycin(0x0C4), load screen(0x204), loadmusic(0x1C4), briefing(0x248),
+ * briefsfx(0x288), stratmap(0x2C8), cycle?(0x244), then the three lose movies
+ * at 0x104, 0x144, 0x184. Reading the record's layout off this function in
+ * order would interleave them wrongly.
+ *
+ * THE ID IS THE COUNT PLUS ONE, written before anything is parsed, so a line
+ * that fails still consumed a number -- except that nothing records it, since
+ * the record is discarded. It is the key FindLevelRecord bsearches.
+ *
+ * `map_text` IS THE DISPLAY NAME AND GETS TITLE CASE. Underscores become
+ * spaces, and a lower-case letter is capitalised when it is the first
+ * character or follows a space or a full stop. The full stop is in there
+ * deliberately -- reproduced, though no shipped line has one.
+ *
+ * `folder` IS PREFIXED WITH "data\", so the record holds the path and not the
+ * name. Both halves are unbounded copies into a 0x40-byte field, which is the
+ * original's behaviour and the same class as MovieBuildName's overrun.
+ *
+ * `cycle?` IS THE ONE COLUMN WITH NO NULL CHECK: strtok's result goes straight
+ * into DefParseBoolean, which is expected to reject it. A line that stops
+ * there returns 11 by way of that parser failing rather than by a test here.
+ *
+ * THE LAST COLUMN IS OPTIONAL and the header does not mention it. The field at
+ * LEVEL_OFF_MOVIE_INDEX is zeroed and then filled by DefParseNumber only if a
+ * token is left; a missing one is not an error.
+ *
+ * NOT EXERCISED BY A COUNTER, because ReadLevelFile reaches it through
+ * DefParseInfoFile's table by ADDRESS rather than by name -- so this is one of
+ * the cases where a patch is installed and the counter still cannot move.
+ *
+ * THE A/B DOES COVER IT, and that is measured in both directions rather than
+ * argued. Dropping the "data\" prefix from the folder puts `bootcamp` at
+ * 293,671 pixels with four extra log lines -- "Couldn't open bitmap file!",
+ * "Unable to load sprite bootcamp.bmp", "ReadScript: Could not open
+ * bootcamp1.txt" and a `lines: 0` summary -- so an error in here takes the map
+ * down loudly rather than changing nothing.
+ *
+ * WHAT IT DOES NOT CATCH: swapping the `briefing` and `stratmap` columns moves
+ * ZERO pixels and leaves the log identical. Both are .bmp names and neither
+ * reaches the frame `bootcamp` grabs, so that pair -- and by the same argument
+ * any pair of same-typed columns -- is verified by the file's own header line
+ * and by reading, not by this run. Said plainly, because a clean A/B on a
+ * function this wide reads like more coverage than it is. */
+int32_t __cdecl DefMapLine(int32_t cmd, char *line)
+{
+    uint8_t  rec[AM2_LEVEL_RECORD_SIZE];
+    char    *tok;
+    int32_t  i;
+    int32_t  col;
+
+    (void)cmd;
+
+    memset(rec, 0, sizeof rec);
+    *(int32_t *)(rec + LEVEL_OFF_ID) =
+        *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT) + 1;
+
+    tok = am2_strtok(line, (const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS));
+    if (!tok)
+        return 2;
+    strcpy((char *)rec + LEVEL_OFF_MAP_NAME, tok);
+
+    tok = am2_strtok((char *)0,
+                     (const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS));
+    if (!tok)
+        return 3;
+    strcpy((char *)rec + LEVEL_OFF_NAME, tok);
+
+    /* The original INLINES the title-caser here rather than calling it, and
+     * the body it inlines is TitleCaseName instruction for instruction --
+     * underscore replaced first, a lower-case letter raised when it opens the
+     * string or follows a space or a full stop, strlen recomputed every turn.
+     * It was about to be written a second time; misc.cpp has had it under its
+     * own address all along. Fourth near-miss of this kind, and the first
+     * caught by reading rather than by a tool. */
+    TitleCaseName((char *)rec + LEVEL_OFF_NAME);
+
+    tok = am2_strtok((char *)0,
+                     (const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS));
+    if (!tok)
+        return 4;
+    strcpy((char *)rec + LEVEL_OFF_FOLDER,
+           (const char *)AM2_IMAGE(ADDR_STR_DATA_BACKSLASH));
+    strcat((char *)rec + LEVEL_OFF_FOLDER, tok);
+
+    if (!TakeMapColumn((char *)rec + LEVEL_OFF_WIN_MOVIE))
+        return 5;
+    if (!TakeMapColumn((char *)rec + LEVEL_OFF_LOAD_SCREEN))
+        return 6;
+    if (!TakeMapColumn((char *)rec + LEVEL_OFF_LOAD_MUSIC))
+        return 7;
+    if (!TakeMapColumn((char *)rec + LEVEL_OFF_BRIEFING))
+        return 8;
+    if (!TakeMapColumn((char *)rec + LEVEL_OFF_BRIEF_SFX))
+        return 9;
+    if (!TakeMapColumn((char *)rec + LEVEL_OFF_STRAT_MAP))
+        return 10;
+
+    /* No null check -- see above. */
+    if (!DefParseBoolean((int32_t *)(rec + LEVEL_OFF_CYCLE),
+                         am2_strtok((char *)0,
+                                    (const char *)
+                                        AM2_IMAGE(ADDR_DEF_SEPARATORS))))
+        return 11;
+
+    col = 12;
+    for (i = 0; i < 3; i++, col++)
+        if (!TakeMapColumn((char *)rec + LEVEL_OFF_LOSE_MOVIES
+                           + (uint32_t)i * AM2_LEVEL_MOVIE_BYTES))
+            return col;
+
+    *(int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX) = 0;
+    tok = am2_strtok((char *)0,
+                     (const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS));
+    if (tok)
+        DefParseNumber((int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX), tok);
+
+    AddLevelRecord(rec);
+    return 0;
+}
 
 /* 0x0043E900, five callers. Find a record by name in the name registry --
  * the SECOND of the two triples FreeLevelTables owns, whose records are 0xCC
@@ -1146,6 +1350,10 @@ void map_install(void)
 {
     patch_replace(ADDR_LEVEL_COUNT, (const void *)LevelCount,
                         "LevelCount", 2);
+    patch_replace(ADDR_FIND_LEVEL_BY_NAME, (const void *)FindLevelByName,
+                  "FindLevelByName", 6);
+    patch_replace(ADDR_DEF_MAP_LINE, (const void *)DefMapLine,
+                  "DefMapLine", 0);
     patch_replace(ADDR_FREE_MAP_LAYERS, (const void *)FreeMapLayers,
                   "FreeMapLayers", 2);
     patch_replace(ADDR_PARSE_SCENARIOS, (const void *)ParseScenarios,
