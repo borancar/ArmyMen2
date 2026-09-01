@@ -2502,6 +2502,152 @@ int32_t __cdecl CommGlobalInit(void)
     return CommGlobalAtExit();
 }
 
+/* ADDR_SEND_GAME_MSG stays original; commmsg.cpp reaches it the same way and
+ * spells the typedef the same, so the two cannot drift. */
+typedef int32_t (__cdecl *am2_send_game_msg_fn)(void *msg, int32_t a,
+                                                int32_t b);
+#define orig_send_game_msg (*(am2_send_game_msg_fn)ADDR_SEND_GAME_MSG)
+
+/* SendPlayerMsg -- original 0x00411270, 624 bytes, fifteen callers. The HOST's
+ * game-setup broadcast: pack what every client needs to agree with us about --
+ * the map checksum, the game version, the tileset and script names, and a
+ * roster of who is playing -- and send it once.
+ *
+ * IT NAMES ITSELF: "SendPlayerMsg for %d  Players: \n". orig.h had
+ * ADDR_COMM_SEND_PLAYERS, another call-site name.
+ *
+ * THE MESSAGE BASE IS 0x004FC3B8 AND NOT THE FIRST ADDRESS IT TOUCHES. The
+ * function's first store is to 0x004FC3CC, which is 0x14 bytes in; taking that
+ * for the base would put every field twenty bytes out. Three things agree on
+ * the real one: SendGameMsg is handed 0x004FC3B8, the record block closes
+ * exactly on the trailer, and +0x00..+0x07 are never written -- which is
+ * AM2_ArmyMsgHdr, filled by the send.
+ *
+ * THE ROSTER IS FOUR RECORDS AND I FIRST READ SIX. (0x4FC638 - 0x4FC4B8) /
+ * 0x60 is 4, it matches AM2_COMM_PLAYERS, and 0xA8 + 4 * 0x60 lands exactly on
+ * the trailer at +0x228. When a loop's bound is a pointer comparison, divide;
+ * eyeballing it got the flow-record array wrong earlier today too.
+ *
+ * THE RECORD CURSOR IS CENTRED. `ebx` walks the roster but sits 0x58 INTO each
+ * record, so the fields run [ebx-0x58] to [ebx+0x04]. Reading those negative
+ * displacements as offsets from a record start gives nonsense -- the same
+ * shape as the trig tables, where two bases are the middles of their arrays.
+ *
+ * TWO GATES BEFORE ANYTHING, and the first is not an arbitrary flag:
+ * COMM_OFF_DPLAY is the IDirectPlay4A pointer, so the pair reads "only if the
+ * transport exists and we are the host". That is what makes the per-slot reset
+ * below it safe -- nobody else is going to do it.
+ *
+ * THE PER-PLAYER LOG IS ONLY FOR THE DEGENERATE CASE. With two or more players
+ * the roster is packed and sent; with fewer, the function logs each slot and
+ * returns without sending. So those "  player: %s %x %d" lines are a "why is
+ * nobody here" aid, not a normal trace.
+ *
+ * COLD: this is the sender for the handshake CLAUDE.md records as never
+ * reaching the screen -- "a wrong total is invisible to both halves of an
+ * A/B". Verified by reading; tools/ab.sh's `state` artifact is what would
+ * check it if a session were available.
+ */
+void __cdecl SendPlayerMsg(int32_t arg)
+{
+    uint8_t *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    uint8_t *msg  = (uint8_t *)(uintptr_t)ADDR_PLAYER_MSG;
+    int32_t  i;
+
+    if (!*(const int32_t *)(comm + COMM_OFF_DPLAY))
+        return;
+    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        return;
+
+    *(int32_t *)(msg + MSG_PLAYER_HAS_MAP) = arg;
+
+    /* A non-zero argument clears each slot's +0x278 except the default
+     * owner's, before anything is packed. */
+    if (arg) {
+        for (i = 0; i < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT); i++)
+            if (i != (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+                *(int32_t *)(comm + COMM_OFF_SLOT_FIELD_278
+                             + i * AM2_COMM_SLOT_STRIDE) = 0;
+    }
+
+    *(uint32_t *)(msg + MSG_PLAYER_MAP_SUM) =
+        *(const uint32_t *)(uintptr_t)ADDR_MAP_CHECKSUM_VAL;
+    *(uint32_t *)(msg + MSG_PLAYER_RULE_SUM) =
+        *(const uint32_t *)(uintptr_t)(ADDR_MAP_CHECKSUM_VAL + 4);
+    *(uint32_t *)(msg + MSG_PLAYER_RULE_ARG) =
+        *(const uint32_t *)(uintptr_t)(ADDR_MAP_CHECKSUM_VAL + 8);
+    *(int32_t *)(msg + MSG_PLAYER_VERSION) =
+        *(const int32_t *)(uintptr_t)ADDR_GAME_VERSION;
+    *(int32_t *)(msg + MSG_PLAYER_CHECKSUM) =
+        *(const int32_t *)(uintptr_t)ADDR_DATA_CHECKSUM;
+
+    strcpy((char *)(msg + MSG_PLAYER_LEVEL_NAME),
+           (const char *)(uintptr_t)ADDR_TILESET_NAME);
+    strcpy((char *)(msg + MSG_PLAYER_MAP_NAME),
+           (const char *)(uintptr_t)ADDR_MP_SCRIPT_NAME);
+
+    *(int32_t *)(msg + MSG_PLAYER_COUNT) =
+        *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
+    *(uint32_t *)(msg + MSG_PLAYER_CONNECTED) =
+        *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID);
+    *(int32_t *)(msg + MSG_PLAYER_SCORE_LIMIT) =
+        *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT;
+    *(int32_t *)(msg + MSG_PLAYER_OVER_FLAGS) =
+        *(const int32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS;
+    *(int32_t *)(msg + MSG_PLAYER_SETTING_22C) =
+        *(const int32_t *)(uintptr_t)ADDR_GAME_SETTING_22C;
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        orig_log("SendPlayerMsg for %d  Players: \n",
+                 *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT));
+
+    if (*(const uint32_t *)(comm + COMM_OFF_PLAYER_COUNT) < 2) {
+        /* Nobody to send to: list the slots and leave. */
+        if (!*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            return;
+        for (i = 0; i < AM2_COMM_PLAYERS; i++) {
+            uint8_t *slot = comm + i * AM2_COMM_SLOT_STRIDE;
+
+            orig_log("  player: %s %x %d\n",
+                     (const char *)(slot + COMM_OFF_SLOT_NAME),
+                     *(const uint32_t *)(slot + COMM_OFF_PLAYER_SLOTS),
+                     *(const int32_t *)(slot + COMM_OFF_SLOT_FIELD_210));
+        }
+        return;
+    }
+
+    for (i = 0; i < AM2_COMM_PLAYERS; i++) {
+        uint8_t       *rec  = msg + MSG_PLAYER_RECORDS
+                              + i * MSG_PLAYER_STRIDE;
+        const uint8_t *slot = comm + i * AM2_COMM_SLOT_STRIDE;
+
+        *(uint32_t *)(rec + MSGREC_OFF_ID) =
+            *(const uint32_t *)(slot + COMM_OFF_PLAYER_SLOTS);
+        *(int32_t *)(rec + MSGREC_OFF_FIELD_04) =
+            *(const int32_t *)(slot + COMM_OFF_SLOT_FIELD_210);
+        *(int32_t *)(rec + MSGREC_OFF_ZERO) = 0;
+        *(int32_t *)(rec + MSGREC_OFF_POINTS) =
+            ((const int32_t *)(uintptr_t)ADDR_ARMY_POINTS)[i];
+        *(int32_t *)(rec + MSGREC_OFF_FIELD_54) =
+            *(const int32_t *)(slot + COMM_OFF_SLOT_FIELD_258);
+        *(int32_t *)(rec + MSGREC_OFF_FIELD_58) =
+            *(const int32_t *)(slot + COMM_OFF_SLOT_FIELD_270);
+        *(int32_t *)(rec + MSGREC_OFF_FIELD_5C) =
+            *(const int32_t *)(slot + COMM_OFF_SLOT_FIELD_25C);
+
+        strcpy((char *)(rec + MSGREC_OFF_NAME),
+               (const char *)(slot + COMM_OFF_SLOT_NAME));
+
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log("  player: %s %x %d\n",
+                     (const char *)(rec + MSGREC_OFF_NAME),
+                     *(const uint32_t *)(rec + MSGREC_OFF_ID),
+                     *(const int32_t *)(rec + MSGREC_OFF_FIELD_04));
+    }
+
+    orig_send_game_msg(msg, 0, 1);
+}
+
 /* DestroyFlow -- original 0x004029B0, 544 bytes, seven callers. Tear down one
  * player's flow queue when they leave: reclaim everything still queued for
  * them, and free the record.
@@ -2789,6 +2935,8 @@ int dplay_install(void)
                         "ProcessResendQueue", 1);
     rc |= patch_replace(ADDR_DESTROY_FLOW, (const void *)DestroyFlow,
                         "DestroyFlow", 7);
+    rc |= patch_replace(ADDR_SEND_PLAYER_MSG, (const void *)SendPlayerMsg,
+                        "SendPlayerMsg", 15);
     rc |= patch_replace(ADDR_MSG_LIST_INSERT, (const void *)MsgListInsert,
                         "MsgListInsert", 1);
     rc |= patch_replace(ADDR_COMM_PLAYER_LEFT, (const void *)CommPlayerLeft,

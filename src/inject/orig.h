@@ -2354,7 +2354,18 @@
 /* The player slots ArmyMessageFlush walks, COMM_OFF_PLAYER_COUNT of them at a
  * stride of 0x70. Each begins with the player id; -1 marks an empty slot and
  * COMM_OFF_OUR_PLAYER_ID is skipped, so a flush sends to everyone else. */
+/* The rest of one comm player slot, named from SendPlayerMsg, which copies
+ * each of them into a message record. The slot stride is AM2_COMM_SLOT_STRIDE
+ * and COMM_OFF_PLAYER_SLOTS below is the id; these are its neighbours. Only
+ * the name is evidenced -- it is logged with %s -- so the others keep
+ * field-numbered names. */
+#define COMM_OFF_SLOT_FIELD_210  0x210u  /* logged as the third %d */
 #define COMM_OFF_PLAYER_SLOTS    0x214u
+#define COMM_OFF_SLOT_NAME       0x218u  /* char[], logged with %s */
+#define COMM_OFF_SLOT_FIELD_258  0x258u
+#define COMM_OFF_SLOT_FIELD_25C  0x25Cu
+#define COMM_OFF_SLOT_FIELD_270  0x270u
+#define COMM_OFF_SLOT_FIELD_278  0x278u  /* cleared for every slot but ours */
 #define AM2_COMM_SLOT_STRIDE     0x70u
 #define ADDR_STR_CAPS_HEAD       0x00475400u
 #define ADDR_STR_CAPS_PACKET     0x004753E8u
@@ -2786,7 +2797,12 @@
  * identical copies of it. That is what an inline member function looks like
  * once MSVC has declined to inline it at one site out of three. */
 #define ADDR_COMM_END_SETUP      0x00410CE0u
-#define ADDR_COMM_SEND_PLAYERS   0x00411270u  /* void(int32) -- "SendPlayerMsg for %d" */
+/* IT NAMES ITSELF: "SendPlayerMsg for %d  Players: 
+". The old name here was
+ * off a call site. The HOST's game-setup broadcast -- map checksum, version,
+ * the two names and a four-entry roster -- gated on COMM_OFF_DPLAY existing
+ * and on being the host. Reconstructed. */
+#define ADDR_SEND_PLAYER_MSG     0x00411270u  /* void(int32_t) */
 #define ADDR_COMM_SESSION_OVER   0x0040FB70u  /* thiscall void(this), tail-calls 0x40FAA0 */
 /* 0x00426A90. Shows the multiplayer end screen. Its argument is a RESULT
  * CODE, not a boolean: 0 won, 1 lost, 2 the host left, and anything else
@@ -9155,6 +9171,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MSG_PLAYER_RULE_ARG      0xA4u
 #define MSG_PLAYER_RECORDS       0xA8u
 #define MSG_PLAYER_STRIDE        0x60u
+/* Fields inside one of those records, named from SendPlayerMsg, which is the
+ * writer. It addresses them through a cursor sitting 0x58 INTO each record --
+ * the reader's own note above says the same of its base, one offset further
+ * on -- so the displacements run [ebx-0x58] to [ebx+4] and none of them is a
+ * negative field. */
+#define MSGREC_OFF_ID            0x00u  /* the player id */
+#define MSGREC_OFF_FIELD_04      0x04u  /* logged as the third %d */
+#define MSGREC_OFF_ZERO          0x08u  /* written 0, never read here */
+#define MSGREC_OFF_POINTS        0x10u  /* that army's ADDR_ARMY_POINTS entry */
+#define MSGREC_OFF_NAME          0x14u  /* the player name, strcpy'd in */
+#define MSGREC_OFF_FIELD_54      0x54u
+#define MSGREC_OFF_FIELD_58      0x58u
+#define MSGREC_OFF_FIELD_5C      0x5Cu
+/* The message SendPlayerMsg fills. NOT 0x004FC3CC, which is the first address
+ * that function touches and is 0x14 bytes in: +0x00..+0x07 are an
+ * AM2_ArmyMsgHdr the send fills, and SendGameMsg is handed this. */
+#define ADDR_PLAYER_MSG          0x004FC3B8u
 #define MSG_PLAYER_OVER_FLAGS    0x228u
 #define MSG_PLAYER_SETTING_22C   0x22Cu
 #define MSG_PLAYER_VERSION       0x230u

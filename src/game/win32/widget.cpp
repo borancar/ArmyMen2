@@ -3930,8 +3930,6 @@ typedef void (__cdecl *am2_void_fn)(void);
 #define g_commObject      (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
 
 typedef void (__cdecl *AM2_SendPlayersFn)(int32_t which);
-#define orig_comm_send_players \
-    ((AM2_SendPlayersFn)(uintptr_t)ADDR_COMM_SEND_PLAYERS)
 
 /* The checkbox a record names, reached through the header's parent -- the
  * dialog holds them in an array at 0x0064, the same shape as the CONTROLS
@@ -3993,7 +3991,7 @@ void __cdecl OptionsApply(AM2_Widget *button)
     PlaySoundAt(2, 0, 0, 0, 0);
     g_menuRequest    = AM2_MENU_REQUEST_OPTIONS;
     g_menuRequestSet = 1;
-    orig_comm_send_players(0);
+    SendPlayerMsg(0);
     Announce("Options changed by host.");
 }
 
@@ -7824,7 +7822,6 @@ typedef int32_t (__attribute__((thiscall)) *AM2_SetArmyColourFn)(void *comm,
 typedef void (__cdecl *AM2_SendIntFn)(int32_t v);
 /* SendColorMsg and SendTeamMsg are ours -- msgslot.cpp -- so they are called
  * by name; CommSendPlayers is not. */
-#define orig_send_players ((AM2_SendIntFn)AM2_IMAGE(ADDR_COMM_SEND_PLAYERS))
 
 /* The guard both share: our own row is always ours to change. */
 static int32_t MpRowEditable(void *comm, int32_t row)
@@ -7877,7 +7874,7 @@ void __cdecl OnMpColour(AM2_Widget *w)
                          *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW),
                          army);
     PlaySoundAt(2, 0, 0, 0, 0);
-    orig_send_players(0);
+    SendPlayerMsg(0);
 
     for (i = 0; i < AM2_PLAYERS_MAX; i++) {
         AM2_Widget *b = ((AM2_Widget **)(screen + MP_PANEL_OFF_COLOURS))[i];
@@ -7909,7 +7906,7 @@ void __cdecl OnMpTeamLeft(AM2_Widget *w)
 
     *team = next;
     PlaySoundAt(2, 0, 0, 0, 0);
-    orig_send_players(0);
+    SendPlayerMsg(0);
     ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
 }
 
@@ -7939,7 +7936,7 @@ void __cdecl OnMpTeamRight(AM2_Widget *w)
 
     *team = next;
     PlaySoundAt(2, 0, 0, 0, 0);
-    orig_send_players(0);
+    SendPlayerMsg(0);
     ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
 }
 
@@ -7978,7 +7975,7 @@ void __cdecl OnMpName(AM2_Widget *w)
     }
 
     PlaySoundAt(2, 0, 0, 0, 0);
-    orig_send_players(0);
+    SendPlayerMsg(0);
     ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
 }
 

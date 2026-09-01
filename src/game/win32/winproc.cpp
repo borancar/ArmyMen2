@@ -179,7 +179,6 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 
 #define orig_log            (*(am2_log_fn)ADDR_LOG)
 #define orig_sprintf        (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
-#define orig_send_players   (*(am2_int_fn2)ADDR_COMM_SEND_PLAYERS)
 
 /* The player's name is the first field of its record. */
 static const char *PlayerName(uint8_t *comm, int32_t slot)
@@ -238,7 +237,7 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
 
             DestroyFlow(id);
             if (removed && *(const int32_t *)(comm + COMM_OFF_IS_HOST))
-                orig_send_players(1);
+                SendPlayerMsg(1);
         }
 
         if (g_paintObject) {

@@ -37,6 +37,11 @@
  * an import of our own would resolve through our IAT, and this file is flat. */
 typedef uint32_t (__stdcall *AM2_TickFn)(void);
 #define orig_get_tick_count (*(AM2_TickFn *)AM2_IMAGE(ADDR_IAT_GET_TICK_COUNT))
+/* SendPlayerMsg is reconstructed, in win32/dplay.cpp. Declared here rather
+ * than by including that header because commmsg.cpp is on the flat side of
+ * the split; its signature names no Win32 type. */
+void __cdecl SendPlayerMsg(int32_t arg);
+
 #include "../inject/orig.h"
 #include "crt.h"        /* am2_log */
 #include "image.h"      /* AM2_IMAGE */
@@ -240,8 +245,6 @@ typedef void (__attribute__((thiscall)) *AM2_DlgPaintFn)(void *w, AM2_Rect r);
 /* 0x0040F160, thiscall on the comm object: which slot holds this DirectPlay
  * id. Still original. */
 typedef void (__cdecl *AM2_SendPlayersFn)(int32_t a);
-#define orig_comm_send_players \
-    (*(AM2_SendPlayersFn)(uintptr_t)ADDR_COMM_SEND_PLAYERS)
 
 void __cdecl SendGameReadyToLoadMsg(int32_t ready)
 {
@@ -371,7 +374,7 @@ static void RepaintDialogAndSendPlayers(void)
         ((AM2_DlgPaintFn *)*(void **)dlg)[AM2_DLG_SLOT_PAINT](
             dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
     }
-    orig_comm_send_players(0);
+    SendPlayerMsg(0);
 }
 
 void __cdecl ReceivedColorMsg(void *msg, int32_t dpid)
@@ -540,7 +543,7 @@ void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
             dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
     }
 
-    orig_comm_send_players(0);
+    SendPlayerMsg(0);
 }
 
 void __cdecl ReceiveEndSetupMsg(void)

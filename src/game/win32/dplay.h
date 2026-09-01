@@ -268,6 +268,11 @@ void __cdecl ProcessResendQueue(void);
  * the record. Can UNPAUSE the game when that refills the buffer pool. */
 int32_t __cdecl DestroyFlow(uint32_t id);
 
+/* 0x00411270, fifteen callers. The host's game-setup broadcast: map checksum,
+ * game version, the map and level names, and a four-entry player roster.
+ * Sends nothing when fewer than two players are connected. */
+void __cdecl SendPlayerMsg(int32_t arg);
+
 /* 0x00401150, one caller. Insert a node in ascending key order under the
  * list's mutex, and answer the node. */
 void *__cdecl MsgListInsert(void *list, void *node);
