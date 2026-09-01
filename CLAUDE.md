@@ -330,6 +330,20 @@ Found by mutating a function and watching the run pass, which is the only way
 these ever surface. Re-run after the fix: 0 disagree, so nothing had been
 relying on the accident.
 
+**A FIELD WITH NO WRITER IS DEAD CODE, and the scan that says so is cheap.**
+`SendGameMsg` has two packet-loss arms behind a player record's `+0xA4` and
+`+0xA8`, and both look perfectly live -- a burst mode and a random mode, a
+percentage, an exemption for guaranteed sends. Nothing in the image writes
+either offset. A decoded scan of every store in `.text` finds twelve hits at
+those two displacements and all twelve are other structures or `esp`, so both
+read zero forever and neither arm can be taken.
+
+That is worth doing BEFORE reasoning about what a field means, not after. The
+sibling pair at `+0xB0`/`+0xB4` in the same function passes the same scan with
+a writer -- `RecvFlowControl`, the host dictating latency to a client -- and
+that is what turns two letters into `FLOW_OFF_LAG_MS` and `FLOW_OFF_LAG_SPREAD`.
+One scan separated the half that can run from the half that cannot.
+
 **A function whose answer depends on a table the game has not built yet needs
 the table SEEDED.** `AngleBetween` reads the two reverse trig tables, which are
 `.bss` zeros when the selfcheck runs — so every index answers 0 and the

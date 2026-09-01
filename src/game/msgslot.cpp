@@ -12,20 +12,22 @@
 #include "misc.h"   /* CommArmyOfSlot -- reconstructed */
 
 /* The null check comes first in every one of the six, before the division, so
- * a null comm object costs nothing and never divides. */
-static void SetSlot(void *comm, uint32_t seq, uint32_t off, uint32_t value)
+ * a null record costs nothing and never divides.
+ *
+ * `rec`, not `comm`: these take a PLAYER record. See msgslot.h. */
+static void SetSlot(void *rec, uint32_t seq, uint32_t off, uint32_t value)
 {
-    if (!comm)
+    if (!rec)
         return;
-    ((uint32_t *)((uint8_t *)comm + off))[seq % AM2_MSGSLOT_COUNT] = value;
+    ((uint32_t *)((uint8_t *)rec + off))[seq % AM2_MSGSLOT_COUNT] = value;
 }
 
-void __cdecl MsgSlotA0(void *comm, uint32_t seq) { SetSlot(comm, seq, AM2_MSGSLOT_A_OFF, 0); }
-void __cdecl MsgSlotA1(void *comm, uint32_t seq) { SetSlot(comm, seq, AM2_MSGSLOT_A_OFF, 1); }
-void __cdecl MsgSlotA2(void *comm, uint32_t seq) { SetSlot(comm, seq, AM2_MSGSLOT_A_OFF, 2); }
-void __cdecl MsgSlotB0(void *comm, uint32_t seq) { SetSlot(comm, seq, AM2_MSGSLOT_B_OFF, 0); }
-void __cdecl MsgSlotB1(void *comm, uint32_t seq) { SetSlot(comm, seq, AM2_MSGSLOT_B_OFF, 1); }
-void __cdecl MsgSlotB2(void *comm, uint32_t seq) { SetSlot(comm, seq, AM2_MSGSLOT_B_OFF, 2); }
+void __cdecl MsgSlotA0(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_A_OFF, 0); }
+void __cdecl MsgSlotA1(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_A_OFF, 1); }
+void __cdecl MsgSlotA2(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_A_OFF, 2); }
+void __cdecl MsgSlotB0(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_B_OFF, 0); }
+void __cdecl MsgSlotB1(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_B_OFF, 1); }
+void __cdecl MsgSlotB2(void *rec, uint32_t seq) { SetSlot(rec, seq, AM2_MSGSLOT_B_OFF, 2); }
 
 uint32_t __cdecl MsgField12(const void *msg)
 {
@@ -223,11 +225,15 @@ void *__cdecl FindPlayerById(uint32_t id)
  * is in the offline test's link; commmsg.cpp is not, and adding it drags in
  * two dozen symbols from modules that are not. The declaration is beside its
  * siblings in msgslot.h either way. */
+/* SendGameMsg is reconstructed and lives in win32/dplay.cpp, which this flat
+ * module may not include -- dplay.h names DirectPlay types and
+ * tools/checksplit.py refuses a flat module that reaches a Win32 header even
+ * transitively. Its own signature names nothing platform, so a declaration
+ * here is enough; `extern "C"` because that is how dplay.h declares it. */
+extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
+
 #define kMsgCommObj  (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
 #define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
-#define orig_send_game_msg \
-            ((int32_t (__cdecl *)(void *, int32_t, int32_t)) \
-             (uintptr_t)ADDR_SEND_GAME_MSG)
 
 /* 0x00411E90, and the one message in this family that is not a value.
  *
@@ -260,7 +266,7 @@ void __cdecl SendChatMsg(char *text, int32_t system)
                                                  (int32_t)g_defaultOwner);
 
     record[AM2_MSG_CHAT_SENDER] = sender;
-    orig_send_game_msg(record, 0, 0);
+    SendGameMsg(record, 0, 0);
 }
 
 int msgslot_install(void)

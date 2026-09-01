@@ -76,6 +76,13 @@ int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id);
 int32_t __cdecl CommRegisterSelf(uint32_t id);
 }
 
+/* SendGameMsg is reconstructed and lives in win32/dplay.cpp, which this flat
+ * module may not include -- dplay.h names DirectPlay types and
+ * tools/checksplit.py refuses a flat module that reaches a Win32 header even
+ * transitively. Its own signature names nothing platform, so a declaration
+ * here is enough; `extern "C"` because that is how dplay.h declares it. */
+extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
+
 
 /* Fields of the comm object these two read. Named for position: what +0x3E4
  * and +0x418 actually hold is not established, only which one gates the send
@@ -85,8 +92,6 @@ int32_t __cdecl CommRegisterSelf(uint32_t id);
 #define AM2_COMM_SELF_ID     0x3CC
 #define AM2_MSG_VALUE        8
 
-typedef int32_t (__cdecl *am2_send_game_msg_fn)(void *msg, int32_t a, int32_t b);
-#define orig_send_game_msg (*(am2_send_game_msg_fn)ADDR_SEND_GAME_MSG)
 
 #define kCommObj (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
 
@@ -99,7 +104,7 @@ static void SendValueMsg(uintptr_t record, int32_t value, const char *fmt)
     if (!*(const int32_t *)(comm + AM2_COMM_CONNECTED))
         return;
 
-    orig_send_game_msg((void *)record, 0, 1);
+    SendGameMsg((void *)record, 0, 1);
 
     /* Re-read: the original does not reuse the register it had. */
     comm = kCommObj;
@@ -276,7 +281,7 @@ void __cdecl SendGameReadyToLoadMsg(int32_t ready)
 
     *(int32_t *)((uint8_t *)(uintptr_t)ADDR_MSG_READY_TO_LOAD + AM2_MSG_VALUE)
         = ready;
-    orig_send_game_msg((void *)(uintptr_t)ADDR_MSG_READY_TO_LOAD, 0, 1);
+    SendGameMsg((void *)(uintptr_t)ADDR_MSG_READY_TO_LOAD, 0, 1);
 
     /* No null test on the dialog, unlike the host half. The original's. */
     dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
@@ -320,7 +325,7 @@ int32_t __cdecl SendMapMsg(int32_t result, int32_t unused)
     if (!*(const int32_t *)(comm + AM2_COMM_CONNECTED))
         return rc;
 
-    rc   = orig_send_game_msg((void *)(uintptr_t)ADDR_MSG_MAP, 0, 1);
+    rc   = SendGameMsg((void *)(uintptr_t)ADDR_MSG_MAP, 0, 1);
     comm = kCommObj;
     if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED)) {
         /* "Error = %d" prints the ARGUMENT. `rc`, which is the error, is not
@@ -450,7 +455,7 @@ void __cdecl CommEndSetup(void)
     if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
         am2_log("Sending EndSetupMessage\n");
 
-    orig_send_game_msg((void *)(uintptr_t)ADDR_MSG_END_SETUP, 0, 1);
+    SendGameMsg((void *)(uintptr_t)ADDR_MSG_END_SETUP, 0, 1);
     orig_post_message(*(void **)(uintptr_t)ADDR_HWND, AM2_WM_SETUP_DONE, 0, 0);
 }
 
@@ -484,7 +489,7 @@ void __cdecl SendGameReadyMsg(int32_t ready)
      * the original writes it between the last push and the call. */
     *(int32_t *)((uint8_t *)(uintptr_t)ADDR_MSG_GAME_READY + AM2_MSG_VALUE)
         = ready;
-    orig_send_game_msg((void *)(uintptr_t)ADDR_MSG_GAME_READY, 0, 1);
+    SendGameMsg((void *)(uintptr_t)ADDR_MSG_GAME_READY, 0, 1);
 
     CommEndSetup();
 }
@@ -1956,8 +1961,8 @@ void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
     if (!q)
         return;
 
-    *(int32_t *)(q + FLOWQ_OFF_A) = *(const int32_t *)(m + 0x0C);
-    *(int32_t *)(q + FLOWQ_OFF_B) = *(const int32_t *)(m + 0x10);
+    *(int32_t *)(q + FLOW_OFF_LAG_MS) = *(const int32_t *)(m + 0x0C);
+    *(int32_t *)(q + FLOW_OFF_LAG_SPREAD) = *(const int32_t *)(m + 0x10);
 }
 
 void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
@@ -2575,7 +2580,7 @@ void __cdecl SendChatTo(char *text, int32_t slot)
 
     rec[MSG_CHAT_OFF_INK] = ink;
 
-    orig_send_game_msg(rec, CommPlayerId(kCommObj, slot), 0);
+    SendGameMsg(rec, CommPlayerId(kCommObj, slot), 0);
 }
 
 

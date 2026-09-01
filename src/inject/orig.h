@@ -2311,10 +2311,16 @@
  * than kept beside it. And 0x004F8780 is the DELAYED SEND QUEUE: MsgListInsert
  * puts a node into it in ascending MSGNODE_OFF_KEY order and FlushDelayedSends
  * drains it while GetTickCount has reached that key, so for this list the key
- * is a millisecond deadline. B and C stay letters until something reads
- * them. */
+ * is a millisecond deadline.
+ *
+ * THREE OF THE FOUR NOW. 0x0048D8D8 is the SEND QUEUE, and the program says
+ * so in its own words: DestroyFlow logs "sendqueue Size = %d" of it and
+ * "Adding to freelist from sendque Buffer seq %d". What settles the letter is
+ * having both ends -- SendGameMsg puts a kind-0x0B packet in, keyed on its
+ * sequence and flagged with the recipient's bit, and ProcessResendQueue takes
+ * it out again for whoever has not acknowledged. B stays a letter. */
 #define ADDR_MSG_LIST_B          0x004F48C8u
-#define ADDR_MSG_LIST_C          0x0048D8D8u
+#define ADDR_MSG_LIST_SENDQ      0x0048D8D8u
 /* The one packet ProcessResendQueue stages a resend in: MsgListTakeFlags
  * copies a message body here, the checksum is recomputed over it in place,
  * and CommSend is handed this address. A single shared buffer, so nothing
@@ -6489,16 +6495,23 @@ typedef struct {
  * it stamps the same value into the packet before the send loop, so every
  * player in one flush is told the same number. FLOW_OFF_READY gates the flush
  * entirely: no flow queue for ourselves yet and nothing goes out. */
-/* ProcessResendQueue is the only reader of these two: it refuses to resend a
- * packet whose PACKET_OFF_SEQ is below +0x0C, and stamps PACKET_OFF_ACK from
- * +0x04. Field-numbered, since one reader is not a meaning -- read a writer
- * before relying on either. */
+/* +0x0C IS THE SEQUENCE HE HAS, and the writer is what settled it. It was
+ * FLOW_OFF_FIELD_0C on the strength of ProcessResendQueue alone, which merely
+ * refuses to resend a packet older than it -- one reader is not a meaning, as
+ * the comment here used to say. SendGameMsg sets it, once, on the first packet
+ * ever sent to a player: `if (heHas == 0 && seq > 1) heHas = seq - 1`, and
+ * logs "SendGameMsg, first message to %x, hehas set to %d". DestroyFlow agrees
+ * from a third direction, simulating acks for seq from heHas+1 upwards. The
+ * spelling is the program's, run together exactly as it writes it.
+ *
+ * +0x04 keeps its number: ProcessResendQueue and SendGameMsg both only COPY it
+ * into a packet, and nothing yet read here writes it. */
 /* DrainMsgList is handed `flow + 0x78`, and that function takes a message
  * list -- so this offset IS the flow's queue. Named from its one use, which
  * is enough here only because the callee's own type says what it is. */
 #define FLOW_OFF_QUEUE             0x78u
 #define FLOW_OFF_FIELD_04          0x04u
-#define FLOW_OFF_FIELD_0C          0x0Cu
+#define FLOW_OFF_HE_HAS            0x0Cu
 #define FLOW_OFF_READY             0x88u
 #define FLOW_OFF_SEQUENCE          0x94u
 /* The trooper fields this touches. Only the two positions and the facing are
@@ -9339,7 +9352,81 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * reconstructed below and reach it through here. Among its other messages is
  * "Error Send can't find Flow for Player %x", which is the same player/FlowQ
  * synonym ADDR_FIND_PLAYER_BY_ID records. */
-#define ADDR_SEND_GAME_MSG       0x004022D0u  /* int32_t(void *msg, int32, int32) */
+#define ADDR_SEND_GAME_MSG       0x004022D0u  /* int32_t(void *msg, int32 to,
+                                               * int32 flags); reconstructed */
+/* Its three arguments, settled by its callers rather than by its body.
+ * `to` is a DirectPlay id -- ArmyMessageFlush passes one player slot's id and
+ * SendGamePause passes 0, which is DPID_ALLPLAYERS, and the function's second
+ * refusal is `to == -1`. `flags` is the DirectPlay send flags word:
+ * ArmyMessageFlush hands it COMM_OFF_SEND_FLAGS, SendGamePause hands it 1,
+ * and bit 0 is DPSEND_GUARANTEED -- which is exactly the bit that exempts a
+ * packet from the loss emulation below. Three independent facts, one reading.
+ *
+ * WHAT IT REFUSES, in order: not joined, `to == -1`, and COMM_OFF_SAW_KIND_31.
+ * That third one is the reader NoteKind31 never had: a kind-0x31 message
+ * arriving latches the flag, and from then on every send answers
+ * DPERR_SESSIONLOST. So 0x3E0 is "the session is over", and the writer alone
+ * could not have said so.
+ *
+ * KIND 0x0B IS THE RELIABLE ONE. A packet whose COMMMSG_OFF_KIND is 0x0B is
+ * copied into the SEND QUEUE keyed on its PACKET_OFF_SEQ, with GetPlayerMask's
+ * bit for the recipient in MSGNODE_OFF_FLAGS -- and if that sequence is
+ * already queued only the bit is added, so one buffer serves every recipient
+ * of one flush. ProcessResendQueue is the other end. Everything else goes
+ * straight out. The store at 0x0040FE50 is what gives the outgoing army
+ * packet that kind, and ADDR_RESEND_BUF gets it too, which is what makes the
+ * pair a conversation. */
+#define AM2_COMMMSG_KIND_FLOW    0x0Bu
+
+/* The per-player flow fields the send path writes. All four are named from
+ * this function, which is their only writer. */
+#define FLOW_OFF_ACK_SENT        0x10u  /* the FLOW_OFF_FIELD_04 we last told him */
+#define FLOW_OFF_SENT_AT         0x1Cu  /* GetTickCount at the last send */
+#define FLOW_OFF_SENT_PACKETS    0x28u  /* incremented per send */
+#define FLOW_OFF_SENT_BYTES      0x2Cu  /* PACKET_OFF_LEN accumulated */
+/* THE LATENCY EMULATION, and its two halves have opposite standing.
+ *
+ * The LOSS pair is DEAD CODE in this image. A decoded scan of every store in
+ * the file finds not one write to either offset on a player record -- the
+ * twelve hits at +0xA4/+0xA8 are all other structures or `esp` -- so both read
+ * zero forever and neither drop arm can be taken. Recorded as a fact about
+ * the build rather than left as a puzzle: the code is reproduced because it is
+ * there, not because it can run.
+ *
+ * The LAG pair is live and HOST-DRIVEN: RecvFlowControl copies two fields of
+ * an arriving message into them, on clients only, alongside the send flags.
+ * They were FLOWQ_OFF_A and FLOWQ_OFF_B -- letters, because their one
+ * writer could only say "two more fields". Here they are
+ * RandomAround's centre and its spread,
+ * added to GetTickCount to give a due time on ADDR_MSG_LIST_DELAYED, and the
+ * failure beside them says "Latency Emulation is Out of Send Buffers". The
+ * reader is what names them; the writer never could. */
+#define FLOW_OFF_LOSS_BURST      0xA4u  /* non-zero: drop by count, not by roll */
+#define FLOW_OFF_LOSS_PCT        0xA8u  /* percent of packets to drop */
+#define FLOW_OFF_LAG_MS          0xB0u  /* RandomAround's centre; 0 disables */
+#define FLOW_OFF_LAG_SPREAD      0xB4u  /* RandomAround's spread */
+/* GameRand() % 100, stored on every send and READ BY NOTHING -- this store is
+ * its only reference in the image, by a decoded scan and by a raw dword scan
+ * both. The same standing as ADDR_UNREAD_50C34C, and the reason the random
+ * loss arm would still be observable if anything ever wrote FLOW_OFF_LOSS_PCT:
+ * the roll is taken whether or not it is used. */
+#define ADDR_SEND_ROLL           0x004F8BA8u  /* int32_t, write-only */
+#define AM2_SEND_ROLL_MOD        100
+/* Two more fields of a pooled packet record, both written only on the delayed
+ * path. The stamp is a GetTickCount taken as the node is filled; the sender is
+ * our own player id, the counterpart of MSGNODE_OFF_TO. */
+#define MSGNODE_OFF_STAMP        0x1Cu
+#define MSGNODE_OFF_FROM         0x08u
+/* The three results it returns that ProcessResendQueue's ladder does not
+ * carry. E_FAIL and E_OUTOFMEMORY are the SDK's names for the first two; they
+ * are written out here for the same reason the five beside them are. */
+#define AM2_E_FAIL               0x80004005u
+#define AM2_E_OUTOFMEMORY        0x8007000Eu
+#define AM2_DPERR_SESSIONLOST    0x887700AAu
+/* Bit 0 of the flags word. The one bit SendGameMsg tests, and it exempts a
+ * packet from the loss emulation -- which is exactly what a guaranteed send
+ * should mean. */
+#define AM2_DPSEND_GUARANTEED    0x1
 
 /* Two static message records in .bss -- zero at load, filled in at 0x0040FE04
  * and 0x0040FE14 -- each with the value the sender writes at +8. */
@@ -9858,8 +9945,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * two more fields into our own flow record. Client only. */
 #define ADDR_RECV_FLOW_CONTROL   0x00411BD0u /* void(msg *, int32_t dpid) */
 #define COMM_OFF_SEND_FLAGS      0x414u
-#define FLOWQ_OFF_A              0xB0u
-#define FLOWQ_OFF_B              0xB4u
 /* 0x00411C20, "TIMING OUT PLAYER %d %s" -- a different function, still
  * original, and one of the AM2_WM_PLAYER_GONE senders. */
 #define ADDR_CHECK_PLAYER_TIMEOUT 0x00411C20u

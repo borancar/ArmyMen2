@@ -18,6 +18,13 @@
  * never consults. That fits a debug build's message tracking left compiled in,
  * which is the same shape as ADDR_LOG being a bare `ret` here.
  *
+ * THE FIRST ARGUMENT IS A PLAYER RECORD, NOT THE COMM OBJECT, and it was
+ * spelled `comm` here for as long as nothing had read a caller. SendGameMsg
+ * hands MsgSlotA1 the result of FindPlayerById, and ProcessResendQueue does
+ * the same for MsgSlotA2 -- and the two offsets are PLAYER_REC_OFF_RING_A and
+ * _RING_B, which orig.h had already filed on that record. Three things
+ * agreeing, and the parameter name disagreeing with all of them.
+ *
  * Their callers are PacketThreadProc and its neighbours, so "message" rather
  * than anything more specific is as far as the evidence goes.
  */
@@ -34,12 +41,12 @@ extern "C" {
 #define AM2_MSGSLOT_A_OFF  0x420u
 #define AM2_MSGSLOT_B_OFF  0x600u
 
-void __cdecl MsgSlotA0(void *comm, uint32_t seq);
-void __cdecl MsgSlotA1(void *comm, uint32_t seq);
-void __cdecl MsgSlotA2(void *comm, uint32_t seq);
-void __cdecl MsgSlotB0(void *comm, uint32_t seq);
-void __cdecl MsgSlotB1(void *comm, uint32_t seq);
-void __cdecl MsgSlotB2(void *comm, uint32_t seq);
+void __cdecl MsgSlotA0(void *rec, uint32_t seq);
+void __cdecl MsgSlotA1(void *rec, uint32_t seq);
+void __cdecl MsgSlotA2(void *rec, uint32_t seq);
+void __cdecl MsgSlotB0(void *rec, uint32_t seq);
+void __cdecl MsgSlotB1(void *rec, uint32_t seq);
+void __cdecl MsgSlotB2(void *rec, uint32_t seq);
 
 /* 0x00401040. The dword at +0xC of a comm message. Callers are CommReceive,
  * PacketThreadProc and RemovePlayer, so it is the message rather than the comm

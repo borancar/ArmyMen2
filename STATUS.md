@@ -5,11 +5,45 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `ba116b4`. Working tree clean.
+Last updated: **2026-09-01**, at `8ece1a2`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,377 patches.**
+Nothing uncommitted. **1,378 patches.**
+
+**`SendGameMsg` (`0x004022D0`, 928 B, fourteen callers) is reconstructed** --
+the comm layer's outgoing hub, and the last of the four `orig_send_game_msg`
+seams in the tree. Every packet the game sends goes through it: reliable ones
+are staged in the send queue on the way past, the latency emulator gets its
+chance to drop or delay them, and the rest go to `CommSend`.
+
+**It settled four names that had been letters or numbers**, and every one of
+them by being the missing half of a writer/reader pair:
+
+| was | is | what said so |
+|---|---|---|
+| `ADDR_MSG_LIST_C` | `ADDR_MSG_LIST_SENDQ` | it is the writer; `ProcessResendQueue` is the reader, and `DestroyFlow` logs "sendqueue Size = %d" |
+| `FLOW_OFF_FIELD_0C` | `FLOW_OFF_HE_HAS` | this function writes it, once, and logs "hehas set to %d" |
+| `FLOWQ_OFF_A`/`_B` | `FLOW_OFF_LAG_MS`/`_SPREAD` | `RecvFlowControl` could only say "two more fields"; here they are `RandomAround`'s two arguments |
+| `COMM_OFF_SAW_KIND_31` | (kept) | `NoteKind31` sets it; this refuses every send once it is set, so it means "the session is over" |
+
+**The loss emulation cannot run in this build, and that is measured.** Nothing
+anywhere in the image stores to a player record's `+0xA4` or `+0xA8` -- a
+decoded scan of every store in `.text` finds twelve hits at those offsets and
+all twelve are other structures or `esp`. So both drop arms read zero and fall
+through. The LAG half is live: the host pushes it through `RecvFlowControl`.
+
+**Its five `esp` displacements are at four different depths**, which is the
+same hazard that deferred `CreateTrooper` and `LoadType2`. Two reads that look
+like a fourth and fifth argument are the SECOND argument restored into a
+register the node pointer had borrowed, and the cleanup at `0x0040233C` is
+`add esp, 0x14` for FIVE pushes -- one from `GetPlayerMask`, four from
+`MsgListSetFlag`, merged by the compiler. Twenty is 0x14 and not 20.
+
+**Cold past the first refusal.** `bootcamp`, `multi` and `quit` compare the
+"not joined" arm and nothing else; everything below it needs a live DirectPlay
+session this environment cannot open. Said plainly rather than left to a clean
+A/B to imply.
 
 **`CreateVehicle` (`0x0045B090`) is READ AND NOT WRITTEN**, and the draft was
 backed out rather than committed. That is the same call `orig.h` recorded for

@@ -253,6 +253,14 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
 
 int32_t __cdecl CommRegisterSelf(uint32_t id);
 
+/* 0x004022D0, fourteen callers -- every outgoing packet in the game. Stage the
+ * reliable ones in the send queue, let the latency emulator drop or delay
+ * them, hand the rest to CommSend. `to` is a DirectPlay id (0 broadcasts, -1
+ * is refused) and `flags` is the DirectPlay send flags word. Answers an
+ * HRESULT: 0, or E_FAIL / DPERR_SESSIONLOST / E_OUTOFMEMORY / DPERR_SENDTOOBIG
+ * / whatever CommSend said. Cold past the first refusal. */
+int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
+
 }
 #endif
 

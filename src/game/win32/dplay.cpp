@@ -131,7 +131,7 @@ void __cdecl CommShutdown(void)
 
     EventClose((void *)(uintptr_t)ADDR_MSG_LIST_POOL);
     EventClose((void *)(uintptr_t)ADDR_MSG_LIST_B);
-    EventClose((void *)(uintptr_t)ADDR_MSG_LIST_C);
+    EventClose((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ);
     EventClose((void *)(uintptr_t)ADDR_MSG_LIST_DELAYED);
 
     orig_log("Setting Event 0 \n");
@@ -1591,7 +1591,7 @@ int32_t __cdecl StartPacketThread(void)
 
     if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_POOL)) return 0;
     if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_B))    return 0;
-    if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_C))    return 0;
+    if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ))    return 0;
     if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_DELAYED))    return 0;
 
 /* Defined below, beside MsgListInit. */
@@ -2502,12 +2502,6 @@ int32_t __cdecl CommGlobalInit(void)
     return CommGlobalAtExit();
 }
 
-/* ADDR_SEND_GAME_MSG stays original; commmsg.cpp reaches it the same way and
- * spells the typedef the same, so the two cannot drift. */
-typedef int32_t (__cdecl *am2_send_game_msg_fn)(void *msg, int32_t a,
-                                                int32_t b);
-#define orig_send_game_msg (*(am2_send_game_msg_fn)ADDR_SEND_GAME_MSG)
-
 /* SendPlayerMsg -- original 0x00411270, 624 bytes, fifteen callers. The HOST's
  * game-setup broadcast: pack what every client needs to agree with us about --
  * the map checksum, the game version, the tileset and script names, and a
@@ -2645,7 +2639,7 @@ void __cdecl SendPlayerMsg(int32_t arg)
                      *(const int32_t *)(rec + MSGREC_OFF_FIELD_04));
     }
 
-    orig_send_game_msg(msg, 0, 1);
+    SendGameMsg(msg, 0, 1);
 }
 
 /* DestroyFlow -- original 0x004029B0, 544 bytes, seven callers. Tear down one
@@ -2657,7 +2651,7 @@ void __cdecl SendPlayerMsg(int32_t arg)
  * name off a call site. Fifth function this batch named from its own strings.
  *
  * IT NEEDED NO NEW NAMES AT ALL, which is worth recording as a measure of how
- * far the comm vocabulary has come: FLOW_OFF_SEQUENCE, ADDR_MSG_LIST_C,
+ * far the comm vocabulary has come: FLOW_OFF_SEQUENCE, ADDR_MSG_LIST_SENDQ,
  * ADDR_MSG_LIST_POOL, ADDR_PLAYER_SLOT_MASK, ADDR_PLAYER_RECORDS,
  * AM2_PLAYER_RECORD_BYTES, MsgListSetFlag, MsgListRemove, MsgListAdd and
  * FindPlayerById were all already there. Early units in this batch cost eight
@@ -2715,7 +2709,7 @@ int32_t __cdecl DestroyFlow(uint32_t id)
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
         orig_log("About to Destroy FlowQ for id %x sendqueue Size = %d \n",
-                 id, MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_C));
+                 id, MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ));
 
     if (!flow)
         return 0;
@@ -2735,13 +2729,13 @@ int32_t __cdecl DestroyFlow(uint32_t id)
 
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log(" Simulating Acks for  seq %d thru %d\n",
-                     *(const int32_t *)(flow + FLOW_OFF_FIELD_0C) + 1,
+                     *(const int32_t *)(flow + FLOW_OFF_HE_HAS) + 1,
                      *(const int32_t *)(mine + FLOW_OFF_SEQUENCE) - 1);
 
-        for (seq = *(const int32_t *)(flow + FLOW_OFF_FIELD_0C) + 1;
+        for (seq = *(const int32_t *)(flow + FLOW_OFF_HE_HAS) + 1;
              seq <= *(const int32_t *)(mine + FLOW_OFF_SEQUENCE) - 1; seq++) {
             uint8_t *node = (uint8_t *)MsgListSetFlag(
-                (void *)(uintptr_t)ADDR_MSG_LIST_C, seq, 0, mask);
+                (void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, seq, 0, mask);
 
             if (!node)
                 continue;
@@ -2754,14 +2748,14 @@ int32_t __cdecl DestroyFlow(uint32_t id)
                          " elelment %x \n",
                          *(const int32_t *)(node + MSGNODE_OFF_KEY), node);
 
-            MsgListRemove((void *)(uintptr_t)ADDR_MSG_LIST_C, node);
+            MsgListRemove((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, node);
             MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, node);
         }
     }
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
         orig_log("Finished Destroying FlowQ for id %x sendqueue Size = %d \n",
-                 id, MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_C));
+                 id, MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ));
 
     {
         int32_t nfree = MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL);
@@ -3030,7 +3024,7 @@ void __cdecl ProcessResendQueue(void)
     int32_t   taken;
     int32_t   drained = 0;
 
-    taken = MsgListTakeFlags((void *)(uintptr_t)ADDR_MSG_LIST_C, buf);
+    taken = MsgListTakeFlags((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, buf);
     if (!taken)
         return;
 
@@ -3058,7 +3052,7 @@ void __cdecl ProcessResendQueue(void)
             if (!(taken & (int32_t)GetReSendMask(id)))
                 continue;
             if (*(const uint32_t *)(buf + PACKET_OFF_SEQ)
-                < *(const uint32_t *)(flow + FLOW_OFF_FIELD_0C))
+                < *(const uint32_t *)(flow + FLOW_OFF_HE_HAS))
                 continue;
 
             *(uint32_t *)(buf + PACKET_OFF_ACK) =
@@ -3097,13 +3091,248 @@ void __cdecl ProcessResendQueue(void)
         if (++drained > 2)
             break;
 
-        taken = MsgListTakeFlags((void *)(uintptr_t)ADDR_MSG_LIST_C, buf);
+        taken = MsgListTakeFlags((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, buf);
         if (!taken)
             break;
     }
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE) && drained)
         orig_log("Exiting ProcessResendQueue \n");
+}
+
+/* SendGameMsg -- original 0x004022D0, 928 bytes, fourteen callers. Every
+ * outgoing packet in the game goes through here: the reliable ones are copied
+ * into the send queue on the way past, the latency emulator gets its chance to
+ * drop or delay them, and what is left is handed to CommSend.
+ *
+ * IT NAMES ITSELF -- "SendGameMsg, first message to %x, hehas set to %d" --
+ * and that one line settles two things this port had only field numbers for.
+ * FLOW_OFF_HE_HAS is the sequence a player is known to hold, written once on
+ * the first packet ever sent to him; and the "Flow" of "Error Send can't find
+ * Flow for Player %x" is the same record CommSend calls a PLAYER, which is the
+ * synonym orig.h already records.
+ *
+ * THE FIVE ESP DISPLACEMENTS ARE NOT AT ONE DEPTH, which is the whole
+ * difficulty of reading it and the same hazard that deferred CreateTrooper and
+ * LoadType2. The four register pushes put the arguments at [esp+0x14],
+ * [esp+0x18] and [esp+0x1C]; then `mov ebp, [esp+0x20]` at 0x004023B4 reads
+ * the SECOND argument, because two words are still on the stack from a
+ * MsgListAdd whose cleanup the compiler deferred, and `mov ebp, [esp+0x1C]` at
+ * 0x0040253A reads it again with one word pushed. Both are the same restore of
+ * `to` into a register the node pointer had borrowed. Taken at face value they
+ * would be two more arguments and a third would move.
+ *
+ * The cleanup at 0x0040233C is `add esp, 0x14` for FIVE pushes -- GetPlayerMask's
+ * one argument and MsgListSetFlag's four, merged. Twenty is 0x14 and not 20.
+ *
+ * ONE BUFFER PER SEQUENCE, NOT PER RECIPIENT. MsgListSetFlag is called with
+ * `set` before the pool is touched, so a sequence already queued simply gains
+ * the new recipient's bit and no second copy is made. ArmyMessageFlush sends
+ * the same packet to every player in turn, so this is the common case and not
+ * an edge.
+ *
+ * TWO PATHS LEAK A POOL BUFFER on "Message Too Big", and it is reproduced. The
+ * node has been taken off the free list and filled in by the time the length
+ * is checked, and neither arm puts it back. The original's, on a path that
+ * needs a message longer than the 0x400-byte buffer to reach.
+ *
+ * THE LOSS EMULATION CANNOT RUN IN THIS BUILD: nothing anywhere in the image
+ * writes FLOW_OFF_LOSS_BURST or FLOW_OFF_LOSS_PCT, so both arms read zero and
+ * fall through. See orig.h. The LAG half is live -- the host sets it through
+ * RecvFlowControl -- and a delayed packet is copied into ADDR_MSG_LIST_DELAYED
+ * keyed on its due time, which is what FlushDelayedSends drains.
+ *
+ * COLD, AND SAID PLAINLY. Everything past the first `if` needs a live
+ * DirectPlay session, which this environment cannot open; what an A/B here
+ * compares is the refusal. Verified by reading, like its siblings.
+ */
+int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
+{
+    uint8_t *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    uint8_t *pkt  = (uint8_t *)msg;
+    uint8_t *flow = 0;      /* the DESTINATION's record; only looked up for 0x0B */
+    uint8_t *mine;
+    uint8_t *node;
+    int32_t  roll;
+    int32_t  hr;
+
+    if (*(const int32_t *)(comm + COMM_OFF_JOINED) == 0)
+        return (int32_t)AM2_E_FAIL;
+
+    if (to == -1)
+        return (int32_t)AM2_E_FAIL;
+
+    if (*(const int32_t *)(comm + COMM_OFF_SAW_KIND_31) != 0)
+        return (int32_t)AM2_DPERR_SESSIONLOST;
+
+    if (*(const uint32_t *)(pkt + COMMMSG_OFF_KIND) == AM2_COMMMSG_KIND_FLOW) {
+        uint32_t mask = GetPlayerMask((uint32_t)to);
+
+        if (!MsgListSetFlag((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ,
+                            *(const int32_t *)(pkt + PACKET_OFF_SEQ),
+                            1, (int32_t)mask)) {
+            node = (uint8_t *)MsgListRemHead(
+                       (void *)(uintptr_t)ADDR_MSG_LIST_POOL);
+            if (!node) {
+                orig_log("Out of Send Buffers \n");
+                CommNoBuffers();
+                return (int32_t)AM2_E_OUTOFMEMORY;
+            }
+
+            *(uint32_t *)(node + MSGNODE_OFF_FLAGS) = mask;
+            *(uint32_t *)(node + MSGNODE_OFF_KEY) =
+                *(const uint32_t *)(pkt + PACKET_OFF_SEQ);
+            *(uint32_t *)(node + MSGNODE_OFF_STAMP) = GetTickCount();
+
+            if (*(const uint32_t *)(pkt + PACKET_OFF_LEN)
+                > *(const uint32_t *)(node + PACKET_REC_OFF_SIZE)) {
+                orig_log("Message Too Big \n");
+                return (int32_t)AM2_DPERR_SENDTOOBIG;
+            }
+
+            memcpy(*(void *const *)(node + MSGNODE_OFF_BODY), pkt,
+                   *(const uint32_t *)(pkt + PACKET_OFF_LEN));
+            *(uint32_t *)(node + MSGNODE_OFF_BODY_LEN) =
+                *(const uint32_t *)(pkt + PACKET_OFF_LEN);
+
+            MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, node);
+        }
+
+        flow = (uint8_t *)FindPlayerById((uint32_t)to);
+        if (!flow) {
+            orig_log("Error Send can't find Flow for Player %x\n", to);
+        } else {
+            /* The checksum covers the ack, so the order is load-bearing: stamp
+             * it, clear the checksum field, then compute over the whole
+             * buffer. The same three lines as ProcessResendQueue. */
+            *(uint32_t *)(pkt + PACKET_OFF_ACK) =
+                *(const uint32_t *)(flow + FLOW_OFF_FIELD_04);
+            *(uint32_t *)(pkt + PACKET_OFF_CHECKSUM) = 0;
+            *(uint32_t *)(pkt + PACKET_OFF_CHECKSUM) = XorChecksum(pkt);
+
+            *(uint32_t *)(flow + FLOW_OFF_ACK_SENT) =
+                *(const uint32_t *)(pkt + PACKET_OFF_ACK);
+            *(uint32_t *)(flow + FLOW_OFF_SENT_AT) = GetTickCount();
+            *(int32_t *)(flow + FLOW_OFF_SENT_PACKETS) += 1;
+            *(int32_t *)(flow + FLOW_OFF_SENT_BYTES) +=
+                *(const int32_t *)(pkt + PACKET_OFF_LEN);
+
+            if (*(const int32_t *)(flow + FLOW_OFF_HE_HAS) == 0
+                && *(const uint32_t *)(pkt + PACKET_OFF_SEQ) > 1u) {
+                int32_t hehas = *(const int32_t *)(pkt + PACKET_OFF_SEQ) - 1;
+
+                *(int32_t *)(flow + FLOW_OFF_HE_HAS) = hehas;
+                if (*(const int32_t *)(
+                        *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT
+                        + COMM_OFF_VERBOSE))
+                    orig_log("SendGameMsg, first message to %x, hehas set "
+                             "to %d\n", to, hehas);
+            }
+
+            /* Not for a broadcast: `to` of 0 is DPID_ALLPLAYERS and there is
+             * no one record to mark. */
+            if (to)
+                MsgSlotA1(flow, *(const uint32_t *)(pkt + PACKET_OFF_SEQ));
+        }
+    }
+
+    comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    mine = (uint8_t *)FindPlayerById(
+               *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID));
+    if (!mine)
+        orig_log("Error Send can't find My Flow for Player %x\n",
+                 *(const int32_t *)(
+                     *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT
+                     + COMM_OFF_OUR_PLAYER_ID));
+
+    /* Rolled whether or not anything wants it, and stored where nothing reads
+     * it. Kept because GameRand advances a shared sequence. */
+    roll = orig_rand() % AM2_SEND_ROLL_MOD;
+    *(int32_t *)(uintptr_t)ADDR_SEND_ROLL = roll;
+
+    if (mine) {
+        int32_t pct = *(const int32_t *)(mine + FLOW_OFF_LOSS_PCT);
+
+        if (*(const int32_t *)(mine + FLOW_OFF_LOSS_BURST) != 0) {
+            /* Drop the LAST `pct` of every hundred packets to this player --
+             * a burst rather than a scatter, and it needs a destination
+             * record, so a broadcast is never dropped this way. */
+            if (pct != 0 && flow != 0
+                && (int32_t)(*(const uint32_t *)(flow + FLOW_OFF_SENT_PACKETS)
+                             % (uint32_t)AM2_SEND_ROLL_MOD)
+                   > AM2_SEND_ROLL_MOD - pct
+                && !(flags & AM2_DPSEND_GUARANTEED))
+                return 0;
+        } else {
+            if (pct != 0 && roll <= pct
+                && !(flags & AM2_DPSEND_GUARANTEED))
+                return 0;
+        }
+
+        if (*(const int32_t *)(mine + FLOW_OFF_LAG_MS) != 0) {
+            int32_t due = RandomAround(
+                              *(const int32_t *)(mine + FLOW_OFF_LAG_MS),
+                              *(const int32_t *)(mine + FLOW_OFF_LAG_SPREAD))
+                          + (int32_t)GetTickCount();
+
+            node = (uint8_t *)MsgListRemHead(
+                       (void *)(uintptr_t)ADDR_MSG_LIST_POOL);
+            if (!node) {
+                orig_log("Latency Emulation is Out of Send Buffers \n");
+                /* and fall through to the plain send */
+            } else {
+                *(int32_t *)(node + MSGNODE_OFF_KEY)    = due;
+                *(int32_t *)(node + MSGNODE_OFF_FLAGS)  = flags;
+                *(uint32_t *)(node + MSGNODE_OFF_STAMP) = GetTickCount();
+                *(int32_t *)(node + MSGNODE_OFF_TO)     = to;
+                *(uint32_t *)(node + MSGNODE_OFF_FROM) =
+                    *(const uint32_t *)(
+                        *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT
+                        + COMM_OFF_OUR_PLAYER_ID);
+
+                if (*(const uint32_t *)(pkt + PACKET_OFF_LEN)
+                    > *(const uint32_t *)(node + PACKET_REC_OFF_SIZE)) {
+                    orig_log("Message Too Big \n");
+                    return (int32_t)AM2_DPERR_SENDTOOBIG;
+                }
+
+                memcpy(*(void *const *)(node + MSGNODE_OFF_BODY), pkt,
+                       *(const uint32_t *)(pkt + PACKET_OFF_LEN));
+                *(uint32_t *)(node + MSGNODE_OFF_BODY_LEN) =
+                    *(const uint32_t *)(pkt + PACKET_OFF_LEN);
+
+                MsgListInsert((void *)(uintptr_t)ADDR_MSG_LIST_DELAYED, node);
+                return 0;
+            }
+        }
+    }
+
+    hr = CommSend(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT, (uint32_t)to,
+                  (uint32_t)flags, pkt,
+                  *(const uint32_t *)(pkt + PACKET_OFF_LEN));
+    if (hr >= 0)
+        return hr;
+
+    orig_log("DPlaySend Failure %x to %x size %d\n", hr, to,
+             *(const int32_t *)(pkt + PACKET_OFF_LEN));
+
+    if ((uint32_t)hr == AM2_DPERR_BUSY)
+        orig_log("DPLAY ERROR: Busy\n");
+    else if ((uint32_t)hr == AM2_DPERR_INVALIDOBJECT)
+        orig_log("DPLAY ERROR: Invalid Object\n");
+    else if ((uint32_t)hr == AM2_E_INVALIDARG)
+        orig_log("DPLAY ERROR: INVALID PARAMETERS\n");
+    else if ((uint32_t)hr == AM2_DPERR_INVALIDPLAYER)
+        orig_log("DPLAY ERROR: INVALID PLAYER\n");
+    else if ((uint32_t)hr == AM2_DPERR_SENDTOOBIG)
+        orig_log("DPLAY ERROR: Send too big\n");
+
+    orig_log("gpComm->Send Failure2 %x to %x size %d\n", hr, to,
+             *(const int32_t *)(pkt + PACKET_OFF_LEN));
+
+    *(int32_t *)(uintptr_t)ADDR_EXIT_GAME_FLAG = 1;
+    ExitGamePostClose();
+    return hr;
 }
 
 int dplay_install(void)
@@ -3138,6 +3367,8 @@ int dplay_install(void)
     rc |= patch_replace(ADDR_PROCESS_RESEND_QUEUE,
                         (const void *)ProcessResendQueue,
                         "ProcessResendQueue", 1);
+    rc |= patch_replace(ADDR_SEND_GAME_MSG, (const void *)SendGameMsg,
+                        "SendGameMsg", 14);
     rc |= patch_replace(ADDR_DESTROY_FLOW, (const void *)DestroyFlow,
                         "DestroyFlow", 7);
     rc |= patch_replace(ADDR_SEND_PLAYER_MSG, (const void *)SendPlayerMsg,

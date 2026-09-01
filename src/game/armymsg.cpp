@@ -28,11 +28,12 @@ typedef uint32_t (__stdcall *AM2_TickFn)(void);
 
 #define kCommField(off) (*(const int32_t *)(kComm + (off)))
 
-/* SendGameMsg stays original -- 928 bytes and fourteen callers, the hub this
- * whole family funnels through. */
-typedef int32_t (__cdecl *AM2_SendGameMsgFn)(void *msg, int32_t a, int32_t b);
-#define orig_send_game_msg \
-    (*(AM2_SendGameMsgFn)AM2_IMAGE(ADDR_SEND_GAME_MSG))
+/* SendGameMsg is reconstructed and lives in win32/dplay.cpp, which this flat
+ * module may not include -- dplay.h names DirectPlay types and
+ * tools/checksplit.py refuses a flat module that reaches a Win32 header even
+ * transitively. Its own signature names nothing platform, so a declaration
+ * here is enough; `extern "C"` because that is how dplay.h declares it. */
+extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
 
 
 /* 0x00410420, and it names itself twice -- "ArmyMessageFlush: can't send since
@@ -116,7 +117,7 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
             continue;
         }
 
-        orig_send_game_msg(kPacket, id, kCommField(COMM_OFF_SEND_FLAGS));
+        SendGameMsg(kPacket, id, kCommField(COMM_OFF_SEND_FLAGS));
 
         /* Re-read rather than reuse `seq`: nothing in the loop bumps it, so
          * this is the original's spelling and not a second value. */
@@ -222,7 +223,7 @@ void __cdecl SendGamePause(int32_t pause, int32_t flags)
     *(int32_t *)(msg + MSG_PAUSE_OFF_PAUSE) = pause;
     *(int32_t *)(msg + MSG_PAUSE_OFF_FLAGS) = flags;
 
-    orig_send_game_msg(msg, 0, 1);
+    SendGameMsg(msg, 0, 1);
 
     if (kCommField(COMM_OFF_EVENT_DEBUG))
         orig_log("SendGamePause from %x  Pause =%s  Flags=%x \n",

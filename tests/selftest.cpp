@@ -143,6 +143,17 @@ void __cdecl ShakeAt(const AM2_Point *, int32_t)
 {
 }
 
+/* msgslot.cpp's SendChatMsg and armymsg.cpp's ArmyMessageFlush call this now
+ * that its seam is closed, and it lives in win32/dplay.cpp -- which cannot
+ * join this link at all: it names DirectPlay. Tenth stub, and `extern "C"`
+ * because dplay.h declares it inside that block and both callers
+ * forward-declare it the same way. It has no vectors and could not: it reads
+ * the comm object, the player records and four .bss message lists. */
+extern "C" int32_t __cdecl SendGameMsg(void *, int32_t, int32_t)
+{
+    return 0;
+}
+
 int main(void)
 {
     int32_t pass = 0, fail = 0;
