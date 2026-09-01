@@ -5,33 +5,40 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `02e71c7`. Working tree clean.
+Last updated: **2026-09-01**, at `854b01e`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,384 patches**, **28** analysis tools in `make check`.
+Nothing uncommitted. **1,384 patches**, **29** analysis tools in `make check`.
 
-**`tests/fireposevec.h` closes the gap the `firepose.py` commit named.** That
-tool checks its own Python model against the original; this replays the same
-4,531 recorded cases against the C in `item.cpp`, which is the half a model
-cannot cover on its own -- both were written from one reading, and only the
-emulator's run is ground truth. `make selftest` now reports
-`4531 fire poses: 4531 pass, 0 fail`.
+**`tools/regioncheck.py` is the oracle `orig.h` asked for by name.** That file
+says of this neighbourhood that "region routing feeds the AI, which no drive
+reaches, so a wrong next-hop table would pass every configuration in
+`tools/ab.sh`", and that what it wants is an oracle. This is it: 36 cases, and
+every one compares the WHOLE 12x12 next and cost matrices, with untouched cells
+left at 0xAA and 0xBB so a stray write fails as loudly as a missing one.
 
-**The object is REBUILT from the six inputs rather than stored**, so the header
-cannot drift from what `SelectFirePose` is actually handed, and the replay needs
-no image at all: everything the function reads is in the buffers the test
-supplies.
+**`RegionFindPath` is HOOKED, which is the point rather than a shortcut.** It is
+1,168 bytes of A* over the region graph and still the original's; hooking it to
+hand back a chosen path means the SEARCH is not under test and no graph has to
+be seeded for it. What is under test is the two nested double loops that turn
+one path into next-hop entries for every prefix and suffix, in both directions,
+and the asymmetric no-path exit.
 
-**Five mutations to the C, all of which fail, and the counts are the evidence**:
-swapping one gun pose fails 30, dropping the flamethrower's movement gate 32,
-removing one entry from the nine-pose braced table 2, moving item kind 43 to the
-default arm 96, and making soldier kind 7 no longer count as braced 88. The
-restored build passes all 4,531. That is the check the Python model could not
-make -- mutating `item.cpp` does not touch `firepose.py`'s answer at all.
+**Five mutations, all of which fail, and one of them is the whole reason to have
+this.** Making the no-path exit SYMMETRIC -- writing `cost[to][from]` beside
+`cost[from][to]` -- fails 2 cases. That asymmetry is one line of C that looks
+exactly like a typo, `orig.h` documents it as deliberate, and until now nothing
+could tell the two apart. The other four: forward next-hop off by one fails 14,
+the reverse loop bound 14, the reverse next-hop off by one 14, and dropping the
+inactive-target refusal 16.
 
-`make fireposevec` re-records the header, beside `scriptvec`, `placevec` and
-`dirtyvec`.
+**It checks the MODEL, not the C, and that line is principled.**
+`tests/fireposevec.h` can replay against the C because `SelectFirePose` reaches
+nothing that is still the image's; this one cannot, because `RegionSolvePair`
+calls the original `RegionFindPath` and giving the C the same hook would put
+test scaffolding into production code. CLAUDE.md now says which kind a new
+oracle is and how to tell.
 
 
 ## Stop condition

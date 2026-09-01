@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **28** analysis
+**`make check` runs everything that does not need the game.** **29** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -559,6 +559,19 @@ and the mutation names the token. Caught only because the mutation was tried --
 which is the rule this file already states as "a test that cannot fail has not
 passed", one level further in: check that the mutation reached the CORPUS, not
 just that it reached the code.
+
+**WHEN CAN AN ORACLE'S CASES BE REPLAYED AGAINST THE C? Exactly when the
+function reaches nothing that is still the image's.** `SelectFirePose`'s two
+callees are both reconstructed and pure, so `tests/fireposevec.h` hands the
+recorded cases to the C and five mutations to `item.cpp` fail. `RegionSolvePair`
+calls the ORIGINAL `RegionFindPath` -- 1,168 bytes of A* -- so replaying it
+would mean putting a test hook into production code for a call the game never
+makes that way, and `tools/regioncheck.py` stays a model-versus-original check
+like the seven before it.
+
+That is a principled line and worth stating, because the two look the same from
+outside: both enumerate a space, both compare against Unicorn, and only one of
+them also proves the transcription. Say which kind a new oracle is.
 
 **A CORPUS DRIVEN FROM THE MODEL'S OWN TABLE CANNOT FAIL, AND IT HAPPENED
 AGAIN.** `tools/firepose.py` sweeps the nine poses `SelectFirePose` treats as
