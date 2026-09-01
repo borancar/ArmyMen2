@@ -9239,7 +9239,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * original, passed by address as that helper's callback. */
 #define ADDR_MEDKIT_HEAL_ONE     0x00458AB0u  /* void(void *obj) */
 
-#define ADDR_RECV_TROOP_19       0x0044C680u
+/* IT NAMES ITSELF -- "-->Trooper Want Item Received" -- so this is the
+ * kind-0x19 receiver for TrooperWantItemSend, and the two together are the
+ * whole pickup protocol. Reconstructed as RecvTrooperWantItem; see
+ * armymsg.cpp. Its five strings: */
+#define ADDR_RECV_TROOPER_WANT_ITEM 0x0044C680u  /* void(void *msg) */
+#define ADDR_STR_WANT_RECV_HDR     0x0048ACF8u
+/* ADDR_STR_RECV_DROP_GONE already names 0x0048ACC0 -- the two receivers
+ * share the one "but we handled it" line. Grepped the ADDRESS, and the
+ * ratchet caught it when I had only grepped the name. */
+#define ADDR_STR_TELL_PICKUP       0x0048AC9Cu
+#define ADDR_STR_TELL_DROP         0x0048AC78u
+#define ADDR_STR_REQ_PICKUP_OK     0x0048AC48u
+#define ADDR_STR_REQ_PICKUP_DENY   0x0048AC20u
+#define ADDR_STR_REQ_DROP          0x0048ABF8u
 /* Reconstructed. The receiver for the message TrooperDropItemSend sends, so
  * the sender, this and TrooperDropItem itself are one closed group now. Four
  * log lines, all gated on COMM_OFF_VERBOSE. */

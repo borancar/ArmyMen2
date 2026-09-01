@@ -1442,8 +1442,11 @@ void __cdecl RecvTrooperSetWeapon(void *msg)
 typedef void (__cdecl *AM2_TroopMsgFn)(void *msg);
 typedef void (__cdecl *AM2_TroopMsgArmyFn)(void *msg, int32_t army);
 
-#define orig_recv_troop_19 \
-    ((AM2_TroopMsgFn)(uintptr_t)ADDR_RECV_TROOP_19)
+/* RecvTrooperWantItem is reconstructed, in armymsg.cpp, and called by name.
+ * Declared here rather than by including that header, the same way
+ * SendPlayerMsg is above: commmsg.cpp is flat and this signature names no
+ * Win32 type. */
+void __cdecl RecvTrooperWantItem(void *msg);
 
 void __cdecl TroopMessageRecv(void *msg, int32_t army)
 {
@@ -1463,7 +1466,7 @@ void __cdecl TroopMessageRecv(void *msg, int32_t army)
         return;
 
     case 0x19:
-        orig_recv_troop_19(msg);
+        RecvTrooperWantItem(msg);
         return;
 
     case AM2_MSG_TROOPER_DROP_ITEM:

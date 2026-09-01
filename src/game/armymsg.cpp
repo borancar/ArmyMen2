@@ -1364,6 +1364,187 @@ void __cdecl SendVehicleExit(void *vehicle, void *occupant)
                  UidOnWire(msg.hdr.uid), UidOnWire(msg.occupant));
 }
 
+/* RecvTrooperWantItem -- original 0x0044C680, one caller, and it NAMES ITSELF:
+ * "-->Trooper Want Item Received". The kind-0x19 receiver for
+ * TrooperWantItemSend above, and between them they are the whole pickup
+ * protocol -- the sender's comment already sets out the four request values
+ * and says one of its own callers is this function, turning a WANT into a DO
+ * and sending it back. This is that call.
+ *
+ * THE FIRST TEST IS WHICH SIDE YOU ARE ON, and it is the protocol in two
+ * lines. A host drops a DO -- those are its own answers coming back -- and a
+ * client drops a WANT, because asking is not its job. Everything after runs
+ * only on the machine the message was meant for.
+ *
+ * THE SECOND IS WHOSE TROOPER IT IS: a DO is applied only where
+ * CommMustBroadcast accepts the trooper's army, and a WANT is not gated at
+ * all, because the host answers for everyone.
+ *
+ * THE ITEM MAY ALREADY BE GONE, and there is one arm for that. If the uid no
+ * longer resolves, the trooper's own slot is checked instead: a weapon there
+ * that is already OBJ_FLAG_OVERDUE, on a DO_DROP, means the drop happened
+ * before the message arrived -- so the slot is emptied and the log says "but
+ * we handled it". Any other combination is dropped silently.
+ *
+ * DO_PICKUP RE-ASKS. It does not trust the host's answer: CanPickUpWeapon
+ * runs again locally and the pickup only happens if it agrees. The item's
+ * OBJ_OFF_PICKUP_AFTER is set to the clock before the test and to the clock
+ * plus AM2_PICKUP_HOLD_MS after it, whichever way the test went -- so a
+ * refused pickup still holds the item off for two seconds.
+ *
+ * CanPickUpWeapon's THIRD argument is the ARGUMENT SLOT of this function,
+ * reused as an out parameter, and the slot it writes there is what both
+ * TrooperHostApprovedPickupItem and the broadcast are given. Its FOURTH is a
+ * local zeroed before the call and never read after.
+ *
+ * WANT_PICKUP IS THE HOST'S DECISION and the only arm that answers. The item
+ * must be AM2_ARMY_NEUTRAL and have ammo; the amount granted is the smaller of
+ * what was asked and what is there; and it is taken off the item only when the
+ * trooper's slot already holds something that is NOT a KindInSetB weapon --
+ * so topping up ammo deducts and swapping a weapon does not. Then
+ * TrooperWantItemSend goes back out as AM2_DO_PICKUP.
+ *
+ * ITS TWO WANT_PICKUP LOGS ARE THE ONLY UNGATED ONES. Every other message in
+ * this function is behind COMM_OFF_VERBOSE; "OKed" and "denied" are not, so
+ * the host's decision is always on the record.
+ *
+ * WANT_DROP DOES NOTHING BUT LOG, which is worth saying plainly: the arm
+ * exists, it is reached, and the drop itself must happen somewhere else.
+ */
+void __cdecl RecvTrooperWantItem(void *msg)
+{
+    const uint8_t *m = (const uint8_t *)msg;
+    int32_t        request = *(const int32_t *)(m + MSG_DROP_OFF_REQUEST);
+    int32_t        slot;                 /* the original's own argument slot */
+    int32_t        unused = 0;
+    uint8_t       *t;
+    uint8_t       *w;
+
+    if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_WANT_RECV_HDR),
+                 UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_TROOPER)),
+                 UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_ITEM)),
+                 request,
+                 *(const int32_t *)(m + MSG_DROP_OFF_SLOT),
+                 *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+
+    if (*(const int32_t *)(kComm + COMM_OFF_IS_HOST)) {
+        if (request == AM2_DO_PICKUP || request == AM2_DO_DROP)
+            return;
+    } else {
+        if (request == AM2_WANT_PICKUP || request == AM2_WANT_DROP)
+            return;
+    }
+
+    t = (uint8_t *)ObjByUidAlias(
+        UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_TROOPER)));
+    if (!t)
+        return;
+
+    if ((request == AM2_DO_PICKUP || request == AM2_DO_DROP)
+        && !CommMustBroadcast((void *)kComm,
+                              (int16_t)*(const int8_t *)(t + OBJ_OFF_ARMY)))
+        return;
+
+    w = (uint8_t *)LookupByUID(
+        UidOnWire(*(const uint32_t *)(m + MSG_DROP_OFF_ITEM)));
+
+    if (!w) {
+        /* The item is gone. One combination is still meaningful. */
+        uint8_t *held = (uint8_t *)WeaponByUid(
+            *(const uint32_t *)(t + OBJ_OFF_WEAPON_UID
+                                + (uint32_t)*(const int32_t *)
+                                      (m + MSG_DROP_OFF_SLOT) * 4));
+
+        if (!held)
+            return;
+        if (!(*(const uint32_t *)(held + OBJ_OFF_FLAGS) & OBJ_FLAG_OVERDUE))
+            return;
+        if (request != AM2_DO_DROP)
+            return;
+
+        RemoveInventoryItem(t,
+                            *(const int32_t *)(m + MSG_DROP_OFF_SLOT));
+
+        if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
+            orig_log((const char *)AM2_IMAGE(ADDR_STR_RECV_DROP_GONE));
+        return;
+    }
+
+    if (!ObjIsType4((const AM2_Object *)w))
+        return;
+
+    if (request == AM2_DO_PICKUP) {
+        if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
+            orig_log((const char *)AM2_IMAGE(ADDR_STR_TELL_PICKUP),
+                     *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+
+        *(uint32_t *)(w + OBJ_OFF_PICKUP_AFTER) =
+            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+        if (CanPickUpWeapon(w, t, &slot, &unused)) {
+            TrooperHostApprovedPickupItem(
+                t, w, slot, *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+            SendPairMessage(t, w, slot,
+                            *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+        }
+
+        *(uint32_t *)(w + OBJ_OFF_PICKUP_AFTER) =
+            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            + AM2_PICKUP_HOLD_MS;
+        return;
+    }
+
+    if (request == AM2_DO_DROP) {
+        if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
+            orig_log((const char *)AM2_IMAGE(ADDR_STR_TELL_DROP),
+                     *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+
+        /* NOT the same sense as the DO gate above: here a trooper we would
+         * broadcast for is one we must NOT drop for. */
+        if (CommMustBroadcast((void *)kComm,
+                              (int16_t)*(const int8_t *)(t + OBJ_OFF_ARMY)))
+            return;
+
+        TrooperDropItem(t, *(const int32_t *)(m + MSG_DROP_OFF_SLOT),
+                        *(const uint32_t *)(m + MSG_DROP_OFF_AT));
+        return;
+    }
+
+    if (request == AM2_WANT_PICKUP) {
+        int32_t have = *(const int32_t *)(w + OBJ_OFF_TARGET_UID);
+        int32_t give;
+        int32_t at;
+
+        if (*(const int8_t *)(w + OBJ_OFF_ARMY) != AM2_ARMY_NEUTRAL || !have) {
+            orig_log((const char *)AM2_IMAGE(ADDR_STR_REQ_PICKUP_DENY));
+            return;
+        }
+
+        give = *(const int32_t *)(m + MSG_DROP_OFF_QUANT);
+        if (give >= have)
+            give = have;
+
+        at = *(const int32_t *)(m + MSG_DROP_OFF_SLOT);
+        if (at != -1
+            && *(const uint32_t *)(t + OBJ_OFF_WEAPON_UID + (uint32_t)at * 4)
+            && !KindInSetB(**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)))
+            *(int32_t *)(w + OBJ_OFF_TARGET_UID) -= give;
+
+        TrooperWantItemSend(t, w, AM2_DO_PICKUP,
+                            (int8_t)*(const int32_t *)(m + MSG_DROP_OFF_SLOT),
+                            give);
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_REQ_PICKUP_OK), give);
+        return;
+    }
+
+    if (request == AM2_WANT_DROP) {
+        if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
+            orig_log((const char *)AM2_IMAGE(ADDR_STR_REQ_DROP),
+                     *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
+    }
+}
+
 int armymsg_install(void)
 {
     int rc = 0;
@@ -1413,6 +1594,9 @@ int armymsg_install(void)
                         "ItemGoneMessageSend", 1);
     rc |= patch_replace(ADDR_SEND_GAME_PAUSE, (const void *)SendGamePause,
                         "SendGamePause", 2);
+    rc |= patch_replace(ADDR_RECV_TROOPER_WANT_ITEM,
+                        (const void *)RecvTrooperWantItem,
+                        "RecvTrooperWantItem", 1);
     rc |= patch_replace(ADDR_SEND_PAIR_MSG, (const void *)SendPairMessage,
                         "SendPairMessage", 5);
     return rc;
