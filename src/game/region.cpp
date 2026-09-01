@@ -1454,8 +1454,11 @@ static void ShiftTileCover(int32_t cell, int32_t delta)
  *
  * THE INCREMENT ARM NEEDS A NEGATIVE HEIGHT. `h <= 15 && h - height >= 15`
  * collapses to `h == 15 && height == 0` for any non-negative height, so it is
- * reachable only if OBJ_OFF_HEIGHT_SET goes negative -- and every compare here
- * is a SIGNED byte compare, so it can. Written as found rather than pruned.
+ * reachable only if the height goes negative -- and every compare here is a
+ * SIGNED byte compare, so it can. That reads as strained until you know the
+ * height is OBJ_OFF_RANK: orig.h records that on an ITEM that byte is read for
+ * its SIGN alone, as "this thing raises the ground you stand on", and a
+ * negative one is exactly what the increment arm wants. Written as found.
  *
  * COLD, AND SAID PLAINLY. It is reached from DestroyObjCommon, and no drive
  * this project has destroys an item: 325 are added during load and none dies
@@ -1499,12 +1502,20 @@ void __cdecl ItemTeardown(void *obj)
     if (!ObjIsItem((const AM2_Object *)obj))
         return;
 
-    height = *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET);
-    if ((int8_t)height
+    /* TWO DIFFERENT FIELDS, and this used one for both jobs until
+     * ObjAfterMove was read beside it. OBJ_OFF_HEIGHT_SET is compared against
+     * the tile's attribute byte and never used again; the value SUBTRACTED
+     * from the cell weights is OBJ_OFF_RANK, which is also the byte tested
+     * non-zero above. `mov dl,[esi+0x65]` feeds only the compare;
+     * `movsx eax,[esi+0x98]` is stored to a local and reloaded at the
+     * subtraction. */
+    if (*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
         > (int8_t)(*(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS)
               [*(const uint16_t *)(o + OBJ_OFF_TILE)])
         return;
-    if (!*(const int8_t *)(o + OBJ_OFF_RANK))
+
+    height = *(const int8_t *)(o + OBJ_OFF_RANK);
+    if (!height)
         return;
 
     if (*(const void *const *)(o + OBJ_OFF_HIT_MASK))
