@@ -7458,7 +7458,42 @@ typedef struct {
 /* Called from TrooperFire with (obj, weapon, sight, ready) and its int32_t
  * answer discarded. 1,088 bytes dispatching on the weapon's ITEMTYPE_OFF_KIND
  * through a 42-entry table, so it runs for its side effects; not read. */
-#define ADDR_FIRE_449AB0         0x00449AB0u  /* int32_t(obj, wpn, out, ready) */
+/* READ AND RECONSTRUCTED as SelectFirePose: which pose the trooper takes to
+ * fire this weapon. It writes SIGHTCOUT_OFF_STATE and answers 1 on every path
+ * past its four refusals, which is why TrooperFire discards the answer -- the
+ * side effect is the function.
+ *
+ * FORTY-THREE INDICES AND EIGHT ARMS. Counting the bodies gives eight and
+ * counting the kinds gives forty-three; only the byte table at 0x00449EC4 says
+ * which goes where, and out-of-range joins the twenty-four-kind default rather
+ * than getting an arm of its own.
+ *
+ * ONE GROUPING FALLS OUT OF THE CAPTION TABLE EXACTLY: the five kinds sharing
+ * the AM2_POSE_KNEEL_ARMED_B arm are AIRS, PARA, RECO, MAG and AERO, which is
+ * precisely the five ObjCodeUnmapped answers 0 for. Two tables in two
+ * functions agreeing on one set of five is better evidence than either. */
+#define ADDR_SELECT_FIRE_POSE    0x00449AB0u  /* int32_t(obj, wpn, out, ready) */
+/* Nine poses count as BRACED -- 0x19, 0x1C, 0x13, 0x1A, 0x1D, 0x14, 0x06,
+ * 0x1E, 0x15 -- and the set is tested identically in five of its arms, which
+ * is what makes it a set rather than a chain of compares. Soldier kind 7
+ * counts as braced whatever its pose. The list lives in item.cpp as a table;
+ * naming nine poses that nothing else reads would be nine guesses. */
+/* The poses it writes that had no name. The two pairs are named from the ARM
+ * they belong to, which the caption table establishes -- kind 2 is GREN and
+ * kinds 8, 9, 10, 29 and 30 are HvMG, RIFLE, AUTO, VULC and SNIP -- and the
+ * RAISE pair from the fact that every "not braced" arm lands on those same two
+ * whatever the weapon is. The last three are named for their NUMBER: nothing
+ * read so far says what they are. */
+#define AM2_POSE_GRENADE_STAND   0x13
+#define AM2_POSE_GRENADE_KNEEL   0x14
+#define AM2_POSE_RAISE_STAND     0x16
+#define AM2_POSE_RAISE_KNEEL     0x17
+#define AM2_POSE_GUN_STAND       0x1C
+#define AM2_POSE_GUN_KNEEL       0x1D
+#define AM2_POSE_CLASS2_ARMED    0x1E
+#define AM2_POSE_FLAME_KNEEL     8
+#define AM2_POSE_FLAME_CLASS2    9
+#define AM2_POSE_CARRY           5
 /* 0x00449EF0 IS ALREADY ObjCodeUnmapped and already reconstructed, and it was
  * about to get a second name here -- ADDR_WEAPON_TURNS_TO_AIM, from the one
  * thing its only caller does with it. checkpatches refused the build, which is

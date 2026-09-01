@@ -4921,11 +4921,7 @@ typedef void (__cdecl *AM2_RowFinalFn)(void *row);
 #define orig_row_final    ((AM2_RowFinalFn)(uintptr_t)AM2_IMAGE(ADDR_ROACH_ROW_FINAL))
 
 
-typedef int32_t (__cdecl *AM2_Fire449AB0Fn)(void *obj, void *weapon,
-                                            void *sight, int32_t ready);
 typedef int32_t (__cdecl *AM2_GameRandFn)(void);
-#define orig_fire_449ab0 \
-    ((AM2_Fire449AB0Fn)(uintptr_t)AM2_IMAGE(ADDR_FIRE_449AB0))
 #define orig_game_rand ((AM2_GameRandFn)(uintptr_t)AM2_IMAGE(ADDR_GAME_RAND))
 
 /* The four stores TrooperFire makes twice when a trooper turns to aim, and
@@ -5000,10 +4996,11 @@ static void TrooperFaceTo(uint8_t *o, const AM2_Point *to)
  * with one gap said plainly, that FireWeapon also forwards the unmasked dword
  * to 0x0043B9B0 and that function's use of it has not been read.
  *
- * 0x00449AB0 IS CALLED AND ITS ANSWER THROWN AWAY. `mov eax, [esp+0x30]`
- * overwrites the return value on the very next instruction, so 1,088 bytes of
- * per-weapon-kind dispatch run for their side effects alone. Recorded rather
- * than tidied; it is still original.
+ * SelectFirePose IS CALLED AND ITS ANSWER THROWN AWAY. `mov eax, [esp+0x30]`
+ * overwrites the return value on the very next instruction -- and reading that
+ * function since shows why: it answers 1 on every path past its refusals, and
+ * what it actually does is write the pose into SIGHTCOUT_OFF_STATE. The side
+ * effect is the point, and the discarded answer is not a defect.
  *
  * COLD IN EVERY CONFIGURATION HERE. Nothing in a Boot Camp drive shoots, so
  * this is verified by reading and by a clean A/B saying nothing else moved.
@@ -5079,7 +5076,7 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
                           - *(const uint32_t *)(w + ITEM_OFF_LAST_USE)))
             ? 1 : 0;
 
-    orig_fire_449ab0(o, w, out, ready);
+    SelectFirePose(o, w, out, ready);
 
     *(int32_t *)(o + OBJ_OFF_FIELD_578) = 1;
 

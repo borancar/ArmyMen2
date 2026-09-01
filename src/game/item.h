@@ -18,6 +18,14 @@ extern "C" {
  * -- an index into ADDR_WEAPON_POSE_FRAMES. */
 int32_t __cdecl WeaponPoseIndex(void *obj, void *weapon);
 
+/* 0x00449AB0, one caller -- TrooperFire. WeaponPoseIndex's big brother, asking
+ * the same question with more inputs: which pose should this trooper be in to
+ * fire this weapon. It WRITES SIGHTCOUT_OFF_STATE and answers 1 on every path
+ * past its four refusals, so the caller's discarding of the result is correct.
+ * Forty-three item kinds through eight arms. */
+int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
+                               int32_t ready);
+
 /* 0x00429220, one caller -- the deploy dispatcher's default arm. Put an
  * object at a point: move every row, take it off the map and put it back,
  * re-apply its height. */

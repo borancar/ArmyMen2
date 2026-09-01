@@ -5,36 +5,56 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `2757f94`. Working tree clean.
+Last updated: **2026-09-01**, at `78610ba`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,382 patches.**
+Nothing uncommitted. **1,383 patches.**
 
-**`ObjHitMaskAction` (`0x004389D0`) is READ AND NOT WRITTEN**, and the reading is
-in `orig.h` rather than in a draft. That is the fourth time this session the
-call has been made and the third that was later taken up and finished, so the
-record is the point of it.
+**`SelectFirePose` (`0x00449AB0`, 1088 B, one caller) is reconstructed** -- the
+function `TrooperFire` calls and whose answer it throws away, which two commits
+ago was recorded as an oddity. Reading it explains the oddity: it answers 1 on
+every path past its four refusals, and what it actually does is WRITE the pose
+into `SIGHTCOUT_OFF_STATE`. The side effect is the function, and the discarded
+result is not a defect.
 
-**What is settled.** Its only callee is `Clamp` -- 1,056 bytes of arithmetic and
-one call, which is why it looks harder than it is. Two refusals, both answering
-0. The mask header is four int16s and a cell pointer at +0x0C. It clamps TWICE
-where `BoxAction` clamps once, first against `ADDR_MAP_EXTENT_X/Y` with a
-sixteen-unit margin and then against the tile bounds with the usual two, and it
-writes the four `TILEMASK_OFF_RECT` edges in `BoxAction`'s own order.
+**It is `WeaponPoseIndex`'s big brother**, `0x1A0` bytes further on and asking
+the same question with more inputs -- both answer from `ClassifyByCode74`'s 0,
+1 or 2 and both speak in `AM2_POSE_` numbers.
 
-**And there is a SECOND neighbour table.** Twenty dwords at `0x00554B84`,
-immediately past `ADDR_TILE_RING4`'s four, computed per call from the
-TILEMASK's stride the way `ADDR_TILE_NEIGHBOURS` is computed from the map's --
-so the game keeps two of these and `BuildTileDeltas` fills only one. The inner
-loop ORs 3 into the cell it lands on and 2 into each of the twenty, which is
-`ShiftTileCover`'s "this cell and its ring" shape again.
+**Forty-three indices and EIGHT arms.** Counting the bodies gives eight and
+counting the kinds gives forty-three; only the byte table at `0x00449EC4` says
+which goes where, and out-of-range joins the twenty-four-kind default rather
+than getting an arm of its own.
 
-**What is not:** the walk. It tests one BIT per cell through the
-bits-from-position-n table at `0x00487814` and selects between an eight-step
-and a sixteen-step stride on a parity test against a value saved earlier. That
-is the whole of the mask walk and it is not read.
+**One grouping falls out of the caption table exactly.** The five kinds sharing
+the `AM2_POSE_KNEEL_ARMED_B` arm are AIRS, PARA, RECO, MAG and AERO -- precisely
+the five `ObjCodeUnmapped` answers 0 for, which `TrooperFire` uses to decide
+whether the trooper turns to face its target. Two tables in two functions
+agreeing on one set of five is better evidence than either alone, and it is the
+third thing the `0x00419A94` caption table has settled this session.
 
+**Three things recur and are written once.** `PoseIsBraced` is a nine-pose set
+plus soldier kind 7, tested identically in five arms -- which is what makes it a
+SET rather than a chain of compares. `aimed` is the (seen && ready) pick between
+two poses. And every "not braced" arm lands on the same two poses whatever the
+weapon, which is what says those two are "get into a stance" rather than
+anything about the weapon.
+
+**The movement gate is on two arms only**: a moving trooper keeps its pose for
+the guns and the flamethrower and does not for the grenade, the bazooka or
+anything else. Reproduced; nothing here says why.
+
+**It is exhaustively testable and that oracle is not written.** Forty-four kinds
+times three classes times braced times seen times ready times moving is a few
+hundred cases, and every input is an argument or a plain field -- exactly the
+shape `tools/posecheck.py` already covers for `WeaponPoseIndex`. Said here
+rather than left implied.
+
+Cold: its one caller is `TrooperFire`, which nothing in a Boot Camp drive
+reaches. A/B clean -- `bootcamp` identical 1,610-line state dump and 13-message
+log at 22 pixels, `campaign` identical 35-node widget tree and 14-message log
+at 2 pixels.
 
 ## Stop condition
 

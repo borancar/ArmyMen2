@@ -4768,6 +4768,172 @@ typedef void (__cdecl *AM2_HitEffectFn)(const void *at, int32_t slot,
     ((AM2_HitEffectFn)(uintptr_t)ADDR_SPAWN_HIT_EFFECT)
 
 
+
+/* SelectFirePose -- original 0x00449AB0, 1088 bytes, one caller, which is
+ * TrooperFire. WHICH POSE SHOULD THIS TROOPER BE IN TO FIRE THIS WEAPON: it
+ * writes SIGHTCOUT_OFF_STATE and its int32_t answer is 1 for every path that
+ * gets past the refusals, which is why TrooperFire discards it. The side
+ * effect IS the function.
+ *
+ * IT IS WeaponPoseIndex'S BIG BROTHER, 0x1A0 bytes further on and asking the
+ * same question with more inputs. Both answer from ClassifyCode74's 0, 1 or 2
+ * -- the object class off the first row's ROW_OFF_FRAME -- and both speak in
+ * AM2_POSE_ numbers.
+ *
+ * FORTY-THREE INDICES AND EIGHT ARMS. The byte table at 0x00449EC4 maps item
+ * kinds 1..0x2B onto eight bodies, so counting the arms gives eight and
+ * counting the kinds gives forty-three; only the table says which goes where,
+ * and out-of-range joins the twenty-four-kind default rather than getting one
+ * of its own. The caption table at 0x00419A94 is what turns those numbers into
+ * names, and one grouping falls out of it exactly: the five kinds in the
+ * 0x1F arm are AIRS, PARA, RECO, MAG and AERO, which is precisely
+ * ObjCodeUnmapped's five zero entries. Two tables in two functions agreeing on
+ * one set of five is better evidence than either alone.
+ *
+ * THREE THINGS RECUR AND ARE WRITTEN ONCE. `Braced` is the nine-pose set plus
+ * soldier kind 7 -- tested identically in five arms, which is what makes it a
+ * set rather than a chain of compares. `Aimed` is the (seen && ready) pick
+ * between two poses. And the "not braced" arms all land on the same two poses
+ * whatever the weapon, which is what says those two are "get into a stance"
+ * rather than anything about the weapon.
+ *
+ * THE MOVEMENT GATE IS ON TWO ARMS ONLY. A trooper with OBJ_OFF_FIELD_44 above
+ * zero -- moving -- keeps its pose for the guns and the flamethrower, and does
+ * not for the grenade, the bazooka or anything else. Reproduced; nothing here
+ * says why.
+ *
+ * FOUR REFUSALS, all answering 0 and all before any of that: no object, the
+ * object destroyed, Type2Field5A4Set, and soldier kind 8.
+ *
+ * COLD: its one caller is TrooperFire, which nothing in a Boot Camp drive
+ * reaches. Verified by reading. It is exhaustively testable the way
+ * tools/posecheck.py tests WeaponPoseIndex -- forty-four kinds times three
+ * classes times braced times seen times ready times moving is a few hundred
+ * cases and every input is an argument or a plain field -- and that oracle is
+ * not written yet.
+ */
+static int32_t PoseIsBraced(const uint8_t *o)
+{
+    static const int32_t kBraced[] = {
+        0x19, 0x1C, 0x13, 0x1A, 0x1D, 0x14, 0x06, 0x1E, 0x15,
+    };
+    int32_t pose = *(const int32_t *)(o + OBJ_OFF_POSE);
+    int32_t i;
+
+    for (i = 0; i < (int32_t)(sizeof kBraced / sizeof kBraced[0]); i++)
+        if (pose == kBraced[i])
+            return 1;
+
+    return *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)
+           == AM2_SOLDIER_KIND_ACTION_A;
+}
+
+int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
+                               int32_t ready)
+{
+    const uint8_t *o   = (const uint8_t *)obj;
+    uint8_t       *out = (uint8_t *)sight;
+    int32_t        cls;
+    int32_t        kind;
+    int32_t        aimed;
+
+    if (o == (const uint8_t *)0)
+        return 0;
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        return 0;
+    if (Type2Field5A4Set((const AM2_Object *)o))
+        return 0;
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)
+        == AM2_SOLDIER_KIND_ACTION_B)
+        return 0;
+
+    cls  = ClassifyByCode74(o);
+    kind = **(const int32_t *const *)((const uint8_t *)weapon
+                                      + OBJ_OFF_FIELD_C0);
+    aimed = *(const int32_t *)(out + SIGHTCOUT_OFF_SEEN) != 0 && ready != 0;
+
+    switch (kind) {
+    case 1:  case 7:  case 8:  case 9:  case 10:
+    case 29: case 30:                        /* HvMG, RIFLE, AUTO, VULC, SNIP */
+        if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > 0)
+            return 1;
+        if (cls == 2) {
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_CLASS2_ARMED;
+        } else if (cls == 1) {
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
+                PoseIsBraced(o)
+                ? (aimed ? AM2_POSE_GUN_KNEEL : AM2_POSE_KNEEL_ARMED_A)
+                : AM2_POSE_RAISE_KNEEL;
+        } else {
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
+                PoseIsBraced(o)
+                ? (aimed ? AM2_POSE_GUN_STAND : AM2_POSE_STAND_ARMED)
+                : AM2_POSE_RAISE_STAND;
+        }
+        return 1;
+
+    case 2:                                                        /* GREN */
+        if (cls == 2) {
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_KNEEL;
+        } else if (cls == 1) {
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
+                PoseIsBraced(o)
+                ? (aimed ? AM2_POSE_GRENADE_KNEEL : AM2_POSE_KNEEL_ARMED_A)
+                : AM2_POSE_RAISE_KNEEL;
+        } else {
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
+                PoseIsBraced(o)
+                ? (aimed ? AM2_POSE_GRENADE_STAND : AM2_POSE_STAND_ARMED)
+                : AM2_POSE_RAISE_STAND;
+        }
+        return 1;
+
+    case 3:                                                        /* FLAM */
+        if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > 0)
+            return 1;
+        if (cls == 1)
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_FLAME_KNEEL;
+        else if (cls == 2)
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_FLAME_CLASS2;
+        /* class 0 writes nothing at all, which no other arm does. */
+        return 1;
+
+    case 4:                                                        /* BAZ */
+        if (cls == 2) {
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_KNEEL;
+        } else if (cls == 1) {
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
+                PoseIsBraced(o)
+                ? (aimed ? AM2_POSE_GUN_KNEEL : AM2_POSE_KNEEL_ARMED_A)
+                : AM2_POSE_RAISE_KNEEL;
+        } else {
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
+                PoseIsBraced(o)
+                ? (aimed ? AM2_POSE_GUN_STAND : AM2_POSE_STAND_ARMED)
+                : AM2_POSE_RAISE_STAND;
+        }
+        return 1;
+
+    case 5: case 11: case 12:                       /* MORT, MINE, EXPL */
+        *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
+            (cls > 0 && cls <= 2) ? AM2_POSE_KNEEL : AM2_POSE_CARRY;
+        return 1;
+
+    case 24: case 25: case 26: case 39: case 40:  /* AIRS PARA RECO MAG AERO */
+        *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
+            (cls > 0 && cls <= 2) ? AM2_POSE_KNEEL_ARMED_B : AM2_POSE_CARRY;
+        return 1;
+
+    case 43:
+        *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_GUN_STAND;
+        return 1;
+
+    default:
+        /* Twenty-four kinds and everything out of range: no pose at all. */
+        return 1;
+    }
+}
+
 /* DamageTrooper -- original 0x00447A40, 1040 bytes, one caller, which is
  * DamageObject's type-2 arm. It names itself: "DamageTrooper: droping armor
  * uid:%x", the misspelling included. The sibling of DamageVehicle above and the
@@ -12630,6 +12796,8 @@ void item_install(void)
                   "VehicleBlockWeight", 3);
     patch_replace(ADDR_DAMAGE_TROOPER, (const void *)DamageTrooper,
                   "DamageTrooper", 1);
+    patch_replace(ADDR_SELECT_FIRE_POSE, (const void *)SelectFirePose,
+                  "SelectFirePose", 1);
     patch_replace(ADDR_CREATE_EXPLOSION, (const void *)CreateExplosion,
                   "CreateExplosion", 23);
     patch_replace(ADDR_CAN_PICK_UP_WEAPON, (const void *)CanPickUpWeapon,
