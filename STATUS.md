@@ -5,70 +5,72 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-02**, at `b428bf5`. Working tree clean.
+Last updated: **2026-09-02**, at `ad5a3d5`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,395 patches**, **30** analysis tools in `make check`.
+Nothing uncommitted. **1,396 patches**, **30** analysis tools in `make check`.
 
-**`LevelTeardown` (`0x004256F0`, 160 B) is reconstructed** -- the arm
-`State2Frame` takes when a state change is pending while the game is already in
-state 2, which is what leaving a level means. A dialog delete through vtable
-slot 0, then twenty-four subsystem teardowns in a fixed order, then the state
-change committed.
+**`PointerDropItem` (`0x00458A20`, 144 B) is reconstructed** -- the ACTION slot
+of pointer mode 3: drop whatever our leader is holding.
 
-**TWENTY of the twenty-five callees were already ours**, which is what made
-this worth writing out rather than leaving at an address: the teardown was the
-last original thing holding them together. Two of the remaining five were read
-off their own bodies -- `ADDR_FREE_AIM_SPRITES`, which is `ReleaseSprite` over
-six sprites whose COUNT is the distance between two globals, and
-`ADDR_FREE_SEQ_CONTEXTS` -- and two carry placeholders that say only their
-addresses, which is the `ShutdownSubsystems` precedent: the order is the fact
-worth keeping and a name each would be a guess each.
+**It identifies one of the fire-once modes `SetPointerMode` could not name.**
+That function's comment says its two fire-once records and every mode above 0
+are verified by reading; mode 3's record is `pick = 0, f14 = 0, action = this`,
+which is exactly its guard -- so `SetPointerMode(3)` never becomes a cursor
+state, it runs this immediately with a null object and the zero point. Which
+makes this function's own closing `SetPointerMode(0)` redundant: two
+independent resets, neither able to observe the other. Reproduced.
 
-**Exercised by poking a global, and all 23 steps confirmed.** No drive reaches
-it by playing -- the in-mission ESCAPE handler is sub-state 34 and ordinary
-play sits at 33 -- so `ADDR_MENU_REQUEST` and its flag were written during a
-live Boot Camp mission, and a marker logged per call showed every one arrive.
+**Its search loop cannot run, and it is NOT a binary patch.** The function
+compares `ADDR_DEFAULT_OWNER` against itself -- `3b c0`, two bytes, so nothing
+was overwritten the way `docs/binarypatches.md`'s six were. The source compared
+a local against the global it had just been assigned from and VC6 folded the
+second load. Everything behind the `jne` is dead: a walk of that army's object
+list for the first live type-2 object with `OBJ_OFF_SARGE` set. Transcribed
+anyway, and written as a local compared against the global -- both what the
+source must have said and the only spelling a compiler takes without a
+tautological-compare warning.
 
-**A/B clean on `bootcamp`, `campaign` and `quit`.**
+**And the dead arm is where the null check is.** It sets the object to NULL and
+falls into the inventory read; the live path dereferences the uid lookup with
+no check at all, so a leader that has just died takes the game down. The
+original's.
 
-## Open: something on the poked teardown path diverges, and it is not new
+`checkoffsetuse` reports the offset sets agree exactly. A/B clean on `bootcamp`
+and `campaign`; the function is not reachable by any drive here, so that says
+only that nothing else regressed.
 
-Driving that same poke under `AM2_NOPATCH=1` ends with **sixty**
-`DestroyWeapon, %x` lines as the level's items are freed, and the game returns
-to the title. With the reconstruction installed there are **none**, and it does
-not.
+## Read the split-aware figure, not the entry one
 
-That looked exactly like a defect in the new transcription. It is not: the same
-poke on the **parent commit** -- where `LevelTeardown` is still the original's
-and its callees are already ours -- also reads 0. So the divergence is
-somewhere else on that path and predates this work by an unknown margin.
+This unit is why. 144 bytes of work moved the entry-generous byte figure by
+**1.5%**, because `0x00458A20` sits inside a 5,760-byte `functions.tsv` entry
+that holds **seventeen** functions and patching any one of them credits all of
+it. The same effect inflates the entry count.
 
-It has never been caught because no configuration in `tools/ab.sh` reaches the
-in-mission teardown at all; `quit` leaves from the title, which is state 1.
-Finding it means bisecting the twenty-odd reconstructed callees against
-`AM2_NOPATCH` on the poked drive. Worth doing: this is the one path where a
-whole subsystem comes down, and it is currently unwatched.
+    entry-generous   1,220 of 1,239 entries, 89.5% of sub-CRT bytes
+    split-aware      1,353 of 1,530 real functions, 79.7% of sub-CRT bytes
 
-**The lesson is the cheaper half.** One control run on the parent separated
-"my change broke it" from "nothing has ever tested this path", and the
-temptation was to keep debugging the function in flight instead.
+`tools/merges.py` produces the second. The stop condition below is stated in
+entries because that is what `docs/functions.tsv` counts, and it remains a
+ceiling rather than a floor -- ten percentage points of ceiling, measured.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,219 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 20
-outstanding, which is 1,239 minus 1,219 -- from 1,395 patched addresses, and
-**88.0% of the sub-CRT bytes**. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,220 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 19
+outstanding, which is 1,239 minus 1,220 -- from 1,396 patched addresses, and
+**89.5% of the sub-CRT bytes**. Split-aware that is **1,353 of 1,530** real
+functions and **79.7%** of the bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and fifty batches have gone in and NOTHING SMALL IS LEFT: the
-20 entries outstanding start at **1,120 bytes** -- `0x00434700` -- and the
-median is **1,504**. Read them through `tools/merges.py`, which splits those 20
-into 40 real functions whose smallest are 16, 144 and 160 bytes. The
+small ones in batches. A hundred and fifty-one batches have gone in and NOTHING SMALL IS LEFT among
+the ENTRIES: the 19 outstanding start at **1,120 bytes** -- `0x00434700` -- and
+the median is **1,504**. That is not what is left, though: `tools/merges.py`
+splits them into real functions and the 0x00458930 entry alone still holds
+sixteen unwritten ones from 16 bytes up. Rank by real function, not by entry. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred
 rather than unread; it is done, and with it the last thing under 900 bytes.
 The sentence here used to say they started at 96 and name the MSVC static-init

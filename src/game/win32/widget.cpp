@@ -8962,6 +8962,97 @@ void __cdecl HudMessage(const char *text, int32_t colour)
 typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
 typedef void (__cdecl *AM2_PointerActionFn)(void *obj, uint32_t at);
 
+/* PointerDropItem -- original 0x00458A20, 144 bytes, and its only reference in
+ * the image is the ACTION slot of pointer mode 3 in the table SetPointerMode
+ * below indexes. Drop whatever our leader is holding.
+ *
+ * MODE 3 IS ONE OF THE FIRE-ONCE MODES SetPointerMode's comment names but could
+ * not identify: its record is pick = 0, f14 = 0, action = this, which is
+ * exactly the guard down there. So `SetPointerMode(3)` never becomes a cursor
+ * state at all -- it runs this immediately with a null object and the zero
+ * point, and puts the mode back to 0.
+ *
+ * WHICH MAKES THE LAST LINE HERE REDUNDANT, and it is reproduced anyway. This
+ * function ends by calling SetPointerMode(0) itself, which the caller has
+ * already arranged to do. Two independent resets, neither of which can observe
+ * the other; written as found.
+ *
+ * BOTH ARGUMENTS ARE IGNORED. The original reads no stack slot at all, which
+ * is what says the signature is the action slot's rather than something with a
+ * shape of its own.
+ *
+ * THE SEARCH LOOP CANNOT RUN, AND IT IS NOT A BINARY PATCH. The function opens
+ * by loading ADDR_DEFAULT_OWNER and then comparing it against itself --
+ * `3b c0`, two bytes, so nothing was overwritten in place the way
+ * docs/binarypatches.md's six were. The source compared a local against the
+ * global it had just been assigned from and VC6 folded the second load, so the
+ * `jne` is never taken and everything behind it is dead: a walk of that army's
+ * ADDR_ARMY_OBJ_LISTS entry looking for the first live type-2 object with
+ * OBJ_OFF_SARGE set. It is transcribed, because "the original has a fallback
+ * that cannot run" is a different fact from "the original has none" -- the same
+ * standing as ObjBlockWeight's vacuous range guard.
+ *
+ * Written as a local compared against the global rather than as `x != x`, which
+ * is both what the source must have said and the only spelling a compiler will
+ * take without a tautological-compare warning.
+ *
+ * AND THE DEAD ARM IS WHERE THE NULL CHECK IS. Its exit sets the object to NULL
+ * and falls into the inventory read, so the original would dereference NULL
+ * there -- but only on the path that cannot be reached. On the live path the
+ * uid lookup's answer is dereferenced with no check at all, so a leader that
+ * has just died takes the game down. Reproduced; it is the original's.
+ *
+ * NOT EXERCISED. SetPointerMode's own note records that a driven Boot Camp
+ * mission reaches it exactly once, for mode 0 at mission start, and that every
+ * mode above 0 needs the order-giving UI no drive here reaches. So this is
+ * verified by reading. */
+void __cdecl PointerDropItem(void *obj, uint32_t at)
+{
+    int32_t  owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+    uint8_t *unit;
+    int32_t  slot;
+
+    (void)obj;
+    (void)at;
+
+    if (owner != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
+        /* Dead -- see above. */
+        const uint8_t *list;
+        int32_t        i;
+
+        unit = (uint8_t *)0;
+
+        if (owner >= 0 && owner < AM2_COMM_SLOTS) {
+            list = (const uint8_t *)
+                ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
+
+            for (i = 0; i < *(const int32_t *)(list + LIST_OFF_COUNT); i++) {
+                uint8_t *o = (uint8_t *)LookupByUID(
+                    (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
+
+                if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
+                    && *(const int32_t *)(o + OBJ_OFF_SARGE)) {
+                    unit = o;
+                    break;
+                }
+                /* The list pointer is re-read every turn, as it is in
+                 * ArmyMessageFlush over the same table. */
+                list = (const uint8_t *)
+                    ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
+            }
+        }
+    } else {
+        unit = (uint8_t *)LookupByUID(
+            *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
+    }
+
+    slot = *(const int32_t *)(unit + UNIT_OFF_INVENTORY_SEL);
+    if (slot > 0) {
+        TrooperDropItem(unit, slot, *(const uint32_t *)(unit + OBJ_OFF_X));
+        SetPointerMode(0);
+    }
+}
+
 /* 0x00414430, ten callers. Put the pointer into one of seven modes: store the
  * index, then copy five fields out of that mode's 40-byte record into five
  * fixed globals.
@@ -10064,6 +10155,9 @@ int widget_install(void)
                         "HudPanelWidth", 3);
     rc |= patch_replace(ADDR_SET_POINTER_MODE, (const void *)SetPointerMode,
                         "SetPointerMode", 10);
+    rc |= patch_replace(ADDR_POINTER_DROP_ITEM,
+                        (const void *)PointerDropItem,
+                        "PointerDropItem", 0);
     rc |= patch_replace(ADDR_HUD_MESSAGE, (const void *)HudMessage,
                         "HudMessage", 46);
     rc |= patch_replace(ADDR_CLOSE_SCREEN, (const void *)CloseScreen,

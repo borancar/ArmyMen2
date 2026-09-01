@@ -907,6 +907,10 @@
 #define ADDR_POINTER_MODES     0x004761B8u  /* 7 records of 40 bytes */
 #define AM2_POINTER_MODE_SIZE  40
 #define AM2_POINTER_MODES      7
+/* 0x00458A20: mode 3's action, and mode 3 is one of the fire-once records --
+ * pick and f14 both zero, so SetPointerMode runs it rather than installing it.
+ * Reconstructed as PointerDropItem. */
+#define ADDR_POINTER_DROP_ITEM 0x00458A20u  /* void(void *obj, uint32_t at) */
 #define MODE_OFF_PICK          0x00u  /* int32(obj) -- may the pointer take it */
 #define MODE_OFF_ACTION        0x04u  /* void(obj, packed point) on release */
 #define MODE_OFF_OVERLAY       0x0Cu  /* OverlayPrepare's row, 0..0x12 */
