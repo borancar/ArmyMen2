@@ -2959,7 +2959,30 @@ exact oracle**, however meaningful it is when it is set.
   of the first five unreferenced candidates checked by hand, two disassembled to
   garbage. So the figure is a lower bound and is meant to be — 260 candidates,
   186 confirmed. Do not rewrite `functions.tsv` from the naive scan.
-- **Name a function from its body, not from one call site.** Two instances now,
+- **AN ARGUMENT ORDER IN `orig.h` IS A GUESS UNTIL SOMETHING READS THE
+PROLOGUE, and one of them propagated into a reconstruction and stayed wrong.**
+`ADDR_ENTER_VEHICLE` carried `/* void(vehicle, unit) */`; the unit is first.
+The reconstruction was written from that comment and then written CONSISTENTLY
+with it, so the seat check ran on the unit and the boarding uid went into the
+vehicle -- every field access on the other object, with nothing inside the
+function looking wrong and nothing for the compiler to say.
+
+Two instructions settle it and neither is subtle: `mov edi, [esp+0xC]` before
+the second push is the SECOND argument and carries VEHICLE_OFF_SEATS,
+VEHICLE_OFF_PTR_LIST and the army the broadcast is gated on; `mov esi,
+[esp+0xC]` one push later is the FIRST and carries OBJ_OFF_RIDING,
+OBJ_OFF_SARGE and the DestroyByType at the end.
+
+It was found by reading a CALLER for something else entirely, and confirmed by
+a second caller that reads OBJ_OFF_SOLDIER_KIND off the argument it passes
+first. **When a prototype in `orig.h` names two arguments of similar type, it
+is a guess unless its comment says which instruction fixed it** -- and a
+reconstruction that inherits the guess cannot detect it from the inside.
+`checkoffsetuse` cannot see it either: the offsets are all still there, just
+on the wrong pointer. The sibling `BoardVehicle` was checked the same way and
+is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
+
+**Name a function from its body, not from one call site.** Two instances now,
   and the second was still sitting in `orig.h` months after the first was
   written up. `0x0042C0E0` went in as `ADDR_ON_MAP_RESTORED` because
   `RestoreLostSurfaces` tail-calls it; its own error strings say

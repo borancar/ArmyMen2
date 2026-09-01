@@ -548,7 +548,8 @@ void __cdecl BoardVehicle(uint32_t uid, void *vehicle);
  * selection moving from the unit to the vehicle, the broadcast, and then the
  * unit's own destruction. See item.cpp -- what rides in a vehicle is a uid in
  * a list and not a live object. */
-void __cdecl EnterVehicle(void *vehicle, void *unit);
+/* The UNIT is first -- see item.cpp; orig.h had the pair the other way. */
+void __cdecl EnterVehicle(void *unit, void *vehicle);
 
 /* 0x00427BA0. Deselect everything: clear OBJ_FLAG_SELECTED on each selected
  * object that still resolves, drop the ones that do not, empty the list and

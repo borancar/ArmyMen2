@@ -12048,7 +12048,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * check, the two fields BoardVehicle writes, Sarge's claim on seat zero, the
  * selection moving from the unit to the vehicle, the broadcast, and then the
  * unit's own destruction. */
-#define ADDR_ENTER_VEHICLE         0x0045AA00u  /* void(vehicle, unit) */
+/* THE ORDER HERE WAS A GUESS AND IT WAS WRONG, and the reconstruction picked
+ * it up: the UNIT is the first argument and the VEHICLE the second. The
+ * original's `mov edi, [esp+0xC]` takes the second and reads VEHICLE_OFF_SEATS
+ * and VEHICLE_OFF_PTR_LIST off it; `mov esi, [esp+0xC]` one push later takes
+ * the first and writes OBJ_OFF_RIDING and OBJ_OFF_SARGE. See item.cpp. */
+#define ADDR_ENTER_VEHICLE         0x0045AA00u  /* void(unit, vehicle) */
 /* 0x0045E300, and it names itself: "<--Vehicle Enter Send: Vehicle: %x,
  * item: %x". The counterpart of SendVehicleExit, one kind lower. */
 #define ADDR_SEND_VEHICLE_ENTER    0x0045E300u  /* void(vehicle, unit) */

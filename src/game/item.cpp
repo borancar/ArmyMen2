@@ -7158,8 +7158,35 @@ typedef void (__cdecl *AM2_SendVehicleEnterFn)(void *vehicle, void *unit);
  * the selection move -- deselect the unit, select the vehicle -- happens only
  * when the unit was selected, which is the ordinary "the thing you were
  * commanding became the thing you are now commanding".
+ *
+ * ITS ARGUMENTS WERE THE WRONG WAY ROUND FOR AS LONG AS IT EXISTED, and every
+ * field access in the body was therefore on the other object. The signature
+ * was taken from orig.h's `void(vehicle, unit)`, which was a guess, and the
+ * body was then written consistently WITH that guess -- so nothing inside it
+ * looked wrong and the compiler had nothing to say.
+ *
+ * The original settles it in two instructions: `mov edi, [esp+0xC]` is the
+ * SECOND argument and everything on it is the vehicle's -- +0x53C against
+ * VEHICLE_OFF_SEATS, +0x538 for the list, +0x10 for the army the broadcast is
+ * gated on -- while `mov esi, [esp+0xC]` one push later is the FIRST and
+ * everything on it is the unit's: OBJ_OFF_RIDING, OBJ_OFF_SARGE,
+ * OBJ_OFF_UID_56C, and DestroyByType at the end.
+ *
+ * ALL THREE CALLERS ARE ORIGINAL, so they pass (unit, vehicle) and our code
+ * read them as (vehicle, unit): the seat check ran on the unit, the boarding
+ * uid went into the vehicle. Found by reading a caller -- 0x0044AD40 hands it
+ * the object it was given and the type-3 it looked up, in that order -- and
+ * confirmed against 0x004062B0, whose first argument it reads
+ * OBJ_OFF_SOLDIER_KIND from.
+ *
+ * NO A/B COULD HAVE SEEN IT. Boarding a vehicle is in the cold family this
+ * file's CLAUDE.md entry now names in one place: nothing in any configuration
+ * shoots, dies or gets into anything. Fixed by swapping the two parameter
+ * names, which is the whole change -- `v` and `u` are used consistently
+ * throughout, so binding them to the right arguments makes every line right
+ * at once.
  */
-void __cdecl EnterVehicle(void *vehicle, void *unit)
+void __cdecl EnterVehicle(void *unit, void *vehicle)
 {
     uint8_t  *v = (uint8_t *)vehicle;
     uint8_t  *u = (uint8_t *)unit;
