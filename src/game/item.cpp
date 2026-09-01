@@ -7168,7 +7168,7 @@ void __cdecl SetSoldierKind(void *obj, int32_t kind)
 
     *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)
         ((double)*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH)
-         * *(const double *)(uintptr_t)AM2_KIND7_HEALTH_SCALE);
+         * *(const double *)(uintptr_t)AM2_CONST_1_5);
 }
 
 /* 0x00449660, sixteen callers. Set a unit's soldier kind from the code of the

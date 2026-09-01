@@ -5936,10 +5936,17 @@ typedef struct {
 #define AM2_POSE_KNEEL_ARMED_B   0x1F
 #define AM2_WEAPON_CODE_MAX      0x2B
 #define ADDR_WEAPON_POSE_FRAMES  0x00474FE0u  /* int32[] */
-/* Kind 7's two extras, both read out of the image: a 64-entry table of names
- * filled at runtime, and a health multiplier that is exactly 1.5. */
+/* Kind 7's extra: a 64-entry table of names filled at runtime. The health
+ * multiplier that used to be named here was the shared double below. */
 #define ADDR_KIND7_NAMES         0x0050712Cu  /* char *[] */
-#define AM2_KIND7_HEALTH_SCALE   0x0046FA98u  /* double, 1.5 */
+/* The double 1.5, in .rdata, and it is SHARED. It went in as
+ * AM2_KIND7_HEALTH_SCALE because kind 7's health was the first thing seen to
+ * multiply by it; RegionFindPath weights its A* heuristic by the same address,
+ * where a health name would be a lie. A pooled floating-point literal is not a
+ * concept and must not be named for one of its users -- the linker folds equal
+ * constants, so any name taken from a single use site is one more use away from
+ * being wrong. Named for its VALUE. */
+#define AM2_CONST_1_5            0x0046FA98u  /* double 1.5, several users */
 #define AM2_KIND7_NAME_COUNT     64
 /* Fields of the object's FIRST ROW that carry its animation. */
 #define ROW_OFF_ANIM_CUR         0x40u   /* AM2_AnimTable * */
@@ -9418,6 +9425,39 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * the pair-filling above is what is reconstructed. */
 #define ADDR_REGION_FIND_PATH      0x00437E70u /* int32(from,to,int16*,int32*) */
 #define AM2_REGION_PATH_MAX        256   /* the caller's buffer, 0x200 bytes */
+/* The rest of the region record, which only the search reads. Everything up to
+ * REGION_OFF_LINKS is shape; these eight are the A* working set, rewritten on
+ * every search and meaningful only while REGION_OFF_STAMP matches the current
+ * generation. */
+#define REGION_OFF_G               0x10u  /* int32_t, cost from the start */
+#define REGION_OFF_H               0x14u  /* int32_t, ApproxDistXY * 1.5 */
+#define REGION_OFF_DEPTH           0x18u  /* int32_t, hops from the start */
+#define REGION_OFF_STAMP           0x1Cu  /* uint16_t, the search generation */
+#define REGION_OFF_STATE           0x1Eu  /* uint8_t: 1 open, 2 closed */
+#define REGION_OFF_PARENT          0x20u  /* AM2_Region *, the came-from */
+#define REGION_OFF_PREV            0x24u  /* open-list links, sorted by g+h */
+#define REGION_OFF_NEXT            0x28u
+/* The record size is AM2_REGION_SIZE, already defined above; a second name
+ * for it was written here and deleted before it landed. */
+#define AM2_REGION_LINK_SIZE       6      /* the stride the link walk adds */
+#define AM2_REGION_STATE_OPEN      1
+#define AM2_REGION_STATE_CLOSED    2
+#define AM2_REGION_STEP_WEIGHT     2      /* what a step's distance is scaled by */
+#define AM2_REGION_DEPTH_MAX       0xFE   /* longer than this answers "no path" */
+/* The search's own globals: one generation counter, the goal, the head of the
+ * open list, the node being expanded, the neighbour being relaxed, and two
+ * cursors the sorted insertion walks with. */
+#define ADDR_REGION_GENERATION     0x00654C2Cu  /* int32_t, low 16 stamped */
+#define ADDR_REGION_GOAL           0x00523DC0u  /* AM2_Region * */
+#define ADDR_REGION_OPEN_HEAD      0x00523DC4u  /* AM2_Region * */
+#define ADDR_REGION_CURRENT        0x00654C28u  /* AM2_Region * */
+#define ADDR_REGION_NEIGHBOUR      0x00523D9Cu  /* AM2_Region * */
+#define ADDR_REGION_WALK           0x00523DD4u  /* AM2_Region *, insert + path */
+#define ADDR_REGION_INSERT_PREV    0x00523D98u  /* AM2_Region * */
+/* Read only on the resume arm that cannot be reached -- see
+ * ADDR_REGION_SEARCH_STATE. Named so the transcription can mention them. */
+#define ADDR_REGION_RESUME_NODE    0x0053C4C8u  /* AM2_Region * */
+#define ADDR_REGION_RESUME_GOALID  0x00523DCCu  /* int32_t */
 /* READ AND DELIBERATELY LEFT ORIGINAL, with the reading recorded so it need
  * not be redone. 416 bytes, a 0x204-byte stack frame -- a path array -- and
  * three 2D byte tables indexed as `stride * a + b` off ADDR_REGION_STRIDE,

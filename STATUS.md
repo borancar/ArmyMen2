@@ -5,71 +5,71 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `8066a12`. Working tree clean.
+Last updated: **2026-09-01**, at `df2f87c`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,393 patches**, **29** analysis tools in `make check`.
+Nothing uncommitted. **1,394 patches**, **30** analysis tools in `make check`.
 
-**`FindLevelByName` (`0x0043E230`, 144 B) and `DefMapLine` (`0x0043E2C0`,
-1,520 B) are reconstructed** -- both functions of one `docs/functions.tsv`
-entry, so taking them together closed it. They are the level table's by-name
-search and the parser for one `MAP` line of `campaign.txt`, `bootcamp.txt` or
-`mpmaps.txt`.
+**`RegionFindPath` (`0x00437E70`, 1,168 B) is reconstructed** -- A* over the
+region graph, with the working set kept in the region records themselves, an
+open list sorted by g+h, and a generation stamp in place of a visited set. Its
+only caller, `RegionSolvePair`, was already ours and had been reaching it by
+address.
 
-**`FindLevelByName` is the name `map.cpp` tried to use once and could not.**
-`ScriptListFind`'s comment records the rename being refused because
-`AM2_LEVEL_RECORD_SIZE` already meant 0x30C while that table's records are
-0xCC. The name was right and the address was wrong; this is the function that
-walks the 0x30C records.
+**`tools/pathcheck.py` is the 30th tool and the only check this code can have.**
+No drive reaches region routing -- probed, not assumed: an `am2_log` here with
+a control at `ObjAfterMove`'s top gives 1,598 for the control and **0** for
+this function on a live Boot Camp mission. So `tools/ab.sh` is not evidence
+about it in either direction. The tool emulates the ORIGINAL over fourteen
+seeded graphs -- chains, grids, a diamond, a split graph, inactive nodes,
+`from == to`, and chains long enough to reach the depth cap -- and compares the
+return value, the length and every path entry against a Python model of the C.
 
-**THE GAME'S OWN DATA FILE NAMES THE LEVEL RECORD'S FIELDS, and five of them
-had been spelled after their offsets because nobody had opened it.** The three
-level files begin with a comment line that is the column header --
-`map_name map_text folder victorycin "load screen" loadmusic briefing briefsfx
-stratmap "cycle?" losemovie1 losemovie2 losemovie3` -- and `DefMapLine`
-consumes the columns in exactly that order. `LEVEL_OFF_STR_1C4`, `_204`,
-`_248`, `_2C8` and `LEVEL_OFF_RESERVE10` are gone.
+**It found two real errors on its first two runs.**
 
-**Two of those names settle open questions elsewhere.** `briefsfx` is the
-column that fills the buffer `StopNamedSound`'s only call site guards on, and
-`bootcamp.txt` writes `none` there, which `DefMapLine` maps to the empty
-`ADDR_DIR_SCRATCH` -- so that is WHY the buffer is empty all mission, which was
-an observation without a cause. And `cycle?` is what feeds
-`ADDR_TILESET_RESERVE`, the gate `palette.cpp` had to POKE to reach the
-palette-cycling body: Boot Camp's line says `FALSE`, so the shimmer is off for
-that map by the data's own choice.
+*The open list's unlink drops the rest of the list.* Improving a node that is
+at the HEAD writes `openHead = NULL` where it must write `openHead = head->next`,
+so every other open node is orphaned. That is the original's, checked in the
+bytes, and reproduced. The model was written with a CORRECT unlink and
+disagreed on four graphs, which is how it surfaced -- a defect no drive could
+show, because a pathfinder that drops candidates still returns a path.
 
-**`TitleCaseName` was about to be written a second time.** The original inlines
-it here rather than calling it, and the body it inlines is `misc.cpp`'s
-instruction for instruction. Fourth near-miss of that kind and the first caught
-by reading rather than by a tool.
+*`ApproxDistXY` is not "max + min/2".* `dist.cpp`'s comment had said so for a
+long time; the code is `dx + dy - (min >> 1)`, which is max + CEIL(min/2), and
+the two differ for every odd min. The paraphrase was copied into the model,
+where it disagreed with the original on 40 of 81 small deltas and moved enough
+A* ties to pick different routes. **A formula restated in words is a second
+implementation and can be wrong on its own.**
 
-**The compiler caught a duplicate offset name** -- `LEVEL_OFF_ID` was private
-to `startgame.cpp` with the same value. Third duplicate-name catch in three
-commits, each by a different mechanism.
+**One mutation PASSES and the reason is better than the gap.** Recomputing h on
+the improvement arm -- an asymmetry this file wrote out as deliberate --
+changes no case and cannot: h is a function of the node and the goal, both
+fixed for a search. The term is redundant by construction, not uncovered.
 
-**A/B clean on `bootcamp`, `campaign` and `multi`** -- all three level files.
-**And measured in both directions**: dropping the `"data\"` prefix from the
-folder puts `bootcamp` at 293,671 pixels with four extra log lines, so the run
-really does cover this function. What it does NOT catch is swapping the
-`briefing` and `stratmap` columns -- zero pixels, identical log -- so any pair
-of same-typed columns is verified by the file's header and by reading.
+**`AM2_KIND7_HEALTH_SCALE` is `AM2_CONST_1_5`.** The pooled double 1.5 was
+named for the first thing seen to multiply by it; this weights the A*
+heuristic by the same address. The linker folds equal literals, so a name taken
+from one use site is one more use away from being wrong.
+
+**A/B clean on `bootcamp` and `campaign`**; `mission`'s frames gate failed as
+it has on every run of that configuration, and the probe above says this code
+is not in it.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,217 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 22
-outstanding, which is 1,239 minus 1,217 -- from 1,393 patched addresses, and
-**87.4% of the sub-CRT bytes**. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,218 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 21
+outstanding, which is 1,239 minus 1,218 -- from 1,394 patched addresses, and
+**87.7% of the sub-CRT bytes**. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and forty-eight batches have gone in and NOTHING SMALL IS LEFT: the
-22 entries outstanding start at **1,120 bytes** -- `0x00434700` -- and the
-median is **1,504**. Read them through `tools/merges.py`, which splits those 22
-into 42 real functions whose smallest are 16, 144 and 160 bytes. The
+small ones in batches. A hundred and forty-nine batches have gone in and NOTHING SMALL IS LEFT: the
+21 entries outstanding start at **1,120 bytes** -- `0x00434700` -- and the
+median is **1,504**. Read them through `tools/merges.py`, which splits those 21
+into 41 real functions whose smallest are 16, 144 and 160 bytes. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred
 rather than unread; it is done, and with it the last thing under 900 bytes.
 The sentence here used to say they started at 96 and name the MSVC static-init

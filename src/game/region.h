@@ -271,6 +271,12 @@ int32_t __cdecl ObjBoxAction(void *obj, void *out);
  * for an object with no mask, which nothing on a drivable map is. */
 int32_t __cdecl ObjHitMaskAction(void *obj, void *out);
 
+/* 0x00437E70. A* over the region graph: an open list sorted by g+h, a
+ * generation stamp in place of a visited set, the answer written backwards
+ * through each node's parent. 1 with the path and its length, 0 with none. */
+int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
+                               int32_t *len);
+
 /* 0x00439320, six callers. Take an object's footprint back off the map:
  * ObjClearFootprint or ObjClearRoachFootprint for a vehicle or a roach, and
  * for an ITEM, subtract its height from every masked cell's weight and move

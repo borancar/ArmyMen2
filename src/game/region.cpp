@@ -4262,13 +4262,319 @@ void __cdecl UnrevealArea(int32_t army, uint32_t at)
     }
 }
 
-/* The search itself, still original: 1,168 bytes, and the only thing this
- * function drives. It answers non-zero with the path written into the caller's
- * array and its length through the fourth argument. */
-typedef int32_t (__cdecl *AM2_RegionFindPathFn)(int32_t from, int32_t to,
-                                                int16_t *path, int32_t *len);
-#define orig_region_find_path \
-    ((AM2_RegionFindPathFn)(uintptr_t)ADDR_REGION_FIND_PATH)
+/* One region's x and y, from the tile index it carries. The map's width is a
+ * power of two and ADDR_MAP_ROW_SHIFT is its log, so the original does this
+ * with a shift and a mask rather than a divide -- four times in RegionFindPath,
+ * which is why it is a helper here and inline there. */
+static void RegionTileXY(const uint8_t *r, int32_t *x, int32_t *y)
+{
+    uint32_t tile  = *(const uint16_t *)(r + REGION_OFF_TILE);
+    uint32_t shift = (uint32_t)*(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT
+                     & 0xFFFFu;
+
+    *y = (int32_t)(tile >> shift);
+    *x = (int32_t)(tile
+                   & (uint32_t)(*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+                                - 1));
+}
+
+/* The straight-line distance between two regions, in the units ApproxDistXY
+ * answers -- the same call the search makes for both its step cost and its
+ * heuristic. */
+static int32_t RegionSpan(const uint8_t *a, const uint8_t *b)
+{
+    int32_t ax, ay, bx, by;
+
+    RegionTileXY(a, &ax, &ay);
+    RegionTileXY(b, &bx, &by);
+    return ApproxDistXY(bx - ax, by - ay);
+}
+
+static uint8_t *RegionAt(int32_t id)
+{
+    return (uint8_t *)*(void *const *)(uintptr_t)ADDR_REGIONS
+           + (uint32_t)id * AM2_REGION_SIZE;
+}
+
+/* RegionFindPath -- original 0x00437E70, 1,168 bytes, one caller, and that
+ * caller is RegionSolvePair below.
+ *
+ * A*, with the region graph as its nodes: an open list kept sorted by g+h, a
+ * generation stamp instead of a visited set, and the answer written backwards
+ * from the goal through each node's parent. Answers 1 with the path in the
+ * caller's int16 array and its length through the fourth argument, 0 when
+ * there is none.
+ *
+ * THE WORKING SET LIVES IN THE REGION RECORDS, not in a side structure --
+ * REGION_OFF_G through REGION_OFF_NEXT, eight fields that are rewritten by
+ * every search and mean nothing unless REGION_OFF_STAMP matches
+ * ADDR_REGION_GENERATION. That is what makes the whole thing allocation-free
+ * and what makes it non-reentrant.
+ *
+ * THE HEURISTIC IS WEIGHTED BY 1.5, WHICH MAKES THIS INADMISSIBLE. h is
+ * `ApproxDistXY * 1.5` truncated, while a step costs `ApproxDistXY * 2`, so h
+ * can exceed the true remaining cost and the first path found is not
+ * guaranteed shortest.
+ *
+ * AND THE OPEN LIST'S UNLINK DROPS THE REST OF THE LIST. Improving a node that
+ * is at the HEAD writes `openHead = NULL` where it must write
+ * `openHead = node->next`, so every other open node is orphaned and the
+ * insertion below then finds an empty list. That is the original's, checked in
+ * the bytes -- 0x00438135 stores the zero register into ADDR_REGION_OPEN_HEAD
+ * -- and reproduced. tools/pathcheck.py was written with a CORRECT unlink in
+ * its model and disagreed with the original on four graphs, which is how it
+ * was found; a defect this size is invisible to any drive, because a
+ * pathfinder that drops candidates still returns a path. Reproduced; it is the ordinary game-AI trade, and the
+ * two constants are in orig.h rather than inline so that the ratio is visible.
+ *
+ * The 1.5 comes out of the image as a pooled double, and that address used to
+ * be called AM2_KIND7_HEALTH_SCALE because kind 7's health multiplied by it
+ * first. It is AM2_CONST_1_5 now: the linker folds equal literals, so a name
+ * taken from one use site is one more use away from being wrong.
+ *
+ * A CLOSED NODE IS NEVER REOPENED, which follows from the weighting rather
+ * than contradicting it: the state byte is tested for 1 and then for 2, and
+ * the 2 arm goes straight to the next link. With an inadmissible h that can
+ * settle a node too early, and the original accepts it.
+ *
+ * A NODE ALREADY OPEN AND IMPROVED DOES NOT GET ITS h RECOMPUTED, and that is
+ * a difference without a distinction. The fresh arm writes g, h, parent, depth
+ * and the stamp; the improvement arm writes g, parent and depth. It reads as a
+ * deliberate asymmetry and it cannot matter: h is a function of the node and
+ * the GOAL, both fixed for the length of a search, so the value the fresh arm
+ * stored is the value a recomputation would produce. tools/pathcheck.py
+ * confirms it -- making the model recompute h changes no case, where every
+ * other mutation of this function changes several.
+ *
+ * THE RESUME ARM CANNOT RUN. The function opens by comparing
+ * ADDR_REGION_SEARCH_STATE against -1 and taking a second entry point when it
+ * differs -- restoring a saved node and goal id, as an A* spread over frames
+ * would. Nothing in the image ever stores anything but -1 there, so that arm
+ * is dead. It is transcribed anyway, for the same reason the copy-protection
+ * branches are reproduced: "the original has a resume path" is a different
+ * fact from "the original has none".
+ *
+ * TWO GUARDS AND THEY ARE ASYMMETRIC IN A WAY THE ARGUMENT ORDER HIDES. `to`
+ * is checked for REGION_OFF_ACTIVE first, then `from` -- and RegionSolvePair
+ * has already checked `to` itself, so that one is doubled and `from`'s is the
+ * only one that can fire here.
+ *
+ * The links are SIX bytes apart and only the first int16 of each is read, so
+ * the other four are something this function does not use. `[esp+0x10]` counts
+ * every edge considered and is never read; both are reproduced.
+ *
+ * A path longer than AM2_REGION_DEPTH_MAX answers 0 -- "no path" -- rather
+ * than a truncated one, which is the right way round for a caller that writes
+ * the answer into a fixed matrix.
+ *
+ * NO DRIVE THIS PROJECT HAS REACHES IT, and that is probed rather than
+ * inferred: its counter is blind, so an am2_log here with a CONTROL at
+ * ObjAfterMove's top says the control fires 1,598 times on a live Boot Camp
+ * mission and this function fires ZERO. So tools/ab.sh is not evidence about
+ * this code in either direction, which is what tools/pathcheck.py exists for
+ * -- it emulates the ORIGINAL over fourteen seeded graphs and compares the
+ * return value, the length and every path entry.
+ *
+ * That oracle earned itself twice on its first two runs, once against the
+ * model and once against this file: the head-unlink defect above, and
+ * ApproxDistXY, whose behaviour dist.cpp's prose had rounded the wrong way.
+ */
+int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
+                               int32_t *len)
+{
+    uint8_t *goal;
+    uint8_t *start;
+    uint8_t *cur;
+    uint8_t *nb;
+    int32_t  edges = 0;
+    int32_t  i;
+    int32_t  off;
+
+    if (!*(const int32_t *)(RegionAt(to) + REGION_OFF_ACTIVE))
+        return 0;
+    if (!*(const int32_t *)(RegionAt(from) + REGION_OFF_ACTIVE))
+        return 0;
+
+    goal  = RegionAt(to);
+    start = RegionAt(from);
+
+    if (*(const int32_t *)(uintptr_t)ADDR_REGION_SEARCH_STATE == -1) {
+        *(uint8_t **)(uintptr_t)ADDR_REGION_GOAL      = goal;
+        *(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD = start;
+        *(int32_t *)(uintptr_t)ADDR_REGION_GENERATION += 1;
+
+        *(int32_t *)(start + REGION_OFF_G) = 0;
+        /* _ftol in the original; a C cast truncates toward zero the same
+         * way and the value cannot be negative here. */
+        *(int32_t *)(start + REGION_OFF_H) = (int32_t)
+            ((double)RegionSpan(start, goal)
+             * *(const double *)(uintptr_t)AM2_CONST_1_5);
+        *(int32_t *)(start + REGION_OFF_DEPTH)  = 0;
+        *(uint16_t *)(start + REGION_OFF_STAMP) =
+            (uint16_t)*(const int32_t *)(uintptr_t)ADDR_REGION_GENERATION;
+        *(uint8_t *)(start + REGION_OFF_STATE)  = AM2_REGION_STATE_OPEN;
+        *(void **)(start + REGION_OFF_PREV)     = (void *)0;
+        *(void **)(start + REGION_OFF_NEXT)     = (void *)0;
+        *(void **)(start + REGION_OFF_PARENT)   = (void *)0;
+    } else {
+        /* Dead -- see above. Written out because the original has it. */
+        *(void **)(uintptr_t)ADDR_REGION_OPEN_HEAD =
+            *(void *const *)(uintptr_t)ADDR_REGION_RESUME_NODE;
+        to = *(const int32_t *)(uintptr_t)ADDR_REGION_RESUME_GOALID;
+        *(int32_t *)(uintptr_t)ADDR_REGION_SEARCH_STATE = -1;
+    }
+
+    for (;;) {
+        uint8_t *next;
+
+        cur = *(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD;
+        if (!cur)
+            return 0;
+
+        *(uint8_t **)(uintptr_t)ADDR_REGION_CURRENT = cur;
+        next = *(uint8_t **)(cur + REGION_OFF_NEXT);
+        *(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD = next;
+        if (next)
+            *(void **)(next + REGION_OFF_PREV) = (void *)0;
+
+        *(uint8_t *)(cur + REGION_OFF_STATE) = AM2_REGION_STATE_CLOSED;
+
+        if (*(const int16_t *)(cur + REGION_OFF_ID) == (int16_t)to)
+            break;
+
+        off = 0;
+        for (i = 0; i < *(const uint8_t *)(cur + REGION_OFF_NLINKS);
+             i++, off += AM2_REGION_LINK_SIZE) {
+            const int16_t *links =
+                *(const int16_t *const *)(cur + REGION_OFF_LINKS);
+            int32_t g;
+            int32_t h;
+            uint8_t state;
+
+            edges++;
+
+            nb = RegionAt(*(const int16_t *)((const uint8_t *)links + off));
+            if (!*(const int32_t *)(nb + REGION_OFF_ACTIVE))
+                continue;
+
+            *(uint8_t **)(uintptr_t)ADDR_REGION_NEIGHBOUR = nb;
+
+            g = *(const int32_t *)(cur + REGION_OFF_G)
+                + RegionSpan(cur, nb) * AM2_REGION_STEP_WEIGHT;
+            h = (int32_t)((double)RegionSpan(nb, goal)
+                          * *(const double *)(uintptr_t)AM2_CONST_1_5);
+
+            if (*(const uint16_t *)(nb + REGION_OFF_STAMP)
+                != (uint16_t)*(const int32_t *)
+                       (uintptr_t)ADDR_REGION_GENERATION) {
+                *(uint16_t *)(nb + REGION_OFF_STAMP) =
+                    (uint16_t)*(const int32_t *)
+                        (uintptr_t)ADDR_REGION_GENERATION;
+                *(int32_t *)(nb + REGION_OFF_G)     = g;
+                *(int32_t *)(nb + REGION_OFF_H)     = h;
+                *(uint8_t **)(nb + REGION_OFF_PARENT) = cur;
+                *(int32_t *)(nb + REGION_OFF_DEPTH) =
+                    *(const int32_t *)(cur + REGION_OFF_DEPTH) + 1;
+                *(uint8_t *)(nb + REGION_OFF_STATE) = AM2_REGION_STATE_OPEN;
+            } else {
+                state = *(const uint8_t *)(nb + REGION_OFF_STATE);
+
+                if (state & AM2_REGION_STATE_OPEN) {
+                    uint8_t *p;
+                    uint8_t *n;
+
+                    if (g >= *(const int32_t *)(nb + REGION_OFF_G))
+                        continue;
+
+                    /* h is NOT rewritten here -- see above. */
+                    *(uint8_t **)(nb + REGION_OFF_PARENT) = cur;
+                    *(int32_t *)(nb + REGION_OFF_G)       = g;
+                    *(int32_t *)(nb + REGION_OFF_DEPTH)   =
+                        *(const int32_t *)(cur + REGION_OFF_DEPTH) + 1;
+
+                    /* Unlink, so the insertion below can place it again. */
+                    p = *(uint8_t **)(nb + REGION_OFF_PREV);
+                    n = *(uint8_t **)(nb + REGION_OFF_NEXT);
+                    if (p)
+                        *(uint8_t **)(p + REGION_OFF_NEXT) = n;
+                    else
+                        *(void **)(uintptr_t)ADDR_REGION_OPEN_HEAD =
+                            (void *)0;
+                    if (n)
+                        *(uint8_t **)(n + REGION_OFF_PREV) = p;
+                } else if (state & AM2_REGION_STATE_CLOSED) {
+                    continue;
+                }
+            }
+
+            /* Insert nb into the open list, sorted by g+h ascending. */
+            {
+                uint8_t *head =
+                    *(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD;
+                uint8_t *walk;
+                uint8_t *prev = (uint8_t *)0;
+                int32_t  f    = *(const int32_t *)(nb + REGION_OFF_G)
+                                + *(const int32_t *)(nb + REGION_OFF_H);
+
+                if (!head) {
+                    *(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD = nb;
+                    *(void **)(nb + REGION_OFF_NEXT) = (void *)0;
+                    *(void **)(nb + REGION_OFF_PREV) = (void *)0;
+                    continue;
+                }
+
+                for (walk = head; walk;
+                     walk = *(uint8_t **)(walk + REGION_OFF_NEXT)) {
+                    *(uint8_t **)(uintptr_t)ADDR_REGION_WALK = walk;
+                    if (*(const int32_t *)(walk + REGION_OFF_H)
+                        + *(const int32_t *)(walk + REGION_OFF_G) >= f)
+                        break;
+                    prev = walk;
+                    *(uint8_t **)(uintptr_t)ADDR_REGION_INSERT_PREV = prev;
+                }
+
+                if (prev) {
+                    uint8_t *after = *(uint8_t **)(prev + REGION_OFF_NEXT);
+
+                    *(uint8_t **)(nb + REGION_OFF_NEXT) = after;
+                    if (after)
+                        *(uint8_t **)(after + REGION_OFF_PREV) = nb;
+                    *(uint8_t **)(prev + REGION_OFF_NEXT) = nb;
+                    *(uint8_t **)(nb + REGION_OFF_PREV)   = prev;
+                } else {
+                    /* At the head. The original writes the OLD head's prev
+                     * through ADDR_REGION_OPEN_HEAD before moving it, which is
+                     * the same store written the long way round. */
+                    *(uint8_t **)(nb + REGION_OFF_NEXT) = head;
+                    *(void **)(nb + REGION_OFF_PREV)    = (void *)0;
+                    *(uint8_t **)(head + REGION_OFF_PREV) = nb;
+                    *(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD = nb;
+                }
+            }
+        }
+    }
+
+    /* Found: `cur` is the goal. */
+    *(uint8_t **)(uintptr_t)ADDR_REGION_WALK = cur;
+    if (*(const int32_t *)(cur + REGION_OFF_DEPTH) >= AM2_REGION_DEPTH_MAX)
+        return 0;
+
+    *len = *(const int32_t *)(cur + REGION_OFF_DEPTH) + 1;
+
+    {
+        int16_t *slot = path + *(const int32_t *)(cur + REGION_OFF_DEPTH);
+        uint8_t *walk = *(uint8_t **)(uintptr_t)ADDR_REGION_WALK;
+
+        while (walk) {
+            *slot-- = *(const int16_t *)(walk + REGION_OFF_ID);
+            walk = *(uint8_t **)(walk + REGION_OFF_PARENT);
+            *(uint8_t **)(uintptr_t)ADDR_REGION_WALK = walk;
+        }
+    }
+
+    (void)edges;
+    return 1;
+}
 
 /* RegionSolvePair -- original 0x00438300, four callers. Solve the route from
  * one region to another and record it in the two all-pairs byte matrices, so
@@ -4314,7 +4620,7 @@ void __cdecl RegionSolvePair(int32_t from, int32_t to)
               + (uint32_t)to * AM2_REGION_SIZE + REGION_OFF_ACTIVE))
         return;
 
-    if (!orig_region_find_path(from, to, path, &len)) {
+    if (!RegionFindPath(from, to, path, &len)) {
         stride = *(const int16_t *)(uintptr_t)ADDR_REGION_STRIDE;
         stamp  = *(const uint8_t *)(uintptr_t)ADDR_REGION_STAMP;
 
@@ -6206,6 +6512,8 @@ int region_install(void)
     rc |= patch_replace(ADDR_OBJ_HIT_MASK_ACTION,
                         (const void *)ObjHitMaskAction,
                         "ObjHitMaskAction", 2);
+    rc |= patch_replace(ADDR_REGION_FIND_PATH, (const void *)RegionFindPath,
+                        "RegionFindPath", 1);
     rc |= patch_replace(ADDR_ITEM_TEARDOWN, (const void *)ItemTeardown,
                         "ItemTeardown", 1);
     rc |= patch_replace(ADDR_BOX_ACTION, (const void *)BoxAction,

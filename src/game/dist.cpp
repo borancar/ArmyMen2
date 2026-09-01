@@ -46,9 +46,19 @@ int32_t __cdecl ApproxDist(const AM2_Point *a, const AM2_Point *b)
     return dx + dy - (lo >> 1);
 }
 
-/* 0x0042DE20. The same octagonal approximation as ApproxDist -- max + min/2,
- * written as dx + dy - min/2 -- but handed the deltas rather than two points.
- * ApproxDist is this with the subtraction done for it. */
+/* 0x0042DE20. The same octagonal approximation as ApproxDist, handed the
+ * deltas rather than two points; ApproxDist is this with the subtraction done
+ * for it.
+ *
+ * THIS COMMENT CALLED IT "max + min/2, written as dx + dy - min/2" AND THOSE
+ * ARE NOT THE SAME FUNCTION. `dx + dy - (min >> 1)` is max + min - min/2,
+ * which is max + CEIL(min/2), so the two differ for every odd min --
+ * ApproxDistXY(4, 3) is 6 and max + min/2 is 5. The code was always right; the
+ * prose beside it was a paraphrase that rounded the wrong way, and it was
+ * copied into tools/pathcheck.py's model, where it disagreed with the original
+ * on 40 of 81 small deltas and moved enough A* ties to pick different routes.
+ * A formula restated in words is a second implementation and can be wrong on
+ * its own. */
 int32_t __cdecl ApproxDistXY(int32_t dx, int32_t dy)
 {
     int32_t lo;
