@@ -9,7 +9,93 @@ Last updated: **2026-09-01**, at `ba116b4`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,364 patches.**
+Nothing uncommitted. **1,368 patches.**
+
+**`BuildTileDeltas` (`0x00437B60`) and the three POINT RULES** -- four
+functions in one 672-byte entry, all in `region.cpp` beside the walkers that
+consume them.
+
+**It is what builds three tables this project already walks.** `orig.h`
+described `ADDR_TILE_NEIGHBOURS` and `ADDR_TILE_RING8` as "built at map load"
+and named nothing that builds them; this is it, and `ADDR_DECAL_RING8` comes
+out of the same run. One number in -- `ADDR_MAP_TILES_W` -- and sixty-odd
+straight-line stores out, with no loop and no branch anywhere in the body.
+
+**The twenty neighbours are a 5x5 DIAMOND**: three cells on the row two above,
+five on the row above, four on its own row, five below and three two below.
+3+5+4+5+3 is 20, which independently confirms a bound `orig.h` had taken from
+the address the cover loops stop at. Two routes to one number.
+
+**The two rings hold the SAME EIGHT VALUES in the same order**, which nothing
+had said. `orig.h` named `ADDR_DECAL_RING8` "for its one consumer, which is
+what distinguishes it from the other two rings rather than anything in the
+data" -- and the data now says it is `ADDR_TILE_RING8`'s first eight entries
+exactly. The difference is that the tile ring stores them TWICE, so a walk
+starting anywhere in 0..7 runs eight steps without a wrap test.
+
+**A FOURTH table, and nothing reads it.** `0x00554B70` gets the four
+orthogonals -- north, east, south, west. This builder is the only reference to
+any of its four dwords in the whole image, and there is no indexed access on
+the base either. `ADDR_TILE_RING4`, named for its shape beside the two rings
+because there is no consumer to name it from.
+
+**`AM2_TILE_NEIGHBOURS` and `AM2_TILE_NEIGHBOUR_COUNT` were two names for 20**,
+both in use in `region.cpp`. Collapsed. That is the un-ratcheted value-constant
+class CLAUDE.md warns about -- and worth being precise about what it is:
+`orig.h` also holds three names for 4 and four for 15, and those are NOT the
+same defect. `AM2_COMM_SLOTS`, `AM2_COMM_ARMY_COUNT` and `AM2_REVEAL_ARMIES`
+are three concepts that share a value; the neighbour pair was one concept with
+two spellings. Only the second kind is worth collapsing.
+
+**The three point rules answer "is this tile REFUSED"**, and the polarity comes
+from the consumer rather than from any of them: `SettlePointInRegion` returns
+the tile it was handed when `!rule(tile)`. All three share a tail -- the asking
+army's reveal grid -- and differ in their first two tests.
+
+**The boat's pair is the interesting one.** It refuses a tile whose
+`AM2_TILE_OPEN` bit is clear and one whose `ADDR_TILE_COVER` is BELOW `0x15` --
+a floor where the other two rules apply a ceiling. That threshold sits against
+a table the footprint pair moves in fifteens, so it is not a count of
+footprints, and nothing read so far says what it is. Transcribed and said so.
+
+**`tools/ringcheck.py` is a new exact oracle, and nothing else could check
+this.** The tables never reach the screen or the log; a wrong delta shows up as
+a unit pathing oddly, which no A/B compares -- the same standing as the trig
+tables and the roach footprints. It emulates the original over ten map widths
+and diffs all 49 dwords, poisoning the tables first so a store the
+reconstruction makes and the original does not cannot pass by inheritance.
+Mutation-checked three ways -- swapping two neighbours, dropping the
+seventeenth ring slot, reordering the orthogonals -- each failing on all ten
+widths and naming the slot. It is also what makes the LOOP in the
+reconstruction safe: the original has none, so the grouping is ours.
+
+`make check` runs 24 tools now, and `checkclaims` caught the sentence that
+still said 23 -- which is the whole argument for that tool.
+
+**Closing the seam made three counters blind.** `SetPointRule` used to store
+`ADDR_POINT_RULE_VEHICLE` and friends into the dispatch global, which is the
+fourth spelling of a seam `checkseams` catches: naming a reconstructed address.
+It stores our function pointers now, so the dispatch reaches them directly and
+their counters cannot move. `BuildTileDeltas` is not blind -- its caller, the
+map loader at `0x0042C440`, is still original. Confirmed by
+`tools/blindspots.py --blind` rather than by reasoning: the three rules are in
+its "reached by address" list and the builder is in neither list. A `TRACE=1`
+probe reads `BuildTileDeltas=1` on a Boot Camp briefing, so it runs.
+
+**`ab.sh mission` failed its frames gate, and the control says it is not this
+change.** 25,768/636 twice in a row -- reproducible, which is what made it look
+real, since this file's load signature wanders rather than repeating. Stashed,
+rebuilt the parent, ran the same configuration: **25,838/644, 4012%**, with
+217,608 pixels against my 217,356, the same identical 16-node widget tree and
+the same identical 13-line log. Every figure within noise of the other, and the
+change not in the build.
+
+That is the second time this configuration has been controlled for and the
+second time it came back not-ours; the entry further down this file already
+records the first, at 5,999/315. The RATIO has roughly doubled since then --
+1904% to about 4000% -- which is worth noting because it means the gap is
+growing with something other than the reconstruction. Worth resolving one day;
+not resolvable by re-running.
 
 **`WarMenuConstruct` (`0x0042EED0`)** -- START A WAR, JOIN A WAR and CANCEL
 over a blank panel: the screen COMM. CHANNEL SELECT's SELECT reaches, and the
@@ -3834,14 +3920,16 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,195 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 44
-outstanding, which is 1,239 minus 1,195 -- from 1,364 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,196 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 43
+outstanding, which is 1,239 minus 1,196 -- from 1,368 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and thirty-four batches have gone in and NOTHING SMALL IS LEFT: the
-44 entries outstanding start at **672 bytes**, and the median is **1,168**.
+small ones in batches. A hundred and thirty-five batches have gone in and NOTHING SMALL IS LEFT: the
+43 entries outstanding start at **672 bytes** -- `0x00447620`, which is
+`CreateTrooper` and is deferred rather than unread -- and the median is
+**1,168**.
 The sentence here used to say they started at 96 and name the MSVC static-init
 glue at `0x004248A0` as the smallest; that entry is gone and so is the whole
 band under 480. What is left is real functions, so the strategy that ranked by

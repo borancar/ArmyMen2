@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **23** analysis
+**`make check` runs everything that does not need the game.** **24** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -174,6 +174,17 @@ So "grep the OFFSET before naming it" means the offset, not the prefix -- and
 the case where it matters most is exactly the case where the prefix is new,
 because that is when the checker cannot help. `0xC4` alone would have found it
 in one command.
+
+**Sharing a VALUE is not the same as being a duplicate, and only one of the
+two is worth collapsing.** `orig.h` holds three names for 4 --
+`AM2_COMM_SLOTS`, `AM2_COMM_ARMY_COUNT`, `AM2_REVEAL_ARMIES` -- and four for
+15, and none of those is a defect: comm slots, armies and reveal grids are
+three concepts that happen to number the same, and a footprint's weight step
+is not a passability threshold. What IS a defect is one concept under two
+spellings, which is what `AM2_TILE_NEIGHBOURS` and `AM2_TILE_NEIGHBOUR_COUNT`
+were -- the same table's bound, both in use in the same file. Collapsed. Any
+tool for this class has to key on the concept, not the number, which is why
+there is no ratchet and probably cannot be a cheap one.
 
 **Offset macros have no ratchet at all, and that is where the fourth duplicate
 of the session landed.** `checkpatches.py` counts `ADDR_` aliases and

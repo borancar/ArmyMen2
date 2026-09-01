@@ -244,6 +244,161 @@ void __cdecl BuildRegionGraph(void)
     }
 }
 
+/* BuildTileDeltas -- original 0x00437B60, one caller: the map loader. Fill the
+ * four delta tables from ADDR_MAP_TILES_W, so that a walk over a tile's
+ * neighbourhood is an add rather than an x/y decomposition.
+ *
+ * IT IS WHAT BUILDS THREE TABLES THIS FILE ALREADY WALKS. `orig.h` described
+ * ADDR_TILE_NEIGHBOURS and ADDR_TILE_RING8 as "built at map load" and named
+ * nothing that builds them; this is it, and ADDR_DECAL_RING8 comes out of the
+ * same run.
+ *
+ * THE TWENTY NEIGHBOURS ARE A 5x5 DIAMOND -- three cells on the row two above,
+ * five on the row above, four on its own row, five below and three two below,
+ * in raster order. That is 3+5+4+5+3 == AM2_TILE_NEIGHBOUR_COUNT exactly, and
+ * it is the independent confirmation of a bound `orig.h` had taken from the
+ * address the cover loops stop at.
+ *
+ * THE TWO RINGS HOLD THE SAME EIGHT VALUES IN THE SAME ORDER, which nothing
+ * had said: ADDR_DECAL_RING8 is one copy and ADDR_TILE_RING8 is two, so a walk
+ * starting anywhere in 0..7 runs eight steps without a wrap test. The
+ * seventeenth slot is -1 and is outside that scheme.
+ *
+ * THE ORIGINAL HAS NO LOOP. It is sixty-odd straight-line stores with the
+ * compiler juggling six registers, so the grouping here is ours; what makes
+ * that safe is an exact oracle rather than a reading. `tools/ringcheck.py`
+ * emulates the original over a range of widths and compares all four tables
+ * dword for dword.
+ *
+ * Nothing else can check it. The tables never reach the screen or the log,
+ * they are rebuilt per map, and a wrong delta would show up as a unit pathing
+ * oddly rather than as anything an A/B compares -- the same standing as the
+ * trig tables and the roach footprints. */
+void __cdecl BuildTileDeltas(void)
+{
+    const int32_t  w     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    int32_t *const decal = (int32_t *)(uintptr_t)ADDR_DECAL_RING8;
+    int32_t *const ring8 = (int32_t *)(uintptr_t)ADDR_TILE_RING8;
+    int32_t *const nb    = (int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS;
+    int32_t *const ring4 = (int32_t *)(uintptr_t)ADDR_TILE_RING4;
+    const int32_t  ring[AM2_TILE_RING8_STEPS] = {
+        -1 - w, -w, 1 - w, -1, 1, w + 1, w, w - 1
+    };
+    int32_t i;
+
+    for (i = 0; i < AM2_TILE_RING8_STEPS; i++) {
+        decal[i]                          = ring[i];
+        ring8[i]                          = ring[i];
+        ring8[i + AM2_TILE_RING8_STEPS]   = ring[i];
+    }
+    ring8[AM2_TILE_RING8_SLOTS - 1] = -1;
+
+    nb[0]  = -1 - 2 * w;                    /* the row two above: three */
+    nb[1]  = -2 * w;
+    nb[2]  = 1 - 2 * w;
+    nb[3]  = -2 - w;                        /* the row above: five */
+    nb[4]  = -1 - w;
+    nb[5]  = -w;
+    nb[6]  = 1 - w;
+    nb[7]  = 2 - w;
+    nb[8]  = -2;                            /* its own row, less the centre */
+    nb[9]  = -1;
+    nb[10] = 1;
+    nb[11] = 2;
+    nb[12] = w - 2;                         /* the row below: five */
+    nb[13] = w - 1;
+    nb[14] = w;
+    nb[15] = w + 1;
+    nb[16] = w + 2;
+    nb[17] = 2 * w - 1;                     /* the row two below: three */
+    nb[18] = 2 * w;
+    nb[19] = 2 * w + 1;
+
+    ring4[0] = -w;                          /* north, east, south, west */
+    ring4[1] = 1;
+    ring4[2] = w;
+    ring4[3] = -1;
+}
+
+/* THE THREE POINT RULES. Each answers "is this tile REFUSED" -- the polarity
+ * comes from SettlePointInRegion below, which returns the tile it was given
+ * when `!rule(tile)` -- and each takes the tile as a full dword and masks it
+ * to sixteen bits itself, because the callers pass a packed value.
+ *
+ * They share a tail: the asking army's reveal grid, guarded by the army being
+ * a real comm slot. That guard is `< AM2_COMM_SLOTS` on a value the selector
+ * copied out of OBJ_OFF_ARMY, so an army of 4 -- which the script layer uses
+ * for "nobody" -- skips the grid rather than indexing past it.
+ *
+ * WHAT DIFFERS IS THE FIRST TWO TESTS, and the boat's are the interesting
+ * pair. The vehicle rule refuses a BLOCKED tile and an OCCUPIED one; the boat
+ * refuses a tile that is not AM2_TILE_OPEN and one whose cover is BELOW
+ * AM2_BOAT_COVER_MIN -- a floor where the other two apply a ceiling. See
+ * ADDR_POINT_RULE_BOAT in orig.h for what that threshold is not.
+ *
+ * And the DEFAULT rule asks the reveal grid FIRST and the weight second,
+ * where the other two ask it last. Reproduced; nothing observable turns on
+ * it, since neither test has a side effect. */
+
+/* 0x00437D10 -- vehicles other than the boat, and roaches. */
+int32_t __cdecl PointRuleVehicle(int32_t tile)
+{
+    const uint16_t t    = (uint16_t)tile;
+    const int32_t  army = *(const int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY;
+
+    if ((*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)[t]
+        >= (int8_t)AM2_BLOCK_FULL)
+        return 1;
+
+    if ((*(const int8_t *const *)(uintptr_t)ADDR_TILE_COVER)[t] > 0)
+        return 1;
+
+    if (army < AM2_COMM_SLOTS
+        && ((const int8_t *const *)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[army][t]
+               > 0)
+        return 1;
+
+    return 0;
+}
+
+/* 0x00437D60 -- vehicle kind 5, the ptboat. */
+int32_t __cdecl PointRuleBoat(int32_t tile)
+{
+    const uint16_t t    = (uint16_t)tile;
+    const int32_t  army = *(const int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY;
+
+    if (!((*(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS)[t]
+          & AM2_TILE_OPEN))
+        return 1;
+
+    if ((*(const int8_t *const *)(uintptr_t)ADDR_TILE_COVER)[t]
+        < (int8_t)AM2_BOAT_COVER_MIN)
+        return 1;
+
+    if (army < AM2_COMM_SLOTS
+        && ((const int8_t *const *)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[army][t]
+               > 0)
+        return 1;
+
+    return 0;
+}
+
+/* 0x00437DB0 -- everything else, and a null object. */
+int32_t __cdecl PointRuleDefault(int32_t tile)
+{
+    const uint16_t t    = (uint16_t)tile;
+    const int32_t  army = *(const int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY;
+
+    if (army < AM2_COMM_SLOTS
+        && ((const int8_t *const *)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[army][t]
+               > 0)
+        return 1;
+
+    /* `setge` on the byte, not a branch -- the original's own tail. */
+    return (*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)[t]
+           >= (int8_t)AM2_BLOCK_FULL;
+}
+
 /* 0x00437E00, four callers -- and one of them is ADDR_SETTLE_POINT_IN_REGION
  * itself, which installs the rule and then dispatches through it in the same
  * breath. Choose which of three rules a point gets settled under, from the
@@ -280,16 +435,19 @@ void __cdecl SetPointRule(void *obj)
         if (ObjIsType3((const AM2_Object *)o)) {
             *(uint32_t *)(uintptr_t)ADDR_POINT_RULE =
                 *(const int32_t *)(o + VEHICLE_OFF_KIND) == AM2_VEHICLE_KIND_BOAT
-                    ? ADDR_POINT_RULE_BOAT : ADDR_POINT_RULE_VEHICLE;
+                    ? (uint32_t)(uintptr_t)PointRuleBoat
+                    : (uint32_t)(uintptr_t)PointRuleVehicle;
             return;
         }
 
-        *(uint32_t *)(uintptr_t)ADDR_POINT_RULE = ADDR_POINT_RULE_VEHICLE;
+        *(uint32_t *)(uintptr_t)ADDR_POINT_RULE =
+            (uint32_t)(uintptr_t)PointRuleVehicle;
         if (ObjIsType8((const AM2_Object *)o))
             return;
     }
 
-    *(uint32_t *)(uintptr_t)ADDR_POINT_RULE = ADDR_POINT_RULE_DEFAULT;
+    *(uint32_t *)(uintptr_t)ADDR_POINT_RULE =
+        (uint32_t)(uintptr_t)PointRuleDefault;
 }
 
 /* 0x0042B7F0, three callers. Of all the links `region` has to `to`, the index
@@ -1145,7 +1303,7 @@ void __cdecl TileCoverAdd(uint16_t tile)
     cover = *(uint8_t **)(uintptr_t)ADDR_TILE_COVER;
     cover[tile]++;
 
-    for (i = 0; i < AM2_TILE_NEIGHBOURS; i++)
+    for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++)
         cover[(int32_t)tile
               + ((const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS)[i]]++;
 }
@@ -1174,7 +1332,7 @@ void __cdecl TileCoverSub(uint16_t tile)
     cover = *(uint8_t **)(uintptr_t)ADDR_TILE_COVER;
     cover[tile]--;
 
-    for (i = 0; i < AM2_TILE_NEIGHBOURS; i++)
+    for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++)
         cover[(int32_t)tile
               + ((const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS)[i]]--;
 }
@@ -1216,7 +1374,7 @@ int32_t __cdecl MarkOpenTile(uint16_t tile)
 
     cover = *(const int8_t *const *)(uintptr_t)ADDR_TILE_COVER;
 
-    for (i = 0; i < AM2_TILE_NEIGHBOURS; i++) {
+    for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++) {
         int32_t at = (int32_t)tile
                      + ((const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS)[i];
 
@@ -5201,6 +5359,14 @@ int region_install(void)
      * one did, and the patch count not moving is what said so. */
     int rc = 0;
 
+    rc |= patch_replace(ADDR_BUILD_TILE_DELTAS,
+                        (const void *)BuildTileDeltas, "BuildTileDeltas", 1);
+    rc |= patch_replace(ADDR_POINT_RULE_VEHICLE,
+                        (const void *)PointRuleVehicle, "PointRuleVehicle", 1);
+    rc |= patch_replace(ADDR_POINT_RULE_BOAT,
+                        (const void *)PointRuleBoat, "PointRuleBoat", 1);
+    rc |= patch_replace(ADDR_POINT_RULE_DEFAULT,
+                        (const void *)PointRuleDefault, "PointRuleDefault", 1);
     rc |= patch_replace(ADDR_SET_POINT_RULE, (const void *)SetPointRule,
                         "SetPointRule", 4);
     rc |= patch_replace(ADDR_AI_STEP_IGNORE, (const void *)AiStepIgnore,

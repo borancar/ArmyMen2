@@ -11184,9 +11184,26 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x00439D60, three callers -- both AI families' common steps and 0x00408210.
  * Reconstructed. */
 #define ADDR_PLAN_PATH_TO        0x00439D60u  /* int32(obj, uint32 *, int32) */
+/* THE THREE RULES ANSWER "IS THIS TILE REFUSED", not "is it allowed", and the
+ * consumer is what says so: SettlePointInRegion returns the tile it was given
+ * when `!rule(tile)`. All three end by answering 0 for a tile they have found
+ * nothing against.
+ *
+ * They share a tail and differ in their first two tests. Every one of them
+ * refuses a tile the asking army's reveal grid has something on, and reads
+ * ADDR_POINT_RULE_ARMY to know which grid -- so the rules are army-aware, and
+ * a null object leaves that holding the previous object's army.
+ *
+ * The BOAT's two tests are the interesting pair: it refuses a tile whose
+ * AM2_TILE_OPEN bit is clear, and one whose ADDR_TILE_COVER is BELOW
+ * AM2_BOAT_COVER_MIN -- a floor rather than the ceiling the other two apply.
+ * That threshold is 0x15 against a table the footprint pair moves in fifteens,
+ * so it is not a count of footprints and nothing read so far says what it is.
+ * Transcribed. */
 #define ADDR_POINT_RULE_BOAT     0x00437D60u  /* vehicle kind 5 */
 #define ADDR_POINT_RULE_VEHICLE  0x00437D10u  /* other vehicles, and roaches */
 #define ADDR_POINT_RULE_DEFAULT  0x00437DB0u  /* everything else, and null */
+#define AM2_BOAT_COVER_MIN       0x15
 /* The kind is VEHICLE_OFF_KIND, further down and already named. */
 #define AM2_VEHICLE_KIND_BOAT    5
 /* The map's bounds in pixels, four int32 read as one 16-byte block out of the
@@ -12101,7 +12118,26 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * loop stops at, which is what fixes the count at twenty. */
 #define ADDR_TILE_NEIGHBOURS     0x00654BD8u  /* int32_t[20] */
 #define AM2_TILE_NEIGHBOUR_COUNT 20     /* 0x00654BD8..0x00654C28 */
-#define AM2_TILE_NEIGHBOURS      20
+/* THE BUILDER, and it fills four tables from one number. 0x00437B60 takes
+ * ADDR_MAP_TILES_W and writes ADDR_TILE_NEIGHBOURS, ADDR_TILE_RING8,
+ * ADDR_DECAL_RING8 and ADDR_TILE_RING4 in one run of straight-line stores
+ * with no loop at all -- which is why three of those four tables had been
+ * described as "built at map load" with no name for what builds them.
+ *
+ * The twenty neighbours are a 5x5 DIAMOND: three cells on the row two above,
+ * five on the row above, four on its own row, five below and three two below.
+ * The eight in ADDR_TILE_RING8 and ADDR_DECAL_RING8 are the same eight values
+ * in the same order, and ADDR_TILE_RING4 is the four orthogonals. */
+#define ADDR_BUILD_TILE_DELTAS   0x00437B60u  /* void(void) */
+/* The four orthogonal deltas -- north, east, south, west, in that order. This
+ * builder is the ONLY reference to any of the four dwords in the whole image:
+ * nothing reads them, and no indexed access uses the base either. Written and
+ * unused, and named for its shape beside the two rings rather than for a
+ * consumer, because there is none to name it from. */
+#define ADDR_TILE_RING4          0x00554B70u  /* int32_t[4] */
+#define AM2_TILE_RING4_COUNT     4
+#define AM2_TILE_RING8_STEPS     8      /* the ring itself */
+#define AM2_TILE_RING8_SLOTS     17     /* doubled, plus the odd seventeenth */
 /* The +1/-1 pair, and the reader that turns their two tables into tile flags.
  * All three share one bounds test: 2 <= x < width-2 and 2 <= y < height-2,
  * which is what keeps `tile + delta` inside the map without a per-neighbour

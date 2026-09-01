@@ -37,7 +37,18 @@ int32_t __cdecl MiddleRegionLink(int32_t region, int32_t to);
 
 /* 0x00437E00. Choose which of three rules a point gets settled under, from
  * the object asking. See region.cpp for why it lives here. */
+/* 0x00437B60, one caller -- the map loader. Fill the four tile-delta tables
+ * from ADDR_MAP_TILES_W: the 5x5 diamond, the eight-ring twice over, one copy
+ * of the ring for the decals and the four orthogonals. */
+void __cdecl BuildTileDeltas(void);
+
 void __cdecl SetPointRule(void *obj);
+
+/* 0x00437D10, 0x00437D60 and 0x00437DB0, the three rules SetPointRule chooses
+ * between. Each answers "is this tile REFUSED"; see the note in region.cpp. */
+int32_t __cdecl PointRuleVehicle(int32_t tile);
+int32_t __cdecl PointRuleBoat(int32_t tile);
+int32_t __cdecl PointRuleDefault(int32_t tile);
 
 /* 0x00407BF0, one caller. The `ignore` arm of the AI mode dispatcher at
  * 0x00407F80 -- mode 2. Walk to the remembered destination; on arrival, turn
