@@ -29,6 +29,8 @@
 #define AM2_PLACE_H
 
 #include <stdint.h>
+#include "image.h"        /* AM2_IMAGE -- the MakePlacedUnit seam below */
+#include "../inject/orig.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -104,5 +106,23 @@ int place_install(void);
  * as one of that army's placed units? A vehicle always; a trooper unless it is
  * Sarge or carries something; an item only if some non-unit type claims it. */
 int32_t __cdecl IsPlacedUnit(void *obj, int32_t army);
+
+/* 0x0043B160, one caller -- the manual placement screen. Take a placed unit
+ * back off the map and put its cost back into `points`. */
+void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points);
+
+/* MakePlacedUnit is still original and reached by address. It is shared by
+ * this module and by the manual placement screen in win32/widget.cpp, so the
+ * seam is HERE rather than in either of them -- one signature, in the same
+ * file as the reconstructions around it, which is the whole argument against
+ * a local typedef. It is a live layer under both callers rather than
+ * something waiting on them, as PlacementAllowed was until it was
+ * reconstructed above. */
+typedef void (__cdecl *AM2_MakePlacedFn)(uint32_t where, int32_t type,
+                                         int32_t slot, int32_t *points,
+                                         int32_t facing, int32_t group,
+                                         const char *name);
+
+#define orig_make_placed  (*(AM2_MakePlacedFn)AM2_IMAGE(ADDR_MAKE_PLACED_UNIT))
 
 #endif /* AM2_PLACE_H */

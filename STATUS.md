@@ -5,11 +5,64 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-08-31**, at `0b64d4e`. Working tree clean.
+Last updated: **2026-09-01**, at `ba116b4`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,289 patches.**
+Nothing uncommitted. **1,363 patches.**
+
+**`PlacementScreenClick` (`0x00413BC0`)** -- the manual placement screen's
+click handler, and the layer directly above the three functions place.cpp
+already held: `IsPlacedUnit`, `PlacementAllowed` and `RefundPlacedUnit` are
+each reached from here and from nowhere else in the image.
+
+**Two modes, and `ADDR_HUD_DIRTY` chooses.** Set, the click BUYS the selected
+unit; clear, it SELLS whatever is under the pointer. The two arms are mirror
+images -- hit test, predicate, tell the cursor what was decided, check the
+mouse, transact, reprint the points.
+
+**Buying happens on RELEASE and selling on PRESS.** Both arms test
+`ADDR_MOUSE_BUTTON` and `ADDR_MOUSE_CHANGED` and they test them in opposite
+senses: `jne` on the button in one and `je` in the other. Neither half is
+remarkable alone and the pair is only visible with both in view -- the same
+argument for reading siblings side by side that found the two role-swap
+defects earlier in this run.
+
+**It settles what the 1..8 keys select.** `orig.h` said `ADDR_NUMBER_KEY_SLOT`
+went "into a formatting call beside `ADDR_OUR_POINTS`, `ADDR_HUD_INDEX` and
+`ADDR_DIR_SCRATCH`" and that what it selects "is decided there and not here".
+It is decided there: the call is `MakePlacedUnit`, not a formatting call, and
+the slot is its `group` argument -- the same column the shipped
+`<map>_<colour>_place.txt` lines carry as their fifth field. `ADDR_HUD_INDEX`
+is not an argument at all; the unit TYPE derived from it is.
+
+**Its private helper is a CURSOR.** `0x004127B0` has exactly two references,
+both in this function, and its first instructions write argument 1 into
+`ADDR_MENU_ROW` -- the global `OverlayPrepare` picks a cursor row with. So the
+ghost unit hanging off the pointer is the menu cursor wearing a different
+sprite, and this bypasses `OverlayPrepare`'s one-row-per-millisecond throttle
+by writing the row itself. It is `ADDR_PLACE_CURSOR_PREPARE` now.
+
+**And its fourth argument is easy to lose.** The army from `CommArmyOfSlot` is
+pushed one instruction BEFORE the branch that chooses between the accept and
+reject arms, so it belongs to both -- a push on the common path that reads
+like a leftover until the `add esp, 0x10` underneath it is counted.
+
+**Two panel fields named, from the constructor rather than from here.**
+`HUDPANEL_OFF_POINTS_TEXT` (0x6C) and `HUDPANEL_OFF_POINTS_FIELD` (0x68): the
+panel's constructor sprintfs `ADDR_OUR_POINTS` into the buffer and then makes
+an edit widget over it, and this function rewrites the buffer and repaints
+that widget every time points are spent or refunded. Three sites, and they are
+the only ones in the image that touch either field.
+
+It lives in `win32/widget.cpp` rather than the flat `place.cpp`, because its
+tail dispatches a widget's paint slot with a `RECT` by value. `place.h` now
+carries the `MakePlacedUnit` seam both modules need, instead of a local
+typedef in one of them.
+
+Cold on every configuration the suite has -- manual placement is a
+multiplayer setup screen -- so `bootcamp` and `campaign` are a no-regression
+check and the reading is the evidence.
 
 **`EvalOperand` (`0x00421590`)** -- one side of a testvar comparison, eight
 kinds through a jump table, with anything past them answering the operand
@@ -3721,14 +3774,15 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,193 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 46
-outstanding, which is 1,239 minus 1,193 -- from 1,362 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,194 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 45
+outstanding, which is 1,239 minus 1,194 -- from 1,363 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and thirty-two batches have gone in and NOTHING SMALL IS LEFT: the
-46 entries outstanding start at **480 bytes**, and the median is over 1,000.
+small ones in batches. A hundred and thirty-three batches have gone in and NOTHING SMALL IS LEFT: the
+45 entries outstanding start at **592 bytes** -- `0x0042EED0`, the
+START A WAR / JOIN A WAR screen's constructor -- and the median is **1,168**.
 The sentence here used to say they started at 96 and name the MSVC static-init
 glue at `0x004248A0` as the smallest; that entry is gone and so is the whole
 band under 480. What is left is real functions, so the strategy that ranked by

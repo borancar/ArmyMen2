@@ -1580,6 +1580,12 @@ void __attribute__((thiscall)) MpPreviewSetBitmap(void *self, const char *name);
 /* 0x00413A30, four callers. Repaint one HUD widget if it has been marked. */
 void __cdecl HudRepaintOne(void);
 
+/* 0x00413BC0, one caller. The manual placement screen's click handler: buys
+ * a unit when ADDR_HUD_DIRTY says the player is placing, sells the one under
+ * the pointer when it does not. Its argument is never read -- the slot is
+ * reused for the world point straight away. */
+void __cdecl PlacementScreenClick(uint32_t at);
+
 /* 0x0041A170, three callers. The width of the HUD panel, or 0 when there is
  * none -- and the 0 is what lets the callers clamp without a special case. */
 int32_t __cdecl HudPanelWidth(void);

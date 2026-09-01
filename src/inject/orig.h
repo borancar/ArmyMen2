@@ -418,6 +418,50 @@
  * each one IS has not been established here. */
 #define ADDR_HUD_WIDGET_A  0x004FCF00u  /* AM2_Widget * */
 #define ADDR_HUD_WIDGET_B  0x004FCF54u
+/* Set to 1 in the same two instructions as ADDR_HUD_DIRTY, by 0x00418F78, and
+ * read once -- by PlacementScreenClick, after a unit has gone down, to decide
+ * whether to repaint the panel. One writer, one reader, and neither says what
+ * it MEANS, so it keeps a field-numbered name. */
+#define ADDR_PLACE_FLAG_4FCF88 0x004FCF88u  /* int32_t */
+/* The facing a placed unit gets. PlacementScreenClick owns it outright --
+ * the only function in the image that reads or writes it -- rotating it by
+ * AM2_PLACE_FACING_STEP on two action keys and handing it to both
+ * PlacementAllowed and MakePlacedUnit. A BYTE, so it wraps on its own. */
+#define ADDR_PLACE_FACING      0x004FCF8Cu  /* uint8_t */
+#define AM2_PLACE_FACING_STEP  4
+/* 0x00413BC0, one caller. The manual placement screen's click handler, and
+ * the layer above IsPlacedUnit, PlacementAllowed and RefundPlacedUnit.
+ * Reconstructed in win32/widget.cpp rather than the flat place.cpp, because
+ * its tail dispatches a widget's paint slot with a RECT by value. */
+#define ADDR_PLACE_SCREEN_CLICK 0x00413BC0u  /* void(uint32_t) */
+/* 0x004127B0, and its only two references are the two arms of the function
+ * above -- so it is that function's private helper and nothing else's.
+ *
+ * IT IS A CURSOR, which its first instructions settle: argument 1 goes
+ * straight into ADDR_MENU_ROW, the same global OverlayPrepare picks a row
+ * with, and the rest of the body looks a soldier, vehicle or turret animation
+ * up by kind, heading and army colour. So the ghost unit the placement screen
+ * hangs off the pointer is the MENU CURSOR wearing a different sprite, not a
+ * layer of its own -- and this bypasses OverlayPrepare's one-row-per-
+ * millisecond throttle by writing the row itself.
+ *
+ * Argument 2 is the yes/no PlacementAllowed just answered, and the caller
+ * passes it on a refusal as well as an acceptance, which is presumably how
+ * the cursor turns red. Arguments 3 and 4 are the facing and the army. */
+#define ADDR_PLACE_CURSOR_PREPARE 0x004127B0u /* void(row, ok, facing, army) */
+/* The build menu's eighteen entries sit at ADDR_MENU_ROW 0x13 and up, past
+ * the nineteen rows ADDR_MENU_SPRITES holds -- which is the arithmetic and
+ * not a claim about what rows 0x13.. contain, since the helper above builds
+ * those sprites itself rather than reading them out of that table. */
+#define AM2_PLACE_CURSOR_ROW_BASE 0x13
+/* The cursor row the placement screen shows over a unit it could sell. Row 0
+ * is what it asks for over anything else, including empty ground. */
+#define AM2_OVERLAY_ROW_SELL      0x11
+/* Actions 0..3 are up, down, left and right -- W/S/A/D with the arrow keys as
+ * the alternates, read straight out of the binding table at 0x004854BC. The
+ * placement screen rotates its facing with the last two. */
+#define AM2_ACTION_LEFT           2
+#define AM2_ACTION_RIGHT          3
 #define ADDR_HUD_WIDGET_C  0x004FCF4Cu  /* may be null */
 /* THE SEVEN HUD CLASSES, and every name here comes from what the widget dump
  * shows the node DRAWING -- not from its constructor, its geometry alone, or
@@ -640,6 +684,15 @@
  * the radar writes the PANEL's field -- ADDR_HUD_WIDGET_B + 0x8C -- and not
  * its own, which is what settles that this offset belongs to one class rather
  * than to the family. HUD_SQUAD_PAIR_HI is 0x8C on a different class. */
+/* The points readout, and the panel's CONSTRUCTOR is what binds the pair:
+ * it sprintfs ADDR_OUR_POINTS into +0x6C with "%i", then makes an edit widget
+ * over that buffer with a length of 0xC and stores it at +0x68. The placement
+ * screen does the same two steps in the other order every time it spends or
+ * refunds points -- rewrite the buffer, then repaint the widget through its
+ * own paint slot -- and those three sites are the only ones in the image that
+ * touch either field. */
+#define HUDPANEL_OFF_POINTS_FIELD 0x68u  /* AM2_Widget *, drawn from below */
+#define HUDPANEL_OFF_POINTS_TEXT  0x6Cu  /* char[0xC] */
 #define HUDPANEL_OFF_CAPTION   0x8Cu  /* char[], emptied every update */
 #define ADDR_HUD_PANEL_UPDATE  0x004193C0u  /* thiscall void(obj) */
 #define ADDR_HUD_RADAR_UPDATE  0x00414890u  /* thiscall void(obj) */
@@ -807,10 +860,19 @@
 #define ADDR_HUD_REPAINT_ONE   0x00413A30u  /* void(void) */
 #define ADDR_HUD_DIRTY         0x004FCF84u  /* int32_t */
 #define ADDR_HUD_INDEX         0x004FCF50u  /* int32_t, into the table below */
-/* 0..7, latched by TakeNumberKey from the 1..8 keys. Its ONLY reader is
- * 0x00413BC0, which pushes it into a formatting call beside ADDR_OUR_POINTS,
- * ADDR_HUD_INDEX and ADDR_DIR_SCRATCH -- so what the number selects is
- * decided there and not here. Named for how it is written. */
+/* 0..7, latched by TakeNumberKey from the 1..8 keys, and its only reader is
+ * PlacementScreenClick.
+ *
+ * WHAT IT SELECTS IS SETTLED NOW. This comment used to say the reader "pushes
+ * it into a formatting call beside ADDR_OUR_POINTS, ADDR_HUD_INDEX and
+ * ADDR_DIR_SCRATCH", which was a reading of the argument block from the
+ * outside and got two of the three wrong: the call is MakePlacedUnit, not a
+ * formatting call; ADDR_HUD_INDEX is not an argument at all -- the unit TYPE
+ * derived from it is; and the slot lands in the `group` parameter. So the
+ * 1..8 keys choose which GROUP a placed unit joins, which is the same column
+ * the shipped <map>_<colour>_place.txt lines carry as their fifth field. The
+ * name still says how it is written, and now the comment says what it is
+ * for. */
 #define ADDR_NUMBER_KEY_SLOT   0x004FCF90u  /* int32_t 0..7 */
 /* 0x00413A80, one caller. Eight arms, DIK 2..9 -- the 1..8 keys -- each
  * latching its index into the above on a fresh press. Reconstructed. */

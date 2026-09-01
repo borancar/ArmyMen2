@@ -33,17 +33,6 @@
 #define kUnitType(i) ((const uint8_t *)AM2_IMAGE(ADDR_UNIT_TYPES) \
                       + (size_t)(i) * AM2_UNIT_TYPE_STRIDE)
 
-/* MakePlacedUnit is still original and reached by address. It is shared with
- * the manual placement screen at 0x00413BC0, so it is a live layer under this
- * one rather than something waiting on it -- as PlacementAllowed was until it
- * was reconstructed below, taking its typedef with it. */
-typedef void (__cdecl *AM2_MakePlacedFn)(uint32_t where, int32_t type,
-                                         int32_t slot, int32_t *points,
-                                         int32_t facing, int32_t group,
-                                         const char *name);
-
-#define orig_make_placed     (*(AM2_MakePlacedFn)AM2_IMAGE(ADDR_MAKE_PLACED_UNIT))
-
 /* 0x0043B3D0. The three globals are cleared in the original's order --
  * pointer, capacity, count -- which nothing can observe, and reproduced
  * because nothing can observe it either way. */
