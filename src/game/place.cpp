@@ -7,6 +7,9 @@
 #include "definfo.h"  /* DefParseInfoFile */
 #include "packkey.h"  /* PackKey -- reconstructed */
 #include "misc.h"     /* CommArmyOfSlot -- reconstructed */
+#include "item.h"     /* BlockWeightAt, MaskBlockWeight -- reconstructed */
+#include "region.h"   /* CanPlaceAt -- reconstructed */
+#include "map.h"      /* TileOfPoint -- reconstructed */
 #include "objtable.h"  /* AM2_Object */
 #include "objtype.h"   /* ObjIsItem, ObjIsTypeIn238 -- reconstructed */
 #include "gamedir.h"  /* SetGameDir */
@@ -30,18 +33,15 @@
 #define kUnitType(i) ((const uint8_t *)AM2_IMAGE(ADDR_UNIT_TYPES) \
                       + (size_t)(i) * AM2_UNIT_TYPE_STRIDE)
 
-/* Still original, and both reached by address. They are shared with the manual
- * placement screen at 0x00413BC0, so they are a live layer under this one
- * rather than something waiting on it. */
-typedef int32_t (__cdecl *AM2_PlaceAllowedFn)(uint32_t where, int32_t type,
-                                              int32_t slot, int32_t points,
-                                              int32_t facing);
+/* MakePlacedUnit is still original and reached by address. It is shared with
+ * the manual placement screen at 0x00413BC0, so it is a live layer under this
+ * one rather than something waiting on it -- as PlacementAllowed was until it
+ * was reconstructed below, taking its typedef with it. */
 typedef void (__cdecl *AM2_MakePlacedFn)(uint32_t where, int32_t type,
                                          int32_t slot, int32_t *points,
                                          int32_t facing, int32_t group,
                                          const char *name);
 
-#define orig_place_allowed   (*(AM2_PlaceAllowedFn)AM2_IMAGE(ADDR_PLACEMENT_ALLOWED))
 #define orig_make_placed     (*(AM2_MakePlacedFn)AM2_IMAGE(ADDR_MAKE_PLACED_UNIT))
 
 /* 0x0043B3D0. The three globals are cleared in the original's order --
@@ -145,7 +145,7 @@ void __cdecl LoadArmyPlacement(int32_t slot)
     for (i = 0; i < g_placementCount; i++) {
         const AM2_Placement *p = &g_placements[i];
 
-        if (orig_place_allowed(p->where, p->type, slot, points, p->facing))
+        if (PlacementAllowed(p->where, p->type, slot, points, p->facing))
             orig_make_placed(p->where, p->type, slot, &points, p->facing,
                              p->group, p->name);
     }
@@ -369,6 +369,141 @@ int32_t __cdecl UnitKindMatches(int32_t code, int32_t kind, int32_t n)
 }
 
 
+/* PlacementAllowed -- original 0x0043A810, two callers: the `place` line
+ * parser and the manual placement screen. May this unit type go down at this
+ * point, for this comm slot, on this budget? The name is ours and predates
+ * the reading; the body agrees with it.
+ *
+ * AN EIGHTEEN-WAY SWITCH, ONE ARM PER ADDR_UNIT_TYPES RECORD, and it is
+ * unreadable until that table is dumped. See orig.h: 0..4 are the soldiers,
+ * 5..9 the vehicles, 10..16 the buildings, 17 the mine. Then:
+ *
+ *   THE VEHICLE ARMS ARE NOT SCRAMBLED. They pass MaskBlockWeight kinds 1, 0,
+ *   2, 3, 5 in table order, which reads exactly like WeaponClassOf's jump
+ *   table laying its arms out in one order and dispatching them in another --
+ *   and is not. Each arm passes ITS OWN RECORD'S +0x08: tank 1, jeep 0,
+ *   halftrack 2, truck 3, ptboat 5. The apparent scramble is the table's.
+ *
+ *   THE BUILDING ARMS ARE THE THIRD MEMBER OF A FAMILY. Arm 10+k uses the
+ *   same set id SpriteKeyForKind and UnitKindMatches use for kind k -- 0x26
+ *   for 0, 1 and 2, 0x20 for 3, 0x21 for 4, 0x2A for 5, 0x1F for 6 -- and the
+ *   same (n+1)*10, n*10+11 and n*10+12 arithmetic. It picks a SUBSET of
+ *   UnitKindMatches' candidates: the two extras for kinds 3 and 4, the bare
+ *   `1` for kind 5, the only one there is for kind 6.
+ *
+ *   AND THAT TRIO'S THREE-WAY SHARE IS EXPLAINED HERE. Kinds 0, 1 and 2 are
+ *   riflepill, bazookapill and mgpill, all on set 0x26. The jump tables show
+ *   the share; the record table says what it is.
+ *
+ * ARM 16 ENDS INSIDE ARM 15 -- it pushes its three arguments and `jmp`s into
+ * the middle of the radar arm to make the call and run its tail. Second
+ * instance today, after UnitKindMatches' kind 3, and the same lesson: read
+ * the branch, not the layout.
+ *
+ * THE `kind` IT HANDS CanPlaceAt IS AN ARMY, and this function is what
+ * settles what ADDR_TILE_KIND's bytes mean -- `(army + 1) * 0x10`, computed
+ * once and used twice: as CanPlaceAt's third argument and again on the
+ * placement's own tile in the final test. See orig.h. Everything else in the
+ * function can pass and that last comparison still refuses, so the tile the
+ * cursor is over has to belong to you.
+ *
+ * ONE BRANCH IS NOT REPRODUCED AND CANNOT FIRE. `cmp ax, 0xFFFF` followed by
+ * `ja` is taken only when a sixteen-bit value exceeds 0xFFFF. The bytes are
+ * `66 3d ff ff / 0f 87`, so it is `ja` and not `jae` or `je`; VC6 emitted a
+ * comparison it could have folded. Writing it out would only draw a
+ * compiler warning saying the same thing. Same treatment as
+ * UpdateMouseState's unreachable `je`, and the comment is the record.
+ *
+ * THE WEIGHT CHECK IS SHARED AND HALF THE ARMS JUMP PAST IT. Arms 0..9, 13,
+ * 14 and 17 reach `cmp ebx, 0xF`; the rest go straight to the tile test. It
+ * is written here as one test after the switch, which is the same outcome:
+ * those arms leave the accumulator at its initial zero and zero is never
+ * AM2_BLOCK_FULL.
+ *
+ * CommArmyOfSlot IS CALLED TWICE on every arm that needs the army -- once for
+ * the tile kind and once inside the arm. One local here; the two calls cannot
+ * disagree.
+ */
+int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
+                                 int32_t pts, int32_t facing)
+{
+    void    *comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
+    int32_t  tile;
+    int32_t  army;
+    int32_t  kind;
+    int32_t  weight = 0;
+    int32_t  rec;
+
+    if (!CanAffordUnit(type, pts))
+        return 0;
+
+    tile = TileOfPoint(where);
+    /* `cmp ax, 0xFFFF; ja` sits here and cannot be taken -- see above. */
+
+    army = CommArmyOfSlot(comm, slot);
+    kind = (army + 1) * AM2_TILE_KIND_ARMY_STEP;
+
+    switch ((uint32_t)type) {
+    /* The five soldiers, and the mine. */
+    case 0: case 1: case 2: case 3: case 4: case 17:
+        weight = BlockWeightAt((void *)0, where, where);
+        break;
+
+    /* The five vehicles, each passing its record's own kind. */
+    case 5: weight = MaskBlockWeight(1, facing, where); break;
+    case 6: weight = MaskBlockWeight(0, facing, where); break;
+    case 7: weight = MaskBlockWeight(2, facing, where); break;
+    case 8: weight = MaskBlockWeight(3, facing, where); break;
+    case 9: weight = MaskBlockWeight(5, facing, where); break;
+
+    /* riflepill, bazookapill, mgpill -- one set between them. */
+    case 10: case 11: case 12:
+        rec = EnsureSpriteAaiRecord(0x26, (army + 1) * 10, 0);
+        if (rec != -1 && !CanPlaceAt(where, rec, kind))
+            return 0;
+        break;
+
+    case 13:  /* medtent */
+        rec = EnsureSpriteAaiRecord(0x20, (army + 1) * 10, 0);
+        if (rec != -1 && !CanPlaceAt(where, rec, kind))
+            weight = AM2_BLOCK_FULL;
+        rec = EnsureSpriteAaiRecord(0x20, army * 10 + 11, 0);
+        if (rec != -1 && !CanPlaceAt(where, rec, kind))
+            weight += AM2_BLOCK_FULL;
+        break;
+
+    case 14:  /* garage */
+        rec = EnsureSpriteAaiRecord(0x21, (army + 1) * 10, 0);
+        if (rec != -1 && !CanPlaceAt(where, rec, kind))
+            weight = AM2_BLOCK_FULL;
+        rec = EnsureSpriteAaiRecord(0x21, army * 10 + 12, 0);
+        if (rec != -1 && !CanPlaceAt(where, rec, kind))
+            weight += AM2_BLOCK_FULL;
+        break;
+
+    case 15:  /* radar */
+        rec = EnsureSpriteAaiRecord(0x2A, 1, 0);
+        if (rec != -1 && !CanPlaceAt(where, rec, kind))
+            return 0;
+        break;
+
+    case 16:  /* aagun */
+        rec = EnsureSpriteAaiRecord(0x1F, (army + 1) * 10, 0);
+        if (rec != -1 && !CanPlaceAt(where, rec, kind))
+            return 0;
+        break;
+
+    default:
+        break;
+    }
+
+    if (weight >= AM2_BLOCK_FULL)
+        return 0;
+
+    return ((const uint8_t *)*(void *const *)(uintptr_t)ADDR_TILE_KIND)
+               [(uint32_t)tile & 0xFFFFu] == (uint32_t)kind ? 1 : 0;
+}
+
 /* IsPlacedUnit -- original 0x0043B0A0, one caller, which is the manual
  * placement screen at 0x00413BC0. Does this object count as one of that army's
  * placed units? The name is ours, from the caller and from what each arm
@@ -463,6 +598,9 @@ int place_install(void)
     rc |= patch_replace(ADDR_UNIT_KIND_MATCHES,
                         (const void *)UnitKindMatches,
                         "UnitKindMatches", 2);
+    rc |= patch_replace(ADDR_PLACEMENT_ALLOWED,
+                        (const void *)PlacementAllowed,
+                        "PlacementAllowed", 2);
 
     rc |= patch_replace(ADDR_FREE_PLACEMENTS, (const void *)FreePlacements,
                         "FreePlacements", 1);

@@ -57,6 +57,15 @@ void __cdecl AddPlacement(const AM2_Placement *rec);
  * table: +0x20 is the cost and +0x24 is the game-type mask. */
 int32_t __cdecl CanAffordUnit(int32_t type, int32_t points);
 
+/* 0x0043A810, two callers. May unit type `type` -- an index into
+ * ADDR_UNIT_TYPES -- be placed at `where` for comm slot `slot` on a budget of
+ * `pts`? One switch arm per record: a footprint weight for the soldiers, the
+ * mine and the vehicles, a CanPlaceAt against the building's own sprite for
+ * the rest, and in every case the tile under the point must belong to that
+ * slot's army. */
+int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
+                                 int32_t pts, int32_t facing);
+
 /* 0x0043A560. Build "<map>_<colour>_place.txt" for one comm slot. Returns
  * `dest`, which is what the original leaves in eax. */
 char *__cdecl BuildPlacementPath(char *dest, int32_t slot);

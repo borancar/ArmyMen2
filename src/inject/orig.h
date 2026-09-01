@@ -1384,9 +1384,21 @@
  * supplies: 0x0042C761 mallocs width * height and freads straight into it,
  * with a second path that allocates and zeroes when the file has none. One
  * accessor returns the byte for a tile and CanPlaceAt requires every cell of a
- * placement to match a value the caller passes. What the value MEANS is not
- * established -- only that it is per tile, comes off disk, and has to match. */
+ * placement to match a value the caller passes.
+ *
+ * THE VALUE IS ESTABLISHED NOW, AND IT IS AN ARMY. PlacementAllowed computes
+ * `(CommArmyOfSlot(comm, slot) + 1) * 0x10` and uses it twice -- as the `kind`
+ * it hands every CanPlaceAt, and again on the placement's own tile in its
+ * final test. So the byte is 0x10 for army 0, 0x20 for army 1, 0x30 and 0x40
+ * for 2 and 3, and a tile whose byte is something else belongs to somebody
+ * else. A slot with no army answers -1, which makes the product 0; what 0
+ * means is arithmetic here and is not read anywhere as a claim.
+ *
+ * Writer and reader, one function apart, which is the pairing this project
+ * asks for before believing a layout -- the note above stood for months on
+ * the reader alone. */
 #define ADDR_TILE_KIND         0x00514ED4u /* uint8_t *, one per tile index */
+#define AM2_TILE_KIND_ARMY_STEP  0x10   /* (army + 1) * this is the tile byte */
 /* 0x0042BCF0, one caller. Seal the map's four edges with a full cell weight,
  * then walk every tile once: block what is marked open, mark what is blocked,
  * and flag everything outside a five-tile margin. */
@@ -2777,6 +2789,23 @@
  * whether the unit may go there; the second puts it there and takes the cost
  * out of the points, which is why it gets the budget BY ADDRESS. */
 #define ADDR_PLACEMENT_ALLOWED   0x0043A810u  /* int32(where,type,slot,pts,facing) */
+/* ITS EIGHTEEN-WAY SWITCH IS INDEXED BY ADDR_UNIT_TYPES, one arm per record,
+ * and the table above is what makes the arms readable:
+ *
+ *   0..4   the five soldiers, and 17, the mine -- BlockWeightAt on the point
+ *   5..9   the five vehicles -- MaskBlockWeight, and the kind each passes is
+ *          its own record's +0x08: tank 1, jeep 0, halftrack 2, truck 3,
+ *          ptboat 5. NOT a scrambled mapping, which is what it looks like
+ *          until the table is dumped
+ *   10..16 the buildings -- EnsureSpriteAaiRecord then CanPlaceAt, with the
+ *          same six set ids ADDR_SPRITE_KEY_FOR_KIND and
+ *          ADDR_UNIT_KIND_MATCHES use, selected by record +0x08 minus nothing
+ *          at all: arm 10+k uses kind k
+ *
+ * AND IT EXPLAINS WHY THOSE TWO FUNCTIONS SHARE ARM ZERO THREE WAYS. Kinds 0,
+ * 1 and 2 are riflepill, bazookapill and mgpill, and all three are set 0x26 --
+ * three buildings on one sprite set. The jump tables could only show that the
+ * share exists; the record table says what it is. */
 #define ADDR_MAKE_PLACED_UNIT    0x0043ACF0u  /* void(where,type,slot,&pts,facing,
                                                * group,name) */
 #define AM2_COMM_ARMY_COUNT      4

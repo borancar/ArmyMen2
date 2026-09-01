@@ -3721,14 +3721,14 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,176 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 63
-outstanding, which is 1,239 minus 1,176 -- from 1,343 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,177 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 62
+outstanding, which is 1,239 minus 1,177 -- from 1,344 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
 small ones in batches. A hundred and thirty-two batches have gone in and NOTHING SMALL IS LEFT: the
-63 entries outstanding start at **480 bytes**, and the median is over 1,000.
+62 entries outstanding start at **480 bytes**, and the median is over 1,000.
 The sentence here used to say they started at 96 and name the MSVC static-init
 glue at `0x004248A0` as the smallest; that entry is gone and so is the whole
 band under 480. What is left is real functions, so the strategy that ranked by
