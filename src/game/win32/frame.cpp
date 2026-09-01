@@ -393,7 +393,7 @@ void __cdecl FramePost(void)
         return;
 
     FlushDelayedSends();
-    call0(ADDR_COMM_FRAME_POST_C);
+    ProcessResendQueue();
 
     if (MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL)
         < AM2_COMM_MIN_BUFFERS)

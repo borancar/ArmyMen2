@@ -2241,6 +2241,11 @@
  * them. */
 #define ADDR_MSG_LIST_B          0x004F48C8u
 #define ADDR_MSG_LIST_C          0x0048D8D8u
+/* The one packet ProcessResendQueue stages a resend in: MsgListTakeFlags
+ * copies a message body here, the checksum is recomputed over it in place,
+ * and CommSend is handed this address. A single shared buffer, so nothing
+ * may hold a pointer into it across calls. */
+#define ADDR_RESEND_BUF          0x004FAE68u
 #define ADDR_MSG_LIST_DELAYED    0x004F8780u
 #define ADDR_COMM_EVENT          0x0048D8F8u  /* HANDLE, signalled to stop the thread */
 #define ADDR_COMM_EVENT_2        0x0048D8FCu  /* HANDLE */
@@ -6113,6 +6118,12 @@ typedef struct {
  * it stamps the same value into the packet before the send loop, so every
  * player in one flush is told the same number. FLOW_OFF_READY gates the flush
  * entirely: no flow queue for ourselves yet and nothing goes out. */
+/* ProcessResendQueue is the only reader of these two: it refuses to resend a
+ * packet whose PACKET_OFF_SEQ is below +0x0C, and stamps PACKET_OFF_ACK from
+ * +0x04. Field-numbered, since one reader is not a meaning -- read a writer
+ * before relying on either. */
+#define FLOW_OFF_FIELD_04          0x04u
+#define FLOW_OFF_FIELD_0C          0x0Cu
 #define FLOW_OFF_READY             0x88u
 #define FLOW_OFF_SEQUENCE          0x94u
 /* The trooper fields this touches. Only the two positions and the facing are
@@ -8738,6 +8749,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define PACKET_OFF_LEN           4u
 #define PACKET_OFF_SEQ           8u
 #define PACKET_OFF_CHECKSUM      0x0Cu
+/* +0x10, stamped from the destination flow's +0x04 just before a resend. The
+ * only writer is ProcessResendQueue and the only reader is the far end, so
+ * this is named for what it is FED, not for what it means. */
+#define PACKET_OFF_ACK           0x10u
 #define PACKET_HEADER_SIZE       0x14u
 #define COMM_ARMY_OFF_CHKSUM_ERRS 0x260u  /* int32_t, one per player */
 /* 0x0040FBB0, "Unknown Army Msg Item Type %d, msgtype:%d, item uid: %x;
@@ -9617,7 +9632,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_E_INVALIDARG         0x80070057u  /* the game prints it as DPLAY */
 #define AM2_DPERR_INVALIDPLAYER  0x88770096u
 #define AM2_DPERR_SENDTOOBIG     0x887700E6u
-#define ADDR_COMM_FRAME_POST_C   0x00403050u
+/* IT NAMES ITSELF three times -- "Entering ProcessResendQueue",
+ * "RESENDING %d to %x size %d", "Exiting ProcessResendQueue". The old name
+ * here said where it sits in the frame, not what it does. Reconstructed. */
+#define ADDR_PROCESS_RESEND_QUEUE 0x00403050u  /* void(void) */
 #define AM2_COMM_MIN_BUFFERS     10           /* below this, COMM ERROR: NO BUFFERS */
 #define AM2_COMM_OFF_ACTIVE      0x3DCu       /* gates all the comm frame work */
 #define ADDR_STATE_LEAVE_COMMON  0x00426640u  /* states 0 and 3 tail-jump here */

@@ -257,6 +257,12 @@ void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst);
  * those bits, copy its body to dst, and answer the bits taken. */
 int32_t __cdecl MsgListTakeFlags(void *list, void *dst);
 
+/* 0x00403050, one caller. Drain up to THREE messages off the resend list,
+ * sending each to every player whose resend mask wants it. Names itself in
+ * its own log lines; the old ADDR_COMM_FRAME_POST_C said where it sits in
+ * the frame. Cold: needs a live DirectPlay session. */
+void __cdecl ProcessResendQueue(void);
+
 /* 0x00401150, one caller. Insert a node in ascending key order under the
  * list's mutex, and answer the node. */
 void *__cdecl MsgListInsert(void *list, void *node);

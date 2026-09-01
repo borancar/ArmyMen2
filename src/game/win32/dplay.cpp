@@ -31,6 +31,7 @@
 #include "frame.h"
 #include "cdcheck.h"
 #include "../msgslot.h"
+#include "../misc.h"     /* XorChecksum -- reconstructed */
 #include "../objtable.h"
 #include "../commmsg.h"  /* CommInitDefaults -- reconstructed */
 #include "../../inject/patch.h"
@@ -2501,6 +2502,123 @@ int32_t __cdecl CommGlobalInit(void)
     return CommGlobalAtExit();
 }
 
+/* ProcessResendQueue -- original 0x00403050, 560 bytes, one caller. Drain up
+ * to three messages off the resend list, sending each to every player whose
+ * resend mask wants it.
+ *
+ * IT NAMES ITSELF THREE TIMES -- "Entering ProcessResendQueue",
+ * "RESENDING %d to %x size %d", "Exiting ProcessResendQueue" -- where orig.h
+ * had it as ADDR_COMM_FRAME_POST_C, a name for where it sits in the frame
+ * rather than for what it does. Fourth function this batch to be named from
+ * its own log lines.
+ *
+ * THREE MESSAGES PER CALL, and that bound is explicit: `inc esi; cmp esi, 2;
+ * jg` ends the outer loop, so a backed-up queue drains at a fixed rate instead
+ * of in one burst. A CommSend failure abandons the whole drain, not just that
+ * player.
+ *
+ * THE CHECKSUM FIELD IS ZEROED BEFORE IT IS COMPUTED. XorChecksum runs over
+ * the whole buffer including that field, so leaving the previous value there
+ * would give a different answer; the order is load-bearing and not tidiness.
+ *
+ * ITS SIX EXITS ARE ONE EXIT AND A DIAGNOSTIC LADDER. Five of them are
+ * per-HRESULT arms that all do the same thing -- log and stop -- and every one
+ * of those codes was already named, by the sibling in commmsg.cpp that walks
+ * the identical CommSend failure chain. Written to match that function rather
+ * than as five returns.
+ *
+ * THE PACKET LAYOUT WAS ALREADY NAMED and confirms the read: PACKET_OFF_LEN,
+ * PACKET_OFF_SEQ and PACKET_OFF_CHECKSUM are 4, 8 and 0x0C, exactly where the
+ * disassembly puts them, so only +0x10 is new here. COMM_OFF_PLAYER_SLOTS and
+ * AM2_COMM_PLAYERS existed too.
+ *
+ * COLD, AND SAID PLAINLY: nothing here runs without a live DirectPlay session,
+ * which this environment cannot open. Verified by reading; a clean A/B says
+ * only that nothing else regressed.
+ */
+void __cdecl ProcessResendQueue(void)
+{
+    uint8_t  *comm;
+    uint8_t  *buf = (uint8_t *)(uintptr_t)ADDR_RESEND_BUF;
+    int32_t   taken;
+    int32_t   drained = 0;
+
+    taken = MsgListTakeFlags((void *)(uintptr_t)ADDR_MSG_LIST_C, buf);
+    if (!taken)
+        return;
+
+    comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+
+    for (;;) {
+        int32_t off;
+
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE) && drained == 0)
+            orig_log("Entering ProcessResendQueue \n");
+
+        for (off = 0; off < (int32_t)(AM2_COMM_PLAYERS * AM2_COMM_SLOT_STRIDE);
+             off += AM2_COMM_SLOT_STRIDE) {
+            uint32_t id = *(const uint32_t *)(comm + COMM_OFF_PLAYER_SLOTS + off);
+            uint8_t *flow;
+            int32_t  hr;
+
+            if (!id || id == 0xFFFFFFFFu
+                || id == *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID))
+                continue;
+
+            flow = (uint8_t *)FindPlayerById(id);
+            if (!flow)
+                continue;
+            if (!(taken & (int32_t)GetReSendMask(id)))
+                continue;
+            if (*(const uint32_t *)(buf + PACKET_OFF_SEQ)
+                < *(const uint32_t *)(flow + FLOW_OFF_FIELD_0C))
+                continue;
+
+            *(uint32_t *)(buf + PACKET_OFF_ACK) =
+                *(const uint32_t *)(flow + FLOW_OFF_FIELD_04);
+            *(uint32_t *)(buf + PACKET_OFF_CHECKSUM) = 0;
+            *(uint32_t *)(buf + PACKET_OFF_CHECKSUM) = XorChecksum(buf);
+
+            MsgSlotA2(flow, *(const uint32_t *)(buf + PACKET_OFF_SEQ));
+
+            hr = CommSend(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT, id, 0,
+                          buf, *(const uint32_t *)(buf + PACKET_OFF_LEN));
+
+            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                orig_log("RESENDING %d to %x size %d \n",
+                        *(const int32_t *)(buf + PACKET_OFF_SEQ), id,
+                        *(const int32_t *)(buf + PACKET_OFF_LEN));
+
+            if (hr < 0) {
+                orig_log("DPlaySend Failure %x to %x size %d\n", hr, id,
+                        *(const int32_t *)(buf + PACKET_OFF_LEN));
+
+                if ((uint32_t)hr == AM2_DPERR_BUSY)
+                    orig_log("DPLAY ERROR: Busy\n");
+                else if ((uint32_t)hr == AM2_DPERR_INVALIDOBJECT)
+                    orig_log("DPLAY ERROR: Invalid Object\n");
+                else if ((uint32_t)hr == AM2_E_INVALIDARG)
+                    orig_log("DPLAY ERROR: INVALID PARAMETERS\n");
+                else if ((uint32_t)hr == AM2_DPERR_INVALIDPLAYER)
+                    orig_log("DPLAY ERROR: INVALID PLAYER\n");
+                else if ((uint32_t)hr == AM2_DPERR_SENDTOOBIG)
+                    orig_log("DPLAY ERROR: Send too big\n");
+                return;
+            }
+        }
+
+        if (++drained > 2)
+            break;
+
+        taken = MsgListTakeFlags((void *)(uintptr_t)ADDR_MSG_LIST_C, buf);
+        if (!taken)
+            break;
+    }
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE) && drained)
+        orig_log("Exiting ProcessResendQueue \n");
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -2528,6 +2646,9 @@ int dplay_install(void)
     rc |= patch_replace(ADDR_MSG_LIST_TAKE_FLAGS,
                         (const void *)MsgListTakeFlags,
                         "MsgListTakeFlags", 2);
+    rc |= patch_replace(ADDR_PROCESS_RESEND_QUEUE,
+                        (const void *)ProcessResendQueue,
+                        "ProcessResendQueue", 1);
     rc |= patch_replace(ADDR_MSG_LIST_INSERT, (const void *)MsgListInsert,
                         "MsgListInsert", 1);
     rc |= patch_replace(ADDR_COMM_PLAYER_LEFT, (const void *)CommPlayerLeft,
