@@ -696,6 +696,15 @@ extern "C" void __cdecl SpeakItemPickupLine(int32_t, int32_t)
 {
 }
 
+/* gameproc.cpp's Teardown40A4B0 now calls BuildRemapTables by name, and that
+ * lives in win32/palette.cpp, which the selftest cannot link -- it names
+ * DirectDraw types. A stub for the same reason as the two above: nothing here
+ * has a palette, and no vector reaches a function that takes no arguments and
+ * only writes globals. */
+extern "C" void __cdecl BuildRemapTables(void)
+{
+}
+
 /* armymsg.cpp's TellOneSlot now calls AppendTroopState by name, and that lives
  * in commmsg.cpp which is not in SELFTEST_SRC. A stub rather than pulling the
  * whole comm module in: nothing here has a message buffer to append to, and a

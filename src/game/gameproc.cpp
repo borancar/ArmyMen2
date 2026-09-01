@@ -1696,7 +1696,11 @@ typedef void (__cdecl *AM2_Call3Fn)(int32_t a, int32_t b, int32_t c);
 #define orig_teardown_log   ((AM2_TeardownFn)(uintptr_t)ADDR_LOG)
 #define orig_free_list_a    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_LIST_662024)
 #define orig_free_list_b    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_LIST_662928)
-#define orig_free_40a4b0    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_40A4B0)
+/* 0x0040A4B0 is BuildRemapTables, reconstructed in win32/palette.cpp and
+ * called by name -- see the note below. Declared here rather than by
+ * including that header: gameproc.cpp is on the flat side of the split and
+ * palette.h names Win32 types, while this one signature names none. */
+extern "C" void __cdecl BuildRemapTables(void);
 #define orig_free_40a5f0    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_40A5F0)
 #define orig_big_405220     ((AM2_Call3Fn)(uintptr_t)ADDR_BIG_405220)
 
@@ -1748,10 +1752,17 @@ void __cdecl TeardownDefTables(void)
 
 /* 0x0040A690. Two steps, the second a tail jump -- and both halves sit inside
  * ONE functions.tsv entry, which is why the second has no entry of its own
- * and why tools/merges.py is what finds it. */
+ * and why tools/merges.py is what finds it.
+ *
+ * ITS NAME IS NOW KNOWN TO BE WRONG and is left for the commit that fixes it
+ * properly. The first step is BuildRemapTables, which FILLS four army remaps,
+ * sixty-four variation blocks and a grey ramp -- so this is an INIT, and
+ * "Teardown" came from the same guess ADDR_FREE_40A4B0 did. Whether the
+ * second step frees anything is unread; renaming the pair on half the
+ * evidence is what put the wrong name here in the first place. */
 void __cdecl Teardown40A4B0(void)
 {
-    orig_free_40a4b0();
+    BuildRemapTables();
     orig_free_40a5f0();
 }
 

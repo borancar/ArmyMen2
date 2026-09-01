@@ -79,6 +79,12 @@ uint8_t __cdecl NearestPalIndex(const uint32_t *palette, uint32_t colour,
 uint8_t __cdecl NearestPalIndexRGB(const uint32_t *pal, uint32_t r, uint32_t g,
                                    uint32_t b, uint32_t from);
 
+/* 0x0040A4B0, one caller. Build every palette remap the game owns: the four
+ * army tables at ADDR_OBJ_TABLE_RECORDS, four more ramps beside them, sixty-
+ * four randomised variation blocks, and the grey ramp at
+ * ADDR_ROW_LUT_DOUBLES. Every one is the identity above AM2_REMAP_COLOURS. */
+void __cdecl BuildRemapTables(void);
+
 /* 0x0041B6D0 and the two halves under it. Read an 8-bit .bmp's palette and
  * expand it into the renderer's pair of 256-entry tables. */
 int32_t __cdecl ReadBitmapPalette(const char *path, BITMAPINFO *out);

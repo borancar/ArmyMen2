@@ -7625,7 +7625,42 @@ typedef struct {
 #define ADDR_HOST_MASK_A         0x00516078u  /* uint32_t */
 #define ADDR_HOST_MASK_B         0x0051607Cu  /* uint32_t */
 #define ADDR_HOST_VALUE_3E8      0x00516090u  /* int32_t, set to 1000 */
-#define ADDR_FREE_40A4B0         0x0040A4B0u  /* void(void) */
+/* NOT A FREE. It BUILDS every palette remap the game owns, and orig.h already
+ * half knew: ADDR_ROW_LUT_DOUBLES is described as "filled at 0x0040A5C2 and
+ * 0x0040A5D7", which are both inside this function. Four things in one pass:
+ *
+ *   the four ARMY remaps at ADDR_OBJ_TABLE_RECORDS -- so an object's "table"
+ *   is a 256-byte palette remap, which is how a script recolours a unit and
+ *   what AM2_OBJ_TABLE_REC_SIZE has been measuring all along;
+ *   four more at 0x004F96CC, built from the same bases without asking the
+ *   palette at all;
+ *   sixty-four blocks of randomised ten-colour rows, six rows each, with a
+ *   table of pointers to them;
+ *   and the grey ramp at ADDR_ROW_LUT_DOUBLES.
+ *
+ * Every remap is IDENTITY above index 10 and only the first ten entries are
+ * ever changed, which is what makes a palette with a reserved block at the
+ * bottom remappable at all. Reconstructed. */
+#define ADDR_BUILD_REMAP_TABLES  0x0040A4B0u  /* void(void) */
+/* One palette index per army, {206, 216, 186, 196}, and every remap this
+ * builder writes starts from one of them. */
+#define ADDR_ARMY_PAL_BASE       0x00474174u  /* uint8_t[4] */
+/* The second set of four, built without the palette: entry i takes
+ * base + (i >> 1), so ten entries come out as five doubled steps. */
+#define ADDR_ARMY_RAMP_TABLES    0x004F96CCu  /* uint8_t[4][0x100] */
+/* Sixty-four blocks of 0x100 bytes and the table of pointers into them. Each
+ * block holds six rows of ten, and each ROW picks a random army base -- so
+ * these are the randomised colour variations, decided once at startup. */
+#define ADDR_VARIATION_BLOCKS    0x004FE2C0u  /* uint8_t[64][0x100] */
+#define ADDR_VARIATION_END       0x005022C0u
+#define ADDR_VARIATION_TABLE     0x00507130u  /* uint8_t *[64] */
+#define AM2_REMAP_COLOURS        10     /* entries below this are remapped */
+#define AM2_VARIATION_ROWS       6
+#define AM2_ARMY_PAL_BASES       4
+/* The `from` every NearestPalIndexRGB call in the builder passes. CLAUDE.md
+ * records that argument arriving as 0, 9, 10, 60 and 100 over 8,498 calls;
+ * this is where the 100 comes from. */
+#define AM2_PAL_REMAP_FROM       100
 #define ADDR_FREE_40A5F0         0x0040A5F0u  /* void(void) */
 /* 0x0044CD40 is the third: qsort the table with ADDR_COMPARE_DWORD and then
  * TAIL-JUMP to 0x0045CAA0. That address is ADDR_LOG, which src/inject/gamelog.c

@@ -642,11 +642,115 @@ void __cdecl LoadTilesetPalettes(void)
                         (uint8_t *)AM2_IMAGE(ADDR_TILESET_PALETTES)
                             + i * AM2_TILESET_PALETTE_BYTES);
 }
+/* The game's own rand, through the image, the way event.cpp and item.cpp
+ * reach it -- BuildRemapTables below picks a base per row with it. */
+typedef int32_t (__cdecl *AM2_PalRandFn)(void);
+#define orig_rand ((AM2_PalRandFn)AM2_IMAGE(ADDR_GAME_RAND))
+
+
+/* BuildRemapTables -- original 0x0040A4B0, one caller, and it is not a free.
+ * orig.h called it ADDR_FREE_40A4B0 and, one screen away, described
+ * ADDR_ROW_LUT_DOUBLES as "filled at 0x0040A5C2 and 0x0040A5D7" -- both of
+ * which are inside THIS function. The two notes were about the same code and
+ * neither knew it.
+ *
+ * IT BUILDS EVERY PALETTE REMAP THE GAME OWNS, in four passes:
+ *
+ *   THE FOUR ARMY REMAPS, at ADDR_OBJ_TABLE_RECORDS. Each is 256 bytes; the
+ *   first ten entries are the closest ACTIVE palette index to the ten colours
+ *   starting at that army's ADDR_ARMY_PAL_BASE, taken out of the saved
+ *   palette copy, and the other 246 are the identity. So AN OBJECT'S "TABLE"
+ *   IS A PALETTE REMAP -- which is what AM2_OBJ_TABLE_REC_SIZE has been
+ *   measuring, and how the `setobjtable` script statement recolours a unit.
+ *
+ *   FOUR MORE at ADDR_ARMY_RAMP_TABLES, built without asking the palette at
+ *   all: entry i is base + (i >> 1), so the ten come out as five doubled
+ *   steps, and the rest is again the identity.
+ *
+ *   SIXTY-FOUR VARIATION BLOCKS and a table of pointers to them. Each block is
+ *   six rows of ten, and each ROW picks a random army base -- so the
+ *   variations are decided once, at startup, by GameRand.
+ *
+ *   AND THE GREY RAMP at ADDR_ROW_LUT_DOUBLES, ten entries from a descending
+ *   grey and 246 of identity.
+ *
+ * EVERY REMAP IS IDENTITY ABOVE TEN and only the first ten entries are ever
+ * touched, which is the reserved-block convention NearestPalIndex's `from`
+ * argument follows from the other side -- air.h already names it. Ten colours
+ * per army is the whole of the recolouring.
+ *
+ * THE IDENTITY FILL IS WRITTEN WITH THE INDEX ITSELF, `mov [base+eax], al`,
+ * which is why it starts at ten rather than zero: the first ten have already
+ * been written and would be overwritten by their own indices.
+ */
+void __cdecl BuildRemapTables(void)
+{
+    const uint8_t  *base = (const uint8_t *)AM2_IMAGE(ADDR_ARMY_PAL_BASE);
+    const uint8_t  *pal  = (const uint8_t *)(uintptr_t)ADDR_PALETTE_COPY;
+    uint8_t        *obj  = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS;
+    uint8_t        *ramp = (uint8_t *)(uintptr_t)ADDR_ARMY_RAMP_TABLES;
+    uint8_t       **table = (uint8_t **)(uintptr_t)ADDR_VARIATION_TABLE;
+    uint8_t        *block = (uint8_t *)(uintptr_t)ADDR_VARIATION_BLOCKS;
+    int32_t         army;
+    int32_t         i;
+
+    for (army = 0; army < AM2_ARMY_PAL_BASES; army++) {
+        uint8_t *rec = obj + (uint32_t)army * AM2_OBJ_TABLE_REC_SIZE;
+        uint8_t *rmp = ramp + (uint32_t)army * AM2_OBJ_TABLE_REC_SIZE;
+
+        for (i = 0; i < AM2_REMAP_COLOURS; i++) {
+            const uint8_t *c = pal + ((uint32_t)base[army] + (uint32_t)i) * 4;
+
+            rec[i] = NearestPalIndexRGB(
+                *(const uint32_t *const *)(uintptr_t)ADDR_ACTIVE_PALETTE,
+                c[0], c[1], c[2], AM2_PAL_REMAP_FROM);
+        }
+        for (i = AM2_REMAP_COLOURS; i < (int32_t)AM2_OBJ_TABLE_REC_SIZE; i++)
+            rec[i] = (uint8_t)i;
+
+        for (i = 0; i < AM2_REMAP_COLOURS; i++)
+            rmp[i] = (uint8_t)(base[army] + (i >> 1));
+        for (i = AM2_REMAP_COLOURS; i < (int32_t)AM2_OBJ_TABLE_REC_SIZE; i++)
+            rmp[i] = (uint8_t)i;
+    }
+
+    while (block < (uint8_t *)(uintptr_t)ADDR_VARIATION_END) {
+        int32_t row;
+
+        *table = block;
+
+        for (row = 0; row < AM2_VARIATION_ROWS; row++) {
+            int32_t pick = orig_rand() % AM2_ARMY_PAL_BASES;
+
+            for (i = 0; i < AM2_REMAP_COLOURS; i++)
+                (*table)[row * AM2_REMAP_COLOURS + i] =
+                    (uint8_t)(base[pick] + i);
+        }
+
+        block += AM2_OBJ_TABLE_REC_SIZE;
+        table++;
+    }
+
+    for (i = 0; i < AM2_REMAP_COLOURS; i++)
+        ((uint8_t *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)[i] =
+            NearestPalIndexRGB(
+                *(const uint32_t *const *)(uintptr_t)ADDR_ACTIVE_PALETTE,
+                (uint32_t)(uint8_t)(0x24 - i * 4),
+                (uint32_t)(uint8_t)(0x28 - i * 4),
+                (uint32_t)(uint8_t)(0x28 - i * 4),
+                AM2_PAL_REMAP_FROM);
+
+    for (i = AM2_REMAP_COLOURS; i < (int32_t)AM2_OBJ_TABLE_REC_SIZE; i++)
+        ((uint8_t *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)[i] = (uint8_t)i;
+}
 
 int palette_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_BUILD_REMAP_TABLES,
+                        (const void *)BuildRemapTables,
+                        "BuildRemapTables", 1);
     rc |= patch_replace(ADDR_NEAREST_PAL_RGB, (const void *)NearestPalIndexRGB,
                         "NearestPalIndexRGB", 5);
     rc |= patch_replace(ADDR_NEAREST_PAL_INDEX, (const void *)NearestPalIndex,
