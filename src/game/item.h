@@ -286,6 +286,20 @@ void __cdecl ObjSetRoachFootprint(void *obj);
  * message and gameproc.cpp for LoadType3. The typedef is HERE rather than in
  * either of them, for the reason the five copies of CreateExplosion's made
  * plain: a second private typedef is a second place to be wrong. */
+/* CreateWeapon, still original -- the type-4 arm of the item-create message,
+ * and it names itself in its own log line. Eight arguments.
+ *
+ * ITS SECOND IS AN ARMY, NOT A TYPE, and the two callers are what settle it:
+ * MakePlacedUnit passes a comm slot there and item.cpp passed a literal 4,
+ * which had been written AM2_OBJ_TYPE_WEAPON. The callee hands the argument to
+ * CommMustBroadcast, which takes an army -- so the literal is AM2_ARMY_NEUTRAL
+ * and the two concepts merely share a value. Corrected at that call site. */
+typedef void *(__cdecl *AM2_CreateWeaponFn)(const char *name, int32_t army,
+                                            int32_t key, uint32_t at,
+                                            int32_t flags, int32_t quantity,
+                                            int32_t g, int32_t h);
+#define CreateWeapon (*(AM2_CreateWeaponFn)AM2_IMAGE(ADDR_CREATE_WEAPON))
+
 typedef void *(__cdecl *AM2_CreateVehicleFn)(int32_t kind, const char *name,
                                              int32_t x, int32_t y, int32_t a5,
                                              int32_t army, int32_t flags,

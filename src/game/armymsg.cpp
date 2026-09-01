@@ -931,9 +931,8 @@ void __cdecl RecvDamage(void *msg)
 /* CreateItem is reconstructed and called by name; its typedef went with it. */
 /* CreateTrooper is reconstructed too, and its typedef went with it. */
 /* AM2_CreateVehicleFn moved to item.h -- gameproc.cpp wants it too. */
-typedef void *(__cdecl *AM2_CreateWeaponFn)(const char *, int32_t, int32_t,
-                                            int32_t, int32_t, int32_t,
-                                            int32_t, uint32_t);
+/* AM2_CreateWeaponFn moved to item.h -- place.cpp wants it too, and its
+ * second argument is an ARMY rather than the type it was called there. */
 /* ItemPostCreate -- original 0x0043A210, four callers.
  *
  * Walk the 5x5 block of map tiles around a new object and increment the entry
@@ -1017,7 +1016,7 @@ void __cdecl ItemPostCreate(int32_t army, uint32_t where)
 
 #define orig_create_trooper  CreateTrooper
 #define orig_create_vehicle  CreateVehicle
-#define orig_create_weapon   ((AM2_CreateWeaponFn)(uintptr_t)ADDR_CREATE_WEAPON)
+#define orig_create_weapon   CreateWeapon
 
 /* SendItemCreate -- original 0x0042AB50, FOUR callers, and they are the four
  * creators: CreateItem, CreateTrooper, CreateVehicle and CreateWeapon. So

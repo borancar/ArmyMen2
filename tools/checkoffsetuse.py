@@ -52,6 +52,10 @@ meant to run as a report over a named function, not as a wall.
 
 Regression test: revert those three sites to OBJ_OFF_OWNER; this must flag
 0x04 as used-by-C-not-original and 0x10 as the reverse.
+
+The C side has its COMMENTS stripped before names are collected: a comment
+naming the macro a reading got wrong is prose, not code, and reading it made
+this report an offset the function does not use.
 """
 
 import os, re, subprocess, sys
@@ -131,6 +135,13 @@ def c_offsets(path, func):
         raise SystemExit('no definition of ' + func)
     i = m.start()
     body = src[i:src.index('\n}\n', i)]
+    # COMMENTS ARE NOT CODE, and reading them is how this reported a name the
+    # function does not use: a note saying "+0x540, not OBJ_OFF_SOLDIER_KIND at
+    # +0x544" put 0x544 in the C's set. tools/checkseams.py had to learn the
+    # same thing -- it was scanning comments, where every ADDR_ name in this
+    # tree is discussed, and went from about two hundred false sites to 21.
+    body = re.sub(r'/\*.*?\*/', ' ', body, flags=re.S)
+    body = re.sub(r'//[^\n]*', ' ', body)
     # Offsets live in orig.h AND in the module headers -- CHECK_OFF_TICKED is
     # in win32/widget.h, and looking only at orig.h reported it unnamed.
     hdr = ''

@@ -1576,6 +1576,14 @@ which is why the list is empirical rather than aspirational.
    spots; four produce false positives, which is why it is a report and not a
    gate.
 
+   **And it read the C's COMMENTS, which is how it reported a macro the
+   function does not use.** A note saying "+0x540, not `OBJ_OFF_SOLDIER_KIND`
+   at +0x544" put 0x544 in the C's set and the tool flagged it as unread by the
+   original -- true, and about the prose rather than the code. Comments are
+   stripped now. `tools/checkseams.py` had to learn exactly this and went from
+   about two hundred false sites to 21; any check that scans this tree's source
+   has to, because the comments discuss every name in it.
+
    **It matched only `__cdecl` definitions, so it had never seen a thiscall
    one -- which is the entire menu widget layer.** Every `*Construct` and every
    vtable slot answered `no definition of <name>`, and that reads like a typo

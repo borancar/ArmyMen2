@@ -14,6 +14,10 @@
 #include "objtype.h"   /* ObjIsItem, ObjIsTypeIn238 -- reconstructed */
 #include "gamedir.h"  /* SetGameDir */
 #include "crt.h"       /* the game's allocator -- this table is its memory */
+#include "armymsg.h"   /* SendTrooperSetWeapon -- reconstructed */
+#include "maprow.h"    /* RowUpdate -- reconstructed */
+#include "army.h"      /* AllyFlag -- reconstructed */
+#include "air.h"       /* ObjConceal -- reconstructed */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
@@ -575,6 +579,224 @@ int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
     return found;
 }
 
+/* MakePlacedUnit -- original 0x0043ACF0, two callers: the manual placement
+ * screen's click handler and the `place` line loader. The last thing in this
+ * module that was reached by address, so with it the placement subsystem is
+ * entirely ours.
+ *
+ * IT CHARGES FIRST AND ASKS QUESTIONS AFTER. The cost comes off the caller's
+ * points before anything is looked at, and nothing below can refuse -- so a
+ * type this function does not recognise still costs its money and makes
+ * nothing. Reproduced.
+ *
+ * THREE CLASSES, TESTED IN ORDER, off the unit-type record: a TROOPER if
+ * UNIT_TYPE_OFF_TROOPER is set, a VEHICLE if UNIT_TYPE_OFF_VEHICLE is, and
+ * otherwise an ITEM -- which is where the buildings live, and where the arms
+ * multiply.
+ *
+ * A TROOPER COMES WITH A WEAPON. CreateTrooper, then CreateWeapon with a key
+ * looked up from the record's kind, then three steps that tie them together:
+ * the weapon's uid into +0x54C, SoldierKindForWeapon off the weapon's code,
+ * and SendTrooperSetWeapon so the other players hear about it.
+ *
+ * A VEHICLE REGISTERS ITS EXTRA ROWS BY HAND. Rows past the first are placed
+ * at the object's position plus that row's own attach offsets and handed to
+ * RowUpdate one at a time -- the loop steps 0x60 per row, which is the row
+ * stride, and starts at row 1 because row 0 is already registered.
+ *
+ * A PILLBOX IS THREE OBJECTS. UNIT_TYPE_OFF_KIND 0..2 makes the building, then
+ * a TROOPER to man it and a WEAPON for him -- and the weapon kind is 9, 4 or 8
+ * by which pillbox it is, computed with a `dec`/`neg`/`sbb`/`and 4` chain
+ * rather than a table. The occupant gets OBJ_OFF_RANK 4 and a health of its
+ * own from ADDR_PILLBOX_TROOPER_HEALTH rather than the rank record's, which is
+ * why RefundPlacedUnit has to find him by uid arithmetic rather than by asking
+ * the building.
+ *
+ * AND THE SECOND ARGUMENT OF CreateWeapon IS AN ARMY. item.cpp passed
+ * AM2_OBJ_TYPE_WEAPON there and this passes a comm slot; the callee hands it
+ * to CommMustBroadcast, which takes an army, so this one is right and that one
+ * was a constant named for the wrong concept -- invisible because army 4, the
+ * neutral one, and object type 4 share a value. Corrected at that call site.
+ *
+ * KIND 7 IS REACHED BY ELIMINATION and gets neither an occupant nor a weapon:
+ * ItemPostCreate and, when the placing army is not allied to ours, a conceal.
+ * What kind 7 IS is not established here.
+ *
+ * The dead `mov ecx, ADDR_COMM_OBJECT` in front of the AllyFlag call is the
+ * original's -- AllyFlag is stdcall and never reads ecx. Not reproduced,
+ * because a register load with no effect has nothing to reproduce. */
+void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
+                            int32_t *points, int32_t facing, int32_t group,
+                            const char *name)
+{
+    const uint8_t *rec = (const uint8_t *)AM2_IMAGE(ADDR_UNIT_TYPES)
+                         + (uintptr_t)type * AM2_UNIT_TYPE_STRIDE;
+    const int32_t  kind = *(const int32_t *)(rec + UNIT_TYPE_OFF_KIND);
+    uint8_t       *made;
+    uint8_t       *weapon;
+    uint8_t       *rows;
+
+    *points -= *(const int32_t *)(rec + UNIT_TYPE_OFF_COST);
+
+    if (*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER)) {
+        made = (uint8_t *)CreateTrooper(
+                   (char *)name, (int16_t)where, (int16_t)(where >> 16), slot,
+                   CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT, slot),
+                   0, 0, 0, 1, facing);
+        ObjSetFieldA(made, (uint32_t)group);
+
+        weapon = (uint8_t *)CreateWeapon(
+                     (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH), slot,
+                     KeyLookupTriple(AM2_WEAPON_KEY_KIND, (uint32_t)kind, 0),
+                     *(const uint32_t *)AM2_IMAGE(ADDR_ZERO_POINT),
+                     AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
+
+        if (weapon) {
+            *(int32_t *)(made + TROOPER_OFF_WEAPON_UID) =
+                *(const int32_t *)(weapon + 4);
+            SoldierKindForWeapon(made,
+                **(const uint32_t *const *)(weapon + OBJ_OFF_FIELD_C0));
+            SendTrooperSetWeapon(made, *(const uint32_t *)(weapon + 4), 0);
+        }
+
+        rows = *(uint8_t **)(made + OBJ_OFF_ROWS);
+        *(uint8_t *)(rows + ROW_OFF_HEADING) =
+            *(const uint8_t *)(made + OBJ_OFF_FACING);
+        StepObjRows(made);
+        ObjTileChanged(made, *(const int8_t *)(made + OBJ_OFF_HEIGHT_SET), 1);
+        return;
+    }
+
+    if (*(const int32_t *)(rec + UNIT_TYPE_OFF_VEHICLE)) {
+        int32_t n;
+        int32_t i;
+
+        made = (uint8_t *)CreateVehicle(
+                   kind, (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                   (int16_t)where, (int16_t)(where >> 16), slot,
+                   CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT, slot),
+                   0, 0, 0, facing);
+
+        rows = *(uint8_t **)(made + OBJ_OFF_ROWS);
+        *(uint8_t *)(rows + ROW_OFF_HEADING) =
+            *(const uint8_t *)(made + OBJ_OFF_FACING);
+
+        if (*(const int32_t *)(made + OBJ_OFF_ROW_COUNT) > 1)
+            *(uint8_t *)(*(uint8_t **)(made + OBJ_OFF_ROWS)
+                         + ROW_OFF_FIELD_B0) =
+                *(const uint8_t *)(made + OBJ_OFF_FIELD_530);
+
+        StepObjRows(made);
+        ObjTileChanged(made, *(const int8_t *)(made + OBJ_OFF_HEIGHT_SET), 1);
+
+        n = *(const int32_t *)(made + OBJ_OFF_ROW_COUNT);
+        rows = (n > 0) ? *(uint8_t **)(made + OBJ_OFF_ROWS) : (uint8_t *)0;
+
+        for (i = 1; i < n; i++) {
+            uint8_t       *row = *(uint8_t **)(made + OBJ_OFF_ROWS)
+                                 + (uintptr_t)i * AM2_OBJ_ROW_STRIDE;
+            const uint8_t *spr = *(const uint8_t *const *)(rows + 4);
+
+            *(uint32_t *)(row + ROW_OFF_X) =
+                *(const uint32_t *)(made + OBJ_OFF_POS);
+            *(int16_t *)(row + ROW_OFF_X) +=
+                *(const int16_t *)(spr + SPR_OFF_OVX);
+            *(int16_t *)(row + ROW_OFF_Y) +=
+                *(const int16_t *)(spr + SPR_OFF_OVY);
+
+            RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+            n = *(const int32_t *)(made + OBJ_OFF_ROW_COUNT);
+        }
+
+        ObjSetFieldA(made, (uint32_t)group);
+        return;
+    }
+
+    /* ---- an ITEM, which is where the buildings live ---- */
+    {
+        int32_t army = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                      slot);
+        int32_t key  = SpriteKeyForKind(kind, army);
+        int32_t flag = (kind >= AM2_PILLBOX_KIND_FIRST
+                        && kind <= AM2_PILLBOX_KIND_LAST)
+                       ? (int32_t)OBJ_FLAG_SHOT_PROOF : 0;
+
+        made = (uint8_t *)CreateItem((char *)name, slot, key, where, flag,
+                                     0, 0);
+
+        if (made)
+            ApplyHeightItem(made,
+                (int8_t)(*(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS)
+                    [*(const uint16_t *)(made + OBJ_OFF_TILE)]);
+
+        if (kind < AM2_PILLBOX_KIND_FIRST || kind > AM2_PILLBOX_KIND_LAST) {
+            if (kind == AM2_PLACE_KIND_POST_CREATE) {
+                ItemPostCreate(slot, where);
+                if (!AllyFlag(*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                              (uint32_t)slot))
+                    ObjConceal(made, 1);
+            }
+            return;
+        }
+
+        /* A pillbox: the building is made, now the man inside and his gun. */
+        *(uint32_t *)(made + OBJ_OFF_FLAGS) |= OBJ_FLAG_SHOT_PROOF;
+
+        {
+            int32_t wkind;
+            uint8_t *occupant;
+
+            if (kind == 0)
+                wkind = AM2_PILLBOX_WEAPON_RIFLE;
+            else
+                wkind = (kind == 2) ? AM2_PILLBOX_WEAPON_MG
+                                    : AM2_PILLBOX_WEAPON_BAZOOKA;
+
+            occupant = (uint8_t *)CreateTrooper(
+                           (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                           (int16_t)where, (int16_t)(where >> 16), slot,
+                           CommArmyOfSlot(
+                               *(void **)(uintptr_t)ADDR_COMM_OBJECT, slot),
+                           0, 0, 0, 1, facing);
+            ObjSetFieldA(occupant, (uint32_t)group);
+
+            weapon = (uint8_t *)CreateWeapon(
+                         (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH), slot,
+                         KeyLookupTriple(AM2_WEAPON_KEY_KIND,
+                                         (uint32_t)wkind, 0),
+                         *(const uint32_t *)AM2_IMAGE(ADDR_ZERO_POINT),
+                         AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
+
+            if (weapon) {
+                *(int32_t *)(occupant + TROOPER_OFF_WEAPON_UID) =
+                    *(const int32_t *)(weapon + 4);
+                SoldierKindForWeapon(occupant,
+                    **(const uint32_t *const *)(weapon + OBJ_OFF_FIELD_C0));
+                SendTrooperSetWeapon(occupant,
+                                     *(const uint32_t *)(weapon + 4), 0);
+            }
+
+            rows = *(uint8_t **)(occupant + OBJ_OFF_ROWS);
+            *(uint8_t *)(rows + ROW_OFF_HEADING) =
+                *(const uint8_t *)(occupant + OBJ_OFF_FACING);
+            StepObjRows(occupant);
+
+            *(int32_t *)(occupant + OBJ_OFF_RANK) = 4;
+            *(int16_t *)(occupant + OBJ_OFF_MAX_HEALTH) =
+                *(const int16_t *)AM2_IMAGE(ADDR_PILLBOX_TROOPER_HEALTH);
+            *(int16_t *)(occupant + OBJ_OFF_HEALTH) =
+                *(const int16_t *)AM2_IMAGE(ADDR_PILLBOX_TROOPER_HEALTH);
+            /* +0x540, not OBJ_OFF_SOLDIER_KIND at +0x544 -- four bytes
+             * apart, and tools/checkoffsetuse.py is what caught the slip. */
+            *(int32_t *)(occupant + OBJ_OFF_FIELD_94)  = 1;
+            *(int32_t *)(occupant + OBJ_OFF_FIELD_540) = 1;
+
+            ObjTileChanged(occupant,
+                           *(const int8_t *)(occupant + OBJ_OFF_HEIGHT_SET), 1);
+        }
+    }
+}
+
 /* RefundPlacedUnit -- original 0x0043B160, one caller: the manual placement
  * screen at 0x00413BC0, which is also IsPlacedUnit's only caller. So this is
  * what happens when you take a unit back off the layout: work out what it
@@ -786,6 +1008,8 @@ int place_install(void)
     rc |= patch_replace(ADDR_UNIT_KIND_MATCHES,
                         (const void *)UnitKindMatches,
                         "UnitKindMatches", 2);
+    rc |= patch_replace(ADDR_MAKE_PLACED_UNIT,
+                        (const void *)MakePlacedUnit, "MakePlacedUnit", 2);
     rc |= patch_replace(ADDR_PLACEMENT_ALLOWED,
                         (const void *)PlacementAllowed,
                         "PlacementAllowed", 2);

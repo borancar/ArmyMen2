@@ -118,11 +118,15 @@ void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points);
  * a local typedef. It is a live layer under both callers rather than
  * something waiting on them, as PlacementAllowed was until it was
  * reconstructed above. */
-typedef void (__cdecl *AM2_MakePlacedFn)(uint32_t where, int32_t type,
-                                         int32_t slot, int32_t *points,
-                                         int32_t facing, int32_t group,
-                                         const char *name);
+/* 0x0043ACF0, two callers: the placement screen's click handler and the
+ * `place` line loader. Charge the caller's points and make the unit -- a
+ * trooper with a weapon, a vehicle with its extra rows relinked, or an item,
+ * which for a pillbox means three objects. Reconstructed; the seam it used to
+ * need is gone with it. */
+void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
+                            int32_t *points, int32_t facing, int32_t group,
+                            const char *name);
 
-#define orig_make_placed  (*(AM2_MakePlacedFn)AM2_IMAGE(ADDR_MAKE_PLACED_UNIT))
+#define orig_make_placed  MakePlacedUnit
 
 #endif /* AM2_PLACE_H */

@@ -2888,7 +2888,22 @@
  * three buildings on one sprite set. The jump tables could only show that the
  * share exists; the record table says what it is. */
 #define ADDR_MAKE_PLACED_UNIT    0x0043ACF0u  /* void(where,type,slot,&pts,facing,
-                                               * group,name) */
+                                               * group,name); reconstructed */
+/* The health a pillbox's occupant is given, read by nothing else in the
+ * image. 55, where a rank-0 trooper gets what ADDR_RANK_RECORDS says. */
+#define ADDR_PILLBOX_TROOPER_HEALTH 0x00473E44u /* int16_t, 55 */
+/* What MakePlacedUnit hands CreateWeapon as the pillbox occupant's weapon
+ * kind, by pillbox kind: riflepill 9, bazookapill 4, mgpill 8. The original
+ * computes the last two with a `dec`/`neg`/`sbb`/`and 4`/`add 4` chain rather
+ * than a table, which is the same 0-or-4 idiom it uses elsewhere. */
+#define AM2_PILLBOX_WEAPON_RIFLE 9
+#define AM2_PILLBOX_WEAPON_BAZOOKA 4
+#define AM2_PILLBOX_WEAPON_MG    8
+/* UNIT_TYPE_OFF_KIND 7 is the one placement type that gets ItemPostCreate and
+ * a conceal check instead of an occupant. What it IS is not established -- the
+ * arm is reached by elimination, after the trooper, vehicle and pillbox
+ * classes have all been ruled out. */
+#define AM2_PLACE_KIND_POST_CREATE 7
 #define AM2_COMM_ARMY_COUNT      4
 #define ADDR_COMM_FIND_PLAYER    0x0040F330u  /* thiscall int32(this,id), -1 if absent */
 #define ADDR_COMM_REMOVE_PLAYER  0x0040F640u  /* thiscall int32(this,id) --
@@ -11132,6 +11147,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ROW_OFF_X              0x1Cu  /* int16_t */
 #define ROW_OFF_Y              0x1Eu  /* int16_t */
 #define ROW_OFF_Y_ADJUST       0x20u  /* int16_t, taken off Y as well as hotY */
+/* A row's byte at +0xB0, written by MakePlacedUnit from the vehicle's
+ * OBJ_OFF_FIELD_530 and only when the vehicle has more than one row. Named
+ * structurally: what it selects is not established, and OBJ_OFF_SCRIPT_ID
+ * shares the number on a different structure. */
+#define ROW_OFF_FIELD_B0       0xB0u  /* uint8_t */
 /* Two more the seq adders write and nothing here reads. 0x26 takes 0x3E8 from
  * kind 5 and 1 from kind 7, so it is a scale or a count rather than a flag;
  * 0x2C is only ever zeroed. Named for their offsets, which is all that is
@@ -12256,7 +12276,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * because the new name used the family's own prefix. */
 #define OBJ_FLAG_RESPAWN_RANDOM  0x10000u   /* pick a kind instead of reusing */
 #define AM2_WEAPON_RESPAWN_MS    0x000493E0  /* 300,000 -- five minutes */
-#define AM2_WEAPON_RESPAWN_KEY   0x2D
+/* Was AM2_WEAPON_RESPAWN_KEY here, a second spelling of AM2_WEAPON_KEY_KIND
+ * -- one concept, two names, which is the kind worth collapsing. Withdrawn;
+ * the surviving name is the one that says what the argument IS. */
 /* Reconstructed, and its SIGNATURE WAS WRONG HERE: `void(obj, int32)` said
  * the first argument is an object, and the function opens with `cmp eax, 4;
  * jge` and returns. It is (army, packed point). armymsg.cpp's RecvItemCreate

@@ -2118,14 +2118,10 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc);
 void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
                             int32_t (__cdecl *keep)(void *obj));
 
-/* CreateWeapon, still original -- the type-4 arm of the item-create message,
- * and it names itself in its own log line. Eight arguments. */
-typedef void *(__cdecl *AM2_CreateWeaponFn)(const char *name, int32_t type,
-                                            int32_t key, uint32_t at,
-                                            int32_t flags, int32_t quantity,
-                                            int32_t g, int32_t h);
-#define orig_create_weapon \
-    ((AM2_CreateWeaponFn)(uintptr_t)ADDR_CREATE_WEAPON)
+/* CreateWeapon's typedef moved to item.h: place.cpp wants it too, and its
+ * second argument was called `type` here on the strength of one call site
+ * passing 4. It is an ARMY -- see item.h. */
+#define orig_create_weapon CreateWeapon
 
 /* The respawn's other half, still original: pick a random eligible kind and
  * hand back one of its ADDR_MISSILE_DEFS fields. */
@@ -2208,8 +2204,13 @@ void __cdecl WeaponRespawn(void *obj)
                     + (uint32_t)*(const int32_t *)(o + ITEM_OFF_NAME_INDEX)
                       * AM2_NAME_TABLE_STRIDE);
 
-    made = orig_create_weapon(name, AM2_OBJ_TYPE_WEAPON,
-                              KeyLookupTriple(AM2_WEAPON_RESPAWN_KEY,
+    /* AN ARMY, NOT A TYPE, and the two are 4 apiece so the wrong name was
+     * invisible. CreateWeapon hands this argument to CommMustBroadcast, which
+     * takes an army; MakePlacedUnit passes a comm slot in the same position.
+     * It was AM2_OBJ_TYPE_WEAPON here, which is a different concept that
+     * happens to share the value. */
+    made = orig_create_weapon(name, AM2_ARMY_NEUTRAL,
+                              KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                               (uint32_t)kind, 0),
                               *(const uint32_t *)(o + OBJ_OFF_POS),
                               (int32_t)(*(const uint32_t *)(o + OBJ_OFF_FLAGS)
@@ -4389,7 +4390,7 @@ void __cdecl PortalSpawn(void)
 
         weapon = (uint8_t *)orig_create_weapon(
                      (char *)AM2_IMAGE(ADDR_DIR_SCRATCH), 1,
-                     KeyLookupTriple(AM2_WEAPON_RESPAWN_KEY,
+                     KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                      (uint32_t)kWeapons[pick], 0),
                      *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
                      4, -1, 0, 0);

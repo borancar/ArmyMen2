@@ -9,7 +9,44 @@ Last updated: **2026-09-01**, at `ba116b4`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,373 patches.**
+Nothing uncommitted. **1,374 patches.**
+
+**`MakePlacedUnit` (`0x0043ACF0`)** -- the last thing in `place.cpp` reached by
+address, so the placement subsystem is now entirely ours: the click handler,
+the predicate, the refund and the maker.
+
+**It charges first and asks questions after.** The cost comes off the caller's
+points before anything is looked at, and nothing below can refuse -- a type it
+does not recognise still costs its money and makes nothing. Reproduced.
+
+**Three classes, tested in order** off the unit-type record: a trooper, a
+vehicle, or an item -- which is where the buildings live and where the arms
+multiply. A trooper comes with a weapon and three steps tying them together; a
+vehicle relinks its extra rows by hand, each at the object's position plus that
+row's own attach offsets; **a pillbox is three objects**, and its occupant gets
+a health of its own rather than the rank record's, which is why
+`RefundPlacedUnit` has to find him by uid arithmetic.
+
+**`CreateWeapon`'s second argument is an ARMY, not a type, and the two callers
+are what settle it.** This one passes a comm slot; `item.cpp` passed a literal
+4 written `AM2_OBJ_TYPE_WEAPON`. The callee hands the argument straight to
+`CommMustBroadcast`, which takes an army -- so the constant was named for the
+wrong concept and was invisible because army 4, the neutral one, and object
+type 4 share a value. Corrected, and the third private copy of that typedef is
+gone with it.
+
+**A different flavour of the same thing, collapsed:**
+`AM2_WEAPON_RESPAWN_KEY` and `AM2_WEAPON_KEY_KIND` were one concept under two
+names. By this session's own distinction that IS worth collapsing, unlike the
+three names for 4 that are three concepts.
+
+**`checkoffsetuse` caught a real slip and then a bug of its own.** The original
+writes `+0x540` where I wrote `OBJ_OFF_SOLDIER_KIND` at `+0x544` -- four bytes
+apart, and the tool named it. Fixing it left a *second* report: my own comment
+saying "+0x540, not `OBJ_OFF_SOLDIER_KIND` at +0x544" put 0x544 back in the C's
+set, because the tool was reading COMMENTS. Stripped now.
+`tools/checkseams.py` had to learn exactly this and went from about two hundred
+false sites to 21; the fix is inert on three functions checked before it.
 
 **`CommSystemMessage` (`0x00410090`)** -- the DirectPlay SYSTEM message
 handler, one caller, and `orig.h` said "Stays original" of it. Five cases, each
@@ -4154,14 +4191,14 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,201 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 38
-outstanding, which is 1,239 minus 1,201 -- from 1,373 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,202 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 37
+outstanding, which is 1,239 minus 1,202 -- from 1,374 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and forty batches have gone in and NOTHING SMALL IS LEFT: the
-38 entries outstanding start at **928 bytes** and the median is **1,240**. The
+small ones in batches. A hundred and forty-one batches have gone in and NOTHING SMALL IS LEFT: the
+37 entries outstanding start at **928 bytes** and the median is **1,264**. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred
 rather than unread; it is done, and with it the last thing under 900 bytes.
 The sentence here used to say they started at 96 and name the MSVC static-init
