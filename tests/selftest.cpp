@@ -154,6 +154,16 @@ extern "C" int32_t __cdecl SendGameMsg(void *, int32_t, int32_t)
     return 0;
 }
 
+/* region.cpp's TrooperFire calls this now that 0x00449FD0 is ours, and it
+ * lives in commmsg.cpp -- which this link does not carry, for the reason
+ * msgslot.cpp's own comment gives about SendChatMsg. Eleventh stub, and
+ * `extern "C"` because commmsg.h's block covers it -- lines 16 to 122, and
+ * this declaration is inside. TrooperFire has no vectors and could not: it
+ * reads the comm object, the game clock and the object registry. */
+extern "C" void __cdecl TrooperFireSend(void *, void *)
+{
+}
+
 int main(void)
 {
     int32_t pass = 0, fail = 0;

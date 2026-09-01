@@ -56,7 +56,13 @@ HEADER = os.path.join(ROOT, "src", "inject", "orig.h")
 # readings of one bit, sitting there unremarked for as long as nothing looked
 # at flags.  Left as backlog rather than guessed at, which is what a ratchet
 # baseline is for.
-FAMILY_ALIAS_BASELINE = 16
+# 16 -> 15. Two of the three names on COMM_OFF_ 0x418 -- COMM_OFF_DEBUG and
+# COMM_OFF_EVENT_DEBUG, which this docstring named as a plain duplicate -- are
+# gone, and OBJ_OFF_UID went on 0x04 beside OBJ_OFF_OWNER in the same commit.
+# Net one down, and the new pair is EVIDENCED rather than assumed: TrooperFire
+# logs +0x04 as a uid and TrooperFireSend hands it to UidOnWire, while the
+# "owner" reading of the same offset stands unresolved beside it.
+FAMILY_ALIAS_BASELINE = 15
 
 DEFINE = re.compile(r"^#define\s+([A-Z][A-Z0-9_]*)\s+(0x[0-9A-Fa-f]+u?|\d+u?)\s*(?:/\*|$)")
 # `_OFF_` was the whole of this for as long as offsets were the thing that got

@@ -201,6 +201,26 @@ void     __cdecl ObjSetFieldA(void *obj, uint32_t value);
  * are meaningful. */
 int32_t __cdecl ObjFieldB(const void *obj);
 
+/* 0x0045F460's argument 5 and 6, which the original pushes as ONE eight-byte
+ * structure. Both fields have a fallback inside the callee: a zero point is
+ * filled from the target object's position and a zero ground height from the
+ * shooter's own. `pad` is deliberately never written, by the original or by
+ * us -- nothing correct can read it.
+ *
+ * Here rather than in event.cpp because region.cpp's TrooperFire needs the
+ * same declaration, and two spellings of one prototype is how they come to
+ * disagree. */
+typedef struct {
+    uint32_t at;
+    int16_t  ground;
+    int16_t  pad;
+} AM2_FireSpot;
+
+typedef int32_t (__cdecl *AM2_FireWeaponFn)(void *weapon, void *unit,
+                                            int32_t height, int32_t heading,
+                                            AM2_FireSpot spot, void *target);
+#define orig_fire_weapon ((AM2_FireWeaponFn)(uintptr_t)ADDR_FIRE_WEAPON)
+
 /* 0x00428950 and 0x00428BB0. The item section of a savegame, both named by
  * their own counts -- "Saved %d items" and "Loaded %d items".
  *

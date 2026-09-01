@@ -330,7 +330,7 @@ int32_t __cdecl CommRegisterSelf(uint32_t id)
     }
 
     if (comm_u32(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT,
-                 COMM_OFF_DEBUG) != 0)
+                 COMM_OFF_VERBOSE) != 0)
         orig_log((const char *)(uintptr_t)ADDR_STR_FLOWQ_MAKING, id);
 
     own  = 1u << slot;
@@ -882,7 +882,7 @@ static_assert(DPCAPS_GUARANTEEDSUPPORTED == 0x40, "DPCAPS_GUARANTEEDSUPPORTED");
 /* DirectPlay's per-message overhead, subtracted from the usable payload. */
 #define DPLAY_MESSAGE_OVERHEAD 0x14
 
-#define g_commDebug(self) comm_u32((uint8_t *)(self), COMM_OFF_DEBUG)
+#define g_commDebug(self) comm_u32((uint8_t *)(self), COMM_OFF_VERBOSE)
 
 int32_t __attribute__((thiscall)) CommOnConnected(void *self)
 {

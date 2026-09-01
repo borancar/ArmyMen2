@@ -6618,8 +6618,9 @@ typedef struct {
                                               * stamps at offset 2 */
 /* Gates the event logging in EventTriggerDelayed, EventMessageSend and
  * EventMessageReceive -- all three read it before calling the logger, and the
- * logger is stubbed to `ret` in this build, so it is inert either way. */
-#define COMM_OFF_EVENT_DEBUG       0x418u
+ * logger is stubbed to `ret` in this build, so it is inert either way.
+ * COMM_OFF_VERBOSE, defined once further down; this was a second name for it
+ * and a third stood beside StartSelectedGame. */
 /* The event.cpp section's own tag and the path string CheckSaveTag is given.
  * docs/savetags.tsv lists all fifteen; this is the one at event.cpp:3274. */
 #define AM2_SAVETAG_EVENT        0x06660004u
@@ -7358,7 +7359,69 @@ typedef struct {
 #define AM2_SND_KIND7            0x33
 #define AM2_SND_FIELD5A4         0x2D
 /* Two of StepType2's callees, still original and named by offset. */
-#define ADDR_AI_449FD0           0x00449FD0u  /* void(obj, weapon, out) */
+/* RECONSTRUCTED as TrooperFire, and it names itself: "FIRE  trooper: %x
+ * weapon: %x  ammo: %d". Given a trooper, the weapon in hand and the sight
+ * record the AI has just filled in, take the shot.
+ *
+ * ITS 19-ARM JUMP TABLE AT 0x0044A360 HAS TWO ARMS. Codes 0x14..0x26 index a
+ * byte table selecting one of two targets, so the switch FILTERS rather than
+ * dispatches: seven codes leave the trooper's state alone and everything else
+ * -- including every code outside the range, which the `ja` sends to the same
+ * arm -- ends it. Read the table, never the arms.
+ *
+ * ITS ANSWER TO 0x00449AB0 IS THROWN AWAY: `mov eax, [esp+0x30]` overwrites
+ * eax on the instruction after the call. */
+#define ADDR_TROOPER_FIRE        0x00449FD0u  /* void(obj, weapon, sight) */
+/* Called from TrooperFire with (obj, weapon, sight, ready) and its int32_t
+ * answer discarded. 1,088 bytes dispatching on the weapon's ITEMTYPE_OFF_KIND
+ * through a 42-entry table, so it runs for its side effects; not read. */
+#define ADDR_FIRE_449AB0         0x00449AB0u  /* int32_t(obj, wpn, out, ready) */
+/* 0x00449EF0 IS ALREADY ObjCodeUnmapped and already reconstructed, and it was
+ * about to get a second name here -- ADDR_WEAPON_TURNS_TO_AIM, from the one
+ * thing its only caller does with it. checkpatches refused the build, which is
+ * the fifth near-miss of this shape and the same argument the ratchet has
+ * earned before: the rule is to grep the ADDRESS, and knowing the offsets does
+ * not substitute for it.
+ *
+ * What TrooperFire adds is what the answer MEANS. Its table says 0 for kinds
+ * 0x18, 0x19, 0x1A, 0x27 and 0x28, which the caption table at 0x00419A94 names
+ * AIRS, PARA, RECO, MAG and AERO, and 1 for everything else including every
+ * code out of range. The caller uses it to decide whether the trooper TURNS to
+ * face the point the sight named -- so an air strike or a paradrop does not
+ * swing the soldier round, and a rifle does. */
+/* The sight record's weapon OVERRIDE: non-zero means fire this uid rather than
+ * what the caller passed. TrooperFire's first act. */
+#define SIGHTCOUT_OFF_WEAPON_UID 0x20u
+/* OBJ_OFF_FIELD_530's "not a troop" value, which AM2_OPERAND_TROOP_STATE
+ * already documents from the other end -- the testvar operand answers 5 for
+ * anything that is not a troop. TrooperFire WRITES it, which is the writer
+ * that sentence never had. */
+#define AM2_TROOP_STATE_NONE     5
+/* Subtracted from the target's ObjHeight to place the shot: the original does
+ * `sub al, 6` on the low byte and sign-extends THAT, so a height under six
+ * wraps negative rather than clamping. */
+#define AM2_FIRE_HEIGHT_DROP     6
+/* Cleared on a REMOTE trooper's shot, where our own broadcasts instead. The
+ * one bit of WEAPON_OFF_FLAGS this path touches. */
+#define AM2_WEAPON_FLAG_FIRED    0x08000000u
+/* The item kinds TrooperFire names. All seven come from the caption table at
+ * 0x00419A94, which is the program's own vocabulary for these numbers -- the
+ * four-letter strings it draws in the HUD. */
+#define AM2_ITEM_KIND_MSWP       0x14
+#define AM2_ITEM_KIND_16         0x16   /* the caption table's ??? default */
+#define AM2_ITEM_KIND_MEDI       0x17
+#define AM2_ITEM_KIND_DISG_0     0x23
+#define AM2_ITEM_KIND_DISG_1     0x24
+#define AM2_ITEM_KIND_DISG_2     0x25
+#define AM2_ITEM_KIND_DISG_3     0x26
+#define AM2_ITEM_KIND_WREN       0x29
+/* +0x04 IS THE UID, and OBJ_OFF_OWNER is a second name on it that this does
+ * not resolve. TrooperFire logs the dword there as `trooper: %x` and
+ * `weapon: %x`, and TrooperFireSend hands the same field to UidOnWire -- so
+ * uid is what it is here. Whether objscript.cpp's "owner", which reads the
+ * same offset as a pointer, is a third reading of the uid or a genuine union
+ * arm has NOT been settled; the alias is recorded rather than argued. */
+#define OBJ_OFF_UID              0x04u
 #define ADDR_AI_44AFB0           0x0044AFB0u  /* void(obj, int32, void *) */
 /* The two StepType2 runs INSTEAD of the AI arms when the object is Sarge and
  * belongs to the default owner -- the trooper the player commands. Named by
@@ -9337,7 +9400,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* The mask of occupied player slots, OR'd with PLAYER_REC_OFF_OWN_BIT as each
  * record is made. ADDR_MSG_WANTED_FLAGS takes the other one. */
 #define ADDR_PLAYER_SLOT_MASK    0x004F48DCu  /* uint32_t */
-/* CommRegisterSelf's own two lines. The first is gated on COMM_OFF_DEBUG. */
+/* CommRegisterSelf's own two lines. The first is gated on COMM_OFF_VERBOSE. */
 #define ADDR_STR_FLOWQ_MAKING    0x00473A5Cu /* "Creating Flow Queue for Player id %x" */
 #define ADDR_STR_FLOWQ_FAILED    0x00473A3Cu /* "Create FlowQ failed for ID %x" */
 #define AM2_PLAYER_WANT_SHIFT    4
@@ -10066,7 +10129,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_APPLY_GAME_SETTINGS 0x0042F170u  /* void(void) */
 #define ADDR_FMT_COMPUTER_N      0x00486EC4u  /* "Computer%d" */
 #define ADDR_START_SELECTED_GAME 0x0042ECF0u  /* void(void), a button handler */
-#define COMM_OFF_DEBUG           0x418u
 #define COMM_OFF_TRACE           0x470u
 #define COMM_OFF_LOG             0x474u
 

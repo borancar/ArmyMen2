@@ -16,6 +16,7 @@
 #include "maprow.h"   /* RowAnimField4 -- reconstructed */
 #include "msgslot.h"  /* CommMustBroadcast -- the timeout kill's gate */
 #include "armymsg.h"  /* DamageBroadcast */
+#include "commmsg.h" /* TrooperFireSend -- reconstructed */
 #include "item.h"     /* ObjClearFootprint, ObjClearRoachFootprint */
 #include "gameproc.h" /* Call405220 -- the `defend` arm's thunk */
 #include "item.h"     /* ObjectsHitByPoint -- reconstructed */
@@ -4912,11 +4913,270 @@ extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
 typedef void (__cdecl *AM2_Step2AFn)(void *obj, void *weapon, void *out);
 typedef void (__cdecl *AM2_Step2BFn)(void *obj, void *out);
 typedef void (__cdecl *AM2_RowFinalFn)(void *row);
-#define orig_step2_449fd0 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_AI_449FD0))
+/* TrooperFire is reconstructed below and called by name; 0x00449FD0's seam is
+ * gone with it. */
 #define orig_step2_44afb0 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_AI_44AFB0))
 #define orig_step2_44a420 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_STEP2_44A420))
 /* Type2PlayerStep is reconstructed below and called by name. */
 #define orig_row_final    ((AM2_RowFinalFn)(uintptr_t)AM2_IMAGE(ADDR_ROACH_ROW_FINAL))
+
+
+typedef int32_t (__cdecl *AM2_Fire449AB0Fn)(void *obj, void *weapon,
+                                            void *sight, int32_t ready);
+typedef int32_t (__cdecl *AM2_GameRandFn)(void);
+#define orig_fire_449ab0 \
+    ((AM2_Fire449AB0Fn)(uintptr_t)AM2_IMAGE(ADDR_FIRE_449AB0))
+#define orig_game_rand ((AM2_GameRandFn)(uintptr_t)AM2_IMAGE(ADDR_GAME_RAND))
+
+/* The four stores TrooperFire makes twice when a trooper turns to aim, and
+ * the original writes them out both times. One helper here: they are four
+ * spellings of one facing and splitting them is what would invite a
+ * divergence. obj+0x580 is SIGHTCOUT_OFF_BEARING of the record at
+ * OBJ_OFF_SIGHT_OUT_T2 -- written through the OBJECT, as the original does,
+ * rather than through the `sight` argument the two callers happen to point at
+ * the same place. */
+static void TrooperFaceTo(uint8_t *o, const AM2_Point *to)
+{
+    uint8_t f = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), to);
+
+    *(uint8_t *)(o + OBJ_OFF_FACING) = f;
+    *(uint8_t *)(o + OBJ_OFF_SIGHT_OUT_T2 + SIGHTCOUT_OFF_BEARING) = f;
+    *(uint8_t *)(o + OBJ_OFF_FACING_COPY) = f;
+    *(int16_t *)(o + OBJ_OFF_FIELD_574) = (int16_t)f;
+}
+
+/* TrooperFire -- original 0x00449FD0, 976 bytes, two callers, both of them
+ * StepType2's AI arms. It names itself in its own log line:
+ * "FIRE  trooper: %x  weapon: %x  ammo: %d". Given a trooper, the weapon it
+ * is holding and the sight record the AI has just filled in, take the shot.
+ *
+ * ITS THIRD ARGUMENT IS THE SIGHTCOUT RECORD, so every field it reads already
+ * had a name; +0x20 is the one new one, the uid of a weapon that OVERRIDES the
+ * one in hand. That override is the first thing it does, and the fallback is
+ * the caller's weapon.
+ *
+ * THE NINETEEN-ARM JUMP TABLE AT 0x0044A360 HAS TWO ARMS. Codes 0x14..0x26
+ * index a byte table that selects one of exactly two targets, so the switch is
+ * a FILTER and not a dispatch: MSWP, MEDI, the four DISG kinds and 0x16 leave
+ * the trooper's state alone, and every other weapon -- including every code
+ * outside the range, which the `ja` sends to the same arm -- ends it. The
+ * caption table at 0x00419A94 is what turns those numbers into names.
+ *
+ * WHAT "ENDING THE STATE" IS was already in orig.h twice over and needed no
+ * new offsets: OBJ_OFF_TABLE_REC_KIND and _SLOT are the two 256-byte record
+ * pointers, obj + OBJ_OFF_SUBRECORD + 0x4C0 is exactly +0x52C, and 5 is the
+ * value AM2_OPERAND_TROOP_STATE already documents as "not a troop". So the
+ * block moves the slot-indexed record onto the kind-indexed one, clears the
+ * slot and pushes the same pointer through SetFieldInAll. Two independent
+ * notes describing one thing, and grepping the OFFSET found them.
+ *
+ * THREE WAYS TO AIM, and they are the function's whole shape:
+ *
+ *   the sight named a TARGET OBJECT -- aim at where it is, turn to face it
+ *   unless the weapon is MEDI (0x17) or WREN (0x29), and pass the object to
+ *   FireWeapon so it can resolve the point itself;
+ *
+ *   no target but a POINT, and the weapon turns to aim -- face the point if
+ *   it differs from where we stand, and fire at it;
+ *
+ *   otherwise -- fire along the current facing, and when the sight gave no
+ *   point at all compute the impact from cos/sin of the heading times the
+ *   weapon's ITEMTYPE_OFF_RANGE.
+ *
+ * WHICH WEAPONS TURN is ObjCodeUnmapped, which misc.cpp already had: its table
+ * answers 0 for AIRS, PARA, RECO, MAG and AERO and 1 for everything else. This
+ * is the first caller to say what that answer is FOR -- an air strike does not
+ * swing the soldier round and a rifle does. It was very nearly reconstructed a
+ * second time here under a name taken from that use; checkpatches refused it,
+ * which is the fifth near-miss of the shape.
+ *
+ * THE HEADING IS PASSED AS A BYTE AND THE ORIGINAL PASSES A DWORD. MSVC put
+ * the local in argument 3's home, wrote only `al` into it, and reloaded the
+ * whole dword -- so the three high bytes handed to Cos8, Sin8 and FireWeapon
+ * are the top of the `out` POINTER. Not reproduced, on the same footing as the
+ * SEH prologue this port also leaves out: it is the code generator's, not the
+ * program's. Both trig functions mask with `& 0xFF` and FireWeapon does
+ * `and eax, 0xff` at 0x0045F567 before its own use, so nothing observes it --
+ * with one gap said plainly, that FireWeapon also forwards the unmasked dword
+ * to 0x0043B9B0 and that function's use of it has not been read.
+ *
+ * 0x00449AB0 IS CALLED AND ITS ANSWER THROWN AWAY. `mov eax, [esp+0x30]`
+ * overwrites the return value on the very next instruction, so 1,088 bytes of
+ * per-weapon-kind dispatch run for their side effects alone. Recorded rather
+ * than tidied; it is still original.
+ *
+ * COLD IN EVERY CONFIGURATION HERE. Nothing in a Boot Camp drive shoots, so
+ * this is verified by reading and by a clean A/B saying nothing else moved.
+ */
+void __cdecl TrooperFire(void *obj, void *held, void *sight)
+{
+    uint8_t     *o     = (uint8_t *)obj;
+    uint8_t     *out   = (uint8_t *)sight;
+    uint8_t     *w;
+    const uint8_t *def;
+    uint8_t     *target;
+    AM2_FireSpot spot;
+    int32_t      kind;
+    int32_t      ready;
+    int32_t      remote;
+    int32_t      fired;
+    uint8_t      heading;
+
+    if (*(const int32_t *)(out + SIGHTCOUT_OFF_HIT) == 0
+        && *(const int32_t *)(out + SIGHTCOUT_OFF_SEEN) == 0)
+        return;
+
+    if (*(const uint32_t *)(out + SIGHTCOUT_OFF_WEAPON_UID) != 0)
+        w = (uint8_t *)WeaponByUid(
+                *(const int32_t *)(out + SIGHTCOUT_OFF_WEAPON_UID));
+    else
+        w = (uint8_t *)held;
+
+    if (w == (uint8_t *)0)
+        return;
+
+    def  = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
+    kind = *(const int32_t *)(def + ITEMTYPE_OFF_KIND);
+
+    switch (kind) {
+    case AM2_ITEM_KIND_MSWP:
+    case AM2_ITEM_KIND_16:
+    case AM2_ITEM_KIND_MEDI:
+    case AM2_ITEM_KIND_DISG_0:
+    case AM2_ITEM_KIND_DISG_1:
+    case AM2_ITEM_KIND_DISG_2:
+    case AM2_ITEM_KIND_DISG_3:
+        break;                       /* these leave the trooper's state alone */
+
+    default:
+        if (o != (uint8_t *)0
+            && *(const int32_t *)(o + OBJ_OFF_FIELD_530)
+               != AM2_TROOP_STATE_NONE) {
+            void *rec = *(void *const *)(o + OBJ_OFF_TABLE_REC_SLOT);
+
+            *(int32_t *)(o + OBJ_OFF_FIELD_530) = AM2_TROOP_STATE_NONE;
+            *(void **)(o + OBJ_OFF_TABLE_REC_KIND) = rec;
+            *(void **)(o + OBJ_OFF_TABLE_REC_SLOT) = 0;
+            SetFieldInAll(o + OBJ_OFF_SUBRECORD, rec);
+        }
+        break;
+    }
+
+    /* Whose trooper this is. CommMustBroadcast answers "is that slot NOT
+     * remote", so the negation is a REMOTE player's trooper -- one whose shots
+     * arrive over the wire rather than being decided here. Computed before
+     * anything is fired and read again at the very bottom. */
+    remote = 0;
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+        remote = 1;
+
+    /* Unsigned, as the original's `cmp`/`sbb`/`neg` is. */
+    def   = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
+    ready = (*(const uint32_t *)(def + ITEMTYPE_OFF_COOLDOWN)
+             < (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                          - *(const uint32_t *)(w + ITEM_OFF_LAST_USE)))
+            ? 1 : 0;
+
+    orig_fire_449ab0(o, w, out, ready);
+
+    *(int32_t *)(o + OBJ_OFF_FIELD_578) = 1;
+
+    if (!remote) {
+        if (!ready)
+            return;
+        if (!WeaponFrameReady(o, w))
+            return;
+    }
+
+    *(int32_t *)(out + SIGHTCOUT_OFF_SEEN) = 0;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        || CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                             (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))) {
+        *(int32_t *)out = 0;
+        *(uint8_t *)(o + TROOPER_OFF_FIRE_FLAG) = (uint8_t)orig_game_rand();
+    }
+
+    *(int32_t *)(out + SIGHTCOUT_OFF_HIT) = 0;
+    *(uint32_t *)(w + ITEM_OFF_LAST_USE) =
+        *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+    target = (uint8_t *)LookupByUID(*(const uint32_t *)(out + SIGHTCOUT_OFF_UID));
+
+    if (target != (uint8_t *)0) {
+        int16_t z;
+
+        spot.at = *(const uint32_t *)(target + OBJ_OFF_POS);
+        z = (int16_t)(int8_t)((uint8_t)ObjHeight(target) - AM2_FIRE_HEIGHT_DROP);
+
+        *(uint16_t *)(o + UNIT_OFF_FIRE_X) = (uint16_t)spot.at;
+        *(uint16_t *)(o + UNIT_OFF_FIRE_Y) = (uint16_t)(spot.at >> 16);
+        *(int16_t *)(o + UNIT_OFF_FIRE_Z)  = z;
+        spot.ground = z;
+
+        def = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
+        if (*(const int32_t *)(def + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_MEDI
+            && *(const int32_t *)(def + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_WREN)
+            TrooperFaceTo(o, (const AM2_Point *)(target + OBJ_OFF_POS));
+
+        heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
+        fired = orig_fire_weapon(w, o, ObjHeight(o), heading, spot, target);
+    } else {
+        const uint8_t *at = out + SIGHTCOUT_OFF_X;
+
+        if (*(const int16_t *)at != 0
+            && ObjCodeUnmapped(w)
+            && PointsDiffer(*(const uint32_t *)(o + OBJ_OFF_POS),
+                            *(const uint32_t *)at))
+            TrooperFaceTo(o, (const AM2_Point *)at);
+
+        heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
+
+        /* No point at all: put the impact one weapon-range away along the
+         * heading. `long double` because the original is x87 and keeps 80 bits
+         * across the whole expression -- `fimul` on the integer range, then
+         * `fiadd` on the signed position, then _ftol, which TRUNCATES toward
+         * zero. The same reasoning as SetMaxHealth's. Only the low sixteen
+         * bits are stored, as the `mov word` says.
+         *
+         * The definition pointer is re-read between the two, which is the
+         * original's spelling and not a second value. */
+        if (*(const int16_t *)at == 0) {
+            def = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
+            *(int16_t *)(o + UNIT_OFF_FIRE_X) = (int16_t)(int32_t)
+                ((long double)Cos8(heading)
+                 * (long double)*(const int32_t *)(def + ITEMTYPE_OFF_RANGE)
+                 + (long double)*(const int16_t *)(o + OBJ_OFF_X));
+
+            def = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
+            *(int16_t *)(o + UNIT_OFF_FIRE_Y) = (int16_t)(int32_t)
+                ((long double)Sin8(heading)
+                 * (long double)*(const int32_t *)(def + ITEMTYPE_OFF_RANGE)
+                 + (long double)*(const int16_t *)(o + OBJ_OFF_Y));
+        }
+
+        spot.at     = *(const uint32_t *)at;
+        spot.ground = *(const int16_t *)(at + 4);
+        fired = orig_fire_weapon(w, o, ObjHeight(o), heading, spot, 0);
+    }
+
+    orig_log("FIRE  trooper: %x  weapon: %x  ammo: %d\n",
+             *(const int32_t *)(o + OBJ_OFF_UID),
+             *(const int32_t *)(w + OBJ_OFF_UID),
+             *(const int32_t *)(w + ITEM_OFF_AMMO));
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) {
+        if (!remote)
+            TrooperFireSend(o, w);
+        else
+            *(uint32_t *)(w + WEAPON_OFF_FLAGS) &= ~AM2_WEAPON_FLAG_FIRED;
+    }
+
+    if (fired)
+        UseInventoryItem(o, *(const int32_t *)(o + UNIT_OFF_INVENTORY_SEL));
+}
 
 /* StepType2 -- original 0x0044B7D0, one caller: ObjFrameStep's type-2 arm. The
  * trooper's per-frame step, and the last piece of the AI band's shape.
@@ -4978,7 +5238,7 @@ void __cdecl StepType2(void *obj)
         w = (uint8_t *)WeaponByUid(AM2_STEP2_HELD_UID);
         if (!w)
             return;
-        orig_step2_449fd0(obj, w, out);
+        TrooperFire(obj, w, out);
         return;
     }
 
@@ -5489,5 +5749,7 @@ int region_install(void)
                         "NearestAllowedTile", 6);
     rc |= patch_replace(ADDR_INACTIVATE_REGION, (const void *)InactivateRegion,
                         "InactivateRegion", 1);
+    rc |= patch_replace(ADDR_TROOPER_FIRE, (const void *)TrooperFire,
+                        "TrooperFire", 2);
     return rc;
 }

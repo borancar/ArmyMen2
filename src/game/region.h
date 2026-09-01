@@ -182,6 +182,15 @@ void __cdecl RoachAliveStepA(void *obj, void *out);
  * wants, and drag every other selected unit along. */
 void __cdecl Type2PlayerStep(void *obj, void *out);
 
+/* 0x00449FD0, two callers -- StepType2's trooper AI arm and 0x0044AFB0. The
+ * trooper's shot: pick the weapon (the sight record may override the one in
+ * hand), end the trooper's state unless the weapon is one of the seven that
+ * do not, check the cooldown, aim, and hand the whole thing to 0x0045F460.
+ * It names itself in "FIRE  trooper: %x  weapon: %x  ammo: %d".
+ *
+ * Cold in every configuration here: nothing in a Boot Camp drive shoots. */
+void __cdecl TrooperFire(void *obj, void *held, void *sight);
+
 void __cdecl StepType2(void *obj);
 
 /* 0x0045D660, one caller -- ObjFrameStep's type-3 arm. The vehicle's

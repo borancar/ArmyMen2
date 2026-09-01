@@ -700,7 +700,7 @@ void __cdecl ItemPreDestroy(void *obj, int32_t cells)
 
 #define kCommDbg \
     (*(const int32_t *)((const uint8_t *)*(void **)AM2_IMAGE(ADDR_COMM_OBJECT) \
-                        + COMM_OFF_EVENT_DEBUG))
+                        + COMM_OFF_VERBOSE))
 
 /* 0x00429C80. Release an item object's allocation, by its own log line.
  *
@@ -966,7 +966,7 @@ void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify)
 
 #define kCommDebug \
     (*(const int32_t *)((const uint8_t *)*(void **)AM2_IMAGE(ADDR_COMM_OBJECT) \
-                        + COMM_OFF_EVENT_DEBUG))
+                        + COMM_OFF_VERBOSE))
 
 /* 0x004285F0. Destroy one item, dispatching on its kind.
  *

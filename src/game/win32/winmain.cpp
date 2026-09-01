@@ -566,7 +566,7 @@ static void ParseCommandLine(char *cmdLine)
     if (strstr(cmdLine, "-traceVEH"))  opt(ADDR_OPT_TRACE_VEH) = 1;
 
     if (strstr(cmdLine, "-debugComm"))
-        *(int32_t *)(g_commObject + COMM_OFF_DEBUG) = 1;
+        *(int32_t *)(g_commObject + COMM_OFF_VERBOSE) = 1;
     if (strstr(cmdLine, "-traceComm"))
         *(int32_t *)(g_commObject + COMM_OFF_TRACE) = 1;
     if (strstr(cmdLine, "-logComm"))

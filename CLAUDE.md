@@ -1116,6 +1116,25 @@ That table also confirms what this file worked out by probing: arm 34 is index
 12 and calls `0x00425DA0`, the in-mission ESCAPE handler, and ordinary play
 sits in 33. Two independent routes to the same fact.
 
+**And a fourth: A TABLE WITH NINETEEN INDICES AND TWO ARMS.** `TrooperFire`'s
+switch at `0x0044A360` covers codes 0x14..0x26 through a byte table whose
+entries are only 0 and 1, so it is a FILTER rather than a dispatch -- seven
+item kinds leave the trooper's state alone and everything else, including
+every code outside the range, ends it. Reading the arms finds two behaviours
+and no idea which code takes which; the byte table is the whole answer, and it
+is four lines of Python to decode.
+
+**The ITEM CAPTIONS are the program's own names for those numbers**, and
+decoding them is what turned two of these tables into sentences. `0x00419A30`
+is a 25-entry jump table reached through the 41-byte index at `0x00419A94`, and
+each arm pushes one four-letter string: GREN, FLAM, BAZ, MORT, HvMG, RIFLE,
+AUTO, MINE, EXPL, FLAG, MSWP, MEDI, AIRS, PARA, RECO, NOTE, FLAK, VULC, SNIP,
+DISG, MAG, AERO, WREN, M80. With those, `ObjCodeUnmapped`'s five zero entries
+stop being numbers: AIRS, PARA, RECO, MAG and AERO, the items that do NOT turn
+the soldier to face what he is aiming at. **When a switch is on an item or
+object kind, find the table that gives those kinds names before reading the
+arms.**
+
 **Three instances now, and the second failure mode is SLOTS SHARING AN ARM.**
 `WeaponClassOf` (`0x0042AAE0`) lays four arms out in one order and dispatches
 them in another -- kinds 2, 3, 4, 5 answer 2, 3, 1, 4, where reading the bodies

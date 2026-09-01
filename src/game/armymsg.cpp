@@ -225,7 +225,7 @@ void __cdecl SendGamePause(int32_t pause, int32_t flags)
 
     SendGameMsg(msg, 0, 1);
 
-    if (kCommField(COMM_OFF_EVENT_DEBUG))
+    if (kCommField(COMM_OFF_VERBOSE))
         orig_log("SendGamePause from %x  Pause =%s  Flags=%x \n",
                  kCommField(COMM_OFF_OUR_PLAYER_ID),
                  pause ? (const char *)AM2_IMAGE(ADDR_STR_TRUE)

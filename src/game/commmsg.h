@@ -79,8 +79,14 @@ void __cdecl TellEachSlot(void);
  * fields are zeroed as it goes and the flow record's sequence number is
  * recorded on it -- READ, not bumped, so something else owns that counter.
  *
- * Does nothing at all without a DirectPlay session. */
-void __cdecl TrooperFireSend(void *trooper, void *target);
+ * Does nothing at all without a DirectPlay session.
+ *
+ * ITS SECOND ARGUMENT IS THE WEAPON, not a target, and reading the one caller
+ * is what says so: TrooperFire passes the object it just fired. The field its
+ * uid lands in is the one the message logs as `globTarg`, so the wire format's
+ * own word and the caller disagree; the parameter is named for what is passed
+ * to it, which is the half that is evidenced. */
+void __cdecl TrooperFireSend(void *trooper, void *weapon);
 
 /* 0x00431C30 and 0x00430120. MenuMessage logs a line and shows it; its third
  * argument picks WHICH of the panel's two indicators blinks, and is not a

@@ -739,7 +739,7 @@ void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame)
  * functions in the first place. */
 #define kEventDebug \
     (*(const int32_t *)((const uint8_t *)*(void **)AM2_IMAGE(ADDR_COMM_OBJECT) \
-                        + COMM_OFF_EVENT_DEBUG))
+                        + COMM_OFF_VERBOSE))
 
 
 /* Both stay original and are reached by address. ArmyMessageSend is the whole
@@ -2182,16 +2182,9 @@ void __cdecl AdvanceMission(int32_t a, int32_t b)
  * it rather than to whoever owns the weapon object. The unit's-own-weapon
  * pair do not, because a held weapon already belongs to its holder. */
 
-typedef struct {
-    uint32_t at;      /* the packed destination, or 0 to use the target's */
-    int16_t  ground;  /* the height there, or 0 to use the shooter's own */
-    int16_t  pad;     /* NOT written by any caller; see above */
-} AM2_FireSpot;
-
-typedef int32_t (__cdecl *AM2_FireWeaponFn)(void *weapon, void *unit,
-                                            int32_t height, int32_t heading,
-                                            AM2_FireSpot spot, void *target);
-#define orig_fire_weapon ((AM2_FireWeaponFn)(uintptr_t)ADDR_FIRE_WEAPON)
+/* AM2_FireSpot and orig_fire_weapon moved to item.h when region.cpp's
+ * TrooperFire needed them too -- one definition, for the reason
+ * tools/merges.py imports coverage.REGISTERED rather than copying it. */
 
 /* 0x004200F0. A named weapon, fired by a named unit, at a point. */
 void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
