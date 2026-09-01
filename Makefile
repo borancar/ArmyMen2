@@ -240,7 +240,7 @@ selftest: $(BUILD)/selftest.exe
 # removing a module from the list leaves a stale binary that make happily
 # calls up to date, and the link guard in `check` reports ok on a list that
 # no longer links. Verified by removing gamedir.cpp and watching it fail.
-$(BUILD)/selftest.exe: $(SELFTEST_SRC) tests/vectors.h tests/scriptvec.h tests/placevec.h tests/dirtyvec.h Makefile
+$(BUILD)/selftest.exe: $(SELFTEST_SRC) tests/vectors.h tests/scriptvec.h tests/placevec.h tests/dirtyvec.h tests/fireposevec.h Makefile
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) -static -static-libgcc -static-libstdc++ \
 	    -o $@ $(SELFTEST_SRC)
@@ -265,6 +265,14 @@ placevec:
 # ORIGINAL run over a sequence of appends under Unicorn, with the whole record
 # array recorded rather than a return value. See tools/dirtycheck.py for why
 # neither ab.sh configuration can see them.
+# The same shape once more: the ORIGINAL SelectFirePose run over every case
+# tools/firepose.py enumerates, recorded into tests/fireposevec.h for
+# `selftest` to replay against the C. Separate from `check` because `check`
+# already runs the tool -- this target only re-records the header.
+.PHONY: fireposevec
+fireposevec:
+	./.venv/bin/python tools/firepose.py --emit tests/fireposevec.h
+
 .PHONY: dirtyvec
 dirtyvec:
 	./.venv/bin/python tools/dirtycheck.py

@@ -34,6 +34,7 @@
 #include "vectors.h"
 #include "scriptvec.h"
 #include "placevec.h"
+#include "fireposevec.h"
 #include "dirtyvec.h"
 
 static uint8_t g_scratch[AM2_SCRATCH_LEN];
@@ -164,6 +165,8 @@ extern "C" void __cdecl TrooperFireSend(void *, void *)
 {
 }
 
+static int FirePoses(int *passed);
+
 int main(void)
 {
     int32_t pass = 0, fail = 0;
@@ -267,6 +270,7 @@ int main(void)
 
     fail += ScriptTokens(&pass);
     fail += PlaceLines(&pass);
+    fail += FirePoses(&pass);
     fail += DirtyList(&pass);
     fail += ScriptLines(&pass);
     fail += ScriptSpine(&pass);
@@ -569,6 +573,81 @@ static int PlaceRecordMatches(const AM2_Placement *got,
         && got->type == w->type
         && got->group == w->group
         && strcmp(got->name, w->name) == 0;
+}
+
+/* SelectFirePose against the cases tools/firepose.py recorded from the
+ * ORIGINAL. That tool checks its own Python model against the original; this
+ * checks the C against the same recorded answers, which is the half a model
+ * cannot cover on its own -- both were written from one reading, and only the
+ * emulator's run is ground truth.
+ *
+ * The object is REBUILT from the six inputs rather than stored, so the header
+ * cannot drift from what the function is actually handed. No image is needed:
+ * everything it reads is in the buffers below.
+ */
+static int FirePoses(int *passed)
+{
+    static unsigned char obj[0x600];
+    static unsigned char row[0x60];
+    static unsigned char wpn[0x100];
+    static unsigned char kindrec[0x10];
+    static unsigned char sight[0x40];
+    int pass = 0, fail = 0;
+
+    for (uint32_t i = 0; i < sizeof am2_firepose_vectors /
+                             sizeof am2_firepose_vectors[0]; i++) {
+        const AM2_FirePoseVector *v = &am2_firepose_vectors[i];
+        int32_t rc;
+        int32_t got;
+        int     bad = 0;
+
+        memset(obj, 0, sizeof obj);
+        memset(row, 0, sizeof row);
+        memset(wpn, 0, sizeof wpn);
+        memset(sight, 0, sizeof sight);
+
+        *(int32_t *)(obj + 0x00)  = v->objtype;
+        *(int32_t *)(obj + 0x08)  = v->flags;
+        *(int32_t *)(obj + 0x44)  = v->speed;
+        *(unsigned char **)(obj + 0x74) = row;
+        *(int32_t *)(obj + 0x538) = v->pose;
+        *(int32_t *)(obj + 0x544) = v->soldier;
+        *(int32_t *)(obj + 0x5A4) = v->f5a4;
+        *(int16_t *)(row + 0x4C)  = (int16_t)v->frame;
+        *(unsigned char **)(wpn + 0xC0) = kindrec;
+        *(int32_t *)kindrec = v->kind;
+        *(int32_t *)(sight + 0x08) = 0x7BADF00D;
+        *(int32_t *)(sight + 0x10) = v->seen;
+
+        rc  = SelectFirePose(v->nullobj ? (void *)0 : obj, wpn, sight,
+                             v->ready);
+        got = *(const int32_t *)(sight + 0x08);
+
+        if (rc != v->rc)
+            bad = 1;
+        else if (v->wrote && got != v->state)
+            bad = 1;
+        else if (!v->wrote && got != (int32_t)0x7BADF00D)
+            bad = 1;
+
+        if (bad) {
+            if (fail < 10)
+                printf("  FAIL SelectFirePose kind=%d frame=%d pose=%d "
+                       "sk=%d spd=%d seen=%d rdy=%d -> rc=%d pose=%d, "
+                       "want rc=%d pose=%d\n",
+                       (int)v->kind, (int)v->frame, (int)v->pose,
+                       (int)v->soldier, (int)v->speed, (int)v->seen,
+                       (int)v->ready, (int)rc, (int)got,
+                       (int)v->rc, v->wrote ? (int)v->state : -1);
+            fail++;
+        } else {
+            pass++;
+        }
+    }
+
+    printf("  %d fire poses: %d pass, %d fail\n", pass + fail, pass, fail);
+    *passed += pass;
+    return fail;
 }
 
 #define kPlacements     (*(AM2_Placement **)AM2_IMAGE(0x00654C7Cu))

@@ -5,54 +5,34 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `4c76644`. Working tree clean.
+Last updated: **2026-09-01**, at `02e71c7`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted. **1,384 patches**, **28** analysis tools in `make check`.
 
-**`AddSightBlocker` (`0x004036F0`, 1,024 B, one caller) is reconstructed** --
-what one object does to another's VIEW. Take the blocker's silhouette as seen
-from the viewer and, for every heading it subtends, record how far the view is
-obstructed, in three height bands.
+**`tests/fireposevec.h` closes the gap the `firepose.py` commit named.** That
+tool checks its own Python model against the original; this replays the same
+4,531 recorded cases against the C in `item.cpp`, which is the half a model
+cannot cover on its own -- both were written from one reading, and only the
+emulator's run is ground truth. `make selftest` now reports
+`4531 fire poses: 4531 pass, 0 fail`.
 
-**Its output is a per-direction buffer, not a return value** -- the original's
-epilogue sets no `eax` at all. `ADDR_SIGHT_BLOCK_BY_DIR` is sixty-four
-sixteen-byte records, one per heading rounded down to a multiple of four, each
-holding three int16 distances and a generation stamp. A stale record is
-overwritten; a current one takes the MINIMUM, so several blockers in one
-direction leave the nearest.
+**The object is REBUILT from the six inputs rather than stored**, so the header
+cannot drift from what `SelectFirePose` is actually handed, and the replay needs
+no image at all: everything the function reads is in the buffers the test
+supplies.
 
-**The three bands are HEIGHT, and which of them a blocker fills is the point.**
-Above the viewer fills all three, level with it fills the middle and the far,
-below fills only the far -- and the bands it does not fill get the viewer's own
-rank sight range, which is "not obstructed at all".
+**Five mutations to the C, all of which fail, and the counts are the evidence**:
+swapping one gun pose fails 30, dropping the flamethrower's movement gate 32,
+removing one entry from the nine-pose braced table 2, moving item kind 43 to the
+default arm 96, and making soldier kind 7 no longer count as braced 88. The
+restored build passes all 4,531. That is the check the Python model could not
+make -- mutating `item.cpp` does not touch `firepose.py`'s answer at all.
 
-**A SIXTEEN-ENTRY TABLE THAT IS MOSTLY IMPOSSIBLE.** Eight of the sixteen codes
-share the refusal exit: seven cannot happen with `left <= right` and
-`top <= bottom`, and the eighth is the viewer standing INSIDE the box. Generated
-from the image rather than transcribed, which is what `DirtyCollect`'s
-eighty-one arms forced.
+`make fireposevec` re-records the header, beside `scriptvec`, `placevec` and
+`dirtyvec`.
 
-**`RANK_REC_OFF_FIELD_04` gets its first READER here**, and it is a sight ARC:
-this function takes the low byte as an angular half-width and clips the
-silhouette to it. Left field-numbered anyway -- one reader is not a meaning, and
-48 through 76 is a wide arc for a heading unit -- but everything before this only
-wrote or copied the field.
-
-**The heading is the TURRET'S** when the viewer is a vehicle with more than one
-row, which is the one place this function looks at what kind of thing is seeing.
-
-**Its arc clipping is not symmetric**: when one silhouette edge is inside the arc
-and the other is not, WHICH end gets clipped depends on which was inside. Both
-outside is a refusal, and so is a span that comes out at zero.
-
-**`mission` failed its frames gate again, at 25,689/589, and the parent-commit
-control for that is already in hand** -- the `TrooperFire` commit measured
-25,662/638 on the same configuration with none of this in it. Same numbers, same
-known starvation of the run's second half; no verdict either way.
-`bootcamp` and `campaign` are clean -- identical 1,610-line state dump,
-identical 35-node widget tree, 22 and 2 pixels.
 
 ## Stop condition
 
