@@ -10469,6 +10469,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define UNIT_TYPE_OFF_NAME      0x0Cu
 #define UNIT_TYPE_OFF_COST      0x20u
 #define UNIT_TYPE_OFF_GAME_MASK 0x24u
+/* The three BUILDING kinds that share sprite set 0x26 -- riflepill,
+ * bazookapill and mgpill, which is why SpriteKeyForKind and UnitKindMatches
+ * both give 0, 1 and 2 one arm. RefundPlacedUnit treats them as one case and
+ * asks the occupant which of the three to charge for. */
+#define AM2_PILLBOX_KIND_FIRST  0
+#define AM2_PILLBOX_KIND_LAST   2
+/* How far past a pillbox's own uid it looks for the trooper inside. Three,
+ * and it works because CreateItem allocates a composite's children straight
+ * after its parent. */
+#define AM2_PILLBOX_UID_SCAN    3
+/* 0x0043B160, one caller -- the manual placement screen. Take a placed unit
+ * back off the layout: find its ADDR_UNIT_TYPES record, destroy it, and add
+ * UNIT_TYPE_OFF_COST back to the caller's points. Reconstructed. */
+#define ADDR_REFUND_PLACED_UNIT 0x0043B160u  /* void(obj, slot, int32 *pts) */
 #define ADDR_UNIT_TYPE_COST 0x0043A5E0u  /* uint32_t(int32_t type) */
 #define ADDR_PACK_KEY       0x00433810u
 /* 0x0043A5F0, one caller. A packed sprite key for a selector in 0..7: five of

@@ -586,6 +586,205 @@ int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
     return found;
 }
 
+/* RefundPlacedUnit -- original 0x0043B160, one caller: the manual placement
+ * screen at 0x00413BC0, which is also IsPlacedUnit's only caller. So this is
+ * what happens when you take a unit back off the layout: work out what it
+ * cost, destroy it, and add the points back.
+ *
+ * IT OPENS EXACTLY AS IsPlacedUnit DOES -- the same "types 2, 3 and 8 OR an
+ * item" gate and the same army test -- and then diverges: where that one
+ * answers yes or no, this one has to find the ADDR_UNIT_TYPES record and take
+ * its UNIT_TYPE_OFF_COST. Three arms, and each finds the record a different
+ * way:
+ *
+ *   A VEHICLE matches on its own OBJ_OFF_TABLE_REC_KIND against a record whose
+ *   UNIT_TYPE_OFF_VEHICLE is set.
+ *
+ *   A TROOPER matches on THE KIND OF THE WEAPON IN ITS FIRST SLOT, against a
+ *   record whose UNIT_TYPE_OFF_TROOPER is set -- so what a soldier is worth
+ *   is decided by what it is holding. It refuses outright if the trooper is
+ *   Sarge or has anything at OBJ_OFF_FIELD_94, which is the same pair
+ *   IsPlacedUnit refuses on.
+ *
+ *   AN ITEM asks UnitKindMatches, one BUILDING record at a time, with the
+ *   army for this slot -- the same three-function family as SpriteKeyForKind
+ *   and PlacementAllowed, and the fourth caller of that vocabulary.
+ *
+ * THE ITEM ARM CLIMBS TO THE ROOT FIRST. OBJ_OFF_CHAIN_PARENT_UID is followed
+ * until it runs out, so clicking any piece of a composite refunds the whole
+ * thing -- which is the other end of what CreateItem builds.
+ *
+ * AND THE PILLBOXES FIND THEIR OCCUPANT BY UID ARITHMETIC. For kinds 0, 1 and
+ * 2 -- riflepill, bazookapill and mgpill, the three that share a sprite set --
+ * it looks up uid+1, uid+2 and uid+3 in turn and takes the first that is a
+ * TROOPER. That works because CreateItem allocates a composite's children
+ * immediately after its parent, so their uids are consecutive; nothing here
+ * checks that assumption, and a uid allocated in between would break it.
+ * Then the trooper's WEAPON decides which pillbox record to charge for: kind
+ * 4 is the second, kind 8 the third, anything else the first.
+ *
+ * The occupant is destroyed on BOTH paths out of that arm -- whether or not a
+ * record was found -- while the outer object is destroyed only if a cost was
+ * found. A pillbox whose weapon matches nothing therefore loses its soldier
+ * and stays on the map.
+ *
+ * NOTHING HAPPENS AT ALL FOR A COST OF ZERO OR LESS: no destroy, no refund.
+ * That is the single exit every arm falls into.
+ *
+ * THE ORIGINAL WALKS THE TABLE FROM rec+8, not from rec+0 -- its pointer
+ * starts at 0x004878A0 and reads the trooper and vehicle flags as [-8] and
+ * [-4] and the cost as [+0x18]. Written here from rec+0 with the
+ * UNIT_TYPE_OFF_ names, which is the same three addresses said legibly, and
+ * is why checkoffsetuse reports 0 and 0x20 on one side and 0x18 on the other.
+ */
+void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points)
+{
+    uint8_t *o    = (uint8_t *)obj;
+    int32_t  cost = 0;
+    int32_t  i;
+
+    if (!ObjIsTypeIn238((const AM2_Object *)o)
+        && !ObjIsItem((const AM2_Object *)o))
+        return;
+
+    if (*(const int8_t *)(o + OBJ_OFF_ARMY) != slot)
+        return;
+
+    switch (*(const int32_t *)o) {
+    case AM2_OBJ_TYPE_VEHICLE:
+        for (i = 0; i < AM2_UNIT_TYPE_COUNT; i++) {
+            const uint8_t *rec = kUnitType(i);
+
+            if (!*(const int32_t *)(rec + UNIT_TYPE_OFF_VEHICLE))
+                continue;
+            if (*(const int32_t *)(rec + UNIT_TYPE_OFF_KIND)
+                != *(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND))
+                continue;
+            cost = *(const int32_t *)(rec + UNIT_TYPE_OFF_COST);
+        }
+        break;
+
+    case AM2_OBJ_TYPE_TROOPER: {
+        uint8_t *w;
+
+        if (*(const int32_t *)(o + OBJ_OFF_SARGE))
+            return;
+        if (*(const int32_t *)(o + OBJ_OFF_FIELD_94))
+            return;
+
+        w = (uint8_t *)LookupByUID(*(const uint32_t *)(o + OBJ_OFF_WEAPON_UID));
+        if (!w)
+            return;
+        if (!ObjIsType4((const AM2_Object *)w))
+            return;
+
+        for (i = 0; i < AM2_UNIT_TYPE_COUNT; i++) {
+            const uint8_t *rec = kUnitType(i);
+
+            if (!*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER))
+                continue;
+            if (*(const int32_t *)(rec + UNIT_TYPE_OFF_KIND)
+                != **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))
+                continue;
+            cost = *(const int32_t *)(rec + UNIT_TYPE_OFF_COST);
+        }
+        break;
+    }
+
+    case AM2_OBJ_TYPE_ITEM: {
+        int32_t army = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                      slot);
+        int32_t found = -1;
+        int32_t kind;
+
+        for (i = 0; i < AM2_UNIT_TYPE_COUNT; i++) {
+            const uint8_t *rec = kUnitType(i);
+
+            if (*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER)
+                || *(const int32_t *)(rec + UNIT_TYPE_OFF_VEHICLE))
+                continue;
+            if (UnitKindMatches(
+                    *(const int32_t *)(
+                        *(const uint8_t *const *)(o + OBJ_OFF_FIELD_94)
+                        + AAIREC_OFF_KEY),
+                    *(const int32_t *)(rec + UNIT_TYPE_OFF_KIND), army)) {
+                found = i;
+                break;
+            }
+        }
+        if (found < 0)
+            return;
+
+        /* Climb to the root of the chain -- see the note above. */
+        while (*(const uint32_t *)(o + OBJ_OFF_CHAIN_PARENT_UID))
+            o = (uint8_t *)LookupByUID(
+                *(const uint32_t *)(o + OBJ_OFF_CHAIN_PARENT_UID));
+
+        kind = *(const int32_t *)(kUnitType(found) + UNIT_TYPE_OFF_KIND);
+        if (kind < AM2_PILLBOX_KIND_FIRST || kind > AM2_PILLBOX_KIND_LAST) {
+            cost = *(const int32_t *)(kUnitType(found) + UNIT_TYPE_OFF_COST);
+            break;
+        }
+
+        {
+            uint8_t *inside = (uint8_t *)0;
+            uint8_t *w;
+            int32_t  want;
+            int32_t  n;
+
+            for (n = 1; n <= AM2_PILLBOX_UID_SCAN; n++) {
+                uint8_t *c = (uint8_t *)LookupByUID(
+                    ((const AM2_Object *)o)->uid + (uint32_t)n);
+
+                if (ObjIsType2((const AM2_Object *)c)) {
+                    inside = c;
+                    break;
+                }
+            }
+
+            w = (uint8_t *)LookupByUID(
+                *(const uint32_t *)(inside + OBJ_OFF_WEAPON_UID));
+            if (!w)
+                return;
+            if (!ObjIsType4((const AM2_Object *)w))
+                return;
+
+            switch (**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)) {
+            case 4:  want = 1; break;
+            case 8:  want = 2; break;
+            default: want = 0; break;
+            }
+
+            for (i = 0; i < AM2_UNIT_TYPE_COUNT; i++) {
+                const uint8_t *rec = kUnitType(i);
+
+                if (*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER)
+                    || *(const int32_t *)(rec + UNIT_TYPE_OFF_VEHICLE))
+                    continue;
+                if (*(const int32_t *)(rec + UNIT_TYPE_OFF_KIND) != want)
+                    continue;
+
+                cost = *(const int32_t *)(rec + UNIT_TYPE_OFF_COST);
+                break;
+            }
+
+            /* Destroyed either way -- see the note. */
+            DestroyByType(inside);
+        }
+        break;
+    }
+
+    default:
+        return;
+    }
+
+    if (cost <= 0)
+        return;
+
+    DestroyByType(o);
+    *points += cost;
+}
+
 int place_install(void)
 {
     patch_replace(ADDR_IS_PLACED_UNIT, (const void *)IsPlacedUnit,
@@ -601,6 +800,9 @@ int place_install(void)
     rc |= patch_replace(ADDR_PLACEMENT_ALLOWED,
                         (const void *)PlacementAllowed,
                         "PlacementAllowed", 2);
+    rc |= patch_replace(ADDR_REFUND_PLACED_UNIT,
+                        (const void *)RefundPlacedUnit,
+                        "RefundPlacedUnit", 1);
 
     rc |= patch_replace(ADDR_FREE_PLACEMENTS, (const void *)FreePlacements,
                         "FreePlacements", 1);
