@@ -101,6 +101,14 @@ void __cdecl AiKeepRange(void *obj, void *out, void *ctx);
  * destination, react to a hit and face what it sees. */
 void __cdecl AiWalkStep(void *obj, void *out, void *ctx);
 
+/* 0x00407190, NINE callers -- the step every AI arm but one shares. Turn the
+ * destination at OBJ_OFF_FIELD_C0 into a heading in `out`, routing through the
+ * region graph when it is not in the region the object stands in. The third
+ * argument is never read; the fourth suppresses the second copy of the
+ * bearing. */
+void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
+                           int32_t keepFacing);
+
 /* 0x00407020, one caller. Sarge's per-frame AI step: build a SIGHTC record on
  * the stack, pick up a weapon if one is in reach, react to being hit, then
  * dispatch on OBJ_OFF_AI_MODE and record the region. */

@@ -3184,9 +3184,41 @@
  * ADDR_REGION_OF_CELL indexed by OBJ_OFF_TILE. A byte zero-extended into a
  * word, which is why it is a uint16_t. */
 #define OBJ_OFF_REGION         0xDCu  /* uint16_t */
-/* The step every arm but this one shares, nine call sites. Unnamed: nothing
- * in it says what it is and this file will not guess from a call site. */
-#define ADDR_AI_407190         0x00407190u  /* void(obj, out, ctx, int32) */
+/* READ NOW, after sitting here as "nothing in it says what it is and this
+ * file will not guess from a call site". It turns a DESTINATION into a
+ * HEADING, and it is the step every AI arm but one shares because that is the
+ * one thing they all need. Nine call sites. Reconstructed as AiRouteToward;
+ * see region.cpp.
+ *
+ * ITS THIRD ARGUMENT IS NEVER READ. Every caller pushes four and the body
+ * touches frame+4, +8 and +16; frame+12 -- the sight context -- is not
+ * among them. Fourth unused parameter in this tree. */
+#define ADDR_AI_ROUTE_TOWARD   0x00407190u  /* void(obj, out, ctx, int32) */
+/* Its two remembered regions, both int16 and both named from writers.
+ * PREV_REGION is set to 0xFFFF in two places and stored into after a compare
+ * in a third, so it is "the region we were in last time, or none yet";
+ * GOAL_REGION takes the region the destination is in, written only by this
+ * function and its twin at 0x004082C5. */
+#define OBJ_OFF_PREV_REGION    0xDEu   /* int16_t, -1 for none */
+#define OBJ_OFF_GOAL_REGION    0xE0u   /* int16_t */
+/* AiRouteToward's own thresholds. ARRIVED ends the walk and clears the
+ * destination; NEAR_WAYPOINT is what advances the cursor past a waypoint
+ * already reached, and REPLAN is how far the target may drift before the path
+ * is planned again. The two budgets PlanPathTo gets differ by three orders of
+ * magnitude: the short one when the object has no region, the long one when
+ * it has and the destination does too. */
+/* AM2_AI_ARRIVED_DIST is 0x20 and is already defined further up, beside the
+ * SIGHT_OFF_ block -- I defined it a SECOND time here and checkoffsets
+ * refused it, which is the third time that ratchet has caught its author.
+ * The 0x20 the waypoint cursor advances on is the same number, and gets no
+ * name of its own for the same reason. */
+#define AM2_AI_REPLAN_DIST       0x30
+#define AM2_AI_PLAN_BUDGET_SHORT 0x30
+#define AM2_AI_PLAN_BUDGET_LONG  0xC350
+/* The two distances the tail grades the approach by: closer than SLOW it sets
+ * one flag, closer than STOP it sets a second as well. */
+#define AM2_AI_APPROACH_SLOW     0x48
+#define AM2_AI_APPROACH_STOP     0x40
 /* THE THIRD AND FOURTH AI-MODE DISPATCHERS, and their one shared caller says
  * which unit each is for. 0x0044B9FE branches on OBJ_OFF_SARGE: set, it calls
  * 0x00407020; clear, 0x004062B0. So one is Sarge's per-frame AI step and the

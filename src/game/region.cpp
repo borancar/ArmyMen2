@@ -25,6 +25,8 @@
 #include "../inject/patch.h"
 
 #define kRegionOfCell (*(uint8_t **)AM2_IMAGE(ADDR_REGION_OF_CELL))
+#define kRegionCost   (*(uint8_t **)AM2_IMAGE(ADDR_REGION_COST))
+#define kRegionNext   (*(uint8_t **)AM2_IMAGE(ADDR_REGION_NEXT))
 /* Spelled as army.cpp spells it, so checkglobals sees one name per
  * address rather than two. */
 #define g_armyObjLists ((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
@@ -1752,9 +1754,204 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
     }
 }
 
-typedef void (__cdecl *AM2_AiCommonFn)(void *obj, void *out, const void *ctx,
-                                       int32_t flag);
-#define orig_ai_common ((AM2_AiCommonFn)(uintptr_t)ADDR_AI_407190)
+/* AiRouteToward -- original 0x00407190, NINE callers: the step every AI arm
+ * but one shares. orig.h left it unnamed for a long time, on the grounds that
+ * "nothing in it says what it is and this file will not guess from a call
+ * site". Read now, and the name is from the body: it turns the DESTINATION at
+ * OBJ_OFF_FIELD_C0 into a HEADING in the out record, routing through the
+ * region graph when the destination is not in the region the object is
+ * standing in.
+ *
+ * FIVE STAGES, and only the last one always runs:
+ *
+ *   BEGIN. If BeginMoveTo accepts the destination, seed a two-point path --
+ *   here to there -- and go straight to the heading.
+ *
+ *   ROUTE. Otherwise, if both regions are known and different, ask the
+ *   all-pairs tables: solve the pair if this generation has not, take
+ *   ADDR_REGION_NEXT's next hop, take the MIDDLE link into it, and move the
+ *   working destination to that link's far cell. So the object walks to a
+ *   region boundary rather than at the thing it wants.
+ *
+ *   REPLAN. If the target has drifted more than AM2_AI_REPLAN_DIST, or the
+ *   waypoint cursor has run out, ask PlanPathTo -- with a budget of 0x30 when
+ *   the object has no region and 0xC350 when it and its goal both do, three
+ *   orders of magnitude apart. A refusal falls back to the same two-point
+ *   path BEGIN would have made.
+ *
+ *   ADVANCE. Otherwise, walk the cursor forward over every waypoint already
+ *   within AM2_AI_ARRIVED_DIST, stopping at the last one.
+ *
+ *   HEAD. Measure to the real destination. Inside AM2_AI_ARRIVED_DIST the
+ *   walk is over: out+8 gets 1 and OBJ_OFF_FIELD_C0 is cleared to
+ *   ADDR_ZERO_POINT. Otherwise out+0 gets the bearing, out+8 gets 4, and one
+ *   or two slow-down flags go in depending on how close the WORKING point is.
+ *
+ * out+8 IS A POSE, which AiHitReact in this file establishes rather than this
+ * function. The two values here are 1 and 4, and AM2_POSE_STAND and
+ * AM2_POSE_KNEEL are those same numbers in WeaponPoseIndex's vocabulary --
+ * RECORDED rather than used, because nothing has shown the two tables to be
+ * one and "kneel" is a strange thing to ask for while walking.
+ *
+ * THE FOURTH ARGUMENT DECIDES WHETHER THE BEARING IS WRITTEN TWICE. It goes
+ * to out[0] always and to out[1] as well when that argument is zero -- so a
+ * caller passing non-zero is asking for the facing to be left alone.
+ *
+ * THE THIRD ARGUMENT IS NEVER READ. All nine callers push four; the body
+ * touches frame+4, +8 and +16 and never frame+12, which is the sight context
+ * every other function in this band wants. Fourth unused parameter in the
+ * tree, and the signature keeps it because the call sites do.
+ *
+ * THE FIRST ARGUMENT'S SLOT IS THE WORKING POINT. The original copies the
+ * destination into it in the fourth instruction and then uses that slot for
+ * the rest of the function -- the region waypoint overwrites it, the cursor
+ * walk overwrites it, and the tail measures from it. `obj` survives in a
+ * register. Written here as a local, which is the same thing said clearly.
+ *
+ * THE CURSOR ADVANCE UPDATES THE POINT THROUGH A POINTER ALREADY PUSHED. Each
+ * turn of that loop writes the next waypoint into the working slot AFTER
+ * pushing its address, so ApproxDist sees the new value. That is what settles
+ * once more that ApproxDist takes POINTERS -- the same fact PlaySoundAt got
+ * wrong in the other direction.
+ *
+ * kRegionCost and kRegionNext are spelled here the way kRegionOfCell already
+ * is one screen up: the globals hold POINTERS to the matrices, not the
+ * matrices, and this file records that getting it wrong took the game down on
+ * the first run.
+ *
+ * A REGION OF ZERO IS "none", which is why both `<= 0` tests refuse before
+ * the matrices are indexed, and the stuck check refuses a route out of a
+ * region the object has not left since it got stuck.
+ */
+void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
+                           int32_t keepFacing)
+{
+    uint8_t  *o    = (uint8_t *)obj;
+    uint8_t  *w    = (uint8_t *)out;
+    uint8_t  *dest = o + OBJ_OFF_FIELD_C0;
+    AM2_Point pt;                    /* the original's first argument slot */
+    int32_t   from, to;
+    int32_t   d;
+
+    (void)ctx;
+
+    *(uint32_t *)&pt = *(const uint32_t *)dest;
+
+    from = kRegionOfCell[(uint32_t)TileOfPoint(*(const uint32_t *)(o + OBJ_OFF_POS))
+                         & 0xFFFFu];
+    to   = kRegionOfCell[(uint32_t)TileOfPoint(*(const uint32_t *)&pt) & 0xFFFFu];
+
+    if (BeginMoveTo(obj, (uint32_t *)&pt)) {
+        *(uint32_t *)(o + OBJ_OFF_TAIL_BLOCK) = *(const uint32_t *)&pt;
+        *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)&pt;
+        *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  =
+            *(const uint32_t *)(o + OBJ_OFF_POS);
+        *(int16_t *)(o + OBJ_OFF_MOVE_END)    = 0;
+        *(int16_t *)(o + OBJ_OFF_MOVE_AT)     = 0;
+        *(int16_t *)(o + OBJ_OFF_MOVE_COUNT)  = 1;
+        goto heading;
+    }
+
+    if (to > 0 && from > 0 && to != from) {
+        int16_t stride = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
+        int32_t link;
+
+        *(int16_t *)(o + OBJ_OFF_GOAL_REGION) = (int16_t)to;
+
+        if (kRegionCost[(uint32_t)(from * stride + to)]
+            != *(const uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP))
+            RegionSolvePair(from, to);
+
+        if (from == *(const int16_t *)(o + OBJ_OFF_PREV_REGION)
+            && *(const int32_t *)(o + OBJ_OFF_STUCK_COUNT))
+            goto waypoint;
+
+        link = (int16_t)MiddleRegionLink(
+            from, (int16_t)(uint8_t)kRegionNext[(uint32_t)(from * stride + to)]);
+        if (link < 0)
+            goto waypoint;
+
+        {
+            int32_t x = 0, y = 0;
+
+            TileToXY(kLinks(from)[link].into, &x, &y);
+            if (x) {
+                pt.x = (int16_t)x;
+                pt.y = (int16_t)y;
+            }
+        }
+    }
+
+waypoint:
+    d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_TAIL_BLOCK), &pt);
+
+    if (d > AM2_AI_REPLAN_DIST
+        || (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
+           >= (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1) {
+        int32_t budget = AM2_AI_PLAN_BUDGET_SHORT;
+
+        if (*(const int16_t *)(o + OBJ_OFF_REGION) != 0 && to != 0)
+            budget = AM2_AI_PLAN_BUDGET_LONG;
+
+        *(uint32_t *)(o + OBJ_OFF_TAIL_BLOCK) = *(const uint32_t *)&pt;
+
+        if (!PlanPathTo(obj, (uint32_t *)&pt, budget)) {
+            *(uint32_t *)(o + OBJ_OFF_TAIL_BLOCK) = *(const uint32_t *)&pt;
+            *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  =
+                *(const uint32_t *)(o + OBJ_OFF_POS);
+            *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)&pt;
+            *(int16_t *)(o + OBJ_OFF_MOVE_END)    = 0;
+            *(int16_t *)(o + OBJ_OFF_MOVE_AT)     = 1;
+            *(int16_t *)(o + OBJ_OFF_MOVE_COUNT)  = 2;
+            goto heading;
+        }
+    }
+
+    /* Reached BOTH when no replan was wanted and when one SUCCEEDED -- the
+     * original's `jne` from PlanPathTo lands here, not past it. */
+    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_TAIL_BLOCK),
+                           *(const uint32_t *)&pt)
+               && *(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
+                  < *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT)) {
+        uint32_t at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
+
+        *(uint32_t *)&pt =
+            *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
+
+        while (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &pt)
+               < AM2_AI_ARRIVED_DIST) {
+            at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
+            if ((int32_t)at
+                >= (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1)
+                break;
+
+            at++;
+            *(int16_t *)(o + OBJ_OFF_MOVE_AT) = (int16_t)at;
+            *(uint32_t *)&pt =
+                *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
+        }
+    }
+
+heading:
+    if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                   (const AM2_Point *)dest) < AM2_AI_ARRIVED_DIST) {
+        *(int32_t *)(w + 8) = 1;
+        *(uint32_t *)dest = *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        return;
+    }
+
+    d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &pt);
+    w[0] = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), &pt);
+    if (!keepFacing)
+        w[1] = w[0];
+
+    *(int32_t *)(w + 8) = 4;
+    if (d < AM2_AI_APPROACH_SLOW) {
+        if (d < AM2_AI_APPROACH_STOP)
+            *(int32_t *)(w + 0x10) = 1;
+        *(int32_t *)(w + 0x14) = 1;
+    }
+}
 
 /* AiStepIgnore -- original 0x00407BF0, one caller, which is the AI mode
  * dispatcher at 0x00407F80. THIS IS THE `ignore` ARM, and the identification
@@ -1802,7 +1999,7 @@ void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx)
     if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_ARRIVED_DIST) {
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        orig_ai_common(obj, out, ctx, 0);
+        AiRouteToward(obj, out, ctx, 0);
         return;
     }
 
@@ -1881,7 +2078,7 @@ void __cdecl AiStepDefend(void *obj, void *out, void *ctx)
     if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_ARRIVED_DIST) {
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        orig_ai_common(obj, out, ctx, 0);
+        AiRouteToward(obj, out, ctx, 0);
     } else {
         uint8_t hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
 
@@ -1944,7 +2141,7 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
     if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_ARRIVED_DIST) {
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        orig_ai_common(obj, out, ctx, 0);
+        AiRouteToward(obj, out, ctx, 0);
     } else {
         uint8_t hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
 
@@ -2022,7 +2219,7 @@ void __cdecl AiStepFollow(void *obj, void *out, void *ctx)
     if (move) {
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(c + SIGHT_OFF_DEST);
-        orig_ai_common(obj, out, ctx, 0);
+        AiRouteToward(obj, out, ctx, 0);
     } else {
         uint8_t hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
 
@@ -4374,6 +4571,8 @@ int region_install(void)
                         "RoachAliveStepA", 1);
     rc |= patch_replace(ADDR_TYPE2_PLAYER_STEP, (const void *)Type2PlayerStep,
                         "Type2PlayerStep", 1);
+    rc |= patch_replace(ADDR_AI_ROUTE_TOWARD, (const void *)AiRouteToward,
+                        "AiRouteToward", 9);
     rc |= patch_replace(ADDR_STEP_TYPE2, (const void *)StepType2,
                         "StepType2", 1);
     rc |= patch_replace(ADDR_STEP_TYPE3, (const void *)StepType3,
