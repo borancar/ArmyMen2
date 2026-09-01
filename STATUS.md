@@ -152,6 +152,29 @@ overwritten the way `docs/binarypatches.md`'s six were; this is one source
 construct compiled the same way everywhere. And the NULL check lives inside the
 dead arm, so every one of these dereferences the uid lookup unguarded.
 
+## Next: the pointer picks inline ArmyAlliedWithObj, and not identically
+
+Seven of the remaining functions in the 0x00458930 band -- `0x00458EE0`,
+`0x004590F0`, `0x00459300`, `0x00459420`, `0x004597B0`, `0x004599A0`,
+`0x00459BE0` -- share a block that maps an object's table record back to an
+index against `ADDR_OBJ_TABLE_RECORDS + 0, 0x100, 0x200, 0x300`. That block is
+`ArmyAlliedWithObj`, which `army.cpp` has had as a function all along.
+
+Identified by STRUCTURE, not by a score: normalising registers and diffing gave
+0.52 with a nine-instruction run, which is suggestive and proves nothing since
+the boundaries were guessed. Reading the C beside the block settles it arm for
+arm -- the two army-4 returns, the multiplayer kind-7 refusal, the `useRec3`
+choice, the `CommArmyOfSlot` compare and both `AllyFlag` calls, in order.
+
+**The copies are not identical.** `0x00458EE0` hoists an `obj->army == 4`
+refusal ABOVE the block and sends it to the FAILURE exit; `0x004590F0` leaves it
+where `ArmyAlliedWithObj` has it, where army 4 returns ALLIED. So mode 4's pick
+refuses a neutral object outright and mode 5's treats it as allied -- one `je`
+target apart, and invisible to anything but a diff.
+
+So these want writing as calls to `ArmyAlliedWithObj` with each hoisted guard
+spelled out, rather than as seven transcriptions of one body.
+
 ## Read the split-aware figure, not the entry one
 
 This unit is why. 144 bytes of work moved the entry-generous byte figure by

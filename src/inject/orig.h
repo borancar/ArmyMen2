@@ -10075,6 +10075,28 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * along, with a comment that already said what the function does. Grep the
  * ADDRESS first; the ratchet is the mechanism, not the backstop. */
 #define ADDR_MEDKIT_HEAL_ONE     0x00458AB0u  /* void(void *obj) */
+/* ArmyAlliedWithObj IS INLINED INTO THE POINTER PICKS, and army.cpp has had it
+ * as a function since long before. The block that appears in 0x00458EE0,
+ * 0x004590F0, 0x00459300, 0x00459420, 0x004597B0, 0x004599A0 and 0x00459BE0 --
+ * the one that maps an object's table record back to an index by comparing it
+ * against ADDR_OBJ_TABLE_RECORDS + 0, 0x100, 0x200 and 0x300 -- is that
+ * function's body: the two army-4 returns, the multiplayer kind-7 refusal, the
+ * useRec3 choice, the CommArmyOfSlot compare and both AllyFlag calls, in order.
+ *
+ * Identified by STRUCTURE and not by a similarity score. Normalising registers
+ * and diffing gave 0.52 with a nine-instruction run, which is suggestive and
+ * proves nothing -- the boundaries were guessed. Reading army.cpp's C beside
+ * the block settles it, arm for arm.
+ *
+ * THE SEVEN COPIES ARE NOT ALL THE SAME, and that is the part worth having
+ * before any of them is written. 0x00458EE0 hoists an `obj->army == 4` refusal
+ * ABOVE the block and sends it to the FAILURE exit; 0x004590F0 leaves it where
+ * ArmyAlliedWithObj has it, where army 4 returns ALLIED. So mode 4's pick
+ * refuses a neutral object outright and mode 5's treats it as allied -- one
+ * `je` target apart, and invisible to anything but a diff.
+ *
+ * That is why these are worth writing as calls to ArmyAlliedWithObj with the
+ * hoisted guards written out, rather than seven transcriptions of one body. */
 
 /* IT NAMES ITSELF -- "-->Trooper Want Item Received" -- so this is the
  * kind-0x19 receiver for TrooperWantItemSend, and the two together are the
