@@ -5,46 +5,54 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `764e8ee`. Working tree clean.
+Last updated: **2026-09-01**, at `4c76644`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,383 patches**, **28** analysis tools in `make check`.
+Nothing uncommitted. **1,384 patches**, **28** analysis tools in `make check`.
 
-**`tools/firepose.py` is the oracle the last commit said was missing.** 4,531
-cases: forty-six item kinds times three object classes times braced times
-soldier kind times speed times seen times ready, plus a sweep of every pose
-0x00..0x24 and the four refusals. The original runs under Unicorn with NOTHING
-HOOKED -- `SelectFirePose`'s two callees are pure reads of the object, unlike
-`explcheck`'s and `collectcheck`'s, which reach the heap and the map.
+**`AddSightBlocker` (`0x004036F0`, 1,024 B, one caller) is reconstructed** --
+what one object does to another's VIEW. Take the blocker's silhouette as seen
+from the viewer and, for every heading it subtends, record how far the view is
+obstructed, in three height bands.
 
-**Its output is not its return value, and a check could miss that entirely.**
-The function answers 1 on every path past its refusals and does its work by
-WRITING `SIGHTCOUT_OFF_STATE`, so an oracle comparing `eax` would pass with the
-whole body deleted. The pose slot is seeded with a sentinel, so "wrote nothing"
--- which two of the eight arms really do -- is distinguishable from "wrote
-zero".
+**Its output is a per-direction buffer, not a return value** -- the original's
+epilogue sets no `eax` at all. `ADDR_SIGHT_BLOCK_BY_DIR` is sixty-four
+sixteen-byte records, one per heading rounded down to a multiple of four, each
+holding three int16 distances and a generation stamp. A stale record is
+overwritten; a current one takes the MINIMUM, so several blockers in one
+direction leave the nearest.
 
-**A CORPUS DRIVEN FROM THE MODEL'S OWN TABLE CANNOT FAIL, and this is the
-second instance in the project.** The braced-pose sweep first looped over the
-model's own nine-entry tuple; deleting `0x06` from it PASSED, because deleting
-the entry deleted the case that would have caught it. The symptom is
-`boolcheck`'s exactly -- the corpus came back three cases smaller, 4459 against
-4462 -- and a case count that moves under a mutation is the tell. Swept over a
-RANGE it fails both ways, two cases for removing `0x06` and two for adding
-`0x07`, with the total pinned at 4531 in all three runs.
+**The three bands are HEIGHT, and which of them a blocker fills is the point.**
+Above the viewer fills all three, level with it fills the middle and the far,
+below fills only the far -- and the bands it does not fill get the viewer's own
+rank sight range, which is "not obstructed at all".
 
-**Mutation-checked in five directions, four of which failed first time**:
-swapping the two gun poses fails 36, dropping the flamethrower's movement gate
-fails 32, turning `seen && ready` into `||` fails 132, and moving item kind 43
-into the default arm fails 96. The fifth is the one above.
+**A SIXTEEN-ENTRY TABLE THAT IS MOSTLY IMPOSSIBLE.** Eight of the sixteen codes
+share the refusal exit: seven cannot happen with `left <= right` and
+`top <= bottom`, and the eighth is the viewer standing INSIDE the box. Generated
+from the image rather than transcribed, which is what `DirtyCollect`'s
+eighty-one arms forced.
 
-**What it does NOT close, said plainly.** It checks the READING against the
-original; the C in `item.cpp` is a second transcription of that same reading,
-verified by the compiler and by `checkoffsetuse` rather than by this. Replaying
-the recorded cases against the C the way `tests/selftest.cpp` replays
-`placevec.h` would close that, and is not done.
+**`RANK_REC_OFF_FIELD_04` gets its first READER here**, and it is a sight ARC:
+this function takes the low byte as an angular half-width and clips the
+silhouette to it. Left field-numbered anyway -- one reader is not a meaning, and
+48 through 76 is a wide arc for a heading unit -- but everything before this only
+wrote or copied the field.
 
+**The heading is the TURRET'S** when the viewer is a vehicle with more than one
+row, which is the one place this function looks at what kind of thing is seeing.
+
+**Its arc clipping is not symmetric**: when one silhouette edge is inside the arc
+and the other is not, WHICH end gets clipped depends on which was inside. Both
+outside is a refusal, and so is a span that comes out at zero.
+
+**`mission` failed its frames gate again, at 25,689/589, and the parent-commit
+control for that is already in hand** -- the `TrooperFire` commit measured
+25,662/638 on the same configuration with none of this in it. Same numbers, same
+known starvation of the run's second half; no verdict either way.
+`bootcamp` and `campaign` are clean -- identical 1,610-line state dump,
+identical 35-node widget tree, 22 and 2 pixels.
 
 ## Stop condition
 

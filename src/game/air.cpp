@@ -1463,11 +1463,223 @@ void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
     headings[slot] = heading;
 }
 
+/* AddSightBlocker -- original 0x004036F0, 1,024 bytes, one caller. What one
+ * object does to another's view: take the blocker's silhouette as seen from
+ * the viewer, and for every heading it subtends record how far the view is
+ * obstructed, in three height bands.
+ *
+ * ITS OUTPUT IS A PER-DIRECTION BUFFER, not a return value -- the epilogue
+ * sets no eax at all. ADDR_SIGHT_BLOCK_BY_DIR is sixty-four sixteen-byte
+ * records, one per heading rounded down to a multiple of four, each holding
+ * three int16 distances and a generation stamp. A record whose stamp is not
+ * ADDR_SIGHT_GENERATION is stale and is overwritten; one that is current takes
+ * the MINIMUM, so several blockers in one direction leave the nearest.
+ *
+ * THE THREE BANDS ARE HEIGHT, and which of them a blocker fills is the whole
+ * point: one standing ABOVE the viewer fills all three, one LEVEL with it --
+ * within AM2_SIGHT_BAND_STEP -- fills the middle and the far, and one BELOW
+ * fills only the far. The bands it does not fill are set to the viewer's own
+ * rank sight range, which is the same as "not obstructed at all".
+ *
+ * A SIXTEEN-ENTRY QUADRANT TABLE PICKS THE SILHOUETTE, and it is GENERATED
+ * from the image rather than transcribed -- the same decision DirtyCollect's
+ * eighty-one arms forced, where six hand-written codes landed in the wrong
+ * arm. Four comparisons build a code out of (left < x), (top < y),
+ * (right < x), (bottom < y); eight of the sixteen are geometrically impossible
+ * or mean the viewer is INSIDE the box, and every one of those eight goes to
+ * the same exit. The other eight name the two extreme corners.
+ *
+ * THE HEADING IS THE TURRET'S when the viewer is a vehicle with more than one
+ * row -- OBJ_OFF_FIELD_530 rather than OBJ_OFF_FACING -- which is the one
+ * place this function looks at what kind of thing is doing the seeing.
+ *
+ * ARC CLIPPING, and it is not symmetric. When one silhouette edge is inside
+ * the rank's arc and the other is not, the outside one is CLIPPED to the arc
+ * -- and which end gets clipped depends on which was inside. Both outside is a
+ * refusal. A span that comes out at or below zero is a refusal too.
+ *
+ * The original hands AngleOfDelta a THIRD argument it does not read; cdecl and
+ * caller-cleaned, so it is unobservable and is not reproduced.
+ */
+/* AngleDelta's answer with the compiler's abs() over it -- `cdq; xor; sub`,
+ * which the original spells out at all four sites. */
+static int32_t AbsAngle(uint32_t from, uint32_t to)
+{
+    int32_t d = AngleDelta(from, to);
+
+    return d < 0 ? -d : d;
+}
+
+static void SightSilhouette(int32_t code, int32_t l, int32_t t, int32_t r,
+                            int32_t b, int32_t *nx, int32_t *ny,
+                            int32_t *fx, int32_t *fy)
+{
+    /* Generated from the byte table at 0x00403AE0 and the jump table at
+     * 0x00403ABC; the eight codes not listed share the refusal exit. */
+    switch (code) {
+    case 0:  *nx = l; *ny = b; *fx = r; *fy = t; return;  /* left,  above  */
+    case 1:  *nx = l; *ny = t; *fx = r; *fy = t; return;  /* inside above  */
+    case 2:  *nx = l; *ny = b; *fx = l; *fy = t; return;  /* left,  level  */
+    case 5:  *nx = l; *ny = t; *fx = r; *fy = b; return;  /* right, above  */
+    case 7:  *nx = r; *ny = t; *fx = r; *fy = b; return;  /* right, level  */
+    case 10: *nx = r; *ny = b; *fx = l; *fy = t; return;  /* left,  below  */
+    case 11: *nx = r; *ny = b; *fx = l; *fy = b; return;  /* inside below  */
+    case 15: *nx = r; *ny = t; *fx = l; *fy = b; return;  /* right, below  */
+    default: return;
+    }
+}
+
+void __cdecl AddSightBlocker(void *viewer, void *blocker)
+{
+    const uint8_t *v = (const uint8_t *)viewer;
+    const uint8_t *b = (const uint8_t *)blocker;
+    const uint8_t *rank;
+    uint8_t       *slots = (uint8_t *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR;
+    int32_t        heading;
+    int32_t        hv;
+    int32_t        hb;
+    int32_t        l, t, r, bo;
+    int32_t        vx, vy;
+    int32_t        nx = 0, ny = 0, fx = 0, fy = 0;
+    int32_t        code;
+    int32_t        dist;
+    int32_t        arc;
+    int32_t        span;
+    int32_t        steps;
+    uint8_t        a0;
+    uint8_t        a1;
+    uint8_t        dir;
+
+    heading = *(const uint8_t *)(v + OBJ_OFF_FACING);
+    if (ObjIsType3((const AM2_Object *)v)
+        && *(const int32_t *)(v + OBJ_OFF_ROW_COUNT) > 1)
+        heading = *(const uint8_t *)(v + OBJ_OFF_FIELD_530);
+
+    hb = ObjHeight(b);
+    hv = ObjHeight(v);
+    if (hb + AM2_SIGHT_OVERHEAD < hv)
+        return;
+
+    if (*(const void *const *)(b + OBJ_OFF_HIT_MASK) != (const void *)0) {
+        /* Through the rect, as objtype.cpp reaches the same four fields:
+         * only OBJ_OFF_HIT_RECT has a macro and the other three are its
+         * members, which is the composed-offset case checkoffsetuse lists. */
+        const AM2_Rect *hit = (const AM2_Rect *)(b + OBJ_OFF_HIT_RECT);
+
+        l = hit->left; t = hit->top; r = hit->right; bo = hit->bottom;
+    } else {
+        int32_t bx = *(const int16_t *)(b + OBJ_OFF_X);
+        int32_t by = *(const int16_t *)(b + OBJ_OFF_Y);
+
+        l  = *(const int32_t *)(b + OBJ_OFF_BOX_LEFT)   + bx;
+        r  = *(const int32_t *)(b + OBJ_OFF_BOX_RIGHT)  + bx;
+        t  = *(const int32_t *)(b + OBJ_OFF_BOX_TOP)    + by;
+        bo = *(const int32_t *)(b + OBJ_OFF_BOX_BOTTOM) + by;
+    }
+
+    vx = *(const int16_t *)(v + OBJ_OFF_X);
+    vy = *(const int16_t *)(v + OBJ_OFF_Y);
+
+    code = (l < vx ? 1 : 0) | (t < vy ? 2 : 0)
+         | (r < vx ? 4 : 0) | (bo < vy ? 8 : 0);
+
+    switch (code) {
+    case 0: case 1: case 2: case 5: case 7: case 10: case 11: case 15:
+        break;
+    default:
+        /* Seven of these cannot happen with l <= r and t <= b; the eighth,
+         * code 3, is the viewer standing INSIDE the box. */
+        return;
+    }
+    SightSilhouette(code, l, t, r, bo, &nx, &ny, &fx, &fy);
+
+    {
+        int32_t dx0 = (int16_t)(nx - vx);
+        int32_t dy0 = (int16_t)(ny - vy);
+        int32_t dx1 = (int16_t)(fx - vx);
+        int32_t dy1 = (int16_t)(fy - vy);
+        int32_t d0  = ApproxDistXY(dx0, dy0);
+        int32_t d1;
+
+        a0 = AngleOfDelta(dx0, dy0);
+        d1 = ApproxDistXY(dx1, dy1);
+        a1 = AngleOfDelta(dx1, dy1);
+        dist = d0 > d1 ? d0 : d1;
+    }
+
+    rank = (const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+         + (uint32_t)*(const int32_t *)(v + OBJ_OFF_RANK) * RANK_REC_BYTES;
+
+    if ((int32_t)(int16_t)(dist + AM2_SIGHT_DIST_PAD)
+        > *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE))
+        return;
+
+    arc = *(const uint8_t *)(rank + RANK_REC_OFF_FIELD_04);
+
+    if (AbsAngle(heading, a0) < arc) {
+        if (AbsAngle(heading, a1) > arc)
+            a1 = (uint8_t)(arc + heading);      /* clip the far edge */
+    } else {
+        if (AbsAngle(heading, a1) > arc)
+            return;                             /* both outside the arc */
+        a0 = (uint8_t)(heading - arc);          /* clip the near edge */
+    }
+
+    span = AbsAngle(a1, a0);
+    if ((int16_t)span <= 0)
+        return;
+
+    steps = ((int32_t)(int16_t)span + 3) >> 2;
+    dir   = a0;
+
+    for (; steps > 0; steps--, dir = (uint8_t)(dir + AM2_SIGHT_DIR_STEP)) {
+        uint8_t *rec = slots
+                     + (uint32_t)((dir & 0xFF) >> 2) * AM2_SIGHT_DIR_STRIDE;
+        int16_t  d   = (int16_t)dist;
+
+        if (*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP)
+            != *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION) {
+            int32_t range = *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE);
+
+            *(int32_t *)(rec + SIGHTDIR_OFF_STAMP) =
+                *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
+
+            if (hb > hv) {
+                *(int16_t *)(rec + SIGHTDIR_OFF_LOW) = d;
+                *(int16_t *)(rec + SIGHTDIR_OFF_MID) = d;
+            } else if (hb + AM2_SIGHT_BAND_STEP >= hv) {
+                *(int16_t *)(rec + SIGHTDIR_OFF_LOW) = (int16_t)range;
+                *(int16_t *)(rec + SIGHTDIR_OFF_MID) = d;
+            } else {
+                *(int16_t *)(rec + SIGHTDIR_OFF_LOW) = (int16_t)range;
+                *(int16_t *)(rec + SIGHTDIR_OFF_MID) = (int16_t)range;
+            }
+            *(int16_t *)(rec + SIGHTDIR_OFF_HIGH) = d;
+            continue;
+        }
+
+        /* Already stamped this generation: keep the nearest per band. */
+        if (hb > hv) {
+            if (*(const int16_t *)(rec + SIGHTDIR_OFF_LOW) > d)
+                *(int16_t *)(rec + SIGHTDIR_OFF_LOW) = d;
+            if (*(const int16_t *)(rec + SIGHTDIR_OFF_MID) > d)
+                *(int16_t *)(rec + SIGHTDIR_OFF_MID) = d;
+        } else if (hb + AM2_SIGHT_BAND_STEP >= hv) {
+            if (*(const int16_t *)(rec + SIGHTDIR_OFF_MID) > d)
+                *(int16_t *)(rec + SIGHTDIR_OFF_MID) = d;
+        }
+        if (*(const int16_t *)(rec + SIGHTDIR_OFF_HIGH) > d)
+            *(int16_t *)(rec + SIGHTDIR_OFF_HIGH) = d;
+    }
+}
+
 void air_install(void)
 {
     patch_replace(ADDR_FORMATION_SLOT_POINT,
                   (const void *)FormationSlotPoint,
                   "FormationSlotPoint", 3);
+    patch_replace(ADDR_ADD_SIGHT_BLOCKER, (const void *)AddSightBlocker,
+                  "AddSightBlocker", 1);
     patch_replace(ADDR_FORMATION_POINT, (const void *)FormationPoint,
                   "FormationPoint", 4);
     patch_replace(ADDR_FORMATION_POINT_FAR, (const void *)FormationPointFar,

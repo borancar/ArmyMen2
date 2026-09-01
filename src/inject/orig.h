@@ -6903,10 +6903,53 @@ typedef struct {
  * twelve and each offset gained twelve. Measured, not assumed: region.o's and
  * item.o's .text are byte-identical across the change. */
 #define ADDR_RANK_RECORDS        0x00473DC0u  /* 28-byte records, rank 0..7 */
+/* 0x004036F0, one caller, in the same band. What one object does to another's
+ * VIEW: take the blocker's silhouette as seen from the viewer, and for every
+ * heading it subtends record how far the view is obstructed, in three height
+ * bands. The output is the buffer below and not a return value -- its epilogue
+ * sets no eax at all. Reconstructed.
+ *
+ * A SIXTEEN-ENTRY QUADRANT TABLE picks the silhouette from four comparisons.
+ * Eight of the sixteen codes are geometrically impossible with a sane box, or
+ * mean the viewer is INSIDE it, and all eight share one exit; the other eight
+ * name two extreme corners. Generated from the image rather than transcribed,
+ * which is what DirtyCollect's eighty-one arms forced. */
+#define ADDR_ADD_SIGHT_BLOCKER   0x004036F0u  /* void(viewer, blocker) */
+/* Sixty-four sixteen-byte records, one per heading rounded down to a multiple
+ * of four. Three int16 distances -- the three HEIGHT BANDS -- and a generation
+ * stamp: a record whose stamp is stale is overwritten and one that is current
+ * takes the MINIMUM, so several blockers in one direction leave the nearest.
+ * A blocker ABOVE the viewer fills all three bands, one LEVEL with it fills
+ * the middle and the far, and one BELOW fills only the far; the bands it does
+ * not fill get the viewer's own rank sight range, which is "not obstructed".
+ * +0x06 is never touched by this function and has no name. */
+#define ADDR_SIGHT_BLOCK_BY_DIR  0x004F8FB8u  /* record[64] */
+#define SIGHTDIR_OFF_LOW         0x00u  /* int16 */
+#define SIGHTDIR_OFF_MID         0x02u
+#define SIGHTDIR_OFF_HIGH        0x04u
+#define SIGHTDIR_OFF_STAMP       0x08u  /* int32, against the generation */
+#define AM2_SIGHT_DIR_STRIDE     16u
+#define AM2_SIGHT_DIR_STEP       4      /* headings per record */
+#define ADDR_SIGHT_GENERATION    0x004F93C0u  /* int32_t */
+/* A blocker this far under the viewer is ignored outright, before anything
+ * else is computed. */
+#define AM2_SIGHT_OVERHEAD       0x18
+/* And within this much either way it counts as LEVEL rather than below. */
+#define AM2_SIGHT_BAND_STEP      8
+/* Added to the silhouette distance before the range test, so a blocker just
+ * past the rank's sight range still fails it. */
+#define AM2_SIGHT_DIST_PAD       0x10
 #define RANK_REC_BYTES           28u
 /* 280 285 290 295 300 305 310 320, doubled at the one site that reads it --
  * so 560..640, the range past which a trooper forgets its target. */
 #define RANK_REC_OFF_SIGHT_RANGE 0u    /* int32; 0x00404730 */
+/* AddSightBlocker (0x004036F0) is the second reader of both, and it settles
+ * what RANK_REC_OFF_FIELD_04 is: it takes the LOW BYTE as an angular
+ * half-width and clips a blocker's silhouette to it, so it is the rank's SIGHT
+ * ARC in the same eighth-of-a-turn units AngleDelta answers in. Left
+ * field-numbered anyway: 48 through 76 is a wide arc for a heading unit and
+ * one reader is not a meaning -- but it is the first thing that USES it, where
+ * everything before only wrote or copied it. */
 #define RANK_REC_OFF_FIELD_04    4u    /* int32; 48 52 56 60 64 68 72 76 */
 #define RANK_REC_OFF_FIELD_08    8u    /* int32; 120 130 140 150 160 170 180 190 */
 #define RANK_REC_OFF_FIRE_SCALE  12u   /* float; UnitWeaponInfo */

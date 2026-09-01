@@ -244,4 +244,11 @@ int32_t __cdecl PeerShouldNack(void *peer, uint32_t seq);
 void __cdecl RandomPointToward(const void *target, const void *obj,
                                int32_t dist, AM2_Point *out);
 
+/* 0x004036F0, one caller. What one object does to another's VIEW: take the
+ * blocker's silhouette as seen from the viewer and, for every heading it
+ * subtends, record how far the view is obstructed in three height bands. The
+ * output is ADDR_SIGHT_BLOCK_BY_DIR, not a return value -- the original's
+ * epilogue sets no eax at all. */
+void __cdecl AddSightBlocker(void *viewer, void *blocker);
+
 #endif /* AM2_AIR_H */

@@ -1172,6 +1172,21 @@ the soldier to face what he is aiming at. **When a switch is on an item or
 object kind, find the table that gives those kinds names before reading the
 arms.**
 
+**A SIXTEEN-ENTRY TABLE CAN BE MOSTLY IMPOSSIBLE, and that is worth knowing
+before writing any of it.** `AddSightBlocker` builds a code from four
+comparisons -- (left < x), (top < y), (right < x), (bottom < y) -- and jumps
+through a sixteen-entry table. EIGHT of the sixteen share the refusal exit:
+seven cannot happen at all with `left <= right` and `top <= bottom`, and the
+eighth is the viewer standing inside the box. So the table has eight real arms
+and eight that exist because the compiler needs a dense index, and reading the
+arms in order without decoding the table would invent behaviour for codes that
+never arrive.
+
+Generated from the image, not transcribed -- the decision `DirtyCollect`'s
+eighty-one arms forced, and the reason is the same: a hand-written mapping of
+sixteen codes onto eight bodies is exactly where six of eighty-one went wrong
+before.
+
 **Three instances now, and the second failure mode is SLOTS SHARING AN ARM.**
 `WeaponClassOf` (`0x0042AAE0`) lays four arms out in one order and dispatches
 them in another -- kinds 2, 3, 4, 5 answer 2, 3, 1, 4, where reading the bodies
