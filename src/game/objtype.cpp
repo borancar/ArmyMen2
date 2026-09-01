@@ -27,7 +27,7 @@
 #include "map.h"           /* TileOfPoint -- reconstructed */
 #include "item.h"          /* ItemLinkCells -- reconstructed */
 #include "packkey.h"       /* PackKey, KeyLookup -- reconstructed */
-#include "region.h"        /* ItemTeardown -- declared there, still original */
+#include "region.h"        /* ItemTeardown, ObjAfterMove -- reconstructed */
 
 /* PreloadSprite and PreloadSpriteByKey are reconstructed, in win32/sprite.cpp.
  * Declared here rather than by including that header because objtype.cpp is on
@@ -679,8 +679,7 @@ int32_t __cdecl AddAaiRecord(void *rec)
 }
 
 typedef void (__cdecl *AM2_ObjAfterMoveFn)(void *obj, int32_t a, int32_t b);
-#define orig_obj_after_move \
-    ((AM2_ObjAfterMoveFn)(uintptr_t)ADDR_OBJ_AFTER_MOVE)
+/* ObjAfterMove is reconstructed, in region.cpp, and called by name. */
 
 /* InitObjFromAai -- original 0x00433880, two callers.
  *
@@ -765,7 +764,7 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
                      + (size_t)i * AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_28) =
             *(const int32_t *)(rec + AAI_OFF_ROW_FIELD28);
 
-    orig_obj_after_move(o, 0, 0);
+    ObjAfterMove(o, 0, 0);
     return 1;
 }
 
@@ -1244,7 +1243,7 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
                   (void *)(uintptr_t)ADDR_MAP_DESC);
     }
 
-    orig_obj_after_move(obj, 1,
+    ObjAfterMove(obj, 1,
                         *(const int32_t *)(rec + DEF_OBJ_REC_OFF_FIELD_30));
     return 1;
 }

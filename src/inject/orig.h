@@ -5871,7 +5871,14 @@ typedef struct {
  * the branch goes to the epilogue, so ObjTileChanged and the notify below it
  * are skipped too. The object has already been moved by then. */
 #define ADDR_POINT_ACTION_C      0x00428F80u  /* void(obj, AM2_Point) */
-#define ADDR_OBJ_AFTER_MOVE      0x00439000u  /* void(obj, int32, int32) */
+/* ItemTeardown's MIRROR, one function earlier in the image: same gate
+ * inverted, same type switch, same mask walk, ADDING the height where that one
+ * subtracts and SETTING OBJ_FLAG_FOOTPRINT_ON where that one clears it. The
+ * one thing it has that the other does not is a damage pass over everything
+ * standing where the footprint lands. Its SECOND argument is never read.
+ * Reconstructed; see region.cpp. */
+#define ADDR_OBJ_AFTER_MOVE      0x00439000u  /* void(obj, unused, damage) */
+#define AM2_CRUSH_DAMAGE_KIND    4
 #define OBJ_OFF_ROW0_Y_ADJUST    0x42u  /* int16, copied to ROW_OFF_Y_ADJUST */
 #define SPRITE_OFF_ATTACH_X      0x28u  /* int16, AM2_Sprite::attachX */
 #define SPRITE_OFF_ATTACH_Y      0x2Au  /* int16, AM2_Sprite::attachY */
@@ -10262,6 +10269,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* Subtracted from every hit before it is applied, and clamped to zero for
  * damage kind 1 -- so it is the record's ARMOUR. Named from DamageItem, its
  * only reader. */
+/* What an item does to whatever is standing where its footprint lands.
+ * ObjAfterMove takes it when its caller passes zero, and hands it to
+ * DamageObject with kind 4. Named from that use, its only one. */
+#define AAIREC_OFF_CRUSH_DAMAGE  0x38u   /* int16_t */
 #define AAIREC_OFF_ARMOUR        0x3Au   /* int16_t */
 /* TWO PREFIXES ARE ON THIS ONE RECORD, which is the shape checkoffsets cannot
  * see and CLAUDE.md already warns about under ITEM_OFF_LAST_USE. AAIREC_OFF_

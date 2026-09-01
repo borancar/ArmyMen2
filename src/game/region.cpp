@@ -1553,6 +1553,161 @@ void __cdecl ItemTeardown(void *obj)
     *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
 }
 
+/* ObjAfterMove -- original 0x00439000, four callers. ItemTeardown's MIRROR,
+ * one function earlier in the image: same gate, same three-way type switch,
+ * same mask walk, ADDING the height where that one subtracts it, and SETTING
+ * OBJ_FLAG_FOOTPRINT_ON at the end where that one clears it. Reading them
+ * side by side is what found the swapped field in the other, and this comment
+ * only records the DIFFERENCES.
+ *
+ * ITS GATE IS THE OTHER'S INVERTED, and it takes three tests rather than two:
+ * OBJ_FLAG_BIT0 must be SET, OBJ_FLAG_DESTROYED clear, and
+ * OBJ_FLAG_FOOTPRINT_ON clear -- so an object already carrying its footprint
+ * is left alone, which is the same idempotence ItemTeardown gets from
+ * requiring the flag to be set.
+ *
+ * ITS SECOND ARGUMENT IS NEVER READ. All four call sites push three and the
+ * body touches frame+4 and frame+0xC and never frame+8. Fifth unused
+ * parameter in this tree, and the signature keeps it because the call sites
+ * do.
+ *
+ * ITS THIRD ARGUMENT DEFAULTS FROM THE RECORD. Zero means "use the AAI
+ * record's own AAIREC_OFF_CRUSH_DAMAGE", and the value is written BACK into
+ * the argument slot, so nothing downstream can tell which it got.
+ *
+ * AND WHAT IT IS FOR IS THE ONLY THING ItemTeardown HAS NO COUNTERPART TO.
+ * When it ends up non-zero, every cell the footprint covers is turned back
+ * into a point, ObjectsAtPoint walks whatever is standing there, and
+ * everything that is not this object takes that much damage with kind 4 and
+ * this object's uid as the attacker. So laying a footprint down HURTS what is
+ * already under it -- a crate dropped on a soldier -- and an item that
+ * declares no crush damage lays its footprint quietly.
+ *
+ * The chain is walked through OBJ_OFF_QUERY_NEXT, and the object itself is
+ * skipped by pointer identity rather than by uid.
+ *
+ * Everything else -- the ROW_COUNT and sprite gates, ObjIsItem, the
+ * ADDR_TILE_ATTRS compare against OBJ_OFF_HEIGHT_SET, the non-zero
+ * OBJ_OFF_RANK that is also the value applied, the hit-mask-or-box choice,
+ * the row-major walk with the index that starts at rect.top, and
+ * ShiftTileCover on the two crossings of AM2_BLOCK_FULL -- is ItemTeardown's,
+ * and its comment is the one to read.
+ */
+void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    (void)unused;
+    uint8_t        mask[AM2_TILEMASK_BYTES];
+    const int32_t *rect  = (const int32_t *)(mask + TILEMASK_OFF_RECT);
+    const uint8_t *cells = mask + TILEMASK_OFF_CELLS;
+    int32_t        height;
+    int32_t        idx;
+    int32_t        row;
+    int32_t        x;
+
+    if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0))
+        return;
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        return;
+    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON)
+        return;
+
+    switch (*(const int32_t *)o) {
+    case AM2_OBJ_TYPE_ROACH:
+        ObjSetRoachFootprint(obj);
+        return;
+    case AM2_OBJ_TYPE_VEHICLE:
+        ObjSetFootprint(obj);
+        return;
+    case AM2_OBJ_TYPE_ITEM:
+        break;
+    default:
+        return;
+    }
+
+    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) < 1)
+        return;
+    if (!*(const void *const *)(*(const uint8_t *const *)(o + OBJ_OFF_ROWS)
+                                + ROW_OFF_SPRITE))
+        return;
+    if (!ObjIsItem((const AM2_Object *)obj))
+        return;
+
+    height = *(const int8_t *)(o + OBJ_OFF_RANK);
+
+    /* Zero means "the record's own kind", written back so nothing downstream
+     * can tell which it got. */
+    if (!damage)
+        damage = *(const int16_t *)
+                     (*(const uint8_t *const *)(o + OBJ_OFF_FIELD_94)
+                      + AAIREC_OFF_CRUSH_DAMAGE);
+
+    if (*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
+        > (int8_t)(*(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS)
+              [*(const uint16_t *)(o + OBJ_OFF_TILE)])
+        return;
+    if (!height)
+        return;
+
+    if (*(const void *const *)(o + OBJ_OFF_HIT_MASK))
+        orig_obj_hit_mask_action(obj, mask);
+    else
+        ObjBoxAction(obj, mask);
+
+    idx = rect[1];      /* rect.top, as ItemTeardown's comment explains */
+
+    for (row = rect[1]; row <= rect[3]; row++) {
+        /* A SHIFT here where ItemTeardown MULTIPLIES by the width. The two
+         * agree only for a power-of-two width, which ShiftTileCover's own
+         * comment already records as the reason that shift is stored beside
+         * the width. Each is written as its own function has it. */
+        int32_t cell = (row << *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)
+                       + rect[0];
+
+        for (x = rect[0]; x <= rect[2]; x++, idx++, cell++) {
+            uint8_t *weights =
+                *(uint8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
+            int8_t   h;
+            int8_t   nh;
+
+            if (!(cells[idx] & 1))
+                continue;
+
+            h  = (int8_t)weights[cell & 0xFFFF];
+            nh = (int8_t)(h + height);
+
+            if (h <= 15 && nh >= 15)
+                ShiftTileCover(cell, 1);
+            else if (h >= 15 && nh < 15)
+                ShiftTileCover(cell, -1);
+
+            weights[cell & 0xFFFF] = (uint8_t)nh;
+
+            if (damage) {
+                int32_t   ox = 0, oy = 0;
+                uint32_t  at;
+                uint8_t  *hit;
+
+                TileToXY(cell, &ox, &oy);
+                ((int16_t *)&at)[0] = (int16_t)ox;
+                ((int16_t *)&at)[1] = (int16_t)oy;
+
+                for (hit = (uint8_t *)ObjectsAtPoint(&at,
+                         (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+                     hit;
+                     hit = *(uint8_t **)(hit + OBJ_OFF_QUERY_NEXT)) {
+                    if (hit == o)
+                        continue;
+                    DamageObject(hit, damage, AM2_CRUSH_DAMAGE_KIND,
+                                 ((const AM2_Object *)o)->uid, 0, 0);
+                }
+            }
+        }
+    }
+
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_FOOTPRINT_ON;
+}
+
 /* ListBoxAction -- original 0x00438F10, one caller.
  *
  * ObjBoxAction for a RECORD-LIST HEADER instead of an object, and the same
@@ -5093,6 +5248,8 @@ int region_install(void)
     rc |= patch_replace(ADDR_BUILD_REGION_GRAPH,
                         (const void *)BuildRegionGraph,
                         "BuildRegionGraph", 1);
+    rc |= patch_replace(ADDR_OBJ_AFTER_MOVE, (const void *)ObjAfterMove,
+                        "ObjAfterMove", 4);
     rc |= patch_replace(ADDR_AI_APPROACH_LEADER,
                         (const void *)AiApproachLeader,
                         "AiApproachLeader", 2);

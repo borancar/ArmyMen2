@@ -253,6 +253,12 @@ int32_t __cdecl ObjBoxAction(void *obj, void *out);
  * it is idempotent. COLD: no drive this project has destroys an item. */
 void __cdecl ItemTeardown(void *obj);
 
+/* 0x00439000, four callers. ItemTeardown's mirror: lay the object's footprint
+ * down instead of taking it up, and -- when the third argument or the record
+ * supplies a crush damage -- hurt everything already standing on it. The
+ * second argument is never read. */
+void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage);
+
 /* 0x00438F10, one caller. The same function for a record-list HEADER: the
  * first list record's sprite, the header's own box, and the point as an
  * argument rather than a field. */

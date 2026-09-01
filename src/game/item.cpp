@@ -1287,7 +1287,7 @@ void __cdecl ApplyHeightItem(void *obj, int32_t height)
 /* Still original: the teardown PointActionC opens with, and the notify it
  * ends on. */
 typedef void (__cdecl *AM2_AfterMoveFn)(void *obj, int32_t a, int32_t b);
-#define orig_obj_after_move ((AM2_AfterMoveFn)(uintptr_t)ADDR_OBJ_AFTER_MOVE)
+/* ObjAfterMove is reconstructed, in region.cpp, and called by name. */
 /* ItemTeardown had THREE private spellings in this file -- two typedefs and a
  * bare cast, under three names -- for one void(void *). Reconstructing it
  * collapsed all three; the typedef is gone with them. */
@@ -1408,7 +1408,7 @@ void __cdecl PointActionC(void *obj, uint32_t point)
 
 done:
     ObjTileChanged(o, 0, 0);
-    orig_obj_after_move(o, 1, 0);
+    ObjAfterMove(o, 1, 0);
 }
 
 /* 0x004278E0, four callers -- ObjTileChanged's tail among them. Give an object
@@ -4000,7 +4000,7 @@ void __cdecl DestroyObjCommon(void *obj)
  */
 typedef void (__cdecl *AM2_ObjOnlyFn3)(void *obj);
 typedef void (__cdecl *AM2_AfterMoveFn)(void *obj, int32_t a, int32_t b);
-#define orig_after_move     ((AM2_AfterMoveFn)(uintptr_t)ADDR_OBJ_AFTER_MOVE)
+/* ObjAfterMove is reconstructed, in region.cpp, and called by name. */
 
 void __cdecl PlaceObj(void *obj, uint32_t where)
 {
@@ -4050,7 +4050,7 @@ void __cdecl PlaceObj(void *obj, uint32_t where)
     ObjTileChanged(obj, *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET), 1);
 
     if (ObjIsItem((const AM2_Object *)obj))
-        orig_after_move(obj, 1, 0);
+        ObjAfterMove(obj, 1, 0);
 }
 
 
