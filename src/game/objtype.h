@@ -121,6 +121,18 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
                                int32_t index, uint32_t at, int32_t orFlags,
                                int32_t a7, int32_t a8, int32_t unused);
 
+/* 0x00434F20, three callers. Give an object the appearance of one sprite
+ * triple: rebuild its rows from the def-obj record, copy that record's fields
+ * over, resize its box to the new sprite and tell the map. Answers 1 when it
+ * did the work, 0 when the record or the sprite would not resolve, and 1
+ * without doing anything when the object is already showing that frame.
+ *
+ * `flag` non-zero writes the frame to OBJ_OFF_FORMATION_SLOT and leaves
+ * health alone; zero writes OBJ_OFF_REPAIR_FRAME, clears the other, and
+ * resets health to the record's. */
+int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
+                              int32_t frame, int32_t flag);
+
 /* ADDR_OBJ_INIT_COMMON, still original, and shared rather than typedef'd
  * privately in each caller -- item.cpp and objtype.cpp each had their own and
  * the two disagreed about which argument was the name. See the note in

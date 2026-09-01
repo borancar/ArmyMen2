@@ -7401,6 +7401,40 @@ typedef struct {
  * can sit in front of or behind another at the same ground height, which is
  * the one thing a scaled height alone cannot express. */
 #define DEF_OBJ_REC_OFF_DEPTH      0x20u        /* int16_t */
+/* SIX MORE OF THAT RECORD, every one named from the OBJECT FIELD it lands in
+ * -- the same method the AAI record's own note describes, and here it applies
+ * twice over, because ApplyObjFrame does for a def-obj record what
+ * InitObjFromAai does for an AAI one. The two records are NOT the same shape
+ * and there is no uniform shift between them, but the SEQUENCE of meanings is
+ * identical: flags, health, height adjust, rank, then the dword every row's
+ * own +0x28 is filled from.
+ *
+ * FLAGS IS ASSIGNED HERE AND OR'd THERE. InitObjFromAai combines AAI_OFF_OR_FLAGS
+ * with its caller's and ORs the result in; this writes +0x10 straight over
+ * OBJ_OFF_FLAGS, so a frame change can turn a flag OFF where a create cannot.
+ * Worth stating because the two functions otherwise read as the same code.
+ *
+ * FIELD_30 KEEPS A FIELD-NUMBERED NAME AND MAKES NO CLAIM: its one use is as
+ * ObjAfterMove's third argument, and that function is still original, so a
+ * name would be taken from a call site. Same standing as MISSILE_OFF_FIELD_A8.
+ *
+ * AND NOTHING IS ADDED AT 0x20. The list-record's third dword is copied from
+ * there as a DWORD, which straddles DEF_OBJ_REC_OFF_DEPTH and the two bytes
+ * after it; what those two bytes are has not been read, so the existing int16
+ * name stays and the site casts. */
+#define DEF_OBJ_REC_OFF_FLAGS         0x10u  /* -> OBJ_OFF_FLAGS, assigned */
+#define DEF_OBJ_REC_OFF_HEALTH        0x14u  /* int16, -> max AND current */
+#define DEF_OBJ_REC_OFF_HEIGHT_ADJ    0x18u  /* int8 -> OBJ_OFF_HEIGHT_ADJ */
+#define DEF_OBJ_REC_OFF_RANK          0x1Cu  /* int8 -> OBJ_OFF_RANK */
+#define DEF_OBJ_REC_OFF_ROW_FIELD28   0x24u  /* -> every ROW_OFF_FIELD_28 */
+#define DEF_OBJ_REC_OFF_FIELD_30      0x30u  /* ObjAfterMove's third argument */
+/* Set 0x16 loads its sprites with an extra bit. Every other set here, and
+ * EnsureSpriteAaiRecord's PreloadSprite beside it, pass a bare 0x1000 --
+ * spelled as a literal there and left as one here to match; ApplyObjFrame is
+ * the only site in the image that adds 0x80, and only for that one set. What
+ * the bit does has not been read, so the SET gets the name and the flag does
+ * not. */
+#define AM2_SET_WITH_EXTRA_LOAD_FLAG  0x16
 /* Subtracted from the scaled height to make a row's ROW_OFF_FIELD_26. It is
  * 1000, which is also AM2_SEQ_LIFE6 -- two unrelated constants that happen to
  * share a value, and writing one for the other is how a name goes wrong
@@ -10530,9 +10564,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ROW_FLAG_REMOVED_DONE  0x04u
 #define ROW_OFF_OWNS           0x34u  /* uint8_t: there is a buffer at +0x38 */
 #define ROW_OFF_BUFFER         0x38u
-/* The sub-list header inside an object: {?, count, rows, capacity} at
+/* The sub-list header inside an object: {list, count, rows, capacity} at
  * OBJ_OFF_SUBRECORD, so the count the object reads at OBJ_OFF_ROW_COUNT and
- * the header's own +4 are the same dword seen two ways. */
+ * the header's own +4 are the same dword seen two ways.
+ *
+ * THE FIRST FIELD WAS `?` UNTIL ApplyObjFrame WAS READ. It is the
+ * ADDR_RECORD_LISTS header the rows were built from, and that header's own
+ * LISTHDR_OFF_OWNER is the packed sprite key -- so the whole of that
+ * function's "is this object already showing this frame" test is
+ * `sub->list->owner == PackKey(set, index, frame)`, two dereferences deep.
+ * Named from a reader; MakeRecordList is the writer that puts the key there,
+ * and the two agree. */
+#define SUBREC_OFF_LIST        0x00u
 #define SUBREC_OFF_COUNT       0x04u
 #define SUBREC_OFF_ROWS        0x08u
 #define SUBREC_OFF_CAPACITY    0x0Cu

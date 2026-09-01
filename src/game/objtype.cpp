@@ -27,6 +27,7 @@
 #include "map.h"           /* TileOfPoint -- reconstructed */
 #include "item.h"          /* ItemLinkCells -- reconstructed */
 #include "packkey.h"       /* PackKey, KeyLookup -- reconstructed */
+#include "region.h"        /* ItemTeardown -- declared there, still original */
 
 /* PreloadSprite and PreloadSpriteByKey are reconstructed, in win32/sprite.cpp.
  * Declared here rather than by including that header because objtype.cpp is on
@@ -1042,6 +1043,212 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
 }
 
 
+/* ApplyObjFrame -- original 0x00434F20, three callers, and the name is the
+ * image's own by way of ChangeObjectFrame, which is its only caller here.
+ *
+ * Give an object a new appearance: look up the def-obj record for the sprite
+ * triple, tear the old subrecord down, make sure a record list exists for the
+ * new key, rebuild the rows, copy the record's fields onto the object, resize
+ * its box to the new sprite and tell the map it moved. Answers 1 when it did
+ * the work and 0 when it could not.
+ *
+ * READ IT BESIDE InitObjFromAai AND EnsureSpriteAaiRecord, both in this file,
+ * and two thirds of it is already written. The build path is
+ * EnsureSpriteAaiRecord's miss path almost instruction for instruction --
+ * PreloadSprite, a twelve-byte entry, MakeRecordList(1, entry, key),
+ * LoadMask into +0x10, the RectSet(-16,-16,16,16) fallback when
+ * LISTHDR_OFF_HIT_MASK came back null, AddRecordList -- and the field copying
+ * is InitObjFromAai's with a different record. That is why it needed six
+ * offset names and no new function name at all.
+ *
+ * THREE DIFFERENCES FROM THOSE TWO, and each is a fact rather than a
+ * variation:
+ *
+ *   THE ENTRY'S THIRD DWORD IS WRITTEN HERE. EnsureSpriteAaiRecord leaves it
+ *   holding whatever the stack held and its own note says so; this fills it
+ *   from the def-obj record's +0x20, read as a DWORD. So the twelve-byte list
+ *   record's last field has a source at last, even though what the two bytes
+ *   past DEF_OBJ_REC_OFF_DEPTH mean is still unread.
+ *
+ *   FLAGS ARE ASSIGNED, NOT OR'd. InitObjFromAai ORs the record's flags in;
+ *   this writes them over OBJ_OFF_FLAGS whole. A frame change can therefore
+ *   clear a flag where a create cannot.
+ *
+ *   SET 0x16 GETS AN EXTRA LOAD BIT. Every other set loads with 0x1000 and
+ *   that one with 0x1080. One `cmp` and one `mov`; nothing else in the image
+ *   does this.
+ *
+ * THE KEY IS PackKey WRITTEN OUT INLINE -- `((set << 12) + index) << 7 |
+ * frame`, byte for byte what packkey.cpp reconstructs -- and the FIRST thing
+ * the function does with it is compare it against the subrecord's own first
+ * dword. If they match the object is already showing this frame and it
+ * returns 1 having done nothing, which is the common case.
+ *
+ * ITS FIFTH ARGUMENT SETTLES OBJ_OFF_FORMATION_SLOT, and from the other end
+ * than CreateItem did. flag non-zero writes the frame to +0xA0; flag zero
+ * writes it to OBJ_OFF_REPAIR_FRAME and CLEARS +0xA0. orig.h records that
+ * LoadType1 replays +0xA0 through ChangeObjectFrame with flag 1 and
+ * OBJ_OFF_REPAIR_FRAME with flag 0 -- so the save format and this function
+ * agree exactly, which is as close to a definition of that flag as the image
+ * offers. Type 1 and type 4 only; anything else skips the pair.
+ *
+ * THE NULL CHECK ON `obj` COMES AFTER A DOZEN DEREFERENCES and after one more
+ * STORE -- `test esi,esi` sits two instructions before the `je` and the write
+ * to OBJ_OFF_RANK is scheduled between them. It cannot fire: the argument was
+ * dereferenced in the third instruction of the function. Reproduced as the
+ * plain test it is, because removing it would be a decision about code the
+ * compiler kept.
+ *
+ * THE BOX IS THE SPRITE'S EXTENT ABOUT ITS HOT SPOT -- -hotx, -hoty,
+ * w - hotx, h - hoty, the same four expressions EnsureSpriteAaiRecord builds
+ * -- and ItemSetBox is called ONLY when all four differ from what the object
+ * already has. The sprite comes from row zero, so an object with no rows, or
+ * one whose first row has no sprite, skips the box and the height together.
+ *
+ * ONE `add esp` CLEANS TWO CALLS. FreeSubrecordRows' argument is left on the
+ * stack and popped with BuildRowsFromDef's five, which is why the disassembly
+ * shows `add esp, 0x18` after a five-argument call. Stack accounting, not a
+ * sixth argument.
+ */
+int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
+                              int32_t frame, int32_t flag)
+{
+    uint8_t  *o = (uint8_t *)obj;
+    uint32_t  key;
+    uint8_t  *rec;
+    uint8_t  *sub;
+    int32_t   slot;
+    int32_t   loadFlags;
+    int32_t   i;
+
+    /* PackKey, inline, exactly as the original writes it. */
+    key = (uint32_t)((((set << 12) + index) << 7) + frame);
+
+    {
+        const uint8_t *cur =
+            *(const uint8_t *const *)(o + OBJ_OFF_SUBRECORD + SUBREC_OFF_LIST);
+
+        if (!cur)
+            return 0;
+        if (*(const uint32_t *)(cur + LISTHDR_OFF_OWNER) == key)
+            return 1;
+    }
+
+    rec = (uint8_t *)DefFindObjRec(set, index, frame);
+    if (!rec)
+        return 0;
+
+    ItemTeardown(obj);
+
+    loadFlags = (set == AM2_SET_WITH_EXTRA_LOAD_FLAG) ? 0x1080 : 0x1000;
+
+    slot = FindRecordList(key);
+    if (slot < 0) {
+        uint8_t    entry[AM2_LIST_RECORD_BYTES];
+        AM2_Sprite *spr;
+        uint8_t    *list;
+
+        spr = PreloadSprite(set, index, frame, loadFlags, 1);
+        if (!spr)
+            return 0;
+
+        *(AM2_Sprite **)entry    = spr;
+        *(int16_t *)(entry + 4)  = 0;
+        *(int16_t *)(entry + 6)  = 0;
+        /* The DWORD at DEF_OBJ_REC_OFF_DEPTH, not the int16 that name means --
+         * see orig.h. */
+        *(int32_t *)(entry + 8)  =
+            *(const int32_t *)(rec + DEF_OBJ_REC_OFF_DEPTH);
+
+        list = (uint8_t *)MakeRecordList(1, entry, (void *)(uintptr_t)key);
+        LoadMask(list + 0x10, set, index, frame);
+
+        if (!*(const int32_t *)(list + LISTHDR_OFF_HIT_MASK)) {
+            AM2_Rect box;
+
+            RectSet(&box, -0x10, -0x10, 0x10, 0x10);
+            *(int32_t *)(list + LISTHDR_OFF_BOX_LEFT)   = box.left;
+            *(int32_t *)(list + LISTHDR_OFF_BOX_TOP)    = box.top;
+            *(int32_t *)(list + LISTHDR_OFF_BOX_RIGHT)  = box.right;
+            *(int32_t *)(list + LISTHDR_OFF_BOX_BOTTOM) = box.bottom;
+        }
+
+        slot = AddRecordList(list);
+    }
+
+    sub = o + OBJ_OFF_SUBRECORD;
+    FreeSubrecordRows(sub);
+    BuildRowsFromDef(sub,
+                     (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)[slot],
+                     (int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
+                     (int32_t)*(const int16_t *)(o + OBJ_OFF_Y),
+                     *(const uint32_t *)(o + OBJ_OFF_FLAGS));
+
+    for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++)
+        *(int32_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS)
+                     + (uint32_t)i * AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_28) =
+            *(const int32_t *)(rec + DEF_OBJ_REC_OFF_ROW_FIELD28);
+
+    /* ASSIGNED, not OR'd -- see the note above. */
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) =
+        *(const uint32_t *)(rec + DEF_OBJ_REC_OFF_FLAGS);
+
+    if (!flag) {
+        *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
+            *(const int16_t *)(rec + DEF_OBJ_REC_OFF_HEALTH);
+        *(int16_t *)(o + OBJ_OFF_HEALTH) =
+            *(const int16_t *)(rec + DEF_OBJ_REC_OFF_HEALTH);
+    }
+
+    *(int8_t *)(o + OBJ_OFF_HEIGHT_ADJ) =
+        *(const int8_t *)(rec + DEF_OBJ_REC_OFF_HEIGHT_ADJ);
+    *(uint8_t *)(o + OBJ_OFF_RANK) =
+        *(const uint8_t *)(rec + DEF_OBJ_REC_OFF_RANK);
+
+    /* The original's own null test, kept -- it is scheduled AFTER the store
+     * above and cannot fire. */
+    if (o) {
+        int32_t type = *(const int32_t *)o;
+
+        if (type == 1 || type == 4) {
+            if (flag) {
+                *(int32_t *)(o + OBJ_OFF_FORMATION_SLOT) = frame;
+            } else {
+                *(int32_t *)(o + OBJ_OFF_FORMATION_SLOT) = 0;
+                *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME)   = frame;
+            }
+        }
+    }
+
+    if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0) {
+        const uint8_t *spr =
+            *(const uint8_t *const *)(*(uint8_t **)(o + OBJ_OFF_ROWS)
+                                      + ROW_OFF_SPRITE);
+
+        if (spr) {
+            int32_t l = -(int32_t)*(const int16_t *)(spr + SPR_OFF_HOTX);
+            int32_t t = -(int32_t)*(const int16_t *)(spr + SPR_OFF_HOTY);
+            int32_t r = *(const int32_t *)(spr + SPR_OFF_W) + l;
+            int32_t b = *(const int32_t *)(spr + SPR_OFF_H) + t;
+
+            if (l != *(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 0)
+                || t != *(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 4)
+                || r != *(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 8)
+                || b != *(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 12))
+                ItemSetBox(obj, l, t, r, b);
+        }
+
+        ApplyObjHeight(obj,
+                       (int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
+        RowUpdate(*(void **)(o + OBJ_OFF_ROWS), 0,
+                  (void *)(uintptr_t)ADDR_MAP_DESC);
+    }
+
+    orig_obj_after_move(obj, 1,
+                        *(const int32_t *)(rec + DEF_OBJ_REC_OFF_FIELD_30));
+    return 1;
+}
+
 int objtype_install(void)
 {
     int rc = 0;
@@ -1049,6 +1256,8 @@ int objtype_install(void)
     rc |= patch_replace(ADDR_INIT_OBJ_FROM_AAI,
                         (const void *)InitObjFromAai,
                         "InitObjFromAai", 2);
+    rc |= patch_replace(ADDR_APPLY_OBJ_FRAME, (const void *)ApplyObjFrame,
+                        "ApplyObjFrame", 3);
 
     rc |= patch_replace(ADDR_OBJ_EVENT_MASK, (const void *)ObjEventMask,
                         "ObjEventMask", 1);

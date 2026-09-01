@@ -6542,9 +6542,10 @@ void __cdecl SoldierKindForWeapon(void *unit, uint32_t code)
     }
 }
 
-typedef int32_t (__cdecl *AM2_ApplyFrameFn)(void *obj, int32_t b, int32_t a,
-                                            int32_t frame, int32_t flag);
-#define orig_apply_obj_frame ((AM2_ApplyFrameFn)(uintptr_t)ADDR_APPLY_OBJ_FRAME)
+/* ApplyObjFrame is reconstructed, in objtype.cpp, and called by name. The
+ * typedef here named its second and third parameters `b` and `a`; reading the
+ * body settled them as the sprite SET and INDEX, in that order, which is what
+ * the two unpacks below have always been passing. */
 
 /* 0x004351C0, and the name is the image's own. Changes an object's frame and
  * then every object CHAINED to it -- OBJ_OFF_CHAIN_UID to the first, then
@@ -6584,12 +6585,12 @@ int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag)
     {
         uint32_t v = *(const uint32_t *)(*(uint8_t **)(o + OBJ_OFF_FIELD_94) + 8);
 
-        if (orig_apply_obj_frame(obj,
-                                 (int32_t)((v >> AM2_OBJREC_SHIFT_B)
-                                           & AM2_OBJREC_MASK_B),
-                                 (int32_t)((v >> AM2_OBJREC_SHIFT_A)
-                                           & AM2_OBJREC_MASK_A),
-                                 frame, flag))
+        if (ApplyObjFrame(obj,
+                          (int32_t)((v >> AM2_OBJREC_SHIFT_B)
+                                    & AM2_OBJREC_MASK_B),
+                          (int32_t)((v >> AM2_OBJREC_SHIFT_A)
+                                    & AM2_OBJREC_MASK_A),
+                          frame, flag))
             any = 1;
     }
 
@@ -6608,12 +6609,12 @@ int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag)
             uint32_t v =
                 *(const uint32_t *)(*(uint8_t **)(link + OBJ_OFF_FIELD_94) + 8);
 
-            if (orig_apply_obj_frame(link,
-                                     (int32_t)((v >> AM2_OBJREC_SHIFT_B)
-                                               & AM2_OBJREC_MASK_B),
-                                     (int32_t)((v >> AM2_OBJREC_SHIFT_A)
-                                               & AM2_OBJREC_MASK_A),
-                                     frame, flag))
+            if (ApplyObjFrame(link,
+                              (int32_t)((v >> AM2_OBJREC_SHIFT_B)
+                                        & AM2_OBJREC_MASK_B),
+                              (int32_t)((v >> AM2_OBJREC_SHIFT_A)
+                                        & AM2_OBJREC_MASK_A),
+                              frame, flag))
                 any = 1;
         }
 
