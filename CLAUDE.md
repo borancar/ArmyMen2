@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **27** analysis
+**`make check` runs everything that does not need the game.** **28** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -559,6 +559,28 @@ and the mutation names the token. Caught only because the mutation was tried --
 which is the rule this file already states as "a test that cannot fail has not
 passed", one level further in: check that the mutation reached the CORPUS, not
 just that it reached the code.
+
+**A CORPUS DRIVEN FROM THE MODEL'S OWN TABLE CANNOT FAIL, AND IT HAPPENED
+AGAIN.** `tools/firepose.py` sweeps the nine poses `SelectFirePose` treats as
+BRACED, and the first version looped over the model's own `BRACED` tuple.
+Deleting `0x06` from it passed -- because deleting the entry also deleted the
+case that would have caught it. The symptom is the one `boolcheck` already
+records: the corpus came back three cases SMALLER, 4459 against 4462, and a
+count that moves at all under a mutation is the tell.
+
+Swept over `range(0, 0x25)` instead it fails in BOTH directions -- two cases for
+removing `0x06` and two for adding `0x07`, with the total pinned at 4531 in all
+three runs. Second instance of this exact trap in the project, which is the
+argument for the rule being written down rather than remembered: it was written
+down, and it still had to be caught by mutating.
+
+**AND ITS OUTPUT IS NOT ITS RETURN VALUE, which a check can miss entirely.**
+`SelectFirePose` answers 1 on every path past its refusals and does its work by
+WRITING `SIGHTCOUT_OFF_STATE`, so an oracle comparing `eax` would pass with the
+whole body deleted. The pose slot is seeded with a sentinel before each call, so
+"wrote nothing" -- which two of the eight arms really do -- is distinguishable
+from "wrote zero". Ask what a function's output actually IS before comparing
+anything.
 
 **Say which mutations the corpus does NOT catch.** Making `/` not end a line
 fails on every `// comment`, and stopping `>` from pairing splits `<>` in the

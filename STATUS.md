@@ -5,56 +5,46 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-01**, at `78610ba`. Working tree clean.
+Last updated: **2026-09-01**, at `764e8ee`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,383 patches.**
+Nothing uncommitted. **1,383 patches**, **28** analysis tools in `make check`.
 
-**`SelectFirePose` (`0x00449AB0`, 1088 B, one caller) is reconstructed** -- the
-function `TrooperFire` calls and whose answer it throws away, which two commits
-ago was recorded as an oddity. Reading it explains the oddity: it answers 1 on
-every path past its four refusals, and what it actually does is WRITE the pose
-into `SIGHTCOUT_OFF_STATE`. The side effect is the function, and the discarded
-result is not a defect.
+**`tools/firepose.py` is the oracle the last commit said was missing.** 4,531
+cases: forty-six item kinds times three object classes times braced times
+soldier kind times speed times seen times ready, plus a sweep of every pose
+0x00..0x24 and the four refusals. The original runs under Unicorn with NOTHING
+HOOKED -- `SelectFirePose`'s two callees are pure reads of the object, unlike
+`explcheck`'s and `collectcheck`'s, which reach the heap and the map.
 
-**It is `WeaponPoseIndex`'s big brother**, `0x1A0` bytes further on and asking
-the same question with more inputs -- both answer from `ClassifyByCode74`'s 0,
-1 or 2 and both speak in `AM2_POSE_` numbers.
+**Its output is not its return value, and a check could miss that entirely.**
+The function answers 1 on every path past its refusals and does its work by
+WRITING `SIGHTCOUT_OFF_STATE`, so an oracle comparing `eax` would pass with the
+whole body deleted. The pose slot is seeded with a sentinel, so "wrote nothing"
+-- which two of the eight arms really do -- is distinguishable from "wrote
+zero".
 
-**Forty-three indices and EIGHT arms.** Counting the bodies gives eight and
-counting the kinds gives forty-three; only the byte table at `0x00449EC4` says
-which goes where, and out-of-range joins the twenty-four-kind default rather
-than getting an arm of its own.
+**A CORPUS DRIVEN FROM THE MODEL'S OWN TABLE CANNOT FAIL, and this is the
+second instance in the project.** The braced-pose sweep first looped over the
+model's own nine-entry tuple; deleting `0x06` from it PASSED, because deleting
+the entry deleted the case that would have caught it. The symptom is
+`boolcheck`'s exactly -- the corpus came back three cases smaller, 4459 against
+4462 -- and a case count that moves under a mutation is the tell. Swept over a
+RANGE it fails both ways, two cases for removing `0x06` and two for adding
+`0x07`, with the total pinned at 4531 in all three runs.
 
-**One grouping falls out of the caption table exactly.** The five kinds sharing
-the `AM2_POSE_KNEEL_ARMED_B` arm are AIRS, PARA, RECO, MAG and AERO -- precisely
-the five `ObjCodeUnmapped` answers 0 for, which `TrooperFire` uses to decide
-whether the trooper turns to face its target. Two tables in two functions
-agreeing on one set of five is better evidence than either alone, and it is the
-third thing the `0x00419A94` caption table has settled this session.
+**Mutation-checked in five directions, four of which failed first time**:
+swapping the two gun poses fails 36, dropping the flamethrower's movement gate
+fails 32, turning `seen && ready` into `||` fails 132, and moving item kind 43
+into the default arm fails 96. The fifth is the one above.
 
-**Three things recur and are written once.** `PoseIsBraced` is a nine-pose set
-plus soldier kind 7, tested identically in five arms -- which is what makes it a
-SET rather than a chain of compares. `aimed` is the (seen && ready) pick between
-two poses. And every "not braced" arm lands on the same two poses whatever the
-weapon, which is what says those two are "get into a stance" rather than
-anything about the weapon.
+**What it does NOT close, said plainly.** It checks the READING against the
+original; the C in `item.cpp` is a second transcription of that same reading,
+verified by the compiler and by `checkoffsetuse` rather than by this. Replaying
+the recorded cases against the C the way `tests/selftest.cpp` replays
+`placevec.h` would close that, and is not done.
 
-**The movement gate is on two arms only**: a moving trooper keeps its pose for
-the guns and the flamethrower and does not for the grenade, the bazooka or
-anything else. Reproduced; nothing here says why.
-
-**It is exhaustively testable and that oracle is not written.** Forty-four kinds
-times three classes times braced times seen times ready times moving is a few
-hundred cases, and every input is an argument or a plain field -- exactly the
-shape `tools/posecheck.py` already covers for `WeaponPoseIndex`. Said here
-rather than left implied.
-
-Cold: its one caller is `TrooperFire`, which nothing in a Boot Camp drive
-reaches. A/B clean -- `bootcamp` identical 1,610-line state dump and 13-message
-log at 22 pixels, `campaign` identical 35-node widget tree and 14-message log
-at 2 pixels.
 
 ## Stop condition
 
