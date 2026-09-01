@@ -10,6 +10,7 @@
 #include "../inject/patch.h"
 #include "objtable.h" /* LookupByUID */
 #include "objtype.h"  /* ObjIsType2 */
+#include "commmsg.h"  /* AppendTroopState -- reconstructed, its receiver too */
 #include "dist.h"     /* AngleBetween */
 #include "army.h"     /* AllyFlag, SetLeadsAndAct */
 #include "packkey.h"
@@ -310,12 +311,9 @@ void __cdecl SendObjDestroyed(const void *obj)
     ArmyMessageSend(msg);
 }
 
-/* ADDR_APPEND_TROOP_STATE stays original and is reached by address. It writes
- * one variable-length record for a trooper into the message and advances the
- * length itself -- 632 bytes of it, none of them read here. */
-typedef void (__cdecl *AM2_AppendTroopStateFn)(void *msg, void *obj);
-#define orig_append_troop_state \
-    ((AM2_AppendTroopStateFn)(uintptr_t)ADDR_APPEND_TROOP_STATE)
+/* AppendTroopState is ours now; the seam and its typedef went with it. What
+ * this comment used to say -- "none of them read here" -- was true and is why
+ * the record's length was a guess: it is 5 bytes at least and 9 at most. */
 
 /* TrooperDropItemSend -- original 0x0044C150, two callers, and it names itself
  * in both of its log lines: "<--Trooper Drop Item Send" going out and
@@ -541,7 +539,7 @@ void __cdecl TellOneSlot(int32_t slot)
                 && ObjIsType2((const AM2_Object *)obj)) {
                 if (h->uid == 0)
                     h->uid = *(const uint32_t *)(obj + 4);
-                orig_append_troop_state(msg, obj);
+                AppendTroopState(msg, obj);
             }
             if ((uint32_t)h->len + AM2_TROOP_BATCH_SLACK
                     > AM2_TROOP_BATCH_MAX) {

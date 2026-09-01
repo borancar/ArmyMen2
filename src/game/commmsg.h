@@ -33,6 +33,13 @@ int32_t __attribute__((thiscall)) ArmyInPlay(void *comm, uint32_t uid);
  * a batch of variable-length sub-records, kind 0x18 a (trooper, weapon) pair
  * whose sender armymsg.cpp already has. */
 void __cdecl RecvTroopBatch(void *msg, int32_t army);
+
+/* 0x0044BC10, one caller: TellOneSlot. Append one trooper's state to a batch
+ * message -- a DELTA record, emitted only when position, facing or pose has
+ * changed enough, with one presence bit each in the top three bits of its
+ * first dword. Five bytes at least and NINE at most, which is what makes the
+ * caller's ten-byte reservation a bound rather than a guess. */
+void __cdecl AppendTroopState(void *msg, void *obj);
 void __cdecl RecvTroopPair(void *msg);
 
 /* 0x0044C3E0, kind 0x22 -- the twin of armymsg.cpp's SendTrooperSetWeapon, so

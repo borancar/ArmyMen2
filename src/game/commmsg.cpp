@@ -911,6 +911,182 @@ typedef void (__cdecl *AM2_PairApplyFn)(void *a, void *b, int32_t x, int32_t y);
 #define orig_trooper_pair_apply \
     TrooperRemotePickupItem
 
+/* AppendTroopState -- original 0x0044BC10, 656 bytes, one caller: TellOneSlot,
+ * which walks a comm slot's army list and packs one message out of these.
+ *
+ * A DELTA ENCODER. It appends a variable-length record for one trooper, and
+ * only when something has actually changed -- position, facing or pose, one
+ * presence BIT each in the top three bits of the record's first dword.
+ *
+ * ITS RECEIVER IS ALREADY RECONSTRUCTED AND THIS CONFIRMS IT FROM THE OTHER
+ * END. TroopSubParse documents the wire format; every claim it makes turns up
+ * here independently -- the 29-bit uid with the army stripped (ADDR_UID_ON_WIRE
+ * does the stripping), the three flags above it, the big-endian 24/16/8/0 head,
+ * and the position as two TWELVE-bit fields in three bytes. CLAUDE.md prefers
+ * the writer/reader pair over either alone; this is what that buys.
+ *
+ * IT ANSWERS AN OPEN QUESTION IN orig.h. TellOneSlot reserves TEN bytes for
+ * the next record and its note calls that "a guess about
+ * ADDR_APPEND_TROOP_STATE's output rather than a bound on it". It is a bound:
+ * the head is 4, the pose byte is ALWAYS present, and position and facing add
+ * at most 3 and 1 -- so a record is 5 bytes at least and 9 at most, and ten is
+ * correct and tight by one.
+ *
+ * BIT 29 IS SET TWICE AND THE SECOND ONE IS NOT REDUNDANT. The conditional set
+ * decides whether a record is emitted at all -- the function returns when no
+ * flag is set -- and then bit 29 is forced ON unconditionally before the head
+ * is written. So every record on the wire carries a pose byte whether or not
+ * the pose changed. Dropping the second `or` as duplicated would change the
+ * format.
+ *
+ * EACH FIELD HAS TWO THRESHOLDS AND ITS OWN CACHE. The trooper keeps a
+ * (value, timestamp) pair per field, and a field goes on the wire when either
+ * COMM_OFF_SEND_INTERVAL has passed and it differs at all, or the shorter
+ * COMM_OFF_SEND_COARSE has passed and it differs a LOT -- more than 8 in an
+ * axis for the position, or in the top nibble for the facing. Big changes get
+ * through sooner. SARGE'S INTERVAL IS FORCED TO 1, so the leader is sent every
+ * frame he moves.
+ *
+ * THE "TIME" IS A SEQUENCE, and the field it comes from is named for that:
+ * FindPlayerById answers the sender's FLOW QUEUE -- the same lookup
+ * DestroyFlow uses -- and FLOW_OFF_SEQUENCE is its counter. Every interval here is measured against the
+ * sending player's +0x94, which TROOPER_OFF_LAST_SEQ is named for -- so the
+ * thresholds count packets, not milliseconds, and a slow machine throttles by
+ * the same amount as a fast one.
+ *
+ * The nibble byte is `((x8 ^ y4) & 0xF) ^ y4`, which takes its low nibble from
+ * x's high bits and its high nibble from y's -- the merge idiom, and exactly
+ * what TroopSubParse unpacks. */
+void __cdecl AppendTroopState(void *msg, void *obj)
+{
+    uint8_t  *o = (uint8_t *)obj;
+    uint8_t  *m = (uint8_t *)msg;
+    uint8_t  *out;
+    uint32_t  seq;   /* the sending player's +0x94, a SEQUENCE not a clock */
+    uint32_t  flags = 0;
+    uint32_t  interval;
+    int32_t   dx, dy;
+    int16_t   px, py, lx, ly;
+
+    if (!*(const int16_t *)(o + OBJ_OFF_COUNT62))
+        return;
+
+    seq = *(const uint32_t *)((const uint8_t *)FindPlayerById(
+              *(const uint32_t *)(*(uint8_t *const *)(uintptr_t)
+                  ADDR_COMM_OBJECT + COMM_OFF_OUR_PLAYER_ID))
+              + FLOW_OFF_SEQUENCE);
+
+    if (*(const uint32_t *)(o + TROOPER_OFF_LAST_SEQ) == seq)
+        return;
+    if (*(const uint32_t *)(o + TROOPER_OFF_SENT_POSE_T) == seq
+        && IsKind10To17(*(const int32_t *)(o + TROOPER_OFF_SENT_POSE)))
+        return;
+
+    px = *(const int16_t *)(o + OBJ_OFF_POS);
+    py = *(const int16_t *)(o + OBJ_OFF_POS + 2);
+    lx = *(const int16_t *)(o + TROOPER_OFF_SENT_POS);
+    ly = *(const int16_t *)(o + TROOPER_OFF_SENT_POS + 2);
+    dx = px - lx;
+    dy = py - ly;
+    if (dx < 0) dx = -dx;
+    if (dy < 0) dy = -dy;
+
+    {
+        uint8_t *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+
+        interval = *(const uint32_t *)(comm + COMM_OFF_SEND_INTERVAL);
+        if (*(const int32_t *)(o + OBJ_OFF_SARGE) && interval > 1)
+            interval = 1;
+
+        uint32_t age = seq - *(const uint32_t *)(o + TROOPER_OFF_SENT_POS_T);
+
+        /* The exact test JUMPS PAST the coarse one when it sets the flag, and
+         * FALLS INTO it when it does not -- so a position that has not moved
+         * still reaches the coarse test. It cannot pass it (dx and dy are then
+         * zero), so an `else if` would answer the same; written as the branch
+         * runs rather than as the answer it happens to give. */
+        if (age >= interval && (px != lx || py != ly))
+            flags = 0x80000000u;
+        else if (age >= *(const uint32_t *)(comm + COMM_OFF_SEND_COARSE)
+                 && (dx > 8 || dy > 8))
+            flags = 0x80000000u;
+
+        {
+            uint32_t age = seq - *(const uint32_t *)
+                               (o + TROOPER_OFF_SENT_FACING_T);
+            uint8_t  f  = *(const uint8_t *)(o + OBJ_OFF_FACING);
+            uint8_t  lf = *(const uint8_t *)(o + TROOPER_OFF_SENT_FACING);
+
+            if ((age >= interval && f != lf)
+                || (age >= *(const uint32_t *)(comm + COMM_OFF_SEND_COARSE)
+                    && ((uint32_t)(lf ^ f) & 0xFFFFFFF0u)))
+                flags |= 0x40000000u;
+        }
+
+        if (seq - *(const uint32_t *)(o + TROOPER_OFF_SENT_POSE_T)
+                >= *(const uint32_t *)(comm + COMM_OFF_SEND_COARSE)
+            && *(const int32_t *)(o + OBJ_OFF_POSE)
+               != *(const int32_t *)(o + TROOPER_OFF_SENT_POSE))
+            flags |= 0x20000000u;
+    }
+
+    if (!flags)
+        return;
+
+    out = m + *(const uint16_t *)m;
+
+    /* NOT redundant with the conditional set above: that one decides whether
+     * to emit at all, this one puts the pose in every record. */
+    flags |= 0x20000000u;
+
+    {
+        uint32_t head = (UidOnWire(((const AM2_Object *)o)->uid) & 0x1FFFFFFFu)
+                        | flags;
+
+        *out++ = (uint8_t)(head >> 24);
+        *out++ = (uint8_t)(head >> 16);
+        *out++ = (uint8_t)(head >> 8);
+        *out++ = (uint8_t)head;
+    }
+
+    if (flags & 0x80000000u) {
+        int16_t x, y;
+
+        /* Clamped to twelve bits IN THE OBJECT, not just on the wire. */
+        if (*(const int16_t *)(o + OBJ_OFF_POS) > 0xFFF)
+            *(int16_t *)(o + OBJ_OFF_POS) = 0xFFF;
+        if (*(const int16_t *)(o + OBJ_OFF_POS + 2) > 0xFFF)
+            *(int16_t *)(o + OBJ_OFF_POS + 2) = 0xFFF;
+
+        x = *(const int16_t *)(o + OBJ_OFF_POS);
+        y = *(const int16_t *)(o + OBJ_OFF_POS + 2);
+        *out++ = (uint8_t)x;
+        *out++ = (uint8_t)y;
+        *out++ = (uint8_t)(((((uint8_t)(x >> 8)) ^ ((uint8_t)(y >> 4))) & 0x0F)
+                           ^ ((uint8_t)(y >> 4)));
+
+        *(uint32_t *)(o + TROOPER_OFF_SENT_POS) =
+            *(const uint32_t *)(o + OBJ_OFF_POS);
+        *(uint32_t *)(o + TROOPER_OFF_SENT_POS_T) = seq;
+    }
+
+    if (flags & 0x40000000u) {
+        *out++ = *(const uint8_t *)(o + OBJ_OFF_FACING);
+        *(uint8_t *)(o + TROOPER_OFF_SENT_FACING) =
+            *(const uint8_t *)(o + OBJ_OFF_FACING);
+        *(uint32_t *)(o + TROOPER_OFF_SENT_FACING_T) = seq;
+    }
+
+    if (flags & 0x20000000u) {
+        *out++ = *(const uint8_t *)(o + OBJ_OFF_POSE);
+        *(int32_t *)(o + TROOPER_OFF_SENT_POSE) =
+            *(const int32_t *)(o + OBJ_OFF_POSE);
+        *(uint32_t *)(o + TROOPER_OFF_SENT_POSE_T) = seq;
+    }
+
+    *(uint16_t *)m += (uint16_t)(out - m);
+}
+
 /* RecvTroopBatch -- original 0x0044CC90, one caller. Message kind 0x16.
  *
  * A BATCH, and that is why it is the only arm of the trooper dispatcher that
@@ -2411,6 +2587,8 @@ int commmsg_install(void)
                   "RecvTrooperFire", 1);
     patch_replace(ADDR_RECV_TROOP_16, (const void *)RecvTroopBatch,
                   "RecvTroopBatch", 1);
+    patch_replace(ADDR_APPEND_TROOP_STATE, (const void *)AppendTroopState,
+                  "AppendTroopState", 2);
     patch_replace(ADDR_RECV_TROOP_PAIR, (const void *)RecvTroopPair,
                   "RecvTroopPair", 1);
     patch_replace(ADDR_RECV_TROOP_SET_WEAPON,

@@ -6127,6 +6127,17 @@ typedef struct {
 #define TROOPER_OFF_FIRE_FLAG      0x529u
 #define TROOPER_OFF_CLEAR_A        0x57Cu  /* both zeroed as the shot goes */
 #define TROOPER_OFF_CLEAR_B        0x588u
+/* AppendTroopState's SEND CACHE: three (value, timestamp) pairs, one per
+ * field it delta-encodes. A field goes on the wire when it differs from the
+ * value here, and the timestamp is what the two thresholds are measured
+ * against -- so each field throttles independently. Named from the body:
+ * each is written immediately after its own field is appended. */
+#define TROOPER_OFF_SENT_POS       0x5B4u  /* packed point, last transmitted */
+#define TROOPER_OFF_SENT_POS_T     0x5B8u  /* the seq it went out on */
+#define TROOPER_OFF_SENT_FACING    0x5BCu  /* uint8_t */
+#define TROOPER_OFF_SENT_FACING_T  0x5C0u
+#define TROOPER_OFF_SENT_POSE      0x5C4u  /* int32_t, OBJ_OFF_POSE's copy */
+#define TROOPER_OFF_SENT_POSE_T    0x5C8u
 #define TROOPER_OFF_LAST_SEQ       0x5CCu  /* where the sequence is kept */
 /* 0x00410820, "SendGamePause from %x  Pause =%s  Flags=%x". Eight callers.
  * It fills two fields of a message that lives in .bss at 0x004FAA50 and hands
@@ -7271,9 +7282,10 @@ typedef struct {
  * message, flushing whenever another record would not fit.
  *
  * The buffer is 0x12C bytes and the room it reserves for the next record is
- * TEN, which is a guess about ADDR_APPEND_TROOP_STATE's output rather than a
- * bound on it -- that function writes variable-length records and nothing
- * here asks how long the next one will be. */
+ * TEN. THAT IS A BOUND, settled by reconstructing the function it guesses
+ * about: the head is four bytes, the pose byte is always present, and the
+ * position and facing add at most three and one -- so a record is FIVE bytes
+ * at least and NINE at most. Ten is correct and tight by one. */
 #define ADDR_TELL_ONE_SLOT       0x0044C480u  /* void(int32_t slot) */
 #define ADDR_APPEND_TROOP_STATE  0x0044BC10u  /* void(msg *, void *obj) */
 #define AM2_TROOP_BATCH_MAX      0x12Cu  /* the whole message buffer */
@@ -9197,6 +9209,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_RECV_BANDWIDTH  0x004757B0u
 #define ADDR_STR_SENT_PACKETS    0x00475740u
 #define ADDR_STR_RECV_PACKETS    0x004756D0u
+/* The two thresholds AppendTroopState throttles on, and they are measured in
+ * SEQUENCES rather than milliseconds -- the counter is the sending player's
+ * +0x94, which TROOPER_OFF_LAST_SEQ is named for -- so a slow machine
+ * throttles by the same amount as a fast one. COARSE is the shorter of the
+ * two: soon after a send only a LARGE change gets through, and after the
+ * longer INTERVAL any change does. */
+#define COMM_OFF_SEND_COARSE     0x478u  /* uint32_t */
+#define COMM_OFF_SEND_INTERVAL   0x47Cu  /* uint32_t; forced to 1 for Sarge */
 #define COMM_OFF_OUR_PLAYER_ID   0x3CCu
 #define COMM_OFF_PLAYER_COUNT    0x3D0u
 /* Six fields CommRemovePlayer clears or stamps on its way out, and the only

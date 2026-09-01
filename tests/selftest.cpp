@@ -696,6 +696,14 @@ extern "C" void __cdecl SpeakItemPickupLine(int32_t, int32_t)
 {
 }
 
+/* armymsg.cpp's TellOneSlot now calls AppendTroopState by name, and that lives
+ * in commmsg.cpp which is not in SELFTEST_SRC. A stub rather than pulling the
+ * whole comm module in: nothing here has a message buffer to append to, and a
+ * vector that reached it would leave the message unchanged. */
+extern "C" void __cdecl AppendTroopState(void *, void *)
+{
+}
+
 /* event.cpp's two bitmap triggers reach FreeBitmap, which is in win32/sprite.cpp
  * with the rest of the sprite code. Same reasoning as PreloadSprite above.
  *
