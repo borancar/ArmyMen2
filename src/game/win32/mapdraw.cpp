@@ -2835,6 +2835,204 @@ int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out)
     return best < AM2_BOAT_EXIT_MAX;
 }
 
+/* DirtyCollect -- original 0x0041DD90, three callers, all of them row code:
+ * ADDR_ROW_UNREGISTER_ALL calls it before it unlinks anything, so the region a
+ * row occupied is marked while the row still knows where it was.
+ *
+ * IT IS A RECTANGLE SUBTRACTION, and the whole of it is one 81-entry table.
+ * The new rectangle is clipped to the view and then walked against every entry
+ * already in the list; for each, the four edges are compared and turned into a
+ * BASE-3 CODE -- 27*left + 9*top + 3*right + bottom, each digit 0 when the new
+ * edge is less than the old, 1 when equal and 2 when greater. That is 81
+ * cases, and a byte table at 0x0041E10C maps them onto twenty-four arms
+ * through a second table of addresses. The arms do four things: emit a piece
+ * of the OLD rectangle that the new one does not cover, shrink the old one,
+ * shrink the NEW one, or unlink the old one entirely because the new one
+ * swallows it. Case 40 -- every edge equal -- returns outright.
+ *
+ * SO THE LIST NEVER OVERLAPS ITSELF, which is the point: whatever is left of
+ * the new rectangle after the walk is appended at the end, and everything it
+ * would have double-painted has already been cut out of somebody.
+ *
+ * THE ARMS ARE TAKEN FROM THE TABLE AND NOT FROM THEIR ORDER. Three of the
+ * twenty-four are the same unlink sequence written out three times, and one --
+ * case 36 and its neighbours -- is the function's own exit. Reading the bodies
+ * top to bottom and numbering as one goes gets that wrong in both directions,
+ * which is what CLAUDE.md says about every jump table in this image.
+ *
+ * IT BAILS BEFORE IT STARTS IF THE LIST IS FULL, setting ADDR_FULL_REDRAW
+ * rather than dropping a rectangle -- the same trade AddDirtyRect makes, and
+ * checked here so a walk that would emit several pieces cannot half-succeed.
+ *
+ * FILED IN win32/ BECAUSE OF ONE CALL. It clips with IntersectRect, which is
+ * what put ObjectsInRect and BoatExitPoint on this side of the split too; the
+ * rest of the dirty list is flat, in dirty.cpp, where tools/dirtycheck.py can
+ * reach it with no game running. That tool tests THIS one by emulating the
+ * original with IntersectRect hooked, so the split costs nothing.
+ */
+void __cdecl DirtyCollect(const AM2_Rect *r)
+{
+    uint8_t  *recs = (uint8_t *)AM2_IMAGE(ADDR_DIRTY_RECTS);
+    AM2_Rect  cur;
+    AM2_Rect  hit;
+    uint16_t  at;
+
+    if (!IntersectRect((LPRECT)&cur, (const RECT *)r,
+                       (const RECT *)AM2_IMAGE(ADDR_VIEW_RECT_PREV)))
+        return;
+
+    if ((int32_t)(uint16_t)*(const uint16_t *)AM2_IMAGE(ADDR_DIRTY_TAIL) + 1
+        >= AM2_DEPTH_MAX) {
+        *(int32_t *)AM2_IMAGE(ADDR_FULL_REDRAW) = 1;
+        return;
+    }
+
+    for (at = *(const uint16_t *)AM2_IMAGE(ADDR_DIRTY_HEAD); at;
+         at = *(const uint16_t *)(recs + (uint32_t)at * AM2_DIRTY_RECORD_SIZE
+                                  + DIRTY_OFF_NEXT)) {
+        AM2_Rect *e = (AM2_Rect *)(recs
+                                   + (uint32_t)at * AM2_DIRTY_RECORD_SIZE);
+        int32_t   code;
+
+        if (!IntersectRect((LPRECT)&hit, (const RECT *)&cur, (const RECT *)e))
+            continue;
+
+        code = (cur.left   < e->left   ? 0 : cur.left   == e->left   ? 27 : 54)
+             + (cur.top    < e->top    ? 0 : cur.top    == e->top    ?  9 : 18)
+             + (cur.right  < e->right  ? 0 : cur.right  == e->right  ?  3 :  6)
+             + (cur.bottom < e->bottom ? 0 : cur.bottom == e->bottom ?  1 :  2);
+
+        switch (code) {
+        case 0:
+            AddDirtyRect(cur.right, e->top, e->right, cur.bottom);
+            e->top = cur.bottom;
+            break;
+
+        case 1: case 2: case 11: case 29:
+            e->left = cur.right;
+            break;
+
+        case 3: case 6: case 12: case 15: case 33: case 42:
+            e->top = cur.bottom;
+            break;
+
+        case 4: case 5: case 7: case 8: case 13: case 14: case 16:
+        case 17: case 31: case 32: case 34: case 35: case 43: case 44:
+            goto unlink;
+
+        case 9:
+            cur.right = e->right;
+            e->top = cur.bottom;
+            break;
+
+        case 10:
+            cur.right = e->right;
+            goto unlink;
+
+        case 18:
+            AddDirtyRect(e->left, cur.bottom, e->right, e->bottom);
+            cur.right = e->right;
+            e->bottom = cur.top;
+            break;
+
+        case 19:
+            cur.right = e->right;
+            e->bottom = cur.top;
+            break;
+
+        case 20:
+            AddDirtyRect(cur.right, cur.top, e->right, e->bottom);
+            e->bottom = cur.top;
+            break;
+
+        case 21: case 24: case 51:
+            AddDirtyRect(e->left, cur.bottom, e->right, e->bottom);
+            e->bottom = cur.top;
+            break;
+
+        case 22: case 23: case 25: case 26: case 52: case 53:
+            e->bottom = cur.top;
+            break;
+
+        case 27: case 28: case 54: case 55: case 57: case 58:
+            cur.bottom = e->top;
+            break;
+
+        case 30:
+            cur.bottom = e->bottom;
+            goto unlink;
+
+        case 36: case 37: case 39: case 40: case 45: case 46: case 48:
+        case 49: case 63: case 64: case 66: case 67: case 72: case 73:
+        case 75: case 76:
+            return;
+
+        case 38: case 47: case 65: case 68: case 74: case 77:
+            cur.top = e->bottom;
+            break;
+
+        case 41:
+            goto unlink;
+
+        case 50:
+            cur.top = e->top;
+            goto unlink;
+
+        case 56:
+            AddDirtyRect(cur.right, e->top, e->right, e->bottom);
+            e->right = cur.left;
+            break;
+
+        case 59: case 61: case 62: case 71:
+            e->right = cur.left;
+            break;
+
+        case 60:
+            AddDirtyRect(e->left, e->top, cur.left, cur.bottom);
+            e->top = cur.bottom;
+            break;
+
+        case 69:
+            cur.left = e->left;
+            e->top = cur.bottom;
+            break;
+
+        case 70:
+            cur.left = e->left;
+            goto unlink;
+
+        case 78: case 79:
+            cur.left = e->right;
+            break;
+
+        case 80:
+            AddDirtyRect(e->left, cur.top, cur.left, e->bottom);
+            e->bottom = cur.top;
+            break;
+
+        default:
+            break;   /* unreachable: the code is 0..80 by construction */
+        }
+        continue;
+
+    unlink:
+        {
+            uint16_t prev = *(const uint16_t *)((uint8_t *)e + DIRTY_OFF_PREV);
+            uint16_t next = *(const uint16_t *)((uint8_t *)e + DIRTY_OFF_NEXT);
+
+            *(uint16_t *)(recs + (uint32_t)prev * AM2_DIRTY_RECORD_SIZE
+                          + DIRTY_OFF_NEXT) = next;
+            if (!next)
+                *(uint16_t *)AM2_IMAGE(ADDR_DIRTY_TAIL) = prev;
+            else
+                *(uint16_t *)(recs + (uint32_t)next * AM2_DIRTY_RECORD_SIZE
+                              + DIRTY_OFF_PREV) = prev;
+        }
+    }
+
+    AddDirtyRect(cur.left, cur.top, cur.right, cur.bottom);
+}
+
 int mapdraw_install(void)
 {
     patch_replace(ADDR_BOAT_EXIT_POINT, (const void *)BoatExitPoint,
@@ -2862,6 +3060,8 @@ int mapdraw_install(void)
                   "DrawViewRect", 2);
     int rc = 0;
 
+    rc |= patch_replace(ADDR_DIRTY_COLLECT, (const void *)DirtyCollect,
+                        "DirtyCollect", 3);
     rc |= patch_replace(ADDR_MERGE_DIRTY, (const void *)ScrollView,
                         "ScrollView", 0);
     rc |= patch_replace(ADDR_SCROLL_MAP_CACHE, (const void *)ScrollMapCache,

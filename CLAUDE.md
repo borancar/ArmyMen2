@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **26** analysis
+**`make check` runs everything that does not need the game.** **27** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -521,6 +521,20 @@ the mutation fails 8 cases. This file already records the same thing happening
 to a `case` column in the action-parser probe; it is the second instance, and
 the cheap defence is to `grep` for the MUTATED text before believing the run,
 not to eyeball the `sed`.
+
+**AND WHEN IT CANNOT, THE SYMPTOM MAY BE A SMALLER CORPUS RATHER THAN A
+PASS.** `tools/collectcheck.py`'s classifier both selects the arm and filters
+which rectangle pairs are valid, so mutating it did not fail the run -- it ran
+27 of 81 cases and reported them all identical. The case count is a failure
+condition there now. A mutation that shrinks the corpus reads exactly like a
+mutation that was absorbed; check how many cases ran, not only whether they
+agreed.
+
+**A UNICORN CODE HOOK FIRES BEFORE THE INSTRUCTION EXECUTES, so the stand-in
+address an import is redirected to has to be MAPPED.** Every one of
+`collectcheck`'s 81 cases faulted until the page existed -- the fetch faults
+first and the hook never runs. It reads as "the original faulted", which is
+what a genuinely bad vector looks like.
 
 **A CORPUS DERIVED FROM THE MODEL UNDER TEST CANNOT FAIL AGAINST IT.**
 `tools/boolcheck.py` built its token list from the same two tuples its
@@ -1067,6 +1081,14 @@ puts the war menu, ENTER BATTLE NAME and the battle browser three places early.
 `frame.cpp`'s `kMenuScreens` already has them right, because it was built from
 the table at `0x00426518` and not from the layout. Worth recording that the
 rule held where it was followed, not only the places it was not.
+
+**AND FOR A TABLE THIS SIZE, GENERATE THE CODE FROM IT RATHER THAN
+TRANSCRIBE IT.** `DirtyCollect`'s decision is an 81-entry byte table over
+twenty-four arms; the switch I hand-wrote from a printed decode put six codes
+in the wrong arm, and no amount of re-reading would have found it. What found
+it was diffing my case groupings against the image's table programmatically,
+and the fix was to emit the `case` labels from the table. Dumping a table is
+the first half of the rule; not retyping it is the second.
 
 **A jump table's order is not the order its arms are laid out in.** State 2's
 thirteen sub-state arms are nine of one shape -- repaint if the overlay is

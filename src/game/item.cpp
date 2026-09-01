@@ -715,8 +715,13 @@ void __cdecl ItemPreDestroy(void *obj, int32_t cells)
  *
  * Note the log prints the object's uid at +4 and is gated on the comm object's
  * debug field, the same one the event functions read. */
-typedef void (__cdecl *AM2_DirtyCollectFn)(const void *rect);
-#define orig_dirty_collect ((AM2_DirtyCollectFn)(uintptr_t)ADDR_DIRTY_COLLECT)
+/* DirtyCollect is reconstructed, in win32/mapdraw.cpp -- it clips with
+ * IntersectRect, so it is on the platform side of the split. Forward-declared
+ * rather than included, for the reason air.cpp declares ObjectsInRect and
+ * army.cpp declares BoatExitPoint: item.cpp is flat and must name no Win32
+ * type, and this signature has none. */
+void __cdecl DirtyCollect(const AM2_Rect *r);
+#define orig_dirty_collect DirtyCollect
 
 /* 0x0041DB20, four callers in the image plus RowRelease below. Take one row
  * out of every map cell list it is linked into.
@@ -754,7 +759,7 @@ void __cdecl RowUnregisterAll(void *row, void *desc)
     if (*(const int32_t *)(*(uint8_t *const *)(r + ROW_OFF_BUFFER) + 0x0C) < 0)
         return;
 
-    orig_dirty_collect(r + ROW_OFF_RECT);
+    orig_dirty_collect((const AM2_Rect *)(r + ROW_OFF_RECT));
 
     if (!r[ROW_OFF_OWNS])
         return;

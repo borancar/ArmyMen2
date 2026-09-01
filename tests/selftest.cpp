@@ -115,6 +115,14 @@ void *__cdecl ObjectsInRect(const AM2_Rect *, const void *,
     return 0;
 }
 
+/* item.cpp's RowUnregisterAll calls this now that its seam is closed, and it
+ * lives in win32/mapdraw.cpp for the same reason the two around it do -- it
+ * clips with IntersectRect. NOT extern "C": item.cpp forward-declares it as
+ * ordinary C++. It has no vectors; it walks a .bss list. */
+void __cdecl DirtyCollect(const AM2_Rect *)
+{
+}
+
 /* army.cpp's ExitOneFromVehicle calls this now that its seam is closed, and it
  * lives in win32/mapdraw.cpp for the same reason ObjectsInRect does -- it
  * clips with IntersectRect. Eighth stub, and extern "C" because army.cpp

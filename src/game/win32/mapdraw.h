@@ -169,4 +169,11 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
  * home-cell rule. See the definition. */
 void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc);
 
+/* 0x0041DD90, three callers, all row code. Cut a rectangle into the dirty
+ * list so nothing in it overlaps: clip to the view, subtract every entry it
+ * meets through an 81-case base-3 classification, and append what is left.
+ * Filed here rather than beside the rest of the list in dirty.cpp because it
+ * clips with IntersectRect. */
+void __cdecl DirtyCollect(const AM2_Rect *r);
+
 #endif /* AM2_MAPDRAW_H */

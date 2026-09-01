@@ -9,7 +9,54 @@ Last updated: **2026-09-01**, at `ba116b4`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,374 patches.**
+Nothing uncommitted. **1,375 patches.**
+
+**`DirtyCollect` (`0x0041DD90`)** -- the dirty-rectangle collector, three
+callers, all row code. `orig.h` said "Stays original" of it.
+
+**It is a rectangle SUBTRACTION and the whole of it is one table.** The new
+rectangle is clipped to the view and walked against every entry already in the
+list; for each, the four edges become a BASE-3 CODE -- 27·left + 9·top +
+3·right + bottom, each digit 0/1/2 for less/equal/greater -- and an 81-entry
+byte table maps those onto twenty-four arms that emit a piece of the old
+rectangle, shrink the old one, shrink the NEW one, or unlink the old one
+because the new one swallows it. Whatever is left is appended, so the list
+never overlaps itself.
+
+**I hand-wrote the 81-case switch and got it wrong**, in a way no amount of
+re-reading would have caught: six codes that belong to the "shrink the old
+one's bottom" arm were in my unlink group. What found it was diffing my case
+groupings against the image's own table programmatically -- and the fix was to
+GENERATE the switch from that table rather than transcribe it. The rule this
+file already states as "dump the table before writing anything down about
+order" has a stronger form: for a table this size, generate the code from it.
+
+**`tools/collectcheck.py` is the oracle, and nothing else could be.** A wrong
+arm changes which pixels are repainted and the frame is repainted either way,
+so `ab.sh` compares a settled screen where a rectangle merged instead of split
+leaves no trace. It enumerates all 81 codes, seeds the list, runs the ORIGINAL
+with `IntersectRect` hooked -- the import does not exist under emulation -- and
+compares the whole array.
+
+**Its mutation counts match the table exactly**, which is the part worth
+keeping: breaking arm 10 fails 6 cases, arm 1 fails 4, arm 3 fails 14, and
+those are precisely how many codes the image's table gives each. A failure
+count that matches the table is evidence the corpus reaches every arm.
+
+**And the fourth mutation exposed the same trap `boolcheck` had this morning.**
+Swapping the base-3 weights reported "all identical" -- over **27 of 81** cases,
+because `code_of` both selects the arm and filters which pairs are valid, so
+mutating it shrank the corpus instead of failing it. The case count is a
+failure condition now, not a statistic.
+
+**One thing cost a run and is worth writing down**: a Unicorn code hook fires
+before an instruction executes, so the stand-in address an import is redirected
+to has to be MAPPED -- every case faulted on the fetch until the page existed.
+
+Filed in `win32/mapdraw.cpp` because it clips with `IntersectRect`, which is
+what put `ObjectsInRect` and `BoatExitPoint` on that side too; the rest of the
+dirty list stays flat in `dirty.cpp`. `docs/boundary.md` moves to **117
+functions and 251 import sites**.
 
 **`MakePlacedUnit` (`0x0043ACF0`)** -- the last thing in `place.cpp` reached by
 address, so the placement subsystem is now entirely ours: the click handler,
@@ -4191,14 +4238,14 @@ commit -- gave the right answer every time it was used.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,202 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 37
-outstanding, which is 1,239 minus 1,202 -- from 1,374 patched addresses. That figure counts merged entries generously and is a
+line (0x0045C000) patched**. Measured: **1,203 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 36
+outstanding, which is 1,239 minus 1,203 -- from 1,375 patched addresses. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
-small ones in batches. A hundred and forty-one batches have gone in and NOTHING SMALL IS LEFT: the
-37 entries outstanding start at **928 bytes** and the median is **1,264**. The
+small ones in batches. A hundred and forty-two batches have gone in and NOTHING SMALL IS LEFT: the
+36 entries outstanding start at **928 bytes** and the median is **1,272**. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred
 rather than unread; it is done, and with it the last thing under 900 bytes.
 The sentence here used to say they started at 96 and name the MSVC static-init
