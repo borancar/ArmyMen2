@@ -4697,6 +4697,26 @@ typedef struct {
  *
  * The cheats are also gated on ADDR_MP_SESSION being zero, so they are
  * single-player only -- 0x0041859F is inside that test. */
+/* SURVEYED AND NOT RECONSTRUCTED. 2,304 bytes, 833 instructions, and its
+ * content is a TABLE: it walks 39 phrase pointers from 0x00476708 to
+ * 0x004767A4 comparing the typed line against each, then dispatches through a
+ * 39-entry jump table at 0x004183E4. Thirty-nine phrases, thirty-nine distinct
+ * arms, one to one. docs/cheats.md is generated from both by tools/cheats.py.
+ *
+ * THE ARMS ARE NOT IN DISPATCH ORDER. Entry 31, "god of gamblers", is at
+ * 0x00417C3A -- BEFORE the jump instruction and ahead of entry 0 -- so reading
+ * the bodies from the top and numbering as you go gives "santini" the wrong
+ * one. Thirty-nine-way version of what DirtyCollect's eighty-one arms and
+ * WeaponClassOf's four both cost.
+ *
+ * tools/espmap.py reports six references in unreached code here, and the
+ * indirect jump is why: it follows branches and calls, not jump tables. That
+ * is a limitation worth knowing rather than a decode failure -- the arms are
+ * reachable, just not from where the walker can see.
+ *
+ * All twenty-one of its callees are named. Two of the cheats run SCRIPT LINES
+ * through ADDR_SCRIPT_RUN_LINE -- "trigger greenwins" and "trigger tanwins" --
+ * so the cheat layer and the mission scripts meet here. */
 #define ADDR_CHEAT_ENTRY         0x00417B80u
 #define ADDR_CHEAT_ENABLED       0x004FCF94u  /* int32_t, "when all else fails..." */
 #define ADDR_CHEAT_WORDS         0x00476704u  /* const char *[41] */
