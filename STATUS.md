@@ -202,4 +202,23 @@ the one a profile would find in minutes and nobody has taken one.
 `AM2_AB_TRACE` exists now for anyone repeating this. Note that with `TRACE=0`
 there are no counters at all, since the counters ARE the stubs.
 
+**FOUR MORE SAMPLES, AND TWELVE COMMITS RULED OUT.** 582, 619, 573 and 589,
+taken while chasing what looked like a regression from a seam closure. They
+sit inside the 533-652 spread above, so nothing has moved. What they add is
+the ATTRIBUTION: 573 is the parent commit with the change stashed, and 589 is
+`291581c`, which predates this session entirely -- so none of the twelve
+commits made since is the cause, and neither is the change that was under
+suspicion when the gate first failed.
+
+Both halves ran the same `am2hook.dll` on every one of those, which the hash
+guard in `ab.sh` reports rather than leaving to trust; and `uptime` was 3.8,
+well below the 18-21 that makes any A/B figure meaningless.
+
+**Read this section, not `CLAUDE.md`, for the band.** CLAUDE.md still says our
+side sits at 6,291-8,300 and calls a departure from it the cheapest possible
+check -- which was true when written and is now an order of magnitude wrong.
+A commit message in this session asserted the opposite, that STATUS.md was the
+stale one; it was not, and the correction is recorded here because getting the
+direction backwards is exactly how a stale number survives being noticed.
+
 ## What is next, as a number rather than a direction
