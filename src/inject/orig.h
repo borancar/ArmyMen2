@@ -14295,21 +14295,17 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * their clean A/Bs proved much less.
  *
  * WHERE IT HAS GOT TO: the chunk walk, the record loop and all 1,587 objects
- * run. What fails is the TEARDOWN, and it is heap corruption rather than a
- * bad pointer: fclose never returns when it is called after the frees, and
- * returns perfectly when moved BEFORE them. So one of the frees is handing
- * the allocator something it did not give out.
+ * run. What fails is the TEARDOWN -- the last fclose does not return -- and
+ * the cause is NOT yet known.
  *
- * Ruled out by probing rather than by reading: the record indices are 6..697
- * against an array of 1,587, so nothing is written out of bounds; every
- * record's script pointer is null unless SCRI set it, because the batch is
- * memset before the 0x10-byte reads; and the free loop's shape matches the
- * original's, which reads the count and the array from two ADJACENT slots
- * that look like one slot read twice.
- *
- * Still open. The remaining candidates are the SCRI string copy and the
- * field-descriptor read, both of which take a LENGTH FROM THE FILE and
- * neither of which bounds it.
+ * Ruled out by probing: the record indices are 6..697 against an array of
+ * 1,587, so nothing is written out of bounds; every record's script pointer
+ * is null unless SCRI set it; skipping the string frees changes nothing;
+ * skipping the array free changes nothing; and all eight field descriptors
+ * this map declares have sizes of 4 or 1, so no read overruns its
+ * destination. The map's own field list is INDX, MOVE, ELEV, OWNR, TRIG,
+ * NUMB, GRUP and SCRI -- GRUP being a second tag with no arm, read and
+ * dropped like RESV.
  *
  * The transcription is kept out of the tree rather than installed while
  * broken. The chunk loop and the layer defaulting now both complete;
