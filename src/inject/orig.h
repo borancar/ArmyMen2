@@ -14342,6 +14342,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * for a code shape finds every site with that shape and no others, and
  * "allocate if null" and "test a flag" are the same shape.
  *
+ * THE CORRECT LIST, extracted by the WRITER rather than the test -- every
+ * `mov [ADDR_x], eax` that follows a malloc between 0x0042CE05 and
+ * 0x0042D080: ADDR_CELL_WEIGHTS, ADDR_TILE_ATTRS, ADDR_REGION_OF_CELL,
+ * ADDR_MAP_PADBIT_LAYER, ADDR_MAP_PAD_LAYER, ADDR_TILE_KIND,
+ * ADDR_TILE_FLAGS and ADDR_TILE_COVER -- eight, plus the four reveal grids
+ * the loop fills through a register. Twelve allocations, and
+ * ADDR_LOAD_PENDING is not among them.
+ *
+ * Extracting by the writer would have got this right the first time and by
+ * the test did not, which is the same lesson this file records for naming a
+ * global: prefer the writer.
+ *
  * THE PEEK COMMAND IS WHAT LED HERE. `drive.sh ctl "peek
  * ADDR N"` dumps N dwords and answers under AM2_NOPATCH=1, so the original's
  * map block can be read after a real load with no probe code in it. Over the
