@@ -3006,6 +3006,19 @@
 #define AM2_FLOW_PULSE           0x0Bu
 #define AM2_FLOW_NACK            0x0Cu
 #define AM2_FLOW_PULSE_ACK       0x10u
+/* THE RESEND IS THROTTLED TO TWO PER NACK, and the throttle is a counter in
+ * the frame rather than anything in a record -- `cmp [esp+0x14], 2; jge`.
+ * Past the second, the arm stops sending and instead sets the send queue's
+ * flag to 1 for that sequence ("ADDING to Resend Queue seq %d to id %x
+ * mask %x"), leaving it for whatever drains that queue later. Below it, the
+ * flag goes to 0 and the message goes out now.
+ *
+ * So the SAME MsgListSetFlag call means two opposite things depending on one
+ * argument, and both arms reach it through a shared tail at 0x40189C. A
+ * transcription that read the tail once and hoisted the constant would send
+ * everything or queue everything, and on a machine that opens no DirectPlay
+ * session neither is observable. Read what the arms push before the jump. */
+#define FLOW_OFF_RESENDS         0x3Cu  /* incremented per message actually resent */
 /* Where the drop path receives a packet it has no node for, so the transport
  * does not keep re-delivering it. */
 #define ADDR_RECV_SCRATCH        0x004F8790u
