@@ -457,6 +457,12 @@ pushes are identical bar a *kind* and an *ammo* count -- everything else, four
 zeros and the caller's position, is the same in all eighteen. So the
 transcription is one helper and eighteen one-line cases.
 
+**MpPanelConstruct (0x00430530) is reconstructed** -- 4,512 bytes in
+win32/widget.cpp, the multiplayer lobby panel: four player rows, four list
+groups, the score spinner and label, the map preview and four buttons.
+Installed and NOT executed: no drive here opens a DirectPlay session, so
+its counter reads 0 and both A/Bs are no-regression only.
+
 **RunScriptAction (0x00420410) is reconstructed** -- 4,096 bytes in
 event.cpp, a 58-way direct dispatch over the script action codes. `ab.sh
 bootcamp` and `campaign` are both clean. The campaign caught a swapped

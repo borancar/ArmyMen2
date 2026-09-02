@@ -1464,6 +1464,12 @@ AM2_Widget *__attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w,
 /* The three button classes the multiplayer host/join panel builds one of per
  * player row: 0x004329A0, 0x00432E20 and 0x00433030. All three derive from
  * the base button and carry their row in the base's 0x0058. */
+/* 0x00430530. The multiplayer host/join panel. ONE class for both roles:
+ * COMM_OFF_IS_HOST decides which children are greyed, which are built at all,
+ * and whether the corner button says START or READY. */
+AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
+                                                       const char *bmp);
+
 AM2_Widget *__attribute__((thiscall)) MpNameConstruct(AM2_Widget *w,
                                                       const char *text,
                                                       int32_t left, int32_t top,

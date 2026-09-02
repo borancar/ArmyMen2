@@ -4090,7 +4090,6 @@ typedef void *(__attribute__((thiscall)) *AM2_ScreenCtorFn)(void *obj,
 typedef void (__cdecl *AM2_VoidFn)(void);
 
 #define orig_operator_new     ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
-#define orig_mp_panel_ctor    ((AM2_ScreenCtorFn)AM2_IMAGE(ADDR_MP_PANEL_CTOR))
 
 /* The half every factory opens with: whatever screen is up goes away first.
  *
@@ -4259,7 +4258,7 @@ static void OpenScreen(uint32_t size, AM2_ScreenCtorFn ctor, const char *bmp)
 void __cdecl OpenMpHost(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_MP_PANEL_SIZE, orig_mp_panel_ctor,
+    OpenScreen(AM2_MP_PANEL_SIZE, (AM2_ScreenCtorFn)MpPanelConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_MPHOST_BMP));
     g_mpSession = AM2_MP_SESSION_HOST;
     RefreshMapSelection();
@@ -4268,7 +4267,7 @@ void __cdecl OpenMpHost(void)
 void __cdecl OpenMpJoin(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_MP_PANEL_SIZE, orig_mp_panel_ctor,
+    OpenScreen(AM2_MP_PANEL_SIZE, (AM2_ScreenCtorFn)MpPanelConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_MPJOIN_BMP));
     g_mpSession = AM2_MP_SESSION_JOIN;
 }
@@ -11184,6 +11183,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_MP_PANEL_DESTRUCT, (const void *)MpPanelDestruct,
                         "MpPanelDestruct", 1);
 
+    rc |= patch_replace(ADDR_MP_PANEL_CTOR, (const void *)MpPanelConstruct,
+                        "MpPanelConstruct", 2);
     rc |= patch_replace(ADDR_MP_NAME_CTOR, (const void *)MpNameConstruct,
                         "MpNameConstruct", 9);
     rc |= patch_replace(ADDR_MP_COLOUR_CTOR, (const void *)MpColourConstruct,
@@ -11726,4 +11727,342 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_POST_UPDATE, (const void *)HudPostUpdate,
                         "HudPostUpdate", 1);
     return rc;
+}
+
+/* ---- MpPanelConstruct -------------------------------------------------- */
+
+/* The spin control's class is NOT reconstructed -- 0x00456300 is still the
+ * image's -- so it is the one seam this function needs.  Everything else it
+ * calls is ours. */
+typedef AM2_Widget *(__attribute__((thiscall)) *am2_mp_spin_fn)(
+    AM2_Widget *w, int32_t left, int32_t top, int32_t width, int32_t height,
+    int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent,
+    void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2,
+    int32_t row);
+#define orig_mp_spin ((am2_mp_spin_fn)(uintptr_t)ADDR_MP_SPIN_CTOR)
+
+/* 0x00430530. The multiplayer host/join panel's constructor.
+ *
+ * ONE CLASS, TWO PANELS: both factories allocate 0x278 and call this, and
+ * `bmp` is the only thing that differs between hosting and joining.
+ *
+ * THE MSVC SEH FRAME IS NOT REPRODUCED, per the standing decision -- the
+ * original's `push -1; push <handler>; push fs:[0]` prologue and the unwind
+ * state index it bumps at every child (frame slot +0x1BC, written 51 times)
+ * exist only so a throw can destroy what has been built.  Nothing in this
+ * program throws: VC6's operator new answers NULL and the game tests it,
+ * which is the `if (w)` before every constructor below.
+ *
+ * The children go into THREE PARALLEL ARRAYS -- names, colours and teams,
+ * four of each, contiguous by kind rather than by slot.  MpPanelDestruct
+ * walks them that way. */
+AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
+                                                       const char *bmp)
+{
+    uint8_t   *p = (uint8_t *)w;
+    AM2_Rect   r;
+    int32_t    i;
+
+    ScreenBaseConstruct(w, bmp, 1);
+    *(const void **)p = (const void *)(uintptr_t)VTABLE_MP_PANEL;
+    ReadMpMapList();
+
+    /* The four player-colour swatches.  The loop's bound is the address of
+     * the NEXT global, so the array's length is written nowhere. */
+    {
+        AM2_Sprite **slot = (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_A;
+        char         name[0x20];
+
+        for (i = 0; slot < (AM2_Sprite **)(uintptr_t)ADDR_MENU_MSG_LIST;
+             slot++, i++) {
+            am2_sprintf(name, (const char *)AM2_IMAGE(0x004871ACu), i);
+            *slot = PreloadSpriteName(name, 1, 1);
+        }
+    }
+
+    /* And the thirteen panel sprites, by set and index rather than by name. */
+    {
+        AM2_Sprite **slot = (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_B;
+
+        for (i = 0; slot < (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_B_END;
+             slot++, i++)
+            *slot = PreloadSprite(3, 0x17, i, 1, 1);
+    }
+    /* FOUR PLAYER ROWS, three widgets each, into three PARALLEL arrays.  The
+     * original's y coordinates are a constant minus `this` plus the name
+     * buffer pointer, which cancels to `base + slot * 32`. */
+    for (i = 0; i < AM2_COMM_SLOTS; i++) {
+        char       *name = (char *)(p + 0x64) + (size_t)i * 0x20;
+        AM2_Widget **names   = (AM2_Widget **)(p + MP_PANEL_OFF_NAMES);
+        AM2_Widget **colours = (AM2_Widget **)(p + MP_PANEL_OFF_COLOURS);
+        AM2_Widget **teams   = (AM2_Widget **)(p + MP_PANEL_OFF_TEAMS);
+        AM2_Widget  *child;
+
+        name[0] = '\0';
+
+        /* The row's own name: the comm slot's player, or `-- Open --`. */
+        {
+            const uint8_t *comm = *(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+
+            if (*(const int32_t *)(comm + COMM_OFF_PLAYER_SLOTS
+                                   + (size_t)i * AM2_COMM_SLOT_STRIDE) != 0)
+                am2_sprintf(name, (const char *)(uintptr_t)ADDR_STR_FMT_S,
+                            comm + COMM_OFF_SLOT_NAME
+                            + (size_t)i * AM2_COMM_SLOT_STRIDE);
+            else
+                am2_sprintf(name, (const char *)AM2_IMAGE(AM2_STR_OPEN_SLOT));
+        }
+
+        child = (AM2_Widget *)orig_operator_new(0x74);
+        names[i] = child
+                 ? MpNameConstruct(child, name, 0x18, 40 + i * 32, 0x58, 0x12,
+                                   1,
+                                   *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR,
+                                   *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
+                                   i)
+                 : 0;
+        WidgetAddChild(w, names[i]);
+
+        child = (AM2_Widget *)orig_operator_new(0x68);
+        colours[i] = child ? MpColourConstruct(child, 0x86, 39 + i * 32, i) : 0;
+        WidgetAddChild(w, colours[i]);
+
+        child = (AM2_Widget *)orig_operator_new(0x68);
+        teams[i] = child ? MpTeamConstruct(child, 0xBF, 37 + i * 32, i) : 0;
+        WidgetAddChild(w, teams[i]);
+    }
+
+    /* THE MAP-TYPE LIST and its scrollbar.  The idiom for every fixed child
+     * is the same: allocate, and if that succeeded build it with a rectangle
+     * from RectSet followed by the class's own arguments; then store the
+     * pointer in its field and add it -- adding a null child is what the
+     * original does when the allocation fails, not a guard we supply. */
+    {
+        AM2_Widget **slot = (AM2_Widget **)(p + MP_PANEL_OFF_TYPE_BOX);
+        AM2_Widget  *child;
+
+        child = (AM2_Widget *)orig_operator_new(0x98);
+        *slot = child ? ListBoxConstruct(child, 0x16, 0xC8, 0xFA, 0x5A,
+                                         (void *)0, 0, 0, 1)
+                      : 0;
+        /* UNGUARDED, and that is the original: it stores the result -- null
+         * or not -- and then writes three fields THROUGH it. On an
+         * allocation failure this faults, which VC6 makes possible because
+         * its operator new returns null rather than throwing. Reproduced,
+         * like LockSurface's descriptor defect, rather than repaired. */
+        *(int32_t *)((uint8_t *)*slot + 0x5C) = -1;
+        *(int32_t *)((uint8_t *)*slot + 0x4C) = 1;
+        *(int32_t *)((uint8_t *)*slot + 0x50) = 0;
+        WidgetAddChild(w, *slot);
+
+        child = (AM2_Widget *)orig_operator_new(0x78);
+        if (child)
+            ArrowBarConstruct(child, 0x121, 0xC2, 0x13, 0x68, w,
+                              (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
+                              (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                              0x40, 1);
+        WidgetAddChild(w, child);
+
+        /* The list and its bar point at each other -- the list's +0x7C is the
+         * bar and the bar's +0x58 is the list. A scrollbar built without that
+         * back-link scrolls nothing and looks perfectly constructed. */
+        *(AM2_Widget **)((uint8_t *)*slot + 0x7C) = child;
+        *(AM2_Widget **)((uint8_t *)child + 0x58) = *slot;
+        *(int32_t *)((uint8_t *)child + 0x50) = 0;
+    }
+
+    /* The two ready lamps, green and red, at the same size and 0x35 apart. */
+    {
+        AM2_Widget *child;
+
+        child = (AM2_Widget *)orig_operator_new(0x80);
+        if (child)
+            MultiSpriteConstruct(child,
+                                 (const char *)AM2_IMAGE(AM2_BMP_GREEN0),
+                                 (const char *)AM2_IMAGE(AM2_BMP_GREEN1),
+                                 1, *RectSet(&r, 0xA0, 0x139, 0x11, 0x10));
+        *(AM2_Widget **)(p + MP_PANEL_OFF_BLINKER_0) = child;
+        WidgetAddChild(w, child);
+        *(int32_t *)((uint8_t *)*(AM2_Widget **)(p + MP_PANEL_OFF_BLINKER_0)
+                     + 0x50) = 0;
+    }
+
+    {
+        AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x80);
+
+        if (child)
+            MultiSpriteConstruct(child,
+                                 (const char *)AM2_IMAGE(0x00485E30u),
+                                 (const char *)AM2_IMAGE(0x00485E44u),
+                                 1, *RectSet(&r, 0xD5, 0x139, 0x11, 0x10));
+        *(AM2_Widget **)(p + MP_PANEL_OFF_BLINKER_1) = child;
+        WidgetAddChild(w, child);
+        *(int32_t *)((uint8_t *)*(AM2_Widget **)(p + MP_PANEL_OFF_BLINKER_1)
+                     + 0x50) = 0;
+    }
+
+    /* The chat line: its buffer is a FIELD of the panel, seeded from the
+     * directory scratch, and the edit writes into it in place. */
+    strcpy((char *)(p + 0xE4), (const char *)(uintptr_t)ADDR_DIR_SCRATCH);
+    {
+        AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x80);
+
+        if (child)
+            EditConstruct(child, (char *)(p + 0xE4), 0x3C,
+                          0x17, 0x153, 0xF7, 0x10, 1,
+                          *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
+                          *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
+                          *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
+                          OnChatEnter,
+                          0, 0);
+        WidgetAddChild(w, child);
+        *(AM2_Widget **)(p + 0x34) = child;
+        *(AM2_Widget **)((uint8_t *)child + 0x70) =
+            *(AM2_Widget **)(p + MP_PANEL_OFF_BLINKER_0);
+        *(int32_t *)((uint8_t *)child + 0x44) = 1;
+    }
+
+    /* THE MESSAGE LIST'S ROWS ARE A GLOBAL SINGLETON, made once and kept.
+     * Every panel after the first reuses it, which is why the log survives
+     * closing and reopening the lobby. */
+    if (*(void **)(uintptr_t)ADDR_MENU_MSG_LIST == 0) {
+        void *rows = orig_operator_new(0x0C);
+
+        *(void **)(uintptr_t)ADDR_MENU_MSG_LIST = rows ? RecordCtor(rows, 0)
+                                                       : 0;
+    }
+    {
+        AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x98);
+
+        /* ADDR_LOG as the callback is not a mistake: it is a bare `ret` in
+         * this build, so the list is built with a do-nothing notifier. */
+        if (child)
+            TextListConstruct(child, 0x14, 0x17B, 0xFC, 0x43,
+                              *(void **)(uintptr_t)ADDR_MENU_MSG_LIST,
+                              (int32_t)ADDR_LOG, 0);
+        WidgetAddChild(w, child);
+    }
+
+    /* THE SCORE SPINNER is built ONLY when hosting -- a joiner has no such
+     * child, so the two roles give the panel different child counts. */
+    if (*(const int32_t *)(*(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
+                           + COMM_OFF_IS_HOST) != 0) {
+        AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x84);
+
+        if (child)
+            orig_mp_spin(child, 0x22B, 0x2F, 0x4A, 0x18,
+                            *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT,
+                            0x64, 0x2706, 0x64, w,
+                            MpCommitScore,
+                            *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
+                            *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
+                            *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
+                            0);
+        WidgetAddChild(w, child);
+    }
+
+    /* The score limit as TEXT, in the panel's own buffer, shown by a label
+     * that does not own it. */
+    am2_sprintf((char *)(p + MP_PANEL_OFF_SCORE_TEXT),
+                (const char *)(uintptr_t)ADDR_FMT_INT,
+                *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT);
+    {
+        AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x64);
+
+        if (child)
+            LabelConstruct(child, (const char *)(p + MP_PANEL_OFF_SCORE_TEXT),
+                           0x22B, 0x35, 0x21, 0x0E, 2,
+                           *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
+                           *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+        WidgetAddChild(w, child);
+        *(int32_t *)((uint8_t *)child + 0x50) = 0;
+    }
+
+    /* THE MAP PREVIEW, with a fallback that also moves the data directory.
+     * Neither move is undone; the panel leaves the directory where the
+     * fallback put it, unlike LoadMap which restores its own. */
+    {
+        char        path[0x104];
+        AM2_Widget *child;
+
+        SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
+        am2_sprintf(path, (const char *)(uintptr_t)ADDR_FMT_PREV_BMP,
+                    (const char *)(uintptr_t)ADDR_MAP_NAME);
+        if (!FileExists(path)) {
+            SetGameDir((const char *)(uintptr_t)ADDR_STR_BITMAPS_DIR);
+            strcpy(path, (const char *)(uintptr_t)ADDR_STR_BAD_MP_PREV);
+        }
+
+        child = (AM2_Widget *)orig_operator_new(0x60);
+        if (child)
+            PanelConstruct(child, path, 1,
+                           *RectSet(&r, 0x152, 0x110, 0xBA, 0xBA));
+        *(AM2_Widget **)(p + MP_PANEL_OFF_PREVIEW) = child;
+        WidgetAddChild(w, child);
+        *(int32_t *)((uint8_t *)*(AM2_Widget **)(p + MP_PANEL_OFF_PREVIEW)
+                     + 0x50) = 0;
+    }
+
+    /* START or READY -- ONE slot, two bitmaps, two handlers.  The host
+     * starts the game and everyone else declares themselves ready, so the
+     * two never coexist. */
+    {
+        AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x78);
+        int32_t     host  = *(const int32_t *)(
+                                *(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
+                                + COMM_OFF_IS_HOST);
+
+        if (child) {
+            if (host)
+                ButtonConstruct(child,
+                                (const char *)AM2_IMAGE(0x00476E7Cu),
+                                (const char *)AM2_IMAGE(0x00476E90u),
+                                (const char *)AM2_IMAGE(0x00476EA4u), 1,
+                                *RectSet(&r, 0x21F, 0x11A, 0x51, 0x20),
+                                (void (__cdecl *)(AM2_Widget *))(uintptr_t)
+                                    0x00431850u,
+                                0);
+            else
+                ButtonConstruct(child,
+                                (const char *)AM2_IMAGE(0x0048713Cu),
+                                (const char *)AM2_IMAGE(0x00487150u),
+                                (const char *)AM2_IMAGE(0x00487164u), 1,
+                                *RectSet(&r, 0x21F, 0x11A, 0x51, 0x20),
+                                (void (__cdecl *)(AM2_Widget *))(uintptr_t)
+                                    0x00431920u,
+                                0);
+        }
+        WidgetAddChild(w, child);
+    }
+
+    /* OPTIONS and CANCEL, always present, at 0x322 and 0x363. Cancel passes a
+     * NULL first bitmap where the other three buttons pass one, so it has no
+     * released state of its own. */
+    {
+        AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x78);
+
+        if (child)
+            ButtonConstruct(child,
+                            (const char *)AM2_IMAGE(0x004870F4u),
+                            (const char *)AM2_IMAGE(0x0048710Cu),
+                            (const char *)AM2_IMAGE(0x00487124u), 1,
+                            *RectSet(&r, 0x21F, 0x142, 0x51, 0x20),
+                            (void (__cdecl *)(AM2_Widget *))(uintptr_t)
+                                0x004319B0u,
+                            0);
+        WidgetAddChild(w, child);
+
+        child = (AM2_Widget *)orig_operator_new(0x78);
+        if (child)
+            ButtonConstruct(child, 0,
+                            (const char *)AM2_IMAGE(0x00486E04u),
+                            (const char *)AM2_IMAGE(0x00486E1Cu), 1,
+                            *RectSet(&r, 0x21F, 0x16B, 0x51, 0x20),
+                            (void (__cdecl *)(AM2_Widget *))(uintptr_t)
+                                0x004319E0u,
+                            0);
+        WidgetAddChild(w, child);
+    }
+
+    return w;
 }
