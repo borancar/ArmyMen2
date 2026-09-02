@@ -4438,6 +4438,19 @@
  * one at a time out of a disassembly window is what hid it. */
 #define ADDR_STR_REMOTE_ACKING_D 0x0047369Cu  /* the PULSE ACK arm's */
 #define ADDR_STR_REMOTE_ACKING_X 0x004732CCu  /* the DATA arm's */
+#define ADDR_STR_GOT_NACK        0x004735ACu
+#define ADDR_STR_NACK_NOT_FOUND  0x00473578u
+#define ADDR_STR_ADDING_RESENDQ  0x004734F8u
+#define ADDR_STR_RESEND_SEQ      0x0047352Cu
+#define ADDR_STR_DPLAY_SEND_FAIL 0x00473554u
+#define ADDR_STR_CANT_FIND_FLOWQ 0x004735E4u
+/* The scratch the nack arm copies each queued message into before resending.
+ * A static buffer, not a heap allocation -- so the resend loop is not
+ * reentrant, which is fine on the single receive thread that calls it. */
+#define ADDR_RESEND_SCRATCH      0x004FB780u
+/* At most two messages are resent immediately per nack; the rest are flagged
+ * into the resend queue for whatever drains it later. */
+#define AM2_FLOW_RESEND_BURST    2
 #define ADDR_STR_NACK_FULL       0x00473C94u
 /* The IAT slot the original CALLS THROUGH for GetTickCount. Reached this way
  * rather than by importing the symbol, for two reasons: it is what the

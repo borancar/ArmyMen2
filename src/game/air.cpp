@@ -1850,3 +1850,95 @@ static void FlowRetireThrough(uint8_t *flow, uint32_t ackedThrough,
 
     *(uint32_t *)(flow + FLOW_OFF_HE_HAS) = ackedThrough;
 }
+
+/* Forward-declared rather than included, the same way script.cpp reaches
+ * PreloadSprite: both of these live in win32/dplay.h, and air.cpp is in the
+ * flat half of the split. Including that header would pull DirectPlay's COM
+ * types in transitively and tools/checksplit.py would fail this file --
+ * correctly, since nothing here talks to an API. */
+extern "C" void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst);
+int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
+                                           uint32_t flags, void *buf,
+                                           uint32_t len);
+
+/* The AM2_FLOW_NACK arm. The peer is asking for a range of sequences back.
+ *
+ * THE RANGE IS IN FIELDS THAT MEAN SOMETHING ELSE ON A DATA MESSAGE. +8 and
+ * +0xC are PACKET_OFF_SEQ and PACKET_OFF_CHECKSUM ordinarily; here they are
+ * the first and last sequence wanted, so they are spelled FLOWMSG_NACK_FIRST
+ * and FLOWMSG_NACK_LAST rather than given names that would mislead.
+ *
+ * AT MOST TWO GO OUT NOW. Past that the arm stops sending and sets the send
+ * queue's flag to 1 instead, leaving the message for whatever drains that
+ * queue. Below the cap the flag goes to 0 and it goes out immediately -- so
+ * the same MsgListSetFlag call means opposite things in the two arms, and
+ * they reach it through a shared tail in the original. */
+static int32_t FlowRecvNack(uint8_t *node, uint8_t *msg, uint8_t *sender,
+                            uint8_t *me)
+{
+    const uint8_t *comm = (const uint8_t *)
+        *(void *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    uint32_t from = *(const uint32_t *)(node + MSGNODE_OFF_FROM);
+    uint32_t first = *(const uint32_t *)(msg + FLOWMSG_NACK_FIRST);
+    uint32_t last = *(const uint32_t *)(msg + FLOWMSG_NACK_LAST);
+    uint32_t mask = *(const uint32_t *)(sender + MSGNODE_OFF_FLAGS);
+    int32_t resent = 0;
+    uint32_t seq;
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        am2_log((const char *)AM2_IMAGE(ADDR_STR_GOT_NACK),
+                first, last, from, from,
+                *(const uint32_t *)(me + FLOW_OFF_SEQUENCE));
+
+    /* An empty range is not an error; the epilogue returns the node. */
+    for (seq = first; first <= last && seq <= last; seq++) {
+        uint8_t *copy = (uint8_t *)MsgListCopyByKey(
+            (void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, (int32_t)seq,
+            (void *)(uintptr_t)ADDR_RESEND_SCRATCH);
+
+        if (copy == 0) {
+            /* Already retired -- ordinary, so log and keep going. */
+            am2_log((const char *)AM2_IMAGE(ADDR_STR_NACK_NOT_FOUND),
+                    seq, *(const uint32_t *)(sender + FLOW_OFF_HE_HAS));
+            continue;
+        }
+
+        if (resent >= AM2_FLOW_RESEND_BURST) {
+            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                am2_log((const char *)AM2_IMAGE(ADDR_STR_ADDING_RESENDQ),
+                        seq, from, mask);
+            MsgListSetFlag((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ,
+                           (int32_t)seq, 1, (int32_t)mask);
+            continue;
+        }
+
+        /* The checksum covers the ack field, so it is stamped first and the
+         * checksum slot zeroed before XorChecksum runs over the copy. */
+        *(uint32_t *)(copy + PACKET_OFF_ACK) =
+            *(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED);
+        *(uint32_t *)(copy + PACKET_OFF_CHECKSUM) = 0;
+        *(uint32_t *)(copy + PACKET_OFF_CHECKSUM) = XorChecksum(copy);
+
+        {
+            int32_t rc = CommSend((void *)(uintptr_t)comm, from, 0, copy,
+                                  *(const uint32_t *)(copy + PACKET_OFF_LEN));
+            if (rc < 0)
+                am2_log((const char *)AM2_IMAGE(ADDR_STR_DPLAY_SEND_FAIL),
+                        rc, from,
+                        *(const uint32_t *)(copy + PACKET_OFF_LEN));
+        }
+
+        MsgSlotA2(sender, seq);
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            am2_log((const char *)AM2_IMAGE(ADDR_STR_RESEND_SEQ),
+                    seq, from, from,
+                    *(const uint32_t *)(me + FLOW_OFF_SEQUENCE));
+
+        *(uint32_t *)(sender + FLOW_OFF_RESENDS) += 1;
+        resent++;
+        MsgListSetFlag((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ,
+                       (int32_t)seq, 0, (int32_t)mask);
+    }
+
+    return 0;
+}
