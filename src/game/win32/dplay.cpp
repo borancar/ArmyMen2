@@ -1553,7 +1553,8 @@ typedef void (__cdecl *am2_slot_reset_fn)(int32_t slot);
 typedef void (__cdecl *am2_srand_fn)(uint32_t seed);
 typedef int32_t (__cdecl *am2_rand_fn)(void);
 
-#define orig_srand      (*(am2_srand_fn)ADDR_GAME_SRAND)
+/* GameSrand is reconstructed, in maprow.cpp; declared below. */
+void __cdecl GameSrand(int32_t seed);
 #define orig_rand       (*(am2_rand_fn)ADDR_GAME_RAND)
 
 /* 0x00401000. Clear the list and give it a mutex. Answers 0 if the mutex
@@ -1728,7 +1729,7 @@ int32_t __cdecl StartPacketThread(void)
 void __cdecl PacketSlotReset(uint32_t slot);
 
     /* A fixed seed, so every run fills the buffers identically. */
-    orig_srand(0);
+    GameSrand(0);
 
     while (data < (uint8_t *)(uintptr_t)ADDR_PACKET_BUFFERS_END) {
         uint32_t *w = (uint32_t *)data;

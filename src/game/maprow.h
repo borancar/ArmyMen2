@@ -138,4 +138,11 @@ void __cdecl LeaveRemainsRow(const void *src);
  * write it into the row, and answer whether more frames remain. */
 int32_t __cdecl TimedDirFrame(void *rows, int32_t dir);
 
+/* 0x00460120. Build the weighted bag a respawn draws from: two passes over
+ * ADDR_SPAWN_KIND_TABLE, the first to size it and the second to fill it. */
+void __cdecl BuildRespawnPool(int32_t seed);
+
+/* 0x00464416. MSVC's srand: store the seed ADDR_GAME_RAND's LCG reads. */
+void __cdecl GameSrand(int32_t seed);
+
 #endif

@@ -1519,8 +1519,7 @@ static void DefaultLayerPtr(void **slot, int32_t bytes)
 
 typedef int32_t (__cdecl *am2_kind_allowed_fn)(int32_t kind);
 typedef void (__cdecl *am2_respawn_pool_fn)(int32_t seed);
-#define orig_build_respawn_pool \
-    ((am2_respawn_pool_fn)(uintptr_t)ADDR_BUILD_RESPAWN_POOL)
+/* BuildRespawnPool is reconstructed; maprow.h declares it. */
 
 /* RespawnKindAllowed is reconstructed; maprow.h declares it. */
 
@@ -1875,7 +1874,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             *(const int32_t *)((const uint8_t *)cam + 4);
     }
 
-    orig_build_respawn_pool(*(const int32_t *)(uintptr_t)ADDR_GAME_SEED);
+    BuildRespawnPool(*(const int32_t *)(uintptr_t)ADDR_GAME_SEED);
 
     BuildMapObjects(objs, objCount);
 

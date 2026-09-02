@@ -1183,6 +1183,11 @@ int maprow_install(void)
                         "LeaveRemainsRow", 1);
     rc |= patch_replace(ADDR_TIMED_DIR_FRAME, (const void *)TimedDirFrame,
                         "TimedDirFrame", 2);
+    rc |= patch_replace(ADDR_GAME_SRAND, (const void *)GameSrand,
+                        "GameSrand", 1);
+    rc |= patch_replace(ADDR_BUILD_RESPAWN_POOL,
+                        (const void *)BuildRespawnPool,
+                        "BuildRespawnPool", 1);
     return rc;
 }
 
@@ -1843,4 +1848,79 @@ int32_t __cdecl TimedDirFrame(void *rows, int32_t dir)
         (*(uint32_t *const *)(uintptr_t)ADDR_SPRITE_GRID)[band * cols + col];
 
     return col < cols - 1;
+}
+
+/* GameSrand -- original 0x00464416, two callers, three instructions. MSVC's
+ * `srand`: store the seed and nothing else.
+ *
+ * IT SITS BELOW THE CRT FRONTIER BY TEN BYTES -- tools/crt.py puts the real
+ * boundary at 0x00464420, which is ADDR_GAME_RAND itself -- so it counts as
+ * game code by position while being CRT by every other measure. Reconstructed
+ * anyway, and the reason is not tidiness: our srand has to write the same
+ * global the IMAGE's rand reads, because that rand stays original. Replacing
+ * this with libc's would silently give the two a different sequence, and
+ * BuildRespawnPool below seeds it deliberately.
+ *
+ * The pairing is checkable rather than assumed: ADDR_GAME_RAND's body reads
+ * and writes ADDR_RAND_SEED with the LCG constants, and this writes the same
+ * address. */
+void __cdecl GameSrand(int32_t seed)
+{
+    *(uint32_t *)(uintptr_t)ADDR_RAND_SEED = (uint32_t)seed;
+}
+
+/* BuildRespawnPool -- original 0x00460120, one caller. Build the weighted bag
+ * a respawn is drawn from: seed the RNG, throw the old bag away, and write
+ * each allowed kind into a fresh one as many times as its weight.
+ *
+ * TWO PASSES OVER THE SAME PREDICATE, and that is the design rather than
+ * waste: the first totals the weights so the bag can be allocated exactly, the
+ * second fills it. RespawnKindAllowed is therefore called twice per kind and
+ * must be free of side effects for the two passes to agree -- which they must,
+ * or the fill runs off the end of a bag sized by the count.
+ *
+ * THE TABLE IT WALKS IS 0x0066205C, and walking it is what showed that a dozen
+ * globals in orig.h are fields of it rather than separate variables; see the
+ * note there. This function reads only each record's FIRST dword, so the
+ * bound and the stride are transcribed exactly rather than turned into a
+ * record count -- what the rest of each record holds is not established, and a
+ * count would assert it.
+ *
+ * The bag is int32 entries of KIND INDEX, not pointers, so a draw is one
+ * random index into a flat array -- which is what makes the weighting work
+ * without any per-draw arithmetic. */
+void __cdecl BuildRespawnPool(int32_t seed)
+{
+    const uint8_t *rec;
+    int32_t        kind;
+    int32_t        total = 0;
+    int32_t        at    = 0;
+    int32_t       *bag;
+
+    GameSrand(seed);
+
+    if (*(void **)(uintptr_t)ADDR_RESPAWN_KINDS != 0)
+        am2_free(*(void **)(uintptr_t)ADDR_RESPAWN_KINDS);
+
+    kind = 0;
+    for (rec = (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE;
+         rec < (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE_END;
+         rec += AM2_SPAWN_KIND_STRIDE, kind++) {
+        if (RespawnKindAllowed(kind))
+            total += *(const int32_t *)rec;
+    }
+
+    bag = (int32_t *)am2_malloc((size_t)total * 4);
+    *(int32_t *)(uintptr_t)ADDR_RESPAWN_KIND_COUNT = total;
+    *(int32_t **)(uintptr_t)ADDR_RESPAWN_KINDS = bag;
+
+    kind = 0;
+    for (rec = (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE;
+         rec < (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE_END;
+         rec += AM2_SPAWN_KIND_STRIDE, kind++) {
+        if (!RespawnKindAllowed(kind))
+            continue;
+        for (int32_t n = 0; n < *(const int32_t *)rec; n++)
+            (*(int32_t **)(uintptr_t)ADDR_RESPAWN_KINDS)[at++] = kind;
+    }
 }

@@ -15907,6 +15907,40 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_IFF_SCRI               0x49524353u  /* 'SCRI' */
 #define AM2_IFF_INDX               0x58444E49u  /* 'INDX' */
 #define ADDR_LOAD_ATL_FILE        0x0042BEA0u  /* int32_t(const char *path) */
+/* 0x0066205C IS A STRIDED TABLE, AND AT LEAST TWELVE GLOBALS IN THIS FILE ARE
+ * INDIVIDUALLY-NAMED FIELDS OF IT. BuildRespawnPool is the first function to
+ * WALK it -- 0x34 a step, reading each record's first dword as a weight -- and
+ * walking it is what exposed the rest.
+ *
+ * The arithmetic is not a coincidence and is worth reproducing before anyone
+ * doubts it. Every one of the twelve lands on an exact record boundary plus
+ * one of only FOUR field offsets, and the names we invented already encode the
+ * pattern without knowing it:
+ *
+ *     field +0x0C   AIM_LIFE_HALF_A (rec 38), AIM_LIFE_HALF_B (rec 39)
+ *     field +0x18   PICK_REACH_662450 (19), _6624EC (22), _66275C (34),
+ *                   _662894 (40), _6628C8 (41)
+ *     field +0x24   UNUSED_662288 (10), SPAWN_EXTRA_6622BC (11),
+ *                   AIM_DAMAGE (38), AIM_SPAWN_ARG (39), _6628D4 (41)
+ *
+ * Five names meaning "pick reach" all being one field of five different
+ * records, and two "aim life" names being the same field of CONSECUTIVE
+ * records, is the tell. This is CLAUDE.md's opening warning at scale: not one
+ * field pointer named as a table base, but a dozen fields named as separate
+ * globals, because no consumer had walked the table.
+ *
+ * NOT RENAMED HERE. Collapsing twelve names into a base plus two field offsets
+ * is a change to every use site at once -- the audit COMM_OFF_PLAYERS needed,
+ * where one of twenty-six sites was missed -- and it is not this commit's job.
+ * Recorded so the next reader starts from the table rather than the leaves.
+ * What the RECORD holds beyond those four fields is not established. */
+/* The LCG state ADDR_GAME_RAND reads and writes -- `imul 0x343FD; add
+ * 0x269EC3`, which CLAUDE.md names as MSVC's rand -- and the only thing
+ * ADDR_GAME_SRAND does is store into it. */
+#define ADDR_RAND_SEED            0x0048CC1Cu /* uint32_t */
+#define ADDR_SPAWN_KIND_TABLE     0x0066205Cu /* 0x34-byte records */
+#define ADDR_SPAWN_KIND_TABLE_END 0x0066294Cu /* BuildRespawnPool's bound */
+#define AM2_SPAWN_KIND_STRIDE     0x34u
 #define ADDR_RESPAWN_KIND_ALLOWED 0x004600F0u  /* int32_t(int32_t kind) */
 #define ADDR_BUILD_RESPAWN_POOL   0x00460120u  /* void(int32_t seed) */
 /* The vehicle display names, shown in the HUD squad panel: Jeep, Tank, Half
