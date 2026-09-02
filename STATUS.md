@@ -55,6 +55,19 @@ per-call cost landed on a fraction of the tree that has since become all of
 it. That predicts exactly this shape: our side slower, the `AM2_NOPATCH` side
 untouched, and no behavioural difference anywhere.
 
+**AND IT MAY ALREADY BE BREAKING DRIVES, which is a different severity.**
+On the same suite `combat` came back **16160/0** -- our side composed NO
+frames at all. `ab.sh` caught that itself and refused to let the log be read:
+"Comparing these logs would compare the two ways of not getting there."
+Without that gate the eight missing FIRE lines would have looked like a
+combat regression, and they only mean our side never reached gameplay.
+
+If a drive whose steps are timed is run against a build ~12x slower, not
+reaching gameplay inside the waits is exactly what happens -- so `mission` at
+533 frames and `combat` at 0 are plausibly one fact, not two. Plausibly:
+there is no baseline for `combat` on disk to compare against, so its zero is
+unprecedented in the available history rather than known-new.
+
 Cheap way to test it, for whoever picks this up: run `mission` with `TRACE=0`
 and read the volatile count. If it returns to the thousands the tracing is the
 cost and the band in `CLAUDE.md` was simply recorded under a smaller table.
