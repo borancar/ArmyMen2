@@ -10244,7 +10244,18 @@ typedef struct {
  * fact. */
 #define ADDR_DEF_FINISH          0x0041A230u  /* void(void) */
 #define ADDR_DEF_STEP_460290     0x00460290u
-#define ADDR_DEF_STEP_45EBC0     0x0045EBC0u
+/* It was ADDR_DEF_STEP_45EBC0 -- named by its POSITION in DefFinish's ordered
+ * run, which is what you can say about a step nobody has read. Reading it
+ * says more: it qsorts the vehicle def table with ADDR_COMPARE_DWORD over
+ * 0x24-byte records, which is AddVehicleDef's table and record size.
+ *
+ * LEFT ORIGINAL, for exactly the reason ADDR_DEF_SORT_TROOPER_RECS is: it
+ * then TAIL-JUMPS to 0x0045CAA0, which is ADDR_LOG, an address gamelog.c
+ * patches -- so naming it in src/game is a seam checkseams refuses, and it is
+ * a bare `ret` ICF has folded with the stubbed logger. Reproducing the jump
+ * means deciding what the folded function WAS. Not decided, so not written.
+ * Second instance of this shape and the same answer as the first. */
+#define ADDR_SORT_VEHICLE_DEFS   0x0045EBC0u  /* void(void). Original. */
 /* Two of DefFinish's five are qsorts, and they are the same function with
  * different tables: 0x00435A50 sorts ADDR_DEF_OBJ_RECS by ADDR_COMPARE_TRIPLE
  * and 0x0044CD40 sorts ADDR_DEF_TROOPER_RECS by ADDR_COMPARE_DWORD. Both end
@@ -10262,7 +10273,7 @@ typedef struct {
  * why the sort exists. Records are AM2_MISSILE_DEF_BYTES apart. */
 #define ADDR_DEF_MISSILE_RECS    0x00662928u  /* void *, 0x34-byte records */
 #define ADDR_DEF_MISSILE_COUNT   0x0066292Cu  /* uint32_t */
-/* Zeroed beside the count by the teardown, exactly as ADDR_VEHICLE_DEF_FIELD_2C
+/* Zeroed beside the count by the teardown, exactly as ADDR_VEHICLE_DEF_CAP
  * is beside its own. One toucher each, both of them frees, so both stay
  * locations rather than meanings. */
 #define ADDR_DEF_MISSILE_FIELD_30 0x00662930u  /* int32_t */
@@ -15023,7 +15034,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * teardown and nothing else names it, so this is a location and not yet a
  * meaning -- a field with one toucher is one you cannot name, and a teardown
  * is the weakest toucher there is. */
-#define ADDR_VEHICLE_DEF_FIELD_2C  0x0066202Cu /* int32_t */
+/* The CAPACITY, settled by AddVehicleDef: it is set to 50 beside the initial
+ * malloc, compared against the count, and raised by 20 before each realloc --
+ * the same three roles AM2_DEF_LINK_INITIAL and _GROW play for the trooper
+ * table. FreeDefTable zeroing it agrees. Was ADDR_VEHICLE_DEF_CAP, which
+ * named its offset because nothing had read a user. */
+#define ADDR_VEHICLE_DEF_CAP       0x0066202Cu /* int32_t */
+/* 0x0045EB40. Append one 36-byte record, growing the table when it is full.
+ * NOT the trooper appender's twin -- 0.700 similar, and the record size makes
+ * the multiply structurally different (lea+shl against a single shl). */
+#define ADDR_ADD_VEHICLE_DEF       0x0045EB40u /* void(const void *rec) */
+#define AM2_VEHICLE_DEF_REC_SIZE   0x24u   /* 9 dwords, rep movsd */
+/* 0x0045E550, one caller. Ask every comm slot in turn to send its vehicle
+ * batch -- four slots, COMM_PLAYER_STRIDE apart, each gated on its player
+ * record's +0x50 and on CommMustBroadcast. */
+#define ADDR_SEND_ALL_VEH_UPDATES  0x0045E550u /* void(void) */
 #define AM2_VEHICLE_DEF_BYTES      0x24
 /* The rest of the record, named by the object field each lands in --
  * CreateVehicle copies eight of them straight across and that is the only

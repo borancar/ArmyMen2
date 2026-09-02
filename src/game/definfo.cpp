@@ -424,6 +424,8 @@ int definfo_install(void)
     rc |= patch_replace(ADDR_FREE_MISSILE_DEFS,
                         (const void *)FreeMissileDefs,
                         "FreeMissileDefs", 2);
+    rc |= patch_replace(ADDR_ADD_VEHICLE_DEF, (const void *)AddVehicleDef,
+                        "AddVehicleDef", 1);
     return rc;
 }
 
@@ -449,7 +451,7 @@ void __cdecl FreeVehicleDefs(void)
 {
     FreeDefTable((void **)(uintptr_t)ADDR_VEHICLE_DEFS,
                  (int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT,
-                 (int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_FIELD_2C);
+                 (int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_CAP);
 }
 
 /* 0x004607D0. The same function again for the missile def table -- diffed
@@ -462,4 +464,51 @@ void __cdecl FreeMissileDefs(void)
     FreeDefTable((void **)(uintptr_t)ADDR_DEF_MISSILE_RECS,
                  (int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT,
                  (int32_t *)(uintptr_t)ADDR_DEF_MISSILE_FIELD_30);
+}
+
+/* AddVehicleDef -- original 0x0045EB40, one caller. Append one record to the
+ * vehicle def table, growing it when full.
+ *
+ * NOT DefAddTrooperRec'S TWIN, which is worth stating because it looks like
+ * one: same three globals in the same roles, same initial 50, same growth of
+ * 20, same rep-movsd copy. Normalised disassembly puts them at 0.700, and the
+ * differences are STRUCTURAL rather than constants -- a 36-byte record makes
+ * the index multiply `lea ecx,[ecx+ecx*8]; shl ecx,2` where a 32-byte one is
+ * a single `shl ecx,5`, and this version keeps the count in a register across
+ * the grow where the other reloads it. The two initial mallocs agree with
+ * that reading exactly: 0x640 is 50 x 32 and 0x708 is 50 x 36.
+ *
+ * So the shared constants ARE shared -- AM2_DEF_LINK_INITIAL and _GROW are
+ * the table policy, not the trooper's -- and the record size is not. */
+void __cdecl AddVehicleDef(const void *rec)
+{
+    uint8_t *tab = *(uint8_t **)(uintptr_t)ADDR_VEHICLE_DEFS;
+    int32_t  cap;
+    int32_t  n;
+
+    if (tab == (uint8_t *)0) {
+        tab = (uint8_t *)am2_malloc(AM2_DEF_LINK_INITIAL
+                                    * AM2_VEHICLE_DEF_REC_SIZE);
+        cap = AM2_DEF_LINK_INITIAL;
+        *(uint8_t **)(uintptr_t)ADDR_VEHICLE_DEFS = tab;
+        *(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_CAP = cap;
+    } else {
+        cap = *(const int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_CAP;
+    }
+
+    n = *(const int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT;
+    if (n >= cap) {
+        cap += AM2_DEF_LINK_GROW;
+        *(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_CAP = cap;
+        tab = (uint8_t *)am2_realloc(tab,
+                  (size_t)cap * AM2_VEHICLE_DEF_REC_SIZE);
+        *(uint8_t **)(uintptr_t)ADDR_VEHICLE_DEFS = tab;
+        n = *(const int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT;
+    }
+
+    for (int32_t i = 0; i < (int32_t)(AM2_VEHICLE_DEF_REC_SIZE / 4); i++)
+        ((int32_t *)(tab + n * AM2_VEHICLE_DEF_REC_SIZE))[i] =
+            ((const int32_t *)rec)[i];
+
+    *(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT = n + 1;
 }

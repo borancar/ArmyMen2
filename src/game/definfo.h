@@ -81,4 +81,8 @@ void __cdecl FreeVehicleDefs(void);
  * FreeVehicleDefs with a different table, diffed at zero differences. */
 void __cdecl FreeMissileDefs(void);
 
+/* 0x0045EB40. Append one 36-byte vehicle def record, growing the table when
+ * it is full. Reads as DefAddTrooperRec's twin and is not one. */
+void __cdecl AddVehicleDef(const void *rec);
+
 #endif /* AM2_DEFINFO_H */

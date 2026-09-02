@@ -2127,7 +2127,7 @@ typedef void (__cdecl *AM2_WalkCellFn)(const uint32_t *pt, void *desc,
                                        void *fn);
 
 /* 0x00460290 is DefSortMissileRecs now; defparse.h declares it. */
-#define orig_def_45ebc0   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_45EBC0)
+#define orig_sort_vehicle_defs   ((AM2_VoidFn)(uintptr_t)ADDR_SORT_VEHICLE_DEFS)
 
 void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c)
 {
@@ -2152,7 +2152,7 @@ void __cdecl DefFinish(void)
     DefSortMissileRecs();
     DefSortObjRecs();
     DefCheckLinks();
-    orig_def_45ebc0();
+    orig_sort_vehicle_defs();
 }
 
 /* 0x0044A3A0, two callers. Walk the objects in the cell a point falls in,
