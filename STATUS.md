@@ -457,6 +457,11 @@ pushes are identical bar a *kind* and an *ammo* count -- everything else, four
 zeros and the caller's position, is the same in all eighteen. So the
 transcription is one helper and eighteen one-line cases.
 
+**The last entry is 0x004014C0, not the MP panel.** My running count was one
+optimistic: recomputing it after the panel landed shows 1,238 of 1,239 with
+one genuinely outstanding -- ADDR_RECV_MSG_4014C0, a small comm-thread
+predicate whose single caller is RecvThreadProc.
+
 **MpPanelConstruct (0x00430530) is reconstructed** -- 4,512 bytes in
 win32/widget.cpp, the multiplayer lobby panel: four player rows, four list
 groups, the score spinner and label, the map preview and four buttons.
