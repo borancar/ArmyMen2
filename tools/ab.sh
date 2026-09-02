@@ -332,7 +332,13 @@ play() {
     local extra=""
     [ "$cfg" = multi ] && extra="AM2_MULTIPLAYER=1"
     [ "$cfg" = mpoptions ] && extra="AM2_MULTIPLAYER=1"
-    AM2_MAKEVARS="TRACE=1" drive start "$wait" "ARGS=$args" $extra \
+    # TRACE=1 is the default and every recorded figure in CLAUDE.md was taken
+    # with it. AM2_AB_TRACE exists to answer one question -- whether the trace
+    # stubs are what makes the reconstruction side slower than its recorded
+    # band -- and NOT to be turned off routinely: with TRACE=0 there are no
+    # counters at all, because the counters ARE the stubs, so a run with it
+    # off compares logs and pixels and nothing else.
+    AM2_MAKEVARS="TRACE=${AM2_AB_TRACE:-1}" drive start "$wait" "ARGS=$args" $extra \
         >/dev/null 2>&1
 
     # Boot Camp needs driving; the other two show what they show.
