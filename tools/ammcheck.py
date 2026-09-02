@@ -21,11 +21,18 @@ WHAT IS STILL UNEXPLAINED: nineteen maps desync, and every one of them lands
 ONE BYTE before the next tag, having trusted OATT's size.  OATT says 0x988 and
 its data behaves as 0x987.
 
-IFF's pad-to-even is the obvious candidate and it is NOT the answer -- it was
-tried, it fixed none of the nineteen, and it silently changed the chunk count
-from 296 to 335 by padding chunks that did not need it.  A change that does
-not fix what it was made for does not get kept, so it is reverted and this
-paragraph is what survives of it.
+IFF's pad-to-even is the obvious candidate and it is NOT the answer: it was
+tried and fixed none of the nineteen, so it was reverted.
+
+AND THE FIRST WRITE-UP OF THAT BLAMED THE WRONG EDIT.  The chunk count moved
+from 296 to 335 across the same commit, and padding was recorded as the cause.
+It was not: the count is 335 with padding reverted and line 66 adding only
+`8 + size`.  What moved it was the FORM allowance, which let three maps be
+walked that had been rejected outright before.  Two edits went in together and
+the count change was pinned on the wrong one without isolating either --
+which is the same mistake as reading one A/B run as a regression, at a much
+smaller scale.  The tell was that the number did not go back after the
+revert.
 
 So the header layout and the chunk walk are right, and something about OATT
 specifically is not.  That has to come from LoadMap rather than from more
