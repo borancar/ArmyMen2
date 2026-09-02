@@ -213,28 +213,35 @@ ran-out arm re-tests the two conditions that got it there, the other way round,
 and falls through both. Said out loud because dropping two dead compares is how
 a live one goes with them.
 
-## Next: AiAttackBody, surveyed
+## Next: AiAttackBody, mapped block by block
 
-`0x00407710`, 1,216 bytes over a 0x81C-byte frame -- a `TraceTileLine` buffer,
-so it is a line-of-sight test as well as a step. Two near-misses, both caught
-by grepping rather than by reasoning, and both recorded in `orig.h`.
+`0x00407710`, 1,216 bytes over a `TraceTileLine` buffer. The survey is in
+`orig.h` and now carries a BLOCK MAP rather than a description, because three
+separate readings of the control flow were wrong on the way to it -- and the
+function is cold, so nothing but reading will catch a fourth.
 
-**Its context is `SIGHT_OFF_*`, not `SIGHTC_OFF_*`, and the two families sit
-four bytes apart.** OBSERVER/RANGE/BEARING are 0x10/0x14/0x18 in one and
-0x14/0x18/0x1C in the other, so taking the wrong one shifts every field by a
-slot and still compiles and still indexes. What settles it is that the body
-copies FOUND, FOUND_RANGE and FOUND_BEARING into OBSERVER, RANGE and BEARING --
-a sentence under one family and nonsense under the other.
+**A claim from the first survey was wrong and is corrected.** It said
+`RANK_REC_OFF_FIELD_04` and `_FIELD_08` are both compared against
+`abs(AngleDelta(...))`. Only the first is: `FIELD_08` is compared against an
+`ApproxDistXY`, so it is a DISTANCE, and 120..190 sits sensibly below
+`FIELD_00`'s 280..320 sight range. The two are read four bytes apart off one
+`rank * 28` base, which is exactly how one plausible sentence covered both and
+hid the difference. `FIELD_04` still gains its second independent reader as an
+arc, which is what `AddSightBlocker`'s note was waiting for.
 
-**And `0x00473DC4` is not a table base.** It is indexed `[rank * 28 + base]`
-and has eight references of its own, which is exactly what a base looks like.
-`ADDR_RANK_RECORDS` is `0x00473DC0`; this is its `RANK_REC_OFF_FIELD_04`.
+Three shapes the map records, all of them things a fresh transcription gets
+wrong:
 
-That makes this the third reader of `FIELD_04` and `FIELD_08`, and the units
-agree: both are compared against `abs(AngleDelta(...))`, so they are angles.
-`AddSightBlocker`'s note called `FIELD_04` a sight arc and declined to claim it
-on one reader -- a second independent consumer using it the same way is the
-evidence that was missing.
+- **The two tails are different functions and look like one.** Both open with
+  the identical `OBJ_OFF_HIT_DIR` block; one then turns on `LEAD_BEARING` and
+  ends in an `ObjIsType2` test, the other turns on `BEARING`, promotes, and
+  writes `OBJ_OFF_FOLLOW_UID`.
+- **The engage arms are not an `if`/`else`.** The far arm chases and returns;
+  the near arm records the target and falls into the hit tail, so a unit
+  already at the range it wants still reacts to a hit and still turns.
+- **One arm ends inside another** -- the HIGH band's compare jumps back to
+  borrow the LOW band's `jg`, so following bodies without following branches
+  gives it no exit.
 
 ## Stop condition
 

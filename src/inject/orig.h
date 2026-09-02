@@ -8395,13 +8395,58 @@ typedef struct {
  * address before writing a name; the alternative was the sixth instance of
  * the commonest mistake in this project.
  *
- * THAT MAKES IT THE THIRD READER OF BOTH FIELDS, and the units agree. It
- * compares each against `abs(AngleDelta(facing, bearing))` -- eighth-of-a-turn
- * heading units -- so 48..76 and 120..190 are ANGLES, which is what
- * AddSightBlocker's reading of FIELD_04 as a sight arc already said and what
- * that note declined to claim on one reader. Two independent consumers using
- * a field the same way is the evidence that was missing; the names stay
- * field-numbered until something says what the two arcs are FOR.
+ * THAT MAKES IT A THIRD READER FOR FIELD_04 AND THE TWO FIELDS ARE NOT ALIKE,
+ * which the survey first said they were and the transcription corrected.
+ * FIELD_04 is compared against `abs(AngleDelta(facing, bearing))`, so it is an
+ * angle in eighth-of-a-turn units -- the second independent consumer reading
+ * it as an arc, which is the evidence AddSightBlocker's note said it lacked.
+ * FIELD_08 is compared against an ApproxDistXY, so it is a DISTANCE, and
+ * 120..190 sits sensibly below FIELD_00's 280..320 sight range. Both are read
+ * off the SAME `rank * 28` base four bytes apart, which is exactly how one
+ * plausible sentence covered both and hid the difference.
+ *
+ * IT IS THE FOURTH MEMBER OF AiStepIgnore'S FAMILY and shares three blocks
+ * with it -- the SIGHT_OFF_DEST_DIST head, the OBJ_OFF_HIT_DIR turn, and the
+ * delayed turn toward what the context found. AiPromoteFound in region.cpp is
+ * the promotion it does three times, and OBJ_OFF_SCRIPT_STATE is read as a
+ * POINT here exactly as AiStepDefend and AiStepTrack already read it.
+ *
+ * THE BLOCK MAP, written down because three separate readings of it were
+ * wrong on the way to this one and the function is cold, so nothing but
+ * reading will ever catch a fourth:
+ *
+ *   0x407710  head: past DEST_DIST, route and promote; else clear the point
+ *   0x407790  no leader -> 0x407B2A
+ *   0x40779E  facing = OBJ_OFF_FACING, REPLACED by OBJ_OFF_FIELD_530 for a
+ *             type 3 with more than one row -- one slot, written twice
+ *   0x4077C1  range and bearing to the leader; |AngleDelta| against FIELD_04
+ *   0x407831  outside the arc: inside FIELD_08 -> engage, else 0x407A26
+ *   0x407848  the heading cache; trace the tile line unless already stamped
+ *   0x40794A  three-band minimum, then the band test by relative height
+ *   0x407980  ENGAGE, and its two arms are NOT symmetric -- see below
+ *   0x407A06  cache miss: plain range test against FIELD_00
+ *   0x407A26  out of sight: face and walk, promote, RETURN
+ *   0x407A85  in sight and close enough: record the target and FALL THROUGH
+ *   0x407AAB  hit; then the delayed turn on LEAD_BEARING; then ObjIsType2 and
+ *             a walk toward the leader
+ *   0x407B2A  no leader at all: hit; promote and turn on BEARING; then
+ *             OBJ_OFF_FOLLOW_UID from the observer
+ *   0x407BAE  ConsiderSighting, on every path
+ *
+ * THE TWO TAILS ARE DIFFERENT FUNCTIONS AND LOOK LIKE ONE. 0x407AAB turns on
+ * SIGHT_OFF_LEAD_BEARING and ends with an ObjIsType2 test and a walk; 0x407B2A
+ * turns on SIGHT_OFF_BEARING, promotes, and writes OBJ_OFF_FOLLOW_UID. Both
+ * open with the identical OBJ_OFF_HIT_DIR block, which is what makes merging
+ * them tempting and wrong.
+ *
+ * AND THE ENGAGE ARMS ARE NOT AN if/else. The far arm chases and RETURNS; the
+ * near arm records the target and falls into 0x407AAB, so a unit already at
+ * the range it wants still reacts to a hit and still turns. Writing the near
+ * arm as the far one's `else` with a shared tail loses that.
+ *
+ * ONE ARM ENDS INSIDE ANOTHER: the HIGH band's compare at 0x4079F6 jumps back
+ * to 0x40797A to borrow the LOW band's `jg`, so following the bodies without
+ * following the branches gives it no exit at all.
  *
  * Its callees are all named and all reconstructed bar ConsiderSighting:
  * AiRouteToward, ObjTileAttr, ObjHeight, AngleDelta, ApproxDistXY,
