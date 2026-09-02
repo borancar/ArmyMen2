@@ -5050,6 +5050,25 @@ typedef struct {
  * dangerous kind: it produced a clean, plausible list of nineteen and nothing
  * about it looked incomplete.
  *
+ * THE PLAYER ROWS' Y COORDINATES ARE HIDDEN IN POINTER ARITHMETIC, and they
+ * decode to something completely ordinary. Before the loop the original
+ * computes three values of the form `mov ecx, 0xFFFFFFC3; sub ecx, ebp` --
+ * a negative constant minus `this` -- and inside the loop adds the name
+ * buffer pointer, which is `this + 0x64 + slot*0x20`. The `this` cancels:
+ *
+ *     names   y = 40 + slot*32     40, 72, 104, 136
+ *     colours y = 39 + slot*32     39, 71, 103, 135
+ *     teams   y = 37 + slot*32     37, 69, 101, 133
+ *
+ * So it is a four-row layout with three widgets per row at slightly different
+ * heights, strength-reduced by the compiler into pointer-relative arithmetic
+ * that reads as though a POINTER were being used as a coordinate.
+ *
+ * Transcribing the arithmetic literally would work and would be unreadable;
+ * writing the rows out as `40 + slot * 32` is the same computation and says
+ * what it is. Worth checking rather than reproducing blind: a constant minus
+ * `this` is nearly always a cancellation waiting for its other half.
+ *
  * THE TWO SPRITE LOOPS DIFFER IN HOW THEY NAME A SPRITE, which is worth
  * keeping when they are written out. The first builds a FILENAME per index --
  * `03_013_0%i_color.bmp` through the game's sprintf -- and calls
