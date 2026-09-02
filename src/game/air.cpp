@@ -20,6 +20,7 @@
 #include "army.h"   /* ObjIsFriendly -- reconstructed */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
+#include "commmsg.h"  /* MsgListSetFlag, MsgListAdd -- reconstructed */
 #include "maprow.h"   /* RowUpdate -- reconstructed */
 
 #define kAirSaveBlock ((void *)(uintptr_t)AM2_IMAGE(ADDR_AIR_SAVE_BLOCK))
@@ -1783,4 +1784,61 @@ static void FlowNoteRoundTrip(uint8_t *flow, uint32_t rtt)
         *(uint32_t *)(flow + FLOW_OFF_RTT_MAX) = rtt;
     *(uint32_t *)(flow + FLOW_OFF_RTT_TOTAL) += rtt;
     RingPush32(flow, rtt);
+}
+
+/* The send-queue retirement both the DATA and the PULSE ACK arms do.
+ *
+ * THE ACK IS CUMULATIVE: one message retires every sequence from the peer's
+ * last acknowledged up to the one it carries, so this is a loop and not a
+ * field assignment. Getting that wrong gives statistics quietly a factor of
+ * the window size out, and nothing inside the body would look wrong.
+ *
+ * MsgListSetFlag does double duty as the lookup: it answers the queued node
+ * for that sequence, or NULL if there is none, and clears the flag on the
+ * way past. A NULL is ordinary -- the peer is acking something already
+ * retired -- so it logs and carries on rather than stopping.
+ *
+ * FLOW_OFF_HE_HAS is written ONCE, after the loop, not per iteration. The
+ * loop bound reads it, so updating it inside would cut the walk short. */
+static void FlowRetireThrough(uint8_t *flow, uint32_t ackedThrough,
+                              uint32_t mask, uint32_t now, uint32_t from)
+{
+    const uint8_t *comm = (const uint8_t *)
+        *(void *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    uint32_t seq;
+
+    for (seq = *(uint32_t *)(flow + FLOW_OFF_HE_HAS) + 1;
+         seq <= ackedThrough; seq++) {
+        uint8_t *sent;
+
+        /* Not behind COMM_OFF_VERBOSE, unlike almost everything else here. */
+        am2_log((const char *)AM2_IMAGE(ADDR_STR_GOT_PULSE_ACK), seq);
+
+        sent = (uint8_t *)MsgListSetFlag(
+            (void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, (int32_t)seq, 0,
+            (int32_t)mask);
+        if (sent == 0) {
+            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                am2_log((const char *)AM2_IMAGE(ADDR_STR_ACK_NOT_IN_SENDQ),
+                        seq, from, from, mask);
+            continue;
+        }
+
+        MsgSlotA0(flow, seq);
+        *(uint32_t *)(flow + FLOW_OFF_ACKS_SEEN) += 1;
+        FlowNoteRoundTrip(flow,
+                          now - *(uint32_t *)(sent + MSGNODE_OFF_STAMP));
+
+        /* Nobody else is still waiting on it, so the buffer goes home. */
+        if ((*(const uint32_t *)(uintptr_t)ADDR_PLAYER_SLOT_MASK
+             & *(uint32_t *)(sent + MSGNODE_OFF_FLAGS)) == 0) {
+            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                am2_log((const char *)AM2_IMAGE(ADDR_STR_PULSE_FREELIST),
+                        seq, sent);
+            MsgListRemove((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, sent);
+            MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, sent);
+        }
+    }
+
+    *(uint32_t *)(flow + FLOW_OFF_HE_HAS) = ackedThrough;
 }

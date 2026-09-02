@@ -4421,6 +4421,13 @@
  * Reconstructed. */
 #define ADDR_PEER_SHOULD_NACK    0x00402C30u  /* int32(peer, uint32 seq) */
 #define ADDR_STR_NACKING         0x00473C30u
+/* 0x004014C0's own format strings. Named rather than inlined because this
+ * tree gets its literals from the image, and because the spellings are the
+ * original's: "Recieve", " No many acks", the double spaces. */
+#define ADDR_STR_GOT_PULSE_ACK   0x00473710u
+#define ADDR_STR_SENDQUEUE_SEQ   0x004736E0u
+#define ADDR_STR_PULSE_FREELIST  0x00473610u  /* takes seq AND element */
+#define ADDR_STR_ACK_NOT_IN_SENDQ 0x004736C4u  /* the MsgListSetFlag miss */
 #define ADDR_STR_NACK_FULL       0x00473C94u
 /* The IAT slot the original CALLS THROUGH for GetTickCount. Reached this way
  * rather than by importing the symbol, for two reasons: it is what the
