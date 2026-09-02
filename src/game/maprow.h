@@ -117,4 +117,12 @@ void __cdecl SeqEvict(void *ctx);
  * allocators test. Always returns a record. */
 void *__cdecl SeqAlloc(void *ctx);
 
+/* 0x004600F0. May this weapon kind respawn? Permissive on three of four
+ * paths; the refusing one needs a multiplayer session and cannot run here. */
+int32_t __cdecl RespawnKindAllowed(int32_t kind);
+/* 0x004601D0. Pick a respawn kind at random. TWO OUTPUTS: it answers the
+ * chosen kind AND writes the def's +0x30 field through `out`. One of its two
+ * callers discards the answer. */
+int32_t __cdecl RandomRespawnKind(int32_t *out);
+
 #endif

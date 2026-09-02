@@ -2131,9 +2131,7 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
 
 /* The respawn's other half, still original: pick a random eligible kind and
  * hand back one of its ADDR_MISSILE_DEFS fields. */
-typedef int32_t (__cdecl *AM2_RandomKindFn)(int32_t *out);
-#define orig_random_respawn_kind \
-    ((AM2_RandomKindFn)(uintptr_t)ADDR_RANDOM_RESPAWN_KIND)
+/* RandomRespawnKind is reconstructed; maprow.h declares it. */
 
 /* WeaponRespawn -- original 0x00448280, eight callers. When a weapon leaves
  * the map in a multiplayer game, put another one back where it was.
@@ -2193,7 +2191,7 @@ void __cdecl WeaponRespawn(void *obj)
         goto mark;
 
     if (flags & OBJ_FLAG_RESPAWN_RANDOM) {
-        kind = orig_random_respawn_kind(&quantity);
+        kind = RandomRespawnKind(&quantity);
     } else {
         const uint8_t *rec = *(const uint8_t *const *)(o + OBJ_OFF_FIELD_C0);
 

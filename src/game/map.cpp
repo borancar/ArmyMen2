@@ -1522,12 +1522,11 @@ typedef void (__cdecl *am2_respawn_pool_fn)(int32_t seed);
 #define orig_build_respawn_pool \
     ((am2_respawn_pool_fn)(uintptr_t)ADDR_BUILD_RESPAWN_POOL)
 
-#define orig_respawn_kind_allowed \
-    ((am2_kind_allowed_fn)(uintptr_t)ADDR_RESPAWN_KIND_ALLOWED)
+/* RespawnKindAllowed is reconstructed; maprow.h declares it. */
 
-typedef int32_t (__cdecl *am2_respawn_kind_fn)(int32_t *out);
-#define orig_random_respawn_kind \
-    ((am2_respawn_kind_fn)(uintptr_t)ADDR_RANDOM_RESPAWN_KIND)
+/* RandomRespawnKind is reconstructed; maprow.h declares it. Its typedef here
+ * said `int32_t (int32_t *)` and was right about the return value -- which I
+ * re-derived from a call site rather than reading it. */
 
 
 /* Turn the parse records into objects.  NOT "CreateWeapon per record": each
@@ -1588,7 +1587,7 @@ static void BuildMapObjects(uint8_t *objs, int32_t count)
                 if (*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS & 2) {
                     int32_t sub = 0;
 
-                    code = orig_random_respawn_kind(&sub);
+                    code = RandomRespawnKind(&sub);
                     aai  = EnsureSpriteAaiRecord(0x2D, code, 0);
                     flags |= 0x10000;
                     key = *(const int32_t *)((*(uint8_t ***)(uintptr_t)
@@ -1600,7 +1599,7 @@ static void BuildMapObjects(uint8_t *objs, int32_t count)
                 code -= 0x64;
                 key = PackKey(type + 0x14, code, 0);
             }
-            if (orig_respawn_kind_allowed(code) == 0)
+            if (RespawnKindAllowed(code) == 0)
                 continue;
             aai = EnsureSpriteAaiRecord(type + 0x14, code, 0);
 

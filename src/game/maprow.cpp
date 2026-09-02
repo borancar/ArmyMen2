@@ -1163,6 +1163,12 @@ int maprow_install(void)
                         "SeqEvict", 1);
     rc |= patch_replace(ADDR_SEQ_ALLOC, (const void *)SeqAlloc,
                         "SeqAlloc", 1);
+    rc |= patch_replace(ADDR_RESPAWN_KIND_ALLOWED,
+                        (const void *)RespawnKindAllowed,
+                        "RespawnKindAllowed", 2);
+    rc |= patch_replace(ADDR_RANDOM_RESPAWN_KIND,
+                        (const void *)RandomRespawnKind,
+                        "RandomRespawnKind", 2);
     return rc;
 }
 
@@ -1665,4 +1671,60 @@ void *__cdecl SeqAlloc(void *ctxv)
     *(int32_t *)(ctx + SEQ_CTX_OFF_TAIL) = i;
 
     return rec;
+}
+
+/* ---- The respawn pool: two small functions off the map-load path --------- */
+
+/* region.cpp spells this the same way; ADDR_GAME_RAND is above the nominal
+ * CRT line but is the game's own LCG, not libc's. */
+typedef int32_t (__cdecl *AM2_GameRandFn)(void);
+#define orig_game_rand ((AM2_GameRandFn)(uintptr_t)AM2_IMAGE(ADDR_GAME_RAND))
+
+
+/* 0x004600F0. May this weapon kind respawn?
+ *
+ * PERMISSIVE ON THREE OF FOUR PATHS -- it answers 1 unless a multiplayer
+ * session is up AND the kind carries a mask AND that mask misses the game-over
+ * flags. Since ADDR_MP_SESSION is 0 on every drive this project has, the
+ * refusing exit cannot execute here and is verified by reading. */
+int32_t __cdecl RespawnKindAllowed(int32_t kind)
+{
+    uint32_t mask;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
+        return 1;
+
+    mask = ((const uint32_t *)(uintptr_t)ADDR_RESPAWN_KIND_MASK)[kind];
+    if (mask == 0)
+        return 1;
+    if ((*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS & mask) != 0)
+        return 1;
+    return 0;
+}
+
+/* 0x004601D0. Pick a respawn kind at random.
+ *
+ * IT HAS TWO OUTPUTS AND ONE OF THEM IS THE RETURN VALUE, which reading the
+ * body alone misses: eax takes the chosen kind at 0x004601E1 and is never
+ * written again, and 0x0042D1FA passes it straight to EnsureSpriteAaiRecord.
+ * The OTHER caller discards it and uses only the out-pointer -- so one call
+ * site would have confirmed the wrong reading.
+ *
+ * The division is `cdq; idiv`, SIGNED. MSVC's rand cannot answer negative so
+ * it cannot matter, but writing it unsigned is a different function for an
+ * input the original accepts.
+ *
+ * And 0x00662060 is NOT a table: it is ADDR_MISSILE_DEFS + 0x30, with the
+ * lea/lea pair computing kind * AM2_MISSILE_DEF_BYTES. It has exactly the
+ * shape of a fresh base-plus-stride array. */
+int32_t __cdecl RandomRespawnKind(int32_t *out)
+{
+    int32_t r = orig_game_rand()
+                % *(const int32_t *)(uintptr_t)ADDR_RESPAWN_KIND_COUNT;
+    int32_t kind = (*(int32_t *const *)(uintptr_t)ADDR_RESPAWN_KINDS)[r];
+
+    *out = *(const int32_t *)((const uint8_t *)AM2_IMAGE(ADDR_MISSILE_DEFS)
+                               + kind * AM2_MISSILE_DEF_BYTES
+                               + MISSILEDEF_OFF_FIELD_30);
+    return kind;
 }
