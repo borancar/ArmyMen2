@@ -5096,6 +5096,22 @@ typedef struct {
  * an uninitialised descriptor after a successful Restore -- a defect in the
  * original is not ours to fix.
  *
+ * THE MAP PREVIEW HAS A FALLBACK AND IT MOVES THE DATA DIRECTORY TWICE.
+ * SetGameDir(ADDR_MAP_FOLDER), then sprintf the preview's name from
+ * ADDR_MAP_NAME and test it with FileExists; if it is missing,
+ * SetGameDir("bitmaps") and use ADDR_STR_BAD_MP_PREV instead. The Panel is
+ * then built with whichever name survived.
+ *
+ * So this constructor changes the current directory as well as selecting a
+ * level -- two global side effects, and the directory is left wherever the
+ * fallback put it rather than restored. LoadMap restores its directory
+ * explicitly; this does not.
+ *
+ * A reconstruction that skipped the FileExists test would work on every map
+ * that ships a preview and show nothing on the ones that do not, which no
+ * A/B here would notice: the multiplayer maps are exactly the ones this
+ * environment cannot open a session for.
+ *
  * THE FOUR LIST GROUPS AND WHAT EACH LISTS:
  *
  *   0x204 TYPE_BOX  + bar   the game type, rows a rules file fills
