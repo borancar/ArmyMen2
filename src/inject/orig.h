@@ -2849,6 +2849,25 @@
  * received node and appends the node to ADDR_MSG_LIST_B when it answers 0.
  * Placeholder -- nothing read so far says what it decides. */
 #define ADDR_RECV_MSG_4014C0     0x004014C0u  /* int32_t(void *node) */
+/* SURVEYED, and it is the last entry below the CRT line. 3,040 bytes, EIGHT
+ * exits, TWENTY-TWO distinct callees and not one unnamed, one caller.
+ *
+ * It dispatches on the message's own type -- `ecx = **(node + 0x20)` -- with
+ * a compare chain rather than a table, and only THREE cases plus a default:
+ * 0x0B, 0x0C and 0x10. So roughly seven hundred bytes an arm, which is the
+ * opposite shape from RunScriptAction's fifty-eight arms of twenty
+ * instructions.
+ *
+ * 0x10 is AM2_MSG_OBJ_DESTROYED, already in this file. 0x0B and 0x0C are NOT
+ * in the AM2_MSG_ family -- which runs 0x0E ITEM_GONE, 0x0F ITEM_DEPLOY, 0x10
+ * OBJ_DESTROYED, 0x11 DAMAGE, 0x12 ITEM_CREATE -- so two of its three cases
+ * handle message types nothing else in the tree has named. Reading the arms
+ * is what will name them, and this file's own note calls the function's
+ * current name a placeholder for exactly that reason.
+ *
+ * Its first act is the interesting one: if node->+8 is zero it hands the node
+ * to ADDR_NOTE_KIND_31 and returns, so a message with no payload takes a
+ * completely different path from one with. */
 /* Where the drop path receives a packet it has no node for, so the transport
  * does not keep re-delivering it. */
 #define ADDR_RECV_SCRATCH        0x004F8790u
