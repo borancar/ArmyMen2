@@ -5050,6 +5050,13 @@ typedef struct {
  * dangerous kind: it produced a clean, plausible list of nineteen and nothing
  * about it looked incomplete.
  *
+ * THE TWO SPRITE LOOPS DIFFER IN HOW THEY NAME A SPRITE, which is worth
+ * keeping when they are written out. The first builds a FILENAME per index --
+ * `03_013_0%i_color.bmp` through the game's sprintf -- and calls
+ * PreloadSpriteName; the second asks for set 3, index 0x17 and the loop
+ * counter through PreloadSprite, with no string at all. Same shape, two
+ * different lookups, and only the first needs a buffer.
+ *
  * AND THE THREE ARRAYS WERE ALREADY NAMED, which grepping for the NAME did
  * not find. MP_PANEL_OFF_NAMES, MP_PANEL_OFF_COLOURS and MP_PANEL_OFF_TEAMS
  * sit at 0x220, 0x230 and 0x240 -- exactly the three displacements the loop
