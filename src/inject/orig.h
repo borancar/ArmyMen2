@@ -7938,6 +7938,21 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
+ * `moveto` HAS THREE PATHS, NOT A PAIR. A named variable pair gives the
+ * point; failing that, an action carrying NO point at all moves one object to
+ * ANOTHER OBJECT through EvtAtObjPosC; failing that, the literal point the
+ * script wrote goes to EvtAtPointC.
+ *
+ * The middle test is `fireweapon`'s three-part guard used to SELECT instead
+ * of to refuse -- relative zero and the point's low word zero. So the same
+ * predicate appears in this one function as a refusal in two arms and as a
+ * branch in a third, which is a good reason to write it out each time rather
+ * than hoist it into a helper whose name would have to mean both.
+ *
+ * Reading the `jle` and assuming the else is "use the literal point" gets two
+ * of the three right and silently drops the object-to-object case, which is
+ * the one a script uses to say `moveto <thing>` rather than `moveto x,y`.
+ *
  * `createtrooper` ENDS WITH THE CHEAT CONSOLE'S WEAPON-ATTACH, instruction
  * for instruction: KeyLookupTriple for the item key, CreateWeapon into the
  * scratch name, then set the weapon's army byte, put its uid in the unit's
