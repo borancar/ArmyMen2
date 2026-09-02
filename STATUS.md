@@ -81,6 +81,30 @@ hottest functions in the tree: `MoveStepPoint` at 175,145 calls a mission,
 That is consistency, not proof -- 2.8x more stubs is not 12x slower on its
 own, and the argument leans on which functions joined rather than how many.
 
+**THREE CONFIGURATIONS NOW, ALL DEEP DRIVES, ALL OUR SIDE.**
+
+| configuration | original | ours |
+|---|---|---|
+| `mission` | 25,563 frames | **533** |
+| `combat` | 16,160 frames | **0** |
+| `mpoptions` | 131 widget nodes | **0** |
+
+Eleven other configurations pass with byte-identical artifacts, so this is
+not a build that is broken. What separates the three is DEPTH of drive: each
+needs many timed steps -- past two dialogs and a scroll, past dialogs and
+firing, or a four-click multiplayer menu chain -- while the eleven that pass
+settle within a screen or two.
+
+That is exactly what a slower build does to a drive paced by `sleep`, and it
+is the strongest evidence for the hypothesis so far, because it is a
+PREDICTION the hypothesis makes and not a restatement of it: nothing about
+"our side composes fewer frames" implies "our side loses the deep drives"
+unless the cause is time.
+
+Ruled out for `mpoptions` specifically: no `bind/listen` failure in the log
+and no process holding the control port, which is the cause `CLAUDE.md`
+documents for this configuration failing this way.
+
 Cheap way to test it, for whoever picks this up: run `mission` with `TRACE=0`
 and read the volatile count. If it returns to the thousands the tracing is the
 cost and the band in `CLAUDE.md` was simply recorded under a smaller table.
