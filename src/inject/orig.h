@@ -5017,6 +5017,19 @@ typedef struct {
  * its own SEH frame, so this is a class building a sub-object rather than
  * calling a helper.
  *
+ * ITS PLAYER-ROW LOOP IS A SECOND CONSUMER OF THE COMM PLAYER RECORD, and it
+ * agrees with the names already here. It walks the four slots reading
+ * COMM_OFF_PLAYER_SLOTS at +0x214 and COMM_OFF_SLOT_NAME at +0x218, and
+ * writes either the player's name or the literal `-- Open --` into the row.
+ *
+ * That matters more than it looks. COMM_OFF_PLAYERS is the macro this file
+ * records as having been RE-BASED twelve bytes, needing an audit of
+ * twenty-six use sites, one of which was missed and silently wrote a computer
+ * player's name twelve bytes early. A second consumer landing exactly on
+ * +0x214 and +0x218 is independent evidence the corrected base is right --
+ * which is what "look for a second toucher before believing a layout" asks
+ * for, arriving a long time after the layout was settled.
+ *
  * ITS CALL PROFILE IS THE WHOLE DESIGN: 26 operator new, 20 RectSet and 20
  * WidgetAddChild. So it builds TWENTY children, and the body is one idiom
  * twenty times -- allocate, construct, place with a rectangle, add to the
