@@ -14244,7 +14244,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * FILE DID NOT SUPPLY; build the objects; free the temporaries; fclose;
  * restore the data directory; answer 1.
  *
- * NINE LAYERS ARE ALLOCATED AND ZEROED IF ABSENT, in this order --
+ * AND THE DEFAULTING IS PARTLY A LOOP OVER A CONTIGUOUS RUN OF GLOBALS, not
+ * nine separate blocks. 0x0042D01E is `cmp esi, ADDR_TILE_COVER; jl` with esi
+ * stepping 4 -- so a range of adjacent layer pointers is walked and each null
+ * one filled, and only some layers get an explicit block of their own. A scan
+ * for `mov eax, [ADDR_x]; test eax, eax` finds the explicit ones and MISSES
+ * every slot the loop covers, which is how the list below came to be nine.
+ *
+ * That matters because a layer left null is not a crash: SettlePointInRegion
+ * spirals over the region map looking for a passable tile and simply never
+ * finds one. The reconstruction hangs there, on a valid tile, with every
+ * input printed and correct.
+ *
+ * NINE LAYERS GET AN EXPLICIT BLOCK, in this order --
  * ADDR_CELL_WEIGHTS, ADDR_TILE_ATTRS, ADDR_REGION_OF_CELL,
  * ADDR_MAP_PADBIT_LAYER, ADDR_MAP_PAD_LAYER, ADDR_TILE_KIND,
  * ADDR_TILE_FLAGS, ADDR_TILE_COVER and ADDR_LOAD_PENDING. So a chunk missing
