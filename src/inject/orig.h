@@ -5050,6 +5050,19 @@ typedef struct {
  * dangerous kind: it produced a clean, plausible list of nineteen and nothing
  * about it looked incomplete.
  *
+ * THE PLAYER SLOTS ARE THREE PARALLEL ARRAYS AND A NAME BUFFER, not an array
+ * of per-slot structs. The loop walks two pointers: one stepping 0x20 through
+ * a 4 x 32-byte name area at this+0x64, and one stepping 4 through pointer
+ * slots, with the three children written at [p-0x10], [p] and [p+0x10]. So
+ * the name widgets live at this+0x220, the colour widgets at this+0x230 and
+ * the team widgets at this+0x240, four of each, contiguous by KIND rather
+ * than by slot.
+ *
+ * Writing that as an array of {name, w1, w2, w3} records is the obvious C for
+ * "three widgets per player" and would interleave what the original keeps
+ * separate -- every subsequent index would be wrong, and MpPanelDestruct
+ * walks these arrays.
+ *
  * THE RECTANGLES DO NOT MECHANISE, and that is where the extracting stops.
  * Each child's RectSet takes four coordinates and only some are literals --
  * the player rows compute theirs from the loop index, and several others
