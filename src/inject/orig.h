@@ -5096,6 +5096,21 @@ typedef struct {
  * an uninitialised descriptor after a successful Restore -- a defect in the
  * original is not ours to fix.
  *
+ * START AND READY ARE THE SAME BUTTON SLOT. Both are built at rect
+ * (0x21F, 0x11A, 0x51, 0x20) with different bitmaps and different handlers --
+ * 0x00431850 for start, 0x00431920 for ready -- and COMM_OFF_IS_HOST picks
+ * which one exists. Never both.
+ *
+ * That settles a puzzle from the rectangle dump several commits ago, where
+ * two buttons came back with identical coordinates and it read as an
+ * extraction error. It was not: they really do occupy one place, because the
+ * host starts the game and everyone else declares themselves ready.
+ *
+ * A third gating STYLE, on top of the two already recorded -- build-and-grey
+ * for the lists, build-only-if-host for the score spinner, and now
+ * build-one-of-two here. Three ways of saying "the host is different", in one
+ * function.
+ *
  * THE MAP PREVIEW HAS A FALLBACK AND IT MOVES THE DATA DIRECTORY TWICE.
  * SetGameDir(ADDR_MAP_FOLDER), then sprintf the preview's name from
  * ADDR_MAP_NAME and test it with FileExists; if it is missing,
