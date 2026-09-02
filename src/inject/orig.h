@@ -15589,7 +15589,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_RESPAWN_KIND_ALLOWED 0x004600F0u  /* int32_t(int32_t kind) */
 #define ADDR_BUILD_RESPAWN_POOL   0x00460120u  /* void(int32_t seed) */
 #define ADDR_RESPAWN_KIND_MASK    0x0048C530u  /* uint32_t[44], 0 = always */
-#define MISSILE_DEF_OFF_WEIGHT    0x2Cu        /* int32_t, respawn weight */
+/* ONE STRUCT, ONE PREFIX. These were split between MISSILE_DEF_OFF_ (two
+ * names) and MISSILEDEF_OFF_ (five) -- one concept under two spellings, which
+ * CLAUDE.md names as the kind of duplication actually worth collapsing, and
+ * which checkoffsets cannot see because its family-alias rule compares WITHIN
+ * a prefix. Collapsed onto the majority spelling. */
+#define MISSILEDEF_OFF_WEIGHT    0x2Cu        /* int32_t, respawn weight */
 #define ADDR_RESPAWN_KINDS       0x00662920u  /* int32_t *, the eligible kinds */
 #define ADDR_RESPAWN_KIND_COUNT  0x00662924u  /* int32_t */
 /* CreateMissile reads this as the vertical speed when it is positive; when it
@@ -15789,7 +15794,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * while the button is held. definfo.cpp writes it from the parsed record's
  * +0x1C -- one of five fields that table PERMUTES on the way in, which is the
  * reason an ITEMTYPE_ offset does not mean the same thing here. */
-#define MISSILE_DEF_OFF_FIELD_24 0x24u
+#define MISSILEDEF_OFF_FIELD_24 0x24u
 /* The two frames LoadType5 chooses between on the def's first dword: 2 and 5
  * take one and everything else the other. What the dword IS has not been
  * read -- only which two values it treats alike. */

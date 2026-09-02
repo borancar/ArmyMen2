@@ -10896,7 +10896,7 @@ void __cdecl HudPostUpdate(void)
             repeat = *(const int32_t *)((const uint8_t *)(uintptr_t)
                                             ADDR_MISSILE_DEFS
                                         + (uint32_t)kind * AM2_MISSILE_DEF_BYTES
-                                        + MISSILE_DEF_OFF_FIELD_24);
+                                        + MISSILEDEF_OFF_FIELD_24);
         }
     }
 
