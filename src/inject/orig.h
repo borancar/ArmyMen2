@@ -14198,6 +14198,28 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * does not know by the width the file gives, which is the same discipline as
  * the chunk switch's default fseek one level down.
  *
+ * THE WHOLE SHAPE, now that all 1,189 instructions are read: SetDataDir and
+ * keep the name in ADDR_MAP_BLOCK; load "%s.atl" through ADDR_LOAD_ATL_FILE
+ * and answer 0 if it fails; fopen "%s.amm"; check FORM/MAP; run the chunk
+ * loop while the consumed total is under FORM's size; ALLOCATE ANY LAYER THE
+ * FILE DID NOT SUPPLY; build the objects; free the temporaries; fclose;
+ * restore the data directory; answer 1.
+ *
+ * NINE LAYERS ARE ALLOCATED AND ZEROED IF ABSENT, in this order --
+ * ADDR_CELL_WEIGHTS, ADDR_TILE_ATTRS, ADDR_REGION_OF_CELL,
+ * ADDR_MAP_PADBIT_LAYER, ADDR_MAP_PAD_LAYER, ADDR_TILE_KIND,
+ * ADDR_TILE_FLAGS, ADDR_TILE_COVER and ADDR_LOAD_PENDING. So a chunk missing
+ * from a map is not an error at all: every consumer downstream can assume its
+ * layer exists, which is worth knowing before treating an absent chunk as a
+ * failure. ADDR_TILE_COVER and ADDR_LOAD_PENDING have no chunk arm at all and
+ * are allocated here and nowhere else.
+ *
+ * AND THE OBJECT LIST IS A TEMPORARY, which is the last thing that reads
+ * wrong from the middle. OLAY's realloc'd array lives in a LOCAL, not a
+ * global: the tail walks it calling ADDR_CREATE_WEAPON per record and then
+ * frees every record's script string and the array itself before returning.
+ * So the records are a parse buffer and the objects are the output.
+ *
  * THE PER-RECORD LOOP, and its one trap. For each object the file declares,
  * LoadMap zeroes a set of locals, walks the field table it just read, freads
  * each field by its declared width and dispatches: MOVE, NUMB, TRIG, OWNR,
