@@ -13053,6 +13053,33 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * panel bitmaps. 0x0044A420 and 0x00420410 push no literals at all, so for
  * those the sweep answers nothing and says so. */
 #define ADDR_LOAD_MAP            0x0042C440u  /* int32(const char *name) */
+/* SURVEYED, and it is the friendliest of the three left. 3,920 bytes, FOUR
+ * exits, THIRTY-FOUR distinct callees of which only three have no name, and
+ * NO indirect dispatch at all -- no jump table to dump, which is what the
+ * last two functions' surveys each turned on.
+ *
+ * It names its own job in the strings it pushes: "%s.atl" is the tileset
+ * RestoreTileSet already loads and "%s.amm" is the map itself, with "camera"
+ * a token it looks for inside. So this is the map load, and orig.h's
+ * int32(const char *name) is consistent with both.
+ *
+ * The three unnamed are all small and none is a blocker:
+ *   0x0042BEA0  opens a file through the CRT with a mode string at 0x00474170
+ *               and reserves a 0x450 buffer -- and this is the address
+ *               CLAUDE.md's declined list carried as "1200 B, 2 COM calls"
+ *               before tools/merges.py split it; the COM half was
+ *               RestoreTileSet and this is a different function in the same
+ *               entry.
+ *   0x004600F0  a predicate over a table at 0x0048C530 and a bitmask at
+ *               0x00515FD8.
+ *   0x00460120  a string helper reaching two CRT routines.
+ *
+ * What the survey does NOT settle is which side of the split it belongs on.
+ * It reaches files, and this project's answer to "where is the file I/O" is
+ * that the game never opens one itself -- it goes through the statically
+ * linked CRT, which libc replaces wholesale. If that holds here it is flat.
+ * Check before filing it, the way 0x0044A420's `call ebp` turned out to be
+ * GetTickCount rather than a callback. */
 #define AM2_MAP_TILESET_FMT      0x00486328u  /* "%s.atl" */
 #define AM2_MAP_FILE_FMT         0x00486330u  /* "%s.amm" */
 /* The map's bounds in pixels, four int32 read as one 16-byte block out of the
