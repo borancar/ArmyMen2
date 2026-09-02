@@ -1459,7 +1459,7 @@ typedef int32_t (__cdecl *AM2_SeqStepFn)(int32_t at, void *rec, void *ctx);
  * macro under it reached it through the image, which checkseams now refuses. */
 /* Reconstructed now -- maprow.h declares it. */
 #define orig_seq_step0 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP0)
-#define orig_seq_step6 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP6)
+/* Reconstructed now -- misc.h declares it. */
 #define orig_seq_step7 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP7)
 
 /* 0x0043B7C0, one caller -- the per-frame path, and reached only in a network
@@ -2136,7 +2136,7 @@ void __cdecl SeqRun(void *ctx)
         case 3: at = SeqStepKind2(at, rec, ctx); break;
         case 4: at = SeqStepKind4(at, rec, ctx);   break;
         case 5: at = SeqStepKind5(at, rec, ctx);   break;
-        case 6: at = orig_seq_step6(at, rec, ctx); break;
+        case 6: at = SeqStepKind6(at, rec, ctx); break;
         case 7: at = orig_seq_step7(at, rec, ctx); break;
         default:
             at = *(const int16_t *)(rec + SEQ_OFF_NEXT);
@@ -2437,6 +2437,8 @@ int misc_install(void)
                   "SeqStepKind2", 2);
     patch_replace(ADDR_SEQ_STEP5, (const void *)SeqStepKind5,
                   "SeqStepKind5", 1);
+    patch_replace(ADDR_SEQ_STEP6, (const void *)SeqStepKind6,
+                  "SeqStepKind6", 3);
     patch_replace(ADDR_SEQ_ADD_KIND4, (const void *)SeqAddKind4,
                   "SeqAddKind4", 1);
     patch_replace(ADDR_SEQ_STEP4, (const void *)SeqStepKind4,
@@ -2450,4 +2452,80 @@ int misc_install(void)
     patch_replace(ADDR_MOVIE_BUILD_NAME, (const void *)MovieBuildName,
                   "MovieBuildName", 4);
     return 0;
+}
+
+/* SeqStepKind6 -- original 0x00461560, one of the seven SeqRun dispatches to.
+ * Kinds 2, 4 and 5 are already reconstructed; this is the fourth.
+ *
+ * ITS SPRITE CHOICE HAS TWO REGIMES AND THE SWITCH BETWEEN THEM IS THE LIFE.
+ * More than 100 ms from the end it CYCLES -- ROW_OFF_ANIM_PHASE up by one per
+ * emit, wrapping at `stride - tail` -- and inside the last 100 ms it RAMPS
+ * instead, mapping the remaining time onto the tail frames so the thing runs
+ * out rather than looping. The two arms share nothing but the base index.
+ *
+ * THE RAMP DIVIDES 100 BY THE TAIL COUNT AND THEN DIVIDES BY THAT, which is
+ * two divisions where one would do -- `idx = (left * tail) / 100` is the same
+ * function -- and it is written the original's way because the intermediate
+ * is an integer and the rounding differs. `100 / tail` truncates first.
+ *
+ * THE CLAMP IS ON THE RAMP ONLY. `if (idx >= tail - 1) idx = tail - 1` caps
+ * the last frame; the cycling arm has no clamp because its wrap already
+ * bounds it. Sharing a clamp between them would change the cycle.
+ *
+ * BOTH ACCUMULATORS ADVANCE ON EVERY CALL, after the emit and outside its
+ * gate -- ROW_OFF_STAMP_54 and SEQ_OFF_GATE each gain ADDR_FRAME_DELTA_MS.
+ * So an emit that does not happen still ages the sequence, which is what
+ * makes the life test terminate.
+ *
+ * ADDR_SEQ_SPRITES_7 is named for kind 7 and kind 6 reads the same array.
+ * One array with two users is not two concepts; the name is left alone. */
+int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx)
+{
+    uint8_t *r    = (uint8_t *)rec;
+    uint8_t *row  = *(uint8_t **)(r + SEQ_OFF_ROW);
+    int32_t  life = *(const int32_t *)(r + SEQ_OFF_LIFE);
+    int32_t  tail = *(const int32_t *)(uintptr_t)ADDR_SEQ_TAIL_FRAMES;
+    int32_t  stride = *(const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE;
+
+    (void)at;
+
+    if (*(const uint32_t *)(row + ROW_OFF_STAMP_54) > (uint32_t)life)
+        return SeqRetire(ctx, rec);
+
+    if (*(const uint32_t *)(r + SEQ_OFF_GATE)
+            > *(const uint32_t *)(uintptr_t)ADDR_SEQ_ADVANCE_MS) {
+        int32_t variant = (int32_t)*(const uint8_t *)(r + SEQ_OFF_FLAG4)
+                          * stride;
+
+        if ((int32_t)*(const uint32_t *)(row + ROW_OFF_STAMP_54) > life - 100) {
+            int32_t per = 100 / tail;
+            int32_t idx = ((int32_t)*(const uint32_t *)(row + ROW_OFF_STAMP_54)
+                           - life + 100) / per;
+
+            if (idx >= tail - 1)
+                idx = tail - 1;
+            variant += stride - tail + idx;
+        } else {
+            uint8_t phase = (uint8_t)(*(const uint8_t *)(row + 0x51u) + 1);
+
+            *(uint8_t *)(row + 0x51u) = phase;
+            if ((int32_t)phase >= stride - tail)
+                *(uint8_t *)(row + 0x51u) = 0;
+            variant += *(const uint8_t *)(row + 0x51u);
+        }
+
+        *(uint32_t *)(row + ROW_OFF_SPRITE) =
+            (*(uint32_t *const *)(uintptr_t)ADDR_SEQ_SPRITES_7)[variant];
+        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+
+        *(int32_t *)(r + SEQ_OFF_GATE) -=
+            *(const int32_t *)(uintptr_t)ADDR_SEQ_ADVANCE_MS;
+    }
+
+    *(uint32_t *)(row + ROW_OFF_STAMP_54) +=
+        *(const uint32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+    *(int32_t *)(r + SEQ_OFF_GATE) +=
+        *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+
+    return *(const int16_t *)(r + SEQ_OFF_NEXT);
 }

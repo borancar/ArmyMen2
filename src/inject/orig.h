@@ -2062,6 +2062,16 @@
 /* The number of frames per variant in ADDR_SEQ_SPRITES_7, which kinds 6 and 7
  * share: kind 7 takes entry 0 and kind 6 takes `variant * 8`. */
 #define AM2_SEQ_VARIANT_STRIDE   0x0048CB8Cu  /* int32_t, reads 8 */
+/* Both referenced ONLY from SeqStepKind6, so these names rest on one reader
+ * and say what the arithmetic does rather than what it is for. 0x0048CB94 is
+ * subtracted from SEQ_OFF_GATE and compared against it, so it is an interval
+ * in the same milliseconds SEQ_OFF_GATE accumulates; 0x0048CB90 is the
+ * divisor of the 100 ms run-out AND the count of variants reserved at the end
+ * of the stride, which is why the same value appears on both sides of the
+ * `stride - it + index` that picks the last frames. A second consumer would
+ * be worth more than either name. */
+#define ADDR_SEQ_ADVANCE_MS      0x0048CB94u  /* int32_t */
+#define ADDR_SEQ_TAIL_FRAMES     0x0048CB90u  /* int32_t */
 #define ADDR_SEQ_STEP4           0x004613E0u
 /* Reconstructed. Kind 5 is an EMITTER: every ADDR_SEQ_EMIT_MS it adds a kind
  * 4 into the OTHER context, at its own point jittered by -4, 0 or +4 in x,

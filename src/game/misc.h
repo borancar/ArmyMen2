@@ -789,4 +789,8 @@ void __cdecl SeqRunBoth(void);
  * rounds to 80 bits. */
 uint32_t __cdecl Ticks(void);
 
+/* 0x00461560. Sequence stepper kind 6: cycle a sprite variant until the last
+ * 100 ms of the life, then ramp through the tail frames instead. */
+int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx);
+
 #endif /* AM2_MISC_H */
