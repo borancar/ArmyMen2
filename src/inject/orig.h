@@ -2867,7 +2867,22 @@
  *
  * Its first act is the interesting one: if node->+8 is zero it hands the node
  * to ADDR_NOTE_KIND_31 and returns, so a message with no payload takes a
- * completely different path from one with. */
+ * completely different path from one with.
+ *
+ * AND ITS OWN LOG MESSAGES NAME IT. It pushes " Got Pulse Ack for  seq %d",
+ * "sendqueue sequence %d from %x  %d mask %x", " Dumping incoming message on
+ * the floor" and " Low-Level Comm Error No Recieve Buffers fre[e]" -- so this
+ * is the RELIABLE-DELIVERY half of the receive path: acknowledgements,
+ * sequence numbers against the send queue, and the decision to drop.
+ *
+ * That is the self-naming sweep working on the one function this file has
+ * been calling a placeholder for months, and it took one command. The
+ * strings do not sit in the push stream as immediates the usual scan
+ * finds -- they are reached through registers -- which is why nobody had
+ * seen them. Reading the ADDR_LOG call sites' operands directly is what
+ * turned it up.
+ *
+ * The misspelling in the last one is the original's. */
 /* Where the drop path receives a packet it has no node for, so the transport
  * does not keep re-delivering it. */
 #define ADDR_RECV_SCRATCH        0x004F8790u
