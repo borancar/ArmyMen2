@@ -11361,14 +11361,33 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Three of the six keys are 0x980000, 0x980100 and 0x980080, each also stored
  * into a global of its own -- 0x00516158, 0x00516168, 0x0051615C.
  *
- * WHAT IS NOT: the six blocks are NOT uniform. Diffing them shows different
- * shapes rather than one shape with different constants -- block 3 preloads
- * from set 0x2D and blocks 4 and 5 from 0x1D, and the later ones interleave
- * their stack writes differently. Transcribing them needs esp tracked through
- * about 280 instructions across by-value struct passing, and an attempt at it
- * did not come out self-consistent: the count of pushes before one `add esp,
- * 0x28` came to nine where the cleanup says ten. That is exactly the kind of
- * error that is silent, so it is left here rather than guessed at. */
+ * THE esp COUNT DOES ADD UP; I COUNTED IT WRONG. A previous note here said the
+ * pushes before one `add esp, 0x28` came to nine against a cleanup of ten, and
+ * left the function on that basis. There are FOURTEEN outstanding at that point
+ * -- PreloadSprite's five, MakeRecordList's three, AddRecordList's one and
+ * RectSet's five -- and the cleanup is PARTIAL, clearing ten and leaving four
+ * of PreloadSprite's standing. Batched cdecl cleanup that does not clear
+ * everything, which is a shape this file already warns about and I read as a
+ * contradiction instead.
+ *
+ * Tracked mechanically rather than by eye, the six blocks come out as:
+ *
+ *   #  PreloadSprite(set,index,frame)  key         RectSet(l,t,r,b)  type
+ *   0  0x13, 0, 0                      0x980000    -0x14,-5,0x3C,0x23   -1
+ *   1  (reuses block 0's sprite)       0x980100     0, 0, 1, 1          -1
+ *   2  0x13, 1, 0                      0x980080    -2,-2, 2, 2          -1
+ *   3  0x2D, ?, 0 and 0x2D, 0x0A, 0    (from esi)  -0x10,-0x10,0x10,0x10 0x2D
+ *   4  0x1D, 0x0B, 0                   0xE80580    -0x10,-0x10,0x10,0x10 0x1D
+ *   5  0x1D, 0x0C, 9                   0xE80609    -0x10,-0x10,0x10,0x10 0x1D
+ *
+ * THE LAST THREE PASS A REAL TYPE, not -1, so they are seeded from the
+ * object.aai record for their (type, key) where the first three are not -- and
+ * 0xE80609 is the value ADDR_CREATE_WATCHED_KIND's neighbour at 0x00516164 is
+ * already recorded as holding, so this is where it comes from.
+ *
+ * WHAT IS STILL NOT DONE: blocks 3, 4 and 5 each call RectSet TWICE and block 3
+ * preloads twice, so their per-block structure is not the simple one above.
+ * That is the remaining reading. */
 #define ADDR_BUILD_AAI_BUILTINS  0x00434700u  /* void(void) */
 #define AM2_AAI_RECORD_BYTES     0x40u
 #define AAIREC_OFF_TYPE          0x00u   /* 0x2E when the argument is negative */
