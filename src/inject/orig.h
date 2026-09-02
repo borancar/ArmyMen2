@@ -4688,6 +4688,15 @@ typedef struct {
  * this function taught four times -- decode the whole thing rather than
  * reason about its ends.
  *
+ * AND `mov ecx, [ADDR_ARMY_TABLE]` IN THE MASTER ARM IS NOT A DEAD LOAD.
+ * It sits between the argument push and the call and nothing in the arm reads
+ * ecx afterwards, which is exactly what a dead load looks like -- and
+ * ADDR_COMM_ARMY_OF_SLOT is THISCALL, so ecx is `this`. The one-line note
+ * that had been drafted calling it unused would have been the same mistake
+ * CLAUDE.md records for CreateVehicle, where forgetting the convention made
+ * the whole function unreadable. The prototype in this file said `thiscall`
+ * all along; the arm was read before the callee's declaration was.
+ *
  * AND THE "Cheat!!!" REPLY'S COLOUR IS BYTE 1 OF AN OBJECT-TABLE RECORD,
  * which the grep-the-address rule caught before a name was invented for it.
  * The master arm does `CommArmyOfSlot(g_defaultOwner)`, shifts the answer
@@ -11172,6 +11181,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * which neither of their two readers establishes: one is this constructor
  * copying them into a widget and the other copies them into a second table. */
 #define ADDR_COLOUR_DARK_GREEN 0x004FDF74u  /* 32 71 26 */
+/* Both named from win32/palette.cpp's own (address, r, g, b) table rather
+ * than from the cheat arms that read them -- the arms say only "a colour",
+ * and SetGamePalette is the writer. Reading the writer's disassembly instead
+ * would have got them wrong: the compiler interleaves, so the `mov byte
+ * [global], al` that follows a push block belongs to the call BEFORE it, not
+ * the one those pushes are building. */
+#define ADDR_COLOUR_BLUE       0x004FDF7Cu  /* 00 00 FF */
+#define ADDR_COLOUR_DARK_BLUE  0x004FD760u  /* 00 00 AC */
 #define ADDR_COLOUR_OLIVE      0x004FE1AEu  /* 65 57 30 */
 #define ADDR_COLOUR_STEEL_BLUE 0x004FE088u  /* 32 5D 8A */
 #define ADDR_COLOUR_DARK_GREY  0x00502CE4u  /* 54 54 54 */
