@@ -7808,9 +7808,8 @@ void __cdecl DeselectAll(void)
 /* ADDR_SEND_VEHICLE_ENTER stays original and is reached by address -- it is
  * the twin of armymsg.cpp's SendVehicleExit and names itself the same way,
  * "<--Vehicle Enter Send: Vehicle: %x, item: %x". */
-typedef void (__cdecl *AM2_SendVehicleEnterFn)(void *vehicle, void *unit);
-#define orig_send_vehicle_enter \
-    ((AM2_SendVehicleEnterFn)(uintptr_t)ADDR_SEND_VEHICLE_ENTER)
+/* SendVehicleEnter is reconstructed in commmsg.cpp; called by name. */
+void __cdecl SendVehicleEnter(void *vehicle, void *unit);
 
 /* EnterVehicle -- original 0x0045AA00, three callers.
  *
@@ -7908,7 +7907,7 @@ void __cdecl EnterVehicle(void *unit, void *vehicle)
 
     if (CommMustBroadcast((void *)AM2_IMAGE(ADDR_COMM_OBJECT),
                           (int16_t)*(const int8_t *)(v + OBJ_OFF_ARMY)))
-        orig_send_vehicle_enter(v, u);
+        SendVehicleEnter(v, u);
 
     DestroyByType(u);
 }

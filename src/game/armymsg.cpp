@@ -1592,5 +1592,111 @@ int armymsg_install(void)
                         "RecvTrooperWantItem", 1);
     rc |= patch_replace(ADDR_SEND_PAIR_MSG, (const void *)SendPairMessage,
                         "SendPairMessage", 5);
+    rc |= patch_replace(ADDR_SEND_VEHICLE_ENTER, (const void *)SendVehicleEnter,
+                        "SendVehicleEnter", 2);
+    rc |= patch_replace(ADDR_SEND_VEHICLE_FIRE, (const void *)SendVehicleFire,
+                        "SendVehicleFire", 1);
     return rc;
+}
+
+/* SendVehicleEnter -- original 0x0045E300, one caller. Message kind 0x24,
+ * twelve bytes, and it names itself twice: "<--Vehicle Enter Send" before the
+ * send and "-->Vehicle Enter Sent" after it.
+ *
+ * THE UNIT IS CHECKED AND THE VEHICLE IS NOT. The null test before the send
+ * is on argument 2, so a null vehicle would be dereferenced building the
+ * header. Reproduced -- and it is the reason the argument order matters here
+ * rather than being cosmetic, which orig.h fixes from the first log's push
+ * sequence: `Vehicle: %x` takes argument 1.
+ *
+ * IT LOGS THE SAME TWO UIDS TWICE, once from the objects and once back out of
+ * the message it just built, with UidOnWire applied a SECOND time to values
+ * that already went through it. That is the identity on every drive this
+ * project has -- armymsg.cpp records why -- so the double application is
+ * harmless and is reproduced because the original does it, not because
+ * anything is converted. */
+void __cdecl SendVehicleEnter(void *vehicle, void *unit)
+{
+    uint8_t  *veh  = (uint8_t *)vehicle;
+    uint8_t  *unt  = (uint8_t *)unit;
+    uint8_t  *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    struct { AM2_ArmyMsgHdr hdr; uint32_t unitUid; } msg;
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_VEHICLE_ENTER_SEND),
+                UidOnWire(*(const uint32_t *)(veh + OBJ_OFF_UID)),
+                UidOnWire(*(const uint32_t *)(unt + OBJ_OFF_UID)));
+
+    if (unt == 0)
+        return;
+
+    msg.hdr.len  = AM2_MSG_VEHICLE_ENTER_LEN;
+    msg.hdr.kind = AM2_MSG_VEHICLE_ENTER;
+    msg.hdr.uid  = UidOnWire(*(const uint32_t *)(veh + OBJ_OFF_UID));
+    msg.unitUid  = UidOnWire(*(const uint32_t *)(unt + OBJ_OFF_UID));
+    ArmyMessageSend(&msg);
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_VEHICLE_ENTER_SENT),
+                UidOnWire(msg.hdr.uid), UidOnWire(msg.unitUid));
+}
+
+/* SendVehicleFire -- original 0x0045E220, one caller: Step3Drive, once a shot
+ * has been taken. Message kind 0x1C, twenty-four bytes, and it names itself
+ * "Vehicle Fire Send, vehicle: %x,  gunface:%d, pos (%d,%d,%d),  globTarg %d".
+ *
+ * THAT LOG LINE IS WHAT NAMES THE FIELDS, and they turn out to be named
+ * already: the three `pos` words are UNIT_OFF_FIRE_X/Y/Z and `globTarg` is
+ * UNIT_OFF_FIRE_UID -- the same storage a TROOPER fires through, at the same
+ * displacements. Grepping the offsets before inventing a VEHICLE_OFF_FIRE_*
+ * family is what caught that; the ratchet could not have, because a new
+ * prefix has nothing to compare against.
+ *
+ * IT IS GATED ON COMM_OFF_DPLAY, not on a session being joined -- the
+ * DirectPlay object merely existing is enough to build and queue the
+ * message, and ArmyMessageSend does the rest of the refusing.
+ *
+ * AND IT CLEARS UNIT_OFF_FIRE_ACTIVE AS A SIDE EFFECT, between building the
+ * message and sending it. So the send is also the acknowledgement: whoever
+ * set the flag to ask for a shot has it taken away here, and a reconstruction
+ * that only emitted the packet would fire every frame. */
+void __cdecl SendVehicleFire(void *vehicle)
+{
+    uint8_t  *veh  = (uint8_t *)vehicle;
+    uint8_t  *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    struct {
+        AM2_ArmyMsgHdr hdr;
+        uint32_t       target;
+        int16_t        x, y, z;
+        uint16_t       gun;
+        uint8_t        seed;
+        uint8_t        pad[3];
+    } msg;
+
+    if (*(const void *const *)(comm + COMM_OFF_DPLAY) == 0)
+        return;
+
+    msg.hdr.len  = 0x18;
+    msg.hdr.kind = 0x1C;
+    msg.hdr.uid  = UidOnWire(*(const uint32_t *)(veh + OBJ_OFF_UID));
+    msg.target   = UidOnWire(*(const uint32_t *)(veh + UNIT_OFF_FIRE_UID));
+    msg.x        = *(const int16_t *)(veh + UNIT_OFF_FIRE_X);
+    msg.y        = *(const int16_t *)(veh + UNIT_OFF_FIRE_Y);
+    msg.z        = *(const int16_t *)(veh + UNIT_OFF_FIRE_Z);
+    msg.gun      = *(const uint8_t *)(veh + OBJ_OFF_FIELD_530);
+    /* +0x529 is TROOPER_OFF_FIRE_FLAG for a type-2 record; on a vehicle
+     * Step3Drive writes a fresh GameRand byte there before each shot, so it
+     * travels as a spread seed. Raw, because the existing name asserts a
+     * meaning this use contradicts. */
+    msg.seed     = *(const uint8_t *)(veh + 0x529u);
+
+    *(int32_t *)(veh + UNIT_OFF_FIRE_ACTIVE) = 0;
+    ArmyMessageSend(&msg);
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_VEHICLE_FIRE_SEND),
+                *(const uint32_t *)(veh + OBJ_OFF_UID),
+                (uint32_t)*(const uint8_t *)(veh + OBJ_OFF_FIELD_530),
+                (int32_t)msg.x, (int32_t)msg.y, (int32_t)msg.z,
+                msg.target);
 }

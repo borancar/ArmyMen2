@@ -9836,12 +9836,9 @@ void __cdecl Step3RouteAndBoard(void *obj, void *rec)
  * applies. */
 typedef int32_t (__cdecl *AM2_Step3RandFn)(void);
 #define orig_step3_rand ((AM2_Step3RandFn)AM2_IMAGE(ADDR_GAME_RAND))
-typedef void (__cdecl *AM2_SendVehFireFn)(void *vehicle);
 typedef void (__cdecl *AM2_SendVehWantFn)(void *vehicle, void *item,
                                           int32_t request, int8_t slot,
                                           int32_t quant);
-#define SendVehicleFire \
-    ((AM2_SendVehFireFn)(uintptr_t)ADDR_SEND_VEHICLE_FIRE)
 #define SendVehicleWantItem \
     ((AM2_SendVehWantFn)(uintptr_t)ADDR_SEND_VEHICLE_WANT_ITEM)
 

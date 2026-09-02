@@ -123,4 +123,12 @@ int armymsg_install(void);
 }
 #endif
 
+/* 0x0045E300. Kind 0x24, twelve bytes: tell the other players a unit got
+ * into a vehicle. */
+void __cdecl SendVehicleEnter(void *vehicle, void *unit);
+
+/* 0x0045E220. Kind 0x1C, twenty-four bytes: a vehicle fired. Also CLEARS
+ * UNIT_OFF_FIRE_ACTIVE, so the send is the acknowledgement too. */
+void __cdecl SendVehicleFire(void *vehicle);
+
 #endif /* AM2_ARMYMSG_H */
