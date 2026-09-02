@@ -5039,8 +5039,7 @@ typedef struct {
  *   one Edit:                      the chat line
  *   one Panel, and FOUR Buttons:   start, ready, options, cancel
  *
- * THE INVENTORY TOOK THREE COUNTS TO SETTLE, and the first two were both
- * short. Pairing each `operator new` with the NEXT constructor call gives
+ * THE INVENTORY TOOK FOUR COUNTS AND EVERY PATTERN-BASED ONE WAS SHORT. Pairing each `operator new` with the NEXT constructor call gives
  * nineteen and misses anything with a call in between. Listing every *_CTOR
  * call gives more and misses allocations whose constructor is not matched by
  * the pattern. Counting the ALLOCATIONS is the one that closes: 22 sites --
@@ -5048,10 +5047,22 @@ typedef struct {
  * of which three are inside the four-iteration player loop, against 20
  * WidgetAddChild sites.
  *
- * So not every allocation becomes a child, and the counts differ for a real
- * reason rather than because one of them is wrong. Three views of one
- * function, each complete about the thing it counted and silent about the
- * rest.
+ * And that one was short too: there are 26 `call ADDR_GAME_OPERATOR_NEW`
+ * sites and only 20 of them push their size as an immediate the scan can see,
+ * so six allocations size themselves some other way.
+ *
+ * FOUR EXTRACTIONS, ALL SHORT, EACH PRESENTED AS SETTLED. The honest number
+ * is the one that needs no pattern at all -- count the CALL SITES. Every
+ * refinement of the pattern found more and none of them found all, because a
+ * pattern can only report what it matches and has no way to say what it
+ * skipped.
+ *
+ * The rule this leaves: on a function like this, a pattern extraction is a
+ * LOWER BOUND and should be written down as one. What makes it safe is
+ * pairing it with a count of something unconditional -- call sites,
+ * instructions, `ret`s -- and reconciling the two. The rest of this function
+ * is linear reading, and that is not a defeat: it is what the fourth
+ * miscount finally established.
  *
  * The extraction was too narrow rather than wrong, which is the more
  * dangerous kind: it produced a clean, plausible list of nineteen and nothing
