@@ -95,8 +95,8 @@ because `0x00458A20` sits inside a 5,760-byte `functions.tsv` entry that holds
 **seventeen** functions and patching any one of them credits all of it. The
 same effect inflates the entry count.
 
-    entry-generous   1,230 of 1,239 entries, 93.5% of sub-CRT bytes
-    split-aware      1,381 of 1,530 real functions, 84.6% of sub-CRT bytes
+    entry-generous   1,231 of 1,239 entries, 93.9% of sub-CRT bytes
+    split-aware      1,382 of 1,530 real functions, 85.0% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -266,48 +266,50 @@ its leader still adopts it as the observer; and the HIGH band borrows the LOW
 band's compare, as in `AiAttackBody`. Following bodies without following
 branches gives both no exit.
 
-## AiPatrolStep, and the sight test factored for its pair
+## AiPatrolStep and AiGuardStep -- the pair, both done
 
-`0x004057D0`, 1,344 bytes, three callers. Entries 1,229 -> 1,230 of 1,239,
-**9 left**. `ab.sh bootcamp campaign` clean -- no-regression, the band is cold.
+`0x004057D0` and `0x00405220`. Entries 1,229 -> 1,231 of 1,239, **8 left**.
+`ab.sh bootcamp campaign` clean on both -- no-regression, the band is cold.
 
-The 132-instruction sight test is now `AiCanSee(obj, target)`, ready for
-`0x00405220`, which shares it verbatim including every call target. It reads no
-context field, which is what lets it be a helper at all: the two callers put
-the context in different registers and the other two members of the family use
-a different context family entirely.
+The 132-instruction sight test they share is one helper, `AiCanSee(obj,
+target)`, factored on an operand-level diff that compared call targets rather
+than normalising them.
 
-**The three remembered points are a stack.** `OBJ_OFF_SCRIPT_ID` holds a saved
-copy of `OBJ_OFF_SCRIPT_STATE`, `OBJ_OFF_SCRIPT_NEXT` is a detour, and each is
-cleared as it is reached -- so the unit walks the detour, then the state point,
-then restores the state point from the copy and starts over. All three are
-packed points here, under names `UpdateObjectScript` gave them for a different
-and equally live reading.
+**They differ in four ways and none is visible in the shape.** `AiGuardStep` is
+on a LEASH: both its no-detour paths test the distance to its post against 360
+-- the same constant `AiPatrolStep` only ever uses as a distance to *walk* --
+and past it the unit restores its post, goes home, and clears both
+`OBJ_OFF_FOLLOW_UID` and `OBJ_OFF_TARGET_UID`. It also gates the engaged path
+on one test where the other uses two, drops the follow uid before looking so
+what it sees replaces rather than merges, and -- the sharpest one -- **lets
+both in-sight arms reach the react block**, where `AiPatrolStep`'s far arm
+skips `AiHitReact` and `AiKeepRange` because it is already moving.
 
-**A fourth error of the same class, caught by `checkoffsetuse` rather than by
-reading.** The in-sight arm splits in two and the halves end in different
-places: further than the weapon wants, it closes the distance and goes straight
-to the tail -- no `AiHitReact`, no `AiKeepRange`, because it is already moving;
-close enough, it stops and falls into the react block. I had written only the
-second. What exposed it was one unnamed offset in the report, `0x4c`
-(`SIGHTC_OFF_WANT_RANGE`), which is not in the shared helper and so had nowhere
-else to be. **Read the tool's list even when four of five entries are its
-documented blind spots** -- the fifth was the whole finding.
+Two functions sharing 150 instructions and differing on whether a chasing unit
+gets to shoot. That is what a merge would have cost, and it is the reason the
+byte-level diff came before the code rather than after.
+
+**The three remembered points are a stack**, in both: a saved copy, a post, and
+a detour, each cleared as it is reached.
+
+Both thunks in `gameproc.cpp` that forwarded three `int32_t`s to these
+addresses now call them by name; their prototypes predate the targets having a
+shape, so the casts are at the call and the comment says why.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,230 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 9
-outstanding, which is 1,239 minus 1,230 -- from 1,426 reconstructed addresses
-(1,422 patched plus 4 registered), and **93.5% of the sub-CRT bytes**.
-Split-aware that is **1,381 of 1,530** real functions and **84.6%** of the
+line (0x0045C000) patched**. Measured: **1,231 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 8
+outstanding, which is 1,239 minus 1,231 -- from 1,427 reconstructed addresses
+(1,423 patched plus 4 registered), and **93.9% of the sub-CRT bytes**.
+Split-aware that is **1,382 of 1,530** real functions and **85.0%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
 small ones in batches. A hundred and fifty-one batches have gone in and NOTHING SMALL IS LEFT among
-the ENTRIES: the 9 outstanding start at **1,424 bytes** -- `0x00405220` -- and
+the ENTRIES: the 8 outstanding start at **1,504 bytes** -- `0x0043C110` -- and
 the median is **2,080**. That is not what is left, though: `tools/merges.py`
 splits them into real functions and the 0x00458930 entry alone still holds
 sixteen unwritten ones from 16 bytes up. Rank by real function, not by entry. The

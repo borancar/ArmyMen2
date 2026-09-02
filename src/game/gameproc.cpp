@@ -2040,7 +2040,6 @@ typedef void (__cdecl *AM2_Call3Fn)(int32_t a, int32_t b, int32_t c);
  * palette.h names Win32 types, while this one signature names none. */
 extern "C" void __cdecl BuildRemapTables(void);
 #define orig_free_40a5f0    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_40A5F0)
-#define orig_big_405220     ((AM2_Call3Fn)(uintptr_t)ADDR_BIG_405220)
 
 /* 0x0041E740. Zero a global NOTHING READS. One reference in the whole image
  * -- this store -- confirmed by a decoded scan and a raw dword scan both. So
@@ -2067,7 +2066,10 @@ int32_t __cdecl NoteKind31(void *rec)
  * forwarded to a 1,424-byte function that has two other callers of its own. */
 void __cdecl Call405220(int32_t a, int32_t b, int32_t c)
 {
-    orig_big_405220(a, b, c);
+    /* Same shape as Call4057D0 above: three dwords that are (obj, out, ctx),
+     * declared int32_t because this thunk predates the target having one. */
+    AiGuardStep((void *)(uintptr_t)(uint32_t)a, (void *)(uintptr_t)(uint32_t)b,
+                (void *)(uintptr_t)(uint32_t)c);
 }
 
 /* 0x00445FE0. Free, then log. */

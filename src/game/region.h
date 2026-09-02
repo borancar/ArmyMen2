@@ -290,6 +290,10 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out);
 /* 0x004057D0, three callers. Walk the remembered points -- a saved copy, a
  * state point and a detour -- then look for something to shoot. The name is
  * ours. */
+/* 0x00405220, one caller. AiPatrolStep's pair, on a leash: past 360 from its
+ * post it goes home and forgets what it was chasing. The name is ours. */
+void __cdecl AiGuardStep(void *obj, void *out, void *ctx);
+
 void __cdecl AiPatrolStep(void *obj, void *out, void *ctx);
 
 void __cdecl AiEngageStep(void *obj, void *out, void *ctx);
