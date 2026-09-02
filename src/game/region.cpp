@@ -7743,7 +7743,7 @@ typedef void (__cdecl *AM2_Step2BFn)(void *obj, void *out);
 typedef void (__cdecl *AM2_RowFinalFn)(void *row);
 /* TrooperFire is reconstructed below and called by name; 0x00449FD0's seam is
  * gone with it. */
-#define orig_step2_44afb0 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_AI_44AFB0))
+#define orig_step2_44afb0 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_UPDATE_TROOPER_ACTION))
 #define orig_step2_44a420 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_STEP2_44A420))
 /* Type2PlayerStep is reconstructed below and called by name. */
 #define orig_row_final    ((AM2_RowFinalFn)(uintptr_t)AM2_IMAGE(ADDR_ROACH_ROW_FINAL))
@@ -8033,7 +8033,7 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
  * standing cost of finishing a layer.
  *
  * BOTH DEAD BRANCHES END THE SAME WAY: clear the record, DestroyByType, then
- * ADDR_AI_44AFB0 with the weapon looked up further up. The pose-range branch
+ * ADDR_UPDATE_TROOPER_ACTION with the weapon looked up further up. The pose-range branch
  * additionally finishes the row's animation first, and RETURNS EARLY if that
  * animation has not finished -- so a dying trooper is stepped again next frame
  * rather than destroyed mid-animation.
@@ -8116,7 +8116,7 @@ void __cdecl StepType2(void *obj)
         return;
     }
 
-    /* EVERY ALIVE PATH CONVERGES ON ADDR_AI_44AFB0 -- it is a tail, not a set
+    /* EVERY ALIVE PATH CONVERGES ON ADDR_UPDATE_TROOPER_ACTION -- it is a tail, not a set
      * of returns, and writing it as returns is what the state artifact caught:
      * that call moves the held weapon to its owner's position, so skipping it
      * left a dropped weapon at 0,0 where the original had it at the trooper's

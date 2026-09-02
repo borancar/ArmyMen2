@@ -8020,7 +8020,16 @@ typedef struct {
  * same offset as a pointer, is a third reading of the uid or a genuine union
  * arm has NOT been settled; the alias is recorded rather than argued. */
 #define OBJ_OFF_UID              0x04u
-#define ADDR_AI_44AFB0           0x0044AFB0u  /* void(obj, int32, void *) */
+/* IT NAMES ITSELF. "UpdateTrooperAction: asking for an item (2); oldweapon:
+ * %s; maxammo: %d" is pushed from inside this function and is the only
+ * reference to that string in the image, and the message opens `Name:` --
+ * which is the self-naming pattern, not a message about some OTHER function
+ * the way "ERROR: SetObjScriptState was called with %s" is. So the program's
+ * word for 0x0044AFB0 is UpdateTrooperAction and ADDR_UPDATE_TROOPER_ACTION was ours.
+ *
+ * Its sibling 0x0044A420 carries no such string, so the "(2)" numbers the
+ * request sites rather than the functions -- there is no "(1)" anywhere. */
+#define ADDR_UPDATE_TROOPER_ACTION 0x0044AFB0u  /* void(obj, int32, void *) */
 /* SURVEYED AND NOT RECONSTRUCTED. 2,080 bytes, 632 instructions, four callers
  * -- all four inside StepType2, which reaches it as a TAIL rather than as one
  * arm of several.
@@ -9196,7 +9205,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * ADDR_OBJ_BLOCK_WEIGHT is reached from here and not only in principle. The
  * other picks between this and 0x0045B7E0 on a value being 5. Counter measured
  * at 0 -- not blind, just unreached -- so it is verified by reading. */
-/* 0x00448FB0, three call sites, all inside ADDR_AI_44AFB0. The sixth member
+/* 0x00448FB0, three call sites, all inside ADDR_UPDATE_TROOPER_ACTION. The sixth member
  * of the block-weight family: the walk inlined WITH BlockWeightAt's height
  * step, no trooper arm, a strictly-greater distance test where Troops uses >=,
  * and a fourth argument that is an OUT-POINTER rather than the family's `ref`

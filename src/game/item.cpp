@@ -2884,7 +2884,7 @@ int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
 }
 
 /* BlockWeightRoute -- original 0x00448FB0, three call sites, all inside
- * ADDR_AI_44AFB0. THE SIXTH MEMBER of the block-weight family and the fifth
+ * ADDR_UPDATE_TROOPER_ACTION. THE SIXTH MEMBER of the block-weight family and the fifth
  * spelling of one walk; the other five are reconstructed already:
  *
  *   BlockWeightAt        0x00448F00  tile bit and a height step

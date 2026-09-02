@@ -411,7 +411,15 @@ why the two exits answer different bearings.
 Its callers wanted casts at every site -- the out-params are written straight
 into the sight context, which is what confirms where they land.
 
-## Next: 0x0044AFB0, and it is LIVE
+## Next: UpdateTrooperAction (0x0044AFB0), and it is LIVE
+
+**It names itself.** `"UpdateTrooperAction: asking for an item (2); oldweapon:
+%s; maxammo: %d"` is pushed from inside the function and is the only reference
+to that string in the image, and the message opens `Name:` -- the self-naming
+pattern, not a message *about* another function the way
+`"ERROR: SetObjScriptState was called with %s"` is. `ADDR_AI_44AFB0` was ours;
+this is the program's. Its sibling `0x0044A420` carries no such string, so the
+"(2)" numbers the request sites rather than the functions.
 
 2,080 bytes, four callers, all inside `StepType2` -- which reaches it as a
 *tail* rather than as one arm of several.
