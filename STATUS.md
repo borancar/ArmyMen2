@@ -5,12 +5,55 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-02**, at `bbe16f4`. Working tree clean.
+Last updated: **2026-09-02**, at `d5c8985`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,432 patches plus 4 REGISTERED**, **30** analysis
-tools in `make check`.
+Nothing uncommitted. **1,484 patches plus 4 REGISTERED**, **30** analysis
+tools in `make check` (`tools/checkpatches.py`; `make check` for the tools).
+
+## Where the boundary is
+
+The sub-CRT set is **closed at 1,239 of 1,239** and has been since this
+morning. Work is above the nominal `CRT_START`, where `tools/crt.py` measures
+**112 game functions** between `0x0045C000` and the real CRT frontier at
+`0x00464420` -- code every count in this project silently dropped until that
+tool existed. **80 of the 112 are done, 32 remain, 12,714 bytes**
+(`tools/crt.py` then subtract the patch list; the recipe is in this file's
+git history).
+
+Largest outstanding: `FireWeapon` (0x0045F460, 3200 B), `MissileDefFind`
+(0x004602C0, 1296 B), `PausedFrameStep` (0x00462600, 1088 B).
+
+## Families closed today
+
+**The vehicle step, five of five.** `Step3TurnBlocked`, `Step3ChooseFacing`,
+`Step3TurnState`, `Step3RouteAndBoard`, `Step3Drive` (0x0045CB30, 769
+instructions) and `Step3Input` (0x0045C050) -- input, turn planning, routing,
+boarding and the drive itself. **Every one is COLD**: no configuration here
+puts a player in a vehicle, so the transcription checks are the verification
+and the A/B only says nothing else broke.
+
+**The vehicle delta protocol, both ends.** `VehicleUpdateAppend` (0x0045DAA0)
+and `VehicleUpdateApply` (0x0045DF10), plus the batch walk `RecvVehicle1B`
+that drives the second, and `RecvVehicle1E` and `RecvVehicle24` beside them.
+Needs a live DirectPlay session, so also verified by reading.
+
+## What the checks caught today, which reading did not
+
+Worth keeping as evidence about where the defects actually are:
+
+- **`AppendTroopState` counted the old length twice.** Found by reading the
+  vehicle sibling, not by any test -- its only caller needs DirectPlay, so it
+  has never executed here.
+- **Two globals were named from a caller's interpretation.** `ADDR_DRAG_ACTIVE`
+  and `ADDR_CLICK_ENABLED` are mouse button 1's state and edge; our own
+  `PollMouse` already spelled them as `g_mouseButton[n]`, so the tree
+  contradicted itself and nothing could see it.
+- **`checkseams` fired in three consecutive commits**, each time on a seam
+  that became a lie the moment an address became ours.
+- **`checkoffsets` refused a duplicate string define**; the compiler refused a
+  duplicate `VehicleMsgRecv` I wrote without grepping the address first.
 
 ## OPEN: are the row-pool evictors reachable at all?
 
