@@ -42,6 +42,7 @@
 #include "../game/win32/frame.h"
 #include "../game/gamedir.h"
 #include "../game/misc.h"
+#include "../game/cheat.h"
 #include "../game/script.h"
 #include "../game/objscript.h"
 #include "../game/objtable.h"
@@ -460,6 +461,7 @@ static void install(void)
     event_install();
     trig_install();
     frame_install();
+    cheat_install();
     script_install();
     objscript_install();
     objtable_install();

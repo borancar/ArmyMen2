@@ -3935,7 +3935,7 @@ void __attribute__((thiscall)) ListDropOldest(void *list)
 #define g_defaultOwner    (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
 #define g_levelCount      (*(const int32_t *)(uintptr_t)ADDR_LEVEL_TABLE_COUNT)
 #define g_moviePage       (*(int32_t *)(uintptr_t)ADDR_MOVIE_PAGE)
-#define g_movieCount      (*(const int32_t *)(uintptr_t)ADDR_MOVIE_COUNT)
+#define g_movieCount      (*(int32_t *)(uintptr_t)ADDR_MOVIE_COUNT)
 #define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
 #define g_overlayDirty    (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
 typedef void (__cdecl *am2_void_fn)(void);

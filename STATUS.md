@@ -457,6 +457,12 @@ pushes are identical bar a *kind* and an *ammo* count -- everything else, four
 zeros and the caller's position, is the same in all eighteen. So the
 transcription is one helper and eighteen one-line cases.
 
+**CheatLine (0x00417B80) is reconstructed** -- 2,304 bytes, thirty-nine
+arms, in the new flat module `src/game/cheat.cpp`. Nineteen item cheats
+collapse to one helper, `phoenix!`/`cliche ending` to a second, and the rest
+are individual. It is COLD: nothing on any drive types a cheat, so an A/B over
+it is no-regression only and the evidence is the decode.
+
 **The colour bytes are colours**, settled by reading `HudMessage`: its second
 argument is an `int32` it uses as `(uint8_t)colour`, so the upper three bytes
 are dead and the arms' byte-into-an-untouched-register is not sloppiness but
