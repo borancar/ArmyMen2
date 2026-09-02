@@ -842,11 +842,7 @@ void __cdecl ResetLevelState(void)
     *(int32_t *)(uintptr_t)ADDR_CHEAT_INVULNERABLE  = 0;
 }
 
-/* 0x00461F90 is above the CRT line and stays original; reached by name here
- * rather than by address so checkseams can see it. */
-typedef int32_t (__cdecl *AM2_TimedDirFrameFn)(void *rows, int32_t dir);
-#define orig_timed_dir_frame \
-    ((AM2_TimedDirFrameFn)(uintptr_t)AM2_IMAGE(ADDR_TIMED_DIR_FRAME))
+/* TimedDirFrame is reconstructed now; maprow.h declares it. */
 
 /* CreateMissile -- original 0x0043B9B0, nine callers. Build a type-5 object
  * from a weapon and a firing position: allocate it, run the shared init, give
@@ -965,7 +961,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
         *(uint8_t *)(rows + ROW_OFF_HEADING) = (uint8_t)heading;
         *(uint32_t *)(rows + ROW_OFF_STAMP_54) =
             *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
-        orig_timed_dir_frame(rows, heading);
+        TimedDirFrame(rows, heading);
 
         if (*(const uint32_t *)(w + MISSILE_OFF_LAST_UID)) {
             uint8_t *prev = (uint8_t *)

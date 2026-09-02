@@ -7742,11 +7742,10 @@ extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
 
 typedef void (__cdecl *AM2_Step2AFn)(void *obj, void *weapon, void *out);
 typedef void (__cdecl *AM2_Step2BFn)(void *obj, void *out);
-typedef void (__cdecl *AM2_RowFinalFn)(void *row);
 /* TrooperFire is reconstructed below and called by name; 0x00449FD0's seam is
  * gone with it. */
 /* Type2PlayerStep is reconstructed below and called by name. */
-#define orig_row_final    ((AM2_RowFinalFn)(uintptr_t)AM2_IMAGE(ADDR_LEAVE_REMAINS_ROW))
+/* LeaveRemainsRow is reconstructed; maprow.h declares it. */
 
 
 typedef int32_t (__cdecl *AM2_GameRandFn)(void);
@@ -8562,7 +8561,7 @@ void __cdecl StepType2(void *obj)
                               * tail too, so its weapon keeps being placed */
             RowFaceSprite(row);
             *(int32_t *)out = 0;
-            orig_row_final(row);
+            LeaveRemainsRow(row);
         } else {
             *(int32_t *)out = 0;
         }
@@ -8729,7 +8728,7 @@ void __cdecl StepType3(void *obj)
         default:
             /* kind 4 and anything above 5: no sound, finish and destroy */
             *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
-            orig_row_final(row);
+            LeaveRemainsRow(row);
             DestroyByType(obj);
             goto post;
         }

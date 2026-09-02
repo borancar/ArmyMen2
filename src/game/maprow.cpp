@@ -1179,6 +1179,10 @@ int maprow_install(void)
     rc |= patch_replace(ADDR_RANDOM_RESPAWN_KIND,
                         (const void *)RandomRespawnKind,
                         "RandomRespawnKind", 2);
+    rc |= patch_replace(ADDR_LEAVE_REMAINS_ROW, (const void *)LeaveRemainsRow,
+                        "LeaveRemainsRow", 1);
+    rc |= patch_replace(ADDR_TIMED_DIR_FRAME, (const void *)TimedDirFrame,
+                        "TimedDirFrame", 2);
     return rc;
 }
 
@@ -1765,4 +1769,78 @@ void __cdecl FreeSeqContexts(void)
     SeqCtxFree((void *)(uintptr_t)ADDR_SEQ_CTX_A);
     RowPoolBFree();
     RowPoolAFree();
+}
+
+/* LeaveRemainsRow -- original 0x00461EA0, three callers. Take a row from pool
+ * B and leave a copy of a dying object's row behind on the map.
+ *
+ * FOUR FIELDS, NOT A COPY. It takes the sprite, the x and the remap pointer
+ * off the source row and nothing else -- so the remains inherit what they
+ * look like and where they are, and inherit none of the animation state, the
+ * depth links or the owner. A memcpy of the record would be shorter and
+ * would be a different function.
+ *
+ * ROW_OFF_FIELD_26 IS FORCED TO 3 rather than copied, which is what makes the
+ * new row remains rather than a second live row; the source's own value is
+ * never read.
+ *
+ * The pool allocator's answer is DEREFERENCED ONCE before use --
+ * `call RowPoolBAlloc; mov eax,[eax]` -- so it hands back a slot holding the
+ * row, not the row. Reading it as the row writes the sprite over the slot
+ * pointer, which is the obj -> table -> slot shape CLAUDE.md records taking
+ * the game down on its first run. */
+void __cdecl LeaveRemainsRow(const void *src)
+{
+    const uint8_t *s = (const uint8_t *)src;
+    uint8_t       *r = *(uint8_t **)RowPoolBAlloc();
+
+    *(int32_t *)r = 1;
+    *(uint32_t *)(r + ROW_OFF_SPRITE) = *(const uint32_t *)(s + ROW_OFF_SPRITE);
+    *(uint32_t *)(r + ROW_OFF_X)      = *(const uint32_t *)(s + ROW_OFF_X);
+    *(uint32_t *)(r + ROW_OFF_FIELD_2C) =
+        *(const uint32_t *)(s + ROW_OFF_FIELD_2C);
+    *(int16_t *)(r + ROW_OFF_FIELD_26) = 3;
+
+    RowUpdate(r, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+}
+
+/* TimedDirFrame -- original 0x00461F90, two callers, both in the missile
+ * layer. Pick a sprite out of the grid from a DIRECTION and the time elapsed
+ * since the row was stamped, write it into the row, and answer whether the
+ * sequence has more frames left.
+ *
+ * THE DIVISION IS BY 100 AND IS WRITTEN AS A MULTIPLY. `mov eax, 0x51EB851F;
+ * mul ecx; shr edx, 6` is the compiler's reciprocal for /100 -- the constant
+ * is 2^38/100 rounded up and the shift takes the high half down by six. So
+ * the frame advances ten times a second, which no constant in the function
+ * says.
+ *
+ * IT CLAMPS THE COLUMN AND THEN REPORTS THE CLAMP. The elapsed frame is
+ * pinned to cols-1, and the return value is `col < cols - 1` computed from
+ * the CLAMPED value -- so it answers false on the last frame and forever
+ * after, which is what makes it usable as "is this animation still running".
+ * Returning the unclamped comparison would answer true once more.
+ *
+ * The direction goes through RoundTo8 with three bits, so the grid's rows are
+ * eight facings; the row index is that times the column count. */
+int32_t __cdecl TimedDirFrame(void *rows, int32_t dir)
+{
+    uint8_t *r    = (uint8_t *)rows;
+    int32_t  cols = *(const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS;
+    uint32_t elapsed;
+    int32_t  col;
+    int32_t  band;
+
+    elapsed = (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+               - *(const uint32_t *)(r + ROW_OFF_STAMP_54)) / 100u;
+
+    col = (int32_t)elapsed;
+    if (col >= cols - 1)
+        col = cols - 1;
+
+    band = RoundTo8((uint32_t)dir & 0xFFu, 3) & 0xFF;
+    *(uint32_t *)(r + ROW_OFF_SPRITE) =
+        (*(uint32_t *const *)(uintptr_t)ADDR_SPRITE_GRID)[band * cols + col];
+
+    return col < cols - 1;
 }

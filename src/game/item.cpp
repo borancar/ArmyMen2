@@ -6169,8 +6169,7 @@ void __cdecl NextInventorySlot(void *obj)
  * OBJ_OFF_DEATH_STATE. `uint8_t *facing` was a type off one use, the same
  * shape of mistake as ObjInitCommon's `dir`. */
 typedef void (__cdecl *AM2_RoachRowFn)(void *row);
-#define orig_roach_row_final \
-    ((AM2_RoachRowFn)(uintptr_t)ADDR_LEAVE_REMAINS_ROW)
+/* LeaveRemainsRow is reconstructed; maprow.h declares it. */
 
 typedef void (__cdecl *AM2_StepFn)(void *obj);
 
@@ -6242,7 +6241,7 @@ void __cdecl StepType8(void *obj)
             if (!RowAnimFinished(*(void **)(o + OBJ_OFF_ROWS)))
                 break;
             RowFaceSprite(*(void **)(o + OBJ_OFF_ROWS));
-            orig_roach_row_final(*(void **)(o + OBJ_OFF_ROWS));
+            LeaveRemainsRow(*(void **)(o + OBJ_OFF_ROWS));
             DestroyByType(obj);
             break;
 
@@ -12384,8 +12383,7 @@ void __cdecl DamageItem(void *obj, int32_t amount, int32_t extra, int32_t kind,
 /* 0x00461F90 is above the CRT line and stays original -- the same typedef
  * gameproc.cpp carries, and reached the same way so checkseams can see it. */
 typedef int32_t (__cdecl *AM2_TimedDirFrame5Fn)(void *rows, int32_t dir);
-#define orig_timed_dir_frame5 \
-    ((AM2_TimedDirFrame5Fn)(uintptr_t)AM2_IMAGE(ADDR_TIMED_DIR_FRAME))
+/* TimedDirFrame is reconstructed; maprow.h declares it. */
 
 /* StepType5 -- original 0x0043C110, 1,504 bytes, one caller: a missile's
  * per-frame flight. The record it walks is named in orig.h; read that first,
@@ -12550,7 +12548,7 @@ after_flight:
          * decides whether it still has a frame to show, and if the segment
          * ahead is more than 0x14 away and less than a second old, this one
          * jumps to a point 18 units off it on a random spread. */
-        if (!orig_timed_dir_frame5(rows,
+        if (!TimedDirFrame(rows,
                                    *(const uint8_t *)(o + OBJ_OFF_FACING)))
             outcome = 4;
         if (*(const uint32_t *)(o + MISSILE_OFF_NEXT_UID)) {

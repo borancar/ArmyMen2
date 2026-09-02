@@ -130,4 +130,12 @@ void __cdecl SeqSubsystemInit(void);
 /* 0x00461120. Take them down again, LIFO. */
 void __cdecl FreeSeqContexts(void);
 
+/* 0x00461EA0. Leave a remains row behind a dying object: four fields off the
+ * source row, ROW_OFF_FIELD_26 forced to 3, then RowUpdate. */
+void __cdecl LeaveRemainsRow(const void *src);
+
+/* 0x00461F90. Pick a sprite from the grid by direction and elapsed time,
+ * write it into the row, and answer whether more frames remain. */
+int32_t __cdecl TimedDirFrame(void *rows, int32_t dir);
+
 #endif
