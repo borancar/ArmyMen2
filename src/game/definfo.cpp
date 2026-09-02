@@ -285,7 +285,7 @@ int32_t __cdecl DefParseInfoFile(const char *path)
  * names itself through the five files it parses and its "Couldn't parse %s!".
  *
  * Six steps: free every definition table, SetDataDir("aai") and parse the
- * five files, then SetDataDir(ADDR_TILESET_PATH) and parse Object.aai AGAIN --
+ * five files, then SetDataDir(ADDR_MAP_FOLDER) and parse Object.aai AGAIN --
  * a tileset directory may override the global object definitions -- then
  * DefFinish, then rebuild the missile definitions and the rank records.
  *
@@ -327,7 +327,7 @@ void __cdecl LoadDefTables(void)
                  AM2_IMAGE(ADDR_STR_DEF_GAME_AAI));
 
     /* The override pass. */
-    SetGameDir((const char *)AM2_IMAGE(ADDR_TILESET_PATH));
+    SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
     if (!DefParseInfoFile((const char *)AM2_IMAGE(ADDR_STR_DEF_OBJECT_AAI)))
         orig_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE),
                  AM2_IMAGE(ADDR_STR_DEF_OBJECT_AAI));

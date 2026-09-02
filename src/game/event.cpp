@@ -1969,7 +1969,7 @@ void __cdecl MissionEnded(int32_t lost)
     if (*(const int32_t *)(uintptr_t)ADDR_WIN_ENABLED) {
         SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
         am2_sprintf(path, (const char *)AM2_IMAGE(ADDR_STR_LEVEL_FILE_FMT),
-                    (const char *)(uintptr_t)ADDR_TILESET_NAME,
+                    (const char *)(uintptr_t)ADDR_MAP_NAME,
                     *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX + 1);
 
         h = orig_findfirst(path, found);
@@ -2013,7 +2013,7 @@ void __cdecl MissionEnded(int32_t lost)
     if (!lost && *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID > 0) {
         SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
         am2_sprintf(path, (const char *)AM2_IMAGE(ADDR_STR_LEVEL_FILE_FMT),
-                    (const char *)(uintptr_t)ADDR_TILESET_NAME,
+                    (const char *)(uintptr_t)ADDR_MAP_NAME,
                     *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX + 1);
 
         h = orig_findfirst(path, found);

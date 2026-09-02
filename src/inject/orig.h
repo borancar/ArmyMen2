@@ -1936,8 +1936,6 @@
 #define ADDR_RESTORE_TILESET 0x0042C0E0u /* void(void) */
 /* The `.atl` reader's inputs. The name is formatted into "%s.atl"; the path is
  * only probed, and DataPathExists' answer is discarded. */
-#define ADDR_TILESET_NAME    0x00511A88u /* char[] */
-#define ADDR_TILESET_PATH    0x00511AC8u /* char[] */
 /* Non-zero reserves the first ten palette entries, as BMP_FLAG_RESERVE10 does
  * for MakeBitmap -- the same convention reached a different way. */
 #define ADDR_TILESET_RESERVE 0x00511CC8u /* int32_t */
@@ -9818,7 +9816,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_DEF_GAME_AAI    0x00473D4Cu  /* "Game.aai" */
 /* 0x00403400, one caller -- the level load, which also builds the HUD. It
  * names itself through the five files it parses. Free every definition table,
- * SetDataDir("aai"), parse the five, then SetDataDir(ADDR_TILESET_PATH) and
+ * SetDataDir("aai"), parse the five, then SetDataDir(ADDR_MAP_FOLDER) and
  * parse Object.aai AGAIN -- so a tileset directory may override the global
  * object definitions. Then DefFinish, and rebuild two runtime tables.
  *
@@ -13067,7 +13065,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * simply ignored, and every field access inside stays correct.
  *
  * AND IT SETTLES TWO ALIAS PAIRS THIS FILE ALREADY HAD. 0x00511A88 is both
- * ADDR_TILESET_NAME and ADDR_MAP_NAME; 0x00511AC8 is both ADDR_TILESET_PATH
+ * ADDR_MAP_NAME and ADDR_MAP_NAME; 0x00511AC8 is both ADDR_MAP_FOLDER
  * and ADDR_MAP_FOLDER. Since the first feeds the .amm as well as the .atl,
  * "tileset" is too narrow in both -- the same shape as ADDR_MISSILE_DEFS
  * being named for one of the things it holds. Not collapsed here: a rename is
@@ -13105,7 +13103,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * from their own bodies and "the remaining 171 are CRT by sitting above the
  * evidenced frontier" -- and at least two of those 171 are game code, found
  * because a function below the line called them. Reading a global's name is
- * evidence the position rule cannot see. */
+ * evidence the position rule cannot see.
  *
  * What the survey does NOT settle is which side of the split it belongs on.
  * It reaches files, and this project's answer to "where is the file I/O" is

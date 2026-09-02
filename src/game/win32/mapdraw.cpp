@@ -268,8 +268,8 @@ typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
 
 #define orig_sprintf       (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
 
-#define g_tilesetName    ((const char *)(uintptr_t)ADDR_TILESET_NAME)
-#define g_tilesetPath    ((const char *)(uintptr_t)ADDR_TILESET_PATH)
+#define g_tilesetName    ((const char *)(uintptr_t)ADDR_MAP_NAME)
+#define g_tilesetPath    ((const char *)(uintptr_t)ADDR_MAP_FOLDER)
 #define g_tilesetReserve (*(int32_t *)(uintptr_t)ADDR_TILESET_RESERVE)
 #define g_activePalette  (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
 /* g_mapSprite, above, is the same record PaintMapTiles reads: the global

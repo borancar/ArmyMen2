@@ -1908,7 +1908,7 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
 
         strcpy((char *)(uintptr_t)ADDR_MP_SCRIPT_NAME,
                (const char *)(m + MSG_PLAYER_MAP_NAME));
-        strcpy((char *)(uintptr_t)ADDR_TILESET_NAME,
+        strcpy((char *)(uintptr_t)ADDR_MAP_NAME,
                (const char *)(m + MSG_PLAYER_LEVEL_NAME));
         rules = orig_check_map_rules(
                     *(const int32_t *)(m + MSG_PLAYER_RULE_ARG),

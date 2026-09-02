@@ -2706,7 +2706,7 @@ void __cdecl SendPlayerMsg(int32_t arg)
         *(const int32_t *)(uintptr_t)ADDR_DATA_CHECKSUM;
 
     strcpy((char *)(msg + MSG_PLAYER_LEVEL_NAME),
-           (const char *)(uintptr_t)ADDR_TILESET_NAME);
+           (const char *)(uintptr_t)ADDR_MAP_NAME);
     strcpy((char *)(msg + MSG_PLAYER_MAP_NAME),
            (const char *)(uintptr_t)ADDR_MP_SCRIPT_NAME);
 
