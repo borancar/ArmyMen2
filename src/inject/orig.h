@@ -7938,6 +7938,23 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
+ * SEVERAL ARMS TAKE A VALUE FROM A VARIABLE OR FROM act->n0, and the two
+ * halves are not the same width. When act->xvar is positive the value is
+ * GetVarValue's full dword; otherwise the original loads `al` alone and jumps
+ * back into the common path, so the dword it pushes carries whatever was in
+ * the rest of eax.
+ *
+ * That is only harmless because the callees take an int8_t --
+ * EvtSetByte40 and EvtSetByte530 both do, and their headers say so because
+ * they were reconstructed first. Written as a shared helper returning int32
+ * with the CAST at the call, which reproduces both halves without
+ * reproducing the garbage.
+ *
+ * Same shape as Log2Mask leaving its argument in the upper three bytes of
+ * eax, which this file records as needing a byte_ret flag in the vector
+ * harness. Second instance, and both were only visible from the callee's
+ * declared parameter.
+ *
  * `setdamagepad` TOUCHES TWO ARRAYS WITH TWO STRIDES, and the second is
  * reached through the first. Code 0x3A writes PAD_OFF_DAMAGE, +0x38 and
  * PAD_OFF_DAMAGE_KIND of ADDR_PADS[subject] -- stride 72 -- and then, only
