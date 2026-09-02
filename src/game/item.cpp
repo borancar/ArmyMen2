@@ -13251,4 +13251,90 @@ void item_install(void)
     patch_replace(ADDR_ROW_RELEASE, (const void *)RowRelease, "RowRelease", 5);
     patch_replace(ADDR_STEP_OBJ_ROWS, (const void *)StepObjRows,
                   "StepObjRows", 7);
+    patch_replace(ADDR_CREATE_WATCHED_ITEM, (const void *)CreateWatchedItem,
+                  "CreateWatchedItem", 4);
+    patch_replace(ADDR_CREATE_WATCHED_TYPE, (const void *)CreateWatchedType,
+                  "CreateWatchedType", 4);
+}
+
+/* CreateWatchedItem and CreateWatchedType -- originals 0x0045F300 and
+ * 0x0045F3C0, one caller each, adjacent in FireWeapon's tail. Both drop an
+ * item ten units in front of an object along a facing.
+ *
+ * THE SCALE CONSTANT IS -10.0 AND THE COMBINE IS A SUBTRACT, which together
+ * make +10 -- and the two halves cannot be folded. `(int32_t)(Cos8(f) *
+ * -10.0)` truncates TOWARD ZERO on a negative product, so subtracting it is
+ * not the same as adding `(int32_t)(Cos8(f) * 10.0)` for any facing whose
+ * product is not integral. Written the way the image has it, sign and all;
+ * simplifying is a rounding change disguised as arithmetic.
+ *
+ * BOTH BUILD THE NEW POINT IN ARGUMENT 4'S SLOT. `mov word [esp+0x24], cx`
+ * and `[esp+0x26], dx` overwrite the facing once Cos8 and Sin8 have consumed
+ * it, and the dword is then read back whole as the point. tools/espmap.py
+ * resolves it; the halves straddle argument boundaries, so a displacement
+ * read by eye lands in the wrong argument.
+ *
+ * THE PAIR DIFFERS IN THREE THINGS, all of them after the item exists: the
+ * kind global (ADDR_CREATE_WATCHED_KIND against ADDR_WATCHED_TYPE_ID), and
+ * the first one additionally runs ItemPostCreate and CONCEALS the new item
+ * when the owner is not allied to the local player. The second does neither,
+ * so what it drops is always visible. Two functions rather than one with a
+ * flag, and the difference is behaviour rather than a constant. */
+void __cdecl CreateWatchedItem(int32_t unused, void *obj, uint32_t at,
+                               int32_t facing)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint32_t point;
+    void    *item;
+
+    ((int16_t *)&point)[0] = (int16_t)((int32_t)(int16_t)(at & 0xFFFF)
+                                       - (int32_t)(Cos8(facing) * AM2_WATCH_DROP_SCALE));
+    ((int16_t *)&point)[1] = (int16_t)((int32_t)(int16_t)(at >> 16)
+                                       - (int32_t)(Sin8(facing) * AM2_WATCH_DROP_SCALE));
+
+    item = CreateItem((char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                      *(const int8_t *)(o + OBJ_OFF_ARMY),
+                      *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND,
+                      point, 1, 0, 0);
+    if (item == 0)
+        return;
+
+    ItemPostCreate(*(const int8_t *)(o + OBJ_OFF_ARMY), point);
+
+    *(uint8_t *)((uint8_t *)item + 0x65u) = *(const uint8_t *)(o + 0x65u);
+    ObjTileChanged(item, *(const int8_t *)((uint8_t *)item + 0x65u), 1);
+
+    /* The original loads ecx with the comm object first and AllyFlag ignores
+     * it -- army.h records that of both existing call sites, and this is a
+     * third. Two stack arguments, owner then army. */
+    if (!AllyFlag(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                  *(const int8_t *)(o + OBJ_OFF_ARMY)))
+        ObjConceal(item, 1);
+
+    (void)unused;
+}
+
+void __cdecl CreateWatchedType(int32_t unused, void *obj, uint32_t at,
+                               int32_t facing)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint32_t point;
+    void    *item;
+
+    ((int16_t *)&point)[0] = (int16_t)((int32_t)(int16_t)(at & 0xFFFF)
+                                       - (int32_t)(Cos8(facing) * AM2_WATCH_DROP_SCALE));
+    ((int16_t *)&point)[1] = (int16_t)((int32_t)(int16_t)(at >> 16)
+                                       - (int32_t)(Sin8(facing) * AM2_WATCH_DROP_SCALE));
+
+    item = CreateItem((char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                      *(const int8_t *)(o + OBJ_OFF_ARMY),
+                      *(const int32_t *)(uintptr_t)ADDR_WATCHED_TYPE_ID,
+                      point, 1, 0, 0);
+    if (item == 0)
+        return;
+
+    *(uint8_t *)((uint8_t *)item + 0x65u) = *(const uint8_t *)(o + 0x65u);
+    ObjTileChanged(item, *(const int8_t *)((uint8_t *)item + 0x65u), 1);
+
+    (void)unused;
 }

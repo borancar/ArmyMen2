@@ -16075,6 +16075,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * compared with the +8 dword of an object's OBJ_OFF_FIELD_94 record, which
  * orig.h already records as "a type id being matched, not a count". */
 #define ADDR_CREATE_WATCHED_KIND 0x00516160u  /* int32_t */
+/* -10.0f at 0x0046FD58, and the SIGN is load-bearing: the two droppers
+ * multiply Cos8/Sin8 by it and SUBTRACT, so the net offset is +10 -- but
+ * (int32_t)(c * -10.0) truncates toward zero on a negative product, and
+ * folding the pair into `+ (int32_t)(c * 10.0)` changes the result for every
+ * facing whose product is not integral. */
+#define AM2_WATCH_DROP_SCALE     (-10.0f)
+#define ADDR_CREATE_WATCHED_ITEM 0x0045F300u /* void(int32, obj, pt, facing) */
+#define ADDR_CREATE_WATCHED_TYPE 0x0045F3C0u /* void(int32, obj, pt, facing) */
 /* 0x0045EED0, EIGHT callers, 48 bytes: is this object an ITEM of that type?
  * Null answers null, a non-item answers 0, and an item answers the comparison.
  * Reconstructed. */

@@ -951,4 +951,12 @@ int32_t __cdecl TryTakeWeapon(void *cand, void *unit);
  * stale and destroyed entries as it goes. */
 void __cdecl ForEachSelected(void (__cdecl *fn)(void *obj));
 
+/* 0x0045F300 and 0x0045F3C0. Drop an item ten units along a facing from a
+ * point. The first also runs ItemPostCreate and conceals what it drops from
+ * a player not allied to the owner; the second does neither. */
+void __cdecl CreateWatchedItem(int32_t unused, void *obj, uint32_t at,
+                               int32_t facing);
+void __cdecl CreateWatchedType(int32_t unused, void *obj, uint32_t at,
+                               int32_t facing);
+
 #endif
