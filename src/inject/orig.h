@@ -3876,6 +3876,23 @@
  * context's SIGHTC_OFF_FIELD_00 -- ClassifyByCode74's 0, 1 or 2. They differ
  * in ONE entry, which is the whole reason there are two of them, and the
  * tables TILE, 0x004750B4 running to exactly 0x004750C0. */
+/* EIGHT CONSECUTIVE int32[3] TABLES RUN FROM 0x00475090 TO 0x004750F0, all
+ * indexed by ClassifyCode74's 0, 1 or 2, and 0x0044A420 reaches five of them.
+ * The tidy reading is one 8x3 array with a single base -- and taking it would
+ * have put a second base over the storage these two names already hold, which
+ * is the mistake this file warns about at the top under a different shape.
+ * The tree committed to separate int32[3] names first; the rest follow it.
+ *
+ *   0x00475090  5, 7, 6     0x0047509C  5, 4, 4
+ *   0x004750A8 10,11, 6     0x004750B4  2, 8, 9  (below)
+ *   0x004750C0  3, 8, 9     0x004750CC 18, 8, 9
+ *   0x004750D8 13,15,17     0x004750E4 12,14,16
+ *
+ * Their width was worth checking rather than inferring: the first table's
+ * three used entries are followed by three more before the next base, so
+ * 3-wide and 6-wide fit the layout equally. What settles it is the CLASSIFIER
+ * -- item.cpp already records ClassifyCode74 answering 0, 1 or 2 -- and not
+ * the spacing. Read the index's range from the function that produces it. */
 #define ADDR_AI_MOVE_STATE       0x004750B4u  /* int32[3]: 2, 8, 9 */
 #define ADDR_AI_MOVE_STATE_ALT   0x004750C0u  /* int32[3]: 3, 8, 9 */
 #define AM2_AI_MOVE_STATES       3
