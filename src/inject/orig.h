@@ -5096,6 +5096,18 @@ typedef struct {
  * an uninitialised descriptor after a successful Restore -- a defect in the
  * original is not ours to fix.
  *
+ * THE SCORE LABEL READS THE PANEL'S OWN BUFFER, like the chat line does.
+ * The constructor sprintf's ADDR_SCORE_LIMIT into this+0x1E4 with "%d" and
+ * hands a Label that address -- so MP_PANEL_OFF_SCORE_TEXT's existing comment,
+ * "char[], the score limit as text", is exact, and the label does not own or
+ * copy the string.
+ *
+ * Two widgets in this panel are therefore VIEWS on panel fields rather than
+ * holders of their own text: the chat edit on 0xE4 and this label on 0x1E4.
+ * A destructor freeing either would be freeing the panel's own storage, and
+ * a reconstruction that gave either a private buffer would leave the label
+ * showing a stale number every time the spinner commits.
+ *
  * THE PANEL GATES ON COMM_OFF_IS_HOST TWO DIFFERENT WAYS, and the difference
  * is not cosmetic. The rules list box is ALWAYS built and takes `->0x4C = 1`
  * when the flag is clear, so a joiner sees it greyed. The score spinner is
