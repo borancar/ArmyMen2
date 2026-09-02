@@ -5017,6 +5017,18 @@ typedef struct {
  * its own SEH frame, so this is a class building a sub-object rather than
  * calling a helper.
  *
+ * EVERY CONSTRUCTOR IT CALLS IS ALREADY RECONSTRUCTED. MpNameConstruct,
+ * MpColourConstruct, MpTeamConstruct, RecordCtor, ListBoxConstruct,
+ * TextListConstruct, ArrowBarConstruct, MultiSpriteConstruct,
+ * PanelConstruct, ButtonConstruct, ScreenBaseConstruct and WidgetAddChild --
+ * twelve of twelve, each with a header written when it was done.
+ *
+ * So the last function below the CRT line composes nothing but code this port
+ * already owns, and its transcription needs no seam and no new prototype.
+ * That is what a boundary looks like when it has been worked outward-in for
+ * long enough: the thing left over is the one that depends on everything
+ * else.
+ *
  * THE TWENTY CHILDREN, extracted by pairing each operator new's SIZE with the
  * constructor that follows it rather than by reading the body:
  *
