@@ -4703,11 +4703,24 @@ typedef struct {
  * 39-entry jump table at 0x004183E4. Thirty-nine phrases, thirty-nine distinct
  * arms, one to one. docs/cheats.md is generated from both by tools/cheats.py.
  *
- * THE ARMS ARE NOT IN DISPATCH ORDER. Entry 31, "god of gamblers", is at
- * 0x00417C3A -- BEFORE the jump instruction and ahead of entry 0 -- so reading
- * the bodies from the top and numbering as you go gives "santini" the wrong
- * one. Thirty-nine-way version of what DirtyCollect's eighty-one arms and
- * WeaponClassOf's four both cost.
+ * THE ARMS ARE NOT IN DISPATCH ORDER, AND THE REASON IS THE ARM ITSELF. Entry
+ * 31, "god of gamblers", is at 0x00417C3A -- BEFORE the jump instruction and
+ * ahead of entry 0 -- because it JUMPS BACK INTO THE DISPATCH: it prints "No
+ * luck whatsover.", rolls GameRand() % 0x27, and if the result is in range
+ * re-enters the table with it. A cheat that fires a random cheat, which is why
+ * the compiler put its body where the backward branch is cheapest.
+ *
+ * So reading the bodies from the top and numbering as you go gives "santini"
+ * the wrong one -- the thirty-nine-way version of what DirtyCollect's
+ * eighty-one arms and WeaponClassOf's four both cost -- and the arm that
+ * causes it is also the one arm that can reach every other.
+ *
+ * EVERY ARM RETURNS. Thirty-nine separate epilogues, no shared tail, and the
+ * only control flow between arms is that one backward jump. The failure the
+ * no-match path at 0x00417C60 shares with it -- both reach ScriptRunLine --
+ * is a fallthrough and not a jump: an unmatched line is handed to the script
+ * runner, which is how "trigger greenwins" works without being a cheat arm at
+ * all.
  *
  * tools/espmap.py reports six references in unreached code here, and the
  * indirect jump is why: it follows branches and calls, not jump tables. That
