@@ -1855,6 +1855,33 @@ and do not stack a second unverified unit on an unverified one: both bugs
 produced the identical failure signature, and telling them apart depended on
 only one being in flight.
 
+## THE OFFSET-NAMING MISTAKE HAS FOUR SHAPES, and only one is in this file
+
+This file already warns at length about naming a field pointer as a table
+base. One session produced four distinct forms of the same underlying error,
+and only the first is the one described:
+
+| shape | instance |
+|---|---|
+| an offset that indexes correctly from the WRONG BASE | `ADDR_SPRITE_GROUPS` -- and BOTH its walkers were wrong, at +4 and +8, with the arithmetic tiling to ten records from either |
+| a base correction APPLIED WHERE NONE WAS DUE | sprite pair 3's loader points at its record base; carrying pair 1's fix over would have put that table four bytes early |
+| a name belonging to ANOTHER RECORD at the same displacement | five invented `TURNPLAN_OFF_*` over the existing `SIGHTCOUT_OFF_*`, which `checkoffsets` cannot see because a new prefix has nothing to compare against |
+| one offset carrying names for SEVERAL TYPES | `0x52C` has three (`VEHICLE_OFF_KIND`, `OBJ_OFF_TABLE_REC_KIND`, `SAVED_OFF_TABLE_REC2`); `0x548` has two, one of them a record SIZE rather than a field |
+
+All four compile. All four are invisible to `checkoffsets`. None is caught by
+an A/B, because each indexes *something* correctly.
+
+**The question that catches all four is "which record is this, HERE" -- asked
+before the name is written, not after.** Its answers are: what is BEFORE the
+field (a negative displacement in this body, or its absence); which base this
+caller passes; what other prefixes hold that offset; and what type the object
+actually is at that instruction.
+
+Where it cannot be answered, a RAW OFFSET with the reason recorded beats
+either candidate name. `orig.h` already keeps a dozen `FIELD_` placeholders on
+that principle; this extends it to offsets that have too MANY names rather
+than none.
+
 ## ARITY AND IDENTITY ARE DIFFERENT QUESTIONS, and answering one feels like both
 
 `Step3TurnBlocked`'s arguments went in reversed after a reading that was
