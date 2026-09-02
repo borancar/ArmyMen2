@@ -9890,7 +9890,7 @@ typedef struct {
 #define ADDR_TEARDOWN_445F40     0x00445FE0u  /* void(void) */
 /* Free four, then log. Two of the four are already named. */
 #define ADDR_TEARDOWN_DEF_TABLES 0x004033E0u  /* void(void) */
-#define ADDR_FREE_LIST_662024    0x0045EDF0u  /* void(void), two callers */
+#define ADDR_FREE_VEHICLE_DEFS   0x0045EDF0u  /* void(void), two callers */
 #define ADDR_FREE_LIST_662928    0x004607D0u  /* void(void), two callers */
 /* Two steps, the second a tail jump. Both halves are inside one merged
  * functions.tsv entry, which is why the second has no entry of its own. */
@@ -14737,6 +14737,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_VEHICLE_DEF_FIND      0x0045EBF0u /* rec *(int32 kind) */
 #define ADDR_VEHICLE_DEFS          0x00662024u /* rec * */
 #define ADDR_VEHICLE_DEF_COUNT     0x00662028u /* int32_t */
+/* Zeroed beside the count when the vehicle defs are freed. Its writer is that
+ * teardown and nothing else names it, so this is a location and not yet a
+ * meaning -- a field with one toucher is one you cannot name, and a teardown
+ * is the weakest toucher there is. */
+#define ADDR_VEHICLE_DEF_FIELD_2C  0x0066202Cu /* int32_t */
 #define AM2_VEHICLE_DEF_BYTES      0x24
 /* The rest of the record, named by the object field each lands in --
  * CreateVehicle copies eight of them straight across and that is the only

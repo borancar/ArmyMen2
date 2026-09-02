@@ -20,7 +20,7 @@ typedef void    (__cdecl *AM2_VoidFn)(void);
  * lookup, and a second private typedef for one function is where a signature
  * goes wrong unseen. */
 
-#define orig_free_list_662024  ((AM2_VoidFn)AM2_IMAGE(ADDR_FREE_LIST_662024))
+/* 0x0045EDF0 is FreeVehicleDefs now; definfo.h declares it. */
 #define orig_free_list_662928  ((AM2_VoidFn)AM2_IMAGE(ADDR_FREE_LIST_662928))
 #define orig_missile_def_find  ((AM2_DefFindFn)AM2_IMAGE(ADDR_MISSILE_DEF_FIND))
 #define orig_log_noargs        ((AM2_VoidFn)(uintptr_t)ADDR_LOG)
@@ -303,7 +303,7 @@ void __cdecl LoadDefTables(void)
     int32_t  id;
 
     DefFreeTables();
-    orig_free_list_662024();
+    FreeVehicleDefs();
     orig_free_list_662928();
     DefFreeTrooperRecs();
     orig_log_noargs();
@@ -418,5 +418,26 @@ int definfo_install(void)
                         "DefDispatchFile", 1);
     rc |= patch_replace(ADDR_DEF_PARSE_INFO_FILE,
                         (const void *)DefParseInfoFile, "DefParseInfoFile", 1);
+    rc |= patch_replace(ADDR_FREE_VEHICLE_DEFS,
+                        (const void *)FreeVehicleDefs,
+                        "FreeVehicleDefs", 2);
     return rc;
+}
+
+/* 0x0045EDF0. Free the vehicle def table.
+ *
+ * THE ORDER IS THE PART TO PRESERVE: the count and +0x2C are zeroed BEFORE
+ * the free and the pointer is nulled AFTER it, so a reader interrupted
+ * between the two sees an empty table rather than a live count over freed
+ * memory. Writing the three stores together after the free would be tidier
+ * and would lose that. */
+void __cdecl FreeVehicleDefs(void)
+{
+    void *recs = *(void **)(uintptr_t)ADDR_VEHICLE_DEFS;
+
+    *(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT = 0;
+    *(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_FIELD_2C = 0;
+    if (recs != 0)
+        am2_free(recs);
+    *(void **)(uintptr_t)ADDR_VEHICLE_DEFS = 0;
 }

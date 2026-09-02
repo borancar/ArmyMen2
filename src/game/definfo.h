@@ -73,4 +73,8 @@ int definfo_install(void);
 }
 #endif
 
+/* 0x0045EDF0. Free the vehicle def table, zeroing the count before the free
+ * and the pointer after it. */
+void __cdecl FreeVehicleDefs(void);
+
 #endif /* AM2_DEFINFO_H */
