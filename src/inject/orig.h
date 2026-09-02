@@ -13070,9 +13070,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  *               before tools/merges.py split it; the COM half was
  *               RestoreTileSet and this is a different function in the same
  *               entry.
- *   0x004600F0  a predicate reading ADDR_MP_SESSION and ADDR_GAME_OVER_FLAGS
- *               and indexing a table at 0x0048C530 by its argument.
- *   0x00460120  walks ADDR_RESPAWN_KINDS after a CRT call on its argument.
+ *   0x004600F0  now ADDR_RESPAWN_KIND_ALLOWED.
+ *   0x00460120  now ADDR_BUILD_RESPAWN_POOL. Both read properly and named at
+ *               their own definitions; neither is CRT.
  *
  * AND docs/crt.md CALLS BOTH OF THOSE CRT, WHICH THEY ARE NOT. They are
  * listed there with the reason "position" -- meaning they sit above the
@@ -14109,6 +14109,41 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * name is too narrow. Left alone -- one more reader would settle it, and a
  * rename on two is a guess. */
 #define ADDR_RANDOM_RESPAWN_KIND 0x004601D0u  /* int32_t(int32_t *out) */
+/* 0x00460120, which BUILDS that list, and 0x004600F0, the per-kind gate it
+ * asks. The builder seeds the game RNG with its argument, frees any previous
+ * list, then walks all 44 weapon-def records twice: once to total the weights
+ * of the kinds the gate allows, and once to fill a malloc'd array with each
+ * kind repeated its own weight. So a later draw is WEIGHTED, which is the
+ * whole point of the pool and is not visible in the drawer.
+ *
+ * The gate answers 1 -- allowed -- when there is no multiplayer session at
+ * all, when the kind's mask is zero, or when the mask meets
+ * ADDR_GAME_OVER_FLAGS; only a set mask that misses refuses.
+ *
+ * THE WALK'S START IS A FIELD, NOT A TABLE. It runs esi from 0x0066205C to
+ * 0x0066294C in steps of 0x34, which reads exactly like a table of its own --
+ * and 0x0066205C is ADDR_MISSILE_DEFS + 0x2C, AM2_MISSILE_DEF_BYTES is 0x34,
+ * and AM2_MISSILE_DEF_COUNT is 44. So the weight is FIELD +0x2C of the
+ * existing records and the loop is a walk over all of them. Caught by
+ * grepping the address before writing a #define, which is the whole of that
+ * rule and cost one command; a new base here would have been the sixth
+ * instance of this project's commonest mistake.
+ *
+ * The bound confirms it rather than merely fitting: 0x0066205C + 44*0x34 is
+ * 0x00662920, which IS ADDR_RESPAWN_KINDS -- the loop stops where the next
+ * global starts, the same argument that settled the registration table's
+ * nine buckets.
+ *
+ * AND THIS IS THE THIRD READER THAT TABLE HAS HAD, which the note above
+ * ADDR_RANDOM_RESPAWN_KIND asked for by name: it says one more reader would
+ * settle whether ADDR_MISSILE_DEFS is too narrow a name, and here is a WEAPON
+ * respawn pool weighting all 44 records. Three readers, two of them weapons.
+ * Still not renamed here -- that is a change to every use at once and belongs
+ * in its own commit -- but the evidence the note asked for now exists. */
+#define ADDR_RESPAWN_KIND_ALLOWED 0x004600F0u  /* int32_t(int32_t kind) */
+#define ADDR_BUILD_RESPAWN_POOL   0x00460120u  /* void(int32_t seed) */
+#define ADDR_RESPAWN_KIND_MASK    0x0048C530u  /* uint32_t[44], 0 = always */
+#define MISSILE_DEF_OFF_WEIGHT    0x2Cu        /* int32_t, respawn weight */
 #define ADDR_RESPAWN_KINDS       0x00662920u  /* int32_t *, the eligible kinds */
 #define ADDR_RESPAWN_KIND_COUNT  0x00662924u  /* int32_t */
 /* CreateMissile reads this as the vertical speed when it is positive; when it
