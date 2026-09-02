@@ -2924,8 +2924,31 @@
  *                    %d" and clear the flag in ADDR_MSG_LIST_SENDQ through
  *                    MsgListSetFlag.
  *
- * So +0x0C on a player record is the last sequence acknowledged and +0x94 is
- * the far end of the window -- two fields this tree had no reader for. */
+ * BOTH FIELDS IN THAT COMPARISON WERE ALREADY NAMED, and the commit that
+ * decoded the arm claimed neither was. +0x0C is FLOW_OFF_HE_HAS and +0x94 is
+ * FLOW_OFF_SEQUENCE, twelve lines apart in this very file. So the record is
+ * a FLOW record, not some other player structure, and the arm is confirmed
+ * rather than newly discovered -- which is better evidence, but it is not
+ * what was written down.
+ *
+ * The rule broken is the one quoted in the same commit: grep the OFFSET
+ * before naming it. What made it easy was that the offsets arrived through
+ * registers -- `[edi + 0xc]`, `[ebx + 0x94]` -- with no prefix attached, so
+ * there was no name to collide and checkoffsets had nothing to refuse. That
+ * is the same blind spot this file records for a NEW prefix, reached from
+ * the other side: an offset with no prefix at all is equally invisible.
+ *
+ * What IS new is the four beside them, and together they are a LATENCY
+ * BLOCK. On a pulse ack the arm computes esi = now - FLOW_OFF_SENT_AT, the
+ * round-trip time, and then keeps min, max, a running total and a count. */
+#define FLOW_OFF_ACKS_SEEN       0x30u  /* incremented per ack accepted */
+#define FLOW_OFF_RTT_MIN         0x44u  /* 0 means unset, so any sample takes */
+#define FLOW_OFF_RTT_MAX         0x48u  /* after the 10,000 ms clamp */
+#define FLOW_OFF_RTT_TOTAL       0x4Cu  /* sum; the mean is this over ACKS_SEEN */
+/* The clamp is worth keeping straight: the MAX is clamped to 10,000 ms and
+ * the MIN is not, because the min is stored before the clamp runs. So a
+ * 30-second stall raises the total by 10,000 and the max to exactly 10,000,
+ * and leaves the min alone. Reproduce the order, not the intent. */
 /* Where the drop path receives a packet it has no node for, so the transport
  * does not keep re-delivering it. */
 #define ADDR_RECV_SCRATCH        0x004F8790u
