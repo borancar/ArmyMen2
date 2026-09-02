@@ -2983,7 +2983,29 @@
  * into it. So the switch's default and two of the eight exits are one piece
  * of code, which is the arm-sharing shape again in its cheapest form: an
  * unrecognised message type is DROPPED and the caller keeps it, exactly as
- * if the flow queue were missing. */
+ * if the flow queue were missing.
+ *
+ * THE THREE CASES ARE THE THREE MESSAGES OF A RELIABLE PROTOCOL, and reading
+ * the third settles the family. Case 0x0C logs "GOT NACK: seq %d thru %d
+ * from %d (%x)  nxtSeq = %d" and then RESENDS: it takes the range [+8, +0xC]
+ * from the message, pulls each one out of ADDR_MSG_LIST_SENDQ with
+ * MsgListCopyByKey, recomputes XorChecksum over the copy and sends it again.
+ * A missing entry logs "Flow Nack Resend: Msg not found seq %d hehas %d" and
+ * carries on rather than failing.
+ *
+ * So the numbers are not arbitrary and this is not three unrelated arms:
+ *
+ *   0x0B  PULSE     -- the keepalive that carries a sequence
+ *   0x0C  NACK      -- resend this range
+ *   0x10  PULSE ACK -- retire this range, and time it
+ *
+ * which is why 0x10 falls into 0x0C at the end: having acked everything
+ * through, whatever is still outstanding is nacked in the same pass. The
+ * fall-through is the protocol, not a compiler artefact, and factoring the
+ * two arms apart would break it. */
+#define AM2_FLOW_PULSE           0x0Bu
+#define AM2_FLOW_NACK            0x0Cu
+#define AM2_FLOW_PULSE_ACK       0x10u
 /* Where the drop path receives a packet it has no node for, so the transport
  * does not keep re-delivering it. */
 #define ADDR_RECV_SCRATCH        0x004F8790u
