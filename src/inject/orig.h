@@ -5096,6 +5096,23 @@ typedef struct {
  * an uninitialised descriptor after a successful Restore -- a defect in the
  * original is not ours to fix.
  *
+ * THE PANEL GATES ON COMM_OFF_IS_HOST TWO DIFFERENT WAYS, and the difference
+ * is not cosmetic. The rules list box is ALWAYS built and takes `->0x4C = 1`
+ * when the flag is clear, so a joiner sees it greyed. The score spinner is
+ * built only `if (isHost)` -- a joiner has no such child at all, and the
+ * panel's child list is a different length for the two roles.
+ *
+ * Writing both as "build and disable" would look right on screen and give the
+ * joiner a widget the original never made, which anything walking the child
+ * list would then find. MpPanelDestruct walks the child list.
+ *
+ * AND THAT SPINNER CONFIRMS ADDR_MP_SPIN_CTOR'S NAME. This one takes min
+ * 0x64, max 0x2706, step 0x64, its initial value from ADDR_SCORE_LIMIT and
+ * ADDR_MP_COMMIT_SCORE as its callback -- so the two spins commit POINTS and
+ * SCORE respectively, which is what a bounded number with a step and a commit
+ * should look like. The name was recorded as a role on weaker evidence; this
+ * is the second, independent instance.
+ *
  * THE HOST-ONLY CONTROLS ARE DISABLED HERE, at construction, by
  * COMM_OFF_IS_HOST. The rules list box takes `->0x4C = 1` when
  * comm->isHost is zero, and the same gate greys the spin control's three
