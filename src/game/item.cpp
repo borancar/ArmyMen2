@@ -4842,8 +4842,7 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
 typedef void (__cdecl *AM2_HitEffectFn)(const void *at, int32_t slot,
                                         int32_t dir, int32_t height);
 
-#define orig_spawn_hit_effect \
-    ((AM2_HitEffectFn)(uintptr_t)ADDR_SPAWN_HIT_EFFECT)
+/* SpawnHitEffect is reconstructed; maprow.h declares it. */
 
 
 
@@ -5097,7 +5096,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, int32_t d, int32_t kind,
             rec = *(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND);
         }
 
-        orig_spawn_hit_effect(&at, rec, *(const uint8_t *)(o + OBJ_OFF_HIT_DIR),
+        SpawnHitEffect(&at, rec, *(const uint8_t *)(o + OBJ_OFF_HIT_DIR),
                               *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
     }
 
@@ -5325,7 +5324,7 @@ void __cdecl DamageVehicle(void *obj, int32_t amount, int32_t d, int32_t kind,
     at = *(const uint32_t *)(o + OBJ_OFF_POS);
 
     if (amount > 1 && orig_game_rand() % 255 <= AM2_HIT_EFFECT_CHANCE)
-        orig_spawn_hit_effect(&at,
+        SpawnHitEffect(&at,
                               *(const int32_t *)(o + OBJ_OFF_TABLE_REC_SLOT),
                               *(const uint8_t *)(o + OBJ_OFF_HIT_DIR),
                               *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
@@ -9276,7 +9275,7 @@ void __cdecl SelectionClick(void)
 typedef void (__cdecl *AM2_DiedEffectAFn)(void *obj);
 typedef void (__cdecl *AM2_DiedEffectBFn)(const AM2_Point *at, int32_t facing,
                                           int32_t kind, int32_t height);
-#define orig_died_reset ((AM2_DiedEffectAFn)AM2_IMAGE(ADDR_DIED_EFFECT_A))
+/* DiedEffectA is reconstructed; maprow.h declares it. */
 #define orig_died_burst ((AM2_DiedEffectBFn)AM2_IMAGE(ADDR_DIED_EFFECT_B))
 
 /* TrooperDiedTail -- original 0x00447EE0, 512 bytes, two callers. The shared
@@ -9346,7 +9345,7 @@ void __cdecl TrooperDiedTail(void *obj, int32_t kind)
         *(int32_t *)(o + OBJ_OFF_FIELD_584) = 0;
         *(int32_t *)(o + OBJ_OFF_SIGHT_OUT_T2) = 1;
         noise = 5;
-        orig_died_reset(o);
+        DiedEffectA(o);
         goto tail;
 
     case 1:

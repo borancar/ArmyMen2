@@ -155,4 +155,18 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
                                int32_t group, uint32_t ownerUid,
                                int32_t field26);
 
+/* 0x004619F0. Spawn one particle. Argument 6 is a MODE: negative picks a
+ * random direction, non-negative is an angle. */
+void __cdecl SpawnParticle(const uint32_t *at, int32_t rowField2C,
+                           int32_t kind, int32_t speed, int32_t height,
+                           int32_t angle);
+
+/* 0x00461B20. The death spray: six particles of six kinds, then 6..10 more. */
+void __cdecl DiedEffectA(void *obj);
+
+/* 0x00461BA0. One to three particles where something was hit, the count from
+ * a ten-entry weighted table. */
+void __cdecl SpawnHitEffect(const uint32_t *at, int32_t rowField2C,
+                            int32_t dir, int32_t height);
+
 #endif

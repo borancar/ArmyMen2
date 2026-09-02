@@ -2090,6 +2090,8 @@
 #define ADDR_SEQ_STEP7           0x00461700u
 #define ADDR_SEQ_RUN_BOTH        0x00461930u  /* void(void) */
 #define ADDR_SEQ_CTX_A           0x00664580u
+#define ADDR_SPAWN_PARTICLE     0x004619F0u /* void(at, f2c, kind,
+                                                speed, height, angle) */
 /* 0x00461120, two callers. The sequence subsystem coming down: the same
  * releaser over CTX_B then CTX_A, then two more calls in the same band. Named
  * for the two globals it names, which is as far as the body goes. */

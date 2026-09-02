@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "maprow.h"
+#include "trig.h"     /* Cos8, Sin8 -- reconstructed */
 #include "map.h"      /* TileOfPoint -- reconstructed */
 #include "objtable.h"
 #include "objflag.h"   /* ObjFlagBit0 -- reconstructed */
@@ -1186,6 +1187,12 @@ int maprow_install(void)
                         "TimedDirFrame", 2);
     rc |= patch_replace(ADDR_GAME_SRAND, (const void *)GameSrand,
                         "GameSrand", 1);
+    rc |= patch_replace(ADDR_SPAWN_PARTICLE, (const void *)SpawnParticle,
+                        "SpawnParticle", 6);
+    rc |= patch_replace(ADDR_DIED_EFFECT_A, (const void *)DiedEffectA,
+                        "DiedEffectA", 1);
+    rc |= patch_replace(ADDR_SPAWN_HIT_EFFECT, (const void *)SpawnHitEffect,
+                        "SpawnHitEffect", 3);
     rc |= patch_replace(ADDR_SEQ_START_DIR_EFFECT,
                         (const void *)SeqStartDirEffect,
                         "SeqStartDirEffect", 6);
@@ -2057,4 +2064,144 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
     *(int16_t *)(row + 0x20)             = 0;
     *(uint32_t *)(row + ROW_OFF_FIELD_2C) = 0;
     *(int16_t *)(row + ROW_OFF_FIELD_26) = (int16_t)field26;
+}
+
+/* SpawnParticle -- original 0x004619F0, four callers. Put one particle at a
+ * point: take a context from the A pool, give it a velocity, a lifetime and a
+ * sprite, and place its row.
+ *
+ * ARGUMENT 6 IS A MODE, NOT A VALUE. Negative means "pick a random direction"
+ * -- two draws of `rand % speed - speed/2`, one per axis -- and non-negative
+ * means "use this angle", through Cos8 and Sin8 scaled by the same speed.
+ * Both callers here pass -1, so the angled arm is reached only from the two
+ * further out; a reader who saw just these two would take the whole x87 block
+ * for dead code.
+ *
+ * THE SPEED IS USED THREE WAYS from one argument: as the modulus and the
+ * centring term for the random arm, as the scale for the angled one, and
+ * again at +0x14 as `rand % (speed/2) + speed/2` -- a second, independent
+ * draw for a different field. Reading it as "the velocity" and passing it
+ * once would lose two of the three.
+ *
+ * ITS SPRITE COMES THROUGH TWO DEREFERENCES. `mov ecx,[eax+0x48C7E8]; mov
+ * ecx,[ecx]` -- the table entry holds a POINTER to the sprite pointer, not
+ * the sprite. That is the obj -> table -> slot shape CLAUDE.md records taking
+ * the game down on its first run, and the one-deref reading compiles.
+ *
+ * THE TABLE'S EXTENT IS NOT ESTABLISHED. Records are 24 bytes and the four
+ * fields this reads are at +0, +4, +8 and +0xC of 0x0048C7E8; SeqStep0 also
+ * references 0x0048C7E4, which is either a fifth field of the record before
+ * it or a separate global, and nothing here decides which. Raw offsets for
+ * that reason.
+ *
+ * A point outside ADDR_MAP_BOUNDS_LEFT returns before allocating, so the
+ * caller's loop can spray freely at an edge without leaking contexts. */
+void __cdecl SpawnParticle(const uint32_t *at, int32_t rowField2C,
+                           int32_t kind, int32_t speed, int32_t height,
+                           int32_t angle)
+{
+    uint8_t       *ctx;
+    uint8_t       *row;
+    const uint8_t *rec;
+
+    if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT,
+                     (const AM2_Point *)at))
+        return;
+
+    ctx = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_A);
+
+    *(int32_t *)ctx       = 0;
+    *(int32_t *)(ctx + 4) = kind;
+    row = *(uint8_t **)(ctx + 0x1C);
+    *(uint8_t *)(row + 0x51) = 0;
+    *(uint32_t *)(row + ROW_OFF_STAMP_54) = 0;
+
+    if (angle < 0) {
+        *(int32_t *)(ctx + 0x0C) = (orig_game_rand() % speed) - (speed >> 1);
+        *(int32_t *)(ctx + 0x10) = (orig_game_rand() % speed) - (speed >> 1);
+    } else {
+        *(int32_t *)(ctx + 0x0C) = (int32_t)(Cos8(angle) * (float)speed);
+        *(int32_t *)(ctx + 0x10) = (int32_t)(Sin8(angle) * (float)speed);
+    }
+
+    *(int32_t *)(ctx + 0x14) = (orig_game_rand() % (speed >> 1)) + (speed >> 1);
+    *(int32_t *)(ctx + 0x18) = height;
+    *(int32_t *)(ctx + 8)    = (orig_game_rand() % 0x4B) + 0x19;
+    *(int32_t *)(ctx + 0x24) = 0;
+
+    rec = (const uint8_t *)(uintptr_t)0x0048C7E8u + (uint32_t)kind * 24u;
+
+    *(int32_t *)row = 1;
+    *(uint32_t *)(row + ROW_OFF_SPRITE) = **(uint32_t *const *)rec;
+    *(int16_t *)(row + ROW_OFF_X) =
+        (int16_t)(*(const int16_t *)(rec + 4) + *(const int16_t *)at);
+    *(int16_t *)(row + ROW_OFF_X + 2) =
+        (int16_t)(*(const int16_t *)(rec + 8) + *(const int16_t *)((const uint8_t *)at + 2));
+    *(int16_t *)(row + 0x20)             = *(const int16_t *)(rec + 0x0C);
+    *(int16_t *)(row + ROW_OFF_FIELD_26) = 0;
+    *(int32_t *)(row + ROW_OFF_FIELD_2C) = rowField2C;
+}
+
+/* DiedEffectA -- original 0x00461B20, one caller. The death spray: six
+ * particles numbered 0..5, then between 6 and 10 more all of kind 7..9.
+ *
+ * THE FIRST LOOP'S COUNTER IS THE KIND. `edi` runs 0..5 and is passed
+ * straight in as argument 3, so the six are six DIFFERENT particle kinds
+ * rather than six of one -- which is what makes the first burst look like
+ * debris and the second like smoke.
+ *
+ * THE SECOND COUNT IS `rand % 5 + 6` and each of its particles draws its own
+ * `rand % 3 + 7`, so the count and the kinds are independent draws. Folding
+ * them into one would give every particle in a burst the same kind. */
+void __cdecl DiedEffectA(void *obj)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+    int32_t        i;
+    int32_t        n;
+
+    for (i = 0; i < 6; i++)
+        SpawnParticle((const uint32_t *)(o + OBJ_OFF_POS),
+                      *(const int32_t *)(o + 0x52Cu), i, 9,
+                      *(const int8_t *)(o + 0x65u), -1);
+
+    n = (orig_game_rand() % 5) + 6;
+    while (n > 0) {
+        SpawnParticle((const uint32_t *)(o + OBJ_OFF_POS),
+                      *(const int32_t *)(o + 0x52Cu),
+                      (orig_game_rand() % 3) + 7, 9,
+                      *(const int8_t *)(o + 0x65u), -1);
+        n--;
+    }
+}
+
+/* SpawnHitEffect -- original 0x00461BA0, two callers. Nought to three
+ * particles where something was hit.
+ *
+ * THE COUNT COMES FROM A TEN-ENTRY WEIGHTED TABLE built on the stack --
+ * {1,1,1,1,1,1,2,2,2,3} indexed by `rand % 10`, so six times in ten one
+ * particle, three times two, once three. Written out as the array the
+ * original builds rather than as a probability, because the original builds
+ * an array and the two are only equivalent for this exact rand.
+ *
+ * ARGUMENT 3 IS NEVER READ, and item.h's typedef -- which calls it `dir` --
+ * is what caught that: the frame map finds arguments 1, 2 and 4 and no
+ * reference to 3 at all, which reads as a three-argument function until you
+ * see a call site pushing four. The parameter is kept so the ABI matches.
+ *
+ * It can spawn NOTHING: the table holds no zero, but the count is tested
+ * `<= 0` before the loop and the four registers it needs are pushed INSIDE
+ * that test -- so the early exit skips the prologue as well, which is why the
+ * function has two different stack depths at its two returns. */
+void __cdecl SpawnHitEffect(const uint32_t *at, int32_t rowField2C,
+                            int32_t dir, int32_t height)
+{
+    static const int32_t kHitCounts[10] = { 1, 1, 1, 1, 1, 1, 2, 2, 2, 3 };
+    int32_t n = kHitCounts[orig_game_rand() % 10];
+
+    while (n > 0) {
+        SpawnParticle(at, rowField2C, (orig_game_rand() % 3) + 7, 0x0B,
+                      height, -1);
+    (void)dir;
+        n--;
+    }
 }
