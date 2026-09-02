@@ -5039,6 +5039,19 @@ typedef struct {
  *   one Edit:                      the chat line
  *   one Panel, and FOUR Buttons:   start, ready, options, cancel
  *
+ * AND IT WRITES THROUGH AN ALLOCATION IT HAS ALREADY TESTED FOR NULL. Each
+ * fixed child is built as `if (w) Ctor(w, ...)` -- so the null case is
+ * handled -- and then the very next instructions store the pointer in its
+ * field and write three fields THROUGH it with no test at all. On an
+ * allocation failure that faults.
+ *
+ * VC6 makes it reachable: operator new answers null rather than throwing,
+ * which is the whole reason the `if` above it exists. So the function guards
+ * the constructor call and not the initialisation that follows it, in the
+ * same breath. Reproduced rather than repaired, like LockSurface publishing
+ * an uninitialised descriptor after a successful Restore -- a defect in the
+ * original is not ours to fix.
+ *
  * ONE FRAME SLOT IS USED FOR TWO UNRELATED THINGS, and espmap listing them
  * together is what shows it. Slot +0x24 is written and read as an INTEGER
  * inside the player loop, and later serves as an x87 divisor and multiplier
