@@ -14294,8 +14294,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * completely. The three functions before this were cold or nearly so and
  * their clean A/Bs proved much less.
  *
+ * WHERE IT HAS GOT TO: the chunk walk, the record loop, all 1,587 objects
+ * and the teardown now run, and the reconstruction reaches its own
+ * "freeing temporary map load data..." -- the last thing LoadMap logs. What
+ * does NOT happen is everything AFTER it: the caller's script load and
+ * "calculating region data...". So the function completes and something it
+ * leaves behind stops the next step, which is a different bug from the three
+ * already fixed and is not yet found.
+ *
  * The transcription is kept out of the tree rather than installed while
- * broken. The chunk loop and the nine-layer defaulting now both complete;
+ * broken. The chunk loop and the layer defaulting now both complete;
  * what still fails is the OBJECT loop, somewhere between its 200th and 400th
  * record of 1,587. Records 0 through 3 are type 17 kind 940, and three of
  * type 23 -- all plausible, so it is not the first thing it touches.
