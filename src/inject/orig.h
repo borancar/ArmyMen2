@@ -2882,7 +2882,24 @@
  * seen them. Reading the ADDR_LOG call sites' operands directly is what
  * turned it up.
  *
- * The misspelling in the last one is the original's. */
+ * The misspelling in the last one is the original's.
+ *
+ * THREE MORE STRINGS SETTLE WHAT IT IS: "Interrupt Level Can't find FlowQ for
+ * %x", "PULSE Adding to " and "u %d from %d (%x)  nxtSeq = %d". So the three
+ * cases are the FLOW-CONTROL receive path -- a per-player flow queue, a pulse
+ * with its acknowledgement, and a sequence number checked against the send
+ * queue. "Interrupt Level" says where it runs: this is called from the
+ * receive thread, which is why it logs rather than doing anything expensive.
+ *
+ * That connects it to what this file already knows. FLOW_OFF_LAG_MS and
+ * FLOW_OFF_LAG_SPREAD are named from RecvFlowControl, the host dictating
+ * latency to a client; this is the other end of the same machinery, and the
+ * two packet-loss arms in SendGameMsg that this file proved DEAD -- no writer
+ * for their fields -- sit on the sending side of it.
+ *
+ * Case 0x0C is the smallest and reads cleanly: look up the sender and
+ * ourselves with FindPlayerById, and if either is missing, log the FlowQ
+ * failure and return. The default case does nothing at all. */
 /* Where the drop path receives a packet it has no node for, so the transport
  * does not keep re-delivering it. */
 #define ADDR_RECV_SCRATCH        0x004F8790u
