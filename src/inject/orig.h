@@ -5039,6 +5039,17 @@ typedef struct {
  *   one Edit:                      the chat line
  *   one Panel, and FOUR Buttons:   start, ready, options, cancel
  *
+ * THE CHAT LINE'S BUFFER IS A FIELD OF THE PANEL, not something the edit
+ * owns. Before building it the constructor strcpy's ADDR_DIR_SCRATCH into
+ * this+0xE4 and hands the edit that address with a 0x3C limit, so the widget
+ * writes into the panel in place and MP_PANEL_OFF_CHATBOX at 0x21C is the
+ * widget while 0xE4 is its text.
+ *
+ * Two things follow. The edit does not free it, and the seed is whatever the
+ * directory scratch last held -- so the chat line opens showing a leftover
+ * path unless something clears it, which is the original's behaviour and not
+ * obviously deliberate.
+ *
  * RectSet'S OWN ARGUMENTS BECOME THE BY-VALUE RECTANGLE. After each
  * `call ADDR_RECT_SET` the original does `add esp, 4` -- popping the rect
  * POINTER and leaving the four coordinates on the stack, exactly where the
