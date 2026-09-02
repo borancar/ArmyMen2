@@ -2023,6 +2023,9 @@
 #define ADDR_BLIT_CENTRED        0x00445500u  /* thiscall void(this, surface *) */
 #define BLIT_SRC_OFF_SURFACE     0x04u   /* the source, inside `this` */
 #define BLIT_SRC_OFF_DESC        0x1Cu   /* -> {?, width, height} */
+/* 0x004623D0, one caller. One player's latency bar: the colour steps at
+ * 750, 1250 and 1750 ms of CommMean32. */
+#define ADDR_DRAW_LATENCY_BAR    0x004623D0u /* void(int32 slot, int32 row) */
 #define ADDR_DRAW_SEQ_BAR        0x004624A0u  /* void(x,y,colour,value,base) */
 /* One byte, three uses and formerly two names: the sequence bar's unfilled
  * colour, the fill AttachPalette is handed, and the list box's background. All

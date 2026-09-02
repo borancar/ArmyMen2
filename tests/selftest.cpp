@@ -144,6 +144,17 @@ void __cdecl ShakeAt(const AM2_Point *, int32_t)
 {
 }
 
+/* armymsg.cpp's DrawLatencyBar calls this now, and it lives in
+ * win32/surface.cpp -- it Blts. Tenth stub, and extern "C" because
+ * surface.h's block opens at line 26 and covers the declaration, which is the
+ * opposite answer from ShakeAt above in the same file. The linkage matches
+ * the HEADER, never the module the stub sits in. DrawLatencyBar has no
+ * vectors: it reads the comm object and a coordinate table. */
+extern "C" void __cdecl DrawSeqBar(int32_t, int32_t, uint32_t, int32_t,
+                                   int32_t)
+{
+}
+
 /* msgslot.cpp's SendChatMsg and armymsg.cpp's ArmyMessageFlush call this now
  * that its seam is closed, and it lives in win32/dplay.cpp -- which cannot
  * join this link at all: it names DirectPlay. Tenth stub, and `extern "C"`

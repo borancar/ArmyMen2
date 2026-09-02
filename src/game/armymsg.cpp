@@ -1608,6 +1608,9 @@ int armymsg_install(void)
     rc |= patch_replace(ADDR_SEND_VEHICLE_WANT_ITEM,
                         (const void *)SendVehicleWantItem,
                         "SendVehicleWantItem", 5);
+    rc |= patch_replace(ADDR_DRAW_LATENCY_BAR,
+                        (const void *)DrawLatencyBar,
+                        "DrawLatencyBar", 2);
     return rc;
 }
 
@@ -2135,4 +2138,81 @@ void __cdecl SendVehicleWantItem(void *vehicle, void *item, int32_t request,
     else if (request == 3)
         am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_DO_DROP),
                 *(const uint32_t *)(itm + OBJ_OFF_UID), quant);
+}
+
+/* Forward-declared rather than included: DrawSeqBar lives in win32/surface.h
+ * and armymsg.cpp is on the FLAT side of the split, which tools/checksplit.py
+ * enforces in both directions. Its signature names no Win32 or COM type, so
+ * the declaration is safe where the header would not be -- the same reason
+ * script.cpp declares PreloadSprite by hand.
+ *
+ * extern "C" BECAUSE THE HEADER'S BLOCK COVERS IT. surface.h declares it
+ * inside an extern "C", and the linkage has to match the header rather than
+ * the file it is stubbed in -- the split CLAUDE.md records for ShakeAt and
+ * BoatExitPoint, which need opposite answers in the same file. The compiler
+ * says nothing; the linker does. */
+extern "C" void __cdecl DrawSeqBar(int32_t x, int32_t bottom,
+                                   uint32_t colour, int32_t value,
+                                   int32_t base);
+
+/* DrawLatencyBar -- original 0x004623D0, one caller. Paint one player's
+ * latency bar in the multiplayer HUD, its colour stepping through four
+ * thresholds.
+ *
+ * THE THRESHOLDS CONFIRM A NAME GIVEN ELSEWHERE. They are 0x2EE, 0x4E2 and
+ * 0x6D6 -- 750, 1250 and 1750 -- and orig.h's ADDR_COLOUR_LAG_MID already
+ * carries the comment "latency over 750 ms", written from a different use
+ * entirely. The first threshold matching that number exactly is two
+ * independent routes to one fact, which is the standard this project sets
+ * before believing a name.
+ *
+ * The other three colours are named from their own first-seen uses --
+ * ADDR_VIEW_RECT_COLOUR, ADDR_COLOUR_NO_MAP, ADDR_HUD_MESSAGE_COLOUR -- and
+ * are reused here as palette indices. One colour serving several purposes is
+ * not the same defect as one concept under two names.
+ *
+ * THE COLOUR IS ASSIGNED THROUGH A STACK SLOT AND NOT A REGISTER, and the
+ * four writes are to the SAME slot in ascending threshold order, so the last
+ * test that passes wins. Written as a fall-through chain rather than an
+ * if/else if, which is what the original does and what makes the ordering
+ * load-bearing.
+ *
+ * THE COORDINATE TABLE IS INDEXED `slot + row * 4`, four players to a row,
+ * with a fixed +0x37 and +0x12 added after the lookup -- so the table holds
+ * offsets within the panel and not screen positions. */
+void __cdecl DrawLatencyBar(int32_t slot, int32_t row)
+{
+    const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    const uint8_t *player;
+    const int16_t *xy;
+    uint32_t       id;
+    int32_t        mean;
+    uint8_t        colour;
+
+    if (*(const void *const *)(comm + COMM_OFF_DPLAY) == 0)
+        return;
+
+    id = *(const uint32_t *)(comm + COMM_OFF_PLAYER_SLOTS
+                             + (uint32_t)slot * COMM_PLAYER_STRIDE);
+    if (id == 0xFFFFFFFFu)
+        return;
+
+    player = (const uint8_t *)FindPlayerById(id);
+    if (player == 0)
+        return;
+
+    colour = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+    mean = CommMean32(player);
+    if (mean > 750)
+        colour = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
+    if (mean > 1250)
+        colour = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_NO_MAP;
+    if (mean > 1750)
+        colour = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+
+    xy = (const int16_t *)((const uint8_t *)(uintptr_t)0x0048C768u
+                           + (uint32_t)(slot + row * 4) * 4u);
+    DrawSeqBar(xy[0] + 0x37, xy[1] + 0x12, colour,
+               *(const int32_t *)(player + 0x28u),
+               *(const int32_t *)(player + 0x30u));
 }

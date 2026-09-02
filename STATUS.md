@@ -221,4 +221,26 @@ A commit message in this session asserted the opposite, that STATUS.md was the
 stale one; it was not, and the correction is recorded here because getting the
 direction backwards is exactly how a stale number survives being noticed.
 
+## OPEN: `ab.sh mpoptions` is broken, and it predates this session
+
+It fails its drive outright -- "could not settle the team button on 1575810
+(got )" -- and then reports 221,423 pixels against a budget of 300, with the
+reconstruction side logging `Couldn't open bitmap file!` twice where the
+original logs the .aai checksums.
+
+**Three commits give byte-identical failures**: the current tree, its parent,
+and `291581c`, which predates this session entirely. 221423 every time. So it
+is deterministic and none of this session's work caused it -- which is the
+only thing established. What it IS remains unknown.
+
+Ruled out on the way: no stale `ArmyMen2.exe`, port 31436 free, no
+`bind/listen` line in either log. Those are the two cheap ways this
+configuration lies and CLAUDE.md names both.
+
+Worth knowing before trusting it: the last recorded clean `mpoptions` run is
+in CLAUDE.md's own notes, so the breakage happened at some point nobody has
+bisected. It is the only configuration that reaches the multiplayer widget
+tree, so every comm reconstruction verified "by reading" has had no drive
+behind it for longer than anyone has checked.
+
 ## What is next, as a number rather than a direction

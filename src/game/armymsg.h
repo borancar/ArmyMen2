@@ -148,4 +148,8 @@ void __cdecl SendAllVehicleUpdates(void);
 void __cdecl SendVehicleWantItem(void *vehicle, void *item, int32_t request,
                                  int8_t slot, int32_t quant);
 
+/* 0x004623D0. Paint one player's latency bar, its colour stepping through
+ * thresholds at 750, 1250 and 1750 ms. */
+void __cdecl DrawLatencyBar(int32_t slot, int32_t row);
+
 #endif /* AM2_ARMYMSG_H */
