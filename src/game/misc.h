@@ -793,4 +793,9 @@ uint32_t __cdecl Ticks(void);
  * 100 ms of the life, then ramp through the tail frames instead. */
 int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx);
 
+/* 0x00461700. Sequence stepper kind 7: a FLAME. Every 300 ms it puffs a
+ * kind-6 sequence and burns what is in a box around its row -- 1 to a
+ * type-2/3/8 every puff, 15 to anything else once every ten. */
+int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx);
+
 #endif /* AM2_MISC_H */

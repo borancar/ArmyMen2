@@ -8,6 +8,8 @@
 #include "map.h"    /* TileOfPoint -- reconstructed */
 #include "item.h"   /* TileAttrAt -- reconstructed */
 #include "maprow.h" /* RowUpdate -- reconstructed */
+#include "msgslot.h" /* CommMustBroadcast -- reconstructed */
+#include "objtype.h" /* ObjIsTypeIn238 -- reconstructed */
 #include "place.h"   /* LoadArmyPlacement */
 #include "gamedir.h" /* SetGameDir -- the chdir the mask glob needs */
 #include "script.h"  /* GetVarValue */
@@ -1460,7 +1462,7 @@ typedef int32_t (__cdecl *AM2_SeqStepFn)(int32_t at, void *rec, void *ctx);
 /* Reconstructed now -- maprow.h declares it. */
 #define orig_seq_step0 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP0)
 /* Reconstructed now -- misc.h declares it. */
-#define orig_seq_step7 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP7)
+/* Reconstructed now -- misc.h declares it. */
 
 /* 0x0043B7C0, one caller -- the per-frame path, and reached only in a network
  * game. The AI taking over armies whose players have gone.
@@ -2137,7 +2139,7 @@ void __cdecl SeqRun(void *ctx)
         case 4: at = SeqStepKind4(at, rec, ctx);   break;
         case 5: at = SeqStepKind5(at, rec, ctx);   break;
         case 6: at = SeqStepKind6(at, rec, ctx); break;
-        case 7: at = orig_seq_step7(at, rec, ctx); break;
+        case 7: at = SeqStepKind7(at, rec, ctx); break;
         default:
             at = *(const int16_t *)(rec + SEQ_OFF_NEXT);
             break;
@@ -2439,6 +2441,8 @@ int misc_install(void)
                   "SeqStepKind5", 1);
     patch_replace(ADDR_SEQ_STEP6, (const void *)SeqStepKind6,
                   "SeqStepKind6", 3);
+    patch_replace(ADDR_SEQ_STEP7, (const void *)SeqStepKind7,
+                  "SeqStepKind7", 3);
     patch_replace(ADDR_SEQ_ADD_KIND4, (const void *)SeqAddKind4,
                   "SeqAddKind4", 1);
     patch_replace(ADDR_SEQ_STEP4, (const void *)SeqStepKind4,
@@ -2520,6 +2524,109 @@ int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx)
 
         *(int32_t *)(r + SEQ_OFF_GATE) -=
             *(const int32_t *)(uintptr_t)ADDR_SEQ_ADVANCE_MS;
+    }
+
+    *(uint32_t *)(row + ROW_OFF_STAMP_54) +=
+        *(const uint32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+    *(int32_t *)(r + SEQ_OFF_GATE) +=
+        *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+
+    return *(const int16_t *)(r + SEQ_OFF_NEXT);
+}
+
+
+/* AllObjectsInRect is reconstructed, in win32/mapdraw.cpp, and is declared
+ * here rather than by including that header: misc.cpp is on the FLAT side of
+ * the split and mapdraw.h reaches win32.h. Neither parameter names a Win32
+ * type, which is the same test item.cpp applies to the same function.
+ *
+ * It is on CLAUDE.md's "unexercised" list, which means it does not RUN here --
+ * not that it is unwritten. I read the two as the same thing for a moment and
+ * built a seam to the image; checkseams refused it. */
+void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc);
+
+/* SeqStepKind7 -- original 0x00461700, the fifth of the seven steppers. A
+ * FLAME: every 300 ms it puffs a kind-6 sequence and burns everything inside
+ * a box around its row.
+ *
+ * TWO DAMAGE ARMS, AND ONE OF THEM IS RATE-LIMITED. A type-2, -3 or -8 object
+ * takes 1 every puff; anything else takes 15 but only once SEQ_OFF_FIELD_0C
+ * has passed 9, and that counter is reset to 0 in the same breath. So troops
+ * and vehicles burn steadily while scenery takes a single large hit every ten
+ * puffs -- and the two arms differ in the AMOUNT as well as the gate, which a
+ * shared call with a computed amount would blur.
+ *
+ * THE COUNTER IS TESTED TWICE against 9, once to choose the arm and once to
+ * reset it, and the reset is OUTSIDE the object loop. Resetting inside would
+ * give the first non-type-238 object the hit and spare the rest.
+ *
+ * THE RANDOM OFFSETS ARE SIGNED AND THE COMPILER SAYS SO. `and eax,
+ * 0x8000000F; jns; dec; or 0xFFFFFFF0; inc` is MSVC's `% 16` on a value that
+ * may be negative -- rand() here can be -- so the puff can move either way.
+ * Reading it as `& 15` gives a flame that only ever drifts one direction.
+ *
+ * THE TWO AXES ARE NOT TREATED ALIKE: z loses a plain `rand % 16` while x
+ * gains `((rand % 16) - 8) * variant`, so the horizontal spread scales with
+ * which of the three variants was drawn and the vertical does not.
+ *
+ * The point is copied into a stack local first and the puff is spawned from
+ * the COPY, so the row itself never moves -- the flame licks around a fixed
+ * origin rather than wandering. */
+int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
+{
+    uint8_t *r   = (uint8_t *)rec;
+    uint8_t *row = *(uint8_t **)(r + SEQ_OFF_ROW);
+
+    (void)at;
+
+    if (*(const uint32_t *)(row + ROW_OFF_STAMP_54)
+            > *(const uint32_t *)(r + SEQ_OFF_LIFE))
+        return SeqRetire(ctx, rec);
+
+    if (*(const uint32_t *)(r + SEQ_OFF_GATE) > 0x12Cu) {
+        int32_t pt = *(const int32_t *)(row + ROW_OFF_X);
+        int32_t variant = orig_seq_rand() % 3;
+        int32_t skip = 0;
+
+        *((int16_t *)&pt + 1) =
+            (int16_t)(*((const int16_t *)&pt + 1) - (orig_seq_rand() % 16));
+        *(int16_t *)&pt =
+            (int16_t)(*(const int16_t *)&pt
+                      + ((orig_seq_rand() % 16) - 8) * variant);
+
+        SeqAddKind6(&pt, variant);
+        *(int32_t *)(r + SEQ_OFF_FIELD_0C) += 1;
+
+        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
+            && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                    (int16_t)UidArmy(*(const uint32_t *)(r + SEQ_OFF_OWNER))))
+            skip = 1;
+
+        if (!skip) {
+            AM2_Rect box;
+            uint8_t *obj;
+
+            box.left   = *(const int16_t *)(row + ROW_OFF_X) - 0x28;
+            box.top    = *(const int16_t *)(row + ROW_OFF_X + 2) - 0x40;
+            box.right  = *(const int16_t *)(row + ROW_OFF_X) + 0x28;
+            box.bottom = *(const int16_t *)(row + ROW_OFF_X + 2) + 0x10;
+
+            obj = (uint8_t *)AllObjectsInRect(
+                      &box, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+            while (obj != 0) {
+                if (ObjIsTypeIn238((const AM2_Object *)obj))
+                    DamageObject(obj, 1, 1,
+                                 *(const uint32_t *)(r + SEQ_OFF_OWNER), 0, 0);
+                else if (*(const int32_t *)(r + SEQ_OFF_FIELD_0C) > 9)
+                    DamageObject(obj, 0x0F, 1,
+                                 *(const uint32_t *)(r + SEQ_OFF_OWNER), 0, 0);
+                obj = *(uint8_t **)(obj + 0x68u);
+            }
+        }
+
+        *(int32_t *)(r + SEQ_OFF_GATE) -= 0x12C;
+        if (*(const int32_t *)(r + SEQ_OFF_FIELD_0C) > 9)
+            *(int32_t *)(r + SEQ_OFF_FIELD_0C) = 0;
     }
 
     *(uint32_t *)(row + ROW_OFF_STAMP_54) +=
