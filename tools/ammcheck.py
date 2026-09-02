@@ -34,10 +34,27 @@ which is the same mistake as reading one A/B run as a regression, at a much
 smaller scale.  The tell was that the number did not go back after the
 revert.
 
-So the header layout and the chunk walk are right, and something about OATT
-specifically is not.  That has to come from LoadMap rather than from more
-guessing at the format: the loop accumulates a running total in ebp, and the
-likeliest answer is that it never reaches OATT at all.
+MEASURED ACROSS FILES, OATT'S SIZE IS EXACT IN SOME MAPS AND ONE TOO LARGE
+IN OTHERS -- eightball 594, bootcamp 1360 and fortress 2234 land on the next
+tag exactly; airborne, areax and bigbang are each one byte over.  Same tag,
+same following tag (MOVE every time), two behaviours.  So this is a property
+of the FILES rather than of the reading, which is not what a format bug
+usually looks like.
+
+AND LoadMap'S LOOP MAKES THAT CONSEQUENTIAL RATHER THAN COSMETIC.  It runs
+`while (consumed < FORM size)`, and its default arm skips an unknown tag by
+fseek(size) and adds that size to the total.  So a one-byte slip reads a
+garbage tag, adds a garbage size, and the total leaps past the bound -- the
+loop EXITS.  On those maps everything after OATT, MOVE included, would never
+be read.
+
+That is a hypothesis and it is deliberately not written down as a finding:
+MOVE is the cell-weight layer and the game plays those maps.  Either the slip
+does not happen in the game, or something recovers, or MOVE is not needed
+from the file.  Settling it means watching the real loader rather than
+reasoning about it -- and since the loader is what is about to be
+reconstructed, the honest order is to write it against the arms that ARE
+understood and let this arm be the thing the A/B is aimed at.
 """
 import os, struct, sys
 
