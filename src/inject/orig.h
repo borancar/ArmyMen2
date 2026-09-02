@@ -979,6 +979,7 @@
 #define ADDR_PICK_REACH_66275C   0x0066275Cu  /* int32_t */
 #define ADDR_PICK_REACH_6624EC   0x006624ECu  /* int32_t */
 #define ADDR_PICK_REACH_662894   0x00662894u  /* int32_t */
+#define ADDR_PICK_REACH_6628C8   0x006628C8u  /* int32_t */
 #define ADDR_POINTER_PICK_BOARD  0x00459DA0u  /* int32_t(void *obj) */
 #define ADDR_POINTER_PICK_WATCHED 0x00459EE0u /* int32_t(void *obj) */
 /* 0x00458D70, column 1 of the four weapon-handler records at 0x00489AB0..AE0 --
@@ -10093,6 +10094,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x004599A0, its sibling in the same entry: the repair pick. */
 #define ADDR_POINTER_PICK_REPAIR 0x004599A0u  /* int32_t(void *obj) */
 #define AM2_MENU_ROW_REPAIR      0x0C
+/* 0x00459BE0. The only HOSTILE-only pick in this band: an enemy trooper that is
+ * not our Sarge, soldier kind under 6, within reach. The row is a placeholder
+ * -- what the order actually is has not been established. */
+#define ADDR_POINTER_PICK_ENEMY_TROOPER 0x00459BE0u /* int32_t(void *obj) */
+#define AM2_MENU_ROW_0A          0x0A
 /* The one AAI type PointerPickRepair refuses. A placeholder rather than
  * AM2_ITEM_KIND_DISG_3, which is the same number in a different table -- the
  * kind index and AAIREC_OFF_TYPE are not the same namespace. */

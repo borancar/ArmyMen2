@@ -9,8 +9,23 @@ Last updated: **2026-09-02**, at `969936a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,408 patches plus 3 REGISTERED = 1,411 reconstructed
+Nothing uncommitted. **1,409 patches plus 3 REGISTERED = 1,412 reconstructed
 addresses**, **30** analysis tools in `make check`.
+
+**`PointerPickEnemyTrooper` (`0x00459BE0`) is reconstructed**, and it **inverts
+the alliance test** -- the only hostile-only pick in this band. Every other one
+offers something to a friend and refuses a foe, or offers both; this refuses the
+moment `ArmyAlliedWithObj` answers yes.
+
+**Its two army-4 refusals fall out of that rather than being extra conditions.**
+`ArmyAlliedWithObj` answers ALLIED for army 4 on either side, so the original's
+early refusal on each is the same answer reached sooner. Written as the single
+call with a note, because three tests that all mean "allied, so no" would read
+as three conditions.
+
+It offers an enemy TROOPER that is not our Sarge, soldier kind under 6, within
+reach. The row name is a placeholder: what the order actually is has not been
+established.
 
 **`PointerPickRepair` (`0x004599A0`) is reconstructed** -- `PointerPickHeal`'s
 sibling, the same two menu-row guards on row 0xC. **`OBJ_OFF_REPAIR_FRAME`

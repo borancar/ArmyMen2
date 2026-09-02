@@ -9598,6 +9598,65 @@ int32_t __cdecl PointerPickRepair(void *obj)
     return 1;
 }
 
+/* PointerPickEnemyTrooper -- original 0x00459BE0, gated on menu row 0xA.
+ *
+ * IT INVERTS THE ALLIANCE TEST, which is what makes it worth reading rather
+ * than skimming: every other pick in this band offers something to a FRIEND and
+ * refuses a foe, or offers both. This one refuses the moment
+ * ArmyAlliedWithObj answers yes. It is the only hostile-only pick here.
+ *
+ * The two army-4 refusals in front of it fall out of that rather than being
+ * extra: ArmyAlliedWithObj answers ALLIED for army 4 on either side, so the
+ * original's early `je fail` on each is the same answer reached sooner. Written
+ * as the single call, with this note, because writing three tests that all mean
+ * "allied, so no" would read as three conditions.
+ *
+ * WHAT IT OFFERS: an enemy TROOPER that is not our Sarge -- OBJ_OFF_SARGE clear
+ * -- whose OBJ_OFF_SOLDIER_KIND is under 6, within reach of our leader.
+ *
+ * The original tests `type == 2` TWICE, once as a predicate and once as a bare
+ * compare a few instructions later, when it already knows the answer. That is
+ * the compiler expanding an inlined predicate and then testing the result;
+ * written once here, since the second cannot fail.
+ *
+ * Not exercised: no drive here opens menu row 0xA. */
+int32_t __cdecl PointerPickEnemyTrooper(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *leader;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+        && GetMenuRow() != AM2_MENU_ROW_0A)
+        return 0;
+
+    if (!o)
+        return 0;
+    if (*(const int32_t *)o != AM2_OBJ_TYPE_TROOPER)
+        return 0;
+    if (*(const int32_t *)(o + OBJ_OFF_SARGE))
+        return 0;
+
+    /* Allied -- including either side being army 4 -- means no. */
+    if (ArmyAlliedWithObj(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                          o, 0))
+        return 0;
+
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= 6)
+        return 0;
+
+    leader = OurLeaderUnit();
+    if (!leader)
+        return 0;
+
+    if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_X),
+                   (const AM2_Point *)(leader + OBJ_OFF_X))
+        > *(const int32_t *)(uintptr_t)ADDR_PICK_REACH_6628C8)
+        return 0;
+
+    OverlayPrepare(AM2_MENU_ROW_0A, 1);
+    return 1;
+}
+
 /* PointerPickWatchedItem -- original 0x00459EE0, 208 bytes, one reference: the
  * PICK slot of a record in the second {pick, action, kind, flags} table.
  *
@@ -10968,6 +11027,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_POINTER_PICK_REPAIR,
                         (const void *)PointerPickRepair,
                         "PointerPickRepair", 1);
+    rc |= patch_replace(ADDR_POINTER_PICK_ENEMY_TROOPER,
+                        (const void *)PointerPickEnemyTrooper,
+                        "PointerPickEnemyTrooper", 1);
     rc |= patch_replace(ADDR_SET_WEAPON_TARGET_AIMED,
                         (const void *)SetWeaponTargetAimed,
                         "SetWeaponTargetAimed", 4);
