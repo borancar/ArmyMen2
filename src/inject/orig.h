@@ -4739,13 +4739,23 @@ typedef struct {
  * one-line cases, which is what reading them side by side buys over reading
  * them in sequence.
  *
- * ONE THING IS NOT SETTLED. HudMessage's second argument is loaded as a BYTE
- * from one of six different globals depending on the arm -- 0x004FE092,
- * 0x004FDF7C, 0x004FD768, 0x004FE090, 0x004FE089, 0x004FD760 -- into the low
- * byte of a register whose upper three bytes the arm does not set. Six globals
- * for what looks like one argument is not a pattern yet, and reproducing "the
- * rest of whatever was in ecx" is not something C can express. Read
- * HudMessage's use of it before writing any of the arms.
+ * THE SIX BYTES ARE COLOURS, and reading HudMessage settled it in one look.
+ * Its second argument is an int32 the function uses as `(uint8_t)colour`, so
+ * the upper three bytes are dead and the arms' `mov cl, byte ptr [global]`
+ * into an otherwise untouched register is not sloppiness -- it is the only
+ * part that is read.
+ *
+ * Four of the six globals were already named colours: ADDR_COLOUR_LAG_MID,
+ * ADDR_COLOUR_WHITE, ADDR_COLOUR_STALE and ADDR_VIEW_RECT_COLOUR. So each
+ * cheat's reply is printed in a palette index the game keeps somewhere else,
+ * and the arms differ in which. 0x004FDF7C and 0x004FD760 are the two that
+ * still have no name.
+ *
+ * The open question was worth writing down rather than guessing past: this
+ * function is COLD -- nothing types a cheat on any drive -- so a wrong second
+ * argument would never have surfaced, and the reading that made the arms
+ * easiest to write happens to be the right one only because HudMessage says
+ * so.
  *
  * Counting epilogues is what produced the wrong claim: thirty-nine arms and
  * twenty-one `ret`s, and eighteen `jmp`s that look like eighteen more until

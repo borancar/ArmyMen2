@@ -457,12 +457,12 @@ pushes are identical bar a *kind* and an *ammo* count -- everything else, four
 zeros and the caller's position, is the same in all eighteen. So the
 transcription is one helper and eighteen one-line cases.
 
-**One thing is not settled**: `HudMessage`'s second argument is loaded as a
-byte from one of *six* different globals depending on the arm, into the low
-byte of a register whose upper three bytes the arm never sets. Six globals for
-one argument is not a pattern yet, and "the rest of whatever was in `ecx`" is
-not something C can express. That has to be read from `HudMessage`'s side
-before any arm is written.
+**The six bytes are colours**, settled by reading `HudMessage`: its second
+argument is an `int32` it uses as `(uint8_t)colour`, so the upper three bytes
+are dead and the arms' byte-into-an-untouched-register is not sloppiness but
+the only part that is read. Four of the six globals were already named
+colours; two still have no name. Each cheat's reply is printed in a palette
+index the game keeps elsewhere, and the arms differ in which.
 
 Counting epilogues is what produced the wrong claim: thirty-nine arms,
 twenty-one `ret`s, and eighteen `jmp`s that look like eighteen more until the
