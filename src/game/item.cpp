@@ -24,8 +24,7 @@
  * file it is stubbed in -- audio.h has the same split and selftest.cpp records
  * it. BoatExitPoint needed the wrapper for exactly the opposite reason. */
 void __cdecl ShakeAt(const AM2_Point *at, int32_t strength);
-typedef void (__cdecl *AM2_DecalFn)(int32_t x, int32_t y, int32_t variant);
-#define orig_blast_spin ((AM2_DecalFn)(uintptr_t)ADDR_PLACE_GROUND_DECAL)
+/* PlaceGroundDecal is reconstructed; maprow.h declares it. */
 #include "objtable.h"
 #include "objtype.h"   /* ObjType2Field548 */
 #include "objflag.h"   /* ObjFlagClear0 -- reconstructed */
@@ -11590,7 +11589,7 @@ void __cdecl StepType6(void *obj)
             int32_t  spin = orig_rand() % 6;
             int32_t  tile;
 
-            orig_blast_spin(pos->x, pos->y, spin);
+            PlaceGroundDecal(pos->x, pos->y, spin);
             tile = TileOfPoint(*(const uint32_t *)pos) & 0xFFFF;
 
             if ((( *(const uint8_t **)(uintptr_t)ADDR_TILE_FLAGS)[tile] & 1)

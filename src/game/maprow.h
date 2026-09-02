@@ -145,4 +145,8 @@ void __cdecl BuildRespawnPool(int32_t seed);
 /* 0x00464416. MSVC's srand: store the seed ADDR_GAME_RAND's LCG reads. */
 void __cdecl GameSrand(int32_t seed);
 
+/* 0x00461950. Drop a decal row at a point, unless that tile or any of its
+ * eight neighbours is occupied. */
+void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant);
+
 #endif

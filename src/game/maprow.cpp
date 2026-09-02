@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "maprow.h"
+#include "map.h"      /* TileOfPoint -- reconstructed */
 #include "objtable.h"
 #include "objflag.h"   /* ObjFlagBit0 -- reconstructed */
 #include "rect.h"      /* MakePoint */
@@ -1185,6 +1186,9 @@ int maprow_install(void)
                         "TimedDirFrame", 2);
     rc |= patch_replace(ADDR_GAME_SRAND, (const void *)GameSrand,
                         "GameSrand", 1);
+    rc |= patch_replace(ADDR_PLACE_GROUND_DECAL,
+                        (const void *)PlaceGroundDecal,
+                        "PlaceGroundDecal", 3);
     rc |= patch_replace(ADDR_BUILD_RESPAWN_POOL,
                         (const void *)BuildRespawnPool,
                         "BuildRespawnPool", 1);
@@ -1923,4 +1927,66 @@ void __cdecl BuildRespawnPool(int32_t seed)
         for (int32_t n = 0; n < *(const int32_t *)rec; n++)
             (*(int32_t **)(uintptr_t)ADDR_RESPAWN_KINDS)[at++] = kind;
     }
+}
+
+/* PlaceGroundDecal -- original 0x00461950, one caller. Drop a decal row on the
+ * ground at a point, unless the ground there is occupied.
+ *
+ * IT TESTS NINE TILES, NOT ONE. The tile under the point, then eight more
+ * through ADDR_TILE_STEP8 -- which orig.h already records as `int32[8], raster
+ * order`, i.e. the neighbour offsets. So a decal needs its own tile AND all
+ * eight around it clear, which is what keeps one from straddling an edge.
+ *
+ * THE STEPS ARE OFFSETS, NOT POINTERS, and the addressing says so: the
+ * original computes `lea ebx,[eax+edx]` -- the ADDRESS of the tile's flag byte
+ * -- and then tests `[ebx+ebp]` with ebp taken from the table. A pointer there
+ * would make that a pointer-plus-pointer; an offset makes it the neighbour's
+ * flag byte, which is what the table's own name says it holds.
+ *
+ * The pool answer is dereferenced once, as LeaveRemainsRow's is: the allocator
+ * hands back a slot holding the row.
+ *
+ * `variant` SELECTS ONE OF SIX SPRITES, which the caller settles rather than
+ * this function: it passes `rand() % 6`, and ADDR_DECAL_SPRITES is void *[6].
+ * The seam in item.cpp called this orig_blast_spin, a name from the caller's
+ * local; the same declaration's parameter was already called `variant`, which
+ * was the better half of it.
+ *
+ * ROW_OFF_FIELD_2C COMES OUT OF THE SPRITE, not the caller -- it is the decal
+ * sprite's own +0x34 -- so a decal's remap travels with its artwork. */
+void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
+{
+    const uint8_t *flags = *(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS;
+    const int32_t *step  = (const int32_t *)(uintptr_t)ADDR_TILE_STEP8;
+    uint32_t       point;
+    uint16_t       tile;
+    uint8_t       *row;
+    const uint8_t *spr;
+    int32_t        n;
+
+    /* The arguments arrive as dwords and only their low words are used --
+     * `mov esi,[esp+0x10]` then `mov word [esp+0x14], si`. */
+    ((int16_t *)&point)[0] = (int16_t)x;
+    ((int16_t *)&point)[1] = (int16_t)z;
+    tile = (uint16_t)TileOfPoint(point);
+
+    if (flags[tile] & 1)
+        return;
+    for (n = 0; n < 8; n++) {
+        if (*(const uint8_t *)((uintptr_t)&flags[tile] + (uintptr_t)step[n]) & 1)
+            return;
+    }
+
+    row = *(uint8_t **)RowPoolAAlloc();
+    spr = (const uint8_t *)
+        (*(void *const *const *)(uintptr_t)ADDR_DECAL_SPRITES)[variant];
+
+    *(int32_t *)row = 1;
+    *(uint32_t *)(row + ROW_OFF_SPRITE) = (uint32_t)(uintptr_t)spr;
+    *(int16_t *)(row + ROW_OFF_X)      = (int16_t)x;
+    *(int16_t *)(row + ROW_OFF_X + 2)  = (int16_t)z;
+    *(int16_t *)(row + ROW_OFF_FIELD_26) = 2;
+    *(uint32_t *)(row + ROW_OFF_FIELD_2C) = *(const uint32_t *)(spr + 0x34u);
+
+    RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
 }
