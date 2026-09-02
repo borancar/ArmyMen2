@@ -5039,6 +5039,21 @@ typedef struct {
  *   one Edit:                      the chat line
  *   one Panel, and FOUR Buttons:   start, ready, options, cancel
  *
+ * THE SETTLED STRUCTURE, counted within the loop's own address bounds rather
+ * than by any pattern: the player loop runs 0x430615..0x4308B4, 206
+ * instructions, with FOUR allocations and FOUR AddChild calls in it -- so
+ * four widgets per slot and sixteen in all. The name, colour and team
+ * widgets, and a SPIN CONTROL, which earlier notes here placed outside the
+ * loop because its 0x84 allocation was counted once.
+ *
+ * The whole function has 26 allocations and 20 AddChild sites, so outside the
+ * loop there are 22 allocations feeding 16 children -- six things are
+ * allocated and never added, which the four 0x0C records account for most of.
+ *
+ * The loop's bound is `cmp eax, ADDR_SCORE_LIMIT` with eax stepping 4: a
+ * fourth array of per-slot pointers, ending where the next global begins.
+ * That is the fourth time this function has used that idiom.
+ *
  * THE INVENTORY TOOK FOUR COUNTS AND EVERY PATTERN-BASED ONE WAS SHORT. Pairing each `operator new` with the NEXT constructor call gives
  * nineteen and misses anything with a call in between. Listing every *_CTOR
  * call gives more and misses allocations whose constructor is not matched by
