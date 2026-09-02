@@ -9057,6 +9057,9 @@ int region_install(void)
                         "InactivateRegion", 1);
     rc |= patch_replace(ADDR_TROOPER_FIRE, (const void *)TrooperFire,
                         "TrooperFire", 2);
+    rc |= patch_replace(ADDR_STEP3_TURN_BLOCKED,
+                        (const void *)Step3TurnBlocked,
+                        "Step3TurnBlocked", 4);
     return rc;
 }
 
@@ -9494,4 +9497,104 @@ tail:
     } else {
         *(int32_t *)(o + OBJ_OFF_MOVE_STATE_ALT) = 0;
     }
+}
+
+/* 0x0045C6E0, four callers, all in ADDR_STEP3_45C8D0. Choose the vehicle's
+ * turn for this frame and answer whether the step it implies is BLOCKED.
+ *
+ * THREE ARGUMENTS. Its call sites end `add esp, 0x18`, which says six --
+ * that cleanup also covers the SetFacing08 call above it. espmap finds three
+ * argument slots and one local, and the pushes agree.
+ *
+ * BOTH ARGUMENT SLOTS ARE REUSED AS LOCALS, so the original's own reads of
+ * them stop meaning what they meant: `lea ecx, [esp+0x1C]` takes the address
+ * of ARG2's slot for MoveStepPoint's out-point, and `mov [esp+0x18], al`
+ * overwrites ARG1's with the rounded facing. Written straight through, the
+ * last call reads as VehicleBlockWeight(obj, obj, ...). Here they are plain
+ * locals, which is what the original is doing with them.
+ *
+ * `esi` ALSO CHANGES MEANING: from 0x0045C76F it is the object's ROW, not the
+ * object -- and both records carry fields at the offsets used after it. */
+int32_t __cdecl Step3TurnBlocked(const void *plan, void *obj, int32_t *out)
+{
+    const uint8_t *p = (const uint8_t *)plan;
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    int32_t speed;
+    int32_t limit;
+    int32_t want;
+    int32_t nowFacing, thenFacing;
+    uint32_t elapsed;
+    int32_t commit;
+    AM2_Point pt;
+
+    /* THE SPEED IS ZERO UNLESS THE WHOLE BLOCK RUNS. The original zeroes its
+     * local at 0x0045C6F3 -- BEFORE the `cmp [p+8], 1; je` that skips
+     * everything below -- so a plan with [p+8] == 1 reaches MoveStepPoint
+     * with speed 0 rather than with the speed it would have computed.
+     * Computing it first and branching around only the limiter is the
+     * natural transcription and moves the vehicle. */
+    speed = 0;
+    if (*(const int32_t *)(p + 0x08) != 1) {
+        int32_t want_speed;
+        float   rate;
+
+        want_speed = *(const int32_t *)(p + 0x0C) != 0
+                     ? *(const int32_t *)(o + 0x55C)
+                     : *(const int32_t *)(o + 0x558);
+        /* Two independent `sar esi, 1`, not one test of two bits: both flags
+         * set quarters it. */
+        if (*(const int32_t *)(p + 0x14) != 0)
+            want_speed >>= 1;
+        if (*(const int32_t *)(p + 0x10) != 0)
+            want_speed >>= 1;
+
+        rate = *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
+               * (float)*(const int32_t *)(o + VEHICLE_OFF_ACCEL_RATE);
+
+        /* A FLOOR in the first arm and a CEILING in the second. The original
+         * compares jle and jge; swapping them is invisible whenever the
+         * desired speed is already inside the band. */
+        if (*(const int32_t *)(p + 0x0C) != 0) {
+            limit = (int32_t)((float)*(const int32_t *)(o + OBJ_OFF_FIELD_44)
+                              - rate);
+            speed = (want_speed <= limit) ? limit : want_speed;
+        } else {
+            limit = (int32_t)(rate
+                              + (float)*(const int32_t *)(o + OBJ_OFF_FIELD_44));
+            speed = (want_speed >= limit) ? limit : want_speed;
+        }
+    }
+
+    want = Clamp(AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING), *p),
+                 -8, 8);
+    *out = want;
+
+    {
+        const AM2_Anim *anim = *(const AM2_Anim *const *)(row
+                                                          + ROW_OFF_ANIM_PLAYING);
+        int32_t base = (*(const uint8_t *)(row + ROW_OFF_HEADING_BIAS)
+                        + *(const uint8_t *)(row + ROW_OFF_HEADING)) & 0xFF;
+
+        nowFacing = RoundTo8(base, anim->directionBits);
+        thenFacing = RoundTo8((base + *out) & 0xFF, anim->directionBits);
+    }
+
+    if (nowFacing != thenFacing) {
+        commit = (*(const int32_t *)(o + OBJ_OFF_FIELD_5A8) != 0
+                  || (uint8_t)thenFacing
+                     != *(const uint8_t *)(o + OBJ_OFF_FIELD_5A4));
+        elapsed = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                  - *(const uint32_t *)(row + ROW_OFF_TURN_STAMP);
+
+        if ((elapsed > *(const uint32_t *)(o + VEHICLE_OFF_TURN_INTERVAL)
+             && commit) || elapsed > 0x320)
+            *(uint8_t *)(o + OBJ_OFF_FIELD_5A4) = (uint8_t)nowFacing;
+        else
+            *out = 0;
+    }
+
+    MoveStepPoint(o, (*(const uint8_t *)(o + OBJ_OFF_FACING) + *out) & 0xFF,
+                  0, speed, 0, 0, &pt);
+    return VehicleBlockWeight(o, thenFacing, *(const uint32_t *)&pt, 1) > 0x0E;
 }
