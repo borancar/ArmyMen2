@@ -7938,6 +7938,17 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
+ * AND ONE ARM DISCARDS A CALL'S RESULT, which the push order disguises.
+ * Code 7, `playsoundon`, calls ActionPoint and then overwrites eax with n0
+ * before anything reads it -- so the point is computed and thrown away, and
+ * EvtPlaySoundOn gets ResolveUid's answer instead. Pairing the pushes with
+ * the nearest call reads ActionPoint's result as a THIRD argument to
+ * ResolveUid, which takes two. The signature in event.h is what settles it.
+ *
+ * Reproduced rather than dropped: the call may not be pure, and this project
+ * has already recorded ObjInitCommon's discarded first ClassifyCode74 result
+ * as the same shape.
+ *
  * The record needs no new offsets: AM2_ScriptAction in script.h is already
  * fully named from the parser side, and every field the runner touches --
  * uid, uid2, delay, code, subject, text, item, n0, n1, army, extra -- is in
