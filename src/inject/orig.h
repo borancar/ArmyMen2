@@ -3801,6 +3801,15 @@
 #define SIGHTC_OFF_SEED          0x3Cu  /* uint8_t, thresholds 4 and 0x10 */
 #define AM2_AI_KEEP_RANGE_MS     0x1388 /* 5000, the reposition interval */
 #define AM2_AI_REACHED_DIST      0xC    /* nearer than this and the walk ends */
+/* AiTrooperStep's three of its own, none of which is any of the four above --
+ * worth stating, because a family that already has ARRIVED (0x20), REPLAN
+ * (0x30) and REACHED (0xC) invites reusing one. It arrives at 4, treats a
+ * waypoint as reached at 0x10, and refuses to re-plan for 500 ms, which is
+ * ADDR_PATH_RETRY_MS's shipped value written here as an immediate rather than
+ * read from it. */
+#define AM2_AI_TROOPER_ARRIVED   4
+#define AM2_AI_WAYPOINT_DIST     0x10
+#define AM2_AI_TROOPER_RETRY_MS  0x1F4
 /* 0x004049C0, TWENTY-SIX call sites across the 0x00405xxx..0x00406xxx band and
  * one in 0x0044AD40 -- the step the trooper AI shares, as ADDR_AI_407190 is
  * the vehicle one. Nothing in it says what it is. */

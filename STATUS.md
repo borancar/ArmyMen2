@@ -95,8 +95,8 @@ because `0x00458A20` sits inside a 5,760-byte `functions.tsv` entry that holds
 **seventeen** functions and patching any one of them credits all of it. The
 same effect inflates the entry count.
 
-    entry-generous   1,226 of 1,239 entries, 92.2% of sub-CRT bytes
-    split-aware      1,377 of 1,530 real functions, 83.2% of sub-CRT bytes
+    entry-generous   1,227 of 1,239 entries, 92.5% of sub-CRT bytes
+    split-aware      1,378 of 1,530 real functions, 83.5% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -177,47 +177,57 @@ Renaming them to `dx`/`dy` broke `CreateItem`, which adds the first to a
 point's x and the second to its y -- a second independent reader agreeing on
 which is which, arriving for free because the rename forced it.
 
-## Next: AiTrooperStep, surveyed
+## AiTrooperStep, read as a diff against its sibling
 
-`0x004049C0`, 1,168 bytes, 26 call sites: the step the trooper AI shares. The
-survey is in `orig.h` and the first thing it says is that **it has a sibling
-already reconstructed** -- `AiRouteToward` in region.cpp, with the same
-destination field, the same route-goal/move-to pair and the same
-`AngleBetween` + state tail. It must be DIFFED against that one rather than
-written fresh, which is the rule `SettlePointInRegion` and `ItemLinkCells`
-both earned.
+`0x004049C0`, 1,168 bytes, 26 call sites. Entries 1,226 -> 1,227 of 1,239,
+**12 left**. `ab.sh bootcamp campaign` clean, which is a no-regression result:
+the whole `Ai*` band reads 0 on every drivable map, and closing the seams made
+this counter blind on top.
 
-Two naming findings came out of the read.
+Written as a diff against `AiRouteToward`, which is the method that already
+worked for `RoachRouteToward`. Four things that a fresh reading would have
+flattened:
 
-**`OBJ_OFF_TAIL_BLOCK` was named from a memset**, "0x103 dwords, cleared
-wholesale", because the only toucher looked at was a bulk clear -- which says
-where something begins and never what it is, the same weakness this repo
-records for a name taken from a `free`. Two readers settle it: `AiRouteToward`
-writes the destination there beside `OBJ_OFF_MOVE_TO`, and this function
-compares it against the goal with `PointsEqual` to decide whether the route it
-has is still the route it wants. It is `OBJ_OFF_ROUTE_GOAL`, a packed point,
-and it tiles with the retry deadline at +0x11C and the waypoint list at +0x120.
+**It refuses twice before doing anything**, and both refusals leave the
+caller's record untouched -- no facing, no state -- where `AiRouteToward`'s
+arrival writes a state and zeroes the goal.
 
-**And `OBJ_OFF_FIELD_C0` is overloaded by type.** It is documented as a pointer
-to an item type record, read that way by `SelectInventorySlot`; on a trooper the
-same offset is a packed point handed to `ApproxDist`. Both readings are of live
-code, so the structural name is right and stays -- the type-6 overload again.
+**The retry deadline is tested in opposite senses at two sites and both skip
+the re-plan.** Before any route work, `clock < deadline` means the cooldown has
+not expired; after the region hop, `clock > deadline` means it has, and skips
+too. One field, two comparisons pointing the same way -- the `ObjIsFriendly`
+shape.
+
+**The borrow calls discard their answers.** When an endpoint's tile has no
+region, `TileRegionOrBorrow` is called and the result thrown away; the local
+copy is not refreshed, so the very next test still sees zero and takes the
+no-region path. The call helps the next step, not this one.
+
+**And the two goals come apart.** On the re-plan arms `routeGoal` is written
+from the object's own `OBJ_OFF_FIELD_C0` while `moveTo` gets the local point,
+which the region hop may have redirected to a link tile. The object remembers
+what it was asked for and walks where the corridor says.
+
+One block is provably dead and is reproduced anyway: the waypoint loop's
+ran-out arm re-tests the two conditions that got it there, the other way round,
+and falls through both. Said out loud because dropping two dead compares is how
+a live one goes with them.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,226 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 13
-outstanding, which is 1,239 minus 1,226 -- from 1,422 reconstructed addresses
-(1,418 patched plus 4 registered), and **92.2% of the sub-CRT bytes**.
-Split-aware that is **1,377 of 1,530** real functions and **83.2%** of the
+line (0x0045C000) patched**. Measured: **1,227 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 12
+outstanding, which is 1,239 minus 1,227 -- from 1,423 reconstructed addresses
+(1,419 patched plus 4 registered), and **92.5% of the sub-CRT bytes**.
+Split-aware that is **1,378 of 1,530** real functions and **83.5%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
 small ones in batches. A hundred and fifty-one batches have gone in and NOTHING SMALL IS LEFT among
-the ENTRIES: the 13 outstanding start at **1,168 bytes** -- `0x004049C0` -- and
-the median is **1,888**. That is not what is left, though: `tools/merges.py`
+the ENTRIES: the 12 outstanding start at **1,216 bytes** -- `0x00407710` -- and
+the median is **2,080**. That is not what is left, though: `tools/merges.py`
 splits them into real functions and the 0x00458930 entry alone still holds
 sixteen unwritten ones from 16 bytes up. Rank by real function, not by entry. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred

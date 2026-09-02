@@ -278,6 +278,12 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out);
  * one granularity down -- same node fields in the same order, same weighted
  * heuristic, same open-list defect. Answers 1 with the route written into
  * `out` and its length in `*n`, or 0. The fifth argument is never read. */
+/* 0x004049C0, twenty-six call sites: the step the trooper AI shares. Walk the
+ * object toward OBJ_OFF_FIELD_C0, hopping through the region matrices when the
+ * goal is elsewhere, and write a facing and a state into `out`. AiRouteToward's
+ * longer sibling -- read the two together. */
+void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx);
+
 int32_t __cdecl FindPath(int32_t from, int32_t to, uint16_t *out, int32_t *n,
                          int32_t unused);
 

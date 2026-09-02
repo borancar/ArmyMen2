@@ -3288,6 +3288,242 @@ heading:
     }
 }
 
+/* AiTrooperStep -- original 0x004049C0, 1,168 bytes, twenty-six call sites
+ * across the 0x00405xxx..0x00406xxx band and one in 0x0044AD40. The step the
+ * trooper AI shares, as ADDR_AI_407190 is the vehicle one.
+ *
+ * READ AS A DIFF AGAINST AiRouteToward above, which is the method this file
+ * already uses for RoachRouteToward. Both walk an object toward the point at
+ * OBJ_OFF_FIELD_C0, both hop through the region matrices when the goal is in
+ * another region, both end by writing a facing and a state into the caller's
+ * record. What this one adds is a RETRY DEADLINE and an arrival test, and
+ * where it differs it differs in ways that are easy to flatten:
+ *
+ * IT REFUSES TWICE BEFORE DOING ANYTHING. A zero goal returns leaving the
+ * caller's record untouched -- no facing, no state -- and an object already
+ * within AM2_AI_TROOPER_ARRIVED clears its deadline and returns the same way.
+ * Neither is AiRouteToward's arrival, which writes a state and zeroes the goal.
+ *
+ * THE DEADLINE IS TESTED IN OPPOSITE SENSES AT THE TWO SITES and both skip the
+ * re-plan. Before any route work, `clock < deadline` means "the cooldown has
+ * not expired, keep what you have"; after the region hop, `clock > deadline`
+ * means it has, and skips too. Two guards on one field pointing the same way
+ * by opposite comparisons is exactly the shape this project records for
+ * ObjIsFriendly in CreateTrooper, so it is written out rather than folded.
+ *
+ * THE BORROW CALLS DISCARD THEIR ANSWERS. When either endpoint's tile has no
+ * region the original calls TileRegionOrBorrow and throws the result away --
+ * the local copy is not refreshed, so the very next test still sees zero and
+ * takes the no-region path. The call is worth making for its side effect on
+ * the tile, but it cannot help THIS step. Reproduced; it reads like a missing
+ * assignment and is what the instructions say.
+ *
+ * AND THE TWO GOALS COME APART on the re-plan arms. `routeGoal` is written
+ * from the object's own OBJ_OFF_FIELD_C0 while `moveTo` gets the LOCAL point,
+ * which the region hop may have redirected to a link's tile. So the object
+ * remembers what it was asked for and walks to where the corridor says. A
+ * reading that used one point for both would be tidier and would lose the
+ * region layer entirely.
+ *
+ * THE FACING GOES TO out+4, not out+0 as in AiRouteToward, and only one field
+ * is written rather than that function's two. The state comes from one of the
+ * two three-entry tables in orig.h, indexed by the AI context's class. */
+void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
+{
+    uint8_t  *o    = (uint8_t *)obj;
+    uint8_t  *w    = (uint8_t *)out;
+    uint8_t  *dest = o + OBJ_OFF_FIELD_C0;
+    uint8_t  *pos  = o + OBJ_OFF_POS;
+    AM2_Point pt;                    /* the original's first argument slot */
+    int32_t   fromTile, toTile;
+    int32_t   fromRegion, toRegion;
+    int32_t   d;
+
+    /* A zero goal is "nowhere to be", and it leaves `out` alone entirely. */
+    if (!*(const uint16_t *)dest)
+        return;
+
+    /* Arrived. The deadline is cleared so the next goal may plan at once. */
+    if (ApproxDist((const AM2_Point *)dest, (const AM2_Point *)pos)
+        < AM2_AI_TROOPER_ARRIVED) {
+        *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) = 0;
+        return;
+    }
+
+    if (!*(const int32_t *)(o + OBJ_OFF_FIELD_5A4)
+        && *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+               > *(const int32_t *)(o + OBJ_OFF_DEADLINE_58))
+        *(int32_t *)(o + OBJ_OFF_DEADLINE_58) = 0;
+
+    *(uint32_t *)&pt = *(const uint32_t *)dest;
+
+    /* Still heading where we were told, and the cooldown has not run out:
+     * keep the route and go straight to walking it. */
+    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
+                    *(const uint32_t *)&pt)
+        && (uint32_t)*(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+               < (uint32_t)*(const int32_t *)(o + OBJ_OFF_MOVE_UNTIL))
+        goto walk;
+
+    if (BeginMoveTo(obj, (uint32_t *)&pt)) {
+        *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
+            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            + AM2_AI_TROOPER_RETRY_MS;
+        *(uint32_t *)&pt                      = *(const uint32_t *)dest;
+        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)dest;
+        *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  = *(const uint32_t *)pos;
+        *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)dest;
+        *(int16_t *)(o + OBJ_OFF_MOVE_END)    = 0;
+        goto two_waypoints;
+    }
+
+    fromTile   = TileOfPoint(*(const uint32_t *)pos);
+    fromRegion = kRegionOfCell[(uint32_t)fromTile & 0xFFFFu];
+    toTile     = TileOfPoint(*(const uint32_t *)&pt);
+    toRegion   = kRegionOfCell[(uint32_t)toTile & 0xFFFFu];
+
+    /* Both answers are DISCARDED -- see the header. */
+    if (!fromRegion)
+        (void)TileRegionOrBorrow((uint16_t)fromTile);
+    if (!toRegion)
+        (void)TileRegionOrBorrow((uint16_t)toTile);
+    if (!fromRegion || !toRegion)
+        goto no_region;
+
+    /* The region hop, skipped when we are already routing to this goal from
+     * the region we were last in, and when both ends are in one region. */
+    if ((PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
+                     *(const uint32_t *)&pt)
+         && *(const int16_t *)(o + OBJ_OFF_PREV_REGION) == (int16_t)fromRegion)
+        || toRegion == fromRegion)
+        goto after_region;
+
+    {
+        int16_t stride = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
+        int32_t link;
+
+        if (kRegionCost[(uint32_t)(fromRegion * stride + toRegion)]
+            != *(const uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP))
+            RegionSolvePair(fromRegion, toRegion);
+
+        link = (int16_t)MiddleRegionLink(
+            fromRegion,
+            (int16_t)(uint8_t)kRegionNext[(uint32_t)(fromRegion * stride
+                                                     + toRegion)]);
+        if (link < 0)
+            goto after_region;
+
+        /* NearestAllowedTile writes the point, so the x half is cleared first
+         * rather than the whole local -- the original's `mov word`. */
+        pt.x = 0;
+        NearestAllowedTile(obj, kLinks(fromRegion)[link].into,
+                           (uint32_t *)&pt);
+    }
+
+after_region:
+    /* Keep the route we have when it still aims at this point AND either has
+     * waypoints left or has run past its cooldown. Both arms of that second
+     * test skip the re-plan; see the header. */
+    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
+                    *(const uint32_t *)&pt)) {
+        if (*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT)
+            && *(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
+                   < *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT))
+            goto walk;
+        if ((uint32_t)*(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            > (uint32_t)*(const int32_t *)(o + OBJ_OFF_MOVE_UNTIL))
+            goto walk;
+    }
+
+    if (BeginMoveTo(obj, (uint32_t *)&pt)) {
+        *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
+            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            + AM2_AI_TROOPER_RETRY_MS;
+        /* The goal it was ASKED for, not the point it is walking to. */
+        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)dest;
+        *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  = *(const uint32_t *)pos;
+        goto set_move_to;
+    }
+
+    *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
+    if (!PlanPathTo(obj, (uint32_t *)&pt, AM2_AI_PLAN_BUDGET_LONG)) {
+        *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  = *(const uint32_t *)pos;
+        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)dest;
+        goto set_move_to;
+    }
+    /* A route was found; PlanPathTo filled the waypoints itself. */
+    *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)dest;
+    goto walk;
+
+no_region:
+    *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
+    *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  = *(const uint32_t *)pos;
+set_move_to:
+    *(uint32_t *)(o + OBJ_OFF_MOVE_TO) = *(const uint32_t *)&pt;
+    *(int16_t *)(o + OBJ_OFF_MOVE_END) = 0;
+two_waypoints:
+    *(int16_t *)(o + OBJ_OFF_MOVE_AT)    = 1;
+    *(int16_t *)(o + OBJ_OFF_MOVE_COUNT) = 2;
+
+walk:
+    /* Advance past every waypoint already close enough to count as reached.
+     *
+     * THE RAN-OUT ARM RE-TESTS TWO THINGS IT ALREADY KNOWS and neither test
+     * can fire. It is entered only from inside the loop, where `d` was just
+     * found below AM2_AI_WAYPOINT_DIST and `at` was just found at or past
+     * `count - 1`; the block then compares both again the other way round and
+     * falls through both times. So the clear is unconditional in practice.
+     * Written out because that is what the instructions say, and because the
+     * two dead compares are the sort of thing a tidier reading silently drops
+     * along with a live one. */
+    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
+                    *(const uint32_t *)&pt)
+        && *(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
+               < *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT)) {
+        uint32_t at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
+
+        *(uint32_t *)&pt =
+            *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
+        d = ApproxDist((const AM2_Point *)pos, &pt);
+
+        while (d < AM2_AI_WAYPOINT_DIST) {
+            at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
+            if ((int32_t)at
+                >= (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1) {
+                if (d >= AM2_AI_WAYPOINT_DIST)
+                    break;
+                if ((int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
+                    < (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1)
+                    break;
+                *(int16_t *)(o + OBJ_OFF_MOVE_COUNT)  = 0;
+                *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) =
+                    *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+                break;
+            }
+            at++;
+            *(int16_t *)(o + OBJ_OFF_MOVE_AT) = (int16_t)at;
+            *(uint32_t *)&pt =
+                *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
+            d = ApproxDist((const AM2_Point *)pos, &pt);
+        }
+    }
+
+    /* One field, at +4 rather than AiRouteToward's +0 and +1. */
+    w[4] = AngleBetween((const AM2_Point *)pos, &pt);
+
+    /* Indexed by the AI context's class -- SIGHTC_OFF_FIELD_00, which
+     * TrooperBuildContext fills from ClassifyByCode74, so 0, 1 or 2. */
+    *(int32_t *)(w + 8) =
+        ((const int32_t *)AM2_IMAGE(
+             *(const int32_t *)(o + OBJ_OFF_MOVE_STATE_ALT)
+                 ? ADDR_AI_MOVE_STATE_ALT
+                 : ADDR_AI_MOVE_STATE))[*(const int32_t *)ctx];
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == AM2_AI_KIND_FORCES_ALT)
+        *(int32_t *)(w + 8) = 3;
+
+    *(int32_t *)(o + OBJ_OFF_FIELD_578) = 0;
+}
+
 /* RoachRouteToward -- original 0x00408210, three callers, all of them
  * ADDR_ROACH_BEHAVIOUR. It is AiRouteToward's TWIN: 518 of its 784 bytes are
  * byte-identical, and the diff of the two disassemblies is twenty-one lines.
@@ -3816,8 +4052,6 @@ void __cdecl AiStep(void *obj, void *out)
 }
 
 typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
-#define orig_ai_trooper_step \
-    ((AM2_AiTrooperStepFn)(uintptr_t)ADDR_AI_TROOPER_STEP)
 
 /* The same promote-and-engage block in the SIGHTC base rather than the SIGHT
  * one -- four bytes higher on every field. AiApproachLeader inlines it twice,
@@ -3911,7 +4145,7 @@ void __cdecl AiApproachLeader(void *obj, void *out, void *ctx)
 
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(c + SIGHTC_OFF_DEST);
-        orig_ai_trooper_step(obj, out, ctx);
+        AiTrooperStep(obj, out, ctx);
 
         if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE) <= AM2_AI_LEAD_CLOSE
             && *(const int32_t *)(o + OBJ_OFF_FIELD_584) == 2)
@@ -3940,7 +4174,7 @@ void __cdecl AiApproachLeader(void *obj, void *out, void *ctx)
 
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(c + SIGHTC_OFF_DEST);
-        orig_ai_trooper_step(obj, out, ctx);
+        AiTrooperStep(obj, out, ctx);
         goto turn;
     }
 
@@ -3976,7 +4210,7 @@ provoked:
 
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(c + SIGHTC_OFF_DEST);
-        orig_ai_trooper_step(obj, out, ctx);
+        AiTrooperStep(obj, out, ctx);
         goto turn;
     }
 
@@ -4008,7 +4242,7 @@ walk:
     *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
         *(const uint32_t *)(c + SIGHTC_OFF_DEST);
 step:
-    orig_ai_trooper_step(obj, out, ctx);
+    AiTrooperStep(obj, out, ctx);
 
 promote:
     AM2_SIGHTC_PROMOTE_FOUND(o, c);
@@ -4139,7 +4373,7 @@ void __cdecl AiKeepRange(void *obj, void *out, void *ctx)
         if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
                        (const AM2_Point *)(o + OBJ_OFF_FIELD_C0))
             >= AM2_AI_REACHED_DIST) {
-            orig_ai_trooper_step(obj, out, ctx);
+            AiTrooperStep(obj, out, ctx);
             return;
         }
         *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) = 0;
@@ -4160,7 +4394,7 @@ void __cdecl AiKeepRange(void *obj, void *out, void *ctx)
                               *(const void *const *)(c + SIGHTC_OFF_OBSERVER),
                               *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE),
                               (AM2_Point *)(o + OBJ_OFF_FIELD_C0));
-            orig_ai_trooper_step(obj, out, ctx);
+            AiTrooperStep(obj, out, ctx);
             *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
                 now + AM2_AI_KEEP_RANGE_MS;
         } else if (!*(const int32_t *)(o + OBJ_OFF_FIELD_540)
@@ -4211,7 +4445,7 @@ void __cdecl AiWalkStep(void *obj, void *out, void *ctx)
     if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        orig_ai_trooper_step(obj, out, ctx);
+        AiTrooperStep(obj, out, ctx);
         return;
     }
 
@@ -5485,8 +5719,6 @@ void __cdecl RoachBuildContext(void *obj, void *out)
 }
 
 
-typedef void (__cdecl *AM2_AiTrooperFn)(void *obj, void *out, void *ctx);
-#define orig_ai_trooper ((AM2_AiTrooperFn)(uintptr_t)AM2_IMAGE(ADDR_AI_TROOPER_STEP))
 
 /* AiStepAttach -- original 0x004060D0, one caller, inside the trooper step
  * chooser at 0x0044B990. The name is OURS and describes what distinguishes it
@@ -5560,7 +5792,7 @@ void __cdecl AiStepAttach(void *obj, void *out)
     if (*(const int32_t *)(ctx + SIGHTC_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        orig_ai_trooper(obj, out, ctx);
+        AiTrooperStep(obj, out, ctx);
     } else {
         int32_t r;
 
@@ -5615,7 +5847,7 @@ void __cdecl AiStepAttach(void *obj, void *out)
     } else {
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(ctx + SIGHTC_OFF_DEST);
-        orig_ai_trooper(obj, out, ctx);
+        AiTrooperStep(obj, out, ctx);
 
         *(int32_t *)(w + SIGHTCOUT_OFF_STATE) =
             (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
@@ -5982,7 +6214,7 @@ void __cdecl Type2PlayerStep(void *obj, void *out)
 
     if (*(const int16_t *)dest != 0) {
         if (*(const int32_t *)(o + OBJ_OFF_FIELD_10C)) {
-            orig_ai_trooper_step(obj, o + OBJ_OFF_SIGHT_OUT_T2, ctx);
+            AiTrooperStep(obj, o + OBJ_OFF_SIGHT_OUT_T2, ctx);
 
             if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
                            (const AM2_Point *)dest) < AM2_AI_REACHED_DIST) {
@@ -6893,6 +7125,8 @@ int region_install(void)
                         "ObjHitMaskAction", 2);
     rc |= patch_replace(ADDR_REGION_FIND_PATH, (const void *)RegionFindPath,
                         "RegionFindPath", 1);
+    rc |= patch_replace(ADDR_AI_TROOPER_STEP, (const void *)AiTrooperStep,
+                        "AiTrooperStep", 26);
     rc |= patch_replace(ADDR_FIND_PATH, (const void *)FindPath,
                         "FindPath", 1);
     rc |= patch_replace(ADDR_ITEM_TEARDOWN, (const void *)ItemTeardown,
