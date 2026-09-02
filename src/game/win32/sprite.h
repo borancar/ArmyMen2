@@ -327,4 +327,11 @@ int sprite_install(void);
  * force-release every sprite, free both tables, zero the count and capacity. */
 void __cdecl FreeSpriteRegistry(void);
 
+/* 0x00462A60. Lazily preload the ten sprite groups; a group whose array is
+ * already there is skipped. */
+void __cdecl LoadSpriteGroups(void);
+/* 0x00462AD0. Release them again. Frees unconditionally, as the original
+ * does, so a never-loaded group still sees free(NULL). */
+void __cdecl FreeSpriteGroups(void);
+
 #endif /* AM2_SPRITE_H */

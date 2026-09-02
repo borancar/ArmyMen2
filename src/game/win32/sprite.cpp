@@ -838,6 +838,12 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
 
     rc = MakeBitmap((const uint32_t *)header, pixels, (uint8_t *)out, 0);
     orig_free(pixels);
+    rc |= patch_replace(ADDR_LOAD_SPRITE_GROUPS,
+                        (const void *)LoadSpriteGroups,
+                        "LoadSpriteGroups", 1);
+    rc |= patch_replace(ADDR_FREE_SPRITE_GROUPS,
+                        (const void *)FreeSpriteGroups,
+                        "FreeSpriteGroups", 1);
     return rc;
 }
 
@@ -2328,4 +2334,66 @@ int sprite_install(void)
     rc |= patch_replace(ADDR_PRELOAD_SPRITE, (const void *)PreloadSprite,
                         "PreloadSprite", 37);
     return rc;
+}
+
+/* 0x00462A60 and 0x00462AD0. The first of eight sprite-group pairs -- see
+ * orig.h above ADDR_SPRITE_GROUPS for the record and for why neither of the
+ * original's two loop pointers points at its base.
+ *
+ * Each record names one sprite index and a frame count; the loader fills an
+ * array of that many sprites and the releaser gives them back.
+ *
+ * THE LOADER GUARDS ON THE POINTER AND THE RELEASER CLEARS ONLY THE POINTER,
+ * which is what makes the pair idempotent: a freed group keeps its count and
+ * reloads at the same size. Guarding the loader on the COUNT instead would
+ * compile, read as equivalent, and never reload anything after a teardown. */
+void __cdecl LoadSpriteGroups(void)
+{
+    uint8_t *r;
+
+    for (r = (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS;
+         r < (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_END;
+         r += AM2_SPRITEGRP_BYTES) {
+        int32_t n = *(const int32_t *)(r + SPRITEGRP_OFF_COUNT);
+        AM2_Sprite **slots;
+        int32_t i;
+
+        if (*(void **)(r + SPRITEGRP_OFF_SPRITES) != 0)
+            continue;
+
+        slots = (AM2_Sprite **)am2_malloc((size_t)n * sizeof(AM2_Sprite *));
+        *(void **)(r + SPRITEGRP_OFF_SPRITES) = slots;
+        memset(slots, 0, (size_t)n * sizeof(AM2_Sprite *));
+
+        for (i = 0; i < n; i++)
+            slots[i] = PreloadSprite(AM2_SPRITEGRP_SET,
+                                     *(const int32_t *)(r + SPRITEGRP_OFF_INDEX),
+                                     i, AM2_SPRITEGRP_FLAGS, 1);
+    }
+}
+
+/* 0x00462AD0. The releaser. THE FREE IS UNCONDITIONAL: the original's
+ * `cmp [esi], 0; je` skips only the release loop and jumps to the free
+ * itself, so a group that was never loaded still gets free(NULL) and a
+ * redundant null store. Written as `if (slots) { ... }` it would be tidier
+ * and would change the call count. */
+void __cdecl FreeSpriteGroups(void)
+{
+    uint8_t *r;
+
+    for (r = (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS;
+         r < (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_END;
+         r += AM2_SPRITEGRP_BYTES) {
+        AM2_Sprite **slots = *(AM2_Sprite ***)(r + SPRITEGRP_OFF_SPRITES);
+
+        if (slots != 0) {
+            int32_t n = *(const int32_t *)(r + SPRITEGRP_OFF_COUNT);
+            int32_t i;
+
+            for (i = 0; i < n; i++)
+                ReleaseSprite(slots[i]);
+        }
+        am2_free(slots);
+        *(void **)(r + SPRITEGRP_OFF_SPRITES) = 0;
+    }
 }

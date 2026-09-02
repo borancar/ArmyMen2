@@ -6628,6 +6628,24 @@ typedef struct {
 #define ADDR_ARMY_SPRITE_BASE     0x00414AD0u  /* int32_t(void) */
 #define ADDR_PRELOAD_ARMY_SPRITE  0x00414B00u  /* void *(set,index,frame,flags) */
 #define AM2_ARMY_SPRITE_BLOCK     100
+/* THE SPRITE GROUP TABLE: ten records of 0x18 bytes, 0x0048C7E0..0x0048C8D0.
+ *
+ * NEITHER OF ITS TWO WALKERS POINTS AT THE BASE. The loader runs a pointer at
+ * record+4 and the releaser one at record+8, and each reads its own [esi-4];
+ * both bounds tile to ten records from either, so the arithmetic cannot catch
+ * the mistake and only the [esi-4] shows where a record starts. This file
+ * calls that the commonest mistake in the project, with four instances in one
+ * session -- here there are TWO consumers and BOTH bases are wrong. */
+#define ADDR_SPRITE_GROUPS        0x0048C7E0u  /* AM2_SpriteGroup[10] */
+#define ADDR_SPRITE_GROUPS_END    0x0048C8D0u
+#define SPRITEGRP_OFF_INDEX       0x00u  /* PreloadSprite's `index` */
+#define SPRITEGRP_OFF_COUNT       0x04u  /* how many frames to preload */
+#define SPRITEGRP_OFF_SPRITES     0x08u  /* AM2_Sprite *[count], NULL until loaded */
+#define AM2_SPRITEGRP_BYTES       0x18u
+#define AM2_SPRITEGRP_SET         0x13   /* every group loads from this set */
+#define AM2_SPRITEGRP_FLAGS       0x1080
+#define ADDR_LOAD_SPRITE_GROUPS   0x00462A60u  /* void(void) */
+#define ADDR_FREE_SPRITE_GROUPS   0x00462AD0u  /* void(void) */
 #define ADDR_PRELOAD_SPRITE       0x00445B00u
 /* 0x00445AD0, 15 callers: the same thing addressed by a PACKED KEY. It splits
  * the key into PackKey's three fields and passes them as the first three
