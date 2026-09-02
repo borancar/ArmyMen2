@@ -9676,18 +9676,33 @@ typedef struct {
  * as MoveStepPoint's out-point, and `mov [esp+0x18], al` overwrites ARG1's
  * slot with the rounded facing that VehicleBlockWeight is then given. Read
  * without noticing, the last call reads as BlockWeight(obj, obj, ...). */
-#define ADDR_STEP3_TURN_BLOCKED  0x0045C6E0u  /* int32_t(a, b, int32_t *out) */
-/* The turn PLAN its first argument points at, read only by that function and
- * by ADDR_STEP3_45C8D0 which builds it. Five fields, all read and none
- * written here, so these are named from the reader alone -- weaker than a
- * writer/reader pair, and the +0x08 == 1 case is the one that matters:
- * it makes the whole speed block fall through and the vehicle stand still. */
-#define TURNPLAN_OFF_WANT_FACING  0x00u  /* uint8_t, AngleDelta's target */
-#define TURNPLAN_OFF_MODE         0x08u  /* 1 means "no speed at all" */
-#define TURNPLAN_OFF_DECEL        0x0Cu  /* selects the source speed AND the
-                                          * limiter's direction */
-#define TURNPLAN_OFF_HALF_A       0x10u  /* each halves the speed; both set */
-#define TURNPLAN_OFF_HALF_B       0x14u  /* quarters it */
+#define ADDR_STEP3_TURN_BLOCKED  0x0045C6E0u  /* int32_t(obj, plan, int32_t *out)
+                                               * -- the CALL SITE settles the
+                                               * order, not the frame slots */
+/* Its SECOND argument is the record StepType3 carries at obj+0x578, which
+ * region.cpp's typedef for this family calls `out`.
+ *
+ * ITS FIELDS ARE DELIBERATELY LEFT AS RAW OFFSETS, and neither obvious choice
+ * is right. I first invented TURNPLAN_OFF_* for them and every one collided
+ * with a SIGHTCOUT_OFF_ name already here -- 0x08 STATE, 0x0C HIT, 0x10 SEEN,
+ * 0x14 X -- which checkoffsets could not catch because a BRAND-NEW PREFIX has
+ * nothing to compare against, the exact failure recorded for AICTX_OFF_*.
+ *
+ * The MEANINGS do line up, which is worth saying because my first note here
+ * claimed they did not. region.cpp documents a tail that writes
+ * SIGHTCOUT_OFF_STATE with 0, 1, 4, 5, 6, 7, 8 and 9, so STATE == 1 is a real
+ * state and this function's test of +0x08 against 1 is a narrower view of the
+ * same enum rather than a different field.
+ *
+ * WHAT IS UNRESOLVED IS THE BASE. This file notes that StepType3's record is
+ * at obj+0x578 where StepType2's is at obj+0x57C, and that "the
+ * SIGHTCOUT_OFF_ names are relative to the base a caller passes". Four bytes
+ * apart, so writing SIGHTCOUT_OFF_STATE here asserts which of the two bases
+ * this record uses, and nothing read so far settles that.
+ *
+ * So: raw offsets until it is settled, which is a question about
+ * ConsiderSighting's callers and not about this function. Naming it either
+ * way now would record a base as a fact. */
 #define ADDR_STEP3_45C8D0        0x0045C8D0u  /* void(obj, out) */
 #define ADDR_STEP3_45CB30        0x0045CB30u  /* void(obj, out) */
 #define OBJ_OFF_FIELD_59C        0x59Cu  /* gates the record init, once */

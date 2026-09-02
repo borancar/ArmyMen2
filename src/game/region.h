@@ -397,6 +397,7 @@ void __cdecl UnrevealArea(int32_t army, uint32_t at);
 /* 0x0045C6E0. Choose the vehicle's turn for this frame and answer whether the
  * step it implies is blocked. THREE arguments -- the call site's
  * `add esp, 0x18` is cleaning a neighbour's as well. */
-int32_t __cdecl Step3TurnBlocked(const void *plan, void *obj, int32_t *out);
+int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan,
+                                 int32_t *out);
 
 #endif /* AM2_REGION_H */

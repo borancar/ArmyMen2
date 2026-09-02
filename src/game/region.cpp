@@ -9514,8 +9514,16 @@ tail:
  * locals, which is what the original is doing with them.
  *
  * `esi` ALSO CHANGES MEANING: from 0x0045C76F it is the object's ROW, not the
- * object -- and both records carry fields at the offsets used after it. */
-int32_t __cdecl Step3TurnBlocked(const void *plan, void *obj, int32_t *out)
+ * object -- and both records carry fields at the offsets used after it.
+ *
+ * THE ARGUMENT ORDER IS (obj, plan, out) AND I HAD IT REVERSED. espmap gives
+ * the slots and the callee's registers, and both were read correctly -- but
+ * neither says WHICH caller value lands in which slot. The call site does:
+ * `push &out; push edi; push esi`, and in ADDR_STEP3_45C8D0 esi is the object
+ * and edi is the plan. Written the other way round every field access lands
+ * on the other record, nothing inside the function looks wrong, and it
+ * compiles. Same shape as ADDR_ENTER_VEHICLE, which this file records. */
+int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan, int32_t *out)
 {
     const uint8_t *p = (const uint8_t *)plan;
     uint8_t *o = (uint8_t *)obj;
@@ -9535,18 +9543,18 @@ int32_t __cdecl Step3TurnBlocked(const void *plan, void *obj, int32_t *out)
      * Computing it first and branching around only the limiter is the
      * natural transcription and moves the vehicle. */
     speed = 0;
-    if (*(const int32_t *)(p + TURNPLAN_OFF_MODE) != 1) {
+    if (*(const int32_t *)(p + 0x08u) != 1) {
         int32_t want_speed;
         float   rate;
 
-        want_speed = *(const int32_t *)(p + TURNPLAN_OFF_DECEL) != 0
+        want_speed = *(const int32_t *)(p + 0x0Cu) != 0
                      ? *(const int32_t *)(o + VEHICLE_OFF_FIELD_55C)
                      : *(const int32_t *)(o + VEHICLE_OFF_FIELD_558);
         /* Two independent `sar esi, 1`, not one test of two bits: both flags
          * set quarters it. */
-        if (*(const int32_t *)(p + TURNPLAN_OFF_HALF_B) != 0)
+        if (*(const int32_t *)(p + 0x14u) != 0)
             want_speed >>= 1;
-        if (*(const int32_t *)(p + TURNPLAN_OFF_HALF_A) != 0)
+        if (*(const int32_t *)(p + 0x10u) != 0)
             want_speed >>= 1;
 
         rate = *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
@@ -9555,7 +9563,7 @@ int32_t __cdecl Step3TurnBlocked(const void *plan, void *obj, int32_t *out)
         /* A FLOOR in the first arm and a CEILING in the second. The original
          * compares jle and jge; swapping them is invisible whenever the
          * desired speed is already inside the band. */
-        if (*(const int32_t *)(p + TURNPLAN_OFF_DECEL) != 0) {
+        if (*(const int32_t *)(p + 0x0Cu) != 0) {
             limit = (int32_t)((float)*(const int32_t *)(o + OBJ_OFF_FIELD_44)
                               - rate);
             speed = (want_speed <= limit) ? limit : want_speed;
@@ -9567,7 +9575,7 @@ int32_t __cdecl Step3TurnBlocked(const void *plan, void *obj, int32_t *out)
     }
 
     want = Clamp(AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
-                           *(const uint8_t *)(p + TURNPLAN_OFF_WANT_FACING)),
+                           *(const uint8_t *)(p + 0x00u)),
                  -8, 8);
     *out = want;
 
