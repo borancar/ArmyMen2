@@ -37,8 +37,24 @@ the checks that caught four transcription errors on the way in.
 ## What is next, as a number rather than a direction
 
 Above the line and below the evidenced CRT frontier at `0x00464420` there are
-**115 entries, 30 reconstructed and 85 outstanding, 29,072 bytes**. That is
-the next frontier and it is a much smaller one.
+**115 entries, of which 81 are real work**. That is the next frontier and it
+is a much smaller one.
+
+The first figure written here was 85 and it was wrong twice over, both times
+by counting something that is not outstanding:
+
+- **The scan only read `src/game/`.** `ADDR_LOG` (`0x0045CAA0`) is patched by
+  `src/inject/gamelog.c`, which is the harness capturing the game's stubbed
+  logger -- and CLAUDE.md records that reconstructing it as an empty update
+  silenced the game and blinded half of `ab.sh`. Any "what is left" scan has
+  to read the harness too, for the same reason `coverage.py` has a REGISTERED
+  list: the patch list is not all in one place.
+- **Three of the rest must NOT be reconstructed.** `0x00463390` and
+  `0x00464410` are the one-instruction `jmp [IAT]` import thunks for
+  DirectSound and DirectInput -- and going through the second is REQUIRED,
+  since `dinput_hook.c` patches that IAT slot and an import of our own would
+  walk past it. `0x00464416` is the CRT's `srand`, which libc replaces
+  wholesale.
 
 Two caveats on that figure, both of which make it a lower bound in one
 direction and an over-count in the other. `tools/crt.py` says 112 game
