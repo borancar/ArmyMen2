@@ -10117,6 +10117,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * slot. Unlike mode 6's it hands FormationSlotPoint a real local rather than
  * its own argument slot -- and it reuses that slot for the loop index instead. */
 #define ADDR_POINTER_ACTION_MODE4 0x00458400u /* void(void *, uint32_t) */
+/* 0x00458620, mode 5's ACTION. Delegates an ENEMY target to mode 4's action and
+ * keeps only the move case. FormationSlotPoint writes into its `at` argument
+ * here, where mode 4 gives a real local and mode 6 gives `target`. */
+#define ADDR_POINTER_ACTION_MODE5 0x00458620u /* void(void *, uint32_t) */
 #define AM2_MENU_ROW_8           8  /* the row its trooper arm is gated on */
 /* The one AAI type PointerPickRepair refuses. A placeholder rather than
  * AM2_ITEM_KIND_DISG_3, which is the same number in a different table -- the

@@ -9,8 +9,32 @@ Last updated: **2026-09-02**, at `969936a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,412 patches plus 3 REGISTERED = 1,415 reconstructed
+Nothing uncommitted. **1,413 patches plus 3 REGISTERED = 1,416 reconstructed
 addresses**, **30** analysis tools in `make check`.
+
+**`PointerActionMode5` (`0x00458620`) is reconstructed**, finishing the three
+pointer-mode actions and the whole 0x00458400 entry.
+
+**An enemy target is handed to mode 4's action** -- the original calls it
+outright and returns, so "attack that" is delegated rather than reimplemented.
+Only the move case is this function's own.
+
+**The three actions differ in where `FormationSlotPoint` writes**, and the call
+site looks identical in all three:
+
+    mode 4   a dedicated local, reserved by a bare `push ecx` at entry
+    mode 5   ARGUMENT 1 -- `at`
+    mode 6   ARGUMENT 0 -- `target`
+
+Two of the three therefore have an in-out argument, on different arguments, and
+the third has none. In each case the original value survives in a register and
+is used again, which is what makes the later `PointActionA` differ from the
+earlier one.
+
+**And mode 5 orders its calls the other way**: `PointActionA` then
+`ObjAttachTo`, where 4 and 6 do `ObjAttachTo` first. Same three calls, reversed,
+reproduced -- detaching before or after the order is given is not obviously
+equivalent.
 
 **`PointerActionMode4` (`0x00458400`) is reconstructed** -- "attack that, or move
 there". Same frame and loop as mode 6's action; the difference is per unit once
@@ -353,8 +377,8 @@ This unit is why. 144 bytes of work moved the entry-generous byte figure by
 that holds **seventeen** functions and patching any one of them credits all of
 it. The same effect inflates the entry count.
 
-    entry-generous   1,220 of 1,239 entries, 89.5% of sub-CRT bytes
-    split-aware      1,371 of 1,530 real functions, 81.5% of sub-CRT bytes
+    entry-generous   1,221 of 1,239 entries, 89.9% of sub-CRT bytes
+    split-aware      1,372 of 1,530 real functions, 81.6% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -363,17 +387,17 @@ ceiling rather than a floor -- ten percentage points of ceiling, measured.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,220 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 19
-outstanding, which is 1,239 minus 1,220 -- from 1,415 reconstructed addresses
-(1,412 patched plus 3 registered), and **89.5% of the sub-CRT bytes**.
-Split-aware that is **1,371 of 1,530** real functions and **81.3%** of the
+line (0x0045C000) patched**. Measured: **1,221 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 18
+outstanding, which is 1,239 minus 1,221 -- from 1,416 reconstructed addresses
+(1,413 patched plus 3 registered), and **89.9% of the sub-CRT bytes**.
+Split-aware that is **1,372 of 1,530** real functions and **81.6%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
 small ones in batches. A hundred and fifty-one batches have gone in and NOTHING SMALL IS LEFT among
-the ENTRIES: the 19 outstanding start at **1,120 bytes** -- `0x00434700` -- and
+the ENTRIES: the 18 outstanding start at **1,120 bytes** -- `0x00434700` -- and
 the median is **1,504**. That is not what is left, though: `tools/merges.py`
 splits them into real functions and the 0x00458930 entry alone still holds
 sixteen unwritten ones from 16 bytes up. Rank by real function, not by entry. The

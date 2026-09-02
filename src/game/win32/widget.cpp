@@ -9930,6 +9930,107 @@ void __cdecl PointerActionMode4(void *target, uint32_t at)
     }
 }
 
+/* PointerActionMode5 -- original 0x00458620, 496 bytes, mode 5's ACTION and the
+ * last of the three.
+ *
+ * AN ENEMY TARGET IS HANDED TO MODE 4'S ACTION. The original calls 0x00458400
+ * outright and returns -- so "attack that" is not reimplemented here, it is
+ * delegated. Only the friendly/no-target case is this function's own, and it is
+ * a plain move: AI mode 1 and the formation slot.
+ *
+ * THE THREE ACTIONS DIFFER IN WHERE FormationSlotPoint WRITES, and that is worth
+ * having in one place because the call site looks identical in all three:
+ *
+ *     mode 4  a dedicated local, reserved by a bare `push ecx` at entry
+ *     mode 5  ARGUMENT 1 -- `at`
+ *     mode 6  ARGUMENT 0 -- `target`
+ *
+ * So two of the three have an in-out argument, on different arguments, and the
+ * third has none. In each case the ORIGINAL value survives in a register and is
+ * used again afterwards, which is what makes the later PointActionA call differ
+ * from the earlier one.
+ *
+ * AND THIS ONE ORDERS ITS CALLS DIFFERENTLY. Modes 4 and 6 do ObjAttachTo and
+ * then PointActionA; this does PointActionA and then ObjAttachTo. Same three
+ * calls, reversed, and reproduced -- detaching before or after the order is
+ * given is not obviously equivalent and it is not ours to decide.
+ *
+ * AI mode 1 is set BEFORE FormationSlotPoint rather than after, again unlike
+ * the other two. Written where the original has it.
+ *
+ * Not exercised: no drive here installs a pointer mode above 0. */
+void __cdecl PointerActionMode5(void *target, uint32_t at)
+{
+    uint8_t *ctx = *(uint8_t **)(uintptr_t)ADDR_OBJ_CTX_OBJ_A;
+    uint8_t *tgt = (uint8_t *)target;
+    int32_t  type;
+    int32_t  i;
+
+    if (!ctx)
+        return;
+    if (tgt == ctx)
+        return;
+
+    type = *(const int32_t *)ctx;
+    if (type < AM2_OBJ_TYPE_TROOPER)
+        return;
+    if (type > AM2_OBJ_TYPE_VEHICLE && type != AM2_OBJ_TYPE_ROACH)
+        return;
+
+    if (tgt
+        && !ArmyAlliedWithObj(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                              tgt, 0)) {
+        PointerActionMode4(tgt, at);   /* an enemy: mode 4's job */
+        return;
+    }
+
+    if (SelectIfOwn(tgt))
+        return;
+
+    for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; ) {
+        uint8_t *o = (uint8_t *)LookupByUID(
+            (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+        uint32_t slot;
+        int32_t  ot;
+
+        if (!o) {
+            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            continue;   /* no i++ -- the removal shifts the next entry down */
+        }
+
+        ot = *(const int32_t *)o;
+        if (ot < AM2_OBJ_TYPE_TROOPER
+            || (ot > AM2_OBJ_TYPE_VEHICLE && ot != AM2_OBJ_TYPE_ROACH)) {
+            i++;
+            continue;
+        }
+
+        /* Set before the call, unlike the other two. */
+        *(int32_t *)(o + OBJ_OFF_AI_MODE) = 1;
+
+        /* The original passes the address of its `at` argument slot; the
+         * original value stays in a register and is used below. */
+        slot = at;
+        FormationSlotPoint(i, at, o, &slot);
+
+        /* Ordered PointActionA then ObjAttachTo -- the reverse of modes 4
+         * and 6. */
+        PointActionA(o, slot);
+        ObjAttachTo(o, (void *)0);
+
+        if (*(const int32_t *)o == AM2_OBJ_TYPE_TROOPER) {
+            if (GetMenuRow() == AM2_MENU_ROW_8) {
+                *(uint32_t *)(o + OBJ_OFF_UID_56C) =
+                    *(const uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID;
+                PointActionA(o, at);
+            } else {
+                *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
+            }
+        }
+        i++;
+    }
+}
+
 /* PointerPickWatchedItem -- original 0x00459EE0, 208 bytes, one reference: the
  * PICK slot of a record in the second {pick, action, kind, flags} table.
  *
@@ -11312,6 +11413,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_POINTER_ACTION_MODE4,
                         (const void *)PointerActionMode4,
                         "PointerActionMode4", 1);
+    rc |= patch_replace(ADDR_POINTER_ACTION_MODE5,
+                        (const void *)PointerActionMode5,
+                        "PointerActionMode5", 1);
     rc |= patch_replace(ADDR_SET_WEAPON_TARGET_AIMED,
                         (const void *)SetWeaponTargetAimed,
                         "SetWeaponTargetAimed", 4);

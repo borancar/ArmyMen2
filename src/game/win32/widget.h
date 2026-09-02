@@ -1661,6 +1661,10 @@ void __cdecl PointerActionMode6(void *target, uint32_t at);
  * uid and no move order; anything else is a move to the formation slot. */
 void __cdecl PointerActionMode4(void *target, uint32_t at);
 
+/* 0x00458620. Mode 5's action: an enemy target is handed to mode 4's action,
+ * everything else is a plain move with AI mode 1. */
+void __cdecl PointerActionMode5(void *target, uint32_t at);
+
 /* 0x00458D70. ADDR_SET_WEAPON_TARGET's sibling: record a fire request aimed at
  * ADDR_AIM_X/Y/Z, for the weapon kinds 0x23..0x26. */
 void __cdecl SetWeaponTargetAimed(void *target, uint32_t at);
