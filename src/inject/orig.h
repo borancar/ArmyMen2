@@ -5096,6 +5096,23 @@ typedef struct {
  * an uninitialised descriptor after a successful Restore -- a defect in the
  * original is not ours to fix.
  *
+ * THE FOUR LIST GROUPS AND WHAT EACH LISTS:
+ *
+ *   0x204 TYPE_BOX  + bar   the game type, rows a rules file fills
+ *   0x208           + 0x20C the RULES files, from the name table
+ *   0x210           + bar   the MAPS, from the chosen rules script
+ *   0x21C CHATBOX   + bar   the message log, rows a global singleton
+ *
+ * Each is a list box, a scrollbar, and a mutual back-link -- the list's
+ * +0x7C is its bar and the bar's +0x58 is its list. Three of the four are
+ * ListBox; the message log is a TextList, which is the same class with a
+ * different vtable and the read-only flag.
+ *
+ * Two of the four are host-gated, and the RULES and MAPS lists are the two:
+ * both take `->0x4C = 1` when COMM_OFF_IS_HOST is clear, so a joiner can see
+ * what is chosen and cannot change it. The type box and the chat log are
+ * never gated.
+ *
  * THIS CONSTRUCTOR SELECTS A LEVEL, which is a side effect well outside what
  * building a widget should do. Populating the map list it walks the rules
  * script's map names at stride 0x40, calls FindLevelByName on each, adds the
