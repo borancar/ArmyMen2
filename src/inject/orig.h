@@ -7938,11 +7938,16 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
- * THREE ARMS SHARE THE THREE-PATH POINT BLOCK WITH DIFFERENT CALLEE PAIRS.
- * 0x1F ends in EvtAtPointC / EvtAtObjPosC, 0x18 in EvtAtPointA /
- * EvtAtObjPosA, and 0x19 in a third pair around EvtObjPair and
- * EvtArmyAttach. 0x18 and 0x19 also PRECEDE it with the army-or-object AI
- * mode set that 0x2A ends at, so each is that head plus this block.
+ * TWO ARMS SHARE THE THREE-PATH POINT BLOCK, NOT THREE. 0x1F ends in
+ * EvtAtPointC / EvtAtObjPosC and 0x18 in the A variants. 0x19 does NOT have
+ * the block at all: after the same AI-mode head it calls EvtObjPair on two
+ * resolved uids and returns, with no point, no variables and no third path.
+ *
+ * That was written down here as three sharers on the strength of 0x19's
+ * CALL LIST -- EvtObjPair and EvtArmyAttach looked like a third callee pair
+ * in the same slot. Dumping the arm shows a 0x54-byte body with no point
+ * handling in it. A list of what a function calls is not a description of
+ * its shape, which is the same mistake as counting epilogues to count arms.
  *
  * Three uses of one shape with a substituted callee pair is the case for a
  * parameterised helper -- and this file records the argument against merging
