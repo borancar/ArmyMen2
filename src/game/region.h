@@ -284,6 +284,11 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out);
  * longer sibling -- read the two together. */
 /* 0x00407710, two callers: AI mode 0 directly and mode 6 through the `attack`
  * thunk. AiStepIgnore's family plus a line-of-sight test. */
+/* 0x00406B30, one caller. Hold range, close, engage or go looking -- the
+ * trooper step with the line-of-sight test, over the SIGHTC_ context. The name
+ * is ours. */
+void __cdecl AiEngageStep(void *obj, void *out, void *ctx);
+
 void __cdecl AiAttackBody(void *obj, void *out, void *ctx);
 
 void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx);

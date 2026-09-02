@@ -95,8 +95,8 @@ because `0x00458A20` sits inside a 5,760-byte `functions.tsv` entry that holds
 **seventeen** functions and patching any one of them credits all of it. The
 same effect inflates the entry count.
 
-    entry-generous   1,228 of 1,239 entries, 92.8% of sub-CRT bytes
-    split-aware      1,379 of 1,530 real functions, 83.8% of sub-CRT bytes
+    entry-generous   1,229 of 1,239 entries, 93.2% of sub-CRT bytes
+    split-aware      1,380 of 1,530 real functions, 84.2% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -240,48 +240,46 @@ has just written the field they test. Kept: they are live when the block is
 reached the other way, which it is not, and the original does not know that
 either.
 
-## Next: 0x00406B30, surveyed
+## AiEngageStep, and a block factored on evidence
 
-1,264 bytes, one caller, the same callee set as `AiAttackBody` plus
-`AiKeepRange` and `AiHitReact` -- another sight-test-and-act step, and the
-smallest thing left.
+`0x00406B30`, 1,264 bytes. Entries 1,228 -> 1,229 of 1,239, **10 left**.
+`ab.sh bootcamp campaign` clean -- no-regression, the band is cold.
 
-**It uses the `SIGHTC_` context where `AiAttackBody` uses `SIGHT_`**, which is
-what that survey's warning exists for: the two families sit four bytes apart
-and reading it with the wrong one shifts every field and still compiles.
+The sight-cache block it shares with `AiAttackBody` is now one helper,
+`AiSightTrace`. **Factored on a byte-level diff, not a resemblance**: the two
+38-instruction runs are identical in every register, global, immediate and
+displacement and differ in eight branch targets. A diff that normalises image
+addresses would have said the same thing about two blocks reading *different*
+globals, which is what `VehicleBlockWeight` cost this project once.
 
-**It shares exactly one block, and the share is verified rather than assumed.**
-Normalised, 125 of its 363 instructions match -- 35%, which means "related",
-not "twin". But one run of 38 is identical in every register, global, immediate
-and displacement, differing only in eight branch targets: the
-tile-count-to-distance conversion, the clamp, and the three-band minimum
-update. That was diffed at operand level on purpose, because a normalising diff
-maps every image address to a placeholder and two blocks reading *different*
-globals compare equal -- the trap `VehicleBlockWeight` already cost this
-project once. So the sight-cache update can be factored out of `AiAttackBody`
-with evidence when this lands.
+**`SIGHTC_OFF_DAMAGE` is settled as far as it can be.** It has exactly two
+touchers in the whole image -- `UnitWeaponInfo` writing `ITEMTYPE_OFF_DAMAGE`
+into it, and this function comparing it against a distance -- so there is no
+third reader to appeal to. Taken at face value a unit stands off in proportion
+to how hard its own weapon hits, which for a grenade is what you would want.
+The name stays because the writer is unambiguous about what the field holds;
+what is new is a note about what it is used for.
 
-**One thing to settle before transcribing**: the head tests `SIGHTC_OFF_RANGE`
-against `WANT_RANGE` and then against `SIGHTC_OFF_DAMAGE`, keeping range in the
-band between them. Comparing a distance against a damage reads wrong, and is
-coherent if a weapon's damage doubles as a minimum standoff -- which for a
-grenade is what an AI would want. `UnitWeaponInfo` really does write
-`ITEMTYPE_OFF_DAMAGE` there, so the name is not obviously the error.
+**Two arms end inside other arms.** The out-of-sight path falls into the
+in-sight path's tail when the context found nothing, so a unit that cannot see
+its leader still adopts it as the observer; and the HIGH band borrows the LOW
+band's compare, as in `AiAttackBody`. Following bodies without following
+branches gives both no exit.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,228 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 11
-outstanding, which is 1,239 minus 1,228 -- from 1,424 reconstructed addresses
-(1,420 patched plus 4 registered), and **92.8% of the sub-CRT bytes**.
-Split-aware that is **1,379 of 1,530** real functions and **83.8%** of the
+line (0x0045C000) patched**. Measured: **1,229 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 10
+outstanding, which is 1,239 minus 1,229 -- from 1,425 reconstructed addresses
+(1,421 patched plus 4 registered), and **93.2% of the sub-CRT bytes**.
+Split-aware that is **1,380 of 1,530** real functions and **84.2%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
 small ones in batches. A hundred and fifty-one batches have gone in and NOTHING SMALL IS LEFT among
-the ENTRIES: the 11 outstanding start at **1,264 bytes** -- `0x00406B30` -- and
+the ENTRIES: the 10 outstanding start at **1,344 bytes** -- `0x004057D0` -- and
 the median is **2,080**. That is not what is left, though: `tools/merges.py`
 splits them into real functions and the 0x00458930 entry alone still holds
 sixteen unwritten ones from 16 bytes up. Rank by real function, not by entry. The
