@@ -95,8 +95,8 @@ because `0x00458A20` sits inside a 5,760-byte `functions.tsv` entry that holds
 **seventeen** functions and patching any one of them credits all of it. The
 same effect inflates the entry count.
 
-    entry-generous   1,232 of 1,239 entries, 94.3% of sub-CRT bytes
-    split-aware      1,383 of 1,530 real functions, 85.4% of sub-CRT bytes
+    entry-generous   1,233 of 1,239 entries, 94.8% of sub-CRT bytes
+    split-aware      1,384 of 1,530 real functions, 85.9% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -374,85 +374,51 @@ reports byte-for-byte the same before and after; the band is cold, so no A/B
 can move; and the code compiles and runs either way. What found it was reading
 a fourth function that does the same thing and noticing the register.
 
-## Next: the sighting scan, mapped
+## SightScan -- the AI band is finished
 
-`0x00403B40`, 1,888 bytes over a 0x84C frame -- what fills `SIGHT_OFF_FOUND`,
-and therefore the source of everything the four AI steps reconstructed this
-session act on. All twenty-three callees are named; the survey is in `orig.h`.
+`0x00403B40`, 1,888 bytes, five callers. Entries 1,232 -> 1,233 of 1,239,
+**6 left**, and nothing outstanding is AI any more. `ab.sh bootcamp campaign`
+clean -- no-regression, the band is cold.
 
-**One claim in that survey was wrong and `espmap.py` caught it.** It said this
-function "keeps both facings" where the four AI steps overwrite one slot -- and
-the two stores are `[esp+0x40]` and `[esp+0x3c]`, which look like two slots and
-are one, because the first has an outstanding `push` in front of it. The turret
-overwrites the hull here exactly as everywhere else. That is the error the tool
-was built for, made one commit before building it.
+It fills `SIGHT_OFF_FOUND` and the range and bearing beside it, so it is the
+source of everything the five AI steps reconstructed this session act on; and
+it is what bumps `ADDR_SIGHT_GENERATION` and refills the heading cache they
+read.
 
-**It is where the heading cache comes from**, which closes the loop on
-`ADDR_SIGHT_BLOCK_BY_DIR`'s two stamps. This function increments
-`ADDR_SIGHT_GENERATION` and feeds every object it rejects to `AddSightBlocker`,
-which writes the three per-heading minima; the AI steps only ever *read* that
-cache. So the scan invalidates and refills, the steps consult, and the separate
-trace and minima stamps are the seam between them.
+**A unit adopts what its allies are shooting at.** The allied arm reads as
+count-and-skip and three of its exits fall into the *scoring* tail with the
+ally's target as the candidate. A first draft wrote it as five `continue`s --
+a plausible AI and the wrong one -- and was discarded.
 
-**Two phases, and the first edits the list it walks.** `ObjectsInRect` answers a
-chain threaded through `OBJ_OFF_QUERY_NEXT`, with one of two predicates chosen
-by argument 5. The walk then unlinks each object it wants into a second list and
-hands everything else to `AddSightBlocker` -- so one pass both selects the
-candidates and builds the occlusion data those candidates will be tested
-against. Treating it as a filter followed by a scan gets the order wrong.
+**Two phases, and the first edits the list it walks**: survivors are prepended
+to a second list through the same link, so the candidates come out reversed,
+and everything else becomes a sight blocker in the same pass.
 
-**Three names in that edit were refused by `checkpatches`, and the existing
-ones were better.** `flags` non-zero selects `ADDR_OBJ_IS_HITTABLE` and zero
-selects `ADDR_OBJ_IS_LIVE_TARGET` -- which say what each predicate *asks*,
-where "predicate A" and "predicate B" would have said only which argument picks
-them. The rule about grepping an address before naming it is cited in this
-session's own commits and was then broken three times in one hunk; the ratchet
-is what caught it, not the rule.
+**Three computations are dead and all three are reproduced**, because each is a
+call and therefore visible in a counter: `ObjIsTypeIn238` asked twice in a row
+with opposite branches, the second unable to fire; `AngleDelta` whose answer is
+overwritten two instructions later; and the exit's first bearing store,
+overwritten by `AngleBetween` from the object's anchor. The last of those is
+why the two exits answer different bearings.
 
-**A unit adopts what its allies are shooting at**, and that is invisible unless
-the branches are followed rather than the bodies. The allied arm reads as a
-counting-and-skipping block -- bump the count, validate the ally's target, drop
-it if dead or flagged -- and *three of its exits jump back into the kind-7
-arm's scoring tail* with the ally's target in the candidate slot, so the scan
-scores it as though it had found it itself. Written from the bodies the arm
-ends in `continue` five times and the behaviour vanishes: the unit would only
-ever engage what it saw for itself. A first draft did exactly that and was not
-shipped.
-
-**Its signature is resolved**, with `espmap.py` rather than by eye:
-`void *SightScan(obj, int32 *range, uint8 *bearing, int32 *nAllied, int32
-*nOther, int32 flags)` -- six arguments, four out-params, all cleared before
-anything is looked at. `flags` picks between two `ObjectsInRect` predicates.
-The search box is four int32s built as the position plus and minus the rank's
-sight range, stored right, left, bottom, top -- not the struct's order, and not
-something to transcribe from the store sequence.
-
-**The exit writes the bearing twice and the first write is dead.** The primary
-arm stores what the scan recorded and immediately overwrites it with
-`AngleBetween` from `ObjAnchorPoint` to the winner, so the answer is measured
-from the object's *anchor*. The fallback arm returns the recorded bearing and
-does not. Two exits, two different bearings, one call apart.
-
-Also mapped: anything ours of type 2, 3 or 8 revealed on the way past with a
-2,000 ms stamp -- a side effect of looking, not of finding; and kind 7 scored
-through `AngleBetween` and a flat `0x3E8` where everything else goes through
-the arc and range machinery.
+Its callers wanted casts at every site -- the out-params are written straight
+into the sight context, which is what confirms where they land.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,232 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 7
-outstanding, which is 1,239 minus 1,232 -- from 1,428 reconstructed addresses
-(1,424 patched plus 4 registered), and **94.3% of the sub-CRT bytes**.
-Split-aware that is **1,383 of 1,530** real functions and **85.4%** of the
+line (0x0045C000) patched**. Measured: **1,233 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 6
+outstanding, which is 1,239 minus 1,233 -- from 1,429 reconstructed addresses
+(1,425 patched plus 4 registered), and **94.8% of the sub-CRT bytes**.
+Split-aware that is **1,384 of 1,530** real functions and **85.9%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
 small ones in batches. A hundred and fifty-one batches have gone in and NOTHING SMALL IS LEFT among
-the ENTRIES: the 7 outstanding start at **1,888 bytes** -- `0x00403B40` -- and
-the median is **2,080**. That is not what is left, though: `tools/merges.py`
+the ENTRIES: the 6 outstanding start at **2,080 bytes** -- `0x0044AFB0` -- and
+the median is **2,336**. That is not what is left, though: `tools/merges.py`
 splits them into real functions and the 0x00458930 entry alone still holds
 sixteen unwritten ones from 16 bytes up. Rank by real function, not by entry. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred

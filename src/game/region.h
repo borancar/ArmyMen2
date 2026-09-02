@@ -292,6 +292,12 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out);
  * ours. */
 /* 0x00405220, one caller. AiPatrolStep's pair, on a leash: past 360 from its
  * post it goes home and forgets what it was chasing. The name is ours. */
+/* 0x00403B40, five callers: the sighting scan. Fills SIGHT_OFF_FOUND and the
+ * range and bearing beside it, and is what refills the heading cache every AI
+ * step reads. The name is ours. */
+void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
+                        int32_t *nAllied, int32_t *nOther, int32_t flags);
+
 void __cdecl AiGuardStep(void *obj, void *out, void *ctx);
 
 void __cdecl AiPatrolStep(void *obj, void *out, void *ctx);

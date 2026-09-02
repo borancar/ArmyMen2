@@ -9059,6 +9059,8 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * exits, two different bearings, and the difference is one call. */
 #define AM2_SIGHT_SCAN_FAR       0x1000       /* the initial best range */
 #define AM2_SIGHT_KIND7_RANGE    0x3E8        /* kind 7 is scored flat */
+/* Two seconds, written to OBJ_OFF_REVEALED_UNTIL by whatever looked. */
+#define AM2_SIGHT_REVEAL_MS      0x7D0
 #define ADDR_SIGHT_SCAN           0x00403B40u  /* int32(obj, a, b, c, d, e) */
 /* 0x00448880, two callers, 64 bytes. The first dword of the OBJ_OFF_FIELD_C0
  * record of whatever sits in UNIT_OFF_INVENTORY_SEL -- the same value

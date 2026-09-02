@@ -4965,6 +4965,375 @@ tail:
     ConsiderSightingC(obj, out, ctx);
 }
 
+/* ObjectsInRect is reconstructed in win32/mapdraw.cpp and is declared here
+ * rather than by including that header, for the reason script.cpp gives about
+ * PreloadSprite: region.cpp is flat and mapdraw.h names Win32 types. The
+ * signature is copied exactly and NOT wrapped in `extern "C"`: mapdraw.h's
+ * block closes at line 129 and this declaration is at 164, so it has C++
+ * linkage. Getting that backwards is a link error rather than a silent one,
+ * which is the only reason it is safe to repeat a declaration at all. */
+void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
+                            int32_t (__cdecl *keep)(void *obj));
+
+/* 0x0045CAA0 called with ONE argument and no format string -- a third role for
+ * that folded `ret`, neither the varargs logger nor a vtable slot. See orig.h.
+ * gamelog.c's safe_format walks the string by hand, so handing it an object
+ * pointer renders bytes as text and cannot fault. */
+typedef void (__cdecl *AM2_LogOneFn)(void *obj);
+#define orig_log_one ((AM2_LogOneFn)(uintptr_t)AM2_IMAGE(ADDR_LOG))
+
+/* SightScan -- original 0x00403B40, 1,888 bytes over a 0x84C frame, five
+ * callers. What fills SIGHT_OFF_FOUND and the range and bearing beside it, so
+ * it is the source of everything every AI step in this file acts on. The name
+ * is ours; it names itself nowhere.
+ *
+ * ITS STACK WAS RESOLVED WITH tools/espmap.py. Two claims about this frame
+ * made by hand were wrong before that tool existed, and a third -- the sight
+ * cache's index -- was wrong in three already-shipped functions until this one
+ * was read. Nothing here about a slot is from counting by eye.
+ *
+ * IT IS WHERE THE HEADING CACHE COMES FROM: it bumps ADDR_SIGHT_GENERATION and
+ * hands every object it REJECTS to AddSightBlocker, which writes the minima the
+ * AI steps only ever read.
+ *
+ * TWO PHASES, AND THE FIRST EDITS THE LIST IT WALKS. What survives is
+ * PREPENDED to a second list through the same OBJ_OFF_QUERY_NEXT link, so the
+ * candidates come out reversed, and everything else becomes a sight blocker.
+ * One pass builds both the candidates and the occlusion data they are about to
+ * be tested against.
+ *
+ * A UNIT ADOPTS WHAT ITS ALLIES ARE SHOOTING AT, which is the thing a reading
+ * of the bodies loses. The allied arm looks like count-and-skip and three of
+ * its exits fall into the SCORING tail with the ALLY'S TARGET as the
+ * candidate. Written as five `continue`s, a unit only ever engages what it saw
+ * itself -- a plausible AI and the wrong one.
+ *
+ * THREE COMPUTATIONS ARE DEAD AND ALL THREE ARE REPRODUCED, because each is a
+ * call and therefore visible in a counter:
+ *
+ *   ObjIsTypeIn238 is called TWICE IN A ROW on the same object with opposite
+ *   branches; the second cannot fire, and its target does not advance the
+ *   walk, so reading it as live makes the loop look non-terminating.
+ *
+ *   AngleDelta is called in the scoring tail and its answer overwritten two
+ *   instructions later. The comparison uses range against range and never the
+ *   angle.
+ *
+ *   The exit stores the bearing and then overwrites it with AngleBetween from
+ *   ObjAnchorPoint to the winner -- so the primary arm answers a bearing
+ *   measured from the object's ANCHOR while the fallback answers the recorded
+ *   one. Two exits, two different bearings.
+ *
+ * THE SLACK STARTS AT 0x80 AND BECOMES 0 once anything is picked, so the first
+ * plausible candidate wins by 128 and everything after it is compared exactly.
+ * And REGIONS ARE SOLVED ONCE: the weapon arm passes a flag to RegionsNear
+ * that it clears immediately, so only the first weapon considered pays for a
+ * region solve. */
+void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
+                        int32_t *nAllied, int32_t *nOther, int32_t flags)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *keep = (uint8_t *)0;
+    uint8_t *best = (uint8_t *)0;
+    uint8_t *alt  = (uint8_t *)0;
+    uint8_t *it;
+    int32_t  bestRange   = AM2_SIGHT_SCAN_FAR;
+    int32_t  bestScore   = 0;
+    uint8_t  bestBearing = 0x80;
+    uint8_t  slack       = 0x80;
+    int32_t  solve       = 1;
+    uint8_t  facing;
+    int32_t  reach;
+    AM2_Rect box;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_PERFRAME_COUNT_A
+        > AM2_SIGHT_SCANS_PER_FRAME)
+        return (void *)0;
+
+    *outRange   = 0;
+    *outBearing = 0;
+    *nAllied    = 0;
+    *nOther     = 0;
+
+    /* One slot written twice: a type 3 with more than one row aims with its
+     * turret. Two displacements four apart, one dword. */
+    facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
+    if (ObjIsType3((const AM2_Object *)o)
+        && *(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
+        facing = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
+
+    /* A weapon already earmarked stays the fallback while it is still there,
+     * not flagged gone, reachable, and worth taking. */
+    if (ObjIsType2((const AM2_Object *)o)
+        && *(const uint32_t *)(o + OBJ_OFF_PICKUP_AFTER)) {
+        uint8_t *w = (uint8_t *)LookupByUID(
+            *(const uint32_t *)(o + OBJ_OFF_PICKUP_AFTER));
+
+        if (w && !(*(const uint8_t *)(w + OBJ_OFF_FLAGS) & 4)
+            && RegionsNear(w, o, 1)) {
+            int32_t n = TryTakeWeapon(w, o);
+
+            if (n) {
+                alt       = w;
+                bestScore = n;
+            }
+        }
+    }
+
+    *(int32_t *)(o + OBJ_OFF_FIELD_F4) = 0;
+    *(uint32_t *)(o + OBJ_OFF_FIELD_FC) =
+        *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        + AM2_AI_TROOPER_RETRY_MS;
+    ++*(int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
+    orig_log_one(o);
+
+    reach = *(const int32_t *)((const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+                               + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
+                                     * RANK_REC_BYTES
+                               + RANK_REC_OFF_SIGHT_RANGE);
+    box.left   = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS) - reach;
+    box.right  = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS) + reach;
+    box.top    = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2) - reach;
+    box.bottom = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2) + reach;
+
+    it = (uint8_t *)ObjectsInRect(
+        &box, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+        flags ? ObjIsHittable : ObjIsLiveTarget);
+    if (!it)
+        goto finish;
+
+    /* ---- phase one: split the chain, and build the blockers as we go ---- */
+    while (it) {
+        uint8_t *next;
+
+        if (it == o) {
+            it = *(uint8_t *const *)(it + OBJ_OFF_QUERY_NEXT);
+            continue;
+        }
+        if (!IsKind7(it) && !ObjIsTypeIn238((const AM2_Object *)it)
+            && !ObjIsType4((const AM2_Object *)it)) {
+            /* The second call cannot answer yes -- see the header. */
+            if (ObjIsTypeIn238((const AM2_Object *)it))
+                continue;
+            AddSightBlocker(o, it);
+            it = *(uint8_t *const *)(it + OBJ_OFF_QUERY_NEXT);
+            continue;
+        }
+        next = *(uint8_t *const *)(it + OBJ_OFF_QUERY_NEXT);
+        *(uint8_t **)(it + OBJ_OFF_QUERY_NEXT) = keep;
+        keep = it;
+        /* The predicate asks about the SCANNING object, not the candidate,
+         * so this is constant across the walk and evaluated every time. */
+        if (ObjIsOurs(o, 0) && ObjIsTypeIn238((const AM2_Object *)it)) {
+            RevealObj(it);
+            *(uint32_t *)(it + OBJ_OFF_REVEALED_UNTIL) =
+                *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                + AM2_SIGHT_REVEAL_MS;
+        }
+        it = next;
+    }
+
+    if (!keep)
+        goto finish;
+
+    /* ---- phase two: score what survived ---- */
+    for (it = keep; it;
+         it = *(uint8_t *const *)(it + OBJ_OFF_QUERY_NEXT)) {
+        uint8_t *cand       = (uint8_t *)0;
+        int32_t  candRange  = AM2_SIGHT_SCAN_FAR;
+        uint8_t  candBearing = 0x80;
+
+        if (ObjsAreAllied(o, it, 0)) {
+            uint8_t *theirs;
+
+            if (!ObjIsTypeIn238((const AM2_Object *)it)) {
+                /* Not a unit: a dropped weapon worth walking to. */
+                if (!flags || !ObjIsType4((const AM2_Object *)it))
+                    continue;
+                DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
+                             (const AM2_Point *)(it + OBJ_OFF_POS),
+                             &candRange, &candBearing);
+                if (!RegionsNear(it, o, solve)) {
+                    solve = 0;
+                    continue;
+                }
+                solve = 0;
+                {
+                    int32_t n = TryTakeWeapon(it, o);
+
+                    if (n <= bestScore)
+                        continue;
+                    alt         = it;
+                    bestScore   = n;
+                    bestRange   = candRange;
+                    bestBearing = candBearing;
+                }
+                continue;
+            }
+
+            ++*nAllied;
+            if (!*(const uint32_t *)(it + OBJ_OFF_TARGET_UID))
+                continue;
+            theirs = (uint8_t *)LookupByUID(
+                *(const uint32_t *)(it + OBJ_OFF_TARGET_UID));
+            cand = theirs;
+            if (!theirs) {
+                *(uint32_t *)(it + OBJ_OFF_TARGET_UID) = 0;
+                goto score;                 /* cand is null; score refuses */
+            }
+            if (*(const int16_t *)(theirs + OBJ_OFF_HEALTH) <= 0
+                || (*(const int32_t *)(theirs + OBJ_OFF_FLAGS) & 0x204)) {
+                *(uint32_t *)(it + OBJ_OFF_TARGET_UID) = 0;
+                continue;
+            }
+            if (ObjsAreAllied(o, theirs, 0))
+                continue;
+            DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
+                         (const AM2_Point *)(theirs + OBJ_OFF_POS),
+                         &candRange, &candBearing);
+            /* Only mode 1 adopts an ally's target, and only close by. */
+            if (*(const int32_t *)(o + OBJ_OFF_AI_MODE) != 1)
+                goto score;
+            if (candRange > AM2_AI_PATROL_DETOUR)
+                continue;
+            goto score;
+        }
+
+        if (IsKind7(it)) {
+            candBearing = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+                                       (const AM2_Point *)(it + OBJ_OFF_POS));
+            candRange   = AM2_SIGHT_KIND7_RANGE;
+            cand        = it;
+            goto score;
+        }
+
+        /* The sight test, inline. Same shape as AiCanSee and NOT the same
+         * code -- a normalised diff finds no shared run of ten. */
+        {
+            uint8_t  look = *(const uint8_t *)(o + OBJ_OFF_FACING);
+            int32_t  viewerAttr, dx, dy, delta, gen;
+            uint8_t *rec;
+
+            if (ObjIsType3((const AM2_Object *)o)
+                && *(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
+                look = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
+
+            viewerAttr = ObjTileAttr(o);
+            dx = (int32_t)*(const int16_t *)(it + OBJ_OFF_POS)
+                 - (int32_t)*(const int16_t *)(o + OBJ_OFF_POS);
+            dy = (int32_t)*(const int16_t *)(it + OBJ_OFF_POS + 2)
+                 - (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2);
+            candRange   = ApproxDistXY(dx, dy);
+            candBearing = (uint8_t)AngleOfDelta(dx, dy);
+
+            delta = AngleDelta(look, candBearing);
+            if (delta < 0)
+                delta = -delta;
+            {
+                const uint8_t *rank =
+                    (const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+                    + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
+                          * RANK_REC_BYTES;
+
+                if (delta > *(const int32_t *)(rank + RANK_REC_OFF_FIELD_04)) {
+                    if (candRange
+                        >= *(const int32_t *)(rank + RANK_REC_OFF_FIELD_08))
+                        continue;
+                    goto in_sight;
+                }
+
+                /* Keyed on the BEARING, not the facing -- see orig.h. */
+                rec = (uint8_t *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR
+                      + ((uint32_t)candBearing / AM2_SIGHT_DIR_STEP)
+                            * AM2_SIGHT_DIR_STRIDE;
+                gen = *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
+
+                if (*(const int32_t *)(rec + SIGHTDIR_OFF_TRACE_STAMP) != gen)
+                    AiSightTrace(o, it, rec, rank, viewerAttr, gen);
+
+                if (*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP) != gen) {
+                    if (candRange
+                        > *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE))
+                        continue;
+                } else {
+                    int32_t mine = ObjHeight(o);
+                    int32_t his  = ObjHeight(it);
+
+                    if (his >= mine) {
+                        if (candRange
+                            > *(const int16_t *)(rec + SIGHTDIR_OFF_LOW))
+                            continue;
+                    } else if (his + AM2_SIGHT_BAND_STEP < mine) {
+                        if (candRange
+                            > *(const int16_t *)(rec + SIGHTDIR_OFF_HIGH))
+                            continue;
+                    } else if (candRange
+                               > *(const int16_t *)(rec + SIGHTDIR_OFF_MID)) {
+                        continue;
+                    }
+                }
+            }
+        }
+
+in_sight:
+        /* Modes 2 and 3 refuse a candidate that is allied WITH US, but only
+         * once a second has passed since we were last hit -- and the refusal
+         * skips recording it while still revealing it below. */
+        cand = it;
+        if ((*(const int32_t *)(o + OBJ_OFF_AI_MODE) == 3
+             || *(const int32_t *)(o + OBJ_OFF_AI_MODE) == 2)
+            && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                          - *(const uint32_t *)(o + OBJ_OFF_HIT_TIME))
+                   > AM2_SIGHT_KIND7_RANGE
+            && ObjsAreAllied(it, o, 0))
+            cand = (uint8_t *)0;
+
+        if (ObjIsOurs(o, 0)) {
+            RevealObj(it);
+            *(uint32_t *)(it + OBJ_OFF_REVEALED_UNTIL) =
+                *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                + AM2_SIGHT_REVEAL_MS;
+        }
+
+score:
+        if (!cand)
+            continue;
+        ++*nOther;
+        ++*(int32_t *)(o + OBJ_OFF_FIELD_F4);
+        /* Discarded two instructions later; a call, so it counts. */
+        (void)AngleDelta(facing, candBearing);
+        if (candRange >= bestRange + slack)
+            continue;
+        best        = cand;
+        bestRange   = candRange;
+        bestBearing = candBearing;
+        slack       = 0;
+    }
+
+finish:
+    orig_log_one(o);
+    if (!*(const int32_t *)(o + OBJ_OFF_FIELD_F4))
+        *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 0;
+
+    if (best) {
+        uint32_t anchor;
+
+        *outRange   = bestRange;
+        *outBearing = bestBearing;
+        anchor      = ObjAnchorPoint(o);
+        /* Overwrites the store above, and measures from the ANCHOR. */
+        *outBearing = AngleBetween((const AM2_Point *)&anchor,
+                                   (const AM2_Point *)(best + OBJ_OFF_POS));
+        return best;
+    }
+    if (alt) {
+        *outRange   = bestRange;
+        *outBearing = bestBearing;
+        return alt;
+    }
+    return (void *)0;
+}
+
 /* AiStepFollow -- original 0x00407C80, one caller. Mode 3, and the name comes
  * from what the context builder puts in front of it rather than from a
  * keyword: the record's SIGHT_OFF_LEADER is the object at OBJ_OFF_FOLLOW_UID,
@@ -6523,7 +6892,6 @@ void __cdecl TrooperAiStep(void *obj, void *out)
 
 typedef int32_t  (__cdecl *AM2_ScanFn)(void *obj, void *range, void *bearing,
                                        void *a, void *b, int32_t z);
-#define orig_scan_403b40  ((AM2_ScanFn)(uintptr_t)AM2_IMAGE(ADDR_SIGHT_SCAN))
 #define kRangeWant (*(const double *)AM2_IMAGE(ADDR_SIGHT_RANGE_WANT))
 #define kRangeHi   (*(const double *)AM2_IMAGE(ADDR_WEAPON_RANGE_HI))
 
@@ -6635,9 +7003,10 @@ void __cdecl AiBuildContext(void *obj, void *out)
     if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
         >= *(const uint32_t *)(o + OBJ_OFF_FIELD_FC))
         *(int32_t *)(s + SIGHT_OFF_FOUND) =
-            orig_scan_403b40(obj, s + SIGHT_OFF_FOUND_RANGE,
+            (int32_t)(intptr_t)SightScan(obj, (int32_t *)(s + SIGHT_OFF_FOUND_RANGE),
                              s + SIGHT_OFF_FOUND_BEARING,
-                             o + OBJ_OFF_FIELD_114, o + OBJ_OFF_FIELD_110, 0);
+                             (int32_t *)(o + OBJ_OFF_FIELD_114),
+                             (int32_t *)(o + OBJ_OFF_FIELD_110), 0);
 
     if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
         *(int32_t *)(s + SIGHT_OFF_DEST_DIST) =
@@ -6756,9 +7125,10 @@ void __cdecl RoachBuildContext(void *obj, void *out)
     if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
         >= *(const uint32_t *)(o + OBJ_OFF_FIELD_FC))
         *(int32_t *)(s + SIGHT_OFF_FOUND) =
-            orig_scan_403b40(obj, s + SIGHT_OFF_FOUND_RANGE,
+            (int32_t)(intptr_t)SightScan(obj, (int32_t *)(s + SIGHT_OFF_FOUND_RANGE),
                              s + SIGHT_OFF_FOUND_BEARING,
-                             o + OBJ_OFF_FIELD_114, o + OBJ_OFF_FIELD_110, 0);
+                             (int32_t *)(o + OBJ_OFF_FIELD_114),
+                             (int32_t *)(o + OBJ_OFF_FIELD_110), 0);
 
     if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
         *(int32_t *)(s + SIGHT_OFF_DEST_DIST) =
@@ -7089,9 +7459,9 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
     if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
         >= *(const uint32_t *)(o + OBJ_OFF_FIELD_FC))
         *(int32_t *)(c + SIGHTC_OFF_FOUND) =
-            orig_scan_403b40(obj, c + SIGHTC_OFF_FOUND_RANGE,
+            (int32_t)(intptr_t)SightScan(obj, (int32_t *)(c + SIGHTC_OFF_FOUND_RANGE),
                              c + SIGHTC_OFF_FOUND_BEARING,
-                             o + OBJ_OFF_FIELD_114, o + OBJ_OFF_FIELD_110,
+                             (int32_t *)(o + OBJ_OFF_FIELD_114), (int32_t *)(o + OBJ_OFF_FIELD_110),
                              (int32_t)anchor);
 
     if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
@@ -8192,6 +8562,8 @@ int region_install(void)
                         "AiPatrolStep", 3);
     rc |= patch_replace(ADDR_BIG_405220, (const void *)AiGuardStep,
                         "AiGuardStep", 1);
+    rc |= patch_replace(ADDR_SIGHT_SCAN, (const void *)SightScan,
+                        "SightScan", 5);
     rc |= patch_replace(ADDR_FIND_PATH, (const void *)FindPath,
                         "FindPath", 1);
     rc |= patch_replace(ADDR_ITEM_TEARDOWN, (const void *)ItemTeardown,

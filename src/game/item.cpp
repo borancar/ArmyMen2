@@ -6098,7 +6098,6 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot)
 
 typedef int32_t (__cdecl *AM2_Scan403B40Fn)(void *obj, void *a, void *b,
                                             void *c, void *d, int32_t e);
-#define orig_scan_403b40 ((AM2_Scan403B40Fn)(uintptr_t)ADDR_SIGHT_SCAN)
 
 /* NextInventorySlot -- original 0x004498F0, one caller. Move a trooper on to
  * its next inventory slot, wrapping to 0, on the weapon-switch action key or
@@ -6135,9 +6134,13 @@ void __cdecl NextInventorySlot(void *obj)
 
     if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
         > *(const uint32_t *)(o + OBJ_OFF_FIELD_FC)) {
-        int32_t a, b, c, d;
+        /* Four out-params it discards -- it wants the scan's side effects,
+         * which are the sight cache, the reveal stamps and the retry
+         * deadline. The bearing is a byte; the others are int32. */
+        int32_t range, allied, other;
+        uint8_t bearing;
 
-        orig_scan_403b40(obj, &a, &b, &c, &d, 0);
+        SightScan(obj, &range, &bearing, &allied, &other, 0);
     }
 
     if (!ActionKeyPressed(AM2_ACTION_NEXT_WEAPON)) {
