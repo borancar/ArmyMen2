@@ -100,4 +100,21 @@ void *__cdecl RowPoolAAlloc(void);
 /* 0x00460D30. The same for pool B. */
 void *__cdecl RowPoolBAlloc(void);
 
+/* 0x00460D90. Initialise a SEQ context: capacity records of 48 bytes, each
+ * owning a 0x60-byte row registered at w x h. FIVE arguments -- read off the
+ * call site, not the body. */
+void __cdecl SeqCtxInit(void *ctx, int32_t capacity, int32_t margin,
+                        int32_t w, int32_t h);
+/* 0x00460E30. Free every record's row; harmless on an unallocated context. */
+void __cdecl SeqCtxFree(void *ctx);
+/* 0x00460EC0. Release a record. CONTEXT FIRST. Answers the next index,
+ * corrected for the compaction; only the evictor uses the answer. */
+int32_t __cdecl SeqRetire(void *ctx, void *rec);
+/* 0x00460FD0. Drop off-screen records, then drop from the head regardless. */
+void __cdecl SeqEvict(void *ctx);
+/* 0x00461070. Take a record, evicting first when count exceeds
+ * capacity MINUS margin -- not capacity, which is what the hardcoded
+ * allocators test. Always returns a record. */
+void *__cdecl SeqAlloc(void *ctx);
+
 #endif

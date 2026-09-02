@@ -7507,6 +7507,23 @@ typedef struct {
 #define ADDR_SEQ_ADD_KIND5       0x00462000u  /* void(pt*, owner, life) */
 #define ADDR_SEQ_ADD_KIND7       0x00462080u  /* void(pt*, uid, 0, 0, life) */
 #define ADDR_SEQ_ADD_KIND6       0x00461660u  /* void(pt*, int32_t) */
+/* The generic five, over a SEQ context. Signatures taken from CALL SITES, not
+ * from bodies: a body shows the arguments it uses, only the caller shows how
+ * many there are and in what order, and for these cdecl functions the `ret`
+ * carries no size at all. Two of the five were wrong when read from the body.
+ *
+ * THE GENERIC POOL HAS NO SLACK. Its array is exactly `capacity` records,
+ * where the two hardcoded pools have capacity + budget slots. The margin does
+ * that job instead: SeqAlloc's threshold is `count > capacity - margin` where
+ * the hardcoded allocators test `count > capacity`. Subtracted from the
+ * threshold rather than added to the array -- which is why these five diff at
+ * 0.222 against the hardcoded pair and are a rewrite, not a re-emission. */
+#define ADDR_SEQ_CTX_INIT        0x00460D90u  /* void(ctx,capacity,margin,w,h) */
+#define ADDR_SEQ_CTX_FREE        0x00460E30u  /* void(ctx) */
+#define ADDR_SEQ_EVICT           0x00460FD0u  /* void(ctx) */
+#define SEQ_CTX_OFF_TAIL         0x04u
+#define SEQ_CTX_OFF_CAPACITY     0x08u
+#define SEQ_CTX_OFF_MARGIN       0x0Cu
 #define ADDR_SEQ_ALLOC           0x00461070u  /* void *(void *ctx) */
 /* The context's own fields, as far as the allocator and the walker read them.
  * Records are ONE-BASED: SeqAlloc increments the count before using it as an
@@ -7542,6 +7559,10 @@ typedef struct {
  * zero a DWORD here and the walker reads it back with `movsx word`. So it is
  * an int16 with two bytes of padding that the adders happen to clear. Read as
  * the walker reads it. */
+/* The list fields, completing the trio SEQ_OFF_NEXT already had. They mirror
+ * the 12-byte pool's +0x04/+0x06/+0x08 exactly, one record shape later. */
+#define SEQ_OFF_ID               0x28u  /* int16_t, the record's own index */
+#define SEQ_OFF_PREV             0x2Au  /* int16_t, -1 terminating */
 #define SEQ_OFF_NEXT             0x2Cu  /* int16_t */
 #define AM2_SEQ_KIND5            5
 #define AM2_SEQ_KIND6            6

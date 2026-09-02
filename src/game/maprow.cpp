@@ -1153,6 +1153,16 @@ int maprow_install(void)
                         "RowPoolAAlloc", 1);
     rc |= patch_replace(ADDR_ROWPOOL_B_ALLOC, (const void *)RowPoolBAlloc,
                         "RowPoolBAlloc", 1);
+    rc |= patch_replace(ADDR_SEQ_CTX_INIT, (const void *)SeqCtxInit,
+                        "SeqCtxInit", 1);
+    rc |= patch_replace(ADDR_SEQ_CTX_FREE, (const void *)SeqCtxFree,
+                        "SeqCtxFree", 1);
+    rc |= patch_replace(ADDR_SEQ_RETIRE, (const void *)SeqRetire,
+                        "SeqRetire", 1);
+    rc |= patch_replace(ADDR_SEQ_EVICT, (const void *)SeqEvict,
+                        "SeqEvict", 1);
+    rc |= patch_replace(ADDR_SEQ_ALLOC, (const void *)SeqAlloc,
+                        "SeqAlloc", 1);
     return rc;
 }
 
@@ -1449,3 +1459,201 @@ void *__cdecl RowPoolBAlloc(void)
 }
 void __cdecl RowPoolAEvict(void) { RowPoolEvict(&kRowPoolA); }
 void __cdecl RowPoolBEvict(void) { RowPoolEvict(&kRowPoolB); }
+
+/* ---- The SEQ contexts: the same five roles, parameterised ----------------
+ *
+ * These are the third implementation of the row-pool algorithm and the only
+ * one that is a REWRITE rather than a re-emission -- 0.222 similarity against
+ * the hardcoded pair, which diff at 1.000 against each other.
+ *
+ * Records are 48 bytes here, not 12, and the array is a POINTER at
+ * SEQ_CTX_OFF_RECORDS rather than being inline -- so the same conceptual
+ * field is one dereference deep in this shape and zero in the other.
+ *
+ * AND THE SLACK IS SOMEWHERE ELSE. The hardcoded pools carry `budget` spare
+ * slots above their capacity; a context carries none, and its margin is
+ * subtracted from the eviction threshold instead. Writing this from the
+ * hardcoded version's outline would overrun the array. */
+static uint8_t *SeqRecord(const uint8_t *ctx, int32_t i)
+{
+    return *(uint8_t **)(uintptr_t)(ctx + SEQ_CTX_OFF_RECORDS)
+           + (int32_t)(i * AM2_SEQ_RECORD_SIZE);
+}
+
+/* 0x00460D90. Five arguments -- the caller pushes 0x20, 0x20, 0x28, 0xC8 and
+ * the context, and the last two are RowAlloc's width and height, which the
+ * hardcoded initialisers inline as 0x60 and 0x80 square.
+ *
+ * The loop runs to CAPACITY, which espmap settles: the bound at 0x00460E15
+ * and `capacity` at 0x00460D9B read the same frame slot. */
+void __cdecl SeqCtxInit(void *ctxv, int32_t capacity, int32_t margin,
+                        int32_t w, int32_t h)
+{
+    uint8_t *ctx = (uint8_t *)ctxv;
+    int32_t  i;
+
+    *(int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY) = capacity;
+    *(int32_t *)(ctx + SEQ_CTX_OFF_MARGIN) = margin;
+    *(int32_t *)(ctx + SEQ_CTX_OFF_TAIL) = 0;
+    *(int32_t *)(ctx + SEQ_CTX_OFF_COUNT) = 0;
+    *(void **)(ctx + SEQ_CTX_OFF_RECORDS) =
+        am2_malloc((size_t)(capacity * AM2_SEQ_RECORD_SIZE));
+
+    for (i = 0; i < capacity; i++) {
+        uint8_t *rec = SeqRecord(ctx, i);
+        uint8_t *row;
+
+        *(int16_t *)(rec + SEQ_OFF_ID) = (int16_t)i;
+        *(int16_t *)(rec + SEQ_OFF_NEXT) = -1;
+        *(int16_t *)(rec + SEQ_OFF_PREV) = -1;
+
+        row = (uint8_t *)am2_malloc(AM2_ROWPOOL_ROW_BYTES);
+        *(void **)(rec + SEQ_OFF_ROW) = row;
+        memset(row, 0, AM2_ROWPOOL_ROW_BYTES);
+        RowAlloc(w, h, row, (void *)(uintptr_t)ADDR_MAP_DESC);
+    }
+}
+
+/* 0x00460E30. Free every record's row. Opens with an early-out on a NULL
+ * record array, which the hardcoded teardowns have no need of because their
+ * arrays are static and always there -- a real difference between the two
+ * shapes, not an oversight in either. */
+void __cdecl SeqCtxFree(void *ctxv)
+{
+    uint8_t *ctx = (uint8_t *)ctxv;
+    int32_t  i;
+
+    if (*(void **)(ctx + SEQ_CTX_OFF_RECORDS) == 0)
+        return;
+
+    for (i = 0; i < *(const int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY); i++) {
+        uint8_t *rec = SeqRecord(ctx, i);
+        void    *row = *(void **)(rec + SEQ_OFF_ROW);
+
+        if (row != 0) {
+            RowRelease(row, (void *)(uintptr_t)ADDR_MAP_DESC);
+            am2_free(row);
+            *(void **)(rec + SEQ_OFF_ROW) = 0;
+        }
+    }
+}
+
+/* 0x00460EC0. THE CONTEXT IS THE FIRST ARGUMENT and the record the second --
+ * `push rec; push ctx; call; add esp, 8` at both of the evictor's call sites.
+ * Read off the body alone it looks like (rec, ctx), which is what I wrote
+ * first; the caller settles it and the callee's frame slots agree.
+ *
+ * Same four roles as the hardcoded release: clear the row's bit 0 and
+ * RowUpdate, unlink both ways, compact by swapping the last record into the
+ * hole, and answer the next index corrected for that swap. */
+int32_t __cdecl SeqRetire(void *ctxv, void *recv)
+{
+    uint8_t *ctx = (uint8_t *)ctxv;
+    uint8_t *rec = (uint8_t *)recv;
+    int32_t  count = *(const int32_t *)(ctx + SEQ_CTX_OFF_COUNT);
+    int32_t  freed = *(int16_t *)(rec + SEQ_OFF_ID);
+    int32_t  next  = *(int16_t *)(rec + SEQ_OFF_NEXT);
+    int32_t  prev  = *(int16_t *)(rec + SEQ_OFF_PREV);
+    uint8_t *last;
+    void    *row   = *(void **)(rec + SEQ_OFF_ROW);
+
+    if ((*(uint32_t *)row & 1) != 0) {
+        *(uint32_t *)row &= ~1u;
+        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+    }
+
+    *(int16_t *)(SeqRecord(ctx, prev) + SEQ_OFF_NEXT) = (int16_t)next;
+    if (next > 0)
+        *(int16_t *)(SeqRecord(ctx, next) + SEQ_OFF_PREV) = (int16_t)prev;
+    if (*(const int32_t *)(ctx + SEQ_CTX_OFF_TAIL) == freed)
+        *(int32_t *)(ctx + SEQ_CTX_OFF_TAIL) = prev;
+
+    last = SeqRecord(ctx, count);
+    if (freed != count) {
+        int32_t lprev = *(int16_t *)(last + SEQ_OFF_PREV);
+        int32_t lnext = *(int16_t *)(last + SEQ_OFF_NEXT);
+
+        *(int16_t *)(SeqRecord(ctx, lprev) + SEQ_OFF_NEXT) = (int16_t)freed;
+        if (lnext > 0)
+            *(int16_t *)(SeqRecord(ctx, lnext) + SEQ_OFF_PREV) = (int16_t)freed;
+        if (next == *(int16_t *)(last + SEQ_OFF_ID))
+            next = freed;
+
+        memcpy(rec, last, AM2_SEQ_RECORD_SIZE);
+        *(void **)(last + SEQ_OFF_ROW) = row;
+        *(int16_t *)(rec + SEQ_OFF_ID) = (int16_t)freed;
+        if (*(const int32_t *)(ctx + SEQ_CTX_OFF_TAIL) == count)
+            *(int32_t *)(ctx + SEQ_CTX_OFF_TAIL) = freed;
+    }
+
+    *(int16_t *)(last + SEQ_OFF_NEXT) = -1;
+    *(int16_t *)(last + SEQ_OFF_PREV) = -1;
+    *(int32_t *)(ctx + SEQ_CTX_OFF_COUNT) = count - 1;
+    return next;
+}
+
+/* 0x00460FD0. Same two loops as the hardcoded evictor -- drop what the view
+ * no longer meets, then drop from the head regardless if that freed too few. */
+void __cdecl SeqEvict(void *ctxv)
+{
+    uint8_t *ctx = (uint8_t *)ctxv;
+    int32_t  left = *(const int32_t *)(ctx + SEQ_CTX_OFF_MARGIN);
+    int32_t  i;
+
+    if (*(void **)(ctx + SEQ_CTX_OFF_RECORDS) == 0)
+        return;
+    if (*(const int32_t *)(ctx + SEQ_CTX_OFF_COUNT) <= 0)
+        return;
+
+    i = *(int16_t *)(SeqRecord(ctx, 0) + SEQ_OFF_NEXT);
+    while (i > 0 && left > 0) {
+        uint8_t *rec = SeqRecord(ctx, i);
+        uint8_t  scratch[16];
+
+        if (!orig_intersect_rect(scratch,
+                                 (const void *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
+                                 *(uint8_t **)(rec + SEQ_OFF_ROW) + ROW_OFF_RECT)) {
+            i = SeqRetire(ctx, rec);
+            left--;
+            continue;
+        }
+        i = *(int16_t *)(rec + SEQ_OFF_NEXT);
+    }
+
+    i = *(int16_t *)(SeqRecord(ctx, 0) + SEQ_OFF_NEXT);
+    while (left > 0) {
+        i = SeqRetire(ctx, SeqRecord(ctx, i));
+        left--;
+    }
+}
+
+/* 0x00461070. THE THRESHOLD IS `count > capacity - margin`, not
+ * `count > capacity` as the hardcoded allocators test. The margin is this
+ * shape's slack: subtracted from the threshold, where the hardcoded pools add
+ * it to the array as spare slots. Writing this from their outline would run
+ * the array off its end. */
+void *__cdecl SeqAlloc(void *ctxv)
+{
+    uint8_t *ctx = (uint8_t *)ctxv;
+    uint8_t *rec;
+    int32_t  i;
+
+    if (*(const int32_t *)(ctx + SEQ_CTX_OFF_COUNT)
+        > *(const int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY)
+          - *(const int32_t *)(ctx + SEQ_CTX_OFF_MARGIN))
+        SeqEvict(ctx);
+
+    i = *(const int32_t *)(ctx + SEQ_CTX_OFF_COUNT) + 1;
+    *(int32_t *)(ctx + SEQ_CTX_OFF_COUNT) = i;
+    rec = SeqRecord(ctx, i);
+
+    *(int16_t *)(rec + SEQ_OFF_ID) = (int16_t)i;
+    *(int16_t *)(rec + SEQ_OFF_PREV) =
+        (int16_t)*(const int32_t *)(ctx + SEQ_CTX_OFF_TAIL);
+    *(int16_t *)(rec + SEQ_OFF_NEXT) = -1;
+    *(int16_t *)(SeqRecord(ctx, *(const int32_t *)(ctx + SEQ_CTX_OFF_TAIL))
+                 + SEQ_OFF_NEXT) = (int16_t)i;
+    *(int32_t *)(ctx + SEQ_CTX_OFF_TAIL) = i;
+
+    return rec;
+}

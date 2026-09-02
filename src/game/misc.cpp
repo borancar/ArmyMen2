@@ -1456,8 +1456,9 @@ typedef int32_t (__cdecl *AM2_SeqRandFn)(void);
 /* The seven steppers SeqRun dispatches to. All take (index, record, context)
  * and answer the next index; kinds 2 and 3 share one. Still original. */
 typedef int32_t (__cdecl *AM2_SeqStepFn)(int32_t at, void *rec, void *ctx);
-typedef int32_t (__cdecl *AM2_SeqRetireFn)(void *ctx, void *rec);
-#define SeqRetire ((AM2_SeqRetireFn)(uintptr_t)ADDR_SEQ_RETIRE)
+/* SeqRetire is reconstructed and declared in maprow.h; this typedef and the
+ * macro under it reached it through the image, which checkseams now refuses. */
+/* Reconstructed now -- maprow.h declares it. */
 #define orig_seq_step0 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP0)
 #define orig_seq_step6 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP6)
 #define orig_seq_step7 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP7)
