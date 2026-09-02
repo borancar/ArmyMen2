@@ -7938,6 +7938,16 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
+ * `createvehicle` MAPS act->army TWO DIFFERENT WAYS IN ONE CALL. Its `table`
+ * argument is CommArmyOfSlot(comm, act->army) unconditionally; its `army`
+ * argument is CommSlotForArmy(comm, act->army) under multiplayer and the raw
+ * act->army otherwise. So one field feeds two parameters through two
+ * OPPOSITE conversions, and the conditional is on only one of them.
+ *
+ * The names make it look like a mistake and it is not: CommArmyOfSlot and
+ * CommSlotForArmy are inverses, and this file records that they are separate
+ * functions with 47 and several callers respectively. Reproduced as written.
+ *
  * `createroach` PASSES ZERO AS ITS KIND, which is not act->n0 or anything
  * else the action carries -- a literal `push 0` before the name. So a script
  * cannot choose a roach kind through this action even though CreateRoach
