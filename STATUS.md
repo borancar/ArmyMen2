@@ -34,6 +34,47 @@ not work.
 The liveness reading is the only thing that made the run interpretable. Take
 one whenever the conclusion is a claim about zeroes.
 
+## Above the line: the sprite family, complete at eighteen
+
+`0x00462A60..0x00463383` -- two dispatchers over eight subsystems, each with a
+lazy loader and a releaser, both dispatchers called from `ADDR_STATE2_ENTER`.
+All sixteen leaves run on a single Boot Camp drive, and `bootcamp` and
+`campaign` are clean with them in.
+
+**It was eight variations on one idea, which is the shape that invites
+generating six of them from the first two.** What stopped that, each a one
+command check that caught something which would have compiled:
+
+- **pairwise diffs, not against one baseline.** A single-baseline pass called
+  pairs 4 and 7 distinct; they are 1.000 identical. A baseline finds twins OF
+  the baseline and hides twins among the rest.
+- **`[esi-4]` per body, presence AND absence.** Four base conventions across
+  the pairs -- and pair 3's loader points at its record base, so carrying pair
+  1's correction over would have put that table four bytes early. The first
+  instance in this project of applying a base fix where none was needed.
+- **a no-writer scan**, which turned an apparent defect back into a constant:
+  a global with no writer is a constant, where a FIELD with no writer is dead
+  code.
+- **reading each `je` target.** One bit between `jl` and `jle` separates a
+  correct free from one that leaks eight of thirteen.
+
+Three defect-shaped behaviours are reproduced rather than fixed: the decal
+loader's `hotY` taken from the width, that eight-of-thirteen leak, and four
+different NULL conventions across the frees.
+
+## Next: the vehicle step, and its entry is already done
+
+`ADDR_STEP_TYPE3` is reconstructed -- found after reading 240 instructions of
+it, because I grepped four sibling addresses for patches and not that one. The
+outstanding work is its five callees, ~4,880 bytes, all reached from our own
+code so their counters will be blind.
+
+The leaf is `0x0045C6E0`, vehicle steering, fully read and scoped in the
+scratchpad: three arguments (the `add esp, 0x18` says six and is cleaning a
+neighbour's), an acceleration limiter whose two arms are a floor and a
+ceiling, and an `esi` that stops being the object and becomes a ROW partway
+through.
+
 ## Above the line: the two 12-byte row pools
 
 Four functions in, 1,436 patches. `RowPoolAInit`/`BInit` (`0x00460800`,
