@@ -9731,6 +9731,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_IFF_FORM             0x4D524F46u  /* 'FORM' */
 #define AM2_IFF_MAP              0x2050414Du  /* 'MAP ' */
 #define AM2_IFF_CSUM            0x4D555343u  /* 'CSUM' */
+#define AM2_IFF_TILE             0x454C4954u  /* 'TILE' */
 #define AM2_AMM_NAME_BYTES       0x40u
 /* NOT ADDR_SCRIPT_FIND_NAME, which is 0x0043F670 over a different table.
  * This one lower-cases its argument IN PLACE and searches the second of the
@@ -14140,6 +14141,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * respawn pool weighting all 44 records. Three readers, two of them weapons.
  * Still not renamed here -- that is a change to every use at once and belongs
  * in its own commit -- but the evidence the note asked for now exists. */
+/* 0x0042BEA0, the third of 0x0042C440's unnamed callees and the one that
+ * gates it: LoadMap returns immediately if this answers 0. It fopen's the
+ * "%s.atl" path in "rb", checks AM2_IFF_FORM and then AM2_IFF_TILE, and reads
+ * the tileset from there -- so the .atl is an IFF file and this is its
+ * reader, distinct from RestoreTileSet at 0x0042C0E0, which reloads the same
+ * tileset onto a surface after DirectDraw takes it back.
+ *
+ * Both were inside the single docs/functions.tsv entry that CLAUDE.md's
+ * declined list carried for months as "0x0042BEA0, 1200 B, 2 COM calls" --
+ * one entry, four functions, and the two COM calls belonged to the other one.
+ * tools/merges.py split it; this is what the rest of that entry turned out to
+ * be. */
+#define ADDR_LOAD_ATL_FILE        0x0042BEA0u  /* int32_t(const char *path) */
 #define ADDR_RESPAWN_KIND_ALLOWED 0x004600F0u  /* int32_t(int32_t kind) */
 #define ADDR_BUILD_RESPAWN_POOL   0x00460120u  /* void(int32_t seed) */
 #define ADDR_RESPAWN_KIND_MASK    0x0048C530u  /* uint32_t[44], 0 = always */
