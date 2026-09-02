@@ -8738,8 +8738,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* Bits 2 and 3, and MarkOpenTile (0x0043A4F0) is the only thing that sets
  * either. It ORs 0x04 into a tile with no WEIGHTED neighbour and 0x08 into one
  * with fewer than two COVERED neighbours, over the same twenty deltas the
- * cover pair walks. What reads them is elsewhere; the names say what sets
- * them. */
+ * cover pair walks.
+ *
+ * FINDPATH IS WHAT READS THEM, and the polarity is the point: a CLEAR
+ * NO_WEIGHT_NEAR costs a tile 3 and a clear LITTLE_COVER_NEAR costs it 1,
+ * because the bits are set for the ABSENCE of the thing they name. So the
+ * tile-level A* steers units into the open and away from cover, three times
+ * as hard away from obstacles as from cover. The names still say what sets
+ * them; what uses them is no longer unknown. */
 /* Bit 1, and SealMapEdges is its only writer: set for every tile OUTSIDE a
  * five-tile margin. Its margin is computed from the map's HEIGHT on both
  * axes -- see that function -- so on a non-square map the x band is wrong. */

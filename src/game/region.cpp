@@ -1084,10 +1084,389 @@ int32_t __cdecl AnimStepPoint(void *obj, int32_t heading, int32_t pose,
                          speed, 0, 0, out);
 }
 
-typedef int32_t (__cdecl *AM2_FindPathFn)(int32_t from, int32_t to,
-                                          uint16_t *route, int32_t *n,
-                                          int32_t arg);
-#define orig_find_path ((AM2_FindPathFn)(uintptr_t)ADDR_FIND_PATH)
+/* Tile ids are (row << ADDR_MAP_ROW_SHIFT) | col, so a delta between two of
+ * them is two shifts and two masks. The original open-codes this five times
+ * and a fifth reading of the same six instructions is five chances to differ.
+ */
+static int32_t PathDistXY(int32_t fromTile, int32_t toTile)
+{
+    const int32_t w     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    const int32_t shift = *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT
+                          & 0xFFFF;
+    const int32_t mask  = w - 1;
+
+    return ApproxDistXY((toTile & mask) - (fromTile & mask),
+                        (toTile >> shift) - (fromTile >> shift));
+}
+
+/* The heuristic both A* layers use: that distance scaled by 1.5 through the
+ * x87 and truncated by _ftol, which REGION_OFF_H already records for the
+ * region-level search. Weighted, so inadmissible, so fast and not optimal --
+ * the original's choice. */
+static int32_t PathHeuristic(int32_t fromTile, int32_t toTile)
+{
+    return (int32_t)((double)PathDistXY(fromTile, toTile) * 1.5);
+}
+
+/* Both exits end the same way: charge the search to the frame and, when it
+ * took long enough to measure, move the node budget toward what this machine
+ * actually managed. The two epilogues in the original are
+ * instruction-for-instruction identical bar one register choice -- diffed
+ * before being written once, because this file records what merging two
+ * "identical" bodies costs when they are not.
+ *
+ * `MAX_SEARCHES * considered / elapsed` is how many nodes the machine would
+ * get through in the whole per-frame allowance; averaging that with half the
+ * current budget and halving is an exponential decay toward it. The `/2*2`
+ * rounds down to even and the floor keeps a slow machine searching at all. */
+static void PathChargeFrame(uint32_t startTicks, int32_t considered)
+{
+    uint32_t elapsed = Ticks() - startTicks;
+    int32_t  budget;
+
+    *(int32_t *)(uintptr_t)ADDR_PATH_FRAME_MS += (int32_t)elapsed;
+    if (elapsed <= AM2_PATH_MIN_ELAPSED)
+        return;
+
+    budget  = (int32_t)((uint32_t)(*(const int32_t *)(uintptr_t)
+                                       ADDR_PATH_MAX_SEARCHES * considered)
+                        / elapsed);
+    budget += *(const int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES / 2;
+    budget  = (int32_t)((uint32_t)budget >> 1) * 2;
+    if (budget <= AM2_PATH_MIN_NODES)
+        budget = AM2_PATH_MIN_NODES;
+    *(int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES = budget;
+}
+
+/* Walk PARENT back from `end` and write the tiles into `out` FORWARDS, by
+ * filling from index depth downwards. `*n` is depth + 1, so it counts the
+ * start tile as well as every step. The loop stops on a zero tile, which is
+ * the start node's PARENT -- tile 0 cannot be a path element, which is the
+ * same thing the entry guard relies on when it refuses a zero argument. */
+static void PathUnwind(int32_t end, uint16_t *out, int32_t *n)
+{
+    uint8_t *const nodes = (uint8_t *)(uintptr_t)ADDR_PATH_NODES;
+    int32_t        depth = *(const uint16_t *)(nodes
+                                               + (end & 0xFFFF)
+                                                     * AM2_PATH_NODE_BYTES
+                                               + PATHNODE_OFF_DEPTH);
+    uint16_t      *p     = out + depth;
+
+    *n = depth + 1;
+    while ((uint16_t)end) {
+        *p-- = (uint16_t)end;
+        end  = *(const uint16_t *)(nodes
+                                   + (end & 0xFFFF) * AM2_PATH_NODE_BYTES
+                                   + PATHNODE_OFF_PARENT);
+    }
+}
+
+/* FindPath -- original 0x004395B0, 1,808 bytes, one caller: PlanPathTo, which
+ * treats a zero answer as "no route". A* over map tiles, and the survey in
+ * orig.h is the thing to read first -- what follows assumes it.
+ *
+ * IT IS RegionFindPath ONE GRANULARITY DOWN. The same eight node fields in the
+ * same order, the same ApproxDistXY * 1.5 heuristic, the same open-list
+ * discipline and the same open-list DEFECT. What differs is the record: sixteen
+ * packed bytes indexed by tile rather than int32s inside a region struct, so
+ * `g` and the tile ids are uint16 and wrap where the region version's do not.
+ *
+ * THE OPEN LIST IS SORTED BY g+h AND SINGLY MAINTAINED THROUGH TWO LINKS.
+ * Insertion walks from the head to the first node whose f is not less than the
+ * new one and links in before it. Improving a node that is already open
+ * unlinks and re-inserts it -- and UNLINKING THE HEAD SETS THE HEAD TO ZERO
+ * rather than to its successor, dropping every node behind it. That is the
+ * original's behaviour, it is reproduced, and tools/pathcheck.py records the
+ * same thing for the region version. A model that corrects it disagrees.
+ *
+ * ARRIVING IN THE GOAL'S REGION COUNTS AS ARRIVING, but only when the start is
+ * in a DIFFERENT region -- that is what couples this to the region-level
+ * search: the coarse layer picks the regions, and the fine layer only has to
+ * reach the right one. Within a single region the test is skipped and nothing
+ * but the exact tile will do.
+ *
+ * A NEIGHBOUR IS REFUSED THREE WAYS and they are not interchangeable: off the
+ * map, refused by the installed point rule, or in a region that is neither the
+ * start's nor the goal's. The third is what keeps the search inside the
+ * corridor the region layer chose; region 0 is exempt.
+ *
+ * THE STEP COST IS NOT THE DISTANCE. It is twice ApproxDistXY plus two terrain
+ * penalties, and those turn out to be the missing readers of two flag bits
+ * orig.h could only describe by their writer -- see the loop.
+ *
+ * RUNNING OUT OF BUDGET IS NOT FAILURE. Past ADDR_PATH_MAX_NODES it compares
+ * the best node's heuristic against the START's and returns the PARTIAL path
+ * whenever it made any progress at all; only an exhausted open list, or a
+ * partial that got no closer, answers 0.
+ *
+ * THE RESUME ARM IS DEAD CODE and is reproduced without being explained: its
+ * gate ships as -1 and is only ever written back to -1, and the two globals it
+ * restores have exactly one reference each in the image, which is that read.
+ * See orig.h.
+ *
+ * A NOTE ON THE FRAME. The original keeps `head` in ARGUMENT 0's stack slot,
+ * which it can because `from` has been copied into a register by then -- and it
+ * uses the same slot as the x87 scratch both before the loop starts and after
+ * it ends. Three lives for one dword. Nothing of that survives here, but it is
+ * why the disassembly's esp displacements do not line up with the arguments. */
+int32_t __cdecl FindPath(int32_t from, int32_t to, uint16_t *out, int32_t *n,
+                         int32_t unused)
+{
+    uint8_t *const nodes  = (uint8_t *)(uintptr_t)ADDR_PATH_NODES;
+    const uint8_t *region = *(const uint8_t *const *)(uintptr_t)
+                                ADDR_REGION_OF_CELL;
+    const int32_t *const step = (const int32_t *)(uintptr_t)ADDR_TILE_STEP8;
+    AM2_PointRuleFn rule;
+    uint32_t startTicks;
+    int32_t  considered = 0;
+    int32_t  fromTile, toTile, goal, goalTile;
+    int32_t  startRegion, goalRegion;
+    int32_t  head, cur, curTile;
+    int32_t  i;
+
+    (void)unused;
+    *n = 0;
+
+    /* One time budget per frame, reset when the clock moves. `ja` is unsigned,
+     * so a frame that has already spent its allowance refuses outright. */
+    if (*(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        != *(const int32_t *)(uintptr_t)ADDR_PATH_FRAME_STAMP) {
+        *(int32_t *)(uintptr_t)ADDR_PATH_FRAME_STAMP =
+            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        *(int32_t *)(uintptr_t)ADDR_PATH_FRAME_MS = 0;
+    } else if ((uint32_t)*(const int32_t *)(uintptr_t)ADDR_PATH_FRAME_MS
+               > (uint32_t)*(const int32_t *)(uintptr_t)
+                     ADDR_PATH_MAX_SEARCHES) {
+        return 0;
+    }
+
+    /* Both bounds are tested twice over: the low word must be non-zero and the
+     * masked value under AM2_PATH_TILES. The second can never fire after the
+     * mask; reproduced because it is there. */
+    if (!(uint16_t)from)
+        return 0;
+    fromTile = from & 0xFFFF;
+    if (fromTile >= AM2_PATH_TILES)
+        return 0;
+    if (!(uint16_t)to)
+        return 0;
+    toTile = to & 0xFFFF;
+    if (toTile >= AM2_PATH_TILES)
+        return 0;
+
+    startRegion = region[fromTile];
+    startTicks  = Ticks();
+
+    if (*(const int32_t *)(uintptr_t)ADDR_PATH_RESUME == -1) {
+        uint8_t *const s = nodes + fromTile * AM2_PATH_NODE_BYTES;
+
+        /* Bumped BEFORE it is stamped, so the start node carries the new
+         * generation and every other node's stamp is stale by construction --
+         * which is what makes a 1 MB array usable without clearing it. It is a
+         * uint16 and nothing resets it, so it wraps; the original's. */
+        ++*(uint16_t *)(uintptr_t)ADDR_PATH_GENERATION;
+
+        *(uint16_t *)(s + PATHNODE_OFF_G)      = 0;
+        *(uint16_t *)(s + PATHNODE_OFF_H)      =
+            (uint16_t)PathHeuristic(fromTile, toTile);
+        *(uint16_t *)(s + PATHNODE_OFF_DEPTH)  = 0;
+        *(uint16_t *)(s + PATHNODE_OFF_STAMP)  =
+            *(const uint16_t *)(uintptr_t)ADDR_PATH_GENERATION;
+        *(uint8_t *)(s + PATHNODE_OFF_STATE)   = 1;
+        *(uint16_t *)(s + PATHNODE_OFF_PREV)   = 0;
+        *(uint16_t *)(s + PATHNODE_OFF_NEXT)   = 0;
+        *(uint16_t *)(s + PATHNODE_OFF_PARENT) = 0;
+
+        head = from;
+        goal = to;
+    } else {
+        /* Dead: see the header. Nothing writes either global, and the gate
+         * above cannot be anything but -1. */
+        goal = *(const int32_t *)(uintptr_t)ADDR_PATH_RESUME_GOAL;
+        head = *(const int32_t *)(uintptr_t)ADDR_PATH_RESUME_HEAD;
+        *(int32_t *)(uintptr_t)ADDR_PATH_RESUME = -1;
+    }
+
+    goalTile   = goal & 0xFFFF;
+    goalRegion = region[goalTile];
+    rule       = *(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE;
+
+    while ((uint16_t)head) {
+        uint8_t *c;
+
+        cur     = head;
+        curTile = cur & 0xFFFF;
+        c       = nodes + curTile * AM2_PATH_NODE_BYTES;
+
+        /* Pop, and detach the new head's back link. */
+        head = *(const uint16_t *)(c + PATHNODE_OFF_NEXT);
+        if ((uint16_t)head)
+            *(uint16_t *)(nodes + (head & 0xFFFF) * AM2_PATH_NODE_BYTES
+                          + PATHNODE_OFF_PREV) = 0;
+        *(uint8_t *)(c + PATHNODE_OFF_STATE) = 2;
+
+        if (considered > *(const int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES) {
+            /* Out of budget. Keep what was found if it got closer than the
+             * start was -- `jbe`, so equal counts as progress. */
+            if (PathHeuristic(curTile, toTile)
+                <= PathHeuristic(fromTile, toTile)) {
+                PathUnwind(cur, out, n);
+                PathChargeFrame(startTicks, considered);
+                return 1;
+            }
+            PathChargeFrame(startTicks, considered);
+            return 0;
+        }
+
+        if ((uint16_t)cur == (uint16_t)goal) {
+            PathUnwind(cur, out, n);
+            PathChargeFrame(startTicks, considered);
+            return 1;
+        }
+        /* The region shortcut, and it needs BOTH guards: a goal region of zero
+         * means nothing, and a start already in the goal's region would make
+         * every tile an arrival. */
+        if (goalRegion > 0 && startRegion != goalRegion
+            && region[curTile] == goalRegion) {
+            PathUnwind(cur, out, n);
+            PathChargeFrame(startTicks, considered);
+            return 1;
+        }
+
+        considered += AM2_TILE_STEP8_COUNT;
+
+        for (i = 0; i < AM2_TILE_STEP8_COUNT; i++) {
+            int32_t  nb = curTile + step[i];
+            uint8_t *b;
+            int32_t  nbRegion, g, h, prev, next, walk, before, fNew;
+
+            if (nb <= 0 || nb >= AM2_PATH_TILES)
+                continue;
+            if (rule(nb))
+                continue;
+            nbRegion = region[nb];
+            if (nbRegion != 0 && nbRegion != startRegion
+                && nbRegion != goalRegion)
+                continue;
+
+            /* Twice the step, plus a penalty for each flag the tile LACKS.
+             * The accumulation into `g` is sixteen bits wide and the penalties
+             * are not -- the original does `add di, [g]` and then `add edi,3`
+             * on the full register. */
+            g = PathDistXY(curTile, nb) * 2;
+            g = (int32_t)(((uint32_t)g & 0xFFFF0000u)
+                          | (uint16_t)((uint32_t)g
+                                       + *(const uint16_t *)(c
+                                                    + PATHNODE_OFF_G)));
+            {
+                uint8_t f = (*(const uint8_t *const *)(uintptr_t)
+                                 ADDR_TILE_FLAGS)[nb];
+                if (!(f & AM2_TILE_NO_WEIGHT_NEAR))
+                    g += 3;
+                if (!(f & AM2_TILE_LITTLE_COVER_NEAR))
+                    g += 1;
+            }
+            h = PathHeuristic(nb, goalTile);
+
+            b = nodes + nb * AM2_PATH_NODE_BYTES;
+            if (*(const uint16_t *)(b + PATHNODE_OFF_STAMP)
+                != *(const uint16_t *)(uintptr_t)ADDR_PATH_GENERATION) {
+                /* Never seen this search: claim it and fall through to the
+                 * insert with the current head. */
+                *(uint16_t *)(b + PATHNODE_OFF_STAMP) =
+                    *(const uint16_t *)(uintptr_t)ADDR_PATH_GENERATION;
+                *(uint16_t *)(b + PATHNODE_OFF_G)      = (uint16_t)g;
+                *(uint16_t *)(b + PATHNODE_OFF_H)      = (uint16_t)h;
+                *(uint16_t *)(b + PATHNODE_OFF_PARENT) = (uint16_t)cur;
+                *(uint16_t *)(b + PATHNODE_OFF_DEPTH)  =
+                    (uint16_t)(*(const uint16_t *)(c + PATHNODE_OFF_DEPTH) + 1);
+                *(uint8_t *)(b + PATHNODE_OFF_STATE)   = 1;
+            } else if (!(*(const uint8_t *)(b + PATHNODE_OFF_STATE) & 1)) {
+                /* Seen, and not open. Closed nodes are done with; anything
+                 * else falls through to the insert, which cannot happen while
+                 * STATE only ever holds 1 or 2. */
+                if (*(const uint8_t *)(b + PATHNODE_OFF_STATE) & 2)
+                    continue;
+            } else {
+                if ((uint16_t)g >= *(const uint16_t *)(b + PATHNODE_OFF_G))
+                    continue;   /* already there by a cheaper route */
+
+                *(uint16_t *)(b + PATHNODE_OFF_PARENT) = (uint16_t)cur;
+                *(uint16_t *)(b + PATHNODE_OFF_G)      = (uint16_t)g;
+                *(uint16_t *)(b + PATHNODE_OFF_DEPTH)  =
+                    (uint16_t)(*(const uint16_t *)(c + PATHNODE_OFF_DEPTH) + 1);
+
+                /* Unlink so the improved node can be re-inserted in order.
+                 * THE HEAD CASE LOSES THE LIST: the original writes 0 rather
+                 * than the successor. Reproduced -- see the header. */
+                prev = *(const uint16_t *)(b + PATHNODE_OFF_PREV);
+                next = *(const uint16_t *)(b + PATHNODE_OFF_NEXT);
+                if (prev)
+                    *(uint16_t *)(nodes + prev * AM2_PATH_NODE_BYTES
+                                  + PATHNODE_OFF_NEXT) = (uint16_t)next;
+                else
+                    head = 0;
+                if (next)
+                    *(uint16_t *)(nodes + next * AM2_PATH_NODE_BYTES
+                                  + PATHNODE_OFF_PREV) = (uint16_t)prev;
+            }
+
+            /* Insert, sorted by g+h ascending. */
+            if (!(uint16_t)head) {
+                *(uint16_t *)(b + PATHNODE_OFF_NEXT) = 0;
+                *(uint16_t *)(b + PATHNODE_OFF_PREV) = 0;
+                head = nb;
+                continue;
+            }
+
+            /* THE KEY IS READ BACK OUT OF THE NODE, not taken from the `g`
+             * and `h` just computed, and the two are not always the same. The
+             * improving arm writes G and NOT H, and the third arm writes
+             * nothing at all -- so a node re-inserted after an improvement is
+             * ordered by its NEW g against its OLD h. Using the locals here
+             * would be tidier and would sort a different list. */
+            fNew   = *(const uint16_t *)(b + PATHNODE_OFF_H)
+                     + *(const uint16_t *)(b + PATHNODE_OFF_G);
+            before = 0;
+            walk   = head;
+            for (;;) {
+                const uint8_t *q = nodes + (walk & 0xFFFF)
+                                               * AM2_PATH_NODE_BYTES;
+                int32_t fq = *(const uint16_t *)(q + PATHNODE_OFF_H)
+                             + *(const uint16_t *)(q + PATHNODE_OFF_G);
+
+                if (fq >= fNew)
+                    break;
+                before = walk;
+                walk   = *(const uint16_t *)(q + PATHNODE_OFF_NEXT);
+                if (!(uint16_t)walk)
+                    break;
+            }
+
+            if (!(uint16_t)before) {
+                /* Cheapest so far: in front of the head. */
+                *(uint16_t *)(b + PATHNODE_OFF_NEXT) = (uint16_t)head;
+                *(uint16_t *)(b + PATHNODE_OFF_PREV) = 0;
+                *(uint16_t *)(nodes + (head & 0xFFFF) * AM2_PATH_NODE_BYTES
+                              + PATHNODE_OFF_PREV) = (uint16_t)nb;
+                head = nb;
+            } else {
+                uint8_t *p = nodes + (before & 0xFFFF) * AM2_PATH_NODE_BYTES;
+                int32_t  after = *(const uint16_t *)(p + PATHNODE_OFF_NEXT);
+
+                *(uint16_t *)(b + PATHNODE_OFF_NEXT) = (uint16_t)after;
+                if (after)
+                    *(uint16_t *)(nodes + after * AM2_PATH_NODE_BYTES
+                                  + PATHNODE_OFF_PREV) = (uint16_t)nb;
+                *(uint16_t *)(p + PATHNODE_OFF_NEXT) = (uint16_t)nb;
+                *(uint16_t *)(b + PATHNODE_OFF_PREV) = (uint16_t)before;
+            }
+        }
+    }
+
+    PathChargeFrame(startTicks, considered);
+    return 0;
+}
 
 /* PlanPathTo -- original 0x00439D60, three callers: the trooper AI's common
  * step, the vehicle AI's, and 0x00408210. Find a route from where the object
@@ -1139,7 +1518,7 @@ int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg)
     *(uint16_t *)(o + OBJ_OFF_MOVE_AT)    = 0;
     *(uint16_t *)(o + OBJ_OFF_MOVE_COUNT) = 0;
 
-    if (!orig_find_path((int32_t)*(const uint16_t *)(o + OBJ_OFF_TILE),
+    if (!FindPath((int32_t)*(const uint16_t *)(o + OBJ_OFF_TILE),
                         TileOfPoint(*at), route, &n, arg)) {
         *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
             *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
@@ -6514,6 +6893,8 @@ int region_install(void)
                         "ObjHitMaskAction", 2);
     rc |= patch_replace(ADDR_REGION_FIND_PATH, (const void *)RegionFindPath,
                         "RegionFindPath", 1);
+    rc |= patch_replace(ADDR_FIND_PATH, (const void *)FindPath,
+                        "FindPath", 1);
     rc |= patch_replace(ADDR_ITEM_TEARDOWN, (const void *)ItemTeardown,
                         "ItemTeardown", 1);
     rc |= patch_replace(ADDR_BOX_ACTION, (const void *)BoxAction,

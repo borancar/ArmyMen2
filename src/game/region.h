@@ -274,6 +274,13 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out);
 /* 0x00437E70. A* over the region graph: an open list sorted by g+h, a
  * generation stamp in place of a visited set, the answer written backwards
  * through each node's parent. 1 with the path and its length, 0 with none. */
+/* 0x004395B0, one caller: PlanPathTo. The tile-level A*, and RegionFindPath
+ * one granularity down -- same node fields in the same order, same weighted
+ * heuristic, same open-list defect. Answers 1 with the route written into
+ * `out` and its length in `*n`, or 0. The fifth argument is never read. */
+int32_t __cdecl FindPath(int32_t from, int32_t to, uint16_t *out, int32_t *n,
+                         int32_t unused);
+
 int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
                                int32_t *len);
 

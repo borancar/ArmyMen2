@@ -771,4 +771,22 @@ void __cdecl AiTakeAbandoned(void);
 /* Original: 0x00461930. Run the seq walker over both contexts. */
 void __cdecl SeqRunBoth(void);
 
+/* IMPLEMENTED IN win32/winmain.cpp AND DECLARED HERE, which is deliberate:
+ * region.cpp's FindPath charges its search to the frame clock and is flat
+ * code, so it cannot reach a header that pulls in windows.h. The function
+ * itself is boundary work and stays where it is; only the declaration moved,
+ * and it moved rather than being copied so the two sides cannot drift.
+ *
+ 0x00426CD0, 15 callers. Milliseconds since InitTimer took its baseline.
+ *
+ * Two clocks, chosen once: with a performance counter, the elapsed count times
+ * the period InitTimer worked out, truncated by MSVC's _ftol; without one,
+ * GetTickCount, which is not the same clock at all and is not reconciled with
+ * the other. The frequency being zero OR NEGATIVE selects GetTickCount -- the
+ * high dword is tested first and a negative one goes straight there.
+ *
+ * `long double` for the multiply, as in SetMaxHealth: the original is x87 and
+ * rounds to 80 bits. */
+uint32_t __cdecl Ticks(void);
+
 #endif /* AM2_MISC_H */

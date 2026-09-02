@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "../../inject/orig.h"
 #include "../../inject/win32.h"
+#include "../misc.h"   /* Ticks is declared there -- see misc.h */
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
  * compatible so dllmain.c can still call the install hooks. */
@@ -81,17 +82,6 @@ void    __cdecl FreeSpriteSets(void);
 void    __cdecl ReportLeaks(void);
 void    __cdecl FreeMemTracker(void);
 
-/* 0x00426CD0, 15 callers. Milliseconds since InitTimer took its baseline.
- *
- * Two clocks, chosen once: with a performance counter, the elapsed count times
- * the period InitTimer worked out, truncated by MSVC's _ftol; without one,
- * GetTickCount, which is not the same clock at all and is not reconciled with
- * the other. The frequency being zero OR NEGATIVE selects GetTickCount -- the
- * high dword is tested first and a negative one goes straight there.
- *
- * `long double` for the multiply, as in SetMaxHealth: the original is x87 and
- * rounds to 80 bits. */
-uint32_t __cdecl Ticks(void);
 
 int winmain_install(void);
 

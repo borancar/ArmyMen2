@@ -165,6 +165,24 @@ extern "C" void __cdecl TrooperFireSend(void *, void *)
 {
 }
 
+/* region.cpp's FindPath charges its search to the frame clock now that
+ * 0x004395B0 is ours, and Ticks lives in win32/winmain.cpp -- a performance
+ * counter and GetTickCount, neither of which this link can carry. Twelfth
+ * stub, and NOT `extern "C"`: the declaration moved to misc.h precisely so a
+ * flat module could see it, and misc.h has no extern "C" block around it, so
+ * the linkage has to match the header rather than the file it is stubbed in.
+ *
+ * Answering a constant is right rather than merely convenient. Ticks is only
+ * read to charge elapsed time against a per-frame budget and to decide whether
+ * to adapt the node limit; a frozen clock makes the elapsed time zero, which
+ * is below AM2_PATH_MIN_ELAPSED, so the adaptive arm does not run and the
+ * search is deterministic. That is the same reason tools/pathcheck.py hooks it
+ * rather than emulating it. */
+uint32_t __cdecl Ticks(void)
+{
+    return 0;
+}
+
 static int FirePoses(int *passed);
 
 int main(void)
