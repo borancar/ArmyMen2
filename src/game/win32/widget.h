@@ -1657,6 +1657,10 @@ void __cdecl VehicleDismountAll(void *a, void *b);
  * AI mode `ignore`. Its first argument is IN-OUT -- see widget.cpp. */
 void __cdecl PointerActionMode6(void *target, uint32_t at);
 
+/* 0x00458400. Mode 4's action: an ENEMY target becomes AI mode 3 plus a follow
+ * uid and no move order; anything else is a move to the formation slot. */
+void __cdecl PointerActionMode4(void *target, uint32_t at);
+
 /* 0x00458D70. ADDR_SET_WEAPON_TARGET's sibling: record a fire request aimed at
  * ADDR_AIM_X/Y/Z, for the weapon kinds 0x23..0x26. */
 void __cdecl SetWeaponTargetAimed(void *target, uint32_t at);

@@ -9830,6 +9830,106 @@ void __cdecl PointerActionMode6(void *target, uint32_t at)
     }
 }
 
+/* PointerActionMode4 -- original 0x00458400, 528 bytes, mode 4's ACTION, whose
+ * PICK is PointerPickMode4 above. "Attack that, or move there."
+ *
+ * The frame and the loop are PointerActionMode6's, and the difference is what
+ * happens per unit once its formation slot is known:
+ *
+ *   - NO TARGET, or an ALLIED one -- AI mode 0 and a move to the slot point.
+ *   - AN ENEMY target -- AI mode 3, the target's uid into OBJ_OFF_FOLLOW_UID,
+ *     and NO move order at all. The unit is given something to chase instead of
+ *     somewhere to go.
+ *
+ * AI MODE 0 IS WRITTEN BEFORE THE BRANCH THAT MIGHT OVERWRITE IT WITH 3, not in
+ * the arm that wants it. Reproduced in that order: it is one store either way,
+ * but a reader matching the disassembly will find it above the test.
+ *
+ * ITS ARGUMENT SLOT BECOMES THE LOOP INDEX. `target` is copied into ebx at the
+ * top and the slot is then reused to hold `i` across the calls -- the same
+ * shape mode 6 has for a different purpose, and the reason the two look alike
+ * in the disassembly and are not. Written as an ordinary local, since the
+ * original has already taken its copy.
+ *
+ * THE FORMATION POINT GOES TO A REAL LOCAL HERE, not to an argument slot: the
+ * original reserves one with a bare `push ecx` at entry and hands
+ * FormationSlotPoint its address. Mode 6 hands over its argument slot instead.
+ * Same call, different destination, and only one of the two is an in-out
+ * argument.
+ *
+ * The two PointActionA calls disagree the same way mode 6's do -- the first
+ * takes the formation slot, the second the original click point -- and the
+ * trooper arm is gated on the same GetMenuRow() == 8.
+ *
+ * Not exercised: no drive here installs a pointer mode above 0. */
+void __cdecl PointerActionMode4(void *target, uint32_t at)
+{
+    uint8_t *ctx = *(uint8_t **)(uintptr_t)ADDR_OBJ_CTX_OBJ_A;
+    uint8_t *tgt = (uint8_t *)target;
+    int32_t  type;
+    int32_t  i;
+
+    if (!ctx)
+        return;
+    if (tgt == ctx)
+        return;
+
+    type = *(const int32_t *)ctx;
+    if (type < AM2_OBJ_TYPE_TROOPER)
+        return;
+    if (type > AM2_OBJ_TYPE_VEHICLE && type != AM2_OBJ_TYPE_ROACH)
+        return;
+
+    if (SelectIfOwn(tgt))
+        return;
+
+    for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; ) {
+        uint8_t *o = (uint8_t *)LookupByUID(
+            (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+        uint32_t slot;
+        int32_t  ot;
+
+        if (!o) {
+            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            continue;   /* no i++ -- the removal shifts the next entry down */
+        }
+
+        ot = *(const int32_t *)o;
+        if (ot < AM2_OBJ_TYPE_TROOPER
+            || (ot > AM2_OBJ_TYPE_VEHICLE && ot != AM2_OBJ_TYPE_ROACH)) {
+            i++;
+            continue;
+        }
+
+        FormationSlotPoint(i, at, o, &slot);
+        ObjAttachTo(o, (void *)0);
+
+        /* Written before the test that may replace it -- see above. */
+        *(int32_t *)(o + OBJ_OFF_AI_MODE) = 0;
+
+        if (tgt
+            && !ArmyAlliedWithObj(
+                   *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER, tgt, 0)) {
+            *(int32_t *)(o + OBJ_OFF_AI_MODE)  = 3;
+            *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
+                *(const uint32_t *)(tgt + OBJ_OFF_UID);
+        } else {
+            PointActionA(o, slot);
+        }
+
+        if (*(const int32_t *)o == AM2_OBJ_TYPE_TROOPER) {
+            if (GetMenuRow() == AM2_MENU_ROW_8) {
+                *(uint32_t *)(o + OBJ_OFF_UID_56C) =
+                    *(const uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID;
+                PointActionA(o, at);
+            } else {
+                *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
+            }
+        }
+        i++;
+    }
+}
+
 /* PointerPickWatchedItem -- original 0x00459EE0, 208 bytes, one reference: the
  * PICK slot of a record in the second {pick, action, kind, flags} table.
  *
@@ -11209,6 +11309,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_POINTER_ACTION_MODE6,
                         (const void *)PointerActionMode6,
                         "PointerActionMode6", 1);
+    rc |= patch_replace(ADDR_POINTER_ACTION_MODE4,
+                        (const void *)PointerActionMode4,
+                        "PointerActionMode4", 1);
     rc |= patch_replace(ADDR_SET_WEAPON_TARGET_AIMED,
                         (const void *)SetWeaponTargetAimed,
                         "SetWeaponTargetAimed", 4);

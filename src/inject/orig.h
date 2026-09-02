@@ -10113,6 +10113,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * formation with AI mode `ignore`. Its FIRST ARGUMENT IS IN-OUT --
  * FormationSlotPoint is handed the address of that slot and rewrites it. */
 #define ADDR_POINTER_ACTION_MODE6 0x00458810u /* void(void *, uint32_t) */
+/* 0x00458400, mode 4's ACTION: attack an enemy target, or move to the formation
+ * slot. Unlike mode 6's it hands FormationSlotPoint a real local rather than
+ * its own argument slot -- and it reuses that slot for the loop index instead. */
+#define ADDR_POINTER_ACTION_MODE4 0x00458400u /* void(void *, uint32_t) */
 #define AM2_MENU_ROW_8           8  /* the row its trooper arm is gated on */
 /* The one AAI type PointerPickRepair refuses. A placeholder rather than
  * AM2_ITEM_KIND_DISG_3, which is the same number in a different table -- the
