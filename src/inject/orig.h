@@ -13053,7 +13053,25 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * cheat phrases and their replies, and 0x00430530 pushes twenty multiplayer
  * panel bitmaps. 0x0044A420 and 0x00420410 push no literals at all, so for
  * those the sweep answers nothing and says so. */
-#define ADDR_LOAD_MAP            0x0042C440u  /* int32(const char *name) */
+#define ADDR_LOAD_MAP            0x0042C440u  /* int32(const char *base,
+                                                       const char *folder) */
+/* TWO ARGUMENTS, NOT ONE. This carried `int32(const char *name)` for as long
+ * as it has been named, and its only caller settles it outright:
+ * `push ADDR_MAP_FOLDER; push ADDR_MAP_NAME; call` with no cleanup between.
+ * tools/espmap.py agrees, putting reads at both +0x13C and +0x140.
+ *
+ * The first is the base name and feeds BOTH "%s.atl" and "%s.amm"; the second
+ * goes to SetDataDir and is kept in ADDR_MAP_BLOCK so the directory can be
+ * restored on the way out. Written down because a missing argument is the one
+ * prototype error a caller cannot expose by compiling -- the extra push is
+ * simply ignored, and every field access inside stays correct.
+ *
+ * AND IT SETTLES TWO ALIAS PAIRS THIS FILE ALREADY HAD. 0x00511A88 is both
+ * ADDR_TILESET_NAME and ADDR_MAP_NAME; 0x00511AC8 is both ADDR_TILESET_PATH
+ * and ADDR_MAP_FOLDER. Since the first feeds the .amm as well as the .atl,
+ * "tileset" is too narrow in both -- the same shape as ADDR_MISSILE_DEFS
+ * being named for one of the things it holds. Not collapsed here: a rename is
+ * a change to every use at once and belongs in its own commit. */
 /* SURVEYED, and it is the friendliest of the three left. 3,920 bytes, FOUR
  * exits, THIRTY-FOUR distinct callees of which only three have no name, and
  * NO indirect dispatch at all -- no jump table to dump, which is what the
