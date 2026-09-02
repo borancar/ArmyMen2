@@ -34,6 +34,32 @@ reads globals and calls into the image; and `AM2_SELFCHECK=1` cannot, because
 the comm object is NULL before `install()`. It is verified by reading, and by
 the checks that caught four transcription errors on the way in.
 
+## OPEN: the reconstruction side of `mission` is ~12x slower than recorded
+
+Measured today over three runs: our side composes **533, 652 and 625** frames
+where `CLAUDE.md` records a band of 6,291-8,300. The original's side reads
+25,563 / 26,305 / 26,433 against its recorded 25,932 / 25,917 / 25,738 -- so
+**the original is unchanged and ours is what moved.** Two of the three runs
+predate this session entirely.
+
+It is not a correctness problem on the evidence available: the game log is
+identical at 13 messages, the object state dump is identical, and the widget
+tree is identical at 16 nodes, on every one of those runs.
+
+**Leading hypothesis, untested: the trace table.** `MAX_TRACED` was raised to
+2,048 after a documented third overflow, and there are now **1,432 patches**.
+Every patched function under `TRACE=1` goes through a counter stub, and
+`ab.sh` runs with tracing on. When the table was 512 the majority of patches
+could not be wrapped at all -- CLAUDE.md records 104 going unwrapped -- so the
+per-call cost landed on a fraction of the tree that has since become all of
+it. That predicts exactly this shape: our side slower, the `AM2_NOPATCH` side
+untouched, and no behavioural difference anywhere.
+
+Cheap way to test it, for whoever picks this up: run `mission` with `TRACE=0`
+and read the volatile count. If it returns to the thousands the tracing is the
+cost and the band in `CLAUDE.md` was simply recorded under a smaller table.
+That is a measurement, not a guess, and it has not been made.
+
 ## What is next, as a number rather than a direction
 
 Above the line and below the evidenced CRT frontier at `0x00464420` there are
