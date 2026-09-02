@@ -14294,13 +14294,22 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * completely. The three functions before this were cold or nearly so and
  * their clean A/Bs proved much less.
  *
- * WHERE IT HAS GOT TO: the chunk walk, the record loop, all 1,587 objects
- * and the teardown now run, and the reconstruction reaches its own
- * "freeing temporary map load data..." -- the last thing LoadMap logs. What
- * does NOT happen is everything AFTER it: the caller's script load and
- * "calculating region data...". So the function completes and something it
- * leaves behind stops the next step, which is a different bug from the three
- * already fixed and is not yet found.
+ * WHERE IT HAS GOT TO: the chunk walk, the record loop and all 1,587 objects
+ * run. What fails is the TEARDOWN, and it is heap corruption rather than a
+ * bad pointer: fclose never returns when it is called after the frees, and
+ * returns perfectly when moved BEFORE them. So one of the frees is handing
+ * the allocator something it did not give out.
+ *
+ * Ruled out by probing rather than by reading: the record indices are 6..697
+ * against an array of 1,587, so nothing is written out of bounds; every
+ * record's script pointer is null unless SCRI set it, because the batch is
+ * memset before the 0x10-byte reads; and the free loop's shape matches the
+ * original's, which reads the count and the array from two ADJACENT slots
+ * that look like one slot read twice.
+ *
+ * Still open. The remaining candidates are the SCRI string copy and the
+ * field-descriptor read, both of which take a LENGTH FROM THE FILE and
+ * neither of which bounds it.
  *
  * The transcription is kept out of the tree rather than installed while
  * broken. The chunk loop and the layer defaulting now both complete;
