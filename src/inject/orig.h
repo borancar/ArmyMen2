@@ -7938,6 +7938,18 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
+ * AND `restorecamerafocus` IS NOT THE INVERSE OF `setcamerafocus`. Code 0x1E
+ * writes OBJ_CTX_OBJ from OBJ_CTX_OBJ_PREV and OBJ_CTX_VAL from
+ * OBJ_CTX_VAL_PREV -- restoring two fields -- and then writes
+ * OBJ_CTX_SET_PREV from OBJ_CTX_SET, which is the other direction. Two
+ * restores and one SAVE, in one six-instruction arm.
+ *
+ * Written out rather than tidied into a three-way swap, because a symmetric
+ * reading is what an eye supplies and it would be wrong about the third
+ * field. The same shape as the pause/unpause pair and the states 0-and-3
+ * ordering this file already records: reproduce the asymmetry, note it, do
+ * not decide it was a mistake.
+ *
  * AND ONE ARM DISCARDS A CALL'S RESULT, which the push order disguises.
  * Code 7, `playsoundon`, calls ActionPoint and then overwrites eax with n0
  * before anything reads it -- so the point is computed and thrown away, and
