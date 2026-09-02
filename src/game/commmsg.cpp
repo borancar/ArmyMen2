@@ -974,6 +974,7 @@ void __cdecl AppendTroopState(void *msg, void *obj)
     uint8_t  *o = (uint8_t *)obj;
     uint8_t  *m = (uint8_t *)msg;
     uint8_t  *out;
+    uint8_t  *outStart;
     uint32_t  seq;   /* the sending player's +0x94, a SEQUENCE not a clock */
     uint32_t  flags = 0;
     uint32_t  interval;
@@ -1046,6 +1047,7 @@ void __cdecl AppendTroopState(void *msg, void *obj)
         return;
 
     out = m + *(const uint16_t *)m;
+    outStart = out;
 
     /* NOT redundant with the conditional set above: that one decides whether
      * to emit at all, this one puts the pose in every record. */
@@ -1096,7 +1098,16 @@ void __cdecl AppendTroopState(void *msg, void *obj)
         *(uint32_t *)(o + TROOPER_OFF_SENT_POSE_T) = seq;
     }
 
-    *(uint16_t *)m += (uint16_t)(out - m);
+    /* THE LENGTH GAINS WHAT THIS CALL WROTE, NOT WHERE THE CURSOR ENDED.
+     * The original saves the cursor's START into the argument slot at
+     * 0x0044BDB8 -- overwriting `msg`, which it has already copied into ebp --
+     * and subtracts THAT at 0x0044BE85. Reading the slot as the buffer makes
+     * the tail look like `out - m`, which is the old length plus what was
+     * written, so a second append would count the first one twice. Nothing
+     * here could have caught it: TellOneSlot only runs with a live DirectPlay
+     * session, which this machine cannot open. Found by reading the vehicle
+     * sibling at 0x0045DAA0, which does the identical dance. */
+    *(uint16_t *)m += (uint16_t)(out - outStart);
 }
 
 /* RecvTroopBatch -- original 0x0044CC90, one caller. Message kind 0x16.
