@@ -5096,6 +5096,17 @@ typedef struct {
  * an uninitialised descriptor after a successful Restore -- a defect in the
  * original is not ours to fix.
  *
+ * ONE SEAM, AND IT IS THE SPIN CLASS. Everything this constructor calls is
+ * reconstructed except ADDR_MP_SPIN_CTOR at 0x00456300, which is a widget
+ * class of its own and was the single unnamed callee the survey found. So the
+ * transcription needs exactly one orig_ macro, and checkseams will accept it
+ * because that address is not in the patch list.
+ *
+ * Worth stating because the survey said "every constructor it calls is
+ * already reconstructed" and that was true of the twelve it could see -- the
+ * thirteenth was the unnamed one. Two facts recorded at different times, both
+ * correct, and together they read as a contradiction.
+ *
  * THE FOUR BUTTON HANDLERS ARE 0x00431850, 0x00431920, 0x004319B0 and
  * 0x004319E0 -- start, ready, options and cancel, four consecutive small
  * functions. NONE of them is ADDR_OPEN_MP_OPTIONS (0x00432910), which is what
