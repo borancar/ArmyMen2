@@ -5096,6 +5096,19 @@ typedef struct {
  * an uninitialised descriptor after a successful Restore -- a defect in the
  * original is not ours to fix.
  *
+ * THE RULES LIST IS POPULATED WITH AN INLINED strcmp, which is worth
+ * recognising rather than transcribing. The constructor walks the name table
+ * at stride 0xCC, adds each entry to the list box's rows, and compares each
+ * against ADDR_MP_SCRIPT_NAME with a byte-at-a-time loop ending in
+ * `sbb eax, eax; sbb eax, -1` -- the classic MSVC inline strcmp, sign and
+ * all. Writing it as `strcmp(name, current) == 0` is the same test and the
+ * only readable form; reproducing the loop would be forty lines that mean
+ * one.
+ *
+ * The match's index is kept, and afterwards that entry's name is copied back
+ * into ADDR_MP_SCRIPT_NAME with ".txt" appended -- so the panel both LISTS
+ * the rules files and normalises the current selection's name as it goes.
+ *
  * SLOT +0x24 IS AN INTEGER SCRATCH THROUGHOUT, and an earlier version of this
  * note had it changing type. `fild` and `fidiv` take INTEGER memory operands
  * -- fidiv means "divide by the integer at" -- so the two x87 uses at
