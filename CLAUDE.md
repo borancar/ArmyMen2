@@ -1855,6 +1855,38 @@ and do not stack a second unverified unit on an unverified one: both bugs
 produced the identical failure signature, and telling them apart depended on
 only one being in flight.
 
+## Take every signature in a family from its CALL SITES, before writing any of it
+
+Fifteen functions implementing five roles three times -- two hardcoded row
+pools and one over a SEQ context -- and reading the five generic BODIES gave
+two wrong signatures out of five. Both would have compiled.
+
+- `SeqCtxInit` takes **five** arguments, not the three its first stores
+  suggest. The caller pushes `0x20, 0x20, 0x28, 0xC8, ctx`, and the two extra
+  are RowAlloc's width and height, which the hardcoded versions inline.
+- The generic release takes the **context first**, not the record. Read off
+  the body it looks the other way round, because the prologue's own pushes
+  shift every `[esp+N]` and I had not counted them.
+
+**A body shows the arguments a function USES; only the caller shows how many
+there are and in what order.** And `ret N` does not help here -- all of these
+are `__cdecl`, so the epilogue carries no size at all. CLAUDE.md's rule about
+comparing `ret N` is about STDCALL and is silent about these; I cited it
+confidently one message before checking, which is its own lesson.
+
+`tools/espmap.py` is the tool for the second failure: it normalises every
+`[esp+N]` to a frame slot, so an argument read at two different depths is one
+slot rather than two. It settled a question three readings had not -- the loop
+bound and `capacity` are the same slot -- in one command.
+
+**AND THE SAME SUBSYSTEM CAN CARRY ITS SLACK IN TWO PLACES.** The hardcoded
+pools have `capacity + budget` slots and test `count > capacity`; the generic
+context has exactly `capacity` records and tests `count > capacity - margin`.
+Same protection, opposite implementation, and writing either from the other's
+outline runs the array off its end. Where a family is a REWRITE rather than a
+re-emission -- 0.222 similarity here against 1.000 between the twins -- assume
+nothing carries over but the shape.
+
 ## Five things the last function taught, all of them cheap
 
 **AN OFFSET WITH NO PREFIX IS INVISIBLE TO `checkoffsets`, and that is the
