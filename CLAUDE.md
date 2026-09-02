@@ -1617,6 +1617,30 @@ remember the argument order: it is to read the two artifacts, which are named
 -- `$WORK/<cfg>-orig.volatile` and `$WORK/<cfg>-recon.volatile` hold the two
 numbers with the side in the filename.
 
+**AND THAT BAND WENT STALE, WHICH TURNS THE CHEAPEST CHECK INTO A FALSE
+ALARM.** The paragraph below quotes ours as 6,291-8,300 on `mission` and says
+one number you already know beats a re-run. Measured today across three runs
+-- 17:41, 06:25 and 06:21 -- our side read **533, 652 and 625**, an order of
+magnitude below it, while the original's read 25,563, 26,305 and 26,433,
+squarely inside ITS documented band. Two of the three predate the session's
+work entirely, so nothing in the reconstruction moved it.
+
+So `mission` now fails its frame gate on every run, and the failure is not
+evidence of anything. What the run still says is the part that was always the
+real evidence: log identical at 13 messages, object state identical, widget
+tree identical at 16 nodes. Read those and ignore the gate on this
+configuration until someone finds out what changed.
+
+Why our side dropped from ~7,000 to ~600 is NOT established here, and the
+honest thing is to say so rather than guess -- three samples say it is stable
+and old, not that they explain it.
+
+The lesson generalises past this number. A remembered band is a measurement
+with no timestamp, and this file offers several as shortcuts. When one
+disagrees with a run, check whether the BAND moved before concluding the
+BUILD did -- the artifacts are on disk and carry their own dates, which is
+how three runs across eleven hours were compared in one command.
+
 **Know the reconstruction side's NORMAL BAND, which is the cheapest form of
 this check.** Over one session `mission` failed that gate on four separate
 builds and the original's side was the runaway every time -- 22372, 25493,
