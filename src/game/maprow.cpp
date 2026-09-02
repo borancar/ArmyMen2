@@ -1160,6 +1160,7 @@ struct AM2_RowPool {
     int32_t           capacity;   /* the eviction threshold */
     int32_t           budget;     /* how many one eviction pass may free */
     int32_t           slots;      /* capacity + budget; the array's real size */
+    int32_t           rowDim;     /* RowAlloc's w and h -- 0x60 A, 0x80 B */
 };
 
 static uint8_t *RowPoolEntry(const AM2_RowPool *p, int32_t i)
@@ -1171,7 +1172,17 @@ static uint8_t *RowPoolEntry(const AM2_RowPool *p, int32_t i)
  * the head sentinel, and give every slot its permanent row.
  *
  * The row is zeroed with `mov ecx, 0x18; rep stosd` -- 24 DWORDS, which is
- * the 0x60 bytes and not 0x18 of them. */
+ * the 0x60 bytes and not 0x18 of them.
+ *
+ * AND EACH ROW IS THEN REGISTERED WITH RowAlloc, which the first version of
+ * this omitted -- `ab.sh bootcamp` came back with 37% of the frame wrong and
+ * an identical log, the map-load-truncated signature. The malloc gives the
+ * row STRUCT its 0x60 bytes; RowAlloc gives it its extent, and the two pools
+ * differ there: 0x60 square for A, 0x80 square for B.
+ *
+ * Its arguments are cleaned by a single `add esp, 0x14` that also cleans the
+ * malloc's -- five dwords for two calls -- which is the cdecl shape CLAUDE.md
+ * warns makes a call's arity unreadable from the cleanup alone. */
 static void RowPoolInit(const AM2_RowPool *p)
 {
     int32_t i;
@@ -1189,8 +1200,8 @@ static void RowPoolInit(const AM2_RowPool *p)
 
         row = (uint8_t *)am2_malloc(AM2_ROWPOOL_ROW_BYTES);
         *(void **)(e + ROWPOOL_OFF_ROW) = row;
-        if (row != 0)
-            memset(row, 0, AM2_ROWPOOL_ROW_BYTES);
+        memset(row, 0, AM2_ROWPOOL_ROW_BYTES);
+        RowAlloc(p->rowDim, p->rowDim, row, (void *)(uintptr_t)ADDR_MAP_DESC);
     }
 }
 
@@ -1254,7 +1265,7 @@ static const AM2_RowPool kRowPoolA = {
     (volatile int32_t *)(uintptr_t)ADDR_ROWPOOL_A_TAIL,
     (uint8_t *)(uintptr_t)ADDR_ROWPOOL_A_ENTRIES,
     AM2_ROWPOOL_A_CAP, AM2_ROWPOOL_A_BUDGET,
-    AM2_ROWPOOL_A_CAP + AM2_ROWPOOL_A_BUDGET
+    AM2_ROWPOOL_A_CAP + AM2_ROWPOOL_A_BUDGET, 0x60
 };
 
 static const AM2_RowPool kRowPoolB = {
@@ -1262,7 +1273,7 @@ static const AM2_RowPool kRowPoolB = {
     (volatile int32_t *)(uintptr_t)ADDR_ROWPOOL_B_TAIL,
     (uint8_t *)(uintptr_t)ADDR_ROWPOOL_B_ENTRIES,
     AM2_ROWPOOL_B_CAP, AM2_ROWPOOL_B_BUDGET,
-    AM2_ROWPOOL_B_CAP + AM2_ROWPOOL_B_BUDGET
+    AM2_ROWPOOL_B_CAP + AM2_ROWPOOL_B_BUDGET, 0x80
 };
 
 void __cdecl RowPoolAInit(void) { RowPoolInit(&kRowPoolA); }
