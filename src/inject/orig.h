@@ -2899,7 +2899,33 @@
  *
  * Case 0x0C is the smallest and reads cleanly: look up the sender and
  * ourselves with FindPlayerById, and if either is missing, log the FlowQ
- * failure and return. The default case does nothing at all. */
+ * failure and return. The default case does nothing at all.
+ *
+ * THE RETURN VALUE IS THE WHOLE INTERFACE, and it is worth stating before
+ * the arms are written. Case 0x0B's not-found exit is `mov eax, 1` and its
+ * own epilogue -- so 1 means HANDLED, and RecvThreadProc appends the node to
+ * ADDR_MSG_LIST_B only on 0. Every one of the eight exits is therefore a
+ * claim about whether the caller still owns the message, and an exit written
+ * with the wrong constant leaks a node or double-frees one. Read the exits
+ * first, as this file already says for ObjInitCommon.
+ *
+ * The three arms, decoded rather than read off the bodies:
+ *
+ *   0x0B (0x4018BD)  GetPlayerMask, then FindPlayerById on node->+8.
+ *                    Missing -> log "Can't Find FlowQ for id %x  seq " and
+ *                    return 1.
+ *   0x0C (0x4016EE)  FindPlayerById on the sender and on
+ *                    ADDR_ARMY_TABLE->+0x3CC, which is US. Either missing
+ *                    -> log "Interrupt Level Can't find FlowQ for %x".
+ *   0x10 (0x401506)  the same two lookups, then the PULSE ACK: compare the
+ *                    message's sequence at +0x10 against the sender's
+ *                    last-seen at +0x0C and our window at +0x94, and when it
+ *                    is exactly the next one, log " Got Pulse Ack for  seq
+ *                    %d" and clear the flag in ADDR_MSG_LIST_SENDQ through
+ *                    MsgListSetFlag.
+ *
+ * So +0x0C on a player record is the last sequence acknowledged and +0x94 is
+ * the far end of the window -- two fields this tree had no reader for. */
 /* Where the drop path receives a packet it has no node for, so the transport
  * does not keep re-delivering it. */
 #define ADDR_RECV_SCRATCH        0x004F8790u
