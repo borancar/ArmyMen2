@@ -3034,6 +3034,24 @@
  * session neither is observable. Read what the arms push before the jump. */
 #define FLOW_OFF_RESENDS         0x3Cu  /* incremented per message actually resent */
 #define FLOW_OFF_BAD_CHECKSUMS   0x8Cu  /* bumped when XorChecksum rejects one */
+/* THE FIRST MESSAGE FROM A PEER RESYNCS RATHER THAN BEING REJECTED, which is
+ * the one thing in this function that is a protocol decision rather than
+ * bookkeeping. When FLOW_OFF_SEQUENCE is 1, our own next-expected is 1, and
+ * FLOW_OFF_READY is still 0, the arm does NOT demand sequence 1: it writes
+ * `FLOW_OFF_NEXT_EXPECTED = msg->seq - 1` and adopts whatever numbering the
+ * peer arrived with. A late joiner is therefore accepted mid-stream instead
+ * of nacking forever, and this is why "First message received from player
+ * %x, Received seq %d" is a normal line and not an error.
+ *
+ * It also takes TWO GetTickCount readings back to back, and they are not the
+ * same quantity. The first is stored raw; the second has half of +0x68
+ * subtracted from it, which is the classic one-way-delay estimate -- half a
+ * round trip is how far in the past the peer's clock was when it sent. So
+ * +0x90 is an estimate of the remote clock's base, not a local timestamp,
+ * and collapsing the two calls into one variable would be wrong even though
+ * they read the same millisecond. */
+#define FLOW_OFF_READY_AT        0x5Cu  /* GetTickCount when the flow went ready */
+#define FLOW_OFF_PEER_CLOCK      0x90u  /* that, less half of +0x68: the peer's base */
 /* Where the drop path receives a packet it has no node for, so the transport
  * does not keep re-delivering it. */
 #define ADDR_RECV_SCRATCH        0x004F8790u
