@@ -8375,6 +8375,37 @@ typedef struct {
 #define ADDR_AI_STEP_ATTACK      0x00407BD0u  /* void(obj, out, void *ctx) */
 #define ADDR_AI_ATTACK_BODY      0x00407710u  /* mode 6 through the above, and
                                                * mode 0 directly */
+/* SURVEYED AND NOT RECONSTRUCTED. 1,216 bytes over a 0x81C-byte frame, which
+ * is a TraceTileLine buffer -- so it is a line-of-sight test as well as a step.
+ *
+ * ITS CONTEXT IS SIGHT_OFF_*, NOT SIGHTC_OFF_*, and the two families sit FOUR
+ * BYTES APART: OBSERVER/RANGE/BEARING are 0x10/0x14/0x18 in one and
+ * 0x14/0x18/0x1C in the other. Taking the wrong one shifts every field by one
+ * slot and still compiles, still indexes, and still looks right. What settles
+ * it is that the body copies {0x1C, 0x20, 0x24} into {0x10, 0x14, 0x18} --
+ * FOUND, FOUND_RANGE and FOUND_BEARING promoted into OBSERVER, RANGE and
+ * BEARING, which is a sentence under SIGHT_OFF_* and nonsense under SIGHTC_.
+ * The 0x28 the head compares against 0x20 is SIGHT_OFF_DEST_DIST, so the first
+ * thing it decides is whether it is far enough from where it belongs to walk.
+ *
+ * AND 0x00473DC4 IS NOT A TABLE BASE. It is indexed `[rank * 28 + 0x473DC4]`
+ * and has eight references of its own, which is exactly what a base looks
+ * like -- but ADDR_RANK_RECORDS is 0x00473DC0 and this is its
+ * RANK_REC_OFF_FIELD_04. 0x00473DC8 beside it is FIELD_08. One grep of the
+ * address before writing a name; the alternative was the sixth instance of
+ * the commonest mistake in this project.
+ *
+ * THAT MAKES IT THE THIRD READER OF BOTH FIELDS, and the units agree. It
+ * compares each against `abs(AngleDelta(facing, bearing))` -- eighth-of-a-turn
+ * heading units -- so 48..76 and 120..190 are ANGLES, which is what
+ * AddSightBlocker's reading of FIELD_04 as a sight arc already said and what
+ * that note declined to claim on one reader. Two independent consumers using
+ * a field the same way is the evidence that was missing; the names stay
+ * field-numbered until something says what the two arcs are FOR.
+ *
+ * Its callees are all named and all reconstructed bar ConsiderSighting:
+ * AiRouteToward, ObjTileAttr, ObjHeight, AngleDelta, ApproxDistXY,
+ * AngleOfDelta, TraceTileLine, ObjIsType2, ObjIsType3. */
 /* Four calls and a tail jump, all five to the def tables: sort the trooper
  * records, two unnamed, then DefCheckLinks, then one more. The order is the
  * fact. */

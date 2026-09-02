@@ -213,6 +213,29 @@ ran-out arm re-tests the two conditions that got it there, the other way round,
 and falls through both. Said out loud because dropping two dead compares is how
 a live one goes with them.
 
+## Next: AiAttackBody, surveyed
+
+`0x00407710`, 1,216 bytes over a 0x81C-byte frame -- a `TraceTileLine` buffer,
+so it is a line-of-sight test as well as a step. Two near-misses, both caught
+by grepping rather than by reasoning, and both recorded in `orig.h`.
+
+**Its context is `SIGHT_OFF_*`, not `SIGHTC_OFF_*`, and the two families sit
+four bytes apart.** OBSERVER/RANGE/BEARING are 0x10/0x14/0x18 in one and
+0x14/0x18/0x1C in the other, so taking the wrong one shifts every field by a
+slot and still compiles and still indexes. What settles it is that the body
+copies FOUND, FOUND_RANGE and FOUND_BEARING into OBSERVER, RANGE and BEARING --
+a sentence under one family and nonsense under the other.
+
+**And `0x00473DC4` is not a table base.** It is indexed `[rank * 28 + base]`
+and has eight references of its own, which is exactly what a base looks like.
+`ADDR_RANK_RECORDS` is `0x00473DC0`; this is its `RANK_REC_OFF_FIELD_04`.
+
+That makes this the third reader of `FIELD_04` and `FIELD_08`, and the units
+agree: both are compared against `abs(AngleDelta(...))`, so they are angles.
+`AddSightBlocker`'s note called `FIELD_04` a sight arc and declined to claim it
+on one reader -- a second independent consumer using it the same way is the
+evidence that was missing.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
