@@ -4456,6 +4456,289 @@ done:
     ConsiderSightingC(obj, out, ctx);
 }
 
+/* The sight test 0x004057D0 and 0x00405220 share -- 132 instructions, one run,
+ * identical in every register, global, immediate AND CALL TARGET, differing
+ * only in branch displacements. Call targets were compared rather than
+ * normalised on purpose: normalising them makes a call to a different function
+ * compare equal, which is a worse error than the noise it removes.
+ *
+ * IT READS NO CONTEXT FIELD, only the object, the target, the rank record and
+ * the heading cache -- which is what lets it be a helper at all, since the two
+ * callers put the context in different registers and the other two members of
+ * this family use a different context family entirely.
+ *
+ * It does NOT extend to those other two: against AiEngageStep the same region
+ * breaks into runs of 11, 25, 28, 11 and 11, and against AiAttackBody into a
+ * single 28. Four functions doing the same thing, two of them identically.
+ * AiSightTrace below is the inner 38 that all four DO share. */
+static int32_t AiCanSee(const uint8_t *o, const uint8_t *seen)
+{
+    const uint8_t *rank = (const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+                          + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
+                                * RANK_REC_BYTES;
+    uint8_t  facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
+    int32_t  viewerAttr, dx, dy, dist, delta, gen;
+    uint8_t  bearing;
+    uint8_t *rec;
+
+    /* One slot, written twice: a type 3 with more than one row aims with its
+     * turret rather than its hull. */
+    if (ObjIsType3((const AM2_Object *)o)
+        && *(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
+        facing = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
+
+    viewerAttr = ObjTileAttr((void *)o);
+    dx = (int32_t)*(const int16_t *)(seen + OBJ_OFF_POS)
+         - (int32_t)*(const int16_t *)(o + OBJ_OFF_POS);
+    dy = (int32_t)*(const int16_t *)(seen + OBJ_OFF_POS + 2)
+         - (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2);
+    dist    = ApproxDistXY(dx, dy);
+    bearing = (uint8_t)AngleOfDelta(dx, dy);
+
+    delta = AngleDelta(facing, bearing);
+    if (delta < 0)
+        delta = -delta;
+    if (delta > *(const int32_t *)(rank + RANK_REC_OFF_FIELD_04))
+        /* Outside the arc, a target still counts if it is close enough. */
+        return dist < *(const int32_t *)(rank + RANK_REC_OFF_FIELD_08);
+
+    rec = (uint8_t *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR
+          + ((uint32_t)facing / AM2_SIGHT_DIR_STEP) * AM2_SIGHT_DIR_STRIDE;
+    gen = *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
+
+    if (*(const int32_t *)(rec + SIGHTDIR_OFF_TRACE_STAMP) != gen)
+        AiSightTrace(o, seen, rec, rank, viewerAttr, gen);
+
+    if (*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP) != gen)
+        return dist <= *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE);
+
+    {
+        int32_t mine = ObjHeight((void *)o);
+        int32_t his  = ObjHeight((void *)seen);
+
+        /* The HIGH arm borrows the LOW arm's compare in the original. */
+        if (his >= mine)
+            return dist <= *(const int16_t *)(rec + SIGHTDIR_OFF_LOW);
+        if (his + AM2_SIGHT_BAND_STEP < mine)
+            return dist <= *(const int16_t *)(rec + SIGHTDIR_OFF_HIGH);
+        return dist <= *(const int16_t *)(rec + SIGHTDIR_OFF_MID);
+    }
+}
+
+/* AiPatrolStep -- original 0x004057D0, 1,344 bytes, three callers, one of them
+ * the three-argument thunk at 0x00405D10. The name is OURS: it names itself
+ * nowhere, and what it decides is which of three remembered points to walk to
+ * before it looks for anything to shoot.
+ *
+ * THE ARGUMENTS ARE THE OTHER WAY ROUND from AiAttackBody and AiEngageStep --
+ * the object is in esi and the context in edi, where those two have it the
+ * other way. All three are void(obj, out, ctx) and the register choice is the
+ * compiler's; a reading carried over from the neighbours puts every field on
+ * the wrong structure and still compiles.
+ *
+ * THE FOUR "SCRIPT" DWORDS AT 0xB0..0xBC ARE PACKED POINTS HERE, all of them.
+ * The head copies OBJ_OFF_SCRIPT_STATE into OBJ_OFF_SCRIPT_ID or clears it,
+ * and OBJ_OFF_SCRIPT_NEXT goes to ApproxDist, which takes an AM2_Point *.
+ * They keep the names UpdateObjectScript gave them because that function's
+ * reading is equally live; the overload is the fact, not a mistake to fix.
+ *
+ * THE THREE POINTS ARE A STACK, which is what the head is doing. SCRIPT_ID
+ * holds a saved copy of SCRIPT_STATE, SCRIPT_NEXT is a detour, and each is
+ * cleared to ADDR_ZERO_POINT as it is reached -- so the unit walks the detour,
+ * then the state point, then restores the state point from the saved copy and
+ * starts over.
+ *
+ * AND IT ENDS BY FORGETTING A KIND-7 TARGET AFTER FIVE SECONDS. The tail
+ * re-reads SIGHTC_OFF_FOUND, and when it is a kind 7 and
+ * AM2_AI_KEEP_RANGE_MS has passed since OBJ_OFF_DEADLINE_58, it picks a fresh
+ * point 360 units toward it and stamps the clock. That is the only use of
+ * RandomPointAhead here and the only thing 0x168 means. */
+void __cdecl AiPatrolStep(void *obj, void *out, void *ctx)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *c = (uint8_t *)ctx;
+    uint8_t *seen;
+    uint32_t goalPoint;
+
+    /* Save the state point, or remember that there was none. */
+    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
+        *(uint32_t *)(o + OBJ_OFF_SCRIPT_ID) =
+            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+    else
+        *(uint32_t *)(o + OBJ_OFF_SCRIPT_ID) =
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_F4) > 0
+        || *(const int32_t *)(o + OBJ_OFF_TARGET_UID))
+        goto engaged;
+
+    /* Nothing to fight: walk the detour, then the state point, then reload. */
+    *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 0;
+
+    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_NEXT)) {
+        if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                       (const AM2_Point *)(o + OBJ_OFF_SCRIPT_NEXT))
+            > AM2_AI_REACHED_DIST) {
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+                *(const uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT);
+            AiTrooperStep(obj, out, ctx);
+            goto tail;
+        }
+        *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        goto react;
+    }
+
+    if (*(void *const *)(c + SIGHTC_OFF_LEADER)) {
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(
+            *(uint8_t *const *)(c + SIGHTC_OFF_LEADER) + OBJ_OFF_POS);
+        AiTrooperStep(obj, out, ctx);
+        goto tail;
+    }
+
+    if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
+        *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        goalPoint = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+        goto step;
+    }
+
+    /* Arrived at the state point: clear the detour and reload the state point
+     * from the copy the head made. */
+    *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+        *(const uint32_t *)(o + OBJ_OFF_SCRIPT_ID);
+    goto react;
+
+engaged:
+    /* A kind-7 sighting is not worth detouring for. */
+    if (*(void *const *)(c + SIGHTC_OFF_FOUND)
+        && !IsKind7(*(void *const *)(c + SIGHTC_OFF_FOUND)))
+        *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_EC)) {
+        if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST)
+            > AM2_AI_REACHED_DIST) {
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+                *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+            AiTrooperStep(obj, out, ctx);
+            goto tail;
+        }
+        *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 0;
+        goto react;
+    }
+
+    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_NEXT)) {
+        if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                       (const AM2_Point *)(o + OBJ_OFF_SCRIPT_NEXT))
+            > AM2_AI_REACHED_DIST) {
+            goalPoint = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT);
+            goto step;
+        }
+        *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        goto react;
+    }
+
+    seen = *(uint8_t *const *)(c + SIGHTC_OFF_LEADER);
+    if (!seen)
+        goto react;
+
+    if (!AiCanSee(o, seen)) {
+        /* Out of sight: walk toward it. */
+        goalPoint = *(const uint32_t *)(seen + OBJ_OFF_POS);
+        goto step;
+    }
+
+    /* IN SIGHT SPLITS IN TWO AND THE HALVES END IN DIFFERENT PLACES. Further
+     * than the weapon wants: close the distance, adopt it, and go STRAIGHT TO
+     * THE TAIL -- no AiHitReact, no AiKeepRange, because it is already moving.
+     * Close enough: stop, adopt it, and fall into the react block. Reading
+     * this as one arm with a shared tail gives a chasing unit two calls it
+     * does not make. */
+    if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE)
+        >= *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(seen + OBJ_OFF_POS);
+        AiTrooperStep(obj, out, ctx);
+        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
+            *(const uint32_t *)(seen + OBJ_OFF_UID);
+        *(void **)(c + SIGHTC_OFF_OBSERVER) = seen;
+        *(int32_t *)(c + SIGHTC_OFF_RANGE) =
+            *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
+        *(c + SIGHTC_OFF_BEARING) =
+            *(const uint8_t *)(c + SIGHTC_OFF_LEAD_BEARING);
+        goto tail;
+    }
+
+    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
+        *(const uint32_t *)(seen + OBJ_OFF_UID);
+    *(void **)(c + SIGHTC_OFF_OBSERVER) = seen;
+    *(int32_t *)(c + SIGHTC_OFF_RANGE) =
+        *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
+    *(c + SIGHTC_OFF_BEARING) = *(const uint8_t *)(c + SIGHTC_OFF_LEAD_BEARING);
+
+react:
+    AiHitReact(obj, out, ctx);
+    if (*(void *const *)(c + SIGHTC_OFF_FOUND)) {
+        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = *(const uint32_t *)(
+            *(uint8_t *const *)(c + SIGHTC_OFF_FOUND) + OBJ_OFF_UID);
+        *(void **)(c + SIGHTC_OFF_OBSERVER) =
+            *(void *const *)(c + SIGHTC_OFF_FOUND);
+        *(int32_t *)(c + SIGHTC_OFF_RANGE) =
+            *(const int32_t *)(c + SIGHTC_OFF_FOUND_RANGE);
+        *(c + SIGHTC_OFF_BEARING) =
+            *(const uint8_t *)(c + SIGHTC_OFF_FOUND_BEARING);
+    }
+    if (!*(const uint32_t *)(o + OBJ_OFF_FOLLOW_UID))
+        *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
+            *(const uint32_t *)(o + OBJ_OFF_TARGET_UID);
+    AiKeepRange(obj, out, ctx);
+    goto tail;
+
+step:
+    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = goalPoint;
+    AiTrooperStep(obj, out, ctx);
+
+tail:
+    /* Re-read what the context found: AiHitReact and the steps above may have
+     * replaced it. A kind 7 that has held our attention for five seconds gets
+     * a fresh detour point 360 units toward it. */
+    if (*(void *const *)(c + SIGHTC_OFF_FOUND)) {
+        if (IsKind7(*(void *const *)(c + SIGHTC_OFF_FOUND))
+            && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                          - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58))
+               > AM2_AI_KEEP_RANGE_MS) {
+            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
+                *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+            /* (unused, the object to head toward, distance, out) -- the
+             * first argument really is discarded, per air.h, and the original
+             * passes the stepping object into it. */
+            RandomPointAhead(obj, *(void *const *)(c + SIGHTC_OFF_FOUND),
+                             AM2_AI_PATROL_DETOUR,
+                             (AM2_Point *)(o + OBJ_OFF_SCRIPT_NEXT));
+        }
+        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = *(const uint32_t *)(
+            *(uint8_t *const *)(c + SIGHTC_OFF_FOUND) + OBJ_OFF_UID);
+        *(void **)(c + SIGHTC_OFF_OBSERVER) =
+            *(void *const *)(c + SIGHTC_OFF_FOUND);
+        *(int32_t *)(c + SIGHTC_OFF_RANGE) =
+            *(const int32_t *)(c + SIGHTC_OFF_FOUND_RANGE);
+        *(c + SIGHTC_OFF_BEARING) =
+            *(const uint8_t *)(c + SIGHTC_OFF_FOUND_BEARING);
+    }
+
+    if (!*(const uint32_t *)(o + OBJ_OFF_FOLLOW_UID))
+        *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
+            *(const uint32_t *)(o + OBJ_OFF_TARGET_UID);
+
+    ConsiderSightingC(obj, out, ctx);
+}
+
 /* AiStepFollow -- original 0x00407C80, one caller. Mode 3, and the name comes
  * from what the context builder puts in front of it rather than from a
  * keyword: the record's SIGHT_OFF_LEADER is the object at OBJ_OFF_FOLLOW_UID,
@@ -5819,7 +6102,6 @@ void __cdecl RegionSolvePair(int32_t from, int32_t to)
  * naming the address here is a seam checkseams allows. */
 typedef void (__cdecl *AM2_AiArmFn)(void *obj, void *out, void *ctx);
 typedef void (__cdecl *AM2_AiFillFn)(void *obj, void *ctx, int32_t sarge);
-#define orig_ai_arm0   ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_BIG_4057D0))
 /* Arm 3 is AiApproachLeader, reconstructed above and called by name. */
 #define orig_ai_deflt  ((AM2_AiArmFn)(uintptr_t)AM2_IMAGE(ADDR_BIG_405220))
 
@@ -5853,7 +6135,7 @@ static void AiStepReactAndDispatch(void *obj, void *out, uint8_t *ctx)
     }
 
     switch (*(const int32_t *)(o + OBJ_OFF_AI_MODE)) {
-    case 0:  orig_ai_arm0(obj, out, ctx);  break;
+    case 0:  AiPatrolStep(obj, out, ctx);  break;
     case 2:  AiWalkStep(obj, out, ctx);    break;
     case 3:  AiApproachLeader(obj, out, ctx);  break;
     case 6:  AiEngageStep(obj, out, ctx);  break;
@@ -7681,6 +7963,8 @@ int region_install(void)
                         "AiAttackBody", 2);
     rc |= patch_replace(ADDR_AI_406B30, (const void *)AiEngageStep,
                         "AiEngageStep", 1);
+    rc |= patch_replace(ADDR_BIG_4057D0, (const void *)AiPatrolStep,
+                        "AiPatrolStep", 3);
     rc |= patch_replace(ADDR_FIND_PATH, (const void *)FindPath,
                         "FindPath", 1);
     rc |= patch_replace(ADDR_ITEM_TEARDOWN, (const void *)ItemTeardown,

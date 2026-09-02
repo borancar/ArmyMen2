@@ -287,6 +287,11 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out);
 /* 0x00406B30, one caller. Hold range, close, engage or go looking -- the
  * trooper step with the line-of-sight test, over the SIGHTC_ context. The name
  * is ours. */
+/* 0x004057D0, three callers. Walk the remembered points -- a saved copy, a
+ * state point and a detour -- then look for something to shoot. The name is
+ * ours. */
+void __cdecl AiPatrolStep(void *obj, void *out, void *ctx);
+
 void __cdecl AiEngageStep(void *obj, void *out, void *ctx);
 
 void __cdecl AiAttackBody(void *obj, void *out, void *ctx);

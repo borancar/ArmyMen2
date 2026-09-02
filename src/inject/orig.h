@@ -7349,6 +7349,9 @@ typedef struct {
  * different fields against two different numbers. */
 #define AM2_AI_ENGAGE_DEST_B     8
 #define AM2_AI_ENGAGE_DEST       0xC
+/* AiPatrolStep's detour: 360 units toward a kind-7 sighting, once every
+ * AM2_AI_KEEP_RANGE_MS. The only use of RandomPointAhead in the AI band. */
+#define AM2_AI_PATROL_DETOUR     0x168
 #define RANK_REC_BYTES           28u
 /* 280 285 290 295 300 305 310 320, doubled at the one site that reads it --
  * so 560..640, the range past which a trooper forgets its target. */

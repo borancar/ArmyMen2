@@ -36,6 +36,7 @@ typedef int32_t (__cdecl *AM2_AtExitFn)(void (__cdecl *)(void));
 #include "../inject/patch.h"
 #include "misc.h"      /* ReturnOne */
 #include "crt.h"       /* am2_realloc, am2_free -- the game's own */
+#include "region.h"   /* AiPatrolStep -- reconstructed, and this forwards to it */
 
 #define kBlock  ((char *)(uintptr_t)AM2_IMAGE(ADDR_GAMEPROC_BLOCK))
 #define kStrB   ((char *)(uintptr_t)AM2_IMAGE(ADDR_GAMEPROC_STR_B))
@@ -2123,13 +2124,16 @@ typedef void (__cdecl *AM2_VoidFn)(void);
 typedef void (__cdecl *AM2_WalkCellFn)(const uint32_t *pt, void *desc,
                                        void *fn);
 
-#define orig_big_4057d0   ((AM2_Call3Fn2)(uintptr_t)ADDR_BIG_4057D0)
 #define orig_def_460290   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_460290)
 #define orig_def_45ebc0   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_45EBC0)
 
 void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c)
 {
-    orig_big_4057d0(a, b, c);
+    /* The three dwords really are (obj, out, ctx); this thunk was written
+     * before the target had a shape, which is why its own prototype is
+     * int32_t. Left as the original declares it and cast at the one call. */
+    AiPatrolStep((void *)(uintptr_t)(uint32_t)a, (void *)(uintptr_t)(uint32_t)b,
+                 (void *)(uintptr_t)(uint32_t)c);
 }
 
 
