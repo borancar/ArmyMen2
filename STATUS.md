@@ -266,6 +266,35 @@ its leader still adopts it as the observer; and the HIGH band borrows the LOW
 band's compare, as in `AiAttackBody`. Following bodies without following
 branches gives both no exit.
 
+## Next: 0x004057D0 and 0x00405220, surveyed as a pair
+
+1,344 and 1,424 bytes, adjacent, and **132 of their ~375 instructions are one
+shared run** -- identical in every register, global, immediate *and call
+target*, differing only in branch displacements. Call targets were compared
+rather than normalised, which matters: normalising them makes a call to a
+different function compare equal.
+
+**That run is the whole sight test** -- turret facing, `ObjTileAttr`, the arc
+and range checks against the rank record, the heading cache, the tile-line walk
+and the three-band height test -- and it reads no context field at all. So it
+factors for this pair as a helper of `(obj, target, rank)`, the way
+`AiSightTrace` already factors its inner 38 for `AiAttackBody` and
+`AiEngageStep`. It does **not** factor across all four: against `0x00406B30`
+the same region breaks into runs of 11, 25, 28, 11 and 11. Four functions doing
+the same thing, two of them doing it identically.
+
+Two traps recorded before writing either:
+
+- **The arguments are the other way round.** Here `esi` is the object and `edi`
+  the context; in `AiAttackBody` and `AiEngageStep` `esi` is the context. A
+  reading carried over from the neighbours puts every field on the wrong
+  structure and still compiles.
+- **The four "script" dwords at 0xB0..0xBC are packed points here.** The head
+  copies `OBJ_OFF_SCRIPT_STATE` into `OBJ_OFF_SCRIPT_ID` or clears it to
+  `ADDR_ZERO_POINT`, and hands `OBJ_OFF_SCRIPT_NEXT` to `ApproxDist`. That is
+  the overload `AiStepDefend` relies on for the first of them, extended to the
+  whole block.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT

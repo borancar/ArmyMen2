@@ -8416,6 +8416,37 @@ typedef struct {
  * thunk that only moves arguments is what a source-level wrapper compiles
  * to. Worth knowing before reading one as a place where something happens. */
 #define ADDR_CALL_4057D0         0x00405D10u  /* void(int32, int32, int32) */
+/* SURVEYED AND NOT RECONSTRUCTED, and it comes as a PAIR with ADDR_BIG_405220
+ * -- 1,344 and 1,424 bytes, adjacent, and 132 of their ~375 instructions are
+ * ONE SHARED RUN: 0x00405973..  against 0x0040542F.., identical in every
+ * register, global, immediate AND CALL TARGET, differing only in branch
+ * displacements. Checked with call targets compared rather than normalised,
+ * which matters: normalising them would make a call to a different function
+ * compare equal, and this file already records what normalising image
+ * addresses cost in VehicleBlockWeight.
+ *
+ * THAT RUN IS THE WHOLE SIGHT TEST -- turret facing, ObjTileAttr, the arc and
+ * range checks against the rank record, the heading cache, the tile-line walk
+ * and the three-band height test -- and it reads NO CONTEXT FIELD AT ALL, only
+ * the object, the target, the rank record and the cache. So it factors for
+ * this pair as a helper of (obj, target, rank), the way AiSightTrace already
+ * factors its inner 38 for AiAttackBody and AiEngageStep. It does NOT factor
+ * across all four: against 0x00406B30 the same region breaks into runs of 11,
+ * 25, 28, 11 and 11, and against 0x00407710 into a single 28. Four functions
+ * doing the same thing, two of them doing it identically.
+ *
+ * THE ARGUMENTS ARE THE OTHER WAY ROUND from AiAttackBody and AiEngageStep:
+ * here esi is the OBJECT and edi the context, there esi is the context. Both
+ * are void(obj, out, ctx) and the register choice is the compiler's, but a
+ * reading carried over from the neighbours puts every field on the wrong
+ * structure and still compiles.
+ *
+ * AND THE FOUR "SCRIPT" DWORDS AT 0xB0..0xBC ARE PACKED POINTS HERE. The head
+ * copies OBJ_OFF_SCRIPT_STATE into OBJ_OFF_SCRIPT_ID or clears it to
+ * ADDR_ZERO_POINT, and hands OBJ_OFF_SCRIPT_NEXT to ApproxDist, which takes an
+ * AM2_Point *. That is the overload AiStepDefend already relies on for
+ * OBJ_OFF_SCRIPT_STATE, extended to the whole block -- and the reason all four
+ * keep names taken from UpdateObjectScript rather than from either use. */
 #define ADDR_BIG_4057D0          0x004057D0u
 /* Not a nameless pass-through any more: 0x00407BD0 is the AI mode
  * dispatcher's `attack` arm, mode 6, and all it does is forward its three
