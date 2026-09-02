@@ -7880,6 +7880,28 @@ typedef struct {
  * callers, and it names itself nowhere -- so this is a ROLE, not a recovered
  * source name, and it stays that way until the body says otherwise. */
 #define ADDR_RUN_SCRIPT_ACTION     0x00420410u  /* void(action *, void *owner) */
+/* SURVEYED, and it is the most uniform thing left. 4,096 bytes, SEVENTY-TWO
+ * exits, SIXTY-EIGHT distinct callees and NOT ONE of them unnamed, one jump
+ * table and no other indirect control flow.
+ *
+ * The dispatch is `eax = act->code; dec; cmp 0x39; ja default;
+ * jmp [eax*4 + 0x0042131C]` -- so codes 1..0x3A index a DIRECT table of 58
+ * entries, and all 58 targets are DISTINCT. No shared arms, no byte index,
+ * no arm ending inside another to find. That is the opposite of every
+ * dispatch this project has met: WeaponClassOf scrambled its order,
+ * SpriteKeyForKind shared three slots, TrooperFire's nineteen indices had two
+ * arms, and 0x0044A420's seventeen had two. Fifty-eight for fifty-eight is
+ * worth stating precisely because it is the case the rule does NOT have to
+ * guard against.
+ *
+ * At ~70 bytes an arm the work is breadth rather than depth, and the arms are
+ * NAMED already: script.cpp's own ScriptParseActionRecon assigns act->code in
+ * 39 places from the keyword, and that parser is verified against
+ * tests/actions-reference.txt over 9,934 records. So the keyword for each of
+ * the 58 codes is recoverable from our own source rather than guessed.
+ *
+ * Three callers: ScriptRunLine, one in the objscript band, and its own tail.
+ * The name is a ROLE and stays one until the body says otherwise. */
 
 /* The four object fields the object-script runner uses, all read out of
  * UpdateObjectScript's body rather than guessed at a call site. */
