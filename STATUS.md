@@ -457,12 +457,19 @@ pushes are identical bar a *kind* and an *ammo* count -- everything else, four
 zeros and the caller's position, is the same in all eighteen. So the
 transcription is one helper and eighteen one-line cases.
 
-**The six bytes are colours**, settled by reading `HudMessage`: its second
+**The colour bytes are colours**, settled by reading `HudMessage`: its second
 argument is an `int32` it uses as `(uint8_t)colour`, so the upper three bytes
 are dead and the arms' byte-into-an-untouched-register is not sloppiness but
-the only part that is read. Four of the six globals were already named
-colours; two still have no name. Each cheat's reply is printed in a palette
-index the game keeps elsewhere, and the arms differ in which.
+the only part that is read. There are **ten** such globals, not the six
+claimed a commit ago -- the six were what a partial sample of the arms
+touched. Four were already named colours.
+
+**And the shared tail has nineteen users, not eighteen.** `0x0041827C` is not
+a helper at all: it is the middle of arm 29, `rubber cement`, which falls into
+it because the two are adjacent. Eighteen other arms jump in. Searching for
+the jump finds the eighteen callers and misses the arm the address is inside;
+only decoding the bytes above the target finds the owner. Third instance in
+the project of an arm ending inside another.
 
 Counting epilogues is what produced the wrong claim: thirty-nine arms,
 twenty-one `ret`s, and eighteen `jmp`s that look like eighteen more until the

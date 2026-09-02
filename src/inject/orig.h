@@ -4715,12 +4715,26 @@ typedef struct {
  * eighty-one arms and WeaponClassOf's four both cost -- and the arm that
  * causes it is also the one arm that can reach every other.
  *
- * EIGHTEEN OF THE THIRTY-NINE SHARE A TAIL, which the previous version of
- * this note denied. Entries 11 through 28 are the item-granting cheats: each
+ * NINETEEN OF THE THIRTY-NINE SHARE A TAIL, and the nineteenth is the one
+ * that OWNS it. Entries 11 through 28 are the item-granting cheats: each
  * pushes SEVEN dwords of its own -- a kind, the caller's position, a -1 and
  * four zeros -- and jumps to 0x0041827C, which pushes an item key, calls
  * KeyLookupTriple, then pushes three more and calls 0x0045F0C0 before the one
  * epilogue they all use.
+ *
+ * 0x0041827C IS NOT A HELPER. It is the middle of arm 29, `rubber cement`,
+ * which starts at 0x0041825C, pushes its own seven dwords ending with
+ * `push 0x17` at 0x0041827A, and then simply FALLS INTO 0x0041827C because
+ * the two are adjacent. So arm 29 is a nineteenth user with kind 0x17 and
+ * ammo -1, and it is the only one that reaches the code without a jump.
+ *
+ * That is exactly the failure CLAUDE.md already records twice as AN ARM THAT
+ * ENDS INSIDE ANOTHER -- UnitKindMatches kind 3 jumping into kind 4, and
+ * PlacementAllowed arm 16 jumping into arm 15. Here it is the other way
+ * round: nothing jumps OUT of arm 29, eighteen other arms jump INTO it, and
+ * a scan for `jmp 0x41827c` finds eighteen and misses the arm the address is
+ * physically inside. Searching for the jump finds the callers; only decoding
+ * the bytes ABOVE the target finds the owner.
  *
  * So the arm's arguments are built ACROSS TWO CALLS -- the shape CLAUDE.md
  * records for CreateVehicle, where pairing each push with the nearest call
@@ -4730,22 +4744,27 @@ typedef struct {
  * So they are the eighteen cheats that hand the player a weapon, and the tail
  * is one CreateWeapon call reached eighteen ways.
  *
- * AND THE EIGHTEEN ARE ONE HELPER WITH TWO PARAMETERS. Extracted side by side
- * their pushes are identical bar two slots: a KIND (2, 3, 4, 0x1D, 0xB, 0xC,
- * 0x14, 0x24, 0x26, 0x25, 0x1C, 0x27, 0x28, 0x2A, 0x1E, 0x18, 0x1A, 0x19) and
- * an AMMO count, which is -1 for eleven of them and 0x2C, 0xD, 0xC or 3 for
- * the rest. Everything else -- four zeros and the caller's position -- is the
- * same in all eighteen. So the transcription is one helper and eighteen
- * one-line cases, which is what reading them side by side buys over reading
- * them in sequence.
+ * AND THE NINETEEN ARE ONE HELPER WITH TWO PARAMETERS. Extracted side by
+ * side their pushes are identical bar two slots: a KIND (2, 3, 4, 0x1D, 0xB,
+ * 0xC, 0x14, 0x24, 0x26, 0x25, 0x1C, 0x27, 0x28, 0x2A, 0x1E, 0x18, 0x1A,
+ * 0x19, and 0x17 for arm 29) and an AMMO count, which is -1 for eleven of
+ * them and 0x2C, 0xD, 0xC or 3 for the rest. Everything else -- four zeros
+ * and the caller's position -- is the same in all nineteen. So the
+ * transcription is one helper and nineteen one-line cases, which is what
+ * reading them side by side buys over reading them in sequence.
  *
- * THE SIX BYTES ARE COLOURS, and reading HudMessage settled it in one look.
+ * THE COLOUR BYTES ARE COLOURS, and reading HudMessage settled it in one
+ * look. There are TEN of them, not the six this note claimed one commit ago:
+ * the six were what a partial sample of the arms happened to touch, and
+ * decoding all thirty-nine adds 0x00502AD9, 0x00507234, 0x00502CE5 and
+ * 0x0050712C. Six carry five or six arms each and four carry one or two.
+ * A count taken from some of the arms is a count of those arms.
  * Its second argument is an int32 the function uses as `(uint8_t)colour`, so
  * the upper three bytes are dead and the arms' `mov cl, byte ptr [global]`
  * into an otherwise untouched register is not sloppiness -- it is the only
  * part that is read.
  *
- * Four of the six globals were already named colours: ADDR_COLOUR_LAG_MID,
+ * Four of the ten globals were already named colours: ADDR_COLOUR_LAG_MID,
  * ADDR_COLOUR_WHITE, ADDR_COLOUR_STALE and ADDR_VIEW_RECT_COLOUR. So each
  * cheat's reply is printed in a palette index the game keeps somewhere else,
  * and the arms differ in which. 0x004FDF7C and 0x004FD760 are the two that
