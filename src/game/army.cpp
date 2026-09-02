@@ -889,5 +889,32 @@ int army_install(void)
                         "SetMaxHealth", 2);
     rc |= patch_replace(ADDR_FOR_EACH_ARMY_OBJECT,
                         (const void *)ForEachArmyObject, "ForEachArmyObject", 2);
+    rc |= patch_replace(ADDR_VEHICLE_KIND_NAME, (const void *)VehicleKindName,
+                        "VehicleKindName", 2);
     return rc;
+}
+
+/* 0x0045D990. The vehicle's display name for the HUD squad panel -- both
+ * callers are ADDR_HUD_SQUAD_DESTRUCT and ADDR_HUD_SQUAD_DETAIL, and the
+ * second hands the result straight to DrawText.
+ *
+ * THE DEFAULT IS A SLOT OF THE SAME TABLE. The original loads 0x0048BE60 on
+ * the NULL path, which is ADDR_VEHICLE_NAMES[4], the "???" string. Two
+ * globals is how it reads and one table is what it is.
+ *
+ * VEHICLE_OFF_KIND is the right one of the three names on 0x52C: the first
+ * call site tests ObjIsType3 immediately before, and type 3 is a vehicle.
+ *
+ * No bounds check, deliberately: a kind outside 0..5 reads past the table,
+ * which is the original's behaviour. */
+const char *__cdecl VehicleKindName(const void *vehicle)
+{
+    const char *const *names =
+        (const char *const *)AM2_IMAGE(ADDR_VEHICLE_NAMES);
+
+    if (vehicle == 0)
+        return names[AM2_VEHICLE_NAME_UNKNOWN];
+
+    return names[*(const int32_t *)((const uint8_t *)vehicle
+                                    + VEHICLE_OFF_KIND)];
 }

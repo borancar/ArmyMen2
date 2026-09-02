@@ -15588,6 +15588,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_LOAD_ATL_FILE        0x0042BEA0u  /* int32_t(const char *path) */
 #define ADDR_RESPAWN_KIND_ALLOWED 0x004600F0u  /* int32_t(int32_t kind) */
 #define ADDR_BUILD_RESPAWN_POOL   0x00460120u  /* void(int32_t seed) */
+/* The vehicle display names, shown in the HUD squad panel: Jeep, Tank, Half
+ * Track, Convoy Truck, "???", PT Boat.
+ *
+ * ONE TABLE, NOT TWO. VehicleKindName's NULL path loads 0x0048BE60 and its
+ * normal path indexes 0x0048BE50 -- and 0x0048BE60 IS 0x0048BE50 + 4*4, i.e.
+ * entry [4], which is the "???" string. Naming the default separately would
+ * index correctly forever and hide that the unknown is a table slot. */
+#define ADDR_VEHICLE_NAMES       0x0048BE50u  /* const char *[6] */
+#define ADDR_VEHICLE_KIND_NAME   0x0045D990u  /* const char *(const void *) */
+#define AM2_VEHICLE_NAME_UNKNOWN 4            /* the "???" slot */
 #define ADDR_RESPAWN_KIND_MASK    0x0048C530u  /* uint32_t[44], 0 = always */
 /* ONE STRUCT, ONE PREFIX. These were split between MISSILE_DEF_OFF_ (two
  * names) and MISSILEDEF_OFF_ (five) -- one concept under two spellings, which

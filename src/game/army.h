@@ -169,4 +169,8 @@ int32_t __cdecl ObjIsOurs(void *obj, int32_t allies);
 int32_t __cdecl ObjIsLiveTarget(void *obj);
 int32_t __cdecl ObjIsHittable(void *obj);
 
+/* 0x0045D990. The vehicle's display name for the HUD squad panel, or the
+ * table's own "???" slot for a NULL vehicle. */
+const char *__cdecl VehicleKindName(const void *vehicle);
+
 #endif /* AM2_ARMY_H */
