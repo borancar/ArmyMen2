@@ -445,9 +445,16 @@ re-enters the table with the result. A cheat that fires a random cheat -- which
 is why the compiler put its body where the backward branch is cheapest, and why
 reading the arms top-to-bottom mis-assigns every one of them.
 
-**Every arm returns.** Thirty-nine separate epilogues, no shared tail, and the
-only control flow between arms is that one backward jump. The arms themselves
-are regular: `HudMessage(reply, flag)` and then one action.
+**Eighteen of the thirty-nine share a tail**, which the first version of this
+note denied. Entries 11 through 28 are the item-granting cheats: each pushes
+seven dwords of its own and jumps to one block that calls `KeyLookupTriple` and
+then `CreateWeapon`. So the arm's arguments are built *across two calls* -- the
+`CreateVehicle` shape, where pairing each push with the nearest call gets both
+wrong.
+
+Counting epilogues is what produced the wrong claim: thirty-nine arms,
+twenty-one `ret`s, and eighteen `jmp`s that look like eighteen more until the
+target is decoded.
 
 And an unmatched line falls through to `ScriptRunLine` -- which is how
 `trigger greenwins` works without being a cheat arm at all.

@@ -4715,8 +4715,25 @@ typedef struct {
  * eighty-one arms and WeaponClassOf's four both cost -- and the arm that
  * causes it is also the one arm that can reach every other.
  *
- * EVERY ARM RETURNS. Thirty-nine separate epilogues, no shared tail, and the
- * only control flow between arms is that one backward jump. The failure the
+ * EIGHTEEN OF THE THIRTY-NINE SHARE A TAIL, which the previous version of
+ * this note denied. Entries 11 through 28 are the item-granting cheats: each
+ * pushes SEVEN dwords of its own -- a kind, the caller's position, a -1 and
+ * four zeros -- and jumps to 0x0041827C, which pushes an item key, calls
+ * KeyLookupTriple, then pushes three more and calls 0x0045F0C0 before the one
+ * epilogue they all use.
+ *
+ * So the arm's arguments are built ACROSS TWO CALLS -- the shape CLAUDE.md
+ * records for CreateVehicle, where pairing each push with the nearest call
+ * gets both wrong. Seven pushed in the arm, three in the tail, three consumed
+ * by the first call and 0x20 cleaned at the end.
+ *
+ * So they are the eighteen cheats that hand the player a weapon, and the tail
+ * is one CreateWeapon call reached eighteen ways.
+ *
+ * Counting epilogues is what produced the wrong claim: thirty-nine arms and
+ * twenty-one `ret`s, and eighteen `jmp`s that look like eighteen more until
+ * the target is decoded. The only control flow between arms is that plus the
+ * one backward jump. The failure the
  * no-match path at 0x00417C60 shares with it -- both reach ScriptRunLine --
  * is a fallthrough and not a jump: an unmatched line is handed to the script
  * runner, which is how "trigger greenwins" works without being a cheat arm at
