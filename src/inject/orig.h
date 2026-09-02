@@ -8168,6 +8168,43 @@ typedef struct {
 #define TROOPER_OFF_SENT_POSE      0x5C4u  /* int32_t, OBJ_OFF_POSE's copy */
 #define TROOPER_OFF_SENT_POSE_T    0x5C8u
 #define TROOPER_OFF_LAST_SEQ       0x5CCu  /* where the sequence is kept */
+
+/* THE VEHICLE'S SHADOW BLOCK OVERLAPS THE TROOPER'S AND IS EIGHT BYTES
+ * EARLIER, which is not a contradiction and is worth stating plainly because
+ * it looks like one. A type-2 record keeps its last-transmitted position at
+ * TROOPER_OFF_SENT_POS (0x5B4); a type-3 keeps its own at 0x5AC, and 0x5B4 is
+ * where its FACING shadow lives. Both readings come from the same evidence --
+ * each field is compared against a specific live field a few instructions
+ * away -- and CLAUDE.md already records that this far tail is overloaded by
+ * type. Do NOT reach for a TROOPER_OFF_ name on a vehicle.
+ *
+ * The names are the PROGRAM'S, not ours: vehicleUpdateMessageAppend prints
+ * "Pos/last (%d,%d)/(%d,%d), Facing/last:%d/%d, Gunfacing/last:%d/%d,
+ * intFacing/last:%d/%d, intGunfacing/last:%d/%d, action/last:%x/%x, seq:%d",
+ * and the push order of that call fixes which shadow is which.
+ *
+ * `_SEQ` rather than `_T`: the interval is measured against the sending
+ * player's FLOW_OFF_SEQUENCE, so these count packets and not milliseconds --
+ * the same point TROOPER_OFF_LAST_SEQ's name already carries. */
+#define VEHICLE_OFF_SENT_POS       0x5ACu  /* packed point, last transmitted */
+#define VEHICLE_OFF_SENT_POS_SEQ   0x5B0u
+#define VEHICLE_OFF_SENT_FACING    0x5B4u  /* uint8_t, hull */
+#define VEHICLE_OFF_SENT_FACING_SEQ 0x5B8u
+#define VEHICLE_OFF_SENT_GUN       0x5BCu  /* uint8_t, turret */
+#define VEHICLE_OFF_SENT_GUN_SEQ   0x5C0u
+#define VEHICLE_OFF_SENT_INTFACING 0x5C4u  /* uint8_t */
+#define VEHICLE_OFF_SENT_INTFACING_SEQ 0x5C8u
+#define VEHICLE_OFF_SENT_INTGUN    0x5CCu  /* uint8_t */
+#define VEHICLE_OFF_SENT_INTGUN_SEQ 0x5D0u
+#define VEHICLE_OFF_SENT_ACTION    0x5D4u  /* kind | the three state bits */
+#define VEHICLE_OFF_SENT_ACTION_SEQ 0x5D8u
+/* 0x0045DAA0, one caller, and it names itself in the message above. Build a
+ * DELTA update for one vehicle and append it to a message buffer whose first
+ * word is its length. Returns nothing; the buffer's length is the output. */
+#define ADDR_STR_VEHICLE_UPDATE_APPEND 0x0048BFDCu
+#define ADDR_VEHICLE_UPDATE_APPEND 0x0045DAA0u /* void(msg, vehicle) -- the
+                                                  caller pushes the vehicle
+                                                  then the buffer */
 /* 0x00410820, "SendGamePause from %x  Pause =%s  Flags=%x". Eight callers.
  * It fills two fields of a message that lives in .bss at 0x004FAA50 and hands
  * it to SendGameMsg -- the header is set up elsewhere, since nothing in the
