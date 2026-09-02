@@ -7938,6 +7938,19 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
+ * `createtrooper` ENDS WITH THE CHEAT CONSOLE'S WEAPON-ATTACH, instruction
+ * for instruction: KeyLookupTriple for the item key, CreateWeapon into the
+ * scratch name, then set the weapon's army byte, put its uid in the unit's
+ * OBJ_OFF_WEAPON_UID, SoldierKindForWeapon on the weapon's +0xC0 chain and
+ * SendTrooperSetWeapon to publish it. Four calls in a fixed order.
+ *
+ * That sequence was written once already, in cheat.cpp's CheatSwapWeapon,
+ * and finding it here is the "grep for the SHAPE" rule paying off a third
+ * time -- after SettlePointInRegion turning out to be NearestAllowedTile's
+ * spiral and ItemLinkCells being RowRegisterAll's registration. The two are
+ * NOT merged: the cheat's version swaps a weapon on an existing unit and has
+ * the old-weapon flag arm this one has no use for.
+ *
  * `createvehicle` MAPS act->army TWO DIFFERENT WAYS IN ONE CALL. Its `table`
  * argument is CommArmyOfSlot(comm, act->army) unconditionally; its `army`
  * argument is CommSlotForArmy(comm, act->army) under multiplayer and the raw
