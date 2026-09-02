@@ -427,6 +427,16 @@ All twenty-eight callees are named, and its frame is clean under `espmap.py`
 now that the tool knows about thiscall cleanup -- which it learned *from* this
 function.
 
+**When the way ahead is blocked it sweeps alternate facings, and the sweep is a
+table.** The headings at `0x00489E00` are added *cumulatively* to the base
+facing -- +32, then -64, then +96 -- so what is actually tried is base+32,
+base-32, base+64: alternating and widening. Read as absolute offsets rather
+than deltas it is a different and much narrower search.
+
+**How many it tries depends on whose trooper it is**: four when the object
+belongs to the default owner and one flag is clear, seven otherwise. The
+player's own soldier gives up sooner than everything else on the map.
+
 The head: classify, send a dead object to the tail, and -- outside a
 multiplayer session, or inside one for an army the comm object does not own --
 remember `OBJ_OFF_FACING` when it is under 150 ms since the last hit. A trooper

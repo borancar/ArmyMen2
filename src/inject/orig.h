@@ -8045,6 +8045,27 @@ typedef struct {
  * milliseconds. So a trooper hit in the last sixth of a second keeps the
  * facing it was hit at, and the flag that says so is carried the length of the
  * function. */
+
+/* WHEN THE WAY AHEAD IS BLOCKED IT SWEEPS ALTERNATE FACINGS, and the sweep is
+ * a TABLE rather than arithmetic. Each attempt calls AnimStepPoint for the
+ * candidate heading, ObjectsAtPoint for what is there, and BlockWeightRoute
+ * for what it would cost; anything under 15 is walkable and ends the search.
+ *
+ * The headings come from ADDR_STEP_FACING_SWEEP, whose entries are added
+ * CUMULATIVELY to the base facing: +32, then -64, then +96, so the facings
+ * actually tried are base+32, base-32, base+64 -- alternating and widening.
+ * Read as absolute offsets rather than deltas it is a different and much
+ * narrower search.
+ *
+ * HOW MANY IT TRIES DEPENDS ON WHOSE TROOPER IT IS: four when the object
+ * belongs to ADDR_DEFAULT_OWNER and OBJ_OFF_FIELD_10C is clear, seven
+ * otherwise. So the player's own soldier gives up sooner than everything else
+ * on the map. */
+#define ADDR_STEP_FACING_SWEEP   0x00489E00u  /* int32[], low byte used */
+#define AM2_STEP_SWEEP_PLAYER    4
+#define AM2_STEP_SWEEP_OTHER     7
+/* Under this a route is walkable and the sweep stops. */
+#define AM2_STEP_ROUTE_OK        0xF
 /* The two StepType2 runs INSTEAD of the AI arms when the object is Sarge and
  * belongs to the default owner -- the trooper the player commands. Named by
  * the function they are called from and their offset: "player control" is read
