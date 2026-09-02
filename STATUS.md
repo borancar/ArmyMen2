@@ -440,6 +440,22 @@ through to `TrooperFire`, whose signature `orig.h` already records as
 `void(obj, weapon, sight)`. Settled by `espmap.py` naming the slots rather than
 by reading displacements.
 
+**Four of its fields already had names and all four confirm the reading**:
+`OBJ_OFF_HEIGHT_SET` at 0x65 is what makes the step-up a height comparison
+rather than a coincidence; `OBJ_OFF_HEIGHT_ADJ` at 0x64 means the class table's
+28/18/12 are per-class height adjustments; `OBJ_OFF_HELD_WEAPON_UID` at 0x564
+means the clear at the end of the walk is "nothing underfoot, forget what you
+were holding"; and 0x538 is `OBJ_OFF_POSE`. Grepping the *offsets* rather than
+inventing `OBJ_OFF_FIELD_65` and friends turned four blanks into four
+sentences.
+
+**And one contradicts its name.** 0xD8 is `OBJ_OFF_STUCK_COUNT`, "refused moves
+in a row" -- a reading from `AiRouteToward`, which only tests it for non-zero.
+This function writes clock + 1000 into it and compares it against the clock,
+which is a deadline and not a count. Both uses are live; a boolean test cannot
+tell them apart. Recorded rather than renamed, because the rename wants
+`AiRouteToward` re-read first.
+
 **A trooper steps up onto what it is standing on**, and the behaviour is one
 stack slot used twice: zeroed at entry and when the facing sweep gives up,
 given the height of any item underfoot within ±0x10 of the trooper's own during

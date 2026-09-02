@@ -8069,6 +8069,24 @@ typedef struct {
  * OBJ_OFF_HIT_TIME at 0x108. A field with fourteen writers does not get its
  * meaning from one of them, and the correction cost one decoded scan.
  *
+ * FOUR OF ITS FIELDS ALREADY HAD NAMES AND ALL FOUR CONFIRM THE READING.
+ * 0x65 is OBJ_OFF_HEIGHT_SET, which is what makes the step-up below a height
+ * comparison rather than a coincidence; 0x64 is OBJ_OFF_HEIGHT_ADJ, so
+ * ADDR_TROOPER_CLASS_VALUE's 28/18/12 are per-class height adjustments; 0x564
+ * is OBJ_OFF_HELD_WEAPON_UID, so the clear at the end of the walk means
+ * "nothing was underfoot, forget what you were holding"; and 0x538 is
+ * OBJ_OFF_POSE. Grepping the OFFSETS rather than inventing OBJ_OFF_FIELD_65
+ * and friends turned four blanks into four sentences.
+ *
+ * AND ONE OF THEM CONTRADICTS ITS NAME. 0xD8 is OBJ_OFF_STUCK_COUNT, "int32_t,
+ * refused moves in a row" -- a reading taken from AiRouteToward, which only
+ * tests it for non-zero. This function writes ADDR_GAME_CLOCK_MS + 1000 into
+ * it and compares it against the clock, which is a DEADLINE and not a count.
+ * Both uses are live and a boolean test cannot tell them apart. Recorded
+ * rather than renamed: the rename wants AiRouteToward re-read first, and this
+ * file has enough one-consumer names in it already without adding a
+ * one-consumer correction.
+ *
  * A TROOPER STEPS UP ONTO WHAT IT IS STANDING ON, and the whole behaviour is
  * one stack slot used twice. The slot is zeroed at entry and again when the
  * facing sweep gives up; in the pickup walk it takes the HEIGHT
