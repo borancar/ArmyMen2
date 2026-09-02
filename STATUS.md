@@ -5,41 +5,40 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-02**, at `d27a8d7`. Working tree clean.
+Last updated: **2026-09-02**, at `bbe16f4`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,414 patches plus 4 REGISTERED = 1,418 reconstructed
-addresses**, **30** analysis tools in `make check`.
+Nothing uncommitted. **1,432 patches plus 4 REGISTERED**, **30** analysis
+tools in `make check`.
 
-**`BuildAaiBuiltins` (`0x00434700`, 1,120 B) is reconstructed** -- empty the AAI
-tables and put back the records that do not come from `object.aai`: three
-singletons, a run of FORTY-FOUR, and two more.
+## THE SUB-CRT BOUNDARY IS CLOSED
 
-**Two of its five key globals already had names, and they are the good ones**:
-`ADDR_CREATE_WATCHED_KIND` and `ADDR_WATCHED_TYPE_ID`, the pair
-`ObjIsWatchedKind` matches an item against. So the "watched kind" the default
-pointer stands aside for -- `PointerPickMode0`, written earlier this session --
-is the last built-in record this function makes. Reached from the reader's end
-long ago and the writer's end here, and the two agree. I named both a second
-time before checking and `checkpatches` refused them.
+**Every game function below `0x0045C000` is reconstructed: 1,239 of 1,239.**
+Measured, not asserted -- `docs/functions.tsv` lists 1,239 entries below the
+line, 1,238 have at least one `patch_replace` inside them, and the one that
+does not is `0x0040A6A0`, which is `WndProc` and is REGISTERED into the
+`WNDCLASS` rather than detoured. That is the shape `CLAUDE.md` warns about
+under "not every reconstruction is a patch", and a count that only looked at
+patches would have reported 1,238 and left someone hunting a function that
+was finished long ago.
 
-**THE A/B CAUGHT A REAL DEFECT, which is worth more than the function.**
-`MakeAaiRecord`'s third parameter is `slot`, and the original passes
-**`AddRecordList`'s return value** there -- I passed the list POINTER. Both
-`bootcamp` and `campaign` stopped mid-map-load: five log lines missing from
-`freeing temporary map load data` onward, and 294,304 pixels differing. Fixed,
-and clean on both.
+The last one in was `FlowRecvMessage` (`0x004014C0`, 3,040 B), the
+flow-control receive path: three protocol messages -- data, nack and pulse
+ack -- eight exits, and a cumulative-ack retirement loop written out twice.
 
-That is the first time in this run of work that a reconstruction was actually
-wrong and the suite said so. Everything else in the pointer band is verified by
-reading because no drive reaches it; this one runs at startup, so it got
-compared -- and it needed to be.
+**It is the weakest-verified function in the tree and that should be said
+plainly.** No DirectPlay session opens on this machine, so every counter in
+it reads 0 on every drive; `tools/vectors.py` cannot take it, because it
+reads globals and calls into the image; and `AM2_SELFCHECK=1` cannot, because
+the comm object is NULL before `install()`. It is verified by reading, and by
+the checks that caught four transcription errors on the way in.
 
-**Other findings**: the run of 44 is a `do`-`while` over the KEY (0x01680000
-stepping 0x80 to 0x01681600) with the sprite index carried alongside; its sprite
-load falls back to index 0x0A when one is missing; and it centres each sprite's
-hotspot to half its width and height, skipped for eight keys in one band.
+What the *count* does not mean: the CRT line is a rule of thumb and there are
+**112 game functions above it** (`tools/crt.py`), whose entire outside contact
+is two `GetTickCount` reads, three `IntersectRect` calls and one COM dispatch
+that is itself reconstructed. Read `docs/boundary.md` for the boundary and
+`tools/crt.py` for what the line omits.
 
 ## Next: 0x00413E70, surveyed and ready to transcribe
 
