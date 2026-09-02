@@ -1149,6 +1149,10 @@ int maprow_install(void)
                         "RowPoolAEvict", 1);
     rc |= patch_replace(ADDR_ROWPOOL_B_EVICT, (const void *)RowPoolBEvict,
                         "RowPoolBEvict", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_A_ALLOC, (const void *)RowPoolAAlloc,
+                        "RowPoolAAlloc", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_B_ALLOC, (const void *)RowPoolBAlloc,
+                        "RowPoolBAlloc", 1);
     return rc;
 }
 
@@ -1431,6 +1435,17 @@ int32_t __cdecl RowPoolARelease(void *e)
 int32_t __cdecl RowPoolBRelease(void *e)
 {
     return RowPoolRelease(&kRowPoolB, (uint8_t *)e);
+}
+void __cdecl RowPoolAEvict(void);
+void __cdecl RowPoolBEvict(void);
+
+void *__cdecl RowPoolAAlloc(void)
+{
+    return RowPoolAlloc(&kRowPoolA, RowPoolAEvict);
+}
+void *__cdecl RowPoolBAlloc(void)
+{
+    return RowPoolAlloc(&kRowPoolB, RowPoolBEvict);
 }
 void __cdecl RowPoolAEvict(void) { RowPoolEvict(&kRowPoolA); }
 void __cdecl RowPoolBEvict(void) { RowPoolEvict(&kRowPoolB); }

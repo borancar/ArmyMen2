@@ -9076,9 +9076,15 @@ typedef void (__cdecl *am2_char_fn)(uint32_t wparam, int32_t lo, int32_t hi);
 /* Spelled orig_get_tick_count, not GetTickCount: naming the Win32 symbol in a
  * flat module fails tools/checksplit.py, and air.cpp already reaches the same
  * IAT slot under exactly this name. */
-typedef uint32_t (__stdcall *AM2_GetTickCountFn)(void);
-#define orig_get_tick_count \
-    (*(AM2_GetTickCountFn *)(uintptr_t)ADDR_IAT_GET_TICK_COUNT)
+/* orig_get_tick_count is ALREADY DEFINED at the top of this file, and the
+ * two spellings were not equivalent: that one goes through AM2_IMAGE and this
+ * one cast the raw address. AM2_IMAGE adds the slide, which is zero in the
+ * game and NOT zero under tests/loadimage.h -- and region.cpp is in
+ * SELFTEST_SRC. The later definition wins for everything below it, so the
+ * three uses down here were reading an unslid address in the offline harness.
+ *
+ * Found by reading a compiler warning ('orig_get_tick_count' redefined) that
+ * a `grep -E 'error'` had been discarding all session. */
 #define AM2_CHEAT_ABS(v)  ((v) < 0 ? -(v) : (v))
 
 #define g_charHandler (*(am2_char_fn *)(uintptr_t)ADDR_CHAR_HANDLER)

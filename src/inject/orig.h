@@ -4541,6 +4541,11 @@
 #define ADDR_ROWPOOL_A_EVICT     0x004609D0u  /* void(void) */
 #define ADDR_ROWPOOL_B_RELEASE   0x00460B90u  /* int32_t(entry *) */
 #define ADDR_ROWPOOL_B_EVICT     0x00460CA0u  /* void(void) */
+/* The allocators. Each calls its own pool's evictor when over capacity and
+ * then allocates ANYWAY -- the cap test is a `jle`, signed, and is not a
+ * refusal: these always return a slot. */
+#define ADDR_ROWPOOL_A_ALLOC     0x00460A60u  /* entry *(void) */
+#define ADDR_ROWPOOL_B_ALLOC     0x00460D30u  /* entry *(void) */
 /* The row's rectangle is ROW_OFF_RECT, already defined further down at 0x0C
  * -- checkoffsets refused a second copy, which is the fourth time this
  * session that grepping the OFFSET rather than the name would have been one

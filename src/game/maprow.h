@@ -94,4 +94,10 @@ void __cdecl RowPoolAEvict(void);
 /* 0x00460CA0. The same for pool B. */
 void __cdecl RowPoolBEvict(void);
 
+/* 0x00460A60. Take a slot from pool A, evicting first if it is over capacity.
+ * Always returns a slot: the cap test is not a refusal. */
+void *__cdecl RowPoolAAlloc(void);
+/* 0x00460D30. The same for pool B. */
+void *__cdecl RowPoolBAlloc(void);
+
 #endif
