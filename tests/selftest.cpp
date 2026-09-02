@@ -183,6 +183,28 @@ uint32_t __cdecl Ticks(void)
     return 0;
 }
 
+/* place.cpp's PlaceCursorPrepare dresses the menu cursor with these now that
+ * 0x004127B0 is ours, and all three live in win32/sprite.cpp, which this link
+ * cannot carry -- AM2_Sprite has an LPDIRECTDRAWSURFACE in it. Thirteenth,
+ * fourteenth and fifteenth stubs, and `extern "C"` because place.cpp declares
+ * them that way rather than including that header, for the same reason
+ * script.cpp declares PreloadSprite. Linkage follows the declaration.
+ *
+ * They can answer NULL: PlaceCursorPrepare has no vectors and could not -- it
+ * writes eleven globals and returns nothing -- so nothing here calls it. */
+extern "C" struct AM2_Sprite *__cdecl SoldierAnimSprite(int32_t, uint32_t)
+{
+    return 0;
+}
+extern "C" struct AM2_Sprite *__cdecl VehicleAnimSprite(int32_t, uint32_t)
+{
+    return 0;
+}
+extern "C" struct AM2_Sprite *__cdecl TurretAnimSprite(int32_t, uint32_t)
+{
+    return 0;
+}
+
 static int FirePoses(int *passed);
 
 int main(void)

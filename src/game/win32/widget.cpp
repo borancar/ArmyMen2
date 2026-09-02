@@ -10384,12 +10384,6 @@ void __cdecl HudRepaintOne(void)
     ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
 }
 
-typedef void (__cdecl *AM2_PlaceCursorFn)(int32_t row, int32_t ok,
-                                          int32_t facing, int32_t army);
-
-#define orig_place_cursor \
-    (*(AM2_PlaceCursorFn)AM2_IMAGE(ADDR_PLACE_CURSOR_PREPARE))
-
 /* Rewrite the panel's points readout and repaint the widget that draws it --
  * the tail both arms of PlacementScreenClick share, written out twice in the
  * original and once here. The rect goes into the paint slot BY VALUE, the
@@ -10531,7 +10525,7 @@ void __cdecl PlacementScreenClick(uint32_t at)
                           *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS,
                           *(const uint8_t *)(uintptr_t)ADDR_PLACE_FACING);
 
-    orig_place_cursor(*(const int32_t *)(uintptr_t)ADDR_HUD_INDEX
+    PlaceCursorPrepare(*(const int32_t *)(uintptr_t)ADDR_HUD_INDEX
                           + AM2_PLACE_CURSOR_ROW_BASE,
                       ok ? 1 : 0,
                       *(const uint8_t *)(uintptr_t)ADDR_PLACE_FACING, army);

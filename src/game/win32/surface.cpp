@@ -1233,9 +1233,9 @@ static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
 #define g_curY          (*(const int32_t *)(uintptr_t)ADDR_CURSOR_Y)
 #define g_overlayA      (*(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A)
 #define g_overlayB      (*(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_B)
-#define g_spriteMode    (*(int32_t *)(uintptr_t)ADDR_MENU_SPRITE_MODE)
-#define g_overlayAFld   (*(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_FLD)
-#define g_overlayBFld   (*(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_FLD)
+#define g_cursorInk    (*(int32_t *)(uintptr_t)ADDR_MENU_INK)
+#define g_overlayAInk   (*(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_INK)
+#define g_overlayBInk   (*(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_INK)
 
 #define g_netGame       (*(int32_t *)(uintptr_t)ADDR_NET_GAME)
 #define g_gameClockMs   (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
@@ -1285,9 +1285,9 @@ void __cdecl OverlayPrepare(int32_t row, int32_t force)
 
     g_overlayA    = (uint8_t *)0;
     g_overlayB    = (uint8_t *)0;
-    g_spriteMode  = 0;
-    g_overlayAFld = 0;
-    g_overlayBFld = 0;
+    g_cursorInk  = 0;
+    g_overlayAInk = 0;
+    g_overlayBInk = 0;
     *(uint32_t *)(uintptr_t)ADDR_MENU_CURSOR_DX    = origin;
     *(uint32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_DX = origin;
     *(uint32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_DX = origin;
@@ -1350,7 +1350,7 @@ static void DrawMenuOverlaySprite(uint8_t *spr, uint32_t dxAddr, int32_t fld)
       + *(const int16_t *)(uintptr_t)dxAddr;
     y = g_curY + sfld16(cursor, SPR_OFF_OVY)
       + *(const int16_t *)(uintptr_t)(dxAddr + 2);
-    DrawSprite((AM2_Sprite *)spr, x, y, g_spriteMode != 0);
+    DrawSprite((AM2_Sprite *)spr, x, y, g_cursorInk != 0);
 }
 
 void __cdecl DrawMenuCursor(void)
@@ -1423,15 +1423,15 @@ void __cdecl DrawMenuCursor(void)
             if (g_cursorSprite) {
                 uint8_t *spr = g_cursorSprite;
 
-                swr32(spr, SPR_OFF_MODE) = g_spriteMode;
+                swr32(spr, SPR_OFF_MODE) = g_cursorInk;
                 DrawSprite((AM2_Sprite *)spr,
                            g_curX + *(const int16_t *)(uintptr_t)ADDR_MENU_CURSOR_DX,
                            g_curY + *(const int16_t *)(uintptr_t)(ADDR_MENU_CURSOR_DX + 2),
-                           g_spriteMode != 0);
+                           g_cursorInk != 0);
                 DrawMenuOverlaySprite(g_overlayA, ADDR_MENU_OVERLAY_A_DX,
-                                      g_overlayAFld);
+                                      g_overlayAInk);
                 DrawMenuOverlaySprite(g_overlayB, ADDR_MENU_OVERLAY_B_DX,
-                                      g_overlayBFld);
+                                      g_overlayBInk);
             }
             UnlockSurface();
         } else {

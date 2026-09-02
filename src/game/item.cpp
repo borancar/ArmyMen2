@@ -12088,8 +12088,8 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, uint32_t at,
         char child[AM2_CHILD_NAME_BUF];
 
         do {
-            uint16_t px = (uint16_t)((uint16_t)at + (uint16_t)rec->a);
-            uint16_t py = (uint16_t)((uint16_t)(at >> 16) + (uint16_t)rec->b);
+            uint16_t px = (uint16_t)((uint16_t)at + (uint16_t)rec->dx);
+            uint16_t py = (uint16_t)((uint16_t)(at >> 16) + (uint16_t)rec->dy);
             uint32_t pt = (uint32_t)px | ((uint32_t)py << 16);
 
             if (!parent) {

@@ -95,8 +95,8 @@ because `0x00458A20` sits inside a 5,760-byte `functions.tsv` entry that holds
 **seventeen** functions and patching any one of them credits all of it. The
 same effect inflates the entry count.
 
-    entry-generous   1,225 of 1,239 entries, 91.8% of sub-CRT bytes
-    split-aware      1,376 of 1,530 real functions, 82.8% of sub-CRT bytes
+    entry-generous   1,226 of 1,239 entries, 92.2% of sub-CRT bytes
+    split-aware      1,377 of 1,530 real functions, 83.2% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -144,66 +144,53 @@ rectangle are all zero, because `mission` scrolls with relative motion and never
 presses a button on the map. The drag-rectangle arm and the whole
 claimed/click path stay verified by reading.
 
-## FindPath is done, and verified by an oracle rather than by a run
+## PlaceCursorPrepare, and three names that a second reader corrected
 
-`0x004395B0`, 1,808 bytes, the tile-level A*. Entries 1,224 -> 1,225 of 1,239,
-**14 left**.
+`0x004127B0`, 1,408 bytes: the placement screen's cursor dresser, and
+`PlacementScreenClick`'s private helper. Entries 1,225 -> 1,226 of 1,239,
+**13 left**. `ab.sh bootcamp campaign controls` is clean.
 
-It is `RegionFindPath` one granularity down -- same eight node fields in the
-same order, same `ApproxDistXY * 1.5` heuristic, same open-list defect -- so
-the reading was cheap and `tools/pathcheck.py` gave the shape of the check.
+The ghost unit the placement screen hangs off the pointer is the MENU CURSOR
+wearing a different sprite -- argument 1 goes straight into `ADDR_MENU_ROW` --
+so writing the row directly bypasses `OverlayPrepare`'s one-row-per-millisecond
+throttle. Eighteen rows, seventeen arms, and the arms are emitted in a
+different order from the rows, so the switch was generated from a decode of the
+table rather than read top to bottom.
 
-**Nothing in `tools/ab.sh` can see it.** `PlanPathTo` reads 0 on a driven Boot
-Camp mission, which is a real cold reading rather than a blind one -- its
-callers are the original AI band, and CLAUDE.md already records that band as
-entirely unreachable here. Closing the seam made `FindPath`'s own counter blind
-on top. `ab.sh bootcamp campaign` is clean, and that is a no-regression result,
-not evidence about the function.
+**`ok` changes the colours, not the sprites.** All three ink slots start as the
+player's army ink on an acceptance and as `ADDR_FLAME_RECORD` on a refusal, and
+whatever an arm then clears is filled in with `ADDR_PALETTE_GLYPHS` by the
+tail. Same sprite either way -- which is a better answer than orig.h's
+"presumably how the cursor turns red".
 
-**`tools/tilepathcheck.py` is the verification**, tool 31: 24 seeded maps
-emulated against the original, comparing the return value, the length and every
-tile of the route. Ticks is patched to a constant -- left alone it falls
-through to `GetTickCount`, an import, and faults -- and the point rule is six
-bytes of x86 indexing a byte array, because it is a function pointer and a stub
-that always allows would leave the only refusal the original consults for
-arbitrary tiles unchecked.
+**Three globals were named from a boolean test and hold a pointer.**
+`ADDR_MENU_SPRITE_MODE` and two `_FLD` siblings were named because the only
+reader looked at was `DrawMenuCursor`, which tests one for non-zero. This
+function is the writer and puts one of three 256-byte tables there. They are
+`ADDR_MENU_INK`, `_OVERLAY_A_INK` and `_OVERLAY_B_INK` now. What `DrawSprite`
+does with `SPR_OFF_MODE` further down is still unread, and the comment says so.
 
-**Two of its nine mutations were caught by nothing until the corpus grew, and
-neither gap was found by mutating.** A single penalised tile costs 3 where
-going round it costs 4, so the route never moved and the terrain terms never
-reached the output; a RUN of them fixes that, and telling the two constants
-apart needed a wall with two openings priced by different flags. And the
-head-unlink defect -- the most interesting thing in the function -- was
-unexercised: the open list is improved 49 times across every other case and not
-once is the improved node the HEAD. Counting the branch said so in one run
-where mutation said only "no difference". Even then a map that REACHES it was
-not enough, because the search ended before the discarded nodes mattered; the
-case that works was searched for on the criterion that actually matters,
-"defect and no-defect give different routes".
-
-**Two things it closed elsewhere.** `AM2_TILE_NO_WEIGHT_NEAR` and
-`AM2_TILE_LITTLE_COVER_NEAR` were named for their writer with "what reads them
-is elsewhere" -- elsewhere is here, and the polarity is the point: the bits are
-set for the ABSENCE of what they name, so a clear bit costs 3 and 1
-respectively and the A* steers units into the open and away from cover. And
-`Ticks`'s declaration moved to `misc.h` so a flat module can see it; the
-function stays in `win32/winmain.cpp`, and the declaration moved rather than
-being copied so the two cannot drift.
+**And two struct fields were named by the compiler.** `AM2_DefLink::a` and `b`
+were "narrowed from a parsed int32" and nothing more; this function hands the
+pair to `ADDR_MENU_CURSOR_DX`, an int16 pair, so they are a draw offset.
+Renaming them to `dx`/`dy` broke `CreateItem`, which adds the first to a
+point's x and the second to its y -- a second independent reader agreeing on
+which is which, arriving for free because the rename forced it.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,225 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 14
-outstanding, which is 1,239 minus 1,225 -- from 1,421 reconstructed addresses
-(1,417 patched plus 4 registered), and **91.8% of the sub-CRT bytes**.
-Split-aware that is **1,376 of 1,530** real functions and **82.8%** of the
+line (0x0045C000) patched**. Measured: **1,226 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 13
+outstanding, which is 1,239 minus 1,226 -- from 1,422 reconstructed addresses
+(1,418 patched plus 4 registered), and **92.2% of the sub-CRT bytes**.
+Split-aware that is **1,377 of 1,530** real functions and **83.2%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
 small ones in batches. A hundred and fifty-one batches have gone in and NOTHING SMALL IS LEFT among
-the ENTRIES: the 14 outstanding start at **1,168 bytes** -- `0x004049C0` -- and
+the ENTRIES: the 13 outstanding start at **1,168 bytes** -- `0x004049C0` -- and
 the median is **1,888**. That is not what is left, though: `tools/merges.py`
 splits them into real functions and the 0x00458930 entry alone still holds
 sixteen unwritten ones from 16 bytes up. Rank by real function, not by entry. The

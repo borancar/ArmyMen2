@@ -96,8 +96,8 @@ int32_t __cdecl DefLinkParse(int32_t cmd, char *line)
     link.parent   = (int32_t)PackKey((uint32_t)parent, (uint32_t)n1, 0);
     link.child    = (int32_t)PackKey((uint32_t)child, (uint32_t)n2, 0);
     link.siblings = DefCountLinks(link.parent);
-    link.a        = (int16_t)a;
-    link.b        = (int16_t)b;
+    link.dx       = (int16_t)a;
+    link.dy       = (int16_t)b;
     link.c        = c;
 
     DefAddLink(&link);

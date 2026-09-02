@@ -1883,9 +1883,23 @@
  * carry. */
 #define ADDR_MENU_OVERLAY_A      0x004FCDA8u  /* AM2_Sprite * */
 #define ADDR_MENU_OVERLAY_B      0x004FCDACu  /* AM2_Sprite * */
-#define ADDR_MENU_SPRITE_MODE    0x004FCDB0u  /* int32_t, non-zero -> mode 1 */
-#define ADDR_MENU_OVERLAY_A_FLD  0x004FCDB4u
-#define ADDR_MENU_OVERLAY_B_FLD  0x004FCDB8u
+/* THE COLOUR TABLE each of those three is drawn with, and the names were
+ * "MODE" and two "FLD"s because the only reader looked at them was
+ * DrawMenuCursor, which tests one for non-zero and copies it into the sprite's
+ * SPR_OFF_MODE. A boolean test names a boolean.
+ *
+ * PlaceCursorPrepare is the WRITER and it puts a POINTER in all three: record
+ * `CommArmyOfSlot(comm, defaultOwner)` of ADDR_OBJ_TABLE_RECORDS, which is
+ * 0x100 bytes per army and is the same block ADDR_ARMY_INK indexes; or
+ * ADDR_FLAME_RECORD, 256 bytes InitMenuScreen fills; or ADDR_PALETTE_GLYPHS,
+ * 256 bytes derived from the live palette. Three different 256-byte tables in
+ * one slot is a remap, not a mode.
+ *
+ * What DrawSprite does with SPR_OFF_MODE further down is still unread, so the
+ * claim here is exactly what the writer puts there and no more. */
+#define ADDR_MENU_INK            0x004FCDB0u  /* uint8_t[256] *, or NULL */
+#define ADDR_MENU_OVERLAY_A_INK  0x004FCDB4u
+#define ADDR_MENU_OVERLAY_B_INK  0x004FCDB8u
 #define ADDR_MENU_CURSOR_DX      0x004FCDBCu  /* int16_t pair */
 #define ADDR_MENU_OVERLAY_A_DX   0x004FCDC0u
 #define ADDR_MENU_OVERLAY_B_DX   0x004FCDC4u
@@ -8493,6 +8507,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * split them, so this address carried the wrong name until the body was read.
  * The function with the three "DefLinkParse:" strings is 0x004360C0, above. */
 #define ADDR_DEF_LINK_SEARCH       0x00436080u  /* AM2_DefLink *(int32,int32) */
+/* Every PreloadSprite/PreloadSpriteKey call in the placement cursor passes
+ * this, and so does EnsureSpriteAaiRecord -- see AM2_SET_WITH_EXTRA_LOAD_FLAG
+ * for the one site that adds a bit to it. */
+#define AM2_PLACE_SPRITE_SET       0x1000
 
 #define ADDR_SCRIPT_OBJECT        0x00436D60u  /* keywords 139 and 140 --
                                                * GenerateObjScriptFromTokens,

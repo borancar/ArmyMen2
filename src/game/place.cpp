@@ -15,6 +15,7 @@
 #include "gamedir.h"  /* SetGameDir */
 #include "crt.h"       /* the game's allocator -- this table is its memory */
 #include "armymsg.h"   /* SendTrooperSetWeapon -- reconstructed */
+#include "defparse.h"  /* AM2_DefLink, DefFindLink -- reconstructed */
 #include "maprow.h"    /* RowUpdate -- reconstructed */
 #include "army.h"      /* AllyFlag -- reconstructed */
 #include "air.h"       /* ObjConceal -- reconstructed */
@@ -996,6 +997,251 @@ void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points)
     *points += cost;
 }
 
+/* The three anim lookups are reconstructed, in win32/sprite.cpp with the rest
+ * of the sprite record, and are declared here rather than by including that
+ * header for the reason script.cpp gives about PreloadSprite: place.cpp is on
+ * the flat side of the split and must name no Win32 type, and AM2_Sprite has
+ * an LPDIRECTDRAWSURFACE in it. An incomplete type keeps the SIGNATURES exact,
+ * which a `void *` stand-in would not. */
+struct AM2_Sprite;
+extern "C" AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind,
+                                                 uint32_t heading);
+extern "C" AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind,
+                                                 uint32_t heading);
+extern "C" AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind,
+                                                uint32_t heading);
+
+extern "C" AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
+                                                  int32_t b);
+
+#define SET_CURSOR(x) (*(void **)(uintptr_t)ADDR_MENU_SPRITES_END = (void *)(x))
+
+/* A vehicle: hull on the cursor, turret on overlay A, same kind and heading.
+ * Kinds 1, 2, 0, 3, 5 over rows 0x18..0x1C -- four is absent, and the jump
+ * table is what says so rather than the arms. Neither arm touches the ink. */
+static void PlaceVehicle(int32_t kind, int32_t facing)
+{
+    SET_CURSOR(VehicleAnimSprite(kind, (uint32_t)facing));
+    *(void **)(uintptr_t)ADDR_MENU_OVERLAY_A =
+        TurretAnimSprite(kind, (uint32_t)facing);
+}
+
+/* One sprite out of a set, by the key PackKey builds. Every arm below that is
+ * not an animation lookup is this shape, and the two constants never vary:
+ * 0x1000 is the set the placement sprites live in and 1 says load it now. */
+static AM2_Sprite *PlaceSprite(uint32_t set, uint32_t id)
+{
+    return PreloadSpriteByKey(PackKey(set, id, 0), AM2_PLACE_SPRITE_SET,
+                                   1);
+}
+
+/* An emplacement: a base and a mount out of set 0x26 keyed off the ARMY, with
+ * a soldier of `kind` manning it on overlay B. The two ids are 10*army + 10
+ * and 10*army + 11, so each army owns a run of ten. Both sprite slots have
+ * their ink cleared; overlay B's is left as the head set it, which is the
+ * asymmetry that makes the manning soldier the player's colour. */
+static void PlaceEmplacement(int32_t army, int32_t facing, int32_t kind)
+{
+    SET_CURSOR(PlaceSprite(0x26, (uint32_t)(army * 5 + 5) * 2));
+    *(uint8_t **)(uintptr_t)ADDR_MENU_INK = (uint8_t *)0;
+    *(void **)(uintptr_t)ADDR_MENU_OVERLAY_A =
+        PlaceSprite(0x26, (uint32_t)(army * 5) * 2 + 11);
+    *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = (uint8_t *)0;
+    *(void **)(uintptr_t)ADDR_MENU_OVERLAY_B =
+        SoldierAnimSprite(kind, (uint32_t)facing);
+}
+
+/* PlaceCursorPrepare -- original 0x004127B0, two callers, both of them arms of
+ * PlacementScreenClick: this is that function's private helper and nothing
+ * else's.
+ *
+ * IT IS A CURSOR. Argument 1 goes straight into ADDR_MENU_ROW, the same global
+ * OverlayPrepare picks a row with, so the ghost unit the placement screen
+ * hangs off the pointer is the MENU CURSOR wearing a different sprite rather
+ * than a layer of its own -- and writing the row directly bypasses
+ * OverlayPrepare's one-row-per-millisecond throttle.
+ *
+ * EIGHTEEN ROWS, SEVENTEEN ARMS, AND THE LAYOUT IS NOT THE ORDER. The table at
+ * 0x00412CDC is indexed by `row - 0x13`; rows 0x1D and 0x1F share an arm, and
+ * the arms are emitted 0x13, 0x17, 0x15, 0x14, 0x16, ... so reading the bodies
+ * top to bottom and numbering as you go gets four of the first five wrong.
+ * Generated from a decode of the table, which is the rule this project already
+ * pays for twice over.
+ *
+ * `ok` IS WHAT MAKES THE CURSOR RED, and the mechanism is the ink rather than
+ * the sprite. On an accepted placement all three ink slots start as the
+ * player's own army ink -- record `CommArmyOfSlot(comm, defaultOwner)` of
+ * ADDR_OBJ_TABLE_RECORDS, which is 0x100 bytes a side; on a refusal they start
+ * as ADDR_FLAME_RECORD, and any an arm then clears to zero is filled in with
+ * ADDR_PALETTE_GLYPHS by the tail. Same sprites either way.
+ *
+ * THAT IS A THIRD READING OF 0x004FCDF8, and it agrees with the two orig.h
+ * already carries. InitMenuScreen writes 256 bytes there and the "Flame On!"
+ * cheat points every unit's weapon record at it; here the menu hands the same
+ * 256 bytes to the cursor as a colour table. Two subsystems that cannot be up
+ * at once, and this is the menu one.
+ *
+ * THE ARMY LOOKUP IS DONE THREE TIMES with identical arguments, once per ink
+ * slot, and the answer cannot change between them. Reproduced rather than
+ * hoisted: CommArmyOfSlot is thiscall on the comm object and the original did
+ * not common them up, so hoisting is a change to the call count for no gain.
+ *
+ * ROW 0x22's SECOND SPRITE IS INDEXED BY THE ROW. `row + 0x3D5` is what the
+ * original computes, and since the arm is only ever entered with row 0x22 it
+ * is the constant 0x3F7 written the long way -- the switch variable happened
+ * to be live in a register. Written as the original has it. */
+void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, int32_t facing,
+                                int32_t army)
+{
+    void   *comm = *(void *const *)(uintptr_t)ADDR_ARMY_TABLE;
+    int32_t owner = (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+    uint8_t *ink;
+
+    /* The three draw offsets, zeroed from the image's own {0,0}. */
+    *(int32_t *)(uintptr_t)ADDR_MENU_CURSOR_DX =
+        *(const int32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    *(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_DX =
+        *(const int32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    *(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_DX =
+        *(const int32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+    *(int32_t *)(uintptr_t)ADDR_MENU_ROW        = row;
+    *(int32_t *)(uintptr_t)ADDR_MENU_ANIM_FRAME = -1;
+    *(int32_t *)(uintptr_t)ADDR_MENU_ANIM_NEXT  = 0;
+    *(void **)(uintptr_t)ADDR_MENU_OVERLAY_A    = (void *)0;
+    *(void **)(uintptr_t)ADDR_MENU_OVERLAY_B    = (void *)0;
+
+    if (ok) {
+        ink = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+              + ((uint32_t)CommArmyOfSlot(comm, owner) << 8);
+        *(uint8_t **)(uintptr_t)ADDR_MENU_INK = ink;
+        ink = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+              + ((uint32_t)CommArmyOfSlot(comm, owner) << 8);
+        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = ink;
+        ink = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+              + ((uint32_t)CommArmyOfSlot(comm, owner) << 8);
+    } else {
+        ink = (uint8_t *)(uintptr_t)ADDR_FLAME_RECORD;
+        *(uint8_t **)(uintptr_t)ADDR_MENU_INK           = ink;
+        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = ink;
+    }
+    *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_B_INK = ink;
+
+    switch (row) {
+    /* The five foot soldiers. The kind is the arm's whole content and the
+     * numbering is the jump table's, not the layout's. */
+    case 0x13: SET_CURSOR(SoldierAnimSprite(0, (uint32_t)facing)); break;
+    case 0x14: SET_CURSOR(SoldierAnimSprite(2, (uint32_t)facing)); break;
+    case 0x15: SET_CURSOR(SoldierAnimSprite(4, (uint32_t)facing)); break;
+    case 0x16: SET_CURSOR(SoldierAnimSprite(3, (uint32_t)facing)); break;
+    case 0x17: SET_CURSOR(SoldierAnimSprite(1, (uint32_t)facing)); break;
+
+    /* The five vehicles, each a hull on the cursor and a turret on overlay A.
+     * Kinds 0, 1, 2, 3, 5 -- four is missing and the table is what says so. */
+    case 0x18: PlaceVehicle(1, facing); break;
+    case 0x19: PlaceVehicle(2, facing); break;
+    case 0x1A: PlaceVehicle(0, facing); break;
+    case 0x1B: PlaceVehicle(3, facing); break;
+    case 0x1C: PlaceVehicle(5, facing); break;
+
+    /* Two emplacements: a base and a mount out of set 0x26, both keyed off the
+     * ARMY rather than the row, with a soldier of a fixed kind manning it on
+     * overlay B. The two ids are 10*army + 10 and 10*army + 11, so each army
+     * owns a run of ten. Rows 0x1D and 0x1F are the same arm. */
+    case 0x1D:
+    case 0x1F: PlaceEmplacement(army, facing, 0); break;
+    case 0x1E: PlaceEmplacement(army, facing, 1); break;
+
+    case 0x20:
+        SET_CURSOR(PlaceSprite(0x20, (uint32_t)(army * 5 + 5) * 2));
+        *(uint8_t **)(uintptr_t)ADDR_MENU_INK = (uint8_t *)0;
+        break;
+
+    /* THE BUILDINGS, and the only arm that consults the def files. The three
+     * pieces are links 0, 1 and 2 of def key (army + 1) in set 0x21, each
+     * missing piece simply skipped -- so a building with one link draws one
+     * sprite and the other two slots keep whatever the head left. The link's
+     * +0x0C is the piece's draw offset and goes into the matching DX slot,
+     * which is the only place in this function those offsets are ever
+     * non-zero. */
+    case 0x21: {
+        uint32_t key  = PackKey(0x21, (uint32_t)(army + 1), 0);
+        AM2_DefLink *link = DefFindLink((int32_t)key, 0);
+
+        if (link) {
+            SET_CURSOR(PlaceSprite(0x21, (uint32_t)(army + 1) * 10));
+            *(uint8_t **)(uintptr_t)ADDR_MENU_INK = (uint8_t *)0;
+            *(int32_t *)(uintptr_t)ADDR_MENU_CURSOR_DX =
+                *(const int32_t *)&link->dx;
+        }
+        link = DefFindLink((int32_t)key, 1);
+        if (link) {
+            *(void **)(uintptr_t)ADDR_MENU_OVERLAY_A =
+                PlaceSprite(0x21, (uint32_t)army * 10 + 11);
+            *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = (uint8_t *)0;
+            *(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_A_DX =
+                *(const int32_t *)&link->dx;
+        }
+        link = DefFindLink((int32_t)key, 2);
+        if (link) {
+            *(void **)(uintptr_t)ADDR_MENU_OVERLAY_B =
+                PlaceSprite(0x21, (uint32_t)army * 10 + 12);
+            *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_B_INK = (uint8_t *)0;
+            *(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_DX =
+                *(const int32_t *)&link->dx;
+        }
+        break;
+    }
+
+    case 0x22:
+        SET_CURSOR(PlaceSprite(0x2A, 1));
+        *(uint8_t **)(uintptr_t)ADDR_MENU_INK = (uint8_t *)0;
+        /* `row + 0x3D5`, which is 0x3F7 -- see the header. */
+        *(void **)(uintptr_t)ADDR_MENU_OVERLAY_A =
+            PlaceSprite(0x2B, (uint32_t)row + 0x3D5);
+        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = (uint8_t *)0;
+        break;
+
+    case 0x23:
+        SET_CURSOR(PlaceSprite(0x1F, (uint32_t)(army * 5 + 5) * 2));
+        *(uint8_t **)(uintptr_t)ADDR_MENU_INK           = (uint8_t *)0;
+        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = (uint8_t *)0;
+        break;
+
+    /* The watched-object kind, whose key is already packed in a global. */
+    case 0x24:
+        SET_CURSOR(PreloadSpriteByKey(
+            *(const uint32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND,
+            AM2_PLACE_SPRITE_SET, 1));
+        *(uint8_t **)(uintptr_t)ADDR_MENU_INK           = (uint8_t *)0;
+        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = (uint8_t *)0;
+        break;
+
+    /* Anything else gets the menu's own first sprite, so the cursor is never
+     * left holding whatever the last row put there. */
+    default:
+        SET_CURSOR(*(void *const *)(uintptr_t)ADDR_MENU_SPRITES);
+        *(uint8_t **)(uintptr_t)ADDR_MENU_INK           = (uint8_t *)0;
+        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = (uint8_t *)0;
+        break;
+    }
+
+    /* A refusal fills in whatever the arm cleared. Note the test is on `ok`
+     * and the fills are on the slots that are ZERO, so an arm that set a slot
+     * deliberately keeps it even on a refusal -- only the cleared ones turn. */
+    if (ok)
+        return;
+    if (!*(uint8_t *const *)(uintptr_t)ADDR_MENU_INK)
+        *(uint8_t **)(uintptr_t)ADDR_MENU_INK =
+            (uint8_t *)(uintptr_t)ADDR_PALETTE_GLYPHS;
+    if (!*(uint8_t *const *)(uintptr_t)ADDR_MENU_OVERLAY_A_INK)
+        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK =
+            (uint8_t *)(uintptr_t)ADDR_PALETTE_GLYPHS;
+    if (!*(uint8_t *const *)(uintptr_t)ADDR_MENU_OVERLAY_B_INK)
+        *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_B_INK =
+            (uint8_t *)(uintptr_t)ADDR_PALETTE_GLYPHS;
+}
+
 int place_install(void)
 {
     patch_replace(ADDR_IS_PLACED_UNIT, (const void *)IsPlacedUnit,
@@ -1029,5 +1275,8 @@ int place_install(void)
                         "LoadArmyPlacement", 1);
     rc |= patch_replace(ADDR_PARSE_PLACE_LINE, (const void *)ParsePlaceLine,
                         "ParsePlaceLine", 0);
+    rc |= patch_replace(ADDR_PLACE_CURSOR_PREPARE,
+                        (const void *)PlaceCursorPrepare,
+                        "PlaceCursorPrepare", 2);
     return rc;
 }

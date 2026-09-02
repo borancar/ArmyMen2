@@ -36,8 +36,20 @@ typedef struct {
     int32_t parent;     /* +0x00, PackKey(parenttype, n1, 0) */
     int32_t siblings;   /* +0x04, links already sharing that parent */
     int32_t child;      /* +0x08, PackKey(childtype, n2, 0) */
-    int16_t a;          /* +0x0C, narrowed from a parsed int32 */
-    int16_t b;          /* +0x0E, likewise */
+    /* Where the child is drawn relative to the parent. Both were "narrowed
+     * from a parsed int32" and nothing more until PlaceCursorPrepare was
+     * read: it hands the pair straight to ADDR_MENU_CURSOR_DX and its two
+     * siblings, which are int16 pairs, so a building's second and third
+     * pieces are offset by these. Read as a PAIR by that consumer -- one
+     * int32 load -- which is also why they are adjacent int16s.
+     *
+     * CONFIRMED BY A SECOND CONSUMER, and the compiler is what found it:
+     * renaming these broke CreateItem, which adds the first to a point's x
+     * and the second to its y. Two independent readers agreeing on which is
+     * which is better evidence than either alone, and it is the rule about
+     * preferring a second toucher arriving for free. */
+    int16_t dx;         /* +0x0C, narrowed from a parsed int32 */
+    int16_t dy;         /* +0x0E, likewise */
     int32_t c;          /* +0x10 */
 } AM2_DefLink;
 

@@ -96,6 +96,13 @@ int32_t __cdecl SpriteKeyForKind(int32_t sel, int32_t n);
  * many more they try. Same eight-way selector, same unsigned bound. */
 int32_t __cdecl UnitKindMatches(int32_t code, int32_t kind, int32_t n);
 
+/* 0x004127B0, two callers, both arms of PlacementScreenClick. Dress the menu
+ * cursor as the unit about to be placed: a sprite, up to two overlays, and the
+ * colour table each is drawn with. `ok` is what PlacementAllowed just said and
+ * changes the colours rather than the sprites. */
+void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, int32_t facing,
+                                int32_t army);
+
 int place_install(void);
 
 #ifdef __cplusplus
