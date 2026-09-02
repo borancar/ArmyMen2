@@ -5096,6 +5096,22 @@ typedef struct {
  * an uninitialised descriptor after a successful Restore -- a defect in the
  * original is not ours to fix.
  *
+ * THIS CONSTRUCTOR SELECTS A LEVEL, which is a side effect well outside what
+ * building a widget should do. Populating the map list it walks the rules
+ * script's map names at stride 0x40, calls FindLevelByName on each, adds the
+ * survivors to the list box and inline-strcmps each against ADDR_MAP_NAME to
+ * find the current one -- and then calls ADDR_SELECT_LEVEL on it.
+ *
+ * SelectLevel is the function that fills ADDR_LEVEL_* from the chosen level's
+ * record, including the sound name this file records StopNamedSound as
+ * depending on. So constructing this panel changes global game state, and
+ * doing it twice, or out of order with anything that also selects a level,
+ * is not neutral.
+ *
+ * Worth flagging because a constructor is the last place anyone looks for
+ * that, and because a reconstruction that skipped it would leave the level
+ * unselected while the panel looked perfectly built.
+ *
  * THE SCORE LABEL READS THE PANEL'S OWN BUFFER, like the chat line does.
  * The constructor sprintf's ADDR_SCORE_LIMIT into this+0x1E4 with "%d" and
  * hands a Label that address -- so MP_PANEL_OFF_SCORE_TEXT's existing comment,
