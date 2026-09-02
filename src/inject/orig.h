@@ -7228,6 +7228,22 @@ typedef struct {
  * ADDR_MP_SESSION is set. */
 #define ADDR_MARK_SPRITES        0x0048CBB0u  /* AM2_Sprite ** */
 #define ADDR_MARK_SPRITE_COUNT   0x0048CBB4u  /* int32_t */
+/* The eighth subsystem's MULTIPLAYER half, which ADDR_MP_SESSION gates and
+ * which cannot execute on any drive this project has. A 4 x n grid at indices
+ * 0x384..0x387, three individual sprites, and a 13-entry array from a
+ * DIFFERENT set -- 3, where everything else in the family uses 0x13. */
+#define ADDR_MP_MARK_GRID         0x0048CBB8u  /* AM2_Sprite *[4 * n] */
+#define ADDR_MP_MARK_COLS         0x0048CBBCu  /* int32_t, the n */
+#define ADDR_MP_MARK_A            0x00664594u  /* AM2_Sprite * */
+#define ADDR_MP_MARK_B            0x00664598u
+#define ADDR_MP_MARK_C            0x0066459Cu
+#define ADDR_MP_TEAM_SPRITES      0x006645A0u  /* AM2_Sprite *[13] */
+#define AM2_MP_TEAM_SPRITE_COUNT  13           /* malloc(0x34) / 4, and the
+                                                * loop is `cmp 0xC; jle` */
+#define AM2_MP_MARK_GRID_BASE     0x384
+#define AM2_MP_TEAM_SPRITE_SET    3            /* not 0x13 */
+#define ADDR_LOAD_MARK_SPRITES    0x00463060u  /* void(void) */
+#define ADDR_FREE_MARK_SPRITES    0x00463200u  /* void(void) */
 #define AM2_MARK_LEADER          0        /* the entry drawn over the leader */
 #define AM2_LEADER_MARK_DY       0x0C     /* below the leader's own point */
 /* The `test [obj+8], 0x204` that drops an entry. Both bits already have names

@@ -880,6 +880,12 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
     rc |= patch_replace(ADDR_FREE_SEQ_GRID,
                         (const void *)FreeSeqGrid,
                         "FreeSeqGrid", 1);
+    rc |= patch_replace(ADDR_LOAD_MARK_SPRITES,
+                        (const void *)LoadMarkSprites,
+                        "LoadMarkSprites", 1);
+    rc |= patch_replace(ADDR_FREE_MARK_SPRITES,
+                        (const void *)FreeMarkSprites,
+                        "FreeMarkSprites", 1);
     return rc;
 }
 
@@ -2684,4 +2690,134 @@ void __cdecl FreeSeqGrid(void)
     FreeGrid((const int32_t *)(uintptr_t)ADDR_SEQ_GRID_ROWS,
              (const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE,
              (AM2_Sprite ***)(uintptr_t)ADDR_SEQ_SPRITES_7);
+}
+
+/* 0x00463060 and 0x00463200. The mark sprites, and the largest pair in the
+ * family because each half has a MULTIPLAYER SECTION behind ADDR_MP_SESSION
+ * -- which is 0 on every drive this project has, so that half is verified by
+ * reading alone.
+ *
+ * The loader's write-back differs from the decals': hotX is bounds.right / 2
+ * as there, but hotY is ZERO rather than the width, and the sprite's palette
+ * takes ADDR_REMAP_BRIGHT. Top-anchored and deliberate, which is what makes
+ * the decal loader's hotY look like the slip it is.
+ *
+ * THE MP TEAM SPRITES LEAK EIGHT OF THIRTEEN. The loader mallocs 0x34 -- 13
+ * pointers -- and fills all 13 with `cmp esi, 0xC; jle` over an INDEX. The
+ * releaser walks a BYTE OFFSET with `cmp esi, 0x10; jle`, which is 0,4,8,12,16
+ * and releases five. Reproduced.
+ *
+ * Pair 6's releaser has the same literal 0x10 with `jl` instead of `jle` and
+ * is correct for its four. One bit apart, one leaks and one does not. */
+void __cdecl LoadMarkSprites(void)
+{
+    int32_t n = *(const int32_t *)(uintptr_t)ADDR_MARK_SPRITE_COUNT;
+    AM2_Sprite **slots;
+    int32_t i, row, col, cols;
+
+    slots = (AM2_Sprite **)am2_malloc((size_t)n * sizeof(AM2_Sprite *));
+    *(void **)(uintptr_t)ADDR_MARK_SPRITES = slots;
+    memset(slots, 0, (size_t)n * sizeof(AM2_Sprite *));
+
+    for (i = 0; i < n; i++) {
+        AM2_Sprite *spr = PreloadSprite(AM2_SPRITEGRP_SET, 0x1F4, i,
+                                        AM2_SPRITE_FLAGS_FLAT, 1);
+        slots[i] = spr;
+        if (spr != 0) {
+            spr->palette = *(void *const *)(uintptr_t)ADDR_REMAP_BRIGHT;
+            spr->hotX = (int16_t)(spr->bounds.right / 2);
+            spr->hotY = 0;
+        }
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
+        return;
+
+    cols = *(const int32_t *)(uintptr_t)ADDR_MP_MARK_COLS;
+    {
+        AM2_Sprite **grid =
+            (AM2_Sprite **)am2_malloc((size_t)cols * 4 * sizeof(AM2_Sprite *));
+
+        *(void **)(uintptr_t)ADDR_MP_MARK_GRID = grid;
+        memset(grid, 0, (size_t)cols * 4 * sizeof(AM2_Sprite *));
+        for (row = 0; row < 4; row++)
+            for (col = 0; col < cols; col++)
+                grid[cols * row + col] =
+                    PreloadSprite(AM2_SPRITEGRP_SET,
+                                  AM2_MP_MARK_GRID_BASE + row, col, 1, 1);
+    }
+
+    *(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_A =
+        PreloadSprite(AM2_SPRITEGRP_SET, 0x389, 0, 0, 1);
+    *(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_B =
+        PreloadSprite(AM2_SPRITEGRP_SET, 0x389, 1, 0, 1);
+    *(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_C =
+        PreloadSprite(AM2_SPRITEGRP_SET, 0x38A, 0, 0, 1);
+
+    {
+        AM2_Sprite **team = (AM2_Sprite **)am2_malloc(0x34);
+
+        *(void **)(uintptr_t)ADDR_MP_TEAM_SPRITES = team;
+        for (i = 0; i <= 12; i++)
+            team[i] = PreloadSprite(AM2_MP_TEAM_SPRITE_SET, 0x17, i, 1, 1);
+    }
+}
+
+void __cdecl FreeMarkSprites(void)
+{
+    AM2_Sprite **slots = *(AM2_Sprite ***)(uintptr_t)ADDR_MARK_SPRITES;
+    AM2_Sprite  *spr;
+    int32_t      i, row, col, cols;
+
+    if (slots != 0) {
+        int32_t n = *(const int32_t *)(uintptr_t)ADDR_MARK_SPRITE_COUNT;
+
+        for (i = 0; i < n; i++)
+            ReleaseSprite(slots[i]);
+        am2_free(slots);
+        *(void **)(uintptr_t)ADDR_MARK_SPRITES = 0;
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
+        return;
+
+    {
+        AM2_Sprite **grid = *(AM2_Sprite ***)(uintptr_t)ADDR_MP_MARK_GRID;
+
+        if (grid != 0) {
+            cols = *(const int32_t *)(uintptr_t)ADDR_MP_MARK_COLS;
+            for (row = 0; row < 4; row++)
+                for (col = 0; col < cols; col++)
+                    ReleaseSprite(grid[cols * row + col]);
+            am2_free(grid);
+            *(void **)(uintptr_t)ADDR_MP_MARK_GRID = 0;
+        }
+    }
+
+    spr = *(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_A;
+    if (spr != 0)
+        ReleaseSprite(spr);
+    spr = *(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_B;
+    if (spr != 0)
+        ReleaseSprite(spr);
+    spr = *(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_C;
+    if (spr != 0)
+        ReleaseSprite(spr);
+
+    {
+        AM2_Sprite **team = *(AM2_Sprite ***)(uintptr_t)ADDR_MP_TEAM_SPRITES;
+
+        if (team != 0) {
+            /* FIVE, not thirteen. The original walks a byte offset with
+             * `cmp esi, 0x10; jle`, so 0, 4, 8, 12 and 16 -- and the loader
+             * filled all thirteen. Eight leak per teardown, and it is the
+             * original's. Note pair 6's releaser has the same 0x10 with `jl`
+             * and is exactly right for its four. */
+            for (i = 0; i <= 4; i++)
+                ReleaseSprite(team[i]);
+            am2_free(team);
+            *(void **)(uintptr_t)ADDR_MP_TEAM_SPRITES = 0;
+        }
+    }
+    /* The three singles are NOT nulled by the original -- only released. */
 }

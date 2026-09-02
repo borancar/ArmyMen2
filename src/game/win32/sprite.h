@@ -352,6 +352,11 @@ void __cdecl FreeSpriteGrid(void);
  * halves, over AM2_SEQ_VARIANT_STRIDE columns with indices from 0x1C2. */
 void __cdecl LoadSeqGrid(void);
 void __cdecl FreeSeqGrid(void);
+/* 0x00463060 and 0x00463200. The mark sprites, plus a multiplayer half behind
+ * ADDR_MP_SESSION that cannot execute here. Its team-sprite releaser frees 5
+ * of 13 -- the original's, reproduced. */
+void __cdecl LoadMarkSprites(void);
+void __cdecl FreeMarkSprites(void);
 /* 0x00462DC0 and 0x00462E50. The decal sprites: a flat array at a fixed
  * sprite index. The loader also centres each sprite's hotspot -- and sets
  * hotY from the WIDTH, which is the original's and is reproduced. */
