@@ -1737,3 +1737,50 @@ void air_install(void)
     patch_replace(ADDR_SET_FOG_OF_WAR, (const void *)SetFogOfWar,
                   "SetFogOfWar", 1);
 }
+
+/* 0x004014C0 -- the flow-control receive path, called from the receive
+ * thread for every message that arrives on a reliable channel.
+ *
+ * Its own log strings name it: "Interrupt Level Can't find FlowQ for %x"
+ * says where it runs, and the three cases it dispatches are the three
+ * messages of the protocol -- AM2_FLOW_DATA, AM2_FLOW_NACK and
+ * AM2_FLOW_PULSE_ACK. orig.h carries the full reading; the parts that
+ * matter for this transcription are repeated where they bite.
+ *
+ * THE RETURN VALUE IS THE INTERFACE. 1 means the message is dealt with and
+ * the caller must not queue it; 0 means it goes on the incoming list. Every
+ * exit below is one or the other deliberately, and the default case is
+ * literally the shared `return 0` epilogue.
+ *
+ * THE PACKET FIELDS ARE OVERLOADED BY MESSAGE TYPE. On a data message +8 is
+ * the sequence and +0xC the checksum, which is what PACKET_OFF_SEQ and
+ * PACKET_OFF_CHECKSUM say. On a NACK the same two dwords are the first and
+ * last sequence being asked for. That is the type-6 blast situation again --
+ * one record read two ways -- so the nack arm spells them out rather than
+ * using names that would be actively misleading there.
+ *
+ * Nothing here can be A/B'd: no DirectPlay session opens on this machine, so
+ * every counter in this function is 0 on every drive the project has. It is
+ * verified by reading, which is weaker than the rest of the tree. */
+#define FLOWMSG_NACK_FIRST   0x08u   /* PACKET_OFF_SEQ, read as a range base */
+#define FLOWMSG_NACK_LAST    0x0Cu   /* PACKET_OFF_CHECKSUM, read as its end */
+
+/* The RTT bookkeeping both retirement loops do. Diffing the two copies in
+ * the image says the arithmetic is identical -- 48 instructions against 50,
+ * every difference an edi/esi swap bar the log line -- so one helper is
+ * faithful here. The ORDER is the part worth preserving: the minimum is
+ * taken BEFORE the 10,000 ms clamp and the maximum after, so a long stall
+ * moves the max to exactly 10,000 and leaves the min alone. */
+static void FlowNoteRoundTrip(uint8_t *flow, uint32_t rtt)
+{
+    uint32_t lo = *(uint32_t *)(flow + FLOW_OFF_RTT_MIN);
+
+    if (lo == 0 || rtt < lo)
+        *(uint32_t *)(flow + FLOW_OFF_RTT_MIN) = rtt;
+    if (rtt > AM2_FLOW_RTT_CAP)
+        rtt = AM2_FLOW_RTT_CAP;
+    if (rtt > *(uint32_t *)(flow + FLOW_OFF_RTT_MAX))
+        *(uint32_t *)(flow + FLOW_OFF_RTT_MAX) = rtt;
+    *(uint32_t *)(flow + FLOW_OFF_RTT_TOTAL) += rtt;
+    RingPush32(flow, rtt);
+}

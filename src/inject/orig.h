@@ -3020,6 +3020,11 @@
 #define AM2_FLOW_DATA            0x0Bu
 #define AM2_FLOW_NACK            0x0Cu
 #define AM2_FLOW_PULSE_ACK       0x10u
+/* The RTT clamp, 10,000 ms. It appears three times in 0x004014C0 and it is
+ * NOT a timeout: a sample above it still counts, it is only recorded as
+ * exactly this. The minimum is taken before the clamp and the maximum after,
+ * so the two are not symmetric and reproducing them as a pair would be. */
+#define AM2_FLOW_RTT_CAP         10000u
 /* THE RESEND IS THROTTLED TO TWO PER NACK, and the throttle is a counter in
  * the frame rather than anything in a record -- `cmp [esp+0x14], 2; jge`.
  * Past the second, the arm stops sending and instead sets the send queue's
