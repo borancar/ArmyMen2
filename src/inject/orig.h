@@ -7938,6 +7938,12 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
+ * FOUR ARMS GUARD ON `(int16_t)point == 0` AND NOT ON THE DWORD. Codes 0x0E,
+ * 0x10, 0x31 and 0x32 all take ActionPoint's packed answer and test `ax`, so
+ * a point at x == 0 is refused whatever its y. Same width question as
+ * `fireweapon`'s third test, from the other direction -- there the field is
+ * read narrow, here the RESULT is.
+ *
  * `fireweapon` REFUSES UNLESS THE ACTION NAMES NO POINT, by three separate
  * tests: act->xvar must not be positive, act->relative must be zero, and
  * act->u.pos.x -- a WORD, tested with `cmp word ptr [esi+0x20], 0` -- must be
