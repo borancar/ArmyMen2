@@ -5050,6 +5050,15 @@ typedef struct {
  * dangerous kind: it produced a clean, plausible list of nineteen and nothing
  * about it looked incomplete.
  *
+ * THE COMM SLOT STRIDE HAS THREE NAMES -- AM2_COMM_SLOT_STRIDE,
+ * COMM_PLAYER_STRIDE and AM2_PLAYER_STRIDE, all 0x70, all the same concept.
+ * That is the defect this file distinguishes from the harmless case: four
+ * names for 15 are four concepts that happen to number the same, but three
+ * names for ONE stride is one concept under three spellings, which is what
+ * AM2_TILE_NEIGHBOURS and AM2_TILE_NEIGHBOUR_COUNT were before they were
+ * collapsed. Noted here rather than fixed in passing: a rename is a change to
+ * every use at once and gets its own commit.
+ *
  * THE PLAYER ROWS' Y COORDINATES ARE HIDDEN IN POINTER ARITHMETIC, and they
  * decode to something completely ordinary. Before the loop the original
  * computes three values of the form `mov ecx, 0xFFFFFFC3; sub ecx, ebp` --
