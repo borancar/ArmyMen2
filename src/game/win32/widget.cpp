@@ -9513,6 +9513,91 @@ int32_t __cdecl PointerPickHeal(void *obj)
     return 1;
 }
 
+/* PointerPickRepair -- original 0x004599A0, the second function in the
+ * 0x004597B0 entry, and PointerPickHeal's sibling: the same two menu-row
+ * guards, on row 0xC instead of 0xB.
+ *
+ * OBJ_OFF_REPAIR_FRAME NAMED THIS ONE. The field at +0x9C already carried that
+ * name, and this function is what reads it -- so "repair" is the tree's own
+ * word rather than a guess from the row number.
+ *
+ * TROOPERS ARE REFUSED OUTRIGHT, which is what separates it from its sibling:
+ * heal takes type 2 only, repair rejects type 2 and takes the rest.
+ *
+ * THE HEALTH TEST IS SKIPPED FOR A THIRD CLASS. An ITEM is offered when it is
+ * already being repaired -- OBJ_OFF_REPAIR_FRAME set -- or hurt; a VEHICLE only
+ * when hurt; and anything that is NEITHER an item nor a vehicle falls past both
+ * tests and is offered whatever its health. That last arm is easy to miss:
+ * the `else` has no final test, it just continues.
+ *
+ * IF OUR LEADER IS RIDING, THE TARGET MUST BE THE THING HE IS RIDING. The
+ * leader's OBJ_OFF_RIDING is compared against the object's own uid, so a
+ * passenger can repair his vehicle and nothing else. Where the sibling compares
+ * OBJ_OFF_RIDING to OBJ_OFF_RIDING -- "we are in the same place" -- this one
+ * compares it to the uid. Two lines that look alike and ask different
+ * questions.
+ *
+ * ONE KIND IS REFUSED at the very end: an ITEM whose AAI record's
+ * AAIREC_OFF_TYPE is 0x26. Named as a placeholder rather than borrowed from
+ * AM2_ITEM_KIND_DISG_3, which is the same number in a different table.
+ *
+ * Not exercised: no drive here opens menu row 0xC. */
+int32_t __cdecl PointerPickRepair(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *leader;
+    uint32_t riding;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+        && GetMenuRow() != AM2_MENU_ROW_REPAIR)
+        return 0;
+    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
+        && GetMenuRow() != AM2_MENU_ROW_REPAIR)
+        return 0;
+
+    if (*(const int8_t *)(o + OBJ_OFF_ARMY) == AM2_ARMY_NEUTRAL)
+        return 0;
+    if (!ArmyAlliedWithObj(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                           o, 0))
+        return 0;
+
+    if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER)
+        return 0;
+
+    if (ObjIsItem((const AM2_Object *)o)) {
+        if (!*(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME)
+            && *(const int16_t *)(o + OBJ_OFF_HEALTH)
+                   >= *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH))
+            return 0;
+    } else if (o && *(const int32_t *)o == AM2_OBJ_TYPE_VEHICLE) {
+        if (*(const int16_t *)(o + OBJ_OFF_HEALTH)
+            >= *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH))
+            return 0;
+    }
+    /* Neither an item nor a vehicle: no health test at all -- see above. */
+
+    leader = OurLeaderUnit();
+    if (!leader)
+        return 0;
+
+    riding = *(const uint32_t *)(leader + OBJ_OFF_RIDING);
+    if (riding && *(const uint32_t *)(o + OBJ_OFF_UID) != riding)
+        return 0;
+
+    if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_X),
+                   (const AM2_Point *)(leader + OBJ_OFF_X))
+        > *(const int32_t *)(uintptr_t)ADDR_PICK_REACH_662894)
+        return 0;
+
+    if (*(const int32_t *)o == AM2_OBJ_TYPE_ITEM
+        && *(const int32_t *)(*(const uint8_t *const *)(o + OBJ_OFF_FIELD_94)
+                              + AAIREC_OFF_TYPE) == AM2_AAI_TYPE_26)
+        return 0;
+
+    OverlayPrepare(AM2_MENU_ROW_REPAIR, 1);
+    return 1;
+}
+
 /* PointerPickWatchedItem -- original 0x00459EE0, 208 bytes, one reference: the
  * PICK slot of a record in the second {pick, action, kind, flags} table.
  *
@@ -10880,6 +10965,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_POINTER_PICK_HEAL,
                         (const void *)PointerPickHeal,
                         "PointerPickHeal", 1);
+    rc |= patch_replace(ADDR_POINTER_PICK_REPAIR,
+                        (const void *)PointerPickRepair,
+                        "PointerPickRepair", 1);
     rc |= patch_replace(ADDR_SET_WEAPON_TARGET_AIMED,
                         (const void *)SetWeaponTargetAimed,
                         "SetWeaponTargetAimed", 4);

@@ -9,8 +9,26 @@ Last updated: **2026-09-02**, at `969936a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,407 patches plus 3 REGISTERED = 1,410 reconstructed
+Nothing uncommitted. **1,408 patches plus 3 REGISTERED = 1,411 reconstructed
 addresses**, **30** analysis tools in `make check`.
+
+**`PointerPickRepair` (`0x004599A0`) is reconstructed** -- `PointerPickHeal`'s
+sibling, the same two menu-row guards on row 0xC. **`OBJ_OFF_REPAIR_FRAME`
+named it**: that field already carried the name and this is what reads it, so
+"repair" is the tree's own word rather than a guess from the row number.
+
+**Troopers are refused outright**, which is what separates the pair: heal takes
+type 2 only, repair rejects type 2 and takes the rest.
+
+**A third class skips the health test entirely.** An ITEM is offered when it is
+already being repaired or hurt, a VEHICLE only when hurt, and anything that is
+NEITHER falls past both tests and is offered whatever its health -- the `else`
+has no final test, it just continues.
+
+**Two lines that look alike ask different questions.** Heal compares
+`OBJ_OFF_RIDING` on both objects -- "we are in the same place". Repair compares
+the leader's `OBJ_OFF_RIDING` against the object's own UID -- so a passenger can
+repair his vehicle and nothing else.
 
 **`PointerPickHeal` (`0x004597B0`) is reconstructed** -- the first pick gated on
 a MENU ROW rather than a pointer mode. Offer to heal a friendly TROOPER that is
@@ -245,6 +263,22 @@ target apart, and invisible to anything but a diff.
 So these want writing as calls to `ArmyAlliedWithObj` with each hoisted guard
 spelled out, rather than as seven transcriptions of one body.
 
+## And the split-aware figure is a lower bound too
+
+`PointerPickRepair` went in and the split-aware count did **not move** -- still
+1,367 of 1,530. Not a mistake: `tools/merges.py` does not split the 1,072-byte
+entry at 0x004597B0, so both it and `PointerPickHeal` are one "real function" to
+that tool, and the entry was already credited when the first went in.
+
+That tool's docstring has always said its splits are confirmed by xref and so
+are a lower bound. The consequence had not been stated: the split-aware figure
+inherits the same floor. It is much closer than the entry-generous one and it is
+still generous.
+
+Two functions here have now been written for one unit of credit, which is the
+honest direction for a measure to be wrong in -- but a run of commits that moves
+neither figure is a real possibility, and it would not mean the work stopped.
+
 ## Read the split-aware figure, not the entry one
 
 This unit is why. 144 bytes of work moved the entry-generous byte figure by
@@ -264,8 +298,8 @@ ceiling rather than a floor -- ten percentage points of ceiling, measured.
 The loop's `completion_promise` is now **every game function below the CRT
 line (0x0045C000) patched**. Measured: **1,220 of 1,239** entries in
 `docs/functions.tsv` below that address have a patch inside them -- so 19
-outstanding, which is 1,239 minus 1,220 -- from 1,410 reconstructed addresses
-(1,407 patched plus 3 registered), and **89.5% of the sub-CRT bytes**.
+outstanding, which is 1,239 minus 1,220 -- from 1,411 reconstructed addresses
+(1,408 patched plus 3 registered), and **89.5% of the sub-CRT bytes**.
 Split-aware that is **1,367 of 1,530** real functions and **81.0%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.

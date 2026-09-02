@@ -1641,6 +1641,10 @@ int32_t __cdecl PointerPickMode0(void *obj);
  * riding whatever our leader is riding, within reach. */
 int32_t __cdecl PointerPickHeal(void *obj);
 
+/* 0x004599A0. Gated on menu row 0xC: repair an item or vehicle -- never a
+ * trooper -- and if our leader is riding, only the thing he is riding. */
+int32_t __cdecl PointerPickRepair(void *obj);
+
 /* 0x00458D70. ADDR_SET_WEAPON_TARGET's sibling: record a fire request aimed at
  * ADDR_AIM_X/Y/Z, for the weapon kinds 0x23..0x26. */
 void __cdecl SetWeaponTargetAimed(void *target, uint32_t at);

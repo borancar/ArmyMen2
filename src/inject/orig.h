@@ -978,6 +978,7 @@
 #define ADDR_PICK_REACH_662450   0x00662450u  /* int32_t */
 #define ADDR_PICK_REACH_66275C   0x0066275Cu  /* int32_t */
 #define ADDR_PICK_REACH_6624EC   0x006624ECu  /* int32_t */
+#define ADDR_PICK_REACH_662894   0x00662894u  /* int32_t */
 #define ADDR_POINTER_PICK_BOARD  0x00459DA0u  /* int32_t(void *obj) */
 #define ADDR_POINTER_PICK_WATCHED 0x00459EE0u /* int32_t(void *obj) */
 /* 0x00458D70, column 1 of the four weapon-handler records at 0x00489AB0..AE0 --
@@ -10089,6 +10090,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * heal a hurt friendly trooper riding whatever our leader rides. */
 #define ADDR_POINTER_PICK_HEAL   0x004597B0u  /* int32_t(void *obj) */
 #define AM2_MENU_ROW_HEAL        0x0B  /* the row it demands, and the overlay */
+/* 0x004599A0, its sibling in the same entry: the repair pick. */
+#define ADDR_POINTER_PICK_REPAIR 0x004599A0u  /* int32_t(void *obj) */
+#define AM2_MENU_ROW_REPAIR      0x0C
+/* The one AAI type PointerPickRepair refuses. A placeholder rather than
+ * AM2_ITEM_KIND_DISG_3, which is the same number in a different table -- the
+ * kind index and AAIREC_OFF_TYPE are not the same namespace. */
+#define AM2_AAI_TYPE_26          0x26
 /* ArmyAlliedWithObj IS INLINED INTO THE POINTER PICKS, and army.cpp has had it
  * as a function since long before. The block that appears in 0x00458EE0,
  * 0x004590F0, 0x00459300, 0x00459420, 0x004597B0, 0x004599A0 and 0x00459BE0 --
