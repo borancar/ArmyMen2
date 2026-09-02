@@ -415,6 +415,48 @@ static void handle_line(SOCKET s, char *line)
         reply(s, "ok %s", out);
         return;
     }
+    /* `peek ADDR [COUNT]` -- COUNT dwords at ADDR, as hex.
+     *
+     * IT ANSWERS UNDER AM2_NOPATCH=1, which is the whole point: the control
+     * socket is harness rather than reconstruction, so the same command
+     * compares the ORIGINAL's globals against ours after an identical drive,
+     * with no probe code in either side.  Every other way of comparing a
+     * global here needs code in the function under test, and that code cannot
+     * exist on the original's side.
+     *
+     * Built for the map layer block, where a reconstruction completes and
+     * returns 1 while leaving something downstream cannot use -- and every
+     * remaining candidate is a global, so one dump settles what would
+     * otherwise be one full A/B run per candidate.
+     *
+     * Reads only, and refuses a count that would overrun the reply. */
+    if (!strcmp(argv[0], "peek")) {
+        char     out[MAX_LINE - 8];
+        uint32_t addr;
+        int      n = 1, i, used = 0;
+
+        if (argc < 2) {
+            reply(s, "err peek ADDR [COUNT]");
+            return;
+        }
+        addr = (uint32_t)strtoul(argv[1], NULL, 0);
+        if (argc >= 3)
+            n = atoi(argv[2]);
+        if (n < 1)
+            n = 1;
+        if (n > 64)
+            n = 64;
+
+        out[0] = '\0';
+        for (i = 0; i < n; i++) {
+            used += snprintf(out + used, sizeof out - (size_t)used, "%08x ",
+                             *(const uint32_t *)(uintptr_t)(addr + 4u * (unsigned)i));
+            if (used >= (int)sizeof out - 10)
+                break;
+        }
+        reply(s, "ok %s", out);
+        return;
+    }
     if (!strcmp(argv[0], "counts")) {
         char buf[MAX_LINE - 8];
         trace_describe(buf, sizeof buf, (argc >= 2) ? argv[1] : NULL);

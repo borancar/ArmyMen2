@@ -14319,7 +14319,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * chunk arms, DeriveMapGeometry and the layer defaulting -- everything that
  * writes a GLOBAL rather than doing work.
  *
- * PARKED HERE, and the next step is a TOOL rather than another bisect. Each
+ * THE PEEK COMMAND FOUND THE FIRST CONCRETE DIFFERENCE. `drive.sh ctl "peek
+ * ADDR N"` dumps N dwords and answers under AM2_NOPATCH=1, so the original's
+ * map block can be read after a real load with no probe code in it. Over the
+ * whole 416-byte block the two sides agree on everything except the OBJECT
+ * COUNT at 0x00514F04: the original ends with 1,590 and ours with 1,587,
+ * which is exactly our OLAY record count. So the original creates THREE
+ * objects this reconstruction does not, and every rectangle, extent, shift
+ * and descriptor around it matches.
+ *
+ * The candidates are the three `continue` exits in the weapon arm -- kind
+ * exactly 0x64, a kind the gate refuses, and a negative AAI index -- one of
+ * which is presumably not an exit in the original at all.
+ *
+ * PARKED BEFORE THAT, and the next step was a TOOL rather than another bisect. Each
  * of these runs is a full ab.sh and answers one yes/no question; comparing
  * the map globals directly would answer all of them at once. The control
  * socket is harness and answers under AM2_NOPATCH=1 as well, so a peek
@@ -14406,6 +14419,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * records, zeroes the new tail, and then reads 0x10 bytes into each -- so the
  * on-disk record is 0x10 and the in-memory one is 0x1C, and the difference is
  * why a straight fread of the whole array would be wrong. */
+#define MAPREC_OFF_TYPE    0x00u
+#define MAPREC_OFF_KIND    0x04u
+#define MAPREC_OFF_X       0x08u
+#define MAPREC_OFF_Y       0x0Cu
+#define MAPREC_OFF_TRIG    0x10u
+#define MAPREC_OFF_ELEV    0x12u
+#define MAPREC_OFF_OWNER   0x13u
+#define MAPREC_OFF_MOVE    0x14u
+#define MAPREC_OFF_NUMB    0x15u
+#define MAPREC_OFF_SCRIPT  0x18u
+#define AM2_MAPREC_BYTES   0x1Cu
+
 #define ADDR_MAP_FIELD_DESCS      0x00485FB8u  /* {uint32 tag, uint32 size}[7] */
 #define AM2_IFF_RESV              0x56534552u  /* 'RESV', read and discarded */
 #define AM2_IFF_MHDR               0x5244484Du  /* 'MHDR' */
