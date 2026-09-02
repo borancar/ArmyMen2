@@ -10638,6 +10638,8 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Numbered rather than named, the way OBJ_OFF_FIELD_C0 is. */
 #define AM2_ACTION_0A            0x0A
 #define AM2_ACTION_06            0x06
+#define AM2_MOUSE_LEFT           0     /* into ADDR_MOUSE_BUTTON/_CHANGED */
+#define AM2_MOUSE_RIGHT          1     /* == ADDR_MOUSE_BUTTON1 */
 #define AM2_MOUSE_MIDDLE         2     /* into ADDR_MOUSE_BUTTON/_CHANGED */
 /* 0x00403B40, five callers, and what it ANSWERS is what several of them keep:
  * AiStepDefend promotes it into SIGHT_OFF_FOUND, and NextInventorySlot runs it
@@ -13037,9 +13039,32 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * is being dragged. ADDR_VIEW_RECT_ON says a band EXISTS; this says the mouse
  * is still down on it. Both are named from 0x004137D0's branch on them. */
 #define ADDR_DRAG_ANCHOR         0x004FCF68u  /* two int16, world space */
-#define ADDR_DRAG_ACTIVE         0x00485474u  /* int32_t */
-/* Gates the plain-click path only -- the two drag paths do not read it. */
-#define ADDR_CLICK_ENABLED       0x00485480u  /* int32_t */
+/* THE MOUSE STATE IS TWO ARRAYS OF THREE, not six separate globals, and
+ * these two carried names that said otherwise. 0x00485474 was
+ * ADDR_DRAG_ACTIVE and 0x00485480 was ADDR_CLICK_ENABLED -- both named from
+ * one caller's branch at 0x004137D0, where "the right button is held" really
+ * is how a drag is detected. That is a reading of the CALLER promoted into
+ * the global's identity, which is the mistake this file already records for
+ * functions, one level along.
+ *
+ * PollMouse settles it: three structurally identical arms, each reading the
+ * old state, computing the new, storing it, and then `cmp eax, ecx; setne dl`
+ * into the matching changed slot -- 0x485470/0x48547C, 0x485474/0x485480 and
+ * 0x485478/0x485484 at 0x004271AB, 0x00427205 and 0x0042725B. Our own
+ * reconstruction spells it `g_mouseButton[n]` / `g_mouseChanged[n]` over
+ * n = 0..2 and has been A/B clean for as long as it has existed, so the
+ * array reading was already in the tree while the names denied it.
+ *
+ * Behaviour is unchanged -- the address is the address -- but every comment
+ * built on the old names described a right-button press edge as a policy
+ * flag. */
+#define ADDR_MOUSE_BUTTON1       0x00485474u  /* int32_t, right button down */
+#define ADDR_MOUSE_CHANGED1      0x00485480u  /* int32_t, its edge */
+/* 0x00485478 and 0x00485484 get NO names of their own: they are element 2 of
+ * the two arrays above, and the tree already reaches them that way --
+ * NextInventorySlot spells it `((int32_t *)ADDR_MOUSE_BUTTON)[AM2_MOUSE_MIDDLE]`.
+ * A scalar name here would be a second spelling of one concept, which is the
+ * defect this file distinguishes from two concepts that merely share a value. */
 /* The band is not published until the pointer has moved more than six from
  * the anchor, by ApproxDist.  Below that a drag is a click. */
 #define AM2_DRAG_DEAD_ZONE       6

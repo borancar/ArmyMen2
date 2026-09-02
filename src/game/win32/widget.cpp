@@ -10506,8 +10506,8 @@ void __cdecl PlacementScreenClick(uint32_t at)
                           (int32_t)*(const uint32_t *)(uintptr_t)
                               ADDR_DEFAULT_OWNER);
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_DRAG_ACTIVE
-        && *(const int32_t *)(uintptr_t)ADDR_CLICK_ENABLED) {
+    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON1
+        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED1) {
         HudRepaintOne();
         return;
     }
@@ -10821,8 +10821,8 @@ void __cdecl HudPostUpdate(void)
         *(int32_t *)(uintptr_t)ADDR_MOUSE_GRAB = -1;
 
     if (*(const int32_t *)(uintptr_t)ADDR_OPT_4FD748
-        && *(const int32_t *)(uintptr_t)ADDR_DRAG_ACTIVE
-        && *(const int32_t *)(uintptr_t)ADDR_CLICK_ENABLED
+        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON1
+        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED1
         && orig_get_tick_count() - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS2_MS
                < AM2_DOUBLE_CLICK_MS)
         CreateExplosion(((const int16_t *)&at)[0], ((const int16_t *)&at)[1],
@@ -10832,8 +10832,8 @@ void __cdecl HudPostUpdate(void)
                         0xF, 0, 0, 0, 0);
 
     /* ---- the drag rectangle ------------------------------------------- */
-    if (*(const int32_t *)(uintptr_t)ADDR_DRAG_ACTIVE) {
-        if (*(const int32_t *)(uintptr_t)ADDR_CLICK_ENABLED)
+    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON1) {
+        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED1)
             *(uint32_t *)(uintptr_t)ADDR_DRAG_ANCHOR = at;
 
         /* Six is the dead zone: a drag shorter than that is a click, and the

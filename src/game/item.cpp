@@ -9114,9 +9114,18 @@ extern "C" void __cdecl SetPointerMode(int32_t mode);
  *   ADDR_VIEW_RECT_ON  -- a rubber band was being dragged and has been let go:
  *                         clear the flag, sweep ObjectsInRect over
  *                         ADDR_VIEW_RECT, and select what comes back;
- *   ADDR_DRAG_ACTIVE   -- a drag is in progress: renormalise ADDR_VIEW_RECT
- *                         from the anchor and the cursor and return;
+ *   ADDR_MOUSE_BUTTON1 -- the right button is still HELD, which is what a
+ *                         drag in progress looks like from here: renormalise
+ *                         ADDR_VIEW_RECT from the anchor and the cursor and
+ *                         return;
  *   neither            -- a plain click: WalkCellAtPoint under the cursor.
+ *
+ * That second global used to be called ADDR_DRAG_ACTIVE and the one below it
+ * ADDR_CLICK_ENABLED, both named from THIS function's branch on them. They
+ * are mouse button 1's state and edge, two thirds of the way through a pair
+ * of three-element arrays PollMouse fills -- see orig.h. The names described
+ * what a drag means to this caller rather than what the globals hold, so the
+ * gesture reading here is unchanged and the identity is corrected.
  *
  * and inside the last two, CTRL held turns "select" into "toggle".
  *
@@ -9159,9 +9168,9 @@ void __cdecl SelectionClick(void)
         if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT,
                          (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
             return;
-        if (*(const int32_t *)(uintptr_t)ADDR_DRAG_ACTIVE)
+        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON1)
             return;
-        if (!*(const int32_t *)(uintptr_t)ADDR_CLICK_ENABLED)
+        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED1)
             return;
 
         e = (uint8_t *)WalkCellAtPoint(
@@ -9211,7 +9220,7 @@ void __cdecl SelectionClick(void)
     /* A rubber band exists. While the drag is still under way this only
      * renormalises the rectangle from the anchor and the cursor -- the min of
      * each axis into left/top and the max into right/bottom -- and returns. */
-    if (*(const int32_t *)(uintptr_t)ADDR_DRAG_ACTIVE) {
+    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON1) {
         int16_t ax = *(const int16_t *)(uintptr_t)ADDR_DRAG_ANCHOR;
         int16_t ay = *(const int16_t *)(uintptr_t)(ADDR_DRAG_ANCHOR + 2);
         AM2_Rect *r = (AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT;
