@@ -1843,7 +1843,6 @@ typedef void (__cdecl *AM2_VehMsgFn)(void *msg);
 typedef void (__cdecl *AM2_VehMsgArmyFn)(void *msg, int32_t army);
 
 #define orig_recv_vehicle_1c ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_1C)
-#define orig_recv_vehicle_1f ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_1F)
 
 void __cdecl VehicleMsgRecv(void *msg, int32_t army)
 {
@@ -1854,7 +1853,7 @@ void __cdecl VehicleMsgRecv(void *msg, int32_t army)
     case 0x1C: orig_recv_vehicle_1c(msg);       return;
     case 0x1D: RecvVehicle1D(msg);              return;
     case 0x1E: RecvVehicle1E(msg);              return;
-    case 0x1F: orig_recv_vehicle_1f(msg);       return;
+    case 0x1F: RecvVehicle1F(msg);              return;
     case 0x24: RecvVehicle24(msg);              return;
     case AM2_MSG_VEHICLE_EXIT:
         RecvVehicleExit(msg);
@@ -2858,6 +2857,8 @@ int commmsg_install(void)
                   "VehicleUpdateApply", 2);
     patch_replace(ADDR_RECV_VEHICLE_1D, (const void *)RecvVehicle1D,
                   "RecvVehicle1D", 1);
+    patch_replace(ADDR_RECV_VEHICLE_1F, (const void *)RecvVehicle1F,
+                  "RecvVehicle1F", 1);
     patch_replace(ADDR_RECV_VEHICLE_1E, (const void *)RecvVehicle1E,
                   "RecvVehicle1E", 1);
     patch_replace(ADDR_RECV_VEHICLE_24, (const void *)RecvVehicle24,
@@ -3697,4 +3698,80 @@ void __cdecl RecvVehicle1D(void *msg)
             am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_REQ_DROP),
                     *(const int32_t *)(m + 0x14));
     }
+}
+
+/* RecvVehicle1F -- original 0x0045E860, one caller. Message kind 0x1F, the
+ * drop counterpart of RecvVehicle1D, and it names itself: "-->Vehicle Drop
+ * Item Received: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d".
+ *
+ * IT WRITES NOTHING. Not one store to memory in 288 bytes -- measured, not
+ * read off: a decoded scan of every `mov`/`or`/`and`/`add` with a memory
+ * destination finds zero. Every arm is a guard or a log, and since the retail
+ * build stubs the logger to a bare `ret`, the whole function is a chain of
+ * lookups whose results are discarded.
+ *
+ * That is worth stating rather than glossing, because a handler with three
+ * exits and five calls reads as though it does something. Its own text says
+ * where the work went: "Weapon destroyed before dropping; but we handled it"
+ * -- the drop is performed elsewhere and this message is the notification,
+ * so the handler is diagnostics for a state change that has already
+ * happened.
+ *
+ * THE MISSING-ITEM ARM IS NOT AN ERROR PATH. When the dropped item no longer
+ * resolves, it checks the VEHICLE'S OWN weapon for flag 2 and reports the
+ * race as handled; when it does resolve, it checks the item is a weapon and
+ * reports the drop as performed. Two different questions about two different
+ * objects, and reading the second lookup as a retry of the first inverts
+ * which one the flag belongs to.
+ *
+ * All four Log calls carry format strings and are reproduced. */
+void __cdecl RecvVehicle1F(void *msg)
+{
+    const uint8_t *m = (const uint8_t *)msg;
+    uint8_t       *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    uint8_t       *vehicle;
+    void          *item;
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_VEH_DROP_ITEM_RECV),
+                UidOnWire(*(const uint32_t *)(m + 4)),
+                UidOnWire(*(const uint32_t *)(m + 8)),
+                *(const int32_t *)(m + 0x10),
+                *(const int32_t *)(m + 0x18),
+                *(const int32_t *)(m + 0x14));
+
+    vehicle = (uint8_t *)ObjByUidAlias(UidOnWire(*(const uint32_t *)(m + 4)));
+    if (vehicle == 0)
+        return;
+
+    item = LookupByUID(UidOnWire(*(const uint32_t *)(m + 8)));
+
+    if (item == 0) {
+        /* The item is already gone. Ask the VEHICLE's weapon, not the item:
+         * flag 2 on it is what says the drop was dealt with locally. */
+        const uint8_t *w = (const uint8_t *)WeaponByUid(
+            *(const uint32_t *)(vehicle + VEHICLE_OFF_WEAPON_UID));
+
+        if (w == 0)
+            return;
+        if ((*(const uint32_t *)(w + 8) & 2u) == 0)
+            return;
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_RECV_DROP_GONE));
+        return;
+    }
+
+    if (!ObjIsType4((const AM2_Object *)item))
+        return;
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_RECV_DROP_DONE),
+                *(const int32_t *)(m + 0x14));
+
+    if (!CommMustBroadcast(comm,
+                           (int16_t)*(const int8_t *)(vehicle + OBJ_OFF_ARMY)))
+        return;
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_RECV_DROP_MINE));
 }

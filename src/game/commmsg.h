@@ -164,4 +164,8 @@ uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army);
  * pick an item up, and tells the asker. Three of its four arms are a log. */
 void __cdecl RecvVehicle1D(void *msg);
 
+/* 0x0045E860. Kind 0x1F, the drop notification -- and it writes NOTHING:
+ * every arm is a guard or a log, for work done elsewhere. */
+void __cdecl RecvVehicle1F(void *msg);
+
 #endif
