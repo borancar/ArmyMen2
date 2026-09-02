@@ -5096,6 +5096,17 @@ typedef struct {
  * an uninitialised descriptor after a successful Restore -- a defect in the
  * original is not ours to fix.
  *
+ * THE FOUR BUTTON HANDLERS ARE 0x00431850, 0x00431920, 0x004319B0 and
+ * 0x004319E0 -- start, ready, options and cancel, four consecutive small
+ * functions. NONE of them is ADDR_OPEN_MP_OPTIONS (0x00432910), which is what
+ * the options button obviously ought to call and does not: it calls
+ * 0x004319B0, which presumably calls that in turn.
+ *
+ * Guessed and wrong, one commit after writing down the rule against exactly
+ * this. A named address that fits the role is more tempting than a plausible
+ * neighbouring string, not less, because it comes with a justification
+ * attached.
+ *
  * THE BUTTON BITMAPS ARE NOT WHERE A GUESS WOULD PUT THEM. Start's three are
  * at 0x00476E7C..0x00476EA4 and ready's at 0x0048713C..0x00487164 -- two
  * different regions, nowhere near each other, and neither adjacent to the
