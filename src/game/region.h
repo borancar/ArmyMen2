@@ -400,4 +400,9 @@ void __cdecl UnrevealArea(int32_t army, uint32_t at);
 int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan,
                                  int32_t *out);
 
+/* 0x0045C8D0. Choose the vehicle's facing for the frame: propose a candidate
+ * heading, ask Step3TurnBlocked whether the step is walkable, and fan out
+ * alternately either side of the base heading for up to seven attempts. */
+void __cdecl Step3ChooseFacing(void *obj, void *out);
+
 #endif /* AM2_REGION_H */

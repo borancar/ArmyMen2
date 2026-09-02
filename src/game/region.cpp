@@ -8630,7 +8630,7 @@ tail:
 }
 
 
-#define orig_step3_45c8d0 ((AM2_Step2BFn)(uintptr_t)AM2_IMAGE(ADDR_STEP3_45C8D0))
+/* 0x0045C8D0 is Step3ChooseFacing now; region.h declares it. */
 #define orig_step3_45cb30 ((AM2_Step2BFn)(uintptr_t)AM2_IMAGE(ADDR_STEP3_45CB30))
 
 /* StepType3 -- original 0x0045D660, one caller: ObjFrameStep's type-3 arm.
@@ -8639,7 +8639,7 @@ tail:
  * TWO SEQUENTIAL CONVERGING TAILS, and nothing here returns early. All twenty
  * jump targets were decoded before this was written and not one begins with a
  * pop or a ret -- so every conditional jump goes to more code. The AI and
- * attach arms reach orig_step3_45c8d0 and FALL THROUGH into a second block
+ * attach arms reach Step3ChooseFacing and FALL THROUGH into a second block
  * that ends at orig_step3_45cb30, which every path reaches. StepType2 carried
  * exactly this defect three times; here the shape was established first.
  *
@@ -8756,7 +8756,7 @@ alive:
 attach:
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_94)) {
         AiStep(obj, out);
-        orig_step3_45c8d0(obj, out);
+        Step3ChooseFacing(obj, out);
     } else {
         ObjAttachTo(obj, NULL);
         *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
@@ -9060,6 +9060,9 @@ int region_install(void)
     rc |= patch_replace(ADDR_STEP3_TURN_BLOCKED,
                         (const void *)Step3TurnBlocked,
                         "Step3TurnBlocked", 4);
+    rc |= patch_replace(ADDR_STEP3_45C8D0,
+                        (const void *)Step3ChooseFacing,
+                        "Step3ChooseFacing", 2);
     return rc;
 }
 
@@ -9606,4 +9609,75 @@ int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan, int32_t *out)
     MoveStepPoint(o, (*(const uint8_t *)(o + OBJ_OFF_FACING) + *out) & 0xFF,
                   0, speed, 0, 0, &pt);
     return VehicleBlockWeight(o, thenFacing, *(const uint32_t *)&pt, 1) > 0x0E;
+}
+
+/* 0x0045C8D0, two callers in StepType3. Choose the vehicle's facing for this
+ * frame: propose a candidate heading, ask Step3TurnBlocked whether the step it
+ * implies is walkable, and on refusal try the next candidate -- up to SEVEN.
+ *
+ * The candidate walk is `[+0x574]++` and then half of it added to or
+ * subtracted from `[+0x570]` masked to 7, the sign chosen by the counter's low
+ * bit: so it fans out alternately either side of the base heading. The same
+ * three lines appear three times in the original and are one helper here.
+ *
+ * TWO PATHS CONVERGE ON ONE LOOP. Under 1200 ms since the last turn it goes
+ * straight to the search; past that it tests the current heading first and,
+ * only if the base is still zero, seeds it from FacingFromDelta08. That is
+ * the same converging-tails shape StepType3's own comment describes.
+ *
+ * AND ITS TWO CALLS TO Step3TurnBlocked PROVE THAT FUNCTION'S ARITY. One is
+ * followed by `add esp, 0x18` and the other by `add esp, 0x0C` -- the first
+ * cleans SetFacing08's three arguments as well as its own three, the second
+ * has no preceding call and cleans exactly three. Three, from the image. */
+static int32_t Step3NextCandidate(uint8_t *o)
+{
+    int32_t n = *(const int32_t *)(o + 0x574) ;
+    int32_t base = *(const int32_t *)(o + 0x570);
+
+    return (n & 1) ? ((base - (n >> 1)) & 7) : ((base + (n >> 1)) & 7);
+}
+
+void __cdecl Step3ChooseFacing(void *obj, void *out)
+{
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  local;
+    int32_t  tries;
+
+    /* Nothing to decide when the record already wants the current facing and
+     * its state says so. */
+    if (*(const uint8_t *)out == *(const uint8_t *)(o + OBJ_OFF_FACING)
+        && *(const int32_t *)((const uint8_t *)out + 0x08u) == 1)
+        return;
+
+    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        - *(const uint32_t *)(o + 0x56Cu) >= 0x4B0u) {
+        /* Past the interval: test the heading as it stands first. */
+        if (!Step3TurnBlocked(o, out, &local))
+            return;
+        *(uint32_t *)(o + 0x56Cu) =
+            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        if (*(const int32_t *)(o + 0x570u) == 0)
+            *(int32_t *)(o + 0x570u) = FacingFromDelta08(out, local);
+        tries = 0;
+    } else {
+        tries = 0;
+        SetFacing08(Step3NextCandidate(o), o, out);
+        if (!Step3TurnBlocked(o, out, &local))
+            return;
+        *(uint32_t *)(o + 0x56Cu) =
+            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+    }
+
+    /* The search. Seven attempts, fanning out alternately either side of the
+     * base heading; the counter is PERSISTENT in the object, so a vehicle
+     * that gave up last frame resumes where it left off rather than starting
+     * over. */
+    for (;;) {
+        *(int32_t *)(o + 0x574u) += 1;
+        SetFacing08(Step3NextCandidate(o), o, out);
+        if (!Step3TurnBlocked(o, out, &local))
+            return;
+        if (++tries >= 7)
+            return;
+    }
 }
