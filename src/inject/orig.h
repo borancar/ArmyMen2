@@ -3077,13 +3077,23 @@
  * with the same MsgListSetFlag / statistics work the 0x10 arm does. The ack
  * rides on the data, and 0x10 exists for when there is no data to carry it.
  *
- * So THE RETIREMENT LOOP IS WRITTEN OUT TWICE and the two copies are not
- * identical -- 0x10's is reached with the flow record already in hand and
- * 0x0B's re-reads it. This file's rule for two functions that look like one
- * applies to two loops inside one function: diff them before merging them.
- * Factoring these into a helper is the single most tempting change a reader
- * could make to this function and it would have to reproduce both entry
- * conditions to be correct.
+ * So THE RETIREMENT LOOP IS WRITTEN OUT TWICE, and DIFFING THE TWO SAYS
+ * SOMETHING DIFFERENT FROM WHAT READING THEM DID. 48 instructions against
+ * 50, and normalising branch targets shows all but two differences are an
+ * edi/esi swap -- register allocation, nothing more. The ARITHMETIC is
+ * identical: same +0x30 increment, same GetTickCount subtraction, same
+ * unclamped min, same clamped max, same total, same RingPush32.
+ *
+ * The two real differences are both cosmetic in the strict sense. 0x10
+ * reaches the message through one extra dereference because ebp does not
+ * already hold it; and 0x0B's diagnostic takes eight arguments where 0x10's
+ * takes seven, so they are different format strings.
+ *
+ * Which INVERTS the conclusion the first reading reached. A helper here
+ * would be safe for behaviour provided the log line is a parameter -- the
+ * thing that stopped it being safe was asserted from the two bodies looking
+ * different, and they do not. Diff before merging AND before declining to
+ * merge; this file only ever states the first half.
  *
  * A sanity line sits in front of it: more than 200 sequences acked in one
  * packet logs " No many acks in one packet\t %d thru %d " -- the spelling is
