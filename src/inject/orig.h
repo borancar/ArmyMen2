@@ -3677,6 +3677,38 @@
  * resets, so an object un-allied even once behaves differently from then on.
  * Reconstructed as AiApproachLeader. */
 #define ADDR_AI_APPROACH_LEADER 0x00405DB0u  /* void(obj, out, ctx) */
+/* SURVEYED AND NOT RECONSTRUCTED. 1,264 bytes over a 0x818-byte frame, one
+ * caller, and the same callee set as AiAttackBody plus AiKeepRange and
+ * AiHitReact -- so it is another sight-test-and-act step.
+ *
+ * IT USES THE SIGHTC_ CONTEXT WHERE AiAttackBody USES SIGHT_, which is the
+ * distinction that block's warning exists for. Its fields land on OBSERVER
+ * 0x14, RANGE 0x18, FOUND 0x20 and the range band at 0x4C/0x50 -- the 0x58-byte
+ * record AM2_SIGHTC_BYTES names. Reading it with the other family shifts
+ * everything by four and still compiles.
+ *
+ * IT SHARES EXACTLY ONE BLOCK WITH AiAttackBody and the share is verified
+ * rather than assumed. Normalised, 125 of its 363 instructions match, which is
+ * 35% and means "related", not "twin"; but ONE run of 38 --
+ * 0x00406DBC..0x00406E58 against 0x004078C0..0x0040795C -- is identical in
+ * every register, global, immediate and displacement, differing only in eight
+ * BRANCH TARGETS. That is the tile-count-to-distance conversion, the clamp to
+ * the rank sight range, and the three-band minimum update. Diffed at operand
+ * level on purpose: a normalising diff maps every image address to a
+ * placeholder, so two blocks reading DIFFERENT globals compare equal -- the
+ * trap VehicleBlockWeight already cost this project once.
+ *
+ * SO THE SIGHT-CACHE UPDATE CAN BE FACTORED, with evidence, when this lands.
+ *
+ * THE HEAD IS A THREE-BAND RANGE DECISION and the middle threshold is worth
+ * looking at before transcribing. It tests SIGHTC_OFF_RANGE against
+ * SIGHTC_OFF_WANT_RANGE and then against SIGHTC_OFF_DAMAGE, taking AiKeepRange
+ * in the band between them and closing the distance below it. Comparing a
+ * distance against a DAMAGE reads wrong; it is coherent if the weapon's damage
+ * doubles as a minimum standoff, which for a grenade or a bazooka is exactly
+ * what an AI would want. Not established either way -- UnitWeaponInfo really
+ * does write ITEMTYPE_OFF_DAMAGE there, so the name is not obviously the
+ * error. Read the third consumer before deciding. */
 #define ADDR_AI_406B30         0x00406B30u  /* void(obj, out, ctx) */
 #define AM2_SIGHTC_BYTES       0x58   /* the frame both dispatchers reserve */
 /* 0x00407BF0, one caller -- the `ignore` arm, mode 2. Reconstructed. */

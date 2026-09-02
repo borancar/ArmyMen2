@@ -240,6 +240,34 @@ has just written the field they test. Kept: they are live when the block is
 reached the other way, which it is not, and the original does not know that
 either.
 
+## Next: 0x00406B30, surveyed
+
+1,264 bytes, one caller, the same callee set as `AiAttackBody` plus
+`AiKeepRange` and `AiHitReact` -- another sight-test-and-act step, and the
+smallest thing left.
+
+**It uses the `SIGHTC_` context where `AiAttackBody` uses `SIGHT_`**, which is
+what that survey's warning exists for: the two families sit four bytes apart
+and reading it with the wrong one shifts every field and still compiles.
+
+**It shares exactly one block, and the share is verified rather than assumed.**
+Normalised, 125 of its 363 instructions match -- 35%, which means "related",
+not "twin". But one run of 38 is identical in every register, global, immediate
+and displacement, differing only in eight branch targets: the
+tile-count-to-distance conversion, the clamp, and the three-band minimum
+update. That was diffed at operand level on purpose, because a normalising diff
+maps every image address to a placeholder and two blocks reading *different*
+globals compare equal -- the trap `VehicleBlockWeight` already cost this
+project once. So the sight-cache update can be factored out of `AiAttackBody`
+with evidence when this lands.
+
+**One thing to settle before transcribing**: the head tests `SIGHTC_OFF_RANGE`
+against `WANT_RANGE` and then against `SIGHTC_OFF_DAMAGE`, keeping range in the
+band between them. Comparing a distance against a damage reads wrong, and is
+coherent if a weapon's damage doubles as a minimum standoff -- which for a
+grenade is what an AI would want. `UnitWeaponInfo` really does write
+`ITEMTYPE_OFF_DAMAGE` there, so the name is not obviously the error.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
