@@ -14253,6 +14253,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * failure. ADDR_TILE_COVER and ADDR_LOAD_PENDING have no chunk arm at all and
  * are allocated here and nowhere else.
  *
+ * FIRST BUG FOUND AND IT WAS AN esp DISPLACEMENT, not a misreading. TLAY's
+ * 0x14-byte header carries w and h at hdr[1] and hdr[2]. The original's
+ * `lea` for the buffer happens two pushes into the fread call and the two
+ * reads happen two pushes further still, so the displacements it uses are
+ * four dwords beyond the fields they name -- taken at face value they give
+ * hdr[3] and hdr[4], which are ZERO.
+ *
+ * The failure that produced was silent and total: bytes = w*h*2 came out 0,
+ * the arm took its "nothing to read" exit, the tile plane was never loaded,
+ * and the very next chunk header was read from the middle of the tile data.
+ * A probe on the chunk walk shows it plainly -- CSUM, VERS, DESC ... MHDR,
+ * TNAM, ONAM, TLAY, and then a tag of garbage with a size of 23 million.
+ *
+ * With hdr[1]/hdr[2] the walk runs to the last chunk of the file: OLAY at
+ * 131266 with 1,587 objects and 8 declared fields, then MOVE, ELEV, OWNR,
+ * NORM, TRIG, REGN, BPAD, NPAD and SCEN, ending at 682,774 of 682,766.
+ *
  * WRITTEN ONCE AND REVERTED: the whole function was transcribed, compiled
  * clean, passed every static check and FAILED the A/B outright -- 293,671
  * pixels of 786,432 and a log that stops inside the map load, before the
@@ -14266,9 +14283,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * their clean A/Bs proved much less.
  *
  * The transcription is kept out of the tree rather than installed while
- * broken. What is NOT yet known is which of the two loops fails, and finding
- * out needs a probe run rather than more reading -- the reading is done and
- * was not the problem.
+ * broken. The chunk loop and the nine-layer defaulting now both complete;
+ * what still fails is the OBJECT loop, somewhere between its 200th and 400th
+ * record of 1,587. Records 0 through 3 are type 17 kind 940, and three of
+ * type 23 -- all plausible, so it is not the first thing it touches.
  *
  * THE OBJECT-BUILDING LOOP IS EFFECTIVELY A SECOND FUNCTION and is the last
  * part of this to be written. It is not the "CreateWeapon per record" the
