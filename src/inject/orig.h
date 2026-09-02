@@ -5438,6 +5438,20 @@ typedef struct {
 #define BUTTON_BASE_OFF_B        0x60u
 #define BUTTON_BASE_OFF_C        0x64u
 #define VTABLE_EDIT              0x0046FC98u
+/* The 34th vtable, and the class the multiplayer panel builds TWICE with
+ * 0x84 bytes apiece. Its constructor takes a rectangle, three colours, a
+ * commit callback, and a minimum, maximum and step -- 0, 0x1388 and 0x64 for
+ * the first of the two.
+ *
+ * NAMED FROM ITS ARGUMENTS AND A NEIGHBOUR, WHICH IS WEAKER THAN THIS FILE
+ * PREFERS. The callback is ADDR_MP_COMMIT_POINTS and the panel already has
+ * MP_PANEL_OFF_SCORE_TEXT, "the score limit as text", so a bounded number
+ * with a step and a commit is a score spinner. Its BODY says only that it
+ * chains WidgetConstruct, stamps this vtable and takes its screen rectangle
+ * -- which identifies the base class and nothing else. Treat the name as a
+ * role until something reads the field it commits. */
+#define VTABLE_MP_SPIN           0x0046FD10u
+#define ADDR_MP_SPIN_CTOR        0x00456300u  /* thiscall, min/max/step */
 #define VTABLE_MULTISPRITE       0x0046FD38u
 #define VTABLE_LISTBOX           0x0046FCC0u
 #define VTABLE_CHECKBOX          0x0046FC5Cu
