@@ -6695,6 +6695,16 @@ typedef struct {
 #define ADDR_FREE_SEQ_SPRITES_5   0x00462F10u  /* void(void) */
 #define ADDR_LOAD_SPRITE_GRID     0x00462CB0u  /* void(void) */
 #define ADDR_FREE_SPRITE_GRID     0x00462D50u  /* void(void) */
+/* The seventh subsystem is the SAME grid again -- 1.000 against the fourth on
+ * both halves -- over AM2_SEQ_VARIANT_STRIDE columns and a row count at
+ * 0x0048CB88, with indices from 0x1C2. Found only by diffing PAIRWISE: an
+ * earlier pass compared every pair against the first and reported 3..8 as all
+ * distinct, because a single baseline finds twins OF the baseline and hides
+ * twins among the rest. */
+#define ADDR_SEQ_GRID_ROWS        0x0048CB88u  /* int32_t */
+#define AM2_SEQ_GRID_BASE         0x1C2
+#define ADDR_LOAD_SEQ_GRID        0x00462F50u  /* void(void) */
+#define ADDR_FREE_SEQ_GRID        0x00462FF0u  /* void(void) */
 #define ADDR_SPRITE_GROUPS_C_END  ADDR_SPRITE_GRID_ROWS
 #define SPRITEGRP_C_OFF_COUNT     0x00u
 #define SPRITEGRP_C_OFF_SPRITES   0x04u

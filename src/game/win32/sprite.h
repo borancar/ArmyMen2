@@ -348,6 +348,10 @@ void __cdecl FreeSpriteGroupsC(void);
  * on a NULL grid where the other two frees behave two other ways. */
 void __cdecl LoadSpriteGrid(void);
 void __cdecl FreeSpriteGrid(void);
+/* 0x00462F50 and 0x00462FF0. The second grid, 1.000 against the first on both
+ * halves, over AM2_SEQ_VARIANT_STRIDE columns with indices from 0x1C2. */
+void __cdecl LoadSeqGrid(void);
+void __cdecl FreeSeqGrid(void);
 /* 0x00462DC0 and 0x00462E50. The decal sprites: a flat array at a fixed
  * sprite index. The loader also centres each sprite's hotspot -- and sets
  * hotY from the WIDTH, which is the original's and is reproduced. */

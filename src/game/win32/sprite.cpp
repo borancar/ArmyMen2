@@ -874,6 +874,12 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
     rc |= patch_replace(ADDR_FREE_SEQ_SPRITES_5,
                         (const void *)FreeSeqSprites5,
                         "FreeSeqSprites5", 1);
+    rc |= patch_replace(ADDR_LOAD_SEQ_GRID,
+                        (const void *)LoadSeqGrid,
+                        "LoadSeqGrid", 1);
+    rc |= patch_replace(ADDR_FREE_SEQ_GRID,
+                        (const void *)FreeSeqGrid,
+                        "FreeSeqGrid", 1);
     return rc;
 }
 
@@ -2523,41 +2529,43 @@ void __cdecl FreeSpriteGroupsC(void)
  * unconditionally, the third skips a NULL record, and this one returns at
  * once if the whole grid is NULL. Same job, three shapes, and a helper across
  * any two of them erases the difference. */
-void __cdecl LoadSpriteGrid(void)
+static void LoadGrid(const int32_t *rowsAt, const int32_t *colsAt,
+                     AM2_Sprite ***gridAt, int32_t indexBase)
 {
-    int32_t rows = *(const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_ROWS;
-    int32_t cols = *(const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS;
+    int32_t rows = *rowsAt;
+    int32_t cols = *colsAt;
     AM2_Sprite **grid;
     int32_t row, col;
 
     grid = (AM2_Sprite **)am2_malloc((size_t)(rows * cols)
                                      * sizeof(AM2_Sprite *));
-    *(void **)(uintptr_t)ADDR_SPRITE_GRID = grid;
+    *gridAt = grid;
     memset(grid, 0, (size_t)(rows * cols) * sizeof(AM2_Sprite *));
 
     for (row = 0; row < rows; row++)
         for (col = 0; col < cols; col++)
             grid[row * cols + col] =
-                PreloadSprite(AM2_SPRITEGRP_SET, AM2_SPRITE_GRID_BASE + row,
+                PreloadSprite(AM2_SPRITEGRP_SET, indexBase + row,
                               col, AM2_SPRITEGRP_C_FLAGS, 1);
 }
 
-void __cdecl FreeSpriteGrid(void)
+static void FreeGrid(const int32_t *rowsAt, const int32_t *colsAt,
+                     AM2_Sprite ***gridAt)
 {
-    AM2_Sprite **grid = *(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_GRID;
+    AM2_Sprite **grid = *gridAt;
     int32_t rows, cols, row, col;
 
     if (grid == 0)
         return;
 
-    rows = *(const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_ROWS;
-    cols = *(const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS;
+    rows = *rowsAt;
+    cols = *colsAt;
     for (row = 0; row < rows; row++)
         for (col = 0; col < cols; col++)
             ReleaseSprite(grid[row * cols + col]);
 
     am2_free(grid);
-    *(void **)(uintptr_t)ADDR_SPRITE_GRID = 0;
+    *gridAt = 0;
 }
 
 /* 0x00462DC0 and 0x00462E50. The decal sprites: one flat array, a FIXED
@@ -2644,4 +2652,36 @@ void __cdecl FreeSeqSprites5(void)
         ReleaseSprite(slots[i]);
     am2_free(slots);
     *(void **)(uintptr_t)ADDR_SEQ_SPRITES_5 = 0;
+}
+
+/* The two grid subsystems. Pair 7 diffs 1.000 against pair 4 on BOTH halves,
+ * so one implementation is faithful -- found only by diffing pairwise, since
+ * an earlier pass compared everything against pair 1 and reported these as
+ * distinct. A single baseline finds twins OF the baseline and hides twins
+ * among the rest. */
+void __cdecl LoadSpriteGrid(void)
+{
+    LoadGrid((const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_ROWS,
+             (const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS,
+             (AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_GRID,
+             AM2_SPRITE_GRID_BASE);
+}
+void __cdecl FreeSpriteGrid(void)
+{
+    FreeGrid((const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_ROWS,
+             (const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS,
+             (AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_GRID);
+}
+void __cdecl LoadSeqGrid(void)
+{
+    LoadGrid((const int32_t *)(uintptr_t)ADDR_SEQ_GRID_ROWS,
+             (const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE,
+             (AM2_Sprite ***)(uintptr_t)ADDR_SEQ_SPRITES_7,
+             AM2_SEQ_GRID_BASE);
+}
+void __cdecl FreeSeqGrid(void)
+{
+    FreeGrid((const int32_t *)(uintptr_t)ADDR_SEQ_GRID_ROWS,
+             (const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE,
+             (AM2_Sprite ***)(uintptr_t)ADDR_SEQ_SPRITES_7);
 }
