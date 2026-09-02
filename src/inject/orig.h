@@ -14319,7 +14319,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * chunk arms, DeriveMapGeometry and the layer defaulting -- everything that
  * writes a GLOBAL rather than doing work.
  *
- * THE PEEK COMMAND FOUND THE FIRST CONCRETE DIFFERENCE. `drive.sh ctl "peek
+ * THE ROOT CAUSE, AND IT IS AN OMISSION RATHER THAN A MISREADING. Between
+ * the layer defaulting and the object loop the original does four things
+ * this reconstruction did none of:
+ *
+ *     call ADDR_SEAL_MAP_EDGES
+ *     call ADDR_REBUILD_TILE_COVER
+ *     call ADDR_BUILD_AAI_BUILTINS
+ *     if (!ADDR_LOAD_PENDING) create an object from ADDR_AAI_KEY_980000
+ *                             at ADDR_ZERO_POINT
+ *
+ * AND ADDR_LOAD_PENDING IS A FLAG BEING TESTED, NOT A LAYER. It appeared in
+ * my scan for `mov eax, [ADDR_x]; test eax, eax` -- which is the shape of an
+ * allocate-if-null block AND the shape of an ordinary flag test, and the scan
+ * cannot tell them apart. So it went into the defaulting list, where the
+ * reconstruction malloc'd w*h bytes and stored the pointer into an int32_t
+ * flag. That makes the flag non-zero, which SKIPS the creation above, which
+ * is where at least some of the three missing objects come from.
+ *
+ * Two errors from one scan: it missed a loop it could not see (the four
+ * reveal grids) and it swallowed a flag it should not have. A pattern match
+ * for a code shape finds every site with that shape and no others, and
+ * "allocate if null" and "test a flag" are the same shape.
+ *
+ * THE PEEK COMMAND IS WHAT LED HERE. `drive.sh ctl "peek
  * ADDR N"` dumps N dwords and answers under AM2_NOPATCH=1, so the original's
  * map block can be read after a real load with no probe code in it. Over the
  * whole 416-byte block the two sides agree on everything except the OBJECT
