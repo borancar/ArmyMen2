@@ -14161,6 +14161,24 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * carries w and h, and from them the function derives ADDR_MAP_ROW_SHIFT via
  * Log2Mask, the two extents, three rectangles and the listener position.
  *
+ * THE FIRST CHAIN'S ARMS, extracted from the disassembly rather than read off
+ * and retyped -- each is malloc(w*h), fread, store, except where noted:
+ *
+ *     MHDR  w and h, and everything derived from them
+ *     BPAD  ADDR_MAP_PADBIT_LAYER     NPAD  ADDR_MAP_PAD_LAYER
+ *     MOVE  ADDR_CELL_WEIGHTS         OWNR  ADDR_TILE_KIND
+ *     TRIG  ADDR_TILE_FLAGS           REGN  ADDR_REGION_OF_CELL
+ *     ELEV  ADDR_TILE_ATTRS           TLAY  ADDR_MAP_TILES (w*h*2 + 0x14)
+ *     SCEN  read to a temp and handed to ADDR_PARSE_SCENARIOS, then freed
+ *     OLAY  a realloc'd object list rather than a plane
+ *     default  fseek past it
+ *
+ * Two of those are worth not mistaking for the plane arms. TLAY reads a
+ * 0x14-byte header first and its chunk is w*h*2 PLUS that header, so the size
+ * check is `size == w*h*2 + 0x14` and not `size == w*h`. SCEN owns nothing:
+ * the bytes go to a scratch buffer, ParseScenarios takes them, and the buffer
+ * is freed immediately.
+ *
  * ADDR_MAP_FIELD_DESCS (0x00485FB8) IS A SECOND TABLE AND A SECOND LOOP.
  * Past the chunk switch, LoadMap walks seven {tag, size} pairs and freads
  * exactly `size` bytes per entry, dispatching on the tag again -- so the
