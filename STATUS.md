@@ -144,6 +144,28 @@ rectangle are all zero, because `mission` scrolls with relative motion and never
 presses a button on the map. The drag-rectangle arm and the whole
 claimed/click path stay verified by reading.
 
+## Next: FindPath, surveyed
+
+`0x004395B0`, 1,808 bytes, is the tile-level A* and the survey is in `orig.h`.
+The finding that makes it cheap: **it is `RegionFindPath` again, one
+granularity down.** The same eight node fields in the same order, the same
+`ApproxDistXY * 1.5` heuristic, and the same open-list defect -- unlinking the
+head sets the head to zero rather than to its successor. `tools/pathcheck.py`
+already reproduces that for the region version and is the obvious oracle for
+this one; four callees, of which only `Ticks` is nondeterministic and a hook
+pins it.
+
+Two things the survey settled that a reading would have got wrong. **The
+resume arm is dead code** -- its gate ships as -1 and is only ever written back
+to -1, and the two globals it reads have exactly one reference each in the
+whole image, which is that read. And **the node budget adapts**: both exits
+measure the search and move `ADDR_PATH_MAX_NODES` toward what the machine
+managed, floored at 4,000, so a slow machine searches less.
+
+`ADDR_DECAL_RING8` was renamed `ADDR_TILE_STEP8` on the way. It was "named for
+its one consumer" and this is its third; the A* also confirms its eight-entry
+bound from a loop, which the decal site could not.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT

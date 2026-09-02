@@ -251,7 +251,7 @@ void __cdecl BuildRegionGraph(void)
  *
  * IT IS WHAT BUILDS THREE TABLES THIS FILE ALREADY WALKS. `orig.h` described
  * ADDR_TILE_NEIGHBOURS and ADDR_TILE_RING8 as "built at map load" and named
- * nothing that builds them; this is it, and ADDR_DECAL_RING8 comes out of the
+ * nothing that builds them; this is it, and ADDR_TILE_STEP8 comes out of the
  * same run.
  *
  * THE TWENTY NEIGHBOURS ARE A 5x5 DIAMOND -- three cells on the row two above,
@@ -261,7 +261,7 @@ void __cdecl BuildRegionGraph(void)
  * address the cover loops stop at.
  *
  * THE TWO RINGS HOLD THE SAME EIGHT VALUES IN THE SAME ORDER, which nothing
- * had said: ADDR_DECAL_RING8 is one copy and ADDR_TILE_RING8 is two, so a walk
+ * had said: ADDR_TILE_STEP8 is one copy and ADDR_TILE_RING8 is two, so a walk
  * starting anywhere in 0..7 runs eight steps without a wrap test. The
  * seventeenth slot is -1 and is outside that scheme.
  *
@@ -278,7 +278,7 @@ void __cdecl BuildRegionGraph(void)
 void __cdecl BuildTileDeltas(void)
 {
     const int32_t  w     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
-    int32_t *const decal = (int32_t *)(uintptr_t)ADDR_DECAL_RING8;
+    int32_t *const decal = (int32_t *)(uintptr_t)ADDR_TILE_STEP8;
     int32_t *const ring8 = (int32_t *)(uintptr_t)ADDR_TILE_RING8;
     int32_t *const nb    = (int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS;
     int32_t *const ring4 = (int32_t *)(uintptr_t)ADDR_TILE_RING4;

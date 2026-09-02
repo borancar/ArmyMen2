@@ -12192,11 +12192,88 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define OBJ_OFF_MOVE_UNTIL       0x11Cu   /* game-clock ms */
 #define AM2_MOVE_VALID_MS        0xBB8    /* 3000 */
 #define ADDR_PATH_RETRY_MS       0x00487894u  /* int32_t, 500 */
-/* 0x004395B0, and nothing in it says what it is. PlanPathTo hands it the two
- * tiles, ADDR_TILE_LINE_BUF, a length out and its own third argument, and
- * treats a zero answer as "no route". */
+/* 0x004395B0, 1,808 bytes, one caller. SURVEYED AND NOT RECONSTRUCTED.
+ * PlanPathTo hands it the two tiles, ADDR_TILE_LINE_BUF, a length out and its
+ * own third argument, and treats a zero answer as "no route".
+ *
+ * IT IS RegionFindPath AGAIN, ONE GRANULARITY DOWN, and that is the finding
+ * the rest of this block rests on. Its node carries the SAME EIGHT FIELDS IN
+ * THE SAME ORDER as REGION_OFF_G..NEXT -- cost, heuristic, depth, stamp,
+ * parent, prev, next, state -- packed into sixteen bytes of uint16 where the
+ * region version spreads int32s over 0x10..0x28, with STATE moved from fifth
+ * to last. The heuristic is the same expression too, ApproxDistXY scaled by
+ * AM2_CONST_1_5, which REGION_OFF_H already records. So the image contains one
+ * weighted A* written twice: once over regions, once over tiles.
+ *
+ * AND IT HAS THE SAME DEFECT. Unlinking a node that is the open list HEAD sets
+ * the head to ZERO rather than to the node's successor -- `xor edx,edx; mov
+ * [esp+0x44],edx` at 0x00439945, against `edx = [esp+0x44]` on the other arm --
+ * so the rest of the list is dropped. tools/pathcheck.py already reproduces
+ * that for RegionFindPath rather than fixing it; the same choice applies here,
+ * and a model that "corrects" it will disagree with the original.
+ *
+ * THE RESUME ARM IS DEAD CODE, by the scan this file prescribes rather than by
+ * reading. 0x00487828 gates it, ships as -1, and its ONLY other reference
+ * writes -1 back; the two globals that arm reads -- 0x00554B80 for the goal and
+ * 0x00523DC8 for the open-list head -- have exactly ONE reference each in the
+ * whole image and it is this read. Three globals with no writer, so a
+ * continuation can never be resumed. Reproduce it; do not explain it.
+ *
+ * THE NODE ARRAY'S BASE IS CONFIRMED BY TILING. 0x00554BD8 + 0x10000 tiles *
+ * 16 bytes lands exactly on 0x00654BD8, and the next thing anything touches is
+ * 0x00654C30, 88 bytes later -- the same 88-byte gap that sits between
+ * 0x00554B80 and the array. 0x10000 is also the bound the entry checks its two
+ * arguments against. A layout that tiles at both ends is the check.
+ *
+ * THE BUDGET ADAPTS, which is the part no reading of the loop would suggest.
+ * Both exits measure Ticks() across the search and, when it took more than
+ * 3 ms, move ADDR_PATH_MAX_NODES toward what the machine actually managed:
+ * `(MAX_SEARCHES * considered / elapsed + budget / 2) / 2 * 2`, rounded down
+ * to even and floored at 0xFA0. So a slow machine searches less. The two
+ * epilogues are instruction-for-instruction the same bar a register choice --
+ * diffed, not assumed.
+ *
+ * FOUR CALLEES AND NOTHING ELSE: ApproxDistXY (ours, pure), _ftol, Ticks, and
+ * the installed ADDR_POINT_RULE through a function pointer. That is what makes
+ * it a tools/pathcheck.py target rather than an unverifiable one -- Ticks is
+ * the only nondeterminism and a Unicorn hook pins it.
+ *
+ * Its exits: 1 with the path written backwards from the goal through PARENT
+ * and `*n` set to depth+1, or 0. The give-up path is not a failure -- past
+ * MAX_NODES it compares the best node's heuristic against the START's and
+ * returns the PARTIAL path when it made progress. */
 #define ADDR_FIND_PATH           0x004395B0u  /* int32(from, to, uint16 *,
                                                *       int32 *n, int32) */
+/* The tile-level search's node array, one per tile index. */
+#define ADDR_PATH_NODES          0x00554BD8u  /* [0x10000][16] */
+#define AM2_PATH_TILES           0x10000
+#define AM2_PATH_NODE_BYTES      16
+#define PATHNODE_OFF_G           0x00u  /* uint16, cost from the start */
+#define PATHNODE_OFF_H           0x02u  /* uint16, ApproxDistXY * 1.5 */
+#define PATHNODE_OFF_DEPTH       0x04u  /* uint16, hops from the start */
+#define PATHNODE_OFF_STAMP       0x06u  /* uint16, the search generation */
+#define PATHNODE_OFF_PARENT      0x08u  /* uint16 tile, the came-from */
+#define PATHNODE_OFF_PREV        0x0Au  /* open-list links, sorted by g+h */
+#define PATHNODE_OFF_NEXT        0x0Cu
+#define PATHNODE_OFF_STATE       0x0Eu  /* uint8: 1 open, 2 closed */
+/* Bumped once per search so a stale STAMP means "never visited". A uint16, and
+ * nothing resets it -- it wraps, which is the original's behaviour. */
+#define ADDR_PATH_GENERATION     0x00654C30u  /* uint16_t */
+/* Milliseconds of searching charged to the current frame, and the frame the
+ * charge belongs to: when ADDR_GAME_CLOCK_MS moves, the total resets. Over
+ * ADDR_PATH_MAX_SEARCHES the entry refuses outright, so this is a per-frame
+ * TIME budget rather than a count of searches despite the name it earns from
+ * being compared against one. */
+#define ADDR_PATH_FRAME_MS       0x00654C34u  /* int32_t */
+#define ADDR_PATH_FRAME_STAMP    0x00654C38u  /* int32_t, ADDR_GAME_CLOCK_MS */
+#define ADDR_PATH_MAX_SEARCHES   0x00487890u  /* int32_t, ships 10 */
+#define ADDR_PATH_MAX_NODES      0x0048788Cu  /* int32_t, ships 10000, adapts */
+#define AM2_PATH_MIN_NODES       0xFA0        /* the adaptive floor, 4000 */
+#define AM2_PATH_MIN_ELAPSED     3            /* ms below which it does not adapt */
+/* The resume arm's three globals. NONE OF THEM HAS A WRITER -- see above. */
+#define ADDR_PATH_RESUME         0x00487828u  /* int32_t, ships -1 */
+#define ADDR_PATH_RESUME_GOAL    0x00554B80u  /* int32_t, reads 0 forever */
+#define ADDR_PATH_RESUME_HEAD    0x00523DC8u  /* int32_t, reads 0 forever */
 /* 0x00439D60, three callers -- both AI families' common steps and 0x00408210.
  * Reconstructed. */
 #define ADDR_PLAN_PATH_TO        0x00439D60u  /* int32(obj, uint32 *, int32) */
@@ -13290,13 +13367,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_TILE_NEIGHBOUR_COUNT 20     /* 0x00654BD8..0x00654C28 */
 /* THE BUILDER, and it fills four tables from one number. 0x00437B60 takes
  * ADDR_MAP_TILES_W and writes ADDR_TILE_NEIGHBOURS, ADDR_TILE_RING8,
- * ADDR_DECAL_RING8 and ADDR_TILE_RING4 in one run of straight-line stores
+ * ADDR_TILE_STEP8 and ADDR_TILE_RING4 in one run of straight-line stores
  * with no loop at all -- which is why three of those four tables had been
  * described as "built at map load" with no name for what builds them.
  *
  * The twenty neighbours are a 5x5 DIAMOND: three cells on the row two above,
  * five on the row above, four on its own row, five below and three two below.
- * The eight in ADDR_TILE_RING8 and ADDR_DECAL_RING8 are the same eight values
+ * The eight in ADDR_TILE_RING8 and ADDR_TILE_STEP8 are the same eight values
  * in the same order, and ADDR_TILE_RING4 is the four orthogonals. */
 #define ADDR_BUILD_TILE_DELTAS   0x00437B60u  /* void(void) */
 /* The four orthogonal deltas -- north, east, south, west, in that order. This
@@ -13382,14 +13459,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * one that will not be laid over anything already flagged. */
 #define ADDR_PLACE_GROUND_DECAL  0x00461950u  /* void(int32 x, int32 y, int32) */
 #define ADDR_DECAL_SPRITES       0x0048CBA0u  /* void *[6] */
-/* An EIGHT-entry ring of tile deltas, and the third such table in this image:
- * ADDR_TILE_NEIGHBOURS is the int32_t[20] at 0x00654BD8 and ADDR_TILE_RING8
- * the int32_t[17] at 0x0053C480. Both of those names were the obvious ones and
- * both were already taken -- the compiler caught each in turn, because the
- * grep-before-naming pass covered the names I invented and not the ones I
- * thought were free. Named for its one consumer, which is what distinguishes
- * it from the other two rings rather than anything in the data. */
-#define ADDR_DECAL_RING8         0x00523DA0u  /* int32[8] */
+/* THE EIGHT NEIGHBOUR STEPS, one copy: `{-1-w, -w, 1-w, -1, 1, w+1, w, w-1}`,
+ * built by BuildTileDeltas beside ADDR_TILE_RING8, which is the same eight
+ * values written TWICE so a walk starting anywhere in 0..7 needs no wrap test.
+ *
+ * IT WAS ADDR_DECAL_RING8 AND THAT NAME HAS EXPIRED. It was "named for its one
+ * consumer, which is what distinguishes it from the other two rings rather
+ * than anything in the data" -- an honest name at the time and wrong now: the
+ * decal placer at 0x00461984 is one of THREE touchers, the others being
+ * BuildTileDeltas, which writes it, and FindPath, which walks it as its A*
+ * neighbour set. A name taken from one consumer has to be re-read when a
+ * second arrives, and this is what that looks like.
+ *
+ * FindPath also confirms the BOUND independently, which the old comment could
+ * not: its loop runs `p = 0x00523DA0; p += 4; while (p < 0x00523DC0)`, so the
+ * table really is eight and ends where 0x00523DC8 begins. */
+#define ADDR_TILE_STEP8         0x00523DA0u  /* int32[8], raster order */
+#define AM2_TILE_STEP8_COUNT    8
 #define AM2_DECAL_VARIANTS       6
 /* The missile's own constants. The def record is 52 bytes and the file gives
  * LoadType5 an INDEX into the table rather than a pointer, which is the same
