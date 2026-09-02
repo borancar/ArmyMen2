@@ -131,4 +131,13 @@ void __cdecl SendVehicleEnter(void *vehicle, void *unit);
  * UNIT_OFF_FIRE_ACTIVE, so the send is the acknowledgement too. */
 void __cdecl SendVehicleFire(void *vehicle);
 
+/* 0x0045E480. The vehicle batch sender -- TellOneSlot compiled a second time
+ * for type 3, differing in the kind, the predicate and the appender. */
+void __cdecl SendVehicleUpdates(int32_t slot);
+
+/* 0x0045DAA0. Append one vehicle's DELTA update to a message buffer whose
+ * first word is its length. The sibling of AppendTroopState, sharing its
+ * design and not its code. */
+void __cdecl VehicleUpdateAppend(void *msg, void *obj);
+
 #endif /* AM2_ARMYMSG_H */

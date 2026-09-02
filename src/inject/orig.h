@@ -10288,6 +10288,10 @@ typedef struct {
  * lower bound and this kind are one value seen two ways. Spelled separately
  * because a message kind and a range bound are different claims. */
 #define AM2_MSG_TROOP_BATCH      0x16u
+/* The vehicle batch, kind 0x1B: RecvVehicle1B walks it, SendVehicleUpdates
+ * builds it, and the two are TellOneSlot and its receiver one type over. */
+#define AM2_MSG_VEHICLE_BATCH    0x1Bu
+#define ADDR_SEND_VEHICLE_UPDATES 0x0045E480u /* void(int32 slot) */
 /* 0x00453AB0, thiscall with one argument, `ret 4`. Grow a list of 260-byte
  * records by one and then SEARCH it for a key at +0x100, answering the index
  * or -1.

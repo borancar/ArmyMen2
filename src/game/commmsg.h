@@ -136,11 +136,6 @@ const void *__cdecl TroopSubParse(const void *rec, int32_t army);
  * message and 0 when the caller should queue it. */
 int32_t __cdecl FlowRecvMessage(void *nodev);
 
-/* 0x0045DAA0. Append one vehicle's DELTA update to a message buffer whose
- * first word is its length. The sibling of AppendTroopState, sharing its
- * design and not its code. */
-void __cdecl VehicleUpdateAppend(void *msg, void *obj);
-
 /* 0x0045E590. The vehicle message dispatcher: eleven table slots over seven
  * handlers, with kinds 0x20..0x23 sharing the unknown-message arm. */
 void __cdecl VehicleMsgRecv(void *msg, int32_t army);

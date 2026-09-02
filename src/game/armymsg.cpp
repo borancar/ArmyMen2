@@ -1596,6 +1596,12 @@ int armymsg_install(void)
                         "SendVehicleEnter", 2);
     rc |= patch_replace(ADDR_SEND_VEHICLE_FIRE, (const void *)SendVehicleFire,
                         "SendVehicleFire", 1);
+    rc |= patch_replace(ADDR_VEHICLE_UPDATE_APPEND,
+                        (const void *)VehicleUpdateAppend,
+                        "VehicleUpdateAppend", 2);
+    rc |= patch_replace(ADDR_SEND_VEHICLE_UPDATES,
+                        (const void *)SendVehicleUpdates,
+                        "SendVehicleUpdates", 1);
     return rc;
 }
 
@@ -1699,4 +1705,311 @@ void __cdecl SendVehicleFire(void *vehicle)
                 (uint32_t)*(const uint8_t *)(veh + OBJ_OFF_FIELD_530),
                 (int32_t)msg.x, (int32_t)msg.y, (int32_t)msg.z,
                 msg.target);
+}
+
+/* VehicleUpdateAppend -- original 0x0045DAA0, 1136 bytes, one caller. The
+ * program's own name for it is in the message it logs: "<--
+ * vehicleUpdateMessageAppend: id: %x, Change:%d%d%d, Pos/last (%d,%d)/(%d,%d),
+ * Facing/last:%d/%d, Gunfacing/last:%d/%d, intFacing/last:%d/%d,
+ * intGunfacing/last:%d/%d, action/last:%x/%x, seq:%d".
+ *
+ * The vehicle's answer to AppendTroopState above, and NOT the same function
+ * written twice: 344 instructions against 201, and normalised disassembly
+ * puts their similarity at 0.191 with only the seven-instruction epilogue in
+ * common. What they share is a DESIGN -- a (value, sequence) shadow pair per
+ * field, a fine interval and a coarse one, and the twelve-bit nibble merge --
+ * so this is a sibling to read alongside, not a body to factor out. Reading
+ * it is what exposed the length defect fixed in AppendTroopState.
+ *
+ * THREE FIELDS EACH SEND TWO BYTES, which is why six shadow pairs produce
+ * only three change bits: bit 31 carries the position AND the action byte,
+ * bit 30 the hull facing AND the turret facing, bit 29 both interpolation
+ * bytes. Counting the pairs predicts six bits and there are three.
+ *
+ * THE THIRD TEST IN EACH PAIR COMPARES ACROSS THE PAIRS, and it is systematic
+ * rather than a slip. The hull facing is checked against the INTFACING shadow
+ * at 0x5C4, and the turret facing against the INTGUN shadow at 0x5CC -- not
+ * against their own. Both arms do it, in the same shape, which is what argues
+ * against a copy-paste error: the receiver interpolates these, so the sender
+ * is asking whether the value it last interpolated from has drifted from the
+ * real one. Reproduced as written either way; the reading of WHY is offered,
+ * the behaviour is transcribed.
+ *
+ * The argument slot is reused, and mis-reading it is exactly what cost the
+ * sibling its length: at 0x0045DDE1 the cursor's START goes into `msg`'s slot,
+ * which the function has already copied into ebx, and 0x0045DEFD subtracts
+ * that -- so the buffer's length gains what THIS call wrote and not where the
+ * cursor happened to end. */
+void __cdecl VehicleUpdateAppend(void *msg, void *obj)
+{
+    uint8_t  *o = (uint8_t *)obj;
+    uint8_t  *m = (uint8_t *)msg;
+    uint8_t  *comm;
+    uint8_t  *out, *outStart;
+    uint32_t  seq, flags = 0, interval, coarse;
+    int32_t   dx, dz;
+    uint8_t   action;
+
+    if (*(const int16_t *)(o + OBJ_OFF_COUNT62) == 0)
+        return;
+
+    comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    seq = *(const uint32_t *)((const uint8_t *)FindPlayerById(
+              *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID))
+              + FLOW_OFF_SEQUENCE);
+    coarse = *(const uint32_t *)(comm + COMM_OFF_SEND_COARSE);
+
+    dx = *(const int16_t *)(o + OBJ_OFF_POS)
+         - *(const int16_t *)(o + VEHICLE_OFF_SENT_POS);
+    dz = *(const int16_t *)(o + OBJ_OFF_POS + 2)
+         - *(const int16_t *)(o + VEHICLE_OFF_SENT_POS + 2);
+    if (dx < 0) dx = -dx;
+    if (dz < 0) dz = -dz;
+
+    /* Sarge's vehicle is sent every frame it moves, the same forcing
+     * AppendTroopState applies to Sarge himself. */
+    interval = *(const uint32_t *)(comm + COMM_OFF_SEND_INTERVAL);
+    if (ListFirstField548(o) && interval > 1)
+        interval = 1;
+
+    {
+        uint32_t age = seq - *(const uint32_t *)(o + VEHICLE_OFF_SENT_POS_SEQ);
+
+        if (age >= interval
+            && (*(const int16_t *)(o + OBJ_OFF_POS)
+                    != *(const int16_t *)(o + VEHICLE_OFF_SENT_POS)
+                || *(const int16_t *)(o + OBJ_OFF_POS + 2)
+                    != *(const int16_t *)(o + VEHICLE_OFF_SENT_POS + 2)))
+            flags = 0x80000000u;
+        else if (age >= coarse && (dx > 8 || dz > 8))
+            flags = 0x80000000u;
+    }
+
+    /* +0x544 is the vehicle KIND -- the same field Step3Drive dispatches its
+     * engine sounds on -- with three state bits laid over the top. */
+    action = *(const uint8_t *)(o + 0x544u);
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_584))
+        action |= 0x80u;
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_588))
+        action |= 0x40u;
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_58C))
+        action |= 0x20u;
+
+    /* The action rides bit 31 with the position, and is tested ONLY against
+     * the coarse interval -- there is no fine arm for it. */
+    if (seq - *(const uint32_t *)(o + VEHICLE_OFF_SENT_ACTION_SEQ) >= coarse
+        && action != *(const uint8_t *)(o + VEHICLE_OFF_SENT_ACTION))
+        flags |= 0x80000000u;
+
+    {
+        uint32_t age = seq - *(const uint32_t *)(o + VEHICLE_OFF_SENT_FACING_SEQ);
+        uint8_t  f  = *(const uint8_t *)(o + OBJ_OFF_FACING);
+        uint8_t  lf = *(const uint8_t *)(o + VEHICLE_OFF_SENT_FACING);
+
+        if ((age >= interval && f != lf)
+            || (age >= coarse && (((uint32_t)lf ^ (uint32_t)f) & 0xFFFFFFF0u))
+            || (age >= interval
+                && f != *(const uint8_t *)(o + VEHICLE_OFF_SENT_INTFACING)))
+            flags |= 0x40000000u;
+    }
+
+    {
+        uint32_t age = seq - *(const uint32_t *)(o + VEHICLE_OFF_SENT_GUN_SEQ);
+        uint8_t  g  = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
+        uint8_t  lg = *(const uint8_t *)(o + VEHICLE_OFF_SENT_GUN);
+
+        if ((age >= interval && g != lg)
+            || (age >= coarse && (((uint32_t)lg ^ (uint32_t)g) & 0xFFFFFFF0u))
+            || (age >= interval
+                && g != *(const uint8_t *)(o + VEHICLE_OFF_SENT_INTGUN)))
+            flags |= 0x40000000u;
+    }
+
+    {
+        uint32_t age = seq - *(const uint32_t *)
+                           (o + VEHICLE_OFF_SENT_INTFACING_SEQ);
+        uint8_t  v  = *(const uint8_t *)(o + OBJ_OFF_FIELD_578);
+        uint8_t  lv = *(const uint8_t *)(o + VEHICLE_OFF_SENT_INTFACING);
+
+        if ((age >= interval && v != lv)
+            || (age >= coarse && (((uint32_t)lv ^ (uint32_t)v) & 0xFFFFFFF0u)))
+            flags |= 0x20000000u;
+    }
+
+    {
+        uint32_t age = seq - *(const uint32_t *)
+                           (o + VEHICLE_OFF_SENT_INTGUN_SEQ);
+        uint8_t  v  = *(const uint8_t *)(o + OBJ_OFF_FACING_COPY2);
+        uint8_t  lv = *(const uint8_t *)(o + VEHICLE_OFF_SENT_INTGUN);
+
+        if ((age >= interval && v != lv)
+            || (age >= coarse && (((uint32_t)lv ^ (uint32_t)v) & 0xFFFFFFF0u)))
+            flags |= 0x20000000u;
+    }
+
+    if (!flags)
+        return;
+
+    /* COMM_OFF_VERBOSE gates it, and unlike the bare call in Step3Drive this
+     * one carries its format string, so it is reproduced. */
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(
+                    ADDR_STR_VEHICLE_UPDATE_APPEND),
+            *(const uint32_t *)(o + OBJ_OFF_UID),
+            (flags >> 31) & 1u, (flags >> 30) & 1u, (flags >> 29) & 1u,
+            *(const int16_t *)(o + OBJ_OFF_POS),
+            *(const int16_t *)(o + OBJ_OFF_POS + 2),
+            *(const int16_t *)(o + VEHICLE_OFF_SENT_POS),
+            *(const int16_t *)(o + VEHICLE_OFF_SENT_POS + 2),
+            *(const uint8_t *)(o + OBJ_OFF_FACING),
+            *(const uint8_t *)(o + VEHICLE_OFF_SENT_FACING),
+            *(const uint8_t *)(o + OBJ_OFF_FIELD_530),
+            *(const uint8_t *)(o + VEHICLE_OFF_SENT_GUN),
+            *(const uint8_t *)(o + OBJ_OFF_FIELD_578),
+            *(const uint8_t *)(o + VEHICLE_OFF_SENT_INTFACING),
+            *(const uint8_t *)(o + OBJ_OFF_FACING_COPY2),
+            *(const uint8_t *)(o + VEHICLE_OFF_SENT_INTGUN),
+            (uint32_t)action,
+            (uint32_t)*(const uint8_t *)(o + VEHICLE_OFF_SENT_ACTION),
+            seq);
+
+    out = m + *(const uint16_t *)m;
+    outStart = out;
+
+    {
+        uint32_t head = (UidOnWire(*(const uint32_t *)(o + OBJ_OFF_UID))
+                         & 0x1FFFFFFFu) | flags;
+
+        *out++ = (uint8_t)(head >> 24);
+        *out++ = (uint8_t)(head >> 16);
+        *out++ = (uint8_t)(head >> 8);
+        *out++ = (uint8_t)head;
+    }
+
+    if (flags & 0x80000000u) {
+        int16_t x, z;
+
+        /* Clamped IN THE OBJECT, not just on the wire -- the same as the
+         * trooper's, and the reason twelve bits is enough below. */
+        if (*(const int16_t *)(o + OBJ_OFF_POS) > 0xFFF)
+            *(int16_t *)(o + OBJ_OFF_POS) = 0xFFF;
+        if (*(const int16_t *)(o + OBJ_OFF_POS + 2) > 0xFFF)
+            *(int16_t *)(o + OBJ_OFF_POS + 2) = 0xFFF;
+
+        x = *(const int16_t *)(o + OBJ_OFF_POS);
+        z = *(const int16_t *)(o + OBJ_OFF_POS + 2);
+        *out++ = (uint8_t)x;
+        *out++ = (uint8_t)z;
+        *out++ = (uint8_t)(((((uint8_t)(x >> 8)) ^ ((uint8_t)(z >> 4))) & 0x0F)
+                           ^ ((uint8_t)(z >> 4)));
+
+        *(uint32_t *)(o + VEHICLE_OFF_SENT_POS) =
+            *(const uint32_t *)(o + OBJ_OFF_POS);
+        *(uint32_t *)(o + VEHICLE_OFF_SENT_POS_SEQ) = seq;
+
+        *out++ = action;
+        *(uint8_t *)(o + VEHICLE_OFF_SENT_ACTION) = action;
+        *(uint32_t *)(o + VEHICLE_OFF_SENT_ACTION_SEQ) = seq;
+    }
+
+    if (flags & 0x40000000u) {
+        *out++ = *(const uint8_t *)(o + OBJ_OFF_FACING);
+        *(uint8_t *)(o + VEHICLE_OFF_SENT_FACING) =
+            *(const uint8_t *)(o + OBJ_OFF_FACING);
+        *(uint32_t *)(o + VEHICLE_OFF_SENT_FACING_SEQ) = seq;
+
+        *out++ = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
+        *(uint8_t *)(o + VEHICLE_OFF_SENT_GUN) =
+            *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
+        *(uint32_t *)(o + VEHICLE_OFF_SENT_GUN_SEQ) = seq;
+    }
+
+    if (flags & 0x20000000u) {
+        *out++ = *(const uint8_t *)(o + OBJ_OFF_FIELD_578);
+        *(uint8_t *)(o + VEHICLE_OFF_SENT_INTFACING) =
+            *(const uint8_t *)(o + OBJ_OFF_FIELD_578);
+        *(uint32_t *)(o + VEHICLE_OFF_SENT_INTFACING_SEQ) = seq;
+
+        *out++ = *(const uint8_t *)(o + OBJ_OFF_FACING_COPY2);
+        *(uint8_t *)(o + VEHICLE_OFF_SENT_INTGUN) =
+            *(const uint8_t *)(o + OBJ_OFF_FACING_COPY2);
+        *(uint32_t *)(o + VEHICLE_OFF_SENT_INTGUN_SEQ) = seq;
+    }
+
+    *(uint16_t *)m += (uint16_t)(out - outStart);
+}
+
+/* SendVehicleUpdates -- original 0x0045E480, one caller. The vehicle batch
+ * sender: walk one comm slot's object list, append a delta for every live
+ * vehicle, and flush whenever the next record might not fit.
+ *
+ * IT IS TellOneSlot COMPILED A SECOND TIME. Sixty-four instructions each,
+ * instruction for instruction, and normalising the immediates makes them
+ * identical -- similarity 1.000. Diffing the operands gives exactly THREE
+ * real differences, and every other line that moved is a branch target
+ * relocated by the address change:
+ *
+ *     kind        AM2_MSG_TROOP_BATCH (0x16)  ->  0x1B
+ *     predicate   ObjIsType2                  ->  ObjIsType3
+ *     appender    AppendTroopState            ->  VehicleUpdateAppend
+ *
+ * DELIBERATELY NOT MERGED. A helper taking (slot, kind, predicate, appender)
+ * would be faithful today -- the three differences are enumerated above and
+ * there is provably nothing else -- and this project has already paid for
+ * exactly that tidiness once, in VehicleBlockWeight, where two loops that
+ * read as one differed in five ways and a merge would have lost all five.
+ * The image has two functions; so does this. What the diff buys is not a
+ * factoring, it is the certainty that the buffer size, the flush headroom,
+ * the uid latch and the null-object arm need no separate reading.
+ *
+ * THE SIZE CONSTANTS ARE SHARED AND THAT IS THE IMAGE'S DOING, not ours:
+ * both use a 0x12C buffer and the same ten bytes of headroom, so
+ * AM2_TROOP_BATCH_MAX and _SLACK are reused rather than duplicated under a
+ * vehicle name. Two concepts that genuinely are one number.
+ *
+ * The list pointer is RE-READ every iteration, which is the original's and is
+ * why it is written that way here: appending can register or free objects, so
+ * the count is not loop-invariant. Reading it once would be a faster function
+ * and a different one. */
+void __cdecl SendVehicleUpdates(int32_t slot)
+{
+    uint8_t         msg[AM2_TROOP_BATCH_MAX];
+    AM2_ArmyMsgHdr *h = (AM2_ArmyMsgHdr *)msg;
+    const uint8_t  *list;
+    int32_t         i = 0;
+
+    h->len  = (uint16_t)sizeof(AM2_ArmyMsgHdr);
+    h->kind = AM2_MSG_VEHICLE_BATCH;
+    h->uid  = 0;
+
+    list = (const uint8_t *)
+        ((void *const *)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
+    if (*(const int32_t *)(list + LIST_OFF_COUNT) <= 0)
+        return;
+
+    do {
+        uint8_t *obj = (uint8_t *)LookupByUID(
+            (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
+
+        if (obj) {
+            if (!(*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+                && ObjIsType3((const AM2_Object *)obj)) {
+                if (h->uid == 0)
+                    h->uid = *(const uint32_t *)(obj + OBJ_OFF_UID);
+                VehicleUpdateAppend(msg, obj);
+            }
+            if ((uint32_t)h->len + AM2_TROOP_BATCH_SLACK
+                    > AM2_TROOP_BATCH_MAX) {
+                ArmyMessageSend(msg);
+                h->len = (uint16_t)sizeof(AM2_ArmyMsgHdr);
+            }
+        }
+
+        list = (const uint8_t *)
+            ((void *const *)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
+        i++;
+    } while (i < *(const int32_t *)(list + LIST_OFF_COUNT));
+
+    if (h->len != sizeof(AM2_ArmyMsgHdr))
+        ArmyMessageSend(msg);
 }
