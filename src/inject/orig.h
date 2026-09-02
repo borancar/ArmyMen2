@@ -7938,6 +7938,20 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
+ * `fireweapon` REFUSES UNLESS THE ACTION NAMES NO POINT, by three separate
+ * tests: act->xvar must not be positive, act->relative must be zero, and
+ * act->u.pos.x -- a WORD, tested with `cmp word ptr [esi+0x20], 0` -- must be
+ * zero too. Only then does it fire at an object. Writing that as one
+ * "has a point" predicate over the packed dword would test the wrong width
+ * on the third and accept actions the original refuses.
+ *
+ * Its four arguments are three ResolveUid calls and act->n0, and they are not
+ * in push order: FireWeaponAtObject(weaponUid, unitUid, heading, targetUid)
+ * takes the SUBJECT resolved with me=0 as the weapon, the ARMY field resolved
+ * with the owner as the unit, and the TARGET as the target. The me=0 on one
+ * of three otherwise identical calls is the kind of thing only the header's
+ * parameter names make readable.
+ *
  * CODES 0x18 AND 0x2A ARE THE SAME PAIR, and 0x18 has a tail. Both choose
  * between EvtArmySetField(army, subject, n0) and
  * EvtSetAiMode(ResolveUid(subject, owner), n0) on act->extra -- so extra
