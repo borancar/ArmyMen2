@@ -14354,6 +14354,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * the test did not, which is the same lesson this file records for naming a
  * global: prefer the writer.
  *
+ * AND THE MAP FILE ANSWERS QUESTIONS THE GAME CANNOT BE ASKED CHEAPLY.
+ * bootcamp.AMM's OLAY chunk declares 1,587 objects, 8 fields and 92
+ * field-described records -- and its longest SCRI string is ZERO BYTES. So
+ * the script-name path never runs on this map, which kills the standing
+ * suspicion that an unbounded read into a fixed buffer was smashing the
+ * stack. One offline parse, no game, no A/B; the same class of instrument as
+ * tools/ammcheck.py and it should have been the first thing tried rather than
+ * the fifth.
+ *
  * THE PEEK COMMAND IS WHAT LED HERE. `drive.sh ctl "peek
  * ADDR N"` dumps N dwords and answers under AM2_NOPATCH=1, so the original's
  * map block can be read after a real load with no probe code in it. Over the
