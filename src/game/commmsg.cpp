@@ -1843,7 +1843,6 @@ typedef void (__cdecl *AM2_VehMsgFn)(void *msg);
 typedef void (__cdecl *AM2_VehMsgArmyFn)(void *msg, int32_t army);
 
 #define orig_recv_vehicle_1c ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_1C)
-#define orig_recv_vehicle_1d ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_1D)
 #define orig_recv_vehicle_1f ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_1F)
 
 void __cdecl VehicleMsgRecv(void *msg, int32_t army)
@@ -1853,7 +1852,7 @@ void __cdecl VehicleMsgRecv(void *msg, int32_t army)
     switch (kind) {
     case 0x1B: RecvVehicle1B(msg, army);        return;
     case 0x1C: orig_recv_vehicle_1c(msg);       return;
-    case 0x1D: orig_recv_vehicle_1d(msg);       return;
+    case 0x1D: RecvVehicle1D(msg);              return;
     case 0x1E: RecvVehicle1E(msg);              return;
     case 0x1F: orig_recv_vehicle_1f(msg);       return;
     case 0x24: RecvVehicle24(msg);              return;
@@ -2857,6 +2856,8 @@ int commmsg_install(void)
     patch_replace(ADDR_VEHICLE_UPDATE_APPLY,
                   (const void *)VehicleUpdateApply,
                   "VehicleUpdateApply", 2);
+    patch_replace(ADDR_RECV_VEHICLE_1D, (const void *)RecvVehicle1D,
+                  "RecvVehicle1D", 1);
     patch_replace(ADDR_RECV_VEHICLE_1E, (const void *)RecvVehicle1E,
                   "RecvVehicle1E", 1);
     patch_replace(ADDR_RECV_VEHICLE_24, (const void *)RecvVehicle24,
@@ -3570,4 +3571,130 @@ uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army)
                 *(const int32_t *)(o + 0x58Cu));
 
     return at;
+}
+
+/* Still the image's; region.cpp reaches it the same way. The argument
+ * identity is orig.h's, fixed by the sender's own log push order -- and the
+ * call below independently agrees with it. */
+typedef void (__cdecl *AM2_SendVehWantFn)(void *vehicle, void *item,
+                                          int32_t request, int8_t slot,
+                                          int32_t quant);
+#define SendVehicleWantItem \
+    ((AM2_SendVehWantFn)(uintptr_t)ADDR_SEND_VEHICLE_WANT_ITEM)
+
+/* RecvVehicle1D -- original 0x0045E630, one caller. Message kind 0x1D, and it
+ * names itself: "-->Vehicle Want Item Received: Vehicle: %x, item: %x,
+ * request: %d, slot: %d, quant: %d". The receive half of
+ * SendVehicleWantItem, which this project named earlier today off that same
+ * sender's log.
+ *
+ * THE REQUEST FIELD SPLITS THE FUNCTION BY ROLE, and the split is the
+ * protocol. COMM_OFF_IS_HOST at +0x3D8 decides which half of the message set a
+ * client will even look at: a HOST handles requests 0 and 1 -- the WANTs --
+ * and returns at once on 2 and 3; a CLIENT does the opposite. So a client
+ * asks, the host decides, and the host's answer comes back as a DO. Reading
+ * the four arms without that gate suggests every peer runs all four.
+ *
+ * ONLY ONE OF THE FOUR ARMS DOES ANYTHING. Requests 1, 2 and 3 are a log
+ * apiece and nothing else -- and the logger is a bare `ret` in this retail
+ * image, so on this build they are empty. Request 0, WANT_PICKUP, is the
+ * whole function: it grants ammo and sends the DO back.
+ *
+ * THE GRANT IS CLAMPED AND DEDUCTED IN ONE STEP. The asker names a quantity;
+ * the host gives it `min(asked, ITEM_OFF_AMMO)` and takes exactly that much
+ * off the item, so two clients racing for one pickup cannot both be paid.
+ * The reply reuses SendVehicleWantItem with request 2, and THAT CALL
+ * INDEPENDENTLY CONFIRMS the sender's argument identity: it pushes vehicle,
+ * item, 2, slot, quant in the order orig.h records from the log's own push
+ * sequence, which was derived from the other end entirely.
+ *
+ * The pickup is refused unless the item's army is AM2_ARMY_NEUTRAL -- an
+ * item on the ground belongs to nobody, and one still owned cannot be taken.
+ *
+ * Every Log here carries its format string, so all of them are reproduced;
+ * that is the distinction Step3Drive's header draws against the two-argument
+ * call to the same address. */
+void __cdecl RecvVehicle1D(void *msg)
+{
+    const uint8_t *m = (const uint8_t *)msg;
+    uint8_t       *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    uint8_t       *vehicle;
+    uint8_t       *item;
+    int32_t        request;
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_VEH_WANT_ITEM_RECV),
+                UidOnWire(*(const uint32_t *)(m + 4)),
+                UidOnWire(*(const uint32_t *)(m + 8)),
+                *(const int32_t *)(m + 0x10),
+                *(const int32_t *)(m + 0x18),
+                *(const int32_t *)(m + 0x14));
+
+    request = *(const int32_t *)(m + 0x10);
+    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST) != 0) {
+        if (request == 2 || request == 3)
+            return;
+    } else {
+        if (request == 0 || request == 1)
+            return;
+    }
+
+    vehicle = (uint8_t *)ObjByUidAlias(UidOnWire(*(const uint32_t *)(m + 4)));
+    if (vehicle == 0)
+        return;
+
+    /* The two DO arms are gated a second time, on the vehicle's own army --
+     * a peer only acts on a grant it is entitled to see. */
+    if ((request == 2 || request == 3)
+        && !CommMustBroadcast(comm,
+                              (int16_t)*(const int8_t *)(vehicle + OBJ_OFF_ARMY)))
+        return;
+
+    item = (uint8_t *)LookupByUID(UidOnWire(*(const uint32_t *)(m + 8)));
+    if (item == 0)
+        return;
+    if (!ObjIsType4((const AM2_Object *)item))
+        return;
+
+    if (request == 2) {
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_TELL_PICKUP),
+                    *(const int32_t *)(m + 0x14));
+        return;
+    }
+
+    if (request == 3) {
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_TELL_DROP),
+                    *(const int32_t *)(m + 0x14));
+        /* The answer is discarded -- the original calls it and drops it. */
+        (void)CommMustBroadcast(comm,
+                  (int16_t)*(const int8_t *)(vehicle + OBJ_OFF_ARMY));
+        return;
+    }
+
+    if (request == 0) {
+        if (*(const uint8_t *)(item + OBJ_OFF_ARMY) == AM2_ARMY_NEUTRAL) {
+            int32_t have    = *(const int32_t *)(item + ITEM_OFF_AMMO);
+            int32_t granted = *(const int32_t *)(m + 0x14);
+
+            if (granted >= have)
+                granted = have;
+            *(int32_t *)(item + ITEM_OFF_AMMO) = have - granted;
+
+            SendVehicleWantItem(vehicle, item, 2,
+                                (int8_t)*(const uint8_t *)(m + 0x18), granted);
+            am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_REQ_PICKUP_OK),
+                    granted);
+        } else {
+            am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_REQ_PICKUP_DENY));
+        }
+        return;
+    }
+
+    if (request == 1) {
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_REQ_DROP),
+                    *(const int32_t *)(m + 0x14));
+    }
 }

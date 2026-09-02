@@ -160,4 +160,8 @@ void __cdecl RecvVehicle24(void *msg);
  * which is what lets RecvVehicle1B find the next one. */
 uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army);
 
+/* 0x0045E630. Kind 0x1D: the host grants or refuses a vehicle's request to
+ * pick an item up, and tells the asker. Three of its four arms are a log. */
+void __cdecl RecvVehicle1D(void *msg);
+
 #endif
