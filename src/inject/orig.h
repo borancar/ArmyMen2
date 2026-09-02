@@ -11336,6 +11336,40 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Reconstructed; 151 calls on a driven Boot Camp mission, matching
  * ADDR_ADD_RECORD_LIST exactly. */
 #define ADDR_MAKE_AAI_RECORD     0x004344A0u  /* void *(type,key,slot,4 more) */
+/* 0x00434700, 1,120 bytes, one caller. READ IN PART AND NOT RECONSTRUCTED,
+ * recorded the way LoadType2, CreateTrooper, CreateVehicle, RegionFindPath and
+ * 0x00459DA0 were -- every one of which went in quickly once the reading was
+ * finished rather than being restarted from scratch.
+ *
+ * WHAT IS SETTLED. It calls FreeAaiTables and then builds SIX built-in AAI
+ * records, each by the same shape:
+ *
+ *     spr  = PreloadSprite(set, index, frame, 0x1000, addref);
+ *     rec  = { spr, int16, int16, dword };        -- AM2_LIST_RECORD_BYTES
+ *     g_k  = KEY;                                 -- one global per record
+ *     list = MakeRecordList(1, &rec, (void *)KEY);
+ *     AddRecordList(list);
+ *     RectSet(&r, l, t, right, bottom);
+ *     AddAaiRecord(MakeAaiRecord(-1, g_k, (int32_t)list,
+ *                                r.left, r.top, r.right, r.bottom));
+ *
+ * The rect reaches MakeAaiRecord as its last FOUR arguments -- the compiler
+ * writes them into reserved stack above a pushed `list` rather than pushing
+ * them, which is why the call looks like three arguments in the disassembly and
+ * is seven. objtype.h already declares it that way.
+ *
+ * Three of the six keys are 0x980000, 0x980100 and 0x980080, each also stored
+ * into a global of its own -- 0x00516158, 0x00516168, 0x0051615C.
+ *
+ * WHAT IS NOT: the six blocks are NOT uniform. Diffing them shows different
+ * shapes rather than one shape with different constants -- block 3 preloads
+ * from set 0x2D and blocks 4 and 5 from 0x1D, and the later ones interleave
+ * their stack writes differently. Transcribing them needs esp tracked through
+ * about 280 instructions across by-value struct passing, and an attempt at it
+ * did not come out self-consistent: the count of pushes before one `add esp,
+ * 0x28` came to nine where the cleanup says ten. That is exactly the kind of
+ * error that is silent, so it is left here rather than guessed at. */
+#define ADDR_BUILD_AAI_BUILTINS  0x00434700u  /* void(void) */
 #define AM2_AAI_RECORD_BYTES     0x40u
 #define AAIREC_OFF_TYPE          0x00u   /* 0x2E when the argument is negative */
 #define AAIREC_OFF_KEY           0x08u

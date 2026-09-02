@@ -377,6 +377,28 @@ target apart, and invisible to anything but a diff.
 So these want writing as calls to `ArmyAlliedWithObj` with each hoisted guard
 spelled out, rather than as seven transcriptions of one body.
 
+## Next: 0x00434700 is read in part and not written, and why
+
+The smallest remaining real function, 1,120 bytes. It calls `FreeAaiTables` and
+then builds SIX built-in AAI records, each as
+`PreloadSprite` -> a 12-byte list record -> `MakeRecordList` -> `AddRecordList`
+-> `RectSet` -> `MakeAaiRecord` -> `AddAaiRecord`. The rect reaches
+`MakeAaiRecord` as its last FOUR arguments -- the compiler writes them into
+reserved stack above a pushed `list` rather than pushing them, so the call looks
+like three arguments and is seven. Three of the six keys are 0x980000,
+0x980100 and 0x980080, each also stored into a global of its own.
+
+**The six blocks are NOT uniform** -- diffing shows different shapes rather than
+one shape with different constants, and transcribing them needs `esp` tracked
+through about 280 instructions across by-value struct passing.
+
+**It is not written because an attempt at that tracking did not come out
+self-consistent**: the pushes before one `add esp, 0x28` counted to nine where
+the cleanup says ten. That discrepancy is small, silent if guessed past, and
+would land as a wrong constant in a table nothing here executes -- so it is
+recorded in `orig.h` and left. Same standing as `0x00459DA0` two sessions ago,
+which went in cleanly the moment its reading was finished.
+
 ## And the split-aware figure is a lower bound too
 
 `PointerPickRepair` went in and the split-aware count did **not move** -- it
