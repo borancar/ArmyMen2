@@ -348,5 +348,15 @@ void __cdecl FreeSpriteGroupsC(void);
  * on a NULL grid where the other two frees behave two other ways. */
 void __cdecl LoadSpriteGrid(void);
 void __cdecl FreeSpriteGrid(void);
+/* 0x00462DC0 and 0x00462E50. The decal sprites: a flat array at a fixed
+ * sprite index. The loader also centres each sprite's hotspot -- and sets
+ * hotY from the WIDTH, which is the original's and is reproduced. */
+void __cdecl LoadDecalSprites(void);
+void __cdecl FreeDecalSprites(void);
+/* 0x00462EA0 and 0x00462F10. The seq kind-5 sprites, same shape at index
+ * 0x1A4. The releaser's bound is a literal 4 where the loader reads the
+ * count; the count has no writer and reads 4, so they agree permanently. */
+void __cdecl LoadSeqSprites5(void);
+void __cdecl FreeSeqSprites5(void);
 
 #endif /* AM2_SPRITE_H */

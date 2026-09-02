@@ -6673,6 +6673,26 @@ typedef struct {
 #define ADDR_SPRITE_GRID_COLS     0x0048CA3Cu  /* int32_t */
 #define ADDR_SPRITE_GRID          0x0048CA40u  /* AM2_Sprite *[rows * cols] */
 #define AM2_SPRITE_GRID_BASE      0x12C        /* index = this + row */
+/* The fifth and sixth subsystems are flat arrays with a FIXED sprite index,
+ * varying the frame -- 0x190 for the decals and 0x1A4 for the seq kind-5
+ * sprites -- where the first four vary the index and hold it in a record. */
+#define ADDR_DECAL_SPRITE_COUNT   0x0048CBA4u  /* int32_t, no writer */
+#define AM2_DECAL_SPRITE_INDEX    0x190
+#define AM2_SPRITE_FLAGS_FLAT     0x200        /* not 0x1080 or 0x1000 */
+#define ADDR_LOAD_DECAL_SPRITES   0x00462DC0u  /* void(void) */
+#define ADDR_FREE_DECAL_SPRITES   0x00462E50u  /* void(void) */
+/* THIS COUNT HAS NO WRITER ANYWHERE and reads 4 in the image, which is why
+ * the releaser can bound itself with a literal 0x10 -- four pointers -- where
+ * the loader reads the global on every iteration. That looked like an
+ * asymmetry worth reproducing carefully until a decoded scan showed zero
+ * stores and four loads, all four inside the loader. A global with no writer
+ * is a constant, and an apparent inconsistency against one is not a defect.
+ * Same scan CLAUDE.md uses to prove SendGameMsg's packet-loss arms dead,
+ * reaching the opposite conclusion. */
+#define ADDR_SEQ_SPRITE_5_COUNT   0x0048CBACu  /* int32_t, no writer, reads 4 */
+#define AM2_SEQ_SPRITE_5_INDEX    0x1A4
+#define ADDR_LOAD_SEQ_SPRITES_5   0x00462EA0u  /* void(void) */
+#define ADDR_FREE_SEQ_SPRITES_5   0x00462F10u  /* void(void) */
 #define ADDR_LOAD_SPRITE_GRID     0x00462CB0u  /* void(void) */
 #define ADDR_FREE_SPRITE_GRID     0x00462D50u  /* void(void) */
 #define ADDR_SPRITE_GROUPS_C_END  ADDR_SPRITE_GRID_ROWS

@@ -862,6 +862,18 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
     rc |= patch_replace(ADDR_FREE_SPRITE_GRID,
                         (const void *)FreeSpriteGrid,
                         "FreeSpriteGrid", 1);
+    rc |= patch_replace(ADDR_LOAD_DECAL_SPRITES,
+                        (const void *)LoadDecalSprites,
+                        "LoadDecalSprites", 1);
+    rc |= patch_replace(ADDR_FREE_DECAL_SPRITES,
+                        (const void *)FreeDecalSprites,
+                        "FreeDecalSprites", 1);
+    rc |= patch_replace(ADDR_LOAD_SEQ_SPRITES_5,
+                        (const void *)LoadSeqSprites5,
+                        "LoadSeqSprites5", 1);
+    rc |= patch_replace(ADDR_FREE_SEQ_SPRITES_5,
+                        (const void *)FreeSeqSprites5,
+                        "FreeSeqSprites5", 1);
     return rc;
 }
 
@@ -2546,4 +2558,90 @@ void __cdecl FreeSpriteGrid(void)
 
     am2_free(grid);
     *(void **)(uintptr_t)ADDR_SPRITE_GRID = 0;
+}
+
+/* 0x00462DC0 and 0x00462E50. The decal sprites: one flat array, a FIXED
+ * sprite index with the frame varying, and the only loader in the family that
+ * writes back into the sprites it loads.
+ *
+ * hotY IS SET FROM THE WIDTH. Both stores read bounds.right at +0x1C, where
+ * centring would take hotY from bounds.bottom at +0x20 -- one field along and
+ * never read. That is the original's, and it goes in as the original's, the
+ * same way LockSurface's uninitialised descriptor does: correcting it would
+ * fail the A/B for being right.
+ *
+ * The divide is `cdq; sub; sar` -- SIGNED, so a negative bound rounds toward
+ * zero where a shift would not. */
+void __cdecl LoadDecalSprites(void)
+{
+    int32_t n = *(const int32_t *)(uintptr_t)ADDR_DECAL_SPRITE_COUNT;
+    AM2_Sprite **slots;
+    int32_t i;
+
+    slots = (AM2_Sprite **)am2_malloc((size_t)n * sizeof(AM2_Sprite *));
+    *(void **)(uintptr_t)ADDR_DECAL_SPRITES = slots;
+    memset(slots, 0, (size_t)n * sizeof(AM2_Sprite *));
+
+    for (i = 0; i < n; i++) {
+        AM2_Sprite *spr = PreloadSprite(AM2_SPRITEGRP_SET,
+                                        AM2_DECAL_SPRITE_INDEX, i,
+                                        AM2_SPRITE_FLAGS_FLAT, 1);
+        slots[i] = spr;
+        if (spr != 0) {
+            spr->hotX = (int16_t)(spr->bounds.right / 2);
+            spr->hotY = (int16_t)(spr->bounds.right / 2);
+        }
+    }
+}
+
+void __cdecl FreeDecalSprites(void)
+{
+    AM2_Sprite **slots = *(AM2_Sprite ***)(uintptr_t)ADDR_DECAL_SPRITES;
+    int32_t n, i;
+
+    if (slots == 0)
+        return;
+
+    n = *(const int32_t *)(uintptr_t)ADDR_DECAL_SPRITE_COUNT;
+    for (i = 0; i < n; i++)
+        ReleaseSprite(slots[i]);
+    am2_free(slots);
+    *(void **)(uintptr_t)ADDR_DECAL_SPRITES = 0;
+}
+
+/* 0x00462EA0 and 0x00462F10. The seq kind-5 sprites, the same flat shape at
+ * index 0x1A4 and with no write-back.
+ *
+ * THE RELEASER'S BOUND IS A LITERAL where the loader reads the global: it
+ * walks four pointers with `cmp esi, 0x10`. That is not an inconsistency --
+ * ADDR_SEQ_SPRITE_5_COUNT has NO WRITER in the image and reads 4, so the two
+ * agree permanently. Written with the loop bound spelled the way each half
+ * spells it, because the two are different facts that happen to coincide. */
+void __cdecl LoadSeqSprites5(void)
+{
+    int32_t n = *(const int32_t *)(uintptr_t)ADDR_SEQ_SPRITE_5_COUNT;
+    AM2_Sprite **slots;
+    int32_t i;
+
+    slots = (AM2_Sprite **)am2_malloc((size_t)n * sizeof(AM2_Sprite *));
+    *(void **)(uintptr_t)ADDR_SEQ_SPRITES_5 = slots;
+    memset(slots, 0, (size_t)n * sizeof(AM2_Sprite *));
+
+    for (i = 0; i < n; i++)
+        slots[i] = PreloadSprite(AM2_SPRITEGRP_SET, AM2_SEQ_SPRITE_5_INDEX, i,
+                                 AM2_SPRITE_FLAGS_FLAT, 1);
+}
+
+void __cdecl FreeSeqSprites5(void)
+{
+    AM2_Sprite **slots = *(AM2_Sprite ***)(uintptr_t)ADDR_SEQ_SPRITES_5;
+    int32_t i;
+
+    if (slots == 0)
+        return;
+
+    for (i = 0; i < 4; i++)          /* the original's literal, not the count */
+        ReleaseSprite(slots[i]);
+    am2_free(slots);
+    *(void **)(uintptr_t)ADDR_SEQ_SPRITES_5 = 0;
 }
