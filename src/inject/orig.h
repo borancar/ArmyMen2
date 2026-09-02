@@ -14307,6 +14307,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * NUMB, GRUP and SCRI -- GRUP being a second tag with no arm, read and
  * dropped like RESV.
  *
+ * HOW TO PICK THIS UP CHEAPLY, because the hand-driven probe loop is what
+ * made it expensive. `tools/drive.sh start` plus a `point.py` click on BOOT
+ * CAMP reaches the mission only sometimes -- two runs in a row sat on the
+ * title screen with the click reporting success, and a title-screen run logs
+ * the same "Object AAI record not found" lines a real load does, so the two
+ * are indistinguishable from the log tail alone. Use `tools/ab.sh bootcamp`,
+ * which drives reliably, and read $WORK/bootcamp-recon.log; or check
+ * ADDR_GAME_CLOCK_MS is ticking before believing any probe, which this file
+ * already recommends for exactly this reason.
+ *
  * The transcription is kept out of the tree rather than installed while
  * broken. The chunk loop and the layer defaulting now both complete;
  * what still fails is the OBJECT loop, somewhere between its 200th and 400th
