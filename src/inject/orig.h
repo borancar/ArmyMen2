@@ -9704,6 +9704,19 @@ typedef struct {
  * ConsiderSighting's callers and not about this function. Naming it either
  * way now would record a base as a fact. */
 #define ADDR_STEP3_45C8D0        0x0045C8D0u  /* void(obj, out) */
+/* 0x0045CAB0, one caller (ADDR_STEP3_45CB30). Turn the gap between the record's
+ * wanted facing and the vehicle's current one into a turn STATE: 7 one way, 6
+ * the other, and no write at all inside the tolerance. Those two values are
+ * the ones region.cpp already documents this record's state taking.
+ *
+ * THE TOLERANCE IS 16 UNLESS A TURN KEY IS HELD, when it is 1 -- so a player
+ * steering manually gets a response to a one-eighth difference where the AI
+ * needs a sixteenth of the circle. Both ActionKeyDown probes must be read:
+ * either key tightens it, and testing only the first leaves the other key
+ * feeling sluggish in a way no A/B here could see. */
+#define ADDR_STEP3_TURN_STATE    0x0045CAB0u  /* void(obj, rec) */
+#define AM2_STEP3_TURN_TOL_KEY   1
+#define AM2_STEP3_TURN_TOL_IDLE  0x10
 #define ADDR_STEP3_45CB30        0x0045CB30u  /* void(obj, out) */
 #define OBJ_OFF_FIELD_59C        0x59Cu  /* gates the record init, once */
 /* The destruction sounds, one per vehicle kind. Kind 4 makes none -- it goes

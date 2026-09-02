@@ -9063,6 +9063,9 @@ int region_install(void)
     rc |= patch_replace(ADDR_STEP3_45C8D0,
                         (const void *)Step3ChooseFacing,
                         "Step3ChooseFacing", 2);
+    rc |= patch_replace(ADDR_STEP3_TURN_STATE,
+                        (const void *)Step3TurnState,
+                        "Step3TurnState", 1);
     return rc;
 }
 
@@ -9680,4 +9683,36 @@ void __cdecl Step3ChooseFacing(void *obj, void *out)
         if (++tries >= 7)
             return;
     }
+}
+
+/* 0x0045CAB0, one caller. Decide the vehicle's turn STATE from the gap
+ * between the record's wanted facing and the object's current one.
+ *
+ * State 4 is reset to 2 on the way in, unconditionally and before anything
+ * else looks at it. */
+void __cdecl Step3TurnState(void *obj, void *rec)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *r = (uint8_t *)rec;
+    int32_t  tol;
+    int32_t  delta;
+
+    if (*(const int32_t *)(r + 0x08u) == 4)
+        *(int32_t *)(r + 0x08u) = 2;
+
+    if (*(const uint8_t *)r == *(const uint8_t *)(o + OBJ_OFF_FACING))
+        return;
+
+    /* EITHER key tightens it. The original tests 3 first and falls through to
+     * 2 only when 3 is up, so reading one and stopping leaves the other key
+     * sluggish -- and nothing in this suite reaches a driven vehicle. */
+    tol = (ActionKeyDown(3) || ActionKeyDown(2)) ? AM2_STEP3_TURN_TOL_KEY
+                                                 : AM2_STEP3_TURN_TOL_IDLE;
+
+    delta = AngleDelta(*(const uint8_t *)r,
+                       *(const uint8_t *)(o + OBJ_OFF_FACING));
+    if (delta > tol)
+        *(int32_t *)(r + 0x08u) = 7;
+    else if (delta < -tol)
+        *(int32_t *)(r + 0x08u) = 6;
 }

@@ -405,4 +405,9 @@ int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan,
  * alternately either side of the base heading for up to seven attempts. */
 void __cdecl Step3ChooseFacing(void *obj, void *out);
 
+/* 0x0045CAB0. Turn the facing gap into a turn state -- 7 one way, 6 the
+ * other, nothing inside the tolerance, which is 1 while a turn key is held
+ * and 16 otherwise. */
+void __cdecl Step3TurnState(void *obj, void *rec);
+
 #endif /* AM2_REGION_H */
