@@ -1713,6 +1713,25 @@ arithmetic over memory the caller supplies and needs none of it.
 Each of these caught something in one session that reading had already missed,
 which is why the list is empirical rather than aspirational.
 
+0. **READ THE WARNINGS, AND NEVER `grep` THE BUILD FOR `error`.** This
+   file's step 1 says the compiler is the first check, and then a session
+   spent all day running `make -s 2>&1 | grep -E 'error'`, which throws away
+   every warning the step exists to read. It cost a whole function:
+   `RowPoolAlloc` was written, compiled, committed and installed nowhere, and
+   GCC said so at the time -- `'RowPoolAlloc' defined but not used
+   [-Wunused-function]` -- into a filter that discarded it.
+
+   `-Wall -Wextra` is already on, so the diagnostic was free. What was not
+   free was the two commits and an A/B run spent believing eight functions
+   had landed when seven had. **`-Wunused-function` on a static is the
+   compiler telling you a reconstruction is not wired up**, which is the one
+   failure `checkinstalled` and `checkpatches` are both blind to: there is no
+   declaration for the first to match and no patch for the second to count.
+
+   Note `-fsyntax-only` does NOT emit it -- the analysis needs a real
+   compile. `g++ ... -c -o /tmp/x.o src/game/foo.cpp` outside the build tree
+   answers in a second without disturbing a running suite.
+
 1. **`make`.** The compiler finds name collisions -- three in one session, twice
    because the obvious name for a table was already on a different table -- and
    linkage mismatches, which go BOTH ways: `mapdraw.h` closes its `extern "C"`
