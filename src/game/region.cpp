@@ -4980,6 +4980,8 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
  * gamelog.c's safe_format walks the string by hand, so handing it an object
  * pointer renders bytes as text and cannot fault. */
 typedef void (__cdecl *AM2_LogOneFn)(void *obj);
+typedef void (__cdecl *AM2_LogSixFn)(const char *, ...);
+#define orig_log_six ((AM2_LogSixFn)(uintptr_t)AM2_IMAGE(ADDR_LOG))
 #define orig_log_one ((AM2_LogOneFn)(uintptr_t)AM2_IMAGE(ADDR_LOG))
 
 /* SightScan -- original 0x00403B40, 1,888 bytes over a 0x84C frame, five
@@ -7743,7 +7745,6 @@ typedef void (__cdecl *AM2_Step2BFn)(void *obj, void *out);
 typedef void (__cdecl *AM2_RowFinalFn)(void *row);
 /* TrooperFire is reconstructed below and called by name; 0x00449FD0's seam is
  * gone with it. */
-#define orig_step2_44afb0 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_UPDATE_TROOPER_ACTION))
 #define orig_step2_44a420 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_STEP2_44A420))
 /* Type2PlayerStep is reconstructed below and called by name. */
 #define orig_row_final    ((AM2_RowFinalFn)(uintptr_t)AM2_IMAGE(ADDR_ROACH_ROW_FINAL))
@@ -8003,6 +8004,461 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
         UseInventoryItem(o, *(const int32_t *)(o + UNIT_OFF_INVENTORY_SEL));
 }
 
+/* UpdateTrooperAction -- original 0x0044AFB0, 2,080 bytes, four callers, all
+ * of them inside StepType2, which reaches it as a TAIL. The name is the
+ * program's, off "UpdateTrooperAction: asking for an item (2); ...".
+ *
+ * IT IS LIVE, and it is the only thing left in the tree that an A/B can
+ * discriminate on: StepType2 runs per type-2 object per frame, and skipping
+ * this call once left a dropped weapon at 0,0 where the original leaves it at
+ * the trooper's feet -- one line of bootcamp's 1,610-line object dump, with
+ * the pixels and the log identical. That weapon-dragging loop is the last
+ * thing this function does.
+ *
+ * ITS SECOND ARGUMENT IS THE WEAPON. orig.h carried `int32` there for as long
+ * as the address has been named; it goes straight through to TrooperFire,
+ * whose signature is void(obj, weapon, sight).
+ *
+ * THE BLOCKED-STEP SWEEP IS A TABLE AND ITS ENTRIES ARE CUMULATIVE. Each
+ * attempt is AnimStepPoint for a candidate heading, ObjectsAtPoint for what is
+ * standing there and BlockWeightRoute for what it would cost; under
+ * AM2_STEP_ROUTE_OK is walkable and ends it. The headings add up as they go --
+ * +32, then -64, then +96 -- so what is tried is base+32, base-32, base+64.
+ * And HOW MANY depends on whose trooper it is: four for the player's, seven
+ * for everything else.
+ *
+ * TWO FIELDS BOUND THE SWEEP AND NEITHER IS READABLE ALONE.
+ * OBJ_OFF_FIELD_D6 accumulates the AngleDelta of every enforced turn and is
+ * wrapped into +/-0x100 by two SEPARATE tests, the second re-reading the field
+ * after the first may have changed it; OBJ_OFF_STUCK_COUNT is stamped a second
+ * ahead and the sweep refuses to turn anything until it has passed.
+ *
+ * THE TAIL SWITCHES ON A RELOADED FIELD. StepObjRows answers nothing -- the
+ * three-way test after it reads the ROW's animation frame, which that call has
+ * just advanced. */
+void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *w = (uint8_t *)out;
+    uint8_t *at;
+    int32_t  klass;
+    int32_t  settled;          /* the facing has been stable long enough */
+    int32_t  turned  = 0;      /* a turn was enforced this step */
+    int32_t  speed   = 0;
+    int32_t  tries;
+    int32_t  found = 0;
+    uint8_t  facing;
+    uint32_t stepPoint;
+
+    klass = ClassifyByCode74(o);
+    stepPoint = *(const uint32_t *)(o + OBJ_OFF_POS);
+    if (!*(const int16_t *)(o + OBJ_OFF_HEALTH))
+        goto pose;
+
+    /* Outside a session, or for an army the comm object does not own, ask how
+     * long the facing has been stable; a trooper that has just turned keeps
+     * the facing it turned to. */
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && !CommArmyOfSlot(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
+                           (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY))) {
+        settled = 1;
+    } else {
+        settled = (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                             - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
+                  > AM2_TROOPER_SETTLE_MS;
+        if (!settled)
+            *(o + OBJ_OFF_FIELD_580) = *(const uint8_t *)(o + OBJ_OFF_FACING);
+    }
+
+    /* A row still mid-animation, or one whose animation says so, stops the
+     * whole step: take whatever is under the trooper and go to the tail. */
+    if (*(const int16_t *)(*(uint8_t *const *)(o + OBJ_OFF_ROWS) + 0x3C) <= 0
+        && RowAnimField4(*(uint8_t *const *)(o + OBJ_OFF_ROWS),
+                         (uint16_t)*(const int16_t *)(
+                             (const uint8_t *)AM2_IMAGE(ADDR_WEAPON_POSE_FRAMES)
+                             + (uint32_t)*(const int32_t *)(w + 8) * 4)) <= 0) {
+        *(int16_t *)(o + OBJ_OFF_FIELD_D6) = 0;
+        *(int32_t *)(o + OBJ_OFF_STUCK_COUNT) = 0;
+        at = (uint8_t *)ObjectsAtPoint((const uint32_t *)(o + OBJ_OFF_POS),
+                                       (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+        goto settle_facing;
+    }
+
+    /* Four states become two while the object is still moving. */
+    {
+        int32_t st = *(const int32_t *)(w + 8);
+
+        if (st == 2 || st == 3 || st == 0x26 || st == 0x12) {
+            *(int32_t *)(o + OBJ_OFF_FIELD_578) = 0;
+            if (klass == 1)
+                *(int32_t *)(w + 8) = 8;
+            else if (klass == 2)
+                *(int32_t *)(w + 8) = 9;
+        }
+    }
+
+    facing = *(const uint8_t *)(w + 4);
+
+    /* An enforced turn, at most one a second and only so far: the delta
+     * between where the trooper faces and where it is being sent decides
+     * which way, and OBJ_OFF_FIELD_D6 remembers how far it has been pushed. */
+    if ((uint32_t)*(const int32_t *)(o + OBJ_OFF_STUCK_COUNT)
+        > (uint32_t)*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS) {
+        int32_t d = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING), facing);
+
+        if (d > AM2_TROOPER_TURN_ARC) {
+            facing = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
+                               + AM2_TROOPER_TURN_STEP);
+        } else if (d < -AM2_TROOPER_TURN_ARC) {
+            facing = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
+                               - AM2_TROOPER_TURN_STEP);
+        } else {
+            goto have_facing;
+        }
+        ++*(o + OBJ_OFF_FIELD_D4);
+    }
+
+have_facing:
+    at = (uint8_t *)0;
+    {
+        int32_t pose = ObjNextKind538(o, *(const int32_t *)(w + 8));
+
+        AnimStepPoint(o, facing, pose, &stepPoint, 0);
+        at = (uint8_t *)ObjectsAtPoint(&stepPoint,
+                                       (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+        if (BlockWeightRoute(o, stepPoint, at, (int32_t *)&stepPoint)
+            < AM2_STEP_ROUTE_OK)
+            goto no_route;
+    }
+
+    /* The way ahead is walkable. If the trooper has claimed a vehicle and it
+     * is standing there, board it and stop. */
+    for (;;) {
+        uint32_t claimed = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
+
+        if (!claimed)
+            break;
+        {
+            uint8_t *p = at;
+
+            while (p) {
+                if (*(const uint32_t *)(p + OBJ_OFF_UID) == claimed) {
+                    EnterVehicle(o, p);
+                    return;
+                }
+                p = *(uint8_t *const *)(p + OBJ_OFF_QUERY_NEXT);
+            }
+        }
+        break;
+    }
+
+    /* Sweep alternate headings. The player's trooper gives up sooner. */
+    tries = AM2_STEP_SWEEP_OTHER;
+    {
+        int32_t owner = ObjType2Field548((const AM2_Object *)o);
+
+        if (owner && owner == (int32_t)*(const uint32_t *)(uintptr_t)
+                                  ADDR_DEFAULT_OWNER
+            && !*(const int32_t *)(o + OBJ_OFF_FIELD_10C))
+            tries = AM2_STEP_SWEEP_PLAYER;
+    }
+    {
+        const int32_t *step = (const int32_t *)AM2_IMAGE(
+                                  ADDR_STEP_FACING_SWEEP);
+        int32_t        i    = 0;
+
+        for (;;) {
+            int32_t pose;
+
+            facing = (uint8_t)(facing + (uint8_t)step[i]);
+            pose   = *(const int32_t *)(w + 8);
+            AnimStepPoint(o, facing, pose, &stepPoint, 0);
+            at = (uint8_t *)ObjectsAtPoint(&stepPoint,
+                                           (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+            if (BlockWeightRoute(o, stepPoint, at, (int32_t *)&stepPoint)
+                < AM2_STEP_ROUTE_OK)
+                break;
+            {
+                uint32_t claimed = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
+                uint8_t *p       = claimed ? at : (uint8_t *)0;
+
+                while (p) {
+                    if (*(const uint32_t *)(p + OBJ_OFF_UID) == claimed) {
+                        EnterVehicle(o, p);
+                        return;
+                    }
+                    p = *(uint8_t *const *)(p + OBJ_OFF_QUERY_NEXT);
+                }
+            }
+            if (++i >= tries)
+                break;
+        }
+        if (i == 0) {
+            *(w + 4) = facing;
+            goto settle_facing;
+        }
+        if (i < tries) {
+            /* Gave up: stop, stamp the turn deadline and charge the sweep to
+             * the accumulator, which wraps at +/-0x100 in two steps. */
+            int16_t acc;
+
+            speed  = 0;
+            *(w + 4) = facing;
+            *(int32_t *)(o + OBJ_OFF_STUCK_COUNT) =
+                (int32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                          + AM2_TROOPER_TURN_MS);
+            *(int16_t *)(o + OBJ_OFF_FIELD_D6) +=
+                (int16_t)AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
+                                    facing);
+            acc = *(const int16_t *)(o + OBJ_OFF_FIELD_D6);
+            if (acc > 0x100)
+                *(int16_t *)(o + OBJ_OFF_FIELD_D6) = (int16_t)(acc - 0x100);
+            acc = *(const int16_t *)(o + OBJ_OFF_FIELD_D6);
+            if (acc < (int16_t)0xFF00)
+                *(int16_t *)(o + OBJ_OFF_FIELD_D6) = (int16_t)(acc + 0x100);
+            goto settle_facing;
+        }
+        PickFireMode(o);
+        turned = 1;
+        goto settle_facing;
+    }
+
+no_route:
+    /* Nothing walkable ahead. Four reasons to simply stop, and one that goes
+     * back to the sweep because a multiplayer client may not decide. */
+    if (ObjKind538In10To17(o)) {
+        turned = 1;
+        speed  = 0;
+        *(w + 4) = facing;
+    } else if (*(const int32_t *)(w + 0x0C)) {
+        *(int32_t *)(w + 8) = 1;
+        turned = 1;
+        *(w + 4) = facing;
+        speed  = 0;
+    } else if (!settled) {
+        *(int32_t *)(w + 8) = 1;
+        turned = 1;
+        *(w + 4) = facing;
+        speed  = 0;
+    } else if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+               && !CommArmyOfSlot(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
+                                  (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY))
+               && ObjType2Field548((const AM2_Object *)o)) {
+        *(int32_t *)(w + 8) = 1;
+        turned = 1;
+        *(w + 4) = facing;
+        speed  = 0;
+    }
+
+settle_facing:
+    /* A facing that actually changed stamps the settle clock. */
+    if (*(const uint8_t *)(o + OBJ_OFF_FACING) != *(const uint8_t *)(w + 4)) {
+        *(uint32_t *)(o + OBJ_OFF_DEADLINE_D0) =
+            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        *(o + OBJ_OFF_FACING) = *(const uint8_t *)(w + 4);
+    }
+    TrooperFire(o, weapon, out);
+
+    /* Everything standing where the trooper is going: an item to step up
+     * onto, an item to ask for or take, something watched to reveal or bump,
+     * and a healer arm. `found` says whether anything was there at all. */
+    for (; at; at = *(uint8_t *const *)(at + OBJ_OFF_QUERY_NEXT)) {
+        int32_t slot = 0, qty = 0;
+
+        if (at == o)
+            continue;
+        found = 1;
+
+        /* THE STEP-UP, and it shares its slot with the move value -- see
+         * orig.h. Only an item, only one flagged by a negative
+         * OBJ_OFF_RANK, and only one within 0x10 of our own height. */
+        if (ObjIsItem((const AM2_Object *)at)
+            && (int8_t)*(const uint8_t *)(at + OBJ_OFF_RANK) < 0) {
+            int32_t theirs = (int8_t)*(const uint8_t *)(at + OBJ_OFF_HEIGHT_SET);
+            int32_t ours   = (int8_t)*(const uint8_t *)(o + OBJ_OFF_HEIGHT_SET);
+            int32_t d      = theirs - ours;
+
+            if ((d < 0 ? -d : d) <= AM2_TROOPER_STEP_UP)
+                speed = theirs;
+        }
+
+        if (ObjType2Field548((const AM2_Object *)o)
+            && CanPickUpWeapon(at, o, &slot, &qty)) {
+            /* Off-line, or as the host, take it outright. In a session a
+             * client ASKS -- and the two comm tests are not each other's
+             * negation: the first lets the host through, the second refuses
+             * anyone the comm object does not answer for. */
+            int32_t local = 1;
+
+            if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) {
+                void *comm = *(void *const *)(uintptr_t)ADDR_COMM_OBJECT;
+
+                local = 0;
+                if (*(const int32_t *)((const uint8_t *)comm + 0x3D8)
+                    && CommArmyOfSlot(comm, slot))
+                    local = 1;
+                else if (!CommArmyOfSlot(
+                             *(void *const *)(uintptr_t)ADDR_COMM_OBJECT, 0)
+                         || *(const int32_t *)(
+                                (const uint8_t *)*(void *const *)(uintptr_t)
+                                    ADDR_COMM_OBJECT + 0x3D8))
+                    goto watched;
+            }
+            if (local) {
+                TrooperPickupItem(o, at, slot);
+            } else {
+                /* THE QUANTITY IS COMPUTED HERE, not taken from
+                 * CanPickUpWeapon's out-param: it is the item type's capacity
+                 * -- or 999 when the type has none -- minus what the weapon
+                 * already in that slot is carrying, and simply the item's own
+                 * count when the slot is empty. Passing the out-param instead
+                 * asks for the wrong number and looks entirely reasonable. */
+                uint8_t *old = (uint8_t *)WeaponByUid(
+                    *(const uint32_t *)(o + UNIT_OFF_INVENTORY
+                                        + (uint32_t)slot * 4));
+                int32_t  cap = *(const int32_t *)(
+                    *(uint8_t *const *)(at + OBJ_OFF_FIELD_C0)
+                    + ITEMTYPE_OFF_CAPACITY);
+                int32_t  had = 0;
+
+                if (!cap)
+                    cap = AM2_TROOPER_NO_CAPACITY;
+                if (!old) {
+                    qty = *(const int32_t *)(at + OBJ_OFF_TARGET_UID);
+                } else {
+                    had = *(const int32_t *)(old + OBJ_OFF_TARGET_UID);
+                    qty = cap - had;
+                }
+
+                /* Gated on a comm-object flag, and reached through the folded
+                 * `ret` at ADDR_LOG -- which is what NAMES this function. */
+                if (*(const int32_t *)(
+                        (const uint8_t *)*(void *const *)(uintptr_t)
+                            ADDR_COMM_OBJECT + 0x418))
+                    orig_log_six(
+                        (const char *)AM2_IMAGE(AM2_STR_ASKING_FOR_ITEM),
+                        (const char *)AM2_IMAGE(old ? AM2_STR_YES
+                                                    : AM2_STR_NO),
+                        cap,
+                        *(const int32_t *)(
+                            *(uint8_t *const *)(at + OBJ_OFF_FIELD_C0)
+                            + ITEMTYPE_OFF_CAPACITY),
+                        had, qty,
+                        *(void *const *)(uintptr_t)ADDR_COMM_OBJECT);
+
+                *(uint32_t *)(at + OBJ_OFF_PICKUP_AFTER) =
+                    *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                    + AM2_SIGHT_REVEAL_MS;
+                TrooperWantItemSend(o, at, 0, slot, qty);
+            }
+        }
+
+watched:
+        if (ObjIsWatchedKind(at)) {
+            if (HeldWeaponCode(o) == AM2_ITEM_KIND_MSWP) {
+                /* The mine sweeper reveals rather than sets off. */
+                if (*(const int32_t *)(at + OBJ_OFF_FLAGS) & 0x200) {
+                    RevealObj(at);
+                    PlaySoundAt(AM2_SND_MINE_FOUND, 0, 0, 0, 0);
+                }
+            } else if ((!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+                        || CommArmyOfSlot(
+                               *(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
+                               (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY)))
+                       && (*(const uint8_t *)(o + OBJ_OFF_ARMY)
+                               != *(const uint8_t *)(at + OBJ_OFF_ARMY)
+                           || (uint32_t)(*(const uint32_t *)(uintptr_t)
+                                             ADDR_GAME_CLOCK_MS
+                                         - *(const uint32_t *)(
+                                               at + OBJ_OFF_DEADLINE_58))
+                                  > AM2_AI_KEEP_RANGE_MS)) {
+                /* Your own mine is safe for five seconds; anyone else's, and
+                 * your own after that, goes off under you. */
+                DamageObject(at, 1, 4,
+                             *(const uint32_t *)(at + OBJ_OFF_UID), 0, 0);
+            }
+        }
+
+        /* A medic tent heals whoever stands in it, twice a second. */
+        if (*(const int32_t *)at == 1
+            && *(const int32_t *)(*(uint8_t *const *)(at + OBJ_OFF_FIELD_94))
+                   == 0x20
+            && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                   > *(const uint32_t *)(o + OBJ_OFF_FIELD_5B0)
+                     + AM2_TROOPER_HEAL_MS) {
+            HealObject(o, AM2_TROOPER_HEAL, at);
+            *(uint32_t *)(o + OBJ_OFF_FIELD_5B0) =
+                *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        }
+    }
+
+    if (!found)
+        *(void **)(o + OBJ_OFF_HELD_WEAPON_UID) = (void *)0;
+
+pose:
+    SetUnitPose(o, *(const int32_t *)(w + 8));
+    *(*(uint8_t **)(o + OBJ_OFF_ROWS) + 0x50) =
+        *(const uint8_t *)(o + OBJ_OFF_FACING);
+    StepObjRows(o);
+    {
+        /* The ROW's animation frame, reloaded -- StepObjRows returns nothing. */
+        int32_t f = *(const int16_t *)(*(uint8_t *const *)(o + OBJ_OFF_ROWS)
+                                       + 0x4C);
+
+        if (f == 0x2C)
+            *(int32_t *)(o + OBJ_OFF_POSE) = 0x19;
+        else if (f == 0x2D)
+            *(int32_t *)(o + OBJ_OFF_POSE) = 0x1A;
+        else if (f == 1)
+            *(int32_t *)(o + OBJ_OFF_POSE) = 1;
+    }
+
+    if (turned)
+        *(int32_t *)(o + OBJ_OFF_FIELD_44) = 0;
+    {
+        int32_t v = *(const int32_t *)(o + OBJ_OFF_FIELD_44);
+
+        if (!v
+            && *(const uint8_t *)(o + OBJ_OFF_HEIGHT_SET)
+                   == (*(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS)[
+                          *(const uint16_t *)(o + OBJ_OFF_TILE)])
+            v = speed;
+        ObjMoveAlongFacing(o, v, 0, 0);
+    }
+
+    *(o + OBJ_OFF_HEIGHT_ADJ) = (uint8_t)((const int32_t *)AM2_IMAGE(
+        ADDR_TROOPER_CLASS_VALUE))[klass];
+
+    /* DRAG THE HELD WEAPONS ALONG. This is the loop whose absence bootcamp's
+     * object dump caught: a dropped weapon left at 0,0 instead of at the
+     * trooper's feet, one line, with the pixels and the log identical. */
+    if (*(const int32_t *)(o + OBJ_OFF_SARGE)) {
+        int32_t i;
+
+        for (i = 0; i < AM2_INVENTORY_SLOTS; i++) {
+            uint8_t *held = (uint8_t *)WeaponByUid(
+                *(const uint32_t *)(o + UNIT_OFF_INVENTORY + i * 4));
+
+            if (held)
+                *(uint32_t *)(held + OBJ_OFF_POS) =
+                    *(const uint32_t *)(o + OBJ_OFF_POS);
+        }
+    }
+
+    /* OBJ_OFF_PREV_REGION takes the region of the PREVIOUS tile, not of the
+     * current one, and only when the two differ and it does not already hold
+     * the new one. */
+    {
+        const uint8_t *reg = *(const uint8_t *const *)(uintptr_t)
+                                 ADDR_REGION_OF_CELL;
+        uint16_t now  = reg[*(const uint16_t *)(o + OBJ_OFF_TILE)];
+        uint16_t was  = reg[*(const int32_t *)(o + OBJ_OFF_PREV_TILE)];
+
+        if (now != was && now != *(const uint16_t *)(o + OBJ_OFF_PREV_REGION))
+            *(uint16_t *)(o + OBJ_OFF_PREV_REGION) = was;
+    }
+}
+
 /* StepType2 -- original 0x0044B7D0, one caller: ObjFrameStep's type-2 arm. The
  * trooper's per-frame step, and the last piece of the AI band's shape.
  *
@@ -8112,7 +8568,7 @@ void __cdecl StepType2(void *obj)
             *(int32_t *)out = 0;
         }
         DestroyByType(obj);
-        orig_step2_44afb0(obj, w, out);
+        UpdateTrooperAction(obj, w, out);
         return;
     }
 
@@ -8169,7 +8625,7 @@ void __cdecl StepType2(void *obj)
     }
 
 tail:
-    orig_step2_44afb0(obj, w, out);
+    UpdateTrooperAction(obj, w, out);
 
 #undef AM2_STEP2_HELD_UID
 }
@@ -8507,6 +8963,9 @@ int region_install(void)
     rc |= patch_replace(ADDR_ROACH_ROUTE_TOWARD,
                         (const void *)RoachRouteToward,
                         "RoachRouteToward", 3);
+    rc |= patch_replace(ADDR_UPDATE_TROOPER_ACTION,
+                        (const void *)UpdateTrooperAction,
+                        "UpdateTrooperAction", 4);
     rc |= patch_replace(ADDR_STEP_TYPE2, (const void *)StepType2,
                         "StepType2", 1);
     rc |= patch_replace(ADDR_STEP_TYPE3, (const void *)StepType3,

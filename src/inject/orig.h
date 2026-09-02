@@ -6362,6 +6362,12 @@ typedef struct {
 /* Both read only by ADDR_OBJ_DEATH_CLEANUP and neither established further:
  * the field gates the first delayed event, the flag suppresses the second. */
 #define OBJ_OFF_FIELD_94         0x94u
+/* Three more UpdateTrooperAction reads: how many enforced turns have been
+ * charged, the running total of how far they turned it, and when the medic
+ * tent last healed. All named structurally -- one consumer each. */
+#define OBJ_OFF_FIELD_D4         0xD4u   /* uint8, incremented per turn */
+#define OBJ_OFF_FIELD_D6         0xD6u   /* int16, wrapped into +/-0x100 */
+#define OBJ_OFF_FIELD_5B0        0x5B0u  /* game-clock ms */
 /* 0x004572A0, two callers. Reset a type 2's transient state.
  *
  * WHAT IT CLEARS WAS ALREADY NAMED, and the offset ratchet is what said so:
@@ -8038,6 +8044,27 @@ typedef struct {
 /* Per-CLASS, indexed by ClassifyCode74's 0, 1 or 2 and written to
  * OBJ_OFF_FIELD_64 at the very end: 28, 18, 12. */
 #define ADDR_TROOPER_CLASS_VALUE  0x00489840u  /* int32[3] */
+/* UpdateTrooperAction's own constants, all of them measured rather than
+ * shared with a neighbour: the settle window, the arc outside which a turn is
+ * enforced and the step it turns by, how long a turn is refused for, the
+ * height difference that counts as standing on something, and the medic
+ * tent's rate and amount. */
+#define AM2_TROOPER_SETTLE_MS    0x96
+#define AM2_TROOPER_TURN_ARC     0x40
+#define AM2_TROOPER_TURN_STEP    0x10
+#define AM2_TROOPER_TURN_MS      0x3E8
+#define AM2_TROOPER_STEP_UP      0x10
+#define AM2_TROOPER_HEAL         0x14
+#define AM2_TROOPER_HEAL_MS      0x1F4
+#define AM2_SND_MINE_FOUND       3
+/* What a request asks for when the item type declares no capacity at all. */
+#define AM2_TROOPER_NO_CAPACITY  0x3E7
+#define AM2_STR_ASKING_FOR_ITEM  0x0048A534u
+#define AM2_STR_YES              0x0048A5B0u
+#define AM2_STR_NO               0x0048A5ACu
+/* Read with the state as its index by the row-animation test at the head of
+ * UpdateTrooperAction -- the same table ADDR_WEAPON_POSE_FRAMES names, reached
+ * for a different purpose. Named once; this is a note, not a second name. */
 /* SURVEYED AND NOT RECONSTRUCTED. 2,080 bytes, 632 instructions, four callers
  * -- all four inside StepType2, which reaches it as a TAIL rather than as one
  * arm of several.

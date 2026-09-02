@@ -95,8 +95,8 @@ because `0x00458A20` sits inside a 5,760-byte `functions.tsv` entry that holds
 **seventeen** functions and patching any one of them credits all of it. The
 same effect inflates the entry count.
 
-    entry-generous   1,233 of 1,239 entries, 94.8% of sub-CRT bytes
-    split-aware      1,384 of 1,530 real functions, 85.9% of sub-CRT bytes
+    entry-generous   1,234 of 1,239 entries, 95.4% of sub-CRT bytes
+    split-aware      1,385 of 1,530 real functions, 86.5% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -411,125 +411,44 @@ why the two exits answer different bearings.
 Its callers wanted casts at every site -- the out-params are written straight
 into the sight context, which is what confirms where they land.
 
-## Next: UpdateTrooperAction (0x0044AFB0), and it is LIVE
+## UpdateTrooperAction -- and this one the A/B can actually check
 
-**It names itself.** `"UpdateTrooperAction: asking for an item (2); oldweapon:
-%s; maxammo: %d"` is pushed from inside the function and is the only reference
-to that string in the image, and the message opens `Name:` -- the self-naming
-pattern, not a message *about* another function the way
-`"ERROR: SetObjScriptState was called with %s"` is. `ADDR_AI_44AFB0` was ours;
-this is the program's. Its sibling `0x0044A420` carries no such string, so the
-"(2)" numbers the request sites rather than the functions.
+`0x0044AFB0`, 2,080 bytes, four callers, all in `StepType2` which reaches it as
+a tail. Entries 1,233 -> 1,234 of 1,239, **5 left**.
 
-2,080 bytes, four callers, all inside `StepType2` -- which reaches it as a
-*tail* rather than as one arm of several.
+**`ab.sh bootcamp campaign` clean, and here that is evidence.** The 1,610-line
+object dump is the artifact that has caught this function before -- skipping
+this call once left a dropped weapon at 0,0 where the original leaves it at the
+trooper's feet, one line, with pixels and log identical. Every AI function
+before it was cold; this one the suite can discriminate on.
 
-**It is the only thing left that an A/B can discriminate on.** `StepType2` runs
-per type-2 object per frame, and `region.cpp` already records what happens when
-this call is skipped: a dropped weapon stays at 0,0 where the original leaves it
-at the trooper's feet, caught by `bootcamp`'s object dump as **one line**, with
-the pixels and the log identical on both sides. Unlike every AI function
-reconstructed before it, a mistake here is visible -- exactly, with no budget.
+Six things it does that a reading of the bodies loses, each recorded at its
+site: the blocked-step sweep whose table entries are *cumulative* and whose
+length depends on whose trooper it is; a turn accumulator and a deadline that
+are unreadable apart; a step-up that shares one stack slot with the move value;
+a tail switching on a field the previous call advanced rather than on its
+return; a request quantity computed from the item's capacity rather than taken
+from `CanPickUpWeapon`'s out-param; and the log call that names the function,
+gated on a comm flag and reached through the folded `ret` at `ADDR_LOG`.
 
-All twenty-eight callees are named, and its frame is clean under `espmap.py`
-now that the tool knows about thiscall cleanup -- which it learned *from* this
-function.
-
-**Its second argument is the weapon, not an `int32`** -- it goes straight
-through to `TrooperFire`, whose signature `orig.h` already records as
-`void(obj, weapon, sight)`. Settled by `espmap.py` naming the slots rather than
-by reading displacements.
-
-**Four of its fields already had names and all four confirm the reading**:
-`OBJ_OFF_HEIGHT_SET` at 0x65 is what makes the step-up a height comparison
-rather than a coincidence; `OBJ_OFF_HEIGHT_ADJ` at 0x64 means the class table's
-28/18/12 are per-class height adjustments; `OBJ_OFF_HELD_WEAPON_UID` at 0x564
-means the clear at the end of the walk is "nothing underfoot, forget what you
-were holding"; and 0x538 is `OBJ_OFF_POSE`. Grepping the *offsets* rather than
-inventing `OBJ_OFF_FIELD_65` and friends turned four blanks into four
-sentences.
-
-**And one contradicts its name.** 0xD8 is `OBJ_OFF_STUCK_COUNT`, "refused moves
-in a row" -- a reading from `AiRouteToward`, which only tests it for non-zero.
-This function writes clock + 1000 into it and compares it against the clock,
-which is a deadline and not a count. Both uses are live; a boolean test cannot
-tell them apart. Recorded rather than renamed, because the rename wants
-`AiRouteToward` re-read first.
-
-**A trooper steps up onto what it is standing on**, and the behaviour is one
-stack slot used twice: zeroed at entry and when the facing sweep gives up,
-given the height of any item underfoot within ±0x10 of the trooper's own during
-the pickup walk, and handed to `ObjMoveAlongFacing` at the end. Read as two
-locals -- a "move speed" and an "item height" -- the connection disappears and
-the move gets a constant zero. The displacements at the two sites are `0x1c`
-and `0x20`, differing only because of an outstanding push.
-
-**Its tail switches on a reloaded field, not on a return value.**
-`StepObjRows` answers nothing; the three-way test after it reads the *row's*
-animation frame out of `OBJ_OFF_ROWS`, which the call has just advanced.
-Reading `eax` there would give the switch a value `StepObjRows` never sets --
-the shape `SelectFirePose`'s note warns about.
-
-**When the way ahead is blocked it sweeps alternate facings, and the sweep is a
-table.** The headings at `0x00489E00` are added *cumulatively* to the base
-facing -- +32, then -64, then +96 -- so what is actually tried is base+32,
-base-32, base+64: alternating and widening. Read as absolute offsets rather
-than deltas it is a different and much narrower search.
-
-**How many it tries depends on whose trooper it is**: four when the object
-belongs to the default owner and one flag is clear, seven otherwise. The
-player's own soldier gives up sooner than everything else on the map.
-
-The head: classify, send a dead object to the tail, and -- outside a
-multiplayer session, or inside one for an army the comm object does not own --
-remember `OBJ_OFF_FACING` when under 150 ms have passed since
-`OBJ_OFF_DEADLINE_D0`.
-
-**That is a turn settle time, not "since the last hit"**, which the first
-version of this survey claimed. This function is one of the field's *fourteen*
-writers and stamps it when the facing it settles on differs from the one the
-object had, so the head's test asks whether the trooper has been pointing the
-same way for a sixth of a second. A field with fourteen writers does not get
-its meaning from one of them; the correction cost one decoded scan.
-
-It also keeps a turn accumulator: `OBJ_OFF_FIELD_D6` takes the `AngleDelta` of
-every enforced turn and is wrapped into ±256 by two separate tests, the second
-re-reading the field after the first may have changed it. Beside it a deadline
-at clock + 1000 stops the sweep pushing a trooper around more than once a
-second.
-
-## The string sweep, run on all five remaining unnamed functions
-
-Applied straight after `UpdateTrooperAction` named itself, because the lesson
-there was that the sweep should have come first. Over the five it produced one
-identification, two confirmations, and two honest blanks:
-
-- **`0x0042C440` is the map loader** -- `"%s.atl"` for the tileset, `"%s.amm"`
-  for the map, and a `"camera"` record parsed out of it. `orig.h` has called it
-  "the map loader" in prose for a long time and never gave the address a name;
-  it is `ADDR_LOAD_MAP` now.
-- `0x00417B80` pushes forty-odd cheat phrases and their replies, confirming
-  `ADDR_CHEAT_ENTRY`.
-- `0x00430530` pushes twenty multiplayer panel bitmaps, confirming
-  `ADDR_MP_PANEL_CTOR`.
-- `0x0044A420` and `0x00420410` push no literals at all. The sweep answers
-  nothing for those and says so, which is the useful half of running it.
+`TrooperPickupItem` had been defined in `item.cpp` and never declared in
+`item.h`, because its only caller was in the same file. It has two now.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,233 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 6
-outstanding, which is 1,239 minus 1,233 -- from 1,429 reconstructed addresses
-(1,425 patched plus 4 registered), and **94.8% of the sub-CRT bytes**.
-Split-aware that is **1,384 of 1,530** real functions and **85.9%** of the
+line (0x0045C000) patched**. Measured: **1,234 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 5
+outstanding, which is 1,239 minus 1,234 -- from 1,430 reconstructed addresses
+(1,426 patched plus 4 registered), and **95.4% of the sub-CRT bytes**.
+Split-aware that is **1,385 of 1,530** real functions and **86.5%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
 small ones in batches. A hundred and fifty-one batches have gone in and NOTHING SMALL IS LEFT among
-the ENTRIES: the 6 outstanding start at **2,080 bytes** -- `0x0044AFB0` -- and
-the median is **2,336**. That is not what is left, though: `tools/merges.py`
+the ENTRIES: the 5 outstanding start at **2,304 bytes** -- `0x00417B80` -- and
+the median is **3,920**. That is not what is left, though: `tools/merges.py`
 splits them into real functions and the 0x00458930 entry alone still holds
 sixteen unwritten ones from 16 bytes up. Rank by real function, not by entry. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred

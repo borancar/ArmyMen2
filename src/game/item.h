@@ -140,6 +140,10 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
  * units at a time so a fast one cannot tunnel, fixed-point on all three axes,
  * and an impact explosion chosen by the def kind through a thirty-entry table
  * of which eighteen entries make nothing. */
+/* 0x00448540, and now two callers: it was defined in item.cpp without ever
+ * being declared here, because its only caller was in the same file. */
+void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot);
+
 void __cdecl StepType5(void *obj);
 
 void __cdecl StepType6(void *obj);

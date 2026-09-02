@@ -191,6 +191,11 @@ void __cdecl Type2PlayerStep(void *obj, void *out);
  * Cold in every configuration here: nothing in a Boot Camp drive shoots. */
 void __cdecl TrooperFire(void *obj, void *held, void *sight);
 
+/* 0x0044AFB0, four callers, all in StepType2 which reaches it as a tail. The
+ * player's trooper: turn it, walk it, pick things up, fire, and drag the held
+ * weapons along. The name is the program's, off its own log string. */
+void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out);
+
 void __cdecl StepType2(void *obj);
 
 /* 0x0045D660, one caller -- ObjFrameStep's type-3 arm. The vehicle's
