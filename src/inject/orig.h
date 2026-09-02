@@ -6406,6 +6406,12 @@ typedef struct {
  * while the macro did not. 0x00407F80 dispatches an eight-entry jump table
  * on it and tests/actions-reference.txt gives the numbers the scripts
  * write: attack 6, defend 7, ignore 2, evade 5. */
+/* The AI modes the eight-arm table dispatches on. The numbers come from
+ * tests/actions-reference.txt -- the shipped scripts' own setaimode operands --
+ * and orig.h's reading of the jump table agrees with them. Only the two this
+ * band writes are named here; the rest are still literals at their use sites. */
+#define AM2_AI_MODE_IGNORE       2
+#define AM2_AI_MODE_ATTACK       6
 #define OBJ_OFF_AI_MODE          0xE4u
 #define OBJ_OFF_AI_MODE_PREV     0xE8u  /* the previous value of it */
 #define ADDR_EVT_SET_MODE_F0     0x0041FAE0u  /* void(uid, int32), +0xF0, type 2/3/8 */
@@ -10103,6 +10109,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * and attach everyone who leaves to whoever was in seat 0. Its two arguments
  * are pushed by the caller and read by nothing. */
 #define ADDR_VEHICLE_DISMOUNT_ALL 0x00458930u /* void(void *, void *) */
+/* 0x00458810, the ACTION of pointer mode 6: order the selection to move in
+ * formation with AI mode `ignore`. Its FIRST ARGUMENT IS IN-OUT --
+ * FormationSlotPoint is handed the address of that slot and rewrites it. */
+#define ADDR_POINTER_ACTION_MODE6 0x00458810u /* void(void *, uint32_t) */
+#define AM2_MENU_ROW_8           8  /* the row its trooper arm is gated on */
 /* The one AAI type PointerPickRepair refuses. A placeholder rather than
  * AM2_ITEM_KIND_DISG_3, which is the same number in a different table -- the
  * kind index and AAIREC_OFF_TYPE are not the same namespace. */

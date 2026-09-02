@@ -1653,6 +1653,10 @@ int32_t __cdecl PointerPickEnemyTrooper(void *obj);
  * in seat 0. Both arguments are ignored -- see the note in widget.cpp. */
 void __cdecl VehicleDismountAll(void *a, void *b);
 
+/* 0x00458810. Mode 6's action: order the selection to move in formation with
+ * AI mode `ignore`. Its first argument is IN-OUT -- see widget.cpp. */
+void __cdecl PointerActionMode6(void *target, uint32_t at);
+
 /* 0x00458D70. ADDR_SET_WEAPON_TARGET's sibling: record a fire request aimed at
  * ADDR_AIM_X/Y/Z, for the weapon kinds 0x23..0x26. */
 void __cdecl SetWeaponTargetAimed(void *target, uint32_t at);

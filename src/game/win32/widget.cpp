@@ -28,6 +28,7 @@
 #include "mapdraw.h"   /* SetDrawTarget -- reconstructed */
 #include "winmain.h"   /* Ticks -- reconstructed */
 #include "../army.h"    /* LookupOwnerObj -- reconstructed */
+#include "../air.h"     /* FormationSlotPoint -- PointerActionMode6 */
 #include "../objtype.h" /* LookupType3ByUID -- reconstructed */
 #include "../item.h"    /* WeaponByUid -- reconstructed */
 
@@ -9738,6 +9739,97 @@ void __cdecl VehicleDismountAll(void *a, void *b)
     }
 }
 
+/* PointerActionMode6 -- original 0x00458810, 288 bytes, the ACTION slot of
+ * pointer mode 6, whose PICK is PointerPickMode6 above.
+ *
+ * Order the whole SELECTION to move, in formation, without engaging: for each
+ * selected unit, compute its formation slot, detach it from whatever it was
+ * following, set OBJ_OFF_AI_MODE to 2 -- which orig.h's AI table calls `ignore`
+ * -- and hand it the slot point.
+ *
+ * THE FOURTH ARGUMENT TO FormationSlotPoint IS THE ADDRESS OF THIS FUNCTION'S
+ * OWN FIRST ARGUMENT SLOT, and the value is read back out of it afterwards. So
+ * `target` is an in-out: it arrives as the object under the pointer and leaves
+ * as the formation point, and it is THAT rewritten value the first PointActionA
+ * is given. An argument slot reused as an out-param is a shape CLAUDE.md warns
+ * about for esp tracking; here it also changes what the call below means.
+ *
+ * WHICH IS WHY THE TWO PointActionA CALLS DISAGREE. The first passes the
+ * rewritten slot point; the second, in the trooper arm, passes the ORIGINAL
+ * click point. Two calls to one function with different second arguments, ten
+ * instructions apart, and the difference is invisible unless the out-param is
+ * noticed.
+ *
+ * THE TROOPER ARM IS GATED ON A MENU ROW: with GetMenuRow() == 8 the unit's
+ * OBJ_OFF_UID_56C takes ADDR_POINTER_HOVER_UID and it is ordered again at the
+ * click point; otherwise that field is cleared. So the same action means
+ * something extra while one menu row is up.
+ *
+ * The selection walk has the same don't-always-advance shape as
+ * VehicleDismountAll: a uid that no longer resolves is removed from
+ * ADDR_SELECTED_UIDS and the index is NOT incremented.
+ *
+ * Not exercised: no drive here installs a pointer mode above 0. */
+void __cdecl PointerActionMode6(void *target, uint32_t at)
+{
+    uint8_t *ctx = *(uint8_t **)(uintptr_t)ADDR_OBJ_CTX_OBJ_A;
+    int32_t  type;
+    int32_t  i;
+
+    if (!ctx)
+        return;
+    if ((uint8_t *)target == ctx)
+        return;
+
+    type = *(const int32_t *)ctx;
+    if (type < AM2_OBJ_TYPE_TROOPER)
+        return;
+    if (type > AM2_OBJ_TYPE_VEHICLE && type != AM2_OBJ_TYPE_ROACH)
+        return;
+
+    if (SelectIfOwn(target))
+        return;
+
+    for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; ) {
+        uint8_t *o = (uint8_t *)LookupByUID(
+            (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+        int32_t  ot;
+
+        if (!o) {
+            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            continue;   /* no i++ -- the removal shifts the next entry down */
+        }
+
+        ot = *(const int32_t *)o;
+        if (ot >= AM2_OBJ_TYPE_TROOPER
+            && (ot <= AM2_OBJ_TYPE_VEHICLE || ot == AM2_OBJ_TYPE_ROACH)) {
+            /* The original hands FormationSlotPoint the address of its own
+             * first argument slot; written as a local initialised from it,
+             * which is the same dword and the same value in and out. */
+            uint32_t slot = (uint32_t)(uintptr_t)target;
+
+            FormationSlotPoint(i, at, o, &slot);
+
+            ObjAttachTo(o, (void *)0);
+            *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 1;
+            *(int32_t *)(o + OBJ_OFF_AI_MODE)  = AM2_AI_MODE_IGNORE;
+
+            PointActionA(o, slot);
+
+            if (*(const int32_t *)o == AM2_OBJ_TYPE_TROOPER) {
+                if (GetMenuRow() == AM2_MENU_ROW_8) {
+                    *(uint32_t *)(o + OBJ_OFF_UID_56C) =
+                        *(const uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID;
+                    PointActionA(o, at);
+                } else {
+                    *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
+                }
+            }
+        }
+        i++;
+    }
+}
+
 /* PointerPickWatchedItem -- original 0x00459EE0, 208 bytes, one reference: the
  * PICK slot of a record in the second {pick, action, kind, flags} table.
  *
@@ -11114,6 +11206,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_VEHICLE_DISMOUNT_ALL,
                         (const void *)VehicleDismountAll,
                         "VehicleDismountAll", 1);
+    rc |= patch_replace(ADDR_POINTER_ACTION_MODE6,
+                        (const void *)PointerActionMode6,
+                        "PointerActionMode6", 1);
     rc |= patch_replace(ADDR_SET_WEAPON_TARGET_AIMED,
                         (const void *)SetWeaponTargetAimed,
                         "SetWeaponTargetAimed", 4);

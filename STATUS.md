@@ -9,8 +9,26 @@ Last updated: **2026-09-02**, at `969936a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,410 patches plus 3 REGISTERED = 1,413 reconstructed
+Nothing uncommitted. **1,411 patches plus 3 REGISTERED = 1,414 reconstructed
 addresses**, **30** analysis tools in `make check`.
+
+**`PointerActionMode6` (`0x00458810`) is reconstructed** -- mode 6's ACTION,
+pairing with `PointerPickMode6`. Order the whole selection to move in formation
+without engaging: per unit, compute its formation slot, detach it, set
+`OBJ_OFF_AI_MODE` to 2 -- which the AI table calls `ignore` -- and hand it the
+slot point.
+
+**Its first argument is IN-OUT.** `FormationSlotPoint` is handed the address of
+this function's own first argument slot and rewrites it, so `target` arrives as
+the object under the pointer and leaves as the formation point.
+
+**Which is why its two `PointActionA` calls disagree**: the first passes the
+rewritten slot point, the second -- in the trooper arm -- passes the ORIGINAL
+click point. Two calls to one function with different second arguments, ten
+instructions apart, and the difference is invisible unless the out-param is
+noticed.
+
+`checkoffsetuse` reports the offset sets agree exactly.
 
 **`VehicleDismountAll` (`0x00458930`) is reconstructed** -- empty the current
 vehicle, attaching everyone who leaves to whoever was in seat 0. Behind
@@ -321,7 +339,7 @@ that holds **seventeen** functions and patching any one of them credits all of
 it. The same effect inflates the entry count.
 
     entry-generous   1,220 of 1,239 entries, 89.5% of sub-CRT bytes
-    split-aware      1,369 of 1,530 real functions, 81.2% of sub-CRT bytes
+    split-aware      1,370 of 1,530 real functions, 81.3% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -332,9 +350,9 @@ ceiling rather than a floor -- ten percentage points of ceiling, measured.
 The loop's `completion_promise` is now **every game function below the CRT
 line (0x0045C000) patched**. Measured: **1,220 of 1,239** entries in
 `docs/functions.tsv` below that address have a patch inside them -- so 19
-outstanding, which is 1,239 minus 1,220 -- from 1,413 reconstructed addresses
-(1,410 patched plus 3 registered), and **89.5% of the sub-CRT bytes**.
-Split-aware that is **1,369 of 1,530** real functions and **81.2%** of the
+outstanding, which is 1,239 minus 1,220 -- from 1,414 reconstructed addresses
+(1,411 patched plus 3 registered), and **89.5% of the sub-CRT bytes**.
+Split-aware that is **1,370 of 1,530** real functions and **81.3%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
