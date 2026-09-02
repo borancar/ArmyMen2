@@ -327,6 +327,31 @@ height -- the trajectory is untouched and only the reference moves.
 `CreateMissile` writes the launch height into it, which is the writer
 confirming the reader.
 
+## tools/espmap.py -- stack slots resolved mechanically
+
+Reading a large function means turning `[esp + 0x4c]` into "argument 3" or "the
+fourth local", and the displacement alone does not say which: it depends on how
+many pushes are outstanding at that instruction. That arithmetic by eye is the
+whole class of error `CLAUDE.md` records under "THISCALL CLEANS ITS OWN STACK
+ARGUMENTS" and "an ARGUMENT SLOT reused as a local".
+
+**Doing it by eye failed on the first function it was tried on.** Two writes to
+`[esp + 0x4c]` in `0x00403B40` looked like one slot and are two -- one has an
+outstanding `push` for a call in front of it. The conflict was mine, not the
+image's.
+
+**And a linear trace is not enough**, which was the second thing this found: a
+single pass desynchronises at the first branch that jumps past an `add esp`,
+and then reports negative slots and offsets past the end of the frame. Both of
+which it duly produced. esp has to be propagated along control flow with every
+edge agreeing.
+
+Validated against three functions whose frames were worked out by hand --
+`AiAttackBody`'s facing slot, `AiPatrolStep`'s, and `StepType5`'s sub-step,
+outcome and speed all land where the hand derivation put them. It reports
+disagreeing depths and unreached references rather than guessing; on
+`0x00403B40` it reports neither, across 559 instructions.
+
 ## Next: the sighting scan, mapped
 
 `0x00403B40`, 1,888 bytes over a 0x84C frame -- what fills `SIGHT_OFF_FOUND`,
