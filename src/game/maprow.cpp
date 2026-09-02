@@ -1193,6 +1193,8 @@ int maprow_install(void)
                         "DiedEffectA", 1);
     rc |= patch_replace(ADDR_SPAWN_HIT_EFFECT, (const void *)SpawnHitEffect,
                         "SpawnHitEffect", 3);
+    rc |= patch_replace(ADDR_DIED_EFFECT_B, (const void *)DiedEffectB,
+                        "DiedEffectB", 4);
     rc |= patch_replace(ADDR_SEQ_START_DIR_EFFECT,
                         (const void *)SeqStartDirEffect,
                         "SeqStartDirEffect", 6);
@@ -2203,5 +2205,76 @@ void __cdecl SpawnHitEffect(const uint32_t *at, int32_t rowField2C,
                       height, -1);
     (void)dir;
         n--;
+    }
+}
+
+/* DiedEffectB -- original 0x00461C30, one caller. The directional death
+ * burst: up to seven particles thrown outward, chosen by which way the thing
+ * was facing.
+ *
+ * ITS TWO TABLES ARE BUILT ON THE STACK, one dword at a time, across sixty
+ * instructions of the prologue. They are DECODED from that instruction
+ * stream here rather than transcribed -- the rule DirtyCollect's eighty-one
+ * arms established -- because a hand-read of sixty scattered `mov [esp+N],
+ * reg` with three different registers holding 1, 0 and -1 is exactly the
+ * transcription this project has got wrong before.
+ *
+ * THE FACING BECOMES A SECTOR: `(facing + 0x10) >> 5`, so the byte angle is
+ * rounded to one of eight, and a result outside 0..7 returns without
+ * spawning. The +0x10 is half a sector, which makes it round rather than
+ * truncate -- the same idiom SeqStartDirEffect uses with a different divisor.
+ *
+ * AND THE RANDOM ARM IS UNREACHABLE FROM HERE, which only the decoded tables
+ * show. Two of the seven angles are -1, the value SpawnParticle reads as
+ * "pick a direction at random" -- and columns 2 and 6, the ones carrying
+ * them, are ZERO IN ALL EIGHT ROWS. So the `if (angle == -1)` arm at
+ * 0x00461E4F cannot run through this caller, and it is written out only
+ * because the original has it. Reading the three arms without the mask would
+ * describe a behaviour the function never produces. */
+static const int32_t kDiedBurstAngle[7] = { 64, -64, -1, 0, -100, -154, -1 };
+
+static const int32_t kDiedBurstMask[8][7] = {
+    { 1, 1, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 1, 1, 0 },
+    { 0, 1, 0, 1, 1, 0, 0 },
+    { 0, 1, 0, 1, 1, 1, 0 },
+    { 0, 0, 0, 1, 0, 0, 0 },
+    { 0, 0, 0, 1, 1, 1, 0 },
+    { 1, 0, 0, 0, 1, 1, 0 },
+    { 1, 1, 0, 0, 1, 1, 0 },
+};
+
+void __cdecl DiedEffectB(const uint32_t *at, int32_t facing,
+                         int32_t rowField2C, int32_t height)
+{
+    int32_t sector = (facing + 0x10) >> 5;
+    int32_t i;
+
+    if (sector < 0 || sector > 7)
+        return;
+
+    for (i = 0; i < 7; i++) {
+        int32_t angle;
+
+        if (kDiedBurstMask[sector][i] == 0)
+            continue;
+
+        angle = kDiedBurstAngle[i];
+        if (angle == -1) {
+            /* Unreachable through this caller; see the header. */
+            SpawnParticle(at, rowField2C, i, 7, height, -1);
+            continue;
+        }
+
+        /* The stored angle is a DELTA on the sector, wrapped into a byte --
+         * and the wrap is one add or one subtract because the table's values
+         * keep the sum inside +/- one turn. */
+        angle += sector;
+        if (angle < 0)
+            angle += 0x100;
+        else if (angle >= 0x100)
+            angle -= 0x100;
+
+        SpawnParticle(at, rowField2C, i, 7, height, angle);
     }
 }

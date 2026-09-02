@@ -9273,10 +9273,8 @@ void __cdecl SelectionClick(void)
 /* TrooperDiedTail's two helpers stay original: both are above the CRT line,
  * so neither is in the 1,239 and reconstructing them would not move it. */
 typedef void (__cdecl *AM2_DiedEffectAFn)(void *obj);
-typedef void (__cdecl *AM2_DiedEffectBFn)(const AM2_Point *at, int32_t facing,
-                                          int32_t kind, int32_t height);
 /* DiedEffectA is reconstructed; maprow.h declares it. */
-#define orig_died_burst ((AM2_DiedEffectBFn)AM2_IMAGE(ADDR_DIED_EFFECT_B))
+/* DiedEffectB is reconstructed; maprow.h declares it. */
 
 /* TrooperDiedTail -- original 0x00447EE0, 512 bytes, two callers. The shared
  * tail of TrooperDied: choose the death ANIMATION and the noise that goes
@@ -9358,7 +9356,7 @@ void __cdecl TrooperDiedTail(void *obj, int32_t kind)
                    [ClassifyByCode74(o)];
         noise = 5;
         if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) < big && anim == 0x21)
-            orig_died_burst((const AM2_Point *)(o + OBJ_OFF_POS),
+            DiedEffectB((const uint32_t *)(o + OBJ_OFF_POS),
                             *(const uint8_t *)(o + OBJ_OFF_FACING),
                             *(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND),
                             *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));

@@ -169,4 +169,10 @@ void __cdecl DiedEffectA(void *obj);
 void __cdecl SpawnHitEffect(const uint32_t *at, int32_t rowField2C,
                             int32_t dir, int32_t height);
 
+/* 0x00461C30. The directional death burst: up to seven particles chosen by an
+ * 8x7 mask indexed on the facing sector. Both its tables are decoded from the
+ * prologue that builds them on the stack. */
+void __cdecl DiedEffectB(const uint32_t *at, int32_t facing,
+                         int32_t rowField2C, int32_t height);
+
 #endif
