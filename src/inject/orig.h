@@ -16322,8 +16322,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * 0xA4 and 0x94 rather than aliasing. */
 #define VEHICLE_OFF_FIELD_558      0x558u
 #define VEHICLE_OFF_FIELD_55C      0x55Cu
-#define VEHICLE_OFF_FIELD_560      0x560u
-#define VEHICLE_OFF_FIELD_564      0x564u
+/* Both were FIELD_ placeholders until 0x0045C6E0 read them. It multiplies
+ * +0x560 by ADDR_FRAME_DELTA_SEC and adds or subtracts it from the current
+ * speed at +0x44 to get a per-frame ceiling or floor -- so it is an
+ * acceleration RATE. And it compares +0x564 against the milliseconds since
+ * the row last turned, so that is a minimum turn INTERVAL. */
+#define VEHICLE_OFF_ACCEL_RATE     0x560u  /* per second, x frame delta */
+#define VEHICLE_OFF_TURN_INTERVAL  0x564u  /* ms between committed turns */
 /* A uid, and that is all that is evidenced. 0x00404730 resolves it through
  * the uid lookup and stores the object it gets; EnterVehicle clears it. Two
  * readers, neither of which says what it is FOR, so the name says only what

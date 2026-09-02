@@ -11920,9 +11920,9 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
         *(const int32_t *)(def + VEHDEF_OFF_FIELD_08);
     *(int32_t *)(o + VEHICLE_OFF_FIELD_55C) =
         *(const int32_t *)(def + VEHDEF_OFF_FIELD_0C);
-    *(int32_t *)(o + VEHICLE_OFF_FIELD_560) =
+    *(int32_t *)(o + VEHICLE_OFF_ACCEL_RATE) =
         *(const int32_t *)(def + VEHDEF_OFF_FIELD_10);
-    *(int32_t *)(o + VEHICLE_OFF_FIELD_564) =
+    *(int32_t *)(o + VEHICLE_OFF_TURN_INTERVAL) =
         *(const int32_t *)(def + VEHDEF_OFF_FIELD_14);
 
     *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
