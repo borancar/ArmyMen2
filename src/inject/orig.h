@@ -5017,6 +5017,25 @@ typedef struct {
  * its own SEH frame, so this is a class building a sub-object rather than
  * calling a helper.
  *
+ * THE TWENTY CHILDREN, extracted by pairing each operator new's SIZE with the
+ * constructor that follows it rather than by reading the body:
+ *
+ *   in the four-slot player loop:  MpName 0x74, MpColour 0x68, MpTeam 0x68
+ *   four list groups:              Record 0x0C + Listbox 0x98 + Arrowbar 0x78
+ *                                  (the second group uses TextList, not Listbox)
+ *   then:                          MultiSprite 0x80, Panel 0x60, Button 0x78 x2
+ *
+ * So the panel is three widgets per player, four scrolling lists with their
+ * own scrollbars, and four pieces of fixed furniture. Nineteen static
+ * constructor sites and twenty WidgetAddChild calls, because the loop's three
+ * are one site each and run four times.
+ *
+ * That the SECOND list group uses TextList where the other three use Listbox
+ * is the sort of thing a reader normalises away -- four groups that look
+ * identical, one with a different class. The extraction pairs sizes with
+ * constructors and shows it without a judgement call, which is the same
+ * argument as generating DirtyCollect's case labels from its table.
+ *
  * THE CHILD IDIOM, WHICH IS THE WHOLE BODY TWENTY TIMES OVER:
  *
  *     w = operator new(size);
