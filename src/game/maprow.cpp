@@ -1186,6 +1186,9 @@ int maprow_install(void)
                         "TimedDirFrame", 2);
     rc |= patch_replace(ADDR_GAME_SRAND, (const void *)GameSrand,
                         "GameSrand", 1);
+    rc |= patch_replace(ADDR_SEQ_START_DIR_EFFECT,
+                        (const void *)SeqStartDirEffect,
+                        "SeqStartDirEffect", 6);
     rc |= patch_replace(ADDR_PLACE_GROUND_DECAL,
                         (const void *)PlaceGroundDecal,
                         "PlaceGroundDecal", 3);
@@ -1989,4 +1992,69 @@ void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
     *(uint32_t *)(row + ROW_OFF_FIELD_2C) = *(const uint32_t *)(spr + 0x34u);
 
     RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+}
+
+/* SeqStartDirEffect -- original 0x00461EE0, five callers, all in FireWeapon.
+ * Start a sequence effect whose frame is chosen by DIRECTION: take a context
+ * from the B pool, pick the sprite for the angle out of sprite group C, and
+ * fill in the row the context carries.
+ *
+ * ITS TABLE IS SPRITE GROUP C, WHICH THIS TREE ALREADY DESCRIBES. The
+ * addressing is `[esi + 0x0048CA08]` with esi = group * 12, and 0x0048CA08 is
+ * ADDR_SPRITE_GROUPS_C with AM2_SPRITEGRP_C_BYTES of 0x0C -- so the three
+ * fields it reads are SPRITEGRP_C_OFF_COUNT, SPRITEGRP_C_OFF_SPRITES and the
+ * unnamed one at +8. Every part of that was already established by the
+ * loader; nothing here needed a new name, which is what grepping for the
+ * existing spelling is for.
+ *
+ * THE COUNT IS A DIRECTION COUNT. `0x100 / count` is the angle step, and
+ * `(step/2 + angle) / step` rounds the byte angle to the nearest of them --
+ * the half-step being what makes it round rather than truncate. The
+ * `if (frame >= count) frame -= count` after it is the wrap for angles that
+ * round up past the last direction, which is a single subtraction because
+ * they can only ever overshoot by one.
+ *
+ * THE Z GOES IN ONE HIGHER THAN IT ARRIVES. `mov eax,[esp+0xc]; inc eax`
+ * before the store to ROW_OFF_X + 2, and nothing else adjusts it. Reproduced;
+ * it is the original's and the only place in this pair of functions where a
+ * coordinate is not passed straight through.
+ *
+ * The row is the CONTEXT'S, not a fresh one -- SeqAlloc hands back a context
+ * whose +0x1C already points at a row -- so this fills a row it did not
+ * allocate and must not free. */
+void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
+                               int32_t group, uint32_t ownerUid,
+                               int32_t field26)
+{
+    uint8_t       *ctx = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_B);
+    const uint8_t *grp = (const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C
+                         + (uint32_t)group * AM2_SPRITEGRP_C_BYTES;
+    int32_t        count = *(const int32_t *)(grp + SPRITEGRP_C_OFF_COUNT);
+    int32_t        step  = 0x100 / count;
+    int32_t        frame;
+    uint8_t       *row;
+
+    *(uint8_t *)(ctx + 4)     = (uint8_t)group;
+    *(uint32_t *)(ctx + 0x24) = ownerUid;
+    *(int32_t *)ctx           = 2;
+    *(int32_t *)(ctx + 0x0C)  = 0;
+    *(int32_t *)(ctx + 0x10)  = 0;
+
+    frame = ((step >> 1) + angle) / step;
+    if (frame >= count)
+        frame -= count;
+    *(int32_t *)(ctx + 0x14) = frame;
+    *(int32_t *)(ctx + 8)    = *(const int32_t *)(grp + 8);
+
+    row = *(uint8_t **)(ctx + 0x1C);
+    *(uint8_t *)(row + 0x51)  = 0;
+    *(uint32_t *)(row + ROW_OFF_STAMP_54) = 0;
+    *(int32_t *)row           = 1;
+    *(uint32_t *)(row + ROW_OFF_SPRITE) =
+        ((uint32_t *const *)(grp + SPRITEGRP_C_OFF_SPRITES))[0][frame];
+    *(int16_t *)(row + ROW_OFF_X)        = (int16_t)x;
+    *(int16_t *)(row + ROW_OFF_X + 2)    = (int16_t)(z + 1);
+    *(int16_t *)(row + 0x20)             = 0;
+    *(uint32_t *)(row + ROW_OFF_FIELD_2C) = 0;
+    *(int16_t *)(row + ROW_OFF_FIELD_26) = (int16_t)field26;
 }

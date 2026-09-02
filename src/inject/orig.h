@@ -6711,6 +6711,10 @@ typedef struct {
 #define AM2_SPRITEGRP_C_BYTES     0x0Cu
 #define AM2_SPRITEGRP_C_BASE      0xC8   /* the first group's sprite index */
 #define AM2_SPRITEGRP_C_FLAGS     0x1000 /* not 0x1080, as the first two use */
+/* 0x00461EE0, five callers in FireWeapon. Start a direction-chosen sequence
+ * effect from one of these groups. */
+#define ADDR_SEQ_START_DIR_EFFECT 0x00461EE0u /* void(x,z,angle,group,
+                                                 uid,field26) */
 #define ADDR_LOAD_SPRITE_GROUPS_C 0x00462BE0u  /* void(void) */
 #define ADDR_FREE_SPRITE_GROUPS_C 0x00462C60u  /* void(void) */
 #define ADDR_LOAD_SPRITE_GROUPS   0x00462A60u  /* void(void) */

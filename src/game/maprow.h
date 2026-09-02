@@ -149,4 +149,10 @@ void __cdecl GameSrand(int32_t seed);
  * eight neighbours is occupied. */
 void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant);
 
+/* 0x00461EE0. Start a sequence effect whose frame is chosen by direction out
+ * of sprite group C. Six arguments, confirmed from a call site. */
+void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
+                               int32_t group, uint32_t ownerUid,
+                               int32_t field26);
+
 #endif
