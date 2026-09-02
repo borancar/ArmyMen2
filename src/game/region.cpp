@@ -3986,8 +3986,14 @@ void __cdecl AiAttackBody(void *obj, void *out, void *ctx)
             goto out_of_sight;
         }
 
+        /* KEYED ON THE BEARING TO THE TARGET, NOT ON THE VIEWER'S FACING.
+         * Both are bytes in the same units and both are live in registers
+         * here, which is what made `facing` a plausible and wrong reading --
+         * the original indexes with the very register it just passed to
+         * AngleDelta as the SECOND argument. See the note in AiCanSee. */
         rec = (uint8_t *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR
-              + ((uint32_t)facing / AM2_SIGHT_DIR_STEP) * AM2_SIGHT_DIR_STRIDE;
+              + ((uint32_t)bearing / AM2_SIGHT_DIR_STEP)
+                    * AM2_SIGHT_DIR_STRIDE;
         gen = *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
 
         if (*(const int32_t *)(rec + SIGHTDIR_OFF_TRACE_STAMP) != gen) {
@@ -4341,8 +4347,14 @@ void __cdecl AiEngageStep(void *obj, void *out, void *ctx)
             goto out_of_sight;
         }
 
+        /* KEYED ON THE BEARING TO THE TARGET, NOT ON THE VIEWER'S FACING.
+         * Both are bytes in the same units and both are live in registers
+         * here, which is what made `facing` a plausible and wrong reading --
+         * the original indexes with the very register it just passed to
+         * AngleDelta as the SECOND argument. See the note in AiCanSee. */
         rec = (uint8_t *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR
-              + ((uint32_t)facing / AM2_SIGHT_DIR_STEP) * AM2_SIGHT_DIR_STRIDE;
+              + ((uint32_t)bearing / AM2_SIGHT_DIR_STEP)
+                    * AM2_SIGHT_DIR_STRIDE;
         gen = *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
 
         if (*(const int32_t *)(rec + SIGHTDIR_OFF_TRACE_STAMP) != gen)
@@ -4502,8 +4514,20 @@ static int32_t AiCanSee(const uint8_t *o, const uint8_t *seen)
         /* Outside the arc, a target still counts if it is close enough. */
         return dist < *(const int32_t *)(rank + RANK_REC_OFF_FIELD_08);
 
+    /* KEYED ON THE BEARING TO THE TARGET, NOT ON THE VIEWER'S FACING -- and I
+     * had it as `facing` in all three copies of this test until a fourth
+     * member of the family was read. Both are bytes in the same eighth-of-a-
+     * turn units, both are live in registers at this point, and the original
+     * indexes with the register it has just passed to AngleDelta as its
+     * SECOND argument. Nothing in the shape of the code distinguishes them;
+     * only following that register does.
+     *
+     * It matters: the cache records how far the view is blocked in a
+     * DIRECTION, and the direction that matters is the one the target lies
+     * in. Keying on the viewer's facing gives a unit the occlusion for
+     * wherever its hull happens to point. */
     rec = (uint8_t *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR
-          + ((uint32_t)facing / AM2_SIGHT_DIR_STEP) * AM2_SIGHT_DIR_STRIDE;
+          + ((uint32_t)bearing / AM2_SIGHT_DIR_STEP) * AM2_SIGHT_DIR_STRIDE;
     gen = *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
 
     if (*(const int32_t *)(rec + SIGHTDIR_OFF_TRACE_STAMP) != gen)

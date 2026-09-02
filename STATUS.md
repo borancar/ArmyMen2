@@ -352,6 +352,28 @@ outcome and speed all land where the hand derivation put them. It reports
 disagreeing depths and unreached references rather than guessing; on
 `0x00403B40` it reports neither, across 559 instructions.
 
+## A defect in three shipped functions, found by reading a fourth
+
+`ADDR_SIGHT_BLOCK_BY_DIR` is indexed by the **bearing to the target**, not by
+the viewer's facing. `AiAttackBody`, `AiEngageStep` and `AiCanSee` -- the last
+shared by two functions -- all had `facing`. Fixed; `ab.sh bootcamp campaign`
+clean before and after, which is the point.
+
+Both values are bytes in the same eighth-of-a-turn units, both are live in
+registers where the index is computed, and the original indexes with the very
+register it has just handed `AngleDelta` as its *second* argument. Nothing in
+the shape of the code distinguishes them; only following that register does.
+
+It matters because the record says how far the view is blocked in a
+*direction*, and the direction that matters is the one the target lies in.
+Keyed on the facing, a unit gets the occlusion for wherever its hull happens to
+point.
+
+**No check could see it.** The offsets are identical, so `checkoffsetuse`
+reports byte-for-byte the same before and after; the band is cold, so no A/B
+can move; and the code compiles and runs either way. What found it was reading
+a fourth function that does the same thing and noticing the register.
+
 ## Next: the sighting scan, mapped
 
 `0x00403B40`, 1,888 bytes over a 0x84C frame -- what fills `SIGHT_OFF_FOUND`,

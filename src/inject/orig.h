@@ -7332,6 +7332,20 @@ typedef struct {
 #define SIGHTDIR_OFF_TRACE_STAMP 0x0Cu  /* int32 */
 #define AM2_SIGHT_DIR_STRIDE     16u
 #define AM2_SIGHT_DIR_STEP       4      /* headings per record */
+/* THE INDEX IS THE BEARING TO THE TARGET, NOT THE VIEWER'S FACING, and three
+ * reconstructions had it wrong until a fourth member of the family was read.
+ * Both are bytes in the same eighth-of-a-turn units and both are live in
+ * registers where the index is computed, so `facing` reads perfectly; the
+ * original indexes with the register it has just handed AngleDelta as its
+ * SECOND argument, which is AngleOfDelta's answer.
+ *
+ * It matters because the record says how far the view is blocked in a
+ * DIRECTION: the one the target lies in. Keyed on the facing, a unit gets the
+ * occlusion for wherever its hull happens to point.
+ *
+ * No check could see it -- the offsets are identical, the band is cold, and
+ * `checkoffsetuse` reports byte-for-byte the same before and after. What found
+ * it was reading a FOURTH function that does the same thing. */
 #define ADDR_SIGHT_GENERATION    0x004F93C0u  /* int32_t */
 /* A blocker this far under the viewer is ignored outright, before anything
  * else is computed. */
