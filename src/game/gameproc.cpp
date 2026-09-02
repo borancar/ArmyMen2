@@ -2126,7 +2126,7 @@ typedef void (__cdecl *AM2_VoidFn)(void);
 typedef void (__cdecl *AM2_WalkCellFn)(const uint32_t *pt, void *desc,
                                        void *fn);
 
-#define orig_def_460290   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_460290)
+/* 0x00460290 is DefSortMissileRecs now; defparse.h declares it. */
 #define orig_def_45ebc0   ((AM2_VoidFn)(uintptr_t)ADDR_DEF_STEP_45EBC0)
 
 void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c)
@@ -2149,7 +2149,7 @@ void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c)
 void __cdecl DefFinish(void)
 {
     DefSortTrooperRecs();
-    orig_def_460290();
+    DefSortMissileRecs();
     DefSortObjRecs();
     DefCheckLinks();
     orig_def_45ebc0();

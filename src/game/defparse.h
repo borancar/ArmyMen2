@@ -116,4 +116,8 @@ void __cdecl DefFreeTrooperRecs(void);
  * index arrays beside them. */
 void __cdecl FreeAaiTables(void);
 
+/* 0x00460290. Sort the missile-def lookup array so ADDR_MISSILE_DEF_FIND can
+ * binary-search it. The third of this file's three identical sorters. */
+void __cdecl DefSortMissileRecs(void);
+
 #endif /* AM2_DEFPARSE_H */

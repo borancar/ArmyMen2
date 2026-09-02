@@ -10036,6 +10036,13 @@ typedef struct {
  * the moment it was reconstructed, which is the alias ratchet doing exactly
  * what it is for: a placeholder name is fine until the thing has a real one. */
 #define ADDR_DEF_SORT_OBJ_RECS   0x00435A50u  /* void(void) */
+/* The THIRD sorter of that family, between the trooper and object ones in
+ * ADDR_LOAD_DEF_TABLES's four-call sequence. Its table is identified from its
+ * READERS rather than from the sort: ADDR_MISSILE_DEF_FIND reads 0x00662928,
+ * and a find over a table something else qsorts is a binary search, which is
+ * why the sort exists. Records are AM2_MISSILE_DEF_BYTES apart. */
+#define ADDR_DEF_MISSILE_RECS    0x00662928u  /* void *, 0x34-byte records */
+#define ADDR_DEF_MISSILE_COUNT   0x0066292Cu  /* uint32_t */
 /* 0x0044C550, one caller. Walk the four comm slots and run 0x0044C480 on
  * every one that is occupied AND that CommMustBroadcast accepts. */
 #define ADDR_TELL_EACH_SLOT      0x0044C550u  /* void(void) */

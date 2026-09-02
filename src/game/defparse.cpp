@@ -612,6 +612,23 @@ void __cdecl DefSortObjRecs(void)
     orig_def_log();
 }
 
+/* 0x00460290. The third of the three sorters, and the same function again --
+ * this file's note above the other two applies unchanged: same shape, a
+ * different table, and the comparator is the only thing that distinguishes
+ * them. This one uses CompareDword like the trooper sorter.
+ *
+ * The table is the missile defs' lookup array, named from its READER:
+ * ADDR_MISSILE_DEF_FIND reads it, and a find over something another function
+ * qsorts is a binary search. */
+void __cdecl DefSortMissileRecs(void)
+{
+    orig_qsort(*(void **)(uintptr_t)ADDR_DEF_MISSILE_RECS,
+               *(const uint32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT,
+               AM2_MISSILE_DEF_BYTES,
+               (const void *)CompareDword);
+    orig_def_log();
+}
+
 void __cdecl DefSortTrooperRecs(void)
 {
     orig_qsort(*(void **)(uintptr_t)ADDR_DEF_TROOPER_RECS,
@@ -704,6 +721,9 @@ int defparse_install(void)
 
     rc |= patch_replace(ADDR_DEF_SORT_OBJ_RECS, (const void *)DefSortObjRecs,
                         "DefSortObjRecs", 1);
+    rc |= patch_replace(ADDR_DEF_STEP_460290,
+                        (const void *)DefSortMissileRecs,
+                        "DefSortMissileRecs", 1);
     rc |= patch_replace(ADDR_DEF_SORT_TROOPER_RECS,
                         (const void *)DefSortTrooperRecs,
                         "DefSortTrooperRecs", 1);
