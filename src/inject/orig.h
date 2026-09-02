@@ -9892,7 +9892,7 @@ typedef struct {
 /* Free four, then log. Two of the four are already named. */
 #define ADDR_TEARDOWN_DEF_TABLES 0x004033E0u  /* void(void) */
 #define ADDR_FREE_VEHICLE_DEFS   0x0045EDF0u  /* void(void), two callers */
-#define ADDR_FREE_LIST_662928    0x004607D0u  /* void(void), two callers */
+#define ADDR_FREE_MISSILE_DEFS   0x004607D0u  /* void(void), two callers */
 /* Two steps, the second a tail jump. Both halves are inside one merged
  * functions.tsv entry, which is why the second has no entry of its own. */
 #define ADDR_TEARDOWN_40A4B0     0x0040A690u  /* void(void) */
@@ -10044,6 +10044,10 @@ typedef struct {
  * why the sort exists. Records are AM2_MISSILE_DEF_BYTES apart. */
 #define ADDR_DEF_MISSILE_RECS    0x00662928u  /* void *, 0x34-byte records */
 #define ADDR_DEF_MISSILE_COUNT   0x0066292Cu  /* uint32_t */
+/* Zeroed beside the count by the teardown, exactly as ADDR_VEHICLE_DEF_FIELD_2C
+ * is beside its own. One toucher each, both of them frees, so both stay
+ * locations rather than meanings. */
+#define ADDR_DEF_MISSILE_FIELD_30 0x00662930u  /* int32_t */
 /* 0x0044C550, one caller. Walk the four comm slots and run 0x0044C480 on
  * every one that is occupied AND that CommMustBroadcast accepts. */
 #define ADDR_TELL_EACH_SLOT      0x0044C550u  /* void(void) */

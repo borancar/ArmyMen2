@@ -2033,7 +2033,7 @@ typedef void (__cdecl *AM2_Call3Fn)(int32_t a, int32_t b, int32_t c);
 
 #define orig_teardown_log   ((AM2_TeardownFn)(uintptr_t)ADDR_LOG)
 /* 0x0045EDF0 is FreeVehicleDefs now; definfo.h declares it. */
-#define orig_free_list_b    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_LIST_662928)
+/* 0x004607D0 is FreeMissileDefs now; definfo.h declares it. */
 /* 0x0040A4B0 is BuildRemapTables, reconstructed in win32/palette.cpp and
  * called by name -- see the note below. Declared here rather than by
  * including that header: gameproc.cpp is on the flat side of the split and
@@ -2085,7 +2085,7 @@ void __cdecl TeardownDefTables(void)
 {
     DefFreeTables();
     FreeVehicleDefs();
-    orig_free_list_b();
+    FreeMissileDefs();
     DefFreeTrooperRecs();
     orig_teardown_log();
 }

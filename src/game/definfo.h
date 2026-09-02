@@ -77,4 +77,8 @@ int definfo_install(void);
  * and the pointer after it. */
 void __cdecl FreeVehicleDefs(void);
 
+/* 0x004607D0. Free the missile def table -- the same function as
+ * FreeVehicleDefs with a different table, diffed at zero differences. */
+void __cdecl FreeMissileDefs(void);
+
 #endif /* AM2_DEFINFO_H */

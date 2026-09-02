@@ -21,7 +21,7 @@ typedef void    (__cdecl *AM2_VoidFn)(void);
  * goes wrong unseen. */
 
 /* 0x0045EDF0 is FreeVehicleDefs now; definfo.h declares it. */
-#define orig_free_list_662928  ((AM2_VoidFn)AM2_IMAGE(ADDR_FREE_LIST_662928))
+/* 0x004607D0 is FreeMissileDefs now; definfo.h declares it. */
 #define orig_missile_def_find  ((AM2_DefFindFn)AM2_IMAGE(ADDR_MISSILE_DEF_FIND))
 #define orig_log_noargs        ((AM2_VoidFn)(uintptr_t)ADDR_LOG)
 
@@ -304,7 +304,7 @@ void __cdecl LoadDefTables(void)
 
     DefFreeTables();
     FreeVehicleDefs();
-    orig_free_list_662928();
+    FreeMissileDefs();
     DefFreeTrooperRecs();
     orig_log_noargs();
 
@@ -421,6 +421,9 @@ int definfo_install(void)
     rc |= patch_replace(ADDR_FREE_VEHICLE_DEFS,
                         (const void *)FreeVehicleDefs,
                         "FreeVehicleDefs", 2);
+    rc |= patch_replace(ADDR_FREE_MISSILE_DEFS,
+                        (const void *)FreeMissileDefs,
+                        "FreeMissileDefs", 2);
     return rc;
 }
 
@@ -431,13 +434,32 @@ int definfo_install(void)
  * between the two sees an empty table rather than a live count over freed
  * memory. Writing the three stores together after the free would be tidier
  * and would lose that. */
+static void FreeDefTable(void **recs, int32_t *count, int32_t *other)
+{
+    void *p = *recs;
+
+    *count = 0;
+    *other = 0;
+    if (p != 0)
+        am2_free(p);
+    *recs = 0;
+}
+
 void __cdecl FreeVehicleDefs(void)
 {
-    void *recs = *(void **)(uintptr_t)ADDR_VEHICLE_DEFS;
+    FreeDefTable((void **)(uintptr_t)ADDR_VEHICLE_DEFS,
+                 (int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT,
+                 (int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_FIELD_2C);
+}
 
-    *(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT = 0;
-    *(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_FIELD_2C = 0;
-    if (recs != 0)
-        am2_free(recs);
-    *(void **)(uintptr_t)ADDR_VEHICLE_DEFS = 0;
+/* 0x004607D0. The same function again for the missile def table -- diffed
+ * with the three globals substituted: 13 instructions each, ZERO differences.
+ * That is the 1.000 case, where a shared helper is faithful; the row-pool
+ * allocators came out at 0.222 against their generic twin and had to stay
+ * apart. Diff before sharing AND before declining to share. */
+void __cdecl FreeMissileDefs(void)
+{
+    FreeDefTable((void **)(uintptr_t)ADDR_DEF_MISSILE_RECS,
+                 (int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT,
+                 (int32_t *)(uintptr_t)ADDR_DEF_MISSILE_FIELD_30);
 }
