@@ -2344,6 +2344,24 @@
 #define ADDR_MERGE_DIRTY         0x0041D060u  /* void(void) */
 /* The rectangle the view is clipped against before anything is compared --
  * the map's extent on screen. */
+/* THREE RECTS, AND TWO OF THEM ARE NAMED AT THE FIELD LEVEL. LoadMap's MHDR
+ * arm builds all three with RectSet and copies each one's four dwords out, so
+ * their extents are visible together for the first time:
+ *
+ *   0x00514DE8  ADDR_MAP_BOUNDS        (0, 0, extentX, extentY)
+ *   0x00514DF8  ADDR_MAP_BOUNDS_LEFT.. (0x40, 0x40, extentX-0x40, extentY-0x40)
+ *   0x00514EA8  ADDR_VISIBLE_TILES     (1, 1, viewTilesW+1, viewTilesH+1)
+ *
+ * ADDR_CAMERA_Y IS NOT A CAMERA. It is 0x00514EAC, which is ADDR_VISIBLE_TILES
+ * + 4 -- the TOP of that rect, written by the same RectSet as the other three
+ * fields. The name predates knowing the global is a rectangle, and reading it
+ * as a camera position is wrong in a way nothing would catch: it holds a
+ * plausible small number either way.
+ *
+ * ADDR_MAP_BOUNDS_LEFT/TOP/RIGHT/BOTTOM are one rect under four names, which
+ * is the same thing done deliberately and is merely verbose. Neither is
+ * renamed here -- that is a change to every use at once and gets its own
+ * commit, which is now the third time this file has said so. */
 #define ADDR_MAP_BOUNDS          0x00514DE8u  /* AM2_Rect */
 /* Walks the registered dirty rectangles at 0x00508AC4 and repaints the ones
  * meeting the given region. Its only import is IntersectRect. */
