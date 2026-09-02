@@ -4524,6 +4524,27 @@
  * side of the split, where naming a Win32 declaration is what
  * tools/checksplit.py exists to refuse. */
 #define ADDR_IAT_GET_TICK_COUNT  0x0046F084u  /* uint32_t (__stdcall *)(void) */
+/* USER32!IntersectRect. Reached through the game's own IAT slot, not imported
+ * by am2hook.dll -- the convention device.cpp keeps for DirectInput, where an
+ * import of our own would resolve through OUR IAT and walk past the hook.
+ * Nothing hooks this one, so here it is consistency rather than necessity.
+ *
+ * IT HAS NO WRITER, which is how it was identified. A scan of every mov/lea
+ * touching 0x0046F258 finds nine READS and no stores, and the dword there is
+ * 0x00071E26 -- a hint, not a code address. A `call [fixed address]` with no
+ * writer anywhere is an import; a callback has to be installed by somebody.
+ * Three of those nine reads are the row-pool evictors, and they are exactly
+ * the "three IntersectRect calls" tools/crt.py counts as part of the entire
+ * outside contact of the 112 game functions above the CRT line. */
+#define ADDR_IAT_INTERSECT_RECT  0x0046F258u  /* int32 (__stdcall *)(RECT*,RECT*,RECT*) */
+#define ADDR_ROWPOOL_A_RELEASE   0x004608C0u  /* int32_t(entry *) -- the next index */
+#define ADDR_ROWPOOL_A_EVICT     0x004609D0u  /* void(void) */
+#define ADDR_ROWPOOL_B_RELEASE   0x00460B90u  /* int32_t(entry *) */
+#define ADDR_ROWPOOL_B_EVICT     0x00460CA0u  /* void(void) */
+/* The row's rectangle is ROW_OFF_RECT, already defined further down at 0x0C
+ * -- checkoffsets refused a second copy, which is the fourth time this
+ * session that grepping the OFFSET rather than the name would have been one
+ * command and was not run. */
 /* Where the registry key and the application GUID live in the image. Neither is
  * restated here -- the game's own copies are used, as with the DirectPlay
  * CLSIDs. The GUID is {2777D2A2-89D1-11D2-A387-00C04F79DCEB}. */

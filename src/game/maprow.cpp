@@ -1141,6 +1141,14 @@ int maprow_install(void)
                         "RowPoolAFree", 1);
     rc |= patch_replace(ADDR_ROWPOOL_B_FREE, (const void *)RowPoolBFree,
                         "RowPoolBFree", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_A_RELEASE, (const void *)RowPoolARelease,
+                        "RowPoolARelease", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_B_RELEASE, (const void *)RowPoolBRelease,
+                        "RowPoolBRelease", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_A_EVICT, (const void *)RowPoolAEvict,
+                        "RowPoolAEvict", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_B_EVICT, (const void *)RowPoolBEvict,
+                        "RowPoolBEvict", 1);
     return rc;
 }
 
@@ -1280,3 +1288,149 @@ void __cdecl RowPoolAInit(void) { RowPoolInit(&kRowPoolA); }
 void __cdecl RowPoolBInit(void) { RowPoolInit(&kRowPoolB); }
 void __cdecl RowPoolAFree(void) { RowPoolTeardown(&kRowPoolA); }
 void __cdecl RowPoolBFree(void) { RowPoolTeardown(&kRowPoolB); }
+/* 0x004608C0 (pool A) and 0x00460B90 (pool B). One function emitted twice:
+ * masked of constants the two are 82 instructions each and IDENTICAL,
+ * similarity 1.000.
+ *
+ * FOUR ROLES, and the last one is the trap. It
+ *   1. clears bit 0 of the row and calls RowUpdate, if the bit was set;
+ *   2. unlinks the entry both ways;
+ *   3. COMPACTS -- swaps the last entry into the freed slot, exchanging the
+ *      rows so every slot keeps owning one;
+ *   4. ANSWERS THE NEXT INDEX, corrected for the swap.
+ *
+ * Every other call site discards the answer, so `void(entry *)` is what the
+ * function looks like -- and the evictor's second loop depends on it, taking
+ * the new head from each release. Written as void, that loop would spin on a
+ * stale index or index by an address.
+ *
+ * The correction in step 4 matters on its own: if the entry that FOLLOWED the
+ * released one happened to be the last, the swap moved it and its old index
+ * is stale. Without the fixup a walker follows a dangling index one time in
+ * N, which is exactly the kind of defect no drive here would surface. */
+static int32_t RowPoolRelease(const AM2_RowPool *p, uint8_t *e)
+{
+    int32_t  count = *p->count;
+    int32_t  freed = *(int16_t *)(e + ROWPOOL_OFF_ID);
+    int32_t  next  = *(int16_t *)(e + ROWPOOL_OFF_NEXT);
+    int32_t  prev  = *(int16_t *)(e + ROWPOOL_OFF_PREV);
+    uint8_t *last;
+    void    *row;
+
+    row = *(void **)(e + ROWPOOL_OFF_ROW);
+    if ((*(uint32_t *)row & 1) != 0) {
+        *(uint32_t *)row &= ~1u;
+        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+    }
+
+    /* Unlink. The head sentinel is entry 0, so prev is always a real slot. */
+    *(int16_t *)(RowPoolEntry(p, prev) + ROWPOOL_OFF_NEXT) = (int16_t)next;
+    if (next > 0)
+        *(int16_t *)(RowPoolEntry(p, next) + ROWPOOL_OFF_PREV) = (int16_t)prev;
+    if (*p->tail == freed)
+        *p->tail = prev;
+
+    /* Compact: the last entry moves down into the hole, and the freed slot's
+     * row goes up to the vacated one. A MOVE rather than a swap would leak a
+     * row per release and alias two entries onto one. */
+    last = RowPoolEntry(p, count);
+    if (freed != count) {
+        int32_t lprev = *(int16_t *)(last + ROWPOOL_OFF_PREV);
+        int32_t lnext = *(int16_t *)(last + ROWPOOL_OFF_NEXT);
+
+        *(int16_t *)(RowPoolEntry(p, lprev) + ROWPOOL_OFF_NEXT) = (int16_t)freed;
+        if (lnext > 0)
+            *(int16_t *)(RowPoolEntry(p, lnext) + ROWPOOL_OFF_PREV) = (int16_t)freed;
+        /* The original compares the saved `next` against the LAST ENTRY'S OWN
+         * id (movsx from last+4 at 0x00460970), not against `count`. Those
+         * are the same number whenever the pool is consistent, and using the
+         * field is what the image does -- reproduce that rather than the
+         * arithmetic that happens to agree with it. */
+        if (next == *(int16_t *)(last + ROWPOOL_OFF_ID))
+            next = freed;
+
+        *(void **)(e + ROWPOOL_OFF_ROW)   = *(void **)(last + ROWPOOL_OFF_ROW);
+        *(int32_t *)(e + ROWPOOL_OFF_ID)  = *(int32_t *)(last + ROWPOOL_OFF_ID);
+        *(int32_t *)(e + ROWPOOL_OFF_NEXT)= *(int32_t *)(last + ROWPOOL_OFF_NEXT);
+        *(void **)(last + ROWPOOL_OFF_ROW) = row;
+        *(int16_t *)(e + ROWPOOL_OFF_ID)   = (int16_t)freed;
+        if (*p->tail == count)
+            *p->tail = freed;
+    }
+
+    *(int16_t *)(last + ROWPOOL_OFF_NEXT) = -1;
+    *(int16_t *)(last + ROWPOOL_OFF_PREV) = -1;
+    *p->count = count - 1;
+    return next;
+}
+/* 0x004609D0 (pool A) and 0x00460CA0 (pool B). One function twice: with the
+ * six parameters substituted they are 46 and 47 instructions and only EIGHT
+ * differ, every one a branch displacement off by exactly 2 -- the imm32/imm8
+ * encoding of the capacity propagating. Not a rewrite; a re-emission.
+ *
+ * TWO LOOPS, and reading only the first gives a tidy visibility cache that
+ * misses what happens when the pool is full of things you can SEE:
+ *
+ *   1. walk the list from the head; release any entry whose row rectangle no
+ *      longer meets the view; stop after `budget` releases or at the end.
+ *   2. if the budget was NOT used up, release from the head `budget` more
+ *      times REGARDLESS of any rectangle -- the pressure valve.
+ *
+ * The IntersectRect goes through the game's own IAT thunk, not an import of
+ * ours, for the same reason device.cpp calls the DirectInput thunk: an import
+ * in am2hook.dll would resolve through OUR IAT. (Here it is only USER32 and
+ * nothing hooks it, so this is convention rather than necessity -- but the
+ * convention is what keeps the rule legible.)
+ *
+ * Loop 2 takes its next index from the RELEASE'S RETURN VALUE. The original
+ * loads the entry ADDRESS into eax, calls, and branches back to the lea --
+ * which reads as indexing by an address until you notice `call` clobbers eax
+ * with the answer. A version that walked saved indices would be wrong the
+ * moment the compaction moved an entry. */
+typedef int32_t (__stdcall *AM2_IntersectRectFn)(void *dst, const void *a,
+                                                 const void *b);
+#define orig_intersect_rect \
+    (*(AM2_IntersectRectFn *)AM2_IMAGE(ADDR_IAT_INTERSECT_RECT))
+
+static void RowPoolEvict(const AM2_RowPool *p)
+{
+    int32_t left = p->budget;
+    int32_t i;
+
+    if (*p->count <= p->capacity)
+        return;
+
+    i = *(int16_t *)(RowPoolEntry(p, 0) + ROWPOOL_OFF_NEXT);
+    while (i > 0 && left > 0) {
+        uint8_t *e = RowPoolEntry(p, i);
+        uint8_t  scratch[16];
+        void    *row = *(void **)(e + ROWPOOL_OFF_ROW);
+
+        if (!orig_intersect_rect(scratch,
+                                 (const void *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
+                                 (const uint8_t *)row + ROW_OFF_RECT)) {
+            i = RowPoolRelease(p, e);
+            left--;
+            continue;
+        }
+        i = *(int16_t *)(e + ROWPOOL_OFF_NEXT);
+    }
+
+    /* The pressure valve: still over, so drop from the head regardless. */
+    i = *(int16_t *)(RowPoolEntry(p, 0) + ROWPOOL_OFF_NEXT);
+    while (left > 0) {
+        i = RowPoolRelease(p, RowPoolEntry(p, i));
+        left--;
+    }
+}
+
+int32_t __cdecl RowPoolARelease(void *e)
+{
+    return RowPoolRelease(&kRowPoolA, (uint8_t *)e);
+}
+int32_t __cdecl RowPoolBRelease(void *e)
+{
+    return RowPoolRelease(&kRowPoolB, (uint8_t *)e);
+}
+void __cdecl RowPoolAEvict(void) { RowPoolEvict(&kRowPoolA); }
+void __cdecl RowPoolBEvict(void) { RowPoolEvict(&kRowPoolB); }

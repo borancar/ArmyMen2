@@ -82,4 +82,16 @@ void __cdecl RowPoolAFree(void);
 /* 0x00460B30. Tear down row pool B: the only place its rows are freed. */
 void __cdecl RowPoolBFree(void);
 
+/* 0x004608C0. Release a pool-A entry. ANSWERS THE NEXT INDEX, corrected for
+ * the compaction -- every caller but the evictor discards it, so `void` is
+ * what this looks like and would break the evictor's second loop. */
+int32_t __cdecl RowPoolARelease(void *entry);
+/* 0x00460B90. The same for pool B. */
+int32_t __cdecl RowPoolBRelease(void *entry);
+/* 0x004609D0. Pool A is over capacity: drop off-screen entries, then drop
+ * from the head regardless if that did not free enough. */
+void __cdecl RowPoolAEvict(void);
+/* 0x00460CA0. The same for pool B. */
+void __cdecl RowPoolBEvict(void);
+
 #endif
