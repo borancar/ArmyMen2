@@ -9657,6 +9657,87 @@ int32_t __cdecl PointerPickEnemyTrooper(void *obj)
     return 1;
 }
 
+/* VehicleDismountAll -- original 0x00458930, 240 bytes, one caller: the
+ * per-frame input handler, behind ActionKeyDown(0xD).
+ *
+ * BOTH ITS ARGUMENTS ARE IGNORED. The caller pushes two and cleans eight bytes,
+ * and the body reads no stack slot at all -- its only input is
+ * ADDR_OBJ_CTX_OBJ_A. Worth checking rather than assuming a mis-read, because a
+ * function that ignores everything it is given is unusual; the body has exactly
+ * one source and it is that global.
+ *
+ * WHAT IT DOES: empty the current vehicle, attaching everyone who leaves to
+ * whoever is in seat 0. Seats from 1 upward first -- attach the occupant to the
+ * driver, then eject -- and the loop reads the seat count FRESH each turn
+ * through ADDR_FIELD_53C rather than counting down, so it follows whatever the
+ * ejection did. Then seat 0 is ejected. Then everything on the vehicle's
+ * OBJ_OFF_PTR_LIST is attached to the driver as well.
+ *
+ * THE DRIVER IS LOOKED UP ONCE, BEFORE ANYONE LEAVES, and used for every
+ * attach afterwards -- including after seat 0 has itself been ejected. So the
+ * followers follow a unit that is no longer in the vehicle, which is the point
+ * rather than an oversight.
+ *
+ * THE LAST LOOP DOES NOT ALWAYS ADVANCE. A uid that no longer resolves is
+ * removed from the list and the index is NOT incremented, because the removal
+ * shifts the next entry down into it; a uid that does resolve is attached and
+ * the index moves on. Written as the original has it -- an `i++` in the wrong
+ * arm would skip an entry after every dead one.
+ *
+ * ListRemoveAt is THISCALL: the original does `lea ecx, [veh + OBJ_OFF_PTR_LIST]`
+ * and pushes the index with no `add esp` after, which is callee cleanup.
+ *
+ * NOT ExitAllFromVehicle, which is 0x0045AE30 and names itself in its own log
+ * lines. This one attaches the leavers to the driver and that one does not.
+ *
+ * Not exercised: its key is not one any drive here presses. */
+void __cdecl VehicleDismountAll(void *a, void *b)
+{
+    uint8_t *veh;
+    uint8_t *driver;
+    int32_t  i;
+
+    (void)a;
+    (void)b;
+
+    veh = *(uint8_t **)(uintptr_t)ADDR_OBJ_CTX_OBJ_A;
+    if (!veh)
+        return;
+    if (*(const int32_t *)veh != AM2_OBJ_TYPE_VEHICLE)
+        return;
+    if ((int32_t)Field53C(veh) <= 0)
+        return;
+
+    driver = (uint8_t *)LookupByUID(
+        **(const uint32_t *const *)(veh + OBJ_OFF_FIELD_540));
+
+    while ((int32_t)Field53C(veh) > 1) {
+        uint8_t *o = (uint8_t *)LookupByUID(
+            (*(const uint32_t *const *)(veh + OBJ_OFF_FIELD_540))[1]);
+
+        if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER)
+            ObjAttachTo(o, driver);
+
+        if (!ExitOneFromVehicle(1, veh))
+            break;
+    }
+
+    ExitOneFromVehicle(0, veh);
+
+    for (i = 0; i < *(const int32_t *)(veh + SAVED_OFF_LIST_COUNT); ) {
+        uint8_t *o = (uint8_t *)LookupByUID(
+            (*(const uint32_t *const *)(veh + SAVED_OFF_LIST))[i]);
+
+        if (!o) {
+            /* No i++ -- the removal shifts the next entry into this slot. */
+            ListRemoveAt(veh + OBJ_OFF_PTR_LIST, i);
+            continue;
+        }
+        ObjAttachTo(o, driver);
+        i++;
+    }
+}
+
 /* PointerPickWatchedItem -- original 0x00459EE0, 208 bytes, one reference: the
  * PICK slot of a record in the second {pick, action, kind, flags} table.
  *
@@ -11030,6 +11111,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_POINTER_PICK_ENEMY_TROOPER,
                         (const void *)PointerPickEnemyTrooper,
                         "PointerPickEnemyTrooper", 1);
+    rc |= patch_replace(ADDR_VEHICLE_DISMOUNT_ALL,
+                        (const void *)VehicleDismountAll,
+                        "VehicleDismountAll", 1);
     rc |= patch_replace(ADDR_SET_WEAPON_TARGET_AIMED,
                         (const void *)SetWeaponTargetAimed,
                         "SetWeaponTargetAimed", 4);

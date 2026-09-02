@@ -1649,6 +1649,10 @@ int32_t __cdecl PointerPickRepair(void *obj);
  * ALLY: an enemy trooper that is not our Sarge, within reach. */
 int32_t __cdecl PointerPickEnemyTrooper(void *obj);
 
+/* 0x00458930. Empty the current vehicle, attaching each leaver to whoever was
+ * in seat 0. Both arguments are ignored -- see the note in widget.cpp. */
+void __cdecl VehicleDismountAll(void *a, void *b);
+
 /* 0x00458D70. ADDR_SET_WEAPON_TARGET's sibling: record a fire request aimed at
  * ADDR_AIM_X/Y/Z, for the weapon kinds 0x23..0x26. */
 void __cdecl SetWeaponTargetAimed(void *target, uint32_t at);

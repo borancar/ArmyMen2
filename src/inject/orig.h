@@ -10099,6 +10099,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * -- what the order actually is has not been established. */
 #define ADDR_POINTER_PICK_ENEMY_TROOPER 0x00459BE0u /* int32_t(void *obj) */
 #define AM2_MENU_ROW_0A          0x0A
+/* 0x00458930, one caller, behind ActionKeyDown(0xD). Empty the current vehicle
+ * and attach everyone who leaves to whoever was in seat 0. Its two arguments
+ * are pushed by the caller and read by nothing. */
+#define ADDR_VEHICLE_DISMOUNT_ALL 0x00458930u /* void(void *, void *) */
 /* The one AAI type PointerPickRepair refuses. A placeholder rather than
  * AM2_ITEM_KIND_DISG_3, which is the same number in a different table -- the
  * kind index and AAIREC_OFF_TYPE are not the same namespace. */
