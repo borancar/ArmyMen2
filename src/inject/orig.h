@@ -1050,6 +1050,38 @@
  * one array of structs. **Take a stride from the loop step, never from the
  * largest displacement in the body** -- the same rule that says to read a
  * table's bounds from the loop rather than from the data. */
+/* 0x00413E70, 1,280 bytes, one caller. SURVEYED AND NOT RECONSTRUCTED. The
+ * per-frame mouse dispatch: it is what clears ADDR_POINTER_HOVER_UID at the top
+ * of each frame and then runs the whole selection and pointer layer.
+ *
+ * IT IS LIVE, unlike almost everything else left -- which is what makes it the
+ * one remaining function an A/B can actually compare rather than merely fail to
+ * regress.
+ *
+ * ALL THIRTEEN OF ITS CALLEES ARE ALREADY RECONSTRUCTED: SelectionClick,
+ * PointInRect, OverlayPrepare, PlaceScreenClick, CreateExplosion, ApproxDist,
+ * ActionKeyDown, ObjIsType3, VehicleDismountAll, LookupOwnerObj, WeaponByUid,
+ * ObjectsHitByPoint and GetMenuRow. So nothing under it needs reading first.
+ *
+ * AND ITS "UNNAMED" GLOBALS ARE MOSTLY FIELDS OF NAMED ONES, which is worth
+ * knowing before anyone opens a naming session for them: 0x004FCF74, 0x004FCF78
+ * and 0x004FCF7C are ADDR_VIEW_RECT's top, right and bottom -- it is an
+ * AM2_Rect -- and 0x0048546E and 0x004FCF6A are the high halves of the packed
+ * points ADDR_CURSOR_POINT and ADDR_DRAG_ANCHOR. That leaves three genuinely
+ * new: 0x004FD748 (next to ADDR_OPT_PETER, and it gates a CreateExplosion path
+ * that looks like a developer switch), 0x00476FB4 (next to ADDR_FOG_OF_WAR, read
+ * on that same path) and 0x004854A4 (among the mouse timing globals).
+ *
+ * The body is a dispatcher: refuse while a text field has focus or input is
+ * suppressed; clear the hover uid; SelectionClick; turn the cursor into a world
+ * point and bail if it is outside the view; the placement screen's own click
+ * path; drag-rectangle maintenance; two ActionKeyDown arms; and then a fan-out
+ * through the pointer and weapon function-pointer slots -- SLOT0..SLOT3,
+ * ADDR_POINTER_PICK and ADDR_POINTER_ACTION -- which is where the band
+ * reconstructed above this is actually reached from.
+ *
+ * What it needs is a branch-by-branch transcription of about 320 instructions;
+ * what it does not need is any more reading of its neighbours. */
 #define ADDR_HUD_POST_UPDATE 0x00413E70u  /* void(void), 1280 bytes */
 #define ADDR_HUD_MARKER_AGE  0x00412190u  /* void(void), the tail jump */
 

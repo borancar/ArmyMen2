@@ -41,6 +41,24 @@ stepping 0x80 to 0x01681600) with the sprite index carried alongside; its sprite
 load falls back to index 0x0A when one is missing; and it centres each sprite's
 hotspot to half its width and height, skipped for eight keys in one band.
 
+## Next: 0x00413E70, surveyed and ready to transcribe
+
+The per-frame mouse dispatch -- what clears `ADDR_POINTER_HOVER_UID` each frame
+and runs the whole selection and pointer layer. **It is live**, which makes it
+the one function left that an A/B can actually compare rather than merely fail
+to regress.
+
+**All thirteen of its callees are already reconstructed**, so nothing under it
+needs reading first. And its apparently-unnamed globals are mostly FIELDS of
+named ones: 0x004FCF74/78/7C are `ADDR_VIEW_RECT`'s top, right and bottom, and
+0x0048546E and 0x004FCF6A are the high halves of the packed points
+`ADDR_CURSOR_POINT` and `ADDR_DRAG_ANCHOR`. Only three are genuinely new.
+
+The body is a dispatcher that fans out through the pointer and weapon
+function-pointer slots -- which is where the whole band reconstructed this
+session is actually reached from. What it needs is a branch-by-branch
+transcription of about 320 instructions; the survey is in `orig.h`.
+
 ## And the split-aware figure is a lower bound too
 
 `PointerPickRepair` went in and the split-aware count did **not move** -- it
