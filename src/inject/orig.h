@@ -14253,6 +14253,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * failure. ADDR_TILE_COVER and ADDR_LOAD_PENDING have no chunk arm at all and
  * are allocated here and nowhere else.
  *
+ * WRITTEN ONCE AND REVERTED: the whole function was transcribed, compiled
+ * clean, passed every static check and FAILED the A/B outright -- 293,671
+ * pixels of 786,432 and a log that stops inside the map load, before the
+ * original's "freeing temporary map load data...". So the draft dies in the
+ * chunk loop or the object loop, and the map never finishes loading.
+ *
+ * That is the check earning its keep on the one function this session where
+ * an A/B could not possibly be a no-op: LoadMap builds every object on the
+ * map, so bootcamp's 1,610-line object dump and its pixels both depend on it
+ * completely. The three functions before this were cold or nearly so and
+ * their clean A/Bs proved much less.
+ *
+ * The transcription is kept out of the tree rather than installed while
+ * broken. What is NOT yet known is which of the two loops fails, and finding
+ * out needs a probe run rather than more reading -- the reading is done and
+ * was not the problem.
+ *
  * THE OBJECT-BUILDING LOOP IS EFFECTIVELY A SECOND FUNCTION and is the last
  * part of this to be written. It is not the "CreateWeapon per record" the
  * tail looked like from a distance: per record it packs a sprite key, and if
