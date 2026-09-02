@@ -34,6 +34,24 @@ reads globals and calls into the image; and `AM2_SELFCHECK=1` cannot, because
 the comm object is NULL before `install()`. It is verified by reading, and by
 the checks that caught four transcription errors on the way in.
 
+## What is next, as a number rather than a direction
+
+Above the line and below the evidenced CRT frontier at `0x00464420` there are
+**115 entries, 30 reconstructed and 85 outstanding, 29,072 bytes**. That is
+the next frontier and it is a much smaller one.
+
+Two caveats on that figure, both of which make it a lower bound in one
+direction and an over-count in the other. `tools/crt.py` says 112 game
+FUNCTIONS where this says 115 ENTRIES, and the difference is merges --
+`docs/functions.tsv` runs neighbours together where it cannot see a boundary,
+so some of the 85 are several functions and some are one. And 106 of the 112
+touch nothing outside the process at all, so almost none of this is boundary
+work: it is `CreateWeapon`, the item and vehicle comm messages, `DrawSeqBar`,
+"Game type: %s".
+
+Re-measure it rather than quoting it; the command is in this file's git
+history at `60c0050`.
+
 What the *count* does not mean: the CRT line is a rule of thumb and there are
 **112 game functions above it** (`tools/crt.py`), whose entire outside contact
 is two `GetTickCount` reads, three `IntersectRect` calls and one COM dispatch
