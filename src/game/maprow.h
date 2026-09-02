@@ -125,4 +125,9 @@ int32_t __cdecl RespawnKindAllowed(int32_t kind);
  * callers discards the answer. */
 int32_t __cdecl RandomRespawnKind(int32_t *out);
 
+/* 0x004610E0. Bring the row pools and seq contexts up; run from state 2. */
+void __cdecl SeqSubsystemInit(void);
+/* 0x00461120. Take them down again, LIFO. */
+void __cdecl FreeSeqContexts(void);
+
 #endif

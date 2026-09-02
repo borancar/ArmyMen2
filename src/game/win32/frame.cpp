@@ -1,4 +1,5 @@
 /* frame.cpp -- see frame.h. */
+#include "../maprow.h"  /* FreeSeqContexts -- reconstructed */
 #include "../msgslot.h"
 #include "../commmsg.h"  /* CommDrainMsgs -- reconstructed */
 #include "../../inject/win32.h"
@@ -754,7 +755,7 @@ void __cdecl LevelTeardown(void)
     ScriptResetTokens((AM2_ScriptCtx *)(uintptr_t)ADDR_SCRIPT_CONTEXT);
     ResetPads();
     call0(ADDR_TEARDOWN_40A6A0);
-    call0(ADDR_FREE_SEQ_CONTEXTS);
+    FreeSeqContexts();
     FreeAirSpritesAlias();
     call0(ADDR_FREE_AIM_SPRITES);
     call0(ADDR_TEARDOWN_463360);

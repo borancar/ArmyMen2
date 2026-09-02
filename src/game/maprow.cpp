@@ -1166,6 +1166,11 @@ int maprow_install(void)
     rc |= patch_replace(ADDR_RESPAWN_KIND_ALLOWED,
                         (const void *)RespawnKindAllowed,
                         "RespawnKindAllowed", 2);
+    rc |= patch_replace(ADDR_SEQ_SUBSYSTEM_INIT,
+                        (const void *)SeqSubsystemInit,
+                        "SeqSubsystemInit", 1);
+    rc |= patch_replace(ADDR_FREE_SEQ_CONTEXTS, (const void *)FreeSeqContexts,
+                        "FreeSeqContexts", 2);
     rc |= patch_replace(ADDR_RANDOM_RESPAWN_KIND,
                         (const void *)RandomRespawnKind,
                         "RandomRespawnKind", 2);
@@ -1727,4 +1732,32 @@ int32_t __cdecl RandomRespawnKind(int32_t *out)
                                + kind * AM2_MISSILE_DEF_BYTES
                                + MISSILEDEF_OFF_FIELD_30);
     return kind;
+}
+
+/* 0x004610E0. The whole row/seq subsystem coming up: both hardcoded pools,
+ * then both contexts. Reached from ADDR_STATE2_ENTER, so entering a mission
+ * runs it.
+ *
+ * The two SeqCtxInit calls' TEN arguments are cleaned by one `add esp, 0x28`
+ * -- the shared-cleanup shape again, which is why the arity of either call
+ * cannot be read off the cleanup and had to come from the pushes. */
+void __cdecl SeqSubsystemInit(void)
+{
+    RowPoolAInit();
+    RowPoolBInit();
+    SeqCtxInit((void *)(uintptr_t)ADDR_SEQ_CTX_A, 200, 40, 0x20, 0x20);
+    SeqCtxInit((void *)(uintptr_t)ADDR_SEQ_CTX_B, 100, 25, 0x40, 0x40);
+}
+
+/* 0x00461120. The same subsystem coming down, and it is LIFO: the contexts
+ * before the pools, and B before A in both halves where the init did A before
+ * B. orig.h's note on this address -- "the same releaser over CTX_B then
+ * CTX_A, then two more calls in the same band" -- is those two pool
+ * teardowns, which had no names when it was written. */
+void __cdecl FreeSeqContexts(void)
+{
+    SeqCtxFree((void *)(uintptr_t)ADDR_SEQ_CTX_B);
+    SeqCtxFree((void *)(uintptr_t)ADDR_SEQ_CTX_A);
+    RowPoolBFree();
+    RowPoolAFree();
 }

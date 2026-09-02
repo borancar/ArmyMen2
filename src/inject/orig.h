@@ -7519,6 +7519,7 @@ typedef struct {
  * threshold rather than added to the array -- which is why these five diff at
  * 0.222 against the hardcoded pair and are a rewrite, not a re-emission. */
 #define ADDR_SEQ_CTX_INIT        0x00460D90u  /* void(ctx,capacity,margin,w,h) */
+#define ADDR_SEQ_SUBSYSTEM_INIT  0x004610E0u  /* void(void) */
 #define ADDR_SEQ_CTX_FREE        0x00460E30u  /* void(ctx) */
 #define ADDR_SEQ_EVICT           0x00460FD0u  /* void(ctx) */
 #define SEQ_CTX_OFF_TAIL         0x04u
