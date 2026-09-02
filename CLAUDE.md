@@ -2338,7 +2338,27 @@ What is measured is that vtable `0x0046FD10` slot 2 holds `0x0045CAA0`, that
 the address is `ADDR_LOG`, and that patching it silences the game. WHY one
 address serves both is inferred rather than established: an empty virtual and a
 stubbed varargs logger are both a single `c3`, and identical-COMDAT folding is
-what merges such functions. Plausible, and not checked.
+what merges such functions.
+
+**THAT IS NOW CHECKED, from a third site.** `0x00460290` -- a qsort over the
+def tables -- ends `jmp ADDR_LOG` with an EMPTY argument frame: `retsplit`
+says the entry is one function and its caller is one of four consecutive
+no-argument calls, so the logger's format pointer would be whatever sits above
+the return address. If that address were really the logger, our harness would
+capture a garbage line, because `src/inject/gamelog.c` patches it.
+
+It captures nothing -- and the sequence demonstrably runs, because the four
+`Object AAI record not found` lines come from `ADDR_DEF_CHECK_LINKS`, the call
+immediately after this one. So the logger is capturing at that moment and no
+garbage line appears on either side of a `bootcamp` A/B. The address behaves
+as an empty function when reached that way, the folding reading is confirmed
+behaviourally, and the faithful reconstruction of such a tail call is a plain
+`return`.
+
+The measurement cost nothing: it was already in artifacts from a run forty
+minutes old. **Before designing an experiment, check whether a run you have
+already done answers it** -- the same shortcut that settled `mission`'s stale
+frame band from three dated directories on disk.
 
 Reconstructing it as an empty update replaced the logger with a no-op. **The
 game then ran perfectly and logged nothing**, which blinds precisely the half of
