@@ -856,6 +856,12 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
     rc |= patch_replace(ADDR_FREE_SPRITE_GROUPS_C,
                         (const void *)FreeSpriteGroupsC,
                         "FreeSpriteGroupsC", 1);
+    rc |= patch_replace(ADDR_LOAD_SPRITE_GRID,
+                        (const void *)LoadSpriteGrid,
+                        "LoadSpriteGrid", 1);
+    rc |= patch_replace(ADDR_FREE_SPRITE_GRID,
+                        (const void *)FreeSpriteGrid,
+                        "FreeSpriteGrid", 1);
     return rc;
 }
 
@@ -2492,4 +2498,52 @@ void __cdecl FreeSpriteGroupsC(void)
         am2_free(slots);
         *(void **)(r + SPRITEGRP_C_OFF_SPRITES) = 0;
     }
+}
+
+/* 0x00462CB0 and 0x00462D50. The fourth subsystem, and it is not a table at
+ * all: one flat rows x cols GRID of sprites in a single allocation, indexed
+ * [row * cols + col], with the sprite index positional from the OUTER counter.
+ *
+ * So three data shapes in four consecutive callees of one uniform dispatcher:
+ * a 10-record table with keys, a 4-record table without, and this grid.
+ *
+ * AND A THIRD FREE BEHAVIOUR. The first table frees every record
+ * unconditionally, the third skips a NULL record, and this one returns at
+ * once if the whole grid is NULL. Same job, three shapes, and a helper across
+ * any two of them erases the difference. */
+void __cdecl LoadSpriteGrid(void)
+{
+    int32_t rows = *(const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_ROWS;
+    int32_t cols = *(const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS;
+    AM2_Sprite **grid;
+    int32_t row, col;
+
+    grid = (AM2_Sprite **)am2_malloc((size_t)(rows * cols)
+                                     * sizeof(AM2_Sprite *));
+    *(void **)(uintptr_t)ADDR_SPRITE_GRID = grid;
+    memset(grid, 0, (size_t)(rows * cols) * sizeof(AM2_Sprite *));
+
+    for (row = 0; row < rows; row++)
+        for (col = 0; col < cols; col++)
+            grid[row * cols + col] =
+                PreloadSprite(AM2_SPRITEGRP_SET, AM2_SPRITE_GRID_BASE + row,
+                              col, AM2_SPRITEGRP_C_FLAGS, 1);
+}
+
+void __cdecl FreeSpriteGrid(void)
+{
+    AM2_Sprite **grid = *(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_GRID;
+    int32_t rows, cols, row, col;
+
+    if (grid == 0)
+        return;
+
+    rows = *(const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_ROWS;
+    cols = *(const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS;
+    for (row = 0; row < rows; row++)
+        for (col = 0; col < cols; col++)
+            ReleaseSprite(grid[row * cols + col]);
+
+    am2_free(grid);
+    *(void **)(uintptr_t)ADDR_SPRITE_GRID = 0;
 }

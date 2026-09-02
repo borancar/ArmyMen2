@@ -6665,7 +6665,17 @@ typedef struct {
  *
  * It begins where table B ends, so the four tables tile. */
 #define ADDR_SPRITE_GROUPS_C      ADDR_SPRITE_GROUPS_B_END
-#define ADDR_SPRITE_GROUPS_C_END  0x0048CA38u
+/* Table C's end is the address of the NEXT global, which is the fourth
+ * subsystem's row count -- the loop-bound-is-the-next-global pattern, and it
+ * confirms C's extent for free. Spelled from the row count so the adjacency
+ * is visible and no second ADDR_ name lands on 0x0048CA38. */
+#define ADDR_SPRITE_GRID_ROWS     0x0048CA38u  /* int32_t */
+#define ADDR_SPRITE_GRID_COLS     0x0048CA3Cu  /* int32_t */
+#define ADDR_SPRITE_GRID          0x0048CA40u  /* AM2_Sprite *[rows * cols] */
+#define AM2_SPRITE_GRID_BASE      0x12C        /* index = this + row */
+#define ADDR_LOAD_SPRITE_GRID     0x00462CB0u  /* void(void) */
+#define ADDR_FREE_SPRITE_GRID     0x00462D50u  /* void(void) */
+#define ADDR_SPRITE_GROUPS_C_END  ADDR_SPRITE_GRID_ROWS
 #define SPRITEGRP_C_OFF_COUNT     0x00u
 #define SPRITEGRP_C_OFF_SPRITES   0x04u
 #define AM2_SPRITEGRP_C_BYTES     0x0Cu

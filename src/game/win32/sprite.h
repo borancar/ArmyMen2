@@ -343,5 +343,10 @@ void __cdecl FreeSpriteGroupsB(void);
  * two -- 0.878 -- and its releaser skips the free where theirs does not. */
 void __cdecl LoadSpriteGroupsC(void);
 void __cdecl FreeSpriteGroupsC(void);
+/* 0x00462CB0 and 0x00462D50. The fourth subsystem is a flat rows x cols GRID
+ * in one allocation, not a table of descriptors, and its free returns at once
+ * on a NULL grid where the other two frees behave two other ways. */
+void __cdecl LoadSpriteGrid(void);
+void __cdecl FreeSpriteGrid(void);
 
 #endif /* AM2_SPRITE_H */
