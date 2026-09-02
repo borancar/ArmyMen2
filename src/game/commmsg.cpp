@@ -3341,14 +3341,6 @@ uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army)
     return at;
 }
 
-/* Still the image's; region.cpp reaches it the same way. The argument
- * identity is orig.h's, fixed by the sender's own log push order -- and the
- * call below independently agrees with it. */
-typedef void (__cdecl *AM2_SendVehWantFn)(void *vehicle, void *item,
-                                          int32_t request, int8_t slot,
-                                          int32_t quant);
-#define SendVehicleWantItem \
-    ((AM2_SendVehWantFn)(uintptr_t)ADDR_SEND_VEHICLE_WANT_ITEM)
 
 /* RecvVehicle1D -- original 0x0045E630, one caller. Message kind 0x1D, and it
  * names itself: "-->Vehicle Want Item Received: Vehicle: %x, item: %x,

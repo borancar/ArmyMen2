@@ -143,4 +143,9 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj);
 /* 0x0045E550. Ask each of the four comm slots to send its vehicle batch. */
 void __cdecl SendAllVehicleUpdates(void);
 
+/* 0x0045E0D0. Kind 0x1D, 28 bytes: a vehicle asks to pick an item up or
+ * drop one, or is told the answer. The receive half is RecvVehicle1D. */
+void __cdecl SendVehicleWantItem(void *vehicle, void *item, int32_t request,
+                                 int8_t slot, int32_t quant);
+
 #endif /* AM2_ARMYMSG_H */

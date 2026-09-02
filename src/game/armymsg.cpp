@@ -1605,6 +1605,9 @@ int armymsg_install(void)
     rc |= patch_replace(ADDR_SEND_ALL_VEH_UPDATES,
                         (const void *)SendAllVehicleUpdates,
                         "SendAllVehicleUpdates", 0);
+    rc |= patch_replace(ADDR_SEND_VEHICLE_WANT_ITEM,
+                        (const void *)SendVehicleWantItem,
+                        "SendVehicleWantItem", 5);
     return rc;
 }
 
@@ -2051,4 +2054,85 @@ void __cdecl SendAllVehicleUpdates(void)
             continue;
         SendVehicleUpdates(slot);
     }
+}
+
+/* SendVehicleWantItem -- original 0x0045E0D0, and this project named it
+ * earlier from its own log: "<--Vehicle Want Item Send: Vehicle: %x, item:
+ * %x, request: %d, slot: %d, quant: %d". Message kind 0x1D, 28 bytes, and
+ * with RecvVehicle1D the pickup/drop negotiation is ours at both ends.
+ *
+ * ITS WIRE LAYOUT CONFIRMS THE RECEIVER, READ WEEKS APART IN THE OTHER
+ * DIRECTION. request lands at msg+0x10, quant at +0x14 and slot at +0x18 --
+ * exactly the three displacements RecvVehicle1D reads, which were taken from
+ * that function alone. Two independent routes to one layout.
+ *
+ * THE ARGUMENT ORDER WAS THE HARD PART AND IS NOT SETTLED HERE EITHER. The
+ * prologue loads the five out of order, so orig.h fixes the identity from the
+ * LOG's push sequence -- `Vehicle: %x` takes argument 1 -- and RecvVehicle1D's
+ * reply call agreed independently by passing (vehicle, item, 2, slot, quant).
+ * This function's own body cannot distinguish them: both are objects and both
+ * are only read for a uid.
+ *
+ * `slot` IS SIGN-EXTENDED FROM A BYTE (`movsx eax, bl`) and travels as a full
+ * dword, which is why the parameter is int8_t and the field is not.
+ *
+ * IT SENDS THE ITEM'S POSITION AND NOBODY READS IT. msg+0x0C carries
+ * OBJ_OFF_POS off the item, and RecvVehicle1D touches +4, +8, +0x10, +0x14
+ * and +0x18 only. Reproduced -- the sender writes it -- and recorded, because
+ * a field with no reader is the kind of thing worth knowing before anyone
+ * reasons about what this message means.
+ *
+ * The null check is on the ITEM, not the vehicle, and it sits AFTER the log:
+ * a null item is announced and then not sent. */
+void __cdecl SendVehicleWantItem(void *vehicle, void *item, int32_t request,
+                                 int8_t slot, int32_t quant)
+{
+    uint8_t  *veh  = (uint8_t *)vehicle;
+    uint8_t  *itm  = (uint8_t *)item;
+    uint8_t  *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    struct {
+        AM2_ArmyMsgHdr hdr;
+        uint32_t       itemUid;
+        uint32_t       itemPos;
+        int32_t        request;
+        int32_t        quant;
+        int32_t        slot;
+    } msg;
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_VEH_WANT_ITEM_SEND),
+                UidOnWire(*(const uint32_t *)(veh + OBJ_OFF_UID)),
+                UidOnWire(*(const uint32_t *)(itm + OBJ_OFF_UID)),
+                request, (int32_t)slot, quant);
+
+    if (itm == 0)
+        return;
+
+    msg.hdr.len  = 0x1C;
+    msg.hdr.kind = 0x1D;
+    msg.hdr.uid  = UidOnWire(*(const uint32_t *)(veh + OBJ_OFF_UID));
+    msg.itemUid  = UidOnWire(*(const uint32_t *)(itm + OBJ_OFF_UID));
+    msg.itemPos  = *(const uint32_t *)(itm + OBJ_OFF_POS);
+    msg.request  = request;
+    msg.quant    = quant;
+    msg.slot     = (int32_t)slot;
+    ArmyMessageSend(&msg);
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE) == 0)
+        return;
+
+    /* Four separate `cmp`s in the original, not a table -- and each arm logs
+     * the same two values, so what differs between them is only the text. */
+    if (request == 0)
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_WANT_PICKUP),
+                *(const uint32_t *)(itm + OBJ_OFF_UID), quant);
+    else if (request == 1)
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_WANT_DROP),
+                *(const uint32_t *)(itm + OBJ_OFF_UID), quant);
+    else if (request == 2)
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_DO_PICKUP),
+                *(const uint32_t *)(itm + OBJ_OFF_UID), quant);
+    else if (request == 3)
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_DO_DROP),
+                *(const uint32_t *)(itm + OBJ_OFF_UID), quant);
 }
