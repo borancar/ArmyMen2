@@ -6170,7 +6170,7 @@ void __cdecl NextInventorySlot(void *obj)
  * shape of mistake as ObjInitCommon's `dir`. */
 typedef void (__cdecl *AM2_RoachRowFn)(void *row);
 #define orig_roach_row_final \
-    ((AM2_RoachRowFn)(uintptr_t)ADDR_ROACH_ROW_FINAL)
+    ((AM2_RoachRowFn)(uintptr_t)ADDR_LEAVE_REMAINS_ROW)
 
 typedef void (__cdecl *AM2_StepFn)(void *obj);
 

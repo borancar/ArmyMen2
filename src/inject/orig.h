@@ -9803,7 +9803,16 @@ typedef struct {
  * ADDR_TILE_COVER_ADD instead of _SUB, and the flag set instead of cleared.
  * Renamed. Two of the other four in this block are still role names. */
 #define ADDR_OBJ_SET_ROACH_FOOTPRINT 0x0043C8D0u  /* void(obj) */
-#define ADDR_ROACH_ROW_FINAL     0x00461EA0u  /* void(row), before the destroy */
+/* Named ADDR_ROACH_ROW_FINAL from ONE caller. It has three -- ADDR_STEP_TYPE2,
+ * _TYPE3 and _TYPE8, so troopers, vehicles and roaches -- and in STEP_TYPE3 it
+ * sits between a death sound and ADDR_DESTROY_BY_TYPE:
+ *     PlaySoundAt(0x1F, ...); obj->[0x59C] = 0;
+ *     <this>(row); DestroyByType(obj);
+ * Its body takes a slot from the moving-object row pool and copies the dying
+ * object's sprite, position and remap into it. So it leaves the REMAINS on the
+ * map as the object goes away, for any of the three types. Two independent
+ * supports: what the body does and where the call sits. */
+#define ADDR_LEAVE_REMAINS_ROW     0x00461EA0u  /* void(row), before the destroy */
 #define AM2_ROACH_ALIVE_SOUND    0x30
 #define OBJ_OFF_OWNER            0x04u   /* what a frame's actions are run against */
 #define ADDR_SET_OBJ_SCRIPT_STATE  0x004372A0u

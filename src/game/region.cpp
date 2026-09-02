@@ -7746,7 +7746,7 @@ typedef void (__cdecl *AM2_RowFinalFn)(void *row);
 /* TrooperFire is reconstructed below and called by name; 0x00449FD0's seam is
  * gone with it. */
 /* Type2PlayerStep is reconstructed below and called by name. */
-#define orig_row_final    ((AM2_RowFinalFn)(uintptr_t)AM2_IMAGE(ADDR_ROACH_ROW_FINAL))
+#define orig_row_final    ((AM2_RowFinalFn)(uintptr_t)AM2_IMAGE(ADDR_LEAVE_REMAINS_ROW))
 
 
 typedef int32_t (__cdecl *AM2_GameRandFn)(void);
