@@ -7918,7 +7918,31 @@ typedef struct {
  *
  * The arms average TWENTY instructions and the shape repeats: fetch a field
  * of the action record, refuse if it is null, call one named function,
- * return through the common epilogue. 1,166 instructions over 58 arms. */
+ * return through the common epilogue. 1,166 instructions over 58 arms.
+ *
+ * THE PROLOGUE IS A DEFERRAL AND IT IS THE ONLY SUBTLE PART. An action whose
+ * uid is not -2 does NOT run here at all unless its code is 0x1A: it is
+ * handed to EventNotify and executed later. Both branches of that hand-off
+ * are the same call --
+ *
+ *     EventNotify(act->uid2, act->uid, owner, 0, 0, 0, 0, delay, 0, 0)
+ *
+ * -- differing only in the delay, which comes from GetVarValue(act->xvar)
+ * when xvar is positive and from act->delay otherwise. Read as two calls
+ * they look like two behaviours; they are one call and a choice of delay.
+ *
+ * AND GetVarValue WRITES INTO ARGUMENT 1's SLOT. `lea ecx, [esp+0x70]` two
+ * pushes in resolves to the incoming `act` pointer's stack slot, reused once
+ * the pointer is in esi. Reading the two dwords after it as a pair -- which
+ * is what the displacements invite -- gives the variable's value and the
+ * OWNER argument, and calling that a two-field result would put the owner
+ * where a delay belongs. Third argument-slot reuse in three functions.
+ *
+ * The record needs no new offsets: AM2_ScriptAction in script.h is already
+ * fully named from the parser side, and every field the runner touches --
+ * uid, uid2, delay, code, subject, text, item, n0, n1, army, extra -- is in
+ * it. A runner and its parser sharing one struct is worth more than either
+ * having its own. */
 
 /* The four object fields the object-script runner uses, all read out of
  * UpdateObjectScript's body rather than guessed at a call site. */
