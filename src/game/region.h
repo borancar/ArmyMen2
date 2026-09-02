@@ -410,4 +410,9 @@ void __cdecl Step3ChooseFacing(void *obj, void *out);
  * and 16 otherwise. */
 void __cdecl Step3TurnState(void *obj, void *rec);
 
+/* 0x0045D4B0. Route the vehicle toward its destination, correct the heading
+ * against a distance-scaled tolerance, snap the view, and board selected
+ * units. */
+void __cdecl Step3RouteAndBoard(void *obj, void *rec);
+
 #endif /* AM2_REGION_H */

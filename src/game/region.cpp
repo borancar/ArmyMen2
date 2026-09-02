@@ -9066,6 +9066,9 @@ int region_install(void)
     rc |= patch_replace(ADDR_STEP3_TURN_STATE,
                         (const void *)Step3TurnState,
                         "Step3TurnState", 1);
+    rc |= patch_replace(ADDR_STEP3_ROUTE_BOARD,
+                        (const void *)Step3RouteAndBoard,
+                        "Step3RouteAndBoard", 1);
     return rc;
 }
 
@@ -9715,4 +9718,102 @@ void __cdecl Step3TurnState(void *obj, void *rec)
         *(int32_t *)(r + 0x08u) = 7;
     else if (delta < -tol)
         *(int32_t *)(r + 0x08u) = 6;
+}
+
+/* 0x0045D4B0, one caller in StepType3. Four jobs in one function: route the
+ * vehicle toward its destination, decide whether the heading needs
+ * correcting, snap the view to it, and BOARD any selected units.
+ *
+ * THE TOLERANCE LADDER IS THE INTERESTING PART: the angle error needed to
+ * trigger a correction GROWS with distance -- 0x10 under 0x40, 0x20 under
+ * 0x60, 0x40 beyond. A vehicle nearly there corrects for a small error; one
+ * far away tolerates a large one.
+ *
+ * `test ah, 4` IS BIT 10, not bit 2. The original tests the HIGH byte of the
+ * dword at +8, so the mask is 0x400; `& 4` on the low byte is a different
+ * flag and compiles just as well.
+ *
+ * +0x548 is left as a raw offset. orig.h has OBJ_OFF_SARGE there AND
+ * AM2_TYPE3_RECORD_SIZE with the same value, and esi is demonstrably the
+ * vehicle at that instruction -- loaded once at 0x0045D4B6 and never
+ * reassigned, with LookupByUID's result going to a different register later.
+ * Naming it either way asserts something this function cannot settle. */
+void __cdecl Step3RouteAndBoard(void *obj, void *rec)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *r = (uint8_t *)rec;
+    int32_t  i;
+
+    if (*(const uint16_t *)(o + 0xC0u) != 0) {
+        int32_t local;
+
+        if (*(const int32_t *)(o + 0x10Cu) != 0)
+            AiRouteToward(o, o + 0x578u, &local, 1);
+
+        if (ApproxDist((const AM2_Point *)(o + 0x12u),
+                       (const AM2_Point *)(o + 0xC0u)) < 0x30) {
+            *(int32_t *)(r + 0x08u) = 1;
+            *(int32_t *)(o + 0x10Cu) = 0;
+        } else {
+            uint8_t a = AngleBetween((const AM2_Point *)(o + 0x12u),
+                                     (const AM2_Point *)(o + 0xC0u));
+            int32_t d = AngleDelta(a, *(const uint8_t *)(o + OBJ_OFF_FACING));
+            int32_t dist;
+
+            *r = a;
+            *(int32_t *)(r + 0x08u) = 4;
+            if (d < 0)
+                d = -d;                       /* cdq; xor; sub */
+            dist = ApproxDist((const AM2_Point *)(o + 0x12u),
+                              (const AM2_Point *)(o + 0xC0u));
+            if (*(const int32_t *)(o + 0x548u) == 0)
+                r[1] = r[0];
+
+            if (dist < 0x40 ? d >= 0x10
+                            : (dist < 0x60 ? d >= 0x20 : d >= 0x40)) {
+                *(int32_t *)(r + 0x10u) = 1;
+                *(int32_t *)(r + 0x14u) = 1;
+            }
+        }
+    }
+
+    if (*(const int32_t *)(o + 0x10Cu) == 0)
+        *(uint32_t *)(o + 0xC0u) = *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) == 0)
+        return;
+
+    if (orig_get_tick_count() - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS
+            > 0x1F4u
+        && *(const int32_t *)(o + 0x10Cu) == 0) {
+        *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP = 1;
+        *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 1;
+    }
+
+    if ((*(const uint32_t *)(o + 8) & 0x400u) == 0)
+        return;
+
+    /* Five separate guards in the original, each its own branch to the loop
+     * tail. Kept separate rather than ANDed: equivalent today, and the order
+     * is what the image states. */
+    for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; i++) {
+        uint8_t *other = (uint8_t *)LookupByUID(
+            (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
+
+        if (other == 0)
+            continue;
+        if (other == o)
+            continue;
+        if ((*(const uint32_t *)(other + 8) & 4u) != 0)
+            continue;
+        if (*(const uint16_t *)(other + 0x62u) == 0)
+            continue;
+        if (!ObjIsTypeIn238((const AM2_Object *)other))
+            continue;
+        if (*(const int32_t *)(other + 0x94u) != 0)
+            continue;
+
+        *(int32_t *)(other + 0xE4u) = 3;
+        ObjAttachTo(other, o);
+    }
 }

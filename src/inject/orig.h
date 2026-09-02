@@ -9715,6 +9715,10 @@ typedef struct {
  * either key tightens it, and testing only the first leaves the other key
  * feeling sluggish in a way no A/B here could see. */
 #define ADDR_STEP3_TURN_STATE    0x0045CAB0u  /* void(obj, rec) */
+/* 0x0045D4B0, one caller. Route the vehicle toward its destination, decide
+ * whether the heading needs correcting, snap the view, and BOARD any selected
+ * units -- four jobs, one function, one exit. */
+#define ADDR_STEP3_ROUTE_BOARD   0x0045D4B0u  /* void(obj, rec) */
 #define AM2_STEP3_TURN_TOL_KEY   1
 #define AM2_STEP3_TURN_TOL_IDLE  0x10
 #define ADDR_STEP3_45CB30        0x0045CB30u  /* void(obj, out) */
