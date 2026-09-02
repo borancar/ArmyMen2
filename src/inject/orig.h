@@ -5039,6 +5039,24 @@ typedef struct {
  *   one Edit:                      the chat line
  *   one Panel, and FOUR Buttons:   start, ready, options, cancel
  *
+ * ADDR_LOG IS PASSED AS A CALLBACK HERE, which is evidence for something
+ * this file records as reasoned but unchecked. CLAUDE.md notes that vtable
+ * 0x0046FD10's slot 2 holds 0x0045CAA0 -- ADDR_LOG, a bare `ret` in this
+ * build -- and infers identical-COMDAT folding: an empty virtual and a
+ * stubbed varargs logger are both a single `c3`, so the linker merges them.
+ * It says plainly that this is plausible and not established.
+ *
+ * The message list is built with 0x0045CAA0 as its notifier argument. That is
+ * a third role for one address -- logger, vtable slot, and now a do-nothing
+ * callback -- and three unrelated uses of one `ret` is what COMDAT folding
+ * predicts and coincidence does not.
+ *
+ * THE MESSAGE LIST'S ROWS ARE A GLOBAL SINGLETON, created only when
+ * ADDR_MENU_MSG_LIST is null and kept for the life of the process. So the
+ * lobby's message log survives closing and reopening the panel, and a
+ * destructor that freed it would break the second lobby rather than the
+ * first.
+ *
  * THE CHAT LINE'S BUFFER IS A FIELD OF THE PANEL, not something the edit
  * owns. Before building it the constructor strcpy's ADDR_DIR_SCRATCH into
  * this+0xE4 and hands the edit that address with a 0x3C limit, so the widget
