@@ -5050,6 +5050,17 @@ typedef struct {
  * dangerous kind: it produced a clean, plausible list of nineteen and nothing
  * about it looked incomplete.
  *
+ * THE RECTANGLES DO NOT MECHANISE, and that is where the extracting stops.
+ * Each child's RectSet takes four coordinates and only some are literals --
+ * the player rows compute theirs from the loop index, and several others
+ * arrive in registers. Pulling the immediates alone gives three numbers where
+ * there are four and prints a plausible triple, which is the same failure as
+ * the child count one paragraph up: a narrow extraction that looks complete.
+ *
+ * So the rectangles are the part that has to be read per site. Everything
+ * else about this function came out of a dump: the children, their classes,
+ * their sizes, their bitmap names and their constructors.
+ *
  * That the SECOND list group uses TextList where the other three use Listbox
  * is the sort of thing a reader normalises away -- four groups that look
  * identical, one with a different class. The extraction pairs sizes with
