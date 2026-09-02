@@ -3186,7 +3186,7 @@ void __cdecl ProcessResendQueue(void)
                 continue;
 
             *(uint32_t *)(buf + PACKET_OFF_ACK) =
-                *(const uint32_t *)(flow + FLOW_OFF_FIELD_04);
+                *(const uint32_t *)(flow + FLOW_OFF_NEXT_EXPECTED);
             *(uint32_t *)(buf + PACKET_OFF_CHECKSUM) = 0;
             *(uint32_t *)(buf + PACKET_OFF_CHECKSUM) = XorChecksum(buf);
 
@@ -3336,7 +3336,7 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
              * it, clear the checksum field, then compute over the whole
              * buffer. The same three lines as ProcessResendQueue. */
             *(uint32_t *)(pkt + PACKET_OFF_ACK) =
-                *(const uint32_t *)(flow + FLOW_OFF_FIELD_04);
+                *(const uint32_t *)(flow + FLOW_OFF_NEXT_EXPECTED);
             *(uint32_t *)(pkt + PACKET_OFF_CHECKSUM) = 0;
             *(uint32_t *)(pkt + PACKET_OFF_CHECKSUM) = XorChecksum(pkt);
 

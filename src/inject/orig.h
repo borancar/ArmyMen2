@@ -2995,15 +2995,29 @@
  *
  * So the numbers are not arbitrary and this is not three unrelated arms:
  *
- *   0x0B  PULSE     -- the keepalive that carries a sequence
+ *   0x0B  DATA      -- an incoming sequenced message
  *   0x0C  NACK      -- resend this range
  *   0x10  PULSE ACK -- retire this range, and time it
  *
  * which is why 0x10 falls into 0x0C at the end: having acked everything
  * through, whatever is still outstanding is nacked in the same pass. The
  * fall-through is the protocol, not a compiler artefact, and factoring the
- * two arms apart would break it. */
-#define AM2_FLOW_PULSE           0x0Bu
+ * two arms apart would break it.
+ *
+ * 0x0B WAS CALLED A PULSE FOR ONE COMMIT AND IT IS THE DATA MESSAGE. The
+ * guess came from "PULSE Adding to ", which is in the 0x10 arm and not this
+ * one. Reading the body says what it is outright: "Received seq %d expected
+ * %d from %x, he has my seqthru  %d", then XorChecksum over the message, and
+ * on a mismatch "Ack for sequence %d had bad checksum %x", a counter bumped
+ * and return 1 -- so a corrupt message is DROPPED and the caller does not
+ * queue it. A string found NEAR a function is not a string the function
+ * prints.
+ *
+ * That also settles what was FLOW_OFF_FIELD_04, which this file admits was named from
+ * ProcessResendQueue alone: it is printed here as "expected %d" one past an
+ * increment, so it is the NEXT SEQUENCE EXPECTED from that peer. The second
+ * toucher this file asks for, arriving one function later. */
+#define AM2_FLOW_DATA            0x0Bu
 #define AM2_FLOW_NACK            0x0Cu
 #define AM2_FLOW_PULSE_ACK       0x10u
 /* THE RESEND IS THROTTLED TO TWO PER NACK, and the throttle is a counter in
@@ -3019,6 +3033,7 @@
  * everything or queue everything, and on a machine that opens no DirectPlay
  * session neither is observable. Read what the arms push before the jump. */
 #define FLOW_OFF_RESENDS         0x3Cu  /* incremented per message actually resent */
+#define FLOW_OFF_BAD_CHECKSUMS   0x8Cu  /* bumped when XorChecksum rejects one */
 /* Where the drop path receives a packet it has no node for, so the transport
  * does not keep re-delivering it. */
 #define ADDR_RECV_SCRATCH        0x004F8790u
@@ -7797,7 +7812,7 @@ typedef struct {
  * list -- so this offset IS the flow's queue. Named from its one use, which
  * is enough here only because the callee's own type says what it is. */
 #define FLOW_OFF_QUEUE             0x78u
-#define FLOW_OFF_FIELD_04          0x04u
+#define FLOW_OFF_NEXT_EXPECTED     0x04u  /* printed as "expected %d" */
 #define FLOW_OFF_HE_HAS            0x0Cu
 #define FLOW_OFF_READY             0x88u
 #define FLOW_OFF_SEQUENCE          0x94u
@@ -11601,7 +11616,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 
 /* The per-player flow fields the send path writes. All four are named from
  * this function, which is their only writer. */
-#define FLOW_OFF_ACK_SENT        0x10u  /* the FLOW_OFF_FIELD_04 we last told him */
+#define FLOW_OFF_ACK_SENT        0x10u  /* the FLOW_OFF_NEXT_EXPECTED we last told him */
 #define FLOW_OFF_SENT_AT         0x1Cu  /* GetTickCount at the last send */
 #define FLOW_OFF_SENT_PACKETS    0x28u  /* incremented per send */
 #define FLOW_OFF_SENT_BYTES      0x2Cu  /* PACKET_OFF_LEN accumulated */
