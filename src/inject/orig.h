@@ -14294,9 +14294,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * completely. The three functions before this were cold or nearly so and
  * their clean A/Bs proved much less.
  *
- * WHERE IT HAS GOT TO: the chunk walk, the record loop and all 1,587 objects
- * run. What fails is the TEARDOWN -- the last fclose does not return -- and
- * the cause is NOT yet known.
+ * WHERE IT HAS GOT TO: THE FUNCTION COMPLETES AND RETURNS 1. Driven through
+ * tools/ab.sh, which is reliable where a hand-rolled click is not, the probes
+ * run end to end -- entry with base=bootcamp and folder=data\bootcamp, the
+ * .atl loaded, the header accepted, every chunk walked to 682,774 of 682,766,
+ * 1,587 objects built, the frees, the fclose and the final SetGameDir.
+ *
+ * The earlier reading that it died in fclose was wrong twice over: once from
+ * the double-close artefact, and once from two runs that never left the title
+ * screen. It does not die at all.
+ *
+ * SO THE BUG IS A GLOBAL IT FAILS TO SET, and the failure is in the CALLER:
+ * the original goes on to print ReadScript's "lines: 101 tokens: 372 names:
+ * 43 compounds: 16" and "calculating region data...", and ours prints
+ * neither, so the LEVEL SCRIPT LOAD is what breaks.
+ *
+ * NORM is ruled out -- it is plane-sized and looks like a layer this misses,
+ * and the original has no arm for it either: every cmp and sub in the switch
+ * is accounted for and 'NORM' is not among them, so both sides fseek past it.
+ *
+ * What would settle it is comparing the map globals after load between the
+ * two sides, which is the `state` artifact's whole purpose -- but that dump
+ * is taken at the briefing and this failure is before it. A probe that dumps
+ * the layer pointers at the end of LoadMap, run on both sides, is the next
+ * step.
  *
  * Ruled out by probing: the record indices are 6..697 against an array of
  * 1,587, so nothing is written out of bounds; every record's script pointer
