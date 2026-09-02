@@ -3888,6 +3888,20 @@
  *   0x004750C0  3, 8, 9     0x004750CC 18, 8, 9
  *   0x004750D8 13,15,17     0x004750E4 12,14,16
  *
+ * THE FRAME, from tools/espmap.py, because this one needs it. Origin at
+ * esp+24; the three arguments are slots +0x1C (the trooper), +0x20 (the
+ * weapon) and +0x24 (the output record). Two 4-byte points are local: P at
+ * +0x10 is the cursor's world position, Q at +0x0C takes ObjOverlayY(obj)
+ * added to P's y.
+ *
+ * AND SLOT +0x1C IS REUSED AS A LOCAL ONCE ITS ARGUMENT IS CONSUMED. The
+ * trooper is loaded into esi at the second instruction and the slot then
+ * holds the WEAPON CODE, which `cmp [esp+0x20], 0x14` reads two hundred bytes
+ * later at a different esp. That is one of the three shapes CLAUDE.md lists
+ * as making these bodies unreadable, and reading the later access as an
+ * argument would put the trooper pointer where a small integer belongs.
+ * espmap resolves both to +0x1C, which is what makes them visibly one slot.
+ *
  * Their width was worth checking rather than inferring: the first table's
  * three used entries are followed by three more before the next base, so
  * 3-wide and 6-wide fit the layout equally. What settles it is the CLASSIFIER
@@ -8320,9 +8334,22 @@ typedef struct {
  * where reading the arms would have been three hundred. `jmp [ecx*4 +
  * 0x0044AD1C]` looks like a seventeen-way jump on the weapon code; the byte
  * index at 0x0044AD24 covers codes 0x18..0x28 and holds only 0 and 1. Five
- * codes -- 0x18, 0x19, 0x1A, 0x27, 0x28 -- reach the 546-byte arm at
- * 0x0044AAB9; the other twelve reach the 46-byte one at 0x0044ACDB, which is
- * also where the `ja` sends every code outside the range. Same shape as
+ * codes -- 0x18, 0x19, 0x1A, 0x27, 0x28 -- reach 0x0044AAB9; the other
+ * twelve reach 0x0044ACDB, which is also where the `ja` sends every code
+ * outside the range.
+ *
+ * BOTH ARMS ARE TINY AND THE SURVEY SAID ONE WAS 546 BYTES. That figure was
+ * the SPAN from the arm's entry to the next label, and the span is full of
+ * blocks the arm never reaches -- the GetMenuRow paths, which arrive from a
+ * branch four hundred bytes earlier. Following the arm instead: 0x0044AAB9
+ * writes the cursor's world point into the output and jumps to 0x0044ACDB,
+ * which is the COMMON TAIL every path reaches, so it is 35 bytes and a
+ * fallthrough. The filter's whole effect is "for these five codes, also
+ * report where the cursor is pointing".
+ *
+ * Measuring an arm by the distance to the next thing that looks like a label
+ * is the same error as counting epilogues to count arms, which this file
+ * records one function earlier. Follow the branch. Same shape as
  * TrooperFire's nineteen-index two-arm table, and the second instance is what
  * makes it a pattern in this image rather than a curiosity.
  *
