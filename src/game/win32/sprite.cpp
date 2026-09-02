@@ -844,6 +844,12 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
     rc |= patch_replace(ADDR_FREE_SPRITE_GROUPS,
                         (const void *)FreeSpriteGroups,
                         "FreeSpriteGroups", 1);
+    rc |= patch_replace(ADDR_LOAD_SPRITE_GROUPS_B,
+                        (const void *)LoadSpriteGroupsB,
+                        "LoadSpriteGroupsB", 1);
+    rc |= patch_replace(ADDR_FREE_SPRITE_GROUPS_B,
+                        (const void *)FreeSpriteGroupsB,
+                        "FreeSpriteGroupsB", 1);
     return rc;
 }
 
@@ -2347,12 +2353,11 @@ int sprite_install(void)
  * which is what makes the pair idempotent: a freed group keeps its count and
  * reloads at the same size. Guarding the loader on the COUNT instead would
  * compile, read as equivalent, and never reload anything after a teardown. */
-void __cdecl LoadSpriteGroups(void)
+static void LoadGroupRange(uint8_t *base, const uint8_t *end)
 {
     uint8_t *r;
 
-    for (r = (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS;
-         r < (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_END;
+    for (r = base; r < end;
          r += AM2_SPRITEGRP_BYTES) {
         int32_t n = *(const int32_t *)(r + SPRITEGRP_OFF_COUNT);
         AM2_Sprite **slots;
@@ -2377,12 +2382,11 @@ void __cdecl LoadSpriteGroups(void)
  * itself, so a group that was never loaded still gets free(NULL) and a
  * redundant null store. Written as `if (slots) { ... }` it would be tidier
  * and would change the call count. */
-void __cdecl FreeSpriteGroups(void)
+static void FreeGroupRange(uint8_t *base, const uint8_t *end)
 {
     uint8_t *r;
 
-    for (r = (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS;
-         r < (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_END;
+    for (r = base; r < end;
          r += AM2_SPRITEGRP_BYTES) {
         AM2_Sprite **slots = *(AM2_Sprite ***)(r + SPRITEGRP_OFF_SPRITES);
 
@@ -2396,4 +2400,29 @@ void __cdecl FreeSpriteGroups(void)
         am2_free(slots);
         *(void **)(r + SPRITEGRP_OFF_SPRITES) = 0;
     }
+}
+
+/* The four entry points. Pair B (0x00462B20 / 0x00462B90) diffs 1.000 against
+ * pair A on both halves with constants masked, so one implementation each is
+ * faithful -- unlike pairs 3..8, which run 0.29 to 0.51 and are separate
+ * functions despite sitting under a perfectly uniform dispatcher. */
+void __cdecl LoadSpriteGroups(void)
+{
+    LoadGroupRange((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS,
+                   (const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_END);
+}
+void __cdecl FreeSpriteGroups(void)
+{
+    FreeGroupRange((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS,
+                   (const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_END);
+}
+void __cdecl LoadSpriteGroupsB(void)
+{
+    LoadGroupRange((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_B,
+                   (const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_B_END);
+}
+void __cdecl FreeSpriteGroupsB(void)
+{
+    FreeGroupRange((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_B,
+                   (const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_B_END);
 }

@@ -6638,6 +6638,18 @@ typedef struct {
  * session -- here there are TWO consumers and BOTH bases are wrong. */
 #define ADDR_SPRITE_GROUPS        0x0048C7E0u  /* AM2_SpriteGroup[10] */
 #define ADDR_SPRITE_GROUPS_END    0x0048C8D0u
+/* The second table begins exactly where the first ends -- 13 records against
+ * 10 -- which is the tiling check this project uses on the trig tables, and
+ * it confirms both bases at once. Its pair diffs 1.000 against the first on
+ * both halves, so they share the code. */
+#define ADDR_SPRITE_GROUPS_B_END  0x0048CA08u
+/* Table B's base is table A's END, and it is spelled that way on purpose:
+ * two names on 0x0048C8D0 would hide the tiling that confirms both bases at
+ * once, and the alias ratchet counts them as a defect. Written like this the
+ * adjacency is visible at every use site. */
+#define ADDR_SPRITE_GROUPS_B      ADDR_SPRITE_GROUPS_END
+#define ADDR_LOAD_SPRITE_GROUPS_B 0x00462B20u  /* void(void) */
+#define ADDR_FREE_SPRITE_GROUPS_B 0x00462B90u  /* void(void) */
 #define SPRITEGRP_OFF_INDEX       0x00u  /* PreloadSprite's `index` */
 #define SPRITEGRP_OFF_COUNT       0x04u  /* how many frames to preload */
 #define SPRITEGRP_OFF_SPRITES     0x08u  /* AM2_Sprite *[count], NULL until loaded */

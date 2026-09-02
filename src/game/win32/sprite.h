@@ -333,5 +333,10 @@ void __cdecl LoadSpriteGroups(void);
 /* 0x00462AD0. Release them again. Frees unconditionally, as the original
  * does, so a never-loaded group still sees free(NULL). */
 void __cdecl FreeSpriteGroups(void);
+/* 0x00462B20 and 0x00462B90. The second group table, 13 records where the
+ * first has 10, beginning exactly where the first ends. Both halves diff
+ * 1.000 against the first pair, so they share the implementation. */
+void __cdecl LoadSpriteGroupsB(void);
+void __cdecl FreeSpriteGroupsB(void);
 
 #endif /* AM2_SPRITE_H */
