@@ -14313,11 +14313,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * and the original has no arm for it either: every cmp and sub in the switch
  * is accounted for and 'NORM' is not among them, so both sides fseek past it.
  *
- * What would settle it is comparing the map globals after load between the
- * two sides, which is the `state` artifact's whole purpose -- but that dump
- * is taken at the briefing and this failure is before it. A probe that dumps
- * the layer pointers at the end of LoadMap, run on both sides, is the next
- * step.
+ * BISECTED, TWO ARMS RULED OUT: skipping BuildMapObjects entirely changes
+ * nothing, and skipping the final SetGameDir changes nothing. So the object
+ * loop and the directory restore are both innocent, and what is left is the
+ * chunk arms, DeriveMapGeometry and the layer defaulting -- everything that
+ * writes a GLOBAL rather than doing work.
+ *
+ * PARKED HERE, and the next step is a TOOL rather than another bisect. Each
+ * of these runs is a full ab.sh and answers one yes/no question; comparing
+ * the map globals directly would answer all of them at once. The control
+ * socket is harness and answers under AM2_NOPATCH=1 as well, so a peek
+ * command -- dump N bytes at an address -- would let both sides be compared
+ * after a load with no probe code in either. That is the same argument that
+ * produced `ctl widgets` and `objdump.py --table`, and this is the third
+ * subsystem to want it.
  *
  * Ruled out by probing: the record indices are 6..697 against an array of
  * 1,587, so nothing is written out of bounds; every record's script pointer
