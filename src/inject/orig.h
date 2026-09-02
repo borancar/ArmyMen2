@@ -3902,6 +3902,23 @@
  * argument would put the trooper pointer where a small integer belongs.
  * espmap resolves both to +0x1C, which is what makes them visibly one slot.
  *
+ * ONE THING IS NOT SETTLED AND IT BLOCKS THE WRITE: WHICH RECORD THE THIRD
+ * ARGUMENT IS. The function writes a byte at +4, a dword action at +8, dwords
+ * at +0xC and +0x10, a POINT at +0x14/+0x16 and a word at +0x18. The sibling
+ * UpdateTrooperAction calls its third argument a sight record, and
+ * SIGHT_OFF_RANGE is a dword at 0x14 -- which a two-word point cannot be. So
+ * either it is a different family, and SIGHTCOUT_OFF_X at 0x14 fits a point
+ * exactly, or the record is overloaded by caller the way the type-6 blast
+ * fields are.
+ *
+ * Not guessed. Getting a field family wrong is what put three shipped
+ * functions' sight-cache lookups on `facing` where the original uses
+ * `bearing` earlier this session, and nothing could see it: the offsets are
+ * all present and the band is cold. What settles this is reading what
+ * StepType2 passes and what UpdateTrooperAction does with the same record,
+ * and that is the next thing to do rather than picking the family whose
+ * offsets happen to line up.
+ *
  * Their width was worth checking rather than inferring: the first table's
  * three used entries are followed by three more before the next base, so
  * 3-wide and 6-wide fit the layout equally. What settles it is the CLASSIFIER
@@ -14996,6 +15013,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * established, only that this clears it. */
 #define ADDR_LEVEL_FLAG_E30    0x00511E30u  /* int32_t, written never read */
 #define ADDR_THROTTLE_DEADLINE 0x00659EF8u  /* uint32_t, game-clock ms */
+/* The turn keys' repeat delay. Charged 0x32 each time a turn is taken and
+ * drained by ADDR_FRAME_DELTA_MS once per frame, so holding left or right
+ * steps the facing at a fixed rate instead of once per frame. Named from the
+ * pair of writers rather than from either alone: both turn arms charge it and
+ * one block drains it, which is a writer/reader pair and not a free. */
+#define ADDR_TURN_REPEAT_MS      0x00659F48u  /* int32_t */
 
 /* A UID is (owner << 29) | counter, so eight owners each with a 29-bit
  * counter. These are the per-owner counters, indexed 0..7. */
