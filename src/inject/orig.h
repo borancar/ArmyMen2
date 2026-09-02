@@ -5015,7 +5015,22 @@ typedef struct {
  *
  * The one unnamed callee, 0x00456300, is another thiscall constructor with
  * its own SEH frame, so this is a class building a sub-object rather than
- * calling a helper. */
+ * calling a helper.
+ *
+ * ITS CALL PROFILE IS THE WHOLE DESIGN: 26 operator new, 20 RectSet and 20
+ * WidgetAddChild. So it builds TWENTY children, and the body is one idiom
+ * twenty times -- allocate, construct, place with a rectangle, add to the
+ * parent. The classes are counted too: 4 records, 4 arrow bars, 4 buttons,
+ * 3 list boxes, 2 multi-sprites and the rest.
+ *
+ * AND ITS SPRITE LOOPS ARE BOUNDED BY THE NEXT GLOBAL, twice. The first runs
+ * a pointer from ADDR_MP_PANEL_SPRITES_A until it reaches ADDR_MENU_MSG_LIST,
+ * filling each slot with `03_013_0%i_color.bmp` for the four player colours;
+ * the second runs from ADDR_MP_PANEL_SPRITES_B to its own _END. That is the
+ * same shape as the registration table's nine buckets and LoadMap's four
+ * reveal grids -- an array whose length is written nowhere and is simply the
+ * distance to whatever the linker put next. Third instance, and the reason to
+ * check what follows a table before believing a count. */
 #define AM2_MP_PANEL_SIZE        0x278u
 #define ADDR_MP_OPTIONS_CTOR     0x00432320u  /* thiscall obj *(obj, bmp) */
 #define AM2_MP_OPTIONS_SIZE      0x110u
