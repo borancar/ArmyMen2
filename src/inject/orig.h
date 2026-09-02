@@ -3070,6 +3070,25 @@
 #define FLOW_OFF_RECV_PACKETS    0x20u  /* mirrors FLOW_OFF_SENT_PACKETS */
 #define FLOW_OFF_RECV_BYTES      0x24u  /* mirrors FLOW_OFF_SENT_BYTES */
 #define FLOW_OFF_RECV_AT         0x74u  /* GetTickCount at the last arrival */
+/* EVERY DATA MESSAGE CARRIES AN ACK, and that is why this function is three
+ * thousand bytes. The 0x0B arm does not merely deliver: after the checksum
+ * and the join checks it reads the message's own +0x10 as an acked-through
+ * sequence and retires the send queue from FLOW_OFF_HE_HAS + 1 up to it,
+ * with the same MsgListSetFlag / statistics work the 0x10 arm does. The ack
+ * rides on the data, and 0x10 exists for when there is no data to carry it.
+ *
+ * So THE RETIREMENT LOOP IS WRITTEN OUT TWICE and the two copies are not
+ * identical -- 0x10's is reached with the flow record already in hand and
+ * 0x0B's re-reads it. This file's rule for two functions that look like one
+ * applies to two loops inside one function: diff them before merging them.
+ * Factoring these into a helper is the single most tempting change a reader
+ * could make to this function and it would have to reproduce both entry
+ * conditions to be correct.
+ *
+ * A sanity line sits in front of it: more than 200 sequences acked in one
+ * packet logs " No many acks in one packet\t %d thru %d " -- the spelling is
+ * the original's -- and then proceeds anyway. It is a warning, not a guard,
+ * and reproducing it as a guard would drop traffic the original delivers. */
 /* Where the drop path receives a packet it has no node for, so the transport
  * does not keep re-delivering it. */
 #define ADDR_RECV_SCRATCH        0x004F8790u
