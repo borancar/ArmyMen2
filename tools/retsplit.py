@@ -19,6 +19,21 @@ a whole function, or the first one in its entry", which is cheap to ask and
 was answered wrong three times in one session.
 
 Padding after the last ret is ignored: int3 and nop runs are the linker's.
+
+TWO CHECKS SEPARATE A REAL SPLIT FROM A FALSE ONE, and both are one command.
+0x0045D7D4 is reported here and is NOT a function: it is a branch target
+inside ADDR_STEP_TYPE3 that follows a ret, and its "prologue" is a `push esi`
+that is pushing an ARGUMENT -- esi is live from the enclosing function and the
+next instruction dereferences it.
+
+  - a real split has CALLERS. am2.Image.xrefs on 0x0045D7D4 answers nothing,
+    where the genuine merges this found (0x00460860, 0x00462AD0) are both
+    named by a dispatcher.
+  - a real split SETS UP ITS OWN REGISTERS. The false one uses esi and ebp it
+    never loaded.
+
+That is why this stays out of `make check`: as a gate it would fail the build
+on a correct reading of a 784-byte function.
 """
 import os
 import sys
