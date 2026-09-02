@@ -4428,6 +4428,16 @@
 #define ADDR_STR_SENDQUEUE_SEQ   0x004736E0u
 #define ADDR_STR_PULSE_FREELIST  0x00473610u  /* takes seq AND element */
 #define ADDR_STR_ACK_NOT_IN_SENDQ 0x004736C4u  /* the MsgListSetFlag miss */
+/* TWO NEARLY IDENTICAL STRINGS, and the difference is one conversion. The
+ * PULSE ACK arm logs "Remote %d is acking %d, I had thru %d" and the DATA
+ * arm logs "Remote %x is acking %d, I had thru %d" -- same words, %d against
+ * %x on the player id. So the two retirement loops really do differ in their
+ * diagnostics even though the arithmetic between them is identical, and a
+ * helper shared by both has to take the format string rather than embed it.
+ * Found by printing all 23 of the function's literals at once; reading them
+ * one at a time out of a disassembly window is what hid it. */
+#define ADDR_STR_REMOTE_ACKING_D 0x0047369Cu  /* the PULSE ACK arm's */
+#define ADDR_STR_REMOTE_ACKING_X 0x004732CCu  /* the DATA arm's */
 #define ADDR_STR_NACK_FULL       0x00473C94u
 /* The IAT slot the original CALLS THROUGH for GetTickCount. Reached this way
  * rather than by importing the symbol, for two reasons: it is what the

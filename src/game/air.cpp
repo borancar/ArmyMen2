@@ -1801,7 +1801,8 @@ static void FlowNoteRoundTrip(uint8_t *flow, uint32_t rtt)
  * FLOW_OFF_HE_HAS is written ONCE, after the loop, not per iteration. The
  * loop bound reads it, so updating it inside would cut the walk short. */
 static void FlowRetireThrough(uint8_t *flow, uint32_t ackedThrough,
-                              uint32_t mask, uint32_t now, uint32_t from)
+                              uint32_t mask, uint32_t now, uint32_t from,
+                              uint32_t ackingStr)
 {
     const uint8_t *comm = (const uint8_t *)
         *(void *const *)(uintptr_t)ADDR_COMM_OBJECT;
@@ -1821,6 +1822,13 @@ static void FlowRetireThrough(uint8_t *flow, uint32_t ackedThrough,
             if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
                 am2_log((const char *)AM2_IMAGE(ADDR_STR_ACK_NOT_IN_SENDQ),
                         seq, from, from, mask);
+            /* A SECOND line on the same path, and the two arms do not share
+             * it: the PULSE ACK arm prints the id with %d and the DATA arm
+             * with %x. Hence the format string being a parameter. */
+            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                am2_log((const char *)AM2_IMAGE(ackingStr),
+                        from, ackedThrough,
+                        *(uint32_t *)(flow + FLOW_OFF_HE_HAS));
             continue;
         }
 
