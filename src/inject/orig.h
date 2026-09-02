@@ -8069,6 +8069,19 @@ typedef struct {
  * OBJ_OFF_HIT_TIME at 0x108. A field with fourteen writers does not get its
  * meaning from one of them, and the correction cost one decoded scan.
  *
+ * A TROOPER STEPS UP ONTO WHAT IT IS STANDING ON, and the whole behaviour is
+ * one stack slot used twice. The slot is zeroed at entry and again when the
+ * facing sweep gives up; in the pickup walk it takes the HEIGHT
+ * (OBJ_OFF_FIELD_65) of any item underfoot whose height is within 0x10 of the
+ * trooper's own; and at the very end it is the value handed to
+ * ObjMoveAlongFacing -- but only when the trooper's own height already matches
+ * the tile attribute under it.
+ *
+ * Read as two locals -- a "move speed" and an "item height" -- the connection
+ * disappears and the move gets a constant zero. tools/espmap.py is what says
+ * they are one slot; the displacements are 0x1c and 0x20 at the two sites and
+ * differ only because of an outstanding push.
+ *
  * ITS TAIL SWITCHES ON A RELOADED FIELD, NOT ON A RETURN VALUE. StepObjRows
  * answers nothing; the three-way test after it reads the ROW's +0x4C -- the
  * animation frame -- out of OBJ_OFF_ROWS, which the call has just advanced.

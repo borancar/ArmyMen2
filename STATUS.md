@@ -440,6 +440,14 @@ through to `TrooperFire`, whose signature `orig.h` already records as
 `void(obj, weapon, sight)`. Settled by `espmap.py` naming the slots rather than
 by reading displacements.
 
+**A trooper steps up onto what it is standing on**, and the behaviour is one
+stack slot used twice: zeroed at entry and when the facing sweep gives up,
+given the height of any item underfoot within ±0x10 of the trooper's own during
+the pickup walk, and handed to `ObjMoveAlongFacing` at the end. Read as two
+locals -- a "move speed" and an "item height" -- the connection disappears and
+the move gets a constant zero. The displacements at the two sites are `0x1c`
+and `0x20`, differing only because of an outstanding push.
+
 **Its tail switches on a reloaded field, not on a return value.**
 `StepObjRows` answers nothing; the three-way test after it reads the *row's*
 animation frame out of `OBJ_OFF_ROWS`, which the call has just advanced.
