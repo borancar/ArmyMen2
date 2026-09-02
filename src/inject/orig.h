@@ -5096,6 +5096,19 @@ typedef struct {
  * an uninitialised descriptor after a successful Restore -- a defect in the
  * original is not ours to fix.
  *
+ * THE HOST-ONLY CONTROLS ARE DISABLED HERE, at construction, by
+ * COMM_OFF_IS_HOST. The rules list box takes `->0x4C = 1` when
+ * comm->isHost is zero, and the same gate greys the spin control's three
+ * sub-widgets inside the player loop. So a joining player gets the same panel
+ * as the host with several children born disabled, rather than a different
+ * panel.
+ *
+ * That offset was already named -- COMM_OFF_IS_HOST, "from DPCAPS_ISHOST" --
+ * so the reading needed no new name and is corroborated by whoever named it.
+ * It is also the only observable this function has that a drive could ever
+ * reach: host and join differ visibly, and both are reachable with
+ * AM2_MULTIPLAYER=1.
+ *
  * THE RULES LIST IS POPULATED WITH AN INLINED strcmp, which is worth
  * recognising rather than transcribing. The constructor walks the name table
  * at stride 0xCC, adds each entry to the list box's rows, and compares each
