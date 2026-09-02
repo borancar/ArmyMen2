@@ -8029,7 +8029,15 @@ typedef struct {
  *
  * Its sibling 0x0044A420 carries no such string, so the "(2)" numbers the
  * request sites rather than the functions -- there is no "(1)" anywhere. */
-#define ADDR_UPDATE_TROOPER_ACTION 0x0044AFB0u  /* void(obj, int32, void *) */
+#define ADDR_UPDATE_TROOPER_ACTION 0x0044AFB0u /* void(obj, weapon, out) */
+/* ARGUMENT 1 IS THE WEAPON, not the int32 the old prototype guessed. It goes
+ * straight through to TrooperFire, whose signature orig.h already records as
+ * void(obj, weapon, sight) -- so the third argument is the sight record and
+ * the second is a pointer. Settled by tools/espmap.py naming the slots rather
+ * than by reading displacements. */
+/* Per-CLASS, indexed by ClassifyCode74's 0, 1 or 2 and written to
+ * OBJ_OFF_FIELD_64 at the very end: 28, 18, 12. */
+#define ADDR_TROOPER_CLASS_VALUE  0x00489840u  /* int32[3] */
 /* SURVEYED AND NOT RECONSTRUCTED. 2,080 bytes, 632 instructions, four callers
  * -- all four inside StepType2, which reaches it as a TAIL rather than as one
  * arm of several.
@@ -8060,6 +8068,13 @@ typedef struct {
  * recently", which this block claimed on a first reading and which belongs to
  * OBJ_OFF_HIT_TIME at 0x108. A field with fourteen writers does not get its
  * meaning from one of them, and the correction cost one decoded scan.
+ *
+ * ITS TAIL SWITCHES ON A RELOADED FIELD, NOT ON A RETURN VALUE. StepObjRows
+ * answers nothing; the three-way test after it reads the ROW's +0x4C -- the
+ * animation frame -- out of OBJ_OFF_ROWS, which the call has just advanced.
+ * Reading `eax` there would give the switch a value StepObjRows never sets,
+ * and it is exactly the shape SelectFirePose's note warns about: ask what a
+ * function's output actually IS before comparing anything.
  *
  * IT ALSO KEEPS A TURN ACCUMULATOR. OBJ_OFF_FIELD_D6 takes the AngleDelta of
  * every enforced turn and is wrapped into +/-0x100 by two SEPARATE tests, the

@@ -435,6 +435,17 @@ All twenty-eight callees are named, and its frame is clean under `espmap.py`
 now that the tool knows about thiscall cleanup -- which it learned *from* this
 function.
 
+**Its second argument is the weapon, not an `int32`** -- it goes straight
+through to `TrooperFire`, whose signature `orig.h` already records as
+`void(obj, weapon, sight)`. Settled by `espmap.py` naming the slots rather than
+by reading displacements.
+
+**Its tail switches on a reloaded field, not on a return value.**
+`StepObjRows` answers nothing; the three-way test after it reads the *row's*
+animation frame out of `OBJ_OFF_ROWS`, which the call has just advanced.
+Reading `eax` there would give the switch a value `StepObjRows` never sets --
+the shape `SelectFirePose`'s note warns about.
+
 **When the way ahead is blocked it sweeps alternate facings, and the sweep is a
 table.** The headings at `0x00489E00` are added *cumulatively* to the base
 facing -- +32, then -64, then +96 -- so what is actually tried is base+32,
