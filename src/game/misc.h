@@ -798,4 +798,9 @@ int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx);
  * type-2/3/8 every puff, 15 to anything else once every ten. */
 int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx);
 
+/* 0x00461150. Sequence stepper kind 0: a ballistic particle. Flies, falls
+ * under gravity, then bounces or settles into a decal. Its +0x14 is a
+ * VELOCITY, not the life the other kinds keep there. */
+int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx);
+
 #endif /* AM2_MISC_H */

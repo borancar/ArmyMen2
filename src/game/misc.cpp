@@ -1460,7 +1460,7 @@ typedef int32_t (__cdecl *AM2_SeqStepFn)(int32_t at, void *rec, void *ctx);
 /* SeqRetire is reconstructed and declared in maprow.h; this typedef and the
  * macro under it reached it through the image, which checkseams now refuses. */
 /* Reconstructed now -- maprow.h declares it. */
-#define orig_seq_step0 ((AM2_SeqStepFn)(uintptr_t)ADDR_SEQ_STEP0)
+/* Reconstructed now -- misc.h declares it. */
 /* Reconstructed now -- misc.h declares it. */
 /* Reconstructed now -- misc.h declares it. */
 
@@ -2132,7 +2132,7 @@ void __cdecl SeqRun(void *ctx)
         }
 
         switch (*(const uint32_t *)(rec + SEQ_OFF_KIND)) {
-        case 0: at = orig_seq_step0(at, rec, ctx); break;
+        case 0: at = SeqStepKind0(at, rec, ctx); break;
         case 1: break;   /* hangs; see above */
         case 2:          /* both reach the same stepper */
         case 3: at = SeqStepKind2(at, rec, ctx); break;
@@ -2443,6 +2443,8 @@ int misc_install(void)
                   "SeqStepKind6", 3);
     patch_replace(ADDR_SEQ_STEP7, (const void *)SeqStepKind7,
                   "SeqStepKind7", 3);
+    patch_replace(ADDR_SEQ_STEP0, (const void *)SeqStepKind0,
+                  "SeqStepKind0", 3);
     patch_replace(ADDR_SEQ_ADD_KIND4, (const void *)SeqAddKind4,
                   "SeqAddKind4", 1);
     patch_replace(ADDR_SEQ_STEP4, (const void *)SeqStepKind4,
@@ -2634,5 +2636,138 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
     *(int32_t *)(r + SEQ_OFF_GATE) +=
         *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
 
+    return *(const int16_t *)(r + SEQ_OFF_NEXT);
+}
+
+/* SeqStepKind0 -- original 0x00461150, the last of the seven steppers. A
+ * BALLISTIC particle: it flies, falls under gravity, and either bounces or
+ * settles when it reaches the ground.
+ *
+ * SEQ_OFF_LIFE IS NOT A LIFE HERE. Kind 0 reads +0x14 four ways -- as a gate
+ * on the animation, as the vertical velocity added to ROW_OFF_HEIGHT, as the
+ * impact test against -4, and as the thing gravity DECREMENTS each step. One
+ * field, two units, chosen by the kind that owns the record, which is exactly
+ * what SeqStepKind5's header already records for ROW_OFF_STAMP_54. There is
+ * no reading of +0x14 that is right for both kinds.
+ *
+ * THE IMPACT TEST IS ON SPEED AND ITS SENSE IS EASY TO INVERT. `cmp eax, -4;
+ * jge` sends a velocity of -4 OR HIGHER to the settle arm and only a faster
+ * fall to the bounce -- so a hard landing bounces and a gentle one stops,
+ * which is right and reads backwards from the comparison alone.
+ *
+ * THE BOUNCE IS `min(|v / 2| - 2, 7)` and the halving is an ARITHMETIC shift
+ * before the absolute value, so a velocity of -5 gives |-3| - 2 = 1 and not
+ * |-2| - 2 = 0. Written in that order; folding the abs inward changes where
+ * the particle stops bouncing.
+ *
+ * IT RETIRES THREE DIFFERENT WAYS -- off the map, into an explosion on a
+ * blocked tile, and settling into a decal row -- and only the last leaves
+ * anything behind. The decal copies four fields off the flying row and forces
+ * ROW_OFF_FIELD_26 to 2, which is what PlaceGroundDecal does too.
+ *
+ * AND IT SETTLES THE PARTICLE TABLE'S BASE. Its `lea ecx,[ecx+ecx*2]` then
+ * `[ecx*8 + 0x0048C7E4]` is kind * 24 off 0x0048C7E4, four bytes BELOW the
+ * base SpawnParticle appeared to use -- so that function's "field +0" is
+ * really field +4, and the record is {count, sprites, dx, dz, ...}. The
+ * comment there flagged this as undecided; a second toucher decided it. */
+int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
+{
+    uint8_t       *r    = (uint8_t *)rec;
+    uint8_t       *row  = *(uint8_t **)(r + SEQ_OFF_ROW);
+    const uint8_t *tab;
+    uint32_t       pt;
+    int32_t        tile;
+    int32_t        ground;
+
+    (void)at;
+
+    *(uint32_t *)(row + ROW_OFF_STAMP_54) +=
+        *(const uint32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+
+    if (*(const uint32_t *)(row + ROW_OFF_STAMP_54)
+            <= *(const uint32_t *)(r + SEQ_OFF_GATE))
+        goto done;
+
+    tab = (const uint8_t *)(uintptr_t)ADDR_PARTICLE_KINDS
+          + (uint32_t)*(const uint8_t *)(r + SEQ_OFF_FLAG4) * AM2_PARTICLE_KIND_BYTES;
+
+    if (*(const int32_t *)(r + SEQ_OFF_LIFE) != 0) {
+        uint8_t phase = (uint8_t)(*(const uint8_t *)(row + 0x51u) + 1);
+
+        *(uint8_t *)(row + 0x51u) = phase;
+        if ((int32_t)phase >= *(const int32_t *)tab)
+            *(uint8_t *)(row + 0x51u) = 0;
+        *(uint32_t *)(row + ROW_OFF_SPRITE) =
+            (*(uint32_t *const *)(tab + 4))[*(const uint8_t *)(row + 0x51u)];
+    }
+
+    *(int16_t *)(row + ROW_OFF_X) +=
+        (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_0C);
+    *(int16_t *)(row + ROW_OFF_X + 2) +=
+        (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_10);
+    *(int16_t *)(row + 0x20u) +=
+        (int16_t)*(const int32_t *)(r + SEQ_OFF_LIFE);
+
+    /* The bounds test is on the DRAWN point -- the row's position with its
+     * height subtracted from z -- not on the ground position. */
+    pt = *(const uint32_t *)(row + ROW_OFF_X);
+    *((int16_t *)&pt + 1) =
+        (int16_t)(*((const int16_t *)&pt + 1) - *(const int16_t *)(row + 0x20u));
+    if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT,
+                     (const AM2_Point *)&pt))
+        return SeqRetire(ctx, rec);
+
+    tile = TileOfPoint(*(const uint32_t *)(row + ROW_OFF_X)) & 0xFFFF;
+    ground = *(const int8_t *)(
+        *(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS + tile);
+
+    if (*(const int16_t *)(row + 0x20u)
+            + *(const int32_t *)(r + 0x18u) > ground) {
+        *(int32_t *)(r + SEQ_OFF_LIFE) -= 1;   /* gravity */
+        *(uint32_t *)(row + ROW_OFF_STAMP_54) = 0;
+        goto done;
+    }
+
+    *(int16_t *)(row + 0x20u) =
+        (int16_t)(ground - *(const int16_t *)(r + 0x18u));
+
+    if ((*(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS)[tile] & 1) {
+        CreateExplosion(*(const int16_t *)(row + ROW_OFF_X),
+                        *(const int16_t *)(row + ROW_OFF_X + 2),
+                        0x93, 4, 0, 0, 0, 0, 0, 0);
+        return SeqRetire(ctx, rec);
+    }
+
+    if (*(const int32_t *)(r + SEQ_OFF_LIFE) < -4) {
+        int32_t v = *(const int32_t *)(r + SEQ_OFF_LIFE) >> 1;
+
+        if (v < 0)
+            v = -v;
+        v -= 2;
+        if (v >= 7)
+            v = 7;
+        *(int32_t *)(r + SEQ_OFF_LIFE) = v;
+        *(uint32_t *)(row + ROW_OFF_STAMP_54) = 0;
+        goto done;
+    }
+
+    {
+        uint8_t *rest = *(uint8_t **)RowPoolAAlloc();
+
+        *(int32_t *)rest = 1;
+        *(uint32_t *)(rest + ROW_OFF_SPRITE) =
+            *(const uint32_t *)(row + ROW_OFF_SPRITE);
+        *(int16_t *)(rest + ROW_OFF_X) = *(const int16_t *)(row + ROW_OFF_X);
+        *(int16_t *)(rest + ROW_OFF_X + 2) =
+            *(const int16_t *)(row + ROW_OFF_X + 2);
+        *(uint32_t *)(rest + ROW_OFF_FIELD_2C) =
+            *(const uint32_t *)(row + ROW_OFF_FIELD_2C);
+        *(int16_t *)(rest + ROW_OFF_FIELD_26) = 2;
+        RowUpdate(rest, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+    }
+    return SeqRetire(ctx, rec);
+
+done:
+    RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
     return *(const int16_t *)(r + SEQ_OFF_NEXT);
 }

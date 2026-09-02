@@ -2090,11 +2090,13 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
  * the sprite. That is the obj -> table -> slot shape CLAUDE.md records taking
  * the game down on its first run, and the one-deref reading compiles.
  *
- * THE TABLE'S EXTENT IS NOT ESTABLISHED. Records are 24 bytes and the four
- * fields this reads are at +0, +4, +8 and +0xC of 0x0048C7E8; SeqStep0 also
- * references 0x0048C7E4, which is either a fifth field of the record before
- * it or a separate global, and nothing here decides which. Raw offsets for
- * that reason.
+ * THE TABLE'S BASE IS 0x0048C7E4, WHICH THIS FUNCTION CANNOT SHOW. Reading
+ * only this one, the records look like they start at 0x0048C7E8 -- every
+ * field it touches is at or above that. SeqStepKind0 indexes `kind * 24` off
+ * 0x0048C7E4 for the frame COUNT, so the record begins four bytes lower and
+ * what looks like field +0 here is PARTICLE_OFF_SPRITES at +4. Corrected
+ * after the fact; the earlier comment said the extent was undecided, and a
+ * second toucher decided it.
  *
  * A point outside ADDR_MAP_BOUNDS_LEFT returns before allocating, so the
  * caller's loop can spray freely at an edge without leaking contexts. */
@@ -2131,15 +2133,18 @@ void __cdecl SpawnParticle(const uint32_t *at, int32_t rowField2C,
     *(int32_t *)(ctx + 8)    = (orig_game_rand() % 0x4B) + 0x19;
     *(int32_t *)(ctx + 0x24) = 0;
 
-    rec = (const uint8_t *)(uintptr_t)0x0048C7E8u + (uint32_t)kind * 24u;
+    rec = (const uint8_t *)(uintptr_t)ADDR_PARTICLE_KINDS
+          + (uint32_t)kind * AM2_PARTICLE_KIND_BYTES;
 
     *(int32_t *)row = 1;
-    *(uint32_t *)(row + ROW_OFF_SPRITE) = **(uint32_t *const *)rec;
+    *(uint32_t *)(row + ROW_OFF_SPRITE) =
+        **(uint32_t *const *)(rec + PARTICLE_OFF_SPRITES);
     *(int16_t *)(row + ROW_OFF_X) =
-        (int16_t)(*(const int16_t *)(rec + 4) + *(const int16_t *)at);
+        (int16_t)(*(const int16_t *)(rec + 8) + *(const int16_t *)at);
     *(int16_t *)(row + ROW_OFF_X + 2) =
-        (int16_t)(*(const int16_t *)(rec + 8) + *(const int16_t *)((const uint8_t *)at + 2));
-    *(int16_t *)(row + 0x20)             = *(const int16_t *)(rec + 0x0C);
+        (int16_t)(*(const int16_t *)(rec + 0x0C)
+                  + *(const int16_t *)((const uint8_t *)at + 2));
+    *(int16_t *)(row + 0x20)             = *(const int16_t *)(rec + 0x10);
     *(int16_t *)(row + ROW_OFF_FIELD_26) = 0;
     *(int32_t *)(row + ROW_OFF_FIELD_2C) = rowField2C;
 }

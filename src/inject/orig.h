@@ -2071,6 +2071,15 @@
  * `stride - it + index` that picks the last frames. A second consumer would
  * be worth more than either name. */
 #define ADDR_SEQ_ADVANCE_MS      0x0048CB94u  /* int32_t */
+/* THE PARTICLE KIND TABLE, and its base is settled by SeqStepKind0 rather
+ * than by SpawnParticle, which appeared to use 0x0048C7E8. Kind 0 indexes
+ * `kind * 24` off 0x0048C7E4 for the frame COUNT, so the record starts four
+ * bytes lower and SpawnParticle's "field +0" is field +4. Two touchers, and
+ * the one that reads the earliest field decides. */
+#define ADDR_PARTICLE_KINDS      0x0048C7E4u
+#define AM2_PARTICLE_KIND_BYTES  24u
+#define PARTICLE_OFF_COUNT       0x00u  /* int32_t, frames in the sprite run */
+#define PARTICLE_OFF_SPRITES     0x04u  /* AM2_Sprite ** */
 #define ADDR_SEQ_TAIL_FRAMES     0x0048CB90u  /* int32_t */
 #define ADDR_SEQ_STEP4           0x004613E0u
 /* Reconstructed. Kind 5 is an EMITTER: every ADDR_SEQ_EMIT_MS it adds a kind
