@@ -3177,7 +3177,7 @@ void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
     to   = kRegionOfCell[(uint32_t)TileOfPoint(*(const uint32_t *)&pt) & 0xFFFFu];
 
     if (BeginMoveTo(obj, (uint32_t *)&pt)) {
-        *(uint32_t *)(o + OBJ_OFF_TAIL_BLOCK) = *(const uint32_t *)&pt;
+        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
         *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)&pt;
         *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  =
             *(const uint32_t *)(o + OBJ_OFF_POS);
@@ -3218,7 +3218,7 @@ void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
     }
 
 waypoint:
-    d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_TAIL_BLOCK), &pt);
+    d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_ROUTE_GOAL), &pt);
 
     if (d > AM2_AI_REPLAN_DIST
         || (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
@@ -3228,10 +3228,10 @@ waypoint:
         if (*(const int16_t *)(o + OBJ_OFF_REGION) != 0 && to != 0)
             budget = AM2_AI_PLAN_BUDGET_LONG;
 
-        *(uint32_t *)(o + OBJ_OFF_TAIL_BLOCK) = *(const uint32_t *)&pt;
+        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
 
         if (!PlanPathTo(obj, (uint32_t *)&pt, budget)) {
-            *(uint32_t *)(o + OBJ_OFF_TAIL_BLOCK) = *(const uint32_t *)&pt;
+            *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
             *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  =
                 *(const uint32_t *)(o + OBJ_OFF_POS);
             *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)&pt;
@@ -3244,7 +3244,7 @@ waypoint:
 
     /* Reached BOTH when no replan was wanted and when one SUCCEEDED -- the
      * original's `jne` from PlanPathTo lands here, not past it. */
-    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_TAIL_BLOCK),
+    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
                            *(const uint32_t *)&pt)
                && *(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
                   < *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT)) {
@@ -3299,7 +3299,7 @@ heading:
  *
  *   A CURSOR THAT HAS RUN OUT RESETS THE PATH rather than heading straight
  *   off -- and that seeder is the one of the three in this pair that does NOT
- *   write OBJ_OFF_TAIL_BLOCK, which is the kind of asymmetry only a diff
+ *   write OBJ_OFF_ROUTE_GOAL, which is the kind of asymmetry only a diff
  *   surfaces.
  *
  *   IT ARRIVES AT 0x18 where the trooper arrives at 0x20. Eight units closer,
@@ -3335,7 +3335,7 @@ void __cdecl RoachRouteToward(void *obj, void *out, const void *ctx)
     to   = kRegionOfCell[(uint32_t)TileOfPoint(*(const uint32_t *)&pt) & 0xFFFFu];
 
     if (BeginMoveTo(obj, (uint32_t *)&pt)) {
-        *(uint32_t *)(o + OBJ_OFF_TAIL_BLOCK) = *(const uint32_t *)&pt;
+        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
         *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)&pt;
         *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  =
             *(const uint32_t *)(o + OBJ_OFF_POS);
@@ -3376,7 +3376,7 @@ void __cdecl RoachRouteToward(void *obj, void *out, const void *ctx)
     }
 
 waypoint:
-    d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_TAIL_BLOCK), &pt);
+    d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_ROUTE_GOAL), &pt);
 
     if (d > AM2_AI_REPLAN_DIST
         || (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
@@ -3386,10 +3386,10 @@ waypoint:
         if (*(const int16_t *)(o + OBJ_OFF_REGION) != 0 && to != 0)
             budget = AM2_AI_PLAN_BUDGET_LONG;
 
-        *(uint32_t *)(o + OBJ_OFF_TAIL_BLOCK) = *(const uint32_t *)&pt;
+        *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
 
         if (!PlanPathTo(obj, (uint32_t *)&pt, budget)) {
-            *(uint32_t *)(o + OBJ_OFF_TAIL_BLOCK) = *(const uint32_t *)&pt;
+            *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
             *(uint32_t *)(o + OBJ_OFF_MOVE_FROM)  =
                 *(const uint32_t *)(o + OBJ_OFF_POS);
             *(uint32_t *)(o + OBJ_OFF_MOVE_TO)    = *(const uint32_t *)&pt;
@@ -3402,14 +3402,14 @@ waypoint:
 
     /* Reached BOTH when no replan was wanted and when one SUCCEEDED -- the
      * original's `jne` from PlanPathTo lands here, not past it. */
-    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_TAIL_BLOCK),
+    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
                     *(const uint32_t *)&pt)) {
         if (*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
             >= *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT)) {
             /* THE ONE STRUCTURAL ADDITION over the trooper's copy: a cursor
              * that has run out resets the path to a zero-length one instead
              * of heading straight off -- and this is the one seeder of the
-             * three that does NOT write OBJ_OFF_TAIL_BLOCK. */
+             * three that does NOT write OBJ_OFF_ROUTE_GOAL. */
             *(uint32_t *)(o + OBJ_OFF_MOVE_TO)   = *(const uint32_t *)&pt;
             *(uint32_t *)(o + OBJ_OFF_MOVE_FROM) =
                 *(const uint32_t *)(o + OBJ_OFF_POS);

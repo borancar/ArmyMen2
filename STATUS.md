@@ -177,6 +177,32 @@ Renaming them to `dx`/`dy` broke `CreateItem`, which adds the first to a
 point's x and the second to its y -- a second independent reader agreeing on
 which is which, arriving for free because the rename forced it.
 
+## Next: AiTrooperStep, surveyed
+
+`0x004049C0`, 1,168 bytes, 26 call sites: the step the trooper AI shares. The
+survey is in `orig.h` and the first thing it says is that **it has a sibling
+already reconstructed** -- `AiRouteToward` in region.cpp, with the same
+destination field, the same route-goal/move-to pair and the same
+`AngleBetween` + state tail. It must be DIFFED against that one rather than
+written fresh, which is the rule `SettlePointInRegion` and `ItemLinkCells`
+both earned.
+
+Two naming findings came out of the read.
+
+**`OBJ_OFF_TAIL_BLOCK` was named from a memset**, "0x103 dwords, cleared
+wholesale", because the only toucher looked at was a bulk clear -- which says
+where something begins and never what it is, the same weakness this repo
+records for a name taken from a `free`. Two readers settle it: `AiRouteToward`
+writes the destination there beside `OBJ_OFF_MOVE_TO`, and this function
+compares it against the goal with `PointsEqual` to decide whether the route it
+has is still the route it wants. It is `OBJ_OFF_ROUTE_GOAL`, a packed point,
+and it tiles with the retry deadline at +0x11C and the waypoint list at +0x120.
+
+**And `OBJ_OFF_FIELD_C0` is overloaded by type.** It is documented as a pointer
+to an item type record, read that way by `SelectInventorySlot`; on a trooper the
+same offset is a packed point handed to `ApproxDist`. Both readings are of live
+code, so the structural name is right and stays -- the type-6 overload again.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT

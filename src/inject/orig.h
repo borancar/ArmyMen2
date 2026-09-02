@@ -3805,6 +3805,47 @@
  * one in 0x0044AD40 -- the step the trooper AI shares, as ADDR_AI_407190 is
  * the vehicle one. Nothing in it says what it is. */
 #define ADDR_AI_TROOPER_STEP     0x004049C0u  /* void(obj, out, void *ctx) */
+/* SURVEYED AND NOT RECONSTRUCTED, and the first thing to know is that it has a
+ * SIBLING already written: AiRouteToward in region.cpp. Same destination field,
+ * same OBJ_OFF_ROUTE_GOAL/OBJ_OFF_MOVE_TO pair, same `w[0] = AngleBetween(...)`
+ * and `*(int32_t *)(w + 8) = state` tail. This one is the longer, region-aware
+ * version. It must be DIFFED against that one rather than written fresh -- the
+ * rule this file states for SettlePointInRegion and ItemLinkCells, both of
+ * which were siblings of something already reconstructed and both of whose
+ * comments held the answer to what looked odd in the new function.
+ *
+ * ITS OFFSETS ARE OVERLOADED BY TYPE and 0xC0 is the example. OBJ_OFF_FIELD_C0
+ * is documented as a POINTER to an item type record, read that way by
+ * SelectInventorySlot and cleared by a destroy handler -- and here, on a
+ * trooper, the same offset is a packed POINT handed to ApproxDist and
+ * PointsEqual. Both readings are of live code. The structural name is
+ * therefore right and must stay: this is the type-6 overload one more time.
+ *
+ * WHAT IT DOES, in outline. Refuse if the goal is zero, or nearer than 4.
+ * Re-plan when the goal has moved, the retry deadline has passed, or the
+ * waypoint list is exhausted -- through BeginMoveTo for a straight run and
+ * PlanPathTo for a real route -- with a region step in front: if the goal's
+ * region differs from ours, RegionSolvePair the pair unless the matrix is
+ * already stamped, take the next hop out of ADDR_REGION_NEXT and aim at that
+ * region's own point through NearestAllowedTile. Then advance the waypoint
+ * index past every waypoint within 0x10, and finally write the facing and a
+ * state into the caller's record.
+ *
+ * THE STATE COMES OUT OF ONE OF TWO THREE-ENTRY TABLES, indexed by the AI
+ * context's SIGHTC_OFF_FIELD_00 -- ClassifyByCode74's 0, 1 or 2. They differ
+ * in ONE entry, which is the whole reason there are two of them, and the
+ * tables TILE, 0x004750B4 running to exactly 0x004750C0. */
+#define ADDR_AI_MOVE_STATE       0x004750B4u  /* int32[3]: 2, 8, 9 */
+#define ADDR_AI_MOVE_STATE_ALT   0x004750C0u  /* int32[3]: 3, 8, 9 */
+#define AM2_AI_MOVE_STATES       3
+/* Selects between them, and nothing read so far writes it -- so which arm a
+ * trooper takes is not established, only that class 0 is the only class the
+ * choice can reach. */
+#define OBJ_OFF_MOVE_STATE_ALT   0xF0u
+/* Soldier kind 7 overrides both tables with 3, which is ADDR_AI_MOVE_STATE_ALT
+ * entry 0 -- so the override is "use the alt table's answer" spelled as a
+ * literal, not a fourth state. */
+#define AM2_AI_KIND_FORCES_ALT   7
 /* 0x004060D0, one caller, inside the trooper step chooser at 0x0044B990. A
  * trooper AI step of the usual shape -- build the 0x58 context, act, set the
  * output state -- with two things in it that no other member of the family
@@ -6304,7 +6345,21 @@ typedef struct {
 #define OBJ_OFF_FACING_COPY      0xF8u   /* stamped from OBJ_OFF_FACING */
 #define OBJ_OFF_FIELD_FC         0xFCu
 #define OBJ_OFF_FIELD_100        0x100u
-#define OBJ_OFF_TAIL_BLOCK       0x118u  /* 0x103 dwords, cleared wholesale */
+/* THE POINT A ROUTE WAS LAST PLANNED TO, and it was OBJ_OFF_ROUTE_GOAL --
+ * "0x103 dwords, cleared wholesale" -- because the only toucher looked at was
+ * a bulk memset. A wholesale clear tells you the EXTENT of something and
+ * nothing about the field it starts at, which is the same weakness this file
+ * already records for a name taken from a `free`.
+ *
+ * Two readers say what it is. AiRouteToward writes the destination here in the
+ * same breath as OBJ_OFF_MOVE_TO, and AiTrooperStep compares it against the
+ * goal at OBJ_OFF_FIELD_C0 with PointsEqual to decide whether the route it has
+ * is still the route it wants. So it is a packed point, and the memset that
+ * named it merely happens to begin here.
+ *
+ * It also TILES with what follows: the goal, then the retry deadline at +0x11C,
+ * then the waypoint list at +0x120. */
+#define OBJ_OFF_ROUTE_GOAL       0x118u  /* packed point */
 #define AM2_OBJ_TAIL_DWORDS      0x103u
 #define ADDR_RESET_TYPE2_FIELDS  0x004572A0u  /* void(void *obj) */
 /* And 0x94 is type-dependent too, on the same evidence as 0xA0 above.
@@ -8021,7 +8076,7 @@ typedef struct {
  *
  *   a cursor that has run out RESETS the path to a zero-length one rather
  *   than heading straight off, and that seeder is the one of the three that
- *   does NOT write OBJ_OFF_TAIL_BLOCK;
+ *   does NOT write OBJ_OFF_ROUTE_GOAL;
  *   it arrives at 0x18 where the trooper arrives at AM2_AI_ARRIVED_DIST;
  *   it reports through out+0x14 -- 1 arrived, 2 heading -- where the trooper
  *   uses out+8 for a pose and out+0x14 only as a slow-down flag;

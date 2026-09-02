@@ -8806,7 +8806,11 @@ void __cdecl ResetType2Fields(void *obj)
     *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
     *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
 
-    memset(o + OBJ_OFF_TAIL_BLOCK, 0, AM2_OBJ_TAIL_DWORDS * 4);
+    /* The clear STARTS at the route goal and runs 0x103 dwords past it. That
+     * extent is all this site knows, and naming the field from it was the
+     * error corrected in orig.h: a bulk memset says where something begins,
+     * never what it is. */
+    memset(o + OBJ_OFF_ROUTE_GOAL, 0, AM2_OBJ_TAIL_DWORDS * 4);
 
     *(uint32_t *)(o + OBJ_OFF_FIELD_FC)  = 0;
     *(uint32_t *)(o + OBJ_OFF_FIELD_100) = 0;
