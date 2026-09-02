@@ -15,6 +15,8 @@
 #include "scriptint.h"
 #include "objtable.h"
 #include "dist.h"     /* AM2_Point, AngleBetween */
+#include "region.h"   /* ActivateRegion, InactivateRegion */
+#include "packkey.h"  /* KeyLookupTriple */
 #include "map.h"      /* TileOfPoint */
 #include "item.h"   /* UidOnWire */
 #include "objtype.h"
@@ -1413,8 +1415,6 @@ typedef int32_t (__cdecl *AM2_RandFn)(void);
  * the one thing under the condition layer still not reconstructed. */
 typedef void (__cdecl *AM2_RunScriptActionFn)(AM2_ScriptAction *act,
                                               void *arg);
-#define orig_run_script_action_at \
-    (*(AM2_RunScriptActionFn)AM2_IMAGE(ADDR_RUN_SCRIPT_ACTION))
 #define orig_rand        (*(AM2_RandFn)AM2_IMAGE(ADDR_GAME_RAND))
 
 /* 0x00421410. Run the i'th action of a condition.
@@ -1426,7 +1426,7 @@ typedef void (__cdecl *AM2_RunScriptActionFn)(AM2_ScriptAction *act,
  * something RunCondActions invented. */
 static void __cdecl CondRunAction(AM2_ScriptCond *c, int32_t i, void *arg)
 {
-    orig_run_script_action_at(&c->actions[i], arg);
+    RunScriptAction(&c->actions[i], arg);
 }
 
 /* 0x00421430. Run an `if` statement's actions the way its `mode` says to.
@@ -2775,6 +2775,8 @@ int event_install(void)
 {
     int rc = 0;
 
+    rc |= patch_replace(ADDR_RUN_SCRIPT_ACTION, (const void *)RunScriptAction,
+                        "RunScriptAction", 3);
     rc |= patch_replace(ADDR_RESET_TIMERS, (const void *)ResetTimers,
                         "ResetTimers", 0);
     patch_replace(ADDR_EVAL_OPERAND, (const void *)EvalOperand,
@@ -2939,4 +2941,551 @@ int event_install(void)
     rc |= patch_replace(ADDR_EVT_CLEAR_ALLIED, (const void *)EvtClearAllied,
                         "EvtClearAllied", 2);
     return rc;
+}
+
+/* ---- RunScriptAction --------------------------------------------------- */
+/* HudMessage lives behind win32/widget.h, which reaches windows.h; event.cpp
+ * is flat, so it is declared rather than included. */
+extern "C" void __cdecl HudMessage(const char *text, int32_t colour);
+extern "C" void __cdecl StartAudioStream(const char *name, int32_t loop);
+
+typedef void *(__cdecl *am2_ra_weapon_fn)(const char *name, int32_t army,
+                                          int32_t kind, uint32_t where,
+                                          int32_t a, int32_t b, int32_t c,
+                                          uint32_t uid);
+#define orig_ra_create_weapon ((am2_ra_weapon_fn)(uintptr_t)ADDR_CREATE_WEAPON)
+#define AM2_CHEAT_ITEM_GROUP  0x2D
+
+#define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
+#define g_overlayDirty  (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
+#define g_regionStride  (*(const int16_t *)(uintptr_t)ADDR_REGION_STRIDE)
+#define g_padCount      (*(const int32_t *)(uintptr_t)ADDR_PAD_COUNT)
+#define g_inputSuppress (*(int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+#define g_objCtxObj      (*(int32_t *)(uintptr_t)ADDR_OBJ_CTX_OBJ)
+#define g_objCtxObjPrev  (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_OBJ_PREV)
+#define g_objCtxVal      (*(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL)
+#define g_objCtxValPrev  (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_PREV)
+#define g_objCtxSet      (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET)
+#define g_objCtxSetPrev  (*(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET_PREV)
+
+/* A value that comes from a named VARIABLE when the action has one and from
+ * act->n0 otherwise.  Several arms share this and the original inlines it
+ * each time, with the fallback loading only AL. */
+static int32_t ActValueOrVar(const AM2_ScriptAction *act)
+{
+    int32_t v = 0;
+
+    if (act->xvar > 0) {
+        GetVarValue(act->xvar, &v);
+        return v;
+    }
+    return act->n0;
+}
+
+/* 0x00420410. Run one parsed action against an owner.
+ *
+ * IT MOSTLY DOES NOT RUN THE ACTION. An action whose uid is not -2 is handed
+ * to EventNotify and executed later; only an action with no subject, or code
+ * 0x1A, reaches the switch. Both hand-off branches are the same call and
+ * differ only in where the delay comes from.
+ *
+ * The switch is a DIRECT table of 58 entries with 58 distinct arms -- no
+ * shared arms, no byte index, no arm ending inside another. Every code is
+ * one action keyword, and the callee names identify them: code 1 is
+ * showmessage, 2 showbitmap, 3 showbitmapnopause, and so on.
+ *
+ * Code 0x1A is EMPTY, which is why the prologue exempts it from the
+ * deferral: it is the one action that means "do nothing here". */
+void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
+{
+    uint32_t at;
+
+    if (act->uid != -2 && act->code != 0x1A) {
+        int32_t delay = act->delay;
+
+        if (act->xvar > 0) {
+            int32_t v = 0;
+
+            GetVarValue(act->xvar, &v);
+            delay = v;
+        }
+        EventNotify(act->uid2, act->uid, (uint32_t)(uintptr_t)owner,
+                    0, 0, 0, 0, delay, 0, 0);
+        return;
+    }
+
+    switch (act->code) {
+    case 0x01:                                  /* showmessage */
+        if (act->text != 0)
+            HudMessage(act->text, 0);
+        return;
+    case 0x02:                                  /* showbitmap */
+        if (act->text != 0)
+            EvtShowBitmap(act->text);
+        return;
+    case 0x03:                                  /* showbitmapnopause */
+        if (act->text != 0)
+            EvtShowBitmapNoPause(act->text);
+        return;
+    case 0x04:                                  /* showfailure */
+        if (act->text != 0) {
+            strcpy((char *)(uintptr_t)ADDR_MESSAGE_TEXT, act->text);
+            strcpy((char *)(uintptr_t)ADDR_MESSAGE_BMP_NAME,
+                   (const char *)AM2_IMAGE(0x004787D4));
+            g_subState = 0x18;
+            g_overlayDirty = 1;
+        }
+        return;
+    case 0x05:                                  /* showpda */
+        if (act->text != 0) {
+            strcpy((char *)(uintptr_t)ADDR_MESSAGE_TEXT, act->text);
+            strcpy((char *)(uintptr_t)ADDR_MESSAGE_BMP_NAME,
+                   (const char *)AM2_IMAGE(0x004787C0));
+            g_subState = 0x18;
+            g_overlayDirty = 1;
+        }
+        return;
+    case 0x06:                                  /* playsound */
+        if (act->text != 0)
+            EvtPlaySoundAt(act->text, ActionPoint(act, (uint32_t)(uintptr_t)owner),
+                           act->n0, act->n1, act->extra);
+        return;
+    case 0x07:                                  /* playsoundon */
+        if (act->text != 0) {
+            /* ActionPoint's answer is DISCARDED -- eax is overwritten by n0
+             * before anything uses it.  Reproduced because the call may not
+             * be pure, and because reading it as an argument to ResolveUid
+             * is what the push order invites. */
+            ActionPoint(act, (uint32_t)(uintptr_t)owner);
+            EvtPlaySoundOn(act->text,
+                           ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                           act->n0, act->n1, act->extra);
+        }
+        return;
+    case 0x08:                                  /* playmusic */
+        if (act->text != 0)
+            StartAudioStream(act->text, act->n0);
+        return;
+
+    case 0x0A:                                  /* setobjstate-ish */
+        EvtObjSet(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner), act->n0);
+        return;
+    case 0x0B:
+        EvtSetWord60(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                     act->n0);
+        return;
+    case 0x0C:
+        EvtGuardedAction(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                         act->n0, act->extra);
+        return;
+
+    case 0x12:                                  /* dropitem */
+        EvtDeployItem(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                      ActionPoint(act, (uint32_t)(uintptr_t)owner));
+        return;
+    case 0x13:
+        EvtObjAction(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
+        return;
+    case 0x14:
+        ScriptResurrectItem(ResolveUid(act->subject,
+                                       (uint32_t)(uintptr_t)owner),
+                            ActionPoint(act, (uint32_t)(uintptr_t)owner));
+        return;
+    case 0x15:                                  /* ally */
+        EvtSetAllied(act->subject, act->target);
+        return;
+    case 0x16:                                  /* unally */
+        EvtClearAllied(act->subject, act->target);
+        return;
+    case 0x17:
+        ScriptSetObjTable(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                          act->target);
+        return;
+
+    case 0x1A:                                  /* the empty action */
+        return;
+    case 0x1B:                                  /* suspendai */
+        EvtFlag40Clear(act->subject, (uint32_t)(uintptr_t)owner);
+        return;
+    case 0x1C:                                  /* reviveai */
+        EvtFlag40Set(act->subject, (uint32_t)(uintptr_t)owner);
+        return;
+    case 0x1D:                                  /* setcamerafocus */
+        EvtPushObjCtx(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
+        return;
+    case 0x1E:                                  /* restorecamerafocus */
+        g_objCtxObj = g_objCtxObjPrev;
+        g_objCtxVal = g_objCtxValPrev;
+        g_objCtxSetPrev = g_objCtxSet;
+        return;
+
+    case 0x25:                                  /* setobjscriptstate */
+        /* target FIRST: the original pushes n0, subject, target in that
+         * order, so the LAST push -- target -- is the nameidx. Getting these
+         * two round the wrong way makes every lookup fail by name, which the
+         * campaign A/B reports as "SetObjScriptState was called with
+         * rr_burner_low which is not a valid object". */
+        SetObjScriptState(act->target, act->subject, act->n0);
+        return;
+    case 0x26:                                  /* activateregion */
+        if (act->subject < (int32_t)g_regionStride) {
+            if (act->n0 != 0)
+                ActivateRegion(act->subject);
+            else
+                InactivateRegion(act->subject);
+        }
+        return;
+
+    case 0x2B:
+        EvtSetField540(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                       act->n0);
+        return;
+    case 0x2C:
+        EvtSetModeF0(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                     act->n0);
+        return;
+    case 0x2D:
+        EvtSetMode94(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                     act->n0);
+        return;
+    case 0x2F:
+        EvtType2ActionA(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
+        return;
+    case 0x30:
+        EvtType2ActionB(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
+        return;
+    case 0x31:                                  /* by point, not by uid */
+        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if ((int16_t)at != 0)
+            EvtByRefA((int32_t)at, act->n0);
+        return;
+    case 0x32:
+        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if ((int16_t)at != 0)
+            EvtByRefB((int32_t)at, act->n0);
+        return;
+    case 0x33:
+        EvtSetFlag810(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                      act->n0);
+        return;
+    case 0x34:                                  /* the owner is ONE BYTE */
+        EvtSetOwner(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                    (int8_t)act->n0);
+        return;
+    case 0x35:
+        EvtType238Action(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                         act->n0);
+        return;
+    case 0x39:                                  /* setuilock */
+        g_inputSuppress = (act->n0 != 0) ? 1 : 0;
+        return;
+
+    case 0x09: {                                /* showvar */
+        int32_t v = 0;
+        char    text[0x40];
+
+        if (GetVarValue(act->xvar, &v) == 0)
+            return;
+        am2_sprintf(text, (const char *)(uintptr_t)ADDR_STR_PCT_D, v);
+        HudMessage(text, 0);
+        return;
+    }
+
+    /* Three level strings, three destinations, one shape. */
+    case 0x27:                                  /* setbriefing */
+        strcpy((char *)(uintptr_t)ADDR_LEVEL_STR_C, act->text);
+        return;
+    case 0x28:                                  /* setbriefvo */
+        strcpy((char *)(uintptr_t)ADDR_LEVEL_SOUND_NAME, act->text);
+        return;
+    case 0x29:                                  /* setstratmap */
+        strcpy((char *)(uintptr_t)ADDR_LEVEL_STR_D, act->text);
+        return;
+
+    case 0x3A: {                                /* setdamagepad */
+        uint8_t *pad;
+
+        if (act->subject < 0 || act->subject >= g_padCount)
+            return;
+        pad = (uint8_t *)(uintptr_t)ADDR_PADS
+            + (size_t)act->subject * AM2_PAD_STRIDE;
+        *(int32_t *)(pad + PAD_OFF_DAMAGE)      = act->n1;
+        *(int32_t *)(pad + 0x38)                = act->n0;
+        *(int32_t *)(pad + PAD_OFF_DAMAGE_KIND) = act->extra;
+
+        /* Only a positive damage marks the pad's NUMBER as live, and the
+         * number is reached through the pad's own +0x04 rather than by the
+         * pad index -- two different arrays with two different strides. */
+        if (act->n1 > 0) {
+            uint8_t *num = (uint8_t *)(uintptr_t)ADDR_PAD_NUMBERS
+                         + (size_t)*(const int32_t *)(pad + 0x04)
+                           * AM2_PAD_NUMBER_STRIDE;
+
+            *(int32_t *)(num + PADNUM_OFF_PADS) = 1;
+        }
+        return;
+    }
+
+    /* Two arms of one shape: a value that comes from a VARIABLE when one is
+     * named and from act->n0 otherwise.  The callees take an int8_t, and the
+     * original's fallback loads only AL -- so the upper bits it pushes are
+     * whatever was in eax.  Writing the parameter as a byte is what makes
+     * that harmless, and is why the header's int8_t matters. */
+    case 0x20:
+        EvtSetByte40(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                     (int8_t)ActValueOrVar(act));
+        return;
+    case 0x21:
+        EvtSetByte530(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                      (int8_t)ActValueOrVar(act));
+        return;
+
+    case 0x22:                                  /* addtovar */
+        AddToVar(act->subject, ActValueOrVar(act));
+        return;
+
+    case 0x23: {                                /* setvar */
+        /* NOT ActValueOrVar: this one tests xvar for NON-ZERO where its
+         * neighbours test for positive, and it REFUSES outright when the
+         * read fails rather than falling back to n0. */
+        int32_t v;
+
+        if (act->xvar != 0) {
+            v = 0;
+            if (GetVarValue(act->xvar, &v) == 0)
+                return;
+        } else {
+            v = act->n0;
+        }
+        SetVarValue(act->subject, v);
+        return;
+    }
+
+    case 0x24: {                                /* setobjbitmap */
+        /* THE VARIABLE IS READ AND THROWN AWAY. Both branches call with
+         * act->n0; the only difference is that a positive xvar gets a
+         * GetVarValue call whose answer nothing uses. Second arm in this
+         * function to discard a call's result, after playsoundon. */
+        int32_t ignored = 0;
+
+        if (act->xvar > 0)
+            GetVarValue(act->xvar, &ignored);
+        ScriptSetObjBitmap(act->subject, act->n0);
+        return;
+    }
+
+    case 0x2A:                                  /* setaimode, army or object */
+        /* act->extra chooses the TARGET, not the value: the same act->n0
+         * goes to a whole army or to one resolved object. */
+        if (act->extra != 0)
+            EvtArmySetField(act->army, act->subject, act->n0);
+        else
+            EvtSetAiMode(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                         act->n0);
+        return;
+
+    case 0x2E:
+        /* Both paths call the same function; multiplayer maps the army
+         * through its comm SLOT and single-player passes the army itself. */
+        EvtType2ActionC(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                        (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) != 0
+                            ? CommSlotForArmy(kCommObject, act->army)
+                            : act->army);
+        return;
+
+    case 0x36:                                  /* fireweapon at an object */
+        /* Refused unless the action names no point at all: no variable, no
+         * relative flag, and a zero x.  Three separate tests, and the third
+         * is a WORD. */
+        if (act->xvar > 0 || act->relative != 0 || act->u.pos.x != 0)
+            return;
+        FireWeaponAtObject(ResolveUid(act->subject, 0),
+                           ResolveUid(act->army,
+                                      (uint32_t)(uintptr_t)owner),
+                           act->n0,
+                           ResolveUid(act->target,
+                                      (uint32_t)(uintptr_t)owner));
+        return;
+
+    case 0x38:
+        EvtDropItem(ResolveUid(act->army, (uint32_t)(uintptr_t)owner),
+                    ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                    ActionPoint(act, (uint32_t)(uintptr_t)owner));
+        return;
+
+    case 0x0E:                                  /* createexplosion */
+        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if ((int16_t)at == 0)
+            return;
+        CreateExplosion((int16_t)at, (int16_t)(at >> 16), act->n0,
+                        act->army, 0, act->n1, 0, 0, 0, 0);
+        return;
+
+    case 0x10:                                  /* createweapon at a point */
+        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if ((int16_t)at == 0)
+            return;
+        orig_ra_create_weapon(act->text, 4,
+                              KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, act->item, 0),
+                              at, 0, act->n0, 0, 0);
+        return;
+
+    case 0x37:                                  /* unitfire at an object */
+        /* The same three-test refusal as 0x36, and the same me=0 on the
+         * subject where the target uses the owner. */
+        if (act->xvar > 0 || act->relative != 0 || act->u.pos.x != 0)
+            return;
+        UnitFireAtObject(ResolveUid(act->subject, 0), act->n0,
+                         ResolveUid(act->target, (uint32_t)(uintptr_t)owner));
+        return;
+
+    case 0x11:                                  /* createroach */
+        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if ((int16_t)at == 0)
+            return;
+        CreateRoach(0, act->text, (int16_t)at, (int16_t)(at >> 16),
+                    act->army, 0, 0, 0);
+        return;
+
+    case 0x0F: {                                /* createvehicle */
+        int32_t army;
+
+        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if ((int16_t)at == 0)
+            return;
+
+        /* TWO DIFFERENT MAPPINGS OF act->army IN ONE ARM. The sixth argument
+         * is the army itself in single-player and its comm SLOT in
+         * multiplayer; the fifth is CommArmyOfSlot of the same field, always.
+         * They are not the same call and not the same direction. */
+        army = ((*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) != 0)
+             ? CommSlotForArmy(kCommObject, act->army)
+             : act->army;
+
+        CreateVehicle(act->n0, act->text, (int16_t)at, (int16_t)(at >> 16),
+                      CommArmyOfSlot(kCommObject, act->army), army,
+                      0, 0, 0, 0);
+        return;
+    }
+
+    case 0x0D: {                                /* createtrooper */
+        uint8_t *unit, *weapon;
+
+        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if ((int16_t)at == 0)
+            return;
+
+        unit = (uint8_t *)CreateTrooper(act->text, (int16_t)at,
+                                        (int16_t)(at >> 16),
+                                        CommArmyOfSlot(kCommObject,
+                                                       act->army),
+                                        act->army, 0, 0, 0, 1, 0);
+        if (unit == 0)
+            return;
+
+        /* Then the same weapon-attach the cheat console does, which is
+         * worth saying because it is four calls in a fixed order and
+         * getting one wrong leaves a trooper holding nothing. */
+        weapon = (uint8_t *)orig_ra_create_weapon(
+                     (const char *)(uintptr_t)ADDR_DIR_SCRATCH, act->army,
+                     KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, act->item, 0),
+                     *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
+                     4, -1, 0, 0);
+        if (weapon == 0)
+            return;
+
+        weapon[OBJ_OFF_ARMY] = (uint8_t)act->army;
+        *(int32_t *)(unit + OBJ_OFF_WEAPON_UID) =
+            *(const int32_t *)(weapon + OBJ_OFF_UID);
+        SoldierKindForWeapon(unit,
+                             **(int32_t **)(weapon + OBJ_OFF_FIELD_C0));
+        SendTrooperSetWeapon(unit,
+                             *(const int32_t *)(weapon + OBJ_OFF_UID), 0);
+        return;
+    }
+
+    case 0x1F: {                                /* moveto */
+        /* THREE PATHS, not a point-or-fallback pair.  A named variable pair
+         * gives the point; failing that, an action carrying NO point at all
+         * moves one object to another; failing that, the literal point the
+         * script wrote is used.  The middle test is fireweapon's guard used
+         * to SELECT rather than to refuse. */
+        uint32_t uid = ResolveUid(act->subject, (uint32_t)(uintptr_t)owner);
+
+        if (act->xvar > 0) {
+            int32_t vx = 0, vy = 0;
+            AM2_Point p;
+
+            GetVarValue(act->xvar, &vx);
+            GetVarValue(act->yvar, &vy);
+            p.x = (int16_t)vx;
+            p.y = (int16_t)vy;
+            EvtAtPointC(uid, *(const uint32_t *)&p, act->relative);
+            return;
+        }
+        if (act->relative == 0 && act->u.pos.x == 0) {
+            EvtAtObjPosC(uid,
+                         ResolveUid(act->target, (uint32_t)(uintptr_t)owner),
+                         0);
+            return;
+        }
+        EvtAtPointC(uid, act->u.both, act->relative);
+        return;
+    }
+
+    case 0x18: {                                /* setaimode + move */
+        uint32_t uid = ResolveUid(act->subject, (uint32_t)(uintptr_t)owner);
+
+        if (act->extra != 0) {
+            if (act->n0 >= 0)
+                EvtArmySetField(act->army, act->subject, act->n0);
+        } else {
+            if (act->n0 >= 0)
+                EvtSetAiMode(uid, act->n0);
+        }
+
+        /* The same three paths as `moveto`, in the A variants. */
+        if (act->xvar > 0) {
+            int32_t vx = 0, vy = 0;
+            AM2_Point p;
+
+            GetVarValue(act->xvar, &vx);
+            GetVarValue(act->yvar, &vy);
+            p.x = (int16_t)vx;
+            p.y = (int16_t)vy;
+            EvtAtPointA(uid, *(const uint32_t *)&p, act->relative);
+            return;
+        }
+        if (act->relative == 0 && act->u.pos.x == 0) {
+            EvtAtObjPosA(uid,
+                         ResolveUid(act->target, (uint32_t)(uintptr_t)owner),
+                         0);
+            return;
+        }
+        EvtAtPointA(uid, act->u.both, act->relative);
+        return;
+    }
+
+    case 0x19: {                                /* setaimode + attach */
+        /* The same head as 0x18 and a completely different tail: no point
+         * handling at all, just a pair of objects or an army attach. */
+        if (act->extra != 0) {
+            if (act->n0 >= 0)
+                EvtArmySetField(act->army, act->subject, act->n0);
+            EvtArmyAttach(act->army, act->subject,
+                          ResolveUid(act->target,
+                                     (uint32_t)(uintptr_t)owner));
+            return;
+        }
+        if (act->n0 >= 0)
+            EvtSetAiMode(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                         act->n0);
+        EvtObjPair(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                   ResolveUid(act->target, (uint32_t)(uintptr_t)owner));
+        return;
+    }
+
+    default:
+        return;
+    }
 }

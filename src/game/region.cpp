@@ -9082,7 +9082,7 @@ typedef uint32_t (__stdcall *AM2_GetTickCountFn)(void);
 #define AM2_CHEAT_ABS(v)  ((v) < 0 ? -(v) : (v))
 
 #define g_charHandler (*(am2_char_fn *)(uintptr_t)ADDR_CHAR_HANDLER)
-#define g_inputSuppress (*(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+#define g_inputSuppress (*(int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
 #define g_mouseGrab    (*(intptr_t *)(uintptr_t)ADDR_MOUSE_GRAB)
 #define g_mouseChanged ((int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
 #define g_mouseButton  ((int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)

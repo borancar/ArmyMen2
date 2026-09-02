@@ -383,6 +383,9 @@
 #define AM2_MESSAGE_SIZE         0x64u
 /* The only one of the five whose bitmap is a GLOBAL rather than a literal --
  * whoever raises the message writes the name here first. */
+/* The text `showfailure` and `showpda` copy the action's own string into,
+ * beside the bitmap name they set with it. Named from those two writers. */
+#define ADDR_MESSAGE_TEXT        0x00511EA4u /* char[] */
 #define ADDR_MESSAGE_BMP_NAME    0x005122A4u /* char[] */
 /* GameMenu -- 03_123/124/125 load, return, save and abort */
 #define ADDR_DLG_GAMEMENU_DELETE          0x00452E20u

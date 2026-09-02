@@ -159,6 +159,10 @@ void __cdecl UnitFireAtObject(uint32_t unitUid, int32_t heading,
  * position otherwise. Fourteen callers. */
 uint32_t __cdecl ActionPoint(const AM2_ScriptAction *act, uint32_t me);
 
+/* 0x00420410. Run one parsed action against an owner -- or, when the action
+ * names a subject, hand it to EventNotify for later. */
+void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner);
+
 /* 0x00421750. Evaluate an `if`'s testvar comparisons -- all must pass, none
  * passes trivially, and an unknown operator passes. Six callers. */
 int32_t __cdecl EvalCondTests(const AM2_ScriptCond *c);

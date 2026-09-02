@@ -3368,8 +3368,6 @@ static void ScriptParseAll(void)
 /* Still original: the action runtime. ScriptRunLine hands it a NULL owner,
  * where a mission's own actions carry the object they belong to. */
 typedef void (__cdecl *AM2_RunActionFn)(AM2_ScriptAction *act, void *owner);
-#define orig_run_script_action \
-            ((AM2_RunActionFn)AM2_IMAGE(ADDR_RUN_SCRIPT_ACTION))
 
 /* 0x00444C40, three callers -- the cheat table's fallback. Tokenise one typed
  * line, parse it as an ACTION, and run it.
@@ -3413,7 +3411,7 @@ int32_t __cdecl ScriptRunLine(const char *line)
         return 0;
     }
 
-    orig_run_script_action(&act, (void *)0);
+    RunScriptAction(&act, (void *)0);
     ScriptResetTokens(&ctx);
     return 1;
 }

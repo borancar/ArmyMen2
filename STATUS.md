@@ -457,6 +457,11 @@ pushes are identical bar a *kind* and an *ammo* count -- everything else, four
 zeros and the caller's position, is the same in all eighteen. So the
 transcription is one helper and eighteen one-line cases.
 
+**RunScriptAction (0x00420410) is reconstructed** -- 4,096 bytes in
+event.cpp, a 58-way direct dispatch over the script action codes. `ab.sh
+bootcamp` and `campaign` are both clean. The campaign caught a swapped
+argument pair by name, which is the sharpest thing this suite has done.
+
 **LoadMap (0x0042C440) is reconstructed** -- 3,920 bytes in map.cpp, the
 .amm chunk walk, the self-describing per-record field layer, twelve layer
 allocations and the object construction. `ab.sh bootcamp` is clean: 22

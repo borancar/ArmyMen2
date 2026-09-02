@@ -14,6 +14,7 @@
 #include "objscript.h"
 #include "savetag.h"
 #include "script.h"
+#include "event.h"     /* RunScriptAction -- reconstructed */
 #include "scriptint.h"
 /* The object table and the item predicate, both reconstructed. objscript.cpp
  * used to reach all four through the image under a SECOND set of ADDR_ names,
@@ -427,8 +428,6 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
 typedef void (__cdecl *AM2_RunScriptActionFn)(AM2_ScriptAction *act,
                                               void *owner);
 
-#define orig_run_script_action \
-    (*(AM2_RunScriptActionFn)AM2_IMAGE(ADDR_RUN_SCRIPT_ACTION))
 
 /* 0x004371A0. Step one object along its object script.
  *
@@ -489,7 +488,7 @@ int32_t __cdecl UpdateObjectScript(void *obj)
     void *owner = *(void **)(o + OBJ_OFF_OWNER);
 
     for (int32_t i = 0; i < frame->actioncount; i++)
-        orig_run_script_action(&frame->actions[i], owner);
+        RunScriptAction(&frame->actions[i], owner);
 
     return 1;
 }
