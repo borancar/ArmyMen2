@@ -463,6 +463,23 @@ re-reading the field after the first may have changed it. Beside it a deadline
 at clock + 1000 stops the sweep pushing a trooper around more than once a
 second.
 
+## The string sweep, run on all five remaining unnamed functions
+
+Applied straight after `UpdateTrooperAction` named itself, because the lesson
+there was that the sweep should have come first. Over the five it produced one
+identification, two confirmations, and two honest blanks:
+
+- **`0x0042C440` is the map loader** -- `"%s.atl"` for the tileset, `"%s.amm"`
+  for the map, and a `"camera"` record parsed out of it. `orig.h` has called it
+  "the map loader" in prose for a long time and never gave the address a name;
+  it is `ADDR_LOAD_MAP` now.
+- `0x00417B80` pushes forty-odd cheat phrases and their replies, confirming
+  `ADDR_CHEAT_ENTRY`.
+- `0x00430530` pushes twenty multiplayer panel bitmaps, confirming
+  `ADDR_MP_PANEL_CTOR`.
+- `0x0044A420` and `0x00420410` push no literals at all. The sweep answers
+  nothing for those and says so, which is the useful half of running it.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT

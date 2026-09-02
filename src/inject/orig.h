@@ -6789,7 +6789,7 @@ typedef struct {
 #define ADDR_SAVE_MAP_SECTION    0x0042DB40u  /* int32_t(FILE *) */
 #define ADDR_LOAD_MAP_SECTION    0x0042DB70u  /* int32_t(FILE *) */
 /* The block the map loader owns, and its first field is a STRING: the level
- * loader at 0x0042C440 zeroes 416 bytes here and then strcpy's in the map
+ * loader at ADDR_LOAD_MAP zeroes 416 bytes here and then strcpy's in the map
  * directory it was just handed, which is what the sprite and mask paths put in
  * front of a set number 20 or above. Only the first 236 go into a savegame,
  * so the block is larger than the part map.cpp writes out. Named for the block
@@ -12748,8 +12748,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_BOAT_COVER_MIN       0x15
 /* The kind is VEHICLE_OFF_KIND, further down and already named. */
 #define AM2_VEHICLE_KIND_BOAT    5
+/* 0x0042C440, 3,920 bytes. THE MAP LOADER, and this file has called it that in
+ * two places for a long time without ever giving the address a name. It opens
+ * "%s.atl" for the tileset and "%s.amm" for the map itself, and parses a
+ * "camera" record out of the latter.
+ *
+ * Identified by SWEEPING ITS PUSHED STRING LITERALS -- the minute's work this
+ * file recommends and which named MakeBitmap and RestoreTileSet. Run over all
+ * five remaining unnamed functions it produced exactly one identification, and
+ * confirmed two names that were already right: 0x00417B80 pushes forty-odd
+ * cheat phrases and their replies, and 0x00430530 pushes twenty multiplayer
+ * panel bitmaps. 0x0044A420 and 0x00420410 push no literals at all, so for
+ * those the sweep answers nothing and says so. */
+#define ADDR_LOAD_MAP            0x0042C440u  /* int32(const char *name) */
+#define AM2_MAP_TILESET_FMT      0x00486328u  /* "%s.atl" */
+#define AM2_MAP_FILE_FMT         0x00486330u  /* "%s.amm" */
 /* The map's bounds in pixels, four int32 read as one 16-byte block out of the
- * map file by 0x0042C440 and written nowhere else. Distinct from
+ * map file by ADDR_LOAD_MAP and written nowhere else. Distinct from
  * ADDR_MAP_EXTENT_X/Y, which are a different pair at 0x00514DD0. */
 #define ADDR_MAP_BOUNDS_LEFT     0x00514DF8u
 #define ADDR_MAP_BOUNDS_TOP      0x00514DFCu
