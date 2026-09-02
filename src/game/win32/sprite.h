@@ -368,4 +368,9 @@ void __cdecl FreeDecalSprites(void);
 void __cdecl LoadSeqSprites5(void);
 void __cdecl FreeSeqSprites5(void);
 
+/* 0x00463330 and 0x00463360. All eight sprite subsystems up, and down in the
+ * exact reverse order. Both run on entering a mission. */
+void __cdecl LoadAllSprites(void);
+void __cdecl FreeAllSprites(void);
+
 #endif /* AM2_SPRITE_H */

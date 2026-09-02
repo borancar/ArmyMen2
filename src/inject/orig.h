@@ -7242,6 +7242,17 @@ typedef struct {
                                                 * loop is `cmp 0xC; jle` */
 #define AM2_MP_MARK_GRID_BASE     0x384
 #define AM2_MP_TEAM_SPRITE_SET    3            /* not 0x13 */
+/* The two dispatchers over the eight sprite subsystems. Both are reached from
+ * ADDR_STATE2_ENTER, so entering a mission tears the sprites down and builds
+ * them back up -- which is why every loader guards on its own pointer being
+ * NULL and why both halves of all eight pairs run on a single Boot Camp
+ * drive.
+ *
+ * The teardown is the exact REVERSE of the init, eight for eight. That is a
+ * check rather than an observation: a loader written against the wrong table,
+ * or a free pointed at a neighbour's globals, would break the mirror. */
+#define ADDR_LOAD_ALL_SPRITES     0x00463330u  /* void(void) */
+#define ADDR_FREE_ALL_SPRITES     0x00463360u  /* void(void) */
 #define ADDR_LOAD_MARK_SPRITES    0x00463060u  /* void(void) */
 #define ADDR_FREE_MARK_SPRITES    0x00463200u  /* void(void) */
 #define AM2_MARK_LEADER          0        /* the entry drawn over the leader */
@@ -13255,7 +13266,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * 0x0040A6A0 is a one-instruction `jmp` into the middle of another entry;
  * 0x00463360 is eight chained calls in the band above the nominal CRT line. */
 #define ADDR_TEARDOWN_40A6A0     0x0040A6A0u  /* void(void) */
-#define ADDR_TEARDOWN_463360     0x00463360u  /* void(void) */
 #define ADDR_LEVEL_TEARDOWN      0x004256F0u  /* void(void), on leaving a level */
 /* Sub-state 34 of ADDR_STATE2_FRAME's table, and the only in-mission code that
  * reads a key and raises a menu request. The test is `!IsKeyDown(ESC) &&

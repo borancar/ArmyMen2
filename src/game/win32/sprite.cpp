@@ -886,6 +886,12 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
     rc |= patch_replace(ADDR_FREE_MARK_SPRITES,
                         (const void *)FreeMarkSprites,
                         "FreeMarkSprites", 1);
+    rc |= patch_replace(ADDR_LOAD_ALL_SPRITES,
+                        (const void *)LoadAllSprites,
+                        "LoadAllSprites", 1);
+    rc |= patch_replace(ADDR_FREE_ALL_SPRITES,
+                        (const void *)FreeAllSprites,
+                        "FreeAllSprites", 1);
     return rc;
 }
 
@@ -2820,4 +2826,30 @@ void __cdecl FreeMarkSprites(void)
         }
     }
     /* The three singles are NOT nulled by the original -- only released. */
+}
+
+/* 0x00463330 and 0x00463360. The sprite subsystems up and down, in mirrored
+ * order. Both are called from ADDR_STATE2_ENTER. */
+void __cdecl LoadAllSprites(void)
+{
+    LoadSpriteGroups();
+    LoadSpriteGroupsB();
+    LoadSpriteGroupsC();
+    LoadSpriteGrid();
+    LoadDecalSprites();
+    LoadSeqSprites5();
+    LoadSeqGrid();
+    LoadMarkSprites();
+}
+
+void __cdecl FreeAllSprites(void)
+{
+    FreeMarkSprites();
+    FreeSeqGrid();
+    FreeSeqSprites5();
+    FreeDecalSprites();
+    FreeSpriteGrid();
+    FreeSpriteGroupsC();
+    FreeSpriteGroupsB();
+    FreeSpriteGroups();
 }
