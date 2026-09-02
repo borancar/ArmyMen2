@@ -379,6 +379,14 @@ hands everything else to `AddSightBlocker` -- so one pass both selects the
 candidates and builds the occlusion data those candidates will be tested
 against. Treating it as a filter followed by a scan gets the order wrong.
 
+**Three names in that edit were refused by `checkpatches`, and the existing
+ones were better.** `flags` non-zero selects `ADDR_OBJ_IS_HITTABLE` and zero
+selects `ADDR_OBJ_IS_LIVE_TARGET` -- which say what each predicate *asks*,
+where "predicate A" and "predicate B" would have said only which argument picks
+them. The rule about grepping an address before naming it is cited in this
+session's own commits and was then broken three times in one hunk; the ratchet
+is what caught it, not the rule.
+
 **Its signature is resolved**, with `espmap.py` rather than by eye:
 `void *SightScan(obj, int32 *range, uint8 *bearing, int32 *nAllied, int32
 *nOther, int32 flags)` -- six arguments, four out-params, all cleared before

@@ -6499,7 +6499,7 @@ void __cdecl TrooperAiStep(void *obj, void *out)
 
 typedef int32_t  (__cdecl *AM2_ScanFn)(void *obj, void *range, void *bearing,
                                        void *a, void *b, int32_t z);
-#define orig_scan_403b40  ((AM2_ScanFn)(uintptr_t)AM2_IMAGE(ADDR_SCAN_403B40))
+#define orig_scan_403b40  ((AM2_ScanFn)(uintptr_t)AM2_IMAGE(ADDR_SIGHT_SCAN))
 #define kRangeWant (*(const double *)AM2_IMAGE(ADDR_SIGHT_RANGE_WANT))
 #define kRangeHi   (*(const double *)AM2_IMAGE(ADDR_WEAPON_RANGE_HI))
 
@@ -6543,7 +6543,7 @@ static uint8_t *SightResolve(uint32_t *uid, uint32_t *dead_clears, void **slot)
 /* AiBuildContext -- original 0x00407D70, one caller: the AI mode
  * dispatcher at 0x00407F80, whose `sub esp, 0x44` is this record's LENGTH.
  * Fill the sight record every mode arm below then reads -- the leader and the
- * way to them, the target and the way to it, whatever ADDR_SCAN_403B40 has in
+ * way to them, the target and the way to it, whatever ADDR_SIGHT_SCAN has in
  * view, and a description of the weapon in hand.
  *
  * ITS TAIL IS WHAT NAMED THREE FIELDS CORRECTLY. SIGHT_OFF_WEAPON and

@@ -6098,7 +6098,7 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot)
 
 typedef int32_t (__cdecl *AM2_Scan403B40Fn)(void *obj, void *a, void *b,
                                             void *c, void *d, int32_t e);
-#define orig_scan_403b40 ((AM2_Scan403B40Fn)(uintptr_t)ADDR_SCAN_403B40)
+#define orig_scan_403b40 ((AM2_Scan403B40Fn)(uintptr_t)ADDR_SIGHT_SCAN)
 
 /* NextInventorySlot -- original 0x004498F0, one caller. Move a trooper on to
  * its next inventory slot, wrapping to 0, on the weapon-switch action key or

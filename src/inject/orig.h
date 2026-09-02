@@ -3498,7 +3498,7 @@
 #define SIGHT_OFF_SEED         0x2Cu  /* uint8_t, a fresh GameRand each build */
 /* 0x00407D70, one caller -- the 0x00407F80 dispatcher, whose `sub esp, 0x44`
  * is this record's LENGTH. Build the sight record an AI mode arm reads:
- * resolve the leader and the target, measure to each, ask ADDR_SCAN_403B40
+ * resolve the leader and the target, measure to each, ask ADDR_SIGHT_SCAN
  * what is in view, and describe the held weapon.
  *
  * ITS TWIN IS 0x00408060 AND THEY ARE LESS ALIKE THAN THEY LOOK. That one
@@ -3517,7 +3517,7 @@
  *
  * Reconstructed as AiBuildContext; ADDR_AI_BUILD_CONTEXT below is its
  * address, and was already on it. */
-#define OBJ_OFF_FIELD_110      0x110u  /* ADDR_SCAN_403B40's fifth argument */
+#define OBJ_OFF_FIELD_110      0x110u  /* ADDR_SIGHT_SCAN's fifth argument */
 #define OBJ_OFF_FIELD_114      0x114u  /* and its fourth */
 #define AM2_SIGHT_DROP         (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED)
 
@@ -9005,6 +9005,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * arm; the answer is the object chosen, which is what the callers put in
  * SIGHT_OFF_FOUND with `range` and `bearing` beside it.
  *
+ * THE TWO PREDICATES ALREADY HAD NAMES AND THEY ARE BETTER THAN THE ONES I
+ * NEARLY GAVE THEM. `flags` non-zero selects ADDR_OBJ_IS_HITTABLE and zero
+ * selects ADDR_OBJ_IS_LIVE_TARGET -- which say what each one ASKS, where
+ * "predicate A" and "predicate B" would have said only which argument picks
+ * them. checkpatches refused all three names in one edit, this address
+ * included; the rule about grepping an address before naming it was cited
+ * repeatedly in this session's own commits and then broken three times in a
+ * single hunk.
+ *
  * THE SEARCH BOX IS SQUARE AND INT32. Four dwords at the frame's +0x48..+0x54
  * -- an AM2_Rect, whose fields really are int32 -- built as the position plus
  * and minus RANK_REC_OFF_SIGHT_RANGE on both axes. Written in the order
@@ -9017,12 +9026,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * measured from the object's ANCHOR, not from wherever the scan measured it.
  * The fallback arm returns the recorded bearing and does not do this. Two
  * exits, two different bearings, and the difference is one call. */
-#define ADDR_SIGHT_SCAN          0x00403B40u
-#define ADDR_SIGHT_PRED_A        0x004036C0u  /* flags != 0 */
-#define ADDR_SIGHT_PRED_B        0x00403660u  /* flags == 0 */
 #define AM2_SIGHT_SCAN_FAR       0x1000       /* the initial best range */
 #define AM2_SIGHT_KIND7_RANGE    0x3E8        /* kind 7 is scored flat */
-#define ADDR_SCAN_403B40         0x00403B40u  /* int32(obj, a, b, c, d, e) */
+#define ADDR_SIGHT_SCAN           0x00403B40u  /* int32(obj, a, b, c, d, e) */
 /* 0x00448880, two callers, 64 bytes. The first dword of the OBJ_OFF_FIELD_C0
  * record of whatever sits in UNIT_OFF_INVENTORY_SEL -- the same value
  * SaveType2 writes as its tag and ThingCode switches on. Reconstructed. Both
