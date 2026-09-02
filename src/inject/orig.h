@@ -8956,6 +8956,35 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * twice; this one writes the hull into one slot and the turret into another
  * and keeps both. Same idiom, opposite conclusion -- so the "one slot written
  * twice" note does not carry over. */
+
+/* IT IS WHERE THE HEADING CACHE COMES FROM, which closes the loop on
+ * ADDR_SIGHT_BLOCK_BY_DIR's two stamps. This function INCREMENTS
+ * ADDR_SIGHT_GENERATION and then feeds every object it rejects to
+ * AddSightBlocker, which is what writes the three per-heading minima; the four
+ * AI steps reconstructed above only ever READ that cache and compare their own
+ * stamp against the generation. So the scan invalidates and refills, the steps
+ * consult, and the "trace stamp" and "minima stamp" being separate is the
+ * seam between them.
+ *
+ * SEVEN ARGUMENTS, FOUR OF THEM OUT-PARAMS, and all four are zeroed at entry
+ * before anything is looked at -- (int32 *, uint8 *, int32 *, int32 *), which
+ * is the {object, bearing, ?, count} the callers read back into
+ * SIGHT_OFF_FOUND and its neighbours.
+ *
+ * TWO PHASES, AND THE FIRST ONE EDITS THE LIST IT WALKS. ObjectsInRect answers
+ * a chain threaded through OBJ_OFF_QUERY_NEXT, with one of TWO predicates
+ * chosen by argument 5 -- 0x004036C0 or 0x00403660. The walk then UNLINKS each
+ * object it wants into a second list and hands everything else to
+ * AddSightBlocker, so the same pass both selects candidates and builds the
+ * occlusion data the selection will be tested against. A reading that treats
+ * it as a filter followed by a scan gets the order wrong.
+ *
+ * ANYTHING OURS AND OF TYPE 2, 3 OR 8 IS REVEALED on the way past, with a
+ * 0x7D0-millisecond stamp written to its +0x5C. That is a side effect of
+ * looking, not of finding.
+ *
+ * KIND 7 IS SCORED DIFFERENTLY from everything else: AngleBetween and a flat
+ * 0x3E8 where the rest go through the arc and range machinery. */
 #define ADDR_SCAN_403B40         0x00403B40u  /* int32(obj, a, b, c, d, e) */
 /* 0x00448880, two callers, 64 bytes. The first dword of the OBJ_OFF_FIELD_C0
  * record of whatever sits in UNIT_OFF_INVENTORY_SEL -- the same value

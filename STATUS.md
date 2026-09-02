@@ -327,6 +327,32 @@ height -- the trajectory is untouched and only the reference moves.
 `CreateMissile` writes the launch height into it, which is the writer
 confirming the reader.
 
+## Next: the sighting scan, mapped
+
+`0x00403B40`, 1,888 bytes over a 0x84C frame -- what fills `SIGHT_OFF_FOUND`,
+and therefore the source of everything the four AI steps reconstructed this
+session act on. All twenty-three callees are named; the survey is in `orig.h`.
+
+**It is where the heading cache comes from**, which closes the loop on
+`ADDR_SIGHT_BLOCK_BY_DIR`'s two stamps. This function increments
+`ADDR_SIGHT_GENERATION` and feeds every object it rejects to `AddSightBlocker`,
+which writes the three per-heading minima; the AI steps only ever *read* that
+cache. So the scan invalidates and refills, the steps consult, and the separate
+trace and minima stamps are the seam between them.
+
+**Two phases, and the first edits the list it walks.** `ObjectsInRect` answers a
+chain threaded through `OBJ_OFF_QUERY_NEXT`, with one of two predicates chosen
+by argument 5. The walk then unlinks each object it wants into a second list and
+hands everything else to `AddSightBlocker` -- so one pass both selects the
+candidates and builds the occlusion data those candidates will be tested
+against. Treating it as a filter followed by a scan gets the order wrong.
+
+Also mapped: seven arguments with four out-params, all zeroed before anything
+is looked at; anything ours of type 2, 3 or 8 revealed on the way past with a
+2,000 ms stamp -- a side effect of looking, not of finding; and kind 7 scored
+through `AngleBetween` and a flat `0x3E8` where everything else goes through
+the arc and range machinery.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
