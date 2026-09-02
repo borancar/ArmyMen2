@@ -9340,6 +9340,109 @@ int32_t __cdecl PointerPickMode6(void *obj)
     return PointerFriendTail(o);
 }
 
+/* PointerPickMode0 -- original 0x00459420, 912 bytes, the PICK of pointer mode
+ * 0 -- the DEFAULT mode, and the only one in this family a drive reaches.
+ *
+ * It ends in the same friend tail as modes 4, 5 and 6, so the length is mostly
+ * the alliance block and that tail written out again. What is its own is the
+ * ENEMY arm, which the other three do not have in this form.
+ *
+ * TWO REFUSALS THE OTHERS DO NOT HAVE, and the first is the interesting one: it
+ * refuses an object ObjIsWatchedKind ACCEPTS. PointerPickWatchedItem exists to
+ * offer exactly those, so the default pointer stands aside for the mode that
+ * handles them. Then army 4 is refused outright, as in mode 4.
+ *
+ * AN ENEMY IS OFFERED ONLY IF OUR LEADER'S WEAPON REACHES IT, and which weapon
+ * that is depends on whether the leader is riding: with OBJ_OFF_RIDING set it
+ * is the VEHICLE's VEHICLE_OFF_WEAPON_UID, otherwise the leader's own selected
+ * inventory slot. The reach is the weapon definition's ITEMTYPE_OFF_RANGE times
+ * ADDR_WEAPON_RANGE_K3, which is 1.2.
+ *
+ * THE COMPARISON IS x87 AND THE SENSE IS EASY TO INVERT. `fild dist`,
+ * `fild range`, `fmul 1.2`, `fcompp`, `test ah, 1` -- C0 is set when the
+ * TOP of stack, the scaled range, is LESS than the distance. So the refusal is
+ * `range * 1.2 < dist` and the offer is everything at or inside it. Written in
+ * that order rather than flipped, so it can be read against the instructions.
+ *
+ * AND THE ENEMY ARM ANSWERS 0. It shows an overlay row and stores the hover
+ * uid and then returns 0, like the vehicle hint in the friend tail -- so "the
+ * pointer has something to say about this" and "the pointer will act on this"
+ * are different, and only the friend tail's last exit is a yes.
+ *
+ * ONE GUARD IS A MENU TEST: with the mouse button down, the enemy arm is
+ * skipped unless GetMenuRow() is 1. The other three picks have no equivalent.
+ *
+ * MEASURED AT 8,520 CALLS, which makes this the only PICK in the family that
+ * runs at all -- the other five read 0 on the same drive. A live Boot Camp
+ * mission with the pointer moved over units gives PointerPickMode0=8520 beside
+ * PointerSelect=3, so it is asked many times a second about whatever is under
+ * the cursor and answers for real.
+ *
+ * THAT IS COVERAGE AND NOT COMPARISON, and the difference matters here. The A/B
+ * configurations stop at a dialog and never move the pointer over a unit, so a
+ * clean bootcamp/campaign run does not compare this function at all -- it is
+ * covered by the drive above and by reading. Which arm those 8,520 calls take
+ * is also unmeasured: almost all of them are likely the early refusals, and the
+ * weapon-reach arm is the interesting one. A five-figure counter is not
+ * evidence that the branch you care about ran, which this project has recorded
+ * before for ShotStrike. */
+int32_t __cdecl PointerPickMode0(void *obj)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    uint8_t       *leader;
+    const uint8_t *weapon;
+    const uint8_t *ride;
+    int32_t        owner;
+    uint32_t       uid;
+
+    if (ObjIsWatchedKind(o))
+        return 0;
+    if (*(const int8_t *)(o + OBJ_OFF_ARMY) == AM2_ARMY_NEUTRAL)
+        return 0;
+
+    owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+    if (owner == AM2_ARMY_NEUTRAL)
+        return PointerFriendTail(o);
+    if (ArmyAlliedWithObj(owner, o, 0))
+        return PointerFriendTail(o);
+
+    /* An enemy. */
+    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON && GetMenuRow() != 1)
+        return 0;
+
+    leader = OurLeaderUnit();
+    if (!leader)
+        return 0;
+
+    if (*(const uint32_t *)(leader + OBJ_OFF_RIDING)) {
+        ride = (const uint8_t *)LookupType3ByUID(
+            *(const uint32_t *)(leader + OBJ_OFF_RIDING));
+        uid = *(const uint32_t *)(ride + VEHICLE_OFF_WEAPON_UID);
+        if (uid == 0)
+            return 0;
+    } else {
+        uid = *(const uint32_t *)(leader + UNIT_OFF_INVENTORY
+            + (uint32_t)*(const int32_t *)(leader + UNIT_OFF_INVENTORY_SEL) * 4);
+    }
+
+    weapon = (const uint8_t *)WeaponByUid(uid);
+    if (!weapon)
+        return 0;
+
+    if ((double)*(const int32_t *)
+            (*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
+             + ITEMTYPE_OFF_RANGE)
+            * *(const double *)(uintptr_t)ADDR_WEAPON_RANGE_K3
+        < (double)ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
+                             (const AM2_Point *)(o + OBJ_OFF_X)))
+        return 0;
+
+    OverlayPrepare(AM2_OVERLAY_ROW_FIRE, 1);
+    *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
+        *(const uint32_t *)(o + OBJ_OFF_UID);
+    return 0;   /* a hint, not a yes -- see above */
+}
+
 /* PointerPickWatchedItem -- original 0x00459EE0, 208 bytes, one reference: the
  * PICK slot of a record in the second {pick, action, kind, flags} table.
  *
@@ -10701,6 +10804,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_POINTER_PICK_MODE6,
                         (const void *)PointerPickMode6,
                         "PointerPickMode6", 1);
+    rc |= patch_replace(ADDR_POINTER_PICK_MODE0,
+                        (const void *)PointerPickMode0,
+                        "PointerPickMode0", 1);
     rc |= patch_replace(ADDR_SET_WEAPON_TARGET_AIMED,
                         (const void *)SetWeaponTargetAimed,
                         "SetWeaponTargetAimed", 4);

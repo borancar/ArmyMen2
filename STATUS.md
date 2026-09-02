@@ -9,8 +9,33 @@ Last updated: **2026-09-02**, at `969936a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,405 patches plus 3 REGISTERED = 1,408 reconstructed
+Nothing uncommitted. **1,406 patches plus 3 REGISTERED = 1,409 reconstructed
 addresses**, **30** analysis tools in `make check`.
+
+**`PointerPickMode0` (`0x00459420`, 912 B) is reconstructed** -- the DEFAULT
+pointer's pick, and **measured at 8,520 calls** on a driven Boot Camp mission
+where the other five picks read 0. It is the only member of the family that
+runs.
+
+**It refuses what `PointerPickWatchedItem` accepts**: an object passing
+`ObjIsWatchedKind` is declined here, so the default pointer stands aside for the
+mode that handles those.
+
+**An enemy is offered only if our leader's weapon reaches it**, and which weapon
+depends on whether the leader is riding: with `OBJ_OFF_RIDING` set it is the
+VEHICLE's weapon, otherwise the leader's own selected slot. The reach is the
+definition's `ITEMTYPE_OFF_RANGE` times 1.2.
+
+**And the enemy arm answers 0** -- it shows an overlay and stores the hover uid
+and returns 0, like the friend tail's vehicle hint. "The pointer has something
+to say" and "the pointer will act" are different, and only the friend tail's
+last exit is a yes.
+
+**8,520 is coverage, not comparison.** The A/B configurations stop at a dialog
+and never move the pointer over a unit, so a clean run does not compare this.
+Which arm those calls take is also unmeasured -- almost all are likely the early
+refusals, and the weapon-reach arm is the interesting one. The `ShotStrike`
+lesson: a five-figure counter is not evidence the branch you care about ran.
 
 **`PointerPickMode6` (`0x00459300`, 288 B) is reconstructed** -- the same two
 refusals as modes 4 and 5, then the shared friend tail, with **no alliance test
@@ -208,7 +233,7 @@ that holds **seventeen** functions and patching any one of them credits all of
 it. The same effect inflates the entry count.
 
     entry-generous   1,220 of 1,239 entries, 89.5% of sub-CRT bytes
-    split-aware      1,365 of 1,530 real functions, 80.5% of sub-CRT bytes
+    split-aware      1,366 of 1,530 real functions, 80.8% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -219,9 +244,9 @@ ceiling rather than a floor -- ten percentage points of ceiling, measured.
 The loop's `completion_promise` is now **every game function below the CRT
 line (0x0045C000) patched**. Measured: **1,220 of 1,239** entries in
 `docs/functions.tsv` below that address have a patch inside them -- so 19
-outstanding, which is 1,239 minus 1,220 -- from 1,408 reconstructed addresses
-(1,405 patched plus 3 registered), and **89.5% of the sub-CRT bytes**.
-Split-aware that is **1,365 of 1,530** real functions and **80.5%** of the
+outstanding, which is 1,239 minus 1,220 -- from 1,409 reconstructed addresses
+(1,406 patched plus 3 registered), and **89.5% of the sub-CRT bytes**.
+Split-aware that is **1,366 of 1,530** real functions and **80.8%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 

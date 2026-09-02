@@ -462,6 +462,7 @@
  * which is all the evidence there is -- the rows themselves are just indices
  * into the cursor sheet OverlayPrepare selects from. */
 #define AM2_OVERLAY_ROW_ENEMY     4   /* what a pick shows over a foe */
+#define AM2_OVERLAY_ROW_FIRE      1   /* mode 0's, over a foe in range */
 #define AM2_OVERLAY_ROW_BOARD     8
 #define AM2_OVERLAY_ROW_REACH     0x12
 /* The click-versus-drag window, in GetTickCount ticks. Every test of it in the
@@ -10082,6 +10083,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_POINTER_PICK_MODE4  0x00458EE0u  /* int32_t(void *obj) */
 #define ADDR_POINTER_PICK_MODE5  0x004590F0u  /* int32_t(void *obj) */
 #define ADDR_POINTER_PICK_MODE6  0x00459300u  /* int32_t(void *obj) */
+#define ADDR_POINTER_PICK_MODE0  0x00459420u  /* int32_t(void *obj) */
 /* ArmyAlliedWithObj IS INLINED INTO THE POINTER PICKS, and army.cpp has had it
  * as a function since long before. The block that appears in 0x00458EE0,
  * 0x004590F0, 0x00459300, 0x00459420, 0x004597B0, 0x004599A0 and 0x00459BE0 --

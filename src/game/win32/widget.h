@@ -1632,6 +1632,11 @@ int32_t __cdecl PointerPickMode5(void *obj);
  * with no alliance test -- so it offers nothing on an enemy. */
 int32_t __cdecl PointerPickMode6(void *obj);
 
+/* 0x00459420. Mode 0's pick -- the default pointer. Stands aside for watched
+ * items, refuses neutrals, offers an enemy only if our leader's weapon reaches
+ * it, and otherwise falls into the friend tail. */
+int32_t __cdecl PointerPickMode0(void *obj);
+
 /* 0x00458D70. ADDR_SET_WEAPON_TARGET's sibling: record a fire request aimed at
  * ADDR_AIM_X/Y/Z, for the weapon kinds 0x23..0x26. */
 void __cdecl SetWeaponTargetAimed(void *target, uint32_t at);
