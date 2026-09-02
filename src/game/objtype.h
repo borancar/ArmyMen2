@@ -65,6 +65,10 @@ void *__cdecl MakeAaiRecord(int32_t type, int32_t key, int32_t slot,
  * +8 rather than +0, and growing by 19 rather than 17. */
 int32_t __cdecl AddAaiRecord(void *rec);
 
+/* 0x00434700. Empty the AAI tables and put back the records that do not come
+ * from object.aai: three singletons, a run of forty-four, and two more. */
+void __cdecl BuildAaiBuiltins(void);
+
 /* 0x00434E60, three callers. Clear bit 0 on every row the sub-list holds. Its
  * argument is the sub-list header, not the object. */
 void __cdecl SubrecHideRows(void *subrec);

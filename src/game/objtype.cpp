@@ -486,6 +486,175 @@ void __cdecl FreeRecordList(void *list)
     am2_free(list);
 }
 
+/* One built-in AAI record, which BuildAaiBuiltins below makes eight ways. The
+ * list record is twelve bytes -- LISTREC_OFF_SPRITE and then two int16 and a
+ * dword -- and MakeAaiRecord takes the rect as its last FOUR arguments, which
+ * the original passes by writing them into reserved stack rather than pushing.
+ */
+static void AaiBuiltin(void *spr, int16_t a, int16_t b, int32_t c,
+                       int32_t type, uint32_t key,
+                       int32_t l, int32_t t, int32_t r, int32_t bo)
+{
+    uint8_t  rec[AM2_LIST_RECORD_BYTES];
+    AM2_Rect box;
+    void    *list;
+    int32_t  slot;
+
+    *(void **)(rec + LISTREC_OFF_SPRITE) = spr;
+    *(int16_t *)(rec + 4) = a;
+    *(int16_t *)(rec + 6) = b;
+    *(int32_t *)(rec + 8) = c;
+
+    list = MakeRecordList(1, rec, (void *)(uintptr_t)key);
+
+    /* The SLOT, not the list. AddRecordList's return value is what
+     * MakeAaiRecord's third parameter takes -- objtype.h has always named it
+     * `slot`, and passing the pointer instead loads no map at all. */
+    slot = AddRecordList(list);
+
+    RectSet(&box, l, t, r, bo);
+    AddAaiRecord(MakeAaiRecord(type, (int32_t)key, slot,
+                               box.left, box.top, box.right, box.bottom));
+}
+
+/* The same, for the three blocks that ALSO give the list its own
+ * LISTHDR_OFF_BOX before registering it and whose rect is always the same
+ * sixteen-unit square. The singletons above do not touch the list's box. */
+static void AaiBuiltinBoxed(void *spr, int16_t a, int16_t b, int32_t c,
+                            int32_t type, uint32_t key)
+{
+    uint8_t  rec[AM2_LIST_RECORD_BYTES];
+    AM2_Rect box;
+    void    *list;
+    int32_t  slot;
+
+    *(void **)(rec + LISTREC_OFF_SPRITE) = spr;
+    *(int16_t *)(rec + 4) = a;
+    *(int16_t *)(rec + 6) = b;
+    *(int32_t *)(rec + 8) = c;
+
+    list = MakeRecordList(1, rec, (void *)(uintptr_t)key);
+
+    RectSet(&box, -0x10, -0x10, 0x10, 0x10);
+    *(AM2_Rect *)((uint8_t *)list + LISTHDR_OFF_BOX_LEFT) = box;
+
+    slot = AddRecordList(list);
+
+    RectSet(&box, -0x10, -0x10, 0x10, 0x10);
+    AddAaiRecord(MakeAaiRecord(type, (int32_t)key, slot,
+                               box.left, box.top, box.right, box.bottom));
+}
+
+/* BuildAaiBuiltins -- original 0x00434700, 1,120 bytes, one caller. Empty the
+ * AAI tables and put back the records the game does not read from object.aai:
+ * three singletons, a run of FORTY-FOUR, and two more.
+ *
+ * THE KEY GLOBALS ARE WHY THIS MATTERS ELSEWHERE, and two of the five already
+ * had names: ADDR_CREATE_WATCHED_KIND and ADDR_WATCHED_TYPE_ID, the pair
+ * ObjIsWatchedKind matches an item's record against. So the "watched kind" the
+ * default pointer stands aside for -- see PointerPickMode0 -- is the last
+ * built-in record this function makes. That was reached from the reader's end
+ * long ago and from the writer's end here, and the two agree.
+ *
+ * I named both a second time before checking, and checkpatches refused them.
+ * Third time this session; grep the ADDRESS first.
+ *
+ * THE RUN OF 44 IS A do-while OVER THE KEY, not over an index: the key starts
+ * at 0x01680000 and steps 0x80 to 0x01681600, and the sprite index is carried
+ * alongside it. Both are needed, so neither derives from the other here.
+ *
+ * ITS SPRITE LOAD HAS A FALLBACK -- index n, and index 0x0A if that yields
+ * nothing -- so a missing sprite in that set silently becomes sprite 10 rather
+ * than a null in the table.
+ *
+ * AND IT CENTRES THE HOTSPOT, EXCEPT IN ONE BAND. SPR_OFF_HOTX and _HOTY are
+ * set to half of SPR_OFF_W and _H, skipped for keys from 0x01680780 to
+ * 0x01680980 inclusive -- eight of the forty-four, which keep whatever the
+ * sprite file gave them. The halving is a signed divide, `cdq/sub/sar`, so it
+ * rounds toward zero rather than down.
+ *
+ * The last three blocks pass a REAL type to MakeAaiRecord rather than -1, so
+ * they are seeded from the object.aai record for their (type, key) where the
+ * first three are not.
+ *
+ * The three that run in a loop also write their rect into the LIST's own
+ * LISTHDR_OFF_BOX before registering it, which the singletons do not.
+ *
+ * AM2_AIM_PRELOAD_FLAGS is used for the flag word here. That name came from the
+ * aim sprites, which is where 0x1000 was first seen; nothing in this function
+ * confirms the name, only the value. Used rather than given a second spelling.
+ *
+ * Not exercised by any drive here as far as its effects go, but it runs at
+ * startup -- its caller is the AAI table load. */
+void __cdecl BuildAaiBuiltins(void)
+{
+    uint8_t  *spr;
+    uint32_t  key;
+    int32_t   i;
+
+    FreeAaiTables();
+
+    spr = (uint8_t *)PreloadSprite(0x13, 0, 0, AM2_AIM_PRELOAD_FLAGS, 1);
+    *(int32_t *)(uintptr_t)ADDR_AAI_KEY_980000 = 0x980000;
+    AaiBuiltin(spr, 0, 0, 1, -1, 0x980000, -0x14, -5, 0x3C, 0x23);
+
+    /* The SAME record again -- no second load -- under another key. */
+    *(int32_t *)(uintptr_t)ADDR_AAI_KEY_980100 = 0x980100;
+    AaiBuiltin(spr, 0, 0, 1, -1, 0x980100, 0, 0, 1, 1);
+
+    spr = (uint8_t *)PreloadSprite(0x13, 1, 0, AM2_AIM_PRELOAD_FLAGS, 1);
+    *(int32_t *)(uintptr_t)ADDR_AAI_KEY_980080 = 0x980080;
+    AaiBuiltin(spr, -2, -2, 0x5DC, -1, 0x980080, -2, -2, 2, 2);
+
+    i   = 0;
+    key = 0x01680000;
+    do {
+        void    *list;
+        AM2_Rect box;
+        int32_t  slot;
+        uint8_t  rec[AM2_LIST_RECORD_BYTES];
+
+        spr = (uint8_t *)PreloadSprite(0x2D, i, 0, AM2_AIM_PRELOAD_FLAGS, 1);
+        if (!spr)
+            spr = (uint8_t *)PreloadSprite(0x2D, 0x0A, 0,
+                                           AM2_AIM_PRELOAD_FLAGS, 1);
+
+        if (key < 0x01680780 || key > 0x01680980) {
+            *(int16_t *)(spr + SPR_OFF_HOTX) =
+                (int16_t)(*(const int32_t *)(spr + SPR_OFF_W) / 2);
+            *(int16_t *)(spr + SPR_OFF_HOTY) =
+                (int16_t)(*(const int32_t *)(spr + SPR_OFF_H) / 2);
+        }
+
+        *(void **)(rec + LISTREC_OFF_SPRITE) = spr;
+        *(int16_t *)(rec + 4) = 0;
+        *(int16_t *)(rec + 6) = 0;
+        *(int32_t *)(rec + 8) = 0x3E8;
+
+        list = MakeRecordList(1, rec, (void *)(uintptr_t)key);
+
+        /* The loop blocks give the LIST its own box; the singletons do not. */
+        RectSet(&box, -0x10, -0x10, 0x10, 0x10);
+        *(AM2_Rect *)((uint8_t *)list + LISTHDR_OFF_BOX_LEFT) = box;
+
+        slot = AddRecordList(list);
+
+        RectSet(&box, -0x10, -0x10, 0x10, 0x10);
+        AddAaiRecord(MakeAaiRecord(0x2D, (int32_t)key, slot,
+                                   box.left, box.top, box.right, box.bottom));
+        key += 0x80;
+        i++;
+    } while (key < 0x01681600);
+
+    spr = (uint8_t *)PreloadSprite(0x1D, 0x0B, 0, AM2_AIM_PRELOAD_FLAGS, 1);
+    *(int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND = 0xE80580;
+    AaiBuiltinBoxed(spr, 0, 0, 3, 0x1D, 0xE80580);
+
+    spr = (uint8_t *)PreloadSprite(0x1D, 0x0C, 9, AM2_AIM_PRELOAD_FLAGS, 1);
+    *(int32_t *)(uintptr_t)ADDR_WATCHED_TYPE_ID = 0xE80609;
+    AaiBuiltinBoxed(spr, 0, 0, 3, 0x1D, 0xE80609);
+}
+
 /* 0x004344A0, seven callers, and every one of them hands the result straight
  * to 0x004345A0 -- the same make-then-register shape MakeRecordList and
  * AddRecordList have above.
@@ -1274,6 +1443,9 @@ int objtype_install(void)
                         "MakeAaiRecord", 7);
     rc |= patch_replace(ADDR_ADD_AAI_RECORD, (const void *)AddAaiRecord,
                         "AddAaiRecord", 7);
+    rc |= patch_replace(ADDR_BUILD_AAI_BUILTINS,
+                        (const void *)BuildAaiBuiltins,
+                        "BuildAaiBuiltins", 1);
     rc |= patch_replace(ADDR_SUBREC_HIDE_ROWS, (const void *)SubrecHideRows,
                         "SubrecHideRows", 3);
     rc |= patch_replace(ADDR_OBJ_IS_TYPE2, (const void *)ObjIsType2, "ObjIsType2", 1);

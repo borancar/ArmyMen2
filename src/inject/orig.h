@@ -11389,6 +11389,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * preloads twice, so their per-block structure is not the simple one above.
  * That is the remaining reading. */
 #define ADDR_BUILD_AAI_BUILTINS  0x00434700u  /* void(void) */
+/* The five key globals it fills, one per singleton record -- and TWO OF THEM
+ * ALREADY HAD NAMES, which is the better result. 0x00516160 is
+ * ADDR_CREATE_WATCHED_KIND and 0x00516164 is ADDR_WATCHED_TYPE_ID: the pair
+ * ObjIsWatchedKind matches an item's record against. So this function is where
+ * they come from, and the "watched kind" the default pointer stands aside for
+ * is the last built-in AAI record this builds. Reached from the reader's end
+ * months ago and from the writer's end here; the two agree.
+ *
+ * The other three are new. Named for the key each holds, since nothing yet
+ * says what the record is FOR. */
+#define ADDR_AAI_KEY_980000      0x00516158u  /* int32_t */
+#define ADDR_AAI_KEY_980080      0x0051615Cu
+#define ADDR_AAI_KEY_980100      0x00516168u
 #define AM2_AAI_RECORD_BYTES     0x40u
 #define AAIREC_OFF_TYPE          0x00u   /* 0x2E when the argument is negative */
 #define AAIREC_OFF_KEY           0x08u

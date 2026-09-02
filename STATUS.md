@@ -5,399 +5,41 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-02**, at `969936a`. Working tree clean.
+Last updated: **2026-09-02**, at `d27a8d7`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,413 patches plus 4 REGISTERED = 1,417 reconstructed
+Nothing uncommitted. **1,414 patches plus 4 REGISTERED = 1,418 reconstructed
 addresses**, **30** analysis tools in `make check`.
 
-**`RecvThreadProc` (`0x00401F00`) is reconstructed** -- the thread
-`StartPacketThread` creates. It carried "the thread, stays original" in
-`orig.h` with **no reason beside it**, which this project elsewhere calls out as
-meaning "not yet".
-
-**It calls itself the RECEIVE thread**, in the one message it logs on the way
-out. The PACKET in `ADDR_PACKET_THREAD_PROC`'s name came from its creator, not
-from itself.
-
-**It is cdecl, not stdcall**, checked in the instruction rather than assumed:
-the epilogue is a plain `ret` where a `__stdcall` proc with one parameter would
-be `ret 4`. `CreateThread` wants `LPTHREAD_START_ROUTINE` and gets a cdecl
-function; it survives because a thread's return unwinds nobody.
-
-**And unlike almost everything else in this session, it is COMPARED.** The
-thread runs in every session, and `ab.sh quit`'s `.threaded` artifact -- the two
-racing thread lines, compared as a sorted set -- carries
-`" Receive thread got event 0 "` identically on both sides. So this ran, reached
-its shutdown handshake, and matched.
-
-REGISTERED rather than patched: its only reference is `StartPacketThread`'s
-`CreateThread` call and that is ours. Fourth such entry.
-
-**`PointerActionMode5` (`0x00458620`) is reconstructed**, finishing the three
-pointer-mode actions and the whole 0x00458400 entry.
-
-**An enemy target is handed to mode 4's action** -- the original calls it
-outright and returns, so "attack that" is delegated rather than reimplemented.
-Only the move case is this function's own.
-
-**The three actions differ in where `FormationSlotPoint` writes**, and the call
-site looks identical in all three:
-
-    mode 4   a dedicated local, reserved by a bare `push ecx` at entry
-    mode 5   ARGUMENT 1 -- `at`
-    mode 6   ARGUMENT 0 -- `target`
-
-Two of the three therefore have an in-out argument, on different arguments, and
-the third has none. In each case the original value survives in a register and
-is used again, which is what makes the later `PointActionA` differ from the
-earlier one.
-
-**And mode 5 orders its calls the other way**: `PointActionA` then
-`ObjAttachTo`, where 4 and 6 do `ObjAttachTo` first. Same three calls, reversed,
-reproduced -- detaching before or after the order is given is not obviously
-equivalent.
-
-**`PointerActionMode4` (`0x00458400`) is reconstructed** -- "attack that, or move
-there". Same frame and loop as mode 6's action; the difference is per unit once
-its formation slot is known: no target or an ALLIED one gives AI mode 0 and a
-move to the slot, an ENEMY target gives AI mode 3, the target's uid into
-`OBJ_OFF_FOLLOW_UID`, and **no move order at all**.
-
-**AI mode 0 is written before the branch that may overwrite it with 3**, not in
-the arm that wants it. Reproduced in that order.
-
-**The two actions hand `FormationSlotPoint` different things.** Mode 4 reserves a
-real local with a bare `push ecx` at entry and passes its address; mode 6 passes
-its own argument slot, making that argument in-out. Same call, different
-destination -- and mode 4 instead reuses its argument slot for the loop index.
-Two functions that look alike in the disassembly for two unrelated reasons.
-
-**`PointerActionMode6` (`0x00458810`) is reconstructed** -- mode 6's ACTION,
-pairing with `PointerPickMode6`. Order the whole selection to move in formation
-without engaging: per unit, compute its formation slot, detach it, set
-`OBJ_OFF_AI_MODE` to 2 -- which the AI table calls `ignore` -- and hand it the
-slot point.
-
-**Its first argument is IN-OUT.** `FormationSlotPoint` is handed the address of
-this function's own first argument slot and rewrites it, so `target` arrives as
-the object under the pointer and leaves as the formation point.
-
-**Which is why its two `PointActionA` calls disagree**: the first passes the
-rewritten slot point, the second -- in the trooper arm -- passes the ORIGINAL
-click point. Two calls to one function with different second arguments, ten
-instructions apart, and the difference is invisible unless the out-param is
-noticed.
-
-`checkoffsetuse` reports the offset sets agree exactly.
-
-**`VehicleDismountAll` (`0x00458930`) is reconstructed** -- empty the current
-vehicle, attaching everyone who leaves to whoever was in seat 0. Behind
-`ActionKeyDown(0xD)` in the per-frame input handler.
-
-**Both its arguments are ignored.** The caller pushes two and cleans eight
-bytes; the body reads no stack slot at all, its only input being
-`ADDR_OBJ_CTX_OBJ_A`. Checked rather than assumed to be a misread.
-
-**The driver is looked up once, before anyone leaves**, and used for every
-attach afterwards -- including after seat 0 has itself been ejected, so the
-followers follow a unit no longer in the vehicle.
-
-**The last loop does not always advance**: a uid that no longer resolves is
-removed and the index is NOT incremented, because the removal shifts the next
-entry down into it. An `i++` in the wrong arm would skip an entry after every
-dead one.
-
-That is the last function in the 0x00458930 band.
-
-**`PointerPickEnemyTrooper` (`0x00459BE0`) is reconstructed**, and it **inverts
-the alliance test** -- the only hostile-only pick in this band. Every other one
-offers something to a friend and refuses a foe, or offers both; this refuses the
-moment `ArmyAlliedWithObj` answers yes.
-
-**Its two army-4 refusals fall out of that rather than being extra conditions.**
-`ArmyAlliedWithObj` answers ALLIED for army 4 on either side, so the original's
-early refusal on each is the same answer reached sooner. Written as the single
-call with a note, because three tests that all mean "allied, so no" would read
-as three conditions.
-
-It offers an enemy TROOPER that is not our Sarge, soldier kind under 6, within
-reach. The row name is a placeholder: what the order actually is has not been
-established.
-
-**`PointerPickRepair` (`0x004599A0`) is reconstructed** -- `PointerPickHeal`'s
-sibling, the same two menu-row guards on row 0xC. **`OBJ_OFF_REPAIR_FRAME`
-named it**: that field already carried the name and this is what reads it, so
-"repair" is the tree's own word rather than a guess from the row number.
-
-**Troopers are refused outright**, which is what separates the pair: heal takes
-type 2 only, repair rejects type 2 and takes the rest.
-
-**A third class skips the health test entirely.** An ITEM is offered when it is
-already being repaired or hurt, a VEHICLE only when hurt, and anything that is
-NEITHER falls past both tests and is offered whatever its health -- the `else`
-has no final test, it just continues.
-
-**Two lines that look alike ask different questions.** Heal compares
-`OBJ_OFF_RIDING` on both objects -- "we are in the same place". Repair compares
-the leader's `OBJ_OFF_RIDING` against the object's own UID -- so a passenger can
-repair his vehicle and nothing else.
-
-**`PointerPickHeal` (`0x004597B0`) is reconstructed** -- the first pick gated on
-a MENU ROW rather than a pointer mode. Offer to heal a friendly TROOPER that is
-hurt, riding whatever our leader rides, and within reach.
-
-**Its first two guards are the same test twice** on two different globals:
-`ADDR_MOUSE_BUTTON` then `ADDR_MOUSE_CHANGED`, each requiring `GetMenuRow()` to
-be 0xB. Either can refuse independently, so they are written as the two tests
-the original makes.
-
-**The riding condition compares `OBJ_OFF_RIDING` on both**, so a leader on foot
-can only heal someone on foot and a leader in a vehicle only its passengers --
-not "the same vehicle" as a special case, just the same field, which is 0 for
-both when neither is riding.
-
-**And `checkoffsetuse` is noisy here for a knowable reason**: this address's
-entry is 1,072 bytes and holds TWO functions, so the tool's "original" side is
-both. It reports `OBJ_OFF_FIELD_9C` as unnamed, and that offset belongs to the
-sibling at 0x004599A0. A merged entry makes that tool over-report the same way
-it makes coverage over-credit.
-
-**`PointerPickMode0` (`0x00459420`, 912 B) is reconstructed** -- the DEFAULT
-pointer's pick, and **measured at 8,520 calls** on a driven Boot Camp mission
-where the other five picks read 0. It is the only member of the family that
-runs.
-
-**It refuses what `PointerPickWatchedItem` accepts**: an object passing
-`ObjIsWatchedKind` is declined here, so the default pointer stands aside for the
-mode that handles those.
-
-**An enemy is offered only if our leader's weapon reaches it**, and which weapon
-depends on whether the leader is riding: with `OBJ_OFF_RIDING` set it is the
-VEHICLE's weapon, otherwise the leader's own selected slot. The reach is the
-definition's `ITEMTYPE_OFF_RANGE` times 1.2.
-
-**And the enemy arm answers 0** -- it shows an overlay and stores the hover uid
-and returns 0, like the friend tail's vehicle hint. "The pointer has something
-to say" and "the pointer will act" are different, and only the friend tail's
-last exit is a yes.
-
-**8,520 is coverage, not comparison.** The A/B configurations stop at a dialog
-and never move the pointer over a unit, so a clean run does not compare this.
-Which arm those calls take is also unmeasured -- almost all are likely the early
-refusals, and the weapon-reach arm is the interesting one. The `ShotStrike`
-lesson: a five-figure counter is not evidence the branch you care about ran.
-
-**`PointerPickMode6` (`0x00459300`, 288 B) is reconstructed** -- the same two
-refusals as modes 4 and 5, then the shared friend tail, with **no alliance test
-at all**. So mode 6 offers nothing on an enemy where modes 4 and 5 show the
-enemy overlay and answer 1.
-
-288 bytes came to three lines, because the tail was factored out for modes 4 and
-5 first. That is the return on the two previous commits rather than a claim
-about this function being simple -- the original writes the whole tail out
-again.
-
-**`PointerPickMode4` and `PointerPickMode5` (`0x00458EE0`, `0x004590F0`, 528 B
-each) are reconstructed**, written as CALLS to `ArmyAlliedWithObj` rather than
-as two more transcriptions of its body -- which is what the previous commit's
-reading was for.
-
-**They differ in one `je` target.** Mode 4 hoists an `obj->army == 4` refusal
-above the alliance test and sends it to the FAILURE exit; mode 5 leaves it
-inside `ArmyAlliedWithObj`, where army 4 returns ALLIED. A neutral object is
-refused outright by one and treated as a friend by the other.
-
-**Calling the shared function moved the offsets out**, which is visible in
-`checkoffsetuse`: 0x52C and 0x544 are no longer named here because they belong
-to `ArmyAlliedWithObj`, and 0x94/0x53C/0x554 sit in the shared friend tail. That
-is the intended outcome rather than a gap.
-
-**`MedkitHealOne` (`0x00458AB0`, 160 B) is reconstructed** -- the callback
-`ForEachArmyObject` applies for a medkit: heal one trooper by the MEDKIT
-definition's percentage, crediting our leader as the source.
-
-**Its third argument is hidden by a batched cleanup.** The original pushes the
-leader, calls the definition bsearch with ONE argument and cleans only that, so
-the leader is still on the stack when `HealObject`'s own two go down and a
-single `add esp, 0xc` cleans all three. Read literally it looks like a stray
-push; it is `HealObject`'s `src`.
-
-**It is REGISTERED, not patched** -- all four references are the reconstructed
-pickup paths, so a detour would install a jump nothing in the image can reach.
-Third entry beside `WndProc` and `AudioTimerProc`.
-
-**The alias ratchet caught it going in under a second name.** I named the
-address `ADDR_MEDKIT_HEAL`; it had been `ADDR_MEDKIT_HEAL_ONE` all along, with a
-comment that already said what the function does. `checkpatches` refused it as a
-22nd alias. Grep the ADDRESS first -- the ratchet is the mechanism, not the
-backstop.
-
-`OurLeaderUnit` was promoted out of `widget.cpp` so this could live with its
-callers, and `AM2_DefFindFn` out of `definfo.cpp` -- a second private typedef
-for one function is where a signature goes wrong unseen.
-
-**Four more weapon-handler actions** -- `0x00458B50`, `0x00458C00`,
-`0x00458CB0`, `0x00458E30` -- **transcribed from a DIFF rather than read one at
-a time.** Normalising the five bodies against `SetWeaponTargetAimed` leaves
-47-58 instructions each at 0.76-0.84 similarity, and every difference is one of
-three things: which weapon kind the handler accepts, one extra guard on
-`0x00458CB0` (the unit's own `OBJ_OFF_SOLDIER_KIND` must be under 6), and
-whether `UNIT_OFF_FIRE_MODE` is written -- the sweeper's two instructions for
-that are simply absent, so whatever mode the unit was in survives the order.
-
-**The kind test's SHAPE differs too**: the parent takes a RANGE, four disguises
-sharing one handler, and these four each take a single equality.
-
-**And the diff caught a duplicate I had introduced one commit earlier.**
-`AM2_WEAPON_KIND_AIMED_LO/HI` were a second name for 0x23 and 0x26 under a NEW
-prefix, while `AM2_ITEM_KIND_DISG_0..DISG_3` were already in the file --
-precisely the blind spot `CLAUDE.md` describes, since `checkoffsets` compares
-within a prefix and has nothing to compare a new one against. Retired. Grep the
-VALUE, not the prefix.
-
-**Factoring the shared tail costs the offset check, and that is a real
-trade-off.** `checkoffsetuse` scans the named function only, so all five now
-report "C names 0" against eleven displacements. The tail was checked *before*
-it was factored, when the parent had it inline -- fourteen names against eleven,
-agreeing but for documented forms -- and that measurement is what covers these
-five. It is not repeatable now.
-
-**`SetWeaponTargetAimed` (`0x00458D70`, 192 B) is reconstructed**, and reading
-it settled two older things.
-
-**The second table is the WEAPON HANDLER table**, base 0x00489A00 -- the
-previous commit recorded its base and consumer as unestablished. This function
-is column 1 of four consecutive records whose column 0 is `PointerPickBoard`,
-and `ADDR_SET_WEAPON_TARGET`'s own note already described that table. It was in
-the file the whole time; the two ends were not put side by side.
-
-**`ADDR_PERF_WORD_A/B/C` are `ADDR_AIM_X/Y/Z`.** Three int16 beside the
-performance-counter globals that `InitTimer` clears together, so they were named
-from the site that ZEROES them -- the weakest possible toucher. They have seven
-readers, and every one copies the triple straight into `UNIT_OFF_FIRE_X`, `_Y`
-and `_Z`. They are the aim point a fire order is given.
-
-**The function is `ADDR_SET_WEAPON_TARGET`'s sibling** and differs in three
-ways: it gates on the weapon's `ITEMTYPE_OFF_KIND` being 0x23..0x26 -- the same
-field the handler table is indexed by, re-checked at runtime -- it refuses a
-null target where the sibling has a whole arm for firing at a bare point, and it
-aims at `ADDR_AIM_X/Y/Z` where the sibling zeroes the position when it has an
-object.
-
-**`PointerPickWatchedItem` (`0x00459EE0`, 208 B) is reconstructed** -- another
-PICK in the second table: four refusals then a yes. A null object; one that is
-not an ITEM of the type id in `ADDR_CREATE_WATCHED_KIND`; one that is
-`OBJ_FLAG_CONCEALED`, so the pointer will not offer what the player cannot see;
-and one out of the leader's reach.
-
-**Its overlay row is 0x11 and the name for that row came from somewhere else.**
-`orig.h` calls it `AM2_OVERLAY_ROW_SELL`, from the placement screen. The
-constant is right -- same row, same cursor sheet -- but this table is the ORDER
-table, one of whose actions is `ADDR_SET_WEAPON_TARGET`, so nothing here
-confirms the row means "sell" in this context. Used by number, and the name is
-not being taken as evidence.
-
-**`PointerPickBoard` (`0x00459DA0`, 320 B) is reconstructed** -- the PICK half
-of four records in the second `{pick, action, kind, flags}` table. The previous
-commit read it and deliberately stopped, because three of its globals could not
-be named from one use site each. Reading their other touchers settled two of
-them outright, so it went in.
-
-**`ADDR_MOUSE_PRESS_MS`** (0x0048549C) is the time the button went down, beside
-the already-named `ADDR_MOUSE_PRESS` point: the pair is written together at
-0x00426FD8 and read together by every click-versus-drag test in the image --
-`GetTickCount() - this < 500`, then `ApproxDist(press, cursor)`. Eleven
-touchers, and a writer/reader pair rather than any one of them.
-
-**`ADDR_POINTER_HOVER_UID`** (0x004854B8) is the uid of the object the pointer
-is over. Cleared once a frame at 0x00413E92, immediately before the
-mouse-selection interface runs, and set by every pick that shows a hover
-overlay -- **fourteen setters and one clear**, which is what makes it a hover
-slot rather than a selection.
-
-**The reach thresholds stay placeholders, and the caveat is the finding.** All
-five read 0 in the image and have exactly one toucher, which reads as "no
-writer, so these tests pass only at zero distance". That is *not* established:
-they are spaced irregularly and look like fields of a record reached through a
-base pointer, and a write through a base is invisible to the address scan that
-says so. **"No direct writer" is what was measured; "no writer" is not.**
-
-**The function's own shape:** a vehicle with a free seat shows a hint and still
-answers **0** -- a reader who takes the hint-setting for success gets it
-backwards -- while a trooper in reach answers 1. The vehicle test is
-`OBJ_OFF_POSE_PENDING < VEHICLE_OFF_SEATS`, the same pair `EnterVehicle`
-refuses on.
-
-A/B clean on `bootcamp` and `campaign`; nothing in this band runs except mode
-0's action, so that says only that nothing else regressed.
-
-## The pointer-mode family shares a dead helper, eight times over
-
-Worth having written down before the rest of that band is transcribed, because
-it is a third of the bytes in some of those functions and none of it can run.
-
-Every pointer-mode handler needs the unit the player commands, and they all get
-it from the same inlined block: read `ADDR_DEFAULT_OWNER`, and if it differs
-from `ADDR_DEFAULT_OWNER` scan that army's object list for the first live
-type-2 object with `OBJ_OFF_SARGE` set, otherwise `LookupByUID` on
-`ADDR_OUR_LEADER_UID`. VC6 folds the second load, so the compare is
-`cmp eax, eax` and the scan is unreachable.
-
-A byte scan finds **eight** sites -- `0x00457E61`, `0x00457F7F`, `0x00458A20`,
-`0x00458ACB`, `0x00459534`, `0x004598C0`, `0x00459B12`, `0x00459F0C` -- and
-there are more where the load sits further from the compare.
-
-**None of them is a binary patch.** The compare is two bytes, so nothing was
-overwritten the way `docs/binarypatches.md`'s six were; this is one source
-construct compiled the same way everywhere. And the NULL check lives inside the
-dead arm, so every one of these dereferences the uid lookup unguarded.
-
-## Next: the pointer picks inline ArmyAlliedWithObj, and not identically
-
-Seven of the remaining functions in the 0x00458930 band -- `0x00458EE0`,
-`0x004590F0`, `0x00459300`, `0x00459420`, `0x004597B0`, `0x004599A0`,
-`0x00459BE0` -- share a block that maps an object's table record back to an
-index against `ADDR_OBJ_TABLE_RECORDS + 0, 0x100, 0x200, 0x300`. That block is
-`ArmyAlliedWithObj`, which `army.cpp` has had as a function all along.
-
-Identified by STRUCTURE, not by a score: normalising registers and diffing gave
-0.52 with a nine-instruction run, which is suggestive and proves nothing since
-the boundaries were guessed. Reading the C beside the block settles it arm for
-arm -- the two army-4 returns, the multiplayer kind-7 refusal, the `useRec3`
-choice, the `CommArmyOfSlot` compare and both `AllyFlag` calls, in order.
-
-**The copies are not identical.** `0x00458EE0` hoists an `obj->army == 4`
-refusal ABOVE the block and sends it to the FAILURE exit; `0x004590F0` leaves it
-where `ArmyAlliedWithObj` has it, where army 4 returns ALLIED. So mode 4's pick
-refuses a neutral object outright and mode 5's treats it as allied -- one `je`
-target apart, and invisible to anything but a diff.
-
-So these want writing as calls to `ArmyAlliedWithObj` with each hoisted guard
-spelled out, rather than as seven transcriptions of one body.
-
-## Next: 0x00434700 is read in part and not written, and why
-
-The smallest remaining real function, 1,120 bytes. It calls `FreeAaiTables` and
-then builds SIX built-in AAI records, each as
-`PreloadSprite` -> a 12-byte list record -> `MakeRecordList` -> `AddRecordList`
--> `RectSet` -> `MakeAaiRecord` -> `AddAaiRecord`. The rect reaches
-`MakeAaiRecord` as its last FOUR arguments -- the compiler writes them into
-reserved stack above a pushed `list` rather than pushing them, so the call looks
-like three arguments and is seven. Three of the six keys are 0x980000,
-0x980100 and 0x980080, each also stored into a global of its own.
-
-**The six blocks are NOT uniform** -- diffing shows different shapes rather than
-one shape with different constants, and transcribing them needs `esp` tracked
-through about 280 instructions across by-value struct passing.
-
-**It is not written because an attempt at that tracking did not come out
-self-consistent**: the pushes before one `add esp, 0x28` counted to nine where
-the cleanup says ten. That discrepancy is small, silent if guessed past, and
-would land as a wrong constant in a table nothing here executes -- so it is
-recorded in `orig.h` and left. Same standing as `0x00459DA0` two sessions ago,
-which went in cleanly the moment its reading was finished.
+**`BuildAaiBuiltins` (`0x00434700`, 1,120 B) is reconstructed** -- empty the AAI
+tables and put back the records that do not come from `object.aai`: three
+singletons, a run of FORTY-FOUR, and two more.
+
+**Two of its five key globals already had names, and they are the good ones**:
+`ADDR_CREATE_WATCHED_KIND` and `ADDR_WATCHED_TYPE_ID`, the pair
+`ObjIsWatchedKind` matches an item against. So the "watched kind" the default
+pointer stands aside for -- `PointerPickMode0`, written earlier this session --
+is the last built-in record this function makes. Reached from the reader's end
+long ago and the writer's end here, and the two agree. I named both a second
+time before checking and `checkpatches` refused them.
+
+**THE A/B CAUGHT A REAL DEFECT, which is worth more than the function.**
+`MakeAaiRecord`'s third parameter is `slot`, and the original passes
+**`AddRecordList`'s return value** there -- I passed the list POINTER. Both
+`bootcamp` and `campaign` stopped mid-map-load: five log lines missing from
+`freeing temporary map load data` onward, and 294,304 pixels differing. Fixed,
+and clean on both.
+
+That is the first time in this run of work that a reconstruction was actually
+wrong and the suite said so. Everything else in the pointer band is verified by
+reading because no drive reaches it; this one runs at startup, so it got
+compared -- and it needed to be.
+
+**Other findings**: the run of 44 is a `do`-`while` over the KEY (0x01680000
+stepping 0x80 to 0x01681600) with the sprite index carried alongside; its sprite
+load falls back to index 0x0A when one is missing; and it centres each sprite's
+hotspot to half its width and height, skipped for eight keys in one band.
 
 ## And the split-aware figure is a lower bound too
 
@@ -422,8 +64,8 @@ This unit is why. 144 bytes of work moved the entry-generous byte figure by
 that holds **seventeen** functions and patching any one of them credits all of
 it. The same effect inflates the entry count.
 
-    entry-generous   1,222 of 1,239 entries, 90.7% of sub-CRT bytes
-    split-aware      1,373 of 1,530 real functions, 81.7% of sub-CRT bytes
+    entry-generous   1,223 of 1,239 entries, 91.0% of sub-CRT bytes
+    split-aware      1,374 of 1,530 real functions, 82.0% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -432,17 +74,17 @@ ceiling rather than a floor -- ten percentage points of ceiling, measured.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,222 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 17
-outstanding, which is 1,239 minus 1,222 -- from 1,417 reconstructed addresses
-(1,413 patched plus 4 registered), and **90.7% of the sub-CRT bytes**.
-Split-aware that is **1,373 of 1,530** real functions and **81.7%** of the
+line (0x0045C000) patched**. Measured: **1,223 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 16
+outstanding, which is 1,239 minus 1,223 -- from 1,418 reconstructed addresses
+(1,414 patched plus 4 registered), and **91.0% of the sub-CRT bytes**.
+Split-aware that is **1,374 of 1,530** real functions and **82.0%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
 small ones in batches. A hundred and fifty-one batches have gone in and NOTHING SMALL IS LEFT among
-the ENTRIES: the 17 outstanding start at **1,120 bytes** -- `0x00434700` -- and
+the ENTRIES: the 16 outstanding start at **1,168 bytes** -- `0x00434700` -- and
 the median is **1,504**. That is not what is left, though: `tools/merges.py`
 splits them into real functions and the 0x00458930 entry alone still holds
 sixteen unwritten ones from 16 bytes up. Rank by real function, not by entry. The
