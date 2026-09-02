@@ -163,4 +163,8 @@ void __cdecl RecvVehicle1D(void *msg);
  * every arm is a guard or a log, for work done elsewhere. */
 void __cdecl RecvVehicle1F(void *msg);
 
+/* 0x0045E980. Kind 0x1C: unpack a remote vehicle's shot and RAISE the fire
+ * flag SendVehicleFire cleared on the way out. */
+void __cdecl RecvVehicle1C(void *msg);
+
 #endif

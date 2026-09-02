@@ -1611,7 +1611,6 @@ void __cdecl RecvVehicleExit(void *msg)
 typedef void (__cdecl *AM2_VehMsgFn)(void *msg);
 typedef void (__cdecl *AM2_VehMsgArmyFn)(void *msg, int32_t army);
 
-#define orig_recv_vehicle_1c ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_1C)
 
 void __cdecl VehicleMsgRecv(void *msg, int32_t army)
 {
@@ -1619,7 +1618,7 @@ void __cdecl VehicleMsgRecv(void *msg, int32_t army)
 
     switch (kind) {
     case 0x1B: RecvVehicle1B(msg, army);        return;
-    case 0x1C: orig_recv_vehicle_1c(msg);       return;
+    case 0x1C: RecvVehicle1C(msg);              return;
     case 0x1D: RecvVehicle1D(msg);              return;
     case 0x1E: RecvVehicle1E(msg);              return;
     case 0x1F: RecvVehicle1F(msg);              return;
@@ -2625,6 +2624,8 @@ int commmsg_install(void)
                   "RecvVehicle1D", 1);
     patch_replace(ADDR_RECV_VEHICLE_1F, (const void *)RecvVehicle1F,
                   "RecvVehicle1F", 1);
+    patch_replace(ADDR_RECV_VEHICLE_1C, (const void *)RecvVehicle1C,
+                  "RecvVehicle1C", 1);
     patch_replace(ADDR_RECV_VEHICLE_1E, (const void *)RecvVehicle1E,
                   "RecvVehicle1E", 1);
     patch_replace(ADDR_RECV_VEHICLE_24, (const void *)RecvVehicle24,
@@ -3540,4 +3541,61 @@ void __cdecl RecvVehicle1F(void *msg)
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
         am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_RECV_DROP_MINE));
+}
+
+/* RecvVehicle1C -- original 0x0045E980, one caller. Message kind 0x1C, the
+ * receive half of SendVehicleFire, and it names itself: "Vehicle Fire Rec,
+ * vehicle: %x,  gunface:%d, pos (%d,%d,%d), loctarg %x, globTarg %x".
+ *
+ * IT SETS THE FLAG THE SENDER CLEARS. SendVehicleFire zeroes
+ * UNIT_OFF_FIRE_ACTIVE on the way out -- the send is its own
+ * acknowledgement -- and this raises it on the remote copy, which is what
+ * makes that peer's vehicle fire. So the flag is not state being mirrored, it
+ * is a request being handed over, and the asymmetry is the mechanism rather
+ * than an oversight.
+ *
+ * THE WIRE LAYOUT AGREES WITH THE SENDER FIELD FOR FIELD, which is worth
+ * recording because the two were read from opposite ends on different days:
+ * uid at +4, target at +8, the three position words at +0x0C, +0x0E and
+ * +0x10, the gun facing at +0x12 and the seed at +0x14. The sender writes the
+ * gun facing as a WORD and this reads a BYTE off the same offset -- the low
+ * half, which is all a facing needs, and the upper byte is written and never
+ * read.
+ *
+ * `loctarg` and `globTarg` in that message are the SAME uid printed twice --
+ * once as this client resolved it and once raw off the wire. UidOnWire is the
+ * identity on every drive here, so the two always agree; the message exists
+ * to catch the case where they would not.
+ *
+ * No null check on the message's own fields, only on the resolved vehicle --
+ * the original's, reproduced. */
+void __cdecl RecvVehicle1C(void *msg)
+{
+    const uint8_t *m = (const uint8_t *)msg;
+    uint32_t       vehUid    = UidOnWire(*(const uint32_t *)(m + 4));
+    uint32_t       targetUid = UidOnWire(*(const uint32_t *)(m + 8));
+    uint8_t       *veh       = (uint8_t *)ObjByUidAlias(vehUid);
+
+    if (veh == 0)
+        return;
+
+    *(int32_t *)(veh + UNIT_OFF_FIRE_ACTIVE) = 1;
+    *(uint8_t *)(veh + OBJ_OFF_FIELD_530)    = *(const uint8_t *)(m + 0x12);
+    *(int16_t *)(veh + UNIT_OFF_FIRE_X)      = *(const int16_t *)(m + 0x0C);
+    *(int16_t *)(veh + UNIT_OFF_FIRE_Y)      = *(const int16_t *)(m + 0x0E);
+    *(int16_t *)(veh + UNIT_OFF_FIRE_Z)      = *(const int16_t *)(m + 0x10);
+    *(uint32_t *)(veh + UNIT_OFF_FIRE_UID)   = targetUid;
+    /* +0x529 is the spread seed; see SendVehicleFire on why it stays raw. */
+    *(uint8_t *)(veh + 0x529u)               = *(const uint8_t *)(m + 0x14);
+
+    if (*(const int32_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT
+                           + COMM_OFF_VERBOSE))
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_VEHICLE_FIRE_RECV),
+                vehUid,
+                (uint32_t)*(const uint8_t *)(veh + OBJ_OFF_FIELD_530),
+                (int32_t)*(const int16_t *)(m + 0x0C),
+                (int32_t)*(const int16_t *)(m + 0x0E),
+                (int32_t)*(const int16_t *)(m + 0x10),
+                targetUid,
+                *(const uint32_t *)(m + 8));
 }

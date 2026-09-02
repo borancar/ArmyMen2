@@ -12431,6 +12431,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_VEH_DROP_ITEM_RECV 0x0048C338u
 #define ADDR_STR_VEHICLE_ENTER_SENT 0x0048C1ECu
 #define ADDR_STR_VEHICLE_FIRE_SEND 0x0048C1A0u
+#define ADDR_STR_VEHICLE_FIRE_RECV 0x0048C394u
 #define ADDR_RECV_VEHICLE_1C     0x0045E980u  /* void(msg *) */
 #define ADDR_RECV_VEHICLE_1D     0x0045E630u
 #define ADDR_RECV_VEHICLE_1E     0x0045E810u
