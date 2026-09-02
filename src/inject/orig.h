@@ -9020,6 +9020,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * right, left, bottom, top, which is not the struct's order and is worth not
  * transcribing from the store sequence.
  *
+ * A UNIT ADOPTS WHAT ITS ALLIES ARE SHOOTING AT, and that is invisible unless
+ * the branches are followed rather than the bodies. The allied arm looks like
+ * a counting-and-skipping block -- bump *nAllied, validate the ally's
+ * OBJ_OFF_TARGET_UID, drop it if the target is dead or flagged -- and THREE of
+ * its exits jump back INTO the kind-7 arm's scoring tail at 0x00403DCD with
+ * the ALLY'S TARGET in the candidate slot. So the scan scores that object as
+ * though it had found it itself.
+ *
+ * Read as bodies, the arm ends in `continue` five times and the behaviour
+ * disappears; the unit would only ever engage what it saw for itself. It is
+ * the "AN ARM CAN END INSIDE ANOTHER" shape three times in one block, and the
+ * candidate slot being written from two different registers in two different
+ * arms is the tell.
+ *
+ * Only AI mode 1 takes the last of those three, and only inside
+ * AM2_AI_PATROL_DETOUR of the ally's target.
+ *
  * THE EXIT WRITES THE BEARING TWICE AND THE FIRST WRITE IS DEAD. The primary
  * arm stores the bearing the scan recorded and then immediately overwrites it
  * with AngleBetween from ObjAnchorPoint to the winner -- so the answer is

@@ -387,6 +387,16 @@ them. The rule about grepping an address before naming it is cited in this
 session's own commits and was then broken three times in one hunk; the ratchet
 is what caught it, not the rule.
 
+**A unit adopts what its allies are shooting at**, and that is invisible unless
+the branches are followed rather than the bodies. The allied arm reads as a
+counting-and-skipping block -- bump the count, validate the ally's target, drop
+it if dead or flagged -- and *three of its exits jump back into the kind-7
+arm's scoring tail* with the ally's target in the candidate slot, so the scan
+scores it as though it had found it itself. Written from the bodies the arm
+ends in `continue` five times and the behaviour vanishes: the unit would only
+ever engage what it saw for itself. A first draft did exactly that and was not
+shipped.
+
 **Its signature is resolved**, with `espmap.py` rather than by eye:
 `void *SightScan(obj, int32 *range, uint8 *bearing, int32 *nAllied, int32
 *nOther, int32 flags)` -- six arguments, four out-params, all cleared before
