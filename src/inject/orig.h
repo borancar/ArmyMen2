@@ -3052,6 +3052,24 @@
  * they read the same millisecond. */
 #define FLOW_OFF_READY_AT        0x5Cu  /* GetTickCount when the flow went ready */
 #define FLOW_OFF_PEER_CLOCK      0x90u  /* that, less half of +0x68: the peer's base */
+/* THE RECEIVE COUNTERS MIRROR THE SEND ONES, and the symmetry is the
+ * evidence. FLOW_OFF_SENT_PACKETS and FLOW_OFF_SENT_BYTES were already named
+ * at 0x28 and 0x2C from the sending side; 0x20 and 0x24 are incremented and
+ * accumulated the same way on arrival, four bytes below, with the message's
+ * own length added exactly as PACKET_OFF_LEN is on the way out. Two adjacent
+ * pairs doing mirrored work is a better argument for a name than either pair
+ * alone, and it is cheaper than finding a second toucher.
+ *
+ * THERE IS A STARTUP GUARD THAT DISCARDS, and it is narrow enough to be easy
+ * to lose. While our next-expected is still below 10, a message more than 50
+ * sequences ahead of it is dropped outright -- "Dumping incoming message on
+ * the floor" -- rather than nacked. So the resync above accepts a peer whose
+ * numbering is ANY value, and this refuses one whose numbering is absurd,
+ * and the two together are the join policy. Both conditions matter: past
+ * sequence 10 nothing is dropped for being far ahead. */
+#define FLOW_OFF_RECV_PACKETS    0x20u  /* mirrors FLOW_OFF_SENT_PACKETS */
+#define FLOW_OFF_RECV_BYTES      0x24u  /* mirrors FLOW_OFF_SENT_BYTES */
+#define FLOW_OFF_RECV_AT         0x74u  /* GetTickCount at the last arrival */
 /* Where the drop path receives a packet it has no node for, so the transport
  * does not keep re-delivering it. */
 #define ADDR_RECV_SCRATCH        0x004F8790u
