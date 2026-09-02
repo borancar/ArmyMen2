@@ -5017,6 +5017,23 @@ typedef struct {
  * its own SEH frame, so this is a class building a sub-object rather than
  * calling a helper.
  *
+ * THE CHILD IDIOM, WHICH IS THE WHOLE BODY TWENTY TIMES OVER:
+ *
+ *     w = operator new(size);
+ *     if (w) <Class>Ctor(w, rect, ...);       // thiscall, rect BY VALUE
+ *     WidgetAddChild(this, w, 0);
+ *
+ * The rectangle goes by VALUE, not by pointer: the original does
+ * `sub esp, 0x10` and copies four dwords into the hole before the call. That
+ * is the shape CLAUDE.md already lists as checkoffsetuse's dominant blind
+ * spot in this family -- AM2_Widget's x/y/w/h turning up in every constructor
+ * because a RECT passed by value is copied a dword at a time. Expect that
+ * tool to report those four offsets here and to be right about it.
+ *
+ * The `mov byte ptr [esp+0x1BC], N` between the allocations is the SEH unwind
+ * state index, counting up as each child is constructed so the handler knows
+ * how many to destroy. Not reproduced, per the standing decision above.
+ *
  * ITS PLAYER-ROW LOOP IS A SECOND CONSUMER OF THE COMM PLAYER RECORD, and it
  * agrees with the names already here. It walks the four slots reading
  * COMM_OFF_PLAYER_SLOTS at +0x214 and COMM_OFF_SLOT_NAME at +0x218, and
