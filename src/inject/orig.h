@@ -7901,7 +7901,24 @@ typedef struct {
  * the 58 codes is recoverable from our own source rather than guessed.
  *
  * Three callers: ScriptRunLine, one in the objscript band, and its own tail.
- * The name is a ROLE and stays one until the body says otherwise. */
+ * The name is a ROLE and stays one until the body says otherwise.
+ *
+ * AND THE ARMS NAME THEMSELVES THROUGH THEIR CALLEES, so the keyword table is
+ * not needed after all. Code 1 calls ADDR_HUD_MESSAGE, code 2
+ * ADDR_EVT_SHOW_BITMAP, code 3 ADDR_EVT_SHOW_BITMAP_NP -- which are
+ * `showmessage`, `showbitmap` and `showbitmapnopause` in the script
+ * vocabulary, in that order. 49 of the 58 arms contain a named call.
+ *
+ * Two failed attempts before that, both worth not repeating: the parser's
+ * keyword-to-code mapping is NOT extractable by pattern, because
+ * ScriptParseActionRecon assigns act->code in 39 places through several small
+ * {id, code} tables inside case groups, and a regex for the obvious form
+ * finds four of them. And tests/actions-reference.txt carries the code as
+ * field 5 of each record but no keyword at all.
+ *
+ * The arms average TWENTY instructions and the shape repeats: fetch a field
+ * of the action record, refuse if it is null, call one named function,
+ * return through the common epilogue. 1,166 instructions over 58 arms. */
 
 /* The four object fields the object-script runner uses, all read out of
  * UpdateObjectScript's body rather than guessed at a call site. */
