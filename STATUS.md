@@ -457,6 +457,11 @@ pushes are identical bar a *kind* and an *ammo* count -- everything else, four
 zeros and the caller's position, is the same in all eighteen. So the
 transcription is one helper and eighteen one-line cases.
 
+**Type2PlayerInput (0x0044A420) is reconstructed** -- 2,336 bytes in
+region.cpp, beside the Type2PlayerStep it runs before and shares a record
+with. It is the input half of the player trooper's frame. LIVE, and
+`ab.sh bootcamp` is clean.
+
 **CheatLine (0x00417B80) is reconstructed** -- 2,304 bytes, thirty-nine
 arms, in the new flat module `src/game/cheat.cpp`. Nineteen item cheats
 collapse to one helper, `phoenix!`/`cliche ending` to a second, and the rest

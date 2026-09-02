@@ -180,6 +180,14 @@ void __cdecl RoachAliveStepA(void *obj, void *out);
  * commanding does each frame: board a claimed vehicle if it is close enough,
  * otherwise walk toward OBJ_OFF_FIELD_C0, pick the pose the held weapon
  * wants, and drag every other selected unit along. */
+/* 0x0044A420. The input half of the player trooper's frame: keys and mouse
+ * into the same record Type2PlayerStep then acts on. */
+void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out);
+
+/* 0x0044A420. The input half of the player trooper's frame: keys and mouse
+ * into the same record Type2PlayerStep then acts on. */
+void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out);
+
 void __cdecl Type2PlayerStep(void *obj, void *out);
 
 /* 0x00449FD0, two callers -- StepType2's trooper AI arm and 0x0044AFB0. The

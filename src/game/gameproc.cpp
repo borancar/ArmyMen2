@@ -2165,7 +2165,12 @@ void __cdecl DefFinish(void)
  * arrives by value and its address is taken" shape orig.h records for
  * RevealNearby, one step further -- here the argument slot IS the storage.
  * Reproduced, unused parameter and all. */
-void __cdecl WalkCellWrapper(void *unused, uint32_t at)
+/* IT RETURNS ITS CALLEE'S ANSWER, and this said `void` until a caller wanted
+ * it. The original is a tail call with no `xor eax, eax` after it, so eax is
+ * WalkCellAtPoint's -- the object standing at the point, or null. Nothing in
+ * the tree read it, so the wrong prototype was invisible; Type2PlayerInput
+ * tests it and asks the result for its height and uid. */
+void *__cdecl WalkCellWrapper(void *unused, uint32_t at)
 {
     (void)unused;
 
@@ -2173,7 +2178,7 @@ void __cdecl WalkCellWrapper(void *unused, uint32_t at)
      * as a typed function pointer rather than a void *, now that
      * WalkCellAtPoint's third parameter says what it is. That parameter used
      * to be untyped because the macro declared the whole function `void`. */
-    WalkCellAtPoint(&at, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+    return WalkCellAtPoint(&at, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
                     (int32_t (__cdecl *)(void *))(uintptr_t)
                         ADDR_WALK_CELL_CALLBACK);
 }

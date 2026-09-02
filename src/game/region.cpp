@@ -7745,7 +7745,6 @@ typedef void (__cdecl *AM2_Step2BFn)(void *obj, void *out);
 typedef void (__cdecl *AM2_RowFinalFn)(void *row);
 /* TrooperFire is reconstructed below and called by name; 0x00449FD0's seam is
  * gone with it. */
-#define orig_step2_44a420 ((AM2_Step2AFn)(uintptr_t)AM2_IMAGE(ADDR_STEP2_44A420))
 /* Type2PlayerStep is reconstructed below and called by name. */
 #define orig_row_final    ((AM2_RowFinalFn)(uintptr_t)AM2_IMAGE(ADDR_ROACH_ROW_FINAL))
 
@@ -8599,7 +8598,7 @@ void __cdecl StepType2(void *obj)
            == (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
         if (!*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A
             && !*(const uint32_t *)(o + OBJ_OFF_RIDING))
-            orig_step2_44a420(obj, w, out);
+            Type2PlayerInput(obj, w, out);
         Type2PlayerStep(obj, out);
         goto tail;                     /* 0x0044B9D4 is `jmp 0x0044BA3F` --
                                         * this converges too, and Boot Camp's
@@ -8948,6 +8947,8 @@ int region_install(void)
     rc |= patch_replace(ADDR_ROACH_ALIVE_STEP_A,
                         (const void *)RoachAliveStepA,
                         "RoachAliveStepA", 1);
+    rc |= patch_replace(ADDR_STEP2_44A420, (const void *)Type2PlayerInput,
+                        "Type2PlayerInput", 3);
     rc |= patch_replace(ADDR_TYPE2_PLAYER_STEP, (const void *)Type2PlayerStep,
                         "Type2PlayerStep", 1);
     rc |= patch_replace(ADDR_AI_ROUTE_TOWARD, (const void *)AiRouteToward,
@@ -9057,4 +9058,434 @@ int region_install(void)
     rc |= patch_replace(ADDR_TROOPER_FIRE, (const void *)TrooperFire,
                         "TrooperFire", 2);
     return rc;
+}
+
+
+/* ---- Type2PlayerInput -------------------------------------------------- */
+/* Every one of its nineteen callees is reconstructed, so it reaches nothing in
+ * the image except GetTickCount, which it takes through the game's own IAT
+ * slot the way air.cpp does -- a clock read names no Win32 type, so this
+ * module stays flat.
+ *
+ * OverlayPrepare is reconstructed in win32/surface.cpp and declared here
+ * rather than included, because that header reaches windows.h; its two int32
+ * parameters name no Win32 type. */
+extern "C" void __cdecl OverlayPrepare(int32_t row, int32_t force);
+
+typedef void (__cdecl *am2_char_fn)(uint32_t wparam, int32_t lo, int32_t hi);
+/* Spelled orig_get_tick_count, not GetTickCount: naming the Win32 symbol in a
+ * flat module fails tools/checksplit.py, and air.cpp already reaches the same
+ * IAT slot under exactly this name. */
+typedef uint32_t (__stdcall *AM2_GetTickCountFn)(void);
+#define orig_get_tick_count \
+    (*(AM2_GetTickCountFn *)(uintptr_t)ADDR_IAT_GET_TICK_COUNT)
+#define AM2_CHEAT_ABS(v)  ((v) < 0 ? -(v) : (v))
+
+#define g_charHandler (*(am2_char_fn *)(uintptr_t)ADDR_CHAR_HANDLER)
+#define g_inputSuppress (*(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+#define g_mouseGrab    (*(intptr_t *)(uintptr_t)ADDR_MOUSE_GRAB)
+#define g_mouseChanged ((int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+#define g_mouseButton  ((int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
+#define g_mouseDZ      (*(int32_t *)(uintptr_t)ADDR_MOUSE_DZ)
+#define g_blitRect   ((AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT)
+#define g_cursorPoint  (*(int32_t *)(uintptr_t)ADDR_CURSOR_POINT)
+#define g_cursorX      (*(int32_t *)(uintptr_t)ADDR_CURSOR_X)
+#define g_cursorY      (*(int32_t *)(uintptr_t)ADDR_CURSOR_Y)
+#define g_viewRect   ((AM2_Rect *)(uintptr_t)ADDR_VIEW_ORIGIN_X)
+#define g_frameDeltaMs (*(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
+#define g_gameClockMs   (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
+#define g_defaultPos    (*(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT)
+#define g_turnRepeatMs (*(int32_t *)(uintptr_t)ADDR_TURN_REPEAT_MS)
+#define g_throttleDeadline (*(uint32_t *)(uintptr_t)ADDR_THROTTLE_DEADLINE)
+#define g_mousePressMs (*(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS)
+#define g_pointerHoverUid (*(const uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID)
+
+/* Read out of the image rather than retyped. Two of the eight consecutive
+ * int32[3] tables already have names (ADDR_AI_MOVE_STATE and its ALT), which
+ * is why no single base is introduced over the run. */
+#define kActionCrouch ((const int32_t *)(uintptr_t)0x00475090u)
+#define kActionProne  ((const int32_t *)(uintptr_t)0x004750A8u)
+#define kActionKey1   ((const int32_t *)(uintptr_t)0x004750CCu)
+#define kActionKey4   ((const int32_t *)(uintptr_t)0x004750D8u)
+#define kActionKey5   ((const int32_t *)(uintptr_t)0x004750E4u)
+#define kCursorCodeFilter ((const uint8_t *)(uintptr_t)0x0044AD24u)
+
+#define AM2_TURN_REPEAT_MS      0x32
+#define AM2_CLICK_THROTTLE_MS   0x12C
+#define AM2_CLICK_TAP_MS        0x1F4
+
+/* Type2PlayerInput -- original 0x0044A420, one caller: StepType2's player arm,
+ * immediately before Type2PlayerStep and passing it the same record. So this
+ * is the INPUT half of what the trooper you command does each frame -- keys
+ * and mouse into an action -- and the sibling below is the movement half.
+ *
+ * THE RECORD IT WRITES HAS NO FIELD FAMILY ON PURPOSE. Type2PlayerStep
+ * reaches the same structure as bare `w + 4` and `w + 8`, and this follows
+ * it: the obvious family is refuted (SIGHT_OFF_RANGE is a dword at 0x14 and
+ * a POINT goes there) and the near-miss that fits, SIGHTCOUT_OFF_X, fits by
+ * arithmetic rather than by evidence.
+ *
+ * TWO ARGUMENT SLOTS ARE REUSED AS LOCALS once their arguments are consumed
+ * -- the trooper's slot holds the weapon code and the output's holds the
+ * cursor distance, both read hundreds of bytes later at a different esp.
+ * tools/espmap.py resolves them; reading either as an argument would put a
+ * pointer where a small integer belongs.
+ *
+ * THE ACTION CODES COME FROM EIGHT int32[3] TABLES indexed by
+ * ClassifyCode74's 0, 1 or 2. They are read out of the image rather than
+ * retyped, which is the rule DirtyCollect's eighty-one arms established: two
+ * of the eight already have names here, so no base is introduced over them.
+ *
+ * ITS SWITCH IS A FILTER. Seventeen weapon codes index a byte table holding
+ * only 0 and 1: five also report where the cursor points, twelve do not, and
+ * so does every code outside the range. */
+void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
+{
+    uint8_t   *o = (uint8_t *)obj;
+    uint8_t   *w = (uint8_t *)out;
+    AM2_Point  at;                  /* frame +0x10, the cursor in world space */
+    AM2_Point  aim;                 /* frame +0x0C */
+    int32_t    code;                /* frame +0x1C, the trooper's slot reused */
+    int32_t    dist;                /* frame +0x24, the output's slot reused */
+    int32_t    cls;
+    void      *hit;
+    int32_t    moved = 0;
+
+    if (g_charHandler != 0)
+        return;
+    if (g_inputSuppress != 0)
+        return;
+
+    NextInventorySlot(o);
+
+    /* Take the pointer for ourselves the moment it moves over the map. */
+    if (PointInRect(g_blitRect, (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)
+        && g_mouseGrab == 0 && g_mouseChanged[0] != 0)
+        g_mouseGrab = -1;
+
+    cls = ClassifyByCode74(o);
+
+    if (*(const int16_t *)(o + OBJ_OFF_FIELD_574) > 0)
+        w[4] = *(const uint8_t *)(o + OBJ_OFF_FIELD_574);
+
+    code = weapon != 0
+         ? **(int32_t **)((uint8_t *)weapon + OBJ_OFF_FIELD_C0)
+         : 0;
+
+    /* The image adds the packed dwords and keeps the low half for x, then the
+     * two high words for y -- the same idiom the cheat console's jumpjets arm
+     * uses, and written as halves here for the same reason. */
+    at.x  = (int16_t)((int16_t)g_viewRect->left + (int16_t)g_cursorPoint);
+    at.y  = (int16_t)((int16_t)g_viewRect->top + (int16_t)(g_cursorPoint >> 16));
+    dist  = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &at);
+    aim.y = (int16_t)(ObjOverlayY(o) + at.y);
+
+    /* A target uid that no longer resolves is dropped rather than chased. */
+    if (*(const int32_t *)(o + OBJ_OFF_TARGET_UID) != 0
+        && LookupByUID(*(const int32_t *)(o + OBJ_OFF_TARGET_UID)) == 0)
+        *(int32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
+
+    /* TURN LEFT and TURN RIGHT, both on a shared repeat delay so that holding
+     * a key steps the facing at a fixed rate rather than once per frame. The
+     * two arms are the same but for the sign of the 0x10 step. */
+    if (ActionKeyDown(3)) {
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+        moved = 1;
+        OverlayPrepare(1, 1);
+        if (g_turnRepeatMs <= 0) {
+            uint8_t f = (uint8_t)((*(const uint8_t *)(o + OBJ_OFF_FACING) - 0x10)
+                                  & 0xF0);
+            w[4] = f;
+            *(uint16_t *)(o + OBJ_OFF_FIELD_574) = f;
+            *(int32_t *)(o + OBJ_OFF_DEADLINE_D0) = 0;
+            g_turnRepeatMs += AM2_TURN_REPEAT_MS;
+        }
+    }
+    if (ActionKeyDown(2)) {
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+        moved = 1;
+        OverlayPrepare(1, 1);
+        if (g_turnRepeatMs <= 0) {
+            uint8_t f = (uint8_t)((*(const uint8_t *)(o + OBJ_OFF_FACING) + 0x10)
+                                  & 0xF0);
+            w[4] = f;
+            *(int32_t *)(o + OBJ_OFF_DEADLINE_D0) = 0;
+            *(uint16_t *)(o + OBJ_OFF_FIELD_574) = f;
+            g_turnRepeatMs += AM2_TURN_REPEAT_MS;
+        }
+    }
+    if (g_turnRepeatMs > 0)
+        g_turnRepeatMs -= g_frameDeltaMs;
+
+    /* FIRE. One weapon code answers a different action from all the others. */
+    if (ActionKeyDown(0)) {
+        *(int32_t *)(w + 8) = (code == 0x14) ? 0x26 : 2;
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+        moved = 1;
+        OverlayPrepare(1, 1);
+    }
+
+    if (ActionKeyPressed(6)) {
+        *(int32_t *)(w + 8) = kActionCrouch[cls];
+        moved = 1;
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+    }
+    if (ActionKeyDown(6)) {
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+        moved = 1;
+        OverlayPrepare(1, 1);
+    }
+
+    /* The wheel: down takes the same action key 6 does, up is a two-case
+     * remap that leaves class 0 alone. */
+    if (g_mouseDZ < 0) {
+        *(int32_t *)(w + 8) = kActionCrouch[cls];
+        moved = 1;
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+    }
+    if (g_mouseDZ > 0) {
+        if (cls == 2)
+            *(int32_t *)(w + 8) = 4;
+        else if (cls == 1)
+            *(int32_t *)(w + 8) = cls;
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+        moved = 1;
+    }
+
+    if (ActionKeyPressed(7)) {
+        *(int32_t *)(w + 8) = kActionProne[cls];
+        moved = 1;
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+    }
+    if (ActionKeyPressed(4)) {
+        *(int32_t *)(w + 8) = kActionKey4[cls];
+        moved = 1;
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+    }
+    if (ActionKeyPressed(5)) {
+        *(int32_t *)(w + 8) = kActionKey5[cls];
+        moved = 1;
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+    }
+    if (ActionKeyDown(1)) {
+        *(int32_t *)(w + 8) = kActionKey1[cls];
+        moved = 1;
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+        OverlayPrepare(1, 1);
+    }
+    if (ActionKeyDown(0xA)) {
+        *(int32_t *)(w + 8) = WeaponPoseIndex(o, weapon);
+        moved = 1;
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+        OverlayPrepare(1, 1);
+    }
+
+    /* AIM, held. Two weapon codes aim at the cursor; the rest aim at nothing. */
+    if (ActionKeyDown(9)) {
+        *(int32_t *)(w + 0xC) = 1;
+        if (*(const int32_t *)(*(uint8_t **)((uint8_t *)weapon + OBJ_OFF_FIELD_C0)
+                               + 0x24) != 0)
+            *(int32_t *)(w + 0x10) = 1;
+        *(uint16_t *)(w + 0x14) = 0;
+        {
+            int32_t k = **(int32_t **)((uint8_t *)weapon + OBJ_OFF_FIELD_C0);
+            if (k >= 0x27 && k <= 0x28) {
+                *(uint16_t *)(w + 0x14) = (uint16_t)(g_viewRect->left + g_cursorX);
+                *(uint16_t *)(w + 0x16) = (uint16_t)(g_viewRect->top + g_cursorY);
+            }
+        }
+    }
+
+    /* AIM, released. A third code group aims at the cursor, and one aims at
+     * the trooper's own feet. */
+    if (ActionKeyReleased(9)) {
+        int32_t k;
+
+        *(int32_t *)(w + 0x10) = 1;
+        *(uint16_t *)(w + 0x14) = 0;
+        k = **(int32_t **)((uint8_t *)weapon + OBJ_OFF_FIELD_C0);
+        if (k == 0xB) {
+            *(uint16_t *)(w + 0x14) = *(const uint16_t *)(o + OBJ_OFF_POS);
+            *(uint16_t *)(w + 0x16) = *(const uint16_t *)(o + OBJ_OFF_POS + 2);
+        } else if (k > 0x17 && k <= 0x1A) {
+            *(uint16_t *)(w + 0x14) = (uint16_t)(g_viewRect->left + g_cursorX);
+            *(uint16_t *)(w + 0x16) = (uint16_t)(g_viewRect->top + g_cursorY);
+        }
+    }
+
+    /* From here the pointer drives. Anything that took the map's pointer for
+     * another purpose, or a pointer outside the map, skips to the tail. */
+    if (g_mouseGrab != -1) {
+        if (!PointInRect(g_blitRect,
+                         (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+            goto tail;
+        if (g_mouseGrab != 0)
+            goto tail;
+    }
+
+    if (g_mouseButton[0] != 0) {
+        int32_t bearing;
+
+        g_mouseGrab = -1;
+        dist    = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &at);
+        bearing = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), &at);
+        w[4]    = (uint8_t)bearing;
+
+        /* Close in, or already facing far enough away, keep the old facing. */
+        if (dist < 6
+            || (dist < 0x18
+                && AngleDelta(bearing, *(const uint8_t *)(o + OBJ_OFF_FACING))
+                     < 0x40))
+            w[4] = *(const uint8_t *)(o + OBJ_OFF_FACING);
+
+        *(uint16_t *)(o + OBJ_OFF_FIELD_574) = w[4];
+    }
+
+    if (GetMenuRow() == 1) {
+        if (g_mouseButton[0] != 0) {
+            g_throttleDeadline = g_gameClockMs + AM2_CLICK_THROTTLE_MS;
+            *(int32_t *)(w + 0xC) = 1;
+            if (*(const int32_t *)(*(uint8_t **)((uint8_t *)weapon
+                                                 + OBJ_OFF_FIELD_C0) + 0x24) != 0)
+                *(int32_t *)(w + 0x10) = 1;
+            *(uint16_t *)(w + 0x14) = (uint16_t)aim.x;
+            *(uint16_t *)(w + 0x16) = (uint16_t)aim.y;
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+
+            if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &aim) < 0x18) {
+                w[4] = *(const uint8_t *)(o + OBJ_OFF_FACING);
+                *(uint16_t *)(w + 0x14) = 0;
+                *(uint16_t *)(w + 0x16) = 0;
+            } else {
+                int32_t b = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+                                         &aim);
+                int32_t face = *(const uint8_t *)(o + OBJ_OFF_FACING);
+
+                w[4] = (uint8_t)b;
+                if (AM2_CHEAT_ABS((b & 0xFF) - face) < 0x10) {
+                    uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS);
+                    int32_t  dirs = *(const uint8_t *)(*(uint8_t **)(row + 0x44)
+                                                       + 8);
+
+                    /* Both roundings use the SAME directions count; only the
+                     * angle differs, so a difference means the click would
+                     * change the drawn facing. */
+                    if (RoundTo8(w[4], dirs) != RoundTo8(face, dirs)) {
+                        int32_t d = AngleDelta(face, w[4]);
+
+                        w[4] = (uint8_t)(face + ((d - (d >> 31)) >> 1));
+                        *(uint16_t *)(w + 0x14) = 0;
+                        *(uint16_t *)(w + 0x16) = 0;
+                    }
+                }
+            }
+
+            if (g_mouseChanged[0] != 0)
+                *(int32_t *)(o + OBJ_OFF_DEADLINE_D0) = 0;
+            *(uint16_t *)(o + OBJ_OFF_FIELD_574) = w[4];
+
+            hit = WalkCellWrapper(o, *(const uint32_t *)&aim);
+            if (hit != 0) {
+                *(uint16_t *)(w + 0x18) = (uint16_t)(ObjHeight(hit) - 4);
+                *(int32_t *)(o + OBJ_OFF_TARGET_UID) =
+                    *(const int32_t *)((uint8_t *)hit + OBJ_OFF_UID);
+            } else {
+                *(uint16_t *)(w + 0x18) = (uint16_t)ObjHeight(o);
+                *(int32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
+            }
+
+            /* THE FILTER. Five weapon codes also report where the cursor is
+             * pointing; twelve, and everything outside 0x18..0x28, do not. */
+            {
+                int32_t k = **(int32_t **)(o + OBJ_OFF_FIELD_C0) - 0x18;
+
+                if ((uint32_t)k <= 0x10 && kCursorCodeFilter[k] == 0) {
+                    *(uint16_t *)(w + 0x14) =
+                        (uint16_t)(g_viewRect->left + g_cursorX);
+                    *(uint16_t *)(w + 0x16) =
+                        (uint16_t)(g_viewRect->top + g_cursorY);
+                }
+            }
+            goto tail;
+        }
+
+        /* Button up: only a pointer that actually moved does anything. */
+        if (g_mouseChanged[0] == 0)
+            goto tail;
+
+        *(uint16_t *)(w + 0x14) = (uint16_t)aim.x;
+        *(uint16_t *)(w + 0x16) = (uint16_t)aim.y;
+        *(int32_t *)(w + 0x10) = 1;
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+        w[4] = (uint8_t)AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), &aim);
+        *(int32_t *)(o + OBJ_OFF_DEADLINE_D0) = 0;
+        *(uint16_t *)(o + OBJ_OFF_FIELD_574) = w[4];
+
+        hit = WalkCellWrapper(o, *(const uint32_t *)&aim);
+        if (hit != 0) {
+            *(uint16_t *)(w + 0x18) = (uint16_t)(ObjHeight(hit) - 4);
+            *(int32_t *)(o + OBJ_OFF_TARGET_UID) =
+                *(const int32_t *)((uint8_t *)hit + OBJ_OFF_UID);
+        } else {
+            *(uint16_t *)(w + 0x18) = (uint16_t)ObjHeight(o);
+            *(int32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
+        }
+        goto tail;
+    }
+
+    /* Not over the map proper. A key that already acted wins, and the click
+     * is throttled so that holding the button does not re-order every frame. */
+    if (moved != 0)
+        goto tail;
+    if (g_gameClockMs <= g_throttleDeadline)
+        goto tail;
+
+    if (g_mouseButton[0] == 0) {
+        if (g_mouseChanged[0] == 0)
+            goto tail;
+
+        /* A TAP: released soon after it was pressed and barely moved since.
+         * Both bounds are the press record's, not this frame's. */
+        if (orig_get_tick_count() - g_mousePressMs < AM2_CLICK_TAP_MS
+            && ApproxDist((const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT,
+                          (const AM2_Point *)(uintptr_t)ADDR_MOUSE_PRESS) < 4) {
+            w[4] = (uint8_t)AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+                                         &at);
+            *(uint16_t *)(o + OBJ_OFF_FIELD_574) = w[4];
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&at;
+            NearestAllowedTile(o, TileOfPoint(*(const uint32_t *)&at),
+                               (uint32_t *)&at);
+            *(int32_t *)(o + OBJ_OFF_DEADLINE_D0) = 0;
+            *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 1;
+            *(uint16_t *)(o + OBJ_OFF_PREV_REGION) = 0xFFFF;
+            *(int32_t *)(o + OBJ_OFF_UID_56C) =
+                (GetMenuRow() == 8) ? (int32_t)g_pointerHoverUid : 0;
+        }
+        if (g_mouseButton[0] == 0)
+            goto tail;
+    }
+
+    /* Held, and near enough that this is a turn rather than a march. */
+    if (dist <= 0x20 && orig_get_tick_count() - g_mousePressMs < AM2_CLICK_TAP_MS) {
+        w[4] = (uint8_t)AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), &at);
+        *(uint16_t *)(o + OBJ_OFF_FIELD_574) = w[4];
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
+        *(int32_t *)(o + OBJ_OFF_DEADLINE_D0) = 0;
+        goto tail;
+    }
+
+    *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
+    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&at;
+    *(int32_t *)(o + OBJ_OFF_UID_56C) =
+        (GetMenuRow() == 8) ? (int32_t)g_pointerHoverUid : 0;
+
+tail:
+    /* The run key, last, and it can PROMOTE the action chosen above. */
+    if (ActionKeyDown(8)) {
+        *(int32_t *)(o + OBJ_OFF_MOVE_STATE_ALT) = 1;
+        if (*(const int32_t *)(w + 8) == 2)
+            *(int32_t *)(w + 8) = 3;
+    } else {
+        *(int32_t *)(o + OBJ_OFF_MOVE_STATE_ALT) = 0;
+    }
 }

@@ -8979,7 +8979,7 @@ typedef struct {
  * ADDR_OBJECTS_HIT_BY_POINT's is. Reconstructing it is what settled that;
  * the return type below was `void` for the same reason. */
 #define ADDR_WALK_CELL_AT_POINT  0x0042A110u  /* void *(pt*, desc, keep) */
-#define ADDR_WALK_CELL_WRAPPER   0x0044A3A0u  /* void(void *unused, uint32 pt) */
+#define ADDR_WALK_CELL_WRAPPER   0x0044A3A0u  /* void *(void *unused, uint32 pt) */
 #define ADDR_WALK_CELL_CALLBACK  0x0044A380u
 /* Drain one message list into another, head first, until it is empty. */
 #define ADDR_DRAIN_MSG_LIST      0x00401210u  /* void(void *list) */
