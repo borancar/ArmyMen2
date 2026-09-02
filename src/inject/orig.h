@@ -3902,22 +3902,22 @@
  * argument would put the trooper pointer where a small integer belongs.
  * espmap resolves both to +0x1C, which is what makes them visibly one slot.
  *
- * ONE THING IS NOT SETTLED AND IT BLOCKS THE WRITE: WHICH RECORD THE THIRD
- * ARGUMENT IS. The function writes a byte at +4, a dword action at +8, dwords
- * at +0xC and +0x10, a POINT at +0x14/+0x16 and a word at +0x18. The sibling
- * UpdateTrooperAction calls its third argument a sight record, and
- * SIGHT_OFF_RANGE is a dword at 0x14 -- which a two-word point cannot be. So
- * either it is a different family, and SIGHTCOUT_OFF_X at 0x14 fits a point
- * exactly, or the record is overloaded by caller the way the type-6 blast
- * fields are.
+ * THE THIRD ARGUMENT HAS NO FIELD FAMILY, AND THAT IS A DECISION THE TREE
+ * ALREADY MADE. StepType2 passes the same edi to this function and then to
+ * Type2PlayerStep, so they write ONE record -- and Type2PlayerStep is
+ * reconstructed and reaches it as bare `w + 4` and `w + 8`, naming nothing.
  *
- * Not guessed. Getting a field family wrong is what put three shipped
- * functions' sight-cache lookups on `facing` where the original uses
- * `bearing` earlier this session, and nothing could see it: the offsets are
- * all present and the band is cold. What settles this is reading what
- * StepType2 passes and what UpdateTrooperAction does with the same record,
- * and that is the next thing to do rather than picking the family whose
- * offsets happen to line up.
+ * So the question "is it a sight record" does not have to be answered to
+ * write this. It was worth asking, because SIGHT_OFF_RANGE is a dword at
+ * 0x14 and this function writes a POINT there, so the obvious family is
+ * refuted -- and SIGHTCOUT_OFF_X at 0x14 fits a point exactly, which is
+ * precisely the trap: a family whose offsets line up is not evidence of
+ * anything. Opening one here would be a claim about the record's identity
+ * that nothing supports, made attractive by two numbers agreeing.
+ *
+ * The sibling that writes the same record declined to name its fields, and
+ * this follows it. Bare offsets with a comment beat an invented family, and
+ * where a neighbouring reconstruction has already chosen, the tie goes to it.
  *
  * Their width was worth checking rather than inferring: the first table's
  * three used entries are followed by three more before the next base, so
