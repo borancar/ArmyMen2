@@ -1600,9 +1600,18 @@ void __cdecl SeqEvict(void *ctxv)
     int32_t  left = *(const int32_t *)(ctx + SEQ_CTX_OFF_MARGIN);
     int32_t  i;
 
-    if (*(void **)(ctx + SEQ_CTX_OFF_RECORDS) == 0)
-        return;
-    if (*(const int32_t *)(ctx + SEQ_CTX_OFF_COUNT) <= 0)
+    /* IT RE-TESTS THE THRESHOLD SeqAlloc ALREADY TESTED, and that is the only
+     * guard it has. The first version of this invented two others -- a NULL
+     * record array and a zero count -- and omitted this one, which lets a
+     * context below the threshold fall into the second loop and free `margin`
+     * live records from the head.
+     *
+     * It was written from the hardcoded evictor's shape from memory, two
+     * commits after recording that these five are a REWRITE and that nothing
+     * carries over but the outline. Verified against 0x00460FD3 now. */
+    if (*(const int32_t *)(ctx + SEQ_CTX_OFF_COUNT)
+        <= *(const int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY)
+           - *(const int32_t *)(ctx + SEQ_CTX_OFF_MARGIN))
         return;
 
     i = *(int16_t *)(SeqRecord(ctx, 0) + SEQ_OFF_NEXT);
