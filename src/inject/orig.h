@@ -13765,6 +13765,31 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * function is its ONLY toucher, since LoadType5 restores RANK, REPAIR_FRAME,
  * PTR_LIST and CHAIN_NEXT_UID and steps straight over it. What is evidenced is
  * that the same argument also lands in OBJ_OFF_ROW0_Y_ADJUST. */
+/* THE MISSILE'S FLIGHT STATE, named from StepType5 (0x0043C110) which is the
+ * only thing that moves one. Its record is 0xB8 bytes and every offset here is
+ * overloaded -- OBJ_OFF_ROW0_Y_ADJUST, SIGHTC_ and BLAST_ names all sit at
+ * these numbers for other types -- so the MISSILE_ prefix is doing real work.
+ *
+ * THREE SUB-UNIT REMAINDERS AGAINST THREE INTEGER COORDINATES, which is what
+ * settles the whole group. Each step computes `Cos8(facing) * speed` and adds
+ * it to +0x4C, `Sin8(facing) * speed` into +0x50, and the vertical speed times
+ * the frame delta into +0x54; then `_ftol`s each, adds the integer part to
+ * OBJ_OFF_POS's x, to its y and to +0x42, and SUBTRACTS what it took back out
+ * of the remainder. So +0x42 is a third coordinate and +0x4C..+0x54 are its
+ * three fractional parts. A float triple tiling against an integer triple is
+ * better evidence than any one of the six alone.
+ *
+ * +0x48 IS THE VERTICAL SPEED and it is the only one with an accelerating
+ * term: the arced arm subtracts a gravity constant times the frame delta from
+ * it every step and clamps the height at zero on the way down. The flat arm
+ * compares it against zero once and leaves it alone. */
+#define MISSILE_OFF_HEIGHT       0x42u  /* int16, clamped at 0 */
+#define MISSILE_OFF_VZ           0x48u  /* float */
+#define MISSILE_OFF_FRAC_X       0x4Cu  /* float, sub-unit remainder */
+#define MISSILE_OFF_FRAC_Y       0x50u
+#define MISSILE_OFF_FRAC_H       0x54u
+#define MISSILE_OFF_SPEED_SCALE  0xA4u  /* float, multiplies the step */
+#define MISSILE_OFF_DEF          0x94u  /* the def record StepType5 reads */
 #define MISSILE_OFF_FIELD_A8     0xA8u  /* = OBJ_OFF_CHAIN_UID's offset */
 #define MISSILE_OFF_NEXT_UID     0xB4u  /* the next segment of a def-3 trail */
 #define MISSILE_OFF_LAST_UID     0xD0u  /* on the WEAPON: last missile it made */

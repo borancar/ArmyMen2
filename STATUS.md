@@ -296,6 +296,29 @@ Both thunks in `gameproc.cpp` that forwarded three `int32_t`s to these
 addresses now call them by name; their prototypes predate the targets having a
 shape, so the casts are at the call and the comment says why.
 
+## Next: StepType5, surveyed
+
+`0x0043C110`, 1,504 bytes, the missile step -- and the first thing left that is
+not AI. All thirteen callees are named; the cost is the RECORD, which had two
+fields named out of about fifteen.
+
+**Three sub-unit remainders against three integer coordinates settle the whole
+group.** Each step computes `Cos8(facing) * speed` into +0x4C, `Sin8(facing) *
+speed` into +0x50 and the vertical speed times the frame delta into +0x54; then
+`_ftol`s each, adds the integer part to the position's x, its y and +0x42, and
+subtracts what it took back out of the remainder. So +0x42 is a third
+coordinate and +0x4C..+0x54 are its three fractional parts. A float triple
+tiling against an integer triple is better evidence than any one of the six
+alone.
+
++0x48 is the vertical speed, and the only field with an accelerating term: the
+arced arm subtracts gravity times the frame delta every step and clamps the
+height at zero; the flat arm compares it against zero once and leaves it.
+
+**Every one of these offsets is overloaded** -- `OBJ_OFF_ROW0_Y_ADJUST`,
+`SIGHTC_` and `BLAST_` names all sit at these numbers for other types -- so the
+`MISSILE_` prefix is doing real work rather than tidying.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
