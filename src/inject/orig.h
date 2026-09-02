@@ -14253,6 +14253,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * failure. ADDR_TILE_COVER and ADDR_LOAD_PENDING have no chunk arm at all and
  * are allocated here and nowhere else.
  *
+ * THE OBJECT-BUILDING LOOP IS EFFECTIVELY A SECOND FUNCTION and is the last
+ * part of this to be written. It is not the "CreateWeapon per record" the
+ * tail looked like from a distance: per record it packs a sprite key, and if
+ * the record's kind is 0x64 or more it either SUBSTITUTES a random respawn
+ * kind -- when ADDR_GAME_OVER_FLAGS bit 1 is set, through
+ * ADDR_RANDOM_RESPAWN_KIND and the pool ADDR_BUILD_RESPAWN_POOL weighted --
+ * or subtracts 0x64 and packs a key for the remainder. Then
+ * ADDR_RESPAWN_KIND_ALLOWED gates it, ADDR_ENSURE_SPRITE_AAI_REC finds the
+ * record, ADDR_PRELOAD_SPRITE_KEY loads the sprite and its +0x24/+0x26 offset
+ * is ADDED to the record's position, and the result is settled with
+ * ADDR_TILE_OF_POINT and ADDR_SETTLE_POINT_IN_REGION before CreateWeapon.
+ *
+ * So the two respawn helpers named a few entries above are not a multiplayer
+ * curiosity: they are on the map-load path for every object whose kind is
+ * 0x64 or more.
+ *
+ * AND ITS RECORD POINTER IS OFFSET FROM THE RECORD START. The loop indexes
+ * with `[esi-0x13]`, `[esi-0xf]`, `[esi-0xb]`, `[esi-7]`, `[esi-1]` and
+ * `[esi+2]`, so esi is not the record base -- it points into the middle and
+ * the fields run both ways from it. Reading any of those as a positive offset
+ * from the record would put every field in the wrong place, and the stride is
+ * still 0x1C either way, which is exactly what makes the mistake survivable
+ * long enough to ship.
+ *
  * AND THE OBJECT LIST IS A TEMPORARY, which is the last thing that reads
  * wrong from the middle. OLAY's realloc'd array lives in a LOCAL, not a
  * global: the tail walks it calling ADDR_CREATE_WEAPON per record and then
