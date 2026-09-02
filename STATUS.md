@@ -12,6 +12,28 @@ Last updated: **2026-09-02**, at `bbe16f4`. Working tree clean.
 Nothing uncommitted. **1,432 patches plus 4 REGISTERED**, **30** analysis
 tools in `make check`.
 
+## Above the line: the two 12-byte row pools
+
+Four functions in, 1,436 patches. `RowPoolAInit`/`BInit` (`0x00460800`,
+`0x00460AC0`) and `RowPoolAFree`/`BFree` (`0x00460860`, `0x00460B30`).
+
+**Verified for the inits, NOT for the teardowns**, and the difference is worth
+keeping straight:
+
+- The first version omitted `RowAlloc` and `ab.sh bootcamp` returned **293,671
+  pixels** with an identical log. With the call in it is **22**, the usual
+  baseline, and the 1,610-line object-state dump is identical. So the inits
+  are compared against the original on a live map load.
+- `ab.sh quit` passed **on the broken build too**, because it leaves through
+  the TITLE screen and never enters state 2 -- so the pools are never
+  initialised and `ADDR_FREE_SEQ_CONTEXTS`, which is the LEVEL teardown, never
+  runs. Both teardowns are therefore unverified, and that clean pass is worse
+  than no result because it looks like one.
+
+Reaching them needs a drive that leaves a live mission: poke
+`ADDR_MENU_REQUEST` during play, which is how `StopAllSounds` was first
+executed. No configuration does it yet.
+
 ## THE SUB-CRT BOUNDARY IS CLOSED
 
 **Every game function below `0x0045C000` is reconstructed: 1,239 of 1,239.**
