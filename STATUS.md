@@ -12,6 +12,28 @@ Last updated: **2026-09-02**, at `bbe16f4`. Working tree clean.
 Nothing uncommitted. **1,432 patches plus 4 REGISTERED**, **30** analysis
 tools in `make check`.
 
+## OPEN: are the row-pool evictors reachable at all?
+
+`RowPoolARelease`/`BRelease` and `RowPoolAEvict`/`BEvict` are installed and
+**unverified**, because each has exactly one caller and the chain is
+
+    alloc -> (only if count > capacity) -> evict -> release
+
+with capacity 450 for pool A and 90 for pool B. If no drive fills a pool,
+those four are verified by reading alone and every clean `bootcamp` is silent
+about them.
+
+A `peek` probe was written to settle it and **it failed, honestly**: all six
+samples read 0 for both pool counts -- and 0 for `ADDR_GAME_CLOCK_MS` beside
+them, with `ComposeFrame=0` at the end. The clock ticks during play, so the
+zeroes are a drive that never reached the mission, not pools that stayed
+empty. Second hand-rolled drive to fail that way today; `ab.sh`'s mission
+sequence is elaborate for reasons and reinventing it in ten lines of `sh` does
+not work.
+
+The liveness reading is the only thing that made the run interpretable. Take
+one whenever the conclusion is a claim about zeroes.
+
 ## Above the line: the two 12-byte row pools
 
 Four functions in, 1,436 patches. `RowPoolAInit`/`BInit` (`0x00460800`,
