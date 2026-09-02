@@ -5039,6 +5039,21 @@ typedef struct {
  *   one Edit:                      the chat line
  *   one Panel, and FOUR Buttons:   start, ready, options, cancel
  *
+ * RectSet'S OWN ARGUMENTS BECOME THE BY-VALUE RECTANGLE. After each
+ * `call ADDR_RECT_SET` the original does `add esp, 4` -- popping the rect
+ * POINTER and leaving the four coordinates on the stack, exactly where the
+ * constructor's `AM2_Rect box` parameter expects them. The struct is never
+ * copied; the compiler simply does not clean up.
+ *
+ * That is why the push sequence reads as though the rectangle came FIRST and
+ * the headers say it comes LAST. Both are right: the coordinates are pushed
+ * first and end up highest, and the class arguments pushed after them end up
+ * lower, which is argument order. Getting this backwards flips every
+ * constructor call in the function.
+ *
+ * The `add esp, 4` is the tell and it is easy to read as a stray cleanup --
+ * five arguments went in and one dword came off.
+ *
  * AND IT WRITES THROUGH AN ALLOCATION IT HAS ALREADY TESTED FOR NULL. Each
  * fixed child is built as `if (w) Ctor(w, ...)` -- so the null case is
  * handled -- and then the very next instructions store the pointer in its
