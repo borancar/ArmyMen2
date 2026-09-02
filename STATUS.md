@@ -461,7 +461,12 @@ transcription is one helper and eighteen one-line cases.
 arms, in the new flat module `src/game/cheat.cpp`. Nineteen item cheats
 collapse to one helper, `phoenix!`/`cliche ending` to a second, and the rest
 are individual. It is COLD: nothing on any drive types a cheat, so an A/B over
-it is no-regression only and the evidence is the decode.
+it is no-regression only and the evidence is the decode. `ab.sh bootcamp`
+is clean all the same -- 22 pixels, identical log, identical 1,610-line
+object dump -- which is worth running not for the cheat but because a new
+patch can break the game at install time. The counter reads 0 and the NAME
+APPEARS in `counts`, which is the proof the patch went in: a function that
+was never installed is absent from that reply entirely.
 
 **The colour bytes are colours**, settled by reading `HudMessage`: its second
 argument is an `int32` it uses as `(uint8_t)colour`, so the upper three bytes
