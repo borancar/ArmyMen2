@@ -240,6 +240,15 @@ typedef void (__attribute__((thiscall)) *am2_squad_detail_fn)(AM2_Widget *, int3
  * reconstructed a commit later; checkseams caught both the moment they were,
  * which is the whole reason that ratchet exists. */
 typedef void (__cdecl *am2_select_weapon_fn)(void *, int32_t);
+
+/* The six pointer/weapon slots hold two shapes, and the difference is what the
+ * original does with the result: a PICK is `call eax; add esp,4; test eax,eax`
+ * and an ACTION is `call eax; add esp,8` with the answer dropped. Both match
+ * the reconstructions that go into them -- PointerPickMode0.. and
+ * PointerActionMode4.. -- so these agree with widget.h rather than restating
+ * it loosely. */
+typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
+typedef void (__cdecl *AM2_PointerActionFn)(void *obj, uint32_t at);
 #define orig_select_weapon (*(am2_select_weapon_fn)ADDR_SELECT_WEAPON)
 
 /* Clear the focus record and the installed handler, but only if this widget is
@@ -8653,9 +8662,6 @@ void __cdecl AimMarkerAge(void)
     }
 }
 
-typedef void (__cdecl *AM2_HudStepFn)(void);typedef void (__cdecl *AM2_HudStepFn)(void);
-#define orig_hud_post_update ((AM2_HudStepFn)(uintptr_t)ADDR_HUD_POST_UPDATE)
-
 /* 0x00414370, one caller -- the per-frame path. HudPaint's twin: the same
  * three top-level widgets, in the same order and with the same null test on
  * the third, but through vtable slot 2 rather than slot 1.
@@ -8681,7 +8687,7 @@ void __cdecl HudUpdate(void)
         ((AM2_WidgetUpdateFn *)g_hudWidgetC->vtable)[WIDGET_VSLOT_UPDATE](
             g_hudWidgetC);
 
-    orig_hud_post_update();
+    HudPostUpdate();
     AimMarkerAge();
 }
 
@@ -10717,6 +10723,290 @@ void __cdecl SpinDown(AM2_Widget *w)
     SpinRepaint(spin);
 }
 
+/* The idle tail, which the original writes out TWICE -- 0x004142E4 and
+ * 0x00414334 are the same eight instructions, the compiler duplicating a tail
+ * across a guard rather than two behaviours that happen to agree. Diffed
+ * before collapsing, per the rule about near-identical bodies: they match
+ * instruction for instruction, so the helper loses nothing.
+ *
+ * `ours` is the flag the caller computed: SLOT2 is an overlay row and it is
+ * only consulted for something we control. It is read with a SIGNED test --
+ * `test eax,eax; jl` -- which is what says it is a row index and not a
+ * function pointer, and it defaults to -1. */
+static void PointerIdleOverlay(int32_t ours)
+{
+    int32_t row = *(const int32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT2;
+
+    if (ours && row >= 0) {
+        OverlayPrepare(row, 0);
+        return;
+    }
+    OverlayPrepare(*(const int32_t *)(uintptr_t)ADDR_POINTER_OVERLAY, 0);
+}
+
+/* 0x00413E70, 1,280 bytes, one caller: the per-frame mouse dispatch, and the
+ * function the whole pointer band below is actually reached from. It refuses
+ * while a text field owns the keyboard or input is suppressed, clears the
+ * hover uid, runs the selection click, turns the cursor into a world point,
+ * maintains the drag rectangle, takes two ActionKeyDown arms, and then fans
+ * out through six function-pointer slots.
+ *
+ * THE FAN-OUT WALKS A CHAIN, not a single object. ObjectsHitByPoint answers a
+ * list threaded through OBJ_OFF_QUERY_NEXT and each node is tried in turn:
+ * SLOT0 while `ours` is set, then SLOT3 as a plain FLAG that says "stop
+ * looking at this node", then ADDR_POINTER_PICK -- the last only while
+ * `aiming` is clear. The first slot to answer non-zero ends the walk AND
+ * decides which trailing arm runs; falling off the end runs a third.
+ *
+ * ONE PREDICATE, TWO WINDOWS. Every arm asks the mouse the same two questions
+ * -- did the button CHANGE this frame, and is it down -- and they are not the
+ * same question in different arms. A changed-and-up button is a click and
+ * calls the action slot; a changed-and-down button CLAIMS the mouse and calls
+ * nothing; an unchanged button reaches the action slot only when the kind
+ * record allows repeating, which is KINDREC_OFF_FIELD_24 and is the whole
+ * reason that field had to be read.
+ *
+ * THE ACTION SLOT IS CALLED WITH A NULL OBJECT on the no-hit arms and with the
+ * chain node on the hit arms -- same slot, same point, different first
+ * argument -- so a reading that collapses them loses which one the pointer
+ * found something under.
+ *
+ * The debug-explosion arm at the top is real code and cannot run: it is gated
+ * on ADDR_OPT_4FD748, which ships as 0 and has no writer. Reproduced anyway,
+ * because it is the original's behaviour and because ADDR_MOUSE_PRESS2_MS's
+ * 200 ms window is the only place that constant appears. */
+void __cdecl HudPostUpdate(void)
+{
+    uint32_t at;
+    void    *leader;
+    void    *obj;
+    void    *weapon;
+    int32_t  ours   = 0;   /* the context object is ours to command */
+    int32_t  aiming = 0;   /* an aim overlay was prepared this frame */
+    int32_t  repeat = 0;   /* the held weapon keeps acting while held */
+    AM2_PointerPickFn   pick;
+    AM2_PointerActionFn act;
+
+    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER)
+        return;
+    if (*(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+        return;
+
+    *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID = 0;
+    SelectionClick();
+
+    /* Cursor to world, exactly as PlacementScreenClick builds it. The x add is
+     * a full 32-bit add of the packed dword with only the low half stored, so
+     * a carry out of x is discarded; written as int16 arithmetic, which is
+     * what that amounts to. */
+    ((int16_t *)&at)[0] =
+        (int16_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X
+                  + (int32_t)*(const uint32_t *)(uintptr_t)ADDR_CURSOR_POINT);
+    ((int16_t *)&at)[1] =
+        (int16_t)(*(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
+                  + *(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2));
+
+    /* The test is on the CURSOR against the view rectangle, not on the world
+     * point just built -- ADDR_BLIT_RECT is in screen space. */
+    if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT,
+                     (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)) {
+        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
+            return;
+        OverlayPrepare(0, 0);
+        return;
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
+        PlacementScreenClick(at);
+        return;
+    }
+
+    /* Take the grab the first frame the button moves, and only while nothing
+     * else holds it. -1 rather than a widget: this layer is not a widget. */
+    if (!*(void *const *)(uintptr_t)ADDR_MOUSE_GRAB
+        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+        *(int32_t *)(uintptr_t)ADDR_MOUSE_GRAB = -1;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_OPT_4FD748
+        && *(const int32_t *)(uintptr_t)ADDR_DRAG_ACTIVE
+        && *(const int32_t *)(uintptr_t)ADDR_CLICK_ENABLED
+        && orig_get_tick_count() - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS2_MS
+               < AM2_DOUBLE_CLICK_MS)
+        CreateExplosion(((const int16_t *)&at)[0], ((const int16_t *)&at)[1],
+                        *(const int32_t *)(uintptr_t)ADDR_DEBUG_BLAST_KIND,
+                        (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                        *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID,
+                        0xF, 0, 0, 0, 0);
+
+    /* ---- the drag rectangle ------------------------------------------- */
+    if (*(const int32_t *)(uintptr_t)ADDR_DRAG_ACTIVE) {
+        if (*(const int32_t *)(uintptr_t)ADDR_CLICK_ENABLED)
+            *(uint32_t *)(uintptr_t)ADDR_DRAG_ANCHOR = at;
+
+        /* Six is the dead zone: a drag shorter than that is a click, and the
+         * rectangle is not published until it is crossed. Once ON it is not
+         * recomputed here -- the test is on the flag, so the corners are the
+         * ones the crossing frame wrote. */
+        if (!*(const int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON
+            && ApproxDist((const AM2_Point *)&at,
+                          (const AM2_Point *)(uintptr_t)ADDR_DRAG_ANCHOR)
+                   > AM2_DRAG_DEAD_ZONE) {
+            int16_t ax = ((const int16_t *)(uintptr_t)ADDR_DRAG_ANCHOR)[0];
+            int16_t ay = ((const int16_t *)(uintptr_t)ADDR_DRAG_ANCHOR)[1];
+            int16_t px = ((const int16_t *)&at)[0];
+            int16_t py = ((const int16_t *)&at)[1];
+
+            *(int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON = 1;
+            /* Signed 16-bit compares, sign-extended into the rect's int32s. */
+            ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[0] = ax < px ? ax : px;
+            ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[2] = ax > px ? ax : px;
+            ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[1] = ay < py ? ay : py;
+            ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[3] = ay > py ? ay : py;
+        }
+    }
+
+    /* ---- the two key arms --------------------------------------------- */
+    if (ActionKeyDown(AM2_ACTION_0A) || ActionKeyDown(AM2_ACTION_06)) {
+        void *ctx = *(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A;
+
+        /* Everything AIMS except a kind-3 vehicle, which has its own gunner
+         * handling. Note the refusal needs BOTH tests: a non-vehicle reaches
+         * the arm through the first `je`, not past it. */
+        if (!ObjIsType3((const AM2_Object *)ctx)
+            || *(const int32_t *)((const uint8_t *)
+                   *(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A
+                   + VEHICLE_OFF_KIND) != 3) {
+            OverlayPrepare(AM2_OVERLAY_ROW_FIRE, 1);
+            aiming = 1;
+        }
+    }
+    if (ActionKeyDown(AM2_ACTION_EXIT_VEHICLE))
+        VehicleDismountAll((void *)0, (void *)(uintptr_t)at);
+
+    /* ---- what the leader is holding ----------------------------------- */
+    leader = LookupOwnerObj(*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+    if (leader) {
+        int32_t sel = *(const int32_t *)((const uint8_t *)leader
+                                         + UNIT_OFF_INVENTORY_SEL);
+
+        weapon = WeaponByUid(*(const uint32_t *)((const uint8_t *)leader
+                                                 + UNIT_OFF_INVENTORY
+                                                 + (uint32_t)sel * 4));
+        if (weapon) {
+            /* obj -> type record -> kind, then the kind's own record. Three
+             * loads, not two: OBJ_OFF_FIELD_C0 is a POINTER to the type. */
+            const uint8_t *type =
+                *(const uint8_t *const *)((const uint8_t *)weapon
+                                          + OBJ_OFF_FIELD_C0);
+            int32_t kind = *(const int32_t *)(type + ITEMTYPE_OFF_KIND);
+
+            repeat = *(const int32_t *)((const uint8_t *)(uintptr_t)
+                                            ADDR_MISSILE_DEFS
+                                        + (uint32_t)kind * AM2_MISSILE_DEF_BYTES
+                                        + MISSILE_DEF_OFF_FIELD_24);
+        }
+    }
+
+    /* We command the context object when it IS our leader, or when it is the
+     * vehicle our leader is riding. Two separate tests, both writing the one
+     * flag, and the second needs the leader lookup above. */
+    {
+        uint32_t ctx = *(const uint32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_A;
+        uint32_t us  = *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID;
+
+        if (us && ctx == us)
+            ours = 1;
+        if (leader
+            && *(const uint32_t *)((const uint8_t *)leader + OBJ_OFF_RIDING)
+                   == ctx)
+            ours = 1;
+    }
+
+    /* ---- the fan-out --------------------------------------------------- */
+    obj = ObjectsHitByPoint(&at, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+    for (; obj; obj = *(void *const *)((const uint8_t *)obj
+                                       + OBJ_OFF_QUERY_NEXT)) {
+        if (ours) {
+            pick = *(AM2_PointerPickFn *)(uintptr_t)ADDR_WEAPON_FN_SLOT0;
+            if (pick && pick(obj))
+                goto hit_ours;
+            /* A FLAG, not a function: SLOT3 set means this node is spoken for
+             * and the generic pick must not see it. */
+            if (*(const int32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT3)
+                continue;
+        }
+        pick = *(AM2_PointerPickFn *)(uintptr_t)ADDR_POINTER_PICK;
+        if (pick && !aiming && pick(obj))
+            goto hit_generic;
+    }
+
+    /* Nothing under the pointer. */
+    if (ours && *(const int32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT3) {
+        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+            goto click_ours;
+        goto held_ours;
+    }
+    if (*(void *const *)(uintptr_t)ADDR_POINTER_F14 && !aiming
+        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+        goto click_generic;
+    goto tail;
+
+hit_ours:
+    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+        goto held_ours;
+click_ours:
+    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
+        goto claim;
+    act = *(AM2_PointerActionFn *)(uintptr_t)ADDR_WEAPON_FN_SLOT1;
+    if (!act)
+        goto claim;
+    act(obj, at);
+    goto tail;
+
+held_ours:
+    /* The button did not change, so this is a hold. Only a weapon whose kind
+     * record allows repeating gets to act again. */
+    if (!repeat)
+        goto tail;
+    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON) {
+        PointerIdleOverlay(ours);
+        return;
+    }
+    act = *(AM2_PointerActionFn *)(uintptr_t)ADDR_WEAPON_FN_SLOT1;
+    if (act)
+        act(obj, at);
+    goto tail;
+
+hit_generic:
+    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+        goto tail;
+click_generic:
+    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
+        goto claim;
+    act = *(AM2_PointerActionFn *)(uintptr_t)ADDR_POINTER_ACTION;
+    if (!act)
+        goto claim;
+    act(obj, at);
+    goto tail;
+
+claim:
+    *(int32_t *)(uintptr_t)ADDR_MOUSE_CLAIMED = 1;
+
+tail:
+    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+        && !*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED) {
+        PointerIdleOverlay(ours);
+        return;
+    }
+    /* GetMenuRow is five bytes reading a global; the original calls it twice
+     * and so does this. */
+    if (GetMenuRow() == 3)
+        return;
+    if (GetMenuRow() == 1)
+        return;
+    PointerIdleOverlay(ours);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -11439,5 +11729,7 @@ int widget_install(void)
                         "BuildHudWidgets", 2);
     rc |= patch_replace(ADDR_FREE_HUD_WIDGETS, (const void *)FreeHudWidgets,
                         "FreeHudWidgets", 2);
+    rc |= patch_replace(ADDR_HUD_POST_UPDATE, (const void *)HudPostUpdate,
+                        "HudPostUpdate", 1);
     return rc;
 }

@@ -8671,6 +8671,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * action key or on the middle mouse button being RELEASED. Reconstructed. */
 #define ADDR_NEXT_INVENTORY_SLOT 0x004498F0u  /* void(AM2_Object *) */
 #define AM2_ACTION_NEXT_WEAPON   11    /* ADDR_ACTION_KEY_PRESSED's argument */
+/* ADDR_VEHICLE_DISMOUNT_ALL's gate in 0x00413E70, which is what names it --
+ * the CONTROLS dialog's own caption for the binding is "EXIT VEHICLE". */
+#define AM2_ACTION_EXIT_VEHICLE  0x0D
+/* TWO DIFFERENT actions both put the pointer into aim mode: 0x00413E70 tests
+ * them with an OR and takes the same arm either way.  WHICH two is not
+ * established and cannot be read off the image -- the CONTROLS captions come
+ * out of a data file, not a table in .rdata, so there is nothing to index.
+ * Numbered rather than named, the way OBJ_OFF_FIELD_C0 is. */
+#define AM2_ACTION_0A            0x0A
+#define AM2_ACTION_06            0x06
 #define AM2_MOUSE_MIDDLE         2     /* into ADDR_MOUSE_BUTTON/_CHANGED */
 /* 0x00403B40, five callers, and what it ANSWERS is what several of them keep:
  * AiStepDefend promotes it into SIGHT_OFF_FOUND, and NextInventorySlot runs it
@@ -10944,6 +10954,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_DRAG_ACTIVE         0x00485474u  /* int32_t */
 /* Gates the plain-click path only -- the two drag paths do not read it. */
 #define ADDR_CLICK_ENABLED       0x00485480u  /* int32_t */
+/* The band is not published until the pointer has moved more than six from
+ * the anchor, by ApproxDist.  Below that a drag is a click. */
+#define AM2_DRAG_DEAD_ZONE       6
 /* The predicate ObjectsInRect and WalkCellAtPoint are handed to decide what a
  * click may pick. Still original, and passed by address. */
 #define ADDR_SELECTABLE_PRED     0x00413690u
@@ -13386,6 +13399,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MISSILE_DEFS        0x00662030u
 #define AM2_MISSILE_BYTES        0xB8u
 #define AM2_MISSILE_DEF_BYTES    52
+/* One reader -- 0x00413E70, which does `[edx*4 + 0x00662054]` with edx =
+ * 13*kind, i.e. field +0x24 of def `kind`. That displacement is NOT a table
+ * base and naming it as one would have put the whole thing 0x24 bytes late;
+ * this is the fourth time that shape has come up and the first where the
+ * address I derived instead -- 0x00662030 -- turned out to be a table the tree
+ * had named and documented all along. The alias ratchet caught it, not the
+ * grep, because the grep was for the displacement.
+ *
+ * Named structurally, the way OBJ_OFF_FIELD_C0 is, since one reader cannot
+ * carry a name. What that reader does with it: zero means the pointer only
+ * acts on the frame the mouse button CHANGED, non-zero lets it keep acting
+ * while the button is held. definfo.cpp writes it from the parsed record's
+ * +0x1C -- one of five fields that table PERMUTES on the way in, which is the
+ * reason an ITEMTYPE_ offset does not mean the same thing here. */
+#define MISSILE_DEF_OFF_FIELD_24 0x24u
 /* The two frames LoadType5 chooses between on the def's first dword: 2 and 5
  * take one and everything else the other. What the dword IS has not been
  * read -- only which two values it treats alike. */

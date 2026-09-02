@@ -1653,6 +1653,12 @@ int32_t __cdecl PointerPickEnemyTrooper(void *obj);
  * in seat 0. Both arguments are ignored -- see the note in widget.cpp. */
 void __cdecl VehicleDismountAll(void *a, void *b);
 
+/* 0x00413E70, one caller: the per-frame mouse dispatch. It clears the hover
+ * uid, runs the selection click, maintains the drag rectangle and then fans
+ * out through the six pointer/weapon slots -- which is where every Pointer*
+ * function above is actually reached from. */
+void __cdecl HudPostUpdate(void);
+
 /* 0x00458810. Mode 6's action: order the selection to move in formation with
  * AI mode `ignore`. Its first argument is IN-OUT -- see widget.cpp. */
 void __cdecl PointerActionMode6(void *target, uint32_t at);

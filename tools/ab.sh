@@ -996,6 +996,28 @@ play() {
         # the constructor never writes.
         drive ctl "widgets" 2>/dev/null | tr '|' '\n' \
             >> "$WORK/$cfg-$side.widgets" || true
+        # AND THE MOUSE/SELECTION LAYER'S OWN GLOBALS, which is the second
+        # exact oracle this configuration has and the only thing in the suite
+        # that watches HudPostUpdate (0x00413E70) at all. Deleting that
+        # function's ENTIRE BODY moves `bootcamp` from 22 differing pixels to
+        # 160 and `campaign` from 2 to 39 -- both inside a 500-pixel budget
+        # that has to survive a moving scene -- so the per-frame mouse dispatch
+        # is COVERED by the pixels and cannot be discriminated by them.
+        #
+        # IT HAS TO BE SAMPLED HERE AND NOT AT A BRIEFING. The first version
+        # took it on `bootcamp` and `campaign`, beside the object table, and it
+        # came back byte-identical with the whole body deleted -- correctly,
+        # because the game pauses while a dialog is up and every global this
+        # layer writes is still in its startup state. An artifact that provably
+        # catches nothing reads as coverage, which is worse than not having it.
+        #
+        # Filtered on the reply's own `hover=`, so a command that does not
+        # dispatch leaves an EMPTY file the comparer skips and reports rather
+        # than a passing one. Not hypothetical: the first attempt said `drive
+        # pointer`, drive.sh has no such subcommand, and both sides captured
+        # its usage banner and diffed identical over 29 lines of shell comment.
+        drive ctl "pointer" 2>/dev/null | grep -a 'hover=' \
+            > "$WORK/$cfg-$side.state" || true
     fi
 
     if [ "$cfg" = quit ]; then

@@ -421,6 +421,52 @@ static void handle_line(SOCKET s, char *line)
         reply(s, "ok %s", buf[0] ? buf : "(nothing traced)");
         return;
     }
+    /* `pointer` -- the mouse/selection layer's own state, as VALUES.
+     *
+     * It exists because a mutation measured the alternative. HudPostUpdate
+     * (0x00413E70) is the per-frame mouse dispatch and its whole output is
+     * these globals plus the slots it calls; deleting its ENTIRE BODY moves
+     * `bootcamp` from 22 differing pixels to 160 and `campaign` from 2 to 39,
+     * both comfortably inside a 500-pixel budget that has to survive a moving
+     * scene. So the pixel check covers that function and cannot discriminate
+     * on it, which is the same standing MoveStepPoint and NearestClearPoint
+     * already have -- and the cure this file already prescribes is to dump the
+     * global rather than widen the pixels.
+     *
+     * The four function-pointer slots ARE printed, because relocations are
+     * stripped and an image address is a stable, meaningful datum here: which
+     * handler is installed is exactly what the pick/action band decides. The
+     * mouse grab is NOT, because it is a heap widget -- only whether it is
+     * clear, this layer's own -1, or somebody else's, which is the same rule
+     * `ctl widgets` follows for its pointers. */
+    if (!strcmp(argv[0], "pointer")) {
+        const int32_t *rect  = (const int32_t *)(uintptr_t)ADDR_VIEW_RECT;
+        int32_t        grab  = *(const int32_t *)(uintptr_t)ADDR_MOUSE_GRAB;
+
+        reply(s, "ok hover=%08x grab=%s claimed=%d"
+                 " drag=%d/%d anchor=%08x band=%d rect=%d,%d,%d,%d"
+                 " slots=%08x,%08x,%d,%d pick=%08x act=%08x f14=%08x"
+                 " overlay=%d leader=%08x ctx=%08x",
+              *(const uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID,
+              grab == 0 ? "none" : (grab == -1 ? "map" : "widget"),
+              *(const int32_t *)(uintptr_t)ADDR_MOUSE_CLAIMED,
+              *(const int32_t *)(uintptr_t)ADDR_DRAG_ACTIVE,
+              *(const int32_t *)(uintptr_t)ADDR_CLICK_ENABLED,
+              *(const uint32_t *)(uintptr_t)ADDR_DRAG_ANCHOR,
+              *(const int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON,
+              rect[0], rect[1], rect[2], rect[3],
+              *(const uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT0,
+              *(const uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT1,
+              *(const int32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT2,
+              *(const int32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT3,
+              *(const uint32_t *)(uintptr_t)ADDR_POINTER_PICK,
+              *(const uint32_t *)(uintptr_t)ADDR_POINTER_ACTION,
+              *(const uint32_t *)(uintptr_t)ADDR_POINTER_F14,
+              *(const int32_t *)(uintptr_t)ADDR_POINTER_OVERLAY,
+              *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID,
+              *(const uint32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_A);
+        return;
+    }
     if (!strcmp(argv[0], "state")) {
         char buf[MAX_LINE - 8];
         input_describe(buf, sizeof buf);

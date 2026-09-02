@@ -90,33 +90,75 @@ neither figure is a real possibility, and it would not mean the work stopped.
 
 ## Read the split-aware figure, not the entry one
 
-This unit is why. 144 bytes of work moved the entry-generous byte figure by
-**1.5%**, because `0x00458A20` sits inside a 5,760-byte `functions.tsv` entry
-that holds **seventeen** functions and patching any one of them credits all of
-it. The same effect inflates the entry count.
+144 bytes of work once moved the entry-generous byte figure by **1.5%**,
+because `0x00458A20` sits inside a 5,760-byte `functions.tsv` entry that holds
+**seventeen** functions and patching any one of them credits all of it. The
+same effect inflates the entry count.
 
-    entry-generous   1,223 of 1,239 entries, 91.0% of sub-CRT bytes
-    split-aware      1,374 of 1,530 real functions, 82.0% of sub-CRT bytes
+    entry-generous   1,224 of 1,239 entries, 91.3% of sub-CRT bytes
+    split-aware      1,375 of 1,530 real functions, 82.3% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
-ceiling rather than a floor -- ten percentage points of ceiling, measured.
+ceiling rather than a floor -- nine percentage points of ceiling, measured.
+
+## The last LIVE function is done, and it is covered rather than checked
+
+`HudPostUpdate` (`0x00413E70`, 1,280 B) is the per-frame mouse dispatch and was
+the one remaining function an A/B could genuinely compare -- everything else
+outstanding is cold. `ab.sh bootcamp campaign` is clean on it: object state
+identical over 1,610 lines, widget tree identical, logs identical, pixels at
+their floor.
+
+**AND THAT PROVES LESS THAN IT LOOKS, WHICH WAS MEASURED RATHER THAN FEARED.**
+Deleting the function's ENTIRE BODY leaves both configurations passing:
+`bootcamp` goes 22 -> 160 differing pixels and `campaign` 2 -> 39, against a
+budget of 500 that has to survive a moving scene. The log, the object table and
+the widget tree do not move at all. So the pixels COVER it -- the numbers do
+respond -- and cannot DISCRIMINATE on it, which is the standing `MoveStepPoint`
+and `NearestClearPoint` already have.
+
+`ctl pointer` is the answer, and it is the cure this repo already prescribes:
+where the evidence is a global rather than a pixel, dump the global. It reports
+the layer's own state as values -- hover uid, mouse grab, claimed flag, the drag
+pair and its anchor, the band rectangle, the four weapon slots, the pick/action
+handlers and the overlay row -- and `ab.sh mission` diffs it exactly, no budget.
+With the body deleted it reports `grab=map` against `grab=none` and names the
+field, where the pixels differed by 75 out of 219,680 and meant nothing.
+
+**IT HAD TO BE SAMPLED IN LIVE PLAY.** The first version put it beside the
+object table on `bootcamp` and `campaign`, and it came back byte-identical with
+the body deleted -- correctly, because those samples are taken at a briefing,
+the game pauses while a dialog is up, and every global this layer writes is
+still in its startup state. An artifact that provably catches nothing reads as
+coverage.
+
+And it nearly passed on nothing before that: the first invocation said `drive
+pointer`, `drive.sh` has no such subcommand, and both sides captured its usage
+banner and diffed IDENTICAL over 29 lines of shell comment. It is filtered on
+the reply's own `hover=` now, so a non-answer is an empty artifact the comparer
+skips and reports.
+
+What the dump does NOT reach on this drive: `drag`, `anchor` and the band
+rectangle are all zero, because `mission` scrolls with relative motion and never
+presses a button on the map. The drag-rectangle arm and the whole
+claimed/click path stay verified by reading.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,223 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 16
-outstanding, which is 1,239 minus 1,223 -- from 1,418 reconstructed addresses
-(1,414 patched plus 4 registered), and **91.0% of the sub-CRT bytes**.
-Split-aware that is **1,374 of 1,530** real functions and **82.0%** of the
+line (0x0045C000) patched**. Measured: **1,224 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 15
+outstanding, which is 1,239 minus 1,224 -- from 1,420 reconstructed addresses
+(1,416 patched plus 4 registered), and **91.3% of the sub-CRT bytes**.
+Split-aware that is **1,375 of 1,530** real functions and **82.3%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
 small ones in batches. A hundred and fifty-one batches have gone in and NOTHING SMALL IS LEFT among
-the ENTRIES: the 16 outstanding start at **1,168 bytes** -- `0x00434700` -- and
-the median is **1,504**. That is not what is left, though: `tools/merges.py`
+the ENTRIES: the 15 outstanding start at **1,168 bytes** -- `0x004049C0` -- and
+the median is **1,808**. That is not what is left, though: `tools/merges.py`
 splits them into real functions and the 0x00458930 entry alone still holds
 sixteen unwritten ones from 16 bytes up. Rank by real function, not by entry. The
 672-byte entry that headed this list for days was `CreateTrooper`, deferred
