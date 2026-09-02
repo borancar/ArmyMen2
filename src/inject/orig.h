@@ -10276,7 +10276,12 @@ typedef struct {
 /* Zeroed beside the count by the teardown, exactly as ADDR_VEHICLE_DEF_CAP
  * is beside its own. One toucher each, both of them frees, so both stay
  * locations rather than meanings. */
-#define ADDR_DEF_MISSILE_FIELD_30 0x00662930u  /* int32_t */
+/* The CAPACITY, on the same evidence AddVehicleDef gave for its own: set to
+ * 50 beside the initial malloc, compared against the count, raised by 20
+ * before each realloc. Was ADDR_DEF_MISSILE_CAP. */
+#define ADDR_DEF_MISSILE_CAP     0x00662930u  /* int32_t */
+#define AM2_MISSILE_DEF_REC_SIZE 0x34u        /* 13 dwords, rep movsd */
+#define ADDR_ADD_MISSILE_DEF     0x00460200u  /* void(const void *rec) */
 /* 0x0044C550, one caller. Walk the four comm slots and run 0x0044C480 on
  * every one that is occupied AND that CommMustBroadcast accepts. */
 #define ADDR_TELL_EACH_SLOT      0x0044C550u  /* void(void) */

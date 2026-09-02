@@ -426,6 +426,8 @@ int definfo_install(void)
                         "FreeMissileDefs", 2);
     rc |= patch_replace(ADDR_ADD_VEHICLE_DEF, (const void *)AddVehicleDef,
                         "AddVehicleDef", 1);
+    rc |= patch_replace(ADDR_ADD_MISSILE_DEF, (const void *)AddMissileDef,
+                        "AddMissileDef", 1);
     return rc;
 }
 
@@ -463,7 +465,7 @@ void __cdecl FreeMissileDefs(void)
 {
     FreeDefTable((void **)(uintptr_t)ADDR_DEF_MISSILE_RECS,
                  (int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT,
-                 (int32_t *)(uintptr_t)ADDR_DEF_MISSILE_FIELD_30);
+                 (int32_t *)(uintptr_t)ADDR_DEF_MISSILE_CAP);
 }
 
 /* AddVehicleDef -- original 0x0045EB40, one caller. Append one record to the
@@ -511,4 +513,54 @@ void __cdecl AddVehicleDef(const void *rec)
             ((const int32_t *)rec)[i];
 
     *(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT = n + 1;
+}
+
+/* AddMissileDef -- original 0x00460200, one caller. The same append for the
+ * missile def table, and unlike the pair one file over this one IS close to
+ * its sibling: 0.868 against AddVehicleDef, 40 instructions to 36.
+ *
+ * EVERY DIFFERENCE FOLLOWS FROM ONE FACT, the record size -- 52 bytes here
+ * against 36 there. It changes the initial malloc (50 x 52 rather than
+ * 50 x 36), the rep-movsd count (13 dwords rather than 9), and the index
+ * multiply, which needs one more `lea` at each of its two sites because 52 is
+ * (1 + 3*4) * 4 where 36 is (1 + 8) * 4. Those two extra `lea`s ARE the four
+ * instructions of difference; nothing else moved.
+ *
+ * So the two are one function specialised twice, and the specialisation is
+ * arithmetic the compiler inlined rather than a parameter. Written out for
+ * the third time in this session for the reason VehicleBlockWeight
+ * established: the image has three functions and a helper would have to take
+ * the record size as an argument, which is exactly the multiply the compiler
+ * chose not to make general. */
+void __cdecl AddMissileDef(const void *rec)
+{
+    uint8_t *tab = *(uint8_t **)(uintptr_t)ADDR_DEF_MISSILE_RECS;
+    int32_t  cap;
+    int32_t  n;
+
+    if (tab == (uint8_t *)0) {
+        tab = (uint8_t *)am2_malloc(AM2_DEF_LINK_INITIAL
+                                    * AM2_MISSILE_DEF_REC_SIZE);
+        cap = AM2_DEF_LINK_INITIAL;
+        *(uint8_t **)(uintptr_t)ADDR_DEF_MISSILE_RECS = tab;
+        *(int32_t *)(uintptr_t)ADDR_DEF_MISSILE_CAP = cap;
+    } else {
+        cap = *(const int32_t *)(uintptr_t)ADDR_DEF_MISSILE_CAP;
+    }
+
+    n = *(const int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT;
+    if (n >= cap) {
+        cap += AM2_DEF_LINK_GROW;
+        *(int32_t *)(uintptr_t)ADDR_DEF_MISSILE_CAP = cap;
+        tab = (uint8_t *)am2_realloc(tab,
+                  (size_t)cap * AM2_MISSILE_DEF_REC_SIZE);
+        *(uint8_t **)(uintptr_t)ADDR_DEF_MISSILE_RECS = tab;
+        n = *(const int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT;
+    }
+
+    for (int32_t i = 0; i < (int32_t)(AM2_MISSILE_DEF_REC_SIZE / 4); i++)
+        ((int32_t *)(tab + n * AM2_MISSILE_DEF_REC_SIZE))[i] =
+            ((const int32_t *)rec)[i];
+
+    *(int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT = n + 1;
 }

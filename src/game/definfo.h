@@ -85,4 +85,8 @@ void __cdecl FreeMissileDefs(void);
  * it is full. Reads as DefAddTrooperRec's twin and is not one. */
 void __cdecl AddVehicleDef(const void *rec);
 
+/* 0x00460200. Append one 52-byte missile def record. AddVehicleDef's near
+ * sibling -- 0.868 -- differing only in what the record size implies. */
+void __cdecl AddMissileDef(const void *rec);
+
 #endif /* AM2_DEFINFO_H */
