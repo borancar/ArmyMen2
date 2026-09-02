@@ -349,11 +349,13 @@ void __cdecl ObjSetRoachFootprint(void *obj);
  * which had been written AM2_OBJ_TYPE_WEAPON. The callee hands the argument to
  * CommMustBroadcast, which takes an army -- so the literal is AM2_ARMY_NEUTRAL
  * and the two concepts merely share a value. Corrected at that call site. */
-typedef void *(__cdecl *AM2_CreateWeaponFn)(const char *name, int32_t army,
-                                            int32_t key, uint32_t at,
-                                            int32_t flags, int32_t quantity,
-                                            int32_t g, int32_t h);
-#define CreateWeapon (*(AM2_CreateWeaponFn)AM2_IMAGE(ADDR_CREATE_WEAPON))
+/* 0x0045F0C0. Make a type-4 WEAPON. The last of the four creators.
+ * NOTE the second argument is an ARMY -- AM2_ARMY_NEUTRAL where callers pass
+ * 4 -- not the object type, which is what CommMustBroadcast's parameter
+ * establishes and what a literal 4 in a type-4 constructor invites. */
+void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
+                           uint32_t at, int32_t flags, int32_t quantity,
+                           int32_t remote, int32_t uid);
 
 /* 0x0045B090, four callers, and formerly deferred -- the LAST of the four
  * creators. Make a type-3 VEHICLE. Answers null when a network session refuses

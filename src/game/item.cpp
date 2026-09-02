@@ -6682,11 +6682,6 @@ void __cdecl StepType1And4(void *obj)
     }
 }
 
-typedef void *(__cdecl *AM2_MakeWeaponFn)(const char *name, int32_t army,
-                                          int32_t kind, uint32_t where,
-                                          int32_t a, int32_t b, int32_t c,
-                                          uint32_t uid);
-#define orig_make_weapon  ((AM2_MakeWeaponFn)(uintptr_t)ADDR_CREATE_WEAPON)
 
 /* SettlePointInRegion and the two comm functions stay original and are
  * reached by address. The first rewrites the point it is given through a rule
@@ -6904,7 +6899,7 @@ void __cdecl Type2ActionA(void *obj)
     if (old)
         *(uint32_t *)((uint8_t *)old + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
 
-    made = orig_make_weapon((char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+    made = CreateWeapon((char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
                             (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
                             KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                             AM2_WEAPON_KEY_2B, 0),
@@ -7454,7 +7449,7 @@ void __cdecl RankPromote(void *obj)
     if (old)
         *(uint32_t *)((uint8_t *)old + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
 
-    made = (uint8_t *)orig_make_weapon(
+    made = (uint8_t *)CreateWeapon(
         (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
         *(const int8_t *)(o + OBJ_OFF_ARMY),
         KeyLookupTriple(AM2_RANK_WEAPON_GROUP, weaponId, 0),
@@ -13255,6 +13250,8 @@ void item_install(void)
                   "CreateWatchedItem", 4);
     patch_replace(ADDR_CREATE_WATCHED_TYPE, (const void *)CreateWatchedType,
                   "CreateWatchedType", 4);
+    patch_replace(ADDR_CREATE_WEAPON, (const void *)CreateWeapon,
+                  "CreateWeapon", 8);
 }
 
 /* CreateWatchedItem and CreateWatchedType -- originals 0x0045F300 and
@@ -13337,4 +13334,112 @@ void __cdecl CreateWatchedType(int32_t unused, void *obj, uint32_t at,
     ObjTileChanged(item, *(const int8_t *)((uint8_t *)item + 0x65u), 1);
 
     (void)unused;
+}
+
+/* The ammo filter, generated from the image at 0x0045F270 rather than
+ * transcribed: a byte per weapon key selecting one of two arms. Fifteen keys
+ * take -1 and fourteen take the caller's quantity, and the split is not a
+ * range -- 1 is infinite, 2..7 are counted, 8..10 infinite, 11..12 counted,
+ * 13..21 infinite, 22..26 counted, 27 infinite, 28 counted, 29 infinite. A
+ * hand-written condition over that would be six comparisons and is exactly
+ * the shape DirtyCollect's eighty-one arms got wrong. */
+static const uint8_t kWeaponAmmoIsFinite[29] = {
+    0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0
+};
+
+/* CreateWeapon -- original 0x0045F0C0, eight-plus callers, and it names
+ * itself: "CreateWeapon: %s, %d, %d, (%d,%d), %d, %d, %d, %x". The last of
+ * the four object creators; the other three have been reconstructed for some
+ * time and none is a template -- the closest is CreateItem at 0.258.
+ *
+ * THE AMMO RULE IS A TABLE, NOT A RANGE. Twenty-nine weapon keys index a byte
+ * at 0x0045F270 choosing between "ammo is -1" and "ammo is what the caller
+ * asked for", and the two sets interleave five times. Emitted from the image
+ * above; reading the two arms and inferring a boundary is how six of
+ * DirtyCollect's eighty-one went wrong.
+ *
+ * A KEY OUTSIDE 1..29 TAKES THE COUNTED ARM, and that includes key 0: the
+ * original does `dec eax; cmp eax, 0x1C; ja` so 0 wraps to 0xFFFFFFFF and
+ * fails the unsigned compare. Reproduced with an explicit range test, which
+ * is the same answer and says so.
+ *
+ * THE DEFINITION CAN OVERRIDE BOTH. A negative +0x18 in the missile def
+ * forces -1 whatever the table said; a zero ammo becomes 3; and in a
+ * multiplayer session the def's +0x18 CAPS the result. Three rules layered on
+ * the table, and only the first is visible from the switch.
+ *
+ * ITS DEF POINTER IS ADDR_MISSILE_DEFS AND NOT THE OTHER MISSILE TABLE. The
+ * index arithmetic is `52 * KeyFieldB(...)` off 0x00662030 -- the static
+ * array -- where AddMissileDef appends to the malloc'd one at 0x00662928.
+ * Two tables of the same record size, and the 52 is what makes them look
+ * interchangeable.
+ *
+ * The malloc's argument is cleaned by InitObjFromAai's `add esp, 0x24`, which
+ * is why that cleanup counts nine dwords against eight pushes -- the shared
+ * cleanup shape, once more. */
+void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
+                           uint32_t at, int32_t flags, int32_t quantity,
+                           int32_t remote, int32_t uid)
+{
+    uint8_t       *o;
+    const uint8_t *def;
+    int32_t        kb;
+    int32_t        ammo;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_DEBUG_ITEMLIST)
+        am2_log((const char *)AM2_IMAGE(ADDR_STR_CREATE_WEAPON), name, army,
+                key, (int32_t)(int16_t)(at & 0xFFFF),
+                (int32_t)(int16_t)(at >> 16), flags, quantity, remote, uid);
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0 && remote == 0
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)army))
+        return (void *)0;
+
+    o = (uint8_t *)am2_malloc(AM2_WEAPON_BYTES);
+    memset(o, 0, 0x35u * 4u);
+
+    if (!InitObjFromAai(o, (char *)name, army, key, at, flags, remote, uid, 0)) {
+        if (*(const int32_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT
+                               + COMM_OFF_VERBOSE))
+            am2_log((const char *)AM2_IMAGE(ADDR_STR_CREATE_WEAPON_FAIL));
+        am2_free(o);
+        return (void *)0;
+    }
+
+    *(int32_t *)o = 4;
+
+    kb = (int32_t)KeyFieldB(*(const uint32_t *)(
+             (const uint8_t *)(*(void *const *const *)(uintptr_t)ADDR_AAI_RECORDS)[key]
+             + 8));
+    def = (const uint8_t *)(uintptr_t)ADDR_MISSILE_DEFS
+          + (uint32_t)kb * AM2_MISSILE_DEF_REC_SIZE;
+    *(const uint8_t **)(o + 0xC0u) = def;
+
+    if (kb >= 1 && kb <= 29 && !kWeaponAmmoIsFinite[kb - 1])
+        ammo = -1;
+    else
+        ammo = quantity;
+
+    if (*(const int32_t *)(def + 0x18u) < 0)
+        ammo = -1;
+    else if (ammo == 0)
+        ammo = 3;
+    *(int32_t *)(o + 0xCCu) = ammo;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
+        && ammo > *(const int32_t *)(def + 0x18u)
+        && *(const int32_t *)(def + 0x18u) > 0)
+        *(int32_t *)(o + 0xCCu) = *(const int32_t *)(def + 0x18u);
+
+    *(int32_t *)(o + 0xC8u) = 0;
+
+    if (remote == 0
+        && CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                             (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+        SendItemCreate(o);
+
+    ObjMoveAlongFacing(o, 0, 0, 0);
+    return o;
 }

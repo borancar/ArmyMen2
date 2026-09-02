@@ -15537,6 +15537,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * wrong is worse than none, and today's two revived deferrals are the argument
  * for recording the gap precisely instead. */
 #define ADDR_CREATE_WEAPON       0x0045F0C0u  /* type 4; names itself */
+#define AM2_WEAPON_BYTES         0xD4u    /* malloc size; 0x35 dwords cleared */
+#define ADDR_STR_CREATE_WEAPON   0x0048C708u
+#define ADDR_STR_CREATE_WEAPON_FAIL 0x0048C6F8u
 /* 0x00448280, 256 bytes, EIGHT callers -- the multiplayer weapon RESPAWN, read
  * but not reconstructed. Its four gates are all guards and each one is worth
  * knowing before trying to exercise it: the object must be ObjIsType4, there

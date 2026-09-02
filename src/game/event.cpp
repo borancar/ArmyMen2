@@ -2949,11 +2949,6 @@ int event_install(void)
 extern "C" void __cdecl HudMessage(const char *text, int32_t colour);
 extern "C" void __cdecl StartAudioStream(const char *name, int32_t loop);
 
-typedef void *(__cdecl *am2_ra_weapon_fn)(const char *name, int32_t army,
-                                          int32_t kind, uint32_t where,
-                                          int32_t a, int32_t b, int32_t c,
-                                          uint32_t uid);
-#define orig_ra_create_weapon ((am2_ra_weapon_fn)(uintptr_t)ADDR_CREATE_WEAPON)
 #define AM2_CHEAT_ITEM_GROUP  0x2D
 
 #define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
@@ -3325,7 +3320,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
         if ((int16_t)at == 0)
             return;
-        orig_ra_create_weapon(act->text, 4,
+        CreateWeapon(act->text, 4,
                               KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, act->item, 0),
                               at, 0, act->n0, 0, 0);
         return;
@@ -3386,7 +3381,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         /* Then the same weapon-attach the cheat console does, which is
          * worth saying because it is four calls in a fixed order and
          * getting one wrong leaves a trooper holding nothing. */
-        weapon = (uint8_t *)orig_ra_create_weapon(
+        weapon = (uint8_t *)CreateWeapon(
                      (const char *)(uintptr_t)ADDR_DIR_SCRATCH, act->army,
                      KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, act->item, 0),
                      *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,

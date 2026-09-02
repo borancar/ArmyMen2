@@ -1378,17 +1378,12 @@ typedef int32_t (__cdecl *am2_map_fseek_fn)(am2_FILE *fp, int32_t off,
                                             int32_t whence);
 typedef int32_t (__cdecl *am2_map_fclose_fn)(am2_FILE *fp);
 typedef int32_t (__cdecl *am2_load_atl_fn)(const char *path);
-typedef void *(__cdecl *am2_map_weapon_fn)(const char *name, int32_t army,
-                                           int32_t kind, uint32_t where,
-                                           int32_t a, int32_t b, int32_t c,
-                                           uint32_t uid);
 
 #define orig_map_fopen   ((am2_map_fopen_fn)(uintptr_t)ADDR_FOPEN)
 #define orig_map_fread   ((am2_map_fread_fn)(uintptr_t)ADDR_FREAD)
 #define orig_map_fseek   ((am2_map_fseek_fn)(uintptr_t)ADDR_FSEEK)
 #define orig_map_fclose  ((am2_map_fclose_fn)(uintptr_t)ADDR_FCLOSE)
 #define orig_load_atl    ((am2_load_atl_fn)(uintptr_t)ADDR_LOAD_ATL_FILE)
-#define orig_map_weapon  ((am2_map_weapon_fn)(uintptr_t)ADDR_CREATE_WEAPON)
 
 
 /* w*h bytes straight into one global.  Seven of the arms are exactly this. */
@@ -1625,7 +1620,7 @@ static void BuildMapObjects(uint8_t *objs, int32_t count)
             /* AND THE ARMY IS THE LITERAL 4, not the record's owner: the
              * register that carried the owner has been reused twice by here,
              * first for the key and then for the point. */
-            obj = orig_map_weapon(*(char **)(r + MAPREC_OFF_SCRIPT), 4,
+            obj = CreateWeapon(*(char **)(r + MAPREC_OFF_SCRIPT), 4,
                                   aai, settled, flags,
                                   (int32_t)*(const uint32_t *)&at, 1, 0);
             if (obj != 0) {

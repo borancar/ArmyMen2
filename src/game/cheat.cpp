@@ -35,13 +35,8 @@ extern "C" void __cdecl PlayDynamicSound(const char *name, int32_t loop,
  * tools/checkseams.py exists for. */
 
 typedef int32_t (__cdecl *am2_stricmp_fn)(const char *a, const char *b);
-typedef void   *(__cdecl *am2_make_weapon_fn)(const char *name, int32_t army,
-                                              int32_t kind, uint32_t where,
-                                              int32_t a, int32_t b, int32_t c,
-                                              uint32_t uid);
 
 #define orig_stricmp      ((am2_stricmp_fn)(uintptr_t)ADDR_GAME_STRICMP)
-#define orig_make_weapon  ((am2_make_weapon_fn)(uintptr_t)ADDR_CREATE_WEAPON)
 
 /* The phrase table: entry 0 is the master switch, 1..39 are the cheats and
  * entry 40 is a sentinel the walk stops at rather than compares. */
@@ -84,7 +79,7 @@ static void CheatGiveItem(void *unit, int32_t kind, int32_t ammo)
 {
     int32_t key = KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, kind, 0);
 
-    orig_make_weapon((const char *)(uintptr_t)ADDR_DIR_SCRATCH, 0, key,
+    CreateWeapon((const char *)(uintptr_t)ADDR_DIR_SCRATCH, 0, key,
                      *(const uint32_t *)((const uint8_t *)unit + OBJ_OFF_POS),
                      0, ammo, 0, 0);
 }
@@ -116,7 +111,7 @@ static void CheatSwapWeapon(void *unit, int32_t kind, void *subrecord,
 
     old = WeaponByUid(*(const int32_t *)(u + OBJ_OFF_WEAPON_UID));
     key = KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, kind, 0);
-    fresh = (uint8_t *)orig_make_weapon(
+    fresh = (uint8_t *)CreateWeapon(
                 (const char *)(uintptr_t)ADDR_DIR_SCRATCH, 0, key,
                 *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT, 4, -1, 0, 0);
 
