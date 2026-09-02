@@ -7938,6 +7938,20 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
+ * THREE ARMS SHARE THE THREE-PATH POINT BLOCK WITH DIFFERENT CALLEE PAIRS.
+ * 0x1F ends in EvtAtPointC / EvtAtObjPosC, 0x18 in EvtAtPointA /
+ * EvtAtObjPosA, and 0x19 in a third pair around EvtObjPair and
+ * EvtArmyAttach. 0x18 and 0x19 also PRECEDE it with the army-or-object AI
+ * mode set that 0x2A ends at, so each is that head plus this block.
+ *
+ * Three uses of one shape with a substituted callee pair is the case for a
+ * parameterised helper -- and this file records the argument against merging
+ * on resemblance three times over, so the test is whether the three blocks
+ * are identical in STRUCTURE and differ only in which functions they call.
+ * They are, and they do. Writing them out is still the safer choice while the
+ * function is unverified: a helper taking two function pointers hides which
+ * pair each arm uses at exactly the place a reader checks it.
+ *
  * `moveto` HAS THREE PATHS, NOT A PAIR. A named variable pair gives the
  * point; failing that, an action carrying NO point at all moves one object to
  * ANOTHER OBJECT through EvtAtObjPosC; failing that, the literal point the
