@@ -68,6 +68,19 @@ reaching gameplay inside the waits is exactly what happens -- so `mission` at
 there is no baseline for `combat` on disk to compare against, so its zero is
 unprecedented in the available history rather than known-new.
 
+Static numbers that fit the hypothesis, measured rather than assumed:
+`MAX_TRACED` is **2,048** and there are **1,432** patches, so under `TRACE=1`
+every one of them is wrapped. When `CLAUDE.md` recorded the 6,291-8,300 band
+the table was 512 against about 610 patches -- that is the overflow the file
+documents -- so roughly 512 were wrapped and 98 were not. Wrapped count has
+therefore gone up about 2.8x, and what has been added since includes the
+hottest functions in the tree: `MoveStepPoint` at 175,145 calls a mission,
+`GetPauseFlags` at 767,153, `NextItem` at 584,067, `RoachStepAllowed` at
+366,870. A per-call stub on those is not a rounding error.
+
+That is consistency, not proof -- 2.8x more stubs is not 12x slower on its
+own, and the argument leans on which functions joined rather than how many.
+
 Cheap way to test it, for whoever picks this up: run `mission` with `TRACE=0`
 and read the volatile count. If it returns to the thousands the tracing is the
 cost and the band in `CLAUDE.md` was simply recorded under a smaller table.
