@@ -5039,12 +5039,19 @@ typedef struct {
  *   one Edit:                      the chat line
  *   one Panel, and FOUR Buttons:   start, ready, options, cancel
  *
- * AND THE FIRST COUNT OF THAT WAS SHORT. Pairing each `operator new` with the
- * NEXT constructor call finds nineteen and misses the Edit and two of the
- * four Buttons, because those constructions have other calls between the
- * allocation and the constructor. Listing every *_CTOR call instead and
- * reading its pushed arguments finds all of them, and gives the bitmap names
- * with it -- start, ready, options and cancel.
+ * THE INVENTORY TOOK THREE COUNTS TO SETTLE, and the first two were both
+ * short. Pairing each `operator new` with the NEXT constructor call gives
+ * nineteen and misses anything with a call in between. Listing every *_CTOR
+ * call gives more and misses allocations whose constructor is not matched by
+ * the pattern. Counting the ALLOCATIONS is the one that closes: 22 sites --
+ * 0x0C x4, 0x60, 0x64, 0x68 x2, 0x74, 0x78 x6, 0x80, 0x84 x2, 0x98 x4 --
+ * of which three are inside the four-iteration player loop, against 20
+ * WidgetAddChild sites.
+ *
+ * So not every allocation becomes a child, and the counts differ for a real
+ * reason rather than because one of them is wrong. Three views of one
+ * function, each complete about the thing it counted and silent about the
+ * rest.
  *
  * The extraction was too narrow rather than wrong, which is the more
  * dangerous kind: it produced a clean, plausible list of nineteen and nothing
