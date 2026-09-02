@@ -5039,6 +5039,18 @@ typedef struct {
  *   one Edit:                      the chat line
  *   one Panel, and FOUR Buttons:   start, ready, options, cancel
  *
+ * ONE FRAME SLOT IS USED FOR TWO UNRELATED THINGS, and espmap listing them
+ * together is what shows it. Slot +0x24 is written and read as an INTEGER
+ * inside the player loop, and later serves as an x87 divisor and multiplier
+ * at 0x00430D8D and 0x00430D94 -- `fild [eax+0x74]; fidiv [esp+0x24];
+ * fild [esp+0x24]; fmulp`, which is a round-to-a-multiple over a list's
+ * geometry. The two uses share nothing but the address.
+ *
+ * That is the argument-slot-reuse shape one level in: not an argument reused
+ * as a local, but a LOCAL reused for a different type. A reader who sees
+ * espmap group four addresses under one slot and assumes one variable will
+ * write an int where a float belongs.
+ *
  * THE SETTLED STRUCTURE, counted within the loop's own address bounds rather
  * than by any pattern: the player loop runs 0x430615..0x4308B4, 206
  * instructions, with FOUR allocations and FOUR AddChild calls in it -- so
