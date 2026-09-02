@@ -173,6 +173,11 @@ int32_t __cdecl CommEnumPlayers(void);
 /* Original: 0x004021A0, from CommConstruct. Bring the packet subsystem up:
  * four message lists, 400 buffers, two events and the packet thread. Named
  * from its own error string, "Error launching packet thread". */
+/* 0x00401F00. The thread StartPacketThread creates -- it calls itself the
+ * RECEIVE thread in its own log line. cdecl, not stdcall: the epilogue is a
+ * plain `ret`, and the parameter is never read. */
+int32_t __cdecl RecvThreadProc(void *param);
+
 int32_t __cdecl StartPacketThread(void);
 
 /* Original: 0x00401000. Clear a message list and give it a mutex. */

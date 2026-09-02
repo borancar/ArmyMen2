@@ -1569,6 +1569,135 @@ int32_t __cdecl MsgListInit(void *list)
     return l[0] != 0;
 }
 
+/* The neighbour RecvThreadProc hands each received node to; still original. */
+typedef int32_t (__cdecl *AM2_RecvMsgFn)(void *node);
+
+/* RecvThreadProc -- original 0x00401F00, 416 bytes, and the thread
+ * StartPacketThread below creates. It carried "the thread, stays original" in
+ * orig.h with NO reason beside it, which this project elsewhere calls out as
+ * meaning "not yet".
+ *
+ * IT CALLS ITSELF THE *RECEIVE* THREAD, in the one message it logs on the way
+ * out. The PACKET in ADDR_PACKET_THREAD_PROC's name came from its creator, not
+ * from itself -- naming from a call site, one level out. The macro keeps its
+ * name because the creator cluster shares it; this is named after the string.
+ *
+ * IT IS cdecl, NOT stdcall, and that is checked in the instruction rather than
+ * assumed: the epilogue is a plain `ret`, where a __stdcall thread proc with
+ * one parameter would be `ret 4`. CreateThread wants LPTHREAD_START_ROUTINE and
+ * gets a cdecl function; it survives because a thread's return unwinds nobody.
+ * Reproduced, since changing it would change the cast StartPacketThread makes.
+ * The parameter is never read.
+ *
+ * The shape is one wait and then an inner drain: wake on any of
+ * ADDR_PACKET_STATE handles, and keep receiving until the transport has nothing
+ * left, taking a fresh node from the pool for each packet. Handle 0 means quit.
+ *
+ * A NODE SURVIVES A FAILED RECEIVE. `msg` is only cleared after a packet is
+ * taken, so the node popped for a receive that finds nothing is still held on
+ * the next pass round the outer wait. That is what the `if (msg)` at the top of
+ * the drain is for, and it is why the pool is not drained by an idle link.
+ *
+ * THE EMPTY-POOL PATH TRIES TWICE AND LOGS BOTH TIMES. It pops, logs the result
+ * and the free count, pops again, logs again -- the second pop is not a retry
+ * loop, it is exactly one more attempt, and the message with five question
+ * marks in it says what the author thought of the situation. If it still has
+ * nothing it RECEIVES THE PACKET ANYWAY into a scratch buffer and throws it
+ * away, so the transport does not keep redelivering it, and tells the main
+ * thread with AM2_WM_NO_BUFFERS.
+ *
+ * The discard receive is handed three stack locals for the fields a real node
+ * would have supplied, and the size local is the one initialised to
+ * PACKET_BUFFER_BYTES at the top of the function -- so it is written once and
+ * reused, where the node path rewrites the node's own length each time.
+ *
+ * ON THE WAY OUT it logs and then waits on the SAME handle that woke it, with
+ * INFINITE. The events are auto-reset, so that blocks until whoever asked for
+ * the shutdown sets it again -- a handshake, not a hang, and it is why
+ * ab.sh quit sees this thread's line at all.
+ *
+ * MsgField12 is called on a LIST here, not on a node: a list header's +0x0C is
+ * MSGLIST_OFF_COUNT, which is what the two log lines print as the free count.
+ * The accessor is shared between the two structures. */
+int32_t __cdecl RecvThreadProc(void *param)
+{
+    DPID   from;
+    DPID   to;
+    DWORD  size = PACKET_BUFFER_BYTES;
+    void  *msg  = (void *)0;
+
+    (void)param;
+
+    for (;;) {
+        int32_t got = 0;
+
+        if (WaitForMultipleObjects(
+                (DWORD)*(const int32_t *)(uintptr_t)ADDR_PACKET_STATE,
+                (const HANDLE *)(uintptr_t)ADDR_PACKET_EVENT_A,
+                FALSE, INFINITE) == WAIT_OBJECT_0)
+            break;
+
+        for (;;) {
+            uint8_t *node;
+
+            if (!msg) {
+                msg = MsgListRemHead((void *)(uintptr_t)ADDR_MSG_LIST_POOL);
+                if (!msg) {
+                    orig_log((const char *)AM2_IMAGE(ADDR_FMT_RECV_NO_NODE),
+                             msg,
+                             MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL));
+                    msg = MsgListRemHead(
+                        (void *)(uintptr_t)ADDR_MSG_LIST_POOL);
+                    orig_log((const char *)AM2_IMAGE(ADDR_FMT_RECV_NOW_NODE),
+                             msg,
+                             MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL));
+                }
+            }
+
+            if (!msg) {
+                /* No node twice: take the packet and drop it. */
+                orig_log((const char *)AM2_IMAGE(ADDR_FMT_RECV_NO_BUFFERS),
+                         MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL),
+                         MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_B),
+                         MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ));
+                orig_log((const char *)AM2_IMAGE(ADDR_FMT_RECV_DUMPING));
+
+                CommReceive(*(void **)(uintptr_t)ADDR_COMM_OBJECT, &from, &to,
+                            1, (void *)(uintptr_t)ADDR_RECV_SCRATCH, &size);
+
+                PostMessageA(*(HWND *)(uintptr_t)ADDR_HWND,
+                             AM2_WM_NO_BUFFERS, 1, 0);
+                break;
+            }
+
+            node = (uint8_t *)msg;
+            *(DWORD *)(node + MSGNODE_OFF_BODY_LEN) = PACKET_BUFFER_BYTES;
+
+            if (!CommReceive(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                             (DPID *)(node + MSGNODE_OFF_FROM),
+                             (DPID *)(node + MSGNODE_OFF_TO),
+                             1,
+                             *(void **)(node + MSGNODE_OFF_BODY),
+                             (DWORD *)(node + MSGNODE_OFF_BODY_LEN)))
+                break;   /* nothing left -- the node is kept for next time */
+
+            if (!((AM2_RecvMsgFn)(uintptr_t)ADDR_RECV_MSG_4014C0)(msg))
+                MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_B, msg);
+
+            got = 1;
+            msg = (void *)0;
+        }
+
+        if (got)
+            PostMessageA(*(HWND *)(uintptr_t)ADDR_HWND,
+                         AM2_WM_PACKETS_READY, 0, 0);
+    }
+
+    orig_log((const char *)AM2_IMAGE(ADDR_STR_RECV_GOT_EVENT_0));
+    WaitForSingleObject(*(HANDLE *)(uintptr_t)ADDR_PACKET_EVENT_A, INFINITE);
+    return 0;
+}
+
 /* 0x00402170. Close a handle and forget it, along with two fields beside it.
  * Safe on a holder that never got one. */
 void __cdecl EventClose(void *holder)
@@ -1625,9 +1754,10 @@ void __cdecl PacketSlotReset(uint32_t slot);
     for (i = 0; i < 6; i++)
         PacketSlotReset(i);
 
+    /* The cast is the original's own mismatch: RecvThreadProc is cdecl and
+     * CreateThread wants stdcall. See its note. */
     g_packetThread = CreateThread(NULL, 0,
-                                  (LPTHREAD_START_ROUTINE)
-                                      (uintptr_t)ADDR_PACKET_THREAD_PROC,
+                                  (LPTHREAD_START_ROUTINE)RecvThreadProc,
                                   NULL, 0,
                                   (LPDWORD)(uintptr_t)ADDR_PACKET_THREAD_ID);
     if (!g_packetThread) {

@@ -9,8 +9,31 @@ Last updated: **2026-09-02**, at `969936a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,413 patches plus 3 REGISTERED = 1,416 reconstructed
+Nothing uncommitted. **1,413 patches plus 4 REGISTERED = 1,417 reconstructed
 addresses**, **30** analysis tools in `make check`.
+
+**`RecvThreadProc` (`0x00401F00`) is reconstructed** -- the thread
+`StartPacketThread` creates. It carried "the thread, stays original" in
+`orig.h` with **no reason beside it**, which this project elsewhere calls out as
+meaning "not yet".
+
+**It calls itself the RECEIVE thread**, in the one message it logs on the way
+out. The PACKET in `ADDR_PACKET_THREAD_PROC`'s name came from its creator, not
+from itself.
+
+**It is cdecl, not stdcall**, checked in the instruction rather than assumed:
+the epilogue is a plain `ret` where a `__stdcall` proc with one parameter would
+be `ret 4`. `CreateThread` wants `LPTHREAD_START_ROUTINE` and gets a cdecl
+function; it survives because a thread's return unwinds nobody.
+
+**And unlike almost everything else in this session, it is COMPARED.** The
+thread runs in every session, and `ab.sh quit`'s `.threaded` artifact -- the two
+racing thread lines, compared as a sorted set -- carries
+`" Receive thread got event 0 "` identically on both sides. So this ran, reached
+its shutdown handshake, and matched.
+
+REGISTERED rather than patched: its only reference is `StartPacketThread`'s
+`CreateThread` call and that is ours. Fourth such entry.
 
 **`PointerActionMode5` (`0x00458620`) is reconstructed**, finishing the three
 pointer-mode actions and the whole 0x00458400 entry.
@@ -377,8 +400,8 @@ This unit is why. 144 bytes of work moved the entry-generous byte figure by
 that holds **seventeen** functions and patching any one of them credits all of
 it. The same effect inflates the entry count.
 
-    entry-generous   1,221 of 1,239 entries, 89.9% of sub-CRT bytes
-    split-aware      1,372 of 1,530 real functions, 81.6% of sub-CRT bytes
+    entry-generous   1,222 of 1,239 entries, 90.7% of sub-CRT bytes
+    split-aware      1,373 of 1,530 real functions, 81.7% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -387,17 +410,17 @@ ceiling rather than a floor -- ten percentage points of ceiling, measured.
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,221 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 18
-outstanding, which is 1,239 minus 1,221 -- from 1,416 reconstructed addresses
-(1,413 patched plus 3 registered), and **89.9% of the sub-CRT bytes**.
-Split-aware that is **1,372 of 1,530** real functions and **81.6%** of the
+line (0x0045C000) patched**. Measured: **1,222 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 17
+outstanding, which is 1,239 minus 1,222 -- from 1,417 reconstructed addresses
+(1,413 patched plus 4 registered), and **90.7% of the sub-CRT bytes**.
+Split-aware that is **1,373 of 1,530** real functions and **81.7%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
 small ones in batches. A hundred and fifty-one batches have gone in and NOTHING SMALL IS LEFT among
-the ENTRIES: the 18 outstanding start at **1,120 bytes** -- `0x00434700` -- and
+the ENTRIES: the 17 outstanding start at **1,120 bytes** -- `0x00434700` -- and
 the median is **1,504**. That is not what is left, though: `tools/merges.py`
 splits them into real functions and the 0x00458930 entry alone still holds
 sixteen unwritten ones from 16 bytes up. Rank by real function, not by entry. The

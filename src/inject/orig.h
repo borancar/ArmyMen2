@@ -2745,7 +2745,34 @@
 #define ADDR_PACKET_EVENT_B2     0x004F48C0u
 #define ADDR_PACKET_STATE        0x004F877Cu  /* int32_t, set to 2 */
 #define ADDR_PACKET_SLOT_RESET   0x00402750u  /* void(int32_t), six times */
-#define ADDR_PACKET_THREAD_PROC  0x00401F00u  /* the thread, stays original */
+/* THE THREAD CALLS ITSELF THE *RECEIVE* THREAD, in the one message it logs on
+ * the way out: " Receive thread got event 0 ". The PACKET in this macro's name
+ * came from its creator -- StartPacketThread, ADDR_PACKET_THREAD -- rather than
+ * from itself, which is the naming-from-a-call-site shape one level out. The
+ * macro keeps its name because the creator cluster shares it; the
+ * reconstruction is RecvThreadProc, after the string.
+ *
+ * It carried "stays original" here with NO reason beside it, which this file
+ * elsewhere calls out as meaning "not yet". Reconstructed, and NOT patched:
+ * its only reference in the image is StartPacketThread's CreateThread call and
+ * that function is ours, so a detour would install a jump nothing reaches.
+ * Fourth entry in tools/coverage.py's REGISTERED, beside WndProc,
+ * AudioTimerProc and MedkitHealOne -- and the second of the four to be a
+ * callback handed to the OS rather than to the game. */
+#define ADDR_PACKET_THREAD_PROC  0x00401F00u  /* int32_t __cdecl(void *) */
+/* Its neighbour in the same entry, still original: RecvThreadProc hands it each
+ * received node and appends the node to ADDR_MSG_LIST_B when it answers 0.
+ * Placeholder -- nothing read so far says what it decides. */
+#define ADDR_RECV_MSG_4014C0     0x004014C0u  /* int32_t(void *node) */
+/* Where the drop path receives a packet it has no node for, so the transport
+ * does not keep re-delivering it. */
+#define ADDR_RECV_SCRATCH        0x004F8790u
+/* RecvThreadProc's four messages, all of them its own. */
+#define ADDR_FMT_RECV_NO_NODE    0x004737E8u /* " ????? m = %x  freelist..." */
+#define ADDR_FMT_RECV_NOW_NODE   0x004737C0u /* " ????? NOW m = %x ..." */
+#define ADDR_FMT_RECV_NO_BUFFERS 0x00473774u /* "No Recieve Buffers free..." */
+#define ADDR_FMT_RECV_DUMPING    0x0047374Cu /* "Dumping incoming message..." */
+#define ADDR_STR_RECV_GOT_EVENT_0 0x0047372Cu /* " Receive thread got event 0 " */
 #define ADDR_PACKET_THREAD_ID    0x004F8B90u  /* DWORD */
 #define ADDR_STR_THREAD_FAILED   0x0047384Cu  /* "Error launching packet thread" */
 #define ADDR_GAME_SRAND          0x00464416u  /* void(uint32_t) */
@@ -9403,6 +9430,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * its length. DumpMsgList's second number is the dword at +8 of the body, one
  * dereference further than the first, which is why "owner" looked plausible
  * from the dump alone. Name a field from the code that acts on it. */
+/* MSGNODE_OFF_FROM and _TO are already defined further down, with the delayed
+ * send path. They went in here a second time and the grep that should have
+ * come first caught it; RecvThreadProc confirms both, handing CommReceive
+ * &node[8] and &node[0xC] as its `from` and `to`. A LIST header's 0x08 and
+ * 0x0C are its tail and count -- different structure, same offsets. */
 #define MSGNODE_OFF_KEY            0x14u
 #define MSGNODE_OFF_BODY           0x20u
 #define MSGNODE_OFF_BODY_LEN       0x24u
