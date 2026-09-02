@@ -1050,6 +1050,15 @@
  * one array of structs. **Take a stride from the loop step, never from the
  * largest displacement in the body** -- the same rule that says to read a
  * table's bounds from the loop rather than from the data. */
+/* The two globals its debug-explosion arm reads, both with exactly ONE toucher
+ * -- which is the case this file calls "a table with one consumer is a table
+ * you cannot name", so both are placeholders. 0x004FD748 sits next to
+ * ADDR_OPT_PETER, ships as 0, and gates the arm; 0x00476FB4 sits next to
+ * ADDR_FOG_OF_WAR, ships as 0x79, and is the KIND that arm hands
+ * CreateExplosion. A developer switch and the explosion it drops, on the
+ * evidence of one use each. */
+#define ADDR_OPT_4FD748          0x004FD748u  /* int32_t, ships 0 */
+#define ADDR_DEBUG_BLAST_KIND    0x00476FB4u  /* int32_t, ships 0x79 */
 /* 0x00413E70, 1,280 bytes, one caller. SURVEYED AND NOT RECONSTRUCTED. The
  * per-frame mouse dispatch: it is what clears ADDR_POINTER_HOVER_UID at the top
  * of each frame and then runs the whole selection and pointer layer.
@@ -1068,9 +1077,15 @@
  * and 0x004FCF7C are ADDR_VIEW_RECT's top, right and bottom -- it is an
  * AM2_Rect -- and 0x0048546E and 0x004FCF6A are the high halves of the packed
  * points ADDR_CURSOR_POINT and ADDR_DRAG_ANCHOR. That leaves three genuinely
- * new: 0x004FD748 (next to ADDR_OPT_PETER, and it gates a CreateExplosion path
- * that looks like a developer switch), 0x00476FB4 (next to ADDR_FOG_OF_WAR, read
- * on that same path) and 0x004854A4 (among the mouse timing globals).
+ * new, and all three are named now: ADDR_OPT_4FD748 and ADDR_DEBUG_BLAST_KIND
+ * above, and ADDR_MOUSE_PRESS2_MS -- which turned out to be half of a SECOND
+ * press point/time pair, written beside the first by the same handler.
+ *
+ * THE FAN-OUT WALKS A CHAIN. ObjectsHitByPoint answers a list threaded through
+ * +0x68, and the loop tries each object against the slots in turn: SLOT0 while
+ * a leader flag is set, then SLOT3, then ADDR_POINTER_PICK -- the last only
+ * while an overlay has not already been claimed. A slot answering non-zero
+ * ends the walk and selects which of the trailing arms runs.
  *
  * The body is a dispatcher: refuse while a text field has focus or input is
  * suppressed; clear the hover uid; SelectionClick; turn the cursor into a world
@@ -10825,6 +10840,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * writer/reader pair; eleven sites touch it and naming it from any one of them
  * would have been the call-site mistake. */
 #define ADDR_MOUSE_PRESS_MS      0x0048549Cu  /* uint32_t, GetTickCount ticks */
+/* A SECOND press point and time, for the other button. The mouse handler at
+ * 0x00427003 writes this pair exactly as 0x00426FD8 writes the one above, and
+ * 0x00413E70 reads the time with a 200 ms window where the first pair's readers
+ * use AM2_CLICK_MS. Two pairs, two windows; named from the writer/reader pair
+ * the same way. */
+#define ADDR_MOUSE_PRESS2        0x004854A0u  /* packed point */
+#define ADDR_MOUSE_PRESS2_MS     0x004854A4u  /* uint32_t */
+#define AM2_DOUBLE_CLICK_MS      200
 /* The uid of the object the pointer is OVER, or 0. Cleared once a frame at
  * 0x00413E92, immediately before the mouse-selection interface runs, and set
  * by every pointer PICK that shows a hover overlay -- fourteen setters and one

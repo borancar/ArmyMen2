@@ -54,10 +54,23 @@ named ones: 0x004FCF74/78/7C are `ADDR_VIEW_RECT`'s top, right and bottom, and
 0x0048546E and 0x004FCF6A are the high halves of the packed points
 `ADDR_CURSOR_POINT` and `ADDR_DRAG_ANCHOR`. Only three are genuinely new.
 
-The body is a dispatcher that fans out through the pointer and weapon
-function-pointer slots -- which is where the whole band reconstructed this
-session is actually reached from. What it needs is a branch-by-branch
-transcription of about 320 instructions; the survey is in `orig.h`.
+**All three genuinely-new globals are named now.** `ADDR_MOUSE_PRESS2_MS`
+turned out to be half of a SECOND press point/time pair, written beside the
+first by the same handler at 0x00427003 -- and read here with a **200 ms**
+window where the first pair's readers use the 500 ms `AM2_CLICK_MS`. Two pairs,
+two windows. The other two have one toucher each, so they are placeholders:
+`ADDR_OPT_4FD748` gates a debug-explosion arm and ships as 0, and
+`ADDR_DEBUG_BLAST_KIND` is the kind that arm drops and ships as 0x79.
+
+**The fan-out walks a chain.** `ObjectsHitByPoint` answers a list threaded
+through +0x68, and the loop tries each object against the slots in turn --
+`SLOT0` while a leader flag is set, then `SLOT3`, then `ADDR_POINTER_PICK`, the
+last only while an overlay has not already been claimed. A slot answering
+non-zero ends the walk and selects which trailing arm runs. That is where the
+whole pointer band reconstructed this session is actually reached from.
+
+What remains is a branch-by-branch transcription of about 320 instructions; the
+survey and every name it needs are in `orig.h`.
 
 ## And the split-aware figure is a lower bound too
 
