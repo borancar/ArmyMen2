@@ -5991,7 +5991,7 @@ typedef struct {
  * which makes the multiplayer test beside it observably dead, since the arm
  * that avoids this global passes a literal zero instead. Named for its
  * address because nothing establishes a meaning; same standing as
- * MISSILE_OFF_FIELD_A8. */
+ * MISSILE_OFF_GROUND. */
 #define ADDR_UNUSED_662288       0x00662288u  /* int32_t, never written */
 /* 0x00435650, one caller -- and that caller is ADDR_DAMAGE_ITEM itself, so
  * the two are mutually recursive. Damage an item and then every item in the
@@ -8686,7 +8686,7 @@ typedef struct {
  *
  * FIELD_30 KEEPS A FIELD-NUMBERED NAME AND MAKES NO CLAIM: its one use is as
  * ObjAfterMove's third argument, and that function is still original, so a
- * name would be taken from a call site. Same standing as MISSILE_OFF_FIELD_A8.
+ * name would be taken from a call site. Same standing as MISSILE_OFF_GROUND.
  *
  * AND NOTHING IS ADDED AT 0x20. The list-record's third dword is copied from
  * there as a DWORD, which straddles DEF_OBJ_REC_OFF_DEPTH and the two bytes
@@ -13572,6 +13572,18 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * the strength of one more site. */
 #define MISSILEDEF_OFF_HEAL_PCT  0x20u
 #define MISSILEDEF_OFF_FIELD_0C  0x0Cu
+/* StepType5 reads three more of this record. +0x0C, already here, chooses
+ * between the arced arm and the flat one; +0x08 is the divisor its life is
+ * scaled by and the gate on flying at all; +0x10 is the range, compared
+ * against MISSILE_OFF_FLOWN.
+ *
+ * AND +0x20 IS HANDED TO CreateExplosion AS ITS `damage`, which is a second
+ * reading of MISSILEDEF_OFF_HEAL_PCT rather than a contradiction of it -- a
+ * healing missile is a negative damage, and this file already records that
+ * CreateExplosion's sixth argument is what the blast applies. The name stays;
+ * this is what uses it. */
+#define MISSILEDEF_OFF_LIFE      0x08u
+#define MISSILEDEF_OFF_RANGE     0x10u
 #define MISSILEDEF_OFF_FIELD_30  0x30u
 /* A weapon's own script-name index, used to look the name up in
  * ADDR_SCRIPT_NAMES and hand it to CreateWeapon. Zero or negative means no
@@ -13790,7 +13802,24 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MISSILE_OFF_FRAC_H       0x54u
 #define MISSILE_OFF_SPEED_SCALE  0xA4u  /* float, multiplies the step */
 #define MISSILE_OFF_DEF          0x94u  /* the def record StepType5 reads */
-#define MISSILE_OFF_FIELD_A8     0xA8u  /* = OBJ_OFF_CHAIN_UID's offset */
+#define MISSILE_OFF_SOURCE       0x98u  /* uid, into CreateExplosion's src */
+#define MISSILE_OFF_SCALED       0x9Cu  /* gates MISSILE_OFF_SPEED_SCALE */
+#define MISSILE_OFF_FLOWN        0xACu  /* units travelled, against the range */
+/* The flight is sub-stepped so a fast missile cannot tunnel: three units at a
+ * time, with a ShotStrike test after each. AM2_MISSILE_TRAIL_SPACING is the
+ * 18.0 that spaces a def-3 trail's segments. */
+#define AM2_MISSILE_SUBSTEP      3.0f
+#define AM2_MISSILE_TRAIL_SPACING 18.0f
+#define AM2_MISSILE_TRAIL_MS     0x42   /* between def-3 segments */
+#define AM2_MISSILE_SMOKE_MS     0x1E   /* between def-4/6 smoke puffs */
+/* THE GROUND UNDER THE MISSILE, and it was MISSILE_OFF_GROUND -- a name
+ * taken from the offset matching OBJ_OFF_CHAIN_UID's, which says nothing about
+ * what a missile keeps there. StepType5 is what uses it: the row's
+ * ROW_OFF_Y_ADJUST is `MISSILE_OFF_HEIGHT - this` every step, so the sprite
+ * rides that far above the terrain, and when the flight crosses onto ground
+ * that is higher the correction is added HERE rather than to the height -- the
+ * trajectory is untouched and only the reference moves. */
+#define MISSILE_OFF_GROUND       0xA8u
 #define MISSILE_OFF_NEXT_UID     0xB4u  /* the next segment of a def-3 trail */
 #define MISSILE_OFF_LAST_UID     0xD0u  /* on the WEAPON: last missile it made */
 /* NOT AM2_ROW_FIELD26_INIT, which is 0x3E8. LoadType5 stores that constant

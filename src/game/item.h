@@ -136,6 +136,12 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
                               uint32_t src, int32_t damage, int32_t delay,
                               int32_t unused, uint32_t uid, int32_t facing);
 
+/* 0x0043C110, one caller: a missile's per-frame flight. Sub-stepped three
+ * units at a time so a fast one cannot tunnel, fixed-point on all three axes,
+ * and an impact explosion chosen by the def kind through a thirty-entry table
+ * of which eighteen entries make nothing. */
+void __cdecl StepType5(void *obj);
+
 void __cdecl StepType6(void *obj);
 
 int32_t __cdecl CanPickUpWeapon(void *weapon, void *unit, int32_t *slot,

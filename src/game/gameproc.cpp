@@ -931,7 +931,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
                 (int16_t)at, (int16_t)(at >> 16),
                 (const void *)(uintptr_t)ADDR_ZERO_RECT);
 
-    *(int32_t *)(o + MISSILE_OFF_FIELD_A8) = a5;
+    *(int32_t *)(o + MISSILE_OFF_GROUND) = a5;
     *(int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST) = (int16_t)a5;
     *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
         *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;

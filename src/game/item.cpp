@@ -6255,7 +6255,6 @@ void __cdecl StepType8(void *obj)
 }
 
 typedef void (__cdecl *AM2_StepFn)(void *obj);typedef void (__cdecl *AM2_StepFn)(void *obj);
-#define orig_step_type5   ((AM2_StepFn)(uintptr_t)ADDR_STEP_TYPE5)
 
 /* Defined below, beside the rest of the object stepping. */
 void __cdecl StepType1And4(void *obj);
@@ -6333,7 +6332,7 @@ void __cdecl ObjFrameStep(void *obj)
     case 0: case 3: StepType1And4(obj);     break;   /* ours already */
     case 1:         StepType2(obj);         break;   /* ours now */
     case 2:         StepType3(obj);         break;   /* ours now */
-    case 4:         orig_step_type5(obj);   break;
+    case 4:         StepType5(obj);   break;
     case 5:         StepType6(obj);         break;   /* ours now */
     case 6:         ObjMarkIfOverdue(obj);  break;   /* ours already */
     default:        StepType8(obj);         break;
@@ -12373,6 +12372,343 @@ void __cdecl DamageItem(void *obj, int32_t amount, int32_t extra, int32_t kind,
     }
 }
 
+/* 0x00461F90 is above the CRT line and stays original -- the same typedef
+ * gameproc.cpp carries, and reached the same way so checkseams can see it. */
+typedef int32_t (__cdecl *AM2_TimedDirFrame5Fn)(void *rows, int32_t dir);
+#define orig_timed_dir_frame5 \
+    ((AM2_TimedDirFrame5Fn)(uintptr_t)AM2_IMAGE(ADDR_TIMED_DIR_FRAME))
+
+/* StepType5 -- original 0x0043C110, 1,504 bytes, one caller: a missile's
+ * per-frame flight. The record it walks is named in orig.h; read that first,
+ * because every offset here is overloaded with another object type's.
+ *
+ * IT SUB-STEPS SO A FAST MISSILE CANNOT TUNNEL. The frame's travel is computed
+ * once and then walked three units at a time, with a ShotStrike after each
+ * three, and the loop stops the moment ShotStrike answers anything but 6. A
+ * reading that moved the whole distance and tested once would look simpler and
+ * would let a rocket pass through a wall.
+ *
+ * THE HEIGHT IS FIXED-POINT AND SO ARE X AND Y. Three float remainders against
+ * three int16 coordinates: each axis accumulates, `_ftol`s, adds the integer
+ * part and subtracts it back out. The vertical one is the only one with an
+ * accelerating term -- gravity times the frame delta, subtracted from the
+ * vertical speed each step, and the height clamped at zero on the way down.
+ *
+ * TWO ARMS CHOOSE WHETHER IT ARCS, on the def's +0x0C, and they are not each
+ * other's negation: the arced arm applies gravity and clamps, while the flat
+ * arm first asks whether the vertical speed is non-zero at all and, if the
+ * height has already reached the floor, zeroes BOTH the height and the speed.
+ * So a flat missile that touches down stops falling; an arced one keeps its
+ * speed and only its height is clamped.
+ *
+ * THE DEF KIND PICKS THE IMPACT EXPLOSION THROUGH A THIRTY-ENTRY BYTE TABLE at
+ * 0x0043C6C4 into five arms, and EIGHTEEN of the thirty share the arm that
+ * makes nothing at all. The switch below was generated from a decode of that
+ * table, not from reading the arms in order -- which is what this project's
+ * DirectCollect note demands and what its WeaponClassOf note explains: the
+ * arms are laid out 1, 2, 4, 5, 3 and reading them top to bottom mis-assigns
+ * four of the five.
+ *
+ * AND THE GROUND FOLLOWS THE MISSILE. MISSILE_OFF_GROUND is what the row's
+ * ROW_OFF_Y_ADJUST is measured from, and when the flight dips below the
+ * terrain the correction is added to THAT rather than to the height -- so the
+ * missile keeps its trajectory and the sprite stops sinking. */
+void __cdecl StepType5(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *def;
+    uint8_t *rows;
+    int32_t  outcome = 6;
+    int32_t  speed;
+    int32_t  strike = 1;
+    float    travel;
+
+    if (!o)
+        return;
+    def = *(uint8_t *const *)(o + MISSILE_OFF_DEF);
+    if (!def)
+        return;
+    if (!*(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
+        return;
+
+    speed = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
+
+    if (*(const int32_t *)(def + MISSILEDEF_OFF_FIELD_0C)) {
+        /* Arced: gravity, and the height floors without stopping the fall. */
+        if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) > 0) {
+            float f = *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
+                          * *(const float *)(o + MISSILE_OFF_VZ)
+                      + *(const float *)(o + MISSILE_OFF_FRAC_H);
+            int32_t n = (int32_t)f;
+
+            *(int16_t *)(o + MISSILE_OFF_HEIGHT) += (int16_t)n;
+            *(float *)(o + MISSILE_OFF_FRAC_H) = f - (float)n;
+            if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) < 0)
+                *(int16_t *)(o + MISSILE_OFF_HEIGHT) = 0;
+            *(float *)(o + MISSILE_OFF_VZ) -=
+                *(const float *)(uintptr_t)ADDR_GRAVITY
+                * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC;
+        } else {
+            *(int16_t *)(o + MISSILE_OFF_HEIGHT) = 0;
+        }
+    } else if (*(const float *)(o + MISSILE_OFF_VZ)
+               != *(const float *)(uintptr_t)ADDR_FLOAT_ZERO) {
+        if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) > 0) {
+            float f = *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
+                          * *(const float *)(o + MISSILE_OFF_VZ)
+                      + *(const float *)(o + MISSILE_OFF_FRAC_H);
+            int32_t n = (int32_t)f;
+
+            *(int16_t *)(o + MISSILE_OFF_HEIGHT) += (int16_t)n;
+            *(float *)(o + MISSILE_OFF_FRAC_H) = f - (float)n;
+            if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) < 0)
+                *(int16_t *)(o + MISSILE_OFF_HEIGHT) = 0;
+        } else {
+            /* Flat and on the floor: it stops falling as well as sinking. */
+            *(int16_t *)(o + MISSILE_OFF_HEIGHT) = 0;
+            *(float *)(o + MISSILE_OFF_VZ)       = 0.0f;
+        }
+    }
+
+    if (!*(const int32_t *)(def + MISSILEDEF_OFF_LIFE))
+        goto after_flight;
+
+    {
+        int32_t life = *(const int32_t *)(o + OBJ_OFF_FIELD_44)
+                       + *(const int32_t *)(def + MISSILEDEF_OFF_LIFE);
+
+        /* Past twenty, the speed is scaled by how far through its life it is.
+         * The divisor is the def's, so a longer-lived missile slows less. */
+        if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > 0x14)
+            speed = speed * life / *(const int32_t *)(def + MISSILEDEF_OFF_LIFE);
+
+        travel = (float)life;
+        if (*(const int32_t *)(o + MISSILE_OFF_SCALED))
+            travel *= *(const float *)(o + MISSILE_OFF_SPEED_SCALE);
+        travel *= *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC;
+    }
+
+    if (*(const int32_t *)def == 3) {
+        /* A trail lays a segment every AM2_MISSILE_TRAIL_MS; between segments
+         * it flies without testing for a strike at all. */
+        uint32_t due = *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58);
+
+        if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS - due
+            < AM2_MISSILE_TRAIL_MS) {
+            strike  = 0;
+            outcome = 6;
+        } else {
+            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
+                due + AM2_MISSILE_TRAIL_MS;
+        }
+    }
+
+    while (travel > 0.0) {
+        float   d = travel < AM2_MISSILE_SUBSTEP ? travel
+                                                 : AM2_MISSILE_SUBSTEP;
+        float   fx, fy;
+        int32_t nx, ny;
+
+        fx = Cos8(*(const uint8_t *)(o + OBJ_OFF_FACING)) * d
+             + *(const float *)(o + MISSILE_OFF_FRAC_X);
+        fy = Sin8(*(const uint8_t *)(o + OBJ_OFF_FACING)) * d
+             + *(const float *)(o + MISSILE_OFF_FRAC_Y);
+        nx = (int32_t)fx;
+        ny = (int32_t)fy;
+        *(int16_t *)(o + OBJ_OFF_POS)     += (int16_t)nx;
+        *(int16_t *)(o + OBJ_OFF_POS + 2) += (int16_t)ny;
+        *(float *)(o + MISSILE_OFF_FRAC_X) = fx - (float)nx;
+        *(float *)(o + MISSILE_OFF_FRAC_Y) = fy - (float)ny;
+
+        *(int32_t *)(o + MISSILE_OFF_FLOWN) += (int32_t)d;
+
+        if (strike) {
+            outcome = ShotStrike(o, *(const uint32_t *)(o + OBJ_OFF_POS),
+                                 *(const int16_t *)(o + MISSILE_OFF_HEIGHT));
+            if (outcome != 6)
+                break;
+        }
+        travel -= AM2_MISSILE_SUBSTEP;
+    }
+
+after_flight:
+    def  = *(uint8_t *const *)(o + MISSILE_OFF_DEF);
+    rows = *(uint8_t *const *)(o + OBJ_OFF_ROWS);
+
+    switch (*(const int32_t *)def) {
+    case 3:
+        /* A def-3 trail chases the segment in front of it: TimedDirFrame
+         * decides whether it still has a frame to show, and if the segment
+         * ahead is more than 0x14 away and less than a second old, this one
+         * jumps to a point 18 units off it on a random spread. */
+        if (!orig_timed_dir_frame5(rows,
+                                   *(const uint8_t *)(o + OBJ_OFF_FACING)))
+            outcome = 4;
+        if (*(const uint32_t *)(o + MISSILE_OFF_NEXT_UID)) {
+            uint8_t *ahead = (uint8_t *)LookupByUID(
+                *(const uint32_t *)(o + MISSILE_OFF_NEXT_UID));
+
+            if (!ahead) {
+                *(uint32_t *)(o + MISSILE_OFF_NEXT_UID) = 0;
+            } else if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                                  (const AM2_Point *)(ahead + OBJ_OFF_POS))
+                           > 0x14
+                       && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                              - *(const uint32_t *)(rows + 0x54) < 0x3E8) {
+                uint8_t spread;
+
+                /* The spread leans AWAY from the turn: a negative delta takes
+                 * two off, a non-negative one adds two, and the random part is
+                 * `orig_game_rand() % 6` either way. */
+                if (AngleDelta(*(const uint8_t *)(ahead + OBJ_OFF_FACING),
+                               *(const uint8_t *)(o + OBJ_OFF_FACING)) < 0)
+                    spread = (uint8_t)(*(const uint8_t *)(ahead
+                                                          + OBJ_OFF_FACING)
+                                       - (uint8_t)(orig_game_rand() % 6) - 2);
+                else
+                    spread = (uint8_t)((uint8_t)(orig_game_rand() % 6)
+                                       + *(const uint8_t *)(ahead
+                                                            + OBJ_OFF_FACING)
+                                       + 2);
+
+                *(int16_t *)(o + OBJ_OFF_POS) = (int16_t)(int32_t)(
+                    Cos8(spread) * AM2_MISSILE_TRAIL_SPACING
+                    + (float)*(const int16_t *)(ahead + OBJ_OFF_POS));
+                *(int16_t *)(o + OBJ_OFF_POS + 2) = (int16_t)(int32_t)(
+                    Sin8(spread) * AM2_MISSILE_TRAIL_SPACING
+                    + (float)*(const int16_t *)(ahead + OBJ_OFF_POS + 2));
+                *(o + OBJ_OFF_FACING) = *(const uint8_t *)(ahead
+                                                           + OBJ_OFF_FACING);
+            }
+        }
+        break;
+
+    case 4:
+    case 6: {
+        /* Smoke, every AM2_MISSILE_SMOKE_MS, alternating two kinds on the
+         * clock rather than on a roll -- `clock % 5 < 3`. */
+        uint32_t now = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+        if (now - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
+            > AM2_MISSILE_SMOKE_MS) {
+            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) = now;
+            CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
+                            *(const int16_t *)(o + OBJ_OFF_POS + 2),
+                            (now % 5) < 3 ? 0x92 : 0x79,
+                            -1, 0, 0, 0, 0, 0, 0);
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    /* The row rides MISSILE_OFF_GROUND, not the ground under it. */
+    *(uint32_t *)(rows + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
+    *(int16_t *)(rows + ROW_OFF_Y_ADJUST) =
+        (int16_t)(*(const int16_t *)(o + MISSILE_OFF_HEIGHT)
+                  - *(const int16_t *)(o + MISSILE_OFF_GROUND));
+    RowUpdate(rows, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+    ObjTileChanged(o, *(const int16_t *)(o + MISSILE_OFF_HEIGHT), 0);
+
+    /* Crossed onto open ground from blocked: lift the whole flight so the
+     * missile clears the new terrain, and move the GROUND with it rather than
+     * the height, so the trajectory is untouched. */
+    if ((int32_t)*(const uint16_t *)(o + OBJ_OFF_TILE)
+        != *(const int32_t *)(o + OBJ_OFF_PREV_TILE)) {
+        const uint8_t *flags = *(const uint8_t *const *)(uintptr_t)
+                                   ADDR_TILE_FLAGS;
+
+        if ((flags[*(const int32_t *)(o + OBJ_OFF_PREV_TILE)] & AM2_TILE_OPEN)
+            && !(flags[*(const uint16_t *)(o + OBJ_OFF_TILE)]
+                 & AM2_TILE_OPEN)) {
+            int32_t want = (int8_t)HeightAtPoint(
+                               *(const uint32_t *)(o + OBJ_OFF_POS))
+                           + AM2_SIGHT_OVERHEAD;
+
+            if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) < (int16_t)want) {
+                *(int32_t *)(o + MISSILE_OFF_GROUND) +=
+                    want - *(const int16_t *)(o + MISSILE_OFF_HEIGHT);
+                *(int16_t *)(o + MISSILE_OFF_HEIGHT) = (int16_t)want;
+            }
+        }
+    }
+
+    if (outcome >= 5) {
+        if (!*(const int32_t *)(*(uint8_t *const *)(o + MISSILE_OFF_DEF)
+                                + MISSILEDEF_OFF_FIELD_0C)
+            && *(const int32_t *)(o + MISSILE_OFF_FLOWN) > speed)
+            goto expire;
+        if (outcome != 5)
+            return;
+        CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
+                        *(const int16_t *)(o + OBJ_OFF_POS + 2), 0x90, 4,
+                        0, 0, 0, 0, 0, 0);
+        goto gone;
+    }
+
+expire:
+    /* The impact, by def kind. Generated from the byte table -- see above. */
+    switch (*(const int32_t *)(*(uint8_t *const *)(o + MISSILE_OFF_DEF))) {
+    case 1: case 7: case 8: case 9: case 10: case 21: case 29: case 30:
+        CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
+                        *(const int16_t *)(o + OBJ_OFF_POS + 2), 0x7B,
+                        (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY),
+                        *(const uint32_t *)(o + MISSILE_OFF_SOURCE),
+                        0, 0, 0, 0,
+                        (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
+                                  + 0x80));
+        break;
+    case 4: case 6:
+        CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
+                        *(const int16_t *)(o + OBJ_OFF_POS + 2), 0x94,
+                        (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY),
+                        *(const uint32_t *)(o + MISSILE_OFF_SOURCE),
+                        *(const int32_t *)(*(uint8_t *const *)(
+                                               o + MISSILE_OFF_DEF) + MISSILEDEF_OFF_HEAL_PCT),
+                        0, 0, 0,
+                        (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
+                                  + 0x80));
+        break;
+    case 2:
+        CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
+                        (int16_t)(*(const int16_t *)(o + OBJ_OFF_POS + 2)
+                                  - *(const int16_t *)(o
+                                                       + MISSILE_OFF_HEIGHT)
+                                  + *(const int32_t *)(o
+                                                       + MISSILE_OFF_GROUND)),
+                        0x8C, (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY),
+                        *(const uint32_t *)(o + MISSILE_OFF_SOURCE),
+                        *(const int32_t *)(*(uint8_t *const *)(
+                                               o + MISSILE_OFF_DEF) + MISSILEDEF_OFF_HEAL_PCT),
+                        0, 0, 0,
+                        (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
+                                  + 0x80));
+        break;
+    case 5:
+        CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
+                        (int16_t)(*(const int16_t *)(o + OBJ_OFF_POS + 2)
+                                  - *(const int16_t *)(o
+                                                       + MISSILE_OFF_HEIGHT)
+                                  + *(const int32_t *)(o
+                                                       + MISSILE_OFF_GROUND)),
+                        0x81, (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY),
+                        *(const uint32_t *)(o + MISSILE_OFF_SOURCE),
+                        *(const int32_t *)(*(uint8_t *const *)(
+                                               o + MISSILE_OFF_DEF) + MISSILEDEF_OFF_HEAL_PCT),
+                        0, 0, 0,
+                        (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
+                                  + 0x80));
+        break;
+    default:
+        /* Eighteen of the thirty kinds land here and make nothing. */
+        break;
+    }
+
+gone:
+    *(int32_t *)(o + OBJ_OFF_FLAGS) |= 2;
+}
+
 /* TrooperPickupItem -- original 0x00448540, one caller, and it NAMES ITSELF
  * twice: "TrooperPickupItem %x" and "TrooperPickupItem 2 %x". The third and
  * last of the pickup family, after TrooperRemotePickupItem and
@@ -12868,6 +13204,7 @@ void item_install(void)
     patch_replace(ADDR_OBJECTS_HIT_BY_POINT, (const void *)ObjectsHitByPoint,
                   "ObjectsHitByPoint", 5);
     patch_replace(ADDR_STEP_TYPE6, (const void *)StepType6, "StepType6", 1);
+    patch_replace(ADDR_STEP_TYPE5, (const void *)StepType5, "StepType5", 1);
     patch_replace(ADDR_CREATE_TROOPER, (const void *)CreateTrooper,
                   "CreateTrooper", 1);
     patch_replace(ADDR_CREATE_VEHICLE, (const void *)CreateVehicle,

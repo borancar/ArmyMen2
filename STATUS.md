@@ -95,8 +95,8 @@ because `0x00458A20` sits inside a 5,760-byte `functions.tsv` entry that holds
 **seventeen** functions and patching any one of them credits all of it. The
 same effect inflates the entry count.
 
-    entry-generous   1,231 of 1,239 entries, 93.9% of sub-CRT bytes
-    split-aware      1,382 of 1,530 real functions, 85.0% of sub-CRT bytes
+    entry-generous   1,232 of 1,239 entries, 94.3% of sub-CRT bytes
+    split-aware      1,383 of 1,530 real functions, 85.4% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -296,43 +296,51 @@ Both thunks in `gameproc.cpp` that forwarded three `int32_t`s to these
 addresses now call them by name; their prototypes predate the targets having a
 shape, so the casts are at the call and the comment says why.
 
-## Next: StepType5, surveyed
+## StepType5 -- the missile's flight
 
-`0x0043C110`, 1,504 bytes, the missile step -- and the first thing left that is
-not AI. All thirteen callees are named; the cost is the RECORD, which had two
-fields named out of about fifteen.
+`0x0043C110`, 1,504 bytes. Entries 1,231 -> 1,232 of 1,239, **7 left**.
+`ab.sh bootcamp campaign` clean -- no-regression; missiles need combat and no
+drive here reaches it.
 
-**Three sub-unit remainders against three integer coordinates settle the whole
-group.** Each step computes `Cos8(facing) * speed` into +0x4C, `Sin8(facing) *
-speed` into +0x50 and the vertical speed times the frame delta into +0x54; then
-`_ftol`s each, adds the integer part to the position's x, its y and +0x42, and
-subtracts what it took back out of the remainder. So +0x42 is a third
-coordinate and +0x4C..+0x54 are its three fractional parts. A float triple
-tiling against an integer triple is better evidence than any one of the six
-alone.
+**It sub-steps so a fast missile cannot tunnel.** The frame's travel is
+computed once and walked three units at a time, with a `ShotStrike` after each
+three, stopping the moment `ShotStrike` answers anything but 6. Moving the whole
+distance and testing once would read simpler and would let a rocket pass
+through a wall.
 
-+0x48 is the vertical speed, and the only field with an accelerating term: the
-arced arm subtracts gravity times the frame delta every step and clamps the
-height at zero; the flat arm compares it against zero once and leaves it.
+**Two arms choose whether it arcs, and they are not each other's negation.**
+The arced arm applies gravity and clamps the height at zero; the flat arm first
+asks whether the vertical speed is non-zero at all, and if the height has
+already reached the floor it zeroes *both* the height and the speed. So a flat
+missile that touches down stops falling; an arced one keeps its speed.
 
-**Every one of these offsets is overloaded** -- `OBJ_OFF_ROW0_Y_ADJUST`,
-`SIGHTC_` and `BLAST_` names all sit at these numbers for other types -- so the
-`MISSILE_` prefix is doing real work rather than tidying.
+**Thirty def kinds, five arms, eighteen of them making nothing.** The impact
+switch was generated from a decode of the byte table at `0x0043C6C4` -- the
+arms are laid out 1, 2, 4, 5, 3, so reading them top to bottom mis-assigns four
+of the five.
+
+`MISSILE_OFF_FIELD_A8` is renamed `MISSILE_OFF_GROUND`. The old name came from
+the offset matching `OBJ_OFF_CHAIN_UID`'s, which says nothing; this function
+measures the row's `ROW_OFF_Y_ADJUST` from it every step, and when the flight
+crosses onto higher ground the correction goes *there* rather than into the
+height -- the trajectory is untouched and only the reference moves.
+`CreateMissile` writes the launch height into it, which is the writer
+confirming the reader.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,231 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 8
-outstanding, which is 1,239 minus 1,231 -- from 1,427 reconstructed addresses
-(1,423 patched plus 4 registered), and **93.9% of the sub-CRT bytes**.
-Split-aware that is **1,382 of 1,530** real functions and **85.0%** of the
+line (0x0045C000) patched**. Measured: **1,232 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 7
+outstanding, which is 1,239 minus 1,232 -- from 1,428 reconstructed addresses
+(1,424 patched plus 4 registered), and **94.3% of the sub-CRT bytes**.
+Split-aware that is **1,383 of 1,530** real functions and **85.4%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
 small ones in batches. A hundred and fifty-one batches have gone in and NOTHING SMALL IS LEFT among
-the ENTRIES: the 8 outstanding start at **1,504 bytes** -- `0x0043C110` -- and
+the ENTRIES: the 7 outstanding start at **1,888 bytes** -- `0x00403B40` -- and
 the median is **2,080**. That is not what is left, though: `tools/merges.py`
 splits them into real functions and the 0x00458930 entry alone still holds
 sixteen unwritten ones from 16 bytes up. Rank by real function, not by entry. The
