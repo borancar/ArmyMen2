@@ -89,4 +89,10 @@ void __cdecl AddVehicleDef(const void *rec);
  * sibling -- 0.868 -- differing only in what the record size implies. */
 void __cdecl AddMissileDef(const void *rec);
 
+/* 0x0045EBF0 and 0x004602C0. Binary-search the vehicle and missile def
+ * tables by id. Each is the FIRST function in a merged functions.tsv entry;
+ * the rest of each entry is a keyword parser. */
+void *__cdecl VehicleDefFind(int32_t id);
+void *__cdecl MissileDefFind(int32_t id);
+
 #endif /* AM2_DEFINFO_H */

@@ -3,6 +3,8 @@
 #include <string.h>
 
 #include "definfo.h"
+#include "misc.h"    /* CompareDword -- reconstructed, and what these
+                        tables are sorted with */
 #include "crt.h"      /* am2_strtok -- the shared tokeniser cursor */
 #include "image.h"
 #include "../inject/orig.h"
@@ -22,7 +24,7 @@ typedef void    (__cdecl *AM2_VoidFn)(void);
 
 /* 0x0045EDF0 is FreeVehicleDefs now; definfo.h declares it. */
 /* 0x004607D0 is FreeMissileDefs now; definfo.h declares it. */
-#define orig_missile_def_find  ((AM2_DefFindFn)AM2_IMAGE(ADDR_MISSILE_DEF_FIND))
+/* MissileDefFind is reconstructed below; declared in definfo.h. */
 #define orig_log_noargs        ((AM2_VoidFn)(uintptr_t)ADDR_LOG)
 
 /* strtol reached through the game's own thunk. Unlike strtok, nothing here
@@ -342,7 +344,7 @@ void __cdecl LoadDefTables(void)
         const uint8_t *src;
 
         memset(dst, 0, AM2_MISSILE_DEF_BYTES);
-        src = (const uint8_t *)orig_missile_def_find(id);
+        src = (const uint8_t *)MissileDefFind(id);
         if (src == 0)
             continue;
 
@@ -428,6 +430,10 @@ int definfo_install(void)
                         "AddVehicleDef", 1);
     rc |= patch_replace(ADDR_ADD_MISSILE_DEF, (const void *)AddMissileDef,
                         "AddMissileDef", 1);
+    rc |= patch_replace(ADDR_VEHICLE_DEF_FIND, (const void *)VehicleDefFind,
+                        "VehicleDefFind", 1);
+    rc |= patch_replace(ADDR_MISSILE_DEF_FIND, (const void *)MissileDefFind,
+                        "MissileDefFind", 1);
     return rc;
 }
 
@@ -563,4 +569,59 @@ void __cdecl AddMissileDef(const void *rec)
             ((const int32_t *)rec)[i];
 
     *(int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT = n + 1;
+}
+
+/* The image's bsearch and the dword comparator both def-find uses. Neither is
+ * ours: bsearch is CRT. The COMPARATOR is -- CompareDword in misc.cpp -- and
+ * it is the same one DefSortMissileRecs sorts these tables with, so the sort
+ * and the search agree by construction, which is what makes a binary search
+ * over them legitimate at all. Passed by name; reaching it through
+ * AM2_IMAGE(ADDR_COMPARE_DWORD) would be a seam into our own code, and
+ * checkseams said so. */
+#define orig_bsearch ((AM2_BsearchFn)AM2_IMAGE(ADDR_CRT_BSEARCH))
+
+/* VehicleDefFind -- original 0x0045EBF0, two callers. Binary-search the
+ * vehicle def table for a record whose first dword is `id`, or NULL.
+ *
+ * ITS ENTRY IN functions.tsv IS TWO FUNCTIONS. The 512 bytes at this address
+ * are this fourteen-instruction search and then a separate keyword parser at
+ * 0x0045EC20 -- which is why the entry's callee list mixes bsearch with
+ * strtok and AddVehicleDef and reads as one function doing both. The merged
+ * entry is the documented case; tools/merges.py exists for it.
+ *
+ * THE KEY IS PASSED BY ADDRESS, and the address is of a LOCAL the function
+ * writes the id into -- `mov [esp+4], eax` then `lea eax,[esp+0xc]`. bsearch
+ * compares key against each record with ADDR_COMPARE_DWORD, so what it needs
+ * is a pointer to a dword holding the id, not the id. Passing the id itself
+ * would compile and would search for whatever lies at that address.
+ *
+ * The record size is AM2_VEHICLE_DEF_REC_SIZE, the same 0x24 AddVehicleDef
+ * appends and DefFreeTables frees -- three functions agreeing on it. */
+void *__cdecl VehicleDefFind(int32_t id)
+{
+    int32_t key = id;
+
+    return orig_bsearch(&key,
+                        *(void *const *)(uintptr_t)ADDR_VEHICLE_DEFS,
+                        (size_t)*(const int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT,
+                        AM2_VEHICLE_DEF_REC_SIZE,
+                        (const void *)CompareDword);
+}
+
+/* MissileDefFind -- original 0x004602C0, two callers, one of them MedkitHeal.
+ * The same search over the missile def table, and the same merged entry: the
+ * 1296 bytes here are this and a much larger keyword parser after it.
+ *
+ * Identical to VehicleDefFind but for the three constants, which is what the
+ * append pair already showed for these two tables -- the record size is the
+ * only thing that ever differs between them. */
+void *__cdecl MissileDefFind(int32_t id)
+{
+    int32_t key = id;
+
+    return orig_bsearch(&key,
+                        *(void *const *)(uintptr_t)ADDR_DEF_MISSILE_RECS,
+                        (size_t)*(const int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT,
+                        AM2_MISSILE_DEF_REC_SIZE,
+                        (const void *)CompareDword);
 }

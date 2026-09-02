@@ -367,8 +367,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
                             int32_t table, int32_t army, int32_t flags,
                             int32_t remote, uint32_t uid, int32_t facing);
 
-typedef void *(__cdecl *AM2_VehicleDefFindFn)(int32_t kind);
-#define VehicleDefFind (*(AM2_VehicleDefFindFn)AM2_IMAGE(ADDR_VEHICLE_DEF_FIND))
+/* VehicleDefFind is reconstructed; definfo.h declares it. */
 
 /* 0x00447620, and formerly deferred. Make a type-2 TROOPER. Answers null when
  * a network session refuses a local creation for an army this machine must not

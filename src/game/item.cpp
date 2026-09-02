@@ -4733,7 +4733,7 @@ void __cdecl MedkitHealOne(void *obj)
     if (*(const int32_t *)obj != AM2_OBJ_TYPE_TROOPER)
         return;
 
-    def = (const uint8_t *)((AM2_DefFindFn)AM2_IMAGE(ADDR_MISSILE_DEF_FIND))(
+    def = (const uint8_t *)MissileDefFind(
               AM2_ITEM_KIND_MEDKIT);
 
     HealObject(obj, *(const int32_t *)(def + MISSILEDEF_OFF_HEAL_PCT),
