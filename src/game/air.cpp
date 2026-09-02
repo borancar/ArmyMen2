@@ -1857,6 +1857,7 @@ static void FlowRetireThrough(uint8_t *flow, uint32_t ackedThrough,
  * types in transitively and tools/checksplit.py would fail this file --
  * correctly, since nothing here talks to an API. */
 extern "C" void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst);
+extern "C" void __cdecl DumpMsgList(void *list);
 int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
                                            uint32_t flags, void *buf,
                                            uint32_t len);
@@ -1938,6 +1939,131 @@ static int32_t FlowRecvNack(uint8_t *node, uint8_t *msg, uint8_t *sender,
         resent++;
         MsgListSetFlag((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ,
                        (int32_t)seq, 0, (int32_t)mask);
+    }
+
+    return 0;
+}
+
+/* The AM2_FLOW_DATA arm: an incoming sequenced message.
+ *
+ * It validates, joins if this is first contact, retires the send queue from
+ * the ack this message carries, and then decides whether to deliver it.
+ *
+ * TWO JOIN PATHS, and they are not alternatives to a normal case -- they are
+ * how a flow ever starts. Both end up doing the same thing, adopting the
+ * peer's numbering by writing `NEXT_EXPECTED = seq - 1`, so neither rejects
+ * a peer for being at an unexpected sequence. The first fires when our own
+ * sequence is still 1, our next-expected is 0 and the flow is not ready, and
+ * ONLY when we are not the host -- which is why its string says "Starting
+ * Slave Session". COMM_OFF_IS_HOST and that wording were established
+ * separately and agree, which is what makes this reading better than
+ * plausible. */
+static int32_t FlowRecvData(uint8_t *node, uint8_t *msg, uint8_t *sender,
+                            uint8_t *me, uint32_t mask, uint32_t from)
+{
+    const uint8_t *comm = (const uint8_t *)
+        *(void *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    uint32_t seq = *(const uint32_t *)(msg + PACKET_OFF_SEQ);
+    uint32_t expected = *(uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) + 1;
+    uint32_t now;
+
+    if (seq < AM2_FLOW_TRACE_FIRST)
+        am2_log((const char *)AM2_IMAGE(ADDR_STR_RECEIVED_SEQ),
+                seq, expected, from,
+                *(const uint32_t *)(sender + FLOW_OFF_HE_HAS));
+
+    /* A corrupt message is DROPPED, not queued -- hence the 1. */
+    if (XorChecksum(msg) != 0) {
+        am2_log((const char *)AM2_IMAGE(ADDR_STR_BAD_CHECKSUM),
+                seq, *(const uint32_t *)(msg + PACKET_OFF_CHECKSUM));
+        *(uint32_t *)(sender + FLOW_OFF_BAD_CHECKSUMS) += 1;
+        return 1;
+    }
+
+    if (*(const uint32_t *)(me + FLOW_OFF_SEQUENCE) == 1 && expected == 1
+        && *(const uint32_t *)(me + FLOW_OFF_READY) == 0) {
+        if (*(const int32_t *)(comm + COMM_OFF_IS_HOST) == 0) {
+            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                am2_log((const char *)AM2_IMAGE(ADDR_STR_SLAVE_SESSION),
+                        from, seq,
+                        *(const uint32_t *)(sender + FLOW_OFF_HE_HAS),
+                        expected - 1,
+                        *(const uint32_t *)(me + FLOW_OFF_READY));
+            *(uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) = seq - 1;
+            expected = seq;
+            *(uint32_t *)(me + FLOW_OFF_READY) = 1;
+            *(uint32_t *)(me + FLOW_OFF_READY_AT) = orig_get_tick_count();
+            /* A SECOND read, deliberately: this one has half a round trip
+             * taken off it, so it estimates the PEER's clock base rather
+             * than being a local timestamp. Collapsing the two calls into
+             * one variable would be wrong though they read the same ms.
+             * +0x68 has one toucher in this image and stays unnamed. */
+            *(uint32_t *)(me + FLOW_OFF_PEER_CLOCK) =
+                orig_get_tick_count() - (*(const uint32_t *)(me + 0x68) >> 1);
+        }
+    } else if (*(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) == 0) {
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            am2_log((const char *)AM2_IMAGE(ADDR_STR_FIRST_MESSAGE),
+                    from, seq);
+        *(uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) = seq - 1;
+        expected = seq;
+    }
+
+    *(uint32_t *)(sender + FLOW_OFF_RECV_PACKETS) += 1;
+    *(uint32_t *)(sender + FLOW_OFF_RECV_BYTES) +=
+        *(const uint32_t *)(msg + PACKET_OFF_LEN);
+    now = orig_get_tick_count();
+    *(uint32_t *)(sender + FLOW_OFF_RECV_AT) = now;
+
+    /* A JOIN-TIME FILTER, not a window check: both halves matter, and past
+     * sequence 10 nothing is dropped for being far ahead. */
+    if (expected < 10 && seq > expected && seq - expected > 50) {
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            am2_log((const char *)AM2_IMAGE(ADDR_STR_RESIDUAL_MSG),
+                    from, expected, seq, from,
+                    *(const uint32_t *)(msg + PACKET_OFF_ACK));
+        return 1;
+    }
+
+    /* The piggybacked ack. EVERY DATA MESSAGE CARRIES ONE, which is why this
+     * arm does the same send-queue retirement the PULSE ACK arm does -- and
+     * why the loop is written out twice in the original. */
+    {
+        uint32_t acked = *(const uint32_t *)(msg + PACKET_OFF_ACK);
+        uint32_t heHas = *(const uint32_t *)(sender + FLOW_OFF_HE_HAS);
+
+        if (acked > heHas
+            && acked < *(const uint32_t *)(me + FLOW_OFF_SEQUENCE)) {
+            if (seq == 1 && *(const int32_t *)(comm + COMM_OFF_VERBOSE)) {
+                am2_log((const char *)AM2_IMAGE(ADDR_STR_NEW_PLAYER_FLOW),
+                        acked, heHas);
+                DumpMsgList((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ);
+            }
+            /* A WARNING, NOT A GUARD: it proceeds either way. */
+            if (acked - heHas > AM2_FLOW_ACK_WARN)
+                am2_log((const char *)AM2_IMAGE(ADDR_STR_TOO_MANY_ACKS),
+                        acked, heHas);
+            FlowRetireThrough(sender, acked, mask, now, from,
+                              ADDR_STR_REMOTE_ACKING_X);
+        } else {
+            *(uint32_t *)(sender + FLOW_OFF_HE_HAS) = acked;
+        }
+    }
+
+    if (seq > *(const uint32_t *)(sender + FLOW_OFF_HIGHEST_SEQ))
+        *(uint32_t *)(sender + FLOW_OFF_HIGHEST_SEQ) = seq;
+
+    /* At or below what we already have: a resend we did not need. Returning
+     * 1 here is what stops it being played twice. */
+    if (seq < *(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) + 1) {
+        *(uint32_t *)(sender + FLOW_OFF_DUPLICATES) += 1;
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            am2_log((const char *)AM2_IMAGE(ADDR_STR_DUPLICATE_SEQ),
+                    *(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) + 1,
+                    seq, from,
+                    *(const uint32_t *)(msg + PACKET_OFF_ACK));
+        MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, node);
+        return 1;
     }
 
     return 0;
