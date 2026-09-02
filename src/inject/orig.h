@@ -2948,7 +2948,27 @@
 /* The clamp is worth keeping straight: the MAX is clamped to 10,000 ms and
  * the MIN is not, because the min is stored before the clamp runs. So a
  * 30-second stall raises the total by 10,000 and the max to exactly 10,000,
- * and leaves the min alone. Reproduce the order, not the intent. */
+ * and leaves the min alone. Reproduce the order, not the intent.
+ *
+ * THE ACK IS CUMULATIVE, AND THAT IS A LOOP RATHER THAN A FIELD. The 0x10
+ * arm does not ack one sequence: it runs `ebx = FLOW_OFF_HE_HAS + 1` and
+ * walks up to the message's own +0x10, acking each in turn -- the jump back
+ * is at 0x4016D3, `cmp ebx, [edx+0x10]; jbe 0x401589`. So a single packet
+ * retires a RANGE of the send queue, and every statistic above is updated
+ * once per sequence retired rather than once per packet. Only at the end,
+ * at 0x4016DE, does FLOW_OFF_HE_HAS take the acked-through value.
+ *
+ * Reading the body without that loop gives a function that acks one message
+ * and keeps latency statistics that are silently a factor of the window size
+ * out. The loop is two instructions and it is the whole protocol.
+ *
+ * AND THE ARM ENDS INSIDE ANOTHER ARM. At 0x4016E1 it tests the message's
+ * +8 and jumps to 0x4016EE on non-zero -- which is case 0x0C's first
+ * instruction. So 0x10 finishes by running 0x0C, and the two share an
+ * epilogue. This file already records the shape twice (UnitKindMatches kind
+ * 3, PlacementAllowed arm 16); this is the third, and the jump table shows
+ * nothing of it. Follow every branch OUT of an arm, not only the branches
+ * within it. */
 /* Where the drop path receives a packet it has no node for, so the transport
  * does not keep re-delivering it. */
 #define ADDR_RECV_SCRATCH        0x004F8790u
