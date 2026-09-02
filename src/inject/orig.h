@@ -7938,6 +7938,17 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
+ * CODES 0x18 AND 0x2A ARE THE SAME PAIR, and 0x18 has a tail. Both choose
+ * between EvtArmySetField(army, subject, n0) and
+ * EvtSetAiMode(ResolveUid(subject, owner), n0) on act->extra -- so extra
+ * picks the TARGET, a whole army or one object, and not the value. 0x2A stops
+ * there. 0x18 goes on to build a point from two variables and hand the whole
+ * thing to AtPointA.
+ *
+ * Worth noting because the shared half is 20 instructions and the tail is
+ * another 40: the temptation is to write 0x2A as a call to 0x18's helper with
+ * the tail skipped, which is right until someone changes one of them.
+ *
  * THREE ARMS LOOK LIKE ONE HELPER AND ARE THREE DIFFERENT THINGS. Codes
  * 0x22, 0x23 and 0x24 all open `if (act->xvar ...) GetVarValue(...)` and all
  * three differ:
