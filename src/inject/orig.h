@@ -7938,6 +7938,12 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
+ * `createroach` PASSES ZERO AS ITS KIND, which is not act->n0 or anything
+ * else the action carries -- a literal `push 0` before the name. So a script
+ * cannot choose a roach kind through this action even though CreateRoach
+ * takes one. Worth recording because supplying act->n0 there is the natural
+ * completion and would be an invention.
+ *
  * FOUR ARMS GUARD ON `(int16_t)point == 0` AND NOT ON THE DWORD. Codes 0x0E,
  * 0x10, 0x31 and 0x32 all take ActionPoint's packed answer and test `ax`, so
  * a point at x == 0 is refused whatever its y. Same width question as
