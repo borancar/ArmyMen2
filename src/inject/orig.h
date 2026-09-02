@@ -9677,6 +9677,17 @@ typedef struct {
  * slot with the rounded facing that VehicleBlockWeight is then given. Read
  * without noticing, the last call reads as BlockWeight(obj, obj, ...). */
 #define ADDR_STEP3_TURN_BLOCKED  0x0045C6E0u  /* int32_t(a, b, int32_t *out) */
+/* The turn PLAN its first argument points at, read only by that function and
+ * by ADDR_STEP3_45C8D0 which builds it. Five fields, all read and none
+ * written here, so these are named from the reader alone -- weaker than a
+ * writer/reader pair, and the +0x08 == 1 case is the one that matters:
+ * it makes the whole speed block fall through and the vehicle stand still. */
+#define TURNPLAN_OFF_WANT_FACING  0x00u  /* uint8_t, AngleDelta's target */
+#define TURNPLAN_OFF_MODE         0x08u  /* 1 means "no speed at all" */
+#define TURNPLAN_OFF_DECEL        0x0Cu  /* selects the source speed AND the
+                                          * limiter's direction */
+#define TURNPLAN_OFF_HALF_A       0x10u  /* each halves the speed; both set */
+#define TURNPLAN_OFF_HALF_B       0x14u  /* quarters it */
 #define ADDR_STEP3_45C8D0        0x0045C8D0u  /* void(obj, out) */
 #define ADDR_STEP3_45CB30        0x0045CB30u  /* void(obj, out) */
 #define OBJ_OFF_FIELD_59C        0x59Cu  /* gates the record init, once */
