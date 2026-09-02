@@ -5032,15 +5032,23 @@ typedef struct {
  * THE TWENTY CHILDREN, extracted by pairing each operator new's SIZE with the
  * constructor that follows it rather than by reading the body:
  *
- *   in the four-slot player loop:  MpName 0x74, MpColour 0x68, MpTeam 0x68
- *   four list groups:              Record 0x0C + Listbox 0x98 + Arrowbar 0x78
- *                                  (the second group uses TextList, not Listbox)
- *   then:                          MultiSprite 0x80, Panel 0x60, Button 0x78 x2
+ *   in the four-slot player loop:  MpName, MpColour, MpTeam
+ *   four list groups:              Record + Listbox + Arrowbar
+ *                                  (the second group uses TextList)
+ *   two MultiSprites:              the green and red ready lamps
+ *   one Edit:                      the chat line
+ *   one Panel, and FOUR Buttons:   start, ready, options, cancel
  *
- * So the panel is three widgets per player, four scrolling lists with their
- * own scrollbars, and four pieces of fixed furniture. Nineteen static
- * constructor sites and twenty WidgetAddChild calls, because the loop's three
- * are one site each and run four times.
+ * AND THE FIRST COUNT OF THAT WAS SHORT. Pairing each `operator new` with the
+ * NEXT constructor call finds nineteen and misses the Edit and two of the
+ * four Buttons, because those constructions have other calls between the
+ * allocation and the constructor. Listing every *_CTOR call instead and
+ * reading its pushed arguments finds all of them, and gives the bitmap names
+ * with it -- start, ready, options and cancel.
+ *
+ * The extraction was too narrow rather than wrong, which is the more
+ * dangerous kind: it produced a clean, plausible list of nineteen and nothing
+ * about it looked incomplete.
  *
  * That the SECOND list group uses TextList where the other three use Listbox
  * is the sort of thing a reader normalises away -- four groups that look
