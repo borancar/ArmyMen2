@@ -5,12 +5,29 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-02**, at `d5c8985`. Working tree clean.
+Last updated: **2026-09-03**, at `1bc33e8`. Working tree clean.
 
 ## In flight
 
 Nothing uncommitted. **1,484 patches plus 4 REGISTERED**, **30** analysis
 tools in `make check` (`tools/checkpatches.py`; `make check` for the tools).
+
+## ONE FUNCTION LEFT
+
+`FireWeapon` (0x0045F460, 3,200 bytes) is the only game function in this image
+that is not reconstructed. Everything below the nominal CRT line was closed
+first; everything above it went since.
+
+Its dispatch table is already decoded and recorded in `orig.h`, which is the
+expensive half: a 43-entry byte index at 0x004600B0 into 24 arms at
+0x00460050, with THREE arms shared and a default that fifteen kinds reach
+explicitly. Numbering the arms as they are laid out gives 24 behaviours for 43
+kinds and puts most of them in the wrong place, so start from the table.
+
+1,149 instructions, 25 returns, and all 25 callees are named -- so the cost is
+the arms, not the callees. It is a session's work on its own and should have
+one; a half-written table-driven function is what CLAUDE.md warns produces
+defects nothing here can see.
 
 ## Where the boundary is
 

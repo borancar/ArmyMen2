@@ -10594,6 +10594,36 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * are one 8-byte structure pushed by value; its top two bytes are never
  * written by any caller, so nothing correct can read them. */
 #define ADDR_FIRE_WEAPON          0x0045F460u  /* int32_t(weapon, unit, ...) */
+/* THE WEAPON DISPATCH, DECODED FROM THE IMAGE so the next reader starts from
+ * it rather than from the arms. `def = weapon[0xC0]; kind = def[0] - 1;
+ * if (kind > 0x2A) default; jmp table[byteIndex[kind]]` -- a 43-entry byte
+ * index at 0x004600B0 into a 24-entry jump table at 0x00460050.
+ *
+ * THREE ARMS ARE SHARED and the default catches FIFTEEN kinds, which is the
+ * whole reason to decode rather than read: numbering the arms as they are laid
+ * out gives 24 behaviours for 43 kinds and puts most of them in the wrong
+ * place.
+ *
+ *   arm  0  0x0045F523  kinds 1, 9        arm 12  0x0045FC2A  kind 24
+ *   arm  1  0x0045F8FA  kind  2           arm 13  0x0045FC56  kind 25
+ *   arm  2  0x0045F9E0  kind  3           arm 14  0x0045FC82  kind 26
+ *   arm  3  0x0045F7E1  kind  4           arm 15  0x0045F6AA  kind 29
+ *   arm  4  0x0045FA43  kind  5           arm 16  0x0045F5BC  kind 30
+ *   arm  5  0x0045F86D  kind  6           arm 17  0x0045FBA4  kinds 35-38
+ *   arm  6  0x0045F744  kinds 7, 8        arm 18  0x0045FCAE  kind 39
+ *   arm  7  0x0045F650  kind 10           arm 19  0x0045FCFD  kind 40
+ *   arm  8  0x0045FB23  kind 11           arm 20  0x0045FDF7  kind 41
+ *   arm  9  0x0045FB6E  kind 12           arm 21  0x0045FE58  kind 42
+ *   arm 10  0x0045FE99  kind 20           arm 22  0x0045FF8E  kind 43
+ *   arm 11  0x0045FD4B  kind 23           arm 23  0x0045F5B2  DEFAULT, and
+ *                                            kinds 13-19, 21, 22, 27, 28,
+ *                                            31-34 reach it explicitly
+ *
+ * 1,149 instructions, 25 returns, and all 25 callees are already named --
+ * PlaySoundAt nineteen times, CreateMissile nine, SeqStartDirEffect seven --
+ * so the reading cost is the arms, not the callees. */
+#define ADDR_FIRE_WEAPON_INDEX   0x004600B0u  /* uint8_t[43], kind - 1 */
+#define ADDR_FIRE_WEAPON_ARMS    0x00460050u  /* void *[24] */
 /* The four ways a script asks for a shot: an explicit weapon or the unit's
  * own, at a point or at another object. All four take a HEADING that is
  * computed from the geometry when it arrives NEGATIVE, and the two with an
