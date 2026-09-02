@@ -14179,19 +14179,29 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * the bytes go to a scratch buffer, ParseScenarios takes them, and the buffer
  * is freed immediately.
  *
- * ADDR_MAP_FIELD_DESCS (0x00485FB8) IS A SECOND TABLE AND A SECOND LOOP.
- * Past the chunk switch, LoadMap walks seven {tag, size} pairs and freads
- * exactly `size` bytes per entry, dispatching on the tag again -- so the
- * per-record field layout is DATA, not code, and the second compare chain is
- * the same tags a second time rather than a second set:
+ * ADDR_MAP_FIELD_DESCS (0x00485FB8) IS FILLED FROM THE FILE, WHICH MAKES THE
+ * FORMAT SELF-DESCRIBING. An earlier version of this note called it a second
+ * table in the image and read its contents out of .data. Those bytes are only
+ * what the image ships as defaults: inside OLAY, LoadMap freads a COUNT and
+ * then that many {tag, size} pairs straight into 0x00485FB8, eight bytes a
+ * step. So the map declares its own per-record field layout and the loader
+ * obeys it.
  *
- *     INDX 4    MOVE 1    ELOW 1    TRIG 1
- *     RESV 1    ELEV 1    OWNR 1    then a zero terminator
+ * The defaults it ships are INDX 4, then MOVE, ELOW, TRIG, RESV, ELEV and
+ * OWNR at one byte each -- useful as a picture of the usual shape, and NOT a
+ * fixed layout to write into the C.
  *
- * RESV IS IN THE TABLE AND IN NO ARM. The second chain compares OWNR, TRIG,
- * NUMB, MOVE and ELEV and has no case for it, so its one byte is read and
- * discarded -- reserved, and the name says so. A tag that is read but never
- * dispatched is invisible from the switch alone and only the table shows it. */
+ * That is what makes RESV explicable rather than odd. The second compare
+ * chain has arms for OWNR, TRIG, NUMB, MOVE and ELEV and none for RESV, so a
+ * field the FILE declares is read for its stated width and thrown away. A
+ * self-describing format needs exactly that: the loader must skip a field it
+ * does not know by the width the file gives, which is the same discipline as
+ * the chunk switch's default fseek one level down.
+ *
+ * OLAY IS ALSO NOT A PLANE. It freads a count, reallocs an array of 0x1C-byte
+ * records, zeroes the new tail, and then reads 0x10 bytes into each -- so the
+ * on-disk record is 0x10 and the in-memory one is 0x1C, and the difference is
+ * why a straight fread of the whole array would be wrong. */
 #define ADDR_MAP_FIELD_DESCS      0x00485FB8u  /* {uint32 tag, uint32 size}[7] */
 #define AM2_IFF_RESV              0x56534552u  /* 'RESV', read and discarded */
 #define ADDR_LOAD_ATL_FILE        0x0042BEA0u  /* int32_t(const char *path) */
