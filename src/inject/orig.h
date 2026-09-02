@@ -10622,6 +10622,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * 1,149 instructions, 25 returns, and all 25 callees are already named --
  * PlaySoundAt nineteen times, CreateMissile nine, SeqStartDirEffect seven --
  * so the reading cost is the arms, not the callees. */
+/* WHAT EACH ARM DOES, from its calls. The shape recurs: apply the sprite's
+ * muzzle offset (+0x28/+0x2A off the sprite the prologue picked), play a
+ * sound, then spawn -- and what it spawns is the arm.
+ *
+ *   0,6,15  sound, effect, AddByteSat, missile   (recoil weapons)
+ *   3,5,16  sound, effect, missile
+ *   1,4     sound, ftol + ApproxDist, missile    (ranged, distance-scaled)
+ *   2       sound, missile
+ *   7       sound, effect, and NO missile
+ *   8,9     the two watched-item droppers        (MINE, FLAG)
+ *   10      Cos8/Sin8 to a point, ObjectsAtPoint, CreateExplosion
+ *   11      SpeakLine, HealObject, twice         (MEDI)
+ *   12,13,14 SpeakLine then DoAirSupport         (AIRS, PARA, RECO)
+ *   17      ObjIsType2 then SetObjTablePair      (DISG)
+ *   18,19   AimStart / AimStartB
+ *   20      HealObject then SelectInventorySlot  (WREN)
+ *   21      ObjIsType2 then Type2ActionC
+ *   22      Cos8/Sin8, ObjectsHitByPoint, DamageObject  (melee)
+ *   23      DEFAULT -- returns 0 and calls nothing
+ *
+ * Those parenthesised names are the ITEM CAPTIONS at 0x00419A30, which
+ * CLAUDE.md records; the heal arm being MEDI and the three air-support arms
+ * being AIRS/PARA/RECO is a cross-check on the whole table rather than a
+ * guess about any one of them. */
 #define ADDR_FIRE_WEAPON_INDEX   0x004600B0u  /* uint8_t[43], kind - 1 */
 #define ADDR_FIRE_WEAPON_ARMS    0x00460050u  /* void *[24] */
 /* The four ways a script asks for a shot: an explicit weapon or the unit's
