@@ -420,4 +420,9 @@ void __cdecl Step3RouteAndBoard(void *obj, void *rec);
  * engine, drag the passengers along and pick up what is underneath. */
 void __cdecl Step3Drive(void *obj, void *rec);
 
+/* 0x0045C050. The vehicle's driving interface: seven action keys and the
+ * mouse, turned into the heading, destination and turret aim Step3Drive
+ * acts on. The sibling of Type2PlayerInput, and not that code adapted. */
+void __cdecl Step3Input(void *obj, void *rec);
+
 #endif /* AM2_REGION_H */

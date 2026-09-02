@@ -9075,6 +9075,9 @@ int region_install(void)
     rc |= patch_replace(ADDR_STEP3_DRIVE,
                         (const void *)Step3Drive,
                         "Step3Drive", 2);
+    rc |= patch_replace(ADDR_STEP3_INPUT,
+                        (const void *)Step3Input,
+                        "Step3Input", 2);
     return rc;
 }
 
@@ -10314,4 +10317,324 @@ void __cdecl Step3Drive(void *obj, void *rec)
     }
 
     ObjMoveAlongFacing(o, tileArg, 0, 0);
+}
+
+/* Step3Input -- original 0x0045C050, 1424 bytes, one caller in StepType3,
+ * which calls it immediately before Step3RouteAndBoard with the same two
+ * arguments. The vehicle's DRIVING INTERFACE: seven action keys and the
+ * mouse, turned into the heading, destination and turret aim that Step3Drive
+ * then acts on. It writes the record and the object and answers nothing.
+ *
+ * THE CALLER CLEANS 0x10 ONCE FOR TWO CALLS, so reading its `add esp` for
+ * this function's arity gives four arguments. Both calls push (rec, obj) and
+ * the single cleanup covers the pair -- the shared-cleanup shape this project
+ * has met repeatedly, and the reason arity has to come from the callee's own
+ * reads rather than from a cleanup instruction.
+ *
+ * IT IS GATED ON THE TEXT FIELD, which is the first thing it does: if
+ * g_charHandler is installed or ADDR_INPUT_SUPPRESS is set, nothing here
+ * runs. A vehicle does not drive itself while a chat box has focus.
+ *
+ * BOTH ARGUMENT SLOTS ARE REUSED AS LOCALS once the object and record are in
+ * registers -- arg1's holds the cursor distance written at 0x0045C388, arg2's
+ * the aim byte at 0x0045C396, and both are read hundreds of bytes later at a
+ * different esp. Type2PlayerInput's header records the same shape for the
+ * trooper. tools/espmap.py resolves it, and is what should be reached for
+ * first: a linear esp trace desynchronises at the first branch past an
+ * `add esp`, and this function has several.
+ *
+ * NOT THE TROOPER'S FUNCTION ADAPTED. Type2PlayerInput does the same job for
+ * a type-2 object and the two are 0.085 similar over normalised disassembly,
+ * sharing two nine-instruction runs -- the cursor-to-world-point arithmetic.
+ * Different code for one idea, so there is nothing to share.
+ *
+ * THE ACTION BINDINGS ARE NUMBERED, NOT NAMED, and what each does is recorded
+ * here instead: 0 accelerates, 1 reverses AND flips the sense of the two
+ * steering keys, 2 and 3 steer, 4 and 5 swing the turret a fixed 0x0F, 9
+ * fires, 0x0B cycles the weapon. Naming the constants from that would be
+ * naming a binding from one context, which is what ADDR_DRAG_ACTIVE cost. */
+/* Reconstructed in item.cpp, which region.cpp does not include -- declared
+ * here the same way item.cpp declares its own forward uses. */
+void __cdecl SelectInventorySlot(void *unit, int32_t slot);
+
+void __cdecl Step3Input(void *obj, void *rec)
+{
+    uint8_t  *o = (uint8_t *)obj;
+    uint8_t  *r = (uint8_t *)rec;
+    uint8_t  *weapon;
+    uint32_t  cursorWorld = 0;  /* view origin + cursor, a packed point */
+    uint32_t  gunPos;           /* the turret's point, or the hull's */
+    int32_t   dist = 0;         /* arg1's slot, reused */
+    int32_t   aimDelta = 0;
+    int32_t   steered = 0;
+
+    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER != 0)
+        return;
+    if (*(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS != 0)
+        return;
+
+    /* Weapon cycling, and the mouse half is the MIDDLE button RELEASED --
+     * state up with the edge set. Reached as element 2 of the two button
+     * arrays, which is how NextInventorySlot already spells the same pair. */
+    if (ActionKeyPressed(AM2_ACTION_NEXT_WEAPON)
+        || (((const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)[AM2_MOUSE_MIDDLE] == 0
+            && ((const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)[AM2_MOUSE_MIDDLE] != 0)) {
+        uint8_t *unit = (uint8_t *)LookupOwnerObj(
+            *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+
+        if (unit != 0) {
+            int32_t sel = *(const int32_t *)(unit + UNIT_OFF_INVENTORY_SEL);
+
+            /* `[unit + sel*4 + 0x550]` in the image, which is NOT a second
+             * array: UNIT_OFF_INVENTORY is 0x54C, so the compiler folded the
+             * +1 into the displacement and this is inventory[sel + 1] --
+             * exactly what NextInventorySlot writes out longhand. Reading it
+             * as a different base is the mistake CLAUDE.md opens with. */
+            if (sel < AM2_INVENTORY_SLOTS - 1
+                && *(const int32_t *)(unit + UNIT_OFF_INVENTORY
+                                      + (uint32_t)(sel + 1) * 4) != 0) {
+                PlaySoundAt(0, 0, 0, 0, 0);
+                SelectInventorySlot(unit, sel + 1);
+            } else {
+                PlaySoundAt(0, 0, 0, 0, 0);
+                SelectInventorySlot(unit, 0);
+            }
+        }
+    }
+
+    /* Where the gun IS: a multi-part vehicle keeps the turret's own point at
+     * its rows' +0x7C; a single-part one aims from the hull. */
+    if (*(const int32_t *)(o + 0x70u) > 1)
+        gunPos = *(const uint32_t *)(
+            (const uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS) + 0x7Cu);
+    else
+        gunPos = *(const uint32_t *)(o + OBJ_OFF_POS);
+
+    /* Cleared here and set by the steering arms below. Step3Drive reads it as
+     * the term that forces a gun-sprite update past the rate limit, so it
+     * means "the player is steering this frame". Raw offset on purpose: the
+     * OBJ_OFF_FIELD_5A8 in orig.h is a different type's field at the same
+     * displacement, and this block keeps such offsets unnamed. */
+    *(int32_t *)(o + 0x5A8u) = 0;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_A
+        != *(const int32_t *)(o + OBJ_OFF_UID))
+        return;
+
+    /* Throttled by the object's own deadline, and all five out-params are
+     * discarded -- what is wanted is the scan's side effects, the same
+     * reading NextInventorySlot's header records for its call. */
+    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            > *(const uint32_t *)(o + OBJ_OFF_FIELD_FC)) {
+        int32_t range, allied, other;
+        uint8_t bearing;
+
+        SightScan(o, &range, &bearing, &allied, &other, 0);
+    }
+
+    weapon = (uint8_t *)WeaponByUid(
+        *(const uint32_t *)(o + VEHICLE_OFF_WEAPON_UID));
+
+    /* --- steering. 2 and 3 are exclusive, and 1 reverses the sense of both,
+     * so backing up steers the way a reversing driver expects. --- */
+    if (ActionKeyDown(AM2_ACTION_RIGHT) && !ActionKeyDown(AM2_ACTION_LEFT)) {
+        *(int32_t *)(o + 0x5A8u) = 1;
+        *(int32_t *)(r + 0x10u) = 1;
+        if (*(const int32_t *)(o + 0x52Cu) != 1)
+            *(int32_t *)(r + 8) = AM2_VEH_STATE_TURNING;
+        *r = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
+                       + (ActionKeyDown(AM2_ACTION_01) ? 8 : -8));
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
+        steered = 1;
+    }
+
+    if (ActionKeyDown(AM2_ACTION_LEFT) && !ActionKeyDown(AM2_ACTION_RIGHT)) {
+        *(int32_t *)(o + 0x5A8u) = 1;
+        *(int32_t *)(r + 0x10u) = 1;
+        if (*(const int32_t *)(o + 0x52Cu) != 1)
+            *(int32_t *)(r + 8) = AM2_VEH_STATE_TURNING;
+        *r = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
+                       + (ActionKeyDown(AM2_ACTION_01) ? -8 : 8));
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
+        steered = 1;
+    }
+
+    /* Both movement keys clear the destination, so a key cancels a mouse
+     * order. Only reverse sets +0x0C, which is what Step3Drive reads to pick
+     * the reverse speed and to clamp acceleration from the other side. */
+    if (ActionKeyDown(AM2_ACTION_00)) {
+        *(int32_t *)(r + 8) = AM2_VEH_STATE_TURNING;
+        *(int32_t *)(r + 0x10u) = 0;
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
+        steered = 1;
+    }
+
+    if (ActionKeyDown(AM2_ACTION_01)) {
+        *(int32_t *)(r + 8) = AM2_VEH_STATE_TURNING;
+        *(int32_t *)(r + 0x10u) = 0;
+        *(int32_t *)(r + 0x0Cu) = 1;
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
+        steered = 1;
+    }
+
+    /* The turret swings a fixed 0x0F either way and the sound plays only in
+     * state 1. The two arms are identical but for the sign and are written
+     * out rather than parameterised: the image has them that way, and merging
+     * them would hide that the state test is duplicated too. */
+    if (ActionKeyDown(AM2_ACTION_04)) {
+        if (*(const int32_t *)(o + 0x52Cu) == 1)
+            PlaySoundAt(0x16, 1, 0, *(const int16_t *)(o + OBJ_OFF_POS),
+                        *(const int16_t *)(o + OBJ_OFF_POS + 2));
+        r[1] = (uint8_t)(r[1] + 0x0F);
+        *(int32_t *)(o + 0x548u) = 1;
+    }
+
+    if (ActionKeyDown(AM2_ACTION_05)) {
+        if (*(const int32_t *)(o + 0x52Cu) == 1)
+            PlaySoundAt(0x16, 1, 0, *(const int16_t *)(o + OBJ_OFF_POS),
+                        *(const int16_t *)(o + OBJ_OFF_POS + 2));
+        r[1] = (uint8_t)(r[1] - 0x0F);
+        *(int32_t *)(o + 0x548u) = 1;
+    }
+
+    /* --- the mouse, on HUD rows 3 and 1 only, and only inside the map. --- */
+    if (GetMenuRow() == 3 || GetMenuRow() == 1) {
+        int32_t inMap = 1;
+
+        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_GRAB != -1) {
+            if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT,
+                             (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+                inMap = 0;
+            else if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_GRAB != 0)
+                inMap = 0;
+        }
+
+        if (inMap) {
+            const int32_t *button =
+                (const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON;
+            const int32_t *changed =
+                (const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED;
+            uint8_t aim;
+
+            ((int16_t *)&cursorWorld)[0] = (int16_t)(
+                *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X
+                + *(const int32_t *)(uintptr_t)ADDR_CURSOR_POINT);
+            ((int16_t *)&cursorWorld)[1] = (int16_t)(
+                *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
+                + *(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2));
+
+            dist = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                              (const AM2_Point *)&cursorWorld);
+            aim = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+                               (const AM2_Point *)&cursorWorld);
+            aimDelta = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING), aim);
+
+            *(int32_t *)(uintptr_t)ADDR_MOUSE_GRAB = -1;
+            if (steered == 1)
+                OverlayPrepare(1, 1);
+
+            if (GetMenuRow() == 1 && button[AM2_MOUSE_LEFT]) {
+                /* Row 1 aims the TURRET, and from where the gun is rather
+                 * than from the hull. */
+                r[1] = AngleBetween((const AM2_Point *)&gunPos,
+                                    (const AM2_Point *)&cursorWorld);
+                *(int32_t *)(o + 0x548u) = 1;
+            } else if (!button[AM2_MOUSE_LEFT] && changed[AM2_MOUSE_LEFT]
+                       && GetMenuRow() != 1
+                       && orig_get_tick_count()
+                              - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS
+                          < AM2_CLICK_TAP_MS
+                       && ApproxDist(
+                              (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT,
+                              (const AM2_Point *)(uintptr_t)ADDR_MOUSE_PRESS) < 4) {
+                /* A TAP, not a drag: released within 500 ms and within four
+                 * pixels of where it went down. That orders a move. */
+                if (dist > 0x30) {
+                    *r = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+                                      (const AM2_Point *)&cursorWorld);
+                    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = cursorWorld;
+                    NearestAllowedTile(o, TileOfPoint(cursorWorld),
+                                       (uint32_t *)(o + OBJ_OFF_FIELD_C0));
+                    *(int32_t *)(o + 0xD0u) = 0;
+                    *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 1;
+                    *(uint16_t *)(o + 0xDEu) = 0xFFFF;
+                }
+            } else if (button[AM2_MOUSE_LEFT]) {
+                /* Held: steer toward the cursor continuously. */
+                *r = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+                                  (const AM2_Point *)&cursorWorld);
+                *(int32_t *)(r + 8) = AM2_VEH_STATE_TURNING;
+                *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+                    *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+                *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
+                *(int32_t *)(o + 0x5A8u) = 1;
+
+                /* AND IF IT IS BEHIND YOU AND CLOSE, BACK UP INSTEAD of
+                 * turning round: the heading gains 0x80 -- half a turn -- and
+                 * the reverse flag goes on. */
+                if ((aimDelta < 0 ? -aimDelta : aimDelta) > 0x64
+                    && dist < 0x80) {
+                    *(int32_t *)(r + 0x0Cu) = 1;
+                    *r = (uint8_t)(*r + 0x80);
+                }
+            }
+            steered = 1;
+        }
+    }
+
+    if (weapon == 0)
+        return;
+
+    /* --- firing. The cooldown is the weapon's own last-fired stamp against
+     * its definition's interval, and the same test is written three times
+     * for the three ways to ask for a shot. --- */
+    {
+        const uint8_t *def = *(const uint8_t *const *)(weapon + 0xC0u);
+        uint32_t since = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                         - *(const uint32_t *)(weapon + 0xC4u);
+
+        if (ActionKeyDown(AM2_ACTION_09)) {
+            /* Held: only an automatic weapon repeats, which is what the
+             * definition's +0x24 gates. */
+            if (*(const int32_t *)(def + 0x24u) != 0
+                && since > *(const uint32_t *)(def + 4))
+                *(int32_t *)(r + 4) = 1;
+        } else if (ActionKeyReleased(AM2_ACTION_09)) {
+            /* Released: no automatic gate, just the cooldown. */
+            if (since > *(const uint32_t *)(def + 4))
+                *(int32_t *)(r + 4) = 1;
+        }
+
+        if (GetMenuRow() != 1 && steered != 1)
+            return;
+        if (*(const int32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT3 != 0)
+            return;
+
+        {
+            const int32_t *button =
+                (const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON;
+            const int32_t *changed =
+                (const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED;
+
+            if (button[AM2_MOUSE_LEFT]) {
+                if (*(const int32_t *)(def + 0x24u) == 0)
+                    return;
+            } else if (!changed[AM2_MOUSE_LEFT]) {
+                return;
+            }
+
+            since = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                    - *(const uint32_t *)(weapon + 0xC4u);
+            if (since > *(const uint32_t *)(def + 4))
+                *(int32_t *)(r + 4) = 1;
+        }
+    }
 }

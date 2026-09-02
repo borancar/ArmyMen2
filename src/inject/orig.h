@@ -10638,6 +10638,26 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Numbered rather than named, the way OBJ_OFF_FIELD_C0 is. */
 #define AM2_ACTION_0A            0x0A
 #define AM2_ACTION_06            0x06
+/* The vehicle's driving bindings, numbered rather than named for the reason
+ * stated just above: the CONTROLS captions come from a data file, and a
+ * search of the whole install for "EXIT VEHICLE" finds nothing in plain text,
+ * so there is no table to index. What Step3Input DOES with each is recorded
+ * at its use site -- 0 and 1 move, 1 also reverses the sense of 2 and 3, 4
+ * and 5 swing the turret, 9 fires. Naming them from that would be naming a
+ * binding from one context, which is what ADDR_DRAG_ACTIVE cost. */
+#define AM2_ACTION_00            0x00
+#define AM2_ACTION_01            0x01
+#define AM2_ACTION_04            0x04
+#define AM2_ACTION_05            0x05
+#define AM2_ACTION_09            0x09
+/* 0x0045C050, one caller in StepType3, immediately before the router and the
+ * step. The vehicle's INPUT half, as Type2PlayerInput is the trooper's --
+ * and NOT that function adapted: 0.085 similarity over normalised
+ * disassembly, two nine-instruction runs in common. */
+#define ADDR_STEP3_INPUT         0x0045C050u  /* void(obj, rec) -- the caller
+                                                 pushes both for this AND for
+                                                 ADDR_STEP3_ROUTE_BOARD, then
+                                                 cleans 0x10 once */
 #define AM2_MOUSE_LEFT           0     /* into ADDR_MOUSE_BUTTON/_CHANGED */
 #define AM2_MOUSE_RIGHT          1     /* == ADDR_MOUSE_BUTTON1 */
 #define AM2_MOUSE_MIDDLE         2     /* into ADDR_MOUSE_BUTTON/_CHANGED */
