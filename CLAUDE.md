@@ -687,6 +687,22 @@ What it actually does comes from its only caller. `0x00417B80` carries
 typed line is a **cheat code** and `0x00444C40` is what runs one. A function
 that names itself nowhere can still be identified from the one that calls it.
 
+**AND THAT LAST STEP WAS EXACTLY ONE STEP TOO FAR, which decoding the caller
+settled.** `0x00417B80` reaches `0x00444C40` on its NO-MATCH path: the typed
+line is compared against all 39 cheat phrases, and what is handed on is
+whatever was *not* a cheat. Two arms call it as well, with `trigger greenwins`
+and `trigger tanwins` -- which are script statements, not cheats. So it is a
+SCRIPT LINE runner, and `orig.h` has had it right as `ADDR_SCRIPT_RUN_LINE`
+for some time while this paragraph went on calling it the cheat runner.
+
+The reasoning that produced the error is worth keeping, because it is the
+rule's own failure mode. Identifying a function from its caller gave the right
+NEIGHBOURHOOD -- a typed line, a console -- and then one inference too many
+assigned it the caller's subject. A callee reached from a caller's default arm
+is characteristically the GENERAL case, not the special one the caller is
+named for. `0x00417B80` is also not its only caller's only call to it: it
+calls it in three places.
+
 **And the name `ParseScriptFile` was mine, not the program's.** There is no such
 string anywhere in the image; `0x00444CD0` calls itself `ReadScript`, in
 "ReadScript: Could not open %s for reading.". The macro said `PARSE_FILE` while
@@ -3639,7 +3655,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   What is still original is everything *below* a statement, reached by address:
   the event parser (`0x0043FF90`), the event-list parser (`0x00440600`), the
   testvar value parser (`0x00443010`) and the 8,608-byte action parser
-  (`0x00440D70`, now reconstructed). `0x00444C40` -- the cheat-code runner --
+  (`0x00440D70`, now reconstructed). `0x00444C40` -- ScriptRunLine, which the cheat handler feeds its unmatched lines --
   is the other caller of that parser and is still original.
 
   **The handler A/B has better evidence than a log match.** `ReadScript` prints
