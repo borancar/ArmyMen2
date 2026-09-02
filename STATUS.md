@@ -439,8 +439,21 @@ player's own soldier gives up sooner than everything else on the map.
 
 The head: classify, send a dead object to the tail, and -- outside a
 multiplayer session, or inside one for an army the comm object does not own --
-remember `OBJ_OFF_FACING` when it is under 150 ms since the last hit. A trooper
-hit in the last sixth of a second keeps the facing it was hit at.
+remember `OBJ_OFF_FACING` when under 150 ms have passed since
+`OBJ_OFF_DEADLINE_D0`.
+
+**That is a turn settle time, not "since the last hit"**, which the first
+version of this survey claimed. This function is one of the field's *fourteen*
+writers and stamps it when the facing it settles on differs from the one the
+object had, so the head's test asks whether the trooper has been pointing the
+same way for a sixth of a second. A field with fourteen writers does not get
+its meaning from one of them; the correction cost one decoded scan.
+
+It also keeps a turn accumulator: `OBJ_OFF_FIELD_D6` takes the `AngleDelta` of
+every enforced turn and is wrapped into ±256 by two separate tests, the second
+re-reading the field after the first may have changed it. Beside it a deadline
+at clock + 1000 stops the sweep pushing a trooper around more than once a
+second.
 
 ## Stop condition
 

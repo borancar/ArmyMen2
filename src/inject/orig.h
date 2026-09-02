@@ -8042,9 +8042,22 @@ typedef struct {
  * tail. Outside a multiplayer session -- or inside one, for an army the comm
  * object does not own -- it asks how long since OBJ_OFF_DEADLINE_D0 and
  * remembers OBJ_OFF_FACING in OBJ_OFF_FIELD_580 when that is under 0x96
- * milliseconds. So a trooper hit in the last sixth of a second keeps the
- * facing it was hit at, and the flag that says so is carried the length of the
- * function. */
+ * milliseconds.
+ *
+ * AND THIS FUNCTION IS ONE OF THAT FIELD'S FOURTEEN WRITERS: it stamps the
+ * clock there whenever the facing it settles on differs from the one the
+ * object had. So the head's test is "has this trooper been pointing the same
+ * way for a sixth of a second", a TURN SETTLE TIME -- not "was it hit
+ * recently", which this block claimed on a first reading and which belongs to
+ * OBJ_OFF_HIT_TIME at 0x108. A field with fourteen writers does not get its
+ * meaning from one of them, and the correction cost one decoded scan.
+ *
+ * IT ALSO KEEPS A TURN ACCUMULATOR. OBJ_OFF_FIELD_D6 takes the AngleDelta of
+ * every enforced turn and is wrapped into +/-0x100 by two SEPARATE tests, the
+ * second re-reading the field after the first may have changed it. Beside it
+ * OBJ_OFF_FIELD_D8 is stamped at clock + 1000, and the sweep refuses to
+ * enforce a turn until that has passed -- so a trooper can be pushed around
+ * once a second and only so far. */
 
 /* WHEN THE WAY AHEAD IS BLOCKED IT SWEEPS ALTERNATE FACINGS, and the sweep is
  * a TABLE rather than arithmetic. Each attempt calls AnimStepPoint for the
