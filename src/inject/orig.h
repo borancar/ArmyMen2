@@ -5096,6 +5096,18 @@ typedef struct {
  * an uninitialised descriptor after a successful Restore -- a defect in the
  * original is not ours to fix.
  *
+ * THE BUTTON BITMAPS ARE NOT WHERE A GUESS WOULD PUT THEM. Start's three are
+ * at 0x00476E7C..0x00476EA4 and ready's at 0x0048713C..0x00487164 -- two
+ * different regions, nowhere near each other, and neither adjacent to the
+ * panel's other strings. A draft written with plausible consecutive
+ * addresses would compile, run, and draw whatever happened to live there.
+ *
+ * That is the one class of error in this function that nothing catches:
+ * an AM2_IMAGE of a wrong address is a valid pointer to a valid string, and
+ * the multiplayer panel is the screen this environment cannot reach. Every
+ * literal address in the reconstruction has to come from the disassembly,
+ * not from the neighbourhood.
+ *
  * START AND READY ARE THE SAME BUTTON SLOT. Both are built at rect
  * (0x21F, 0x11A, 0x51, 0x20) with different bitmaps and different handlers --
  * 0x00431850 for start, 0x00431920 for ready -- and COMM_OFF_IS_HOST picks
