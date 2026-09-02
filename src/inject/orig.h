@@ -4669,11 +4669,34 @@ typedef struct {
  * "I am the Juggernaut!", "I can fly!" and "Aye aye Captain!", so the typed
  * line is a cheat code and this is what executes one. */
 #define ADDR_SCRIPT_RUN_LINE     0x00444C40u
-/* The cheat runner. It matches the typed line against a table of 40 words at
+/* The cheat runner. It matches the typed line against a table of 41 words at
  * ADDR_CHEAT_WORDS and dispatches through a 39-entry jump table; anything it
  * does not recognise falls through to ADDR_SCRIPT_RUN_LINE, which is why that
  * function is reachable at all. Entry 0, "when all else fails...", is the
  * master switch and is compared separately before the table is walked.
+ *
+ * THE 41ST ENTRY IS "xxx" AND NOTHING CAN MATCH IT. The walk starts at
+ * ADDR_CHEAT_WORDS+4 and its bound is `cmp edi, 0x004767A4; jl`, so the last
+ * pointer compared is 0x004767A0 -- "patton's speach" -- and 0x004767A4,
+ * which really does hold a pointer to the string "xxx", is where the loop
+ * STOPS rather than an entry it tests. So the table is 1 master + 39 cheats
+ * + 1 sentinel, and typing xxx does nothing.
+ *
+ * That is why the declaration says [41] while the prose above it said 40:
+ * both were counting something real and neither said which. Dumping the
+ * table settled it in one command, and it is the same lesson the rest of
+ * this function taught four times -- decode the whole thing rather than
+ * reason about its ends.
+ *
+ * AND THE "Cheat!!!" REPLY'S COLOUR IS BYTE 1 OF AN OBJECT-TABLE RECORD,
+ * which the grep-the-address rule caught before a name was invented for it.
+ * The master arm does `CommArmyOfSlot(g_defaultOwner)`, shifts the answer
+ * left by 8 and reads `[eax + 0x004F9ACD]`. A stride of 0x100 and a base one
+ * past a round number is precisely the ADDR_ARMY_INK shape this file already
+ * records: 0x004F9ACC is ADDR_OBJ_TABLE_RECORDS and AM2_OBJ_TABLE_REC_SIZE is
+ * already 0x100, so the read is byte 1 of the army's own record and NOT a
+ * table of its own. Writing it as a new base would have been the fifth
+ * instance of the commonest mistake in this project.
  *
  * Two of the arms are what identified the fog of war -- see the block at
  * OBJ_FLAG_REVEALED. Word 3 is "spidey senses tingling", which prints
