@@ -9664,6 +9664,19 @@ typedef struct {
 #define ADDR_STEP3_JUMP_TABLE    0x0045D954u  /* six entries, five arms */
 /* Two callees, still original and named by offset: their bodies are unread and
  * every path through StepType3 reaches both. */
+/* 0x0045C6E0, four callers, all in ADDR_STEP3_45C8D0. Decide the vehicle's
+ * turn for this frame and answer whether the step it implies is BLOCKED.
+ *
+ * THREE ARGUMENTS, and its own `add esp, 0x18` says six -- that cleanup also
+ * covers the ADDR_SET_FACING_08 call above it. tools/espmap.py finds three
+ * argument slots and one local.
+ *
+ * BOTH ARGUMENT SLOTS ARE THEN REUSED AS LOCALS, which is the shape CLAUDE.md
+ * warns about: `lea ecx, [esp+0x1C]` takes the address of ARG2's slot to use
+ * as MoveStepPoint's out-point, and `mov [esp+0x18], al` overwrites ARG1's
+ * slot with the rounded facing that VehicleBlockWeight is then given. Read
+ * without noticing, the last call reads as BlockWeight(obj, obj, ...). */
+#define ADDR_STEP3_TURN_BLOCKED  0x0045C6E0u  /* int32_t(a, b, int32_t *out) */
 #define ADDR_STEP3_45C8D0        0x0045C8D0u  /* void(obj, out) */
 #define ADDR_STEP3_45CB30        0x0045CB30u  /* void(obj, out) */
 #define OBJ_OFF_FIELD_59C        0x59Cu  /* gates the record init, once */
