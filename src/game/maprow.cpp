@@ -30,8 +30,13 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
-typedef void (__cdecl *AM2_DirtyCollectFn)(const void *rect);
-#define DirtyCollect ((AM2_DirtyCollectFn)(uintptr_t)ADDR_DIRTY_COLLECT)
+/* DirtyCollect is reconstructed, in dirty.cpp, and has no header of its own
+ * -- item.cpp forward-declares it locally and this does the same. It used to
+ * be reached here through a macro that SHADOWED its name, which pointed at
+ * ADDR_DIRTY_COLLECT and so called our own code through the detour under a
+ * name that said otherwise. checkseams could not see it: the macro is not
+ * spelled `orig_`, and every non-orig_ #define was skipped. */
+void __cdecl DirtyCollect(const AM2_Rect *r);
 
 #define DEPTH_OBJ(n)  (*(void **)((uint8_t *)(n) + DEPTH_OFF_OBJ))
 #define DEPTH_PREV(n) (*(uint8_t **)((uint8_t *)(n) + DEPTH_OFF_PREV))
@@ -364,7 +369,7 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
     if (!ROW_FLD(r, ROW_OFF_SPRITE, void *))
         return;
 
-    DirtyCollect(r + ROW_OFF_RECT);
+    DirtyCollect((const AM2_Rect *)(r + ROW_OFF_RECT));
 
     if (ROW_FLD(r, 0, uint32_t) & ROW_FLAG_REMOVED) {
         RowUnregisterAll(r, desc);
@@ -454,7 +459,7 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
         box[1] = ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t);
         box[2] = ROW_FLD(r, ROW_OFF_RECT + 8,  int32_t);
         box[3] = ROW_FLD(r, ROW_OFF_RECT + 12, int32_t);
-        DirtyCollect(box);
+        DirtyCollect((const AM2_Rect *)box);
     }
 
     /* One dword, which is what pairs X with PREV_X and Y with PREV_Y. */

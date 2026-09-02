@@ -1447,10 +1447,9 @@ typedef void (__cdecl *AM2_SeqRunFn)(void *ctx);
 
 /* The three the seq adders below still reach the image for: the pool
  * allocator, the kind-6 adder, and the game's own LCG. */
-typedef void *(__cdecl *AM2_SeqAllocFn)(void *ctx);
 typedef void  (__cdecl *AM2_SeqAdd6Fn)(const int32_t *at, int32_t a);
 typedef int32_t (__cdecl *AM2_SeqRandFn)(void);
-#define SeqAlloc              ((AM2_SeqAllocFn)(uintptr_t)ADDR_SEQ_ALLOC)
+/* SeqAlloc is reconstructed; maprow.h declares it and is included above. */
 #define orig_seq_rand         ((AM2_SeqRandFn)(uintptr_t)ADDR_GAME_RAND)
 
 /* The seven steppers SeqRun dispatches to. All take (index, record, context)

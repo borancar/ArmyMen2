@@ -165,7 +165,18 @@ def main():
                 continue
             # The other spelling: a call site that names the address itself.
             # Only in a call, not in a patch_replace or a #define of the macro.
-            if "patch_replace" in line or line.lstrip().startswith("#define"):
+            # A #define is skipped ONLY when it is a patch_replace line.
+            # It used to skip every #define that rule one had not already
+            # matched, which left a hole exactly the width of a macro that
+            # SHADOWS the reconstruction's own name: `#define SendVehicleFire
+            # ((Fn)(uintptr_t)ADDR_SEND_VEHICLE_FIRE)` is a seam in every
+            # sense, and is invisible to rule one because it is not spelled
+            # `orig_`. region.cpp carried one for a commit; the sibling in
+            # item.cpp WAS spelled orig_ and was reported, so the pair made
+            # the gap visible. Falling through to the "named by address" rule
+            # below costs nothing -- that rule only fires on a patched
+            # address, so a #define naming unpatched data is still quiet.
+            if "patch_replace" in line:
                 continue
             for m in re.finditer(r"\bcall\d\(\s*(ADDR_[A-Z0-9_]+)", line):
                 sym = m.group(1)
