@@ -7938,6 +7938,17 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
+ * TWO ARMS READ A FIELD NARROWER THAN IT IS DECLARED, and both would be
+ * invisible if written as the whole dword. Code 0x34 takes the new owner with
+ * `mov dl, byte ptr [esi+0x38]` -- ONE BYTE of act->n0, and EvtSetOwner's
+ * parameter is an int8_t, which is the corroboration. Codes 0x31 and 0x32
+ * test `ax` rather than eax after ActionPoint, so a point whose LOW WORD is
+ * zero is refused while one whose high word is zero is not.
+ *
+ * A packed point is two int16s and testing the whole dword is the natural
+ * thing to write; it accepts points the original rejects, at the x==0 column
+ * of the map only. Small, real, and nothing in the suite would see it.
+ *
  * AND `restorecamerafocus` IS NOT THE INVERSE OF `setcamerafocus`. Code 0x1E
  * writes OBJ_CTX_OBJ from OBJ_CTX_OBJ_PREV and OBJ_CTX_VAL from
  * OBJ_CTX_VAL_PREV -- restoring two fields -- and then writes
