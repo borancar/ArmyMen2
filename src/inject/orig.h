@@ -8294,6 +8294,28 @@ typedef struct {
  * the function they are called from and their offset: "player control" is read
  * off that gate, not off their bodies, and neither has been read. */
 #define ADDR_STEP2_44A420        0x0044A420u  /* void(obj, weapon, out) */
+/* SURVEYED, and it is the most favourable of the four left. 2,336 bytes with
+ * TWO exits, and all NINETEEN distinct callees already named -- the key
+ * queries, the overlay row pair, the trig and distance leaves, the tile and
+ * height helpers. Nothing has to be read before it.
+ *
+ * ITS SWITCH IS A FILTER, NOT A DISPATCH, and dumping it was three lines
+ * where reading the arms would have been three hundred. `jmp [ecx*4 +
+ * 0x0044AD1C]` looks like a seventeen-way jump on the weapon code; the byte
+ * index at 0x0044AD24 covers codes 0x18..0x28 and holds only 0 and 1. Five
+ * codes -- 0x18, 0x19, 0x1A, 0x27, 0x28 -- reach the 546-byte arm at
+ * 0x0044AAB9; the other twelve reach the 46-byte one at 0x0044ACDB, which is
+ * also where the `ja` sends every code outside the range. Same shape as
+ * TrooperFire's nineteen-index two-arm table, and the second instance is what
+ * makes it a pattern in this image rather than a curiosity.
+ *
+ * AND THE TWO `call ebp` ARE GetTickCount. `mov ebp, [0x0046F084]` is an IAT
+ * slot, which reads as a function-pointer field until the address is looked
+ * up -- and this file already records air.cpp calling that same slot directly
+ * SO THAT IT CAN STAY FLAT. A clock read names no Win32 type and CLAUDE.md
+ * counts it incidental, so this belongs on the flat side too despite calling
+ * an import. Worth checking before filing a module: an indirect call is not
+ * evidence of a callback and an import is not evidence of boundary work. */
 /* READ NOW, and renamed off its body rather than off the gate that reaches
  * it. It walks the player's trooper toward the point at OBJ_OFF_FIELD_C0,
  * boards a vehicle when one is claimed and close enough, picks the pose the
