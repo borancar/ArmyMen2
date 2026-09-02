@@ -282,6 +282,10 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out);
  * object toward OBJ_OFF_FIELD_C0, hopping through the region matrices when the
  * goal is elsewhere, and write a facing and a state into `out`. AiRouteToward's
  * longer sibling -- read the two together. */
+/* 0x00407710, two callers: AI mode 0 directly and mode 6 through the `attack`
+ * thunk. AiStepIgnore's family plus a line-of-sight test. */
+void __cdecl AiAttackBody(void *obj, void *out, void *ctx);
+
 void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx);
 
 int32_t __cdecl FindPath(int32_t from, int32_t to, uint16_t *out, int32_t *n,

@@ -3903,6 +3903,260 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
     ConsiderSighting(obj, out, ctx);
 }
 
+/* AiAttackBody -- original 0x00407710, 1,216 bytes, two callers: mode 0
+ * reaches it directly and mode 6 through the `attack` thunk, so it is named
+ * for neither. Written from the block map in orig.h; read that first.
+ *
+ * IT IS THE FOURTH MEMBER OF AiStepIgnore's FAMILY and shares three blocks
+ * with it -- the DEST_DIST head, the OBJ_OFF_HIT_DIR turn, and the delayed
+ * turn toward what the context found. What it adds is a LINE-OF-SIGHT test,
+ * which is what the 0x81C-byte frame is for.
+ *
+ * FOUR SHAPES HERE ARE EASY TO GET WRONG AND THREE OF THEM I DID, on a first
+ * pass that was discarded rather than shipped. They are stated at their sites
+ * as well as here, because the function is cold and no A/B can see any of
+ * them:
+ *
+ *   the two tails are different functions that open identically;
+ *   the engage arms are not an if/else -- the near one falls through;
+ *   the HIGH band borrows the LOW band's compare;
+ *   the facing is written twice into one slot, hull then turret.
+ *
+ * THE TWO RANK FIELDS ARE NOT ALIKE either, and they are read four bytes apart
+ * off one base. RANK_REC_OFF_FIELD_04 is compared against an angle delta, so
+ * it is an ARC; RANK_REC_OFF_FIELD_08 against a distance, so it is a RANGE.
+ * Outside the arc a target still counts if it is inside that range -- a unit
+ * can be engaged from behind, but only close up. */
+void __cdecl AiAttackBody(void *obj, void *out, void *ctx)
+{
+    uint8_t       *o = (uint8_t *)obj;
+    uint8_t       *w = (uint8_t *)out;
+    uint8_t       *c = (uint8_t *)ctx;
+    const uint8_t *rank = (const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+                          + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
+                                * RANK_REC_BYTES;
+    uint8_t *leader;
+    int32_t  routed = 0;
+    int32_t  dist   = 0;
+    uint8_t  facing, bearing;
+
+    if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_ARRIVED_DIST) {
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+        AiRouteToward(obj, out, ctx, 0);
+        routed = 1;
+        if (*(void *const *)(c + SIGHT_OFF_FOUND))
+            AiPromoteFound(o, c);
+    } else {
+        *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    }
+
+    leader = *(uint8_t *const *)(c + SIGHT_OFF_LEADER);
+    if (!leader)
+        goto no_leader;
+
+    /* ONE SLOT, WRITTEN TWICE: a type 3 with more than one row aims with its
+     * turret and the hull's facing is simply overwritten. Two locals here
+     * would give a vehicle the wrong arc. */
+    facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
+    if (ObjIsType3((const AM2_Object *)o)
+        && *(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
+        facing = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
+
+    {
+        int32_t viewerAttr = ObjTileAttr(o);
+        int32_t dx = (int32_t)*(const int16_t *)(leader + OBJ_OFF_POS)
+                     - (int32_t)*(const int16_t *)(o + OBJ_OFF_POS);
+        int32_t dy = (int32_t)*(const int16_t *)(leader + OBJ_OFF_POS + 2)
+                     - (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2);
+        int32_t  delta;
+        uint8_t *rec;
+        int32_t  gen;
+
+        dist    = ApproxDistXY(dx, dy);
+        bearing = (uint8_t)AngleOfDelta(dx, dy);
+
+        delta = AngleDelta(facing, bearing);
+        if (delta < 0)
+            delta = -delta;
+        if (delta > *(const int32_t *)(rank + RANK_REC_OFF_FIELD_04)) {
+            if (dist < *(const int32_t *)(rank + RANK_REC_OFF_FIELD_08))
+                goto engage;
+            goto out_of_sight;
+        }
+
+        rec = (uint8_t *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR
+              + ((uint32_t)facing / AM2_SIGHT_DIR_STEP) * AM2_SIGHT_DIR_STRIDE;
+        gen = *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
+
+        if (*(const int32_t *)(rec + SIGHTDIR_OFF_TRACE_STAMP) != gen) {
+            uint16_t       buf[AM2_AI_SIGHT_LINE_MAX];
+            const uint8_t *attrs = *(const uint8_t *const *)(uintptr_t)
+                                       ADDR_TILE_ATTRS;
+            int32_t        highest = AM2_AI_SIGHT_FLOOR;
+            int32_t        n = 0, i = 0, reach;
+
+            *(int32_t *)(rec + SIGHTDIR_OFF_TRACE_STAMP) = gen;
+            TraceTileLine(*(const uint32_t *)(o + OBJ_OFF_POS),
+                          *(const uint32_t *)(leader + OBJ_OFF_POS), buf, &n);
+
+            /* A tile HIGHER than the viewer's own raises the running maximum
+             * and does not stop the walk; only the step back down from it
+             * does, and only by more than AM2_SIGHT_BAND_STEP. */
+            while (i < n) {
+                int32_t a = (int8_t)attrs[buf[i]];
+
+                if (a > viewerAttr)
+                    highest = a;
+                else if (a + AM2_SIGHT_BAND_STEP < highest)
+                    break;
+                i++;
+            }
+
+            reach = i * AM2_AI_SIGHT_TILE_SPAN + AM2_AI_SIGHT_TILE_BASE;
+            if (reach >= *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE))
+                reach = *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE);
+
+            /* The SECOND cache on the same record: three running minima, all
+             * three seeded together when the generation moves. */
+            if (*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP) == gen) {
+                if (reach < *(const int16_t *)(rec + SIGHTDIR_OFF_LOW))
+                    *(int16_t *)(rec + SIGHTDIR_OFF_LOW) = (int16_t)reach;
+                if (reach < *(const int16_t *)(rec + SIGHTDIR_OFF_MID))
+                    *(int16_t *)(rec + SIGHTDIR_OFF_MID) = (int16_t)reach;
+                if (reach < *(const int16_t *)(rec + SIGHTDIR_OFF_HIGH))
+                    *(int16_t *)(rec + SIGHTDIR_OFF_HIGH) = (int16_t)reach;
+            } else {
+                *(int32_t *)(rec + SIGHTDIR_OFF_STAMP) = gen;
+                *(int16_t *)(rec + SIGHTDIR_OFF_LOW)   = (int16_t)reach;
+                *(int16_t *)(rec + SIGHTDIR_OFF_MID)   = (int16_t)reach;
+                *(int16_t *)(rec + SIGHTDIR_OFF_HIGH)  = (int16_t)reach;
+            }
+        }
+
+        if (*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP) != gen) {
+            /* No minima for this heading: fall back on the rank's own range. */
+            if (dist > *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE))
+                goto out_of_sight;
+        } else {
+            int32_t mine = ObjHeight(o);
+            int32_t his  = ObjHeight(leader);
+
+            /* THE HIGH ARM BORROWS THE LOW ARM'S COMPARE in the original --
+             * its `cmp` falls into the `jg` fifteen instructions above it. The
+             * three bands are otherwise the same test on different fields. */
+            if (his >= mine) {
+                if (dist > *(const int16_t *)(rec + SIGHTDIR_OFF_LOW))
+                    goto out_of_sight;
+            } else if (his + AM2_SIGHT_BAND_STEP < mine) {
+                if (dist > *(const int16_t *)(rec + SIGHTDIR_OFF_HIGH))
+                    goto out_of_sight;
+            } else if (dist > *(const int16_t *)(rec + SIGHTDIR_OFF_MID)) {
+                goto out_of_sight;
+            }
+        }
+    }
+
+engage:
+    /* THE TWO ARMS ARE NOT AN if/else. The far one chases and RETURNS; the
+     * near one records the target and FALLS THROUGH into the hit tail, so a
+     * unit already at the range it wants still reacts to being hit and still
+     * turns toward what the context found. Writing the near arm as the far
+     * one's `else` with a shared tail deletes that silently. */
+    if (*(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE)
+        > *(const int32_t *)(c + SIGHT_OFF_WANT_RANGE)) {
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(leader + OBJ_OFF_POS);
+        if (!routed)
+            AiRouteToward(obj, out, ctx, 0);
+        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
+            *(const uint32_t *)(leader + OBJ_OFF_UID);
+        *(void **)(c + SIGHT_OFF_OBSERVER) = leader;
+        *(int32_t *)(c + SIGHT_OFF_RANGE) =
+            *(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE);
+        *(c + SIGHT_OFF_BEARING) =
+            *(const uint8_t *)(c + SIGHT_OFF_LEAD_BEARING);
+        w[1] = *(const uint8_t *)(c + SIGHT_OFF_LEAD_BEARING);
+        goto done;
+    }
+
+    *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
+        *(const uint32_t *)(leader + OBJ_OFF_UID);
+    *(int32_t *)(c + SIGHT_OFF_RANGE) =
+        *(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE);
+    *(void **)(c + SIGHT_OFF_OBSERVER) = leader;
+    *(c + SIGHT_OFF_BEARING) = *(const uint8_t *)(c + SIGHT_OFF_LEAD_BEARING);
+    w[1] = *(const uint8_t *)(c + SIGHT_OFF_LEAD_BEARING);
+
+    /* ---- the CLOSE tail, which is not the no-leader tail below even though
+     * both open with the same OBJ_OFF_HIT_DIR block. This one turns on
+     * SIGHT_OFF_LEAD_BEARING and ends by walking toward a type-2 leader; that
+     * one turns on SIGHT_OFF_BEARING and writes OBJ_OFF_FOLLOW_UID.
+     *
+     * TWO OF ITS GUARDS CANNOT FAIL ON THIS PATH and are kept anyway. The
+     * arm above has just written SIGHT_OFF_OBSERVER, so the hit never turns
+     * the unit here -- only the clear runs, which is the behaviour
+     * AiStepIgnore's comment describes and here it is guaranteed rather than
+     * possible. And SIGHT_OFF_LEADER was tested non-null at the top, so the
+     * delayed turn's first test is always true. Both are live when the block
+     * is reached the other way, which it is not; reproduced because the
+     * original does not know that either. */
+    if (*(const uint8_t *)(o + OBJ_OFF_HIT_DIR)) {
+        if (!*(void *const *)(c + SIGHT_OFF_OBSERVER))
+            w[1] = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
+        *(o + OBJ_OFF_HIT_DIR) = 0;
+    }
+    if (leader
+        && (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                      - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
+           >= AM2_AI_TURN_DELAY_MS)
+        w[1] = *(const uint8_t *)(c + SIGHT_OFF_LEAD_BEARING);
+
+    if (!ObjIsType2((const AM2_Object *)leader))
+        goto done;
+    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+        *(const uint32_t *)(leader + OBJ_OFF_POS);
+    if (routed)
+        goto done;
+    AiRouteToward(obj, out, ctx, 0);
+    goto done;
+
+out_of_sight:
+    /* Face it and walk to it, but do not claim it as the observer. */
+    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+        *(const uint32_t *)(leader + OBJ_OFF_POS);
+    if (!routed)
+        AiRouteToward(obj, out, ctx, 0);
+    w[1] = *(const uint8_t *)(c + SIGHT_OFF_LEAD_BEARING);
+    if (*(void *const *)(c + SIGHT_OFF_FOUND))
+        AiPromoteFound(o, c);
+    goto done;
+
+no_leader:
+    if (*(const uint8_t *)(o + OBJ_OFF_HIT_DIR)) {
+        if (!*(void *const *)(c + SIGHT_OFF_OBSERVER))
+            w[1] = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
+        *(o + OBJ_OFF_HIT_DIR) = 0;
+    }
+    if (*(void *const *)(c + SIGHT_OFF_FOUND)) {
+        AiPromoteFound(o, c);
+        w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
+    }
+    if (*(void *const *)(c + SIGHT_OFF_OBSERVER)) {
+        if ((uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                       - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
+            >= AM2_AI_TURN_DELAY_MS)
+            w[1] = *(const uint8_t *)(c + SIGHT_OFF_BEARING);
+        *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
+            *(const uint32_t *)(*(uint8_t *const *)(c + SIGHT_OFF_OBSERVER)
+                                + OBJ_OFF_UID);
+    }
+
+done:
+    ConsiderSighting(o, w, c);
+}
+
 /* AiStepFollow -- original 0x00407C80, one caller. Mode 3, and the name comes
  * from what the context builder puts in front of it rather than from a
  * keyword: the record's SIGHT_OFF_LEADER is the object at OBJ_OFF_FOLLOW_UID,
@@ -3977,9 +4231,7 @@ void __cdecl AiStepFollow(void *obj, void *out, void *ctx)
     ConsiderSighting(obj, out, ctx);
 }
 
-typedef void (__cdecl *AM2_AiBodyFn)(void *obj, void *out, void *ctx);
 
-#define orig_ai_attack_body ((AM2_AiBodyFn)(uintptr_t)ADDR_AI_ATTACK_BODY)
 
 /* AiStepAttack -- original 0x00407BD0, one caller. Mode 6, and it forwards its
  * three arguments to ADDR_AI_ATTACK_BODY and does nothing else.
@@ -3993,7 +4245,7 @@ typedef void (__cdecl *AM2_AiBodyFn)(void *obj, void *out, void *ctx);
  */
 void __cdecl AiStepAttack(void *obj, void *out, void *ctx)
 {
-    orig_ai_attack_body(obj, out, ctx);
+    AiAttackBody(obj, out, ctx);
 }
 
 /* AiStep -- original 0x00407F80, two callers, both in ADDR_STEP_TYPE3. One
@@ -4038,7 +4290,7 @@ void __cdecl AiStep(void *obj, void *out)
     AiBuildContext(obj, ctx);
 
     switch (*(const uint32_t *)(o + OBJ_OFF_AI_MODE)) {
-    case 0:  orig_ai_attack_body(obj, out, ctx); break;
+    case 0:  AiAttackBody(obj, out, ctx); break;
     case 2:  AiStepIgnore(obj, out, ctx);        break;
     case 3:  AiStepFollow(obj, out, ctx);        break;
     case 6:  AiStepAttack(obj, out, ctx);        break;
@@ -7127,6 +7379,8 @@ int region_install(void)
                         "RegionFindPath", 1);
     rc |= patch_replace(ADDR_AI_TROOPER_STEP, (const void *)AiTrooperStep,
                         "AiTrooperStep", 26);
+    rc |= patch_replace(ADDR_AI_ATTACK_BODY, (const void *)AiAttackBody,
+                        "AiAttackBody", 2);
     rc |= patch_replace(ADDR_FIND_PATH, (const void *)FindPath,
                         "FindPath", 1);
     rc |= patch_replace(ADDR_ITEM_TEARDOWN, (const void *)ItemTeardown,

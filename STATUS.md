@@ -95,8 +95,8 @@ because `0x00458A20` sits inside a 5,760-byte `functions.tsv` entry that holds
 **seventeen** functions and patching any one of them credits all of it. The
 same effect inflates the entry count.
 
-    entry-generous   1,227 of 1,239 entries, 92.5% of sub-CRT bytes
-    split-aware      1,378 of 1,530 real functions, 83.5% of sub-CRT bytes
+    entry-generous   1,228 of 1,239 entries, 92.8% of sub-CRT bytes
+    split-aware      1,379 of 1,530 real functions, 83.8% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -213,50 +213,47 @@ ran-out arm re-tests the two conditions that got it there, the other way round,
 and falls through both. Said out loud because dropping two dead compares is how
 a live one goes with them.
 
-## Next: AiAttackBody, mapped block by block
+## AiAttackBody, written from a map after the first attempt was discarded
 
-`0x00407710`, 1,216 bytes over a `TraceTileLine` buffer. The survey is in
-`orig.h` and now carries a BLOCK MAP rather than a description, because three
-separate readings of the control flow were wrong on the way to it -- and the
-function is cold, so nothing but reading will catch a fourth.
+`0x00407710`, 1,216 bytes over a `TraceTileLine` buffer. Entries 1,227 -> 1,228
+of 1,239, **11 left**. `ab.sh bootcamp campaign` clean -- no-regression, since
+the AI band is cold and the counter is blind.
 
-**A claim from the first survey was wrong and is corrected.** It said
-`RANK_REC_OFF_FIELD_04` and `_FIELD_08` are both compared against
-`abs(AngleDelta(...))`. Only the first is: `FIELD_08` is compared against an
-`ApproxDistXY`, so it is a DISTANCE, and 120..190 sits sensibly below
-`FIELD_00`'s 280..320 sight range. The two are read four bytes apart off one
-`rank * 28` base, which is exactly how one plausible sentence covered both and
-hid the difference. `FIELD_04` still gains its second independent reader as an
-arc, which is what `AddSightBlocker`'s note was waiting for.
+The first attempt was thrown away: three of its control-flow decisions were
+wrong, and being cold means no A/B could have told me. The second was written
+against a block map committed first, and the map's four warnings are all in the
+code as comments at their sites:
 
-Three shapes the map records, all of them things a fresh transcription gets
-wrong:
-
-- **The two tails are different functions and look like one.** Both open with
-  the identical `OBJ_OFF_HIT_DIR` block; one then turns on `LEAD_BEARING` and
-  ends in an `ObjIsType2` test, the other turns on `BEARING`, promotes, and
-  writes `OBJ_OFF_FOLLOW_UID`.
+- **The two tails are different functions that open identically.** Both start
+  with the same `OBJ_OFF_HIT_DIR` block; one turns on `LEAD_BEARING` and ends
+  by walking toward a type-2 leader, the other turns on `BEARING`, promotes,
+  and writes `OBJ_OFF_FOLLOW_UID`.
 - **The engage arms are not an `if`/`else`.** The far arm chases and returns;
-  the near arm records the target and falls into the hit tail, so a unit
-  already at the range it wants still reacts to a hit and still turns.
-- **One arm ends inside another** -- the HIGH band's compare jumps back to
-  borrow the LOW band's `jg`, so following bodies without following branches
-  gives it no exit.
+  the near arm records the target and falls through into the hit tail.
+- **The HIGH band borrows the LOW band's compare**, so following bodies without
+  following branches gives it no exit.
+- **The facing is written twice into one slot** -- hull, then turret for a
+  type 3 with more than one row. Two locals give a vehicle the wrong arc.
+
+Two guards on the fall-through path provably cannot fail, because the arm above
+has just written the field they test. Kept: they are live when the block is
+reached the other way, which it is not, and the original does not know that
+either.
 
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT
-line (0x0045C000) patched**. Measured: **1,227 of 1,239** entries in
-`docs/functions.tsv` below that address have a patch inside them -- so 12
-outstanding, which is 1,239 minus 1,227 -- from 1,423 reconstructed addresses
-(1,419 patched plus 4 registered), and **92.5% of the sub-CRT bytes**.
-Split-aware that is **1,378 of 1,530** real functions and **83.5%** of the
+line (0x0045C000) patched**. Measured: **1,228 of 1,239** entries in
+`docs/functions.tsv` below that address have a patch inside them -- so 11
+outstanding, which is 1,239 minus 1,228 -- from 1,424 reconstructed addresses
+(1,420 patched plus 4 registered), and **92.8% of the sub-CRT bytes**.
+Split-aware that is **1,379 of 1,530** real functions and **83.8%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
 With a target, the strategy changed: rank what is left by SIZE and take the
 small ones in batches. A hundred and fifty-one batches have gone in and NOTHING SMALL IS LEFT among
-the ENTRIES: the 12 outstanding start at **1,216 bytes** -- `0x00407710` -- and
+the ENTRIES: the 11 outstanding start at **1,264 bytes** -- `0x00406B30` -- and
 the median is **2,080**. That is not what is left, though: `tools/merges.py`
 splits them into real functions and the 0x00458930 entry alone still holds
 sixteen unwritten ones from 16 bytes up. Rank by real function, not by entry. The

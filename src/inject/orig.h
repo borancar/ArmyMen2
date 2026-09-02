@@ -7288,6 +7288,11 @@ typedef struct {
 #define SIGHTDIR_OFF_MID         0x02u
 #define SIGHTDIR_OFF_HIGH        0x04u
 #define SIGHTDIR_OFF_STAMP       0x08u  /* int32, against the generation */
+/* A SECOND stamp on the same record, and the two gate different things:
+ * this one says the tile line has already been walked for this heading, the
+ * one above says the three minima are current. AiAttackBody checks them
+ * separately and only skips the trace on the first. */
+#define SIGHTDIR_OFF_TRACE_STAMP 0x0Cu  /* int32 */
 #define AM2_SIGHT_DIR_STRIDE     16u
 #define AM2_SIGHT_DIR_STEP       4      /* headings per record */
 #define ADDR_SIGHT_GENERATION    0x004F93C0u  /* int32_t */
@@ -7299,6 +7304,13 @@ typedef struct {
 /* Added to the silhouette distance before the range test, so a blocker just
  * past the rank's sight range still fails it. */
 #define AM2_SIGHT_DIST_PAD       0x10
+/* AiAttackBody's tile walk. The running maximum starts below anything a tile
+ * attribute can hold, and the count of tiles it got through becomes a distance
+ * as `i * SPAN + BASE`. The buffer is the rest of its 0x81C frame. */
+#define AM2_AI_SIGHT_FLOOR       (-0x7F)
+#define AM2_AI_SIGHT_TILE_SPAN   20
+#define AM2_AI_SIGHT_TILE_BASE   16
+#define AM2_AI_SIGHT_LINE_MAX    1016
 #define RANK_REC_BYTES           28u
 /* 280 285 290 295 300 305 310 320, doubled at the one site that reads it --
  * so 560..640, the range past which a trooper forgets its target. */
