@@ -9443,6 +9443,76 @@ int32_t __cdecl PointerPickMode0(void *obj)
     return 0;   /* a hint, not a yes -- see above */
 }
 
+/* PointerPickHeal -- original 0x004597B0, the first of the two functions in the
+ * 0x004597B0 entry. A PICK gated on a MENU ROW rather than on a pointer mode.
+ *
+ * ITS FIRST TWO GUARDS ARE THE SAME TEST TWICE, on two different globals: with
+ * ADDR_MOUSE_BUTTON set it requires GetMenuRow() to be 0xB, and then with
+ * ADDR_MOUSE_CHANGED set it requires the same thing again. Either can refuse
+ * independently. Reproduced as the two tests the original makes rather than
+ * collapsed into one, because they read different globals.
+ *
+ * WHAT IT OFFERS: a friendly TROOPER that is HURT -- health strictly below
+ * OBJ_OFF_MAX_HEALTH -- riding whatever our leader is riding, and within a
+ * reach threshold. That last condition is the interesting one: it compares
+ * OBJ_OFF_RIDING on both, so a leader on foot can only heal someone on foot and
+ * a leader in a vehicle only its passengers. Not "the same vehicle" as a
+ * special case; the same field, which is 0 for both when neither is riding.
+ *
+ * The alliance test is ArmyAlliedWithObj again, and the refusal is the plain
+ * one: not allied, no offer. This is the first pick in the family whose
+ * alliance test has no hoisted guard around it.
+ *
+ * Unlike modes 4, 5 and 6 it does NOT use the shared friend tail -- it has its
+ * own smaller set of conditions and answers 1 directly.
+ *
+ * Not exercised: it needs menu row 0xB, and no drive here opens that row. Its
+ * counter is not blind, so that is checkable if a drive ever reaches it.
+ *
+ * AND checkoffsetuse IS NOISY HERE FOR A REASON WORTH KNOWING: this address's
+ * functions.tsv entry is 1,072 bytes and holds TWO functions, so the tool's
+ * "original" side is both of them. It reports OBJ_OFF_FIELD_9C among the
+ * offsets this function does not name, and that offset belongs to the sibling
+ * at 0x004599A0. A merged entry makes that tool over-report the same way it
+ * makes coverage over-credit. */
+int32_t __cdecl PointerPickHeal(void *obj)
+{
+    uint8_t *o = (uint8_t *)obj;
+    uint8_t *leader;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+        && GetMenuRow() != AM2_MENU_ROW_HEAL)
+        return 0;
+    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
+        && GetMenuRow() != AM2_MENU_ROW_HEAL)
+        return 0;
+
+    if (!ArmyAlliedWithObj(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                           o, 0))
+        return 0;
+
+    leader = OurLeaderUnit();
+    if (!leader)
+        return 0;
+
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH)
+        >= *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH))
+        return 0;
+    if (!o || *(const int32_t *)o != AM2_OBJ_TYPE_TROOPER)
+        return 0;
+    if (*(const uint32_t *)(leader + OBJ_OFF_RIDING)
+        != *(const uint32_t *)(o + OBJ_OFF_RIDING))
+        return 0;
+
+    if (ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
+                   (const AM2_Point *)(o + OBJ_OFF_X))
+        > *(const int32_t *)(uintptr_t)ADDR_PICK_REACH_6624EC)
+        return 0;
+
+    OverlayPrepare(AM2_MENU_ROW_HEAL, 1);
+    return 1;
+}
+
 /* PointerPickWatchedItem -- original 0x00459EE0, 208 bytes, one reference: the
  * PICK slot of a record in the second {pick, action, kind, flags} table.
  *
@@ -10807,6 +10877,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_POINTER_PICK_MODE0,
                         (const void *)PointerPickMode0,
                         "PointerPickMode0", 1);
+    rc |= patch_replace(ADDR_POINTER_PICK_HEAL,
+                        (const void *)PointerPickHeal,
+                        "PointerPickHeal", 1);
     rc |= patch_replace(ADDR_SET_WEAPON_TARGET_AIMED,
                         (const void *)SetWeaponTargetAimed,
                         "SetWeaponTargetAimed", 4);

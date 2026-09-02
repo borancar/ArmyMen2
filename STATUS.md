@@ -9,8 +9,28 @@ Last updated: **2026-09-02**, at `969936a`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,406 patches plus 3 REGISTERED = 1,409 reconstructed
+Nothing uncommitted. **1,407 patches plus 3 REGISTERED = 1,410 reconstructed
 addresses**, **30** analysis tools in `make check`.
+
+**`PointerPickHeal` (`0x004597B0`) is reconstructed** -- the first pick gated on
+a MENU ROW rather than a pointer mode. Offer to heal a friendly TROOPER that is
+hurt, riding whatever our leader rides, and within reach.
+
+**Its first two guards are the same test twice** on two different globals:
+`ADDR_MOUSE_BUTTON` then `ADDR_MOUSE_CHANGED`, each requiring `GetMenuRow()` to
+be 0xB. Either can refuse independently, so they are written as the two tests
+the original makes.
+
+**The riding condition compares `OBJ_OFF_RIDING` on both**, so a leader on foot
+can only heal someone on foot and a leader in a vehicle only its passengers --
+not "the same vehicle" as a special case, just the same field, which is 0 for
+both when neither is riding.
+
+**And `checkoffsetuse` is noisy here for a knowable reason**: this address's
+entry is 1,072 bytes and holds TWO functions, so the tool's "original" side is
+both. It reports `OBJ_OFF_FIELD_9C` as unnamed, and that offset belongs to the
+sibling at 0x004599A0. A merged entry makes that tool over-report the same way
+it makes coverage over-credit.
 
 **`PointerPickMode0` (`0x00459420`, 912 B) is reconstructed** -- the DEFAULT
 pointer's pick, and **measured at 8,520 calls** on a driven Boot Camp mission
@@ -233,7 +253,7 @@ that holds **seventeen** functions and patching any one of them credits all of
 it. The same effect inflates the entry count.
 
     entry-generous   1,220 of 1,239 entries, 89.5% of sub-CRT bytes
-    split-aware      1,366 of 1,530 real functions, 80.8% of sub-CRT bytes
+    split-aware      1,367 of 1,530 real functions, 81.0% of sub-CRT bytes
 
 `tools/merges.py` produces the second. The stop condition below is stated in
 entries because that is what `docs/functions.tsv` counts, and it remains a
@@ -244,9 +264,9 @@ ceiling rather than a floor -- ten percentage points of ceiling, measured.
 The loop's `completion_promise` is now **every game function below the CRT
 line (0x0045C000) patched**. Measured: **1,220 of 1,239** entries in
 `docs/functions.tsv` below that address have a patch inside them -- so 19
-outstanding, which is 1,239 minus 1,220 -- from 1,409 reconstructed addresses
-(1,406 patched plus 3 registered), and **89.5% of the sub-CRT bytes**.
-Split-aware that is **1,366 of 1,530** real functions and **80.8%** of the
+outstanding, which is 1,239 minus 1,220 -- from 1,410 reconstructed addresses
+(1,407 patched plus 3 registered), and **89.5% of the sub-CRT bytes**.
+Split-aware that is **1,367 of 1,530** real functions and **81.0%** of the
 bytes; see the section above. That figure counts merged entries generously and is a
 ceiling on progress rather than a floor -- read it with `tools/merges.py`.
 
