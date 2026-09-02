@@ -338,5 +338,10 @@ void __cdecl FreeSpriteGroups(void);
  * 1.000 against the first pair, so they share the implementation. */
 void __cdecl LoadSpriteGroupsB(void);
 void __cdecl FreeSpriteGroupsB(void);
+/* 0x00462BE0 and 0x00462C60. The third table: four records of 0x0C bytes,
+ * positional sprite indices from 0xC8, flags 0x1000. Not a copy of the first
+ * two -- 0.878 -- and its releaser skips the free where theirs does not. */
+void __cdecl LoadSpriteGroupsC(void);
+void __cdecl FreeSpriteGroupsC(void);
 
 #endif /* AM2_SPRITE_H */

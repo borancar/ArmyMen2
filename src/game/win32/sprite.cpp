@@ -850,6 +850,12 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
     rc |= patch_replace(ADDR_FREE_SPRITE_GROUPS_B,
                         (const void *)FreeSpriteGroupsB,
                         "FreeSpriteGroupsB", 1);
+    rc |= patch_replace(ADDR_LOAD_SPRITE_GROUPS_C,
+                        (const void *)LoadSpriteGroupsC,
+                        "LoadSpriteGroupsC", 1);
+    rc |= patch_replace(ADDR_FREE_SPRITE_GROUPS_C,
+                        (const void *)FreeSpriteGroupsC,
+                        "FreeSpriteGroupsC", 1);
     return rc;
 }
 
@@ -2425,4 +2431,65 @@ void __cdecl FreeSpriteGroupsB(void)
 {
     FreeGroupRange((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_B,
                    (const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_B_END);
+}
+
+/* 0x00462BE0. The third group table's loader. NOT a copy of the first two --
+ * it diffs 0.878 against them, and every one of the differences matters: a
+ * 0x0C stride, a positional sprite index instead of one held in the record,
+ * flags 0x1000 rather than 0x1080, and a loop pointer that IS the record
+ * base where the first table's is four bytes into it.
+ *
+ * That last one is the trap in reverse. Having just corrected pair A's base
+ * downward, the natural move is to correct this one too -- and it would put
+ * the table four bytes early. The absence of a negative displacement is the
+ * evidence, and it is only visible in this body. */
+void __cdecl LoadSpriteGroupsC(void)
+{
+    uint8_t *r;
+    int32_t  group = 0;
+
+    for (r = (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C;
+         r < (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C_END;
+         r += AM2_SPRITEGRP_C_BYTES, group++) {
+        int32_t n = *(const int32_t *)(r + SPRITEGRP_C_OFF_COUNT);
+        AM2_Sprite **slots;
+        int32_t i;
+
+        if (*(void **)(r + SPRITEGRP_C_OFF_SPRITES) != 0)
+            continue;
+
+        slots = (AM2_Sprite **)am2_malloc((size_t)n * sizeof(AM2_Sprite *));
+        *(void **)(r + SPRITEGRP_C_OFF_SPRITES) = slots;
+        memset(slots, 0, (size_t)n * sizeof(AM2_Sprite *));
+
+        for (i = 0; i < n; i++)
+            slots[i] = PreloadSprite(AM2_SPRITEGRP_SET,
+                                     AM2_SPRITEGRP_C_BASE + group, i,
+                                     AM2_SPRITEGRP_C_FLAGS, 1);
+    }
+}
+
+/* 0x00462C60. Its releaser, and it does NOT free unconditionally where the
+ * first table's does: the `cmp; je` here jumps to the loop increment while
+ * the first one's jumps to the free itself. One displacement apart, and the
+ * difference between ten free(NULL) calls per teardown and none. */
+void __cdecl FreeSpriteGroupsC(void)
+{
+    uint8_t *r;
+
+    for (r = (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C;
+         r < (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C_END;
+         r += AM2_SPRITEGRP_C_BYTES) {
+        AM2_Sprite **slots = *(AM2_Sprite ***)(r + SPRITEGRP_C_OFF_SPRITES);
+        int32_t n, i;
+
+        if (slots == 0)
+            continue;
+
+        n = *(const int32_t *)(r + SPRITEGRP_C_OFF_COUNT);
+        for (i = 0; i < n; i++)
+            ReleaseSprite(slots[i]);
+        am2_free(slots);
+        *(void **)(r + SPRITEGRP_C_OFF_SPRITES) = 0;
+    }
 }

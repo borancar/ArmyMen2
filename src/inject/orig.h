@@ -6656,6 +6656,23 @@ typedef struct {
 #define AM2_SPRITEGRP_BYTES       0x18u
 #define AM2_SPRITEGRP_SET         0x13   /* every group loads from this set */
 #define AM2_SPRITEGRP_FLAGS       0x1080
+/* THE THIRD GROUP TABLE, and almost nothing carries over from the first two.
+ * Records are 0x0C bytes, not 0x18, because the sprite index is POSITIONAL --
+ * 0xC8 plus the group number -- so the record holds no key. And the two
+ * halves disagree about their own walker: the loader's pointer IS the record
+ * base, with no negative displacement anywhere, while the releaser's is at
+ * +4 and reads [edi-4] for the count.
+ *
+ * It begins where table B ends, so the four tables tile. */
+#define ADDR_SPRITE_GROUPS_C      ADDR_SPRITE_GROUPS_B_END
+#define ADDR_SPRITE_GROUPS_C_END  0x0048CA38u
+#define SPRITEGRP_C_OFF_COUNT     0x00u
+#define SPRITEGRP_C_OFF_SPRITES   0x04u
+#define AM2_SPRITEGRP_C_BYTES     0x0Cu
+#define AM2_SPRITEGRP_C_BASE      0xC8   /* the first group's sprite index */
+#define AM2_SPRITEGRP_C_FLAGS     0x1000 /* not 0x1080, as the first two use */
+#define ADDR_LOAD_SPRITE_GROUPS_C 0x00462BE0u  /* void(void) */
+#define ADDR_FREE_SPRITE_GROUPS_C 0x00462C60u  /* void(void) */
 #define ADDR_LOAD_SPRITE_GROUPS   0x00462A60u  /* void(void) */
 #define ADDR_FREE_SPRITE_GROUPS   0x00462AD0u  /* void(void) */
 #define ADDR_PRELOAD_SPRITE       0x00445B00u
