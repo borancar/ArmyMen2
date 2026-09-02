@@ -130,4 +130,10 @@ void __cdecl CommDrainMsgs(void);
  * batch and answer the pointer past it. */
 const void *__cdecl TroopSubParse(const void *rec, int32_t army);
 
+/* 0x004014C0. The flow-control receive path, called from the receive thread
+ * for every message on a reliable channel. Dispatches AM2_FLOW_DATA,
+ * AM2_FLOW_NACK and AM2_FLOW_PULSE_ACK. Answers 1 when it has dealt with the
+ * message and 0 when the caller should queue it. */
+int32_t __cdecl FlowRecvMessage(void *nodev);
+
 #endif

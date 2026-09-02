@@ -1681,7 +1681,8 @@ int32_t __cdecl RecvThreadProc(void *param)
                              (DWORD *)(node + MSGNODE_OFF_BODY_LEN)))
                 break;   /* nothing left -- the node is kept for next time */
 
-            if (!((AM2_RecvMsgFn)(uintptr_t)ADDR_RECV_MSG_4014C0)(msg))
+            /* 0 means the flow layer did not consume it. */
+            if (!FlowRecvMessage(msg))
                 MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_B, msg);
 
             got = 1;

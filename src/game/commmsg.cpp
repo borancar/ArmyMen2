@@ -2685,6 +2685,8 @@ int commmsg_install(void)
     patch_replace(ADDR_MENU_MESSAGE, (const void *)MenuMessage,
                   "MenuMessage", 6);
     patch_replace(ADDR_ANNOUNCE, (const void *)Announce, "Announce", 12);
+    patch_replace(ADDR_RECV_MSG_4014C0, (const void *)FlowRecvMessage,
+                  "FlowRecvMessage", 1);
     return 0;
 }
 
