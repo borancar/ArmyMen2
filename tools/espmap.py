@@ -36,6 +36,18 @@ reports neither, which is itself evidence that the decode is sound -- 559
 instructions with every edge agreeing is not what a desynchronised disassembly
 looks like.
 
+AND THE FIRST TIME IT REPORTED SOMETHING, THE TOOL WAS WRONG AND THE REPORT WAS
+RIGHT. 0x0044AFB0 came back with ten disagreeing depths, every one of them four
+bytes, every one downstream of `push ecx; mov ecx, <this>; call` -- a THISCALL,
+whose callee pops its own argument with no `add esp` at the call site to see.
+The fix is to decode each callee and read its `ret N`, which is the same
+technique CLAUDE.md prescribes for telling two copy variants apart. All ten
+went, and the four functions whose maps were already checked by hand came back
+byte for byte the same.
+
+That is the shape to expect from this tool: a disagreement is a fact about the
+code or a gap in the model, and saying which costs one look at the site.
+
     tools/espmap.py 0x00403B40
 """
 
@@ -59,6 +71,41 @@ def decode(addr):
             ins.append((int(m.group(1), 16), m.group(2),
                         re.sub(r";.*", "", m.group(3)).strip()))
     return ins
+
+
+_RET_N = {}
+
+
+def callee_pops(target):
+    """How many bytes a callee removes on return -- its `ret N`, or 0.
+
+    THIS IS WHY THE TOOL NEEDED A SECOND PASS. A cdecl call leaves esp alone
+    and the caller cleans; a THISCALL or STDCALL callee pops its own arguments
+    and there is no `add esp` at the call site to see. CLAUDE.md records that
+    forgetting this "makes a function unreadable" and that it was the single
+    thing which deferred CreateVehicle -- and it is exactly what made this tool
+    report ten disagreeing depths in 0x0044AFB0, every one of them four bytes,
+    every one of them downstream of `push ecx; mov ecx, <this>; call`.
+
+    So the callee is decoded and its terminating `ret N` read, which is the
+    same technique CLAUDE.md prescribes for telling two copy variants apart.
+    A callee that cannot be decoded answers 0, which is the cdecl assumption
+    and the one that was wrong before -- but now it is wrong only where the
+    disassembler already failed, and the disagreement report says so."""
+    if target in _RET_N:
+        return _RET_N[target]
+    _RET_N[target] = 0            # break recursion before decoding
+    n = 0
+    for _, mn, ops in decode("0x%08X" % target):
+        if mn == "ret" and ops:
+            # disasm.py annotates the line ("ret 4   <<< cleans 4 bytes"), so
+            # take the first token and accept either base -- capstone prints
+            # this immediate in decimal where it prints most others in hex.
+            m = re.match(r"(0x[0-9a-fA-F]+|\d+)", ops.strip())
+            n = int(m.group(1), 0) if m else 0
+            break
+    _RET_N[target] = n
+    return n
 
 
 def delta(mn, ops):
@@ -93,7 +140,8 @@ def main():
     esp = {}
     esp[ins[0][0]] = 0
     work = [ins[0][0]]
-    bad = set()
+    bad = {}
+    src = {}
     while work:
         a = work.pop()
         i = at[a]
@@ -103,15 +151,19 @@ def main():
             d = delta(mn, ops)
             if d is None:            # ret: end of path
                 break
+            if mn == "call" and re.match(r"^0x[0-9a-f]+$", ops):
+                d += callee_pops(int(ops, 16))
             nxt = cur + d
             tgt = None
             if mn[0] == "j" and re.match(r"^0x[0-9a-f]+$", ops):
                 tgt = int(ops, 16)
             if tgt is not None and tgt in at:
                 if tgt in esp and esp[tgt] != nxt:
-                    bad.add(tgt)
+                    bad.setdefault(tgt, []).append((ad, nxt, esp[tgt],
+                                                    src.get(tgt)))
                 elif tgt not in esp:
                     esp[tgt] = nxt
+                    src[tgt] = ad
                     work.append(tgt)
             if mn == "jmp":
                 break
@@ -119,11 +171,13 @@ def main():
                 break
             nad = ins[i + 1][0]
             if nad in esp and esp[nad] != nxt:
-                bad.add(nad)
+                bad.setdefault(nad, []).append((ad, nxt, esp[nad],
+                                                src.get(nad)))
                 break
             if nad in esp:
                 break
             esp[nad] = nxt
+            src[nad] = ad
             cur = nxt
             i += 1
 
@@ -143,8 +197,12 @@ def main():
     print("%s: %d instructions, frame origin at esp%+d" %
           (sys.argv[1], len(ins), -base))
     if bad:
-        print("  %d instruction(s) reached at DISAGREEING depths: %s" %
-              (len(bad), " ".join("0x%08x" % a for a in sorted(bad))))
+        print("  %d instruction(s) reached at DISAGREEING depths:" % len(bad))
+        for a in sorted(bad):
+            for frm, got, had, first in bad[a]:
+                print("     0x%08x: %+d from 0x%08x, but %+d from 0x%08x"
+                      % (a, got, frm, had,
+                         first if first is not None else 0))
     if unknown:
         print("  %d reference(s) in unreached code" % unknown)
     for off in sorted(use):

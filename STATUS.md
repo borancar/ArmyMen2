@@ -346,6 +346,13 @@ and then reports negative slots and offsets past the end of the frame. Both of
 which it duly produced. esp has to be propagated along control flow with every
 edge agreeing.
 
+**The first time it reported something, the tool was wrong and the report was
+right.** `0x0044AFB0` came back with ten disagreeing depths, every one four
+bytes, every one downstream of `push ecx; mov ecx, <this>; call` -- a thiscall,
+whose callee pops its own argument with no `add esp` at the call site to see.
+It reads each callee's `ret N` now. All ten went and the four hand-checked maps
+came back identical.
+
 Validated against three functions whose frames were worked out by hand --
 `AiAttackBody`'s facing slot, `AiPatrolStep`'s, and `StepType5`'s sub-step,
 outcome and speed all land where the hand derivation put them. It reports
