@@ -2854,6 +2854,9 @@ int commmsg_install(void)
                   "VehicleUpdateAppend", 2);
     patch_replace(ADDR_RECV_VEHICLE_1B, (const void *)RecvVehicle1B,
                   "RecvVehicle1B", 2);
+    patch_replace(ADDR_VEHICLE_UPDATE_APPLY,
+                  (const void *)VehicleUpdateApply,
+                  "VehicleUpdateApply", 2);
     patch_replace(ADDR_RECV_VEHICLE_1E, (const void *)RecvVehicle1E,
                   "RecvVehicle1E", 1);
     patch_replace(ADDR_RECV_VEHICLE_24, (const void *)RecvVehicle24,
@@ -3368,13 +3371,6 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
     }
 }
 
-/* The applier is still the image's, reached by address from the batch walk
- * below. Its prototype comes from that walk: it takes the record and the
- * army, and RETURNS the cursor past what it consumed. */
-typedef uint8_t *(__cdecl *AM2_VehApplyFn)(void *rec, int32_t army);
-#define orig_vehicle_update_apply \
-    ((AM2_VehApplyFn)(uintptr_t)ADDR_VEHICLE_UPDATE_APPLY)
-
 /* RecvVehicle1B -- original 0x0045EB10, one caller. Message kind 0x1B is a
  * BATCH of vehicle updates, and this is the walk: the first word of the
  * message is its total length, the records start at +8, and each one is
@@ -3388,6 +3384,8 @@ typedef uint8_t *(__cdecl *AM2_VehApplyFn)(void *rec, int32_t army);
  * past.
  *
  * The applier is reached by ADDRESS because it is still the image's. */
+uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army);
+
 void __cdecl RecvVehicle1B(void *msg, int32_t army)
 {
     uint8_t       *m   = (uint8_t *)msg;
@@ -3395,7 +3393,7 @@ void __cdecl RecvVehicle1B(void *msg, int32_t army)
     uint8_t       *at  = m + 8;
 
     while (at < end)
-        at = (uint8_t *)orig_vehicle_update_apply(at, army);
+        at = VehicleUpdateApply(at, army);
 }
 
 /* RecvVehicle1E -- original 0x0045E810, one caller, and IT DOES NOTHING.
@@ -3459,4 +3457,117 @@ void __cdecl RecvVehicle24(void *msg)
         return;
 
     BoardVehicle(UidOnWire(*(const uint32_t *)(m + 8)), vehicle);
+}
+
+/* VehicleUpdateApply -- original 0x0045DF10, one caller: RecvVehicle1B's
+ * walk. The decode half of the vehicle delta protocol, and it names itself
+ * "-->vehicleUpdateMessageUnpack: ID:%x, Change:%d%d%d, Pos (%d,%d),
+ * facing:%d, gunfacing:%d, intent.facing:%d, intent.gunfacing:%d, action:%d,
+ * rev:%d, half:%d, slow:%d".
+ *
+ * IT RETURNS THE CURSOR, which is what makes the batch loop terminate: each
+ * record is self-describing, its length implied by which of the three change
+ * bits are set, so the caller cannot know where the next one starts without
+ * this function saying so.
+ *
+ * THE UID'S TOP THREE BITS ARE REPLACED, NOT MASKED OFF. The sender ORs the
+ * change flags into them; this strips them with 0x1FFFFFFF and ORs the ARMY
+ * in their place before looking the object up. So the same three bits carry
+ * the flags on the wire and the army in memory, and a reading that only
+ * masked would look up the wrong object for every army but zero.
+ *
+ * THAT LOG LINE NAMED FOUR FIELDS THIS PROJECT HAD ONLY NUMBERED. The action
+ * byte packs a 3-bit code at +0x580 with three flags above it -- `rev` at
+ * +0x584, `half` at +0x588, `slow` at +0x58C -- and those are the same three
+ * the sender reads to build it. The bit positions are 7, 6 and 5, so the
+ * three flags are unpacked in the opposite order from the one they are
+ * printed in; taking them off the format string alone would transpose them.
+ *
+ * AND THE ROUND TRIP IS ASYMMETRIC AT ONE FIELD, which is recorded rather
+ * than explained. The sender builds the byte from +0x544, the vehicle KIND --
+ * the same field Step3Drive dispatches its engine sounds on -- and this
+ * writes the low three bits to +0x580 and never touches +0x544. A remote
+ * vehicle's kind is therefore never updated by an update message, which is
+ * consistent with a kind that is fixed at creation, but the two ends
+ * genuinely name different storage and nothing here settles why.
+ *
+ * NO NULL CHECK, and it is the original's. ObjByUidAlias's answer goes
+ * straight into ObjClearFootprint and then into a dozen field writes with no
+ * test between. Reproduced; a message naming an object this client does not
+ * have would fault the same way in both. */
+uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army)
+{
+    uint8_t  *at = (uint8_t *)rec;
+    uint8_t  *o;
+    uint32_t  head;
+    uint8_t   b0, b1, b2;
+
+    /* Four bytes, big-endian, exactly as VehicleUpdateAppend wrote them. */
+    head  = (uint32_t)at[0] << 24;
+    head |= (uint32_t)at[1] << 16;
+    head |= (uint32_t)at[2] << 8;
+    head |= (uint32_t)at[3];
+    at += 4;
+
+    o = (uint8_t *)ObjByUidAlias((head & 0x1FFFFFFFu)
+                                 | ((uint32_t)army << 29));
+    ObjClearFootprint(o);
+
+    if (head & 0x80000000u) {
+        /* Twelve bits an axis: a low byte each, then a byte holding both
+         * high nibbles -- x's in the low half, z's in the high half. */
+        b0 = *at++;
+        b1 = *at++;
+        b2 = *at++;
+        *(uint16_t *)(o + OBJ_OFF_POS) =
+            (uint16_t)(((uint16_t)(b2 & 0x0Fu) << 8) | b0);
+        *(uint16_t *)(o + OBJ_OFF_POS + 2) =
+            (uint16_t)(((uint16_t)(b2 & 0xF0u) << 4) | b1);
+
+        {
+            uint32_t action = *at++;
+
+            *(int32_t *)(o + 0x59Cu) = 1;
+            *(int32_t *)(o + 0x580u) = (int32_t)(action & 7u);
+            *(int32_t *)(o + 0x584u) = (int32_t)(action >> 7);
+            *(int32_t *)(o + 0x588u) = (int32_t)((action >> 6) & 1u);
+            *(int32_t *)(o + 0x58Cu) = (int32_t)((action >> 5) & 1u);
+        }
+    }
+
+    if (head & 0x40000000u) {
+        *(uint8_t *)(o + OBJ_OFF_FACING) = *at++;
+        *(uint8_t *)(o + 0x530u) = *at++;
+        *(int32_t *)(o + 0x59Cu) = 1;
+    }
+
+    if (head & 0x20000000u) {
+        *(uint8_t *)(o + OBJ_OFF_FIELD_578) = *at++;
+        *(uint8_t *)(o + OBJ_OFF_FACING_COPY2) = *at++;
+        *(int32_t *)(o + 0x59Cu) = 1;
+    }
+
+    /* A received update always clears the destination: a remote vehicle is
+     * driven by its owner's packets, not by a route of ours. */
+    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+    ObjSetFootprint(o);
+
+    if (*(const int32_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT
+                           + COMM_OFF_VERBOSE))
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_VEHICLE_UNPACK),
+                *(const uint32_t *)(o + OBJ_OFF_UID),
+                head >> 31, (head >> 30) & 1u, (head >> 29) & 1u,
+                *(const int16_t *)(o + OBJ_OFF_POS),
+                *(const int16_t *)(o + OBJ_OFF_POS + 2),
+                (uint32_t)*(const uint8_t *)(o + OBJ_OFF_FACING),
+                (uint32_t)*(const uint8_t *)(o + 0x530u),
+                (uint32_t)*(const uint8_t *)(o + OBJ_OFF_FIELD_578),
+                (uint32_t)*(const uint8_t *)(o + OBJ_OFF_FACING_COPY2),
+                *(const int32_t *)(o + 0x580u),
+                *(const int32_t *)(o + 0x584u),
+                *(const int32_t *)(o + 0x588u),
+                *(const int32_t *)(o + 0x58Cu));
+
+    return at;
 }

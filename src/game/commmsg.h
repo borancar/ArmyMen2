@@ -156,4 +156,8 @@ void __cdecl RecvVehicle1E(void *msg);
 /* 0x0045EA30. Kind 0x24, the receive half of SendVehicleEnter. */
 void __cdecl RecvVehicle24(void *msg);
 
+/* 0x0045DF10. Decode one vehicle delta record and RETURN the cursor past it,
+ * which is what lets RecvVehicle1B find the next one. */
+uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army);
+
 #endif

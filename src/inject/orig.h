@@ -12410,6 +12410,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * VehicleUpdateAppend writes, and returns the cursor past what it consumed,
  * which is what makes the batch loop terminate. */
 #define ADDR_VEHICLE_UPDATE_APPLY 0x0045DF10u /* uint8_t *(rec, int32 army) */
+#define ADDR_STR_VEHICLE_UNPACK 0x0048C0A0u
 #define ADDR_STR_VEHICLE_ENTER_RECV 0x0048C3ECu
 #define ADDR_RECV_VEHICLE_1C     0x0045E980u  /* void(msg *) */
 #define ADDR_RECV_VEHICLE_1D     0x0045E630u
