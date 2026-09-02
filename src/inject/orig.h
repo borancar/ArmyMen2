@@ -6874,7 +6874,12 @@ typedef struct {
  * Named for the mechanism -- cleared together, once a frame -- rather than for
  * what they were meant to count, which nothing surviving in the image says. */
 #define ADDR_CLEAR_FRAME_COUNTS    0x004035F0u /* void(void) */
+/* THE SIGHTING SCAN'S PER-FRAME BUDGET, and its cap is 10 -- the same number
+ * ADDR_PATH_MAX_SEARCHES uses for the pathfinder, in the same shape: a counter
+ * the frame resets and a `> 10` at the very top that answers 0 without doing
+ * anything. Two subsystems throttled identically and independently. */
 #define ADDR_PERFRAME_COUNT_A      0x004F93B8u /* int32_t, gates 0x00403B40 */
+#define AM2_SIGHT_SCANS_PER_FRAME  10
 #define ADDR_PERFRAME_COUNT_B      0x004F93BCu /* int32_t, never read */
 #define AM2_PERFRAME_COUNT_LIMIT   10
 #define ADDR_LAST_TICK_MS          0x00511E0Cu /* uint32_t, from ADDR_TICKS */
@@ -8927,6 +8932,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x00403B40, five callers, and what it ANSWERS is what several of them keep:
  * AiStepDefend promotes it into SIGHT_OFF_FOUND, and NextInventorySlot runs it
  * for its effect and ignores the answer. Nothing in it says what it is. */
+/* SURVEYED AND NOT RECONSTRUCTED. 1,888 bytes over a 0x84C frame, and it is
+ * the SIGHTING SCAN -- what fills SIGHT_OFF_FOUND, which is the field every
+ * AI step in this family promotes. All twenty-three of its callees are named.
+ *
+ * IT CALLS ADDR_LOG WITH ONE ARGUMENT AND NO FORMAT STRING, twice, pushing the
+ * object. That is a THIRD role for 0x0045CAA0, which this file already records
+ * as both the retail build's stubbed varargs logger and one widget class's
+ * empty vtable slot -- three unrelated functions folded onto one `ret` by
+ * identical-COMDAT folding, which is the best evidence yet for that
+ * explanation, since a logger, an empty virtual and a per-object hook have
+ * nothing else in common.
+ *
+ * IT IS SAFE TO REPRODUCE, checked rather than assumed: src/inject/gamelog.c
+ * patches that address and would take the object pointer as a format string,
+ * but its safe_format walks the string by hand precisely because "_vsnprintf
+ * means any byte pair that looks like %s dereferences a garbage pointer". So
+ * the call renders object bytes as text and cannot fault. Both halves of an
+ * A/B would render the same bytes, and nothing reaches it anyway.
+ *
+ * IT KEEPS BOTH FACINGS. The four AI steps already reconstructed substitute a
+ * type 3's OBJ_OFF_FIELD_530 for OBJ_OFF_FACING in ONE stack slot, written
+ * twice; this one writes the hull into one slot and the turret into another
+ * and keeps both. Same idiom, opposite conclusion -- so the "one slot written
+ * twice" note does not carry over. */
 #define ADDR_SCAN_403B40         0x00403B40u  /* int32(obj, a, b, c, d, e) */
 /* 0x00448880, two callers, 64 bytes. The first dword of the OBJ_OFF_FIELD_C0
  * record of whatever sits in UNIT_OFF_INVENTORY_SEL -- the same value
