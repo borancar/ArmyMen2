@@ -452,6 +452,18 @@ then `CreateWeapon`. So the arm's arguments are built *across two calls* -- the
 `CreateVehicle` shape, where pairing each push with the nearest call gets both
 wrong.
 
+**And the eighteen are one helper with two parameters.** Side by side their
+pushes are identical bar a *kind* and an *ammo* count -- everything else, four
+zeros and the caller's position, is the same in all eighteen. So the
+transcription is one helper and eighteen one-line cases.
+
+**One thing is not settled**: `HudMessage`'s second argument is loaded as a
+byte from one of *six* different globals depending on the arm, into the low
+byte of a register whose upper three bytes the arm never sets. Six globals for
+one argument is not a pattern yet, and "the rest of whatever was in `ecx`" is
+not something C can express. That has to be read from `HudMessage`'s side
+before any arm is written.
+
 Counting epilogues is what produced the wrong claim: thirty-nine arms,
 twenty-one `ret`s, and eighteen `jmp`s that look like eighteen more until the
 target is decoded.

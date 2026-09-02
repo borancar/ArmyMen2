@@ -4730,6 +4730,23 @@ typedef struct {
  * So they are the eighteen cheats that hand the player a weapon, and the tail
  * is one CreateWeapon call reached eighteen ways.
  *
+ * AND THE EIGHTEEN ARE ONE HELPER WITH TWO PARAMETERS. Extracted side by side
+ * their pushes are identical bar two slots: a KIND (2, 3, 4, 0x1D, 0xB, 0xC,
+ * 0x14, 0x24, 0x26, 0x25, 0x1C, 0x27, 0x28, 0x2A, 0x1E, 0x18, 0x1A, 0x19) and
+ * an AMMO count, which is -1 for eleven of them and 0x2C, 0xD, 0xC or 3 for
+ * the rest. Everything else -- four zeros and the caller's position -- is the
+ * same in all eighteen. So the transcription is one helper and eighteen
+ * one-line cases, which is what reading them side by side buys over reading
+ * them in sequence.
+ *
+ * ONE THING IS NOT SETTLED. HudMessage's second argument is loaded as a BYTE
+ * from one of six different globals depending on the arm -- 0x004FE092,
+ * 0x004FDF7C, 0x004FD768, 0x004FE090, 0x004FE089, 0x004FD760 -- into the low
+ * byte of a register whose upper three bytes the arm does not set. Six globals
+ * for what looks like one argument is not a pattern yet, and reproducing "the
+ * rest of whatever was in ecx" is not something C can express. Read
+ * HudMessage's use of it before writing any of the arms.
+ *
  * Counting epilogues is what produced the wrong claim: thirty-nine arms and
  * twenty-one `ret`s, and eighteen `jmp`s that look like eighteen more until
  * the target is decoded. The only control flow between arms is that plus the
