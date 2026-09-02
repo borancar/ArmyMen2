@@ -1829,6 +1829,11 @@
  * -- the same value, arrived at differently. */
 #define ADDR_TILE_ATTR_AT      0x00429540u /* int32_t(uint32_t tile) */
 #define ADDR_ITEM_PRE_DESTROY_ALIAS 0x00429CE0u /* void(obj, int32_t) */
+/* Log2Mask of ADDR_MAP_EXTENT_X, written beside ADDR_MAP_ROW_SHIFT in
+ * LoadMap's MHDR arm -- the same derivation one scale up, tiles against
+ * world units. Named from the writer, which is the only toucher this file
+ * has seen. */
+#define ADDR_MAP_EXTENT_SHIFT    0x00514DD8u  /* int32_t */
 #define ADDR_MAP_ROW_SHIFT     0x00514DE4u /* int32, log2 of the map's width */
 /* The camera doubles as the top-left of the visible-tile rectangle: the four
  * dwords from ADDR_CAMERA_X are used as a RECT to clip against. */
@@ -14279,6 +14284,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * why a straight fread of the whole array would be wrong. */
 #define ADDR_MAP_FIELD_DESCS      0x00485FB8u  /* {uint32 tag, uint32 size}[7] */
 #define AM2_IFF_RESV              0x56534552u  /* 'RESV', read and discarded */
+#define AM2_IFF_MHDR               0x5244484Du  /* 'MHDR' */
+#define AM2_IFF_BPAD               0x44415042u  /* 'BPAD' */
+#define AM2_IFF_NPAD               0x4441504Eu  /* 'NPAD' */
+#define AM2_IFF_MOVE               0x45564F4Du  /* 'MOVE' */
+#define AM2_IFF_OWNR               0x524E574Fu  /* 'OWNR' */
+#define AM2_IFF_TRIG               0x47495254u  /* 'TRIG' */
+#define AM2_IFF_REGN               0x4E474552u  /* 'REGN' */
+#define AM2_IFF_SCEN               0x4E454353u  /* 'SCEN' */
+#define AM2_IFF_ELEV               0x56454C45u  /* 'ELEV' */
+#define AM2_IFF_ELOW               0x574F4C45u  /* 'ELOW' */
+#define AM2_IFF_OLAY               0x59414C4Fu  /* 'OLAY' */
+#define AM2_IFF_TLAY               0x59414C54u  /* 'TLAY' */
+#define AM2_IFF_NUMB               0x424D554Eu  /* 'NUMB' */
+#define AM2_IFF_SCRI               0x49524353u  /* 'SCRI' */
+#define AM2_IFF_INDX               0x58444E49u  /* 'INDX' */
 #define ADDR_LOAD_ATL_FILE        0x0042BEA0u  /* int32_t(const char *path) */
 #define ADDR_RESPAWN_KIND_ALLOWED 0x004600F0u  /* int32_t(int32_t kind) */
 #define ADDR_BUILD_RESPAWN_POOL   0x00460120u  /* void(int32_t seed) */
