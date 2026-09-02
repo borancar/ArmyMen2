@@ -140,4 +140,7 @@ void __cdecl SendVehicleUpdates(int32_t slot);
  * design and not its code. */
 void __cdecl VehicleUpdateAppend(void *msg, void *obj);
 
+/* 0x0045E550. Ask each of the four comm slots to send its vehicle batch. */
+void __cdecl SendAllVehicleUpdates(void);
+
 #endif /* AM2_ARMYMSG_H */

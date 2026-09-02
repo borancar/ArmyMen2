@@ -1602,6 +1602,9 @@ int armymsg_install(void)
     rc |= patch_replace(ADDR_SEND_VEHICLE_UPDATES,
                         (const void *)SendVehicleUpdates,
                         "SendVehicleUpdates", 1);
+    rc |= patch_replace(ADDR_SEND_ALL_VEH_UPDATES,
+                        (const void *)SendAllVehicleUpdates,
+                        "SendAllVehicleUpdates", 0);
     return rc;
 }
 
@@ -2012,4 +2015,40 @@ void __cdecl SendVehicleUpdates(int32_t slot)
 
     if (h->len != sizeof(AM2_ArmyMsgHdr))
         ArmyMessageSend(msg);
+}
+
+/* SendAllVehicleUpdates -- original 0x0045E550, one caller: CommSyncCheck.
+ * Ask every comm slot in turn to send its vehicle batch.
+ *
+ * FOUR SLOTS, AND THE BOUND IS A BYTE COUNT RATHER THAN A COUNT. The loop
+ * runs `esi` from 0 to 0x1C0 in steps of COMM_PLAYER_STRIDE, which is four
+ * iterations because 4 x 112 is 448 -- so the slot count is implied by the
+ * limit and the stride and appears nowhere as a number. Written with the
+ * index as the loop variable, since that is what both calls inside take;
+ * reading the original's byte offset as the argument would pass 0x70 where a
+ * slot number belongs.
+ *
+ * THE COMM POINTER IS RE-READ EVERY ITERATION, and not for the field: it is
+ * reloaded into ecx immediately before the thiscall to CommMustBroadcast,
+ * which needs it there. One load serving two purposes, which is why it sits
+ * inside the loop rather than above it.
+ *
+ * The gate is the player record's +0x50. That offset has no name in this tree
+ * and gets none here: the record is reached as COMM_OFF_PLAYERS plus a
+ * stride, so 0x25C in the disassembly is 0x20C + 0x50, and what the field
+ * MEANS is not established by a single non-zero test. */
+void __cdecl SendAllVehicleUpdates(void)
+{
+    int32_t slot;
+
+    for (slot = 0; slot < 4; slot++) {
+        const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+
+        if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
+                               + slot * COMM_PLAYER_STRIDE + 0x50) == 0)
+            continue;
+        if (!CommMustBroadcast((void *)comm, (int16_t)slot))
+            continue;
+        SendVehicleUpdates(slot);
+    }
 }
