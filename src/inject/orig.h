@@ -8993,6 +8993,35 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  *
  * KIND 7 IS SCORED DIFFERENTLY from everything else: AngleBetween and a flat
  * 0x3E8 where the rest go through the arc and range machinery. */
+
+/* ITS SIGNATURE, resolved with tools/espmap.py rather than by eye. Six
+ * arguments, four of them out-params, all four cleared before anything is
+ * looked at:
+ *
+ *   void *SightScan(void *obj, int32 *range, uint8 *bearing,
+ *                   int32 *nAllied, int32 *nOther, int32 flags)
+ *
+ * `flags` picks between the two ObjectsInRect predicates and gates the type-4
+ * arm; the answer is the object chosen, which is what the callers put in
+ * SIGHT_OFF_FOUND with `range` and `bearing` beside it.
+ *
+ * THE SEARCH BOX IS SQUARE AND INT32. Four dwords at the frame's +0x48..+0x54
+ * -- an AM2_Rect, whose fields really are int32 -- built as the position plus
+ * and minus RANK_REC_OFF_SIGHT_RANGE on both axes. Written in the order
+ * right, left, bottom, top, which is not the struct's order and is worth not
+ * transcribing from the store sequence.
+ *
+ * THE EXIT WRITES THE BEARING TWICE AND THE FIRST WRITE IS DEAD. The primary
+ * arm stores the bearing the scan recorded and then immediately overwrites it
+ * with AngleBetween from ObjAnchorPoint to the winner -- so the answer is
+ * measured from the object's ANCHOR, not from wherever the scan measured it.
+ * The fallback arm returns the recorded bearing and does not do this. Two
+ * exits, two different bearings, and the difference is one call. */
+#define ADDR_SIGHT_SCAN          0x00403B40u
+#define ADDR_SIGHT_PRED_A        0x004036C0u  /* flags != 0 */
+#define ADDR_SIGHT_PRED_B        0x00403660u  /* flags == 0 */
+#define AM2_SIGHT_SCAN_FAR       0x1000       /* the initial best range */
+#define AM2_SIGHT_KIND7_RANGE    0x3E8        /* kind 7 is scored flat */
 #define ADDR_SCAN_403B40         0x00403B40u  /* int32(obj, a, b, c, d, e) */
 /* 0x00448880, two callers, 64 bytes. The first dword of the OBJ_OFF_FIELD_C0
  * record of whatever sits in UNIT_OFF_INVENTORY_SEL -- the same value

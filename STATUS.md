@@ -379,8 +379,21 @@ hands everything else to `AddSightBlocker` -- so one pass both selects the
 candidates and builds the occlusion data those candidates will be tested
 against. Treating it as a filter followed by a scan gets the order wrong.
 
-Also mapped: seven arguments with four out-params, all zeroed before anything
-is looked at; anything ours of type 2, 3 or 8 revealed on the way past with a
+**Its signature is resolved**, with `espmap.py` rather than by eye:
+`void *SightScan(obj, int32 *range, uint8 *bearing, int32 *nAllied, int32
+*nOther, int32 flags)` -- six arguments, four out-params, all cleared before
+anything is looked at. `flags` picks between two `ObjectsInRect` predicates.
+The search box is four int32s built as the position plus and minus the rank's
+sight range, stored right, left, bottom, top -- not the struct's order, and not
+something to transcribe from the store sequence.
+
+**The exit writes the bearing twice and the first write is dead.** The primary
+arm stores what the scan recorded and immediately overwrites it with
+`AngleBetween` from `ObjAnchorPoint` to the winner, so the answer is measured
+from the object's *anchor*. The fallback arm returns the recorded bearing and
+does not. Two exits, two different bearings, one call apart.
+
+Also mapped: anything ours of type 2, 3 or 8 revealed on the way past with a
 2,000 ms stamp -- a side effect of looking, not of finding; and kind 7 scored
 through `AngleBetween` and a flat `0x3E8` where everything else goes through
 the arc and range machinery.
