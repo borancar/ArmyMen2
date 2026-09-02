@@ -2103,7 +2103,7 @@ void __cdecl TrooperFireSend(void *trooper, void *target)
 
     ArmyMessageSend(&msg);
 
-    if (*(const int32_t *)(kCommObj + AM2_COMM_VERBOSE))
+    if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
         am2_log("Trooper Fire Send, trooper: %d,  face:%d, pos (%d,%d,%d), "
                 "loctarg %x, globTarg %x, weap %d, seq:%d\n",
                 *(const uint32_t *)(t + 4), *(t + TROOPER_OFF_FACING),

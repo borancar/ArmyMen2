@@ -344,7 +344,7 @@ void __cdecl PauseGame(uint32_t bits)
     uint32_t *flags = (uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS;
 
     *flags |= bits;
-    if (*(const int32_t *)(g_comm + AM2_COMM_VERBOSE))
+    if (*(const int32_t *)(g_comm + COMM_OFF_VERBOSE))
         orig_log((const char *)(uintptr_t)ADDR_STR_PAUSE_GAME, *flags, bits);
 }
 
@@ -353,7 +353,7 @@ void __cdecl UnPauseGame(uint32_t bits)
     uint32_t *flags = (uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS;
 
     *flags &= ~bits;
-    if (*(const int32_t *)(g_comm + AM2_COMM_VERBOSE))
+    if (*(const int32_t *)(g_comm + COMM_OFF_VERBOSE))
         orig_log((const char *)(uintptr_t)ADDR_STR_UNPAUSE_GAME, *flags, bits);
 }
 

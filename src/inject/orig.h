@@ -2968,7 +2968,22 @@
  * epilogue. This file already records the shape twice (UnitKindMatches kind
  * 3, PlacementAllowed arm 16); this is the third, and the jump table shows
  * nothing of it. Follow every branch OUT of an arm, not only the branches
- * within it. */
+ * within it.
+ *
+ * EVERY LOG LINE IN IT IS BEHIND COMM_OFF_VERBOSE, which is what makes the
+ * function nameable at all and also what makes it silent. The seven strings
+ * that identify it print only when the comm object's +0x418 is set, and
+ * winmain.cpp sets that from a command-line switch. So a reconstruction that
+ * dropped the logging entirely would look correct on every drive this
+ * project can do -- and so would one that logged unconditionally.
+ *
+ * THE DEFAULT CASE IS THE EPILOGUE ITSELF. 0x401742 is not an arm that
+ * returns 0; it is `pop edi; pop esi; pop ebp; xor eax, eax; pop ebx; add
+ * esp, 0x10; ret`, and the FlowQ-missing exits of case 0x0C fall straight
+ * into it. So the switch's default and two of the eight exits are one piece
+ * of code, which is the arm-sharing shape again in its cheapest form: an
+ * unrecognised message type is DROPPED and the caller keeps it, exactly as
+ * if the flow queue were missing. */
 /* Where the drop path receives a packet it has no node for, so the transport
  * does not keep re-delivering it. */
 #define ADDR_RECV_SCRATCH        0x004F8790u
@@ -10842,7 +10857,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* Slot i's own index field, four bytes before its army. What
  * ADDR_COMM_FIND_PLAYER hands back rather than the loop counter. */
 #define AM2_PLAYER_INDEX         0x20Cu
-#define AM2_COMM_VERBOSE         0x418u   /* gates the per-script logging */
 /* This went in as ADDR_COMM_PLAYER_IS_AI, read off the one call site that
  * skips an AI script when it answers yes -- and it means the opposite. The
  * field it tests is +0x214, which is the id ADDR_COMM_FIND_PLAYER scans for,

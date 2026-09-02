@@ -3185,7 +3185,7 @@ static void ScriptSetDataDir(const char *dir)
  * for. The three sites in LoadLevelScript are identical but for the path. */
 static void ScriptReadWithLog(const char *path)
 {
-    int32_t verbose = *(const int32_t *)(kCommObject + AM2_COMM_VERBOSE) != 0;
+    int32_t verbose = *(const int32_t *)(kCommObject + COMM_OFF_VERBOSE) != 0;
 
     if (verbose)
         am2_log("reading script %s: ", path);
@@ -3193,7 +3193,7 @@ static void ScriptReadWithLog(const char *path)
     int32_t ok = ReadScript(path, (AM2_ScriptCtx *)AM2_IMAGE(ADDR_SCRIPT_CONTEXT));
 
     /* Re-read the flag: ReadScript can have changed it. */
-    if (*(const int32_t *)(kCommObject + AM2_COMM_VERBOSE))
+    if (*(const int32_t *)(kCommObject + COMM_OFF_VERBOSE))
         am2_log(ok ? "worked!\n" : "FAILED!\n");
 }
 
