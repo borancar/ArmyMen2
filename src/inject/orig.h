@@ -14153,6 +14153,29 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * one entry, four functions, and the two COM calls belonged to the other one.
  * tools/merges.py split it; this is what the rest of that entry turned out to
  * be. */
+/* THE .amm IS IFF AND ITS CHUNKS ARE THESE, dumped rather than read off the
+ * compare chain. LoadMap's first dispatch covers thirteen tags -- MHDR, BPAD,
+ * NPAD, MOVE, OWNR, TRIG, REGN, SCEN, ELEV, ELOW, OLAY, NUMB, SCRI, INDX --
+ * and most arms are the same shape: malloc(w*h), fread it, and store the
+ * pointer in one global. MHDR is the odd one and comes first in the file: it
+ * carries w and h, and from them the function derives ADDR_MAP_ROW_SHIFT via
+ * Log2Mask, the two extents, three rectangles and the listener position.
+ *
+ * ADDR_MAP_FIELD_DESCS (0x00485FB8) IS A SECOND TABLE AND A SECOND LOOP.
+ * Past the chunk switch, LoadMap walks seven {tag, size} pairs and freads
+ * exactly `size` bytes per entry, dispatching on the tag again -- so the
+ * per-record field layout is DATA, not code, and the second compare chain is
+ * the same tags a second time rather than a second set:
+ *
+ *     INDX 4    MOVE 1    ELOW 1    TRIG 1
+ *     RESV 1    ELEV 1    OWNR 1    then a zero terminator
+ *
+ * RESV IS IN THE TABLE AND IN NO ARM. The second chain compares OWNR, TRIG,
+ * NUMB, MOVE and ELEV and has no case for it, so its one byte is read and
+ * discarded -- reserved, and the name says so. A tag that is read but never
+ * dispatched is invisible from the switch alone and only the table shows it. */
+#define ADDR_MAP_FIELD_DESCS      0x00485FB8u  /* {uint32 tag, uint32 size}[7] */
+#define AM2_IFF_RESV              0x56534552u  /* 'RESV', read and discarded */
 #define ADDR_LOAD_ATL_FILE        0x0042BEA0u  /* int32_t(const char *path) */
 #define ADDR_RESPAWN_KIND_ALLOWED 0x004600F0u  /* int32_t(int32_t kind) */
 #define ADDR_BUILD_RESPAWN_POOL   0x00460120u  /* void(int32_t seed) */
