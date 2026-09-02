@@ -220,4 +220,9 @@ int32_t __cdecl SelListAtExit(void);
 /* 0x00424890. The CRT initialiser-table entry for the list. */
 int32_t __cdecl SelListInit(void);
 
+/* 0x0045EF50. The LAST of the eight savegame readers: a type-4 weapon. Five
+ * reads, one of them discarded, and a renumber flag that picks between two
+ * CreateWeapon calls and then marks the object. */
+void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber);
+
 #endif /* AM2_GAMEPROC_H */

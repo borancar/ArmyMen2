@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "gameproc.h"
+#include "packkey.h"  /* KeyFieldA, KeyFieldB -- reconstructed */
 #include "gamedir.h"  /* SetGameDir -- the chdir into the save directory */
 #include "savetag.h"
 #include "defparse.h"  /* DefFreeTables -- reconstructed */
@@ -1857,7 +1858,7 @@ int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj)
 typedef int32_t (__cdecl *AM2_LoadHdrFn)(am2_FILE *fp, void *hdr);
 typedef void *(__cdecl *AM2_LoadObjFn)(am2_FILE *fp, void *hdr);
 typedef void *(__cdecl *AM2_LoadObj3Fn)(am2_FILE *fp, void *hdr, int32_t a);
-#define orig_load_type4  ((AM2_LoadObjFn)(uintptr_t)ADDR_LOAD_TYPE4)
+/* LoadType4 is reconstructed below; gameproc.h declares it. */
 
 /* 0x004289E0, SaveOneItem's counterpart. Reads a header onto the stack and
  * hands it to the type's loader, which builds the object and RETURNS it.
@@ -1905,7 +1906,12 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
     case 1:  made = (uint8_t *)LoadType1(fp, hdr);            break;
     case 2:  made = (uint8_t *)LoadType2(fp, (void *)hdr, arg); break;
     case 3:  made = (uint8_t *)LoadType3(fp, hdr);      break;
-    case 4:  made = (uint8_t *)orig_load_type4(fp, hdr);      break;
+    /* THREE arguments, like case 2 and unlike the other six. The seam this
+     * replaced declared two -- AM2_LoadObjFn, shared with the readers that
+     * really do take two -- so the renumber flag was never passed and case 4
+     * read whatever was on the stack for it. The call site settles it: it
+     * pushes three and cleans 0xC. */
+    case 4:  made = (uint8_t *)LoadType4(fp, (void *)hdr, arg); break;
     case 5:  made = (uint8_t *)LoadType5(fp, hdr);      break;
     case 6:  made = (uint8_t *)LoadType6(fp, hdr);      break;
     case 7:  made = (uint8_t *)LoadType7(fp, hdr);            break;
@@ -2410,4 +2416,95 @@ void gameproc_install(void)
                   "SelListDestruct", 1);
     patch_replace(ADDR_SEL_LIST_CTOR, (const void *)SelListConstruct,
                   "SelListConstruct", 1);
+    patch_replace(ADDR_LOAD_TYPE4, (const void *)LoadType4,
+                  "LoadType4", 3);
+}
+
+/* CreateWeapon is still the image's and item.h already reaches it -- with a
+ * correction this function would otherwise have got wrong. The literal 4 in
+ * its second argument is AM2_ARMY_NEUTRAL, an ARMY, not the object type;
+ * item.h established that from CommMustBroadcast's parameter and records that
+ * the two concepts merely share a value. Reading it as "type 4" here would
+ * have been consistent, plausible and wrong. */
+
+/* LoadType4 -- original 0x0045EF50, one caller: LoadOneItem's type-4 arm. The
+ * LAST of the eight savegame readers; the other seven have been reconstructed
+ * for some time, and this one is not a copy of any of them -- its closest
+ * sibling is LoadType1 at 0.381 over normalised disassembly.
+ *
+ * FIVE READS, AND ONE OF THEM IS DISCARDED. The 0x2C record and four dwords
+ * come off the file; three of the dwords are used -- the sprite key, a value
+ * handed to CreateWeapon, and one that ends up in the weapon's +0xC4 -- and
+ * the fourth is read into a local nothing ever touches. tools/espmap.py says
+ * so: that slot has exactly one reference, the `lea` that hands its address
+ * to fread. It is reproduced because the FILE POSITION depends on it; a
+ * reader that skipped it would misparse everything after.
+ *
+ * THE RENUMBER ARGUMENT PICKS BETWEEN TWO CreateWeapon CALLS that differ in
+ * one argument. With renumber set the weapon is created with uid 0 and then
+ * UidRemapAdd records the mapping from the saved uid to the fresh one; with
+ * it clear the saved uid is passed straight in. Same eight arguments, same
+ * order, one value different -- and the arms are written out separately
+ * because the ORIGINAL has two calls, and the remap is only in one of them.
+ *
+ * IT KEEPS THE FRESH OBJECT'S +0x94 POINTER, exactly as LoadType1 does: saved
+ * before the header copy and put back after the record copy, so a loaded
+ * weapon points at this session's table rather than the saved address. The
+ * header copy is ADDR_ITEM_HEADER_SIZE bytes, the same global LoadType1 uses.
+ *
+ * THE RENUMBER FLAG IS READ TWICE. Once to choose the create, and again at
+ * the end to set bit 0x4000000 in OBJ_OFF_FLAGS -- so a renumbered weapon is
+ * marked as such, and the flag is not simply the create path's leftover. */
+void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber)
+{
+    uint8_t  *h = (uint8_t *)hdr;
+    uint8_t   rec[AM2_TYPE1_RECORD_SIZE];
+    uint32_t  spriteKey;
+    uint32_t  extra;
+    uint32_t  cooldown;
+    uint32_t  unused;
+    int32_t   aai;
+    uint8_t  *w;
+    void     *ownRec;
+
+    orig_fread(rec, AM2_TYPE1_RECORD_SIZE, 1, fp);
+    orig_fread(&spriteKey, 4, 1, fp);
+    orig_fread(&cooldown, 4, 1, fp);
+    orig_fread(&unused, 4, 1, fp);
+    orig_fread(&extra, 4, 1, fp);
+
+    aai = EnsureSpriteAaiRecord((int32_t)KeyFieldA(spriteKey),
+                                (int32_t)KeyFieldB(spriteKey), 0);
+
+    if (renumber) {
+        w = (uint8_t *)CreateWeapon(
+                (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH), AM2_ARMY_NEUTRAL, aai,
+                *(const int32_t *)(h + OBJ_OFF_POS),
+                *(const int32_t *)(h + OBJ_OFF_FLAGS),
+                (int32_t)extra, 1, 0);
+        UidRemapAdd(*(const uint32_t *)(h + OBJ_OFF_UID),
+                    *(const uint32_t *)(w + OBJ_OFF_UID));
+        *(uint32_t *)(h + OBJ_OFF_UID) = *(const uint32_t *)(w + OBJ_OFF_UID);
+    } else {
+        w = (uint8_t *)CreateWeapon(
+                (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH), AM2_ARMY_NEUTRAL, aai,
+                *(const int32_t *)(h + OBJ_OFF_POS),
+                *(const int32_t *)(h + OBJ_OFF_FLAGS),
+                (int32_t)extra, 1,
+                *(const uint32_t *)(h + OBJ_OFF_UID));
+    }
+
+    ownRec = *(void **)(w + OBJ_OFF_FIELD_94);
+    memcpy(w, h, (size_t)*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE);
+    memcpy(w + OBJ_OFF_FIELD_94, rec, AM2_TYPE1_RECORD_SIZE);
+    *(void **)(w + OBJ_OFF_FIELD_94) = ownRec;
+
+    *(uint32_t *)(w + 0xC4u) = cooldown;
+    *(uint32_t *)(w + 0xC8u) = 0;
+
+    if (renumber)
+        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= 0x4000000u;
+
+    (void)unused;
+    return w;
 }
