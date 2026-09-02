@@ -13070,9 +13070,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  *               before tools/merges.py split it; the COM half was
  *               RestoreTileSet and this is a different function in the same
  *               entry.
- *   0x004600F0  a predicate over a table at 0x0048C530 and a bitmask at
- *               0x00515FD8.
- *   0x00460120  a string helper reaching two CRT routines.
+ *   0x004600F0  a predicate reading ADDR_MP_SESSION and ADDR_GAME_OVER_FLAGS
+ *               and indexing a table at 0x0048C530 by its argument.
+ *   0x00460120  walks ADDR_RESPAWN_KINDS after a CRT call on its argument.
+ *
+ * AND docs/crt.md CALLS BOTH OF THOSE CRT, WHICH THEY ARE NOT. They are
+ * listed there with the reason "position" -- meaning they sit above the
+ * evidenced frontier and nothing identified them -- and reading them refutes
+ * it outright: a CRT routine does not read ADDR_MP_SESSION,
+ * ADDR_GAME_OVER_FLAGS or ADDR_RESPAWN_KINDS, all three of which are named
+ * game globals in this file.
+ *
+ * That does not break the CRT exclusion, but it does qualify how it is
+ * stated. CLAUDE.md's argument is that 58 functions up there are identified
+ * from their own bodies and "the remaining 171 are CRT by sitting above the
+ * evidenced frontier" -- and at least two of those 171 are game code, found
+ * because a function below the line called them. Reading a global's name is
+ * evidence the position rule cannot see. */
  *
  * What the survey does NOT settle is which side of the split it belongs on.
  * It reaches files, and this project's answer to "where is the file I/O" is
