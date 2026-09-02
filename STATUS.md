@@ -411,6 +411,27 @@ why the two exits answer different bearings.
 Its callers wanted casts at every site -- the out-params are written straight
 into the sight context, which is what confirms where they land.
 
+## Next: 0x0044AFB0, and it is LIVE
+
+2,080 bytes, four callers, all inside `StepType2` -- which reaches it as a
+*tail* rather than as one arm of several.
+
+**It is the only thing left that an A/B can discriminate on.** `StepType2` runs
+per type-2 object per frame, and `region.cpp` already records what happens when
+this call is skipped: a dropped weapon stays at 0,0 where the original leaves it
+at the trooper's feet, caught by `bootcamp`'s object dump as **one line**, with
+the pixels and the log identical on both sides. Unlike every AI function
+reconstructed before it, a mistake here is visible -- exactly, with no budget.
+
+All twenty-eight callees are named, and its frame is clean under `espmap.py`
+now that the tool knows about thiscall cleanup -- which it learned *from* this
+function.
+
+The head: classify, send a dead object to the tail, and -- outside a
+multiplayer session, or inside one for an army the comm object does not own --
+remember `OBJ_OFF_FACING` when it is under 150 ms since the last hit. A trooper
+hit in the last sixth of a second keeps the facing it was hit at.
+
 ## Stop condition
 
 The loop's `completion_promise` is now **every game function below the CRT

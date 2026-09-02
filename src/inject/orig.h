@@ -8021,6 +8021,30 @@ typedef struct {
  * arm has NOT been settled; the alias is recorded rather than argued. */
 #define OBJ_OFF_UID              0x04u
 #define ADDR_AI_44AFB0           0x0044AFB0u  /* void(obj, int32, void *) */
+/* SURVEYED AND NOT RECONSTRUCTED. 2,080 bytes, 632 instructions, four callers
+ * -- all four inside StepType2, which reaches it as a TAIL rather than as one
+ * arm of several.
+ *
+ * IT IS LIVE, AND IT IS THE ONLY THING LEFT THAT AN A/B CAN DISCRIMINATE ON.
+ * StepType2 runs per type-2 object per frame and region.cpp already records
+ * what happens when this call is skipped: a dropped weapon stays at 0,0 where
+ * the original leaves it at the trooper's feet, caught by `bootcamp`'s object
+ * dump as ONE LINE with the pixels and the log identical on both sides. So
+ * unlike every AI function reconstructed before it, a mistake here is visible
+ * -- and visible exactly, with no budget.
+ *
+ * ALL TWENTY-EIGHT CALLEES ARE NAMED, and its frame is clean under
+ * tools/espmap.py once that tool learned about thiscall cleanup -- which it
+ * learned FROM this function, whose `push ecx; mov ecx, ADDR_COMM_OBJECT;
+ * call` produced all ten of the disagreements it first reported.
+ *
+ * WHAT THE HEAD DOES. Classify the object; a dead one goes straight to the
+ * tail. Outside a multiplayer session -- or inside one, for an army the comm
+ * object does not own -- it asks how long since OBJ_OFF_DEADLINE_D0 and
+ * remembers OBJ_OFF_FACING in OBJ_OFF_FIELD_580 when that is under 0x96
+ * milliseconds. So a trooper hit in the last sixth of a second keeps the
+ * facing it was hit at, and the flag that says so is carried the length of the
+ * function. */
 /* The two StepType2 runs INSTEAD of the AI arms when the object is Sarge and
  * belongs to the default owner -- the trooper the player commands. Named by
  * the function they are called from and their offset: "player control" is read
