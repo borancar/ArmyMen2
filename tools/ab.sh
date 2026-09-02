@@ -13,7 +13,10 @@
 #   tools/ab.sh state3       the movie state, entered by poking a transition
 #   tools/ab.sh campaign     SINGLE PLAYER into MAP 01, the only `variable` path
 #   tools/ab.sh quit         out through the menu, so the teardown runs
-#   tools/ab.sh all          all seven
+#   tools/ab.sh all          all seventeen -- the list is at the bottom of
+#                            this file, and this comment said "seven" long
+#                            after it stopped being seven. Do not hand-edit
+#                            a count here; read the expansion.
 #
 # This is the strongest check available and the only one that compares against
 # the original rather than against expectations. The registry invariant checks
