@@ -4994,6 +4994,28 @@ typedef struct {
 /* The host and join panels are ONE class -- both factories allocate 0x278 and
  * call the same constructor, differing only in backdrop and role. */
 #define ADDR_MP_PANEL_CTOR       0x00430530u  /* thiscall obj *(obj, bmp) */
+/* SURVEYED, and it is the last entry in docs/functions.tsv below the CRT.
+ * 4,512 bytes, ONE exit (`ret 4`, so thiscall with a single stack argument),
+ * THIRTY distinct callees of which one is unnamed, and NO indirect dispatch
+ * at all -- no jump table, no vtable call, nothing to dump first.
+ *
+ * It is a widget constructor and it looks like one: a 0x1A4 frame and
+ * TWENTY-EIGHT string literals, all of them bitmap names --
+ * `03_010_00_scrollbar.bmp`, `03_028_01_green.bmp`, `03_013_0%i_color.bmp`
+ * with a format digit for the four player colours -- plus the one non-bitmap
+ * string `-- Open --`, which is what an empty player row reads.
+ *
+ * IT OPENS WITH THE MSVC SEH PROLOGUE and this file's standing decision
+ * applies: `push -1; push <handler>; push fs:[0]; mov fs:[0], esp` is NOT
+ * reproduced. Nothing in this program throws, VC6's operator new answers NULL
+ * rather than throwing and the game tests it, so the registered frame is
+ * never consulted. The cost is stated where that decision is recorded: if
+ * something DID unwind through here the base destructor would be skipped --
+ * a leak, not a wrong answer.
+ *
+ * The one unnamed callee, 0x00456300, is another thiscall constructor with
+ * its own SEH frame, so this is a class building a sub-object rather than
+ * calling a helper. */
 #define AM2_MP_PANEL_SIZE        0x278u
 #define ADDR_MP_OPTIONS_CTOR     0x00432320u  /* thiscall obj *(obj, bmp) */
 #define AM2_MP_OPTIONS_SIZE      0x110u
