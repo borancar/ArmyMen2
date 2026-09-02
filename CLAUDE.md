@@ -1812,6 +1812,61 @@ and do not stack a second unverified unit on an unverified one: both bugs
 produced the identical failure signature, and telling them apart depended on
 only one being in flight.
 
+## Five things the last function taught, all of them cheap
+
+**AN OFFSET WITH NO PREFIX IS INVISIBLE TO `checkoffsets`, and that is the
+hole this file only ever described from the other side.** It already says a
+NEW prefix has nothing to compare against. The same is true of a displacement
+read straight out of a disassembly -- `[edi + 0xc]`, `[ebx + 0x94]` -- which
+arrives attached to no family at all. Two fields were written up as "no reader
+before now" when both had been named twelve lines apart in `orig.h` for
+months. Grep the BARE NUMBER; the checker cannot.
+
+**DIFF BEFORE DECLINING TO MERGE, not only before merging.** The rule here is
+"where the original repeats itself, diff the BYTES before believing the
+repetition", and it exists to stop a merge that flattens a real difference. It
+is worth exactly as much in reverse: two copies of one loop were declared "not
+identical" from reading them, and `difflib` over normalised disassembly showed
+48 instructions against 50 with every difference an `edi`/`esi` swap bar the
+log line. The refusal to share a helper was as unfounded as a merge would have
+been. Thirty seconds settles it either way.
+
+**PRINT THE WHOLE LITERAL POOL AT ONCE.** Four separate errors in one function
+came from reading strings out of fixed-size disassembly windows: a string
+truncated by the window and reasoned about as a complete phrase for three
+commits (`"PULSE Adding to "` is `"PULSE Adding to freelist from sendque
+Buffer seq %d  elelment %x"`); a second log line just past the end of a dump,
+silently dropped; and two strings that differ only in `%d` against `%x`, which
+is why one helper had to take the format string as a parameter. One command
+dumps every `push imm32` that points at a C string. **A literal that ends
+without punctuation mid-phrase is the tell.**
+
+The house style is what actually caught the truncation: this tree takes format
+strings from the image through named `ADDR_STR_` constants rather than
+inlining them, so writing the call FORCED the real text to be fetched. A
+convention that makes a class of mistake impossible to write down beats one
+that documents it.
+
+**WHICH MODULE A FUNCTION GOES IN IS DECIDED BY THE LINK, NOT ONLY BY
+`checksplit`.** That tool asks whether a file NAMES a Win32 or COM type. A
+function can name none and still belong elsewhere: four new functions went
+into `air.cpp` because that is the original's translation unit, and `air.cpp`
+is in `SELFTEST_SRC`, so calling `MsgListCopyByKey`, `CommSend` and
+`DumpMsgList` -- all in `win32/dplay.cpp` -- broke a link that has no DirectX.
+`make` was clean; only `make check`'s link guard failed. `commmsg.cpp` was the
+right home and said so itself, carrying a forward declaration of `CommSend`
+with a comment explaining the very constraint I had re-created one file over.
+
+**ANCHOR A SCRIPTED INSTALL EDIT ON THE LAST `patch_replace`, NOT ON THE
+CLOSING BRACE.** An install function ends `return 0; }`, so an edit anchored
+on the brace lands AFTER the return -- the dead-patch defect this file records
+from `dist_install` and `savetag_install`, where four reconstructions were
+never installed and every tool read them as done. `checkpatches.py` was
+written after that incident and this was the first time it caught the thing it
+was written for. The lesson recorded then was to anchor on something every
+install function has; a closing brace qualifies and was still not enough,
+because what matters is what comes immediately BEFORE it.
+
 ## Verifying a reconstruction
 
 Build, install, run, drive, screenshot, check counts:
