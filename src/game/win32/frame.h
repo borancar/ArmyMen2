@@ -60,4 +60,9 @@ int frame_install(void);
 }
 #endif
 
+/* 0x00462600, three callers. The multiplayer scoreboard overlay: a row per
+ * comm slot with a team marker, a pause badge, a latency bar, the scores and
+ * the game type. Four Lock/Unlock brackets, each checked. */
+void __cdecl PausedFrameStep(void);
+
 #endif /* AM2_FRAME_H */

@@ -7262,6 +7262,19 @@ typedef struct {
  * DIFFERENT set -- 3, where everything else in the family uses 0x13. */
 #define ADDR_MP_MARK_GRID         0x0048CBB8u  /* AM2_Sprite *[4 * n] */
 #define ADDR_MP_MARK_COLS         0x0048CBBCu  /* int32_t, the n */
+/* The scoreboard's row positions: four rows of four (x,y) int16 pairs,
+ * indexed by the ACTIVE PLAYER COUNT minus one, not by slot. x runs {0},
+ * {0,366}, {0,183,366}, {0,122,244,366} and y is 21 throughout, so the
+ * columns spread as players join. DrawLatencyBar indexes the same table with
+ * `slot + row * 4`, which is what confirms both readings at once. */
+#define ADDR_MP_ROW_COORDS        0x0048C768u  /* int16[4][8] */
+/* Three groups of per-slot PAUSE bits, each tested against ADDR_PAUSE_FLAGS
+ * and each selecting a different scoreboard badge. Decoded from the image;
+ * the branches that read them look identical. */
+#define ADDR_MP_PAUSE_BITS_A      0x0048C7A8u  /* {0x10,0x20,0x40,0x80} */
+#define ADDR_MP_PAUSE_BITS_B      0x0048C7B8u  /* {0x800..0x4000} */
+#define ADDR_MP_PAUSE_BITS_C      0x0048C7C8u  /* {0x20000..0x100000} */
+#define ADDR_STR_GAME_TYPE_GOAL   0x0048CC04u
 #define ADDR_MP_MARK_A            0x00664594u  /* AM2_Sprite * */
 #define ADDR_MP_MARK_B            0x00664598u
 #define ADDR_MP_MARK_C            0x0066459Cu

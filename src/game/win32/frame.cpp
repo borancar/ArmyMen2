@@ -20,6 +20,9 @@
 #include "../../inject/patch.h"
 #include "../gameproc.h"  /* RequestState -- reconstructed */
 #include "../misc.h"      /* IsKeyDown, KeyChanged -- reconstructed */
+#include "../crt.h"      /* am2_sprintf -- the game's own */
+#include "../text.h"     /* DrawText -- reconstructed, and NOT winuser's */
+#include "../map.h"      /* ScriptListFind */
 #include "sprite.h"       /* DrawSprite -- reconstructed */
 #include "../image.h"     /* AM2_IMAGE */
 #include "../gamedir.h"   /* SetGameDir -- reconstructed */
@@ -251,8 +254,8 @@ void __cdecl FrameClockStep(void)
 }
 
 typedef void  (__cdecl *AM2_VoidFn0)(void);
-#define orig_paused_frame_step \
-    ((AM2_VoidFn0)(uintptr_t)ADDR_PAUSED_FRAME_STEP)
+/* PausedFrameStep is reconstructed below; frame.h declares it. */
+void __cdecl PausedFrameStep(void);
 
 #define g_currentBitmap (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
 /* Spelled exactly as surface.cpp spells them; checkglobals enforces that. */
@@ -299,7 +302,7 @@ void __cdecl MissionPausedFrame(void)
     }
 
     SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
-    orig_paused_frame_step();
+    PausedFrameStep();
 
     if (!(*(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS & AM2_PAUSE_MAP_WAIT))
         return;
@@ -1210,7 +1213,7 @@ void __cdecl ShowMpResult(int32_t result)
     SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
     SetDrawTarget(g_primarySurface);
 
-    orig_paused_frame_step();
+    PausedFrameStep();
     CommReportStats(comm);
     CommPublishResult(comm);
 
@@ -1286,7 +1289,7 @@ void __cdecl RefreshDraw(void)
     SetDrawTarget(g_backBuffer);
     AirFrameDraw();
     DrawEffectLayer();
-    orig_paused_frame_step();
+    PausedFrameStep();
 
     SetDrawTarget(g_backBuffer);
     DrawSelection();
@@ -1462,5 +1465,214 @@ int frame_install(void)
                         "MissionPausedFrame", 0);
     rc |= patch_replace(ADDR_UNPAUSE_GAME, (const void *)UnPauseGame,
                         "UnPauseGame", 19);
+    rc |= patch_replace(ADDR_PAUSED_FRAME_STEP, (const void *)PausedFrameStep,
+                        "PausedFrameStep", 0);
     return rc;
+}
+
+/* Still the image's -- event.cpp reaches it the same way, and thiscall
+ * because the comm object goes in ecx. */
+typedef int32_t (__attribute__((thiscall)) *AM2_TeamScoreFn)(void *comm,
+                                                             int32_t slot);
+#define orig_comm_team_score \
+    ((AM2_TeamScoreFn)(uintptr_t)ADDR_COMM_TEAM_SCORE)
+
+/* PausedFrameStep -- original 0x00462600, three callers. The multiplayer
+ * scoreboard overlay: one row per comm slot with a team marker, a pause
+ * badge, either a latency bar or an absent-player mark, the army score, the
+ * team score, and the game type across the bottom.
+ *
+ * ITS THREE BITMASK TABLES ARE PER-SLOT PAUSE REASONS, decoded from the image
+ * rather than read off the branches: 0x0048C7A8 holds {0x10, 0x20, 0x40,
+ * 0x80}, 0x0048C7B8 {0x800, 0x1000, 0x2000, 0x4000} and 0x0048C7C8 {0x20000,
+ * 0x40000, 0x80000, 0x100000}, each indexed by slot and tested against
+ * ADDR_PAUSE_FLAGS -- which CLAUDE.md already establishes as one bit per
+ * reason the game is paused. Three groups of four, and the sprite variant
+ * each selects is different.
+ *
+ * OUR OWN SLOT TAKES A DIFFERENT PATH ENTIRELY, testing bits 3 and 16 rather
+ * than indexing any table. So the local player's badge is decided by two
+ * fixed bits and everyone else's by three tables, which reading the arms
+ * without the tables would flatten into one rule.
+ *
+ * THE COORDINATE TABLE IS INDEXED BY THE ACTIVE PLAYER COUNT, not by slot:
+ * four rows of four (x,y) pairs at 0x0048C768, giving x = {0}, {0,366},
+ * {0,183,366}, {0,122,244,366} for one to four players, all at y = 21. So
+ * the columns spread as players join, and DrawLatencyBar's `slot + row * 4`
+ * indexes the same table with the same row -- which is what confirms both
+ * readings.
+ *
+ * FOUR LOCK/UNLOCK BRACKETS, one per text block, and each is checked: a
+ * failed lock RETURNS rather than skipping the draw, so the remaining rows
+ * are abandoned too. That is the original's and it is why the function has
+ * one exit despite four places that can fail.
+ *
+ * The team-mate count decides the marker's size -- 4 when a slot is alone on
+ * its team and 3 when it is not -- and a slot with no team at all skips the
+ * count entirely rather than counting zero. */
+void __cdecl PausedFrameStep(void)
+{
+    static const uint32_t kPauseBitsA[4] = { 0x10u, 0x20u, 0x40u, 0x80u };
+    static const uint32_t kPauseBitsB[4] = { 0x800u, 0x1000u, 0x2000u, 0x4000u };
+    static const uint32_t kPauseBitsC[4] =
+        { 0x20000u, 0x40000u, 0x80000u, 0x100000u };
+
+    uint8_t       *comm;
+    const int16_t *xy;
+    int32_t        active = 0;
+    int32_t        slot;
+    int32_t        n;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
+        return;
+
+    comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+
+    for (n = 0; n < 4; n++) {
+        if (*(const int32_t *)(comm + COMM_OFF_SLOT_FIELD_25C
+                               + n * COMM_PLAYER_STRIDE) != 0)
+            active++;
+    }
+
+    xy = (const int16_t *)((const uint8_t *)(uintptr_t)ADDR_MP_ROW_COORDS
+                           + (uint32_t)(active - 1) * 16u);
+
+    for (slot = 0; slot < 4; slot++, xy += 2) {
+        uint8_t *rec = comm + slot * COMM_PLAYER_STRIDE;
+        uint32_t pause;
+        int32_t  team;
+        int32_t  mates = 0;
+        int32_t  variant;
+        int32_t  badge = 0;
+        int32_t  army;
+        char     buf[64];
+        int32_t  ext[2];
+
+        if (*(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_25C) == 0)
+            continue;
+
+        team = *(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_258);
+        if (team > 0) {
+            for (n = 0; n < 4; n++) {
+                const uint8_t *o = comm + COMM_OFF_SLOT_FIELD_258
+                                   + n * COMM_PLAYER_STRIDE;
+                if (*(const int32_t *)(o + 4) != 0
+                    && *(const int32_t *)o == team)
+                    mates++;
+            }
+        }
+
+        variant = (mates <= 1) ? 4 : 3;
+        pause = *(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS;
+
+        if (slot == *(const int32_t *)(uintptr_t)ADDR_OUR_SLOT) {
+            if (pause & 8u)
+                badge = 1;
+            else if (pause & 0x10000u)
+                variant = 0;
+            else if (*(const int32_t *)(rec + 0x274u) == 0
+                     && *(const int32_t *)(uintptr_t)ADDR_NET_GAME != 0)
+                variant = 1;
+        } else if (pause & kPauseBitsB[slot]) {
+            badge = 1;
+        } else if (pause & kPauseBitsA[slot]) {
+            variant = 2;
+        } else if (pause & kPauseBitsC[slot]) {
+            variant = 0;
+        } else if (*(const int32_t *)(rec + 0x274u) == 0
+                   && *(const int32_t *)(uintptr_t)ADDR_NET_GAME != 0) {
+            variant = 1;
+        }
+
+        army = CommArmyOfSlot(comm, slot);
+        DrawSprite((*(AM2_Sprite *const *const *)(uintptr_t)ADDR_MP_MARK_GRID)
+                       [army * 5 + variant],
+                   xy[0], xy[1], 0);
+
+        if (*(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_258) != 0) {
+            /* The team sprite's x is the marker's, rounded DOWN to a multiple
+             * of 32 and shifted by 0x5E -- `and edx, ~0x1F` before the add,
+             * so two adjacent columns can share a team badge position. */
+            int32_t tx = ((variant - 3) != 0 ? -1 : 0) & ~0x1F;
+
+            tx += 0x5E + xy[0];
+            DrawSprite((*(AM2_Sprite *const *const *)(uintptr_t)ADDR_MP_TEAM_SPRITES)
+                           [*(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_258)],
+                       tx, xy[1] + 3, 0);
+        }
+
+        if (badge) {
+            AM2_Sprite *spr = (variant == 3)
+                ? *(AM2_Sprite *const *)(uintptr_t)ADDR_MP_MARK_A
+                : *(AM2_Sprite *const *)(uintptr_t)ADDR_MP_MARK_B;
+
+            DrawSprite(spr, xy[0], xy[1], 0);
+        }
+
+        if (CommSlotHasPlayer(comm, slot))
+            DrawLatencyBar(slot, active - 1);
+        else
+            DrawSprite(*(AM2_Sprite *const *)(uintptr_t)ADDR_MP_MARK_C,
+                       xy[0] + 0x37, xy[1] + 3, 0);
+
+        if (variant <= 2)
+            continue;
+
+        am2_sprintf(buf, (const char *)AM2_IMAGE(ADDR_STR_PCT_D),
+                    GetArmyScore(comm, slot));
+        TextExtent(buf, 1, ext);
+        if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+            return;
+        DrawText(xy[0] - ext[0] + 0x32, xy[1] + 4, buf, 1, 0,
+                 *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
+        UnlockSurface();
+
+        if (mates > 1) {
+            am2_sprintf(buf, (const char *)AM2_IMAGE(ADDR_STR_PCT_D),
+                        orig_comm_team_score(comm, slot));
+            TextExtent(buf, 1, ext);
+            if (!LockSurface(
+                    *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+                return;
+            DrawText(xy[0] - ext[0] + 0x58, xy[1] + 4, buf, 1, 0,
+                     *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
+            UnlockSurface();
+        }
+
+        if (*(const int32_t *)(uintptr_t)ADDR_INFO_OVERLAY_ON) {
+            RECT clip;
+
+            clip.left   = xy[0];
+            clip.top    = xy[1] + 0x14;
+            clip.right  = xy[0] + 0x6E;
+            clip.bottom = xy[1] + 0x14 + 0x14;
+            if (!LockSurface(
+                    *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+                return;
+            DrawTextClipped(xy[0] + 2, xy[1] + 0x14 + 2,
+                            (const char *)(rec + 0x218u), 1, clip,
+                            *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
+            UnlockSurface();
+        }
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_INFO_OVERLAY_ON) {
+        char buf[128];
+        RECT clip;
+
+        am2_sprintf(buf, (const char *)AM2_IMAGE(ADDR_STR_GAME_TYPE_GOAL),
+                    (const char *)ScriptListFind(
+                        (char *)(uintptr_t)ADDR_MP_SCRIPT_NAME) + 0x80,
+                    *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT);
+
+        clip.left   = xy[0];
+        clip.top    = xy[1] + 0x24;
+        clip.right  = xy[0] + 0x190;
+        clip.bottom = xy[1] + 0x24 + 0x14;
+        if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+            return;
+        DrawTextClipped(xy[0] + 2, xy[1] + 0x24 + 2, buf, 1, clip,
+                        *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
+        UnlockSurface();
+    }
 }
