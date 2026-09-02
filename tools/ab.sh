@@ -341,6 +341,19 @@ play() {
     AM2_MAKEVARS="TRACE=${AM2_AB_TRACE:-1}" drive start "$wait" "ARGS=$args" $extra \
         >/dev/null 2>&1
 
+    # THE DLL THE TWO HALVES RAN MUST BE THE SAME ONE. Every `drive start`
+    # calls `make -s run`, which rebuilds and reinstalls am2hook.dll -- so a
+    # source edit landing between a configuration's two halves silently gives
+    # them different binaries, and the run then reports a difference, or hides
+    # one, for a reason nothing in the output explains.
+    #
+    # CLAUDE.md has warned about this in prose since it happened twice. Prose
+    # did not stop it happening a third time, so this records the hash the
+    # side actually ran and the comparison below fails the configuration if
+    # the two disagree. The rule was known and cited; only the check works.
+    md5sum "$REPO/build/am2hook.dll" 2>/dev/null | cut -d" " -f1 \
+        > "$WORK/$cfg-$side.dllhash"
+
     # Boot Camp needs driving; the other two show what they show.
     if [ "$cfg" = bootcamp ] || [ "$cfg" = audio ] || [ "$cfg" = mission ] \
        || [ "$cfg" = combat ]; then
@@ -1399,6 +1412,18 @@ for cfg in $cfgs; do
     echo "== $cfg"
     play orig  "$cfg" || exit 1
     play recon "$cfg" || exit 1
+    # Both halves must have run the SAME am2hook.dll. See the note beside the
+    # hash capture in play(): a source edit during the suite rebuilds it, and
+    # the resulting difference has nothing to do with the reconstruction.
+    if [ -s "$WORK/$cfg-orig.dllhash" ] && [ -s "$WORK/$cfg-recon.dllhash" ] \
+       && ! cmp -s "$WORK/$cfg-orig.dllhash" "$WORK/$cfg-recon.dllhash"; then
+        echo "  dll     VOID: the two halves ran DIFFERENT am2hook.dll builds"
+        echo "          ($(cat "$WORK/$cfg-orig.dllhash") vs $(cat "$WORK/$cfg-recon.dllhash"))."
+        echo "          src/ was edited mid-suite. Nothing below means anything;"
+        echo "          kill the suite, and re-run this configuration."
+        fail=1
+        continue
+    fi
     compare "$cfg" || fail=1
 done
 
