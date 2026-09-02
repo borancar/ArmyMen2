@@ -1855,6 +1855,28 @@ and do not stack a second unverified unit on an unverified one: both bugs
 produced the identical failure signature, and telling them apart depended on
 only one being in flight.
 
+## ARITY AND IDENTITY ARE DIFFERENT QUESTIONS, and answering one feels like both
+
+`Step3TurnBlocked`'s arguments went in reversed after a reading that was
+correct at every step. `tools/espmap.py` gave the frame slots; tracing which
+register takes which slot was right; reading which offsets each register
+touches was right, and they separated cleanly into object fields and record
+fields. **None of that says which CALLER VALUE lands in which slot.**
+
+I had read the call site -- to count the pushes, because the `add esp` was
+lying about arity as usual. Having done that, checking it again for argument
+IDENTITY felt redundant. It is not: the pushes answer "how many", and only
+knowing what the caller's registers HOLD answers "which".
+
+The result is the ADDR_ENTER_VEHICLE shape exactly -- internally consistent,
+every field access on the other record, nothing wrong from inside, and it
+compiles. Here it also could not be caught by running: both configurations
+passed with it installed, because the function is cold.
+
+So the rule below is two rules. Read the call site for the COUNT, and read
+what the caller put in each slot for the ORDER, and record which instruction
+settled each.
+
 ## Take every signature in a family from its CALL SITES, before writing any of it
 
 Fifteen functions implementing five roles three times -- two hardcoded row
