@@ -358,6 +358,13 @@ disagreeing depths and unreached references rather than guessing; on
 and therefore the source of everything the four AI steps reconstructed this
 session act on. All twenty-three callees are named; the survey is in `orig.h`.
 
+**One claim in that survey was wrong and `espmap.py` caught it.** It said this
+function "keeps both facings" where the four AI steps overwrite one slot -- and
+the two stores are `[esp+0x40]` and `[esp+0x3c]`, which look like two slots and
+are one, because the first has an outstanding `push` in front of it. The turret
+overwrites the hull here exactly as everywhere else. That is the error the tool
+was built for, made one commit before building it.
+
 **It is where the heading cache comes from**, which closes the loop on
 `ADDR_SIGHT_BLOCK_BY_DIR`'s two stamps. This function increments
 `ADDR_SIGHT_GENERATION` and feeds every object it rejects to `AddSightBlocker`,

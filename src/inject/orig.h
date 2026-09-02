@@ -8951,11 +8951,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * the call renders object bytes as text and cannot fault. Both halves of an
  * A/B would render the same bytes, and nothing reaches it anyway.
  *
- * IT KEEPS BOTH FACINGS. The four AI steps already reconstructed substitute a
- * type 3's OBJ_OFF_FIELD_530 for OBJ_OFF_FACING in ONE stack slot, written
- * twice; this one writes the hull into one slot and the turret into another
- * and keeps both. Same idiom, opposite conclusion -- so the "one slot written
- * twice" note does not carry over. */
+ * IT DOES NOT KEEP BOTH FACINGS, AND THE CLAIM THAT IT DID WAS THE EXACT ERROR
+ * tools/espmap.py WAS BUILT FOR -- made one commit before building it, and
+ * caught by it immediately afterwards. The two stores are `mov byte
+ * [esp+0x40], al` and `mov byte [esp+0x3c], cl`, which look like two slots and
+ * are one: the first has an outstanding `push esi` for the ObjIsType3 call in
+ * front of it, so both land on the same dword. A type 3's turret facing
+ * OVERWRITES the hull's here exactly as it does in the four AI steps, and the
+ * "one slot written twice" note carries over unchanged.
+ *
+ * Worth leaving the correction visible rather than quietly editing the claim:
+ * the displacement was read without counting the pushes, which is the one
+ * thing a hand reading of a large frame cannot be trusted to do, and the
+ * second sight test forty instructions later does the same thing again. */
 
 /* IT IS WHERE THE HEADING CACHE COMES FROM, which closes the loop on
  * ADDR_SIGHT_BLOCK_BY_DIR's two stamps. This function INCREMENTS
