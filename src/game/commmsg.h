@@ -141,4 +141,19 @@ int32_t __cdecl FlowRecvMessage(void *nodev);
  * design and not its code. */
 void __cdecl VehicleUpdateAppend(void *msg, void *obj);
 
+/* 0x0045E590. The vehicle message dispatcher: eleven table slots over seven
+ * handlers, with kinds 0x20..0x23 sharing the unknown-message arm. */
+void __cdecl VehicleMsgRecv(void *msg, int32_t army);
+
+/* 0x0045EB10. Kind 0x1B, a BATCH: walk the records from +8 to the message's
+ * own length word, handing each to the applier. */
+void __cdecl RecvVehicle1B(void *msg, int32_t army);
+
+/* 0x0045E810. Kind 0x1E, which resolves two objects and then does nothing --
+ * its only effect was a debug print the retail build stubbed to `ret`. */
+void __cdecl RecvVehicle1E(void *msg);
+
+/* 0x0045EA30. Kind 0x24, the receive half of SendVehicleEnter. */
+void __cdecl RecvVehicle24(void *msg);
+
 #endif

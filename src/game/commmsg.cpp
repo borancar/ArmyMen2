@@ -1842,24 +1842,21 @@ void __cdecl RecvVehicleExit(void *msg)
 typedef void (__cdecl *AM2_VehMsgFn)(void *msg);
 typedef void (__cdecl *AM2_VehMsgArmyFn)(void *msg, int32_t army);
 
-#define orig_recv_vehicle_1b ((AM2_VehMsgArmyFn)(uintptr_t)ADDR_RECV_VEHICLE_1B)
 #define orig_recv_vehicle_1c ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_1C)
 #define orig_recv_vehicle_1d ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_1D)
-#define orig_recv_vehicle_1e ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_1E)
 #define orig_recv_vehicle_1f ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_1F)
-#define orig_recv_vehicle_24 ((AM2_VehMsgFn)(uintptr_t)ADDR_RECV_VEHICLE_24)
 
 void __cdecl VehicleMsgRecv(void *msg, int32_t army)
 {
     uint32_t kind = *(const uint16_t *)((const uint8_t *)msg + 2);
 
     switch (kind) {
-    case 0x1B: orig_recv_vehicle_1b(msg, army); return;
+    case 0x1B: RecvVehicle1B(msg, army);        return;
     case 0x1C: orig_recv_vehicle_1c(msg);       return;
     case 0x1D: orig_recv_vehicle_1d(msg);       return;
-    case 0x1E: orig_recv_vehicle_1e(msg);       return;
+    case 0x1E: RecvVehicle1E(msg);              return;
     case 0x1F: orig_recv_vehicle_1f(msg);       return;
-    case 0x24: orig_recv_vehicle_24(msg);       return;
+    case 0x24: RecvVehicle24(msg);              return;
     case AM2_MSG_VEHICLE_EXIT:
         RecvVehicleExit(msg);
         return;
@@ -2855,6 +2852,12 @@ int commmsg_install(void)
     patch_replace(ADDR_VEHICLE_UPDATE_APPEND,
                   (const void *)VehicleUpdateAppend,
                   "VehicleUpdateAppend", 2);
+    patch_replace(ADDR_RECV_VEHICLE_1B, (const void *)RecvVehicle1B,
+                  "RecvVehicle1B", 2);
+    patch_replace(ADDR_RECV_VEHICLE_1E, (const void *)RecvVehicle1E,
+                  "RecvVehicle1E", 1);
+    patch_replace(ADDR_RECV_VEHICLE_24, (const void *)RecvVehicle24,
+                  "RecvVehicle24", 1);
     patch_replace(ADDR_RECV_TROOP_PAIR, (const void *)RecvTroopPair,
                   "RecvTroopPair", 1);
     patch_replace(ADDR_RECV_TROOP_SET_WEAPON,
@@ -3363,4 +3366,97 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
          * flow queue is. */
         return 0;
     }
+}
+
+/* The applier is still the image's, reached by address from the batch walk
+ * below. Its prototype comes from that walk: it takes the record and the
+ * army, and RETURNS the cursor past what it consumed. */
+typedef uint8_t *(__cdecl *AM2_VehApplyFn)(void *rec, int32_t army);
+#define orig_vehicle_update_apply \
+    ((AM2_VehApplyFn)(uintptr_t)ADDR_VEHICLE_UPDATE_APPLY)
+
+/* RecvVehicle1B -- original 0x0045EB10, one caller. Message kind 0x1B is a
+ * BATCH of vehicle updates, and this is the walk: the first word of the
+ * message is its total length, the records start at +8, and each one is
+ * handed to the applier, which returns the cursor past what it consumed.
+ *
+ * THE BOUND IS THE MESSAGE'S OWN LENGTH WORD, which is what
+ * VehicleUpdateAppend maintains from the other end -- it adds only the bytes
+ * each append wrote, so the two agree exactly. That agreement is the whole
+ * protocol, and it is why the length defect fixed in AppendTroopState
+ * mattered: a sender that over-counts sends a bound this loop would read
+ * past.
+ *
+ * The applier is reached by ADDRESS because it is still the image's. */
+void __cdecl RecvVehicle1B(void *msg, int32_t army)
+{
+    uint8_t       *m   = (uint8_t *)msg;
+    const uint8_t *end = m + *(const uint16_t *)m;
+    uint8_t       *at  = m + 8;
+
+    while (at < end)
+        at = (uint8_t *)orig_vehicle_update_apply(at, army);
+}
+
+/* RecvVehicle1E -- original 0x0045E810, one caller, and IT DOES NOTHING.
+ *
+ * It resolves both uids, checks the second is a weapon, and then calls
+ * 0x0045CAA0 with two arguments and no format string. That address is a bare
+ * `c3` in this retail image, so the whole function is three lookups and a
+ * discarded result -- a debug print that was compiled out, leaving the
+ * guards that fed it.
+ *
+ * THE CALL IS NOT REPRODUCED, for the reason Step3Drive's header gives at
+ * length: 0x0045CAA0 is also ADDR_LOG, which src/inject/gamelog.c patches
+ * into a real varargs logger, so emitting it would hand our logger an object
+ * pointer as a format string. The lookups ARE reproduced -- they are what the
+ * original executes, and ObjByUidAlias is not free of side effects for us to
+ * assume away. */
+void __cdecl RecvVehicle1E(void *msg)
+{
+    const uint8_t *m = (const uint8_t *)msg;
+    void          *vehicle;
+    void          *item;
+
+    vehicle = ObjByUidAlias(UidOnWire(*(const uint32_t *)(m + 4)));
+    if (vehicle == 0)
+        return;
+
+    item = LookupByUID(UidOnWire(*(const uint32_t *)(m + 8)));
+    if (item == 0)
+        return;
+
+    if (!ObjIsType4((const AM2_Object *)item))
+        return;
+
+    /* The log that is a `ret`; see above. */
+}
+
+/* RecvVehicle24 -- original 0x0045EA30, one caller. Kind 0x24, the receive
+ * half of SendVehicleEnter, and it names itself: "-->Vehicle Enter Received:
+ * Vehicle: %x, trooper: %x", gated on COMM_OFF_VERBOSE.
+ *
+ * THE SENDER SAYS `item` AND THE RECEIVER SAYS `trooper` for the same twelve
+ * bytes -- the same disagreement RecvVehicleExit's header already records for
+ * kind 0x25. Neither word is ours; both are kept where they are.
+ *
+ * The vehicle resolves through ObjByUidAlias and the passenger does NOT
+ * resolve at all here: BoardVehicle takes the uid and does its own lookup,
+ * which is why only one of the two is turned into a pointer. */
+void __cdecl RecvVehicle24(void *msg)
+{
+    const uint8_t *m = (const uint8_t *)msg;
+    uint8_t       *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    void          *vehicle;
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_VEHICLE_ENTER_RECV),
+                UidOnWire(*(const uint32_t *)(m + 4)),
+                UidOnWire(*(const uint32_t *)(m + 8)));
+
+    vehicle = ObjByUidAlias(UidOnWire(*(const uint32_t *)(m + 4)));
+    if (vehicle == 0)
+        return;
+
+    BoardVehicle(UidOnWire(*(const uint32_t *)(m + 8)), vehicle);
 }

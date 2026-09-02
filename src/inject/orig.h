@@ -12405,6 +12405,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Kind 0x25 is the one this project can name: ADDR_VEHICLE_DROP_OCCUPANT
  * sends it. The rest are numbered because the number is what is established. */
 #define ADDR_RECV_VEHICLE_1B     0x0045EB10u  /* void(msg *, int32_t army) */
+/* 0x0045DF10, one caller -- RecvVehicle1B's walk. The APPLY half of the
+ * vehicle delta protocol: it decodes the same 4-byte big-endian header
+ * VehicleUpdateAppend writes, and returns the cursor past what it consumed,
+ * which is what makes the batch loop terminate. */
+#define ADDR_VEHICLE_UPDATE_APPLY 0x0045DF10u /* uint8_t *(rec, int32 army) */
+#define ADDR_STR_VEHICLE_ENTER_RECV 0x0048C3ECu
 #define ADDR_RECV_VEHICLE_1C     0x0045E980u  /* void(msg *) */
 #define ADDR_RECV_VEHICLE_1D     0x0045E630u
 #define ADDR_RECV_VEHICLE_1E     0x0045E810u
