@@ -415,4 +415,9 @@ void __cdecl Step3TurnState(void *obj, void *rec);
  * units. */
 void __cdecl Step3RouteAndBoard(void *obj, void *rec);
 
+/* 0x0045CB30. The whole per-frame step of a driven vehicle: aim the turret,
+ * pick a target point, choose a speed, take the step, fire, sound the
+ * engine, drag the passengers along and pick up what is underneath. */
+void __cdecl Step3Drive(void *obj, void *rec);
+
 #endif /* AM2_REGION_H */

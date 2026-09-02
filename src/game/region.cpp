@@ -7333,7 +7333,7 @@ void __cdecl AiStepAttach(void *obj, void *out)
  * exactly into ADDR_FORMATION_SLOTS. See the header; the field is
  * RANK_REC_OFF_SIGHT_RANGE now.
  *
- * ITS LAST ACT NAMES A FIELD. `ctx[SIGHTC_OFF_SEED] = GameRand()` makes that
+ * ITS LAST ACT NAMES A FIELD. `ctx[SIGHTC_OFF_SEED] = orig_step3_rand()` makes that
  * byte a fresh roll per build, so AiHitReact comparing it against 4 and 0x10
  * is a probability gate and not a threshold on anything measured.
  *
@@ -8630,8 +8630,8 @@ tail:
 }
 
 
-/* 0x0045C8D0 is Step3ChooseFacing now; region.h declares it. */
-#define orig_step3_45cb30 ((AM2_Step2BFn)(uintptr_t)AM2_IMAGE(ADDR_STEP3_45CB30))
+/* 0x0045C8D0 is Step3ChooseFacing and 0x0045CB30 is Step3Drive now; both
+ * are declared in region.h and called by name. */
 
 /* StepType3 -- original 0x0045D660, one caller: ObjFrameStep's type-3 arm.
  * The vehicle's per-frame step, and the mirror of StepType2.
@@ -8783,7 +8783,10 @@ post:
     }
 
 emit:
-    orig_step3_45cb30(obj, out);
+    /* Called by NAME, so Step3Drive's own counter cannot move: its only
+     * caller is this one and it no longer crosses the patched entry. The
+     * blind-counter case, not a cold one. */
+    Step3Drive(obj, out);
 
     /* THE THIRD TAIL, and the footprint is why it matters. The entry clears
      * this vehicle's footprint and this puts it back, so a reconstruction that
@@ -9069,6 +9072,9 @@ int region_install(void)
     rc |= patch_replace(ADDR_STEP3_ROUTE_BOARD,
                         (const void *)Step3RouteAndBoard,
                         "Step3RouteAndBoard", 1);
+    rc |= patch_replace(ADDR_STEP3_DRIVE,
+                        (const void *)Step3Drive,
+                        "Step3Drive", 2);
     return rc;
 }
 
@@ -9816,4 +9822,496 @@ void __cdecl Step3RouteAndBoard(void *obj, void *rec)
         *(int32_t *)(other + 0xE4u) = 3;
         ObjAttachTo(other, o);
     }
+}
+
+/* Both senders are still the image's, and both are reached by address. Their
+ * signatures come from their own log lines' push order, not from these call
+ * sites -- see orig.h, where the argument identity is fixed by the
+ * instruction that settles it. */
+/* The image's own rand, reached through AM2_IMAGE the way event.cpp and
+ * air.cpp reach it -- it lives above the CRT line, so the selftest's slide
+ * applies. */
+typedef int32_t (__cdecl *AM2_Step3RandFn)(void);
+#define orig_step3_rand ((AM2_Step3RandFn)AM2_IMAGE(ADDR_GAME_RAND))
+typedef void (__cdecl *AM2_SendVehFireFn)(void *vehicle);
+typedef void (__cdecl *AM2_SendVehWantFn)(void *vehicle, void *item,
+                                          int32_t request, int8_t slot,
+                                          int32_t quant);
+#define SendVehicleFire \
+    ((AM2_SendVehFireFn)(uintptr_t)ADDR_SEND_VEHICLE_FIRE)
+#define SendVehicleWantItem \
+    ((AM2_SendVehWantFn)(uintptr_t)ADDR_SEND_VEHICLE_WANT_ITEM)
+
+/* 0x0045CB30, one caller in StepType3, and the largest function in the
+ * vehicle block at 769 instructions. The whole per-frame step of a driven
+ * vehicle, and it does seven jobs in this order: aim the turret, pick the
+ * frame's target point, choose a speed, take the step, fire, sound the
+ * engine, drag the passengers along, and pick up what is under the new
+ * position.
+ *
+ * ITS TWO SOUND TABLES ARE THE THIRD INSTANCE IN THIS PROJECT OF SLOTS
+ * SHARING AN ARM, and reading the bodies top to bottom gets it wrong in two
+ * separate ways. Both tables are six entries over four bodies: states 2 and
+ * 3 point at the SAME arm, and state 4 points at the function's tail and
+ * plays nothing at all. Numbering the four bodies 0..3 as they are laid out
+ * would give state 3 its own sound and give state 4 one it never plays.
+ * Generated from the image at 0x0045D474 and 0x0045D48C rather than
+ * transcribed, which is what CLAUDE.md's DirtyCollect note argues for.
+ *
+ * THE ARGUMENT SLOT IS REUSED TWICE, which makes an espmap read as though
+ * the function had more arguments than it has. Once esi holds the object,
+ * arg1's slot becomes the frame's target POINT (written at 0x0045CC71), and
+ * once the record is finished with, arg2's slot becomes the passenger loop's
+ * counter (written at 0x0045D24F). Both are the pattern CLAUDE.md records;
+ * neither is visible without tracking esp.
+ *
+ * AND A LINEAR ESP TRACE IS WRONG THROUGH THE FIRING BLOCK. Two paths join
+ * at the FireWeapon call, each pushing 28 bytes of `spot` and `target`, and
+ * the single `add esp, 0x1c` cleans one of them -- so a tool that walks the
+ * instruction stream counts both and every slot below it reads four bytes
+ * out. That drift is what makes 0x0045D10E look like it reads a local when
+ * it reads arg2, which the early `je` into that same address settles: at
+ * that jump esp is untouched, so [esp+0x34] is unambiguously E+8.
+ *
+ * TWO CALLS ARE DELIBERATELY NOT REPRODUCED, for opposite reasons.
+ *
+ * The first is the pickup refusal at 0x0045D3E8, which calls 0x0045CAA0 with
+ * two arguments and NO format string. That address is a bare `ret` in this
+ * retail image -- `c3` -- so the call does nothing whatever. But it is also
+ * ADDR_LOG, which src/inject/gamelog.c patches into a real varargs logger,
+ * so emitting the call would hand our logger an object pointer as its format
+ * and crash on a path the original cannot fail on. Reproducing the
+ * instruction would introduce the defect, not avoid it.
+ *
+ * The second is the AngleBetween at 0x0045D02A, whose result is overwritten
+ * before it is read. It is a pure reconstructed function, so calling it and
+ * discarding the answer is indistinguishable from not calling it.
+ *
+ * The `push esi` before CanPickUp at 0x0045D358 is likewise not reproduced:
+ * the callee reads only [esp+8], so the second push is stray and the
+ * `add esp, 8` cleans both. Faithful to what executes. */
+void __cdecl Step3Drive(void *obj, void *rec)
+{
+    uint8_t  *o = (uint8_t *)obj;
+    uint8_t  *r = (uint8_t *)rec;
+    int32_t   speed = 0;          /* ebp, spilled to E-28 */
+    int32_t   tileArg = 0;        /* E-4, zeroed at entry and read once */
+    uint32_t  step = 0;           /* E-20, MoveStepPoint's out point */
+    uint8_t   facing = 0;         /* E-24, after it stops holding the turn */
+    uint8_t   gunFacing = 0;      /* E-16 */
+    uint8_t  *animRec = 0;        /* E-12 */
+
+    if (*(const uint16_t *)(o + 0x62u) != 0) {
+        uint8_t  *gun = (uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS);
+        uint32_t  target;
+        int32_t   turn;
+        int32_t   noTarget;
+        int32_t   first;
+        int32_t   second;
+        uint32_t  bits;
+
+        if (*(const int32_t *)(o + 0x52Cu) == 5)
+            Step3TurnState(o, o + 0x578u);
+
+        /* The hull's turn for this frame, capped at 8 either way. */
+        turn = Clamp(AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
+                                *(const uint8_t *)r),
+                     -8, 8);
+
+        animRec = gun + 0x44u;
+        bits = *(const uint8_t *)(*(uint8_t *const *)animRec + 8);
+        first  = RoundTo8((*(const uint8_t *)(gun + 0x5Cu)
+                           + *(const uint8_t *)(gun + 0x50u)) & 0xFF, bits);
+        second = RoundTo8((*(const uint8_t *)(gun + 0x5Cu) + turn
+                           + *(const uint8_t *)(gun + 0x50u)) & 0xFF, bits);
+
+        /* A sprite change is rate-limited: it needs either the per-vehicle
+         * interval at +0x564 to have elapsed, or 800 ms outright. The
+         * `changed` term below is the original's, ugly ordering and all --
+         * it asks whether +0x5A8 is set OR the rounded value differs from
+         * what was last committed. */
+        if (first != second) {
+            int32_t changed = (*(const int32_t *)(o + 0x5A8u) != 0
+                               || (uint8_t)second != *(const uint8_t *)(o + 0x5A4u));
+            uint32_t age = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                           - *(const uint32_t *)(gun + 0x58u);
+
+            if ((age > *(const uint32_t *)(o + 0x564u) && changed)
+                || age > 0x320u) {
+                *(uint8_t *)(o + 0x5A4u) = (uint8_t)first;
+                *(uint32_t *)(gun + 0x58u) =
+                    *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+            } else {
+                turn = 0;
+            }
+        }
+        gunFacing = (uint8_t)second;
+
+        facing = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING) + turn);
+
+        /* State 1 skips target selection and the speed ramp entirely and
+         * goes straight to the step below. */
+        if (*(const int32_t *)(r + 8) != 1) {
+            /* The frame's target: the next waypoint if one is pending,
+             * otherwise the standing destination at +0xC0. */
+            if (*(const uint16_t *)(o + 0x520u)
+                    < *(const uint16_t *)(o + 0x522u))
+                target = *(const uint32_t *)(o + 0x120u
+                             + *(const uint16_t *)(o + 0x520u) * 4u);
+            else
+                target = *(const uint32_t *)(o + 0xC0u);
+
+            noTarget = ((uint16_t)target == 0);
+
+            if (!noTarget
+                && ApproxDist((const AM2_Point *)(o + 0x12u),
+                              (const AM2_Point *)&target) < 0xC0) {
+                int32_t d = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
+                                       *(const uint8_t *)r);
+                if (d < 0)
+                    d = -d;
+                if (d > 0x40)
+                    *(int32_t *)(r + 0x0Cu) = 1;
+            }
+
+            speed = *(const int32_t *)(r + 0x0Cu) != 0
+                        ? *(const int32_t *)(o + 0x55Cu)
+                        : *(const int32_t *)(o + 0x558u);
+
+            if (!noTarget
+                && *(const uint16_t *)(o + 0xC0u) == (uint16_t)target
+                && ApproxDist((const AM2_Point *)(o + 0x12u),
+                              (const AM2_Point *)&target) < 0x60)
+                *(int32_t *)(r + 0x10u) = 1;
+            else
+                *(int32_t *)(r + 0x10u) = 0;
+
+            MoveStepPoint(o, facing, 0, speed, 0, 0, &step);
+
+            if (!noTarget
+                && *(const uint16_t *)(o + 0xC0u) == (uint16_t)target
+                && (uint16_t)target != 0) {
+                int32_t d1 = ApproxDist((const AM2_Point *)&step,
+                                        (const AM2_Point *)&target) - 1;
+                int32_t d2 = ApproxDist((const AM2_Point *)(o + 0x12u),
+                                        (const AM2_Point *)&target);
+
+                if (d1 <= d2
+                    && ApproxDist((const AM2_Point *)(o + 0x12u),
+                                  (const AM2_Point *)(o + 0xB4u)) >= 0x30)
+                    *(int32_t *)(r + 0x14u) = 0;
+                else
+                    *(int32_t *)(r + 0x14u) = 1;
+            }
+
+            if (*(const int32_t *)(r + 0x14u) != 0)
+                speed >>= 1;
+            if (*(const int32_t *)(r + 0x10u) != 0)
+                speed >>= 1;
+
+            /* The acceleration limiter, and the two arms clamp from
+             * OPPOSITE sides: slowing down takes the larger of the two,
+             * speeding up the smaller. */
+            if (*(const int32_t *)(r + 0x0Cu) != 0) {
+                int32_t v = (int32_t)((float)*(const int32_t *)(o + OBJ_OFF_FIELD_44)
+                                      - (float)*(const int32_t *)(o + 0x560u)
+                                        * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
+                if (speed <= v)
+                    speed = v;
+            } else {
+                int32_t v = (int32_t)((float)*(const int32_t *)(o + 0x560u)
+                                        * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
+                                      + (float)*(const int32_t *)(o + OBJ_OFF_FIELD_44));
+                if (speed >= v)
+                    speed = v;
+            }
+
+            /* +0xD8 counts consecutive blocked frames and scales the speed
+             * by it -- again in opposite directions on the two arms. */
+            if (*(const uint32_t *)(o + 0xD8u) > 0 && speed != 0) {
+                int32_t t = (int32_t)*(const uint32_t *)(o + 0xD8u) * speed;
+
+                if (*(const int32_t *)(r + 0x0Cu) != 0) {
+                    int32_t c = *(const int32_t *)(o + 0x55Cu);
+                    speed = (c <= t) ? t : c;
+                } else {
+                    int32_t c = *(const int32_t *)(o + 0x558u);
+                    speed = (c < t) ? c : t;
+                }
+            }
+        }
+
+        MoveStepPoint(o, facing, 0, speed, 0, 0, &step);
+
+        if (VehicleBlockWeight(o, gunFacing, step, speed != 0) > 0x0E) {
+            facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
+            speed = 0;
+            *(uint32_t *)(o + 0xD8u) += 1;
+        } else {
+            *(uint32_t *)(o + 0xD8u) = 0;
+        }
+
+        turn = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING), facing);
+        *(uint8_t *)(o + OBJ_OFF_FACING) = facing;
+
+        /* A multi-part vehicle carries a turret, and it counter-rotates
+         * against the hull so that it keeps pointing where it was. */
+        if (*(const int32_t *)(o + 0x70u) > 1) {
+            uint8_t *turret = (uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS)
+                              + 0x60u;
+            int32_t  swing;
+
+            r[1] = (uint8_t)(r[1] + turn);
+            swing = Clamp(AngleDelta(*(const uint8_t *)(o + 0x530u), r[1]),
+                          turn - 0x0F, turn + 0x0F);
+
+            animRec = turret + 0x44u;
+            bits = *(const uint8_t *)(*(uint8_t *const *)animRec + 8);
+            first  = RoundTo8((*(const uint8_t *)(turret + 0x5Cu)
+                               + *(const uint8_t *)(turret + 0x50u)) & 0xFF,
+                              bits);
+            second = RoundTo8((*(const uint8_t *)(turret + 0x5Cu) + swing
+                               + *(const uint8_t *)(turret + 0x50u)) & 0xFF,
+                              bits);
+
+            if (first != second) {
+                uint32_t now = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+                uint8_t *g = (uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS);
+
+                if (*(const uint32_t *)(g + 0x58u) == now) {
+                    *(uint32_t *)(turret + 0x58u) = now;
+                } else {
+                    uint32_t age = now - *(const uint32_t *)(turret + 0x58u);
+
+                    if ((age <= 0x3Cu || *(const int32_t *)(o + 0x52Cu) == 1)
+                        && age <= 0x96u)
+                        swing = 0;
+                    else
+                        *(uint32_t *)(turret + 0x58u) = now;
+                }
+            }
+
+            *(uint8_t *)(o + 0x530u) =
+                (uint8_t)(*(const uint8_t *)(o + 0x530u) + swing);
+            gunFacing = (uint8_t)RoundTo8(
+                (*(const uint8_t *)(turret + 0x5Cu) + swing
+                 + *(const uint8_t *)(turret + 0x50u)) & 0xFF, bits);
+        }
+
+        /* --- firing --- */
+        if (*(const int32_t *)(r + 4) == 1) {
+            uint8_t *weapon = (uint8_t *)WeaponByUid(
+                *(const uint32_t *)(o + 0x550u));
+
+            if (weapon != 0) {
+                uint8_t     *aimed;
+                AM2_FireSpot spot;
+                void        *fireTarget;
+                int32_t      heading;
+                int32_t      height;
+
+                *(uint32_t *)(weapon + 0xC4u) =
+                    *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+                height = ObjHeight(o);
+
+                if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0
+                    || CommMustBroadcast(
+                           *(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                           (int16_t)*(const int8_t *)(o + 0x10u))) {
+                    *(int32_t *)(r + 0x24u) = 0;
+                    *(uint8_t *)(o + 0x529u) = (uint8_t)orig_step3_rand();
+                }
+
+                aimed = (uint8_t *)LookupByUID(*(const uint32_t *)(r + 0x20u));
+                if (aimed != 0) {
+                    /* Firing at an OBJECT: the spot is its position and its
+                     * ground height, and the heading gets a +/-2 spread. */
+                    spot.at = *(const uint32_t *)(aimed + 0x12u);
+                    spot.ground = *(const int16_t *)(aimed + 0x42u);
+                    spot.pad = 0;
+                    fireTarget = aimed;
+                    heading = (uint8_t)(*(const uint8_t *)(o + 0x530u)
+                                        + (orig_step3_rand() % 5) - 2);
+                } else if (*(const uint16_t *)(r + 0x18u) != 0) {
+                    /* Firing at a POINT: same spread, no target object. */
+                    spot.at = *(const uint32_t *)(r + 0x18u);
+                    spot.ground = *(const int16_t *)(r + 0x1Cu);
+                    spot.pad = 0;
+                    fireTarget = 0;
+                    heading = (uint8_t)(*(const uint8_t *)(o + 0x530u)
+                                        + (orig_step3_rand() % 5) - 2);
+                } else {
+                    /* Firing straight ahead: no spread at all, and the
+                     * heading is the gun facing scaled to the animation's
+                     * direction count rather than a raw byte. */
+                    uint32_t dirs =
+                        *(const uint8_t *)(*(uint8_t *const *)animRec + 8);
+
+                    spot.at = *(const uint32_t *)(r + 0x18u);
+                    spot.ground = *(const int16_t *)(r + 0x1Cu);
+                    spot.pad = 0;
+                    fireTarget = 0;
+                    heading = (uint8_t)(gunFacing << (8 - dirs));
+                }
+
+                orig_fire_weapon(weapon, o, height, heading, spot, fireTarget);
+
+                if (CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                      (int16_t)*(const int8_t *)(o + 0x10u)))
+                    SendVehicleFire(o);
+
+                *(int32_t *)(r + 4) = 0;
+                *(uint32_t *)(r + 0x18u) =
+                    *(const uint32_t *)(uintptr_t)ADDR_AIM_X;
+                *(uint16_t *)(r + 0x1Cu) =
+                    *(const uint16_t *)(uintptr_t)ADDR_AIM_Z;
+                *(int32_t *)(r + 0x20u) = 0;
+            }
+        }
+    }
+
+    /* --- 0x0045D10E: everything below runs even on the early exit --- */
+    *(int32_t *)(o + OBJ_OFF_FIELD_44) = speed;
+    SetKindFrames(o, *(const int32_t *)(r + 8));
+
+    if (ListFirstField548(o)) {
+        int32_t kind  = *(const int32_t *)(o + 0x544u);
+        int32_t state = *(const int32_t *)(o + 0x52Cu);
+        int32_t snd   = -1;
+
+        /* Both tables generated from the image; see the header note on
+         * states 2 and 3 sharing an arm and state 4 being silent. */
+        if (kind == 2 || kind == 3 || kind == 4 || kind == 6 || kind == 7) {
+            if ((uint32_t)state <= 5) {
+                static const int32_t kTracked[6] =
+                    { 0x18, 0x17, 0x19, 0x19, -1, 0x1A };
+                snd = kTracked[state];
+            }
+        } else if (kind == 1) {
+            if ((uint32_t)state <= 5) {
+                static const int32_t kWheeled[6] =
+                    { 0x1C, 0x1B, 0x1D, 0x1D, -1, 0x1E };
+                snd = kWheeled[state];
+            }
+        }
+
+        if (snd >= 0)
+            PlaySoundAt(snd, 1, 0, *(const int16_t *)(o + 0x12u),
+                        *(const int16_t *)(o + 0x14u));
+    }
+
+    *(uint8_t *)((uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS) + 0x50u) =
+        *(const uint8_t *)(o + OBJ_OFF_FACING);
+    if (*(const int32_t *)(o + 0x70u) > 1)
+        *(uint8_t *)((uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS) + 0xB0u) =
+            *(const uint8_t *)(o + 0x530u);
+
+    StepObjRows(o);
+    *(int32_t *)(o + OBJ_OFF_FIELD_44) = speed;
+
+    /* Drag the passengers to the vehicle's new position, and their held
+     * weapons with them. A passenger whose uid no longer resolves is
+     * removed -- and the index still advances, so the entry that slid into
+     * the gap is skipped. Reproduced; it is the original's. */
+    {
+        int32_t i;
+
+        for (i = 0; i < *(const int32_t *)(o + 0x53Cu); i++) {
+            uint8_t *p = (uint8_t *)LookupByUID(
+                (*(const uint32_t *const *)(o + 0x540u))[i]);
+
+            if (p == 0) {
+                ListRemoveAt(o + 0x538u, i);
+                continue;
+            }
+
+            *(uint32_t *)(p + 0x12u) = *(const uint32_t *)(o + 0x12u);
+            if (ObjType2Field548((const AM2_Object *)p)) {
+                int32_t n;
+
+                for (n = 0; n < 6; n++) {
+                    uint8_t *w = (uint8_t *)WeaponByUid(
+                        *(const uint32_t *)(p + 0x54Cu + n * 4));
+                    if (w != 0)
+                        *(uint32_t *)(w + 0x12u) = *(const uint32_t *)(p + 0x12u);
+                }
+            }
+            ObjTileChanged(p, *(const int8_t *)(o + 0x65u), 0);
+        }
+    }
+
+    /* A stopped state-5 vehicle draws through the identity remap and a
+     * moving one through the bright remap -- the headlights. */
+    if (*(const int32_t *)(o + 0x52Cu) == 5) {
+        uint8_t *g = (uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS);
+
+        if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) == 0)
+            *(void **)(g + 0x30u) = *(void **)(uintptr_t)ADDR_REMAP_IDENTITY;
+        else
+            *(void **)(g + 0x30u) = *(void **)(uintptr_t)ADDR_REMAP_BRIGHT;
+    }
+
+    /* Everything under the point the vehicle is MOVING TO, not where it is:
+     * ObjectsAtPoint is handed the step point MoveStepPoint just wrote. */
+    {
+        uint8_t *p = (uint8_t *)ObjectsAtPoint(&step,
+                         (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+
+        while (p != 0) {
+            if (ObjIsItem((const AM2_Object *)p)
+                && *(const int8_t *)(p + 0x98u) < 0) {
+                int32_t d = *(const int8_t *)(p + 0x65u)
+                            - *(const int8_t *)(o + 0x65u);
+                if (d < 0)
+                    d = -d;
+                if (d <= 0x10)
+                    tileArg = *(const int8_t *)(p + 0x65u);
+            }
+
+            if (CanPickUp(p) && ListFirstField548(o)) {
+                *(uint32_t *)(p + 0xC8u) =
+                    *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + 0x7D0u;
+
+                if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0) {
+                    void *comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
+
+                    /* Two broadcast questions, not one: the first refuses
+                     * outright when the host flag at +0x3D8 is set AND we
+                     * would broadcast, and only the second decides whether
+                     * a WANT is actually sent. */
+                    if (!(*(const int32_t *)((uint8_t *)comm + 0x3D8u) != 0
+                          && CommMustBroadcast(
+                                 comm, (int16_t)*(const int8_t *)(o + 0x10u)))
+                        && CommMustBroadcast(
+                               comm, (int16_t)*(const int8_t *)(o + 0x10u))
+                        && *(const int32_t *)((uint8_t *)comm + 0x3D8u) == 0)
+                        SendVehicleWantItem(o, p, 0, 0, 0);
+                }
+            }
+
+            /* A repair pad under the vehicle heals it, at most every 500 ms. */
+            if (*(const int32_t *)p == 1
+                && **(const int32_t *const *)(p + 0x94u) == 0x21
+                && *(const int16_t *)(p + 0x62u) > 0
+                && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                       > *(const uint32_t *)(o + 0x5A0u) + 0x1F4u) {
+                HealObject(o, 0x19, p);
+                *(uint32_t *)(o + 0x5A0u) =
+                    *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+            }
+
+            p = (uint8_t *)*(void *const *)(p + 0x68u);
+        }
+    }
+
+    /* A stopped vehicle keeps its own tile height; a moving one takes the
+     * height of the tile it is standing on when that differs. */
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) == 0) {
+        const uint8_t *attrs = *(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS;
+
+        if (*(const uint8_t *)(o + 0x65u) != attrs[*(const uint16_t *)(o + 0x1Au)])
+            tileArg = *(const int8_t *)(o + 0x65u);
+    }
+
+    ObjMoveAlongFacing(o, tileArg, 0, 0);
 }

@@ -9652,7 +9652,7 @@ typedef struct {
  * NOT ONE OF ITS TWENTY JUMP TARGETS IS AN EPILOGUE -- checked by decoding the
  * first instruction at each. Every conditional jump goes to more code, and the
  * function has TWO sequential converging tails: ADDR_STEP3_45C8D0 falls
- * through into a second block that ends at ADDR_STEP3_45CB30. Writing any of
+ * through into a second block that ends at ADDR_STEP3_DRIVE. Writing any of
  * those jumps as a `return` is the defect StepType2 carried three times.
  *
  * ITS DEATH TABLE IS THE JUMP-TABLE TRAP AT ITS WORST. Six indices on
@@ -9704,7 +9704,7 @@ typedef struct {
  * ConsiderSighting's callers and not about this function. Naming it either
  * way now would record a base as a fact. */
 #define ADDR_STEP3_45C8D0        0x0045C8D0u  /* void(obj, out) */
-/* 0x0045CAB0, one caller (ADDR_STEP3_45CB30). Turn the gap between the record's
+/* 0x0045CAB0, one caller (ADDR_STEP3_DRIVE). Turn the gap between the record's
  * wanted facing and the vehicle's current one into a turn STATE: 7 one way, 6
  * the other, and no write at all inside the tolerance. Those two values are
  * the ones region.cpp already documents this record's state taking.
@@ -9721,7 +9721,9 @@ typedef struct {
 #define ADDR_STEP3_ROUTE_BOARD   0x0045D4B0u  /* void(obj, rec) */
 #define AM2_STEP3_TURN_TOL_KEY   1
 #define AM2_STEP3_TURN_TOL_IDLE  0x10
-#define ADDR_STEP3_45CB30        0x0045CB30u  /* void(obj, out) */
+#define ADDR_STEP3_DRIVE         0x0045CB30u  /* void(obj, rec) -- caller
+                                                 pushes the record then the
+                                                 object, add esp,8 */
 #define OBJ_OFF_FIELD_59C        0x59Cu  /* gates the record init, once */
 /* The destruction sounds, one per vehicle kind. Kind 4 makes none -- it goes
  * straight to the row finish and DestroyByType. */
@@ -16406,6 +16408,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_VEHICLE_ENTER_SEND 0x0048C21Cu
 #define AM2_MSG_VEHICLE_ENTER      0x24u
 #define AM2_MSG_VEHICLE_ENTER_LEN  0x0Cu
+/* 0x0045E0D0, and it names itself: "<--Vehicle Want Item Send: Vehicle: %x,
+ * item: %x, request: %d, slot: %d, quant: %d". Four arms below that line --
+ * WANT_PICKUP, WANT_DROP, DO_PICKUP and DO_DROP -- so `request` selects which.
+ * The argument ORDER is fixed by the log's own push sequence rather than by
+ * the prologue, which loads them out of order: `mov esi,[esp+0x30]` at
+ * 0x0045E0E9 is arg2 and its uid is printed as `item`, while `mov eax,
+ * [esp+0x40]` at 0x0045E109 is arg1 and prints as `Vehicle`. `slot` is read
+ * as a BYTE and sign-extended (`movsx ecx, bl`, 0x0045E0FA). */
+#define ADDR_SEND_VEHICLE_WANT_ITEM 0x0045E0D0u /* void(vehicle, item,
+                                                   int32 request, int8 slot,
+                                                   int32 quant) */
+/* 0x0045E220, and it names itself: "Vehicle Fire Send, vehicle: %x,
+ * gunface:%d, pos (%d,%d,%d), globTarg %d". ONE argument -- every value it
+ * sends is read off that record (+0x529, +0x530, +0x590, +0x592, +0x594,
+ * +0x598), and `mov esi,[esp+0x20]` at 0x0045E237 is the only stack read in
+ * the function. */
+#define ADDR_SEND_VEHICLE_FIRE     0x0045E220u  /* void(vehicle) */
 /* 0x0045AE30, one caller, and it names itself twice over: "ExitAllFromVehicle:
  * I was killed in a vehicle, damage owner is me" and "... not me". Empty a
  * vehicle from the last seat down.
