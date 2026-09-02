@@ -10,6 +10,14 @@
 #include "crt.h"       /* am2_log, am2_free */
 #include "map.h"
 #define kMapSep ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
+#include "rect.h"      /* AM2_Rect, RectSet, MakePoint */
+#include "dist.h"      /* Log2Mask */
+#include "maprow.h"    /* MapDescInit */
+#include "region.h"    /* BuildTileDeltas, SettlePointInRegion */
+#include "packkey.h"   /* PackKey */
+#include "objtype.h"   /* EnsureSpriteAaiRecord */
+#include "item.h"      /* CreateItem, ApplyHeightItem */
+#include "air.h"      /* ObjConceal */
 #include "savetag.h"
 #include "image.h"
 #include "../inject/orig.h"
@@ -1346,6 +1354,552 @@ void __cdecl FreeMapLayers(void)
 }
 
 
+
+/* ---- LoadMap ----------------------------------------------------------- */
+/* PreloadSpriteByKey is reconstructed in win32/sprite.cpp; declared here
+ * rather than included, because map.cpp is flat and AM2_Sprite carries an
+ * LPDIRECTDRAWSURFACE.  An incomplete type is enough -- only two int16 fields
+ * of the returned sprite are read, and those are reached by offset. */
+struct AM2_Sprite;
+extern "C" AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
+                                                  int32_t b);
+
+/* The map declares its own per-record field layout, so ADDR_MAP_FIELD_DESCS is
+ * a buffer the loader fills rather than a table the image ships. */
+typedef struct {
+    uint32_t tag;
+    uint32_t size;
+} AM2_MapFieldDesc;
+
+typedef am2_FILE *(__cdecl *am2_map_fopen_fn)(const char *p, const char *m);
+typedef size_t (__cdecl *am2_map_fread_fn)(void *p, size_t sz, size_t n,
+                                           am2_FILE *fp);
+typedef int32_t (__cdecl *am2_map_fseek_fn)(am2_FILE *fp, int32_t off,
+                                            int32_t whence);
+typedef int32_t (__cdecl *am2_map_fclose_fn)(am2_FILE *fp);
+typedef int32_t (__cdecl *am2_load_atl_fn)(const char *path);
+typedef void *(__cdecl *am2_map_weapon_fn)(const char *name, int32_t army,
+                                           int32_t kind, uint32_t where,
+                                           int32_t a, int32_t b, int32_t c,
+                                           uint32_t uid);
+
+#define orig_map_fopen   ((am2_map_fopen_fn)(uintptr_t)ADDR_FOPEN)
+#define orig_map_fread   ((am2_map_fread_fn)(uintptr_t)ADDR_FREAD)
+#define orig_map_fseek   ((am2_map_fseek_fn)(uintptr_t)ADDR_FSEEK)
+#define orig_map_fclose  ((am2_map_fclose_fn)(uintptr_t)ADDR_FCLOSE)
+#define orig_load_atl    ((am2_load_atl_fn)(uintptr_t)ADDR_LOAD_ATL_FILE)
+#define orig_map_weapon  ((am2_map_weapon_fn)(uintptr_t)ADDR_CREATE_WEAPON)
+
+
+/* w*h bytes straight into one global.  Seven of the arms are exactly this. */
+static uint8_t *ReadPlane(am2_FILE *f, uint32_t size, int32_t *consumed)
+{
+    uint8_t *p = (uint8_t *)am2_malloc(size);
+
+    orig_map_fread(p, size, 1, f);
+    *consumed += (int32_t)size;
+    return p;
+}
+
+/* MHDR's tail.  Three rectangles, the listener, both map descriptors and the
+ * tile deltas, all derived from w and h.  ADDR_CAMERA_Y is field +4 of
+ * ADDR_VISIBLE_TILES and is written by the same RectSet as the rest of it. */
+static void DeriveMapGeometry(void)
+{
+    AM2_Rect r;
+
+    (*(AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS)    = *RectSet(&r, 0, 0, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X), (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y));
+    /* The inset rect already has four field names in this tree rather than
+     * one rect name, so it is written a field at a time -- adding a second
+     * base over storage that is already named is the mistake orig.h opens
+     * with. */
+    RectSet(&r, 0x40, 0x40, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X) - 0x40, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y) - 0x40);
+    *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT   = r.left;
+    *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_TOP    = r.top;
+    *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_RIGHT  = r.right;
+    *(int32_t *)(uintptr_t)ADDR_MAP_BOUNDS_BOTTOM = r.bottom;
+    (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS)  = MakePoint(0x10, 0x10);
+    (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS_PREV) = (*(uint32_t *)(uintptr_t)ADDR_LISTENER_POS);
+    (*(AM2_Rect *)(uintptr_t)ADDR_VISIBLE_TILES) = *RectSet(&r, 1, 1, (*(const int32_t *)(uintptr_t)ADDR_VIEW_TILES_W) + 1, (*(const int32_t *)(uintptr_t)ADDR_VIEW_TILES_H) + 1);
+
+    MapDescInit((void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+                (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X), (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y));
+    MapDescInit((void *)(uintptr_t)ADDR_MAP_DESC, (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X), (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y));
+    BuildTileDeltas();
+}
+
+/* One OLAY batch's records.  Each is described by the field table the FILE
+ * just supplied, so the widths come from there and a field with no arm is
+ * read for its stated width and dropped -- which is what RESV is.
+ *
+ * ELOW OVERRIDES ELEV AND OWNR.  When it is non-zero the record takes its
+ * elevation from ELOW's high nibble and its owner from the low one, and the
+ * two single-byte fields are not used at all.  Three fields, two
+ * destinations, and a precedence that is invisible from any one arm. */
+static void LoadMapRecords(am2_FILE *f, uint8_t *objs, int32_t first,
+                           int32_t nfields, int32_t count, int32_t *consumed)
+{
+    int32_t rec;
+
+    for (rec = 0; rec < count; rec++) {
+        int32_t index = -1;
+        int32_t move = 0, numb = 0, trig = 0, ownr = 0, elev = 0, elow = 0;
+        char    scri[0x80];
+        int32_t i;
+
+        scri[0] = 0;
+
+        for (i = 0; i < nfields; i++) {
+            uint32_t tag  = ((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].tag;
+            uint32_t size = ((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].size;
+            int32_t  v    = 0;
+
+            orig_map_fread(&v, size, 1, f);
+            *consumed += (int32_t)size;
+
+            switch (tag) {
+            case AM2_IFF_MOVE: move = (int8_t)v; break;
+            case AM2_IFF_NUMB: numb = (int8_t)v; break;
+            case AM2_IFF_TRIG: trig = (int8_t)v; break;
+            case AM2_IFF_OWNR: ownr = (int8_t)v; break;
+            case AM2_IFF_ELEV: elev = (int8_t)v; break;
+            case AM2_IFF_ELOW: elow = (int8_t)v; break;
+            case AM2_IFF_INDX: index = v + first; break;
+            case AM2_IFF_SCRI:
+                if (v > 0) {
+                    orig_map_fread(scri, (size_t)v, 1, f);
+                    *consumed += v;
+                }
+                break;
+            default:
+                break;          /* read for its declared width and dropped */
+            }
+        }
+
+        if (index < 0) {
+            am2_log("Missing index attribute for item #%d!\n", rec);
+            continue;
+        }
+
+        {
+            uint8_t *r = objs + (size_t)index * 0x1C;
+            uint8_t  owner;
+
+            r[0x14] = (uint8_t)move;
+            if (elow != 0) {
+                r[0x12] = (uint8_t)((elow >> 4) & 0xF);
+                owner   = (uint8_t)(elow & 0xF);
+            } else {
+                r[0x12] = (uint8_t)elev;
+                owner   = (uint8_t)ownr;
+            }
+            r[0x13] = owner;
+            r[0x10] = (uint8_t)trig;
+            r[0x11] = 0;
+            r[0x15] = (uint8_t)numb;
+
+            if (scri[0] != 0) {
+                size_t n = strlen(scri) + 1;
+
+                *(char **)(r + 0x18) = (char *)am2_malloc(n);
+                memcpy(*(char **)(r + 0x18), scri, n);
+            }
+        }
+    }
+}
+
+/* Allocate and zero a layer the file did not supply. */
+static void DefaultLayerPtr(void **slot, int32_t bytes)
+{
+    if (*slot == 0) {
+        *slot = am2_malloc(bytes);
+        memset(*slot, 0, bytes);
+    }
+}
+
+typedef int32_t (__cdecl *am2_kind_allowed_fn)(int32_t kind);
+typedef void (__cdecl *am2_respawn_pool_fn)(int32_t seed);
+#define orig_build_respawn_pool \
+    ((am2_respawn_pool_fn)(uintptr_t)ADDR_BUILD_RESPAWN_POOL)
+
+#define orig_respawn_kind_allowed \
+    ((am2_kind_allowed_fn)(uintptr_t)ADDR_RESPAWN_KIND_ALLOWED)
+
+typedef int32_t (__cdecl *am2_respawn_kind_fn)(int32_t *out);
+#define orig_random_respawn_kind \
+    ((am2_respawn_kind_fn)(uintptr_t)ADDR_RANDOM_RESPAWN_KIND)
+
+
+/* Turn the parse records into objects.  NOT "CreateWeapon per record": each
+ * one packs a sprite key, may have its kind SUBSTITUTED from the weighted
+ * respawn pool, preloads its sprite and takes that sprite's own offset into
+ * its position before anything is created. */
+static void BuildMapObjects(uint8_t *objs, int32_t count)
+{
+    int32_t i;
+
+    for (i = 0; i < count; i++) {
+        uint8_t  *r     = objs + (size_t)i * AM2_MAPREC_BYTES;
+        int32_t   type  = *(const int32_t *)(r + MAPREC_OFF_TYPE);
+        int32_t   kind  = *(const int32_t *)(r + MAPREC_OFF_KIND);
+        uint8_t   trig  = r[MAPREC_OFF_TRIG];
+        uint8_t   owner = r[MAPREC_OFF_OWNER];
+        int32_t   army  = owner != 0 ? (int32_t)owner - 1 : 4;
+        int32_t   flags = 0;
+        AM2_Point at;
+        void     *obj;
+
+        if (trig & 0x20)
+            flags = 4;
+        if (trig & 0x08)
+            flags |= 0x810;
+
+        at.x = *(const int16_t *)(r + MAPREC_OFF_X);
+        at.y = *(const int16_t *)(r + MAPREC_OFF_Y);
+
+        if (type != 0x19) {
+            /* An ITEM. */
+            void *spr = PreloadSpriteByKey(PackKey(type + 0x14, kind, 0),
+                                           0x1000, 1);
+
+            if (spr != 0) {
+                at.x = (int16_t)(at.x + *(const int16_t *)((uint8_t *)spr + 0x24));
+                at.y = (int16_t)(at.y + *(const int16_t *)((uint8_t *)spr + 0x26));
+            }
+            obj = CreateItem(*(char **)(r + MAPREC_OFF_SCRIPT), army,
+                             PackKey(type + 0x14, kind, 0),
+                             *(const uint32_t *)&at, flags, 1, 0);
+            if (obj != 0 && ObjIsWatchedKind(obj)
+                && (int32_t)g_defaultOwner != army)
+                ObjConceal(obj, 1);
+            continue;
+        }
+
+        /* A WEAPON, and the branch where a kind of 0x64 or more is either
+         * substituted from the respawn pool or reduced by 0x64. */
+        {
+            int32_t  aai = -1, key = PackKey(type + 0x14, kind, 0);
+            uint32_t settled;
+            int32_t  code = kind;
+            void    *spr;
+            uint8_t *aaiRec;
+
+            if (code >= 0x64) {
+                if (*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS & 2) {
+                    int32_t sub = 0;
+
+                    code = orig_random_respawn_kind(&sub);
+                    aai  = EnsureSpriteAaiRecord(0x2D, code, 0);
+                    flags |= 0x10000;
+                    key = *(const int32_t *)((*(uint8_t ***)(uintptr_t)
+                                              ADDR_AAI_RECORDS)[aai] + 8);
+                    goto haveRecord;
+                }
+                if (code == 0x64)
+                    continue;
+                code -= 0x64;
+                key = PackKey(type + 0x14, code, 0);
+            }
+            if (orig_respawn_kind_allowed(code) == 0)
+                continue;
+            aai = EnsureSpriteAaiRecord(type + 0x14, code, 0);
+
+        haveRecord:
+            if (aai < 0)
+                continue;
+
+            spr = PreloadSpriteByKey(key, 0x1000, 1);
+            if (spr != 0) {
+                at.x = (int16_t)(at.x + *(const int16_t *)((uint8_t *)spr + 0x24));
+                at.y = (int16_t)(at.y + *(const int16_t *)((uint8_t *)spr + 0x26));
+            }
+
+            aaiRec = (*(uint8_t ***)(uintptr_t)ADDR_AAI_RECORDS)[aai];
+            flags |= *(const int32_t *)(aaiRec + 4);
+
+            /* BOTH POINTS ARE PASSED: the one before SettlePointInRegion and
+             * the one it may have moved.  The original keeps the first in a
+             * register and hands the slot Settle writes as a separate
+             * argument, so they are two arguments and not one. */
+            settled = *(const uint32_t *)&at;
+            SettlePointInRegion(TileOfPoint(settled), (uint32_t *)&at);
+
+            /* AND THE ARMY IS THE LITERAL 4, not the record's owner: the
+             * register that carried the owner has been reused twice by here,
+             * first for the key and then for the point. */
+            obj = orig_map_weapon(*(char **)(r + MAPREC_OFF_SCRIPT), 4,
+                                  aai, settled, flags,
+                                  (int32_t)*(const uint32_t *)&at, 1, 0);
+            if (obj != 0) {
+                const uint8_t *attrs =
+                    *(const uint8_t **)(uintptr_t)ADDR_TILE_ATTRS;
+                int32_t tile = *(const uint16_t *)((uint8_t *)obj + 0x1A);
+
+                ApplyHeightItem(obj, (int8_t)attrs[tile] + r[MAPREC_OFF_ELEV]);
+            }
+        }
+    }
+}
+
+/* 0x0042C440. Load one map: its tileset, its layers and its objects.
+ *
+ * TWO ARGUMENTS, and orig.h said one until its caller was read: `base` feeds
+ * both "%s.atl" and "%s.amm", `folder` goes to SetGameDir and is kept in
+ * ADDR_MAP_BLOCK so the directory can be restored on the way out.
+ *
+ * THE FORMAT IS SELF-DESCRIBING, which is the thing to hold on to. The chunk
+ * tags decide which layer is filled; the map then declares its own per-record
+ * field layout and the record loop obeys whatever widths it was given.
+ * Nothing here may assume a layout.
+ *
+ * AND A MISSING CHUNK IS NOT AN ERROR: nine layers are allocated and zeroed
+ * after the walk if the file did not supply them, so every consumer
+ * downstream may assume its layer exists. Two of the nine have no chunk arm
+ * at all and are created only here. */
+int32_t __cdecl LoadMap(const char *base, const char *folder)
+{
+    char      path[0x104];
+    am2_FILE *f;
+    uint32_t  tag, size, formSize;
+    int32_t   consumed, plane, i;
+    int32_t   objCount = 0, nfields = 0, tlayDone = 0;
+    uint8_t  *objs = 0;
+
+    SetGameDir(folder);
+    memset(((char *)(uintptr_t)ADDR_MAP_BLOCK), 0, 0x1A0);
+    strcpy(((char *)(uintptr_t)ADDR_MAP_BLOCK), folder);
+
+    sprintf(path, "%s.atl", base);
+    if (orig_load_atl(path) == 0) {
+        return 0;
+    }
+
+    sprintf(path, "%s.amm", base);
+    f = orig_map_fopen(path, "rb");
+    if (f == 0)
+        return 0;
+
+    orig_map_fread(&tag, 4, 1, f);
+    if (tag != AM2_IFF_FORM)
+        goto bad;
+    orig_map_fread(&formSize, 4, 1, f);
+    orig_map_fread(&tag, 4, 1, f);
+    if (tag != AM2_IFF_MAP)
+        goto bad;
+    consumed = 0xC;
+
+    do {
+        int32_t bad_size = 0;
+
+        orig_map_fread(&tag, 4, 1, f);
+        orig_map_fread(&size, 4, 1, f);
+        consumed += 8;
+        plane = (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W) * (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H);
+
+        switch (tag) {
+        case AM2_IFF_MHDR: {
+            int32_t hdr[3];
+
+            if (size != 0xC) { bad_size = 1; break; }
+            orig_map_fread(hdr, 0xC, 1, f);
+            consumed += 0xC;
+            (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W)      = hdr[0];
+            (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H)      = hdr[1];
+            (*(int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)    = Log2Mask(hdr[0]) & 0xFF;
+            (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X)     = (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W) << 4;
+            (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)     = (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H) << 4;
+            (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_SHIFT) = Log2Mask((*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X)) & 0xFF;
+            if ((*(int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT) < 1) {
+                FreeMapLayers();
+                goto bad;
+            }
+            DeriveMapGeometry();
+            break;
+        }
+
+        /* Seven planes, one shape.  Only the global differs. */
+        case AM2_IFF_NPAD:
+            if ((int32_t)size != plane) { bad_size = 1; break; }
+            *(uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER = ReadPlane(f, size, &consumed);
+            break;
+        case AM2_IFF_BPAD:
+            if ((int32_t)size != plane) { bad_size = 1; break; }
+            *(uint8_t **)(uintptr_t)ADDR_MAP_PADBIT_LAYER = ReadPlane(f, size, &consumed);
+            break;
+        case AM2_IFF_MOVE:
+            if ((int32_t)size != plane) { bad_size = 1; break; }
+            *(uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS = ReadPlane(f, size, &consumed);
+            break;
+        case AM2_IFF_OWNR:
+            if ((int32_t)size != plane) { bad_size = 1; break; }
+            *(uint8_t **)(uintptr_t)ADDR_TILE_KIND = ReadPlane(f, size, &consumed);
+            break;
+        case AM2_IFF_TRIG:
+            if ((int32_t)size != plane) { bad_size = 1; break; }
+            *(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS = ReadPlane(f, size, &consumed);
+            break;
+        case AM2_IFF_REGN:
+            if ((int32_t)size != plane) { bad_size = 1; break; }
+            *(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL = ReadPlane(f, size, &consumed);
+            break;
+        case AM2_IFF_ELEV:
+            if ((int32_t)size != plane) { bad_size = 1; break; }
+            *(uint8_t **)(uintptr_t)ADDR_TILE_ATTRS = ReadPlane(f, size, &consumed);
+            break;
+
+        /* Owns nothing: a scratch buffer the parser consumes and we free. */
+        case AM2_IFF_SCEN: {
+            uint8_t *tmp = (uint8_t *)am2_malloc(size);
+
+            if (tmp == 0) { bad_size = 2; break; }
+            orig_map_fread(tmp, size, 1, f);
+            consumed += (int32_t)size;
+            ParseScenarios(tmp, (int32_t)size);
+            am2_free(tmp);
+            break;
+        }
+
+        /* NOT a plane: a 0x14-byte header first, and the chunk is w*h*2 PLUS
+         * that header.  Only the first TLAY in a file is taken. */
+        case AM2_IFF_TLAY: {
+            int32_t hdr[5], w, h, bytes;
+
+            if (tlayDone > 0) { bad_size = 2; break; }
+            orig_map_fread(hdr, 0x14, 1, f);
+            consumed += 0x14;
+            /* The two the original reads are hdr[1] and hdr[2].  Its `lea`
+             * for the buffer happens two pushes in and the reads two more,
+             * so the displacements are four dwords further out than the
+             * fields they name -- taking them at face value gives hdr[3] and
+             * hdr[4], which are zero, and the tile plane is silently never
+             * read. */
+            w     = hdr[1];
+            h     = hdr[2];
+            bytes = (w * h) << 1;
+            if (bytes == 0)
+                break;
+            if (w != (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W) || h != (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H)) { bad_size = 1; break; }
+            if ((int32_t)size != bytes + 0x14)        { bad_size = 1; break; }
+            *(uint8_t **)(uintptr_t)ADDR_MAP_TILES = ReadPlane(f, (uint32_t)bytes, &consumed);
+            tlayDone++;
+            break;
+        }
+
+        /* NOT a plane either.  The on-disk record is 0x10 and the in-memory
+         * one 0x1C, so they are read one at a time; the array is a TEMPORARY
+         * that the tail turns into objects and frees. */
+        case AM2_IFF_OLAY: {
+            int32_t count = 0, first = objCount, n, recCount = 0, junk;
+            uint8_t *rec;
+
+            orig_map_fread(&count, 4, 1, f);
+            consumed += 4;
+            if (count > 0) {
+                objCount += count;
+                objs = (uint8_t *)am2_realloc(objs, (size_t)objCount * 0x1C);
+                rec  = objs + (size_t)first * 0x1C;
+                memset(rec, 0, (size_t)count * 0x1C);
+                consumed += count * 0x10;
+                for (n = 0; n < count; n++, rec += 0x1C)
+                    orig_map_fread(rec, 0x10, 1, f);
+            }
+
+            orig_map_fread(&junk, 4, 1, f);
+            orig_map_fread(&junk, 4, 1, f);
+            orig_map_fread(&nfields, 4, 1, f);
+            consumed += 0xC;
+            for (i = 0; i < nfields; i++) {
+                orig_map_fread(&((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].tag, 4, 1, f);
+                orig_map_fread(&((AM2_MapFieldDesc *)(uintptr_t)ADDR_MAP_FIELD_DESCS)[i].size, 4, 1, f);
+                consumed += 8;
+            }
+
+            orig_map_fread(&recCount, 4, 1, f);
+            consumed += 4;
+            if (recCount > 0)
+                LoadMapRecords(f, objs, first, nfields, recCount, &consumed);
+            break;
+        }
+
+        default:
+            bad_size = 2;
+            break;
+        }
+
+        if (bad_size != 0) {
+            if (bad_size == 1)
+                am2_log("chunksize/targetsize different\n");
+            orig_map_fseek(f, (int32_t)size, 1);
+            consumed += (int32_t)size;
+        }
+    } while (consumed < (int32_t)formSize);
+
+    /* Nine layers every consumer may assume exists. */
+    plane = (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W) * (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H);
+    DefaultLayerPtr((void **)(uintptr_t)ADDR_CELL_WEIGHTS, plane);
+    DefaultLayerPtr((void **)(uintptr_t)ADDR_TILE_ATTRS, plane);
+    DefaultLayerPtr((void **)(uintptr_t)ADDR_REGION_OF_CELL, plane);
+    DefaultLayerPtr((void **)(uintptr_t)ADDR_MAP_PADBIT_LAYER, plane);
+    DefaultLayerPtr((void **)(uintptr_t)ADDR_MAP_PAD_LAYER, plane);
+    DefaultLayerPtr((void **)(uintptr_t)ADDR_TILE_KIND, plane);
+    DefaultLayerPtr((void **)(uintptr_t)ADDR_TILE_FLAGS, plane);
+    /* AND A LOOP, WHICH IS WHY ENUMERATING THE EXPLICIT BLOCKS MISSED THESE.
+     * The original walks every pointer from ADDR_TILE_REVEAL_GRIDS up to
+     * ADDR_TILE_COVER four bytes at a time -- the four per-army reveal grids
+     * -- and fills each null one.  Leaving them null does not fault: it makes
+     * SettlePointInRegion spiral for a passable tile it can never find. */
+    {
+        void **slot = (void **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS;
+
+        while (slot < (void **)(uintptr_t)ADDR_TILE_COVER) {
+            DefaultLayerPtr(slot, plane);
+            slot++;
+        }
+    }
+    DefaultLayerPtr((void **)(uintptr_t)ADDR_TILE_COVER, plane);
+
+    /* FOUR THINGS THE DEFAULTING IS FOLLOWED BY, and leaving them out is what
+     * cost this function four attempts.  ADDR_LOAD_PENDING is a FLAG tested
+     * here, not a layer to allocate -- it shares its code shape with an
+     * allocate-if-null block and was swallowed by the scan that found those. */
+    SealMapEdges();
+    RebuildTileCover();
+    BuildAaiBuiltins();
+
+    if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0) {
+        void *cam = CreateItem((char *)"camera", 4,
+                               *(const int32_t *)(uintptr_t)ADDR_AAI_KEY_980000,
+                               *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
+                               0, 1, 0);
+
+        *(int32_t *)(uintptr_t)ADDR_EVT_ID15_UID =
+            *(const int32_t *)((const uint8_t *)cam + 4);
+    }
+
+    orig_build_respawn_pool(*(const int32_t *)(uintptr_t)ADDR_GAME_SEED);
+
+    BuildMapObjects(objs, objCount);
+
+    am2_log("freeing temporary map load data...\n");
+    for (i = 0; i < objCount; i++) {
+        char **owned = (char **)(objs + (size_t)i * 0x1C + 0x18);
+
+        if (*owned != 0)
+            am2_free(*owned);
+    }
+    am2_free(objs);
+
+    orig_map_fclose(f);
+    SetGameDir(((char *)(uintptr_t)ADDR_MAP_BLOCK));
+    return 1;
+
+bad:
+    am2_log("Error in loadmap()\n");
+    orig_map_fclose(f);
+    SetGameDir(((char *)(uintptr_t)ADDR_MAP_BLOCK));
+    return 0;
+}
+
 void map_install(void)
 {
     patch_replace(ADDR_LEVEL_COUNT, (const void *)LevelCount,
@@ -1356,6 +1910,8 @@ void map_install(void)
                   "DefMapLine", 0);
     patch_replace(ADDR_FREE_MAP_LAYERS, (const void *)FreeMapLayers,
                   "FreeMapLayers", 2);
+    patch_replace(ADDR_LOAD_MAP, (const void *)LoadMap,
+                  "LoadMap", 1);
     patch_replace(ADDR_PARSE_SCENARIOS, (const void *)ParseScenarios,
                   "ParseScenarios", 1);
     patch_replace(ADDR_PARSE_SCENARIO_PART, (const void *)ParseScenarioPart,

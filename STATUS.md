@@ -457,6 +457,12 @@ pushes are identical bar a *kind* and an *ammo* count -- everything else, four
 zeros and the caller's position, is the same in all eighteen. So the
 transcription is one helper and eighteen one-line cases.
 
+**LoadMap (0x0042C440) is reconstructed** -- 3,920 bytes in map.cpp, the
+.amm chunk walk, the self-describing per-record field layer, twelve layer
+allocations and the object construction. `ab.sh bootcamp` is clean: 22
+pixels, identical log, identical 1,610-line object dump. It took five bugs
+and one self-inflicted one; see the block above ADDR_LOAD_MAP.
+
 **Type2PlayerInput (0x0044A420) is reconstructed** -- 2,336 bytes in
 region.cpp, beside the Type2PlayerStep it runs before and shares a record
 with. It is the input half of the player trooper's frame. LIVE, and

@@ -74,6 +74,8 @@ void *__cdecl ScriptListFind(char *name);
  * clears before it fills. Free every per-map allocation: the region array with
  * each region's own link list first, then twelve pointers in a row, each
  * guarded and each cleared after. */
+int32_t __cdecl LoadMap(const char *base, const char *folder);
+
 void __cdecl FreeMapLayers(void);
 
 void map_install(void);
