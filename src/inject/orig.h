@@ -4451,6 +4451,28 @@
 /* At most two messages are resent immediately per nack; the rest are flagged
  * into the resend queue for whatever drains it later. */
 #define AM2_FLOW_RESEND_BURST    2
+#define ADDR_STR_RECEIVED_SEQ    0x00473474u
+#define ADDR_STR_BAD_CHECKSUM    0x00473448u
+#define ADDR_STR_SLAVE_SESSION   0x004733E0u
+#define ADDR_STR_FIRST_MESSAGE   0x004733A8u
+#define ADDR_STR_RESIDUAL_MSG    0x00473360u
+#define ADDR_STR_NEW_PLAYER_FLOW 0x00473320u
+#define ADDR_STR_TOO_MANY_ACKS   0x004732F4u
+#define ADDR_STR_QUERY_SEQ       0x00473280u
+#define ADDR_STR_DUPLICATE_SEQ   0x00473248u
+#define ADDR_STR_CANT_FIND_MINE  0x004734B4u
+#define ADDR_STR_CANT_FIND_SEQ   0x004734D4u
+/* The last two flow fields, from the delivery tail. +8 tracks the highest
+ * sequence ever seen -- it only ever moves up -- and +0x40 counts messages
+ * that arrived at or below what we already had. */
+#define FLOW_OFF_HIGHEST_SEQ     0x08u
+#define FLOW_OFF_DUPLICATES      0x40u
+/* Sequences printed with %d below 5 get the "Received seq" trace: a startup
+ * aid, not a threshold anything branches on. */
+#define AM2_FLOW_TRACE_FIRST     5u
+/* More than this many acks in one packet logs a warning and PROCEEDS. It is
+ * not a guard and writing it as one drops traffic the original delivers. */
+#define AM2_FLOW_ACK_WARN        0xC8u
 #define ADDR_STR_NACK_FULL       0x00473C94u
 /* The IAT slot the original CALLS THROUGH for GetTickCount. Reached this way
  * rather than by importing the symbol, for two reasons: it is what the
