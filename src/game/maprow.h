@@ -73,4 +73,13 @@ int16_t __cdecl RowAnimField4(const void *row, uint16_t id);
 void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
                               uint32_t objFlags);
 
+/* 0x00460800. Initialise row pool A -- decals and seq step 0. */
+void __cdecl RowPoolAInit(void);
+/* 0x00460AC0. Initialise row pool B -- troopers, vehicles and roaches. */
+void __cdecl RowPoolBInit(void);
+/* 0x00460860. Tear down row pool A: the only place its rows are freed. */
+void __cdecl RowPoolAFree(void);
+/* 0x00460B30. Tear down row pool B: the only place its rows are freed. */
+void __cdecl RowPoolBFree(void);
+
 #endif

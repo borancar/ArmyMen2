@@ -1133,5 +1133,139 @@ int maprow_install(void)
     rc |= patch_replace(ADDR_ROW_INIT, (const void *)RowInit, "RowInit", 2);
     rc |= patch_replace(ADDR_ROW_SET_SPRITE, (const void *)RowSetSprite,
                         "RowSetSprite", 3);
+    rc |= patch_replace(ADDR_ROWPOOL_A_INIT, (const void *)RowPoolAInit,
+                        "RowPoolAInit", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_B_INIT, (const void *)RowPoolBInit,
+                        "RowPoolBInit", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_A_FREE, (const void *)RowPoolAFree,
+                        "RowPoolAFree", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_B_FREE, (const void *)RowPoolBFree,
+                        "RowPoolBFree", 1);
     return rc;
 }
+
+/* The two 12-byte ROW POOLS -- see orig.h above ADDR_ROWPOOL_A_COUNT for the
+ * layout and for why it tiles. Fifteen functions in the image implement five
+ * roles three times: once hardcoded per pool, and once generically over a seq
+ * context. These are the hardcoded pair.
+ *
+ * A SLOT IS A HANDLE ONTO A PERMANENT ROW. The initialiser mallocs one
+ * 0x60-byte row per slot and nothing frees it until teardown; allocate and
+ * release only shuffle which slot holds which. That is why the allocator
+ * never writes ROWPOOL_OFF_ROW and its callers dereference it immediately. */
+struct AM2_RowPool {
+    volatile int32_t *count;
+    volatile int32_t *tail;
+    uint8_t          *entries;
+    int32_t           capacity;   /* the eviction threshold */
+    int32_t           budget;     /* how many one eviction pass may free */
+    int32_t           slots;      /* capacity + budget; the array's real size */
+};
+
+static uint8_t *RowPoolEntry(const AM2_RowPool *p, int32_t i)
+{
+    return p->entries + (int32_t)(i * AM2_ROWPOOL_ENTRY_BYTES);
+}
+
+/* 0x00460800 (pool A) and 0x00460AC0 (pool B). Zero the header, make entry 0
+ * the head sentinel, and give every slot its permanent row.
+ *
+ * The row is zeroed with `mov ecx, 0x18; rep stosd` -- 24 DWORDS, which is
+ * the 0x60 bytes and not 0x18 of them. */
+static void RowPoolInit(const AM2_RowPool *p)
+{
+    int32_t i;
+
+    *p->tail = 0;
+    *p->count = 0;
+
+    for (i = 0; i < p->slots; i++) {
+        uint8_t *e = RowPoolEntry(p, i);
+        uint8_t *row;
+
+        *(int16_t *)(e + ROWPOOL_OFF_ID) = (int16_t)i;
+        *(int16_t *)(e + ROWPOOL_OFF_PREV) = -1;
+        *(int16_t *)(e + ROWPOOL_OFF_NEXT) = -1;
+
+        row = (uint8_t *)am2_malloc(AM2_ROWPOOL_ROW_BYTES);
+        *(void **)(e + ROWPOOL_OFF_ROW) = row;
+        if (row != 0)
+            memset(row, 0, AM2_ROWPOOL_ROW_BYTES);
+    }
+}
+
+/* 0x00460860 (pool A) and 0x00460B30 (pool B). The ONLY place a row is freed.
+ * Walks every slot -- not the list -- because a released slot still owns its
+ * row, so following the links would leak every slot not currently linked. */
+static void RowPoolTeardown(const AM2_RowPool *p)
+{
+    int32_t i;
+
+    for (i = 0; i < p->slots; i++) {
+        uint8_t *e = RowPoolEntry(p, i);
+        void *row = *(void **)(e + ROWPOOL_OFF_ROW);
+
+        if (row != 0) {
+            RowRelease(row, (void *)(uintptr_t)ADDR_MAP_DESC);
+            am2_free(row);
+            *(void **)(e + ROWPOOL_OFF_ROW) = 0;
+        }
+        *(int16_t *)(e + ROWPOOL_OFF_NEXT) = -1;
+        *(int16_t *)(e + ROWPOOL_OFF_PREV) = -1;
+    }
+
+    *p->tail = 0;
+    *p->count = 0;
+}
+
+/* 0x00460A60 (pool A) and 0x00460D30 (pool B). The two are ONE function
+ * emitted twice: with the six parameters substituted they are 18 instructions
+ * each and differ in two, both the evict call and the branch over it.
+ *
+ * The cap test is `jle`, so SIGNED, and it is not a refusal -- over the cap it
+ * evicts and then allocates anyway. This function always returns a slot. */
+static uint8_t *RowPoolAlloc(const AM2_RowPool *p, void (*evict)(void))
+{
+    uint8_t *e;
+    int32_t  i;
+
+    if (*p->count > p->capacity)
+        evict();
+
+    i = *p->count + 1;
+    *p->count = i;
+    e = RowPoolEntry(p, i);
+
+    *(int16_t *)(e + ROWPOOL_OFF_ID) = (int16_t)i;
+    *(int16_t *)(e + ROWPOOL_OFF_PREV) = (int16_t)*p->tail;
+    *(int16_t *)(e + ROWPOOL_OFF_NEXT) = -1;
+
+    /* Link the previous tail to us. Entry 0 is the head sentinel, so this is
+     * correct with an empty list too: tail is 0 and entry 0's next takes the
+     * new index. */
+    *(int16_t *)(RowPoolEntry(p, *p->tail) + ROWPOOL_OFF_NEXT) = (int16_t)i;
+    *p->tail = i;
+
+    return e;
+}
+
+static const AM2_RowPool kRowPoolA = {
+    (volatile int32_t *)(uintptr_t)ADDR_ROWPOOL_A_COUNT,
+    (volatile int32_t *)(uintptr_t)ADDR_ROWPOOL_A_TAIL,
+    (uint8_t *)(uintptr_t)ADDR_ROWPOOL_A_ENTRIES,
+    AM2_ROWPOOL_A_CAP, AM2_ROWPOOL_A_BUDGET,
+    AM2_ROWPOOL_A_CAP + AM2_ROWPOOL_A_BUDGET
+};
+
+static const AM2_RowPool kRowPoolB = {
+    (volatile int32_t *)(uintptr_t)ADDR_ROWPOOL_B_COUNT,
+    (volatile int32_t *)(uintptr_t)ADDR_ROWPOOL_B_TAIL,
+    (uint8_t *)(uintptr_t)ADDR_ROWPOOL_B_ENTRIES,
+    AM2_ROWPOOL_B_CAP, AM2_ROWPOOL_B_BUDGET,
+    AM2_ROWPOOL_B_CAP + AM2_ROWPOOL_B_BUDGET
+};
+
+void __cdecl RowPoolAInit(void) { RowPoolInit(&kRowPoolA); }
+void __cdecl RowPoolBInit(void) { RowPoolInit(&kRowPoolB); }
+void __cdecl RowPoolAFree(void) { RowPoolTeardown(&kRowPoolA); }
+void __cdecl RowPoolBFree(void) { RowPoolTeardown(&kRowPoolB); }

@@ -2095,6 +2095,50 @@
  * for the two globals it names, which is as far as the body goes. */
 #define ADDR_FREE_SEQ_CONTEXTS   0x00461120u  /* void(void) */
 #define ADDR_SEQ_CTX_B           0x006640B0u
+/* THE TWO 12-BYTE ROW POOLS. Not seq contexts -- their records are 12 bytes
+ * where a seq record is 48, and their arrays are INLINE where a seq context
+ * mallocs and stores a pointer at +0x10. What they share with the seq
+ * contexts is the ALGORITHM, written out a third time: allocate, link,
+ * evict-on-full by IntersectRect against the view, release, tear down.
+ *
+ * Each pool is {int32 count; int32 tail; Entry[N]} with the entry
+ *   +0x00 row (a malloc'd 0x60-byte map row, installed once and never freed
+ *              until teardown -- allocate and release only SWAP which slot
+ *              holds which, so a slot is a HANDLE onto a permanent row)
+ *   +0x04 id   +0x06 prev   +0x08 next, all int16, -1 terminating.
+ * Entry 0 is the list HEAD SENTINEL, not a record; indices are one-based.
+ *
+ * THE LAYOUT TILES, which is what confirms every constant at once: the array
+ * is exactly capacity + eviction budget entries, and each ends where the next
+ * named global begins.
+ *   pool A  0x00662940..ADDR_SEQ_CTX_B = 500 entries; cap 450 + budget 50
+ *   pool B  0x006640D0..ADDR_SEQ_CTX_A = 100 entries; cap  90 + budget 10
+ * The slack is why an allocation can never overrun while an eviction that may
+ * free `budget` entries is in flight. */
+/* The five roles, twice each. Sizes from functions.tsv; note 0x00460800 is a
+ * MERGED entry of 192 bytes holding init AND teardown, which tools/merges.py
+ * does not report because nothing it can see references the second.
+ * tools/retsplit.py finds it by counting rets followed by a prologue. */
+#define ADDR_ROWPOOL_A_INIT      0x00460800u  /* void(void) */
+#define ADDR_ROWPOOL_A_FREE      0x00460860u  /* void(void) */
+#define ADDR_ROWPOOL_B_INIT      0x00460AC0u  /* void(void) */
+#define ADDR_ROWPOOL_B_FREE      0x00460B30u  /* void(void) */
+#define ADDR_ROWPOOL_A_COUNT     0x00662938u  /* decals and seq step 0 */
+#define ADDR_ROWPOOL_A_TAIL      0x0066293Cu
+#define ADDR_ROWPOOL_A_ENTRIES   0x00662940u
+#define ADDR_ROWPOOL_B_COUNT     0x006640C8u  /* troopers, vehicles, roaches */
+#define ADDR_ROWPOOL_B_TAIL      0x006640CCu
+#define ADDR_ROWPOOL_B_ENTRIES   0x006640D0u
+#define ROWPOOL_OFF_ROW          0x00u
+#define ROWPOOL_OFF_ID           0x04u
+#define ROWPOOL_OFF_PREV         0x06u
+#define ROWPOOL_OFF_NEXT         0x08u
+#define AM2_ROWPOOL_ENTRY_BYTES  12
+#define AM2_ROWPOOL_A_CAP        450
+#define AM2_ROWPOOL_A_BUDGET     50
+#define AM2_ROWPOOL_B_CAP        90
+#define AM2_ROWPOOL_B_BUDGET     10
+#define AM2_ROWPOOL_ROW_BYTES    0x60u
 #define ADDR_RELEASE_SPRITE      0x00445D80u  /* void(AM2_Sprite *) */
 #define ADDR_CLEAR_SPRITE        0x00445E40u  /* void(AM2_Sprite *) */
 #define ADDR_SPRITE_SLOT_OF      0x00445990u  /* int32(uint32 id); <0 when absent */
