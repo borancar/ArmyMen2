@@ -14198,6 +14198,25 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * does not know by the width the file gives, which is the same discipline as
  * the chunk switch's default fseek one level down.
  *
+ * THE PER-RECORD LOOP, and its one trap. For each object the file declares,
+ * LoadMap zeroes a set of locals, walks the field table it just read, freads
+ * each field by its declared width and dispatches: MOVE, NUMB, TRIG, OWNR,
+ * ELEV and ELOW each keep one SIGNED byte, SCRI freads a string of the
+ * declared length, INDX gives the record's index, and anything else is
+ * dropped. A record whose INDX never arrived is logged by number and skipped
+ * -- edi starts at -1 for exactly that.
+ *
+ * ELOW IS A PACKED PAIR AND IT OVERRIDES THE OTHER TWO FIELDS. When it is
+ * non-zero the record takes its elevation from ELOW's HIGH nibble and its
+ * owner from the LOW one; only when ELOW is zero do the separate ELEV and
+ * OWNR fields get used. So a map can carry all three and the two singles are
+ * dead, which is invisible unless the arms are read together -- three fields,
+ * two destinations, and a precedence between them.
+ *
+ * The script string is copied rather than kept: strlen, malloc, strcpy into
+ * the record's +0x18, with an empty string skipped. Two strlen passes in the
+ * original, one to test for empty and one to size the copy.
+ *
  * OLAY IS ALSO NOT A PLANE. It freads a count, reallocs an array of 0x1C-byte
  * records, zeroes the new tail, and then reads 0x10 bytes into each -- so the
  * on-disk record is 0x10 and the in-memory one is 0x1C, and the difference is
