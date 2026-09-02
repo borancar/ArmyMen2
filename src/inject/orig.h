@@ -5050,6 +5050,22 @@ typedef struct {
  * dangerous kind: it produced a clean, plausible list of nineteen and nothing
  * about it looked incomplete.
  *
+ * AND THE THREE ARRAYS WERE ALREADY NAMED, which grepping for the NAME did
+ * not find. MP_PANEL_OFF_NAMES, MP_PANEL_OFF_COLOURS and MP_PANEL_OFF_TEAMS
+ * sit at 0x220, 0x230 and 0x240 -- exactly the three displacements the loop
+ * writes -- alongside CHATBOX, PREVIEW, TYPE_BOX, ARMY_ROWS and the two
+ * BLINKERs. A grep for `MPPANEL_OFF_` returned nothing and I was one command
+ * from opening a second family for a structure that already has one.
+ *
+ * That is the rule this file states for exactly this case: before opening a
+ * new offset family, grep the OFFSETS it would contain and not the names,
+ * because the ratchet cannot compare a new prefix against anything. Here the
+ * prefix I guessed was one underscore away from the one in use.
+ *
+ * The existing names also confirm the reading independently: NAMES, COLOURS
+ * and TEAMS are three separate arrays in this file already, written by
+ * whoever reconstructed MpPanelDestruct, which walks them.
+ *
  * THE PLAYER SLOTS ARE THREE PARALLEL ARRAYS AND A NAME BUFFER, not an array
  * of per-slot structs. The loop walks two pointers: one stepping 0x20 through
  * a 4 x 32-byte name area at this+0x64, and one stepping 4 through pointer
