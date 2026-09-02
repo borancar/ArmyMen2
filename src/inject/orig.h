@@ -7938,6 +7938,26 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
+ * THREE ARMS LOOK LIKE ONE HELPER AND ARE THREE DIFFERENT THINGS. Codes
+ * 0x22, 0x23 and 0x24 all open `if (act->xvar ...) GetVarValue(...)` and all
+ * three differ:
+ *
+ *   0x22 `addtovar`      -- the shared shape: variable if xvar > 0, else n0.
+ *   0x23 `setvar`        -- tests xvar for NON-ZERO, not positive, and
+ *                           REFUSES outright if the read fails instead of
+ *                           falling back to n0.
+ *   0x24 `setobjbitmap`  -- reads the variable and THROWS IT AWAY. Both
+ *                           branches call ScriptSetObjBitmap with act->n0;
+ *                           a positive xvar only buys a GetVarValue whose
+ *                           answer nothing uses.
+ *
+ * Factoring all three onto the helper is the obvious tidy-up and it would be
+ * wrong twice: it would make 0x23 accept a failed read and would make 0x24
+ * pass the variable. Neither is visible without following the else branch,
+ * which for all three is a separate block reached by a forward jump.
+ *
+ * Second arm here to discard a call's result, after playsoundon.
+ *
  * SEVERAL ARMS TAKE A VALUE FROM A VARIABLE OR FROM act->n0, and the two
  * halves are not the same width. When act->xvar is positive the value is
  * GetVarValue's full dword; otherwise the original loads `al` alone and jumps
