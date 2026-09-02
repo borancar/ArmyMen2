@@ -7938,6 +7938,19 @@ typedef struct {
  * OWNER argument, and calling that a two-field result would put the owner
  * where a delay belongs. Third argument-slot reuse in three functions.
  *
+ * `setdamagepad` TOUCHES TWO ARRAYS WITH TWO STRIDES, and the second is
+ * reached through the first. Code 0x3A writes PAD_OFF_DAMAGE, +0x38 and
+ * PAD_OFF_DAMAGE_KIND of ADDR_PADS[subject] -- stride 72 -- and then, only
+ * when the damage is positive, marks ADDR_PAD_NUMBERS[pad->+0x04] -- stride
+ * 76 -- by writing 1 into PADNUM_OFF_PADS.
+ *
+ * The index for the second array is the PAD's own +0x04, not the subject.
+ * Reusing the subject there would index the wrong record with the wrong
+ * stride and be wrong twice over, and the arm's `lea eax,[eax+eax*8]` twice
+ * over is what distinguishes them -- 9*8=72 for one and 19*4=76 for the
+ * other. Both bases already exist in this file, so the offsets are fields
+ * and no new base was introduced.
+ *
  * TWO ARMS READ A FIELD NARROWER THAN IT IS DECLARED, and both would be
  * invisible if written as the whole dword. Code 0x34 takes the new owner with
  * `mov dl, byte ptr [esi+0x38]` -- ONE BYTE of act->n0, and EvtSetOwner's
