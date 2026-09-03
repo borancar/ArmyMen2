@@ -16456,7 +16456,24 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_IFF_NUMB               0x424D554Eu  /* 'NUMB' */
 #define AM2_IFF_SCRI               0x49524353u  /* 'SCRI' */
 #define AM2_IFF_INDX               0x58444E49u  /* 'INDX' */
-#define ADDR_LOAD_ATL_FILE        0x0042BEA0u  /* int32_t(const char *path) */
+/* 0x0042BEA0, one caller. Read a `.atl` tileset: a FORM/TILE container whose
+ * DIB chunks become the map sprite. Everything but a DIB chunk is skipped by
+ * its own length, so the format is extensible and this reader ignores what it
+ * does not know.
+ *
+ * It is the FIRST function of a four-function entry; RestoreTileSet at
+ * 0x0042C0E0 is another and is reconstructed. */
+#define ADDR_LOAD_ATL_FILE       0x0042BEA0u  /* int32_t(const char *path) */
+#define AM2_TAG_FORM             0x4D524F46   /* 'FORM' little-endian */
+#define AM2_TAG_TILE             0x454C4954   /* 'TILE' */
+#define AM2_TAG_DIB              0x20424944   /* 'DIB ' */
+#define AM2_ATL_HEADER_BYTES     0x0C         /* FORM + size + TILE */
+#define AM2_ATL_CHUNK_HEADER     8            /* tag + length */
+#define AM2_MAP_SPRITE_BYTES     0x40u
+#define AM2_BMP_REC_BYTES        0x1Cu  /* what MakeBitmap fills */
+/* Log2Mask of the tile sprite's width -- the shift the map painter indexes
+ * by, and the check that the tileset's tiles are a power of two wide. */
+#define ADDR_TILE_SHIFT_LOG      0x00514E9Cu  /* int32_t */
 /* 0x0066205C IS A STRIDED TABLE, AND AT LEAST TWELVE GLOBALS IN THIS FILE ARE
  * INDIVIDUALLY-NAMED FIELDS OF IT. BuildRespawnPool is the first function to
  * WALK it -- 0x34 a step, reading each record's first dword as a weight -- and
