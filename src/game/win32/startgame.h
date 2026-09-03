@@ -9,6 +9,10 @@
  * compatible so dllmain.c can still call the install hooks. */
 #ifdef __cplusplus
 extern "C" {
+/* 0x0042F290. The START A WAR button: past the disabled CD check, ask for
+ * ENTER BATTLE NAME and mark us host. */
+void __cdecl OnStartWar(AM2_Widget *w);
+
 #endif
 
 /* Original: 0x0042ECF0. The menu's "start the selected game" button handler.

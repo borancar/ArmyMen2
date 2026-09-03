@@ -420,6 +420,49 @@ void __cdecl OnQuit(void)
     g_menuRequestSet = 1;
 }
 
+
+/* 0x0042F290, ADDR_ON_START_WAR -- the START A WAR button.
+ *
+ * THIS IS THE LAST FUNCTION docs/boundary.md HAD OUTSTANDING. Its two import
+ * sites are a MessageBoxA and the GetActiveWindow it passes as owner, and both
+ * sit behind the fourth of the five disabled CD checks: tools/binpatches.py
+ * names 0x0042F2A9 as `test eax, eax` overwritten to jump unconditionally to
+ * 0x0042F2D9, so the dialog cannot run in this build.
+ *
+ * Reproduced the way cdcheck.h prescribes and StartSelectedGame already does
+ * -- the call still happens and its answer is still thrown away, because only
+ * the BRANCH was patched, not the call. The refusal arm is written out so the
+ * retail behaviour is not lost, and is unreachable as built.
+ *
+ * Past the check it is three steps and a flag: ask for ENTER BATTLE NAME,
+ * apply the game settings, clear the menu message list, and mark us HOST --
+ * which is what makes this the START half of the pair whose other half,
+ * BattleJoinOk, sets no such flag. */
+void __cdecl OnStartWar(AM2_Widget *w)
+{
+    uint8_t *comm;
+
+    (void)w;
+
+    PlaySoundAt(2, 0, 0, 0, 0);
+
+    if (!RequireGameCD()) {
+        /* Unreachable as built; see cdcheck.h. */
+        g_menuRequest    = AM2_MENU_REQUEST_TITLE;
+        g_menuRequestSet = 1;
+        return;
+    }
+
+    g_menuRequest    = AM2_MENU_REQUEST_BATTLE_NAME;
+    g_menuRequestSet = 1;
+
+    ApplyGameSettings();
+    ClearMenuMsgs();
+
+    comm = g_commObject;
+    *(int32_t *)(comm + COMM_OFF_IS_HOST) = 1;
+}
+
 int startgame_install(void)
 {
     int rc = 0;
@@ -443,5 +486,7 @@ int startgame_install(void)
                         "OnOptionsMenu", 0);
     rc |= patch_replace(ADDR_ON_CREDITS, (const void *)OnCredits, "OnCredits", 0);
     rc |= patch_replace(ADDR_ON_QUIT, (const void *)OnQuit, "OnQuit", 0);
+    rc |= patch_replace(ADDR_ON_START_WAR, (const void *)OnStartWar,
+                        "OnStartWar", 1);
     return rc;
 }

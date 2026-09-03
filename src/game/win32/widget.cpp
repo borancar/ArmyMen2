@@ -6238,7 +6238,7 @@ AM2_Widget *__attribute__((thiscall)) WarMenuConstruct(AM2_Widget *w,
         host = ButtonConstruct(host, (const char *)AM2_IMAGE(AM2_BMP_HOST0),
                                (const char *)AM2_IMAGE(AM2_BMP_HOST1),
                                (const char *)AM2_IMAGE(AM2_BMP_HOST2), 1, box,
-                               kImageHandler(ADDR_ON_START_WAR), 0);
+                               OnStartWar, 0);
     }
     WidgetAddChild(w, host);
     w->focusedChild = host;

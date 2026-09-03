@@ -50,16 +50,20 @@ whether a mechanism is being measured at all.
 
 | channel | how it is found | outstanding |
 |---|---|---|
-| named imports | `docs/imports.tsv` | 2 non-incidental site(s) |
+| named imports | `docs/imports.tsv` | 0 non-incidental site(s) |
 | imports by ordinal | `#N` in the same file, checked through the callers of its thunk | 0 |
 | COM vtables | `docs/comcalls.tsv`, `stdcall` only | 0 |
 | runtime resolution | `LoadLibraryA` + `GetProcAddress` sites | 0 |
 | delay-loaded imports | PE delay-import directory | none in this image |
 
-The 2 named-import site(s) left are `MessageBoxA` calls
-and the `GetActiveWindow` each passes as its owner, and
-`docs/binarypatches.md` shows nothing in the image can reach any of
-them. The value of this table is not the zeroes -- it is that each
+Every named-import site below the CRT line is now inside
+reconstructed code. The last one out was the `MessageBoxA` and
+`GetActiveWindow` pair in ADDR_ON_START_WAR, behind the fourth of
+the five disabled CD checks -- reproduced the way cdcheck.h
+prescribes, so the dialog stays unreachable exactly as the patched
+binary leaves it.
+
+The value of this table is not the zeroes -- it is that each
 mechanism was looked for at all. `tools/comcalls.py` exists because
 an earlier version of this file could not see COM and reported the
 boundary as nearly finished with 23 functions and 66 DirectX calls
@@ -69,8 +73,8 @@ outside it.
 
 | | functions | import sites |
 |---|---:|---:|
-| reconstructed | 129 | 271 |
-| still boundary | 1 | 2 |
+| reconstructed | 130 | 273 |
+| still boundary | 0 | 0 |
 | game logic, incidental calls only | 1 | 3 |
 | **total** | **131** | **276** |
 
@@ -82,7 +86,7 @@ this library ours yet?
 
 | library | reconstructed | sites | |
 |---|---:|---:|---|
-| USER32 | 127 | 130 |  |
+| USER32 | 129 | 130 |  |
 | KERNEL32 | 97 | 99 |  |
 | WINMM | 17 | 17 | **complete** |
 | GDI32 | 16 | 16 | **complete** |
@@ -96,34 +100,8 @@ is running on Windows rather than talking to anyone. The list that
 matters is the one with those removed -- every non-incidental import
 site still outside reconstructed code:
 
-| symbol | sites |
-|---|---:|
-| `MessageBoxA` | 1 |
-
-**This one is a decision, not an omission.** `0x0042f290` holds exactly two
-import sites -- a `MessageBoxA` and the `GetActiveWindow` it
-passes as owner -- and no COM dispatch at all. It sits inside a
-block the section above proves nothing can reach. Everything else
-in it is menu logic: sound requests, menu state, calls into
-other game code.
-
-Porting it would move pure menu logic into the reconstruction
-to capture a dialog that cannot appear -- the opposite of what
-ranking targets by boundary density is for.
-
-The count reached one by the other route, though, and that is
-worth recording: the two that left were the title screen's
-SINGLE PLAYER and BOOT CAMP handlers, ported for their own sake
-as part of the menu, with the CD check coming along through
-`cdcheck.h`. A function declined on density can still arrive
-because the layer around it did.
-
-Read that table with `docs/binarypatches.md` beside it. Those
-`MessageBoxA` sites are the "insert the CD" dialog, and
-every CD check in this executable has been patched to skip it --
-so the sites are still there, still import the symbol, and can
-never execute. A site that cannot run is not outstanding boundary
-work, and counting it as such overstates what is left.
+There are none. Every non-incidental import site in the image is
+inside reconstructed code.
 
 ## Interfaces kept in struct fields
 
@@ -202,13 +180,12 @@ function from game logic with a call in it.
 
 | function | size | sites | B/site | imports |
 |---|---:|---:|---:|---|
-| `0x0042f290` | 0 | 2 | 0 | GetActiveWindow, MessageBoxA |
 
 ## By library
 
 | dll | sites | reconstructed |
 |---|---:|---:|
-| USER32.dll | 130 | 127 |
+| USER32.dll | 130 | 129 |
 | KERNEL32.dll | 99 | 97 |
 | WINMM.dll | 17 | 17 |
 | GDI32.dll | 16 | 16 |

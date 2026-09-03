@@ -367,10 +367,19 @@ def main():
           f"{dynamic_left} |\n")
         w(f"| delay-loaded imports | PE delay-import directory | "
           f"{delay} |\n")
-        w(f"\nThe {sites(real)} named-import site(s) left are `MessageBoxA` calls\n"
-          "and the `GetActiveWindow` each passes as its owner, and\n"
-          "`docs/binarypatches.md` shows nothing in the image can reach any of\n"
-          "them. The value of this table is not the zeroes -- it is that each\n"
+        if sites(real):
+            w(f"\nThe {sites(real)} named-import site(s) left are `MessageBoxA`\n"
+              "calls and the `GetActiveWindow` each passes as its owner, and\n"
+              "`docs/binarypatches.md` shows nothing in the image can reach any\n"
+              "of them.\n")
+        else:
+            w("\nEvery named-import site below the CRT line is now inside\n"
+              "reconstructed code. The last one out was the `MessageBoxA` and\n"
+              "`GetActiveWindow` pair in ADDR_ON_START_WAR, behind the fourth of\n"
+              "the five disabled CD checks -- reproduced the way cdcheck.h\n"
+              "prescribes, so the dialog stays unreachable exactly as the patched\n"
+              "binary leaves it.\n")
+        w("\nThe value of this table is not the zeroes -- it is that each\n"
           "mechanism was looked for at all. `tools/comcalls.py` exists because\n"
           "an earlier version of this file could not see COM and reported the\n"
           "boundary as nearly finished with 23 functions and 66 DirectX calls\n"
