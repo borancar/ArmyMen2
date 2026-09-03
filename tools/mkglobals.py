@@ -302,7 +302,7 @@ def main():
         fh.write('\nextern "C" void am2_run_static_init(void);\n\n'
                  "void am2_run_static_init(void)\n{\n")
         for nm in si:
-            fh.write('    am2_log("init: %s\\n");\n    %s();\n' % (nm, nm))
+            fh.write("    %s();\n" % nm)
         fh.write("}\n")
 
     nimp, ndll = emit_imports(img, OUT)

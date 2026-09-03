@@ -90,6 +90,16 @@ extern "C" void am2_sa_log(const char *fmt, ...)
     if (!fh)
         return;
 
+    /* THE GAME CALLS THIS WITH NO ARGUMENTS AT ALL in places, and that is
+     * not a defect: the retail logger is a bare `ret`, so a call site with
+     * an empty argument frame is harmless there and CommConstruct has one --
+     * CLAUDE.md records another at 0x00460290. The "format" is then whatever
+     * sits above the return address, and formatting it faults inside the
+     * CRT. So the pointer is checked before it is used: a logger that can
+     * crash the game is worse than no logger. */
+    if (IsBadStringPtrA(fmt, 4096))
+        return;
+
     va_start(ap, fmt);
     vfprintf(fh, fmt, ap);
     va_end(ap);
@@ -150,6 +160,28 @@ extern "C" int32_t am2_sa_unimplemented(void)
     return 0;
 }
 
+/* ---- the int3 gap's exception handler ---------------------------------- */
+
+/* The range the original's .text occupied is filled with int3, so a call to
+ * a seam we have not redefined traps AT the intended callee rather than
+ * sliding through zeros. This turns that trap into a sentence: the address
+ * called, and the return address sitting on the stack, which names the
+ * CALLER. Without it every missing seam costs a bisect with printf probes.
+ */
+static LONG CALLBACK am2_sa_gap_filter(EXCEPTION_POINTERS *ep)
+{
+    const EXCEPTION_RECORD *er = ep->ExceptionRecord;
+    uintptr_t eip = (uintptr_t)er->ExceptionAddress;
+
+    if (eip >= 0x00401000u && eip < 0x0046F000u) {
+        uintptr_t *esp = (uintptr_t *)ep->ContextRecord->Esp;
+        am2_log("GAP: called 0x%08lX from 0x%08lX -- a seam this build has "
+                "not redefined\n", (unsigned long)eip,
+                (unsigned long)(esp ? esp[0] : 0));
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
 /* ---- startup --------------------------------------------------------- */
 
 /* Runs before WinMain. The allocator seam is pointed at the host CRT -- in
@@ -165,6 +197,7 @@ extern "C" void am2_standalone_init(void)
     /* FIRST: the original's IAT as we carry it is the FILE's, which no
      * loader has fixed up, so every seam calling through it was jumping to a
      * name-table RVA. Binding it must precede anything that runs game code. */
+    AddVectoredExceptionHandler(1, am2_sa_gap_filter);
     am2_bind_imports();
     am2_apply_fixups();
 

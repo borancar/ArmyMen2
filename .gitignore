@@ -9,3 +9,4 @@ am2.log
 am2-*.log
 /setup.exe
 .claude/*.local.md
+am2port.log

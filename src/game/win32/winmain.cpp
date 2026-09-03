@@ -72,11 +72,6 @@
  * IDI_APPLICATION and IDC_ARROW are the other two -- both MAKEINTRESOURCE
  * casts, so not constant expressions, but both are 32512 which is the 0x7F00
  * the original pushes. */
-#ifdef AM2_STANDALONE
-#define AM2_SA_STEP(n) am2_log("step: " n "\n")
-#else
-#define AM2_SA_STEP(n) ((void)0)
-#endif
 
 static_assert(MUTEX_ALL_ACCESS == 0x1F0001, "MUTEX_ALL_ACCESS");
 static_assert(CS_DBLCLKS == 0x0008, "CS_DBLCLKS");
@@ -262,11 +257,8 @@ void __cdecl FreeSpriteListAlias(void)
  * succeeding sets the flag. */
 int32_t __cdecl InitAudio(void)
 {
-    AM2_SA_STEP("InitAudio: enter");
     if (InitDirectSound()) {
-        AM2_SA_STEP("InitAudio: InitDirectSound ok");
         if (InitWaveSounds()) {
-            AM2_SA_STEP("InitAudio: InitWaveSounds ok");
             *(int32_t *)(uintptr_t)ADDR_AUDIO_ENABLED = 1;
             return 1;
         }
@@ -471,17 +463,11 @@ int32_t __cdecl FindGameCD(void)
     uint32_t need;
     int32_t  found = 0;
 
-#ifdef AM2_STANDALONE
-    am2_log("cd: enter\n");
-#endif
     need   = GetLogicalDriveStringsA(0, NULL) + 1;
     drives = (char *)orig_malloc(need);
     GetLogicalDriveStringsA(need, drives);
     volume = (char *)orig_malloc(VOLUME_NAME_MAX + 1);
 
-#ifdef AM2_STANDALONE
-    am2_log("cd: allocs done drives=%p volume=%p\n", (void *)drives, (void *)volume);
-#endif
     g_cdPresent = 0;
     g_cdPath[0] = '\0';
 
@@ -505,9 +491,6 @@ int32_t __cdecl FindGameCD(void)
             ;
     }
 
-#ifdef AM2_STANDALONE
-    am2_log("cd: loop done found=%d\n", (int)found);
-#endif
     orig_free(drives);
     orig_free(volume);
     return found;
@@ -736,9 +719,7 @@ int32_t __cdecl InitApplication(HINSTANCE hInstance, int32_t nCmdShow)
 
     /* Sized before DirectDraw, because the cooperative level and the mode it
      * asks for depend on the window being the shape it means to keep. */
-    AM2_SA_STEP("InitInput done");
     PositionWindow();
-    AM2_SA_STEP("PositionWindow done");
 
     err = InitDirectDraw(g_hWnd);
     if (err) {
@@ -754,13 +735,9 @@ int32_t __cdecl InitApplication(HINSTANCE hInstance, int32_t nCmdShow)
     if (g_windowed)
         PositionWindow();
 
-    AM2_SA_STEP("InitDirectDraw done");
     BuildTrigTables();
-    AM2_SA_STEP("BuildTrigTables done");
     FreeSpriteListAlias();
-    AM2_SA_STEP("FreeSpriteListAlias done");
     InitAudio();
-    AM2_SA_STEP("InitAudio done");
     ClearGameOver();
     return 1;
 }
@@ -798,13 +775,9 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     if (!InitApplication(hInstance, nCmdShow))
         return 0;
 
-    AM2_SA_STEP("InitApplication done");
     FindGameCD();
-    AM2_SA_STEP("FindGameCD done");
     ResetToTitle();
-    AM2_SA_STEP("ResetToTitle done");
     StartIntro();
-    AM2_SA_STEP("StartIntro done");
 
     /* Drain the queue, and when there is nothing in it run a frame. A game loop
      * rather than a GetMessage loop: the process never blocks waiting for
@@ -814,8 +787,6 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
             if (!PumpMessage(&msg))
                 break;
         } else {
-            static int32_t first = 1;
-            if (first) { first = 0; AM2_SA_STEP("first RunFrame"); }
             RunFrame();
         }
     }

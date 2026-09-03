@@ -414,6 +414,13 @@ $(BUILD)/sa/origgap.o: build/standalone/origgap.S | standalone-generate
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@
 
+# Header dependencies, for the same reason the main build tracks them: the
+# standalone objects depend on src/inject/standalone.h and orig.h, and
+# without this a change to a SEAM rebuilt nothing. That produced several
+# "the fix did not take" runs -- a stale font.o still held `mov $0x4646a9`
+# for a free the header had long since redefined.
+-include $(SA_OBJ:.o=.d)
+
 standalone: standalone-generate
 	$(MAKE) $(BUILD)/ArmyMen2.exe
 
