@@ -275,3 +275,48 @@ tree, so every comm reconstruction verified "by reading" has had no drive
 behind it for longer than anyone has checked.
 
 ## What is next, as a number rather than a direction
+## CORRECTED: "FireWeapon is the last function" was wrong -- 31 remain
+
+Reported for several turns, and it does not survive being measured. Taking
+docs/functions.tsv below CRT_START, subtracting every patch_replace target
+and the two REGISTERED reconstructions that are not patches, leaves **31
+functions, 26,896 bytes**:
+
+| bytes | address | name |
+|---:|---|---|
+| 3328 | 0x00416340 | ADDR_HUD_SQUAD_DETAIL |
+| 2064 | 0x00414F20 | ADDR_SELECT_WEAPON |
+| 1952 | 0x00418480 | ADDR_HUD_CHAT_SEND |
+| 1472 | 0x0044D110 | -- |
+| 1456 | 0x00453280 | ADDR_SAVE_LIST_CTOR |
+| 1296 | 0x00431E10 | ADDR_CHECK_MAP_RULES |
+| 1200 | 0x0042BEA0 | ADDR_LOAD_ATL_FILE |
+| 1168 | 0x00425300 | ADDR_STATE2_ENTER |
+
+plus 23 more from 1,024 bytes down to 192. Most of the tail is the menu
+widget layer -- constructors and destructors for the save list, the game
+menu, the overwrite and message dialogs, the multiplayer spinner, the three
+HUD panels.
+
+**Where the wrong number came from.** `docs/boundary.md` reports the
+Win32/DirectX boundary, and that IS essentially finished -- 0 COM sites and
+2 unreachable MessageBoxA sites outstanding. "The boundary is done" is true
+and answers a narrower question than "every game function is
+reconstructed". The two got conflated, and the second was then reported as
+measured when nothing had measured it.
+
+CLAUDE.md already warns about exactly this in another form: read the figures
+from the generated doc rather than from prose, and know which question the
+doc answers. The boundary doc's own header says "Only game code is counted"
+and means only game code that touches the boundary.
+
+**A patch count cannot detect this either.** 1,516 patches is more than the
+1,239 entries below the line, because merged entries take several patches --
+so the total going up says nothing about coverage of the function list.
+
+Three of the four addresses above the line that look unpatched are NOT
+functions and should never be counted: 0x0045CAA0 is the retail-stubbed
+logger (a bare `c3`, patched by src/inject/gamelog.c, and reconstructing it
+as an empty update once silenced the game log), and 0x00463390, 0x00463396
+and 0x00464410 are one-instruction `jmp [IAT]` import thunks, one of which
+must stay a thunk for dinput_hook.c's IAT patch to be reached.
