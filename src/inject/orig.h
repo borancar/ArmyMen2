@@ -7533,6 +7533,7 @@ typedef struct {
  * and 3 when a move is refused, at either end of a list or on a row the list
  * will not let you pick. */
 #define AM2_SND_MENU_MOVE        1
+#define AM2_SND_MENU_PICK        2
 #define AM2_SND_MENU_REFUSE      3
 #define AM2_SND_HURT             4
 #define AM2_SND_HURT_KIND7       0x35
@@ -13357,6 +13358,30 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * than by role, because the only role either has here is "the radar's
  * fifth pair", which is a fact about one consumer. */
 #define ADDR_COLOUR_WHITE_B     0x004FE1ADu  /* FF FF FF, the radar's */
+/* The GAME TYPE list, whose rows carry a pointer to a game-type record --
+ * unlike MP_PANEL_OFF_TYPE_BOX above, which FillListFromRules fills with a
+ * literal 3 for every row. Picking a row here refills the type box from that
+ * record's rules file and rebuilds the map list below from its map list. */
+/* The game-type record a GAME_BOX row points at. RAW OFFSETS on purpose:
+ * OnMpGameType is its only reader in the image and nothing that BUILDS it has
+ * been identified, so a name here would be the one-toucher guess this file
+ * keeps recording. What is known is that +0 and +0x40 are both strings -- the
+ * first is copied to ADDR_MP_SCRIPT_NAME, the second gets ".txt" appended and
+ * is loaded from rules/ -- and that +0xC4 counts the 0x40-byte map names at
+ * +0xC8. */
+#define MP_GAMETYPE_OFF_RULES      0x40u
+#define MP_GAMETYPE_OFF_MAP_COUNT  0xC4u
+#define MP_GAMETYPE_OFF_MAPS       0xC8u
+#define AM2_MP_MAP_NAME_BYTES      0x40u
+/* The original's whole local frame is 0x40 and two dwords of it are the loop
+ * counters, so the path buffer is the 0x38 between them. */
+#define AM2_MP_RULES_PATH          0x38u
+/* 0x00431A30 -- the row-pick callback GAME_BOX is constructed with. Its only
+ * reference is that constructor argument; nothing calls it. */
+#define ADDR_MP_ON_GAME_TYPE   0x00431A30u /* void(w, AM2_ListRows *, int32) */
+#define MP_PANEL_OFF_GAME_BOX  0x208u
+#define MP_PANEL_OFF_MAP_BOX   0x210u   /* the maps the chosen type allows */
+#define MP_PANEL_OFF_MAP_BAR   0x214u   /* its arrow bar */
 #define MP_PANEL_OFF_PREVIEW   0x218u   /* the map thumbnail widget */
 #define MP_PANEL_OFF_NAMES     0x220u
 #define MP_PANEL_OFF_COLOURS   0x230u

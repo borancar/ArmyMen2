@@ -1642,6 +1642,8 @@ void __cdecl ShowBadMapPreview(AM2_Widget *preview);
 /* 0x00430140. Clear a list box's rows and refill them from a text file in
  * `rules/`, one row per line, newline and all. */
 void __cdecl FillListFromRules(const char *path, void *panel);
+/* 0x00431A30 -- the MP panel's game-type list row-pick callback. */
+void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row);
 
 /* 0x004316D0, slot 2 of the multiplayer panel: grey the row buttons on the
  * same policy their handlers guard on, then push five numbers into text. */

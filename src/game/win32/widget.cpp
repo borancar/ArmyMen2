@@ -9694,6 +9694,123 @@ void __cdecl FillListFromRules(const char *path, void *panel)
     orig_fclose(fp);
 }
 
+/* OnMpGameType -- original 0x00431A30, 512 bytes, one exit.
+ *
+ * The row-pick callback of the multiplayer panel's GAME TYPE list. Its only
+ * reference is a `push 0x431a30` among the arguments of a list-box
+ * constructor inside MpPanelConstruct, so nothing calls it and the address is
+ * invisible to a call graph -- the sixth function this session named from a
+ * data table rather than from code.
+ *
+ * ONLY THE HOST MAY CHANGE THE TYPE. The first thing it reads is
+ * COMM_OFF_IS_HOST, and a guest falls straight out; the announcement at the
+ * end, "Game type changed by host.", is the other half of that.
+ *
+ * A ROW'S VALUE IS A RECORD HERE AND A LITERAL 3 IN THE BOX IT FILLS, which
+ * is worth stating because the two lists look alike. FillListFromRules stores
+ * `(void *)3` as every row's value in MP_PANEL_OFF_TYPE_BOX; this list's rows
+ * carry a pointer to a game-type record, and dereferencing it is the whole
+ * function. The record's own fields stay RAW OFFSETS: this is their only
+ * reader in the image, and CLAUDE.md's rule is that a name from one toucher
+ * is a guess -- what builds the record has not been identified.
+ *
+ * WHAT IT DOES, then, is three things to two other widgets. The record's
+ * first string becomes ADDR_MP_SCRIPT_NAME; `<second string>.txt` is loaded
+ * into the type box, which is repainted through its own vtable; and the map
+ * list is emptied and refilled with every map the type allows, each looked up
+ * by FindLevelByName so an uninstalled map simply does not appear.
+ *
+ * THE SELECTION IS CARRIED ACROSS BY NAME, not by index. While refilling, it
+ * compares each map's name against ADDR_MAP_NAME with an inlined strcmp and
+ * remembers which row matched, so changing game type keeps the map you had if
+ * the new type still offers it and falls back to row 0 if it does not.
+ *
+ * THE THREE LIST FIELDS IT RESETS ARE THE ONES ListUpdate OWNS -- rows,
+ * LIST_OFF_CHOSEN and LIST_OFF_TOP_ROW -- and it sets the last two to zero,
+ * which is a small independent confirmation of that pair: a list being
+ * rebuilt has nothing chosen and is scrolled to the top.
+ *
+ * NOT EXERCISED. It needs the multiplayer options panel, which `mpoptions`
+ * is meant to reach and STATUS.md records as broken. Verified by reading. */
+void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
+{
+    uint8_t       *panel;
+    const uint8_t *rec;
+    uint8_t       *maps;
+    char           path[AM2_MP_RULES_PATH];
+    int32_t        i;
+    int32_t        chosen;
+
+    if (!*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST))
+        return;
+    if (!rows || row < 0 || row >= rows->count)
+        return;
+
+    panel = (uint8_t *)w->parent;
+    PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
+
+    rec = *(const uint8_t *const *)(rows->text + (size_t)row * LIST_ROW_STRIDE
+                                    + AM2_LIST_ROW_VALUE);
+    if (!rec)
+        return;
+
+    /* The sound is played TWICE, once before the record is fetched and once
+     * after it survives the null test. Reproduced. */
+    PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
+
+    strcpy((char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME), (const char *)rec);
+    am2_sprintf(path, "%s.txt", (const char *)(rec + MP_GAMETYPE_OFF_RULES));
+    FillListFromRules(path, panel);
+
+    {
+        AM2_Widget *box =
+            *(AM2_Widget *const *)(panel + MP_PANEL_OFF_TYPE_BOX);
+
+        ((AM2_WidgetPaintFn *)box->vtable)[WIDGET_VSLOT_PAINT](box, box->rect);
+    }
+
+    maps = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
+    RecordReset(*(void **)(maps + LIST_OFF_ROWS));
+    *(int32_t *)(maps + LIST_OFF_CHOSEN)  = 0;
+    *(int32_t *)(maps + LIST_OFF_TOP_ROW) = 0;
+
+    chosen = 0;
+    for (i = 0; i < *(const int32_t *)(rec + MP_GAMETYPE_OFF_MAP_COUNT); i++) {
+        const char *nm = *(const char *const *)(rec + MP_GAMETYPE_OFF_MAPS)
+                         + (size_t)i * AM2_MP_MAP_NAME_BYTES;
+        uint8_t    *lvl = (uint8_t *)FindLevelByName((char *)nm);
+
+        if (!lvl)
+            continue;
+
+        maps = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
+        ListAdd(*(void **)(maps + LIST_OFF_ROWS),
+                (const char *)(lvl + LEVEL_OFF_NAME), lvl);
+
+        if (strcmp(nm, (const char *)AM2_IMAGE(ADDR_MAP_NAME)) == 0)
+            chosen = i;
+    }
+
+    maps = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
+    {
+        uint8_t *lvl = (uint8_t *)FindLevelByName(
+            (char *)(*(const char *const *)(rec + MP_GAMETYPE_OFF_MAPS)
+                     + (size_t)chosen * AM2_MP_MAP_NAME_BYTES));
+
+        /* The INDEX goes in the list, not the level -- espmap puts the
+         * stored value in the same frame slot the loop wrote `chosen` to,
+         * where reading the instruction alone suggests the FindLevelByName
+         * result that was computed two lines earlier. That result is kept in
+         * esi and handed to SelectLevel instead. */
+        *(int32_t *)(maps + LIST_OFF_CHOSEN) = chosen;
+        ArrowBarShowRow(*(AM2_Widget **)(panel + MP_PANEL_OFF_MAP_BAR), chosen);
+        SelectLevel(lvl);
+        RefreshMapSelection();
+        SendPlayerMsg(1);
+        Announce("Game type changed by host.");
+    }
+}
+
 /* 0x00430330 -- the thumbnail when the map is not installed. The literal is
  * copied into a 0x100 local before being handed on, which is the original's
  * inlined strcpy and not something the callee needs; kept, because the callee
@@ -13419,6 +13536,8 @@ int widget_install(void)
                         "HudPanelWidth", 3);
     rc |= patch_replace(ADDR_SET_POINTER_MODE, (const void *)SetPointerMode,
                         "SetPointerMode", 10);
+    rc |= patch_replace(ADDR_MP_ON_GAME_TYPE, (const void *)OnMpGameType,
+                        "OnMpGameType", 3);
     rc |= patch_replace(ADDR_POINTER_ACTION_FOLLOW,
                         (const void *)PointerActionFollow,
                         "PointerActionFollow", 2);
