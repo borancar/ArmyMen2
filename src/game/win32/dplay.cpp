@@ -1053,7 +1053,6 @@ static_assert(sizeof(DPLCONNECTION) <= LOBBY_CONN_BUF_SIZE, "the 0x800 buffer");
 
 typedef void (__cdecl *am2_lobby_void_fn)(void);
 /* CommCreatePlayer is reconstructed; called directly below. */
-#define orig_apply_settings  (*(am2_lobby_void_fn)ADDR_APPLY_GAME_SETTINGS)
 
 /* Release the lobby interface and the connection buffer, in that order. Used
  * by the quiet DPERR_NOTLOBBIED exit and by the dead copy-protection path. */
@@ -1200,7 +1199,7 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
                                   + COMM_SLOT_OFF_NAME);
         strcpy(slotName, playerName);
     }
-    orig_apply_settings();
+    ApplyGameSettings();
     return 1;
 }
 

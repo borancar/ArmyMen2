@@ -627,6 +627,11 @@ int32_t __attribute__((thiscall)) GetArmyScore(void *comm, int32_t slot);
  * scores alone, otherwise every taken slot on its team is summed. */
 int32_t __attribute__((thiscall)) CommTeamScore(void *comm, int32_t slot);
 
+/* 0x0042F170, six callers. Copy the saved/host settings into the live ones,
+ * renumber every comm slot and clear its team, and seed the four army point
+ * pools. The counterpart of ADDR_RESET_HOST_STATE. */
+void __cdecl ApplyGameSettings(void);
+
 /* 0x00421800. Decides whether a multiplayer mission was won and shows the end
  * screen. The argument it passes on is "LOST", not "won" -- both arms invert
  * a `sete` before the call. */

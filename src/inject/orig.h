@@ -10605,9 +10605,18 @@ typedef struct {
  * ADDR_SAVED_BATTLE_NAME, which HostBattle fills -- so this is what undoes
  * it. */
 #define ADDR_RESET_HOST_STATE    0x0042F140u  /* void(void) */
+/* THE LIVE HALF OF THE SAME FIVE SETTINGS. ApplyGameSettings copies
+ * SAVED -> LIVE straight down this list: the two names, then MASK_A into the
+ * game-over flags, MASK_B into GAME_SETTING_22C and VALUE_3E8 into the score
+ * limit. Naming the pairing is most of what that function is, and it settles
+ * what HOST_VALUE_3E8 is FOR -- it becomes ADDR_SCORE_LIMIT, so 1000 is the
+ * default score limit rather than an unexplained constant. */
+#define ADDR_LIVE_PLAYER_NAME    0x00515FF4u  /* char[], from SAVED_PLAYER_NAME */
+#define ADDR_LIVE_BATTLE_NAME    0x00516035u  /* char[], from SAVED_BATTLE_NAME */
 #define ADDR_HOST_MASK_A         0x00516078u  /* uint32_t */
 #define ADDR_HOST_MASK_B         0x0051607Cu  /* uint32_t */
 #define ADDR_HOST_VALUE_3E8      0x00516090u  /* int32_t, set to 1000 */
+#define AM2_DEFAULT_SCORE_LIMIT  0x3E8   /* 1000, and each army's pool */
 /* NOT A FREE. It BUILDS every palette remap the game owns, and orig.h already
  * half knew: ADDR_ROW_LUT_DOUBLES is described as "filled at 0x0040A5C2 and
  * 0x0040A5D7", which are both inside this function. Four things in one pass:

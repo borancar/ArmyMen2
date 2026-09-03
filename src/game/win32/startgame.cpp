@@ -46,7 +46,6 @@ typedef void (__cdecl *am2_play_sound_fn)(int32_t, int32_t, int32_t, int32_t,
 typedef void (__cdecl *am2_void_fn)(void);
 typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
 
-#define orig_apply_game_settings (*(am2_void_fn)ADDR_APPLY_GAME_SETTINGS)
 #define orig_sprintf             (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
 
 /* Reaching the highlighted row: the paint object holds the current screen at
@@ -135,7 +134,7 @@ void __cdecl StartSelectedGame(void)
 
     g_menuRequest    = REQUEST_LOCAL;
     g_menuRequestSet = 1;
-    orig_apply_game_settings();
+    ApplyGameSettings();
     *(int32_t *)(comm + COMM_OFF_IS_HOST) = 1;
 }
 
@@ -195,7 +194,7 @@ void __cdecl StartMultiplayerGame(void)
 
     g_menuRequest    = AM2_MENU_REQUEST_BATTLE_JOIN;
     g_menuRequestSet = 1;
-    orig_apply_game_settings();
+    ApplyGameSettings();
     ClearMenuMsgs();
 
     comm = g_commObject;

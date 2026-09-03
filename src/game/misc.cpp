@@ -999,6 +999,68 @@ int32_t __attribute__((thiscall)) GetArmyScore(void *comm, int32_t slot)
     return out;
 }
 
+/* ApplyGameSettings -- original 0x0042F170, 258 bytes, six callers. Copy the
+ * saved/host settings into the live ones and reset every comm slot.
+ *
+ * It is the counterpart of ADDR_RESET_HOST_STATE, which sits directly above
+ * it at 0x0042F140 and EMPTIES the same two names. One writes the staging
+ * block, the other applies it.
+ *
+ * The pairing is the whole function and it settles a name: HOST_VALUE_3E8
+ * lands in ADDR_SCORE_LIMIT, so the 1000 that RESET_HOST_STATE writes is the
+ * default SCORE LIMIT rather than an unexplained constant. MASK_A becomes the
+ * game-over flags and MASK_B GAME_SETTING_22C.
+ *
+ * Every slot is reset with its own INDEX, not with zero -- the original
+ * carries a second counter in edx purely for that -- while the team beside it
+ * is zeroed. So applying settings un-teams everybody and renumbers the slots.
+ *
+ * The four army point pools are seeded with 1000 each, and the loop bound is
+ * the distance to ADDR_SCORE_LIMIT, the next global: 0x00515FE0 to
+ * 0x00515FF0 is four. Written that way, as the other distance-bounded loops
+ * in this tree are.
+ *
+ * The tail is conditional on the name table being non-empty and copies two
+ * more strings out of the record it points at. The original inlines all four
+ * strcpys as repne scasb plus rep movsd -- MSVC's /Oi -- which is why the
+ * disassembly is mostly string primitives and no calls. */
+void __cdecl ApplyGameSettings(void)
+{
+    uint8_t *comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+    int32_t *pool = (int32_t *)(uintptr_t)ADDR_ARMY_POINTS;
+    int32_t  i;
+
+    strcpy((char *)(uintptr_t)ADDR_LIVE_PLAYER_NAME,
+               (const char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME);
+    strcpy((char *)(uintptr_t)ADDR_LIVE_BATTLE_NAME,
+               (const char *)(uintptr_t)ADDR_SAVED_BATTLE_NAME);
+
+    *(uint32_t *)(uintptr_t)ADDR_GAME_SETTING_22C =
+        *(const uint32_t *)(uintptr_t)ADDR_HOST_MASK_B;
+    *(int32_t *)(uintptr_t)ADDR_SCORE_LIMIT =
+        *(const int32_t *)(uintptr_t)ADDR_HOST_VALUE_3E8;
+    *(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS =
+        *(const uint32_t *)(uintptr_t)ADDR_HOST_MASK_A;
+
+    for (i = 0; pool + i < (int32_t *)(uintptr_t)ADDR_SCORE_LIMIT; i++) {
+        pool[i] = AM2_DEFAULT_SCORE_LIMIT;
+        *(int32_t *)(comm + COMM_OFF_PLAYERS
+                     + (size_t)i * AM2_COMM_SLOT_STRIDE
+                     + COMM_SLOT_OFF_INDEX) = i;
+        *(int32_t *)(comm + COMM_OFF_PLAYERS
+                     + (size_t)i * AM2_COMM_SLOT_STRIDE
+                     + COMM_SLOT_OFF_TEAM) = 0;
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_NAME_TABLE_COUNT != 0) {
+        const uint8_t *rec = *(const uint8_t **)(uintptr_t)ADDR_NAME_TABLE_BASE;
+
+        strcpy((char *)(uintptr_t)ADDR_MP_SCRIPT_NAME, (const char *)rec);
+        strcpy((char *)(uintptr_t)ADDR_MAP_NAME,
+                   *(const char *const *)(rec + NAMEREC_OFF_MAPS));
+    }
+}
+
 /* CommTeamScore -- original 0x0040F990, thiscall. What the `teamscore`
  * keyword answers: EvalOperand's kind 8 returns whatever this does.
  *
@@ -2417,6 +2479,8 @@ int misc_install(void)
                   "CommAllPlayersReady", 1);
     patch_replace(ADDR_COMM_WAS_HERE_FOR_ARMY, (const void *)CommWasHereForArmy,
                   "CommWasHereForArmy", 1);
+    patch_replace(ADDR_APPLY_GAME_SETTINGS, (const void *)ApplyGameSettings,
+                  "ApplyGameSettings", 6);
     patch_replace(ADDR_COMM_TEAM_SCORE, (const void *)CommTeamScore,
                   "CommTeamScore", 1);
     patch_replace(ADDR_GET_ARMY_SCORE, (const void *)GetArmyScore,

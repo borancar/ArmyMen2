@@ -313,7 +313,7 @@ void __cdecl ResetToTitle(void)
 
     ResetHostState();
     ((am2_void_fn)(uintptr_t)0x0044D110u)();
-    ((am2_void_fn)(uintptr_t)ADDR_APPLY_GAME_SETTINGS)();
+    ApplyGameSettings();
 }
 
 /* 0x0040B7A0. Whether the intro movie plays, and what happens instead.
