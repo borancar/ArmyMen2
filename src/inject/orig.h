@@ -6725,6 +6725,9 @@ typedef struct {
  * what it saw, wrong about what the field is. */
 #define ADDR_PENDING_CONFIRM     0x00659F58u /* char[] */
 #define ADDR_STR_DOT_SAV         0x0048BC54u  /* ".sav" */
+/* "Save\\%s" -- the per-player save folder, used by every handler that has to
+ * chdir into it: DlgOverwriteOk, OnDelGameOk and OnDelPlayerOk. */
+#define ADDR_STR_SAVE_DIR_FMT    0x0048B930u
 #define ADDR_STR_DOT             0x004758A0u  /* "." -- ANY extension, not
                                                * this one; SaveListOnSave
                                                * appends .sav only when the
@@ -6780,6 +6783,10 @@ typedef struct {
 #define AM2_MENU_MODE_AUDIO      0x1B
 #define AM2_MENU_MODE_CONTROLS   0x1C
 #define AM2_MENU_MODE_DEL_GAME   0x1D
+/* 0x1F completes the run: SaveListOnSave switches to it when the name typed
+ * already exists, so the three confirmations are consecutive with the four
+ * screens above them. */
+#define AM2_MENU_MODE_OVERWRITE  0x1F
 /* The mode SaveListOnDelete switches to, which is NOT the 0x1D above and is
  * the second entry to what is probably one screen. The note there already
  * says CANCEL computes its target from where it came from, with `sete` and

@@ -4843,7 +4843,7 @@ AM2_Widget *__attribute__((thiscall)) DlgSaveListConstruct(AM2_Widget *w,
                              *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
                              *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
                              (void (__cdecl *)(AM2_Widget *))
-                                 AM2_IMAGE(ADDR_SAVE_LIST_ON_SAVE), 0, 0);
+                                 SaveListOnSave, 0, 0);
     WidgetAddChild(w, edit);
     ((AM2_WidgetFocusFn *)edit->vtable)[WIDGET_VSLOT_FOCUS](edit, 0);
     *(void **)((uint8_t *)edit + EDIT_OFF_CHARSET) =
@@ -4886,7 +4886,7 @@ AM2_Widget *__attribute__((thiscall)) DlgSaveListConstruct(AM2_Widget *w,
         kid = ButtonConstruct(kid, "03_127_00_save.bmp", "03_127_01_save.bmp",
                               "03_127_02_save.bmp", 1, box,
                               (void (__cdecl *)(AM2_Widget *))
-                                  AM2_IMAGE(ADDR_SAVE_LIST_ON_SAVE),
+                                  SaveListOnSave,
                               (void (__cdecl *)(AM2_Widget *))0);
     }
     WidgetAddChild(w, kid);
@@ -4955,7 +4955,7 @@ AM2_Widget *__attribute__((thiscall)) DlgOverwriteConstruct(AM2_Widget *w,
         btn = ButtonConstruct(btn, "03_007_00_ok.bmp", "03_007_01_ok.bmp",
                               "03_007_02_ok.bmp", 1, box,
                               (void (__cdecl *)(AM2_Widget *))
-                                  AM2_IMAGE(ADDR_DLG_OVERWRITE_OK),
+                                  DlgOverwriteOk,
                               (void (__cdecl *)(AM2_Widget *))0);
     }
     WidgetAddChild(w, btn);
@@ -10081,6 +10081,97 @@ void __cdecl SaveListOnDelete(AM2_Widget *w)
     *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
 }
 
+/* SaveListOnSave -- original 0x00453080, 288 bytes, three exits.
+ *
+ * The SAVE dialog's SAVE button. It refuses an empty name, gives the typed
+ * name an extension if it has none, and then either saves outright or hands
+ * off to the overwrite confirmation.
+ *
+ * THE EXTENSION TEST IS FOR ANY DOT, not for ".sav" -- strstr(name, ".") --
+ * so a name typed as "quick.bak" is left exactly as typed and saved under
+ * that. Only a name with no dot at all gets ".sav" appended. Reproduced; it
+ * is the original's, and reading the needle as ".sav" would silently change
+ * what the game does with an extension the player chose.
+ *
+ * The two arms differ in where the name goes and nothing else matters
+ * between them: a file that does not exist is saved immediately, and one
+ * that does is staged in ADDR_PENDING_CONFIRM for DlgOverwriteOk, which
+ * reads it back and does the same save. */
+void __cdecl SaveListOnSave(AM2_Widget *w)
+{
+    uint8_t *dlg = *(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT;
+    char    *name;
+    uint8_t  find[AM2_FINDDATA_BYTES];
+    int32_t  h;
+
+    (void)w;
+
+    if (!dlg)
+        return;
+
+    name = (char *)(dlg + SAVELIST_OFF_NAME);
+    if (strlen(name) < 1) {
+        PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
+        return;
+    }
+    PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
+
+    if (!orig_strstr(name, (const char *)AM2_IMAGE(ADDR_STR_DOT)))
+        strcat(name, (const char *)AM2_IMAGE(ADDR_STR_DOT_SAV));
+
+    h = orig_findfirst(name, find);
+    if (h == -1) {
+        /* Nothing of that name: save it and leave. */
+        strcpy((char *)AM2_IMAGE(ADDR_GAMEPROC_STR_B), name);
+        SaveGame((const char *)AM2_IMAGE(ADDR_GAMEPROC_STR_B));
+        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 1;
+        return;
+    }
+
+    /* It exists -- stage it and let the confirmation ask.
+     *
+     * THE FIND HANDLE IS NEVER CLOSED, on either arm. The original calls
+     * _findfirst and then _findclose on neither path, so every SAVE press
+     * that names an existing file leaks one. Reproduced rather than fixed:
+     * adding the close would read as tidying and is a behaviour change, and
+     * this file's standing position is that the original's defects are the
+     * original's. It was nearly written the other way here. */
+    strcpy(g_pendingDelete, name);
+    *(int32_t *)(uintptr_t)ADDR_MENU_MODE     = AM2_MENU_MODE_OVERWRITE;
+    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+}
+
+/* DlgOverwriteOk -- original 0x00450610, 144 bytes, one exit.
+ *
+ * The confirmation's OK, and the other half of the family's shape: this is
+ * where the file work happens. It reads the name SaveListOnSave staged in
+ * ADDR_PENDING_CONFIRM -- the buffer whose old name asserted DELETE, and this
+ * reader is what settled that rename -- copies it into the gameproc block and
+ * saves.
+ *
+ * The chdir into `Save\<player>` is SKIPPED when no player name is set, so a
+ * session with no profile saves into whatever directory is current. That is
+ * the original's and is the same guard DlgSaveListConstruct uses before it
+ * mkdirs the folder. */
+void __cdecl DlgOverwriteOk(AM2_Widget *w)
+{
+    char dir[AM2_DLG_TEXT_BYTES];
+
+    (void)w;
+
+    if (strlen((const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK)) != 0) {
+        am2_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR_FMT),
+                    (const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
+        SetGameDir(dir);
+    }
+
+    strcpy((char *)AM2_IMAGE(ADDR_GAMEPROC_STR_B), g_pendingDelete);
+    SaveGame((const char *)AM2_IMAGE(ADDR_GAMEPROC_STR_B));
+
+    PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
+    *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 1;
+}
+
 /* 0x00430330 -- the thumbnail when the map is not installed. The literal is
  * copied into a 0x100 local before being handed on, which is the original's
  * inlined strcpy and not something the callee needs; kept, because the callee
@@ -13806,6 +13897,10 @@ int widget_install(void)
                         "HudPanelWidth", 3);
     rc |= patch_replace(ADDR_SET_POINTER_MODE, (const void *)SetPointerMode,
                         "SetPointerMode", 10);
+    rc |= patch_replace(ADDR_SAVE_LIST_ON_SAVE,
+                        (const void *)SaveListOnSave, "SaveListOnSave", 1);
+    rc |= patch_replace(ADDR_DLG_OVERWRITE_OK,
+                        (const void *)DlgOverwriteOk, "DlgOverwriteOk", 1);
     rc |= patch_replace(ADDR_SAVE_LIST_ON_DELETE,
                         (const void *)SaveListOnDelete,
                         "SaveListOnDelete", 1);

@@ -1645,6 +1645,10 @@ void __cdecl FillListFromRules(const char *path, void *panel);
 /* 0x00431A30 -- the MP panel's game-type list row-pick callback. */
 void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row);
 /* 0x00431E10 -- the multiplayer installation check; AM2_MAPCHECK_* codes. */
+/* 0x00453080 -- SAVE's SAVE: extension, existence test, save or confirm. */
+void __cdecl SaveListOnSave(AM2_Widget *w);
+/* 0x00450610 -- the overwrite confirmation's OK; it does the saving. */
+void __cdecl DlgOverwriteOk(AM2_Widget *w);
 /* 0x004531D0 -- SAVE's DELETE: stage the name, open the confirmation. */
 void __cdecl SaveListOnDelete(AM2_Widget *w);
 /* 0x00452FD0 -- clicking a save row fills the name box, minus ".sav". */
