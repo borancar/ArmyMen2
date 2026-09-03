@@ -423,6 +423,14 @@
 #define ADDR_GAMEMENU_CONTROLS   0x00452EB0u
 #define ADDR_GAMEMENU_AUDIO      0x00452F00u
 #define ADDR_GAMEMENU_ABORT      0x00452F30u
+/* Slot 2 of the same dialog, and the READER that named the field below. */
+#define ADDR_GAMEMENU_UPDATE     0x00452A20u  /* thiscall void(AM2_Widget *) */
+/* ABORT raises this and GameMenuUpdate acts on it; a writer/reader pair, held
+ * out for because 0x64 carries three names in this tree for three record
+ * types and StartSelectedGame reads it on the BATTLE BROWSER as a list-box
+ * pointer. Same offset, same ADDR_PAINT_OBJECT global, different classes. */
+#define GAMEMENU_OFF_ABORT       0x64u
+#define AM2_STATE_MP_LOBBY       4    /* what a LOBBIED abort requests */
 #define AM2_GAMEMENU_LEFT        0xF5
 #define AM2_GAMEMENU_TOP         0x82
 #define AM2_GAMEMENU_STEP        0x28

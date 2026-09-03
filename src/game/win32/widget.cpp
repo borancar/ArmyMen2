@@ -4677,20 +4677,20 @@ AM2_Widget *__attribute__((thiscall)) DlgBattleJoinConstruct(AM2_Widget *w,
  * ways and exactly the sort of thing a hand transcription gets wrong. */
 static const struct {
     const char *b0, *b1, *b2;
-    uint32_t    handler;
+    void      (__cdecl *handler)(AM2_Widget *);
 } kGameMenuButtons[6] = {
     { "03_124_00_return.bmp",   "03_124_01_return.bmp",
-      "03_124_02_return.bmp",   ADDR_DLG_CLOSE },
+      "03_124_02_return.bmp",   DlgClose },
     { "03_125_00_save.bmp",     "03_125_01_save.bmp",
-      "03_125_02_save.bmp",     ADDR_GAMEMENU_SAVE },
+      "03_125_02_save.bmp",     GameMenuSave },
     { "03_123_00_load.bmp",     "03_123_01_load.bmp",
-      "03_123_02_load.bmp",     ADDR_GAMEMENU_LOAD },
+      "03_123_02_load.bmp",     GameMenuLoad },
     { "03_121_00_controls.bmp", "03_121_01_controls.bmp",
-      "03_121_02_controls.bmp", ADDR_GAMEMENU_CONTROLS },
+      "03_121_02_controls.bmp", GameMenuControls },
     { "03_120_00_audio.bmp",    "03_120_01_audio.bmp",
-      "03_120_02_audio.bmp",    ADDR_GAMEMENU_AUDIO },
+      "03_120_02_audio.bmp",    GameMenuAudio },
     { "03_122_00_abort.bmp",    "03_122_01_abort.bmp",
-      "03_122_02_abort.bmp",    ADDR_GAMEMENU_ABORT },
+      "03_122_02_abort.bmp",    GameMenuAbort },
 };
 
 /* DlgGameMenuConstruct -- original 0x00452AA0, 928 bytes, thiscall `ret 8`.
@@ -4745,7 +4745,7 @@ AM2_Widget *__attribute__((thiscall)) DlgGameMenuConstruct(AM2_Widget *w,
     }
 
     *(void **)((uint8_t *)w + DLG_OFF_ESCAPE) =
-        (void *)AM2_IMAGE(ADDR_DLG_CLOSE);
+        (void *)DlgClose;
     return w;
 }
 
@@ -4909,14 +4909,13 @@ AM2_Widget *__attribute__((thiscall)) DlgSaveListConstruct(AM2_Widget *w,
         kid = ButtonConstruct(kid, "03_018_00_cancel.bmp",
                               "03_018_01_cancel.bmp", "03_018_02_cancel.bmp",
                               1, box,
-                              (void (__cdecl *)(AM2_Widget *))
-                                  AM2_IMAGE(ADDR_SAVE_LIST_ON_CANCEL),
+                              SaveListOnCancel,
                               (void (__cdecl *)(AM2_Widget *))0);
     }
     WidgetAddChild(w, kid);
 
     *(void **)(self + DLG_OFF_ESCAPE) =
-        (void *)AM2_IMAGE(ADDR_SAVE_LIST_ON_CANCEL);
+        (void *)SaveListOnCancel;
     return w;
 }
 
@@ -4967,8 +4966,7 @@ AM2_Widget *__attribute__((thiscall)) DlgOverwriteConstruct(AM2_Widget *w,
         btn = ButtonConstruct(btn, "03_018_00_cancel.bmp",
                               "03_018_01_cancel.bmp", "03_018_02_cancel.bmp",
                               1, box,
-                              (void (__cdecl *)(AM2_Widget *))
-                                  AM2_IMAGE(ADDR_DLG_OVERWRITE_CANCEL),
+                              DlgOverwriteCancel,
                               (void (__cdecl *)(AM2_Widget *))0);
     }
     WidgetAddChild(w, btn);
@@ -4991,7 +4989,7 @@ AM2_Widget *__attribute__((thiscall)) DlgOverwriteConstruct(AM2_Widget *w,
 
     /* Escape does what Cancel does. */
     *(void **)((uint8_t *)w + DLG_OFF_ESCAPE) =
-        (void *)AM2_IMAGE(ADDR_DLG_OVERWRITE_CANCEL);
+        (void *)DlgOverwriteCancel;
     return w;
 }
 
@@ -5045,8 +5043,7 @@ AM2_Widget *__attribute__((thiscall)) DlgMessageConstruct(AM2_Widget *w,
         RectSet(&box, ox + 0x149, oy + 0x38, 0x51, 0x20);
         btn = ButtonConstruct(btn, "03_007_00_ok.bmp", "03_007_01_ok.bmp",
                               "03_007_02_ok.bmp", 1, box,
-                              (void (__cdecl *)(AM2_Widget *))
-                                  AM2_IMAGE(ADDR_DLG_CLOSE),
+                              DlgClose,
                               (void (__cdecl *)(AM2_Widget *))0);
     }
     WidgetAddChild(w, btn);
@@ -10172,6 +10169,170 @@ void __cdecl DlgOverwriteOk(AM2_Widget *w)
     *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 1;
 }
 
+/* THE GAME MENU'S SIX BUTTONS, and four of them are one shape: play sound 2,
+ * set the sub-state, mark the overlay for repaint. They are written out
+ * rather than driven from a table because the two that DIFFER are the point
+ * -- ABORT writes a field of the dialog instead of a mode, and CLOSE raises
+ * a menu request instead -- and a table would have had to grow two exceptions
+ * to hold them.
+ *
+ * THE MODES ARE NAMED BY THESE BUTTONS' OWN BITMAPS, which is what corrected
+ * AM2_MENU_MODE_SAVE and _LOAD; see orig.h. */
+static void GameMenuGoto(int32_t mode)
+{
+    PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
+    *(int32_t *)(uintptr_t)ADDR_MENU_MODE     = mode;
+    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+}
+
+/* 0x00452E80 -- SAVE. */
+void __cdecl GameMenuSave(AM2_Widget *w)
+{
+    (void)w;
+    GameMenuGoto(AM2_MENU_MODE_SAVE);
+}
+
+/* 0x00452E50 -- LOAD. */
+void __cdecl GameMenuLoad(AM2_Widget *w)
+{
+    (void)w;
+    GameMenuGoto(AM2_MENU_MODE_LOAD);
+}
+
+/* 0x00452F00 -- AUDIO. */
+void __cdecl GameMenuAudio(AM2_Widget *w)
+{
+    (void)w;
+    GameMenuGoto(AM2_MENU_MODE_AUDIO);
+}
+
+/* 0x00452EB0 -- CONTROLS. */
+void __cdecl GameMenuControls(AM2_Widget *w)
+{
+    (void)w;
+    GameMenuGoto(AM2_MENU_MODE_CONTROLS);
+}
+
+/* 0x00452F30 -- ABORT, and it is NOT a mode change. It writes 1 into the open
+ * dialog's +0x64 and nothing else.
+ *
+ * IT IS THE ABORT FLAG, and it took the READER to say so. 0x64 carries three
+ * names in this tree for three record types, and StartSelectedGame reads
+ * +0x64 on the BATTLE BROWSER as a list-box pointer -- it dereferences it for
+ * the rows and the chosen row. Writing the integer 1 there says the GAME MENU
+ * is a different class reached through the same ADDR_PAINT_OBJECT global, so
+ * borrowing DLG_OFF_LIST because the number matched would have been the error
+ * CLAUDE.md catalogues as "a name belonging to another record at the same
+ * displacement". It was left raw for two rounds until GameMenuUpdate turned
+ * up below and tested it: writer and reader, which is the pair this file says
+ * to hold out for. */
+void __cdecl GameMenuAbort(AM2_Widget *w)
+{
+    (void)w;
+    PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
+    *(int32_t *)(*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT
+                 + GAMEMENU_OFF_ABORT) = 1;
+}
+
+/* 0x00452EE0 -- the plain dismiss. SHARED, and orig.h already records why it
+ * carries no caller's name: it is the message box's OK and the game menu's
+ * RETURN, and both dialogs put it in DLG_OFF_ESCAPE. It went in as
+ * ADDR_DLG_MESSAGE_OK from the first consumer found and the second is what
+ * showed that was a guess -- the same shape as ADDR_PENDING_CONFIRM, renamed
+ * earlier today on its fourth toucher.
+ *
+ * There are THREE, not the two that note records: the message box's
+ * constructor, the game menu's, and a third site at 0x00452DFA. The generic
+ * name holds up as more consumers appear, which is the whole argument for
+ * having made it generic.
+ *
+ * It raises the menu request rather than naming a screen, so whoever consumes
+ * that decides where the game goes next. That is what makes it shareable. */
+void __cdecl DlgClose(AM2_Widget *w)
+{
+    (void)w;
+    PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
+    *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 1;
+}
+
+/* 0x004531A0 -- the SAVE dialog's CANCEL, which is also its DLG_OFF_ESCAPE.
+ * 0x17 is the screen orig.h already records LOAD GAME's BACK and the OPTIONS
+ * dialogs sharing.
+ *
+ * NO THIRD SPELLING ADDED. 0x17 already carries TWO names --
+ * AM2_STATE_ESCAPE_MENU and MENU_MODE_OPTIONS -- which is one concept under
+ * two names if the escape menu and the options screen are the same arm, and
+ * that is the duplicate class this file distinguishes from four harmless
+ * names for 15. Using the menu-mode spelling because that is the field being
+ * written; the pair is noted rather than collapsed in passing, for the reason
+ * the comm slot stride's three names are: a rename is a change to every use
+ * at once and gets its own commit. */
+void __cdecl SaveListOnCancel(AM2_Widget *w)
+{
+    (void)w;
+    GameMenuGoto(MENU_MODE_OPTIONS);
+}
+
+/* 0x004505E0 -- the overwrite confirmation's CANCEL.
+ *
+ * IT CONFIRMS BOTH OF TODAY'S RENAMES and neither was made with it in view.
+ * It returns to 0x19, which under the corrected names reads as "cancelling an
+ * overwrite puts you back in the SAVE dialog" -- plainly right, where the old
+ * AM2_MENU_MODE_AFTER_LOAD meant nothing there. And it CLEARS
+ * ADDR_PENDING_CONFIRM, the sixth toucher of a buffer whose old name asserted
+ * DELETE and the third that is not one: a save path writes it, the overwrite
+ * OK reads it, and this clears it. */
+void __cdecl DlgOverwriteCancel(AM2_Widget *w)
+{
+    (void)w;
+    PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
+    g_pendingDelete[0] = '\0';
+    *(int32_t *)(uintptr_t)ADDR_MENU_MODE     = AM2_MENU_MODE_SAVE;
+    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+}
+
+/* GameMenuUpdate -- original 0x00452A20, 128 bytes, thiscall, two exits.
+ *
+ * Slot 2 of the in-mission game menu. It defers to WidgetUpdateCancel first,
+ * so ESCAPE closes the dialog exactly as it does for every other one, and
+ * then acts on the flag ABORT raised.
+ *
+ * LEAVING IS TWO DIFFERENT REQUESTS. A lobbied game asks for state 4 and a
+ * standalone one for state 1, decided by COMM_OFF_LOBBIED -- so the same
+ * button unwinds differently depending on how the session began.
+ *
+ * AND THE MULTIPLAYER TEARDOWN IS THE TIMEOUT'S. Dropping the session,
+ * reporting the stats and resetting the comm state are the same three calls
+ * CheckPlayerTimeout makes, in the same order, so a deliberate abort and
+ * being timed out converge on one path. The last is a TAIL JUMP in the
+ * original and is a plain call here; there is nothing after it. */
+void __attribute__((thiscall)) GameMenuUpdate(AM2_Widget *w)
+{
+    uint8_t    *comm;
+    AM2_Widget *dlg;
+
+    WidgetUpdateCancel(w);
+
+    if (!*(const int32_t *)((const uint8_t *)w + GAMEMENU_OFF_ABORT))
+        return;
+
+    comm = g_commObject;
+    RequestState(*(const int32_t *)(comm + COMM_OFF_LOBBIED)
+                     ? AM2_STATE_MP_LOBBY : AM2_STATE_MENU);
+
+    dlg = *(AM2_Widget **)(uintptr_t)ADDR_PAINT_OBJECT;
+    if (dlg)
+        ((AM2_WidgetDeleteFn *)dlg->vtable)[WIDGET_VSLOT_DTOR](dlg, 1);
+    *(void **)(uintptr_t)ADDR_PAINT_OBJECT = (void *)0;
+
+    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
+        return;
+
+    CommDropSession(comm);
+    CommReportStats(comm);
+    CommResetStats(comm);
+}
+
 /* 0x00430330 -- the thumbnail when the map is not installed. The literal is
  * copied into a 0x100 local before being handed on, which is the original's
  * inlined strcpy and not something the callee needs; kept, because the callee
@@ -13897,6 +14058,24 @@ int widget_install(void)
                         "HudPanelWidth", 3);
     rc |= patch_replace(ADDR_SET_POINTER_MODE, (const void *)SetPointerMode,
                         "SetPointerMode", 10);
+    rc |= patch_replace(ADDR_GAMEMENU_SAVE, (const void *)GameMenuSave,
+                        "GameMenuSave", 1);
+    rc |= patch_replace(ADDR_GAMEMENU_LOAD, (const void *)GameMenuLoad,
+                        "GameMenuLoad", 1);
+    rc |= patch_replace(ADDR_GAMEMENU_AUDIO, (const void *)GameMenuAudio,
+                        "GameMenuAudio", 1);
+    rc |= patch_replace(ADDR_GAMEMENU_CONTROLS, (const void *)GameMenuControls,
+                        "GameMenuControls", 1);
+    rc |= patch_replace(ADDR_GAMEMENU_ABORT, (const void *)GameMenuAbort,
+                        "GameMenuAbort", 1);
+    rc |= patch_replace(ADDR_DLG_CLOSE, (const void *)DlgClose,
+                        "DlgClose", 1);
+    rc |= patch_replace(ADDR_SAVE_LIST_ON_CANCEL, (const void *)SaveListOnCancel,
+                        "SaveListOnCancel", 1);
+    rc |= patch_replace(ADDR_DLG_OVERWRITE_CANCEL, (const void *)DlgOverwriteCancel,
+                        "DlgOverwriteCancel", 1);
+    rc |= patch_replace(ADDR_GAMEMENU_UPDATE, (const void *)GameMenuUpdate,
+                        "GameMenuUpdate", 1);
     rc |= patch_replace(ADDR_SAVE_LIST_ON_SAVE,
                         (const void *)SaveListOnSave, "SaveListOnSave", 1);
     rc |= patch_replace(ADDR_DLG_OVERWRITE_OK,
