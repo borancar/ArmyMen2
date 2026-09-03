@@ -961,17 +961,41 @@
  *   HEIGHT cm  4.4  4.8  4.3  4.4  4.0  4.5  4.4  4.9  3.9   (base +0xCC)
  *   WEIGHT g   2.3  2.6  2.3  2.4  2.1  2.4  2.3   ?   2.2   (base +0x84)
  *
- * Read out of the instruction stream rather than transcribed from the
- * screen; a panel showing HT:4.6 means the kind indexes PAST these, so
- * whoever finishes this should find where that comes from before assuming
- * the tables are the whole story.
+ * AND THE HT:4.6 IN THIS PROJECT'S OWN SCREENSHOT IS NOT FROM THEM. The
+ * function has two arms, chosen by ObjType2Field548 -- is this SARGE. The
+ * Sarge arm draws eight LITERALS: "Sarge", "HT:", "4.6 cm", "WT:", "2.4 g",
+ * "MV:", "2 cm/s", "HP:", with only the health formatted. The tables belong
+ * to the OTHER arm, the ordinary soldier, where the numbers vary by kind.
+ *
+ * Recorded because the first version of this note flagged the mismatch as an
+ * open question -- "the kind indexes PAST these" -- and the answer was that
+ * the value is not indexed at all. A number that does not match a table is
+ * as likely to be a literal as a table you have not found.
+ *
+ * THREE ARMS, chosen in this order, and each draws a different panel:
+ *
+ *   ObjType2Field548  -> SARGE. Eight literals and one formatted health.
+ *   ObjIsType2        -> a SOLDIER. The name comes from ADDR_SCRIPT_NAMES
+ *                        when the script name begins "green" (TitleCase'd
+ *                        first), else SoldierNameOf for a named trooper,
+ *                        else UnitClassName. Then "%3.1lf cm" and
+ *                        "%3.1lf g" off the two tables, "%4d/%4d" for EXP,
+ *                        "%3d/%3d" for HP, and a loop of rank pips drawn
+ *                        with ClipRect + DrawSpriteClipped.
+ *   otherwise         -> a VEHICLE, at 0x00416A99, using VehicleKindName.
+ *
+ * Every string is placed at a fixed offset from the widget's own +0x14 and
+ * +0x18, which are its screen x and y, so the whole panel moves with the
+ * widget and none of the 28 coordinates is absolute.
+ *
+ * Health and experience are CLAMPED before formatting -- 999 for the two
+ * health fields and for experience -- because the format strings are %3d
+ * and %4d and a wider number would push the columns apart.
  *
  * Read and NOT reconstructed. Its verification is good -- bootcamp draws
  * this panel at the briefing, so the 22-pixel floor would catch a wrong
- * coordinate -- but 2,643 bytes of 28 text placements is a large unit and
- * one wrong offset is a debugging cycle. Started fresh it is a day's work
- * with a real check at the end, which is a better trade than finishing it
- * tired. */
+ * coordinate -- and what is left is transcription rather than reading: 28
+ * placements against the offsets above. */
 #define ADDR_HUD_SQUAD_DETAIL  0x00416340u  /* thiscall void(obj, int32) */
 #define AM2_SQUAD_KIND_COUNT   9    /* both stack tables */
 #define HUD_SQUAD_ICON_SPRITE  0x58u   /* AM2_Sprite *, the pip drawn per icon */
