@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **37** analysis
+**`make check` runs everything that does not need the game.** **38** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -1160,7 +1160,9 @@ existence test; that alias is gone too and the ratchet is 38.
 
 **Everything RunFrame calls is reconstructed too** -- the input poll, the two
 comm bookkeeping steps around the state handler, and all five per-state
-handlers, in `src/game/win32/frame.cpp`. One level further down stays original.
+handlers, in `src/game/win32/frame.cpp`. The sentence here used to end "one
+level further down stays original", and that stopped being true without being
+noticed: every level below it is ours as well.
 
 **A CONFIRMATION of the rule below rather than another breach of it.** The
 menu-request dispatch at `0x00426400` lays its arms out 1, 2, 3, 4, 5, 6, 10,
