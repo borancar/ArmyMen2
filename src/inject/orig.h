@@ -6712,9 +6712,19 @@ typedef struct {
 #define ADDR_ON_LOADGAME_LOAD    0x00452060u
 #define ADDR_ON_LOADGAME_DELETE  0x00451F10u
 #define ADDR_ON_LOADGAME_BACK    0x00452010u
-/* The save DELETE GAME is about to remove -- LOAD GAME's DELETE copies the
- * chosen name in, DELETE GAME's CANCEL clears it, and its OK reads it. */
-#define ADDR_PENDING_DELETE      0x00659F58u /* char[] */
+/* THE FILENAME WHICHEVER CONFIRMATION IS ABOUT TO OPEN WILL ACT ON, and the
+ * old name said DELETE because the three touchers it was read from were all
+ * deletions: LOAD GAME's DELETE copies the chosen name in, DELETE GAME's
+ * CANCEL clears it, and its OK reads it. That enumeration is accurate and is
+ * exactly what makes a too-narrow name look complete.
+ *
+ * SaveListOnSave is a FOURTH toucher and is not a deletion. When the typed
+ * name already exists on disk it stages it here for the OVERWRITE
+ * confirmation, which then reads it the same way DELETE GAME's OK does. One
+ * buffer, two dialogs. Same shape as SCENARIO_PART_OFF_NAME, named from a
+ * free site, and ADDR_SPRITE_DROP_NAMED, named from a call site: right about
+ * what it saw, wrong about what the field is. */
+#define ADDR_PENDING_CONFIRM     0x00659F58u /* char[] */
 /* Its prompt, and the name says the global is not only the DELETE dialog's:
  * "Are you sure you want to overwrite savefile '%s'?" takes the same buffer.
  * Left named for the first consumer found; both dialogs stage their target

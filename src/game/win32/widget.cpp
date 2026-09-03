@@ -4974,7 +4974,7 @@ AM2_Widget *__attribute__((thiscall)) DlgOverwriteConstruct(AM2_Widget *w,
     WidgetAddChild(w, btn);
 
     am2_sprintf(text, (const char *)AM2_IMAGE(ADDR_STR_OVERWRITE_ASK),
-                (const char *)(uintptr_t)ADDR_PENDING_DELETE);
+                (const char *)(uintptr_t)ADDR_PENDING_CONFIRM);
 
     typer = (AM2_Widget *)orig_operator_new(AM2_TYPER_BYTES);
     if (typer)
@@ -9018,7 +9018,7 @@ AM2_Widget *__attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w,
  * from play.
  * ------------------------------------------------------------------ */
 
-#define g_pendingDelete   ((char *)(uintptr_t)ADDR_PENDING_DELETE)
+#define g_pendingDelete   ((char *)(uintptr_t)ADDR_PENDING_CONFIRM)
 
 /* 0x00451AC0. ENTER NAME's CANCEL, and the screen's escape action. */
 void __cdecl OnEnterNameCancel(AM2_Widget *w)
