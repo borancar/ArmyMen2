@@ -2896,6 +2896,30 @@
 #define ADDR_REMAP_IDENTITY      0x004FD764u  /* uint8_t *, index -> itself */
 #define ADDR_REMAP_DARK          0x004FE084u  /* uint8_t *, 70% brightness */
 #define ADDR_REMAP_BRIGHT        0x00507230u  /* uint8_t *, +0x80 or 70% */
+/* The storage those three pointers are set to, by the static initialisers at
+ * 0x0041A840, 0x0041A860 and 0x0041A880. Nothing reaches these addresses
+ * directly -- every consumer goes through the pointer above -- so they are
+ * named for what holds them. The initialiser computes (buffer + 3) & ~3, and
+ * the compiler folded the +3 into the immediate, which is why the
+ * disassembly reads `mov eax, <buffer+3>; and al, 0xFC`. */
+#define ADDR_REMAP_IDENTITY_BUF  0x00507238u
+#define ADDR_DEFAULT_PALETTE_BUF 0x00502BDCu
+#define ADDR_REMAP_BRIGHT_BUF    0x004FE09Cu
+/* Two globals that are WRITTEN AT STARTUP AND READ BY NOTHING. Every byte of
+ * both has exactly one reference in the image and it is the initialiser that
+ * fills it -- the inverse of this file's "a field with no writer is dead
+ * code", and checked the same way, by scanning every store and load rather
+ * than by reading the two functions. Reproduced because the original does it;
+ * named for what they HOLD, since no reader exists to say what they are for. */
+#define ADDR_STARTUP_COLOURS     0x00512340u  /* uint8_t[5], five colours */
+#define ADDR_VIEW_COLOUR_COPY    0x004FCFA8u  /* uint8_t */
+/* The seven C++ static initialisers that fill all of the above. */
+#define ADDR_INIT_VIEW_COLOUR_COPY 0x0041A1A0u
+#define ADDR_INIT_REMAP_IDENTITY   0x0041A840u
+#define ADDR_INIT_DEFAULT_PALETTE  0x0041A860u
+#define ADDR_INIT_REMAP_BRIGHT     0x0041A880u
+#define ADDR_INIT_OVERLAY_PALETTE  0x0041A8A0u
+#define ADDR_INIT_STARTUP_COLOURS  0x00424BB0u
 #define ADDR_REMAP_TINT          0x0047826Cu  /* uint8_t *, two colours by parity */
 /* Four more, at 40/50/60/85% brightness, whose 256-byte blocks sit back to
  * back from 0x00502CEC. */

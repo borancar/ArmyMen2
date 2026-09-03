@@ -1488,6 +1488,58 @@ void __cdecl ClearBothSurfaces(void)
 }
 
 
+
+/* ---- five palette/remap static initialisers ----------------------------
+ *
+ * Entries in the table at 0x00473004 that _initterm runs before WinMain, and
+ * reachable for the reason air.cpp records: install() finishes before the EXE
+ * entry point, so the CRT calls these and lands in our code.
+ *
+ * THE THREE POINTER ONES ARE (buffer + 3) & ~3, and the disassembly hides
+ * that: the compiler folded the +3 into the immediate, so it reads
+ * `mov eax, <buffer+3>; and al, 0xFC`. Written back out as the alignment it
+ * is rather than as the constant it folds to, because the constant is only
+ * correct while the buffer happens to be aligned already.
+ *
+ * ADDR_VIEW_COLOUR_COPY is written here and read by NOTHING: a scan of every
+ * absolute reference in the image finds exactly one, this store. Reproduced
+ * because the original does it, and named for what it holds rather than for
+ * a purpose no reader exists to confirm. */
+
+void __cdecl InitViewColourCopy(void)
+{
+    *(uint8_t *)(uintptr_t)ADDR_VIEW_COLOUR_COPY =
+        *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+}
+
+void __cdecl InitRemapIdentity(void)
+{
+    *(uint8_t **)(uintptr_t)ADDR_REMAP_IDENTITY =
+        (uint8_t *)((ADDR_REMAP_IDENTITY_BUF + 3u) & ~3u);
+}
+
+void __cdecl InitDefaultPalette(void)
+{
+    *(void **)(uintptr_t)ADDR_DEFAULT_PALETTE =
+        (void *)((ADDR_DEFAULT_PALETTE_BUF + 3u) & ~3u);
+}
+
+void __cdecl InitRemapBright(void)
+{
+    *(uint8_t **)(uintptr_t)ADDR_REMAP_BRIGHT =
+        (uint8_t *)((ADDR_REMAP_BRIGHT_BUF + 3u) & ~3u);
+}
+
+/* The overlay starts out sharing the default palette. It is the only one of
+ * the five that copies another global rather than computing anything, so it
+ * depends on InitDefaultPalette having run -- and the table's order is what
+ * guarantees that. */
+void __cdecl InitOverlayPalette(void)
+{
+    *(void **)(uintptr_t)ADDR_OVERLAY_PALETTE =
+        *(void *const *)(uintptr_t)ADDR_DEFAULT_PALETTE;
+}
+
 int surface_install(void)
 {
     int rc = 0;
@@ -1547,5 +1599,10 @@ int surface_install(void)
                         "DrawMenuOverlay", 0);
     rc |= patch_replace(ADDR_FREE_MAP_SURFACES, (const void *)FreeMapSurfaces,
                         "FreeMapSurfaces", 0);
+    rc |= patch_replace(ADDR_INIT_VIEW_COLOUR_COPY, (const void *)InitViewColourCopy, "InitViewColourCopy", 0);
+    rc |= patch_replace(ADDR_INIT_REMAP_IDENTITY, (const void *)InitRemapIdentity, "InitRemapIdentity", 0);
+    rc |= patch_replace(ADDR_INIT_DEFAULT_PALETTE, (const void *)InitDefaultPalette, "InitDefaultPalette", 0);
+    rc |= patch_replace(ADDR_INIT_REMAP_BRIGHT, (const void *)InitRemapBright, "InitRemapBright", 0);
+    rc |= patch_replace(ADDR_INIT_OVERLAY_PALETTE, (const void *)InitOverlayPalette, "InitOverlayPalette", 0);
     return rc;
 }

@@ -2737,6 +2737,34 @@ int32_t __cdecl SelListInit(void)
     return SelListAtExit();
 }
 
+
+/* 0x00424BB0. Copy five palette indices into ADDR_STARTUP_COLOURS at startup,
+ * one of the C++ static initialisers _initterm runs before WinMain.
+ *
+ * ALL FIVE BYTES ARE READ BY NOTHING. Each of 0x00512340..0x00512344 has
+ * exactly one reference in the image and it is the store below -- checked by
+ * scanning every absolute reference, which is the method this project uses to
+ * prove a field has no writer, run the other way round. Reproduced because
+ * the original does it, not because anything depends on it.
+ *
+ * The five sources are all named colours, which makes the array's CONTENT
+ * legible even though its purpose is not: the view rectangle's, the two
+ * latency shades, blue, and the HUD message colour.
+ *
+ * The original interleaves its loads and stores, which is the scheduler
+ * rather than an ordering that matters -- the sources and the destination do
+ * not overlap. */
+void __cdecl InitStartupColours(void)
+{
+    uint8_t *out = (uint8_t *)(uintptr_t)ADDR_STARTUP_COLOURS;
+
+    out[0] = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+    out[1] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
+    out[2] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BLUE;
+    out[3] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STALE;
+    out[4] = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+}
+
 void gameproc_install(void)
 {
     patch_replace(ADDR_LOAD_OPTIONS, (const void *)LoadOptions,
@@ -2834,6 +2862,7 @@ void gameproc_install(void)
                   "LoadType4", 3);
     patch_replace(ADDR_WALK_CELL_CALLBACK, (const void *)WalkCellKeepEnemy,
                   "WalkCellKeepEnemy", 1);
+    patch_replace(ADDR_INIT_STARTUP_COLOURS, (const void *)InitStartupColours, "InitStartupColours", 0);
 }
 
 /* CreateWeapon is still the image's and item.h already reaches it -- with a

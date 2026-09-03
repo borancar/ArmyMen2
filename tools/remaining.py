@@ -87,20 +87,44 @@ def remaining():
         elif len(words) >= 2 and is_text(words[0]) and is_text(words[1]):
             tables.add(a)
 
-    return funcs, rem, init, tables
+    # MSVC's incremental-linking thunks: one `jmp` to the real function and
+    # then padding, in a 16-byte slot.  The static-initializer table points at
+    # the thunk and the thunk jumps to the body, so patching the body is what
+    # the CRT actually reaches -- and a thunk is a LINKER artifact, not a
+    # function the original source had.  Counting them as work left to do
+    # would mean reconstructing the linker.
+    thunks = set()
+    for a, size in rem:
+        if size > 16:
+            continue
+        ins = [i for i in md.disasm(img.read(a, size), a) if i.mnemonic != "nop"]
+        if len(ins) == 1 and ins[0].mnemonic == "jmp":
+            try:
+                target = int(ins[0].op_str, 16)
+            except ValueError:
+                continue
+            if 0x00401000 <= target < merges.CRT_START:
+                thunks.add(a)
+
+    return funcs, rem, init, tables, thunks
 
 
 def main():
-    funcs, rem, init, tables = remaining()
-    ini  = [(a, s) for a, s in rem if a in init]
-    tab  = [(a, s) for a, s in rem if a not in init and a in tables]
-    game = [(a, s) for a, s in rem if a not in init and a not in tables]
+    funcs, rem, init, tables, thunks = remaining()
+    thk  = [(a, s) for a, s in rem if a in thunks]
+    ini  = [(a, s) for a, s in rem if a not in thunks and a in init]
+    tab  = [(a, s) for a, s in rem if a not in thunks and a not in init
+            and a in tables]
+    game = [(a, s) for a, s in rem if a not in thunks and a not in init
+            and a not in tables]
 
     print("real functions below the CRT line: %d" % len(funcs))
     print("still original                   : %d functions, %d bytes"
           % (len(rem), sum(s for _, s in rem)))
     print("  C++ static initializers        : %d functions, %d bytes"
           % (len(ini), sum(s for _, s in ini)))
+    print("  linker thunks (one jmp each)   : %d entries,   %d bytes"
+          % (len(thk), sum(s for _, s in thk)))
     print("  jump tables (data, not code)   : %d entries,   %d bytes"
           % (len(tab), sum(s for _, s in tab)))
     print("  game functions                 : %d functions, %d bytes"

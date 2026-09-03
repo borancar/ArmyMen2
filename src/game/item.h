@@ -963,6 +963,7 @@ int32_t __cdecl TryTakeWeapon(void *cand, void *unit);
 /* 0x004578A0, one caller. Call a function for every selected object, dropping
  * stale and destroyed entries as it goes. */
 void __cdecl ForEachSelected(void (__cdecl *fn)(void *obj));
+void __cdecl InitItemHeaderSize(void);
 
 /* 0x0045F300 and 0x0045F3C0. Drop an item ten units along a facing from a
  * point. The first also runs ItemPostCreate and conceals what it drops from

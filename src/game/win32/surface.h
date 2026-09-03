@@ -239,6 +239,11 @@ void __cdecl RefreshGate(int32_t enabled);
 void __cdecl ProgressBar(int32_t percent);
 
 int surface_install(void);
+void __cdecl InitViewColourCopy(void);
+void __cdecl InitRemapIdentity(void);
+void __cdecl InitDefaultPalette(void);
+void __cdecl InitRemapBright(void);
+void __cdecl InitOverlayPalette(void);
 
 #ifdef __cplusplus
 }

@@ -26,6 +26,7 @@ void __cdecl TeardownDefTables(void);
  * with. */
 int32_t __cdecl WalkCellKeepEnemy(void *obj);
 void __cdecl InitRemapsAndLists(void);
+void __cdecl InitStartupColours(void);
 void __cdecl InitArmyObjLists(void);
 void __cdecl FreeArmyObjLists(void);
 void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c);

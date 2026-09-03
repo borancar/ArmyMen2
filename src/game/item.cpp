@@ -13435,6 +13435,15 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
     }
 }
 
+
+/* 0x00427640, a static initialiser with one store: the item header's size.
+ * orig.h already recorded ADDR_ITEM_HEADER_SIZE as "int32_t, 0x68" from its
+ * READERS -- this is where the 0x68 comes from, and the two agree. */
+void __cdecl InitItemHeaderSize(void)
+{
+    *(int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE = 0x68;
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -13780,6 +13789,7 @@ void item_install(void)
                   "CreateWatchedType", 4);
     patch_replace(ADDR_CREATE_WEAPON, (const void *)CreateWeapon,
                   "CreateWeapon", 8);
+    patch_replace(ADDR_SET_ITEM_HEADER_SIZE, (const void *)InitItemHeaderSize, "InitItemHeaderSize", 0);
 }
 
 /* CreateWatchedItem and CreateWatchedType -- originals 0x0045F300 and
