@@ -387,7 +387,8 @@ run: isolate-prefix install-hook
 SA_SRC   := $(wildcard src/game/*.cpp) $(wildcard src/game/win32/*.cpp) \
             src/standalone/runtime.cpp build/standalone/fixups.cpp \
             build/standalone/staticinit.cpp \
-            build/standalone/imports.cpp
+            build/standalone/imports.cpp \
+            build/standalone/tables.cpp
 SA_OBJ   := $(patsubst %.cpp,$(BUILD)/sa/%.o,$(SA_SRC)) $(BUILD)/sa/origdata.o \
             $(BUILD)/sa/origgap.o
 SA_FLAGS := $(CXXFLAGS) -DAM2_STANDALONE -Ibuild/standalone

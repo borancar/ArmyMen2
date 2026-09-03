@@ -87,6 +87,11 @@ void am2_sa_free_army_lists(void);
  * and beats a silent wrong answer by more. */
 int32_t am2_sa_unimplemented(void);
 
+
+/* Tables MSVC placed in .text, which this build does not carry. Extracted
+ * into build/standalone/tables.cpp rather than transcribed. */
+extern const uint8_t am2_pickup_kind_index[29];
+
 #ifdef __cplusplus
 }
 #endif
@@ -200,5 +205,15 @@ int32_t am2_sa_unimplemented(void);
 #define ADDR_HUD_CHAT_CHAR    AM2_SA(am2_sa_unimplemented)
 #define ADDR_ON_ENTER_NAME_OK AM2_SA(am2_sa_unimplemented)
 #define ADDR_SCRIPT_PARSE_ACTION AM2_SA(am2_sa_unimplemented)
+
+
+/* AM2_ITEM_KIND_IS_SPECIAL reads a 29-byte table at 0x00433770, inside the
+ * .text range a standalone build does not carry -- so every byte read 0xCC
+ * and the predicate was false for every kind, quietly dropping kinds 1, 7,
+ * 8, 9, 10 and 29 out of the special set. */
+#undef AM2_ITEM_KIND_IS_SPECIAL
+#define AM2_ITEM_KIND_IS_SPECIAL(kind) \
+    ((uint32_t)((kind) - 1) <= 0x1Cu \
+     && am2_pickup_kind_index[(kind) - 1] == 0)
 
 #endif /* AM2_STANDALONE_H */
