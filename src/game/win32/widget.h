@@ -1677,6 +1677,12 @@ void __attribute__((thiscall)) MpPanelUpdate(AM2_Widget *w);
 /* 0x00430480, slot 0: release the panel's two GLOBAL sprite arrays and chain
  * to the dialog base. */
 void __attribute__((thiscall)) MpPanelDestruct(AM2_Widget *w);
+
+/* 0x00430510, 0x00431790, 0x0042FF40. The slots that complete those classes:
+ * the two scalar deleting destructors and the panel's paint forward. */
+AM2_Widget *__attribute__((thiscall)) MpPanelDelete(AM2_Widget *w, int32_t f);
+AM2_Widget *__attribute__((thiscall)) MpDialogDelete(AM2_Widget *w, int32_t f);
+void __attribute__((thiscall)) MpPanelPaint(AM2_Widget *w, RECT clip);
 void __cdecl RefreshMapSelection(void);
 
 /* The save-game family's buttons: 0x00451AC0, 0x00452010, 0x00451F10,

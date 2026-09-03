@@ -13554,6 +13554,56 @@ void __cdecl PointerInvokeFreezeSelected(void)
     ForEachSelected(ObjFreeze);
 }
 
+
+/* ---- the multiplayer panel's and dialogs' remaining vtable slots --------
+ *
+ * Three slots that complete classes whose bodies were already ours:
+ * MpPanelDestruct, MpPanelUpdate and MpDialogDestruct have been
+ * reconstructed for some time, and these are the wrappers around them.
+ *
+ * VTABLE_MP_PANEL (0x0046FA20) reads
+ * { MpPanelDelete, MpPanelPaint, MpPanelUpdate, base focus, base repaint },
+ * which is what confirms the alignment -- slots 3 and 4 are the shared base
+ * pair that 30 and 29 of the 33 vtables carry, so a run of five starting
+ * anywhere else would not show them.
+ *
+ * MpDialogDelete is slot 0 of TWO vtables, 0x0046FA0C (ENTER BATTLE NAME)
+ * and 0x0046FA34 (HOST OPTIONS) -- orig.h already recorded that, and it is
+ * why the name is the dialog PAIR's rather than either dialog's.
+ *
+ * Both deletes are the MSVC scalar deleting destructor, the `ret 4` shape
+ * with the flags word: run the real destructor, free only when bit 0 is set,
+ * and answer `this` either way. The tree already spells this out for
+ * WidgetDelete and LabelDelete and these two are written the same.
+ *
+ * MpPanelPaint is a plain forward. It copies its RECT argument into a local
+ * and calls WidgetPaintFwd2 with `this` untouched in ecx -- the four dword
+ * stores are a RECT passed BY VALUE, not four fields, which is the same
+ * shape checkoffsetuse reports as struct members across this whole family. */
+
+AM2_Widget *__attribute__((thiscall)) MpPanelDelete(AM2_Widget *w,
+                                                    int32_t flags)
+{
+    MpPanelDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+AM2_Widget *__attribute__((thiscall)) MpDialogDelete(AM2_Widget *w,
+                                                     int32_t flags)
+{
+    MpDialogDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
+void __attribute__((thiscall)) MpPanelPaint(AM2_Widget *w, RECT clip)
+{
+    WidgetPaintFwd2(w, clip);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -14396,6 +14446,12 @@ int widget_install(void)
     rc |= patch_replace(ADDR_POINTER_INVOKE_FREEZE_SEL,
                         (const void *)PointerInvokeFreezeSelected,
                         "PointerInvokeFreezeSelected", 0);
+    rc |= patch_replace(ADDR_MP_PANEL_DELETE, (const void *)MpPanelDelete,
+                        "MpPanelDelete", 2);
+    rc |= patch_replace(ADDR_MP_DIALOG_DELETE, (const void *)MpDialogDelete,
+                        "MpDialogDelete", 2);
+    rc |= patch_replace(ADDR_MP_PANEL_PAINT, (const void *)MpPanelPaint,
+                        "MpPanelPaint", 5);
     return rc;
 }
 

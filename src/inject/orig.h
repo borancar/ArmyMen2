@@ -4038,6 +4038,14 @@
 #define ADDR_MP_PANEL_SPRITES_B_END 0x00515FD4u
 #define ADDR_MP_PANEL_DESTRUCT   0x00430480u  /* thiscall void(this) */
 #define VTABLE_MP_PANEL          0x0046FA20u
+/* Its remaining two slots. Slot 0 is the MSVC scalar deleting destructor
+ * around ADDR_MP_PANEL_DESTRUCT; slot 1 forwards its RECT to
+ * ADDR_WIDGET_PAINT_FWD2 with `this` untouched. */
+#define ADDR_MP_PANEL_DELETE     0x00430510u  /* thiscall obj *(obj, flags) */
+#define ADDR_MP_PANEL_PAINT      0x00431790u  /* thiscall void(obj, RECT) */
+/* Slot 0 of BOTH 0x0046FA0C and 0x0046FA34 -- the multiplayer dialog pair's
+ * shared scalar deleting destructor, around ADDR_MP_DIALOG_DESTRUCT. */
+#define ADDR_MP_DIALOG_DELETE    0x0042FF40u  /* thiscall obj *(obj, flags) */
 /* A SCROLLING LIST OF COLOURED TEXT LINES, five slots like every widget here:
  * its own destructor and paint, the base's update, focus and repaint. Built at
  * 0x00433290 from 0x00430C95, on the screen that also loads
