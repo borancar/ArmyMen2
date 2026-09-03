@@ -3656,7 +3656,17 @@
 #define ADDR_BUILD_HUD_WIDGETS   0x00413480u  /* void(void), 320 bytes */
 #define ADDR_HUD_A_CTOR          0x00417580u  /* thiscall void *(this) */
 #define ADDR_HUD_B_CTOR          0x00418FB0u
-#define ADDR_HUD_C_CTOR          0x004195B0u
+/* 0x004195B0, thiscall -- the HUD EDGE STRIP's constructor, and the name is
+ * settled by its destructor: 0x00419650 tail-calls ADDR_HUD_EDGE_DESTRUCT.
+ * "HUD_C" was a placeholder from the order the three were found in.
+ *
+ * It takes its own size from the FIRST sprite it loads and pins itself to the
+ * right of the screen -- x = ADDR_SCREEN_W minus the sprite's bounds.right --
+ * which is why VTABLE_HUD_EDGE_STRIP's comment reads 624,21,640,480: that is
+ * the absolute rect the arithmetic produces, not four constants. */
+#define ADDR_HUD_EDGE_CONSTRUCT  0x004195B0u  /* thiscall AM2_Widget *(this) */
+#define AM2_HUD_EDGE_SPRITE_SET  0x0A  /* all three of its sprites */
+#define AM2_HUD_EDGE_TOP         0x15  /* the only literal in its rectangle */
 #define AM2_HUD_A_BYTES          0x5BCu
 #define AM2_HUD_B_BYTES          0xCCu
 #define AM2_HUD_C_BYTES          0xB0u

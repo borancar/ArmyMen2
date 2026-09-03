@@ -3775,6 +3775,55 @@ AM2_Widget *__attribute__((thiscall)) HudCmdConstruct(AM2_Widget *w)
     return w;
 }
 
+/* HudEdgeConstruct -- original 0x004195B0, thiscall. The HUD edge strip: the
+ * vertical panel pinned to the right of the screen.
+ *
+ * IT SIZES ITSELF FROM ITS OWN FIRST SPRITE. The width and height are the
+ * sprite's bounds.right and bounds.bottom, and x is ADDR_SCREEN_W minus that
+ * width, so the strip sits flush against the right edge whatever the sprite
+ * turns out to be. VTABLE_HUD_EDGE_STRIP's comment records the result --
+ * 624,21,640,480 -- which is the absolute rect this produces and not four
+ * constants someone typed.
+ *
+ * Only y is a literal, 0x15.
+ *
+ * Like HudCmdConstruct, a null from the FIRST preload abandons the rest: the
+ * two later sprites are never loaded and the rectangle is never set. The
+ * sprite pointer is stored either way, so the field holds the null.
+ *
+ * All three come from sprite set 0x0A, indices 0, 0x0B and 0x0A, and all
+ * three pass 1 as the fourth argument where HudCmdConstruct passes 0.
+ *
+ * The first sprite is stored TWICE -- into HUD_OFF_SPRITE0 and into the
+ * widget's own AM2_Widget::sprite at 0x38, which WidgetPaint draws as the
+ * backdrop. That second store is a real struct field and not a fourth slot,
+ * which is why nothing new is named here. */
+AM2_Widget *__attribute__((thiscall)) HudEdgeConstruct(AM2_Widget *w)
+{
+    uint8_t   *self = (uint8_t *)w;
+    AM2_Sprite *spr;
+
+    WidgetConstruct(w);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_EDGE_STRIP);
+
+    spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 0, 0, 1);
+    *(void **)(self + HUD_OFF_SPRITE0) = spr;
+    if (!spr)
+        return w;
+
+    w->sprite = spr;              /* its own backdrop, not a fourth slot */
+    w->y = AM2_HUD_EDGE_TOP;
+    w->x = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - spr->bounds.right;
+    w->w = spr->bounds.right;
+    w->h = spr->bounds.bottom;
+
+    *(void **)(self + HUD_OFF_SPRITE1) =
+        PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 0x0B, 0, 1);
+    *(void **)(self + HUD_OFF_SPRITE2) =
+        PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 0x0A, 0, 1);
+    return w;
+}
+
 AM2_Widget *__attribute__((thiscall)) WidgetConstruct(AM2_Widget *w)
 {
     AM2_Rect zero;
@@ -4241,7 +4290,7 @@ typedef void (__cdecl *AM2_NoArgLogFn)(void);
 
 #define orig_hud_a_ctor   ((AM2_HudCtorFn)AM2_IMAGE(ADDR_HUD_A_CTOR))
 #define orig_hud_b_ctor   ((AM2_HudCtorFn)AM2_IMAGE(ADDR_HUD_B_CTOR))
-#define orig_hud_c_ctor   ((AM2_HudCtorFn)AM2_IMAGE(ADDR_HUD_C_CTOR))
+
 #define orig_log_noargs   ((AM2_NoArgLogFn)(uintptr_t)ADDR_LOG)
 
 static AM2_Widget *NewHudWidget(uint32_t size, AM2_HudCtorFn ctor)
@@ -4284,7 +4333,7 @@ void __cdecl BuildHudWidgets(void)
 
     if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME)
         *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C =
-            NewHudWidget(AM2_HUD_C_BYTES, orig_hud_c_ctor);
+            NewHudWidget(AM2_HUD_C_BYTES, (AM2_HudCtorFn)HudEdgeConstruct);
 
     if (ticked) {
         /* No null test on A -- the original's. */
@@ -11111,6 +11160,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_HUD_EDGE_CONSTRUCT,
+                        (const void *)HudEdgeConstruct,
+                        "HudEdgeConstruct", 1);
     rc |= patch_replace(ADDR_HUD_CMD_CONSTRUCT, (const void *)HudCmdConstruct,
                         "HudCmdConstruct", 1);
     rc |= patch_replace(ADDR_FREE_AIM_SPRITES, (const void *)FreeAimSprites,

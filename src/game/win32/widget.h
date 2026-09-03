@@ -281,6 +281,10 @@ void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip);
  * constructor does. */
 /* 0x00417040, thiscall. The HUD command bar. A failed sprite preload
  * abandons the rest of the constructor -- see the definition. */
+/* 0x004195B0, thiscall. The HUD edge strip, sized from its own first sprite
+ * and pinned to the right of the screen. */
+AM2_Widget *__attribute__((thiscall)) HudEdgeConstruct(AM2_Widget *w);
+
 AM2_Widget *__attribute__((thiscall)) HudCmdConstruct(AM2_Widget *w);
 
 AM2_Widget *__attribute__((thiscall)) WidgetConstruct(AM2_Widget *w);
