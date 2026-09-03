@@ -372,6 +372,47 @@ run: isolate-prefix install-hook
 	    "$(LAUNCHEXE)" "$(GAMEEXE)" $(ARGS)
 
 # Unpatched, straight from the GOG install -- the A/B reference.
+# The standalone build: an EXE that replaces ArmyMen2.exe in the game folder,
+# needing the original at BUILD time only.  It is a different PRODUCT from
+# am2hook.dll rather than a variation on it -- no harness, no patching, its own
+# entry point -- which is why it has a target of its own rather than a
+# variable on `run`.
+#
+# The layout is not decoration.  The image's relocations are stripped, so the
+# 3,582 pointers inside its own data cannot be told from the bytes around them
+# and cannot be moved; .origdat is OUR section, placed at the addresses those
+# pointers were written for, with our own code linked above it.  Every table
+# migrated out of that blob into typed C data is one less thing holding the
+# layout in place.
+SA_SRC   := $(wildcard src/game/*.cpp) $(wildcard src/game/win32/*.cpp) \
+            src/standalone/runtime.cpp build/standalone/fixups.cpp
+SA_OBJ   := $(patsubst %.cpp,$(BUILD)/sa/%.o,$(SA_SRC)) $(BUILD)/sa/origdata.o
+SA_FLAGS := $(CXXFLAGS) -DAM2_STANDALONE -Ibuild/standalone
+SA_LIBS  := -lddraw -ldinput -ldsound -lwinmm -lole32 -ldxguid
+SA_LDF   := -mwindows -static -static-libgcc -static-libstdc++ \
+            -Wl,--image-base,0x400000 \
+            -Wl,--section-start,.origdat=0x0046F000 \
+            -Wl,-Ttext,0x00700000
+
+.PHONY: standalone standalone-generate
+standalone-generate:
+	./.venv/bin/python tools/mkglobals.py
+
+$(BUILD)/sa/%.o: %.cpp | standalone-generate
+	@mkdir -p $(dir $@)
+	$(CXX) $(SA_FLAGS) -c $< -o $@
+
+$(BUILD)/sa/origdata.o: build/standalone/origdata.S | standalone-generate
+	@mkdir -p $(dir $@)
+	$(CC) -c $< -o $@
+
+standalone: standalone-generate
+	$(MAKE) $(BUILD)/ArmyMen2.exe
+
+$(BUILD)/ArmyMen2.exe: $(SA_OBJ)
+	$(CXX) -o $@ $(SA_OBJ) $(SA_LDF) $(SA_LIBS)
+	@echo "standalone: $@  -- copy it into the game folder to replace ArmyMen2.exe"
+
 run-stock:
 	WINEPREFIX="$(PREFIX)" WINEDEBUG=$(WINEDBG) \
 	    $(WINE) explorer /desktop=$(DESKNAME),$(DESKTOP) "$(GAMEEXE)"
