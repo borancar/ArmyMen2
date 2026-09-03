@@ -13820,6 +13820,29 @@ void __cdecl BattleJoinOk(void)
     PlaySoundAt(3, 0, 0, 0, 0);
 }
 
+
+/* 0x00433350, the TEXT LIST's destructor: one `jmp` to ADDR_LIST_DESTRUCT.
+ * Reconstructed as the alias it is rather than as a jump somewhere else --
+ * the FreeSpriteListAlias precedent. */
+void __attribute__((thiscall)) TextListDestruct(AM2_Widget *w)
+{
+    ListDestruct(w);
+}
+
+/* 0x00456570, slot 4 of VTABLE_MP_SPIN. Clear the focused child, then defer to
+ * the base repaint -- an override that ADDS one store rather than replacing
+ * anything, which is why it is two instructions and a tail jump.
+ *
+ * The vtable alignment is worth stating because a five-slot run can be read
+ * one column out: slot 3 here is the shared base focus and slot 2 is
+ * 0x0045CAA0, which is ADDR_LOG -- the folded empty update this project
+ * already documents. Both landing where they should is the check. */
+void __attribute__((thiscall)) MpSpinRepaint(AM2_Widget *w)
+{
+    w->focusedChild = (AM2_Widget *)0;
+    WidgetRepaint(w);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -14682,6 +14705,11 @@ int widget_install(void)
                         "BattleJoinPoll", 1);
     rc |= patch_replace(ADDR_BATTLE_JOIN_OK, (const void *)BattleJoinOk,
                         "BattleJoinOk", 0);
+    rc |= patch_replace(ADDR_TEXTLIST_DESTRUCT,
+                        (const void *)TextListDestruct,
+                        "TextListDestruct", 1);
+    rc |= patch_replace(ADDR_MP_SPIN_REPAINT, (const void *)MpSpinRepaint,
+                        "MpSpinRepaint", 1);
     return rc;
 }
 

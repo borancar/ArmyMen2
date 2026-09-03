@@ -63,19 +63,42 @@ def remaining():
         if ins and ins[0].mnemonic == "jmp":
             init.add(int(ins[0].op_str, 16))
 
-    return funcs, rem, init
+    # Jump tables sit in .text and are counted as functions by any tool that
+    # trusts docs/functions.tsv.  Two were found by hand: 0x00427974 is the
+    # target of `jmp dword ptr [ecx*4 + 0x427974]` and disassembles to
+    # nonsense.  An entry whose every dword is either a .text address or
+    # MSVC's 0x90909090 padding is data, not code.
+    # Confirmed by hand and NOT matched by the rule below, because its tail is
+    # byte-table data rather than addresses: 0x004263C8 is two code pointers
+    # (0x42639C, 0x4263AA) followed by 0x01000100-style index bytes.  The rule
+    # stays conservative on purpose -- it should under-report data rather than
+    # hide a real function.
+    tables = {0x004263C8}
+    for a, size in rem:
+        if size % 4 or size > 64:
+            continue
+        words = struct.unpack("<%dI" % (size // 4), img.read(a, size))
+        if words and all(0x00401000 <= w < merges.CRT_START or w in (0, 0x90909090)
+                         for w in words) \
+           and any(0x00401000 <= w < merges.CRT_START for w in words):
+            tables.add(a)
+
+    return funcs, rem, init, tables
 
 
 def main():
-    funcs, rem, init = remaining()
-    ini = [(a, s) for a, s in rem if a in init]
-    game = [(a, s) for a, s in rem if a not in init]
+    funcs, rem, init, tables = remaining()
+    ini  = [(a, s) for a, s in rem if a in init]
+    tab  = [(a, s) for a, s in rem if a not in init and a in tables]
+    game = [(a, s) for a, s in rem if a not in init and a not in tables]
 
     print("real functions below the CRT line: %d" % len(funcs))
     print("still original                   : %d functions, %d bytes"
           % (len(rem), sum(s for _, s in rem)))
     print("  C++ static initializers        : %d functions, %d bytes"
           % (len(ini), sum(s for _, s in ini)))
+    print("  jump tables (data, not code)   : %d entries,   %d bytes"
+          % (len(tab), sum(s for _, s in tab)))
     print("  game functions                 : %d functions, %d bytes"
           % (len(game), sum(s for _, s in game)))
     if "-v" in sys.argv:

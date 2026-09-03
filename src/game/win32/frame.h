@@ -23,6 +23,10 @@
 
 #ifdef __cplusplus
 extern "C" {
+/* 0x00426640. What states 0 and 3 both tail-jump to on leaving: end the
+ * current movie, then commit the pending state. */
+void __cdecl StateLeaveCommon(void);
+
 #endif
 
 /* 0x00426840, 0x004267C0, 0x00426800. The pause mask and the two functions

@@ -430,7 +430,7 @@ void __cdecl StateEnter0(void);
 void __cdecl State0Frame(void)
 {
     if (g_statePending) {
-        call0(ADDR_STATE_LEAVE_COMMON);
+        StateLeaveCommon();
         return;
     }
 
@@ -1081,7 +1081,7 @@ void __cdecl State3Frame(void)
         StateEnter3();
 
     if (g_statePending) {
-        call0(ADDR_STATE_LEAVE_COMMON);
+        StateLeaveCommon();
         return;
     }
 
@@ -1642,6 +1642,17 @@ void __cdecl State4Frame(void)
     g_stateEntered = 0;
 }
 
+
+/* 0x00426640, ADDR_STATE_LEAVE_COMMON -- what states 0 and 3 both tail-jump to
+ * when they leave: end whatever movie is playing, then commit the pending
+ * state. Two calls and nothing else, which is why it has no entry of its own
+ * in functions.tsv and turns up only as a jump target. */
+void __cdecl StateLeaveCommon(void)
+{
+    MovieEndCurrent();
+    CommitState();
+}
+
 int frame_install(void)
 {
     int rc = 0;
@@ -1700,6 +1711,9 @@ int frame_install(void)
                         "UnPauseGame", 19);
     rc |= patch_replace(ADDR_PAUSED_FRAME_STEP, (const void *)PausedFrameStep,
                         "PausedFrameStep", 0);
+    rc |= patch_replace(ADDR_STATE_LEAVE_COMMON,
+                        (const void *)StateLeaveCommon,
+                        "StateLeaveCommon", 0);
     return rc;
 }
 

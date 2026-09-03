@@ -929,6 +929,12 @@ typedef struct AM2_ListRows {
 /* 0x00455340 -- slot 2 of BOTH the list box and the text list. */
 void __attribute__((thiscall)) ListUpdate(AM2_Widget *w);
 void __attribute__((thiscall)) ListDestruct(AM2_Widget *w);
+
+/* 0x00433350. The text list's destructor -- one `jmp` to ListDestruct. */
+void __attribute__((thiscall)) TextListDestruct(AM2_Widget *w);
+
+/* 0x00456570. VTABLE_MP_SPIN slot 4: drop the focused child, then repaint. */
+void __attribute__((thiscall)) MpSpinRepaint(AM2_Widget *w);
 AM2_Widget *__attribute__((thiscall)) ListDelete(AM2_Widget *w, int32_t flags);
 
 /* Original: 0x00455180, thiscall, slot 1 of the list box. Clear the whole list

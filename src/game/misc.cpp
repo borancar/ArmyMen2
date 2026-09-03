@@ -2502,6 +2502,16 @@ int32_t __attribute__((thiscall)) ListGrowFind(void *self, int32_t key)
     return -1;
 }
 
+
+/* 0x0043CCE0. One line: step `this` on by 0xA4 and empty the pointer list
+ * that lives there. Four callers, all of them tail jumps from game code above
+ * the nominal CRT line, and not one names the enclosing object -- so the name
+ * carries the OFFSET rather than a record it cannot support. */
+void __attribute__((thiscall)) ClearPtrListAtA4(void *obj)
+{
+    ClearPtrListAlias((uint8_t *)obj + 0xA4);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_AI_TAKE_ABANDONED, (const void *)AiTakeAbandoned,
@@ -2678,6 +2688,8 @@ int misc_install(void)
                   "SeqAddKind7", 3);
     patch_replace(ADDR_MOVIE_BUILD_NAME, (const void *)MovieBuildName,
                   "MovieBuildName", 4);
+    patch_replace(ADDR_CLEAR_PTR_LIST_A4, (const void *)ClearPtrListAtA4,
+                  "ClearPtrListAtA4", 1);
     return 0;
 }
 

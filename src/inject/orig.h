@@ -6447,6 +6447,9 @@ typedef struct {
  * -- which identifies the base class and nothing else. Treat the name as a
  * role until something reads the field it commits. */
 #define VTABLE_MP_SPIN           0x0046FD10u
+/* Its slot 4. Clears the focused child, then tail-jumps to the base repaint --
+ * so it is an override that adds one store, not a replacement. */
+#define ADDR_MP_SPIN_REPAINT     0x00456570u  /* thiscall void(AM2_Widget *) */
 /* The spin's own fields, all written by its constructor. The three children
  * are laid out from the widget's rect after WidgetScreenRect, not from the
  * constructor's arguments. */
@@ -17805,6 +17808,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * 0x0042A670 is one `jmp` to the teardown above -- an alias, the same shape as
  * FreeSpriteListAlias. */
 #define ADDR_INIT_PTR_LIST         0x0042A660u  /* thiscall void(void *) */
+/* 0x0043CCE0: `add ecx, 0xA4; jmp ADDR_CLEAR_PTR_LIST` -- a one-line wrapper
+ * that empties the pointer list embedded at +0xA4 of whatever it is handed.
+ * Named for the OFFSET rather than for a record, because its four callers are
+ * all above the nominal CRT line and none of them says what the object is.
+ * A raw offset with the reason recorded beats a guessed record name. */
+#define ADDR_CLEAR_PTR_LIST_A4     0x0043CCE0u  /* thiscall void(void *) */
 /* 0x0042A6E0, 13 callers: append to that record, growing it through 0x0042A6B0
  * when the count has caught the capacity. {capacity, count, items} is the
  * layout this fixes -- the grow test is [+4] against [+0] and the store is
