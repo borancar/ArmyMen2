@@ -68,19 +68,23 @@ def remaining():
     # target of `jmp dword ptr [ecx*4 + 0x427974]` and disassembles to
     # nonsense.  An entry whose every dword is either a .text address or
     # MSVC's 0x90909090 padding is data, not code.
-    # Confirmed by hand and NOT matched by the rule below, because its tail is
-    # byte-table data rather than addresses: 0x004263C8 is two code pointers
-    # (0x42639C, 0x4263AA) followed by 0x01000100-style index bytes.  The rule
-    # stays conservative on purpose -- it should under-report data rather than
-    # hide a real function.
-    tables = {0x004263C8}
+    # Two shapes.  A pure table is all .text addresses or MSVC padding.  A
+    # MIXED one -- 0x004263C8 and 0x004162D8 -- is a run of addresses followed
+    # by the switch's byte index table, so the all-dwords test misses it; two
+    # leading .text addresses is the tell, and a real function is vanishingly
+    # unlikely to open with eight bytes that both read as code pointers.
+    tables = set()
     for a, size in rem:
-        if size % 4 or size > 64:
+        if size % 4 or size > 256:
             continue
         words = struct.unpack("<%dI" % (size // 4), img.read(a, size))
-        if words and all(0x00401000 <= w < merges.CRT_START or w in (0, 0x90909090)
-                         for w in words) \
-           and any(0x00401000 <= w < merges.CRT_START for w in words):
+        def is_text(w):
+            return 0x00401000 <= w < merges.CRT_START
+
+        if words and all(is_text(w) or w in (0, 0x90909090) for w in words) \
+           and any(is_text(w) for w in words):
+            tables.add(a)
+        elif len(words) >= 2 and is_text(words[0]) and is_text(words[1]):
             tables.add(a)
 
     return funcs, rem, init, tables

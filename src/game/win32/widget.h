@@ -1707,6 +1707,10 @@ void __cdecl BattleJoinOk(void);
 /* 0x00418F90. The build screen's START: click sound, then declare ready. */
 void __cdecl BuildStartHandler(AM2_Widget *w);
 
+/* 0x00418F20. A build button toggled: select its menu row, and flag the HUD
+ * when we can afford the unit. */
+void __cdecl BuildOnToggle(AM2_Widget *w);
+
 /* 0x004501E0. DELETE GAME's OK: chdir, remove the save, then close. */
 void __cdecl OnDelGameOk(AM2_Widget *w);
 void __cdecl BattleJoinPoll(AM2_Widget *w);

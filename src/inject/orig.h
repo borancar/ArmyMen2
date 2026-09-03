@@ -554,12 +554,20 @@
 /* The two fields between the flag and the count, both named by the class's
  * three own functions and by nothing else. +0x74 is a CALLBACK the activate
  * handler fires after it has toggled and repainted, and the null test in front
- * of it is what makes it optional. +0x78 is written by the constructor from
- * its seventh argument and read by NOTHING below the CRT line -- neither the
- * paint, the activate, nor the three inherited slots -- so it is carried and
- * not used, and the name says only where it comes from. */
+ * of it is what makes it optional.
+ *
+ * +0x78 WAS RECORDED AS "written and never read", from a survey of the class
+ * itself -- the paint, the activate and the three inherited slots. That survey
+ * was right about the class and looked in the wrong place: the reader is the
+ * HANDLER the class fires. ADDR_BUILD_ON_TOGGLE takes it as the index into
+ * ADDR_BUILD_MENU, looks the unit's cost up from there, and decides whether we
+ * can afford it. So the field is the menu row this button builds, and the
+ * placeholder name is gone.
+ *
+ * Worth keeping as a shape: a field read by NOTHING IN ITS OWN CLASS can still
+ * be read by the callback the class carries. */
 #define COUNTBTN_OFF_ON_TOGGLE 0x74u   /* void (*)(AM2_Widget *), may be null */
-#define COUNTBTN_OFF_ARG7      0x78u   /* int32_t, written and never read */
+#define COUNTBTN_OFF_MENU_ROW  0x78u   /* int32_t, index into ADDR_BUILD_MENU */
 /* The class's own three functions. The constructor takes NINE arguments and
  * the widget dump has never seen an instance, so all three are verified by
  * reading -- see the note on VTABLE_COUNT_BUTTON above. */

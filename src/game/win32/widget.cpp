@@ -3203,9 +3203,9 @@ typedef void (__attribute__((thiscall)) *AM2_CountDtorFn)(AM2_Widget *);
  * is the same call item.cpp already documents as the game's generic click.
  */
 AM2_Widget *__attribute__((thiscall))
-CountButtonConstruct(AM2_Widget *w, int32_t index, int32_t frame,
+CountButtonConstruct(AM2_Widget *w, int32_t index, int32_t army,
                      int32_t x, int32_t y, int32_t cw, int32_t ch,
-                     int32_t arg7, int32_t count,
+                     int32_t menuRow, int32_t count,
                      void (__cdecl *onToggle)(AM2_Widget *))
 {
     uint8_t *self = (uint8_t *)w;
@@ -3215,7 +3215,7 @@ CountButtonConstruct(AM2_Widget *w, int32_t index, int32_t frame,
     w->vtable = (void *)AM2_IMAGE(VTABLE_COUNT_BUTTON);
 
     *(void **)(self + COUNTBTN_OFF_SPR) =
-        PreloadArmySprite(AM2_COUNT_SPRITE_SET, index, frame, 0);
+        PreloadArmySprite(AM2_COUNT_SPRITE_SET, index, army, 0);
     *(void **)(self + COUNTBTN_OFF_SPR_OFF) =
         PreloadArmySprite(AM2_COUNT_SPRITE_SET, index, AM2_COUNT_FRAME_OFF, 0);
 
@@ -3229,7 +3229,7 @@ CountButtonConstruct(AM2_Widget *w, int32_t index, int32_t frame,
     WidgetScreenRect(w);
 
     *(int32_t *)(self + COUNTBTN_OFF_COUNT) = count;
-    *(int32_t *)(self + COUNTBTN_OFF_ARG7)  = arg7;
+    *(int32_t *)(self + COUNTBTN_OFF_MENU_ROW)  = menuRow;
     w->activate = CountButtonActivate;
     *(void **)(self + COUNTBTN_OFF_ON_TOGGLE) = (void *)onToggle;
 
@@ -5155,7 +5155,21 @@ AM2_Widget *__attribute__((thiscall)) HudPanelConstruct(AM2_Widget *w)
 
     /* The network half, inline rather than factored: it is one contiguous
      * block in the original and a helper would put a seam where the two
-     * null-deref paths live. */
+     * null-deref paths live.
+     *
+     * CORRECTED: the loop index and the army were passed to
+     * CountButtonConstruct THE WRONG WAY ROUND.  tools/espmap.py settles it --
+     * the slot stored from CommArmyOfSlot is read for argument 2, and the slot
+     * the loop increments is read for argument 7.  So the army is the sprite
+     * FRAME (the set has one face per army plus AM2_COUNT_FRAME_OFF for
+     * disabled, which is why a row index there asked for frames 0..17 of a
+     * five-frame set) and the row is what the button carries at +0x78.
+     *
+     * Nothing could catch this by running: the multiplayer HUD is never built
+     * on a machine that opens no DirectPlay session, and both values are small
+     * integers, so the swap is invisible from inside the function.  It was
+     * found by reading ADDR_BUILD_ON_TOGGLE, which indexes an 18-row table
+     * with +0x78 -- coherent only if that field is the row. */
     {
         const uint8_t *rec  = (const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU);
         const uint8_t *rect = (const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU_RECTS);
@@ -5174,11 +5188,12 @@ AM2_Widget *__attribute__((thiscall)) HudPanelConstruct(AM2_Widget *w)
 
             btn = (AM2_Widget *)orig_operator_new(AM2_COUNT_BUTTON_BYTES);
             if (btn)
-                btn = CountButtonConstruct(btn, kind, i,
+                /* ARMY is the sprite FRAME and the row is arg7, not the
+                 * other way round -- see the note above the loop. */
+                btn = CountButtonConstruct(btn, kind, army,
                                            r[0], r[1], r[2], r[3],
-                                           army, (int32_t)UnitTypeCost(id),
-                                           (void (__cdecl *)(AM2_Widget *))
-                                               AM2_IMAGE(ADDR_BUILD_ON_TOGGLE));
+                                           i, (int32_t)UnitTypeCost(id),
+                                           BuildOnToggle);
             WidgetAddChild(w, btn);
             *slot = btn;
 
@@ -13942,6 +13957,51 @@ void __attribute__((thiscall)) MpColourPaint(AM2_Widget *w, RECT clip)
     WidgetPaint(w, clip);
 }
 
+
+/* 0x00418F20, ADDR_BUILD_ON_TOGGLE -- what a build button does when it is
+ * toggled. It is the COUNTBTN_OFF_ON_TOGGLE handler, fired by the class after
+ * it has toggled and repainted itself.
+ *
+ * IT READS THE FIELD ITS OWN CLASS NEVER TOUCHES. orig.h had +0x78 as
+ * "written and never read", from a survey of the button's paint, activate and
+ * inherited slots -- correct about the class, and looking in the wrong place,
+ * because the reader is the handler the class calls. It is the row into
+ * ADDR_BUILD_MENU, and it is COUNTBTN_OFF_MENU_ROW now.
+ *
+ * The early return is the interesting half: if the HUD is already dirty it
+ * repaints first, and then does NOTHING MORE when the row is the one already
+ * selected -- so re-toggling the current button is a repaint and not a
+ * reselect.
+ *
+ * The affordability test gates only the two flags, not the selection: an
+ * unaffordable unit still becomes the selected row. */
+void __cdecl BuildOnToggle(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+    int32_t  row;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_HUD_DIRTY) {
+        HudRepaintOne();
+        if (*(const int32_t *)(uintptr_t)ADDR_HUD_INDEX
+                == *(const int32_t *)(self + COUNTBTN_OFF_MENU_ROW))
+            return;
+    }
+
+    (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B)->focusedChild = w;
+
+    row = *(const int32_t *)(self + COUNTBTN_OFF_MENU_ROW);
+    *(int32_t *)(uintptr_t)ADDR_HUD_INDEX = row;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_OUR_POINTS
+            >= (int32_t)UnitTypeCost(
+                   *(const int32_t *)((const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU)
+                                      + row * AM2_BUILD_MENU_STRIDE
+                                      + BUILD_MENU_OFF_ID))) {
+        *(int32_t *)(uintptr_t)ADDR_HUD_DIRTY         = 1;
+        *(int32_t *)(uintptr_t)ADDR_PLACE_FLAG_4FCF88 = 1;
+    }
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -14818,6 +14878,8 @@ int widget_install(void)
                         "OnDelGameOk", 1);
     rc |= patch_replace(ADDR_MP_COLOUR_PAINT, (const void *)MpColourPaint,
                         "MpColourPaint", 5);
+    rc |= patch_replace(ADDR_BUILD_ON_TOGGLE, (const void *)BuildOnToggle,
+                        "BuildOnToggle", 1);
     return rc;
 }
 
