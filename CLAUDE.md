@@ -200,6 +200,27 @@ along. Until something counts them, the only defence is the same one the
 `ADDR_` rule states: grep for the OFFSET before defining a name for it, not
 just for the name.
 
+**THE NEXT PROSE RATCHET WAS TRIED AND IS NOT WORTH BUILDING, which is worth
+saying so nobody builds it twice.** After checkprose.py the obvious extension
+is to flag MACRO NAMES cited in the docs that no longer exist in `src/` --
+this file names plenty, and several were renamed in one session
+(ADDR_EVT_PAD_HANDLER_A, ADDR_BATTLE_JOIN_DRAW, ADDR_COMM_SYNC_CHECK,
+COMM_OFF_SEND_COARSE). Scanned: fifteen hits, and not one is a defect.
+
+Eleven are deliberate HISTORY -- ADDR_STARTUP_4249C0, ADDR_GAME_DIR_ALT and
+the rest of the alias table exist in this file precisely because they were
+deleted, and AM2_ROW_STRIDE and AICTX_OFF_OBJ_10 are named as duplicates that
+were collapsed. Removing those mentions would delete the finding. The other
+four are the scan's own fault: `ADDR_STR_` is a prefix rather than a macro,
+and AM2_AB_PIXELS, AM2_AB_TRACE and AM2_MAKEVARS are environment variables,
+all three real and all three defined in tools/ rather than src/.
+
+So the class is dominated by correct usage, and a check over it would be a
+noise generator with a caveat attached -- which this file already says is
+worth suspecting before it is worth believing. checkprose works because
+"this address is still original" is a claim that can only be true or false;
+"this name is mentioned" is not a claim at all.
+
 **`tools/checkglobals.py` ratchets the `g_` macros, and there is a large
 backlog behind it.** `src/game` reaches the original's globals through macros
 like `#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)`, and
