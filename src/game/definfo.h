@@ -67,6 +67,9 @@ int32_t __cdecl DefParseInfoFile(const char *path);
  * definfo.cpp. */
 void __cdecl LoadDefTables(void);
 
+/* 0x0045EBC0. Sort the vehicle def table so VehicleDefFind can bsearch it. */
+void __cdecl SortVehicleDefs(void);
+
 int definfo_install(void);
 
 #ifdef __cplusplus

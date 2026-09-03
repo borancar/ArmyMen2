@@ -10933,13 +10933,22 @@ typedef struct {
  * says more: it qsorts the vehicle def table with ADDR_COMPARE_DWORD over
  * 0x24-byte records, which is AddVehicleDef's table and record size.
  *
- * LEFT ORIGINAL, for exactly the reason ADDR_DEF_SORT_TROOPER_RECS is: it
- * then TAIL-JUMPS to 0x0045CAA0, which is ADDR_LOG, an address gamelog.c
- * patches -- so naming it in src/game is a seam checkseams refuses, and it is
- * a bare `ret` ICF has folded with the stubbed logger. Reproducing the jump
- * means deciding what the folded function WAS. Not decided, so not written.
- * Second instance of this shape and the same answer as the first. */
-#define ADDR_SORT_VEHICLE_DEFS   0x0045EBC0u  /* void(void). Original. */
+ * IT WAS LEFT ORIGINAL because it TAIL-JUMPS to 0x0045CAA0 -- ADDR_LOG, which
+ * gamelog.c patches, and which ICF folded with every empty function. The note
+ * here said reproducing that jump means deciding what the folded function WAS,
+ * and that it was "not decided, so not written".
+ *
+ * IT IS DECIDED NOW, and by measurement rather than by argument. CLAUDE.md
+ * records the check from the sibling at 0x00460290: a tail jump there with an
+ * EMPTY argument frame would make our patched logger capture a garbage line,
+ * and it captures none -- on either side of a bootcamp A/B, while the
+ * surrounding sequence demonstrably runs. So the address behaves as an empty
+ * function when reached that way, and the faithful reconstruction of the tail
+ * call is a plain return. Reconstructed on that evidence.
+ *
+ * ADDR_DEF_SORT_TROOPER_RECS is the same shape and the same answer now applies
+ * to it, whenever someone picks it up. */
+#define ADDR_SORT_VEHICLE_DEFS   0x0045EBC0u  /* void(void) */
 /* Two of DefFinish's five are qsorts, and they are the same function with
  * different tables: 0x00435A50 sorts ADDR_DEF_OBJ_RECS by ADDR_COMPARE_TRIPLE
  * and 0x0044CD40 sorts ADDR_DEF_TROOPER_RECS by ADDR_COMPARE_DWORD. Both end
@@ -12931,6 +12940,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_COLOUR_LAG_MID      0x004FE092u  /* uint8_t, latency over 750 ms */
 #define ADDR_COLOUR_STALE        0x004FE090u  /* uint8_t, silent over 1250 ms */
 #define ADDR_COLOUR_NO_MAP       0x00502CE5u  /* uint8_t, has not confirmed */
+/* A SECOND write-only colour copy, the twin of ADDR_STARTUP_COLOURS: four
+ * bytes filled by the static initialiser at 0x004623A0 from four named colour
+ * globals, and every one of them has exactly ONE reference in the image --
+ * that store. Same cause as the first: _initterm runs before anything sets
+ * those colours, so it captures .bss and nothing refreshes it. */
+#define ADDR_STARTUP_COLOURS_B   0x006645A4u  /* uint8_t[4] */
+#define ADDR_INIT_STARTUP_COLOURS_B 0x004623A0u  /* void(void) */
 #define AM2_LATENCY_MID          0x2EEu       /* 750 */
 #define AM2_LATENCY_BAD          0x3E8u       /* 1000 */
 #define AM2_SILENCE_BAD          0x4E2u       /* 1250 */

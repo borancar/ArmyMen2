@@ -402,6 +402,31 @@ void __cdecl LoadDefTables(void)
     }
 }
 
+
+/* SortVehicleDefs -- original 0x0045EBC0, one caller: DefFinish, once the
+ * whole def file has been read. It sorts the vehicle def table by its first
+ * dword, which is what makes VehicleDefFind's bsearch above legal at all --
+ * the two are a pair, and the comparator is the same CompareDword.
+ *
+ * IT ENDS `jmp ADDR_LOG` WITH AN EMPTY ARGUMENT FRAME, and that is not a call
+ * to the logger. orig.h records the reading and the measurement behind it:
+ * 0x0045CAA0 is a bare `ret` that identical-COMDAT folding gave to both the
+ * stubbed logger and every empty function, and a tail jump there with nothing
+ * pushed would make our harness capture a garbage line -- which it does not,
+ * on either side of a bootcamp A/B. So the faithful reconstruction is a plain
+ * return, and this function ends where the qsort does. */
+typedef void (__cdecl *AM2_QsortFn)(void *base, size_t n, size_t width,
+                                    const void *cmp);
+#define orig_qsort ((AM2_QsortFn)AM2_IMAGE(ADDR_CRT_QSORT))
+
+void __cdecl SortVehicleDefs(void)
+{
+    orig_qsort(*(void *const *)(uintptr_t)ADDR_VEHICLE_DEFS,
+               (size_t)*(const int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT,
+               AM2_VEHICLE_DEF_REC_SIZE,
+               (const void *)CompareDword);
+}
+
 int definfo_install(void)
 {
     int rc = 0;
@@ -434,6 +459,8 @@ int definfo_install(void)
                         "VehicleDefFind", 1);
     rc |= patch_replace(ADDR_MISSILE_DEF_FIND, (const void *)MissileDefFind,
                         "MissileDefFind", 1);
+    rc |= patch_replace(ADDR_SORT_VEHICLE_DEFS, (const void *)SortVehicleDefs,
+                        "SortVehicleDefs", 0);
     return rc;
 }
 

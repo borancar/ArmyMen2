@@ -2526,7 +2526,6 @@ typedef void (__cdecl *AM2_WalkCellFn)(const uint32_t *pt, void *desc,
                                        void *fn);
 
 /* 0x00460290 is DefSortMissileRecs now; defparse.h declares it. */
-#define orig_sort_vehicle_defs   ((AM2_VoidFn)(uintptr_t)ADDR_SORT_VEHICLE_DEFS)
 
 void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c)
 {
@@ -2551,7 +2550,7 @@ void __cdecl DefFinish(void)
     DefSortMissileRecs();
     DefSortObjRecs();
     DefCheckLinks();
-    orig_sort_vehicle_defs();
+    SortVehicleDefs();
 }
 
 /* 0x0044A3A0, two callers. Walk the objects in the cell a point falls in,
@@ -2765,6 +2764,29 @@ void __cdecl InitStartupColours(void)
     out[4] = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
 }
 
+
+/* 0x004623A0, the TWIN of InitStartupColours above, and it fails the same way.
+ *
+ * Four bytes rather than five, into a different array, from four of the same
+ * named colour globals -- and every one of ADDR_STARTUP_COLOURS_B's bytes has
+ * exactly ONE reference in the image: this store. No reader, for the same
+ * reason: _initterm runs before anything sets those colours, so it captures
+ * .bss zeros and nothing refreshes them.
+ *
+ * Two independent instances of one dead pattern is worth more than one. The
+ * first could have been an oversight in a single function; a second, writing
+ * a different array from an overlapping set of sources, says the original
+ * had a habit rather than a slip. */
+void __cdecl InitStartupColoursB(void)
+{
+    uint8_t *out = (uint8_t *)(uintptr_t)ADDR_STARTUP_COLOURS_B;
+
+    out[0] = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+    out[1] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
+    out[2] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_NO_MAP;
+    out[3] = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+}
+
 void gameproc_install(void)
 {
     patch_replace(ADDR_LOAD_OPTIONS, (const void *)LoadOptions,
@@ -2863,6 +2885,9 @@ void gameproc_install(void)
     patch_replace(ADDR_WALK_CELL_CALLBACK, (const void *)WalkCellKeepEnemy,
                   "WalkCellKeepEnemy", 1);
     patch_replace(ADDR_INIT_STARTUP_COLOURS, (const void *)InitStartupColours, "InitStartupColours", 0);
+    patch_replace(ADDR_INIT_STARTUP_COLOURS_B,
+                  (const void *)InitStartupColoursB,
+                  "InitStartupColoursB", 0);
 }
 
 /* CreateWeapon is still the image's and item.h already reaches it -- with a
