@@ -275,6 +275,43 @@ tree, so every comm reconstruction verified "by reading" has had no drive
 behind it for longer than anyone has checked.
 
 ## What is next, as a number rather than a direction
+## `ab.sh mission`'s `frames` figure is a MARKER COUNT, not a frame rate
+
+A `mission` run of HudSquadUpdate failed the frame gate at 7452/379 -- the
+original's side running away, as it always is, and ours below the gate's
+floor of 500. All three exact oracles passed on the same run: state
+identical, widget tree identical at 16 nodes, log identical at 13 messages.
+
+What settled it was a probe rather than a re-run. On a live Boot Camp
+mission our build composes **1,196 frames a second** under a load average of
+8, and HudSquadUpdate runs 9,688 times against HudSquadPaint's 9,688 -- one
+update per paint, exactly. So the reconstruction is neither slow nor broken.
+
+The `frames` number counts the per-frame `-dbg` markers stripped from the
+LOG, so it measures how much of the run was spent in live play, not how fast
+the game went. Under load the drive spends longer getting through the two
+dialogs and the marker count collapses while the frame rate does not. The
+widget tree matching at 16 nodes is the proof our side did reach live play:
+that artifact is taken after both dialogs are cleared.
+
+Read this one as a drive-timing gauge. Its evidence is the log, the widgets
+and the state, exactly as its own comment says the pixels are meaningless.
+
+## Driving to a live mission by hand needs ab.sh's WAITS
+
+Three probe attempts read `HudSquadUpdate=0` and looked like dead code. The
+drive was simply too impatient: `ab.sh` waits **25 seconds** after clicking
+BOOT CAMP at (306,143) and **30 more** after `key RETURN tap`, and sends the
+key by NAME rather than as scancode 28. With six-second waits the game sits
+on the briefing with the load bar full and composes nothing.
+
+`ComposeFrame` is the wrong liveness counter to check that with -- it is
+BLIND, its caller being reconstructed, so it reads 0 in a healthy mission
+and looks like confirmation that nothing is running. `HudSquadPaint` is an
+honest one on this screen. CLAUDE.md already says to read a liveness counter
+beside the one you care about; it does not help if the liveness counter is
+itself blind, so check blindspots.py for the one you pick.
+
 ## CORRECTED AGAIN: it is 112 functions, not 31 -- and not 0
 
 The "31 remain" table below is stale twice over. Most of its entries have

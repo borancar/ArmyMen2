@@ -821,6 +821,8 @@
 #define ADDR_HUD_RADAR_UPDATE  0x00414890u  /* thiscall void(obj) */
 #define ADDR_HUD_PANEL_PAINT   0x004194E0u  /* thiscall void(obj, RECT) */
 #define ADDR_HUD_CMD_PAINT     0x00417440u  /* thiscall void(obj, RECT) */
+/* Slot 2 of the command panel's row in the same array. */
+#define ADDR_HUD_CMD_UPDATE    0x004171C0u  /* thiscall void(obj) */
 /* Where the three command icons sit inside the panel: three int16 PAIRS, x
  * then y, at 6/50/94 across one row at y=22 -- the same three columns the
  * build menu uses. The loop pointer starts at 0x004766FA and reads [esi-2] and
@@ -921,6 +923,20 @@
 #define HUD_SQUAD_PAIR_LO      0x5Cu
 #define HUD_SQUAD_PAIR_HI      0x8Cu
 #define AM2_HUD_SQUAD_SLOTS    12
+/* The portrait icon that goes over a slot. A soldier's comes from his
+ * WEAPON through a 43-entry byte index at 0x004162AC into a seven-entry
+ * jump table at 0x00416290, and it is a FILTER rather than a dispatch:
+ * only kinds 2, 3, 4, 5 and 43 get an icon of their own and the other 38
+ * all answer 1. A vehicle's comes from a six-entry table at 0x004162D8
+ * on VEHICLE_OFF_KIND, and kind 4 is the one that answers 0.
+ *
+ * The passenger loop repeats the weapon pair at 0x0041630C/0x004162F0.
+ * Diffed byte for byte rather than assumed: the two indices are identical
+ * and the two jump tables map to the same six values, so one table serves. */
+#define AM2_HUD_SQUAD_WEAPON_KINDS 43
+#define AM2_HUD_SQUAD_VEHICLE_KINDS 6
+#define AM2_HUD_SQUAD_BAR_MAX      0x29  /* 41, the widest a slot's bar goes */
+#define AM2_HUD_SQUAD_PIPS_MAX     5
 /* Vtable slot 1 of the squad panel: twelve slots in a 3x4 grid, each a portrait
  * with optional decoration. The grid comes from a table of int16 PAIRS rather
  * than from arithmetic -- x is 6, 50, 94 and y is 22, 60, 98, 136 -- and the
@@ -947,6 +963,13 @@
 #define AM2_HUD_SQUAD_TOP        0xE6  /* also its height */
 #define AM2_HUD_SQUAD_WIDTH      0x90
 #define ADDR_HUD_SQUAD_PAINT   0x00416DA0u  /* thiscall void(obj, RECT) */
+/* Slot 2 of the same row -- the squad panel's per-frame update. Named from
+ * the HUD vtable array at 0x0046F8B0, which is a SECOND five-slot array
+ * below the menu one at 0x0046FAB8 and lays its rows out the same way:
+ * delete, paint, update, focus, repaint. Nothing in .text refers to this
+ * address at all, so the usual xref hunt answers nothing and the table is
+ * the only thing that names it. */
+#define ADDR_HUD_SQUAD_UPDATE  0x004158D0u  /* thiscall void(obj) */
 #define ADDR_HUD_SQUAD_SLOT_XY 0x004766C8u  /* int16[12][2], x then y */
 /* 0x00416340, 2,643 bytes and ONE exit -- the squad panel's detail slot,
  * which is where "HT:4.6 cm  WT:2.4 g  MV:2 cm/s  HP:140/140" comes from.
@@ -1017,6 +1040,12 @@
 #define SQUAD_REC_DETAIL_ARG   0x04u  /* int32, handed to ADDR_HUD_SQUAD_DETAIL */
 #define SQUAD_REC_WIDE         0x08u  /* int32; see above -- it changes three
                                        * separate things at once */
+/* Set means the slot is a PASSENGER of the vehicle in slot 0, and clicking
+ * it ejects them -- HudSquadUpdate's middle click arm looks the vehicle up
+ * from slot 0's uid, finds this unit in VEHICLE_OFF_PTR_LIST and calls
+ * ExitOneFromVehicle. The refill writes it as 1 for exactly the six slots it
+ * fills from a vehicle's rider list and leaves it 0 for the selection. */
+#define SQUAD_REC_EJECT        0x0Cu  /* int32 */
 #define SQUAD_REC_HILITE       0x10u  /* int32, fill the portrait box first */
 #define SQUAD_REC_BAR_W        0x14u  /* int32, > 0 draws a bar under it */
 #define SQUAD_REC_BAR_COLOUR   0x18u  /* uint8_t */
@@ -7891,7 +7920,7 @@ typedef struct {
  * It was not harmless. The reconstruction was written from this comment and
  * then written CONSISTENTLY with it, so nothing inside it looked wrong; and
  * it is PATCHED while one of its two callers is still the image's -- the
- * thiscall painter at 0x004158D0, which functions.tsv hides inside
+ * thiscall HudSquadUpdate at 0x004158D0, which functions.tsv hides inside
  * HudSquadDestruct's merged 2,800-byte entry. That caller passed the object
  * where our code expected the buffer, making `out[0] = 0` a store into the
  * object's first byte. ADDR_ENTER_VEHICLE's failure, a second time. */
