@@ -27,6 +27,10 @@ void __cdecl DefSortTrooperRecs(void);
  * dword. NULL when the .aai declared no such level. */
 void *__cdecl DefFindTrooperRec(int32_t level);
 
+/* 0x0045EC20. One .aai vehicle line: the kind from the keyword's code, then
+ * eight numbers. Answers 0, or the 1-based index of the field that failed. */
+int32_t __cdecl DefVehicleLine(int32_t code, char *line);
+
 #endif
 
 /* One entry of the link table at ADDR_DEF_LINKS. Twenty bytes, which is the

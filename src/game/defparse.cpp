@@ -766,6 +766,59 @@ void __cdecl FreeAaiTables(void)
     }
 }
 
+
+/* DefVehicleLine -- original 0x0045EC20, and it is registered FOUR times in
+ * the .aai keyword table at 0x00477258: for `tank` (0x36), `half_track`
+ * (0x37), `convoy` (0x38) and one more. One function serves every vehicle
+ * keyword and the TABLE supplies the difference, which is why its first
+ * argument is the keyword's own code.
+ *
+ * `jeep` (0x35) is the exception -- it gets 0x004602F0, a much larger
+ * function, rather than this one. So the switch below covers 0x35 even though
+ * nothing in the table routes 0x35 here; reading the arms without reading the
+ * table would make that arm look reachable.
+ *
+ * Nine dwords, which is AM2_VEHICLE_DEF_REC_SIZE exactly: the kind from the
+ * keyword, then eight numbers off the line.
+ *
+ * EVERY FIELD HAS ITS OWN ERROR CODE, 2 through 9 in order, and the caller
+ * gets the index of the field that failed rather than a flag. The default arm
+ * answers 1 and is the only one that says anything -- "Bad Vehicle Type",
+ * through the game's own logger, which here is a REAL call with a format
+ * string rather than the empty-frame tail jump that SortVehicleDefs ends on.
+ * The two look alike in a disassembly and are not the same thing.
+ *
+ * Only the first token comes from the line; the rest continue from strtok's
+ * own state, which is what NextNumber above is for. */
+int32_t __cdecl DefVehicleLine(int32_t code, char *line)
+{
+    int32_t rec[9];
+
+    switch (code) {
+    case 0x35: rec[0] = 0; break;
+    case 0x36: rec[0] = 1; break;
+    case 0x37: rec[0] = 2; break;
+    case 0x38: rec[0] = 3; break;
+    case 0x39: rec[0] = 4; break;
+    case 0x3A: rec[0] = 5; break;
+    default:
+        orig_log("Bad Vehicle Type\n");
+        return 1;
+    }
+
+    if (!DefParseNumber(&rec[1], am2_strtok(line, kSep)))  return 2;
+    if (!NextNumber(&rec[2]))                              return 3;
+    if (!NextNumber(&rec[3]))                              return 4;
+    if (!NextNumber(&rec[4]))                              return 5;
+    if (!NextNumber(&rec[5]))                              return 6;
+    if (!NextNumber(&rec[6]))                              return 7;
+    if (!NextNumber(&rec[7]))                              return 8;
+    if (!NextNumber(&rec[8]))                              return 9;
+
+    AddVehicleDef(rec);
+    return 0;
+}
+
 int defparse_install(void)
 {
     int rc = 0;
@@ -812,5 +865,7 @@ int defparse_install(void)
                         "DefFreeTrooperRecs", 2);
     rc |= patch_replace(ADDR_DEF_FREE_TABLES, (const void *)DefFreeTables,
                         "DefFreeTables", 3);
+    rc |= patch_replace(ADDR_DEF_VEHICLE_LINE, (const void *)DefVehicleLine,
+                        "DefVehicleLine", 2);
     return rc;
 }

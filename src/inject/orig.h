@@ -10700,6 +10700,12 @@ typedef struct {
  * which names the condition and not the function -- 48 callers. */
 #define ADDR_DEF_PARSE_NUMBER      0x0041A250u  /* int32_t(int32_t *, const char *) */
 #define ADDR_DEF_SEPARATORS        0x00477A4Cu  /* " \t\n;," */
+/* 0x0045EC20, registered FOUR times in the .aai keyword table at 0x00477258 --
+ * for `tank`, `half_track`, `convoy` and one more -- with the keyword's own
+ * code as its first argument. It maps that code to the vehicle KIND and then
+ * reads eight numbers, so one function serves every vehicle keyword and the
+ * table supplies the difference. `jeep` gets 0x004602F0 instead. */
+#define ADDR_DEF_VEHICLE_LINE      0x0045EC20u /* int32(int32 code, char *) */
 /* The link table: 20-byte records, count first. CountLinksWithParent walks it
  * comparing the parent key at +0, which is how the record's first field is
  * known to be that key. */

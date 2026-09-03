@@ -117,7 +117,14 @@ def remaining():
             continue
         words = struct.unpack("<%dI" % (size // 4), img.read(a, size))
         def is_text(w):
-            return 0x00401000 <= w < merges.CRT_START
+            # CRT_REAL, not merges.CRT_START.  A jump table above the nominal
+            # line holds addresses above it too, and testing against the
+            # nominal constant rejected every one of them -- 0x0046071C, 45
+            # dwords all pointing into 0x004603xx, was counted as a 180-byte
+            # game function for exactly that reason.  Second range assumption
+            # left behind by widening the range; the first was in
+            # merges.real_functions.
+            return 0x00401000 <= w < CRT_REAL
 
         if words and all(is_text(w) or w in (0, 0x90909090) for w in words) \
            and any(is_text(w) for w in words):
@@ -141,7 +148,7 @@ def remaining():
                 target = int(ins[0].op_str, 16)
             except ValueError:
                 continue
-            if 0x00401000 <= target < merges.CRT_START:
+            if 0x00401000 <= target < CRT_REAL:
                 thunks.add(a)
 
     return funcs, rem, init, tables, thunks
