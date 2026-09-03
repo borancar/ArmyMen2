@@ -13742,7 +13742,27 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define COMM_OFF_SEND_FLAGS      0x414u
 /* 0x00411C20, "TIMING OUT PLAYER %d %s" -- a different function, still
  * original, and one of the AM2_WM_PLAYER_GONE senders. */
-#define ADDR_CHECK_PLAYER_TIMEOUT 0x00411C20u
+#define ADDR_CHECK_PLAYER_TIMEOUT 0x00411C20u  /* void(void) */
+/* Its two strings, which are what separate the host arm from the client one:
+ * a host times a player OUT, a client discovers it has been left BEHIND. */
+#define ADDR_STR_TIMING_OUT      0x004760FCu /* "TIMING OUT PLAYER %d %s\n" */
+#define ADDR_STR_LOST_HOST       0x004760D0u /* "EXITING - HAVE NOT HEARD..." */
+/* Rate-limits those two log lines to one per window; zeroed on every player
+ * that is still answering, so a run of silence logs once rather than per
+ * frame. Not a timeout of its own. */
+#define ADDR_TIMEOUT_LOGGED_AT   0x004FC8B8u /* uint32_t, GetTickCount */
+#define AM2_TIMEOUT_PLAYER_MS    0xAFC8u     /* 45,000 -- the host's patience */
+#define AM2_TIMEOUT_HOST_MS      0xEA60u     /* 60,000 -- the client's */
+/* Set to 1 by the comm constructor and read only by CheckPlayerTimeout's two
+ * arms, each of which gates its ACTION on it while still logging: so it turns
+ * the consequences off and leaves the diagnosis on. */
+#define COMM_OFF_TIMEOUTS_ON     0x454u
+/* The four per-slot bits of each family, which is how the guard reads them --
+ * AM2_PAUSE_LEFT_A is documented "<< slot" and the test is against all four
+ * at once. */
+#define AM2_PAUSE_LEFT_A_ALL     0x7800u
+#define AM2_PAUSE_LEFT_B_ALL     0x00F0u
+#define AM2_PAUSE_LEFT_C_ALL     0x1E0000u
 /* 0x0469, and NOTHING handles it. ReceiveStartGameMsg is the only sender in
  * the image and WndProc has no case for it, so DefWindowProc eats it. Named
  * from what posts it, as the other six are. */
@@ -14235,7 +14255,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
                                                * 0x00426230 is indexed from */
 #define ADDR_SUBSTATE_TABLE      0x00426230u
 /* The frame chain's own callees, all still original. */
-#define ADDR_COMM_FRAME_PRE_A    0x00411C20u  /* "TIMING OUT PLAYER" */
 /* Its own log strings call it ArmyMessageFlush, so it is renamed rather than
  * aliased -- the old name came from the one call site in RunFrame, and knowing
  * the body means knowing what that step IS: the frame's post-work flushes the

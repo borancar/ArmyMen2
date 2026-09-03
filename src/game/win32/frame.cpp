@@ -392,7 +392,7 @@ void __cdecl FramePre(void)
     if (CommActive() && !GetPauseFlags())
         CommDrainMsgs();
 
-    call0(ADDR_COMM_FRAME_PRE_A);
+    CheckPlayerTimeout();
 }
 
 /* 0x0040AFA0. The other half, and it asks the same question twice rather than

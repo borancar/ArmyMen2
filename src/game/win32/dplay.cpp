@@ -3679,6 +3679,130 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
     return hr;
 }
 
+
+/* 0x00411C20, ADDR_CHECK_PLAYER_TIMEOUT -- one caller, in the comm frame step.
+ *
+ * TWO ARMS, AND THE STRINGS NAME THEM: a host times a PLAYER out ("TIMING OUT
+ * PLAYER %d %s"), a client discovers it has been left behind ("EXITING - HAVE
+ * NOT HEARD FROM HOST"). They differ in more than that -- 45 seconds against
+ * 60, every slot against only the host's, and a message posted against the
+ * whole teardown -- so they are written out rather than shared.
+ *
+ * THE GUARD IS THREE PAUSE MASKS AND IT IS NOT A DUPLICATE OF ITSELF.
+ * AM2_PAUSE_LEFT_A/B/C are each documented "<< slot", and the entry test reads
+ * all four bits of each: proceed only when some slot has LEFT_A and none has
+ * LEFT_B or LEFT_C. The per-player test inside the loop is the same LEFT_A bit
+ * for one slot.
+ *
+ * COMM_OFF_TIMEOUTS_ON gates the CONSEQUENCE and not the logging, in both
+ * arms -- so turning it off leaves the diagnosis and removes the action. The
+ * comm constructor sets it to 1 and nothing else writes it.
+ *
+ * The client arm's three teardown calls are the same three, in the same order,
+ * that GameMenuUpdate makes for a deliberate abort: orig.h already records
+ * that a timeout and a quit converge on one path.
+ *
+ * ADDR_TIMEOUT_LOGGED_AT rate-limits both lines to one per window, and is
+ * ZEROED on every player still answering -- so a run of silence logs once
+ * rather than once a frame. The original keeps it in a register across the
+ * host loop and reloads it after the post; reading the global each time is the
+ * same value and is what is written here. */
+void __cdecl CheckPlayerTimeout(void)
+{
+    uint32_t  paused = GetPauseFlags();
+    uint8_t  *comm;
+    uint32_t  now;
+    int32_t   i;
+
+    if (!paused
+        || (paused & AM2_PAUSE_LEFT_C_ALL)
+        || (paused & AM2_PAUSE_LEFT_B_ALL)
+        || !(paused & AM2_PAUSE_LEFT_A_ALL))
+        return;
+
+    comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+
+    if (comm_u32(comm, COMM_OFF_IS_HOST)) {
+        now  = GetTickCount();
+        comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+
+        for (i = 0; i < (int32_t)comm_u32(comm, COMM_OFF_PLAYER_COUNT); i++) {
+            uint8_t *slot = comm + COMM_OFF_PLAYERS
+                            + (uint32_t)i * COMM_PLAYER_STRIDE;
+            int32_t  id   = (int32_t)comm_u32(slot, COMM_SLOT_OFF_ID);
+
+            if (id == -1 || id == (int32_t)comm_u32(comm, COMM_OFF_OUR_PLAYER_ID))
+                continue;
+
+            if (now - comm_u32(slot, COMM_SLOT_OFF_HEARD) <= AM2_TIMEOUT_PLAYER_MS
+                || !(paused & (AM2_PAUSE_LEFT_A << i))) {
+                *(uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT = 0;
+                continue;
+            }
+
+            if (comm_u32(comm, COMM_OFF_VERBOSE)
+                && *(const uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT
+                && now - *(const uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT
+                       > AM2_TIMEOUT_PLAYER_MS) {
+                orig_log((const char *)(uintptr_t)ADDR_STR_TIMING_OUT, i,
+                         slot + COMM_SLOT_OFF_NAME);
+                *(uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT = now;
+            }
+
+            if (comm_u32(comm, COMM_OFF_TIMEOUTS_ON))
+                PostMessageA(g_hwnd, AM2_WM_PLAYER_GONE,
+                             (WPARAM)comm_u32(slot, COMM_SLOT_OFF_ID), 0);
+        }
+        return;
+    }
+
+    now  = GetTickCount();
+    comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+
+    for (i = 0; i < (int32_t)comm_u32(comm, COMM_OFF_PLAYER_COUNT); i++) {
+        uint8_t *slot = comm + COMM_OFF_PLAYERS
+                        + (uint32_t)i * COMM_PLAYER_STRIDE;
+
+        if (comm_u32(slot, COMM_SLOT_OFF_ID)
+                != comm_u32(comm, COMM_OFF_PLAYER_MADE))
+            continue;
+        if (now - comm_u32(slot, COMM_SLOT_OFF_HEARD) <= AM2_TIMEOUT_HOST_MS)
+            continue;
+        if (!(paused & (AM2_PAUSE_LEFT_A << i)))
+            continue;
+
+        if (comm_u32(comm, COMM_OFF_VERBOSE)
+            && *(const uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT
+            && now - *(const uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT
+                   > AM2_TIMEOUT_HOST_MS) {
+            orig_log((const char *)(uintptr_t)ADDR_STR_LOST_HOST, i,
+                     slot + COMM_SLOT_OFF_NAME);
+            *(uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT = now;
+        }
+
+        if (!comm_u32(comm, COMM_OFF_TIMEOUTS_ON)) {
+            *(uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT = 0;
+            continue;
+        }
+
+        if (comm_u32(comm, COMM_OFF_LOBBIED)) {
+            RequestState(AM2_STATE_MP_LOBBY);
+        } else {
+            RequestState(AM2_STATE_MENU);
+            /* The request code without the pending flag, which every other
+             * writer of this pair sets. Reproduced. */
+            *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST = AM2_MENU_REQUEST_TITLE;
+        }
+
+        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) {
+            CommDropSession(comm);
+            CommReportStats(comm);
+            CommResetStats(comm);
+        }
+        comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+    }
+}
+
 int dplay_install(void)
 {
     int rc = 0;
@@ -3805,5 +3929,8 @@ int dplay_install(void)
                         "CommRecentTotal", 1);
     rc |= patch_replace(ADDR_ON_LOBBY_SLAVE, (const void *)OnLobbySlave,
                         "OnLobbySlave", 2);
+    rc |= patch_replace(ADDR_CHECK_PLAYER_TIMEOUT,
+                        (const void *)CheckPlayerTimeout,
+                        "CheckPlayerTimeout", 0);
     return rc;
 }

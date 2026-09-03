@@ -216,6 +216,9 @@ void __attribute__((thiscall)) CommResetStats(void *comm);
  * line is gated on its own denominator; nothing prints when nothing moved. */
 void __attribute__((thiscall)) CommReportStats(void *comm);
 
+/* 0x00411C20. Time a silent player out, or discover the host has gone. */
+void __cdecl CheckPlayerTimeout(void);
+
 /* 0x0040FB80. Eight bytes: forwards to CommSendLobbyProperty with id 2. */
 void __attribute__((thiscall)) CommPublishResult(void *comm);
 
