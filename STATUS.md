@@ -5,30 +5,50 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-03**, at `35e2f82`. Working tree clean.
+Last updated: **2026-09-04**, at `0c90819`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,641 patches plus 6 REGISTERED**, **40** analysis
+Nothing uncommitted. **1,641 patches plus 6 REGISTERED**, **41** analysis
 tools in `make check` (`tools/checkpatches.py`; `tools/checkclaims.py` counts
 the recipe).
+
+## THE STANDALONE PORT REACHES THE MAIN MENU
+
+`make standalone` builds `build/ArmyMen2.exe`, which replaces ArmyMen2.exe in
+the game folder and needs the original at BUILD time only. It renders the
+title art, the six menu buttons, the cursor and the copyright text, and its
+log is identical to the injected build's, line for line.
+
+    make standalone      # -> build/ArmyMen2.exe, copy into the game folder
+
+How it is put together, and why: the image's relocations are stripped, so the
+3,582 pointers inside its own data cannot be told from the bytes around them
+and cannot be moved. `.origdat` is OUR section, placed at the addresses those
+pointers were written for, with our code linked above at 0x00700000. What is
+rewritten at startup is what IS unambiguous -- 411 function pointers, the
+whole import table (171 across 10 DLLs), and the 21 C++ static initializers
+the MSVC CRT used to run.
+
+**Every table migrated out of that blob into typed C data is one less thing
+holding the layout in place**, and the first is already gone: `c_dfDIMouse`
+now comes from the DirectInput SDK rather than the image.
+
+What is NOT done: only the menu has been reached. Nothing past it has been
+driven, and no A/B compares the standalone build against the injected one.
 
 ## NOTHING LEFT TO TRANSPOSE
 
 `tools/remaining.py` reads **0 game functions and 0 C++ static initializers**
 over every byte from `0x00401000` to the real CRT frontier at `0x00464420`,
-and reports that the entries tile `.text` with no gaps, so nothing can hide
-between them. What is left in that range is 19 linker thunks of one `jmp`
-each, 5 jump tables that are data, and 4 harness/IAT entries -- none of which
-is a function the original source had, and one of which must STAY a thunk for
-`dinput_hook.c`'s IAT patch to be reached.
+and reports that the entries tile `.text` with no gaps.
 
-`FireWeapon` (0x0045F460), which this file called the last one left, is
-reconstructed.
-
-**Read that from the tool, not from here.** Four separate blind spots each
-made an earlier version of this section wrong, and three of them were in the
-measurement rather than in the work; the sections below record all four.
+**But the standalone build is a stronger completeness oracle**, and it found
+three functions nothing else could see: `0x0040A6A0`, `0x004185C0` and
+`0x00451990` are called by address and are still the original's code. They
+are INTERIOR addresses of merged entries whose entry is patched, so every
+count reads them as done. Two are stubbed and log if reached;
+`0x00433770` is not a function at all but a byte table MSVC placed in .text.
 
 ## Where the work is now: VERIFICATION, not transposition
 
