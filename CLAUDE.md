@@ -2990,13 +2990,19 @@ exact oracle**, however meaningful it is when it is set.
   bars, which is the first of the batch that ordinary play actually reaches.
 
   Rather than keep writing the queue down, generate it -- the same argument
-  that put the count in `tools/checkclaims.py`. What that tool has, minus the
-  patch list, is **four** functions and none of them small:
+  that put the count in `tools/checkclaims.py`.
 
-  | | |
-  |---|---|
-  | `0x00462600` | 1088 B |
-  | `0x00416340` | 2656 B, the squad detail panel |
+  **THE QUEUE IS EMPTY AND THE HAND-KEPT VERSION WAS WRONG IN BOTH
+  DIRECTIONS.** It said "**four** functions and none of them small" and then
+  listed TWO, `0x00462600` and `0x00416340` -- a count and a table that had
+  stopped agreeing with each other, in a paragraph whose whole argument is
+  that queues should be generated rather than written down. Both are
+  reconstructed now, checkclaims reads (29, 29) for the bracket, and
+  tools/remaining.py reads 0 game functions.
+
+  So this entry is closed, and the way it failed is the argument for the
+  advice above it: the list drifted from its own count before it drifted from
+  the code, and neither drift was visible without checking both.
 - **A vtable call is only COM if `this` is pushed.** Under `CINTERFACE` every
   COM method takes the interface as an explicit first argument, so it goes on
   the stack; an i386 MSVC C++ virtual is thiscall and keeps `this` in `ecx`.
