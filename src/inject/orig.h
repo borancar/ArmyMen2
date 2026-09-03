@@ -15372,6 +15372,17 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* Written 5 or 6 by ADDR_DAMAGE_ROACH when health reaches zero, chosen on the
  * damage KIND: 1 and 3 give 5, everything else 6. */
 #define OBJ_OFF_DEATH_STATE    0x554u       /* int32_t */
+/* WHAT THE VEHICLE PANEL SHOWS, and all three names were already here.
+ * HudSquadDetail's type-3 arm reads 0x54C, 0x554 and 0x52C and formats them
+ * "%d mm", "%d" and "%d cm/s" under AR:, CR: and MV:. The tree already calls
+ * those VEHICLE_OFF_ARMOUR, VEHICLE_OFF_SEATS and VEHICLE_OFF_KIND.
+ *
+ * ARMOUR agrees. SEATS under a label reading "CR:" is consistent -- crew is
+ * how many seats are filled or offered. But MV: formats VEHICLE_OFF_KIND as
+ * "%d cm/s", and a KIND is not a speed. Either 0x52C is a fourth union arm
+ * or the panel prints the wrong field; nothing here settles it, and the
+ * panel is drawn on every mission so it is observable if anyone looks at a
+ * vehicle's MV against its actual speed. Recorded, not guessed at. */
 /* Bit 0 of OBJ_OFF_FLAGS. Cleared after ADDR_ITEM_PRE_DESTROY_ALIAS runs, and
  * named structurally because nothing yet read says what it means. */
 #define OBJ_FLAG_BIT0          0x01u
