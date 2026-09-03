@@ -2940,6 +2940,13 @@
  * said `void` and every caller ignores the result, so nothing observed the
  * difference. */
 #define ADDR_COMM_REGISTER_SELF  0x004027F0u  /* int32_t(uint32_t id) */
+/* The two lines EnumPlayersCb writes. The first is TRUNCATED in any
+ * fixed-width disassembly window -- it ends "contex", the mid-phrase tell --
+ * and in full it carries SIX specifiers for six pushed arguments, the last
+ * labelled `slot` and fed ADDR_COMM_ENUM_COUNT. That is the program naming
+ * that counter, not us. */
+#define ADDR_STR_INIT_JOIN       0x0047527Cu
+#define ADDR_STR_PLAYER_DPID     0x0047526Cu  /* "%s's dpid: %d\n" */
 #define ADDR_DEFAULT_PLAYER_EVT  0x004F48C0u  /* HANDLE, used when none is given */
 #define COMM_OFF_PLAYER_MADE     0x3E4u
 #define COMM_OFF_JOINED          0x3DCu
@@ -12532,7 +12539,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_COMM_ENUM_COUNT     0x004751B4u  /* int32_t */
 /* EnumPlayers' DPENUMPLAYERSCALLBACK2. Left original -- it is the other side
  * of the same enumeration and touches no import. */
-#define ADDR_ENUM_PLAYERS_CB     0x0040E0B0u
+#define ADDR_ENUM_PLAYERS_CB     0x0040E0B0u  /* LPDPENUMPLAYERSCALLBACK2 */
 #define ADDR_COMM_ENUM_PLAYERS   0x0040E200u  /* int32_t(void) */
 /* A player slot's index field, which the session carries as dwUser1. 0x63
  * is what a reset slot holds -- no player. */

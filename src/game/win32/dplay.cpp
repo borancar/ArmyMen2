@@ -585,6 +585,85 @@ static_assert(DPENUMSESSIONS_ASYNC == 0x10, "DPENUMSESSIONS_ASYNC");
 
 #define g_sessionList  (*(void **)(uintptr_t)ADDR_SESSION_LIST)
 
+/* EnumPlayersCb -- original 0x0040E0B0, 336 bytes, one exit.
+ *
+ * DirectPlay's per-player callback, run when a client joins and walks the
+ * session's existing players. `ret 0x14` is five callee-cleaned arguments,
+ * which is LPDPENUMPLAYERSCALLBACK2, and espmap puts its four reads on
+ * dpId, lpName, dwFlags and lpContext.
+ *
+ * IT NEEDS NO NEW NAMES, which is worth stating because it is rare here:
+ * every field it writes was already named from the other side. The slot it
+ * fills is COMM_OFF_PLAYERS + n * AM2_COMM_SLOT_STRIDE, and the four fields
+ * are COMM_SLOT_OFF_ID, _TAKEN, _INDEX and _NAME. That base is the one
+ * CLAUDE.md records being corrected by twelve bytes, where the fix meant
+ * auditing every use site rather than grepping; this is written against the
+ * corrected base with explicit field offsets, which is the convention that
+ * incident established.
+ *
+ * IT IS WHERE A JOINING CLIENT LEARNS WHICH SLOT IT IS. When the enumerated
+ * dpid matches COMM_OFF_OUR_PLAYER_ID, the running count goes into both
+ * ADDR_OUR_SLOT and ADDR_DEFAULT_OWNER -- and 0x0040E117, the first of those
+ * two stores, is the instruction orig.h already cites as what settled
+ * ADDR_OUR_SLOT against the earlier ADDR_HOST_SLOT reading. Reading the
+ * function confirms that note rather than depending on it.
+ *
+ * THE LOG LINE IS WHY THE COUNTER IS CALLED A SLOT. A disassembly window cuts
+ * the format at "contex", which is the mid-phrase ending CLAUDE.md names as
+ * the tell for a truncated literal; in full it is "InitJoin dpId = %x
+ * PlayerName = %s (%s), Flags = %x , context = %x slot = %d", six specifiers
+ * for six pushed arguments -- so the argument list is complete rather than
+ * five and a guess -- and the last is labelled `slot` and is fed
+ * ADDR_COMM_ENUM_COUNT. The program's own vocabulary, not ours.
+ *
+ * It answers TRUE always, like EnumConnectionsCb and unlike EnumSessionsCb,
+ * which stops the enumeration on a null list or a failed allocation. Three
+ * callbacks of one shape and three different failure policies.
+ *
+ * NOT EXERCISED: it needs a session with another player in it, which this
+ * machine cannot open. Verified by reading. */
+BOOL FAR PASCAL EnumPlayersCb(DPID dpId, DWORD dwPlayerType, LPCDPNAME lpName,
+                              DWORD dwFlags, LPVOID lpContext)
+{
+    uint8_t *comm = g_commObject;
+    uint8_t *slot;
+    int32_t  n;
+
+    (void)dwPlayerType;
+
+    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_INIT_JOIN),
+                 dpId, lpName->lpszLongNameA, lpName->lpszShortNameA,
+                 dwFlags, lpContext, g_commEnumCount);
+
+    orig_log((const char *)AM2_IMAGE(ADDR_STR_PLAYER_DPID),
+             lpName->lpszShortNameA, dpId);
+
+    if (dpId == *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID)) {
+        *(int32_t *)(uintptr_t)ADDR_OUR_SLOT      = g_commEnumCount;
+        *(int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER = g_commEnumCount;
+    }
+
+    n    = g_commEnumCount;
+    slot = comm + COMM_OFF_PLAYERS + (size_t)n * AM2_COMM_SLOT_STRIDE;
+
+    *(uint32_t *)(slot + COMM_SLOT_OFF_ID)    = dpId;
+    *(int32_t *)(slot + COMM_SLOT_OFF_TAKEN)  = 1;
+    *(int32_t *)(slot + COMM_SLOT_OFF_INDEX)  = n;
+
+    if (dpId != *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID)) {
+        if (n < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT))
+            CommSetSlotRemote(comm, n);
+        CommRegisterSelf(dpId);
+    }
+
+    strcpy((char *)(slot + COMM_SLOT_OFF_NAME), lpName->lpszShortNameA);
+
+    g_commEnumCount++;
+    return TRUE;
+}
+
+
 /* EnumSessionsCb -- original 0x0040E280, 304 bytes, two exits.
  *
  * DirectPlay's per-session callback for the battle browser. `ret 0x10` is
@@ -1648,8 +1727,7 @@ int32_t __cdecl CommEnumPlayers(void)
     g_commEnumCount = 0;
 
     return IDirectPlayX_EnumPlayers(dp, *(GUID **)comm,
-                                    (LPDPENUMPLAYERSCALLBACK2)
-                                        (uintptr_t)ADDR_ENUM_PLAYERS_CB,
+                                    EnumPlayersCb,
                                     (LPVOID)g_hwnd, 0) == DP_OK;
 }
 
@@ -3667,6 +3745,9 @@ int dplay_install(void)
                         "CommConstruct", 0);
     rc |= patch_replace(ADDR_COMM_DESTRUCT, (const void *)CommDestruct,
                         "CommDestruct", 0);
+    rc |= patch_replace(ADDR_ENUM_PLAYERS_CB,
+                        (const void *)EnumPlayersCb,
+                        "EnumPlayersCb", 5);
     rc |= patch_replace(ADDR_ENUM_SESSIONS_CB,
                         (const void *)EnumSessionsCb,
                         "EnumSessionsCb", 4);
