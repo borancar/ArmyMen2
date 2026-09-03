@@ -13379,13 +13379,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * unlike MP_PANEL_OFF_TYPE_BOX above, which FillListFromRules fills with a
  * literal 3 for every row. Picking a row here refills the type box from that
  * record's rules file and rebuilds the map list below from its map list. */
-/* The game-type record a GAME_BOX row points at. RAW OFFSETS on purpose:
- * OnMpGameType is its only reader in the image and nothing that BUILDS it has
- * been identified, so a name here would be the one-toucher guess this file
- * keeps recording. What is known is that +0 and +0x40 are both strings -- the
- * first is copied to ADDR_MP_SCRIPT_NAME, the second gets ".txt" appended and
- * is loaded from rules/ -- and that +0xC4 counts the 0x40-byte map names at
- * +0xC8. */
+/* The game-type record a GAME_BOX row points at.
+ *
+ * THESE WERE RAW OFFSETS UNTIL A SECOND READER TURNED UP. OnMpGameType was
+ * the only one, so a name would have been the one-toucher guess this file
+ * keeps recording -- and the note here said so. CheckMapRules is the second,
+ * and it reads +0x40 as the rules file base and +0xC4 as the map count in
+ * exactly the same way, on a record reached the same way. Two independent
+ * readers agreeing is the bar this file sets before a layout stops being a
+ * guess, so they are named now.
+ *
+ * +0 is copied to ADDR_MP_SCRIPT_NAME; +0x40 gets ".txt" appended and is
+ * loaded from rules/; +0xC4 counts the 0x40-byte map names at +0xC8. What
+ * BUILDS the record is still unidentified, and the field beyond 0xC8 with
+ * it. */
 #define MP_GAMETYPE_OFF_RULES      0x40u
 #define MP_GAMETYPE_OFF_MAP_COUNT  0xC4u
 #define MP_GAMETYPE_OFF_MAPS       0xC8u
@@ -13397,6 +13404,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * reference is that constructor argument; nothing calls it. */
 #define ADDR_MP_ON_GAME_TYPE   0x00431A30u /* void(w, AM2_ListRows *, int32) */
 #define MP_PANEL_OFF_GAME_BOX  0x208u
+#define MP_PANEL_OFF_GAME_BAR  0x20Cu   /* the game box's arrow bar, from
+                                         * CheckMapRules -- it sits between
+                                         * the two boxes, which is what makes
+                                         * the pair of names above credible */
 #define MP_PANEL_OFF_MAP_BOX   0x210u   /* the maps the chosen type allows */
 #define MP_PANEL_OFF_MAP_BAR   0x214u   /* its arrow bar */
 #define MP_PANEL_OFF_PREVIEW   0x218u   /* the map thumbnail widget */
