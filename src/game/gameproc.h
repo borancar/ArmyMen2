@@ -115,6 +115,11 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr);
 /* 0x00424E80, one caller -- the level start. Clear two dozen globals, seed the
  * tick interval from the difficulty, fill ADDR_ALLY_MATRIX with the identity
  * and then ally any two comm players sharing a team. */
+/* 0x0043DDA0, one caller -- State2Enter, and only when no save is being
+ * loaded. Put every scenario row on the map, then form the local army up
+ * around its leader if a default .cof was found. */
+int32_t __cdecl PlaceScenario(void);
+
 void __cdecl ResetLevelState(void);
 
 void *__cdecl LoadType5(am2_FILE *fp, void *hdr);

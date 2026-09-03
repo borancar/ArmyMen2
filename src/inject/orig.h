@@ -13858,7 +13858,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * a restored one gets them from the save. */
 #define ADDR_STATE2_ENTER        0x00425300u  /* void(void) */
 #define AM2_MENU_MODE_PLAY       0x21   /* 33 -- ordinary in-mission play */
-#define ADDR_PLACE_SCENARIO      0x0043DDA0u  /* void(void) */
+#define ADDR_PLACE_SCENARIO      0x0043DDA0u  /* int32_t(void) */
+#define AM2_SCEN_KIND_LEADER     0x8005 /* the row that becomes the player */
+/* Where PlaceScenario parks the leader's point and facing for its own second
+ * pass, and what State2Enter's view snap reads back. */
+#define ADDR_LEADER_POS          0x00511E50u  /* {int16 x, int16 y} */
+#define ADDR_LEADER_FACING       0x00511E54u  /* uint8_t */
 #define ADDR_STR_LEVEL_PAL       0x004851D4u  /* "palette.bmp" */
 #define ADDR_STR_LOADING_BMP     0x004851ACu  /* "load_default.bmp" */
 #define ADDR_STR_ATTEMPT         0x0048519Cu  /* "Attempt# %d\n" */

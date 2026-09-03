@@ -769,6 +769,220 @@ int32_t __cdecl SaveType1(am2_FILE *fp, void *obj)
  * The identity fill runs first and unconditionally, so an army is always
  * allied with itself even when the comm object holds nothing.
  */
+/* Reconstructed in item.cpp, declared there rather than in item.h. */
+void __cdecl SelectInventorySlot(void *unit, int32_t slot);
+#define g_ourLeaderUid (*(uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID)
+
+/* The kind a scenario row's KIND field selects, for the five it names. Read
+ * out of the image's own jump table at 0x0043E130 rather than off the arms:
+ * kinds 0 and 4 share the default with everything above 5, and the five that
+ * do not are 1->2, 2->3, 3->4, 5->5. Six slots, five distinct answers, and
+ * two of them the default -- exactly the shape the DirtyCollect rule is for. */
+static int32_t ScenRowWeapon(int32_t kind)
+{
+    switch (kind) {
+    case 1:  return 2;
+    case 2:  return 3;
+    case 3:  return 4;
+    case 5:  return 5;
+    default: return 1;   /* kinds 0 and 4, and everything past 5 */
+    }
+}
+
+/* PlaceScenario -- original 0x0043DDA0, 908 bytes, one caller: State2Enter,
+ * and only when nothing is being loaded. Put every scenario row on the map.
+ *
+ * Four parts, one per army slot, each a count and an array of 0x6C-byte rows.
+ * The original walks the parts through a FIELD POINTER at scen + 0x14, which
+ * is SCENARIO_OFF_PARTS plus SCENARIO_PART_OFF_COUNT -- so `[esi]` is the
+ * count and `[esi+4]` the rows, and the record itself starts four bytes
+ * earlier. Written from the record base with the existing names.
+ *
+ * A NETWORK GAME SKIPS SLOTS NOBODY OCCUPIES. In single player every slot is
+ * placed; with a session up, a slot is placed only if CommWasHereForArmy says
+ * someone has been in it.
+ *
+ * KIND 0x8005 IS THE LEADER and gets everything the others do not: a weapon
+ * from key 0x2D group 9, SetLeadsAndAct, soldier kind 7, and -- only when the
+ * slot is the local player's -- the camera and the selection. Every other
+ * kind takes a weapon chosen by the table above and a soldier kind derived
+ * from it.
+ *
+ * THE TAIL IS A SEPARATE PASS and runs only when a default .cof was found:
+ * it moves the leader to the saved point, then walks the local army's object
+ * list placing every unencumbered type 2 into a formation around it. That
+ * loop REMOVES dead entries from the list as it goes -- a uid that no longer
+ * resolves is dropped and the index is NOT advanced -- so it rebuilds the
+ * list while iterating it, which is why it re-reads the list head every
+ * time. */
+int32_t __cdecl PlaceScenario(void)
+{
+    uint8_t *scen = *(uint8_t **)(uintptr_t)ADDR_SCENARIOS;
+    void    *comm;
+    int32_t  slot;
+
+    if (!scen)
+        return 0;
+
+    comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
+
+    for (slot = 0; slot < AM2_COMM_SLOTS; slot++) {
+        uint8_t *part = scen + SCENARIO_OFF_PARTS
+                      + (size_t)slot * SCENARIO_PART_BYTES;
+        uint8_t *row  = *(uint8_t **)(part + SCENARIO_PART_OFF_ROWS);
+        int32_t  n    = *(const int16_t *)(part + SCENARIO_PART_OFF_COUNT);
+        int32_t  army;
+        int32_t  i;
+
+        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
+            && !CommWasHereForArmy(comm, slot))
+            continue;
+
+        army = CommSlotForArmy(comm, slot);
+
+        for (i = 0; i < n; i++, row += SCEN_ROW_BYTES) {
+            uint8_t *unit;
+            int32_t  kind = *(const int32_t *)(row + SCEN_ROW_OFF_KIND);
+            int32_t  amount;
+
+            if (*(const int16_t *)(row + SCEN_ROW_OFF_POS) <= 0)
+                continue;
+
+            /* THE NAME IS THE ROW'S OWN, at +0x13 -- not the shared scratch
+             * buffer every other creator in this tree passes. And the flags
+             * are 4 or 0 chosen by SCEN_ROW_OFF_FLAG, not a constant.
+             *
+             * Getting either wrong is invisible in the pixels and in the log:
+             * the first attempt passed ADDR_DIR_SCRATCH and fixed flags, and
+             * bootcamp came back with 1,609 of 1,610 object lines identical
+             * and Sarge's UID reading 1 instead of 0x3E8. The state dump is
+             * the only artifact that could see it. */
+            unit = (uint8_t *)CreateTrooper(
+                       (char *)(row + SCEN_ROW_OFF_NAME),
+                       *(const int16_t *)(row + SCEN_ROW_OFF_POS),
+                       *(const int16_t *)(row + SCEN_ROW_OFF_POS + 2),
+                       CommArmyOfSlot(comm, army), army,
+                       *(const uint8_t *)(row + SCEN_ROW_OFF_FLAG) ? 0 : 4,
+                       1, 0, 1, 0);
+
+            /* SCEN_ROW_OFF_AMOUNT, clamped up to 1, into OBJ_OFF_FACING_COPY.
+             * THE TWO NAMES DISAGREE and this writer is the evidence: one of
+             * them is wrong, since clamping a facing to >= 1 makes no sense
+             * and neither does calling 0xF8 a facing if a scenario amount
+             * lands in it. Six other sites write 0xF8; settling it means
+             * reading one of them, which this commit does not. Reproduced
+             * with the offsets as they stand and the conflict recorded. */
+            amount = *(const uint8_t *)(row + SCEN_ROW_OFF_AMOUNT);
+            if (amount < 1)
+                amount = 1;
+            *(unit + OBJ_OFF_FACING_COPY) = (uint8_t)amount;
+
+            if (kind == AM2_SCEN_KIND_LEADER) {
+                void *w = CreateWeapon((const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                                       army,
+                                       KeyLookupTriple(0x2D, 9, 0),
+                                       *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
+                                       4, -1, 1, 0);
+
+                *(uint32_t *)(unit + OBJ_OFF_WEAPON_UID) =
+                    *(const uint32_t *)((const uint8_t *)w + OBJ_OFF_UID);
+                SetLeadsAndAct(unit);
+                *(int32_t *)(unit + OBJ_OFF_RANK) = 7;   /* the leader outranks */
+
+                if ((uint32_t)slot == g_defaultOwner) {
+                    g_ourLeaderUid = *(const uint32_t *)(unit + OBJ_OFF_UID);
+                    *(int16_t *)(uintptr_t)ADDR_LEADER_POS =
+                        *(const int16_t *)(row + SCEN_ROW_OFF_POS);
+                    *(int16_t *)((uintptr_t)ADDR_LEADER_POS + 2) =
+                        *(const int16_t *)(row + SCEN_ROW_OFF_POS + 2);
+                    *(uint8_t *)(uintptr_t)ADDR_LEADER_FACING =
+                        *(const uint8_t *)(unit + OBJ_OFF_FACING);
+                    DeselectAll();
+                    SelectUnit(unit);
+                    *(int32_t *)(uintptr_t)ADDR_VIEW_HOLD   = 1;
+                    *(uint32_t *)(uintptr_t)ADDR_VIEW_TARGET =
+                        *(const uint32_t *)(uintptr_t)ADDR_LEADER_POS;
+                }
+                SelectInventorySlot(unit, 0);
+            } else {
+                void *w = CreateWeapon((const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                                       army,
+                                       KeyLookupTriple(0x2D, ScenRowWeapon(kind), 0),
+                                       *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
+                                       4, -1, 1, 0);
+
+                *(uint32_t *)(unit + OBJ_OFF_WEAPON_UID) =
+                    *(const uint32_t *)((const uint8_t *)w + OBJ_OFF_UID);
+                SoldierKindForWeapon(unit,
+                    **(const uint32_t **)((const uint8_t *)w + OBJ_OFF_FIELD_C0));
+            }
+        }
+    }
+
+    if (*(const int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF == 0)
+        return 1;
+
+    /* The .cof pass: put the leader where the save says, then form up on it. */
+    {
+        uint8_t *lead = (uint8_t *)LookupOwnerObj(g_defaultOwner);
+        int32_t  formed = 0;
+        int32_t  i;
+
+        if (!lead)
+            return 1;
+
+        *(uint32_t *)(lead + OBJ_OFF_POS) =
+            *(const uint32_t *)(uintptr_t)ADDR_LEADER_POS;
+        *(uint8_t *)(lead + OBJ_OFF_FACING) =
+            *(const uint8_t *)(uintptr_t)ADDR_LEADER_FACING;
+        ObjTileChanged(lead, 0, 0);
+        SetUnitPose(lead, 1);
+        DeselectAll();
+        SelectUnit(lead);
+
+        for (i = 0; ; ) {
+            uint8_t **list = ((uint8_t ***)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
+                                 [g_defaultOwner];
+            uint8_t  *obj;
+
+            if (i >= *(const int32_t *)((const uint8_t *)list + 4))
+                break;
+
+            obj = (uint8_t *)LookupByUID(
+                      ((const uint32_t *const *)list)[2][i]);
+            if (!obj) {
+                /* A stale uid is REMOVED and the index does not advance. */
+                ListRemoveAt(list, i);
+                continue;
+            }
+            if (!(*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & 4)
+                && ObjIsTypeIn238((const AM2_Object *)obj)
+                && *(const void *const *)(obj + OBJ_OFF_FIELD_94) == (void *)0
+                && *(const int32_t *)obj == 2
+                && *(const int32_t *)(obj + OBJ_OFF_SARGE) == 0) {
+                uint32_t at;
+
+                *(uint32_t *)(obj + OBJ_OFF_SCRIPT_STATE) =
+                    *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+                {
+                    AM2_Point p;
+                    FormationPoint(obj, lead, &p, formed);
+                    at = ((uint32_t)(uint16_t)p.y << 16)
+                       | (uint32_t)(uint16_t)p.x;
+                }
+                *(uint32_t *)(obj + OBJ_OFF_POS) = at;
+                *(uint8_t *)(obj + OBJ_OFF_FACING) =
+                    *(const uint8_t *)(uintptr_t)ADDR_LEADER_FACING;
+                ObjTileChanged(obj, 0, 0);
+                SetUnitPose(obj, 1);
+                formed++;
+            }
+            i++;
+        }
+    }
+    return 1;
+}
+
 void __cdecl ResetLevelState(void)
 {
     int32_t  *matrix = (int32_t *)(uintptr_t)ADDR_ALLY_MATRIX;
@@ -2355,6 +2569,8 @@ int32_t __cdecl SelListInit(void)
 
 void gameproc_install(void)
 {
+    patch_replace(ADDR_PLACE_SCENARIO, (const void *)PlaceScenario,
+                  "PlaceScenario", 1);
     patch_replace(ADDR_OPEN_SAVE_FOR_LOAD, (const void *)OpenSaveForLoad,
                   "OpenSaveForLoad", 1);
     patch_replace(ADDR_ZERO_50C34C, (const void *)ZeroUnread50C34C,

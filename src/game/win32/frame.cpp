@@ -793,9 +793,6 @@ void __cdecl LevelTeardown(void)
  * with ADDR_STATE_ENTER_ONCE set it consumes a menu request, clears the flag
  * and leaves the frame there, so the sub-state dispatch below is skipped
  * entirely for that one frame. */
-typedef void (__cdecl *AM2_PlaceScenarioFn)(void);
-#define orig_place_scenario \
-    ((AM2_PlaceScenarioFn)AM2_IMAGE(ADDR_PLACE_SCENARIO))
 typedef int32_t (__cdecl *AM2_FindFirstFn2)(const char *, void *);
 typedef int32_t (__cdecl *AM2_FindCloseFn)(int32_t);
 #define orig_findfirst ((AM2_FindFirstFn2)AM2_IMAGE(ADDR_CRT_FINDFIRST))
@@ -951,7 +948,7 @@ void __cdecl State2Enter(void)
     if (*(const int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF != 0)
         LoadDefaultCof();
     if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0)
-        orig_place_scenario();
+        PlaceScenario();
 
     ProgressBar(0x50);
     *(int32_t *)(uintptr_t)ADDR_LEVEL_FLAG_E30 = 1;
