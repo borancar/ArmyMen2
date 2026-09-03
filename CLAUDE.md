@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **40** analysis
+**`make check` runs everything that does not need the game.** **41** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3691,7 +3691,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 12 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 13 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3782,7 +3782,44 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   test -- and the new part is that a stub is a mention the prose filter
   cannot see.
 
-  The other twenty are verified by READING, which is the standing worth
+  `AllObjectsInRect` joins them by `tools/rectquerycheck.py`, 312 cases over
+  two map configurations. This file listed it as beyond BOTH existing
+  harnesses -- `tools/vectors.py` refuses it because it reads two globals,
+  and `AM2_SELFCHECK=1` would take the process down on its null descriptor,
+  the way `LookupOwnerObj` did -- and that was true of those two harnesses
+  and not of the function.
+
+  **THE POINT OF IT IS THE SIBLING.** `ObjectsInRect` runs 112 times on a
+  drive and the two were transcribed within an hour of each other, differing
+  by four bytes of jump apiece: an entry clip that is the OPPOSITE test, and
+  a home-cell rule with two arms here against three there. Both differences
+  are invisible to any run that exercises only the other one. Taking the
+  sibling's clip fails 120 cases and its third arm 20 by row and 16 by
+  column -- so the pair really is distinguished now, where before the only
+  evidence either way was that the two disassemblies had been read
+  carefully.
+
+  **`IntersectRect` IS SHARED RATHER THAN MODELLED TWICE.** The one import
+  does not exist under emulation, so the IAT slot points at a mapped stub
+  implemented in Python -- and the MODEL calls that same Python. That is
+  `tools/formationcheck.py`'s lesson used in reverse: there a hand-written
+  model of `AngleDelta` produced 256 mismatches that were all the model's,
+  and the cure was to call the image's own function. Where that is
+  impossible, one implementation serving both sides keeps the count of
+  truths at one.
+
+  **AND THREE MUTATIONS FAILED NOTHING UNTIL THE CORPUS LEARNED SOMETHING.**
+  The home-cell guard only applies where `y > y0`, so an object in ROW 0
+  cannot reach it however its hit rect is placed, and the first attempt at
+  covering the dropped arm put its objects in row 0. A cell index past the
+  reported width ALIASES a later row's slot, and the column guard skips
+  whatever it finds there unless that object's own left is in the
+  out-of-range column. And with the world extent equal to `cols <<
+  CELL_SHIFT` the entry clip makes both clamps vacuous, so a second map
+  configuration whose descriptor under-reports its extent is what makes them
+  observable at all.
+
+  The other nineteen are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is
