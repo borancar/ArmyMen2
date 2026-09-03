@@ -1726,6 +1726,11 @@ void __cdecl HudPaint(void);
 /* 0x00412230, one caller -- FireWeapon. The A half of an aim marker, and the
  * one that DAMAGES: same eleven opening lines as AimStartB on the A arrays,
  * then everything at the point takes ADDR_AIM_DAMAGE. */
+/* 0x00412120, two callers. Release both aim sprite sets and clear the
+ * per-army state behind them. Both sprite counts are the distance to the
+ * next global, six and nine. */
+void __cdecl FreeAimSprites(void);
+
 void __cdecl AimStart(uint32_t uid, int8_t army, uint32_t at);
 
 void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at);

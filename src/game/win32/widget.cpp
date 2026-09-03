@@ -8405,6 +8405,49 @@ uint8_t __cdecl MpNamePaper(int32_t row)
  * and all five are gone. */
 #define orig_spawn_at_aim CreateExplosion
 
+/* FreeAimSprites -- original 0x00412120, two callers. Releases both aim
+ * sprite sets and clears the per-army state behind them.
+ *
+ * NEITHER LOOP BOUND IS A COUNT. Both walk from one global to the next four
+ * bytes at a time, so the number of sprites is the DISTANCE between two
+ * addresses: 0x004FC8C8 to 0x004FC8E0 is six, and 0x004FC920 to 0x004FC944 is
+ * nine. Written the same way rather than as `< 6` and `< 9`, because the
+ * bound is the neighbouring global and a literal would silently stop matching
+ * if either moved.
+ *
+ * The two clear loops are the reason this is not just a teardown: the A side
+ * zeroes LIVE and STAMP, and the B side zeroes LIVE, FRAME and STAMP -- one
+ * more array, not a copy of the same shape. Each runs four times, one per
+ * army, which is the one count here that IS a literal distance of 0x10.
+ *
+ * The original indexes those by a cursor running over the STAMP array and
+ * reaching back 0x20 for LIVE, which is how the pairing is visible at all;
+ * spelled here as the named arrays it is actually touching. */
+void __cdecl FreeAimSprites(void)
+{
+    AM2_Sprite **spr;
+    int32_t      i;
+
+    for (spr = (AM2_Sprite **)(uintptr_t)ADDR_AIM_SPRITES_A;
+         spr < (AM2_Sprite **)(uintptr_t)ADDR_AIM_LIVE_A; spr++)
+        ReleaseSprite(*spr);
+
+    for (i = 0; i < AM2_AIM_ARMIES; i++) {
+        ((int32_t *)(uintptr_t)ADDR_AIM_LIVE_A)[i]  = 0;
+        ((int32_t *)(uintptr_t)ADDR_AIM_STAMP_A)[i] = 0;
+    }
+
+    for (spr = (AM2_Sprite **)(uintptr_t)ADDR_AIM_SPRITES_B;
+         spr < (AM2_Sprite **)(uintptr_t)ADDR_AIM_LIVE_B; spr++)
+        ReleaseSprite(*spr);
+
+    for (i = 0; i < AM2_AIM_ARMIES; i++) {
+        ((int32_t *)(uintptr_t)ADDR_AIM_LIVE_B)[i]  = 0;
+        ((int32_t *)(uintptr_t)ADDR_AIM_FRAME_B)[i] = 0;
+        ((int32_t *)(uintptr_t)ADDR_AIM_STAMP_B)[i] = 0;
+    }
+}
+
 /* AimStart -- original 0x00412230, one caller, which is FireWeapon. The A half
  * of an aim marker, and the pair is now complete: THIS ONE DOES THE DAMAGE and
  * AimStartB below draws the marker. Reading either alone would have made the
@@ -11017,6 +11060,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_FREE_AIM_SPRITES, (const void *)FreeAimSprites,
+                        "FreeAimSprites", 0);
     rc |= patch_replace(ADDR_AIM_START_B, (const void *)AimStartB,
                         "AimStartB", 1);
     rc |= patch_replace(ADDR_AIM_START, (const void *)AimStart,

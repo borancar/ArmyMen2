@@ -760,7 +760,7 @@ void __cdecl LevelTeardown(void)
     call0(ADDR_TEARDOWN_40A6A0);
     FreeSeqContexts();
     FreeAirSpritesAlias();
-    call0(ADDR_FREE_AIM_SPRITES);
+    FreeAimSprites();
     FreeAllSprites();
     FreeHudWidgets();
     RefreshGate(0);
