@@ -1781,8 +1781,14 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
     }
 }
 
-typedef int32_t (__cdecl *AM2_MapRulesFn)(int32_t a, int32_t b, int32_t c);
-#define orig_check_map_rules ((AM2_MapRulesFn)(uintptr_t)ADDR_CHECK_MAP_RULES)
+/* FORWARD-DECLARED RATHER THAN INCLUDED, for the reason script.cpp gives for
+ * PreloadSprite: CheckMapRules lives in win32/widget.cpp because it paints
+ * widgets, and this is a flat module that checksplit.py forbids from naming a
+ * Win32 type. One declaration is cheaper than moving the function to the
+ * wrong side of the split. */
+extern "C" int32_t __cdecl CheckMapRules(uint32_t rulesSum,
+                                        uint32_t scriptSum,
+                                        uint32_t mapSum);
 typedef int32_t (__cdecl *AM2_SprintfFn)(char *out, const char *fmt, ...);
 #define orig_sprintf ((AM2_SprintfFn)(uintptr_t)ADDR_GAME_SPRINTF)
 
@@ -1917,10 +1923,10 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
                (const char *)(m + MSG_PLAYER_MAP_NAME));
         strcpy((char *)(uintptr_t)ADDR_MAP_NAME,
                (const char *)(m + MSG_PLAYER_LEVEL_NAME));
-        rules = orig_check_map_rules(
-                    *(const int32_t *)(m + MSG_PLAYER_RULE_ARG),
-                    *(const int32_t *)(m + MSG_PLAYER_RULE_SUM),
-                    *(const int32_t *)(m + MSG_PLAYER_MAP_SUM));
+        rules = CheckMapRules(
+                    *(const uint32_t *)(m + MSG_PLAYER_RULE_ARG),
+                    *(const uint32_t *)(m + MSG_PLAYER_RULE_SUM),
+                    *(const uint32_t *)(m + MSG_PLAYER_MAP_SUM));
         SendMapMsg(rules, *(const int32_t *)(kCommObj + AM2_COMM_CONNECTED));
     }
 

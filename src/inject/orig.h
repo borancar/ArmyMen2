@@ -13459,6 +13459,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * compare values no drive here produces. Recorded so the next attempt starts
  * from the message table rather than from the branch soup. */
 #define ADDR_CHECK_MAP_RULES     0x00431E10u  /* int32_t(int32, int32, int32) */
+/* CheckMapRules' answer, and the codes are GENERATED from the image rather
+ * than numbered off the arms: there is no 5, and 2 is reached twice by two
+ * unrelated failures -- no map in the game type's list, and no .amm on disk.
+ * The caller at 0x0041179B is what turns these into a refusal to join. */
+#define AM2_MAPCHECK_OK           0
+#define AM2_MAPCHECK_BAD_MAP      1
+#define AM2_MAPCHECK_NO_MAP       2
+#define AM2_MAPCHECK_BAD_RULES    3
+#define AM2_MAPCHECK_BAD_INSTALL  4
+#define AM2_MAPCHECK_NO_RULES     6
+/* ADDR_MENU_MODE while the multiplayer options panel is the open dialog,
+ * which is the only state in which CheckMapRules has widgets to update. */
+#define AM2_MENU_MODE_MP_PANEL    9
+#define AM2_MP_COMPLAINT_BYTES    0x100u
 #define ADDR_MSG_NO_RULES        0x004872F4u
 #define ADDR_MSG_BAD_INSTALL     0x004872BCu
 #define ADDR_MSG_BAD_RULES       0x0048729Cu

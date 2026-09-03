@@ -9811,6 +9811,191 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     }
 }
 
+/* The panel's complaint, six times over: grey the map preview and announce
+ * the failure against the OFFENDING PLAYER's name, which is our own slot's
+ * -- this runs on the machine that is failing the check, not on the host. */
+static void MpComplain(uint8_t *panel, uint32_t fmt)
+{
+    char line[AM2_MP_COMPLAINT_BYTES];
+
+    if (!panel)
+        return;
+
+    ShowBadMapPreview(*(AM2_Widget **)(panel + MP_PANEL_OFF_PREVIEW));
+    am2_sprintf(line, (const char *)AM2_IMAGE(fmt),
+                (const char *)(g_commObject + COMM_OFF_PLAYERS
+                    + (size_t)*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+                      * AM2_COMM_SLOT_STRIDE + COMM_SLOT_OFF_NAME));
+    Announce(line);
+}
+
+/* CheckMapRules -- original 0x00431E10, 1,184 bytes, SEVEN exits.
+ *
+ * The multiplayer installation check: the host sends three checksums and this
+ * answers with a code saying what the joining machine is missing or has
+ * wrong. Its one caller is the comm message handler at 0x0041179B.
+ *
+ * THE SIGNATURE IS MEASURED. espmap puts the three compared values on
+ * arguments 1, 2 and 3, each against one of RulesChecksum, MpScriptChecksum
+ * and MapChecksum. CLAUDE.md already records those three totals as the ones
+ * `ab.sh`'s `state` artifact exists for, because they never reach the screen
+ * and this build's logger is stubbed -- so a wrong one is invisible to both
+ * halves of an A/B and has to be dumped.
+ *
+ * THE EXIT CODES WERE GENERATED FROM THE IMAGE, not read off the arms, and
+ * that matters: there is no 5, and code 2 is reached TWICE by two unrelated
+ * failures -- no map in the type's list, and no `.amm` file on disk. Numbering
+ * the arms top to bottom would have invented a seventh code that does not
+ * exist. 6 no rules, 2 no map, 4 damaged installation, 3 damaged rules file,
+ * 1 damaged map, 0 good.
+ *
+ * IT RUNS WITH OR WITHOUT A DIALOG. `panel` is the open dialog only in menu
+ * mode 9, and every widget touch below is guarded on it -- so the same
+ * function validates an installation with no list boxes to fill. That guard
+ * is the first of two things separating it from OnMpGameType.
+ *
+ * ITS MIDDLE IS OnMpGameType'S BODY, measured at 0.825 similar over
+ * normalised disassembly, and the differences are the point. Besides the
+ * panel guard, `chosen` starts at -1 here and at 0 there: there it is a
+ * fallback to the first row, here -1 IS the "does not have map" rejection.
+ * Two loops that are instruction-for-instruction the same and mean opposite
+ * things at the end -- the AiStepTrack lesson, which is why the rule is to
+ * diff and then read what differs rather than to diff and stop. Not factored
+ * into a shared helper for that reason.
+ *
+ * NOT EXERCISED: it needs a host to send the handshake. Verified by reading,
+ * with the checksum globals available to `state` if a session is ever
+ * opened. */
+int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
+                              uint32_t mapSum)
+{
+    uint8_t       *panel = (uint8_t *)0;
+    const uint8_t *rec;
+    char           path[AM2_MP_RULES_PATH];
+    int32_t        chosen;
+    int32_t        i;
+
+    *(int32_t *)(uintptr_t)ADDR_LEVEL_ID    = 0;
+    *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX = 0;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MENU_MODE == AM2_MENU_MODE_MP_PANEL)
+        panel = *(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT;
+
+    rec = (const uint8_t *)ScriptListFind(
+              (char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME));
+    if (!rec) {
+        MpComplain(panel, ADDR_MSG_NO_RULES);
+        return AM2_MAPCHECK_NO_RULES;
+    }
+
+    if (panel) {
+        uint8_t    *box = *(uint8_t **)(panel + MP_PANEL_OFF_GAME_BOX);
+        AM2_Widget *type;
+        /* The key is the RECORD POINTER: ListGrowFind searches the rows'
+         * values at +0x100, and a game-box row's value is its record, which
+         * is what OnMpGameType established. */
+        int32_t     row = ListGrowFind(*(void **)(box + LIST_OFF_ROWS),
+                                       (int32_t)(uintptr_t)rec);
+
+        if (row != -1) {
+            box = *(uint8_t **)(panel + MP_PANEL_OFF_GAME_BOX);
+            *(int32_t *)(box + LIST_OFF_CHOSEN) = row;
+            ArrowBarShowRow(*(AM2_Widget **)(panel + MP_PANEL_OFF_GAME_BAR),
+                            row);
+        }
+
+        am2_sprintf(path, (const char *)AM2_IMAGE(ADDR_FMT_DOT_TXT),
+                    (const char *)(rec + MP_GAMETYPE_OFF_RULES));
+        FillListFromRules(path, panel);
+
+        type = *(AM2_Widget **)(panel + MP_PANEL_OFF_TYPE_BOX);
+        ((AM2_WidgetPaintFn *)type->vtable)[WIDGET_VSLOT_PAINT](type,
+                                                                type->rect);
+
+        box = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
+        RecordReset(*(void **)(box + LIST_OFF_ROWS));
+        box = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
+        *(int32_t *)(box + LIST_OFF_CHOSEN) = 0;
+        box = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
+        *(int32_t *)(box + LIST_OFF_TOP_ROW) = 0;
+    }
+
+    /* -1, NOT 0 -- see above. */
+    chosen = -1;
+    for (i = 0; i < *(const int32_t *)(rec + MP_GAMETYPE_OFF_MAP_COUNT); i++) {
+        const char *nm = *(const char *const *)(rec + MP_GAMETYPE_OFF_MAPS)
+                         + (size_t)i * AM2_MP_MAP_NAME_BYTES;
+        uint8_t    *lvl = (uint8_t *)FindLevelByName((char *)nm);
+
+        if (!lvl)
+            continue;
+
+        if (panel) {
+            uint8_t *box = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
+
+            ListAdd(*(void **)(box + LIST_OFF_ROWS),
+                    (const char *)(lvl + LEVEL_OFF_NAME), lvl);
+        }
+
+        if (strcmp(nm, (const char *)AM2_IMAGE(ADDR_MAP_NAME)) == 0)
+            chosen = i;
+    }
+
+    if (chosen == -1) {
+        MpComplain(panel, ADDR_MSG_NO_MAP);
+        return AM2_MAPCHECK_NO_MAP;
+    }
+
+    if (panel) {
+        uint8_t *box = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
+
+        *(int32_t *)(box + LIST_OFF_CHOSEN) = chosen;
+        ArrowBarShowRow(*(AM2_Widget **)(panel + MP_PANEL_OFF_MAP_BAR), chosen);
+    }
+
+    if (RulesChecksum() != rulesSum) {
+        MpComplain(panel, ADDR_MSG_BAD_INSTALL);
+        return AM2_MAPCHECK_BAD_INSTALL;
+    }
+
+    SelectLevel(FindLevelByName((char *)AM2_IMAGE(ADDR_MAP_NAME)));
+
+    if (MpScriptChecksum() != scriptSum) {
+        MpComplain(panel, ADDR_MSG_BAD_RULES);
+        return AM2_MAPCHECK_BAD_RULES;
+    }
+    if (MapChecksum() != mapSum) {
+        MpComplain(panel, ADDR_MSG_BAD_MAP);
+        return AM2_MAPCHECK_BAD_MAP;
+    }
+
+    /* The map is listed and the totals agree; the FILE still has to be there.
+     * This is the second exit that answers 2, for a different reason. */
+    SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
+    am2_sprintf(path, (const char *)AM2_IMAGE(ADDR_FMT_DOT_AMM),
+                (const char *)AM2_IMAGE(ADDR_MAP_NAME));
+    if (!FileExists(path)) {
+        MpComplain(panel, ADDR_MSG_NO_MAP);
+        return AM2_MAPCHECK_NO_MAP;
+    }
+
+    if (panel) {
+        AM2_Widget *preview = *(AM2_Widget **)(panel + MP_PANEL_OFF_PREVIEW);
+        char        bmp[AM2_MP_COMPLAINT_BYTES];
+
+        SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
+        am2_sprintf(bmp, (const char *)AM2_IMAGE(ADDR_FMT_PREV_BMP),
+                    (const char *)AM2_IMAGE(ADDR_MAP_NAME));
+        MpPreviewSetBitmap(preview, bmp);
+
+        preview = *(AM2_Widget **)(panel + MP_PANEL_OFF_PREVIEW);
+        ((AM2_WidgetPaintFn *)preview->vtable)[WIDGET_VSLOT_PAINT](
+            preview, preview->rect);
+    }
+
+    return AM2_MAPCHECK_OK;
+}
+
 /* 0x00430330 -- the thumbnail when the map is not installed. The literal is
  * copied into a 0x100 local before being handed on, which is the original's
  * inlined strcpy and not something the callee needs; kept, because the callee
@@ -13536,6 +13721,8 @@ int widget_install(void)
                         "HudPanelWidth", 3);
     rc |= patch_replace(ADDR_SET_POINTER_MODE, (const void *)SetPointerMode,
                         "SetPointerMode", 10);
+    rc |= patch_replace(ADDR_CHECK_MAP_RULES, (const void *)CheckMapRules,
+                        "CheckMapRules", 3);
     rc |= patch_replace(ADDR_MP_ON_GAME_TYPE, (const void *)OnMpGameType,
                         "OnMpGameType", 3);
     rc |= patch_replace(ADDR_POINTER_ACTION_FOLLOW,
