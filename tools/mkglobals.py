@@ -1,219 +1,128 @@
 #!/usr/bin/env python3
-"""Generate real C storage for every global the original kept in its image.
+"""Generate the data image the standalone build places at the original's VAs.
 
-THE STANDALONE BUILD IS A DROP-IN REPLACEMENT, so it can hold no hardcoded
-VA and cannot need ArmyMen2.exe present.  What makes that cheap is that
-src/game reaches the original's data through exactly one spelling --
-`ADDR_<NAME>`, cast to a pointer -- so redefining the macro to the ADDRESS OF
-A REAL OBJECT leaves all 3,776 use sites compiling unchanged:
+THE STANDALONE BUILD is an EXE that replaces ArmyMen2.exe in the game folder,
+needing the original at BUILD time only.  None of the original's CODE is
+required -- measured: of the 1,685 `.text` addresses src/game names, 1,640
+are `patch_replace` targets a standalone build has nothing to detour, and the
+other 46 are the CRT, rand and log seams that become libc.
 
-    injected    #define ADDR_AIR_GAUGE_X0 0x00473F20u
-    standalone  #define ADDR_AIR_GAUGE_X0 ((uintptr_t)&am2_g_air_gauge_x0)
+WHY THE DATA KEEPS THE ORIGINAL'S ADDRESSES, having first been generated as
+1,363 separate C objects.  That version linked and ran and faulted before its
+first log line, and the reason is a fact about this image rather than a bug:
+its RELOCATIONS ARE STRIPPED, and its .rdata and .data hold 3,582 dwords that
+look like pointers into .rdata/.data.  Some are -- 0x004702C0 -> 0x004702D8,
+and a run of them at 0x18 intervals.  Some are not: 0x00606060 is the ASCII
+"```".  Nothing distinguishes them, so moving the data breaks the real ones
+and rewriting by pattern corrupts the strings among them.
 
-    *(int32_t *)(uintptr_t)ADDR_AIR_GAUGE_X0     <- unchanged either way
+Placed back at the addresses they were written for, all 3,582 are correct and
+none needs touching.  The section is OURS -- the binary depends on no other
+file at run time -- it simply occupies the same range, and our own code is
+linked above it at 0x00700000.
 
-SIZES COME FROM THE GAPS.  An object runs from its own address to the next
-named one, which is how the original's own data is tiled; where a name has
-no successor in its section the object runs to the section's end.  That is
-an approximation and it is checkable -- an object too SHORT would be written
-past, and CLAUDE.md's standing warning about a field pointer named as a table
-base is exactly the case that makes one too short.
+WHAT STILL NEEDS FIXING UP is the other direction: 408 dwords that are
+FUNCTION pointers, the 33 menu vtables among them.  Those are unambiguous,
+because a reconstructed function's original address is known exactly, and
+they are rewritten at startup to point at ours.  The original's .text is not
+present, so a pointer that is missed faults at once rather than running
+something unexpected.
 
-VALUES COME FROM THE IMAGE, not from reading.  An address inside a section's
-raw bytes keeps them; anything past raw is .bss and is emitted with no
-initialiser so it costs nothing in the source or the binary.
+THIS IS A STAGE, NOT THE DESTINATION.  Every table carved out of the blob and
+written as typed, named C data is one less thing depending on the layout, and
+when the last one goes so does the placement constraint.  That is the same
+piecewise method the functions were reconstructed by.
 
-ALIGNMENT IS NOT OPTIONAL.  Every object is a byte array, because the code
-casts it to whatever it likes, and a byte array has alignment 1 -- so a
-`*(uint32_t *)` through it would be misaligned.  Each carries an explicit
-alignment.
-
-WHAT THIS CANNOT SEE is code that walks OFF one global into the next.  In the
-image they are contiguous; as separate objects they are not.  The original
-does this at least once -- CLAUDE.md records a teardown walking 0x005101F0 up
-to ADDR_SCRIPT_CONDITIONS because it is "the next global" -- so
-tools/checkadjacent.py exists to look for it.
-
-    tools/mkglobals.py            # writes src/game/standalone/
+    tools/mkglobals.py            # writes build/standalone/
 """
 import os
-import re
+import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import am2
+import merges
+import checkclaims as cc
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Generated build artifacts, not reconstruction: they live under
-# build/ so tools that scan src/game for modules do not count
-# them (checkclaims saw 36 flat modules instead of 34).
 OUT = os.path.join(REPO, "build", "standalone")
-ALIGN = 16
 
-
-# Where address-valued macros are defined.  Not only ADDR_: the widget layer
-# names the 33 menu vtables, the HUD bitmaps and a handful of strings the same
-# way, and those land in .rdata beside everything else.
-SOURCES = ("src/inject/orig.h", "src/game/win32/widget.h",
-           "src/game/win32/widget.cpp")
-
-
-def addr_defs():
-    out = []
-    for rel in SOURCES:
-        text = open(os.path.join(REPO, rel)).read()
-        out += [(m.group(1), int(m.group(2), 16)) for m in
-                re.finditer(r"^#define\s+(\w+)\s+0x([0-9A-Fa-f]{6,8})u?",
-                            text, re.M)]
-    return out
-
-
-def sections(img):
-    out = {}
-    for s in img.pe.sections:
-        name = s.Name.decode().rstrip("\0")
-        out[name] = (s.VirtualAddress + 0x400000, s.Misc_VirtualSize,
-                     s.SizeOfRawData)
-    return out
-
-
-def cname(macro):
-    base = macro[len("ADDR_"):] if macro.startswith("ADDR_") else macro
-    return "am2_g_" + base.lower()
+BLOB_LO = 0x0046F000          # the original's .rdata
+BLOB_HI = 0x00666000          # the end of its .data
+SECTION = ".origdat"
 
 
 def main():
+    os.makedirs(OUT, exist_ok=True)
     img = am2.Image()
-    secs = sections(img)
-    data_secs = [(n,) + secs[n] for n in (".rdata", ".data") if n in secs]
 
-    # Every ADDR_ that lands in a data section, grouped by address so the
-    # aliases -- two names on one address -- share one object.
-    by_addr = {}
-    for macro, a in addr_defs():
-        for _, va, vs, raw in data_secs:
-            if va <= a < va + vs:
-                by_addr.setdefault(a, []).append(macro)
-                break
-
-    addrs = sorted(by_addr)
-    objs = []
-    for i, a in enumerate(addrs):
-        sec = next(s for s in data_secs if s[1] <= a < s[1] + s[2])
-        end = sec[1] + sec[2]
-        nxt = addrs[i + 1] if i + 1 < len(addrs) else end
-        size = min(nxt, end) - a
-        if size <= 0:
+    blob = bytearray(BLOB_HI - BLOB_LO)
+    for s in img.pe.sections:
+        name = s.Name.decode().rstrip("\0")
+        if name not in (".rdata", ".data"):
             continue
-        raw_end = sec[1] + sec[3]
-        init = img.read(a, min(size, max(0, raw_end - a))) if a < raw_end else b""
-        if not any(init):
-            init = b""
-        objs.append((a, by_addr[a], size, init))
+        va = s.VirtualAddress + 0x400000
+        raw = img.pe.get_data(s.VirtualAddress, s.SizeOfRawData)
+        off = va - BLOB_LO
+        blob[off:off + len(raw)] = raw
 
-    # Any dword inside a copied object that is a reconstructed function's
-    # ORIGINAL address is a function pointer -- the 33 menu vtables are made
-    # of them -- and copying its bytes would leave it pointing at code this
-    # binary does not have.  They are rewritten at startup instead of in the
-    # initialiser, so globals.cpp stays plain bytes.
-    import struct as _s
-    import merges
-    import checkclaims as _cc
+    binpath = os.path.join(OUT, "origdata.bin")
+    open(binpath, "wb").write(bytes(blob))
+
+    with open(os.path.join(OUT, "origdata.S"), "w") as fh:
+        fh.write("/* Generated by tools/mkglobals.py -- do not edit.\n"
+                 " *\n"
+                 " * The original's .rdata and .data, placed by the linker at\n"
+                 " * the addresses they were written for.  See the tool's\n"
+                 " * docstring for why they cannot simply be moved.\n"
+                 " */\n"
+                 "    .section %s,\"dw\"\n"
+                 "    .globl am2_origdata\n"
+                 "am2_origdata:\n"
+                 "    .incbin \"%s\"\n" % (SECTION, binpath))
+
+    # The function pointers the original stored in its own data.  A dword
+    # equal to a reconstructed function's ORIGINAL address is one; nothing
+    # else in this range is unambiguous enough to touch.
     done = set(merges.reconstructed())
     a2n = {}
-    for n, a in _cc._name_addresses().items():
+    for n, a in cc._name_addresses().items():
         a2n.setdefault(int(a, 16), n)
+
     fixups = []
-    for a, macros, size, init in objs:
-        for off in range(0, len(init) - 3, 4):
-            v = _s.unpack_from("<I", init, off)[0]
-            if v in done and v in a2n:
-                fixups.append((cname(macros[0]), off, a2n[v]))
+    for off in range(0, len(blob) - 3, 4):
+        v = struct.unpack_from("<I", blob, off)[0]
+        if v in done and v in a2n:
+            fixups.append((BLOB_LO + off, a2n[v]))
 
-    os.makedirs(OUT, exist_ok=True)
-    with open(os.path.join(OUT, "globals.h"), "w") as fh:
-        fh.write("/* Generated by tools/mkglobals.py -- do not edit.\n"
-                 " *\n"
-                 " * One object per global the original kept in its own\n"
-                 " * image, so the standalone build needs no fixed address\n"
-                 " * and no copy of ArmyMen2.exe.\n"
-                 " */\n"
-                 "#ifndef AM2_STANDALONE_GLOBALS_H\n"
-                 "#define AM2_STANDALONE_GLOBALS_H\n\n"
-                 "#include <stdint.h>\n\n"
-                 '#ifdef __cplusplus\nextern "C" {\n#endif\n\n')
-        for a, macros, size, init in objs:
-            fh.write("extern uint8_t %s[%d];   /* was 0x%08X */\n"
-                     % (cname(macros[0]), size, a))
-        fh.write('\n#ifdef __cplusplus\n}\n#endif\n\n#endif\n')
-
-    nbytes = ninit = 0
-    with open(os.path.join(OUT, "globals.cpp"), "w") as fh:
-        fh.write("/* Generated by tools/mkglobals.py -- do not edit. */\n"
-                 '#include "globals.h"\n\n')
-        for a, macros, size, init in objs:
-            nbytes += size
-            decl = ("__attribute__((aligned(%d))) uint8_t %s[%d]"
-                    % (ALIGN, cname(macros[0]), size))
-            if not init:
-                fh.write("%s;\n" % decl)
-                continue
-            ninit += 1
-            fh.write("%s = {" % decl)
-            for j, b in enumerate(init):
-                fh.write("\n   " if j % 12 == 0 else " ")
-                fh.write("0x%02X," % b)
-            fh.write("\n};\n")
-
-    with open(os.path.join(OUT, "origaddr.h"), "w") as fh:
-        fh.write("/* Generated by tools/mkglobals.py -- do not edit.\n"
-                 " *\n"
-                 " * The standalone spelling of every data ADDR_.  Included\n"
-                 " * by src/inject/orig.h under AM2_STANDALONE, so the use\n"
-                 " * sites do not change.\n"
-                 " */\n"
-                 "#ifndef AM2_STANDALONE_ORIGADDR_H\n"
-                 "#define AM2_STANDALONE_ORIGADDR_H\n\n"
-                 '#include "globals.h"\n\n')
-        for a, macros, size, init in objs:
-            for m in macros:
-                # orig.h has already defined these as literals, so the
-                # standalone spelling has to replace them rather than clash.
-                fh.write("#undef %s\n#define %-40s ((uintptr_t)&%s)\n"
-                         % (m, m, cname(macros[0])))
-        fh.write("\n#endif\n")
-
-    repo = REPO
-    import glob as _g
-    headers = ([os.path.join(repo, "src/game/win32/widget.h")]
-               + sorted(_g.glob(os.path.join(repo, "src/game/*.h")))
-               + sorted(_g.glob(os.path.join(repo, "src/game/win32/*.h"))))
+    import glob
+    headers = ([os.path.join(REPO, "src/game/win32/widget.h")]
+               + sorted(glob.glob(os.path.join(REPO, "src/game/*.h")))
+               + sorted(glob.glob(os.path.join(REPO, "src/game/win32/*.h"))))
     with open(os.path.join(OUT, "fixups.cpp"), "w") as fh:
         fh.write("/* Generated by tools/mkglobals.py -- do not edit.\n"
                  " *\n"
-                 " * Function pointers the original stored in its own data:\n"
-                 " * the menu vtables and the dispatch tables.  Copying the\n"
-                 " * bytes would leave them pointing at code this binary does\n"
-                 " * not contain, so am2_apply_fixups() writes ours in.\n"
+                 " * The original stored pointers to its own functions in its\n"
+                 " * own data -- the 33 menu vtables among them.  Its code is\n"
+                 " * not in this binary, so each is rewritten to ours before\n"
+                 " * WinMain runs.\n"
                  " */\n"
-                 '#include "%s/src/inject/win32.h"\n' % repo)
+                 '#include "%s/src/inject/win32.h"\n' % REPO)
         for h in headers:
             fh.write('#include "%s"\n' % h)
-        fh.write('#include "globals.h"\n\n'
+        fh.write("\n#include <stdint.h>\n\n"
                  'extern "C" void am2_apply_fixups(void);\n\n'
                  "void am2_apply_fixups(void)\n{\n")
-        for obj, off, fn in fixups:
-            fh.write("    *(const void **)(%s + %d) = (const void *)%s;\n"
-                     % (obj, off, fn))
+        for addr, fn in fixups:
+            fh.write("    *(const void **)(uintptr_t)0x%08Xu = "
+                     "(const void *)%s;\n" % (addr, fn))
         fh.write("}\n")
 
     print("mkglobals:")
-    print("  objects              : %d  (%d addresses, %d names)"
-          % (len(objs), len(addrs), sum(len(m) for m in by_addr.values())))
-    print("  storage              : %d bytes (%.1f MB)" % (nbytes, nbytes / 1e6))
-    print("  with initial values  : %d" % ninit)
-    print("  pointer fixups       : %d" % len(fixups))
-    print("  written to           : build/standalone/")
+    print("  %s  0x%06X..0x%06X  %d bytes"
+          % (SECTION, BLOB_LO, BLOB_HI, len(blob)))
+    print("  function-pointer fixups : %d" % len(fixups))
+    print("  written to              : build/standalone/")
     return 0
 
 

@@ -65,8 +65,24 @@ extern "C" void am2_sa_log(const char *fmt, ...)
     if (!tried) {
         const char *path = getenv("AM2_LOG");
         tried = 1;
-        if (path && *path)
+        if (path && *path) {
             fh = fopen(path, "w");
+        } else {
+            /* Next to the exe, not the working directory: SetGameDir chdirs
+             * into the map and avi directories as it goes, so a relative
+             * name lands somewhere different depending on when it is
+             * opened -- which is why the first attempt at this produced no
+             * file anywhere. */
+            char buf[MAX_PATH];
+            DWORD n = GetModuleFileNameA(NULL, buf, sizeof buf);
+            if (n && n < sizeof buf) {
+                char *slash = strrchr(buf, '\\');
+                if (slash && (size_t)(slash - buf) + 16 < sizeof buf) {
+                    strcpy(slash + 1, "am2port.log");
+                    fh = fopen(buf, "w");
+                }
+            }
+        }
     }
     if (!fh)
         return;
@@ -77,13 +93,13 @@ extern "C" void am2_sa_log(const char *fmt, ...)
     fflush(fh);
 }
 
-extern "C" int32_t am2_sa_ddraw_create(void *guid, void **out, void *outer)
+extern "C" int32_t __stdcall am2_sa_ddraw_create(void *guid, void **out, void *outer)
 {
     return (int32_t)DirectDrawCreate((GUID *)guid, (LPDIRECTDRAW *)out,
                                      (IUnknown *)outer);
 }
 
-extern "C" int32_t am2_sa_dinput_create(void *inst, uint32_t ver, void **out,
+extern "C" int32_t __stdcall am2_sa_dinput_create(void *inst, uint32_t ver, void **out,
                                         void *outer)
 {
     return (int32_t)DirectInputCreateA((HINSTANCE)inst, (DWORD)ver,
@@ -91,7 +107,7 @@ extern "C" int32_t am2_sa_dinput_create(void *inst, uint32_t ver, void **out,
                                        (IUnknown *)outer);
 }
 
-extern "C" int32_t am2_sa_dsound_create(void *guid, void **out, void *outer)
+extern "C" int32_t __stdcall am2_sa_dsound_create(void *guid, void **out, void *outer)
 {
     return (int32_t)DirectSoundCreate((GUID *)guid, (LPDIRECTSOUND *)out,
                                       (IUnknown *)outer);

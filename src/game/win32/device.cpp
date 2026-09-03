@@ -32,6 +32,7 @@
 
 #include "surface.h"
 #include "device.h"
+#include "../crt.h"
 #include "report.h"
 #include "../rect.h"
 #include "../../inject/patch.h"
@@ -76,8 +77,25 @@ static_assert((DISCL_NONEXCLUSIVE | DISCL_FOREGROUND) == 6, "keyboard cooperatio
 #define kIID_IDirectDraw2 (*(const GUID *)(uintptr_t)ADDR_IID_DIRECTDRAW2)
 #define kGuidSysMouse     (*(const GUID *)(uintptr_t)ADDR_GUID_SYS_MOUSE)
 #define kGuidSysKeyboard  (*(const GUID *)(uintptr_t)ADDR_GUID_SYS_KEYBOARD)
+/* THE DATA FORMATS ARE THE API'S, NOT THE IMAGE'S, in the standalone build.
+ * The original's c_dfDIMouse is intact at ADDR_DF_MOUSE, but its `rgodf`
+ * points at 0x004643A0 -- a const array MSVC placed BELOW .rdata, inside the
+ * .text range the standalone build deliberately does not carry. So the
+ * struct arrives and its array does not, and SetDataFormat answers
+ * E_INVALIDARG.
+ *
+ * Reaching for the image's copy was never necessary: c_dfDIMouse and
+ * c_dfDIKeyboard are part of the DirectInput contract and every SDK ships
+ * the same bytes. Using the ones we link against removes the dependency
+ * rather than working around it, which is what migrating a table out of the
+ * copied image is supposed to look like. */
+#ifdef AM2_STANDALONE
+#define kFormatMouse      (&c_dfDIMouse)
+#define kFormatKeyboard   (&c_dfDIKeyboard)
+#else
 #define kFormatMouse      ((LPCDIDATAFORMAT)(uintptr_t)ADDR_DF_MOUSE)
 #define kFormatKeyboard   ((LPCDIDATAFORMAT)(uintptr_t)ADDR_DF_KEYBOARD)
+#endif
 #define kBufferSizeProp   ((LPCDIPROPHEADER)(uintptr_t)ADDR_DIPROP_BUFFER_SIZE)
 
 /* The game's import thunks, not ours -- see the note at the top. */

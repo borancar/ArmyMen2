@@ -18223,13 +18223,15 @@ typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
 #define orig_realloc (*(am2_realloc_fn)ADDR_REALLOC)
 #define orig_memmove (*(am2_memmove_fn)ADDR_MEMMOVE)
 
-/* The standalone build is a drop-in replacement for ArmyMen2.exe, so it can
- * hold no address from that image.  Every data ADDR_ above is redefined here
- * to the address of a real object in our own binary -- generated, because
- * there are 1,233 of them -- which leaves all 3,776 use sites unchanged.
- * The injected build includes none of this and is untouched. */
+/* The standalone build replaces ArmyMen2.exe outright, needing it at BUILD
+ * time only.  The data addresses above stay exactly as they are: our own
+ * .origdat section is placed at the original's VAs, because the image's
+ * relocations are stripped and the 3,582 pointers inside its own data cannot
+ * be told from the bytes around them.  What this header does redefine is the
+ * 47 .text seams -- the CRT, rand, the logger and the DirectX creators --
+ * which are the only .text addresses the reconstruction uses for anything
+ * but a patch_replace.  The injected build includes none of it. */
 #ifdef AM2_STANDALONE
-#include "origaddr.h"   /* build/standalone, via -I */
 #include "standalone.h"
 #endif
 

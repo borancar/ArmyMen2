@@ -46,9 +46,16 @@ void am2_sa_log(const char *fmt, ...);
  * through wrappers rather than being named here, so this header -- which
  * every translation unit sees -- does not have to pull in ddraw.h, dinput.h
  * and dsound.h. */
-int32_t am2_sa_ddraw_create(void *guid, void **out, void *outer);
-int32_t am2_sa_dinput_create(void *inst, uint32_t ver, void **out, void *outer);
-int32_t am2_sa_dsound_create(void *guid, void **out, void *outer);
+/* __stdcall, NOT cdecl: the game calls these through WINAPI function-pointer
+ * typedefs, so a cdecl wrapper leaves the four arguments on the stack that
+ * neither side pops. The frame then shifts by sixteen bytes and the CALLER's
+ * next parameter read returns a stack address -- which is exactly how this
+ * was found, with InitInput's hWnd reading 0x00c3fdbc and SetCooperativeLevel
+ * answering E_HANDLE for a window that was demonstrably valid. */
+int32_t __stdcall am2_sa_ddraw_create(void *guid, void **out, void *outer);
+int32_t __stdcall am2_sa_dinput_create(void *inst, uint32_t ver, void **out,
+                                       void *outer);
+int32_t __stdcall am2_sa_dsound_create(void *guid, void **out, void *outer);
 
 /* MSVC spells these with a leading underscore and mingw agrees, but the
  * find-file family also shares a STRUCT layout with the caller, so these
