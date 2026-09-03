@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "misc.h"
+#include "packkey.h"  /* PackKey -- reconstructed */
 #include "rect.h"   /* PointInRect -- reconstructed */
 #include "map.h"    /* TileOfPoint -- reconstructed */
 #include "item.h"   /* TileAttrAt -- reconstructed */
@@ -369,13 +370,8 @@ static int32_t MaskSolid(uint32_t x, uint32_t y, const void *mask,
     }
 }
 
-/* The two the loose arm needs that are still original: the packed half and
- * MSVC's
- * _findfirst. */
-typedef void (__cdecl *AM2_LoadMaskPackedFn)(void *out, int32_t set,
-                                             int32_t index, int32_t frame);
-#define orig_load_mask_packed \
-    ((AM2_LoadMaskPackedFn)AM2_IMAGE(ADDR_LOAD_MASK_PACKED))
+/* The one the loose arm still needs: MSVC's _findfirst. The packed half was
+ * here too until it was reconstructed. */
 typedef int32_t (__cdecl *AM2_FindFirstFn)(const char *pattern, void *data);
 #define orig_findfirst  ((AM2_FindFirstFn)AM2_IMAGE(ADDR_CRT_FINDFIRST))
 /* LoadDibFlipped is reconstructed, in win32/surface.cpp. Declared here rather
@@ -416,6 +412,121 @@ extern "C" void *__cdecl LoadDibFlipped(const char *path, void *hdr,
  * failed load leaves the record's words untouched rather than zeroed -- only
  * the pointer says whether it worked.
  */
+/* Forward-declared rather than included: both live in win32/sprite.h and this
+ * module is on the flat side of the split, so the include would drag
+ * AM2_Sprite's LPDIRECTDRAWSURFACE across it and fail checksplit. The same
+ * reason script.cpp forward-declares PreloadSprite.
+ *
+ * WITH extern "C", unlike AimStart's pair: sprite.h opens its block at line
+ * 14 and both of these are declared inside it, where widget.h closes its
+ * block BEFORE AimStart. Match the header, not the module -- the rule cuts
+ * both ways and this is the other way. */
+extern "C" {
+void *__cdecl SpriteSetForKey(uint32_t key);
+int32_t __cdecl SpriteDirIndex(void *set, uint32_t key);
+}
+#define orig_fread_m (*(am2_fread_fn)AM2_IMAGE(ADDR_FREAD))
+#define orig_fseek_m (*(am2_fseek_fn)AM2_IMAGE(ADDR_FSEEK))
+#define orig_log_m   (*(am2_log_fn)AM2_IMAGE(ADDR_LOG))
+
+/* LoadMaskPacked -- original 0x00424590, 496 bytes, one caller: LoadMask's
+ * non-`-df` branch, which is the DEFAULT, so this is the arm that actually
+ * runs and the loose-file one is the exception.
+ *
+ * PackKey the three arguments, find the sprite set that owns the key, find
+ * the key's entry in that set's directory, seek to it and read the record.
+ *
+ * THREE OF THE SEVEN READS ARE DISCARDED AND ALL SEVEN MUST HAPPEN. The
+ * original reads four bytes at a time and consumes each immediately -- the
+ * value comes back at the same displacement plus 0x10, because the four
+ * pushes are still live when it is read -- and three of them are simply
+ * dropped. They are not dead: `fread` advances the file position, so
+ * skipping one would misalign every read after it. Reproduced as reads into
+ * a scratch rather than as seeks, which is what the original does.
+ *
+ * The two words it keeps go into MASKREC_OFF_DESC4 and
+ * MASKREC_OFF_DESC_BLOCKS. Those names were given from the LOOSE arm, which
+ * takes them from a DIB descriptor, and orig.h says so explicitly -- "only
+ * the loose arm is read here, so the two words are named for WHERE THEY COME
+ * FROM rather than for what they mean". This arm reads the same two fields
+ * out of the archive, so the pairing is now confirmed from both sides even
+ * though what they MEAN is still open.
+ *
+ * Both failure paths -- a bad seek and a key that does not match -- free
+ * MASKREC_OFF_BITS if it is set, null it, and answer 0. The field is zeroed
+ * on entry, so on those paths the free is of whatever a previous call left,
+ * not of anything this one allocated.
+ *
+ * A zero or negative size skips the malloc entirely and still answers 1. */
+int32_t __cdecl LoadMaskPacked(void *out, int32_t set, int32_t index,
+                               int32_t frame)
+{
+    uint8_t *rec = (uint8_t *)out;
+    uint8_t *ss;
+    am2_FILE *fp;
+    uint32_t key;
+    uint32_t got;
+    int32_t  dir;
+    int32_t  scratch;
+    int32_t  size;
+    int32_t  where;
+
+    *(void **)(rec + MASKREC_OFF_BITS) = (void *)0;
+
+    key = (uint32_t)PackKey(set, index, frame);
+    ss  = (uint8_t *)SpriteSetForKey(key);
+    if (!ss)
+        return 0;
+
+    dir = SpriteDirIndex(ss, key);
+    if (dir < 0)
+        return 0;
+
+    fp = *(am2_FILE **)(ss + SPRITE_SET_OFF_FILE);
+
+    if (orig_fseek_m(fp, ((const int32_t *)(*(void **)(ss + SPRITE_SET_OFF_DIR)))
+                       [dir * 2 + 1], 0) != 0) {
+        orig_log_m((const char *)AM2_IMAGE(ADDR_STR_DF_SEEK_FAIL),
+                 ((const int32_t *)(*(void **)(ss + SPRITE_SET_OFF_DIR)))
+                     [dir * 2 + 1]);
+        goto fail;
+    }
+
+    orig_fread_m(&got, 4, 1, fp);
+    if (key != got) {
+        orig_log_m((const char *)AM2_IMAGE(ADDR_STR_DF_BAD_OBJECT));
+        goto fail;
+    }
+
+    orig_fread_m(&scratch, 4, 1, fp);
+    *(uint16_t *)(rec + MASKREC_OFF_DESC4) = (uint16_t)scratch;
+    orig_fread_m(&scratch, 4, 1, fp);
+    *(uint16_t *)(rec + MASKREC_OFF_DESC_BLOCKS) = (uint16_t)scratch;
+
+    orig_fread_m(&scratch, 4, 1, fp);   /* three reads whose values are dropped */
+    orig_fread_m(&scratch, 4, 1, fp);   /* and whose SIDE EFFECT on the file    */
+    orig_fread_m(&scratch, 4, 1, fp);   /* position is the point of them        */
+
+    orig_fread_m(&where, 4, 1, fp);
+    orig_fseek_m(fp, where, 1);
+    orig_fread_m(&where, 4, 1, fp);
+    orig_fseek_m(fp, where, 1);
+
+    orig_fread_m(&size, 4, 1, fp);
+    if (size > 0) {
+        void *bits = am2_malloc((size_t)size);
+        *(void **)(rec + MASKREC_OFF_BITS) = bits;
+        orig_fread_m(bits, (size_t)size, 1, fp);
+    }
+    return 1;
+
+fail:
+    if (*(void **)(rec + MASKREC_OFF_BITS))
+        am2_free(*(void **)(rec + MASKREC_OFF_BITS));
+    *(void **)(rec + MASKREC_OFF_BITS) = (void *)0;
+    return 0;
+}
+
 void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)
 {
     uint8_t *rec = (uint8_t *)out;
@@ -425,7 +536,7 @@ void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)
     uint8_t  desc[AM2_DIB_DESC_BYTES];
 
     if (!*(const int32_t *)AM2_IMAGE(ADDR_OPT_DF)) {
-        orig_load_mask_packed(out, set, index, frame);
+        LoadMaskPacked(out, set, index, frame);
         return;
     }
 
@@ -2479,6 +2590,8 @@ int misc_install(void)
                   "CommAllPlayersReady", 1);
     patch_replace(ADDR_COMM_WAS_HERE_FOR_ARMY, (const void *)CommWasHereForArmy,
                   "CommWasHereForArmy", 1);
+    patch_replace(ADDR_LOAD_MASK_PACKED, (const void *)LoadMaskPacked,
+                  "LoadMaskPacked", 1);
     patch_replace(ADDR_APPLY_GAME_SETTINGS, (const void *)ApplyGameSettings,
                   "ApplyGameSettings", 6);
     patch_replace(ADDR_COMM_TEAM_SCORE, (const void *)CommTeamScore,

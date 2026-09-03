@@ -259,6 +259,11 @@ int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask);
  * SpriteLoadTriple's twin, with the same -df fork and the same glob
  * convention, globbing `.msk` where that one globs `.bmp` and `.sha`. The two
  * halves are NOT symmetrical -- see misc.cpp. */
+/* 0x00424590, one caller -- LoadMask's non-`-df` branch, which is the
+ * DEFAULT. Read a mask record out of the packed archive. */
+int32_t __cdecl LoadMaskPacked(void *out, int32_t set, int32_t index,
+                               int32_t frame);
+
 void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame);
 
 /* 0x0041CEC0. The same decoder over the same format with ONE difference: the

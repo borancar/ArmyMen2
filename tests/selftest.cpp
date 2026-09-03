@@ -154,6 +154,12 @@ void __cdecl ShakeAt(const AM2_Point *, int32_t)
  * NO extern "C": widget.h's block closes at line 1711 and both are declared
  * at 1729, outside it, so they are C++ linkage -- the same "match the header,
  * not the module" rule DrawSeqBar's note states, landing the other way round. */
+/* Pulled in because LoadMaskPacked forward-declares them: both are in
+ * win32/sprite.h, INSIDE its extern "C", so C linkage -- the opposite of
+ * AimStart above. */
+extern "C" void *__cdecl SpriteSetForKey(uint32_t) { return (void *)0; }
+extern "C" int32_t __cdecl SpriteDirIndex(void *, uint32_t) { return -1; }
+
 void __cdecl AimStart(uint32_t, int8_t, uint32_t) {}
 void __cdecl AimStartB(uint32_t, int8_t, uint32_t) {}
 
