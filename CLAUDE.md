@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **36** analysis
+**`make check` runs everything that does not need the game.** **37** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3621,7 +3621,24 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   rather than merely passing near it. Dropping the zero-range arm fails 216,
   applying the timed weapon's extra scale to every kind 486.
 
-  The other twelve are verified by READING, which is the standing worth
+  `ListDropOldest` joins them too, by `tools/listcheck.py` -- this file calls
+  it "the sharpest case of a function that cannot be driven rather than merely
+  has not been", and fourteen cases now cover its whole space. malloc is a
+  BUMP allocator rather than a fixed address, because a fixed one would alias
+  the array being copied out of; free is a bare `ret` with a hook recording
+  its argument, so "what was freed" is an observable rather than a crash.
+
+  Its mutation counts are all exactly derivable -- copying from row 0 instead
+  of row 1 fails 10, which is the counts of two or more; never freeing the
+  owned value fails 6, which is the owning cases with a non-null pointer.
+
+  **AND THE ORACLE CAUGHT THE MODEL, not the code.** The first model freed the
+  dropped row's value whenever the list owns its values, and the
+  reconstruction guards on the pointer being non-null. The one case that
+  distinguishes them is a count of ZERO, where row 0 is blank -- so the corpus
+  reaching an empty list is what made the difference visible at all.
+
+  The other eleven are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is
