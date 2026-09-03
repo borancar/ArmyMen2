@@ -3496,7 +3496,35 @@ exact oracle**, however meaningful it is when it is set.
   of the first five unreferenced candidates checked by hand, two disassembled to
   garbage. So the figure is a lower bound and is meant to be — 260 candidates,
   186 confirmed. Do not rewrite `functions.tsv` from the naive scan.
-- **A PROBE THAT REDEFINES THE FUNCTION'S NAME ALSO REDEFINES ITS PATCH.** The
+- **A PROBE INSIDE THE FRAME LOOP IS MEASURING THE COMPILER UNLESS IT IS
+`volatile`, AND I MADE THIS MISTAKE TWICE IN ONE SESSION BEFORE CHECKING.**
+Chasing a report that the standalone port would not move Sarge, a probe in
+WinMain's `for (;;)` read `ADDR_GAME_CLOCK_MS` and reported it frozen at 100
+forever -- which reads as the whole answer, since nothing that depends on
+elapsed time can run. A second probe read `ADDR_MENU_MODE` and reported the
+sub-state stuck at 24, an in-mission dialog arm rather than play. Both were
+plain `*(uint32_t *)(uintptr_t)ADDR_X` reads; neither address is written by
+anything the compiler can see from that loop, so GCC hoisted the load out and
+re-reported one stale value. With `volatile` the clock climbs normally and
+the sub-state reaches 33.
+
+The tell was available and ignored: `FrameClockStep`'s own probe showed the
+clock at 19,462 ms in the same run the loop probe called it 100. Two
+measurements of one global disagreeing means one of the measurements is
+wrong, and the one to suspect is the one in the hot loop.
+
+**AND THE CONTROL SETTLED IT WHERE FOUR PROBES DID NOT.** Running the SAME
+drive and the SAME measurements against the injected build gave submode 33
+against 33, pause 0 against 0, a clock advancing on both, 104 pixels against
+117 for a held arrow key, and 248 against 0 for a click-to-move. Holding a
+key does not scroll in the ORIGINAL under this environment either. So there
+was no divergence to find, and every hour after the first probe was spent
+looking for one. This file already says to give the control as many samples
+as the thing it is controlling for; the corollary is that a bug report about
+a port needs the ORIGINAL measured the same way FIRST, before anything is
+instrumented.
+
+**A PROBE THAT REDEFINES THE FUNCTION'S NAME ALSO REDEFINES ITS PATCH.** The
 trick that works for a blind counter -- `#define Fn ((FnType)(uintptr_t)ADDR_FN)`
 so the caller goes through the detour -- rewrites the `patch_replace(ADDR_FN,
 (const void *)Fn, ...)` line too, so the address is patched to jump to itself.
