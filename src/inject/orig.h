@@ -4056,6 +4056,11 @@
  * push operands at 0x004315BB and 0x0043163D. */
 #define ADDR_MP_REQUEST_OPTIONS  0x004319B0u  /* void(void) */
 #define ADDR_MP_LEAVE_SESSION    0x004319E0u  /* void(void) */
+/* The READY button beside them, and the program names it: its format string
+ * is "%s is ready.". Non-host only, and refused once the slot is already
+ * flagged. */
+#define ADDR_MP_READY_TO_LOAD    0x00431920u  /* void(void) */
+#define ADDR_STR_IS_READY        0x00487240u  /* "%s is ready." */
 /* A SCROLLING LIST OF COLOURED TEXT LINES, five slots like every widget here:
  * its own destructor and paint, the base's update, focus and repaint. Built at
  * 0x00433290 from 0x00430C95, on the screen that also loads

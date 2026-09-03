@@ -13647,6 +13647,51 @@ void __cdecl MpLeaveSession(void)
     g_menuRequestSet = 1;
 }
 
+
+/* 0x00431920, the READY button, installed by `push imm32` like the two above.
+ *
+ * THE PROGRAM NAMES IT: the format string it hands sprintf is "%s is ready.",
+ * which is what makes this the ready button rather than a guess from the
+ * message it sends. Non-host only -- the host has nothing to declare -- and
+ * refused a second time once the slot's own flag is set.
+ *
+ * THE TWO FIELD READS ARE WHY THE OFFSET RULE EXISTS. The original indexes
+ * `comm + owner*0x70 + 0x218` and `+ 0x270`, and writing those down as they
+ * appear would put a field pointer where a base belongs. They are
+ * COMM_OFF_PLAYERS (0x20C) plus owner * COMM_PLAYER_STRIDE (112) plus
+ * COMM_SLOT_OFF_NAME (0x0C) and COMM_SLOT_OFF_READY_TO_LOAD (0x64) -- every
+ * one of those names already existed, and grepping the OFFSETS rather than
+ * inventing a COMM_PLAYER_OFF_ prefix is what found them. orig.h records that
+ * exact duplicate being created three times in one session under a new
+ * prefix, which is the one shape checkoffsets cannot catch.
+ *
+ * Both globals are RE-READ after the send rather than kept in locals, because
+ * that is what the original does. */
+
+void __cdecl MpReadyToLoad(void)
+{
+    const uint8_t *comm = g_commObject;
+    const uint8_t *slot;
+    char           text[0x40];
+
+    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        return;
+
+    slot = comm + COMM_OFF_PLAYERS
+           + (uintptr_t)g_defaultOwner * COMM_PLAYER_STRIDE;
+    if (*(const int32_t *)(slot + COMM_SLOT_OFF_READY_TO_LOAD))
+        return;
+
+    PlaySoundAt(2, 0, 0, 0, 0);
+    SendGameReadyToLoadMsg(1);
+
+    slot = g_commObject + COMM_OFF_PLAYERS
+           + (uintptr_t)g_defaultOwner * COMM_PLAYER_STRIDE;
+    am2_sprintf(text, (const char *)AM2_IMAGE(ADDR_STR_IS_READY),
+                slot + COMM_SLOT_OFF_NAME);
+    Announce(text);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -14500,6 +14545,8 @@ int widget_install(void)
                         "MpRequestOptions", 0);
     rc |= patch_replace(ADDR_MP_LEAVE_SESSION, (const void *)MpLeaveSession,
                         "MpLeaveSession", 0);
+    rc |= patch_replace(ADDR_MP_READY_TO_LOAD, (const void *)MpReadyToLoad,
+                        "MpReadyToLoad", 0);
     return rc;
 }
 
@@ -15905,8 +15952,7 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
                                 (const char *)AM2_IMAGE(0x00487150u),
                                 (const char *)AM2_IMAGE(0x00487164u), 1,
                                 *RectSet(&r, 0x21F, 0x11A, 0x51, 0x20),
-                                (void (__cdecl *)(AM2_Widget *))(uintptr_t)
-                                    0x00431920u,
+                                (void (__cdecl *)(AM2_Widget *))MpReadyToLoad,
                                 0);
         }
         WidgetAddChild(w, child);

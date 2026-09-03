@@ -1684,6 +1684,7 @@ void __attribute__((thiscall)) MpPanelDestruct(AM2_Widget *w);
  * address: open the options dialog, and leave the session. */
 void __cdecl MpRequestOptions(void);
 void __cdecl MpLeaveSession(void);
+void __cdecl MpReadyToLoad(void);
 
 AM2_Widget *__attribute__((thiscall)) MpPanelDelete(AM2_Widget *w, int32_t f);
 AM2_Widget *__attribute__((thiscall)) MpDialogDelete(AM2_Widget *w, int32_t f);
