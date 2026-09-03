@@ -357,6 +357,9 @@
  * constructor installs VTABLE_DLG_OVERWRITE. Sitting next to the destructor in
  * the image is not evidence and is not what was used. */
 #define ADDR_OVERWRITE_CTOR      0x00450320u /* thiscall, ret 8 */
+#define ADDR_DLG_OVERWRITE_OK     0x00450610u /* void(AM2_Widget *) */
+#define ADDR_DLG_OVERWRITE_CANCEL 0x004505E0u /* void(AM2_Widget *), and the
+                                               * dialog's DLG_OFF_ESCAPE */
 #define ADDR_OPEN_OVERWRITE_GAME 0x004506A0u /* void(void) */
 #define AM2_OVERWRITE_SIZE       0x64u
 #define ADDR_STR_OVRGAME_BMP     0x0048B96Cu /* "02_018_00_ovrgame.bmp" */
@@ -6568,6 +6571,12 @@ typedef struct {
 /* The save DELETE GAME is about to remove -- LOAD GAME's DELETE copies the
  * chosen name in, DELETE GAME's CANCEL clears it, and its OK reads it. */
 #define ADDR_PENDING_DELETE      0x00659F58u /* char[] */
+/* Its prompt, and the name says the global is not only the DELETE dialog's:
+ * "Are you sure you want to overwrite savefile '%s'?" takes the same buffer.
+ * Left named for the first consumer found; both dialogs stage their target
+ * name in it. */
+#define ADDR_STR_OVERWRITE_ASK   0x0048B938u /* char[] */
+#define AM2_DLG_TEXT_BYTES       0x100u      /* the constructors' stack buffer */
 #define ADDR_STR_DATA_DIR        0x0048BAB8u /* "data" */
 /* The in-mission overlay mode DELETE GAME asks with. Its CANCEL goes back to
  * AM2_MENU_MODE_DEL_PLAYER (0x1A) when it came from here and to 0x19

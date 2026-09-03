@@ -673,6 +673,12 @@ AM2_Widget *__attribute__((thiscall)) DlgMessageConstruct(AM2_Widget *w,
                                                           const char *bmp,
                                                           int32_t flag);
 
+/* 0x00450320, thiscall. The overwrite prompt: OK, Cancel, message, icon.
+ * Unlike DlgMessage its coordinates are ABSOLUTE. */
+AM2_Widget *__attribute__((thiscall)) DlgOverwriteConstruct(AM2_Widget *w,
+                                                            const char *bmp,
+                                                            int32_t flag);
+
 AM2_DECLARE_CLASS_DTOR(DlgMessage);
 AM2_DECLARE_CLASS_DTOR(DlgGameMenu);
 

@@ -4287,6 +4287,81 @@ void __attribute__((thiscall)) HudCmdInvoke(AM2_Widget *w, int32_t mode)
     }
 }
 
+/* DlgOverwriteConstruct -- original 0x00450320, 688 bytes, thiscall `ret 8`.
+ * "Are you sure you want to overwrite savefile '%s'?" with OK and CANCEL,
+ * the message, and the same red icon the message box uses.
+ *
+ * ITS COORDINATES ARE ABSOLUTE, where DlgMessageConstruct's are all relative
+ * to a centre it computes from its backdrop. Two dialogs of the same shape,
+ * built two different ways, and the difference is invisible unless both are
+ * read -- so this one does NOT re-centre if its bitmap changes size.
+ *
+ * DLG_OFF_ESCAPE is set to the CANCEL button's own handler, so escaping the
+ * dialog and pressing Cancel run the same code. That is the last thing the
+ * constructor does and it is why 0x004505E0 appears twice.
+ *
+ * The four children are added whether or not their allocation succeeded, the
+ * family habit; the OK button also becomes the focused child. */
+AM2_Widget *__attribute__((thiscall)) DlgOverwriteConstruct(AM2_Widget *w,
+                                                            const char *bmp,
+                                                            int32_t flag)
+{
+    AM2_Widget *btn;
+    AM2_Widget *typer;
+    AM2_Widget *icon;
+    AM2_Rect    box;
+    char        text[AM2_DLG_TEXT_BYTES];
+
+    ScreenBaseConstruct(w, bmp, flag);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_DLG_OVERWRITE);
+    w->flag44 = 1;
+
+    btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    if (btn) {
+        RectSet(&box, 0x1B5, 0xD0, 0x51, 0x20);
+        btn = ButtonConstruct(btn, "03_007_00_ok.bmp", "03_007_01_ok.bmp",
+                              "03_007_02_ok.bmp", 1, box,
+                              (void (__cdecl *)(AM2_Widget *))
+                                  AM2_IMAGE(ADDR_DLG_OVERWRITE_OK),
+                              (void (__cdecl *)(AM2_Widget *))0);
+    }
+    WidgetAddChild(w, btn);
+    w->focusedChild = btn;
+
+    btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    if (btn) {
+        RectSet(&box, 0x1B5, 0xF9, 0x51, 0x20);
+        btn = ButtonConstruct(btn, "03_018_00_cancel.bmp",
+                              "03_018_01_cancel.bmp", "03_018_02_cancel.bmp",
+                              1, box,
+                              (void (__cdecl *)(AM2_Widget *))
+                                  AM2_IMAGE(ADDR_DLG_OVERWRITE_CANCEL),
+                              (void (__cdecl *)(AM2_Widget *))0);
+    }
+    WidgetAddChild(w, btn);
+
+    am2_sprintf(text, (const char *)AM2_IMAGE(ADDR_STR_OVERWRITE_ASK),
+                (const char *)(uintptr_t)ADDR_PENDING_DELETE);
+
+    typer = (AM2_Widget *)orig_operator_new(AM2_TYPER_BYTES);
+    if (typer)
+        typer = TyperConstruct(typer, 0x94, 0xD9, 0xF0, 0x34, text);
+    WidgetAddChild(w, typer);
+
+    icon = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_BYTES);
+    if (icon) {
+        RectSet(&box, 0x8F, 0x12D, 0x11, 0x10);
+        icon = MultiSpriteConstruct(icon, "03_029_00_red.bmp",
+                                    "03_029_01_red.bmp", 1, box);
+    }
+    WidgetAddChild(w, icon);
+
+    /* Escape does what Cancel does. */
+    *(void **)((uint8_t *)w + DLG_OFF_ESCAPE) =
+        (void *)AM2_IMAGE(ADDR_DLG_OVERWRITE_CANCEL);
+    return w;
+}
+
 /* DlgMessageConstruct -- original 0x00452750, 560 bytes, thiscall `ret 8`.
  * The plain message box: an OK button, a typer for the text, and the red
  * 03_029 icon. orig.h described it from its sprites alone -- "Message --
@@ -5206,7 +5281,7 @@ void __cdecl OpenOverwriteGame(void)
 {
     CloseCurrentScreen();
     RefreshScreen();
-    OpenScreen2(AM2_OVERWRITE_SIZE, (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_OVERWRITE_CTOR),
+    OpenScreen2(AM2_OVERWRITE_SIZE, (AM2_ScreenCtor2Fn)DlgOverwriteConstruct,
                 (const char *)AM2_IMAGE(ADDR_STR_OVRGAME_BMP), 0);
 }
 
@@ -11832,6 +11907,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_OVERWRITE_CTOR,
+                        (const void *)DlgOverwriteConstruct,
+                        "DlgOverwriteConstruct", 1);
     rc |= patch_replace(ADDR_MESSAGE_CTOR,
                         (const void *)DlgMessageConstruct,
                         "DlgMessageConstruct", 1);
