@@ -3724,6 +3724,57 @@ void __attribute__((thiscall)) WidgetRepaint(AM2_Widget *w)
     ((AM2_WidgetPaintFn *)target->vtable)[WIDGET_VSLOT_PAINT](target, w->rect);
 }
 
+/* HudCmdConstruct -- original 0x00417040, one caller, thiscall. Builds the
+ * HUD command bar: base-construct, take the vtable, preload seven sprites,
+ * then set three empty command slots and the bar's rectangle.
+ *
+ * THE PRELOAD LOOP CAN ABANDON THE REST OF THE CONSTRUCTOR. A null from
+ * PreloadArmySprite jumps straight to the epilogue, so the three slots are
+ * never set to -1 and the rectangle is never written -- the widget comes back
+ * with whatever WidgetConstruct left. That is an early exit out of the middle
+ * of a constructor and it is reproduced; writing the tail unconditionally
+ * would be the obvious tidy-up and would change what a failed load returns.
+ *
+ * The table is walked by its SECOND field: the original starts ESI at
+ * 0x004761AC and reads [esi-4], so the record base is 0x004761A8 and the
+ * bound 0x004762C4 yields seven. Written from the base with named fields.
+ * ADDR_HUD_CMD_SPRITES is this same table reached at its sprite field, 0x0C
+ * along, and three other functions walk it that way.
+ *
+ * The MSVC SEH prologue is not reproduced -- see the note on the widget
+ * destructors. Nothing in this program throws.
+ *
+ * All seven records name sprite set 15; the indices are 0, 0, 1, 2, 3, 4, 1,
+ * so two pairs share a sprite rather than there being seven distinct ones. */
+AM2_Widget *__attribute__((thiscall)) HudCmdConstruct(AM2_Widget *w)
+{
+    uint8_t *rec = (uint8_t *)AM2_IMAGE(ADDR_HUD_CMD_SPEC);
+    int32_t  i;
+
+    WidgetConstruct(w);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_COMMANDS);
+
+    for (i = 0; i < AM2_HUD_CMD_SPRITES; i++, rec += AM2_HUD_CMD_SPR_STRIDE) {
+        void *spr = PreloadArmySprite(
+            *(const int32_t *)(rec + HUDCMDSPR_OFF_SET),
+            *(const int32_t *)(rec + HUDCMDSPR_OFF_INDEX),
+            *(const int32_t *)(rec + HUDCMDSPR_OFF_FRAME), 0);
+        *(void **)(rec + HUDCMDSPR_OFF_SPRITE) = spr;
+        if (!spr)
+            return w;                 /* the tail below is SKIPPED */
+    }
+
+    ((int32_t *)((uint8_t *)w + HUDCMD_OFF_SLOTS))[0] = -1;
+    ((int32_t *)((uint8_t *)w + HUDCMD_OFF_SLOTS))[1] = -1;
+    ((int32_t *)((uint8_t *)w + HUDCMD_OFF_SLOTS))[2] = -1;
+
+    w->x = 0;
+    w->y = AM2_HUD_CMD_TOP;
+    w->w = AM2_HUD_CMD_WIDTH;
+    w->h = AM2_HUD_CMD_HEIGHT;
+    return w;
+}
+
 AM2_Widget *__attribute__((thiscall)) WidgetConstruct(AM2_Widget *w)
 {
     AM2_Rect zero;
@@ -11060,6 +11111,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_HUD_CMD_CONSTRUCT, (const void *)HudCmdConstruct,
+                        "HudCmdConstruct", 1);
     rc |= patch_replace(ADDR_FREE_AIM_SPRITES, (const void *)FreeAimSprites,
                         "FreeAimSprites", 0);
     rc |= patch_replace(ADDR_AIM_START_B, (const void *)AimStartB,

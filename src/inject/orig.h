@@ -645,6 +645,30 @@
 #define ADDR_HUD_SARGE_DELETE  0x00414E90u
 #define ADDR_HUD_SARGE_DESTRUCT 0x00414EB0u
 #define ADDR_HUD_CMD_DELETE    0x004170F0u
+/* 0x00417040, one caller, thiscall -- the HUD command bar's constructor.
+ * It preloads seven sprites into a table of 0x28-byte records, and ESI walks
+ * the records' SECOND field: the loop starts at 0x004761AC and reads [esi-4],
+ * so the record base is 0x004761A8 and the bound 0x004762C4 gives seven.
+ * Named from the base, not from the cursor -- the mistake this file opens by
+ * warning about.
+ *
+ * ADDR_HUD_CMD_SPRITES is the SAME TABLE reached at its sprite field, which
+ * is this base plus HUDCMDSPR_OFF_SPRITE, and it keeps that name: it has
+ * three consumers that walk only that field, with a matching _END, and its
+ * own comment already said "0x0C below the mode fields". Two entry points
+ * into one table, each named for what its users touch, rather than a second
+ * spelling of one concept. */
+#define ADDR_HUD_CMD_CONSTRUCT 0x00417040u  /* thiscall AM2_Widget *(this) */
+#define ADDR_HUD_CMD_SPEC      0x004761A8u  /* 7 x 0x28, the RECORD base */
+#define AM2_HUD_CMD_SPRITES    7
+#define HUDCMDSPR_OFF_SET      0x00u  /* PreloadArmySprite's three arguments */
+#define HUDCMDSPR_OFF_INDEX    0x04u
+#define HUDCMDSPR_OFF_FRAME    0x08u
+#define HUDCMDSPR_OFF_SPRITE   0x0Cu  /* where the loaded sprite is stored */
+#define AM2_HUD_CMD_SPR_STRIDE 0x28u
+#define AM2_HUD_CMD_TOP        0x199  /* the bar's y, w and h; x is 0 */
+#define AM2_HUD_CMD_WIDTH      0x90
+#define AM2_HUD_CMD_HEIGHT     0x30
 #define ADDR_HUD_CMD_DESTRUCT  0x00417110u
 /* The Sarge panel's own sprites: 31 slots from HUD_OFF_SPRITE0, filled by its
  * constructor from sprite set 13 indices 0..30. */

@@ -279,6 +279,10 @@ void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip);
  * clears the tree links, then leaves 0x0040 alone -- the one field in the
  * range it touches that it does not write. Returns `this`, as an i386 MSVC
  * constructor does. */
+/* 0x00417040, thiscall. The HUD command bar. A failed sprite preload
+ * abandons the rest of the constructor -- see the definition. */
+AM2_Widget *__attribute__((thiscall)) HudCmdConstruct(AM2_Widget *w);
+
 AM2_Widget *__attribute__((thiscall)) WidgetConstruct(AM2_Widget *w);
 
 /* Original: 0x00454E70, thiscall. The label's constructor: base first, then
