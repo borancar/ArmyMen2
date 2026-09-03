@@ -2531,6 +2531,22 @@ int32_t __cdecl WriteDotString(char *dst)
     return 1;
 }
 
+
+/* 0x0045A3F0. Empty both of a vehicle's pointer lists: the one at
+ * VEHICLE_OFF_PTR_LIST and the common one at OBJ_OFF_PTR_LIST. It is the MSVC
+ * member-destructor sequence -- two subobjects taken down in order, with the
+ * unwind index stepped between them -- and the 0xA4 half is the same field
+ * ClearPtrListAtA4 above reaches on its own.
+ *
+ * The SEH prologue is not reproduced, per the standing decision. Its only
+ * purpose here is to unwind the FIRST list if the second throws, and nothing
+ * in this program throws. */
+void __attribute__((thiscall)) ClearVehicleLists(void *obj)
+{
+    ClearPtrListAlias((uint8_t *)obj + VEHICLE_OFF_PTR_LIST);
+    ClearPtrListAlias((uint8_t *)obj + OBJ_OFF_PTR_LIST);
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_AI_TAKE_ABANDONED, (const void *)AiTakeAbandoned,
@@ -2711,6 +2727,9 @@ int misc_install(void)
                   "ClearPtrListAtA4", 1);
     patch_replace(ADDR_WRITE_DOT_STRING, (const void *)WriteDotString,
                   "WriteDotString", 1);
+    patch_replace(ADDR_CLEAR_VEHICLE_LISTS,
+                  (const void *)ClearVehicleLists,
+                  "ClearVehicleLists", 1);
     return 0;
 }
 

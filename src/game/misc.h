@@ -669,6 +669,9 @@ void __attribute__((thiscall)) ClearPtrListAlias(void *rec);
 /* 0x0043CCE0. Empty the pointer list embedded at +0xA4 of the object. */
 void __attribute__((thiscall)) ClearPtrListAtA4(void *obj);
 
+/* 0x0045A3F0. Empty both of a vehicle's pointer lists, 0x538 then 0xA4. */
+void __attribute__((thiscall)) ClearVehicleLists(void *obj);
+
 /* 0x0040FB90. Write "." into the buffer and answer 1. */
 int32_t __cdecl WriteDotString(char *dst);
 

@@ -17583,6 +17583,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * the rule working rather than the ratchet, since a new VEHICLE_ name would
  * have clashed and a new prefix would not have. */
 #define VEHICLE_OFF_PTR_LIST       0x538u
+/* 0x0045A3F0, thiscall: empty BOTH of a vehicle's pointer lists -- the one at
+ * VEHICLE_OFF_PTR_LIST and the common OBJ_OFF_PTR_LIST at 0xA4. The MSVC
+ * member-destructor sequence, and the same 0xA4 that ADDR_CLEAR_PTR_LIST_A4
+ * reaches on its own. */
+#define ADDR_CLEAR_VEHICLE_LISTS   0x0045A3F0u  /* thiscall void(void *) */
 /* How many the vehicle holds -- EnterVehicle refuses once the occupant list
  * has reached it. The same offset carries OBJ_OFF_DEATH_STATE on a roach,
  * which is a different record; recorded as its own name in the VEHICLE_

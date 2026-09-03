@@ -8798,7 +8798,7 @@ AM2_Widget *__attribute__((thiscall)) DeleteGameConstruct(AM2_Widget *w,
     }
 
     ok = MakeButton(dx + 0x149, dy + 0x38, AM2_BMP_OK0, AM2_BMP_OK1,
-                    AM2_BMP_OK2, kImageHandler(ADDR_ON_DELGAME_OK));
+                    AM2_BMP_OK2, OnDelGameOk);
     WidgetAddChild(parent, ok);
     parent->focusedChild = ok;
 
@@ -13882,6 +13882,37 @@ void __attribute__((thiscall)) MpTeamPaint(AM2_Widget *w, RECT clip)
     WidgetPaint(w, clip);
 }
 
+
+/* 0x004501E0, ADDR_ON_DELGAME_OK -- the DELETE GAME confirmation's OK.
+ *
+ * Three steps, and the last is the giveaway: it ends by calling
+ * OnDelGameCancel, so confirming and cancelling close the dialog the same
+ * way and only the deletion is extra. That is the same convergence the abort
+ * path shows elsewhere in this file.
+ *
+ * The chdir is CONDITIONAL on the current player's name being non-empty --
+ * the test is a `repne scasb` for length, not a null check -- because the
+ * save directory is per player. With no name, whatever directory is current
+ * is used as-is.
+ *
+ * The file is only removed if it BEGINS WITH A SAVE TAG, which is what stops
+ * a stray ADDR_PENDING_CONFIRM from deleting something that is not a save. */
+void __cdecl OnDelGameOk(AM2_Widget *w)
+{
+    char dir[0x100];
+
+    if (strlen(g_currentPlayer) != 0) {
+        am2_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR_FMT),
+                    g_currentPlayer);
+        SetGameDir(dir);
+    }
+
+    if (FileHasSaveTag((const char *)(uintptr_t)ADDR_PENDING_CONFIRM))
+        orig_remove((const char *)(uintptr_t)ADDR_PENDING_CONFIRM);
+
+    OnDelGameCancel(w);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -14754,6 +14785,8 @@ int widget_install(void)
                         "BuildStartHandler", 1);
     rc |= patch_replace(ADDR_MP_TEAM_PAINT, (const void *)MpTeamPaint,
                         "MpTeamPaint", 5);
+    rc |= patch_replace(ADDR_ON_DELGAME_OK, (const void *)OnDelGameOk,
+                        "OnDelGameOk", 1);
     return rc;
 }
 
