@@ -1474,8 +1474,6 @@ int frame_install(void)
  * because the comm object goes in ecx. */
 typedef int32_t (__attribute__((thiscall)) *AM2_TeamScoreFn)(void *comm,
                                                              int32_t slot);
-#define orig_comm_team_score \
-    ((AM2_TeamScoreFn)(uintptr_t)ADDR_COMM_TEAM_SCORE)
 
 /* PausedFrameStep -- original 0x00462600, three callers. The multiplayer
  * scoreboard overlay: one row per comm slot with a team marker, a pause
@@ -1629,7 +1627,7 @@ void __cdecl PausedFrameStep(void)
 
         if (mates > 1) {
             am2_sprintf(buf, (const char *)AM2_IMAGE(ADDR_STR_PCT_D),
-                        orig_comm_team_score(comm, slot));
+                        CommTeamScore(comm, slot));
             TextExtent(buf, 1, ext);
             if (!LockSurface(
                     *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))

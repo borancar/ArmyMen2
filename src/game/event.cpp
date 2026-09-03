@@ -2669,8 +2669,6 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
 /* The comm object's team score, still original. */
 typedef int32_t (__attribute__((thiscall)) *AM2_TeamScoreFn)(void *comm,
                                                              int32_t slot);
-#define orig_comm_team_score \
-    ((AM2_TeamScoreFn)(uintptr_t)ADDR_COMM_TEAM_SCORE)
 
 /* EvalOperand -- original 0x00421590, two callers. Evaluate one side of a
  * testvar comparison: eight kinds through a jump table, and anything past them
@@ -2762,7 +2760,7 @@ int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
         return AllyFlag(a, b) ? 1 : 0;
 
     case AM2_OPERAND_TEAMSCORE:
-        return orig_comm_team_score(
+        return CommTeamScore(
                    *(void *const *)(uintptr_t)ADDR_COMM_OBJECT, a);
 
     default:

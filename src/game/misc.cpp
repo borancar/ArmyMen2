@@ -999,6 +999,48 @@ int32_t __attribute__((thiscall)) GetArmyScore(void *comm, int32_t slot)
     return out;
 }
 
+/* CommTeamScore -- original 0x0040F990, thiscall. What the `teamscore`
+ * keyword answers: EvalOperand's kind 8 returns whatever this does.
+ *
+ * A slot with NO TEAM scores alone. Team 0 means unteamed rather than "team
+ * number zero", so the whole sum is skipped and the slot's own score is
+ * returned -- one call, not a loop that happens to match once. Otherwise every
+ * TAKEN slot sharing that team is added, the asking slot included, because it
+ * shares its own team by definition.
+ *
+ * Both tests matter and neither subsumes the other: an untaken slot can still
+ * carry a stale team, and a taken slot on a different team is skipped. The
+ * original reads TAKEN first and only then compares the team.
+ *
+ * The addressing is worth writing out because it decomposes exactly. The
+ * original computes the slot base as `eax*8 - eax` shifted left four, which is
+ * eax * 0x70 -- AM2_COMM_SLOT_STRIDE -- and reaches the team at a literal
+ * 0x258. That is COMM_OFF_PLAYERS (0x20C) plus COMM_SLOT_OFF_TEAM (0x4C), and
+ * the `+4` beside it is COMM_SLOT_OFF_TAKEN (0x50). Nothing here needed a new
+ * name; the literal confirms the existing layout rather than competing with
+ * it, which is the useful direction for a function this small. */
+int32_t __attribute__((thiscall)) CommTeamScore(void *comm, int32_t slot)
+{
+    const uint8_t *players = (const uint8_t *)comm + COMM_OFF_PLAYERS;
+    int32_t        team;
+    int32_t        total;
+    int32_t        i;
+
+    team = *(const int32_t *)(players + (size_t)slot * AM2_COMM_SLOT_STRIDE
+                              + COMM_SLOT_OFF_TEAM);
+    if (team == 0)
+        return GetArmyScore(comm, slot);
+
+    total = 0;
+    for (i = 0; i < AM2_COMM_SLOTS; i++) {
+        const uint8_t *rec = players + (size_t)i * AM2_COMM_SLOT_STRIDE;
+        if (*(const int32_t *)(rec + COMM_SLOT_OFF_TAKEN) != 0
+            && *(const int32_t *)(rec + COMM_SLOT_OFF_TEAM) == team)
+            total += GetArmyScore(comm, i);
+    }
+    return total;
+}
+
 /* 0x0040F1C0, thiscall, one caller. The same walk as CommSlotForArmy above
  * and a different answer: the matching slot's COMM_ARMY_OFF_WAS_HERE rather
  * than its index.
@@ -2375,6 +2417,8 @@ int misc_install(void)
                   "CommAllPlayersReady", 1);
     patch_replace(ADDR_COMM_WAS_HERE_FOR_ARMY, (const void *)CommWasHereForArmy,
                   "CommWasHereForArmy", 1);
+    patch_replace(ADDR_COMM_TEAM_SCORE, (const void *)CommTeamScore,
+                  "CommTeamScore", 1);
     patch_replace(ADDR_GET_ARMY_SCORE, (const void *)GetArmyScore,
                   "GetArmyScore", 3);
     patch_replace(ADDR_COMM_SLOT_HAS_PLAYER, (const void *)CommSlotHasPlayer,
