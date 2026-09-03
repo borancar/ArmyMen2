@@ -6269,6 +6269,12 @@ typedef struct {
  * list's "silent over 1250 ms" grey. Both are a greyed-out ink and they may be
  * the same idea; recorded rather than renamed, because nothing here settles
  * which name is the general one. */
+/* The checkbox's destructor pair, vtable slot 0. 0x00454740 is the scalar
+ * deleting destructor -- `push 1` into slot 0, the MSVC tell -- and it
+ * tail-calls the plain one at 0x004547C0, which releases all four faces in
+ * CHECKBOX_OFF_SPR_* order and chains to the base. */
+#define ADDR_CHECKBOX_DELETE     0x00454740u /* thiscall AM2_Widget *(w, int) */
+#define ADDR_CHECKBOX_DTOR       0x004547C0u /* thiscall void(w) */
 #define ADDR_CHECKBOX_PAINT      0x00454840u /* thiscall void(w, RECT) */
 #define CHECKBOX_OFF_SPR_ON      0x68u  /* checked, not focused */
 #define CHECKBOX_OFF_SPR_OFF     0x6Cu

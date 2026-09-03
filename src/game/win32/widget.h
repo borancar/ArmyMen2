@@ -685,6 +685,9 @@ AM2_DECLARE_CLASS_DTOR(MpName);
  * Destruct through a seam until Destruct itself was reconstructed. */
 void __attribute__((thiscall)) CountButtonDestruct(AM2_Widget *w);
 
+/* 0x004547C0 and 0x00454740. The checkbox releases four faces. */
+AM2_DECLARE_CLASS_DTOR(CheckBox);
+
 AM2_DECLARE_CLASS_DTOR(HudTop);
 AM2_DECLARE_CLASS_DTOR(HudPanel);
 AM2_DECLARE_CLASS_DTOR(HudRadar);

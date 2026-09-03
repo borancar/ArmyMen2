@@ -2974,6 +2974,42 @@ void __cdecl CountButtonActivate(AM2_Widget *w)
         onToggle(w);
 }
 
+/* CheckBoxDestruct -- original 0x004547C0, 113 bytes, and CheckBoxDelete --
+ * original 0x00454740, vtable slot 0. The checkbox releases FOUR faces: on,
+ * off, on-focused, off-focused, in CHECKBOX_OFF_SPR_* order, which is the
+ * same order its constructor takes them.
+ *
+ * Written as a pair because they are one: the deleting destructor is six
+ * instructions and tail-calls the plain one, and writing only the plain half
+ * would leave our code reached through the image the way CountButtonDelete
+ * reached CountButtonDestruct until this session. Doing both closes that
+ * before it exists.
+ *
+ * The `push 1` into vtable slot 0 is the MSVC scalar deleting destructor and
+ * is what distinguishes this from a COM QueryInterface, per the abi note. */
+void __attribute__((thiscall)) CheckBoxDestruct(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_CHECKBOX);
+
+    ReleaseSprite(*(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON));
+    ReleaseSprite(*(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF));
+    ReleaseSprite(*(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON_FOC));
+    ReleaseSprite(*(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF_FOC));
+
+    WidgetDestruct(w);
+}
+
+AM2_Widget *__attribute__((thiscall)) CheckBoxDelete(AM2_Widget *w,
+                                                     int32_t flags)
+{
+    CheckBoxDestruct(w);
+    if (flags & 1)
+        am2_free(w);
+    return w;
+}
+
 /* CountButtonDestruct -- original 0x00418D60, 95 bytes. Releases the button's
  * two faces and chains to the base.
  *
@@ -11663,6 +11699,10 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_CHECKBOX_DTOR, (const void *)CheckBoxDestruct,
+                        "CheckBoxDestruct", 1);
+    rc |= patch_replace(ADDR_CHECKBOX_DELETE, (const void *)CheckBoxDelete,
+                        "CheckBoxDelete", 1);
     rc |= patch_replace(ADDR_COUNT_BUTTON_DTOR,
                         (const void *)CountButtonDestruct,
                         "CountButtonDestruct", 1);
