@@ -11702,7 +11702,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_AAI_DIR         0x00473D9Cu  /* "aai" */
 #define ADDR_FMT_DOT_TXT         0x00485178u  /* "%s.txt" */
 #define ADDR_FMT_DOT_AMM         0x00486330u  /* "%s.amm" */
-#define ADDR_FMT_PREV_BMP        0x004870A8u  /* "%s_prev.bmp" */
 #define ADDR_STR_GAME_AAI        0x004870E8u  /* "game.aai" */
 #define ADDR_STR_OBJECT_AAI      0x004870DCu  /* "object.aai" */
 #define ADDR_STR_TROOP_AAI       0x004870D0u  /* "troop.aai" */
@@ -13237,9 +13236,40 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * are read in those two places and nowhere else. */
 #define ADDR_GAME_VERSION        0x00475894u  /* int32_t, 1 in this build */
 #define ADDR_DATA_CHECKSUM       0x004FC8B4u  /* int32_t */
-/* 0x00431E10, "%s does not have rules." and "%s.txt" -- loads a map's rules
- * and answers with the code SendMapMsg reports. */
+/* 0x00431E10, ~1150 bytes -- the multiplayer map VALIDATOR, run when a map
+ * is chosen. It answers the code SendMapMsg reports, and its five failure
+ * messages are what it is for. Each formats the LOCAL PLAYER'S name, taken
+ * from ADDR_ARMY_TABLE indexed by ADDR_DEFAULT_OWNER, and each is preceded
+ * by ShowBadPreview and followed by Announce -- so every rejection blanks
+ * the map preview and tells the room whose install is wrong:
+ *
+ *   0x004872F4  "%s does not have rules."        no entry in the script list
+ *   0x004872BC  "%s has a damaged installation."
+ *   0x0048729C  "%s has a damaged rules file."   RulesChecksum disagreed
+ *   0x00487284  "%s has a damaged map."          MapChecksum disagreed
+ *   0x004872DC  "%s does not have map."          no <name>.amm on disk
+ *
+ * The order is the order the checks run: the rules must be listed, then the
+ * install intact, then the two checksums, then the map file present. The
+ * success tail selects the level, loads "<name>_prev.bmp" into the preview
+ * and dispatches vtable slot 1.
+ *
+ * ADDR_MENU_MODE 9 is the only mode that takes the branch reading
+ * ADDR_PAINT_OBJECT, so the dialog is only consulted on the map-select
+ * screen; everywhere else the preview pointer stays null and the failure
+ * arms skip their ShowBadPreview.
+ *
+ * Read but NOT reconstructed. It is unreachable in this environment -- it
+ * needs a multiplayer session picking a map -- so every one of its seven
+ * exits would be verified by reading alone, and the two checksum arms
+ * compare values no drive here produces. Recorded so the next attempt starts
+ * from the message table rather than from the branch soup. */
 #define ADDR_CHECK_MAP_RULES     0x00431E10u  /* int32_t(int32, int32, int32) */
+#define ADDR_MSG_NO_RULES        0x004872F4u
+#define ADDR_MSG_BAD_INSTALL     0x004872BCu
+#define ADDR_MSG_BAD_RULES       0x0048729Cu
+#define ADDR_MSG_BAD_MAP         0x00487284u
+#define ADDR_MSG_NO_MAP          0x004872DCu
 /* Offsets into the player message. The per-player records start at 0x00A8 and
  * are 0x60 apart; the original addresses them from 0x00AC, so the id reads as
  * rec[-4]. */
