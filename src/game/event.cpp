@@ -573,7 +573,7 @@ int32_t __cdecl LoadEventSection(am2_FILE *fp)
             orig_fread(rec, 0x10, 1, fp);
             /* owns = 1: the table's teardown frees this one. */
             EventRegister(1, key, 0,
-                          (const void *)(uintptr_t)ADDR_EVT_RECORD_HANDLER,
+                          (const void *)EvtRecordHandler,
                           rec, 1);
         }
 
@@ -599,7 +599,7 @@ int32_t __cdecl SaveEventSection(am2_FILE *fp)
                     kind = AM2_EVTSAVE_PAD_A;
                 else if (h->fn == (const void *)EvtPadOff && h->arg)
                     kind = AM2_EVTSAVE_PAD_B;
-                else if (h->fn == kImageFn(ADDR_EVT_RECORD_HANDLER))
+                else if (h->fn == (const void *)EvtRecordHandler)
                     kind = AM2_EVTSAVE_OWNED;
                 else
                     continue;
@@ -1810,7 +1810,10 @@ void __cdecl EvtRuleA(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
     if (ObjIsType2((const AM2_Object *)obj)
         && *(const int32_t *)(obj + OBJ_OFF_FIELD_94)) {
         at = *(const uint32_t *)(obj + OBJ_OFF_SPAWN_AT);
-        if (BlockWeightAt((void *)0, at, at) >= AM2_CELL_WEIGHT_STEP)
+        /* SIGNED: the original is `cmp eax,0xf; jge` at 0x004222C0, not jae.
+         * Left unsigned, the int32_t promotes and a negative weight would
+         * read as huge and take the opposite branch. */
+        if (BlockWeightAt((void *)0, at, at) >= (int32_t)AM2_CELL_WEIGHT_STEP)
             return;
     }
 
@@ -2767,6 +2770,32 @@ void __cdecl EventNotify(int32_t type, int32_t num1, uint32_t uid1,
 
 /* ----------------------------------------------- delayed trigger ---- */
 
+
+/* 0x0041F3E0, three registration sites and all three ours: the timer that
+ * EventTriggerDelayed starts, and the savegame save and restore below.
+ *
+ * The third of the family whose other two are pad.cpp's EvtPadOn/EvtPadOff.
+ * When a delayed event's timer fires, this is what raises it: unpack the
+ * 16-byte record EventTriggerDelayed malloc'd and hand it straight to the
+ * immediate trigger. The record is (type, num, uid, removeevent), which
+ * orig.h had already recorded from the builder's own log line, and the nine
+ * pushes here line up with EventTriggerImmediate's nine parameters one for
+ * one -- the four masks and the second num/uid pair are all literal zero,
+ * which is the delayed path dropping them, and `remote` is 0 because a timer
+ * firing locally is not a peer's traffic.
+ *
+ * Argument 8 is the record EventRegister stored, the same slot the pad pair
+ * takes its pad from. `owns` was 1 at registration, so the teardown frees the
+ * record; nothing here does. */
+void __cdecl EvtRecordHandler(int32_t a1, int32_t a2, int32_t a3, int32_t a4,
+                              int32_t a5, int32_t a6, int32_t a7,
+                              const int32_t *rec)
+{
+    (void)a1; (void)a2; (void)a3; (void)a4; (void)a5; (void)a6; (void)a7;
+    EventTriggerImmediate(rec[0], rec[1], (uint32_t)rec[2],
+                          0, 0, 0, 0, rec[3], 0);
+}
+
 /* 0x0041F410. Arrange for an event to be raised after a delay.
  *
  * Sixteen bytes are allocated and filled with what the event will need when it
@@ -2810,7 +2839,7 @@ void __cdecl EventTriggerDelayed(int32_t type, int32_t num, int32_t uid,
     if (id == -100 || id == -101)
         return;
 
-    EventRegister(1, id, 0, (const void *)AM2_IMAGE(ADDR_EVT_RECORD_HANDLER),
+    EventRegister(1, id, 0, (const void *)EvtRecordHandler,
                   rec, 1);
 }
 
@@ -3300,6 +3329,9 @@ int event_install(void)
                         "EvtSetAllied", 2);
     rc |= patch_replace(ADDR_EVT_CLEAR_ALLIED, (const void *)EvtClearAllied,
                         "EvtClearAllied", 2);
+    rc |= patch_replace(ADDR_EVT_RECORD_HANDLER,
+                        (const void *)EvtRecordHandler,
+                        "EvtRecordHandler", 1);
     return rc;
 }
 

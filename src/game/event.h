@@ -125,6 +125,14 @@ void __cdecl EventTriggerImmediate(int32_t type, int32_t num1, uint32_t uid1,
                                    int32_t maskB, int32_t removeevent,
                                    int32_t remote);
 
+/* 0x0041F3E0. What raises a delayed event when its timer fires: unpack the
+ * 16-byte record EventTriggerDelayed built and hand it to the immediate
+ * trigger. Registered by that function and by the savegame restore, and
+ * compared by POINTER in the save -- so all three sites must name this
+ * function rather than its address, or the save stops recognising it. */
+void __cdecl EvtRecordHandler(int32_t, int32_t, int32_t, int32_t, int32_t,
+                              int32_t, int32_t, const int32_t *rec);
+
 /* 0x00421430. Run an `if` statement's actions according to its mode: all, one
  * at random, one round-robin, or the one whose `onobjstate` name matches the
  * object's current state. Nine callers. */
