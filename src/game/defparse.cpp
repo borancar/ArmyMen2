@@ -231,6 +231,61 @@ void __cdecl DefAddTrooperRec(const void *rec)
     kDefTrooperCount = n + 1;
 }
 
+/* DefTrooperLine -- original 0x0044CDA0, 464 bytes, NINE exits.
+ *
+ * The `trooperlevel1` .. `trooperlevel8` lines of a .def file, which is how
+ * the eight-entry RANK table is declared: seven numbers per line, keyed by
+ * which of the eight keywords opened it. Its fields already had names --
+ * RANK_SRC_OFF_MAX_HEALTH, _SIGHT_RANGE, _FIRE_PCT, _THRESHOLD and _XP --
+ * from the side that consumes the record.
+ *
+ * NOTHING IN .text CALLS IT. Its eight callers are eight entries of the
+ * keyword table in .rdata, each {const char *word, int32_t id, void *fn},
+ * and dumping that table is what named the function: the words are
+ * trooperlevel1..8 and the ids 0x2D..0x34. A function reached only from a
+ * data table is invisible to a call-graph and obvious from the table.
+ *
+ * ITS EIGHT-ARM JUMP TABLE IS THE IDENTITY, and that was checked rather than
+ * assumed. Each arm does nothing but store 0..7, so the whole switch is
+ * `cmd - 0x2D` -- but WeaponClassOf lays four arms out in one order and
+ * dispatches them in another, so an eight-arm table that looks like a
+ * counted sequence is exactly the case this project has been burned by.
+ * Decoded: entry k really is arm k. Written as the subtraction it is.
+ *
+ * The RETURN IS AN ERROR CODE, not a boolean: 0 when the record is added,
+ * 1 for a keyword outside the eight, and 2..8 to say which of the seven
+ * numbers failed to parse. That is where nine exits come from, and it
+ * matches DefObjLine, whose numbering runs to 12 for the same reason.
+ *
+ * IT DOES NOT ZERO THE RECORD, where DefObjLine does. It has no need to --
+ * all eight dwords are written before DefAddTrooperRec sees them, one from
+ * the keyword and seven from the line -- and the difference is reproduced
+ * rather than tidied into a shared shape.
+ *
+ * am2_strtok rather than the host's, for the reason crt.h gives: the cursor
+ * is shared with DefParseInfoFile, which is mid-file when this is called. */
+int32_t __cdecl DefTrooperLine(int32_t cmd, char *line)
+{
+    int32_t rec[AM2_DEF_TROOPER_REC_DWORDS];
+
+    if (cmd < AM2_DEF_TROOPERLEVEL1
+        || cmd > AM2_DEF_TROOPERLEVEL1 + AM2_RANK_COUNT - 1) {
+        orig_log("Bad Trooper Type\n");
+        return 1;
+    }
+    rec[0] = cmd - AM2_DEF_TROOPERLEVEL1;
+
+    if (!DefParseNumber(&rec[1], am2_strtok(line, kSep)))
+        return 2;
+
+    for (int32_t i = 2; i < AM2_DEF_TROOPER_REC_DWORDS; i++)
+        if (!DefParseNumber(&rec[i], am2_strtok((char *)0, kSep)))
+            return i + 1;
+
+    DefAddTrooperRec(rec);
+    return 0;
+}
+
 void __cdecl DefFreeTrooperRecs(void)
 {
     uint8_t *recs = (uint8_t *)kDefTrooperRecs;
@@ -745,6 +800,8 @@ int defparse_install(void)
                         "DefObjLine", 1);
     rc |= patch_replace(ADDR_DEF_ADD_OBJ_REC, (const void *)DefAddObjRec,
                         "DefAddObjRec", 1);
+    rc |= patch_replace(ADDR_DEF_TROOPER_LINE,
+                        (const void *)DefTrooperLine, "DefTrooperLine", 2);
     rc |= patch_replace(ADDR_DEF_ADD_TROOPER_REC,
                         (const void *)DefAddTrooperRec, "DefAddTrooperRec", 1);
     rc |= patch_replace(ADDR_DEF_FIND_TROOPER_REC,

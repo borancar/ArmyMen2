@@ -10511,6 +10511,18 @@ typedef struct {
 #define ADDR_DEF_TROOPER_COUNT     0x00659F50u
 #define ADDR_DEF_TROOPER_CAP       0x00659F54u
 #define AM2_DEF_TROOPER_REC_SIZE   0x20u
+#define AM2_DEF_TROOPER_REC_DWORDS 8
+/* The keyword ids of `trooperlevel1` .. `trooperlevel8`, from the .rdata
+ * table of {const char *word, int32_t id, void *handler} at 0x00476FEC.
+ * Eight consecutive ids, and DefTrooperLine's own eight-arm jump table maps
+ * them to 0..7 as the IDENTITY -- decoded rather than assumed, because
+ * WeaponClassOf lays four arms out in one order and dispatches them in
+ * another and an eight-arm table that reads as a counted sequence is
+ * exactly that trap. */
+#define AM2_DEF_TROOPERLEVEL1      0x2D
+/* 0x0044CDA0 -- the handler those eight entries share. Nothing in .text
+ * refers to it; the table is its only caller. */
+#define ADDR_DEF_TROOPER_LINE      0x0044CDA0u  /* int32(int32 cmd, char *) */
 #define ADDR_DEF_ADD_TROOPER_REC   0x0044CCC0u  /* void(const void *rec) */
 #define ADDR_DEF_FREE_TROOPER_RECS 0x0044CF70u  /* void(void) */
 

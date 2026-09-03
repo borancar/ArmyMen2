@@ -106,6 +106,8 @@ int defparse_install(void);
  * their first dword, filled by the still-original parser at 0x0044CD70 whose
  * rejection message is "Bad Trooper Type". Append one, and drop the lot. */
 void __cdecl DefAddTrooperRec(const void *rec);
+/* 0x0044CDA0 -- the `trooperlevel1`..`trooperlevel8` lines of a .def file. */
+int32_t __cdecl DefTrooperLine(int32_t cmd, char *line);
 void __cdecl DefFreeTrooperRecs(void);
 
 #ifdef __cplusplus
