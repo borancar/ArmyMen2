@@ -1364,7 +1364,24 @@
  * It calls ObjIsType2 twice in a row on the same object inside the same
  * branch, the second call unable to answer differently. Reproduced. */
 #define ADDR_RADAR_BLIP_COLOUR 0x004149B0u /* int32(const obj *, int32 *out) */
-#define ADDR_RADAR_COLOURS   0x004FCF5Cu  /* uint8_t[][2], indexed by that */
+/* FIVE PAIRS, and HudRadarConstruct is what fills them -- it copies ten
+ * palette indices out of scattered globals into this contiguous block. In
+ * pair order they are light green / dark green, cream / olive, light blue /
+ * steel blue, light grey / dark grey, and white / black: the four army
+ * colours with a shade each, then a fifth pair for the index 4 the note above
+ * says a multiplayer soldier kind 7 returns.
+ *
+ * The original interleaves the ten copies so no two adjacent instructions
+ * belong to one pair, which is why the structure is invisible in the
+ * disassembly and obvious the moment the destinations are sorted. */
+#define ADDR_RADAR_COLOURS   0x004FCF5Cu  /* uint8_t[5][2], indexed by that */
+#define AM2_RADAR_COLOUR_PAIRS 5
+/* 0x00414700, thiscall -- the radar panel. Its bitmap is the MAP's own
+ * "<name>.bmp", so its size is whatever the mission ships. */
+#define ADDR_HUD_RADAR_CONSTRUCT 0x00414700u  /* thiscall AM2_Widget *(this) */
+#define AM2_HUD_RADAR_LEFT       6
+#define AM2_HUD_RADAR_TOP        0x0A
+#define AM2_RADAR_NAME_BYTES     0x40
 #define AM2_RADAR_KIND_FIRST 16   /* type-4 kinds 16..19 map to armies 0..3 */
 #define AM2_RADAR_KEY_FIRST  994  /* item key field B, likewise */
 #define AM2_RADAR_KEY_TAG    0x2B /* the field A an item must carry first */
@@ -13030,6 +13047,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_COLOUR_OLIVE      0x004FE1AEu  /* 65 57 30 */
 #define ADDR_COLOUR_STEEL_BLUE 0x004FE088u  /* 32 5D 8A */
 #define ADDR_COLOUR_DARK_GREY  0x00502CE4u  /* 54 54 54 */
+/* The other six the radar gathers, named the same way -- from
+ * win32/palette.cpp's own (address, r, g, b) table, which is the writer. */
+#define ADDR_COLOUR_LIGHT_GREEN 0x004FE091u  /* 69 A9 52 */
+#define ADDR_COLOUR_CREAM       0x004FDF75u  /* EF D9 A0 */
+#define ADDR_COLOUR_LIGHT_GREY  0x004FE093u  /* AB AB AB */
+#define ADDR_COLOUR_LIGHT_BLUE  0x004FE1ACu  /* 92 B8 DF */
+#define ADDR_COLOUR_BLACK       0x004FE094u  /* 00 00 00 */
+/* A SECOND WHITE. 0x004FD768 already holds ADDR_COLOUR_WHITE and is also
+ * FF FF FF -- palette.cpp's table lists both -- so these are two distinct
+ * slots of one colour and not an alias. Named by colour with a suffix rather
+ * than by role, because the only role either has here is "the radar's
+ * fifth pair", which is a fact about one consumer. */
+#define ADDR_COLOUR_WHITE_B     0x004FE1ADu  /* FF FF FF, the radar's */
 #define MP_PANEL_OFF_PREVIEW   0x218u   /* the map thumbnail widget */
 #define MP_PANEL_OFF_NAMES     0x220u
 #define MP_PANEL_OFF_COLOURS   0x230u

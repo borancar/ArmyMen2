@@ -287,6 +287,10 @@ void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip);
  * its indent, its base sprite frame and whether it gets a chat-to checkbox. */
 /* 0x00414DF0, thiscall. The Sarge panel: 31 portraits and six slots. The one
  * HUD constructor with no early exit on a failed preload. */
+/* 0x00414700, thiscall. The radar panel: the map's own bitmap and the ten
+ * palette indices the blips are drawn in. */
+AM2_Widget *__attribute__((thiscall)) HudRadarConstruct(AM2_Widget *w);
+
 AM2_Widget *__attribute__((thiscall)) HudSargeConstruct(AM2_Widget *w);
 
 AM2_Widget *__attribute__((thiscall)) HudTopConstruct(AM2_Widget *w);

@@ -4191,6 +4191,65 @@ typedef void (__cdecl *AM2_VoidFn)(void);
 
 #define orig_operator_new     ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
 
+/* The radar's ten palette indices, in the order the constructor writes them:
+ * five light/dark pairs indexed by RadarBlipColour's answer. Generated from
+ * the destinations rather than the instruction order -- the original
+ * interleaves the copies so no two adjacent ones belong to the same pair. */
+static const uint32_t kRadarColourSrc[AM2_RADAR_COLOUR_PAIRS * 2] = {
+    ADDR_COLOUR_LIGHT_GREEN, ADDR_COLOUR_DARK_GREEN,
+    ADDR_COLOUR_CREAM,       ADDR_COLOUR_OLIVE,
+    ADDR_COLOUR_LIGHT_BLUE,  ADDR_COLOUR_STEEL_BLUE,
+    ADDR_COLOUR_LIGHT_GREY,  ADDR_COLOUR_DARK_GREY,
+    ADDR_COLOUR_WHITE_B,     ADDR_COLOUR_BLACK,
+};
+
+/* HudRadarConstruct -- original 0x00414700, 259 bytes, thiscall. The radar
+ * panel: load the map's own bitmap, size to it, and gather the blip palette.
+ *
+ * The bitmap is the MAP's. It chdirs to ADDR_MAP_FOLDER and builds
+ * "<ADDR_MAP_NAME>.bmp", so every mission supplies its own minimap image and
+ * the widget's width and height come from whatever that turns out to be.
+ *
+ * NO NULL TEST ON THE BITMAP. LoadBitmap's result goes into two fields and
+ * is then dereferenced for its bounds without a check, unlike the three
+ * preload-based HUD constructors which all guard. A missing map bitmap
+ * faults here, and that is the original's behaviour.
+ *
+ * The ten colour copies are the interesting part and they are INTERLEAVED --
+ * the compiler emits them so that no two adjacent instructions belong to one
+ * destination pair, which hides the structure completely. Sorted by
+ * destination they are five light/dark pairs: the four army colours with a
+ * shade each, then white/black for the index 4 that a multiplayer soldier
+ * kind 7 produces. See ADDR_RADAR_COLOURS. */
+AM2_Widget *__attribute__((thiscall)) HudRadarConstruct(AM2_Widget *w)
+{
+    uint8_t    *self = (uint8_t *)w;
+    uint8_t    *dst  = (uint8_t *)(uintptr_t)ADDR_RADAR_COLOURS;
+    AM2_Sprite *bmp;
+    char        name[AM2_RADAR_NAME_BYTES];
+    int32_t     i;
+
+    WidgetConstruct(w);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_RADAR);
+
+    SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
+    am2_sprintf(name, "%s.bmp", (const char *)(uintptr_t)ADDR_MAP_NAME);
+
+    bmp = (AM2_Sprite *)LoadBitmap(name, 1);
+    *(void **)(self + HUD_OFF_SPRITE0) = bmp;
+    w->sprite = bmp;
+
+    w->x = AM2_HUD_RADAR_LEFT;
+    w->y = AM2_HUD_RADAR_TOP;
+    w->w = bmp->bounds.right;     /* no null test -- the original's */
+    w->h = bmp->bounds.bottom;
+
+    for (i = 0; i < AM2_RADAR_COLOUR_PAIRS * 2; i++)
+        dst[i] = *(const uint8_t *)(uintptr_t)kRadarColourSrc[i];
+
+    return w;
+}
+
 /* HudSargeConstruct -- original 0x00414DF0, 157 bytes, thiscall. The Sarge
  * panel: 31 portrait sprites and six selection slots.
  *
@@ -11323,6 +11382,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_HUD_RADAR_CONSTRUCT,
+                        (const void *)HudRadarConstruct,
+                        "HudRadarConstruct", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_CONSTRUCT,
                         (const void *)HudSargeConstruct,
                         "HudSargeConstruct", 1);
