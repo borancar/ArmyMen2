@@ -6325,6 +6325,11 @@ typedef struct {
  * be null is evidence about the class, and making them agree destroys it. */
 #define ADDR_ARROWBAR_DELETE     0x00455B80u /* thiscall obj *(obj, flags) */
 #define ADDR_ARROWBAR_DESTRUCT   0x00455BA0u /* thiscall void(obj) */
+/* 0x00455E10, thiscall, three callers -- the THIRD member of the arrow bar
+ * family, beside ArrowBarScroll's two arrows and ArrowBarFollowEnd. Scroll a
+ * named row into view: it moves the top row only far enough to show that row
+ * and leaves it alone when the row is already visible. */
+#define ADDR_ARROWBAR_SHOW_ROW   0x00455E10u /* thiscall void(bar, int32 row) */
 #define ARROWBAR_OFF_SHIFT       0x70u /* int32_t, where the thumb sits */
 #define ARROWBAR_OFF_SPAN        0x74u
 /* Was ADDR_CHATBOX_REFLOW, from the one call site, which reaches it as

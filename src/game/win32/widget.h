@@ -1422,6 +1422,10 @@ void __cdecl OnArrowDown(AM2_Widget *w);
  * mover: jump the list to its end and put the thumb at the bottom. The chat
  * log's appender calls it, so the newest line is always the visible one. */
 void __attribute__((thiscall)) ArrowBarFollowEnd(AM2_Widget *bar);
+
+/* 0x00455E10, thiscall. Scroll a row into view, moving the top row the
+ * smallest distance that shows it -- and not at all if it already is. */
+void __attribute__((thiscall)) ArrowBarShowRow(AM2_Widget *bar, int32_t row);
 void __cdecl OnArrowLeft(AM2_Widget *w);
 void __cdecl OnArrowRight(AM2_Widget *w);
 

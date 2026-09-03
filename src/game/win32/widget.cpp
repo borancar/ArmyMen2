@@ -7277,6 +7277,64 @@ static void ArrowBarScroll(AM2_Widget *arrow, int32_t delta)
     RepaintAncestor(bar, bar->rect);
 }
 
+/* ArrowBarShowRow -- original 0x00455E10, 178 bytes, thiscall, three callers.
+ * Scroll `row` into view. The third member of the family, and its head is the
+ * only part that is not shared: ArrowBarScroll steps by one, ArrowBarFollowEnd
+ * clamps to the end, and this one moves the top row the SMALLEST distance that
+ * makes `row` visible -- and not at all when it already is.
+ *
+ * The three-way test is worth writing out because two of its arms store and
+ * the middle one does not. Above the window, the row becomes the top; below
+ * it, the row becomes the bottom; inside it, nothing is written and the list
+ * is still repainted. The original expresses "inside" as a jump PAST the
+ * store rather than as a condition, which is why it reads as two arms.
+ *
+ * From `top + visible - 1 < row` the new top is `row - visible + 1`, which
+ * the original computes as `(row - visible) + 1` in two instructions.
+ *
+ * Everything after the paint is ArrowBarScroll's tail verbatim, ThumbShift
+ * included, and like ArrowBarFollowEnd it RE-READS the list pointer and its
+ * fields afterwards rather than trusting the ones it already had. */
+void __attribute__((thiscall)) ArrowBarShowRow(AM2_Widget *bar, int32_t row)
+{
+    AM2_Widget       *list = *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST);
+    const AM2_Sprite *thumb;
+    uint8_t          *l;
+    uint8_t          *b = (uint8_t *)bar;
+    int32_t           top;
+    int32_t           visible;
+    int32_t           count;
+
+    if (!list)
+        return;
+    l = (uint8_t *)list;
+
+    top     = *(const int32_t *)(l + LIST_OFF_TOP_ROW);
+    if (top > row)
+        *(int32_t *)(l + LIST_OFF_TOP_ROW) = row;
+    else {
+        visible = *(const int32_t *)(l + LIST_OFF_VISIBLE);
+        if (top + visible - 1 < row)
+            *(int32_t *)(l + LIST_OFF_TOP_ROW) = row - visible + 1;
+        /* already visible -- nothing stored, and still repainted */
+    }
+
+    ((AM2_WidgetPaintFn *)list->vtable)[WIDGET_VSLOT_PAINT](list, list->rect);
+
+    list    = *(AM2_Widget **)(b + ARROWBAR_OFF_LIST);
+    l       = (uint8_t *)list;
+    top     = *(const int32_t *)(l + LIST_OFF_TOP_ROW);
+    visible = *(const int32_t *)(l + LIST_OFF_VISIBLE);
+    count   = **(const int32_t *const *)(l + LIST_OFF_ROWS);
+
+    thumb = *(const AM2_Sprite *const *)(b + ARROWBAR_OFF_SPRITE0);
+    *(int32_t *)(b + ARROWBAR_OFF_SHIFT) =
+        ThumbShift(top, count - visible,
+                   *(const int32_t *)(b + ARROWBAR_OFF_SPAN)
+                   - thumb->bounds.bottom);
+    RepaintAncestor(bar, bar->rect);
+}
+
 void __cdecl OnArrowUp(AM2_Widget *w)
 {
     ArrowBarScroll(w, -1);
@@ -11699,6 +11757,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_ARROWBAR_SHOW_ROW,
+                        (const void *)ArrowBarShowRow,
+                        "ArrowBarShowRow", 3);
     rc |= patch_replace(ADDR_CHECKBOX_DTOR, (const void *)CheckBoxDestruct,
                         "CheckBoxDestruct", 1);
     rc |= patch_replace(ADDR_CHECKBOX_DELETE, (const void *)CheckBoxDelete,
