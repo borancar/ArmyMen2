@@ -819,6 +819,80 @@ int32_t __cdecl DefVehicleLine(int32_t code, char *line)
     return 0;
 }
 
+
+/* THE KEYWORD-TO-KIND MAP, GENERATED FROM THE IMAGE'S JUMP TABLE RATHER THAN
+ * TRANSCRIBED, and it is not the identity.
+ *
+ * Entry k is the arm for code k+1, and every arm does one thing: store a small
+ * integer. Forty-two of them store k. TWO DO NOT -- entry 31 stores 32 and
+ * entry 32 stores 31 -- so `vehicleammo` (code 32) and `vehiclearmor` (code
+ * 33) get each other's kind index. Writing this as `cmd - 1`, which is what
+ * forty-two of the forty-four arms say, would have been wrong for exactly
+ * those two and invisible to every check this project has: the def tables are
+ * loaded before any A/B takes its first screenshot, and nothing compares them.
+ *
+ * Decoded by reading each table entry's target and its immediate, which is the
+ * rule DirtyCollect's eighty-one arms established -- emit the mapping from the
+ * table, never from the order the arms are laid out in. */
+static const int32_t kWeaponKind[44] = {
+     0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,
+    11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+    22, 23, 24, 25, 26, 27, 28, 29, 30, 32, 31,
+    33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
+};
+
+/* DefWeaponLine -- original 0x004602F0, and the .aai keyword table registers
+ * it for forty-four weapon keywords. Thirteen dwords, which is
+ * AM2_MISSILE_DEF_REC_SIZE: the kind from the keyword, then twelve numbers,
+ * and the record goes to AddMissileDef.
+ *
+ * TWO OF THE TWELVE FIELDS ARE BOOLEANS, not numbers -- rec[7] and rec[10] go
+ * through DefParseBoolean, the rest through DefParseNumber. That is not
+ * visible from reading a couple of the parse blocks, which are otherwise
+ * identical; only the call TARGETS separate them, 0x0041A2D0 against
+ * 0x0041A250. Written first as twelve numbers, and the A/B caught it at once:
+ * "Invalid table entry: line 4, token #8" and a dumped record reading
+ * `0 0 0 0 0 0 False 0 0 False 0 0`, with the False in exactly those two
+ * columns. Where the original repeats itself, diff the calls before believing
+ * the repetition -- this file says so and it was still worth relearning.
+ *
+ * The return is an error code like its two siblings' -- 0 on success, 1 for a
+ * keyword outside the range, and 2..13 to say which field failed. That is
+ * the numbering DefTrooperLine's comment already points at as "runs to 12".
+ *
+ * `jeep` IS REGISTERED HERE AND CANNOT WORK. Its code is 53, outside the
+ * switch, so it takes the default arm and is refused with "Bad Weapon Type".
+ * The vehicle keywords beside it go to DefVehicleLine; this one entry points
+ * at the wrong handler. Reproduced -- it is the table's mistake, not ours,
+ * and correcting it would diverge from the original for a `jeep` line. */
+int32_t __cdecl DefWeaponLine(int32_t cmd, char *line)
+{
+    int32_t rec[AM2_MISSILE_DEF_REC_SIZE / 4];
+    int32_t i;
+
+    if (cmd < 1 || cmd > 44) {
+        orig_log("Bad Weapon Type\n");
+        return 1;
+    }
+    rec[0] = kWeaponKind[cmd - 1];
+
+    if (!DefParseNumber(&rec[1], am2_strtok(line, kSep)))
+        return 2;
+
+    for (i = 2; i < (int32_t)(AM2_MISSILE_DEF_REC_SIZE / 4); i++) {
+        const char *tok = am2_strtok((char *)0, kSep);
+        int32_t     ok  = (i == 7 || i == 10)
+                          ? DefParseBoolean(&rec[i], tok)
+                          : DefParseNumber(&rec[i], tok);
+
+        if (!ok)
+            return i + 1;
+    }
+
+    AddMissileDef(rec);
+    return 0;
+}
+
 int defparse_install(void)
 {
     int rc = 0;
@@ -867,5 +941,7 @@ int defparse_install(void)
                         "DefFreeTables", 3);
     rc |= patch_replace(ADDR_DEF_VEHICLE_LINE, (const void *)DefVehicleLine,
                         "DefVehicleLine", 2);
+    rc |= patch_replace(ADDR_DEF_WEAPON_LINE, (const void *)DefWeaponLine,
+                        "DefWeaponLine", 2);
     return rc;
 }

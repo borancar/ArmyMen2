@@ -10704,8 +10704,16 @@ typedef struct {
  * for `tank`, `half_track`, `convoy` and one more -- with the keyword's own
  * code as its first argument. It maps that code to the vehicle KIND and then
  * reads eight numbers, so one function serves every vehicle keyword and the
- * table supplies the difference. `jeep` gets 0x004602F0 instead. */
+ * table supplies the difference.
+ *
+ * `jeep` is registered to ADDR_DEF_WEAPON_LINE instead -- with code 53, which
+ * is outside that function's 1..44 switch, so it lands on the default arm and
+ * is refused with "Bad Weapon Type". Reproduced; see defparse.cpp. */
 #define ADDR_DEF_VEHICLE_LINE      0x0045EC20u /* int32(int32 code, char *) */
+/* 0x004602F0, the WEAPON line: forty-four keywords through a jump table, then
+ * twelve numbers into a 52-byte record for AddMissileDef. Its default arm
+ * says "Bad Weapon Type", which is what names it. */
+#define ADDR_DEF_WEAPON_LINE       0x004602F0u /* int32(int32 code, char *) */
 /* The link table: 20-byte records, count first. CountLinksWithParent walks it
  * comparing the parent key at +0, which is how the record's first field is
  * known to be that key. */

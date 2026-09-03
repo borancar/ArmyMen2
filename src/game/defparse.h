@@ -31,6 +31,10 @@ void *__cdecl DefFindTrooperRec(int32_t level);
  * eight numbers. Answers 0, or the 1-based index of the field that failed. */
 int32_t __cdecl DefVehicleLine(int32_t code, char *line);
 
+/* 0x004602F0. One .aai weapon line: the kind from the keyword through a
+ * forty-four entry map, then twelve numbers. */
+int32_t __cdecl DefWeaponLine(int32_t cmd, char *line);
+
 #endif
 
 /* One entry of the link table at ADDR_DEF_LINKS. Twenty bytes, which is the
