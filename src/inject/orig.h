@@ -3891,6 +3891,7 @@
  * comm player. Reached from the update on a mouse RELEASE while typing; the
  * char handler has its own RETURN path at 0x0041864C. */
 #define ADDR_HUD_CHAT_SEND       0x00418480u  /* void(obj) */
+#define AM2_CHEAT_LINE_BYTES     0xF4u  /* the stack copy, line + 1 */
 #define ADDR_HUD_CHAT_CHAR       0x004185C0u  /* the ADDR_CHAR_HANDLER slot */
 #define ADDR_HUD_TOP_UPDATE      0x00418660u  /* thiscall void(obj) */
 #define ADDR_HUD_TOP_PAINT       0x00418A20u  /* thiscall void(obj, RECT) */

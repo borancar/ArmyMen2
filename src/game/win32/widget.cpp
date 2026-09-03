@@ -9,7 +9,8 @@
 #include "font.h"    /* TextExtent -- reconstructed */
 #include "../rect.h"
 #include "../commmsg.h" /* Announce -- reconstructed */
-#include "../misc.h"   /* IsKeyDown, KeyChanged, TitleCaseName */
+#include "../misc.h"
+#include "../cheat.h"   /* CheatLine -- reconstructed */   /* IsKeyDown, KeyChanged, TitleCaseName */
 #include "../text.h"   /* DrawText -- reconstructed */
 #include "../msgslot.h" /* SendColorMsg, SendTeamMsg -- reconstructed */
 #include "sprite.h"
@@ -230,7 +231,6 @@ typedef int32_t (__cdecl *am2_rand_fn)(void);
 /* The chat send, still the original's: it reaches the comm layer and the name
  * table below it, neither of which is ours. */
 typedef void (__attribute__((thiscall)) *am2_chat_send_fn)(AM2_Widget *);
-#define orig_hud_chat_send (*(am2_chat_send_fn)ADDR_HUD_CHAT_SEND)
 /* The squad panel's per-slot detail painter, 3,328 bytes and still the
  * original's -- nothing about it is needed to know what HudSquadPaint does. */
 typedef void (__attribute__((thiscall)) *am2_squad_detail_fn)(AM2_Widget *, int32_t);
@@ -1806,7 +1806,7 @@ void __attribute__((thiscall)) HudTopUpdate(AM2_Widget *w)
         if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
             && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
             && *(const int32_t *)(self + HUDLOG_OFF_TYPING))
-            orig_hud_chat_send(w);
+            HudChatSend(w);
         return;
     }
 
@@ -12259,6 +12259,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_HUD_CHAT_SEND, (const void *)HudChatSend,
+                        "HudChatSend", 1);
     rc |= patch_replace(ADDR_SELECT_WEAPON, (const void *)SelectWeapon,
                         "SelectWeapon", 7);
     rc |= patch_replace(ADDR_MP_SPIN_CTOR, (const void *)MpSpinConstruct,
@@ -13031,6 +13033,90 @@ int widget_install(void)
  * calls is ours. */
 /* Reconstructed in item.cpp and declared there rather than in item.h. */
 void __cdecl SelectInventorySlot(void *unit, int32_t slot);
+
+/* HudChatSend -- original 0x00418480, 317 bytes, thiscall. Finish a chat
+ * line: stop typing, post it to the log, send it, and -- if it starts with
+ * `!` -- run it as a CHEAT.
+ *
+ * THAT LAST PART JOINS TWO THINGS THIS PROJECT DOCUMENTED SEPARATELY.
+ * docs/cheats.md lists 39 phrases dispatched by 0x00417B80, and orig.h's
+ * note on the console binding says the strip's console "is the MULTIPLAYER
+ * CHAT line and not the cheat entry". Both are right, and this is where they
+ * meet: a chat line beginning `!` and at least three characters long has its
+ * `!` stripped and the rest handed to CheatLine -- but ONLY when
+ * ADDR_MP_SESSION is clear. So the cheat console IS the chat line, and it is
+ * disabled the moment a session exists.
+ *
+ * The length test is `strlen(line) - 1 > 1`, so "!x" is not enough and "!xy"
+ * is; the copy is taken from line + 1 into a stack buffer before the test on
+ * the session, not after.
+ *
+ * WHO IT IS SENT TO DEPENDS ON A CHECKBOX. With HUD_A_OFF_CHECKBOX present
+ * and CHECKBOX_OFF_CHECKED set, it walks the four comm slots and sends only
+ * to players who are neither us, nor empty, nor unallied -- three separate
+ * refusals. Otherwise one SendChatMsg goes to everybody.
+ *
+ * The colour is the sender's own: CommArmyOfSlot indexes
+ * ADDR_CHAT_COLOUR_TABLE by army, shifted 8 because the table is one
+ * 256-byte remap per army rather than a byte per army.
+ *
+ * The last line clears the TYPED buffer through ADDR_HUD_WIDGET_A rather
+ * than through `this`, which are the same object here -- reproduced as the
+ * original spells it. */
+void __attribute__((thiscall)) HudChatSend(AM2_Widget *w)
+{
+    uint8_t *b = (uint8_t *)w;
+    char    *line;
+    char     cheat[AM2_CHEAT_LINE_BYTES];
+    uint8_t *cb;
+
+    if (*(const int32_t *)(b + HUDLOG_OFF_TYPING) == 0)
+        return;
+
+    *(int32_t *)(b + HUDLOG_OFF_TYPING)    = 0;
+    *(int32_t *)(b + HUDLOG_OFF_JUST_SENT) = 1;
+    *(void **)(uintptr_t)ADDR_CHAR_HANDLER = (void *)0;
+    PlaySoundAt(0, 0, 0, 0, 0);
+
+    line = (char *)(b + HUDLOG_OFF_TYPED);
+    HudMessage(line,
+        *(const uint8_t *)((const uint8_t *)(uintptr_t)ADDR_CHAT_COLOUR_TABLE
+            + ((size_t)CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                      (int32_t)g_defaultOwner) << 8)));
+
+    cb = *(uint8_t **)(b + HUD_A_OFF_CHECKBOX);
+    if (cb && *(const uint8_t *)(cb + CHECKBOX_OFF_CHECKED)) {
+        const uint8_t *comm = *(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+        int32_t        i;
+
+        for (i = 0; i < AM2_COMM_SLOTS; i++) {
+            int32_t id = *(const int32_t *)(comm + COMM_OFF_PLAYERS
+                             + (size_t)i * AM2_COMM_SLOT_STRIDE
+                             + COMM_SLOT_OFF_ID);
+
+            if ((uint32_t)i == g_defaultOwner)
+                continue;
+            if (id == 0 || id == -1)
+                continue;
+            if (!AllyFlag((int32_t)g_defaultOwner,
+                          CommSlotOfId(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                       (uint32_t)id)))
+                continue;
+            SendChatTo(line, i);
+        }
+    } else {
+        SendChatMsg(line, 0);
+    }
+
+    /* A line beginning `!` is a cheat -- outside a session only. */
+    if (line[0] == '!' && strlen(line) - 1 > 1) {
+        strcpy(cheat, line + 1);
+        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
+            CheatLine(cheat);
+    }
+
+    *(char *)(*(uint8_t **)(uintptr_t)ADDR_HUD_WIDGET_A + HUDLOG_OFF_TYPED) = 0;
+}
 
 /* SelectWeapon -- original 0x00414F20, 410 bytes, seven callers -- the six
  * HUD hotkeys and the panel's click. Pick weapon slot `slot` on `unit`.
