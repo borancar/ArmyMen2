@@ -71,6 +71,16 @@ void __cdecl PadFinalise(void *pad, void *obj);
  * discards it. */
 int32_t __cdecl ObjTileHook(void *obj);
 
+/* 0x00437570 and 0x00437540. The two handlers a pad registers when it has an
+ * enter or leave event to raise: match the uid the pad recorded against the
+ * one the notify carried, then raise the pad event itself. Registered here and
+ * in event.cpp's savegame restore, and compared by pointer in its save -- so
+ * all four sites must name the same function, never the image address. */
+void __cdecl EvtPadOn(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t,
+                      int32_t, const uint8_t *pad);
+void __cdecl EvtPadOff(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t,
+                       int32_t, const uint8_t *pad);
+
 void __cdecl PadNumberEnter(void *obj, void *padNumber);
 void __cdecl PadNumberLeave(void *obj, void *padNumber);
 

@@ -223,7 +223,7 @@ void __cdecl PadFinalise(void *pad, void *obj)
 
         *(int32_t *)(p + PAD_OFF_UID_ENTER) = AllocUid();
         EventRegister(0, *(const int32_t *)(p + PAD_OFF_UID_ENTER), 0,
-                      (const void *)(uintptr_t)ADDR_EVT_PAD_HANDLER_A, p, 0);
+                      (const void *)EvtPadOn, p, 0);
         EventNotify(0, *(const int32_t *)(p + PAD_OFF_UID_ENTER), uid,
                     0, 0, 0, 0,
                     *(const int32_t *)(p + PAD_OFF_EVENT_ENTER), 1, 0);
@@ -245,7 +245,7 @@ void __cdecl PadFinalise(void *pad, void *obj)
 
     *(int32_t *)(p + PAD_OFF_UID_LEAVE) = AllocUid();
     EventRegister(0, *(const int32_t *)(p + PAD_OFF_UID_LEAVE), 0,
-                  (const void *)(uintptr_t)ADDR_EVT_PAD_HANDLER_B, p, 0);
+                  (const void *)EvtPadOff, p, 0);
     EventNotify(0, *(const int32_t *)(p + PAD_OFF_UID_LEAVE), uid,
                 0, 0, 0, 0,
                 *(const int32_t *)(p + PAD_OFF_EVENT_LEAVE), 1, 0);
@@ -359,6 +359,52 @@ int32_t __cdecl ObjTileHook(void *obj)
     return changed;
 }
 
+
+/* 0x00437570 and 0x00437540, registered here and by event.cpp's savegame
+ * restore.
+ *
+ * What a pad raises once it has scheduled an enter or leave event: compare the
+ * uid the pad recorded for that transition against the one the notify carried,
+ * and if they match, raise the pad event itself with the pad's own id.
+ *
+ * ONE FUNCTION PARAMETERISED TWICE, and that is measured rather than eyeballed
+ * -- the two bodies are 48 bytes and differ in THREE, of which only two are
+ * semantic: the field (0x28 against 0x2C) and the event type (3 against 2).
+ * The third is the call displacement, a relocation, since the two calls sit 48
+ * bytes apart and reach the same EventNotify. Written out rather than merged
+ * because at this size the shared helper is longer than the pair, and because
+ * which field each reads is the entire distinction between them.
+ *
+ * They were ADDR_EVT_PAD_HANDLER_A and _B. Two namings the tree already
+ * carried agree on what they are: PAD_OFF_UID_ENTER at 0x28 pairs with
+ * AM2_EVT_PADON, and PAD_OFF_UID_LEAVE at 0x2C with AM2_EVT_PADOFF.
+ *
+ * Argument 8 is the pad EventRegister stored and argument 2 is the uid to
+ * match, which is the convention every handler in event.cpp follows. */
+static void EvtPadRaise(const uint8_t *pad, int32_t want, int32_t payload,
+                        uint32_t field, int32_t type)
+{
+    if (*(const int32_t *)(pad + field) != want)
+        return;
+
+    EventNotify(type, *(const int32_t *)(pad + PAD_OFF_ID), (uint32_t)payload,
+                0, 0, 0, 0, 0, 0, 0);
+}
+
+void __cdecl EvtPadOn(int32_t a1, int32_t want, int32_t payload, int32_t a4,
+                      int32_t a5, int32_t a6, int32_t a7, const uint8_t *pad)
+{
+    (void)a1; (void)a4; (void)a5; (void)a6; (void)a7;
+    EvtPadRaise(pad, want, payload, PAD_OFF_UID_ENTER, AM2_EVT_PADON);
+}
+
+void __cdecl EvtPadOff(int32_t a1, int32_t want, int32_t payload, int32_t a4,
+                       int32_t a5, int32_t a6, int32_t a7, const uint8_t *pad)
+{
+    (void)a1; (void)a4; (void)a5; (void)a6; (void)a7;
+    EvtPadRaise(pad, want, payload, PAD_OFF_UID_LEAVE, AM2_EVT_PADOFF);
+}
+
 void pad_install(void)
 {
     patch_replace(ADDR_OBJ_TILE_HOOK, (const void *)ObjTileHook,
@@ -376,4 +422,6 @@ void pad_install(void)
                   "SavePadSection", 1);
     patch_replace(ADDR_LOAD_PAD_SECTION, (const void *)LoadPadSection,
                   "LoadPadSection", 1);
+    patch_replace(ADDR_EVT_PAD_ON, (const void *)EvtPadOn, "EvtPadOn", 1);
+    patch_replace(ADDR_EVT_PAD_OFF, (const void *)EvtPadOff, "EvtPadOff", 1);
 }

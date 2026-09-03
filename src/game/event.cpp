@@ -14,6 +14,7 @@
 #include "objscript.h" /* AM2_ObjScript, kObjScripts */
 #include "scriptint.h"
 #include "air.h"      /* ObjConceal -- reconstructed */
+#include "pad.h"      /* EvtPadOn/EvtPadOff -- compared by POINTER below */
 #include "objtable.h"
 #include "dist.h"     /* AM2_Point, AngleBetween */
 #include "region.h"   /* ActivateRegion, InactivateRegion */
@@ -554,11 +555,17 @@ int32_t __cdecl LoadEventSection(am2_FILE *fp)
 
             orig_fread(&idx, 4, 1, fp);
             pad = &kPads[idx];
+            /* Both arms write +0x28, which is the ORIGINAL's behaviour and
+             * is reproduced: only the enter handler reads that field, so a
+             * restored leave registration compares +0x2C, which nothing here
+             * wrote, and clobbers the enter uid on the way past. Verified at
+             * 0x0042268F and 0x004226D5 -- the second arm kept the first's
+             * displacement. Not fixed. */
             *(int32_t *)pad->rest = key;        /* +0x28 */
             EventRegister(0, key, 0,
-                          (const void *)(uintptr_t)
                           (kind == (int32_t)AM2_EVTSAVE_PAD_A
-                           ? ADDR_EVT_PAD_HANDLER_A : ADDR_EVT_PAD_HANDLER_B),
+                           ? (const void *)EvtPadOn
+                           : (const void *)EvtPadOff),
                           pad, 0);
         } else if (kind == (int32_t)AM2_EVTSAVE_OWNED) {
             void *rec = orig_malloc(0x10);
@@ -588,9 +595,9 @@ int32_t __cdecl SaveEventSection(am2_FILE *fp)
                 /* Tested in this order, and the two pad arms want an argument
                  * while the owned one does not. A pad handler with a null
                  * argument falls through every arm and is skipped. */
-                if (h->fn == kImageFn(ADDR_EVT_PAD_HANDLER_A) && h->arg)
+                if (h->fn == (const void *)EvtPadOn && h->arg)
                     kind = AM2_EVTSAVE_PAD_A;
-                else if (h->fn == kImageFn(ADDR_EVT_PAD_HANDLER_B) && h->arg)
+                else if (h->fn == (const void *)EvtPadOff && h->arg)
                     kind = AM2_EVTSAVE_PAD_B;
                 else if (h->fn == kImageFn(ADDR_EVT_RECORD_HANDLER))
                     kind = AM2_EVTSAVE_OWNED;

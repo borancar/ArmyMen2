@@ -8507,11 +8507,17 @@ typedef struct {
 #define ADDR_SAVE_SCRIPT_CONDS   0x0041EC20u  /* int32_t(FILE *) */
 #define ADDR_LOAD_SCRIPT_CONDS   0x0041EDD0u  /* int32_t(FILE *) */
 #define AM2_SAVETAG_CONDS        0x06660003u  /* event.cpp's other tag */
-/* The three handlers a saved event registration is restored with. Two are in
- * the objscript band and take a pad; the third takes a 16-byte record read
- * straight from the file. Reached by address -- they are original code. */
-#define ADDR_EVT_PAD_HANDLER_A   0x00437570u
-#define ADDR_EVT_PAD_HANDLER_B   0x00437540u
+/* The three handlers a saved event registration is restored with. Two take a
+ * pad and are reconstructed in pad.cpp; the third takes a 16-byte record read
+ * straight from the file and is still original.
+ *
+ * The pad pair was ADDR_EVT_PAD_HANDLER_A and _B until the bodies were read.
+ * Each compares one field of the pad against the uid the notify carried and
+ * raises one event type, and the two namings the tree already had agree about
+ * which is which: 0x28 is PAD_OFF_UID_ENTER and raises AM2_EVT_PADON, 0x2C is
+ * PAD_OFF_UID_LEAVE and raises AM2_EVT_PADOFF. */
+#define ADDR_EVT_PAD_ON          0x00437570u  /* void(8 args), enter */
+#define ADDR_EVT_PAD_OFF         0x00437540u  /* void(8 args), leave */
 #define ADDR_EVT_RECORD_HANDLER  0x0041F3E0u
 /* The one that BUILDS such a record. EventTriggerDelayed mallocs 16 bytes,
  * fills it with (type, num, uid, removeevent), starts a timer and registers
