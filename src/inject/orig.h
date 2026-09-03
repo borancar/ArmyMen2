@@ -379,6 +379,13 @@
 #define ADDR_DLG_MESSAGE_DELETE           0x00452960u
 #define ADDR_DLG_MESSAGE_DESTRUCT         0x00452980u
 #define ADDR_MESSAGE_CTOR        0x00452750u /* thiscall, ret 8 */
+#define ADDR_DLG_MESSAGE_OK      0x00452EE0u /* void(AM2_Widget *) */
+#define AM2_TYPER_BYTES          0x464u
+#define AM2_MULTISPRITE_BYTES    0x80u
+/* The typer owns the message box's icon: DlgMessageConstruct builds the
+ * MultiSprite, adds it to the DIALOG, and then stores it HERE rather than in
+ * a slot of its own. */
+#define TYPER_OFF_ICON           0x460u  /* AM2_Widget * */
 #define ADDR_OPEN_MESSAGE        0x00452990u /* void(void) */
 #define AM2_MESSAGE_SIZE         0x64u
 /* The only one of the five whose bitmap is a GLOBAL rather than a literal --
@@ -553,7 +560,10 @@
 #define AM2_HUD_CMD_BYTES        0x68u
 #define AM2_COUNT_BUTTON_BYTES   0x88u
 #define AM2_HUD_EDIT_BYTES       0x80u
-#define AM2_HUD_BUTTON_BYTES     0x78u
+/* One concept, one spelling: widget.cpp had AM2_BUTTON_SIZE for this and a
+ * second name was added here before the collision was noticed. Collapsed to
+ * the older one, which the menu constructors already use. */
+#define AM2_BUTTON_SIZE          0x78u
 #define VTABLE_HUD_RADAR       0x0046F8B8u  /* 486,31,618,163 */
 #define VTABLE_HUD_SARGE       0x0046F8CCu  /* 480,169,624,249 */
 /* 0x00414DF0, thiscall -- the Sarge panel's constructor. Its rectangle is

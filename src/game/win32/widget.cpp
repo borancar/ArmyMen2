@@ -4287,6 +4287,82 @@ void __attribute__((thiscall)) HudCmdInvoke(AM2_Widget *w, int32_t mode)
     }
 }
 
+/* DlgMessageConstruct -- original 0x00452750, 560 bytes, thiscall `ret 8`.
+ * The plain message box: an OK button, a typer for the text, and the red
+ * 03_029 icon. orig.h described it from its sprites alone -- "Message --
+ * 03_029 red, and an OK -- a plain message box" -- and the body agrees.
+ *
+ * EVERY CHILD IS PLACED FROM A COMPUTED CENTRE, not from constants. The
+ * origin is ((BITMAP_AREA_W - backdrop.width) / 2, (BITMAP_AREA_H -
+ * backdrop.height) / 2), taken off the backdrop ScreenBaseConstruct just
+ * loaded, and each child adds its own offset to that. So the dialog centres
+ * itself on whatever its bitmap turns out to be and none of the six
+ * coordinates below is absolute.
+ *
+ * The division is MSVC's signed halve -- `cdq; sub eax,edx; sar eax,1` --
+ * which rounds toward zero rather than down. Written as `/ 2` on a signed
+ * int, which is the same thing in C99 and what the original computes; a
+ * `>> 1` would differ for an odd negative, and a backdrop wider than the
+ * screen makes that reachable.
+ *
+ * The three children are added even when their allocation failed: each arm
+ * nulls its pointer and calls WidgetAddChild anyway, which is the same
+ * shape HudPanelConstruct has. The button also becomes the focused child,
+ * and the icon is stored into the TYPER at +0x460 rather than into this
+ * dialog -- so the typer owns it and this is not a fourth child slot. */
+AM2_Widget *__attribute__((thiscall)) DlgMessageConstruct(AM2_Widget *w,
+                                                          const char *bmp,
+                                                          int32_t flag)
+{
+    const AM2_Sprite *back;
+    AM2_Widget       *btn;
+    AM2_Widget       *typer;
+    AM2_Widget       *icon;
+    AM2_Rect          box;
+    int32_t           ox;
+    int32_t           oy;
+
+    ScreenBaseConstruct(w, bmp, flag);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_DLG_MESSAGE);
+    w->flag44 = 1;
+
+    back = *(const AM2_Sprite *const *)((uint8_t *)w + HUD_OFF_SPRITE0);
+    ox = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
+          - back->bounds.right) / 2;
+    oy = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H
+          - back->bounds.bottom) / 2;
+
+    btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    if (btn) {
+        RectSet(&box, ox + 0x149, oy + 0x38, 0x51, 0x20);
+        btn = ButtonConstruct(btn, "03_007_00_ok.bmp", "03_007_01_ok.bmp",
+                              "03_007_02_ok.bmp", 1, box,
+                              (void (__cdecl *)(AM2_Widget *))
+                                  AM2_IMAGE(ADDR_DLG_MESSAGE_OK),
+                              (void (__cdecl *)(AM2_Widget *))0);
+    }
+    WidgetAddChild(w, btn);
+    w->focusedChild = btn;
+
+    typer = (AM2_Widget *)orig_operator_new(AM2_TYPER_BYTES);
+    if (typer)
+        typer = TyperConstruct(typer, ox + 0x28, oy + 0x41, 0xF0, 0x34,
+                               (const char *)(uintptr_t)ADDR_MESSAGE_TEXT);
+    WidgetAddChild(w, typer);
+
+    icon = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_BYTES);
+    if (icon) {
+        RectSet(&box, ox + 0x23, oy + 0x95, 0x11, 0x10);
+        icon = MultiSpriteConstruct(icon, "03_029_00_red.bmp",
+                                    "03_029_01_red.bmp", 1, box);
+    }
+    WidgetAddChild(w, icon);
+
+    /* The icon belongs to the TYPER, not to this dialog. */
+    *(void **)((uint8_t *)typer + TYPER_OFF_ICON) = icon;
+    return w;
+}
+
 /* The build screen's START button. Read out of the image rather than guessed
  * -- "done" was the obvious name for a button at the bottom of a build menu
  * and it is not what the strings say. */
@@ -4434,7 +4510,7 @@ AM2_Widget *__attribute__((thiscall)) HudPanelConstruct(AM2_Widget *w)
         *(int32_t *)((uint8_t *)btn + COUNTBTN_OFF_DISABLED) = 1;
         WidgetAddChild(w, *(AM2_Widget **)(self + HUDPANEL_OFF_POINTS_FIELD));
 
-        btn = (AM2_Widget *)orig_operator_new(AM2_HUD_BUTTON_BYTES);
+        btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
         if (btn) {
             AM2_Rect box;
             RectSet(&box, 0x1F, 0x1A6, 0x51, 0x20);
@@ -5145,7 +5221,7 @@ void __cdecl OpenGameMenu(void)
 void __cdecl OpenMessage(void)
 {
     CloseCurrentScreen();
-    OpenScreen2(AM2_MESSAGE_SIZE, (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_MESSAGE_CTOR),
+    OpenScreen2(AM2_MESSAGE_SIZE, (AM2_ScreenCtor2Fn)DlgMessageConstruct,
                 (const char *)AM2_IMAGE(ADDR_MESSAGE_BMP_NAME), 0);
 }
 
@@ -5217,7 +5293,6 @@ static const AM2_MenuButton kOptionsButtons[] = {
 #define AM2_OPTIONS_BUTTON_LEFT   0xE7
 #define AM2_OPTIONS_BUTTON_WIDTH  0x98
 #define AM2_OPTIONS_BUTTON_HEIGHT 0x19
-#define AM2_BUTTON_SIZE           0x78
 
 AM2_Widget *__attribute__((thiscall)) OptionsMenuConstruct(AM2_Widget *w,
                                                            const char *bmp)
@@ -11757,6 +11832,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_MESSAGE_CTOR,
+                        (const void *)DlgMessageConstruct,
+                        "DlgMessageConstruct", 1);
     rc |= patch_replace(ADDR_ARROWBAR_SHOW_ROW,
                         (const void *)ArrowBarShowRow,
                         "ArrowBarShowRow", 3);

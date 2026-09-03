@@ -668,6 +668,11 @@ AM2_DECLARE_CLASS_DTOR(DlgControls);
 AM2_DECLARE_CLASS_DTOR(DlgSelectPlayer);
 AM2_DECLARE_CLASS_DTOR(DlgNameEntry);
 AM2_DECLARE_CLASS_DTOR(DlgLoadGame);
+/* 0x00452750, thiscall. The plain message box, centred on its own backdrop. */
+AM2_Widget *__attribute__((thiscall)) DlgMessageConstruct(AM2_Widget *w,
+                                                          const char *bmp,
+                                                          int32_t flag);
+
 AM2_DECLARE_CLASS_DTOR(DlgMessage);
 AM2_DECLARE_CLASS_DTOR(DlgGameMenu);
 
