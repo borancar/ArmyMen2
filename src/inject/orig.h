@@ -6736,6 +6736,14 @@ typedef struct {
 /* "Save\\%s" -- the per-player save folder, used by every handler that has to
  * chdir into it: DlgOverwriteOk, OnDelGameOk and OnDelPlayerOk. */
 #define ADDR_STR_SAVE_DIR_FMT    0x0048B930u
+#define ADDR_STR_ANY_FILE        0x0048B9D8u  /* "*.*" */
+/* Two CRT wrappers identified from the imports they call, which is the
+ * strongest evidence there is: 0x0046646C calls KERNEL32 DeleteFileA and
+ * 0x00466496 calls RemoveDirectoryA, both translating failure through
+ * GetLastError. Consistent with this image never opening a file itself --
+ * every file operation goes through the statically linked CRT. */
+#define ADDR_CRT_REMOVE          0x0046646Cu  /* int32(const char *) */
+#define ADDR_CRT_RMDIR           0x00466496u  /* int32(const char *) */
 #define ADDR_STR_DOT             0x004758A0u  /* "." -- ANY extension, not
                                                * this one; SaveListOnSave
                                                * appends .sav only when the
@@ -12116,6 +12124,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * it tests: every player whose AM2_PLAYER_ID is neither 0 nor -1 must have it
  * set, and an empty table answers yes. Reconstructed; both measured at 0,
  * since their caller is on the multiplayer start path. */
+/* The two the launch button announces, and the panel's launch handler. */
+#define ADDR_MSG_VERSION_MISMATCH 0x00487210u
+#define ADDR_MSG_HOST_WAITING     0x004871DCu
+#define ADDR_MP_ON_LAUNCH         0x00431850u /* void(AM2_Widget *) */
 #define ADDR_ALL_PLAYERS_AGREED  0x0040F8A0u  /* thiscall int32(comm) */
 #define ADDR_ALL_PLAYERS_READY   0x0040F8E0u  /* thiscall int32(comm) */
 #define AM2_PLAYER_ACTIVE        0x25Cu

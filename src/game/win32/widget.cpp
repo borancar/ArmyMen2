@@ -6272,7 +6272,7 @@ AM2_Widget *__attribute__((thiscall)) DelPlayerDialogConstruct(AM2_Widget *w,
                                                                const char *bmp)
 {
     return ConfirmDialogBuild(w, bmp, VTABLE_DELPLAYER_DIALOG, 0x0048B9C4,
-                              kImageHandler(ADDR_ON_DELPLAYER_OK), 0x0048B984,
+                              OnDelPlayerOk, 0x0048B984,
                               kOnDelPlayerCancel);
 }
 
@@ -8310,6 +8310,72 @@ void __cdecl OnDelPlayerCancel(AM2_Widget *w)
     }
 }
 
+typedef int32_t (__cdecl *AM2_RemoveFn)(const char *);
+#define orig_remove ((AM2_RemoveFn)AM2_IMAGE(ADDR_CRT_REMOVE))
+#define orig_rmdir  ((AM2_RemoveFn)AM2_IMAGE(ADDR_CRT_RMDIR))
+
+/* OnDelPlayerOk -- original 0x00450A60, 272 bytes, one exit.
+ *
+ * The DELETE PLAYER confirmation's OK. Deleting a player means deleting the
+ * player's SAVE FOLDER, which is why a function named for players is all
+ * file I/O: chdir into `Save\<name>`, remove every save in it, remove the
+ * folder, forget the name.
+ *
+ * I WENT LOOKING FOR A MISNAMING HERE AND THERE ISN'T ONE. The body is
+ * "Save\%s", FindFirst and FileHasSaveTag, and ADDR_GAMEPROC_BLOCK is used as
+ * a STRING while being named for a block -- both of which read as a name
+ * describing the wrong thing. Both resolve: orig.h already records that
+ * global as "also a string", and DlgSaveListConstruct's note says it names
+ * the player's save folder. Checking the tree before writing up a
+ * discrepancy is what turned a suspected defect into a confirmation.
+ *
+ * ONLY TAGGED FILES ARE REMOVED. FileHasSaveTag gates every deletion, so a
+ * file the game did not write survives -- and the same guard is what
+ * OnDelGameOk applies to the single file it removes. The pair is consistent
+ * and the guard is not incidental.
+ *
+ * THE SKIP IS ON ANY LEADING DOT, not on "." and ".." specifically, so a
+ * dotfile in a save folder is skipped too. Reproduced.
+ *
+ * It closes by calling its own CANCEL rather than repeating the teardown --
+ * the shape PointerDropItem's neighbour uses, and the same one GameMenuUpdate
+ * takes in the other direction. */
+void __cdecl OnDelPlayerOk(AM2_Widget *w)
+{
+    char    dir[AM2_DLG_TEXT_BYTES];
+    char    pattern[AM2_DLG_TEXT_BYTES];
+    uint8_t find[AM2_FINDDATA_BYTES];
+    int32_t h;
+
+    PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
+
+    if (strlen((const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK)) != 0) {
+        am2_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR_FMT),
+                    (const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
+        SetGameDir(dir);
+    }
+
+    strcpy(pattern, (const char *)AM2_IMAGE(ADDR_STR_ANY_FILE));
+    h = orig_findfirst(pattern, find);
+    if (h != -1) {
+        do {
+            const char *nm = (const char *)(find + AM2_FIND_OFF_NAME);
+
+            if (nm[0] == '.')
+                continue;
+            if (FileHasSaveTag(nm))
+                orig_remove(nm);
+        } while (orig_findnext(h, find) == 0);
+        orig_findclose(h);
+    }
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
+    orig_rmdir((const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
+    *(char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK) = '\0';
+
+    OnDelPlayerCancel(w);
+}
+
 /* 0x0044F1B0. The REPLAY prompt's OK -- "do you wish to reattempt your failed
  * mission?" -- and it is the route to LoadGame this project has been looking
  * for. With the second name set it raises ADDR_LOAD_PENDING, which the
@@ -9806,6 +9872,85 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
         SendPlayerMsg(1);
         Announce("Game type changed by host.");
     }
+}
+
+/* OnMpLaunch -- original 0x00431850, 208 bytes, four exits.
+ *
+ * The multiplayer panel's launch button, pushed into a ButtonConstruct by
+ * MpPanelConstruct. It needed no new name: every global, offset and callee it
+ * touches was already in the tree, which is worth stating because the
+ * function is the far end of work committed earlier today.
+ *
+ * IT IS THE HOST SIDE OF CheckMapRules. Each client answers the checksum
+ * handshake with a code saying which of rules-file, map or checksum failed;
+ * ADDR_ALL_PLAYERS_AGREED is the aggregate of those answers, and this is
+ * where the host declines to start. Neither function was written with the
+ * other in view and the vocabulary lines up -- CheckMapRules complains per
+ * player, "%s does not have rules", and this refuses once for everyone.
+ *
+ * THE AGREEMENT TEST READS BACKWARDS at a glance: non-zero PROCEEDS and zero
+ * announces the failure. The name is what settles it rather than the branch.
+ * Both predicates are thiscall on the comm object, which the original never
+ * reloads -- ecx still holds it from the function's first instruction.
+ *
+ * A LONE HOST SKIPS THE CHECK. With COMM_OFF_PLAYER_COUNT at 1 there is
+ * nobody to disagree, so the comparison is jumped over entirely rather than
+ * being trivially true -- which is why a solo host can always launch.
+ *
+ * READY IS TWO STEPS. It marks its OWN slot ready first and then asks whether
+ * everyone is; the host pressing launch is itself a ready signal, and the
+ * message it prints when others are outstanding says so.
+ *
+ * THE THREE COPIES ARE THE HOST'S SETTINGS BECOMING AUTHORITATIVE. Score
+ * limit, game-over flags and setting 0x22C are latched into the three
+ * ADDR_HOST_* globals immediately before the start goes out. Those
+ * destinations carry structural names because nothing had shown what they
+ * hold; this is their writer, and it says what they are. Not renamed here --
+ * a writer alone is half the pair this file asks for, and the readers have
+ * not been found.
+ *
+ * It ends in a TAIL JUMP to SaveOptions, so launching also writes the options
+ * file; a plain call here, with nothing after it. */
+void __cdecl OnMpLaunch(AM2_Widget *w)
+{
+    uint8_t *comm = g_commObject;
+    uint8_t *slot;
+
+    (void)w;
+
+    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        return;
+
+    if (*(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT) > 1
+        && !CommAllPlayersAgreed(comm)) {
+        PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
+        Announce((const char *)AM2_IMAGE(ADDR_MSG_VERSION_MISMATCH));
+        return;
+    }
+
+    slot = comm + COMM_OFF_PLAYERS
+           + (size_t)*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+             * AM2_COMM_SLOT_STRIDE;
+    *(int32_t *)(slot + COMM_SLOT_OFF_READY_TO_LOAD) = 1;
+
+    if (!CommAllPlayersReady(comm)) {
+        PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
+        SendPlayerMsg(1);
+        Announce((const char *)AM2_IMAGE(ADDR_MSG_HOST_WAITING));
+        return;
+    }
+
+    PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
+    SendGameStartMsg();
+
+    *(int32_t *)(uintptr_t)ADDR_HOST_VALUE_3E8 =
+        *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT;
+    *(int32_t *)(uintptr_t)ADDR_HOST_MASK_A =
+        *(const int32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS;
+    *(int32_t *)(uintptr_t)ADDR_HOST_MASK_B =
+        *(const int32_t *)(uintptr_t)ADDR_GAME_SETTING_22C;
+
+    SaveOptions();
 }
 
 /* The panel's complaint, six times over: grey the map preview and announce
@@ -14058,6 +14203,10 @@ int widget_install(void)
                         "HudPanelWidth", 3);
     rc |= patch_replace(ADDR_SET_POINTER_MODE, (const void *)SetPointerMode,
                         "SetPointerMode", 10);
+    rc |= patch_replace(ADDR_ON_DELPLAYER_OK, (const void *)OnDelPlayerOk,
+                        "OnDelPlayerOk", 1);
+    rc |= patch_replace(ADDR_MP_ON_LAUNCH, (const void *)OnMpLaunch,
+                        "OnMpLaunch", 1);
     rc |= patch_replace(ADDR_GAMEMENU_SAVE, (const void *)GameMenuSave,
                         "GameMenuSave", 1);
     rc |= patch_replace(ADDR_GAMEMENU_LOAD, (const void *)GameMenuLoad,
@@ -15558,8 +15707,7 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
                                 (const char *)AM2_IMAGE(0x00476E90u),
                                 (const char *)AM2_IMAGE(0x00476EA4u), 1,
                                 *RectSet(&r, 0x21F, 0x11A, 0x51, 0x20),
-                                (void (__cdecl *)(AM2_Widget *))(uintptr_t)
-                                    0x00431850u,
+                                OnMpLaunch,
                                 0);
             else
                 ButtonConstruct(child,
