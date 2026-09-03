@@ -14772,6 +14772,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * naming a function from one call site. */
 #define AAIREC_OFF_SLOT          0x0Cu
 #define AAIREC_OFF_LIST_SLOT     0x10u   /* into ADDR_RECORD_LISTS, 0 for none */
+/* It had a SECOND name, AAI_OFF_DEF_INDEX, on this same offset and for this
+ * same field -- and objtype.cpp used BOTH, at lines 710 and 995 against 926,
+ * one record spelled two ways inside one file. checkoffsets cannot see it
+ * because the prefixes differ, which is the hole this file already describes
+ * for a NEW prefix and which is just as open for an old one. The writer
+ * decides: 0x00434590 stores the slot through AAIREC_OFF_LIST_SLOT, so that
+ * is the name and the other is gone. */
 #define ADDR_RECORD_LIST_CAP     0x00516138u  /* int32_t, slots allocated */
 #define ADDR_RECORD_LIST_COUNT   0x0051613Cu  /* int32_t, slots used */
 #define ADDR_RECORD_LISTS        0x00516140u  /* void **, one per slot */
@@ -18021,7 +18028,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * to OBJ_OFF_RANK; +0x28 is OR'd into the object's flags; +0x10 indexes
  * ADDR_RECORD_LISTS for the row def; +0x14 is handed to ObjInitCommon; and
  * +0x34 is written into every row's own +0x28. */
-#define AAI_OFF_DEF_INDEX          0x10u
 /* Named for its USE -- "the block handed to ObjInitCommon" -- until that
  * argument was read. It is the box offsets, one AM2_Rect. */
 #define AAI_OFF_BOX                0x14u  /* int32_t[4] */

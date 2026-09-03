@@ -923,7 +923,7 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
 
     BuildRowsFromDef(o + OBJ_OFF_SUBRECORD,
                      (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)
-                         [*(const int32_t *)(rec + AAI_OFF_DEF_INDEX)],
+                         [*(const int32_t *)(rec + AAIREC_OFF_LIST_SLOT)],
                      (int32_t)(int16_t)at,
                      (int32_t)(int16_t)(at >> 16),
                      *(const uint32_t *)(o + OBJ_OFF_FLAGS));

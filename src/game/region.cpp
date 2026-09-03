@@ -2932,7 +2932,7 @@ int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind)
     rec = ((const uint8_t *const *)
               *(void *const *)(uintptr_t)ADDR_AAI_RECORDS)[slot];
     hdr = ((void *const *)*(void *const *)(uintptr_t)ADDR_RECORD_LISTS)
-              [*(const int32_t *)(rec + AAI_OFF_DEF_INDEX)];
+              [*(const int32_t *)(rec + AAIREC_OFF_LIST_SLOT)];
 
     if (*(const void *const *)((const uint8_t *)hdr + LISTHDR_OFF_MASK
                                + OBJMASK_OFF_BITS))
