@@ -4191,6 +4191,48 @@ typedef void (__cdecl *AM2_VoidFn)(void);
 
 #define orig_operator_new     ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
 
+/* HudSargeConstruct -- original 0x00414DF0, 157 bytes, thiscall. The Sarge
+ * panel: 31 portrait sprites and six selection slots.
+ *
+ * IT HAS NO EARLY EXIT, which is the whole reason it is worth saying so. The
+ * other three HUD constructors each abandon the rest of their body on a null
+ * preload; this one stores all 31 results unconditionally and never looks at
+ * any of them. A family habit is only a habit once you have checked the
+ * member that does not share it.
+ *
+ * The rectangle is PARENT-RELATIVE. VTABLE_HUD_SARGE's comment records the
+ * absolute 480,169,624,249, and 624-480 is 0x90 with 249-169 is 0x50 -- the
+ * width and height written here -- so the two agree and the parent is at
+ * (480, 21), which is the top strip's y. Two notes written for different
+ * functions lining up is the check that neither is wrong.
+ *
+ * ArmySpriteBase is called for its side effect and its answer discarded; the
+ * original does not test it either. */
+AM2_Widget *__attribute__((thiscall)) HudSargeConstruct(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+    int32_t  i;
+
+    WidgetConstruct(w);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_SARGE);
+
+    ArmySpriteBase();
+
+    for (i = 0; i < AM2_HUD_SARGE_SLOTS; i++)
+        ((void **)(self + HUDSARGE_OFF_SPRITES))[i] =
+            PreloadArmySprite(AM2_HUD_SARGE_SPRITE_SET, i, 0, 0);
+
+    for (i = 0; i < AM2_HUD_SARGE_SLOT_COUNT; i++)
+        *(int32_t *)(self + HUDSARGE_OFF_SLOTS
+                     + (size_t)i * AM2_HUD_SARGE_SLOT_SIZE) = -1;
+
+    w->x = AM2_HUD_SARGE_LEFT;
+    w->y = AM2_HUD_SARGE_TOP;
+    w->w = AM2_HUD_SARGE_WIDTH;
+    w->h = AM2_HUD_SARGE_HEIGHT;
+    return w;
+}
+
 static const char *const kChatToSprites[4] = {
     "18_001_00_chatto.bmp", "18_001_01_chatto.bmp",
     "18_001_02_chatto.bmp", "18_001_03_chatto.bmp",
@@ -11281,6 +11323,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_HUD_SARGE_CONSTRUCT,
+                        (const void *)HudSargeConstruct,
+                        "HudSargeConstruct", 1);
     rc |= patch_replace(ADDR_HUD_TOP_CONSTRUCT,
                         (const void *)HudTopConstruct,
                         "HudTopConstruct", 1);

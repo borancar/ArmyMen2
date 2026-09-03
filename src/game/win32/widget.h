@@ -285,6 +285,10 @@ void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip);
  * and pinned to the right of the screen. */
 /* 0x00417580, thiscall. The HUD top strip / chat log. Multiplayer changes
  * its indent, its base sprite frame and whether it gets a chat-to checkbox. */
+/* 0x00414DF0, thiscall. The Sarge panel: 31 portraits and six slots. The one
+ * HUD constructor with no early exit on a failed preload. */
+AM2_Widget *__attribute__((thiscall)) HudSargeConstruct(AM2_Widget *w);
+
 AM2_Widget *__attribute__((thiscall)) HudTopConstruct(AM2_Widget *w);
 
 AM2_Widget *__attribute__((thiscall)) HudEdgeConstruct(AM2_Widget *w);

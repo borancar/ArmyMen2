@@ -538,6 +538,18 @@
 #define VTABLE_HUD_PANEL       0x0046F944u  /* 480,21,624,480 -- HUD_WIDGET_B */
 #define VTABLE_HUD_RADAR       0x0046F8B8u  /* 486,31,618,163 */
 #define VTABLE_HUD_SARGE       0x0046F8CCu  /* 480,169,624,249 */
+/* 0x00414DF0, thiscall -- the Sarge panel's constructor. Its rectangle is
+ * PARENT-RELATIVE (0, 0x94, 0x90, 0x50), and the vtable comment above is the
+ * absolute one: 624-480 is 0x90 and 249-169 is 0x50, so the two agree and the
+ * parent sits at (480, 21) -- the top strip's y. */
+#define ADDR_HUD_SARGE_CONSTRUCT 0x00414DF0u  /* thiscall AM2_Widget *(this) */
+#define AM2_HUD_SARGE_SPRITE_SET 0x0D
+#define AM2_HUD_SARGE_SLOT_COUNT 6
+#define AM2_HUD_SARGE_SLOT_SIZE  0x10u
+#define AM2_HUD_SARGE_LEFT       0
+#define AM2_HUD_SARGE_TOP        0x94
+#define AM2_HUD_SARGE_WIDTH      0x90
+#define AM2_HUD_SARGE_HEIGHT     0x50
 #define VTABLE_HUD_SQUAD       0x0046F8E0u  /* 480,251,624,481 */
 #define VTABLE_HUD_COMMANDS    0x0046F8F4u  /* 480,430,624,478 */
 #define VTABLE_HUD_EDGE_STRIP  0x0046F960u  /* 624,21,640,480 */
