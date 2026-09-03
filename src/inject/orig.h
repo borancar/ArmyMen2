@@ -536,6 +536,24 @@
 #define AM2_COUNT_FONT         0
 #define VTABLE_HUD_TOP_STRIP   0x0046F908u  /* 0,0,640,21 */
 #define VTABLE_HUD_PANEL       0x0046F944u  /* 480,21,624,480 -- HUD_WIDGET_B */
+/* 0x00418FB0, thiscall -- the HUD panel, the parent of every other HUD
+ * widget. Single player gets radar, sarge, squad and commands; a network game
+ * gets the radar, then eighteen build buttons, an edit and a button instead. */
+#define ADDR_HUD_PANEL_CONSTRUCT 0x00418FB0u  /* thiscall AM2_Widget *(this) */
+#define ADDR_HUD_PANEL_X         0x00485328u  /* int32, its x, published */
+#define AM2_BUILD_MENU_COUNT     18
+#define ADDR_BUILD_ON_TOGGLE     0x00418F20u  /* void(AM2_Widget *) */
+#define ADDR_BUILD_START_HANDLER 0x00418F90u  /* void(AM2_Widget *) */
+#define COUNTBTN_OFF_DISABLED    0x4Cu   /* int32, 1 when unaffordable */
+#define BUTTON_OFF_FLAG44        0x44u
+#define AM2_HUD_PANEL_SP_INSET   0x10  /* single player sits 0x10 further left */
+#define AM2_HUD_RADAR_BYTES      0x5Cu
+#define AM2_HUD_SARGE_BYTES      0x134u
+#define AM2_HUD_SQUAD_BYTES      0x23Cu
+#define AM2_HUD_CMD_BYTES        0x68u
+#define AM2_COUNT_BUTTON_BYTES   0x88u
+#define AM2_HUD_EDIT_BYTES       0x80u
+#define AM2_HUD_BUTTON_BYTES     0x78u
 #define VTABLE_HUD_RADAR       0x0046F8B8u  /* 486,31,618,163 */
 #define VTABLE_HUD_SARGE       0x0046F8CCu  /* 480,169,624,249 */
 /* 0x00414DF0, thiscall -- the Sarge panel's constructor. Its rectangle is
@@ -3718,7 +3736,6 @@
  * say TOP; its fields are spelled HUDLOG_ and are the same widget. */
 #define ADDR_HUD_TOP_CONSTRUCT   0x00417580u  /* thiscall AM2_Widget *(this) */
 #define AM2_HUD_CHECKBOX_BYTES   0x90
-#define ADDR_HUD_B_CTOR          0x00418FB0u
 /* 0x004195B0, thiscall -- the HUD EDGE STRIP's constructor, and the name is
  * settled by its destructor: 0x00419650 tail-calls ADDR_HUD_EDGE_DESTRUCT.
  * "HUD_C" was a placeholder from the order the three were found in.

@@ -291,6 +291,11 @@ void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip);
  * palette indices the blips are drawn in. */
 /* 0x00415730, thiscall. The squad panel: twelve portrait slots whose sprite
  * indices run 1..7 and 10..14, skipping 8 and 9. */
+/* 0x00418FB0, thiscall. The HUD panel: parent of every other HUD widget, and
+ * split completely by ADDR_NET_GAME -- four children in single player, the
+ * radar plus eighteen build buttons in a network game. */
+AM2_Widget *__attribute__((thiscall)) HudPanelConstruct(AM2_Widget *w);
+
 AM2_Widget *__attribute__((thiscall)) HudSquadConstruct(AM2_Widget *w);
 
 AM2_Widget *__attribute__((thiscall)) HudRadarConstruct(AM2_Widget *w);

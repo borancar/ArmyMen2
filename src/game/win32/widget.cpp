@@ -4191,6 +4191,170 @@ typedef void (__cdecl *AM2_VoidFn)(void);
 
 #define orig_operator_new     ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
 
+/* The build screen's START button. Read out of the image rather than guessed
+ * -- "done" was the obvious name for a button at the bottom of a build menu
+ * and it is not what the strings say. */
+static const char *const kBuildStartSprites[3] = {
+    "03_016_00_start.bmp", "03_016_01_start.bmp", "03_016_02_start.bmp",
+};
+
+/* Make a child of `size`, construct it with `ctor`, and hand it to the
+ * parent -- the shape the panel repeats six times. A failed allocation adds
+ * a NULL child rather than skipping the call, which is the original's. */
+static AM2_Widget *HudAddChild(AM2_Widget *parent, uint32_t size,
+                               AM2_Widget *(__attribute__((thiscall)) *ctor)(AM2_Widget *))
+{
+    AM2_Widget *c = (AM2_Widget *)orig_operator_new(size);
+
+    c = c ? ctor(c) : (AM2_Widget *)0;
+    WidgetAddChild(parent, c);
+    return c;
+}
+
+/* HudPanelConstruct -- original 0x00418FB0, 905 bytes, thiscall. The HUD
+ * panel: the parent every other HUD widget hangs off, and the largest of the
+ * six constructors.
+ *
+ * ONE FLAG SPLITS IT COMPLETELY. In single player it adds the radar, the
+ * Sarge panel, the squad grid and the command bar; in a network game it adds
+ * the radar and then EIGHTEEN build buttons, a text edit and a button. The
+ * two halves share only the radar.
+ *
+ * The same flag also picks the backdrop's frame and shifts the whole panel:
+ * x is ADDR_SCREEN_W minus the sprite's width, and then 0x10 further left in
+ * SINGLE player -- the inset is on the non-network path, which reads
+ * backwards from the compare and is why it is spelled out here.
+ *
+ * The x it settles on is published to ADDR_HUD_PANEL_X and kept in
+ * HUDPANEL_OFF_STOP, which is the position the panel slides open to.
+ *
+ * THE BUILD LOOP PAIRS EACH RECORD WITH THE PREVIOUS RECORD'S RECTANGLE --
+ * `base + i*0x38 - 0x10` -- so Rifleman takes the standalone rect at
+ * ADDR_BUILD_MENU_RECTS and every later button takes its predecessor's
+ * +0x28. See that macro; the layout note there was wrong about which button
+ * owned which rectangle until this loop was read.
+ *
+ * IT NULL-DEREFERENCES ON A FAILED ALLOCATION, in three places, and all
+ * three are reproduced. When operator new returns null the pointer is zeroed
+ * and then written through -- [0]+0x4C for a build button that cannot be
+ * afforded, [0]+0x4C for the edit, [0]+0x44 for the button. The original
+ * crashes there and so does this; the alternative is inventing a guard the
+ * game does not have. */
+AM2_Widget *__attribute__((thiscall)) HudPanelConstruct(AM2_Widget *w)
+{
+    uint8_t    *self = (uint8_t *)w;
+    AM2_Sprite *spr;
+    int32_t     net = *(const int32_t *)(uintptr_t)ADDR_NET_GAME;
+    int32_t     x;
+
+    WidgetConstruct(w);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_PANEL);
+
+    spr = (AM2_Sprite *)PreloadArmySprite(0x0B, 0, net != 0 ? 1 : 0, 1);
+    *(void **)(self + HUD_OFF_SPRITE0) = spr;
+    if (!spr)
+        return w;
+    w->sprite = spr;
+
+    x = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - spr->bounds.right;
+    if (net == 0)
+        x -= AM2_HUD_PANEL_SP_INSET;   /* the inset is SINGLE player's */
+    w->x = x;
+    w->y = AM2_HUD_EDGE_TOP;
+    w->w = spr->bounds.right;
+    w->h = spr->bounds.bottom;
+    *(int32_t *)(self + HUDPANEL_OFF_STOP) = x;
+    *(int32_t *)(self + HUDPANEL_OFF_OPEN) = 1;
+    *(int32_t *)(uintptr_t)ADDR_HUD_PANEL_X = x;
+
+    HudAddChild(w, AM2_HUD_RADAR_BYTES, HudRadarConstruct);
+
+    if (net == 0) {
+        HudAddChild(w, AM2_HUD_SARGE_BYTES, HudSargeConstruct);
+        HudAddChild(w, AM2_HUD_SQUAD_BYTES, HudSquadConstruct);
+        HudAddChild(w, AM2_HUD_CMD_BYTES,   HudCmdConstruct);
+        return w;
+    }
+
+    /* The network half, inline rather than factored: it is one contiguous
+     * block in the original and a helper would put a seam where the two
+     * null-deref paths live. */
+    {
+        const uint8_t *rec  = (const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU);
+        const uint8_t *rect = (const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU_RECTS);
+        AM2_Widget   **slot = (AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_TABLE;
+        int32_t        army = CommArmyOfSlot(
+                                  *(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                                  (int32_t)g_defaultOwner);
+        AM2_Widget    *btn;
+        char          *points;
+        int32_t        i;
+
+        for (i = 0; i < AM2_BUILD_MENU_COUNT; i++) {
+            int32_t id   = *(const int32_t *)(rec + BUILD_MENU_OFF_ID);
+            int32_t kind = *(const int32_t *)(rec + BUILD_MENU_OFF_KIND);
+            const int32_t *r = (const int32_t *)rect;
+
+            btn = (AM2_Widget *)orig_operator_new(AM2_COUNT_BUTTON_BYTES);
+            if (btn)
+                btn = CountButtonConstruct(btn, kind, i,
+                                           r[0], r[1], r[2], r[3],
+                                           army, (int32_t)UnitTypeCost(id),
+                                           (void (__cdecl *)(AM2_Widget *))
+                                               AM2_IMAGE(ADDR_BUILD_ON_TOGGLE));
+            WidgetAddChild(w, btn);
+            *slot = btn;
+
+            /* Writes through btn even when it is null -- the original's. */
+            if (!CanAffordUnit(id, *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS))
+                *(int32_t *)((uint8_t *)btn + COUNTBTN_OFF_DISABLED) = 1;
+
+            rec  += AM2_BUILD_MENU_STRIDE;
+            rect += AM2_BUILD_MENU_STRIDE;
+            slot++;
+        }
+
+        /* The points readout, formatted into the panel's own buffer. */
+        points = (char *)(self + HUDPANEL_OFF_POINTS_TEXT);
+        am2_sprintf(points, "%d", *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS);
+
+        btn = (AM2_Widget *)orig_operator_new(AM2_HUD_EDIT_BYTES);
+        if (btn) {
+            /* The edit takes its rectangle as FOUR ints, not a struct. The
+             * original still routes them through RectSet and copies the
+             * result back over the same four pushes, which is why the values
+             * appear twice in the disassembly. */
+            /* Both already named for other users -- the view rect's colour
+             * and the background's. Reused rather than given a third and
+             * fourth spelling; checkpatches refused the aliases. */
+            int32_t ink   = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+            int32_t paper = *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR;
+
+            btn = EditConstruct(btn, points, 0x0C,
+                                0x5A, 0x98, 0x26, 0x0E,
+                                1, ink, ink, paper, 0, 0, 0);
+        }
+        *(void **)(self + HUDPANEL_OFF_POINTS_FIELD) = btn;
+        *(int32_t *)((uint8_t *)btn + COUNTBTN_OFF_DISABLED) = 1;
+        WidgetAddChild(w, *(AM2_Widget **)(self + HUDPANEL_OFF_POINTS_FIELD));
+
+        btn = (AM2_Widget *)orig_operator_new(AM2_HUD_BUTTON_BYTES);
+        if (btn) {
+            AM2_Rect box;
+            RectSet(&box, 0x1F, 0x1A6, 0x51, 0x20);
+            btn = ButtonConstruct(btn, kBuildStartSprites[0], kBuildStartSprites[1],
+                                  kBuildStartSprites[2], 1, box,
+                                  (void (__cdecl *)(AM2_Widget *))
+                                      AM2_IMAGE(ADDR_BUILD_START_HANDLER),
+                                  (void (__cdecl *)(AM2_Widget *))0);
+        }
+        WidgetAddChild(w, btn);
+        w->focusedChild = btn;
+        *(int32_t *)((uint8_t *)btn + BUTTON_OFF_FLAG44) = 1;
+    }
+    return w;
+}
+
 /* HudSquadConstruct -- original 0x00415730, 247 bytes, thiscall. The squad
  * panel: twelve portrait slots, each with a lo and a hi sprite, and twelve
  * records the painter reads.
@@ -4569,7 +4733,6 @@ typedef void *(__attribute__((thiscall)) *AM2_HudCtorFn)(void *obj);
 typedef void (__cdecl *AM2_NoArgLogFn)(void);
 
 
-#define orig_hud_b_ctor   ((AM2_HudCtorFn)AM2_IMAGE(ADDR_HUD_B_CTOR))
 
 #define orig_log_noargs   ((AM2_NoArgLogFn)(uintptr_t)ADDR_LOG)
 
@@ -4609,7 +4772,7 @@ void __cdecl BuildHudWidgets(void)
     *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A =
         NewHudWidget(AM2_HUD_A_BYTES, (AM2_HudCtorFn)HudTopConstruct);
     *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B =
-        NewHudWidget(AM2_HUD_B_BYTES, orig_hud_b_ctor);
+        NewHudWidget(AM2_HUD_B_BYTES, (AM2_HudCtorFn)HudPanelConstruct);
 
     if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME)
         *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C =
@@ -11440,6 +11603,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_HUD_PANEL_CONSTRUCT,
+                        (const void *)HudPanelConstruct,
+                        "HudPanelConstruct", 1);
     rc |= patch_replace(ADDR_HUD_SQUAD_CONSTRUCT,
                         (const void *)HudSquadConstruct,
                         "HudSquadConstruct", 1);
