@@ -60,9 +60,20 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def decode(addr):
+def decode(addr, extra=()):
+    """Disassemble, forwarding any extra flags to disasm.py.
+
+    `--raw N` is the one that matters and it took a real failure to notice.
+    disasm.py resolves an address to its docs/functions.tsv ENTRY, and where
+    that entry is several functions run together the walk starts at the
+    wrong one -- so a callback like EvtCondition at 0x00421E80, which sits
+    inside the 1,888-byte entry at 0x00421c70 and is reached only through
+    the event table, is never on any path from that entry. Every one of its
+    `[esp + N]` references came back "in unreached code", which reads as the
+    tool failing rather than as it being pointed somewhere else. Give it
+    `--raw <size>` and it starts at the real entry."""
     out = subprocess.run([os.path.join(HERE, "..", ".venv", "bin", "python"),
-                          os.path.join(HERE, "disasm.py"), addr],
+                          os.path.join(HERE, "disasm.py"), addr, *extra],
                          capture_output=True, text=True).stdout
     ins = []
     for ln in out.splitlines():
@@ -129,7 +140,7 @@ def main():
     if len(sys.argv) < 2:
         print(__doc__)
         return 2
-    ins = decode(sys.argv[1])
+    ins = decode(sys.argv[1], sys.argv[2:])
     if not ins:
         print("no instructions")
         return 1
