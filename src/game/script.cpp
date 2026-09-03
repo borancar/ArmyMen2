@@ -784,7 +784,7 @@ static void ScriptAddEvent(AM2_ScriptCond *c, int32_t a, int32_t b, int32_t d)
     c->events[n].a = a;
     c->events[n].b = b;
     c->events[n].c = d;
-    c->events[n].d = 0;
+    c->events[n].fired = 0;
 }
 
 int32_t __cdecl ScriptResolveName(AM2_ScriptCtx *ctx, int32_t *at,

@@ -361,7 +361,13 @@ typedef struct AM2_ScriptAction {
 /* One event term in an `if` condition -- three values from the event parser,
  * and a fourth field it always writes as zero. */
 typedef struct {
-    int32_t a, b, c, d;
+    int32_t a, b, c;
+    /* The parser writes this as zero and never touches it again, which is
+     * why it read as a fourth value nobody wanted. It is RUNTIME state:
+     * EvtCondition sets it to 1 when this term's event fires and clears it
+     * again when the whole condition is satisfied. A field whose only
+     * parse-time write is a zero is not dead if something else runs. */
+    int32_t fired;
 } AM2_ScriptEvent;
 
 /* One `testvar` comparison: two operand triples and an operator code. */
@@ -378,7 +384,10 @@ typedef struct {
     int32_t           number;     /* +0x04, the count for repeat/count/time */
     int32_t           nevents;    /* +0x08 */
     AM2_ScriptEvent  *events;     /* +0x0C */
-    int32_t           unused10;   /* +0x10 */
+    int32_t           fired;      /* +0x10, runtime: how many of `events`
+                                   * have fired. Zeroed by the parser and
+                                   * owned by EvtCondition thereafter, which
+                                   * is why it looked unused. */
     int32_t           ntests;     /* +0x14 */
     AM2_ScriptTest   *tests;      /* +0x18 */
     int32_t           nactions;   /* +0x1C */

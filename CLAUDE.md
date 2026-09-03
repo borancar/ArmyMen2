@@ -2338,6 +2338,21 @@ nothing, or fail on noise, is worse than not running one. Note the counts are em
 the trace stubs, installed by `patch_replace` — so the evidence is the log and
 the pixels, not the counters.
 
+**AND `make check` IS ALSO A BUILD, which the rule below did not say.** Its
+last step links `build/selftest.exe`, which recompiles the shared objects, so
+`ab.sh`'s next launch relinks `am2hook.dll` and the two halves of whatever
+configuration straddles it run DIFFERENT binaries. Nothing was edited; a
+static check was run.
+
+That happened, and the `dll` guard caught it outright: `campaign` came back
+`VOID: the two halves ran DIFFERENT am2hook.dll builds`, with the two md5s
+printed. The configuration that had already finished stands, exactly as the
+note below says.
+
+So the rule is not "do not edit `src/` while a suite runs" -- it is **run
+nothing that can rebuild**, which includes `make`, `make check`, and anything
+that invokes them. Read a check's recipe before assuming it only reads.
+
 **`tools/ab.sh` REBUILDS, twice per configuration, so do not edit `src/`
 while it runs.** Every `play` calls `drive.sh start`, which calls `make -s run`,
 which rebuilds and reinstalls `am2hook.dll`. Editing a source file mid-suite is

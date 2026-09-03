@@ -11741,6 +11741,17 @@ void __cdecl PointerSelect(void *obj, uint32_t at)
  * is both what the source must have said and the only spelling a compiler will
  * take without a tautological-compare warning.
  *
+ * THE IDIOM IS BOUNDED, which is worth recording so the next reader does not
+ * re-derive it. A decoded sweep of .text finds exactly SIXTEEN `cmp r, r`
+ * against the same register, every one followed by a conditional jump that
+ * therefore cannot be taken: three in ScriptIf, two in ScriptParseEvents,
+ * one in ScriptObjFrame, and the rest through the pointer band --
+ * PointerPickMode0, PointerPickHeal (two), PointerPickEnemyTrooper,
+ * PointerPickBoard, PointerPickWatched, MedkitHealOne, this, and two in
+ * 0x00457E50. Fourteen of the sixteen are already reconstructed and were
+ * written this way; that count is the check that none was read as a live
+ * test.
+ *
  * AND THE DEAD ARM IS WHERE THE NULL CHECK IS. Its exit sets the object to NULL
  * and falls into the inventory read, so the original would dereference NULL
  * there -- but only on the path that cannot be reached. On the live path the

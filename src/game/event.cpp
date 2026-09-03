@@ -194,8 +194,13 @@ void __cdecl DeclareRuleVars(void)
         if (cond->kind == AM2_IF_TIMEABSOLUTE) {
             int32_t uid = AllocUid();
 
-            EventRegister(0, uid, 0, kImageFn(ADDR_EVT_CONDITION),
-                                cond, 0);
+            /* By NAME now that it is ours -- checkseams.py caught both of
+             * these the moment the patch went in, which is the fourth
+             * spelling of that seam and the one that looks least like a
+             * call. The cost is the usual one: the dispatcher reaches our
+             * code without crossing the patched entry, so EvtCondition's
+             * counter is blind by construction. */
+            EventRegister(0, uid, 0, (const void *)EvtCondition, cond, 0);
             EventNotify(0, uid, 0, 0, 0, 0, 0, cond->number, 1, 0);
             continue;
         }
@@ -203,7 +208,7 @@ void __cdecl DeclareRuleVars(void)
         for (int32_t i = 0; i < cond->nevents; i++)
             EventRegister(cond->events[i].a, cond->events[i].b,
                                 cond->events[i].c,
-                                kImageFn(ADDR_EVT_CONDITION), cond, 0);
+                                (const void *)EvtCondition, cond, 0);
     }
 }
 
@@ -1519,6 +1524,206 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg)
     }
 }
 
+/* EvtCondition -- original 0x00421E80, 976 bytes, cdecl, THIRTEEN exits.
+ * Every `if` in a mission script, one registration per event term.
+ *
+ * IT NAMES ITSELF: "ERROR: a compound event got called for an event it
+ * didn't care about" is what it logs when no term matches, which is how a
+ * function with no callers of its own can still be identified. Nothing calls
+ * it directly -- both `push 0x421e80` sites hand it to EventRegister as a
+ * handler, so its arguments come from the dispatcher.
+ *
+ * EIGHT ARGUMENTS, and that is measured rather than counted by eye. The
+ * dispatcher is `call dword ptr [esi]` at 0x0041F060 with `add esp, 0x20`
+ * and eight pushes, and the handler node's own stored argument is pushed
+ * FIRST, so the condition arrives LAST. EvtArmyWins reads its argument from
+ * the same place, which is the second witness.
+ *
+ * The frame needed the tool. Doing it by hand put 0x00421EB1's operand on
+ * the saved-ebx slot, which is not an argument at all; espmap says argument
+ * 2, and it was wrong the same way about 0x00421EAC. See the espmap commit
+ * -- it could not read this function until it stopped resolving the address
+ * to its merged functions.tsv entry.
+ *
+ * NINE ARMS, EIGHT TARGETS, and script.h had already written down what each
+ * one means. The kinds are the `if` grammar's forms, so the table and the
+ * parser agree without either being derived from the other:
+ *
+ *   0 plain and 5 timeabsolute SHARE an arm -- evaluate the tests and run,
+ *     no state at all. 5 is also the kind the prologue lets through with no
+ *     matching term, and event.cpp already says why: `timeabsolute` has no
+ *     event terms, so it registers an invented uid and announces itself.
+ *   1 allof     every term must have fired.
+ *   2 inorder   the matched term's INDEX must equal the running count, so
+ *               they have to arrive in sequence.
+ *   3 count n   n distinct terms, each counted once through its flag.
+ *   4 repeat n  n firings, with no flags at all -- so one term firing n
+ *               times satisfies it, which is the difference from 3.
+ *   6 after     the terms are PAIRS: an even index is halved to index the
+ *               pair and the target is nevents/2, which is `A after B and
+ *               C after D` in the grammar.
+ *   7, 8 butnot the last term is the exception: it only ever sets its flag
+ *               and returns, and the others fire the condition only while
+ *               that flag is still CLEAR.
+ *
+ * THE `butnot` RESET IS A DEFECT IN THE ORIGINAL AND IS REPRODUCED. Arm 1's
+ * clear-down walks the array with a cursor stepping 0x10; arm 7's is the
+ * same loop written with the MATCHED term's fixed offset, so it clears that
+ * one flag nevents times and leaves every other term still marked. The two
+ * loops look identical and are not, which is the AiStepTrack lesson again --
+ * diffing them is what shows it. A `butnot` condition therefore only fires
+ * once per matched term rather than rearming cleanly.
+ *
+ * The second argument to EvalCondTests is DEAD: the original pushes it and
+ * the callee reads only its first. Called with one here, which cdecl makes
+ * identical.
+ */
+void __cdecl EvtCondition(int32_t bucket, int32_t a2, void *arg, int32_t a4,
+                          int32_t a5, int32_t a6, int32_t a7,
+                          AM2_ScriptCond *c)
+{
+    int32_t hit = -1;
+    int32_t i;
+
+    (void)a6;
+
+    /* Which of this condition's terms is the one that just fired. */
+    for (i = 0; i < c->nevents; i++)
+        if (c->events[i].a == bucket
+            && FilterMatches(c->events[i].b, c->events[i].c, a2, a5, a4, a7))
+            hit = i;
+
+    if (hit < 0 && c->kind != AM2_IF_TIMEABSOLUTE) {
+        orig_log("ERROR: a compound event got called for an event it "
+                 "didn't care about\n");
+        return;
+    }
+
+    switch (c->kind) {
+    case AM2_IF_PLAIN:
+    case AM2_IF_TIMEABSOLUTE:
+        if (EvalCondTests(c))
+            RunCondActions(c, arg);
+        return;
+
+    case AM2_IF_ALLOF:
+        if (!c->events[hit].fired) {
+            c->events[hit].fired = 1;
+            c->fired++;
+        }
+        if (c->fired != c->nevents)
+            return;
+        if (!EvalCondTests(c))
+            return;
+        /* allof DOES clear, with a cursor that walks -- the loop arm 7 got
+         * wrong. */
+        for (i = 0; i < c->nevents; i++)
+            c->events[i].fired = 0;
+        c->fired = 0;
+        RunCondActions(c, arg);
+        return;
+
+    case AM2_IF_INORDER:
+        if (hit != c->fired)
+            return;
+        if (++c->fired != c->nevents)
+            return;
+        c->fired = 0;
+        RunCondActions(c, arg);
+        return;
+
+    case AM2_IF_COUNT:
+        if (c->events[hit].fired)
+            return;
+        c->events[hit].fired = 1;
+        if (++c->fired != c->number)
+            return;
+        RunCondActions(c, arg);
+        return;
+
+    case AM2_IF_REPEAT:
+        if (++c->fired != c->number)
+            return;
+        RunCondActions(c, arg);
+        return;
+
+    case AM2_IF_AFTER:
+        /* AN ODD INDEX CANCELS THE PAIR rather than being ignored, which is
+         * how `A after B` enforces its ordering: B, the even one, marks the
+         * pair and A, the odd one, unmarks it. Reading the odd path as a
+         * bare return would have made `after` mean `both`. */
+        if (hit & 1) {
+            if (c->events[hit / 2].fired == 1) {
+                c->events[hit / 2].fired = 0;
+                c->fired--;
+            }
+            return;
+        }
+        if (!c->events[hit / 2].fired) {
+            c->events[hit / 2].fired = 1;
+            c->fired++;
+        }
+        if (c->fired != c->nevents / 2)
+            return;
+        if (!EvalCondTests(c))
+            return;
+        /* NO RESET HERE, unlike allof -- the pair flags stay set, so an
+         * `after` that has been satisfied once fires again on every later
+         * matching event. Different from arm 1 and deliberately not shared
+         * with it. */
+        RunCondActions(c, arg);
+        return;
+
+    case AM2_IF_BUTNOT_KEYWORD:
+        if (hit == c->nevents - 1) {
+            /* The `butnot` term itself: remember it and do nothing else. */
+            c->events[hit].fired = 1;
+            return;
+        }
+        if (!c->events[hit].fired) {
+            c->events[hit].fired = 1;
+            c->fired++;
+        }
+        if (c->fired != c->nevents - 1)
+            return;
+        if (c->events[c->nevents - 1].fired)
+            return;              /* the butnot term HAS fired: refuse */
+        if (!EvalCondTests(c))
+            return;
+        c->fired = 0;
+        /* THE ORIGINAL'S RESET, DEFECT INCLUDED. `ebx` holds the MATCHED
+         * term's byte offset and never advances, so this clears one flag
+         * nevents times and leaves every other term still marked. Arm 1's
+         * otherwise identical loop walks with a cursor stepping 0x10; these
+         * two look the same and are not. The original writes it twice, once
+         * on each of this arm's paths, and both are reproduced by arriving
+         * here. A `butnot` therefore does not rearm cleanly. */
+        for (i = 0; i < c->nevents; i++)
+            c->events[hit].fired = 0;
+        RunCondActions(c, arg);
+        return;
+
+    case AM2_IF_BUTNOT_STRING:
+        /* NOT the same arm as 7, though it reads like it. This one counts
+         * nothing: past the butnot check it falls THROUGH into the plain
+         * arm's body in the image, so there is no all-but-last requirement
+         * and no reset. An arm ending inside another, which the jump table
+         * cannot show. */
+        if (hit == c->nevents - 1) {
+            c->events[hit].fired = 1;
+            return;
+        }
+        if (c->events[c->nevents - 1].fired)
+            return;
+        if (EvalCondTests(c))
+            RunCondActions(c, arg);
+        return;
+
+    default:
+        return;
+    }
+}
+
 /* --------------------------------------------- immediate trigger ---- */
 
 /* Free one entry's handler chain and then the entry. `owns` decides whether
@@ -2827,6 +3032,8 @@ int event_install(void)
     rc |= patch_replace(ADDR_SCRIPT_SET_OBJ_TABLE,
                         (const void *)ScriptSetObjTable,
                         "ScriptSetObjTable", 1);
+    rc |= patch_replace(ADDR_EVT_CONDITION, (const void *)EvtCondition,
+                        "EvtCondition", 8);
     rc |= patch_replace(ADDR_EVAL_COND_TESTS, (const void *)EvalCondTests,
                         "EvalCondTests", 6);
     rc |= patch_replace(ADDR_MISSION_ENDED, (const void *)MissionEnded,
