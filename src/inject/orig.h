@@ -10748,13 +10748,20 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * null rather than defaulted, which is why a unit with no animation fires
  * from its own point.
  *
- * THE RETURN VALUE IS NOT UNIFORM ACROSS THE SHAPE, and that is the part a
- * summary of it would lose. Arms 0, 7, 15 and 10 end `xor eax, eax` and
- * answer 0; arms 16, 3, 5, 6, 1, 4 and 2 fall out of CreateMissile and answer
- * WHATEVER IT RETURNED. Since the return value means "consume the item", a
- * weapon in the second group is spent only when the missile was actually
- * made. Reading the shape and assuming the tail is the mistake this table
- * exists to prevent.
+ * THE RETURN VALUE IS A PLAIN BOOLEAN. All 25 exits set it explicitly --
+ * twenty `mov eax, 1` and five `xor eax, eax` -- and NOT ONE of them falls
+ * out of CreateMissile with its result. The five that answer 0 are the
+ * shared refusal epilogue at 0x0045F5B5 (which arm 0 falls into and eight
+ * arms jump to), arm 15 at 0x0045F73A, 0x0045FBC9, arm 20's second block at
+ * 0x0045FE4E, and arm 10 at 0x0045FF84. Since the value means "consume the
+ * item", 0 is "the shot did not happen, keep it".
+ *
+ * THIS ENTRY SAID THE OPPOSITE FOR TWO COMMITS and the cause is worth more
+ * than the fact. The arms were read through a grep that dropped `mov` lines
+ * to make 1,149 instructions legible -- and `mov eax, 1` is a `mov` line, so
+ * every arm that sets the result looked like it ended at the call. The
+ * filter that made the function readable is exactly what hid its answer.
+ * Anchor a tail read on the `ret`, never on a filtered body.
  *
  * FACING BIAS, per arm: 0 adds 0x20, 7 adds 0x10 (by JUMPING into arm 0's
  * tail at 0x0045F578 with a different push), 15 and 3 add 0x0A through
