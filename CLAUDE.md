@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **32** analysis
+**`make check` runs everything that does not need the game.** **33** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3609,6 +3609,32 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   Do not read a large counter as coverage. `RoachStepAllowed` running a third
   of a million times says the code executes and the mission plays; it says
   nothing about whether it agrees with the original.
+
+  **HALF OF THAT IS CLOSED NOW, and saying which half is the point.**
+  `tools/roachcheck.py` is the tool this paragraph asked for, in the PARTIAL
+  form the layer allows: RoachMaskWeight cannot be emulated whole, because
+  every point it makes goes to ObjectsAtPoint and then to
+  BlockWeightDamaging, which walks the live object map and damages what it
+  finds. Both are stubbed to `xor eax, eax; ret` in the emulator, and what is
+  compared is the SEQUENCE OF POINTS the original asks about -- which is the
+  half most likely to be wrong: a 164-byte stride into a table whose base is
+  four bytes before the points, and two axes added in SIXTEEN BITS that wrap
+  independently.
+
+  The tables are SEEDED, and without that the tool would prove nothing: they
+  live in .bss, BuildRoachFootprints fills them at startup, so in the file
+  every count is zero and every case returns immediately. That is
+  shakecheck's finding one layer along.
+
+  640 cases and three mutations, and the counts are the useful part: a 32-bit
+  add where the original wraps at sixteen fails 264, swapping the axes fails
+  560, and seeding at a 163-byte stride fails 560 AND DROPS THE CORPUS to 630
+  -- the boolcheck tell, a mutation that shrinks the case count rather than
+  being caught by it. Check the count, not only the verdict.
+
+  What it does NOT cover: the accumulation, the zero-count early exit reaching
+  the caller, and everything inside the two stubs. RoachStepAllowed is still
+  unchecked entirely.
 
   **`RoachBite`'s drive is identified and it is not a longer wait.** Its one
   caller reaches it only in the roach's state 4, and a live MAP 01 run with
