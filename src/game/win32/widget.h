@@ -289,6 +289,10 @@ void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip);
  * HUD constructor with no early exit on a failed preload. */
 /* 0x00414700, thiscall. The radar panel: the map's own bitmap and the ten
  * palette indices the blips are drawn in. */
+/* 0x00415730, thiscall. The squad panel: twelve portrait slots whose sprite
+ * indices run 1..7 and 10..14, skipping 8 and 9. */
+AM2_Widget *__attribute__((thiscall)) HudSquadConstruct(AM2_Widget *w);
+
 AM2_Widget *__attribute__((thiscall)) HudRadarConstruct(AM2_Widget *w);
 
 AM2_Widget *__attribute__((thiscall)) HudSargeConstruct(AM2_Widget *w);

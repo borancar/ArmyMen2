@@ -859,6 +859,20 @@
  * that changes the portrait itself -- set, the sprite comes from
  * HUD_SQUAD_PAIR_HI instead of _LO, a wide backdrop is filled behind it, and
  * the slot's own drawing stops there in favour of ADDR_HUD_SQUAD_DETAIL. */
+/* 0x00415730, thiscall -- the squad panel's constructor. It fills the twelve
+ * pairs from sprite sets 0x0E (lo) and 0x11 (hi), and the twelve indices are
+ * NOT 0..11: two loops supply 1..7 and then 10..14, so 8 and 9 are skipped
+ * and the second loop's bound is written as `esi - 3 < 0x0C`. Both arrays are
+ * walked by ONE cursor that reaches back 0x30 for the lo slot, which is the
+ * "0x30 apart, walked together" the note below already records. */
+#define ADDR_HUD_SQUAD_CONSTRUCT 0x00415730u  /* thiscall AM2_Widget *(this) */
+#define AM2_HUD_SQUAD_ICON_INDEX 0x14u  /* its pip, from set 0x0A not 0x0E */
+#define AM2_HUD_SQUAD_SET_LO     0x0Eu
+#define AM2_HUD_SQUAD_SET_HI     0x11u
+#define AM2_HUD_SQUAD_SPLIT      7     /* indices 1..7, then 10..14 */
+#define AM2_HUD_SQUAD_GAP        2     /* 8 and 9 are not used */
+#define AM2_HUD_SQUAD_TOP        0xE6  /* also its height */
+#define AM2_HUD_SQUAD_WIDTH      0x90
 #define ADDR_HUD_SQUAD_PAINT   0x00416DA0u  /* thiscall void(obj, RECT) */
 #define ADDR_HUD_SQUAD_SLOT_XY 0x004766C8u  /* int16[12][2], x then y */
 #define ADDR_HUD_SQUAD_DETAIL  0x00416340u  /* thiscall void(obj, int32) */

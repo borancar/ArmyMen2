@@ -4191,6 +4191,64 @@ typedef void (__cdecl *AM2_VoidFn)(void);
 
 #define orig_operator_new     ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
 
+/* HudSquadConstruct -- original 0x00415730, 247 bytes, thiscall. The squad
+ * panel: twelve portrait slots, each with a lo and a hi sprite, and twelve
+ * records the painter reads.
+ *
+ * THE TWELVE SPRITE INDICES ARE NOT 0..11. Two loops supply 1..7 and then
+ * 10..14, so 8 and 9 are skipped -- the second loop's bound is written as
+ * `esi - 3 < 0x0C`, which is what makes the gap easy to miss and impossible
+ * to guess. Written as one loop over an index that steps over the gap, since
+ * both halves are otherwise identical and the original's two bodies differ
+ * only in their start and bound.
+ *
+ * The original walks BOTH arrays with a single cursor that reaches back 0x30
+ * for the lo slot -- the "0x30 apart, walked together" HUD_SQUAD_PAIR_LO's
+ * note already records -- and the second loop simply continues the cursor
+ * where the first left it, at +0xA8. That continuity is why they are one
+ * array of twelve and not two arrays of seven and five.
+ *
+ * The lo sprite comes from set 0x0E with flag 0 and the hi from set 0x11 with
+ * flag 1; nothing is null-tested, like HudSargeConstruct and unlike the other
+ * three.
+ *
+ * y and h are THE SAME CONSTANT, 0xE6, written from one register. */
+AM2_Widget *__attribute__((thiscall)) HudSquadConstruct(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+    int32_t  i;
+
+    WidgetConstruct(w);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_SQUAD);
+
+    /* Its own pip, and NOT from either pair set: 0x0A index 0x14. */
+    *(void **)(self + HUD_SQUAD_ICON_SPRITE) =
+        PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, AM2_HUD_SQUAD_ICON_INDEX,
+                          0, 0);
+
+    for (i = 0; i < AM2_HUD_SQUAD_SLOTS; i++) {
+        /* 1..7, then 10..14 -- the original's two loops, one index. */
+        int32_t idx = (i < AM2_HUD_SQUAD_SPLIT)
+                    ? i + 1
+                    : i + 1 + AM2_HUD_SQUAD_GAP;
+
+        ((void **)(self + HUD_SQUAD_PAIR_LO))[i] =
+            PreloadArmySprite(AM2_HUD_SQUAD_SET_LO, idx, 0, 0);
+        ((void **)(self + HUD_SQUAD_PAIR_HI))[i] =
+            PreloadArmySprite(AM2_HUD_SQUAD_SET_HI, idx, 0, 1);
+    }
+
+    for (i = 0; i < AM2_HUD_SQUAD_SLOTS; i++)
+        *(int32_t *)(self + HUD_SQUAD_RECS
+                     + (size_t)i * HUD_SQUAD_REC_SIZE + SQUAD_REC_INDEX) = -1;
+
+    w->x = 0;
+    w->y = AM2_HUD_SQUAD_TOP;
+    w->w = AM2_HUD_SQUAD_WIDTH;
+    w->h = AM2_HUD_SQUAD_TOP;      /* the same constant, one register */
+    return w;
+}
+
 /* The radar's ten palette indices, in the order the constructor writes them:
  * five light/dark pairs indexed by RadarBlipColour's answer. Generated from
  * the destinations rather than the instruction order -- the original
@@ -11382,6 +11440,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_HUD_SQUAD_CONSTRUCT,
+                        (const void *)HudSquadConstruct,
+                        "HudSquadConstruct", 1);
     rc |= patch_replace(ADDR_HUD_RADAR_CONSTRUCT,
                         (const void *)HudRadarConstruct,
                         "HudRadarConstruct", 1);
