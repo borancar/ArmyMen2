@@ -4620,8 +4620,8 @@ AM2_Widget *__attribute__((thiscall)) DlgBattleJoinConstruct(AM2_Widget *w,
         RectSet(&box, 0x26, 0x42, 0xCE, 0x6E);
         kid = ListBoxConstruct(kid, box.left, box.top, box.right, box.bottom,
                                *(void **)(uintptr_t)ADDR_SESSION_OBJECT,
-                               (int32_t)AM2_IMAGE(ADDR_BATTLE_JOIN_SELECT),
-                               (int32_t)AM2_IMAGE(ADDR_BATTLE_JOIN_DRAW), 0);
+                               (int32_t)(uintptr_t)BattleJoinSelect,
+                               (int32_t)(uintptr_t)BattleJoinPoll, 0);
     }
     WidgetAddChild(panel, kid);
     ((AM2_WidgetFocusFn *)kid->vtable)[WIDGET_VSLOT_FOCUS](kid, 0);
@@ -13692,6 +13692,69 @@ void __cdecl MpReadyToLoad(void)
     Announce(text);
 }
 
+
+/* ---- the battle browser's two list callbacks ----------------------------
+ *
+ * 0x0042F910 and 0x0042F970, handed to ListBoxConstruct by
+ * BattleJoinConstruct as its `callback` and `arg6C`. Nothing calls either --
+ * they are reached only through the list box, which is why refs_to finds them
+ * as push operands and an xref sweep of .text finds nothing.
+ *
+ * THE SECOND WAS MISNAMED AND THE ARGUMENT POSITION IS WHY. orig.h called it
+ * ADDR_BATTLE_JOIN_DRAW, "its row painter", which is what a callback in that
+ * slot looks like from the constructor. Its body is a REFRESH: throttle on
+ * five seconds, reset the row array, re-enumerate the sessions into it, and
+ * only then repaint. The repaint is its last step, not its purpose -- the same
+ * "name a function from its body, not from one call site" this project keeps
+ * paying for. Renamed to ADDR_BATTLE_JOIN_POLL.
+ *
+ * Select refuses a row whose first character is '^'. That is the marker the
+ * enumerator puts on a heading row, and the refusal is audible rather than
+ * silent -- sound 3 where a real pick plays sound 2.
+ *
+ * The chosen row goes into the DIALOG, not the list: ADDR_PAINT_OBJECT is
+ * whatever dialog is up, which for this callback is always the battle browser,
+ * so +0x84 is BATTLEJOIN_OFF_CHOSEN beside the BATTLEJOIN_OFF_NAME already
+ * there. Worth saying that 0x84 is ALSO LIST_OFF_INK_SEL, a uint8_t on the
+ * list -- one offset on two records, which is why the question to ask is
+ * "which record is this, here" before writing any name down. */
+
+void __cdecl BattleJoinSelect(AM2_Widget *w, const uint8_t *src, int32_t row)
+{
+    const uint8_t *rows;
+
+    (void)w;
+
+    if (!src || row < 0 || row >= *(const int32_t *)src)
+        return;
+
+    rows = *(const uint8_t *const *)(src + 4);
+    if (rows[(uint32_t)row * AM2_LIST_ROW_STRIDE] == '^') {
+        PlaySoundAt(3, 0, 0, 0, 0);
+        return;
+    }
+
+    PlaySoundAt(2, 0, 0, 0, 0);
+    *(int32_t *)(*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT
+                 + BATTLEJOIN_OFF_CHOSEN) = row;
+}
+
+void __cdecl BattleJoinPoll(AM2_Widget *w)
+{
+    uint8_t  *self = (uint8_t *)w;
+    uint32_t  now  = orig_get_tick_count();
+
+    if (now - *(const uint32_t *)(self + TEXTLIST_OFF_POLLED)
+            <= AM2_BATTLE_POLL_MS)
+        return;
+
+    RecordReset(*(void **)(self + TEXTLIST_OFF_SOURCE));
+    CommEnumSessions(g_commObject, *(void **)(self + TEXTLIST_OFF_SOURCE));
+
+    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    *(uint32_t *)(self + TEXTLIST_OFF_POLLED) = now;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -14547,6 +14610,11 @@ int widget_install(void)
                         "MpLeaveSession", 0);
     rc |= patch_replace(ADDR_MP_READY_TO_LOAD, (const void *)MpReadyToLoad,
                         "MpReadyToLoad", 0);
+    rc |= patch_replace(ADDR_BATTLE_JOIN_SELECT,
+                        (const void *)BattleJoinSelect,
+                        "BattleJoinSelect", 3);
+    rc |= patch_replace(ADDR_BATTLE_JOIN_POLL, (const void *)BattleJoinPoll,
+                        "BattleJoinPoll", 1);
     return rc;
 }
 

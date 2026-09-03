@@ -4078,6 +4078,7 @@
 #define TEXTLIST_OFF_FIRST       0x74u  /* int32, the top visible row */
 #define TEXTLIST_OFF_VISIBLE     0x78u  /* int32, how many fit */
 #define TEXTLIST_OFF_COLOURS     0x80u  /* int32[], low byte used */
+#define TEXTLIST_OFF_POLLED      0x70u  /* GetTickCount of the last refresh */
 #define TEXTLIST_SRC_COUNT       0x00u
 #define TEXTLIST_SRC_RECORDS     0x04u
 #define TEXTLIST_REC_SIZE        0x104u
@@ -6937,7 +6938,14 @@ typedef struct {
                                          * copied from ADDR_SAVED_PLAYER_NAME
                                          * so typing does not disturb it */
 #define ADDR_BATTLE_JOIN_SELECT  0x0042F910u /* the list's pick callback */
-#define ADDR_BATTLE_JOIN_DRAW    0x0042F970u /* and its row painter */
+/* It was ADDR_BATTLE_JOIN_DRAW, "its row painter", which is what the argument
+ * POSITION in ListBoxConstruct suggested. The body says otherwise: it throttles
+ * on five seconds, resets the row array, re-enumerates the sessions into it and
+ * only then repaints through vtable slot 1. It is the browser's REFRESH, and
+ * the repaint is its last step rather than its purpose. Renamed, not aliased. */
+#define ADDR_BATTLE_JOIN_POLL    0x0042F970u /* thiscall-free void(list) */
+#define BATTLEJOIN_OFF_CHOSEN    0x84u  /* int32, the row Select stored */
+#define AM2_BATTLE_POLL_MS       0x1388u /* 5000 -- how stale the list may get */
 #define ADDR_BATTLE_JOIN_OK      0x0042F9D0u /* OK, and the edit's onEnter */
 #define AM2_BATTLE_JOIN_SIZE     0x88u
 #define VTABLE_BATTLE_JOIN       0x0046F9F8u
@@ -10937,7 +10945,6 @@ typedef struct {
  * a save tag? Two are accepted: AM2_SAVETAG_GAMEPROC and one more. */
 #define ADDR_FILE_HAS_SAVE_TAG   0x00423620u  /* int32_t(const char *path) */
 #define AM2_SAVETAG_ALT          0x06660668u
-#define AM2_GROWLIST_STRIDE      0x104u
 #define AM2_GROWLIST_KEY         0x100u
 /* Walk the objects in the cell a point falls in and chain the ones that
  * qualify through OBJ_OFF_QUERY_NEXT, answering the head. 0x0044A3A0 is one
@@ -12809,6 +12816,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * count+1 records, so adding n entries is n reallocs; nothing here rounds up.
  * The name is copied with no bound at all. */
 #define ADDR_LIST_ADD            0x00453A30u  /* thiscall void(this, const char *, void *) */
+/* One 260-byte list row. It had a second spelling, AM2_GROWLIST_STRIDE, on
+ * the same value for the same concept -- the grow helper's rows and the list
+ * box's rows are the same records. Collapsed; sharing a VALUE is fine, sharing
+ * a CONCEPT under two names is not. */
 #define AM2_LIST_ROW_STRIDE      0x104u
 /* The dword beside the name, which the row OWNS when the record's third
  * field says so: RecordReset frees it per row. The comm panel keeps its

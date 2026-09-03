@@ -2489,13 +2489,13 @@ int32_t __attribute__((thiscall)) ListGrowFind(void *self, int32_t key)
     int32_t  i;
 
     items = (uint8_t *)am2_realloc(*(void **)(s + 4),
-                                   (size_t)n * AM2_GROWLIST_STRIDE);
+                                   (size_t)n * AM2_LIST_ROW_STRIDE);
     *(void **)(s + 4) = items;
 
     n = *(const int32_t *)s;
 
     for (i = 0; i < n; i++)
-        if (*(const int32_t *)(items + i * AM2_GROWLIST_STRIDE
+        if (*(const int32_t *)(items + i * AM2_LIST_ROW_STRIDE
                                + AM2_GROWLIST_KEY) == key)
             return i;
 
