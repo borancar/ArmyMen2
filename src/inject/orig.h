@@ -3676,6 +3676,13 @@
 #define ADDR_AIR_GAUGE_X0        0x00473F20u  /* int32_t, -278 */
 #define ADDR_AIR_GAUGE_Y0        0x00473F24u  /* int32_t, 320 */
 #define ADDR_AIR_GAUGE_SLOPE     0x00473F28u  /* double, 0.43 */
+/* The two doubles the startup initialisers use, and neither is read anywhere
+ * else: LEG1_X0 is TURN_X - (IN_Y - TURN_Y_IN) * 0.95, and LEG3_X1 is
+ * (OUT_Y - TURN_Y_OUT) * 1.18 + AWAY_X. Both land on the values orig.h
+ * already records for those two globals -- 110 and -6 -- which is what
+ * confirms the reading rather than the arithmetic merely being plausible. */
+#define ADDR_AIR_LEG1_SLOPE      0x00473F50u  /* double, 0.95 */
+#define ADDR_AIR_LEG3_SLOPE      0x00473F58u  /* double, 1.18 */
 /* The nine derived parameters, each named for the leg it belongs to. */
 #define ADDR_AIR_LEG1_X0         0x004F96ACu  /* int32_t, 110 */
 #define ADDR_AIR_LEG1_DX         0x004F96B0u  /* int32_t, TURN_X - LEG1_X0 */
@@ -3686,6 +3693,20 @@
 #define ADDR_AIR_LEG3_X1         0x004F96B4u  /* int32_t, -6 */
 #define ADDR_AIR_LEG3_DX         0x004F93D4u  /* int32_t, AWAY_X - LEG3_X1 */
 #define ADDR_AIR_LEG3_DY         0x004F96A8u  /* int32_t, TURN_Y_OUT - OUT_Y */
+/* The eleven C++ static initialisers that DERIVE all of the above, entries in
+ * the table at 0x00473004 that _initterm runs before WinMain. Named for the
+ * global each one writes, which is the only thing each one does. */
+#define ADDR_AIR_INIT_LEG2_MS_SPAN  0x00408AC0u  /* void(void) */
+#define ADDR_AIR_INIT_TURN_Y_IN     0x00408AF0u
+#define ADDR_AIR_INIT_TURN_Y_OUT    0x00408B20u
+#define ADDR_AIR_INIT_LEG2_DIVISOR  0x00408B50u
+#define ADDR_AIR_INIT_LEG1_X0       0x00408BA0u
+#define ADDR_AIR_INIT_LEG3_X1       0x00408BF0u
+#define ADDR_AIR_INIT_LEG1_DX       0x00408C40u
+#define ADDR_AIR_INIT_LEG1_DY       0x00408C70u
+#define ADDR_AIR_INIT_LEG3_DX       0x00408CA0u
+#define ADDR_AIR_INIT_LEG3_DY       0x00408CD0u
+#define ADDR_AIR_INIT_LEG2_DY       0x00408D00u
 /* The hot spot of each of ADDR_AIR_SPRITES_6's eleven frames, {x, y} int16
  * pairs, subtracted from the path point before the draw. Eleven pairs for
  * eleven sprites is what ties the two tables together. */

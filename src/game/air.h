@@ -223,6 +223,20 @@ void __cdecl AirDeliver(void);
 
 void __cdecl AirPassesDraw(void);
 
+/* 0x00408AC0..0x00408D00. The eleven C++ static initialisers that derive the
+ * air path's parameters, run by _initterm before WinMain. */
+void __cdecl AirInitTurnYIn(void);
+void __cdecl AirInitTurnYOut(void);
+void __cdecl AirInitLeg1X0(void);
+void __cdecl AirInitLeg1Dx(void);
+void __cdecl AirInitLeg1Dy(void);
+void __cdecl AirInitLeg2MsSpan(void);
+void __cdecl AirInitLeg2Dy(void);
+void __cdecl AirInitLeg2Divisor(void);
+void __cdecl AirInitLeg3X1(void);
+void __cdecl AirInitLeg3Dx(void);
+void __cdecl AirInitLeg3Dy(void);
+
 void air_install(void);
 
 #ifdef __cplusplus

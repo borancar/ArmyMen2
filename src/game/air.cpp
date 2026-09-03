@@ -1741,6 +1741,106 @@ void __cdecl AirPassStrike(uint32_t at, int32_t army)
     }
 }
 
+
+/* ---- the air path's eleven startup initialisers -------------------------
+ *
+ * Entries in the C++ static-initializer table at 0x00473004 that _initterm
+ * runs before WinMain. Each derives exactly one of the parameters orig.h
+ * lists as "the nine derived parameters", plus the two turn waypoints.
+ *
+ * THEY ARE REACHABLE, which is worth stating before anyone reads a detour on
+ * one as dead. tools/launcher.c creates the process SUSPENDED and injects
+ * with a remote LoadLibraryA, so DllMain -- and install() with it -- finishes
+ * before the EXE entry point and therefore before _initterm. The CRT calls
+ * these through the table and reaches our code.
+ *
+ * TWO OF THEM WRITE BACK INTO .data: TURN_Y_IN and TURN_Y_OUT read 300 and 0
+ * in the file and 320 and 160 once these have run. orig.h already uses that
+ * pair as its example of asking who WRITES a value before treating a table's
+ * number as a constant, and everything below them consumes the run-time pair.
+ *
+ * THE ARITHMETIC IS PLAIN C RATHER THAN x87, and the check is not that it
+ * looks equivalent. The original computes the two slope terms on the FPU and
+ * truncates through _ftol; double arithmetic with a truncating cast gives the
+ * same answers, and they are the values orig.h independently records for
+ * those globals -- LEG1_X0 is 110 and LEG3_X1 is -6, both exact. That is the
+ * trig tables' precedent, where the x87 was reproduced first and then
+ * measured to be unnecessary.
+ *
+ * LEG2_DIVISOR is stored as a FLOAT because the global is one; a double there
+ * would change what every later read sees. */
+
+void __cdecl AirInitTurnYIn(void)
+{
+    *(int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_IN = (int16_t)(*(const int32_t *)(uintptr_t)ADDR_AIR_PATH_MID_Y + *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_HALF_Y);
+}
+
+void __cdecl AirInitTurnYOut(void)
+{
+    *(int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_OUT = (int16_t)(*(const int32_t *)(uintptr_t)ADDR_AIR_PATH_MID_Y - *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_HALF_Y);
+}
+
+void __cdecl AirInitLeg1X0(void)
+{
+    *(int32_t *)(uintptr_t)ADDR_AIR_LEG1_X0 =
+        (int32_t)((double)*(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_X - (double)(*(const int32_t *)(uintptr_t)ADDR_AIR_PATH_IN_Y - *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_IN)
+                                   * *(const double *)(uintptr_t)ADDR_AIR_LEG1_SLOPE);
+}
+
+void __cdecl AirInitLeg1Dx(void)
+{
+    *(int32_t *)(uintptr_t)ADDR_AIR_LEG1_DX =
+        *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_X - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG1_X0;
+}
+
+void __cdecl AirInitLeg1Dy(void)
+{
+    *(int32_t *)(uintptr_t)ADDR_AIR_LEG1_DY = *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_IN_Y - *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_IN;
+}
+
+void __cdecl AirInitLeg2MsSpan(void)
+{
+    *(int32_t *)(uintptr_t)ADDR_AIR_LEG2_MS_SPAN =
+        *(const int32_t *)(uintptr_t)ADDR_AIR_LEG2_MS
+        - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG1_MS;
+}
+
+void __cdecl AirInitLeg2Dy(void)
+{
+    *(int32_t *)(uintptr_t)ADDR_AIR_LEG2_DY = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_IN - *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_OUT;
+}
+
+/* (rise * rise) / run, the parabola leg 2 follows, with the run measured from
+ * the apex. The original squares by duplicating the loaded integer rather
+ * than loading it twice, so both factors are necessarily the same value. */
+void __cdecl AirInitLeg2Divisor(void)
+{
+    int32_t rise = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_IN - *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_HALF_Y;
+    int32_t run  = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_X - *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_APEX_X;
+
+    *(float *)(uintptr_t)ADDR_AIR_LEG2_DIVISOR =
+        (float)((double)rise * (double)rise / (double)run);
+}
+
+void __cdecl AirInitLeg3X1(void)
+{
+    *(int32_t *)(uintptr_t)ADDR_AIR_LEG3_X1 =
+        (int32_t)((double)(*(const int32_t *)(uintptr_t)ADDR_AIR_PATH_OUT_Y - *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_OUT)
+                  * *(const double *)(uintptr_t)ADDR_AIR_LEG3_SLOPE
+                  + (double)*(const int16_t *)(uintptr_t)ADDR_AIR_PATH_AWAY_X);
+}
+
+void __cdecl AirInitLeg3Dx(void)
+{
+    *(int32_t *)(uintptr_t)ADDR_AIR_LEG3_DX =
+        *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_AWAY_X - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG3_X1;
+}
+
+void __cdecl AirInitLeg3Dy(void)
+{
+    *(int32_t *)(uintptr_t)ADDR_AIR_LEG3_DY = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_OUT - *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_OUT_Y;
+}
+
 void air_install(void)
 {
     patch_replace(ADDR_AIR_PASS_STRIKE, (const void *)AirPassStrike,
@@ -1806,5 +1906,16 @@ void air_install(void)
                   "ObjBlockWeight", 3);
     patch_replace(ADDR_SET_FOG_OF_WAR, (const void *)SetFogOfWar,
                   "SetFogOfWar", 1);
+    patch_replace(ADDR_AIR_INIT_TURN_Y_IN, (const void *)AirInitTurnYIn, "AirInitTurnYIn", 0);
+    patch_replace(ADDR_AIR_INIT_TURN_Y_OUT, (const void *)AirInitTurnYOut, "AirInitTurnYOut", 0);
+    patch_replace(ADDR_AIR_INIT_LEG1_X0, (const void *)AirInitLeg1X0, "AirInitLeg1X0", 0);
+    patch_replace(ADDR_AIR_INIT_LEG1_DX, (const void *)AirInitLeg1Dx, "AirInitLeg1Dx", 0);
+    patch_replace(ADDR_AIR_INIT_LEG1_DY, (const void *)AirInitLeg1Dy, "AirInitLeg1Dy", 0);
+    patch_replace(ADDR_AIR_INIT_LEG2_MS_SPAN, (const void *)AirInitLeg2MsSpan, "AirInitLeg2MsSpan", 0);
+    patch_replace(ADDR_AIR_INIT_LEG2_DY, (const void *)AirInitLeg2Dy, "AirInitLeg2Dy", 0);
+    patch_replace(ADDR_AIR_INIT_LEG2_DIVISOR, (const void *)AirInitLeg2Divisor, "AirInitLeg2Divisor", 0);
+    patch_replace(ADDR_AIR_INIT_LEG3_X1, (const void *)AirInitLeg3X1, "AirInitLeg3X1", 0);
+    patch_replace(ADDR_AIR_INIT_LEG3_DX, (const void *)AirInitLeg3Dx, "AirInitLeg3Dx", 0);
+    patch_replace(ADDR_AIR_INIT_LEG3_DY, (const void *)AirInitLeg3Dy, "AirInitLeg3Dy", 0);
 }
 
