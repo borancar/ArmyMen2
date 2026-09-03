@@ -129,7 +129,15 @@ def c_offsets(path, func):
     # answered "no definition of" and was never checked by this tool at all.
     # Found by pointing it at WarMenuConstruct; DifficultyDialogConstruct,
     # written long before, had the same non-answer.
-    m = re.search(r'^\w[\w \*]*(?:__cdecl|__attribute__\(\(thiscall\)\))\s+'
+    #
+    # AND STDCALL IS A THIRD, found the same way one convention later. A Win32
+    # or DirectPlay callback is written `BOOL FAR PASCAL Name(...)` -- no
+    # __cdecl, no thiscall -- so EnumSessionsCb answered "no definition of"
+    # exactly as the whole menu layer once did. Any convention this tree
+    # actually writes has to be listed here; the failure is silent and reads
+    # like a typo in the invocation.
+    m = re.search(r'^\w[\w \*]*(?:__cdecl|__attribute__\(\(thiscall\)\)'
+                  r'|FAR PASCAL|PASCAL|__stdcall|WINAPI|CALLBACK)\s+'
                   + func + r'\(', src, re.M)
     if not m:
         raise SystemExit('no definition of ' + func)

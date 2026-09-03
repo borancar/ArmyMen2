@@ -12621,6 +12621,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_NUM_PLAYERS     0x00475230u
 #define ADDR_STR_OPEN_FAILED     0x00475410u  /* " Open Session Failed returned %x \n" */
 #define ADDR_ENUM_SESSIONS_CB    0x0040E280u  /* LPDPENUMSESSIONSCALLBACK2 */
+#define ADDR_STR_IN_PROGRESS     0x004752CCu  /* "  --  In Progress" */
+/* The row DATA a session gets: what the join needs and nothing else, lifted
+ * straight out of DPSESSIONDESC2 rather than guessed at. */
+#define AM2_SESSION_REC_BYTES    0x18u
+#define SESSION_REC_OFF_GUID     0x00u  /* GUID, the session's guidInstance */
+#define SESSION_REC_OFF_CUR      0x10u  /* uint32, dwCurrentPlayers */
+#define SESSION_REC_OFF_MAX      0x14u  /* uint32, dwMaxPlayers */
+#define AM2_SESSION_ROW_BYTES    0x100u /* the row text the callback builds */
 /* The service-provider browser and its callback. The callback drops two
  * providers by name before adding the rest -- "Play on HEAT" and "Play on
  * Mplayer", both matchmaking services that no longer exist -- and its `ret 0x18`

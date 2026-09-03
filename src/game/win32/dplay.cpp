@@ -584,6 +584,80 @@ static_assert(DPENUMSESSIONS_AVAILABLE == 1, "DPENUMSESSIONS_AVAILABLE");
 static_assert(DPENUMSESSIONS_ASYNC == 0x10, "DPENUMSESSIONS_ASYNC");
 
 #define g_sessionList  (*(void **)(uintptr_t)ADDR_SESSION_LIST)
+
+/* EnumSessionsCb -- original 0x0040E280, 304 bytes, two exits.
+ *
+ * DirectPlay's per-session callback for the battle browser. `ret 0x10` is
+ * four callee-cleaned arguments, which is LPDPENUMSESSIONSCALLBACK2, and
+ * espmap puts the two it reads on lpThisSD and dwFlags.
+ *
+ * IT ANSWERS FALSE ON TIMEOUT AND ON NOTHING ELSE. DPESC_TIMEDOUT ends the
+ * enumeration, as does a missing list or a failed allocation -- so unlike
+ * EnumConnectionsCb above, which never stops, a session this cannot record
+ * truncates the browse. Both are the original's and the pair is worth seeing
+ * together: the two callbacks disagree about that, and diffing them is what
+ * showed they are not the twins their call lists suggest (0.194 similar).
+ *
+ * A ROW'S DATA is a 0x18-byte copy of what the join needs and nothing else:
+ * the session's guidInstance, its current player count and its maximum.
+ * DirectPlay owns the descriptor it passes, so this is a copy, and the three
+ * fields are lifted straight out of DPSESSIONDESC2 rather than guessed at.
+ *
+ * AND AN IN-PROGRESS SESSION IS SHOWN BUT CANNOT BE PICKED, which is where
+ * this meets the list box. When DPSESSION_NEWPLAYERSDISABLED is set the row
+ * text is built as '^', an ink byte, the session name and "  --  In
+ * Progress"; otherwise it is the plain name. ListUpdate refuses to select any
+ * row whose first character is '^' -- LIST_ROW_DEAD -- so the two ends of
+ * that convention were read independently today and meet here.
+ *
+ * IT ALSO SAYS WHAT LIST_ROW_DEAD's SECOND BYTE IS. ListUpdate only ever
+ * tests text[0]; this is the writer, and it puts ADDR_LIST_INK_HOT_SEL in
+ * text[1] before the name. So a dead row is '^', a palette index, then the
+ * text -- not merely a prefix character.
+ *
+ * ONE BUFFER, TWO SPELLINGS. The prefix is written at `esp+0xc` and the name
+ * appended at `esp+0x10`, which are THE SAME ADDRESS at different push
+ * depths; espmap collapses all four references to one slot. Read as two
+ * buffers, the name would be appended to uninitialised stack and the row
+ * would come out as two characters. */
+BOOL FAR PASCAL EnumSessionsCb(LPCDPSESSIONDESC2 lpThisSD, LPDWORD lpdwTimeOut,
+                               DWORD dwFlags, LPVOID lpContext)
+{
+    char     row[AM2_SESSION_ROW_BYTES];
+    uint8_t *rec;
+
+    (void)lpdwTimeOut;
+    (void)lpContext;
+
+    if (!g_sessionList)
+        return FALSE;
+    if (dwFlags & DPESC_TIMEDOUT)
+        return FALSE;
+    if (!lpThisSD)
+        return FALSE;
+
+    rec = (uint8_t *)orig_malloc(AM2_SESSION_REC_BYTES);
+    if (!rec)
+        return FALSE;
+
+    *(GUID *)(rec + SESSION_REC_OFF_GUID)   = lpThisSD->guidInstance;
+    *(uint32_t *)(rec + SESSION_REC_OFF_CUR) = lpThisSD->dwCurrentPlayers;
+    *(uint32_t *)(rec + SESSION_REC_OFF_MAX) = lpThisSD->dwMaxPlayers;
+
+    if (lpThisSD->dwFlags & DPSESSION_NEWPLAYERSDISABLED) {
+        row[0] = LIST_ROW_DEAD;
+        row[1] = (char)*(const uint8_t *)(uintptr_t)ADDR_LIST_INK_HOT_SEL;
+        row[2] = '\0';
+        strcat(row, lpThisSD->lpszSessionNameA);
+        strcat(row, (const char *)AM2_IMAGE(ADDR_STR_IN_PROGRESS));
+    } else {
+        strcpy(row, lpThisSD->lpszSessionNameA);
+    }
+
+    ListAdd(g_sessionList, row, rec);
+    return TRUE;
+}
+
 /* lpContext for both enumerations is the game window; see orig.h. */
 #define g_enumContext  (*(void **)(uintptr_t)ADDR_HWND)
 
@@ -614,7 +688,7 @@ int32_t __attribute__((thiscall)) CommEnumSessions(void *comm, void *list)
         desc.guidApplication = *app;
 
     hr = IDirectPlayX_EnumSessions(dp, &desc, 0,
-                                   (LPDPENUMSESSIONSCALLBACK2)(uintptr_t)ADDR_ENUM_SESSIONS_CB,
+                                   EnumSessionsCb,
                                    g_enumContext,
                                    DPENUMSESSIONS_AVAILABLE | DPENUMSESSIONS_ASYNC);
     return hr == DP_OK;
@@ -3593,6 +3667,9 @@ int dplay_install(void)
                         "CommConstruct", 0);
     rc |= patch_replace(ADDR_COMM_DESTRUCT, (const void *)CommDestruct,
                         "CommDestruct", 0);
+    rc |= patch_replace(ADDR_ENUM_SESSIONS_CB,
+                        (const void *)EnumSessionsCb,
+                        "EnumSessionsCb", 4);
     rc |= patch_replace(ADDR_ENUM_CONNECTIONS_CB,
                         (const void *)EnumConnectionsCb,
                         "EnumConnectionsCb", 6);
