@@ -385,13 +385,17 @@ run: isolate-prefix install-hook
 # migrated out of that blob into typed C data is one less thing holding the
 # layout in place.
 SA_SRC   := $(wildcard src/game/*.cpp) $(wildcard src/game/win32/*.cpp) \
-            src/standalone/runtime.cpp build/standalone/fixups.cpp
-SA_OBJ   := $(patsubst %.cpp,$(BUILD)/sa/%.o,$(SA_SRC)) $(BUILD)/sa/origdata.o
+            src/standalone/runtime.cpp build/standalone/fixups.cpp \
+            build/standalone/staticinit.cpp \
+            build/standalone/imports.cpp
+SA_OBJ   := $(patsubst %.cpp,$(BUILD)/sa/%.o,$(SA_SRC)) $(BUILD)/sa/origdata.o \
+            $(BUILD)/sa/origgap.o
 SA_FLAGS := $(CXXFLAGS) -DAM2_STANDALONE -Ibuild/standalone
 SA_LIBS  := -lddraw -ldinput -ldsound -lwinmm -lole32 -ldxguid
 SA_LDF   := -mwindows -static -static-libgcc -static-libstdc++ \
             -Wl,--image-base,0x400000 \
             -Wl,--section-start,.origdat=0x0046F000 \
+            -Wl,--section-start,.origgap=0x00401000 \
             -Wl,-Ttext,0x00700000
 
 .PHONY: standalone standalone-generate
@@ -403,6 +407,10 @@ $(BUILD)/sa/%.o: %.cpp | standalone-generate
 	$(CXX) $(SA_FLAGS) -c $< -o $@
 
 $(BUILD)/sa/origdata.o: build/standalone/origdata.S | standalone-generate
+	@mkdir -p $(dir $@)
+	$(CC) -c $< -o $@
+
+$(BUILD)/sa/origgap.o: build/standalone/origgap.S | standalone-generate
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@
 

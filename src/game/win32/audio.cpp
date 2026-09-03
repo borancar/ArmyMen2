@@ -18,6 +18,7 @@
 #include "../objtable.h"
 #include "../army.h"   /* LookupOwnerObj -- where the ear is */
 #include "audio.h"
+#include "../crt.h"
 #include "../dist.h"
 #include "../../inject/hooklog.h"
 
@@ -1052,32 +1053,50 @@ int32_t __cdecl ReadWaveFile(int32_t unused, const char *name,
 
     (void)unused;
 
+#ifdef AM2_STANDALONE
+    am2_log("rwf: enter\n");
+#endif
     fp = orig_fopen(name, (const char *)AM2_IMAGE(ADDR_MODE_RB));
     if (!fp) {
         orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_NOLOAD), name);
         return 0;
     }
 
+#ifdef AM2_STANDALONE
+    am2_log("rwf: fopen fp=%p\n", (void *)fp);
+#endif
     if (orig_fseek(fp, 0, SEEK_END)) {
         orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_SEEK_END), name);
         return 0;   /* the handle stays open -- see above */
     }
 
+#ifdef AM2_STANDALONE
+    am2_log("rwf: fseek end ok\n");
+#endif
     size = orig_ftell(fp);
     if (size <= 0) {
         orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_EMPTY), name);
         return 0;   /* and here */
     }
 
+#ifdef AM2_STANDALONE
+    am2_log("rwf: size=%d\n", (int)size);
+#endif
     orig_fseek(fp, 0, SEEK_SET);
 
     *owned = orig_malloc((size_t)size);
     if (!*owned)
         return 0;
 
+#ifdef AM2_STANDALONE
+    am2_log("rwf: owned=%p\n", *owned);
+#endif
     orig_fread(*owned, (size_t)size, 1, fp);
     orig_fclose(fp);
 
+#ifdef AM2_STANDALONE
+    am2_log("rwf: read+close ok\n");
+#endif
     if (!ParseWave(*owned, format, samples, length)) {
         orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_PARSE), name);
         orig_free(*owned);
@@ -1660,7 +1679,13 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
     DSBUFFERDESC  desc;
     size_t        n;
 
+#ifdef AM2_STANDALONE
+    am2_log("lws: enter %s\n", name);
+#endif
     rec = (uint8_t *)orig_malloc(SOUND_RECORD_SIZE);
+#ifdef AM2_STANDALONE
+    am2_log("lws: malloc rec=%p\n", (void *)rec);
+#endif
     *slot = rec;
     if (!rec) {
         orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOMEM_DATA);
@@ -1682,6 +1707,9 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
     }
     memcpy(nameCopy, name, n);
 
+#ifdef AM2_STANDALONE
+    am2_log("lws: name copied\n");
+#endif
     memset(&desc, 0, sizeof desc);
 
     /* Straight into the descriptor: the format and the length are the reader's
@@ -1692,6 +1720,10 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
         goto give_up;
     }
 
+#ifdef AM2_STANDALONE
+    am2_log("lws: ReadWaveFile ok bytes=%lu fmt=%p\n",
+            (unsigned long)desc.dwBufferBytes, (void *)desc.lpwfxFormat);
+#endif
     desc.dwSize  = sizeof desc;
     desc.dwFlags = DSBCAPS_STATIC | DSBCAPS_CTRL3D | DSBCAPS_CTRLFREQUENCY
                  | DSBCAPS_CTRLPAN | DSBCAPS_CTRLVOLUME
@@ -1765,6 +1797,13 @@ int32_t __cdecl InitWaveSounds(void)
         uint8_t *slot = g_soundSlots + i * SOUND_SLOT_STRIDE;
         DSBCAPS  caps;
 
+#ifdef AM2_STANDALONE
+        if (i < 3)
+            am2_log("wave %d: name=%p(%s) slot=%p dsound=%p\n", (int)i,
+                    (const void *)g_waveNames[i],
+                    g_waveNames[i] ? g_waveNames[i] : "?",
+                    (void *)slot, (void *)g_dsound);
+#endif
         if (!LoadWaveSound((void **)slot, g_dsound, g_waveNames[i])) {
             orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_INIT_FAIL, i);
             *(void **)slot = NULL;
@@ -1776,6 +1815,13 @@ int32_t __cdecl InitWaveSounds(void)
          * original. One dereference would call the record's first word as a
          * vtable, and with no audio device on this machine nothing would ever
          * have shown it. See the note in CLAUDE.md about this exact shape. */
+#ifdef AM2_STANDALONE
+        if (i < 3)
+            am2_log("wave %d: record=%p buffer=%p\n", (int)i,
+                    (void *)*(uint8_t **)slot,
+                    (void *)*(LPDIRECTSOUNDBUFFER *)(*(uint8_t **)slot
+                                                     + SOUND_SLOT_OFF_BUFFER));
+#endif
         caps.dwSize = sizeof caps;
         IDirectSoundBuffer_GetCaps(
             *(LPDIRECTSOUNDBUFFER *)(*(uint8_t **)slot + SOUND_SLOT_OFF_BUFFER),

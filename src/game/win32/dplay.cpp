@@ -27,6 +27,7 @@
 #include "../map.h"      /* the level table -- reconstructed */
 #include "widget.h"   /* ListAdd */
 #include "dplay.h"
+#include "../crt.h"
 #include "../armymsg.h"   /* SendGamePause */
 #include "frame.h"
 #include "cdcheck.h"
@@ -494,8 +495,17 @@ void *__attribute__((thiscall)) CommConstruct(void *comm)
     uint32_t now;
     int32_t  i;
 
+#ifdef AM2_STANDALONE
+    am2_log("cc: enter comm=%p\n", comm);
+#endif
     StartPacketThread();
+#ifdef AM2_STANDALONE
+    am2_log("cc: thread started\n");
+#endif
     CommInitDefaults();
+#ifdef AM2_STANDALONE
+    am2_log("cc: defaults done\n");
+#endif
     now = GetTickCount();
 
     comm_u32(self, 0x3EC) = 0;
@@ -522,9 +532,15 @@ void *__attribute__((thiscall)) CommConstruct(void *comm)
     comm_u32(self, 0x408) = now;
     comm_u32(self, 0x004) = 0;
     comm_u32(self, 0x410) = 0x400;
+#ifdef AM2_STANDALONE
+    am2_log("cc: slots done\n");
+#endif
     CommResetStats(comm);
 
     /* The one key the game ever touches. Created, never read. */
+#ifdef AM2_STANDALONE
+    am2_log("cc: stats done\n");
+#endif
     RegCreateKeyExA(HKEY_LOCAL_MACHINE, (const char *)(uintptr_t)ADDR_REGISTRY_KEY,
                     0, NULL, 0, KEY_ALL_ACCESS, NULL,
                     (PHKEY)(self + 0x204), (LPDWORD)(self + 0x208));
@@ -1932,6 +1948,9 @@ int32_t __cdecl StartPacketThread(void)
     uint8_t *data = (uint8_t *)(uintptr_t)ADDR_PACKET_BUFFERS;
     int32_t  i;
 
+#ifdef AM2_STANDALONE
+    am2_log("spt: enter\n");
+#endif
     if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_POOL)) return 0;
     if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_B))    return 0;
     if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ))    return 0;
@@ -1941,8 +1960,14 @@ int32_t __cdecl StartPacketThread(void)
 void __cdecl PacketSlotReset(uint32_t slot);
 
     /* A fixed seed, so every run fills the buffers identically. */
+#ifdef AM2_STANDALONE
+    am2_log("spt: lists inited\n");
+#endif
     GameSrand(0);
 
+#ifdef AM2_STANDALONE
+    am2_log("spt: srand done rec=%p data=%p end=%p\n", (void *)rec, (void *)data, (void *)(uintptr_t)ADDR_PACKET_BUFFERS_END);
+#endif
     while (data < (uint8_t *)(uintptr_t)ADDR_PACKET_BUFFERS_END) {
         uint32_t *w = (uint32_t *)data;
 
@@ -1952,7 +1977,15 @@ void __cdecl PacketSlotReset(uint32_t slot);
         for (i = 0; i < (int32_t)(PACKET_BUFFER_BYTES / 4); i++)
             *w++ = (uint32_t)orig_rand();
 
+#ifdef AM2_STANDALONE
+        { static int32_t once = 0;
+          if (!once) { once = 1; am2_log("spt: first MsgListAdd rec=%p\n", (void *)rec); } }
+#endif
         MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, rec);
+#ifdef AM2_STANDALONE
+        { static int32_t once2 = 0;
+          if (!once2) { once2 = 1; am2_log("spt: first MsgListAdd ok\n"); } }
+#endif
         rec  += PACKET_RECORD_STRIDE;
         data  = (uint8_t *)w;
     }

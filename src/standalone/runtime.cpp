@@ -8,6 +8,7 @@
 #include "../inject/win32.h"
 #include "../inject/orig.h"
 #include "../game/crt.h"
+#include "../game/gameproc.h"
 
 #include <stdarg.h>
 #include <stdint.h>
@@ -16,6 +17,8 @@
 #include <io.h>
 
 extern "C" void am2_apply_fixups(void);
+extern "C" void am2_run_static_init(void);
+extern "C" void am2_bind_imports(void);
 
 /* ---- what the harness provided -------------------------------------- */
 
@@ -136,6 +139,17 @@ extern "C" int am2_sa_findclose(intptr_t handle) { return _findclose(handle); }
 extern "C" void *am2_sa_operator_new(size_t n) { return malloc(n); }
 extern "C" void am2_sa_operator_delete(void *p) { free(p); }
 
+
+extern "C" long am2_sa_ftell(void *fp) { return ftell((FILE *)fp); }
+
+extern "C" void am2_sa_free_army_lists(void) { FreeArmyObjLists(); }
+
+extern "C" int32_t am2_sa_unimplemented(void)
+{
+    am2_log("STANDALONE: an unreconstructed function was called\n");
+    return 0;
+}
+
 /* ---- startup --------------------------------------------------------- */
 
 /* Runs before WinMain. The allocator seam is pointed at the host CRT -- in
@@ -148,7 +162,18 @@ extern "C" void am2_standalone_init(void)
     am2_realloc = realloc;
     am2_free = free;
     am2_log = am2_sa_log;
+    /* FIRST: the original's IAT as we carry it is the FILE's, which no
+     * loader has fixed up, so every seam calling through it was jumping to a
+     * name-table RVA. Binding it must precede anything that runs game code. */
+    am2_bind_imports();
     am2_apply_fixups();
+
+    /* The original's CRT ran the __xc_a..__xc_z table before WinMain and
+     * ours does not, so the C++ static initializers are called here. Without
+     * them the globals they fill stay null -- SetGamePalette writes through
+     * one, g_remapIdent, and faulted on address 0. Fixups first: an
+     * initializer may store a pointer the table also mentions. */
+    am2_run_static_init();
 }
 
 /* WinMain is the reconstruction's own and is not touched, so the startup

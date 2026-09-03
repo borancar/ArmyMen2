@@ -67,9 +67,32 @@ int      am2_sa_findclose(intptr_t handle);
 void *am2_sa_operator_new(size_t n);
 void  am2_sa_operator_delete(void *p);
 
+/* Seams that live in orig.h itself rather than in src/game, which is why the
+ * first sweep for these missed them: it scanned src/game only, and orig_ftell
+ * is defined beside the very macros it uses.  The gap surfaced as a fault
+ * inside ReadWaveFile, three layers below where it was introduced. */
+long am2_sa_ftell(void *fp);
+
+/* 0x0040A6A0 is a one-instruction `jmp 0x0040A660` -- a linker thunk, not a
+ * function -- and its target is FreeArmyObjLists, which is reconstructed. */
+void am2_sa_free_army_lists(void);
+
+/* Three addresses the standalone build has no code for. Two are genuine
+ * functions still unreconstructed -- 0x004185C0, the HUD chat WM_CHAR
+ * handler, and 0x00451990, the ENTER BATTLE NAME button -- both interior
+ * addresses of merged entries, which is why every completeness check reads
+ * them as done. The third is the AM2_PROBE_NOACTION seam, which exists to
+ * call the ORIGINAL parser and so cannot mean anything here. Each LOGS and
+ * returns 0: a stub that announces itself beats a jump into unmapped memory,
+ * and beats a silent wrong answer by more. */
+int32_t am2_sa_unimplemented(void);
+
 #ifdef __cplusplus
 }
 #endif
+
+
+
 
 #define AM2_SA(fn) ((uintptr_t)(void *)&(fn))
 
@@ -164,5 +187,18 @@ void  am2_sa_operator_delete(void *p);
 #define ADDR_DIRECTDRAWCREATE  AM2_SA(am2_sa_ddraw_create)
 #define ADDR_DIRECTINPUTCREATE AM2_SA(am2_sa_dinput_create)
 #define ADDR_DIRECTSOUNDCREATE AM2_SA(am2_sa_dsound_create)
+
+#undef ADDR_FTELL
+#undef ADDR_GAME_FREE
+#undef ADDR_FREE_ARMY_LISTS_ALIAS
+#undef ADDR_HUD_CHAT_CHAR
+#undef ADDR_ON_ENTER_NAME_OK
+#undef ADDR_SCRIPT_PARSE_ACTION
+#define ADDR_FTELL            AM2_SA(am2_sa_ftell)
+#define ADDR_GAME_FREE        AM2_SA(free)
+#define ADDR_FREE_ARMY_LISTS_ALIAS AM2_SA(am2_sa_free_army_lists)
+#define ADDR_HUD_CHAT_CHAR    AM2_SA(am2_sa_unimplemented)
+#define ADDR_ON_ENTER_NAME_OK AM2_SA(am2_sa_unimplemented)
+#define ADDR_SCRIPT_PARSE_ACTION AM2_SA(am2_sa_unimplemented)
 
 #endif /* AM2_STANDALONE_H */
