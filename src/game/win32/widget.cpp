@@ -4191,6 +4191,127 @@ typedef void (__cdecl *AM2_VoidFn)(void);
 
 #define orig_operator_new     ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
 
+static const char *const kChatToSprites[4] = {
+    "18_001_00_chatto.bmp", "18_001_01_chatto.bmp",
+    "18_001_02_chatto.bmp", "18_001_03_chatto.bmp",
+};
+
+/* HudTopConstruct -- original 0x00417580, 490 bytes, thiscall. The HUD top
+ * strip, which IS the chat log -- the tree already spells the class HudTop
+ * (Destruct, Paint, Update) while spelling its fields HUDLOG_, and both are
+ * this one widget. Named HudTop to match the three methods rather than the
+ * offsets, since a class has one name. Named from its destructor
+ * (0x00417770 tail-calls ADDR_HUD_TOP_DESTRUCT) and confirmed by its own
+ * data: the checkbox it may add loads 18_001_0N_chatto.bmp.
+ *
+ * MULTIPLAYER CHANGES ITS SHAPE TWICE, from one flag read at the top and
+ * again at the bottom. ADDR_NET_GAME picks the base sprite's FRAME (0 or 1)
+ * and the button's x (2 or 0x10), and the typing cursor and the scroll width
+ * are both derived from that x rather than being constants -- TYPED_X is
+ * x + 0x19 and VIEW_W is 0x258 - x. So the widget is narrower and indented in
+ * a network game, and one global decides it.
+ *
+ * THREE PRELOADS, THREE EARLY EXITS. Each stores its result and then bails to
+ * the epilogue on null, so a failure part-way leaves the later fields
+ * untouched -- the same mid-body exit HudCmdConstruct and HudEdgeConstruct
+ * have. Third instance; it is the family's habit, not an accident.
+ *
+ * The row clear walks a CURSOR at ROWS + 0x50 and reaches BACK 0x50 for the
+ * text byte, so a naive read puts the array at 0xBC. It is at
+ * HUDLOG_OFF_ROWS, 0x6C, and the tree already had that name -- the arithmetic
+ * agreeing with a macro written for another function is the check.
+ *
+ * The checkbox is added only in a network game AND only when the local
+ * player's slot has a team, which is the same COMM_SLOT_OFF_TEAM test
+ * CommTeamScore makes. Otherwise the child pointer is explicitly nulled --
+ * not left, nulled, on a path of its own. */
+AM2_Widget *__attribute__((thiscall)) HudTopConstruct(AM2_Widget *w)
+{
+    uint8_t    *self = (uint8_t *)w;
+    AM2_Sprite *spr;
+    int32_t     frame;
+    int32_t     buttonX;
+    int32_t     i;
+
+    WidgetConstruct(w);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_TOP_STRIP);
+
+    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME == 0) {
+        frame = 0;
+        buttonX = 2;
+    } else {
+        frame = 1;
+        buttonX = 0x10;
+    }
+    *(int32_t *)(self + HUDLOG_OFF_BUTTON_X) = buttonX;
+
+    spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 1, frame, 0);
+    *(void **)(self + HUD_OFF_SPRITE0) = spr;
+    if (!spr)
+        return w;
+
+    w->sprite = spr;
+
+    *(int32_t *)(self + HUDLOG_OFF_TYPED_Y)  = 3;
+    *(int32_t *)(self + HUDLOG_OFF_TYPED_X)  = buttonX + 0x19;
+    *(int32_t *)(self + HUDLOG_OFF_VIEW_W)   = 0x258 - buttonX;
+    *(int32_t *)(self + HUDLOG_OFF_FIELD_5B4) = 0x0A;
+    *(int32_t *)(self + HUDLOG_OFF_TYPING)    = 0;
+    *(int32_t *)(self + HUDLOG_OFF_JUST_SENT) = 0;
+    *(void **)(self + HUDLOG_OFF_BUTTON_SPRITE) = 0;
+    *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT)  = 0;
+    *(int32_t *)(self + HUDLOG_OFF_BLIPS)       = 0;
+    *(uint32_t *)(self + HUDLOG_OFF_BLIP_AT)    = 0;
+
+    for (i = 0; i < AM2_HUDLOG_ROWS; i++) {
+        uint8_t *row = self + HUDLOG_OFF_ROWS
+                     + (size_t)i * AM2_HUDLOG_ROW_STRIDE;
+        row[HUDLOGROW_OFF_TEXT] = 0;
+        *(int32_t *)(row + HUDLOGROW_OFF_FIELD_50) = 0;
+    }
+
+    *(int32_t *)(self + HUDLOG_OFF_SCROLL) = 0;
+    w->x = 0;
+    w->y = 0;
+    w->w = spr->bounds.right;
+    w->h = spr->bounds.bottom;
+    self[HUDLOG_OFF_TYPED] = 0;
+    *(int32_t *)(self + HUDLOG_OFF_COUNT) = 0;
+
+    spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 2, 1, 1);
+    *(void **)(self + HUDLOG_OFF_SPRITE_DOWN) = spr;
+    if (!spr)
+        return w;
+
+    spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 2, 2, 1);
+    *(void **)(self + HUDLOG_OFF_SPRITE_HOT) = spr;
+    if (!spr)
+        return w;
+
+    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME != 0) {
+        const uint8_t *comm = *(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+        uint32_t       me   = g_defaultOwner;
+
+        if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
+                               + (size_t)me * AM2_COMM_SLOT_STRIDE
+                               + COMM_SLOT_OFF_TEAM) != 0) {
+            AM2_Widget *cb = (AM2_Widget *)orig_operator_new(AM2_HUD_CHECKBOX_BYTES);
+
+            if (cb)
+                cb = CheckBoxConstruct(cb, kChatToSprites[0], kChatToSprites[1],
+                                       kChatToSprites[2], kChatToSprites[3],
+                                       2, 4, 0x0D, 0x0D, 0, 0, 0);
+            *(void **)(self + HUD_A_OFF_CHECKBOX) = cb;
+            WidgetAddChild(w, cb);
+            return w;
+        }
+    }
+
+    *(void **)(self + HUD_A_OFF_CHECKBOX) = 0;
+    return w;
+}
+
+
 /* The half every factory opens with: whatever screen is up goes away first.
  *
  * The delete is vtable slot 0 with a flag of 1 -- the MSVC scalar deleting
@@ -4288,7 +4409,7 @@ void __cdecl FreeHudWidgets(void)
 typedef void *(__attribute__((thiscall)) *AM2_HudCtorFn)(void *obj);
 typedef void (__cdecl *AM2_NoArgLogFn)(void);
 
-#define orig_hud_a_ctor   ((AM2_HudCtorFn)AM2_IMAGE(ADDR_HUD_A_CTOR))
+
 #define orig_hud_b_ctor   ((AM2_HudCtorFn)AM2_IMAGE(ADDR_HUD_B_CTOR))
 
 #define orig_log_noargs   ((AM2_NoArgLogFn)(uintptr_t)ADDR_LOG)
@@ -4327,7 +4448,7 @@ void __cdecl BuildHudWidgets(void)
     }
 
     *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A =
-        NewHudWidget(AM2_HUD_A_BYTES, orig_hud_a_ctor);
+        NewHudWidget(AM2_HUD_A_BYTES, (AM2_HudCtorFn)HudTopConstruct);
     *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B =
         NewHudWidget(AM2_HUD_B_BYTES, orig_hud_b_ctor);
 
@@ -11160,6 +11281,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_HUD_TOP_CONSTRUCT,
+                        (const void *)HudTopConstruct,
+                        "HudTopConstruct", 1);
     rc |= patch_replace(ADDR_HUD_EDGE_CONSTRUCT,
                         (const void *)HudEdgeConstruct,
                         "HudEdgeConstruct", 1);

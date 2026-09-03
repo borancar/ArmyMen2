@@ -3654,7 +3654,11 @@
  * CHECK_OFF_TICKED is already 0x78, a uint8_t. So the latch around the rebuild
  * preserves the box's TICKED state -- and only outside a net game. */
 #define ADDR_BUILD_HUD_WIDGETS   0x00413480u  /* void(void), 320 bytes */
-#define ADDR_HUD_A_CTOR          0x00417580u  /* thiscall void *(this) */
+/* 0x00417580, thiscall -- the HUD TOP STRIP's constructor, which is the chat
+ * log. Named from its destructor at 0x00417770 and its vtable, both of which
+ * say TOP; its fields are spelled HUDLOG_ and are the same widget. */
+#define ADDR_HUD_TOP_CONSTRUCT   0x00417580u  /* thiscall AM2_Widget *(this) */
+#define AM2_HUD_CHECKBOX_BYTES   0x90
 #define ADDR_HUD_B_CTOR          0x00418FB0u
 /* 0x004195B0, thiscall -- the HUD EDGE STRIP's constructor, and the name is
  * settled by its destructor: 0x00419650 tail-calls ADDR_HUD_EDGE_DESTRUCT.
@@ -3681,6 +3685,18 @@
  * frame at AM2_HUD_BLIP_MS with a sound each, so it is a budget of radio
  * blips and a longer message chatters for longer. Renamed accordingly. */
 #define HUDLOG_OFF_ROWS          0x6Cu
+/* Twelve rows of 0x58, which HudLogConstruct clears two fields of apiece: the
+ * text's first byte, making it empty, and the dword at +0x50. It walks them
+ * with a cursor at ROWS + 0x50 and reaches BACK for the text, which is why a
+ * naive read puts the array at 0xBC. */
+#define AM2_HUDLOG_ROWS          12
+#define AM2_HUDLOG_ROW_STRIDE    0x58u
+#define HUDLOGROW_OFF_TEXT       0x00u
+#define HUDLOGROW_OFF_FIELD_50   0x50u
+/* 0xA, written beside TYPED_X/TYPED_Y/VIEW_W and never read by anything this
+ * project has reconstructed. Named for its offset, which is all that is
+ * established. */
+#define HUDLOG_OFF_FIELD_5B4     0x5B4u
 #define HUDLOG_OFF_COUNT         0x594u
 #define HUDLOG_OFF_BLIPS         0x59Cu  /* int32_t, chatter still owed */
 #define AM2_HUD_MSG_SIZE         0x58u   /* 88 */
