@@ -6725,6 +6725,20 @@ typedef struct {
  * free site, and ADDR_SPRITE_DROP_NAMED, named from a call site: right about
  * what it saw, wrong about what the field is. */
 #define ADDR_PENDING_CONFIRM     0x00659F58u /* char[] */
+#define ADDR_STR_DOT_SAV         0x0048BC54u  /* ".sav" */
+#define ADDR_STR_DOT             0x004758A0u  /* "." -- ANY extension, not
+                                               * this one; SaveListOnSave
+                                               * appends .sav only when the
+                                               * typed name has no dot at all,
+                                               * so "quick.bak" is left as
+                                               * typed. */
+/* 0x00464D40, 19 callers, in the CRT band: two arguments, a byte-wise
+ * substring scan with the empty-needle and single-character cases spelled
+ * out. It is strstr, identified from its own body the way crt.py identifies
+ * the other 58. The save dialogs use it twice for different jobs -- to strip
+ * ".sav" off a name for display, and to ask whether a typed name has any
+ * extension at all. */
+#define ADDR_CRT_STRSTR          0x00464D40u  /* char *(const char *, const char *) */
 /* Its prompt, and the name says the global is not only the DELETE dialog's:
  * "Are you sure you want to overwrite savefile '%s'?" takes the same buffer.
  * Left named for the first consumer found; both dialogs stage their target
@@ -6744,6 +6758,14 @@ typedef struct {
  * shows is not established here. A possibly-narrow name beats a second name
  * on one value. */
 #define AM2_MENU_MODE_DEL_GAME   0x1D
+/* The mode SaveListOnDelete switches to, which is NOT the 0x1D above and is
+ * the second entry to what is probably one screen. The note there already
+ * says CANCEL computes its target from where it came from, with `sete` and
+ * `add 0x19` -- two entry modes showing the same DELETE GAME question and
+ * remembering the origin is what that arithmetic is for. Named for its one
+ * writer, narrowly, on the same principle stated above: what the arm draws
+ * is still not established here. */
+#define AM2_MENU_MODE_DEL_SAVE   0x1E
 #define AM2_MENU_MODE_AFTER_LOAD 0x19
 #define AM2_MENU_REQUEST_DEL_GAME 0x15u
 #define AM2_BMP_NEW0             0x0048BAFCu /* 03_011_0N_new.bmp */

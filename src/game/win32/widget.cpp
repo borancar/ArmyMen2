@@ -4866,7 +4866,7 @@ AM2_Widget *__attribute__((thiscall)) DlgSaveListConstruct(AM2_Widget *w,
     if (kid)
         kid = ListBoxConstruct(kid, 0xA5, 0xBD, 0x9A, 0xAA,
                                *(void **)(self + DLG_OFF_LIST),
-                               (int32_t)AM2_IMAGE(ADDR_SAVE_LIST_ON_PICK),
+                               (int32_t)(uintptr_t)SaveListOnPick,
                                0, 1);
     WidgetAddChild(w, kid);
 
@@ -4898,7 +4898,7 @@ AM2_Widget *__attribute__((thiscall)) DlgSaveListConstruct(AM2_Widget *w,
                               "03_012_01_delete.bmp", "03_012_02_delete.bmp",
                               1, box,
                               (void (__cdecl *)(AM2_Widget *))
-                                  AM2_IMAGE(ADDR_SAVE_LIST_ON_DELETE),
+                                  SaveListOnDelete,
                               (void (__cdecl *)(AM2_Widget *))0);
     }
     WidgetAddChild(w, kid);
@@ -9996,6 +9996,91 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
     return AM2_MAPCHECK_OK;
 }
 
+typedef char *(__cdecl *AM2_StrstrFn)(const char *, const char *);
+#define orig_strstr ((AM2_StrstrFn)AM2_IMAGE(ADDR_CRT_STRSTR))
+
+/* The save dialogs' shared shape, which is worth stating once for the four
+ * handlers below: THE LIST HANDLERS ONLY PREPARE AND THE OK HANDLERS DO THE
+ * FILE WORK. SaveListOnDelete stages a filename and opens a confirmation;
+ * SaveListOnSave stages a decision; DlgOverwriteOk and OnDelPlayerOk are
+ * where SaveGame, remove and rmdir actually live. Reading them as a family
+ * before writing any of them is what made that visible.
+ *
+ * All four reach the open dialog through ADDR_PAINT_OBJECT rather than
+ * through their widget argument, and all four tolerate its being null. */
+
+/* SaveListOnPick -- original 0x00452FD0, 176 bytes, one exit.
+ *
+ * Clicking a row of the save list puts that filename in the name box. The
+ * ".sav" is STRIPPED for display -- strstr finds it and a NUL goes in its
+ * place -- so what the user sees and can edit is the bare name, and
+ * SaveListOnSave puts an extension back on if there is none. */
+void __cdecl SaveListOnPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
+{
+    uint8_t    *dlg;
+    AM2_Widget *edit;
+    char       *dot;
+
+    (void)w;
+
+    if (!rows || row < 0 || row >= rows->count)
+        return;
+
+    dlg = *(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT;
+    if (!dlg)
+        return;
+
+    strcpy((char *)(dlg + SAVELIST_OFF_NAME),
+           rows->text + (size_t)row * LIST_ROW_STRIDE);
+
+    dot = orig_strstr((char *)(dlg + SAVELIST_OFF_NAME),
+                      (const char *)AM2_IMAGE(ADDR_STR_DOT_SAV));
+    if (dot)
+        *dot = '\0';
+
+    edit = *(AM2_Widget **)(dlg + SAVELIST_OFF_EDIT);
+    ((AM2_WidgetPaintFn *)edit->vtable)[WIDGET_VSLOT_PAINT](edit, edit->rect);
+
+    PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
+}
+
+/* SaveListOnDelete -- original 0x004531D0, 176 bytes, two exits.
+ *
+ * The SAVE dialog's DELETE button. It DELETES NOTHING: it stages the target
+ * filename and switches to the confirmation screen, which is the family's
+ * shape -- the list handlers prepare and the OK handlers do the file work.
+ *
+ * The name is taken from the EDIT BOX, not from the selected row, so DELETE
+ * removes whatever is typed. SaveListOnPick stripped ".sav" off for display,
+ * and this puts it back before staging.
+ *
+ * Its mode is 0x1E and not the 0x1D orig.h already had: two entry modes into
+ * what is probably one screen, which is what DELETE GAME's CANCEL arithmetic
+ * is for. */
+void __cdecl SaveListOnDelete(AM2_Widget *w)
+{
+    uint8_t *dlg = *(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT;
+
+    (void)w;
+
+    if (!dlg)
+        return;
+
+    /* An empty box is refused with the same sound a list plays at its end. */
+    if (strlen((const char *)(dlg + SAVELIST_OFF_NAME)) < 1) {
+        PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
+        return;
+    }
+
+    strcpy(g_pendingDelete, (const char *)(dlg + SAVELIST_OFF_NAME));
+    strcat(g_pendingDelete, (const char *)AM2_IMAGE(ADDR_STR_DOT_SAV));
+
+    PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
+
+    *(int32_t *)(uintptr_t)ADDR_MENU_MODE     = AM2_MENU_MODE_DEL_SAVE;
+    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+}
+
 /* 0x00430330 -- the thumbnail when the map is not installed. The literal is
  * copied into a 0x100 local before being handed on, which is the original's
  * inlined strcpy and not something the callee needs; kept, because the callee
@@ -13721,6 +13806,11 @@ int widget_install(void)
                         "HudPanelWidth", 3);
     rc |= patch_replace(ADDR_SET_POINTER_MODE, (const void *)SetPointerMode,
                         "SetPointerMode", 10);
+    rc |= patch_replace(ADDR_SAVE_LIST_ON_DELETE,
+                        (const void *)SaveListOnDelete,
+                        "SaveListOnDelete", 1);
+    rc |= patch_replace(ADDR_SAVE_LIST_ON_PICK,
+                        (const void *)SaveListOnPick, "SaveListOnPick", 3);
     rc |= patch_replace(ADDR_CHECK_MAP_RULES, (const void *)CheckMapRules,
                         "CheckMapRules", 3);
     rc |= patch_replace(ADDR_MP_ON_GAME_TYPE, (const void *)OnMpGameType,
