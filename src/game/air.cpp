@@ -12,6 +12,9 @@
 #include "objtype.h"  /* ObjIsTypeIn238 -- reconstructed */
 #include "crt.h"      /* am2_free, am2_realloc -- the game's own */
 #include "savetag.h"
+#include "packkey.h" /* KeyLookupTriple -- reconstructed */
+#include "misc.h"    /* CommArmyOfSlot -- reconstructed */
+#include "armymsg.h" /* SendTrooperSetWeapon -- reconstructed */
 #include "image.h"
 #include "misc.h"   /* MeetsAllThree -- reconstructed */
 #include "msgslot.h" /* CommMustBroadcast -- reconstructed */
@@ -1215,8 +1218,6 @@ void __cdecl ToggleFogOfWar(void)
  * out. Its second argument is an army: it compares it against
  * ADDR_DEFAULT_OWNER, which is the third reading agreeing on that field. */
 typedef void (__cdecl *AM2_AirStrikeFn)(uint32_t at, int32_t army);
-#define orig_air_pass_strike \
-    ((AM2_AirStrikeFn)(uintptr_t)ADDR_AIR_PASS_STRIKE)
 
 /* The ten-argument creator is CreateExplosion and is reconstructed in
  * item.cpp, so the two call sites below name it. */
@@ -1370,7 +1371,7 @@ void __cdecl AirPassesDraw(void)
     if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
         || CommMustBroadcast(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
                              g_airPassArmy[0]))
-        orig_air_pass_strike(*(const uint32_t *)g_airPassWhere,
+        AirPassStrike(*(const uint32_t *)g_airPassWhere,
                              g_airPassArmy[0]);
 
     for (i = 1; i < g_airPassCount; i++) {
@@ -1675,8 +1676,75 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     }
 }
 
+#define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+#define g_fogOfWar     (*(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR)
+
+/* AirPassStrike -- original 0x00409540, 256 bytes, one caller: what an air
+ * pass does when its timer runs out. It DROPS THREE PARATROOPERS, which the
+ * function says nowhere and its two tables say between them -- offsets
+ * (0,0), (-48,+32), (+48,+32), a V behind the drop point, and facings 0x00,
+ * 0x60, 0xA0, so each lands looking a different way.
+ *
+ * The count is the distance between the two tables over four, not a literal.
+ * Written that way for the same reason FreeAimSprites is: the bound IS the
+ * next global.
+ *
+ * Each trooper gets a weapon and only then a soldier kind, in that order --
+ * SoldierKindForWeapon is asked what kind suits the weapon that was just
+ * made, so making the weapon first is required and not incidental.
+ *
+ * The flag word is 0x8000 always, plus 0x200 when the drop is for the
+ * DEFAULT OWNER and the fog of war is off. ADDR_FOG_OF_WAR is 0 when fog is
+ * ON, so the test reads inverted and is not: `!= 0` there means no fog, and
+ * the extra bit is what reveals the drop. Both halves of that had to be read
+ * from orig.h's note on the global rather than from the compare.
+ *
+ * A NULL WEAPON SKIPS THE WHOLE TAIL but still leaves the trooper on the map
+ * -- the guard is around the four calls, not around the creation. */
+void __cdecl AirPassStrike(uint32_t at, int32_t army)
+{
+    const int16_t *off  = (const int16_t *)(uintptr_t)ADDR_AIR_DROP_OFFSETS;
+    const uint8_t *face = (const uint8_t *)(uintptr_t)ADDR_AIR_DROP_FACINGS;
+    void          *comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
+    int32_t        flags = 0;
+    int32_t        i;
+
+    if (army == (int32_t)g_defaultOwner && g_fogOfWar == 0)
+        flags = AM2_AIR_DROP_REVEAL;
+    flags |= AM2_AIR_DROP_FLAG;
+
+    for (i = 0; i < AM2_AIR_DROP_COUNT; i++) {
+        void *trooper;
+        void *weapon;
+
+        trooper = CreateTrooper((char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                                (int16_t)at + off[i * 2],
+                                (int16_t)(at >> 16) + off[i * 2 + 1],
+                                CommArmyOfSlot(comm, army),
+                                army, flags, 0, 0, 1, 0);
+
+        weapon = CreateWeapon((const char *)(uintptr_t)ADDR_DIR_SCRATCH, army,
+                              KeyLookupTriple(AM2_AIR_DROP_WEAPON_KEY, 1, 0),
+                              *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
+                              4, -1, 0, 0);
+        if (!weapon)
+            continue;
+
+        *(uint32_t *)((uint8_t *)trooper + OBJ_OFF_WEAPON_UID) =
+            *(const uint32_t *)((const uint8_t *)weapon + OBJ_OFF_UID);
+        *((uint8_t *)trooper + OBJ_OFF_FACING) = face[i];
+
+        SoldierKindForWeapon(trooper,
+            **(const uint32_t **)((const uint8_t *)weapon + OBJ_OFF_FIELD_C0));
+        SendTrooperSetWeapon(trooper,
+            *(const uint32_t *)((const uint8_t *)weapon + OBJ_OFF_UID), 0);
+    }
+}
+
 void air_install(void)
 {
+    patch_replace(ADDR_AIR_PASS_STRIKE, (const void *)AirPassStrike,
+                  "AirPassStrike", 2);
     patch_replace(ADDR_FORMATION_SLOT_POINT,
                   (const void *)FormationSlotPoint,
                   "FormationSlotPoint", 3);

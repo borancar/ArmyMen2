@@ -3317,6 +3317,18 @@
 /* 0x00409540, 320 bytes, one caller -- what a pass does when its timer runs
  * out. The name is descriptive; the function names itself nowhere. */
 #define ADDR_AIR_PASS_STRIKE     0x00409540u  /* void(uint32 at, int32 army) */
+/* The pass drops THREE paratroopers, and the two tables say so between them:
+ * the offsets are (0,0), (-48,+32) and (+48,+32) -- a V behind the drop point
+ * -- and the facings are 0x00, 0x60 and 0xA0, so each lands looking a
+ * different way. Three is the DISTANCE between the two tables divided by four,
+ * not a literal, which is also what bounds the loop. */
+#define ADDR_AIR_DROP_OFFSETS    0x00473F74u  /* {int16 dx, int16 dy}[3] */
+#define ADDR_AIR_DROP_FACINGS    0x00473F80u  /* uint8_t[3] */
+#define AM2_AIR_DROP_COUNT       3
+#define AM2_AIR_DROP_FLAG        0x8000  /* always set on the trooper flags */
+#define AM2_AIR_DROP_REVEAL      0x0200  /* added when the drop is ours and
+                                          * the fog is off */
+#define AM2_AIR_DROP_WEAPON_KEY  0x2Du   /* KeyLookupTriple(0x2D, 1, 0) */
 #define AM2_AIR_PASS_MAX         8
 #define AIR_OFF_FLAG_A           0x240u  /* int32_t, set and cleared together */
 #define AIR_OFF_FLAG_B           0x244u  /* int32_t, with the above */

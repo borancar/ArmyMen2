@@ -251,4 +251,8 @@ void __cdecl RandomPointToward(const void *target, const void *obj,
  * epilogue sets no eax at all. */
 void __cdecl AddSightBlocker(void *viewer, void *blocker);
 
+/* 0x00409540, one caller. What an air pass does when its timer expires:
+ * drop three paratroopers in a V, each with a weapon and its own facing. */
+void __cdecl AirPassStrike(uint32_t at, int32_t army);
+
 #endif /* AM2_AIR_H */
