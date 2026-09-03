@@ -18223,4 +18223,13 @@ typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
 #define orig_realloc (*(am2_realloc_fn)ADDR_REALLOC)
 #define orig_memmove (*(am2_memmove_fn)ADDR_MEMMOVE)
 
+/* The standalone build is a drop-in replacement for ArmyMen2.exe, so it can
+ * hold no address from that image.  Every data ADDR_ above is redefined here
+ * to the address of a real object in our own binary -- generated, because
+ * there are 1,233 of them -- which leaves all 3,776 use sites unchanged.
+ * The injected build includes none of this and is untouched. */
+#ifdef AM2_STANDALONE
+#include "origaddr.h"   /* build/standalone, via -I */
+#endif
+
 #endif /* AM2_ORIG_H */

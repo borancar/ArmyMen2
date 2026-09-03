@@ -87,26 +87,46 @@ typedef struct AM2_Widget {
 
 /* The base class's vtable, stored by its constructor and restored by its
  * destructor. It is the twentieth of the thirty-three. */
+#ifndef VTABLE_WIDGET_BASE   /* the standalone build defines it as an object */
 #define VTABLE_WIDGET_BASE  0x0046FC20u
+#endif
 /* The label's vtable, twenty-sixth of the thirty-three. */
+#ifndef VTABLE_LABEL   /* the standalone build defines it as an object */
 #define VTABLE_LABEL        0x0046FCACu
+#endif
 /* The edit box, twenty-fifth of the thirty-three. */
+#ifndef VTABLE_EDIT   /* the standalone build defines it as an object */
 #define VTABLE_EDIT         0x0046FC98u
+#endif
 /* The three-state button, and what its destructor restores. */
+#ifndef VTABLE_BUTTON   /* the standalone build defines it as an object */
 #define VTABLE_BUTTON       0x0046FC34u
+#endif
 /* The one-sprite icon, and the blinker that derives from it. */
+#ifndef VTABLE_ICON   /* the standalone build defines it as an object */
 #define VTABLE_ICON         0x0046FC70u
+#endif
+#ifndef VTABLE_BLINKER   /* the standalone build defines it as an object */
 #define VTABLE_BLINKER      0x0046FD38u
+#endif
+#ifndef VTABLE_LIST   /* the standalone build defines it as an object */
 #define VTABLE_LIST         0x0046FCC0u
+#endif
 /* The horizontal scroll bar. Its constructor loads 03_020_00_hscrollbar.bmp
  * and builds an ltarrow and an rtarrow child, so the class names itself. */
+#ifndef VTABLE_SCROLLBAR   /* the standalone build defines it as an object */
 #define VTABLE_SCROLLBAR    0x0046FCFCu
+#endif
 /* The dialog base, one level under the icon. Fifteen classes derive from it
  * with a destructor that is the same two instructions, and each stamps its own
  * vtable from this list on the way past. */
+#ifndef VTABLE_DIALOG   /* the standalone build defines it as an object */
 #define VTABLE_DIALOG       0x0046FC84u
+#endif
 /* The typewriter message label. Six confirm dialogs build one. */
+#ifndef VTABLE_TYPER   /* the standalone build defines it as an object */
 #define VTABLE_TYPER        0x0046FD24u
+#endif
 #define TYPER_OFF_TEXT      0x58    /* char[0x400], lines separated by `|` */
 #define TYPER_OFF_LAST      0x458   /* uint32_t, GetTickCount at the last reveal */
 #define TYPER_OFF_SHOWN     0x45C   /* int32_t, characters revealed so far */
@@ -114,21 +134,51 @@ typedef struct AM2_Widget {
 #define TYPER_LINE_HEIGHT   12
 #define TYPER_REVEAL_MS     100
 #define TYPER_BLINK_MS      0x46    /* 70 ms, the same period the list box uses */
+#ifndef VTABLE_DLG_SELECTMAP   /* the standalone build defines it as an object */
 #define VTABLE_DLG_SELECTMAP             0x0046FAB8u
+#endif
+#ifndef VTABLE_DLG_DIFFICULTY   /* the standalone build defines it as an object */
 #define VTABLE_DLG_DIFFICULTY            0x0046FAE0u
+#endif
+#ifndef VTABLE_DLG_QUITGAME   /* the standalone build defines it as an object */
 #define VTABLE_DLG_QUITGAME              0x0046FAF4u
+#endif
+#ifndef VTABLE_DLG_REPLAY   /* the standalone build defines it as an object */
 #define VTABLE_DLG_REPLAY                0x0046FB08u
+#endif
+#ifndef VTABLE_DLG_AUDIO   /* the standalone build defines it as an object */
 #define VTABLE_DLG_AUDIO                 0x0046FB1Cu
+#endif
+#ifndef VTABLE_DLG_OPTIONS   /* the standalone build defines it as an object */
 #define VTABLE_DLG_OPTIONS               0x0046FB30u
+#endif
+#ifndef VTABLE_DLG_DELGAME   /* the standalone build defines it as an object */
 #define VTABLE_DLG_DELGAME               0x0046FB44u
+#endif
+#ifndef VTABLE_DLG_OVERWRITE   /* the standalone build defines it as an object */
 #define VTABLE_DLG_OVERWRITE             0x0046FB58u
+#endif
+#ifndef VTABLE_DLG_DELPLAYER   /* the standalone build defines it as an object */
 #define VTABLE_DLG_DELPLAYER             0x0046FB6Cu
+#endif
+#ifndef VTABLE_DLG_CONTROLS   /* the standalone build defines it as an object */
 #define VTABLE_DLG_CONTROLS              0x0046FB94u
+#endif
+#ifndef VTABLE_DLG_SELECTPLAYER   /* the standalone build defines it as an object */
 #define VTABLE_DLG_SELECTPLAYER          0x0046FBA8u
+#endif
+#ifndef VTABLE_DLG_NAMEENTRY   /* the standalone build defines it as an object */
 #define VTABLE_DLG_NAMEENTRY             0x0046FBBCu
+#endif
+#ifndef VTABLE_DLG_LOADGAME   /* the standalone build defines it as an object */
 #define VTABLE_DLG_LOADGAME              0x0046FBD0u
+#endif
+#ifndef VTABLE_DLG_MESSAGE   /* the standalone build defines it as an object */
 #define VTABLE_DLG_MESSAGE               0x0046FBE4u
+#endif
+#ifndef VTABLE_DLG_GAMEMENU   /* the standalone build defines it as an object */
 #define VTABLE_DLG_GAMEMENU              0x0046FBF8u
+#endif
 #define SCROLLBAR_OFF_BAR   0x64   /* AM2_Sprite *, the bar the paint draws */
 #define SCROLLBAR_OFF_SHIFT 0x6C   /* int32_t, added to the centred x */
 #define SCROLLBAR_OFF_SPAN  0x70   /* int32_t, taken off the width first */

@@ -6082,14 +6082,30 @@ typedef AM2_Widget *(__attribute__((thiscall)) *AM2_PanelCtorFn)(
 
 
 /* The four bitmaps every one of the three uses, and the one string. */
+#ifndef AM2_BMP_OK0   /* the standalone build defines it as an object */
 #define AM2_BMP_OK0    0x00487044u
+#endif
+#ifndef AM2_BMP_OK1   /* the standalone build defines it as an object */
 #define AM2_BMP_OK1    0x00487058u
+#endif
+#ifndef AM2_BMP_OK2   /* the standalone build defines it as an object */
 #define AM2_BMP_OK2    0x0048706Cu
+#endif
+#ifndef AM2_BMP_CAN0   /* the standalone build defines it as an object */
 #define AM2_BMP_CAN0   0x00486DECu
+#endif
+#ifndef AM2_BMP_CAN1   /* the standalone build defines it as an object */
 #define AM2_BMP_CAN1   0x00486E04u
+#endif
+#ifndef AM2_BMP_CAN2   /* the standalone build defines it as an object */
 #define AM2_BMP_CAN2   0x00486E1Cu
+#endif
+#ifndef AM2_BMP_RED0   /* the standalone build defines it as an object */
 #define AM2_BMP_RED0   0x00487178u
+#endif
+#ifndef AM2_BMP_RED1   /* the standalone build defines it as an object */
 #define AM2_BMP_RED1   0x0048718Cu
+#endif
 
 
 /* The handler by POINTER, always. There used to be a second form taking the
