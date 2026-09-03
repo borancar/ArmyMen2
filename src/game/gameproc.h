@@ -22,6 +22,9 @@ void __cdecl Teardown445F40(const char *msg);
 void __cdecl TeardownDefTables(void);
 /* 0x0040A690, 0x0040A5F0, 0x0040A660. BuildRemapTables plus the four army
  * object lists, and the pair that makes and unmakes those lists. */
+/* 0x0044A380. WalkCellWrapper's filter: keep the objects we are not allied
+ * with. */
+int32_t __cdecl WalkCellKeepEnemy(void *obj);
 void __cdecl InitRemapsAndLists(void);
 void __cdecl InitArmyObjLists(void);
 void __cdecl FreeArmyObjLists(void);

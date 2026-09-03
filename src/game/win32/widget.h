@@ -1697,6 +1697,9 @@ void __cdecl MpReadyToLoad(void);
 void __cdecl BattleJoinSelect(AM2_Widget *w, AM2_ListRows *rows,
                               int32_t row);
 void __cdecl BattleJoinOk(void);
+
+/* 0x00418F90. The build screen's START: click sound, then declare ready. */
+void __cdecl BuildStartHandler(AM2_Widget *w);
 void __cdecl BattleJoinPoll(AM2_Widget *w);
 
 AM2_Widget *__attribute__((thiscall)) MpPanelDelete(AM2_Widget *w, int32_t f);

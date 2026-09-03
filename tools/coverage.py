@@ -54,6 +54,7 @@ REGISTERED = {
     "ADDR_WND_PROC",          # into the WNDCLASS, by InitApplication
     "ADDR_AUDIO_TIMER_PROC",  # into timeSetEvent, by StartAudioStream
     "ADDR_MEDKIT_HEAL_ONE",   # into ForEachArmyObject, by the pickup paths
+    "ADDR_CHEAT_HEAL_ONE",    # into ForEachArmyObject, by the doctor cheat
     "ADDR_PACKET_THREAD_PROC",# into CreateThread, by StartPacketThread
 }
 

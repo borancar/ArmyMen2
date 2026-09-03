@@ -669,6 +669,9 @@ void __attribute__((thiscall)) ClearPtrListAlias(void *rec);
 /* 0x0043CCE0. Empty the pointer list embedded at +0xA4 of the object. */
 void __attribute__((thiscall)) ClearPtrListAtA4(void *obj);
 
+/* 0x0040FB90. Write "." into the buffer and answer 1. */
+int32_t __cdecl WriteDotString(char *dst);
+
 /* 0x0042A680, six callers -- what that alias jumps to, and the last of the
  * record's five. Zero the capacity and the count, free the items if there are
  * any, zero that too. The two fields are cleared BEFORE the free, which is

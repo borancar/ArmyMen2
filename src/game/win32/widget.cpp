@@ -5222,7 +5222,7 @@ AM2_Widget *__attribute__((thiscall)) HudPanelConstruct(AM2_Widget *w)
             btn = ButtonConstruct(btn, kBuildStartSprites[0], kBuildStartSprites[1],
                                   kBuildStartSprites[2], 1, box,
                                   (void (__cdecl *)(AM2_Widget *))
-                                      AM2_IMAGE(ADDR_BUILD_START_HANDLER),
+                                      BuildStartHandler,
                                   (void (__cdecl *)(AM2_Widget *))0);
         }
         WidgetAddChild(w, btn);
@@ -13843,6 +13843,19 @@ void __attribute__((thiscall)) MpSpinRepaint(AM2_Widget *w)
     WidgetRepaint(w);
 }
 
+
+/* 0x00418F90, ADDR_BUILD_START_HANDLER. A button handler that ignores its
+ * widget: click sound, then declare us ready. SendGameReadyMsg is the LOCAL
+ * half of the ready pair -- it marks our own slot from the comm object rather
+ * than from a message -- which is what makes this the button and not a
+ * receiver. */
+void __cdecl BuildStartHandler(AM2_Widget *w)
+{
+    (void)w;
+    PlaySoundAt(0, 0, 0, 0, 0);
+    SendGameReadyMsg(1);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -14710,6 +14723,9 @@ int widget_install(void)
                         "TextListDestruct", 1);
     rc |= patch_replace(ADDR_MP_SPIN_REPAINT, (const void *)MpSpinRepaint,
                         "MpSpinRepaint", 1);
+    rc |= patch_replace(ADDR_BUILD_START_HANDLER,
+                        (const void *)BuildStartHandler,
+                        "BuildStartHandler", 1);
     return rc;
 }
 

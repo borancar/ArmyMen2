@@ -633,7 +633,7 @@ void __cdecl State1Menu(void)
 void __cdecl State1Frame(void)
 {
     if (g_statePending) {
-        call0(ADDR_STATE1_LEAVE);
+        State1Leave();
         return;
     }
 
@@ -1653,6 +1653,19 @@ void __cdecl StateLeaveCommon(void)
     CommitState();
 }
 
+
+/* 0x004263E0, ADDR_STATE1_LEAVE, reached from State1Frame. Five steps and the
+ * last is a TAIL JUMP to CommitState, so the state change is this function's
+ * final act rather than something a caller does afterwards. */
+void __cdecl State1Leave(void)
+{
+    RefreshGate(0);
+    FreeMenuSprites();
+    CloseScreen();
+    StopAudioStream();
+    CommitState();
+}
+
 int frame_install(void)
 {
     int rc = 0;
@@ -1714,6 +1727,8 @@ int frame_install(void)
     rc |= patch_replace(ADDR_STATE_LEAVE_COMMON,
                         (const void *)StateLeaveCommon,
                         "StateLeaveCommon", 0);
+    rc |= patch_replace(ADDR_STATE1_LEAVE, (const void *)State1Leave,
+                        "State1Leave", 0);
     return rc;
 }
 

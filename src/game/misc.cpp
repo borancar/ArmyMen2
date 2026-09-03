@@ -2512,6 +2512,25 @@ void __attribute__((thiscall)) ClearPtrListAtA4(void *obj)
     ClearPtrListAlias((uint8_t *)obj + 0xA4);
 }
 
+
+/* 0x0040FB90. Format a bare "." into the caller's buffer and answer 1.
+ *
+ * Its only reference is a slot in a record at 0x0047588C that also holds the
+ * string "FOO" -- and nothing in the image references that record's base, so
+ * the record's consumer is NOT identified. The name therefore describes the
+ * BODY and claims nothing about the role, which is the standing rule for a
+ * table with no readable consumer.
+ *
+ * orig.h already records the neighbourhood being misread once: 0x0040FB80 was
+ * described as "formats a string and hands it to CommSendProperty" because the
+ * merged functions.tsv entry was swept as one function. It is eight bytes; the
+ * sprintf is this function. */
+int32_t __cdecl WriteDotString(char *dst)
+{
+    am2_sprintf(dst, (const char *)AM2_IMAGE(ADDR_STR_DOT));
+    return 1;
+}
+
 int misc_install(void)
 {
     patch_replace(ADDR_AI_TAKE_ABANDONED, (const void *)AiTakeAbandoned,
@@ -2690,6 +2709,8 @@ int misc_install(void)
                   "MovieBuildName", 4);
     patch_replace(ADDR_CLEAR_PTR_LIST_A4, (const void *)ClearPtrListAtA4,
                   "ClearPtrListAtA4", 1);
+    patch_replace(ADDR_WRITE_DOT_STRING, (const void *)WriteDotString,
+                  "WriteDotString", 1);
     return 0;
 }
 

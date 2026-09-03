@@ -2569,17 +2569,26 @@ void __cdecl DefFinish(void)
  * WalkCellAtPoint's -- the object standing at the point, or null. Nothing in
  * the tree read it, so the wrong prototype was invisible; Type2PlayerInput
  * tests it and asks the result for its height and uid. */
+
+/* 0x0044A380, ADDR_WALK_CELL_CALLBACK -- the FILTER WalkCellWrapper hands
+ * WalkCellAtPoint. Its answer decides whether an object joins the chain.
+ *
+ * `neg eax; sbb eax, eax; inc eax` is the compiler's `== 0`, so the filter
+ * keeps exactly the objects our army is NOT allied with: enemies. Written as
+ * the negation rather than transcribed as three instructions. */
+int32_t __cdecl WalkCellKeepEnemy(void *obj)
+{
+    return ArmyAlliedWithObj((int32_t)g_defaultOwner, obj, 0) == 0;
+}
+
 void *__cdecl WalkCellWrapper(void *unused, uint32_t at)
 {
     (void)unused;
 
-    /* The callback is still the original's, so it goes in by address -- and
-     * as a typed function pointer rather than a void *, now that
-     * WalkCellAtPoint's third parameter says what it is. That parameter used
-     * to be untyped because the macro declared the whole function `void`. */
+    /* The callback is ours now, so it goes in by NAME. It used to be handed
+     * over by address, as a typed function pointer rather than a void *. */
     return WalkCellAtPoint(&at, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
-                    (int32_t (__cdecl *)(void *))(uintptr_t)
-                        ADDR_WALK_CELL_CALLBACK);
+                           WalkCellKeepEnemy);
 }
 
 /* 0x0042F140. Undo what HostBattle set up: reset the pair mask, put 1000 in
@@ -2823,6 +2832,8 @@ void gameproc_install(void)
                   "SelListConstruct", 1);
     patch_replace(ADDR_LOAD_TYPE4, (const void *)LoadType4,
                   "LoadType4", 3);
+    patch_replace(ADDR_WALK_CELL_CALLBACK, (const void *)WalkCellKeepEnemy,
+                  "WalkCellKeepEnemy", 1);
 }
 
 /* CreateWeapon is still the image's and item.h already reaches it -- with a

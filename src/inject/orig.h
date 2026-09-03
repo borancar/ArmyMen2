@@ -6802,6 +6802,11 @@ typedef struct {
                                                * typed name has no dot at all,
                                                * so "quick.bak" is left as
                                                * typed. */
+/* 0x0040FB90. Writes that "." into the caller's buffer and answers 1. Its one
+ * reference is a slot in the record at 0x0047588C, which also holds the string
+ * "FOO" -- and nothing references that record's base, so its consumer is not
+ * identified and the name describes the body only. */
+#define ADDR_WRITE_DOT_STRING    0x0040FB90u  /* int32_t(char *dst) */
 /* 0x00464D40, 19 callers, in the CRT band: two arguments, a byte-wise
  * substring scan with the empty-needle and single-character cases spelled
  * out. It is strstr, identified from its own body the way crt.py identifies
@@ -13137,6 +13142,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * along, with a comment that already said what the function does. Grep the
  * ADDRESS first; the ratchet is the mechanism, not the backstop. */
 #define ADDR_MEDKIT_HEAL_ONE     0x00458AB0u  /* void(void *obj) */
+/* The `doctor doctor` cheat's per-object callback, the same shape one line up:
+ * handed to ForEachArmyObject rather than called, so it is RECONSTRUCTED
+ * WITHOUT BEING PATCHED -- cheat.cpp has had it as CheatHealOne for some time
+ * and our CheatLine passes it by name, so a detour on this address could never
+ * be reached. Listed in coverage.py's REGISTERED for that reason. */
+#define ADDR_CHEAT_HEAL_ONE      0x00417A90u  /* void(void *obj) */
 /* Modes 4 and 5's PICK slots. Named for their table index rather than for a
  * purpose: what they do is clear (below) but which order the mode represents is
  * not, and the index is the part that is measured. */

@@ -27,6 +27,9 @@ extern "C" {
  * current movie, then commit the pending state. */
 void __cdecl StateLeaveCommon(void);
 
+/* 0x004263E0. State 1 leaving: gate, sprites, screen, audio, then commit. */
+void __cdecl State1Leave(void);
+
 #endif
 
 /* 0x00426840, 0x004267C0, 0x00426800. The pause mask and the two functions
