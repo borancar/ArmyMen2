@@ -54,7 +54,10 @@ code or a gap in the model, and saying which costs one look at the site.
 import collections
 import os
 import re
+import struct
 import subprocess
+
+import am2
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -82,6 +85,40 @@ def decode(addr, extra=()):
             ins.append((int(m.group(1), 16), m.group(2),
                         re.sub(r";.*", "", m.group(3)).strip()))
     return ins
+
+
+def table_targets(ops, at):
+    """Successors of `jmp dword ptr [reg*4 + 0xTABLE]`.
+
+    Reads consecutive dwords from TABLE and stops at the first that is not an
+    address inside this function -- the table's own end is not marked, and
+    what follows it is padding or code. Conservative on purpose: an entry
+    that is not in `at` ends the read rather than being skipped, so a bad
+    decode cannot invent successors."""
+    m = re.search(r"\[[a-z]{3}\*4 \+ (0x[0-9a-f]+)\]", ops)
+    if not m:
+        return []
+    img = _image()
+    base = int(m.group(1), 16)
+    out = []
+    for k in range(256):
+        raw = img.read(base + k * 4, 4)
+        if len(raw) < 4:
+            break
+        t = struct.unpack("<I", raw)[0]
+        if t not in at:
+            break
+        out.append(t)
+    return out
+
+
+_IMG = []
+
+
+def _image():
+    if not _IMG:
+        _IMG.append(am2.Image())
+    return _IMG[0]
 
 
 _RET_N = {}
@@ -165,10 +202,20 @@ def main():
             if mn == "call" and re.match(r"^0x[0-9a-f]+$", ops):
                 d += callee_pops(int(ops, 16))
             nxt = cur + d
-            tgt = None
+            tgts = []
             if mn[0] == "j" and re.match(r"^0x[0-9a-f]+$", ops):
-                tgt = int(ops, 16)
-            if tgt is not None and tgt in at:
+                tgts = [int(ops, 16)]
+            elif mn == "jmp":
+                # A SWITCH. `jmp dword ptr [reg*4 + 0xTABLE]` ends the walk
+                # dead unless the table is read, and everything the switch
+                # dispatches to is then "unreached" -- which is how this tool
+                # came back with no slots at all for EvtCondition and for
+                # DefTrooperLine, both of which open with one. Read the table
+                # and treat every entry inside the function as a successor.
+                tgts = table_targets(ops, at)
+            for tgt in tgts:
+                if tgt not in at:
+                    continue
                 if tgt in esp and esp[tgt] != nxt:
                     bad.setdefault(tgt, []).append((ad, nxt, esp[tgt],
                                                     src.get(tgt)))
@@ -199,11 +246,14 @@ def main():
     use = collections.defaultdict(list)
     unknown = 0
     for ad, mn, ops in ins:
-        for g in re.finditer(r"\[esp \+ (0x[0-9a-f]+)\]", ops):
+        # capstone prints small displacements in DECIMAL -- `[esp + 4]`, not
+        # `[esp + 0x4]` -- so a hex-only pattern silently drops the first few
+        # slots of every frame, which for a cdecl function is argument one.
+        for g in re.finditer(r"\[esp \+ (0x[0-9a-f]+|\d+)\]", ops):
             if ad not in esp:
                 unknown += 1
                 continue
-            use[esp[ad] + int(g.group(1), 16) - base].append((ad, mn))
+            use[esp[ad] + int(g.group(1), 0) - base].append((ad, mn))
 
     print("%s: %d instructions, frame origin at esp%+d" %
           (sys.argv[1], len(ins), -base))
