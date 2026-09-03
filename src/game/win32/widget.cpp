@@ -4287,6 +4287,109 @@ void __attribute__((thiscall)) HudCmdInvoke(AM2_Widget *w, int32_t mode)
     }
 }
 
+/* DlgBattleJoinConstruct -- original 0x0042F4C0, 944 bytes, thiscall
+ * `ret 4`. CHOOSE A BATTLE: the session browser reached from JOIN A WAR.
+ *
+ * IT IS TWO LEVELS DEEP AND THAT IS THE WHOLE STRUCTURE. The dialog gets ONE
+ * child, a panel, and the other five -- the session list, the player-name
+ * edit, OK, Cancel and the green icon -- are children of the PANEL. A read
+ * that only counts the WidgetAddChild calls sees six children and gets the
+ * tree wrong; the parent is in the `mov ecx` before each call and it is ebp
+ * once and esi five times.
+ *
+ * `this` IS EBP HERE, not esi. esi holds the panel from the moment it is
+ * built, so `mov [esi+0x44], 1` sets the PANEL's flag and not the dialog's,
+ * and the dialog's focused child is the panel. Both are easy to attribute to
+ * the wrong object, and both were, until the prologue's `mov ebp, ecx` was
+ * read rather than assumed.
+ *
+ * It null-dereferences the panel on a failed allocation -- `[esi+0x44]` with
+ * esi zeroed -- which is the same OOM shape HudPanelConstruct has.
+ *
+ * The player name is copied out of ADDR_SAVED_PLAYER_NAME into the dialog's
+ * own buffer at +0x64, and the edit is pointed at THAT buffer rather than at
+ * the global, so typing here does not disturb the saved name until OK.
+ *
+ * The list's rows come from ADDR_SESSION_OBJECT, which is what makes this the
+ * session browser rather than a map list. It is given focus through vtable
+ * slot 3 right after being added. */
+AM2_Widget *__attribute__((thiscall)) DlgBattleJoinConstruct(AM2_Widget *w,
+                                                             const char *bmp)
+{
+    uint8_t    *self = (uint8_t *)w;
+    AM2_Widget *panel;
+    AM2_Widget *kid;
+    AM2_Rect    box;
+
+    ScreenBaseConstruct(w, bmp, 1);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_BATTLE_JOIN);
+    SetGameDir((const char *)(uintptr_t)ADDR_DIR_SCRATCH);
+    strcpy((char *)(self + BATTLEJOIN_OFF_NAME),
+           (const char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME);
+
+    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_BYTES);
+    if (panel) {
+        RectSet(&box, 0x6C, 0x54, 0x1A7, 0x138);
+        panel = PanelConstruct(panel, "02_003_00_join.bmp", 0, box);
+    }
+    WidgetAddChild(w, panel);
+    w->focusedChild = panel;
+    panel->flag44 = 1;            /* faults on a failed alloc -- original's */
+
+    kid = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_BYTES);
+    if (kid) {
+        RectSet(&box, 0x26, 0x42, 0xCE, 0x6E);
+        kid = ListBoxConstruct(kid, box.left, box.top, box.right, box.bottom,
+                               *(void **)(uintptr_t)ADDR_SESSION_OBJECT,
+                               (int32_t)AM2_IMAGE(ADDR_BATTLE_JOIN_SELECT),
+                               (int32_t)AM2_IMAGE(ADDR_BATTLE_JOIN_DRAW), 0);
+    }
+    WidgetAddChild(panel, kid);
+    ((AM2_WidgetFocusFn *)kid->vtable)[WIDGET_VSLOT_FOCUS](kid, 0);
+
+    kid = (AM2_Widget *)orig_operator_new(AM2_HUD_EDIT_BYTES);
+    if (kid)
+        kid = EditConstruct(kid, (char *)(self + BATTLEJOIN_OFF_NAME), 0x18,
+                            0x26, 0xFF, 0xF3, 0x0E, 1,
+                            *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
+                            *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
+                            *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
+                            (void (__cdecl *)(AM2_Widget *))
+                                AM2_IMAGE(ADDR_BATTLE_JOIN_OK), 0, 0);
+    WidgetAddChild(panel, kid);
+
+    kid = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    if (kid) {
+        RectSet(&box, 0x14C, 0x37, 0x4E, 0x20);
+        kid = ButtonConstruct(kid, "03_007_00_ok.bmp", "03_007_01_ok.bmp",
+                              "03_007_02_ok.bmp", 1, box,
+                              (void (__cdecl *)(AM2_Widget *))
+                                  AM2_IMAGE(ADDR_BATTLE_JOIN_OK),
+                              (void (__cdecl *)(AM2_Widget *))0);
+    }
+    WidgetAddChild(panel, kid);
+
+    kid = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    if (kid) {
+        RectSet(&box, 0x14C, 0x69, 0x4E, 0x20);
+        kid = ButtonConstruct(kid, "03_018_00_cancel.bmp",
+                              "03_018_01_cancel.bmp", "03_018_02_cancel.bmp",
+                              1, box,
+                              OnMenuBack,
+                              (void (__cdecl *)(AM2_Widget *))0);
+    }
+    WidgetAddChild(panel, kid);
+
+    kid = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_BYTES);
+    if (kid) {
+        RectSet(&box, 0xA6, 0xE2, 0x11, 0x10);
+        kid = MultiSpriteConstruct(kid, "03_028_00_green.bmp",
+                                   "03_028_01_green.bmp", 1, box);
+    }
+    WidgetAddChild(panel, kid);
+    return w;
+}
+
 /* The in-mission game menu's six buttons, in the order the constructor adds
  * them: a 0x98x0x19 button every 0x28 pixels down a single column. Generated
  * as a table because six near-identical arms are what the DirtyCollect rule
@@ -5192,7 +5295,7 @@ void __cdecl OpenBattleJoin(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_BATTLE_JOIN_SIZE,
-               (AM2_ScreenCtorFn)AM2_IMAGE(ADDR_BATTLE_JOIN_CTOR),
+               (AM2_ScreenCtorFn)DlgBattleJoinConstruct,
                (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
 }
 
@@ -11987,6 +12090,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_BATTLE_JOIN_CTOR,
+                        (const void *)DlgBattleJoinConstruct,
+                        "DlgBattleJoinConstruct", 1);
     rc |= patch_replace(ADDR_GAMEMENU_CTOR,
                         (const void *)DlgGameMenuConstruct,
                         "DlgGameMenuConstruct", 1);

@@ -6679,6 +6679,14 @@ typedef struct {
 #define AM2_BATTLE_NAME_SIZE     0xA4u
 #define ADDR_OPEN_BATTLE_JOIN    0x0042F880u  /* void(void) */
 #define ADDR_BATTLE_JOIN_CTOR    0x0042F4C0u  /* thiscall obj *(obj, bmp) */
+#define AM2_PANEL_BYTES          0x60u
+#define AM2_LISTBOX_BYTES        0x98u
+#define BATTLEJOIN_OFF_NAME      0x64u  /* char[0x18], the edit's buffer --
+                                         * copied from ADDR_SAVED_PLAYER_NAME
+                                         * so typing does not disturb it */
+#define ADDR_BATTLE_JOIN_SELECT  0x0042F910u /* the list's pick callback */
+#define ADDR_BATTLE_JOIN_DRAW    0x0042F970u /* and its row painter */
+#define ADDR_BATTLE_JOIN_OK      0x0042F9D0u /* OK, and the edit's onEnter */
 #define AM2_BATTLE_JOIN_SIZE     0x88u
 #define VTABLE_BATTLE_JOIN       0x0046F9F8u
 #define ADDR_BATTLE_JOIN_DELETE  0x0042F850u /* thiscall obj *(obj, flags) */

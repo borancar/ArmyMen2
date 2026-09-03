@@ -685,6 +685,11 @@ AM2_Widget *__attribute__((thiscall)) DlgGameMenuConstruct(AM2_Widget *w,
                                                            const char *bmp,
                                                            int32_t flag);
 
+/* 0x0042F4C0, thiscall. CHOOSE A BATTLE. Its tree is TWO levels: one panel
+ * child, and the list, edit, two buttons and icon hang off THAT. */
+AM2_Widget *__attribute__((thiscall)) DlgBattleJoinConstruct(AM2_Widget *w,
+                                                             const char *bmp);
+
 AM2_DECLARE_CLASS_DTOR(DlgMessage);
 AM2_DECLARE_CLASS_DTOR(DlgGameMenu);
 
