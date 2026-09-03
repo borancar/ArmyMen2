@@ -154,6 +154,34 @@ def remaining():
     return funcs, rem, init, tables, thunks
 
 
+def coverage_gaps():
+    """Bytes below the CRT frontier that no functions.tsv entry covers.
+
+    A function in a gap is invisible to every count here, because the whole
+    method starts from that file's entries and splits WITHIN them.  This is
+    the third blind spot the counts have had -- the first two were range
+    assumptions -- and unlike those it can be ruled out rather than fixed:
+    if the entries tile, there is nowhere for a function to hide.
+
+    The trig tables' rule, applied to the function list: if a layout does not
+    tile, one of the bases is wrong.
+    """
+    rows = []
+    with open(os.path.join(REPO, "docs", "functions.tsv")) as fh:
+        for row in csv.DictReader(fh, delimiter="\t"):
+            rows.append((int(row["addr"], 16), int(row["size"])))
+    rows.sort()
+
+    gaps, prev = [], rows[0][0]
+    for addr, size in rows:
+        if addr >= CRT_REAL:
+            break
+        if addr > prev:
+            gaps.append((prev, addr - prev))
+        prev = max(prev, addr + size)
+    return gaps
+
+
 def main():
     funcs, rem, init, tables, thunks = remaining()
     off  = [(a, s) for a, s in rem if a in OFF_LIMITS]
@@ -178,7 +206,18 @@ def main():
           % (len(tab), sum(s for _, s in tab)))
     print("  game functions                 : %d functions, %d bytes"
           % (len(game), sum(s for _, s in game)))
-    if not game and not ini:
+    gaps = coverage_gaps()
+    if gaps:
+        print("\n  %d GAP(S) no entry covers, %d bytes -- a function could hide\n"
+              "  in one and this count would not see it:" 
+              % (len(gaps), sum(g for _, g in gaps)))
+        for a, g in sorted(gaps, key=lambda x: -x[1])[:8]:
+            print("    0x%08X %5d B" % (a, g))
+    else:
+        print("\nThe entries tile .text with no gaps, so nothing can hide\n"
+              "between them -- the counts above are over every byte.")
+
+    if not game and not ini and not gaps:
         print("\nNothing left to transpose: what remains is build artifacts\n"
               "(linker thunks), data (jump tables), and the harness/IAT\n"
               "entries above, none of which is a function the original\n"

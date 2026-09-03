@@ -9,7 +9,7 @@ Last updated: **2026-09-03**, at `1bc33e8`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,637 patches plus 6 REGISTERED**, **30** analysis
+Nothing uncommitted. **1,641 patches plus 6 REGISTERED**, **30** analysis
 tools in `make check` (`tools/checkpatches.py`; `make check` for the tools).
 
 ## ONE FUNCTION LEFT
@@ -312,7 +312,27 @@ honest one on this screen. CLAUDE.md already says to read a liveness counter
 beside the one you care about; it does not help if the liveness counter is
 itself blind, so check blindspots.py for the one you pick.
 
-## CORRECTED: it was not complete, and the tool was measuring wrong
+## COMPLETE, with the three blind spots each ruled out by measurement
+
+tools/remaining.py reads **0 game functions and 0 C++ static initializers**
+over every byte from 0x00401000 to the real CRT frontier at 0x00464420.
+
+The number is only worth as much as the method, and the method was wrong
+twice before it was right.  All three ways it could have been wrong are now
+either fixed or ruled out:
+
+| blind spot | how it was found | state |
+|---|---|---|
+| range: merged entries not split above the nominal CRT_START | six functions hidden, found by splitting the band by hand | fixed -- remaining.py splits the whole range |
+| range: the jump-table and thunk classifiers testing against the nominal line | a 45-entry table counted as a 180-byte function | fixed -- both test against CRT_REAL |
+| gaps: a function living where no entry covers | ruled out -- the entries tile .text from 0x00401000 to 0x00464420 with ZERO gap bytes | checked on every run |
+
+The tiling check is the one that can be ruled out rather than fixed, and it
+is the trig tables' rule applied to the function list: if a layout does not
+tile, one of the bases is wrong.  remaining.py prints it every run, so the
+claim stays verified rather than remembered.
+
+## What is left, and why none of it is work
 
 The section below claimed 0 game functions.  That was an artifact of HOW the
 range was widened, not a fact about the work: `merges.real_functions()` stops
