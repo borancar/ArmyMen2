@@ -245,4 +245,12 @@ int32_t __cdecl SelListInit(void);
  * CreateWeapon calls and then marks the object. */
 void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber);
 
+
+/* 0x00424780. Parse one GAME line of an .aai file into the game constants.
+ * Named by its own error string, "DefGameParse: Bad Game Constant Type" --
+ * one of the nine real names the strings gave up. Declared here because the
+ * standalone build takes its ADDRESS: the original stored a pointer to it in
+ * its own data, and that pointer has to be ours. */
+int32_t __cdecl DefGameParse(int32_t cmd, char *line);
+
 #endif /* AM2_GAMEPROC_H */

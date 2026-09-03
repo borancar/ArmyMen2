@@ -18230,6 +18230,7 @@ typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
  * The injected build includes none of this and is untouched. */
 #ifdef AM2_STANDALONE
 #include "origaddr.h"   /* build/standalone, via -I */
+#include "standalone.h"
 #endif
 
 #endif /* AM2_ORIG_H */
