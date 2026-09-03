@@ -10630,7 +10630,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  *   3,5,16  sound, effect, missile
  *   1,4     sound, ftol + ApproxDist, missile    (ranged, distance-scaled)
  *   2       sound, missile
- *   7       sound, effect, and NO missile
+ *   7       sound, effect, then JUMPS INTO ARM 0 -- see below
  *   8,9     the two watched-item droppers        (MINE, FLAG)
  *   10      Cos8/Sin8 to a point, ObjectsAtPoint, CreateExplosion
  *   11      SpeakLine, HealObject, twice         (MEDI)
@@ -10645,7 +10645,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Those parenthesised names are the ITEM CAPTIONS at 0x00419A30, which
  * CLAUDE.md records; the heal arm being MEDI and the three air-support arms
  * being AIRS/PARA/RECO is a cross-check on the whole table rather than a
- * guess about any one of them. */
+ * guess about any one of them.
+ *
+ * TWO ARMS END INSIDE OTHER ARMS, which the jump table cannot show and a scan
+ * of each arm's own calls gets WRONG. Following every branch out of every arm
+ * finds exactly two:
+ *
+ *   arm  7 at 0x0045F6A5 jumps to 0x0045F578, inside ARM 0 -- so it shares
+ *          arm 0's AddByteSat and CreateMissile tail with 0x10 where arm 0
+ *          passes 0x20, and its sound is 8 where arm 0's is 7. The line above
+ *          said arm 7 fires no missile; it was written from a call scan that
+ *          stopped at the arm boundary, and it was wrong.
+ *   arm 11 at 0x0045FD56 and 0x0045FD60 jumps to 0x0045FBB7, inside ARM 17.
+ *
+ * The eleven other cross-arm branches all target 0x0045F5B2, which is the
+ * DEFAULT arm and is nothing but `return 0` -- early exits, not shared
+ * bodies. Distinguishing those two cases is the whole reason to follow the
+ * branches rather than count them. */
 #define ADDR_FIRE_WEAPON_INDEX   0x004600B0u  /* uint8_t[43], kind - 1 */
 #define ADDR_FIRE_WEAPON_ARMS    0x00460050u  /* void *[24] */
 /* The four ways a script asks for a shot: an explicit weapon or the unit's
