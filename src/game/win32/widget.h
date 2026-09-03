@@ -696,6 +696,14 @@ AM2_Widget *__attribute__((thiscall)) DlgSaveListConstruct(AM2_Widget *w,
                                                            const char *bmp,
                                                            int32_t flag);
 
+/* 0x00456300, thiscall. The SPIN control: two arrows and a numeric edit,
+ * all laid out from the widget's own rect. */
+AM2_Widget *__attribute__((thiscall)) MpSpinConstruct(
+    AM2_Widget *w, int32_t left, int32_t top, int32_t width, int32_t height,
+    int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent,
+    void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2,
+    int32_t row);
+
 AM2_DECLARE_CLASS_DTOR(DlgMessage);
 AM2_DECLARE_CLASS_DTOR(DlgGameMenu);
 

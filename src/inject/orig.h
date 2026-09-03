@@ -6293,6 +6293,16 @@ typedef struct {
  * -- which identifies the base class and nothing else. Treat the name as a
  * role until something reads the field it commits. */
 #define VTABLE_MP_SPIN           0x0046FD10u
+/* The spin's own fields, all written by its constructor. The three children
+ * are laid out from the widget's rect after WidgetScreenRect, not from the
+ * constructor's arguments. */
+#define MPSPIN_OFF_LO            0x64u  /* int32, the low bound */
+#define MPSPIN_OFF_HI            0x68u
+#define MPSPIN_OFF_STEP          0x6Cu
+#define MPSPIN_OFF_ROW           0x70u  /* int32, which row it edits */
+#define MPSPIN_OFF_TEXT          0x74u  /* char[], the value as "%d" */
+#define MPSPIN_OFF_PARENT        0x80u  /* AM2_Widget * */
+#define AM2_ARROW_BYTES          0x7Cu
 #define ADDR_MP_SPIN_CTOR        0x00456300u  /* thiscall, min/max/step */
 #define VTABLE_MULTISPRITE       0x0046FD38u
 #define VTABLE_LISTBOX           0x0046FCC0u

@@ -12261,6 +12261,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_MP_SPIN_CTOR, (const void *)MpSpinConstruct,
+                        "MpSpinConstruct", 2);
     rc |= patch_replace(ADDR_SAVE_LIST_CTOR,
                         (const void *)DlgSaveListConstruct,
                         "DlgSaveListConstruct", 1);
@@ -13027,12 +13029,92 @@ int widget_install(void)
 /* The spin control's class is NOT reconstructed -- 0x00456300 is still the
  * image's -- so it is the one seam this function needs.  Everything else it
  * calls is ours. */
-typedef AM2_Widget *(__attribute__((thiscall)) *am2_mp_spin_fn)(
+/* MpSpinConstruct -- original 0x00456300, 1008 bytes, thiscall `ret 0x38`.
+ * The SPIN control: an up arrow, a down arrow, and a numeric edit between
+ * them. Fourteen stack arguments, which is why it kept its typedef for so
+ * long -- and that typedef, written for the seam, turned out to name every
+ * one of them correctly.
+ *
+ * THE THREE CHILDREN ARE LAID OUT FROM THE WIDGET'S OWN RECT, not from the
+ * arguments. WidgetScreenRect runs first, and the arrows are placed at
+ * `x + width - 0x13` while the edit takes `x`, `y + 5`, `width - 0x29` and
+ * `height - 0x0A`. So the caller gives an outer box and the parts are
+ * derived; nothing here is a constant except the arrows' 0x13 by 9.
+ *
+ * BOTH ARROWS ARE BUTTONS RETAGGED TO VTABLE_ARROW after construction, and
+ * each takes a BACK-POINTER to the spin at +0x78. ButtonConstruct is given a
+ * NULL first sprite -- b0 is 0 and only the pressed and hover faces are
+ * named -- which is what makes an arrow draw nothing in its rest state.
+ *
+ * The edit's buffer is the spin's own +0x74, seeded with the value through
+ * "%d", and its commit handler goes in the `a` slot rather than onEnter,
+ * with the spin itself in `b`. That is the reverse of how the battle-join
+ * edit is wired and is not a transcription slip: the pushes are in that
+ * order and the counts agree either way. */
+AM2_Widget *__attribute__((thiscall)) MpSpinConstruct(
     AM2_Widget *w, int32_t left, int32_t top, int32_t width, int32_t height,
     int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent,
     void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2,
-    int32_t row);
-#define orig_mp_spin ((am2_mp_spin_fn)(uintptr_t)ADDR_MP_SPIN_CTOR)
+    int32_t row)
+{
+    uint8_t    *self = (uint8_t *)w;
+    AM2_Widget *kid;
+    AM2_Rect    box;
+    int32_t     inner;
+
+    WidgetConstruct(w);
+    *(void **)(self + MPSPIN_OFF_PARENT) = parent;
+    w->x = left;
+    w->y = top;
+    w->w = width;
+    w->h = height;
+    w->vtable = (void *)AM2_IMAGE(VTABLE_MP_SPIN);
+    WidgetScreenRect(w);
+
+    *(int32_t *)(self + MPSPIN_OFF_LO)   = lo;
+    *(int32_t *)(self + MPSPIN_OFF_HI)   = hi;
+    *(int32_t *)(self + MPSPIN_OFF_STEP) = step;
+    *(int32_t *)(self + MPSPIN_OFF_ROW)  = row;
+
+    inner = width - 0x29;
+
+    kid = (AM2_Widget *)orig_operator_new(AM2_ARROW_BYTES);
+    if (kid) {
+        RectSet(&box, w->x + inner + 0x16, w->y, 0x13, 9);
+        kid = ButtonConstruct(kid, (const char *)0, "03_008_01_uparrow.bmp",
+                              "03_008_02_uparrow.bmp", 1, box,
+                              SpinUp,
+                              (void (__cdecl *)(AM2_Widget *))0);
+        kid->vtable = (void *)AM2_IMAGE(VTABLE_ARROW);
+        *(void **)((uint8_t *)kid + ARROW_OFF_OWNER) = w;
+    }
+    WidgetAddChild(w, kid);
+
+    kid = (AM2_Widget *)orig_operator_new(AM2_ARROW_BYTES);
+    if (kid) {
+        RectSet(&box, w->x + inner + 0x16, w->y + 9, 0x13, 9);
+        kid = ButtonConstruct(kid, (const char *)0, "03_009_01_dnarrow.bmp",
+                              "03_009_02_dnarrow.bmp", 1, box,
+                              SpinDown,
+                              (void (__cdecl *)(AM2_Widget *))0);
+        kid->vtable = (void *)AM2_IMAGE(VTABLE_ARROW);
+        *(void **)((uint8_t *)kid + ARROW_OFF_OWNER) = w;
+    }
+    WidgetAddChild(w, kid);
+
+    am2_sprintf((char *)(self + MPSPIN_OFF_TEXT),
+                (const char *)AM2_IMAGE(ADDR_FMT_INT), value);
+
+    kid = (AM2_Widget *)orig_operator_new(AM2_HUD_EDIT_BYTES);
+    if (kid)
+        kid = EditConstruct(kid, (char *)(self + MPSPIN_OFF_TEXT), 5,
+                            w->x, w->y + 5, inner, height - 0x0A, 1,
+                            c0, c1, c2, (void (__cdecl *)(AM2_Widget *))0,
+                            (int32_t)(uintptr_t)commit, (int32_t)(uintptr_t)w);
+    WidgetAddChild(w, kid);
+    return w;
+}
+
 
 /* 0x00430530. The multiplayer host/join panel's constructor.
  *
@@ -13243,7 +13325,7 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
         AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x84);
 
         if (child)
-            orig_mp_spin(child, 0x22B, 0x2F, 0x4A, 0x18,
+            MpSpinConstruct(child, 0x22B, 0x2F, 0x4A, 0x18,
                             *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT,
                             0x64, 0x2706, 0x64, w,
                             MpCommitScore,
