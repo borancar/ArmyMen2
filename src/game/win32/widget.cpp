@@ -313,9 +313,9 @@ void __attribute__((thiscall)) KeyRowUpdate(AM2_Widget *w)
     WidgetScreenRect(w);
 
     if (w->parent && orig_mouse_moved && !w->disabled) {
-        w->unknown40 = PointInRect((const AM2_Rect *)&w->rect,
+        w->hovered = PointInRect((const AM2_Rect *)&w->rect,
                                    (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
-        if (w->unknown40)
+        if (w->hovered)
             ((AM2_WidgetFocusFn *)w->vtable)[WIDGET_VSLOT_FOCUS](w, 1);
     }
 
@@ -480,6 +480,289 @@ AM2_Widget *__attribute__((thiscall)) ListDelete(AM2_Widget *w, int32_t flags)
     return w;
 }
 
+static int32_t ThumbShift(int32_t pos, int32_t range, int32_t travel);
+
+/* Repaint ONE row rather than the list. The rectangle is the widget's full
+ * width and the row's own band, `top + (row - firstRow) * 14 + 4`, height 14
+ * -- the same two constants the hover arithmetic divides by, arrived at from
+ * the other direction, which is what makes the row geometry certain. */
+static void ListRepaintRow(AM2_Widget *w, int32_t row)
+{
+    uint8_t *self = (uint8_t *)w;
+    RECT band;
+
+    band.left  = w->rect.left;
+    band.right = w->rect.right;
+    band.top   = w->rect.top
+                 + (row - *(const int32_t *)(self + LIST_OFF_TOP_ROW))
+                   * LIST_ROW_HEIGHT + LIST_ROW_TOP_MARGIN;
+    band.bottom = band.top + LIST_ROW_HEIGHT;
+
+    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, band);
+}
+
+/* A row whose text opens with '^' is REFUSED -- a separator or a heading. */
+static int32_t ListRowIsDead(const AM2_ListRows *rows, int32_t row)
+{
+    return rows->text[(size_t)row * LIST_ROW_STRIDE] == LIST_ROW_DEAD;
+}
+
+/* ListUpdate -- original 0x00455340, 1,200 bytes, thiscall, TWO exits.
+ *
+ * ONE FUNCTION SERVING TWO CLASSES. It is slot 2 of two separate menu
+ * vtables -- the plain list box at 0x0046FCC8 and the text list at
+ * 0x0046FA8C -- which is why nothing in .text refers to it and why both
+ * LIST_OFF_ and TEXTLIST_ names describe the same fields.
+ *
+ * IT SETTLED WHAT 0x0058 AND 0x005C ARE, and the answer was not the obvious
+ * one. 0x0058 is the MOVING HIGHLIGHT, written from the cursor's y on every
+ * hover and stepped by UP and DOWN; 0x005C is written ONLY when a click is
+ * released or SPACE or RETURN is pressed, copying 0x0058, so it is the row
+ * the user CHOSE and is what SELECT DIFFICULTY reads back. The header's
+ * comment called 0x005C "the row under the pointer", which is exactly what
+ * 0x0058 is, and orig.h had a second name on 0x005C under another prefix --
+ * the cross-prefix duplicate checkoffsets.py cannot see. Both fixed.
+ *
+ * THE ROW GEOMETRY IS CONFIRMED TWICE. The hover divides by 14 through
+ * MSVC's magic-number sequence (0x92492493 with the add and a shift of 3,
+ * which is a signed divide by 14, checked numerically rather than eyeballed),
+ * and the partial repaint at the tail multiplies by 14 with the same +4
+ * margin. Two directions, one geometry.
+ *
+ * ITS TAIL IS AN OPTIMISATION AND THE SECOND EXIT. If the scroll origin
+ * moved, everything is repainted and the arrow bar's thumb is recomputed
+ * through the same ThumbShift the bar's own movers use. If it did not, only
+ * the row that lost the highlight and the row that gained it are repainted --
+ * so an ordinary mouse move over a list costs two 14-pixel bands, not a list.
+ *
+ * A ROW OPENING WITH '^' CANNOT BE PICKED. Clicking or entering one plays
+ * sound 3 and leaves the choice alone, which is how a separator or a heading
+ * is spelled in a list whose rows are otherwise plain text.
+ */
+void __attribute__((thiscall)) ListUpdate(AM2_Widget *w)
+{
+    uint8_t            *self = (uint8_t *)w;
+    const AM2_ListRows *rows;
+    void (__cdecl      *tick)(AM2_Widget *);
+    int32_t             wasTop, wasSel, wasChosen;
+
+    wasTop = *(const int32_t *)(self + LIST_OFF_TOP_ROW);
+
+    WidgetScreenRect(w);
+
+    /* A list with no row array RETURNS -- it does not fall through to the
+     * repaint tail. The `je` lands on the epilogue, which is the second of
+     * this function's two exits. */
+    rows = *(const AM2_ListRows *const *)(self + LIST_OFF_ROWS);
+    if (!rows)
+        return;
+
+    tick = *(void (__cdecl *const *)(AM2_Widget *))(self + LIST_OFF_ON_TICK);
+    if (tick)
+        tick(w);
+
+    wasChosen = *(const int32_t *)(self + LIST_OFF_CHOSEN);
+    wasSel    = *(const int32_t *)(self + LIST_OFF_SELECTED);
+
+    /* ---- the mouse ---------------------------------------------------- */
+    if (w->parent
+        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_MOVED
+        && !w->disabled) {
+
+        /* 0x0040 IS THE HOVER FLAG. The base constructor never writes it --
+         * CLAUDE.md records it as `unknown40` and as the one field the widget
+         * dump deliberately omits for that reason -- because the update
+         * computes it before anything reads it. This is that write. */
+        w->hovered = PointInRect((const AM2_Rect *)&w->rect,
+                           (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
+
+        if (w->hovered) {
+            int32_t row;
+
+            if (!w->flag44)
+                ((AM2_WidgetFocusFn *)w->vtable)[WIDGET_VSLOT_FOCUS](w, 1);
+
+            row = (*(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2)
+                   - w->rect.top - LIST_ROW_TOP_MARGIN) / LIST_ROW_HEIGHT
+                  + *(const int32_t *)(self + LIST_OFF_TOP_ROW);
+
+            *(int32_t *)(self + LIST_OFF_SELECTED) = row;
+            if (row >= rows->count)
+                *(int32_t *)(self + LIST_OFF_SELECTED) = rows->count - 1;
+
+            if (wasSel != *(const int32_t *)(self + LIST_OFF_SELECTED)) {
+                AM2_Widget *blink =
+                    *(AM2_Widget *const *)(self + LIST_OFF_BLINKER);
+                if (blink)
+                    BlinkerStart(blink, TYPER_BLINK_MS, 1);
+            }
+
+            if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED) {
+                int32_t sel;
+
+                ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+
+                sel = *(const int32_t *)(self + LIST_OFF_SELECTED);
+                if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON && sel >= 0) {
+                    if (ListRowIsDead(rows, sel)) {
+                        PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
+                    } else {
+                        AM2_Widget *blink =
+                            *(AM2_Widget *const *)(self + LIST_OFF_BLINKER);
+                        void (__cdecl *pick)(AM2_Widget *,
+                                             const AM2_ListRows *, int32_t);
+
+                        *(int32_t *)(self + LIST_OFF_CHOSEN) = sel;
+                        if (blink)
+                            BlinkerStart(blink, TYPER_BLINK_MS, 3);
+
+                        pick = *(void (__cdecl *const *)(
+                                   AM2_Widget *, const AM2_ListRows *,
+                                   int32_t))(self + LIST_OFF_CALLBACK);
+                        if (pick)
+                            pick(w,
+                                 *(const AM2_ListRows *const *)
+                                     (self + LIST_OFF_ROWS),
+                                 *(const int32_t *)(self + LIST_OFF_SELECTED));
+                    }
+                }
+            }
+        }
+    }
+
+    /* ---- the keyboard, only with the focus ----------------------------- */
+    if (w->flag44) {
+        AM2_Widget *blink = *(AM2_Widget *const *)(self + LIST_OFF_BLINKER);
+
+        if (KeyPressed(AM2_DIK_UP)) {
+            int32_t sel = *(const int32_t *)(self + LIST_OFF_SELECTED);
+
+            if (sel > 0) {
+                sel--;
+                *(int32_t *)(self + LIST_OFF_SELECTED) = sel;
+                if (sel < *(const int32_t *)(self + LIST_OFF_TOP_ROW))
+                    *(int32_t *)(self + LIST_OFF_TOP_ROW) = sel;
+                if (blink)
+                    BlinkerStart(blink, TYPER_BLINK_MS, 1);
+            } else {
+                PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
+            }
+            ConsumeKey(AM2_DIK_UP);
+
+        } else if (KeyPressed(AM2_DIK_DOWN)) {
+            int32_t sel = *(const int32_t *)(self + LIST_OFF_SELECTED);
+
+            if (sel < rows->count - 1) {
+                int32_t visible = *(const int32_t *)(self + LIST_OFF_VISIBLE);
+                int32_t top     = *(const int32_t *)(self + LIST_OFF_TOP_ROW);
+
+                sel++;
+                *(int32_t *)(self + LIST_OFF_SELECTED) = sel;
+                if (sel >= top + visible)
+                    *(int32_t *)(self + LIST_OFF_TOP_ROW) = sel - visible + 1;
+                if (blink)
+                    BlinkerStart(blink, TYPER_BLINK_MS, 1);
+            } else {
+                PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
+            }
+            ConsumeKey(AM2_DIK_DOWN);
+        }
+
+        /* SPACE or RETURN, on the key going DOWN -- `IsKeyDown && KeyChanged`,
+         * the same edge WidgetUpdate uses, and NOT the release that the mouse
+         * arm above waits for. */
+        if ((IsKeyDown(AM2_DIK_SPACE) && KeyChanged(AM2_DIK_SPACE))
+            || (IsKeyDown(AM2_DIK_RETURN) && KeyChanged(AM2_DIK_RETURN))) {
+            int32_t sel;
+
+            ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+
+            sel = *(const int32_t *)(self + LIST_OFF_SELECTED);
+            if (sel >= 0 && rows->count > 0) {
+                if (ListRowIsDead(rows, sel)) {
+                    PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
+                } else {
+                    AM2_Widget *blink =
+                        *(AM2_Widget *const *)(self + LIST_OFF_BLINKER);
+                    void (__cdecl *pick)(AM2_Widget *,
+                                         const AM2_ListRows *, int32_t);
+
+                    *(int32_t *)(self + LIST_OFF_CHOSEN) = sel;
+                    if (blink)
+                        BlinkerStart(blink, TYPER_BLINK_MS, 3);
+
+                    pick = *(void (__cdecl *const *)(
+                               AM2_Widget *, const AM2_ListRows *,
+                               int32_t))(self + LIST_OFF_CALLBACK);
+                    if (pick)
+                        pick(w,
+                             *(const AM2_ListRows *const *)
+                                 (self + LIST_OFF_ROWS),
+                             *(const int32_t *)(self + LIST_OFF_SELECTED));
+                }
+            }
+            ConsumeKey(AM2_DIK_SPACE);
+            ConsumeKey(AM2_DIK_RETURN);
+        }
+    }
+
+    /* ---- what to repaint ----------------------------------------------- */
+    if (*(const int32_t *)(self + LIST_OFF_TOP_ROW) != wasTop) {
+        AM2_Widget *bar;
+
+        /* The window moved, so everything is stale. */
+        PlaySoundAt(AM2_SND_MENU_MOVE, 0, 0, 0, 0);
+        ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+
+        bar = *(AM2_Widget *const *)(self + LIST_OFF_ARROWBAR);
+        if (bar) {
+            uint8_t          *b = (uint8_t *)bar;
+            const AM2_Sprite *thumb =
+                *(const AM2_Sprite *const *)(b + ARROWBAR_OFF_SPRITE0);
+            const AM2_ListRows *r =
+                *(const AM2_ListRows *const *)(self + LIST_OFF_ROWS);
+
+            *(int32_t *)(b + ARROWBAR_OFF_SHIFT) =
+                ThumbShift(*(const int32_t *)(self + LIST_OFF_TOP_ROW),
+                           r->count - *(const int32_t *)(self + LIST_OFF_VISIBLE),
+                           *(const int32_t *)(b + ARROWBAR_OFF_SPAN)
+                           - thumb->bounds.bottom);
+
+            bar = *(AM2_Widget *const *)(self + LIST_OFF_ARROWBAR);
+            ((AM2_WidgetPaintFn *)bar->vtable)[WIDGET_VSLOT_PAINT](bar,
+                                                                   bar->rect);
+        }
+        return;
+    }
+
+    /* The window held still, so repaint only what changed -- the band that
+     * lost the highlight and the band that gained it. */
+    if (*(const int32_t *)(self + LIST_OFF_SELECTED) != wasSel) {
+        int32_t now;
+
+        if (wasSel >= 0)
+            ListRepaintRow(w, wasSel);
+
+        now = *(const int32_t *)(self + LIST_OFF_SELECTED);
+        if (now < 0)
+            return;
+        PlaySoundAt(AM2_SND_MENU_MOVE, 0, 0, 0, 0);
+        ListRepaintRow(w, now);
+
+    } else if (*(const int32_t *)(self + LIST_OFF_CHOSEN) != wasChosen) {
+        int32_t now;
+
+        if (wasChosen >= 0)
+            ListRepaintRow(w, wasChosen);
+
+        now = *(const int32_t *)(self + LIST_OFF_CHOSEN);
+        if (now < 0)
+            return;
+        PlaySoundAt(AM2_SND_MENU_MOVE, 0, 0, 0, 0);
+        ListRepaintRow(w, now);
+    }
+}
+
 /* TextListConstruct -- original 0x00433290, one caller, and the TEXT LIST:
  * the message log's list box. It is the LIST BOX with a different vtable and
  * five colours, and nothing else -- `operator new` asks for AM2_LISTBOX_SIZE
@@ -526,7 +809,7 @@ AM2_Widget *__attribute__((thiscall)) TextListConstruct(AM2_Widget *w,
     colours[4] = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
 
     *(int32_t *)(self + LISTBOX_OFF_READ_ONLY) = 1;
-    *(int32_t *)(self + LISTBOX_OFF_SELECTED)  = -1;
+    *(int32_t *)(self + LIST_OFF_CHOSEN)  = -1;
     return w;
 }
 
@@ -594,7 +877,7 @@ void __attribute__((thiscall)) ListDraw(AM2_Widget *w, RECT clip)
             ink = g_mouseButton[0]
                   ? *(const uint8_t *)(self + LIST_OFF_INK_SEL_DOWN)
                   : *(const uint8_t *)(self + LIST_OFF_INK_SEL);
-        if (idx == *(const int32_t *)(self + LIST_OFF_HOT))
+        if (idx == *(const int32_t *)(self + LIST_OFF_CHOSEN))
             ink = selectedHere ? *(const uint8_t *)(self + LIST_OFF_INK_HOT_SEL)
                                : g_hiliteColour;
 
@@ -723,9 +1006,9 @@ void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w)
         return;
     }
 
-    w->unknown40 = PointInRect((const AM2_Rect *)&w->rect,
+    w->hovered = PointInRect((const AM2_Rect *)&w->rect,
                                (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
-    if (!w->unknown40) {
+    if (!w->hovered) {
         BUTTON_DEADLINE(w) = 0;
         WidgetUpdate(w);
         return;
@@ -745,13 +1028,13 @@ void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w)
         if (g_mouseChanged[0]) {
             if (!g_mouseButton[0]) {
                 ButtonFire(w, BUTTON_OFF_ON_LEFT);
-                w->unknown40 = 0;
+                w->hovered = 0;
             }
             ButtonRepaintSelf(w);
         } else if (g_mouseChanged[1]) {
             if (!g_mouseButton[1]) {
                 ButtonFire(w, BUTTON_OFF_ON_RIGHT);
-                w->unknown40 = 0;
+                w->hovered = 0;
             }
             ButtonRepaintSelf(w);
         }
@@ -790,7 +1073,7 @@ void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w)
     } else {
         /* Neither button down: forget the deadline and the hover. */
         BUTTON_DEADLINE(w) = 0;
-        w->unknown40 = 0;
+        w->hovered = 0;
         WidgetUpdate(w);
         return;
     }
@@ -808,7 +1091,7 @@ void __attribute__((thiscall)) ButtonPaint(AM2_Widget *w, RECT clip)
         } else {
             int32_t pressed = 0;
 
-            if (w->unknown40 && (g_mouseButton[0] || g_mouseChanged[0]))
+            if (w->hovered && (g_mouseButton[0] || g_mouseChanged[0]))
                 pressed = 1;
             else if (IsKeyDown(AM2_DIK_RETURN))
                 pressed = 1;
@@ -893,9 +1176,9 @@ void __attribute__((thiscall)) EditUpdate(AM2_Widget *w)
     /* Hover to focus, and nothing else -- which is how clicking a text field
      * gives it the caret and the keyboard. */
     if (w->parent && orig_mouse_moved && !w->disabled) {
-        w->unknown40 = PointInRect((const AM2_Rect *)&w->rect,
+        w->hovered = PointInRect((const AM2_Rect *)&w->rect,
                                    (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
-        if (w->unknown40)
+        if (w->hovered)
             ((AM2_WidgetFocusFn *)w->vtable)[WIDGET_VSLOT_FOCUS](w, 1);
     }
     WidgetUpdate(w);
@@ -6005,7 +6288,7 @@ AM2_Widget *__attribute__((thiscall)) DelPlayerDialogConstruct(AM2_Widget *w,
  * code on a screen the suite drives.
  *
  * Two fields are seeded from ADDR_DIFFICULTY and it is worth naming which:
- * LIST_OFF_SELECTED and LIST_OFF_HOT, so the dialog opens with the current
+ * LIST_OFF_SELECTED and LIST_OFF_CHOSEN, so the dialog opens with the current
  * setting both selected AND highlighted rather than merely selected. That is
  * the green bar on Medium in a default install.
  *
@@ -6057,7 +6340,7 @@ AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
         AM2_Widget *sel = *(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST);
 
         ((AM2_WidgetFocusFn *)sel->vtable)[WIDGET_VSLOT_FOCUS](sel, 0);
-        *(int32_t *)((uint8_t *)sel + LIST_OFF_HOT)      = g_difficulty;
+        *(int32_t *)((uint8_t *)sel + LIST_OFF_CHOSEN)      = g_difficulty;
         *(int32_t *)((uint8_t *)sel + LIST_OFF_SELECTED) = g_difficulty;
     }
 
@@ -7025,9 +7308,9 @@ AM2_Widget *__attribute__((thiscall)) ListBoxConstruct(AM2_Widget *w,
     *(void **)(self + LIST_OFF_ROWS)       = rows;
     *(int32_t *)(self + LIST_OFF_OWNS_ROWS) = ownsRows;
     *(int32_t *)(self + LIST_OFF_ARG70)     = 0;
-    *(int32_t *)(self + LIST_OFF_ARG6C)     = arg6C;
+    *(int32_t *)(self + LIST_OFF_ON_TICK)     = arg6C;
     *(int32_t *)(self + LIST_OFF_CALLBACK)  = callback;
-    *(int32_t *)(self + LIST_OFF_HOT)       = -1;
+    *(int32_t *)(self + LIST_OFF_CHOSEN)       = -1;
     *(int32_t *)(self + LIST_OFF_SELECTED)  = 0;
 
     WidgetScreenRect(w);
@@ -7045,7 +7328,7 @@ AM2_Widget *__attribute__((thiscall)) ListBoxConstruct(AM2_Widget *w,
     *(int32_t *)(self + LIST_OFF_BLINKER) = 0;
 
     if (rows && *(const int32_t *)rows > 0)
-        *(int32_t *)(self + LIST_OFF_HOT) = 0;
+        *(int32_t *)(self + LIST_OFF_CHOSEN) = 0;
     return w;
 }
 
@@ -7663,7 +7946,7 @@ void __cdecl OnDifficultyOk(AM2_Widget *w)
     list = *(const uint8_t *const *)((const uint8_t *)w->parent->parent
                                      + DLG_OFF_LIST);
     g_menuRequest    = AM2_MENU_REQUEST_OPTIONS_MENU;
-    g_difficulty     = *(const int32_t *)(list + LIST_OFF_HOT);
+    g_difficulty     = *(const int32_t *)(list + LIST_OFF_CHOSEN);
     g_menuRequestSet = 1;
     SaveOptions();
 }
@@ -12266,6 +12549,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_CMD_UPDATE,
                         (const void *)HudCmdUpdate,
                         "HudCmdUpdate", 1);
+    rc |= patch_replace(ADDR_LIST_UPDATE, (const void *)ListUpdate,
+                        "ListUpdate", 1);
     rc |= patch_replace(ADDR_HUD_CHAT_SEND, (const void *)HudChatSend,
                         "HudChatSend", 1);
     rc |= patch_replace(ADDR_SELECT_WEAPON, (const void *)SelectWeapon,

@@ -53,7 +53,18 @@ typedef struct AM2_Widget {
     int32_t  flag3C;                /* 0x003C  constructed as 1. Set centres the
                                      * sprite in the widget; clear puts it at
                                      * the top left. */
-    int32_t  unknown40;             /* 0x0040  NOT written by the constructor */
+    int32_t  hovered;               /* 0x0040  the pointer is inside this
+                                     * widget's screen rect. The base
+                                     * constructor never writes it, which is
+                                     * why `ctl widgets` deliberately leaves
+                                     * it out of the dump -- before an update
+                                     * has run it holds whatever the allocator
+                                     * left. Was `unknown40`; every writer in
+                                     * the tree sets it from
+                                     * PointInRect(&rect, cursor) and every
+                                     * reader gates hover work on it, which is
+                                     * four independent touchers saying the
+                                     * same thing. */
     int32_t  flag44;                /* 0x0044  constructed as 0 */
     int32_t  unknown48;             /* 0x0048 */
     int32_t  disabled;              /* 0x004C  set disqualifies from focus, and
@@ -842,10 +853,22 @@ void __attribute__((thiscall)) TyperUpdate(AM2_Widget *w);
  * `top + 14 * (0x58 - 0x74) + 4`, with the row 14 tall.
  *
  * What that arithmetic establishes is that 0x0058 is the row being singled out
- * and 0x0074 is the first row on screen. Calling them the SELECTED row and the
- * SCROLL ORIGIN is the obvious reading and is not otherwise evidenced here.
- * 0x0058 is the text pointer in a label -- the tails differ, as ever. */
-#define LIST_OFF_SELECTED    0x58   /* int32_t, negative means none */
+ * and 0x0074 is the first row on screen. 0x0058 is the text pointer in a
+ * label -- the tails differ, as ever.
+ *
+ * THE PAIR IS NOW EVIDENCED, by ListUpdate, and it is not the obvious
+ * reading. 0x0058 is the MOVING HIGHLIGHT: the update writes it from the
+ * cursor's y on every hover, `(cursorY - top - 4) / 14 + firstRow`, and the
+ * UP and DOWN keys step it. 0x005C is written ONLY when a click is released
+ * or SPACE or RETURN is pressed, copying 0x0058 -- so it is the row the user
+ * actually CHOSE, and it is what SELECT DIFFICULTY reads back into
+ * g_difficulty. The constructor's `0x005C = -1, 0x0058 = 0` says the same:
+ * nothing chosen yet, highlight on row 0.
+ *
+ * The painter agrees from a third direction. 0x0058's row gets the filled
+ * highlight bar and the pressed ink while the button is down; 0x005C's gets
+ * the hilite colour. Three touchers, which is what this pair was missing. */
+#define LIST_OFF_SELECTED    0x58   /* int32_t, the moving highlight */
 #define LIST_OFF_TOP_ROW     0x74   /* int32_t, first row drawn */
 #define LIST_ROW_HEIGHT      14
 #define LIST_ROW_TOP_MARGIN  4
@@ -861,7 +884,12 @@ typedef struct AM2_ListRows {
 } AM2_ListRows;
 
 #define LIST_OFF_ROWS        0x60   /* AM2_ListRows * */
-#define LIST_OFF_HOT         0x5C   /* int32_t, the row under the pointer */
+/* NOT "the row under the pointer" -- that is LIST_OFF_SELECTED above, and
+ * this comment said so for as long as nothing had read the update. Renamed
+ * from LIST_OFF_HOT, which also collapses a duplicate: orig.h carried
+ * LISTBOX_OFF_SELECTED on this same offset under a different prefix, which
+ * is exactly the cross-prefix case checkoffsets.py cannot see. */
+#define LIST_OFF_CHOSEN      0x5C   /* int32_t, committed by click or RETURN */
 #define LIST_OFF_OWNS_ROWS   0x64   /* int32_t; the array is freed only if set */
 #define LIST_OFF_VISIBLE     0x78   /* int32_t, how many rows fit */
 #define LIST_OFF_INK         0x80   /* uint8_t, an ordinary row */
@@ -869,14 +897,18 @@ typedef struct AM2_ListRows {
 #define LIST_OFF_INK_SEL_DOWN 0x88  /* uint8_t, selected with the button down */
 #define LIST_OFF_INK_HOT_SEL 0x8C   /* uint8_t, hot AND selected AND eligible */
 #define LIST_OFF_CALLBACK    0x68   /* the row callback, or ADDR_LOG for none */
-#define LIST_OFF_ARG6C       0x6C
+#define LIST_OFF_ON_TICK     0x6C   /* void(*)(AM2_Widget *), each update */
 #define LIST_OFF_ARG70       0x70   /* constructed 0 */
 #define LIST_OFF_ARG7C       0x7C   /* constructed 0 */
 #define LIST_ROW_STRIDE      0x104  /* 260 bytes per row record */
+/* A row whose text opens with this cannot be picked: clicking it or pressing
+ * RETURN on it plays AM2_SND_MENU_REFUSE and leaves the choice alone. It is
+ * how a separator or a heading is spelled in a list of plain strings. */
+#define LIST_ROW_DEAD        '^'
 #define LIST_TEXT_INDENT     4
 
-/* Slot 2 of the list box, 0x00455340, is NOT reconstructed. It is 2 KB and
- * branchy, and what has been read of it is in STATUS.md: a per-frame callback
+/* Slot 2 of the list box, 0x00455340, is ListUpdate below and is
+ * reconstructed. What had been read of it before then: a per-frame callback
  * at 0x006C, the row under the pointer computed as
  * `(cursorY - rect.top - 4) / 14 + topRow` -- the division by 14 is the
  * compiler's magic-number sequence, which is a second independent route to the
@@ -894,6 +926,8 @@ typedef struct AM2_ListRows {
  * conventions sit side by side in the same hierarchy.
  *
  * The SEH prologue is not reproduced; see CLAUDE.md. */
+/* 0x00455340 -- slot 2 of BOTH the list box and the text list. */
+void __attribute__((thiscall)) ListUpdate(AM2_Widget *w);
 void __attribute__((thiscall)) ListDestruct(AM2_Widget *w);
 AM2_Widget *__attribute__((thiscall)) ListDelete(AM2_Widget *w, int32_t flags);
 

@@ -200,6 +200,11 @@
 #define ADDR_LIST_ROWS_CLEANUP  0x00453930u /* thiscall void(void *), one jmp */
 /* 0x00455180, thiscall, slot 1 of the list box: clear, then draw every visible
  * row with an ink chosen from the row's state. */
+/* Slot 2 of BOTH the list box's vtable at 0x0046FCC8 and the text list's at
+ * 0x0046FA8C -- one function serving two classes, which is why nothing in
+ * .text names it and why the LIST_ and TEXTLIST_ prefixes describe the same
+ * fields. */
+#define ADDR_LIST_UPDATE       0x00455340u  /* thiscall void(AM2_Widget *) */
 #define ADDR_LIST_DRAW          0x00455180u /* void(AM2_Widget *, RECT) */
 /* The two palette bytes it reads are both already named: the background is
  * ADDR_BACKGROUND_COLOUR and the highlight is ADDR_VIEW_RECT_COLOUR. */
@@ -7524,6 +7529,11 @@ typedef struct {
  * and 8, and this is none of them. */
 #define AM2_SOLDIER_KIND_3       3
 #define AM2_SPEECH_SARGE_HURT    0x19
+/* The two the menu widgets ask for by number: 1 whenever a highlight moves
+ * and 3 when a move is refused, at either end of a list or on a row the list
+ * will not let you pick. */
+#define AM2_SND_MENU_MOVE        1
+#define AM2_SND_MENU_REFUSE      3
 #define AM2_SND_HURT             4
 #define AM2_SND_HURT_KIND7       0x35
 #define AM2_EXPL_TROOPER_GORE    0x95
@@ -8447,6 +8457,8 @@ typedef struct {
 #define AM2_DIK_ESCAPE             1
 #define AM2_DIK_RETURN             0x1Cu
 #define AM2_DIK_SPACE              0x39u
+#define AM2_DIK_UP                 0xC8u
+#define AM2_DIK_DOWN               0xD0u
 #define AM2_DIK_F1                 0x3Bu
 /* The timer table: 1,000 records of {start, period, count, id} at 0x0050C370,
  * with the live count at 0x0050C36C. A slot is FREE when its id is zero, which
@@ -13279,7 +13291,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * thing: the selected-row colour, the highlight, and the whole keyboard arm of
  * the update. TextListCtor sets it to 1, which is what a message log wants. */
 #define LISTBOX_OFF_READ_ONLY  0x4Cu    /* non-zero: no selection, no keys */
-#define LISTBOX_OFF_SELECTED   0x5Cu    /* int32 row index, -1 for none */
+/* 0x5C is win32/widget.h's LIST_OFF_CHOSEN -- one offset had a name in
+ * each file, under two prefixes, saying two different things. Collapsed
+ * there; see that header for what the three touchers establish. */
 /* 0x00433290, one caller, and the TEXT LIST -- the message log's list box.
  * A thiscall constructor that runs ADDR_LISTBOX_CTOR, takes VTABLE_TEXT_LIST,
  * copies five palette indices into TEXTLIST_OFF_COLOURS and marks itself read
