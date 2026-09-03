@@ -10381,7 +10381,7 @@ int32_t __cdecl WeaponFrameReady(void *obj, void *weapon)
  *
  * A uid that does not resolve does nothing at all, silently.
  */
-void __cdecl SetObjTablePair(uint32_t uid, int32_t kind)
+void __cdecl SetObjTablePair(int32_t kind, uint32_t uid)
 {
     uint8_t *o = (uint8_t *)ObjByUidAlias(uid);
     int32_t  slot;

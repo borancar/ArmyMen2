@@ -935,9 +935,18 @@ void *__cdecl WalkCellAtPoint(const uint32_t *pt, const void *desc,
  * weapon may act? Three answers -- see the definition. */
 int32_t __cdecl WeaponFrameReady(void *obj, void *weapon);
 
-/* 0x0044BA70, one caller. Set an object's kind, both table-record pointers --
- * one by kind, one by the owner's comm slot -- propagate one, refresh rows. */
-void __cdecl SetObjTablePair(uint32_t uid, int32_t kind);
+/* 0x0044BA70, one caller -- FireWeapon's arm 17. Set an object's kind, both
+ * table-record pointers -- one by kind, one by the owner's comm slot --
+ * propagate one, refresh rows.
+ *
+ * KIND FIRST, UID SECOND, and this was the other way round until the caller
+ * was read. The original takes the uid from [esp+0xC] (argument 2) to look
+ * the object up and the kind from [esp+0x10] (argument 1) to store in
+ * OBJ_OFF_FIELD_530. Nothing inside the function could show the swap: it is
+ * self-consistent either way, and its one caller was still original, so no
+ * A/B and no counter could reach it. The caller also pushes the firer's army
+ * and position, which the body never reads. */
+void __cdecl SetObjTablePair(int32_t kind, uint32_t uid);
 
 /* 0x00406800, one caller. Which inventory slot should take this weapon, and
  * may it be taken at all? The slot is an out-parameter carrying -1 for "no

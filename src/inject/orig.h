@@ -14285,7 +14285,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define OBJ_OFF_TABLE_REC_SLOT   0x534u
 /* 0x0044BA70, one caller. Set an object's kind, both table-record pointers,
  * propagate one of them, and refresh its rows. */
-#define ADDR_SET_OBJ_TABLE_PAIR  0x0044BA70u  /* void(uint32_t uid, int32_t) */
+#define ADDR_SET_OBJ_TABLE_PAIR  0x0044BA70u  /* void(int32_t kind, uint32_t uid,
+                                               * int32_t army, uint32_t at) --
+                                               * the last two are never read */
 #define OBJ_OFF_FIELD_530        0x530u  /* int32_t; ObjConceal compares to 5 */
 /* 0x0043CD40, two callers. Move an object to a new OBJ_OFF_FIELD_530 and put
  * the first row on the animation frame that goes with it -- gated on the
