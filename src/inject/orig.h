@@ -1145,6 +1145,15 @@
  * Reconstructed, and reached exactly ONCE on a driven Boot Camp mission --
  * mode 0 at mission start. Every mode above 0 is verified by reading. */
 #define ADDR_POINTER_MODES     0x004761B8u  /* 7 records of 40 bytes */
+/* Column +8 of that table -- the one SetPointerMode does not install, read by
+ * the HUD command bar as `mov eax,[eax*8+0x4761c0]; test; je; call eax`, so it
+ * is an optional no-argument handler. Four of the seven records have one, and
+ * records 4 and 5 SHARE the click handler. Named by data: nothing calls any of
+ * them, the table slots are the only references. */
+#define ADDR_POINTER_INVOKE_CLICK       0x00457910u  /* void(void) */
+#define ADDR_OBJ_FREEZE                 0x00457930u  /* void(void *obj) */
+#define ADDR_POINTER_INVOKE_FREEZE_ARMY 0x00457960u  /* void(void) */
+#define ADDR_POINTER_INVOKE_FREEZE_SEL  0x004579A0u  /* void(void) */
 #define AM2_POINTER_MODE_SIZE  40
 #define AM2_POINTER_MODES      7
 /* AN INLINED "OUR LEADER" HELPER WHOSE FALLBACK IS DEAD, EIGHT TIMES OVER.

@@ -1766,6 +1766,15 @@ int32_t __cdecl HudPanelWidth(void);
  * action at once and revert to mode 0. */
 void __cdecl SetPointerMode(int32_t mode);
 
+/* 0x00457910, 0x00457930, 0x00457960, 0x004579A0. Column +8 of
+ * ADDR_POINTER_MODES: what a pointer mode does when the HUD command bar
+ * invokes it. ObjFreeze is the per-object callback the two freeze handlers
+ * hand to the object walkers. */
+void __cdecl PointerInvokeClick(void);
+void __cdecl PointerInvokeFreezeArmy(void);
+void __cdecl PointerInvokeFreezeSelected(void);
+void __cdecl ObjFreeze(void *obj);
+
 /* 0x00458A20. The ACTION slot of pointer mode 3: drop what our leader holds.
  * Both arguments are ignored -- the shape is the slot's, not its own. */
 void __cdecl PointerDropItem(void *obj, uint32_t at);

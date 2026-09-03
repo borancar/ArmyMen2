@@ -13480,6 +13480,80 @@ tail:
     PointerIdleOverlay(ours);
 }
 
+
+/* ---- the pointer modes' invoke handlers ---------------------------------
+ *
+ * 0x00457910, 0x00457930, 0x00457960 and 0x004579A0. ADDR_POINTER_MODES is
+ * seven 40-byte records and these are COLUMN +8 of four of them -- the one
+ * column SetPointerMode does not install. Named by DATA: nothing calls them
+ * by address, and the only references are the table slots themselves.
+ *
+ * The column's reader is the HUD command bar, twice, both times as
+ *
+ *     mov eax, [eax*8 + 0x4761c0]   ; base + 8, stride 40
+ *     test eax, eax ; je ; call eax
+ *
+ * so the field is an OPTIONAL handler taking no arguments -- which is what
+ * settles the signatures, since all four clean only their own pushes.
+ *
+ *   record 2  ->  PointerInvokeFreezeArmy      (sound, voice, army, reset)
+ *   record 4  ->  PointerInvokeClick           (the click sound, nothing else)
+ *   record 5  ->  PointerInvokeClick           (the same function, shared)
+ *   record 6  ->  PointerInvokeFreezeSelected  (sound, then the selection)
+ *
+ * THE COMMAND IS "FREEZE" AND THE GAME SAYS SO. The voice group passed here
+ * is 0x1D, which orig.h already names AM2_SPEAK_FREEZE -- so setting AI mode
+ * `ignore` on every unit is the freeze order, and the name comes from the
+ * game's own vocabulary rather than from the field being written.
+ *
+ * ObjFreeze is the callback the last two hand to the object walkers. It
+ * is ObjIsTypeIn238 INLINED -- t >= 2 && (t <= 3 || t == 8), the owned
+ * non-item types -- which is why no call to 0x00457420 appears here, and then
+ * two field writes. The AI mode it sets is 2, `ignore`, the same number the
+ * shipped scripts write for setaimode ignore.
+ *
+ * The script-state write reads ADDR_ZERO_POINT rather than storing an
+ * immediate, because the original loads the global; it is always {0,0}, so
+ * the effect is a clear either way, and the load is reproduced as written. */
+
+void __cdecl ObjFreeze(void *o)
+{
+    uint8_t *obj = (uint8_t *)o;
+    int32_t  type;
+
+    if (!obj)
+        return;
+
+    type = *(const int32_t *)obj;
+    if (type < 2)
+        return;
+    if (type > 3 && type != 8)
+        return;
+
+    *(int32_t *)(obj + OBJ_OFF_AI_MODE) = AM2_AI_MODE_IGNORE;
+    *(int32_t *)(obj + OBJ_OFF_SCRIPT_STATE) =
+        *(const int32_t *)AM2_IMAGE(ADDR_ZERO_POINT);
+}
+
+void __cdecl PointerInvokeClick(void)
+{
+    PlaySoundAt(0, 0, 0, 0, 0);
+}
+
+void __cdecl PointerInvokeFreezeArmy(void)
+{
+    PlaySoundAt(0, 0, 0, 0, 0);
+    SpeakLine(AM2_SPEAK_FREEZE, (int32_t)g_defaultOwner);
+    ForEachArmyObject((int32_t)g_defaultOwner, ObjFreeze);
+    SetPointerMode(0);
+}
+
+void __cdecl PointerInvokeFreezeSelected(void)
+{
+    PlaySoundAt(0, 0, 0, 0, 0);
+    ForEachSelected(ObjFreeze);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -14310,6 +14384,18 @@ int widget_install(void)
                         "FreeHudWidgets", 2);
     rc |= patch_replace(ADDR_HUD_POST_UPDATE, (const void *)HudPostUpdate,
                         "HudPostUpdate", 1);
+    rc |= patch_replace(ADDR_OBJ_FREEZE,
+                        (const void *)ObjFreeze,
+                        "ObjFreeze", 1);
+    rc |= patch_replace(ADDR_POINTER_INVOKE_CLICK,
+                        (const void *)PointerInvokeClick,
+                        "PointerInvokeClick", 0);
+    rc |= patch_replace(ADDR_POINTER_INVOKE_FREEZE_ARMY,
+                        (const void *)PointerInvokeFreezeArmy,
+                        "PointerInvokeFreezeArmy", 0);
+    rc |= patch_replace(ADDR_POINTER_INVOKE_FREEZE_SEL,
+                        (const void *)PointerInvokeFreezeSelected,
+                        "PointerInvokeFreezeSelected", 0);
     return rc;
 }
 
