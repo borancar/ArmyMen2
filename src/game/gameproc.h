@@ -20,7 +20,11 @@ void __cdecl Call405220(int32_t a, int32_t b, int32_t c);
  * ARGUMENT, inherited by Log through a tail jump -- see gameproc.cpp. */
 void __cdecl Teardown445F40(const char *msg);
 void __cdecl TeardownDefTables(void);
-void __cdecl Teardown40A4B0(void);
+/* 0x0040A690, 0x0040A5F0, 0x0040A660. BuildRemapTables plus the four army
+ * object lists, and the pair that makes and unmakes those lists. */
+void __cdecl InitRemapsAndLists(void);
+void __cdecl InitArmyObjLists(void);
+void __cdecl FreeArmyObjLists(void);
 void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c);
 void __cdecl DefFinish(void);
 void *__cdecl WalkCellWrapper(void *unused, uint32_t at);

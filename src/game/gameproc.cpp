@@ -2351,6 +2351,12 @@ void __cdecl UidRemapAdd(uint32_t from, uint32_t to)
  * with none is what the original makes.
  */
 typedef void (__cdecl *AM2_TeardownFn)(void);
+typedef void *(__cdecl *AM2_OperatorNewFn)(uint32_t size);
+typedef void  (__cdecl *AM2_OperatorDeleteFn)(void *p);
+#define orig_operator_new \
+    ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
+#define orig_operator_delete \
+    ((AM2_OperatorDeleteFn)AM2_IMAGE(ADDR_GAME_DELETE))
 typedef void (__cdecl *AM2_Call3Fn)(int32_t a, int32_t b, int32_t c);
 
 #define orig_teardown_log   ((am2_log_fn)(uintptr_t)ADDR_LOG)
@@ -2367,7 +2373,6 @@ typedef void (__cdecl *AM2_Call3Fn)(int32_t a, int32_t b, int32_t c);
  * including that header: gameproc.cpp is on the flat side of the split and
  * palette.h names Win32 types, while this one signature names none. */
 extern "C" void __cdecl BuildRemapTables(void);
-#define orig_free_40a5f0    ((AM2_TeardownFn)(uintptr_t)ADDR_FREE_40A5F0)
 
 /* 0x0041E740. Zero a global NOTHING READS. One reference in the whole image
  * -- this store -- confirmed by a decoded scan and a raw dword scan both. So
@@ -2434,20 +2439,70 @@ void __cdecl TeardownDefTables(void)
     orig_teardown_log0();
 }
 
+
+/* 0x0040A5F0 and 0x0040A660, the two halves of the ARMY OBJECT LISTS: one
+ * 12-byte {capacity, count, items} record per comm slot, in the four-entry
+ * array at ADDR_ARMY_OBJ_LISTS.
+ *
+ * The loop bound is the NEXT GLOBAL -- both walk to 0x004F9EDC, which is
+ * ADDR_ROW_LUT_DOUBLES -- so the array's length is four because that is where
+ * the neighbour starts, the same way the registration table's nine buckets
+ * were settled. AM2_COMM_SLOTS is that four.
+ *
+ * THE INIT STORES THE CONSTRUCTOR'S RETURN, not the pointer it allocated.
+ * They are the same value, because InitPtrList answers `this` like every i386
+ * MSVC constructor -- misc.h records that and notes no caller had reached it
+ * yet. This is that caller, and it is written the way the original does it.
+ * A failed allocation stores a null and the loop carries on.
+ *
+ * THE FREE DOES NOT CLEAR THE SLOTS. It empties each record and frees it, and
+ * leaves the array holding dangling pointers -- reproduced, not tidied.
+ *
+ * The MSVC SEH prologue on the init is NOT reproduced, per the standing
+ * decision: nothing in this program throws, VC6's operator new answers null
+ * rather than throwing, and this function tests it. */
+
+void __cdecl InitArmyObjLists(void)
+{
+    void **slot;
+    int32_t i;
+
+    slot = (void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS;
+    for (i = 0; i < AM2_COMM_SLOTS; i++) {
+        void *rec = orig_operator_new(AM2_PTR_LIST_BYTES);
+
+        slot[i] = rec ? InitPtrList(rec) : (void *)0;
+    }
+}
+
+void __cdecl FreeArmyObjLists(void)
+{
+    void **slot;
+    int32_t i;
+
+    slot = (void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS;
+    for (i = 0; i < AM2_COMM_SLOTS; i++) {
+        if (slot[i]) {
+            ClearPtrListAlias(slot[i]);
+            orig_operator_delete(slot[i]);
+        }
+    }
+}
+
 /* 0x0040A690. Two steps, the second a tail jump -- and both halves sit inside
  * ONE functions.tsv entry, which is why the second has no entry of its own
  * and why tools/merges.py is what finds it.
  *
- * ITS NAME IS NOW KNOWN TO BE WRONG and is left for the commit that fixes it
- * properly. The first step is BuildRemapTables, which FILLS four army remaps,
- * sixty-four variation blocks and a grey ramp -- so this is an INIT, and
- * "Teardown" came from the same guess ADDR_FREE_40A4B0 did. Whether the
- * second step frees anything is unread; renaming the pair on half the
- * evidence is what put the wrong name here in the first place. */
-void __cdecl Teardown40A4B0(void)
+ * THE DEFERRED RENAME IS SETTLED. This carried "Teardown" under a comment
+ * saying the name was known wrong and was waiting on one fact: whether the
+ * second step frees anything. It does not -- that step is InitArmyObjLists
+ * above, which ALLOCATES four records. So both halves build: BuildRemapTables
+ * fills the army remaps, and this fills the object lists. Renamed on the whole
+ * evidence, which is what the half-evidence rename failed to do. */
+void __cdecl InitRemapsAndLists(void)
 {
     BuildRemapTables();
-    orig_free_40a5f0();
+    InitArmyObjLists();
 }
 
 /* ---- Six more, same size and same argument ----------------------------
@@ -2695,8 +2750,12 @@ void gameproc_install(void)
                   "Teardown445F40", 1);
     patch_replace(ADDR_TEARDOWN_DEF_TABLES, (const void *)TeardownDefTables,
                   "TeardownDefTables", 1);
-    patch_replace(ADDR_TEARDOWN_40A4B0, (const void *)Teardown40A4B0,
-                  "Teardown40A4B0", 1);
+    patch_replace(ADDR_INIT_REMAPS_AND_LISTS, (const void *)InitRemapsAndLists,
+                  "InitRemapsAndLists", 0);
+    patch_replace(ADDR_INIT_ARMY_OBJ_LISTS, (const void *)InitArmyObjLists,
+                  "InitArmyObjLists", 0);
+    patch_replace(ADDR_FREE_ARMY_OBJ_LISTS, (const void *)FreeArmyObjLists,
+                  "FreeArmyObjLists", 0);
     patch_replace(ADDR_UID_REMAP_CLEAR, (const void *)UidRemapClear,
                   "UidRemapClear", 2);
     patch_replace(ADDR_UID_REMAP_ADD, (const void *)UidRemapAdd,

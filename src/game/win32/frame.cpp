@@ -766,7 +766,7 @@ void __cdecl LevelTeardown(void)
     ResetScriptState();
     ScriptResetTokens((AM2_ScriptCtx *)(uintptr_t)ADDR_SCRIPT_CONTEXT);
     ResetPads();
-    call0(ADDR_TEARDOWN_40A6A0);
+    call0(ADDR_FREE_ARMY_LISTS_ALIAS);
     FreeSeqContexts();
     FreeAirSpritesAlias();
     FreeAimSprites();
@@ -943,7 +943,7 @@ void __cdecl State2Enter(void)
 
     AimInit();
     SeqSubsystemInit();
-    Teardown40A4B0();
+    InitRemapsAndLists();
 
     if (*(const int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF != 0)
         LoadDefaultCof();

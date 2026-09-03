@@ -10725,7 +10725,12 @@ typedef struct {
 #define ADDR_FREE_MISSILE_DEFS   0x004607D0u  /* void(void), two callers */
 /* Two steps, the second a tail jump. Both halves are inside one merged
  * functions.tsv entry, which is why the second has no entry of its own. */
-#define ADDR_TEARDOWN_40A4B0     0x0040A690u  /* void(void) */
+/* It was ADDR_TEARDOWN_40A4B0, and gameproc.cpp's comment already said the
+ * name was known wrong and was waiting on ONE fact: whether its second step
+ * frees anything. It does not -- that step is ADDR_INIT_ARMY_OBJ_LISTS, which
+ * allocates. So both halves build and this is an INIT. Renamed on the whole
+ * evidence rather than half of it, which is what put "Teardown" here. */
+#define ADDR_INIT_REMAPS_AND_LISTS 0x0040A690u  /* void(void) */
 
 /* ---- Six more small ones ------------------------------------------------
  *
@@ -11012,7 +11017,12 @@ typedef struct {
  * records that argument arriving as 0, 9, 10, 60 and 100 over 8,498 calls;
  * this is where the 100 comes from. */
 #define AM2_PAL_REMAP_FROM       100
-#define ADDR_FREE_40A5F0         0x0040A5F0u  /* void(void) */
+/* NOT a free: it ALLOCATES. One 12-byte {capacity, count, items} record per
+ * comm slot into ADDR_ARMY_OBJ_LISTS, each zeroed through InitPtrList. Its
+ * partner at 0x0040A660 is the matching teardown. */
+#define AM2_PTR_LIST_BYTES       0x0Cu  /* {capacity, count, items} */
+#define ADDR_INIT_ARMY_OBJ_LISTS 0x0040A5F0u  /* void(void) */
+#define ADDR_FREE_ARMY_OBJ_LISTS 0x0040A660u  /* void(void) */
 /* 0x0044CD40 is the third: qsort the table with ADDR_COMPARE_DWORD and then
  * TAIL-JUMP to 0x0045CAA0. That address is ADDR_LOG, which src/inject/gamelog.c
  * patches -- so naming it in src/game would be a seam checkseams refuses, and
@@ -14406,7 +14416,10 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * the ORDER is the fact worth keeping and a name each would be a guess each.
  * 0x0040A6A0 is a one-instruction `jmp` into the middle of another entry;
  * 0x00463360 is eight chained calls in the band above the nominal CRT line. */
-#define ADDR_TEARDOWN_40A6A0     0x0040A6A0u  /* void(void) */
+/* One `jmp` to ADDR_FREE_ARMY_OBJ_LISTS -- so it IS a teardown, unlike its
+ * opposite number above, and the placeholder name was right about that much.
+ * Named now that the callee is read. */
+#define ADDR_FREE_ARMY_LISTS_ALIAS 0x0040A6A0u  /* void(void), one jmp */
 #define ADDR_LEVEL_TEARDOWN      0x004256F0u  /* void(void), on leaving a level */
 /* Sub-state 34 of ADDR_STATE2_FRAME's table, and the only in-mission code that
  * reads a key and raises a menu request. The test is `!IsKeyDown(ESC) &&
