@@ -664,7 +664,7 @@ void __cdecl State1Frame(void)
         }
     }
 
-    call0(ADDR_STATE1_COMMON);
+    State1Common();
 }
 
 /* Nine of the thirteen sub-state arms are one shape -- repaint if the overlay
@@ -1698,6 +1698,41 @@ void __cdecl PollMovieSkipKey(void)
     }
 }
 
+
+/* 0x00426270, ADDR_STATE1_COMMON. The name is positional and is KEPT -- it
+ * really is state 1's shared frame step -- but the body is three distinct
+ * things and the first is the one worth naming.
+ *
+ * Pause reason 8 means A FULL-SCREEN BITMAP IS UP, which orig.h settles from
+ * the pair that sets it alongside the `showbitmap` script keyword. So the
+ * first block is the instruction sign's dismissal: while that bit is set,
+ * a released dismiss key clears it locally AND tells the other players, which
+ * is why the un-pause is two calls rather than one.
+ *
+ * The rest is the frame: draw into the back buffer, paint whatever dialog is
+ * up through its own vtable slot 1 with its own rectangle, put the cursor on
+ * top, and present. */
+void __cdecl State1Common(void)
+{
+    void *dlg;
+
+    if (GetPauseFlags() & AM2_EVENT_FLAG_8) {
+        if (DismissKeyReleased()) {
+            UnPauseGame(AM2_EVENT_FLAG_8);
+            SendGamePause(0, AM2_EVENT_FLAG_8);
+        }
+    }
+
+    SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER);
+
+    dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+    ((AM2_DlgPaintFn2 *)*(void **)dlg)[AM2_DLG_SLOT_PAINT](
+        dlg, *(const RECT *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
+
+    DrawMenuCursor();
+    PresentFrame();
+}
+
 int frame_install(void)
 {
     int rc = 0;
@@ -1764,6 +1799,8 @@ int frame_install(void)
     rc |= patch_replace(ADDR_POLL_MOVIE_SKIP,
                         (const void *)PollMovieSkipKey,
                         "PollMovieSkipKey", 0);
+    rc |= patch_replace(ADDR_STATE1_COMMON, (const void *)State1Common,
+                        "State1Common", 0);
     return rc;
 }
 

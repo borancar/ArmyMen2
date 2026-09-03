@@ -938,6 +938,9 @@ void __attribute__((thiscall)) MpSpinRepaint(AM2_Widget *w);
 
 /* 0x00433240. VTABLE_MP_TEAM slot 1: team sprite, then the base painter. */
 void __attribute__((thiscall)) MpTeamPaint(AM2_Widget *w, RECT clip);
+
+/* 0x00432FC0. VTABLE_MP_COLOUR slot 1: the player's colour, or the blank. */
+void __attribute__((thiscall)) MpColourPaint(AM2_Widget *w, RECT clip);
 AM2_Widget *__attribute__((thiscall)) ListDelete(AM2_Widget *w, int32_t flags);
 
 /* Original: 0x00455180, thiscall, slot 1 of the list box. Clear the whole list

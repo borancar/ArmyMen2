@@ -13485,6 +13485,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 
 #define ADDR_MP_COLOUR_CTOR    0x00432E20u /* thiscall, ret 0x0C */
 #define VTABLE_MP_COLOUR       0x0046FA5Cu
+/* Its slot 1, the sibling of ADDR_MP_TEAM_PAINT. Same shape -- pick a sprite
+ * by the row's player and defer to the base painter -- but it reads the slot
+ * INDEX rather than the team, and falls back to sprite 4 of 5 when that index
+ * is 0x63, the empty-slot sentinel. */
+#define ADDR_MP_COLOUR_PAINT     0x00432FC0u  /* thiscall void(obj, RECT) */
 #define ADDR_ON_MP_COLOUR      0x00432EC0u
 #define AM2_MP_COLOUR_SIZE     0x68u
 

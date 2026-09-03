@@ -13913,6 +13913,35 @@ void __cdecl OnDelGameOk(AM2_Widget *w)
     OnDelGameCancel(w);
 }
 
+
+/* 0x00432FC0, slot 1 of VTABLE_MP_COLOUR -- the sibling of MpTeamPaint, and
+ * the differences are the point rather than the resemblance.
+ *
+ * The team painter reads COMM_SLOT_OFF_TEAM and indexes a 13-entry array. This
+ * one reads COMM_SLOT_OFF_INDEX, compares it against 0x63 -- the empty-slot
+ * sentinel -- and only asks CommArmyOfSlot for the colour when a player is
+ * really there. With no player it uses index 4, which is the LAST of
+ * ADDR_MP_PANEL_SPRITES_A's five: the blank swatch.
+ *
+ * So the default is loaded before the test and survives it, which is why the
+ * `mov eax, 4` sits above the compare rather than in an else arm. Two
+ * near-identical painters, one of which has a fallback the other does not. */
+void __attribute__((thiscall)) MpColourPaint(AM2_Widget *w, RECT clip)
+{
+    const uint8_t *self = (const uint8_t *)w;
+    uint8_t       *comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+    int32_t        row  = *(const int32_t *)(self + MPBTN_OFF_ROW);
+    int32_t        which = 4;
+
+    if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
+                           + row * COMM_PLAYER_STRIDE
+                           + COMM_SLOT_OFF_INDEX) != 0x63)
+        which = CommArmyOfSlot(comm, row);
+
+    w->sprite = ((struct AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_A)[which];
+    WidgetPaint(w, clip);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -14787,6 +14816,8 @@ int widget_install(void)
                         "MpTeamPaint", 5);
     rc |= patch_replace(ADDR_ON_DELGAME_OK, (const void *)OnDelGameOk,
                         "OnDelGameOk", 1);
+    rc |= patch_replace(ADDR_MP_COLOUR_PAINT, (const void *)MpColourPaint,
+                        "MpColourPaint", 5);
     return rc;
 }
 

@@ -33,6 +33,10 @@ void __cdecl State1Leave(void);
 /* 0x00426650. Any released key skips the movie, after a 500 ms holdoff. */
 void __cdecl PollMovieSkipKey(void);
 
+/* 0x00426270. State 1's frame step: dismiss the full-screen bitmap if a key
+ * was released, then paint the dialog, the cursor, and present. */
+void __cdecl State1Common(void);
+
 #endif
 
 /* 0x00426840, 0x004267C0, 0x00426800. The pause mask and the two functions
