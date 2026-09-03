@@ -5,44 +5,60 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-03**, at `1bc33e8`. Working tree clean.
+Last updated: **2026-09-03**, at `35e2f82`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,641 patches plus 6 REGISTERED**, **30** analysis
-tools in `make check` (`tools/checkpatches.py`; `make check` for the tools).
+Nothing uncommitted. **1,641 patches plus 6 REGISTERED**, **40** analysis
+tools in `make check` (`tools/checkpatches.py`; `tools/checkclaims.py` counts
+the recipe).
 
-## ONE FUNCTION LEFT
+## NOTHING LEFT TO TRANSPOSE
 
-`FireWeapon` (0x0045F460, 3,200 bytes) is the only game function in this image
-that is not reconstructed. Everything below the nominal CRT line was closed
-first; everything above it went since.
+`tools/remaining.py` reads **0 game functions and 0 C++ static initializers**
+over every byte from `0x00401000` to the real CRT frontier at `0x00464420`,
+and reports that the entries tile `.text` with no gaps, so nothing can hide
+between them. What is left in that range is 19 linker thunks of one `jmp`
+each, 5 jump tables that are data, and 4 harness/IAT entries -- none of which
+is a function the original source had, and one of which must STAY a thunk for
+`dinput_hook.c`'s IAT patch to be reached.
 
-Its dispatch table is already decoded and recorded in `orig.h`, which is the
-expensive half: a 43-entry byte index at 0x004600B0 into 24 arms at
-0x00460050, with THREE arms shared and a default that fifteen kinds reach
-explicitly. Numbering the arms as they are laid out gives 24 behaviours for 43
-kinds and puts most of them in the wrong place, so start from the table.
+`FireWeapon` (0x0045F460), which this file called the last one left, is
+reconstructed.
 
-1,149 instructions, 25 returns, and all 25 callees are named -- so the cost is
-the arms, not the callees. It is a session's work on its own and should have
-one; a half-written table-driven function is what CLAUDE.md warns produces
-defects nothing here can see.
+**Read that from the tool, not from here.** Four separate blind spots each
+made an earlier version of this section wrong, and three of them were in the
+measurement rather than in the work; the sections below record all four.
+
+## Where the work is now: VERIFICATION, not transposition
+
+Everything is transposed; not everything is checked. The sharpest statement
+of the gap is CLAUDE.md's list of functions no drive in this environment
+reaches, which `tools/checkclaims.py` now splits by measurement rather than
+by assertion: **12 of 32 have an oracle, 20 are verified by reading alone.**
+
+The twenty are the nine AI arms below the dispatcher, the roach bite, the
+vehicle exits, and a handful of teardown and menu paths. Each needs an
+enumerating oracle of the `tools/shakecheck.py` shape, because no
+configuration here reaches any of them and none can be added -- Boot Camp's
+enemies never engage, and MAP 01 turns hostile the moment its dialog clears,
+which is the one screen whose log, pixels and object table are all
+unavailable at once.
 
 ## Where the boundary is
 
-The sub-CRT set is **closed at 1,239 of 1,239** and has been since this
-morning. Work is above the nominal `CRT_START`, where `tools/crt.py` measures
-**112 game functions** between `0x0045C000` and the real CRT frontier at
-`0x00464420` -- code every count in this project silently dropped until that
-tool existed. **80 of the 112 are done, 32 remain, 12,714 bytes**
-(`tools/crt.py` then subtract the patch list; the recipe is in this file's
-git history).
+The sub-CRT set is **closed at 1,239 of 1,239**, and so is everything above
+the nominal `CRT_START`: `tools/crt.py` measures **148 game functions** below
+the real frontier -- 112 of them above the nominal line, code every count in
+this project silently dropped until that tool existed -- and reports
+**0 unlabelled**. The Win32/DirectX boundary is separately closed at 0 COM
+sites and 2 unreachable `MessageBoxA` sites (`docs/boundary.md`).
 
-Largest outstanding: `FireWeapon` (0x0045F460, 3200 B), `MissileDefFind`
-(0x004602C0, 1296 B), `PausedFrameStep` (0x00462600, 1088 B).
+The line itself is measured rather than assumed: game code runs to
+`0x00462600` and the CRT proper starts at `0x00464420`, with a six-entry
+thunk table parked between them.
 
-## Families closed today
+## Families closed earlier in this run
 
 **The vehicle step, five of five.** `Step3TurnBlocked`, `Step3ChooseFacing`,
 `Step3TurnState`, `Step3RouteAndBoard`, `Step3Drive` (0x0045CB30, 769
