@@ -98,6 +98,12 @@ int32_t __attribute__((thiscall)) CommSetSessionDesc(void *comm, void *desc,
  * reads the size out of the complaint. Returns 1 on success. */
 int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm);
 
+/* 0x0040E7B0. Join the session with this instance GUID. Declared here for the
+ * first time -- it was defined in dplay.cpp and used only there until the
+ * battle browser's OK needed it. */
+int32_t __attribute__((thiscall)) CommJoinSession(void *comm,
+                                                  const GUID *instance);
+
 /* Original: 0x0040FA00, one caller -- ShowMpResult, which tail-jumps to it.
  * Put a finished game back in the lobby: drop the departed players, clear
  * DPSESSION_NEWPLAYERSDISABLED and DPSESSION_JOINDISABLED, reset the ready

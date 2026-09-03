@@ -4074,7 +4074,6 @@
  * entry rather than carrying one. */
 #define VTABLE_TEXT_LIST         0x0046FA84u
 #define ADDR_TEXT_LIST_PAINT     0x00433360u  /* thiscall void(obj, RECT) */
-#define TEXTLIST_OFF_SOURCE      0x60u  /* {int32 count; void *records} */
 #define TEXTLIST_OFF_FIRST       0x74u  /* int32, the top visible row */
 #define TEXTLIST_OFF_VISIBLE     0x78u  /* int32, how many fit */
 #define TEXTLIST_OFF_COLOURS     0x80u  /* int32[], low byte used */
@@ -11413,6 +11412,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * reaches the description as an opaque pointer, because the game passes it
  * around as one. */
 #define AM2_DPSESSION_OFF_FLAGS    0x04u
+/* Confirmed by ADDR_ON_LOBBY_SLAVE's own log line, which prints +0x28, +0x2C
+ * and +0x30 as dwMaxPlayers, dwCurrentPlayers and lpszSessionNameA. */
+#define AM2_DPSESSION_OFF_CUR_PLAYERS 0x2Cu
 /* Four player slots, and the count every loop over them uses. */
 #define AM2_COMM_SLOTS             4
 #define COMM_ARMY_OFF_READY        0x274u   /* m_ArmyReady, its own name */

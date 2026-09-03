@@ -1688,7 +1688,9 @@ void __cdecl MpReadyToLoad(void);
 
 /* 0x0042F910, 0x0042F970. The battle browser's list callbacks: what a pick
  * does, and the five-second refresh that re-enumerates the sessions. */
-void __cdecl BattleJoinSelect(AM2_Widget *w, const uint8_t *src, int32_t row);
+void __cdecl BattleJoinSelect(AM2_Widget *w, AM2_ListRows *rows,
+                              int32_t row);
+void __cdecl BattleJoinOk(void);
 void __cdecl BattleJoinPoll(AM2_Widget *w);
 
 AM2_Widget *__attribute__((thiscall)) MpPanelDelete(AM2_Widget *w, int32_t f);

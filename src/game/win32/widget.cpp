@@ -3041,7 +3041,7 @@ refill:
 void __attribute__((thiscall)) TextListPaint(AM2_Widget *w, RECT clip)
 {
     uint8_t       *self = (uint8_t *)w;
-    const uint8_t *src  = *(const uint8_t *const *)(self + TEXTLIST_OFF_SOURCE);
+    const uint8_t *src  = *(const uint8_t *const *)(self + LIST_OFF_ROWS);
     RECT           vis;
     int32_t        row;
 
@@ -3055,7 +3055,7 @@ void __attribute__((thiscall)) TextListPaint(AM2_Widget *w, RECT clip)
 
     ClearRegion(&vis, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
 
-    src = *(const uint8_t *const *)(self + TEXTLIST_OFF_SOURCE);
+    src = *(const uint8_t *const *)(self + LIST_OFF_ROWS);
 
     for (row = *(const int32_t *)(self + TEXTLIST_OFF_FIRST);
          row < *(const int32_t *)(src + TEXTLIST_SRC_COUNT);
@@ -3084,7 +3084,7 @@ void __attribute__((thiscall)) TextListPaint(AM2_Widget *w, RECT clip)
                         (const char *)rec, AM2_TEXT_LIST_FONT, vis, colour);
         UnlockSurface();
 
-        src = *(const uint8_t *const *)(self + TEXTLIST_OFF_SOURCE);
+        src = *(const uint8_t *const *)(self + LIST_OFF_ROWS);
     }
 }
 
@@ -4634,7 +4634,7 @@ AM2_Widget *__attribute__((thiscall)) DlgBattleJoinConstruct(AM2_Widget *w,
                             *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
                             *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
                             (void (__cdecl *)(AM2_Widget *))
-                                AM2_IMAGE(ADDR_BATTLE_JOIN_OK), 0, 0);
+                                BattleJoinOk, 0, 0);
     WidgetAddChild(panel, kid);
 
     kid = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
@@ -4643,7 +4643,7 @@ AM2_Widget *__attribute__((thiscall)) DlgBattleJoinConstruct(AM2_Widget *w,
         kid = ButtonConstruct(kid, "03_007_00_ok.bmp", "03_007_01_ok.bmp",
                               "03_007_02_ok.bmp", 1, box,
                               (void (__cdecl *)(AM2_Widget *))
-                                  AM2_IMAGE(ADDR_BATTLE_JOIN_OK),
+                                  BattleJoinOk,
                               (void (__cdecl *)(AM2_Widget *))0);
     }
     WidgetAddChild(panel, kid);
@@ -13719,17 +13719,14 @@ void __cdecl MpReadyToLoad(void)
  * list -- one offset on two records, which is why the question to ask is
  * "which record is this, here" before writing any name down. */
 
-void __cdecl BattleJoinSelect(AM2_Widget *w, const uint8_t *src, int32_t row)
+void __cdecl BattleJoinSelect(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
 {
-    const uint8_t *rows;
-
     (void)w;
 
-    if (!src || row < 0 || row >= *(const int32_t *)src)
+    if (!rows || row < 0 || row >= rows->count)
         return;
 
-    rows = *(const uint8_t *const *)(src + 4);
-    if (rows[(uint32_t)row * AM2_LIST_ROW_STRIDE] == '^') {
+    if (rows->text[(uint32_t)row * AM2_LIST_ROW_STRIDE] == '^') {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
@@ -13748,11 +13745,79 @@ void __cdecl BattleJoinPoll(AM2_Widget *w)
             <= AM2_BATTLE_POLL_MS)
         return;
 
-    RecordReset(*(void **)(self + TEXTLIST_OFF_SOURCE));
-    CommEnumSessions(g_commObject, *(void **)(self + TEXTLIST_OFF_SOURCE));
+    RecordReset(*(void **)(self + LIST_OFF_ROWS));
+    CommEnumSessions(g_commObject, *(void **)(self + LIST_OFF_ROWS));
 
     ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
     *(uint32_t *)(self + TEXTLIST_OFF_POLLED) = now;
+}
+
+
+/* 0x0042F9D0, ADDR_BATTLE_JOIN_OK -- the browser's OK, installed twice: as the
+ * button's handler and as the name field's onEnter, which is why refs_to finds
+ * two push operands for one function.
+ *
+ * A CONVENIENCE THAT LOOKS LIKE A BUG UNTIL THE COUNT IS READ: with nothing
+ * chosen and EXACTLY ONE session listed, it picks that one for you. Any other
+ * count leaves -1 and falls through to the refusal.
+ *
+ * Every refusal is the same audible one -- sound 3 -- and there are five of
+ * them: no row chosen, a row past the end, an empty player name, the join
+ * failing, and the player not being created. Worth counting the exits before
+ * writing, since they all converge on one tail.
+ *
+ * The non-host arm re-reads the session description and copies its
+ * dwCurrentPlayers into COMM_OFF_PLAYER_COUNT; the host already knows. Both
+ * globals are re-read after each call rather than kept, as the original does.
+ *
+ * Menu request 9 is where it goes on success -- OpenMpJoin, the non-host
+ * panel -- and the name is saved to ADDR_SAVED_PLAYER_NAME and written back
+ * to Options.cfg, which is why the browser remembers it next time. */
+
+void __cdecl BattleJoinOk(void)
+{
+    uint8_t      *dlg = *(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT;
+    AM2_ListRows *rows;
+    const char   *name;
+    uint8_t      *comm;
+    int32_t       row;
+
+    rows = *(AM2_ListRows **)(uintptr_t)ADDR_SESSION_OBJECT;
+
+    if (*(const int32_t *)(dlg + BATTLEJOIN_OFF_CHOSEN) == -1
+            && rows->count == 1)
+        *(int32_t *)(dlg + BATTLEJOIN_OFF_CHOSEN) = 0;
+
+    row  = *(const int32_t *)(dlg + BATTLEJOIN_OFF_CHOSEN);
+    name = (const char *)(dlg + BATTLEJOIN_OFF_NAME);
+
+    if (row >= 0 && row < rows->count && strlen(name) >= 1
+        && CommJoinSession(g_commObject,
+                           *(const GUID **)(rows->text
+                                      + (uint32_t)row * AM2_LIST_ROW_STRIDE
+                                      + AM2_LIST_ROW_VALUE))) {
+
+        comm = g_commObject;
+        if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+            CommGetSessionDesc(comm);
+            comm = g_commObject;
+            *(int32_t *)(comm + COMM_OFF_PLAYER_COUNT) =
+                *(const int32_t *)(*(uint8_t **)(comm + COMM_OFF_SESSION_DESC)
+                                   + AM2_DPSESSION_OFF_CUR_PLAYERS);
+        }
+
+        if (CommCreatePlayer(g_commObject, name, 0, 0, 0)) {
+            OnLobbySlave();
+            PlaySoundAt(2, 0, 0, 0, 0);
+            g_menuRequest    = AM2_MENU_REQUEST_OPTIONS_VIEW;
+            g_menuRequestSet = 1;
+            strcpy((char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME, name);
+            SaveOptions();
+            return;
+        }
+    }
+
+    PlaySoundAt(3, 0, 0, 0, 0);
 }
 
 int widget_install(void)
@@ -14615,6 +14680,8 @@ int widget_install(void)
                         "BattleJoinSelect", 3);
     rc |= patch_replace(ADDR_BATTLE_JOIN_POLL, (const void *)BattleJoinPoll,
                         "BattleJoinPoll", 1);
+    rc |= patch_replace(ADDR_BATTLE_JOIN_OK, (const void *)BattleJoinOk,
+                        "BattleJoinOk", 0);
     return rc;
 }
 
