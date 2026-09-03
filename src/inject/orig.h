@@ -382,7 +382,12 @@
 #define ADDR_DLG_MESSAGE_DELETE           0x00452960u
 #define ADDR_DLG_MESSAGE_DESTRUCT         0x00452980u
 #define ADDR_MESSAGE_CTOR        0x00452750u /* thiscall, ret 8 */
-#define ADDR_DLG_MESSAGE_OK      0x00452EE0u /* void(AM2_Widget *) */
+/* SHARED, which is why it is not named for either caller. It is the message
+ * box's OK and the game menu's RETURN, and it is what both dialogs put in
+ * DLG_OFF_ESCAPE -- so it is "dismiss this dialog" and nothing more specific.
+ * It went in as ADDR_DLG_MESSAGE_OK from the first consumer found; the second
+ * is what showed that was a guess. */
+#define ADDR_DLG_CLOSE           0x00452EE0u /* void(AM2_Widget *) */
 #define AM2_TYPER_BYTES          0x464u
 #define AM2_MULTISPRITE_BYTES    0x80u
 /* The typer owns the message box's icon: DlgMessageConstruct builds the
@@ -406,6 +411,18 @@
  * Naming this one from the string it pushes would have been the call-site
  * mistake exactly. */
 #define ADDR_GAMEMENU_CTOR       0x00452AA0u /* thiscall, ret 8 */
+/* Its six button handlers, in menu order. RETURN's is ADDR_DLG_CLOSE, shared
+ * with the message box, and is also the dialog's DLG_OFF_ESCAPE. */
+#define ADDR_GAMEMENU_SAVE       0x00452E80u
+#define ADDR_GAMEMENU_LOAD       0x00452E50u
+#define ADDR_GAMEMENU_CONTROLS   0x00452EB0u
+#define ADDR_GAMEMENU_AUDIO      0x00452F00u
+#define ADDR_GAMEMENU_ABORT      0x00452F30u
+#define AM2_GAMEMENU_LEFT        0xF5
+#define AM2_GAMEMENU_TOP         0x82
+#define AM2_GAMEMENU_STEP        0x28
+#define AM2_GAMEMENU_WIDTH       0x98
+#define AM2_GAMEMENU_HEIGHT      0x19
 #define ADDR_OPEN_GAME_MENU      0x00452F50u /* void(void) */
 #define AM2_GAMEMENU_SIZE        0x68u
 #define ADDR_STR_BLANK_BMP       0x00486F90u /* "00_999_99_blank.bmp" */

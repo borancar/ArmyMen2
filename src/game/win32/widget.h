@@ -679,6 +679,12 @@ AM2_Widget *__attribute__((thiscall)) DlgOverwriteConstruct(AM2_Widget *w,
                                                             const char *bmp,
                                                             int32_t flag);
 
+/* 0x00452AA0, thiscall. The in-mission menu: RETURN, SAVE, LOAD, CONTROLS,
+ * AUDIO, ABORT -- six buttons down one column, 0x28 apart. */
+AM2_Widget *__attribute__((thiscall)) DlgGameMenuConstruct(AM2_Widget *w,
+                                                           const char *bmp,
+                                                           int32_t flag);
+
 AM2_DECLARE_CLASS_DTOR(DlgMessage);
 AM2_DECLARE_CLASS_DTOR(DlgGameMenu);
 

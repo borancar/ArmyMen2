@@ -4287,6 +4287,86 @@ void __attribute__((thiscall)) HudCmdInvoke(AM2_Widget *w, int32_t mode)
     }
 }
 
+/* The in-mission game menu's six buttons, in the order the constructor adds
+ * them: a 0x98x0x19 button every 0x28 pixels down a single column. Generated
+ * as a table because six near-identical arms are what the DirtyCollect rule
+ * is about -- the original writes the first three y values as literals and
+ * the last three as `edi += 0x28`, which is the same sequence spelled two
+ * ways and exactly the sort of thing a hand transcription gets wrong. */
+static const struct {
+    const char *b0, *b1, *b2;
+    uint32_t    handler;
+} kGameMenuButtons[6] = {
+    { "03_124_00_return.bmp",   "03_124_01_return.bmp",
+      "03_124_02_return.bmp",   ADDR_DLG_CLOSE },
+    { "03_125_00_save.bmp",     "03_125_01_save.bmp",
+      "03_125_02_save.bmp",     ADDR_GAMEMENU_SAVE },
+    { "03_123_00_load.bmp",     "03_123_01_load.bmp",
+      "03_123_02_load.bmp",     ADDR_GAMEMENU_LOAD },
+    { "03_121_00_controls.bmp", "03_121_01_controls.bmp",
+      "03_121_02_controls.bmp", ADDR_GAMEMENU_CONTROLS },
+    { "03_120_00_audio.bmp",    "03_120_01_audio.bmp",
+      "03_120_02_audio.bmp",    ADDR_GAMEMENU_AUDIO },
+    { "03_122_00_abort.bmp",    "03_122_01_abort.bmp",
+      "03_122_02_abort.bmp",    ADDR_GAMEMENU_ABORT },
+};
+
+/* DlgGameMenuConstruct -- original 0x00452AA0, 928 bytes, thiscall `ret 8`.
+ * The in-mission menu: RETURN, SAVE, LOAD, CONTROLS, AUDIO, ABORT.
+ *
+ * Those six are the same six CLAUDE.md lists as RefreshScreen's callers, and
+ * the reason that function is unreachable from the title screen: every one of
+ * them is gated on ADDR_GAME_STATE being 2, and this dialog is how they are
+ * reached at all.
+ *
+ * ONLY THE FIRST BUTTON IS TREATED SPECIALLY, in two ways that are easy to
+ * miss because the other five arms are byte-for-byte alike: it becomes the
+ * focused child, and the constructor calls its vtable slot 3 -- take focus --
+ * immediately after adding it. The other five are added and left alone.
+ *
+ * DLG_OFF_ESCAPE takes RETURN's handler, so escape leaves the menu.
+ *
+ * DLG_OFF_LIST is nulled before anything is built -- this dialog has no list
+ * and says so explicitly, where DlgOverwriteConstruct simply leaves it. */
+AM2_Widget *__attribute__((thiscall)) DlgGameMenuConstruct(AM2_Widget *w,
+                                                           const char *bmp,
+                                                           int32_t flag)
+{
+    AM2_Rect box;
+    int32_t  i;
+
+    ScreenBaseConstruct(w, bmp, flag);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_DLG_GAMEMENU);
+    *(void **)((uint8_t *)w + DLG_OFF_LIST) = (void *)0;
+    w->flag44 = 1;
+
+    for (i = 0; i < 6; i++) {
+        AM2_Widget *btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+
+        if (btn) {
+            RectSet(&box, AM2_GAMEMENU_LEFT,
+                    AM2_GAMEMENU_TOP + i * AM2_GAMEMENU_STEP,
+                    AM2_GAMEMENU_WIDTH, AM2_GAMEMENU_HEIGHT);
+            btn = ButtonConstruct(btn, kGameMenuButtons[i].b0,
+                                  kGameMenuButtons[i].b1,
+                                  kGameMenuButtons[i].b2, 0, box,
+                                  (void (__cdecl *)(AM2_Widget *))
+                                      AM2_IMAGE(kGameMenuButtons[i].handler),
+                                  (void (__cdecl *)(AM2_Widget *))0);
+        }
+        WidgetAddChild(w, btn);
+
+        if (i == 0) {
+            w->focusedChild = btn;
+            ((AM2_WidgetFocusFn *)btn->vtable)[WIDGET_VSLOT_FOCUS](btn, 0);
+        }
+    }
+
+    *(void **)((uint8_t *)w + DLG_OFF_ESCAPE) =
+        (void *)AM2_IMAGE(ADDR_DLG_CLOSE);
+    return w;
+}
+
 /* DlgOverwriteConstruct -- original 0x00450320, 688 bytes, thiscall `ret 8`.
  * "Are you sure you want to overwrite savefile '%s'?" with OK and CANCEL,
  * the message, and the same red icon the message box uses.
@@ -4413,7 +4493,7 @@ AM2_Widget *__attribute__((thiscall)) DlgMessageConstruct(AM2_Widget *w,
         btn = ButtonConstruct(btn, "03_007_00_ok.bmp", "03_007_01_ok.bmp",
                               "03_007_02_ok.bmp", 1, box,
                               (void (__cdecl *)(AM2_Widget *))
-                                  AM2_IMAGE(ADDR_DLG_MESSAGE_OK),
+                                  AM2_IMAGE(ADDR_DLG_CLOSE),
                               (void (__cdecl *)(AM2_Widget *))0);
     }
     WidgetAddChild(w, btn);
@@ -5288,7 +5368,7 @@ void __cdecl OpenOverwriteGame(void)
 void __cdecl OpenGameMenu(void)
 {
     CloseCurrentScreen();
-    OpenScreen2(AM2_GAMEMENU_SIZE, (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_GAMEMENU_CTOR),
+    OpenScreen2(AM2_GAMEMENU_SIZE, (AM2_ScreenCtor2Fn)DlgGameMenuConstruct,
                 (const char *)AM2_IMAGE(ADDR_STR_BLANK_BMP), 0);
     RefreshScreen();
 }
@@ -11907,6 +11987,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_GAMEMENU_CTOR,
+                        (const void *)DlgGameMenuConstruct,
+                        "DlgGameMenuConstruct", 1);
     rc |= patch_replace(ADDR_OVERWRITE_CTOR,
                         (const void *)DlgOverwriteConstruct,
                         "DlgOverwriteConstruct", 1);
