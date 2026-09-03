@@ -948,7 +948,32 @@
 #define AM2_HUD_SQUAD_WIDTH      0x90
 #define ADDR_HUD_SQUAD_PAINT   0x00416DA0u  /* thiscall void(obj, RECT) */
 #define ADDR_HUD_SQUAD_SLOT_XY 0x004766C8u  /* int16[12][2], x then y */
+/* 0x00416340, 2,643 bytes and ONE exit -- the squad panel's detail slot,
+ * which is where "HT:4.6 cm  WT:2.4 g  MV:2 cm/s  HP:140/140" comes from.
+ * 28 DrawText calls, 9 sprintfs, three ClearRegions, and it brackets
+ * Lock/Unlock, so it is also one of the outstanding rasterisers.
+ *
+ * IT BUILDS TWO TABLES OF DOUBLES ON THE STACK, one dword at a time, which
+ * is what the forty-odd `mov [esp+N], imm32` at its head are -- not
+ * initialisation of forty locals. Nine entries each, indexed by soldier
+ * kind:
+ *
+ *   HEIGHT cm  4.4  4.8  4.3  4.4  4.0  4.5  4.4  4.9  3.9   (base +0xCC)
+ *   WEIGHT g   2.3  2.6  2.3  2.4  2.1  2.4  2.3   ?   2.2   (base +0x84)
+ *
+ * Read out of the instruction stream rather than transcribed from the
+ * screen; a panel showing HT:4.6 means the kind indexes PAST these, so
+ * whoever finishes this should find where that comes from before assuming
+ * the tables are the whole story.
+ *
+ * Read and NOT reconstructed. Its verification is good -- bootcamp draws
+ * this panel at the briefing, so the 22-pixel floor would catch a wrong
+ * coordinate -- but 2,643 bytes of 28 text placements is a large unit and
+ * one wrong offset is a debugging cycle. Started fresh it is a day's work
+ * with a real check at the end, which is a better trade than finishing it
+ * tired. */
 #define ADDR_HUD_SQUAD_DETAIL  0x00416340u  /* thiscall void(obj, int32) */
+#define AM2_SQUAD_KIND_COUNT   9    /* both stack tables */
 #define HUD_SQUAD_ICON_SPRITE  0x58u   /* AM2_Sprite *, the pip drawn per icon */
 #define HUD_SQUAD_RECS         0xBCu   /* the twelve records start here */
 #define HUD_SQUAD_REC_SIZE     0x20u
