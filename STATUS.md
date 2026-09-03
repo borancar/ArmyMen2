@@ -191,6 +191,20 @@ It is not a correctness problem on the evidence available: the game log is
 identical at 13 messages, the object state dump is identical, and the widget
 tree is identical at 16 nodes, on every one of those runs.
 
+**Two more samples after FireWeapon landed: 471 and 546, against the
+original's 7,443 and 7,343.** Same band as the 533/652/625 above, and the
+same three artifacts identical both times. Worth recording because
+FireWeapon is the largest function in the tree and lands in the middle of
+the weapon path, so it was the obvious suspect the moment the gate failed --
+and it is not the cause. The band was already this low on commits that
+predate it.
+
+Note the ORIGINAL side also reads ~7,400 here rather than the ~26,000 above,
+so both halves moved with the machine between those sessions. Read the
+RATIO's direction, not either number alone: what stayed constant across all
+five runs is that ours is the short side, which is itself the reverse of
+what CLAUDE.md documents for this configuration.
+
 **THE TRACE TABLE IS NOT THE CAUSE. TESTED AND DISPROVED.**
 
 | | original | reconstruction |
