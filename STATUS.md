@@ -9,7 +9,7 @@ Last updated: **2026-09-03**, at `1bc33e8`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,580 patches plus 4 REGISTERED**, **30** analysis
+Nothing uncommitted. **1,637 patches plus 6 REGISTERED**, **30** analysis
 tools in `make check` (`tools/checkpatches.py`; `make check` for the tools).
 
 ## ONE FUNCTION LEFT
@@ -312,7 +312,32 @@ honest one on this screen. CLAUDE.md already says to read a liveness counter
 beside the one you care about; it does not help if the liveness counter is
 itself blind, so check blindspots.py for the one you pick.
 
-## THE COUNT TODAY: 82 functions, and 36 of them are one class
+## THE TRANSPOSITION IS COMPLETE, and tools/remaining.py says so
+
+Measured 2026-09-03. `tools/remaining.py` reads **0 game functions and 0 C++
+static initializers**, over the full range to the REAL CRT frontier
+(0x00464420, per tools/crt.py) rather than the nominal CRT_START -- which is
+26 KB low and would have hidden 112 game functions.
+
+What is still the image's, and why none of it is work:
+
+| | entries | bytes | why |
+|---|---:|---:|---|
+| linker thunks | 18 | 288 | one `jmp` each into the real body; an incremental-linking artifact the original source never had |
+| jump tables | 4 | 188 | data in `.text`, not code |
+| harness / IAT | 4 | 4,246 | ADDR_LOG, which src/inject/gamelog.c owns, and the three `jmp [IAT]` import thunks |
+
+The last group is the one worth being explicit about, because reconstructing
+any of it is a DEFECT rather than progress. Replacing ADDR_LOG with an empty
+function once silenced the game's log and blinded half of tools/ab.sh --
+CLAUDE.md records the five configurations spent that way. And DirectInput
+MUST go through its thunk, or our own import would resolve past
+dinput_hook.c's patch, which tools/checkhooks.py exists to catch.
+
+remaining.py classifies all three groups rather than counting them, and
+prints "nothing left to transpose" when the two real counts reach zero.
+
+## STALE: 82 functions, and 36 of them are one class
 
 Measured 2026-09-03 at 1,580 patches, by the method below (split merged
 entries through tools/merges.py, then containment WITHIN a real function):

@@ -31,6 +31,23 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 import am2, capstone, merges
 
+# Where the CRT actually begins, per tools/crt.py -- not the nominal constant.
+CRT_REAL = 0x00464420
+
+# Reached only through the harness or the game's own IAT, and reconstructing
+# either is a DEFECT rather than progress.  0x0045CAA0 is the retail build's
+# stubbed logger, which src/inject/gamelog.c patches to capture output --
+# CLAUDE.md records that replacing it with an empty function silenced the log
+# and blinded half of tools/ab.sh.  The other three are one-instruction
+# `jmp [IAT]` import thunks; DirectInput in particular MUST go through its
+# thunk, or our own import would resolve past dinput_hook.c's patch.
+OFF_LIMITS = {
+    0x0045CAA0,  # ADDR_LOG, stubbed to `ret`, owned by the harness
+    0x00463390,  # DirectSoundCreate
+    0x00463396,  # DirectDrawCreate
+    0x00464410,  # DirectInputCreateA
+}
+
 
 def remaining():
     img = am2.Image()
@@ -42,7 +59,11 @@ def remaining():
     with open(os.path.join(REPO, "docs", "functions.tsv")) as fh:
         for row in csv.DictReader(fh, delimiter="\t"):
             addr, size = int(row["addr"], 16), int(row["size"])
-            if addr >= merges.CRT_START:
+            # tools/crt.py measured the REAL frontier: game code runs to
+            # 0x00462600 and the CRT proper starts at 0x00464420, with the
+            # import thunks parked between.  CRT_START is 26 KB low, so
+            # stopping there would hide 112 game functions.
+            if addr >= CRT_REAL:
                 continue
             if addr in splits:
                 starts, total = splits[addr]
@@ -111,6 +132,8 @@ def remaining():
 
 def main():
     funcs, rem, init, tables, thunks = remaining()
+    off  = [(a, s) for a, s in rem if a in OFF_LIMITS]
+    rem  = [(a, s) for a, s in rem if a not in OFF_LIMITS]
     thk  = [(a, s) for a, s in rem if a in thunks]
     ini  = [(a, s) for a, s in rem if a not in thunks and a in init]
     tab  = [(a, s) for a, s in rem if a not in thunks and a not in init
@@ -118,9 +141,11 @@ def main():
     game = [(a, s) for a, s in rem if a not in thunks and a not in init
             and a not in tables]
 
-    print("real functions below the CRT line: %d" % len(funcs))
+    print("real functions below the CRT frontier: %d" % len(funcs))
     print("still original                   : %d functions, %d bytes"
           % (len(rem), sum(s for _, s in rem)))
+    print("  harness / IAT, must NOT be done : %d entries,   %d bytes"
+          % (len(off), sum(s for _, s in off)))
     print("  C++ static initializers        : %d functions, %d bytes"
           % (len(ini), sum(s for _, s in ini)))
     print("  linker thunks (one jmp each)   : %d entries,   %d bytes"
@@ -129,6 +154,12 @@ def main():
           % (len(tab), sum(s for _, s in tab)))
     print("  game functions                 : %d functions, %d bytes"
           % (len(game), sum(s for _, s in game)))
+    if not game and not ini:
+        print("\nNothing left to transpose: what remains is build artifacts\n"
+              "(linker thunks), data (jump tables), and the harness/IAT\n"
+              "entries above, none of which is a function the original\n"
+              "source had.")
+
     if "-v" in sys.argv:
         print()
         for a, s in sorted(game, key=lambda x: -x[1]):
