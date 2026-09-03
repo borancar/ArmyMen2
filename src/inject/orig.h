@@ -710,7 +710,23 @@
 #define BUILD_MENU_OFF_ID      0x00u  /* into ADDR_UNIT_TYPES, NOT the index */
 #define BUILD_MENU_OFF_KIND    0x04u
 #define BUILD_MENU_OFF_NAME    0x08u  /* char[0x18] */
-#define BUILD_MENU_OFF_RECT    0x28u  /* int32 x, y, w, h -- 43x27 throughout */
+/* THE RECTANGLES ARE SHIFTED ONE RECORD EARLIER THAN THE RECORD THEY BELONG
+ * TO, and the entry above described the layout correctly while attributing
+ * each rect to the wrong button. HudBuildConstruct pairs record i with the
+ * rect at `base + i*0x38 - 0x10`, not with its own +0x28 -- so Rifleman, the
+ * first record, takes the standalone rect at 0x004762C0, which is
+ * {6,190,43,27}, and Grenadier takes record 0's +0x28, {50,190,43,27}. Six
+ * and fifty are the first two columns of the same grid the squad panel uses.
+ *
+ * That also explains what the note above could only observe: record 17's tail
+ * "is not a rectangle" because it is never read. The loop's last rect is
+ * record 16's +0x28, so the final +0x28 in the table has no consumer at all.
+ *
+ * Read BUILD_MENU_OFF_RECT as "the NEXT button's rectangle", or reach it as
+ * ADDR_BUILD_MENU_RECTS below, which is the base the loop actually walks. */
+#define BUILD_MENU_OFF_RECT    0x28u  /* int32 x,y,w,h -- the NEXT button's */
+#define ADDR_BUILD_MENU_RECTS  0x004762C0u  /* what record i's button uses:
+                                             * base + i*0x38, stride 0x38 */
 /* ARMY_POINTS[OUR_SLOT], cached when the HUD is built rather than re-derived
  * eighteen times a frame. */
 #define ADDR_OUR_POINTS        0x004FCF9Cu  /* int32_t */
