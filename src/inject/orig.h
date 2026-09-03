@@ -10661,7 +10661,27 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * The eleven other cross-arm branches all target 0x0045F5B2, which is the
  * DEFAULT arm and is nothing but `return 0` -- early exits, not shared
  * bodies. Distinguishing those two cases is the whole reason to follow the
- * branches rather than count them. */
+ * branches rather than count them.
+ *
+ * A THIRD ARM ENDS INSIDE ANOTHER BY FALLING THROUGH, which no branch scan
+ * can see: arm 0's tail runs off the end of 0x0045F5AF straight into the
+ * DEFAULT arm's `xor eax, eax; ret`. So arms 0 and 7 both return 0.
+ *
+ * AND THE RETURN VALUE IS "CONSUME THE ITEM", NOT "DID IT FIRE". Two of the
+ * three callers discard it outright -- Step3Drive and FireWeaponAtPoint --
+ * and the third, TrooperFire, uses it for exactly one thing: gating
+ * UseInventoryItem. That settles a pattern which reads as a bug otherwise:
+ *
+ *   return 0   arms 0, 7, 15 (repeat-fire) and 10 (area), all of which
+ *              plainly DO fire, plus the default which does nothing
+ *   return 1   the one-shot arms -- MINE, FLAG, the three air-support
+ *              kinds, and the rest
+ *   both       arms 17 and 20, which decide per call
+ *
+ * So arm 0 and arm 7 falling into the default's `xor eax, eax` is not an
+ * accident of layout; it is how a repeating weapon says "do not use me up".
+ * An arm written to return 1 because it fired would empty the player's
+ * inventory a round at a time, and nothing on this machine fires. */
 #define ADDR_FIRE_WEAPON_INDEX   0x004600B0u  /* uint8_t[43], kind - 1 */
 #define ADDR_FIRE_WEAPON_ARMS    0x00460050u  /* void *[24] */
 /* The four ways a script asks for a shot: an explicit weapon or the unit's
