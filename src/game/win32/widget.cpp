@@ -4191,6 +4191,44 @@ typedef void (__cdecl *AM2_VoidFn)(void);
 
 #define orig_operator_new     ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
 
+/* HudCmdInvoke -- original 0x00417180, 56 bytes, thiscall, six callers (one
+ * per command). Pick command `mode` if the bar is currently offering it.
+ *
+ * It walks all THREE slots and does not stop at the first match. Three slots
+ * cannot normally hold the same mode, so the difference is unobservable --
+ * but a `break` would be a change to the code rather than to its effect, and
+ * the original's loop is a plain three-iteration countdown with no early
+ * exit. Left as written.
+ *
+ * The handler comes out of the SAME 0x28-byte records HudCmdConstruct fills
+ * with sprites, at +0x18. The original reaches it as `[eax*8 + 0x004761C0]`
+ * after `lea eax,[esi+esi*4]` -- esi*0x28 from a base that is 0x18 into
+ * record 0 -- so 0x004761C0 is a field pointer and not a table of its own.
+ * That is the third field pointer in this one table: the sprites are reached
+ * at +0x0C and the specs at +0x00.
+ *
+ * A null handler is skipped and the pointer mode is set anyway. */
+void __attribute__((thiscall)) HudCmdInvoke(AM2_Widget *w, int32_t mode)
+{
+    const int32_t *slot = (const int32_t *)((uint8_t *)w + HUDCMD_OFF_SLOTS);
+    int32_t        i;
+
+    for (i = 0; i < AM2_HUD_CMD_SLOTS; i++) {
+        if (slot[i] != mode)
+            continue;
+
+        SetPointerMode(mode);
+        {
+            const uint8_t *rec = (const uint8_t *)AM2_IMAGE(ADDR_HUD_CMD_SPEC)
+                               + (size_t)mode * AM2_HUD_CMD_SPR_STRIDE;
+            void (*handler)(void) =
+                *(void (**)(void))(rec + HUDCMDSPR_OFF_HANDLER);
+            if (handler)
+                handler();
+        }
+    }
+}
+
 /* The build screen's START button. Read out of the image rather than guessed
  * -- "done" was the obvious name for a button at the bottom of a build menu
  * and it is not what the strings say. */
@@ -11603,6 +11641,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_HUD_CMD_INVOKE, (const void *)HudCmdInvoke,
+                        "HudCmdInvoke", 6);
     rc |= patch_replace(ADDR_HUD_PANEL_CONSTRUCT,
                         (const void *)HudPanelConstruct,
                         "HudPanelConstruct", 1);

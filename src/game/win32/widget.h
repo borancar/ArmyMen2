@@ -294,6 +294,9 @@ void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip);
 /* 0x00418FB0, thiscall. The HUD panel: parent of every other HUD widget, and
  * split completely by ADDR_NET_GAME -- four children in single player, the
  * radar plus eighteen build buttons in a network game. */
+/* 0x00417180, thiscall. Pick a command mode if the bar is offering it. */
+void __attribute__((thiscall)) HudCmdInvoke(AM2_Widget *w, int32_t mode);
+
 AM2_Widget *__attribute__((thiscall)) HudPanelConstruct(AM2_Widget *w);
 
 AM2_Widget *__attribute__((thiscall)) HudSquadConstruct(AM2_Widget *w);

@@ -695,10 +695,19 @@
 #define HUDCMDSPR_OFF_INDEX    0x04u
 #define HUDCMDSPR_OFF_FRAME    0x08u
 #define HUDCMDSPR_OFF_SPRITE   0x0Cu  /* where the loaded sprite is stored */
+/* +0x18 of the SAME record: the handler HudCmdInvoke calls when that command
+ * is picked. The original reaches it as `[eax*8 + 0x004761C0]` after
+ * `lea eax,[esi+esi*4]`, which is esi*0x28 from a base 0x18 into record 0 --
+ * a field pointer, not a table of its own. */
+#define HUDCMDSPR_OFF_HANDLER  0x18u  /* void (*)(void), may be null */
 #define AM2_HUD_CMD_SPR_STRIDE 0x28u
 #define AM2_HUD_CMD_TOP        0x199  /* the bar's y, w and h; x is 0 */
 #define AM2_HUD_CMD_WIDTH      0x90
 #define AM2_HUD_CMD_HEIGHT     0x30
+/* 0x00417180, thiscall, six callers -- one per command. Is this mode in one
+ * of my three slots, and if so make it the pointer mode and run its handler.
+ * It checks all three rather than stopping at the first match. */
+#define ADDR_HUD_CMD_INVOKE    0x00417180u  /* thiscall void(this, int32) */
 #define ADDR_HUD_CMD_DESTRUCT  0x00417110u
 /* The Sarge panel's own sprites: 31 slots from HUD_OFF_SPRITE0, filled by its
  * constructor from sprite set 13 indices 0..30. */
