@@ -713,6 +713,8 @@ void __cdecl SelectWeapon(void *unit, int32_t slot);
 void __attribute__((thiscall)) HudSquadDetail(AM2_Widget *w, int32_t uid);
 /* 0x004158D0 -- the squad panel's per-frame update: hit-test, clear, refill. */
 void __attribute__((thiscall)) HudSquadUpdate(AM2_Widget *w);
+/* 0x004171C0 -- the command panel's per-frame update: hotkeys, mouse, refill. */
+void __attribute__((thiscall)) HudCmdUpdate(AM2_Widget *w);
 
 /* 0x00418480, thiscall. Finish a chat line -- and run it as a cheat when it
  * starts with `!` and there is no session. */

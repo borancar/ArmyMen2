@@ -12263,6 +12263,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_SQUAD_UPDATE,
                         (const void *)HudSquadUpdate,
                         "HudSquadUpdate", 1);
+    rc |= patch_replace(ADDR_HUD_CMD_UPDATE,
+                        (const void *)HudCmdUpdate,
+                        "HudCmdUpdate", 1);
     rc |= patch_replace(ADDR_HUD_CHAT_SEND, (const void *)HudChatSend,
                         "HudChatSend", 1);
     rc |= patch_replace(ADDR_SELECT_WEAPON, (const void *)SelectWeapon,
@@ -13711,6 +13714,171 @@ void __attribute__((thiscall)) HudSquadUpdate(AM2_Widget *w)
     if (*(const int32_t *)(self + HUD_SQUAD_RECS + HUD_SQUAD_REC_SIZE
                            + SQUAD_REC_INDEX) < 0)
         *(int32_t *)(self + HUD_SQUAD_RECS + SQUAD_REC_WIDE) = 1;
+}
+
+/* HudCmdUpdate -- original 0x004171C0, 640 bytes, thiscall, ONE exit.
+ * Slot 2 of the command panel's row in the HUD vtable array at 0x0046F8B0,
+ * named the same way HudSquadUpdate was and unreferenced from .text for the
+ * same reason: the table is in .rdata.
+ *
+ * Three passes again, and the first two are HudSargeUpdate's exactly -- six
+ * hotkeys where the first match wins and skips everything else, then a mouse
+ * pass gated on HUDPANEL_OFF_OPEN that claims through ADDR_MOUSE_GRAB and
+ * fires on RELEASE.
+ *
+ * THE SIX HOTKEY PAIRS ARE NOT IN ORDER and that is the whole risk in the
+ * first pass: scancodes 0x10, 0x11, 0x12, 0x0E, 0x0C, 0x0F select commands
+ * 4, 5, 6, 1, 3, 2. Reading the arms top to bottom and numbering as you go
+ * gets three of the six wrong, which is this file's standing warning about
+ * dispatch order applied to a ladder rather than to a table.
+ *
+ * IT SHARES THE SQUAD PANEL'S GRID. The loop walks from
+ * ADDR_HUD_SQUAD_SLOT_XY in the same `[p-2]`/`[p]` convention and stops at
+ * 0x004766D6, which is three pairs -- so the command row sits on the top row
+ * of the squad grid, at x 6, 50 and 94 and y 22. Not a table of its own.
+ *
+ * THE TYPE-3 ARM ENDS INSIDE THE TYPE-2 ARM. A vehicle whose first occupant
+ * is Sarge gets commands 1 and 2; a vehicle whose first occupant is anyone
+ * else `jmp`s into the middle of the plain-trooper arm and takes 4, 5, 6.
+ * Following every branch out of an arm is the only way to see that -- the
+ * bodies read as three independent cases and there are only two endings.
+ *
+ * Sarge himself gets 1 and 2, and 3 as well when he has something in hand.
+ */
+void __attribute__((thiscall)) HudCmdUpdate(AM2_Widget *w)
+{
+    /* The scancode each command answers to. Transcribed as PAIRS because the
+     * ladder's order is not the commands' order -- see the note above. */
+    static const struct { int32_t key; int32_t cmd; } kHotkeys[] = {
+        { 0x10, 4 }, { 0x11, 5 }, { 0x12, 6 },
+        { 0x0E, 1 }, { 0x0C, 3 }, { 0x0F, 2 },
+    };
+
+    uint8_t *self = (uint8_t *)w;
+    uint8_t *panel;
+    int32_t *slots = (int32_t *)(self + HUDCMD_OFF_SLOTS);
+    uint8_t *obj;
+    int32_t  i;
+
+    if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER
+        || *(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
+        return;
+
+    WidgetUpdate(w);
+
+    /* Pass one: the hotkeys, first match wins and the mouse pass is skipped. */
+    for (i = 0; i < (int32_t)(sizeof kHotkeys / sizeof kHotkeys[0]); i++) {
+        if (ActionKeyPressed(kHotkeys[i].key)) {
+            HudCmdInvoke(w, kHotkeys[i].cmd);
+            goto refill;
+        }
+    }
+
+    panel = (uint8_t *)*(AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_B;
+
+    /* Pass two: the mouse, but only while the panel is open. */
+    if (*(const int32_t *)(panel + HUDPANEL_OFF_OPEN)) {
+        const int16_t *grid =
+            (const int16_t *)AM2_IMAGE(ADDR_HUD_SQUAD_SLOT_XY);
+
+        for (i = 0; i < AM2_HUD_CMD_SLOTS; i++) {
+            int32_t           idx = slots[i];
+            const uint8_t    *spec;
+            const AM2_Sprite *spr;
+            AM2_Rect          cell;
+            AM2_Widget       *grab;
+            int32_t           changed;
+
+            if (idx < 0)
+                continue;
+
+            spec = (const uint8_t *)AM2_IMAGE(ADDR_HUD_CMD_SPEC)
+                   + (uint32_t)idx * AM2_HUD_CMD_SPR_STRIDE;
+            spr  = *(const AM2_Sprite *const *)(spec + HUDCMDSPR_OFF_SPRITE);
+
+            cell.left   = grid[i * 2]     + w->rect.left;
+            cell.top    = grid[i * 2 + 1] + w->rect.top;
+            cell.right  = spr->bounds.right  + cell.left;
+            cell.bottom = spr->bounds.bottom + cell.top;
+
+            if (!PointInRect(&cell,
+                             (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+                continue;
+
+            grab    = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
+            changed = *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED;
+
+            if (!grab && changed) {
+                grab = w;
+                *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
+            }
+
+            if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+                || !changed || grab != w)
+                continue;
+
+            PlaySoundAt(0, 0, 0, 0, 0);
+            SetPointerMode(slots[i]);
+
+            /* Re-read the slot: SetPointerMode is handed the same value but
+             * the handler comes from a SECOND load of it, which is what the
+             * original does and costs nothing to keep. */
+            {
+                void (__cdecl *fn)(void) = *(void (__cdecl *const *)(void))(
+                    (const uint8_t *)AM2_IMAGE(ADDR_HUD_CMD_SPEC)
+                    + (uint32_t)slots[i] * AM2_HUD_CMD_SPR_STRIDE
+                    + HUDCMDSPR_OFF_HANDLER);
+
+                if (fn)
+                    fn();
+            }
+        }
+    }
+
+refill:
+    /* Pass three: which three commands the current object offers. */
+    slots[0] = -1;
+    slots[1] = -1;
+    slots[2] = -1;
+
+    obj = (uint8_t *)*(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A;
+
+    if (ObjType2Field548((const AM2_Object *)obj)) {
+        slots[0] = 1;
+        slots[1] = 2;
+        if (*(const int32_t *)(obj + UNIT_OFF_INVENTORY_SEL) > 0)
+            slots[2] = 3;
+    } else {
+        /* The two remaining arms SHARE AN ENDING in the image: a vehicle
+         * whose first occupant is not Sarge `jmp`s into the middle of the
+         * trooper arm. Written with the flag rather than a goto into a
+         * block, which is the same control flow and compiles. */
+        int32_t trooper = 0;
+
+        if (ObjIsType3((const AM2_Object *)obj)) {
+            if (ObjType2Field548((const AM2_Object *)ListFirstObj(obj))) {
+                slots[0] = 1;
+                slots[1] = 2;
+            } else {
+                trooper = 1;
+            }
+        } else if (obj && *(const int32_t *)obj == AM2_OBJ_TYPE_TROOPER) {
+            trooper = 1;
+        }
+
+        if (trooper) {
+            slots[0] = 4;
+            slots[1] = 5;
+            slots[2] = 6;
+        }
+    }
+
+    /* Whichever slot matches the live pointer mode is the highlighted one. */
+    *(int32_t *)(self + HUDCMD_OFF_SELECTED) = -1;
+    for (i = 0; i < AM2_HUD_CMD_SLOTS; i++) {
+        if (slots[i] == *(const int32_t *)(uintptr_t)ADDR_POINTER_MODE)
+            *(int32_t *)(self + HUDCMD_OFF_SELECTED) = i;
+    }
 }
 
 /* HudChatSend -- original 0x00418480, 317 bytes, thiscall. Finish a chat
