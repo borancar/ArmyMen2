@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **33** analysis
+**`make check` runs everything that does not need the game.** **34** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3772,6 +3772,31 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   the hardware branch every time. It is the same reason `BlitCopy16` and
   `BlitCopy32` have always read 0. The software rasteriser is not a function
   this environment misses, it is a layer it never enters.
+
+  **EncodeBig and EncodeSmall are checked now, by `tools/rlecheck.py`.** They
+  are the sharpest case for an offline oracle in the tree: behind
+  BMP_FLAG_SOFTWARE, which nothing sets, so the layer is never entered; and
+  both counters BLIND, so `counts` cannot speak for them either. The original
+  is emulated with its allocator stubbed to a fixed buffer -- `malloc` reaches
+  HeapAlloc, which does not exist under emulation -- and the whole output is
+  compared byte for byte against a model of the reconstruction: header, row
+  table and payload, plus the size the caller keeps. The harness maps more
+  stack because the function reserves 199,000 bytes through _chkstk, which is
+  larger than vectors.py's whole stack.
+
+  280 cases. Its mutations are worth reading for what they say about the
+  CORPUS rather than the code: dropping the remap fails 164 and making the row
+  table 16-bit for both encoders fails 48, but INVERTING THE ROW DIRECTION
+  first failed only 8 -- because five of six patterns were functions of x
+  alone and read identically upside down. A corpus with no power over the one
+  thing `h`'s sign decides. With the patterns made row-dependent it fails 32
+  of 280, and the case count went UP rather than down, which is the boolcheck
+  tell in the good direction.
+
+  And say which mutation is not a test: raising the 0xFF cap on a skip or a
+  run makes the MODEL throw, because the count is written into one byte. That
+  cap is fixed by the format, not by the corpus, so it is verified by the
+  encoding's shape and no case can speak to it.
 
   The three multiplayer ones need a live DirectPlay session with a second
   player, which this machine cannot open: the row painter has two branches and with nothing connected it
