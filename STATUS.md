@@ -332,6 +332,30 @@ is the trig tables' rule applied to the function list: if a layout does not
 tile, one of the bases is wrong.  remaining.py prints it every run, so the
 claim stays verified rather than remembered.
 
+## The fourth blind spot: "CRT by position" is an inference, and it holds
+
+tools/crt.py labels 58 functions CRT from their own bodies and **171 more by
+sitting above the evidenced frontier**.  That second group is an inference,
+and if any of them were game code it would be untransposed work the counts
+cannot see -- they stop at 0x00464420.
+
+Two probes, and the sharper one is the second:
+
+- Referencing game-range data does NOT distinguish them.  97 of the 230
+  entries above the frontier touch 0x004F0000..0x00670000, because the CRT is
+  statically linked and its own statics live in the same .data.  A test that
+  cannot separate the two answers nothing.
+- CALLING game code does.  Exactly TWO entries above the frontier call
+  anything below 0x00462600, and both are explained: 0x004664C0 calls
+  ADDR_WIN_MAIN, which is the CRT startup doing its job, and 0x0046D8D0 is an
+  MSVC SEH unwind funclet -- `mov ecx,[ebp-0x50]; jmp WidgetDestruct`, sitting
+  just past int3 padding -- which is compiler-generated and which this port
+  does not reproduce by standing decision.
+
+So nothing above the frontier is game code wearing a CRT label.  Worth
+recording that the first probe was useless rather than only the second: a
+test with no discriminating power reads exactly like a passing one.
+
 ## What is left, and why none of it is work
 
 The section below claimed 0 game functions.  That was an artifact of HOW the
