@@ -233,8 +233,6 @@ typedef int32_t (__cdecl *am2_rand_fn)(void);
 typedef void (__attribute__((thiscall)) *am2_chat_send_fn)(AM2_Widget *);
 /* The squad panel's per-slot detail painter, 3,328 bytes and still the
  * original's -- nothing about it is needed to know what HudSquadPaint does. */
-typedef void (__attribute__((thiscall)) *am2_squad_detail_fn)(AM2_Widget *, int32_t);
-#define orig_hud_squad_detail (*(am2_squad_detail_fn)ADDR_HUD_SQUAD_DETAIL)
 /* Selecting a weapon reaches the unit and comm layers and stays the
  * original's. ItemIsReady and ItemTypeName were seams here until they were
  * reconstructed a commit later; checkseams caught both the moment they were,
@@ -2516,7 +2514,7 @@ void __attribute__((thiscall)) HudSquadPaint(AM2_Widget *w, RECT clip)
         }
 
         if (wide) {
-            orig_hud_squad_detail(w, *(const int32_t *)(rec + SQUAD_REC_DETAIL_ARG));
+            HudSquadDetail(w, *(const int32_t *)(rec + SQUAD_REC_DETAIL_ARG));
             continue;
         }
 
@@ -12259,6 +12257,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_HUD_SQUAD_DETAIL,
+                        (const void *)HudSquadDetail,
+                        "HudSquadDetail", 1);
     rc |= patch_replace(ADDR_HUD_CHAT_SEND, (const void *)HudChatSend,
                         "HudChatSend", 1);
     rc |= patch_replace(ADDR_SELECT_WEAPON, (const void *)SelectWeapon,
@@ -13033,6 +13034,266 @@ int widget_install(void)
  * calls is ours. */
 /* Reconstructed in item.cpp and declared there rather than in item.h. */
 void __cdecl SelectInventorySlot(void *unit, int32_t slot);
+
+typedef int32_t (__cdecl *AM2_StrnicmpFn)(const char *, const char *, size_t);
+#define orig_strnicmp ((AM2_StrnicmpFn)AM2_IMAGE(ADDR_CRT_STRNICMP))
+
+/* The squad detail panel is a 2-column, 5-row grid, and all 28 of the
+ * function's text placements sit on it. Extracted from the image by walking
+ * back from each DrawText to the `add` that offsets the widget's own rect,
+ * rather than transcribed -- 28 hand-copied coordinates is exactly where
+ * the DirtyCollect rule says the mistakes go. */
+#define SQD_LABEL_X   0x4C
+#define SQD_VALUE_X   0x60
+#define SQD_ROW_NAME  0x16
+#define SQD_ROW_1     0x22
+#define SQD_ROW_2     0x2E
+#define SQD_ROW_3     0x3A
+#define SQD_ROW_HP    0x46
+#define SQD_BAR_X     0x4C
+#define SQD_BAR_Y     0x54
+#define SQD_BAR_MAX_W 0x38
+#define SQD_PIP_X     0x4D
+#define SQD_PIP_Y     0x5B
+
+/* HudSquadDetail -- original 0x00416340, 2,643 bytes, thiscall, one exit.
+ * The squad panel's detail slot: who this unit is, and four stat rows.
+ *
+ * THREE ARMS ON ONE GRID. ObjType2Field548 picks SARGE, ObjIsType2 an
+ * ordinary soldier, anything else a vehicle. They differ only in the labels
+ * and where the values come from; every string lands at SQD_LABEL_X or
+ * SQD_VALUE_X across and on one of five rows down, all relative to the
+ * widget's own rect -- so nothing here is a screen coordinate.
+ *
+ * SARGE'S STATS ARE STRING LITERALS. "4.6 cm", "2.4 g", "2 cm/s" are baked
+ * in and only his health is formatted. The two tables of doubles the
+ * original builds on its stack a dword at a time belong to the SOLDIER arm,
+ * which is why the height table contains no 4.6 -- something this tree
+ * recorded wrongly once, before the arms were separated.
+ *
+ * The soldier's NAME has three sources tried in order: the script name from
+ * ADDR_SCRIPT_NAMES when it begins "green", title-cased; else
+ * SoldierNameOf for a trooper carrying a name index; else UnitClassName.
+ *
+ * EVERY NUMBER IS CLAMPED BEFORE FORMATTING -- 9999 for experience, 999 for
+ * health -- because the formats are %4d and %3d and a wider number would
+ * push the value column apart. It is a layout guard, not a range check.
+ *
+ * The rank pips are min(rank + 1, 5) copies of one sprite, SQD_PIP_STEP
+ * apart, each clipped against ADDR_SCREEN_CLIP before drawing -- so a pip
+ * that would fall outside is skipped rather than clipped to nothing.
+ *
+ * It brackets Lock/Unlock around the whole body and answers early if either
+ * the uid or the lock fails. */
+void __attribute__((thiscall)) HudSquadDetail(AM2_Widget *w, int32_t uid)
+{
+    static const double kSoldierHeight[AM2_SQUAD_KIND_COUNT] = {
+        4.4, 4.8, 4.3, 4.4, 4.0, 4.5, 4.4, 4.9, 3.9
+    };
+    static const double kSoldierWeight[AM2_SQUAD_KIND_COUNT] = {
+        2.3, 2.6, 2.3, 2.4, 2.1, 2.4, 2.3, 2.5, 2.2
+    };
+    uint8_t      *b   = (uint8_t *)w;
+    const int32_t ink = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+    uint8_t      *obj;
+    char          line[AM2_SQUAD_TEXT_BYTES];
+    char          name[AM2_SQUAD_TEXT_BYTES];
+    int32_t       x, y, a, c, kind;
+
+    obj = (uint8_t *)LookupByUID((uint32_t)uid);
+    if (!obj)
+        return;
+    if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+        return;
+
+    x = w->rect.left;
+    y = w->rect.top;
+
+#define SQD_TEXT(dx, dy, s) DrawText(x + (dx), y + (dy), (s), 0, 0, ink)
+
+    if (ObjType2Field548((const AM2_Object *)obj)) {
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, "Sarge");
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_1,    "HT:");
+        SQD_TEXT(SQD_VALUE_X, SQD_ROW_1,    "4.6 cm");
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_2,    "WT:");
+        SQD_TEXT(SQD_VALUE_X, SQD_ROW_2,    "2.4 g");
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_3,    "MV:");
+        SQD_TEXT(SQD_VALUE_X, SQD_ROW_3,    "2 cm/s");
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_HP,   "HP:");
+
+        a = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
+        if (a >= AM2_SQUAD_HP_CAP) a = AM2_SQUAD_HP_CAP;
+        c = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
+        if (c >= AM2_SQUAD_HP_CAP) c = AM2_SQUAD_HP_CAP;
+        am2_sprintf(line, "%3d/%3d", a, c);
+        SQD_TEXT(SQD_VALUE_X, SQD_ROW_HP, line);
+
+    } else if (ObjIsType2((const AM2_Object *)obj)) {
+        int32_t script = *(const int32_t *)(obj + ITEM_OFF_NAME_INDEX);
+        int32_t named  = 0;
+
+        if (script >= 0) {
+            const char *s = *(const char *const *)
+                ((const uint8_t *)*(void *const *)
+                     (uintptr_t)ADDR_SCRIPT_NAMES
+                 + (uint32_t)script * AM2_NAME_TABLE_STRIDE);
+            if (orig_strnicmp(s, (const char *)AM2_IMAGE(ADDR_STR_GREEN),
+                              5) == 0) {
+                strcpy(name, s);
+                TitleCaseName(name);
+                SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, name);
+                named = 1;
+            }
+        }
+        if (!named) {
+            if (*(const int32_t *)(obj + OBJ_OFF_NAME_INDEX) >= 0) {
+                SoldierNameOf(obj, name);
+                SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, name);
+            } else {
+                SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, UnitClassName(obj));
+            }
+        }
+
+        kind = *(const int32_t *)(obj + OBJ_OFF_SOLDIER_KIND);
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_1, "HT:");
+        am2_sprintf(line, "%3.1lf cm", kSoldierHeight[kind]);
+        SQD_TEXT(SQD_VALUE_X, SQD_ROW_1, line);
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_2, "WT:");
+        am2_sprintf(line, "%3.1lf g", kSoldierWeight[kind]);
+        SQD_TEXT(SQD_VALUE_X, SQD_ROW_2, line);
+
+        a = *(const int32_t *)(obj + OBJ_OFF_REPAIR_FRAME);
+        if (a >= AM2_SQUAD_STAT_CAP) a = AM2_SQUAD_STAT_CAP;
+        c = *(const int32_t *)((const uint8_t *)(uintptr_t)ADDR_RANK_EXP_TABLE
+              + (size_t)*(const int32_t *)(obj + OBJ_OFF_RANK)
+                * AM2_RANK_EXP_STRIDE);
+        if (c >= AM2_SQUAD_STAT_CAP) c = AM2_SQUAD_STAT_CAP;
+        am2_sprintf(line, "%4d/%4d", a, c);
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_3, "EXP:");
+        SQD_TEXT(SQD_VALUE_X, SQD_ROW_3, line);
+
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_HP, "HP:");
+        a = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
+        if (a >= AM2_SQUAD_HP_CAP) a = AM2_SQUAD_HP_CAP;
+        c = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
+        if (c >= AM2_SQUAD_HP_CAP) c = AM2_SQUAD_HP_CAP;
+        am2_sprintf(line, "%3d/%3d", a, c);
+        SQD_TEXT(SQD_VALUE_X, SQD_ROW_HP, line);
+
+        /* Rank pips: rank + 1 of them, capped at five. */
+        if (*(void *const *)(b + HUD_SQUAD_ICON_SPRITE)) {
+            int32_t n = *(const int32_t *)(obj + OBJ_OFF_RANK) + 1;
+            int32_t i;
+
+            if (n > AM2_SQUAD_MAX_PIPS)
+                n = AM2_SQUAD_MAX_PIPS;
+            for (i = 0; i < n; i++) {
+                AM2_Sprite *pip = *(AM2_Sprite **)(b + HUD_SQUAD_ICON_SPRITE);
+                AM2_Rect    out;
+                int32_t     px = x + SQD_PIP_X + i * AM2_SQUAD_PIP_STEP;
+                int32_t     py = y + SQD_PIP_Y;
+
+                if (ClipRect(&pip->bounds,
+                             (const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP,
+                             &px, &py, &out))
+                    DrawSpriteClipped(pip, px, py, &out, 0);
+            }
+        }
+
+    } else if (ObjIsType3((const AM2_Object *)obj)) {
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, VehicleKindName(obj));
+
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_1, "AR:");
+        am2_sprintf(line, "%d mm",
+                    *(const int32_t *)(obj + VEHICLE_OFF_ARMOUR));
+        SQD_TEXT(SQD_VALUE_X, SQD_ROW_1, line);
+
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_2, "CR:");
+        am2_sprintf(line, "%d", *(const int32_t *)(obj + VEHICLE_OFF_SEATS));
+        SQD_TEXT(SQD_VALUE_X, SQD_ROW_2, line);
+
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_3, "MV:");
+        /* VEHICLE_OFF_KIND under a "cm/s" format -- see its note in orig.h. */
+        am2_sprintf(line, "%d cm/s",
+                    *(const int32_t *)(obj + VEHICLE_OFF_KIND));
+        SQD_TEXT(SQD_VALUE_X, SQD_ROW_3, line);
+
+        SQD_TEXT(SQD_LABEL_X, SQD_ROW_HP, "HP:");
+        a = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
+        if (a >= AM2_SQUAD_HP_CAP) a = AM2_SQUAD_HP_CAP;
+        c = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
+        if (c >= AM2_SQUAD_HP_CAP) c = AM2_SQUAD_HP_CAP;
+        am2_sprintf(line, "%3d/%3d", a, c);
+        SQD_TEXT(SQD_VALUE_X, SQD_ROW_HP, line);
+    }
+
+#undef SQD_TEXT
+    UnlockSurface();
+
+    /* THE HEALTH BAR, AND IT IS DrawSelection'S BAR WITH A FIXED RECTANGLE.
+     * Same width clamp, the same `hp > 0 ? hp * wide / max : wide` guard on
+     * the divide, and the same three-colour ladder off the same three bytes
+     * -- ADDR_HUD_MESSAGE_COLOUR under a quarter, ADDR_COLOUR_LAG_MID under
+     * a half, ADDR_VIEW_RECT_COLOUR above. Found by the shape rather than by
+     * the address: the disassembly read familiar, and the sibling four
+     * hundred lines away in mapdraw.cpp had already answered every question
+     * this one raised.
+     *
+     * WHAT DIFFERS IS THE ORDER OF THE LAST TWO REGIONS, and it is not
+     * cosmetic. DrawSelection paints the FILLED part and then the remainder
+     * beside it; this paints the whole trough EMPTY and then the filled part
+     * back over it. Both land the same pixels and neither is a rewrite of
+     * the other, so they stay two functions -- merging them into one
+     * parameterised helper would have flattened that and the outer frame
+     * with it.
+     *
+     * IT IS OUTSIDE THE LOCK and that is the original's: ClearRegion blits,
+     * so it cannot run against locked bits. The UnlockSurface above is the
+     * one the disassembly puts at 0x00416C8D, before any of this.
+     *
+     * The width is half the unit's MAX health, capped -- so a bar says how
+     * much health a unit has in absolute terms and not merely what fraction
+     * is left, and a weak unit's full bar is shorter than a strong one's. */
+    {
+        int16_t max  = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
+        int16_t hp   = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
+        int32_t wide = max / 2;
+        int32_t fill;
+        RECT    box;
+        uint8_t bar;
+
+        if (wide >= SQD_BAR_MAX_W)
+            wide = SQD_BAR_MAX_W;
+
+        fill = hp > 0 ? hp * wide / max : wide;
+
+        box.left   = x + SQD_BAR_X;
+        box.top    = y + SQD_BAR_Y;
+        box.right  = x + wide + SQD_BAR_X + 3;
+        box.bottom = y + SQD_BAR_Y + 5;
+        ClearRegion(&box, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+
+        box.left   += 1;
+        box.top    += 1;
+        box.right   = box.left + wide + 1;
+        box.bottom -= 1;
+        ClearRegion(&box, *(const uint8_t *)(uintptr_t)ADDR_LIST_INK_HOT_SEL);
+
+        if (hp <= (int16_t)(max >> 2))
+            bar = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
+        else if (hp <= (int16_t)(max >> 1))
+            bar = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
+        else
+            bar = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
+
+        box.right = box.left + fill;
+        ClearRegion(&box, bar);
+    }
+
+#undef SQD_BAR_X
+#undef SQD_BAR_Y
+#undef SQD_BAR_MAX_W
+}
 
 /* HudChatSend -- original 0x00418480, 317 bytes, thiscall. Finish a chat
  * line: stop typing, post it to the log, send it, and -- if it starts with

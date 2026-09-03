@@ -708,6 +708,10 @@ AM2_Widget *__attribute__((thiscall)) MpSpinConstruct(
  * selected DESELECTS instead. */
 void __cdecl SelectWeapon(void *unit, int32_t slot);
 
+/* 0x00416340, thiscall. The squad panel's detail slot: three arms on one
+ * 2-column, 5-row grid. */
+void __attribute__((thiscall)) HudSquadDetail(AM2_Widget *w, int32_t uid);
+
 /* 0x00418480, thiscall. Finish a chat line -- and run it as a cheat when it
  * starts with `!` and there is no session. */
 void __attribute__((thiscall)) HudChatSend(AM2_Widget *w);

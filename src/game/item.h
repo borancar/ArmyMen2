@@ -795,7 +795,7 @@ const char *__cdecl ItemTypeName(uint32_t kind);
 
 /* 0x004475C0, two callers, both in the HUD. Copy a type 2's personal name out
  * of the soldier-name table, or leave the buffer empty. */
-void __cdecl SoldierNameOf(char *out, const void *obj);
+void __cdecl SoldierNameOf(const void *obj, char *out);
 
 /* 0x00417B10, one caller. Award 300 experience to every live type 2 the
  * player's own army owns, dropping stale uids on the way past. */

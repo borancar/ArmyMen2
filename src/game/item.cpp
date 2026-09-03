@@ -8076,8 +8076,23 @@ void __cdecl Type2ActionAll(void)
  * The original inlines the copy as strlen-then-rep-movs, which is strcpy, and
  * is written as one. Unbounded, exactly as the original: both callers pass a
  * field of the HUD structure and the longest name is thirteen characters.
+ *
+ * THE OBJECT IS THE FIRST ARGUMENT AND THIS HEADER SAID THE OPPOSITE, which
+ * survived because the reconstruction was written CONSISTENTLY with its own
+ * declaration -- nothing inside the function looks wrong and there is nothing
+ * for the compiler to say. Two instructions settle it, and neither is subtle:
+ * `push ebx; mov ebx,[esp+0xC]` reaches the SECOND argument and that is the
+ * register `mov byte [ebx], 0` clears, so `out` is second; `push esi; mov
+ * esi,[esp+0xC]` reaches the FIRST and that is what goes to ObjIsType2. Both
+ * call sites agree, pushing the buffer and then the object.
+ *
+ * It mattered because this one is PATCHED and one of its two callers is still
+ * the image's -- the thiscall HUD painter at 0x004158D0, inside a merged
+ * functions.tsv entry and so easy to read as reconstructed. That caller passed
+ * the object where our code expected the buffer, so `out[0] = 0` was a store
+ * into the object's own first byte. The ENTER_VEHICLE failure exactly.
  */
-void __cdecl SoldierNameOf(char *out, const void *obj)
+void __cdecl SoldierNameOf(const void *obj, char *out)
 {
     int32_t n;
 

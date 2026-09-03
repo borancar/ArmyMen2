@@ -998,6 +998,18 @@
  * placements against the offsets above. */
 #define ADDR_HUD_SQUAD_DETAIL  0x00416340u  /* thiscall void(obj, int32) */
 #define AM2_SQUAD_KIND_COUNT   9    /* both stack tables */
+#define AM2_SQUAD_TEXT_BYTES   0x40u
+#define AM2_SQUAD_MAX_PIPS     5     /* rank + 1, capped */
+#define AM2_SQUAD_PIP_STEP     6     /* pixels between them */
+#define AM2_SQUAD_STAT_CAP     0x270F /* 9999 -- the %4d columns */
+#define AM2_SQUAD_HP_CAP       999    /* the %3d ones */
+/* Per-rank experience thresholds, indexed by OBJ_OFF_RANK with a stride of
+ * 0x1C -- the panel prints "current/next" out of it. Found from
+ * HudSquadDetail's `lea edx,[ecx*8]; sub edx,ecx; ... [edx*4 + 0x473DD8]`,
+ * which is rank * 7 * 4. */
+#define ADDR_CRT_STRNICMP      0x00465160u  /* MSVC _strnicmp */
+#define ADDR_RANK_EXP_TABLE    0x00473DD8u
+#define AM2_RANK_EXP_STRIDE    0x1Cu
 #define HUD_SQUAD_ICON_SPRITE  0x58u   /* AM2_Sprite *, the pip drawn per icon */
 #define HUD_SQUAD_RECS         0xBCu   /* the twelve records start here */
 #define HUD_SQUAD_REC_SIZE     0x20u
@@ -7869,7 +7881,21 @@ typedef struct {
 #define ADDR_TAKE_SOLDIER_NAME   0x00447570u  /* int32_t(void) */
 /* 0x004475C0, two callers, both in the HUD. Copy a type 2's personal name out
  * of ADDR_SOLDIER_NAMES into the caller's buffer, or leave it empty. */
-#define ADDR_SOLDIER_NAME_OF     0x004475C0u  /* void(char *, const void *) */
+/* THE OBJECT IS FIRST AND THE BUFFER SECOND, and this comment said the
+ * reverse until HudSquadDetail's soldier arm was read. `push ebx; mov
+ * ebx,[esp+0xC]` takes the SECOND argument and that is what `mov byte
+ * [ebx], 0` clears, so the buffer is second; `push esi; mov esi,[esp+0xC]`
+ * takes the FIRST and hands it to ObjIsType2. Both call sites push the
+ * buffer and then the object, agreeing.
+ *
+ * It was not harmless. The reconstruction was written from this comment and
+ * then written CONSISTENTLY with it, so nothing inside it looked wrong; and
+ * it is PATCHED while one of its two callers is still the image's -- the
+ * thiscall painter at 0x004158D0, which functions.tsv hides inside
+ * HudSquadDestruct's merged 2,800-byte entry. That caller passed the object
+ * where our code expected the buffer, making `out[0] = 0` a store into the
+ * object's first byte. ADDR_ENTER_VEHICLE's failure, a second time. */
+#define ADDR_SOLDIER_NAME_OF     0x004475C0u  /* void(const void *, char *) */
 #define AM2_ANIM_TABLE_BYTES     8u      /* ADDR_SOLDIER_ANIMS' stride */
 #define AM2_MP_ROLE_SEVEN        7
 /* Both read only by ADDR_OBJ_DEATH_CLEANUP and neither established further:
@@ -16679,7 +16705,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* A weapon's own script-name index, used to look the name up in
  * ADDR_SCRIPT_NAMES and hand it to CreateWeapon. Zero or negative means no
  * name and CreateWeapon gets a null. OBJ_OFF_BOUNDS is the same offset on
- * another kind of object -- overloading, as at 0x52C and 0x538. */
+ * another kind of object -- overloading, as at 0x52C and 0x538.
+ *
+ * A TROOPER CARRIES IT TOO, which is a third arm of that overload and was
+ * found the expensive way. HudSquadDetail's soldier arm reads this field to
+ * look a script name up, and it went in as OBJ_OFF_SCRIPT_ID (0xB0) -- a
+ * plausible name for the same idea, on the wrong offset. The two are not
+ * interchangeable and the guards say so: this one is 0-based and tested with
+ * `jl`, ADDR_SCRIPT_NAMES being indexed directly, while OBJ_OFF_SCRIPT_ID is
+ * 1-based with 0 meaning none. Grepping 0x0C would have found this entry;
+ * grepping for a name that sounded right found the wrong field. */
 #define ITEM_OFF_NAME_INDEX      0x0Cu   /* int32_t, into ADDR_SCRIPT_NAMES */
 #define AM2_NAME_TABLE_STRIDE    16
 /* WeaponRespawn's own flag is OBJ_FLAG_8000, which already existed -- and the
