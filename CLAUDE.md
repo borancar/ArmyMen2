@@ -3602,7 +3602,24 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- Unexercised so far: `KeyFieldC`, `CheckSaveTag`, `ListDropOldest`,
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and five of the eighteen below are
+  now checked.** The heading means no drive reaches them, which is a fact
+  about this environment; it says nothing about whether they agree with the
+  original. Measured against what actually exists:
+
+  | | checked by |
+  |---|---|
+  | `KeyFieldC` | 96 vectors in tests/vectors.h -- it has been in the selftest all along |
+  | `EncodeBig`, `EncodeSmall` | tools/rlecheck.py, 280 cases |
+  | `MpNameInk`, `MpNamePaper` | tools/mprowcheck.py, 240 cases |
+
+  The other thirteen are verified by READING, which is the standing worth
+  stating plainly rather than leaving a reader to infer it from a list whose
+  title is about drives. `KeyFieldC` in particular should never have read as
+  unverified: a pure function of one argument is what tools/vectors.py is
+  for, and it was covered before this list was written.
+
+- Unexercised by any drive: `KeyFieldC`, `CheckSaveTag`, `ListDropOldest`,
   `MpNameInk`, `MpNamePaper`, `PlayerLatency`,
   `StateLeave`, `RowRelease`, `EncodeBig`, `EncodeSmall`,
   `RestoreTileSet`, `AllObjectsInRect`, `ItemSetBox`, `AiStepIgnore`,
