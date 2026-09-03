@@ -16,6 +16,8 @@
 #include "surface.h"
 #include "movie.h"
 #include "../gamedir.h"   /* SetGameDir, FileExists -- reconstructed */
+#include "../gameproc.h"  /* SetGameOver, RequestState -- reconstructed */
+#include "../misc.h"      /* MovieBuildName -- reconstructed */
 #include "../image.h"
 #include "palette.h"
 #include "../../inject/patch.h"
@@ -608,6 +610,93 @@ void __cdecl PlayMovie(const char *name, int32_t big)
     MovieStart(*(void **)(uintptr_t)ADDR_STATE_MOVIE, (void *)0);
 }
 
+
+/* ---- the state-action table's movie handlers ----------------------------
+ *
+ * 0x0042E8E0, 0x0042E910, 0x0042E930, 0x0042E960 and 0x0042E990: five of the
+ * ten function pointers in ADDR_STATE_ACTIONS, whose other five slots are all
+ * ReturnZero. Named by DATA -- nothing calls any of them, so an xref sweep of
+ * .text answers nothing for all five; both consumers reach them through the
+ * table and both are already ours (frame.cpp's StateEnter0 reads column 0,
+ * WndProc reads column 1).
+ *
+ *   idx   onEnter                      onMessage
+ *    0    play the 3do logo            end, game over 1, request state 0
+ *    1    play act1 (from "avi")       end, clear game over, request the menu
+ *    2    ReturnZero                   ReturnZero
+ *    3    ReturnZero                   ReturnZero
+ *    4    play the credits             end, clear game over, request the menu
+ *
+ * THEY LIVE HERE BECAUSE THE ADDRESS BAND SAYS SO. They were written into
+ * misc.cpp first, beside the MovieBuildName and ReturnZero they share the
+ * table with, and that broke `make check`'s selftest link -- misc.cpp is in
+ * SELFTEST_SRC, which links without DirectX, and these call PlayMovie and
+ * StateLeave. That is the air.cpp lesson exactly: which module a function goes
+ * in is decided by the LINK, not only by checksplit. The right answer was
+ * already visible in the addresses -- PlayMovie is 0x0042E5E0 and StateLeave
+ * 0x0042E720, so this band is the original's own translation unit for them.
+ *
+ * ENTER LOGO AND ENTER CREDITS ARE ONE FUNCTION TWICE -- 48 bytes differing in
+ * FOUR, of which only ONE is semantic: the string operand. The other three are
+ * the two call displacements, which are relocations. Left written out for the
+ * same reason as the pad pair; the string is the entire difference.
+ *
+ * The `lea` displacements look wrong until the DEFERRED CLEANUP is read. These
+ * are cdecl and the compiler cleans every call's arguments together in the
+ * epilogue's single `add esp`, so the buffer's displacement GROWS by 8 after
+ * each call rather than returning to where it started. 0x0042E930's 0x34 is
+ * 0x20 of buffer plus one, two and two pushed arguments.
+ *
+ * All five end `xor eax, eax`, so they are int32_t(void) like the ReturnZero
+ * sharing their columns; orig.h's am2_state_action_fn says void, which is what
+ * the two call sites want rather than what the functions are. The table is the
+ * image's own data and we patch only the addresses, so neither needs a cast. */
+
+int32_t __cdecl StateEnterLogoMovie(void)
+{
+    char name[0x20];
+
+    MovieBuildName(name, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_3DO));
+    PlayMovie(name, 0);
+    return 0;
+}
+
+int32_t __cdecl StateEnterAct1Movie(void)
+{
+    char name[0x20];
+
+    /* The directory table's first entry, which is "avi". */
+    SetGameDir(*(const char *const *)AM2_IMAGE(ADDR_STR_AVI_DIR));
+    MovieBuildName(name, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_ACT1));
+    PlayMovie(name, 0);
+    return 0;
+}
+
+int32_t __cdecl StateEnterCreditsMovie(void)
+{
+    char name[0x20];
+
+    MovieBuildName(name, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_CREDITS));
+    PlayMovie(name, 0);
+    return 0;
+}
+
+int32_t __cdecl StateMessageLogoMovie(void)
+{
+    StateLeave();
+    SetGameOver(1);
+    RequestState(0);
+    return 0;
+}
+
+int32_t __cdecl StateMessageMovieToMenu(void)
+{
+    StateLeave();
+    SetGameOver(-1);
+    RequestState(AM2_STATE_MENU);
+    return 0;
+}
+
 int movie_install(void)
 {
     int rc = 0;
@@ -638,5 +727,20 @@ int movie_install(void)
     rc |= patch_replace(ADDR_MOVIE_POLL, (const void *)MoviePoll, "MoviePoll", 0);
     rc |= patch_replace(ADDR_MOVIE_APPLY_PALETTE, (const void *)MovieApplyPalette,
                         "MovieApplyPalette", 1);
+    rc |= patch_replace(ADDR_STATE_ENTER_LOGO,
+                        (const void *)StateEnterLogoMovie,
+                        "StateEnterLogoMovie", 0);
+    rc |= patch_replace(ADDR_STATE_ENTER_ACT1,
+                        (const void *)StateEnterAct1Movie,
+                        "StateEnterAct1Movie", 0);
+    rc |= patch_replace(ADDR_STATE_ENTER_CREDITS,
+                        (const void *)StateEnterCreditsMovie,
+                        "StateEnterCreditsMovie", 0);
+    rc |= patch_replace(ADDR_STATE_MSG_LOGO,
+                        (const void *)StateMessageLogoMovie,
+                        "StateMessageLogoMovie", 0);
+    rc |= patch_replace(ADDR_STATE_MSG_TO_MENU,
+                        (const void *)StateMessageMovieToMenu,
+                        "StateMessageMovieToMenu", 0);
     return rc;
 }

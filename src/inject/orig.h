@@ -5359,6 +5359,17 @@
  * record holds what to do on entering state 0 and what to do when a message
  * arrives while in it. */
 #define ADDR_STATE_ACTIONS       0x0048654Cu  /* AM2_StateAction[] */
+/* The five distinct handlers ADDR_STATE_ACTIONS holds; its other five slots
+ * are ADDR_RETURN_ZERO. Named by DATA -- nothing calls any of them, so an
+ * xref sweep of .text answers nothing for all five. Reconstructed in
+ * misc.cpp, beside the MovieBuildName and ReturnZero they share the table
+ * with. Enter-logo and enter-credits are one function twice: 48 bytes, four
+ * differing, and only the string operand is semantic. */
+#define ADDR_STATE_ENTER_LOGO    0x0042E8E0u  /* int32_t(void), col 0 idx 0 */
+#define ADDR_STATE_MSG_LOGO      0x0042E910u  /* int32_t(void), col 1 idx 0 */
+#define ADDR_STATE_ENTER_ACT1    0x0042E930u  /* int32_t(void), col 0 idx 1 */
+#define ADDR_STATE_MSG_TO_MENU   0x0042E960u  /* int32_t(void), col 1 idx 1,4 */
+#define ADDR_STATE_ENTER_CREDITS 0x0042E990u  /* int32_t(void), col 0 idx 4 */
 /* One definition, because BOTH readers were reaching this table and only one
  * of them had a struct for it. */
 typedef void (__cdecl *am2_state_action_fn)(void);
@@ -12044,6 +12055,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_MOVIE_3DO       0x0048658Cu  /* "3do" */
 #define ADDR_STR_MOVIE_CREDITS   0x00486584u  /* "credits" */
 #define ADDR_STR_MOVIE_ACT2      0x004865A4u  /* "act2" */
+#define ADDR_STR_MOVIE_ACT1      0x004865ACu  /* "act1", pooled AFTER act2 */
 #define ADDR_STR_MOVIE_PORTAL    0x0048659Cu  /* "portal" */
 #define ADDR_STR_MOVIE_SMALL     0x00486598u  /* "sml" */
 #define ADDR_STR_MOVIE_EXT       0x00486590u  /* ".smk" */

@@ -88,6 +88,16 @@ void __cdecl StateLeave(void);              /* 0x0042E720 */
  * is missing or -nm was given, and construct and start a movie object. */
 void __cdecl PlayMovie(const char *name, int32_t big);
 
+/* 0x0042E8E0, 0x0042E910, 0x0042E930, 0x0042E960, 0x0042E990. The five
+ * distinct handlers of ADDR_STATE_ACTIONS: what to do on entering a game-over
+ * state, and what to do when a message arrives while in it. Reached only
+ * through that table, by frame.cpp and winproc.cpp. */
+int32_t __cdecl StateEnterLogoMovie(void);
+int32_t __cdecl StateEnterAct1Movie(void);
+int32_t __cdecl StateEnterCreditsMovie(void);
+int32_t __cdecl StateMessageLogoMovie(void);
+int32_t __cdecl StateMessageMovieToMenu(void);
+
 /* 0x004451F0. Put the multimedia timer on a movie. */
 int32_t __attribute__((thiscall)) MovieStart(void *movie, void *arg);
 
