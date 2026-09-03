@@ -176,4 +176,8 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc);
  * clips with IntersectRect. */
 void __cdecl DirtyCollect(const AM2_Rect *r);
 
+/* 0x0042BEA0, one caller. Read a .atl tileset and build the map sprite.
+ * RestoreTileSet's sibling -- same container, different result. */
+int32_t __cdecl LoadAtlFile(const char *path);
+
 #endif /* AM2_MAPDRAW_H */

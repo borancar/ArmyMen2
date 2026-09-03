@@ -157,6 +157,10 @@ void __cdecl ShakeAt(const AM2_Point *, int32_t)
 /* Pulled in because LoadMaskPacked forward-declares them: both are in
  * win32/sprite.h, INSIDE its extern "C", so C linkage -- the opposite of
  * AimStart above. */
+/* map.cpp forward-declares this; mapdraw.h declares it OUTSIDE its
+ * extern "C", so C++ linkage. */
+int32_t __cdecl LoadAtlFile(const char *) { return 0; }
+
 extern "C" void *__cdecl SpriteSetForKey(uint32_t) { return (void *)0; }
 extern "C" int32_t __cdecl SpriteDirIndex(void *, uint32_t) { return -1; }
 

@@ -23,6 +23,12 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
+/* Reconstructed in win32/mapdraw.cpp beside RestoreTileSet, which reads the
+ * same .atl container. Forward-declared rather than included: this module
+ * is flat. NO extern "C" -- mapdraw.h closes its block at 129 and declares
+ * this at 181, outside it. */
+int32_t __cdecl LoadAtlFile(const char *path);
+
 #define kMapSaveBlock ((void *)(uintptr_t)AM2_IMAGE(ADDR_MAP_BLOCK))
 
 int32_t __cdecl SaveMapSection(am2_FILE *fp)
@@ -1383,7 +1389,6 @@ typedef int32_t (__cdecl *am2_load_atl_fn)(const char *path);
 #define orig_map_fread   ((am2_map_fread_fn)(uintptr_t)ADDR_FREAD)
 #define orig_map_fseek   ((am2_map_fseek_fn)(uintptr_t)ADDR_FSEEK)
 #define orig_map_fclose  ((am2_map_fclose_fn)(uintptr_t)ADDR_FCLOSE)
-#define orig_load_atl    ((am2_load_atl_fn)(uintptr_t)ADDR_LOAD_ATL_FILE)
 
 
 /* w*h bytes straight into one global.  Seven of the arms are exactly this. */
@@ -1663,7 +1668,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     strcpy(((char *)(uintptr_t)ADDR_MAP_BLOCK), folder);
 
     sprintf(path, "%s.atl", base);
-    if (orig_load_atl(path) == 0) {
+    if (LoadAtlFile(path) == 0) {
         return 0;
     }
 

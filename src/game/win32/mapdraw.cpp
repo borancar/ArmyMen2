@@ -20,6 +20,7 @@
  */
 
 #include "mapdraw.h"
+#include "../crt.h"   /* am2_malloc, am2_free -- the game's own */
 #include "../blit.h"   /* BlitBitmapIn -- reconstructed */
 #include "../dirty.h"   /* the list RepaintDirtyList walks */
 #include "../objflag.h"  /* ObjFlagBit1 -- reconstructed */
@@ -272,6 +273,122 @@ typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
 #define g_tilesetPath    ((const char *)(uintptr_t)ADDR_MAP_FOLDER)
 #define g_tilesetReserve (*(int32_t *)(uintptr_t)ADDR_TILESET_RESERVE)
 #define g_activePalette  (*(const uint32_t **)(uintptr_t)ADDR_ACTIVE_PALETTE)
+/* LoadAtlFile -- original 0x0042BEA0, 563 bytes, one caller. Read a `.atl`
+ * tileset and build the map sprite from its DIB chunk.
+ *
+ * WRITTEN FROM ITS SIBLING, NOT FROM ITS DISASSEMBLY. RestoreTileSet below
+ * reads the SAME file format -- same FORM/TILE header, same {tag, length}
+ * chunks, same skip-what-you-do-not-know loop, same ReadDibChunk -- and the
+ * two share everything but what they do with the result. Reconstructing this
+ * from the instruction stream alone cost a broken commit: I sized the DIB
+ * header buffer AM2_DIB_DESC_BYTES, which is 0x1C, where ReadDibChunk writes
+ * a BITMAPINFO -- a 40-byte header plus up to 256 RGBQUADs. It smashed the
+ * stack, the map never loaded, and our side of the A/B stopped logging
+ * without even reaching the error path. The original's `sub esp, 0x450` was
+ * saying so the whole time.
+ *
+ * DIB_HEADER_DWORDS is the size the sibling already uses. Grepping for the
+ * SHAPE would have found it before the first attempt.
+ *
+ * What differs from RestoreTileSet: this one OWNS the map sprite. It mallocs
+ * 0x40, zeroes it, publishes it to ADDR_MAP_SURFACE before filling it, and
+ * derives the view grid from the tile width -- Log2Mask, and below 1 it
+ * frees everything and fails. The visible grid is the screen over 16 plus
+ * two, one tile of slack each side, and the cache surface is that grid in
+ * pixels. RestoreTileSet re-reads the same file into surfaces that already
+ * exist and touches none of that.
+ *
+ * BMP_OFF_FLAGS is set BEFORE MakeBitmap as an INPUT: 1 normally, 0x81 when
+ * there is both an active palette and a tileset reserve. */
+int32_t __cdecl LoadAtlFile(const char *path)
+{
+    uint32_t  header[DIB_HEADER_DWORDS];
+    uint8_t   rec[AM2_BMP_REC_BYTES];
+    am2_FILE *fp;
+    uint32_t  magic, formSize, chunkId, chunkSize;
+    int32_t   offset;
+
+    fp = orig_fopen(path, (const char *)(uintptr_t)ADDR_MODE_RB);
+    if (!fp)
+        return 0;
+
+    orig_fread(&magic, 4, 1, fp);
+    if (magic != mmioFOURCC('F', 'O', 'R', 'M'))
+        goto bad;
+
+    orig_fread(&formSize, 4, 1, fp);
+    orig_fread(&magic, 4, 1, fp);
+    if (magic != mmioFOURCC('T', 'I', 'L', 'E'))
+        goto bad;
+
+    offset = AM2_ATL_HEADER_BYTES;
+    do {
+        uint8_t *spr;
+        void    *pixels;
+        int32_t  shift, tw, th;
+
+        orig_fread(&chunkId, 4, 1, fp);
+        orig_fread(&chunkSize, 4, 1, fp);
+        offset += AM2_ATL_CHUNK_HEADER;
+
+        if (chunkId != mmioFOURCC('D', 'I', 'B', ' ')) {
+            orig_fseek(fp, (int32_t)chunkSize, SEEK_CUR);
+            offset += (int32_t)chunkSize;
+            continue;
+        }
+        offset += (int32_t)chunkSize;
+
+        spr = (uint8_t *)am2_malloc(AM2_MAP_SPRITE_BYTES);
+        *(void **)(uintptr_t)ADDR_MAP_SURFACE = spr;
+        memset(spr, 0, AM2_MAP_SPRITE_BYTES);
+
+        *(int32_t *)(rec + BMP_OFF_FLAGS) = 1;
+
+        pixels = ReadDibChunk(fp, header);
+        if (!pixels)
+            goto bad;
+
+        if (*(void *const *)(uintptr_t)ADDR_ACTIVE_PALETTE
+            && *(const int32_t *)(uintptr_t)ADDR_TILESET_RESERVE)
+            *(int32_t *)(rec + BMP_OFF_FLAGS) |= 0x80;
+
+        MakeBitmap(header, pixels, rec, (const uint8_t *)0);
+        am2_free(pixels);
+
+        spr = *(uint8_t **)(uintptr_t)ADDR_MAP_SURFACE;
+        *(void **)(spr + 0x10) = *(void *const *)(rec + BMP_OFF_SURFACE);
+        *(uint8_t *)(spr + 0x2C) = rec[BMP_OFF_KEY];
+        *(int32_t *)(spr + 0x18) = 0;
+        *(int32_t *)(spr + 0x14) = 0;
+        *(int32_t *)(spr + 0x1C) = *(const int32_t *)(rec + BMP_OFF_WIDTH);
+        *(int32_t *)(spr + 0x20) = *(const int32_t *)(rec + BMP_OFF_HEIGHT);
+        *(int32_t *)(spr + 0x0C) |= 1;
+
+        shift = Log2Mask((uint32_t)*(const int32_t *)(spr + 0x1C)) & 0xFF;
+        *(int32_t *)(uintptr_t)ADDR_TILE_SHIFT_LOG = shift;
+        if (shift < 1) {
+            FreeMapSurfaces();
+            goto bad;
+        }
+
+        th = (*(const int32_t *)(uintptr_t)ADDR_SCREEN_H >> AM2_TILE_SHIFT) + 2;
+        tw = (*(const int32_t *)(uintptr_t)ADDR_SCREEN_W >> AM2_TILE_SHIFT) + 2;
+        *(int32_t *)(uintptr_t)ADDR_VIEW_TILES_H = th;
+        *(int32_t *)(uintptr_t)ADDR_VIEW_TILES_W = tw;
+        *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MAP_CACHE_SURFACE =
+            CreateOffscreenSurface(tw << AM2_TILE_SHIFT,
+                                   th << AM2_TILE_SHIFT, 0x40, -1);
+    } while (offset < (int32_t)formSize);
+
+    orig_fclose(fp);
+    return 1;
+
+bad:
+    orig_log((const char *)(uintptr_t)ADDR_MSG_TILESET_LOAD);
+    orig_fclose(fp);
+    return 0;
+}
+
 /* g_mapSprite, above, is the same record PaintMapTiles reads: the global
  * holds a POINTER to it, so reaching the surface is two dereferences and
  * not one. Width and height sit at +0x1C and +0x20 of the same record. */
@@ -3035,6 +3152,8 @@ void __cdecl DirtyCollect(const AM2_Rect *r)
 
 int mapdraw_install(void)
 {
+    patch_replace(ADDR_LOAD_ATL_FILE, (const void *)LoadAtlFile,
+                        "LoadAtlFile", 1);
     patch_replace(ADDR_BOAT_EXIT_POINT, (const void *)BoatExitPoint,
                   "BoatExitPoint", 1);
     patch_replace(ADDR_OBJECTS_IN_RECT, (const void *)ObjectsInRect,
