@@ -7078,6 +7078,23 @@ typedef struct {
  * returned straight on. 0x00428370 has eight callers and no name. */
 #define ADDR_EVT_OBJ_SET         0x0041F6E0u  /* void(uint32_t, int32_t) */
 #define ADDR_HEAL_OBJECT         0x00428370u  /* void(obj, int32 pct, void *src) */
+/* THE MEDIC PACK HEALS BY ZERO, and this is a field-with-no-writer finding
+ * rather than a reading of the arm. FireWeapon's arm 11 (weapon kind 23) is
+ * the only code in the image that touches 0x006624F8, and it touches it
+ * twice, both times as `mov reg, [0x6624F8]` on its way to becoming
+ * HealObject's `pct`. There is no store to it anywhere in .text.
+ *
+ * The address is past .data's file-backed length -- it is in the .bss tail --
+ * so it is zero at load and stays zero. The arm therefore runs its refusals
+ * (health must be above zero and below the maximum), speaks its line if the
+ * casualty is Sarge or plays sound 0x12 if not, and then heals nothing at
+ * all.
+ *
+ * Recorded rather than corrected: it is the shipped binary's behaviour and
+ * the reconstruction reproduces it. Worth knowing before anyone reads a
+ * medic that appears not to work as a defect in this port. */
+#define ADDR_MEDIC_HEAL_PCT       0x006624F8u  /* int32_t, .bss, never written */
+
 /* 0x0041F710. The most guarded member of the family: uid threshold, pointer,
  * a flag bit CLEAR at +8, and a positive int16 at +0x62, all before it acts.
  * Its callee has nineteen callers and no name. */
