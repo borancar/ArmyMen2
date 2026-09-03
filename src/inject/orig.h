@@ -7094,6 +7094,18 @@ typedef struct {
  * the reconstruction reproduces it. Worth knowing before anyone reads a
  * medic that appears not to work as a defect in this port. */
 #define ADDR_MEDIC_HEAL_PCT       0x006624F8u  /* int32_t, .bss, never written */
+/* AND THE REPAIR KIT IS THE SAME, which makes it a pair rather than an
+ * oddity. Arm 20 (weapon kind 41) reads 0x006628A0 for its own HealObject
+ * `pct`, and that address has exactly ONE reference in the whole image --
+ * this load. It is .bss too. So both of FireWeapon's healing weapons play
+ * their sound and heal nothing.
+ *
+ * One unwritten global is a curiosity; two, in sibling arms of one function,
+ * both feeding the same argument of the same callee, is a subsystem that was
+ * never wired up. Neither is reachable in this environment anyway -- nothing
+ * in the suite fires a weapon -- so this is read evidence and will stay that
+ * way until a drive exists that shoots. */
+#define ADDR_REPAIR_HEAL_PCT      0x006628A0u  /* int32_t, .bss, never written */
 
 /* 0x0041F710. The most guarded member of the family: uid threshold, pointer,
  * a flag bit CLEAR at +8, and a positive int16 at +0x62, all before it acts.
