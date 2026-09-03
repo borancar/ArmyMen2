@@ -9,7 +9,7 @@ Last updated: **2026-09-03**, at `1bc33e8`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,484 patches plus 4 REGISTERED**, **30** analysis
+Nothing uncommitted. **1,580 patches plus 4 REGISTERED**, **30** analysis
 tools in `make check` (`tools/checkpatches.py`; `make check` for the tools).
 
 ## ONE FUNCTION LEFT
@@ -312,7 +312,51 @@ honest one on this screen. CLAUDE.md already says to read a liveness counter
 beside the one you care about; it does not help if the liveness counter is
 itself blind, so check blindspots.py for the one you pick.
 
-## CORRECTED AGAIN: it is 112 functions, not 31 -- and not 0
+## THE COUNT TODAY: 82 functions, and 36 of them are one class
+
+Measured 2026-09-03 at 1,580 patches, by the method below (split merged
+entries through tools/merges.py, then containment WITHIN a real function):
+
+**82 functions, 4,636 bytes** -- which reconciles exactly with the 84 /
+4,732 measured earlier in the session: the difference is 2 functions and
+96 bytes, the two 48-byte pad handlers transcribed since. Same method,
+same answer, which is the first time two of these counts have agreed.
+
+The decomposition is new and it matters more than the total:
+
+| | functions | bytes |
+|---|---:|---:|
+| C++ static initializers | 36 | 896 |
+| real game functions | 46 | 3,740 |
+
+The 36 are the null-terminated function-pointer array at **0x00473004**
+-- MSVC's `.CRT$XC` table, run by `_initterm` -- together with the 16-byte
+incremental-linking thunks that jmp into them. They compute globals from
+a .data geometry block: 0x00427640 is `[0x51307c] = 0x68`, the record size
+that 0x004227DB then uses as a rep movsd count.
+
+**They are reachable, which was not obvious and was nearly assumed away.**
+Static initializers run from the CRT before WinMain, so the instinct is
+that a patch on one can never fire. It does: tools/launcher.c creates the
+process CREATE_SUSPENDED, calls LoadLibraryA remotely -- which runs
+DllMain, which is where install() lives -- and only THEN ResumeThread. So
+every patch is in place before the EXE entry point, hence before
+_initterm. A patched initializer is called by the CRT and its counter
+moves like anything else.
+
+Two ways to get this wrong, both avoided by measuring rather than reading:
+
+- A naive split reports **83 / 6,892** because it matches on exact start
+  and so misses that ADDR_WND_PROC is 0x0040A6B0 filed under an entry
+  beginning 0x0040A6A0 -- 2,256 bytes of reconstructed code counted as
+  outstanding. Containment within the real function fixes it. This is the
+  merged-entry error one step along, and it bit again while writing this.
+- Roughly half the 16-byte "functions" in any raw list are pure `jmp`
+  thunks with twelve nops after them. Nothing to transcribe. refs_to
+  answers [] for all of them, which proves nothing -- it cannot see a
+  call rel32, as CLAUDE.md says.
+
+## STALE: it is 112 functions, not 31 -- and not 0
 
 The "31 remain" table below is stale twice over. Most of its entries have
 since been transcribed, and the method that produced it was wrong in a way
