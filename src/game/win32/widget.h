@@ -690,6 +690,12 @@ AM2_Widget *__attribute__((thiscall)) DlgGameMenuConstruct(AM2_Widget *w,
 AM2_Widget *__attribute__((thiscall)) DlgBattleJoinConstruct(AM2_Widget *w,
                                                              const char *bmp);
 
+/* 0x00453280, thiscall. The SAVE GAME dialog. Creates the player's save
+ * folder before listing it. */
+AM2_Widget *__attribute__((thiscall)) DlgSaveListConstruct(AM2_Widget *w,
+                                                           const char *bmp,
+                                                           int32_t flag);
+
 AM2_DECLARE_CLASS_DTOR(DlgMessage);
 AM2_DECLARE_CLASS_DTOR(DlgGameMenu);
 

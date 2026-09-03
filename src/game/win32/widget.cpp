@@ -4470,6 +4470,177 @@ AM2_Widget *__attribute__((thiscall)) DlgGameMenuConstruct(AM2_Widget *w,
     return w;
 }
 
+typedef int32_t (__cdecl *AM2_FindFirstFn3)(const char *, void *);
+typedef int32_t (__cdecl *AM2_FindNextFn)(int32_t, void *);
+typedef int32_t (__cdecl *AM2_FindCloseFn2)(int32_t);
+typedef int32_t (__cdecl *AM2_MkdirFn)(const char *);
+#define orig_findfirst ((AM2_FindFirstFn3)AM2_IMAGE(ADDR_CRT_FINDFIRST))
+#define orig_findnext  ((AM2_FindNextFn)AM2_IMAGE(ADDR_CRT_FINDNEXT))
+#define orig_findclose ((AM2_FindCloseFn2)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
+#define orig_mkdir     ((AM2_MkdirFn)AM2_IMAGE(ADDR_CRT_MKDIR))
+
+/* DlgSaveListConstruct -- original 0x00453280, 1456 bytes, thiscall `ret 8`.
+ * The SAVE GAME dialog: a name edit, the list of existing saves, a
+ * scrollbar, and SAVE / DELETE / CANCEL.
+ *
+ * IT CREATES THE PLAYER'S SAVE FOLDER BEFORE LISTING ANYTHING, and the test
+ * is not just "does it exist". findfirst on the folder named by
+ * ADDR_GAMEPROC_BLOCK, then mkdir when it is ABSENT or when it exists and is
+ * NOT a directory -- AM2_ATTR_SUBDIR. So a stray file with the player's name
+ * does not stop the game saving; mkdir simply fails and the chdir after it
+ * does too. Both arms then fall into the same tail.
+ *
+ * `this` IS EBP here, as in DlgBattleJoinConstruct. esi and edi carry
+ * children, so a write through either is a CHILD's field and not the
+ * dialog's -- which is how the two stores below have to be read.
+ *
+ * TWO FIELDS GO INTO THE EDIT, NOT INTO THE DIALOG. The edit gets
+ * ADDR_EDIT_CHARSET_PTR at +0x68 and the green icon at +0x70; the dialog
+ * keeps only the list at +0x64 and the edit itself at +0x68. Same offset,
+ * two different objects, three lines apart.
+ *
+ * The name buffer the edit types into is the dialog's own +0x6C, seeded from
+ * ADDR_GAMEPROC_STR_B -- the last save name -- so opening the dialog offers
+ * that name back.
+ *
+ * DLG_OFF_ESCAPE takes CANCEL's handler, as the overwrite prompt's does. */
+AM2_Widget *__attribute__((thiscall)) DlgSaveListConstruct(AM2_Widget *w,
+                                                            const char *bmp,
+                                                            int32_t flag)
+{
+    uint8_t    *self = (uint8_t *)w;
+    AM2_Widget *edit;
+    AM2_Widget *kid;
+    AM2_Rect    box;
+    char        dir[AM2_MASK_PATH_MAX];
+    char        path[AM2_DLG_TEXT_BYTES];
+    uint8_t     find[AM2_FINDDATA_BYTES];
+    int32_t     h;
+
+    ScreenBaseConstruct(w, bmp, flag);
+    w->vtable = (void *)AM2_IMAGE(VTABLE_SAVE_LIST);
+    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
+
+    /* Make the player's folder if it is missing, or if the name is taken by
+     * something that is not a directory. */
+    strcpy(dir, (const char *)(uintptr_t)ADDR_GAMEPROC_BLOCK);
+    h = orig_findfirst(dir, find);
+    if (h == -1) {
+        orig_mkdir(dir);
+    } else {
+        if (!(find[AM2_FIND_OFF_ATTRIB] & AM2_ATTR_SUBDIR))
+            orig_mkdir(dir);
+        orig_findclose(h);
+    }
+
+    am2_sprintf(path, (const char *)AM2_IMAGE(ADDR_STR_SAVE_PLAYER_FMT),
+                (const char *)(uintptr_t)ADDR_GAMEPROC_BLOCK);
+    SetGameDir(path);
+
+    {
+        void *rec = orig_operator_new(AM2_RECORD_BYTES);
+        *(void **)(self + DLG_OFF_LIST) = rec ? RecordCtor(rec, 1) : (void *)0;
+    }
+
+    strcpy(dir, (const char *)AM2_IMAGE(ADDR_STR_GLOB_SAV));
+    h = orig_findfirst(dir, find);
+    if (h != -1) {
+        do {
+            ListAdd(*(void **)(self + DLG_OFF_LIST),
+                    (const char *)(find + AM2_FIND_OFF_NAME), 0);
+        } while (orig_findnext(h, find) == 0);
+        orig_findclose(h);
+    }
+
+    w->flag44 = 1;
+    strcpy((char *)(self + SAVELIST_OFF_NAME),
+           (const char *)(uintptr_t)ADDR_GAMEPROC_STR_B);
+
+    edit = (AM2_Widget *)orig_operator_new(AM2_HUD_EDIT_BYTES);
+    if (edit)
+        edit = EditConstruct(edit, (char *)(self + SAVELIST_OFF_NAME), 0x18,
+                             0xA5, 0x74, 0x98, 0x11, 1,
+                             *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
+                             *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
+                             *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
+                             (void (__cdecl *)(AM2_Widget *))
+                                 AM2_IMAGE(ADDR_SAVE_LIST_ON_SAVE), 0, 0);
+    WidgetAddChild(w, edit);
+    ((AM2_WidgetFocusFn *)edit->vtable)[WIDGET_VSLOT_FOCUS](edit, 0);
+    *(void **)((uint8_t *)edit + EDIT_OFF_CHARSET) =
+        *(void **)(uintptr_t)ADDR_EDIT_CHARSET_PTR;
+    *(void **)(self + SAVELIST_OFF_EDIT) = edit;
+
+    kid = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_BYTES);
+    if (kid) {
+        RectSet(&box, 0xFC, 0x57, 0x11, 0x10);
+        kid = MultiSpriteConstruct(kid, "03_028_00_green.bmp",
+                                   "03_028_01_green.bmp", 1, box);
+    }
+    WidgetAddChild(w, kid);
+    /* The icon belongs to the EDIT -- EDIT_OFF_DOT, which already had that
+     * name from the multiplayer panel's send/receive dots. Same slot, same
+     * kind of little MultiSprite beside a text field. */
+    *(void **)((uint8_t *)edit + EDIT_OFF_DOT) = kid;
+
+    kid = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_BYTES);
+    if (kid)
+        kid = ListBoxConstruct(kid, 0xA5, 0xBD, 0x9A, 0xAA,
+                               *(void **)(self + DLG_OFF_LIST),
+                               (int32_t)AM2_IMAGE(ADDR_SAVE_LIST_ON_PICK),
+                               0, 1);
+    WidgetAddChild(w, kid);
+
+    /* The scrollbar takes its rectangle as FOUR ints and the parent BEFORE
+     * the sprites. The original still routes the four through RectSet and
+     * copies the result back over the same pushes, so they appear twice. */
+    kid = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    if (kid)
+        kid = ArrowBarConstruct(kid, 0x152, 0xB7, 0x13, 0xBA, w,
+                                "03_010_00_scrollbar.bmp",
+                                "03_010_01_scrollbar.bmp", 0x8C, 0);
+    WidgetAddChild(w, kid);
+
+    kid = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    if (kid) {
+        RectSet(&box, 0x1A0, 0xBA, 0x51, 0x20);
+        kid = ButtonConstruct(kid, "03_127_00_save.bmp", "03_127_01_save.bmp",
+                              "03_127_02_save.bmp", 1, box,
+                              (void (__cdecl *)(AM2_Widget *))
+                                  AM2_IMAGE(ADDR_SAVE_LIST_ON_SAVE),
+                              (void (__cdecl *)(AM2_Widget *))0);
+    }
+    WidgetAddChild(w, kid);
+
+    kid = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    if (kid) {
+        RectSet(&box, 0x1A0, 0xE2, 0x51, 0x20);
+        kid = ButtonConstruct(kid, "03_012_00_delete.bmp",
+                              "03_012_01_delete.bmp", "03_012_02_delete.bmp",
+                              1, box,
+                              (void (__cdecl *)(AM2_Widget *))
+                                  AM2_IMAGE(ADDR_SAVE_LIST_ON_DELETE),
+                              (void (__cdecl *)(AM2_Widget *))0);
+    }
+    WidgetAddChild(w, kid);
+
+    kid = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    if (kid) {
+        RectSet(&box, 0x1A0, 0x108, 0x51, 0x20);
+        kid = ButtonConstruct(kid, "03_018_00_cancel.bmp",
+                              "03_018_01_cancel.bmp", "03_018_02_cancel.bmp",
+                              1, box,
+                              (void (__cdecl *)(AM2_Widget *))
+                                  AM2_IMAGE(ADDR_SAVE_LIST_ON_CANCEL),
+                              (void (__cdecl *)(AM2_Widget *))0);
+    }
+    WidgetAddChild(w, kid);
+
+    *(void **)(self + DLG_OFF_ESCAPE) =
+        (void *)AM2_IMAGE(ADDR_SAVE_LIST_ON_CANCEL);
+    return w;
+}
+
 /* DlgOverwriteConstruct -- original 0x00450320, 688 bytes, thiscall `ret 8`.
  * "Are you sure you want to overwrite savefile '%s'?" with OK and CANCEL,
  * the message, and the same red icon the message box uses.
@@ -5455,7 +5626,7 @@ void __cdecl OpenDeleteGame(void)
 void __cdecl OpenSaveGame(void)
 {
     CloseCurrentScreen();
-    OpenScreen2(AM2_SAVE_LIST_SIZE, (AM2_ScreenCtor2Fn)AM2_IMAGE(ADDR_SAVE_LIST_CTOR),
+    OpenScreen2(AM2_SAVE_LIST_SIZE, (AM2_ScreenCtor2Fn)DlgSaveListConstruct,
                 (const char *)AM2_IMAGE(ADDR_STR_SAVEGAME_BMP), 0);
     RefreshScreen();
 }
@@ -12090,6 +12261,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_SAVE_LIST_CTOR,
+                        (const void *)DlgSaveListConstruct,
+                        "DlgSaveListConstruct", 1);
     rc |= patch_replace(ADDR_BATTLE_JOIN_CTOR,
                         (const void *)DlgBattleJoinConstruct,
                         "DlgBattleJoinConstruct", 1);

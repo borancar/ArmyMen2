@@ -1384,7 +1384,21 @@
 #define ADDR_OPEN_SAVE_GAME      0x00453890u /* void(void) */
 #define AM2_SAVE_LIST_SIZE       0xACu
 #define ADDR_STR_SAVEGAME_BMP    0x0048BC98u /* "02_008_00_savegame.bmp" */
-#define ADDR_SAVE_LIST_CTOR      0x00453280u /* thiscall, two arguments */
+/* 0x00453280, thiscall `ret 8` -- the SAVE GAME dialog: an edit for the
+ * name, the list of existing saves, a scrollbar, and SAVE / DELETE / CANCEL.
+ *
+ * IT CREATES THE PLAYER'S SAVE FOLDER. Before listing anything it findfirsts
+ * the folder named by ADDR_GAMEPROC_BLOCK and mkdirs it when it is absent OR
+ * when it exists and is not a directory -- the AM2_ATTR_SUBDIR test -- then
+ * chdirs into "save\\<player>" and globs *.sav. */
+#define ADDR_SAVE_LIST_CTOR      0x00453280u /* thiscall obj *(obj, bmp, int) */
+#define ADDR_SAVE_LIST_ON_SAVE   0x00453080u /* SAVE, and the edit's onEnter */
+#define ADDR_SAVE_LIST_ON_DELETE 0x004531D0u
+#define ADDR_SAVE_LIST_ON_CANCEL 0x004531A0u /* also its DLG_OFF_ESCAPE */
+#define ADDR_SAVE_LIST_ON_PICK   0x00452FD0u /* the list's row callback */
+#define AM2_RECORD_BYTES         0x0Cu
+#define SAVELIST_OFF_EDIT        0x68u  /* AM2_Widget *, the name field */
+#define SAVELIST_OFF_NAME        0x6Cu  /* char[0x18], what it types into */
 #define ADDR_SAVE_LIST_DELETE    0x00453810u /* thiscall obj *(obj, flags) */
 #define ADDR_SAVE_LIST_DESTRUCT  0x00453830u /* thiscall void(obj) */
 #define AM2_SAVE_LIST_FONT       2
