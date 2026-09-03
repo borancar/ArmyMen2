@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **34** analysis
+**`make check` runs everything that does not need the game.** **35** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3798,8 +3798,33 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   cap is fixed by the format, not by the corpus, so it is verified by the
   encoding's shape and no case can speak to it.
 
-  The three multiplayer ones need a live DirectPlay session with a second
-  player, which this machine cannot open: the row painter has two branches and with nothing connected it
+  **TWO OF THE THREE MULTIPLAYER ONES ARE CHECKED NOW**, by
+  `tools/mprowcheck.py`: MpNameInk and MpNamePaper, enumerated over every
+  branch either can take. Paper is three flags; ink is the three latency
+  bands, whether the row is our own, whether a player record exists and
+  whether it has gone silent. 240 cases, and the mutation counts are exactly
+  derivable, which is the strongest form this evidence takes -- dropping the
+  host gate on the "has not confirmed the map" colour fails SIX, precisely
+  the host-clear, map-clear paper cases, and swapping the ready pair fails
+  EIGHTEEN, precisely the other twenty-four minus those six.
+
+  Three stubs, each the standard answer to a wall already recorded here:
+  GetTickCount is an import so the IAT slot points at a stub in a MAPPED page
+  (collectcheck's finding), and PlayerLatency and FindPlayerById are stubbed
+  so the latency and the record's presence become inputs rather than
+  consequences of a comm object nobody can build offline.
+
+  **AND A STUB THAT REWRITES ITS OWN IMMEDIATE DOES NOT WORK.** The first
+  version wrote `mov eax, <value>; ret` afresh for each case, and Unicorn
+  CACHES TRANSLATED BLOCKS -- so once 0x00402EC0 had executed, every later
+  call returned the first case's value. It failed 72 of 216 while a single
+  call in isolation passed, which is a confusing shape to debug: the tool
+  looked wrong only in bulk. The stubs read their answers from memory cells
+  now and the code is written once, before either address has run. Vary the
+  DATA, never the CODE, in an emulator that caches.
+
+  The third, PlayerLatency's own body, still needs a live DirectPlay session
+  with a second player, which this machine cannot open: the row painter has two branches and with nothing connected it
   takes the other one. `MpNameSetInk` beside them runs 60,152 times, so the
   painter itself is thoroughly exercised and the branch is not.
 
