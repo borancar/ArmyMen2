@@ -307,7 +307,7 @@ vectors:
 .PHONY: check
 check:
 	@rc=0; \
-	for t in coverage comcalls merges checkcom checkhooks binpatches blindspots checkclaims crt scripttokens scriptactions screens checkpatches checkseams checkinstalled checkglobals checkoffsets checksplit checkthis moviecheck posecheck formationcheck shakecheck roachcheck rlecheck mprowcheck ringcheck boolcheck explcheck collectcheck firepose regioncheck pathcheck tilepathcheck cheats; do \
+	for t in coverage comcalls merges checkcom checkhooks binpatches blindspots checkclaims crt scripttokens scriptactions screens checkpatches checkseams checkinstalled checkglobals checkoffsets checksplit checkthis moviecheck posecheck formationcheck shakecheck roachcheck rlecheck mprowcheck weaponcheck ringcheck boolcheck explcheck collectcheck firepose regioncheck pathcheck tilepathcheck cheats; do \
 	    printf '  %-12s ' "$$t"; \
 	    if ./.venv/bin/python tools/$$t.py >/dev/null 2>&1; then \
 	        echo ok; \

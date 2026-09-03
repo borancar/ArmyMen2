@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **35** analysis
+**`make check` runs everything that does not need the game.** **36** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3613,7 +3613,15 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   | `EncodeBig`, `EncodeSmall` | tools/rlecheck.py, 280 cases |
   | `MpNameInk`, `MpNamePaper` | tools/mprowcheck.py, 240 cases |
 
-  The other thirteen are verified by READING, which is the standing worth
+  `UnitWeaponInfo` joins them: `tools/weaponcheck.py` enumerates its THREE
+  range arms and TWO readiness arms over 3,240 cases. The mutation that
+  matters is the tightest one -- turning the cooldown comparison from `<` to
+  `<=` fails 54, which is exactly the cases where the elapsed time equals the
+  cooldown, and is the evidence that the corpus straddles that boundary
+  rather than merely passing near it. Dropping the zero-range arm fails 216,
+  applying the timed weapon's extra scale to every kind 486.
+
+  The other twelve are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is
