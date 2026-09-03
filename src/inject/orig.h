@@ -7106,6 +7106,30 @@ typedef struct {
  * in the suite fires a weapon -- so this is read evidence and will stay that
  * way until a drive exists that shoots. */
 #define ADDR_REPAIR_HEAL_PCT      0x006628A0u  /* int32_t, .bss, never written */
+/* AND ARM 22 MAKES IT FOUR, so this is a BLOCK and not three coincidences.
+ * The sweep weapon (kind 43) reads 0x006628FC for the distance it steps out
+ * and 0x00662908 for the damage it deals, and neither has a store anywhere in
+ * .text either. It sweeps at distance zero and damages by zero.
+ *
+ * Scanning 0x00662000..0x00662FFF for every global .text touches gives 36,
+ * and 22 of them have no writer -- but the interesting part is WHERE. The
+ * ones with real writers sit at the two ends, 0x00662020..0x0066202C and
+ * 0x00662920..0x00662948; the span 0x00662450..0x00662908 is unwritten
+ * WITHOUT EXCEPTION, fourteen globals, loads only. That is the shape of a
+ * tuning table that something was meant to fill and nothing does.
+ *
+ * So the finding is not "the medic is broken". It is that a contiguous block
+ * of weapon parameters is inert in the shipped binary, and any arm reading
+ * from it does its sound, its speech and its refusals and then applies a
+ * zero. Reproduce it; do not repair it.
+ *
+ * Standard of evidence, stated because it is not a proof: this is a decoded
+ * scan for a direct absolute displacement. It would not see a write through a
+ * computed pointer. It is the same standard the SendGameMsg packet-loss
+ * finding used, and stronger here, since a global has only one addressing
+ * form to miss. */
+#define ADDR_SWEEP_DISTANCE       0x006628FCu  /* int32_t, .bss, never written */
+#define ADDR_SWEEP_DAMAGE         0x00662908u  /* int32_t, .bss, never written */
 
 /* 0x0041F710. The most guarded member of the family: uid threshold, pointer,
  * a flag bit CLEAR at +8, and a positive int16 at +0x62, all before it acts.
