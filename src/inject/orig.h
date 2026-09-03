@@ -12952,6 +12952,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * below for what the rest of that entry does. */
 #define ADDR_LOAD_OPTIONS        0x0044D110u  /* void(void) */
 #define AM2_OPTIONS_MIN_BYTES    0x24   /* the seek that proves it is whole */
+#define ADDR_STR_OPTIONS_NOREAD  0x0048B454u /* "Failed to open Options.cfg\n" */
 #define AM2_VOLUME_SENTINEL      (-2000)
 #define AM2_VOLUME_SILENT        (-10000)
 #define ADDR_GAME_WINNER         0x00512300u  /* int32_t */

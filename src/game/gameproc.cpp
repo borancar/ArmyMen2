@@ -159,11 +159,14 @@ void __cdecl LoadOptions(void)
     fp = orig_fopen((const char *)AM2_IMAGE(ADDR_STR_OPTIONS_CFG),
                     (const char *)AM2_IMAGE(ADDR_STR_MODE_R));
     if (!fp)
-        return;
+        goto defaults;
 
-    /* Whole-file check: if it cannot seek this far there is nothing to read. */
+    /* Whole-file check: if it cannot seek this far there is nothing to read.
+     * NOTE it does NOT close the file on this path -- it falls into the same
+     * defaults tail as a failed open, which never had one to close. The
+     * handle leaks. Reproduced. */
     if (orig_fseek(fp, AM2_OPTIONS_MIN_BYTES, 0) != 0)
-        return;
+        goto defaults;
     orig_fseek(fp, 0, 0);
 
     orig_fread((void *)AM2_IMAGE(ADDR_VOLUME_AT_ZERO), 4, 1, fp);
@@ -201,6 +204,31 @@ void __cdecl LoadOptions(void)
         *(int32_t *)AM2_IMAGE(ADDR_STREAM_VOLUME) = AM2_VOLUME_SILENT;
     if (*(int32_t *)AM2_IMAGE(ADDR_VOLUME_VOICE) == AM2_VOLUME_SENTINEL)
         *(int32_t *)AM2_IMAGE(ADDR_VOLUME_VOICE) = AM2_VOLUME_SILENT;
+    return;
+
+defaults:
+    /* BOTH failure exits land here, and it is not a bare return: the settings
+     * are reset and the key bindings rebuilt from ADDR_KEY_DEFAULTS. The
+     * defaults go into every OTHER byte, matching the one-in-two stride
+     * SaveOptions writes and this function reads -- so only the primary of
+     * each binding is restored and the alternate is left as it was. */
+    orig_log((const char *)AM2_IMAGE(ADDR_STR_OPTIONS_NOREAD));
+
+    *(int32_t *)AM2_IMAGE(ADDR_VOLUME_AT_ZERO) = 0;
+    *(int32_t *)AM2_IMAGE(ADDR_STREAM_VOLUME)  = 0;
+    *(int32_t *)AM2_IMAGE(ADDR_VOLUME_VOICE)   = 0;
+    *(int32_t *)AM2_IMAGE(ADDR_MOVIE_COUNT)    = 0;
+
+    {
+        const uint8_t *src = (const uint8_t *)AM2_IMAGE(ADDR_KEY_DEFAULTS);
+        uint8_t       *dst = (uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS);
+        int32_t        i   = 0;
+
+        while (dst < (uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS_END)) {
+            *dst = src[i++];
+            dst += 2;
+        }
+    }
 }
 
 /* SaveOptions -- original 0x0044CFA0, seven callers. Write Options.cfg: every
