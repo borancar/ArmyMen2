@@ -10681,7 +10681,47 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * So arm 0 and arm 7 falling into the default's `xor eax, eax` is not an
  * accident of layout; it is how a repeating weapon says "do not use me up".
  * An arm written to return 1 because it fired would empty the player's
- * inventory a round at a time, and nothing on this machine fires. */
+ * inventory a round at a time, and nothing on this machine fires.
+ *
+ * THE CONSTANTS EACH ARM PASSES, collected so the arms can be written from a
+ * table rather than re-read one at a time. SOUND is PlaySoundAt's first
+ * argument, GROUP is SeqStartDirEffect's fourth, SPREAD is AddByteSat's
+ * second:
+ *
+ *   arm  kinds      sound  group  spread   then
+ *    0   1, 9        0x07    0     0x20    CreateMissile, 1.0f
+ *    7   10          0x08    0     0x10    -- shares arm 0's tail
+ *   15   29          0x0A    0     0x0A    CreateMissile, 1.0f
+ *    6   7, 8        0x09    3     0x0A    CreateMissile, 1.0f
+ *    3   4           0x0F    1     --      CreateMissile, 1.0f
+ *    5   6           0x15    1     --      CreateMissile, 1.0f
+ *   16   30          0x07    0     --      facing is -1 - (seed & 3)
+ *    1   2           0x0C    --    --      ApproxDist scales the velocity
+ *    4   5           0x0D    --    --      ApproxDist scales the velocity
+ *    2   3           0x0E    --    --      CreateMissile, flag 1
+ *    8   11          0x10    --    --      CreateWatchedItem
+ *    9   12          --      --    --      CreateWatchedType, NO sound
+ *   11   23          0x12    --    --      SpeakLine 0x1A, HealObject twice
+ *   12   24          --      --    --      SpeakLine 0x16, DoAirSupport 0
+ *   13   25          --      --    --      SpeakLine 0x17, DoAirSupport 1
+ *   14   26          --      --    --      SpeakLine 0x18, DoAirSupport 2
+ *   17   35-38       0x14    --    --      SetObjTablePair
+ *   18   39          0x2B    --    --      AimStart
+ *   19   40          0x2C    --    --      AimStartB
+ *   20   41          0x13    --    --      HealObject, SelectInventorySlot 0
+ *   21   42          --      --    --      Type2ActionC
+ *   10   20          0x10    --    --      CreateExplosion kind 0x79, army 4
+ *   22   43          0x34    --    --      DamageObject, kind 2
+ *
+ * The three air-support arms differing ONLY in the speech line and the mode
+ * (0x16/0, 0x17/1, 0x18/2) is the clearest evidence the table is read right.
+ *
+ * CAVEAT, because it matters more than the table: these were collected by a
+ * scan that resets its push list at each `add esp`, and this function uses
+ * SHARED CLEANUPS. Where a push count does not match the callee's arity the
+ * values bleed between calls -- arm 17 appears to call PlaySoundAt(0,0,0,0,0)
+ * before its real one, which is that artefact and not an instruction. Read
+ * the arm before trusting a row. */
 #define ADDR_FIRE_WEAPON_INDEX   0x004600B0u  /* uint8_t[43], kind - 1 */
 #define ADDR_FIRE_WEAPON_ARMS    0x00460050u  /* void *[24] */
 /* The four ways a script asks for a shot: an explicit weapon or the unit's
