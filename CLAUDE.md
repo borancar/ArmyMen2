@@ -2831,6 +2831,35 @@ ss -ltn | grep 31436              # want nothing
 
 and grep the run's own log for `bind/listen`, which says so outright.
 
+**A SHELL WAITING FOR A COMMAND MATCHES ITSELF, AND THE BRACKET TRICK DOES
+NOT SAVE IT.** This file already records `pkill -f 'ArmyMen2.exe'` matching
+the killing shell, and the cure -- bracket the pattern. That cure does not
+reach the case where the waiting shell's OWN command line CONTAINS the
+command it is waiting for:
+
+```
+nohup tools/ab.sh bootcamp campaign > out 2>&1 &
+while pgrep -f 'tools/ab[.]sh' >/dev/null; do sleep 25; done
+```
+
+The brackets stop the pattern matching itself as written, and the shell's
+command line still holds the literal `tools/ab.sh` from the `nohup` clause --
+so the loop waits for itself and never ends. Three of these were left
+spinning across a session, and each one reported its background task as
+FAILED long after the A/B it was waiting for had finished CLEAN. The runs
+were fine; only the waiters hung.
+
+The reading it produces is the dangerous part and it goes both ways. A
+`pgrep -cf 'tools/ab[.]sh'` answered **3** with no suite and no game running,
+which is exactly the answer that argues against running `make check` -- and
+`make check` is a build, so a false "a suite is running" is as capable of
+stopping real work as a false "nothing is running" is of voiding a run.
+
+Wait on the PID (`wait $!`, or `kill -0`), never on a pattern that the
+waiter's own arguments contain. And when the question is really "is it safe
+to build", ask the two things that cannot match a shell: `pgrep -c -f
+'ArmyMen2[.]exe'` and whether the control port is held.
+
 ## Open items
 
 - **The Lock/Unlock bracket batch is a different goal from the boundary, and
