@@ -19,7 +19,16 @@
 #include "../../inject/orig.h"
 #include "../../inject/patch.h"
 #include "../gameproc.h"  /* RequestState -- reconstructed */
-#include "../misc.h"      /* IsKeyDown, KeyChanged -- reconstructed */
+#include "../misc.h"
+#include "../region.h"   /* BuildRegionGraph -- reconstructed */
+#include "../definfo.h"  /* LoadDefTables -- reconstructed */
+#include "../item.h"     /* SelectInventorySlot, DeselectAll */
+#include "../objtype.h"  /* LookupType3ByUID -- reconstructed */
+#include "../objtable.h" /* SelectUnit -- reconstructed */
+/* Reconstructed in item.cpp and declared there rather than in item.h. */
+void __cdecl SelectInventorySlot(void *unit, int32_t slot);
+#include "../army.h"     /* LookupOwnerObj -- reconstructed */
+#include "../gameproc.h" /* LoadDefTables, LoadGame, OpenSaveForLoad */      /* IsKeyDown, KeyChanged -- reconstructed */
 #include "../crt.h"      /* am2_sprintf -- the game's own */
 #include "../text.h"     /* DrawText -- reconstructed, and NOT winuser's */
 #include "../map.h"      /* ScriptListFind */
@@ -784,6 +793,231 @@ void __cdecl LevelTeardown(void)
  * with ADDR_STATE_ENTER_ONCE set it consumes a menu request, clears the flag
  * and leaves the frame there, so the sub-state dispatch below is skipped
  * entirely for that one frame. */
+typedef void (__cdecl *AM2_PlaceScenarioFn)(void);
+#define orig_place_scenario \
+    ((AM2_PlaceScenarioFn)AM2_IMAGE(ADDR_PLACE_SCENARIO))
+typedef int32_t (__cdecl *AM2_FindFirstFn2)(const char *, void *);
+typedef int32_t (__cdecl *AM2_FindCloseFn)(int32_t);
+#define orig_findfirst ((AM2_FindFirstFn2)AM2_IMAGE(ADDR_CRT_FINDFIRST))
+#define orig_findclose ((AM2_FindCloseFn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
+
+/* State2Enter -- original 0x00425300, 1168 bytes, one caller: RunFrame's
+ * state-2 arm, reached once per mission start. Tear down the previous
+ * screen, load the map and every animation table, build the HUD, place or
+ * load the units, unpause.
+ *
+ * IT SETS ADDR_MENU_MODE TO 33. CLAUDE.md records 33 as the value a probe
+ * reads throughout Boot Camp play, and uses it to explain why the in-mission
+ * ESCAPE arm -- number 34 -- never runs. This is where the 33 is written, so
+ * that is now true by construction rather than by observation.
+ *
+ * THE FOG AND SCRIPT-RELOAD TEST IS FOUR PATHS COMPUTING TWO STORES. The
+ * original branches on the debug flag and the session so that two stores are
+ * reached from four directions; every path was walked, and together they say
+ * exactly: a network game clears the fog, a single-player one raises it and
+ * additionally sets script-reloading when the debug flag is on. Written that
+ * way rather than as the four jumps.
+ *
+ * A LOAD IS PENDING ONLY IF ONE WAS ASKED FOR *AND* THE FILE OPENS. Both
+ * gameproc strings must be non-empty, and OpenSaveForLoad must answer a
+ * handle; a failure resets the level to 1 and falls back to a fresh start.
+ * The handle is carried all the way to LoadGame at the far end of the
+ * function, which is why the original keeps it in esi across two hundred
+ * instructions.
+ *
+ * PlaceScenario runs only when nothing is being loaded -- a fresh mission
+ * places its units from the scenario table, a restored one gets them from the
+ * save instead.
+ *
+ * The loading screen is drawn by hand: the level's own bitmap, a default if
+ * that is missing, centred with the same signed halve the dialogs use, then
+ * freed. The progress bar is stepped at ten fixed points from 10 to 100. */
+void __cdecl State2Enter(void)
+{
+    AM2_Widget *screen = *(AM2_Widget **)(uintptr_t)ADDR_PAINT_OBJECT;
+    am2_FILE   *save   = (am2_FILE *)0;
+    AM2_Sprite *splash;
+    void       *leader;
+
+    if (screen) {
+        ((AM2_WidgetDeleteFn *)screen->vtable)[WIDGET_VSLOT_DTOR](screen, 1);
+        *(void **)(uintptr_t)ADDR_PAINT_OBJECT = (void *)0;
+    }
+    if (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
+        FreeBitmap((void **)(uintptr_t)ADDR_CURRENT_BITMAP);
+
+    ClearBothSurfaces();
+    *(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED = 1;
+
+    if (*(const uint8_t *)(uintptr_t)ADDR_GAMEPROC_BLOCK != 0
+        && *(const uint8_t *)(uintptr_t)ADDR_GAMEPROC_STR_B != 0) {
+        if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING != 0) {
+            save = OpenSaveForLoad();
+            if (!save) {
+                *(int32_t *)(uintptr_t)ADDR_LOAD_PENDING = 0;
+                *(int32_t *)(uintptr_t)ADDR_LEVEL_ID     = 1;
+                *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX  = 1;
+            }
+        }
+    } else {
+        *(int32_t *)(uintptr_t)ADDR_LOAD_PENDING = 0;
+    }
+
+    SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
+    LoadPaletteFile((const char *)AM2_IMAGE(ADDR_STR_LEVEL_PAL),
+                    *(void **)(uintptr_t)ADDR_ACTIVE_PALETTE);
+    SetGamePalette(*(uint8_t **)(uintptr_t)ADDR_ACTIVE_PALETTE);
+
+    if (*(const int32_t *)AM2_IMAGE(ADDR_OPT_DF))
+        SpriteSetLoad((const char *)(uintptr_t)ADDR_MAP_FOLDER);
+
+    ZeroUnread50C34C();
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0) {
+        *(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR = 0;
+    } else {
+        if (*(const int32_t *)(uintptr_t)ADDR_OPT_DBG != 0)
+            *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOADING = 1;
+        *(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR = 1;
+    }
+
+    ResetItemsAndUids();
+    *(int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF = 0;
+
+    /* A default .cof only matters for a fresh campaign level past the first. */
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0
+        && *(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0
+        && *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID > 1) {
+        uint8_t find[AM2_FINDDATA_BYTES];
+
+        SetGameDir((const char *)(uintptr_t)ADDR_STR_SAVE_DIR);
+        int32_t h = orig_findfirst(
+            (const char *)(uintptr_t)ADDR_STR_DEFAULT_COF, find);
+        if (h != -1) {
+            *(int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF = 1;
+            orig_findclose(h);
+        }
+    }
+
+    SetGameDir((const char *)(uintptr_t)ADDR_STR_BITMAPS_DIR);
+    splash = LoadBitmap((const char *)(uintptr_t)ADDR_LEVEL_STR_B, 1);
+    if (!splash)
+        splash = LoadBitmap((const char *)AM2_IMAGE(ADDR_STR_LOADING_BMP), 1);
+    if (splash) {
+        SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
+        DrawSprite(splash,
+                   (*(const int32_t *)(uintptr_t)ADDR_SCREEN_W
+                    - splash->bounds.right) / 2,
+                   (*(const int32_t *)(uintptr_t)ADDR_SCREEN_H
+                    - splash->bounds.bottom) / 2,
+                   0);
+    }
+    FreeBitmap((void **)&splash);
+
+    ResetLevelState();
+    BuildFontAlias(0);
+    BuildFontAlias(1);
+
+    SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
+    LoadDefTables();
+    Teardown445F40((const char *)(uintptr_t)ADDR_DIR_SCRATCH);
+    DeclareBuiltinNames();
+    ResetPadsAlias();
+    FreeObjScripts();
+
+    StartAudioStream((char *)(uintptr_t)ADDR_LEVEL_STR_A, 1);
+    LoadMap((const char *)(uintptr_t)ADDR_MAP_NAME,
+            (const char *)(uintptr_t)ADDR_MAP_FOLDER);
+
+    ProgressBar(0x0A);
+    LoadTilesetPalettes();
+    LoadSoldierAnims();
+    ProgressBar(0x14);
+    LoadVehicleAnims();
+    LoadRoachAnims();
+    ProgressBar(0x1E);
+    LoadMissileAnims();
+    LoadExplosionAnims();
+    ProgressBar(0x28);
+    LoadAllSprites();
+    ProgressBar(0x46);
+    ResetAirSupport();
+    ProgressBar(0x4B);
+
+    AimInit();
+    SeqSubsystemInit();
+    Teardown40A4B0();
+
+    if (*(const int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF != 0)
+        LoadDefaultCof();
+    if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0)
+        orig_place_scenario();
+
+    ProgressBar(0x50);
+    *(int32_t *)(uintptr_t)ADDR_LEVEL_FLAG_E30 = 1;
+    *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP      = 1;
+    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET    = 1;
+
+    BuildHudWidgets();
+    InitMenuScreen();
+    RefreshGate(1);
+    *(int32_t *)(uintptr_t)ADDR_FULL_REDRAW = 1;
+    ProgressBar(0x5A);
+    ResetTimers();
+
+    if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0)
+        LoadLevelScript();
+    else
+        LoadGame(save);
+
+    ProgressBar(0x64);
+
+    if (*(const int32_t *)(uintptr_t)ADDR_MISSION_RETRY != 0) {
+        int32_t n = *(const int32_t *)(uintptr_t)ADDR_ATTEMPT_COUNT + 1;
+        *(int32_t *)(uintptr_t)ADDR_MISSION_RETRY = 0;
+        *(int32_t *)(uintptr_t)ADDR_ATTEMPT_COUNT = n;
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_ATTEMPT), n);
+    }
+    orig_log((const char *)AM2_IMAGE(ADDR_STR_REGION_DATA));
+
+    BuildRegionGraph();
+
+    /* Select whatever the local player leads -- its vehicle if it is in one. */
+    leader = LookupOwnerObj(
+                 (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+    if (leader) {
+        SelectInventorySlot(leader,
+            *(const int32_t *)((const uint8_t *)leader + UNIT_OFF_INVENTORY_SEL));
+        DeselectAll();
+        if (*(const uint32_t *)((const uint8_t *)leader + OBJ_OFF_RIDING))
+            SelectUnit(LookupType3ByUID(
+                *(const uint32_t *)((const uint8_t *)leader + OBJ_OFF_RIDING)));
+        else
+            SelectUnit(leader);
+        *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP = 1;
+    }
+    
+
+    /* A FRESH single-player game comes up PAUSED under -dbg. All three
+     * branches are `skip if set` except the last, so the call is reached only
+     * when a load is NOT pending, there is no session, and the debug flag IS
+     * on -- I had the first of the three inverted, and the symptom was that
+     * our side ran straight past MESSAGE FROM HQ while the original sat on
+     * it. 189,990 pixels, twice, and identical logs and object state either
+     * way: the mission had loaded correctly and only the pause was missing. */
+    if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0
+        && *(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0
+        && *(const int32_t *)(uintptr_t)ADDR_OPT_DBG != 0)
+        PauseGame(8);
+
+    *(int32_t *)(uintptr_t)ADDR_MENU_MODE        = AM2_MENU_MODE_PLAY;
+    *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST     = 0;
+    *(int32_t *)(uintptr_t)ADDR_STATE_ENTERED    = 0;
+    *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY    = 1;
+    *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOADING = 0;
+    SendGamePause(0, 0x10000);
+}
+
 void __cdecl State2Frame(void)
 {
     if (g_statePending) {
@@ -796,7 +1030,7 @@ void __cdecl State2Frame(void)
     if (g_stateEntered) {
         int32_t *once = (int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE;
 
-        call0(ADDR_STATE2_ENTER);
+        State2Enter();
         if (*once) {
             TakeMenuRequest();
             *once = 0;
@@ -1430,6 +1664,8 @@ int frame_install(void)
                         "State1Enter", 1);
     rc |= patch_replace(ADDR_STATE1_FRAME, (const void *)State1Frame,
                         "State1Frame", 1);
+    rc |= patch_replace(ADDR_STATE2_ENTER, (const void *)State2Enter,
+                        "State2Enter", 1);
     rc |= patch_replace(ADDR_STATE2_FRAME, (const void *)State2Frame,
                         "State2Frame", 1);
     rc |= patch_replace(ADDR_LEVEL_TEARDOWN, (const void *)LevelTeardown,

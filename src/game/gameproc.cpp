@@ -2033,7 +2033,13 @@ void __cdecl UidRemapAdd(uint32_t from, uint32_t to)
 typedef void (__cdecl *AM2_TeardownFn)(void);
 typedef void (__cdecl *AM2_Call3Fn)(int32_t a, int32_t b, int32_t c);
 
-#define orig_teardown_log   ((AM2_TeardownFn)(uintptr_t)ADDR_LOG)
+#define orig_teardown_log   ((am2_log_fn)(uintptr_t)ADDR_LOG)
+/* TeardownDefTables has the SAME tail-jump shape and its one caller,
+ * LevelTeardown, pushes NOTHING -- the stack is balanced by an `add esp, 8`
+ * well before the call. So in the original its Log inherits whatever is
+ * there, which is not a message it chose, and there is nothing to pass on.
+ * Left as a no-argument call rather than invented. */
+#define orig_teardown_log0  ((AM2_TeardownFn)(uintptr_t)ADDR_LOG)
 /* 0x0045EDF0 is FreeVehicleDefs now; definfo.h declares it. */
 /* 0x004607D0 is FreeMissileDefs now; definfo.h declares it. */
 /* 0x0040A4B0 is BuildRemapTables, reconstructed in win32/palette.cpp and
@@ -2074,11 +2080,27 @@ void __cdecl Call405220(int32_t a, int32_t b, int32_t c)
                 (void *)(uintptr_t)(uint32_t)c);
 }
 
-/* 0x00445FE0. Free, then log. */
-void __cdecl Teardown445F40(void)
+/* 0x00445FE0. Free, then log -- and the MESSAGE IS AN ARGUMENT.
+ *
+ * The body is `call 0x00445F40` then `jmp ADDR_LOG`. A tail jump leaves the
+ * frame alone, so Log inherits this function's first argument as its format.
+ * This was reconstructed as `void(void)` calling Log with nothing.
+ *
+ * PROVED BY AN A/B, not by reading. Nothing could catch it while its only
+ * caller -- State2Enter -- was the image's, because the original pushed the
+ * string and our stub ignored it, and both halves of every run behaved the
+ * same. Reconstructing that caller made ours pass nothing, and `ab.sh
+ * bootcamp` came back with the log line "data\bootcamp" on the original
+ * side only, and 189,990 pixels.
+ *
+ * The string is ADDR_DIR_SCRATCH, so what it logs is the map directory the
+ * level was loaded from. CLAUDE.md's rule that a no-format Log call must not
+ * be reproduced is about a call with TWO arguments and no format; this one
+ * has exactly one and it IS the format. */
+void __cdecl Teardown445F40(const char *msg)
 {
     FreeSpriteRegistry();
-    orig_teardown_log();
+    orig_teardown_log(msg);
 }
 
 /* 0x004033E0. Free four things, then log. Two of the four already had names,
@@ -2089,7 +2111,7 @@ void __cdecl TeardownDefTables(void)
     FreeVehicleDefs();
     FreeMissileDefs();
     DefFreeTrooperRecs();
-    orig_teardown_log();
+    orig_teardown_log0();
 }
 
 /* 0x0040A690. Two steps, the second a tail jump -- and both halves sit inside

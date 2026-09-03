@@ -13844,7 +13844,25 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_DLG_OFF_RECT         0x14u
 #define ADDR_STATE1_COMMON       0x00426270u
 #define ADDR_MOVIE_FRAME_STEP    0x00445630u  /* states 0 and 3, per frame */
-#define ADDR_STATE2_ENTER        0x00425300u
+/* 0x00425300, one caller -- RunFrame's state-2 arm. ENTERING a mission: tear
+ * the previous screen down, load the map and every animation table, build the
+ * HUD, place or load the units, and unpause.
+ *
+ * It is what SETS ADDR_MENU_MODE to 0x21. This file already recorded 33 as
+ * the value a probe reads throughout Boot Camp play, and 0x21 is 33 -- so the
+ * measurement now has its writer, and the ESCAPE arm being number 34 is
+ * unreachable by construction rather than by observation.
+ *
+ * 0x0043DDA0, the scenario placement walk, is called only when nothing is
+ * being LOADED: a fresh mission places its units from the scenario table and
+ * a restored one gets them from the save. */
+#define ADDR_STATE2_ENTER        0x00425300u  /* void(void) */
+#define AM2_MENU_MODE_PLAY       0x21   /* 33 -- ordinary in-mission play */
+#define ADDR_PLACE_SCENARIO      0x0043DDA0u  /* void(void) */
+#define ADDR_STR_LEVEL_PAL       0x004851D4u  /* "palette.bmp" */
+#define ADDR_STR_LOADING_BMP     0x004851ACu  /* "load_default.bmp" */
+#define ADDR_STR_ATTEMPT         0x0048519Cu  /* "Attempt# %d\n" */
+#define ADDR_STR_REGION_DATA     0x00485180u  /* "calculating region data..." */
 #define ADDR_SUBSTATE22          0x00425C10u
 /* Sub-state 33's other arm: the one that runs while the game is PAUSED, where
  * ADDR_TAKE_MENU_REQUEST runs when it is not. Named for the body rather than

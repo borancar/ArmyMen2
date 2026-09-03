@@ -16,7 +16,9 @@ extern "C" {
 void __cdecl ZeroUnread50C34C(void);
 int32_t __cdecl NoteKind31(void *rec);
 void __cdecl Call405220(int32_t a, int32_t b, int32_t c);
-void __cdecl Teardown445F40(void);
+/* 0x00445FE0. Free the sprite registry, then log `msg`. The message is an
+ * ARGUMENT, inherited by Log through a tail jump -- see gameproc.cpp. */
+void __cdecl Teardown445F40(const char *msg);
 void __cdecl TeardownDefTables(void);
 void __cdecl Teardown40A4B0(void);
 void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c);
