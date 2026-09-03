@@ -52,7 +52,24 @@ OFF_LIMITS = {
 def remaining():
     img = am2.Image()
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+    # merges.real_functions() stops at the NOMINAL CRT_START, so entries in
+    # the band above it are never split -- and a function sharing an entry
+    # with a reconstructed neighbour is then credited whole.  That is the
+    # merged-entry error this file already documents, and it recurred here
+    # the moment the range was widened: six functions between 0x0045E000 and
+    # the real frontier were hidden by it.  Split the whole range instead.
+    referenced = merges.referenced_addresses(img)
     splits = merges.real_functions(img)
+    with open(os.path.join(REPO, "docs", "functions.tsv")) as fh:
+        for row in csv.DictReader(fh, delimiter="\t"):
+            addr, size = int(row["addr"], 16), int(row["size"])
+            if addr < merges.CRT_START or addr >= CRT_REAL or size < 16:
+                continue
+            starts = [a for a in merges.split_points(img, addr, size, md)
+                      if a in referenced]
+            if starts:
+                splits[addr] = ([addr] + starts, size)
+
     done = set(merges.reconstructed())
 
     funcs = []

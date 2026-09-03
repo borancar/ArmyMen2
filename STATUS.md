@@ -312,7 +312,24 @@ honest one on this screen. CLAUDE.md already says to read a liveness counter
 beside the one you care about; it does not help if the liveness counter is
 itself blind, so check blindspots.py for the one you pick.
 
-## THE TRANSPOSITION IS COMPLETE, and tools/remaining.py says so
+## CORRECTED: it was not complete, and the tool was measuring wrong
+
+The section below claimed 0 game functions.  That was an artifact of HOW the
+range was widened, not a fact about the work: `merges.real_functions()` stops
+splitting merged entries at the NOMINAL CRT_START, so every entry in the band
+above it was credited whole the moment one function inside it was
+reconstructed.  Six functions were hidden that way.
+
+This is the merged-entry error this file already documents twice -- once when
+the naive count read 0, and once when matching on exact start hid WndProc --
+recurring a third time, in the band that had just been added.  Widening a
+range without widening the SPLITTING that goes with it produces a number that
+gets better-looking as it gets more wrong.
+
+tools/remaining.py splits the whole range now.  Read its output; the table
+below is kept only for the description of what is not work.
+
+## The three groups that are not work
 
 Measured 2026-09-03. `tools/remaining.py` reads **0 game functions and 0 C++
 static initializers**, over the full range to the REAL CRT frontier
