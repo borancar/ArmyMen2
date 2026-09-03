@@ -3633,8 +3633,33 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   being caught by it. Check the count, not only the verdict.
 
   What it does NOT cover: the accumulation, the zero-count early exit reaching
-  the caller, and everything inside the two stubs. RoachStepAllowed is still
-  unchecked entirely.
+  the caller, and everything inside the two stubs.
+
+  **The second oracle covers RoachStepAllowed's SPEED**, which is the head of
+  that function up to 0x0043D168 -- the four roach velocity and acceleration
+  constants, the frame delta, and the object's own field, through _ftol.
+  Past that point it reads the object's rows, its playing animation and the
+  map, so the same partial-oracle line applies. 576 cases and four mutations:
+  clamping the reverse arm with min instead of max fails 190, inverting the
+  state test 182, dropping the frame-delta scale 106, and making _ftol round
+  instead of truncate fails 26 -- which is the count that matters, because it
+  is exactly the cases whose float has a fractional part, and it proves the
+  deltas reach non-integral values.
+
+  **AND THE FIRST RUN OF IT REPORTED 348 FAILURES THAT WERE THE HARNESS'S.**
+  `Emu.call` writes its scratch bytes at SCRATCH, and the control record had
+  been placed there -- so `state` and `reverse` were zeroed AFTER being
+  seeded, and every case ran the forward arm. The seeds have to outlive the
+  call that uses them, which is the same class as shakecheck's unseeded run
+  and reads the same way from outside: a confident disagreement.
+
+  **espmap KEPT A FALSE DEFECT OUT OF THIS ONE.** Hand-counting the prologue
+  made the original look as though it reads the state from argument 1 and the
+  speed field from argument 2 -- the opposite of the reconstruction, and the
+  ADDR_ENTER_VEHICLE shape exactly. The count had dropped the leading
+  `push ecx`. tools/espmap.py puts the three arguments at slots +0x18, +0x1C
+  and +0x20 and shows ebx taking the second, which is what the C already
+  does. Hand-tracking esp through a prologue is what the tool exists for.
 
   **`RoachBite`'s drive is identified and it is not a longer wait.** Its one
   caller reaches it only in the roach's state 4, and a live MAP 01 run with
