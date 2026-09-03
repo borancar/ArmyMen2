@@ -639,6 +639,67 @@ typedef void (__attribute__((thiscall)) *am2_list_add_fn)(void *list,
                                                           void *data);
 #define g_connectionList  (*(void **)(uintptr_t)ADDR_CONNECTION_LIST)
 
+/* EnumConnectionsCb -- original 0x0040E460, 208 bytes, one exit.
+ *
+ * DirectPlay's per-service-provider callback, handed to EnumConnections by
+ * CommEnumConnections above. Its `ret 0x18` is six arguments cleaned by the
+ * callee, which is LPDPENUMCONNECTIONSCALLBACK exactly, and espmap puts the
+ * three it reads on arguments 2, 3 and 4 -- lpConnection, dwConnectionSize
+ * and lpName. Nothing calls it; DirectPlay does.
+ *
+ * IT DROPS TWO PROVIDERS BY NAME. "Play on Mplayer" and "Play on HEAT" are
+ * matchmaking services that no longer exist, and the original compares the
+ * short name against both with an inlined strcmp before adding anything. So
+ * the list this fills is every provider the machine has EXCEPT those two,
+ * plus the "Play Against Computer Only" row CommEnumConnections appends
+ * afterwards.
+ *
+ * IT ALWAYS ANSWERS TRUE, on every path -- both filters, a null list, and a
+ * failed allocation alike. A DirectPlay enumeration callback returning FALSE
+ * would stop the enumeration, and this one never does, so a provider that
+ * cannot be recorded is skipped rather than truncating the rest.
+ *
+ * THE CONNECTION BLOB IS COPIED because DirectPlay owns the one it passes:
+ * dwConnectionSize bytes into memory from the game's own allocator, and the
+ * copy is what goes in the row. The row's NAME is the provider's short name,
+ * which points into DirectPlay's storage and is not copied -- that is the
+ * original's, and it is why the list is rebuilt on every browse rather than
+ * kept.
+ *
+ * EXERCISED, unlike most of what is left. CommEnumConnections is ours and
+ * hands this to DirectPlay BY ADDRESS, so the patched entry is crossed and
+ * the counter is real; `tools/ab.sh multi` reaches that call and clicks the
+ * TCP/IP row this produces. */
+BOOL FAR PASCAL EnumConnectionsCb(LPCGUID lpguidSP, LPVOID lpConnection,
+                                  DWORD dwConnectionSize, LPCDPNAME lpName,
+                                  DWORD dwFlags, LPVOID lpContext)
+{
+    void *copy;
+
+    (void)lpguidSP;
+    (void)dwFlags;
+    (void)lpContext;
+
+    if (!g_connectionList)
+        return TRUE;
+
+    if (strcmp(lpName->lpszShortNameA,
+               (const char *)AM2_IMAGE(ADDR_STR_SP_MPLAYER)) == 0)
+        return TRUE;
+    if (strcmp(lpName->lpszShortNameA,
+               (const char *)AM2_IMAGE(ADDR_STR_SP_HEAT)) == 0)
+        return TRUE;
+
+    copy = orig_malloc(dwConnectionSize);
+    if (!copy)
+        return TRUE;
+    memcpy(copy, lpConnection, dwConnectionSize);
+
+    ListAdd(g_connectionList, lpName->lpszShortNameA, copy);
+    return TRUE;
+}
+
+
 int32_t __attribute__((thiscall)) CommEnumConnections(void *comm, void *list)
 {
     LPDIRECTPLAY4A dp = *DirectPlaySlot(comm);
@@ -654,7 +715,7 @@ int32_t __attribute__((thiscall)) CommEnumConnections(void *comm, void *list)
 
     app = *(const GUID **)((uint8_t *)comm + COMM_OFF_APP_GUID);
     hr = IDirectPlayX_EnumConnections(dp, app,
-                                      (LPDPENUMCONNECTIONSCALLBACK)(uintptr_t)ADDR_ENUM_CONNECTIONS_CB,
+                                      EnumConnectionsCb,
                                       g_enumContext, 0);
     if (hr != DP_OK)
         return 0;
@@ -3532,6 +3593,9 @@ int dplay_install(void)
                         "CommConstruct", 0);
     rc |= patch_replace(ADDR_COMM_DESTRUCT, (const void *)CommDestruct,
                         "CommDestruct", 0);
+    rc |= patch_replace(ADDR_ENUM_CONNECTIONS_CB,
+                        (const void *)EnumConnectionsCb,
+                        "EnumConnectionsCb", 6);
     rc |= patch_replace(ADDR_COMM_ENUM_SESSIONS, (const void *)CommEnumSessions,
                         "CommEnumSessions", 1);
     rc |= patch_replace(ADDR_COMM_ENUM_CONNECTIONS, (const void *)CommEnumConnections,

@@ -12627,6 +12627,8 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * matches LPDPENUMCONNECTIONSCALLBACK's six arguments exactly. */
 #define ADDR_COMM_ENUM_CONNECTIONS 0x0040E530u /* thiscall int32(this, void *) */
 #define ADDR_ENUM_CONNECTIONS_CB 0x0040E460u  /* LPDPENUMCONNECTIONSCALLBACK */
+#define ADDR_STR_SP_HEAT         0x004752E0u  /* "Play on HEAT" */
+#define ADDR_STR_SP_MPLAYER      0x004752F0u  /* "Play on Mplayer" */
 #define ADDR_CONNECTION_LIST     0x004FA900u  /* void *, what that callback fills */
 /* int32_t, which player slot is OURS. It was ADDR_HOST_SLOT, named from
  * CommOpenSession -- where the machine opening the session IS the host, so the
