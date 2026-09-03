@@ -239,7 +239,6 @@ typedef void (__attribute__((thiscall)) *am2_squad_detail_fn)(AM2_Widget *, int3
  * original's. ItemIsReady and ItemTypeName were seams here until they were
  * reconstructed a commit later; checkseams caught both the moment they were,
  * which is the whole reason that ratchet exists. */
-typedef void (__cdecl *am2_select_weapon_fn)(void *, int32_t);
 
 /* The six pointer/weapon slots hold two shapes, and the difference is what the
  * original does with the result: a PICK is `call eax; add esp,4; test eax,eax`
@@ -249,7 +248,6 @@ typedef void (__cdecl *am2_select_weapon_fn)(void *, int32_t);
  * it loosely. */
 typedef int32_t (__cdecl *AM2_PointerPickFn)(void *obj);
 typedef void (__cdecl *AM2_PointerActionFn)(void *obj, uint32_t at);
-#define orig_select_weapon (*(am2_select_weapon_fn)ADDR_SELECT_WEAPON)
 
 /* Clear the focus record and the installed handler, but only if this widget is
  * the one that owns them. Both callers need the test: a field can be repainted
@@ -2626,7 +2624,7 @@ void __attribute__((thiscall)) HudSargeUpdate(AM2_Widget *w)
     /* Pass one: the hotkeys, first match wins and nothing else runs. */
     for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
         if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + i)) {
-            orig_select_weapon(obj, i);
+            SelectWeapon(obj, i);
             goto refill;
         }
     }
@@ -2671,7 +2669,7 @@ void __attribute__((thiscall)) HudSargeUpdate(AM2_Widget *w)
 
         if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
             && changed && grab == w)
-            orig_select_weapon(obj, i);
+            SelectWeapon(obj, i);
 
         /* The tooltip, and it is gated on STILLNESS rather than on the click.
          * ADDR_MOUSE_ACTIVITY is stamped from the clock on any movement or
@@ -12261,6 +12259,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_SELECT_WEAPON, (const void *)SelectWeapon,
+                        "SelectWeapon", 7);
     rc |= patch_replace(ADDR_MP_SPIN_CTOR, (const void *)MpSpinConstruct,
                         "MpSpinConstruct", 2);
     rc |= patch_replace(ADDR_SAVE_LIST_CTOR,
@@ -13029,6 +13029,106 @@ int widget_install(void)
 /* The spin control's class is NOT reconstructed -- 0x00456300 is still the
  * image's -- so it is the one seam this function needs.  Everything else it
  * calls is ours. */
+/* Reconstructed in item.cpp and declared there rather than in item.h. */
+void __cdecl SelectInventorySlot(void *unit, int32_t slot);
+
+/* SelectWeapon -- original 0x00414F20, 410 bytes, seven callers -- the six
+ * HUD hotkeys and the panel's click. Pick weapon slot `slot` on `unit`.
+ *
+ * SELECTING THE SLOT THAT IS ALREADY SELECTED DESELECTS, and that is the
+ * whole shape of the function: the equal case clears the weapon's target and
+ * falls through to the same tail, so a second press of the same hotkey puts
+ * the weapon away rather than re-arming it.
+ *
+ * WHICH target is cleared comes from a 19-entry byte index at 0x004150DC
+ * into a jump table at 0x004150BC, over weapon def kinds 0x17..0x29.
+ * Generated from those tables, not read off the arms -- twelve of the
+ * nineteen kinds share the do-nothing default, and arm 0x23 JUMPS INTO arm
+ * 0x26's comparison rather than having its own, which reading the bodies top
+ * to bottom would show as four arms where there are four conditions and
+ * three tests.
+ *
+ * The four middle arms are one shape with different comparands: clear the
+ * target unless OBJ_OFF_FIELD_530 already equals 0, 1, 2 or 3 respectively.
+ * Kind 0x17 clears only for a unit that is alive and not at full health;
+ * 0x1A clears unconditionally; 0x29 clears the target of whatever the unit
+ * is RIDING, and nulls OBJ_OFF_RIDING when that uid no longer resolves --
+ * so a stale vehicle reference is repaired here as a side effect.
+ *
+ * The tail is shared by both halves: store the slot, select it, and unless
+ * the unit carries flag 0x400, deselect everything and select either its
+ * vehicle or itself, snapping the view either way.
+ *
+ * PlaySoundAt(0,0,0,0,0) fires before any of it -- the same five-zero call
+ * FireWeapon's arm 17 makes, and just as real. */
+void __cdecl SelectWeapon(void *unit, int32_t slot)
+{
+    uint8_t *u = (uint8_t *)unit;
+    uint8_t *w;
+    int32_t  kind;
+
+    w = (uint8_t *)WeaponByUid(
+            *(const uint32_t *)(u + OBJ_OFF_WEAPON_UID + (size_t)slot * 4));
+    if (!w)
+        return;
+
+    PlaySoundAt(0, 0, 0, 0, 0);
+
+    if (*(const int32_t *)(u + UNIT_OFF_INVENTORY_SEL) == slot) {
+        *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP = 1;
+
+        kind = **(const int32_t **)(w + OBJ_OFF_FIELD_C0);
+        switch (kind) {
+        case 0x17: {
+            int16_t hp = *(const int16_t *)(u + OBJ_OFF_HEALTH);
+            if (hp > 0 && hp < *(const int16_t *)(u + OBJ_OFF_MAX_HEALTH))
+                SetWeaponTarget(u, *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+            break;
+        }
+        case 0x1A:
+            SetWeaponTarget(u, *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+            break;
+        case 0x23: case 0x24: case 0x25: case 0x26:
+            /* One shape, four comparands: 0x23 wants 0, 0x24 wants 1, and so
+             * on. The original gives 0x23 no test of its own and jumps into
+             * 0x26's. */
+            if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != kind - 0x23)
+                SetWeaponTarget(u, *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+            break;
+        case 0x29: {
+            uint32_t riding = *(const uint32_t *)(u + OBJ_OFF_RIDING);
+            if (riding) {
+                void *veh = LookupType3ByUID(riding);
+                if (veh)
+                    SetWeaponTarget(veh,
+                        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+                else
+                    *(uint32_t *)(u + OBJ_OFF_RIDING) = 0;
+            }
+            break;
+        }
+        default:
+            break;   /* twelve kinds, and every kind outside 0x17..0x29 */
+        }
+    }
+
+    *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = slot;
+    SelectInventorySlot(u, slot);
+
+    if (*(const uint8_t *)(u + OBJ_OFF_FLAGS + 1) & 4)
+        return;
+
+    DeselectAll();
+    {
+        uint32_t riding = *(const uint32_t *)(u + OBJ_OFF_RIDING);
+        if (riding)
+            SelectUnit(LookupType3ByUID(riding));
+        else
+            SelectUnit(u);
+    }
+    *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP = 1;
+}
+
 /* MpSpinConstruct -- original 0x00456300, 1008 bytes, thiscall `ret 0x38`.
  * The SPIN control: an up arrow, a down arrow, and a numeric edit between
  * them. Fourteen stack arguments, which is why it kept its typedef for so

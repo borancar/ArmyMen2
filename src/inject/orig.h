@@ -11702,6 +11702,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_AAI_DIR         0x00473D9Cu  /* "aai" */
 #define ADDR_FMT_DOT_TXT         0x00485178u  /* "%s.txt" */
 #define ADDR_FMT_DOT_AMM         0x00486330u  /* "%s.amm" */
+#define ADDR_FMT_PREV_BMP        0x004870A8u  /* "%s_prev.bmp" */
 #define ADDR_STR_GAME_AAI        0x004870E8u  /* "game.aai" */
 #define ADDR_STR_OBJECT_AAI      0x004870DCu  /* "object.aai" */
 #define ADDR_STR_TROOP_AAI       0x004870D0u  /* "troop.aai" */

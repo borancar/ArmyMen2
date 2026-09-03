@@ -704,6 +704,10 @@ AM2_Widget *__attribute__((thiscall)) MpSpinConstruct(
     void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2,
     int32_t row);
 
+/* 0x00414F20, seven callers. Pick a weapon slot; picking the one already
+ * selected DESELECTS instead. */
+void __cdecl SelectWeapon(void *unit, int32_t slot);
+
 AM2_DECLARE_CLASS_DTOR(DlgMessage);
 AM2_DECLARE_CLASS_DTOR(DlgGameMenu);
 
