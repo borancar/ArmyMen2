@@ -681,6 +681,10 @@ AM2_DECLARE_CLASS_DTOR(MpName);
 /* The HUD classes' destructor pairs. Named from what `ctl widgets` shows each
  * node drawing in a live mission; see orig.h. Five distinct bodies, so the
  * macro declares them and each is written out. */
+/* The count button destructor pair. Delete was written first and reached
+ * Destruct through a seam until Destruct itself was reconstructed. */
+void __attribute__((thiscall)) CountButtonDestruct(AM2_Widget *w);
+
 AM2_DECLARE_CLASS_DTOR(HudTop);
 AM2_DECLARE_CLASS_DTOR(HudPanel);
 AM2_DECLARE_CLASS_DTOR(HudRadar);

@@ -2892,8 +2892,6 @@ void __attribute__((thiscall)) CheckboxPaint(AM2_Widget *w, RECT clip)
  * past this one's 320 bytes, so it is reached by address rather than dragged
  * into this batch. */
 typedef void (__attribute__((thiscall)) *AM2_CountDtorFn)(AM2_Widget *);
-#define orig_count_button_dtor \
-    ((AM2_CountDtorFn)(uintptr_t)ADDR_COUNT_BUTTON_DTOR)
 
 /* The COUNT BUTTON's own three functions -- constructor, deleting destructor
  * and activate handler. The class already had its paint here; this completes
@@ -2976,10 +2974,34 @@ void __cdecl CountButtonActivate(AM2_Widget *w)
         onToggle(w);
 }
 
+/* CountButtonDestruct -- original 0x00418D60, 95 bytes. Releases the button's
+ * two faces and chains to the base.
+ *
+ * Its deleting destructor beside it has called this through a seam since it
+ * was written; closing that is most of what this commit is.
+ *
+ * The vtable is retagged to VTABLE_COUNT_BUTTON before anything is released,
+ * which is the MSVC destructor idiom and not a no-op: it stops a virtual
+ * dispatched during teardown reaching a derived override. Reproduced in the
+ * original's order, as the other five HUD destructors are.
+ *
+ * The MSVC SEH prologue is not reproduced -- the standing decision. */
+void __attribute__((thiscall)) CountButtonDestruct(AM2_Widget *w)
+{
+    uint8_t *self = (uint8_t *)w;
+
+    w->vtable = (void *)AM2_IMAGE(VTABLE_COUNT_BUTTON);
+
+    ReleaseSprite(*(AM2_Sprite **)(self + COUNTBTN_OFF_SPR));
+    ReleaseSprite(*(AM2_Sprite **)(self + COUNTBTN_OFF_SPR_OFF));
+
+    WidgetDestruct(w);
+}
+
 AM2_Widget *__attribute__((thiscall))
 CountButtonDelete(AM2_Widget *w, int32_t flags)
 {
-    orig_count_button_dtor(w);
+    CountButtonDestruct(w);
     if (flags & 1)
         am2_free(w);
     return w;
@@ -11641,6 +11663,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_MARKER_AGE, (const void *)AimMarkerAge,
                         "AimMarkerAge", 1);
     rc |= patch_replace(ADDR_AIM_INIT, (const void *)AimInit, "AimInit", 1);
+    rc |= patch_replace(ADDR_COUNT_BUTTON_DTOR,
+                        (const void *)CountButtonDestruct,
+                        "CountButtonDestruct", 1);
     rc |= patch_replace(ADDR_HUD_CMD_INVOKE, (const void *)HudCmdInvoke,
                         "HudCmdInvoke", 6);
     rc |= patch_replace(ADDR_HUD_PANEL_CONSTRUCT,
