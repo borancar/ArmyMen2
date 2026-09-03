@@ -334,7 +334,7 @@ void __cdecl StartIntro(void)
         comm = g_commObject;
     }
 
-    if (*(const int32_t *)(comm + ADDR_COMM_OFF_SKIP_INTRO)) {
+    if (*(const int32_t *)(comm + COMM_OFF_LOBBIED)) {
         RequestState(1);
         return;
     }

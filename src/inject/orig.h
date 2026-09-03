@@ -2990,7 +2990,12 @@
 #define COMM_OFF_LOBBY_BUF       0x3F0u   /* DPLCONNECTION, 0x800 bytes */
 #define COMM_OFF_IS_HOST         0x3D8u   /* from DPCAPS_ISHOST */
 #define COMM_OFF_SESSION_DESC    0x3E8u   /* the fetched DPSESSIONDESC2 */
-#define COMM_OFF_LOBBIED         0x3F8u
+#define COMM_OFF_LOBBIED         0x3F8u  /* dplay.cpp sets it on being lobbied */
+/* It had a SECOND name, ADDR_COMM_OFF_SKIP_INTRO, on this same offset -- one
+ * concept under two spellings, which checkoffsets cannot see because the
+ * prefixes differ, and with an ADDR_ prefix on what is a field offset. The
+ * writer decides it: dplay.cpp stores 1 here when the session was lobbied, so
+ * "lobbied" is the field and "skip the intro" was one CONSUMER's use of it. */
 #define COMM_OFF_LOBBY_STARTING  0x3FCu
 #define LOBBY_CONN_BUF_SIZE      0x800u
 #define ADDR_STR_LOBBY_START     0x004756A4u
@@ -4046,6 +4051,11 @@
 /* Slot 0 of BOTH 0x0046FA0C and 0x0046FA34 -- the multiplayer dialog pair's
  * shared scalar deleting destructor, around ADDR_MP_DIALOG_DESTRUCT. */
 #define ADDR_MP_DIALOG_DELETE    0x0042FF40u  /* thiscall obj *(obj, flags) */
+/* Two handlers the multiplayer panel installs by `push imm32` into a button
+ * constructor -- so nothing calls them and refs_to finds them only as the
+ * push operands at 0x004315BB and 0x0043163D. */
+#define ADDR_MP_REQUEST_OPTIONS  0x004319B0u  /* void(void) */
+#define ADDR_MP_LEAVE_SESSION    0x004319E0u  /* void(void) */
 /* A SCROLLING LIST OF COLOURED TEXT LINES, five slots like every widget here:
  * its own destructor and paint, the base's update, focus and repaint. Built at
  * 0x00433290 from 0x00430C95, on the screen that also loads
@@ -6574,6 +6584,12 @@ typedef struct {
 #define AM2_MENU_REQUEST_OPTIONS_MENU 0x0Eu
 #define AM2_MENU_REQUEST_QUIT         0x11u
 #define AM2_MENU_REQUEST_COMM_PANEL   0x06u
+/* kMenuScreens 8 is OpenMpOptions, which is what grounds this. Worth saying
+ * that 7 and 9 next to it are the odd ones: AM2_MENU_REQUEST_OPTIONS and
+ * _OPTIONS_VIEW open OpenMpHost and OpenMpJoin, the host and non-host PANELS,
+ * so their names describe the button that raises them rather than the screen
+ * they select. This one is the options dialog itself. */
+#define AM2_MENU_REQUEST_MP_OPTIONS   0x08u
 #define AM2_MENU_REQUEST_SELECT_MAP   0x02u
 #define AM2_MENU_REQUEST_SELECT_PLAYER 0x03u
 #define AM2_MENU_REQUEST_ENTER_NAME    0x04u
@@ -14294,7 +14310,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STATE3_FRAME        0x00426760u
 #define ADDR_STATE4_FRAME        0x00426790u
 #define ADDR_COMM_OFF_LOBBY      0x3FCu       /* on the comm object */
-#define ADDR_COMM_OFF_SKIP_INTRO 0x3F8u
 #define ADDR_SET_GAME_OVER       0x0042E5A0u  /* void(int32) */
 #define ADDR_LEAK_COUNT          0x0050C344u  /* int32 */
 #define ADDR_LEAK_TOTAL          0x0050C340u  /* int32 */

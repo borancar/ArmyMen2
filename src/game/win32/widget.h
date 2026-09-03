@@ -1680,6 +1680,11 @@ void __attribute__((thiscall)) MpPanelDestruct(AM2_Widget *w);
 
 /* 0x00430510, 0x00431790, 0x0042FF40. The slots that complete those classes:
  * the two scalar deleting destructors and the panel's paint forward. */
+/* 0x004319B0, 0x004319E0. Two buttons the multiplayer panel installs by
+ * address: open the options dialog, and leave the session. */
+void __cdecl MpRequestOptions(void);
+void __cdecl MpLeaveSession(void);
+
 AM2_Widget *__attribute__((thiscall)) MpPanelDelete(AM2_Widget *w, int32_t f);
 AM2_Widget *__attribute__((thiscall)) MpDialogDelete(AM2_Widget *w, int32_t f);
 void __attribute__((thiscall)) MpPanelPaint(AM2_Widget *w, RECT clip);

@@ -13604,6 +13604,49 @@ void __attribute__((thiscall)) MpPanelPaint(AM2_Widget *w, RECT clip)
     WidgetPaintFwd2(w, clip);
 }
 
+
+/* ---- two multiplayer panel buttons --------------------------------------
+ *
+ * 0x004319B0 and 0x004319E0, installed by `push imm32` into a button
+ * constructor from the panel builder at 0x00430530 -- so nothing calls them
+ * and their only references are those two push operands. The shape CLAUDE.md
+ * describes for menu handlers, and the reason an aligned-dword cross
+ * reference would report both as dead code.
+ *
+ * The first opens the options dialog. The second leaves, and LEAVING IS TWO
+ * DIFFERENT ACTIONS decided by COMM_OFF_LOBBIED -- the same split
+ * GameMenuUpdate already documents for the in-mission menu.
+ *
+ * BUT IT IS NOT THE SAME PAIR OF ACTIONS, which is why the sibling could not
+ * simply be copied. GameMenuUpdate asks for state 4 or state 1 through
+ * RequestState. This one asks for state 4 the same way, and on the standalone
+ * path raises MENU REQUEST 1 instead -- the title screen, through the menu
+ * request pair rather than the state machine. Two mechanisms, one decision. */
+
+void __cdecl MpRequestOptions(void)
+{
+    PlaySoundAt(2, 0, 0, 0, 0);
+    g_menuRequest    = AM2_MENU_REQUEST_MP_OPTIONS;
+    g_menuRequestSet = 1;
+}
+
+void __cdecl MpLeaveSession(void)
+{
+    uint8_t *comm;
+
+    PlaySoundAt(2, 0, 0, 0, 0);
+    CommDropSession(g_commObject);
+
+    comm = g_commObject;
+    if (*(const int32_t *)(comm + COMM_OFF_LOBBIED)) {
+        RequestState(AM2_STATE_MP_LOBBY);
+        return;
+    }
+
+    g_menuRequest    = AM2_MENU_REQUEST_TITLE;
+    g_menuRequestSet = 1;
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -14452,6 +14495,11 @@ int widget_install(void)
                         "MpDialogDelete", 2);
     rc |= patch_replace(ADDR_MP_PANEL_PAINT, (const void *)MpPanelPaint,
                         "MpPanelPaint", 5);
+    rc |= patch_replace(ADDR_MP_REQUEST_OPTIONS,
+                        (const void *)MpRequestOptions,
+                        "MpRequestOptions", 0);
+    rc |= patch_replace(ADDR_MP_LEAVE_SESSION, (const void *)MpLeaveSession,
+                        "MpLeaveSession", 0);
     return rc;
 }
 
@@ -15876,8 +15924,7 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
                             (const char *)AM2_IMAGE(0x0048710Cu),
                             (const char *)AM2_IMAGE(0x00487124u), 1,
                             *RectSet(&r, 0x21F, 0x142, 0x51, 0x20),
-                            (void (__cdecl *)(AM2_Widget *))(uintptr_t)
-                                0x004319B0u,
+                            (void (__cdecl *)(AM2_Widget *))MpRequestOptions,
                             0);
         WidgetAddChild(w, child);
 
@@ -15887,8 +15934,7 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
                             (const char *)AM2_IMAGE(0x00486E04u),
                             (const char *)AM2_IMAGE(0x00486E1Cu), 1,
                             *RectSet(&r, 0x21F, 0x16B, 0x51, 0x20),
-                            (void (__cdecl *)(AM2_Widget *))(uintptr_t)
-                                0x004319E0u,
+                            (void (__cdecl *)(AM2_Widget *))MpLeaveSession,
                             0);
         WidgetAddChild(w, child);
     }
