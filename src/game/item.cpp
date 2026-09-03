@@ -9181,7 +9181,7 @@ void __cdecl SelectionClick(void)
 
         e = (uint8_t *)WalkCellAtPoint(
                 &world, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
-                (int32_t (__cdecl *)(void *))(uintptr_t)ADDR_SELECTABLE_PRED);
+                ObjIsSelectable);
         if (!e)
             return;
 
@@ -9244,7 +9244,7 @@ void __cdecl SelectionClick(void)
     e = (uint8_t *)ObjectsInRect(
             (const AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT,
             (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
-            (int32_t (__cdecl *)(void *))(uintptr_t)ADDR_SELECTABLE_PRED);
+            ObjIsSelectable);
     if (!e)
         return;
 

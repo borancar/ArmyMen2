@@ -1417,6 +1417,51 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
     return 1;
 }
 
+
+/* 0x00413690, SelectionClick's filter -- which of our objects a click may
+ * pick. Both of its references are in that one function, one as a callback
+ * and one as a direct call.
+ *
+ * IT LIVES HERE RATHER THAN WITH SelectionClick, and the LINK decided that:
+ * item.cpp hands it to WalkCellAtPoint twice, item.cpp is in SELFTEST_SRC, and
+ * that link has no DirectX -- so a home in win32/ would break it. The function
+ * touches no Win32 at all and both predicates it calls are in this file.
+ *
+ * SIX EXITS, FIVE OF THEM REFUSALS, and they were written from the epilogues
+ * rather than read top to bottom: not ours, gone, dead, not an owned type,
+ * busy, or a vehicle with no seat left. Only the fall-through answers 1.
+ *
+ * Two are worth spelling out. "Dead" is health == 0 AND max health > 0, so an
+ * object with no health bar at all is not treated as a corpse. And the seat
+ * test applies to VEHICLES ONLY -- ObjIsType3 gates it -- which is why a full
+ * transport cannot be selected while a full squad can. */
+int32_t __cdecl ObjIsSelectable(void *o)
+{
+    const uint8_t *obj = (const uint8_t *)o;
+
+    if (*(const int8_t *)(obj + OBJ_OFF_ARMY) != (int8_t)g_defaultOwner)
+        return 0;
+
+    if (*(const int32_t *)(obj + OBJ_OFF_FLAGS) & AM2_SIGHT_DROP)
+        return 0;
+
+    if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) == 0
+            && *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH) > 0)
+        return 0;
+
+    if (!ObjIsTypeIn238((const AM2_Object *)obj))
+        return 0;
+
+    if (*(const int32_t *)(obj + OBJ_OFF_FIELD_94) != 0)
+        return 0;
+
+    if (ObjIsType3((const AM2_Object *)obj)
+            && *(const int32_t *)(obj + OBJ_OFF_POSE_PENDING) <= 0)
+        return 0;
+
+    return 1;
+}
+
 int objtype_install(void)
 {
     int rc = 0;
@@ -1464,5 +1509,7 @@ int objtype_install(void)
     rc |= patch_replace(ADDR_ENSURE_SPRITE_AAI_REC,
                         (const void *)EnsureSpriteAaiRecord,
                         "EnsureSpriteAaiRecord", 3);
+    patch_replace(ADDR_SELECTABLE_PRED, (const void *)ObjIsSelectable,
+                  "ObjIsSelectable", 1);
     return rc;
 }

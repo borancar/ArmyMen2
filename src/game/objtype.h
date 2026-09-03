@@ -104,6 +104,9 @@ int32_t __cdecl ObjEventMask(const AM2_Object *obj);
 /* Original: 0x00457420. Types 2, 3 and 8 -- the owned non-item types. */
 int32_t __cdecl ObjIsTypeIn238(const AM2_Object *obj);
 
+/* Original: 0x00413690. SelectionClick's filter: may a click pick this? */
+int32_t __cdecl ObjIsSelectable(void *o);
+
 /* 0x0045D970. The registry lookup and the type test in one: the object
  * registered for `uid` if it is type 3, and NULL for every other answer --
  * no such uid, or one that is some other type.

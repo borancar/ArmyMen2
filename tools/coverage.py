@@ -55,6 +55,7 @@ REGISTERED = {
     "ADDR_AUDIO_TIMER_PROC",  # into timeSetEvent, by StartAudioStream
     "ADDR_MEDKIT_HEAL_ONE",   # into ForEachArmyObject, by the pickup paths
     "ADDR_CHEAT_HEAL_ONE",    # into ForEachArmyObject, by the doctor cheat
+    "ADDR_MOVIE_TIMER_PROC",  # into timeSetEvent, by MoviePlay
     "ADDR_PACKET_THREAD_PROC",# into CreateThread, by StartPacketThread
 }
 

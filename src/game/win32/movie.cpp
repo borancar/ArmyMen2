@@ -249,7 +249,7 @@ int32_t __attribute__((thiscall)) MovieStart(void *movie, void *arg)
 
     fld(movie, MOVIE_TIMER_ID, UINT) =
         timeSetEvent(MOVIE_TIMER_MS, MOVIE_TIMER_RES,
-                     (LPTIMECALLBACK)(uintptr_t)ADDR_MOVIE_TIMER_PROC, 0,
+                     MovieTimerProc, 0,
                      TIME_PERIODIC);
 
     if (fld(movie, MOVIE_TIMER_ID, UINT)) {
@@ -695,6 +695,30 @@ int32_t __cdecl StateMessageMovieToMenu(void)
     SetGameOver(-1);
     RequestState(AM2_STATE_MENU);
     return 0;
+}
+
+
+/* 0x004455E0. The multimedia timer callback MoviePlay starts: five stdcall
+ * arguments -- timeSetEvent's uID, uMsg, dwUser and two spares -- every one of
+ * them ignored, and the whole body is one store into the current movie.
+ *
+ * It runs on the timer thread rather than the game's, which is why it does as
+ * little as it does: it raises a flag and lets the frame notice.
+ *
+ * REGISTERED RATHER THAN PATCHED. The timeSetEvent call above is ours and now
+ * passes this by name, so the image address is never called and a detour there
+ * would be a jump nothing reaches -- the same standing AudioTimerProc has, and
+ * the reason both are in coverage.py's REGISTERED instead of the patch list.
+ * The cost is that it gets no trace counter. */
+void CALLBACK MovieTimerProc(UINT id, UINT msg, DWORD_PTR user,
+                             DWORD_PTR dw1, DWORD_PTR dw2)
+{
+    uint8_t *movie = *(uint8_t **)(uintptr_t)ADDR_MOVIE_CURRENT;
+
+    (void)id; (void)msg; (void)user; (void)dw1; (void)dw2;
+
+    if (movie)
+        fld(movie, MOVIE_UNKNOWN14, int32_t) = 1;
 }
 
 int movie_install(void)

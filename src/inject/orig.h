@@ -5293,7 +5293,13 @@
 #define ADDR_MOVIE_SET_CURRENT   0x00445620u  /* void(void *movie) */
 #define ADDR_MOVIE_END_CURRENT   0x00445650u  /* void(void) */
 #define ADDR_MOVIE_FORGET        0x00445670u  /* void(void) */
-#define ADDR_MOVIE_TIMER_PROC    0x004455E0u  /* the timer callback, stays original */
+/* The multimedia timer callback MoviePlay hands timeSetEvent -- five stdcall
+ * arguments, all ignored, and all it does is mark the current movie. It said
+ * "stays original"; it is reconstructed now, and REGISTERED rather than
+ * patched, because the timeSetEvent call is ours and passes the function by
+ * name, so a detour on this address could never be reached. AudioTimerProc's
+ * shape exactly. */
+#define ADDR_MOVIE_TIMER_PROC    0x004455E0u  /* CALLBACK void(5 args) */
 #define ADDR_GAME_DELETE         0x004648F5u  /* the game's own operator delete */
 /* Posted to the window to advance the game state machine: 0x400 when a movie
  * finishes, 0x402 when one could not be started. Both land in the same handler,

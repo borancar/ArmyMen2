@@ -14002,6 +14002,7 @@ void __cdecl BuildOnToggle(AM2_Widget *w)
     }
 }
 
+
 int widget_install(void)
 {
     int rc = 0;
