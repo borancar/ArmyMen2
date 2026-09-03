@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **38** analysis
+**`make check` runs everything that does not need the game.** **39** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3662,7 +3662,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and five of the eighteen below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 11 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3698,7 +3698,32 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   distinguishes them is a count of ZERO, where row 0 is blank -- so the corpus
   reaching an empty list is what made the difference visible at all.
 
-  The other eleven are verified by READING, which is the standing worth
+  `CanPlaceAt` joins them by `tools/placementcheck.py`, 560 cases over four
+  rects, five cell patterns and seven blockers. It stubs the two mask
+  builders with an ASSEMBLED COPIER rather than a bare `ret`, because both
+  WRITE the mask into a stack buffer whose address is not known until the
+  call happens -- a `ret` leaves the scan reading whatever the stack held.
+
+  **ITS FIRST RUN DISAGREED ON 64 OF 320 CASES AND THE HARNESS WAS THE ONE
+  THAT WAS WRONG.** Two of my own scratch buffers overlapped: the kind grid
+  was 0x10000 bytes at DATA+0x9000 and the mask source sat at DATA+0x11000,
+  so every case zeroed the mask before the call, every cell was skipped, and
+  the original was recorded as accepting placements it refuses. It reads
+  exactly like a defect in the game. What found it was hooking the stub and
+  printing what it had been handed -- the mask source was all zeros, which no
+  amount of re-reading the disassembly would have shown.
+
+  Two mutations of the model passed the first corpus and both gaps were the
+  CORPUS: every blocker filled the whole grid, so an origin off by one still
+  landed on a blocked cell, and every cell byte was 0 or 1, so the original's
+  `test al,al` and `test al,1` were the same predicate. Position-dependent
+  blockers and a cell value of 2 make them fail 30 and 48. What stays
+  uncaught is the `and eax,0xffff` on the tile index, and that one is a
+  theorem rather than a gap: with a tile shift of 4 the index only exceeds
+  16 bits above y = 4096, which is a thousand times more tile rows than any
+  map in the game has.
+
+  The other twenty-one are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is

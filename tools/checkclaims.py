@@ -20,6 +20,7 @@ handful that kept going stale.
 """
 
 import csv
+import glob
 import os
 import re
 import struct
@@ -28,6 +29,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import am2
 import merges
+import checkinstalled
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CRT_START = 0x0045C000
@@ -101,6 +103,90 @@ def check_tool_count():
     return (len(m.group(1).split()),)
 
 
+# The enumerating oracles -- the tools that generate a corpus and compare it
+# against the original.  Deliberately NOT every tools/*check*.py: checkabi.py
+# and checkcom.py are inventories that name every function in the image, so
+# matching against them would report the whole list as checked.
+ORACLES = ("moviecheck posecheck formationcheck shakecheck roachcheck rlecheck "
+           "mprowcheck weaponcheck listcheck ringcheck boolcheck explcheck "
+           "collectcheck firepose regioncheck pathcheck tilepathcheck "
+           "placementcheck scriptcheck").split()
+
+DOCSTRING = re.compile(r'"""[\s\S]*?"""')
+COMMENT = re.compile(r"#[^\n]*")
+
+
+def _strip_python_prose(src):
+    """Drop docstrings and comments, so a MENTION cannot count as coverage.
+
+    Two of these tools discuss a function they do not test -- roachcheck.py
+    names ItemSetBox in its header to say whose shape it borrows, and
+    tilepathcheck.py names PlanPathTo to say whose callee it covers.  A plain
+    substring search reports both as checked, which is the same mistake
+    checkseams.py and checkoffsetuse.py each had to be taught out of.
+    """
+    return COMMENT.sub("", DOCSTRING.sub("", src))
+
+
+PATCH = re.compile(r"patch_replace\(\s*(ADDR_\w+)\s*,\s*\(const void \*\)\s*(\w+)")
+ADDRDEF = re.compile(r"^#define\s+(ADDR_\w+)\s+0x([0-9A-Fa-f]{8})u?", re.M)
+
+
+def _name_addresses():
+    """Every reconstruction's name -> the address it replaces.
+
+    An oracle reaches the ORIGINAL by address, so the function's NAME often
+    appears in its prose and nowhere else -- searching for names alone found
+    one of thirty-two.  Searching for names anywhere at all found sixteen,
+    two of them tools merely discussing a function they do not test.  The
+    address is the key that is neither.
+
+    Two routes, because neither is complete on its own: the declaration
+    comment checkinstalled.py already parses, and the patch list.  Seven of
+    the thirty-two have no matching declaration -- a static definition, or a
+    signature the DECL regex does not take -- and the patch list has them.
+    """
+    out = {}
+    for path in (glob.glob(os.path.join(REPO, "src", "game", "*.h"))
+                 + glob.glob(os.path.join(REPO, "src", "game", "win32", "*.h"))):
+        for m in checkinstalled.DECL.finditer(open(path).read()):
+            out.setdefault(m.group("name"), "0x00" + m.group("addr").upper())
+
+    addrs = dict(ADDRDEF.findall(open(os.path.join(REPO, "src", "inject",
+                                                   "orig.h")).read()))
+    for path in (glob.glob(os.path.join(REPO, "src", "game", "*.cpp"))
+                 + glob.glob(os.path.join(REPO, "src", "game", "win32", "*.cpp"))):
+        for macro, name in PATCH.findall(open(path).read()):
+            if macro in addrs:
+                out.setdefault(name, "0x" + addrs[macro].upper())
+    return out
+
+
+def unexercised_split(text):
+    """(names in CLAUDE.md's unexercised list an oracle checks, list length)."""
+    m = re.search(r"- Unexercised by any drive: (.*?)\n\n", text, re.S)
+    names = re.findall(r"`(\w+)`", m.group(1))
+    addrs = _name_addresses()
+
+    bodies = []
+    for t in ORACLES:
+        path = os.path.join(REPO, "tools", t + ".py")
+        if os.path.exists(path):
+            bodies.append(_strip_python_prose(open(path).read()))
+    vectors = os.path.join(REPO, "tests", "vectors.h")
+    if os.path.exists(vectors):
+        bodies.append(open(vectors).read())
+
+    checked = 0
+    for n in names:
+        a = addrs.get(n)
+        keys = [n] if a is None else [n, a, a.lower(), a.replace("0x00", "0x")]
+        if any(re.search(r"\b%s\b" % re.escape(k), b)
+               for b in bodies for k in keys):
+            checked += 1
+    return (checked, len(names))
+
+
 def claims():
     com = com_rows()
     game = [r for r in com if int(r["func"], 16) < CRT_START and r["func"] != "0x00000000"]
@@ -136,6 +222,10 @@ def claims():
         ("functions calling the Lock/Unlock bracket, and how many are ours",
          r"Measured: \*\*(\d+) functions\*\* call the bracket and \*\*(\d+)\*\*",
          (total, ours)),
+
+        ("unexercised functions an oracle checks, and the list length",
+         r'\*\*"UNEXERCISED" IS NOT "UNVERIFIED", and (\d+) of the (\d+) below are\n  now checked',
+         unexercised_split(open(os.path.join(REPO, "CLAUDE.md")).read())),
 
         ("analysis tools `make check` runs",
          r"does not need the game\.\*\* \*\*(\d+)\*\* analysis",
