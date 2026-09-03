@@ -6551,7 +6551,6 @@ typedef struct {
 #define AM2_MENU_REQUEST_WAR_MENU     0x0Au
 #define AM2_MENU_REQUEST_BATTLE_NAME  0x0Bu
 #define AM2_MENU_REQUEST_BATTLE_JOIN  0x0Cu
-#define AM2_MENU_MODE_DEL_PLAYER       0x1Au
 #define AM2_GAME_OVER_CREDITS         0x04u
 /* 0x0043ED00: reload the Boot Camp level table -- it frees whatever is there,
  * chdirs to `shared` and parses "bootcamp.txt", naming the file in
@@ -6747,7 +6746,7 @@ typedef struct {
 #define AM2_DLG_TEXT_BYTES       0x100u      /* the constructors' stack buffer */
 #define ADDR_STR_DATA_DIR        0x0048BAB8u /* "data" */
 /* The in-mission overlay mode DELETE GAME asks with. Its CANCEL goes back to
- * AM2_MENU_MODE_DEL_PLAYER (0x1A) when it came from here and to 0x19
+ * AM2_MENU_MODE_LOAD (0x1A) when it came from here and to 0x19
  * otherwise -- computed with `sete` and `add 0x19` rather than written.
  *
  * TWO names for 0x1A and two for 0x17 were nearly added here. They are one
@@ -6757,6 +6756,29 @@ typedef struct {
  * mode is a sub-state index into the table at 0x00426230, and what each arm
  * shows is not established here. A possibly-narrow name beats a second name
  * on one value. */
+/* THE MODES ARE NAMED BY THE BUTTONS THAT SELECT THEM, which is what the
+ * note above asked for and could not supply. The GAME MENU's six handlers at
+ * 0x00452E50..0x00452F30 are one shape -- sound, set the mode, dirty the
+ * overlay -- and DlgGameMenuConstruct builds them with their bitmaps, so the
+ * button that says SAVE is the one that writes 0x19:
+ *
+ *     03_125_02_save.bmp     -> 0x19
+ *     03_123_02_load.bmp     -> 0x1A
+ *     03_120_02_audio.bmp    -> 0x1B
+ *     03_121_02_controls.bmp -> 0x1C
+ *
+ * That makes AM2_MENU_MODE_SAVE and AM2_MENU_MODE_LOAD, the two
+ * names the note warned "come from the first CALL SITE seen and may be
+ * under-specific", both wrong about which screen they are: 0x19 is SAVE and
+ * 0x1A is LOAD. Renamed on the bitmaps, which is the game's own vocabulary
+ * and not another inference from a caller.
+ *
+ * It also makes the CANCEL arithmetic read: `sete` on 0x1D plus 0x19 sends a
+ * delete begun at the LOAD dialog back to LOAD and anything else to SAVE. */
+#define AM2_MENU_MODE_SAVE       0x19
+#define AM2_MENU_MODE_LOAD       0x1A
+#define AM2_MENU_MODE_AUDIO      0x1B
+#define AM2_MENU_MODE_CONTROLS   0x1C
 #define AM2_MENU_MODE_DEL_GAME   0x1D
 /* The mode SaveListOnDelete switches to, which is NOT the 0x1D above and is
  * the second entry to what is probably one screen. The note there already
@@ -6766,7 +6788,6 @@ typedef struct {
  * writer, narrowly, on the same principle stated above: what the arm draws
  * is still not established here. */
 #define AM2_MENU_MODE_DEL_SAVE   0x1E
-#define AM2_MENU_MODE_AFTER_LOAD 0x19
 #define AM2_MENU_REQUEST_DEL_GAME 0x15u
 #define AM2_BMP_NEW0             0x0048BAFCu /* 03_011_0N_new.bmp */
 #define AM2_BMP_NEW1             0x0048BB10u

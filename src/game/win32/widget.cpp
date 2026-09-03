@@ -8305,7 +8305,7 @@ void __cdecl OnDelPlayerCancel(AM2_Widget *w)
     (void)w;
     PlaySoundAt(2, 0, 0, 0, 0);
     if (g_gameState == 2) {
-        g_subState     = AM2_MENU_MODE_DEL_PLAYER;
+        g_subState     = AM2_MENU_MODE_LOAD;
         g_overlayDirty = 1;
     } else {
         g_menuRequest    = AM2_MENU_REQUEST_SELECT_PLAYER;
@@ -9082,8 +9082,8 @@ void __cdecl OnDelGameCancel(AM2_Widget *w)
 
         g_overlayDirty = 1;
         g_subState = (from == AM2_MENU_MODE_DEL_GAME)
-                         ? AM2_MENU_MODE_DEL_PLAYER
-                         : AM2_MENU_MODE_AFTER_LOAD;
+                         ? AM2_MENU_MODE_LOAD
+                         : AM2_MENU_MODE_SAVE;
     } else {
         g_menuRequest    = AM2_MENU_REQUEST_LOAD_GAME;
         g_menuRequestSet = 1;
