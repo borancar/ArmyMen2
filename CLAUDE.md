@@ -3157,10 +3157,17 @@ exact oracle**, however meaningful it is when it is set.
   What changed is that two of the three turned out to be the title screen's
   SINGLE PLAYER and BOOT CAMP buttons. They were reconstructed for their own
   sake, as part of finishing the menu, and the CD check came along through
-  `src/game/win32/cdcheck.h` at no extra cost. So the figure is 1 and 2 now,
-  and it moved without the decision being revisited. **A function declined on
+  `src/game/win32/cdcheck.h` at no extra cost. **A function declined on
   density can still arrive because the layer around it did** — which is a
   better reason to re-read `docs/boundary.md` than any argument in prose.
+
+  **AND THE THIRD ARRIVED THE SAME WAY, so the figure is 0 and 0.**
+  `0x0042F290` is START A WAR, and it was written as part of finishing the
+  multiplayer menu rather than because anything here changed its mind about
+  density. All three declined functions came in through the layer around
+  them, one at a time, and the decision was never revisited once. Worth
+  keeping as the strongest version of the rule: a density ranking does not
+  decide what gets reconstructed, it decides what gets reconstructed FIRST.
 
   **That last step is now proved rather than asserted**, and the proof needed
   two corrections to be worth anything. `tools/binpatches.py` checks each
@@ -3352,11 +3359,12 @@ exact oracle**, however meaningful it is when it is set.
 - `docs/boundary.md` answers "is the boundary handled yet" with numbers rather
   than prose, and regenerates from `tools/coverage.py`. It reads the
   reconstructed set out of the `patch_replace` calls themselves, so it cannot
-  drift from what the harness installs. What is left outside is **1 function
-  and 2 sites** — a `MessageBoxA` and the `GetActiveWindow` it passes as its
-  owner — and it sits behind a CD check this build has patched to jump past
-  (`docs/binarypatches.md`), so it cannot execute. The other 122 sites are game
-  logic that happens to read a clock or call `IntersectRect`.
+  drift from what the harness installs. What is left outside is **0 functions
+  and 0 sites**: the last one out was the `MessageBoxA` and `GetActiveWindow`
+  pair in ADDR_ON_START_WAR, behind the fourth of the five disabled CD checks,
+  reproduced the way `cdcheck.h` prescribes so the dialog stays unreachable
+  exactly as the patched binary leaves it. The remaining sites are game logic
+  that happens to read a clock or call `IntersectRect`.
 
   **Re-read those numbers from `docs/boundary.md`, never from here**, and
   expect them to move for reasons that are not progress. This bullet said "one
