@@ -13,6 +13,7 @@
 #include "gamedir.h"   /* SetGameDir */
 #include "objscript.h" /* AM2_ObjScript, kObjScripts */
 #include "scriptint.h"
+#include "air.h"      /* ObjConceal -- reconstructed */
 #include "objtable.h"
 #include "dist.h"     /* AM2_Point, AngleBetween */
 #include "region.h"   /* ActivateRegion, InactivateRegion */
@@ -67,30 +68,30 @@ typedef struct AM2_EventEntry {
  * into the name table on the spot -- ScriptNameUid creates the entry when the
  * lookup misses -- so a mission can test `greenwins` without declaring it. */
 static const struct {
-    uint32_t name;      /* image address of the literal */
-    uint32_t handler;
-    int32_t  army;
+    uint32_t    name;      /* image address of the literal */
+    const void *handler;
+    int32_t     army;
 } kWinConditions[] = {
-    { ADDR_NAME_GREENWINS,     ADDR_EVT_ARMY_WINS, 0 },
-    { ADDR_NAME_TANWINS,       ADDR_EVT_ARMY_WINS, 1 },
-    { ADDR_NAME_BLUEWINS,      ADDR_EVT_ARMY_WINS, 2 },
-    { ADDR_NAME_GREYWINS,      ADDR_EVT_ARMY_WINS, 3 },
-    { ADDR_NAME_GREENTEAMWINS, ADDR_EVT_TEAM_WINS, 0 },
-    { ADDR_NAME_TANTEAMWINS,   ADDR_EVT_TEAM_WINS, 1 },
-    { ADDR_NAME_BLUETEAMWINS,  ADDR_EVT_TEAM_WINS, 2 },
-    { ADDR_NAME_GREYTEAMWINS,  ADDR_EVT_TEAM_WINS, 3 },
+    { ADDR_NAME_GREENWINS,     (const void *)EvtArmyWins, 0 },
+    { ADDR_NAME_TANWINS,       (const void *)EvtArmyWins, 1 },
+    { ADDR_NAME_BLUEWINS,      (const void *)EvtArmyWins, 2 },
+    { ADDR_NAME_GREYWINS,      (const void *)EvtArmyWins, 3 },
+    { ADDR_NAME_GREENTEAMWINS, (const void *)EvtTeamWins, 0 },
+    { ADDR_NAME_TANTEAMWINS,   (const void *)EvtTeamWins, 1 },
+    { ADDR_NAME_BLUETEAMWINS,  (const void *)EvtTeamWins, 2 },
+    { ADDR_NAME_GREYTEAMWINS,  (const void *)EvtTeamWins, 3 },
 };
 
 /* The three that are not named at all: nothing looks them up by string, so
  * each takes a fresh uid and the uid is parked in a global for whoever raises
  * it later. */
 static const struct {
-    uint32_t handler;
-    uint32_t uidslot;
+    const void *handler;
+    uint32_t    uidslot;
 } kRuleEvents[] = {
-    { ADDR_EVT_RULE_A, ADDR_RULE_UID_A },
-    { ADDR_EVT_RULE_B, ADDR_RULE_UID_B },
-    { ADDR_EVT_RULE_C, ADDR_RULE_UID_C },
+    { (const void *)EvtRuleA, ADDR_RULE_UID_A },
+    { (const void *)EvtRuleB, ADDR_RULE_UID_B },
+    { (const void *)EvtRuleC, ADDR_RULE_UID_C },
 };
 
 /* 0x0041EE70, 19 call sites.
@@ -175,14 +176,14 @@ void __cdecl DeclareRuleVars(void)
     for (uint32_t i = 0; i < sizeof kWinConditions / sizeof kWinConditions[0]; i++)
         EventRegister(0, ScriptNameUid((const char *)AM2_IMAGE(
                                    kWinConditions[i].name)),
-                            0, kImageFn(kWinConditions[i].handler),
+                            0, kWinConditions[i].handler,
                             (void *)(uintptr_t)kWinConditions[i].army, 0);
 
     for (uint32_t i = 0; i < sizeof kRuleEvents / sizeof kRuleEvents[0]; i++) {
         int32_t uid = AllocUid();
 
         *(int32_t *)AM2_IMAGE(kRuleEvents[i].uidslot) = uid;
-        EventRegister(0, uid, 0, kImageFn(kRuleEvents[i].handler), 0, 0);
+        EventRegister(0, uid, 0, kRuleEvents[i].handler, 0, 0);
     }
 
     /* One registration per event term of every `if`, with the condition itself
@@ -1724,6 +1725,148 @@ void __cdecl EvtCondition(int32_t bucket, int32_t a2, void *arg, int32_t a4,
     }
 }
 
+/* THE FIVE EVENT-TABLE HANDLERS, and the calling convention is worth stating
+ * once for all of them because nothing CALLS these -- the dispatcher does, so
+ * there is no call site to check the slots against.
+ *
+ * All eight arguments, as EvtCondition established from the dispatcher's
+ * `call dword ptr [esi]` and `add esp, 0x20`. ARGUMENT 3 is the notify's
+ * payload and ARGUMENT 8 is whatever EventRegister stored. Which half a
+ * handler reads follows from how event.cpp registered it: the win conditions
+ * pass their army index as the argument and read 8, while the rule events
+ * pass 0 and take their uid from the notify in 3. Two apparent signatures,
+ * one convention, established from three functions independently.
+ *
+ * Their sizes came out of finding the `ret` boundaries rather than out of
+ * docs/functions.tsv, which runs the first three together -- a 192-byte span
+ * that is really 16, 16 and 156. merges.py splits only where it can find a
+ * reference and its own docstring says the result is a lower bound. */
+
+/* 0x00422250 and 0x00422260 -- greenwins/tanwins/... and the team versions.
+ *
+ * SIXTEEN BYTES EACH AND THEY DIFFER IN ONE SEMANTIC BYTE: the flag that
+ * says army or team. Diffed rather than eyeballed -- two bytes differ and the
+ * other is the call displacement, which is a relocation, since the two calls
+ * sit sixteen bytes apart and target the same address. */
+void __cdecl EvtArmyWins(int32_t a1, int32_t a2, int32_t a3, int32_t a4,
+                         int32_t a5, int32_t a6, int32_t a7, int32_t army)
+{
+    (void)a1; (void)a2; (void)a3; (void)a4; (void)a5; (void)a6; (void)a7;
+    AdvanceMission(army, 0);
+}
+
+void __cdecl EvtTeamWins(int32_t a1, int32_t a2, int32_t a3, int32_t a4,
+                         int32_t a5, int32_t a6, int32_t a7, int32_t team)
+{
+    (void)a1; (void)a2; (void)a3; (void)a4; (void)a5; (void)a6; (void)a7;
+    AdvanceMission(team, 1);
+}
+
+/* 0x004223A0, 35 bytes -- the smallest of the three rule events. Deploy an
+ * item at the object's own position. */
+void __cdecl EvtRuleC(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
+                      int32_t a5, int32_t a6, int32_t a7, int32_t a8)
+{
+    uint8_t *obj;
+
+    (void)a1; (void)a2; (void)a4; (void)a5; (void)a6; (void)a7; (void)a8;
+
+    obj = (uint8_t *)LookupByUID(uid);
+    if (!obj)
+        return;
+
+    DeployItem(obj, *(const uint32_t *)(obj + OBJ_OFF_POS), 0, 0);
+}
+
+/* 0x00422270, 156 bytes -- put a unit back on the map where it fell.
+ *
+ * THE GUARD IS A FOOTPRINT'S WORTH OF BLOCKAGE, not a passability constant.
+ * BlockWeightAt is compared against AM2_CELL_WEIGHT_STEP, "what one footprint
+ * point is worth", so the test reads as "something already occupies that
+ * cell" -- and reaching for a new name for 15 would have added a fifth to the
+ * four this file already distinguishes as four different concepts.
+ *
+ * The saved byte at +0x528 goes back into +0x40 before the deploy, and the
+ * sound plays only for OUR army. */
+void __cdecl EvtRuleA(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
+                      int32_t a5, int32_t a6, int32_t a7, int32_t a8)
+{
+    uint8_t *obj;
+    uint32_t at;
+
+    (void)a1; (void)a2; (void)a4; (void)a5; (void)a6; (void)a7; (void)a8;
+
+    obj = (uint8_t *)LookupByUID(uid);
+    if (!obj || !ObjIsTypeIn238((const AM2_Object *)obj))
+        return;
+
+    if (ObjIsType2((const AM2_Object *)obj)
+        && *(const int32_t *)(obj + OBJ_OFF_FIELD_94)) {
+        at = *(const uint32_t *)(obj + OBJ_OFF_SPAWN_AT);
+        if (BlockWeightAt((void *)0, at, at) >= AM2_CELL_WEIGHT_STEP)
+            return;
+    }
+
+    at = *(const uint32_t *)(obj + OBJ_OFF_SPAWN_AT);
+    *(uint8_t *)(obj + OBJ_OFF_FACING) =
+        *(const uint8_t *)(obj + OBJ_OFF_SPAWN_FACING);
+    DeployItem(obj, at, 1, 0);
+
+    if (*(const int8_t *)(obj + OBJ_OFF_ARMY)
+        == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+        PlayDynamicSound((const char *)AM2_IMAGE(ADDR_STR_MP_POP_WAV),
+                         0, 0, 0, 0, 3, 2, 0);
+}
+
+/* 0x00422310, 141 bytes -- spawn a replacement trooper for a fallen one.
+ *
+ * SEVEN PUSHES BEFORE A ONE-ARGUMENT CALL. CommArmyOfSlot is thiscall with a
+ * single slot argument and 47 callers; the seven values already on the stack
+ * are CreateTrooper's, staged early, and the thiscall pops only its own. The
+ * single `add esp, 0x28` at the end cleans ten. Counting the pushes in front
+ * of the first call gives a seven-argument call to a one-argument function,
+ * which is the shape CLAUDE.md says makes these bodies look impossible; what
+ * settles it is the callee's arity, not the stack.
+ *
+ * The name handed to CreateTrooper is ADDR_DIR_SCRATCH, the shared scratch
+ * buffer whoever raised the event filled.
+ *
+ * IT FORCES ATTACK. The new trooper's previous AI mode is saved to
+ * OBJ_OFF_AI_MODE_PREV and the mode set to 6 -- the same field
+ * PointerActionFollow writes 3 into, established earlier from the other
+ * direction entirely. */
+void __cdecl EvtRuleB(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
+                      int32_t a5, int32_t a6, int32_t a7, int32_t a8)
+{
+    uint8_t *obj;
+    uint8_t *unit;
+    int32_t  army;
+
+    (void)a1; (void)a2; (void)a4; (void)a5; (void)a6; (void)a7; (void)a8;
+
+    obj = (uint8_t *)LookupByUID(uid);
+    if (!obj || !ObjIsType2((const AM2_Object *)obj))
+        return;
+
+    army = *(const int8_t *)(obj + OBJ_OFF_ARMY);
+
+    unit = (uint8_t *)CreateTrooper(
+               (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+               *(const int16_t *)(obj + OBJ_OFF_POS),
+               *(const int16_t *)(obj + OBJ_OFF_POS + 2),
+               CommArmyOfSlot(kCommObject, army),
+               army, 0, 0, 0, 1, 0);
+    if (!unit)
+        return;
+
+    Type2ActionA(unit);
+    *(int32_t *)(unit + OBJ_OFF_FIELD_94)   = 1;
+    *(int32_t *)(unit + OBJ_OFF_AI_MODE_PREV) =
+        *(const int32_t *)(unit + OBJ_OFF_AI_MODE);
+    *(int32_t *)(unit + OBJ_OFF_AI_MODE)    = AM2_AI_MODE_ATTACK;
+    ObjConceal(unit, 0);
+}
+
 /* --------------------------------------------- immediate trigger ---- */
 
 /* Free one entry's handler chain and then the entry. `owns` decides whether
@@ -3032,6 +3175,11 @@ int event_install(void)
     rc |= patch_replace(ADDR_SCRIPT_SET_OBJ_TABLE,
                         (const void *)ScriptSetObjTable,
                         "ScriptSetObjTable", 1);
+    rc |= patch_replace(ADDR_EVT_ARMY_WINS, (const void *)EvtArmyWins, "EvtArmyWins", 8);
+    rc |= patch_replace(ADDR_EVT_TEAM_WINS, (const void *)EvtTeamWins, "EvtTeamWins", 8);
+    rc |= patch_replace(ADDR_EVT_RULE_A, (const void *)EvtRuleA, "EvtRuleA", 8);
+    rc |= patch_replace(ADDR_EVT_RULE_B, (const void *)EvtRuleB, "EvtRuleB", 8);
+    rc |= patch_replace(ADDR_EVT_RULE_C, (const void *)EvtRuleC, "EvtRuleC", 8);
     rc |= patch_replace(ADDR_EVT_CONDITION, (const void *)EvtCondition,
                         "EvtCondition", 8);
     rc |= patch_replace(ADDR_EVAL_COND_TESTS, (const void *)EvalCondTests,

@@ -9319,6 +9319,14 @@ typedef struct {
 
 #define ADDR_EVT_ARMY_WINS       0x00422250u
 #define ADDR_EVT_TEAM_WINS       0x00422260u
+#define ADDR_STR_MP_POP_WAV      0x004788D4u  /* "mp_pop.wav" */
+/* WHERE A UNIT STARTED, and its facing there. CreateTrooper writes both --
+ * 0x004477A3 and 0x004476AE -- and EvtRuleA reads them to put a unit back
+ * where it fell, restoring the facing into OBJ_OFF_FACING. Writer and reader,
+ * which is why they are named rather than left raw; +0x528 was provisionally
+ * "a flag" until the destination showed it is a facing. */
+#define OBJ_OFF_SPAWN_AT         0x524u  /* packed point */
+#define OBJ_OFF_SPAWN_FACING     0x528u  /* uint8_t */
 #define ADDR_EVT_RULE_A          0x00422270u
 #define ADDR_EVT_RULE_B          0x00422310u
 #define ADDR_EVT_RULE_C          0x004223A0u

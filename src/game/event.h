@@ -181,6 +181,20 @@ void __cdecl ScriptSetObjTable(uint32_t uid, int32_t index);
  * player, a networked path otherwise. The two arms take different arguments. */
 void __cdecl AdvanceMission(int32_t a, int32_t b);
 
+/* The five event-table handlers, 0x00422250..0x004223C2. All eight arguments:
+ * argument 3 is the notify's payload and argument 8 is what EventRegister
+ * stored, and which half a handler reads follows from how it was registered. */
+void __cdecl EvtArmyWins(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t,
+                         int32_t, int32_t army);
+void __cdecl EvtTeamWins(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t,
+                         int32_t, int32_t team);
+void __cdecl EvtRuleA(int32_t, int32_t, uint32_t uid, int32_t, int32_t,
+                      int32_t, int32_t, int32_t);
+void __cdecl EvtRuleB(int32_t, int32_t, uint32_t uid, int32_t, int32_t,
+                      int32_t, int32_t, int32_t);
+void __cdecl EvtRuleC(int32_t, int32_t, uint32_t uid, int32_t, int32_t,
+                      int32_t, int32_t, int32_t);
+
 /* 0x00422450. Drop the whole script and event state: names, conditions,
  * registrations, flag -- in that order. One caller. */
 void __cdecl ResetScriptState(void);
