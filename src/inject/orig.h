@@ -10593,7 +10593,19 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * below are exactly the four ways of doing that. Argument 5 and argument 6
  * are one 8-byte structure pushed by value; its top two bytes are never
  * written by any caller, so nothing correct can read them. */
-#define ADDR_FIRE_WEAPON          0x0045F460u  /* int32_t(weapon, unit, ...) */
+/* 0x0045F460, four callers, all four in the FireWeaponAt* family and all four
+ * cleaning `add esp, 0x1c` -- SEVEN arguments, cdecl. Arguments 5 and 6 are
+ * one 8-byte aggregate passed by value: the callers reserve it with
+ * `sub esp, 8` and fill it as a dword point and a word height, which is why a
+ * naive reading finds a stray `sub esp` with no pushes under it.
+ *
+ * The prologue defaults both halves of it. A zero height is replaced by
+ * argument 3, which every caller computes with ObjFieldB or ObjHeight, and a
+ * zero x is replaced by the TARGET's position -- so "fire at where that thing
+ * is" is spelled as a null point plus a non-null object. */
+#define ADDR_FIRE_WEAPON          0x0045F460u  /* int32_t(weapon, unit, height,
+                                                * facing, point, ground,
+                                                * target) */
 /* THE WEAPON DISPATCH, DECODED FROM THE IMAGE so the next reader starts from
  * it rather than from the arms. `def = weapon[0xC0]; kind = def[0] - 1;
  * if (kind > 0x2A) default; jmp table[byteIndex[kind]]` -- a 43-entry byte
@@ -10722,6 +10734,44 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * values bleed between calls -- arm 17 appears to call PlaySoundAt(0,0,0,0,0)
  * before its real one, which is that artefact and not an instruction. Read
  * the arm before trusting a row. */
+/* ALL 24 ARMS READ. Seventeen of them are ONE SHAPE with five parameters,
+ * which is what makes a 3,200-byte function tractable:
+ *
+ *     if (anim) { spot.x += anim[0x28]; spot.y += anim[0x2A]; }
+ *     PlaySoundAt(sound, near, 0, spot.x, spot.y);
+ *     SeqStartDirEffect(spot.x, spot.y, ground, facing & 0xFF, effect, ...);
+ *     [ optional facing bias ]
+ *     CreateMissile(weapon, unit, facing, ..., 1.0f, 0, 0);
+ *
+ * The muzzle offset is the anim record's +0x28/+0x2A -- so a shot leaves the
+ * barrel and not the soldier's centre -- and it is skipped when the record is
+ * null rather than defaulted, which is why a unit with no animation fires
+ * from its own point.
+ *
+ * THE RETURN VALUE IS NOT UNIFORM ACROSS THE SHAPE, and that is the part a
+ * summary of it would lose. Arms 0, 7, 15 and 10 end `xor eax, eax` and
+ * answer 0; arms 16, 3, 5, 6, 1, 4 and 2 fall out of CreateMissile and answer
+ * WHATEVER IT RETURNED. Since the return value means "consume the item", a
+ * weapon in the second group is spent only when the missile was actually
+ * made. Reading the shape and assuming the tail is the mistake this table
+ * exists to prevent.
+ *
+ * FACING BIAS, per arm: 0 adds 0x20, 7 adds 0x10 (by JUMPING into arm 0's
+ * tail at 0x0045F578 with a different push), 15 and 3 add 0x0A through
+ * AddByteSat, and 16 uses `0xFF - (seed & 3)` -- a spread of four rather than
+ * a constant kick. Arms 5, 6 and 2 do not bias at all.
+ *
+ * Arms 1 and 4 are the only ones that SCALE the velocity: they build
+ * `(double)h - (double)h * [0x0046F2F0] + [0x0046FD60]`, take ApproxDist to
+ * the target, and hand CreateMissile `(float)h / def[0x10]` in place of the
+ * 1.0f every other arm passes. Arm 1 also drops the spot 0x10 in y before
+ * the sound. That is a lobbed shot; the flat ones are all 1.0f.
+ *
+ * CreateMissile is ELEVEN arguments and always eleven, whatever the arm's
+ * `add esp` says -- 0x58, 0x60, 0x40 and 0x2C all appear, because the cleanup
+ * is shared with the PlaySoundAt and SeqStartDirEffect above it. Count the
+ * pushes, never the cleanup; this function is the strongest example of that
+ * rule in the image. */
 #define ADDR_FIRE_WEAPON_INDEX   0x004600B0u  /* uint8_t[43], kind - 1 */
 #define ADDR_FIRE_WEAPON_ARMS    0x00460050u  /* void *[24] */
 /* The four ways a script asks for a shot: an explicit weapon or the unit's
