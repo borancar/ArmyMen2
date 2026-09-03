@@ -398,7 +398,16 @@ whole-game A/B has never been able to do.
 
 It only works for functions that read no global data — one that reads a global
 needs that global mapped, and mapping it means starting the game. **161 of the
-433 unreconstructed leaves qualify**, and 99 of those already yield vectors.
+433 unreconstructed leaves qualified**, and 99 of those already yielded
+vectors.
+
+**BOTH FIGURES ARE HISTORY NOW AND THE TENSE MATTERED.** There are no
+unreconstructed leaves: tools/remaining.py reads 0 game functions and 0 static
+initializers. The sentence was written when the denominator was live and went
+on describing a population that has since emptied, which is the same drift as
+a stale count except that no number changed -- the WORLD did. The tool still
+does exactly what this paragraph says; what is gone is the set it was pointed
+at, so its remaining job is the validation set, not a queue.
 
 **A vector count that includes DUPLICATES is a claim about effort, not about
 inputs.** The generator tried 96 times per function and recorded every try;
@@ -4049,11 +4058,15 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   `GenerateObjScriptFromTokens`, which is a real source name recovered from
   that function's own error string.
 
-  What is still original is everything *below* a statement, reached by address:
-  the event parser (`0x0043FF90`), the event-list parser (`0x00440600`), the
-  testvar value parser (`0x00443010`) and the 8,608-byte action parser
-  (`0x00440D70`, now reconstructed). `0x00444C40` -- ScriptRunLine, which the cheat handler feeds its unmatched lines --
-  is the other caller of that parser and is still original.
+  **NOTHING BELOW A STATEMENT IS STILL ORIGINAL, and this paragraph said
+  otherwise for a long time.** It listed the event parser (`0x0043FF90`), the
+  event-list parser (`0x00440600`), the testvar value parser (`0x00443010`),
+  the 8,608-byte action parser (`0x00440D70`) and ScriptRunLine
+  (`0x00444C40`) as reached by address. All five are reconstructed --
+  checked against the patch list, not assumed from the total -- and the
+  parenthetical "now reconstructed" against just one of them is the tell: a
+  list corrected in place, one entry at a time, until only the sentence
+  around it was wrong.
 
   **The handler A/B has better evidence than a log match.** `ReadScript` prints
   four totals that count exactly what the handlers produce -- Boot Camp
