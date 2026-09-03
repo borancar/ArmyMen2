@@ -7611,6 +7611,11 @@ typedef struct {
  * that do not, then empty the list and tell ADDR_ON_SELECTION_CHANGED.
  * Reconstructed; 2 calls on a driven Boot Camp mission. */
 #define ADDR_DESELECT_ALL        0x00427BA0u  /* void(void) */
+/* The ACTION slot of pointer mode 1 -- record 1's +0x14 in the command spec
+ * table, beside PointerSelect's and PointerDropItem's. The follow-me order:
+ * "Over here!", then every unit the army owns is selected, set to
+ * AM2_AI_MODE_FOLLOW and attached to the leader. */
+#define ADDR_POINTER_ACTION_FOLLOW 0x00457E50u /* void(void *, uint32_t) */
 #define ADDR_DESELECT_UNIT       0x00427C80u  /* void(obj) */
 /* The count word of ADDR_SELECTED_UIDS, which is {capacity, count, items}. */
 #define ADDR_SELECTED_COUNT      0x0051230Cu  /* int32_t */
@@ -8201,6 +8206,10 @@ typedef struct {
  * and orig.h's reading of the jump table agrees with them. Only the two this
  * band writes are named here; the rest are still literals at their use sites. */
 #define AM2_AI_MODE_IGNORE       2
+/* The arm no script keyword reaches: the scripts name attack, defend, ignore
+ * and evade only, and this is what PointerActionFollow writes into every unit
+ * it rallies. */
+#define AM2_AI_MODE_FOLLOW       3
 #define AM2_AI_MODE_ATTACK       6
 #define OBJ_OFF_AI_MODE          0xE4u
 #define OBJ_OFF_AI_MODE_PREV     0xE8u  /* the previous value of it */

@@ -1742,6 +1742,8 @@ void __cdecl SetPointerMode(int32_t mode);
 /* 0x00458A20. The ACTION slot of pointer mode 3: drop what our leader holds.
  * Both arguments are ignored -- the shape is the slot's, not its own. */
 void __cdecl PointerDropItem(void *obj, uint32_t at);
+/* 0x00457E50 -- pointer mode 1's action: the follow-me order. */
+void __cdecl PointerActionFollow(void *obj, uint32_t at);
 
 /* 0x00458ED0. The ACTION slot of pointer mode 0 -- the default mode, and the
  * one ordinary play reaches: hand the object to SelectIfOwn, drop the point. */

@@ -11809,6 +11809,168 @@ void __cdecl PointerDropItem(void *obj, uint32_t at)
     }
 }
 
+/* The inlined "our leader" helper whose fallback is dead, which orig.h
+ * documents in full above ADDR_POINTER_MODES -- it lists eight sites and two
+ * of them, 0x00457E61 and 0x00457F7F, are this function's. Written once here
+ * rather than inlined twice, and spelled as a local compared against the
+ * global it came from, which is what the source said and the only form a
+ * compiler takes without a tautological-compare warning. */
+static uint8_t *FollowFindLeader(void)
+{
+    int32_t owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+
+    if (owner != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
+        /* Dead -- see above. */
+        const uint8_t *list;
+        int32_t        i;
+
+        if (owner < 0 || owner >= AM2_COMM_SLOTS)
+            return (uint8_t *)0;
+
+        list = (const uint8_t *)
+            ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
+
+        for (i = 0; i < *(const int32_t *)(list + LIST_OFF_COUNT); i++) {
+            uint8_t *o = (uint8_t *)LookupByUID(
+                (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
+
+            if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
+                && *(const int32_t *)(o + OBJ_OFF_SARGE))
+                return o;
+
+            list = (const uint8_t *)
+                ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
+        }
+        return (uint8_t *)0;
+    }
+
+    return (uint8_t *)LookupByUID(
+        *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
+}
+
+/* PointerActionFollow -- original 0x00457E50, 544 bytes, one exit.
+ *
+ * The ACTION slot of pointer mode 1, which is what its only reference says:
+ * +0x14 of record 1 in the command spec table at 0x004761A8, the same field
+ * that holds PointerSelect for mode 0 and PointerDropItem for mode 3. Nothing
+ * in .text refers to the address at all.
+ *
+ * IT IS THE FOLLOW-ME COMMAND, and three things say so together. It opens by
+ * speaking AM2_SPEAK_OVERHERE -- "Over here!" -- for our own army; it walks
+ * every object that army owns, selecting each; and it sets each one's
+ * OBJ_OFF_AI_MODE to 3 and attaches it to the leader. CLAUDE.md's table of
+ * the eight AI modes has 3 as an arm no script keyword reaches, the scripts
+ * naming only attack 6, defend 7, ignore 2 and evade 5. This is what writes
+ * it, so mode 3 is FOLLOW.
+ *
+ * THE LEADER IS RESOLVED TWICE and the second time is not redundant: the
+ * first fixes who everything attaches to, and the second is asked, for each
+ * VEHICLE encountered, whether our leader is riding THAT vehicle -- if so it
+ * is selected and nothing is attached to it.
+ *
+ * A LEADER WHO IS RIDING is replaced by the vehicle he rides before anything
+ * else happens, so ordering a follow from inside a jeep rallies the squad on
+ * the jeep rather than on a man who is not on the map.
+ *
+ * THE REMOVE PATH DOES NOT ADVANCE, which is the one thing in the loop that
+ * has to be right: a uid that no longer resolves is dropped from the army
+ * list with ListRemoveAt and the index is left alone, so the entry that
+ * shifted down is examined next. Everything else falls to the increment.
+ *
+ * NOT EXERCISED HERE. Every pointer mode above 0 needs the order-giving UI,
+ * which no drive in this project reaches -- SetPointerMode's own note records
+ * a driven Boot Camp mission reaching it exactly once, for mode 0 at mission
+ * start. Verified by reading, and the two arms behind the folded compares
+ * cannot run at all. */
+void __cdecl PointerActionFollow(void *obj, uint32_t at)
+{
+    uint8_t *leader;
+    int32_t  i;
+
+    (void)obj;
+    (void)at;
+
+    SpeakLine(AM2_SPEAK_OVERHERE,
+              *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+
+    leader = FollowFindLeader();
+    if (!leader)
+        return;
+
+    if (*(const uint32_t *)(leader + OBJ_OFF_RIDING)) {
+        leader = (uint8_t *)LookupByUID(
+            *(const uint32_t *)(leader + OBJ_OFF_RIDING));
+        if (!leader)
+            return;
+    }
+
+    DeselectAll();
+
+    for (i = 0; ; ) {
+        const uint8_t *list = (const uint8_t *)
+            ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
+                [*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER];
+        uint8_t *o;
+        int32_t  type;
+
+        if (i >= *(const int32_t *)(list + LIST_OFF_COUNT))
+            return;
+
+        o = (uint8_t *)LookupByUID(
+            (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
+
+        if (!o) {
+            /* Gone: drop it and DO NOT advance. */
+            ListRemoveAt((void *)((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
+                             [*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER],
+                         i);
+            continue;
+        }
+
+        if ((*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+            || *(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
+            goto next;
+
+        type = *(const int32_t *)o;
+
+        /* Sarge himself is selected and never attached to anything. */
+        if (type == AM2_OBJ_TYPE_TROOPER && *(const int32_t *)(o + OBJ_OFF_SARGE)) {
+            SelectUnit(o);
+            goto next;
+        }
+
+        /* The vehicle our leader is riding is selected, not ordered. */
+        if (type == AM2_OBJ_TYPE_VEHICLE) {
+            uint8_t *riding = FollowFindLeader();
+
+            if (riding
+                && *(const uint32_t *)(riding + OBJ_OFF_RIDING)
+                   == *(const uint32_t *)(o + OBJ_OFF_UID)) {
+                SelectUnit(o);
+                goto next;
+            }
+        }
+
+        if (type < AM2_OBJ_TYPE_TROOPER)
+            goto next;
+        if (type > AM2_OBJ_TYPE_VEHICLE && type != AM2_OBJ_TYPE_ROACH)
+            goto next;
+        if (*(const int32_t *)(o + OBJ_OFF_FIELD_94))
+            goto next;
+        /* An empty vehicle has nobody to give the order to. */
+        if (type == AM2_OBJ_TYPE_VEHICLE
+            && *(const int32_t *)(o + VEHICLE_OFF_PTR_LIST + 4) == 0)
+            goto next;
+
+        *(int32_t *)(o + OBJ_OFF_AI_MODE) = AM2_AI_MODE_FOLLOW;
+        SelectUnit(o);
+        ObjAttachTo(o, leader);
+
+    next:
+        i++;
+    }
+}
+
 /* 0x00414430, ten callers. Put the pointer into one of seven modes: store the
  * index, then copy five fields out of that mode's 40-byte record into five
  * fixed globals.
@@ -13257,6 +13419,9 @@ int widget_install(void)
                         "HudPanelWidth", 3);
     rc |= patch_replace(ADDR_SET_POINTER_MODE, (const void *)SetPointerMode,
                         "SetPointerMode", 10);
+    rc |= patch_replace(ADDR_POINTER_ACTION_FOLLOW,
+                        (const void *)PointerActionFollow,
+                        "PointerActionFollow", 2);
     rc |= patch_replace(ADDR_POINTER_DROP_ITEM,
                         (const void *)PointerDropItem,
                         "PointerDropItem", 0);
