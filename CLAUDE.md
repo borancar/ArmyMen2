@@ -3578,6 +3578,30 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
 - `CheckSaveTag` executes; it is reached by the save-file header read at
   `0x00425950` on any campaign start with a save present. The entry below
   predates that and is left for the others.
+- **SEVENTEEN OF THE EIGHTEEN NAMES BELOW HAVE BLIND COUNTERS, so the list's
+  own zeros are not evidence for it.** Measured: a Boot Camp drive past both
+  dialogs, with HudSquadPaint at 55,274 to prove the mission was live, reads 0
+  for every name in the list -- and `tools/blindspots.py` says only
+  `StateLeave` among them has a counter that could have moved. The other
+  seventeen have every caller reconstructed, and this file says elsewhere,
+  repeatedly, that such a zero "is not evidence of anything".
+
+  That does not make the list WRONG. Most entries carry their own reasoning
+  beside them -- the software rasteriser is a layer nothing enters, the
+  multiplayer three need a session this machine cannot open, StopNamedSound
+  needs a level record that names a sound -- and that reasoning stands on its
+  own. What is not evidence is the counter, and the heading "unexercised"
+  reads as though it were.
+
+  The measurement that DOES generalise: of 1,640 traced functions,
+  blindspots.py reports **54 counters that mean what they say**, 1,346 blind
+  because every caller is ours, and 240 reached by address. So a zero is now
+  meaningless about thirty times out of thirty-one, and reaching for `counts`
+  as evidence is worth checking against that tool first. The number gets
+  worse as the reconstruction gets better, which is the same observation
+  this file already makes about counts being "a measure of what still crosses
+  an original boundary, not of what runs".
+
 - Unexercised so far: `KeyFieldC`, `CheckSaveTag`, `ListDropOldest`,
   `MpNameInk`, `MpNamePaper`, `PlayerLatency`,
   `StateLeave`, `RowRelease`, `EncodeBig`, `EncodeSmall`,
