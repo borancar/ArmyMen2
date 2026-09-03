@@ -440,7 +440,7 @@ void __cdecl State0Frame(void)
     }
 
     MovieStepCurrent();
-    call0(ADDR_STATE_FRAME_COMMON);
+    PollMovieSkipKey();
 }
 
 /* The two still-original callees this needs. The digit table is 0x00412E00 --
@@ -1086,7 +1086,7 @@ void __cdecl State3Frame(void)
     }
 
     MovieStepCurrent();
-    call0(ADDR_STATE_FRAME_COMMON);
+    PollMovieSkipKey();
 }
 
 typedef void (__cdecl *AM2_NoArgFn)(void);
@@ -1666,6 +1666,38 @@ void __cdecl State1Leave(void)
     CommitState();
 }
 
+
+/* 0x00426650, the "press anything to skip" poller, called by both movie
+ * states.
+ *
+ * It sweeps scancodes 1..255 for one that was RELEASED -- `!IsKeyDown &&
+ * KeyChanged`, the same idiom the in-mission ESCAPE handler uses -- and acts
+ * only once the state has been up longer than 500 ms, which stops the
+ * keystroke that STARTED the movie from immediately ending it.
+ *
+ * The original computes that test as `sbb`/`neg` and then an `abs` of the 0/1
+ * it produced, which cannot change anything; only the comparison is written
+ * here. The delta is UNSIGNED, which is right for a tick count.
+ *
+ * It was ADDR_STATE_FRAME_COMMON -- a name about where it sits in the frame
+ * rather than what it does. */
+void __cdecl PollMovieSkipKey(void)
+{
+    int32_t key;
+
+    for (key = 1; key < 0x100; key++) {
+        if (IsKeyDown(key) || !KeyChanged(key))
+            continue;
+
+        if (GetTickCount() - *(const uint32_t *)(uintptr_t)ADDR_STATE0_TICK
+                > AM2_MOVIE_SKIP_HOLDOFF_MS) {
+            MovieEndCurrent();
+            LatchKeyState();
+            return;
+        }
+    }
+}
+
 int frame_install(void)
 {
     int rc = 0;
@@ -1729,6 +1761,9 @@ int frame_install(void)
                         "StateLeaveCommon", 0);
     rc |= patch_replace(ADDR_STATE1_LEAVE, (const void *)State1Leave,
                         "State1Leave", 0);
+    rc |= patch_replace(ADDR_POLL_MOVIE_SKIP,
+                        (const void *)PollMovieSkipKey,
+                        "PollMovieSkipKey", 0);
     return rc;
 }
 

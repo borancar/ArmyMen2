@@ -935,6 +935,9 @@ void __attribute__((thiscall)) TextListDestruct(AM2_Widget *w);
 
 /* 0x00456570. VTABLE_MP_SPIN slot 4: drop the focused child, then repaint. */
 void __attribute__((thiscall)) MpSpinRepaint(AM2_Widget *w);
+
+/* 0x00433240. VTABLE_MP_TEAM slot 1: team sprite, then the base painter. */
+void __attribute__((thiscall)) MpTeamPaint(AM2_Widget *w, RECT clip);
 AM2_Widget *__attribute__((thiscall)) ListDelete(AM2_Widget *w, int32_t flags);
 
 /* Original: 0x00455180, thiscall, slot 1 of the list box. Clear the whole list

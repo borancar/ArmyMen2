@@ -13856,6 +13856,32 @@ void __cdecl BuildStartHandler(AM2_Widget *w)
     SendGameReadyMsg(1);
 }
 
+
+/* 0x00433240, slot 1 of VTABLE_MP_TEAM -- the TEAM button's painter. Choose
+ * the sprite for the row's team, hang it on the widget as its own backdrop,
+ * and let the base painter do the drawing.
+ *
+ * THE COMPOSITE OFFSET IS THE POINT. The original reads
+ * `comm + row*0x70 + 0x258`, and writing that down as it appears would put a
+ * field pointer where a base belongs. 0x258 is COMM_OFF_PLAYERS (0x20C) plus
+ * COMM_SLOT_OFF_TEAM (0x4C) -- misc.cpp already spells that exact sum out --
+ * and 0x70 is COMM_PLAYER_STRIDE. Every name existed; none had to be invented.
+ *
+ * The row is MPBTN_OFF_ROW, which all three multiplayer row button classes
+ * carry in the base's 0x58. */
+void __attribute__((thiscall)) MpTeamPaint(AM2_Widget *w, RECT clip)
+{
+    const uint8_t *self = (const uint8_t *)w;
+    const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    int32_t        row  = *(const int32_t *)(self + MPBTN_OFF_ROW);
+    int32_t        team = *(const int32_t *)(comm + COMM_OFF_PLAYERS
+                                             + row * COMM_PLAYER_STRIDE
+                                             + COMM_SLOT_OFF_TEAM);
+
+    w->sprite = ((struct AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_B)[team];
+    WidgetPaint(w, clip);
+}
+
 int widget_install(void)
 {
     int rc = 0;
@@ -14726,6 +14752,8 @@ int widget_install(void)
     rc |= patch_replace(ADDR_BUILD_START_HANDLER,
                         (const void *)BuildStartHandler,
                         "BuildStartHandler", 1);
+    rc |= patch_replace(ADDR_MP_TEAM_PAINT, (const void *)MpTeamPaint,
+                        "MpTeamPaint", 5);
     return rc;
 }
 

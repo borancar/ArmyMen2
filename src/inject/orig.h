@@ -13490,6 +13490,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 
 #define ADDR_MP_TEAM_CTOR   0x00433030u /* thiscall, ret 0x0C */
 #define VTABLE_MP_TEAM      0x0046FA70u
+/* Its slot 1. Picks the row's team sprite out of ADDR_MP_PANEL_SPRITES_B,
+ * stores it as the widget's own backdrop, then defers to the base painter. */
+#define ADDR_MP_TEAM_PAINT       0x00433240u  /* thiscall void(obj, RECT) */
 #define ADDR_ON_MP_TEAM_LEFT   0x004330E0u
 #define ADDR_ON_MP_TEAM_RIGHT  0x00433190u
 /* Both small ones are the same 18 by 20 at a column the caller picks. */
@@ -14242,7 +14245,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_COMM_MIN_BUFFERS     10           /* below this, COMM ERROR: NO BUFFERS */
 #define AM2_COMM_OFF_ACTIVE      0x3DCu       /* gates all the comm frame work */
 #define ADDR_STATE_LEAVE_COMMON  0x00426640u  /* states 0 and 3 tail-jump here */
-#define ADDR_STATE_FRAME_COMMON  0x00426650u  /* and then here */
+/* It was ADDR_STATE_FRAME_COMMON, "and then here" -- a name that said where it
+ * sits in the frame rather than what it does, exactly as the note two lines up
+ * says of ADDR_PROCESS_RESEND_QUEUE. Its body is specific: sweep scancodes
+ * 1..255 for one that was RELEASED, and if the state has been up longer than
+ * 500 ms, end the movie and latch the key buffer. It is the "press anything to
+ * skip" poller, and both its callers are movie states. */
+#define ADDR_POLL_MOVIE_SKIP     0x00426650u  /* void(void) */
+#define AM2_MOVIE_SKIP_HOLDOFF_MS 0x1F4u  /* 500 -- before a key can skip */
 #define ADDR_STATE0_ENTER        0x004265F0u
 #define ADDR_STATE3_ENTER        0x004266F0u
 #define ADDR_STATE1_LEAVE        0x004263E0u
