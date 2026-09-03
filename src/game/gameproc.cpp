@@ -889,7 +889,7 @@ void __cdecl ResetLevelState(void)
  * OBJ_OFF_ROW0_Y_ADJUST and goes through ScaleBy32Blocks into the row. */
 void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
                             int32_t heading, int32_t a5, int32_t a6,
-                            int32_t repairFrame, int32_t ptrList,
+                            int32_t repairFrame, int32_t speedScale,
                             int32_t initUnused, uint32_t uid,
                             int32_t scriptId)
 {
@@ -910,7 +910,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
         *(const void *const *)(w + OBJ_OFF_FIELD_C0);
     *(uint8_t *)(o + OBJ_OFF_FACING) = (uint8_t)heading;
     *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME) = repairFrame;
-    *(int32_t *)(o + OBJ_OFF_PTR_LIST) = ptrList;
+    *(int32_t *)(o + MISSILE_OFF_SPEED_SCALE) = speedScale;
     *(int32_t *)(o + OBJ_OFF_RANK) = (int32_t)((const AM2_Object *)source)->uid;
     *(uint8_t *)(o + OBJ_OFF_SCRIPT_ID) = (uint8_t)scriptId;
 

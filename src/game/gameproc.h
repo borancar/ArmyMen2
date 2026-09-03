@@ -123,7 +123,7 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr);
  * missile.ani and an ordinary SetAnimFrame. */
 void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
                             int32_t heading, int32_t a5, int32_t a6,
-                            int32_t repairFrame, int32_t ptrList,
+                            int32_t repairFrame, int32_t speedScale,
                             int32_t initUnused, uint32_t uid,
                             int32_t scriptId);
 
