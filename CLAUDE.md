@@ -282,9 +282,23 @@ silently and report the boundary as barely started. They now share `am2.game_sou
 `src/game/` is **C++** (`.cpp` sources, `.h` headers). `src/inject/` is **C** —
 it is harness, not game.
 
-The reason is the ABI survey (`tools/checkabi.py`): of the 1,239 game functions
-below the CRT, **100 are thiscall**, which on i386 means non-static member
-functions. Reconstructing those in C would mean hand-written
+The reason is an ABI survey: of the 1,239 game functions below the CRT,
+**100 are thiscall**, which on i386 means non-static member functions.
+
+**THE CITATION WENT STALE WITHOUT THE CLAIM DOING SO, and only half of it can
+still be checked.** This sentence credited `tools/checkabi.py`, and that tool
+no longer performs the survey -- it audits the calling convention of every
+RECONSTRUCTED function against a hand-kept table, which is a different and
+narrower job. Measured today: the denominator is exactly right, 1,239 entries
+below CRT_START. The 100 is not produced by anything in the tree any more; a
+crude re-scan (ecx read before written, edx not, `ret N`, first 256 bytes)
+finds 57, which is a LOWER BOUND rather than a contradiction, because that
+heuristic is weaker than the one that produced the original figure.
+
+So the number stands as history and the argument it supports is unaffected --
+a hundred or fifty-seven thiscall functions both make the case for C++ -- but
+nothing checks it, and this note is here so the next reader does not run
+checkabi.py expecting to see it. Reconstructing those in C would mean hand-written
 `__attribute__((thiscall))` shims around what the original wrote as ordinary
 methods.
 
