@@ -95,6 +95,13 @@ void __cdecl FreeSpriteRegistry(void) { }
  * the linkage has to match the declaration, not the file it is stubbed in. */
 extern "C" void __cdecl SetPointerMode(int32_t) { }
 
+/* item.cpp's frame step calls this now that its seam is closed, and it lives
+ * in commmsg.cpp, which this harness cannot link: the bandwidth governor
+ * reaches CommRecentTotal in win32/dplay.cpp. Eighth stub, extern "C" because
+ * commmsg.h declares it inside such a block. Nothing under test reaches it --
+ * it needs a live comm object and a sequence to compare against. */
+extern "C" void __cdecl CommTuneChangeLimit(void) { }
+
 /* misc.cpp's LoadMask calls this now that its seam is closed, and it lives in
  * win32/surface.cpp, which this harness cannot link. Sixth stub, extern "C"
  * because surface.h declares it inside such a block. Nothing under test

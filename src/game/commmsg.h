@@ -68,6 +68,10 @@ void __cdecl DrainMsgList(void *list);
  * CommMustBroadcast accepts -- so nothing at all in single player. */
 void __cdecl TellEachSlot(void);
 
+/* 0x00411FB0. The bandwidth governor: move enoughChangeLimit to fit what the
+ * last 100 ms actually sent, at most once per sequence. */
+void __cdecl CommTuneChangeLimit(void);
+
 #endif
 
 /* 0x0044C250, one caller, and it names itself -- "Trooper Fire Send,

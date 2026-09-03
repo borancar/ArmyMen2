@@ -13818,10 +13818,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* The two thresholds AppendTroopState throttles on, and they are measured in
  * SEQUENCES rather than milliseconds -- the counter is the sending player's
  * +0x94, which TROOPER_OFF_LAST_SEQ is named for -- so a slow machine
- * throttles by the same amount as a fast one. COARSE is the shorter of the
+ * throttles by the same amount as a fast one. The LIMIT is the shorter of the
  * two: soon after a send only a LARGE change gets through, and after the
- * longer INTERVAL any change does. */
-#define COMM_OFF_SEND_COARSE     0x478u  /* uint32_t */
+ * longer INTERVAL any change does.
+ *
+ * IT WAS COMM_OFF_SEND_COARSE, which was ours. The program calls it
+ * `enoughChangeLimit`, in both of ADDR_COMM_TUNE_CHANGE_LIMIT's log lines --
+ * "Exceeded bandwidth (%d), enoughChangeLimit increased to %d". A name the
+ * program supplies beats one we invented for the same field. */
+#define COMM_OFF_ENOUGH_CHANGE_LIMIT 0x478u  /* uint32_t */
 #define COMM_OFF_SEND_INTERVAL   0x47Cu  /* uint32_t; forced to 1 for Sarge */
 #define COMM_OFF_OUR_PLAYER_ID   0x3CCu
 #define COMM_OFF_PLAYER_COUNT    0x3D0u
@@ -18003,7 +18008,23 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * registered object, and in a session tail-jumps to the comm check. */
 #define ADDR_OBJ_FRAME_SWEEP  0x00428700u  /* void(void) */
 #define ADDR_OBJ_FRAME_STEP   0x004284D0u  /* void(obj *), one caller */
-#define ADDR_COMM_SYNC_CHECK  0x00411FB0u  /* void(void); name ours */
+/* It was ADDR_COMM_SYNC_CHECK, and the comment said "name ours" -- correctly,
+ * because nothing had read the body. It is a BANDWIDTH GOVERNOR: measure what
+ * went out in the last 100 ms and move enoughChangeLimit up or down so the
+ * next window fits. Both of its log lines name the field it tunes. */
+#define ADDR_COMM_TUNE_CHANGE_LIMIT 0x00411FB0u  /* void(void) */
+#define ADDR_STR_BANDWIDTH_UP    0x0047615Cu /* "Exceeded bandwidth (%d)..." */
+#define ADDR_STR_BANDWIDTH_DOWN  0x00476118u /* "Less than half bandwidth..." */
+/* The sequence this last ran for: FLOW_OFF_SEQUENCE of our own player record,
+ * so the governor moves the limit at most once per sequence however often the
+ * frame calls it. */
+#define ADDR_BANDWIDTH_LAST_SEQ  0x004FC8C0u  /* uint32_t */
+/* The floor. The limit is only lowered while it is ABOVE this, so a quiet
+ * network cannot wind the throttle down to nothing. */
+#define ADDR_CHANGE_LIMIT_FLOOR  0x004FC8BCu  /* uint32_t */
+#define AM2_BANDWIDTH_HIGH       0x12Cu  /* 300 bytes/100ms: raise the limit */
+#define AM2_BANDWIDTH_VERY_HIGH  0x258u  /* 600: raise it by two, not one */
+#define AM2_BANDWIDTH_LOW        0x096u  /* 150: lower it again */
 /* 0x00424FE0, one caller. Advances a deadline one second at a time -- and
  * NOTHING reads that deadline. 0x005122F8 is written by this function and
  * seeded by 0x00424E80, and there is no other reference to it below the CRT

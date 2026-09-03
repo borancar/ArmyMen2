@@ -955,7 +955,7 @@ typedef void (__cdecl *AM2_PairApplyFn)(void *a, void *b, int32_t x, int32_t y);
  * EACH FIELD HAS TWO THRESHOLDS AND ITS OWN CACHE. The trooper keeps a
  * (value, timestamp) pair per field, and a field goes on the wire when either
  * COMM_OFF_SEND_INTERVAL has passed and it differs at all, or the shorter
- * COMM_OFF_SEND_COARSE has passed and it differs a LOT -- more than 8 in an
+ * COMM_OFF_ENOUGH_CHANGE_LIMIT has passed and it differs a LOT -- more than 8 in an
  * axis for the position, or in the top nibble for the facing. Big changes get
  * through sooner. SARGE'S INTERVAL IS FORCED TO 1, so the leader is sent every
  * frame he moves.
@@ -1021,7 +1021,7 @@ void __cdecl AppendTroopState(void *msg, void *obj)
          * runs rather than as the answer it happens to give. */
         if (age >= interval && (px != lx || py != ly))
             flags = 0x80000000u;
-        else if (age >= *(const uint32_t *)(comm + COMM_OFF_SEND_COARSE)
+        else if (age >= *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT)
                  && (dx > 8 || dy > 8))
             flags = 0x80000000u;
 
@@ -1032,13 +1032,13 @@ void __cdecl AppendTroopState(void *msg, void *obj)
             uint8_t  lf = *(const uint8_t *)(o + TROOPER_OFF_SENT_FACING);
 
             if ((age >= interval && f != lf)
-                || (age >= *(const uint32_t *)(comm + COMM_OFF_SEND_COARSE)
+                || (age >= *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT)
                     && ((uint32_t)(lf ^ f) & 0xFFFFFFF0u)))
                 flags |= 0x40000000u;
         }
 
         if (seq - *(const uint32_t *)(o + TROOPER_OFF_SENT_POSE_T)
-                >= *(const uint32_t *)(comm + COMM_OFF_SEND_COARSE)
+                >= *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT)
             && *(const int32_t *)(o + OBJ_OFF_POSE)
                != *(const int32_t *)(o + TROOPER_OFF_SENT_POSE))
             flags |= 0x20000000u;
@@ -2409,6 +2409,16 @@ int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
                                            uint32_t flags, void *data,
                                            uint32_t size);
 
+/* And CommRecentTotal beside it, for the same reason: bytes sent in the last
+ * 100 ms, which is the only thing the governor below measures.
+ *
+ * It needs `extern "C"` and CommSend does NOT, which looks inconsistent and is
+ * not: dplay.h declares this one inside its extern "C" block, and does not
+ * declare CommSend at all -- that name's only declaration is the line above,
+ * so both sides of it are C++. The linkage has to match the header that
+ * exists, not the one next to it. */
+extern "C" int32_t __attribute__((thiscall)) CommRecentTotal(void *comm);
+
 /* FlushDelayedSends -- original 0x00402F50, one caller, the frame chain's
  * post-work. It lives here rather than in air.cpp, whose band the image
  * suggests, for two reasons that point the same way: this file already owns
@@ -2597,6 +2607,80 @@ void __cdecl SendChatTo(char *text, int32_t slot)
 }
 
 
+
+/* 0x00411FB0 -- the BANDWIDTH GOVERNOR, and the last game function below the
+ * CRT line that was still the image's.
+ *
+ * Measure what went out in the last 100 ms and move enoughChangeLimit so the
+ * next window fits: above 300 bytes raise it, by two rather than one past 600;
+ * below 150 lower it again, but only while it is above ADDR_CHANGE_LIMIT_FLOOR
+ * so a quiet network cannot wind the throttle down to nothing. Then the
+ * INTERVAL is always the limit plus one.
+ *
+ * BOTH LOG LINES NAME THE FIELD -- "enoughChangeLimit increased to %d" -- which
+ * is where COMM_OFF_ENOUGH_CHANGE_LIMIT gets its name from, in place of the
+ * COMM_OFF_SEND_COARSE we had invented for it.
+ *
+ * IT RUNS AT MOST ONCE PER SEQUENCE. The gate is our own player record's
+ * FLOW_OFF_SEQUENCE against ADDR_BANDWIDTH_LAST_SEQ, so however often the
+ * frame calls this, the limit moves once per sequence and no faster.
+ *
+ * The two sweeps at the end run whether or not anything was adjusted -- they
+ * are past the early-out, not inside either arm, which is why the `jae` at the
+ * top skips only the tuning. */
+void __cdecl CommTuneChangeLimit(void)
+{
+    uint8_t       *comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+    const uint8_t *self;
+    uint32_t       seq;
+    uint32_t       sent;
+    uint32_t       limit;
+
+    self = (const uint8_t *)FindPlayerById(
+               *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID));
+    seq  = *(const uint32_t *)(self + FLOW_OFF_SEQUENCE);
+
+    if (*(const uint32_t *)(uintptr_t)ADDR_BANDWIDTH_LAST_SEQ < seq) {
+        comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+        sent = (uint32_t)CommRecentTotal(comm);
+
+        if (sent > AM2_BANDWIDTH_HIGH) {
+            comm  = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+            limit = *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT);
+            limit += (sent > AM2_BANDWIDTH_VERY_HIGH) ? 2u : 1u;
+            *(uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT) = limit;
+
+            comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+            *(uint32_t *)(uintptr_t)ADDR_BANDWIDTH_LAST_SEQ = seq;
+            orig_log((const char *)(uintptr_t)ADDR_STR_BANDWIDTH_UP, sent,
+                     *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT));
+            comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+
+        } else {
+            comm  = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+            limit = *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT);
+
+            if (limit > *(const uint32_t *)(uintptr_t)ADDR_CHANGE_LIMIT_FLOOR
+                    && sent < AM2_BANDWIDTH_LOW) {
+                *(uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT) = limit - 1u;
+
+                comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+                *(uint32_t *)(uintptr_t)ADDR_BANDWIDTH_LAST_SEQ = seq;
+                orig_log((const char *)(uintptr_t)ADDR_STR_BANDWIDTH_DOWN, sent,
+                         *(const uint32_t *)(comm
+                                             + COMM_OFF_ENOUGH_CHANGE_LIMIT));
+                comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+            }
+        }
+
+        *(uint32_t *)(comm + COMM_OFF_SEND_INTERVAL) =
+            *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT) + 1u;
+    }
+
+    TellEachSlot();
+    SendAllVehicleUpdates();
+}
+
 int commmsg_install(void)
 {
     patch_replace(ADDR_TROOP_SUB_PARSE, (const void *)TroopSubParse,
@@ -2715,6 +2799,9 @@ int commmsg_install(void)
     patch_replace(ADDR_ANNOUNCE, (const void *)Announce, "Announce", 12);
     patch_replace(ADDR_RECV_MSG_4014C0, (const void *)FlowRecvMessage,
                   "FlowRecvMessage", 1);
+    patch_replace(ADDR_COMM_TUNE_CHANGE_LIMIT,
+                  (const void *)CommTuneChangeLimit,
+                  "CommTuneChangeLimit", 0);
     return 0;
 }
 

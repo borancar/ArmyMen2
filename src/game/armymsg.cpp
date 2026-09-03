@@ -1766,7 +1766,7 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
     seq = *(const uint32_t *)((const uint8_t *)FindPlayerById(
               *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID))
               + FLOW_OFF_SEQUENCE);
-    coarse = *(const uint32_t *)(comm + COMM_OFF_SEND_COARSE);
+    coarse = *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT);
 
     dx = *(const int16_t *)(o + OBJ_OFF_POS)
          - *(const int16_t *)(o + VEHICLE_OFF_SENT_POS);

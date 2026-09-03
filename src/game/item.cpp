@@ -35,6 +35,7 @@ void __cdecl ShakeAt(const AM2_Point *at, int32_t strength);
 #include "army.h"     /* LookupOwnerObj -- reconstructed */
 #include "region.h"   /* NearestAllowedTile -- reconstructed */
 #include "event.h"    /* EventNotify -- reconstructed */
+#include "commmsg.h"  /* CommTuneChangeLimit -- reconstructed */
 #include "msgslot.h"  /* CommMustBroadcast -- reconstructed */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
@@ -4549,7 +4550,6 @@ void __cdecl RefreshObjCtx(void)
 
 typedef void (__cdecl *AM2_ObjStepFn)(void *obj);
 typedef void (__cdecl *AM2_VoidFn)(void);
-#define orig_comm_sync_check ((AM2_VoidFn)(uintptr_t)ADDR_COMM_SYNC_CHECK)
 
 #define g_iterStamp       (*(uint32_t *)(uintptr_t)ADDR_ITER_STAMP)
 #define g_secondDeadline  (*(uint32_t *)(uintptr_t)ADDR_SECOND_DEADLINE)
@@ -4582,7 +4582,7 @@ void __cdecl ObjFrameSweep(void)
         ObjFrameStep(obj);
 
     if (g_mpSession)
-        orig_comm_sync_check();
+        CommTuneChangeLimit();
 }
 
 /* 0x00424FE0, one caller, also on the per-frame path.
