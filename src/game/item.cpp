@@ -12906,6 +12906,520 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
     SpeakItemPickupLine(kind, *(const int8_t *)(t + OBJ_OFF_ARMY));
 }
 
+/* Forward-declared rather than included. AimStart and AimStartB live in
+ * win32/widget.h, and this module is on the flat side of the split -- pulling
+ * that header in would drag Win32 types across it and fail checksplit. Same
+ * reason script.cpp forward-declares PreloadSprite. */
+void __cdecl AimStart(uint32_t uid, int8_t army, uint32_t at);
+void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at);
+
+#define g_gameClockMs  (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
+#define g_ourLeaderUid (*(uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID)
+
+#define g_createWatchedKind (*(int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND)
+#define g_medicHealPct      (*(int32_t *)(uintptr_t)ADDR_MEDIC_HEAL_PCT)
+#define g_repairHealPct     (*(int32_t *)(uintptr_t)ADDR_REPAIR_HEAL_PCT)
+#define g_sweepDistance     (*(int32_t *)(uintptr_t)ADDR_SWEEP_DISTANCE)
+#define g_sweepDamage       (*(int32_t *)(uintptr_t)ADDR_SWEEP_DAMAGE)
+
+/* The literal 1.0f every flat arm hands CreateMissile, and the bit pattern
+ * the two lobbed ones compute. CreateMissile's speedScale parameter is an
+ * int32_t carrying float bits -- see MISSILE_OFF_SPEED_SCALE -- so the
+ * conversion is a reinterpret and not a cast. */
+#define AM2_FLOAT_ONE 0x3F800000
+
+static inline int32_t AM2_FLOAT_BITS(float f)
+{
+    int32_t bits;
+    __builtin_memcpy(&bits, &f, sizeof bits);
+    return bits;
+}
+
+/* MSVC's _ftol truncates toward zero, which is what the x87 control word is
+ * set to here and what a C cast does. */
+#define AM2_FTOL(x) ((int32_t)(x))
+
+#define AM2_PACK_POINT(x, y) \
+    (((uint32_t)(uint16_t)(y) << 16) | (uint32_t)(uint16_t)(x))
+
+/* 0x0046F2F0, 0x0046FD60, 0x0046FAA8 and 0x0046FD5C, read out of the image
+ * rather than guessed: the lobbed arms' arc term and bias, the detonator's
+ * step, and the sweep's scale. */
+#define AM2_FW_ARC_K    1.2
+#define AM2_FW_ARC_BIAS 16.0
+#define AM2_FW_STEP     24.0f
+#define AM2_FW_SWEEP_K  0.5f
+
+/* 0x0045F460, 3,200 bytes and 1,149 instructions, four callers -- the whole
+ * FireWeaponAt* family, and the last function in the image below the CRT line.
+ *
+ * Seven cdecl arguments. Arguments 5 and 6 are one 8-byte aggregate the
+ * callers build with `sub esp, 8` and fill as a dword point plus a word
+ * height, which is why their call sites look like they have a stray `sub esp`
+ * with nothing under it.
+ *
+ * The body is a 43-entry byte index at ADDR_FIRE_WEAPON_INDEX into 24 arms at
+ * ADDR_FIRE_WEAPON_ARMS. The case labels below were GENERATED from that
+ * table, for the reason DirtyCollect's eighty-one arms established: a
+ * hand-written mapping of kinds onto bodies is where six of eighty-one went
+ * wrong before. Four kinds share arm 17, two share arm 0, two share arm 6,
+ * and fifteen fall to the default.
+ *
+ * EVERY EXIT IS EXPLICIT -- twenty `mov eax, 1` and five `xor eax, eax`, and
+ * not one returns a callee's result. The value means "consume the item", so 0
+ * reads as "the shot did not happen, keep it".
+ *
+ * Seventeen arms share a shape: offset the muzzle by the sprite's attach
+ * point, play a sound, start a directional effect, optionally bias the
+ * facing, call CreateMissile. They are written out rather than factored,
+ * because they are NOT identical -- the two lobbed arms pass a ballistically
+ * adjusted position where the flat ones pass the firing point, a clamped
+ * distance where the flat ones pass the height argument, and a computed speed
+ * scale where the flat ones pass 1.0f. Factoring the shape and parameterising
+ * the differences is how AiStepTrack and AiStepDefend would have lost a real
+ * behavioural difference. */
+int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
+                           int32_t facing, AM2_FireSpot spot, void *target)
+{
+    uint8_t  *w   = (uint8_t *)weapon;
+    uint8_t  *u   = (uint8_t *)unit;
+    uint8_t  *tgt = (uint8_t *)target;
+    int16_t  *pt  = (int16_t *)&spot.at;
+    uint8_t  *rows;
+    uint8_t  *spr;
+    uint8_t  *def;
+    uint32_t  from;         /* the packed spot.at the shot leaves from */
+    int16_t  *fromP = (int16_t *)&from;
+    int32_t   dir;
+    uint32_t  kind;
+    uint8_t   seed;
+
+    /* Both halves of the aggregate default. A zero height comes from the
+     * height argument, which every caller computes with ObjFieldB or
+     * ObjHeight; a zero x comes from the target's own position, so "fire at
+     * where that thing is" is spelled as a null spot.at plus a live object. */
+    if (spot.ground == 0)
+        spot.ground = (int16_t)height;
+
+    if (pt[0] == 0 && tgt) {
+        pt[0] = *(const int16_t *)(tgt + OBJ_OFF_POS);
+        pt[1] = *(const int16_t *)(tgt + OBJ_OFF_POS + 2);
+    }
+
+    /* A unit with more than one ROW fires from its SECOND row -- its position,
+     * its sprite and its direction -- and a single-row one fires from the
+     * object's own position with row 0's sprite. The three fields are the same
+     * three either way: the multi-row displacements 0x64, 0x7C and 0x86 are
+     * 0x60 + ROW_OFF_SPRITE, 0x60 + ROW_OFF_X and 0x60 + ROW_OFF_FIELD_26,
+     * which is what identifies them as row 1 rather than as fields of their
+     * own. Nothing new had to be named for this function. */
+    rows = *(uint8_t **)(u + OBJ_OFF_ROWS);
+    if (*(const int32_t *)(u + OBJ_OFF_ROW_COUNT) > 1) {
+        from = *(const uint32_t *)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_X);
+        spr  = *(uint8_t **)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_SPRITE);
+        dir  = *(const int16_t *)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_26);
+    } else {
+        from = *(const uint32_t *)(u + OBJ_OFF_POS);
+        spr  = *(uint8_t **)(rows + ROW_OFF_SPRITE);
+        dir  = *(const int16_t *)(rows + ROW_OFF_FIELD_26);
+    }
+
+    /* Types 2, 3 and 8 stamp the clock and take the trooper's own fire flag;
+     * everything else takes a fresh random byte. It ends up as CreateMissile's
+     * last argument, and four arms bias it before passing it on. */
+    if (ObjIsTypeIn238((const AM2_Object *)u)) {
+        *(uint32_t *)(u + OBJ_OFF_FIELD_100) = g_gameClockMs;
+        seed = *(const uint8_t *)(u + TROOPER_OFF_FIRE_FLAG);
+    } else {
+        seed = (uint8_t)orig_game_rand();
+    }
+
+    def  = *(uint8_t **)(w + OBJ_OFF_FIELD_C0);
+    kind = (uint32_t)(*(const int32_t *)def) - 1u;
+    if (kind > 0x2Au)
+        return 0;
+
+    /* The muzzle offset, shared by every arm that takes the missile shape and
+     * skipped -- not defaulted -- when the row has no sprite. */
+#define AM2_FW_MUZZLE()                                                       \
+    do {                                                                      \
+        if (spr) {                                                            \
+            fromP[0] = (int16_t)(fromP[0]                                     \
+                     + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X));        \
+            fromP[1] = (int16_t)(fromP[1]                                     \
+                     + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y));        \
+        }                                                                     \
+    } while (0)
+
+    switch (kind + 1u) {
+
+    /* arm 0 -- 0x0045F523. Falls THROUGH into the shared refusal epilogue, so
+     * it answers 0 even though it fires: the weapon is not consumed. */
+    case 1: case 9:
+        AM2_FW_MUZZLE();
+        PlaySoundAt(7, 0, 0, fromP[0], fromP[1]);
+        SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 0,
+                          *(const uint32_t *)(u + OBJ_OFF_UID), dir);
+        CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
+                      AM2_FLOAT_ONE, 0, 0, AddByteSat(seed, 0x20));
+        return 0;
+
+    /* arm 16 -- 0x0045F5BC. Same shape and sound as arm 0, but the facing is
+     * a SPREAD rather than a kick: 0xFF - (seed & 3), four adjacent values. */
+    case 30:
+        AM2_FW_MUZZLE();
+        PlaySoundAt(7, 0, 0, fromP[0], fromP[1]);
+        SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 0,
+                          *(const uint32_t *)(u + OBJ_OFF_UID), dir);
+        CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
+                      AM2_FLOAT_ONE, 0, 0,
+                      (int32_t)(uint8_t)(0xFF - (seed & 3)));
+        return 1;
+
+    /* arm 7 -- 0x0045F650. Its own sound, then it JUMPS into arm 0's tail at
+     * 0x0045F578 with 0x10 pushed instead of 0x20 -- so it shares arm 0's
+     * CreateMissile and arm 0's return of 0. An arm that ends inside another. */
+    case 10:
+        AM2_FW_MUZZLE();
+        PlaySoundAt(8, 0, 0, fromP[0], fromP[1]);
+        SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 0,
+                          *(const uint32_t *)(u + OBJ_OFF_UID), dir);
+        CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
+                      AM2_FLOAT_ONE, 0, 0, AddByteSat(seed, 0x10));
+        return 0;
+
+    /* arm 15 -- 0x0045F6AA. */
+    case 29:
+        AM2_FW_MUZZLE();
+        PlaySoundAt(0x0A, 0, 0, fromP[0], fromP[1]);
+        SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 0,
+                          *(const uint32_t *)(u + OBJ_OFF_UID), dir);
+        CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
+                      AM2_FLOAT_ONE, 0, 0, AddByteSat(seed, 0x0A));
+        return 0;
+
+    /* arm 6 -- 0x0045F744. The only arm using effect group 3. */
+    case 7: case 8:
+        AM2_FW_MUZZLE();
+        PlaySoundAt(9, 0, 0, fromP[0], fromP[1]);
+        SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 3,
+                          *(const uint32_t *)(u + OBJ_OFF_UID), dir);
+        CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
+                      AM2_FLOAT_ONE, 0, 0, AddByteSat(seed, 0x0A));
+        return 1;
+
+    /* arm 3 -- 0x0045F7E1. No facing bias: the seed goes through unchanged. */
+    case 4:
+        AM2_FW_MUZZLE();
+        PlaySoundAt(0x0F, 0, 0, fromP[0], fromP[1]);
+        SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 1,
+                          *(const uint32_t *)(u + OBJ_OFF_UID), dir);
+        CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
+                      AM2_FLOAT_ONE, 0, 0, seed);
+        return 1;
+
+    /* arm 5 -- 0x0045F86D. */
+    case 6:
+        AM2_FW_MUZZLE();
+        PlaySoundAt(0x15, 0, 0, fromP[0], fromP[1]);
+        SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 1,
+                          *(const uint32_t *)(u + OBJ_OFF_UID), dir);
+        CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
+                      AM2_FLOAT_ONE, 0, 0, seed);
+        return 1;
+
+    /* arm 2 -- 0x0045F9E0. The only arm passing PlaySoundAt a non-zero second
+     * argument on the flat path, and it starts no directional effect at all. */
+    case 3:
+        AM2_FW_MUZZLE();
+        PlaySoundAt(0x0E, 1, 0, fromP[0], fromP[1]);
+        CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
+                      AM2_FLOAT_ONE, 0, 0, seed);
+        return 1;
+
+    /* arms 1 and 4 -- 0x0045F8FA and 0x0045FA43, the LOBBED shots and the only
+     * two that scale the missile's speed. Identical but for the sound and for
+     * arm 1 raising the muzzle 0x10 first.
+     *
+     * The range is measured from a ballistically adjusted aim spot.at, clamped
+     * into the def's own [min, max] pair at +0x14 and +0x10, and the speed is
+     * that fraction of the maximum. With no target spot.at the distance IS the
+     * maximum, so the scale is exactly 1.0 and the shot is flat -- which is
+     * why the two readings agree on every unaimed shot and only diverge once
+     * something is aimed at. */
+    case 2: case 5: {
+        AM2_Point a, b;
+        int32_t   d, lo, hi, clamped;
+        float     scale;
+
+        if (kind + 1u == 2) {
+            fromP[1] = (int16_t)(fromP[1] - 0x10);
+            PlaySoundAt(0x0C, 0, 0, fromP[0], fromP[1]);
+        } else {
+            PlaySoundAt(0x0D, 0, 0, fromP[0], fromP[1]);
+        }
+
+        a.x = fromP[0];
+        if (pt[0] > 0) {
+            a.y = (int16_t)AM2_FTOL((double)pt[1]
+                                    - (double)(pt[1] - fromP[1]) * AM2_FW_ARC_K
+                                    + AM2_FW_ARC_BIAS);
+            b.x = pt[0];
+            b.y = pt[1];
+            d   = ApproxDist(&a, &b);
+        } else {
+            a.y = fromP[1];
+            d   = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
+        }
+
+        lo = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE_MIN);
+        hi = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
+        clamped = d;
+        if (d < lo)
+            clamped = lo;
+        else if (d > hi)
+            clamped = hi;
+
+        scale = (float)clamped / (float)hi;
+
+        CreateMissile(weapon, unit, AM2_PACK_POINT(a.x, a.y), facing,
+                      (int16_t)clamped, spot.ground, 1,
+                      AM2_FLOAT_BITS(scale), 0, 0, seed);
+        return 1;
+    }
+
+    /* arms 8 and 9 -- 0x0045FB23 and 0x0045FB6E. Not missiles at all: they
+     * place a watched object at the muzzle. Arm 9 plays no sound. */
+    case 11:
+        AM2_FW_MUZZLE();
+        PlaySoundAt(0x10, 0, 0, fromP[0], fromP[1]);
+        CreateWatchedItem(0, unit, from,
+                          *(const int8_t *)(u + OBJ_OFF_ARMY));
+        return 1;
+
+    case 12:
+        AM2_FW_MUZZLE();
+        CreateWatchedType(0, unit, from,
+                          *(const int8_t *)(u + OBJ_OFF_ARMY));
+        return 1;
+
+    /* arm 17 -- 0x0045FBA4, four kinds. Retag an object's table pair, which is
+     * how a weapon changes what something IS. The target defaults to the
+     * FIRER, so a unit can retag itself, and the arm refuses when the object
+     * is not a type 2 or already carries the kind this weapon would set.
+     *
+     * BOTH REFUSALS GO THROUGH PlaySoundAt(0, 0, 0, 0, 0) at 0x0045FBB7 --
+     * five explicit zeros, not an artefact of the push-list extractor, which
+     * is what it looked like the first time it was read. Arm 11 jumps into
+     * that same call, so it is a shared refusal and not this arm's alone. */
+    case 35: case 36: case 37: case 38: {
+        int32_t newKind;
+        if (!tgt)
+            tgt = u;
+        newKind = *(const int32_t *)def - 0x23;
+        if (!ObjIsType2((const AM2_Object *)tgt)
+            || *(const int32_t *)(tgt + OBJ_OFF_FIELD_530) == newKind) {
+            PlaySoundAt(0, 0, 0, 0, 0);
+            return 0;
+        }
+        PlaySoundAt(0x14, 0, 0,
+                    *(const int16_t *)(tgt + OBJ_OFF_POS),
+                    *(const int16_t *)(tgt + OBJ_OFF_POS + 2));
+        SetObjTablePair(newKind, *(const uint32_t *)(tgt + OBJ_OFF_UID));
+        return 1;
+    }
+
+    /* arms 12, 13, 14 -- 0x0045FC2A, 0x0045FC56, 0x0045FC82. Air support, and
+     * the three differ ONLY in the speech line and the mode. Three arms this
+     * regular is the clearest evidence the dispatch table is read right. */
+    case 24:
+        SpeakLine(0x16, *(const int8_t *)(u + OBJ_OFF_ARMY));
+        DoAirSupport(0, spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
+        return 1;
+
+    case 25:
+        SpeakLine(0x17, *(const int8_t *)(u + OBJ_OFF_ARMY));
+        DoAirSupport(1, spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
+        return 1;
+
+    case 26:
+        SpeakLine(0x18, *(const int8_t *)(u + OBJ_OFF_ARMY));
+        DoAirSupport(2, spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
+        return 1;
+
+    /* arms 18 and 19 -- 0x0045FCAE and 0x0045FCFD. Aim rather than fire: they
+     * subtract the view origin from the spot.at IN PLACE and hand the
+     * screen-space result to AimStart or AimStartB. Identical but for the
+     * sound and which of the two they call. */
+    case 39:
+    case 40:
+        PlaySoundAt(kind + 1u == 39 ? 0x2B : 0x2C, 1, 0,
+                    (int32_t)spot.at, (int32_t)(spot.at >> 16));
+        pt[0] = (int16_t)(pt[0] - *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X);
+        pt[1] = (int16_t)(pt[1] - *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
+        if (kind + 1u == 39)
+            AimStart(*(const uint32_t *)(u + OBJ_OFF_UID),
+                     *(const int8_t *)(u + OBJ_OFF_ARMY), spot.at);
+        else
+            AimStartB(*(const uint32_t *)(u + OBJ_OFF_UID),
+                      *(const int8_t *)(u + OBJ_OFF_ARMY), spot.at);
+        return 1;
+
+    /* arm 11 -- 0x0045FD4B, the medic pack. Refuse a casualty who is dead or
+     * already whole; speak if it is SARGE and play a sound if it is anyone
+     * else; then heal. With no target it treats the FIRER as the casualty and
+     * always speaks.
+     *
+     * ADDR_MEDIC_HEAL_PCT is zero and nothing writes it, so the heal is a
+     * no-op -- see its note. Reproduced as written. */
+    case 23:
+        if (tgt) {
+            int16_t hp = *(const int16_t *)(tgt + OBJ_OFF_HEALTH);
+            if (hp <= 0 || hp >= *(const int16_t *)(tgt + OBJ_OFF_MAX_HEALTH)) {
+                PlaySoundAt(0, 0, 0, 0, 0);
+                return 0;
+            }
+            if (*(const int32_t *)(tgt + OBJ_OFF_SARGE))
+                SpeakLine(0x1A, *(const int8_t *)(u + OBJ_OFF_ARMY));
+            else
+                PlaySoundAt(0x12, 0, 0,
+                            *(const int16_t *)(tgt + OBJ_OFF_POS),
+                            *(const int16_t *)(tgt + OBJ_OFF_POS + 2));
+            HealObject(tgt, g_medicHealPct, unit);
+            return 1;
+        } else {
+            int16_t hp = *(const int16_t *)(u + OBJ_OFF_HEALTH);
+            if (hp <= 0 || hp >= *(const int16_t *)(u + OBJ_OFF_MAX_HEALTH))
+                return 0;
+            SpeakLine(0x1A, *(const int8_t *)(u + OBJ_OFF_ARMY));
+            HealObject(u, g_medicHealPct, unit);
+            return 1;
+        }
+
+    /* arm 20 -- 0x0045FDF7, the repair kit. With a target it heals it (by
+     * ADDR_REPAIR_HEAL_PCT, which is also never written). With none it puts
+     * the firer's inventory slot back to 0 -- but only if the firer IS the
+     * unit we are leading -- and answers 0, so the kit is not consumed. */
+    case 41:
+        if (tgt) {
+            PlaySoundAt(0x13, 0, 0,
+                        *(const int16_t *)(tgt + OBJ_OFF_POS),
+                        *(const int16_t *)(tgt + OBJ_OFF_POS + 2));
+            HealObject(tgt, g_repairHealPct, unit);
+            return 1;
+        }
+        if (g_ourLeaderUid == 0
+            || *(const uint32_t *)(u + OBJ_OFF_UID) != g_ourLeaderUid)
+            return 0;
+        SelectInventorySlot(u, 0);
+        return 0;
+
+    /* arm 21 -- 0x0045FE58. Refuses a non-type-2 and one already on soldier
+     * kind 7, which is the kind Type2ActionC would put it on. */
+    case 42:
+        if (!tgt || !ObjIsType2((const AM2_Object *)tgt)
+            || *(const int32_t *)(tgt + OBJ_OFF_SOLDIER_KIND) == 7)
+            return 0;
+        Type2ActionC(tgt, *(const int8_t *)(u + OBJ_OFF_ARMY));
+        return 1;
+
+    /* arm 10 -- 0x0045FE99, the detonator, and the other half of arms 8 and 9:
+     * what it looks for is an object of ADDR_CREATE_WATCHED_KIND, which is
+     * exactly what CreateWatchedItem plants. Kind 11 lays the charge and kind
+     * 20 sets it off.
+     *
+     * If the target is already such a charge it is used directly; otherwise
+     * the firing spot.at is stepped 24.0 units along the firer's facing and
+     * every object at that spot.at is walked down OBJ_OFF_QUERY_NEXT for one.
+     *
+     * THE SEARCH DOES NOT CLEAR THE TARGET. `ebp` holds the argument on entry
+     * and is only reassigned when the walk finds a match, so a target that
+     * failed the type test and a search that finds nothing leaves the ORIGINAL
+     * target to be detonated. Writing `target = NULL` before the loop is the
+     * obvious tidy-up and changes the behaviour. */
+    case 20: {
+        uint8_t *found = tgt;
+
+        if (!(tgt && *(const int32_t *)tgt == 1
+              && *(const int32_t *)(*(uint8_t **)(tgt + OBJ_OFF_FIELD_94) + 8)
+                 == g_createWatchedKind)) {
+            uint8_t *o;
+            fromP[0] = (int16_t)AM2_FTOL(
+                Cos8(*(const uint8_t *)(u + OBJ_OFF_FACING)) * AM2_FW_STEP
+                + fromP[0]);
+            fromP[1] = (int16_t)AM2_FTOL(
+                Sin8(*(const uint8_t *)(u + OBJ_OFF_FACING)) * AM2_FW_STEP
+                + fromP[1]);
+            for (o = (uint8_t *)ObjectsAtPoint(&from,
+                     (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+                 o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
+                if (*(const int32_t *)o == 1
+                    && *(const int32_t *)(*(uint8_t **)(o + OBJ_OFF_FIELD_94) + 8)
+                       == g_createWatchedKind) {
+                    found = o;
+                    break;
+                }
+            }
+        }
+
+        if (!found)
+            return 0;
+
+        PlaySoundAt(0x10, 0, 0,
+                    *(const int16_t *)(found + OBJ_OFF_POS),
+                    *(const int16_t *)(found + OBJ_OFF_POS + 2));
+        *(int32_t *)(found + OBJ_OFF_FLAGS) |= 2;
+        CreateExplosion(*(const int16_t *)(found + OBJ_OFF_POS),
+                        *(const int16_t *)(found + OBJ_OFF_POS + 2),
+                        0x79, 4, 0, 0, 0, 0, 0, 0);
+        return 0;
+    }
+
+    /* arm 22 -- 0x0045FF8E, the sweep. Steps out from the FIRER's own position
+     * -- not the muzzle -- by ADDR_SWEEP_DISTANCE scaled, collects everything
+     * the spot.at hits, and damages each in turn, skipping the firer itself.
+     *
+     * Both of its constants are unwritten .bss, so in the shipped binary the
+     * step is zero and the damage is zero. See ADDR_SWEEP_DISTANCE. */
+    case 43: {
+        uint8_t  *o;
+        uint32_t  at;
+        int16_t  *atP = (int16_t *)&at;
+        uint32_t  attacker;
+
+        PlaySoundAt(0x34, 0, 0,
+                    *(const int16_t *)(u + OBJ_OFF_POS),
+                    *(const int16_t *)(u + OBJ_OFF_POS + 2));
+
+        atP[0] = (int16_t)AM2_FTOL(
+            Cos8(facing) * (double)g_sweepDistance * AM2_FW_SWEEP_K
+            + *(const int16_t *)(u + OBJ_OFF_POS));
+        atP[1] = (int16_t)AM2_FTOL(
+            Sin8(facing) * (double)g_sweepDistance * AM2_FW_SWEEP_K
+            + *(const int16_t *)(u + OBJ_OFF_POS + 2));
+
+        o = (uint8_t *)ObjectsHitByPoint(&at,
+                (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+
+        attacker = *(const uint32_t *)(u + OBJ_OFF_UID);
+        if (g_mpSession)
+            attacker = 0;
+
+        for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT))
+            if (o != u)
+                DamageObject(o, g_sweepDamage, 2, attacker,
+                             (uint8_t)(facing + 0x80), 0);
+        return 1;
+    }
+
+    /* arm 23 -- 0x0045F5B2, the default, and the shared refusal epilogue that
+     * eight other arms jump to. Fifteen kinds reach it explicitly through the
+     * index table and everything above 0x2B by the range check above. */
+    default:
+        return 0;
+    }
+}
+
 void item_install(void)
 {
     patch_replace(ADDR_ITEM_IS_READY, (const void *)ItemIsReady,
@@ -13142,6 +13656,8 @@ void item_install(void)
                   "WalkCellAtPoint", 2);
     patch_replace(ADDR_WEAPON_FRAME_READY, (const void *)WeaponFrameReady,
                   "WeaponFrameReady", 1);
+    patch_replace(ADDR_FIRE_WEAPON, (const void *)FireWeapon,
+                  "FireWeapon", 7);
     patch_replace(ADDR_SET_OBJ_TABLE_PAIR, (const void *)SetObjTablePair,
                   "SetObjTablePair", 1);
     patch_replace(ADDR_PICK_WEAPON_SLOT, (const void *)PickWeaponSlot,

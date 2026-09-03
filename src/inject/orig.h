@@ -16275,6 +16275,13 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * this is what uses it. */
 #define MISSILEDEF_OFF_LIFE      0x08u
 #define MISSILEDEF_OFF_RANGE     0x10u
+/* The other end of the pair, and it took FireWeapon's two lobbed arms to
+ * find a reader: they clamp the measured distance into [+0x14, +0x10] before
+ * dividing by +0x10 for the speed scale, so +0x14 is the range BELOW which a
+ * lobbed shot is still thrown at minimum speed rather than dropped. Named
+ * from the clamp, which is a reader and a writer's worth of evidence in one
+ * expression -- the two bounds are used in the same comparison chain. */
+#define MISSILEDEF_OFF_RANGE_MIN 0x14u
 #define MISSILEDEF_OFF_FIELD_30  0x30u
 /* A weapon's own script-name index, used to look the name up in
  * ADDR_SCRIPT_NAMES and hand it to CreateWeapon. Zero or negative means no

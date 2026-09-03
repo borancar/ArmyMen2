@@ -2182,7 +2182,7 @@ void __cdecl AdvanceMission(int32_t a, int32_t b)
  * it rather than to whoever owns the weapon object. The unit's-own-weapon
  * pair do not, because a held weapon already belongs to its holder. */
 
-/* AM2_FireSpot and orig_fire_weapon moved to item.h when region.cpp's
+/* AM2_FireSpot and FireWeapon moved to item.h when region.cpp's
  * TrooperFire needed them too -- one definition, for the reason
  * tools/merges.py imports coverage.REGISTERED rather than copying it. */
 
@@ -2214,7 +2214,7 @@ void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
     if (heading < 0)
         heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), &dest);
 
-    orig_fire_weapon(weapon, unit, ObjFieldB(unit), heading, spot, (void *)0);
+    FireWeapon(weapon, unit, ObjFieldB(unit), heading, spot, (void *)0);
 
     *(int8_t *)(weapon + OBJ_OFF_ARMY) = lent;
 }
@@ -2258,7 +2258,7 @@ void __cdecl FireWeaponAtObject(uint32_t weaponUid, uint32_t unitUid,
     lent = *(const int8_t *)(weapon + OBJ_OFF_ARMY);
     *(int8_t *)(weapon + OBJ_OFF_ARMY) = *(const int8_t *)(unit + OBJ_OFF_ARMY);
 
-    orig_fire_weapon(weapon, unit, ObjHeight(unit), heading, spot, target);
+    FireWeapon(weapon, unit, ObjHeight(unit), heading, spot, target);
 
     *(int8_t *)(weapon + OBJ_OFF_ARMY) = lent;
 }
@@ -2286,7 +2286,7 @@ void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, uint32_t at)
     if (heading < 0)
         heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), &dest);
 
-    orig_fire_weapon(weapon, unit, ObjFieldB(unit), heading, spot, (void *)0);
+    FireWeapon(weapon, unit, ObjFieldB(unit), heading, spot, (void *)0);
 }
 
 /* 0x00420300. The unit's own held weapon, at another object.
@@ -2318,7 +2318,7 @@ void __cdecl UnitFireAtObject(uint32_t unitUid, int32_t heading,
         heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS),
                                (const AM2_Point *)(target + OBJ_OFF_POS));
 
-    orig_fire_weapon(weapon, unit, ObjFieldB(unit), heading, spot, target);
+    FireWeapon(weapon, unit, ObjFieldB(unit), heading, spot, target);
 }
 
 /* 0x004203A0. Work out the point an action refers to. Fourteen callers.

@@ -242,10 +242,11 @@ typedef struct {
     int16_t  pad;
 } AM2_FireSpot;
 
-typedef int32_t (__cdecl *AM2_FireWeaponFn)(void *weapon, void *unit,
-                                            int32_t height, int32_t heading,
-                                            AM2_FireSpot spot, void *target);
-#define orig_fire_weapon ((AM2_FireWeaponFn)(uintptr_t)ADDR_FIRE_WEAPON)
+/* Reconstructed now, so the seam is gone and the eight call sites reach it
+ * directly. The typedef went with it: its whole purpose was to give the
+ * indirect call a shape. */
+int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
+                           int32_t heading, AM2_FireSpot spot, void *target);
 
 /* 0x00428950 and 0x00428BB0. The item section of a savegame, both named by
  * their own counts -- "Saved %d items" and "Loaded %d items".
@@ -947,6 +948,7 @@ int32_t __cdecl WeaponFrameReady(void *obj, void *weapon);
  * A/B and no counter could reach it. The caller also pushes the firer's army
  * and position, which the body never reads. */
 void __cdecl SetObjTablePair(int32_t kind, uint32_t uid);
+
 
 /* 0x00406800, one caller. Which inventory slot should take this weapon, and
  * may it be taken at all? The slot is an out-parameter carrying -1 for "no

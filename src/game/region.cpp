@@ -7946,7 +7946,7 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
             TrooperFaceTo(o, (const AM2_Point *)(target + OBJ_OFF_POS));
 
         heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
-        fired = orig_fire_weapon(w, o, ObjHeight(o), heading, spot, target);
+        fired = FireWeapon(w, o, ObjHeight(o), heading, spot, target);
     } else {
         const uint8_t *at = out + SIGHTCOUT_OFF_X;
 
@@ -7983,7 +7983,7 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
 
         spot.at     = *(const uint32_t *)at;
         spot.ground = *(const int16_t *)(at + 4);
-        fired = orig_fire_weapon(w, o, ObjHeight(o), heading, spot, 0);
+        fired = FireWeapon(w, o, ObjHeight(o), heading, spot, 0);
     }
 
     orig_log("FIRE  trooper: %x  weapon: %x  ammo: %d\n",
@@ -10148,7 +10148,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
                     heading = (uint8_t)(gunFacing << (8 - dirs));
                 }
 
-                orig_fire_weapon(weapon, o, height, heading, spot, fireTarget);
+                FireWeapon(weapon, o, height, heading, spot, fireTarget);
 
                 if (CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
                                       (int16_t)*(const int8_t *)(o + 0x10u)))

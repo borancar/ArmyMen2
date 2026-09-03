@@ -150,6 +150,13 @@ void __cdecl ShakeAt(const AM2_Point *, int32_t)
  * opposite answer from ShakeAt above in the same file. The linkage matches
  * the HEADER, never the module the stub sits in. DrawLatencyBar has no
  * vectors: it reads the comm object and a coordinate table. */
+/* AimStart and AimStartB, pulled in because FireWeapon forward-declares them.
+ * NO extern "C": widget.h's block closes at line 1711 and both are declared
+ * at 1729, outside it, so they are C++ linkage -- the same "match the header,
+ * not the module" rule DrawSeqBar's note states, landing the other way round. */
+void __cdecl AimStart(uint32_t, int8_t, uint32_t) {}
+void __cdecl AimStartB(uint32_t, int8_t, uint32_t) {}
+
 extern "C" void __cdecl DrawSeqBar(int32_t, int32_t, uint32_t, int32_t,
                                    int32_t)
 {
