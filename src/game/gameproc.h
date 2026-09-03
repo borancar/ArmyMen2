@@ -118,6 +118,10 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr);
 /* 0x0043DDA0, one caller -- State2Enter, and only when no save is being
  * loaded. Put every scenario row on the map, then form the local army up
  * around its leader if a default .cof was found. */
+/* 0x0044D110, one caller. SaveOptions's other half: read Options.cfg back.
+ * Rejects a truncated file by seeking to 0x24 first. */
+void __cdecl LoadOptions(void);
+
 int32_t __cdecl PlaceScenario(void);
 
 void __cdecl ResetLevelState(void);

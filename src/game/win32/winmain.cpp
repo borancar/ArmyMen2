@@ -312,7 +312,7 @@ void __cdecl ResetToTitle(void)
         *(int32_t *)(uintptr_t)kCleared[i] = 0;
 
     ResetHostState();
-    ((am2_void_fn)(uintptr_t)0x0044D110u)();
+    LoadOptions();
     ApplyGameSettings();
 }
 

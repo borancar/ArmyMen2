@@ -12947,9 +12947,21 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_MSG_VEHICLE_LAST     0x25u
 #define ADDR_STR_UNKNOWN_VEH_MSG 0x0048C2ACu
 /* Who won, written only by the two game-over arms of the army dispatcher. */
+/* 0x0044D110, one caller. Read Options.cfg back into the settings globals.
+ * 395 bytes, and the first function of a merged entry -- see ADDR_WIN_ENABLED
+ * below for what the rest of that entry does. */
+#define ADDR_LOAD_OPTIONS        0x0044D110u  /* void(void) */
+#define AM2_OPTIONS_MIN_BYTES    0x24   /* the seek that proves it is whole */
+#define AM2_VOLUME_SENTINEL      (-2000)
+#define AM2_VOLUME_SILENT        (-10000)
 #define ADDR_GAME_WINNER         0x00512300u  /* int32_t */
 /* Gates the WON arm: with this clear, a win is recorded exactly as a loss.
- * 0x0044D110 is the only writer, and it sets and clears it in three places. */
+ * ITS WRITERS ARE NOT 0x0044D110, which is the merged ENTRY and not the
+ * function. That entry begins with LoadOptions, 395 bytes ending at
+ * 0x0044D29A, which never touches this global; the four writes are at
+ * 0x0044D2F2, 0x0044D38A, 0x0044D438 and 0x0044D507, in whatever starts
+ * after it. The merge trap docs/functions.tsv is known to have, recorded
+ * here because the note it replaces read as a fact about a function. */
 #define ADDR_WIN_ENABLED         0x00512304u  /* int32_t */
 #define AM2_MENU_REQUEST_GAME_OVER 0x22u
 #define ADDR_RECV_START_GAME_MSG 0x00411100u  /* "ReceiveStartGameMsg for %d Players.  Seed is %d " */

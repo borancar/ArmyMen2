@@ -125,6 +125,84 @@ typedef int32_t (__cdecl *AM2_ChmodFn)(const char *path, int32_t mode);
 typedef int32_t (__cdecl *AM2_FflushFn)(am2_FILE *fp);
 #define orig_fflush ((AM2_FflushFn)AM2_IMAGE(ADDR_CRT_FFLUSH))
 
+/* LoadOptions -- original 0x0044D110, 395 bytes, one caller. SaveOptions's
+ * other half, and it agrees with it field for field: the same four volumes,
+ * the same one-byte-in-two key bindings, the same four host settings, and
+ * the same two length-prefixed names.
+ *
+ * IT PROVES THE FILE IS WHOLE BY SEEKING TO 0x24 AND BACK. A seek past the
+ * end fails, so a truncated Options.cfg is rejected before a single field is
+ * read rather than half-loaded. The rewind is a second fseek to 0, not a
+ * rewind() call, and its result is not checked.
+ *
+ * THE NAMES ARE TERMINATED HERE AND NOT THERE. SaveOptions writes a length
+ * and exactly that many bytes with no NUL; this reads the length, reads that
+ * many bytes, and writes the NUL itself at [len]. So the terminator lives in
+ * the reader, which is why a name containing one is truncated by this and
+ * not by the writer -- the note on SaveOptions says so from the other side.
+ *
+ * THE THREE VOLUMES ARE REWRITTEN AFTER THE FILE IS CLOSED. A stored -2000
+ * becomes -10000, and only those three; MOVIE_COUNT and DIFFICULTY are taken
+ * as read. -2000 is what the mixer means by "quiet" and -10000 by "silent",
+ * so this is an old settings file being migrated, not a range clamp -- it
+ * fires on exactly one value and leaves every other alone.
+ *
+ * It fflushes before fclose, as SaveOptions does. Reproduced. */
+void __cdecl LoadOptions(void)
+{
+    am2_FILE *fp;
+    uint8_t  *key;
+    int32_t   len;
+
+    SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+
+    fp = orig_fopen((const char *)AM2_IMAGE(ADDR_STR_OPTIONS_CFG),
+                    (const char *)AM2_IMAGE(ADDR_STR_MODE_R));
+    if (!fp)
+        return;
+
+    /* Whole-file check: if it cannot seek this far there is nothing to read. */
+    if (orig_fseek(fp, AM2_OPTIONS_MIN_BYTES, 0) != 0)
+        return;
+    orig_fseek(fp, 0, 0);
+
+    orig_fread((void *)AM2_IMAGE(ADDR_VOLUME_AT_ZERO), 4, 1, fp);
+    orig_fread((void *)AM2_IMAGE(ADDR_STREAM_VOLUME), 4, 1, fp);
+    orig_fread((void *)AM2_IMAGE(ADDR_VOLUME_VOICE), 4, 1, fp);
+    orig_fread((void *)AM2_IMAGE(ADDR_MOVIE_COUNT), 4, 1, fp);
+
+    for (key = (uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS);
+         key < (uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS_END);
+         key += 2)
+        orig_fread(key, 1, 1, fp);
+
+    orig_fread((void *)AM2_IMAGE(ADDR_DIFFICULTY), 4, 1, fp);
+    orig_fread((void *)AM2_IMAGE(ADDR_HOST_MASK_A), 4, 1, fp);
+    orig_fread((void *)AM2_IMAGE(ADDR_HOST_MASK_B), 4, 1, fp);
+    orig_fread((void *)AM2_IMAGE(ADDR_HOST_VALUE_3E8), 4, 1, fp);
+
+    len = 0;
+    orig_fread(&len, 4, 1, fp);
+    orig_fread((void *)AM2_IMAGE(ADDR_SAVED_PLAYER_NAME), 1, (size_t)len, fp);
+    ((char *)AM2_IMAGE(ADDR_SAVED_PLAYER_NAME))[len] = '\0';
+
+    len = 0;
+    orig_fread(&len, 4, 1, fp);
+    orig_fread((void *)AM2_IMAGE(ADDR_SAVED_BATTLE_NAME), 1, (size_t)len, fp);
+    ((char *)AM2_IMAGE(ADDR_SAVED_BATTLE_NAME))[len] = '\0';
+
+    orig_fflush(fp);
+    orig_fclose(fp);
+
+    /* Migrate an old file's "quiet" to "silent". Only these three. */
+    if (*(int32_t *)AM2_IMAGE(ADDR_VOLUME_AT_ZERO) == AM2_VOLUME_SENTINEL)
+        *(int32_t *)AM2_IMAGE(ADDR_VOLUME_AT_ZERO) = AM2_VOLUME_SILENT;
+    if (*(int32_t *)AM2_IMAGE(ADDR_STREAM_VOLUME) == AM2_VOLUME_SENTINEL)
+        *(int32_t *)AM2_IMAGE(ADDR_STREAM_VOLUME) = AM2_VOLUME_SILENT;
+    if (*(int32_t *)AM2_IMAGE(ADDR_VOLUME_VOICE) == AM2_VOLUME_SENTINEL)
+        *(int32_t *)AM2_IMAGE(ADDR_VOLUME_VOICE) = AM2_VOLUME_SILENT;
+}
+
 /* SaveOptions -- original 0x0044CFA0, seven callers. Write Options.cfg: every
  * setting the game keeps between runs, as one straight line of fwrites with
  * no header, no tag and no version.
@@ -2569,6 +2647,8 @@ int32_t __cdecl SelListInit(void)
 
 void gameproc_install(void)
 {
+    patch_replace(ADDR_LOAD_OPTIONS, (const void *)LoadOptions,
+                  "LoadOptions", 1);
     patch_replace(ADDR_PLACE_SCENARIO, (const void *)PlaceScenario,
                   "PlaceScenario", 1);
     patch_replace(ADDR_OPEN_SAVE_FOR_LOAD, (const void *)OpenSaveForLoad,
