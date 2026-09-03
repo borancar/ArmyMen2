@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **39** analysis
+**`make check` runs everything that does not need the game.** **40** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3691,7 +3691,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 11 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 12 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3752,7 +3752,37 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   16 bits above y = 4096, which is a thousand times more tile rows than any
   map in the game has.
 
-  The other twenty-one are verified by READING, which is the standing worth
+  `AiStep` joins them by `tools/aicheck.py`, 92 cases, and it is the
+  dispatcher rather than an arm on purpose: this file's own rule is that a
+  family of cold functions is best attacked where it converges, and the six
+  arms reach sighting, pathfinding and the object model, none of which
+  emulates outside the game. So the arms are stubbed and what is compared is
+  WHICH ONE RAN -- the question a jump table answers and reading the arms
+  cannot.
+
+  Its mutation counts are all derivable, which is the evidence the corpus
+  reaches every arm rather than merely passing: sending mode 6 to the default
+  fails 5, the number of tiles tried; swapping modes 0 and 1 fails 10; making
+  the default `ignore` instead of `track` fails 65, which is thirteen modes
+  by five tiles and is exactly how many of the eighteen mode values are not
+  one of the five named arms; and shifting the region byte fails 90, every
+  case but the two null ones.
+
+  **THE OUTPUT IS THE REGION HALFWORD, NOT THE RETURN VALUE**, so the field
+  is seeded with a sentinel before each case -- the null guard really does
+  write nothing, and "wrote nothing" has to be distinguishable from "wrote
+  zero". An oracle comparing `eax` here would pass with the body deleted.
+
+  **AND IT MADE `checkclaims.py` CREDIT FIVE FUNCTIONS IT ONLY STUBS.** The
+  split above is computed by resolving each name to its address and searching
+  the oracles; `aicheck.py` holds all six arm addresses in its CODE, where
+  stripping docstrings cannot help. So a tool may now DECLARE its subject in
+  a `CHECKS` tuple, and a declaration wins over the search outright. The
+  general shape is one this file already states twice -- a mention is not a
+  test -- and the new part is that a stub is a mention the prose filter
+  cannot see.
+
+  The other twenty are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is

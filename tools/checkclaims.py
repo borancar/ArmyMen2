@@ -110,7 +110,7 @@ def check_tool_count():
 ORACLES = ("moviecheck posecheck formationcheck shakecheck roachcheck rlecheck "
            "mprowcheck weaponcheck listcheck ringcheck boolcheck explcheck "
            "collectcheck firepose regioncheck pathcheck tilepathcheck "
-           "placementcheck scriptcheck").split()
+           "placementcheck aicheck scriptcheck").split()
 
 DOCSTRING = re.compile(r'"""[\s\S]*?"""')
 COMMENT = re.compile(r"#[^\n]*")
@@ -162,23 +162,48 @@ def _name_addresses():
     return out
 
 
+CHECKS_DECL = re.compile(r"^CHECKS\s*=\s*\(([^)]*)\)", re.M)
+
+
+def _oracle_subjects():
+    """Per oracle: an explicit CHECKS tuple, or None to fall back to search.
+
+    A tool that stubs the functions around its subject holds their addresses
+    in its code, where stripping prose cannot help -- tools/aicheck.py names
+    six arms it replaces with stubs.  So a tool may declare what it verifies,
+    and a declaration wins over the search outright.
+    """
+    out = {}
+    for t in ORACLES:
+        path = os.path.join(REPO, "tools", t + ".py")
+        if not os.path.exists(path):
+            continue
+        src = open(path).read()
+        m = CHECKS_DECL.search(src)
+        out[t] = (re.findall(r'"(\w+)"', m.group(1)) if m else None, src)
+    return out
+
 def unexercised_split(text):
     """(names in CLAUDE.md's unexercised list an oracle checks, list length)."""
     m = re.search(r"- Unexercised by any drive: (.*?)\n\n", text, re.S)
     names = re.findall(r"`(\w+)`", m.group(1))
     addrs = _name_addresses()
 
-    bodies = []
-    for t in ORACLES:
-        path = os.path.join(REPO, "tools", t + ".py")
-        if os.path.exists(path):
-            bodies.append(_strip_python_prose(open(path).read()))
+    declared, bodies = set(), []
+    for t, (names_, src) in _oracle_subjects().items():
+        if names_ is None:
+            bodies.append(_strip_python_prose(src))
+        else:
+            declared.update(names_)
     vectors = os.path.join(REPO, "tests", "vectors.h")
     if os.path.exists(vectors):
         bodies.append(open(vectors).read())
 
     checked = 0
     for n in names:
+        if n in declared:
+            checked += 1
+            continue
         a = addrs.get(n)
         keys = [n] if a is None else [n, a, a.lower(), a.replace("0x00", "0x")]
         if any(re.search(r"\b%s\b" % re.escape(k), b)
