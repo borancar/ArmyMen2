@@ -275,7 +275,51 @@ tree, so every comm reconstruction verified "by reading" has had no drive
 behind it for longer than anyone has checked.
 
 ## What is next, as a number rather than a direction
-## CORRECTED: "FireWeapon is the last function" was wrong -- 31 remain
+## CORRECTED AGAIN: it is 112 functions, not 31 -- and not 0
+
+The "31 remain" table below is stale twice over. Most of its entries have
+since been transcribed, and the method that produced it was wrong in a way
+that gets MORE wrong as the work finishes.
+
+Counting docs/functions.tsv entries below CRT_START and dropping any entry
+that contains a patched address now answers **0 functions, 0 bytes** -- which
+is the merged-entry false positive CLAUDE.md already documents for
+coverage.py, arriving here by a different route. An entry that is several
+functions is credited whole the moment ANY of them is patched, so the count
+collapses to zero exactly when the last straggler in each merged entry is
+still outstanding.
+
+There is a concrete counterexample and it was found by accident, reading
+SoldierNameOf's callers: 0x004158D0 is a thiscall HUD painter that nothing
+has reconstructed, and it sits inside HudSquadDestruct's merged 2,800-byte
+entry at 0x00415850. The naive count calls it done. It is also, at 2,568
+bytes, the LARGEST thing left.
+
+Splitting every merged entry through tools/merges.py first -- which is what
+CLAUDE.md says to do before ranking anything -- gives the real figure:
+
+**112 functions, 15,796 bytes.**
+
+| bytes | address | name |
+|---:|---|---|
+| 2568 | 0x004158D0 | -- |
+| 1200 | 0x00455340 | -- |
+| 1184 | 0x00431E10 | ADDR_CHECK_MAP_RULES |
+| 976 | 0x00421E80 | ADDR_EVT_CONDITION |
+| 640 | 0x004171C0 | -- |
+| 624 | 0x00411C20 | ADDR_COMM_FRAME_PRE_A |
+| 544 | 0x00457E50 | -- |
+| 512 | 0x00431A30 | -- |
+| 464 | 0x0044CDA0 | -- |
+
+and a long tail of DirectPlay callbacks, save-list handlers and menu widget
+methods from 336 bytes down. Note how much of the tail is comm: those are
+verifiable by reading only, on a machine that opens no session.
+
+Do not hand-keep this table either -- recompute it. The one-line version is
+merges.real_functions() to split, merges.reconstructed() to subtract.
+
+## STALE: the earlier "31 remain" table, kept for the record
 
 Reported for several turns, and it does not survive being measured. Taking
 docs/functions.tsv below CRT_START, subtracting every patch_replace target
