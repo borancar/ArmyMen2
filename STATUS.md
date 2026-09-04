@@ -572,31 +572,34 @@ second and the 608 markers were never measuring the same thing, because the
 probe: it reads 0 in live play while the log takes 33,494 markers, because
 its caller is reconstructed and reaches it directly. Count the markers.
 
-What is still open, stated as what is measured and nothing more.
+**ANSWERED: THE MARKERS STOP WHILE THE GAME KEEPS DRAWING.** Our side does
+not compose fewer frames; it stops EMITTING the per-frame `-dbg` marker and
+goes on rendering. Measured in one drive:
 
-Under `ab.sh` our side emits 608 markers where the original emits 25,797.
-Driven BY HAND with `ab.sh`'s own clicks and waits -- click BOOT CAMP, 25 s,
-RETURN, 30 s, the two dialogs, then play -- our side emits **28,386**. Run
-again with the longer 46 s settle it emits **28,249**, so the initial wait is
-NOT the variable; the two differ by half a percent.
+- after both dialogs, 7,891 markers
+- after six horizontal mouse-moves and 4 s, 8,638 -- already slowing
+- after six VERTICAL mouse-moves and 6 s, 8,638 -- **delta zero**
+- ten seconds idle, then scrolling back: still 8,638, so it never resumes
 
-So one build, the same drive, 608 under the harness and 28,000 by hand. The
-difference is something `ab.sh` does that a hand replication does not, and
-the candidates not yet excluded are the per-side `Options.cfg` it installs,
-the ORIGINAL side having run first, and its mouse-move scrolling where the
-hand version simply waits.
+The game is fine at that point. The control socket answers `pong`, the pause
+mask reads 0, `ctl pointer` is normal -- and scrolling again moves **202,859
+pixels**, which is a frame composed and presented after the markers stopped.
+So the `frames` figure stops being a frame count on our side partway through
+this drive, and the gate compares two different things.
 
-**The most promising place to look is the PAUSE**, because a paused game
-composes no frames and that is exactly the shape of 608: `State2Enter` calls
-`PauseGame(8)` when no load is pending, there is no session, and `-dbg` is
-on. This is NOT a claim that the pause is the cause -- it is where to point
-the next measurement, which should read the pause mask on both sides during
-a real `ab.sh` run rather than reasoning about it.
+Ruled out along the way, each by a run rather than an argument: the initial
+wait (28,386 against 28,249 at 20 s and 46 s), the PAUSE (both sides read
+mask 0 -- now captured in the state artifact of every `mission` run), and
+TRACE (26,333 against 633 with `AM2_AB_TRACE=0`, unchanged).
 
-Three explanations for this number have now been offered and retracted: a
-stale band, a still-loading map, and two irreconcilable measurements. Each
-rested on ONE artifact read in isolation. The next attempt gets a probe or
-nothing.
+What is left is WHY the marker emission stops after a vertical scroll, in OUR
+code since the original's does not stop. Worth having found: it is the same
+log the A/B compares.
+
+Three explanations were offered and retracted before this one -- a stale band,
+a still-loading map, and two irreconcilable measurements -- and each rested on
+ONE artifact read in isolation. What settled it was changing one thing at a
+time and a screenshot diff that asked whether the frame had moved.
 
 ## Driving to a live mission by hand needs ab.sh's WAITS
 

@@ -1049,6 +1049,20 @@ play() {
         # its usage banner and diffed identical over 29 lines of shell comment.
         drive ctl "pointer" 2>/dev/null | grep -a 'hover=' \
             > "$WORK/$cfg-$side.state" || true
+        # AND THE PAUSE MASK, because this configuration's frame gate has
+        # failed on every run for longer than anyone has bisected and three
+        # explanations for it have been offered and retracted. A paused game
+        # composes no frames, which is the shape of our side's 608 markers
+        # against the original's 25,797 -- and State2Enter calls PauseGame(8)
+        # on a fresh -dbg game, so the two sides disagreeing here would
+        # explain it outright.
+        #
+        # Put in the STATE artifact rather than a probe script so it is
+        # captured on both sides of every run from now on, compared exactly,
+        # and cannot be forgotten. If the masks match, the pause is ruled out
+        # and the next candidate is Options.cfg or the run order.
+        drive ctl "peek 0x5122FC 1" 2>/dev/null \
+            >> "$WORK/$cfg-$side.state" || true
     fi
 
     if [ "$cfg" = quit ]; then
