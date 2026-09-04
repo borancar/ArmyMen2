@@ -1301,15 +1301,35 @@ nodes against the original's 44**, most fields identical, where before the
 drive got a dead process and no tree at all. `controls` and `campaign` are
 clean with it, so the shared spin constructor did not regress the menus.
 
-What is still wrong is now VISIBLE for the first time, which is the point of
-getting this far, and it is four specific things rather than a screen that
-differs: our team button sits at y=37 where the original has 39; the
-original's spin children are siblings at DEPTH 1 -- `mov ecx,[esp+0x54]` makes
-`AddChild`'s `this` the PARENT, not the spin -- while ours are its children;
-our down arrow is at `y+9` where the original bottom-aligns it at `y+14`; and
-our edit's rect is `480,79,515,92` against `240,42,275,55`. The pixels are
-still 221,423 and the side still stops answering during the later clicks, so
-this is progress and not a fix.
+**A WIDGET ADDED TO THE WRONG PARENT IS OFFSET BY EXACTLY ITS PARENT'S
+POSITION, and that is the signature to look for.** Our edit came out at screen
+`480,79` against the original's `240,42` -- which is 240+240 and 42+37, the
+spin's own origin counted twice, because the three children had been added to
+the SPIN when the original adds them to the PARENT. It is not a placement that
+is a little wrong; the arithmetic names the culprit outright. Two further
+observations agreed before the change was made: the original's arrows and edit
+appear at DEPTH 1 in `ctl widgets`, and all three of its `AddChild` calls load
+`this` from the slot that the height's own slot fixes as argument nine.
+
+With that and the down arrow's `y + height - 9` -- `lea ecx,[edx+eax-9]` at
+0x00456431, where `y + 9` had the two arrows touching -- **every rectangle on
+the panel now matches the original exactly.**
+
+**AND THE JOINER-DISABLE ARM IS LEFT OUT ON PURPOSE, which is a measurement.**
+Transcribed as it reads -- clear flag50 and set `disabled` on names[i] and the
+spin's three children when the comm object's +0x3D8 is zero -- it produced
+**22 disabled nodes against the original's 2**, on a run where BOTH sides read
+that field as 0 through the control socket with the same comm pointer. So the
+arm as written is not what the original executes, and `COMM_OFF_IS_HOST` being
+0 at panel-open on both sides says the condition is not simply "are we the
+host" the way the name reads. The original also logs six handshake checksums
+here where we log none, so something upstream differs and this arm is
+downstream of it. **A wrong arm that LOOKS transcribed is worse than an absent
+one that is documented**, and the count is what settles which you have.
+
+Ten disabled nodes remain against two, and the other eight are `MpPanelUpdate`
+applying the same test per row -- pre-existing code, the same open question,
+not a second bug.
 
 **A READ-ONLY OFFSET LOOKED LIKE A CHEAP RATCHET AND IS NOT ONE, measured
 before it was built.** `checkoffsets.py` refuses a second name on an offset;

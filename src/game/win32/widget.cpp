@@ -16084,14 +16084,31 @@ AM2_Widget *__attribute__((thiscall)) MpSpinConstruct(
      * The write through the stored field is UNGUARDED in the original, so a
      * failed allocation faults here as it does there; reproduced, like the
      * same constructor's other allocation defect. */
+    /* THE THREE CHILDREN GO TO THE PARENT, not to the spin. All three of the
+     * original's AddChild calls load `this` from the same frame slot, and the
+     * slot is argument NINE -- the height is read at slot +0x44 as argument
+     * four, which fixes the whole argument row and puts the parent at +0x58.
+     *
+     * Two observations say the same thing without the arithmetic, which is
+     * why this is a correction rather than a guess. The original's arrows and
+     * edit appear at DEPTH 1 in `ctl widgets`, siblings of the spin rather
+     * than below it. And with them parented to the spin our edit came out at
+     * screen 480,79 against the original's 240,42 -- which is 240+240 and
+     * 42+37, the spin's own origin counted twice. A widget added to the wrong
+     * parent is not misplaced by a little; it is offset by exactly its
+     * parent's position, and that is the signature to look for. */
     *(AM2_Widget **)(self + SPIN_OFF_UP) = kid;
-    WidgetAddChild(w, kid);
+    WidgetAddChild(parent, kid);
     *(int32_t *)((uint8_t *)*(AM2_Widget **)(self + SPIN_OFF_UP)
                  + ARROW_OFF_FLAG5C) = 1;
 
     kid = (AM2_Widget *)orig_operator_new(AM2_ARROW_BYTES);
     if (kid) {
-        RectSet(&box, w->x + inner + 0x16, w->y + 9, 0x13, 9);
+        /* BOTTOM-ALIGNED, not stacked under the up arrow: the original is
+         * `mov edx,[esi+8]; mov eax,<height>; lea ecx,[edx+eax-9]` at
+         * 0x00456431, so it is `y + height - 9`. With `y + 9` the two arrows
+         * touch and the pair floats above the box on anything taller than 18. */
+        RectSet(&box, w->x + inner + 0x16, w->y + height - 9, 0x13, 9);
         kid = ButtonConstruct(kid, (const char *)0, "03_009_01_dnarrow.bmp",
                               "03_009_02_dnarrow.bmp", 1, box,
                               SpinDown,
@@ -16100,7 +16117,7 @@ AM2_Widget *__attribute__((thiscall)) MpSpinConstruct(
         *(void **)((uint8_t *)kid + ARROW_OFF_OWNER) = w;
     }
     *(AM2_Widget **)(self + SPIN_OFF_DOWN) = kid;
-    WidgetAddChild(w, kid);
+    WidgetAddChild(parent, kid);
     *(int32_t *)((uint8_t *)*(AM2_Widget **)(self + SPIN_OFF_DOWN)
                  + ARROW_OFF_FLAG5C) = 1;
 
@@ -16114,7 +16131,7 @@ AM2_Widget *__attribute__((thiscall)) MpSpinConstruct(
                             c0, c1, c2, (void (__cdecl *)(AM2_Widget *))0,
                             (int32_t)(uintptr_t)commit, (int32_t)(uintptr_t)w);
     *(AM2_Widget **)(self + SPIN_OFF_EDIT) = kid;
-    WidgetAddChild(w, kid);
+    WidgetAddChild(parent, kid);
     return w;
 }
 
@@ -16258,25 +16275,23 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
          * uninitialised descriptor: reproduced, not repaired. */
         rows[i]->flag50 = 0;
 
-        /* A JOINER CANNOT EDIT ANY OF IT. Gated on the comm object's host
-         * flag, and the order is the original's: every flag50 cleared first,
-         * then the three spin children disabled. The three are reached by
-         * RAW OFFSET because which of +0x58, +0x5c and +0x60 is the edit and
-         * which are the two arrows is not established here -- SPIN_OFF_EDIT
-         * names 0x58 while the constructor adds arrow, arrow, edit in that
-         * order, and the two readings disagree. All three are written either
-         * way, so the block is faithful without the claim. */
-        if (*(const int32_t *)(*(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
-                               + COMM_OFF_IS_HOST) == 0) {
-            static const uint32_t kSpinKids[3] = { 0x5Cu, 0x60u, 0x58u };
-            int32_t k;
-
-            names[i]->flag50 = 0;
-            for (k = 0; k < 3; k++)
-                (*(AM2_Widget **)((uint8_t *)rows[i] + kSpinKids[k]))->flag50 = 0;
-            for (k = 0; k < 3; k++)
-                (*(AM2_Widget **)((uint8_t *)rows[i] + kSpinKids[k]))->disabled = 1;
-        }
+        /* THE JOINER-DISABLE ARM IS NOT REPRODUCED, and that is a
+         * MEASUREMENT rather than an omission. The original at 0x00430849
+         * reads the comm object's +0x3D8 and, when it is zero, clears flag50
+         * and sets `disabled` on names[i] and the spin's three children.
+         * Written that way, `ctl widgets` came back with 22 disabled nodes
+         * against the original's 2 -- on a run where BOTH sides read that
+         * field as 0, measured through the control socket with the same comm
+         * pointer on each.
+         *
+         * So the arm as transcribed cannot be what the original executes, and
+         * the field being 0 at panel-open on both sides says the condition is
+         * not simply "are we the host" the way COMM_OFF_IS_HOST's name reads.
+         * The original also logs six handshake checksums here where we log
+         * none, so something upstream differs and this block is downstream of
+         * it. Leaving it out costs two disabled nodes; putting it in costs
+         * twenty, and a wrong arm that LOOKS transcribed is worse than an
+         * absent one that is documented. */
     }
 
     /* THE MAP-TYPE LIST and its scrollbar.  The idiom for every fixed child
