@@ -109,6 +109,17 @@ Generalising the defect into a static check was tried and abandoned with
 measurements -- see CLAUDE.md. MSVC compiles a null test AS a register
 compare, so all 15 candidates it finds are correct.
 
+## LOADING A SAVED GAME WORKS
+
+`tools/loadcheck.sh` passes: our build and the original both come back alive
+at sub-state 0x18 with 325 objects and the save file untouched. Two fixes and
+one deliberate deviation got there; see CLAUDE.md for all three.
+
+The deviation is the only one in the tree: `LoadItems` unlinks objects from
+the cell grid before `ItemsReset` frees them, because the original leaves 305
+dangling entries and survives only because its allocations happen to reoccupy
+them. It is confined to the load path so no other configuration is touched.
+
 ## FIXED: LoadGameProcSection dropped the two stores that make a load happen
 
 The original ends that function's success path with `HAVE_DEFAULT_COF = 0`

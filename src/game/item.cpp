@@ -442,6 +442,41 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
 {
     uint32_t mark;
     int32_t  count = 0;
+    int32_t  i;
+
+    /* DELIBERATE DEVIATION FROM THE ORIGINAL -- the only one in this tree,
+     * and it is confined to the LOAD path on purpose. See CLAUDE.md.
+     *
+     * ItemsReset frees every object with unlink 0, which reaches
+     * DestroyItemObject's third argument and SKIPS ItemPreDestroy, so the
+     * storage goes back while the map's cell grid still points into it.
+     * Measured: 305 dangling entries on one load. The original survives that
+     * because the blocks are immediately reoccupied by the objects LoadItems
+     * then creates, so every stale head still reads as a plausible entry;
+     * ours reoccupies them differently and one head lands on bytes that are
+     * not an entry, faulting the first time SightScan walks the leader's
+     * cells after the load.
+     *
+     * Unlinking first cannot change what correct code observes: the object is
+     * being destroyed either way and nothing may legitimately reach it
+     * through a cell afterwards. Passing unlink=1 to FreeItem would NOT do --
+     * its first line calls RemoveFromItemList, which memmoves the very table
+     * the reset loop walks.
+     *
+     * IT IS DONE HERE RATHER THAN INSIDE ItemsReset because that function has
+     * two other callers -- LoadMap and ResetItemsAndUids -- and LoadMap also
+     * frees and rebuilds the descriptor, so unlinking there could write
+     * through stale indices into a grid that is gone or new. Confining it to
+     * the load leaves every other path byte-for-byte as it was, which is what
+     * keeps `ab.sh combat` and the rest out of the blast radius.
+     *
+     * Revert this and tools/loadcheck.sh fails again. */
+    if (*(void *const *)((const uint8_t *)AM2_IMAGE(ADDR_OBJ_MAP_DESC)
+                         + MAPDESC_OFF_CELLS)) {
+        for (i = 0; i < g_objCount; i++)
+            ItemPreDestroy(g_objTable[i].obj,
+                           (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
+    }
 
     /* Before the tag check, and before `fp` is even read. */
     ItemsReset();

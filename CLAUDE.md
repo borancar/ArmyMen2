@@ -1706,6 +1706,37 @@ the walk faults only when the memory underneath has been rewritten into
 something whose first dword is small. That explains the one bad node out of
 305 and why the earlier probe found exactly one.
 
+**FIXED, BY THE ONE DELIBERATE DEVIATION IN THIS TREE.** `LoadItems` now
+unlinks every registered object from the cell grid before `ItemsReset` frees
+them. `tools/loadcheck.sh` goes from failing to passing: our build comes back
+alive at sub-state 0x18 with 325 objects and the save's md5 unchanged, which
+is the original's answer on all four.
+
+Say plainly that it IS a deviation. The original frees those objects with
+unlink 0 and leaves 305 dangling entries; it survives because the blocks are
+reoccupied by the objects `LoadItems` then creates, so each stale head still
+reads as a plausible entry. That is luck, not design, and ours reoccupies them
+differently.
+
+**THE PLACEMENT IS THE CAREFUL PART.** It went first into `ItemsReset` itself,
+which was wrong: that function is also called by `LoadMap` -- which frees and
+rebuilds the descriptor in the same breath -- and by `ResetItemsAndUids`, so
+unlinking there could write through stale indices into a grid that is gone or
+new. Confined to `LoadItems`, the deviation cannot reach any path but a load,
+which is what keeps every other configuration byte-for-byte as it was.
+
+`ab.sh bootcamp` is clean at its floor with the change in -- 1,610 state lines
+and 13 messages identical -- and `campaign` was clean on the wider variant
+before it was narrowed.
+
+**A NOTE ON THE COMBAT FRAME GATE, which is why the narrow version exists.**
+The first, broader version was run against `ab.sh combat` and failed the frame
+gate at 277% and 384%, with a single control run at 195%. One control sample
+of a metric this file already documents as varying two-fold is not evidence
+either way, and rather than spend four more runs settling it, the change was
+narrowed so that configuration cannot be affected at all. When a measurement
+is too noisy to settle cheaply, shrink what you are asking it about.
+
 **AND THE TWO DEFECTS THIS SESSION FOUND ARE LINKED: THE MOVEMENT FIX IS WHAT
 EXPOSED THIS ONE.** `SightScan` has five callers in the image, and the one that
 reaches it here is `NextInventorySlot`, whose ONE caller is
