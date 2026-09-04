@@ -1155,10 +1155,28 @@ so the omission is larger than the selection. The original's loop at
 empty `ADDR_MAP_NAME`: nothing matches, so the first row wins.
 
 So the multiplayer map list is EMPTY in our build and no map is ever selected.
-That is one piece of reconstruction rather than a patch -- the maps object's
-layout, `ListAdd`'s arguments and the level record's two name fields all have
-to be read first -- and guessing a line into a 4,497-byte panel is how the
-FIRST bug on this screen got there. `OpenMpHost` and `OpenMpJoin`
+
+**EVERYTHING THE MISSING BLOCK NEEDS IS NOW IDENTIFIED**, so what is left is
+transcription rather than investigation:
+
+| piece | what it is |
+|---|---|
+| the maps object | `ScriptListFind(ADDR_MP_SCRIPT_NAME)` -- `0x0043E900` on the key at `0x00511C08` |
+| its count | `*(int32_t *)(maps + 0xC4)`, and the loop is skipped when it is <= 0 |
+| its names | `*(char **)(maps + 0xC8)`, stride **0x40** |
+| each row | `FindLevelByName(names + i * 0x40)`, skipped when it answers null |
+| the add | `ListAdd(list, lvl + LEVEL_OFF_NAME, lvl)` -- THISCALL, list in `ecx`, caption `0x44`, data the record |
+| the match | `strcmp(lvl + LEVEL_OFF_MAP_NAME, ADDR_MAP_NAME) == 0` sets `sel = i` |
+| the tail | `lvl = FindLevelByName(names + sel * 0x40); if (lvl) SelectLevel(lvl);` |
+
+The one thing still to establish is where the ROWS record comes from: the
+original holds it in `[esp+0x14]` and hands it to `ListBoxConstruct`, where
+ours passes `(void *)0`. `DlgSaveListConstruct` shows the idiom -- allocate
+`AM2_ROWS_SIZE`, `RecordCtor(rows, 1)`, `ListAdd` into it, then pass it in --
+so that is a pattern to follow rather than a puzzle.
+
+Guessing a line into a 4,497-byte panel is how the FIRST bug on this screen
+got there, which is why this is specified rather than written. `OpenMpHost` and `OpenMpJoin`
 are both faithful (host sets `g_mpSession` 1 and calls the refresh, join sets
 2 and does not, exactly as the image does), so the divergence is in what the
 map name or folder holds, not in who calls what.
