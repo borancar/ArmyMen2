@@ -442,6 +442,24 @@ A commit message in this session asserted the opposite, that STATUS.md was the
 stale one; it was not, and the correction is recorded here because getting the
 direction backwards is exactly how a stale number survives being noticed.
 
+## `tools/ab.sh all` -- 17 configurations, one failure and it is the known one
+
+Run end to end after this session's work. Every configuration's real evidence
+is identical: logs match on all seventeen, every widget tree matches
+(`mpoptions` 131 nodes, `campaign` 35, `controls` 26, `mission` 16,
+`audiovol` 14, `movies` 9, `multi` 9, `menuscreens` 8, `difficulty` 7), and
+`bootcamp`'s 1,610-line object dump and `mpoptions`' five exact state dumps
+both match byte for byte. Nine configurations report ZERO differing pixels.
+
+The one failure is `mission`'s frame gate at **26157/640**, and CLAUDE.md
+already says what it is: our side's band went stale at roughly 600 against the
+original's 26,000, so that gate fails on every run and "the failure is not
+evidence of anything". `mission`'s own evidence -- state, 16 widget nodes, 13
+log messages -- is identical.
+
+Read `intro`, `mission` and `combat` pixel figures as meaningless by
+construction; their logs are the evidence and all three match.
+
 ## CLOSED: `ab.sh mpoptions` is A/B clean -- widgets, state and log all identical
 
 **Our build EXITS when the multiplayer options screen is requested.** It is
