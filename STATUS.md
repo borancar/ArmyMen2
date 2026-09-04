@@ -5,11 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-04**, at `0c90819`. Working tree clean.
+Last updated: **2026-09-04**, at `5df7469`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,641 patches plus 6 REGISTERED**, **41** analysis
+Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **57** analysis
 tools in `make check` (`tools/checkpatches.py`; `tools/checkclaims.py` counts
 the recipe).
 
@@ -77,16 +77,33 @@ so cannot mean anything in a build that carries none of it.
 
 Everything is transposed; not everything is checked. The sharpest statement
 of the gap is CLAUDE.md's list of functions no drive in this environment
-reaches, which `tools/checkclaims.py` now splits by measurement rather than
-by assertion: **12 of 32 have an oracle, 20 are verified by reading alone.**
+reaches, which `tools/checkclaims.py` splits by measurement rather than by
+assertion. **That list is now 31 of 32**, and the one remaining is excluded
+deliberately rather than outstanding: `ItemSetBox`, whose arithmetic is
+`RowAlloc`'s and runs 2,512 times a mission, so it has live coverage and only
+this transcription of it does not.
 
-The twenty are the nine AI arms below the dispatcher, the roach bite, the
-vehicle exits, and a handful of teardown and menu paths. Each needs an
-enumerating oracle of the `tools/shakecheck.py` shape, because no
-configuration here reaches any of them and none can be added -- Boot Camp's
-enemies never engage, and MAP 01 turns hostile the moment its dialog clears,
-which is the one screen whose log, pixels and object table are all
-unavailable at once.
+Each of the thirty-one is an enumerating oracle of the `tools/shakecheck.py`
+shape, because no configuration here reaches any of them and none can be
+added -- Boot Camp's enemies never engage, and MAP 01 turns hostile the
+moment its dialog clears, which is the one screen whose log, pixels and
+object table are all unavailable at once.
+
+Three lessons from closing the last of them are worth carrying to the next
+oracle, all recorded in CLAUDE.md:
+
+- **A stub has an ABI.** `tools/vehexitcheck.py` reported 71 of 85 cases
+  differing with the ARM SEQUENCE CORRECT on every one and only the arguments
+  wrong, which is the signature of a stack off by a push -- two of its ten
+  callees are thiscall.
+- **A corpus derived from the model cannot fail against it**, in a new place:
+  `tools/tilesetcheck.py`'s model looped over the case's chunk list where the
+  original loops on `offset < formSize`, so removing a payload from the
+  accumulation passed all 84 cases.
+- **Diff before leaning on a sibling for coverage**, not only before merging.
+  `LoadAtlFile` runs on every map load and reads the same file format as
+  `RestoreTileSet`, but at similarity 0.245 with no shared run of six it
+  covers the FORMAT and none of the instructions.
 
 ## Where the boundary is
 

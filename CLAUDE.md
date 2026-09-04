@@ -71,6 +71,19 @@ a tool declaring `CHECKS` and missing from `ORACLES` is an ORPHAN and fails
 the run, because a declaration nothing reads is a check nobody is counting.
 Tested by removing the entry again, which reports it by name.
 
+**AND IT NOW READS `STATUS.md` TOO, which had drifted on every number in
+it.** That file summarises where the work is, and nothing was checking it:
+1,641 patches against 1,643, 41 analysis tools against 57, and a verification
+split of 12 of 32 against 31. Its own header says it "can be stale between
+updates" -- which is the warning this file already says is not a defence
+against the thing it warns about.
+
+Two of its three numbers are checked, and the third is deliberately left. The
+patch count belongs to `checkpatches.py`, which exposes no function to ask,
+so checking it here would mean a second copy of that scan -- the drift this
+is meant to stop, one level down. Say which numbers a check covers and why
+the rest are absent.
+
 It catches a tool whose output changed without being regenerated — tested by
 making `coverage.py` print a different heading, which fails the target. It does
 NOT catch a hand-edit to a generated file, because the tools rewrite those

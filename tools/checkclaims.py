@@ -283,6 +283,29 @@ def undeclared_oracles():
     return missing
 
 
+def status_claims():
+    """The numbers STATUS.md states that THIS tool already computes.
+
+    STATUS.md drifted on three at once -- 1,641 patches against 1,643, 41
+    analysis tools against 57, and a verification split of 12 of 32 against
+    31 -- because nothing read it. Its own header says it "can be stale
+    between updates", and this project has found repeatedly that a warning
+    about stale numbers is not a defence against one.
+
+    The patch count is deliberately NOT here. It is tools/checkpatches.py's,
+    and that tool exposes no function to ask -- so checking it would mean a
+    second copy of the scan, which is the drift this is meant to stop, one
+    level down. Two of the three is what can be had honestly.
+    """
+    return [
+        ("STATUS.md: analysis tools in make check",
+         r"REGISTERED\*\*, \*\*(\d+)\*\* analysis", check_tool_count()),
+        ("STATUS.md: the verification split",
+         r"\*\*That list is now (\d+) of (\d+)\*\*",
+         unexercised_split(open(os.path.join(REPO, "CLAUDE.md")).read())),
+    ]
+
+
 def main():
     text = open(os.path.join(REPO, "CLAUDE.md")).read()
     bad = 0
@@ -303,6 +326,25 @@ def main():
             bad += 1
         else:
             print(f"  ok       {what}: {expected}")
+
+    status_path = os.path.join(REPO, "STATUS.md")
+    if os.path.exists(status_path):
+        status = open(status_path).read()
+        for what, pattern, expected in status_claims():
+            m = re.search(pattern, status)
+            if not m:
+                print(f"  MISSING  {what}\n           no sentence matches "
+                      f"{pattern!r}")
+                bad += 1
+                continue
+            found = tuple(int(g.replace(",", "")) for g in m.groups())
+            if found != expected:
+                print(f"  STALE    {what}\n"
+                      f"           STATUS.md says {found}, the tools say "
+                      f"{expected}")
+                bad += 1
+            else:
+                print(f"  ok       {what}: {expected}")
 
     if bad:
         print(f"\n{bad} claim(s) no longer true. Fix the sentence, or find out "
