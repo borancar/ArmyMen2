@@ -1103,6 +1103,22 @@ With the macros in place the two "Couldn't open bitmap file!" lines are GONE --
 `MultiSpritePaint`'s sprite "is null on every call": one of the two lamps was
 never loading.
 
+**THE SECOND DEFECT IS LOCALISED: THE MAP FILE IS NOT FOUND.**
+`RefreshMapSelection` is what computes the three handshake checksums, and it
+returns BEFORE them when `FileExists("<map>.amm")` fails -- zeroing
+`g_mapChecksum`, clearing the comm record's map-ok flag, and calling
+`ShowBadMapPreview`. That accounts for all three symptoms at once: no
+`Checksum of ...` lines, the `"bad_"` names the first probe caught going to
+`LoadBitmap`, and a quarter of the frame differing because the preview pane
+shows the bad-map bitmap instead of the map.
+
+The path is built by `SetGameDir(ADDR_MAP_FOLDER)` then `sprintf("%s.amm",
+ADDR_MAP_NAME)`, so what to compare next is those two globals at the moment
+the panel opens -- ours against the original's. `OpenMpHost` and `OpenMpJoin`
+are both faithful (host sets `g_mpSession` 1 and calls the refresh, join sets
+2 and does not, exactly as the image does), so the divergence is in what the
+map name or folder holds, not in who calls what.
+
 **THE CONFIGURATION STILL FAILS, for a different reason, and the pixel count is
 how you can tell.** It is still exactly 221,423, unchanged by the fix, because a
 17x16 lamp is not what makes a quarter of the frame differ. Our side's log still
