@@ -1660,6 +1660,21 @@ the map a SECOND TIME, which cost a campaign A/B: the load never finished and
 five log lines from 'calculating region data...' on were missing." That is
 this failure, word for word -- a load that stops at exactly that line.
 
+**STATIC COMPARISON IS EXHAUSTED ON THIS CHAIN -- TEN FUNCTIONS, ALL
+FAITHFUL.** `RemoveFromItemList`, `ItemsReset`, `LoadItems`/`LoadOneItem`,
+`DestroyWeapon`, `DestroyItemObject`, `BuildRegionGraph`'s three allocations,
+the row pool's four entry points, `ItemLinkCells`, both writers of the cell
+entry, and `ItemPreDestroy` -- each compared against the image and each
+correct, including `ItemSetBox` unlinking through `ItemPreDestroy` BEFORE it
+reallocs and relinks, so the obvious double-link is not there.
+
+That is worth stating as a result rather than a failure: the defect is not a
+mis-transcribed instruction in the linking layer, so reading more of it is
+not the way in. What is needed next is RUNTIME instrumentation -- dump the
+cell entries of the objects a load creates, and find which one carries a
+payload that is not its object -- which is the same move that turned the
+movement bug from a mystery into one `cmp`.
+
 So the family is DOUBLE-LINKING, not a bad pointer written once.
 `ItemLinkCells` is called from two places -- `ObjInitCommon`'s tail and
 `ItemSetBox` -- and an object that reaches both on the load path is linked
