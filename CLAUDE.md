@@ -1271,12 +1271,45 @@ and lets them stand as the by-value RECT. Read as ordinary cleanup that
 `add esp, 4` says the arity is one; it is not, and every displacement below it
 would shift.
 
-Two constants are still open and are NOT to be guessed: the rect's `top`,
-which is `edx + esi` where `esi` is the name buffer and so cancels to
-`base + i*32` the way the three siblings already do, and its `height`, which
-is `[esp+0x38] + 0x17`. The siblings put their tops at 40, 39 and 37, and the
-score spinner is 0x18 high, so both have obvious-looking answers -- which is
-exactly why they need reading rather than assuming.
+Both open constants were then READ rather than assumed, and one of them
+punishes the guess. `top` is `-0x3F - this + esi`, cancelling to 37 + i*32 --
+and the same slot pattern gives the names 40 and the colours 39, which is what
+makes the arithmetic checkable rather than merely plausible. **`height` is
+`0x17 + (i == 3)`**: `cmp edi,3; sete al` at 0x0043078F feeds the rect's
+fourth field, so the LAST row is one pixel taller than the other three. A
+uniform 0x18 was the obvious guess and is wrong for three rows out of four.
+
+**THE PANEL OPENS NOW, AND FIXING IT NEEDED A SECOND DEFECT IN A FUNCTION THAT
+WAS ALREADY "DONE".** Writing the block alone moved the fault rather than
+removing it -- from `MpPanelUpdate` to `MpPanelConstruct`, a write to
+`0x00000050`, which is `flag50` through a null. The cause is that
+`MpSpinConstruct` builds its three children and **never stores them**: the
+original writes each into `SPIN_OFF_EDIT`, `SPIN_OFF_UP` and `SPIN_OFF_DOWN`
+BEFORE the `WidgetAddChild` that follows it, and then sets the child's own
+`ARROW_OFF_FLAG5C` through the field it just wrote.
+
+That is worth more than the crash it caused. `MpCommitPoints` and
+`MpCommitScore` both READ `SPIN_OFF_EDIT`, so those handlers have been reading
+whatever the allocator left for as long as the function has existed. It passed
+every check because committing a spinner needs someone to type in one, which
+no drive does, and the score spinner exists only when hosting. **A field the
+constructor forgets is invisible until a second consumer wants it** -- the same
+shape as the field-pointer rule, one level along.
+
+With both in, the process survives the request and the panel builds: **44
+nodes against the original's 44**, most fields identical, where before the
+drive got a dead process and no tree at all. `controls` and `campaign` are
+clean with it, so the shared spin constructor did not regress the menus.
+
+What is still wrong is now VISIBLE for the first time, which is the point of
+getting this far, and it is four specific things rather than a screen that
+differs: our team button sits at y=37 where the original has 39; the
+original's spin children are siblings at DEPTH 1 -- `mov ecx,[esp+0x54]` makes
+`AddChild`'s `this` the PARENT, not the spin -- while ours are its children;
+our down arrow is at `y+9` where the original bottom-aligns it at `y+14`; and
+our edit's rect is `480,79,515,92` against `240,42,275,55`. The pixels are
+still 221,423 and the side still stops answering during the later clicks, so
+this is progress and not a fix.
 
 **A READ-ONLY OFFSET LOOKED LIKE A CHEAP RATCHET AND IS NOT ONE, measured
 before it was built.** `checkoffsets.py` refuses a second name on an offset;

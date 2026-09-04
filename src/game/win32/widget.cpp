@@ -16069,7 +16069,25 @@ AM2_Widget *__attribute__((thiscall)) MpSpinConstruct(
         kid->vtable = (void *)AM2_IMAGE(VTABLE_ARROW);
         *(void **)((uint8_t *)kid + ARROW_OFF_OWNER) = w;
     }
+    /* THE SPIN KEEPS ITS THREE CHILDREN, and this whole layer was missing.
+     * The original stores each one BEFORE the WidgetAddChild that follows it
+     * and then sets the child's own ARROW_OFF_FLAG5C through the field it
+     * just wrote -- `mov [esi+0x5c], edi` / `call` / `mov ecx,[esi+0x5c]` /
+     * `mov [ecx+0x5c], 1` at 0x00456406..0x00456413.
+     *
+     * Nothing here stored any of the three, so SPIN_OFF_EDIT was read by
+     * MpCommitPoints and MpCommitScore as whatever the allocator left. It
+     * survived every check because a spinner is only committed by typing in
+     * one, which no drive does, and the score spinner exists only when
+     * hosting.
+     *
+     * The write through the stored field is UNGUARDED in the original, so a
+     * failed allocation faults here as it does there; reproduced, like the
+     * same constructor's other allocation defect. */
+    *(AM2_Widget **)(self + SPIN_OFF_UP) = kid;
     WidgetAddChild(w, kid);
+    *(int32_t *)((uint8_t *)*(AM2_Widget **)(self + SPIN_OFF_UP)
+                 + ARROW_OFF_FLAG5C) = 1;
 
     kid = (AM2_Widget *)orig_operator_new(AM2_ARROW_BYTES);
     if (kid) {
@@ -16081,7 +16099,10 @@ AM2_Widget *__attribute__((thiscall)) MpSpinConstruct(
         kid->vtable = (void *)AM2_IMAGE(VTABLE_ARROW);
         *(void **)((uint8_t *)kid + ARROW_OFF_OWNER) = w;
     }
+    *(AM2_Widget **)(self + SPIN_OFF_DOWN) = kid;
     WidgetAddChild(w, kid);
+    *(int32_t *)((uint8_t *)*(AM2_Widget **)(self + SPIN_OFF_DOWN)
+                 + ARROW_OFF_FLAG5C) = 1;
 
     am2_sprintf((char *)(self + MPSPIN_OFF_TEXT),
                 (const char *)AM2_IMAGE(ADDR_FMT_INT), value);
@@ -16092,6 +16113,7 @@ AM2_Widget *__attribute__((thiscall)) MpSpinConstruct(
                             w->x, w->y + 5, inner, height - 0x0A, 1,
                             c0, c1, c2, (void (__cdecl *)(AM2_Widget *))0,
                             (int32_t)(uintptr_t)commit, (int32_t)(uintptr_t)w);
+    *(AM2_Widget **)(self + SPIN_OFF_EDIT) = kid;
     WidgetAddChild(w, kid);
     return w;
 }
@@ -16152,6 +16174,7 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
         AM2_Widget **names   = (AM2_Widget **)(p + MP_PANEL_OFF_NAMES);
         AM2_Widget **colours = (AM2_Widget **)(p + MP_PANEL_OFF_COLOURS);
         AM2_Widget **teams   = (AM2_Widget **)(p + MP_PANEL_OFF_TEAMS);
+        AM2_Widget **rows    = (AM2_Widget **)(p + MP_PANEL_OFF_ARMY_ROWS);
         AM2_Widget  *child;
 
         name[0] = '\0';
@@ -16186,6 +16209,74 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
         child = (AM2_Widget *)orig_operator_new(0x68);
         teams[i] = child ? MpTeamConstruct(child, 0xBF, 37 + i * 32, i) : 0;
         WidgetAddChild(w, teams[i]);
+
+        /* THE ARMY-POINTS SPINNER -- the fourth quarter of this loop, and the
+         * one that was missing. The original walks all four arrays off one
+         * pointer, `lea ebx,[ebp+0x230]` at 0x00430602: [ebx-0x10] is names,
+         * [ebx] colours, [ebx+0x10] teams and [ebx+0x28] these. Nothing wrote
+         * MP_PANEL_OFF_ARMY_ROWS, so MpPanelUpdate -- which walks it every
+         * frame -- dereferenced whatever the allocator left and took the
+         * process down the moment the panel opened.
+         *
+         * THE HEIGHT IS 0x17 PLUS (i == 3), which no amount of looking at the
+         * layout would suggest: `cmp edi,3; sete al` at 0x0043078F feeds the
+         * rect's fourth field, so the LAST row is one pixel taller than the
+         * other three. A uniform 0x18 was the obvious guess and is wrong for
+         * three rows out of four.
+         *
+         * The top is the siblings' own arithmetic and lands on theirs: the
+         * original holds `-0x3F - this` in a frame slot and adds the name
+         * buffer, which cancels to 0x64 - 0x3F + i*32. The same slot pattern
+         * gives names 40 and colours 39, which is what makes the reading
+         * checkable rather than merely plausible.
+         *
+         * The value is ADDR_ARMY_POINTS[i] -- the frame slot is loaded with
+         * 0x515FE0 outright at 0x004305FA -- and that is the SAME array
+         * MpPanelUpdate prints back into each row, so the constructor seeds
+         * what the update displays. */
+        child = (AM2_Widget *)orig_operator_new(0x84);
+        rows[i] = child
+                ? MpSpinConstruct(child, 0xF0, 37 + i * 32, 0x4C,
+                                  0x17 + (i == 3),
+                                  ((const int32_t *)(uintptr_t)
+                                       ADDR_ARMY_POINTS)[i],
+                                  0, 0x1388, 0x64, w, MpCommitPoints,
+                                  *(const uint8_t *)(uintptr_t)
+                                       ADDR_VIEW_RECT_COLOUR,
+                                  *(const uint8_t *)(uintptr_t)
+                                       ADDR_COLOUR_BELOW_BG,
+                                  *(const uint8_t *)(uintptr_t)
+                                       ADDR_BACKGROUND_COLOUR,
+                                  i)
+                : 0;
+        WidgetAddChild(w, rows[i]);
+
+        /* Unguarded on purpose. `mov [edi+0x50], 0` at 0x00430842 runs on the
+         * constructor's result with no null test, so a failed allocation
+         * faults here in the original too -- the same defect orig.h already
+         * describes for this constructor and the same policy as LockSurface's
+         * uninitialised descriptor: reproduced, not repaired. */
+        rows[i]->flag50 = 0;
+
+        /* A JOINER CANNOT EDIT ANY OF IT. Gated on the comm object's host
+         * flag, and the order is the original's: every flag50 cleared first,
+         * then the three spin children disabled. The three are reached by
+         * RAW OFFSET because which of +0x58, +0x5c and +0x60 is the edit and
+         * which are the two arrows is not established here -- SPIN_OFF_EDIT
+         * names 0x58 while the constructor adds arrow, arrow, edit in that
+         * order, and the two readings disagree. All three are written either
+         * way, so the block is faithful without the claim. */
+        if (*(const int32_t *)(*(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
+                               + COMM_OFF_IS_HOST) == 0) {
+            static const uint32_t kSpinKids[3] = { 0x5Cu, 0x60u, 0x58u };
+            int32_t k;
+
+            names[i]->flag50 = 0;
+            for (k = 0; k < 3; k++)
+                (*(AM2_Widget **)((uint8_t *)rows[i] + kSpinKids[k]))->flag50 = 0;
+            for (k = 0; k < 3; k++)
+                (*(AM2_Widget **)((uint8_t *)rows[i] + kSpinKids[k]))->disabled = 1;
+        }
     }
 
     /* THE MAP-TYPE LIST and its scrollbar.  The idiom for every fixed child

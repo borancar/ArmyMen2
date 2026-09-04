@@ -12244,6 +12244,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * typed value that gets clamped shows its new value on the next repaint from
  * somewhere else. Reproduced. */
 #define SPIN_OFF_EDIT            0x58u  /* the edit box child */
+/* The two arrows, stored by the constructor in the order it builds them --
+ * `mov [esi+0x5c], edi` at 0x00456406 is the UP arrow and `[esi+0x60]` at
+ * 0x004564A1 the DOWN one, each written BEFORE the WidgetAddChild that
+ * follows it. Named from the construction order and from the bitmaps those
+ * two calls name, `03_008_01_uparrow.bmp` and `03_009_01_dnarrow.bmp`, which
+ * is the writer rather than a reader. */
+#define SPIN_OFF_UP              0x5Cu
+#define SPIN_OFF_DOWN            0x60u
 #define SPIN_OFF_MIN             0x64u
 #define SPIN_OFF_MAX             0x68u
 #define SPIN_OFF_STEP            0x6Cu  /* what one arrow press moves */
