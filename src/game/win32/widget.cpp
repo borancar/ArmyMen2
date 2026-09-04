@@ -16044,7 +16044,17 @@ AM2_Widget *__attribute__((thiscall)) MpSpinConstruct(
     int32_t     inner;
 
     WidgetConstruct(w);
-    *(void **)(self + MPSPIN_OFF_PARENT) = parent;
+    /* 0x80 IS THE COMMIT HANDLER, NOT THE PARENT, and writing the parent here
+     * was a latent crash. SpinApply reads this slot and CALLS it with the
+     * spinner -- `mov eax,[esi+0x80]; test eax,eax; je; push esi; call eax`
+     * at 0x004565B7 -- so a widget pointer stored here is jumped to as code
+     * the first time an arrow or a typed value changes the value.
+     *
+     * The argument is number TEN: espmap puts this store's source at frame
+     * slot +0x5C, and the height read at +0x44 fixes the row, which also puts
+     * `parent` at +0x58 -- the slot the three AddChild calls take their
+     * `this` from, confirming that change from a second direction. */
+    *(void **)(self + SPIN_OFF_HANDLER) = (void *)commit;
     w->x = left;
     w->y = top;
     w->w = width;
@@ -16052,9 +16062,9 @@ AM2_Widget *__attribute__((thiscall)) MpSpinConstruct(
     w->vtable = (void *)AM2_IMAGE(VTABLE_MP_SPIN);
     WidgetScreenRect(w);
 
-    *(int32_t *)(self + MPSPIN_OFF_LO)   = lo;
-    *(int32_t *)(self + MPSPIN_OFF_HI)   = hi;
-    *(int32_t *)(self + MPSPIN_OFF_STEP) = step;
+    *(int32_t *)(self + SPIN_OFF_MIN)   = lo;
+    *(int32_t *)(self + SPIN_OFF_MAX)   = hi;
+    *(int32_t *)(self + SPIN_OFF_STEP) = step;
     *(int32_t *)(self + MPSPIN_OFF_ROW)  = row;
 
     inner = width - 0x29;
