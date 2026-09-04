@@ -107,7 +107,12 @@ def _headers():
 # five surplus came from ONE teardown: CommClose frees both buffers, and a name
 # taken from a free cannot tell what a buffer holds. SEND_BUF and RECV_BUF were
 # both misnomers for it -- nothing sends or receives through either.
-FAMILY_ALIAS_BASELINE = 10
+# 10 -> 9. COMM_OFF_STARTED, "non-zero once the game is running", sat on
+# COMM_OFF_LOCAL's 0x400 with the OPPOSITE sense. StartSelectedGame writes 0
+# when it joins an existing session and 1 for a local game, so the field is
+# LOCAL: a writer PAIR against a single reader's guess, which is the ordering
+# this project already keeps for naming.
+FAMILY_ALIAS_BASELINE = 9
 
 DEFINE = re.compile(r"^#define\s+([A-Z][A-Z0-9_]*)\s+(0x[0-9A-Fa-f]+u?|\d+u?)\s*(?:/\*|$)")
 # `_OFF_` was the whole of this for as long as offsets were the thing that got

@@ -11528,7 +11528,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_GAME_SEED             0x00512314u /* int32_t, the shared seed */
 #define ADDR_GAME_SEED_SENT        0x004FC780u /* int32_t, the copy that goes out */
 #define ADDR_CRT_TIME              0x00465052u /* int32_t(int32_t *) -- GetLocalTime */
-#define COMM_OFF_STARTED           0x400u      /* non-zero once the game is running */
+#define COMM_OFF_LOCAL           0x400u      /* non-zero once the game is running */
 #define AM2_SESSION_FLAGS_START    0x21u       /* or'd into the description */
 /* The same pair CommReopenSession clears again, and the offset it clears them
  * at: DPSESSIONDESC2.dwFlags. Not restated from the SDK header -- dplay.cpp
@@ -13175,7 +13175,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * one that names its default arm.
  *
  * Gated on 0x0404 of the comm object, which is NOT the 0x0400 that
- * COMM_OFF_STARTED and COMM_OFF_LOCAL both already name. */
+ * COMM_OFF_LOCAL and COMM_OFF_LOCAL both already name. */
 #define ADDR_COMM_DISPATCH_MSG   0x0040FEA0u  /* void(msg *, int32_t dpid) */
 #define COMM_OFF_MSGS_ENABLED    0x404u
 /* Where type 1 leaves what it received: the value, and the checksum of the
@@ -13959,7 +13959,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define COMM_OFF_FIELD_368       0x368u   /* uint8_t */
 #define COMM_OFF_FIELD_3A8       0x3A8u
 #define COMM_OFF_FIELD_3AC       0x3ACu
-#define COMM_OFF_LOCAL           0x400u   /* set when the game is offline */
 #define COMM_SLOT_OFF_NAME       0x00Cu   /* 0x40-byte string; CommConstruct
                                            * clears it, StartSelectedGame writes
                                            * "Computer%d" into it */

@@ -2002,7 +2002,7 @@ void __cdecl SendGameStartMsg(void)
 
     comm = (uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT);
 
-    if (!*(const int32_t *)(comm + COMM_OFF_STARTED)) {
+    if (!*(const int32_t *)(comm + COMM_OFF_LOCAL)) {
         int32_t seed;
         void   *desc;
 
