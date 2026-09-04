@@ -1660,6 +1660,32 @@ the map a SECOND TIME, which cost a campaign A/B: the load never finished and
 five log lines from 'calculating region data...' on were missing." That is
 this failure, word for word -- a load that stops at exactly that line.
 
+**THE RUNTIME PROBE NAMED THE ARTIFACT, and it is a STALE CELL HEAD.** A
+temporary guard in `ObjectsInRect` that reports a payload below 0x10000
+instead of dereferencing it caught exactly one node on a load:
+
+    PROBE badnode cell=181 node=0364a088 obj=000009a7
+                  idx=161940511 prev=00000468 next=000009e4
+
+`node` is a plausible heap address and EVERY FIELD IN IT is a small integer --
+`obj`, `prev` and `next` all look like coordinates or uids. So the node is not
+a cell entry at all: cell 181's head points at storage that was an entry once
+and has since been freed and reused. With the guard in place the game
+survives the load, which confirms this one node is the whole fault.
+
+That closes the mechanism: `ItemsReset` calls `FreeItem(obj, 0)`, the 0 travels
+to `DestroyItemObject`'s third argument, `ItemPreDestroy` is therefore NOT
+called, and the object's storage -- including its cell entries -- is freed
+while the grid still points at it. `LoadItems` then allocates the new objects
+over that memory.
+
+**WHAT IS NOT YET EXPLAINED IS WHY THE ORIGINAL SURVIVES IT**, since it takes
+the same path with the same 0. `MapDescInit` memsets the grid to zero and is
+faithful -- including the implicit `& 0xFF` on `Log2Mask`, which our `uint8_t`
+prototype supplies where the original writes `and eax, 0xff`. So the question
+is what clears or rebuilds that grid on the original's load path between
+`ItemsReset` and the first walk, and whether our load skips it.
+
 **STATIC COMPARISON IS EXHAUSTED ON THIS CHAIN -- TEN FUNCTIONS, ALL
 FAITHFUL.** `RemoveFromItemList`, `ItemsReset`, `LoadItems`/`LoadOneItem`,
 `DestroyWeapon`, `DestroyItemObject`, `BuildRegionGraph`'s three allocations,
