@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **41** analysis
+**`make check` runs everything that does not need the game.** **42** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3747,7 +3747,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 13 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 14 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3838,6 +3838,31 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   test -- and the new part is that a stub is a mention the prose filter
   cannot see.
 
+  `AiHitReact` joins them by `tools/hitreactcheck.py`, 14,594 cases -- and it
+  is the second REPLAY oracle in the tree after `tools/firepose.py`, not a
+  model comparison. It calls NOTHING: not one call instruction in its 176
+  bytes, and it reads only its three arguments and two constant tables. So
+  nothing it reaches is still the image's, and `--emit` records the cases into
+  `tests/hitreactvec.h` for `tests/selftest.cpp` to replay against our C.
+  That proves the transcription, where a model comparison only proves the
+  model.
+
+  The corpus straddles both boundaries of the ladder for every rank: the
+  thresholds are 32, 48, 56, 64, 80, 96, 112 and 128, and the seeds sit just
+  below, on, and just above each half and each whole. Mutating the C rather
+  than the model gives the SAME counts as mutating the model -- 96 for the
+  half boundary, 7,296 for the observer gate -- which is what says the two
+  halves are testing the same thing.
+
+  **AND TWO MUTATIONS CANNOT FAIL, PROVABLY.** The pose table is indexed
+  `class * 2 + (seed >= 0x80)`, and that index is only read where
+  `seed < limit >> 1`. The largest threshold is 128, so the largest half is
+  64, and 64 < 0x80 -- the bit is always zero, entries 13, 15 and 17 of
+  ADDR_HIT_POSE_BY_CLASS are unreachable, and the original's
+  `cmp cl, 0x80; sbb edx, edx; inc edx` computes a constant. Third instance
+  of a theorem rather than a gap, after AM2_SHAKE_FALLOFF's continuous ramp
+  and placementcheck's 16-bit tile index.
+
   `AllObjectsInRect` joins them by `tools/rectquerycheck.py`, 312 cases over
   two map configurations. This file listed it as beyond BOTH existing
   harnesses -- `tools/vectors.py` refuses it because it reads two globals,
@@ -3875,7 +3900,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   configuration whose descriptor under-reports its extent is what makes them
   observable at all.
 
-  The other nineteen are verified by READING, which is the standing worth
+  The other eighteen are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is

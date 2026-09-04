@@ -23,6 +23,7 @@
 #include "../src/game/objflag.h"
 #include "../src/game/misc.h"
 #include "../src/game/objtype.h"
+#include "../src/game/region.h"   /* AiHitReact */
 
 #include "../src/game/script.h"
 #include "../src/game/place.h"
@@ -35,6 +36,7 @@
 #include "scriptvec.h"
 #include "placevec.h"
 #include "fireposevec.h"
+#include "hitreactvec.h"
 #include "dirtyvec.h"
 
 static uint8_t g_scratch[AM2_SCRATCH_LEN];
@@ -248,6 +250,7 @@ extern "C" struct AM2_Sprite *__cdecl TurretAnimSprite(int32_t, uint32_t)
 }
 
 static int FirePoses(int *passed);
+static int HitReacts(int *passed);
 
 int main(void)
 {
@@ -353,6 +356,7 @@ int main(void)
     fail += ScriptTokens(&pass);
     fail += PlaceLines(&pass);
     fail += FirePoses(&pass);
+    fail += HitReacts(&pass);
     fail += DirtyList(&pass);
     fail += ScriptLines(&pass);
     fail += ScriptSpine(&pass);
@@ -1051,4 +1055,86 @@ extern "C" void __cdecl StateLeave(void)
 int32_t __cdecl LoadAudioSection(am2_FILE *)
 {
     return 1;
+}
+
+/* AiHitReact against the cases tools/hitreactcheck.py recorded from the
+ * ORIGINAL. That tool checks its own Python model; this checks the C against
+ * the same recorded answers, which is the half a model cannot cover -- both
+ * were written from one reading, and only the emulator's run is ground truth.
+ *
+ * It needs the image, because the function indexes two tables the original
+ * ships: the rank thresholds and the per-class hit poses. Everything else is
+ * rebuilt from the row's inputs, so the header cannot drift from what the
+ * function is handed.
+ *
+ * The two output fields are seeded with sentinels, because two arms write
+ * NOTHING -- the top band of the ladder and the kind-8 exit -- and "wrote
+ * nothing" has to be distinguishable from "wrote zero". AiHitReact returns
+ * void, so a check comparing a return value would pass with the body deleted.
+ */
+static int HitReacts(int *passed)
+{
+    static unsigned char obj[0x600];
+    static unsigned char out[0x20];
+    static unsigned char ctx[0x60];
+    static unsigned char observer[0x10];
+    int pass = 0, fail = 0;
+
+    if (am2_load_image(".wine/drive_c/GOG Games/Army Men II/ArmyMen2.exe")
+        != 0) {
+        printf("\n  hit reactions: SKIPPED (no image)\n");
+        return 1;
+    }
+
+    for (uint32_t i = 0; i < sizeof am2_hitreact_vectors /
+                             sizeof am2_hitreact_vectors[0]; i++) {
+        const AM2_HitReactVector *v = &am2_hitreact_vectors[i];
+        uint32_t pose;
+        int32_t  turn, consumed;
+        int      bad = 0;
+
+        memset(obj, 0, sizeof obj);
+        memset(out, 0, sizeof out);
+        memset(ctx, 0, sizeof ctx);
+
+        *(unsigned char *)(obj + 0x104) = (unsigned char)v->hit;
+        *(int32_t *)(obj + 0x544) = v->kind;
+        *(int32_t *)(obj + 0x98)  = v->rank;
+
+        *(int32_t *)(ctx + 0x00) = v->cls;
+        *(unsigned char **)(ctx + 0x14) = v->observer ? observer : 0;
+        *(unsigned char *)(ctx + 0x3C) = (unsigned char)v->seed;
+        *(int32_t *)(ctx + 0x44) = v->ctxkind;
+
+        *(uint32_t *)(out + 8) = 0x5EED5EEDu;
+        *(unsigned char *)(out + 4) = 0xA5;
+
+        AiHitReact(obj, out, ctx);
+
+        pose     = *(const uint32_t *)(out + 8);
+        turn     = *(const unsigned char *)(out + 4);
+        consumed = *(const unsigned char *)(obj + 0x104);
+
+        if (pose != v->pose || turn != v->turn || consumed != v->consumed)
+            bad = 1;
+
+        if (bad) {
+            if (fail < 10)
+                printf("  FAIL AiHitReact hit=%d kind=%d rank=%d ctx=%d "
+                       "seed=%d cls=%d obs=%d -> pose=%08X turn=%d con=%d, "
+                       "want pose=%08X turn=%d con=%d\n",
+                       (int)v->hit, (int)v->kind, (int)v->rank,
+                       (int)v->ctxkind, (int)v->seed, (int)v->cls,
+                       (int)v->observer, (unsigned)pose, (int)turn,
+                       (int)consumed, (unsigned)v->pose, (int)v->turn,
+                       (int)v->consumed);
+            fail++;
+        } else {
+            pass++;
+        }
+    }
+
+    printf("  %d hit reactions: %d pass, %d fail\n", pass + fail, pass, fail);
+    *passed += pass;
+    return fail;
 }

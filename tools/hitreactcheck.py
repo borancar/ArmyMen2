@@ -24,6 +24,24 @@ or no pose at all.  Both boundaries move with rank, so a corpus that does not
 straddle each of the sixteen values proves nothing about the comparisons; the
 seeds here are chosen to sit just below, on, and just above every one.
 
+MUTATIONS, AND THE ONE THAT IS A THEOREM.  Of 14,594 cases: moving the half
+boundary fails 96, the full boundary 96, dropping kind 8's exemption 1,158,
+dropping the context-kind exemption 2,316, ignoring the observer 7,296, and
+swapping the heavy pose for the kind-7 one 1,116.
+
+TWO MUTATIONS CANNOT FAIL, AND THAT IS PROVABLE RATHER THAN A GAP.  The pose
+table is indexed `class * 2 + (seed >= 0x80)`, and that index is only read on
+the arm where `seed < limit >> 1`.  The largest rank threshold the image
+ships is 128, so the largest half is 64 -- and 64 < 0x80.  The bit is
+therefore ALWAYS zero, the odd entries of ADDR_HIT_POSE_BY_CLASS (13, 15, 17)
+are unreachable, and the original's `cmp cl, 0x80; sbb edx, edx; inc edx`
+computes a constant.  Neither dropping the bit nor moving its boundary can
+change any answer, and the corpus is not at fault for missing them.
+
+Say which of a tool's gaps are gaps and which are theorems -- this is the
+third instance in the tree, after AM2_SHAKE_FALLOFF's continuous ramp and
+tools/placementcheck.py's 16-bit tile index.
+
 WHAT THE SENTINELS ARE FOR.  Two of the arms write NOTHING -- the top band
 and the kind-8 exit -- so both output fields are seeded before each case and
 "wrote nothing" is a distinct answer from "wrote zero".  An oracle comparing

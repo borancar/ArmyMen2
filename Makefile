@@ -241,7 +241,7 @@ selftest: $(BUILD)/selftest.exe
 # removing a module from the list leaves a stale binary that make happily
 # calls up to date, and the link guard in `check` reports ok on a list that
 # no longer links. Verified by removing gamedir.cpp and watching it fail.
-$(BUILD)/selftest.exe: $(SELFTEST_SRC) tests/vectors.h tests/scriptvec.h tests/placevec.h tests/dirtyvec.h tests/fireposevec.h Makefile
+$(BUILD)/selftest.exe: $(SELFTEST_SRC) tests/vectors.h tests/scriptvec.h tests/placevec.h tests/dirtyvec.h tests/fireposevec.h tests/hitreactvec.h Makefile
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) -static -static-libgcc -static-libstdc++ \
 	    -o $@ $(SELFTEST_SRC)
@@ -273,6 +273,12 @@ placevec:
 .PHONY: fireposevec
 fireposevec:
 	./.venv/bin/python tools/firepose.py --emit tests/fireposevec.h
+
+# tools/hitreactcheck.py enumerates, recorded into tests/hitreactvec.h so the
+# C is replayed against the ORIGINAL's answers rather than against a model.
+.PHONY: hitreactvec
+hitreactvec:
+	./.venv/bin/python tools/hitreactcheck.py --emit tests/hitreactvec.h
 
 .PHONY: dirtyvec
 dirtyvec:
@@ -307,7 +313,7 @@ vectors:
 .PHONY: check
 check:
 	@rc=0; \
-	for t in coverage comcalls merges checkcom checkhooks binpatches blindspots checkclaims crt scripttokens scriptactions screens checkpatches checkprose checkseams checkinstalled checkglobals checkoffsets checksplit checkthis moviecheck posecheck formationcheck shakecheck roachcheck rlecheck mprowcheck weaponcheck listcheck placementcheck aicheck rectquerycheck ringcheck boolcheck explcheck collectcheck firepose regioncheck pathcheck tilepathcheck cheats; do \
+	for t in coverage comcalls merges checkcom checkhooks binpatches blindspots checkclaims crt scripttokens scriptactions screens checkpatches checkprose checkseams checkinstalled checkglobals checkoffsets checksplit checkthis moviecheck posecheck formationcheck shakecheck roachcheck rlecheck mprowcheck weaponcheck listcheck placementcheck aicheck hitreactcheck rectquerycheck ringcheck boolcheck explcheck collectcheck firepose regioncheck pathcheck tilepathcheck cheats; do \
 	    printf '  %-12s ' "$$t"; \
 	    if ./.venv/bin/python tools/$$t.py >/dev/null 2>&1; then \
 	        echo ok; \
