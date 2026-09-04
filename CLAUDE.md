@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **53** analysis
+**`make check` runs everything that does not need the game.** **54** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3823,7 +3823,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 27 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 28 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3935,6 +3935,29 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   confirmed each against itself would still pass if one were rewritten into
   the other. Making Defend turn on the route path fails at once; so does
   dropping the route path's promotion.
+
+  `RoachBite` joins them by `tools/roachbitecheck.py`, 90 cases -- and this
+  file already says why it must be checked here or nowhere: a live MAP 01 run
+  with nine roaches alive leaves its counter at 0 after two minutes, because
+  the roaches run and nothing ever walks into one. A longer wait was tried.
+
+  **THE TRIG TABLES ARE SEEDED**, which is what makes the geometry checkable:
+  Cos8 and Sin8 are `table[h & 0xFF]` over two float[256] that
+  BuildTrigTables fills at startup, so in the file they are .bss zeros and an
+  unseeded run computes the same bite point for every facing. That is
+  shakecheck's trap one subsystem over.
+
+  **AND THE FIFTH ARGUMENT'S UPPER BYTES ARE UNINITIALISED STACK.** The
+  original computes `facing + 0x80` into AL, stores it as a BYTE into a frame
+  slot, and pushes that slot as a DWORD -- so the top three bytes are
+  leftovers, and the first run of this tool reported 36 differences that were
+  all 0x0781 against 0x0081. Only the low byte is the value. Comparing all 32
+  bits would be comparing the frame, which is the rule this file already
+  states for the widget field the constructor never writes.
+
+  One mutation is a theorem: the bite box is (-24, -24, 24, 24), so swapping
+  LEFT with TOP cannot be detected by any corpus. Swapping left with RIGHT
+  fails all 90, which is what says the rectangle is checked at all.
 
   `NearestClearVehiclePoint` joins them by `tools/vehpointcheck.py`, 36 cases
   -- and what is compared is the SEQUENCE OF POINTS it asks about, not the
@@ -4178,7 +4201,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   configuration whose descriptor under-reports its extent is what makes them
   observable at all.
 
-  The other five are verified by READING, which is the standing worth
+  The other four are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is
