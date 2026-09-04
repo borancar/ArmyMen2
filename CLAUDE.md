@@ -1084,8 +1084,38 @@ moved. The run's own `patch:` lines settle it with no assumption:
 were that address plus 0x50 and plus 0xD5. **Read the base out of the run you
 are diagnosing, not out of a previous one.**
 
-What remains is one more level: a probe on `MultiSpriteConstruct`'s OWN caller,
-to see which function hands it a format string where a bitmap name belongs.
+**FOUND AND FIXED: `MpPanelConstruct` HAD TWO RAW HEX LITERALS POINTING AT LOG
+FORMAT STRINGS.** A probe on `MultiSpriteConstruct`'s own caller named
+`MpPanelConstruct + 0x638`, and the source there read
+
+    MultiSpriteConstruct(child,
+                         (const char *)AM2_IMAGE(0x00485E30u),
+                         (const char *)AM2_IMAGE(0x00485E44u),
+
+where the original pushes 0x487178 and 0x48718C -- `AM2_BMP_RED0` and
+`AM2_BMP_RED1`, the red ready lamp. The block's own comment says "the two ready
+lamps, green and red"; the green one above it uses the macros correctly and
+this one was transcribed as bare addresses that landed four kilobytes short,
+inside the log format pool.
+
+With the macros in place the two "Couldn't open bitmap file!" lines are GONE --
+2 to 0 -- so the lamp loads. That also settles this file's older note that
+`MultiSpritePaint`'s sprite "is null on every call": one of the two lamps was
+never loading.
+
+**THE CONFIGURATION STILL FAILS, for a different reason, and the pixel count is
+how you can tell.** It is still exactly 221,423, unchanged by the fix, because a
+17x16 lamp is not what makes a quarter of the frame differ. Our side's log still
+stops at "Releasing Comm Connection" where the original goes on to the data
+checksums, so the panel is still not reaching the same point. Two defects on one
+screen, and the fingerprint that identified the first is what proves the second
+is not it.
+
+**A RAW ADDRESS WHERE THE FILE HAS A MACRO IS WORTH GREPPING FOR.** Both
+literals sat two lines from correct `AM2_BMP_*` uses, and nothing checks that a
+`0x0048xxxx` handed to a string parameter is a string. `checkoffsets` counts
+offset macros and `checkpatches` counts `ADDR_` aliases; a bare address inside
+an expression is invisible to both.
 
 
 Worth knowing before spending a control run on it: a deterministic pixel count

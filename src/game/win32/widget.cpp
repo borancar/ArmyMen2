@@ -16248,8 +16248,8 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
 
         if (child)
             MultiSpriteConstruct(child,
-                                 (const char *)AM2_IMAGE(0x00485E30u),
-                                 (const char *)AM2_IMAGE(0x00485E44u),
+                                 (const char *)AM2_IMAGE(AM2_BMP_RED0),
+                                 (const char *)AM2_IMAGE(AM2_BMP_RED1),
                                  1, *RectSet(&r, 0xD5, 0x139, 0x11, 0x10));
         *(AM2_Widget **)(p + MP_PANEL_OFF_BLINKER_1) = child;
         WidgetAddChild(w, child);
