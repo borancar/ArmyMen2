@@ -1156,6 +1156,28 @@ empty `ADDR_MAP_NAME`: nothing matches, so the first row wins.
 
 So the multiplayer map list is EMPTY in our build and no map is ever selected.
 
+**THE BLOCK IS WRITTEN, AND IT IS INERT BECAUSE A PREREQUISITE IS WRONG.**
+`MpPanelConstruct` now builds the rows record, walks the map list, adds each
+level it finds and selects one -- transcribed from 0x004311A1, with
+`MPMAPS_OFF_COUNT`, `MPMAPS_OFF_NAMES` and `AM2_MPMAP_STRIDE` added to
+`orig.h` for the three constants the loop reads.
+
+It changes nothing yet, and a probe says exactly why: `ScriptListFind` is
+handed the buffer at `ADDR_MP_SCRIPT_NAME`, and in our build that buffer holds
+**"death.txt"** at the moment the panel opens, so the lookup answers null and
+the guarded loop does nothing. The name is written in two places -- once at
+startup in `winmain.cpp` and once in `misc.cpp:1169`, which copies the FIRST
+NAME-TABLE RECORD into it and the record's `NAMEREC_OFF_MAPS` into
+`ADDR_MAP_NAME`. Our `ADDR_MAP_NAME` comes out empty from that same copy, so
+both globals are being filled from a record that is not the one the original
+reads. **That is the next defect, and it is upstream of everything on this
+screen.**
+
+Keeping the block is deliberate: it is faithful to the image, it is guarded so
+a null lookup does nothing, and `ab.sh multi` is clean with it in -- 9 widget
+nodes identical, 7 messages, 0 pixels. It will start working the day the name
+is right, and leaving it out would only hide that.
+
 **EVERYTHING THE MISSING BLOCK NEEDS IS NOW IDENTIFIED**, so what is left is
 transcription rather than investigation:
 

@@ -12315,6 +12315,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * clears the id, and the slot becomes the AI's. Fourth time a name has been
  * taken from a call site and been wrong. */
 #define ADDR_COMM_SLOT_HAS_PLAYER 0x0040F200u /* thiscall int32_t(this, slot) */
+/* The multiplayer map list, found by ScriptListFind on the name below. Its
+ * count is at +0xC4 and a POINTER to the names at +0xC8, one every 0x40 bytes
+ * -- read off MpPanelConstruct's loop at 0x004311A1. */
+#define MPMAPS_OFF_COUNT         0x0C4u
+#define MPMAPS_OFF_NAMES         0x0C8u
+#define AM2_MPMAP_STRIDE         0x40u
 #define ADDR_MP_SCRIPT_NAME      0x00511C08u  /* char[], the multiplayer script */
 
 /* The three names that used to live here -- GREENSCORE at 0x0065648C and so on

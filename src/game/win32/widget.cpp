@@ -16196,10 +16196,63 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
     {
         AM2_Widget **slot = (AM2_Widget **)(p + MP_PANEL_OFF_TYPE_BOX);
         AM2_Widget  *child;
+        void        *rows;
+        int32_t      sel = 0;
+
+        /* THE MAP LIST, which was missing entirely -- the box was built with
+         * no rows at all, so nothing was ever listed and, worse, nothing was
+         * ever SELECTED. `SelectLevel` is the only writer of ADDR_MAP_NAME and
+         * ADDR_MAP_FOLDER, so without the tail below they stayed empty, the
+         * `.amm` path RefreshMapSelection builds resolved to ".amm",
+         * FileExists refused it and the panel took its bad-map exit: no
+         * handshake checksums, the "bad map" preview, and a quarter of the
+         * frame differing from the original's.
+         *
+         * The rows record is `new(0xC)` then RecordCtor with ZERO -- the save
+         * list's is one, and the difference is the original's.
+         *
+         * `sel` starts at 0 and is only moved by a name match, which is why
+         * the first map wins on a fresh panel: nothing matches an empty
+         * ADDR_MAP_NAME, so the original comes up on alpine3_mp. */
+        rows = orig_operator_new(AM2_ROWS_SIZE);
+        rows = rows ? RecordCtor(rows, 0) : (void *)0;
+
+        {
+            const uint8_t *maps = (const uint8_t *)ScriptListFind(
+                (char *)(uintptr_t)ADDR_MP_SCRIPT_NAME);
+
+            if (maps && *(const int32_t *)(maps + MPMAPS_OFF_COUNT) > 0) {
+                const char *names = *(const char *const *)
+                                        (maps + MPMAPS_OFF_NAMES);
+                int32_t     n     = *(const int32_t *)
+                                        (maps + MPMAPS_OFF_COUNT);
+                int32_t     i;
+
+                for (i = 0; i < n; i++) {
+                    uint8_t *lvl = (uint8_t *)FindLevelByName(
+                        (char *)names + (uint32_t)i * AM2_MPMAP_STRIDE);
+
+                    if (!lvl)
+                        continue;
+                    ListAdd(rows, (const char *)(lvl + LEVEL_OFF_NAME), lvl);
+                    if (strcmp((const char *)(lvl + LEVEL_OFF_MAP_NAME),
+                               (const char *)AM2_IMAGE(ADDR_MAP_NAME)) == 0)
+                        sel = i;
+                }
+
+                {
+                    void *lvl = FindLevelByName(
+                        (char *)names + (uint32_t)sel * AM2_MPMAP_STRIDE);
+
+                    if (lvl)
+                        SelectLevel(lvl);
+                }
+            }
+        }
 
         child = (AM2_Widget *)orig_operator_new(0x98);
         *slot = child ? ListBoxConstruct(child, 0x16, 0xC8, 0xFA, 0x5A,
-                                         (void *)0, 0, 0, 1)
+                                         rows, 0, 0, 1)
                       : 0;
         /* UNGUARDED, and that is the original: it stores the result -- null
          * or not -- and then writes three fields THROUGH it. On an
