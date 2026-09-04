@@ -1600,6 +1600,24 @@ operand is a REGISTER cannot be checked by looking at the global alone; the
 comparison is the fact, and `checkoffsetuse` cannot see it either, because
 every offset involved is correct.
 
+**AND THE FIGURE BELOW IS HISTORY NOW, which is the stale-band lesson again
+one layer in.** `ShotStrike`'s 13,582 was a real measurement when its callers
+were still the image's. They are ours, and `tools/blindspots.py` reports
+`ShotStrike`, `ApplyShotDamage`, `DamageObject` and `FireWeaponAtPoint` ALL
+BLIND -- so a fresh `counts` on a driven combat run reads 0 for every one of
+them and that reads exactly like "combat never happened". It was nearly
+written up that way here.
+
+So the counts in the paragraph below stand as history and the ARGUMENT they
+support is unaffected, but nothing in the tree reproduces them any more. What
+is left is the observable this file already prescribes for the class: an
+object's HEALTH in `tools/objdump.py --table`. On a driven Boot Camp run
+after eight rounds of walking and firing, nothing among the 1,609 objects is
+below its maximum -- which is consistent with the note below that NOTHING
+DIES on that stretch, and is not by itself evidence either way about whether
+a shot was fired. Settling that needs a target whose health moves, and
+finding one is the open work.
+
 **A HOT function can still be undiscriminated, and `ShotStrike` is the sharp
 example.** It runs **13,582 times** in a driven Boot Camp mission with eight
 rounds of firing -- the busiest thing reconstructed in weeks -- and `combat`
