@@ -3823,7 +3823,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 19 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 20 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3935,6 +3935,17 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   confirmed each against itself would still pass if one were rewritten into
   the other. Making Defend turn on the route path fails at once; so does
   dropping the route path's promotion.
+
+  `AiStepAttack` joins them inside `tools/aicheck.py`, where the dispatcher
+  it belongs to is already checked. It is a pure forwarder, so THE ONLY THING
+  THAT CAN BE WRONG IS THE ORDER -- and this project has had exactly that:
+  ADDR_ENTER_VEHICLE's two arguments went in reversed from a comment in
+  orig.h, every field access landed on the other record, and nothing inside
+  the function looked wrong. A forwarder is that failure with nothing else to
+  hide behind, and this one lived in gameproc.cpp as `Call407710`, typed
+  `void(int32, int32, int32)`, until the dispatcher said what the three were.
+  Three distinguishable values go in and the stubbed body records what it was
+  handed.
 
   `AiStepIgnore` joins them by `tools/aiignorecheck.py`, 480 cases, and it is
   the first of the AI ARMS checked from the inside -- `tools/aicheck.py`
@@ -4065,7 +4076,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   configuration whose descriptor under-reports its extent is what makes them
   observable at all.
 
-  The other thirteen are verified by READING, which is the standing worth
+  The other twelve are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is

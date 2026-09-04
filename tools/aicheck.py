@@ -44,7 +44,7 @@ from vectors import Emu
 # an address search would read those as coverage, which is the same
 # "a mention is not a test" mistake tools/checkclaims.py already strips
 # docstrings to avoid, one level in: here the address is in CODE.
-CHECKS = ("AiStep",)
+CHECKS = ("AiStep", "AiStepAttack")
 
 AI_STEP = 0x00407F80
 BUILD_CONTEXT = 0x00407D70
@@ -145,6 +145,51 @@ def cases():
         yield 0, tile, True                     # the null guard
 
 
+AI_STEP_ATTACK = 0x00407BD0
+AI_ATTACK_BODY = 0x00407710
+
+
+def check_forwarder():
+    """Mode 6's arm forwards its three arguments and does nothing else.
+
+    THE ONLY THING THAT CAN BE WRONG IS THE ORDER, and this project has had
+    exactly that: ADDR_ENTER_VEHICLE's two arguments went in reversed from a
+    comment in orig.h, every field access landed on the other record, and
+    nothing inside the function looked wrong. A forwarder is that failure with
+    nothing else to hide behind -- and it lived in gameproc.cpp as
+    `Call407710` with orig.h typing it `void(int32, int32, int32)` until the
+    dispatcher said what the three were.
+
+    Three distinguishable values go in; the body is stubbed and records what
+    it was handed.
+    """
+    emu = Emu()
+    uc = emu.uc
+    seen = []
+
+    from unicorn import UC_HOOK_CODE, x86_const
+    uc.mem_write(AI_ATTACK_BODY, b"\xc3")
+
+    def body(uc_, addr, size, user):
+        esp = uc_.reg_read(x86_const.UC_X86_REG_ESP)
+        ret, a, b, c = struct.unpack("<4I", uc_.mem_read(esp, 16))
+        seen.append((a, b, c))
+        uc_.reg_write(x86_const.UC_X86_REG_EAX, 0)
+        uc_.reg_write(x86_const.UC_X86_REG_ESP, esp + 4)
+        uc_.reg_write(x86_const.UC_X86_REG_EIP, ret)
+
+    uc.hook_add(UC_HOOK_CODE, body, begin=AI_ATTACK_BODY, end=AI_ATTACK_BODY)
+
+    args = (0x11111111, 0x22222222, 0x33333333)
+    emu.call(AI_STEP_ATTACK, list(args), b"\0" * 64, count=100000)
+
+    expect = [args]
+    if seen == expect:
+        print("  AiStepAttack forwards (obj, out, ctx) in order")
+        return 0
+    print("  FAIL AiStepAttack forwarded %s, want %s" % (seen, expect))
+    return 1
+
 def main():
     h = Harness()
     n = bad = 0
@@ -159,6 +204,7 @@ def main():
                       "vs arm %s region 0x%x"
                       % (mode, tile, " NULL" if null else "",
                          got[0], got[1], want[0], want[1]))
+    bad += check_forwarder()
     print("aicheck: %d cases, %d differ" % (n, bad))
     return 1 if bad else 0
 
