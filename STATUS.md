@@ -141,9 +141,39 @@ the animation, and not in the key state. `arm=12` also writes 1 over garbage
 values (`28 -> 1`, `7796576 -> 1`), so it runs for other objects too and the
 test is shared.
 
-The oracle for the fix is the same probe: with it correct, `arm=12` should
-stop firing for the player's trooper while W is held, and the frame histogram
-should show the original's `04, 05, 2e, 2f` walk chain instead of `01`/`05`.
+**AND THE STEP ITSELF IS FINE, so the fault is the ROUTE TEST.** Probing
+`AnimStepPoint` on a clock-verified live run with W held:
+
+    STEPPROBE pose=2 anim=5 i=15 count=52 speed=88  1743,1052 -> 1748,1052
+    ROUTEPROBE facing=c5 pose=2 pt=1748,1052 at=0326D630 wt=0
+
+It finds the walk animation (entry 15 of 52), takes speed 88 and advances the
+point 2-5 units. So the pose table, the table search and `MoveStepPoint` all
+work. The step lands 2-5 units ahead -- INSIDE the trooper's own footprint --
+so `ObjectsAtPoint` returns the leader itself, `at` is his own object, and
+`BlockWeightRoute` answers **0**.
+
+Our caller then does `if (weight < AM2_STEP_ROUTE_OK) goto no_route`, so a
+CLEAR step -- weight 0, nothing in the way but himself, which the function
+explicitly scores as `w = 0` -- is treated as blocked.
+
+**The branch sense is the open question and it is worth one careful read.** In
+the original at 0x0044B148, `cmp eax,0xf; jl 0x44b382`. The `>= 15` fall-through
+at 0x44b151 reads `[esi+0x56c]`, the vehicle uid -- a boarding check, which
+only makes sense if something IS there. That argues weight-high = blocked and
+our test inverted. Against it: the `jl` path at 0x44b382 also zeroes a local
+before jumping to the settle-and-step at 0x44b41c, and a clear path that zeroes
+what may be `speed` does not obviously walk.
+
+Both readings are consistent with part of the evidence and that is exactly the
+shape of the two wrong movement claims retracted earlier today, so it is left
+for a careful read rather than guessed. What IS settled: the weight is 0, the
+step point is good, the input is right, and one of `no_route`'s four stop arms
+fires every frame.
+
+The oracle for whatever fix is tried: `arm=12` should stop firing for the
+player's trooper while W is held, and the row's frame histogram should show
+the original's `04, 05, 2e, 2f` walk chain instead of alternating `01`/`05`.
 
 **A parser bug wasted three runs here and is worth naming:** `ctl dump` returns
 ONE contiguous hex string, not space-separated bytes. Splitting it into tokens
