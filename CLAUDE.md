@@ -1538,6 +1538,30 @@ dataflow, not a scan. A check without it reports fifteen correct functions,
 which this file already says to suspect before believing. The real instance
 was found by RUNNING the game, and that is what `movecheck.sh` now keeps.
 
+**`tools/saquit.sh` COVERS THE STANDALONE'S TEARDOWN, which nothing did.**
+`samenu.sh` compares a title screen and `samission.sh` a live mission's object
+table, and both KILL the process -- so the comm shutdown, the sprite frees and
+the leak report never ran in the standalone even once. `ab.sh quit` exists for
+exactly that reason on the injected side and found a real bug the first time
+it ran.
+
+There is more at stake here than on that side: the standalone's C++ static
+initializers run from OUR runtime rather than the MSVC CRT's, so anything they
+registered comes down here or not at all. Measured: the game's own messages
+are IDENTICAL through a full menu quit -- 7 of them -- and the standalone
+reports `Unreleased memory (0) blocks`.
+
+The harness lines are filtered rather than diffed, because the injected build
+logs an attach banner, a patch list and the DirectInput hook that the
+standalone cannot produce by construction. The two racing thread lines are
+compared as a SET and flagged rather than failed, for the reason `ab.sh quit`
+already records: one of them can be ABSENT, not merely out of order.
+
+Mutation-checked in both directions, since a new test that cannot fail has not
+passed: dropping one game line from the standalone side names the missing
+lines and fails, and asking for a heap report that is not there fails
+separately.
+
 **`tools/movecheck.sh` IS THAT CONFIGURATION, and it is the only one in the
 project that drives a real device.** Everything else writes the game's
 globals over the control socket -- `cursor` and `key` never touch
