@@ -10729,7 +10729,7 @@ void __cdecl FreeAimSprites(void)
          spr < (AM2_Sprite **)(uintptr_t)ADDR_AIM_LIVE_A; spr++)
         ReleaseSprite(*spr);
 
-    for (i = 0; i < AM2_AIM_ARMIES; i++) {
+    for (i = 0; i < (int32_t)AM2_AIM_ARMIES; i++) {
         ((int32_t *)(uintptr_t)ADDR_AIM_LIVE_A)[i]  = 0;
         ((int32_t *)(uintptr_t)ADDR_AIM_STAMP_A)[i] = 0;
     }
@@ -10738,7 +10738,7 @@ void __cdecl FreeAimSprites(void)
          spr < (AM2_Sprite **)(uintptr_t)ADDR_AIM_LIVE_B; spr++)
         ReleaseSprite(*spr);
 
-    for (i = 0; i < AM2_AIM_ARMIES; i++) {
+    for (i = 0; i < (int32_t)AM2_AIM_ARMIES; i++) {
         ((int32_t *)(uintptr_t)ADDR_AIM_LIVE_B)[i]  = 0;
         ((int32_t *)(uintptr_t)ADDR_AIM_FRAME_B)[i] = 0;
         ((int32_t *)(uintptr_t)ADDR_AIM_STAMP_B)[i] = 0;

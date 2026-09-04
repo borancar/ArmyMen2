@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **57** analysis
+**`make check` runs everything that does not need the game.** **58** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3700,7 +3700,34 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   `InitDirectDraw` calls it. It is a colour fill — vtable slot 5 is `Blt` — and
   the wrong name survived a commit. Reading the callee costs a minute;
   a wrong name in `orig.h` propagates into every module that picks it up.
-- **`tools/checkhooks.py` guards the one failure that no A/B can see.** It
+- **`tools/checkgap.py` guards the standalone's own version of that failure.**
+The standalone does not carry the original's `.text`; that range is int3, so
+a reference into it is not a link error and not a crash at the call site --
+it is whatever the filler means. `c_dfDIMouse` is how this was found: the
+DIDATAFORMAT struct is in `.rdata` and IS carried, its `rgodf` array is at
+`0x004643A0` and is NOT, and the game reported "DDERROR 80070057:
+SetDataFormat (mouse)" -- a plausible DirectInput failure with nothing in it
+about a missing byte range. A missing `free` seam did worse and faulted at an
+address that appears nowhere in the binary.
+
+So: any `ADDR_` macro `src/game` DEREFERENCES whose address is in the gap
+must be redefined under `AM2_STANDALONE`. It is **37 of 37** today, all of
+them the statically linked MSVC CRT plus the stubbed logger -- which is
+exactly the set the port points at the real C library. Tested by removing one
+definition, which names it and its use site.
+
+It skips `patch_replace` targets, since installing a patch in the standalone
+is a no-op and the address is never reached; and it resolves macros rather
+than dataflow, so a seam reached through a variable is invisible, the same
+blind spot `checkseams.py` records.
+
+**And it disproved a hypothesis cheaply, which is most of what it is for.**
+Movement not working in the standalone looked like a missing input seam --
+the mouse data format had already been exactly that. One run said 37 of 37
+were covered, so it is not a gap read, and no time was spent reading the
+input path again.
+
+**`tools/checkhooks.py` guards the one failure that no A/B can see.** It
   reads the IAT slot `src/inject/dinput_hook.c` patches, resolves which symbol
   that is from the game's own import directory, and fails if `am2hook.dll`
   imports it. Tested by pointing the hook at `PostMessageA`, which the harness

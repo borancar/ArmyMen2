@@ -48,6 +48,7 @@ import checkclaims as cc
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(REPO, "build", "standalone")
 
+GAP_LO  = 0x00401000          # the original's .text, which we do NOT carry
 BLOB_LO = 0x0046F000          # the original's .rdata
 BLOB_HI = 0x00666000          # the end of its .data
 SECTION = ".origdat"
@@ -80,13 +81,13 @@ def find_static_init(img, done):
         off = 0
         while off + 4 <= len(raw) - 3:
             v = struct.unpack_from("<I", raw, off)[0]
-            if not (0x00401000 <= v < 0x0046EB82):
+            if not (GAP_LO <= v < 0x0046EB82):
                 off += 4
                 continue
             start = off
             while off + 4 <= len(raw) - 3:
                 v = struct.unpack_from("<I", raw, off)[0]
-                if not (0x00401000 <= v < 0x0046EB82):
+                if not (GAP_LO <= v < 0x0046EB82):
                     break
                 off += 4
             ents = [struct.unpack_from("<I", raw, k)[0]
@@ -222,7 +223,7 @@ def main():
                  "    .section .origgap,\"dw\"\n"
                  "    .globl am2_origgap\n"
                  "am2_origgap:\n"
-                 "    .fill %d, 1, 0xCC\n" % (BLOB_LO - 0x00401000))
+                 "    .fill %d, 1, 0xCC\n" % (BLOB_LO - GAP_LO))
 
     binpath = os.path.join(OUT, "origdata.bin")
     open(binpath, "wb").write(bytes(blob))
@@ -261,7 +262,7 @@ def main():
                                orig, re.M))
     for m in re.finditer(r"^#define\s+(ADDR_\w+)\s+AM2_SA\((\w+)\)", sa, re.M):
         a = addr_of.get(m.group(1))
-        if a is not None and 0x00401000 <= a < BLOB_LO:
+        if a is not None and GAP_LO <= a < BLOB_LO:
             seams.setdefault(a, m.group(2))
 
     fixups = []
