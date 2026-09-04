@@ -71,8 +71,13 @@ start)
     : > "$LOGPATH"
     # setsid gives the run its own process group, so stop can target exactly
     # this instance instead of every ArmyMen2 on the machine.
+    # Wine's own stderr is DISCARDED by default, which is the right default --
+    # it is thousands of fixme lines -- and it also throws away the one thing
+    # that identifies a page fault. AM2_WINE_OUT names a file to keep it in.
+    # Reached for when the game exits with nothing in its own log: the game
+    # log is written by our harness and a fault never gets that far.
     ( cd "$REPO" && setsid make -s run "${MAKEVARS[@]+"${MAKEVARS[@]}"}" "$@" \
-        >/dev/null 2>&1 & echo $! > "$PIDFILE" )
+        >"${AM2_WINE_OUT:-/dev/null}" 2>&1 & echo $! > "$PIDFILE" )
     echo "instance ID=$ID port=$CTLPORT desktop=$DESKNAME log=$LOGFILE"
     sleep "$wait_for"
     shot 00-start

@@ -1191,8 +1191,61 @@ clearing `ADDR_MAP_NAME` could have reached single player, and `ab.sh bootcamp
 campaign` is clean with it in -- 1,610 state lines and 13 messages identical,
 35 widget nodes identical.
 
-What still has to be found is why `ADDR_NAME_TABLE_COUNT` is zero here at all,
-or why the record it would name is not the multiplayer one.
+**AND IT IS NOT ZERO. `mpoptions` FAULTS, and the screen was never a drawing
+difference at all.** Every reading above assumed the panel came up and looked
+wrong. It does not come up: our build EXITS when the multiplayer options
+screen is requested, and 221,423 pixels is one side showing a panel and the
+other showing whatever was on screen when the process died.
+
+Measured, with the two sides driven identically by the same pokes:
+
+| | original | ours |
+|---|---|---|
+| alive after the request | yes | **no** |
+| `ADDR_NAME_TABLE_COUNT` | 6 | 6 |
+| `ADDR_LEVEL_TABLE_COUNT` | 10 | 10 |
+| handshake checksums logged | six | none |
+
+So both tables parse correctly -- 6 `RULES` and 10 `MAP` lines, which is
+exactly what `mpmaps.txt` declares -- and the name-table theory this paragraph
+spent three commits on was answering a question that was not being asked.
+
+**Two false trails, both killed by measurement rather than argument.** The
+game logs `Lobby start: about to call ReadMpMapsFile` and `Releasing Comm
+Connection` just before dying, which reads as the lobby arm `State1Enter`
+already has a scar for -- and the ORIGINAL logs both lines too, at startup, on
+its way to the quiet `DPERR_NOTLOBBIED` exit. And the map-list block added to
+`MpPanelConstruct` was the obvious suspect, being the newest code on the
+screen; disabling it behind a switch leaves the exit exactly where it was.
+**Diff the logs before believing a message is a symptom** -- a line that
+appears on both sides is startup, however incriminating it reads.
+
+**The fault is `MpPanelUpdate` +0xa2, and resolving it needed the DLL base
+from the RUN'S OWN patch lines.** Wine reports `c0000005` at a runtime
+address inside `am2hook.dll`; two anchors from that run's log give the same
+delta, which is the check that the base is right rather than remembered --
+this file already records a caller mis-resolved from an earlier run's log.
+The faulting instruction is `mov 0x58(%eax),%eax` with `eax = rows[i]`.
+
+**`MP_PANEL_OFF_ARMY_ROWS` (+0x258) IS READ AND NEVER WRITTEN.** One grep says
+so: `MpPanelUpdate` walks it every frame and nothing in the tree stores to it,
+so the four army-points rows are whatever the allocator left. The original
+does the identical pair of dereferences, so it is not the update that is wrong
+-- it is that our `MpPanelConstruct` never builds those four rows.
+
+That is the defect, and it is deliberately NOT fixed in the same commit as its
+diagnosis: the original fills the array through a walking pointer rather than
+a `+0x258` literal, so a scan for the offset finds nothing and the block has
+to be read out of the constructor. Writing it from the shape of the update
+would be inventing a layout, which is what this file's whole offset section
+exists to stop.
+
+**A READ-ONLY OFFSET IS A CHEAP CLASS OF BUG TO HUNT, and nothing looks for
+it.** `checkoffsets.py` refuses a second name on an offset; nothing asks
+whether an offset that is read is ever written. A field with no writer is
+already recorded here as dead code -- this is the same scan pointed at our own
+source rather than at the image, and it would have found this without a
+crash.
 
 Keeping the block is deliberate: it is faithful to the image, it is guarded so
 a null lookup does nothing, and `ab.sh multi` is clean with it in -- 9 widget
@@ -3435,6 +3488,17 @@ avoid disturbing a suite that was running; but `ab.sh` rebuilds on every launch,
 so the code went live and only the check was deferred. **Deferring the build
 does not defer the code — it defers the checking.** If a source edit cannot be
 checked now, do not make it now.
+
+**`AM2_WINE_OUT` KEEPS WINE'S STDERR, and without it a fault is invisible.**
+`drive.sh` sent the launcher's output to `/dev/null` -- the right default,
+since it is thousands of `fixme` lines -- and that also discarded the only
+record of a page fault. A game that dies mid-drive writes NOTHING to its own
+log, because the log is our harness's and a fault never reaches it, so the
+symptom is a clean `am2hook detaching` and no explanation. Set
+`AM2_WINE_OUT=<file>` and pass `WINEDBG=+seh` to get the exception code and
+address; that pair is what identified the `mpoptions` fault after five runs
+had produced nothing but "it exits". Reach for it whenever a run ends with no
+game log line to blame.
 
 **Launch through `tools/drive.sh`, never a bare backgrounded `make run`.** A
 `setsid make -s run ... &` issued from a script or an agent shell starts the
