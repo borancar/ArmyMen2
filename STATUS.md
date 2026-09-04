@@ -525,6 +525,31 @@ that artifact is taken after both dialogs are cleared.
 Read this one as a drive-timing gauge. Its evidence is the log, the widgets
 and the state, exactly as its own comment says the pixels are meaningless.
 
+**BUT THE TWO MEASUREMENTS DO NOT RECONCILE, and that is worth stating rather
+than leaving as a shrug.** The markers really are one per composed frame, and
+both sides emit them across their whole log -- ours from raw line 56 of 653,
+the original's from 484 of 26,170 -- so this is not our side reaching play
+late. It is the original composing 26,170 frames where ours composes 653 in
+the same wall-clock drive.
+
+That cannot be squared with the 1,196 frames a second measured above. At that
+rate a drive with any live play at all would show tens of thousands. Either
+the marker is not emitted once per ComposeFrame on our side, or the 1,196
+figure does not describe this configuration. **Both are measurements and one
+of them is wrong**, which is a sharper open question than "the band went
+stale".
+
+What is NOT in doubt: it predates this session -- CLAUDE.md records 533, 652
+and 625 across runs two of which are older than the work that first noticed it
+-- and it is not a defect the other artifacts can see, since `mission`'s
+state, its 16-node widget tree and its 13 log messages are identical every
+time.
+
+Answering it needs a live-play drive, and a hand-driven one does not work:
+clicking BOOT CAMP, RETURN and the two dialogs by hand gives
+`ComposeFrame=0`, the trap the next entry describes. Use `ab.sh mission`'s own
+waits, or add a counter dump to that configuration.
+
 ## Driving to a live mission by hand needs ab.sh's WAITS
 
 Three probe attempts read `HudSquadUpdate=0` and looked like dead code. The
