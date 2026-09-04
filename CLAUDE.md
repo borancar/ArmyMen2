@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **58** analysis
+**`make check` runs everything that does not need the game.** **59** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -1599,6 +1599,36 @@ so reading it proved nothing until the instruction was decoded. A gate whose
 operand is a REGISTER cannot be checked by looking at the global alone; the
 comparison is the fact, and `checkoffsetuse` cannot see it either, because
 every offset involved is correct.
+
+**`tools/damagecheck.py` IS THE COMBAT LAYER'S ORACLE, for the reason
+`aicheck.py` is the AI's.** With no drive reaching combat and all four
+counters blind, `DamageObject` is checked there or nowhere. It is the
+family's convergence point -- three refusals, a four-way dispatch on the
+object's type, and a death tail -- so 95 cases over its arms compare the
+TRACE, which is what a void function's output actually is.
+
+Two things the corpus had to be built to reach, neither of which a live drive
+would produce:
+
+- the health test is asked TWICE, once before the dispatch and once after.
+  A stub that leaves health alone can only ever reach the first, so the four
+  damage stubs SUBTRACT and the corpus carries blows that do and do not kill.
+- `CommMustBroadcast` is asked in THREE places with two different arguments --
+  the attacker's army twice, and the VICTIM's on the last refusal. A stub
+  answering from one flag makes those indistinguishable, so it answers per
+  army and the corpus varies the two independently. This is the only thing
+  that exercises those arms at all: `ADDR_MP_SESSION` is 0 on every drive
+  here, so all three broadcast refusals are unreachable in play.
+
+**AND TWO MUTATIONS PASSED UNTIL THE CORPUS GAINED A DIMENSION.** The deepest
+tail -- the selected-count test, the leader lookup and the re-select -- is
+behind `victim owner == g_defaultOwner`, and every case had the victim on
+another army, so the function returned before reaching any of it. Dropping
+the count test and inverting the leader test both failed NOTHING. With the
+victim's army made a dimension they fail 2 each, which is exactly the number
+of cases that reach them. Third instance of the boolcheck trap in this file
+and the first where the missing dimension was an IDENTITY rather than a
+value.
 
 **MOVEMENT IS FACING-RELATIVE, and not knowing that wastes a drive.** Action
 0 walks FORWARD along the unit's own facing; actions 2 and 3 TURN, on a
