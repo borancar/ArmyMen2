@@ -1240,12 +1240,35 @@ to be read out of the constructor. Writing it from the shape of the update
 would be inventing a layout, which is what this file's whole offset section
 exists to stop.
 
-**A READ-ONLY OFFSET IS A CHEAP CLASS OF BUG TO HUNT, and nothing looks for
-it.** `checkoffsets.py` refuses a second name on an offset; nothing asks
-whether an offset that is read is ever written. A field with no writer is
-already recorded here as dead code -- this is the same scan pointed at our own
-source rather than at the image, and it would have found this without a
-crash.
+**A READ-ONLY OFFSET LOOKED LIKE A CHEAP RATCHET AND IS NOT ONE, measured
+before it was built.** `checkoffsets.py` refuses a second name on an offset;
+nothing asks whether an offset we READ is ever WRITTEN, and a field with no
+writer is already recorded here as dead code. Pointed at our own source that
+scan finds this defect -- so it looked like the obvious next gate.
+
+It is a noise generator, and the numbers say so: **329 of 1,106** `*_OFF_*`
+macros in `src/game` are never on the left of an `=`. Most are legitimate --
+we read a field the ORIGINAL's code writes, which is the normal state of a
+half-reconstructed program and not a defect at all.
+
+**And its false positives look exactly like its true one.** The same scan
+flags `MP_PANEL_OFF_COLOURS` and `MP_PANEL_OFF_TEAMS`, which sit beside
+`ARMY_ROWS` in the same panel and read as three instances of one bug. They are
+written -- through a LOCAL taken from the macro (`colours[i] = ...`), which a
+macro-level scan cannot see. Believing them would have turned one real defect
+into three and sent the fix at code that is already correct.
+
+What has signal is the SCOPED question, not the global one: for a structure
+whose CONSTRUCTOR is ours, every field we read must be written by us, because
+nothing else builds it. That is a claim about one structure at a time and
+needs to know which those are, so it is not a cheap gate either -- but it is
+the form worth reaching for by hand when a reconstructed constructor is
+suspected.
+
+The confirmation that costs nothing is two SPELLINGS rather than one: the
+macro has a single use in the whole tree and no `0x258` literal reaches the
+panel. That is the same "grep the address as well as the name" rule this file
+already states for naming, used to establish an absence.
 
 Keeping the block is deliberate: it is faithful to the image, it is guarded so
 a null lookup does nothing, and `ab.sh multi` is clean with it in -- 9 widget
