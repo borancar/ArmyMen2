@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **51** analysis
+**`make check` runs everything that does not need the game.** **52** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3823,7 +3823,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 25 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 26 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3935,6 +3935,22 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   confirmed each against itself would still pass if one were rewritten into
   the other. Making Defend turn on the route path fails at once; so does
   dropping the route path's promotion.
+
+  `RefreshScreen` joins them by `tools/refreshcheck.py`, four cases over four
+  things a reading gets wrong. The present flag is SAVED AND RESTORED rather
+  than cleared, so setting it back to 1 turns presenting on for a caller that
+  had turned it off -- that fails 3 of the 4, the three where it did not
+  start at 1. RefreshDraw is called TWICE, which a reading naturally
+  collapses to once. And the blit is BltFast through vtable slot 0x1C with
+  six arguments, whose destination comes from the screen RECT and whose
+  source rectangle comes from the screen CLIP -- two globals sixteen bytes
+  apart, and taking the source from the rect fails every case.
+
+  **THE SURFACE IS A FAKE OBJECT WITH A FAKE VTABLE**, so the call through
+  slot 0x1C lands on a stub that records what it was handed. That is the only
+  way to check the argument order of a COM call: nothing else in the process
+  knows what a BltFast was asked to do, which is why this file's note that
+  the DirectX boundary is "verified by reading" held for so long.
 
   `StateLeave` joins them by `tools/stateleavecheck.py`, and it is four cases
   because only one of them matters. **THE SLOT IS RE-READ AFTER
@@ -4145,7 +4161,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   configuration whose descriptor under-reports its extent is what makes them
   observable at all.
 
-  The other seven are verified by READING, which is the standing worth
+  The other six are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is
