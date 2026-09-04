@@ -1401,6 +1401,31 @@ which was also read every frame and written nowhere. Two instances on one
 screen says the panel was transcribed as a series of widgets with the
 bookkeeping between them left out.
 
+**AND THE THIRD INSTANCE IS A WHOLE WIDGET: `MP_PANEL_OFF_GAME_BOX` IS NEVER
+BUILT.** The field is defined in `orig.h` at 0x208 and read by `OnMpGameType`
+and its neighbour, and `MpPanelConstruct` never writes it. The original builds
+it at 0x00430F26 -- `RectSet(0x152, 0x35, 0x97, 0x42)`, list-box constructor,
+row callback `0x00431A30` (`OnMpGameType`), stored to `[ebp+0x208]`, then
+added as a child. That is the `338,53,489,119` node the original's tree has
+and ours does not, which is also why the two dumps stop lining up past the
+list boxes.
+
+So the type-list omission and the missing script-name write are ONE omission,
+not two: the name-table walk, the `strcpy` that follows it, the
+`FillListFromRules` after that, and the box they all feed are a single block
+of the original that is absent from ours.
+
+**A DEFINED-BUT-UNBUILT FIELD IS CHEAPER TO FIND THAN ITS SYMPTOMS.** Three
+fields on this one screen were read by our code and written by none of it, and
+each cost a separate investigation -- a crash, a bad-map exit, a tree that
+stops matching. Grepping `orig.h`'s `MP_PANEL_OFF_*` against the constructor
+finds all three in one command -- and run for real it reports SIX:
+`CHATBOX`, `COLOUR_SEL`, `GAME_BAR`, `GAME_BOX`, `MAP_BAR` and `MAP_BOX`.
+`PREVIEW` is built, so the test is discriminating rather than merely
+pessimistic. That is the check to run on any screen whose
+constructor is suspected, and it is the scoped form of the read-only-offset
+idea that was rejected as a whole-tree gate.
+
 **A READ-ONLY OFFSET LOOKED LIKE A CHEAP RATCHET AND IS NOT ONE, measured
 before it was built.** `checkoffsets.py` refuses a second name on an offset;
 nothing asks whether an offset we READ is ever WRITTEN, and a field with no
