@@ -1463,11 +1463,26 @@ the other way round searches for an empty string, finds nothing, and never
 calls `SelectLevel`. Take a long constructor's order from its field stores
 rather than from reading it top to bottom.
 
+**AND TWO PIXELS BROKE THE DRIVE RATHER THAN THE PICTURE.** The team button
+sat at y=37 where the original has 39 -- the colour swatch and the team button
+are two halves of ONE row, `r=134,39,152,59` beside `r=191,39,209,59`, and our
+colours were already right. `ab.sh` settles that button by grepping its
+RECTANGLE out of `ctl widgets`, so a row two pixels off matched nothing, the
+settle loop tapped sixteen times and gave up, and every step after it ran
+against a panel in the wrong state. Fixed: the warning is gone and the
+first-dump diff falls from 15 lines to 9.
+
+That is worth recording as a class. A pixel budget would never have found it;
+the widget tree did, and it did so by breaking the HARNESS rather than the
+image. **When a drive reports it could not settle, suspect the coordinate it
+is matching on before suspecting the button.**
+
 What is still wrong is no longer construction. Our side answers ONE `widgets`
-dump where the original answers three, so it stops responding during the
-clicks that follow -- and the original logs its checksums twice to our once,
-which is the same story from the other end. The panel is built correctly and
-something in the click path is not. That is the check to run on any screen whose
+dump where the original answers three and one `state` line where it writes
+five, so the drive stops progressing after the panel -- while the process
+itself survives every click and the socket still answers `pong`, tested by
+hand. So it is not a crash and not the settle; the clicks after it are landing
+somewhere ours does not follow. That is the check to run on any screen whose
 constructor is suspected, and it is the scoped form of the read-only-offset
 idea that was rejected as a whole-tree gate.
 

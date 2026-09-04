@@ -16224,7 +16224,17 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
         WidgetAddChild(w, colours[i]);
 
         child = (AM2_Widget *)orig_operator_new(0x68);
-        teams[i] = child ? MpTeamConstruct(child, 0xBF, 37 + i * 32, i) : 0;
+        /* 39, not 37. The colour swatch and the team button are two halves
+         * of ONE row -- x 0x86 and 0xBF, the same y -- and the original's own
+         * tree has both at 39: `r=134,39,152,59` beside `r=191,39,209,59`.
+         *
+         * Two pixels, and they broke the drive rather than the picture.
+         * `ab.sh` settles the team button by grepping its rectangle out of
+         * `ctl widgets`, so a row at 37 matches nothing, the settle loop taps
+         * sixteen times and gives up, and every step after it runs against a
+         * panel in the wrong state. The pixels were never going to show this;
+         * the widget tree did. */
+        teams[i] = child ? MpTeamConstruct(child, 0xBF, 39 + i * 32, i) : 0;
         WidgetAddChild(w, teams[i]);
 
         /* THE ARMY-POINTS SPINNER -- the fourth quarter of this loop, and the
