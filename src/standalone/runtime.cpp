@@ -9,6 +9,7 @@
 #include "../inject/orig.h"
 #include "../game/crt.h"
 #include "../game/gameproc.h"
+#include "../inject/control.h"
 
 #include <stdarg.h>
 #include <stdint.h>
@@ -38,7 +39,31 @@ extern "C" int patch_replace(uintptr_t addr, const void *fn, const char *name,
  * the reconstruction, not by six overwritten branches. */
 extern "C" void restore_multiplayer(void) { }
 
-extern "C" void hooklog(const char *fmt, ...) { (void)fmt; }
+static FILE *sa_logfile(void);   /* defined with the logger below */
+
+extern "C" void hooklog(const char *fmt, ...)
+{
+    FILE   *fh = sa_logfile();
+    va_list ap;
+
+    if (!fh)
+        return;
+    va_start(ap, fmt);
+    vfprintf(fh, fmt, ap);
+    va_end(ap);
+    fputc('\n', fh);
+    fflush(fh);
+}
+
+/* The trace table is the patch stubs, and a standalone build has none: every
+ * function IS the binary. `counts` therefore has nothing to report, which is
+ * the same answer AM2_NOPATCH=1 gives in the injected build. */
+extern "C" void trace_describe(char *out, uint32_t cap, const char *want)
+{
+    (void)want;
+    if (cap)
+        snprintf(out, cap, "(no counters: this build has no patch stubs)");
+}
 
 /* ---- the seams src/inject/standalone.h declares ---------------------- */
 
@@ -59,36 +84,57 @@ extern "C" int am2_sa_rand(void)
  * nowhere near the screen, so it cannot show lines the original did not, and
  * without it a standalone run has no diagnostics at all. AM2_LOG names the
  * file; unset means dropped, as the retail stub does. */
-extern "C" void am2_sa_log(const char *fmt, ...)
+/* The log file, opened once. Shared by the game's logger and the harness's,
+ * because in a standalone build they are one file: the control socket's
+ * "bind/listen failed" is the line CLAUDE.md says to grep for when a drive
+ * goes nowhere, and it has nowhere else to go. */
+static FILE *sa_logfile(void)
 {
     static FILE *fh;
-    static int tried;
-    va_list ap;
+    static int   tried;
 
-    if (!tried) {
+    if (tried)
+        return fh;
+    tried = 1;
+
+    {
         const char *path = getenv("AM2_LOG");
-        tried = 1;
         if (path && *path) {
             fh = fopen(path, "w");
-        } else {
-            /* Next to the exe, not the working directory: SetGameDir chdirs
-             * into the map and avi directories as it goes, so a relative
-             * name lands somewhere different depending on when it is
-             * opened -- which is why the first attempt at this produced no
-             * file anywhere. */
-            char buf[MAX_PATH];
-            DWORD n = GetModuleFileNameA(NULL, buf, sizeof buf);
-            if (n && n < sizeof buf) {
-                char *slash = strrchr(buf, '\\');
-                if (slash && (size_t)(slash - buf) + 16 < sizeof buf) {
-                    strcpy(slash + 1, "am2port.log");
-                    fh = fopen(buf, "w");
-                }
+            return fh;
+        }
+    }
+    /* Next to the exe, not the working directory: SetGameDir chdirs into the
+     * map and avi directories as it goes, so a relative name lands somewhere
+     * different depending on when it is opened -- which is why the first
+     * attempt at this produced no file anywhere. */
+    {
+        char  buf[MAX_PATH];
+        DWORD n = GetModuleFileNameA(NULL, buf, sizeof buf);
+        if (n && n < sizeof buf) {
+            char *slash = strrchr(buf, '\\');
+            if (slash && (size_t)(slash - buf) + 16 < sizeof buf) {
+                strcpy(slash + 1, "am2port.log");
+                fh = fopen(buf, "w");
             }
         }
     }
+    return fh;
+}
+
+static void sa_vlog(const char *fmt, va_list ap)
+{
+    FILE *fh = sa_logfile();
+
     if (!fh)
         return;
+    vfprintf(fh, fmt, ap);
+    fflush(fh);
+}
+
+extern "C" void am2_sa_log(const char *fmt, ...)
+{
+    va_list ap;
 
     /* THE GAME CALLS THIS WITH NO ARGUMENTS AT ALL in places, and that is
      * not a defect: the retail logger is a bare `ret`, so a call site with
@@ -101,9 +147,8 @@ extern "C" void am2_sa_log(const char *fmt, ...)
         return;
 
     va_start(ap, fmt);
-    vfprintf(fh, fmt, ap);
+    sa_vlog(fmt, ap);
     va_end(ap);
-    fflush(fh);
 }
 
 extern "C" int32_t __stdcall am2_sa_ddraw_create(void *guid, void **out, void *outer)
@@ -207,6 +252,14 @@ extern "C" void am2_standalone_init(void)
      * one, g_remapIdent, and faulted on address 0. Fixups first: an
      * initializer may store a pointer the table also mentions. */
     am2_run_static_init();
+
+    /* The control socket, which the injected build gets from the harness.
+     * Without it a standalone run cannot be driven or dumped, so every
+     * comparison against the injected build had to go through screenshots --
+     * and tools/objdump.py, the object-table diff that is bootcamp's
+     * sharpest artifact, was unavailable entirely. AM2_CONTROL=1 enables it,
+     * exactly as it does there. */
+    control_start();
 }
 
 /* WinMain is the reconstruction's own and is not touched, so the startup

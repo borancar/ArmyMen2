@@ -395,10 +395,16 @@ SA_SRC   := $(wildcard src/game/*.cpp) $(wildcard src/game/win32/*.cpp) \
             build/standalone/staticinit.cpp \
             build/standalone/imports.cpp \
             build/standalone/tables.cpp
-SA_OBJ   := $(patsubst %.cpp,$(BUILD)/sa/%.o,$(SA_SRC)) $(BUILD)/sa/origdata.o \
-            $(BUILD)/sa/origgap.o
+# control.c and input.c come from the harness unchanged: the socket is what
+# makes a standalone run drivable and dumpable, and input.c turned out to have
+# no DirectInput dependency at all -- it is a state store the hook reads, so
+# it links here even though nothing reads it yet.
+SA_CSRC  := src/inject/control.c src/inject/input.c
+SA_OBJ   := $(patsubst %.cpp,$(BUILD)/sa/%.o,$(SA_SRC)) \
+            $(patsubst %.c,$(BUILD)/sa/%.o,$(SA_CSRC)) \
+            $(BUILD)/sa/origdata.o $(BUILD)/sa/origgap.o
 SA_FLAGS := $(CXXFLAGS) -DAM2_STANDALONE -Ibuild/standalone
-SA_LIBS  := -lddraw -ldinput -ldsound -lwinmm -lole32 -ldxguid
+SA_LIBS  := -lddraw -ldinput -ldsound -lwinmm -lole32 -ldxguid -lws2_32
 SA_LDF   := -mwindows -static -static-libgcc -static-libstdc++ \
             -Wl,--image-base,0x400000 \
             -Wl,--section-start,.origdat=0x0046F000 \
@@ -412,6 +418,10 @@ standalone-generate:
 $(BUILD)/sa/%.o: %.cpp | standalone-generate
 	@mkdir -p $(dir $@)
 	$(CXX) $(SA_FLAGS) -c $< -o $@
+
+$(BUILD)/sa/%.o: %.c | standalone-generate
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -DAM2_STANDALONE -Ibuild/standalone -c $< -o $@
 
 $(BUILD)/sa/origdata.o: build/standalone/origdata.S | standalone-generate
 	@mkdir -p $(dir $@)

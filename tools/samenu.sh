@@ -75,7 +75,15 @@ LOGPATH=$(DISPLAY=$DISP make -s config 2>/dev/null | sed -n "s/^LOGPATH='\(.*\)'
 # Both sides go through the SAME normalisation, or a stray carriage return
 # on one of them reads as a behavioural difference. The game's loading bars
 # end in CR, which is why they are dropped rather than trimmed.
-norm() { tr -d '\r' | grep -vE '^[[:space:]]*$' | sed 's/[[:space:]]*$//'; }
+# The standalone build carries the control socket now, and its `control:`
+# and `hook:` lines are the HARNESS's -- the same ones this filter already
+# drops from the injected side. Both sides go through the same filter, or a
+# line one of them cannot produce reads as a behavioural difference.
+norm() {
+    tr -d '\r' \
+    | grep -vE '^(control:|hook:|patch:|am2hook|verify:|dinput:|gamelog:|====)' \
+    | grep -vE '^[[:space:]]*$' | sed 's/[[:space:]]*$//'
+}
 grep -vE '^(patch:|am2hook|verify:|dinput:|control:|gamelog:|====)' "$LOGPATH" \
     | grep -v '^\]' | norm > "$WORK/inj.log" || true
 AM2_DISPLAY=$DISP tools/drive.sh stop >/dev/null 2>&1
