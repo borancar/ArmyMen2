@@ -62,9 +62,29 @@ That also explains why every oracle missed it: `bootcamp`'s 1,610-line object
 dump compares type, flags, army, position, tile, both boxes, health and cell
 counts, and +0x584 is in none of them.
 
-Next: find what writes +0x584 on a freshly created trooper. The row A/B and
-this one-field peek are both one drive per side and both name the answer as a
-number.
+**THE VALUE IS A TABLE ENTRY AND IT NAMES THE ARM.** The eight action tables
+read out of the image are `kCrouch` [5,7,6] at 0x00475090, `kProne` [10,11,6],
+`kKey1` [18,8,9], **`kKey4` [13,15,17]** and `kKey5` [12,14,16]. Our 17 is
+`kActionKey4[2]` -- so `ActionKeyPressed(4)` fired with `cls == 2`, and the
+original's 1 did not come from any of these.
+
+**Four things excluded, each by a measurement rather than an argument:**
+
+- the KEY BINDINGS are byte-identical on both sides, 42 bytes at 0x004854BC;
+  action 4's pair is `38 00`, ALT and an unbound slot
+- `ActionKeyPressed` is faithful: the original checks BOTH slots with no
+  zero-binding test (0x00427542 then 0x00427571), exactly as ours does
+- `g_curKeys` and `g_prevKeys` are pointers in ours as in the original, at
+  the same 0x5127C8 / 0x5127CC, and `curKeys[0..7]` is zero on both, so the
+  unbound slot is not firing
+- the two key-buffer POINTERS being equal on one sample looked like a real
+  divergence and is not: sampled six times the original's alternate, equal on
+  some polls and not others. One sample would have made this a finding.
+
+So the remaining question is narrow: why `ActionKeyPressed(4)` answers yes on
+our side, or why `cls` is 2 there. `ClassifyByCode74` and the ALT scancode are
+the two things left to compare, and the one-field peek at +0x584 is the oracle
+for both.
 
 ## In flight
 
