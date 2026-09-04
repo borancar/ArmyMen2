@@ -1289,7 +1289,7 @@ void __cdecl EvtGuardedAction(uint32_t uid, int32_t a, int32_t b)
     if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG8_BLOCKED)
         return;
 
-    if (*(const int16_t *)(obj + OBJ_OFF_COUNT62) <= 0)
+    if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) <= 0)
         return;
 
     DamageObject(obj, a, b, 0, 0, 0);

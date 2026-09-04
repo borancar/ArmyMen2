@@ -320,7 +320,7 @@ again:
         return;
     case 33:                                    /* suicide kings */
         HudMessage("And you're the king!", kColour(ADDR_COLOUR_LAG_MID));
-        *(uint16_t *)(u + OBJ_OFF_COUNT62) = 1;
+        *(uint16_t *)(u + OBJ_OFF_HEALTH) = 1;
         g_invulnerable = 0;
         DamageObject(u, 0x64, 2, *(const int32_t *)(u + OBJ_OFF_UID), 0, 0);
         return;

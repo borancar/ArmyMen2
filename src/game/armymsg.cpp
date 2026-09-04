@@ -1759,7 +1759,7 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
     int32_t   dx, dz;
     uint8_t   action;
 
-    if (*(const int16_t *)(o + OBJ_OFF_COUNT62) == 0)
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
         return;
 
     comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;

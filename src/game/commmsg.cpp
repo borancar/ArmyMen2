@@ -982,7 +982,7 @@ void __cdecl AppendTroopState(void *msg, void *obj)
     int32_t   dx, dy;
     int16_t   px, py, lx, ly;
 
-    if (!*(const int16_t *)(o + OBJ_OFF_COUNT62))
+    if (!*(const int16_t *)(o + OBJ_OFF_HEALTH))
         return;
 
     seq = *(const uint32_t *)((const uint8_t *)FindPlayerById(

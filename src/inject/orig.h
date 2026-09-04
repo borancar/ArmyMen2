@@ -8235,7 +8235,11 @@ typedef struct {
  * any of the 23 OBJ_FLAG_ values, so there was never a second field to
  * distinguish. Collapsed; bit 2 of it blocks the action above. */
 #define OBJ_FLAG8_BLOCKED        4u
-#define OBJ_OFF_COUNT62          0x62u /* int16; must be > 0 */
+/* OBJ_OFF_COUNT62 lived here, named after its own offset, beside
+ * OBJ_OFF_HEALTH at the same 0x62. All four of its uses were alive/dead
+ * tests -- `<= 0`, `== 0`, `!` -- which is what health is. Collapsed onto
+ * the name that says so; `must be > 0` was the placeholder's whole
+ * content and is exactly the same claim. */
 
 /* Two more of the "On" shape: take a uid, substitute the object's own position
  * for a point, and call the twin that takes the point directly. event.h

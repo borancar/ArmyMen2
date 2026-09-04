@@ -91,7 +91,11 @@ def _headers():
 # 17 -> 16. OBJ_OFF_FLAGS8 was `8u` beside OBJ_OFF_FLAGS at 0x08 -- the same
 # word, and its single OBJ_FLAG8_ bit collides with none of the 23 OBJ_FLAG_
 # values, so there was never a second field for the second name to describe.
-FAMILY_ALIAS_BASELINE = 16
+# 16 -> 15. OBJ_OFF_COUNT62 was named after its own offset and sat on
+# OBJ_OFF_HEALTH's 0x62. All four uses were alive/dead tests, and the "suicide
+# kings" cheat settles it beyond argument: it writes 1 and then calls
+# DamageObject with 0x64, which only kills if the field is health.
+FAMILY_ALIAS_BASELINE = 15
 
 DEFINE = re.compile(r"^#define\s+([A-Z][A-Z0-9_]*)\s+(0x[0-9A-Fa-f]+u?|\d+u?)\s*(?:/\*|$)")
 # `_OFF_` was the whole of this for as long as offsets were the thing that got
