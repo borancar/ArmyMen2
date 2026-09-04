@@ -1706,6 +1706,29 @@ the walk faults only when the memory underneath has been rewritten into
 something whose first dword is small. That explains the one bad node out of
 305 and why the earlier probe found exactly one.
 
+**THE WALK THAT FAULTS IS `SightScan`'s, OVER THE LOADED POSITION.** A probe
+logging the caller and the rectangle at the bad node:
+
+    cell=181 obj=000009a7 caller=0074011c
+    rect=1479,3036,2119,3676 cells=5..8/11..14
+
+`nm` puts the caller in `SightScan` + 0x11C, and the rectangle is a 640x640 box
+centred on 1799,3356 -- SARGE'S SAVED POSITION. The grid is `cols`=16 with
+shift 4, so cell 181 is `(11 << 4) + 5`, squarely inside the 256-entry
+allocation. Those cells are visited only after a load: on a fresh map the
+leader stands somewhere else entirely, which is why no drive had ever walked
+them.
+
+That completes the picture and also says why chasing it further needs a
+different tool. The original loads the leader to the same point and its
+`SightScan` walks the same cells, so its grid must be CLEAN there. Both builds
+leave 305 entries dangling; the original's stale heads apparently land on
+memory that new objects' entry blocks reoccupy, so every one still reads as a
+plausible entry, while one of ours lands on something else. Same heap, same
+faithful functions, different malloc/free SEQUENCE -- which is a property of
+everything the two builds allocate around the load, not of any function on
+this chain.
+
 **BUT THE ORIGINAL SURVIVES 3 OF 3 AND WE FAULT ABOUT 2 IN 3, so it is
 SYSTEMATIC rather than luck.** Three consecutive `AM2_NOPATCH=1` loads of the
 same save all came back alive with 325 objects; ours has faulted on two runs
