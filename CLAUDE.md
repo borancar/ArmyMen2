@@ -1706,6 +1706,26 @@ the walk faults only when the memory underneath has been rewritten into
 something whose first dword is small. That explains the one bad node out of
 305 and why the earlier probe found exactly one.
 
+**AND THE TWO DEFECTS THIS SESSION FOUND ARE LINKED: THE MOVEMENT FIX IS WHAT
+EXPOSED THIS ONE.** `SightScan` has five callers in the image, and the one that
+reaches it here is `NextInventorySlot`, whose ONE caller is
+`Type2PlayerInput` -- the function whose gate was inverted until this session.
+While that gate read `!ADDR_OBJ_CTX_OBJ_A` instead of comparing it with the
+object, `Type2PlayerInput` never ran, so `NextInventorySlot` never ran, so
+`SightScan` never ran, so nothing ever walked the cells around the leader.
+
+So the fault is on the FIRST FRAME OF PLAY after a load, not inside
+`State2Enter` -- the log's last line is that state's own
+`calculating region data...`, and the crash follows it. Two fixes landing in
+one session uncovered a third defect that neither could have shown alone: the
+load path had to work before there were stale entries to walk, and the input
+path had to work before anything walked them.
+
+Worth keeping as a general point about this kind of porting. A latent defect
+is invisible until EVERY path that reaches it works, so fixing one thing
+routinely makes the next thing fail, and a suite that goes red after a
+correct change is not evidence the change was wrong.
+
 **THE WALK THAT FAULTS IS `SightScan`'s, OVER THE LOADED POSITION.** A probe
 logging the caller and the rectangle at the bad node:
 
