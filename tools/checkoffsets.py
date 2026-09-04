@@ -95,7 +95,15 @@ def _headers():
 # OBJ_OFF_HEALTH's 0x62. All four uses were alive/dead tests, and the "suicide
 # kings" cheat settles it beyond argument: it writes 1 and then calls
 # DamageObject with 0x64, which only kills if the field is health.
-FAMILY_ALIAS_BASELINE = 15
+# 15 -> 13. EDIT_OFF_SCROLL ("int32_t, constructed 0", one use) sat on
+# EDIT_OFF_DOT's 0x70, which six sites store and follow a widget through -- the
+# constructor's zero is that pointer being nulled. TYPER_OFF_ICON, a bare
+# `AM2_Widget *`, sat on TYPER_OFF_BLINKER's 0x460, which says what the field
+# DOES and has four uses to its one.
+#
+# The pattern in all six retired today: a placeholder describing the field's
+# TYPE or its initial value, beside a name describing its JOB. Keep the job.
+FAMILY_ALIAS_BASELINE = 13
 
 DEFINE = re.compile(r"^#define\s+([A-Z][A-Z0-9_]*)\s+(0x[0-9A-Fa-f]+u?|\d+u?)\s*(?:/\*|$)")
 # `_OFF_` was the whole of this for as long as offsets were the thing that got

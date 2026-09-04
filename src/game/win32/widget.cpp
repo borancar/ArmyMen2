@@ -5066,7 +5066,7 @@ AM2_Widget *__attribute__((thiscall)) DlgMessageConstruct(AM2_Widget *w,
     WidgetAddChild(w, icon);
 
     /* The icon belongs to the TYPER, not to this dialog. */
-    *(void **)((uint8_t *)typer + TYPER_OFF_ICON) = icon;
+    *(void **)((uint8_t *)typer + TYPER_OFF_BLINKER) = icon;
     return w;
 }
 
@@ -7242,7 +7242,7 @@ AM2_Widget *__attribute__((thiscall)) EditConstruct(AM2_Widget *w, char *buf,
     *(int32_t *)(self + EDIT_OFF_CARET)  = 0;
     *(const char **)(self + EDIT_OFF_CHARSET) =
         *(const char *const *)(uintptr_t)ADDR_EDIT_CHARSET_DEFAULT;
-    *(int32_t *)(self + EDIT_OFF_SCROLL) = 0;
+    *(int32_t *)(self + EDIT_OFF_DOT) = 0;
 
     w->x = left;
     w->y = top;

@@ -398,7 +398,9 @@
 /* The typer owns the message box's icon: DlgMessageConstruct builds the
  * MultiSprite, adds it to the DIALOG, and then stores it HERE rather than in
  * a slot of its own. */
-#define TYPER_OFF_ICON           0x460u  /* AM2_Widget * */
+/* TYPER_OFF_ICON lived here as a bare `AM2_Widget *` on
+ * TYPER_OFF_BLINKER's 0x460. The other name carries what the field DOES
+ * -- ticked on every reveal -- and has four use sites to the one. */
 #define ADDR_OPEN_MESSAGE        0x00452990u /* void(void) */
 #define AM2_MESSAGE_SIZE         0x64u
 /* The only one of the five whose bitmap is a GLOBAL rather than a literal --

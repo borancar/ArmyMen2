@@ -1135,7 +1135,9 @@ AM2_Widget *__attribute__((thiscall)) ButtonDelete(AM2_Widget *w,
 #define EDIT_OFF_PAPER      0x66   /* uint8_t, background */
 #define EDIT_OFF_MAX        0x5C   /* int32_t, characters the field accepts */
 #define EDIT_OFF_CARET      0x6C   /* int32_t, constructed 0 */
-#define EDIT_OFF_SCROLL     0x70   /* int32_t, constructed 0 */
+/* EDIT_OFF_SCROLL lived here as "int32_t, constructed 0" on EDIT_OFF_DOT's
+ * 0x70. The constructor only zeroes it, which is the dot POINTER being
+ * nulled; six other sites store and follow a widget there. Collapsed. */
 #define EDIT_OFF_ON_ENTER   0x74   /* void(__cdecl *)(AM2_Widget *) */
 #define EDIT_OFF_ARG78      0x78
 #define EDIT_OFF_ARG7C      0x7C
