@@ -103,7 +103,11 @@ def _headers():
 #
 # The pattern in all six retired today: a placeholder describing the field's
 # TYPE or its initial value, beside a name describing its JOB. Keep the job.
-FAMILY_ALIAS_BASELINE = 13
+# 13 -> 10. Three names on COMM_OFF_ 0x3E8 and two on 0x3F0, and FOUR of the
+# five surplus came from ONE teardown: CommClose frees both buffers, and a name
+# taken from a free cannot tell what a buffer holds. SEND_BUF and RECV_BUF were
+# both misnomers for it -- nothing sends or receives through either.
+FAMILY_ALIAS_BASELINE = 10
 
 DEFINE = re.compile(r"^#define\s+([A-Z][A-Z0-9_]*)\s+(0x[0-9A-Fa-f]+u?|\d+u?)\s*(?:/\*|$)")
 # `_OFF_` was the whole of this for as long as offsets were the thing that got

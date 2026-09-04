@@ -3021,8 +3021,17 @@
 #define ADDR_FMT_SESSION_MAX     0x00475DACu  /* "Session Max Players: %d\n" */
 #define ADDR_FMT_SESSION_CUR     0x00475D90u  /* "Session Cur Players: %d\n" */
 #define ADDR_FMT_SESSION_NAME    0x00475D7Cu  /* "Session Name: %s\n" */
+/* COMM_OFF_RECV_BUF was a second name here and, exactly like SEND_BUF above,
+ * every one of its uses was the teardown free. This name has a WRITER --
+ * CommLobbyStart stores the DPLCONNECTION into it -- which is what settles
+ * it. Two aliases on two adjacent fields, both from the same teardown. */
 #define COMM_OFF_LOBBY_BUF       0x3F0u   /* DPLCONNECTION, 0x800 bytes */
 #define COMM_OFF_IS_HOST         0x3D8u   /* from DPCAPS_ISHOST */
+/* THREE NAMES SAT ON THIS OFFSET: COMM_OFF_SEND_BUF and COMM_OFF_SESSION_BUF
+ * as well. SEND_BUF's only three uses were the teardown's free -- the weakest
+ * possible toucher, which this file already says produces an unsupported name
+ * -- and it is a misnomer besides, since nothing sends through it. Collapsed
+ * onto the name that says what the buffer HOLDS and that twelve sites use. */
 #define COMM_OFF_SESSION_DESC    0x3E8u   /* the fetched DPSESSIONDESC2 */
 #define COMM_OFF_LOBBIED         0x3F8u  /* dplay.cpp sets it on being lobbied */
 /* It had a SECOND name, ADDR_COMM_OFF_SKIP_INTRO, on this same offset -- one
@@ -3046,8 +3055,6 @@
 #define ADDR_STR_LOBBY_AS_SLAVE  0x004754DCu
 #define COMM_OFF_LOBBY           0x3F4u   /* IDirectPlayLobby3A; the store at
                                            * 0x0040ED3C names it */
-#define COMM_OFF_SEND_BUF        0x3E8u   /* game heap */
-#define COMM_OFF_RECV_BUF        0x3F0u   /* game heap */
 /* IT NAMES ITSELF TWICE -- "DestroyFlow: Flow queue for Player %x not found"
  * and "...for me (%x) not found" -- where ADDR_REMOVE_PLAYER was a name off a
  * call site. It reclaims a departing player's queued messages by SIMULATING
@@ -4977,7 +4984,6 @@
 #define ADDR_COMM_INIT_CONN      0x0040DD90u  /* thiscall int32(this, conn) */
 #define ADDR_COMM_SET_SESSION    0x0040E630u  /* thiscall int32(this, desc, flags) */
 #define ADDR_COMM_GET_SESSION    0x0040E5A0u  /* thiscall int32(this) */
-#define COMM_OFF_SESSION_BUF     0x3E8u       /* the description, on the game heap */
 
 /* ---- streaming audio ---------------------------------------------------
  *

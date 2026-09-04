@@ -207,7 +207,7 @@ static_assert((uint32_t)DPERR_BUFFERTOOSMALL == 0x8877001Eu,
 int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm)
 {
     LPDIRECTPLAY4A dp   = *DirectPlaySlot(comm);
-    void         **slot = (void **)((uint8_t *)comm + COMM_OFF_SESSION_BUF);
+    void         **slot = (void **)((uint8_t *)comm + COMM_OFF_SESSION_DESC);
     DWORD          size;
     HRESULT        hr;
 
@@ -1168,13 +1168,13 @@ int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
     uint32_t             ours;
     int32_t              i;
 
-    if (comm_u32(self, COMM_OFF_SEND_BUF)) {
-        orig_free(*(void **)(self + COMM_OFF_SEND_BUF));
-        comm_u32(self, COMM_OFF_SEND_BUF) = 0;
+    if (comm_u32(self, COMM_OFF_SESSION_DESC)) {
+        orig_free(*(void **)(self + COMM_OFF_SESSION_DESC));
+        comm_u32(self, COMM_OFF_SESSION_DESC) = 0;
     }
-    if (comm_u32(self, COMM_OFF_RECV_BUF)) {
-        orig_free(*(void **)(self + COMM_OFF_RECV_BUF));
-        comm_u32(self, COMM_OFF_RECV_BUF) = 0;
+    if (comm_u32(self, COMM_OFF_LOBBY_BUF)) {
+        orig_free(*(void **)(self + COMM_OFF_LOBBY_BUF));
+        comm_u32(self, COMM_OFF_LOBBY_BUF) = 0;
     }
     if (*dp) {
         IDirectPlayX_Release(*dp);
@@ -2026,7 +2026,7 @@ void __cdecl SendGameStartMsg(void)
 
         CommGetSessionDesc(comm);
 
-        desc = *(void **)(comm + COMM_OFF_SESSION_BUF);
+        desc = *(void **)(comm + COMM_OFF_SESSION_DESC);
         *(uint32_t *)((uint8_t *)desc + 4) |= AM2_SESSION_FLAGS_START;
         CommSetSessionDesc(comm, desc, 0);
 
