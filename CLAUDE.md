@@ -1331,37 +1331,40 @@ Ten disabled nodes remain against two, and the other eight are `MpPanelUpdate`
 applying the same test per row -- pre-existing code, the same open question,
 not a second bug.
 
-**THE UPSTREAM DIFFERENCE IS FOUND, AND TWO BUFFERS SPELL IT OUT BYTE FOR
-BYTE.** `RefreshMapSelection` is what computes the three handshake checksums,
-and it exits early on a bad map -- which is why ours writes zeros where the
-original writes three sums. Dumping `ADDR_MP_SCRIPT_NAME` on both sides at
-panel-open says why:
+**THAT FINDING WAS WRONG AND THE CONTROL WAS UNMATCHED -- SECOND TIME THIS
+SESSION, SAME CAUSE.** It was recorded here that `ADDR_MP_SCRIPT_NAME` reads
+`death\0txt` on the original and `\0eath.txt` on ours, and therefore that
+`ApplyGameSettings` takes opposite arms on the two sides. Re-run with the SAME
+`Options.cfg` copied in before each half, both sides read `\0eath.txt` and
+both read a name count of 6. The two halves are byte-identical; the earlier
+pair came from manual runs whose config files differed, because a previous
+run of the panel had persisted a rules name into one of them.
 
-| | bytes | what ran |
-|---|---|---|
-| original | `death\0txt` | the COPY arm |
-| ours | `\0eath.txt` | the ELSE arm |
+`LoadOptions()` runs immediately before `ApplyGameSettings`, so the config IS
+an input to the very buffer being compared -- and `tools/ab.sh` already knows
+this, which is the part that stings. It copies `Options.cfg` per side and
+leaves `Options.cfg.mpoptions.orig` and `.recon` in its artifacts; those files
+were sitting in the directory listing I read and I did not connect them.
 
-Both start from the same literal, `"death.txt"`. The original `strcpy`'d the
-name table's record name `"death"` over it, leaving `txt` behind; ours cleared
-BYTE ZERO and left `eath.txt` behind. So `ApplyGameSettings` took opposite
-arms, and its condition is `ADDR_NAME_TABLE_COUNT != 0`.
+**A CONTROL IS NOT MATCHED BECAUSE THE COMMAND LINE MATCHES.** The first
+instance this session was a `-dbg` present on one half only; this one is a
+file on disk that one half had written earlier. Both times the reasoning built
+on top was detailed, internally consistent and wrong. When two runs disagree
+about a GLOBAL, ask what on disk feeds it before asking what code differs --
+and prefer `ab.sh`, which matches the inputs, over a hand-rolled pair of runs.
 
-**That vindicates the else branch rather than convicting it.** The arm is
-faithful -- `mov byte [0x511c08], bl` writes exactly one byte, which is why
-the tail survives to be read -- and it fires correctly for the state it is
-given. What differs is the STATE: the original's name table is populated when
-`ApplyGameSettings` runs and ours is empty, though both read 6 by the time the
-panel is up. `ScriptListFind` lazily calls `ReadMpMapList` when the count is
-zero and `ApplyGameSettings` does NOT, so something reaches the table earlier
-in the original than in ours.
+What survives the correction, because it was measured on our side alone: a
+probe in `ApplyGameSettings` prints `count=0` and the "Lobby start" line
+follows it, so the name table really is empty when that function runs and is
+populated afterwards by `CommLobbyStart`'s `ReadMpMapList`. That is true of
+the reconstruction and, since both sides take the same arm, evidently of the
+original too. So the else branch is faithful, fires correctly, and is not the
+mpoptions difference.
 
-**A ONE-BYTE CLEAR LEAVES ITS OWN EVIDENCE, which is worth knowing generally.**
-Had the original memset the buffer, both sides would read empty and the two
-arms would be indistinguishable. Because it writes a single NUL, the debris
-after it says what the buffer used to hold and therefore which arm ran -- a
-free record of history in a global nobody logged. Dump the WHOLE buffer, not
-the string.
+What remains genuinely different is narrower than before and still real: the
+original logs six handshake checksums at panel-open and ours logs none, so
+`RefreshMapSelection` exits early on our side for a reason that is NOT the
+script name -- that buffer is identical on both.
 
 **A READ-ONLY OFFSET LOOKED LIKE A CHEAP RATCHET AND IS NOT ONE, measured
 before it was built.** `checkoffsets.py` refuses a second name on an offset;
