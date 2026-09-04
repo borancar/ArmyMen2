@@ -1422,7 +1422,29 @@ stops matching. Grepping `orig.h`'s `MP_PANEL_OFF_*` against the constructor
 finds all three in one command -- and run for real it reports SIX:
 `CHATBOX`, `COLOUR_SEL`, `GAME_BAR`, `GAME_BOX`, `MAP_BAR` and `MAP_BOX`.
 `PREVIEW` is built, so the test is discriminating rather than merely
-pessimistic. That is the check to run on any screen whose
+pessimistic.
+
+**THE GAME BOX IS WRITTEN NOW, AND THE SCRIPT NAME MATCHES THE ORIGINAL BYTE
+FOR BYTE** -- `death\0txt` on both sides after the panel opens, where ours was
+`\0eath.txt` before. So the name-table walk and the `strcpy` that follows it
+are right.
+
+**ITS FIRST PLACEMENT CRASHED, AND THE ORDER IS THE FINDING.**
+`FillListFromRules` reaches `panel + MP_PANEL_OFF_TYPE_BOX` and reads that
+widget's rows, so calling it before the 0x204 box exists reads a garbage
+pointer -- a page fault at `FillListFromRules+0x5c`. The original stores its
+six list fields in a fixed order, and the addresses say it outright: +0x204 at
+0x0043094E, +0x208 at 0x00430F3A, +0x20C at 0x00430FDD, +0x210 at 0x004312C3,
++0x214 at 0x0043136B, +0x218 at 0x00431481. **Scanning for the stores to a
+record's fields gives the constructor's order in one command**, which is worth
+having before inserting anything into a constructor this long.
+
+What is still wrong is that our TYPE_BOX block does two jobs. It builds the
+0x204 box AND fills it with MAP rows, where the original keeps those apart --
+0x204 is the box `FillListFromRules` fills from the rules file and 0x210 is
+the maps. So the game box currently sits after the map block and the map list
+still has no name to look up; splitting the conflated block is the next step,
+and it is why `ADDR_MAP_NAME` is still empty. That is the check to run on any screen whose
 constructor is suspected, and it is the scoped form of the read-only-offset
 idea that was rejected as a whole-tree gate.
 

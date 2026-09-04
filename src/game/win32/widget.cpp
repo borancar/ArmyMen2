@@ -16327,11 +16327,11 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
             const uint8_t *maps = (const uint8_t *)ScriptListFind(
                 (char *)(uintptr_t)ADDR_MP_SCRIPT_NAME);
 
-            if (maps && *(const int32_t *)(maps + MPMAPS_OFF_COUNT) > 0) {
+            if (maps && *(const int32_t *)(maps + NAMEREC_OFF_COUNT) > 0) {
                 const char *names = *(const char *const *)
-                                        (maps + MPMAPS_OFF_NAMES);
+                                        (maps + NAMEREC_OFF_MAPS);
                 int32_t     n     = *(const int32_t *)
-                                        (maps + MPMAPS_OFF_COUNT);
+                                        (maps + NAMEREC_OFF_COUNT);
                 int32_t     i;
 
                 for (i = 0; i < n; i++) {
@@ -16384,6 +16384,72 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
         *(AM2_Widget **)((uint8_t *)*slot + 0x7C) = child;
         *(AM2_Widget **)((uint8_t *)child + 0x58) = *slot;
         *(int32_t *)((uint8_t *)child + 0x50) = 0;
+    }
+
+    /* THE GAME TYPE LIST, which was missing entirely -- and its last act is
+     * what made every other symptom on this screen.
+     *
+     * The original walks the name table at 0x00430DD9, adding each rules
+     * record to this box, and remembers which one matches the current
+     * ADDR_MP_SCRIPT_NAME with an inlined strcmp. Then, whenever the table is
+     * non-empty, it copies name_table[sel]'s own name back INTO that global
+     * with an inlined strcpy at 0x00430E96 -- `sel` defaulting to 0.
+     *
+     * That last copy is the load-bearing line. On a fresh panel nothing
+     * matches, so record 0 wins and the script name becomes "death"; the map
+     * list below then hands ScriptListFind a name that EXISTS, finds the ten
+     * maps that rules file allows, and SelectLevel fills ADDR_MAP_NAME and
+     * ADDR_MAP_FOLDER. Without it the global stays empty and everything
+     * downstream fails quietly: empty map list, no SelectLevel, ".amm" as the
+     * path, and RefreshMapSelection's bad-map exit with no checksums.
+     *
+     * Measured on both sides of the panel-open with a matched Options.cfg:
+     * the original goes empty -> "death" across it and ours did not move.
+     *
+     * The record is AM2_NAME_RECORD_SIZE apart; the row's TEXT is the third
+     * name at +0x80 and its VALUE is the record itself, and the rules file
+     * whose lines fill the OTHER box is the second name at +0x40 with ".txt"
+     * appended. */
+    {
+        AM2_Widget **slot = (AM2_Widget **)(p + MP_PANEL_OFF_GAME_BOX);
+        AM2_Widget  *child;
+        void        *rows;
+        char         path[0x100];
+        int32_t      sel = 0;
+
+        rows = orig_operator_new(AM2_ROWS_SIZE);
+        rows = rows ? RecordCtor(rows, 0) : (void *)0;
+
+        for (i = 0;
+             i < *(const int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT); i++) {
+            uint8_t *rec = *(uint8_t **)AM2_IMAGE(ADDR_NAME_TABLE_BASE)
+                         + (uint32_t)i * AM2_NAME_RECORD_SIZE;
+
+            if (!rec)
+                continue;
+            ListAdd(rows, (const char *)(rec + NAMEREC_OFF_NAME3), rec);
+            if (strcmp((const char *)(rec + NAMEREC_OFF_NAME),
+                       (const char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME)) == 0)
+                sel = i;
+        }
+
+        if (*(const int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT) != 0) {
+            uint8_t *rec = *(uint8_t **)AM2_IMAGE(ADDR_NAME_TABLE_BASE)
+                         + (uint32_t)sel * AM2_NAME_RECORD_SIZE;
+
+            strcpy((char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME),
+                   (const char *)(rec + NAMEREC_OFF_NAME));
+            am2_sprintf(path, (const char *)AM2_IMAGE(ADDR_FMT_DOT_TXT),
+                        (const char *)(rec + NAMEREC_OFF_NAME2));
+            FillListFromRules(path, w);
+        }
+
+        child = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_BYTES);
+        *slot = child ? ListBoxConstruct(child, 0x152, 0x35, 0x97, 0x42, rows,
+                                         (int32_t)(uintptr_t)OnMpGameType,
+                                         0, 1)
+                      : (AM2_Widget *)0;
+        WidgetAddChild(w, *slot);
     }
 
     /* The two ready lamps, green and red, at the same size and 0x35 apart. */

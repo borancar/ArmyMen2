@@ -12326,8 +12326,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* The multiplayer map list, found by ScriptListFind on the name below. Its
  * count is at +0xC4 and a POINTER to the names at +0xC8, one every 0x40 bytes
  * -- read off MpPanelConstruct's loop at 0x004311A1. */
-#define MPMAPS_OFF_COUNT         0x0C4u
-#define MPMAPS_OFF_NAMES         0x0C8u
+/* MPMAPS_OFF_COUNT and MPMAPS_OFF_NAMES lived here and were a second spelling
+ * of NAMEREC_OFF_COUNT and NAMEREC_OFF_MAPS, which had held 0xC4 and 0xC8 all
+ * along. A NEW PREFIX is invisible to checkoffsets, exactly as this file warns,
+ * and the grep that would have caught it is for the OFFSET and not the name.
+ * Collapsed. AM2_MPMAP_STRIDE stays: it is the stride BETWEEN map names in the
+ * array those fields describe, not a field of the record. */
 #define AM2_MPMAP_STRIDE         0x40u
 #define ADDR_MP_SCRIPT_NAME      0x00511C08u  /* char[], the multiplayer script */
 
