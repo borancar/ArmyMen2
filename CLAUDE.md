@@ -1062,8 +1062,30 @@ original at 0x00456BC0 ends `ret 0x1C` -- 28 bytes, seven dwords -- which is
 exactly `b0, b1, flag` plus the four of a `RECT` passed by value, matching our
 signature. (Its entry also shows a `ret 4`, which belongs to the next function
 inside a merged `functions.tsv` row, not to this one.) So the caller really is
-supplying mid-string pointers rather than our frame reading the wrong slots,
-and what to read next is whatever the MP panel takes those two names FROM.
+supplying mid-string pointers rather than our frame reading the wrong slots.
+
+**THE POINTERS ARE LOG FORMAT STRINGS.** `0x00485E30` is `"type %d\n"` and
+`0x00485E44` is `"oyMessageSend: uid=%x, pos=("`, where the names the panel
+should pass are `0x0048701C` `"03_028_00_green.bmp"` and `0x00487030`
+`"03_028_01_green.bmp"` -- or the red pair at `0x00487178`/`0x0048718C`.
+
+**EVERY OTHER LINK IN THE CHAIN CHECKS OUT**, which is what makes this narrow.
+All fourteen original callers of `MultiSpriteConstruct` push one of those two
+correct pairs, in the order our signature expects -- the `_00_` name pushed
+last, so it lands as `b0`. All eight of OUR call sites pass a literal or a
+macro, and every `AM2_BMP_*` macro resolves to a real `.bmp` name; the only
+two that do not are record SIZES rather than addresses.
+
+**AND THE CALLER RESOLUTION WAS CHECKED RATHER THAN ASSUMED**, which nearly
+went wrong. The DLL is relocated, and the first resolution used a base taken
+from an EARLIER run's log -- which would have named the wrong function had it
+moved. The run's own `patch:` lines settle it with no assumption:
+`patch: MultiSpriteConstruct 00456bc0 -> 770623F0`, and the probe's callers
+were that address plus 0x50 and plus 0xD5. **Read the base out of the run you
+are diagnosing, not out of a previous one.**
+
+What remains is one more level: a probe on `MultiSpriteConstruct`'s OWN caller,
+to see which function hands it a format string where a bitmap name belongs.
 
 
 Worth knowing before spending a control run on it: a deterministic pixel count
