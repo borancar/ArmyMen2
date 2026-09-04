@@ -40,12 +40,15 @@ game's own log (identical, five messages) and the title screen (0 of 307,200
 pixels on a run where the cursor lands in the same place, 45 when it does
 not). Tested in the failing direction with a negative budget.
 
-Past the menu, the port loads and renders a Boot Camp mission -- map, HUD,
-radar, Sarge's stats, the briefing dialog -- and its sub-state, game state,
-pause mask and clock all match the injected build in live play. A report that
-Sarge cannot be moved did NOT reproduce here: the same measurements against
-the injected build give the same answers, including for held keys and
-click-to-move, so no divergence has been demonstrated.
+Past the menu the port loads and plays a Boot Camp mission, and its LIVE
+OBJECT STATE is identical to the injected build's -- all 1,610 lines of
+`tools/objdump.py --table`, diffed with no budget, taken in ordinary play at
+sub-state 0x21. That is the same artifact `ab.sh bootcamp` treats as its
+sharpest, and it is a much stronger statement than the title screen.
+
+A report that Sarge cannot be moved did not reproduce: with the cursor placed
+absolutely through the socket, the same click moves him in NEITHER build, so
+the click is not a move order and the port is not diverging.
 
 ## NOTHING LEFT TO TRANSPOSE
 

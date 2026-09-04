@@ -3496,7 +3496,36 @@ exact oracle**, however meaningful it is when it is set.
   of the first five unreferenced candidates checked by hand, two disassembled to
   garbage. So the figure is a lower bound and is meant to be — 260 candidates,
   186 confirmed. Do not rewrite `functions.tsv` from the naive scan.
-- **AN A/B CAN PASS ON AN EMPTY STATE DUMP, and it did.** `tools/ab.sh`
+- **THE PORT'S LIVE OBJECT STATE IS IDENTICAL TO THE ORIGINAL'S, all 1,610
+lines of it**, and that is what the control socket was added to find out.
+Driven to the same point of the same Boot Camp mission -- past both dialogs,
+sub-state 0x21, the clock running -- `tools/objdump.py --table` gives the two
+builds the same 1,609 objects with the same type, flags, army, position,
+tile, both rectangles, health, cell count, AI mode and pose. Not a budget, not
+a pixel count: a diff with no slack that comes back empty.
+
+That is a far stronger statement than `tools/samenu.sh`'s title screen,
+because it is taken in PLAY rather than at a static menu, and it is the
+artifact `ab.sh bootcamp` already treats as its sharpest -- the one that has
+caught a wrong field five times where the pixels and the log agreed.
+
+**AND IT SETTLES A BUG REPORT THAT FOUR ROUNDS OF PROBING COULD NOT.** The
+port was reported unable to move Sarge. With the cursor placed ABSOLUTELY
+through the socket rather than by relative motion -- which Wine's
+acceleration makes land somewhere else, and which is why every earlier
+attempt was inconclusive -- a click at the same point moves Sarge in NEITHER
+build: `pos=1743,1052` before and after, on both. So the click is not a move
+order, the port is not diverging, and the thing to fix is the drive rather
+than the reconstruction.
+
+The general shape is one this file already states and I still had to learn
+again here: **a bug report about the port needs the ORIGINAL measured the
+same way, first, with an artifact that cannot pass on nothing.** Two of the
+comparisons on the way to this one came back "equal" because both sides were
+EMPTY -- an objdump against the wrong port, and an A/B whose drive never
+reached the mission.
+
+**AN A/B CAN PASS ON AN EMPTY STATE DUMP, and it did.** `tools/ab.sh`
 compares the object table only `if [ -s ... ]` on both sides, so a run where
 the drive never reached the mission produced two EMPTY dumps, skipped the
 comparison silently, and reported **A/B clean** on a four-line log and 0
