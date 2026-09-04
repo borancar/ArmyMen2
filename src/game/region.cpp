@@ -8595,7 +8595,15 @@ void __cdecl StepType2(void *obj)
     if (*(const int32_t *)(o + OBJ_OFF_SARGE)
         && (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
            == (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
-        if (!*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A
+        /* `cmp [0x5122c8], esi; jne` at 0x0044B9B0 -- the test is whether
+         * the FOLLOWED OBJECT IS THIS ONE, not whether anything is followed.
+         * Written as a test for null, it inverted the gate in practice: the
+         * camera follows Sarge for the whole of a mission, so the original
+         * takes this arm every frame and we took it never. Nothing moved on
+         * a keypress or a click, in either build, while the original walked
+         * -- and every A/B was silent, because both sides are driven with
+         * the same input and agreed about ignoring it. */
+        if (*(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A == obj
             && !*(const uint32_t *)(o + OBJ_OFF_RIDING))
             Type2PlayerInput(obj, w, out);
         Type2PlayerStep(obj, out);
