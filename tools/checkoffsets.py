@@ -129,11 +129,20 @@ def _headers():
 #                   NOT [objtable's owner] -- that constant is 0x0004 and
 #                   belongs to a different structure entirely. Two right
 #                   names, one collision." Do not collapse it.
-#   OBJ_OFF_ 0xA4   CHAIN_PARENT_UID against PTR_LIST, and 0x534 STUCK_SINCE
-#   OBJ_OFF_ 0x534  against TABLE_REC_SLOT. Still unread. The OBJ_ prefix
-#                   covers eight object TYPES, so either may be the documented
-#                   one-offset-several-types case; check the DESTRUCTOR first,
-#                   which is what settled three other pairs.
+#   OBJ_OFF_ 0xA4   LEGITIMATE. CHAIN_PARENT_UID is the item chain's back
+#                   pointer, written by CreateChainedItem; PTR_LIST is one of
+#                   four dwords a MISSILE's save format reads by position, and
+#                   gameproc.cpp already calls that overloading "the same as at
+#                   0x52C and 0x538".
+#   OBJ_OFF_ 0x534  LEGITIMATE, same shape. STUCK_SINCE is a roach's stuck
+#                   timestamp, written from ADDR_GAME_CLOCK_MS in the roach
+#                   step; TABLE_REC_SLOT is a comm-slot pointer in the
+#                   TABLE_REC_ family that begins at 0x52C, which CLAUDE.md
+#                   already records as carrying three names for three types.
+#
+# So of the six, FIVE are correct by design and one -- OBJ_FLAG_ 0x2 -- is real
+# backlog. The count is fully explained; do not treat it as five defects and a
+# spare.
 #   OBJ_FLAG_ 0x2   OVERDUE against REPLACED, two readings of one bit, already
 #                   recorded above as backlog.
 # 8 -> 6. The 0x8C/0x90 pair flagged above as needing the writer is settled and
