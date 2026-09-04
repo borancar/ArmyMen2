@@ -13966,6 +13966,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * Note docs/functions.tsv gives this entry 160 bytes, which is a MERGE: the
  * function ends at 0x00431D7F and 0x00431D80 is a different one. */
 #define ADDR_CLEAR_MENU_MSGS     0x00431D70u  /* void(void) */
+/* The MAP list's row callback, and the function the note above says begins at
+ * 0x00431D80. Named from the list-box constructor's callback slot in
+ * MpPanelConstruct -- the same route that named OnMpGameType, and the only
+ * route there is: nothing CALLS either address. Still original. */
+#define ADDR_MP_ON_MAP_PICK      0x00431D80u  /* void(w, rows, row) */
 #define ADDR_GAME_OPERATOR_NEW   0x00464900u  /* void *(size_t); MSVC operator new */
 #define ADDR_START_MULTIPLAYER   0x0042F310u  /* void(void), a button handler */
 #define ADDR_MP_DATA_PROBE       0x0048700Cu  /* "data\\mpalpine" */

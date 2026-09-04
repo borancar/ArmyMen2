@@ -1439,12 +1439,35 @@ six list fields in a fixed order, and the addresses say it outright: +0x204 at
 record's fields gives the constructor's order in one command**, which is worth
 having before inserting anything into a constructor this long.
 
-What is still wrong is that our TYPE_BOX block does two jobs. It builds the
-0x204 box AND fills it with MAP rows, where the original keeps those apart --
-0x204 is the box `FillListFromRules` fills from the rules file and 0x210 is
-the maps. So the game box currently sits after the map block and the map list
-still has no name to look up; splitting the conflated block is the next step,
-and it is why `ADDR_MAP_NAME` is still empty. That is the check to run on any screen whose
+**SPLIT, AND THE CHAIN COMPLETES.** Our TYPE_BOX block was doing two jobs --
+building the 0x204 box AND filling it with MAP rows -- where the original
+keeps them apart: 0x204 holds the rules file's own lines and 0x210 the maps.
+With the three boxes in the original's order, which its field stores give
+outright (0x204, 0x208, 0x210), every global on the screen now matches:
+
+| | original | ours, before | ours, after |
+|---|---|---|---|
+| `ADDR_MP_SCRIPT_NAME` | `death` | empty | `death` |
+| `ADDR_MAP_NAME` | `alpine3_mp` | empty | `alpine3_mp` |
+| `ADDR_MAP_FOLDER` | `data\mpalpine` | all zero | `data\mpalpine` |
+| the three checksums | `df072909717e62202d690575` | all zero | `df072909717e62202d690575` |
+
+**The checksum triple is the one that counts**, because `ab.sh` diffs it as a
+`state` artifact with no budget at all -- three values that never reach the
+screen, compared exactly, and they agree. That is the strongest evidence this
+screen has ever produced, and it went from all-zero to identical.
+
+The ORDER is the whole of it and it is not a detail: the game box writes
+`ADDR_MP_SCRIPT_NAME` and the map list looks up BY that name, so running them
+the other way round searches for an empty string, finds nothing, and never
+calls `SelectLevel`. Take a long constructor's order from its field stores
+rather than from reading it top to bottom.
+
+What is still wrong is no longer construction. Our side answers ONE `widgets`
+dump where the original answers three, so it stops responding during the
+clicks that follow -- and the original logs its checksums twice to our once,
+which is the same story from the other end. The panel is built correctly and
+something in the click path is not. That is the check to run on any screen whose
 constructor is suspected, and it is the scoped form of the read-only-offset
 idea that was rejected as a whole-tree gate.
 

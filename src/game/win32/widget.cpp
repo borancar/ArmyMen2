@@ -16294,7 +16294,11 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
          * absent one that is documented. */
     }
 
-    /* THE MAP-TYPE LIST and its scrollbar.  The idiom for every fixed child
+    /* THE RULES-TEXT LIST and its scrollbar. Its rows start EMPTY and are
+     * filled later by FillListFromRules from the chosen rules file -- this
+     * block used to build the MAP list into this box, which is a different
+     * field (0x210) and a different list. The original keeps 0x204 for the
+     * rules file's own lines.  The idiom for every fixed child
      * is the same: allocate, and if that succeeded build it with a rectangle
      * from RectSet followed by the class's own arguments; then store the
      * pointer in its field and add it -- adding a null child is what the
@@ -16303,7 +16307,6 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
         AM2_Widget **slot = (AM2_Widget **)(p + MP_PANEL_OFF_TYPE_BOX);
         AM2_Widget  *child;
         void        *rows;
-        int32_t      sel = 0;
 
         /* THE MAP LIST, which was missing entirely -- the box was built with
          * no rows at all, so nothing was ever listed and, worse, nothing was
@@ -16322,39 +16325,6 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
          * ADDR_MAP_NAME, so the original comes up on alpine3_mp. */
         rows = orig_operator_new(AM2_ROWS_SIZE);
         rows = rows ? RecordCtor(rows, 0) : (void *)0;
-
-        {
-            const uint8_t *maps = (const uint8_t *)ScriptListFind(
-                (char *)(uintptr_t)ADDR_MP_SCRIPT_NAME);
-
-            if (maps && *(const int32_t *)(maps + NAMEREC_OFF_COUNT) > 0) {
-                const char *names = *(const char *const *)
-                                        (maps + NAMEREC_OFF_MAPS);
-                int32_t     n     = *(const int32_t *)
-                                        (maps + NAMEREC_OFF_COUNT);
-                int32_t     i;
-
-                for (i = 0; i < n; i++) {
-                    uint8_t *lvl = (uint8_t *)FindLevelByName(
-                        (char *)names + (uint32_t)i * AM2_MPMAP_STRIDE);
-
-                    if (!lvl)
-                        continue;
-                    ListAdd(rows, (const char *)(lvl + LEVEL_OFF_NAME), lvl);
-                    if (strcmp((const char *)(lvl + LEVEL_OFF_MAP_NAME),
-                               (const char *)AM2_IMAGE(ADDR_MAP_NAME)) == 0)
-                        sel = i;
-                }
-
-                {
-                    void *lvl = FindLevelByName(
-                        (char *)names + (uint32_t)sel * AM2_MPMAP_STRIDE);
-
-                    if (lvl)
-                        SelectLevel(lvl);
-                }
-            }
-        }
 
         child = (AM2_Widget *)orig_operator_new(0x98);
         *slot = child ? ListBoxConstruct(child, 0x16, 0xC8, 0xFA, 0x5A,
@@ -16448,6 +16418,66 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
         *slot = child ? ListBoxConstruct(child, 0x152, 0x35, 0x97, 0x42, rows,
                                          (int32_t)(uintptr_t)OnMpGameType,
                                          0, 1)
+                      : (AM2_Widget *)0;
+        WidgetAddChild(w, *slot);
+    }
+
+    /* THE MAP LIST, in the field that actually holds it. It has to come AFTER
+     * the game box, because the game box is what writes ADDR_MP_SCRIPT_NAME
+     * and this lookup is by that name -- run the other way round it searches
+     * for an empty string, finds nothing, and SelectLevel never fills
+     * ADDR_MAP_NAME or ADDR_MAP_FOLDER.
+     *
+     * The original's own order says the same and is worth taking from the
+     * stores rather than the reading: 0x204 at 0x0043094E, 0x208 at
+     * 0x00430F3A, 0x210 here at 0x004312C3.
+     *
+     * `sel` starts at 0 and moves only on a name match, so the first map wins
+     * on a fresh panel -- which is why the original comes up on alpine3_mp. */
+    {
+        AM2_Widget **slot = (AM2_Widget **)(p + MP_PANEL_OFF_MAP_BOX);
+        AM2_Widget  *child;
+        void        *rows;
+        int32_t      sel = 0;
+
+        rows = orig_operator_new(AM2_ROWS_SIZE);
+        rows = rows ? RecordCtor(rows, 0) : (void *)0;
+
+        {
+            const uint8_t *maps = (const uint8_t *)ScriptListFind(
+                (char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME));
+
+            if (maps && *(const int32_t *)(maps + NAMEREC_OFF_COUNT) > 0) {
+                const char *names = *(const char *const *)
+                                        (maps + NAMEREC_OFF_MAPS);
+                int32_t     n     = *(const int32_t *)
+                                        (maps + NAMEREC_OFF_COUNT);
+
+                for (i = 0; i < n; i++) {
+                    uint8_t *lvl = (uint8_t *)FindLevelByName(
+                        (char *)names + (uint32_t)i * AM2_MPMAP_STRIDE);
+
+                    if (!lvl)
+                        continue;
+                    ListAdd(rows, (const char *)(lvl + LEVEL_OFF_NAME), lvl);
+                    if (strcmp((const char *)(lvl + LEVEL_OFF_MAP_NAME),
+                               (const char *)AM2_IMAGE(ADDR_MAP_NAME)) == 0)
+                        sel = i;
+                }
+
+                {
+                    void *lvl = FindLevelByName(
+                        (char *)names + (uint32_t)sel * AM2_MPMAP_STRIDE);
+
+                    if (lvl)
+                        SelectLevel(lvl);
+                }
+            }
+        }
+
+        child = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_BYTES);
+        *slot = child ? ListBoxConstruct(child, 0x154, 0xAD, 0xF6, 0x48, rows,
+                                         (int32_t)ADDR_MP_ON_MAP_PICK, 0, 1)
                       : (AM2_Widget *)0;
         WidgetAddChild(w, *slot);
     }
