@@ -1585,7 +1585,28 @@ painter's names, and `controls`, `audiovol` and `difficulty` stay clean.
 keep**: it failed the build the moment the rename produced two
 `CHECKBOX_OFF_CAPTION` defines. It compares WITHIN a prefix, so it is blind to
 a second prefix and sharp about a second name -- which is exactly the split
-this file already describes for a NEW prefix, met from the other direction. That is the check to run on any screen whose
+this file already describes for a NEW prefix, met from the other direction.
+
+**AND IT HAD A SECOND BLIND SPOT, WHICH WAS THE FILE LIST.** `checkoffsets.py`
+read `src/inject/orig.h` and nothing else, so the **68** `_OFF_` macros in
+`src/game/**.h` were invisible to it -- including `LIST_OFF_ARG7C`, a
+"constructed 0" placeholder sitting on `LIST_OFF_ARROWBAR`'s 0x7C in the SAME
+family, which is the one thing the tool exists to catch. Three
+`FOCUSLABEL_OFF_INK2/3/4` were the same shape against `INK_FOCUS`, `PAPER` and
+`PAPER_FOCUS`.
+
+It reads them now, and found a straight duplicate on its first run:
+`VTABLE_EDIT` defined identically in `orig.h` and `widget.h`.
+
+**A NAME THAT LIVES IN A GAME HEADER STILL BELONGS IN `orig.h` IF ANYTHING
+ELSE USES IT.** Deleting `LIST_OFF_ARROWBAR` from `orig.h` in favour of the
+descriptive copy broke `commmsg.cpp`, which does not include `widget.h` --
+the shared header is the canonical home and the comment moves to it, not the
+other way round.
+
+**The baseline went 15 to 17 and that is COVERAGE, not decay.** Four aliases
+were collapsed before the number was taken, so it would have been higher
+still. Whenever this figure moves, say which of the two it is. That is the check to run on any screen whose
 constructor is suspected, and it is the scoped form of the read-only-offset
 idea that was rejected as a whole-tree gate.
 

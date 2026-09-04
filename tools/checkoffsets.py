@@ -48,6 +48,20 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HEADER = os.path.join(ROOT, "src", "inject", "orig.h")
 
+# AND THE GAME'S OWN HEADERS, which this tool did not read for as long as it
+# existed. 68 `_OFF_` macros live in src/game/**.h, and every duplicate among
+# them was invisible: LIST_OFF_ARG7C sat on LIST_OFF_ARROWBAR's 0x7C -- a
+# placeholder beside the body-derived name, in the SAME family, which is the
+# one thing this checker is for. It was found by a hand scan while chasing an
+# unrelated bug, which is the argument for the tool reading them.
+def _headers():
+    out = [HEADER]
+    for base, _dirs, files in os.walk(os.path.join(ROOT, "src", "game")):
+        for f in sorted(files):
+            if f.endswith(".h"):
+                out.append(os.path.join(base, f))
+    return out
+
 # Two names on one offset inside a family.  May only go down.
 #
 # It went 13 -> 14 when `_FLAG_` families joined `_OFF_` ones, and the extra
@@ -62,7 +76,19 @@ HEADER = os.path.join(ROOT, "src", "inject", "orig.h")
 # Net one down, and the new pair is EVIDENCED rather than assumed: TrooperFire
 # logs +0x04 as a uid and TrooperFireSend hands it to UidOnWire, while the
 # "owner" reading of the same offset stands unresolved beside it.
-FAMILY_ALIAS_BASELINE = 15
+# 15 -> 17, and the rise is COVERAGE rather than decay. This tool read only
+# orig.h until now; teaching it the 68 `_OFF_` macros in src/game/**.h brought
+# their aliases into the count for the first time. Four were collapsed in the
+# same commit before this number was taken -- LIST_OFF_ARG7C onto
+# LIST_OFF_ARROWBAR, and FOCUSLABEL_OFF_INK2/3/4 onto INK_FOCUS, PAPER and
+# PAPER_FOCUS, placeholders every one of them sitting on a body-derived name --
+# and a straight duplicate of VTABLE_EDIT was deleted, so without those the
+# figure would have been higher still.
+#
+# A baseline that goes UP when a checker starts looking somewhere new is not
+# the ratchet failing; it is the ratchet's population changing. Say which of
+# the two it is whenever this number moves.
+FAMILY_ALIAS_BASELINE = 17
 
 DEFINE = re.compile(r"^#define\s+([A-Z][A-Z0-9_]*)\s+(0x[0-9A-Fa-f]+u?|\d+u?)\s*(?:/\*|$)")
 # `_OFF_` was the whole of this for as long as offsets were the thing that got
@@ -83,20 +109,21 @@ def main():
     seen = {}          # name -> [(line, value)]
     families = {}      # family -> {value: [names]}
 
-    with open(HEADER, encoding="utf-8") as fh:
+    for path in _headers():
+      with open(path, encoding="utf-8") as fh:
         for lineno, line in enumerate(fh, 1):
-            m = DEFINE.match(line)
-            if not m:
-                continue
-            name, raw = m.group(1), m.group(2)
-            try:
-                value = value_of(raw)
-            except ValueError:
-                continue
-            seen.setdefault(name, []).append((lineno, value))
-            fam = FAMILY.match(name)
-            if fam:
-                families.setdefault(fam.group(1), {}).setdefault(value, []).append(name)
+              m = DEFINE.match(line)
+              if not m:
+                    continue
+              name, raw = m.group(1), m.group(2)
+              try:
+                    value = value_of(raw)
+              except ValueError:
+                    continue
+              seen.setdefault(name, []).append((lineno, value))
+              fam = FAMILY.match(name)
+              if fam:
+                    families.setdefault(fam.group(1), {}).setdefault(value, []).append(name)
 
     redefined = {n: v for n, v in seen.items() if len(v) > 1}
     alias_pairs = []

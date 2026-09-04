@@ -96,7 +96,8 @@ typedef struct AM2_Widget {
 #endif
 /* The edit box, twenty-fifth of the thirty-three. */
 #ifndef VTABLE_EDIT   /* the standalone build defines it as an object */
-#define VTABLE_EDIT         0x0046FC98u
+/* VTABLE_EDIT is orig.h's; it was defined here too, identically, which is
+ * legal C and says nothing. Deleted rather than left as a second copy. */
 #endif
 /* The three-state button, and what its destructor restores. */
 #ifndef VTABLE_BUTTON   /* the standalone build defines it as an object */
@@ -955,7 +956,6 @@ typedef struct AM2_ListRows {
 #define LIST_OFF_CALLBACK    0x68   /* the row callback, or ADDR_LOG for none */
 #define LIST_OFF_ON_TICK     0x6C   /* void(*)(AM2_Widget *), each update */
 #define LIST_OFF_ARG70       0x70   /* constructed 0 */
-#define LIST_OFF_ARG7C       0x7C   /* constructed 0 */
 #define LIST_ROW_STRIDE      0x104  /* 260 bytes per row record */
 /* A row whose text opens with this cannot be picked: clicking it or pressing
  * RETURN on it plays AM2_SND_MENU_REFUSE and leaves the choice alone. It is

@@ -6342,6 +6342,12 @@ typedef struct {
 #define ADDR_STR_HARD            0x0048B718u
 /* Where the dialog keeps its list, and where the list keeps its blinker. */
 #define DLG_OFF_LIST             0x64u
+/* The list's scrollbar, and the bar's own back-pointer to the list is
+ * ARROWBAR_OFF_LIST. This was ALSO defined in widget.h as LIST_OFF_ARG7C
+ * "constructed 0" -- a placeholder beside the body-derived name, one concept
+ * under two spellings, and invisible to checkoffsets because that tool reads
+ * only this file. Collapsed onto the name that knows what the field is. */
+#define LIST_OFF_ARROWBAR        0x7Cu
 #define LIST_OFF_BLINKER         0x94u
 
 /* The CONTROLS dialog, 0x00450E10. Twenty-one key-capture rows built from
@@ -6426,7 +6432,6 @@ typedef struct {
 #define AM2_BMP_SELECT1          0x00486E4Cu
 #define AM2_BMP_SELECT2          0x00486E64u
 /* The list and its bar point at each other. */
-#define LIST_OFF_ARROWBAR        0x7Cu
 #define ARROWBAR_OFF_LIST        0x58u
 /* Where this dialog keeps them: the list at 0x0064 and the rows at 0x0068. */
 #define COMMPANEL_OFF_LIST       0x64u
@@ -6478,9 +6483,6 @@ typedef struct {
  * colour bytes and the bound key's index. `ret 0x2C` is 44: the index, the
  * caption, sixteen of rectangle, a font and four colours. */
 #define VTABLE_KEYROW            0x0046FB80u
-#define FOCUSLABEL_OFF_INK2      0x65u
-#define FOCUSLABEL_OFF_INK3      0x66u
-#define FOCUSLABEL_OFF_INK4      0x67u
 
 /* The SCREEN BASE, 0x00454B00 -- every one of the twenty screens starts here.
  * It is a PANEL over the whole 640x480, then the dialog vtable on top. */

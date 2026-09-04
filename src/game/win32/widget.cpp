@@ -7117,9 +7117,9 @@ AM2_Widget *__attribute__((thiscall)) KeyRowConstruct(AM2_Widget *w,
     self[FOCUSLABEL_OFF_INK]  = (uint8_t)ink;
     w->vtable = (void *)AM2_IMAGE(VTABLE_KEYROW);
     *(int32_t *)(self + KEYROW_OFF_KEY) = nameIndex;
-    self[FOCUSLABEL_OFF_INK2] = (uint8_t)ink2;
-    self[FOCUSLABEL_OFF_INK3] = (uint8_t)ink3;
-    self[FOCUSLABEL_OFF_INK4] = (uint8_t)ink4;
+    self[FOCUSLABEL_OFF_INK_FOCUS] = (uint8_t)ink2;
+    self[FOCUSLABEL_OFF_PAPER] = (uint8_t)ink3;
+    self[FOCUSLABEL_OFF_PAPER_FOCUS] = (uint8_t)ink4;
     return w;
 }
 
@@ -7354,7 +7354,7 @@ AM2_Widget *__attribute__((thiscall)) ListBoxConstruct(AM2_Widget *w,
     *(int32_t *)(self + LIST_OFF_INK_SEL_DOWN) = g_hiliteColour;
     *(int32_t *)(self + LIST_OFF_INK_HOT_SEL) =
         *(const uint8_t *)(uintptr_t)ADDR_LIST_INK_HOT_SEL;
-    *(int32_t *)(self + LIST_OFF_ARG7C)  = 0;
+    *(int32_t *)(self + LIST_OFF_ARROWBAR)  = 0;
     *(int32_t *)(self + LIST_OFF_BLINKER) = 0;
 
     if (rows && *(const int32_t *)rows > 0)
