@@ -1124,9 +1124,23 @@ settles it outright:
 So our `sprintf` produces `.amm`, `FileExists` fails, and the function takes
 its bad-map exit. Both globals are written in exactly one place --
 `SelectLevel` at `map.cpp:223`, copying `LEVEL_OFF_MAP_NAME` and
-`LEVEL_OFF_FOLDER` out of a level record -- so on the multiplayer host path our
-build either never calls it or calls it with no record. That is the next thing
-to read, and it is a much smaller question than the one this started from. `OpenMpHost` and `OpenMpJoin`
+`LEVEL_OFF_FOLDER` out of a level record -- and **our `MpPanelConstruct` never
+calls it.**
+
+The original does, at 0x00431242, from a default-map step our reconstruction
+omits entirely:
+
+    edx = [esp+0x1c]              ; the map-list object
+    ecx = [esp+0x20] << 6         ; index * 0x40
+    eax = [edx + 0xC8] + ecx      ; the name at that row
+    FindLevelByName(eax)
+    if (eax) SelectLevel(eax)
+
+Ours calls `ReadMpMapList()` and builds the list box beside it, and then
+stops -- so nothing ever chooses a map, `ADDR_MAP_NAME` and
+`ADDR_MAP_FOLDER` stay as the empty strings they were, and every consequence
+above follows. That is the whole of the second defect, and writing the missing
+block needs the surrounding loop read properly rather than a line guessed. `OpenMpHost` and `OpenMpJoin`
 are both faithful (host sets `g_mpSession` 1 and calls the refresh, join sets
 2 and does not, exactly as the image does), so the divergence is in what the
 map name or folder holds, not in who calls what.
