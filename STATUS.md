@@ -73,12 +73,39 @@ like a prime suspect -- 16 directions, a whole notch a step -- and the original
 does exactly the same, `sub al,0x10; and al,0xf0` at 0x0044A566 and
 `add al,0x10; and al,0xf0` at 0x0044A5BC. Stepped facing is the game's own.
 
-**One difference is unexplained and is NOT yet a finding.** In the one clean
-matched pair the animation CELL differed: the original's samples spread across
-0, 1 and 2 while ours read 0 in six of eight. That is 250 ms sampling of a
-field that resets on every frame change, so it may be aliasing. Two attempts to
-sample faster ended with the game exiting under a sustained held key, which is
-its own thing to look at.
+**IT IS OURS, AND HERE IS THE MEASUREMENT.** Forty samples a side, same
+drive, same matched `Options.cfg`, the same injected `key 0x11 down`:
+
+| | animation cell | animation frame |
+|---|---|---|
+| original | 00 x19, 01 x15, 02 x6 -- it ADVANCES | 04, 05, 2e, 2f -- the whole walk cycle |
+| ours | **00 x40 -- never advances** | **01 x26 (STAND), 05 x14 (walk)** |
+
+The original never shows frame 1 while walking. Ours flips between stand and
+walk, and every flip calls `SetAnimFrame` with a different frame, which resets
+`ROW_OFF_CELL` to 0 -- so the legs restart perpetually. That is exactly the
+reported symptom, and the cell never advancing is a CONSEQUENCE of the frame
+changing, not a second bug.
+
+So `ActionKeyDown(0)` reads FALSE on frames where the key is held. The harness
+is not the cause: both sides get the same injection through the same hook, and
+only the reconstruction flickers.
+
+**Excluded by reading the original beside ours:** `ActionKeyDown` itself (the
+original loads the buffer pointer once and tests both bindings; ours does the
+same), the key bindings (byte-identical), `PollKeyboard`'s buffer SWAP (same
+three moves, same order, GetDeviceState into the new current), and its
+`DI_OK`-is-zero retry.
+
+What is left is what fills `g_curKeys` -- `PollKeyboard`'s body past the swap,
+and how our call interacts with the injected device. That is where the next
+session should start, and the 40-sample cell/frame histogram above is the
+oracle: it takes one drive a side and answers in numbers.
+
+**A parser bug wasted three runs here and is worth naming:** `ctl dump` returns
+ONE contiguous hex string, not space-separated bytes. Splitting it into tokens
+and indexing gives an empty result, which reads exactly like a dead socket --
+and the socket was answering `pong` throughout.
 
 **Do not read an earlier "cell stuck at 0" observation as evidence** -- it came
 from a run with stale instances alive, the condition CLAUDE.md warns produces
