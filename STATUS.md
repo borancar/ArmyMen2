@@ -602,11 +602,25 @@ but markers to the end -- 633 of them on ours, 26,333 on the original's. So
 markers begin when the mission does, on both, and only the count differs.
 
 **And the launch is not the difference.** `ab.sh` passes `extra=""` for this
-configuration, so its command line is exactly the hand replication's; the two
-candidates left untested are that the suite runs the ORIGINAL side FIRST and
-the reconstruction second, and that `Options.cfg` carries over between them
-(the suite copies it into the artifacts but does not install a fresh one).
-Test those before anything else, because everything cheaper is excluded.
+configuration, so its command line is exactly the hand replication's.
+
+**Run ORDER is not it either**, tested by hand: the original driven first
+gives 20,212 markers and the reconstruction driven straight after it gives
+**8,421** -- not the 633 the suite reports. So inheriting the previous side's
+`Options.cfg` and running second do not reproduce it.
+
+What that run DID confirm is the scroll: with the mouse-moves included our
+side falls from ~28,000 to 8,421, which is the marker stop measured
+independently.
+
+So a hand replication of everything the suite does still lands an order of
+magnitude above the suite itself, and the residue is unexplained. **This is
+where the investigation stops being worth its cost**: five candidates have
+been excluded by runs, the shortfall is in a LOG COUNT and not in the game,
+and every other artifact this configuration produces is identical. Anyone
+picking it up should start by instrumenting `ab.sh` itself -- printing the
+marker count at each step of its own drive -- rather than replicating it a
+sixth time by hand.
 
 Worth stating plainly: this is not a defect in the game. Every other artifact
 this configuration produces -- the state, the 16-node widget tree, the 13 log
