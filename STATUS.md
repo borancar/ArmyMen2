@@ -7,6 +7,45 @@ command that produces it, so it can be re-measured rather than believed.
 
 Last updated: **2026-09-04**, at `5df7469`. Working tree clean.
 
+## OPEN: the player trooper shows the WRONG ANIMATION -- measured, 13 against 1
+
+Reported from play: holding the mouse moves Sarge now, but changing direction
+makes him "jerkstep" -- the walk animation restarting rather than the position
+hopping.
+
+**Measured with an A/B on the row's own fields**, both sides driven to a live
+Boot Camp mission by `ab.sh mission`'s waits and given the same cursor sweep,
+reading the leader's row through `objdump --leader --at 0x74` and then the
+row itself:
+
+| | ROW_OFF_FRAME | ANIM_NEXT_ID | HEADING | CELL |
+|---|---|---|---|---|
+| original | **0x0001** | 0x0001 | 0xc5 | 0 |
+| ours | **0x000d** | 0x000d | 0xc5 | 0 |
+
+Same heading, same cell, same drive, different ANIMATION. `ADDR_WEAPON_POSE_FRAMES`
+decodes the ids: entry 0 and entry 1 are both animation 1, and entry **6** is
+animation 13. So the original is on pose index 0 or 1 and ours is on pose
+index 6 -- `Type2PlayerStep`'s `w + 8`, the action the input half chose.
+
+**What is ruled out**, each by reading the original beside ours: the walk
+arm's destination clear (`mov [esi], edx` at 0x0044AE72 is the original's),
+the 200 ms re-aim throttle (the original reads +0xD0 and never writes it
+either), `StepRowAnim`'s cell advance and its `sar eax,1` halving of the
+hold, and `SetAnimFrame`'s `if (!force && frame == ROW_OFF_FRAME) return`
+guard. All faithful.
+
+**Also measured and worth keeping**: while the mouse is HELD, `OBJ_OFF_FIELD_10C`
+and `OBJ_OFF_FIELD_C0` are both ZERO, so held-mouse steering does not go
+through `Type2PlayerStep`'s walk arm at all -- the pose comes from the input
+half. And the facing itself is fine: it decelerates smoothly, 9c a2 a8 ad b2
+b6 b9 bc be c0 c2 c3, with position advancing at a steady ~33 a sample.
+
+Next: `Type2PlayerInput`'s action choice. Its own note says the codes come
+from EIGHT int32[3] tables indexed by ClassifyByCode74's 0, 1 or 2, and one
+wrong table or index puts 6 where 0 belongs. The A/B above is the oracle --
+it takes one drive per side and names the answer as a number.
+
 ## In flight
 
 Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **61** analysis
