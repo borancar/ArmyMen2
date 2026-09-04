@@ -1111,6 +1111,19 @@ checksums, so the panel is still not reaching the same point. Two defects on one
 screen, and the fingerprint that identified the first is what proves the second
 is not it.
 
+**THE GREP WAS RUN AND THE BUG IS ISOLATED.** Fourteen raw addresses remain
+inside `AM2_IMAGE()` in `src/game`, and every one resolves to a real `.bmp`
+name -- failure, hq, colour, start, ready, options and cancel. The one that
+looked wrong is not: the cancel button is built
+`ButtonConstruct(child, 0, CAN1, CAN2, ...)` with a NULL normal sprite, and
+the original at 0x00431684 pushes `0` in exactly that slot, so two names
+rather than three is what the game does.
+
+So `MpPanelConstruct`'s two literals were the only instance, which is worth
+knowing before anyone generalises the fix. They remain raw where macros exist
+beside them -- a style inconsistency rather than a defect, left alone rather
+than churned.
+
 **A RAW ADDRESS WHERE THE FILE HAS A MACRO IS WORTH GREPPING FOR.** Both
 literals sat two lines from correct `AM2_BMP_*` uses, and nothing checks that a
 `0x0048xxxx` handed to a string parameter is a string. `checkoffsets` counts
