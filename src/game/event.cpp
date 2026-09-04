@@ -1134,7 +1134,7 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
             continue;                       /* the list shifted; do not ++ */
         }
 
-        if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS8) & OBJ_FLAG8_BLOCKED) {
+        if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG8_BLOCKED) {
             i++;
             continue;
         }
@@ -1286,7 +1286,7 @@ void __cdecl EvtGuardedAction(uint32_t uid, int32_t a, int32_t b)
     if (obj == (uint8_t *)0)
         return;
 
-    if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS8) & OBJ_FLAG8_BLOCKED)
+    if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG8_BLOCKED)
         return;
 
     if (*(const int16_t *)(obj + OBJ_OFF_COUNT62) <= 0)
@@ -2048,7 +2048,7 @@ void __cdecl EvtFlag40Clear(int32_t name, uint32_t me)
                   *(const uint32_t *)AM2_IMAGE(ADDR_EVT_ID15_UID));
 
         if (obj != (uint8_t *)0)
-            *(uint32_t *)(obj + OBJ_OFF_FLAGS8) |= OBJ_FLAG8_BIT40;
+            *(uint32_t *)(obj + OBJ_OFF_FLAGS) |= OBJ_FLAG8_BIT40;
 
         return;
     }
@@ -2056,7 +2056,7 @@ void __cdecl EvtFlag40Clear(int32_t name, uint32_t me)
     obj = (uint8_t *)LookupByUID(ResolveUid(name, me));
 
     if (obj != (uint8_t *)0)
-        *(uint32_t *)(obj + OBJ_OFF_FLAGS8) &= ~(uint32_t)OBJ_FLAG8_BIT40;
+        *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG8_BIT40;
 }
 
 void __cdecl EvtFlag40Set(int32_t name, uint32_t me)
@@ -2071,7 +2071,7 @@ void __cdecl EvtFlag40Set(int32_t name, uint32_t me)
     obj = (uint8_t *)LookupByUID(ResolveUid(name, me));
 
     if (obj != (uint8_t *)0)
-        *(uint32_t *)(obj + OBJ_OFF_FLAGS8) |= OBJ_FLAG8_BIT40;
+        *(uint32_t *)(obj + OBJ_OFF_FLAGS) |= OBJ_FLAG8_BIT40;
 }
 
 /* 0x0041FA10. Set a field on every object of an army that passes the gates.
@@ -2104,7 +2104,7 @@ void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
             continue;
         }
 
-        if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS8) & OBJ_FLAG8_BLOCKED) {
+        if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG8_BLOCKED) {
             i++;
             continue;
         }

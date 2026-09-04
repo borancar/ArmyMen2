@@ -2620,7 +2620,7 @@ void __attribute__((thiscall)) HudRadarPaint(AM2_Widget *w, RECT clip)
         int32_t           colour;
         int32_t           blink;
 
-        if (ObjIsTypeIn238(o) && (*(const uint32_t *)(obj + OBJ_OFF_FLAGS8)
+        if (ObjIsTypeIn238(o) && (*(const uint32_t *)(obj + OBJ_OFF_FLAGS)
                                 & OBJ_FLAG_DESTROYED)) {
             const uint8_t *veh;
             uint32_t       ride;
@@ -2636,15 +2636,15 @@ void __attribute__((thiscall)) HudRadarPaint(AM2_Widget *w, RECT clip)
 
             /* The object's OWN bit 4 short-circuits the vehicle test. The
              * original dereferences `veh` without checking it; reproduced. */
-            if (!(*(const uint32_t *)(obj + OBJ_OFF_FLAGS8) & OBJ_FLAG_BIT4)) {
-                uint32_t vf = *(const uint32_t *)(veh + OBJ_OFF_FLAGS8);
+            if (!(*(const uint32_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT4)) {
+                uint32_t vf = *(const uint32_t *)(veh + OBJ_OFF_FLAGS);
 
                 if ((vf & OBJ_FLAG_REVEALED) && !(vf & OBJ_FLAG_CONCEALED))
                     continue;
             }
         }
 
-        flags = *(const uint32_t *)(obj + OBJ_OFF_FLAGS8);
+        flags = *(const uint32_t *)(obj + OBJ_OFF_FLAGS);
 
         if ((flags & OBJ_FLAG_CONCEALED) && !(flags & OBJ_FLAG_BIT4))
             continue;

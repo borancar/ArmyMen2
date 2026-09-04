@@ -8230,7 +8230,10 @@ typedef struct {
 /* The death message: 16 bytes, type 0x23. */
 #define AM2_MSG_DEATH            0x23
 #define AM2_MSG_DEATH_BYTES      0x10
-#define OBJ_OFF_FLAGS8           8u    /* bit 2 blocks the action above */
+/* OBJ_OFF_FLAGS8 lived here as `8u`, a second spelling of OBJ_OFF_FLAGS
+ * at 0x08 -- the same word, and its OBJ_FLAG8_ bit does not collide with
+ * any of the 23 OBJ_FLAG_ values, so there was never a second field to
+ * distinguish. Collapsed; bit 2 of it blocks the action above. */
 #define OBJ_FLAG8_BLOCKED        4u
 #define OBJ_OFF_COUNT62          0x62u /* int16; must be > 0 */
 

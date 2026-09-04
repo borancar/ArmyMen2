@@ -6351,7 +6351,7 @@ void __cdecl ObjFrameStep(void *obj)
     *(uint32_t *)(o + OBJ_OFF_PREV_POS) = *(const uint32_t *)(o + OBJ_OFF_POS);
 
     if (*(const int32_t *)(uintptr_t)ADDR_EVT_ID15_FLAG
-        && !(*(const uint8_t *)(o + OBJ_OFF_FLAGS8) & OBJ_FLAG8_BIT40))
+        && !(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG8_BIT40))
         return;
 
     type = *(const uint32_t *)o - 1u;

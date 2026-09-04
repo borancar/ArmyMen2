@@ -88,7 +88,10 @@ def _headers():
 # A baseline that goes UP when a checker starts looking somewhere new is not
 # the ratchet failing; it is the ratchet's population changing. Say which of
 # the two it is whenever this number moves.
-FAMILY_ALIAS_BASELINE = 17
+# 17 -> 16. OBJ_OFF_FLAGS8 was `8u` beside OBJ_OFF_FLAGS at 0x08 -- the same
+# word, and its single OBJ_FLAG8_ bit collides with none of the 23 OBJ_FLAG_
+# values, so there was never a second field for the second name to describe.
+FAMILY_ALIAS_BASELINE = 16
 
 DEFINE = re.compile(r"^#define\s+([A-Z][A-Z0-9_]*)\s+(0x[0-9A-Fa-f]+u?|\d+u?)\s*(?:/\*|$)")
 # `_OFF_` was the whole of this for as long as offsets were the thing that got
