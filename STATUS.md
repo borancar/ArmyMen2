@@ -41,10 +41,30 @@ through `Type2PlayerStep`'s walk arm at all -- the pose comes from the input
 half. And the facing itself is fine: it decelerates smoothly, 9c a2 a8 ad b2
 b6 b9 bc be c0 c2 c3, with position advancing at a steady ~33 a sample.
 
-Next: `Type2PlayerInput`'s action choice. Its own note says the codes come
-from EIGHT int32[3] tables indexed by ClassifyByCode74's 0, 1 or 2, and one
-wrong table or index puts 6 where 0 belongs. The A/B above is the oracle --
-it takes one drive per side and names the answer as a number.
+**NARROWED TO ONE FIELD AND IT IS ALREADY WRONG BEFORE ANY INPUT.** The
+action is `out + 8`, and `out` is not a stack local -- `StepType2` sets it to
+`o + OBJ_OFF_SIGHT_OUT_T2`, so it is a FIELD OF THE OBJECT at +0x584 that
+persists between frames. Sampled at the same point of the same drive, with
+the briefing just cleared and no action key pressed:
+
+| | +0x584 | pose table gives |
+|---|---|---|
+| original | **1** | animation 1 |
+| ours | **17** | animation 52 |
+
+Neither side resets it: the original's head has no store to `[edi+8]` and its
+tail only rewrites 2 into 3, which ours matches at 0x0044ACFC. So a single
+wrong value STICKS, and this one is wrong before the player touches anything
+-- which puts the fault in what INITIALISES the field, not in the input arms
+that react to the mouse.
+
+That also explains why every oracle missed it: `bootcamp`'s 1,610-line object
+dump compares type, flags, army, position, tile, both boxes, health and cell
+counts, and +0x584 is in none of them.
+
+Next: find what writes +0x584 on a freshly created trooper. The row A/B and
+this one-field peek are both one drive per side and both name the answer as a
+number.
 
 ## In flight
 
