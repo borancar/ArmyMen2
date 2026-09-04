@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **42** analysis
+**`make check` runs everything that does not need the game.** **43** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3823,7 +3823,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 14 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 15 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3914,6 +3914,28 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   test -- and the new part is that a stub is a mention the prose filter
   cannot see.
 
+  `CheckSaveTag` joins them by `tools/savetagcheck.py`, 200 cases -- and the
+  reason a nine-line function needs an oracle is the case no drive can make.
+  Its read goes into ITS OWN FIRST ARGUMENT SLOT: `lea ecx, [esp+4]` hands
+  fread the address of the `FILE *`, so the pointer is overwritten by the
+  bytes read. Our C reproduces that by initialising the local FROM fp, which
+  reads as a pointless cast until fread returns SHORT -- then the untouched
+  bytes still hold the old pointer and the tag compared is a mixture of the
+  file's bytes and the caller's stack. A savegame either has four bytes or
+  the read fails, so that is verified here or nowhere.
+
+  fread is hooked in Python rather than stubbed in assembly, because the
+  destination is a stack address not known until the call happens -- the same
+  reason tools/placementcheck.py assembles a copier. The hook writes exactly
+  `n` of the four bytes.
+
+  The mutation counts are internally consistent, which is the evidence worth
+  having: 24 of the 200 cases match and 176 do not, so returning 0 on a match
+  fails 24 and mis-logging the line fails 176, and they sum. Starting the
+  local at zero instead of at fp fails 32 -- the short-read cases alone, which
+  is what says the corpus reaches them and that the initialisation is
+  load-bearing rather than decoration.
+
   `AiHitReact` joins them by `tools/hitreactcheck.py`, 14,594 cases -- and it
   is the second REPLAY oracle in the tree after `tools/firepose.py`, not a
   model comparison. It calls NOTHING: not one call instruction in its 176
@@ -3976,7 +3998,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   configuration whose descriptor under-reports its extent is what makes them
   observable at all.
 
-  The other eighteen are verified by READING, which is the standing worth
+  The other seventeen are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is

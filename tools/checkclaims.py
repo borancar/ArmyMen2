@@ -110,7 +110,8 @@ def check_tool_count():
 ORACLES = ("moviecheck posecheck formationcheck shakecheck roachcheck rlecheck "
            "mprowcheck weaponcheck listcheck ringcheck boolcheck explcheck "
            "collectcheck firepose regioncheck pathcheck tilepathcheck "
-           "placementcheck aicheck rectquerycheck hitreactcheck scriptcheck").split()
+           "placementcheck aicheck rectquerycheck hitreactcheck savetagcheck "
+           "scriptcheck").split()
 
 DOCSTRING = re.compile(r'"""[\s\S]*?"""')
 COMMENT = re.compile(r"#[^\n]*")
