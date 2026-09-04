@@ -109,6 +109,19 @@ Generalising the defect into a static check was tried and abandoned with
 measurements -- see CLAUDE.md. MSVC compiles a null test AS a register
 compare, so all 15 candidates it finds are correct.
 
+## THIS SESSION'S CHANGES ARE VERIFIED ACROSS EIGHT CONFIGURATIONS
+
+Four `src/` changes landed -- the player-input gate, `LoadGameProcSection`'s
+two missing stores, `State2Enter`'s missing no-argument log call, and the one
+deliberate deviation in `LoadItems`. They are checked by:
+
+    bootcamp  campaign  combat  mission  quit  controls  windowed  menuscreens
+
+all clean, plus `loadcheck` (now passing on both builds), `movecheck`,
+`samenu`, `samission` and `saquit`. `mission`'s frame gate fails as it has on
+every run for reasons recorded in CLAUDE.md -- ours at 635, inside the
+documented band -- while its state, widgets and log are identical.
+
 ## LOADING A SAVED GAME WORKS
 
 `tools/loadcheck.sh` passes: our build and the original both come back alive
