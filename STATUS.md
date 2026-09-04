@@ -545,10 +545,29 @@ and 625 across runs two of which are older than the work that first noticed it
 state, its 16-node widget tree and its 13 log messages are identical every
 time.
 
-Answering it needs a live-play drive, and a hand-driven one does not work:
-clicking BOOT CAMP, RETURN and the two dialogs by hand gives
-`ComposeFrame=0`, the trap the next entry describes. Use `ab.sh mission`'s own
-waits, or add a counter dump to that configuration.
+**ANSWERED: OUR SIDE IS STILL LOADING THE MAP WHEN THE DRIVE ENDS.** The
+recon log's LAST line is `calculating region data...`, so the mission never
+starts on that side; its 608 markers are the menus, and the original's 25,797
+are a mission that began. Nothing about the frame path is wrong.
+
+Driven by hand with the SAME clicks but more slack -- 46 s before BOOT CAMP
+instead of `ab.sh`'s 20, then its own 25 and 30 -- our side reaches live play
+and emits **33,494** markers in twenty seconds, comfortably past the
+original's whole-run 25,797. So the build is not slow at composing; it is
+slow at LOADING, and `ab.sh mission`'s fixed 30-second wait is enough for the
+original and not for us.
+
+That also disposes of the reconciliation puzzle above: the 1,196 frames a
+second and the 608 markers were never measuring the same thing, because the
+608 contains no live play at all.
+
+**`ComposeFrame`'s counter is BLIND and cannot be used here**, which cost a
+probe: it reads 0 in live play while the log takes 33,494 markers, because
+its caller is reconstructed and reaches it directly. Count the markers.
+
+What is still open is narrower and real: WHY our map load is slower than the
+original's. `calculating region data` is where it is sitting, and both sides
+otherwise log the same 13 messages.
 
 ## Driving to a live mission by hand needs ab.sh's WAITS
 
