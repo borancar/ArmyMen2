@@ -1511,6 +1511,26 @@ stay original and are reached by address, so our code runs in the middle of a
 live path and the A/B compares the result. Nothing had to wait for the layer
 beneath it.
 
+**`tools/movecheck.sh` IS THAT CONFIGURATION, and it is the only one in the
+project that drives a real device.** Everything else writes the game's
+globals over the control socket -- `cursor` and `key` never touch
+DirectInput -- so the whole device-to-gameplay path was unexercised. This
+drives X events through `xdotool`, which reach the game the way a player's
+keyboard does, and asks the one question that matters: did the unit's
+position change?
+
+Its assertion is DISPLACEMENT, not equality, and that is deliberate. Two
+unsynchronised runs cannot leave Sarge on the same tile -- they see different
+frame deltas, so he walks for different lengths of time. What is comparable
+is whether he moved at all, and the failure being guarded is zero against
+hundreds, which needs no budget tuned to see it. Measured: 241 units against
+the original's 237 with the fix, 0 against 237 with the bug put back.
+
+It carries a VOID arm for the same reason `samission.sh` does: if the
+ORIGINAL walked less than the floor, the drive never reached live play and
+the run compares nothing. A reconstruction that cannot move looks exactly
+like a drive that never started.
+
 **THE PLAYER COULD NOT MOVE, FOR A MONTH, AND NOTHING IN THE SUITE COULD SEE
 IT.** `StepType2`'s player arm gates the input call on
 `cmp [0x5122c8], esi; jne` at 0x0044B9B0 -- is the FOLLOWED OBJECT THIS ONE.
