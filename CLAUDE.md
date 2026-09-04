@@ -1626,6 +1626,18 @@ the per-type `Destroy*` path. `DestroyWeapon` demonstrably runs, since the log
 carries one line per weapon. That path, and `ItemPreDestroy` under it, is
 where to look next.
 
+`DestroyWeapon` and `DestroyItemObject` (0x00429C80) are faithful too: the
+original gates `ItemPreDestroy` on the THIRD argument exactly as ours does --
+`mov eax,[esp+0x10]; test eax,eax; je` -- so with `ItemsReset` passing 0
+neither build unlinks from the cells there. That kills the tidy theory that we
+alone leave dangling cell entries.
+
+**And the value argues against dangling anyway: 0x9A7 is a tiny integer, not
+a freed heap pointer.** A cell holding a stale pointer would fault on a large
+address or not at all; this looks like uninitialised or mis-indexed memory --
+a cell array read past its end, or one reallocated without being cleared.
+That is where to go next, not the destroy path.
+
 None of it had ever executed before this session's `LoadGameProcSection` fix:
 CLAUDE.md's own unexercised list carries `FreeItem` and `RemoveFromItemList`,
 and a load is the first thing in this project to call them in bulk.
