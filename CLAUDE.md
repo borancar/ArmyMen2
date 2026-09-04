@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **52** analysis
+**`make check` runs everything that does not need the game.** **53** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3823,7 +3823,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 26 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 27 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3935,6 +3935,23 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   confirmed each against itself would still pass if one were rewritten into
   the other. Making Defend turn on the route path fails at once; so does
   dropping the route path's promotion.
+
+  `NearestClearVehiclePoint` joins them by `tools/vehpointcheck.py`, 36 cases
+  -- and what is compared is the SEQUENCE OF POINTS it asks about, not the
+  point it returns. That is the choice `tools/roachcheck.py` makes for the
+  same reason: the answer is one point, and a wrong turn order gives the
+  right answer from the wrong place often enough to pass a spot check. This
+  file already records the sibling `NearestClearPoint` running eight times on
+  a drive with a mutation that skipped the spiral entirely going unnoticed.
+
+  Three of the four geometry facts fail a mutation: the leg grows every
+  SECOND turn -- the flag that makes it a spiral rather than a diamond, 18
+  cases -- the step is shifted left by 4 so the table's 1 is sixteen world
+  units, 27, and the turn fires on `>=`, 27. The direction wrap needed care:
+  wrapping at 4 makes the MODEL index past a four-entry table and crash,
+  which proves nothing about the corpus, so it is wrapped at 2 instead and
+  fails 18. **A mutation that crashes the model is not a mutation that the
+  corpus caught.**
 
   `RefreshScreen` joins them by `tools/refreshcheck.py`, four cases over four
   things a reading gets wrong. The present flag is SAVED AND RESTORED rather
@@ -4161,7 +4178,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   configuration whose descriptor under-reports its extent is what makes them
   observable at all.
 
-  The other six are verified by READING, which is the standing worth
+  The other five are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is
