@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **55** analysis
+**`make check` runs everything that does not need the game.** **56** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3836,7 +3836,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 29 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 30 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3896,6 +3896,27 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   theorem rather than a gap: with a tile shift of 4 the index only exceeds
   16 bits above y = 4096, which is a thousand times more tile rows than any
   map in the game has.
+
+  `ExitOneFromVehicle` joins them by `tools/vehexitcheck.py`, 85 cases. Its
+  output is not its return value -- five separate refusals all answer 0, so
+  an oracle comparing `eax` would pass with four of them deleted. What the
+  function DOES is call things, so all ten callees are stubbed and the
+  compared value is the TRACE with the deploy point in it. Three mutation
+  counts are exactly derivable: ignoring the boat's health fails 8, the boat
+  cases with none; ungating the broadcast fails 6, the reachable cases that
+  do not broadcast; and loosening the last-occupant test fails 10.
+
+  **AND A STUB HAS AN ABI, which cost the first run of it.** Two of the ten
+  callees are thiscall -- `CommMustBroadcast` and `ListRemoveAt` -- so `this`
+  arrives in ECX rather than on the stack AND the callee pops the stack
+  arguments itself, the rule this file already states for reading these
+  bodies. A cdecl-only stub gets both halves wrong and shifts every frame
+  below it.
+
+  The symptom is worth knowing because it does not look like an ABI error:
+  71 of 85 cases differed with the ARM SEQUENCE CORRECT on every one of them,
+  and only the arguments wrong. Control flow surviving while every argument
+  is rubbish is the tell for a stack that is off, not for a misread branch.
 
   `PlanPathTo` joins them by `tools/pathplancheck.py`, 24 cases. It is a
   model-versus-original check and NOT a replay, on this file's own rule: it
