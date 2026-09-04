@@ -103,6 +103,7 @@ original's 237, and 241 against 237 with the fix.
 
     tools/movecheck.sh
     tools/saquit.sh        # the standalone's teardown, which nothing covered
+    tools/loadcheck.sh     # loading a save; FAILS today on the known defect
 
 Generalising the defect into a static check was tried and abandoned with
 measurements -- see CLAUDE.md. MSVC compiles a null test AS a register

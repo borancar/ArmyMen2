@@ -1878,6 +1878,30 @@ reason to keep it: every configuration here runs with `-dbg`, so no A/B can
 see it, and someone playing the port normally is the one whose save gets a
 retry stamp the original would not have written.
 
+**`tools/loadcheck.sh` IS THE SAVE/LOAD GATE, and it FAILS TODAY ON A KNOWN
+DEFECT.** Nothing in the suite ever pressed LOAD -- `ab.sh campaign` reaches a
+mission by clicking NEW -- which is how `LoadGameProcSection` came to be
+missing the two stores that make a load happen at all, and why that went
+unnoticed while it silently rewrote the player's save.
+
+It drives the real sequence on our build and on the original under
+`AM2_NOPATCH=1`, from the same restored fixture each half, and compares four
+things: the process is still alive, the sub-state matches, the registered
+object count matches, and the save file's md5 is UNCHANGED. The md5 is the
+sharpest, because a load that becomes a fresh start rewrites the slot -- the
+whole original defect in one line.
+
+Measured now: the original comes back alive at sub-state 0x18 with 325 objects
+and the file untouched; ours comes back DEAD, with the file untouched. So the
+fix holds -- no more overwriting -- and the remaining fault is the page fault
+in `ObjectsInRect` this file records above.
+
+**A CHECK THAT FAILS IS STILL WORTH COMMITTING when the failure is a defect
+you have measured and written down.** It converts "loading crashes sometimes"
+from folklore into a gate that will go green the day the cell-entry defect is
+fixed, and it pins the two halves' arguments together so the `-dbg` confound
+cannot come back.
+
 **`tools/saquit.sh` COVERS THE STANDALONE'S TEARDOWN, which nothing did.**
 `samenu.sh` compares a title screen and `samission.sh` a live mission's object
 table, and both KILL the process -- so the comm shutdown, the sprite frees and
