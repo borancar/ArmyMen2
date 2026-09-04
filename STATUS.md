@@ -97,10 +97,31 @@ same), the key bindings (byte-identical), `PollKeyboard`'s buffer SWAP (same
 three moves, same order, GetDeviceState into the new current), and its
 `DI_OK`-is-zero retry.
 
-What is left is what fills `g_curKeys` -- `PollKeyboard`'s body past the swap,
-and how our call interacts with the injected device. That is where the next
-session should start, and the 40-sample cell/frame histogram above is the
-oracle: it takes one drive a side and answers in numbers.
+**AND THE INPUT IS NOT THE CAUSE EITHER.** An 11-arm probe over every write to
+the action inside `Type2PlayerInput`, plus both writes inside
+`Type2PlayerStep`, run on a verified-live drive with W held:
+
+    7741  arm=1    1 -> 2      the ActionKeyDown(0) walk arm, EVERY frame
+     155  arm=102  1 -> 2
+       1  arm=101  2 -> 1
+
+So `ActionKeyDown(0)` answers TRUE every frame -- the key state is fine, and
+the flicker is not a missed keypress. What the counts say instead is that the
+field reads **1 at the START of nearly every frame**: the walk arm would fire
+once and stay if nothing reset it, and instead it fires 7,741 times.
+
+Neither instrumented arm puts a 1 there -- arm=101 is the only 2 -> 1 and it
+fired ONCE. So the per-frame reset happens OUTSIDE both functions, in
+something else holding the same record: it is `o + OBJ_OFF_SIGHT_OUT_T2`, and
+`AiTrooperStep` and `TrooperFire` are both handed it.
+
+**Excluded, each by reading the original beside ours or by measurement:**
+`ActionKeyDown`, the key bindings, `PollKeyboard`'s swap and its DI_OK retry,
+`KEY_STATES` being 256 so the harness overlay applies, the wheel delta being
+cleared each poll, and the turn quantisation.
+
+Next: find what writes +8 of that record between frames. The probe above is
+the instrument -- extend it to every function taking the sight-out record.
 
 **A parser bug wasted three runs here and is worth naming:** `ctl dump` returns
 ONE contiguous hex string, not space-separated bytes. Splitting it into tokens
