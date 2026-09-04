@@ -1538,6 +1538,43 @@ dataflow, not a scan. A check without it reports fifteen correct functions,
 which this file already says to suspect before believing. The real instance
 was found by RUNNING the game, and that is what `movecheck.sh` now keeps.
 
+**FIXED: `LoadGameProcSection` DROPPED THE TWO STORES THAT MAKE A LOAD
+HAPPEN.** The original ends its success path with `mov [0x511ddc], 0` and
+`mov [0x511dd8], 1` at 0x0042698B -- `ADDR_HAVE_DEFAULT_COF` and
+`ADDR_LOAD_PENDING`. Our reconstruction had neither.
+
+They are there because the function's own `fread` destroys the flag: the
+0x438-byte block starts at `ADDR_GAMEPROC_BLOCK` and `ADDR_LOAD_PENDING` is
+0x370 into it, so reading the section overwrites the very flag that says a
+load is in progress -- with the 0 that was in the file, because nothing was
+pending when the game was saved. The original puts it back; we did not, so
+every load silently became a fresh start.
+
+**THE CONSEQUENCE WAS A SAVE BEING OVERWRITTEN.** With the flag clear,
+`State2Enter` takes the start-fresh branch and `TakeMenuRequest` reaches
+`MissionStartup`, whose retry stamp saves over the file the player asked to
+load. That is why the md5 moved on our side and not the original's.
+
+Measured after the fix, against a restored save each time: our build logs
+`Loaded 317 items` where it never did before, and the save's md5 is
+UNCHANGED. `ab.sh bootcamp campaign` is clean -- 1,610 state lines and 13
+messages identical, 35 widget nodes identical -- so nothing else moved.
+
+**AND IT EXPOSES THE NEXT DEFECT, which is the honest half.** The load path
+had never once executed here, so what it reaches was never exercised: with
+the flag now set, our build loads and then EXITS, right after
+`calculating region data...`, where the ORIGINAL loads and lives -- the
+original ends at sub-state 0x18 with 325 objects and its process alive. So
+"the save loads" is now true and "the game survives loading it" is not yet.
+No configuration in the suite loads a save, which is why this was invisible
+and why it stays invisible until one does.
+
+Worth keeping as the reason the earlier readings were confusing: the
+ORIGINAL's post-load state is 325 objects at sub-state 0x18, and our unfixed
+build's 316 at 0x21 was the FRESH mission, not the loaded one. I had those
+two the wrong way round for several turns, and it is what made a
+build-versus-build difference look like a load working on one side.
+
 **RETRACTED: THE STANDALONE DOES NOT LOSE SAVED GAMES. `-dbg` DID.** This
 file carried, for several commits, a confident open defect saying the
 standalone failed to load a save and overwrote it. It was a CONFOUND of my

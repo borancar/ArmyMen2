@@ -88,6 +88,23 @@ int32_t __cdecl LoadGameProcSection(am2_FILE *fp)
     kVolVoice  = volVoice;
     strcpy(kStrB, stashA);
     strcpy(kBlock, stashB);
+
+    /* THE READ CLOBBERS THE LOAD FLAG AND THE ORIGINAL PUTS IT BACK. The
+     * 0x438-byte block starts at ADDR_GAMEPROC_BLOCK and ADDR_LOAD_PENDING is
+     * 0x370 into it, so the fread above overwrites the very flag that says a
+     * load is in progress -- with the 0 that was in the file, because nothing
+     * was pending when the game was saved. `mov [0x511ddc], 0` and
+     * `mov [0x511dd8], 1` at 0x0042698B are the original restoring both, on
+     * the SUCCESS path only; the tag failure returns before them.
+     *
+     * Omitting these was invisible to every configuration in the suite: they
+     * all run with -dbg, which pauses the mission and skips the arm that
+     * notices. Without it the flag reads 0, State2Enter takes the "start
+     * fresh" branch, and TakeMenuRequest reaches MissionStartup, whose retry
+     * stamp then SAVES OVER the file the player asked to load. The original
+     * does not, and that difference is what found this. */
+    *(int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF = 0;
+    *(int32_t *)(uintptr_t)ADDR_LOAD_PENDING     = 1;
     return 1;
 }
 

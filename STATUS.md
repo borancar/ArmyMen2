@@ -108,7 +108,23 @@ Generalising the defect into a static check was tried and abandoned with
 measurements -- see CLAUDE.md. MSVC compiles a null test AS a register
 compare, so all 15 candidates it finds are correct.
 
-## OPEN DEFECT: our autosave fires where the original's does not
+## FIXED: LoadGameProcSection dropped the two stores that make a load happen
+
+The original ends that function's success path with `HAVE_DEFAULT_COF = 0`
+and `LOAD_PENDING = 1` (0x0042698B). We had neither. They exist because the
+function's own fread overwrites LOAD_PENDING -- it lies 0x370 into the
+0x438-byte block being read -- so without them every load silently became a
+fresh start, and the retry stamp in MissionStartup then saved over the file
+the player asked to load.
+
+After the fix our build logs `Loaded 317 items` for the first time and the
+save's md5 is unchanged; `ab.sh bootcamp campaign` is clean.
+
+**It exposes the next defect**: the load path had never executed here, and now
+that it does, our build exits just after `calculating region data...` where
+the original loads and lives. That is the next thing to chase.
+
+## SUPERSEDED: our autosave fires where the original's does not
 
 **Retracted first**: an earlier entry here said the standalone loses saved
 games. It does not. `drive.sh` defaults to `-nointro -dbg` and my standalone
