@@ -34,8 +34,18 @@ the MSVC CRT used to run.
 holding the layout in place**, and the first is already gone: `c_dfDIMouse`
 now comes from the DirectInput SDK rather than the image.
 
-What is NOT done: only the menu has been reached. Nothing past it has been
-driven, and no A/B compares the standalone build against the injected one.
+**`tools/samenu.sh` checks that claim rather than leaving it to a
+screenshot**: it runs both builds through the same startup and compares the
+game's own log (identical, five messages) and the title screen (0 of 307,200
+pixels on a run where the cursor lands in the same place, 45 when it does
+not). Tested in the failing direction with a negative budget.
+
+Past the menu, the port loads and renders a Boot Camp mission -- map, HUD,
+radar, Sarge's stats, the briefing dialog -- and its sub-state, game state,
+pause mask and clock all match the injected build in live play. A report that
+Sarge cannot be moved did NOT reproduce here: the same measurements against
+the injected build give the same answers, including for held keys and
+click-to-move, so no divergence has been demonstrated.
 
 ## NOTHING LEFT TO TRANSPOSE
 

@@ -3496,7 +3496,35 @@ exact oracle**, however meaningful it is when it is set.
   of the first five unreferenced candidates checked by hand, two disassembled to
   garbage. So the figure is a lower bound and is meant to be — 260 candidates,
   186 confirmed. Do not rewrite `functions.tsv` from the naive scan.
-- **A PROBE INSIDE THE FRAME LOOP IS MEASURING THE COMPILER UNLESS IT IS
+- **`tools/samenu.sh` IS THE STANDALONE BUILD'S A/B, and it is the only place
+the port's headline claim is checked rather than looked at.** It runs the
+injected build and the standalone through the same startup, then compares the
+two things that CAN be compared: the game's own log lines, which come out
+identical at five messages, and the title screen, which is static on both
+sides. Measured: **0 of 307,200 pixels** on a run where the cursor happens to
+land in the same place, 45 when it does not.
+
+It is deliberately not a configuration of `tools/ab.sh`. That compares one
+binary with and without our patches; this compares two DIFFERENT executables,
+and wiring it in would have meant teaching every stage about a second one.
+
+Tested in the failing direction, which took three tries and each failure was
+the SCRIPT rather than the port:
+
+- `set -e` aborts on a failing last command in an `&&` list, so a `kill` of a
+  process that had already exited took the script down -- after it had
+  printed that it PASSED, leaving a passing run reporting failure.
+- doing that kill BEFORE the comparison ended the script silently, which read
+  exactly like the budget check failing.
+- `set -e` also aborts on a failing command substitution, so `SA_PID=$(cat
+  ...)` on a pid file that had not been written yet exited before anything
+  was compared.
+
+A budget of 0 is NOT a failing-direction test here, because the cursor lands
+in the same place often enough that a clean run really does read 0; `-1` is,
+and that is what proves the check can fail.
+
+**A PROBE INSIDE THE FRAME LOOP IS MEASURING THE COMPILER UNLESS IT IS
 `volatile`, AND I MADE THIS MISTAKE TWICE IN ONE SESSION BEFORE CHECKING.**
 Chasing a report that the standalone port would not move Sarge, a probe in
 WinMain's `for (;;)` read `ADDR_GAME_CLOCK_MS` and reported it frozen at 100
