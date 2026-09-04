@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **59** analysis
+**`make check` runs everything that does not need the game.** **60** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -1599,6 +1599,32 @@ so reading it proved nothing until the instruction was decoded. A gate whose
 operand is a REGISTER cannot be checked by looking at the global alone; the
 comparison is the fact, and `checkoffsetuse` cannot see it either, because
 every offset involved is correct.
+
+**`tools/shotcheck.py` CHECKS THE FUNCTION THIS FILE CALLS COVERED AND
+UNCHECKED, and it catches the exact mutation that defeated the A/B.** Making a
+non-explosive shot PENETRATE instead of stopping at the first thing it damages
+left `combat` clean -- 21 identical messages, frames in step. Here it fails 17
+of 107 cases. The corpus is what makes the difference: a list of ONE object
+cannot tell stopping from continuing, and almost every live call finds nothing
+at the point at all.
+
+**THREE MUTATIONS FAILED NOTHING UNTIL THE CORPUS LEARNED TWO THINGS ABOUT
+CONTROL FLOW**, and both are worth stating because neither is about inputs:
+
+- **the terrain test is only reached when the walk does not return.** A
+  non-explosive shot leaves the moment it damages anything, so an `attr`
+  sweep run with one hittable object never reaches the ground test at all --
+  turning its `<` into `<=` failed not one of 55 cases. Sweeping over an
+  EMPTY list too takes it to 8.
+- **the loop's write to FIELD_44 is observable only on the early ground
+  return.** For an explosive shot the `code == 3` arm rewrites that field with
+  the same value, so unless `attr < height` sends the function out first, what
+  the loop decided is overwritten -- and the two skips, the trooper and the
+  flagged item, change nothing anyone can see. They fail 4 and 2 now.
+
+A corpus can be rich in INPUTS and still never reach a branch, because what
+gates it is where an earlier arm RETURNED. Ask which exit the case takes
+before crediting it with covering anything past that exit.
 
 **`tools/damagecheck.py` IS THE COMBAT LAYER'S ORACLE, for the reason
 `aicheck.py` is the AI's.** With no drive reaching combat and all four
