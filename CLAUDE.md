@@ -1706,6 +1706,25 @@ the walk faults only when the memory underneath has been rewritten into
 something whose first dword is small. That explains the one bad node out of
 305 and why the earlier probe found exactly one.
 
+**BUT THE ORIGINAL SURVIVES 3 OF 3 AND WE FAULT ABOUT 2 IN 3, so it is
+SYSTEMATIC rather than luck.** Three consecutive `AM2_NOPATCH=1` loads of the
+same save all came back alive with 325 objects; ours has faulted on two runs
+and survived one. A latent defect that the original hits and shrugs off would
+not be that lopsided.
+
+`DestroyItemCommon` (0x0043BBB0) -- the handler for the type-1 objects the
+probe actually names -- is faithful too: same null guard, same
+`FreeSubrecordRows(obj + 0x6C)`, same `DestroyItemObject(obj, 0x514F10,
+unlink)`, and the same order of the two frees, which is what would matter for
+reuse.
+
+So thirteen functions on this path are verified and the difference is not in
+any of them. What is left is the ALLOCATION PATTERN around the load -- what
+else our build mallocs and frees, and in what order, between `ItemsReset` and
+the first walk. That is a different kind of investigation from reading
+functions, and the tool for it is a malloc/free trace compared between the
+two builds rather than more disassembly.
+
 **SO THIS IS A LATENT USE-AFTER-FREE ON THE LOAD PATH, and the evidence says
 it is the ORIGINAL'S.** `ItemsReset` passes 0, the original passes 0, and
 `DestroyItemObject` gates the unlink on that argument in both. Nothing on the
