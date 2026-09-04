@@ -1169,6 +1169,17 @@ void __cdecl ApplyGameSettings(void)
         strcpy((char *)(uintptr_t)ADDR_MP_SCRIPT_NAME, (const char *)rec);
         strcpy((char *)(uintptr_t)ADDR_MAP_NAME,
                    *(const char *const *)(rec + NAMEREC_OFF_MAPS));
+    } else {
+        /* THE ELSE ARM WAS MISSING. `mov byte [0x511c08], bl` and
+         * `mov byte [0x511a88], bl` at 0x0042F273 and 0x0042F279 -- with the
+         * table empty the original EMPTIES both names rather than leaving
+         * them, and `bl` is that function's zero register.
+         *
+         * Without it our two buffers went out of step: ADDR_MP_SCRIPT_NAME
+         * kept a stale "death.txt" while ADDR_MAP_NAME was empty, and the
+         * multiplayer panel looks its map list up by the first of them. */
+        *(char *)(uintptr_t)ADDR_MP_SCRIPT_NAME = '\0';
+        *(char *)(uintptr_t)ADDR_MAP_NAME       = '\0';
     }
 }
 

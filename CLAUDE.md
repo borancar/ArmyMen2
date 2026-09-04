@@ -1181,10 +1181,18 @@ whatever was already in them, which is how `ADDR_MP_SCRIPT_NAME` comes to hold
 "death.txt" while `ADDR_MAP_NAME` is empty -- two globals that the original
 would have made consistent.
 
-That is the next thing to fix, and it is upstream of everything on this
-screen. Whether it is SUFFICIENT is not established: clearing the name makes
-`ScriptListFind("")` the lookup, which may or may not answer, so the fix wants
-a run rather than an argument.
+The branch is restored, and the run says it is NOT SUFFICIENT: `mpoptions`
+still reports its unchanged 221,423 pixels. So the missing else was a real
+transcription defect and not this screen's cause -- worth having on its own
+terms, and worth saying plainly that fixing it changed nothing visible.
+
+It is safe, which is the part that needed measuring rather than arguing:
+clearing `ADDR_MAP_NAME` could have reached single player, and `ab.sh bootcamp
+campaign` is clean with it in -- 1,610 state lines and 13 messages identical,
+35 widget nodes identical.
+
+What still has to be found is why `ADDR_NAME_TABLE_COUNT` is zero here at all,
+or why the record it would name is not the multiplayer one.
 
 Keeping the block is deliberate: it is faithful to the image, it is guarded so
 a null lookup does nothing, and `ab.sh multi` is clean with it in -- 9 widget
