@@ -442,7 +442,7 @@ A commit message in this session asserted the opposite, that STATUS.md was the
 stale one; it was not, and the correction is recorded here because getting the
 direction backwards is exactly how a stale number survives being noticed.
 
-## OPEN: `ab.sh mpoptions` -- CRASH FIXED, panel builds, content still differs
+## OPEN: `ab.sh mpoptions` -- crash fixed, rects exact, name table empty upstream
 
 **Our build EXITS when the multiplayer options screen is requested.** It is
 not a drawing difference and never was: 221,423 pixels is one side showing a

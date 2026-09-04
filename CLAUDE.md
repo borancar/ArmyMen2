@@ -1331,6 +1331,38 @@ Ten disabled nodes remain against two, and the other eight are `MpPanelUpdate`
 applying the same test per row -- pre-existing code, the same open question,
 not a second bug.
 
+**THE UPSTREAM DIFFERENCE IS FOUND, AND TWO BUFFERS SPELL IT OUT BYTE FOR
+BYTE.** `RefreshMapSelection` is what computes the three handshake checksums,
+and it exits early on a bad map -- which is why ours writes zeros where the
+original writes three sums. Dumping `ADDR_MP_SCRIPT_NAME` on both sides at
+panel-open says why:
+
+| | bytes | what ran |
+|---|---|---|
+| original | `death\0txt` | the COPY arm |
+| ours | `\0eath.txt` | the ELSE arm |
+
+Both start from the same literal, `"death.txt"`. The original `strcpy`'d the
+name table's record name `"death"` over it, leaving `txt` behind; ours cleared
+BYTE ZERO and left `eath.txt` behind. So `ApplyGameSettings` took opposite
+arms, and its condition is `ADDR_NAME_TABLE_COUNT != 0`.
+
+**That vindicates the else branch rather than convicting it.** The arm is
+faithful -- `mov byte [0x511c08], bl` writes exactly one byte, which is why
+the tail survives to be read -- and it fires correctly for the state it is
+given. What differs is the STATE: the original's name table is populated when
+`ApplyGameSettings` runs and ours is empty, though both read 6 by the time the
+panel is up. `ScriptListFind` lazily calls `ReadMpMapList` when the count is
+zero and `ApplyGameSettings` does NOT, so something reaches the table earlier
+in the original than in ours.
+
+**A ONE-BYTE CLEAR LEAVES ITS OWN EVIDENCE, which is worth knowing generally.**
+Had the original memset the buffer, both sides would read empty and the two
+arms would be indistinguishable. Because it writes a single NUL, the debris
+after it says what the buffer used to hold and therefore which arm ran -- a
+free record of history in a global nobody logged. Dump the WHOLE buffer, not
+the string.
+
 **A READ-ONLY OFFSET LOOKED LIKE A CHEAP RATCHET AND IS NOT ONE, measured
 before it was built.** `checkoffsets.py` refuses a second name on an offset;
 nothing asks whether an offset we READ is ever WRITTEN, and a field with no
