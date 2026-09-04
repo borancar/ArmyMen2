@@ -1631,8 +1631,31 @@ inserted; `awk` for the enclosing definition costs one command. Only that
 probe is affected: the `SaveGame` and `MissionStartup` ones were inside the
 functions they name.
 
-The shape that fits is a MODE: this panel is shared between saving and
-loading, so a wrong mode makes the second button write where it should read.
+**AND THE MODE THEORY IS DEAD; THE DIVERGENCE IS THE PAUSE.** Probing
+`TakeMenuRequest` -- the function holding both `MissionStartup` call sites,
+and this time with the enclosing definition CHECKED -- shows it is never
+called at all in the injected build, on any of its first eight opportunities.
+`State2Frame` reaches it two ways: an entered-once path, and `arm == 11` when
+`GetPauseFlags()` is ZERO.
+
+That fits everything measured. The injected build comes back at sub-state
+**33** -- arm 11 -- and a mission that has just loaded is PAUSED, with the
+briefing dialog up, so `GetPauseFlags()` is non-zero and the autosave arm is
+skipped. The standalone comes back at sub-state **24**, reaches
+`TakeMenuRequest` by the other route, and runs `MissionStartup`, whose three
+guards are all clear -- so it stamps a retry save over the slot.
+
+So the question to answer next is why the standalone is not paused, or not in
+sub-state 33, after the same load. `State2Enter`'s tail sets the sub-state to
+play and its last arm is exactly a pause: `if (!LOAD_PENDING && !MP_SESSION &&
+OPT_DBG) PauseGame(8)`. That arm's own comment records getting its first test
+INVERTED once already, with the symptom that "our side ran straight past
+MESSAGE FROM HQ while the original sat on it" -- which is this symptom
+exactly, one build later.
+
+The save-dialog MODE theory is retired: both builds construct the same class,
+the widget trees match node for node, and the writer is `MissionStartup`
+rather than anything the dialog calls.
 The widget dump cannot see that -- it prints geometry, and both panels have
 the same geometry. Note the dump reports `sid=-1` for every node in the
 standalone, which is its own range-checked sprite-id read failing on that

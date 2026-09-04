@@ -122,6 +122,15 @@ the save, with matching widget trees), the row click, and a missing gap seam
 (checkgap reads 37 of 37). The shape that fits is a wrong MODE on a panel
 shared between saving and loading.
 
+**The divergence is the PAUSE.** `TakeMenuRequest` -- which holds both
+`MissionStartup` call sites -- is never called in the injected build. It is
+reached from `State2Frame` when `arm == 11` and `GetPauseFlags()` is zero;
+the injected build sits at sub-state 33 and PAUSED behind the briefing, so
+the autosave arm is skipped, while the standalone sits at 24, reaches it, and
+saves. Next question: why the standalone is not paused after the same load.
+`State2Enter`'s last arm is that pause, and its comment records the same
+symptom from an inverted test once before.
+
 **The writer is named**: a return-address probe puts it at `MissionStartup`
 + 0x8F, the mission-start autosave, whose three guards are all clear in the
 standalone. The injected build never calls `MissionStartup` on this path at
