@@ -7,6 +7,34 @@ command that produces it, so it can be re-measured rather than believed.
 
 Last updated: **2026-09-04**, at `5df7469`. Working tree clean.
 
+## `AM2_GAMEDIR` points the port at the original game's directory
+
+The original has no way to be told where the game lives: `CheckBasePath` reads
+the working directory into `ADDR_GAME_DIR` and every `SetGameDir` concatenates
+onto that, so the install directory is simply wherever the process started.
+Fine for a shortcut in the game folder, useless for running the port from a
+build tree or aiming it at a second install.
+
+    AM2_GAMEDIR='C:\GOG Games\Army Men II' wine .../am2port.exe -nointro
+
+Set it and the process chdirs there before the read, so everything downstream
+sees that directory. **Unset it and nothing changes** -- with the variable
+absent `CheckBasePath` is the original's function instruction for instruction,
+which is what keeps the A/Bs honest, since both halves are driven with the
+same environment.
+
+Verified in both directions from a scratch working directory:
+
+| | log | screen |
+|---|---|---|
+| with the variable | the normal four startup lines | 234 distinct colours -- the title art |
+| without it | `Unable to load wave file click.wav` | 2 colours -- blank |
+
+A chdir that FAILS is logged, naming the directory and the Win32 error, and is
+not fatal. `FatalError`'s only string is about a path being too long, which
+would be a lie; a game that cannot find its data then says so in its own words
+with our line above it.
+
 ## OPEN: the player trooper "jerksteps" while turning -- NOT yet reproduced
 
 Reported from play: holding the mouse moves Sarge now, but changing direction

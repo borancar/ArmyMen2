@@ -145,6 +145,33 @@ typedef void (__cdecl *am2_i32_fn)(int32_t);
  * only thing the message mentions. */
 void __cdecl CheckBasePath(void)
 {
+    /* AM2_GAMEDIR IS OURS AND IS THE ONE DEVIATION IN THIS FUNCTION. The
+     * original has no way to be told where the game lives: the install
+     * directory is wherever the process happened to start, which is fine for
+     * a shortcut in the game folder and useless for a port you want to run
+     * from a build tree or point at a second install.
+     *
+     * Set it and the process chdirs there first, so the getcwd below -- and
+     * every SetGameDir that concatenates onto ADDR_GAME_DIR afterwards -- sees
+     * that directory instead. UNSET IT AND NOTHING CHANGES, which is what
+     * keeps every A/B against the original honest: the two halves are driven
+     * with the same environment, and with the variable absent this is the
+     * original's function instruction for instruction.
+     *
+     * A chdir that FAILS is reported and not fatal. The alternative is
+     * FatalError, and its only string is about a path being too long, which
+     * would be a lie; a game that then cannot find its data says so in its own
+     * words, and the log line above it names the directory that was asked
+     * for. */
+    {
+        const char *dir = getenv("AM2_GAMEDIR");
+
+        if (dir && *dir && !SetCurrentDirectoryA(dir))
+            am2_log("AM2_GAMEDIR: cannot enter \"%s\" (%lu) -- "
+                    "using the launch directory\n",
+                    dir, (unsigned long)GetLastError());
+    }
+
     if (!am2_getcwd((char *)(uintptr_t)ADDR_GAME_DIR, 0xFF))
         FatalError((const char *)(uintptr_t)ADDR_STR_BASE_PATH_LONG);
 }
