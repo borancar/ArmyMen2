@@ -9,7 +9,7 @@ Last updated: **2026-09-04**, at `5df7469`. Working tree clean.
 
 ## In flight
 
-Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **60** analysis
+Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **61** analysis
 tools in `make check` (`tools/checkpatches.py`; `tools/checkclaims.py` counts
 the recipe).
 

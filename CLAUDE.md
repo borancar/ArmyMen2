@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **60** analysis
+**`make check` runs everything that does not need the game.** **61** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -1599,6 +1599,30 @@ so reading it proved nothing until the instruction was decoded. A gate whose
 operand is a REGISTER cannot be checked by looking at the global alone; the
 comparison is the fact, and `checkoffsetuse` cannot see it either, because
 every offset involved is correct.
+
+**THE SHOT CHAIN IS CHECKED END TO END NOW** -- `shotcheck` over
+`ShotStrike`, `shotdmgcheck` over `ApplyShotDamage`, `damagecheck` over
+`DamageObject`. All three are unreachable the same way: no drive here reaches
+combat, and each one's caller is ours, so every counter in the chain is blind
+and reads 0 whatever happens.
+
+`ApplyShotDamage`'s substance is the ARGUMENTS it computes. The amount is
+scaled by a switch with four behaviours and the damage KIND differs on
+exactly one arm -- the random one answers 1 where every other answers 2,
+which no A/B could see because that number never reaches the screen. `rand`
+is stubbed to a value each case chooses, which is what makes the modulus
+comparable at all; with a real generator the same case answers differently
+every run.
+
+**AND IT CONFIRMED A FINDING FROM ANOTHER TOOL, which is what turns a quirk
+into a contract.** All 92 cases differed at first, only in `DamageObject`'s
+FIFTH argument: 0x00BB0090 against the 0x90 the C computes, with the
+shooter's uid showing through above the biased facing. `tools/roachbitecheck.py`
+records exactly this at the same argument of the same callee, from a
+completely different caller -- so only the low byte is the function's, and it
+is `DamageObject`'s contract rather than one caller's accident. Two
+independent callers agreeing is better evidence than either alone, which is
+the same standard this file applies to two routes to one fact.
 
 **`tools/shotcheck.py` CHECKS THE FUNCTION THIS FILE CALLS COVERED AND
 UNCHECKED, and it catches the exact mutation that defeated the A/B.** Making a
