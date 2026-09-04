@@ -2097,7 +2097,7 @@ void __attribute__((thiscall)) HudTopUpdate(AM2_Widget *w)
         *(int32_t *)(self + HUDLOG_OFF_JUST_SENT) = 0;
     } else if (ActionKeyPressed(AM2_ACTION_CONSOLE)) {
         PlaySoundAt(0, 0, 0, 0, 0);
-        g_charHandler = (am2_char_fn)(uintptr_t)ADDR_HUD_CHAT_CHAR;
+        g_charHandler = HudChatChar;   /* ours now, not the image */
         *(int32_t *)(self + HUDLOG_OFF_TYPING) = 1;
     } else {
         if (*(const int32_t *)(self + HUDLOG_OFF_BLIPS) > 0
@@ -14049,6 +14049,8 @@ int widget_install(void)
                         "HudCmdUpdate", 1);
     rc |= patch_replace(ADDR_LIST_UPDATE, (const void *)ListUpdate,
                         "ListUpdate", 1);
+    rc |= patch_replace(ADDR_HUD_CHAT_CHAR, (const void *)HudChatChar,
+                        "HudChatChar", 1);
     rc |= patch_replace(ADDR_HUD_CHAT_SEND, (const void *)HudChatSend,
                         "HudChatSend", 1);
     rc |= patch_replace(ADDR_SELECT_WEAPON, (const void *)SelectWeapon,
@@ -15779,6 +15781,83 @@ refill:
  * The last line clears the TYPED buffer through ADDR_HUD_WIDGET_A rather
  * than through `this`, which are the same object here -- reproduced as the
  * original spells it. */
+/* The typed line is capped at 0x50 characters, which is NOT
+ * AM2_CHAT_TEXT_MAX -- that one is 0xFF and belongs to the wire message. The
+ * two are different limits on the same text: what may be typed, and what may
+ * be sent. */
+#define AM2_HUD_CHAT_TYPED_MAX  0x50
+
+/* 0x004185C0. The WM_CHAR handler the HUD chat line installs into
+ * g_charHandler: a printable character is appended, backspace removes one,
+ * RETURN sends, and anything else is ignored.
+ *
+ * IT IS THE SIBLING OF EditCharHandler ABOVE and shares its opening -- the
+ * same "Error: Key handler not freed" when the widget it belongs to has gone,
+ * which is what that message means: a handler still installed with nothing
+ * behind it. What it does NOT share is the charset filter and the pixel-width
+ * test; this line takes any printable byte and stops on a count.
+ *
+ * TWO SOUNDS AND THEY ARE NOT EditCharHandler'S. Accepting plays wave 0 and
+ * refusing plays wave 3, where the edit box refuses with wave 2. Reproduced
+ * as written rather than made consistent.
+ *
+ * THE TERMINATOR IS WRITTEN THROUGH A RE-READ of the global rather than
+ * through the pointer already in hand -- `mov eax, [0x4FCF00]` between the
+ * two stores. Nothing can move the widget between them, so it is the
+ * compiler's spill rather than a guard, and it is reproduced because the
+ * alternative is to assume that.
+ *
+ * RETURN is a TAIL CALL to HudChatSend with the widget in ecx, which is why
+ * this function has no epilogue on that path.
+ *
+ * checkoffsetuse reports 0x493 and 0x495 as read by the original and unnamed
+ * here, and that is one of its documented false positives: they are
+ * HUDLOG_OFF_TYPED minus and plus one, which the compiler folded into the
+ * index. The C writes them as typed[len - 1] and typed[len + 1] off the one
+ * named base, which is the right way round -- naming a second and third
+ * offset for them is exactly the mistake CLAUDE.md warns about. */
+void __cdecl HudChatChar(uint32_t ch, uint32_t lo, uint32_t hi)
+{
+    AM2_Widget *w = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A;
+    char       *typed;
+    int32_t     len;
+
+    (void)lo;
+    (void)hi;
+    if (!w) {
+        orig_log((const char *)AM2_IMAGE(ADDR_STR_KEY_HANDLER_LEAK));
+        return;
+    }
+
+    typed = (char *)w + HUDLOG_OFF_TYPED;
+    len   = (int32_t)strlen(typed);
+
+    if (ch >= 0x20 && ch < 0x80) {
+        if (len >= AM2_HUD_CHAT_TYPED_MAX) {
+            PlaySoundAt(3, 0, 0, 0, 0);
+            return;
+        }
+        typed[len] = (char)ch;
+        ((char *)*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A)
+            [HUDLOG_OFF_TYPED + len + 1] = 0;
+        PlaySoundAt(0, 0, 0, 0, 0);
+        return;
+    }
+
+    if (ch == 8) {                      /* backspace */
+        if (len <= 0) {
+            PlaySoundAt(3, 0, 0, 0, 0);
+            return;
+        }
+        typed[len - 1] = 0;
+        PlaySoundAt(0, 0, 0, 0, 0);
+        return;
+    }
+
+    if (ch == 0xD)                      /* RETURN -- a tail call there */
+        HudChatSend(w);
+}
+
 void __attribute__((thiscall)) HudChatSend(AM2_Widget *w)
 {
     uint8_t *b = (uint8_t *)w;

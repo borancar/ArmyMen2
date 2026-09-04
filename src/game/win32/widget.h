@@ -779,6 +779,12 @@ void __attribute__((thiscall)) HudCmdUpdate(AM2_Widget *w);
 
 /* 0x00418480, thiscall. Finish a chat line -- and run it as a cheat when it
  * starts with `!` and there is no session. */
+/* 0x004185C0. The HUD chat line's WM_CHAR handler: append a printable
+ * character, remove one on backspace, send on RETURN. Installed into
+ * g_charHandler by the chat widget, so it is reached through that slot
+ * rather than by a call -- which is why the standalone build needed it. */
+void __cdecl HudChatChar(uint32_t ch, uint32_t lo, uint32_t hi);
+
 void __attribute__((thiscall)) HudChatSend(AM2_Widget *w);
 
 AM2_DECLARE_CLASS_DTOR(DlgMessage);

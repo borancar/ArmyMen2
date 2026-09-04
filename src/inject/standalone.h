@@ -77,17 +77,18 @@ long am2_sa_ftell(void *fp);
  * function -- and its target is FreeArmyObjLists, which is reconstructed. */
 void am2_sa_free_army_lists(void);
 
-/* Two addresses the standalone build has no code for. One is a genuine
- * function still unreconstructed -- 0x004185C0, the HUD chat WM_CHAR handler,
- * an interior address of a merged entry, which is why every completeness
- * check reads it as done. The other is the AM2_PROBE_NOACTION seam, which
- * exists to call the ORIGINAL parser and so cannot mean anything here. Each
- * LOGS and returns 0: a stub that announces itself beats a jump into unmapped
+/* ONE address the standalone build has no code for, and it is not a gap: the
+ * AM2_PROBE_NOACTION seam exists to call the ORIGINAL action parser, so it
+ * cannot mean anything in a build that carries none of the original. It LOGS
+ * and returns 0 -- a stub that announces itself beats a jump into unmapped
  * memory, and beats a silent wrong answer by more.
  *
- * 0x00451990 was the third until OnEnterNameOk was reconstructed, which the
- * standalone build is what asked for -- it is the only thing in the tree that
- * cannot call code it does not contain. */
+ * The other two were real functions and are gone: 0x00451990 became
+ * OnEnterNameOk and 0x004185C0 became HudChatChar. Both were interior
+ * addresses of merged entries, which is why remaining.py, coverage.py and
+ * checkinstalled all read them as done; the standalone build is the only
+ * thing in the tree that cannot call code it does not contain, and it is what
+ * found them. */
 int32_t am2_sa_unimplemented(void);
 
 
@@ -199,12 +200,10 @@ extern const uint8_t am2_pickup_kind_index[29];
 #undef ADDR_FTELL
 #undef ADDR_GAME_FREE
 #undef ADDR_FREE_ARMY_LISTS_ALIAS
-#undef ADDR_HUD_CHAT_CHAR
 #undef ADDR_SCRIPT_PARSE_ACTION
 #define ADDR_FTELL            AM2_SA(am2_sa_ftell)
 #define ADDR_GAME_FREE        AM2_SA(free)
 #define ADDR_FREE_ARMY_LISTS_ALIAS AM2_SA(am2_sa_free_army_lists)
-#define ADDR_HUD_CHAT_CHAR    AM2_SA(am2_sa_unimplemented)
 #define ADDR_SCRIPT_PARSE_ACTION AM2_SA(am2_sa_unimplemented)
 
 

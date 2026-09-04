@@ -38,7 +38,18 @@ SA_PID=""
 # The kill must be tolerant: `set -e` aborts on a failing last command
 # in an && list, and the process is often already gone -- which made
 # the script exit 1 after printing that it had PASSED.
-cleanup() { [ -n "$SA_PID" ] && kill "$SA_PID" 2>/dev/null || true; return 0; }
+# Killing SA_PID alone is NOT enough: that is the `wine explorer` wrapper,
+# and the game it started survives it -- three of them accumulated across
+# runs, each still holding ArmyMenMutex, which silently makes the NEXT
+# injected run exit and made tools/ab.sh compare two failed drives and call
+# them clean. The pattern is safe here in a way it is not from an interactive
+# shell: this script's own command line is `sh tools/samenu.sh` and contains
+# no such literal, so it cannot match itself.
+cleanup() {
+    [ -n "$SA_PID" ] && kill "$SA_PID" 2>/dev/null
+    pkill -f 'am2port\.exe' 2>/dev/null
+    return 0
+}
 # Preserve the status: an EXIT trap whose last command is a kill can
 # otherwise decide the script's exit code, which made a PASSING run
 # report failure.

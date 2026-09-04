@@ -3496,7 +3496,28 @@ exact oracle**, however meaningful it is when it is set.
   of the first five unreferenced candidates checked by hand, two disassembled to
   garbage. So the figure is a lower bound and is meant to be — 260 candidates,
   186 confirmed. Do not rewrite `functions.tsv` from the naive scan.
-- **`tools/samenu.sh` IS THE STANDALONE BUILD'S A/B, and it is the only place
+- **AN A/B CAN PASS ON AN EMPTY STATE DUMP, and it did.** `tools/ab.sh`
+compares the object table only `if [ -s ... ]` on both sides, so a run where
+the drive never reached the mission produced two EMPTY dumps, skipped the
+comparison silently, and reported **A/B clean** on a four-line log and 0
+differing pixels. The cause was three leftover standalone processes holding
+`ArmyMenMutex` -- `tools/samenu.sh` was killing the `wine explorer` wrapper
+by pid and not the game beneath it -- so both halves exited early and
+compared nothing.
+
+This is the sibling of the missing-file case this file already records, where
+"two missing files diff as identical". Empty ones do too, and the `-s` guard
+that fixed the first hides the second. The configurations that INTEND a dump
+now leave a marker beside it, and an empty dump with a marker is a VOID that
+fails the run and names the likely cause. Tested both ways: with a decoy
+holding the mutex it fails and says so, and without one it reads the usual
+1,610 lines, 13 messages and 22 pixels.
+
+The reading to take is the one this file keeps arriving at from new
+directions: **a clean verdict on a configuration whose evidence is missing is
+worse than no run**, and the artifact counts are what tell the two apart.
+
+**`tools/samenu.sh` IS THE STANDALONE BUILD'S A/B, and it is the only place
 the port's headline claim is checked rather than looked at.** It runs the
 injected build and the standalone through the same startup, then compares the
 two things that CAN be compared: the game's own log lines, which come out

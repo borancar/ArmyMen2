@@ -387,8 +387,17 @@ play() {
     # weapon's `pos`, which was already dumped. Types 2 and 3 alone because a
     # missile's record is 0xB8 bytes and a roach's 0x560; reading the block
     # from those would print heap. See tools/objdump.py.
+    # The marker says this configuration INTENDS a state dump, which is what
+    # lets an empty one be told from a configuration that never made one.
+    # Without it an empty dump is skipped by the `-s` guard below and the run
+    # still reports A/B clean -- which happened: three leftover standalone
+    # processes held ArmyMenMutex, both sides exited early, both state files
+    # came back empty and both logs held four lines, and ab.sh called it
+    # clean. That is the sibling of the missing-file case this script already
+    # guards, and it passes on NOTHING in the same way.
     if [ "$cfg" = bootcamp ]; then
         drive objtable 2>/dev/null > "$WORK/$cfg-$side.state" || true
+        : > "$WORK/$cfg-$side.state.want"
     fi
 
     if [ "$cfg" = campaign ]; then
@@ -1148,6 +1157,17 @@ compare() {
     # The widget tree, where a configuration captured one. Compared as an exact
     # diff rather than against a budget, because it is exact: the same 25 lines
     # come back from the original and from the reconstruction.
+    for side in orig recon; do
+        if [ -f "$WORK/$cfg-$side.state.want" ] \
+           && [ ! -s "$WORK/$cfg-$side.state" ]; then
+            echo "  state   VOID -- $side produced an EMPTY object dump, so"
+            echo "          the drive did not reach the mission and this run"
+            echo "          compares nothing. Check for a surviving process"
+            echo "          holding ArmyMenMutex, and the control port."
+            rc=1
+        fi
+    done
+
     if [ -s "$WORK/$cfg-orig.state" ] && [ -s "$WORK/$cfg-recon.state" ]; then
         if diff -q "$WORK/$cfg-orig.state" "$WORK/$cfg-recon.state" \
                >/dev/null 2>&1; then
