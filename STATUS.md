@@ -20,11 +20,23 @@ copied in before each half, both sides read action **1** and row
 **`01000100c5000000`** -- frame, next, heading and cell all identical. There
 is no divergence under matched conditions.
 
-**Fourth unmatched control of this session, same file.** `Options.cfg` is an
-input to key bindings and to the options the input layer reads, previous runs
-rewrite it, and `tools/ab.sh` copies it per side for exactly this reason.
-Every hand-rolled pair of runs in this investigation that skipped that step
-produced a confident, wrong finding.
+**AND THE RETRACTION'S OWN REASON WAS WRONG TOO, which is worth more than
+the retraction.** It blamed an unmatched `Options.cfg` -- the trap that had
+already bitten three times that day, so it was the obvious culprit and was
+written down without being checked. The file on disk is BYTE-IDENTICAL to the
+baseline and nothing rewrote it, so the configs were never unmatched.
+
+What actually happened is plainer and less comfortable: **one run read 17 and
+five since have read 1**, under the same config, the same drive and the same
+build. It is a single unreproduced observation. `Options.cfg` was a plausible
+story that fit the shape of earlier mistakes, and reaching for it was the same
+error one level up -- explaining a result from a REMEMBERED failure mode
+rather than from evidence.
+
+Whether the 17 was a real intermittent divergence or an artefact of that one
+run is NOT established. Five clean runs make it rare if it is real, and this
+file's own rule applies: three clean runs cannot distinguish "never" from
+"one in five".
 
 What IS established, and survives the retraction:
 
