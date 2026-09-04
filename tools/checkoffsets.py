@@ -112,7 +112,28 @@ def _headers():
 # when it joins an existing session and 1 for a local game, so the field is
 # LOCAL: a writer PAIR against a single reader's guess, which is the ordering
 # this project already keeps for naming.
-FAMILY_ALIAS_BASELINE = 9
+# 9 -> 8. SOUND_REC_OFF_STATE only ever wrote NULL; SOUND_REC_OFF_OWNER_DS at
+# the same 0x08 writes g_dsound, a typed IDirectSound. Placeholder against a
+# typed writer.
+#
+# WHAT IS LEFT IS NOT ALL BACKLOG, and saying which is which is the useful part
+# -- the count alone invites a future reader to "fix" a pair that is correct:
+#
+#   DLG_OFF_ 0x64   LEGITIMATE. BATTLE_NAME is a char buffer read by the battle
+#                   dialog; LIST is a record pointer written by another. The
+#                   DLG_ prefix spans several dialog classes.
+#   OBJ_OFF_ 0x12   LEGITIMATE. POS is the AM2_Point and X its first member;
+#                   both names are true of the same address.
+#   OBJ_OFF_ 0x8C   Suspicious as a PAIR with 0x90 -- ALLOC_LIVE/ALLOC_PTR
+#   OBJ_OFF_ 0x90   against CELL_COUNT/CELL_ENTRIES. Two readings of one
+#                   count+array, and one of them is wrong. Needs the writer.
+#   OBJ_OFF_ 0x4    OWNER against UID, 0xA4 CHAIN_PARENT_UID against PTR_LIST,
+#   OBJ_OFF_ 0xA4   0x534 STUCK_SINCE against TABLE_REC_SLOT: the OBJ_ prefix
+#   OBJ_OFF_ 0x534  covers eight object TYPES, so these may be the documented
+#                   one-offset-several-types case rather than duplicates.
+#   OBJ_FLAG_ 0x2   OVERDUE against REPLACED, two readings of one bit, already
+#                   recorded above as backlog.
+FAMILY_ALIAS_BASELINE = 8
 
 DEFINE = re.compile(r"^#define\s+([A-Z][A-Z0-9_]*)\s+(0x[0-9A-Fa-f]+u?|\d+u?)\s*(?:/\*|$)")
 # `_OFF_` was the whole of this for as long as offsets were the thing that got

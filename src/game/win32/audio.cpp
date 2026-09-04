@@ -1670,7 +1670,7 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
 
     *(void **)(rec + SOUND_REC_OFF_BUFFER) = NULL;
     *(void **)(rec + SOUND_REC_OFF_NAME)   = NULL;
-    *(void **)(rec + SOUND_REC_OFF_STATE)  = NULL;
+    *(void **)(rec + SOUND_REC_OFF_OWNER_DS)  = NULL;
 
     n = strlen(name) + 1;
     nameCopy = (char *)orig_malloc(n);
@@ -1715,7 +1715,7 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
         goto give_up;
     }
 
-    *(void **)(rec + SOUND_REC_OFF_STATE) = NULL;
+    *(void **)(rec + SOUND_REC_OFF_OWNER_DS) = NULL;
     orig_free(owned);
     return 1;
 

@@ -5112,7 +5112,7 @@
 #define SOUND_RECORD_SIZE        0x20u    /* what a slot points at */
 #define SOUND_REC_OFF_BUFFER     0x00u    /* IDirectSoundBuffer * */
 #define SOUND_REC_OFF_NAME       0x04u    /* strdup of the wave's name */
-#define SOUND_REC_OFF_STATE      0x08u
+#define SOUND_REC_OFF_OWNER_DS      0x08u
 #define ADDR_STR_WAVE_NOMEM_DATA 0x00474D44u
 #define ADDR_STR_WAVE_NOMEM_NAME 0x00474D18u
 #define ADDR_STR_WAVE_NOLOAD     0x00474CF8u
@@ -5245,7 +5245,6 @@
 #define AM2_VOICE_SLOT           0x10
 #define ADDR_VOS_DIR             0x00474D70u /* "audio\\vos" */
 #define ADDR_VOLUME_VOICE        0x00512320u /* used for slots 0 and 16 */
-#define SOUND_REC_OFF_OWNER_DS   0x08u   /* the IDirectSound it was made from */
 #define SOUND_REC_OFF_PRIORITY   0x0Cu
 #define SOUND_REC_OFF_LOOPING    0x1Cu
 #define SOUND_VOICE_SLOT_HI      0x10    /* slot 16, like slot 0, is a voice */
