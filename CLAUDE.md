@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **48** analysis
+**`make check` runs everything that does not need the game.** **49** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3823,7 +3823,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 22 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 23 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3935,6 +3935,24 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   confirmed each against itself would still pass if one were rewritten into
   the other. Making Defend turn on the route path fails at once; so does
   dropping the route path's promotion.
+
+  **THE WHOLE AI BAND IS COVERED NOW, and that paragraph below about it is
+  history.** This file says of `counts Ai` returning every counter at 0 that
+  "everything in that band is verified by reading until a drive exists that
+  provokes a fight". No such drive exists and the band is checked anyway: the
+  dispatcher by `tools/aicheck.py`, the six arms by `aiignorecheck`,
+  `aitwincheck` (two at once), `aifollowcheck` and `aicheck`'s forwarder
+  test, and the two helpers by `aiwalkcheck` and `hitreactcheck`. Nine
+  functions, none of them reachable here, none of them now resting on a
+  reading.
+
+  `AiKeepRange` is the last of them, by `tools/aikeeprangecheck.py`, 3,840
+  cases over its eight decisions. **THE EARLY RETURN IS THE ONE WORTH
+  NAMING**: with no observer this arm returns before the turn test that every
+  sibling still runs, so a unit with nothing in sight does not even turn. It
+  is one `je` to the epilogue rather than to the tail, invisible in any
+  summary of what the function does, and letting it fall through instead
+  fails 1,680 cases.
 
   `AiStepFollow` joins them by `tools/aifollowcheck.py`, 384 cases. Three
   things separate it from its siblings and each is a merge waiting to happen:
@@ -4102,7 +4120,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   configuration whose descriptor under-reports its extent is what makes them
   observable at all.
 
-  The other ten are verified by READING, which is the standing worth
+  The other nine are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is
