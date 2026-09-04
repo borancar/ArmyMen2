@@ -545,10 +545,17 @@ and 625 across runs two of which are older than the work that first noticed it
 state, its 16-node widget tree and its 13 log messages are identical every
 time.
 
-**ANSWERED: OUR SIDE IS STILL LOADING THE MAP WHEN THE DRIVE ENDS.** The
-recon log's LAST line is `calculating region data...`, so the mission never
-starts on that side; its 608 markers are the menus, and the original's 25,797
-are a mission that began. Nothing about the frame path is wrong.
+**THAT ANSWER WAS WRONG AND THE NEXT PROBE KILLED IT.** It read the recon
+log's last line -- `calculating region data...` -- as the mission still
+loading. Timed on both sides, RETURN to that message takes **2 s on the
+original and 1 s on ours**, so the load is not slow and is not where either
+side sits. A log that ENDS at a line means only that nothing was logged after
+it; with the per-frame markers being the only thing that follows, it means no
+frames were composed, which is a different claim and not the one made.
+
+Both sides also finish showing the MAP -- their finishing screenshots carry
+195 and 193 distinct colours with the same greens and browns -- so both reach
+live play. The dialogs are cleared on both.
 
 Driven by hand with the SAME clicks but more slack -- 46 s before BOOT CAMP
 instead of `ab.sh`'s 20, then its own 25 and 30 -- our side reaches live play
@@ -565,9 +572,13 @@ second and the 608 markers were never measuring the same thing, because the
 probe: it reads 0 in live play while the log takes 33,494 markers, because
 its caller is reconstructed and reaches it directly. Count the markers.
 
-What is still open is narrower and real: WHY our map load is slower than the
-original's. `calculating region data` is where it is sitting, and both sides
-otherwise log the same 13 messages.
+What is still open, stated as what is actually measured rather than as a
+theory: under `ab.sh` our side emits 608 markers where the original emits
+25,797, and driven BY HAND with the same clicks and more slack our side emits
+33,494 in twenty seconds. Two runs of the same build doing the same thing
+differ by fifty times, which points at the drive rather than the build --
+but nothing here establishes that, and the previous two attempts to explain
+this number were both wrong. Measure before theorising again.
 
 ## Driving to a live mission by hand needs ab.sh's WAITS
 
