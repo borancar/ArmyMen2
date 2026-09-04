@@ -124,10 +124,16 @@ def _headers():
 #                   DLG_ prefix spans several dialog classes.
 #   OBJ_OFF_ 0x12   LEGITIMATE. POS is the AM2_Point and X its first member;
 #                   both names are true of the same address.
-#   OBJ_OFF_ 0x4    OWNER against UID, 0xA4 CHAIN_PARENT_UID against PTR_LIST,
-#   OBJ_OFF_ 0xA4   0x534 STUCK_SINCE against TABLE_REC_SLOT: the OBJ_ prefix
-#   OBJ_OFF_ 0x534  covers eight object TYPES, so these may be the documented
-#                   one-offset-several-types case rather than duplicates.
+#   OBJ_OFF_ 0x4    LEGITIMATE, and the tree already said so before this tool
+#                   could see it: air.cpp's comment reads "OBJ_OFF_OWNER is
+#                   NOT [objtable's owner] -- that constant is 0x0004 and
+#                   belongs to a different structure entirely. Two right
+#                   names, one collision." Do not collapse it.
+#   OBJ_OFF_ 0xA4   CHAIN_PARENT_UID against PTR_LIST, and 0x534 STUCK_SINCE
+#   OBJ_OFF_ 0x534  against TABLE_REC_SLOT. Still unread. The OBJ_ prefix
+#                   covers eight object TYPES, so either may be the documented
+#                   one-offset-several-types case; check the DESTRUCTOR first,
+#                   which is what settled three other pairs.
 #   OBJ_FLAG_ 0x2   OVERDUE against REPLACED, two readings of one bit, already
 #                   recorded above as backlog.
 # 8 -> 6. The 0x8C/0x90 pair flagged above as needing the writer is settled and
