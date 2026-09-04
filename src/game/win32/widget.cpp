@@ -16553,15 +16553,60 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
                                                        : 0;
     }
     {
-        AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x98);
+        AM2_Widget **slot = (AM2_Widget **)(p + MP_PANEL_OFF_CHATBOX);
+        AM2_Widget  *child = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_BYTES);
 
         /* ADDR_LOG as the callback is not a mistake: it is a bare `ret` in
          * this build, so the list is built with a do-nothing notifier. */
-        if (child)
-            TextListConstruct(child, 0x14, 0x17B, 0xFC, 0x43,
-                              *(void **)(uintptr_t)ADDR_MENU_MSG_LIST,
-                              (int32_t)ADDR_LOG, 0);
-        WidgetAddChild(w, child);
+        *slot = child ? TextListConstruct(child, 0x14, 0x17B, 0xFC, 0x43,
+                                          *(void **)(uintptr_t)
+                                              ADDR_MENU_MSG_LIST,
+                                          (int32_t)ADDR_LOG, 0)
+                      : (AM2_Widget *)0;
+
+        /* THE STORE WAS MISSING and the widget was not. This block built the
+         * chat list correctly and then dropped the pointer on the floor, so
+         * MP_PANEL_OFF_CHATBOX kept whatever the allocator left -- and
+         * MenuMessage follows that field on every chat line, then follows its
+         * LIST_OFF_ARROWBAR. 0x280 + 0x7C is the 0x2FC the page fault named.
+         *
+         * The original stores BEFORE the AddChild and then writes flag50
+         * THROUGH the stored field, which is the same shape as the spin's
+         * three children and unguarded for the same reason. */
+        WidgetAddChild(w, *slot);
+        (*slot)->flag50 = 0;
+
+        /* AND ITS SCROLLBAR, which the list is useless without. MenuMessage
+         * hands the list's LIST_OFF_ARROWBAR straight to ArrowBarFollowEnd,
+         * so an unlinked bar faults there on the FIRST chat line -- one
+         * dereference further along than the missing store above, and the
+         * second fault this one block produced.
+         *
+         * The highlight starts on the LAST row: the original reads the row
+         * record's count out of the list's own rows field and stores count-1.
+         * On an empty log that is -1, which is what "no row" is elsewhere in
+         * this tree. */
+        {
+            AM2_Widget *bar = (AM2_Widget *)orig_operator_new(0x78);
+
+            if (bar)
+                bar = ArrowBarConstruct(bar, 0x121, 0x172, 0x13, 0x55, w,
+                                        (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
+                                        (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                                        0x2C, 1);
+            WidgetAddChild(w, bar);
+
+            *(AM2_Widget **)((uint8_t *)*slot + LIST_OFF_ARROWBAR) = bar;
+            *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST)   = *slot;
+            *(int32_t *)((uint8_t *)bar + ARROWBAR_OFF_FLAG50)     = 0;
+
+            {
+                uint8_t *cb   = (uint8_t *)*slot;
+                void    *rows = *(void **)(cb + LISTBOX_OFF_ROWS);
+
+                *(int32_t *)(cb + 0x58) = *(const int32_t *)rows - 1;
+            }
+        }
     }
 
     /* THE SCORE SPINNER is built ONLY when hosting -- a joiner has no such

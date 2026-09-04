@@ -1499,7 +1499,35 @@ names both.
 
 That is three of the six unbuilt fields now accounted for by a symptom
 apiece -- `ARMY_ROWS` by a crash on panel open, `GAME_BOX` by the empty script
-name, `CHATBOX` by this -- and the check that listed all six cost one command. That is the check to run on any screen whose
+name, `CHATBOX` by this -- and the check that listed all six cost one command.
+
+**THE CHAT BOX WAS BUILT ALL ALONG AND ITS POINTER WAS DROPPED.** That block
+constructed the text list with the right rectangle and arguments and then
+never stored it, so the field kept the allocator's leavings. Fixing the store
+moved the fault ONE dereference further, to `ArrowBarFollowEnd+0x2` reading
+NULL+0x58: the list's scrollbar was neither built nor back-linked, and
+`MenuMessage` hands `LIST_OFF_ARROWBAR` straight to it. Two faults from one
+omitted tail.
+
+**A WIDGET THAT IS CONSTRUCTED BUT NOT STORED IS INVISIBLE TO EVERY CHECK WE
+HAVE.** It draws, it is in the child list, it appears in `ctl widgets` -- and
+the field that names it is garbage. Only a consumer that follows the field
+finds out, which is why this survived until a chat line was typed.
+
+**`mpoptions` is now essentially clean, and the numbers are the finding:**
+
+| | before | after |
+|---|---|---|
+| pixels | 221,423 | **308**, against a budget of 300 |
+| log | DIFFERS, 21 against 35 | **identical, 35 messages** |
+| `state` | one line, all zeros | **identical, five lines** |
+| widgets | 43 lines against 128 | 131 against 131, 36 differing |
+
+The `state` artifact is the one to read: five exact dumps with no budget --
+both checksum rounds and the chat buffer holding `Zulu` -- and they agree
+byte for byte. The configuration has been failing since before anyone
+bisected it, and what it needed was six unbuilt fields, an ordering, and two
+pixels. That is the check to run on any screen whose
 constructor is suspected, and it is the scoped form of the read-only-offset
 idea that was rejected as a whole-tree gate.
 
