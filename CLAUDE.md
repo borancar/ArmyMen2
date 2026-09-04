@@ -1170,8 +1170,21 @@ startup in `winmain.cpp` and once in `misc.cpp:1169`, which copies the FIRST
 NAME-TABLE RECORD into it and the record's `NAMEREC_OFF_MAPS` into
 `ADDR_MAP_NAME`. Our `ADDR_MAP_NAME` comes out empty from that same copy, so
 both globals are being filled from a record that is not the one the original
-reads. **That is the next defect, and it is upstream of everything on this
-screen.**
+reads.
+
+**AND `ApplyGameSettings` IS MISSING THE ELSE BRANCH.** The original at
+0x0042F218 tests `ADDR_NAME_TABLE_COUNT`, copies into `0x511C08` and
+`0x511A88` when it is non-zero, and otherwise CLEARS both --
+`mov byte [0x511c08], bl` and `mov byte [0x511a88], bl` at 0x0042F273 and
+0x0042F279. Ours has only the copying arm, so on an empty table it leaves
+whatever was already in them, which is how `ADDR_MP_SCRIPT_NAME` comes to hold
+"death.txt" while `ADDR_MAP_NAME` is empty -- two globals that the original
+would have made consistent.
+
+That is the next thing to fix, and it is upstream of everything on this
+screen. Whether it is SUFFICIENT is not established: clearing the name makes
+`ScriptListFind("")` the lookup, which may or may not answer, so the fix wants
+a run rather than an argument.
 
 Keeping the block is deliberate: it is faithful to the image, it is guarded so
 a null lookup does nothing, and `ab.sh multi` is clean with it in -- 9 widget
