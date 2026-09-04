@@ -1028,6 +1028,28 @@ differing pixels. That exact number appears in commit 2f55eb3 from a previous
 session and again on two runs today, so a run reporting it is reproducing the
 known defect rather than finding a new one.
 
+**ITS MECHANISM IS A GARBAGE SPRITE NAME, localised now.** A probe in
+`LoadBitmap` logging its `name` argument and `__builtin_return_address(0)`,
+driven through `ab.sh`'s own mpoptions sequence -- MULTI-PLAYER, TCP/IP,
+SELECT, then poking the comm host flag and the menu-request pair -- catches
+four calls as the panel opens:
+
+    name=00485E30 caller=PreloadSpriteName+0x7E first="type"
+    name=00485E44 caller=PreloadSpriteName+0x7E first="oyMe"
+    name=0076FD50 caller=PreloadSpriteName+0x7E first="bad_"
+    name=0076FC48 caller=PreloadSpriteName+0x7E first="bad_"
+
+The first two point into the MIDDLE of strings in the image's `.data` pool --
+"type" and "oyMe" are the tails of longer literals, which is why the failure
+message prints `Unable to load sprite oyMessageSend: uid=%x, ...`: the `%s`
+argument is a mid-string pointer and the logger walks it to the next NUL. That
+is a table indexed wrongly, not a name built wrongly.
+
+`PreloadSpriteName` passes its `name` straight through to `LoadBitmap`, so the
+bad pointer arrives from ITS caller, on the MP options panel's path. That is
+where to look next; the panel itself is still the original's 4,497 bytes, so
+the suspect is whatever reconstructed code supplies it a name.
+
 Worth knowing before spending a control run on it: a deterministic pixel count
 that matches a recorded one IS the control. It cost one re-run and one search
 of the git log to establish that today's failure predates the session's
