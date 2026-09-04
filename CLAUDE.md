@@ -1600,6 +1600,32 @@ operand is a REGISTER cannot be checked by looking at the global alone; the
 comparison is the fact, and `checkoffsetuse` cannot see it either, because
 every offset involved is correct.
 
+**MOVEMENT IS FACING-RELATIVE, and not knowing that wastes a drive.** Action
+0 walks FORWARD along the unit's own facing; actions 2 and 3 TURN, on a
+shared repeat delay. So holding the key bound to "up" does not move north --
+measured, it took Sarge from 1782,1084 to 1424,1084 and then to 1093,968,
+i.e. west and then north-west, because that is where he was pointing. A drive
+that assumes screen axes will conclude the unit is stuck when it is walking
+perfectly well in a direction nobody asked about.
+
+**AND THE COMBAT LAYER STILL HAS NO DRIVE, now for measured reasons rather
+than assumed ones.** Three probes, all negative, recorded so they are not
+repeated:
+
+- Boot Camp holds exactly THREE enemy troopers, at ~1,330 world units from
+  Sarge's start and reachable only by a long walk in one direction. Eight
+  rounds of the `combat` drive move him about 500.
+- MAP 01 is described here as hostile the moment its dialog clears, and that
+  does not mean damage arrives quickly: driven into live play and left for 46
+  seconds, NOTHING among its 331 objects is below its maximum health -- on
+  our build AND under `AM2_NOPATCH=1`, identically.
+- and the counters cannot stand in, being blind.
+
+The one thing those runs did establish is a new matching observable: the
+campaign in live play gives 331 objects with identical health on both sides.
+What is still missing is a target whose health MOVES, and until one is found
+the consequence layer is verified by reading.
+
 **AND THE FIGURE BELOW IS HISTORY NOW, which is the stale-band lesson again
 one layer in.** `ShotStrike`'s 13,582 was a real measurement when its callers
 were still the image's. They are ours, and `tools/blindspots.py` reports
