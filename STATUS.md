@@ -120,8 +120,30 @@ something else holding the same record: it is `o + OBJ_OFF_SIGHT_OUT_T2`, and
 `KEY_STATES` being 256 so the harness overlay applies, the wheel delta being
 cleared each poll, and the turn quantisation.
 
-Next: find what writes +8 of that record between frames. The probe above is
-the instrument -- extend it to every function taking the sight-out record.
+**FOUND: `UpdateTrooperAction`'s `no_route` ARM, firing every frame.**
+Instrumenting all TWENTY-FOUR writers of that field in region.cpp and running
+the repro on a clock-verified live drive:
+
+    7838  arm=14  1 -> 2   Type2PlayerInput's ActionKeyDown(0) walk arm
+    6197  arm=12  2 -> 1   UpdateTrooperAction, the `no_route` block
+     156  arm=8   1 -> 2   Type2PlayerStep
+       1  arm=7   2 -> 1
+
+So the two fight every frame. The input says walk, `UpdateTrooperAction`
+decides there is nothing walkable ahead and stops the trooper, and the next
+frame the input says walk again. Each flip calls `SetAnimFrame` with a
+different frame, which resets `ROW_OFF_CELL` to 0 -- the legs restart, and the
+movement hitches. That is the whole symptom.
+
+**So the defect is in the walkability test**, in the code above `no_route:`
+that decides whether the tile ahead can be entered -- not in the input, not in
+the animation, and not in the key state. `arm=12` also writes 1 over garbage
+values (`28 -> 1`, `7796576 -> 1`), so it runs for other objects too and the
+test is shared.
+
+The oracle for the fix is the same probe: with it correct, `arm=12` should
+stop firing for the player's trooper while W is held, and the frame histogram
+should show the original's `04, 05, 2e, 2f` walk chain instead of `01`/`05`.
 
 **A parser bug wasted three runs here and is worth naming:** `ctl dump` returns
 ONE contiguous hex string, not space-separated bytes. Splitting it into tokens
