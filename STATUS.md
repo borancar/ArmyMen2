@@ -51,57 +51,39 @@ keeps the ORIGINAL `ArmyMen2.exe` untouched, which every A/B needs, and
 `am2port.exe` beside it stays useful for testing what a player would actually
 have.
 
-## OPEN: the player trooper "jerksteps" while turning -- NOT yet reproduced
+## OPEN: the trooper "jerksteps" while turning -- a REPRO, and what it rules out
 
-Reported from play: holding the mouse moves Sarge now, but changing direction
-makes him jerkstep -- the walk ANIMATION restarting, not the position hopping.
+Reported from play: in Boot Camp hold W to move forward and then hold A (or S)
+-- Sarge should run in circles without stutters, and does not. That is a
+deterministic repro and far better than anything the suite can drive; it also
+needs no mouse, so the input is exactly two held scancodes.
 
-**A previous version of this entry claimed the cause was found and it was
-WRONG. Retracted in full.** It reported the leader's row on animation 13
-against the original's 1, and the action field +0x584 holding 17 against 1,
-and named `kActionKey4[2]` as the source. Re-run with the SAME `Options.cfg`
-copied in before each half, both sides read action **1** and row
-**`01000100c5000000`** -- frame, next, heading and cell all identical. There
-is no divergence under matched conditions.
+**Drive it with `ctl key 0x11 down` and `ctl key 0x1E down`** -- the command
+takes a NAME or an `0x`-prefixed scancode, and a bare `11` silently resolves to
+nothing, which reads as the game ignoring input. `ctl keys` confirms what the
+GAME sees: `down: 11 1e pressed: 11 1e`.
 
-**AND THE RETRACTION'S OWN REASON WAS WRONG TOO, which is worth more than
-the retraction.** It blamed an unmatched `Options.cfg` -- the trap that had
-already bitten three times that day, so it was the obvious culprit and was
-written down without being checked. The file on disk is BYTE-IDENTICAL to the
-baseline and nothing rewrote it, so the configs were never unmatched.
+**Walking straight is NOT broken**, measured on both sides under the same
+drive with a matched `Options.cfg`. Both cycle the same animation chain --
+frames 0x2E, 0x04, 0x2F, 0x05 through `ROW_OFF_ANIM_NEXT_ID` -- and both
+advance position steadily, about 0x23 a sample.
 
-What actually happened is plainer and less comfortable: **one run read 17 and
-five since have read 1**, under the same config, the same drive and the same
-build. It is a single unreproduced observation. `Options.cfg` was a plausible
-story that fit the shape of earlier mistakes, and reaching for it was the same
-error one level up -- explaining a result from a REMEMBERED failure mode
-rather than from evidence.
+**What the turn quantisation is NOT:** our `(facing +/- 0x10) & 0xF0` looked
+like a prime suspect -- 16 directions, a whole notch a step -- and the original
+does exactly the same, `sub al,0x10; and al,0xf0` at 0x0044A566 and
+`add al,0x10; and al,0xf0` at 0x0044A5BC. Stepped facing is the game's own.
 
-Whether the 17 was a real intermittent divergence or an artefact of that one
-run is NOT established. Five clean runs make it rare if it is real, and this
-file's own rule applies: three clean runs cannot distinguish "never" from
-"one in five".
+**One difference is unexplained and is NOT yet a finding.** In the one clean
+matched pair the animation CELL differed: the original's samples spread across
+0, 1 and 2 while ours read 0 in six of eight. That is 250 ms sampling of a
+field that resets on every frame change, so it may be aliasing. Two attempts to
+sample faster ended with the game exiting under a sustained held key, which is
+its own thing to look at.
 
-What IS established, and survives the retraction:
-
-- the facing is fine: 9c a2 a8 ad b2 b6 b9 bc be c0 c2 c3, decelerating into
-  the target, position advancing a steady ~33 a sample
-- while the mouse is HELD, `OBJ_OFF_FIELD_10C` and `OBJ_OFF_FIELD_C0` are
-  both ZERO, so held-mouse steering does NOT use `Type2PlayerStep`'s walk arm
-- the action lives in the OBJECT at `o + OBJ_OFF_SIGHT_OUT_T2 + 8` and
-  persists between frames; neither side resets it, so one wrong value would
-  stick
-- an 11-arm probe over every assignment to that field logged NOTHING on a
-  full drive, so `Type2PlayerInput` never changes it there
-- the walk arm's destination clear, the 200 ms re-aim throttle,
-  `StepRowAnim`'s advance and its `sar` halving, `SetAnimFrame`'s guard,
-  `ActionKeyPressed`, the key bindings and the key-buffer pointers are all
-  faithful, each checked against the original
-
-So the symptom is real and unreproduced by these instruments. The next attempt
-should reproduce it with the REPORTER'S `Options.cfg` rather than a baseline
--- the one run that showed 17 used a config left by an earlier run, and
-nothing has yet compared the original under that same config.
+**Do not read an earlier "cell stuck at 0" observation as evidence** -- it came
+from a run with stale instances alive, the condition CLAUDE.md warns produces
+convincing false results, and it did not reproduce once the environment was
+clean.
 
 ## In flight
 

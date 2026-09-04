@@ -34,6 +34,11 @@ PREFIX    ?= $(CURDIR)/.wine
 # immediate assignment here would have baked in the shared prefix.
 GAMEDIR    = $(PREFIX)/drive_c/GOG Games/Army Men II
 GAMEEXE   := C:\\GOG Games\\Army Men II\\ArmyMen2.exe
+# PORT=1's two paths. The install is named for AM2_GAMEDIR rather than chdir'd
+# into, and the exe is reached through Z: so no copy into the game folder is
+# needed -- see STATUS.md.
+GAMEDIRWIN := C:\\GOG Games\\Army Men II
+PORTEXEWIN := Z:$(subst /,\\,$(CURDIR))\\build\\ArmyMen2.exe
 LAUNCHEXE := C:\\GOG Games\\Army Men II\\launcher.exe
 
 HOOK_C   := src/inject/dllmain.c \
@@ -170,6 +175,15 @@ install-hook: all
 # Always windowed, so the game cannot mode-switch the desktop out from under
 # you. Runs on $DISPLAY, so set DISPLAY=:99 for a headless Xvfb run.
 
+# PORT=1 launches the STANDALONE instead of the injected build: the exe under
+# build/, straight from the tree, with AM2_GAMEDIR naming the install so it
+# needs no copy into the game folder. A variable on this recipe rather than a
+# second target, which is the rule this file keeps -- near-duplicate launch
+# targets drift apart and it stops being obvious which is canonical.
+#
+# The harness variables above do not apply to it: it has no DLL to inject, so
+# TRACE and OBSERVE do nothing, and its log is written beside the exe as
+# build/am2port.log rather than into the game folder.
 ARGS    ?= -nointro -dbg
 WINEDBG ?= -all
 GAMELOG ?= 1
@@ -177,6 +191,7 @@ TRACE   ?= 0
 OBSERVE ?= 0
 CONTROL ?= 1
 DESKTOP ?= 800x600
+PORT    ?= 0
 
 # --- instance identity ---------------------------------------------------
 #
@@ -369,13 +384,21 @@ ifeq ($(ISOLATE),1)
 	fi
 endif
 
-run: isolate-prefix install-hook
-	@echo "run: ID=$(ID) port=$(CTLPORT) desktop=$(DESKNAME) log=$(LOGFILE) prefix=$(PREFIX)"
+run: isolate-prefix $(if $(filter 1,$(PORT)),standalone,install-hook)
+	@echo "run: ID=$(ID) port=$(CTLPORT) desktop=$(DESKNAME) log=$(LOGFILE) prefix=$(PREFIX)$(if $(filter 1,$(PORT)), STANDALONE)"
+ifeq ($(PORT),1)
+	WINEPREFIX="$(PREFIX)" WINEDEBUG=$(WINEDBG) \
+	    AM2_GAMEDIR="$(GAMEDIRWIN)" \
+	    AM2_CONTROL=$(CONTROL) AM2_CTL_PORT=$(CTLPORT) \
+	    $(WINE) explorer /desktop=$(DESKNAME),$(DESKTOP) \
+	    "$(PORTEXEWIN)" $(ARGS)
+else
 	WINEPREFIX="$(PREFIX)" WINEDEBUG=$(WINEDBG) \
 	    AM2_GAMELOG=$(GAMELOG) AM2_TRACE=$(TRACE) AM2_OBSERVE=$(OBSERVE) \
 	    AM2_CONTROL=$(CONTROL) AM2_CTL_PORT=$(CTLPORT) AM2_LOG=$(LOGFILE) \
 	    $(WINE) explorer /desktop=$(DESKNAME),$(DESKTOP) \
 	    "$(LAUNCHEXE)" "$(GAMEEXE)" $(ARGS)
+endif
 
 # Unpatched, straight from the GOG install -- the A/B reference.
 # The standalone build: an EXE that replaces ArmyMen2.exe in the game folder,
