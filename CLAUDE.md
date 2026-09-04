@@ -1361,10 +1361,45 @@ the reconstruction and, since both sides take the same arm, evidently of the
 original too. So the else branch is faithful, fires correctly, and is not the
 mpoptions difference.
 
-What remains genuinely different is narrower than before and still real: the
-original logs six handshake checksums at panel-open and ours logs none, so
-`RefreshMapSelection` exits early on our side for a reason that is NOT the
-script name -- that buffer is identical on both.
+**AND THE SAME CONCLUSION THEN CAME BACK, MEASURED PROPERLY.** Matched on
+`Options.cfg` and sampled on BOTH sides of the poke rather than once:
+
+| | before the poke | after |
+|---|---|---|
+| original | `\0eath.txt` | **`death\0txt`** |
+| ours | `\0eath.txt` | `\0eath.txt` |
+
+Identical before, divergent after -- so the original WRITES the script name
+while the panel opens and we do not. The retracted claim was directionally
+right and measured wrong; sampling both ends of the event is what separates
+"these differ" from "this one changed".
+
+The rest of the chain is measured with the same control: the original's
+`ADDR_MAP_NAME` reads `alpine3_mp` and `ADDR_MAP_FOLDER` `data\mpalpine`,
+ours are empty and all-zero. `SelectLevel` is their only writer, so ours never
+ran, `RefreshMapSelection` built `".amm"`, `FileExists` refused it and the
+panel took its bad-map exit -- no checksums, bad-map preview, a quarter of the
+frame.
+
+**THE MISSING BLOCK IS THE TYPE LIST, AND ITS LAST ACT IS THE WHOLE PROBLEM.**
+The original walks the name table at 0x00430DD9 -- stride **0xCC**, the record
+name at +0, the display name at +0x80 -- adding each rules record to the type
+box and remembering which one an inlined `strcmp` matches against
+`ADDR_MP_SCRIPT_NAME`. Then, whenever the count is non-zero, it copies
+`name_table[sel]`'s name INTO that global with an inlined `strcpy` at
+0x00430E96, `sel` defaulting to 0.
+
+So on a fresh panel nothing matches, `sel` stays 0, and record 0 -- `death` --
+becomes the script name. That is precisely the `death\0txt` observed, and it
+is what makes the map-list block below it work: `ScriptListFind` is handed a
+name that exists. Ours never writes the global, so its lookup is handed an
+empty string and every consequence follows from that one omission.
+
+**A GLOBAL WITH NO WRITER IN OUR TREE, READ BY OUR OWN CODE, IS THE SHAPE TO
+LOOK FOR** -- the same class as `MP_PANEL_OFF_ARMY_ROWS` two findings up,
+which was also read every frame and written nowhere. Two instances on one
+screen says the panel was transcribed as a series of widgets with the
+bookkeeping between them left out.
 
 **A READ-ONLY OFFSET LOOKED LIKE A CHEAP RATCHET AND IS NOT ONE, measured
 before it was built.** `checkoffsets.py` refuses a second name on an offset;
