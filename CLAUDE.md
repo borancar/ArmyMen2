@@ -1525,9 +1525,31 @@ finds out, which is why this survived until a chat line was typed.
 
 The `state` artifact is the one to read: five exact dumps with no budget --
 both checksum rounds and the chat buffer holding `Zulu` -- and they agree
-byte for byte. The configuration has been failing since before anyone
-bisected it, and what it needed was six unbuilt fields, an ordering, and two
-pixels. That is the check to run on any screen whose
+byte for byte.
+
+**IT IS CLEAN NOW: `widgets identical (131 nodes)`, `state identical`, `log
+identical (35 game messages)`, 151 pixels inside a budget of 300, and 0 on
+both intermediate frames.** The last two steps were ORDER and two more
+scrollbars.
+
+**A CHILD LIST IS ORDERED BY WHEN EACH CHILD WAS ADDED, so a block in the
+right place with the wrong neighbours is still wrong.** The game and map
+boxes were built correctly and built too EARLY -- before the chat list rather
+than after it -- and that moved four nodes and renumbered every sprite index
+below them. The original's field stores give the order outright and disagree
+with reading the function top to bottom: 0x204 at 0x0043094E, **0x21C at
+0x00430CA9**, 0x208 at 0x00430F3A, 0x210 at 0x004312C3. The chat box is built
+BEFORE the game box, which no amount of looking at the screen would suggest.
+
+Then `GAME_BAR` and `MAP_BAR`, the last two of the six unbuilt fields, each an
+`ArrowBarConstruct` immediately after its box with the two back-links every
+other bar here already has. With those the tree matches node for node.
+
+So all six unbuilt fields are now accounted for, and the tally is worth
+keeping: `ARMY_ROWS` a crash on open, `GAME_BOX` an empty script name,
+`CHATBOX` a crash on the first chat line, `COLOUR_SEL` still unbuilt and
+apparently unread, `GAME_BAR` and `MAP_BAR` four misplaced nodes. **One grep
+found them all before any of it was diagnosed.** That is the check to run on any screen whose
 constructor is suspected, and it is the scoped form of the read-only-offset
 idea that was rejected as a whole-tree gate.
 

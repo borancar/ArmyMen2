@@ -442,7 +442,7 @@ A commit message in this session asserted the opposite, that STATUS.md was the
 stale one; it was not, and the correction is recorded here because getting the
 direction backwards is exactly how a stale number survives being noticed.
 
-## `ab.sh mpoptions` -- log/state identical, 308 pixels against a budget of 300
+## CLOSED: `ab.sh mpoptions` is A/B clean -- widgets, state and log all identical
 
 **Our build EXITS when the multiplayer options screen is requested.** It is
 not a drawing difference and never was: 221,423 pixels is one side showing a
