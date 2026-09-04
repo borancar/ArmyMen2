@@ -1511,6 +1511,33 @@ stay original and are reached by address, so our code runs in the middle of a
 live path and the A/B compares the result. Nothing had to wait for the layer
 beneath it.
 
+**GENERALISING THAT BUG INTO A CHECK WAS TRIED AND IS NOT WORTH BUILDING.**
+The obvious next move is to find every OTHER gate where the original compares
+a global against a REGISTER and our C tests the same global for null. Scanned
+per function, since a linear sweep of `.text` desynchronises on data and
+misses the very site that motivated it -- 8 hits swept linearly against 202
+scanned properly, and 0x5122C8 absent from the first.
+
+202 sites over 97 globals, of which 15 functions also null-test the same
+global in our C. **Every one of the fifteen is correct**, and they fail for
+two reasons that are both ordinary:
+
+- MSVC compiles a null test AS a register compare. `TakeMenuRequest` opens
+  `xor esi, esi` and then compares ten globals against `esi`; `HudPostUpdate`
+  does the same with `edi`. Those ARE `== 0`, spelled in the register.
+- `movsx edx, [esi+0x10]; cmp edx, [0x4F9FDC]` is the `army == g_defaultOwner`
+  idiom, in `DamageTrooper` and `UpdateTrooperAction` both, and our C has it.
+
+The one that looked like a signed-versus-null difference was not either:
+`cmp [0x511D98], edi; jle` is `ADDR_LEVEL_ID > 1`, which is exactly what
+`frame.cpp` writes.
+
+So the discriminator is not the instruction, it is WHAT THE REGISTER HOLDS --
+zero, an argument, or a field -- and answering that needs dominator-aware
+dataflow, not a scan. A check without it reports fifteen correct functions,
+which this file already says to suspect before believing. The real instance
+was found by RUNNING the game, and that is what `movecheck.sh` now keeps.
+
 **`tools/movecheck.sh` IS THAT CONFIGURATION, and it is the only one in the
 project that drives a real device.** Everything else writes the game's
 globals over the control socket -- `cursor` and `key` never touch
