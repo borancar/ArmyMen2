@@ -572,13 +572,31 @@ second and the 608 markers were never measuring the same thing, because the
 probe: it reads 0 in live play while the log takes 33,494 markers, because
 its caller is reconstructed and reaches it directly. Count the markers.
 
-What is still open, stated as what is actually measured rather than as a
-theory: under `ab.sh` our side emits 608 markers where the original emits
-25,797, and driven BY HAND with the same clicks and more slack our side emits
-33,494 in twenty seconds. Two runs of the same build doing the same thing
-differ by fifty times, which points at the drive rather than the build --
-but nothing here establishes that, and the previous two attempts to explain
-this number were both wrong. Measure before theorising again.
+What is still open, stated as what is measured and nothing more.
+
+Under `ab.sh` our side emits 608 markers where the original emits 25,797.
+Driven BY HAND with `ab.sh`'s own clicks and waits -- click BOOT CAMP, 25 s,
+RETURN, 30 s, the two dialogs, then play -- our side emits **28,386**. Run
+again with the longer 46 s settle it emits **28,249**, so the initial wait is
+NOT the variable; the two differ by half a percent.
+
+So one build, the same drive, 608 under the harness and 28,000 by hand. The
+difference is something `ab.sh` does that a hand replication does not, and
+the candidates not yet excluded are the per-side `Options.cfg` it installs,
+the ORIGINAL side having run first, and its mouse-move scrolling where the
+hand version simply waits.
+
+**The most promising place to look is the PAUSE**, because a paused game
+composes no frames and that is exactly the shape of 608: `State2Enter` calls
+`PauseGame(8)` when no load is pending, there is no session, and `-dbg` is
+on. This is NOT a claim that the pause is the cause -- it is where to point
+the next measurement, which should read the pause mask on both sides during
+a real `ab.sh` run rather than reasoning about it.
+
+Three explanations for this number have now been offered and retracted: a
+stale band, a still-loading map, and two irreconcilable measurements. Each
+rested on ONE artifact read in isolation. The next attempt gets a probe or
+nothing.
 
 ## Driving to a live mission by hand needs ab.sh's WAITS
 
