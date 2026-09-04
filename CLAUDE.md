@@ -1694,6 +1694,34 @@ rebuilt in between: `MapDescInit`'s only caller is `LoadMap` and
 `MapDescFree`'s other caller is the map teardown, so neither runs between
 `ItemsReset` and the first walk in either build.
 
+**305 OBJECTS ARE FREED WHILE STILL LINKED, and the fault is INTERMITTENT.**
+A probe in `DestroyItemObject`'s `notify == 0` arm, counting entries whose
+cell index is still >= 0, reports 305 on one load -- every object the map
+built, freed by `ItemsReset` with its cell entries still in the grid. The
+first is `uid=200003e8 type=1 cells=4 linked=1`.
+
+The run carrying that probe SURVIVED. So the crash depends on what reuses the
+freed storage, not on whether the dangling entries exist: they always do, and
+the walk faults only when the memory underneath has been rewritten into
+something whose first dword is small. That explains the one bad node out of
+305 and why the earlier probe found exactly one.
+
+**SO THIS IS A LATENT USE-AFTER-FREE ON THE LOAD PATH, and the evidence says
+it is the ORIGINAL'S.** `ItemsReset` passes 0, the original passes 0, and
+`DestroyItemObject` gates the unlink on that argument in both. Nothing on the
+chain is mis-transcribed -- twelve functions checked -- so the game frees
+those entries without unlinking them and then walks the grid. What differs is
+only whether the reused bytes happen to fault, which is why the original gets
+away with it and we do not always.
+
+That reframes the fix. It is not a transcription correction: it is a choice
+between reproducing a latent defect faithfully and crashing sometimes, or
+deviating deliberately. This file's standing position is that the original's
+defects are the original's -- but that was written about defects nobody could
+reach, and this one takes the process down on an ordinary LOAD GAME. Say
+which it is before changing anything, and record the deviation if one is
+made.
+
 **WHAT IS NOT YET EXPLAINED IS WHY THE ORIGINAL SURVIVES IT**, since it takes
 the same path with the same 0. `MapDescInit` memsets the grid to zero and is
 faithful -- including the implicit `& 0xFF` on `Log2Mask`, which our `uint8_t`
