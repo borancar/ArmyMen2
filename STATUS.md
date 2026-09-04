@@ -7,84 +7,45 @@ command that produces it, so it can be re-measured rather than believed.
 
 Last updated: **2026-09-04**, at `5df7469`. Working tree clean.
 
-## OPEN: the player trooper shows the WRONG ANIMATION -- measured, 13 against 1
+## OPEN: the player trooper "jerksteps" while turning -- NOT yet reproduced
 
 Reported from play: holding the mouse moves Sarge now, but changing direction
-makes him "jerkstep" -- the walk animation restarting rather than the position
-hopping.
+makes him jerkstep -- the walk ANIMATION restarting, not the position hopping.
 
-**Measured with an A/B on the row's own fields**, both sides driven to a live
-Boot Camp mission by `ab.sh mission`'s waits and given the same cursor sweep,
-reading the leader's row through `objdump --leader --at 0x74` and then the
-row itself:
+**A previous version of this entry claimed the cause was found and it was
+WRONG. Retracted in full.** It reported the leader's row on animation 13
+against the original's 1, and the action field +0x584 holding 17 against 1,
+and named `kActionKey4[2]` as the source. Re-run with the SAME `Options.cfg`
+copied in before each half, both sides read action **1** and row
+**`01000100c5000000`** -- frame, next, heading and cell all identical. There
+is no divergence under matched conditions.
 
-| | ROW_OFF_FRAME | ANIM_NEXT_ID | HEADING | CELL |
-|---|---|---|---|---|
-| original | **0x0001** | 0x0001 | 0xc5 | 0 |
-| ours | **0x000d** | 0x000d | 0xc5 | 0 |
+**Fourth unmatched control of this session, same file.** `Options.cfg` is an
+input to key bindings and to the options the input layer reads, previous runs
+rewrite it, and `tools/ab.sh` copies it per side for exactly this reason.
+Every hand-rolled pair of runs in this investigation that skipped that step
+produced a confident, wrong finding.
 
-Same heading, same cell, same drive, different ANIMATION. `ADDR_WEAPON_POSE_FRAMES`
-decodes the ids: entry 0 and entry 1 are both animation 1, and entry **6** is
-animation 13. So the original is on pose index 0 or 1 and ours is on pose
-index 6 -- `Type2PlayerStep`'s `w + 8`, the action the input half chose.
+What IS established, and survives the retraction:
 
-**What is ruled out**, each by reading the original beside ours: the walk
-arm's destination clear (`mov [esi], edx` at 0x0044AE72 is the original's),
-the 200 ms re-aim throttle (the original reads +0xD0 and never writes it
-either), `StepRowAnim`'s cell advance and its `sar eax,1` halving of the
-hold, and `SetAnimFrame`'s `if (!force && frame == ROW_OFF_FRAME) return`
-guard. All faithful.
+- the facing is fine: 9c a2 a8 ad b2 b6 b9 bc be c0 c2 c3, decelerating into
+  the target, position advancing a steady ~33 a sample
+- while the mouse is HELD, `OBJ_OFF_FIELD_10C` and `OBJ_OFF_FIELD_C0` are
+  both ZERO, so held-mouse steering does NOT use `Type2PlayerStep`'s walk arm
+- the action lives in the OBJECT at `o + OBJ_OFF_SIGHT_OUT_T2 + 8` and
+  persists between frames; neither side resets it, so one wrong value would
+  stick
+- an 11-arm probe over every assignment to that field logged NOTHING on a
+  full drive, so `Type2PlayerInput` never changes it there
+- the walk arm's destination clear, the 200 ms re-aim throttle,
+  `StepRowAnim`'s advance and its `sar` halving, `SetAnimFrame`'s guard,
+  `ActionKeyPressed`, the key bindings and the key-buffer pointers are all
+  faithful, each checked against the original
 
-**Also measured and worth keeping**: while the mouse is HELD, `OBJ_OFF_FIELD_10C`
-and `OBJ_OFF_FIELD_C0` are both ZERO, so held-mouse steering does not go
-through `Type2PlayerStep`'s walk arm at all -- the pose comes from the input
-half. And the facing itself is fine: it decelerates smoothly, 9c a2 a8 ad b2
-b6 b9 bc be c0 c2 c3, with position advancing at a steady ~33 a sample.
-
-**NARROWED TO ONE FIELD AND IT IS ALREADY WRONG BEFORE ANY INPUT.** The
-action is `out + 8`, and `out` is not a stack local -- `StepType2` sets it to
-`o + OBJ_OFF_SIGHT_OUT_T2`, so it is a FIELD OF THE OBJECT at +0x584 that
-persists between frames. Sampled at the same point of the same drive, with
-the briefing just cleared and no action key pressed:
-
-| | +0x584 | pose table gives |
-|---|---|---|
-| original | **1** | animation 1 |
-| ours | **17** | animation 52 |
-
-Neither side resets it: the original's head has no store to `[edi+8]` and its
-tail only rewrites 2 into 3, which ours matches at 0x0044ACFC. So a single
-wrong value STICKS, and this one is wrong before the player touches anything
--- which puts the fault in what INITIALISES the field, not in the input arms
-that react to the mouse.
-
-That also explains why every oracle missed it: `bootcamp`'s 1,610-line object
-dump compares type, flags, army, position, tile, both boxes, health and cell
-counts, and +0x584 is in none of them.
-
-**THE VALUE IS A TABLE ENTRY AND IT NAMES THE ARM.** The eight action tables
-read out of the image are `kCrouch` [5,7,6] at 0x00475090, `kProne` [10,11,6],
-`kKey1` [18,8,9], **`kKey4` [13,15,17]** and `kKey5` [12,14,16]. Our 17 is
-`kActionKey4[2]` -- so `ActionKeyPressed(4)` fired with `cls == 2`, and the
-original's 1 did not come from any of these.
-
-**Four things excluded, each by a measurement rather than an argument:**
-
-- the KEY BINDINGS are byte-identical on both sides, 42 bytes at 0x004854BC;
-  action 4's pair is `38 00`, ALT and an unbound slot
-- `ActionKeyPressed` is faithful: the original checks BOTH slots with no
-  zero-binding test (0x00427542 then 0x00427571), exactly as ours does
-- `g_curKeys` and `g_prevKeys` are pointers in ours as in the original, at
-  the same 0x5127C8 / 0x5127CC, and `curKeys[0..7]` is zero on both, so the
-  unbound slot is not firing
-- the two key-buffer POINTERS being equal on one sample looked like a real
-  divergence and is not: sampled six times the original's alternate, equal on
-  some polls and not others. One sample would have made this a finding.
-
-So the remaining question is narrow: why `ActionKeyPressed(4)` answers yes on
-our side, or why `cls` is 2 there. `ClassifyByCode74` and the ALT scancode are
-the two things left to compare, and the one-field peek at +0x584 is the oracle
-for both.
+So the symptom is real and unreproduced by these instruments. The next attempt
+should reproduce it with the REPORTER'S `Options.cfg` rather than a baseline
+-- the one run that showed 17 used a config left by an earlier run, and
+nothing has yet compared the original under that same config.
 
 ## In flight
 
