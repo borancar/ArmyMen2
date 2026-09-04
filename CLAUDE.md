@@ -3836,6 +3836,28 @@ address; that pair is what identified the `mpoptions` fault after five runs
 had produced nothing but "it exits". Reach for it whenever a run ends with no
 game log line to blame.
 
+**THE STANDALONE NEEDS AN ABSOLUTE WINDOWS PATH UNDER `explorer`, and the two
+ways of getting that wrong fail differently.** Verified today with the whole
+session's work in: its log is the same four lines the commit that first
+reached the menu quotes -- `system speed`, `Using High Performance Counter`,
+`Lobby start`, `Releasing Comm Connection` -- and the frame renders 234
+distinct colours rather than a flat desktop.
+
+    wine explorer /desktop=NAME,1024x768 "C:\GOG Games\Army Men II\am2port.exe" -nointro
+
+Run with a RELATIVE path under `explorer` it exits silently: no log, no
+window, nothing on wine's stderr, which reads exactly like a broken build.
+Run WITHOUT `explorer` it gets four lines further and dies at
+`DDERROR 80004001: InitDirectDraw` -- E_NOTIMPL, because there is no virtual
+desktop for the mode change and Xvfb refuses it. Neither failure says
+"invocation"; both say "the port is broken". Three attempts were spent on
+that before the path was the thing that changed.
+
+Install it as `am2port.exe` beside the original rather than over it. The
+original is needed at BUILD time and by every A/B, and `make standalone`'s own
+message -- "copy it into the game folder to replace ArmyMen2.exe" -- is about
+what a player would do, not what this tree should.
+
 **Launch through `tools/drive.sh`, never a bare backgrounded `make run`.** A
 `setsid make -s run ... &` issued from a script or an agent shell starts the
 game, gets as far as `system speed:` in the log, then fails inside `InitInput`
