@@ -16438,7 +16438,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * the build within the minute. It refused OBJ_OFF_ENTRY_COUNT because 0x8C is
  * already OBJ_OFF_CELL_COUNT, which is the very field I was naming; and its
  * backlog already lists 0x8C with three names and 0x90 with two
- * (OBJ_OFF_CELL_ENTRIES beside OBJ_OFF_ALLOC_PTR). Use the existing ones. */
+ * (OBJ_OFF_CELL_ENTRIES beside OBJ_OFF_CELL_ENTRIES). Use the existing ones. */
 
 #define OBJ_FLAG_NO_TILE_HOOK    0x08u
 /* 0x004278E0, four callers. Give an object a height and push it into the
@@ -18024,8 +18024,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define WEAPON_OFF_FLAGS           0x08u
 #define WEAPON_FLAG_DEAD           0x02u
 #define ADDR_ITEM_PRE_DESTROY      0x0042A0A0u  /* void(obj, int32_t) */
-#define OBJ_OFF_ALLOC_LIVE         0x8Cu   /* uint8_t */
-#define OBJ_OFF_ALLOC_PTR          0x90u
 /* Kinds 1, 5, 6 and 8 share one arm, and it is the BARE version of the family:
  * the tail all five have and nothing else. 48 bytes. */
 #define ADDR_FREE_ITEM_COMMON      0x0043BBB0u

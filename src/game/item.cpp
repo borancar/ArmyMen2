@@ -978,7 +978,7 @@ void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify)
 {
     uint8_t *o = (uint8_t *)obj;
 
-    if (*(const uint8_t *)(o + OBJ_OFF_ALLOC_LIVE) == 0)
+    if (*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT) == 0)
         return;
 
     if (kCommDbg)
@@ -987,9 +987,9 @@ void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify)
     if (notify)
         ItemPreDestroy(obj, arg);
 
-    am2_free(*(void **)(o + OBJ_OFF_ALLOC_PTR));
+    am2_free(*(void **)(o + OBJ_OFF_CELL_ENTRIES));
 
-    *(uint8_t *)(o + OBJ_OFF_ALLOC_LIVE) = 0;
+    *(uint8_t *)(o + OBJ_OFF_CELL_COUNT) = 0;
 }
 
 /* All five per-kind destructors are ours now, and the switch below calls them

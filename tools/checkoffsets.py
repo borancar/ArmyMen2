@@ -124,16 +124,22 @@ def _headers():
 #                   DLG_ prefix spans several dialog classes.
 #   OBJ_OFF_ 0x12   LEGITIMATE. POS is the AM2_Point and X its first member;
 #                   both names are true of the same address.
-#   OBJ_OFF_ 0x8C   Suspicious as a PAIR with 0x90 -- ALLOC_LIVE/ALLOC_PTR
-#   OBJ_OFF_ 0x90   against CELL_COUNT/CELL_ENTRIES. Two readings of one
-#                   count+array, and one of them is wrong. Needs the writer.
 #   OBJ_OFF_ 0x4    OWNER against UID, 0xA4 CHAIN_PARENT_UID against PTR_LIST,
 #   OBJ_OFF_ 0xA4   0x534 STUCK_SINCE against TABLE_REC_SLOT: the OBJ_ prefix
 #   OBJ_OFF_ 0x534  covers eight object TYPES, so these may be the documented
 #                   one-offset-several-types case rather than duplicates.
 #   OBJ_FLAG_ 0x2   OVERDUE against REPLACED, two readings of one bit, already
 #                   recorded above as backlog.
-FAMILY_ALIAS_BASELINE = 8
+# 8 -> 6. The 0x8C/0x90 pair flagged above as needing the writer is settled and
+# it was the teardown again: DestroyItemObject reads 0x8C, frees the array at
+# 0x90 and zeroes 0x8C -- the CELL LIST coming down. ALLOC_LIVE and ALLOC_PTR
+# were that free's names for CELL_COUNT and CELL_ENTRIES, which twelve and
+# fourteen other sites write a count into, iterate and grow.
+#
+# Third time today one function's frees produced the aliases: CommClose gave
+# SEND_BUF and RECV_BUF, this gave two more. **When a family has aliases, look
+# at the destructor first** -- it touches every field and names none of them.
+FAMILY_ALIAS_BASELINE = 6
 
 DEFINE = re.compile(r"^#define\s+([A-Z][A-Z0-9_]*)\s+(0x[0-9A-Fa-f]+u?|\d+u?)\s*(?:/\*|$)")
 # `_OFF_` was the whole of this for as long as offsets were the thing that got
