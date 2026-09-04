@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **47** analysis
+**`make check` runs everything that does not need the game.** **48** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3823,7 +3823,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 21 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 22 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3935,6 +3935,21 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   confirmed each against itself would still pass if one were rewritten into
   the other. Making Defend turn on the route path fails at once; so does
   dropping the route path's promotion.
+
+  `AiStepFollow` joins them by `tools/aifollowcheck.py`, 384 cases. Three
+  things separate it from its siblings and each is a merge waiting to happen:
+  it zeroes OBJ_OFF_SCRIPT_STATE UNCONDITIONALLY at the top where the others
+  do it only on arrival; its route arm is reached TWO ways, by range or by the
+  leader having MOVED; and its copy into OBJ_OFF_FIELD_C0 comes from the
+  CONTEXT where every sibling takes it from the object. That last is the
+  dangerous one -- same instruction shape, different source -- and it fails
+  160 of the cases when taken from the object instead.
+
+  **AND ITS FIRST CORPUS COULD NOT SEE THE UNSIGNED COMPARE.** The signed
+  mutation that fails 32 cases in tools/aiignorecheck.py failed NOTHING here,
+  because this corpus had no deadline in the FUTURE -- the one input where
+  the wrap matters. Adding one takes it to 384 cases and the mutation to 36.
+  A sibling's corpus is not inherited by writing a sibling's tool.
 
   `AiWalkStep` joins them by `tools/aiwalkcheck.py`, 144 cases -- and it is
   the family's SHAPE WITH DIFFERENT NUMBERS, which is why it is checked
@@ -4087,7 +4102,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   configuration whose descriptor under-reports its extent is what makes them
   observable at all.
 
-  The other eleven are verified by READING, which is the standing worth
+  The other ten are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is
