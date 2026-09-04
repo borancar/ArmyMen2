@@ -3496,7 +3496,33 @@ exact oracle**, however meaningful it is when it is set.
   of the first five unreferenced candidates checked by hand, two disassembled to
   garbage. So the figure is a lower bound and is meant to be — 260 candidates,
   186 confirmed. Do not rewrite `functions.tsv` from the naive scan.
-- **THE PORT'S LIVE OBJECT STATE IS IDENTICAL TO THE ORIGINAL'S, all 1,610
+- **`tools/samission.sh` IS THE SAME COMPARISON IN PLAY**, and it is the
+strongest check the port has. It drives both builds to the same point of the
+same Boot Camp mission -- past the briefing and the instruction sign, into
+sub-state 0x21 -- and diffs the whole object table with NO budget: 1,609
+objects, each with type, flags, army, position, tile, both rectangles,
+health, cell count, AI mode and pose. It reads IDENTICAL at 1,610 lines.
+
+Two things make it work where four rounds of hand-driving did not. The cursor
+is placed through the CONTROL SOCKET, which writes the game's own three
+globals, so both builds take identical coordinates -- a relative move lands
+somewhere else, because Wine's acceleration is non-linear. And the button is
+still xdotool's on both sides, because the standalone has no DirectInput hook
+and the socket's `mouse` is inert there; using the same real button keeps the
+two drives the same.
+
+**MUTATION-CHECKED, AND THE MUTATION HAS TO BE STANDALONE-ONLY.** Both halves
+build from one tree, so an ordinary edit changes them together and the diff
+stays empty -- the corpus-derived-from-the-model trap in a new shape. Guarded
+with `#ifdef AM2_STANDALONE`, adding 1 to SetMaxHealth's argument fails the
+run and names the objects and the field: health 60 against 62, 138 against
+140. Restored, it reads identical again.
+
+It also refuses to pass on nothing: a dump under 100 lines is a VOID that
+names ArmyMenMutex, because two empty tables diff as identical and that is
+how three wrong conclusions were reached in one session.
+
+**THE PORT'S LIVE OBJECT STATE IS IDENTICAL TO THE ORIGINAL'S, all 1,610
 lines of it**, and that is what the control socket was added to find out.
 Driven to the same point of the same Boot Camp mission -- past both dialogs,
 sub-state 0x21, the clock running -- `tools/objdump.py --table` gives the two
