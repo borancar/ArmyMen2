@@ -809,7 +809,7 @@ void __cdecl RecvItemGone(void *msg)
     if (!obj)
         return;
 
-    *(uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+    *(uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
 
     comm = kComm;
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
@@ -1375,7 +1375,7 @@ void __cdecl SendVehicleExit(void *vehicle, void *occupant)
  *
  * THE ITEM MAY ALREADY BE GONE, and there is one arm for that. If the uid no
  * longer resolves, the trooper's own slot is checked instead: a weapon there
- * that is already OBJ_FLAG_OVERDUE, on a DO_DROP, means the drop happened
+ * that is already OBJ_FLAG_REPLACED, on a DO_DROP, means the drop happened
  * before the message arrived -- so the slot is emptied and the log says "but
  * we handled it". Any other combination is dropped silently.
  *
@@ -1451,7 +1451,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
 
         if (!held)
             return;
-        if (!(*(const uint32_t *)(held + OBJ_OFF_FLAGS) & OBJ_FLAG_OVERDUE))
+        if (!(*(const uint32_t *)(held + OBJ_OFF_FLAGS) & OBJ_FLAG_REPLACED))
             return;
         if (request != AM2_DO_DROP)
             return;

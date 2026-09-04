@@ -676,7 +676,7 @@ void __cdecl DeselectAll(void);
 void __cdecl SetUnitPose(void *obj, int32_t pose);
 
 /* 0x00448220. A unit gives up: soldier kind 8, AI mode 2 (ignore), and its
- * weapon marked OBJ_FLAG_OVERDUE before the uid is cleared -- in that order,
+ * weapon marked OBJ_FLAG_REPLACED before the uid is cleared -- in that order,
  * or the weapon would leak. The name is orig.h's and deliberately neutral. */
 void __cdecl Type2ActionB(void *obj);
 
@@ -686,7 +686,7 @@ void __cdecl Type2ActionB(void *obj);
 void __cdecl Type2ActionC(void *obj, int32_t prev);
 
 /* 0x00448170. The third sibling: soldier kind 7, the old weapon abandoned as
- * OBJ_FLAG_OVERDUE, and a NEW one created and handed over. Refuses when
+ * OBJ_FLAG_REPLACED, and a NEW one created and handed over. Refuses when
  * ADDR_TYPE2_FIELD5A4_SET says so, which B and C do not check. */
 void __cdecl Type2ActionA(void *obj);
 

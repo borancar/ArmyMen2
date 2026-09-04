@@ -3959,7 +3959,7 @@ void __cdecl ObjMarkIfOverdue(void *obj)
 
     if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
         > *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58))
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
 }
 
 void __cdecl ItemPreDestroyAlias(void *obj, int32_t arg)
@@ -5827,7 +5827,7 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
  * instead of reading it; the rule is in CLAUDE.md and it is about callees just
  * as much as callers.
  *
- * OBJ_FLAG_OVERDUE is set by ADDR_OBJ_MARK_IF_OVERDUE when an object passes
+ * OBJ_FLAG_REPLACED is set by ADDR_OBJ_MARK_IF_OVERDUE when an object passes
  * the deadline at OBJ_OFF_DEADLINE_58, so the sweep is a deferred free: mark
  * during play, collect on the way out. Bit 27 exempts an object from it; what
  * that means is not established and the name says so.
@@ -5852,7 +5852,7 @@ void __cdecl FreeOverdueItems(void)
         uint8_t *o    = (uint8_t *)obj;
         uint32_t flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
 
-        if ((flags & OBJ_FLAG_OVERDUE) && !(flags & OBJ_FLAG_NO_SWEEP)) {
+        if ((flags & OBJ_FLAG_REPLACED) && !(flags & OBJ_FLAG_NO_SWEEP)) {
             if (CommMustBroadcast(kItemComm,
                                   (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
                 ItemGoneMessageSend(obj);
@@ -5874,7 +5874,7 @@ void __cdecl SoldierKindForWeapon(void *unit, uint32_t code);
  * `ignore`, per the action-parser oracle -- and it loses its weapon.
  *
  * Losing the weapon is two separate writes and only one of them is on the
- * unit. The weapon object is looked up by uid and marked OBJ_FLAG_OVERDUE, so
+ * unit. The weapon object is looked up by uid and marked OBJ_FLAG_REPLACED, so
  * FreeOverdueItems collects it later; only then is the unit's uid field
  * cleared. Doing it the other way round would lose the uid before anything
  * could find the object, and the weapon would leak.
@@ -5919,7 +5919,7 @@ void __cdecl Type2ActionB(void *obj)
 
     weapon = WeaponByUid(*(const uint32_t *)(o + TROOPER_OFF_WEAPON_UID));
     if (weapon)
-        *(uint32_t *)((uint8_t *)weapon + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        *(uint32_t *)((uint8_t *)weapon + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
 
     *(int32_t *)(o + TROOPER_OFF_WEAPON_UID) = 0;
     SoldierKindForWeapon(o, 0);
@@ -6594,7 +6594,7 @@ void __cdecl Type2ActionC(void *obj, int32_t prev)
  * different guard, different clock field. When the record's +8 matches
  * ADDR_WATCHED_TYPE_ID the object shows `9 - elapsed_seconds` as its frame,
  * clamped at 9, and after ten seconds it spawns something and marks itself
- * OBJ_FLAG_OVERDUE.
+ * OBJ_FLAG_REPLACED.
  *
  * TWO DETAILS IN THAT SPAWN ARE EASY TO GET BACKWARDS. The uid passed is the
  * OWNER's object's uid when the owner has one and the object's OWN uid when it
@@ -6706,7 +6706,7 @@ void __cdecl StepType1And4(void *obj)
                                  (int16_t)army))
             extra = *(const int32_t *)(uintptr_t)ADDR_SPAWN_EXTRA_6622BC;
 
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
         *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
             *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
 
@@ -6749,7 +6749,7 @@ void __cdecl StepType1And4(void *obj)
  *
  * THE SPENT ITEM IS FLAGGED, NOT FREED. Its OBJ_OFF_FLAGS gains bit 1 and it
  * is left for whatever sweeps that flag. orig.h carries two names for that
- * bit -- OBJ_FLAG_OVERDUE and OBJ_FLAG_REPLACED, an alias in the ratchet's
+ * bit -- OBJ_FLAG_REPLACED and OBJ_FLAG_REPLACED, an alias in the ratchet's
  * baseline -- and REPLACED is the reading here: this is the same flag the two
  * weapon-making paths in this file set on the weapon they supersede.
  *
@@ -6897,7 +6897,7 @@ void __cdecl TrooperDropItem(void *unit, int32_t slot, uint32_t at)
  * a positive OBJ_OFF_FIELD_5A4. So whatever that counter tracks is a reason
  * NOT to re-arm.
  *
- * The old weapon is marked OBJ_FLAG_OVERDUE and simply abandoned -- unlike
+ * The old weapon is marked OBJ_FLAG_REPLACED and simply abandoned -- unlike
  * Type2ActionB, the uid field is not cleared first, because the very next
  * thing overwrites it with the new weapon's. Same two writes, opposite order,
  * and both are correct for what their own function is doing.
@@ -6931,7 +6931,7 @@ void __cdecl Type2ActionA(void *obj)
 
     old = WeaponByUid(*(const uint32_t *)(o + TROOPER_OFF_WEAPON_UID));
     if (old)
-        *(uint32_t *)((uint8_t *)old + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        *(uint32_t *)((uint8_t *)old + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
 
     made = CreateWeapon((char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
                             (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
@@ -9459,7 +9459,7 @@ tail:
  * reading the two together is worth more than reading either twice:
  *
  *   replace     DestroyByType here, WeaponRespawn there. The displaced weapon
- *               is also marked OBJ_FLAG_OVERDUE here and is not there;
+ *               is also marked OBJ_FLAG_REPLACED here and is not there;
  *   ammo        SpeakLine 0x15 here, and only when the held weapon is NOT
  *               already full -- the test is before the transfer, so a topped
  *               up weapon says nothing. There, nothing is said at all;
@@ -9557,7 +9557,7 @@ void __cdecl TrooperHostApprovedPickupItem(void *troop, void *item,
         else if (k == 29)
             SpeakLine(AM2_SPEAK_VULCANGUN, *(const int8_t *)(t + OBJ_OFF_ARMY));
 
-        *(uint32_t *)(held + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        *(uint32_t *)(held + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
         *(uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4) =
             ((const AM2_Object *)w)->uid;
         *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
@@ -9634,7 +9634,7 @@ void __cdecl TrooperHostApprovedPickupItem(void *troop, void *item,
  * checkoffsetuse FOUND CODE I HAD NOT TRANSCRIBED, which is the first time it
  * has caught an omission rather than a wrong name. It reported +0x08 read by
  * the original and named nowhere here: both respawn arms follow
- * WeaponRespawn with `item->flags |= OBJ_FLAG_OVERDUE`, and the medkit arm
+ * WeaponRespawn with `item->flags |= OBJ_FLAG_REPLACED`, and the medkit arm
  * has a whole tail -- a CommMustBroadcast on the ITEM's army deciding whether
  * the medkit leaves the map at all -- that I had stopped short of. Roughly
  * fifteen instructions, invisible to every other check, and an A/B could not
@@ -9686,7 +9686,7 @@ void __cdecl TrooperRemotePickupItem(void *troop, void *item, int32_t slot,
         if (CommMustBroadcast(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
                               (int16_t)*(const int8_t *)(w + OBJ_OFF_ARMY))) {
             WeaponRespawn(item);
-            *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+            *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
         }
         return;
     }
@@ -9730,7 +9730,7 @@ void __cdecl TrooperRemotePickupItem(void *troop, void *item, int32_t slot,
         && *(const int8_t *)(w + OBJ_OFF_ARMY) == 4   /* the neutral army; item.cpp spells it as the literal */
         && *(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
         WeaponRespawn(item);
-        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
     }
 }
 
@@ -11654,7 +11654,7 @@ void __cdecl StepType6(void *obj)
      * tools/checkoffsetuse.py is what caught it, by reporting OBJ_OFF_FLAGS
      * read by the original and named nowhere in the C. */
     if (RowAnimFinished(*(void **)(o + OBJ_OFF_ROWS))) {
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
         return;
     }
 
@@ -12269,7 +12269,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, uint32_t at,
  *
  * THE TWO TEARDOWN ARMS ARE THE SAME CODE TWICE, which is the original's:
  * whether the lookup missed or ApplyObjFrame refused, it tears the subrecord
- * down, marks OBJ_FLAG_OVERDUE, hides the rows and calls the pre-destroy.
+ * down, marks OBJ_FLAG_REPLACED, hides the rows and calls the pre-destroy.
  *
  * AND THE WHOLE SPAWN TAIL IS GATED ON ONE SPRITE SET. `cmp edi, 0x1D` on the
  * key's set field: an item from any other set is destroyed silently. Inside
@@ -12358,7 +12358,7 @@ void __cdecl DamageItem(void *obj, int32_t amount, int32_t extra, int32_t kind,
 
         if (!alive) {
             ItemTeardown(obj);
-            *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+            *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
 
             if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0) {
                 ObjFlagClear0(*(void **)(o + OBJ_OFF_ROWS));
@@ -12770,7 +12770,7 @@ gone:
  * FIVE OUTCOMES, chosen by the item's kind and by what is already in the slot:
  *
  *   A MEDKIT heals the whole army through ForEachArmyObject and is marked
- *   OBJ_FLAG_OVERDUE. That arm appears TWICE, once before the slot is looked
+ *   OBJ_FLAG_REPLACED. That arm appears TWICE, once before the slot is looked
  *   at and once after an empty slot has taken the item, and the second copy
  *   is reached only when the item was NOT a weapon. Written out both times,
  *   as the original has it.
@@ -12824,7 +12824,7 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log((const char *)AM2_IMAGE(AM2_STR_TROOPER_PICKUP),
                      ((const AM2_Object *)w)->uid);
-        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
         WeaponRespawn(w);
         SpeakLine(AM2_SPEAK_HITSSPOT, *(const int8_t *)(t + OBJ_OFF_ARMY));
         return;
@@ -12861,7 +12861,7 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
                 break;
             }
 
-            *(uint32_t *)(held + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+            *(uint32_t *)(held + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
             *(uint32_t *)(t + OBJ_OFF_WEAPON_UID + (uint32_t)slot * 4) =
                 ((const AM2_Object *)w)->uid;
             *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
@@ -12909,7 +12909,7 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
             orig_log((const char *)AM2_IMAGE(AM2_STR_TROOPER_PICKUP_2),
                      ((const AM2_Object *)w)->uid);
 
-        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
 
         if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
             SendPairMessage(t, w, (int32_t)slot,
@@ -12947,7 +12947,7 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log((const char *)AM2_IMAGE(AM2_STR_TROOPER_PICKUP),
                      ((const AM2_Object *)w)->uid);
-        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_OVERDUE;
+        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
         WeaponRespawn(w);
         SpeakLine(AM2_SPEAK_HITSSPOT, *(const int8_t *)(t + OBJ_OFF_ARMY));
         return;

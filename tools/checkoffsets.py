@@ -140,11 +140,9 @@ def _headers():
 #                   TABLE_REC_ family that begins at 0x52C, which CLAUDE.md
 #                   already records as carrying three names for three types.
 #
-# So of the six, FIVE are correct by design and one -- OBJ_FLAG_ 0x2 -- is real
-# backlog. The count is fully explained; do not treat it as five defects and a
-# spare.
-#   OBJ_FLAG_ 0x2   OVERDUE against REPLACED, two readings of one bit, already
-#                   recorded above as backlog.
+# So ALL FIVE that remain are correct by design. There is no backlog left in
+# this count: every surplus name is a second TYPE's field on a shared offset,
+# not a second spelling. If this number rises, the new one is the defect.
 # 8 -> 6. The 0x8C/0x90 pair flagged above as needing the writer is settled and
 # it was the teardown again: DestroyItemObject reads 0x8C, frees the array at
 # 0x90 and zeroes 0x8C -- the CELL LIST coming down. ALLOC_LIVE and ALLOC_PTR
@@ -154,7 +152,13 @@ def _headers():
 # Third time today one function's frees produced the aliases: CommClose gave
 # SEND_BUF and RECV_BUF, this gave two more. **When a family has aliases, look
 # at the destructor first** -- it touches every field and names none of them.
-FAMILY_ALIAS_BASELINE = 6
+# 6 -> 5, and the last real duplicate goes with it. OBJ_FLAG_OVERDUE was
+# "deliberately neutral", chosen before the bit's meaning was read;
+# OBJ_FLAG_REPLACED is what item.cpp concluded it means -- the flag a
+# make-path puts on the weapon it supersedes, an item spent to zero, and the
+# weapon a unit abandons. The tree had written that conclusion down and left
+# both names standing, which is how an alias survives being understood.
+FAMILY_ALIAS_BASELINE = 5
 
 DEFINE = re.compile(r"^#define\s+([A-Z][A-Z0-9_]*)\s+(0x[0-9A-Fa-f]+u?|\d+u?)\s*(?:/\*|$)")
 # `_OFF_` was the whole of this for as long as offsets were the thing that got

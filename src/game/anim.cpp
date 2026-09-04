@@ -355,7 +355,7 @@ void __cdecl FreeVehicleAnims(void)
  * animation playing, or the cell index short of the last one. Only on the
  * LAST cell does it look at the clock, so the question is "is the animation
  * over", not "is it time for the next cell". Its one caller in the type-6
- * stepper sets OBJ_FLAG_OVERDUE when it answers yes.
+ * stepper sets OBJ_FLAG_REPLACED when it answers yes.
  *
  * The clock comparison is UNSIGNED -- `jb`, not `jl` -- so a hold that pushed
  * the sum past 2^31 would read as still running. The clock is mission

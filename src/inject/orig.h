@@ -9291,6 +9291,12 @@ typedef struct {
 #define AM2_RANK_WEAPON_GROUP    0x2D   /* KeyLookupTriple's first argument */
 /* Flag bit 1 on the weapon being replaced. Set as it is let go and read
  * nowhere this function can see. */
+/* Bit 1: this object has been SUPERSEDED and is awaiting whatever sweeps
+ * the flag -- the weapon a make-path replaces, an item spent to zero, or
+ * the weapon a unit abandons when it gives up. It carried a second,
+ * deliberately neutral name, OBJ_FLAG_OVERDUE, from before the meaning
+ * was read; item.cpp then recorded that REPLACED is the reading and left
+ * both in place. Collapsed onto the one with the evidence. */
 #define OBJ_FLAG_REPLACED        2u
 /* 0x98 IS TYPE-DEPENDENT, the same way 0x94 and 0xA0 are. For a trooper it is
  * the rank, an int32 in 0..7. For an ITEM -- types 1 and 4 -- HeightAtPoint
@@ -9921,7 +9927,7 @@ typedef struct {
  * reads it too -- an object of your own army is collided with only once five
  * seconds have passed since it -- and 0x0045BC70 STAMPS it, with the clock
  * plus 100, on the object it has just collided with. So it is a per-object
- * cooldown as well as the deadline 0x004355D0 uses to set OBJ_FLAG_OVERDUE.
+ * cooldown as well as the deadline 0x004355D0 uses to set OBJ_FLAG_REPLACED.
  * Both names ours; the field has two users on two timescales. */
 #define OBJ_OFF_DEADLINE_58      0x58u
 #define AM2_COLLIDE_OWN_DELAY    0x1388  /* 5,000 ms before your own blocks */
@@ -9929,7 +9935,6 @@ typedef struct {
  * The per-object half of a collision test, and the arms are stated in
  * item.cpp. Reconstructed. */
 #define ADDR_OBJ_COLLIDES_WITH   0x0045B700u  /* int32_t(void *from, void *obj) */
-#define OBJ_FLAG_OVERDUE         0x02u
 /* The eight per-TYPE frame steppers ADDR_OBJ_FRAME_STEP dispatches to. Named
  * by the type they serve, because the jump table at 0x00428564 is what
  * establishes that and none of them names itself -- swept for pushed string
@@ -15331,7 +15336,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_ROW_UPDATE        0x0041D480u /* void(row *, int32 force, desc) */
 /* Bit 1 of a ROW's own flags word, which is what ADDR_ROW_UPDATE branches on:
  * set means take the row out of the map's cell lists, clear means put it back.
- * It shares its value with OBJ_FLAG_OVERDUE and nothing else -- that one lives
+ * It shares its value with OBJ_FLAG_REPLACED and nothing else -- that one lives
  * in an OBJECT's flags at +0x08 and is a different field in a different
  * struct. air.cpp spelled the row's bit with the object's name for as long as
  * both were 0x02 and it read as though the two were related. */
