@@ -1633,7 +1633,17 @@ neither build unlinks from the cells there. That kills the tidy theory that we
 alone leave dangling cell entries.
 
 **And the value argues against dangling anyway: 0x9A7 is a tiny integer, not
-a freed heap pointer.** A cell holding a stale pointer would fault on a large
+a freed heap pointer.** The faulting pair maps exactly onto
+`ObjectsInRect`'s inner loop in `win32/mapdraw.cpp`:
+
+    uint8_t *o = *(uint8_t **)(node + CELL_NODE_OFF_OBJ);   /* mov (%ebx),%esi   */
+    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)  /* testb $4,0x8(%esi) */
+
+`CELL_NODE_OFF_OBJ` is 0 and `OBJ_OFF_FLAGS` is 8, so it is a CELL NODE whose
+object pointer is 0x9A7 -- the node list is intact enough to be walked and one
+node's payload is not a pointer. That is narrower than "the cell array is
+wrong": the array and the `next` chain both survived, so what to read is who
+BUILDS those nodes on a load and what it puts in `+0x00`. A cell holding a stale pointer would fault on a large
 address or not at all; this looks like uninitialised or mis-indexed memory --
 a cell array read past its end, or one reallocated without being cleared.
 That is where to go next, not the destroy path.
