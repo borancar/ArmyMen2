@@ -51,6 +51,13 @@ void __cdecl OnSinglePlayer(void);
 void __cdecl OnMultiPlayer(void);
 void __cdecl OnMovies(void);
 void __cdecl OnBootCamp(void);
+
+/* 0x00451990. The OK button of RECRUIT's ENTER NAME dialog: refuse a name
+ * whose save directory already exists, otherwise create it and start the
+ * level there.
+ * Reached by ADDRESS from the widget tree, which is why the standalone build
+ * needs it: it was stubbed there and logged if called. */
+void __cdecl OnEnterNameOk(void);
 void __cdecl OnOptionsMenu(void);
 void __cdecl OnCredits(void);
 void __cdecl OnQuit(void);

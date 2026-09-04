@@ -29,6 +29,7 @@
 #include "startgame.h"
 #include "cdcheck.h"
 #include "dplay.h"
+#include "../image.h"    /* AM2_IMAGE -- the CRT seams below */
 #include "../gamedir.h"
 #include "../gameproc.h"
 #include "../misc.h"
@@ -396,6 +397,98 @@ void __cdecl OnBootCamp(void)
     RequestState(2);
 }
 
+/* The CRT's find-file and mkdir, spelled as frame.cpp spells them. The find
+ * buffer is opaque bytes rather than a `_finddata_t`: the layout is the
+ * game's CRT's and nothing here reads a field of it. */
+typedef int32_t (__cdecl *am2_findfirst_fn)(const char *, void *);
+typedef int32_t (__cdecl *am2_findclose_fn)(int32_t);
+typedef int32_t (__cdecl *am2_mkdir_fn)(const char *);
+#define orig_findfirst ((am2_findfirst_fn)AM2_IMAGE(ADDR_CRT_FINDFIRST))
+#define orig_findclose ((am2_findclose_fn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
+#define orig_mkdir     ((am2_mkdir_fn)AM2_IMAGE(ADDR_CRT_MKDIR))
+
+/* 0x00451990. The OK button of RECRUIT's ENTER NAME dialog -- 0x00451AF0
+ * builds it and is the only thing that references this address. Take the
+ * typed player name, refuse it if a save directory of that name already
+ * exists, and otherwise create one and start the level in it.
+ *
+ * THE NAME OF THE MACRO SAYS "ENTER NAME" AND THE FIELD OFFSET SAYS "BATTLE
+ * NAME", and only the caller settles which dialog this is. DLG_OFF_BATTLE_NAME
+ * is the right OFFSET -- 0x64 is where both dialogs keep their edit text --
+ * but here it holds a PLAYER name, which is why the destination is the buffer
+ * widget.cpp calls g_currentPlayer.
+ *
+ * IT IS WHY CLAUDE.md SAYS NOT TO DRIVE THE CAMPAIGN THROUGH RECRUIT. "A name
+ * that already exists is rejected in silence" is this function's find-first
+ * arm: it plays the refusal note and returns, leaving the dialog up, which
+ * looks exactly like a broken reconstruction on the second run of a script.
+ *
+ * ONE REFUSAL ARM REACHED TWO WAYS. An empty name and a missing level record
+ * both jump to the same PlaySoundAt(3) and return; the original shares that
+ * exit rather than writing it twice. Sound 3 is the refusal note where 2 is
+ * the accept, which is how OnBootCamp above uses them too.
+ *
+ * THE FIND AND THE MKDIR SHARE ONE BUFFER, which the disassembly hides. The
+ * find reads `[esp+0x14]` and the mkdir `[esp+0x10]` -- four bytes apart, and
+ * the same local: SetGameDir's argument is still on the stack at the first
+ * and has been cleaned by the second, because `add esp, 0xc` at 0x00451A2A
+ * cleans that push AND the find's two together. Reading the two `lea`s
+ * without tracking the deferred cleanup invents a second buffer, which is the
+ * cdecl one of the three esp shapes CLAUDE.md lists.
+ *
+ * IT SETS BOTH LEVEL GLOBALS TO 1, where OnBootCamp sets the id from the
+ * record's own LEVEL_OFF_ID. The original writes `mov eax, 1` once and stores
+ * it twice, so the difference between the two functions is real and is
+ * reproduced rather than made consistent.
+ *
+ * The mkdir's result is ignored here as it is there: a name that cannot be
+ * created is noticed only when the level fails to save.
+ */
+void __cdecl OnEnterNameOk(void)
+{
+    uint8_t    *dlg = g_paintObject;
+    const char *name;
+    char        path[0x100];
+    uint8_t     find[0x120];
+    void       *level;
+    int32_t     handle;
+    int32_t     n;
+
+    if (!dlg)
+        return;
+
+    name = (const char *)(dlg + DLG_OFF_BATTLE_NAME);
+    for (n = 0; name[n]; n++)
+        ;
+
+    level = (n < 1) ? (void *)0 : FindLevelRecord(BOOTCAMP_LEVEL_ID);
+    if (!level) {
+        PlaySoundAt(3, 0, 0, 0, 0);
+        return;
+    }
+
+    SetGameDir((const char *)(uintptr_t)ADDR_STR_SAVE_DIR);
+    CopyName(path, name);
+
+    handle = orig_findfirst(path, find);
+    if (handle != -1) {
+        PlaySoundAt(3, 0, 0, 0, 0);
+        orig_findclose(handle);
+        return;
+    }
+
+    orig_mkdir(path);
+    /* widget.cpp already names this address g_currentPlayer, which is what
+     * it holds: a second `g_` name here would be an alias, and the ratchet
+     * caught it. Written inline instead. */
+    CopyName((char *)(uintptr_t)ADDR_GAMEPROC_BLOCK, name);
+    PlaySoundAt(2, 0, 0, 0, 0);
+    SelectLevel(level);
+    g_levelId    = 1;
+    g_levelIndex = 1;
+    RequestState(2);
+}
+
 void __cdecl OnOptionsMenu(void)
 {
     PlaySoundAt(2, 0, 0, 0, 0);
@@ -469,6 +562,9 @@ int startgame_install(void)
 
     rc |= patch_replace(ADDR_HOST_BATTLE, (const void *)HostBattle,
                         "HostBattle", 0);
+
+    rc |= patch_replace(ADDR_ON_ENTER_NAME_OK, (const void *)OnEnterNameOk,
+                        "OnEnterNameOk", 0);
 
     rc |= patch_replace(ADDR_START_SELECTED_GAME, (const void *)StartSelectedGame,
                         "StartSelectedGame", 0);

@@ -49,6 +49,8 @@
  * image owns the rest -- so the two spellings sit side by side on purpose. */
 #define kImageHandler(a)       AM2_BUTTON_HANDLER(AM2_IMAGE(a))
 #define kOnBootCamp     AM2_BUTTON_HANDLER(OnBootCamp)
+/* Reconstructed too, so it is named rather than reached through the image. */
+#define kOnEnterNameOk  AM2_BUTTON_HANDLER(OnEnterNameOk)
 #define kOnSinglePlayer AM2_BUTTON_HANDLER(OnSinglePlayer)
 #define kOnMultiPlayer  AM2_BUTTON_HANDLER(OnMultiPlayer)
 #define kOnOptionsMenu  AM2_BUTTON_HANDLER(OnOptionsMenu)
@@ -8754,7 +8756,7 @@ AM2_Widget *__attribute__((thiscall)) EnterNameConstruct(AM2_Widget *w,
         edit = EditConstruct(edit, text, AM2_ENTER_NAME_MAX, box.left,
                              box.top, box.right, box.bottom, 1,
                              g_hiliteColour, g_whiteInk, g_backgroundColour,
-                             kImageHandler(ADDR_ON_ENTER_NAME_OK), 0, 0);
+                             kOnEnterNameOk, 0, 0);
     }
     WidgetAddChild(panel, edit);
     ((AM2_WidgetFocusFn *)edit->vtable)[WIDGET_VSLOT_FOCUS](edit, 0);
@@ -8762,7 +8764,7 @@ AM2_Widget *__attribute__((thiscall)) EnterNameConstruct(AM2_Widget *w,
 
     WidgetAddChild(panel, MakeButton(0x14A, 0x1F, AM2_BMP_OK0, AM2_BMP_OK1,
                                      AM2_BMP_OK2,
-                                     kImageHandler(ADDR_ON_ENTER_NAME_OK)));
+                                     kOnEnterNameOk));
     WidgetAddChild(panel, MakeButton(0x14A, 0x48, AM2_BMP_CAN0, AM2_BMP_CAN1,
                                      AM2_BMP_CAN2,
                                      kOnEnterNameCancel));

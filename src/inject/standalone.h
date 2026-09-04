@@ -77,14 +77,17 @@ long am2_sa_ftell(void *fp);
  * function -- and its target is FreeArmyObjLists, which is reconstructed. */
 void am2_sa_free_army_lists(void);
 
-/* Three addresses the standalone build has no code for. Two are genuine
- * functions still unreconstructed -- 0x004185C0, the HUD chat WM_CHAR
- * handler, and 0x00451990, the ENTER BATTLE NAME button -- both interior
- * addresses of merged entries, which is why every completeness check reads
- * them as done. The third is the AM2_PROBE_NOACTION seam, which exists to
- * call the ORIGINAL parser and so cannot mean anything here. Each LOGS and
- * returns 0: a stub that announces itself beats a jump into unmapped memory,
- * and beats a silent wrong answer by more. */
+/* Two addresses the standalone build has no code for. One is a genuine
+ * function still unreconstructed -- 0x004185C0, the HUD chat WM_CHAR handler,
+ * an interior address of a merged entry, which is why every completeness
+ * check reads it as done. The other is the AM2_PROBE_NOACTION seam, which
+ * exists to call the ORIGINAL parser and so cannot mean anything here. Each
+ * LOGS and returns 0: a stub that announces itself beats a jump into unmapped
+ * memory, and beats a silent wrong answer by more.
+ *
+ * 0x00451990 was the third until OnEnterNameOk was reconstructed, which the
+ * standalone build is what asked for -- it is the only thing in the tree that
+ * cannot call code it does not contain. */
 int32_t am2_sa_unimplemented(void);
 
 
@@ -197,13 +200,11 @@ extern const uint8_t am2_pickup_kind_index[29];
 #undef ADDR_GAME_FREE
 #undef ADDR_FREE_ARMY_LISTS_ALIAS
 #undef ADDR_HUD_CHAT_CHAR
-#undef ADDR_ON_ENTER_NAME_OK
 #undef ADDR_SCRIPT_PARSE_ACTION
 #define ADDR_FTELL            AM2_SA(am2_sa_ftell)
 #define ADDR_GAME_FREE        AM2_SA(free)
 #define ADDR_FREE_ARMY_LISTS_ALIAS AM2_SA(am2_sa_free_army_lists)
 #define ADDR_HUD_CHAT_CHAR    AM2_SA(am2_sa_unimplemented)
-#define ADDR_ON_ENTER_NAME_OK AM2_SA(am2_sa_unimplemented)
 #define ADDR_SCRIPT_PARSE_ACTION AM2_SA(am2_sa_unimplemented)
 
 
