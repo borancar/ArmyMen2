@@ -1583,6 +1583,20 @@ Wine reports nothing -- `WINEDBG=err+all` produced no output -- so this is an
 ordinary exit or a fault Wine swallows rather than a page fault it would
 print.
 
+**WHAT IS ALREADY RULED OUT INSIDE THAT BLOCK**, so the next pass need not
+redo it. `BuildRegionGraph`'s three allocations match the original's
+arithmetic exactly: the realloc is `44 * (region + 1)`, which the original
+spells as `lea ecx,[ebp+ebp*4+5]; lea edx,[ebp+ecx*2+1]; shl edx,2` and which
+`AM2_REGION_SIZE` 44 reproduces, and both mallocs are `stride * stride` off
+the int16 at `ADDR_REGION_STRIDE`, matching `movsx eax,[0x514eec]; imul ecx,
+eax`. Its log call is guarded and passes a real format plus one integer, as
+the original's is at 0x0042BAF1.
+
+So the sizes are not the fault. What has NOT been checked is the rest of that
+block -- `LookupOwnerObj`, `SelectInventorySlot`, `DeselectAll`,
+`LookupType3ByUID` and `SelectUnit` -- reached on a load with a leader whose
+`OBJ_OFF_RIDING` came out of a save file rather than out of a fresh map.
+
 <!-- superseded -->
 **Earlier localisation, kept for the reasoning.** Both builds reach
 `calculating region data...` on a load. The ORIGINAL then emits TWO of the
