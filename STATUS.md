@@ -53,12 +53,19 @@ click-to-move, so no divergence has been demonstrated.
 over every byte from `0x00401000` to the real CRT frontier at `0x00464420`,
 and reports that the entries tile `.text` with no gaps.
 
-**But the standalone build is a stronger completeness oracle**, and it found
-three functions nothing else could see: `0x0040A6A0`, `0x004185C0` and
-`0x00451990` are called by address and are still the original's code. They
-are INTERIOR addresses of merged entries whose entry is patched, so every
-count reads them as done. Two are stubbed and log if reached;
-`0x00433770` is not a function at all but a byte table MSVC placed in .text.
+**The standalone build is a stronger completeness oracle**, and it found
+three things nothing else could see -- `0x0040A6A0`, `0x004185C0` and
+`0x00451990`, called by address and still the original's code, all INTERIOR
+addresses of merged entries whose entry is patched, so every count read them
+as done. All three are closed now: the first is a linker thunk to
+FreeArmyObjLists, and the other two are reconstructed as `OnEnterNameOk`
+(RECRUIT's ENTER NAME dialog) and `HudChatChar` (the HUD chat WM_CHAR
+handler). It also found `0x00433770`, which is not a function at all but a
+byte table MSVC placed in .text, now extracted into generated C.
+
+Nothing in the standalone build is stubbed any more except the
+AM2_PROBE_NOACTION seam, which exists to call the ORIGINAL action parser and
+so cannot mean anything in a build that carries none of it.
 
 ## Where the work is now: VERIFICATION, not transposition
 
