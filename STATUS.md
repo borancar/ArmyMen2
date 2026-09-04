@@ -122,6 +122,13 @@ the save, with matching widget trees), the row click, and a missing gap seam
 (checkgap reads 37 of 37). The shape that fits is a wrong MODE on a panel
 shared between saving and loading.
 
+**The writer is named**: a return-address probe puts it at `MissionStartup`
++ 0x8F, the mission-start autosave, whose three guards are all clear in the
+standalone. The injected build never calls `MissionStartup` on this path at
+all, so the open question is why the call is reached in one build and not the
+other -- both sites sit in `TakeMenuRequest` behind the overlay-dirty and
+load-pending tests. `OpenSaveForLoad` succeeds in both.
+
 This is data loss on the deliverable and should be fixed before the port is
 played on. See CLAUDE.md for the full evidence.
 

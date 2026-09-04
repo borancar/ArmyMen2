@@ -1602,6 +1602,35 @@ apart is against different bytes. Snapshot the file, restore it before each
 half, and check the md5 -- the md5 CHANGING on the standalone side is itself
 the clearest statement of the bug.
 
+**NARROWED AGAIN, and the writer is NAMED.** A probe on `SaveGame` logging
+`__builtin_return_address(0)` gives `0x0071388F`, which `nm` on the standalone
+resolves to **`MissionStartup` + 0x8F** -- the mission-start autosave. So the
+file is rewritten by the ordinary "stamp a retry save as the mission begins"
+path, not by anything in the save dialog.
+
+Its three guards are all clear in the standalone -- `LEVEL_ID` 1,
+`GAMEPROC_BLOCK` "sarge", `WIN_ENABLED` 0 -- so nothing cancels it. And the
+same probe built into the INJECTED build produces NO line at all: that build
+never calls `MissionStartup` on this path. So the question is not which guard
+differs, it is why the call is reached in one build and not the other. Both
+call sites are inside `TakeMenuRequest`, behind the overlay-dirty and
+load-pending tests.
+
+**The comment above `MissionStartup` predicted exactly this and could not
+say which guard.** It records that on the campaign the save IS written and
+that "one of the three guards cancels it there and WHICH one is not
+established". The answer is that none of them does -- the call itself does not
+happen in the working build.
+
+**AND A PROBE LANDED IN THE WRONG FUNCTION, which is this file's own trap met
+again.** An anchor on the first `if (!ADDR_OVERLAY_DIRTY)` in `frame.cpp` put
+the probe in `TakeMenuRequest` rather than where it was aimed, and the run
+came back with ZERO lines -- which reads exactly like "this branch never
+runs". Check which FUNCTION a probe landed in, not only that the text was
+inserted; `awk` for the enclosing definition costs one command. Only that
+probe is affected: the `SaveGame` and `MissionStartup` ones were inside the
+functions they name.
+
 The shape that fits is a MODE: this panel is shared between saving and
 loading, so a wrong mode makes the second button write where it should read.
 The widget dump cannot see that -- it prints geometry, and both panels have
