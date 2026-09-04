@@ -112,7 +112,9 @@ compare, so all 15 candidates it finds are correct.
 ## LOADING A SAVED GAME WORKS
 
 `tools/loadcheck.sh` passes: our build and the original both come back alive
-at sub-state 0x18 with 325 objects and the save file untouched. Two fixes and
+at sub-state 0x18 with 325 objects and the save file untouched. The STANDALONE
+does the same, measured separately: alive, sub-state 0x18, 325 objects, md5
+unchanged, `Loaded 317 items` in its log. Two fixes and
 one deliberate deviation got there; see CLAUDE.md for all three.
 
 The deviation is the only one in the tree: `LoadItems` unlinks objects from

@@ -1706,6 +1706,13 @@ the walk faults only when the memory underneath has been rewritten into
 something whose first dword is small. That explains the one bad node out of
 305 and why the earlier probe found exactly one.
 
+**AND THE STANDALONE LOADS ONE TOO, measured the same way.** Driven through
+SINGLE PLAYER, the player row, SELECT, the save row and LOAD, with `-dbg` as
+both other halves take, `build/ArmyMen2.exe` comes back ALIVE at sub-state
+0x18 with 325 objects, the save's md5 unchanged, and `Loaded 317 items` in its
+own log -- the original's answer on every one. So the port can now load a
+saved campaign, which it could not do at any point before this session.
+
 **FIXED, BY THE ONE DELIBERATE DEVIATION IN THIS TREE.** `LoadItems` now
 unlinks every registered object from the cell grid before `ItemsReset` frees
 them. `tools/loadcheck.sh` goes from failing to passing: our build comes back
