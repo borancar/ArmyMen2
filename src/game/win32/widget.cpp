@@ -16196,6 +16196,22 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
 
         name[0] = '\0';
 
+        /* THE COLOUR SELECTION STARTS AT -1, PER ROW, and nothing here wrote
+         * it. The original does it inside this same loop -- `mov dword ptr
+         * [ebx + 0x38], 0xffffffff` at 0x0043062A, with ebx walking 4 bytes a
+         * row from `this + 0x230`, so it lands on 0x268 + i*4.
+         *
+         * It is load-bearing rather than tidy: OnMpColour reads `sel[row]`
+         * and takes -1 as "not chosen yet", initialising it to the row
+         * itself. Left as whatever the allocator supplied, that test fails,
+         * the next colour is computed from garbage, and the army handed to
+         * CommArmyOfSlot is arbitrary.
+         *
+         * Sixth and last of the fields MpPanelConstruct never wrote. It was
+         * listed as "apparently unread" and that was wrong -- widget.cpp
+         * reads it; the grep that found the six only asked who WRITES. */
+        *(int32_t *)(p + MP_PANEL_OFF_COLOUR_SEL + (uint32_t)i * 4) = -1;
+
         /* The row's own name: the comm slot's player, or `-- Open --`. */
         {
             const uint8_t *comm = *(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;

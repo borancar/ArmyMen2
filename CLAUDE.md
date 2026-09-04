@@ -1545,11 +1545,25 @@ Then `GAME_BAR` and `MAP_BAR`, the last two of the six unbuilt fields, each an
 `ArrowBarConstruct` immediately after its box with the two back-links every
 other bar here already has. With those the tree matches node for node.
 
-So all six unbuilt fields are now accounted for, and the tally is worth
-keeping: `ARMY_ROWS` a crash on open, `GAME_BOX` an empty script name,
-`CHATBOX` a crash on the first chat line, `COLOUR_SEL` still unbuilt and
-apparently unread, `GAME_BAR` and `MAP_BAR` four misplaced nodes. **One grep
-found them all before any of it was diagnosed.** That is the check to run on any screen whose
+So all six unbuilt fields are now BUILT, and the tally is worth keeping:
+`ARMY_ROWS` a crash on open, `GAME_BOX` an empty script name, `CHATBOX` a
+crash on the first chat line, `GAME_BAR` and `MAP_BAR` four misplaced nodes,
+and `COLOUR_SEL` a per-row selection that must start at -1. **One grep found
+them all before any of it was diagnosed**, and re-running it now reports
+nothing.
+
+**`COLOUR_SEL` was written up as "apparently unread" and that was wrong.**
+`OnMpColour` reads `sel[row]` and takes -1 as "not chosen yet"; left as the
+allocator's leavings the test fails, the next colour is computed from garbage
+and the army handed to `CommArmyOfSlot` is arbitrary. The original writes it
+inside the row loop -- `mov dword ptr [ebx + 0x38], 0xffffffff` at 0x0043062A,
+`ebx` walking four bytes a row from `this + 0x230`, so it lands on
+0x268 + i*4.
+
+The mistake is instructive about the check itself: it asks who WRITES a field
+and says nothing about who reads it, so "unbuilt" was read as "unused" for the
+one entry that had no other symptom. **A field with no writer is a finding; a
+field with no reader is a separate question the same grep cannot answer.** That is the check to run on any screen whose
 constructor is suspected, and it is the scoped form of the read-only-offset
 idea that was rejected as a whole-tree gate.
 
