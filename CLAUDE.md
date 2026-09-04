@@ -5279,7 +5279,17 @@ where the built dialog is dispatched to. `RefreshScreen` stayed at 0 for the
 same reason: its callers are those openers.
 
 Forcing arm 34 -- the in-mission ESCAPE handler -- and releasing ESCAPE is
-worse: the process exits. That is an inconsistent state nobody constructed
+worse: the process exits. Clicking the HUD's own boxes does not open one
+either: the three panels at 480,430, 480,169 and 486,31 were each clicked in
+a live mission and the sub-state stayed 33, the dump kept falling back to the
+HUD, and `RefreshScreen` stayed 0. So the radar, the commands panel and the
+portrait are displays rather than openers.
+
+Three routes tried and three failed, which is worth more than the list of
+functions it leaves unexercised: the in-mission dialogs appear to have NO
+reachable trigger in this environment, and `RefreshScreen`, the save dialog
+and the game menu are unexercised for that reason rather than for want of a
+drive that nobody has written. That is an inconsistent state nobody constructed
 properly, not a defect, and it is recorded here only so the route is not
 tried a third time. Reaching those dialogs needs the opener CALLED, not the
 mode set.
