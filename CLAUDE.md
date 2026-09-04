@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **43** analysis
+**`make check` runs everything that does not need the game.** **44** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3823,7 +3823,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 15 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 16 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3914,6 +3914,29 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   test -- and the new part is that a stub is a mention the prose filter
   cannot see.
 
+  `TakeNumberKey` joins them by `tools/numberkeycheck.py`, 2,048 cases, and
+  it is the first oracle here written to check a REWRITE rather than a
+  transcription. Our C is a loop where the original is eight inlined copies,
+  and this file already argues that is the right trade -- but the argument
+  rests on two claims that reading it twice cannot settle: that the `return`
+  after each store makes the arms an if/else chain so the LOWEST key wins,
+  and that `&&` keeps KeyChanged behind IsKeyDown as the original's second
+  branch does.
+
+  **IT COMPARES THE CALL COUNT AS WELL AS THE SLOT**, which is what makes the
+  first claim checkable: a scan that does not stop asks IsKeyDown eight times
+  where the original asks it once per key up to the match. Making the model
+  run on fails 1,100 cases; reversing the scan so the highest key wins fails
+  846. Neither is visible in the answer alone on the single-key inputs, which
+  is most of what a drive would ever produce.
+
+  The output is the SLOT and not the return value: the original leaves
+  whatever its last failed test left in eax and our C returns void, so
+  comparing returns would compare the register allocator. Seeded with a
+  sentinel, so the no-match path -- which really does fall through without
+  storing -- is distinct from a key-1 press. Making no-match write 0 instead
+  fails 802.
+
   `CheckSaveTag` joins them by `tools/savetagcheck.py`, 200 cases -- and the
   reason a nine-line function needs an oracle is the case no drive can make.
   Its read goes into ITS OWN FIRST ARGUMENT SLOT: `lea ecx, [esp+4]` hands
@@ -3998,7 +4021,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   configuration whose descriptor under-reports its extent is what makes them
   observable at all.
 
-  The other seventeen are verified by READING, which is the standing worth
+  The other sixteen are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is
