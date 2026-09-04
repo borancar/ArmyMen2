@@ -1113,8 +1113,20 @@ returns BEFORE them when `FileExists("<map>.amm")` fails -- zeroing
 shows the bad-map bitmap instead of the map.
 
 The path is built by `SetGameDir(ADDR_MAP_FOLDER)` then `sprintf("%s.amm",
-ADDR_MAP_NAME)`, so what to compare next is those two globals at the moment
-the panel opens -- ours against the original's. `OpenMpHost` and `OpenMpJoin`
+ADDR_MAP_NAME)`, and comparing those two globals at the moment the panel opens
+settles it outright:
+
+| | `ADDR_MAP_NAME` | `ADDR_MAP_FOLDER` |
+|---|---|---|
+| original | `alpine3_mp` | `data\mpalpine` |
+| ours | **empty** | **empty** |
+
+So our `sprintf` produces `.amm`, `FileExists` fails, and the function takes
+its bad-map exit. Both globals are written in exactly one place --
+`SelectLevel` at `map.cpp:223`, copying `LEVEL_OFF_MAP_NAME` and
+`LEVEL_OFF_FOLDER` out of a level record -- so on the multiplayer host path our
+build either never calls it or calls it with no record. That is the next thing
+to read, and it is a much smaller question than the one this started from. `OpenMpHost` and `OpenMpJoin`
 are both faithful (host sets `g_mpSession` 1 and calls the refresh, join sets
 2 and does not, exactly as the image does), so the divergence is in what the
 map name or folder holds, not in who calls what.
