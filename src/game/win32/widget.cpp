@@ -4409,7 +4409,7 @@ void __cdecl OptionsDefaults(AM2_Widget *button)
                            ? flags : other;
 
         box->disabled = 0;
-        *((uint8_t *)box + CHECK_OFF_TICKED) = (mask & bit) != 0;
+        *((uint8_t *)box + CHECKBOX_OFF_CHECKED) = (mask & bit) != 0;
         ((AM2_WidgetPaintFn *)box->vtable)[WIDGET_VSLOT_PAINT](box, box->rect);
         rec += AM2_OPTION_STRIDE;
     } while (rec < (const uint8_t *)(uintptr_t)ADDR_OPTION_TABLE_END);
@@ -4426,7 +4426,7 @@ void __cdecl OptionsApply(AM2_Widget *button)
         AM2_Widget *box =
             OptionBox(parent, *(const int32_t *)(rec + AM2_OPTION_OFF_WIDGET));
 
-        if (*((const uint8_t *)box + CHECK_OFF_TICKED)) {
+        if (*((const uint8_t *)box + CHECKBOX_OFF_CHECKED)) {
             uint32_t bit = *(const uint32_t *)(rec + AM2_OPTION_OFF_BIT);
 
             if (*(const int32_t *)(rec + AM2_OPTION_OFF_WHICH))
@@ -4472,9 +4472,9 @@ void __cdecl OptionsSyncGroup(AM2_Widget *header)
          i <= *(const int32_t *)(rec + AM2_OPTION_OFF_LAST);
          i++) {
         AM2_Widget *box    = OptionBox(parent, i);
-        uint8_t     ticked = *((const uint8_t *)header + CHECK_OFF_TICKED);
+        uint8_t     ticked = *((const uint8_t *)header + CHECKBOX_OFF_CHECKED);
 
-        *((uint8_t *)box + CHECK_OFF_TICKED) = ticked;
+        *((uint8_t *)box + CHECKBOX_OFF_CHECKED) = ticked;
         box->disabled = (ticked == 0);
         ((AM2_WidgetPaintFn *)box->vtable)[WIDGET_VSLOT_PAINT](box, box->rect);
     }
@@ -5647,7 +5647,7 @@ void __cdecl BuildHudWidgets(void)
         a = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A;
         if (a) {
             box = *(AM2_Widget **)((uint8_t *)a + HUD_A_OFF_CHECKBOX);
-            if (box && *((uint8_t *)box + CHECK_OFF_TICKED))
+            if (box && *((uint8_t *)box + CHECKBOX_OFF_CHECKED))
                 ticked = 1;
         }
     }
@@ -5677,7 +5677,7 @@ void __cdecl BuildHudWidgets(void)
         a = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A;
         box = *(AM2_Widget **)((uint8_t *)a + HUD_A_OFF_CHECKBOX);
         if (box)
-            *((uint8_t *)box + CHECK_OFF_TICKED) = 1;
+            *((uint8_t *)box + CHECKBOX_OFF_CHECKED) = 1;
     }
 }
 
@@ -6538,7 +6538,7 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
 
         mask = OPT_REC(rec, AM2_OPTION_OFF_WHICH) ? g_gameOverFlags
                                                   : g_gameSetting22C;
-        *((uint8_t *)cb + CHECK_OFF_TICKED) = (mask & bit) != 0;
+        *((uint8_t *)cb + CHECKBOX_OFF_CHECKED) = (mask & bit) != 0;
 
         WidgetAddChild(w, cb);
         if (!host)
@@ -6559,7 +6559,7 @@ AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
             for (i = OPT_REC(rec, AM2_OPTION_OFF_FIRST);
                  i <= OPT_REC(rec, AM2_OPTION_OFF_LAST); i++)
                 boxes[i]->disabled =
-                    (*((const uint8_t *)head + CHECK_OFF_TICKED) == 0);
+                    (*((const uint8_t *)head + CHECKBOX_OFF_CHECKED) == 0);
         }
 
         {
@@ -7394,32 +7394,32 @@ AM2_Widget *__attribute__((thiscall)) CheckBoxConstruct(AM2_Widget *w,
     ButtonBaseConstruct(w);
     w->vtable = (void *)AM2_IMAGE(VTABLE_CHECKBOX);
 
-    *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_ON)  =
+    *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF)  =
         PreloadSpriteName(b0, 1, 1);
-    *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_OFF) =
+    *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON) =
         PreloadSpriteName(b1, 1, 1);
-    *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_3)   =
+    *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF_FOC)   =
         PreloadSpriteName(b2, 1, 1);
-    *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_2)   =
+    *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON_FOC)   =
         PreloadSpriteName(b3, 1, 1);
-    w->sprite = *(AM2_Sprite **)(self + CHECK_OFF_SPRITE_ON);
+    w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF);
 
     w->x = left;
     w->y = top;
     w->w = width;
     w->h = height;
-    self[CHECK_OFF_TICKED] = 0;
+    self[CHECKBOX_OFF_CHECKED] = 0;
     WidgetScreenRect(w);
 
     *(int32_t *)(self + CHECK_OFF_GROUP)   = group;
-    *(const char **)(self + CHECK_OFF_CAPTION) = caption;
-    self[CHECK_OFF_INK0]     = 0xD4;
-    self[CHECK_OFF_INK0 + 1] = 0xD4;
-    self[CHECK_OFF_INK0 + 2] = 0xFB;
-    self[CHECK_OFF_INK0 + 3] = 0xFB;
+    *(const char **)(self + CHECKBOX_OFF_CAPTION) = caption;
+    self[CHECKBOX_OFF_INK_ON]      = 0xD4;
+    self[CHECKBOX_OFF_INK_OFF]     = 0xD4;
+    self[CHECKBOX_OFF_INK_ON_FOC]  = 0xFB;
+    self[CHECKBOX_OFF_INK_OFF_FOC] = 0xFB;
     *(uint32_t *)(self + BUTTON_OFF_ON_LEFT) = (uint32_t)(uintptr_t)CheckboxToggle;
     *(void **)(self + CHECK_OFF_ON_CHANGE) = (void *)onChange;
-    self[CHECK_OFF_FLAG8C] = 0;
+    self[CHECKBOX_OFF_FORCE_PLAIN] = 0;
     return w;
 }
 
@@ -8616,7 +8616,7 @@ void __cdecl CheckboxToggle(AM2_Widget *w)
     uint8_t *self = (uint8_t *)w;
     void   (__cdecl *onChange)(AM2_Widget *);
 
-    *(self + CHECK_OFF_TICKED) = (uint8_t)(*(self + CHECK_OFF_TICKED) == 0);
+    *(self + CHECKBOX_OFF_CHECKED) = (uint8_t)(*(self + CHECKBOX_OFF_CHECKED) == 0);
     PlaySoundAt(1, 0, 0, 0, 0);
     ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
 

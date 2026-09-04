@@ -3958,7 +3958,7 @@
  * a CHECKBOX rather than anything else: A's constructor news one and builds it
  * with ADDR_CHECKBOX_CTOR before handing it to WidgetAddChild; 0x004184E3
  * independently reads the same child and gates a loop on its +0x78; and
- * CHECK_OFF_TICKED is already 0x78, a uint8_t. So the latch around the rebuild
+ * CHECKBOX_OFF_CHECKED is already 0x78, a uint8_t. So the latch around the rebuild
  * preserves the box's TICKED state -- and only outside a net game. */
 #define ADDR_BUILD_HUD_WIDGETS   0x00413480u  /* void(void), 320 bytes */
 /* 0x00417580, thiscall -- the HUD TOP STRIP's constructor, which is the chat
@@ -6783,9 +6783,14 @@ typedef struct {
  * anything else. */
 #define ADDR_CHECKBOX_TOGGLE     0x00454760u
 #define CHECK_OFF_ON_CHANGE      0x7Cu
-#define CHECK_OFF_INK0           0x84u  /* 0xD4, 0xD4, 0xFB, 0xFB -- hardcoded */
-#define CHECK_OFF_CAPTION        0x88u
-#define CHECK_OFF_FLAG8C         0x8Cu
+/* CHECK_OFF_INK0, CHECK_OFF_CAPTION and CHECK_OFF_FLAG8C lived here and were
+ * a SECOND PREFIX over the same record CHECKBOX_OFF_* already described --
+ * eight fields under two spellings, which checkoffsets cannot see because it
+ * compares within a prefix. Collapsed onto the CHECKBOX_ names, which are the
+ * body-derived ones: CheckboxPaint picks 0x68 when the box is checked and
+ * 0x6C when it is not, so SPR_ON and SPR_OFF are right and the SPRITE_ON /
+ * SPRITE_OFF pair at those addresses was BACKWARDS. The ink run is
+ * INK_ON, INK_OFF, INK_ON_FOC, INK_OFF_FOC rather than INK0 + 1..3. */
 /* The fourth colour the list box seeds itself with, beside ADDR_COLOUR_WHITE,
  * ADDR_BACKGROUND_COLOUR and ADDR_VIEW_RECT_COLOUR. Named from where it is
  * used rather than from anything it says about itself. */

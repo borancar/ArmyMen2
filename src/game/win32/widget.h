@@ -1198,14 +1198,9 @@ void __attribute__((thiscall)) EditUpdate(AM2_Widget *w);
  *
  * The checkbox's ticked flag is at 0x0078, which the two apply/load bodies and
  * the group sync all agree on. */
-#define CHECK_OFF_TICKED  0x78   /* uint8_t */
 /* And a group HEADER carries its own record index at 0x0080, which is how
  * OptionsSyncGroup finds the range it owns without searching the table. */
 #define CHECK_OFF_GROUP   0x80   /* int32_t, index into ADDR_OPTION_TABLE */
-#define CHECK_OFF_SPRITE_OFF   0x68
-#define CHECK_OFF_SPRITE_ON    0x6C   /* also copied to the base 0x0038 */
-#define CHECK_OFF_SPRITE_2     0x70
-#define CHECK_OFF_SPRITE_3     0x74
 
 /* Original: 0x00432710, the DEFAULTS button. It reads nothing back: it asks
  * ResetPairMask for the two manufactured default masks and fills all 43

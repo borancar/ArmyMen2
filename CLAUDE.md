@@ -1563,7 +1563,29 @@ inside the row loop -- `mov dword ptr [ebx + 0x38], 0xffffffff` at 0x0043062A,
 The mistake is instructive about the check itself: it asks who WRITES a field
 and says nothing about who reads it, so "unbuilt" was read as "unused" for the
 one entry that had no other symptom. **A field with no writer is a finding; a
-field with no reader is a separate question the same grep cannot answer.** That is the check to run on any screen whose
+field with no reader is a separate question the same grep cannot answer.**
+
+**GENERALISED TO EVERY WIDGET CONSTRUCTOR, IT FINDS DUPLICATE PREFIXES RATHER
+THAN MISSING WRITES.** Run over the 19 `*_OFF_*` families that have a matching
+`*Construct`, the same scan reports nine families with unwritten fields -- and
+the ones worth anything are not bugs in the constructors, they are records
+described by TWO prefixes at once, so the constructor writes every field under
+the other spelling. `CheckBoxConstruct` uses `CHECK_OFF_*`; the painter uses
+`CHECKBOX_OFF_*`; eight fields had both.
+
+**And two of the eight CONTRADICTED each other**, which is what makes this
+worth more than tidying: `CHECK_OFF_SPRITE_OFF` and `CHECKBOX_OFF_SPR_ON` are
+both 0x68, and `CHECK_OFF_SPRITE_ON` and `CHECKBOX_OFF_SPR_OFF` are both
+0x6C. `CheckboxPaint` settles it -- it takes 0x68 when the box is checked and
+0x6C when it is not -- so the `SPR_` names are body-derived and right and the
+`SPRITE_` pair was named BACKWARDS at those addresses. Collapsed onto the
+painter's names, and `controls`, `audiovol` and `difficulty` stay clean.
+
+**`checkoffsets` cannot see any of this and the ratchet still earned its
+keep**: it failed the build the moment the rename produced two
+`CHECKBOX_OFF_CAPTION` defines. It compares WITHIN a prefix, so it is blind to
+a second prefix and sharp about a second name -- which is exactly the split
+this file already describes for a NEW prefix, met from the other direction. That is the check to run on any screen whose
 constructor is suspected, and it is the scoped form of the read-only-offset
 idea that was rejected as a whole-tree gate.
 
