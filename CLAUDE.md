@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **46** analysis
+**`make check` runs everything that does not need the game.** **47** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3823,7 +3823,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 20 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 21 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3935,6 +3935,17 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   confirmed each against itself would still pass if one were rewritten into
   the other. Making Defend turn on the route path fails at once; so does
   dropping the route path's promotion.
+
+  `AiWalkStep` joins them by `tools/aiwalkcheck.py`, 144 cases -- and it is
+  the family's SHAPE WITH DIFFERENT NUMBERS, which is why it is checked
+  rather than read beside its siblings. It compares SIGHTC_OFF_DEST_DIST at
+  0x34 against 12 where AiStepIgnore and the twins use SIGHT_OFF_DEST_DIST at
+  0x28 against 32, reads SIGHTC_OFF_FOUND at 0x20 rather than 0x1C, and
+  writes `out[4]` where every sibling writes `out[1]`. Four numbers, none
+  shared, in functions that otherwise read alike -- the shape this file
+  records as costing a rewrite when one is written from another's outline.
+  Giving it the siblings' threshold fails 24 cases, which is exactly the
+  `dist == 13` inputs.
 
   `AiStepAttack` joins them inside `tools/aicheck.py`, where the dispatcher
   it belongs to is already checked. It is a pure forwarder, so THE ONLY THING
@@ -4076,7 +4087,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   configuration whose descriptor under-reports its extent is what makes them
   observable at all.
 
-  The other twelve are verified by READING, which is the standing worth
+  The other eleven are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is
