@@ -1240,6 +1240,44 @@ to be read out of the constructor. Writing it from the shape of the update
 would be inventing a layout, which is what this file's whole offset section
 exists to stop.
 
+**THE BLOCK IS NOW DECODED AND THE WALKING POINTER IS WHAT MAKES IT LEGIBLE.**
+`lea ebx, [ebp + 0x230]` at `0x00430602` walks all four arrays in ONE loop:
+`[ebx-0x10]` is NAMES, `[ebx]` COLOURS, `[ebx+0x10]` TEAMS and `[ebx+0x28]`
+ARMY_ROWS. We build three quarters of that loop and stop -- so this is one
+missing quarter of a loop we already have, not a missing function.
+
+The row is a SPIN control, which its callees say outright: `operator new(0x84)`,
+`ADDR_MP_SPIN_CTOR`, `ADDR_WIDGET_ADD_CHILD`, and `ADDR_MP_COMMIT_POINTS` as
+the handler. Every one is reconstructed, so the block needs no new seam. The
+fifteen arguments line up exactly with the SCORE spinner this constructor
+already builds forty lines further on -- same shape, different numbers:
+
+    MpSpinConstruct(child, 0xF0, <top>, 0x4C, <height>,
+                    ((const int32_t *)ADDR_ARMY_POINTS)[i],
+                    0, 0x1388, 0x64, w, MpCommitPoints,
+                    ADDR_VIEW_RECT_COLOUR, ADDR_COLOUR_BELOW_BG,
+                    ADDR_BACKGROUND_COLOUR, i)
+
+The value confirms the whole reading: it is `[edx]` walking `ADDR_ARMY_POINTS`,
+which is the SAME array `MpPanelUpdate` prints into each row -- constructor
+seeds it, update displays it. `0`/`0x1388`/`0x64` are the spinner's lo, hi and
+step, and the last parameter is `row`, which our own signature names.
+
+**A RECT PASSED BY VALUE IS BUILT BY REUSING RectSet'S OWN ARGUMENTS, and the
+`add esp, 4` is the tell.** `RectSet` takes five arguments and only FOUR BYTES
+are popped after it -- the buffer pointer -- because the compiler then
+overwrites the four remaining pushed dwords in place with the rect's contents
+and lets them stand as the by-value RECT. Read as ordinary cleanup that
+`add esp, 4` says the arity is one; it is not, and every displacement below it
+would shift.
+
+Two constants are still open and are NOT to be guessed: the rect's `top`,
+which is `edx + esi` where `esi` is the name buffer and so cancels to
+`base + i*32` the way the three siblings already do, and its `height`, which
+is `[esp+0x38] + 0x17`. The siblings put their tops at 40, 39 and 37, and the
+score spinner is 0x18 high, so both have obvious-looking answers -- which is
+exactly why they need reading rather than assuming.
+
 **A READ-ONLY OFFSET LOOKED LIKE A CHEAP RATCHET AND IS NOT ONE, measured
 before it was built.** `checkoffsets.py` refuses a second name on an offset;
 nothing asks whether an offset we READ is ever WRITTEN, and a field with no
