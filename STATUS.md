@@ -596,6 +596,23 @@ What is left is WHY the marker emission stops after a vertical scroll, in OUR
 code since the original's does not stop. Worth having found: it is the same
 log the A/B compares.
 
+**THE LOG'S SHAPE IS IDENTICAL ON BOTH SIDES, which narrows it further.** Each
+run is 13 header lines ending at `calculating region data...` and then nothing
+but markers to the end -- 633 of them on ours, 26,333 on the original's. So
+markers begin when the mission does, on both, and only the count differs.
+
+**And the launch is not the difference.** `ab.sh` passes `extra=""` for this
+configuration, so its command line is exactly the hand replication's; the two
+candidates left untested are that the suite runs the ORIGINAL side FIRST and
+the reconstruction second, and that `Options.cfg` carries over between them
+(the suite copies it into the artifacts but does not install a fresh one).
+Test those before anything else, because everything cheaper is excluded.
+
+Worth stating plainly: this is not a defect in the game. Every other artifact
+this configuration produces -- the state, the 16-node widget tree, the 13 log
+messages -- is identical, the frame is demonstrably being composed, and the
+gate is the only thing that disagrees.
+
 Three explanations were offered and retracted before this one -- a stale band,
 a still-loading map, and two irreconcilable measurements -- and each rested on
 ONE artifact read in isolation. What settled it was changing one thing at a
