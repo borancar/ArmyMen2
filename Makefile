@@ -408,6 +408,7 @@ SA_LIBS  := -lddraw -ldinput -ldsound -lwinmm -lole32 -ldxguid -lws2_32
 SA_LDF   := -mwindows -static -static-libgcc -static-libstdc++ \
             -Wl,--image-base,0x400000 \
             -Wl,--section-start,.origdat=0x0046F000 \
+            -Wl,--section-start,.origbss=$$(cat build/standalone/origbss.addr) \
             -Wl,--section-start,.origgap=0x00401000 \
             -Wl,-Ttext,0x00700000
 

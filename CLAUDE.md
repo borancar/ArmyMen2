@@ -3700,7 +3700,32 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   `InitDirectDraw` calls it. It is a colour fill — vtable slot 5 is `Blt` — and
   the wrong name survived a commit. Reading the callee costs a minute;
   a wrong name in `orig.h` propagates into every module that picks it up.
-- **`tools/checkgap.py` guards the standalone's own version of that failure.**
+- **94% OF THE CARRIED BLOB IS ZERO-FILL, and emitting it cost 1.84 MB of the
+binary.** The standalone places the original's `.rdata` and `.data` at the
+addresses their own pointers were written for, spanning 0x0046F000..0x00666000
+-- 1.96 MB. Measured: only 73,772 bytes of it are non-zero and the last one is
+at 0x0048D8D3, because MSVC folds `.bss` into `.data` and the original's file
+never contained those bytes either.
+
+So the span is split at the next page, 0x0048E000: `.origdat` keeps the
+initialised head and an ALLOC-only `.origbss` covers the rest, which the
+loader zeroes. `build/ArmyMen2.exe` went from 6,102,591 bytes to 4,169,345,
+and the split address is written by `mkglobals.py` into a file the link line
+reads, so the section start and the split cannot disagree.
+
+**`.origgap` is NOT eligible and the contrast is the point.** Its content must
+be 0xCC, because zeros there decode as `add [eax], al` and SLIDE -- a call to
+a missing seam then faults at an address unrelated to the call, which is how a
+missing `free` reported itself at a value appearing nowhere in the binary. A
+region of zeros and a region that is uninitialised are the same thing only
+when nothing executes it.
+
+The evidence it is behaviour-free is `samission.sh`: the object tables live
+ABOVE the split, at 0x0065xxxx, and 1,610 objects come back identical -- so
+the region is demonstrably both writable and zeroed. The pixels and the log
+could not have shown that; only the artifact that reads those addresses does.
+
+**`tools/checkgap.py` guards the standalone's own version of that failure.**
 The standalone does not carry the original's `.text`; that range is int3, so
 a reference into it is not a link error and not a crash at the call site --
 it is whatever the filler means. `c_dfDIMouse` is how this was found: the

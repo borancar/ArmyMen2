@@ -34,6 +34,13 @@ the MSVC CRT used to run.
 holding the layout in place**, and the first is already gone: `c_dfDIMouse`
 now comes from the DirectInput SDK rather than the image.
 
+**The blob is smaller than it looks, which reframes that campaign.** Of its
+1.96 MB only **73,772 bytes are non-zero**, the last at 0x0048D8D3 -- MSVC
+folds `.bss` into `.data`, so 94% was never in the original's file either. It
+is split at 0x0048E000 now, with an ALLOC-only `.origbss` for the tail, and
+`build/ArmyMen2.exe` is 4,169,345 bytes rather than 6,102,591. What actually
+holds the layout in place is 124 KB, not 2 MB.
+
 **Two tools check the port rather than leaving it to a screenshot.**
 `tools/samission.sh` is the stronger: it drives both builds into the same
 live Boot Camp mission and diffs the whole object table with no budget --
