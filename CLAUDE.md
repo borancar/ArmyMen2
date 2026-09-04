@@ -1643,7 +1643,31 @@ a freed heap pointer.** The faulting pair maps exactly onto
 object pointer is 0x9A7 -- the node list is intact enough to be walked and one
 node's payload is not a pointer. That is narrower than "the cell array is
 wrong": the array and the `next` chain both survived, so what to read is who
-BUILDS those nodes on a load and what it puts in `+0x00`. A cell holding a stale pointer would fault on a large
+BUILDS those nodes on a load and what it puts in `+0x00`.
+
+**BOTH WRITERS OF `+0x00` ARE CORRECT**, checked: `ObjInitCommon`'s allocator
+in `objtype.cpp` mallocs `count * 0x10` and fills every entry with
+`obj`/0/0/-1, and `ItemSetBox`'s realloc in `item.cpp` rewrites all of them
+the same way. `ItemLinkCells` never touches `+0x00`, only the index and the
+list pointers, which is right. The row pool is installed -- all four entry
+points are patched -- so cell entries are not coming from an uninstalled
+allocator either.
+
+**AND THE STRONGEST LEAD IS A COMMENT THIS TREE ALREADY CARRIES.**
+`objtype.cpp`'s no-cells exit is documented with the symptom of a bug fixed
+earlier: writing it as two independent `if`s "linked every such object into
+the map a SECOND TIME, which cost a campaign A/B: the load never finished and
+five log lines from 'calculating region data...' on were missing." That is
+this failure, word for word -- a load that stops at exactly that line.
+
+So the family is DOUBLE-LINKING, not a bad pointer written once.
+`ItemLinkCells` is called from two places -- `ObjInitCommon`'s tail and
+`ItemSetBox` -- and an object that reaches both on the load path is linked
+twice into the same cell list, which walks into itself. That is what to test
+next, and it explains the shape better than anything else here: a list whose
+`next` chain is intact enough to walk, with one payload that is not a pointer.
+
+ A cell holding a stale pointer would fault on a large
 address or not at all; this looks like uninitialised or mis-indexed memory --
 a cell array read past its end, or one reallocated without being cleared.
 That is where to go next, not the destroy path.
