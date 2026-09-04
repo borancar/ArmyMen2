@@ -1136,11 +1136,29 @@ omits entirely:
     FindLevelByName(eax)
     if (eax) SelectLevel(eax)
 
-Ours calls `ReadMpMapList()` and builds the list box beside it, and then
-stops -- so nothing ever chooses a map, `ADDR_MAP_NAME` and
-`ADDR_MAP_FOLDER` stay as the empty strings they were, and every consequence
-above follows. That is the whole of the second defect, and writing the missing
-block needs the surrounding loop read properly rather than a line guessed. `OpenMpHost` and `OpenMpJoin`
+Ours calls `ReadMpMapList()` and then builds the list box with NO ROWS AT ALL
+-- `ListBoxConstruct(child, 0x16, 0xC8, 0xFA, 0x5A, (void *)0, 0, 0, 1)` --
+so the omission is larger than the selection. The original's loop at
+0x004311A1 is what fills it:
+
+    for (i = 0; i < maps[0xC4]; i++) {
+        lvl = FindLevelByName(maps[0xC8] + i * 0x40);
+        if (!lvl) continue;
+        ListAdd(list, lvl + 0x44, lvl);      /* the row's caption and data */
+        if (strcmp(lvl + 4, ADDR_MAP_NAME) == 0)
+            sel = i;                          /* remember the current map */
+    }
+    lvl = FindLevelByName(maps[0xC8] + sel * 0x40);
+    if (lvl) SelectLevel(lvl);
+
+`sel` starts at 0, which is why the original lands on `alpine3_mp` with an
+empty `ADDR_MAP_NAME`: nothing matches, so the first row wins.
+
+So the multiplayer map list is EMPTY in our build and no map is ever selected.
+That is one piece of reconstruction rather than a patch -- the maps object's
+layout, `ListAdd`'s arguments and the level record's two name fields all have
+to be read first -- and guessing a line into a 4,497-byte panel is how the
+FIRST bug on this screen got there. `OpenMpHost` and `OpenMpJoin`
 are both faithful (host sets `g_mpSession` 1 and calls the refresh, join sets
 2 and does not, exactly as the image does), so the divergence is in what the
 map name or folder holds, not in who calls what.
