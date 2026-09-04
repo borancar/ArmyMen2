@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **56** analysis
+**`make check` runs everything that does not need the game.** **57** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3836,7 +3836,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 30 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 31 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3896,6 +3896,36 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   theorem rather than a gap: with a tile shift of 4 the index only exceeds
   16 bits above y = 4096, which is a thousand times more tile rows than any
   map in the game has.
+
+  `RestoreTileSet` joins them by `tools/tilesetcheck.py`, 94 cases, and it
+  was the last one standing on reading alone. Twelve callees are stubbed in
+  THREE conventions -- the two COM slots are stdcall and pop their own
+  arguments -- and a synthetic `.atl` is served through the CRT stubs, so the
+  file walk, the palette remap and the lock bracket are all compared.
+
+  **ITS SIBLING DOES NOT COVER IT, and that was worth measuring rather than
+  assuming.** `LoadAtlFile` reads the same format and runs on every map load,
+  so the tempting argument is that the parse is verified by it. Normalised
+  disassembly says no: 177 instructions against 206, similarity **0.245**,
+  and not one shared run of six. The two are a rewrite of each other rather
+  than a re-emission -- the SeqCtx shape, not the AiStepTrack one -- so what
+  the sibling establishes is the FILE FORMAT and nothing about these
+  instructions. This file already says to diff before believing a
+  resemblance; the same command is worth running before leaning on one for
+  coverage.
+
+  **A MODEL THAT LOOPS ON THE CORPUS CANNOT SEE THE ORIGINAL'S LOOP
+  CONTROL.** The original walks chunks while `offset < formSize`, accumulating
+  eight bytes of header plus each payload; my model iterated the case's chunk
+  LIST instead, so removing the DIB payload from the accumulation passed all
+  84 cases. It is the boolcheck trap in a new place -- the corpus was driving
+  the very thing under test. Cases whose declared size is SHORTER than the
+  bytes present make the arithmetic decide, and the four offset mutations
+  then fail 8, 2, 10 and 50.
+
+  The original's own defect is reproduced and the corpus reaches it: the arm
+  that logs "Error on Lock in RestoreTileSet()" is the arm holding the lock,
+  and it does not unlock. Tidying that fails 16 cases.
 
   `ExitOneFromVehicle` joins them by `tools/vehexitcheck.py`, 85 cases. Its
   output is not its return value -- five separate refusals all answer 0, so
