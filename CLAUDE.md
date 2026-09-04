@@ -1565,6 +1565,43 @@ What is ruled out, each by measurement:
 - **not a missing gap seam.** `checkgap.py` reads 37 of 37, and the vectored
   handler logs nothing.
 
+**NARROWED BY PROBING, and the mode theory is now the surviving one rather
+than the only one tried.** Temporary `orig_log` probes in `OpenSaveForLoad`
+and through `State2Enter`, built into BOTH halves and run against the same
+baseline save, say:
+
+- `OpenSaveForLoad` SUCCEEDS in the standalone. The path is `save\sarge`, the
+  file is `map1_mission1.sav`, `fopen` returns non-null, and both checks pass
+  -- `tag=1 section=1`. So the file is found, opened and validated. The
+  `_finddata_t` shim is fine too: the row reads `map1_mission1.sav` in both
+  builds, compared by zooming the same pixels.
+- both names are right in the standalone -- `ADDR_GAMEPROC_BLOCK` is "sarge"
+  and `ADDR_GAMEPROC_STR_B` is the file -- as are `ADDR_GAME_DIR`, the
+  `save\%s` format and the separator, so `SetGameDir`'s absolute path is
+  correct.
+- **the two logs are IDENTICAL, line for line, through the map load and the
+  script parse.** The standalone has exactly ONE extra line, and it is
+  `Saved 317 items` -- `item.cpp`'s SAVE path. So the standalone runs a
+  SaveGame the injected build does not, which is what rewrites the file.
+
+`am2_image_slide` is 0 in both, so the `AM2_IMAGE()` spellings around the save
+sites are not it either.
+
+**AND IT ANSWERED A STANDING OPEN ITEM ON THE WAY.** This file has recorded as
+a puzzle that `ADDR_LOAD_PENDING` "is set, read as SET at 0x00425360, and read
+as 0 again by 0x004255CB". The probes show it going 1 to 0 INSIDE
+`OpenSaveForLoad` -- and in BOTH builds, so it is not the defect. The cause is
+plain once seen: `LoadGameProcSection` restores the gameproc block from the
+file, the flag lives in that block, and the saved value is 0 because nothing
+was pending when the game was saved. A function that restores globals will
+restore the one you are using as a control.
+
+**THE FIXTURE MOVES UNDER THIS TEST, which nearly invalidated two runs.** The
+standalone rewrites the save every attempt, so a comparison taken minutes
+apart is against different bytes. Snapshot the file, restore it before each
+half, and check the md5 -- the md5 CHANGING on the standalone side is itself
+the clearest statement of the bug.
+
 The shape that fits is a MODE: this panel is shared between saving and
 loading, so a wrong mode makes the second button write where it should read.
 The widget dump cannot see that -- it prints geometry, and both panels have
