@@ -1046,9 +1046,25 @@ argument is a mid-string pointer and the logger walks it to the next NUL. That
 is a table indexed wrongly, not a name built wrongly.
 
 `PreloadSpriteName` passes its `name` straight through to `LoadBitmap`, so the
-bad pointer arrives from ITS caller, on the MP options panel's path. That is
-where to look next; the panel itself is still the original's 4,497 bytes, so
-the suspect is whatever reconstructed code supplies it a name.
+bad pointer arrives from ITS caller. **A second probe names that caller:
+`MultiSpriteConstruct`, at +0x50 and +0xD5** -- two call sites, because
+`PanelConstruct` is inlined into it, so BOTH `b0` and `b1` arrive wrong.
+
+**AND THAT CONNECTS TO A SYMPTOM THIS FILE ALREADY RECORDED WITHOUT A CAUSE.**
+It says `MultiSpritePaint` runs 9,081 times on the multiplayer path and that
+"the sprite is null on every call and the function never draws at all" --
+found by mutating it and watching nothing change. This is why: the constructor
+hands `LoadBitmap` a name that cannot open, the load fails, and the slot keeps
+the null. One probe turns a recorded oddity into a diagnosis.
+
+**THE ARITY IS NOT THE FAULT, checked the way this file prescribes.** The
+original at 0x00456BC0 ends `ret 0x1C` -- 28 bytes, seven dwords -- which is
+exactly `b0, b1, flag` plus the four of a `RECT` passed by value, matching our
+signature. (Its entry also shows a `ret 4`, which belongs to the next function
+inside a merged `functions.tsv` row, not to this one.) So the caller really is
+supplying mid-string pointers rather than our frame reading the wrong slots,
+and what to read next is whatever the MP panel takes those two names FROM.
+
 
 Worth knowing before spending a control run on it: a deterministic pixel count
 that matches a recorded one IS the control. It cost one re-run and one search
