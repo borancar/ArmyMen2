@@ -80,6 +80,33 @@ Nothing in the standalone build is stubbed any more except the
 AM2_PROBE_NOACTION seam, which exists to call the ORIGINAL action parser and
 so cannot mean anything in a build that carries none of it.
 
+## THE PLAYER CAN MOVE AGAIN
+
+`StepType2`'s player-input gate was transcribed as a test for null where the
+original does `cmp [0x5122c8], esi; jne` -- is the FOLLOWED OBJECT THIS ONE.
+The camera follows Sarge all mission, so the original took that arm every
+frame and we took it never: no key and no click moved anything, in either
+build. Reported from play, invisible to the whole suite.
+
+Nothing here could see it, and each artifact has its own reason. The A/B
+drives both sides with the same input, so they agree about ignoring it;
+`bootcamp`'s object dump is taken at the briefing before anything moves;
+`mission`'s pixel check is off by construction; and every counter on that
+path is blind, its callers being ours.
+
+**`tools/movecheck.sh` is the check that was missing** -- the only one in the
+project that drives a REAL DEVICE, sending X events through `xdotool` so they
+reach the game as a player's keyboard does. It asserts DISPLACEMENT rather
+than equality, since two unsynchronised runs walk for different lengths of
+time. Mutation-checked by putting the bug back: 0 units against the
+original's 237, and 241 against 237 with the fix.
+
+    tools/movecheck.sh
+
+Generalising the defect into a static check was tried and abandoned with
+measurements -- see CLAUDE.md. MSVC compiles a null test AS a register
+compare, so all 15 candidates it finds are correct.
+
 ## Where the work is now: VERIFICATION, not transposition
 
 Everything is transposed; not everything is checked. The sharpest statement
