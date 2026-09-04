@@ -34,8 +34,11 @@ the MSVC CRT used to run.
 holding the layout in place**, and the first is already gone: `c_dfDIMouse`
 now comes from the DirectInput SDK rather than the image.
 
-**`tools/samenu.sh` checks that claim rather than leaving it to a
-screenshot**: it runs both builds through the same startup and compares the
+**Two tools check the port rather than leaving it to a screenshot.**
+`tools/samission.sh` is the stronger: it drives both builds into the same
+live Boot Camp mission and diffs the whole object table with no budget --
+1,610 lines, identical -- which is the artifact ab.sh already treats as its
+sharpest. `tools/samenu.sh` is the cheap one and covers startup:: it runs both builds through the same startup and compares the
 game's own log (identical, five messages) and the title screen (0 of 307,200
 pixels on a run where the cursor lands in the same place, 45 when it does
 not). Tested in the failing direction with a negative budget.
