@@ -1608,6 +1608,28 @@ It only happens after a load because until the `LoadGameProcSection` fix above
 no load had ever completed here -- the cell lists have never once been
 rebuilt from a save file in this project.
 
+**THE CHAIN ABOVE THE FAULT IS VERIFIED FAITHFUL, so the defect is below it.**
+Checked instruction by instruction against the image, and all three match:
+
+- `RemoveFromItemList` (0x00428590) -- the count decrement, `tail = count - i`,
+  and the `memmove` of `tail * 12` bytes from `&table[i+1]` to `&table[i]`,
+  which the original spells with the `lea ecx,[ecx+ecx*2]; shl ecx,2` pair.
+- `ItemsReset` (0x00429450) -- the loop re-reading the count each iteration,
+  `FreeItem(table[i].obj, 0)` with unlink ZERO, then `free(table)` and the
+  three globals zeroed.
+- `LoadItems`/`LoadOneItem`'s dispatch and the guards around it.
+
+The `unlink` argument being 0 is the thing to carry forward: `ItemsReset` does
+NOT ask `RemoveFromItemList` to run, because the whole table is about to be
+freed -- so whatever takes an object out of the map's CELLS has to be inside
+the per-type `Destroy*` path. `DestroyWeapon` demonstrably runs, since the log
+carries one line per weapon. That path, and `ItemPreDestroy` under it, is
+where to look next.
+
+None of it had ever executed before this session's `LoadGameProcSection` fix:
+CLAUDE.md's own unexercised list carries `FreeItem` and `RemoveFromItemList`,
+and a load is the first thing in this project to call them in bulk.
+
 **AND `WINEDBG=-all` IS WHY THIS TOOK SO LONG.** `make run` sets it, so the
 page fault Wine prints was discarded on every run through `drive.sh`; the
 game just "detached". Launching the binary directly cost one command and gave
