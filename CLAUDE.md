@@ -2389,6 +2389,13 @@ Why our side dropped from ~7,000 to ~600 is NOT established here, and the
 honest thing is to say so rather than guess -- three samples say it is stable
 and old, not that they explain it.
 
+**A FOURTH SAMPLE, taken after this session's four `src/` changes, holds the
+band exactly:** ours 635, the original's 26,399. So the movement gate, the two
+load fixes and the deviation moved it not at all, and the gate is still
+failing for the reason recorded above rather than for anything anyone did.
+`state`, `widgets` and `log` were identical on that run -- 1 line, 16 nodes,
+13 messages -- which is what this configuration's evidence actually is.
+
 The lesson generalises past this number. A remembered band is a measurement
 with no timestamp, and this file offers several as shortcuts. When one
 disagrees with a run, check whether the BAND moved before concluding the
