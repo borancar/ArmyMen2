@@ -1606,7 +1606,19 @@ other way round.
 
 **The baseline went 15 to 17 and that is COVERAGE, not decay.** Four aliases
 were collapsed before the number was taken, so it would have been higher
-still. Whenever this figure moves, say which of the two it is. That is the check to run on any screen whose
+still. Whenever this figure moves, say which of the two it is.
+
+**THE OTHER RATCHETS WERE AUDITED FOR THE SAME HOLE AND ONLY THIS ONE HAD
+IT.** `checkglobals` walks `am2.game_sources()`, `checkseams` globs
+`src/game/**/*.cpp` recursively, `checkinstalled` takes both header
+directories and `checksplit` reads the two halves by design -- all correct.
+`checkpatches` reads `orig.h` alone and that is right rather than lucky:
+**all 2,957 `ADDR_` defines are in `orig.h` and none is anywhere else**, so
+its scope matches its population exactly.
+
+Recorded because the question is cheap to ask and tedious to re-derive: the
+file list of a checker is part of what it checks, and four of the five were
+already right. That is the check to run on any screen whose
 constructor is suspected, and it is the scoped form of the read-only-offset
 idea that was rejected as a whole-tree gate.
 
