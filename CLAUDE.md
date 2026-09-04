@@ -1560,6 +1560,27 @@ Measured after the fix, against a restored save each time: our build logs
 UNCHANGED. `ab.sh bootcamp campaign` is clean -- 1,610 state lines and 13
 messages identical, 35 widget nodes identical -- so nothing else moved.
 
+**THE NEXT DEFECT IS LOCALISED TO ONE LOG CALL.** Both builds reach
+`calculating region data...` on a load. The ORIGINAL then emits TWO of the
+harness's "call site passed a non-string format" notes and lives; ours emits
+ONE and the process detaches. So we die between the first of those calls and
+the second.
+
+The ARGUMENTS differ, and that is the sharper clue: the original's first note
+carries `00000001`, an integer, where ours carries `0076FEA4` -- an address
+inside OUR OWN code, since the standalone links text at 0x00700000 and the
+injected DLL is mapped high too. A log call whose format argument is a code
+pointer in our build and a small integer in the original's is a call site
+handing over the wrong thing, and this tree has the shape on file: several
+log calls in the image take NO arguments and read whatever sits above the
+return address, which `TakeMenuRequest`'s `orig_log_noargs` already
+reproduces deliberately.
+
+So the next step is to find which log call runs immediately after the region
+pass, and what our caller leaves on the stack there. Wine prints no fault --
+`WINEDBG=err+all` produced nothing -- so this is an ordinary exit or a fault
+Wine swallows, not a page fault it would report.
+
 **AND IT EXPOSES THE NEXT DEFECT, which is the honest half.** The load path
 had never once executed here, so what it reaches was never exercised: with
 the flag now set, our build loads and then EXITS, right after
