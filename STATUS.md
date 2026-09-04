@@ -35,6 +35,22 @@ not fatal. `FatalError`'s only string is about a path being too long, which
 would be a lie; a game that cannot find its data then says so in its own words
 with our line above it.
 
+**WHAT IT BUYS: the port runs from the BUILD TREE, never copied anywhere.**
+
+    AM2_GAMEDIR='C:\GOG Games\Army Men II' \
+      wine explorer /desktop=NAME,1024x768 \
+      'Z:\home\boran\git\ArmyMen2\build\ArmyMen2.exe' -nointro
+
+Verified: the title art renders (234 distinct colours) and the log is the same
+four startup lines. It lands beside the EXE, so `build/am2port.log` rather than
+the game folder's -- which is the diagnostic that memory note asks to keep, and
+it follows the binary rather than the data.
+
+That removes the install step from the edit-run loop entirely. The game folder
+keeps the ORIGINAL `ArmyMen2.exe` untouched, which every A/B needs, and
+`am2port.exe` beside it stays useful for testing what a player would actually
+have.
+
 ## OPEN: the player trooper "jerksteps" while turning -- NOT yet reproduced
 
 Reported from play: holding the mouse moves Sarge now, but changing direction
