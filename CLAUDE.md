@@ -1477,12 +1477,29 @@ the widget tree did, and it did so by breaking the HARNESS rather than the
 image. **When a drive reports it could not settle, suspect the coordinate it
 is matching on before suspecting the button.**
 
-What is still wrong is no longer construction. Our side answers ONE `widgets`
-dump where the original answers three and one `state` line where it writes
-five, so the drive stops progressing after the panel -- while the process
-itself survives every click and the socket still answers `pong`, tested by
-hand. So it is not a crash and not the settle; the clicks after it are landing
-somewhere ours does not follow. That is the check to run on any screen whose
+**AND THE NEXT ONE IS THE CHAT BOX, WHICH THE SCOPED CHECK HAD ALREADY
+NAMED.** Replaying `ab.sh`'s drive step by step with a `ping` after each, the
+socket answers through the panel, the toggle, both team taps, the two swatch
+clicks, the chat click and the typing -- and dies on RETURN, the chat SEND.
+
+The arithmetic identifies it to the byte. The fault is `MenuMessage+0x4a`
+reading `0x000002FC`; `MenuMessage` follows
+`*(screen + MP_PANEL_OFF_CHATBOX)` and then that pointer's
+`LIST_OFF_ARROWBAR`, and 0x280 + 0x7C is 0x2FC exactly. `MP_PANEL_OFF_CHATBOX`
+is one of the six fields `MpPanelConstruct` never writes, so it holds whatever
+the allocator left -- 0x280 -- and the first chat line follows it.
+
+**A never-written field does not fault where it is READ, it faults one
+dereference LATER**, which is why this looked like a click-path bug for two
+rounds of measurement. The read of `screen + 0x21C` is perfectly valid memory
+-- the panel is 0x278 bytes and the field is inside it -- and only the pointer
+it yields is nonsense. Check the offsets against the FAULT ADDRESS: a small
+number like 0x2FC is a garbage base plus a real field, and solving for it
+names both.
+
+That is three of the six unbuilt fields now accounted for by a symptom
+apiece -- `ARMY_ROWS` by a crash on panel open, `GAME_BOX` by the empty script
+name, `CHATBOX` by this -- and the check that listed all six cost one command. That is the check to run on any screen whose
 constructor is suspected, and it is the scoped form of the read-only-offset
 idea that was rejected as a whole-tree gate.
 
