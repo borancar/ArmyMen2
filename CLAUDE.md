@@ -1560,7 +1560,31 @@ Measured after the fix, against a restored save each time: our build logs
 UNCHANGED. `ab.sh bootcamp campaign` is clean -- 1,610 state lines and 13
 messages identical, 35 widget nodes identical -- so nothing else moved.
 
-**THE NEXT DEFECT IS LOCALISED TO ONE LOG CALL.** Both builds reach
+**THE NEXT DEFECT IS INSIDE `BuildRegionGraph`.** Both builds reach
+`calculating region data...` on a load. The ORIGINAL then emits TWO of the
+harness's "call site passed a non-string format" notes and lives; ours emits
+ONE and the process detaches.
+
+Decoding `State2Enter` at 0x00425628 says what sits between them:
+`BuildRegionGraph`, `LookupOwnerObj`, `SelectInventorySlot`, `DeselectAll`,
+a `SelectUnit`, and then a `call 0x45CAA0` with NOTHING pushed at 0x0042568A.
+That last one was MISSING from our C -- a blank line with stray whitespace
+sat where it belongs -- and it is added now, which is why the note counts
+could be compared at all. It still does not appear on a load, so we exit
+BEFORE it, inside that block.
+
+Which leaves `BuildRegionGraph` (0x0042B9A0) or something under it, and the
+ARGUMENT is the tell: the note our build emits carries `0076FEA4`, an address
+inside our own code, where the original's carries `00000001`. A log call
+handed a code pointer in one build and a small integer in the other is a call
+site passing the wrong thing, and the fault follows it.
+
+Wine reports nothing -- `WINEDBG=err+all` produced no output -- so this is an
+ordinary exit or a fault Wine swallows rather than a page fault it would
+print.
+
+<!-- superseded -->
+**Earlier localisation, kept for the reasoning.** Both builds reach
 `calculating region data...` on a load. The ORIGINAL then emits TWO of the
 harness's "call site passed a non-string format" notes and lives; ours emits
 ONE and the process detaches. So we die between the first of those calls and

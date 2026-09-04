@@ -64,6 +64,10 @@ typedef int32_t (__cdecl *am2_list_fn)(void *list);
 #define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
 #define g_overlayDirty (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
 
+typedef void    (__cdecl *AM2_NoArgFn)(void);
+/* The image's logger reached with NOTHING pushed. Declared up here because
+ * State2Enter needs it as well as TakeMenuRequest. */
+#define orig_log_noargs   ((AM2_NoArgFn)(uintptr_t)ADDR_LOG)
 typedef int32_t (__cdecl *AM2_ActionKeyFn)(int32_t action);
 typedef void    (__cdecl *AM2_VoidFn0b)(void);
 typedef int32_t (__cdecl *AM2_EventFlag8Fn)(void);
@@ -993,7 +997,15 @@ void __cdecl State2Enter(void)
             SelectUnit(leader);
         *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP = 1;
     }
-    
+
+    /* `call 0x45CAA0` at 0x0042568A with NOTHING pushed -- the same
+     * no-argument log call TakeMenuRequest makes, and it was MISSING here.
+     * Found by counting the harness's "call site passed a non-string format"
+     * notes on a load: the original emits two past the region pass and we
+     * emitted one. Reproduced rather than tidied away, for the reason the
+     * other one is: the format the logger reads is whatever sits above the
+     * return address, and src/inject/gamelog.c already declines to print it. */
+    orig_log_noargs();
 
     /* A FRESH single-player game comes up PAUSED under -dbg. All three
      * branches are `skip if set` except the last, so the call is reached only
@@ -1089,9 +1101,7 @@ void __cdecl State3Frame(void)
     PollMovieSkipKey();
 }
 
-typedef void (__cdecl *AM2_NoArgFn)(void);
 typedef void (__attribute__((thiscall)) *AM2_PaintUpdateFn)(void *self);
-#define orig_log_noargs   ((AM2_NoArgFn)(uintptr_t)ADDR_LOG)
 
 /* 0x00425EE0, one caller -- RunFrame's state 2, on every unpaused frame. The
  * in-mission driver, and the last piece of this chain: every one of its
