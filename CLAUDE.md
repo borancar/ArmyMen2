@@ -4274,6 +4274,27 @@ ss -ltn | grep 31436              # want nothing
 
 and grep the run's own log for `bind/listen`, which says so outright.
 
+**AND THE CURE FOR THAT -- MATCHING ON SOMETHING BESIDES THE EXE NAME -- HAS
+ITS OWN FAILURE, WHICH COST HALF A SESSION QUIETLY.** A `/proc` sweep that
+excludes the caller's own ancestor chain is the right shape, and the one used
+here then narrowed on `"wine" in cmdline or "explorer" in cmdline` to avoid
+matching shells. The game's own processes do NOT say either:
+
+    C:\GOG Games\Army Men II\launcher.exe C:\GOG Games\Army Men II\ArmyMen2.exe
+
+so every "cleaned N" that sweep printed was counting the wrapper and leaving
+the GAME running. Two instances survived a dozen kills, kept
+`ArmyMenMutex` and port 31436, and the next suite failed with `bootcamp/orig
+produced no game log lines` -- the exact symptom this file already documents,
+diagnosed at once and caused by the tool that was supposed to prevent it.
+
+**The EXE NAME is the signal; the ancestor chain is what excludes the caller.**
+Do not add a second predicate about how the process was launched, because the
+launcher's command line is the game's own path and says nothing about wine.
+And check BOTH conditions afterwards -- `ss -ltn | grep 31436` as well as the
+process count -- which this file already says and which a "killed 0" makes
+very easy to skip.
+
 **A SHELL WAITING FOR A COMMAND MATCHES ITSELF, AND THE BRACKET TRICK DOES
 NOT SAVE IT.** This file already records `pkill -f 'ArmyMen2.exe'` matching
 the killing shell, and the cure -- bracket the pattern. That cure does not
