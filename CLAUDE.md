@@ -1021,6 +1021,19 @@ this: bytes read over the control socket on both sides and diffed exactly. It
 is the same idea as `tools/trigdump.py` and worth reaching for whenever a
 subsystem's output is a number the frame does not show.
 
+**`mpoptions` HAS A STANDING FAILURE, and its pixel count is the fingerprint
+that identifies it.** It logs "Couldn't open bitmap file!" twice on the
+reconstruction side, cannot settle its team button, and reports **221,423**
+differing pixels. That exact number appears in commit 2f55eb3 from a previous
+session and again on two runs today, so a run reporting it is reproducing the
+known defect rather than finding a new one.
+
+Worth knowing before spending a control run on it: a deterministic pixel count
+that matches a recorded one IS the control. It cost one re-run and one search
+of the git log to establish that today's failure predates the session's
+changes, where reverting `src/` and rebuilding would have cost twenty minutes.
+**Search the history for the number before bisecting for the cause.**
+
 **Reusing an entry for a repeated key pair is load-bearing**, which a mutation
 settles: making the lookup always miss, so every registration makes its own
 entry, puts `bootcamp` at 79,695 differing pixels against a budget of 500.

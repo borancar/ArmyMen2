@@ -109,6 +109,21 @@ Generalising the defect into a static check was tried and abandoned with
 measurements -- see CLAUDE.md. MSVC compiles a null test AS a register
 compare, so all 15 candidates it finds are correct.
 
+## THIS SESSION'S CHANGES ARE VERIFIED ACROSS SIXTEEN CONFIGURATIONS
+
+Sixteen `ab.sh` configurations were run over the four `src/` changes this
+session landed. Fifteen are clean:
+
+    bootcamp campaign combat mission quit controls windowed menuscreens
+    intro audio df multi difficulty audiovol movies state3
+
+`mpoptions` fails -- and it was ALREADY failing before this session, with the
+same signature to the pixel: commit 2f55eb3 of 2026-09-03 records it logging
+"Couldn't open bitmap file!" twice on the reconstruction side and reporting
+**221,423** differing pixels, which is exactly what it reports today, twice
+over. So it is a standing defect on the multiplayer options screen and not a
+regression from anything here.
+
 ## THIS SESSION'S CHANGES ARE VERIFIED ACROSS EIGHT CONFIGURATIONS
 
 Four `src/` changes landed -- the player-input gate, `LoadGameProcSection`'s
