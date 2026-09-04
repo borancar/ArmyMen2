@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **54** analysis
+**`make check` runs everything that does not need the game.** **55** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -57,6 +57,19 @@ number. It is deliberately short — most of this file is judgement and cannot b
 checked, which is the argument for keeping numbers in `docs/boundary.md` and
 pointing at them from here. Seconds, no display, and it is the half
 of verification `tools/ab.sh all` is not.
+
+**AND IT KEPT A SECOND LIST OF ITS OWN, which drifted from `make check`'s
+within one commit.** `ORACLES` in `checkclaims.py` names the tools whose
+subjects count toward the verified split, and `make check`'s recipe names the
+tools it runs. Adding `pathplancheck.py` to the recipe alone left the split
+reporting 28 when the tool it had just gained made it 29 -- so a check that
+exists to stop numbers going stale had a hand-kept list going stale inside it.
+
+The two are not the same set and cannot simply be merged: `scriptcheck` is in
+one and not the other. What is checked instead is the direction that bites --
+a tool declaring `CHECKS` and missing from `ORACLES` is an ORPHAN and fails
+the run, because a declaration nothing reads is a check nobody is counting.
+Tested by removing the entry again, which reports it by name.
 
 It catches a tool whose output changed without being regenerated — tested by
 making `coverage.py` print a different heading, which fails the target. It does
@@ -3823,7 +3836,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 28 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 29 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3883,6 +3896,23 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   theorem rather than a gap: with a tile shift of 4 the index only exceeds
   16 bits above y = 4096, which is a thousand times more tile rows than any
   map in the game has.
+
+  `PlanPathTo` joins them by `tools/pathplancheck.py`, 24 cases. It is a
+  model-versus-original check and NOT a replay, on this file's own rule: it
+  calls the image's 1,168-byte `FindPath`, so replaying the cases against our
+  C would mean a test hook in production code for a call the game never makes
+  that way. Six callees are stubbed and what is compared is the work AROUND
+  them -- the route written into the object at a stride, the TERMINATOR one
+  step past the last waypoint, and the two different deadlines a success and
+  a failure leave behind.
+
+  Every mutation count is derivable, which is the evidence the corpus reaches
+  each arm rather than merely passing near it: dropping the terminator fails
+  12, which is every success; giving a failed search the success deadline
+  fails the other 12; ignoring what the collapse returned fails 4, which is
+  the two routes that collapse; and both a halved stride and a swapped x/y
+  fail 8, which is the successes with at least one waypoint -- the zero-length
+  success writes only a terminator, where a swap of two zeros is invisible.
 
   `AiStep` joins them by `tools/aicheck.py`, 92 cases, and it is the
   dispatcher rather than an arm on purpose: this file's own rule is that a

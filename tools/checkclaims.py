@@ -111,7 +111,7 @@ ORACLES = ("moviecheck posecheck formationcheck shakecheck roachcheck rlecheck "
            "mprowcheck weaponcheck listcheck ringcheck boolcheck explcheck "
            "collectcheck firepose regioncheck pathcheck tilepathcheck "
            "placementcheck aicheck rectquerycheck hitreactcheck savetagcheck "
-           "numberkeycheck aiignorecheck aitwincheck aiwalkcheck aifollowcheck aikeeprangecheck rowreleasecheck stateleavecheck refreshcheck vehpointcheck roachbitecheck "
+           "numberkeycheck aiignorecheck aitwincheck aiwalkcheck aifollowcheck aikeeprangecheck rowreleasecheck stateleavecheck refreshcheck vehpointcheck roachbitecheck pathplancheck "
            "scriptcheck").split()
 
 DOCSTRING = re.compile(r'"""[\s\S]*?"""')
@@ -260,9 +260,36 @@ def claims():
     ]
 
 
+def undeclared_oracles():
+    """Oracles that declare a subject and are missing from ORACLES.
+
+    ORACLES is a hand-kept list beside `make check`'s own, which is two
+    spellings of nearly one set -- and adding tools/pathplancheck.py to the
+    recipe alone left this file silently counting it as absent, so the split
+    it reports did not move.  That is the failure this file exists to stop,
+    one level up: a queue kept beside a ratchet drifts from it.
+
+    The direction that bites is a NEW oracle, so that is the direction
+    checked.  A `CHECKS = (...)` declaration is the tool saying what it
+    verifies; one that nothing reads is a check nobody is counting.
+    """
+    missing = []
+    for path in sorted(glob.glob(os.path.join(REPO, "tools", "*.py"))):
+        name = os.path.basename(path)[:-3]
+        if name in ORACLES:
+            continue
+        if CHECKS_DECL.search(open(path).read()):
+            missing.append(name)
+    return missing
+
+
 def main():
     text = open(os.path.join(REPO, "CLAUDE.md")).read()
     bad = 0
+    for name in undeclared_oracles():
+        print(f"  ORPHAN   tools/{name}.py declares CHECKS and is not in ORACLES\n"
+              f"           so nothing counts what it verifies")
+        bad += 1
     for what, pattern, expected in claims():
         m = re.search(pattern, text)
         if not m:
