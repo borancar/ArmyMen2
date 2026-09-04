@@ -1538,6 +1538,40 @@ dataflow, not a scan. A check without it reports fifteen correct functions,
 which this file already says to suspect before believing. The real instance
 was found by RUNNING the game, and that is what `movecheck.sh` now keeps.
 
+**OPEN DEFECT: THE STANDALONE DOES NOT LOAD A SAVED GAME, AND IT OVERWRITES
+THE SAVE.** Driven to GAME SELECT PANEL and asked to LOAD, the injected build
+comes back in sub-state 0x21 with the save's **316** objects and the file's
+md5 UNCHANGED; the standalone comes back in sub-state 0x18 with a fresh map's
+**325**, having re-parsed the script -- and the save file's md5 has CHANGED.
+So it is not merely failing to load, it is writing over the slot. For a port
+whose whole point is to replace the original in the folder, that is data loss
+and it should be fixed before anyone plays on it.
+
+Measured back to back against ONE file, because an earlier comparison was
+taken minutes apart and the fixture had moved under it -- which is exactly the
+control this file demands and I nearly skipped. The save is `.wine`-ignored
+and was restored from a snapshot afterwards.
+
+What is ruled out, each by measurement:
+
+- **not the drive.** The injected build was re-run with the IDENTICAL click
+  method -- `cursor` plus a real xdotool button, not `point.py` -- and still
+  loaded. That confound was the first suspect and it is gone.
+- **not the directory scan.** Both builds show the same GAME SELECT PANEL
+  with the save listed and highlighted; the screenshots and the widget trees
+  match node for node, same vtables and same rectangles.
+- **not the row selection.** Clicking LOAD without the row click first
+  behaves identically.
+- **not a missing gap seam.** `checkgap.py` reads 37 of 37, and the vectored
+  handler logs nothing.
+
+The shape that fits is a MODE: this panel is shared between saving and
+loading, so a wrong mode makes the second button write where it should read.
+The widget dump cannot see that -- it prints geometry, and both panels have
+the same geometry. Note the dump reports `sid=-1` for every node in the
+standalone, which is its own range-checked sprite-id read failing on that
+build's heap addresses rather than a difference in the screen.
+
 **`tools/saquit.sh` COVERS THE STANDALONE'S TEARDOWN, which nothing did.**
 `samenu.sh` compares a title screen and `samission.sh` a live mission's object
 table, and both KILL the process -- so the comm shutdown, the sprite frees and

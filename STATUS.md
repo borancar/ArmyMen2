@@ -108,6 +108,23 @@ Generalising the defect into a static check was tried and abandoned with
 measurements -- see CLAUDE.md. MSVC compiles a null test AS a register
 compare, so all 15 candidates it finds are correct.
 
+## OPEN DEFECT: the standalone loses saved games
+
+Asked to LOAD a saved game, the standalone starts a new mission AND
+overwrites the save file. Measured back to back against one file: the
+injected build returns sub-state 0x21 with the save's 316 objects and the
+md5 unchanged; the standalone returns 0x18 with a fresh map's 325 and a
+CHANGED md5.
+
+Ruled out by measurement: the drive (the injected build was re-run with the
+identical click method), the directory scan (both panels list and highlight
+the save, with matching widget trees), the row click, and a missing gap seam
+(checkgap reads 37 of 37). The shape that fits is a wrong MODE on a panel
+shared between saving and loading.
+
+This is data loss on the deliverable and should be fixed before the port is
+played on. See CLAUDE.md for the full evidence.
+
 ## Where the work is now: VERIFICATION, not transposition
 
 Everything is transposed; not everything is checked. The sharpest statement
