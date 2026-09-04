@@ -5271,7 +5271,20 @@ input path again.
   `ListDropOldest` is the sharpest case of a function that cannot be driven
   rather than merely has not been: its one caller is `MenuMessage` and it
   fires only above a hundred logged menu lines, which no configuration in
-  `ab.sh` produces. `RefreshScreen` has 7 callers and "whatever forces an
+  `ab.sh` produces. **AND POKING THE SUB-STATE DOES NOT OPEN A DIALOG, which was tried.**
+Setting `ADDR_MENU_MODE` to 23 with the socket's `poke` puts the state-2
+dispatch on the game-menu ARM, and `ctl widgets` then falls back to printing
+the HUD -- because the dialog is built by the OPENER, and the mode is only
+where the built dialog is dispatched to. `RefreshScreen` stayed at 0 for the
+same reason: its callers are those openers.
+
+Forcing arm 34 -- the in-mission ESCAPE handler -- and releasing ESCAPE is
+worse: the process exits. That is an inconsistent state nobody constructed
+properly, not a defect, and it is recorded here only so the route is not
+tried a third time. Reaching those dialogs needs the opener CALLED, not the
+mode set.
+
+  `RefreshScreen` has 7 callers and "whatever forces an
   out-of-band repaint is somewhere further in" is no longer the state of
   knowledge: six of the seven are the in-mission dialog openers — GAME MENU,
   SAVE, LOAD, DELETE, OVERWRITE, AUDIO — and every one of them calls it only
