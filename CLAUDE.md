@@ -1583,6 +1583,37 @@ Wine reports nothing -- `WINEDBG=err+all` produced no output -- so this is an
 ordinary exit or a fault Wine swallows rather than a page fault it would
 print.
 
+**THE FAULT IS FOUND: A MAP CELL HOLDS A NON-POINTER AFTER A LOAD.** Running
+the STANDALONE directly, where Wine's stderr is not redirected, prints what
+`drive.sh` had been swallowing:
+
+    wine: Unhandled page fault on read access to 000009AF
+          at address 0075C8E2
+
+`nm` puts 0x0075C8E2 in **`ObjectsInRect` + 0x112**, and the two instructions
+there are
+
+    mov   (%ebx),%esi        ; take the object pointer out of a map cell
+    testb $0x4,0x8(%esi)     ; esi->flags & OBJ_FLAG_DESTROYED
+
+so `esi` is 0x9A7 -- the fault address less the 8 -- a small integer where a
+pointer belongs. A cell slot holds garbage, and `ObjectsInRect` walks it.
+
+**0x9A7 IS THE SIZE OF A UID, NOT OF A POINTER**, which is the hypothesis to
+test first: a save stores objects by uid and the load has to resolve those
+back to pointers, so a uid left unresolved in a cell list is exactly this
+shape. `LookupByUID` and the relink in `ItemLinkCells` are where to look.
+
+It only happens after a load because until the `LoadGameProcSection` fix above
+no load had ever completed here -- the cell lists have never once been
+rebuilt from a save file in this project.
+
+**AND `WINEDBG=-all` IS WHY THIS TOOK SO LONG.** `make run` sets it, so the
+page fault Wine prints was discarded on every run through `drive.sh`; the
+game just "detached". Launching the binary directly cost one command and gave
+the faulting instruction outright. When a run dies with nothing in the log,
+run it outside the harness before instrumenting anything.
+
 **WHAT IS ALREADY RULED OUT INSIDE THAT BLOCK**, so the next pass need not
 redo it. `BuildRegionGraph`'s three allocations match the original's
 arithmetic exactly: the realloc is `44 * (region + 1)`, which the original
