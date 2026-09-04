@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **44** analysis
+**`make check` runs everything that does not need the game.** **45** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3823,7 +3823,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 16 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 17 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3913,6 +3913,28 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   general shape is one this file already states twice -- a mention is not a
   test -- and the new part is that a stub is a mention the prose filter
   cannot see.
+
+  `AiStepIgnore` joins them by `tools/aiignorecheck.py`, 480 cases, and it is
+  the first of the AI ARMS checked from the inside -- `tools/aicheck.py`
+  compares only which arm the dispatcher picks and stubs the arms themselves.
+
+  **THE DELAY IS COMPARED UNSIGNED, and that is why a reading is not enough.**
+  `cmp eax, 0x82; jb` on `clock - deadline` means a deadline in the FUTURE
+  wraps to a huge number and PASSES, so a unit whose deadline has not arrived
+  turns immediately rather than waiting. No drive produces that -- a deadline
+  ahead of the clock is not a state the game reaches on its own -- and a
+  signed compare is indistinguishable from it in every other case. Making the
+  model signed fails 32 cases, all of them that one.
+
+  Two of the counts are exactly derivable, which is the evidence worth
+  keeping: moving the arrival boundary fails 80, the single `dist == 0x20`
+  value times four hit values, two observers, two found flags and five
+  clocks; and not consuming the hit fails 240, the four arrived distances
+  times the three non-zero hits times the same twenty. Turning while
+  observing fails 84 and the delay boundary 32.
+
+  What it does not cover is AiRouteToward, which is stubbed -- the first arm
+  is checked by whether the call HAPPENS, not by what it does.
 
   `TakeNumberKey` joins them by `tools/numberkeycheck.py`, 2,048 cases, and
   it is the first oracle here written to check a REWRITE rather than a
@@ -4021,7 +4043,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   configuration whose descriptor under-reports its extent is what makes them
   observable at all.
 
-  The other sixteen are verified by READING, which is the standing worth
+  The other fifteen are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is
