@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **45** analysis
+**`make check` runs everything that does not need the game.** **46** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -3823,7 +3823,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   this file already makes about counts being "a measure of what still crosses
   an original boundary, not of what runs".
 
-- **"UNEXERCISED" IS NOT "UNVERIFIED", and 17 of the 32 below are
+- **"UNEXERCISED" IS NOT "UNVERIFIED", and 19 of the 32 below are
   now checked.** The heading means no drive reaches them, which is a fact
   about this environment; it says nothing about whether they agree with the
   original. Measured against what actually exists:
@@ -3913,6 +3913,28 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   general shape is one this file already states twice -- a mention is not a
   test -- and the new part is that a stub is a mention the prose filter
   cannot see.
+
+  `AiStepTrack` and `AiStepDefend` join them together, by
+  `tools/aitwincheck.py`, and the tool exists because of the near-miss this
+  file already records: two functions that read as one written twice, and a
+  helper factored out of them would have flattened a real difference in
+  silence.
+
+  **THE DIFFERENCE IS OBSERVABLE ONLY WHILE ROUTING, which is sharper than
+  the account above and was measured rather than reasoned.** The turn test
+  sits before the second promotion in one and after it in the other, and the
+  still-moving path jumps straight to that promotion in both -- so Track
+  turns while walking and Defend does not. On the ARRIVED path the two orders
+  are equivalent, because the first promotion has already run and promoting
+  again is idempotent: swapping the order there fails NOTHING, and that is a
+  theorem rather than a gap in the corpus. Of the 12 inputs on which the two
+  functions disagree, all 12 are routing and none is arrived.
+
+  So the tool checks each against one model parameterised by which twin it
+  is, AND asserts that the two still disagree somewhere -- a check that only
+  confirmed each against itself would still pass if one were rewritten into
+  the other. Making Defend turn on the route path fails at once; so does
+  dropping the route path's promotion.
 
   `AiStepIgnore` joins them by `tools/aiignorecheck.py`, 480 cases, and it is
   the first of the AI ARMS checked from the inside -- `tools/aicheck.py`
@@ -4043,7 +4065,7 @@ is correct, as are `SendVehicleEnter` and `SendVehicleExit`.
   configuration whose descriptor under-reports its extent is what makes them
   observable at all.
 
-  The other fifteen are verified by READING, which is the standing worth
+  The other thirteen are verified by READING, which is the standing worth
   stating plainly rather than leaving a reader to infer it from a list whose
   title is about drives. `KeyFieldC` in particular should never have read as
   unverified: a pure function of one argument is what tools/vectors.py is
