@@ -1538,128 +1538,47 @@ dataflow, not a scan. A check without it reports fifteen correct functions,
 which this file already says to suspect before believing. The real instance
 was found by RUNNING the game, and that is what `movecheck.sh` now keeps.
 
-**OPEN DEFECT: THE STANDALONE DOES NOT LOAD A SAVED GAME, AND IT OVERWRITES
-THE SAVE.** Driven to GAME SELECT PANEL and asked to LOAD, the injected build
-comes back in sub-state 0x21 with the save's **316** objects and the file's
-md5 UNCHANGED; the standalone comes back in sub-state 0x18 with a fresh map's
-**325**, having re-parsed the script -- and the save file's md5 has CHANGED.
-So it is not merely failing to load, it is writing over the slot. For a port
-whose whole point is to replace the original in the folder, that is data loss
-and it should be fixed before anyone plays on it.
+**RETRACTED: THE STANDALONE DOES NOT LOSE SAVED GAMES. `-dbg` DID.** This
+file carried, for several commits, a confident open defect saying the
+standalone failed to load a save and overwrote it. It was a CONFOUND of my
+own making: `drive.sh` defaults to `ARGS ?= -nointro -dbg` and every
+standalone launch I wrote passes `-nointro` alone. The pause that decides all
+of this is gated on exactly that switch --
+`if (!LOAD_PENDING && !MP_SESSION && OPT_DBG) PauseGame(8)`.
 
-Measured back to back against ONE file, because an earlier comparison was
-taken minutes apart and the fixture had moved under it -- which is exactly the
-control this file demands and I nearly skipped. The save is `.wine`-ignored
-and was restored from a snapshot afterwards.
+Re-measured with the command lines MATCHED, against one restored save each
+time:
 
-What is ruled out, each by measurement:
+| build | args | sub-state | objects | save md5 |
+|---|---|---|---|---|
+| injected | `-dbg` | 0x21 | 316 | unchanged |
+| standalone | `-dbg` | 0x21 | **316** | **unchanged** |
+| injected | no `-dbg` | 0x18 | 325 | CHANGED |
+| standalone | no `-dbg` | 0x18 | 325 | CHANGED |
+| ORIGINAL | no `-dbg` | 0x18 | 325 | unchanged |
 
-- **not the drive.** The injected build was re-run with the IDENTICAL click
-  method -- `cursor` plus a real xdotool button, not `point.py` -- and still
-  loaded. That confound was the first suspect and it is gone.
-- **not the directory scan.** Both builds show the same GAME SELECT PANEL
-  with the save listed and highlighted; the screenshots and the widget trees
-  match node for node, same vtables and same rectangles.
-- **not the row selection.** Clicking LOAD without the row click first
-  behaves identically.
-- **not a missing gap seam.** `checkgap.py` reads 37 of 37, and the vectored
-  handler logs nothing.
+So the standalone loads a save exactly as the injected build does, and the
+whole difference was an argument. Four commits of evidence-gathering rested
+on a control I never checked, in a file that says to match the halves before
+believing either.
 
-**NARROWED BY PROBING, and the mode theory is now the surviving one rather
-than the only one tried.** Temporary `orig_log` probes in `OpenSaveForLoad`
-and through `State2Enter`, built into BOTH halves and run against the same
-baseline save, say:
+**WHAT SURVIVES IS A REAL AND NARROWER DEFECT, and it is not the standalone's.**
+Read the last two rows: without `-dbg` OUR reconstruction rewrites the save
+and the ORIGINAL does not, in BOTH builds. Starting fresh without `-dbg` is
+the game's own behaviour -- the original does that too -- but the retry stamp
+`MissionStartup` writes is ours alone.
 
-- `OpenSaveForLoad` SUCCEEDS in the standalone. The path is `save\sarge`, the
-  file is `map1_mission1.sav`, `fopen` returns non-null, and both checks pass
-  -- `tag=1 section=1`. So the file is found, opened and validated. The
-  `_finddata_t` shim is fine too: the row reads `map1_mission1.sav` in both
-  builds, compared by zooming the same pixels.
-- both names are right in the standalone -- `ADDR_GAMEPROC_BLOCK` is "sarge"
-  and `ADDR_GAMEPROC_STR_B` is the file -- as are `ADDR_GAME_DIR`, the
-  `save\%s` format and the separator, so `SetGameDir`'s absolute path is
-  correct.
-- **the two logs are IDENTICAL, line for line, through the map load and the
-  script parse.** The standalone has exactly ONE extra line, and it is
-  `Saved 317 items` -- `item.cpp`'s SAVE path. So the standalone runs a
-  SaveGame the injected build does not, which is what rewrites the file.
+`MissionStartup`'s three guards are transcribed CORRECTLY: at 0x00444F3D the
+original tests `LEVEL_ID <= 0`, then `GAMEPROC_BLOCK[0] == 0`, then
+`WIN_ENABLED != 0`, and calls 0x00425790, which is `SaveGame`. So the
+divergence is upstream -- whether the call is REACHED -- and `TakeMenuRequest`
+is where to look, since `State2Frame` enters it on `arm == 11` only when
+`GetPauseFlags()` is zero.
 
-`am2_image_slide` is 0 in both, so the `AM2_IMAGE()` spellings around the save
-sites are not it either.
-
-**AND IT ANSWERED A STANDING OPEN ITEM ON THE WAY.** This file has recorded as
-a puzzle that `ADDR_LOAD_PENDING` "is set, read as SET at 0x00425360, and read
-as 0 again by 0x004255CB". The probes show it going 1 to 0 INSIDE
-`OpenSaveForLoad` -- and in BOTH builds, so it is not the defect. The cause is
-plain once seen: `LoadGameProcSection` restores the gameproc block from the
-file, the flag lives in that block, and the saved value is 0 because nothing
-was pending when the game was saved. A function that restores globals will
-restore the one you are using as a control.
-
-**THE FIXTURE MOVES UNDER THIS TEST, which nearly invalidated two runs.** The
-standalone rewrites the save every attempt, so a comparison taken minutes
-apart is against different bytes. Snapshot the file, restore it before each
-half, and check the md5 -- the md5 CHANGING on the standalone side is itself
-the clearest statement of the bug.
-
-**NARROWED AGAIN, and the writer is NAMED.** A probe on `SaveGame` logging
-`__builtin_return_address(0)` gives `0x0071388F`, which `nm` on the standalone
-resolves to **`MissionStartup` + 0x8F** -- the mission-start autosave. So the
-file is rewritten by the ordinary "stamp a retry save as the mission begins"
-path, not by anything in the save dialog.
-
-Its three guards are all clear in the standalone -- `LEVEL_ID` 1,
-`GAMEPROC_BLOCK` "sarge", `WIN_ENABLED` 0 -- so nothing cancels it. And the
-same probe built into the INJECTED build produces NO line at all: that build
-never calls `MissionStartup` on this path. So the question is not which guard
-differs, it is why the call is reached in one build and not the other. Both
-call sites are inside `TakeMenuRequest`, behind the overlay-dirty and
-load-pending tests.
-
-**The comment above `MissionStartup` predicted exactly this and could not
-say which guard.** It records that on the campaign the save IS written and
-that "one of the three guards cancels it there and WHICH one is not
-established". The answer is that none of them does -- the call itself does not
-happen in the working build.
-
-**AND A PROBE LANDED IN THE WRONG FUNCTION, which is this file's own trap met
-again.** An anchor on the first `if (!ADDR_OVERLAY_DIRTY)` in `frame.cpp` put
-the probe in `TakeMenuRequest` rather than where it was aimed, and the run
-came back with ZERO lines -- which reads exactly like "this branch never
-runs". Check which FUNCTION a probe landed in, not only that the text was
-inserted; `awk` for the enclosing definition costs one command. Only that
-probe is affected: the `SaveGame` and `MissionStartup` ones were inside the
-functions they name.
-
-**AND THE MODE THEORY IS DEAD; THE DIVERGENCE IS THE PAUSE.** Probing
-`TakeMenuRequest` -- the function holding both `MissionStartup` call sites,
-and this time with the enclosing definition CHECKED -- shows it is never
-called at all in the injected build, on any of its first eight opportunities.
-`State2Frame` reaches it two ways: an entered-once path, and `arm == 11` when
-`GetPauseFlags()` is ZERO.
-
-That fits everything measured. The injected build comes back at sub-state
-**33** -- arm 11 -- and a mission that has just loaded is PAUSED, with the
-briefing dialog up, so `GetPauseFlags()` is non-zero and the autosave arm is
-skipped. The standalone comes back at sub-state **24**, reaches
-`TakeMenuRequest` by the other route, and runs `MissionStartup`, whose three
-guards are all clear -- so it stamps a retry save over the slot.
-
-So the question to answer next is why the standalone is not paused, or not in
-sub-state 33, after the same load. `State2Enter`'s tail sets the sub-state to
-play and its last arm is exactly a pause: `if (!LOAD_PENDING && !MP_SESSION &&
-OPT_DBG) PauseGame(8)`. That arm's own comment records getting its first test
-INVERTED once already, with the symptom that "our side ran straight past
-MESSAGE FROM HQ while the original sat on it" -- which is this symptom
-exactly, one build later.
-
-The save-dialog MODE theory is retired: both builds construct the same class,
-the widget trees match node for node, and the writer is `MissionStartup`
-rather than anything the dialog calls.
-The widget dump cannot see that -- it prints geometry, and both panels have
-the same geometry. Note the dump reports `sid=-1` for every node in the
-standalone, which is its own range-checked sprite-id read failing on that
-build's heap addresses rather than a difference in the screen.
+**And this matters to a player rather than to the suite**, which is the
+reason to keep it: every configuration here runs with `-dbg`, so no A/B can
+see it, and someone playing the port normally is the one whose save gets a
+retry stamp the original would not have written.
 
 **`tools/saquit.sh` COVERS THE STANDALONE'S TEARDOWN, which nothing did.**
 `samenu.sh` compares a title screen and `samission.sh` a live mission's object

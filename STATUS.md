@@ -108,38 +108,26 @@ Generalising the defect into a static check was tried and abandoned with
 measurements -- see CLAUDE.md. MSVC compiles a null test AS a register
 compare, so all 15 candidates it finds are correct.
 
-## OPEN DEFECT: the standalone loses saved games
+## OPEN DEFECT: our autosave fires where the original's does not
 
-Asked to LOAD a saved game, the standalone starts a new mission AND
-overwrites the save file. Measured back to back against one file: the
-injected build returns sub-state 0x21 with the save's 316 objects and the
-md5 unchanged; the standalone returns 0x18 with a fresh map's 325 and a
-CHANGED md5.
+**Retracted first**: an earlier entry here said the standalone loses saved
+games. It does not. `drive.sh` defaults to `-nointro -dbg` and my standalone
+launches passed `-nointro` alone, and the pause that decides the whole
+behaviour is gated on that switch. With the arguments matched the standalone
+loads a save exactly as the injected build does -- sub-state 0x21, the save's
+316 objects, md5 unchanged.
 
-Ruled out by measurement: the drive (the injected build was re-run with the
-identical click method), the directory scan (both panels list and highlight
-the save, with matching widget trees), the row click, and a missing gap seam
-(checkgap reads 37 of 37). The shape that fits is a wrong MODE on a panel
-shared between saving and loading.
+What survives is real and is not standalone-specific. Without `-dbg`, OUR
+reconstruction rewrites the save through `MissionStartup`'s retry stamp and
+the ORIGINAL does not, in both builds. Starting the mission fresh without
+`-dbg` is the game's own behaviour; the extra save is ours.
 
-**The divergence is the PAUSE.** `TakeMenuRequest` -- which holds both
-`MissionStartup` call sites -- is never called in the injected build. It is
-reached from `State2Frame` when `arm == 11` and `GetPauseFlags()` is zero;
-the injected build sits at sub-state 33 and PAUSED behind the briefing, so
-the autosave arm is skipped, while the standalone sits at 24, reaches it, and
-saves. Next question: why the standalone is not paused after the same load.
-`State2Enter`'s last arm is that pause, and its comment records the same
-symptom from an inverted test once before.
+The three guards are transcribed correctly against the disassembly, so the
+divergence is whether the call is reached -- `TakeMenuRequest`, entered from
+`State2Frame` on arm 11 only when `GetPauseFlags()` is zero.
 
-**The writer is named**: a return-address probe puts it at `MissionStartup`
-+ 0x8F, the mission-start autosave, whose three guards are all clear in the
-standalone. The injected build never calls `MissionStartup` on this path at
-all, so the open question is why the call is reached in one build and not the
-other -- both sites sit in `TakeMenuRequest` behind the overlay-dirty and
-load-pending tests. `OpenSaveForLoad` succeeds in both.
-
-This is data loss on the deliverable and should be fixed before the port is
-played on. See CLAUDE.md for the full evidence.
+No configuration in the suite can see this: they all run with `-dbg`. It is
+the player running the port normally who is affected.
 
 ## Where the work is now: VERIFICATION, not transposition
 
