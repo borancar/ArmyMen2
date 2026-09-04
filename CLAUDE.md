@@ -1679,6 +1679,21 @@ called, and the object's storage -- including its cell entries -- is freed
 while the grid still points at it. `LoadItems` then allocates the new objects
 over that memory.
 
+**AND THE ALLOCATOR IS NOT THE EXPLANATION EITHER, which is the useful
+elimination.** The tempting answer is that the original's heap happens not to
+reuse the freed entries before the walk while ours does. It cannot be that:
+the INJECTED build faults too, and `src/game/crt.h` points `am2_malloc` at the
+game's own statically linked MSVC CRT, so that build allocates from the same
+heap as the original. Same allocator, same path, one faults. The divergence is
+real rather than luck.
+
+`LoadItems` itself is faithful -- the original opens with `call ItemsReset`,
+checks tag 0x06660007, and loops on the record mark 0x06660000, which are
+`AM2_SAVE_TAG_ITEMS` and `AM2_SAVE_RECORD_MARK` exactly. And the grid is not
+rebuilt in between: `MapDescInit`'s only caller is `LoadMap` and
+`MapDescFree`'s other caller is the map teardown, so neither runs between
+`ItemsReset` and the first walk in either build.
+
 **WHAT IS NOT YET EXPLAINED IS WHY THE ORIGINAL SURVIVES IT**, since it takes
 the same path with the same 0. `MapDescInit` memsets the grid to zero and is
 faithful -- including the implicit `& 0xFF` on `Log2Mask`, which our `uint8_t`
