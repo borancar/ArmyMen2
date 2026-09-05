@@ -39,7 +39,9 @@ import merges
 # into docs/ must not move it out of the ratchet's reach, which is exactly
 # how a stale "still original" would come back.
 DOCS = ("CLAUDE.md", "STATUS.md",
-        "docs/screen-mpoptions.md")
+        "docs/screen-mpoptions.md",
+        "docs/saveload.md",
+        "docs/movement.md")
 
 # Present-tense claims that an address has NOT been reconstructed.  "was left
 # original" and "used to be" are history and are not matched.
