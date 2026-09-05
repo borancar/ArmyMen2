@@ -1,5 +1,7 @@
 """Verify the numeric claims in CLAUDE.md against the tools that produce them.
 
+And in the narrative docs extracted out of it -- see PROSE below.
+
 Three separate figures in CLAUDE.md were found stale by measuring rather than
 reading: the Lock/Unlock item counted two functions that do not lock, the COM
 function count was one high, and an "unknown sites" figure described history as
@@ -306,23 +308,54 @@ def status_claims():
     ]
 
 
+# CLAUDE.md and the narratives extracted OUT of it.  A checked claim moved to
+# docs/ would otherwise come back MISSING, which is a true report of the wrong
+# thing -- the sentence is not gone, it moved -- and the tempting fix is to
+# delete the claim rather than follow it.  Four went at once when the boundary
+# reasoning was extracted, so the list is here and anything extracted later
+# joins it in the same commit, exactly as tools/checkprose.py's DOCS does.
+PROSE = (
+    "CLAUDE.md",
+    "docs/boundary-notes.md",
+    "docs/screen-mpoptions.md",
+    "docs/saveload.md",
+    "docs/movement.md",
+)
+
+
+def _prose():
+    """(path, text) for every file a claim may live in."""
+    return [(p, open(os.path.join(REPO, p)).read()) for p in PROSE]
+
+
 def main():
-    text = open(os.path.join(REPO, "CLAUDE.md")).read()
+    prose = _prose()
     bad = 0
     for name in undeclared_oracles():
         print(f"  ORPHAN   tools/{name}.py declares CHECKS and is not in ORACLES\n"
               f"           so nothing counts what it verifies")
         bad += 1
     for what, pattern, expected in claims():
-        m = re.search(pattern, text)
-        if not m:
-            print(f"  MISSING  {what}\n           no sentence matches {pattern!r}")
+        hits = [(path, m) for path, text in prose
+                for m in [re.search(pattern, text)] if m]
+        if not hits:
+            print(f"  MISSING  {what}\n           no sentence in {'/'.join(PROSE)}"
+                  f"\n           matches {pattern!r}")
             bad += 1
             continue
+        if len(hits) > 1:
+            # Two copies of one claim is the drift this tool exists to stop,
+            # one level up: the extraction would have left the original behind.
+            where = ", ".join(path for path, _ in hits)
+            print(f"  DOUBLE   {what}\n           stated in {where} -- "
+                  f"one of them will go stale")
+            bad += 1
+            continue
+        path, m = hits[0]
         found = tuple(int(g) for g in m.groups())
         if found != expected:
             print(f"  STALE    {what}\n"
-                  f"           CLAUDE.md says {found}, the tools say {expected}")
+                  f"           {path} says {found}, the tools say {expected}")
             bad += 1
         else:
             print(f"  ok       {what}: {expected}")
