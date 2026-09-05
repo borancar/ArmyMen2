@@ -1,0 +1,15 @@
+# title -> BOOT CAMP -> briefing -> mission -> both dialogs -> walk
+40  cursor 306 143
+44  button 0 tap
+90  key RETURN tap
+200 cursor 476 224
+204 button 0 tap
+260 cursor 600 400
+264 button 0 tap
+320 key W down
+420 key W up
+430 key S down
+520 key S up
+530 key D down
+600 key D up
+700 exit

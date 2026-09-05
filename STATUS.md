@@ -7,6 +7,46 @@ command that produces it, so it can be re-measured rather than believed.
 
 Last updated: **2026-09-06**, the hybrid landing (see the first section).
 
+## THE ORIGINAL AND THE RECONSTRUCTION RUN IN LOCKSTEP
+
+`AM2_LOCKSTEP=1` makes the platform deterministic: the clock is a count of
+pumps (16.67 ms each, `AM2_LOCKSTEP_MS` overrides), `Sleep` on the game
+thread moves it, multimedia timers fire from the pump when it passes them,
+the sound is mixed on the game thread one step per pump, input comes only
+from an `AM2_REPLAY` script keyed by pump number, and every frame presented
+is hashed into `AM2_FRAMELOG`. Both the hybrid and the native build run it
+headless under SDL's dummy drivers, so a comparison needs no display and
+takes half a minute:
+
+    tools/lockstep.sh tests/replays/bootcamp.txt
+
+**Measured** (2026-09-06, `tests/replays/bootcamp.txt`: title, BOOT CAMP,
+RETURN, both dialogs, then W, S and D held for 100 pumps each):
+
+| what | result |
+|---|---|
+| native run against native run | identical, 628 presented frames |
+| hybrid (original) against native (reconstruction) | identical through frame 79 -- the title, the click, the loading, the briefing -- then **every frame from 80 on differs by the same 26 pixels** |
+| the 26 pixels | 13 horizontal PAIRS on sandbag and hut edges, static from frame to frame, and in every pair the two colours are SWAPPED: the original has A,B where the reconstruction has B,A |
+| the object tables | identical at the mission start and after the walk, all 1,610 lines, Sarge at `1743,976` on both |
+
+So the simulation is in lockstep with the original over this drive, and the
+whole visible difference is one rare two-pixel case in something that
+encodes or paints terrain -- a 16-bit unit written with its bytes reversed
+where the two pixels differ, invisible wherever they are equal. Not yet
+located; the way to locate it is a hybrid that installs reconstructions
+one at a time, which is the next tool.
+
+**How the native build had stopped running, and why nothing said so.** The
+platform's headers are included through `-isystem`, and `-MMD` omits system
+headers from the dependency files, so reordering the `IDirectDraw` vtable
+rebuilt `ddraw.o` and not `device.o`: the reconstruction went on calling
+slot 22 for `SetDisplayMode` and landed on `WaitForVerticalBlank`. The
+build is `-MD` now and the dependency files name the platform headers. A
+header change that rebuilds one side of an interface and not the other is
+a crash that reads like a code defect; the bisection that found it reverted
+the header and got a clean run from objects that had never been rebuilt.
+
 ## THE ORIGINAL EXE RUNS OVER THE PLATFORM LAYER, WITHOUT WINE
 
 `make hybrid` builds `build/armymen2-hybrid` and `build/armymen2-hybrid-dev`:

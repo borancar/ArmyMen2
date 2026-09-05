@@ -71,6 +71,29 @@ void am2_host_wait_vblank(void);
 /* Tear the host down and end the process: what ExitProcess does. */
 void am2_host_exit(int32_t code) __attribute__((noreturn));
 
+/* ---- lockstep (sdl.cpp) ------------------------------------------------- */
+
+/* AM2_LOCKSTEP=1: every source of nondeterminism the platform owns is
+ * replaced by one it counts. Time is a virtual clock that advances by a
+ * fixed step on every pump (AM2_LOCKSTEP_MS, default 1000/60) and by what
+ * Sleep asks for on the game thread; multimedia timers fire from the pump
+ * when the clock passes them, not from a host thread; the sound is mixed
+ * on the game thread, one step's worth per pump; input comes from the
+ * AM2_REPLAY script by pump number and from nowhere else; and every frame
+ * presented is hashed into AM2_FRAMELOG. Two binaries fed the same script
+ * then either match frame for frame or name the first frame that does
+ * not, which is what tools/lockstep.sh reports. */
+int32_t  am2_host_lockstep(void);
+/* Nanoseconds: the virtual clock in lockstep, the host's otherwise. */
+uint64_t am2_host_clock_ns(void);
+/* Sleep on the game thread in lockstep: the clock moves, the host does not. */
+void     am2_host_clock_advance_ms(uint32_t ms);
+int32_t  am2_host_on_game_thread(void);
+/* Put the game's own cursor at a screen point, as the control socket's
+ * `cursor` does: the runtime installs it, since only the game side knows
+ * the globals. Used by the replay's `cursor` line. */
+extern void (*am2_host_cursor_set)(int32_t x, int32_t y);
+
 /* Show or hide the host's pointer. */
 void am2_host_cursor_visible(int32_t visible);
 

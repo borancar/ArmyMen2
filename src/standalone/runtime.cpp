@@ -270,6 +270,27 @@ static void am2_sa_cursor_query(int32_t *x, int32_t *y)
     *x = *(const int32_t *)(uintptr_t)ADDR_CURSOR_X;
     *y = *(const int32_t *)(uintptr_t)ADDR_CURSOR_Y;
 }
+
+/* The replay's `cursor`: the three globals the control socket's `cursor`
+ * writes, clamped as UpdateMouseState clamps, and the moved flag a real
+ * move sets. Kept identical to control.c's on purpose. */
+static void am2_sa_cursor_set(int32_t x, int32_t y)
+{
+    int32_t       *cx   = (int32_t *)(uintptr_t)ADDR_CURSOR_X;
+    int32_t       *cy   = (int32_t *)(uintptr_t)ADDR_CURSOR_Y;
+    int16_t       *pt   = (int16_t *)(uintptr_t)ADDR_CURSOR_POINT;
+    const int32_t *clip = (const int32_t *)(uintptr_t)ADDR_SCREEN_CLIP;
+
+    if (x < clip[0]) x = clip[0];
+    if (x > clip[2] - 1) x = clip[2] - 1;
+    if (y < clip[1]) y = clip[1];
+    if (y > clip[3] - 1) y = clip[3] - 1;
+    *cx = x;
+    *cy = y;
+    pt[0] = (int16_t)x;
+    pt[1] = (int16_t)y;
+    *(int32_t *)(uintptr_t)ADDR_MOUSE_MOVED = 1;
+}
 #endif
 
 /* ---- startup --------------------------------------------------------- */
@@ -309,6 +330,7 @@ extern "C" void am2_standalone_init(void)
     am2_getcwd = _getcwd;
 #ifdef AM2_NATIVE
     am2_host_cursor_query = am2_sa_cursor_query;
+    am2_host_cursor_set = am2_sa_cursor_set;
 #endif
     /* FIRST: the original's IAT as we carry it is the FILE's, which no
      * loader has fixed up, so every seam calling through it was jumping to a

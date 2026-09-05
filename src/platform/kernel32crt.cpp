@@ -516,12 +516,23 @@ static void am2_systemtime_from_tm(LPSYSTEMTIME st, const struct tm *t, uint32_t
     st->wMilliseconds = (WORD)ms;
 }
 
+/* Lockstep's date: the image's own link date, plus the virtual clock. */
+static void am2_lockstep_timeval(struct timeval *tv)
+{
+    uint64_t ns = am2_host_clock_ns();
+    tv->tv_sec = 918000000 + (time_t)(ns / 1000000000ULL);
+    tv->tv_usec = (suseconds_t)((ns % 1000000000ULL) / 1000);
+}
+
 void WINAPI GetSystemTime(LPSYSTEMTIME out)
 {
     struct timeval tv;
     struct tm      t;
 
-    gettimeofday(&tv, NULL);
+    if (am2_host_lockstep())
+        am2_lockstep_timeval(&tv);
+    else
+        gettimeofday(&tv, NULL);
     gmtime_r(&tv.tv_sec, &t);
     am2_systemtime_from_tm(out, &t, (uint32_t)(tv.tv_usec / 1000));
 }
@@ -531,7 +542,10 @@ void WINAPI GetLocalTime(LPSYSTEMTIME out)
     struct timeval tv;
     struct tm      t;
 
-    gettimeofday(&tv, NULL);
+    if (am2_host_lockstep())
+        am2_lockstep_timeval(&tv);
+    else
+        gettimeofday(&tv, NULL);
     localtime_r(&tv.tv_sec, &t);
     am2_systemtime_from_tm(out, &t, (uint32_t)(tv.tv_usec / 1000));
 }

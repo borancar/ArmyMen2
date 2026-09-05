@@ -19,7 +19,7 @@ CXX      := i686-w64-mingw32-g++
 # a header edit leaves stale objects behind, which is not a theoretical worry:
 # the old build compiled every source in one command, so headers were always
 # picked up, and splitting into per-object rules silently lost that.
-DEPFLAGS := -MMD -MP
+DEPFLAGS := -MD -MP
 CFLAGS   := -O2 -g -Wall -Wextra -std=gnu11 -fno-strict-aliasing $(DEPFLAGS)
 CXXFLAGS := -O2 -g -Wall -Wextra -std=gnu++14 -fno-strict-aliasing \
             -fno-exceptions -fno-rtti $(DEPFLAGS)

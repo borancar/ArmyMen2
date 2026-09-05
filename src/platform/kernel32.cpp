@@ -79,18 +79,25 @@ void  WINAPI SetLastError(DWORD err) { am2_last_error = err; }
 
 /* ---- time ------------------------------------------------------------------ */
 
+/* All four clocks are one clock, so that under AM2_LOCKSTEP the game's
+ * frame clock, its animation ticks and its timestamps agree with the
+ * pump count and with nothing else. See platform.h. */
 DWORD WINAPI GetTickCount(void)
 {
-    return (DWORD)SDL_GetTicks();
+    return (DWORD)(am2_host_clock_ns() / 1000000ULL);
 }
 
 DWORD WINAPI timeGetTime(void)
 {
-    return (DWORD)SDL_GetTicks();
+    return (DWORD)(am2_host_clock_ns() / 1000000ULL);
 }
 
 void WINAPI Sleep(DWORD ms)
 {
+    if (am2_host_lockstep() && am2_host_on_game_thread()) {
+        am2_host_clock_advance_ms(ms);
+        return;
+    }
     if (ms == 0)
         sched_yield();
     else
@@ -99,13 +106,15 @@ void WINAPI Sleep(DWORD ms)
 
 BOOL WINAPI QueryPerformanceCounter(LARGE_INTEGER *out)
 {
-    out->QuadPart = (LONGLONG)SDL_GetPerformanceCounter();
+    out->QuadPart = am2_host_lockstep() ? (LONGLONG)am2_host_clock_ns()
+                                        : (LONGLONG)SDL_GetPerformanceCounter();
     return TRUE;
 }
 
 BOOL WINAPI QueryPerformanceFrequency(LARGE_INTEGER *out)
 {
-    out->QuadPart = (LONGLONG)SDL_GetPerformanceFrequency();
+    out->QuadPart = am2_host_lockstep() ? 1000000000LL
+                                        : (LONGLONG)SDL_GetPerformanceFrequency();
     return TRUE;
 }
 

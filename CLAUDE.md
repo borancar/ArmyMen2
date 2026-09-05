@@ -397,6 +397,28 @@ asking what it draws, and compare on a screen that repaints the spot.
 The stretch rounding was a real finding on the way -- the platform now steps
 wined3d's truncated 16.16 increment -- but it was not the cause.
 
+**`-isystem` HEADERS ARE INVISIBLE TO `-MMD`, AND A HEADER CHANGE THEN
+REBUILDS ONE SIDE OF AN INTERFACE.** Reordering the platform's `IDirectDraw`
+vtable rebuilt `ddraw.o` and left every reconstruction object that called
+through it stale, because their dependency files did not list a header
+included via `-isystem`. The native binary crashed on its first DirectDraw
+call for two sessions and nothing in the build said why; the bisection
+"fixed" it by reverting the header, which merely matched the stale
+objects again. `DEPFLAGS` is `-MD` now. When a header change breaks a
+binary that includes it, clean-rebuild before reading a single line of
+code.
+
+**LOCKSTEP IS THE PLATFORM'S TO PROVIDE, and it made "frame-by-frame" a
+real comparison.** Every source of nondeterminism between two runs was in
+`src/platform`: the clocks, the multimedia timer thread, the audio thread,
+input timing. `AM2_LOCKSTEP=1` replaces all of them with a pump count,
+`AM2_REPLAY` scripts input by pump number, `AM2_FRAMELOG` hashes every
+presented frame, and `tools/lockstep.sh` runs two binaries headless and
+names the first frame that differs. The hybrid against the native build
+diverged on frame 80 of Boot Camp by 26 pixels and on nothing else through
+a walk, with identical object tables at both ends. A hash log is exact
+where the pixel budgets were blunt; reach for it before any screenshot.
+
 **THE ORIGINAL'S CRT IMPORTS ARE THE ORIGINAL'S CRT'S.** All 56 kernel32
 entries the platform did not have -- heaps, virtual memory, the
 environment, std handles, file I/O, find-file, code pages, string

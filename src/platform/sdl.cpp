@@ -17,6 +17,7 @@
 #include <dinput.h>
 
 #include <SDL3/SDL.h>
+#include <pthread.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -200,6 +201,107 @@ void am2_host_cursor_visible(int32_t visible)
         SDL_HideCursor();
 }
 
+/* ---- lockstep: the clock ---------------------------------------------------------- */
+
+static pthread_t am2_game_thread;
+static uint64_t  am2_clock_ns;          /* the virtual clock */
+static uint64_t  am2_step_ns;           /* one pump's worth of it */
+static uint32_t  am2_pump_count;        /* the replay's frame number */
+static uint32_t  am2_present_count;     /* the frame log's index */
+
+int32_t am2_host_lockstep(void)
+{
+    static int32_t on = -1;
+    if (on < 0) {
+        const char *l = getenv("AM2_LOCKSTEP");
+        const char *ms = getenv("AM2_LOCKSTEP_MS");
+        on = l && *l && *l != '0';
+        am2_step_ns = ms && *ms ? (uint64_t)(atof(ms) * 1000000.0) : 1000000000ULL / 60;
+    }
+    return on;
+}
+
+uint64_t am2_host_clock_ns(void)
+{
+    return am2_host_lockstep() ? am2_clock_ns : SDL_GetTicksNS();
+}
+
+int32_t am2_host_on_game_thread(void)
+{
+    return pthread_equal(pthread_self(), am2_game_thread);
+}
+
+static void am2_timers_fire_due(void);
+
+void am2_host_clock_advance_ms(uint32_t ms)
+{
+    am2_plat_debug("lockstep: sleep %u ms at pump %u", (unsigned)ms, (unsigned)am2_pump_count);
+    am2_clock_ns += (uint64_t)ms * 1000000ULL;
+    am2_timers_fire_due();
+}
+
+/* ---- lockstep: the frame log ---------------------------------------------------- */
+
+static FILE    *am2_framelog;
+static int32_t  am2_framelog_tried;
+static char     am2_framedump_path[1024];   /* a pending dump of the next present */
+
+static uint64_t am2_fnv(uint64_t h, const uint8_t *p, size_t n)
+{
+    size_t i;
+    for (i = 0; i < n; i++) {
+        h ^= p[i];
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+static void am2_frame_record(const uint8_t *pixels, int32_t pitch, int32_t w,
+                             int32_t h, const PALETTEENTRY *palette)
+{
+    if (!am2_framelog_tried) {
+        const char *path = getenv("AM2_FRAMELOG");
+        const char *at = getenv("AM2_FRAMEDUMP_AT");
+        const char *to = getenv("AM2_FRAMEDUMP_TO");
+        am2_framelog_tried = 1;
+        if (path && *path)
+            am2_framelog = !strcmp(path, "-") ? stderr : fopen(path, "w");
+        if (at && *at && to && *to && (uint32_t)atoi(at) == am2_present_count)
+            snprintf(am2_framedump_path, sizeof am2_framedump_path, "%s", to);
+    } else {
+        const char *at = getenv("AM2_FRAMEDUMP_AT");
+        const char *to = getenv("AM2_FRAMEDUMP_TO");
+        if (at && *at && to && *to && (uint32_t)atoi(at) == am2_present_count)
+            snprintf(am2_framedump_path, sizeof am2_framedump_path, "%s", to);
+    }
+    if (am2_framelog) {
+        uint64_t hash = 14695981039346656037ULL;
+        int32_t  y;
+        for (y = 0; y < h; y++)
+            hash = am2_fnv(hash, pixels + y * pitch, (size_t)w);
+        hash = am2_fnv(hash, (const uint8_t *)palette, 256 * sizeof *palette);
+        fprintf(am2_framelog, "%u %u %016llx\n", (unsigned)am2_present_count,
+                (unsigned)am2_pump_count, (unsigned long long)hash);
+        fflush(am2_framelog);
+    }
+    if (am2_framedump_path[0]) {
+        FILE *fh = fopen(am2_framedump_path, "wb");
+        if (fh) {
+            int32_t x, y;
+            fprintf(fh, "P6\n%d %d\n255\n", w, h);
+            for (y = 0; y < h; y++)
+                for (x = 0; x < w; x++) {
+                    const PALETTEENTRY *e = &palette[pixels[y * pitch + x]];
+                    fputc(e->peRed, fh); fputc(e->peGreen, fh); fputc(e->peBlue, fh);
+                }
+            fclose(fh);
+            am2_plat_log("frame %u written to %s", (unsigned)am2_present_count, am2_framedump_path);
+        }
+        am2_framedump_path[0] = 0;
+    }
+    am2_present_count++;
+}
+
 /* ---- the frame ---------------------------------------------------------------------- */
 
 void am2_host_present(const uint8_t *pixels, int32_t pitch, int32_t w,
@@ -210,6 +312,7 @@ void am2_host_present(const uint8_t *pixels, int32_t pitch, int32_t w,
     int       dstPitch;
     int32_t   x, y;
 
+    am2_frame_record(pixels, pitch, w, h, palette);
     if (!am2_sdl_renderer)
         return;
     am2_texture_fit();
@@ -244,6 +347,17 @@ void am2_host_wait_vblank(void)
     static int32_t  frames;
     uint64_t        now = SDL_GetTicksNS();
 
+    /* In lockstep the pump is the clock and a flip costs no real time,
+     * unless AM2_LOCKSTEP_PACE=1 asks to watch it at speed. */
+    if (am2_host_lockstep()) {
+        static int32_t pace = -1;
+        if (pace < 0) {
+            const char *pc = getenv("AM2_LOCKSTEP_PACE");
+            pace = pc && *pc && *pc != '0';
+        }
+        if (!pace)
+            return;
+    }
     if (period < 0) {
         const char *env = getenv("AM2_FPS");
         int32_t     fps = env && *env ? atoi(env) : 60;
@@ -457,6 +571,184 @@ void (*am2_host_frame_hook)(void);
 extern "C" void devtools_hotkey(int32_t which);
 #endif
 
+/* ---- lockstep: the replay ---------------------------------------------------------- */
+
+void (*am2_host_cursor_set)(int32_t x, int32_t y);
+
+/* AM2_REPLAY=<file>: one line per action, applied at the pump whose number
+ * begins it. `#` starts a comment.
+ *
+ *   N key NAME down|up|tap      NAME is a DirectInput code (0x1C) or one of
+ *                               the names below; tap is down now, up 4 later
+ *   N button B down|up|tap      B is 0 left, 1 right, 2 middle
+ *   N move DX DY                relative motion into the mouse buffer
+ *   N cursor X Y                the game's cursor, as the socket's `cursor`
+ *   N dump FILE                 the next frame presented, as a PPM
+ *   N exit                      leave, exit code 0
+ */
+typedef struct AM2_ReplayLine {
+    uint32_t frame;
+    char     verb[8];
+    int32_t  a, b;
+    char     text[512];
+} AM2_ReplayLine;
+static AM2_ReplayLine *am2_replay;
+static int32_t         am2_replay_count, am2_replay_next, am2_replay_tried;
+
+static const struct { const char *name; uint8_t dik, vk; } am2_key_names[] = {
+    { "RETURN", 0x1C, 0x0D }, { "ESCAPE", 0x01, 0x1B }, { "SPACE", 0x39, 0x20 },
+    { "TAB", 0x0F, 0x09 }, { "UP", 0xC8, 0x26 }, { "DOWN", 0xD0, 0x28 },
+    { "LEFT", 0xCB, 0x25 }, { "RIGHT", 0xCD, 0x27 }, { "LSHIFT", 0x2A, 0x10 },
+    { "LCONTROL", 0x1D, 0x11 }, { "F1", 0x3B, 0x70 }, { "F2", 0x3C, 0x71 },
+    { "F3", 0x3D, 0x72 }, { "F4", 0x3E, 0x73 }, { "F5", 0x3F, 0x74 },
+    { "F9", 0x43, 0x78 }, { "F10", 0x44, 0x79 },
+    { "Q", 0x10, 'Q' }, { "W", 0x11, 'W' }, { "E", 0x12, 'E' }, { "R", 0x13, 'R' },
+    { "T", 0x14, 'T' }, { "Y", 0x15, 'Y' }, { "U", 0x16, 'U' }, { "I", 0x17, 'I' },
+    { "O", 0x18, 'O' }, { "P", 0x19, 'P' }, { "A", 0x1E, 'A' }, { "S", 0x1F, 'S' },
+    { "D", 0x20, 'D' }, { "F", 0x21, 'F' }, { "G", 0x22, 'G' }, { "H", 0x23, 'H' },
+    { "J", 0x24, 'J' }, { "K", 0x25, 'K' }, { "L", 0x26, 'L' }, { "Z", 0x2C, 'Z' },
+    { "X", 0x2D, 'X' }, { "C", 0x2E, 'C' }, { "V", 0x2F, 'V' }, { "B", 0x30, 'B' },
+    { "N", 0x31, 'N' }, { "M", 0x32, 'M' },
+    { "1", 0x02, '1' }, { "2", 0x03, '2' }, { "3", 0x04, '3' }, { "4", 0x05, '4' },
+    { "5", 0x06, '5' }, { "6", 0x07, '6' }, { "7", 0x08, '7' }, { "8", 0x09, '8' },
+    { "9", 0x0A, '9' }, { "0", 0x0B, '0' },
+};
+
+static int32_t am2_key_lookup(const char *name, uint8_t *dik, uint8_t *vk)
+{
+    size_t i;
+    if (!strncasecmp(name, "0x", 2)) {
+        *dik = (uint8_t)strtoul(name, NULL, 16);
+        *vk = 0;
+        return 1;
+    }
+    for (i = 0; i < sizeof am2_key_names / sizeof am2_key_names[0]; i++)
+        if (!strcasecmp(am2_key_names[i].name, name)) {
+            *dik = am2_key_names[i].dik;
+            *vk = am2_key_names[i].vk;
+            return 1;
+        }
+    return 0;
+}
+
+static void am2_replay_add(uint32_t frame, const char *verb, int32_t a, int32_t b, const char *text)
+{
+    AM2_ReplayLine *l;
+    am2_replay = (AM2_ReplayLine *)realloc(am2_replay, (size_t)(am2_replay_count + 1) * sizeof *am2_replay);
+    l = &am2_replay[am2_replay_count++];
+    memset(l, 0, sizeof *l);
+    l->frame = frame;
+    snprintf(l->verb, sizeof l->verb, "%s", verb);
+    l->a = a;
+    l->b = b;
+    if (text)
+        snprintf(l->text, sizeof l->text, "%s", text);
+}
+
+static int am2_replay_order(const void *x, const void *y)
+{
+    const AM2_ReplayLine *p = (const AM2_ReplayLine *)x, *q = (const AM2_ReplayLine *)y;
+    if (p->frame != q->frame)
+        return p->frame < q->frame ? -1 : 1;
+    return (int)(p - q > 0) - (int)(p - q < 0);
+}
+
+static void am2_replay_load(void)
+{
+    const char *path = getenv("AM2_REPLAY");
+    FILE       *fh;
+    char        line[1024];
+    int32_t     n = 0;
+
+    am2_replay_tried = 1;
+    if (!path || !*path)
+        return;
+    fh = fopen(path, "r");
+    if (!fh) {
+        /* Fatal, not a warning: the game chdirs into its data directory
+         * before this runs, so a relative name is the commonest way here,
+         * and a run with no script never reaches its `exit`. */
+        am2_plat_log("replay: cannot open %s (use an absolute path)", path);
+        am2_host_exit(2);
+    }
+    while (fgets(line, sizeof line, fh)) {
+        char     verb[16] = "", w1[512] = "", w2[64] = "";
+        unsigned frame;
+        char    *hash = strchr(line, '#');
+        n++;
+        if (hash)
+            *hash = 0;
+        if (sscanf(line, "%u %15s %511s %63s", &frame, verb, w1, w2) < 2)
+            continue;
+        if (!strcmp(verb, "key")) {
+            uint8_t dik, vk;
+            if (!am2_key_lookup(w1, &dik, &vk)) {
+                am2_plat_log("replay: line %d: unknown key %s", n, w1);
+                continue;
+            }
+            if (!strcmp(w2, "tap")) {
+                am2_replay_add(frame, "key", dik | (vk << 8), 1, NULL);
+                am2_replay_add(frame + 4, "key", dik | (vk << 8), 0, NULL);
+            } else {
+                am2_replay_add(frame, "key", dik | (vk << 8), !strcmp(w2, "down"), NULL);
+            }
+        } else if (!strcmp(verb, "button")) {
+            int32_t bt = atoi(w1);
+            if (!strcmp(w2, "tap")) {
+                am2_replay_add(frame, "button", bt, 1, NULL);
+                am2_replay_add(frame + 4, "button", bt, 0, NULL);
+            } else {
+                am2_replay_add(frame, "button", bt, !strcmp(w2, "down"), NULL);
+            }
+        } else if (!strcmp(verb, "move") || !strcmp(verb, "cursor")) {
+            am2_replay_add(frame, verb, atoi(w1), atoi(w2), NULL);
+        } else if (!strcmp(verb, "dump")) {
+            am2_replay_add(frame, verb, 0, 0, w1);
+        } else if (!strcmp(verb, "exit")) {
+            am2_replay_add(frame, verb, 0, 0, NULL);
+        } else {
+            am2_plat_log("replay: line %d: unknown verb %s", n, verb);
+        }
+    }
+    fclose(fh);
+    if (am2_replay_count > 1)
+        qsort(am2_replay, (size_t)am2_replay_count, sizeof *am2_replay, am2_replay_order);
+    am2_plat_log("replay: %d actions from %s", am2_replay_count, path);
+}
+
+static void am2_replay_apply(void)
+{
+    if (!am2_replay_tried)
+        am2_replay_load();
+    while (am2_replay_next < am2_replay_count &&
+           am2_replay[am2_replay_next].frame <= am2_pump_count) {
+        const AM2_ReplayLine *l = &am2_replay[am2_replay_next++];
+        if (!strcmp(l->verb, "key")) {
+            uint8_t dik = (uint8_t)l->a, vk = (uint8_t)(l->a >> 8);
+            am2_keys[dik] = l->b ? 0x80 : 0;
+            if (vk)
+                am2_window_on_key(l->b, vk);
+        } else if (!strcmp(l->verb, "button")) {
+            am2_di_mouse_button(l->a, l->b);
+        } else if (!strcmp(l->verb, "move")) {
+            am2_di_mouse_motion(l->a, l->b);
+        } else if (!strcmp(l->verb, "cursor")) {
+            if (am2_host_cursor_set)
+                am2_host_cursor_set(l->a, l->b);
+            else
+                am2_plat_log("replay: cursor: this binary installs no cursor setter");
+        } else if (!strcmp(l->verb, "dump")) {
+            snprintf(am2_framedump_path, sizeof am2_framedump_path, "%s", l->text);
+        } else if (!strcmp(l->verb, "exit")) {
+            am2_plat_log("replay: exit at pump %u, %u frames presented",
+                         (unsigned)am2_pump_count, (unsigned)am2_present_count);
+            am2_host_exit(0);
+        }
+    }
+}
+
+static void am2_audio_step(void);
+
 void am2_host_pump(void)
 {
     SDL_Event ev;
@@ -468,6 +760,21 @@ void am2_host_pump(void)
         am2_host_frame_hook();
     am2_dik_table_init();
     am2_mouse_pay_releases();
+    if (am2_host_lockstep()) {
+        /* The pump IS the clock: one step, the timers it passes, one
+         * step's worth of sound, and the script's actions for this frame.
+         * Host events are drained and dropped -- a stray real click would
+         * make the run unrepeatable -- except the window closing. */
+        am2_pump_count++;
+        am2_clock_ns += am2_step_ns;
+        am2_timers_fire_due();
+        am2_audio_step();
+        am2_replay_apply();
+        while (SDL_PollEvent(&ev))
+            if (ev.type == SDL_EVENT_QUIT || ev.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)
+                am2_window_on_close();
+        return;
+    }
     while (SDL_PollEvent(&ev)) {
         switch (ev.type) {
         case SDL_EVENT_QUIT:
@@ -599,6 +906,38 @@ static void SDLCALL am2_audio_pull(void *ud, SDL_AudioStream *stream,
 #endif
 }
 
+static int32_t  am2_audio_rate;
+static uint64_t am2_audio_carry_ns;
+
+/* One pump's worth of sound, mixed on the game thread and pushed: the
+ * lockstep replacement for the device pulling on its own thread. */
+static void am2_audio_step(void)
+{
+    uint64_t ns;
+    int32_t  frames;
+
+    if (!am2_sdl_audio || !am2_audio_mix)
+        return;
+    ns = am2_step_ns + am2_audio_carry_ns;
+    frames = (int32_t)(ns * (uint64_t)am2_audio_rate / 1000000000ULL);
+    am2_audio_carry_ns = ns - (uint64_t)frames * 1000000000ULL / (uint64_t)am2_audio_rate;
+    if (frames <= 0)
+        return;
+    if (frames > am2_audio_scratch_frames) {
+        float *n = (float *)realloc(am2_audio_scratch, (size_t)frames * 2 * sizeof(float));
+        if (!n)
+            return;
+        am2_audio_scratch = n;
+        am2_audio_scratch_frames = frames;
+    }
+    am2_audio_mix(am2_audio_ud, am2_audio_scratch, frames);
+    SDL_PutAudioStreamData(am2_sdl_audio, am2_audio_scratch, frames * (int)(2 * sizeof(float)));
+#ifdef AM2_DEVTOOLS
+    if (am2_audio_dump)
+        fwrite(am2_audio_scratch, 2 * sizeof(float), (size_t)frames, am2_audio_dump);
+#endif
+}
+
 int32_t am2_host_audio_open(int32_t rate, am2_audio_mix_fn mix, void *ud)
 {
     SDL_AudioSpec spec;
@@ -614,8 +953,10 @@ int32_t am2_host_audio_open(int32_t rate, am2_audio_mix_fn mix, void *ud)
     spec.freq     = rate;
     am2_audio_mix = mix;
     am2_audio_ud  = ud;
+    am2_audio_rate = rate;
     am2_sdl_audio = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
-                                              &spec, am2_audio_pull, NULL);
+                                              &spec, am2_host_lockstep() ? NULL : am2_audio_pull,
+                                              NULL);
     if (!am2_sdl_audio) {
         am2_plat_log("audio: no playback device (%s); the game runs silent",
                      SDL_GetError());
@@ -651,7 +992,47 @@ typedef struct AM2_HostTimer {
     am2_timer_fn fn;
     void        *ud;
     int32_t      periodic;
+    uint64_t     due, interval;     /* lockstep: on the virtual clock */
+    uint32_t     id;
 } AM2_HostTimer;
+
+/* Lockstep's timers: a list the pump walks, in the order they were made. */
+#define AM2_LOCK_TIMERS 32
+static AM2_HostTimer *am2_lock_timers[AM2_LOCK_TIMERS];
+static uint32_t       am2_lock_timer_next_id = 0x4000;
+
+static void am2_timers_fire_due(void)
+{
+    static int32_t firing;
+    int32_t        i;
+
+    if (!am2_host_lockstep() || firing)
+        return;
+    firing = 1;
+    for (i = 0; i < AM2_LOCK_TIMERS; i++) {
+        int32_t guard = 0;
+        /* A callback may kill its own timer and arm another into the same
+         * slot, so nothing about `t` is trusted after fn returns: the slot
+         * is re-read, and a record that is no longer there is not touched. */
+        while (am2_lock_timers[i] && am2_clock_ns >= am2_lock_timers[i]->due && guard++ < 64) {
+            AM2_HostTimer *t = am2_lock_timers[i];
+            int32_t        periodic = t->periodic;
+            uint64_t       interval = t->interval;
+            am2_plat_debug("lockstep: timer %u fires at %llu ms", (unsigned)t->id,
+                           (unsigned long long)(am2_clock_ns / 1000000ULL));
+            t->fn(t->ud);
+            if (am2_lock_timers[i] != t)
+                break;
+            if (!periodic) {
+                am2_lock_timers[i] = NULL;
+                free(t);
+                break;
+            }
+            t->due += interval;
+        }
+    }
+    firing = 0;
+}
 
 static Uint32 SDLCALL am2_timer_fire(void *ud, SDL_TimerID id, Uint32 interval)
 {
@@ -682,6 +1063,19 @@ uint32_t am2_host_timer_add(uint32_t ms, int32_t periodic, am2_timer_fn fn, void
     t->fn = fn;
     t->ud = ud;
     t->periodic = periodic;
+    if (am2_host_lockstep()) {
+        for (i = 0; i < AM2_LOCK_TIMERS; i++) {
+            if (!am2_lock_timers[i]) {
+                t->interval = (uint64_t)(ms ? ms : 1) * 1000000ULL;
+                t->due = am2_clock_ns + t->interval;
+                t->id = am2_lock_timer_next_id++;
+                am2_lock_timers[i] = t;
+                return t->id;
+            }
+        }
+        free(t);
+        return 0;
+    }
     id = SDL_AddTimer(ms ? ms : 1, am2_timer_fire, t);
     if (!id) {
         free(t);
@@ -702,6 +1096,15 @@ uint32_t am2_host_timer_add(uint32_t ms, int32_t periodic, am2_timer_fn fn, void
 void am2_host_timer_remove(uint32_t id)
 {
     int32_t i;
+
+    if (am2_host_lockstep()) {
+        for (i = 0; i < AM2_LOCK_TIMERS; i++)
+            if (am2_lock_timers[i] && am2_lock_timers[i]->id == id) {
+                free(am2_lock_timers[i]);
+                am2_lock_timers[i] = NULL;
+            }
+        return;
+    }
 
     /* Removing a one-shot that has already fired is a no-op; SDL says so
      * and its record is gone. */
@@ -741,6 +1144,7 @@ int main(int argc, char **argv)
         cmdline[used] = 0;
     }
 
+    am2_game_thread = pthread_self();
     SDL_SetAppMetadata("Army Men II", "0.1", "org.armymen2.port");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         fprintf(stderr, "platform: SDL_Init: %s\n", SDL_GetError());
