@@ -156,8 +156,8 @@ extern const uint8_t am2_pickup_kind_index[29];
 #define ADDR_CRT_BSEARCH      AM2_SA(crt_bsearch)
 #define ADDR_CRT_CHDIR        AM2_SA(_chdir)
 #define ADDR_CRT_CHMOD        AM2_SA(_chmod)
-#define ADDR_CRT_FFLUSH       AM2_SA(fflush)
-#define ADDR_CRT_FGETS        AM2_SA(fgets)
+#define ADDR_CRT_FFLUSH       AM2_SA(crt_fflush)
+#define ADDR_CRT_FGETS        AM2_SA(crt_fgets)
 #define ADDR_CRT_FINDCLOSE    AM2_SA(am2_sa_findclose)
 #define ADDR_CRT_FINDFIRST    AM2_SA(am2_sa_findfirst)
 #define ADDR_CRT_FINDNEXT     AM2_SA(am2_sa_findnext)
@@ -182,18 +182,15 @@ extern const uint8_t am2_pickup_kind_index[29];
 #define ADDR_CRT_STRTOK       AM2_SA(crt_strtok)
 #define ADDR_CRT_STRTOL       AM2_SA(crt_strtol)
 #define ADDR_CRT_TIME         AM2_SA(time)
-#define ADDR_FCLOSE           AM2_SA(fclose)
-/* The native build's fopen translates the game's Windows paths -- separators,
- * a drive letter, case -- into the files that exist; see src/platform/crt.cpp.
- * Under Wine the loader does that, so libc's is the right one there. */
-#ifdef AM2_NATIVE
-#define ADDR_FOPEN            AM2_SA(am2_fopen)
-#else
-#define ADDR_FOPEN            AM2_SA(fopen)
-#endif
-#define ADDR_FREAD            AM2_SA(fread)
-#define ADDR_FSEEK            AM2_SA(fseek)
-#define ADDR_FWRITE           AM2_SA(fwrite)
+#define ADDR_FCLOSE           AM2_SA(crt_fclose)
+/* The CRT's own stdio, over CreateFileA and friends: the native build's
+ * kernel32crt.cpp translates the game's Windows paths there -- separators,
+ * a drive letter, case -- and Wine's kernel32 does the same for the
+ * standalone, so one fopen serves both. */
+#define ADDR_FOPEN            AM2_SA(crt_fopen)
+#define ADDR_FREAD            AM2_SA(crt_fread)
+#define ADDR_FSEEK            AM2_SA(crt_fseek)
+#define ADDR_FWRITE           AM2_SA(crt_fwrite)
 #define ADDR_GAME_DELETE      AM2_SA(am2_sa_operator_delete)
 #define ADDR_GAME_MALLOC      AM2_SA(malloc)
 #define ADDR_GAME_OPERATOR_NEW AM2_SA(am2_sa_operator_new)
@@ -212,7 +209,7 @@ extern const uint8_t am2_pickup_kind_index[29];
 #undef ADDR_GAME_FREE
 #undef ADDR_FREE_ARMY_LISTS_ALIAS
 #undef ADDR_SCRIPT_PARSE_ACTION
-#define ADDR_FTELL            AM2_SA(am2_sa_ftell)
+#define ADDR_FTELL            AM2_SA(crt_ftell)
 #define ADDR_GAME_FREE        AM2_SA(free)
 #define ADDR_FREE_ARMY_LISTS_ALIAS AM2_SA(am2_sa_free_army_lists)
 

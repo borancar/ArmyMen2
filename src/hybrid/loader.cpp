@@ -189,6 +189,7 @@ static const void *am2_hybrid_make_stub(const char *module, const char *name)
 
 #ifdef AM2_DEVTOOLS
 extern "C" void input_init(void);
+extern "C" int32_t WINAPI am2_crtcheck_main(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int32_t show);
 extern "C" int  control_start(void);
 #endif
 
@@ -468,6 +469,12 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
      * they do there. */
     input_init();
     control_start();
+
+    /* AM2_CRTCHECK=<dir>: run src/hybrid/crtcheck.cpp instead of the game.
+     * It takes over at WinMain, so the original CRT's startup has run and
+     * both stacks share the tables it built. */
+    if (getenv("AM2_CRTCHECK"))
+        am2_hybrid_patch_jmp(ADDR_WIN_MAIN, (const void *)&am2_crtcheck_main);
 #endif
 
     am2_plat_log("running %s from its entry point 0x%08lx", path, (unsigned long)(uintptr_t)entry);

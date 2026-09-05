@@ -246,7 +246,7 @@ endif
 # reads a global needs that global mapped, and mapping it means starting the
 # game, which is the thing this avoids.
 SELFTEST_SRC := tests/selftest.cpp src/game/rect.cpp src/game/dist.cpp \
-                src/game/packkey.cpp src/game/item.cpp src/game/msgslot.cpp src/game/armymsg.cpp src/game/defparse.cpp src/game/definfo.cpp src/game/region.cpp src/game/objflag.cpp src/game/misc.cpp src/game/objtype.cpp src/game/objtable.cpp src/game/cheat.cpp src/game/script.cpp src/game/objscript.cpp src/game/image.cpp src/game/crt.cpp src/game/gamedir.cpp src/game/event.cpp src/game/savetag.cpp src/game/army.cpp src/game/maprow.cpp src/game/map.cpp src/game/air.cpp src/game/trig.cpp src/game/gameproc.cpp src/game/pad.cpp src/game/place.cpp src/game/dirty.cpp src/game/anim.cpp src/platform/crt/sort.cpp src/platform/crt/string.cpp src/platform/crt/conv.cpp src/platform/crt/printf.cpp src/platform/crt/fltcvt.cpp src/platform/crt/stdio.cpp
+                src/game/packkey.cpp src/game/item.cpp src/game/msgslot.cpp src/game/armymsg.cpp src/game/defparse.cpp src/game/definfo.cpp src/game/region.cpp src/game/objflag.cpp src/game/misc.cpp src/game/objtype.cpp src/game/objtable.cpp src/game/cheat.cpp src/game/script.cpp src/game/objscript.cpp src/game/image.cpp src/game/crt.cpp src/game/gamedir.cpp src/game/event.cpp src/game/savetag.cpp src/game/army.cpp src/game/maprow.cpp src/game/map.cpp src/game/air.cpp src/game/trig.cpp src/game/gameproc.cpp src/game/pad.cpp src/game/place.cpp src/game/dirty.cpp src/game/anim.cpp src/platform/crt/sort.cpp src/platform/crt/string.cpp src/platform/crt/conv.cpp src/platform/crt/printf.cpp src/platform/crt/fltcvt.cpp src/platform/crt/stdio.cpp src/platform/crt/lowio.cpp src/platform/crt/standin.cpp
 
 .PHONY: selftest
 selftest: $(BUILD)/selftest.exe
@@ -328,7 +328,7 @@ vectors:
 .PHONY: check
 check:
 	@rc=0; \
-	for t in coverage comcalls merges checkcom checkhooks binpatches blindspots checkclaims crt scripttokens scriptactions screens checkpatches checkprose checkseams checkinstalled checkcallers checkglobals checkoffsets checksplit checkthis checkgap checkvtables glyphdump qsortcheck printfcheck moviecheck posecheck formationcheck shakecheck roachcheck rlecheck mprowcheck weaponcheck listcheck placementcheck aicheck hitreactcheck savetagcheck numberkeycheck aiignorecheck aitwincheck aiwalkcheck aifollowcheck aikeeprangecheck rowreleasecheck stateleavecheck refreshcheck vehpointcheck roachbitecheck pathplancheck vehexitcheck tilesetcheck damagecheck shotcheck shotdmgcheck rectquerycheck ringcheck boolcheck explcheck collectcheck firepose regioncheck pathcheck tilepathcheck cheats; do \
+	for t in coverage comcalls merges checkcom checkhooks binpatches blindspots checkclaims crt scripttokens scriptactions screens checkpatches checkprose checkseams checkinstalled checkcallers checkglobals checkoffsets checksplit checkthis checkgap checkvtables glyphdump qsortcheck printfcheck crtcheck moviecheck posecheck formationcheck shakecheck roachcheck rlecheck mprowcheck weaponcheck listcheck placementcheck aicheck hitreactcheck savetagcheck numberkeycheck aiignorecheck aitwincheck aiwalkcheck aifollowcheck aikeeprangecheck rowreleasecheck stateleavecheck refreshcheck vehpointcheck roachbitecheck pathplancheck vehexitcheck tilesetcheck damagecheck shotcheck shotdmgcheck rectquerycheck ringcheck boolcheck explcheck collectcheck firepose regioncheck pathcheck tilepathcheck cheats; do \
 	    printf '  %-12s ' "$$t"; \
 	    if ./.venv/bin/python tools/$$t.py >/dev/null 2>&1; then \
 	        echo ok; \
@@ -549,7 +549,9 @@ HYBRID_LDF   := $(NATIVE_ARCH) -static-libgcc \
 # control.c and input.c, over the stubs in src/hybrid/devtools.cpp), so a
 # run can be driven and its object table dumped exactly as the native
 # development binary's can. Same port, same tools.
-HYBRID_DEV_OBJ := $(patsubst %.cpp,$(BUILD)/hybrid-dev/%.o,$(HYBRID_SRC) src/hybrid/devtools.cpp) \
+HYBRID_DEV_SRC := $(HYBRID_SRC) src/hybrid/devtools.cpp src/hybrid/crtcheck.cpp \
+                  src/game/image.cpp $(wildcard src/platform/crt/*.cpp)
+HYBRID_DEV_OBJ := $(patsubst %.cpp,$(BUILD)/hybrid-dev/%.o,$(HYBRID_DEV_SRC)) \
                   $(patsubst %.c,$(BUILD)/hybrid-dev/%.o,$(SA_CSRC))
 HYBRID_CF    := $(NATIVE_ARCH) -O2 -g -Wall -Wextra -std=gnu11 -fno-strict-aliasing \
                 $(DEPFLAGS) $(HYBRID_DEFS)

@@ -209,9 +209,6 @@ extern "C" void *am2_sa_operator_new(size_t n) { return malloc(n); }
 extern "C" void am2_sa_operator_delete(void *p) { free(p); }
 #endif
 
-
-extern "C" long am2_sa_ftell(void *fp) { return ftell((FILE *)fp); }
-
 extern "C" void am2_sa_free_army_lists(void) { FreeArmyObjLists(); }
 
 extern "C" int32_t am2_sa_unimplemented(void)

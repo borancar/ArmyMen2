@@ -18233,6 +18233,52 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_FCLOSE         0x0046486Cu  /* int32_t(FILE*) */
 #define ADDR_FSEEK          0x00464F18u  /* int32_t(FILE*, int32_t, int32_t) */
 #define ADDR_FWRITE         0x004644B7u  /* size_t(const void*,size_t,size_t,FILE*) */
+
+/* The rest of the CRT's stdio and its low-level I/O layer, from the bodies.
+ * A FILE is 0x20 bytes {ptr, cnt, base, flag, file, charbuf, bufsiz,
+ * tmpfname}; an ioinfo is 8 {osfhnd, osfile, pipech} and the table is 64
+ * blocks of 32, indexed fd>>5 / fd&31. src/platform/crt/stdio.cpp and
+ * lowio.cpp reconstruct all of it. */
+#define ADDR_CRT_FSOPEN        0x004648C2u  /* FILE *(path, mode, shflag) */
+#define ADDR_CRT_OPENFILE      0x00467FF8u  /* FILE *(path, mode, shflag, FILE *): parses the mode, _sopen, fills the FILE */
+#define ADDR_CRT_GETSTREAM     0x00468168u  /* FILE *(void): first free __piob slot, allocating one */
+#define ADDR_CRT_FLUSH         0x00465AD1u  /* int32(FILE *): _flush, writes the buffer out */
+#define ADDR_CRT_FLUSHALL      0x00465B36u  /* int32(int32 flag): every __piob stream; 1 counts, 0 only writers */
+#define ADDR_CRT_FLSBUF        0x00466AB3u  /* int32(ch, FILE *) */
+#define ADDR_CRT_FILBUF        0x004670B5u  /* int32(FILE *) */
+#define ADDR_CRT_GETBUF        0x0046AE81u  /* void(FILE *): malloc(0x1000) or the two-byte charbuf */
+#define ADDR_CRT_FREEBUF       0x00467FCDu  /* void(FILE *) */
+#define ADDR_CRT_ISATTY        0x0046AEC5u  /* int32(fd): osfile & FDEV */
+#define ADDR_CRT_INITSTDIO     0x00469BE6u  /* void(void): __initstdio, allocates __piob over _iob */
+#define ADDR_CRT_SOPEN         0x0046B0AEu  /* int32(path, oflag, shflag, pmode) */
+#define ADDR_CRT_READ          0x0046718Eu  /* int32(fd, buf, n): ReadFile plus the text-mode CR/LF and Ctrl-Z rules */
+#define ADDR_CRT_WRITE         0x00466BC8u  /* int32(fd, buf, n): WriteFile, LF -> CR LF through a 0x400 frame buffer */
+#define ADDR_CRT_LSEEK         0x0046958Fu  /* int32(fd, off, whence) */
+#define ADDR_CRT_CLOSE         0x00467F1Au  /* int32(fd) */
+#define ADDR_CRT_COMMIT        0x00469B8Fu  /* int32(fd): FlushFileBuffers */
+#define ADDR_CRT_CHSIZE        0x0046CB42u  /* int32(fd, size) */
+#define ADDR_CRT_SETMODE       0x0046D113u  /* int32(fd, mode): flips FTEXT, answers the old mode */
+#define ADDR_CRT_ALLOC_OSFHND  0x0046AEEBu  /* int32(void): first free ioinfo, growing the table 32 at a time */
+#define ADDR_CRT_SET_OSFHND    0x0046AF80u  /* int32(fd, HANDLE) */
+#define ADDR_CRT_FREE_OSFHND   0x0046AFF7u  /* int32(fd) */
+#define ADDR_CRT_GET_OSFHANDLE 0x0046B071u  /* HANDLE(fd) */
+#define ADDR_CRT_DOSMAPERR     0x00469D90u  /* void(oserr): _doserrno = oserr, errno from ADDR_CRT_ERRTABLE */
+#define ADDR_CRT_IOINIT        0x004693E4u  /* void(void): _ioinit, block 0 of the table plus the three standard handles */
+#define ADDR_CRT_MEMCPY        0x00466D80u  /* void *(dst, src, n) */
+#define ADDR_CRT_IOB           0x0048CEC0u  /* FILE[20] _iob; stdin holds _bufin, stdout and stderr are 2/1 and 2/2 */
+#define ADDR_CRT_BADIOINFO     0x0048CC90u  /* ioinfo __badioinfo {-1, 0, 0x0A}: what fd -1 indexes */
+#define ADDR_CRT_APP_TYPE      0x0048CC54u  /* int32 __app_type: 2 (GUI), so the SetStdHandle arms in the osfhnd pair never run */
+#define ADDR_CRT_ERRTABLE      0x0048D140u  /* {uint32 oserr, uint32 errno}[45], ends at 0x0048D2A8 */
+#define ADDR_CRT_ERRTABLE_END  0x0048D2A8u
+#define ADDR_CRT_PIOB          0x00664AE8u  /* FILE **__piob */
+#define ADDR_CRT_NSTREAM       0x00665B00u  /* int32 _nstream: 0x200 once __initstdio has run */
+#define ADDR_CRT_PIOINFO       0x00665B20u  /* ioinfo *__pioinfo[64] */
+#define ADDR_CRT_NHANDLE       0x00665C20u  /* int32 _nhandle: 32 per allocated block */
+#define ADDR_CRT_COMMODE       0x006647D8u  /* int32 _commode: the flag bits every fopen starts from */
+#define ADDR_CRT_CFLUSH        0x0066468Cu  /* int32 _cflush: bumped by _openfile and _getbuf, read by nothing here */
+#define ADDR_CRT_DOSERRNO      0x00664604u  /* uint32 _doserrno */
+#define ADDR_CRT_FMODE         0x006648B0u  /* int32 _fmode: 0 is text, 0x8000 binary */
+#define ADDR_CRT_UMASKVAL      0x00664608u  /* int32 _umaskval */
 #define ADDR_MODE_RB        0x00474170u  /* "rb" */
 
 /* ---- typed accessors -------------------------------------------------- */

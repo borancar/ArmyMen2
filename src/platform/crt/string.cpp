@@ -185,6 +185,16 @@ char *__cdecl crt_strcpy(char *dst, const char *src)
 
 /* 0x00465710: memmove, which copies backwards when the destination lies
  * above an overlapping source. */
+void *__cdecl crt_memcpy(void *dst, const void *src, uint32_t n)
+{
+    uint8_t       *d = (uint8_t *)dst;
+    const uint8_t *s = (const uint8_t *)src;
+
+    while (n--)
+        *d++ = *s++;
+    return dst;
+}
+
 void *__cdecl crt_memmove(void *dst, const void *src, uint32_t n)
 {
     uint8_t       *d = (uint8_t *)dst;

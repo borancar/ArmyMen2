@@ -114,7 +114,7 @@ ORACLES = ("moviecheck posecheck formationcheck shakecheck roachcheck rlecheck "
            "collectcheck firepose regioncheck pathcheck tilepathcheck "
            "placementcheck aicheck rectquerycheck hitreactcheck savetagcheck "
            "numberkeycheck aiignorecheck aitwincheck aiwalkcheck aifollowcheck aikeeprangecheck rowreleasecheck stateleavecheck refreshcheck vehpointcheck roachbitecheck pathplancheck vehexitcheck tilesetcheck damagecheck shotcheck shotdmgcheck "
-           "scriptcheck qsortcheck printfcheck").split()
+           "scriptcheck qsortcheck printfcheck crtcheck").split()
 
 DOCSTRING = re.compile(r'"""[\s\S]*?"""')
 COMMENT = re.compile(r"#[^\n]*")

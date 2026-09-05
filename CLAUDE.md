@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **66** analysis
+**`make check` runs everything that does not need the game.** **67** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -436,6 +436,42 @@ the recording through the C in `tests/selftest.cpp` -- and by lockstep for
 the rest. A mutation that cannot fail is stated as a theorem in the tool,
 not left as a gap: which side of a partition `qsort` pushes first changes
 nothing but the stack depth.
+
+**THE HYBRID IS THE CRT'S ORACLE, AND IT NEEDS NEITHER WINE NOR AN
+EMULATOR.** `build/armymen2-hybrid-dev` runs the ORIGINAL CRT over
+`src/platform`, so its `fopen` reaches our `CreateFileA` through the IAT
+and its `fread` our `ReadFile`; link `src/platform/crt` beside it and the
+reconstruction reaches the same two by name. `AM2_CRTCHECK=<dir>` takes
+over at `WinMain`, after the original's startup has built the heap and the
+handle tables, and `src/hybrid/crtcheck.cpp` runs one scripted sequence
+of stdio calls through each stack on its own copy of a generated file,
+comparing every return value, errno, the FILE's fields, a hash of the
+bytes and the file left behind. Where Unicorn needed a hooked `ReadFile`
+and a Python model of a file, this needs nothing: the same platform is
+under both, so only the CRT is being compared. `tools/crtcheck.py` is it
+in `make check`, in seconds. Reach for this shape before an emulator for
+anything the CRT does through kernel32.
+
+Two things it settled on its first run that reading had not. A field can
+be STALE rather than wrong: neither `_getstream` nor `_openfile` writes
+`bufsiz`, so a fresh FILE carries whatever the slot's last user left, and
+the comparison reads it only while a buffer exists -- an exact oracle over
+shared tables has to know which fields the API can see. And the original
+has undefined behaviour the reconstruction reproduces exactly: a read on
+a stream whose last operation was a write leaves `cnt` at -1 through
+`_filbuf`'s error arm, after which the next `fwrite` copies
+`min(remaining, 0xFFFFFFFF)` bytes into the buffer. Both stacks took the
+process down on that until the scripts stopped asking; a mutation that
+makes writes fail reaches it again through a failed flush. Say what a
+corpus must NOT do as well as what it reaches.
+
+**A MUTATION PASS THAT RESTORES WITH `git checkout` DESTROYS AN UNTRACKED
+FILE'S WORK AND RESETS A TRACKED ONE'S.** Nine mutations over two new
+modules, restored with `git checkout -- FILE` after each: the untracked
+one was left carrying two mutations at once, and the tracked one -- whose
+committed state was a stub -- was silently replaced by that stub, so the
+third mutation failed to build and the fourth's anchor was gone. Restore
+from a copy taken before the edit, and assert the file equals it after.
 
 **THE CRT'S FLOAT FORMATTING IS INTEGER ARITHMETIC, AND ITS CONSTANTS ARE
 THE IMAGE'S.** `%6.2f` goes through a twelve-byte long double, a five-word

@@ -43,12 +43,37 @@ original answered under Unicorn:
   theorem (no entry in either table sits on 0x8000), and the multiply's
   exact-half tie is a GAP: no value in the corpus lands on it.
 
-The game's `sprintf`, `qsort`, `bsearch`, `rand`, `atoi`, `strtol` and the
-string functions above now run on the CRT in both the standalone and the
-native build; the lockstep comparison is unchanged by it, as it should be.
+- `stdio.cpp` and `lowio.cpp` (2026-09-06): `fopen` through `_openfile`,
+  `_getstream` and `_sopen`; `fclose`, `fread`, `fwrite`, `fgets`, `fseek`,
+  `ftell`, `fflush` with `_flush` and `_flushall`, `_flsbuf`, `_filbuf`,
+  `_getbuf`, `_freebuf`; and beneath them the `__pioinfo` handle table --
+  `_alloc_osfhnd` and its three siblings, `_read` with the text-mode CR LF
+  and Ctrl-Z rules, `_write` with LF expansion, `_lseek`, `_close`,
+  `_commit`, `_chsize`, `_setmode`, `_isatty`, `_dosmaperr` over the
+  image's own table, `_ioinit` and `__initstdio`. The FILEs are the
+  image's `_iob`, the tables are the image's, and the two initialisers run
+  lazily on the first open since nothing here runs the original's
+  startup. **The oracle is the hybrid, with no Wine and no emulator**:
+  `build/armymen2-hybrid-dev` runs the original CRT over `src/platform`,
+  and `AM2_CRTCHECK=<dir>` (`tools/crtcheck.sh`, `tools/crtcheck.py` in
+  `make check`) links the reconstruction beside it and runs
+  `src/hybrid/crtcheck.cpp` instead of the game: 521 scripted sequences of
+  stdio calls over 19 generated files, through both stacks on separate
+  copies, 40,211 calls compared on return value, errno, the FILE's fields
+  and a hash of the bytes, and every file compared afterwards. 0 differ.
+  Eight of nine mutations fail it and the ninth is unreachable through the
+  FILE layer; the letters S, R, T and D stay verified by reading.
 
-Next: stdio (`fopen` and its family over the lowio handles and `_iob`),
-the directory and time functions, and the heap.
+The game's stdio, `sprintf`, `qsort`, `bsearch`, `rand`, `atoi`, `strtol`
+and the string functions above now run on the CRT in both the standalone
+and the native build; the lockstep comparison is unchanged by all of it,
+as it should be. `standin.cpp` holds what the modules need and nothing
+has read yet -- `malloc`, `calloc`, `free` and `_amsg_exit` over the host
+-- and says so in its name.
+
+Next: the directory and time functions (`_findfirst` and its family,
+`_chdir`, `_getcwd`, `_mkdir`, `_rmdir`, `remove`, `_chmod`, `time`),
+`strtod`, `memcpy`'s vectors, and the heap, which retires `standin.cpp`.
 
 ## THE ORIGINAL AND THE RECONSTRUCTION RUN IN LOCKSTEP
 
@@ -705,7 +730,7 @@ clean.
 
 ## In flight
 
-Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **66** analysis
+Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **67** analysis
 tools in `make check` (`tools/checkpatches.py`; `tools/checkclaims.py` counts
 the recipe).
 
