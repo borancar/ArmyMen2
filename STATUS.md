@@ -1116,3 +1116,47 @@ and the original doing the same drive:
                            original   circle 20 wide, 18 tall
 
 so the standalone plays, and today's route-gate fix is in it.
+
+## The whole suite after both of today's changes
+
+`tools/ab.sh all`, 17 configurations, one run, after the route-gate fix and the
+standalone input wiring:
+
+| | evidence |
+|---|---|
+| bootcamp | state identical (1,610 objects), log identical, 22 pixels |
+| windowed | log identical, 0 pixels |
+| intro | log identical (its pixels are two unsynchronised playbacks) |
+| audio | log identical, 22 pixels |
+| mission | state, widgets and log identical; frame gate FAILS |
+| combat | log identical; frame gate FAILS |
+| campaign | widgets identical (35), log identical, 2 pixels |
+| controls | widgets identical (26), log identical, 0 pixels |
+| difficulty | widgets identical (7), log identical, 0 pixels |
+| audiovol | widgets identical (14), log identical, 45 pixels |
+| menuscreens | widgets identical (8), log identical, 0 pixels |
+| movies | widgets identical (9), log identical, 0 pixels |
+| multi | widgets identical (9), log identical, 0 pixels |
+| mpoptions | state identical (5), widgets identical (131), log identical (35), 151 pixels |
+| df | log identical (24), 0 pixels |
+| state3 | state identical, log identical, 0 pixels |
+| quit | log identical, 0 pixels |
+
+So every artifact this suite compares is identical everywhere, and the only two
+failures are the two frame gates -- `mission`'s, which this file already
+documents as failing for reasons nobody has established, and `combat`'s, which
+the previous commit measured as PRE-EXISTING and NARROWED by the movement fix.
+
+**`combat`'s gate points the OTHER WAY from `mission`'s, on the same machine
+and the same build, and that is not yet explained.** `mission` reads
+26,369/8,461 -- the ORIGINAL running away, which this file calls structural and
+attributes to the `AM2_NOPATCH` half having no trace stubs in front of it.
+`combat` reads 16,505/44,385 and 16,592/43,432 on two runs, with OURS the
+runaway. One build cannot be both slower and faster than the original for the
+reason the trace stubs give, so at least one of those two configurations is
+failing for a different reason than the file states.
+
+Recorded rather than guessed at. What would settle it is what the `frames`
+number actually counts -- the `-dbg` per-frame markers, which is not the same
+question as how many frames were composed -- and nothing has checked that the
+two sides emit one marker per frame in the same places.
