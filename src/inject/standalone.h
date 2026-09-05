@@ -167,19 +167,40 @@ extern const uint8_t am2_pickup_kind_index[29];
 #define ADDR_CRT_MKDIR        AM2_SA(_mkdir)
 #define ADDR_CRT_QSORT        AM2_SA(qsort)
 #define ADDR_CRT_REALLOC      AM2_SA(realloc)
+#ifdef AM2_NATIVE
+#define ADDR_CRT_REMOVE       AM2_SA(am2_remove)
+#else
 #define ADDR_CRT_REMOVE       AM2_SA(remove)
+#endif
 #define ADDR_CRT_RMDIR        AM2_SA(_rmdir)
+/* glibc's C++ string.h overloads strchr and strstr, so taking their address
+ * needs the type spelled out; MSVC's and mingw's do not. */
+#ifdef AM2_NATIVE
+#define ADDR_CRT_STRCHR       ((uintptr_t)(void *)(const char *(*)(const char *, int))strchr)
+#else
 #define ADDR_CRT_STRCHR       AM2_SA(strchr)
+#endif
 #define ADDR_CRT_STRLWR       AM2_SA(_strlwr)
 #define ADDR_CRT_STRNCPY      AM2_SA(strncpy)
 #define ADDR_CRT_STRNICMP     AM2_SA(_strnicmp)
+#ifdef AM2_NATIVE
+#define ADDR_CRT_STRSTR       ((uintptr_t)(void *)(const char *(*)(const char *, const char *))strstr)
+#else
 #define ADDR_CRT_STRSTR       AM2_SA(strstr)
+#endif
 #define ADDR_CRT_STRTOD       AM2_SA(strtod)
 #define ADDR_CRT_STRTOK       AM2_SA(strtok)
 #define ADDR_CRT_STRTOL       AM2_SA(strtol)
 #define ADDR_CRT_TIME         AM2_SA(time)
 #define ADDR_FCLOSE           AM2_SA(fclose)
+/* The native build's fopen translates the game's Windows paths -- separators,
+ * a drive letter, case -- into the files that exist; see src/platform/crt.cpp.
+ * Under Wine the loader does that, so libc's is the right one there. */
+#ifdef AM2_NATIVE
+#define ADDR_FOPEN            AM2_SA(am2_fopen)
+#else
 #define ADDR_FOPEN            AM2_SA(fopen)
+#endif
 #define ADDR_FREAD            AM2_SA(fread)
 #define ADDR_FSEEK            AM2_SA(fseek)
 #define ADDR_FWRITE           AM2_SA(fwrite)

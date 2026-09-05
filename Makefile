@@ -473,5 +473,68 @@ run-stock:
 	WINEPREFIX="$(PREFIX)" WINEDEBUG=$(WINEDBG) \
 	    $(WINE) explorer /desktop=$(DESKNAME),$(DESKTOP) "$(GAMEEXE)"
 
+# The NATIVE build: the same reconstruction as the standalone, linked as a
+# Linux executable against src/platform -- the Win32 and DirectX surface the
+# game's win32/ modules call, implemented over SDL3 -- instead of against
+# Wine. One executable, no runner: SDL is the outermost layer and everything
+# the game sees below its window is emulated to it.
+#
+# It is i386, not x86_64, and cannot be otherwise: the carried .data holds
+# 32-bit pointers and every record offset in the reconstruction assumes a
+# 4-byte pointer. The section placement is the standalone's -- .origdat at
+# the original's VAs, our code above at 0x00700000 -- and the same generated
+# files serve both; only the assembler directives in them differ by format.
+# Needs glibc-devel.i686, libstdc++-devel.i686 and SDL3-devel.i686.
+#
+#     make native                          builds build/armymen2
+#     AM2_GAMEDIR="$(GAMEDIR)" build/armymen2 -nointro
+NATIVE_CXX   := g++
+NATIVE_CC    := gcc
+NATIVE_SRC   := $(SA_SRC) $(wildcard src/platform/*.cpp)
+NATIVE_CSRC  := $(SA_CSRC)
+NATIVE_OBJ   := $(patsubst %.cpp,$(BUILD)/native/%.o,$(NATIVE_SRC)) \
+                $(patsubst %.c,$(BUILD)/native/%.o,$(NATIVE_CSRC)) \
+                $(BUILD)/native/origdata.o $(BUILD)/native/origgap.o
+NATIVE_DEFS  := -DAM2_STANDALONE -DAM2_NATIVE -Ibuild/standalone \
+                -isystem src/platform/include -include callconv.h
+NATIVE_ARCH  := -m32 -fno-pie -no-pie
+NATIVE_CXXF  := $(NATIVE_ARCH) -O2 -g -Wall -Wextra -std=gnu++14 \
+                -fno-strict-aliasing -fno-exceptions -fno-rtti $(DEPFLAGS) \
+                $(NATIVE_DEFS)
+NATIVE_CF    := $(NATIVE_ARCH) -O2 -g -Wall -Wextra -std=gnu11 \
+                -fno-strict-aliasing $(DEPFLAGS) $(NATIVE_DEFS)
+NATIVE_LDF   := $(NATIVE_ARCH) -static-libgcc \
+                -Wl,--section-start,.origgap=0x00401000 \
+                -Wl,--section-start,.origdat=0x0046F000 \
+                -Wl,--section-start,.origbss=$$(cat build/standalone/origbss.addr) \
+                -Wl,-Ttext=0x00700000 -Wl,-z,norelro -Wl,--no-warn-rwx-segments
+NATIVE_LIBS  := -lSDL3 -lpthread -lm
+
+.PHONY: native
+native: standalone-generate
+	$(MAKE) $(BUILD)/armymen2
+
+$(BUILD)/native/%.o: %.cpp | standalone-generate
+	@mkdir -p $(dir $@)
+	$(NATIVE_CXX) $(NATIVE_CXXF) -c $< -o $@
+
+$(BUILD)/native/%.o: %.c | standalone-generate
+	@mkdir -p $(dir $@)
+	$(NATIVE_CC) $(NATIVE_CF) -c $< -o $@
+
+$(BUILD)/native/origdata.o: build/standalone/origdata.S | standalone-generate
+	@mkdir -p $(dir $@)
+	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
+
+$(BUILD)/native/origgap.o: build/standalone/origgap.S | standalone-generate
+	@mkdir -p $(dir $@)
+	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
+
+-include $(NATIVE_OBJ:.o=.d)
+
+$(BUILD)/armymen2: $(NATIVE_OBJ)
+	$(NATIVE_CXX) -o $@ $(NATIVE_OBJ) $(NATIVE_LDF) $(NATIVE_LIBS)
+	@echo "native: $@"
+
 clean:
 	rm -rf $(BUILD)

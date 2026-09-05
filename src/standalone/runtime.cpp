@@ -114,6 +114,9 @@ static FILE *sa_logfile(void)
         DWORD n = GetModuleFileNameA(NULL, buf, sizeof buf);
         if (n && n < sizeof buf) {
             char *slash = strrchr(buf, '\\');
+            /* The native build's module path is a POSIX one. */
+            if (!slash)
+                slash = strrchr(buf, '/');
             if (slash && (size_t)(slash - buf) + 16 < sizeof buf) {
                 strcpy(slash + 1, "am2port.log");
                 fh = fopen(buf, "w");
@@ -146,6 +149,19 @@ extern "C" void am2_sa_log(const char *fmt, ...)
      * crash the game is worse than no logger. */
     if (IsBadStringPtrA(fmt, 4096))
         return;
+    /* And a readable pointer is not yet a format string: natively that
+     * junk pointer has landed inside the carried data, where it reads as a
+     * few kilobytes of binary before the first NUL, and went into the log
+     * as such. A format string starts with text. */
+    {
+        const unsigned char *p = (const unsigned char *)fmt;
+        int i;
+        for (i = 0; i < 8 && p[i]; i++)
+            if (p[i] < 0x20 && p[i] != '\n' && p[i] != '\t' && p[i] != '\r')
+                return;
+            else if (p[i] >= 0x7F)
+                return;
+    }
 
     va_start(ap, fmt);
     sa_vlog(fmt, ap);
@@ -228,6 +244,18 @@ static LONG CALLBACK am2_sa_gap_filter(EXCEPTION_POINTERS *ep)
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
+#ifdef AM2_NATIVE
+/* The host layer keeps the game's cursor under the pointer; this is how it
+ * learns where the game's cursor is. See platform.h. */
+#include "../platform/platform.h"
+
+static void am2_sa_cursor_query(int32_t *x, int32_t *y)
+{
+    *x = *(const int32_t *)(uintptr_t)ADDR_CURSOR_X;
+    *y = *(const int32_t *)(uintptr_t)ADDR_CURSOR_Y;
+}
+#endif
+
 /* ---- startup --------------------------------------------------------- */
 
 /* Runs before WinMain. The allocator seam is pointed at the host CRT -- in
@@ -240,6 +268,16 @@ extern "C" void am2_standalone_init(void)
     am2_realloc = realloc;
     am2_free = free;
     am2_log = am2_sa_log;
+    /* The directory calls too: crt.cpp's defaults are the host's chdir and
+     * getcwd, which under mingw understand a backslash and under glibc do
+     * not. _chdir is mingw's own there and the platform layer's translating
+     * one in the native build, so SetGameDir's "<dir>\aai" works in both
+     * before am2_crt_use_game has run. */
+    am2_chdir = _chdir;
+    am2_getcwd = _getcwd;
+#ifdef AM2_NATIVE
+    am2_host_cursor_query = am2_sa_cursor_query;
+#endif
     /* FIRST: the original's IAT as we carry it is the FILE's, which no
      * loader has fixed up, so every seam calling through it was jumping to a
      * name-table RVA. Binding it must precede anything that runs game code. */

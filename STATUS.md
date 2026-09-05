@@ -5,7 +5,89 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-04**, at `5df7469`. Working tree clean.
+Last updated: **2026-09-05**, native build landing (see the first section).
+
+## THE GAME RUNS AS A LINUX EXECUTABLE
+
+`make native` builds `build/armymen2`: the same reconstruction as the
+standalone, linked as an i386 ELF against `src/platform/` -- the Win32 and
+DirectX surface `src/game/win32/` calls, implemented over SDL3 -- instead of
+against Wine. One executable, no runner. SDL is the outermost layer; every
+Win32, GDI, DirectDraw, DirectInput, kernel and CRT call the game makes is
+emulated to it below the window.
+
+    make native
+    AM2_GAMEDIR=".wine/drive_c/GOG Games/Army Men II" build/armymen2 -nointro
+
+Needs `glibc-devel.i686`, `libstdc++-devel.i686` and `SDL3-devel.i686`. It is
+32-bit and cannot be otherwise: the carried `.data` holds 32-bit pointers and
+every record offset assumes a 4-byte pointer. The section placement is the
+standalone's -- `.origdat` at the original's VAs, our code at `0x00700000` --
+and the same generated files serve both builds; only the assembler section
+flags differ by object format, and `mkglobals.py` emits both.
+
+**What it reaches, measured on Xvfb `:99` with real X input (`xdotool`):**
+
+| step | evidence |
+|---|---|
+| title screen | **54 of 307,200** pixels differ from the injected build's title frame (`build/shots/99/title.png`), all inside the cursor's 10x13 box |
+| BOOT CAMP, briefing, both dialogs | `lines: 101  tokens: 372  names: 43  compounds: 16` -- the four totals CLAUDE.md records for Boot Camp |
+| live mission | `tools/objdump.py --table` reads **1,609** objects over the control socket; holding W moves Sarge (`pos=1979,1028` after 2.5 s from the start) |
+| QUIT through the menu | `Releasing Comm Connection`, `Unreleased memory (0) blocks`, `Packet Thread Exited with return code 259`, `Receive thread got event 0`, exit 0 -- the same lines as the Wine log, 259 included |
+| the game's own log | 14 messages on a Boot Camp run, the count the Wine A/B table gives, with no line the original does not write |
+
+The layout of `src/platform/` is in its `platform.h`. Four things decided there
+that are worth knowing before touching it:
+
+- **DirectDraw surfaces are plain 8-bit buffers.** The primary's pixels go
+  through its attached palette (or the last realised GDI palette) into one
+  streaming SDL texture on Flip, on any Blt into the primary, on Unlock or
+  ReleaseDC of it, and on a SetEntries of its palette -- that last one is
+  what makes the game's palette fades show without a flip.
+- **Exclusive modes are accepted and not enforced.** `SetCooperativeLevel`,
+  `SetDisplayMode` and DirectInput's exclusive mouse all answer success and do
+  nothing; the game gets a window whose logical size is the mode it asked
+  for, and the desktop keeps its pointer.
+- **GDI text is stb_truetype** (`src/platform/stb/`, vendored, public
+  domain), drawn onto the surface a DC names and thresholded to one palette
+  index, which is what the game's `EncodeGlyph` reads back. ArialNarrow is
+  Liberation Sans at 82% width; ArialBlack is Liberation Sans Bold.
+  `AM2_FONT_NARROW`, `AM2_FONT_BLACK`, `AM2_FONT_DEFAULT` override.
+- **The game's cursor is kept under the host pointer by measuring each delta
+  from where the game's cursor actually is**, not from the last pointer
+  position; `runtime.cpp` installs the query. And each axis is followed by a
+  zero on the same axis, because `PollMouse` re-adds its sticky per-poll delta
+  after EVERY event -- which is the "acceleration" this file's Wine notes
+  measured, explained.
+
+**Five defects the first native run found, each a Windows behaviour the
+reconstruction relied on without saying so:**
+
+- `_strlwr` writes only the characters it changes (MSVC's does); `map.cpp`
+  lowercases the literal `"camera"`, which lives in `.rodata` here.
+- Text-mode `fopen` strips CR before LF; `mpmaps.txt` read raw yields a
+  `"\r"` token on every blank line and the level list does not parse.
+- `crt.cpp`'s host `chdir` default does not understand a backslash; every
+  `SetGameDir` before `am2_crt_use_game` failed silently and the `.aai`
+  files opened from the wrong directory.
+- The packet thread is cdecl behind a stdcall cast (dplay.cpp records the
+  original's mismatch), so the thread trampoline restores `esp` itself.
+- `IID_IDirectPlay4A` and `IID_IDirectPlayLobby3A` were compared against the
+  wrong GUIDs, the lobby was never created, and `CommLobbyStart` calls a
+  method on the NULL that follows -- the original's test there "can only
+  ever pass", so it has no path for that.
+
+**DEFERRED, deliberately:** DirectSound (`DirectSoundCreate` answers
+`DSERR_NODRIVER`, the path CLAUDE.md records for a host with no audio server;
+the mmio calls are declared and inert), DirectPlay (objects that decline
+everything, no transport), and Smacker movies (`SmackOpen` answers NULL).
+Windowed mode (`-w`) renders the same title frame -- 208 pixels differ from
+the reference in both modes, all of them the cursor, drawn at its start
+position here and where the A/B's drive left it there -- and it needed one
+more Windows fact: a windowed primary shows through the system palette GDI
+realised, not through the DirectDraw palette attached to it, which the game
+builds from a snapshot that is still zero at that point. The A/B suite does
+not know this build exists yet.
 
 ## `AM2_GAMEDIR` points the port at the original game's directory
 
