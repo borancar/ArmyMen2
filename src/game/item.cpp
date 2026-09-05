@@ -1911,7 +1911,7 @@ void __cdecl ObjSetRoachFootprint(void *obj)
             continue;
 
         tile = TileOfPoint(at);
-        ((uint8_t *)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
+        (*(uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
             += AM2_TILE_COVER_STEP;
         TileCoverAdd((uint16_t)tile);
 
@@ -2051,6 +2051,15 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
  * rounded to the animation's own directionBits. Both halves of the slot are
  * needed and the roach version has only the second.
  *
+ * ADDR_CELL_WEIGHTS IS A POINTER TO THE PLANE, NOT THE PLANE. The original
+ * loads it (`mov edx, [0x514EC0]` at 0x0045A70B) and then indexes; this
+ * body and the roach pair indexed the global itself for months, so every
+ * vehicle footprint -- laid and lifted once a frame by Step3Drive -- went
+ * into the globals after 0x00514EC0 and never into the plane. The walker in
+ * region.cpp had it right, which is why item stamps were fine and vehicle
+ * ones were 80 cells of nothing. Found by diffing the plane against the
+ * original's under AM2_NOPATCH and bisecting with AM2_NOPATCH_NAMES.
+ *
  * The stamp is bumped ONCE PER CALL and compared per cell, so a cell that two
  * of the mask's points land on is weighted once. It is a different array from
  * the roach pair's, which is worth stating because the two look
@@ -2120,11 +2129,11 @@ static void ObjFootprint(void *obj, int32_t set)
 
         tile = TileOfPoint(at);
         if (set) {
-            ((uint8_t *)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
+            (*(uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
                 += AM2_TILE_COVER_STEP;
             TileCoverAdd((uint16_t)tile);
         } else {
-            ((uint8_t *)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
+            (*(uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
                 -= AM2_TILE_COVER_STEP;
             TileCoverSub((uint16_t)tile);
         }
@@ -2757,7 +2766,7 @@ void __cdecl ObjClearRoachFootprint(void *obj)
             continue;
 
         tile = TileOfPoint(at);
-        ((uint8_t *)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
+        (*(uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
             -= AM2_TILE_COVER_STEP;
         TileCoverSub((uint16_t)tile);
 

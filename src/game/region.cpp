@@ -2202,14 +2202,19 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
 }
 
 
-/* The original inlines this twice -- once to add cover and once to remove it
- * -- with the same bounds test and the same walk over ADDR_TILE_NEIGHBOURS,
- * differing only in `inc` against `dec`. Written once with a delta. The bounds
- * keep two tiles clear of every edge, and the x and y are recovered from the
- * cell SEPARATELY: x by masking with the width minus one and y by shifting
- * down ADDR_MAP_ROW_SHIFT, which only agree if the map's width is a power of
- * two -- which is presumably why that shift is stored beside the width. */
-static void ShiftTileCover(int32_t cell, int32_t delta)
+/* The original inlines this FOUR times -- add and remove, in ItemTeardown and
+ * in ObjAfterMove -- with the same bounds test and the same walk over
+ * ADDR_TILE_NEIGHBOURS, differing in `inc` against `dec` on the ring, and in
+ * ONE place in what the centre cell gets: ObjAfterMove's remove arm does
+ * `add dl, 0xFE` at 0x0043922D, two off the centre, where ItemTeardown's
+ * does `dec dl` at 0x0043951E and both add arms `inc`. Written once with the
+ * centre's delta separate from the ring's, so that asymmetry is carried and
+ * not smoothed. The bounds keep two tiles clear of every edge, and the x and
+ * y are recovered from the cell SEPARATELY: x by masking with the width
+ * minus one and y by shifting down ADDR_MAP_ROW_SHIFT, which only agree if
+ * the map's width is a power of two -- which is presumably why that shift
+ * is stored beside the width. */
+static void ShiftTileCover(int32_t cell, int32_t centre, int32_t delta)
 {
     int32_t  w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
     int32_t  tx = cell & (w - 1);
@@ -2226,7 +2231,7 @@ static void ShiftTileCover(int32_t cell, int32_t delta)
         return;
 
     cover = *(uint8_t *const *)(uintptr_t)ADDR_TILE_COVER;
-    cover[cell] = (uint8_t)(cover[cell] + delta);
+    cover[cell] = (uint8_t)(cover[cell] + centre);
 
     n = (const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS;
     for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++) {
@@ -2375,9 +2380,9 @@ void __cdecl ItemTeardown(void *obj)
             nh = (int8_t)(h - height);
 
             if (h <= 15 && nh >= 15)
-                ShiftTileCover(cell, 1);
+                ShiftTileCover(cell, 1, 1);
             else if (h >= 15 && nh < 15)
-                ShiftTileCover(cell, -1);
+                ShiftTileCover(cell, -1, -1);
 
             weights[cell & 0xFFFF] = (uint8_t)nh;
         }
@@ -2511,9 +2516,9 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
             nh = (int8_t)(h + height);
 
             if (h <= 15 && nh >= 15)
-                ShiftTileCover(cell, 1);
+                ShiftTileCover(cell, 1, 1);
             else if (h >= 15 && nh < 15)
-                ShiftTileCover(cell, -1);
+                ShiftTileCover(cell, -2, -1);   /* `add dl, 0xFE`: two off the centre */
 
             weights[cell & 0xFFFF] = (uint8_t)nh;
 

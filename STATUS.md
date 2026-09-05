@@ -93,6 +93,42 @@ site, and garbage at ctx[1]. No A/B could have seen it -- both sides of an
 injected comparison run the reconstruction -- and it is the same cdecl
 cleans-later trap CLAUDE.md records for `CreateVehicle`.
 
+**And the collision report was FOUR defects in the reconstruction, none
+of them visible under Wine.** "Sarge walks through things" was chased by
+dumping the two collision planes -- `ADDR_CELL_WEIGHTS` and
+`ADDR_TILE_COVER`, 256x256 bytes each -- out of a live Boot Camp mission and
+diffing them against the ORIGINAL's under `AM2_NOPATCH=1`. The injected
+build is not the oracle there: both sides of an ordinary A/B run the
+reconstruction, which is why all four had survived every configuration in
+the suite. `AM2_NOPATCH_NAMES=a,b` (a comma list of reconstructions left
+original) bisected them one at a time:
+
+- `LoadMask` had the `-df` polarity inverted, so the packed masks were
+  loaded only under the switch and no drive here ever loaded a footprint
+  mask at all. CLAUDE.md already records that switch's name says the
+  opposite of what it does; this was the same trap one function over.
+- `ObjAfterMove` and `ItemTeardown` took the cell index from the wrong
+  slot -- `[esp+N]` read before a push rather than after it, the eighth
+  defect's shape again -- so a walking object's own weight was moved to a
+  cell chosen by a rectangle coordinate.
+- `ObjAfterMove`'s remove arm takes TWO off the centre cover cell
+  (`add dl, 0xFE` at 0x0043922D) where the add arm and both of
+  `ItemTeardown`'s take one; the shared helper had smoothed the asymmetry
+  away, and `ShiftTileCover` carries the centre's delta separately now.
+- `ObjFootprint` and the roach pair indexed `ADDR_CELL_WEIGHTS` as the
+  plane, where it is a POINTER to the plane (`mov edx, [0x514EC0]` at
+  0x0045A70B). Every vehicle footprint -- laid and lifted each frame by
+  `Step3Drive` -- went into the globals after 0x00514EC0, so no vehicle
+  ever blocked anything.
+- Not a defect but a cause of two false ones: the native build's random
+  seed was a private global, so anything randomised diverged from the
+  original run to run; it reads `ADDR_RAND_SEED` now.
+
+Both planes are BYTE-IDENTICAL to the original's with the HQ dialog up.
+Dumped in live play they differ by a handful of cells, which is the socket
+thread reading between a vehicle's clear and its re-stamp; take that dump
+under a dialog, where no frame composes.
+
 **Five defects the first native run found, each a Windows behaviour the
 reconstruction relied on without saying so:**
 
@@ -114,7 +150,7 @@ reconstruction relied on without saying so:**
 `DSERR_NODRIVER`, the path CLAUDE.md records for a host with no audio server;
 the mmio calls are declared and inert), DirectPlay (objects that decline
 everything, no transport), and Smacker movies (`SmackOpen` answers NULL).
-Windowed mode (`-w`) renders the same title frame -- 208 pixels differ from
+Present does not wait for the display's vertical blank by default (`AM2_VSYNC=1` turns it on): the clock already paces Flip, and a compositor throttling an unfocused window to a frame a second reads to the game as enormous time steps. Windowed mode (`-w`) renders the same title frame -- 208 pixels differ from
 the reference in both modes, all of them the cursor, drawn at its start
 position here and where the A/B's drive left it there -- and it needed one
 more Windows fact: a windowed primary shows through the system palette GDI

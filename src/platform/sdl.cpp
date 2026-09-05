@@ -7,7 +7,8 @@
  * host's events into what user32.cpp and dinput.cpp expect.
  *
  *   AM2_SCALE=N     integer window scale (default: the largest that fits)
- *   AM2_VSYNC=0     do not wait for vertical blank on present
+ *   AM2_VSYNC=1     also wait for the display's vertical blank on present
+ *                   (the clock paces the frame either way; AM2_FPS sets it)
  */
 #include "platform.h"
 #include <dinput.h>
@@ -90,7 +91,12 @@ void am2_host_window_open(const char *title, int32_t w, int32_t h)
             fprintf(stderr, "platform: SDL_CreateRenderer: %s\n", SDL_GetError());
             exit(1);
         }
-        SDL_SetRenderVSync(am2_sdl_renderer, (vs && *vs == '0') ? 0 : 1);
+        /* The clock paces the game (am2_host_wait_vblank), not the display:
+         * a present that blocks on the compositor's vertical blank stacks a
+         * second wait on top of that one, and an occluded or unfocused
+         * window can be throttled to a frame a second, which the game reads
+         * as huge time steps. AM2_VSYNC=1 turns the display's wait back on. */
+        SDL_SetRenderVSync(am2_sdl_renderer, (vs && *vs == '1') ? 1 : 0);
         SDL_StartTextInput(am2_sdl_window);
         am2_plat_log("window %dx%d at scale %d, renderer %s", w, h, am2_scale,
                      SDL_GetRendererName(am2_sdl_renderer));
