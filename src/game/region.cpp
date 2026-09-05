@@ -7602,8 +7602,23 @@ typedef uint32_t (__stdcall *AM2_RegionTickFn)(void);
  *
  * THE CONTEXT IS THE WHOLE 0x58-BYTE FRAME. `sub esp, 0x58` is
  * AM2_SIGHTC_BYTES exactly, the local starts where the four pushes leave it,
- * and ClassifyByCode74's answer is seeded into its +4 before the walker is
- * handed it. Nothing in this function reads that field back.
+ * and ClassifyByCode74's answer is seeded into its +0 -- SIGHTC_OFF_FIELD_00,
+ * the class every other builder puts there and the field AiTrooperStep
+ * indexes its move-state table with. Nothing in this function reads it back.
+ *
+ * THAT OFFSET WAS +4 HERE FOR MONTHS, AND THE NATIVE BUILD IS WHAT FOUND IT.
+ * The store is `mov [esp+0x14], eax` at 0x0044AD51, and it runs while the
+ * `push edi` for the ClassifyByCode74 call is STILL ON THE STACK -- the
+ * `add esp, 4` comes at 0x0044AD5B, after it. So [esp+0x14] at the store is
+ * [esp+0x10] once the argument is cleaned, which is the context's +0 (the
+ * `lea eax, [esp+0x10]` at 0x0044AD9D). Reading the store against the
+ * post-cleanup frame put it one dword late: the cdecl-cleans-later trap
+ * CLAUDE.md records for CreateVehicle. The wrong reconstruction left +0
+ * uninitialised and AiTrooperStep indexed a table with whatever the stack
+ * held -- small enough to pass under Wine, a libc pointer in the native
+ * build's first desktop run, which faulted. Measured by running the ORIGINAL
+ * with only AiTrooperStep replaced by a logger: ctx[0] is the class, 0, on
+ * every call from this site, and ctx[1] is garbage.
  *
  * The follow arm dereferences LookupByUID's answer with no null test, which is
  * the original's; reproduced.
@@ -7618,9 +7633,9 @@ void __cdecl Type2PlayerStep(void *obj, void *out)
     int32_t  frame;
     int32_t  i;
 
-    /* Into SIGHTC_OFF_LEADER, whose name says a pointer and which takes a
-     * 0/1/2 class code here -- see orig.h. */
-    *(int32_t *)(ctx + SIGHTC_OFF_LEADER) = ClassifyByCode74(obj);
+    /* The class, into the field AiTrooperStep reads. See the note above on
+     * the pending push that made this look like +4. */
+    *(int32_t *)(ctx + SIGHTC_OFF_FIELD_00) = ClassifyByCode74(obj);
 
     uid = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
     if (uid) {

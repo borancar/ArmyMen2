@@ -79,6 +79,20 @@ ends at (1246,1227) here against (1247,1205) under Wine, stopped by the
 hut in both. Measured, since the object tables at mission start were
 already identical apart from Sarge's own row.
 
+**An eighth, and this one is in the RECONSTRUCTION, found by the native
+build's first run on a real desktop:** `Type2PlayerStep` seeded the AI
+context's class at +4, and the original seeds +0 -- the store is
+`mov [esp+0x14], eax` at 0x0044AD51 while the `push edi` of the call before
+it is still on the stack, so it is [esp+0x10], the context's first field,
+once `add esp, 4` has run. `AiTrooperStep` indexes its move-state table
+with +0, which the wrong reconstruction left uninitialised: small enough to
+pass under Wine for months, a libc pointer on the desktop, a fault. Settled
+by measurement, not reading: the original run with only `AiTrooperStep`
+replaced by a logger writes 0, the class, at ctx[0] on every call from that
+site, and garbage at ctx[1]. No A/B could have seen it -- both sides of an
+injected comparison run the reconstruction -- and it is the same cdecl
+cleans-later trap CLAUDE.md records for `CreateVehicle`.
+
 **Five defects the first native run found, each a Windows behaviour the
 reconstruction relied on without saying so:**
 
