@@ -25,6 +25,7 @@
 
 #include <windows.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,6 +73,25 @@ void am2_host_pump(void);
 
 /* Keyboard state as DirectInput scancodes, 256 bytes, 0x80 when down. */
 void am2_host_keyboard_state(uint8_t *out);
+
+/* ---- sound and timers (sdl.cpp) ------------------------------------------- */
+
+/* Open the host's playback device at `rate` frames a second, stereo float.
+ * `mix` is called from the host's audio thread whenever it wants more:
+ * it must write `frames` interleaved stereo frames into `out`. Returns 0
+ * when there is no device, which is DirectSoundCreate's DSERR_NODRIVER. */
+typedef void (*am2_audio_mix_fn)(void *ud, float *out, int32_t frames);
+int32_t am2_host_audio_open(int32_t rate, am2_audio_mix_fn mix, void *ud);
+void    am2_host_audio_close(void);
+
+/* A multimedia timer: `fn` runs on a host thread every `ms` (periodic) or
+ * once. Returns 0 when none could be made. */
+typedef void (*am2_timer_fn)(void *ud);
+uint32_t am2_host_timer_add(uint32_t ms, int32_t periodic, am2_timer_fn fn, void *ud);
+void     am2_host_timer_remove(uint32_t id);
+
+/* crt.cpp's fopen, with the Windows path translated (see am2_native_path). */
+FILE *am2_fopen(const char *path, const char *mode);
 
 /* ---- the window and its queue (user32.cpp) ------------------------------ */
 

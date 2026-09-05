@@ -177,17 +177,40 @@ reconstruction relied on without saying so:**
   method on the NULL that follows -- the original's test there "can only
   ever pass", so it has no path for that.
 
-**DEFERRED, deliberately:** DirectSound (`DirectSoundCreate` answers
-`DSERR_NODRIVER`, the path CLAUDE.md records for a host with no audio server;
-the mmio calls are declared and inert), DirectPlay (objects that decline
-everything, no transport), and Smacker movies (`SmackOpen` answers NULL).
-Present does not wait for the display's vertical blank by default (`AM2_VSYNC=1` turns it on): the clock already paces Flip, and a compositor throttling an unfocused window to a frame a second reads to the game as enormous time steps. Windowed mode (`-w`) renders the same title frame -- 208 pixels differ from
-the reference in both modes, all of them the cursor, drawn at its start
-position here and where the A/B's drive left it there -- and it needed one
-more Windows fact: a windowed primary shows through the system palette GDI
-realised, not through the DirectDraw palette attached to it, which the game
-builds from a snapshot that is still zero at that point. The A/B suite does
-not know this build exists yet.
+**DIRECTSOUND IS IMPLEMENTED, and checked without ears.** A secondary
+buffer keeps its bytes; one mixer, pulled by the host device from its own
+thread, walks every playing buffer's cursor at the buffer's rate,
+resampling 8/16-bit mono/stereo to float stereo with the volume and pan
+applied, so Lock/Unlock write into the very memory the mixer reads,
+GetCurrentPosition advances in real time and a non-looping buffer stops at
+its end with the cursor back at 0 -- the semantics the stream refill and
+the effect restarts were written against. The 3D listener is accepted and
+ignored: the game does its own distance attenuation. winmm's mmio is the
+buffered RIFF reader the wave loader consumes directly through
+GetInfo/Advance/SetInfo, and the multimedia timer is the host's.
+
+`AM2_AUDIO_DUMP=<file>` writes everything the mixer hands the device as raw
+stereo float, and that is the check: a Boot Camp drive under
+`SDL_AUDIO_DRIVER=dummy` dumped 41 s, and seconds 2..6 of it cross-correlate
+with `title.wav` resampled the mixer's way at **1.0000, zero error**, at a
+gain of 0.355 -- the game's own music volume -- and at a lag of exactly
+2.000 s, so the stream's refill kept time to the sample over the run. The
+mission's effects show as bursts in the RMS trace. `AM2_NOSOUND=1` answers
+DSERR_NODRIVER, the silent path the original takes with no device.
+
+**DEFERRED, deliberately:** DirectPlay (objects that decline everything, no
+transport) and Smacker movies (`SmackOpen` answers NULL). Present does
+not wait for the display's vertical blank by default (`AM2_VSYNC=1` turns it
+on): the clock already paces Flip, and a compositor throttling an unfocused
+window to a frame a second reads to the game as enormous time steps.
+Windowed mode
+(`-w`) renders the same title frame -- 208 pixels differ from the reference
+in both modes, all of them the cursor, drawn at its start position here and
+where the A/B's drive left it there -- and it needed one more Windows fact:
+a windowed primary shows through the system palette GDI realised, not
+through the DirectDraw palette attached to it, which the game builds from a
+snapshot that is still zero at that point. The A/B suite does not know this
+build exists yet.
 
 ## `AM2_GAMEDIR` points the port at the original game's directory
 

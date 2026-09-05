@@ -9,6 +9,7 @@
  *   AM2_SCALE=N     integer window scale (default: the largest that fits)
  *   AM2_VSYNC=1     also wait for the display's vertical blank on present
  *                   (the clock paces the frame either way; AM2_FPS sets it)
+ *   AM2_AUDIO_DUMP=<file>  write the mixed audio as raw stereo float
  */
 #include "platform.h"
 #include <dinput.h>
@@ -523,6 +524,158 @@ void am2_host_pump(void)
 
 /* ---- main --------------------------------------------------------------------------- */
 
+/* ---- sound and timers ------------------------------------------------------ */
+
+/* One SDL audio stream bound to the default playback device, pulled by the
+ * device through its get-callback. The mixer above it (dsound.cpp) is what
+ * knows about buffers; this only hands it a float scratch to fill. */
+static SDL_AudioStream *am2_sdl_audio;
+static am2_audio_mix_fn am2_audio_mix;
+static void            *am2_audio_ud;
+static float           *am2_audio_scratch;
+static int32_t          am2_audio_scratch_frames;
+/* AM2_AUDIO_DUMP=<file>: everything the mixer hands the device, as raw
+ * interleaved stereo float at the mix rate -- the way to check the sound
+ * without ears. */
+static FILE            *am2_audio_dump;
+
+static void SDLCALL am2_audio_pull(void *ud, SDL_AudioStream *stream,
+                                   int additional, int total)
+{
+    int32_t frames = additional / (int32_t)(2 * sizeof(float));
+
+    (void)ud; (void)total;
+    if (frames <= 0)
+        return;
+    if (frames > am2_audio_scratch_frames) {
+        float *n = (float *)realloc(am2_audio_scratch,
+                                    (size_t)frames * 2 * sizeof(float));
+        if (!n)
+            return;
+        am2_audio_scratch = n;
+        am2_audio_scratch_frames = frames;
+    }
+    am2_audio_mix(am2_audio_ud, am2_audio_scratch, frames);
+    SDL_PutAudioStreamData(stream, am2_audio_scratch,
+                           frames * (int)(2 * sizeof(float)));
+    if (am2_audio_dump)
+        fwrite(am2_audio_scratch, 2 * sizeof(float), (size_t)frames, am2_audio_dump);
+}
+
+int32_t am2_host_audio_open(int32_t rate, am2_audio_mix_fn mix, void *ud)
+{
+    SDL_AudioSpec spec;
+
+    if (am2_sdl_audio)
+        return 1;
+    if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
+        am2_plat_log("audio: SDL_InitSubSystem: %s", SDL_GetError());
+        return 0;
+    }
+    spec.format   = SDL_AUDIO_F32;
+    spec.channels = 2;
+    spec.freq     = rate;
+    am2_audio_mix = mix;
+    am2_audio_ud  = ud;
+    am2_sdl_audio = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
+                                              &spec, am2_audio_pull, NULL);
+    if (!am2_sdl_audio) {
+        am2_plat_log("audio: no playback device (%s); the game runs silent",
+                     SDL_GetError());
+        return 0;
+    }
+    {
+        const char *dump = getenv("AM2_AUDIO_DUMP");
+
+        if (dump && *dump)
+            am2_audio_dump = fopen(dump, "wb");
+    }
+    SDL_ResumeAudioStreamDevice(am2_sdl_audio);
+    am2_plat_log("audio: %d Hz stereo float through %s", rate,
+                 SDL_GetCurrentAudioDriver());
+    return 1;
+}
+
+void am2_host_audio_close(void)
+{
+    if (am2_sdl_audio) {
+        SDL_DestroyAudioStream(am2_sdl_audio);   /* closes the device too */
+        am2_sdl_audio = NULL;
+    }
+    if (am2_audio_dump) {
+        fclose(am2_audio_dump);
+        am2_audio_dump = NULL;
+    }
+}
+
+typedef struct AM2_HostTimer {
+    am2_timer_fn fn;
+    void        *ud;
+    int32_t      periodic;
+} AM2_HostTimer;
+
+static Uint32 SDLCALL am2_timer_fire(void *ud, SDL_TimerID id, Uint32 interval)
+{
+    AM2_HostTimer *t = (AM2_HostTimer *)ud;
+
+    (void)id;
+    t->fn(t->ud);
+    if (t->periodic)
+        return interval;
+    free(t);
+    return 0;
+}
+
+/* Periodic records outlive their firing and are freed on removal, so they
+ * are remembered here; a one-shot frees its own once it has fired. */
+#define AM2_HOST_TIMERS 16
+static AM2_HostTimer *am2_periodic[AM2_HOST_TIMERS];
+static SDL_TimerID    am2_periodic_id[AM2_HOST_TIMERS];
+
+uint32_t am2_host_timer_add(uint32_t ms, int32_t periodic, am2_timer_fn fn, void *ud)
+{
+    AM2_HostTimer *t = (AM2_HostTimer *)malloc(sizeof *t);
+    SDL_TimerID    id;
+    int32_t        i;
+
+    if (!t)
+        return 0;
+    t->fn = fn;
+    t->ud = ud;
+    t->periodic = periodic;
+    id = SDL_AddTimer(ms ? ms : 1, am2_timer_fire, t);
+    if (!id) {
+        free(t);
+        return 0;
+    }
+    if (periodic) {
+        for (i = 0; i < AM2_HOST_TIMERS; i++) {
+            if (!am2_periodic[i]) {
+                am2_periodic[i] = t;
+                am2_periodic_id[i] = id;
+                break;
+            }
+        }
+    }
+    return (uint32_t)id;
+}
+
+void am2_host_timer_remove(uint32_t id)
+{
+    int32_t i;
+
+    /* Removing a one-shot that has already fired is a no-op; SDL says so
+     * and its record is gone. */
+    (void)SDL_RemoveTimer((SDL_TimerID)id);
+    for (i = 0; i < AM2_HOST_TIMERS; i++) {
+        if (am2_periodic[i] && am2_periodic_id[i] == (SDL_TimerID)id) {
+            free(am2_periodic[i]);
+            am2_periodic[i] = NULL;
+            am2_periodic_id[i] = 0;
+        }
+    }
+}
+
 int main(int argc, char **argv)
 {
     char    cmdline[4096];
@@ -547,6 +700,7 @@ int main(int argc, char **argv)
         return 1;
     }
     rc = WinMain((HINSTANCE)(uintptr_t)0x400000u, NULL, cmdline, SW_SHOWNORMAL);
+    am2_host_audio_close();
     am2_host_window_close();
     SDL_Quit();
     return rc;
