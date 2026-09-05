@@ -13241,8 +13241,23 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
 
         scale = (float)clamped / (float)hi;
 
+        /* THE FIFTH ARGUMENT IS THE LAUNCH HEIGHT, NOT THE RANGE. At
+         * 0x0045F9B7 the original loads `movsx ecx, word [esp+0x3c]`, and
+         * with 16 bytes of pushes already down that is frame slot +0x2C,
+         * which is FireWeapon's ARG3 -- `height`, exactly as the eight
+         * other arms pass it. espmap says so; the raw displacement is four
+         * slots off and reads as ARG7. `clamped` belongs to the SCALE and
+         * to nothing else.
+         *
+         * What passing it here did: CreateMissile stores a5 as the
+         * missile's ground and its row's Y adjust, and then takes
+         * VEL_Z = (a6 - a5) * 2. With the range in a5, aiming FURTHER made
+         * VEL_Z more negative, so a grenade or mortar thrown at a distant
+         * spot fell short and one thrown at your feet sailed away. Reported
+         * from play as "the aim logic is inverse"; no A/B could see it,
+         * since nothing in the suite throws anything. */
         CreateMissile(weapon, unit, AM2_PACK_POINT(a.x, a.y), facing,
-                      (int16_t)clamped, spot.ground, 1,
+                      height, spot.ground, 1,
                       AM2_FLOAT_BITS(scale), 0, 0, seed);
         return 1;
     }

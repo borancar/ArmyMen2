@@ -173,14 +173,20 @@ def delta(mn, ops):
     return 0
 
 
-def main():
-    if len(sys.argv) < 2:
-        print(__doc__)
-        return 2
-    ins = decode(sys.argv[1], sys.argv[2:])
+def analyse(addr, extra=()):
+    """Walk one function and resolve every `[esp + N]` to a frame slot.
+
+    Returns (ins, esp, base, bad, use, unknown): the decoded instructions, the
+    esp depth at each address, the frame origin (negative), the addresses
+    reached at disagreeing depths, {slot: [(addr, mnemonic), ...]}, and how
+    many references sit in unreached code.
+
+    Split out of main so other checks can ask the same question --
+    tools/checkargslots.py asks it of every reconstruction at once.
+    """
+    ins = decode(addr, extra)
     if not ins:
-        print("no instructions")
-        return 1
+        return [], {}, 0, {}, {}, 0
     at = {a: i for i, (a, _, _) in enumerate(ins)}
 
     # The frame origin is the depth after the prologue's saves, which is the
@@ -253,7 +259,50 @@ def main():
             if ad not in esp:
                 unknown += 1
                 continue
-            use[esp[ad] + int(g.group(1), 0) - base].append((ad, mn))
+            raw = int(g.group(1), 0)
+            use[esp[ad] + raw - base].append((ad, mn, raw, esp[ad] - base))
+    return ins, esp, base, bad, use, unknown
+
+
+def main():
+    if len(sys.argv) < 2:
+        print(__doc__)
+        return 2
+    argv = [a for a in sys.argv[2:] if not a.startswith("--site")]
+    sites = []
+    for a in sys.argv[2:]:
+        if a.startswith("--site"):
+            sites += [int(x, 0) for x in a.split("=", 1)[1].split(",")]
+    ins, esp, base, bad, use, unknown = analyse(sys.argv[1], argv)
+    if not ins:
+        print("no instructions")
+        return 1
+
+    # `--site=0xADDR[,...]`: what does THIS instruction read? The per-slot
+    # listing below truncates to four addresses, which is fine for a survey
+    # and useless when the question is one call site's arguments -- and that
+    # question is the one this file's docstring is about.
+    if sites:
+        ret = -base
+        for want in sites:
+            hits = [(off, e) for off in use for e in use[off]
+                    if e[0] == want]
+            if not hits:
+                print("  0x%08x: no [esp+N] operand, or unreached" % want)
+                continue
+            for off, (ad, mn, raw, depth) in sorted(hits):
+                what = "local"
+                if off == ret:
+                    what = "the return address"
+                elif off > ret:
+                    what = "ARG%d" % ((off - ret) // 4)
+                note = ""
+                if depth:
+                    note = ("  <- %d byte(s) of outstanding push: the raw "
+                            "displacement is %d slot(s) off" % (depth, depth // 4))
+                print("  0x%08x  %-6s [esp+%#x] -> slot %+#07x = %s%s"
+                      % (ad, mn, raw, off, what, note))
+        return 0
 
     print("%s: %d instructions, frame origin at esp%+d" %
           (sys.argv[1], len(ins), -base))

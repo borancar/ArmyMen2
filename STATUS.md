@@ -553,7 +553,7 @@ clean.
 
 ## In flight
 
-Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **61** analysis
+Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **62** analysis
 tools in `make check` (`tools/checkpatches.py`; `tools/checkclaims.py` counts
 the recipe).
 
