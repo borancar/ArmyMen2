@@ -215,25 +215,43 @@ the allocator -- the mission is sometimes seen in play at sub-state 0x21
 with nothing drawn and the briefing never shown, and a SPACE brings it up.
 Not understood, and said so.
 
-**A LEVEL CAN BE ENTERED AT WILL, FROZEN, ON ANY BUILD, and that is the
-verification point the port needed.** The game's own save is the snapshot
-that crosses runs and builds, and a LOAD of it is how a level is entered.
-What made a load a fixed point rather than a starting line is one harness
-hook: `AM2_PAUSE_ON_ENTER=1` raises the -dbg pause reason the moment the
-game state becomes 2, which the game does on a fresh start and not after a
-load (its pause is gated on no load pending). The hook lives in
-`input_pump`, which runs on the game thread under the DirectInput hook in
-the injected build, `AM2_NOPATCH=1` included, and from device.cpp's poll in
-the dev binary. `tools/enterlevel.sh [-b dev|orig|recon] SAVE` places the
-save alone in the folder, drives the LOAD, and leaves the game paused on its
-port with the table's md5 printed. Measured on one campaign save: the dev
-binary twice and the original twice all give **327 objects and the same
-table md5 in every field**, at the same clock, and the table is unchanged
-five seconds later. The raw savestates do not cross runs -- a state saved in
-one run and loaded in a fresh run at the same point of the same mission
-dies in `RestoreLostSurfaces` on the first frame, address randomisation off
-or on, because the platform's surfaces are at new addresses -- so they stay
-what they are, the quick iteration tool within a session.
+**A LEVEL CAN BE ENTERED AT WILL, FROZEN, ON ANY BUILD, IN FIFTEEN SECONDS
+AND WITHOUT A MENU, and that is the verification point the port needed.**
+The game's own save is the snapshot that crosses runs and builds, and a load
+of it is how a level is entered. Two harness pieces make that a fixed point:
+
+- **`loadgame FOLDER FILE` on the control socket** makes the LOAD button's
+  four writes (`OnLoadGameLoad`, 0x00452060): the folder name into the
+  game-proc block, the file name into its second string, the load-pending
+  flag, a request for state 2. No menu, no coordinates, and it takes
+  `AM2_NOPATCH=1` unchanged because all four are the game's globals.
+- **`AM2_PAUSE_ON_ENTER=1`** raises the -dbg pause reason the moment the
+  game state becomes 2, which the game does on a fresh start and not after
+  a load (its pause is gated on no load pending). The hook is in
+  `input_pump`, on the game thread in every build. The mission arrives
+  frozen before its first frame.
+
+`tools/enterlevel.sh [-b dev|orig|recon] [-f FOLDER] SAVE` copies the save
+into `save/FOLDER`, starts the build, issues the load and prints the object
+count and the table's md5, leaving the game paused on its port. Measured:
+
+| save | build | objects | table md5 |
+|---|---|---|---|
+| campaign, MAP 01 | dev, twice; original, twice; injected | 327 | b1ced1edb769 |
+| Boot Camp | dev, original, injected | 1,612 | a9ee8b48d784 |
+
+**BOOT CAMP CAN BE SAVED, which the menu never offers.** `SaveGame`'s
+guard is the game-proc block's first string being non-empty, and that
+string is the FOLDER the save goes under: the player's name in the
+campaign, and `bootcamp` in Boot Camp, where the block already holds it.
+So the save dialog, opened by writing the two globals the SAVE button
+writes, saves Boot Camp's briefing into `save\bootcamp\` -- 1,609 items,
+347 KB -- and `loadgame bootcamp FILE` at the title screen brings it back
+identically in all three builds. The raw savestates do not cross runs: a
+state saved in one run and loaded in a fresh run at the same point of the
+same mission dies in `RestoreLostSurfaces` on the first frame, address
+randomisation off or on, because the platform's surfaces are at new
+addresses. They stay the quick tool within a session.
 
 **`tools/savecheck.sh` IS THE SERIALISATION A/B, and it passes.** The
 game's save file is the one snapshot that crosses builds: objects go out

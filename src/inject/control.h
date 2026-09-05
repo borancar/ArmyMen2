@@ -13,6 +13,8 @@
  *     state                   report what is currently held
  *     clear                   release everything
  *     ping                    liveness check
+ *     loadgame FOLDER FILE    enter a mission from save\FOLDER\FILE, as the
+ *                             LOAD button would (see control.c)
  *
  * Every command replies with a single `ok ...` or `err ...` line, so a client
  * can wait for acknowledgement rather than guessing at timing.

@@ -1630,11 +1630,14 @@ native game uses the dev binary; STATUS.md has the measurements.
 `tools/savecheck.sh` is the cross-build serialisation A/B built on it --
 the game's SAVE GAME written by one build and loaded by the other, judged on
 the object tables, because the file's bytes carry raw pointers by design.
-**`tools/enterlevel.sh SAVE` enters a mission from a save and leaves it
-FROZEN before its first frame, on any of the three builds**, through
-`AM2_PAUSE_ON_ENTER=1`; two loads of one file give identical tables in every
-field, across runs and across builds. Reach for it before hand-driving to a
-point in a mission: it is a fixed point, and a drive is not.
+**`tools/enterlevel.sh [-f FOLDER] SAVE` enters a mission from a save and
+leaves it FROZEN before its first frame, on any of the three builds, in
+fifteen seconds and without a menu**: the socket's `loadgame` makes the LOAD
+button's four writes and `AM2_PAUSE_ON_ENTER=1` freezes the arrival. One
+file gives one table md5 across runs and across builds, Boot Camp included
+-- it saves once the game-proc block holds a folder name, which in Boot
+Camp it already does. Reach for it before hand-driving to a point in a
+mission: it is a fixed point, and a drive is not.
 
 **Movement and the input path are `docs/movement.md`.** Two defects a month
 apart each made the player unable to move and neither was visible to any A/B --

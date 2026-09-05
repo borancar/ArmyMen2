@@ -674,6 +674,36 @@ static void handle_line(SOCKET s, char *line)
             return;
         }
     }
+    /* `loadgame FOLDER FILE` -- enter a mission from a save, the way the
+     * LOAD button does it (OnLoadGameLoad, 0x00452060): the folder name into
+     * the game-proc block, the file name into its second string, the load
+     * pending flag, and a request for state 2. FOLDER is what the game
+     * would have put there itself -- the player's name for a campaign save,
+     * `bootcamp` for Boot Camp, which can be saved from once that block
+     * holds a name -- and FILE lives under save\FOLDER. All four are the
+     * game's own globals, so this takes AM2_NOPATCH=1 unchanged and needs no
+     * menu; with AM2_PAUSE_ON_ENTER=1 the mission arrives frozen. Boot Camp
+     * loaded this way in the original and in ours gives one object table. */
+    if (!strcmp(argv[0], "loadgame") && argc >= 3) {
+        char *block = (char *)(uintptr_t)0x00511A68u;          /* ADDR_GAMEPROC_BLOCK */
+        char *file  = (char *)(uintptr_t)0x00511B88u;          /* ADDR_GAMEPROC_STR_B */
+
+        if (strlen(argv[1]) > 60 || strlen(argv[2]) > 60) {
+            reply(s, "err loadgame: names are at most 60 characters");
+            return;
+        }
+        if (IsBadWritePtr(block, 64) || IsBadWritePtr(file, 64)) {
+            reply(s, "err loadgame: the game-proc block is not writable");
+            return;
+        }
+        strcpy(block, argv[1]);
+        strcpy(file, argv[2]);
+        *(int32_t *)(uintptr_t)0x00511DD8u = 1;                /* ADDR_LOAD_PENDING */
+        *(int32_t *)(uintptr_t)0x00511DB0u = 2;                /* ADDR_STATE_WANTED */
+        *(int32_t *)(uintptr_t)0x00511DACu = 1;                /* ADDR_STATE_PENDING */
+        reply(s, "ok loadgame save\\%s\\%s requested", argv[1], argv[2]);
+        return;
+    }
 #ifdef AM2_DEVTOOLS
     {
         /* The development binary's own commands (src/standalone/devtools.cpp):
