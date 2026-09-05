@@ -60,6 +60,14 @@ that are worth knowing before touching it:
   after EVERY event -- which is the "acceleration" this file's Wine notes
   measured, explained.
 
+**A sixth, found by walking:** `ScrollView` blits the offscreen surface
+onto itself, and a copy that walks rows top-down reads rows it has just
+overwritten whenever the destination lies below the source. With a
+one-pixel scroll every row becomes a copy of the first, which showed as
+vertical stripes over the whole map the moment Sarge moved or the pointer
+scrolled the view. The copy goes bottom-up in that case now; verified by
+walking in all four directions and edge-scrolling across the map.
+
 **Five defects the first native run found, each a Windows behaviour the
 reconstruction relied on without saying so:**
 

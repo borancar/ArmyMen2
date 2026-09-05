@@ -248,9 +248,17 @@ static void am2_copy(AM2_DDSurface *dst, int32_t dx, int32_t dy,
     if (dy + h > dst->height) h = dst->height - dy;
     if (w <= 0 || h <= 0 || w > (int32_t)sizeof row)
         return;
-    for (y = 0; y < h; y++) {
-        const uint8_t *s = src->pixels + (r.top + y) * src->pitch + r.left;
-        uint8_t       *d = dst->pixels + (dy + y) * dst->pitch + dx;
+    /* A surface scrolled onto itself: when the destination lies below the
+     * source the rows must go bottom-up, or each row reads the one the
+     * previous step just overwrote -- and with a one-pixel scroll every row
+     * becomes a copy of the first, which is what the vertical stripes over
+     * the map were. memmove settles the horizontal case within a row. */
+    for (int32_t i = 0; i < h; i++) {
+        const uint8_t *s;
+        uint8_t       *d;
+        y = (dst == src && dy > r.top) ? h - 1 - i : i;
+        s = src->pixels + (r.top + y) * src->pitch + r.left;
+        d = dst->pixels + (dy + y) * dst->pitch + dx;
         if (!keyed) {
             memmove(d, s, (size_t)w);
             continue;
