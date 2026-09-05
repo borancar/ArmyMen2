@@ -383,6 +383,7 @@ static HRESULT STDMETHODCALLTYPE Surface_Flip(IDirectDrawSurface *p, LPDIRECTDRA
     s->pixels = s->back->pixels;
     s->back->pixels = t;
     am2_present();
+    am2_host_wait_vblank();
     return DD_OK;
 }
 

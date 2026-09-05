@@ -210,6 +210,35 @@ void am2_host_present(const uint8_t *pixels, int32_t pitch, int32_t w,
     SDL_RenderPresent(am2_sdl_renderer);
 }
 
+void am2_host_wait_vblank(void)
+{
+    static uint64_t next;
+    static int64_t  period = -1;
+    static uint64_t sec_start;
+    static int32_t  frames;
+    uint64_t        now = SDL_GetTicksNS();
+
+    if (period < 0) {
+        const char *env = getenv("AM2_FPS");
+        int32_t     fps = env && *env ? atoi(env) : 60;
+        period = fps > 0 ? 1000000000LL / fps : 0;
+    }
+    frames++;
+    if (now - sec_start >= 1000000000ULL) {
+        if (sec_start)
+            am2_plat_debug("%d flips/s", frames);
+        sec_start = now;
+        frames = 0;
+    }
+    if (period == 0)
+        return;
+    if (next == 0 || now > next + (uint64_t)period * 4)
+        next = now;
+    next += (uint64_t)period;
+    if (next > now)
+        SDL_DelayNS(next - now);
+}
+
 /* ---- input --------------------------------------------------------------------------- */
 
 /* SDL scancodes to DirectInput's, which are PC set 1 with the extended

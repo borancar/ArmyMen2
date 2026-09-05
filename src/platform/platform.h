@@ -58,6 +58,12 @@ void am2_host_display_size(int32_t *w, int32_t *h);
 void am2_host_present(const uint8_t *pixels, int32_t pitch, int32_t w,
                       int32_t h, const PALETTEENTRY *palette);
 
+/* Block until the next vertical blank, as a DirectDraw Flip does. The
+ * game's pace -- its walk speed, its turn rate -- is its frame rate, and
+ * on the hardware it was written for that was the display's. AM2_FPS
+ * overrides the 60 Hz default; 0 disables the wait. */
+void am2_host_wait_vblank(void);
+
 /* Show or hide the host's pointer. */
 void am2_host_cursor_visible(int32_t visible);
 

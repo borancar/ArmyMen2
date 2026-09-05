@@ -68,6 +68,17 @@ vertical stripes over the whole map the moment Sarge moved or the pointer
 scrolled the view. The copy goes bottom-up in that case now; verified by
 walking in all four directions and edge-scrolling across the map.
 
+**A seventh, reported as broken collisions:** a DirectDraw Flip blocks
+until the vertical blank, and the game's pace is its frame rate -- how far
+a trooper steps and how far he turns are per frame. My Flip returned at
+once, so on Xvfb's software GL the game ran at whatever rate a present
+cost, the steps grew, and Sarge walked straight through sandbags and the
+hut. `am2_host_wait_vblank` paces Flip at 60 Hz now (`AM2_FPS` overrides,
+0 disables), and the same drive on both builds -- turn 1.2 s, walk 8 s --
+ends at (1246,1227) here against (1247,1205) under Wine, stopped by the
+hut in both. Measured, since the object tables at mission start were
+already identical apart from Sarge's own row.
+
 **Five defects the first native run found, each a Windows behaviour the
 reconstruction relied on without saying so:**
 
