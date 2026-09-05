@@ -14,6 +14,36 @@ int patch_replace(uint32_t target, const void *replacement, const char *name,
     DWORD    prot = 0;
     int32_t  rel;
 
+    /* AM2_NOPATCH_NAMES=A,B,C leaves those reconstructions uninstalled and
+     * everything else patched: the differential the whole-program
+     * AM2_NOPATCH cannot give, since a subsystem's output is the sum of
+     * several functions and this says which one moved it. Found necessary
+     * when the cell-weight plane differed from the original's in thousands
+     * of cells and four functions could each have been the reason. */
+    {
+        static const char *skip;
+        static int         looked;
+        if (!looked) {
+            looked = 1;
+            skip = getenv("AM2_NOPATCH_NAMES");
+        }
+        if (skip && *skip) {
+            const char *s = skip;
+            size_t      n = strlen(name);
+            while (*s) {
+                const char *e = s;
+                while (*e && *e != ',')
+                    e++;
+                if ((size_t)(e - s) == n && !strncmp(s, name, n)) {
+                    hooklog("patch: %-14s %08x LEFT ORIGINAL (AM2_NOPATCH_NAMES)",
+                            name, target);
+                    return 0;
+                }
+                s = *e ? e + 1 : e;
+            }
+        }
+    }
+
     /* When tracing is on this returns a stub that logs and then jumps to
      * `replacement`; otherwise it hands back `replacement` untouched. */
     dest = trace_wrap(replacement, name, nargs);
