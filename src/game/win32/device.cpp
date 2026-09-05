@@ -36,6 +36,14 @@
 #include "report.h"
 #include "../rect.h"
 #include "../../inject/patch.h"
+#ifdef AM2_STANDALONE
+/* The injected build reaches the input queue through dinput_hook.c,
+ * which wraps the device's own GetDeviceState and GetDeviceData. The
+ * standalone has no IAT to patch and no original device to wrap -- we
+ * ARE the poller -- so the same two overlays are applied here instead,
+ * at the points that hook applies them. */
+#include "../../inject/input.h"
+#endif
 
 #include <stdint.h>
 
@@ -445,6 +453,13 @@ void __cdecl PollMouse(void)
     if (!g_mouseAcquired)
         AcquireMouse();
 
+#ifdef AM2_STANDALONE
+    /* Once per poll, not once per event: input_pump expires timed holds, and
+     * calling it inside the drain loop would retire a tap before the game had
+     * seen its press. */
+    input_pump();
+#endif
+
     g_mouseDX = g_mouseDY = g_mouseDZ = 0;
     g_mouseChanged[0] = g_mouseChanged[1] = g_mouseChanged[2] = 0;
     g_mouseMoved = 0;
@@ -464,8 +479,19 @@ void __cdecl PollMouse(void)
             return;
         }
 
-        if (count == 0)
+        if (count == 0) {
+#ifdef AM2_STANDALONE
+            /* Real events first, injected ones after, which is the order
+             * dinput_hook.c appends them in -- injection adds to real input
+             * rather than masking it. One at a time because that is the only
+             * capacity this loop ever asks for. */
+            count = input_take_events(AM2_DEV_MOUSE, &od, sizeof(od), 1, 0);
+            if (count == 0)
+                return;
+#else
             return;
+#endif
+        }
 
         switch (od.dwOfs) {
         case DIMOFS_X:
@@ -574,6 +600,12 @@ void __cdecl PollKeyboard(void)
     }
 
     keys = g_curKeys;
+#ifdef AM2_STANDALONE
+    /* Before MirrorModifier, so an injected shift mirrors the way a real one
+     * does -- the hook overlays inside GetDeviceState, which is upstream of
+     * everything below. */
+    input_overlay_keyboard(g_curKeys, KEY_STATES);
+#endif
     MirrorModifier(keys, DIK_LSHIFT, DIK_RSHIFT);
     MirrorModifier(keys, DIK_LCONTROL, DIK_RCONTROL);
     MirrorModifier(keys, DIK_LMENU, DIK_RMENU);

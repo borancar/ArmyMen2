@@ -7,6 +7,7 @@
  */
 #include "../inject/win32.h"
 #include "../inject/orig.h"
+#include "../inject/input.h"
 #include "../game/crt.h"
 #include "../game/gameproc.h"
 #include "../inject/control.h"
@@ -252,6 +253,12 @@ extern "C" void am2_standalone_init(void)
      * one, g_remapIdent, and faulted on address 0. Fixups first: an
      * initializer may store a pointer the table also mentions. */
     am2_run_static_init();
+
+    /* The injected queue the control socket writes into. dllmain.c does this
+     * for the injected build; without it here every `key`, `type` and `mouse`
+     * command was accepted and dropped, so a standalone run could be looked
+     * at and not driven. */
+    input_init();
 
     /* The control socket, which the injected build gets from the harness.
      * Without it a standalone run cannot be driven or dumped, so every

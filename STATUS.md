@@ -1060,3 +1060,59 @@ logger (a bare `c3`, patched by src/inject/gamelog.c, and reconstructing it
 as an empty update once silenced the game log), and 0x00463390, 0x00463396
 and 0x00464410 are one-instruction `jmp [IAT]` import thunks, one of which
 must stay a thunk for dinput_hook.c's IAT patch to be reached.
+
+## The standalone is drivable now, and it was accepting input into a hole
+
+`make run PORT=1` launches the standalone and it REACHES THE MAIN MENU and
+plays: title screen with every button painted, BOOT CAMP through to a live
+mission with Sarge on the map, the HUD, the radar and the squad panel, and the
+game clock ticking. The previous session recorded `PORT=1` as not working, on a
+run that showed `control: disabled` and `DDERROR 80004001` in `InitDirectDraw`.
+Nothing in the code was wrong: that is what the standalone does when it is
+launched without a Wine desktop, which is already written down as the way to
+run it. A launch error, read as a defect.
+
+**What WAS wrong is that none of the injected input reached it.** The standalone
+links `src/inject/input.c` and `src/inject/control.c`, so every `key`, `type`
+and `mouse` command was accepted and acknowledged -- and dropped. Two things
+were missing and each is invisible on its own:
+
+- **Nothing called `input_init()`.** `dllmain.c` and `dinput_hook.c` call it and
+  neither is in the standalone link.
+- **Nothing applied the overlays.** In the injected build `dinput_hook.c` wraps
+  the device's own `GetDeviceState` and `GetDeviceData` by patching the game's
+  IAT. The standalone has no IAT to patch and no original device to wrap -- our
+  `PollKeyboard` and `PollMouse` ARE the poller -- so the two overlays are
+  applied there instead, at the points that hook applies them:
+  `input_overlay_keyboard` onto the state just read and before `MirrorModifier`,
+  so an injected shift mirrors the way a real one does; and `input_take_events`
+  in `PollMouse`'s drain loop when the device has nothing left, so injected
+  events come after real ones rather than masking them. `input_pump` runs once
+  per poll, not once per event -- inside the loop it would retire a tap before
+  the game had seen its press.
+
+**The symptom read exactly like a dead port.** The menu painted, the cursor
+moved when written (`cursor` writes globals, which needs no device at all), and
+BOOT CAMP even sat highlighted -- so the screen said the widget layer was
+alive. Only `ctl keys` distinguished it: nothing down while a key was held.
+That is the command's whole purpose, and this file already says why -- `state`
+is what the harness is injecting and `keys` is what the game sees, and a
+channel broken in between shows up in one and not the other. First time the
+distinction has been load-bearing.
+
+`counts` says `(no counters: this build has no patch stubs)` here, correctly:
+the counters ARE the patch stubs and the standalone has no patches. Do not read
+that as a broken socket.
+
+Measured after the fix, on a live Boot Camp mission, against the injected build
+and the original doing the same drive:
+
+    W held, x per second   standalone 85, 91, 92, 91
+                           injected   86, 91, 92, 91, 92
+                           original   92, 91, 91, 65, 91
+
+    W and A held           standalone circle 20 wide, 17 tall
+                           injected   circle 20 wide, 18 tall
+                           original   circle 20 wide, 18 tall
+
+so the standalone plays, and today's route-gate fix is in it.
