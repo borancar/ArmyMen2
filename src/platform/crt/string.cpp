@@ -141,9 +141,9 @@ int32_t __cdecl crt_stricmp(const char *a, const char *b)
                 return 0;
             continue;
         }
-        if (x - 'A' < 26u)
+        if ((uint32_t)(x - 'A') < 26u)
             x += 0x20;
-        if (y - 'A' < 26u)
+        if ((uint32_t)(y - 'A') < 26u)
             y += 0x20;
         if (x == y)
             continue;
@@ -172,4 +172,31 @@ int32_t __cdecl crt_strlen(const char *s)
     while (*p)
         p++;
     return (int32_t)(p - s);
+}
+
+/* 0x00469CA0: strcpy, dword-at-a-time in the original, byte-wise here. */
+char *__cdecl crt_strcpy(char *dst, const char *src)
+{
+    char *d = dst;
+    while ((*d++ = *src++) != 0)
+        ;
+    return dst;
+}
+
+/* 0x00465710: memmove, which copies backwards when the destination lies
+ * above an overlapping source. */
+void *__cdecl crt_memmove(void *dst, const void *src, uint32_t n)
+{
+    uint8_t       *d = (uint8_t *)dst;
+    const uint8_t *s = (const uint8_t *)src;
+    if (d <= s || d >= s + n) {
+        while (n--)
+            *d++ = *s++;
+    } else {
+        d += n;
+        s += n;
+        while (n--)
+            *--d = *--s;
+    }
+    return dst;
 }

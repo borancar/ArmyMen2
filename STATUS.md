@@ -20,18 +20,35 @@ function, from the disassembly, under `crt_` names (the host's libc has
 the real ones), reached through the `ADDR_CRT_*` seams `standalone.h`
 already re-points, so the reconstruction's sources do not change.
 
-Done (2026-09-06): `crt_qsort` with its `shortsort` and `swap`,
-`crt_bsearch`, `crt_rand`, `crt_srand` (over the image's own seed at
-`ADDR_RAND_SEED`). `tools/qsortcheck.py` runs the original's sort and
-search under Unicorn with a comparator stub over 195 arrays built for ties
-and records where every tie went; `tests/selftest.cpp` replays the 1,401
-rows through the C, all passing, and three of four mutations fail (the
-fourth is a theorem; the tool's docstring says which).
+Done (2026-09-06), each replayed in `tests/selftest.cpp` against what the
+original answered under Unicorn:
 
-Next, in the order the differences bite: the heap (`malloc`, `free`,
-`realloc`, `_msize`, `operator new`/`delete`, the small-block heap under
-them), the `printf` family, the string and conversion functions, stdio, the
-directory and time functions.
+- `sort.cpp`: `qsort` with its `shortsort` and `swap`, `bsearch`.
+  `tools/qsortcheck.py`, 195 arrays built for ties, 1,401 rows; three of
+  four mutations fail and the fourth is a theorem.
+- `rand.cpp`: `rand`, `srand` over the image's seed.
+- `string.cpp`: `strtok`, `strchr`, `strstr`, `strncpy`, `strncmp`,
+  `_stricmp`, `_strlwr`, `strlen`, `strcpy`, `memmove`. `conv.cpp`: `atoi`,
+  `atol`, `strtol`. Nine of these are in `tests/vectors.h`: 7,487 vectors.
+- `printf.cpp`: `_output`, the whole state machine, with `sprintf` and
+  `vsprintf` over it. `fltcvt.cpp`: `_cfltcvt` down to `$I10_OUTPUT` -- the
+  twelve-byte long double, its multiply, the powers-of-ten tables read
+  from the image, `_fptostr` and the three layouts. `tools/printfcheck.py`
+  runs the original's `sprintf` over 1,793 formats and values -- every
+  conversion and flag, and for the float ones the halves, the nines that
+  carry, denormals, the extremes, an infinity and a NaN -- and all 1,793
+  replay exactly. Four of six mutations fail it -- the digit rounding, the
+  decimal-exponent estimate, `%p`'s precision, the "0x" a zero does not
+  get. Of the two that do not, the powers-of-ten guard threshold is a
+  theorem (no entry in either table sits on 0x8000), and the multiply's
+  exact-half tie is a GAP: no value in the corpus lands on it.
+
+The game's `sprintf`, `qsort`, `bsearch`, `rand`, `atoi`, `strtol` and the
+string functions above now run on the CRT in both the standalone and the
+native build; the lockstep comparison is unchanged by it, as it should be.
+
+Next: stdio (`fopen` and its family over the lowio handles and `_iob`),
+the directory and time functions, and the heap.
 
 ## THE ORIGINAL AND THE RECONSTRUCTION RUN IN LOCKSTEP
 
@@ -688,7 +705,7 @@ clean.
 
 ## In flight
 
-Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **65** analysis
+Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **66** analysis
 tools in `make check` (`tools/checkpatches.py`; `tools/checkclaims.py` counts
 the recipe).
 

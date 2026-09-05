@@ -119,6 +119,13 @@ int32_t __cdecl crt_sprintf(char *buf, const char *format, ...);
 
 /* 0x004698F0. */
 int32_t __cdecl crt_strlen(const char *s);
+/* 0x00469CA0 and 0x00465710. */
+char *__cdecl crt_strcpy(char *dst, const char *src);
+void *__cdecl crt_memmove(void *dst, const void *src, uint32_t n);
+/* 0x00469714 and the _isdigit the conversions use: the ctype table's
+ * answers for one byte. */
+int32_t __cdecl crt_tolower(int32_t c);
+int32_t __cdecl crt_isdigit(int32_t c);
 
 /* ---- fltcvt.cpp -------------------------------------------------------- */
 
@@ -129,6 +136,8 @@ void __cdecl crt_cfltcvt(const double *value, char *buf, int32_t fmt, int32_t pr
  * a decimal point in. */
 void __cdecl crt_cropzeros(char *buf);
 void __cdecl crt_forcdecpt(char *buf);
+/* 0x00466720. */
+int32_t __cdecl crt_positive(const double *value);
 
 /* ---- stdio.cpp --------------------------------------------------------- */
 

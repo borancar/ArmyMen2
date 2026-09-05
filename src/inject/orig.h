@@ -11213,6 +11213,16 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CRT_PRINTF_TABLE  0x0046FE70u /* uint8_t[0x59]: _output's state table, classes at [ch - 0x20], transitions at [class * 8 + state] >> 4 */
 #define ADDR_CRT_NULLSTRING    0x0048CC88u /* const char *: what %s prints for NULL, "(null)" */
 #define ADDR_CRT_WNULLSTRING   0x0048CC8Cu /* const uint16_t *: the same for %S */
+#define ADDR_CRT_DECIMAL_POINT     0x0048CEA8u /* char: the locale's decimal point, "." from startup to exit */
+#define ADDR_CRT_CFTOG_PFLT        0x006645D8u /* STRFLT *: what _cftog converted, for the _cftof/_cftoe it then calls */
+#define ADDR_CRT_CFTOG_ACTIVE      0x006645DCu /* uint8_t: 1 while _cftof or _cftoe run under _cftog and must not convert again */
+#define ADDR_CRT_CFTOG_MAGNITUDE   0x006645E0u /* int32_t: the decimal exponent _cftog settled on */
+#define ADDR_CRT_CFTOG_EXPANSION   0x006645E4u /* uint8_t: rounding in _cftog carried into a new leading digit */
+#define ADDR_CRT_FLTOUT_RAW        0x006647A8u /* {int16 exp; char sign; uint8 ndigits; char digits[]}: what $I10_OUTPUT fills for _fltout */
+#define ADDR_CRT_STRFLT            0x006647C8u /* {int32 sign; int32 decpt; int32 flag; char *mantissa}: _fltout's answer */
+#define ADDR_CRT_POW10_TABLE       0x0048D618u /* twelve-byte long doubles: 10^1..10^7, 10^8..10^56, ... in groups of seven */
+#define ADDR_CRT_POW10_NEG_TABLE   0x0048D778u /* the same for 10^-1 downward */
+#define ADDR_CRT_EXPONENT_TEXT     0x0046FDF0u /* "e+000", the exponent _cftoe starts from */
 #define ADDR_CRT_STRTOK_NEXT 0x006645C8u /* char * */
 #define ADDR_CRT_STRTOK            0x0046551Cu  /* the game's own; the state is
                                                  * shared with DefObjParse, so

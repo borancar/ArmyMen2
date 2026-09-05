@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **65** analysis
+**`make check` runs everything that does not need the game.** **66** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -436,6 +436,19 @@ the recording through the C in `tests/selftest.cpp` -- and by lockstep for
 the rest. A mutation that cannot fail is stated as a theorem in the tool,
 not left as a gap: which side of a partition `qsort` pushes first changes
 nothing but the stack depth.
+
+**THE CRT'S FLOAT FORMATTING IS INTEGER ARITHMETIC, AND ITS CONSTANTS ARE
+THE IMAGE'S.** `%6.2f` goes through a twelve-byte long double, a five-word
+schoolbook multiply that rounds half to even at a guard word, a table of
+powers of ten and a digit loop that multiplies by ten and reads the top
+byte -- not one x87 instruction decides a digit. So it reproduces exactly
+in C, and the powers of ten, `"e+000"` and the decimal point are read out
+of `.data` and `.rdata` through `AM2_IMAGE` rather than transcribed; only
+the 0.1 that `$I10_OUTPUT` builds on its own stack is a literal. One
+idiom cost three of 1,793 cases: `mov al,[esi]; inc esi; test al; jne`
+leaves the pointer ONE PAST the terminator, so a `[esi-2]` after it is
+the last character, not the one before it. Write the walk as
+`while (*p++)`, not `while (*p) p++`.
 
 **THE ORIGINAL'S CRT IMPORTS ARE THE ORIGINAL'S CRT'S.** All 56 kernel32
 entries the platform did not have -- heaps, virtual memory, the

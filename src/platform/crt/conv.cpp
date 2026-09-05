@@ -39,6 +39,16 @@ static int32_t crt_toupper(int32_t c)
     return (crt_ctype((uint32_t)c) & CRT_LOWER) ? c - 0x20 : c;
 }
 
+int32_t __cdecl crt_tolower(int32_t c)
+{
+    return (crt_ctype((uint32_t)c) & CRT_UPPER) ? c + 0x20 : c;
+}
+
+int32_t __cdecl crt_isdigit(int32_t c)
+{
+    return (crt_ctype((uint32_t)c) & CRT_DIGIT) != 0;
+}
+
 int32_t __cdecl crt_atol(const char *s)
 {
     uint32_t c, sign;

@@ -253,6 +253,7 @@ extern "C" struct AM2_Sprite *__cdecl TurretAnimSprite(int32_t, uint32_t)
 static int FirePoses(int *passed);
 static int HitReacts(int *passed);
 static int Qsort(int *passed);
+static int Printf(int *passed);
 
 /* ---- the CRT's qsort and bsearch ----------------------------------------------- */
 
@@ -311,6 +312,42 @@ static int Qsort(int *passed)
         }
     }
     printf("  %d qsort arrays and bsearch probes: %d pass, %d fail\n", pass + fail, pass, fail);
+    *passed += pass;
+    return fail;
+}
+
+/* ---- the CRT's sprintf ------------------------------------------------------- */
+
+#include "printfvec.h"
+
+/* tools/printfcheck.py recorded what the original sprintf wrote. The
+ * arguments travel as the dwords the original saw on its stack, so a
+ * double is its two halves and the call below hands them over as such:
+ * cdecl puts them where the varargs reader expects them either way. */
+static int Printf(int *passed)
+{
+    int32_t pass = 0, fail = 0;
+
+    for (uint32_t c = 0; c < sizeof am2_printf_cases / sizeof am2_printf_cases[0]; c++) {
+        const AM2_PrintfCase *k = &am2_printf_cases[c];
+        uint32_t a[4];
+        char     buf[512];
+        int32_t  rc;
+
+        for (int32_t i = 0; i < 4; i++)
+            a[i] = k->kind[i] == 1 ? (uint32_t)(uintptr_t)am2_printf_strings[k->a[i]] : k->a[i];
+        memset(buf, 0xA5, sizeof buf);
+        rc = crt_sprintf(buf, k->fmt, a[0], a[1], a[2], a[3]);
+        if (rc != k->rc || strcmp(buf, k->want) != 0) {
+            if (fail < 12)
+                printf("  FAIL crt_sprintf(\"%s\") -> %d \"%s\", want %d \"%s\"\n",
+                       k->fmt, (int)rc, buf, (int)k->rc, k->want);
+            fail++;
+        } else {
+            pass++;
+        }
+    }
+    printf("  %d sprintf cases: %d pass, %d fail\n", pass + fail, pass, fail);
     *passed += pass;
     return fail;
 }
@@ -426,6 +463,7 @@ int main(void)
     fail += FirePoses(&pass);
     fail += HitReacts(&pass);
     fail += Qsort(&pass);
+    fail += Printf(&pass);
     fail += DirtyList(&pass);
     fail += ScriptLines(&pass);
     fail += ScriptSpine(&pass);
