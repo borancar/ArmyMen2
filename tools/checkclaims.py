@@ -321,6 +321,8 @@ PROSE = (
     "docs/saveload.md",
     "docs/movement.md",
     "docs/oracles.md",
+    "docs/combat.md",
+    "docs/abnotes.md",
 )
 
 
