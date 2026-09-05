@@ -41,7 +41,8 @@ import merges
 DOCS = ("CLAUDE.md", "STATUS.md",
         "docs/screen-mpoptions.md",
         "docs/saveload.md",
-        "docs/movement.md")
+        "docs/movement.md",
+        "docs/boundary-notes.md")
 
 # Present-tense claims that an address has NOT been reconstructed.  "was left
 # original" and "used to be" are history and are not matched.
