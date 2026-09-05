@@ -124,6 +124,37 @@ original) bisected them one at a time:
   seed was a private global, so anything randomised diverged from the
   original run to run; it reads `ADDR_RAND_SEED` now.
 
+**AND THE PLANES WERE NOT THE DEFECT THE REPORT WAS ABOUT.** With both
+identical, Sarge still walked through Boot Camp's hut, and so did the
+INJECTED build under Wine -- the same drive on the original stops him at
+(1653,1145). Bisecting `AM2_NOPATCH_NAMES` with "does the hut stop him" as
+the oracle needed the whole by-name chain left original, WinMain down to
+`UpdateTrooperAction`, because a reconstruction reached by NAME cannot be
+put back one function at a time; greedy removal then left exactly that
+chain, so the defect was in that function's own body. Three, all in
+`UpdateTrooperAction` and none an offset:
+
+- The move was handed `OBJ_OFF_FIELD_44` itself where the original hands
+  the SPEED slot whenever that field is set, and the trooper's own signed
+  height only when it differs from the tile's. The field reads 88 on a
+  walking Sarge, `ObjMoveAlongFacing` made that his height, and
+  `BlockWeightRoute` discounts anything more than 16 units off the walker's
+  height -- so every hut and sandbag weighed nothing.
+- The no-route chain fell through to the settle with `turned` clear when
+  none of its four stop conditions held; the original's failed multiplayer
+  tests all jump back to the heading sweep.
+- The sweep tried one heading too many (its count starts at 1), passed the
+  state where the original passes the saved pose, and picked the player's
+  shorter limit by comparing Field548's VALUE against the default owner
+  instead of the object's army byte -- the idiom CLAUDE.md records.
+
+Verified by probing the callees the original reaches by address: with the
+original `UpdateTrooperAction` in place and ours, the per-frame sequence at
+the hut is the same -- three-heading sweeps every frame, all blocked,
+`PickFireMode` each time, the same facing distribution over 4,900 frames.
+No configuration in the suite can see this class: both sides are driven
+with the same input and nothing compares a position in play.
+
 Both planes are BYTE-IDENTICAL to the original's with the HQ dialog up.
 Dumped in live play they differ by a handful of cells, which is the socket
 thread reading between a vehicle's clear and its re-stamp; take that dump

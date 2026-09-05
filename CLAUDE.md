@@ -1606,6 +1606,21 @@ passed: dropping one game line from the standalone side names the missing
 lines and fails, and asking for a heap report that is not there fails
 separately.
 
+**`AM2_NOPATCH_NAMES` BISECTS A BEHAVIOUR, AND THE UNIT OF BISECTION IS A
+CHAIN, NOT A FUNCTION.** It leaves the named reconstructions original, and
+a reconstruction reached by NAME from another reconstruction is not reached
+at all -- the caller compiled a direct call to ours. So a set that restores
+the original's behaviour has to run from something reached by ADDRESS (in
+the injected build that is `WinMain`, which the CRT calls) down to the
+defect, and halves of the patch list fail on both sides while the whole
+half passes. That is what "trial(822) -> 1, trial(411) -> 0, trial(411) ->
+0" means, and delta-debugging over 821 names would have taken an hour to
+say it. Write the by-name chain down from the call sites, confirm it as a
+set, then drop members greedily: what survives is the path to the defect,
+and the deepest survivor is the function to read. Sarge walking through
+Boot Camp's hut took eight names and twenty-two trials that way, and the
+defect was three misreadings in one function, none of them an offset.
+
 **Movement and the input path are `docs/movement.md`.** Two defects a month
 apart each made the player unable to move and neither was visible to any A/B --
 both sides are driven with the same input and agree about ignoring it.
