@@ -323,6 +323,7 @@ PROSE = (
     "docs/oracles.md",
     "docs/combat.md",
     "docs/abnotes.md",
+    "docs/tables.md",
 )
 
 
