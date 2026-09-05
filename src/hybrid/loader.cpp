@@ -1,0 +1,454 @@
+/* loader.cpp -- the ORIGINAL ArmyMen2.exe, loaded by us and run over
+ * src/platform, with no Wine anywhere.
+ *
+ * The native build links the reconstruction against the platform layer.
+ * This build links the platform layer alone and loads the retail PE into
+ * the process the way Windows would: the image is mapped at the base its
+ * pointers were written for -- 0x00400000, which an i386 ELF placed at
+ * 0x00700000 leaves free -- its sections are copied in, every slot of its
+ * import table is filled with the address of our implementation of that
+ * name, and its entry point, the MSVC 6 CRT's WinMainCRTStartup, is
+ * called. From then on the retail code runs unmodified, and every call it
+ * makes out of itself lands in the same src/platform the reconstruction
+ * runs over.
+ *
+ * What the CRT and the game need from the process beyond the imports:
+ *
+ *   fs:[0]      The SEH chain head. 340 sites in the image push and pop
+ *               it and nothing reads any other TEB field, so each thread
+ *               gets a page whose first dword is the end-of-chain marker,
+ *               reached through a GDT entry set_thread_area allocates.
+ *               Threads inherit their creator's, and the ones the game
+ *               makes get their own through am2_thread_attach.
+ *   the cwd     The original reads its install directory with getcwd, so
+ *               AM2_GAMEDIR is entered before the entry point runs.
+ *   the log     The retail logger at ADDR_LOG is a bare `ret`, and the
+ *               harness patches it to capture what the game writes. So
+ *               does this, to the file AM2_LOG names -- which is how a
+ *               hybrid run is compared against a Wine run of the same
+ *               binary. Unset, the line is dropped as the retail stub
+ *               drops it.
+ *
+ * sdl.cpp's main calls WinMain, and this file IS WinMain.
+ */
+#include "../platform/platform.h"
+#include "../inject/orig.h"
+
+#include <sys/mman.h>
+#include <sys/syscall.h>
+#include <asm/ldt.h>
+#include <unistd.h>
+#include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#ifndef MAP_FIXED_NOREPLACE
+#define MAP_FIXED_NOREPLACE 0x100000
+#endif
+
+/* ---- the PE, as much of it as the loader reads ------------------------- */
+
+typedef struct AM2_PeFileHeader {
+    uint16_t Machine, NumberOfSections;
+    uint32_t TimeDateStamp, PointerToSymbolTable, NumberOfSymbols;
+    uint16_t SizeOfOptionalHeader, Characteristics;
+} AM2_PeFileHeader;
+
+typedef struct AM2_PeDataDir { uint32_t VirtualAddress, Size; } AM2_PeDataDir;
+
+typedef struct AM2_PeOptionalHeader {
+    uint16_t Magic;
+    uint8_t  MajorLinkerVersion, MinorLinkerVersion;
+    uint32_t SizeOfCode, SizeOfInitializedData, SizeOfUninitializedData;
+    uint32_t AddressOfEntryPoint, BaseOfCode, BaseOfData, ImageBase;
+    uint32_t SectionAlignment, FileAlignment;
+    uint16_t MajorOperatingSystemVersion, MinorOperatingSystemVersion;
+    uint16_t MajorImageVersion, MinorImageVersion;
+    uint16_t MajorSubsystemVersion, MinorSubsystemVersion;
+    uint32_t Win32VersionValue, SizeOfImage, SizeOfHeaders, CheckSum;
+    uint16_t Subsystem, DllCharacteristics;
+    uint32_t SizeOfStackReserve, SizeOfStackCommit;
+    uint32_t SizeOfHeapReserve, SizeOfHeapCommit;
+    uint32_t LoaderFlags, NumberOfRvaAndSizes;
+    AM2_PeDataDir DataDirectory[16];
+} AM2_PeOptionalHeader;
+
+typedef struct AM2_PeSection {
+    char     Name[8];
+    uint32_t VirtualSize, VirtualAddress, SizeOfRawData, PointerToRawData;
+    uint32_t PointerToRelocations, PointerToLinenumbers;
+    uint16_t NumberOfRelocations, NumberOfLinenumbers;
+    uint32_t Characteristics;
+} AM2_PeSection;
+
+typedef struct AM2_PeImport {
+    uint32_t OriginalFirstThunk, TimeDateStamp, ForwarderChain, Name, FirstThunk;
+} AM2_PeImport;
+
+#define AM2_PE_DIR_IMPORT 1
+#define AM2_IMAGE_BASE 0x00400000u
+
+/* ---- diagnostics ----------------------------------------------------------------- */
+
+static void am2_hybrid_die(const char *fmt, ...) __attribute__((noreturn, format(printf, 1, 2)));
+static void am2_hybrid_die(const char *fmt, ...)
+{
+    va_list ap;
+
+    fputs("hybrid: ", stderr);
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+    fputc('\n', stderr);
+    exit(1);
+}
+
+/* ---- the TEB ---------------------------------------------------------------------- */
+
+/* One page a thread: fs:[0] the end-of-chain marker, fs:[0x18] itself,
+ * the rest zero. set_thread_area gives it a GDT slot the kernel keeps per
+ * thread, so the same selector means a different page on each. */
+static void am2_hybrid_teb_attach(void)
+{
+    static __thread int32_t done;
+    uint32_t        *teb;
+    struct user_desc d;
+    uint16_t         sel;
+
+    if (done)
+        return;
+    done = 1;
+    teb = (uint32_t *)calloc(1024, sizeof *teb);
+    if (!teb)
+        am2_hybrid_die("no memory for a TEB");
+    teb[0] = 0xFFFFFFFFu;
+    teb[6] = (uint32_t)(uintptr_t)teb;
+    memset(&d, 0, sizeof d);
+    d.entry_number = (unsigned int)-1;
+    d.base_addr = (unsigned int)(uintptr_t)teb;
+    d.limit = 0xFFFFF;
+    d.seg_32bit = 1;
+    d.limit_in_pages = 1;
+    d.useable = 1;
+    if (syscall(SYS_set_thread_area, &d) != 0)
+        am2_hybrid_die("set_thread_area: %s", strerror(errno));
+    sel = (uint16_t)(d.entry_number * 8 + 3);
+    __asm__ volatile("mov %0, %%fs" : : "r"(sel));
+}
+
+/* Before main, so every thread SDL or anyone else creates inherits a
+ * usable fs from the one that made it. */
+__attribute__((constructor)) static void am2_hybrid_init(void)
+{
+    am2_hybrid_teb_attach();
+    am2_thread_attach = am2_hybrid_teb_attach;
+}
+
+/* ---- missing imports ----------------------------------------------------------------- */
+
+/* An import we do not provide gets a stub of its own that names it and
+ * stops, rather than the shared trap that answers 0: a silent 0 from,
+ * say, CreateFileA is a game that cannot explain what went wrong. */
+static void __attribute__((noreturn)) am2_hybrid_missing(const char *what)
+{
+    am2_hybrid_die("the game called %s, which this build does not provide", what);
+}
+
+static uint8_t *am2_stub_page;
+static size_t   am2_stub_used;
+
+static const void *am2_hybrid_make_stub(const char *module, const char *name)
+{
+    char    *what = (char *)malloc(strlen(module) + strlen(name) + 2);
+    uint8_t *s;
+    uint32_t rel;
+
+    if (!am2_stub_page) {
+        am2_stub_page = (uint8_t *)mmap(NULL, 4096, PROT_READ | PROT_WRITE | PROT_EXEC,
+                                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (am2_stub_page == MAP_FAILED)
+            am2_hybrid_die("cannot map the import stubs");
+    }
+    if (!what || am2_stub_used + 16 > 4096)
+        am2_hybrid_die("too many missing imports");
+    sprintf(what, "%s!%s", module, name);
+    s = am2_stub_page + am2_stub_used;
+    am2_stub_used += 16;
+    s[0] = 0x68;                                   /* push what */
+    memcpy(s + 1, &what, 4);
+    s[5] = 0xE8;                                   /* call am2_hybrid_missing */
+    rel = (uint32_t)((uintptr_t)&am2_hybrid_missing - (uintptr_t)(s + 10));
+    memcpy(s + 6, &rel, 4);
+    s[10] = 0xCC;
+    return s;
+}
+
+/* ---- the game's log ------------------------------------------------------------------ */
+
+#ifdef AM2_DEVTOOLS
+extern "C" void input_init(void);
+extern "C" int  control_start(void);
+#endif
+
+static FILE *am2_hybrid_logfile(void)
+{
+    static FILE   *fh;
+    static int32_t tried;
+
+    if (!tried) {
+        const char *path = getenv("AM2_LOG");
+        tried = 1;
+        if (path && *path)
+            fh = !strcmp(path, "-") ? stderr : fopen(path, "w");
+    }
+    return fh;
+}
+
+/* cdecl and variadic, as the retail stub's callers expect. Two of the
+ * image's call sites reach it with NO argument frame -- CLAUDE.md records
+ * 0x00460290 and a widget vtable slot folded onto the same `ret` -- so
+ * the "format" is whatever sits above the return address and is checked
+ * before it is used, as src/standalone/runtime.cpp checks it. */
+static void __attribute__((cdecl)) am2_hybrid_log(const char *fmt, ...)
+{
+    FILE   *fh = am2_hybrid_logfile();
+    va_list ap;
+    int32_t i;
+
+    if (!fh || IsBadStringPtrA(fmt, 4096))
+        return;
+    for (i = 0; i < 8 && fmt[i]; i++) {
+        unsigned char c = (unsigned char)fmt[i];
+        if ((c < 0x20 && c != '\n' && c != '\t' && c != '\r') || c >= 0x7F)
+            return;
+    }
+    va_start(ap, fmt);
+    vfprintf(fh, fmt, ap);
+    va_end(ap);
+    fflush(fh);
+}
+
+/* The harness's own lines -- the control socket's -- into the same file,
+ * one per call, as src/standalone/runtime.cpp's hooklog does. */
+extern "C" void am2_hybrid_log_line(const char *fmt, va_list ap)
+{
+    FILE *fh = am2_hybrid_logfile();
+
+    if (!fh)
+        return;
+    vfprintf(fh, fmt, ap);
+    fputc('\n', fh);
+    fflush(fh);
+}
+
+static void am2_hybrid_patch_jmp(uintptr_t at, const void *to)
+{
+    uint8_t *p = (uint8_t *)at;
+    uint32_t rel = (uint32_t)((uintptr_t)to - (at + 5));
+
+    p[0] = 0xE9;
+    memcpy(p + 1, &rel, 4);
+}
+
+/* ---- the cursor ------------------------------------------------------------------------ */
+
+static void am2_hybrid_cursor_query(int32_t *x, int32_t *y)
+{
+    *x = *(const int32_t *)(uintptr_t)ADDR_CURSOR_X;
+    *y = *(const int32_t *)(uintptr_t)ADDR_CURSOR_Y;
+}
+
+/* ---- the fault line --------------------------------------------------------------------- */
+
+static LONG CALLBACK am2_hybrid_fault(EXCEPTION_POINTERS *ep)
+{
+    uintptr_t  eip = (uintptr_t)ep->ExceptionRecord->ExceptionAddress;
+    uintptr_t *esp = (uintptr_t *)ep->ContextRecord->Esp;
+    int32_t    i;
+
+    fprintf(stderr, "hybrid: fault at 0x%08lx (%s) eax=%08lx ebx=%08lx ecx=%08lx "
+            "edx=%08lx esi=%08lx edi=%08lx ebp=%08lx esp=%08lx\n",
+            (unsigned long)eip,
+            eip >= AM2_IMAGE_BASE && eip < AM2_IMAGE_BASE + 0x267000 ? "in the image" : "outside the image",
+            (unsigned long)ep->ContextRecord->Eax, (unsigned long)ep->ContextRecord->Ebx,
+            (unsigned long)ep->ContextRecord->Ecx, (unsigned long)ep->ContextRecord->Edx,
+            (unsigned long)ep->ContextRecord->Esi, (unsigned long)ep->ContextRecord->Edi,
+            (unsigned long)ep->ContextRecord->Ebp, (unsigned long)esp);
+    if (esp && !IsBadReadPtr(esp, 64)) {
+        fputs("hybrid: stack:", stderr);
+        for (i = 0; i < 16; i++)
+            fprintf(stderr, " %08lx", (unsigned long)esp[i]);
+        fputc('\n', stderr);
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+/* ---- loading ------------------------------------------------------------------------------ */
+
+static uint8_t *am2_hybrid_read_file(const char *path, size_t *size)
+{
+    FILE    *fh = fopen(path, "rb");
+    uint8_t *buf;
+    long     n;
+
+    if (!fh)
+        return NULL;
+    fseek(fh, 0, SEEK_END);
+    n = ftell(fh);
+    fseek(fh, 0, SEEK_SET);
+    buf = (uint8_t *)malloc(n > 0 ? (size_t)n : 1);
+    if (!buf || fread(buf, 1, (size_t)n, fh) != (size_t)n) {
+        fclose(fh);
+        free(buf);
+        return NULL;
+    }
+    fclose(fh);
+    *size = (size_t)n;
+    return buf;
+}
+
+static void am2_hybrid_find_exe(char *out, size_t cap)
+{
+    const char *exe = getenv("AM2_EXE");
+    const char *dir = getenv("AM2_GAMEDIR");
+
+    if (exe && *exe)
+        snprintf(out, cap, "%s", exe);
+    else if (dir && *dir)
+        snprintf(out, cap, "%s/ArmyMen2.exe", dir);
+    else
+        snprintf(out, cap, "ArmyMen2.exe");
+}
+
+static uint32_t am2_hybrid_bind_imports(const uint8_t *image, const AM2_PeDataDir *dir)
+{
+    const AM2_PeImport *imp = (const AM2_PeImport *)(image + dir->VirtualAddress);
+    uint32_t            missing = 0, bound = 0;
+
+    if (!dir->VirtualAddress)
+        return 0;
+    for (; imp->Name; imp++) {
+        const char     *module = (const char *)(image + imp->Name);
+        const uint32_t *names = (const uint32_t *)(image + (imp->OriginalFirstThunk
+                                                            ? imp->OriginalFirstThunk
+                                                            : imp->FirstThunk));
+        uint32_t       *slots = (uint32_t *)(image + imp->FirstThunk);
+        uint32_t        i;
+
+        for (i = 0; names[i]; i++) {
+            char        ordinal[16];
+            const char *name;
+            const void *fn;
+
+            if (names[i] & 0x80000000u) {
+                /* DSOUND's #1 is DirectSoundCreate; nothing else imports
+                 * by ordinal. */
+                if (!strcasecmp(module, "DSOUND.dll") && (names[i] & 0xFFFF) == 1)
+                    name = "DirectSoundCreate";
+                else {
+                    snprintf(ordinal, sizeof ordinal, "#%u", (unsigned)(names[i] & 0xFFFF));
+                    name = ordinal;
+                }
+            } else {
+                name = (const char *)(image + (names[i] & 0x7FFFFFFFu) + 2);
+            }
+            fn = am2_export_lookup(module, name);
+            if (!fn) {
+                am2_plat_log("import %s!%s is not provided", module, name);
+                fn = am2_hybrid_make_stub(module, name);
+                missing++;
+            } else {
+                bound++;
+            }
+            slots[i] = (uint32_t)(uintptr_t)fn;
+        }
+    }
+    am2_plat_log("imports: %u bound, %u missing", (unsigned)bound, (unsigned)missing);
+    return missing;
+}
+
+extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int32_t show);
+extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int32_t show)
+{
+    char                        path[4096];
+    uint8_t                    *file;
+    size_t                      size;
+    const AM2_PeFileHeader     *fh;
+    const AM2_PeOptionalHeader *oh;
+    const AM2_PeSection        *sec;
+    uint8_t                    *image;
+    uint32_t                    lfanew, i;
+    void                      (*entry)(void);
+
+    (void)inst; (void)prev; (void)show;
+
+    am2_hybrid_find_exe(path, sizeof path);
+    file = am2_hybrid_read_file(path, &size);
+    if (!file)
+        am2_hybrid_die("cannot read %s (set AM2_EXE or AM2_GAMEDIR)", path);
+    if (size < 0x40 || file[0] != 'M' || file[1] != 'Z')
+        am2_hybrid_die("%s is not a PE image", path);
+    memcpy(&lfanew, file + 0x3C, 4);
+    if (lfanew + 4 + sizeof *fh + sizeof *oh > size || memcmp(file + lfanew, "PE\0\0", 4))
+        am2_hybrid_die("%s has no PE header", path);
+    fh = (const AM2_PeFileHeader *)(file + lfanew + 4);
+    oh = (const AM2_PeOptionalHeader *)(fh + 1);
+    if (fh->Machine != 0x14C || oh->Magic != 0x10B)
+        am2_hybrid_die("%s is not an i386 PE32 image", path);
+    if (oh->ImageBase != AM2_IMAGE_BASE)
+        am2_hybrid_die("%s is based at 0x%08x, not 0x%08x", path,
+                       (unsigned)oh->ImageBase, (unsigned)AM2_IMAGE_BASE);
+
+    /* The whole image, readable, writable and executable: the CRT writes
+     * its own .data, the IAT lives in .rdata and is bound below, and the
+     * log detour rewrites five bytes of .text. */
+    image = (uint8_t *)mmap((void *)(uintptr_t)oh->ImageBase, oh->SizeOfImage,
+                            PROT_READ | PROT_WRITE | PROT_EXEC,
+                            MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
+    if (image == MAP_FAILED || image != (uint8_t *)(uintptr_t)oh->ImageBase)
+        am2_hybrid_die("cannot map the image at 0x%08x: %s", (unsigned)oh->ImageBase,
+                       strerror(errno));
+    memcpy(image, file, oh->SizeOfHeaders < size ? oh->SizeOfHeaders : size);
+    sec = (const AM2_PeSection *)((const uint8_t *)oh + fh->SizeOfOptionalHeader);
+    for (i = 0; i < fh->NumberOfSections; i++) {
+        uint32_t n = sec[i].SizeOfRawData;
+        if (sec[i].PointerToRawData + n > size)
+            am2_hybrid_die("section %.8s runs past the end of the file", sec[i].Name);
+        if (sec[i].VirtualAddress + n > oh->SizeOfImage)
+            am2_hybrid_die("section %.8s runs past the end of the image", sec[i].Name);
+        memcpy(image + sec[i].VirtualAddress, file + sec[i].PointerToRawData, n);
+        am2_plat_debug("section %.8s at 0x%08x, %u bytes of %u",
+                       sec[i].Name, (unsigned)(oh->ImageBase + sec[i].VirtualAddress),
+                       (unsigned)n, (unsigned)sec[i].VirtualSize);
+    }
+    entry = (void (*)(void))(uintptr_t)(oh->ImageBase + oh->AddressOfEntryPoint);
+    am2_hybrid_bind_imports(image, &oh->DataDirectory[AM2_PE_DIR_IMPORT]);
+    free(file);
+
+    am2_hybrid_patch_jmp(ADDR_LOG, (const void *)&am2_hybrid_log);
+    am2_host_cursor_query = am2_hybrid_cursor_query;
+    AddVectoredExceptionHandler(1, am2_hybrid_fault);
+    am2_set_command_line(cmdline);
+
+    {
+        const char *dir = getenv("AM2_GAMEDIR");
+        if (dir && *dir && chdir(dir) != 0)
+            am2_hybrid_die("cannot enter AM2_GAMEDIR \"%s\": %s", dir, strerror(errno));
+    }
+
+#ifdef AM2_DEVTOOLS
+    /* The control socket, on port 31337 as the native development binary
+     * has it. It reads the game's globals by address, which are the
+     * original's here, so `dump`, `cursor` and tools/objdump.py work as
+     * they do there. */
+    input_init();
+    control_start();
+#endif
+
+    am2_plat_log("running %s from its entry point 0x%08lx", path, (unsigned long)(uintptr_t)entry);
+    entry();
+    /* WinMainCRTStartup ends in ExitProcess and does not return. */
+    return 0;
+}

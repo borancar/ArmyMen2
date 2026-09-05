@@ -328,7 +328,7 @@ vectors:
 .PHONY: check
 check:
 	@rc=0; \
-	for t in coverage comcalls merges checkcom checkhooks binpatches blindspots checkclaims crt scripttokens scriptactions screens checkpatches checkprose checkseams checkinstalled checkcallers checkglobals checkoffsets checksplit checkthis checkgap moviecheck posecheck formationcheck shakecheck roachcheck rlecheck mprowcheck weaponcheck listcheck placementcheck aicheck hitreactcheck savetagcheck numberkeycheck aiignorecheck aitwincheck aiwalkcheck aifollowcheck aikeeprangecheck rowreleasecheck stateleavecheck refreshcheck vehpointcheck roachbitecheck pathplancheck vehexitcheck tilesetcheck damagecheck shotcheck shotdmgcheck rectquerycheck ringcheck boolcheck explcheck collectcheck firepose regioncheck pathcheck tilepathcheck cheats; do \
+	for t in coverage comcalls merges checkcom checkhooks binpatches blindspots checkclaims crt scripttokens scriptactions screens checkpatches checkprose checkseams checkinstalled checkcallers checkglobals checkoffsets checksplit checkthis checkgap checkvtables glyphdump moviecheck posecheck formationcheck shakecheck roachcheck rlecheck mprowcheck weaponcheck listcheck placementcheck aicheck hitreactcheck savetagcheck numberkeycheck aiignorecheck aitwincheck aiwalkcheck aifollowcheck aikeeprangecheck rowreleasecheck stateleavecheck refreshcheck vehpointcheck roachbitecheck pathplancheck vehexitcheck tilesetcheck damagecheck shotcheck shotdmgcheck rectquerycheck ringcheck boolcheck explcheck collectcheck firepose regioncheck pathcheck tilepathcheck cheats; do \
 	    printf '  %-12s ' "$$t"; \
 	    if ./.venv/bin/python tools/$$t.py >/dev/null 2>&1; then \
 	        echo ok; \
@@ -346,9 +346,9 @@ check:
 	    echo "    needs the module the function now lives in."; \
 	    rc=1; \
 	fi; \
-	if [ -n "$$(git status --porcelain docs/ src/game/scripttokens.h)" ]; then \
+	if [ -n "$$(git status --porcelain docs/ src/game/scripttokens.h src/platform/glyphs.inc)" ]; then \
 	    echo "  generated files DRIFTED from what is committed:"; \
-	    git status --short docs/ src/game/scripttokens.h | sed 's/^/    /'; \
+	    git status --short docs/ src/game/scripttokens.h src/platform/glyphs.inc | sed 's/^/    /'; \
 	    echo "    regenerate and commit, or find out why a tool changed its mind"; \
 	    rc=1; \
 	else \
@@ -523,6 +523,61 @@ NATIVE_LDF   := $(NATIVE_ARCH) -static-libgcc \
                 -Wl,--section-start,.origbss=$$(cat build/standalone/origbss.addr) \
                 -Wl,-Ttext=0x00700000 -Wl,-z,norelro -Wl,--no-warn-rwx-segments
 NATIVE_LIBS  := -lSDL3 -lpthread -lm
+
+# The HYBRID build: the ORIGINAL ArmyMen2.exe, loaded by our own PE loader
+# and run over src/platform, with no Wine anywhere. src/hybrid/loader.cpp
+# is WinMain: it maps the retail image at 0x00400000 -- which an ELF whose
+# text is at 0x00700000 leaves free -- fills its import table with the
+# platform layer's functions, and calls its entry point. No reconstruction
+# is linked in at all, so it is the platform layer under the ORIGINAL code,
+# which is the other half of what the native build checks.
+#
+#     make hybrid
+#     AM2_GAMEDIR="$(GAMEDIR)" AM2_LOG=/tmp/hybrid.log build/armymen2-hybrid -nointro
+HYBRID_SRC   := $(wildcard src/platform/*.cpp) src/hybrid/loader.cpp
+HYBRID_OBJ   := $(patsubst %.cpp,$(BUILD)/hybrid/%.o,$(HYBRID_SRC))
+HYBRID_DEFS  := -DAM2_NATIVE -DAM2_HYBRID -isystem src/platform/include -include callconv.h
+HYBRID_CXXF  := $(NATIVE_ARCH) -O2 -g -Wall -Wextra -std=gnu++14 \
+                -fno-strict-aliasing -fno-exceptions -fno-rtti $(DEPFLAGS) \
+                $(HYBRID_DEFS)
+HYBRID_LDF   := $(NATIVE_ARCH) -static-libgcc \
+                -Wl,-Ttext=0x00700000 -Wl,-z,norelro -Wl,--no-warn-rwx-segments
+
+#
+# The development binary adds the harness's control socket (src/inject's
+# control.c and input.c, over the stubs in src/hybrid/devtools.cpp), so a
+# run can be driven and its object table dumped exactly as the native
+# development binary's can. Same port, same tools.
+HYBRID_DEV_OBJ := $(patsubst %.cpp,$(BUILD)/hybrid-dev/%.o,$(HYBRID_SRC) src/hybrid/devtools.cpp) \
+                  $(patsubst %.c,$(BUILD)/hybrid-dev/%.o,$(SA_CSRC))
+HYBRID_CF    := $(NATIVE_ARCH) -O2 -g -Wall -Wextra -std=gnu11 -fno-strict-aliasing \
+                $(DEPFLAGS) $(HYBRID_DEFS)
+
+.PHONY: hybrid hybrid-dev
+hybrid: $(BUILD)/armymen2-hybrid $(BUILD)/armymen2-hybrid-dev
+hybrid-dev: $(BUILD)/armymen2-hybrid-dev
+
+$(BUILD)/hybrid/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(NATIVE_CXX) $(HYBRID_CXXF) -c $< -o $@
+
+$(BUILD)/hybrid-dev/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(NATIVE_CXX) $(HYBRID_CXXF) -DAM2_DEVTOOLS -c $< -o $@
+
+$(BUILD)/hybrid-dev/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(NATIVE_CC) $(HYBRID_CF) -DAM2_DEVTOOLS -c $< -o $@
+
+-include $(HYBRID_OBJ:.o=.d) $(HYBRID_DEV_OBJ:.o=.d)
+
+$(BUILD)/armymen2-hybrid: $(HYBRID_OBJ)
+	$(NATIVE_CXX) -o $@ $(HYBRID_OBJ) $(HYBRID_LDF) $(NATIVE_LIBS)
+	@echo "hybrid: $@"
+
+$(BUILD)/armymen2-hybrid-dev: $(HYBRID_DEV_OBJ)
+	$(NATIVE_CXX) -o $@ $(HYBRID_DEV_OBJ) $(HYBRID_LDF) $(NATIVE_LIBS)
+	@echo "hybrid-dev: $@"
 
 .PHONY: native native-dev
 # BOTH, because the two go out of step silently otherwise: every drive and

@@ -715,6 +715,14 @@ void am2_host_timer_remove(uint32_t id)
     }
 }
 
+void am2_host_exit(int32_t code)
+{
+    am2_host_audio_close();
+    am2_host_window_close();
+    SDL_Quit();
+    exit(code);
+}
+
 int main(int argc, char **argv)
 {
     char    cmdline[4096];

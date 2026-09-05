@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **62** analysis
+**`make check` runs everything that does not need the game.** **64** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -351,6 +351,59 @@ subdirectory would have made every one of them miss the whole `win32/` half
 silently and report the boundary as barely started. They now share `am2.game_sources()`
 — one definition, for the same reason `tools/merges.py` imports
 `coverage.REGISTERED` rather than copying it.
+
+**THE HYBRID RUNS THE ORIGINAL OVER OUR PLATFORM, and it is the check the
+native build cannot be.** `make hybrid` is a PE loader of our own: the
+retail image mapped at `0x00400000`, its import table bound by module and
+name from `src/platform`'s export table, a TEB per thread for the SEH chain
+at `fs:[0]` -- the only TEB field the image touches, 340 sites -- and the
+MSVC CRT's entry point called. Every call the original makes out of itself
+lands in the same platform layer the reconstruction runs over, so a defect
+in that layer that the reconstruction happens to agree with shows up here.
+Its first run found two: STATUS.md has them.
+
+**A VTABLE'S SLOT ORDER IS NEVER PRIVATE.** `ddraw.h` said it was, because
+the reconstruction reaches DirectX through name macros, and reordered two
+slots for a tidier macro. The original indexes by number, and the very first
+DirectDraw call after `QueryInterface` landed on the wrong method with the
+wrong arity. `tools/checkvtables.py` compares every platform vtable against
+the SDK's declaration slot by slot, and is in `make check`. The rule
+generalises: any layout the ORIGINAL sees -- a vtable, a struct the image
+carries, an import ordinal -- is the SDK's, and "nothing indexes it" is a
+claim about today's callers, not about the layout.
+
+**GDI TEXT IS REPLAYED FROM WINE, NOT RASTERISED.** The game builds its
+three fonts from `TextOutA`'s pixels, so text is exactly as good as the
+rasteriser, and stb_truetype disagreed with Wine's FreeType on about 1,400
+pixels of one dialog. `tests/glyphs-reference.txt` is those fonts read out
+of the ORIGINAL under Wine by `tools/glyphdump.py` (672 glyphs, the number
+`font.h` already gives for a session), `src/platform/glyphs.inc` is
+generated from it, and `gdi32.cpp` paints the recorded bitmaps for those
+faces. To re-record: drive the injected build to the title
+(fonts 1 and 2) and into a mission (font 0), and run the tool with `--port`
+at each. The `.inc` is in the drift check, the reference is not derived
+from anything in this tree, and a face the game never asks for still goes
+through stb_truetype.
+
+**A DIFFERENCE INSIDE THE POINTER'S BOX IS HISTORY BEFORE IT IS RENDERING.**
+The hybrid's HQ-dialog frame matched Wine's everywhere but the pointer,
+and two hours went on palettes, remap tables, stretch rounding and
+animation phase before the cursor was simply moved away on both sides:
+the residue it left was the difference, and both sides had it. The pointer
+saves and restores only its arrow; its overlays are software sprites nothing
+restores, so that spot holds whatever was drawn there last, which two
+unsynchronised drives never agree on. Ask what the pointer LEAVES before
+asking what it draws, and compare on a screen that repaints the spot.
+The stretch rounding was a real finding on the way -- the platform now steps
+wined3d's truncated 16.16 increment -- but it was not the cause.
+
+**THE ORIGINAL'S CRT IMPORTS ARE THE ORIGINAL'S CRT'S.** All 56 kernel32
+entries the platform did not have -- heaps, virtual memory, the
+environment, std handles, file I/O, find-file, code pages, string
+classification, time, exit -- are called only from above `0x00465000`, the
+statically linked MSVC runtime, and never from the game. `kernel32crt.cpp`
+emulates Microsoft's runtime, not 3DO's, which is why a Win98 `GetVersion`
+and a Latin-1 `GetStringTypeA` are enough.
 
 ## Language split
 

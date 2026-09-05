@@ -3,7 +3,9 @@
  * Winsock names control.c uses. See platform.h for the layer's shape.
  */
 #include "platform.h"
+#include "handle.h"
 #include <winsock2.h>
+#include <io.h>
 #include <ddraw.h>
 #include <dinput.h>
 #include <dsound.h>
@@ -181,6 +183,38 @@ static const AM2_Export am2_exports[] = {
     X("KERNEL32.dll", CreateEventA), X("KERNEL32.dll", GetModuleHandleA),
     X("KERNEL32.dll", SetCurrentDirectoryA), X("KERNEL32.dll", GetCurrentDirectoryA),
     X("KERNEL32.dll", GetLastError),
+    /* The rest of KERNEL32 is what the MSVC 6 CRT inside the original
+     * imports, provided by kernel32crt.cpp for the PE loader. */
+    X("KERNEL32.dll", CompareStringA), X("KERNEL32.dll", CompareStringW),
+    X("KERNEL32.dll", CreateDirectoryA), X("KERNEL32.dll", CreateFileA),
+    X("KERNEL32.dll", DeleteFileA), X("KERNEL32.dll", ExitProcess),
+    X("KERNEL32.dll", FileTimeToLocalFileTime), X("KERNEL32.dll", FileTimeToSystemTime),
+    X("KERNEL32.dll", FindClose), X("KERNEL32.dll", FindFirstFileA),
+    X("KERNEL32.dll", FindNextFileA), X("KERNEL32.dll", FlushFileBuffers),
+    X("KERNEL32.dll", FreeEnvironmentStringsA), X("KERNEL32.dll", FreeEnvironmentStringsW),
+    X("KERNEL32.dll", GetACP), X("KERNEL32.dll", GetCommandLineA),
+    X("KERNEL32.dll", GetCPInfo), X("KERNEL32.dll", GetCurrentProcess),
+    X("KERNEL32.dll", GetEnvironmentStrings), X("KERNEL32.dll", GetEnvironmentStringsW),
+    X("KERNEL32.dll", GetFileAttributesA), X("KERNEL32.dll", GetFileType),
+    X("KERNEL32.dll", GetFullPathNameA), X("KERNEL32.dll", GetLocalTime),
+    X("KERNEL32.dll", GetOEMCP), X("KERNEL32.dll", GetStartupInfoA),
+    X("KERNEL32.dll", GetStdHandle), X("KERNEL32.dll", GetStringTypeA),
+    X("KERNEL32.dll", GetStringTypeW), X("KERNEL32.dll", GetSystemTime),
+    X("KERNEL32.dll", GetTimeZoneInformation), X("KERNEL32.dll", GetVersion),
+    X("KERNEL32.dll", HeapAlloc), X("KERNEL32.dll", HeapCreate),
+    X("KERNEL32.dll", HeapDestroy), X("KERNEL32.dll", HeapFree),
+    X("KERNEL32.dll", HeapReAlloc), X("KERNEL32.dll", HeapSize),
+    { "KERNEL32.dll", "InterlockedExchange", (const void *)&am2_InterlockedExchange },
+    X("KERNEL32.dll", IsBadCodePtr), X("KERNEL32.dll", LCMapStringA),
+    X("KERNEL32.dll", LCMapStringW), X("KERNEL32.dll", MultiByteToWideChar),
+    X("KERNEL32.dll", ReadFile), X("KERNEL32.dll", RemoveDirectoryA),
+    X("KERNEL32.dll", RtlUnwind), X("KERNEL32.dll", SetEndOfFile),
+    X("KERNEL32.dll", SetEnvironmentVariableA), X("KERNEL32.dll", SetFileAttributesA),
+    X("KERNEL32.dll", SetFilePointer), X("KERNEL32.dll", SetHandleCount),
+    X("KERNEL32.dll", SetStdHandle), X("KERNEL32.dll", SetUnhandledExceptionFilter),
+    X("KERNEL32.dll", TerminateProcess), X("KERNEL32.dll", UnhandledExceptionFilter),
+    X("KERNEL32.dll", VirtualAlloc), X("KERNEL32.dll", VirtualFree),
+    X("KERNEL32.dll", WideCharToMultiByte), X("KERNEL32.dll", WriteFile),
     X("USER32.dll", PostMessageA), X("USER32.dll", EndPaint),
     X("USER32.dll", BeginPaint), X("USER32.dll", PostQuitMessage),
     X("USER32.dll", RedrawWindow), X("USER32.dll", GetUpdateRect),
@@ -280,6 +314,19 @@ FARPROC WINAPI GetProcAddress(HMODULE mod, LPCSTR name)
     return (FARPROC)&am2_import_missing;
 }
 
+/* The loader's view of the table: NULL for a name we do not provide, so it
+ * can make a trap that says which name, rather than the shared one. */
+const void *am2_export_lookup(const char *module, const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < sizeof am2_exports / sizeof am2_exports[0]; i++)
+        if (!strcasecmp(am2_exports[i].module, module) &&
+            !strcmp(am2_exports[i].name, name))
+            return am2_exports[i].fn;
+    return NULL;
+}
+
 DWORD WINAPI GetModuleFileNameA(HMODULE mod, LPSTR out, DWORD cap)
 {
     ssize_t n;
@@ -360,38 +407,47 @@ HGLOBAL WINAPI GlobalFree(HGLOBAL mem)
     return NULL;
 }
 
-/* ---- handles: threads, events, mutexes --------------------------------------- */
+/* ---- handles: threads, events, mutexes, files ------------------------------ */
 
 /* One lock and one condition for every handle. The game has two threads
  * besides the main one and they rendezvous a handful of times a second, so
- * a shared condition is simpler than one per object and costs nothing. */
-enum { AM2_H_THREAD = 1, AM2_H_EVENT, AM2_H_MUTEX };
-
-typedef struct AM2_Handle {
-    int32_t   kind;
-    pthread_t thread;
-    int32_t   done;
-    DWORD     exitCode;
-    int32_t   manualReset;
-    int32_t   signaled;
-    LPTHREAD_START_ROUTINE start;
-    LPVOID    param;
-    int32_t   refs;
-} AM2_Handle;
-
+ * a shared condition is simpler than one per object and costs nothing. The
+ * record itself is handle.h's, because kernel32crt.cpp makes the file and
+ * find-file kinds for the original's CRT. */
 static pthread_mutex_t am2_h_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  am2_h_cond = PTHREAD_COND_INITIALIZER;
 
-static void am2_handle_release(AM2_Handle *h)
+AM2_Handle *am2_handle_new(int32_t kind)
+{
+    AM2_Handle *h = (AM2_Handle *)calloc(1, sizeof *h);
+
+    if (h) {
+        h->kind = kind;
+        h->refs = 1;
+        h->fd = -1;
+    }
+    return h;
+}
+
+void am2_handle_release(AM2_Handle *h)
 {
     int32_t gone;
 
     pthread_mutex_lock(&am2_h_lock);
     gone = --h->refs == 0;
     pthread_mutex_unlock(&am2_h_lock);
-    if (gone)
-        free(h);
+    if (!gone)
+        return;
+    if (h->kind == AM2_H_FILE && !h->keepFd && h->fd >= 0)
+        close(h->fd);
+    if (h->kind == AM2_H_FIND && h->find)
+        _findclose(h->find);
+    free(h);
 }
+
+/* Called on every thread the game creates, before its start routine, when
+ * set. The PE loader hangs each thread's own TEB on it. */
+void (*am2_thread_attach)(void);
 
 /* Call a thread's start routine without trusting its convention. The
  * game's packet thread is cdecl behind an LPTHREAD_START_ROUTINE cast --
@@ -418,7 +474,11 @@ static DWORD am2_call_thread_start(LPTHREAD_START_ROUTINE fn, LPVOID param)
 static void *am2_thread_main(void *arg)
 {
     AM2_Handle *h = (AM2_Handle *)arg;
-    DWORD       rc = am2_call_thread_start(h->start, h->param);
+    DWORD       rc;
+
+    if (am2_thread_attach)
+        am2_thread_attach();
+    rc = am2_call_thread_start(h->start, h->param);
 
     pthread_mutex_lock(&am2_h_lock);
     h->exitCode = rc;
@@ -433,13 +493,12 @@ HANDLE WINAPI CreateThread(LPSECURITY_ATTRIBUTES attr, SIZE_T stack,
                            LPTHREAD_START_ROUTINE start, LPVOID param,
                            DWORD flags, LPDWORD id)
 {
-    AM2_Handle    *h = (AM2_Handle *)calloc(1, sizeof *h);
+    AM2_Handle    *h = am2_handle_new(AM2_H_THREAD);
     pthread_attr_t pa;
 
     (void)attr; (void)flags;
     if (!h)
         return NULL;
-    h->kind = AM2_H_THREAD;
     h->start = start;
     h->param = param;
     h->exitCode = STILL_ACTIVE;
@@ -480,15 +539,13 @@ BOOL WINAPI SetThreadPriority(HANDLE thread, int32_t prio)
 HANDLE WINAPI CreateEventA(LPSECURITY_ATTRIBUTES attr, BOOL manualReset,
                            BOOL initialState, LPCSTR name)
 {
-    AM2_Handle *h = (AM2_Handle *)calloc(1, sizeof *h);
+    AM2_Handle *h = am2_handle_new(AM2_H_EVENT);
 
     (void)attr; (void)name;
     if (!h)
         return NULL;
-    h->kind = AM2_H_EVENT;
     h->manualReset = manualReset;
     h->signaled = initialState;
-    h->refs = 1;
     return (HANDLE)h;
 }
 
@@ -522,13 +579,11 @@ BOOL WINAPI ResetEvent(HANDLE ev)
  * the game reads that as "no other copy running". */
 HANDLE WINAPI CreateMutexA(LPSECURITY_ATTRIBUTES attr, BOOL owner, LPCSTR name)
 {
-    AM2_Handle *h = (AM2_Handle *)calloc(1, sizeof *h);
+    AM2_Handle *h = am2_handle_new(AM2_H_MUTEX);
 
     (void)attr; (void)owner; (void)name;
     if (!h)
         return NULL;
-    h->kind = AM2_H_MUTEX;
-    h->refs = 1;
     am2_last_error = ERROR_SUCCESS;
     return (HANDLE)h;
 }
@@ -645,7 +700,7 @@ DWORD WINAPI WaitForMultipleObjects(DWORD n, const HANDLE *hs, BOOL all, DWORD m
 
 BOOL WINAPI CloseHandle(HANDLE h)
 {
-    if (!h)
+    if (!h || h == INVALID_HANDLE_VALUE)
         return FALSE;
     am2_handle_release((AM2_Handle *)h);
     return TRUE;

@@ -274,12 +274,22 @@ static void am2_copy(AM2_DDSurface *dst, int32_t dx, int32_t dy,
     }
 }
 
-/* Stretch src's rectangle onto dst's, nearest neighbour. */
+/* Stretch src's rectangle onto dst's, nearest neighbour -- with WINED3D'S
+ * ARITHMETIC, not the exact one. The source coordinate is a 16.16 sum of a
+ * TRUNCATED increment, (src << 16) / dst, stepped once per destination
+ * pixel. That is not floor(x * src / dst): restoring a 32-row slot into 22
+ * rows takes source row 15 for destination row 11 where exact division
+ * takes 16. The game's cursor is saved and restored through such a slot
+ * every frame (DrawMenuCursor), the round trip is lossy either way, and
+ * the residue it leaves behind the pointer is only the original's if the
+ * rounding is the original's -- 118 pixels of one Boot Camp dialog frame
+ * against Wine said so. */
 static void am2_stretch(AM2_DDSurface *dst, const RECT *dstRect,
                         const AM2_DDSurface *src, const RECT *srcRect, int32_t keyed)
 {
-    RECT    d, s;
-    int32_t dw, dh, sw, sh, x, y;
+    RECT     d, s;
+    int32_t  dw, dh, sw, sh, x, y;
+    uint32_t xinc, yinc, sx16, sy16;
 
     if (!am2_rect_of(dst, dstRect, &d) || !am2_rect_of(src, srcRect, &s))
         return;
@@ -287,13 +297,17 @@ static void am2_stretch(AM2_DDSurface *dst, const RECT *dstRect,
     dh = d.bottom - d.top;
     sw = s.right - s.left;
     sh = s.bottom - s.top;
-    for (y = 0; y < dh; y++) {
-        int32_t sy = s.top + y * sh / dh;
+    if (dw <= 0 || dh <= 0 || sw <= 0 || sh <= 0)
+        return;
+    xinc = ((uint32_t)sw << 16) / (uint32_t)dw;
+    yinc = ((uint32_t)sh << 16) / (uint32_t)dh;
+    for (y = 0, sy16 = 0; y < dh; y++, sy16 += yinc) {
+        int32_t sy = s.top + (int32_t)(sy16 >> 16);
         int32_t dy = d.top + y;
         if (dy < 0 || dy >= dst->height || sy < 0 || sy >= src->height)
             continue;
-        for (x = 0; x < dw; x++) {
-            int32_t sx = s.left + x * sw / dw;
+        for (x = 0, sx16 = 0; x < dw; x++, sx16 += xinc) {
+            int32_t sx = s.left + (int32_t)(sx16 >> 16);
             int32_t dx = d.left + x;
             uint8_t v;
             if (dx < 0 || dx >= dst->width || sx < 0 || sx >= src->width)
@@ -305,6 +319,18 @@ static void am2_stretch(AM2_DDSurface *dst, const RECT *dstRect,
             dst->pixels[dy * dst->pitch + dx] = v;
         }
     }
+}
+
+/* AM2_BLT_TRACE=1 logs every Blt and BltFast with its rectangles, flags and
+ * source key: how the pointer's save-and-restore slot was found. */
+static int32_t am2_blt_trace(void)
+{
+    static int32_t on = -1;
+    if (on < 0) {
+        const char *t = getenv("AM2_BLT_TRACE");
+        on = t && *t && *t != '0';
+    }
+    return on;
 }
 
 static HRESULT STDMETHODCALLTYPE Surface_Blt(IDirectDrawSurface *p, LPRECT dstRect,
@@ -324,6 +350,14 @@ static HRESULT STDMETHODCALLTYPE Surface_Blt(IDirectDrawSurface *p, LPRECT dstRe
                            (unsigned)flags, (void *)src);
         }
     }
+    if (am2_blt_trace())
+        am2_plat_log("Blt dst=%p %d,%d-%d,%d src=%p %d,%d-%d,%d flags=0x%x key=%u..%u/%d",
+                     (void *)dst, dstRect ? (int)dstRect->left : -1, dstRect ? (int)dstRect->top : -1,
+                     dstRect ? (int)dstRect->right : -1, dstRect ? (int)dstRect->bottom : -1,
+                     (void *)src, srcRect ? (int)srcRect->left : -1, srcRect ? (int)srcRect->top : -1,
+                     srcRect ? (int)srcRect->right : -1, srcRect ? (int)srcRect->bottom : -1,
+                     (unsigned)flags, src ? (unsigned)src->srcKey.dwColorSpaceLowValue : 0,
+                     src ? (unsigned)src->srcKey.dwColorSpaceHighValue : 0, src ? (int)src->hasSrcKey : 0);
     if (flags & DDBLT_COLORFILL) {
         if (!fx)
             return DDERR_INVALIDPARAMS;
@@ -352,6 +386,13 @@ static HRESULT STDMETHODCALLTYPE Surface_BltFast(IDirectDrawSurface *p, DWORD x,
 
     if (!src)
         return DDERR_INVALIDPARAMS;
+    if (am2_blt_trace())
+        am2_plat_log("BltFast dst=%p at %d,%d src=%p %d,%d-%d,%d flags=0x%x key=%u..%u/%d",
+                     (void *)dst, (int)x, (int)y, (void *)src,
+                     srcRect ? (int)srcRect->left : -1, srcRect ? (int)srcRect->top : -1,
+                     srcRect ? (int)srcRect->right : -1, srcRect ? (int)srcRect->bottom : -1,
+                     (unsigned)flags, (unsigned)src->srcKey.dwColorSpaceLowValue,
+                     (unsigned)src->srcKey.dwColorSpaceHighValue, (int)src->hasSrcKey);
     if (dst->isPrimary) {
         static int32_t logged;
         if (logged < 3) {
@@ -812,7 +853,7 @@ const IDirectDrawVtbl am2_ddraw_vtbl = {
     DD1_EnumSurfaces, DD1_FlipToGDISurface, DD1_GetCaps, DD1_GetDisplayMode,
     DD1_GetFourCCCodes, DD1_GetGDISurface, DD1_GetMonitorFrequency, DD1_GetScanLine,
     DD1_GetVerticalBlankStatus, DD1_Initialize, DD1_RestoreDisplayMode,
-    DD1_SetCooperativeLevel, DD1_WaitForVerticalBlank, DD1_SetDisplayMode,
+    DD1_SetCooperativeLevel, DD1_SetDisplayMode, DD1_WaitForVerticalBlank,
 };
 
 const IDirectDraw2Vtbl am2_ddraw2_vtbl = {
@@ -821,7 +862,7 @@ const IDirectDraw2Vtbl am2_ddraw2_vtbl = {
     DD2_EnumSurfaces, DD2_FlipToGDISurface, DD2_GetCaps, DD2_GetDisplayMode,
     DD2_GetFourCCCodes, DD2_GetGDISurface, DD2_GetMonitorFrequency, DD2_GetScanLine,
     DD2_GetVerticalBlankStatus, DD2_Initialize, DD2_RestoreDisplayMode,
-    DD2_SetCooperativeLevel, DD2_WaitForVerticalBlank, DD2_SetDisplayMode,
+    DD2_SetCooperativeLevel, DD2_SetDisplayMode, DD2_WaitForVerticalBlank,
     DD2_GetAvailableVidMem,
 };
 

@@ -41,6 +41,27 @@ typedef struct AM2_FontFile {
     struct AM2_FontFile *next;
 } AM2_FontFile;
 
+/* GDI's own rendering of the game's three fonts, read out of the original
+ * under Wine by tools/glyphdump.py: one bit per pixel, the cell TextOutA
+ * painted and GetTextExtentPoint32A measured. A CreateFontA naming one of
+ * those faces at that height gets these back rather than stb_truetype's
+ * rasterisation, which differs from FreeType's in about 1,400 pixels of a
+ * 640x480 dialog. The game builds its glyph tables from what TextOutA
+ * draws, so this is what makes its text come out as the original's. */
+typedef struct AM2_GlyphFont {
+    const char *face;
+    int32_t     height;
+    int32_t     style;
+    int32_t     first, count;   /* into am2_glyphs */
+} AM2_GlyphFont;
+
+typedef struct AM2_Glyph {
+    int32_t  ch, width, height;
+    int32_t  bits;              /* into am2_glyph_bits, (width+7)/8 bytes a row */
+} AM2_Glyph;
+
+#include "glyphs.inc"
+
 typedef struct AM2_Font {
     int32_t        magic;
     stbtt_fontinfo info;
@@ -48,7 +69,32 @@ typedef struct AM2_Font {
     float          xscale;      /* extra horizontal condensing */
     int32_t        ascent, descent, lineGap;
     int32_t        height;      /* cell height in pixels */
+    const AM2_GlyphFont *recorded;  /* Wine's bitmaps for this face, or NULL */
 } AM2_Font;
+
+static const AM2_GlyphFont *am2_glyph_font_for(const char *face, int32_t height,
+                                               int32_t style)
+{
+    size_t i;
+
+    if (getenv("AM2_FONT_NORECORD"))
+        return NULL;
+    for (i = 0; i < sizeof am2_glyph_fonts / sizeof am2_glyph_fonts[0]; i++)
+        if (face && !strcasecmp(am2_glyph_fonts[i].face, face) &&
+            am2_glyph_fonts[i].height == height && am2_glyph_fonts[i].style == style)
+            return &am2_glyph_fonts[i];
+    return NULL;
+}
+
+static const AM2_Glyph *am2_glyph_of(const AM2_GlyphFont *gf, int32_t ch)
+{
+    int32_t i;
+
+    for (i = 0; i < gf->count; i++)
+        if (am2_glyphs[gf->first + i].ch == ch)
+            return &am2_glyphs[gf->first + i];
+    return NULL;
+}
 
 typedef struct AM2_Palette {
     int32_t      magic;
@@ -378,7 +424,27 @@ HFONT WINAPI CreateFontA(int32_t height, int32_t width, int32_t escapement,
         font->height = (int32_t)ceilf((font->ascent - font->descent) * font->scale);
     }
     font->xscale = narrow ? 0.82f : 1.0f;
+    font->recorded = am2_glyph_font_for(face, height,
+                                        (italic ? 1 : 0) | (underline ? 2 : 0) | (strikeout ? 4 : 0));
     return (HFONT)font;
+}
+
+/* The recorded cell of a string: widths summed, the tallest height. */
+static int32_t am2_recorded_extent(const AM2_GlyphFont *gf, LPCSTR text, int32_t n, LPSIZE out)
+{
+    int32_t i, w = 0, h = 0;
+
+    for (i = 0; i < n; i++) {
+        const AM2_Glyph *g = am2_glyph_of(gf, (uint8_t)text[i]);
+        if (!g)
+            return 0;
+        w += g->width;
+        if (g->height > h)
+            h = g->height;
+    }
+    out->cx = w;
+    out->cy = h;
+    return 1;
 }
 
 HGDIOBJ WINAPI SelectObject(HDC dc, HGDIOBJ obj)
@@ -459,6 +525,8 @@ BOOL WINAPI GetTextExtentPoint32A(HDC dc, LPCSTR text, int32_t n, LPSIZE out)
         out->cy = 16;
         return TRUE;
     }
+    if (d->font->recorded && am2_recorded_extent(d->font->recorded, text, n, out))
+        return TRUE;
     out->cx = (LONG)ceilf(am2_text_width(d->font, text, n));
     out->cy = d->font->height;
     return TRUE;
@@ -486,6 +554,43 @@ BOOL WINAPI TextOutA(HDC dc, int32_t x, int32_t y, LPCSTR text, int32_t n)
                               GetGValue(d->textColour), GetBValue(d->textColour));
     paper = 0;
     baseline = y + (int32_t)(f->ascent * f->scale + 0.5f);
+
+    /* Wine's bitmaps, when this face was recorded: each cell painted at the
+     * pen with its top-left at y, which is where the game reads it back
+     * from. Only when every character is on record; a string with one
+     * missing falls through to the rasteriser whole. */
+    if (f->recorded) {
+        SIZE    cell;
+        int32_t px = x;
+        if (am2_recorded_extent(f->recorded, text, n, &cell)) {
+            if (d->bkMode == OPAQUE) {
+                int32_t cx, cy;
+                for (cy = y; cy < y + cell.cy; cy++)
+                    for (cx = x; cx < x + cell.cx; cx++)
+                        if (cy >= 0 && cy < d->target.height && cx >= 0 && cx < d->target.width)
+                            d->target.pixels[cy * d->target.pitch + cx] = paper;
+            }
+            for (i = 0; i < n; i++) {
+                const AM2_Glyph *g = am2_glyph_of(f->recorded, (uint8_t)text[i]);
+                int32_t stride = (g->width + 7) / 8, gx, gy;
+                for (gy = 0; gy < g->height; gy++) {
+                    int32_t py = y + gy;
+                    const uint8_t *row = am2_glyph_bits + g->bits + gy * stride;
+                    if (py < 0 || py >= d->target.height)
+                        continue;
+                    for (gx = 0; gx < g->width; gx++) {
+                        int32_t cx = px + gx;
+                        if (cx < 0 || cx >= d->target.width)
+                            continue;
+                        if (row[gx >> 3] & (0x80 >> (gx & 7)))
+                            d->target.pixels[py * d->target.pitch + cx] = ink;
+                    }
+                }
+                px += g->width;
+            }
+            return TRUE;
+        }
+    }
 
     if (d->bkMode == OPAQUE) {
         int32_t w = (int32_t)ceilf(am2_text_width(f, text, n)), cx, cy;

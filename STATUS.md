@@ -5,7 +5,75 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-05**, native build landing (see the first section).
+Last updated: **2026-09-06**, the hybrid landing (see the first section).
+
+## THE ORIGINAL EXE RUNS OVER THE PLATFORM LAYER, WITHOUT WINE
+
+`make hybrid` builds `build/armymen2-hybrid` and `build/armymen2-hybrid-dev`:
+a PE loader of our own (`src/hybrid/loader.cpp`) that maps the retail
+`ArmyMen2.exe` at `0x00400000` inside an i386 ELF whose own text sits at
+`0x00700000`, binds every one of its 171 imports to `src/platform`'s
+implementation by module and name, gives each thread a TEB for the SEH chain
+at `fs:[0]`, and calls the MSVC CRT's entry point. No reconstruction is
+linked in: it is the ORIGINAL code over OUR platform, which is the other
+half of what the native build checks.
+
+    make hybrid
+    AM2_GAMEDIR=".wine/drive_c/GOG Games/Army Men II" build/armymen2-hybrid -nointro
+
+`AM2_LOG=<file>` captures the game's log (the retail logger stub is
+detoured, as the harness detours it); `AM2_EXE` names another image. The
+dev binary carries the harness's control socket on port 31337, so
+`tools/objdump.py --port 31337 --table` and `tools/am2ctl.py` work on it.
+
+**Measured on Xvfb `:99`, against the original under Wine driven the same
+way** (2026-09-06):
+
+| step | evidence |
+|---|---|
+| imports | `imports: 171 bound, 0 missing` |
+| title screen | **208 of 307,200** pixels differ from the Wine title frame, all inside the pointer's box |
+| BOOT CAMP briefing, HQ dialog | `lines: 101  tokens: 372  names: 43  compounds: 16`; the HQ dialog frame differs from a Wine frame of the same drive by **118..172 pixels, all inside the pointer's 21x22 box** -- see below for what those are |
+| the instruction sign | **0 of 307,200** pixels differ from the Wine frame, seven captures in a row, both pointers parked at (600,400) |
+| live mission, object state | `tools/objdump.py --table` on both: **1,610 lines, no difference**; the live frame differs by 80 pixels in the minimap and the pointer, which animate |
+| live mission, movement | two seconds of S moves Sarge from `pos=1674,910` to `pos=1704,972`, and only Sarge's two rows change in the table |
+| the game's log | the same lines as the Wine log, harness lines aside, bar `Missing cpuinf32.dll` for Wine's `system speed: 1` -- the platform has no cpuinf32.dll to load, as the native build has not |
+
+Two things it found on its first run, both in the platform layer and both
+invisible to the native build:
+
+- **The platform's `IDirectDraw` vtables were not in the SDK's slot order.**
+  `ddraw.h` put `SetDisplayMode` last so one macro could declare the prefix
+  the two interfaces share, on the reasoning that the reconstruction reaches
+  every method by name. The original indexes by NUMBER: `InitDirectDraw`
+  called slot 21 of `IDirectDraw2` with six dwords, got
+  `WaitForVerticalBlank` taking three, and returned twelve bytes off into
+  its own HWND argument. `tools/checkvtables.py` compares all thirteen
+  platform vtables with mingw's SDK headers slot by slot and is in `make
+  check`.
+- **stb_truetype is not Wine's FreeType.** Every non-pointer pixel that
+  differed in the HQ dialog -- about 1,400 -- was GDI text: the game builds
+  its three fonts by drawing each character with `TextOutA` and encoding the
+  result. `tools/glyphdump.py` reads those built fonts out of the original
+  under Wine (all three: ArialNarrow 12 and 14, ArialBlack 18, 672 glyphs)
+  into `tests/glyphs-reference.txt`, and `src/platform/glyphs.inc` is
+  generated from it; `gdi32.cpp` replays the recorded bitmaps for those
+  faces and heights. With that the text is byte for byte the original's, in
+  the native build as well.
+
+**The pointer's box is history, not rendering.** `DrawMenuCursor` saves and
+restores only the 12x16 arrow through a 32x32 slot (AM2_BLT_TRACE=1 shows
+the two stretching blits); the bubble and the bar beside it are software
+sprites that nothing restores, so what lingers at a spot the pointer has
+left is whatever was drawn there last, and the two drives were not
+frame-synchronised. Measured rather than assumed: moving both cursors away
+leaves residue on BOTH sides, the same residue the box differed by, and a
+screen that repaints over the spot (the sign) is exact. The stretch itself
+now uses wined3d's truncated 16.16 stepping rather than exact division,
+which differs on the restore's vertical axis.
+
+What is NOT verified here: audio (the dummy driver), the movie (Smacker is
+stubbed), and every screen the drive above does not reach.
 
 ## THE GAME RUNS AS A LINUX EXECUTABLE
 
@@ -554,7 +622,7 @@ clean.
 
 ## In flight
 
-Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **62** analysis
+Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **64** analysis
 tools in `make check` (`tools/checkpatches.py`; `tools/checkclaims.py` counts
 the recipe).
 

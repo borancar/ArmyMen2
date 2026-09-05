@@ -15,6 +15,9 @@
  *   dplay.cpp     DirectPlay objects that decline everything.
  *   kernel32.cpp  time, modules and the import table, threads, events,
  *                 memory probes, the exception hook, the registry, drives.
+ *   kernel32crt.cpp  what the MSVC 6 CRT inside the original imports:
+ *                 heaps, virtual memory, files, the environment, code
+ *                 pages, time. Only the PE loader (src/hybrid) reaches it.
  *   crt.cpp       MSVC's CRT names and Windows-to-native path translation.
  *
  * Everything below the window the game sees is emulated to the game; only
@@ -64,6 +67,9 @@ void am2_host_present(const uint8_t *pixels, int32_t pitch, int32_t w,
  * on the hardware it was written for that was the display's. AM2_FPS
  * overrides the 60 Hz default; 0 disables the wait. */
 void am2_host_wait_vblank(void);
+
+/* Tear the host down and end the process: what ExitProcess does. */
+void am2_host_exit(int32_t code) __attribute__((noreturn));
 
 /* Show or hide the host's pointer. */
 void am2_host_cursor_visible(int32_t visible);
@@ -169,6 +175,20 @@ typedef struct AM2_Export {
     const char *name;
     const void *fn;
 } AM2_Export;
+
+/* The table by module and name, NULL when absent. */
+const void *am2_export_lookup(const char *module, const char *name);
+
+/* Called on every thread CreateThread makes, before its start routine,
+ * when set. The PE loader gives each thread its own TEB through it. */
+extern void (*am2_thread_attach)(void);
+
+/* What GetCommandLineA answers: the loader sets the arguments after the
+ * program name, which the original's CRT strips off again for WinMain. */
+void am2_set_command_line(const char *args);
+
+/* A plain function for the IAT, where windows.h has an inline. */
+LONG WINAPI am2_InterlockedExchange(volatile LONG *target, LONG value);
 
 #ifdef __cplusplus
 }

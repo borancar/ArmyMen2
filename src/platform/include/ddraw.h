@@ -201,27 +201,32 @@ typedef HRESULT (WINAPI *LPDDENUMSURFACESCALLBACK)(LPDIRECTDRAWSURFACE, LPDDSURF
     HRESULT (STDMETHODCALLTYPE *GetVerticalBlankStatus)(T *, LPBOOL); \
     HRESULT (STDMETHODCALLTYPE *Initialize)(T *, GUID *); \
     HRESULT (STDMETHODCALLTYPE *RestoreDisplayMode)(T *); \
-    HRESULT (STDMETHODCALLTYPE *SetCooperativeLevel)(T *, HWND, DWORD); \
-    HRESULT (STDMETHODCALLTYPE *WaitForVerticalBlank)(T *, DWORD, HANDLE)
+    HRESULT (STDMETHODCALLTYPE *SetCooperativeLevel)(T *, HWND, DWORD)
 
+/* THE SLOT ORDER IS THE SDK'S, AND IT IS NOT PRIVATE. This used to put
+ * SetDisplayMode last on both interfaces so one macro could declare the
+ * shared prefix, on the reasoning that the reconstruction reaches every
+ * method through the macros below and nothing indexes by number. The PE
+ * loader in src/hybrid runs the ORIGINAL binary over this layer, and the
+ * original indexes by number: its InitDirectDraw calls slot 21 of
+ * IDirectDraw2 with six dwords, which in the private order was
+ * WaitForVerticalBlank taking three, and it returned twelve bytes off into
+ * its own HWND argument. tools/checkvtables.py compares every vtable here
+ * with the SDK's declaration, slot by slot. */
 typedef struct IDirectDrawVtbl {
     AM2_DDRAW_METHODS(IDirectDraw);
     HRESULT (STDMETHODCALLTYPE *SetDisplayMode)(IDirectDraw *, DWORD, DWORD, DWORD);
+    HRESULT (STDMETHODCALLTYPE *WaitForVerticalBlank)(IDirectDraw *, DWORD, HANDLE);
 } IDirectDrawVtbl;
 struct IDirectDraw { const IDirectDrawVtbl *lpVtbl; };
 
 typedef struct IDirectDraw2Vtbl {
     AM2_DDRAW_METHODS(IDirectDraw2);
     HRESULT (STDMETHODCALLTYPE *SetDisplayMode)(IDirectDraw2 *, DWORD, DWORD, DWORD, DWORD, DWORD);
+    HRESULT (STDMETHODCALLTYPE *WaitForVerticalBlank)(IDirectDraw2 *, DWORD, HANDLE);
     HRESULT (STDMETHODCALLTYPE *GetAvailableVidMem)(IDirectDraw2 *, LPDDSCAPS, LPDWORD, LPDWORD);
 } IDirectDraw2Vtbl;
 struct IDirectDraw2 { const IDirectDraw2Vtbl *lpVtbl; };
-
-/* In the SDK SetDisplayMode sits in the slot ABOVE WaitForVerticalBlank on
- * both interfaces; the order here has it last so one macro can declare the
- * shared prefix. Nothing indexes these vtables by number -- the
- * reconstruction goes through the macros below -- so the order is private
- * to src/platform. */
 
 #define IDirectDraw_QueryInterface(p, a, b)       ((p)->lpVtbl->QueryInterface(p, a, b))
 #define IDirectDraw_AddRef(p)                     ((p)->lpVtbl->AddRef(p))

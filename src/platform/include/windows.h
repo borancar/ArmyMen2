@@ -363,6 +363,174 @@ typedef LONG (CALLBACK *PVECTORED_EXCEPTION_HANDLER)(PEXCEPTION_POINTERS);
 PVOID WINAPI AddVectoredExceptionHandler(ULONG first,
                                          PVECTORED_EXCEPTION_HANDLER handler);
 
+
+/* ---- kernel: what the original's own CRT imports ------------------------ */
+
+/* Declared for src/platform/kernel32crt.cpp and the PE loader; nothing in
+ * the reconstruction calls these, since it links against glibc's CRT. */
+
+#define INVALID_HANDLE_VALUE ((HANDLE)(LONG_PTR)-1)
+#define ERROR_NO_MORE_FILES 18
+#define ERROR_NOT_ENOUGH_MEMORY 8
+#define ERROR_CALL_NOT_IMPLEMENTED 120
+#define ERROR_INSUFFICIENT_BUFFER 122
+
+#define GENERIC_READ  0x80000000u
+#define GENERIC_WRITE 0x40000000u
+#define CREATE_NEW        1
+#define CREATE_ALWAYS     2
+#define OPEN_EXISTING     3
+#define OPEN_ALWAYS       4
+#define TRUNCATE_EXISTING 5
+#define FILE_ATTRIBUTE_READONLY  0x01
+#define FILE_ATTRIBUTE_DIRECTORY 0x10
+#define FILE_ATTRIBUTE_ARCHIVE   0x20
+#define FILE_ATTRIBUTE_NORMAL    0x80
+#define INVALID_FILE_ATTRIBUTES  0xFFFFFFFFu
+#define FILE_BEGIN   0
+#define FILE_CURRENT 1
+#define FILE_END     2
+#define INVALID_SET_FILE_POINTER 0xFFFFFFFFu
+#define FILE_TYPE_UNKNOWN 0
+#define FILE_TYPE_DISK    1
+#define FILE_TYPE_CHAR    2
+#define FILE_TYPE_PIPE    3
+#define STD_INPUT_HANDLE  ((DWORD)-10)
+#define STD_OUTPUT_HANDLE ((DWORD)-11)
+#define STD_ERROR_HANDLE  ((DWORD)-12)
+
+#define HEAP_ZERO_MEMORY 0x08
+#define HEAP_REALLOC_IN_PLACE_ONLY 0x10
+#define MEM_COMMIT   0x1000
+#define MEM_RESERVE  0x2000
+#define MEM_DECOMMIT 0x4000
+#define MEM_RELEASE  0x8000
+#define PAGE_READWRITE 0x04
+#define PAGE_EXECUTE_READWRITE 0x40
+
+#define CP_ACP 0
+#define CP_OEMCP 1
+#define NORM_IGNORECASE 0x01
+#define CT_CTYPE1 1
+#define C1_UPPER  0x001
+#define C1_LOWER  0x002
+#define C1_DIGIT  0x004
+#define C1_SPACE  0x008
+#define C1_PUNCT  0x010
+#define C1_CNTRL  0x020
+#define C1_BLANK  0x040
+#define C1_XDIGIT 0x080
+#define C1_ALPHA  0x100
+#define LCMAP_LOWERCASE 0x100
+#define LCMAP_UPPERCASE 0x200
+#define CSTR_LESS_THAN 1
+#define CSTR_EQUAL 2
+#define CSTR_GREATER_THAN 3
+#define MAX_LEADBYTES 12
+#define MAX_DEFAULTCHAR 2
+#define TIME_ZONE_ID_UNKNOWN 0
+#define EXCEPTION_EXECUTE_HANDLER 1
+
+typedef struct _FILETIME { DWORD dwLowDateTime, dwHighDateTime; } FILETIME, *LPFILETIME;
+typedef struct _SYSTEMTIME {
+    WORD wYear, wMonth, wDayOfWeek, wDay, wHour, wMinute, wSecond, wMilliseconds;
+} SYSTEMTIME, *LPSYSTEMTIME;
+typedef struct _WIN32_FIND_DATAA {
+    DWORD    dwFileAttributes;
+    FILETIME ftCreationTime, ftLastAccessTime, ftLastWriteTime;
+    DWORD    nFileSizeHigh, nFileSizeLow;
+    DWORD    dwReserved0, dwReserved1;
+    CHAR     cFileName[MAX_PATH];
+    CHAR     cAlternateFileName[14];
+} WIN32_FIND_DATAA, *LPWIN32_FIND_DATAA;
+typedef struct _STARTUPINFOA {
+    DWORD  cb;
+    LPSTR  lpReserved, lpDesktop, lpTitle;
+    DWORD  dwX, dwY, dwXSize, dwYSize, dwXCountChars, dwYCountChars;
+    DWORD  dwFillAttribute, dwFlags;
+    WORD   wShowWindow, cbReserved2;
+    LPBYTE lpReserved2;
+    HANDLE hStdInput, hStdOutput, hStdError;
+} STARTUPINFOA, *LPSTARTUPINFOA;
+typedef struct _CPINFO {
+    UINT MaxCharSize;
+    BYTE DefaultChar[MAX_DEFAULTCHAR];
+    BYTE LeadByte[MAX_LEADBYTES];
+} CPINFO, *LPCPINFO;
+typedef struct _TIME_ZONE_INFORMATION {
+    LONG       Bias;
+    WCHAR      StandardName[32];
+    SYSTEMTIME StandardDate;
+    LONG       StandardBias;
+    WCHAR      DaylightName[32];
+    SYSTEMTIME DaylightDate;
+    LONG       DaylightBias;
+} TIME_ZONE_INFORMATION, *LPTIME_ZONE_INFORMATION;
+typedef LONG (WINAPI *LPTOP_LEVEL_EXCEPTION_FILTER)(EXCEPTION_POINTERS *);
+typedef DWORD LCID;
+typedef WORD *LPWORD_;
+
+int32_t WINAPI CompareStringA(LCID lc, DWORD flags, LPCSTR a, int32_t na, LPCSTR b, int32_t nb);
+int32_t WINAPI CompareStringW(LCID lc, DWORD flags, LPCWSTR a, int32_t na, LPCWSTR b, int32_t nb);
+BOOL    WINAPI CreateDirectoryA(LPCSTR path, LPSECURITY_ATTRIBUTES sa);
+HANDLE  WINAPI CreateFileA(LPCSTR path, DWORD access, DWORD share, LPSECURITY_ATTRIBUTES sa,
+                           DWORD create, DWORD attrs, HANDLE tmpl);
+BOOL    WINAPI DeleteFileA(LPCSTR path);
+void    WINAPI ExitProcess(UINT code) __attribute__((noreturn));
+BOOL    WINAPI FileTimeToLocalFileTime(const FILETIME *in, LPFILETIME out);
+BOOL    WINAPI FileTimeToSystemTime(const FILETIME *in, LPSYSTEMTIME out);
+BOOL    WINAPI FindClose(HANDLE h);
+HANDLE  WINAPI FindFirstFileA(LPCSTR spec, LPWIN32_FIND_DATAA out);
+BOOL    WINAPI FindNextFileA(HANDLE h, LPWIN32_FIND_DATAA out);
+BOOL    WINAPI FlushFileBuffers(HANDLE h);
+BOOL    WINAPI FreeEnvironmentStringsA(LPSTR env);
+BOOL    WINAPI FreeEnvironmentStringsW(LPWSTR env);
+UINT    WINAPI GetACP(void);
+LPSTR   WINAPI GetCommandLineA(void);
+BOOL    WINAPI GetCPInfo(UINT cp, LPCPINFO out);
+HANDLE  WINAPI GetCurrentProcess(void);
+LPSTR   WINAPI GetEnvironmentStrings(void);
+LPWSTR  WINAPI GetEnvironmentStringsW(void);
+DWORD   WINAPI GetFileAttributesA(LPCSTR path);
+DWORD   WINAPI GetFileType(HANDLE h);
+DWORD   WINAPI GetFullPathNameA(LPCSTR path, DWORD cap, LPSTR out, LPSTR *filePart);
+void    WINAPI GetLocalTime(LPSYSTEMTIME out);
+UINT    WINAPI GetOEMCP(void);
+void    WINAPI GetStartupInfoA(LPSTARTUPINFOA out);
+HANDLE  WINAPI GetStdHandle(DWORD which);
+BOOL    WINAPI GetStringTypeA(LCID lc, DWORD type, LPCSTR src, int32_t n, LPWORD out);
+BOOL    WINAPI GetStringTypeW(DWORD type, LPCWSTR src, int32_t n, LPWORD out);
+void    WINAPI GetSystemTime(LPSYSTEMTIME out);
+DWORD   WINAPI GetTimeZoneInformation(LPTIME_ZONE_INFORMATION out);
+DWORD   WINAPI GetVersion(void);
+LPVOID  WINAPI HeapAlloc(HANDLE heap, DWORD flags, SIZE_T n);
+HANDLE  WINAPI HeapCreate(DWORD options, SIZE_T initial, SIZE_T max);
+BOOL    WINAPI HeapDestroy(HANDLE heap);
+BOOL    WINAPI HeapFree(HANDLE heap, DWORD flags, LPVOID p);
+LPVOID  WINAPI HeapReAlloc(HANDLE heap, DWORD flags, LPVOID p, SIZE_T n);
+SIZE_T  WINAPI HeapSize(HANDLE heap, DWORD flags, LPCVOID p);
+BOOL    WINAPI IsBadCodePtr(FARPROC p);
+int32_t WINAPI LCMapStringA(LCID lc, DWORD flags, LPCSTR src, int32_t n, LPSTR out, int32_t cap);
+int32_t WINAPI LCMapStringW(LCID lc, DWORD flags, LPCWSTR src, int32_t n, LPWSTR out, int32_t cap);
+int32_t WINAPI MultiByteToWideChar(UINT cp, DWORD flags, LPCSTR src, int32_t n, LPWSTR out, int32_t cap);
+BOOL    WINAPI ReadFile(HANDLE h, LPVOID buf, DWORD n, LPDWORD got, LPVOID overlapped);
+BOOL    WINAPI RemoveDirectoryA(LPCSTR path);
+void    WINAPI RtlUnwind(PVOID frame, PVOID target, PEXCEPTION_RECORD er, PVOID ret);
+BOOL    WINAPI SetEndOfFile(HANDLE h);
+BOOL    WINAPI SetEnvironmentVariableA(LPCSTR name, LPCSTR value);
+BOOL    WINAPI SetFileAttributesA(LPCSTR path, DWORD attrs);
+DWORD   WINAPI SetFilePointer(HANDLE h, LONG lo, PLONG hi, DWORD method);
+UINT    WINAPI SetHandleCount(UINT n);
+BOOL    WINAPI SetStdHandle(DWORD which, HANDLE h);
+LPTOP_LEVEL_EXCEPTION_FILTER WINAPI SetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER f);
+BOOL    WINAPI TerminateProcess(HANDLE proc, UINT code);
+LONG    WINAPI UnhandledExceptionFilter(EXCEPTION_POINTERS *ep);
+LPVOID  WINAPI VirtualAlloc(LPVOID addr, SIZE_T size, DWORD type, DWORD prot);
+BOOL    WINAPI VirtualFree(LPVOID addr, SIZE_T size, DWORD type);
+int32_t WINAPI WideCharToMultiByte(UINT cp, DWORD flags, LPCWSTR src, int32_t n, LPSTR out,
+                                   int32_t cap, LPCSTR defChar, LPBOOL usedDef);
+BOOL    WINAPI WriteFile(HANDLE h, LPCVOID buf, DWORD n, LPDWORD put, LPVOID overlapped);
+
 /* ---- registry ---------------------------------------------------------- */
 
 #define HKEY_CLASSES_ROOT   ((HKEY)(ULONG_PTR)0x80000000u)
