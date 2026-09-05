@@ -3403,44 +3403,13 @@ input path again.
   default fullscreen run may simply be behind it. The other switches are in
   `orig.h`; three are developer names, and `-rob` is the flag that was already
   known as `ADDR_DEBUG_ITEMLIST`.
-- Windowed mode runs and is worth using as a second configuration — the window
-  is created, sized and positioned correctly (client area 640x480 at (4,30))
-  and `CalibratePalette` fires. **It no longer stays black**: this entry used
-  to say Wine hands back no lockable primary and the client area never draws,
-  and that is not what happens here now — the area paints, mostly white, with
-  a blinking 10×10 element in it. White rather than the title art is still not
-  right, so fullscreen remains the configuration to verify against; what
-  changed is that "it is black" can no longer be quoted as the reason a
-  windowed comparison is trivially exact.
-- Both DirectDraw `Restore` paths are untested. `LockSurface`'s is a real defect
-  in the original — it publishes an uninitialised descriptor after a successful
-  Restore without re-locking. Kept as-is deliberately; see `src/game/win32/surface.cpp`.
-- **NO CONFIGURATION IN THE SUITE REACHES COMBAT, and that is one measurement
-  rather than a dozen separate mysteries.** On a Boot Camp mission driven past
-  both dialogs, with `ObjIsItem` climbing past 84,000 and the frame ticking,
-  `ShotStrike`, `ApplyShotDamage`, `DamageObject`, `CreateMissile`,
-  `FireWeaponAtPoint` and `FireWeaponAtObject` ALL read 0 -- and none of those
-  counters is blind. Sarge stands there; nothing fires and nothing is hit.
-  Pressing SPACE, both CTRLs, ALT and RETURN changes none of them.
-
-  So every function whose only route is "something took damage" is cold for
-  ONE reason, and the entries below that used to explain themselves
-  individually -- `RemoveFromItemList`, `FreeItem`, `ShooterReact`,
-  `ApplyObjFrame`'s DamageItem route -- are the same fact said four times.
-  Getting any of them exercised needs a drive that makes a unit shoot, which
-  this project does not have and which would be worth more than several more
-  reconstructions: it would unlock the whole combat-consequence layer at once.
-
-- **`RemoveFromItemList` is unexercised for a now-known reason.** Its gated
-  caller is `FreeItem` (`0x004285F0`), which dispatches on the item kind and is
-  the only route that unlinks. Neither runs on a campaign drive: 325 items are
-  added during load and none is destroyed in the ~25 s observed, because
-  nothing in that window shoots anything. Reaching either needs a mission
-  driven long enough for something to die, which is a drive this project does
-  not yet have -- not a missing code path.
-- `CheckSaveTag` executes; it is reached by the save-file header read at
-  `0x00425950` on any campaign start with a save present. The entry below
-  predates that and is left for the others.
+- **What no drive reaches, and what windowed mode looks like today, is in
+  STATUS.md.** Both are state rather than policy: windowed mode paints now
+  where it used to stay black, so "it is black" can no longer be quoted as the
+  reason a windowed comparison is trivially exact; both DirectDraw `Restore`
+  paths are still untested, and `LockSurface`'s is a real defect in the
+  ORIGINAL kept as-is deliberately; and no configuration reaches combat, which
+  `docs/combat.md` covers.
 - **What no drive reaches, and what checks it anyway, is `docs/oracles.md`.**
   Thirty-one of the thirty-two unexercised functions are checked by ENUMERATING
   ORACLES -- tools that build a corpus, run the original under Unicorn, and
@@ -3629,46 +3598,20 @@ input path again.
   `variable`, `pad` and `object` declared; `compounds` counts the `if`
   statements that parsed. Four independent numbers agreeing on both sides is
   worth more than "the log is identical".
-- **Object types 2, 3 and 8 are identified now, and the answer had been in the
-  tree for some time.** Type 2 is a TROOPER -- `FreeItem`'s arm for it logs
-  `"DestroyTrooper %x"`, so the program names it. Type 4 is a WEAPON on the
-  same evidence. Type 3 is a VEHICLE by two independent routes: `FreeItem`'s
-  arm is `DestroyVehicle`, and the type-3 destroy handler clears a footprint
-  out of `ADDR_VEHICLE_MASK` indexed by a kind. Type 8 is a ROACH, from the
-  matching clearer that indexes `ADDR_ROACH_MASK` with no kind index at all.
-  The table is in `orig.h` above the type predicates.
+- **The object types are `docs/objects.md`** -- seven of the eight identified,
+  none of them guessed. Two rules from settling them:
 
-  Worth noting HOW it stayed open: nothing was missing. `DestroyTrooper` had
-  been named from its own log string, and `FreeItem`'s switch had been
-  reconstructed with all its arms, and this line went on saying unidentified
-  because nobody put the switch beside the question. Before recording something
-  as unknown, grep the tree for what already answers it.
+  **Reach for `LoadTypeN` when a type is unidentified.** The per-type savegame
+  loader is where a type's constants all appear at once -- the box, the row
+  spec, the anim table and the def record -- which is how the missile and the
+  roach were settled.
 
-- **Type 5 is a MISSILE, and the evidence is the loader.** `LoadType5`
-  (`0x0043B870`) calls `ObjInitCommon` with 5 and then puts
-  `ADDR_MISSILE_ANIMS` -- missile.ani -- into the row it builds, which is
-  exactly how type 8 was settled as a roach and type 3 as a vehicle. Its whole
-  record is 0xB8 bytes against a roach's 0x560, and its box is six units
-  square, both of which fit.
+  **A shared teardown arm names nothing.** Four types share one `FreeItem` arm
+  and three of the four were identified from elsewhere, which is the same rule
+  as "a `free` is the weakest possible toucher", one level up.
 
-  What made it findable was the same thing that made the roach findable: the
-  per-type SAVEGAME LOADER is where a type's constants all appear at once --
-  the box, the row spec, the anim table and the def record. Reach for
-  `LoadTypeN` when a type is unidentified, before anything else.
-
-  **Type 7 is the last one unread.** Type 6 is an EXPLOSION -- `StepType6` and
-  the `BLAST_OFF_*` fields settled it, and `orig.h` records that its offsets
-  are overloaded by type, which is what cost a defect the day it was found.
-  Type 5 is a MISSILE, from `LoadType5` putting `missile.ani` into the row it
-  builds. So the shared `FreeItem` arm holds types 1, 5, 6 and 7 and says
-  nothing about any of them -- demonstrably, since three of the four are now
-  identified from elsewhere and none of it came from that arm.
-- **`object.aai`'s `link 33-1..4` complaint is explained, and it is data
-  rather than a defect.** The message is "Object AAI record not found for link
-  %02d-%-3d", emitted by `0x00435FD0` -- a post-parse validator that qsorts the
-  link table (comparator `0x00435EB0`, stride `0x14`) and then checks every
-  parent key against the AAI records. So the numbers are a parent TYPE and four
-  link numbers, and the file declares links from a parent it never defines. It
-  fires identically under `AM2_NOPATCH=1`, which is what settles that it is the
-  original's behaviour: `tools/ab.sh campaign` compares the log and passes with
-  all four lines on both sides.
+  Worth noting HOW type 2 stayed open: nothing was missing. `DestroyTrooper`
+  had been named from its own log string and `FreeItem`'s switch had been
+  reconstructed with all its arms, and this list went on saying unidentified
+  because nobody put the switch beside the question. **Before recording
+  something as unknown, grep the tree for what already answers it.**
