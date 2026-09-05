@@ -531,11 +531,16 @@ NATIVE_LIBS  := -lSDL3 -lpthread -lm
 # having nothing say so. The player's binary is the one that matters and the
 # development one is the one that gets run, which is the wrong way round for
 # a target that builds only the first.
-native: standalone-generate
+# NOT `native: standalone-generate`. Every object rule already has it as an
+# order-only prerequisite, so the sub-make runs it once; naming it here too
+# ran the generator TWICE per `make native`, printing its summary twice for
+# no work. It is cheap, but a build that says it did something twice invites
+# the reader to believe it had to.
+native:
 	$(MAKE) $(BUILD)/armymen2 $(BUILD)/armymen2-dev
 
 # Just the development binary, for when only that is wanted.
-native-dev: standalone-generate
+native-dev:
 	$(MAKE) $(BUILD)/armymen2-dev
 
 $(BUILD)/native/%.o: %.cpp | standalone-generate
