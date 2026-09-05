@@ -7,6 +7,8 @@
  * host's events into what user32.cpp and dinput.cpp expect.
  *
  *   AM2_SCALE=N     integer window scale (default: the largest that fits)
+ *   AM2_RESIZABLE=1 a free-size window; the default is fixed-size, which a
+ *                   tiling compositor floats
  *   AM2_VSYNC=1     also wait for the display's vertical blank on present
  *                   (the clock paces the frame either way; AM2_FPS sets it)
  *   AM2_AUDIO_DUMP=<file>  write the mixed audio as raw stereo float
@@ -79,13 +81,25 @@ void am2_host_window_open(const char *title, int32_t w, int32_t h)
     am2_client_h = h;
     if (!am2_sdl_window) {
         const char *vs = getenv("AM2_VSYNC");
+        const char *rs = getenv("AM2_RESIZABLE");
+        int32_t     resizable = rs && *rs == '1';
+
         am2_scale = am2_pick_scale(w, h);
+        /* Fixed-size by default: a toplevel whose minimum and maximum sizes
+         * are equal is what a tiling compositor (sway, i3, Hyprland) floats
+         * rather than tiles, and an integer-scaled 640x480 is what the game
+         * wants anyway. AM2_RESIZABLE=1 gives the old free-size window,
+         * letterboxed. */
         am2_sdl_window = SDL_CreateWindow(title ? title : "Army Men II",
                                           w * am2_scale, h * am2_scale,
-                                          SDL_WINDOW_RESIZABLE);
+                                          resizable ? SDL_WINDOW_RESIZABLE : 0);
         if (!am2_sdl_window) {
             fprintf(stderr, "platform: SDL_CreateWindow: %s\n", SDL_GetError());
             exit(1);
+        }
+        if (!resizable) {
+            SDL_SetWindowMinimumSize(am2_sdl_window, w * am2_scale, h * am2_scale);
+            SDL_SetWindowMaximumSize(am2_sdl_window, w * am2_scale, h * am2_scale);
         }
         am2_sdl_renderer = SDL_CreateRenderer(am2_sdl_window, NULL);
         if (!am2_sdl_renderer) {
@@ -104,6 +118,11 @@ void am2_host_window_open(const char *title, int32_t w, int32_t h)
     } else {
         if (title)
             SDL_SetWindowTitle(am2_sdl_window, title);
+        if (!(SDL_GetWindowFlags(am2_sdl_window) & SDL_WINDOW_RESIZABLE)) {
+            /* Keep the fixed-size hint tracking the mode. */
+            SDL_SetWindowMinimumSize(am2_sdl_window, w * am2_scale, h * am2_scale);
+            SDL_SetWindowMaximumSize(am2_sdl_window, w * am2_scale, h * am2_scale);
+        }
         SDL_SetWindowSize(am2_sdl_window, w * am2_scale, h * am2_scale);
     }
     am2_texture_fit();
