@@ -28,6 +28,7 @@
 #include <time.h>
 #include <direct.h>
 #include <io.h>
+#include "../platform/crt/crt.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,7 +37,6 @@ extern "C" {
 /* MSVC's rand, not the host's: the LCG whose constants are visible in the
  * image at 0x00464420 -- imul 0x343FD, add 0x269EC3, and the answer is bits
  * 16..30 of the seed. */
-int am2_sa_rand(void);
 
 /* The retail logger is a bare `ret`.  This drops the message for the same
  * reason. */
@@ -126,7 +126,7 @@ extern const uint8_t am2_pickup_kind_index[29];
 #undef ADDR_CRT_STRCHR
 #undef ADDR_CRT_STRLWR
 #undef ADDR_CRT_STRNCPY
-#undef ADDR_CRT_STRNICMP
+#undef ADDR_CRT_STRNCMP
 #undef ADDR_CRT_STRSTR
 #undef ADDR_CRT_STRTOD
 #undef ADDR_CRT_STRTOK
@@ -152,8 +152,8 @@ extern const uint8_t am2_pickup_kind_index[29];
 #undef ADDR_DIRECTSOUNDCREATE
 
 #define ADDR_CRT_ATEXIT       AM2_SA(atexit)
-#define ADDR_CRT_ATOI         AM2_SA(atoi)
-#define ADDR_CRT_BSEARCH      AM2_SA(bsearch)
+#define ADDR_CRT_ATOI         AM2_SA(crt_atoi)
+#define ADDR_CRT_BSEARCH      AM2_SA(crt_bsearch)
 #define ADDR_CRT_CHDIR        AM2_SA(_chdir)
 #define ADDR_CRT_CHMOD        AM2_SA(_chmod)
 #define ADDR_CRT_FFLUSH       AM2_SA(fflush)
@@ -165,7 +165,7 @@ extern const uint8_t am2_pickup_kind_index[29];
 #define ADDR_CRT_GETCWD       AM2_SA(_getcwd)
 #define ADDR_CRT_MALLOC       AM2_SA(malloc)
 #define ADDR_CRT_MKDIR        AM2_SA(_mkdir)
-#define ADDR_CRT_QSORT        AM2_SA(qsort)
+#define ADDR_CRT_QSORT        AM2_SA(crt_qsort)
 #define ADDR_CRT_REALLOC      AM2_SA(realloc)
 #ifdef AM2_NATIVE
 #define ADDR_CRT_REMOVE       AM2_SA(am2_remove)
@@ -173,24 +173,14 @@ extern const uint8_t am2_pickup_kind_index[29];
 #define ADDR_CRT_REMOVE       AM2_SA(remove)
 #endif
 #define ADDR_CRT_RMDIR        AM2_SA(_rmdir)
-/* glibc's C++ string.h overloads strchr and strstr, so taking their address
- * needs the type spelled out; MSVC's and mingw's do not. */
-#ifdef AM2_NATIVE
-#define ADDR_CRT_STRCHR       ((uintptr_t)(void *)(const char *(*)(const char *, int))strchr)
-#else
-#define ADDR_CRT_STRCHR       AM2_SA(strchr)
-#endif
-#define ADDR_CRT_STRLWR       AM2_SA(_strlwr)
-#define ADDR_CRT_STRNCPY      AM2_SA(strncpy)
-#define ADDR_CRT_STRNICMP     AM2_SA(_strnicmp)
-#ifdef AM2_NATIVE
-#define ADDR_CRT_STRSTR       ((uintptr_t)(void *)(const char *(*)(const char *, const char *))strstr)
-#else
-#define ADDR_CRT_STRSTR       AM2_SA(strstr)
-#endif
+#define ADDR_CRT_STRCHR       AM2_SA(crt_strchr)
+#define ADDR_CRT_STRLWR       AM2_SA(crt_strlwr)
+#define ADDR_CRT_STRNCPY      AM2_SA(crt_strncpy)
+#define ADDR_CRT_STRNCMP     AM2_SA(crt_strncmp)
+#define ADDR_CRT_STRSTR       AM2_SA(crt_strstr)
 #define ADDR_CRT_STRTOD       AM2_SA(strtod)
-#define ADDR_CRT_STRTOK       AM2_SA(strtok)
-#define ADDR_CRT_STRTOL       AM2_SA(strtol)
+#define ADDR_CRT_STRTOK       AM2_SA(crt_strtok)
+#define ADDR_CRT_STRTOL       AM2_SA(crt_strtol)
 #define ADDR_CRT_TIME         AM2_SA(time)
 #define ADDR_FCLOSE           AM2_SA(fclose)
 /* The native build's fopen translates the game's Windows paths -- separators,
@@ -207,9 +197,9 @@ extern const uint8_t am2_pickup_kind_index[29];
 #define ADDR_GAME_DELETE      AM2_SA(am2_sa_operator_delete)
 #define ADDR_GAME_MALLOC      AM2_SA(malloc)
 #define ADDR_GAME_OPERATOR_NEW AM2_SA(am2_sa_operator_new)
-#define ADDR_GAME_RAND        AM2_SA(am2_sa_rand)
+#define ADDR_GAME_RAND        AM2_SA(crt_rand)
 #define ADDR_GAME_SPRINTF     AM2_SA(sprintf)
-#define ADDR_GAME_STRICMP     AM2_SA(_stricmp)
+#define ADDR_GAME_STRICMP     AM2_SA(crt_stricmp)
 #define ADDR_LOG              AM2_SA(am2_sa_log)
 #define ADDR_REALLOC          AM2_SA(realloc)
 #define ADDR_MEMMOVE          AM2_SA(memmove)

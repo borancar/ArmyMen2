@@ -41,7 +41,21 @@
 
 /* Returns 0 on success. The path is relative to the repository root, which is
  * where `make selftest` runs the test from. */
+static int am2_load_image_once(const char *path);
+
 static int am2_load_image(const char *path)
+{
+    /* Once: the vector replay at the top of main needs the slide before
+     * anything else, and the later groups call this again. */
+    static int am2_image_loaded, am2_image_result;
+    if (am2_image_loaded)
+        return am2_image_result;
+    am2_image_loaded = 1;
+    am2_image_result = am2_load_image_once(path);
+    return am2_image_result;
+}
+
+static int am2_load_image_once(const char *path)
 {
     FILE *fh = fopen(path, "rb");
     if (!fh) {

@@ -1053,7 +1053,7 @@
  * 0x1C -- the panel prints "current/next" out of it. Found from
  * HudSquadDetail's `lea edx,[ecx*8]; sub edx,ecx; ... [edx*4 + 0x473DD8]`,
  * which is rank * 7 * 4. */
-#define ADDR_CRT_STRNICMP      0x00465160u  /* MSVC _strnicmp */
+#define ADDR_CRT_STRNCMP       0x00465160u /* strncmp: repne scasb, repe cmpsb, an unsigned compare and no case folding -- it went in as _strnicmp */
 #define ADDR_RANK_EXP_TABLE    0x00473DD8u
 #define AM2_RANK_EXP_STRIDE    0x1Cu
 #define HUD_SQUAD_ICON_SPRITE  0x58u   /* AM2_Sprite *, the pip drawn per icon */
@@ -11205,6 +11205,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_DEF_LINK_CAP          0x00516184u
 #define AM2_DEF_LINK_INITIAL       0x32
 #define AM2_DEF_LINK_GROW          0x14
+/* strtok's resumption pointer, the byte after the last token it cut. */
+#define ADDR_CRT_PCTYPE        0x0048CC98u /* const uint16_t *: the CRT's _pctype, a pointer to its 256-word classification table */
+#define ADDR_CRT_MB_CUR_MAX    0x0048CEA4u /* int32_t: __mb_cur_max, 1 under code page 1252 */
+#define ADDR_CRT_ERRNO         0x00664600u /* int32_t: the CRT's errno */
+#define ADDR_CRT_LC_HANDLE_CTYPE 0x00664674u /* int32_t: __lc_handle[LC_CTYPE], 0 while the locale is "C" -- _stricmp and _strlwr take their ASCII arm on it */
+#define ADDR_CRT_PRINTF_TABLE  0x0046FE70u /* uint8_t[0x59]: _output's state table, classes at [ch - 0x20], transitions at [class * 8 + state] >> 4 */
+#define ADDR_CRT_NULLSTRING    0x0048CC88u /* const char *: what %s prints for NULL, "(null)" */
+#define ADDR_CRT_WNULLSTRING   0x0048CC8Cu /* const uint16_t *: the same for %S */
+#define ADDR_CRT_STRTOK_NEXT 0x006645C8u /* char * */
 #define ADDR_CRT_STRTOK            0x0046551Cu  /* the game's own; the state is
                                                  * shared with DefObjParse, so
                                                  * libc's would be wrong */

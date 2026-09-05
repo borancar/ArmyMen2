@@ -41,7 +41,7 @@ Everything Win32 goes through `src/inject/win32.h`, which is the single place
 that sets `CINTERFACE`/`COBJMACROS`, pulls in `windows.h` and `ddraw.h`, and
 undoes the `winuser.h` `DrawText` macro collision.
 
-**`make check` runs everything that does not need the game.** **64** analysis
+**`make check` runs everything that does not need the game.** **65** analysis
 tools plus a drift check that fails if any generated file under `docs/` no
 longer matches what the tools produce. The list is in the `check` recipe; it
 said "eight" here for a long time after it stopped being eight, and then said
@@ -418,6 +418,24 @@ names the first frame that differs. The hybrid against the native build
 diverged on frame 80 of Boot Camp by 26 pixels and on nothing else through
 a walk, with identical object tables at both ends. A hash log is exact
 where the pixel budgets were blunt; reach for it before any screenshot.
+
+**THE CRT IS RECONSTRUCTED LIKE THE GAME, under `src/platform/crt/`, and
+its names carry a `crt_` prefix.** The image's MSVC 6 runtime is 231
+functions the game reaches 44 of, and glibc behind those names is a second
+runtime with its own tie order, heap and float formatting -- each a frame
+the hybrid and the native build can disagree on. So it is derived from
+the disassembly the way `src/game` is, one function at a time, each
+declaration opening with its address; `crt_` because the host's libc owns
+the plain names; the game reaches them through the `ADDR_CRT_*` seams in
+`standalone.h`, so nothing in `src/game` changes; and its state is the
+image's, `ADDR_RAND_SEED` and the rest, so original and reconstructed code
+share it. Verification is by enumerating oracle where the function is pure
+over memory a stub can supply -- `tools/qsortcheck.py` runs the original's
+sort under Unicorn with a comparator stub in the scratch page and replays
+the recording through the C in `tests/selftest.cpp` -- and by lockstep for
+the rest. A mutation that cannot fail is stated as a theorem in the tool,
+not left as a gap: which side of a partition `qsort` pushes first changes
+nothing but the stack depth.
 
 **THE ORIGINAL'S CRT IMPORTS ARE THE ORIGINAL'S CRT'S.** All 56 kernel32
 entries the platform did not have -- heaps, virtual memory, the

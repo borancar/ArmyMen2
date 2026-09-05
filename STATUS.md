@@ -7,6 +7,32 @@ command that produces it, so it can be re-measured rather than believed.
 
 Last updated: **2026-09-06**, the hybrid landing (see the first section).
 
+## THE CRT IS BEING RECONSTRUCTED, under src/platform/crt
+
+The image carries MSVC 6's C runtime: **231 functions from `0x00464416`,
+42,860 bytes, 44 of them called by the game** (the rest are their
+internals and the startup). The native build ran the game over glibc
+behind those names, and the two are not the same runtime where it shows:
+`qsort` orders ties differently, the heap hands out different addresses,
+`printf` formats floats by other rules. Each is a frame the lockstep
+comparison above can see. `src/platform/crt/` is that runtime function by
+function, from the disassembly, under `crt_` names (the host's libc has
+the real ones), reached through the `ADDR_CRT_*` seams `standalone.h`
+already re-points, so the reconstruction's sources do not change.
+
+Done (2026-09-06): `crt_qsort` with its `shortsort` and `swap`,
+`crt_bsearch`, `crt_rand`, `crt_srand` (over the image's own seed at
+`ADDR_RAND_SEED`). `tools/qsortcheck.py` runs the original's sort and
+search under Unicorn with a comparator stub over 195 arrays built for ties
+and records where every tie went; `tests/selftest.cpp` replays the 1,401
+rows through the C, all passing, and three of four mutations fail (the
+fourth is a theorem; the tool's docstring says which).
+
+Next, in the order the differences bite: the heap (`malloc`, `free`,
+`realloc`, `_msize`, `operator new`/`delete`, the small-block heap under
+them), the `printf` family, the string and conversion functions, stdio, the
+directory and time functions.
+
 ## THE ORIGINAL AND THE RECONSTRUCTION RUN IN LOCKSTEP
 
 `AM2_LOCKSTEP=1` makes the platform deterministic: the clock is a count of
@@ -662,7 +688,7 @@ clean.
 
 ## In flight
 
-Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **64** analysis
+Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **65** analysis
 tools in `make check` (`tools/checkpatches.py`; `tools/checkclaims.py` counts
 the recipe).
 

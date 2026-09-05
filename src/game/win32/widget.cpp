@@ -14912,8 +14912,10 @@ int widget_install(void)
 /* Reconstructed in item.cpp and declared there rather than in item.h. */
 void __cdecl SelectInventorySlot(void *unit, int32_t slot);
 
-typedef int32_t (__cdecl *AM2_StrnicmpFn)(const char *, const char *, size_t);
-#define orig_strnicmp ((AM2_StrnicmpFn)AM2_IMAGE(ADDR_CRT_STRNICMP))
+/* strncmp, case-SENSITIVE: the original at 0x00465160 folds no case, and the
+ * standalone had mapped this seam to _strnicmp for as long as it existed. */
+typedef int32_t (__cdecl *AM2_StrncmpFn)(const char *, const char *, size_t);
+#define orig_strncmp ((AM2_StrncmpFn)AM2_IMAGE(ADDR_CRT_STRNCMP))
 
 /* The squad detail panel is a 2-column, 5-row grid, and all 28 of the
  * function's text placements sit on it. Extracted from the image by walking
@@ -15014,7 +15016,7 @@ void __attribute__((thiscall)) HudSquadDetail(AM2_Widget *w, int32_t uid)
                 ((const uint8_t *)*(void *const *)
                      (uintptr_t)ADDR_SCRIPT_NAMES
                  + (uint32_t)script * AM2_NAME_TABLE_STRIDE);
-            if (orig_strnicmp(s, (const char *)AM2_IMAGE(ADDR_STR_GREEN),
+            if (orig_strncmp(s, (const char *)AM2_IMAGE(ADDR_STR_GREEN),
                               5) == 0) {
                 strcpy(name, s);
                 TitleCaseName(name);

@@ -23,6 +23,7 @@
 #include "../src/game/objflag.h"
 #include "../src/game/misc.h"
 #include "../src/game/objtype.h"
+#include "../src/platform/crt/crt.h"
 #include "../src/game/region.h"   /* AiHitReact */
 
 #include "../src/game/script.h"
@@ -251,10 +252,77 @@ extern "C" struct AM2_Sprite *__cdecl TurretAnimSprite(int32_t, uint32_t)
 
 static int FirePoses(int *passed);
 static int HitReacts(int *passed);
+static int Qsort(int *passed);
+
+/* ---- the CRT's qsort and bsearch ----------------------------------------------- */
+
+#include "qsortvec.h"
+
+static int32_t __cdecl QsortKeyCompare(const void *a, const void *b)
+{
+    return *(const int32_t *)a - *(const int32_t *)b;
+}
+
+/* tools/qsortcheck.py recorded what the original did to arrays of {key, tag}
+ * records under a key_a - key_b comparator: the tag says where each tie
+ * went, and the tie order is the whole point of reconstructing the sort. */
+static int Qsort(int *passed)
+{
+    int32_t pass = 0, fail = 0;
+
+    for (uint32_t c = 0; c < sizeof am2_qsort_cases / sizeof am2_qsort_cases[0]; c++) {
+        const AM2_QsortCase *k = &am2_qsort_cases[c];
+        int32_t recs[512 * 2];
+        int     bad = 0;
+
+        for (int32_t i = 0; i < k->count; i++) {
+            recs[i * 2] = am2_qsort_keys[k->first + i];
+            recs[i * 2 + 1] = i;
+        }
+        crt_qsort(recs, (uint32_t)k->count, 8, QsortKeyCompare);
+        for (int32_t i = 0; i < k->count * 2; i++)
+            if (recs[i] != am2_qsort_sorted[k->first * 2 + i])
+                bad = 1;
+        if (bad) {
+            if (fail < 10)
+                printf("  FAIL crt_qsort: array %u of %d records sorts differently\n",
+                       (unsigned)c, (int)k->count);
+            fail++;
+        } else {
+            pass++;
+        }
+
+        for (int32_t p = 0; p < k->probes; p++) {
+            int32_t key = am2_bsearch_probes[(k->firstProbe + p) * 2];
+            int32_t want = am2_bsearch_probes[(k->firstProbe + p) * 2 + 1];
+            /* The sorted array as the original left it, so bsearch sees the
+             * same records whatever the sort above did. */
+            const int32_t *sorted = am2_qsort_sorted + k->first * 2;
+            const void *hit = crt_bsearch(&key, sorted, (uint32_t)k->count, 8, QsortKeyCompare);
+            int32_t got = hit ? (int32_t)(((const int32_t *)hit - sorted) / 2) : -1;
+            if (got != want) {
+                if (fail < 10)
+                    printf("  FAIL crt_bsearch: key %d in array %u -> %d, want %d\n",
+                           (int)key, (unsigned)c, (int)got, (int)want);
+                fail++;
+            } else {
+                pass++;
+            }
+        }
+    }
+    printf("  %d qsort arrays and bsearch probes: %d pass, %d fail\n", pass + fail, pass, fail);
+    *passed += pass;
+    return fail;
+}
 
 int main(void)
 {
     int32_t pass = 0, fail = 0;
+
+    /* The CRT's vectors reach the image's own data -- strtok's resumption
+     * pointer, the ctype table -- through AM2_IMAGE, so the slide has to
+     * exist before the first replay. */
+    am2_load_image(".wine/drive_c/GOG Games/Army Men II/ArmyMen2.exe");
 
     for (uint32_t v = 0; v < sizeof kVectors / sizeof kVectors[0]; v++) {
         const AM2_Vector *t = &kVectors[v];
@@ -357,6 +425,7 @@ int main(void)
     fail += PlaceLines(&pass);
     fail += FirePoses(&pass);
     fail += HitReacts(&pass);
+    fail += Qsort(&pass);
     fail += DirtyList(&pass);
     fail += ScriptLines(&pass);
     fail += ScriptSpine(&pass);

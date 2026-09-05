@@ -68,27 +68,9 @@ extern "C" void trace_describe(char *out, uint32_t cap, const char *want)
 
 /* ---- the seams src/inject/standalone.h declares ---------------------- */
 
-/* MSVC's rand. The constants are the ones in the image and the sequence is
- * observable in play, so this must be the LCG rather than the host's rand:
- * seed = seed * 0x343FD + 0x269EC3, answer = (seed >> 16) & 0x7FFF.
- *
- * AND THE SEED IS THE IMAGE'S WORD, NOT A PRIVATE ONE. GameSrand is
- * reconstructed to write ADDR_RAND_SEED -- the CRT's holdrand, carried in
- * .origdat with its initial 1 -- because that is what the image's rand
- * reads. With a static seed of its own here, every srand the game did was
- * lost: StartPacketThread seeds 0 at startup and BuildRespawnPool seeds
- * again at level load, and the standalone's sequence ignored both. That
- * put every randomly headed object's FOOTPRINT on different cells from the
- * original's -- 15,022 of the 65,536 cell weights on Boot Camp differed --
- * and the player walked where the original blocked and stopped where it
- * did not. Found by dumping the cell-weight plane on all three builds. */
-#define am2_sa_seed (*(uint32_t *)(uintptr_t)ADDR_RAND_SEED)
-
-extern "C" int am2_sa_rand(void)
-{
-    am2_sa_seed = am2_sa_seed * 0x343FDu + 0x269EC3u;
-    return (int)((am2_sa_seed >> 16) & 0x7FFFu);
-}
+/* rand is src/platform/crt/rand.cpp's now, over the image's own seed; the
+ * note that used to sit here about StartPacketThread and BuildRespawnPool
+ * seeding a private word is in that file. */
 
 /* The retail logger is a bare `ret`, and src/inject/gamelog.c patches it to
  * capture what the game writes -- which is half of what tools/ab.sh compares.

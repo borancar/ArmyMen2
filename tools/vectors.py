@@ -128,7 +128,15 @@ def addr_names():
 # ARITHMETIC: ReverseBlocks computes its source as `add edx, edi` and then
 # dereferences edx, so slot 1 never looks like a pointer and the vectors feed
 # it an integer. Rather than build dataflow analysis for one case, say so here.
+NARGS_OVERRIDE = {
+    0x004660A7: 1,   # atoi(s)
+    0x00465198: 3,   # strtol(s, endptr, base)
+    0x00465610: 3,   # strncpy(dst, src, n): the scan counts a fourth slot
+}
+
 ARG_KIND_OVERRIDE = {
+    0x004660A7: {0: "ptr"},
+    0x00465198: {0: "ptr", 1: "ptr", 2: "scalar"},
     0x004231A0: {0: "ptr", 1: "ptr"},   # ReverseBlocks(dst, src, total, count)
     # BitmapBitSet(base, x, y, height, stride). The address it reads is built
     # from TWO arguments -- `base + (height - y - 1) * stride` indexed by
@@ -509,6 +517,10 @@ def analyse(img, md, addr, size, reachable=None):
                     kinds[slots[reg]] = "ptr"
 
     kinds.update(ARG_KIND_OVERRIDE.get(addr, {}))
+    # A wrapper that only re-pushes its arguments for a callee -- atoi is
+    # `push [esp+4]; call atol` -- shows the scan no slot read of its own.
+    if addr in NARGS_OVERRIDE:
+        return NARGS_OVERRIDE[addr], kinds
     return highest + 1, kinds
 
 
@@ -1138,6 +1150,11 @@ def main():
                 "ADDR_COMPARE_TRIPLE", "ADDR_TYPES_COMPATIBLE",
                 "ADDR_SET_FACING_14", "ADDR_SET_FACING_08",
                 "ADDR_IS_KIND_10_17", "ADDR_IS_KIND_14_22",
+                # The CRT under src/platform/crt: pure over the bytes their
+                # arguments point at, so the same harness serves them.
+                "ADDR_CRT_STRCHR", "ADDR_CRT_STRSTR", "ADDR_CRT_STRNCPY",
+                "ADDR_CRT_STRNCMP", "ADDR_CRT_STRTOK", "ADDR_CRT_ATOI",
+                "ADDR_CRT_STRTOL", "ADDR_GAME_STRICMP", "ADDR_CRT_STRLWR",
                 "ADDR_OBJ_TYPE2_FIELD548", "ADDR_CLASSIFY_CODE74",
                 "ADDR_KIND_IN_SET_A", "ADDR_KIND_IN_SET_B",
                 "ADDR_MASK_PIXEL_SOLID", "ADDR_XOR_CHECKSUM",
@@ -1203,6 +1220,11 @@ def main():
     # that reads a global needs that global mapped, and the point of this is to
     # test without the game running. PURE maps each to its C++ name.
     PURE = {
+        "ADDR_CRT_STRCHR": "crt_strchr", "ADDR_CRT_STRSTR": "crt_strstr",
+        "ADDR_CRT_STRNCPY": "crt_strncpy", "ADDR_CRT_STRNCMP": "crt_strncmp",
+        "ADDR_CRT_STRTOK": "crt_strtok", "ADDR_CRT_ATOI": "crt_atoi",
+        "ADDR_CRT_STRTOL": "crt_strtol", "ADDR_GAME_STRICMP": "crt_stricmp",
+        "ADDR_CRT_STRLWR": "crt_strlwr",
         "ADDR_CLAMP": "Clamp", "ADDR_APPROX_DIST": "ApproxDist",
         "ADDR_POINT_IN_RECT": "PointInRect", "ADDR_RECT_SET": "RectSet",
         "ADDR_PACK_KEY": "PackKey", "ADDR_KEY_FIELD_A": "KeyFieldA",
