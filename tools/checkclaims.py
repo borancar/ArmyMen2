@@ -254,7 +254,7 @@ def claims():
 
         ("unexercised functions an oracle checks, and the list length",
          r'\*\*"UNEXERCISED" IS NOT "UNVERIFIED", and (\d+) of the (\d+) below are\n  now checked',
-         unexercised_split(open(os.path.join(REPO, "CLAUDE.md")).read())),
+         unexercised_split(open(os.path.join(REPO, "docs", "oracles.md")).read())),
 
         ("analysis tools `make check` runs",
          r"does not need the game\.\*\* \*\*(\d+)\*\* analysis",
@@ -304,7 +304,7 @@ def status_claims():
          r"REGISTERED\*\*, \*\*(\d+)\*\* analysis", check_tool_count()),
         ("STATUS.md: the verification split",
          r"\*\*That list is now (\d+) of (\d+)\*\*",
-         unexercised_split(open(os.path.join(REPO, "CLAUDE.md")).read())),
+         unexercised_split(open(os.path.join(REPO, "docs", "oracles.md")).read())),
     ]
 
 
@@ -320,6 +320,7 @@ PROSE = (
     "docs/screen-mpoptions.md",
     "docs/saveload.md",
     "docs/movement.md",
+    "docs/oracles.md",
 )
 
 
