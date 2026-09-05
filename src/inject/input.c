@@ -1,4 +1,5 @@
 #include "input.h"
+#include "hooklog.h"
 
 #include <windows.h>
 #include <stdio.h>
@@ -120,6 +121,31 @@ static int expired(uint32_t deadline, uint32_t now)
 
 void input_pump(void)
 {
+    /* AM2_PAUSE_ON_ENTER=1: raise the -dbg pause reason (8, what
+     * State2Enter's own PauseGame(8) raises on a fresh start) the moment the
+     * game state becomes 2. After a LOAD the game does not do that itself --
+     * its pause is gated on no load pending -- so a loaded mission would run
+     * from its first frame, and two loads of one file would differ by
+     * however many frames passed before anyone looked. With this a loaded
+     * mission arrives frozen and compares to the byte, in every build: this
+     * pump runs on the game thread under the DirectInput hook in the injected
+     * build, AM2_NOPATCH=1 included, and from device.cpp's poll in the
+     * native development binary. SPACE releases it, as it does the game's. */
+    {
+        static int32_t armed = -1, last_state;
+        int32_t        st = *(const int32_t *)(uintptr_t)0x00511DA4u;  /* ADDR_GAME_STATE */
+
+        if (armed < 0) {
+            const char *e = getenv("AM2_PAUSE_ON_ENTER");
+            armed = e && *e == '1';
+        }
+        if (armed && st == 2 && last_state != 2) {
+            *(uint32_t *)(uintptr_t)0x005122FCu |= 8u;               /* ADDR_PAUSE_FLAGS */
+            hooklog("input: paused on entering the mission (AM2_PAUSE_ON_ENTER)");
+        }
+        last_state = st;
+    }
+
     uint32_t now, i;
 
     if (!g_ready)

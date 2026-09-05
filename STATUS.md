@@ -215,6 +215,26 @@ the allocator -- the mission is sometimes seen in play at sub-state 0x21
 with nothing drawn and the briefing never shown, and a SPACE brings it up.
 Not understood, and said so.
 
+**A LEVEL CAN BE ENTERED AT WILL, FROZEN, ON ANY BUILD, and that is the
+verification point the port needed.** The game's own save is the snapshot
+that crosses runs and builds, and a LOAD of it is how a level is entered.
+What made a load a fixed point rather than a starting line is one harness
+hook: `AM2_PAUSE_ON_ENTER=1` raises the -dbg pause reason the moment the
+game state becomes 2, which the game does on a fresh start and not after a
+load (its pause is gated on no load pending). The hook lives in
+`input_pump`, which runs on the game thread under the DirectInput hook in
+the injected build, `AM2_NOPATCH=1` included, and from device.cpp's poll in
+the dev binary. `tools/enterlevel.sh [-b dev|orig|recon] SAVE` places the
+save alone in the folder, drives the LOAD, and leaves the game paused on its
+port with the table's md5 printed. Measured on one campaign save: the dev
+binary twice and the original twice all give **327 objects and the same
+table md5 in every field**, at the same clock, and the table is unchanged
+five seconds later. The raw savestates do not cross runs -- a state saved in
+one run and loaded in a fresh run at the same point of the same mission
+dies in `RestoreLostSurfaces` on the first frame, address randomisation off
+or on, because the platform's surfaces are at new addresses -- so they stay
+what they are, the quick iteration tool within a session.
+
 **`tools/savecheck.sh` IS THE SERIALISATION A/B, and it passes.** The
 game's save file is the one snapshot that crosses builds: objects go out
 by uid. The script drives the dev binary and the ORIGINAL under Wine to the
@@ -226,8 +246,8 @@ build and freezes the loaded game with the game menu. Measured:
 | comparison | result |
 |---|---|
 | the two saves' object tables, 325 objects | static fields identical; two walking troopers 1 px apart |
-| native's file loaded by the original and by native | static fields identical |
-| the original's file loaded by both | static fields identical |
+| native's file loaded by the original and by native | identical in every field, frozen on entry |
+| the original's file loaded by both | identical in every field, frozen on entry |
 | each build's load against its own save | static fields identical, with the four counter-uid'd type-6 records renumbered by both |
 | the two files, 180,618 bytes | 2,943 bytes differ, all of them accounted for |
 

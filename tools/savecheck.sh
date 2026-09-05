@@ -22,11 +22,13 @@
 # a save MEANS is what a load makes of it, so the verdict rests on the
 # object tables: the two saves' tables must agree, and each file loaded by
 # each build must give the same state. Moving fields (position, tile, hit
-# rectangle, destination) are compared separately from the rest, because a
-# loaded game runs for a moment before it is frozen and because the first
-# frame's time step differs between the native build and Wine -- two walking
-# troopers sit one pixel apart at the briefing for that reason, and the
-# injected reconstruction under Wine matches the original there exactly.
+# rectangle, destination) are compared separately from the rest where a
+# frame has run between the two: at the briefing the first frame's time
+# step differs between the native build and Wine -- two walking troopers
+# sit one pixel apart for that reason, and the injected reconstruction under
+# Wine matches the original there exactly. The LOADS are compared in every
+# field, because AM2_PAUSE_ON_ENTER freezes a loaded mission before its
+# first frame.
 #
 #     tools/savecheck.sh --report DIR     re-run the comparison on artifacts
 #
@@ -99,15 +101,19 @@ table() {
     "$PY" "$REPO/tools/objdump.py" --port "$p" --table 2>/dev/null
 }
 
+# Both sides run with AM2_PAUSE_ON_ENTER=1, the harness hook that freezes a
+# loaded mission before its first frame (see tools/enterlevel.sh), so the
+# loaded tables compare in every field rather than only the static ones.
 start_side() {
     if [ "$1" = native ]; then
         cd "$REPO"
-        DISPLAY=$DISP SDL_AUDIO_DRIVER=dummy AM2_GAMEDIR="$G" \
+        DISPLAY=$DISP SDL_AUDIO_DRIVER=dummy AM2_GAMEDIR="$G" AM2_PAUSE_ON_ENTER=1 \
             "$REPO/build/armymen2-dev" -nointro -dbg >"$WORK/native.out" 2>&1 &
         native_pid=$!
         sleep 8
     else
-        AM2_DISPLAY=$DISP "$REPO/tools/drive.sh" start 25 AM2_NOPATCH=1 >"$WORK/orig.out" 2>&1
+        AM2_DISPLAY=$DISP "$REPO/tools/drive.sh" start 25 AM2_NOPATCH=1 AM2_PAUSE_ON_ENTER=1 \
+            >"$WORK/orig.out" 2>&1
         sleep 4
     fi
 }
@@ -150,11 +156,9 @@ to_mission() {
     return 0
 }
 
-# A loaded game comes up in play and moving; the game menu (sub-state 0x17)
-# is a dialog, so poking it freezes the state for the dump.
+# A loaded game arrives frozen under AM2_PAUSE_ON_ENTER; this only waits
+# for the pause reason to be visible before the dump.
 freeze() {
-    ctl "$1" "poke 0x00511DBC 17" >/dev/null
-    ctl "$1" "poke 0x00511DC0 1" >/dev/null
     sleep 2
 }
 
@@ -169,7 +173,7 @@ save_game() {
     click "$1" 456 202; sleep 4
 }
 
-# ... -> the one save row -> LOAD, then wait for play and freeze it.
+# ... -> the one save row -> LOAD, then wait for the frozen mission.
 load_game() {
     to_select_player "$1"
     click "$1" 240 173; sleep 3
@@ -272,7 +276,47 @@ pair() {   # pair A B LABEL: whole lines, informational
 # four type-6 records at the briefing come back as 3f4..3f7 where the save
 # had 3f0..3f3, in both builds), so loaded-against-saved drops the uid
 # column; the rows stay in the same order.
-pair_static() {   # pair_static A B LABEL [nouid]: the gate
+pair_gate() {   # pair_gate A B LABEL: every field, the gate for two frozen loads
+    if diff -q "$WORK/$1.table" "$WORK/$2.table" >/dev/null; then
+        say "savecheck:   $3: identical in every field ($(wc -l <"$WORK/$1.table") lines)"
+    else
+        say "savecheck:   $3: DIFFER, $(diff "$WORK/$1.table" "$WORK/$2.table" | grep -c '^[<>]') lines"
+        rc=1
+    fi
+}
+# Loaded against saved: the save was taken at the briefing, after the
+# mission's first frame had created its transient objects (four type-6
+# records and their kin, uids from the counter); a frozen load has not run
+# that frame yet, so it holds 317 of the 325. The objects present in BOTH
+# must agree in every static field; the rest are counted and named.
+pair_common() {   # pair_common LOADED SAVED LABEL
+    "$PY" - "$WORK/$1.table" "$WORK/$2.table" "$3" <<'PYEOF' || rc=1
+import re, sys
+def load(path):
+    d = {}
+    for line in open(path):
+        m = re.match(r'^([0-9a-f]{8}) (.*)$', line.rstrip('\n'))
+        if m:
+            f = re.sub(r' (pos|tile|hit|destpt|outst|outhit)=[-0-9,]*', '', m.group(2))
+            d[m.group(1)] = f
+    return d
+a, b, label = load(sys.argv[1]), load(sys.argv[2]), sys.argv[3]
+common = sorted(set(a) & set(b))
+bad = [u for u in common if a[u] != b[u]]
+only_saved = sorted(set(b) - set(a)); only_loaded = sorted(set(a) - set(b))
+extra = ''
+if only_saved or only_loaded:
+    extra = ' (%d objects only in the save: %s; %d only after the load: %s)' % (
+        len(only_saved), ' '.join(only_saved[:6]) or '-', len(only_loaded), ' '.join(only_loaded[:6]) or '-')
+if bad:
+    print('savecheck:   %s: %d of %d shared objects DIFFER in static fields%s' % (label, len(bad), len(common), extra))
+    for u in bad[:4]:
+        print('savecheck:     %s\n      loaded %s\n      saved  %s' % (u, a[u], b[u]))
+    sys.exit(1)
+print('savecheck:   %s: %d shared objects identical in static fields%s' % (label, len(common), extra))
+PYEOF
+}
+pair_static() {   # pair_static A B LABEL [nouid]: static fields, for comparisons across a running frame
     static_fields "$WORK/$1.table" >"$WORK/$1.static"
     static_fields "$WORK/$2.table" >"$WORK/$2.static"
     if [ "$4" = nouid ]; then
@@ -300,12 +344,10 @@ report() {
     for f in orig-loads-native native-loads-native orig-loads-orig native-loads-orig; do
         [ -s "$WORK/$f.table" ] || { say "savecheck: VOID -- no $f.table"; return 1; }
     done
-    pair orig-loads-native native-loads-native "native's save, loaded by both"
-    pair_static orig-loads-native native-loads-native "native's save, loaded by both"
-    pair orig-loads-orig native-loads-orig "the original's save, loaded by both"
-    pair_static orig-loads-orig native-loads-orig "the original's save, loaded by both"
-    pair_static native-loads-native native-saved "native: loaded against saved" nouid
-    pair_static orig-loads-orig orig-saved "the original: loaded against saved" nouid
+    pair_gate orig-loads-native native-loads-native "native's save, loaded by both"
+    pair_gate orig-loads-orig native-loads-orig "the original's save, loaded by both"
+    pair_common native-loads-native native-saved "native: loaded against saved"
+    pair_common orig-loads-orig orig-saved "the original: loaded against saved"
     return $rc
 }
 
