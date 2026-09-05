@@ -68,9 +68,18 @@ SAVE=$1
 [ -n "$FOLDER" ] || FOLDER=$(basename "$(cd "$(dirname "$SAVE")" && pwd)")
 SAVEDIR="$G/save/$FOLDER"
 
+# The dev binary's socket is always 31337; the Wine builds' is derived from
+# the run ID the way the Makefile derives it -- 31337 + ID % 1000, ID being
+# the digits of DISPLAY. Hardcoding 31436 works only on :99, and a run on
+# another display then talks to a port nothing is listening on: every reply
+# comes back empty, which reads exactly like a game that died. That cost an
+# afternoon here and is the stale-port confound CLAUDE.md records, in a new
+# spelling.
 case "$BUILD" in
     dev)   PORT=31337 ;;
-    orig|recon) PORT=31436 ;;
+    orig|recon)
+        id=$(printf '%s' "$DISP" | tr -cd '0-9')
+        PORT=$(( 31337 + ${id:-0} % 1000 )) ;;
     *) say "enterlevel: -b takes dev, orig or recon"; exit 2 ;;
 esac
 [ -d "$STASH" ] && { say "enterlevel: a previous run is still up; run --stop first"; exit 2; }
@@ -101,6 +110,12 @@ case "$BUILD" in
         sleep 4 ;;
 esac
 
+# The socket must answer before anything is believed: a silent port is not
+# a dead game.
+if [ "$(ctl ping)" = "" ]; then
+    say "enterlevel: VOID -- no control socket on port $PORT (game up? wrong display?)"
+    exit 1
+fi
 r=$(ctl "loadgame $FOLDER enter.sav")
 case "$r" in
     ok*) ;;

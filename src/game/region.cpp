@@ -8766,12 +8766,28 @@ void __cdecl StepType3(void *obj)
         *(int32_t *)(out + SIGHTCOUT_OFF_SEEN)  = 0;
     }
 
+    /* 0x0045D6E6: while the record's second word is clear, the vehicle's
+     * fire point follows the global aim point every frame, and its local
+     * target is cleared. This block was missing. */
+    if (*(const int32_t *)(out + SIGHTCOUT_OFF_BEARING) == 0) {
+        *(uint32_t *)(o + TROOPER_OFF_POS_X) =
+            *(const uint32_t *)(uintptr_t)ADDR_AIM_X;
+        *(int16_t *)(o + TROOPER_OFF_POS_Z) =
+            *(const int16_t *)(uintptr_t)ADDR_AIM_Z;
+        *(int32_t *)(o + TROOPER_OFF_LOCAL_TARGET) = 0;
+    }
+
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0)
         goto alive;
 
-    /* Dead: only kind 5 runs the destruction sequence at all. */
-    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 0)
-        goto attach;
+    /* Dead. Kind 0 is destroyed outright (0x0045D7D4: clear the gate, then
+     * DestroyByType, then the second tail); this used to send it to the
+     * attach arm. Only kind 5 runs the destruction sequence. */
+    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 0) {
+        *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
+        DestroyByType(obj);
+        goto post;
+    }
     if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) != 5)
         goto post;
     {
@@ -8814,20 +8830,49 @@ void __cdecl StepType3(void *obj)
     goto post;
 
 alive:
-    if (*(const int32_t *)out != 0)
-        goto post;
+    /* 0x0045D7E8 compares the FIELD_59C the seed block loaded, not the
+     * record: a vehicle past its first frame with the gate set goes
+     * straight to the facing chooser. The reconstruction tested the record's
+     * first word here -- the heading byte, never zero -- and jumped past the
+     * chooser to the second tail, so no vehicle was ever steered by the
+     * player or the AI: every truck sat where the mission placed it and the
+     * player's keys did nothing once Sarge had boarded. Found by loading one
+     * save in the native build and in the original and holding D. */
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_59C) != 0)
+        goto choose;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
         && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
-        goto post;
+        goto choose;
 
-    if (*(const int32_t *)(o + OBJ_OFF_POSE + LIST_OFF_COUNT) > 0) {
+    /* No occupant: the attach arm (0x0045D894). */
+    if (*(const int32_t *)(o + OBJ_OFF_POSE + LIST_OFF_COUNT) <= 0)
+        goto attach;
+
+    {
         uint8_t *first = (uint8_t *)LookupByUID(
             ((const uint32_t *)*(void **)(o + OBJ_OFF_POSE + LIST_OFF_UIDS))[0]);
 
-        if (!first)
+        /* A first occupant that no longer resolves is removed, and the
+         * frame ends at the chooser. */
+        if (!first) {
             ListRemoveAt(o + OBJ_OFF_POSE, 0);
+            goto choose;
+        }
+        /* An order already in the record's second word: chooser only. */
+        if (*(const int32_t *)(out + SIGHTCOUT_OFF_BEARING) != 0)
+            goto choose;
+
+        /* The player's vehicle reads the keys and the mouse and routes;
+         * anyone else's runs the AI. Both then choose a facing. */
+        if (ObjType2Field548((const AM2_Object *)first)) {
+            Step3Input(obj, out);
+            Step3RouteAndBoard(obj, out);
+        } else {
+            AiStep(obj, out);
+        }
+        goto choose;
     }
 
 attach:
@@ -8839,6 +8884,11 @@ attach:
         *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
         *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
     }
+    goto post;
+
+choose:
+    /* 0x0045D8CF/0x0045D8D6: every alive path but the attach arm's. */
+    Step3ChooseFacing(obj, out);
 
 post:
     /* The second tail. Everything above reaches it. */
@@ -9282,6 +9332,14 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
     at.x  = (int16_t)((int16_t)g_viewRect->left + (int16_t)g_cursorPoint);
     at.y  = (int16_t)((int16_t)g_viewRect->top + (int16_t)(g_cursorPoint >> 16));
     dist  = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &at);
+    /* THE WHOLE POINT IS COPIED AND ONLY ITS Y IS THEN REPLACED. 0x0044A4F2
+     * loads slot +0x10 as a DWORD and 0x0044A4FB stores it into slot +0x0C,
+     * so `aim` starts as `at`; 0x0044A50D then overwrites aim.y with the
+     * overlay-adjusted one. The copy was missing here, so aim.x was an
+     * uninitialised local -- six sites read it, including the two that write
+     * the fire point into the output record. The symptom was shooting that
+     * worked and aimed at nothing in particular. */
+    aim   = at;
     aim.y = (int16_t)(ObjOverlayY(o) + at.y);
 
     /* A target uid that no longer resolves is dropped rather than chased. */
@@ -9501,7 +9559,18 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
             /* THE FILTER. Five weapon codes also report where the cursor is
              * pointing; twelve, and everything outside 0x18..0x28, do not. */
             {
-                int32_t k = **(int32_t **)(o + OBJ_OFF_FIELD_C0) - 0x18;
+                /* THE WEAPON's +0xC0, not the trooper's: 0x0044AA92 reads
+                 * frame slot +0x20, which is ARG2 -- there is an outstanding
+                 * push there, so the raw `[esp+0x24]` is one slot lower than
+                 * it looks, and espmap says so. The five sibling reads in
+                 * this function all spell it `weapon`; this one said `o`,
+                 * and a trooper's +0xC0 is a packed point, which is (0,0)
+                 * for a standing soldier -- so shift-clicking to fire at a
+                 * spot dereferenced NULL and took the process down. The
+                 * original shoots: its object count goes 1612, 1613, 1612.
+                 * Fifth instance of the push-shifted slot in this project. */
+                int32_t k = **(int32_t **)((uint8_t *)weapon
+                                           + OBJ_OFF_FIELD_C0) - 0x18;
 
                 if ((uint32_t)k <= 0x10 && kCursorCodeFilter[k] == 0) {
                     *(uint16_t *)(w + 0x14) =

@@ -124,6 +124,37 @@ original) bisected them one at a time:
   seed was a private global, so anything randomised diverged from the
   original run to run; it reads `ADDR_RAND_SEED` now.
 
+**NO VEHICLE WAS EVER STEPPED BY THE PLAYER OR THE AI, and the fixed
+point found it in an afternoon.** Reported as "movement is completely
+broken inside a vehicle, and the sound is wrong until Esc opens the menu",
+with two F5 saves, one before boarding and one after. Loading the
+before-save in the native build and in the original (`tools/enterlevel.sh`),
+clicking the truck and holding D: the original's truck turns on boarding
+and again under D, ours never changes facing. Same controlled-object
+context on both, same guards clear, so the vehicle input handler was
+not being reached -- and `grep` found no call to `Step3Input` anywhere,
+only its definition, while its own header names one caller. `StepType3`'s
+alive path was misread in four places against 0x0045D660:
+
+- it tested the record's first word, the heading byte, where the original
+  tests `OBJ_OFF_FIELD_59C`, so every live vehicle skipped the whole block;
+- a vehicle with occupants went nowhere: the original sends the player's
+  vehicle (first occupant owned by the player) to `Step3Input` and
+  `Step3RouteAndBoard` and everyone else's to `AiStep`, then all of them
+  to `Step3ChooseFacing`; ours had the attach arm only, for empty vehicles;
+- a dead kind-0 vehicle went to the attach arm instead of being destroyed;
+- the per-frame copy of the aim point into the vehicle's fire point, gated
+  on the record's second word, was missing.
+
+Measured after the fix on one save, D for two seconds then W for four: the
+native truck turns 33 to 177 to 65 and drives from (1242,2659) to (632,2710)
+with the record in the driving state 4, and stops on release. No A/B could
+have seen it: `bootcamp`'s dump is taken at the briefing before any vehicle
+steps, `mission` compares logs, and Boot Camp's truck sits in the motor pool
+either way. The vehicle sound is the same fix's business -- the engine's
+two sound tables key on the record state that was stuck at 1 -- and wants
+retesting on the desktop.
+
 **AND THE PLANES WERE NOT THE DEFECT THE REPORT WAS ABOUT.** With both
 identical, Sarge still walked through Boot Camp's hut, and so did the
 INJECTED build under Wine -- the same drive on the original stops him at
