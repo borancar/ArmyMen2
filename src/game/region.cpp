@@ -2264,13 +2264,26 @@ static void ShiftTileCover(int32_t cell, int32_t delta)
  * twenty ADDR_TILE_NEIGHBOURS only when the weight CROSSES 15. This is the +1
  * half of the pair CLAUDE.md credits with settling those two globals.
  *
- * THE CELL INDEX STARTS AT rect.top AND THAT LOOKS LIKE A BUG. Both fillers
- * index zero-based over the rect -- ADDR_OBJ_HIT_MASK_ACTION computes
- * `cells + row * width + 2` and BoxAction `cells + (y - top) * stride - left`
- * -- while this walks `cells[top ...]`. Reproduced exactly, not corrected:
- * this is the original's behaviour, the same standing as LockSurface's
- * uninitialised descriptor, and correcting it on a function no drive reaches
- * would be an unverifiable divergence from the binary.
+ * THE CELL INDEX STARTS AT ZERO, AND FOR MONTHS THIS READ IT AS rect.top.
+ * The original writes `[esp+0xc] = 0` and `[esp+0x10] = top` (0x00439405,
+ * 0x0043940D), then `push ebp`, and the loop's `mov eax, [esp+0x10]` at
+ * 0x00439439 is therefore the ZERO slot -- the push moved the top to
+ * [esp+0x14]. Read against the pre-push frame it looks like the walk starts
+ * at `cells[top]`, which this comment used to call "a bug, reproduced"; it
+ * was a bug in the reading. Both fillers index zero-based over the rect --
+ * ADDR_OBJ_HIT_MASK_ACTION computes `cells + row * width + 2` and BoxAction
+ * `cells + (y - top) * stride - left` -- and so does the walk.
+ *
+ * WHAT THE MISREADING DID: the walk ran up to rect.top bytes past the cells
+ * the filler cleared, into whatever the stack held below the mask buffer.
+ * Under Wine that was benign enough to pass every A/B (both sides run this
+ * reconstruction, so no A/B could see it). In the native build it was
+ * another process's worth of frames -- SDL's, the platform layer's -- and
+ * it varied with address-space randomisation: the cell-weight plane on
+ * Boot Camp differed from the original's in 15,022 of 65,536 cells and from
+ * itself between two runs, and the player walked through sandbags. The
+ * push-shifted-slot trap, the third instance in a week after CreateVehicle
+ * and Type2PlayerStep's context field.
  *
  * THE INCREMENT ARM NEEDS A NEGATIVE HEIGHT. `h <= 15 && h - height >= 15`
  * collapses to `h == 15 && height == 0` for any non-negative height, so it is
@@ -2343,7 +2356,7 @@ void __cdecl ItemTeardown(void *obj)
     else
         ObjBoxAction(obj, mask);
 
-    idx = rect[1];      /* the original starts it at rect.top -- see above */
+    idx = 0;            /* the zero slot, not the top -- see above */
 
     for (row = rect[1]; row <= rect[3]; row++) {
         int32_t cell = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W * row
@@ -2474,7 +2487,8 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
     else
         ObjBoxAction(obj, mask);
 
-    idx = rect[1];      /* rect.top, as ItemTeardown's comment explains */
+    idx = 0;            /* the zero slot at 0x00439109, as ItemTeardown's
+                         * comment explains: the same push-shifted read */
 
     for (row = rect[1]; row <= rect[3]; row++) {
         /* A SHIFT here where ItemTeardown MULTIPLIES by the width. The two
