@@ -177,6 +177,72 @@ reconstruction relied on without saying so:**
   method on the NULL that follows -- the original's test there "can only
   ever pass", so it has no path for that.
 
+**TWO NATIVE BINARIES: THE PLAYER'S AND THE DEVELOPER'S.** `make native`
+builds `build/armymen2` with no control socket, no injected input and no
+savestates; `make native-dev` builds `build/armymen2-dev`, the same sources
+with `AM2_DEVTOOLS`, plus the harness's control.c and input.c and
+`src/standalone/devtools.cpp`. The socket is on by default there (port
+31337, `AM2_CONTROL=0` turns it off), and everything a drive or a dump
+needs lives in that binary only.
+
+**SAVESTATES, in the dev binary.** Every game allocation there comes from a
+96 MB arena at a fixed address (0x0A000000) with a deterministic first-fit
+allocator whose bookkeeping lives inside the region, so a savestate is the
+carried globals (2 MB, 0x0046F000..0x00666000) plus the arena's used part,
+16 MB in a Boot Camp mission, written and restored as bytes.
+`snap save FILE` and `snap load FILE` on the socket (FILE absolute -- the
+game chdirs), F5 and F9 for `$TMPDIR/am2-quick.state`. They run on the game
+thread at the top of the host's frame pump, never mid-frame. Measured: save
+at (1981,1026), walk to (2249,998), load, read (1981,1026), walk again and
+the game carries on. What a state does NOT hold is anything the platform
+owns -- surfaces, sound buffers, open files -- so it is valid within the
+session and mission it was taken in; the game's own SAVE GAME is the
+portable one.
+
+**THE ARENA'S ADDRESS IS NOT A FREE CHOICE.** The game overloads fields
+with a uid or a pointer and tells them apart by value; uids carry their
+kind in the high nibble (`200003E8`, `800003E9`), so the arena has to sit
+where the MSVC heap and glibc's brk heap both do, below 0x10000000. Three
+bisecting switches stay in: `AM2_DEV_NOARENA=1` (libc's allocator),
+`AM2_DEV_NOREUSE=1` (freed blocks never handed out again),
+`AM2_DEV_POISON=1` and `AM2_DEV_CANARY=1` (freed blocks filled with 0xDD
+and checked every frame, naming a block written after its free by size and
+allocating call site). They exist because a campaign start came up as a
+black screen in three arena runs in a row and in none of four non-reuse
+runs; the canary found no write into freed memory, and the next four runs
+under every mode came up fine. That start is intermittent and unrelated to
+the allocator -- the mission is sometimes seen in play at sub-state 0x21
+with nothing drawn and the briefing never shown, and a SPACE brings it up.
+Not understood, and said so.
+
+**`tools/savecheck.sh` IS THE SERIALISATION A/B, and it passes.** The
+game's save file is the one snapshot that crosses builds: objects go out
+by uid. The script drives the dev binary and the ORIGINAL under Wine to the
+same campaign briefing, held under `-dbg`, has each save through the game's
+own dialog (opened by writing the two globals the SAVE button writes, the
+name typed after clearing the pre-filled one), then loads each file in each
+build and freezes the loaded game with the game menu. Measured:
+
+| comparison | result |
+|---|---|
+| the two saves' object tables, 325 objects | static fields identical; two walking troopers 1 px apart |
+| native's file loaded by the original and by native | static fields identical |
+| the original's file loaded by both | static fields identical |
+| each build's load against its own save | static fields identical, with the four counter-uid'd type-6 records renumbered by both |
+| the two files, 180,618 bytes | 2,943 bytes differ, all of them accounted for |
+
+The file bytes cannot match and the tool says why per section: the
+object-script, condition and item sections write records whole, pointers
+included -- native's sit in the arena and Wine's in its heap -- the
+game-proc block carries the clock and a frame counter, the event block
+three counters two frames apart, and one word of the script section is
+padding the arena zero-fills. `SaveObjScriptSection`'s
+own comment had already said the item section cannot be compared byte for
+byte across builds. The one-pixel offset is the native port's first frame,
+not the reconstruction: the injected build under Wine gives a briefing
+table identical to the original's, and a second native run gives one
+identical to the first.
+
 **DIRECTSOUND IS IMPLEMENTED, and checked without ears.** A secondary
 buffer keeps its bytes; one mixer, pulled by the host device from its own
 thread, walks every playing buffer's cursor at the buffer's rate,

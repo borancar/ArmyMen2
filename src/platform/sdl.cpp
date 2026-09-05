@@ -452,6 +452,11 @@ static void am2_mouse_flush(void)
     am2_mouse_dx = am2_mouse_dy = 0;
 }
 
+void (*am2_host_frame_hook)(void);
+#ifdef AM2_DEVTOOLS
+extern "C" void devtools_hotkey(int32_t which);
+#endif
+
 void am2_host_pump(void)
 {
     SDL_Event ev;
@@ -459,6 +464,8 @@ void am2_host_pump(void)
 
     if (!am2_sdl_window)
         return;
+    if (am2_host_frame_hook)
+        am2_host_frame_hook();
     am2_dik_table_init();
     am2_mouse_pay_releases();
     while (SDL_PollEvent(&ev)) {
@@ -480,6 +487,15 @@ void am2_host_pump(void)
         case SDL_EVENT_KEY_UP: {
             uint8_t dik = ev.key.scancode < SDL_SCANCODE_COUNT
                         ? am2_dik_of_scancode[ev.key.scancode] : 0;
+#ifdef AM2_DEVTOOLS
+            /* The development binary's quick savestate keys; the game never
+             * reads F5 or F9 itself. */
+            if (ev.key.down && !ev.key.repeat
+                && (ev.key.scancode == SDL_SCANCODE_F5 || ev.key.scancode == SDL_SCANCODE_F9)) {
+                devtools_hotkey(ev.key.scancode == SDL_SCANCODE_F5 ? 1 : 2);
+                break;
+            }
+#endif
             if (dik)
                 am2_keys[dik] = ev.key.down ? 0x80 : 0;
             if (!ev.key.repeat)
@@ -577,8 +593,10 @@ static void SDLCALL am2_audio_pull(void *ud, SDL_AudioStream *stream,
     am2_audio_mix(am2_audio_ud, am2_audio_scratch, frames);
     SDL_PutAudioStreamData(stream, am2_audio_scratch,
                            frames * (int)(2 * sizeof(float)));
+#ifdef AM2_DEVTOOLS
     if (am2_audio_dump)
         fwrite(am2_audio_scratch, 2 * sizeof(float), (size_t)frames, am2_audio_dump);
+#endif
 }
 
 int32_t am2_host_audio_open(int32_t rate, am2_audio_mix_fn mix, void *ud)
@@ -603,12 +621,14 @@ int32_t am2_host_audio_open(int32_t rate, am2_audio_mix_fn mix, void *ud)
                      SDL_GetError());
         return 0;
     }
+#ifdef AM2_DEVTOOLS
     {
         const char *dump = getenv("AM2_AUDIO_DUMP");
 
         if (dump && *dump)
             am2_audio_dump = fopen(dump, "wb");
     }
+#endif
     SDL_ResumeAudioStreamDevice(am2_sdl_audio);
     am2_plat_log("audio: %d Hz stereo float through %s", rate,
                  SDL_GetCurrentAudioDriver());

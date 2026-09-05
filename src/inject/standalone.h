@@ -225,6 +225,39 @@ extern const uint8_t am2_pickup_kind_index[29];
 #define ADDR_FTELL            AM2_SA(am2_sa_ftell)
 #define ADDR_GAME_FREE        AM2_SA(free)
 #define ADDR_FREE_ARMY_LISTS_ALIAS AM2_SA(am2_sa_free_army_lists)
+
+/* The DEVELOPMENT binary (make native-dev, AM2_DEVTOOLS) puts every game
+ * allocation in a fixed-address arena so a savestate can carry the heap;
+ * src/standalone/devtools.cpp. The player's binary keeps the host CRT. */
+#ifdef AM2_DEVTOOLS
+#ifdef __cplusplus
+extern "C" {
+#endif
+void *am2_dev_malloc(size_t n);
+void *am2_dev_realloc(void *p, size_t n);
+void  am2_dev_free(void *p);
+/* The CRT-entry spellings: whatever am2_malloc and friends point at, which
+ * is the arena unless AM2_DEV_NOARENA=1 (runtime.cpp). */
+void *am2_dev_malloc_entry(size_t n);
+void *am2_dev_realloc_entry(void *p, size_t n);
+void  am2_dev_free_entry(void *p);
+void  devtools_init(void);
+#ifdef __cplusplus
+}
+#endif
+#undef ADDR_CRT_MALLOC
+#undef ADDR_CRT_REALLOC
+#undef ADDR_CRT_FREE
+#undef ADDR_GAME_MALLOC
+#undef ADDR_REALLOC
+#undef ADDR_GAME_FREE
+#define ADDR_CRT_MALLOC       AM2_SA(am2_dev_malloc_entry)
+#define ADDR_CRT_REALLOC      AM2_SA(am2_dev_realloc_entry)
+#define ADDR_CRT_FREE         AM2_SA(am2_dev_free_entry)
+#define ADDR_GAME_MALLOC      AM2_SA(am2_dev_malloc_entry)
+#define ADDR_REALLOC          AM2_SA(am2_dev_realloc_entry)
+#define ADDR_GAME_FREE        AM2_SA(am2_dev_free_entry)
+#endif
 #define ADDR_SCRIPT_PARSE_ACTION AM2_SA(am2_sa_unimplemented)
 
 

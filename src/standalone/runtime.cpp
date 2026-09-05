@@ -219,8 +219,13 @@ extern "C" int am2_sa_findclose(intptr_t handle) { return _findclose(handle); }
  * the result -- CLAUDE.md notes 0x00451251 doing exactly that. The nothrow
  * form keeps that true, which is also what makes the widget destructors'
  * missing SEH frames safe. */
+#ifdef AM2_DEVTOOLS
+extern "C" void *am2_sa_operator_new(size_t n) { return am2_malloc(n); }
+extern "C" void am2_sa_operator_delete(void *p) { am2_free(p); }
+#else
 extern "C" void *am2_sa_operator_new(size_t n) { return malloc(n); }
 extern "C" void am2_sa_operator_delete(void *p) { free(p); }
+#endif
 
 
 extern "C" long am2_sa_ftell(void *fp) { return ftell((FILE *)fp); }
@@ -275,9 +280,25 @@ static void am2_sa_cursor_query(int32_t *x, int32_t *y)
  * heap and the question does not arise. */
 extern "C" void am2_standalone_init(void)
 {
+#ifdef AM2_DEVTOOLS
+    /* The development binary's fixed-address arena, so a savestate can
+     * carry the heap. See src/standalone/devtools.cpp. AM2_DEV_NOARENA=1
+     * keeps libc's, which turns the savestates off and is how a behaviour
+     * difference between the two binaries is bisected. */
+    if (getenv("AM2_DEV_NOARENA")) {
+        am2_malloc = malloc;
+        am2_realloc = realloc;
+        am2_free = free;
+    } else {
+        am2_malloc = am2_dev_malloc;
+        am2_realloc = am2_dev_realloc;
+        am2_free = am2_dev_free;
+    }
+#else
     am2_malloc = malloc;
     am2_realloc = realloc;
     am2_free = free;
+#endif
     am2_log = am2_sa_log;
     /* The directory calls too: crt.cpp's defaults are the host's chdir and
      * getcwd, which under mingw understand a backslash and under glibc do
@@ -307,7 +328,9 @@ extern "C" void am2_standalone_init(void)
      * for the injected build; without it here every `key`, `type` and `mouse`
      * command was accepted and dropped, so a standalone run could be looked
      * at and not driven. */
+#ifdef AM2_DEVTOOLS
     input_init();
+#endif
 
     /* The control socket, which the injected build gets from the harness.
      * Without it a standalone run cannot be driven or dumped, so every
@@ -315,7 +338,10 @@ extern "C" void am2_standalone_init(void)
      * and tools/objdump.py, the object-table diff that is bootcamp's
      * sharpest artifact, was unavailable entirely. AM2_CONTROL=1 enables it,
      * exactly as it does there. */
+#ifdef AM2_DEVTOOLS
     control_start();
+    devtools_init();
+#endif
 }
 
 /* WinMain is the reconstruction's own and is not touched, so the startup

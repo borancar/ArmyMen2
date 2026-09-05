@@ -1621,6 +1621,16 @@ and the deepest survivor is the function to read. Sarge walking through
 Boot Camp's hut took eight names and twenty-two trials that way, and the
 defect was three misreadings in one function, none of them an offset.
 
+**THE NATIVE BUILD IS TWO BINARIES, and the one a drive talks to is
+`build/armymen2-dev`.** `make native` is the player's, with no control
+socket at all; `make native-dev` adds the socket (on by default), the
+injected input, and savestates over a fixed-address arena
+(`snap save|load FILE`, F5/F9). Anything that pokes, dumps or drives the
+native game uses the dev binary; STATUS.md has the measurements.
+`tools/savecheck.sh` is the cross-build serialisation A/B built on it --
+the game's SAVE GAME written by one build and loaded by the other, judged on
+the object tables, because the file's bytes carry raw pointers by design.
+
 **Movement and the input path are `docs/movement.md`.** Two defects a month
 apart each made the player unable to move and neither was visible to any A/B --
 both sides are driven with the same input and agree about ignoring it.

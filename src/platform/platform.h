@@ -71,6 +71,10 @@ void am2_host_cursor_visible(int32_t visible);
 /* Drain host events into the message queue and the input devices. */
 void am2_host_pump(void);
 
+/* Called at the top of every pump, on the game thread, when set. The
+ * development binary hangs its savestates on it. */
+extern void (*am2_host_frame_hook)(void);
+
 /* Keyboard state as DirectInput scancodes, 256 bytes, 0x80 when down. */
 void am2_host_keyboard_state(uint8_t *out);
 

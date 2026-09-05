@@ -486,15 +486,29 @@ run-stock:
 # files serve both; only the assembler directives in them differ by format.
 # Needs glibc-devel.i686, libstdc++-devel.i686 and SDL3-devel.i686.
 #
-#     make native                          builds build/armymen2
+#     make native                          builds build/armymen2, the player's
+#     make native-dev                      builds build/armymen2-dev
 #     AM2_GAMEDIR="$(GAMEDIR)" build/armymen2 -nointro
+#
+# TWO BINARIES, ONE TREE. The player's binary carries no control socket, no
+# injected input and no savestates -- src/standalone/noinput.cpp answers
+# device.cpp's three injected-input calls with "nothing". The development
+# binary is the same sources with AM2_DEVTOOLS defined plus the harness's
+# control.c and input.c and src/standalone/devtools.cpp: the control socket
+# on port 31337 (AM2_CTL_PORT), a fixed-address arena for every game
+# allocation, and `snap save|load FILE` savestates over that arena and the
+# carried globals (F5/F9 for $TMPDIR/am2-quick.state). The two object trees are
+# separate because the define changes what a header expands to.
 NATIVE_CXX   := g++
 NATIVE_CC    := gcc
-NATIVE_SRC   := $(SA_SRC) $(wildcard src/platform/*.cpp)
-NATIVE_CSRC  := $(SA_CSRC)
+NATIVE_SRC   := $(SA_SRC) $(wildcard src/platform/*.cpp) \
+                src/standalone/noinput.cpp src/standalone/devtools.cpp
 NATIVE_OBJ   := $(patsubst %.cpp,$(BUILD)/native/%.o,$(NATIVE_SRC)) \
-                $(patsubst %.c,$(BUILD)/native/%.o,$(NATIVE_CSRC)) \
                 $(BUILD)/native/origdata.o $(BUILD)/native/origgap.o
+DEV_CSRC     := $(SA_CSRC)
+DEV_OBJ      := $(patsubst %.cpp,$(BUILD)/native-dev/%.o,$(NATIVE_SRC)) \
+                $(patsubst %.c,$(BUILD)/native-dev/%.o,$(DEV_CSRC)) \
+                $(BUILD)/native-dev/origdata.o $(BUILD)/native-dev/origgap.o
 NATIVE_DEFS  := -DAM2_STANDALONE -DAM2_NATIVE -Ibuild/standalone \
                 -isystem src/platform/include -include callconv.h
 NATIVE_ARCH  := -m32 -fno-pie -no-pie
@@ -510,9 +524,12 @@ NATIVE_LDF   := $(NATIVE_ARCH) -static-libgcc \
                 -Wl,-Ttext=0x00700000 -Wl,-z,norelro -Wl,--no-warn-rwx-segments
 NATIVE_LIBS  := -lSDL3 -lpthread -lm
 
-.PHONY: native
+.PHONY: native native-dev
 native: standalone-generate
 	$(MAKE) $(BUILD)/armymen2
+
+native-dev: standalone-generate
+	$(MAKE) $(BUILD)/armymen2-dev
 
 $(BUILD)/native/%.o: %.cpp | standalone-generate
 	@mkdir -p $(dir $@)
@@ -530,11 +547,32 @@ $(BUILD)/native/origgap.o: build/standalone/origgap.S | standalone-generate
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
 
+$(BUILD)/native-dev/%.o: %.cpp | standalone-generate
+	@mkdir -p $(dir $@)
+	$(NATIVE_CXX) $(NATIVE_CXXF) -DAM2_DEVTOOLS -c $< -o $@
+
+$(BUILD)/native-dev/%.o: %.c | standalone-generate
+	@mkdir -p $(dir $@)
+	$(NATIVE_CC) $(NATIVE_CF) -DAM2_DEVTOOLS -c $< -o $@
+
+$(BUILD)/native-dev/origdata.o: build/standalone/origdata.S | standalone-generate
+	@mkdir -p $(dir $@)
+	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
+
+$(BUILD)/native-dev/origgap.o: build/standalone/origgap.S | standalone-generate
+	@mkdir -p $(dir $@)
+	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
+
 -include $(NATIVE_OBJ:.o=.d)
+-include $(DEV_OBJ:.o=.d)
 
 $(BUILD)/armymen2: $(NATIVE_OBJ)
 	$(NATIVE_CXX) -o $@ $(NATIVE_OBJ) $(NATIVE_LDF) $(NATIVE_LIBS)
 	@echo "native: $@"
+
+$(BUILD)/armymen2-dev: $(DEV_OBJ)
+	$(NATIVE_CXX) -o $@ $(DEV_OBJ) $(NATIVE_LDF) $(NATIVE_LIBS)
+	@echo "native-dev: $@"
 
 clean:
 	rm -rf $(BUILD)

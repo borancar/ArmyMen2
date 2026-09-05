@@ -315,6 +315,11 @@ static void handle_line(SOCKET s, char *line)
             if (p[0] == '\\' && p[1] == 'r') {
                 p++;
                 c = '\r';
+            } else if (p[0] == '\\' && p[1] == 'b') {
+                /* Backspace, for clearing a field the dialog pre-filled:
+                 * EditCharHandler takes WM_CHAR 8 as a delete. */
+                p++;
+                c = 8;
             } else {
                 c = (unsigned char)*p;
             }
@@ -669,6 +674,20 @@ static void handle_line(SOCKET s, char *line)
             return;
         }
     }
+#ifdef AM2_DEVTOOLS
+    {
+        /* The development binary's own commands (src/standalone/devtools.cpp):
+         * savestates, which need the game thread and the fixed arena that
+         * only that binary has. */
+        extern int32_t devtools_command(int32_t argc, char **argv, char *out, size_t cap);
+        char out[MAX_LINE];
+
+        if (devtools_command(argc, argv, out, sizeof out)) {
+            reply(s, "%s", out);
+            return;
+        }
+    }
+#endif
     reply(s, "err unknown command '%s'", argv[0]);
 }
 
@@ -734,10 +753,18 @@ int control_start(void)
     struct sockaddr_in addr;
     int                yes = 1;
 
+#ifdef AM2_DEVTOOLS
+    /* The development binary exists to be driven: on unless AM2_CONTROL=0. */
+    if (opt && *opt == '0') {
+        hooklog("control: disabled by AM2_CONTROL=0");
+        return 0;
+    }
+#else
     if (!opt || *opt != '1') {
         hooklog("control: disabled (set AM2_CONTROL=1 to enable)");
         return 0;
     }
+#endif
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
         hooklog("control: WSAStartup failed");
         return 1;
