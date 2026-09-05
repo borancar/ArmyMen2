@@ -1650,8 +1650,8 @@ Boot Camp's hut took eight names and twenty-two trials that way, and the
 defect was three misreadings in one function, none of them an offset.
 
 **THE NATIVE BUILD IS TWO BINARIES, and the one a drive talks to is
-`build/armymen2-dev`.** `make native` is the player's, with no control
-socket at all; `make native-dev` adds the socket (on by default), the
+`build/armymen2-dev`.** `make native` builds both. The player's has no control socket at all; the
+development one adds the socket (on by default), the
 injected input, and savestates over a fixed-address arena
 (`snap save|load FILE`); F5 writes the GAME's save as a fixture and F9
 reloads it. Anything that pokes, dumps or drives the

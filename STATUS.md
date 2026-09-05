@@ -9,7 +9,8 @@ Last updated: **2026-09-05**, native build landing (see the first section).
 
 ## THE GAME RUNS AS A LINUX EXECUTABLE
 
-`make native` builds `build/armymen2`: the same reconstruction as the
+`make native` builds `build/armymen2` and `build/armymen2-dev`: the same
+reconstruction as the
 standalone, linked as an i386 ELF against `src/platform/` -- the Win32 and
 DirectX surface `src/game/win32/` calls, implemented over SDL3 -- instead of
 against Wine. One executable, no runner. SDL is the outermost layer; every
@@ -208,9 +209,9 @@ reconstruction relied on without saying so:**
   method on the NULL that follows -- the original's test there "can only
   ever pass", so it has no path for that.
 
-**TWO NATIVE BINARIES: THE PLAYER'S AND THE DEVELOPER'S.** `make native`
-builds `build/armymen2` with no control socket, no injected input and no
-savestates; `make native-dev` builds `build/armymen2-dev`, the same sources
+**TWO NATIVE BINARIES: THE PLAYER'S AND THE DEVELOPER'S, and `make native`
+builds both.** It builds `build/armymen2` with no control socket, no injected input and no
+savestates, and `build/armymen2-dev`, the same sources
 with `AM2_DEVTOOLS`, plus the harness's control.c and input.c and
 `src/standalone/devtools.cpp`. The socket is on by default there (port
 31337, `AM2_CONTROL=0` turns it off), and everything a drive or a dump

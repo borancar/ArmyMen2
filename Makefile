@@ -486,8 +486,8 @@ run-stock:
 # files serve both; only the assembler directives in them differ by format.
 # Needs glibc-devel.i686, libstdc++-devel.i686 and SDL3-devel.i686.
 #
-#     make native                          builds build/armymen2, the player's
-#     make native-dev                      builds build/armymen2-dev
+#     make native                          builds BOTH binaries
+#     make native-dev                      builds build/armymen2-dev alone
 #     AM2_GAMEDIR="$(GAMEDIR)" build/armymen2 -nointro
 #
 # TWO BINARIES, ONE TREE. The player's binary carries no control socket, no
@@ -525,9 +525,16 @@ NATIVE_LDF   := $(NATIVE_ARCH) -static-libgcc \
 NATIVE_LIBS  := -lSDL3 -lpthread -lm
 
 .PHONY: native native-dev
+# BOTH, because the two go out of step silently otherwise: every drive and
+# every fixture in tools/ runs build/armymen2-dev, so a `make native` that
+# left it stale meant testing yesterday's code against today's source and
+# having nothing say so. The player's binary is the one that matters and the
+# development one is the one that gets run, which is the wrong way round for
+# a target that builds only the first.
 native: standalone-generate
-	$(MAKE) $(BUILD)/armymen2
+	$(MAKE) $(BUILD)/armymen2 $(BUILD)/armymen2-dev
 
+# Just the development binary, for when only that is wanted.
 native-dev: standalone-generate
 	$(MAKE) $(BUILD)/armymen2-dev
 
