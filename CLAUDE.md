@@ -304,6 +304,34 @@ reach for; `refs_to` answers the narrower question and now says so in its
 docstring. The check that either is working is to point it at a function whose
 call count is already known.
 
+**`tools/checkcallers.py` ASKS THE OTHER HALF OF THE BLIND-COUNTER
+QUESTION: not "can this counter move" but "can this function be reached at
+all".** A reconstruction whose callers in the image are ALL reconstructed is
+reachable only from our own source, so if nothing in `src/game` names it, the
+detour is installed and nothing jumps to it. That is `Step3Input` exactly --
+1,424 bytes of a driven vehicle's whole input handling, installed, counted as
+done by every tool, and called by nobody, because our `StepType3` had lost the
+arm that reaches it. No vehicle in the game could be steered and every check
+was green; its counter read 0, which is what a healthy function reached from
+our own code looks like.
+
+It found three more on its first run and they are in `KNOWN`, a baseline that
+may only go down. The useful tell is that `MsgSlotB0` and `MsgSlotA2` pass
+while `MsgSlotB1` and `MsgSlotB2` fail: same caller, same family, so it is a
+missing dispatch arm rather than a dead function.
+
+**`tools/espmap.py --site=0xADDR` answers what ONE instruction reads**, which
+its per-slot listing cannot: that truncates to four addresses, which is fine
+for a survey and useless when you are reading a call site's arguments. It
+prints the frame slot, which argument it is, and how many bytes of outstanding
+push shift the raw displacement, so a `[esp+0x24]` that is really ARG2 says
+so. **Run it on every argument-slot read in a body that pushes.** Two defects
+in one afternoon were exactly that shift, and each had a correct sibling four
+lines away: `Type2PlayerInput` read the OBJECT's +0xC0 where the original
+reads the WEAPON's, so shift-clicking to fire dereferenced NULL and killed the
+process; `FireWeapon`'s lobbed arm passed the clamped RANGE where the original
+passes the launch HEIGHT, so a grenade aimed further flew shorter.
+
 **`tools/checksplit.py` keeps the split honest, in both directions.** It fails
 if a flat module names a Win32 or COM type — or reaches a Win32 header
 transitively, since a header can be the thing that leaks — and equally if a
