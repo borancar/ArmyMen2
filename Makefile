@@ -497,7 +497,7 @@ run-stock:
 # control.c and input.c and src/standalone/devtools.cpp: the control socket
 # on port 31337 (AM2_CTL_PORT), a fixed-address arena for every game
 # allocation, and `snap save|load FILE` savestates over that arena and the
-# carried globals (F5/F9 for $TMPDIR/am2-quick.state). The two object trees are
+# carried globals; F5 writes the GAME's save and F9 reloads it. The two object trees are
 # separate because the define changes what a header expands to.
 NATIVE_CXX   := g++
 NATIVE_CC    := gcc

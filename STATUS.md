@@ -191,8 +191,13 @@ allocator whose bookkeeping lives inside the region, so a savestate is the
 carried globals (2 MB, 0x0046F000..0x00666000) plus the arena's used part,
 16 MB in a Boot Camp mission, written and restored as bytes.
 `snap save FILE` and `snap load FILE` on the socket (FILE absolute -- the
-game chdirs), F5 and F9 for `$TMPDIR/am2-quick.state`. They run on the game
-thread at the top of the host's frame pump, never mid-frame. Measured: save
+game chdirs). They run on the game thread at the top of the host's frame
+pump, never mid-frame. **F5 and F9 are the GAME's save and load, not the
+raw state**: F5 calls `SaveGame` with the first free `f5-N.sav` under the
+folder the game-proc block names and prints the path, F9 makes the LOAD
+button's writes for the latest one -- because a game save is the file
+`tools/enterlevel.sh` brings back in any build and any run, which is what
+a fixture has to be. Measured: save
 at (1981,1026), walk to (2249,998), load, read (1981,1026), walk again and
 the game carries on. What a state does NOT hold is anything the platform
 owns -- surfaces, sound buffers, open files -- so it is valid within the
@@ -240,14 +245,19 @@ count and the table's md5, leaving the game paused on its port. Measured:
 | campaign, MAP 01 | dev, twice; original, twice; injected | 327 | b1ced1edb769 |
 | Boot Camp | dev, original, injected | 1,612 | a9ee8b48d784 |
 
-**BOOT CAMP CAN BE SAVED, which the menu never offers.** `SaveGame`'s
-guard is the game-proc block's first string being non-empty, and that
-string is the FOLDER the save goes under: the player's name in the
-campaign, and `bootcamp` in Boot Camp, where the block already holds it.
-So the save dialog, opened by writing the two globals the SAVE button
-writes, saves Boot Camp's briefing into `save\bootcamp\` -- 1,609 items,
-347 KB -- and `loadgame bootcamp FILE` at the title screen brings it back
-identically in all three builds. The raw savestates do not cross runs: a
+**BOOT CAMP CAN BE SAVED ONCE IT HAS A FOLDER, which the menu never
+gives it.** `SaveGame`'s guard is the game-proc block's first string, the
+player's name, which is also the folder the save goes under; the level's
+name (`bootcamp`, `kitchen`) sits 0x20 further into the block. In Boot
+Camp the first string is EMPTY -- there is no player -- so the original
+cannot save there and the menu never offers it. Write a folder name into
+that string and the save dialog saves Boot Camp's briefing: 1,609 items,
+347 KB, under `save\<that name>`. The dev binary's F5 does exactly that,
+using the level's name when the folder is empty, and `loadgame bootcamp
+FILE` at the title screen brings the file back identically in all three
+builds. (An earlier version of this paragraph said the block already held
+`bootcamp`; it was the LEVEL string, at +0x20, being read.)
+The raw savestates do not cross runs: a
 state saved in one run and loaded in a fresh run at the same point of the
 same mission dies in `RestoreLostSurfaces` on the first frame, address
 randomisation off or on, because the platform's surfaces are at new

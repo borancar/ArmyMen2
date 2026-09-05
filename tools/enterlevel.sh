@@ -19,8 +19,9 @@
 #
 # Measured: one campaign save loaded twice by the dev binary and twice by
 # the original gives 327 objects and one table md5; Boot Camp's save --
-# which the game writes once its block holds a name, into save\bootcamp --
-# loaded at the title screen by both gives 1,612 objects and one md5.
+# which the dev binary's F5 writes into save\bootcamp, the folder string
+# being empty there and F5 filling it with the level's name -- loaded at
+# the title screen by all three builds gives 1,612 objects and one md5.
 #
 # FOLDER is what the game itself would put in the block: the player's name
 # for a campaign save, `bootcamp` for Boot Camp. It defaults from SAVE's

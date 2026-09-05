@@ -132,16 +132,26 @@ void input_pump(void)
      * build, AM2_NOPATCH=1 included, and from device.cpp's poll in the
      * native development binary. SPACE releases it, as it does the game's. */
     {
-        static int32_t armed = -1, last_state;
-        int32_t        st = *(const int32_t *)(uintptr_t)0x00511DA4u;  /* ADDR_GAME_STATE */
+        static int32_t armed = -1, last_state, reentry;
+        int32_t        st      = *(const int32_t *)(uintptr_t)0x00511DA4u;  /* ADDR_GAME_STATE */
+        int32_t        pending = *(const int32_t *)(uintptr_t)0x00511DACu;  /* ADDR_STATE_PENDING */
+        int32_t        wanted  = *(const int32_t *)(uintptr_t)0x00511DB0u;  /* ADDR_STATE_WANTED */
 
         if (armed < 0) {
             const char *e = getenv("AM2_PAUSE_ON_ENTER");
             armed = e && *e == '1';
         }
-        if (armed && st == 2 && last_state != 2) {
+        /* A load requested from INSIDE a mission (F9, `loadgame` in play)
+         * re-enters state 2 without ever leaving it, so the transition below
+         * never shows. The request itself does: state 2 wanted and pending,
+         * seen here before the frame that commits it. Arm on that and fire
+         * when the commit has happened. */
+        if (armed && pending && wanted == 2)
+            reentry = 1;
+        if (armed && st == 2 && !pending && (last_state != 2 || reentry)) {
             *(uint32_t *)(uintptr_t)0x005122FCu |= 8u;               /* ADDR_PAUSE_FLAGS */
             hooklog("input: paused on entering the mission (AM2_PAUSE_ON_ENTER)");
+            reentry = 0;
         }
         last_state = st;
     }

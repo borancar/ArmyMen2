@@ -1625,7 +1625,8 @@ defect was three misreadings in one function, none of them an offset.
 `build/armymen2-dev`.** `make native` is the player's, with no control
 socket at all; `make native-dev` adds the socket (on by default), the
 injected input, and savestates over a fixed-address arena
-(`snap save|load FILE`, F5/F9). Anything that pokes, dumps or drives the
+(`snap save|load FILE`); F5 writes the GAME's save as a fixture and F9
+reloads it. Anything that pokes, dumps or drives the
 native game uses the dev binary; STATUS.md has the measurements.
 `tools/savecheck.sh` is the cross-build serialisation A/B built on it --
 the game's SAVE GAME written by one build and loaded by the other, judged on
@@ -1635,8 +1636,10 @@ leaves it FROZEN before its first frame, on any of the three builds, in
 fifteen seconds and without a menu**: the socket's `loadgame` makes the LOAD
 button's four writes and `AM2_PAUSE_ON_ENTER=1` freezes the arrival. One
 file gives one table md5 across runs and across builds, Boot Camp included
--- it saves once the game-proc block holds a folder name, which in Boot
-Camp it already does. Reach for it before hand-driving to a point in a
+-- it saves once the game-proc block's first string holds a folder name,
+which in Boot Camp is empty (no player), so the dev binary's F5 fills it
+with the level's name; the level name is the string 0x20 further in, and
+reading that one as the folder is how this was first got wrong. Reach for it before hand-driving to a point in a
 mission: it is a fixed point, and a drive is not.
 
 **Movement and the input path are `docs/movement.md`.** Two defects a month

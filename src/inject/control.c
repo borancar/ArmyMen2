@@ -678,9 +678,9 @@ static void handle_line(SOCKET s, char *line)
      * LOAD button does it (OnLoadGameLoad, 0x00452060): the folder name into
      * the game-proc block, the file name into its second string, the load
      * pending flag, and a request for state 2. FOLDER is what the game
-     * would have put there itself -- the player's name for a campaign save,
-     * `bootcamp` for Boot Camp, which can be saved from once that block
-     * holds a name -- and FILE lives under save\FOLDER. All four are the
+     * would have put there itself -- the player's name for a campaign save;
+     * Boot Camp has none, and the dev binary's F5 saves it under the level's
+     * name -- and FILE lives under save\FOLDER. All four are the
      * game's own globals, so this takes AM2_NOPATCH=1 unchanged and needs no
      * menu; with AM2_PAUSE_ON_ENTER=1 the mission arrives frozen. Boot Camp
      * loaded this way in the original and in ours gives one object table. */
