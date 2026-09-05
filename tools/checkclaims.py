@@ -316,6 +316,7 @@ def status_claims():
 # joins it in the same commit, exactly as tools/checkprose.py's DOCS does.
 PROSE = (
     "CLAUDE.md",
+    "STATUS.md",
     "docs/boundary-notes.md",
     "docs/screen-mpoptions.md",
     "docs/saveload.md",

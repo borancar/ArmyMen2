@@ -1160,3 +1160,58 @@ Recorded rather than guessed at. What would settle it is what the `frames`
 number actually counts -- the `-dbg` per-frame markers, which is not the same
 question as how many frames were composed -- and nothing has checked that the
 two sides emit one marker per frame in the same places.
+
+
+## CLOSED: the Lock/Unlock bracket, and the queue that kept being wrong about it
+
+A goal of its own, separate from the Win32/DirectX boundary: find the game's
+software RASTERISERS by which functions call `LockSurface`/`UnlockSurface`.
+
+- **The Lock/Unlock bracket batch is a different goal from the boundary, and
+  its numbers were wrong.** It said "5 of 22 done" and named `DrawText` and
+  `DrawSprite` among them; neither calls `LockSurface` or `UnlockSurface` at
+  all. Measured: **29 functions** call the bracket and **29** are reconstructed
+  — the bracket is COMPLETE, closed by HudSquadDetail, and the rasteriser
+  goal this item tracks is finished
+  — `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette` and `DrawMenuCursor`,
+  the last of which the old list predates, and the menu-widget painters that
+  have landed since.
+
+The queue for it was hand-kept beside a ratchet, and that is the part worth
+keeping now the goal is closed -- it was wrong in both directions, repeatedly,
+and each time the correction was a paragraph rather than a fix:
+
+  **That shortlist listed functions that were already done**, which is what a
+  hand-kept queue beside a ratchet always comes to: it named `0x0041CC40`,
+  which is `DrawHLine` and had been reconstructed for some time, and
+  `0x0041C7F0`, which is `DrawBlip3` and went in the same day this sentence
+  was corrected. A count that only goes up cannot tell you a candidate has
+  been taken; only re-reading the list against the patch list can.
+
+  **And it did it again one entry later**, listing `0x0041C8A0`, `0x0041CA50`
+  and `0x004149B0` as outstanding when all three -- `DrawBlipPulse`,
+  `DrawBlipSquare` and `RadarBlipColour` -- had landed with the radar. The
+  radar's five primitives are now all ours. So is `DrawSelection`
+  (`0x00462120`, 688 B), the leader's caret and the selected units' health
+  bars, which is the first of the batch that ordinary play actually reaches.
+
+  Rather than keep writing the queue down, generate it -- the same argument
+  that put the count in `tools/checkclaims.py`.
+
+  **THE QUEUE IS EMPTY AND THE HAND-KEPT VERSION WAS WRONG IN BOTH
+  DIRECTIONS.** It said "**four** functions and none of them small" and then
+  listed TWO, `0x00462600` and `0x00416340` -- a count and a table that had
+  stopped agreeing with each other, in a paragraph whose whole argument is
+  that queues should be generated rather than written down. Both are
+  reconstructed now, checkclaims reads (29, 29) for the bracket, and
+  tools/remaining.py reads 0 game functions.
+
+  So this entry is closed, and the way it failed is the argument for the
+  advice above it: the list drifted from its own count before it drifted from
+- **The Win32/DirectX boundary is DONE, and the reasoning is
+  `docs/boundary-notes.md`.** Every Win32 call site in the image that can
+
+The rule that came out of it is in CLAUDE.md and is the reason this section is
+here rather than there: **generate the queue, do not write it down.** A count
+that only goes up cannot tell you a candidate has been taken, and a list beside
+a count drifts from the count before either drifts from the code.

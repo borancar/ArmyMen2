@@ -2880,15 +2880,14 @@ to build", ask the two things that cannot match a shell: `pgrep -c -f
 
 ## Open items
 
-- **The Lock/Unlock bracket batch is a different goal from the boundary, and
-  its numbers were wrong.** It said "5 of 22 done" and named `DrawText` and
-  `DrawSprite` among them; neither calls `LockSurface` or `UnlockSurface` at
-  all. Measured: **29 functions** call the bracket and **29** are reconstructed
-  — the bracket is COMPLETE, closed by HudSquadDetail, and the rasteriser
-  goal this item tracks is finished
-  — `RenderGlyph`, `RedrawMapRegion`, `CalibratePalette` and `DrawMenuCursor`,
-  the last of which the old list predates, and the menu-widget painters that
-  have landed since.
+- **The Lock/Unlock bracket goal is CLOSED** -- 29 functions call the bracket
+  and 29 are ours. See STATUS.md for where it stands and for the queue that
+  kept being wrong about it. Two things from it are durable and stay here:
+
+  Do not hand-edit that pair. `tools/checkclaims.py` recomputes it, and it is
+  the reason this sentence is right: the count moved from 10 to 11 the moment
+  `TyperPaint` was written, and the check failed the build rather than letting
+  the prose go quietly stale — which is the whole argument for the tool.
 
   Do not hand-edit that pair. `tools/checkclaims.py` recomputes it, and it is
   the reason this sentence is right: the count moved from 10 to 11 the moment
@@ -3045,35 +3044,19 @@ exact oracle**, however meaningful it is when it is set.
   count of "functions calling the bracket" will keep finding halves. Worth knowing too that none of the
   three executes on any drive this project has -- being a rasteriser does not
   make a function reachable.
-  **That shortlist listed functions that were already done**, which is what a
-  hand-kept queue beside a ratchet always comes to: it named `0x0041CC40`,
-  which is `DrawHLine` and had been reconstructed for some time, and
-  `0x0041C7F0`, which is `DrawBlip3` and went in the same day this sentence
-  was corrected. A count that only goes up cannot tell you a candidate has
-  been taken; only re-reading the list against the patch list can.
+  **Generate the queue, do not write it down.** That shortlist was wrong in
+  both directions more than once -- naming functions that were already
+  reconstructed, and giving a count that disagreed with its own table, in a
+  paragraph whose whole argument was that queues should be generated. A count
+  that only goes up cannot tell you a candidate has been taken; only re-reading
+  the list against the patch list can, and nobody does that. The history is in
+  STATUS.md.
 
-  **And it did it again one entry later**, listing `0x0041C8A0`, `0x0041CA50`
-  and `0x004149B0` as outstanding when all three -- `DrawBlipPulse`,
-  `DrawBlipSquare` and `RadarBlipColour` -- had landed with the radar. The
-  radar's five primitives are now all ours. So is `DrawSelection`
-  (`0x00462120`, 688 B), the leader's caret and the selected units' health
-  bars, which is the first of the batch that ordinary play actually reaches.
-
-  Rather than keep writing the queue down, generate it -- the same argument
-  that put the count in `tools/checkclaims.py`.
-
-  **THE QUEUE IS EMPTY AND THE HAND-KEPT VERSION WAS WRONG IN BOTH
-  DIRECTIONS.** It said "**four** functions and none of them small" and then
-  listed TWO, `0x00462600` and `0x00416340` -- a count and a table that had
-  stopped agreeing with each other, in a paragraph whose whole argument is
-  that queues should be generated rather than written down. Both are
-  reconstructed now, checkclaims reads (29, 29) for the bracket, and
-  tools/remaining.py reads 0 game functions.
-
-  So this entry is closed, and the way it failed is the argument for the
-  advice above it: the list drifted from its own count before it drifted from
-- **The Win32/DirectX boundary is DONE, and the reasoning is
-  `docs/boundary-notes.md`.** Every Win32 call site in the image that can
+  Worth being clear about what this goal was: the bracket finds the game's
+  software RASTERISERS, which is a rewrite goal of its own. It is not the
+  Win32/DirectX boundary, and the pairing is per FEATURE rather than per
+  function -- both line drawers Lock and never Unlock, so a count of "functions
+  calling the bracket" keeps finding halves.
   actually execute is inside reconstructed code or incidental, and all 207
   confirmed COM dispatch sites below the CRT are ours. **Read the figures from
   `docs/boundary.md`, never from prose here** -- quoting a generated number in
