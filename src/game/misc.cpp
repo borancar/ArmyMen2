@@ -389,13 +389,27 @@ extern "C" void *__cdecl LoadDibFlipped(const char *path, void *hdr,
  * same set directory table. Sprites glob `.bmp` and `.sha`; this globs
  * `.msk`.
  *
- * THE TWO HALVES ARE NOT SYMMETRICAL AND THAT IS THE THING TO KNOW. Without
- * `-df` it is a plain forward to the packed loader with the arguments
- * unchanged. With it, the packed loader is never reached AND a set below
- * AM2_SPRITE_SET_MAP_FIRST returns having done nothing at all -- so under
- * `-df` the fixed sets have no masks, where under the pack they do. That is
- * the original's, not a transcription: the `< 0x14` test guards only the
- * loose arm, because only the map's own sets have a directory to glob in.
+ * THE TWO HALVES ARE NOT SYMMETRICAL AND THAT IS THE THING TO KNOW. With
+ * ADDR_OPT_DF SET -- which is the default: it ships as 1 and `-df` CLEARS
+ * it, as its own note in orig.h says -- it is a plain forward to the packed
+ * loader with the arguments unchanged. Cleared, the packed loader is never
+ * reached AND a set below AM2_SPRITE_SET_MAP_FIRST returns having done
+ * nothing at all -- so under `-df` the fixed sets have no masks, where under
+ * the pack they do. That is the original's, not a transcription: the
+ * `< 0x14` test guards only the loose arm, because only the map's own sets
+ * have a directory to glob in.
+ *
+ * THE BRANCH SENSE WAS INVERTED HERE FOR MONTHS, and no A/B could see it.
+ * `test eax, eax; je <loose>` at 0x0043528B: ZERO takes the loose arm,
+ * non-zero the packed one, and this read it the other way -- so with the
+ * flag at its shipped 1 every mask load globbed for a `.msk` that does not
+ * exist, found nothing, and left the record empty. Not one of the 1,538
+ * items on Boot Camp had a hit mask; the original gives 1,356 of them one,
+ * 60x60 bits for the common scenery, and stamps the terrain cover through
+ * it. Both sides of an injected A/B run this reconstruction, so both lost
+ * the masks alike; it was the native build's cell-weight plane, diffed
+ * against the ORIGINAL's under AM2_NOPATCH, that differed in 9,380 cells
+ * and led here, through the objects' +0x78 being null.
  *
  * IT GLOBS AND NEVER CLOSES THE HANDLE. _findfirst's result is compared
  * against -1 and then discarded; there is no _findclose, unlike
@@ -535,7 +549,7 @@ void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)
     uint8_t  find[AM2_FINDDATA_BYTES];
     uint8_t  desc[AM2_DIB_DESC_BYTES];
 
-    if (!*(const int32_t *)AM2_IMAGE(ADDR_OPT_DF)) {
+    if (*(const int32_t *)AM2_IMAGE(ADDR_OPT_DF)) {
         LoadMaskPacked(out, set, index, frame);
         return;
     }
