@@ -141,39 +141,55 @@ the animation, and not in the key state. `arm=12` also writes 1 over garbage
 values (`28 -> 1`, `7796576 -> 1`), so it runs for other objects too and the
 test is shared.
 
-**AND THE STEP ITSELF IS FINE, so the fault is the ROUTE TEST.** Probing
-`AnimStepPoint` on a clock-verified live run with W held:
+**FIXED, AND THE BRANCH SENSE WAS SETTLED BY CONTROL FLOW RATHER THAN BY THE
+LOCAL.** `< 15` is CLEAR. Three things say so together and none of them needs
+to know what any stack slot holds:
 
-    STEPPROBE pose=2 anim=5 i=15 count=52 speed=88  1743,1052 -> 1748,1052
-    ROUTEPROBE facing=c5 pose=2 pt=1748,1052 at=0326D630 wt=0
+- The sweep loop at `0x0044B283` is `jge 0x44b208`, which loops BACK. A sweep
+  continues while blocked, so `>= 15` is blocked and `< 15` ends it.
+- `0x0044B14B`'s `jl` target, `0x0044B382`, writes the facing back and falls
+  into the settle-and-step at `0x0044B41C`. It runs no stop arm at all.
+- The `>= 15` fall-through at `0x0044B151` reads the claimed vehicle uid and,
+  when there is none, `0x0044B159` jumps to `0x0044B299` -- which IS this
+  function's stop block, calling `ObjKind538In10To17` and writing `w[8] = 1`.
 
-It finds the walk animation (entry 15 of 52), takes speed 88 and advances the
-point 2-5 units. So the pose table, the table search and `MoveStepPoint` all
-work. The step lands 2-5 units ahead -- INSIDE the trooper's own footprint --
-so `ObjectsAtPoint` returns the leader itself, `at` is his own object, and
-`BlockWeightRoute` answers **0**.
+So the original reaches the stop arms only when the step is BLOCKED and no
+vehicle is claimed. Ours reached them when the step was CLEAR.
 
-Our caller then does `if (weight < AM2_STEP_ROUTE_OK) goto no_route`, so a
-CLEAR step -- weight 0, nothing in the way but himself, which the function
-explicitly scores as `w = 0` -- is treated as blocked.
+The one piece of evidence that had held the fix up -- `mov [esp+0x1c], 0` on
+the `jl` path -- turned out to discriminate nothing: the give-up arm at
+`0x0044B3A7` and all four stop arms zero the same slot. A local that is zeroed
+on both sides of a branch cannot say which side is which, and treating it as
+though it could is what made this look unreadable for two sessions.
 
-**The branch sense is the open question and it is worth one careful read.** In
-the original at 0x0044B148, `cmp eax,0xf; jl 0x44b382`. The `>= 15` fall-through
-at 0x44b151 reads `[esi+0x56c]`, the vehicle uid -- a boarding check, which
-only makes sense if something IS there. That argues weight-high = blocked and
-our test inverted. Against it: the `jl` path at 0x44b382 also zeroes a local
-before jumping to the settle-and-step at 0x44b41c, and a clear path that zeroes
-what may be `speed` does not obviously walk.
+**The function's own comment already knew.** The header says of the sweep
+"under AM2_STEP_ROUTE_OK is walkable and ends it" -- correct, and the exact
+opposite of what the first gate twelve lines below it did with the same
+comparison. The sweep's copy of the test was right all along; only the first
+one was pointed at the wrong label.
 
-Both readings are consistent with part of the evidence and that is exactly the
-shape of the two wrong movement claims retracted earlier today, so it is left
-for a careful read rather than guessed. What IS settled: the weight is 0, the
-step point is good, the input is right, and one of `no_route`'s four stop arms
-fires every frame.
+Measured on a live Boot Camp mission, holding W, sampling the leader's
+`OBJ_OFF_POS` once a second:
 
-The oracle for whatever fix is tried: `arm=12` should stop firing for the
-player's trooper while W is held, and the row's frame histogram should show
-the original's `04, 05, 2e, 2f` walk chain instead of alternating `01`/`05`.
+    ours      x += 86, 91, 92, 91, 92     y -= 9, 10, 9, 10, 9
+    original  x += 92, 91, 91, 65, 91     y -= 9, 10, 10, 18, 10
+
+and holding W and A together, which is the repro Boran gave -- Sarge should run
+in circles -- both sides trace a circle of the same size, 20 units across in x
+and 18 in y, over the same twelve samples. Before the fix he restarted his walk
+every frame.
+
+**`combat`'s frame gate fails and it is NOT this change.** 16505/44385 and
+16592/43432 on two runs of the fix; the PARENT commit, same configuration, same
+machine, reads 16591/50865 -- worse. So the gate was already failing and the
+fix NARROWS it, from 306% to 261%, which is what our side doing the same work
+the original's does should look like. The control was run because this file
+says a single clean control does not establish a regression; here it
+established the opposite, which is the same tool used the other way round.
+
+Everything else is clean: `bootcamp` state identical at 1,610 objects,
+`campaign` at 2 pixels and 35 widget nodes, `mission` with state, widgets and
+log identical and the original as the runaway in its usual direction.
 
 **A parser bug wasted three runs here and is worth naming:** `ctl dump` returns
 ONE contiguous hex string, not space-separated bytes. Splitting it into tokens

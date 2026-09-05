@@ -8125,17 +8125,24 @@ have_facing:
         at = (uint8_t *)ObjectsAtPoint(&stepPoint,
                                        (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
         if (BlockWeightRoute(o, stepPoint, at, (int32_t *)&stepPoint)
-            < AM2_STEP_ROUTE_OK)
-            goto no_route;
+            < AM2_STEP_ROUTE_OK) {
+            /* Walkable: take this heading and step, with no sweep at all.
+             * 0x0044B14B jumps straight to the tail that writes the facing
+             * back and falls into the settle, so none of the stop arms below
+             * runs on a clear step. */
+            *(w + 4) = facing;
+            goto settle_facing;
+        }
     }
 
-    /* The way ahead is walkable. If the trooper has claimed a vehicle and it
-     * is standing there, board it and stop. */
+    /* Blocked. A claimed vehicle standing in the way is boarded rather than
+     * swept around; with nothing claimed there is nothing to sweep for and
+     * 0x0044B159 goes straight to the stop arms. */
     for (;;) {
         uint32_t claimed = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
 
         if (!claimed)
-            break;
+            goto no_route;
         {
             uint8_t *p = at;
 
