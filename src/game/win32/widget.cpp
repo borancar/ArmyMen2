@@ -3710,8 +3710,13 @@ void __attribute__((thiscall)) HudRadarUpdate(AM2_Widget *w)
         ((int16_t *)tgt)[0] = (int16_t)
             ((cur[0] - w->rect.left)
              * *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X / w->w);
+        /* FROM THE RECTANGLE'S TOP, +0x18, as the x arm takes its left from
+         * +0x14: `mov ecx,[esi+0x18]` at 0x0041492B. This read w->y, the
+         * widget's own offset at +0x8, so a click on the radar scaled from
+         * the wrong origin and the view jumped 650 pixels too far down.
+         * Found by tools/sidebyside.py on a hand-played radar click. */
         ((int16_t *)tgt)[1] = (int16_t)
-            ((cur[1] - w->y)
+            ((cur[1] - w->rect.top)
              * *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y / w->h);
 
         *(int32_t *)(uintptr_t)ADDR_VIEW_HOLD    = 1;

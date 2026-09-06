@@ -7,6 +7,31 @@ command that produces it, so it can be re-measured rather than believed.
 
 Last updated: **2026-09-06**, the hybrid landing (see the first section).
 
+## OPEN DIVERGENCES, newest first
+
+The rule (2026-09-07): `tools/sidebyside.py` runs EXACT -- no tolerance,
+no forgiven pixel class -- and the first differing frame is the issue.
+Newest first: a divergence found while fixing another is fixed before
+returning to it. Each entry names its reproduction; an entry moves to
+FIXED below when that replay runs identical.
+
+1. **The terrain painter's 16-bit unit** -- 26 pixels from frame 80 of
+   `tests/replays/bootcamp.txt` (13 horizontal pairs, colours exchanged),
+   more as the view scrolls, lone pixels along the top tile row and two
+   other colours in the last columns beside the HUD. Every earlier
+   comparison tolerated it; `PaintMapTiles` against the original is the
+   work. Oldest. All thirteen pairs at frame 80 sit at ODD screen x.
+
+FIXED by this rule so far, each with the replay that reproduces it:
+a radar click scaled its y from the widget's own offset rather than its
+rectangle's top, so the view jumped 650 pixels too far
+(`sessions/click-509.txt`, exact once the terrain unit is fixed);
+weapon range in the wrong slot (`sessions/shot.txt`), held click aimed at
+the raw point (`sessions/shot.txt`), depth slope parsed as an integer
+(`sessions/signpost.txt`), picked-up weapon left on the map
+(`sessions/pickup.txt`), and the step socket's 64-note cap (a tool defect,
+`sessions/pickup.txt` after a long trap).
+
 ## THE CRT IS BEING RECONSTRUCTED, under src/platform/crt
 
 The image carries MSVC 6's C runtime: **231 functions from `0x00464416`,
