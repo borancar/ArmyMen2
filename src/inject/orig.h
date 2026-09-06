@@ -18410,6 +18410,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CRT_NMSG_WRITE              0x0046A5E1u  /* void(rterrnum): stderr for a console, else the message box */
 #define ADDR_CRT_FF_MSGBANNER            0x0046A5A8u  /* void(void) */
 #define ADDR_CRT_MESSAGEBOX              0x0046C685u  /* int32(text, caption, type): __crtMessageBoxA, user32 loaded on demand */
+#define ADDR_CRT_STRCPY                  0x00469CA0u  /* char *(dst, src): shares its copy loop with strcat */
 #define ADDR_CRT_STRCAT                  0x00469CB0u  /* char *(dst, src) */
 #define ADDR_CRT_FPMATH                  0x0046443Eu  /* void(void): _fpmath -- _cfltcvt_init, the FDIV test, 53-bit precision */
 #define ADDR_CRT_FDIV_DETECT             0x0046664Fu  /* int32(void): IsProcessorFeaturePresent(0) if kernel32 has it, else the arithmetic test */

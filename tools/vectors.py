@@ -135,6 +135,7 @@ NARGS_OVERRIDE = {
     0x00466D80: 3,   # memcpy(dst, src, n)
     0x00465710: 3,   # memmove(dst, src, n)
     0x0046B420: 2,   # strcmp(a, b)
+    0x00469CA0: 2,   # strcpy(dst, src)
     0x00469CB0: 2,   # strcat(dst, src)
 }
 
@@ -143,6 +144,7 @@ ARG_KIND_OVERRIDE = {
     0x00466D80: {0: "ptr", 1: "ptr", 2: "scalar"},   # memcpy
     0x00465710: {0: "ptr", 1: "ptr", 2: "scalar"},   # memmove
     0x0046B420: {0: "ptr", 1: "ptr"},   # strcmp
+    0x00469CA0: {0: "ptr", 1: "ptr"},   # strcpy
     0x00469CB0: {0: "ptr", 1: "ptr"},   # strcat
     0x00465198: {0: "ptr", 1: "ptr", 2: "scalar"},
     0x004231A0: {0: "ptr", 1: "ptr"},   # ReverseBlocks(dst, src, total, count)
@@ -1141,7 +1143,7 @@ def main():
     names = addr_names()
     emu = Emu()
 
-    VALIDATE = ["ADDR_CRT_MEMCPY", "ADDR_MEMMOVE", "ADDR_CRT_STRCMP", "ADDR_CRT_STRCAT", "ADDR_CLAMP", "ADDR_APPROX_DIST", "ADDR_POINT_IN_RECT",
+    VALIDATE = ["ADDR_CRT_MEMCPY", "ADDR_MEMMOVE", "ADDR_CRT_STRCMP", "ADDR_CRT_STRCAT", "ADDR_CRT_STRCPY", "ADDR_CLAMP", "ADDR_APPROX_DIST", "ADDR_POINT_IN_RECT",
                 "ADDR_RECT_SET", "ADDR_PACK_KEY", "ADDR_KEY_FIELD_A",
                 "ADDR_KEY_FIELD_B", "ADDR_KEY_FIELD_C", "ADDR_OBJ_IS_ITEM",
                 "ADDR_OBJ_IS_TYPE2", "ADDR_OBJ_IS_TYPE3", "ADDR_OBJ_IS_TYPE238",
@@ -1247,6 +1249,7 @@ def main():
         "ADDR_CRT_STRLWR": "crt_strlwr", "ADDR_CRT_MEMCPY": "crt_memcpy",
         "ADDR_MEMMOVE": "crt_memmove",
         "ADDR_CRT_STRCMP": "crt_strcmp", "ADDR_CRT_STRCAT": "crt_strcat",
+        "ADDR_CRT_STRCPY": "crt_strcpy",
         "ADDR_CLAMP": "Clamp", "ADDR_APPROX_DIST": "ApproxDist",
         "ADDR_POINT_IN_RECT": "PointInRect", "ADDR_RECT_SET": "RectSet",
         "ADDR_PACK_KEY": "PackKey", "ADDR_KEY_FIELD_A": "KeyFieldA",

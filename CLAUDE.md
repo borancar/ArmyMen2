@@ -518,6 +518,24 @@ stacks: a double free of the host's block that MALLOC_CHECK_ reported
 sixty operations later as corruption in the reconstruction. Ask
 `__sbh_find_block` whose it is, which is what free itself does.
 
+**A BYTE LOOP IS NOT THE ORIGINAL'S DWORD LOOP WHERE THE INPUT IS
+UNDEFINED, AND THE VECTOR SET ASKS FOR UNDEFINED INPUTS.** `strcpy` and
+`strcat` were written as byte loops, correct for every well-formed call;
+the original walks the source a dword at a time and writes the tail from
+the dword it has already read. On `strcat(p, p)` with a one-byte string --
+which the generator produces, since two pointer arguments are made equal
+on purpose -- the original writes two bytes and returns, and the byte loop
+reads the byte it has just stored and fills memory until the selftest
+dies at `0x19191919`, the pattern byte it was copying. The loop is the
+original's now, for strcpy, strcat and every idiom that shares it.
+
+**AND THE COMMIT THAT CARRIED THAT CRASH WENT IN BECAUSE `exit 2` WAS
+READ AS PROSE.** The selftest's log ended in `exit 2` and the grep for its
+summary line found nothing, which is exactly what a crashed run leaves,
+and the commit command ran anyway. A run's exit status is the verdict;
+read it before anything else, and never commit on a summary line that
+did not print.
+
 **A MUTATION PASS THAT RESTORES WITH `git checkout` DESTROYS AN UNTRACKED
 FILE'S WORK AND RESETS A TRACKED ONE'S.** Nine mutations over two new
 modules, restored with `git checkout -- FILE` after each: the untracked

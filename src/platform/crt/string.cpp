@@ -175,27 +175,105 @@ int32_t __cdecl crt_strlen(const char *s)
 }
 
 /* 0x00469CA0: strcpy, dword-at-a-time in the original, byte-wise here. */
+/* 0x00469D11: the copy both share. The source is walked a dword at a
+ * time once aligned, `(~x ^ (x + 0x7EFEFEFF)) & 0x81010100` saying whether
+ * a byte of the dword is zero, and the tail is written from the dword
+ * ALREADY READ -- which is what strcat(p, p) on a one-byte string
+ * observes: two bytes written and a return, where a byte loop reads the
+ * byte it has just stored and never stops. The vector set asks exactly
+ * that, and the original's answer is the two bytes. */
+static void crt_store32(char *p, uint32_t v)
+{
+    p[0] = (char)v;
+    p[1] = (char)(v >> 8);
+    p[2] = (char)(v >> 16);
+    p[3] = (char)(v >> 24);
+}
+
+static char *crt_copy_from(char *dst, const char *src, char *ret)
+{
+    const uint8_t *s = (const uint8_t *)src;
+
+    while ((uintptr_t)s & 3) {
+        uint8_t c = *s++;
+
+        if (c == 0) {
+            *dst = 0;
+            return ret;
+        }
+        *dst++ = (char)c;
+    }
+    for (;;) {
+        uint32_t x = *(const uint32_t *)s;
+        uint32_t t = (~x) ^ (x + 0x7EFEFEFFu);
+
+        s += 4;
+        if (!(t & 0x81010100u)) {
+            crt_store32(dst, x);
+            dst += 4;
+            continue;
+        }
+        if ((x & 0xFF) == 0) {
+            *dst = 0;
+            return ret;
+        }
+        if ((x & 0xFF00) == 0) {
+            dst[0] = (char)x;
+            dst[1] = 0;
+            return ret;
+        }
+        if ((x & 0xFF0000) == 0) {
+            dst[0] = (char)x;
+            dst[1] = (char)(x >> 8);
+            dst[2] = 0;
+            return ret;
+        }
+        if ((x & 0xFF000000u) == 0) {
+            crt_store32(dst, x);
+            return ret;
+        }
+        crt_store32(dst, x);   /* the trick's false positive: on */
+        dst += 4;
+    }
+}
+
 char *__cdecl crt_strcpy(char *dst, const char *src)
 {
-    char *d = dst;
-    while ((*d++ = *src++) != 0)
-        ;
-    return dst;
+    return crt_copy_from(dst, src, dst);
 }
+
+char *__cdecl crt_strcat(char *dst, const char *src)
+{
+    const uint8_t *p = (const uint8_t *)dst;
+
+    /* The end of dst by the same dword walk, the pointer left ON the
+     * NUL. */
+    while ((uintptr_t)p & 3) {
+        if (*p == 0)
+            return crt_copy_from((char *)p, src, dst);
+        p++;
+    }
+    for (;;) {
+        uint32_t x = *(const uint32_t *)p;
+        uint32_t t = (~x) ^ (x + 0x7EFEFEFFu);
+
+        p += 4;
+        if (!(t & 0x81010100u))
+            continue;
+        if ((x & 0xFF) == 0)
+            return crt_copy_from((char *)p - 4, src, dst);
+        if ((x & 0xFF00) == 0)
+            return crt_copy_from((char *)p - 3, src, dst);
+        if ((x & 0xFF0000) == 0)
+            return crt_copy_from((char *)p - 2, src, dst);
+        if ((x & 0xFF000000u) == 0)
+            return crt_copy_from((char *)p - 1, src, dst);
+    }
+}
+
 
 /* 0x00465710: memmove, which copies backwards when the destination lies
  * above an overlapping source. */
-char *__cdecl crt_strcat(char *dst, const char *src)
-{
-    char *d = dst;
-
-    while (*d)
-        d++;
-    while ((*d++ = *src++) != 0)
-        ;
-    return dst;
-}
-
 int32_t __cdecl crt_strcmp(const char *a, const char *b)
 {
     /* The original compares a dword at a time when `a` is aligned; the
