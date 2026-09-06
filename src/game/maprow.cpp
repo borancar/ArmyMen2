@@ -28,6 +28,8 @@
 #include "misc.h"      /* ListUnlink -- reconstructed */
 #include "anim.h"      /* AM2_Anim and the table it lives in */
 #include "image.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include "crt.h"       /* am2_malloc -- the game's own */
 #include "../inject/orig.h"
 #include "../inject/patch.h"
@@ -82,7 +84,7 @@ static int32_t DepthProject(int32_t dx, float slope, int32_t y)
  * order is total: two objects at the same place still have a fixed order and
  * the sort cannot loop. Answering 0 would have been the obvious thing and it
  * is not what this does -- 0 is reserved for a null argument. */
-int32_t __cdecl DepthCompare(void *a, void *b)
+static int32_t DepthCompareBody(void *a, void *b)
 {
     const uint8_t *pa = (const uint8_t *)a;
     const uint8_t *pb = (const uint8_t *)b;
@@ -142,6 +144,27 @@ int32_t __cdecl DepthCompare(void *a, void *b)
         return -1;
 
     return (pb < pa) ? 1 : -1;
+}
+
+/* AM2_TRACE_DEPTH=1: the same line the hybrid's dev loader logs over the
+ * original, so the two games' comparisons diff at a pump. */
+extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
+int32_t __cdecl DepthCompare(void *a, void *b)
+{
+    int32_t r = DepthCompareBody(a, b);
+    static int32_t trace = -1;
+    if (trace < 0)
+        trace = getenv("AM2_TRACE_DEPTH") != 0;
+    if (trace && a && b) {
+        const uint8_t *pa = (const uint8_t *)a, *pb = (const uint8_t *)b;
+        fprintf(stderr, "DEPTH pump %u a=(l%d s%g %d,%d) b=(l%d s%g %d,%d) -> %d\n",
+                (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
+                *(const int16_t *)(pa + OBJ_OFF_DEPTH_LAYER), (double)*(const float *)(pa + OBJ_OFF_DEPTH_SLOPE),
+                *(const int16_t *)(pa + ROW_OFF_X), *(const int16_t *)(pa + ROW_OFF_Y),
+                *(const int16_t *)(pb + OBJ_OFF_DEPTH_LAYER), (double)*(const float *)(pb + OBJ_OFF_DEPTH_SLOPE),
+                *(const int16_t *)(pb + ROW_OFF_X), *(const int16_t *)(pb + ROW_OFF_Y), r);
+    }
+    return r;
 }
 
 /* 0x0041D2B0, six callers. Give a row its entry buffer and put it on the map.

@@ -361,7 +361,19 @@ int32_t __cdecl DefObjLine(int32_t cmd, char *line)
         return 2;
 
     for (int32_t i = 2; i <= 11; i++) {
-        if (!DefParseNumber(&rec[i], am2_strtok((char *)0, kSep)))
+        const char *tok = am2_strtok((char *)0, kSep);
+        /* THE NINTH FIELD IS A FLOAT: the call at 0x00435DB2 is DefParseFloat
+         * where the other twelve are DefParseNumber. It is the object's
+         * depth SLOPE, which DepthCompare projects with -- read as a number
+         * the sign's -0.35 became 0 and the hut's 2.06 became 2, so the
+         * port drew a sign post over Sarge's rifle where the original draws
+         * the rifle over the post. Found by tools/sidebyside.py on a walk
+         * past the rifle range sign, settled by logging both comparators'
+         * inputs (AM2_TRACE_DEPTH). Same lesson as DefWeaponLine's booleans:
+         * the parse blocks are identical except for the call target. */
+        int32_t ok = (i == 9) ? DefParseFloat((float *)&rec[9], tok)
+                              : DefParseNumber(&rec[i], tok);
+        if (!ok)
             return i + 1;
 
         if (i == 3)

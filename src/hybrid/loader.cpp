@@ -323,6 +323,45 @@ extern "C" void __cdecl am2_hybrid_trace_draw_sprite(uint8_t *spr, int32_t x, in
     ((am2_draw_sprite_clipped_fn)(uintptr_t)ADDR_DRAW_SPRITE_CLIPPED)(spr, x, y, &clipped, mode);
 }
 
+static int32_t am2_hybrid_depth_project(int32_t dx, float slope, int32_t y)
+{
+    return (int16_t)(int32_t)((float)dx * slope) + y;
+}
+
+extern "C" int32_t __cdecl am2_hybrid_trace_depth_compare(const uint8_t *pa, const uint8_t *pb)
+{
+    int32_t r;
+    if (!pa || !pb)
+        return 0;
+    {
+        int16_t la = *(const int16_t *)(pa + 0x26), lb = *(const int16_t *)(pb + 0x26);
+        float   sa = *(const float *)(pa + 0x28),   sb = *(const float *)(pb + 0x28);
+        int32_t ax = *(const int16_t *)(pa + 0x1C), ay = *(const int16_t *)(pa + 0x1E);
+        int32_t bx = *(const int16_t *)(pb + 0x1C), by = *(const int16_t *)(pb + 0x1E);
+        r = 0;
+        if (la > 0 && lb > 0 && la != lb)
+            r = la > lb ? 1 : -1;
+        else if (sa != 0.0f && sb != 0.0f) {
+            int32_t fromA = am2_hybrid_depth_project(bx - ax, sa, ay);
+            int32_t fromB = am2_hybrid_depth_project(ax - bx, sb, by);
+            int32_t aInFront = fromA > by;
+            if (ay > fromB && aInFront) r = 1;
+            else if (ay < fromB && !aInFront) r = -1;
+        } else if (sa != 0.0f) {
+            int32_t p = am2_hybrid_depth_project(bx - ax, sa, ay);
+            r = p > by ? 1 : p == by ? ((pb < pa) ? 1 : -1) : -1;
+        } else if (sb != 0.0f) {
+            int32_t p = am2_hybrid_depth_project(ax - bx, sb, by);
+            r = ay > p ? 1 : ay == p ? ((pb < pa) ? 1 : -1) : -1;
+        }
+        if (r == 0)
+            r = (int16_t)ay > (int16_t)by ? 1 : (int16_t)ay < (int16_t)by ? -1 : ((pb < pa) ? 1 : -1);
+        fprintf(stderr, "DEPTH pump %u a=(l%d s%g %d,%d) b=(l%d s%g %d,%d) -> %d\n", (unsigned)am2_host_pump_number(),
+                la, (double)sa, ax, ay, lb, (double)sb, bx, by, r);
+    }
+    return r;
+}
+
 static void am2_hybrid_patch_jmp(uintptr_t at, const void *to)
 {
     uint8_t *p = (uint8_t *)at;
@@ -567,6 +606,12 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
      * with its screen position and source rectangle. */
     if (getenv("AM2_TRACE_SPRITE"))
         am2_hybrid_patch_jmp(ADDR_DRAW_SPRITE, (const void *)&am2_hybrid_trace_draw_sprite);
+    /* AM2_TRACE_DEPTH=1: the reconstruction's DepthCompare over the original,
+     * logging both records' keys and the answer. If the hybrid's draw order
+     * changes under it, the comparator is the divergence; if not, its inputs
+     * or the insertion are. */
+    if (getenv("AM2_TRACE_DEPTH"))
+        am2_hybrid_patch_jmp(ADDR_DEPTH_COMPARE, (const void *)&am2_hybrid_trace_depth_compare);
 #endif
 
     am2_plat_log("running %s from its entry point 0x%08lx", path, (unsigned long)(uintptr_t)entry);

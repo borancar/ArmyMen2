@@ -469,6 +469,20 @@ original in the hybrid and the same log in the port, and one line each --
 `tools/espmap.py FUNC --site=ADDR` on every point the function passes,
 which is the check that should have been run when it was written.
 
+**THE THIRD WAS A FLOAT PARSED AS AN INTEGER, and the parse blocks were
+identical except for the call target -- the DefWeaponLine lesson again.**
+`DefObjLine` read thirteen numbers; the original's ninth call is
+`DefParseFloat`. That field is the object's depth SLOPE, the one
+`DepthCompare` projects with, so the rifle-range sign's -0.35 became 0
+and the hut's 2.06 became 2, and the port drew a sign post over Sarge's
+rifle. The object tables cannot show it -- the slope lives in the def
+record -- and no replay walks past the sign. What settled it was
+`AM2_TRACE_DEPTH`: the reconstruction's comparator installed over the
+original in the hybrid, logging both records' keys, beside the same log
+in the port; the first differing line read `s-0.35` against `s0`. When a
+parser's blocks all look alike, list the CALL TARGETS before believing
+the repetition: three defects in these two parsers were exactly that.
+
 **AND A RECORDING IS THE FIRST THING A LIVE TOOL NEEDS.** The very first
 live trap -- Sarge diving prone in the original and standing in the port
 -- was lost, because nothing had written the inputs down. Everything
