@@ -3177,6 +3177,19 @@ pidfd names one process for as long as it is open: it becomes readable when
 that process exits and a signal through it cannot reach a reused pid.
 Capture `$!` when a job starts and use nothing else to wait for it.
 
+**AND `$!` IS NOT ALWAYS THE PROGRAM, so `kill` signals the descendants
+too.** Two `strace` runs from a leak hunt were killed through the tool and
+WAITED FOR, and the wait returned -- because the pid was a wrapper. The
+tracers were reparented to init with their games and ran for three and a
+half hours: 1.9 GB resident each from the very leak being hunted, and two
+UNLINKED trace files of 9 GB and 2.8 GB held open on a tmpfs /tmp, which
+the user found at 16 GB after resizing it. `du` could not see them, since
+the names were gone; what did was walking `/proc/*/fd` for links ending
+`(deleted)`. `pidfd.py kill` walks the pid's descendants deepest first
+now and prints each one it signals, and takes `KILL` as well as
+`SIGKILL`, which it did not. After any kill, read `df` and the deleted-fd
+walk, not only the process list: a dead name can still be a live file.
+
 ## Open items
 
 - **The Lock/Unlock bracket goal is CLOSED** -- 29 functions call the bracket
