@@ -516,6 +516,29 @@ never the follower. The buffer grows now. When the replay disagrees with
 the run it was recorded from, suspect what carries the inputs before
 either game.
 
+**"ONLY THE EFFECT IS REPRODUCED, NOT THE UNROLLING" WAS THE 26 PIXELS.**
+`BlitOverlay`'s comment said its 656 bytes align the destination to a
+dword and transform four pixels at a time with a lead-in per
+misalignment, and that a per-byte loop is indistinguishable in result. It
+is not: the lead-in for misalignment 1 with exactly two pixels left
+(0x0041C57C) maps both bytes and assembles the word as `(lut[first] << 8)
++ lut[second]`, so the store puts the second pixel first. Every one of
+the 26 pixels that separated the port from the original from frame 80 of
+every comparison was a two-pixel shadow run at odd x whose two pixels
+differed. Found by asking which blit last wrote ONE of them
+(`AM2_TRACE_PIX=x,y` in blit_core) and reading that blitter's every arm.
+An unrolled loop is the original's behaviour, quirks included; "the
+effect" of a loop is only known once every lead-in and tail has been
+read, and the claim that they all agree is a claim about each of them.
+
+**THE COMPARISON IS EXACT NOW, and stays exact.** Every replay under
+`tests/replays` runs identical, hybrid against port, and the rule from
+here is the one Boran set: nothing forgiven, the first differing frame
+is the issue, a new divergence found while fixing one is fixed first, and
+the open list is the top of STATUS.md. The tolerance switches on
+`tools/sidebyside.py` remain only for REACHING a later pump past a known
+difference while it is being fixed; they are never a verdict.
+
 **AND A RECORDING IS THE FIRST THING A LIVE TOOL NEEDS.** The very first
 live trap -- Sarge diving prone in the original and standing in the port
 -- was lost, because nothing had written the inputs down. Everything

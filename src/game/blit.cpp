@@ -51,6 +51,8 @@
 #include "../inject/patch.h"
 
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define g_pitch    (*(const int32_t *)(uintptr_t)ADDR_SCREEN_PITCH)
@@ -72,11 +74,24 @@ enum { FILL_SOLID, FILL_COPY, FILL_REMAP, FILL_DESTLUT };
  * jb/jae the compiler emitted, and the running x advances by different amounts
  * on the skipped and drawn paths. Both are load-bearing.
  */
+static int32_t trace_px = -1, trace_py = -1;   /* AM2_TRACE_PIX=x,y */
+
 static void blit_core(int32_t x, int32_t y, const uint8_t *data, AM2_Rect src,
                       uintptr_t param, int fill, int offset32)
 {
     const int32_t  step   = offset32 ? 4 : 2;
     uint8_t       *dst    = g_frameBuf + (uint32_t)(y * g_pitch + x);
+    if (trace_px == -1) {
+        const char *e = getenv("AM2_TRACE_PIX");
+        trace_px = -2;
+        if (e && sscanf(e, "%d,%d", &trace_px, &trace_py) != 2)
+            trace_px = -2;
+    }
+    if (trace_px >= 0 && y <= trace_py && trace_py < y + (src.bottom - src.top)
+        && x <= trace_px && trace_px < x + (src.right - src.left))
+        fprintf(stderr, "PIX fill=%d at=%d,%d src=%d,%d-%d,%d wide=%d before=%02x\n", fill, x, y,
+                src.left, src.top, src.right, src.bottom, offset32,
+                g_frameBuf[(uint32_t)(trace_py * g_pitch + trace_px)]);
     const uint8_t *rowPtr = data + src.top * step + 4;
     const uint8_t *endPtr = data + src.bottom * step + 4;
     uint32_t       left   = (uint32_t)src.left;
@@ -133,11 +148,32 @@ static void blit_core(int32_t x, int32_t y, const uint8_t *data, AM2_Rect src,
                     } else {
                         /* FILL_DESTLUT: transform what is already on screen.
                          * No source pixels are read at all -- the stream only
-                         * says which destination bytes are covered. */
+                         * says which destination bytes are covered.
+                         *
+                         * THE ORIGINAL SWAPS A TWO-PIXEL RUN AT AN ADDRESS OF
+                         * 1 MOD 4. Its unrolled loop aligns the destination
+                         * down to a dword and takes a lead-in per
+                         * misalignment; the lead-in for misalignment 1 with
+                         * exactly two pixels left (0x0041C57C) reads the two
+                         * bytes into AL,AH, maps each, and assembles the word
+                         * as (lut[first] << 8) + lut[second] -- so the store
+                         * at 0x0041C5A6 puts the mapped SECOND pixel first.
+                         * Every other lead-in and tail keeps its order. This
+                         * is the 26 pixels that separated the port from the
+                         * original from frame 80 of every comparison, all at
+                         * odd x on shadow edges: an overlay is drawn onto
+                         * whatever is under it, and a two-pixel shadow run
+                         * whose two pixels differ comes out exchanged. */
                         const uint8_t *lut = g_overlayPalette;
                         uint32_t k;
-                        for (k = 0; k < count; k++)
-                            d[k] = lut[d[k]];
+                        if (count == 2 && ((uintptr_t)d & 3u) == 1u) {
+                            uint8_t first = lut[d[0]], second = lut[d[1]];
+                            d[0] = second;
+                            d[1] = first;
+                        } else {
+                            for (k = 0; k < count; k++)
+                                d[k] = lut[d[k]];
+                        }
                     }
                     d += count;
                 }

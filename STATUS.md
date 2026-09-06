@@ -15,14 +15,14 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
-1. **The terrain painter's 16-bit unit** -- 26 pixels from frame 80 of
-   `tests/replays/bootcamp.txt` (13 horizontal pairs, colours exchanged),
-   more as the view scrolls, lone pixels along the top tile row and two
-   other colours in the last columns beside the HUD. Every earlier
-   comparison tolerated it; `PaintMapTiles` against the original is the
-   work. Oldest. All thirteen pairs at frame 80 sit at ODD screen x.
+(none open -- every replay under tests/replays runs IDENTICAL, frame for
+frame, hybrid against port: bootcamp.txt and the five sessions.)
 
 FIXED by this rule so far, each with the replay that reproduces it:
+the 26 pixels from frame 80 of every comparison since the first lockstep
+-- the ORIGINAL's overlay blitter stores a two-pixel run at an address of
+1 mod 4 with its mapped bytes exchanged (0x0041C5A6), and ours mapped in
+place; reproduced, `bootcamp.txt` identical through all 628 frames;
 a radar click scaled its y from the widget's own offset rather than its
 rectangle's top, so the view jumped 650 pixels too far
 (`sessions/click-509.txt`, exact once the terrain unit is fixed);
@@ -215,7 +215,7 @@ RETURN, both dialogs, then W, S and D held for 100 pumps each):
 | what | result |
 |---|---|
 | native run against native run | identical, 628 presented frames |
-| hybrid (original) against native (reconstruction) | identical through frame 79 -- the title, the click, the loading, the briefing -- then frame 80 on differs by 26 pixels at the briefing and up to 52 during the walk, EVERY one of them a swapped pair (below); nothing else through all 628 frames (`tools/sidebyside.py --tolerate-swaps`, 2026-09-06) |
+| hybrid (original) against native (reconstruction) | **IDENTICAL through all 628 frames** (2026-09-07). Until then frame 80 on differed by 26 pixels, every one a swapped pair, which was the original's overlay blitter exchanging a two-pixel run at an address of 1 mod 4 -- now reproduced |
 | the 26 pixels | 13 horizontal PAIRS on sandbag and hut edges, static from frame to frame, and in every pair the two colours are SWAPPED: the original has A,B where the reconstruction has B,A; more pairs come into view as the map scrolls |
 | hand play, recorded and replayed (`tools/sidebyside.py --video`) | four defects in the first hour. `TrooperPickupItem`'s swap arm destroyed the held weapon where the original destroys the picked-up item, so a weapon picked up stayed on the map, drawn over Sarge. The object line's ninth field is a FLOAT (`DefObjLine`), the depth slope, parsed as an integer so a sign post drew over Sarge's rifle. And two argument slots: every weapon's range was its following field (`DefWeaponLine`, fields 4 and 5 swapped by the original), so the first shot detonated on Sarge; and a held click took its bearing to the raw point where the original uses the overlay-adjusted one (`Type2PlayerInput`). Fixed; the recorded session replays with nothing beyond the swapped pairs |
 | what "the same 26 pixels" had hidden | the port never showed Boot Camp's INSTRUCTION SIGN and kept running through the fifty pumps the original spent paused on it: `ScriptNameUid` indexed the name table with the call that reallocates it, and `showsign`, a forward reference on a growth boundary, got uid 0. Fixed; found by the side-by-side, not by the tables, which agree because nothing moves in a sign |
