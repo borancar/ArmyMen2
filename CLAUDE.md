@@ -3110,6 +3110,15 @@ waiter's own arguments contain. And when the question is really "is it safe
 to build", ask the two things that cannot match a shell: `pgrep -c -f
 'ArmyMen2[.]exe'` and whether the control port is held.
 
+**IT HAPPENED A FOURTH AND FIFTH TIME IN ONE HOUR, so the mechanism is a
+tool now: `tools/pidfd.py wait PID [TIMEOUT]` and `tools/pidfd.py kill PID
+[SIG]`.** A waiter on `pgrep -f 'timeout 900 make check'` spun after the
+check had passed, and the `pkill -f` meant to end it killed the shell
+issuing it -- one command before `git commit`, which therefore never ran. A
+pidfd names one process for as long as it is open: it becomes readable when
+that process exits and a signal through it cannot reach a reused pid.
+Capture `$!` when a job starts and use nothing else to wait for it.
+
 ## Open items
 
 - **The Lock/Unlock bracket goal is CLOSED** -- 29 functions call the bracket
