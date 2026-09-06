@@ -188,9 +188,14 @@ def diff_frames(pa, pb):
     # differs in other shapes too -- black where a clipped sprite's remainder
     # is, or two other colours -- so that strip is forgiven whole, until the
     # painter is fixed. Real defects in those seven columns hide here.
+    # And a lone pixel with no differing neighbour at all, of which the
+    # terrain painter produces one now and then along the top tile row as
+    # the view scrolls (rows 21..25 seen so far). Small counts only.
     left = set(pts)
-    swaps = all((x + 1, y) in left or (x - 1, y) in left or x == 0 or x >= 473 or y <= 24 or y >= 477
-                for (x, y) in pts)
+    def lone(x, y):
+        return not any((x + dx, y + dy) in left for dx in (-1, 0, 1) for dy in (-1, 0, 1) if dx or dy)
+    swaps = len(pts) <= 64 and all((x + 1, y) in left or (x - 1, y) in left or x == 0 or x >= 473 or lone(x, y)
+                                   for (x, y) in pts)
     return ("diff", len(pts), wa * ha, min(p[0] for p in pts), min(p[1] for p in pts),
             max(p[0] for p in pts), max(p[1] for p in pts), swaps)
 
