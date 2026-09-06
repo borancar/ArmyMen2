@@ -78,7 +78,7 @@ original answered under Unicorn:
   takes the API arm; and the `_mbctype` tables, so `_mbctoupper` answers
   its argument. Both are stated in the modules.
 
-The game's stdio, directories, `time`, `sprintf`, `qsort`, `bsearch`,
+The game's stdio, directories, `time`, `strtod`, `sprintf`, `qsort`, `bsearch`,
 `rand`, `atoi`, `strtol` and the string functions above now run on the
 CRT in both the standalone and the native build; the lockstep comparison
 is unchanged by all of it, as it should be. `standin.cpp` holds what the
@@ -86,9 +86,23 @@ modules need and nothing has read yet -- `malloc`, `calloc`, `free`,
 `_amsg_exit`, `__crtCompareStringA` and `__wtomb_environ` over the host --
 and says so in its name.
 
-Next: `strtod`, `memcpy`'s vectors, `atexit`, and the heap, which retires
-most of `standin.cpp`; then the startup, which is what fills the tables
-above.
+- `strtod.cpp` (2026-09-06): `strtod` through `_fltin2`, the twelve-state
+  parser `__strgtold12`, `__mtold12`, `__ld12tod` and `__ld12cvt` with its
+  seven mantissa helpers; `_isctype` beside them in `conv.cpp`. The hybrid
+  check's third section compares it on 1,616 strings by the double's bits,
+  the end offset and errno, in all three TZ runs: seven of nine mutations
+  fail, one is a theorem (a denormal is never observable, strtod answers
+  zero for it) and one a gap (the 25th digit's rounding of the 24th, a part
+  in 10^24). `memcpy` joined `tests/vectors.h` with 75 vectors, and the
+  check's fourth section overlaps it 8,424 ways, which vectors cannot:
+  the original copies from the end when the destination lies inside the
+  source, so it is memmove under the other name. Adding it found a hole
+  in the vector harness rather than in the CRT: Unicorn keeps EFLAGS
+  between runs, a faulted try left the direction flag set, and 117
+  vectors of two functions were recorded wrong; CLAUDE.md has it.
+
+Next: `atexit` with the exit path, and the heap, which retires most of
+`standin.cpp`; then the startup, which is what fills the tables above.
 
 ## THE ORIGINAL AND THE RECONSTRUCTION RUN IN LOCKSTEP
 

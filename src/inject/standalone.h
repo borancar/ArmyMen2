@@ -174,7 +174,7 @@ extern const uint8_t am2_pickup_kind_index[29];
 #define ADDR_CRT_STRNCPY      AM2_SA(crt_strncpy)
 #define ADDR_CRT_STRNCMP     AM2_SA(crt_strncmp)
 #define ADDR_CRT_STRSTR       AM2_SA(crt_strstr)
-#define ADDR_CRT_STRTOD       AM2_SA(strtod)
+#define ADDR_CRT_STRTOD       AM2_SA(crt_strtod)
 #define ADDR_CRT_STRTOK       AM2_SA(crt_strtok)
 #define ADDR_CRT_STRTOL       AM2_SA(crt_strtol)
 #define ADDR_CRT_TIME         AM2_SA(crt_time)

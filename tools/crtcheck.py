@@ -52,6 +52,28 @@ a doubled separator, which getcwd never yields. _mbctoupper is not
 discriminated either, by construction: the drive letter it upper-cases is
 '/' on this platform.
 
+A third section is strtod: 116 fixed strings -- every place the text can
+end, the exponent letters, the extremes of the range and the cap, the
+largest and smallest doubles, ties at bit 53 -- and 1,500 random ones in
+the parser's grammar, compared on the double's bits, the end offset and
+errno. Seven of nine mutations fail it: rounding on the bit after the
+round bit 1 value, round-half-up 6 (the original truncates a tie),
+dropped integer digits not scaling the exponent 130, the exponent cap 1,
+an E with nothing after it keeping the E 46, underflow without ERANGE 37,
+a normalisation off by one word 803. The two that pass: the denormal
+shift is a theorem, since __ld12cvt answers 2 for a denormal and strtod
+then returns zero with ERANGE, so no denormal mantissa is observable
+through it; the 25th digit's rounding of the 24th moves the value by one
+part in 10^24, and even inputs built to straddle a midpoint do not carry
+that far through the power-of-ten multiply -- a gap, verified by reading.
+
+A fourth section is memcpy, which the vector set also covers but cannot
+overlap: 8,424 copies over one pattern, destinations and sources at every
+offset that selects an unrolled arm, both ways round and on top of each
+other, compared on the whole buffer. The original copies from the end
+when the destination lies inside the source's span, so it is memmove
+under the other name; copying forward there fails 2,008 cases.
+
 What the corpus cannot reach: the _read arm for a read whose entire
 content is one CR with an LF behind it, which through the FILE layer needs
 a read of exactly one byte and the smallest is the two-byte fallback
@@ -76,7 +98,9 @@ CHECKS = ("crt_fopen", "crt_fsopen", "crt_openfile", "crt_getstream",
           "crt_rmdir", "crt_remove", "crt_chmod", "crt_time",
           "crt_loctotime_t", "crt_timet_from_ft", "crt_tzset",
           "crt_tzset_body", "crt_isindst", "crt_cvtdate", "crt_getenv",
-          "crt_mbsnbicoll")
+          "crt_mbsnbicoll",
+          "crt_strtod", "crt_fltin2", "crt_strgtold12", "crt_mtold12",
+          "crt_ld12tod", "crt_ld12cvt", "crt_isctype", "crt_memcpy")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

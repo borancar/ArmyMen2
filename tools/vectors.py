@@ -43,7 +43,7 @@ import am2
 import capstone
 import pefile
 from unicorn import Uc, UcError, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
-from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBP, UC_X86_REG_EIP,
+from unicorn.x86_const import (UC_X86_REG_EAX, UC_X86_REG_EBP, UC_X86_REG_EFLAGS, UC_X86_REG_EIP,
                                UC_X86_REG_ESP)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -132,10 +132,12 @@ NARGS_OVERRIDE = {
     0x004660A7: 1,   # atoi(s)
     0x00465198: 3,   # strtol(s, endptr, base)
     0x00465610: 3,   # strncpy(dst, src, n): the scan counts a fourth slot
+    0x00466D80: 3,   # memcpy(dst, src, n)
 }
 
 ARG_KIND_OVERRIDE = {
     0x004660A7: {0: "ptr"},
+    0x00466D80: {0: "ptr", 1: "ptr", 2: "scalar"},   # memcpy
     0x00465198: {0: "ptr", 1: "ptr", 2: "scalar"},
     0x004231A0: {0: "ptr", 1: "ptr"},   # ReverseBlocks(dst, src, total, count)
     # BitmapBitSet(base, x, y, height, stride). The address it reads is built
@@ -199,6 +201,9 @@ VECTOR_CAP = {
 }
 
 ARG_VALUES = {
+    # memcpy(dst, src, n): the sizes that select its tail and its unrolled
+    # arms -- every remainder mod 4, both sides of the eight-dword threshold.
+    0x00466D80: {2: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 100, 255, 256, 1000, 2047]},
     # Log2Mask is a 16-way switch on exact powers of two, and random 32-bit
     # arguments almost never produce one -- 96 random vectors reached 50.8% of
     # it. Every power, both ends of the compare chain above 0x100, and some
@@ -551,6 +556,14 @@ class Emu:
         is then discarded as a failure. Raise it rather than assume a fault.
         """
         self.uc.mem_write(SCRATCH, scratch_bytes)
+        # EFLAGS is reset because Unicorn keeps it between runs and a call
+        # that FAULTS leaves it as it was: memcpy's backward-copy arm does
+        # `std` before its `rep movsd`, a try with a null source took that
+        # arm and faulted, and every vector after it -- memcpy's own and the
+        # next function's -- ran with the direction flag set, so a forward
+        # copy of 100 bytes was recorded landing 96 bytes BELOW its
+        # destination and TitleCaseName's strlen walked backwards.
+        self.uc.reg_write(UC_X86_REG_EFLAGS, 0x202)
         sp = STACK + STACK_SZ - 0x1000
         for a in reversed(args):
             sp -= 4
@@ -1121,7 +1134,7 @@ def main():
     names = addr_names()
     emu = Emu()
 
-    VALIDATE = ["ADDR_CLAMP", "ADDR_APPROX_DIST", "ADDR_POINT_IN_RECT",
+    VALIDATE = ["ADDR_CRT_MEMCPY", "ADDR_CLAMP", "ADDR_APPROX_DIST", "ADDR_POINT_IN_RECT",
                 "ADDR_RECT_SET", "ADDR_PACK_KEY", "ADDR_KEY_FIELD_A",
                 "ADDR_KEY_FIELD_B", "ADDR_KEY_FIELD_C", "ADDR_OBJ_IS_ITEM",
                 "ADDR_OBJ_IS_TYPE2", "ADDR_OBJ_IS_TYPE3", "ADDR_OBJ_IS_TYPE238",
@@ -1224,7 +1237,7 @@ def main():
         "ADDR_CRT_STRNCPY": "crt_strncpy", "ADDR_CRT_STRNCMP": "crt_strncmp",
         "ADDR_CRT_STRTOK": "crt_strtok", "ADDR_CRT_ATOI": "crt_atoi",
         "ADDR_CRT_STRTOL": "crt_strtol", "ADDR_GAME_STRICMP": "crt_stricmp",
-        "ADDR_CRT_STRLWR": "crt_strlwr",
+        "ADDR_CRT_STRLWR": "crt_strlwr", "ADDR_CRT_MEMCPY": "crt_memcpy",
         "ADDR_CLAMP": "Clamp", "ADDR_APPROX_DIST": "ApproxDist",
         "ADDR_POINT_IN_RECT": "PointInRect", "ADDR_RECT_SET": "RectSet",
         "ADDR_PACK_KEY": "PackKey", "ADDR_KEY_FIELD_A": "KeyFieldA",

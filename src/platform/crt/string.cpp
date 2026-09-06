@@ -198,13 +198,24 @@ int32_t __cdecl crt_strcmp(const char *a, const char *b)
     return (uint8_t)*a < (uint8_t)*b ? -1 : 1;
 }
 
+/* The original is overlap-safe: a destination inside the source's span
+ * is copied from the end (`std; rep movsd`), so it is memmove under the
+ * other name. Its dword unrolling and tail tables change nothing a caller
+ * can see; the direction does. */
 void *__cdecl crt_memcpy(void *dst, const void *src, uint32_t n)
 {
     uint8_t       *d = (uint8_t *)dst;
     const uint8_t *s = (const uint8_t *)src;
 
-    while (n--)
-        *d++ = *s++;
+    if (d > s && d < s + n) {
+        d += n;
+        s += n;
+        while (n--)
+            *--d = *--s;
+    } else {
+        while (n--)
+            *d++ = *s++;
+    }
     return dst;
 }
 

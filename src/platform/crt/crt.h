@@ -119,12 +119,13 @@ int32_t __cdecl crt_sprintf(char *buf, const char *format, ...);
 
 /* 0x004698F0. */
 int32_t __cdecl crt_strlen(const char *s);
-/* 0x00469CA0 and 0x00465710. */
+/* 0x00469CA0. */
 char *__cdecl crt_strcpy(char *dst, const char *src);
 /* 0x0046B420. strcmp: -1, 0 or 1. */
 int32_t __cdecl crt_strcmp(const char *a, const char *b);
 /* 0x00466D80. memcpy. */
 void *__cdecl crt_memcpy(void *dst, const void *src, uint32_t n);
+/* 0x00465710. memmove. */
 void *__cdecl crt_memmove(void *dst, const void *src, uint32_t n);
 /* 0x00469714 and the _isdigit the conversions use: the ctype table's
  * answers for one byte. */
@@ -143,7 +144,60 @@ void __cdecl crt_forcdecpt(char *buf);
 /* 0x00466720. */
 int32_t __cdecl crt_positive(const double *value);
 
-/* ---- stdio.cpp --------------------------------------------------------- */
+/* ---- fltcvt.cpp, shared with strtod.cpp --------------------------------- */
+
+/* The twelve-byte long double: bytes 0-1 a guard word, 2-9 the mantissa,
+ * 10-11 the exponent and sign. */
+typedef struct CRT_LD12 {
+    uint8_t b[12];
+} CRT_LD12;
+
+uint32_t crt_ld_dw(const CRT_LD12 *x, int32_t at);
+void     crt_ld_set_dw(CRT_LD12 *x, int32_t at, uint32_t v);
+uint16_t crt_ld_w(const CRT_LD12 *x, int32_t at);
+void     crt_ld_set_w(CRT_LD12 *x, int32_t at, uint16_t v);
+/* 0x0046C78D / 0x0046C72F / 0x0046D097. */
+void crt_shl_12(CRT_LD12 *x);
+void crt_add_12(CRT_LD12 *a, const CRT_LD12 *b);
+void crt_multtenpow12(CRT_LD12 *x, int32_t pow, int32_t rounding);
+
+/* ---- strtod.cpp -------------------------------------------------------- */
+
+/* The record _fltin2 fills, ADDR_CRT_FLT_PTR's target. */
+typedef struct CRT_FLT {
+    int32_t flags;
+    int32_t nbytes;
+    int32_t lval;
+    int32_t pad;
+    double  dval;
+} CRT_FLT;
+
+/* The conversion parameters __ld12cvt takes, ADDR_CRT_CVTINFO_DOUBLE. */
+typedef struct CRT_CVTINFO {
+    int32_t max_exp, min_exp, mantbits, expbits, size, bias;
+} CRT_CVTINFO;
+
+/* 0x004653B7. Leading space skipped, then _fltin2: an overflow answers
+ * +/-HUGE_VAL with ERANGE, an underflow 0 with ERANGE, no digits 0 with
+ * *end at `s`. */
+double __cdecl crt_strtod(const char *s, char **end);
+/* 0x00469858. `len` and the two zeros are unused. */
+CRT_FLT *__cdecl crt_fltin2(const char *s, int32_t len, int32_t a, int32_t b);
+/* 0x0046BCBD. The decimal parser: a twelve-state machine over the text,
+ * up to 24 digits kept (the 25th rounds the 24th), then __mtold12 and a
+ * power of ten. Answers a flag word: 1 underflow, 2 overflow, 4 no digits. */
+uint32_t __cdecl crt_strgtold12(CRT_LD12 *out, const char **end, const char *s,
+                                int32_t mult12, int32_t scale, int32_t decpt, int32_t implicit_e);
+/* 0x0046C7E8. */
+void __cdecl crt_mtold12(const char *digits, uint32_t n, CRT_LD12 *out);
+/* 0x0046AC00 / 0x0046AA94. To a double: 0, or 1 for an overflow (infinity
+ * is stored) or 2 for an underflow (zero or a denormal is stored). */
+int32_t __cdecl crt_ld12tod(const CRT_LD12 *x, double *out);
+int32_t __cdecl crt_ld12cvt(const CRT_LD12 *x, void *out, const CRT_CVTINFO *cvt);
+/* 0x004697E0. _pctype[c] & mask; c is below 0x100 from every caller here. */
+int32_t __cdecl crt_isctype(int32_t c, int32_t mask);
+
+
 
 /* FILE.flag bits, the CRT's own names. */
 #define CRT_IOREAD     0x0001

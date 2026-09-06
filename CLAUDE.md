@@ -797,6 +797,19 @@ condition there now. A mutation that shrinks the corpus reads exactly like a
 mutation that was absorbed; check how many cases ran, not only whether they
 agreed.
 
+**UNICORN KEEPS EFLAGS BETWEEN RUNS, AND A CALL THAT FAULTS LEAVES THE
+DIRECTION FLAG WHERE IT WAS.** `tools/vectors.py` reuses one instance for
+every vector of every function. memcpy's backward-copy arm does `std`
+before its `rep movsd`; a try with a null source took that arm and
+faulted, the vector was discarded as faults are, and every call after it
+ran with DF set: memcpy's own next vector recorded a forward copy of 100
+bytes landing 96 bytes BELOW its destination, and TitleCaseName --
+merely next in the list -- had its strlen walk backwards and 116 of its
+vectors demand answers the original never gives. Nothing in either
+function was wrong. The harness resets EFLAGS before every run now, and
+the tell was that the failures began exactly where the new function had
+been inserted in the order.
+
 **A UNICORN CODE HOOK FIRES BEFORE THE INSTRUCTION EXECUTES, so the stand-in
 address an import is redirected to has to be MAPPED.** Every one of
 `collectcheck`'s 81 cases faulted until the page existed -- the fetch faults

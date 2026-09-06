@@ -233,7 +233,7 @@ static int32_t ck_trace;   /* AM2_CRTCHECK_TRACE: 1 names each script, 2 each ca
 
 #define CK_OPS      80
 #define CK_RECS     (CK_OPS + 2)
-#define CK_DESC     48
+#define CK_DESC     80
 
 static uint32_t ck_hash(const uint8_t *p, uint32_t n)
 {
@@ -537,7 +537,7 @@ static const AM2_CkDirStack kDirOurs = {
     crt_rmdir, crt_remove, crt_chmod, crt_time, crt_free, crt_getenv,
 };
 
-#define CK_DIR_VALUES 2048
+#define CK_DIR_VALUES 20000
 static int32_t ck_dv[2][CK_DIR_VALUES];
 static char    ck_dd[2][CK_DIR_VALUES][CK_DESC];
 static int32_t ck_dn[2];
@@ -782,6 +782,175 @@ static void ck_dirs(const char *dir)
     SetFileAttributesA(path, FILE_ATTRIBUTE_NORMAL);
 }
 
+/* ---- strtod ------------------------------------------------------------- */
+
+typedef double (__cdecl *AM2_CkStrtod)(const char *, char **);
+
+/* A random number in the parser's grammar, with the extremes reachable:
+ * long mantissas past the 24 kept digits, exponents around the range and
+ * the cap, and every place the text can end. */
+static void ck_number(char *out, uint32_t cap)
+{
+    uint32_t n = 0, r = ck_rnd(), i, k;
+
+    if (r & 1) out[n++] = (r & 2) ? '-' : '+';
+    if ((r >> 2) & 1) out[n++] = ' ';
+    k = (ck_rnd() % 4 == 0) ? ck_rnd() % 34 : ck_rnd() % 8;
+    for (i = 0; i < k && n < cap - 12; i++)
+        out[n++] = (char)('0' + (i == 0 && (r & 8) ? 1 + ck_rnd() % 9 : ck_rnd() % 10));
+    if (ck_rnd() & 1) {
+        out[n++] = '.';
+        k = (ck_rnd() % 4 == 0) ? ck_rnd() % 34 : ck_rnd() % 8;
+        for (i = 0; i < k && n < cap - 10; i++)
+            out[n++] = (char)('0' + ck_rnd() % 10);
+    }
+    if (ck_rnd() % 3 == 0) {
+        out[n++] = "eEdD"[ck_rnd() % 4];
+        r = ck_rnd();
+        if (r & 1) out[n++] = (r & 2) ? '-' : '+';
+        k = (r >> 2) % 5;
+        if (r & 64 && k == 0) k = 1;
+        for (i = 0; i < k; i++)
+            out[n++] = (char)('0' + ((i == 0 && (r & 128)) ? 3 + ck_rnd() % 7 : ck_rnd() % 10));
+    }
+    if (ck_rnd() % 5 == 0)
+        out[n++] = "x+-. e"[ck_rnd() % 6];
+    out[n] = 0;
+}
+
+static void ck_strtod_one(int32_t side, const AM2_CkStrtod fn, const char *text)
+{
+    char     desc[CK_DESC];
+    char    *end = NULL;
+    double   v;
+    uint32_t bits[2];
+
+    ck_errno = 0;
+    v = fn(text, &end);
+    memcpy(bits, &v, 8);
+    snprintf(desc, sizeof desc, "strtod \"%.30s\" lo", text);
+    ck_push(side, desc, (int32_t)bits[0]);
+    snprintf(desc, sizeof desc, "strtod \"%.30s\" hi", text);
+    ck_push(side, desc, (int32_t)bits[1]);
+    snprintf(desc, sizeof desc, "strtod \"%.30s\" end", text);
+    ck_push(side, desc, (int32_t)(end - text));
+    snprintf(desc, sizeof desc, "strtod \"%.30s\" errno", text);
+    ck_push(side, desc, ck_errno);
+}
+
+static void ck_strtod(void)
+{
+    static const char *const fixed[] = {
+        "", " ", "+", "-", ".", "-.", "1.", ".5", "-.5", "1e", "1e+", "1e-", "1E5", "1d5", "1D-2",
+        "0x10", "inf", "nan", "1.5+3", "1.5-3", "  12abc", "\t-0.0", "0", "-0", "00012", "0.",
+        "1e5200", "1e5201", "1e-5200", "1e-5201", "1e400", "1e-400", "-1e400", "1e999999999",
+        "1.7976931348623157e308", "1.7976931348623159e308", "1.7976931348623158e308",
+        "2.2250738585072014e-308", "2.2250738585072011e-308", "2.2250738585072009e-308",
+        "4.9406564584124654e-324", "2.4703282292062327e-324", "2.4703282292062328e-324",
+        "5e-324", "1e-323", "3e-324", "7e-324", "1e-320", "9007199254740993", "9007199254740992.5",
+        "9007199254740995", "9007199254740994", "9007199254740991", "18014398509481985",
+        "0.1", "0.3", "1e23", "8.5e-5", "123456789012345678901234567890",
+        "0.000000000000000000000000000000001", "1000000000000000000000000000000",
+        "1234567890123456789012345", "12345678901234567890123456", "1234567890123456789012344",
+        "1234567890123456789012345.5", "0.1234567890123456789012345678", ".000001e10",
+        "1e0000000000005", "1e-0005", "12.34e+2extra", "1e", "1e-", "  +.e5", "e5", "1..2",
+        "1.2.3", "1e5e5", "1e+-5", "0e0", "0.0e-9999", "00000000000000000000000000001",
+        "1.00000000000000000000000000001", "2.5", "3.5", "1.5", "0.5", "-2.5", "1e-1", "1e-2",
+        "1e-3", "1e-10", "1e-30", "1e-100", "1e-300", "1e100", "1e300", "1e308", "1e309",
+        "1e-309", "1e-310", "1e-315", "1e-324", "1e-325", "999999999999999999999999",
+        "9999999999999999999999999", "99999999999999999999999999", "4503599627370497",
+        "4503599627370497.5", "0.000000000000000000000000000000000000000000001e46",
+        /* Twenty-five digits astride a midpoint between two doubles, the
+         * 24th a 5. Meant to reach the 25th digit's rounding of the 24th;
+         * they do not, because the multiply by ten that follows keeps too
+         * few bits for the difference to survive. See tools/crtcheck.py. */
+        "1000000000000001526726656", "1000000000000004882169856", "1000000000000008237613056",
+    };
+    int32_t side, i;
+
+    for (side = 0; side < 2; side++) {
+        const char   *only = getenv("AM2_CRTCHECK_ONLY");
+        AM2_CkStrtod  fn = side ? crt_strtod : (AM2_CkStrtod)(uintptr_t)ADDR_CRT_STRTOD;
+        char          text[80];
+
+        ck_dn[side] = 0;
+        if (only && strcmp(only, side ? "ours" : "orig") != 0)
+            continue;
+        if (ck_trace)
+            fprintf(stderr, "crtcheck: %s strtod\n", side ? "ours" : "orig");
+        for (i = 0; i < (int32_t)(sizeof fixed / sizeof *fixed); i++)
+            ck_strtod_one(side, fn, fixed[i]);
+        ck_rng = 0x51ED0000u;
+        for (i = 0; i < 1500; i++) {
+            ck_number(text, sizeof text);
+            ck_strtod_one(side, fn, text);
+        }
+    }
+    if (ck_dn[0] == 0 || ck_dn[1] == 0)
+        return;
+    ck_scripts++;
+    ck_ops += ck_dn[0] / 4;
+    for (i = 0; i < ck_dn[0] && i < ck_dn[1]; i++) {
+        if (ck_dv[0][i] != ck_dv[1][i]) {
+            ck_mismatches++;
+            if (ck_shown++ < 40)
+                fprintf(stderr, "crtcheck: MISMATCH %s: orig %d (0x%08x), ours %d (0x%08x)\n",
+                        ck_dd[0][i], ck_dv[0][i], (uint32_t)ck_dv[0][i], ck_dv[1][i], (uint32_t)ck_dv[1][i]);
+        }
+    }
+}
+
+/* ---- memcpy ------------------------------------------------------------- */
+
+typedef void *(__cdecl *AM2_CkMemcpy)(void *, const void *, uint32_t);
+
+/* Overlapping copies both ways round and the sizes that pick the original's
+ * unrolled arms, on the same pattern, compared byte for byte. The vector
+ * set cannot make two pointer arguments overlap; this can. */
+static void ck_memcpy(void)
+{
+    static const int32_t offs[] = { 0, 1, 2, 3, 4, 5, 7, 8, 15, 16, 17, 31, 32, 33, 64, 100, 255, 256 };
+    static const int32_t lens[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65, 100, 255, 256, 257, 511, 512, 1000 };
+    static uint8_t buf[2][0x800];
+    int32_t di, si, li, side, i;
+
+    for (side = 0; side < 2; side++) {
+        const char  *only = getenv("AM2_CRTCHECK_ONLY");
+        AM2_CkMemcpy fn = side ? crt_memcpy : (AM2_CkMemcpy)(uintptr_t)ADDR_CRT_MEMCPY;
+
+        ck_dn[side] = 0;
+        if (only && strcmp(only, side ? "ours" : "orig") != 0)
+            continue;
+        for (di = 0; di < (int32_t)(sizeof offs / sizeof *offs); di++) {
+            for (si = 0; si < (int32_t)(sizeof offs / sizeof *offs); si++) {
+                for (li = 0; li < (int32_t)(sizeof lens / sizeof *lens); li++) {
+                    char  desc[CK_DESC];
+                    void *r;
+
+                    for (i = 0; i < 0x800; i++)
+                        buf[side][i] = (uint8_t)(i * 7 + 13);
+                    r = fn(buf[side] + 0x200 + offs[di], buf[side] + 0x200 + offs[si], (uint32_t)lens[li]);
+                    snprintf(desc, sizeof desc, "memcpy +%d <- +%d, %d", offs[di], offs[si], lens[li]);
+                    ck_push(side, desc, (int32_t)((uint8_t *)r - buf[side]));
+                    ck_push(side, desc, (int32_t)ck_hash(buf[side], 0x800));
+                }
+            }
+        }
+    }
+    if (ck_dn[0] == 0 || ck_dn[1] == 0)
+        return;
+    ck_scripts++;
+    ck_ops += ck_dn[0] / 2;
+    for (i = 0; i < ck_dn[0] && i < ck_dn[1]; i++) {
+        if (ck_dv[0][i] != ck_dv[1][i]) {
+            ck_mismatches++;
+            if (ck_shown++ < 40)
+                fprintf(stderr, "crtcheck: MISMATCH %s: orig 0x%08x, ours 0x%08x\n",
+                        ck_dd[0][i], (uint32_t)ck_dv[0][i], (uint32_t)ck_dv[1][i]);
+        }
+    }
+}
+
 static const char *const kReadModes[] = {
     "r", "rb", "rt", "r+", "rb+", "r+t", "rS", "rR", "rT", "rc", "rn", "r+ +", "rbb", "rtb",
 };
@@ -819,6 +988,8 @@ extern "C" int32_t WINAPI am2_crtcheck_main(HINSTANCE inst, HINSTANCE prev, LPST
     ck_compare(dir, &ck_files[3], "a", seed++, 1, 0);
     ck_compare(dir, &ck_files[3], "w", seed++, 1, 0);
     ck_dirs(dir);
+    ck_strtod();
+    ck_memcpy();
 
     fprintf(stderr, "crtcheck: %d scripts, %d calls, %d files: %d mismatching calls, %d differing files\n",
             ck_scripts, ck_ops, ck_nfiles, ck_mismatches, ck_filediffs);

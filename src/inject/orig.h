@@ -18322,6 +18322,24 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CRT_MBLCID        0x006648CCu  /* uint32 __mblcid */
 #define ADDR_CRT_MBCTYPE       0x006649E0u  /* uint8[257] _mbctype, indexed c+1: _setmbcp fills it at startup */
 #define ADDR_CRT_MBCODEPAGE    0x00664AE4u  /* uint32 __mbcodepage */
+
+/* strtod and the long-double conversions under it; src/platform/crt/strtod.cpp. */
+#define ADDR_CRT_FLTIN2        0x00469858u  /* _flt *(str, len, 0, 0): __strgtold12 then __ld12tod into ADDR_CRT_FLT_PTR's record */
+#define ADDR_CRT_STRGTOLD12    0x0046BCBDu  /* uint32(ld12 *, const char **end, str, mult12, scale, decpt, implicit_E) */
+#define ADDR_CRT_MTOLD12       0x0046C7E8u  /* void(digits, n, ld12 *): up to 24 decimal digits into a normalised long double */
+#define ADDR_CRT_LD12TOD       0x0046AC00u  /* int32(ld12 *, double *): __ld12cvt with the double's table */
+#define ADDR_CRT_LD12CVT       0x0046AA94u  /* int32(ld12 *, out, cvtinfo *): 0 exact, 1 overflow, 2 underflow or denormal */
+#define ADDR_CRT_LD12_ROUND    0x0046A939u  /* int32(mant[3], nbits): carry out */
+#define ADDR_CRT_LD12_ZEROTAIL 0x0046A89Au  /* int32(mant[3], pos): 1 when every bit after position pos is clear */
+#define ADDR_CRT_LD12_INCR     0x0046A8E3u  /* int32(mant[3], pos): add one at position pos, carry out */
+#define ADDR_CRT_LD12_COPY     0x0046A9C5u  /* void(dst[3], src[3]) */
+#define ADDR_CRT_LD12_ZERO     0x0046A9E0u  /* void(mant[3]) */
+#define ADDR_CRT_LD12_ISZERO   0x0046A9ECu  /* int32(mant[3]) */
+#define ADDR_CRT_LD12_SHR      0x0046AA07u  /* void(mant[3], n): the 96 bits right by n */
+#define ADDR_CRT_ISCTYPE       0x004697E0u  /* int32(c, mask): _pctype[c] & mask for c below 0x100 */
+#define ADDR_CRT_HUGE_VAL      0x0048CEB0u  /* double: +infinity, what strtod answers for an overflow */
+#define ADDR_CRT_FLT_PTR       0x0048CEB8u  /* _flt *: the static record _fltin2 fills {flags, nbytes, lval, pad, double dval} */
+#define ADDR_CRT_CVTINFO_DOUBLE 0x0048D3C8u /* {max_exp 1024, min_exp -1023, mantbits 53, expbits 11, size 64, bias 1023}; the float's follows */
 #define ADDR_MODE_RB        0x00474170u  /* "rb" */
 
 /* ---- typed accessors -------------------------------------------------- */

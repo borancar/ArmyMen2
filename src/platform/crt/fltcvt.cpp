@@ -28,43 +28,41 @@
 
 /* ---- the twelve-byte long double ------------------------------------------ */
 
-/* Bytes 0-1 a guard word, 2-9 the mantissa, 10-11 the exponent and sign;
- * w0, w1, w2 are the three dwords the shift helpers move as a unit. */
-typedef struct CRT_LD12 {
-    uint8_t b[12];
-} CRT_LD12;
+/* CRT_LD12 is in crt.h: bytes 0-1 a guard word, 2-9 the mantissa, 10-11
+ * the exponent and sign; w0, w1, w2 are the three dwords the shift helpers
+ * move as a unit. strtod.cpp shares the four helpers below. */
 
-static uint32_t ld_dw(const CRT_LD12 *x, int32_t at)
+uint32_t crt_ld_dw(const CRT_LD12 *x, int32_t at)
 {
     uint32_t v;
     memcpy(&v, x->b + at, 4);
     return v;
 }
-static void ld_set_dw(CRT_LD12 *x, int32_t at, uint32_t v) { memcpy(x->b + at, &v, 4); }
-static uint16_t ld_w(const CRT_LD12 *x, int32_t at)
+void crt_ld_set_dw(CRT_LD12 *x, int32_t at, uint32_t v) { memcpy(x->b + at, &v, 4); }
+uint16_t crt_ld_w(const CRT_LD12 *x, int32_t at)
 {
     uint16_t v;
     memcpy(&v, x->b + at, 2);
     return v;
 }
-static void ld_set_w(CRT_LD12 *x, int32_t at, uint16_t v) { memcpy(x->b + at, &v, 2); }
+void crt_ld_set_w(CRT_LD12 *x, int32_t at, uint16_t v) { memcpy(x->b + at, &v, 2); }
 
 /* 0x0046C78D: the 96 bits left one. */
-static void crt_shl_12(CRT_LD12 *x)
+void crt_shl_12(CRT_LD12 *x)
 {
-    uint32_t w0 = ld_dw(x, 0), w1 = ld_dw(x, 4), w2 = ld_dw(x, 8);
-    ld_set_dw(x, 0, w0 << 1);
-    ld_set_dw(x, 4, (w1 << 1) | (w0 >> 31));
-    ld_set_dw(x, 8, (w2 << 1) | (w1 >> 31));
+    uint32_t w0 = crt_ld_dw(x, 0), w1 = crt_ld_dw(x, 4), w2 = crt_ld_dw(x, 8);
+    crt_ld_set_dw(x, 0, w0 << 1);
+    crt_ld_set_dw(x, 4, (w1 << 1) | (w0 >> 31));
+    crt_ld_set_dw(x, 8, (w2 << 1) | (w1 >> 31));
 }
 
 /* 0x0046C7BB: the 96 bits right one. */
 static void crt_shr_12(CRT_LD12 *x)
 {
-    uint32_t w0 = ld_dw(x, 0), w1 = ld_dw(x, 4), w2 = ld_dw(x, 8);
-    ld_set_dw(x, 4, (w1 >> 1) | (w2 << 31));
-    ld_set_dw(x, 0, (w0 >> 1) | (w1 << 31));
-    ld_set_dw(x, 8, w2 >> 1);
+    uint32_t w0 = crt_ld_dw(x, 0), w1 = crt_ld_dw(x, 4), w2 = crt_ld_dw(x, 8);
+    crt_ld_set_dw(x, 4, (w1 >> 1) | (w2 << 31));
+    crt_ld_set_dw(x, 0, (w0 >> 1) | (w1 << 31));
+    crt_ld_set_dw(x, 8, w2 >> 1);
 }
 
 /* 0x0046C70E: *out = a + b, answering the carry. */
@@ -76,28 +74,28 @@ static int32_t crt_addl(uint32_t a, uint32_t b, uint32_t *out)
 }
 
 /* 0x0046C72F: a += b over the 96 bits, carries rippling up. */
-static void crt_add_12(CRT_LD12 *a, const CRT_LD12 *b)
+void crt_add_12(CRT_LD12 *a, const CRT_LD12 *b)
 {
     uint32_t v;
-    if (crt_addl(ld_dw(a, 0), ld_dw(b, 0), &v)) {
-        ld_set_dw(a, 0, v);
-        if (crt_addl(ld_dw(a, 4), 1, &v)) {
-            ld_set_dw(a, 4, v);
-            ld_set_dw(a, 8, ld_dw(a, 8) + 1);
+    if (crt_addl(crt_ld_dw(a, 0), crt_ld_dw(b, 0), &v)) {
+        crt_ld_set_dw(a, 0, v);
+        if (crt_addl(crt_ld_dw(a, 4), 1, &v)) {
+            crt_ld_set_dw(a, 4, v);
+            crt_ld_set_dw(a, 8, crt_ld_dw(a, 8) + 1);
         } else {
-            ld_set_dw(a, 4, v);
+            crt_ld_set_dw(a, 4, v);
         }
     } else {
-        ld_set_dw(a, 0, v);
+        crt_ld_set_dw(a, 0, v);
     }
-    if (crt_addl(ld_dw(a, 4), ld_dw(b, 4), &v)) {
-        ld_set_dw(a, 4, v);
-        ld_set_dw(a, 8, ld_dw(a, 8) + 1);
+    if (crt_addl(crt_ld_dw(a, 4), crt_ld_dw(b, 4), &v)) {
+        crt_ld_set_dw(a, 4, v);
+        crt_ld_set_dw(a, 8, crt_ld_dw(a, 8) + 1);
     } else {
-        ld_set_dw(a, 4, v);
+        crt_ld_set_dw(a, 4, v);
     }
-    crt_addl(ld_dw(a, 8), ld_dw(b, 8), &v);
-    ld_set_dw(a, 8, v);
+    crt_addl(crt_ld_dw(a, 8), crt_ld_dw(b, 8), &v);
+    crt_ld_set_dw(a, 8, v);
 }
 
 /* 0x0046CE77: a = a * b.
@@ -111,7 +109,7 @@ static void crt_add_12(CRT_LD12 *a, const CRT_LD12 *b)
  * 0x8000 with the bit above it set. Words 1..5 are the result's mantissa. */
 static void crt_ld12mul(CRT_LD12 *a, const CRT_LD12 *b)
 {
-    uint16_t ea = ld_w(a, 10), eb = ld_w(b, 10);
+    uint16_t ea = crt_ld_w(a, 10), eb = crt_ld_w(b, 10);
     uint32_t sign = (uint32_t)((ea ^ eb) & 0x8000);
     uint32_t e;
     CRT_LD12 acc;
@@ -127,19 +125,19 @@ static void crt_ld12mul(CRT_LD12 *a, const CRT_LD12 *b)
         goto zero;
     if (ea == 0) {
         e++;
-        if (!(ld_dw(a, 8) & 0x7FFFFFFF) && !ld_dw(a, 4) && !ld_dw(a, 0))
+        if (!(crt_ld_dw(a, 8) & 0x7FFFFFFF) && !crt_ld_dw(a, 4) && !crt_ld_dw(a, 0))
             goto zero;
     }
     if (eb == 0) {
         e++;
-        if (!(ld_dw(b, 8) & 0x7FFFFFFF) && !ld_dw(b, 4) && !ld_dw(b, 0))
+        if (!(crt_ld_dw(b, 8) & 0x7FFFFFFF) && !crt_ld_dw(b, 4) && !crt_ld_dw(b, 0))
             goto zero;
     }
 
     memset(accw, 0, sizeof accw);
     for (i = 0; i < 5; i++) {
         for (k = 0; k < 5 - i; k++) {
-            uint32_t prod = (uint32_t)ld_w(a, (i + k) * 2) * ld_w(b, (4 - k) * 2);
+            uint32_t prod = (uint32_t)crt_ld_w(a, (i + k) * 2) * crt_ld_w(b, (4 - k) * 2);
             uint32_t sum;
             uint32_t lo = (uint32_t)accw[i] | ((uint32_t)accw[i + 1] << 16);
             if (crt_addl(lo, prod, &sum))
@@ -171,51 +169,51 @@ static void crt_ld12mul(CRT_LD12 *a, const CRT_LD12 *b)
                 acc.b[0] |= 1;
         }
     }
-    if (ld_w(&acc, 0) > 0x8000 || (ld_dw(&acc, 0) & 0x1FFFF) == 0x18000) {
-        uint32_t m1 = ld_dw(&acc, 2);
+    if (crt_ld_w(&acc, 0) > 0x8000 || (crt_ld_dw(&acc, 0) & 0x1FFFF) == 0x18000) {
+        uint32_t m1 = crt_ld_dw(&acc, 2);
         if (m1 == 0xFFFFFFFFu) {
             uint32_t m2;
-            ld_set_dw(&acc, 2, 0);
-            m2 = ld_dw(&acc, 6);
+            crt_ld_set_dw(&acc, 2, 0);
+            m2 = crt_ld_dw(&acc, 6);
             if (m2 == 0xFFFFFFFFu) {
-                ld_set_dw(&acc, 6, 0);
-                if (ld_w(&acc, 10) == 0xFFFF) {
+                crt_ld_set_dw(&acc, 6, 0);
+                if (crt_ld_w(&acc, 10) == 0xFFFF) {
                     e = (uint16_t)(e + 1);
-                    ld_set_w(&acc, 10, 0x8000);
+                    crt_ld_set_w(&acc, 10, 0x8000);
                 } else {
-                    ld_set_w(&acc, 10, (uint16_t)(ld_w(&acc, 10) + 1));
+                    crt_ld_set_w(&acc, 10, (uint16_t)(crt_ld_w(&acc, 10) + 1));
                 }
             } else {
-                ld_set_dw(&acc, 6, m2 + 1);
+                crt_ld_set_dw(&acc, 6, m2 + 1);
             }
         } else {
-            ld_set_dw(&acc, 2, m1 + 1);
+            crt_ld_set_dw(&acc, 2, m1 + 1);
         }
     }
     if ((uint16_t)e >= 0x7FFF)
         goto overflow;
-    ld_set_w(a, 0, ld_w(&acc, 2));
-    ld_set_dw(a, 2, ld_dw(&acc, 4));
-    ld_set_dw(a, 6, ld_dw(&acc, 8));
-    ld_set_w(a, 10, (uint16_t)(e | sign));
+    crt_ld_set_w(a, 0, crt_ld_w(&acc, 2));
+    crt_ld_set_dw(a, 2, crt_ld_dw(&acc, 4));
+    crt_ld_set_dw(a, 6, crt_ld_dw(&acc, 8));
+    crt_ld_set_w(a, 10, (uint16_t)(e | sign));
     return;
 
 overflow:
-    ld_set_dw(a, 0, 0);
-    ld_set_dw(a, 4, 0);
-    ld_set_dw(a, 8, 0x7FFF8000u | (sign ? 0x80000000u : 0));
+    crt_ld_set_dw(a, 0, 0);
+    crt_ld_set_dw(a, 4, 0);
+    crt_ld_set_dw(a, 8, 0x7FFF8000u | (sign ? 0x80000000u : 0));
     return;
 zero:
-    ld_set_dw(a, 0, 0);
-    ld_set_dw(a, 4, 0);
-    ld_set_dw(a, 8, 0);
+    crt_ld_set_dw(a, 0, 0);
+    crt_ld_set_dw(a, 4, 0);
+    crt_ld_set_dw(a, 8, 0);
 }
 
 /* 0x0046D097: x *= 10^pow, from the image's two tables -- seven entries a
  * group, the groups for the octal digits of |pow| -- with the guard word
  * cleared first when `rounding` is 0, and an entry whose guard word is
  * above half taken one below. */
-static void crt_multtenpow12(CRT_LD12 *x, int32_t pow, int32_t rounding)
+void crt_multtenpow12(CRT_LD12 *x, int32_t pow, int32_t rounding)
 {
     const uint8_t *table = (const uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_POW10_TABLE) - 0x60;
 
@@ -226,7 +224,7 @@ static void crt_multtenpow12(CRT_LD12 *x, int32_t pow, int32_t rounding)
         table = (const uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_POW10_NEG_TABLE) - 0x60;
     }
     if (rounding == 0)
-        ld_set_w(x, 0, 0);
+        crt_ld_set_w(x, 0, 0);
     while (pow != 0) {
         int32_t idx = pow & 7;
         table += 0x54;
@@ -234,8 +232,8 @@ static void crt_multtenpow12(CRT_LD12 *x, int32_t pow, int32_t rounding)
         if (idx != 0) {
             CRT_LD12 entry;
             memcpy(entry.b, table + idx * 12, 12);
-            if (ld_w(&entry, 0) >= 0x8000)
-                ld_set_dw(&entry, 2, ld_dw(&entry, 2) - 1);
+            if (crt_ld_w(&entry, 0) >= 0x8000)
+                crt_ld_set_dw(&entry, 2, crt_ld_dw(&entry, 2) - 1);
             crt_ld12mul(x, &entry);
         }
     }
@@ -262,9 +260,9 @@ static void crt_dtold(CRT_LD12 *out, const double *value)
         e16 = exp == 0x7FF ? 0x7FFF : (uint16_t)(exp + 0x3C00);
     } else {
         if (mhi == 0 && mlo == 0) {
-            ld_set_dw(out, 2, 0);
-            ld_set_dw(out, 6, 0);
-            ld_set_w(out, 10, 0);
+            crt_ld_set_dw(out, 2, 0);
+            crt_ld_set_dw(out, 6, 0);
+            crt_ld_set_w(out, 10, 0);
             return;
         }
         e16 = 0x3C01;
@@ -278,9 +276,9 @@ static void crt_dtold(CRT_LD12 *out, const double *value)
             l <<= 1;
             e16 = (uint16_t)(e16 - 1);
         }
-        ld_set_dw(out, 2, l);
-        ld_set_dw(out, 6, h);
-        ld_set_w(out, 10, (uint16_t)(e16 | sign));
+        crt_ld_set_dw(out, 2, l);
+        crt_ld_set_dw(out, 6, h);
+        crt_ld_set_w(out, 10, (uint16_t)(e16 | sign));
     }
 }
 
@@ -303,9 +301,9 @@ static int32_t crt_i10_output(const CRT_LD12 *x, int32_t ndigits, int32_t flags,
     static const CRT_LD12 tenth_const = { { 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xFB, 0x3F } };
     const CRT_LD12 *tenth = &tenth_const;
     CRT_LD12 work;
-    uint16_t expw = ld_w(x, 10);
+    uint16_t expw = crt_ld_w(x, 10);
     uint32_t sign = expw & 0x8000, exp = expw & 0x7FFF;
-    uint32_t mlo = ld_dw(x, 2), mhi = ld_dw(x, 6);
+    uint32_t mlo = crt_ld_dw(x, 2), mhi = crt_ld_dw(x, 6);
     int32_t  result = 1, decexp, n, count;
     char    *p;
 
@@ -337,12 +335,12 @@ static int32_t crt_i10_output(const CRT_LD12 *x, int32_t ndigits, int32_t flags,
     decexp = (int16_t)(((int32_t)(exp * 0x4D10u) +
                         (int32_t)((((mhi >> 24) * 2) + (exp >> 8)) * 0x4Du) -
                         0x134312F4) >> 16);
-    ld_set_w(&work, 0, 0);
-    ld_set_dw(&work, 2, mlo);
-    ld_set_dw(&work, 6, mhi);
-    ld_set_w(&work, 10, (uint16_t)exp);
+    crt_ld_set_w(&work, 0, 0);
+    crt_ld_set_dw(&work, 2, mlo);
+    crt_ld_set_dw(&work, 6, mhi);
+    crt_ld_set_w(&work, 10, (uint16_t)exp);
     crt_multtenpow12(&work, -decexp, 1);
-    if (ld_w(&work, 10) >= 0x3FFF) {
+    if (crt_ld_w(&work, 10) >= 0x3FFF) {
         crt_ld12mul(&work, tenth);
         decexp++;
     }
@@ -358,8 +356,8 @@ static int32_t crt_i10_output(const CRT_LD12 *x, int32_t ndigits, int32_t flags,
     /* The value is now in [0.1, 1): with the exponent field cleared and
      * the mantissa shifted eight bits up, the top byte is the integer part
      * after each multiplication by ten. */
-    n = (int32_t)ld_w(&work, 10) - 0x3FFE;
-    ld_set_w(&work, 10, 0);
+    n = (int32_t)crt_ld_w(&work, 10) - 0x3FFE;
+    crt_ld_set_w(&work, 10, 0);
     for (count = 0; count < 8; count++)
         crt_shl_12(&work);
     if (n < 0) {

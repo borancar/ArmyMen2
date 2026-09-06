@@ -33,6 +33,19 @@ static uint32_t crt_ctype(uint32_t c)
     return table[c & 0xFF];
 }
 
+/* 0x004697E0. The word for `c` masked, with c in -1..0xFF: the table is
+ * _ctype + 1, so -1 reads the entry before it. Above 0xFF the original
+ * classifies a two-byte character through GetStringTypeA; nothing here
+ * passes one and that arm is not reproduced. */
+int32_t __cdecl crt_isctype(int32_t c, int32_t mask)
+{
+    const uint16_t *table = (const uint16_t *)(uintptr_t)AM2_IMAGE((uintptr_t)crt_pctype);
+
+    if ((uint32_t)(c + 1) > 0x100)
+        return c & mask;   /* unreachable: see above */
+    return table[c] & mask;
+}
+
 /* 0x00469714, toupper for the ASCII range the single-byte page needs. */
 static int32_t crt_toupper(int32_t c)
 {
