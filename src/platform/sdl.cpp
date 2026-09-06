@@ -22,6 +22,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <poll.h>
+#include <stdarg.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #include "../game/win32/winmain.h"
 
@@ -246,6 +251,27 @@ static FILE    *am2_framelog;
 static int32_t  am2_framelog_tried;
 static char     am2_framedump_path[1024];   /* a pending dump of the next present */
 
+static int32_t am2_write_ppm(const char *path, const uint8_t *pixels, int32_t pitch,
+                             int32_t w, int32_t h, const PALETTEENTRY *palette)
+{
+    FILE   *fh = fopen(path, "wb");
+    int32_t x, y;
+
+    if (!fh)
+        return 0;
+    fprintf(fh, "P6\n%d %d\n255\n", w, h);
+    for (y = 0; y < h; y++)
+        for (x = 0; x < w; x++) {
+            const PALETTEENTRY *e = &palette[pixels[y * pitch + x]];
+            fputc(e->peRed, fh); fputc(e->peGreen, fh); fputc(e->peBlue, fh);
+        }
+    fclose(fh);
+    return 1;
+}
+
+static void am2_step_frame(const uint8_t *pixels, int32_t pitch, int32_t w,
+                           int32_t h, const PALETTEENTRY *palette);
+
 static uint64_t am2_fnv(uint64_t h, const uint8_t *p, size_t n)
 {
     size_t i;
@@ -254,6 +280,16 @@ static uint64_t am2_fnv(uint64_t h, const uint8_t *p, size_t n)
         h *= 1099511628211ULL;
     }
     return h;
+}
+
+static uint64_t am2_frame_hash(const uint8_t *pixels, int32_t pitch, int32_t w,
+                               int32_t h, const PALETTEENTRY *palette)
+{
+    uint64_t hash = 14695981039346656037ULL;
+    int32_t  y;
+    for (y = 0; y < h; y++)
+        hash = am2_fnv(hash, pixels + y * pitch, (size_t)w);
+    return am2_fnv(hash, (const uint8_t *)palette, 256 * sizeof *palette);
 }
 
 static void am2_frame_record(const uint8_t *pixels, int32_t pitch, int32_t w,
@@ -275,30 +311,17 @@ static void am2_frame_record(const uint8_t *pixels, int32_t pitch, int32_t w,
             snprintf(am2_framedump_path, sizeof am2_framedump_path, "%s", to);
     }
     if (am2_framelog) {
-        uint64_t hash = 14695981039346656037ULL;
-        int32_t  y;
-        for (y = 0; y < h; y++)
-            hash = am2_fnv(hash, pixels + y * pitch, (size_t)w);
-        hash = am2_fnv(hash, (const uint8_t *)palette, 256 * sizeof *palette);
+        uint64_t hash = am2_frame_hash(pixels, pitch, w, h, palette);
         fprintf(am2_framelog, "%u %u %016llx\n", (unsigned)am2_present_count,
                 (unsigned)am2_pump_count, (unsigned long long)hash);
         fflush(am2_framelog);
     }
     if (am2_framedump_path[0]) {
-        FILE *fh = fopen(am2_framedump_path, "wb");
-        if (fh) {
-            int32_t x, y;
-            fprintf(fh, "P6\n%d %d\n255\n", w, h);
-            for (y = 0; y < h; y++)
-                for (x = 0; x < w; x++) {
-                    const PALETTEENTRY *e = &palette[pixels[y * pitch + x]];
-                    fputc(e->peRed, fh); fputc(e->peGreen, fh); fputc(e->peBlue, fh);
-                }
-            fclose(fh);
+        if (am2_write_ppm(am2_framedump_path, pixels, pitch, w, h, palette))
             am2_plat_log("frame %u written to %s", (unsigned)am2_present_count, am2_framedump_path);
-        }
         am2_framedump_path[0] = 0;
     }
+    am2_step_frame(pixels, pitch, w, h, palette);
     am2_present_count++;
 }
 
@@ -653,6 +676,9 @@ static int am2_replay_order(const void *x, const void *y)
     return (int)(p - q > 0) - (int)(p - q < 0);
 }
 
+static void am2_replay_parse(int32_t n, uint32_t frame, const char *verb,
+                             const char *w1, const char *w2);
+
 static void am2_replay_load(void)
 {
     const char *path = getenv("AM2_REPLAY");
@@ -680,11 +706,24 @@ static void am2_replay_load(void)
             *hash = 0;
         if (sscanf(line, "%u %15s %511s %63s", &frame, verb, w1, w2) < 2)
             continue;
+        am2_replay_parse(n, frame, verb, w1, w2);
+    }
+    fclose(fh);
+    if (am2_replay_count > 1)
+        qsort(am2_replay, (size_t)am2_replay_count, sizeof *am2_replay, am2_replay_order);
+    am2_plat_log("replay: %d actions from %s", am2_replay_count, path);
+}
+
+/* One replay action, from the file or from the step socket. */
+static void am2_replay_parse(int32_t n, uint32_t frame, const char *verb,
+                             const char *w1, const char *w2)
+{
+    {
         if (!strcmp(verb, "key")) {
             uint8_t dik, vk;
             if (!am2_key_lookup(w1, &dik, &vk)) {
                 am2_plat_log("replay: line %d: unknown key %s", n, w1);
-                continue;
+                return;
             }
             if (!strcmp(w2, "tap")) {
                 am2_replay_add(frame, "key", dik | (vk << 8), 1, NULL);
@@ -710,10 +749,6 @@ static void am2_replay_load(void)
             am2_plat_log("replay: line %d: unknown verb %s", n, verb);
         }
     }
-    fclose(fh);
-    if (am2_replay_count > 1)
-        qsort(am2_replay, (size_t)am2_replay_count, sizeof *am2_replay, am2_replay_order);
-    am2_plat_log("replay: %d actions from %s", am2_replay_count, path);
 }
 
 static void am2_replay_apply(void)
@@ -749,6 +784,307 @@ static void am2_replay_apply(void)
 
 static void am2_audio_step(void);
 
+/* ---- lockstep: the step socket ------------------------------------------------------ */
+
+/* AM2_STEP=<unix socket path>: the pump waits for a coordinator before every
+ * step, so two games can be driven through the same frames by one hand and
+ * stopped, both alive, on the first frame that differs (tools/sidebyside.py).
+ *
+ * At each pump the game first REPORTS what happened since the last one --
+ *
+ *   pump N                       the pump about to run
+ *   frame IDX HASH               each frame presented since the last report
+ *   host key DIK VK 0|1          each host event it applied in the last pump
+ *   host char C | host motion X Y | host button B 0|1 | host wheel D
+ *   ready
+ *
+ * -- and then reads lines until `step`:
+ *
+ *   key|button|move|cursor|dump  a replay action, for THIS pump (the file's
+ *                                grammar without the frame number)
+ *   host ...                     another game's host event, applied through
+ *                                the same handlers a real event takes
+ *   last FILE                    the last frame presented, as a PPM; the
+ *                                reply is `ok last FILE`
+ *   step                         run the pump
+ *
+ * (`exit` is a replay action, so it leaves at the pump like the file's.)
+ *
+ * Host events reach the game only in step mode with a real window: they
+ * are applied here and echoed in the next report, which is what lets the
+ * coordinator hand them to the other side for the same pump. While the
+ * game waits, the frame hook still runs, so the control socket's `snap`
+ * is served on a trapped game. */
+static int32_t  am2_step_fd = -2;              /* -2 untried, -1 off */
+static char     am2_step_buf[4096];
+static size_t   am2_step_len;
+static uint64_t am2_step_hashes[64];
+static uint32_t am2_step_indexes[64];
+static int32_t  am2_step_nframes;
+static char     am2_step_host[64][64];
+static int32_t  am2_step_nhost;
+static uint8_t *am2_step_last;
+static int32_t  am2_step_last_w, am2_step_last_h;
+static PALETTEENTRY am2_step_last_pal[256];
+
+static int32_t am2_step_on(void)
+{
+    if (am2_step_fd == -2) {
+        const char *path = getenv("AM2_STEP");
+        struct sockaddr_un addr;
+        am2_step_fd = -1;
+        if (!path || !*path)
+            return 0;
+        am2_step_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+        memset(&addr, 0, sizeof addr);
+        addr.sun_family = AF_UNIX;
+        snprintf(addr.sun_path, sizeof addr.sun_path, "%s", path);
+        if (am2_step_fd < 0 || connect(am2_step_fd, (struct sockaddr *)&addr, sizeof addr) < 0) {
+            am2_plat_log("step: cannot connect to %s", path);
+            am2_host_exit(2);
+        }
+        am2_plat_log("step: connected to %s", path);
+    }
+    return am2_step_fd >= 0;
+}
+
+static void am2_step_frame(const uint8_t *pixels, int32_t pitch, int32_t w,
+                           int32_t h, const PALETTEENTRY *palette)
+{
+    int32_t y;
+
+    if (am2_step_fd < 0)
+        return;
+    if (am2_step_nframes < 64) {
+        am2_step_hashes[am2_step_nframes] = am2_frame_hash(pixels, pitch, w, h, palette);
+        am2_step_indexes[am2_step_nframes] = am2_present_count;
+        am2_step_nframes++;
+    }
+    if (am2_step_last_w != w || am2_step_last_h != h) {
+        free(am2_step_last);
+        am2_step_last = (uint8_t *)malloc((size_t)w * (size_t)h);
+        am2_step_last_w = w;
+        am2_step_last_h = h;
+    }
+    if (am2_step_last)
+        for (y = 0; y < h; y++)
+            memcpy(am2_step_last + (size_t)y * (size_t)w, pixels + y * pitch, (size_t)w);
+    memcpy(am2_step_last_pal, palette, sizeof am2_step_last_pal);
+}
+
+static void am2_step_send(const char *line)
+{
+    size_t n = strlen(line);
+    while (n) {
+        ssize_t k = write(am2_step_fd, line, n);
+        if (k <= 0) {
+            am2_plat_log("step: coordinator gone at pump %u", (unsigned)am2_pump_count);
+            am2_host_exit(0);
+        }
+        line += k;
+        n -= (size_t)k;
+    }
+}
+
+static void am2_step_note_host(const char *fmt, ...)
+{
+    va_list ap;
+    if (am2_step_nhost >= 64)
+        return;
+    va_start(ap, fmt);
+    vsnprintf(am2_step_host[am2_step_nhost], sizeof am2_step_host[0], fmt, ap);
+    va_end(ap);
+    am2_step_nhost++;
+}
+
+static void am2_step_report(void)
+{
+    char    line[128];
+    int32_t i;
+
+    snprintf(line, sizeof line, "pump %u\n", (unsigned)am2_pump_count + 1);
+    am2_step_send(line);
+    for (i = 0; i < am2_step_nframes; i++) {
+        snprintf(line, sizeof line, "frame %u %016llx\n", (unsigned)am2_step_indexes[i],
+                 (unsigned long long)am2_step_hashes[i]);
+        am2_step_send(line);
+    }
+    for (i = 0; i < am2_step_nhost; i++) {
+        snprintf(line, sizeof line, "%s\n", am2_step_host[i]);
+        am2_step_send(line);
+    }
+    am2_step_nframes = 0;
+    am2_step_nhost = 0;
+    am2_step_send("ready\n");
+}
+
+/* A host event applied to this game, from its own window or from the
+ * other side's report. `echo` says whether to put it in the next report. */
+static void am2_step_host_apply(const char *w, int32_t echo)
+{
+    char     verb[16] = "";
+    int32_t  a = 0, b = 0, c = 0;
+
+    if (sscanf(w, "%15s %i %i %i", verb, &a, &b, &c) < 1)
+        return;
+    if (!strcmp(verb, "key")) {
+        if (a > 0 && a < 256)
+            am2_keys[a] = c ? 0x80 : 0;
+        am2_window_on_key(c, (uint32_t)b);
+        if (echo)
+            am2_step_note_host("host key 0x%02x 0x%02x %d", a, b, c);
+    } else if (!strcmp(verb, "char")) {
+        am2_window_on_char((uint32_t)a);
+        if (echo)
+            am2_step_note_host("host char %d", a);
+    } else if (!strcmp(verb, "motion")) {
+        am2_mouse_moved(a, b);
+        if (echo)
+            am2_step_note_host("host motion %d %d", a, b);
+    } else if (!strcmp(verb, "button")) {
+        am2_mouse_flush();
+        am2_mouse_button(a, b);
+        if (echo)
+            am2_step_note_host("host button %d %d", a, b);
+    } else if (!strcmp(verb, "wheel")) {
+        am2_mouse_flush();
+        am2_di_mouse_wheel(a);
+        if (echo)
+            am2_step_note_host("host wheel %d", a);
+    }
+}
+
+/* Read lines until `step`. Replay actions are queued for this pump and
+ * applied by am2_replay_apply below; host lines are applied at once. */
+static void am2_step_wait(void)
+{
+    for (;;) {
+        char *nl;
+        while ((nl = (char *)memchr(am2_step_buf, '\n', am2_step_len)) != NULL) {
+            char   line[1024];
+            size_t n = (size_t)(nl - am2_step_buf);
+            char   verb[16] = "", w1[512] = "", w2[64] = "";
+
+            if (n >= sizeof line)
+                n = sizeof line - 1;
+            memcpy(line, am2_step_buf, n);
+            line[n] = 0;
+            am2_step_len -= (size_t)(nl - am2_step_buf) + 1;
+            memmove(am2_step_buf, nl + 1, am2_step_len);
+            if (!strcmp(line, "step"))
+                return;
+            if (!strncmp(line, "host ", 5)) {
+                am2_step_host_apply(line + 5, 0);
+                continue;
+            }
+            if (!strncmp(line, "last ", 5)) {
+                char reply[1100];
+                int32_t ok = am2_step_last &&
+                    am2_write_ppm(line + 5, am2_step_last, am2_step_last_w, am2_step_last_w,
+                                  am2_step_last_h, am2_step_last_pal);
+                snprintf(reply, sizeof reply, "%s last %s\n", ok ? "ok" : "err", line + 5);
+                am2_step_send(reply);
+                continue;
+            }
+            if (sscanf(line, "%15s %511s %63s", verb, w1, w2) >= 1)
+                am2_replay_parse(0, am2_pump_count + 1, verb, w1, w2);
+        }
+        {
+            struct pollfd pfd;
+            ssize_t       k;
+            pfd.fd = am2_step_fd;
+            pfd.events = POLLIN;
+            if (poll(&pfd, 1, 50) == 0) {
+                /* Nothing yet: serve the control socket's requests, so a
+                 * trapped game can still be snapshotted. */
+                if (am2_host_frame_hook)
+                    am2_host_frame_hook();
+                continue;
+            }
+            if (am2_step_len >= sizeof am2_step_buf)
+                am2_step_len = 0;
+            k = read(am2_step_fd, am2_step_buf + am2_step_len, sizeof am2_step_buf - am2_step_len);
+            if (k <= 0) {
+                am2_plat_log("step: coordinator gone at pump %u", (unsigned)am2_pump_count);
+                am2_host_exit(0);
+            }
+            am2_step_len += (size_t)k;
+        }
+    }
+}
+
+/* The window's own events, in step mode: applied and echoed. */
+static void am2_step_host_events(void)
+{
+    SDL_Event ev;
+    int32_t   moved = 0;
+
+    while (SDL_PollEvent(&ev)) {
+        switch (ev.type) {
+        case SDL_EVENT_QUIT:
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+            am2_window_on_close();
+            break;
+        case SDL_EVENT_KEY_DOWN:
+        case SDL_EVENT_KEY_UP: {
+            char    w[64];
+            uint8_t dik = ev.key.scancode < SDL_SCANCODE_COUNT
+                        ? am2_dik_of_scancode[ev.key.scancode] : 0;
+            if (ev.key.repeat)
+                break;
+            snprintf(w, sizeof w, "key %d %u %d", dik, (unsigned)am2_vk_of(ev.key.key), ev.key.down ? 1 : 0);
+            am2_step_host_apply(w, 1);
+            break;
+        }
+        case SDL_EVENT_TEXT_INPUT: {
+            const char *s;
+            for (s = ev.text.text; *s; s++)
+                if ((uint8_t)*s < 0x80) {
+                    char w[32];
+                    snprintf(w, sizeof w, "char %d", (uint8_t)*s);
+                    am2_step_host_apply(w, 1);
+                }
+            break;
+        }
+        case SDL_EVENT_MOUSE_MOTION: {
+            int32_t lx, ly;
+            char    w[64];
+            am2_mouse_to_logical(&ev, &lx, &ly);
+            snprintf(w, sizeof w, "motion %d %d", lx, ly);
+            am2_step_host_apply(w, 1);
+            moved = 1;
+            break;
+        }
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        case SDL_EVENT_MOUSE_BUTTON_UP: {
+            int32_t lx, ly, b;
+            char    w[64];
+            am2_mouse_to_logical(&ev, &lx, &ly);
+            snprintf(w, sizeof w, "motion %d %d", lx, ly);
+            am2_step_host_apply(w, 1);
+            b = ev.button.button == SDL_BUTTON_LEFT ? 0
+              : ev.button.button == SDL_BUTTON_RIGHT ? 1
+              : ev.button.button == SDL_BUTTON_MIDDLE ? 2 : -1;
+            if (b >= 0) {
+                snprintf(w, sizeof w, "button %d %d", b, ev.button.down ? 1 : 0);
+                am2_step_host_apply(w, 1);
+            }
+            break;
+        }
+        case SDL_EVENT_MOUSE_WHEEL:
+            if (ev.wheel.y != 0) {
+                char w[32];
+                snprintf(w, sizeof w, "wheel %d", (int32_t)(ev.wheel.y * 120));
+                am2_step_host_apply(w, 1);
+            }
+            break;
+        }
+    }
+    am2_mouse_flush();
+    if (moved && am2_the_window())
+        SendMessageA(am2_the_window(), WM_SETCURSOR, 0, 0);
+}
+
 void am2_host_pump(void)
 {
     SDL_Event ev;
@@ -765,11 +1101,19 @@ void am2_host_pump(void)
          * step's worth of sound, and the script's actions for this frame.
          * Host events are drained and dropped -- a stray real click would
          * make the run unrepeatable -- except the window closing. */
+        if (am2_step_on()) {
+            am2_step_report();
+            am2_step_wait();
+        }
         am2_pump_count++;
         am2_clock_ns += am2_step_ns;
         am2_timers_fire_due();
         am2_audio_step();
         am2_replay_apply();
+        if (am2_step_fd >= 0) {
+            am2_step_host_events();
+            return;
+        }
         while (SDL_PollEvent(&ev))
             if (ev.type == SDL_EVENT_QUIT || ev.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)
                 am2_window_on_close();

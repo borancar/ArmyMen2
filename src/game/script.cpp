@@ -1311,8 +1311,20 @@ int32_t __cdecl ScriptNameUid(const char *name)
     }
 
     /* Declaring it fresh does NOT bump the count -- it is left at the 1 that
-     * AddNameTableName writes. */
-    return kScriptNames[AddNameTableName(name, AM2_NAME_TYPE_OBJECT, 0)].value;
+     * AddNameTableName writes.
+     *
+     * THE CALL MUST COME BEFORE THE TABLE IS READ, and as one expression it
+     * did not: `kScriptNames[AddNameTableName(...)]` let GCC load the table
+     * pointer first, and AddNameTableName reallocates the table every tenth
+     * name, so a forward reference that landed on a growth boundary read its
+     * uid out of the FREED block -- 0 -- while the other forty names were
+     * right. Boot Camp's `triggerdelay 100 showsign` was that name: the
+     * delayed event was raised as (0, 0), nothing listened, and the port never
+     * showed the instruction sign. tools/sidebyside.py found it as the first
+     * frame past the tolerated 26 pixels; the actions oracle would have too,
+     * had anything run it since. MSVC calls first and loads after. */
+    int32_t idx = AddNameTableName(name, AM2_NAME_TYPE_OBJECT, 0);
+    return kScriptNames[idx].value;
 }
 
 int32_t __cdecl ScriptIntOrVar(AM2_ScriptCtx *ctx, int32_t *at,
@@ -1394,11 +1406,24 @@ int32_t __cdecl ScriptArmyColour(AM2_ScriptCtx *ctx, int32_t *at)
     return rc;
 }
 
-/* Set from AM2_DUMP_ACTIONS and AM2_PARSE_ALL. */
+/* Set from AM2_DUMP_ACTIONS and AM2_PARSE_ALL. Read in script_install,
+ * which the NATIVE build never runs, so the first script load reads them
+ * too: AM2_DUMP_ACTIONS printed nothing there for as long as it existed. */
 int32_t am2_dump_actions = 0;
 static int32_t am2_parse_all = 0;
 static int32_t am2_probe_noaction = 0;
 static void ScriptParseAll(void);
+
+static void ScriptReadEnv(void)
+{
+    static int32_t done;
+    if (done)
+        return;
+    done = 1;
+    am2_dump_actions = getenv("AM2_DUMP_ACTIONS") != 0;
+    am2_parse_all = getenv("AM2_PARSE_ALL") != 0;
+    am2_probe_noaction = getenv("AM2_PROBE_NOACTION") != 0;
+}
 
 /* ---------------------------------------------------------- actions ---- */
 
@@ -2451,8 +2476,10 @@ static int32_t ScriptParseAction(AM2_ScriptCtx *ctx, int32_t *at,
 int32_t ScriptAction(AM2_ScriptCtx *ctx, int32_t *at, AM2_ScriptAction *act)
 {
     int32_t line = *at < ctx->count ? ctx->tokens[*at].line : -1;
+    int32_t rc;
 
-    int32_t rc = ScriptParseAction(ctx, at, act);
+    ScriptReadEnv();
+    rc = ScriptParseAction(ctx, at, act);
 
     if (am2_dump_actions) {
         /* One call, not eighteen: the game's logger writes a line per call
@@ -3459,9 +3486,7 @@ int script_install(void)
      * have to be on the game's heap. */
     am2_crt_use_game();
 
-    am2_dump_actions = getenv("AM2_DUMP_ACTIONS") != 0;
-    am2_parse_all = getenv("AM2_PARSE_ALL") != 0;
-    am2_probe_noaction = getenv("AM2_PROBE_NOACTION") != 0;
+    ScriptReadEnv();
 
     rc |= patch_replace(ADDR_IS_BLANK,
                         (const void *)IsBlank, "IsBlank", 1);

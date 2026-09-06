@@ -419,6 +419,55 @@ diverged on frame 80 of Boot Camp by 26 pixels and on nothing else through
 a walk, with identical object tables at both ends. A hash log is exact
 where the pixel budgets were blunt; reach for it before any screenshot.
 
+**THE SIDE-BY-SIDE IS THE LOCKSTEP PLAYED LIVE, AND ITS FIRST HOUR FOUND
+WHAT `lockstep.sh` HAD CALLED CLEAN.** `tools/sidebyside.py` runs the
+hybrid and the port under `AM2_STEP`: each game blocks on a socket before
+every pump, reports the frames it presented and the host input it took,
+and the coordinator hands the leader's input to the follower, steps it
+through the same pump and compares. On a difference BOTH games stop where
+they are, alive, so `tools/objdump.py --port`, `peek`, `poke` and `snap`
+answer at that frame; `--video` gives the leader a real window to play in,
+`--break N` and the prompt's `s`/`c N` stop at a pump, and
+`--tolerate-swaps` forgives the known terrain class -- horizontal pairs
+with their two colours exchanged -- which grows with the scroll and so
+cannot be a pixel budget.
+
+`lockstep.sh` diffs the FIRST differing frame and STATUS.md said every
+frame after it "differs by the same 26 pixels". That was inferred from the
+object tables agreeing, and it was wrong: with the 26 tolerated the next
+frame past them was the port showing the LIVE MISSION where the original
+showed Boot Camp's full-screen instruction sign, and the port kept
+composing frames through fifty pumps the original spent paused. The object
+tables agreed because nothing moves in a sign. Stepping both games pump by
+pump with the timer table, the clock and the sub-state read out over the
+sockets took it to one line in one function, below.
+
+**AND THE ORIGINAL'S OWN EVENT TRACE IS ONE `poke` AWAY IN THE HYBRID.**
+Every log line in the event layer is behind the comm object's
+`COMM_OFF_VERBOSE`, so writing 1 there through both sockets at a break
+before the trigger gave `EventTriggerDelayed: type 0, num: 100005` from
+the original beside `num: 0` from the port -- the whole diagnosis in two
+lines, where the timer table had been identical on both sides. Prefer the
+program's own trace to reasoning about it, and remember the flag is a
+field on a heap object, not a global.
+
+**INDEXING A TABLE WITH THE CALL THAT GROWS IT IS UNDEFINED ORDER, AND GCC
+TAKES THE OTHER ONE.** `kScriptNames[AddNameTableName(...)].value` loads
+the table pointer BEFORE the call under GCC; the call reallocates the
+table every tenth name, so a forward-referenced name that landed on a
+growth boundary read its uid out of the freed block as 0, while the forty
+names around it were right. MSVC calls first and loads after, which is why
+the reference recorded from the original never showed it -- and why the
+actions oracle would have, had anything run it since. The shape to grep
+for is `[Identifier(` over anything that can `realloc`: sequence the call
+into a local first.
+
+**A `peek` OF A BARE HEX ADDRESS IS A `peek` OF 4.** `strtoul(..., 0)`
+reads `4fa898` as decimal 4 and stops at the letter, and reading address 4
+took both games down mid-comparison in a way that read as the verbose flag
+crashing the logger. The command refuses an unreadable address now, as
+`dump` always did. Write socket addresses with `0x`.
+
 **THE CRT IS RECONSTRUCTED LIKE THE GAME, under `src/platform/crt/`, and
 its names carry a `crt_` prefix.** The image's MSVC 6 runtime is 231
 functions the game reaches 44 of, and glibc behind those names is a second

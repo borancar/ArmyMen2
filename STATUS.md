@@ -177,6 +177,12 @@ headless under SDL's dummy drivers, so a comparison needs no display and
 takes half a minute:
 
     tools/lockstep.sh tests/replays/bootcamp.txt
+    tools/sidebyside.py --replay tests/replays/bootcamp.txt --tolerate-swaps
+
+The second is the same comparison with both games STEP-LOCKED over a
+socket and stopped, alive, on the first frame that differs, so the state
+behind a difference can be read out of both at once; `--video` makes it
+playable by hand, the leader's window driving both.
 
 **Measured** (2026-09-06, `tests/replays/bootcamp.txt`: title, BOOT CAMP,
 RETURN, both dialogs, then W, S and D held for 100 pumps each):
@@ -184,8 +190,9 @@ RETURN, both dialogs, then W, S and D held for 100 pumps each):
 | what | result |
 |---|---|
 | native run against native run | identical, 628 presented frames |
-| hybrid (original) against native (reconstruction) | identical through frame 79 -- the title, the click, the loading, the briefing -- then **every frame from 80 on differs by the same 26 pixels** |
-| the 26 pixels | 13 horizontal PAIRS on sandbag and hut edges, static from frame to frame, and in every pair the two colours are SWAPPED: the original has A,B where the reconstruction has B,A |
+| hybrid (original) against native (reconstruction) | identical through frame 79 -- the title, the click, the loading, the briefing -- then frame 80 on differs by 26 pixels at the briefing and up to 52 during the walk, EVERY one of them a swapped pair (below); nothing else through all 628 frames (`tools/sidebyside.py --tolerate-swaps`, 2026-09-06) |
+| the 26 pixels | 13 horizontal PAIRS on sandbag and hut edges, static from frame to frame, and in every pair the two colours are SWAPPED: the original has A,B where the reconstruction has B,A; more pairs come into view as the map scrolls |
+| what "the same 26 pixels" had hidden | the port never showed Boot Camp's INSTRUCTION SIGN and kept running through the fifty pumps the original spent paused on it: `ScriptNameUid` indexed the name table with the call that reallocates it, and `showsign`, a forward reference on a growth boundary, got uid 0. Fixed; found by the side-by-side, not by the tables, which agree because nothing moves in a sign |
 | the object tables | identical at the mission start and after the walk, all 1,610 lines, Sarge at `1743,976` on both |
 | the game's memory at Boot Camp | carried span 2,012 KB (74 KB of it initialised), game heap 14,037 KB, resident total 30.9 MB and FLAT over 56,000 frames |
 

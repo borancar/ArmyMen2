@@ -451,6 +451,14 @@ static void handle_line(SOCKET s, char *line)
             n = 1;
         if (n > 64)
             n = 64;
+        /* A bare hex address without 0x parses as decimal up to its first
+         * letter -- `peek 4fa898` is `peek 4` -- and reading it took two
+         * games down mid-comparison. Refuse what cannot be read, as `dump`
+         * does; a diagnostic that can crash is worse than none. */
+        if (IsBadReadPtr((const void *)(uintptr_t)addr, 4u * (unsigned)n)) {
+            reply(s, "err %08x not readable for %d dwords (write the address as 0x...)", addr, n);
+            return;
+        }
 
         out[0] = '\0';
         for (i = 0; i < n; i++) {
