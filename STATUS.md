@@ -78,7 +78,7 @@ original answered under Unicorn:
   takes the API arm; and the `_mbctype` tables, so `_mbctoupper` answers
   its argument. Both are stated in the modules.
 
-The game's heap, stdio, directories, `time`, `strtod`, `sprintf`, `qsort`, `bsearch`,
+The game's startup, heap, stdio, directories, `time`, `strtod`, `sprintf`, `qsort`, `bsearch`,
 `rand`, `atoi`, `strtol` and the string functions above now run on the
 CRT in both the standalone and the native build; the lockstep comparison
 is unchanged by all of it, as it should be. `standin.cpp` holds what the
@@ -129,9 +129,32 @@ The development binary keeps its fixed-address arena for the game's blocks
 small-block heap, and the one block that could cross, `getcwd(NULL)`'s,
 the game never asks for.
 
-Next: the startup -- `_ioinit`, `__initstdio`, `_setmbcp`, `_setenvp` and
-the rest of what fills the tables the modules above read lazily -- and
-`_amsg_exit`.
+- `startup.cpp` (2026-09-06): `WinMainCRTStartup` up to its call of
+  `WinMain` -- the version words, `_heap_init`, `_ioinit`, the command
+  line and `__crtGetEnvironmentStringsA`, `_setargv` with its two-pass
+  `parse_cmdline`, `_setenvp`, `__wincmdln`, `_cinit` walking the image's
+  own initializer tables -- with `_setmbcp` and the multibyte tables,
+  `_fpmath` with `_control87` and the FDIV test, and `_amsg_exit` with
+  `_NMSG_WRITE` and the message box. The standalone and native builds call
+  it from their startup object, so the tables every other module read
+  lazily are the original's now, built in the original's order, and the
+  x87 runs at the 53-bit precision the original set. `mkglobals` rewrites
+  the initializer table's slots to the reconstructions as well as the
+  terminator tables', which is how `_cinit` finds them. The check's
+  seventh section compares the parser on 22 command lines both passes,
+  `__wincmdln`, `_setmbcp` for nine code pages table for table, and
+  `_control87` both ways round; the lockstep A/B is unchanged.
+
+Not reproduced, and stated in the module: the entry point's SEH frame and
+`_XcptFilter`, which map a machine exception to a C signal handler the
+game never installs. `standin.cpp` holds the three locale wrappers and the
+wide-environment conversion, each forwarding to the one kernel32 call its
+original makes.
+
+Next: the CRT is complete for what the game reaches. What remains of the
+image's runtime is the C++ exception dispatcher and the locale wrappers,
+which nothing reaches, and the vector set could still take `strcmp` and
+`strcat`.
 
 ## THE ORIGINAL AND THE RECONSTRUCTION RUN IN LOCKSTEP
 

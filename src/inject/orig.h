@@ -18319,9 +18319,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CRT_LAST_TZ       0x00664894u  /* char *: a copy of the TZ string last parsed */
 #define ADDR_CRT_TZSET_DONE    0x00664898u  /* int32: __tzset has run */
 #define ADDR_CRT_MBCASEMAP     0x006648E0u  /* uint8[256] _mbcasemap: _setmbcp fills it at startup */
-#define ADDR_CRT_MBLCID        0x006648CCu  /* uint32 __mblcid */
+#define ADDR_CRT_MBCODEPAGE    0x006648CCu  /* uint32 __mbcodepage: _setmbcp stores the code page here */
 #define ADDR_CRT_MBCTYPE       0x006649E0u  /* uint8[257] _mbctype, indexed c+1: _setmbcp fills it at startup */
-#define ADDR_CRT_MBCODEPAGE    0x00664AE4u  /* uint32 __mbcodepage */
+#define ADDR_CRT_MBLCID        0x00664AE4u  /* uint32 __mblcid: the LCID _setmbcp derives from it */
 
 /* strtod and the long-double conversions under it; src/platform/crt/strtod.cpp. */
 #define ADDR_CRT_FLTIN2        0x00469858u  /* _flt *(str, len, 0, 0): __strgtold12 then __ld12tod into ADDR_CRT_FLT_PTR's record */
@@ -18388,6 +18388,84 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CRT_SBH_PHEADER_LIST 0x00665C48u /* HEADER *: 20 bytes each {bitvEntryHi, bitvEntryLo, bitvCommit, pHeapData, pRegion} */
 #define ADDR_CRT_CRTHEAP       0x00665C4Cu  /* HANDLE _crtheap */
 #define ADDR_CRT_SEH_OLD_FILTER 0x006647DCu /* LPTOP_LEVEL_EXCEPTION_FILTER: what SetUnhandledExceptionFilter answered at startup */
+
+/* The startup, src/platform/crt/startup.cpp: what fills the tables the
+ * modules above read. */
+#define ADDR_CRT_STARTUP                 0x004664C0u  /* void(void): WinMainCRTStartup -- the version words, the heap, lowio, the command line and environment, argv, envp, _cinit, WinMain, exit */
+#define ADDR_CRT_GET_ENV_STRINGS         0x0046A396u  /* char *(void): __crtGetEnvironmentStringsA, the wide block converted or the narrow one copied */
+#define ADDR_CRT_SETARGV                 0x0046A149u  /* void(void): _setargv over _acmdln, or the program name when it is empty */
+#define ADDR_CRT_PARSE_CMDLINE           0x0046A1E2u  /* void(cmd, argv, args, &argc, &nchars): the two-pass command-line parser */
+#define ADDR_CRT_SETENVP                 0x0046A090u  /* void(void): _setenvp, _aenvptr into _environ */
+#define ADDR_CRT_WINCMDLN                0x0046A038u  /* char *(void): __wincmdln, _acmdln past the program name */
+#define ADDR_CRT_SETMBCP                 0x0046C263u  /* int32(cp): _setmbcp */
+#define ADDR_CRT_GETSYSTEMCP             0x0046C3FCu  /* int32(cp): -2 OEM, -3 ANSI, -4 the locale's */
+#define ADDR_CRT_CP_LCID                 0x0046C446u  /* uint32(cp): the LCID of a multibyte code page, 0 otherwise */
+#define ADDR_CRT_INITMBCTABLE            0x0046C627u  /* void(void): __initmbctable, _setmbcp(-3) once */
+#define ADDR_CRT_MBCTYPE_RESET           0x0046C479u  /* void(void): the tables cleared, code page 0 */
+#define ADDR_CRT_SETSBUPLOW              0x0046C4A2u  /* void(void): _mbcasemap and the case bits of _mbctype from GetStringTypeA and LCMapStringA */
+#define ADDR_CRT_ISMBBLEAD               0x0046C643u  /* int32(c) */
+#define ADDR_CRT_ISMBBTYPE               0x0046C654u  /* int32(c, ctype mask, mbctype mask) */
+#define ADDR_CRT_AMSG_EXIT               0x004665B6u  /* void(rterrnum): the banner, the message, _exit(255) through ADDR_CRT_EXIT_FN_PTR */
+#define ADDR_CRT_FAST_ERROR_EXIT         0x004665DBu  /* void(rterrnum): the same with ExitProcess, from before the heap exists */
+#define ADDR_CRT_NMSG_WRITE              0x0046A5E1u  /* void(rterrnum): stderr for a console, else the message box */
+#define ADDR_CRT_FF_MSGBANNER            0x0046A5A8u  /* void(void) */
+#define ADDR_CRT_MESSAGEBOX              0x0046C685u  /* int32(text, caption, type): __crtMessageBoxA, user32 loaded on demand */
+#define ADDR_CRT_STRCAT                  0x00469CB0u  /* char *(dst, src) */
+#define ADDR_CRT_FPMATH                  0x0046443Eu  /* void(void): _fpmath -- _cfltcvt_init, the FDIV test, 53-bit precision */
+#define ADDR_CRT_FDIV_DETECT             0x0046664Fu  /* int32(void): IsProcessorFeaturePresent(0) if kernel32 has it, else the arithmetic test */
+#define ADDR_CRT_FDIV_TEST               0x00466611u  /* int32(void): 4195835 / 3145727 * 3145727 - 4195835 > 1 */
+#define ADDR_CRT_SETDEFAULTPRECISION     0x004665FFu  /* void(void): _control87(_PC_53, _MCW_PC) */
+#define ADDR_CRT_CONTROL87               0x0046A769u  /* uint32(new, mask): the infinity-control bit stripped, then the body */
+#define ADDR_CRT_CONTROL87_BODY          0x0046A734u  /* uint32(new, mask) */
+#define ADDR_CRT_HW2ABSTRACT             0x0046A77Fu  /* uint32(cw): the x87 control word as the CRT's flag word */
+#define ADDR_CRT_ABSTRACT2HW             0x0046A811u  /* uint32(flags): and back */
+#define ADDR_CRT_CRTGETSTRINGTYPEA       0x0046BB74u  /* the locale layer's GetStringTypeA wrapper; NOT read, standin.cpp */
+#define ADDR_CRT_CRTLCMAPSTRINGA         0x0046996Bu  /* the locale layer's LCMapStringA wrapper; NOT read, standin.cpp */
+#define ADDR_CRT_XCPTFILTER              0x00469EB4u  /* the startup's __try filter, which maps exceptions to signals; not reproduced, the frame is not */
+#define ADDR_CRT_CFLTCVT_INIT            0x00464456u  /* void(void): fills the _cfltcvt function table; printf.cpp calls fltcvt.cpp by name and reads no table */
+#define ADDR_CRT_OSVER                   0x0066460Cu  /* uint32 _osver: GetVersion >> 16 */
+#define ADDR_CRT_WINVER                  0x00664610u  /* uint32 _winver: major << 8 | minor */
+#define ADDR_CRT_WINMAJOR                0x00664614u  /* uint32 _winmajor */
+#define ADDR_CRT_WINMINOR                0x00664618u  /* uint32 _winminor */
+#define ADDR_CRT_ACMDLN                  0x00665C50u  /* char *_acmdln: GetCommandLineA */
+#define ADDR_CRT_AENVPTR                 0x006645CCu  /* char *_aenvptr: the environment block, freed by _setenvp */
+#define ADDR_CRT_PGMPTR                  0x00664638u  /* char *_pgmptr */
+#define ADDR_CRT_PGMNAME                 0x0066469Cu  /* char[260]: the module file name _setargv fetches */
+#define ADDR_CRT_ARGV                    0x00664620u  /* char **__argv */
+#define ADDR_CRT_ARGC                    0x0066461Cu  /* int32 __argc */
+#define ADDR_CRT_MBCTABLE_INIT           0x00665C28u  /* int32: __initmbctable has run */
+#define ADDR_CRT_ERROR_MODE              0x006645D4u  /* int32 _error_mode: 0 default, 1 stderr, 2 message box */
+#define ADDR_CRT_ENV_KIND                0x006647A0u  /* int32: which GetEnvironmentStrings answered, 1 wide, 2 narrow */
+#define ADDR_CRT_MSGBANNER_HOOK          0x006647A4u  /* void (*)(void): called between the two banner lines when set */
+#define ADDR_CRT_EXIT_FN_PTR             0x0048CC50u  /* void (*)(int): _exit, which _amsg_exit calls through */
+#define ADDR_CRT_FPINIT_PTR              0x0048CC28u  /* void (*)(void): _fpmath, which _cinit calls through */
+#define ADDR_CRT_MBCP_FROM_SYSTEM        0x006648A0u  /* int32: the code page was asked of the system */
+#define ADDR_CRT_ISMBCODEPAGE            0x006648DCu  /* int32 __ismbcodepage */
+#define ADDR_CRT_MBULINFO                0x006648D0u  /* uint8[12] __mbulinfo: the code page table entry's second field */
+#define ADDR_CRT_ADJUST_FDIV             0x006645ACu  /* int32 _adjust_fdiv */
+#define ADDR_CRT_MSGBOX_FN               0x006648A4u  /* MessageBoxA once user32 is loaded */
+#define ADDR_CRT_GETACTIVEWINDOW_FN      0x006648A8u  /* GetActiveWindow */
+#define ADDR_CRT_GETLASTACTIVEPOPUP_FN   0x006648ACu  /* GetLastActivePopup */
+#define ADDR_CRT_RTERR_TABLE             0x0048D338u  /* {int32 num, const char *text}[18], ending where ADDR_CRT_CVTINFO_DOUBLE begins */
+#define ADDR_CRT_MBCTYPE_RANGE_FLAGS     0x0048D520u  /* uint8[4] {1, 2, 4, 8}: the _mbctype bit each of a code page's four range sets sets */
+#define ADDR_CRT_MBCP_TABLE              0x0048D528u  /* {uint32 cp; uint8 mbulinfo[12]; uint8 ranges[4][8]}[5]: 932, 936, 949, 950, 1361; to ADDR_CRT_POW10_TABLE */
+#define ADDR_CRT_XI_BEGIN                0x0047305Cu  /* void (*)[]: the C initializers, {0, _onexitinit, __initstdio, __initmbctable, the SEH filter install} */
+#define ADDR_CRT_XI_END                  0x00473070u
+#define ADDR_CRT_XC_BEGIN                0x00473000u  /* void (*)[]: the C++ static initializers, all 21 reconstructed */
+#define ADDR_CRT_XC_END                  0x00473058u
+#define ADDR_STR_RTERR_BANNER            0x004701B8u  /* "Runtime Error!\n\nProgram: " */
+#define ADDR_STR_RTERR_CRLF2             0x004701B4u  /* "\n\n" */
+#define ADDR_STR_RTERR_ELLIPSIS          0x004701D4u  /* "..." */
+#define ADDR_STR_RTERR_NONAME            0x004701D8u  /* "<program name unknown>" */
+#define ADDR_STR_RTERR_CAPTION           0x0047018Cu  /* "Microsoft Visual C++ Runtime Library" */
+#define ADDR_STR_USER32                  0x00470274u
+#define ADDR_STR_MESSAGEBOXA             0x00470268u
+#define ADDR_STR_GETACTIVEWINDOW         0x00470258u
+#define ADDR_STR_GETLASTACTIVEPOPUP      0x00470244u
+#define ADDR_STR_KERNEL32                0x0046FDE4u
+#define ADDR_STR_ISPROCESSORFEATUREPRESENT 0x0046FDC8u
+#define ADDR_CRT_FDIV_NUM                0x0046FDB8u  /* double 4195835.0; the 1.0 the test compares against is ADDR_DBL_MAX_PERIOD */
+#define ADDR_CRT_FDIV_DEN                0x0046FDC0u  /* double 3145727.0 */
 #define ADDR_MODE_RB        0x00474170u  /* "rb" */
 
 /* ---- typed accessors -------------------------------------------------- */

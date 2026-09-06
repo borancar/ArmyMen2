@@ -499,6 +499,18 @@ left short; and no free entry in an earlier region while the scan
 pointer sat on a later one. A mutation that passes names the input the
 corpus lacks; build that input before calling the gap a theorem.
 
+**A TABLE THE RECONSTRUCTION WALKS NEEDS ITS SLOTS REWRITTEN, NOT ONLY
+ITS TARGETS RESOLVED.** `mkglobals` had resolved all 21 C++ static
+initializers by name for years and generated a function that called them,
+and the initializer table's own slots in the carried `.rdata` still held
+the original's jmp thunks -- which the scan could not match, since a thunk
+is neither a patched address nor a seam. The moment `_cinit` was
+reconstructed and walked the table as the original does, the native build
+jumped to `0x00408AB0` and died. Each entry is now rewritten by position
+with the name already resolved for it. The general form: a fixup pass
+proves only that what it could MATCH is rewritten; anything reached by
+walking a table has to be checked at the table.
+
 **AND A BLOCK'S OWNER DECIDES, NOT ITS SIZE.** A block reallocated above
 the threshold and back down stays HeapAlloc's -- the original keeps it
 there -- and the check, classifying by size, freed it through both

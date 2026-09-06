@@ -149,6 +149,12 @@ extern const uint8_t am2_pickup_kind_index[29];
 #undef ADDR_VSPRINTF
 #undef ADDR_CRT_ENDSTDIO
 #undef ADDR_CRT_SEH_RESTORE
+#undef ADDR_CRT_ONEXITINIT
+#undef ADDR_CRT_INITSTDIO
+#undef ADDR_CRT_INITMBCTABLE
+#undef ADDR_CRT_SEH_SET
+#undef ADDR_CRT_FPMATH
+#undef ADDR_CRT_EXIT_QUICK
 #undef ADDR_DIRECTDRAWCREATE
 #undef ADDR_DIRECTINPUTCREATE
 #undef ADDR_DIRECTSOUNDCREATE
@@ -204,6 +210,14 @@ extern const uint8_t am2_pickup_kind_index[29];
  * tables and finds the reconstructions there. */
 #define ADDR_CRT_ENDSTDIO     AM2_SA(crt_endstdio)
 #define ADDR_CRT_SEH_RESTORE  AM2_SA(crt_seh_restore)
+/* And the initializer table's four entries, the pointer _cinit calls
+ * _fpmath through, and the one _amsg_exit calls _exit through. */
+#define ADDR_CRT_ONEXITINIT   AM2_SA(crt_onexitinit)
+#define ADDR_CRT_INITSTDIO    AM2_SA(crt_initstdio)
+#define ADDR_CRT_INITMBCTABLE AM2_SA(crt_initmbctable)
+#define ADDR_CRT_SEH_SET      AM2_SA(crt_seh_set)
+#define ADDR_CRT_FPMATH       AM2_SA(crt_fpmath)
+#define ADDR_CRT_EXIT_QUICK   AM2_SA(crt_exit_quick)
 #define ADDR_DIRECTDRAWCREATE  AM2_SA(am2_sa_ddraw_create)
 #define ADDR_DIRECTINPUTCREATE AM2_SA(am2_sa_dinput_create)
 #define ADDR_DIRECTSOUNDCREATE AM2_SA(am2_sa_dsound_create)

@@ -1145,6 +1145,9 @@ int main(int argc, char **argv)
     }
 
     am2_game_thread = pthread_self();
+    /* What GetCommandLineA answers: the CRT's startup reads it for argv
+     * and for the line WinMain sees. The hybrid's loader does the same. */
+    am2_set_command_line(cmdline);
     SDL_SetAppMetadata("Army Men II", "0.1", "org.armymen2.port");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         fprintf(stderr, "platform: SDL_Init: %s\n", SDL_GetError());

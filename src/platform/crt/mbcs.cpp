@@ -38,7 +38,7 @@ int32_t __cdecl crt_mbsnbicoll(const char *a, const char *b, uint32_t n)
     if (n == 0)
         return 0;
     r = crt_compare_string_a(crt_mblcid, 1 /* NORM_IGNORECASE */, a, (int32_t)n,
-                             b, (int32_t)n, crt_mbcodepage);
+                             b, (int32_t)n, crt_mbcodepage);   /* lcid first, code page last */
     if (r == 0)
         return 0x7FFFFFFF;
     return r - 2;

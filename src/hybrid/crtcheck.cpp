@@ -1419,6 +1419,152 @@ static void ck_exit(void)
     ck_ops += 6 + counts[0] + counts[1];
 }
 
+/* ---- the startup ----------------------------------------------------------- */
+
+typedef void  (__cdecl *AM2_CkParse)(const char *, char **, char *, int32_t *, int32_t *);
+typedef char *(__cdecl *AM2_CkWincmdln)(void);
+typedef int32_t (__cdecl *AM2_CkSetmbcp)(int32_t);
+typedef uint32_t (__cdecl *AM2_CkControl87)(uint32_t, uint32_t);
+
+#define ck_acmdln (*(char **)(uintptr_t)AM2_IMAGE(ADDR_CRT_ACMDLN))
+
+/* The command-line parser on a corpus of lines, both passes, compared on
+ * argc, the character count and every argument; __wincmdln on the same
+ * lines through the shared _acmdln; _setmbcp against the tables the
+ * original's startup built and for each of the five code pages the image
+ * knows; and _control87 both ways round the 53-bit precision the startup
+ * sets. */
+static void ck_startup(void)
+{
+    static const char *const lines[] = {
+        "", "prog", "prog a b c", "\"C:\\Program Files\\Army Men II\\ArmyMen2.exe\" -nointro -w",
+        "prog  two   spaces\t\ttabs ", "prog \"quoted arg\" plain", "prog \"\"", "prog \"un\"\"quoted",
+        "prog a\\\\b", "prog \"a\\\"b\"", "prog \\\\\"x\\\\\" y", "prog \"a b\"c", "\"quoted prog\"",
+        "\"unterminated prog", "prog \"\"\"triple\"\"\"", "   leading", "prog -dbg -df \"x y\" z\\",
+        "prog \xe9\xe8 \"\xfc\"", "prog a\"b\"c\"d", "prog \\\\\\\"\\\\\\\"", "p \"\\\\\"", "p \\\\\\",
+        "prog\targ", "prog\t\targ two", "\"quoted prog\"\tx", "prog \x01ctl",
+    };
+    AM2_CkParse    oparse = (AM2_CkParse)(uintptr_t)ADDR_CRT_PARSE_CMDLINE;
+    AM2_CkWincmdln owin = (AM2_CkWincmdln)(uintptr_t)ADDR_CRT_WINCMDLN;
+    AM2_CkSetmbcp  osetmbcp = (AM2_CkSetmbcp)(uintptr_t)ADDR_CRT_SETMBCP;
+    AM2_CkControl87 ocontrol = (AM2_CkControl87)(uintptr_t)ADDR_CRT_CONTROL87;
+    static char    argsA[4096], argsB[4096];
+    static char   *argvA[256], *argvB[256];
+    char          *saved_cmdln = ck_acmdln;
+    uint8_t        tables[2][0x101 + 0x100 + 12 + 12];
+    int32_t        i, k, side;
+    static const int32_t cps[] = { 932, 936, 949, 950, 1361, 1252, -3, 437, -2, 12345 };
+
+    if (getenv("AM2_CRTCHECK_ONLY"))
+        return;
+    if (ck_trace)
+        fprintf(stderr, "crtcheck: startup\n");
+    for (side = 0; side < 2; side++)
+        ck_dn[side] = 0;
+
+    for (i = 0; i < (int32_t)(sizeof lines / sizeof *lines); i++) {
+        int32_t argcA, argcB, ncA, ncB;
+        char    desc[CK_DESC];
+
+        oparse(lines[i], NULL, NULL, &argcA, &ncA);
+        crt_parse_cmdline(lines[i], NULL, NULL, &argcB, &ncB);
+        snprintf(desc, sizeof desc, "parse count #%d argc", i);
+        ck_push(0, desc, argcA);
+        ck_push(1, desc, argcB);
+        snprintf(desc, sizeof desc, "parse count #%d nchars", i);
+        ck_push(0, desc, ncA);
+        ck_push(1, desc, ncB);
+        memset(argsA, 0xEE, sizeof argsA);
+        memset(argsB, 0xEE, sizeof argsB);
+        oparse(lines[i], argvA, argsA, &argcA, &ncA);
+        crt_parse_cmdline(lines[i], argvB, argsB, &argcB, &ncB);
+        snprintf(desc, sizeof desc, "parse fill #%d argc", i);
+        ck_push(0, desc, argcA);
+        ck_push(1, desc, argcB);
+        snprintf(desc, sizeof desc, "parse fill #%d chars", i);
+        ck_push(0, desc, (int32_t)ck_hash((const uint8_t *)argsA, (uint32_t)ncA));
+        ck_push(1, desc, (int32_t)ck_hash((const uint8_t *)argsB, (uint32_t)ncB));
+        for (k = 0; k < argcA && k < argcB && k < 255; k++) {
+            snprintf(desc, sizeof desc, "parse fill #%d argv[%d]", i, k);
+            ck_push(0, desc, argvA[k] ? (int32_t)(argvA[k] - argsA) : -1);
+            ck_push(1, desc, argvB[k] ? (int32_t)(argvB[k] - argsB) : -1);
+        }
+        ck_acmdln = (char *)lines[i];
+        snprintf(desc, sizeof desc, "wincmdln #%d", i);
+        ck_push(0, desc, (int32_t)(owin() - lines[i]));
+        ck_push(1, desc, (int32_t)(crt_wincmdln() - lines[i]));
+    }
+    ck_acmdln = saved_cmdln;
+
+    /* The tables: what startup built, against what ours builds for the
+     * same request; then each code page the original serves from its own
+     * table, ours after it, the four tables compared each time. */
+    for (i = 0; i < (int32_t)(sizeof cps / sizeof *cps); i++) {
+        char desc[CK_DESC];
+
+        for (side = 0; side < 2; side++) {
+            int32_t rc = side ? crt_setmbcp(cps[i]) : osetmbcp(cps[i]);
+
+            memcpy(tables[side], (const void *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBCTYPE), 0x101);
+            memcpy(tables[side] + 0x101, (const void *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBCASEMAP), 0x100);
+            memcpy(tables[side] + 0x201, (const void *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBULINFO), 12);
+            memcpy(tables[side] + 0x20D, (const void *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBCODEPAGE), 4);
+            memcpy(tables[side] + 0x211, (const void *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBLCID), 4);
+            memcpy(tables[side] + 0x215, (const void *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ISMBCODEPAGE), 4);
+            snprintf(desc, sizeof desc, "setmbcp %d rc", cps[i]);
+            ck_push(side, desc, rc);
+            snprintf(desc, sizeof desc, "setmbcp %d tables", cps[i]);
+            ck_push(side, desc, (int32_t)ck_hash(tables[side], sizeof tables[side]));
+            /* Back to nothing, so the next request rebuilds from scratch
+             * on both sides -- the original answers 0 for a repeat. */
+            osetmbcp(0);
+        }
+    }
+    osetmbcp(-3);
+
+    /* The control word, as the startup leaves it and as each stack
+     * reads and sets it. */
+    {
+        static const uint32_t reqs[][2] = {
+            { 0, 0 }, { 0x20000, 0x30000 }, { 0x10000, 0x30000 }, { 0x300, 0x300 },
+            { 0, 0x300 }, { 0x100, 0x300 }, { 0x200, 0x300 }, { 0, 0x300 }, { 0x1F, 0x1F },
+            { 0x40000, 0x40000 }, { 0, 0x40000 }, { 0x10000, 0x30000 },
+        };   /* never the masks cleared: an unmasked x87 exception traps the next operation */
+        uint32_t a, b, i2;
+        char     desc[CK_DESC];
+
+        /* Each request through one stack and read back through the other,
+         * then the same the other way round, from the same prior state. */
+        for (i2 = 0; i2 < sizeof reqs / sizeof *reqs; i2++) {
+            a = ocontrol(reqs[i2][0], reqs[i2][1]);
+            b = crt_control87(0, 0);
+            snprintf(desc, sizeof desc, "control87 #%u orig sets", i2);
+            ck_push(0, desc, (int32_t)a);
+            ck_push(1, desc, (int32_t)b);
+            b = crt_control87(reqs[i2][0], reqs[i2][1]);
+            a = ocontrol(0, 0);
+            snprintf(desc, sizeof desc, "control87 #%u ours sets", i2);
+            ck_push(0, desc, (int32_t)a);
+            ck_push(1, desc, (int32_t)b);
+        }
+    }
+
+    ck_scripts++;
+    ck_ops += ck_dn[0];
+    for (i = 0; i < ck_dn[0] || i < ck_dn[1]; i++) {
+        if (i >= ck_dn[0] || i >= ck_dn[1] || ck_dv[0][i] != ck_dv[1][i]
+            || strcmp(ck_dd[0][i], ck_dd[1][i]) != 0) {
+            ck_mismatches++;
+            if (ck_shown++ < 40)
+                fprintf(stderr, "crtcheck: MISMATCH startup value %d: orig %s = %d, ours %s = %d\n",
+                        i, i < ck_dn[0] ? ck_dd[0][i] : "(none)", i < ck_dn[0] ? ck_dv[0][i] : 0,
+                        i < ck_dn[1] ? ck_dd[1][i] : "(none)", i < ck_dn[1] ? ck_dv[1][i] : 0);
+            if (i >= ck_dn[0] || i >= ck_dn[1])
+                break;
+        }
+    }
+}
+
 static const char *const kReadModes[] = {
     "r", "rb", "rt", "r+", "rb+", "r+t", "rS", "rR", "rT", "rc", "rn", "r+ +", "rbb", "rtb",
 };
@@ -1459,6 +1605,7 @@ extern "C" int32_t WINAPI am2_crtcheck_main(HINSTANCE inst, HINSTANCE prev, LPST
     ck_strtod();
     ck_memcpy();
     ck_heap();
+    ck_startup();
     ck_exit();
 
     fprintf(stderr, "crtcheck: %d scripts, %d calls, %d files: %d mismatching calls, %d differing files\n",

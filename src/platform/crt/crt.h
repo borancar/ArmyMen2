@@ -121,6 +121,8 @@ int32_t __cdecl crt_sprintf(char *buf, const char *format, ...);
 int32_t __cdecl crt_strlen(const char *s);
 /* 0x00469CA0. */
 char *__cdecl crt_strcpy(char *dst, const char *src);
+/* 0x00469CB0. strcat. */
+char *__cdecl crt_strcat(char *dst, const char *src);
 /* 0x0046B420. strcmp: -1, 0 or 1. */
 int32_t __cdecl crt_strcmp(const char *a, const char *b);
 /* 0x00466D80. memcpy. */
@@ -473,6 +475,51 @@ int32_t __cdecl crt_fcloseall(void);
 void __cdecl crt_seh_set(void);
 void __cdecl crt_seh_restore(void);
 
+/* ---- startup.cpp ------------------------------------------------------- */
+
+/* 0x004664C0, up to the call of WinMain: the version words, the heap,
+ * lowio, the command line and environment, argv, envp, _cinit. The
+ * standalone and native builds call this before WinMain; the original's
+ * entry point then calls WinMain and exit, which they do from the host's
+ * main and the startup object's destructor. */
+void __cdecl crt_startup(void);
+/* 0x0046A396. The environment block, narrow, malloc'd. */
+char *__cdecl crt_get_environment_strings(void);
+/* 0x0046A149 / 0x0046A1E2. argv from _acmdln, through the two-pass parser:
+ * once to count, once to fill. */
+void __cdecl crt_setargv(void);
+void __cdecl crt_parse_cmdline(const char *cmd, char **argv, char *args, int32_t *argc, int32_t *nchars);
+/* 0x0046A090 / 0x0046A038. */
+void __cdecl crt_setenvp(void);
+char *__cdecl crt_wincmdln(void);
+/* 0x0046C263 and its pieces. */
+int32_t __cdecl crt_setmbcp(int32_t cp);
+int32_t __cdecl crt_getsystemcp(int32_t cp);
+uint32_t __cdecl crt_cp_lcid(int32_t cp);
+void __cdecl crt_initmbctable(void);
+void __cdecl crt_mbctype_reset(void);
+void __cdecl crt_setsbuplow(void);
+int32_t __cdecl crt_ismbblead(int32_t c);
+int32_t __cdecl crt_ismbbtype(int32_t c, int32_t ctype_mask, int32_t mbctype_mask);
+/* 0x004665B6 / 0x004665DB / 0x0046A5E1 / 0x0046A5A8 / 0x0046C685. */
+void __cdecl crt_amsg_exit(int32_t rterrnum);
+void __cdecl crt_fast_error_exit(int32_t rterrnum);
+void __cdecl crt_nmsg_write(int32_t rterrnum);
+void __cdecl crt_ff_msgbanner(void);
+int32_t __cdecl crt_messagebox(const char *text, const char *caption, uint32_t type);
+/* 0x0046443E and its pieces: _fpmath. */
+void __cdecl crt_fpmath(void);
+int32_t __cdecl crt_fdiv_detect(void);
+int32_t __cdecl crt_fdiv_test(void);
+void __cdecl crt_setdefaultprecision(void);
+uint32_t __cdecl crt_control87(uint32_t newval, uint32_t mask);
+uint32_t __cdecl crt_hw2abstract(uint32_t cw);
+uint32_t __cdecl crt_abstract2hw(uint32_t flags);
+/* 0x00464456. printf.cpp calls fltcvt.cpp by name: nothing to fill. */
+void __cdecl crt_cfltcvt_init(void);
+/* 0x004692E2. The XI table, then the XC table. */
+void __cdecl crt_cinit(void);
+
 /* ---- standin.cpp -- NOT reconstructions -------------------------------- */
 
 /* 0x0046D236 __crtCompareStringA and 0x0046D1C8 __wtomb_environ are not
@@ -484,9 +531,13 @@ int32_t __cdecl crt_compare_string_a(uint32_t lcid, uint32_t flags, const char *
 int32_t __cdecl crt_wtomb_environ(void);
 
 
-/* _amsg_exit (0x004665B6) is not read yet: it ends the process with a
- * runtime-error message. This forwards to the host. */
-void  __cdecl crt_amsg_exit(int32_t code);
+/* 0x0046BB74 __crtGetStringTypeA and 0x0046996B __crtLCMapStringA are the
+ * locale layer's wrappers and are not read; these reach the two kernel32
+ * calls with the arguments they would. */
+int32_t __cdecl crt_get_string_type_a(uint32_t info, const char *src, int32_t n, uint16_t *out,
+                                      uint32_t codepage, uint32_t lcid, int32_t error);
+int32_t __cdecl crt_lcmapstring_a(uint32_t lcid, uint32_t flags, const char *src, int32_t n,
+                                  char *dst, int32_t dstn, uint32_t codepage, int32_t error);
 
 /* ---- rand.cpp ---------------------------------------------------------- */
 

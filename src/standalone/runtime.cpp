@@ -308,12 +308,15 @@ extern "C" void am2_standalone_init(void)
     am2_bind_imports();
     am2_apply_fixups();
 
-    /* The original's CRT ran the __xc_a..__xc_z table before WinMain and
-     * ours does not, so the C++ static initializers are called here. Without
-     * them the globals they fill stay null -- SetGamePalette writes through
-     * one, g_remapIdent, and faulted on address 0. Fixups first: an
-     * initializer may store a pointer the table also mentions. */
-    am2_run_static_init();
+    /* The CRT's startup, src/platform/crt/startup.cpp: the version words,
+     * the heap, lowio, the command line and environment, argv and envp,
+     * then _cinit -- the C initializers and the C++ static initializers,
+     * each through the image's own table, whose entries the fixups above
+     * have just pointed at the reconstructions. Without the static
+     * initializers the globals they fill stay null: SetGamePalette writes
+     * through one, g_remapIdent, and faulted on address 0. Fixups first,
+     * for that reason. */
+    crt_startup();
 
     /* The injected queue the control socket writes into. dllmain.c does this
      * for the injected build; without it here every `key`, `type` and `mouse`

@@ -185,6 +185,17 @@ char *__cdecl crt_strcpy(char *dst, const char *src)
 
 /* 0x00465710: memmove, which copies backwards when the destination lies
  * above an overlapping source. */
+char *__cdecl crt_strcat(char *dst, const char *src)
+{
+    char *d = dst;
+
+    while (*d)
+        d++;
+    while ((*d++ = *src++) != 0)
+        ;
+    return dst;
+}
+
 int32_t __cdecl crt_strcmp(const char *a, const char *b)
 {
     /* The original compares a dword at a time when `a` is aligned; the

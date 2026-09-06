@@ -104,6 +104,22 @@ which runs the table from the end and the two terminator tables and comes
 back -- the same 46 in the same reverse order both times. Last, because
 the pre-terminator closes every stream.
 
+A seventh is the startup: parse_cmdline on 26 command lines, both
+passes, compared on argc, the character count and every argument's
+offset -- quotes, doubled quotes, runs of backslashes before and not
+before a quote, tabs and a control character after the program name;
+__wincmdln on the same lines through the shared _acmdln; _setmbcp for
+the five code pages the image carries tables for, 1252, 437, the two
+system requests and a bogus one, compared table for table against what
+the original builds; and _control87 both ways round for the precisions,
+the rounding modes, the exception masks and the infinity bit. Eight of
+nine mutations fail: backslashes not halved 9, a doubled quote not
+literal 4, a quoted program name keeping its quote 10, tab not ending
+the program name 4, one flag for every range set 5, upper and lower
+swapped 9, the rounding modes swapped 2, 936 given 932's LCID 1. The
+ninth, an unknown code page not rejected, is a theorem on this platform:
+its GetCPInfo answers every code page.
+
 What the corpus cannot reach: the _read arm for a read whose entire
 content is one CR with an LF behind it, which through the FILE layer needs
 a read of exactly one byte and the smallest is the two-byte fallback
@@ -139,7 +155,10 @@ CHECKS = ("crt_fopen", "crt_fsopen", "crt_openfile", "crt_getstream",
           "crt_sbh_alloc_new_group", "crt_atexit", "crt_onexit",
           "crt_onexitinit", "crt_exit", "crt_exit_quick", "crt_doexit",
           "crt_initterm", "crt_endstdio", "crt_fcloseall", "crt_seh_set",
-          "crt_seh_restore")
+          "crt_seh_restore", "crt_parse_cmdline", "crt_wincmdln", "crt_setmbcp",
+          "crt_getsystemcp", "crt_cp_lcid", "crt_mbctype_reset", "crt_setsbuplow",
+          "crt_ismbblead", "crt_ismbbtype", "crt_control87", "crt_hw2abstract",
+          "crt_abstract2hw", "crt_setdefaultprecision")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
