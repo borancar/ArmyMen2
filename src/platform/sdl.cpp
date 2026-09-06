@@ -931,7 +931,12 @@ static void am2_audio_step(void)
         am2_audio_scratch_frames = frames;
     }
     am2_audio_mix(am2_audio_ud, am2_audio_scratch, frames);
-    SDL_PutAudioStreamData(am2_sdl_audio, am2_audio_scratch, frames * (int)(2 * sizeof(float)));
+    /* Mixed and then DROPPED, not queued. A device drains its stream in
+     * real time and the pump outruns real time whenever it is not sleeping,
+     * so queueing here grew without bound: 5.6 KB a pump, 70 MB every
+     * 12,400 frames, on a dummy device forever. The mix is what a
+     * comparison wants and the dump below still sees it; the device is
+     * opened so the game believes it has one, and hears nothing. */
 #ifdef AM2_DEVTOOLS
     if (am2_audio_dump)
         fwrite(am2_audio_scratch, 2 * sizeof(float), (size_t)frames, am2_audio_dump);

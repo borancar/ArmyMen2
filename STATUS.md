@@ -187,6 +187,18 @@ RETURN, both dialogs, then W, S and D held for 100 pumps each):
 | hybrid (original) against native (reconstruction) | identical through frame 79 -- the title, the click, the loading, the briefing -- then **every frame from 80 on differs by the same 26 pixels** |
 | the 26 pixels | 13 horizontal PAIRS on sandbag and hut edges, static from frame to frame, and in every pair the two colours are SWAPPED: the original has A,B where the reconstruction has B,A |
 | the object tables | identical at the mission start and after the walk, all 1,610 lines, Sarge at `1743,976` on both |
+| the game's memory at Boot Camp | carried span 2,012 KB (74 KB of it initialised), game heap 14,037 KB, resident total 30.9 MB and FLAT over 56,000 frames |
+
+**The lockstep sound was a leak, in both builds equally.** `am2_audio_step`
+mixed one pump of sound on the game thread and QUEUED it into the SDL
+stream, and a device drains a stream in real time while the pump outruns
+real time whenever it is not sleeping -- so on the dummy device nothing
+drained it at all: 5.6 KB a pump, 70 MB every 12,400 frames, 528 MB resident
+after ninety thousand. The first reading of the game's memory was that
+number and not the game's. A stack trace on the megabyte `mmap`s named it
+(`strace -k`), and the CRT's small-block heap held one region throughout.
+The mix is what a comparison wants, so it is mixed and dropped; the device
+is opened so the game believes it has one.
 
 So the simulation is in lockstep with the original over this drive, and the
 whole visible difference is one rare two-pixel case in something that
