@@ -411,6 +411,7 @@ PVOID WINAPI AddVectoredExceptionHandler(ULONG first,
 #define STD_ERROR_HANDLE  ((DWORD)-12)
 
 #define HEAP_ZERO_MEMORY 0x08
+#define HEAP_NO_SERIALIZE 0x01
 #define HEAP_REALLOC_IN_PLACE_ONLY 0x10
 #define MEM_COMMIT   0x1000
 #define MEM_RESERVE  0x2000

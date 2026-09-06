@@ -18340,6 +18340,54 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CRT_HUGE_VAL      0x0048CEB0u  /* double: +infinity, what strtod answers for an overflow */
 #define ADDR_CRT_FLT_PTR       0x0048CEB8u  /* _flt *: the static record _fltin2 fills {flags, nbytes, lval, pad, double dval} */
 #define ADDR_CRT_CVTINFO_DOUBLE 0x0048D3C8u /* {max_exp 1024, min_exp -1023, mantbits 53, expbits 11, size 64, bias 1023}; the float's follows */
+
+/* The heap: malloc over the small-block heap for 1016 bytes and under,
+ * HeapAlloc above; src/platform/crt/heap.cpp. And the exit path;
+ * exit.cpp. */
+#define ADDR_CRT_NH_MALLOC     0x0046480Au  /* void *(size, nhflag): _heap_alloc, retrying through the new handler */
+#define ADDR_CRT_HEAP_ALLOC    0x00464836u  /* void *(size): __sbh_alloc_block under the threshold, else HeapAlloc */
+#define ADDR_CRT_CALLOC        0x0046C18Eu  /* void *(count, size) */
+#define ADDR_CRT_MSIZE         0x00469629u  /* uint32(p) */
+#define ADDR_CRT_HEAP_INIT     0x00467384u  /* int32(mtflag): HeapCreate and __sbh_heap_init */
+#define ADDR_CRT_SBH_HEAP_INIT 0x004673C0u  /* int32(void): the header list, 16 entries */
+#define ADDR_CRT_SBH_FIND_BLOCK 0x004673FEu /* HEADER *(p): the region a pointer lies in, or NULL */
+#define ADDR_CRT_SBH_ALLOC_BLOCK 0x00467754u /* void *(size) */
+#define ADDR_CRT_SBH_FREE_BLOCK 0x00467429u /* void(HEADER *, p) */
+#define ADDR_CRT_SBH_RESIZE_BLOCK 0x00467C09u /* int32(HEADER *, p, size) */
+#define ADDR_CRT_SBH_ALLOC_NEW_REGION 0x00467A5Du /* HEADER *(void): a megabyte reserved */
+#define ADDR_CRT_SBH_ALLOC_NEW_GROUP 0x00467B0Eu /* int32(HEADER *): 32 KB committed, eight pages of one free entry each */
+#define ADDR_CRT_CALLNEWH      0x00467EFFu  /* int32(size): the new handler, if one is set */
+#define ADDR_CRT_ONEXIT        0x00464FA4u  /* fn(fn): the table grown four entries at a time */
+#define ADDR_CRT_ONEXITINIT    0x00465023u  /* void(void): a 32-entry table; startup's */
+#define ADDR_CRT_EXIT          0x0046930Fu  /* void(code): doexit(code, 0, 0) */
+#define ADDR_CRT_EXIT_QUICK    0x00469320u  /* void(code): _exit, doexit(code, 1, 0) */
+#define ADDR_CRT_DOEXIT        0x00469331u  /* void(code, quick, retcaller) */
+#define ADDR_CRT_CINIT         0x004692E2u  /* void(void): the XI then XC initializer tables */
+#define ADDR_CRT_INITTERM      0x004693CAu  /* void(begin, end) */
+#define ADDR_CRT_ENDSTDIO      0x00469C8Bu  /* void(void): _flushall, and _fcloseall when the exit returns to its caller */
+#define ADDR_CRT_FCLOSEALL     0x0046C20Bu  /* int32(void): every stream from 3, the FILEs past _iob freed */
+#define ADDR_CRT_SEH_SET       0x0046B3ADu  /* void(void): SetUnhandledExceptionFilter(the CRT's), the old one kept */
+#define ADDR_CRT_SEH_RESTORE   0x0046B3BEu  /* void(void): the old one put back */
+#define ADDR_CRT_XP_BEGIN      0x00473074u  /* void (*)[]: the pre-terminators, {0, _endstdio} */
+#define ADDR_CRT_XP_END        0x0047307Cu
+#define ADDR_CRT_XT_BEGIN      0x00473080u  /* void (*)[]: the terminators, {0, the SEH restore} */
+#define ADDR_CRT_XT_END        0x00473088u
+#define ADDR_CRT_SBH_THRESHOLD 0x0048CC74u  /* uint32 __sbh_threshold, 1016 */
+#define ADDR_CRT_NEWMODE       0x006645ECu  /* int32 _newmode: malloc retries through the new handler when set */
+#define ADDR_CRT_PNHHEAP       0x006645E8u  /* int32 (*)(size): the new handler */
+#define ADDR_CRT_EXIT_RETCALLER 0x00664640u /* uint8: doexit's retcaller, read by _endstdio */
+#define ADDR_CRT_EXIT_STARTED  0x00664644u  /* int32: doexit has begun */
+#define ADDR_CRT_EXIT_DONE     0x00664648u  /* int32: set before ExitProcess; a second doexit terminates the process */
+#define ADDR_CRT_ONEXITEND     0x00665C2Cu  /* fn **__onexitend */
+#define ADDR_CRT_ONEXITBEGIN   0x00665C30u  /* fn **__onexitbegin */
+#define ADDR_CRT_SBH_SIZE_HEADER_LIST 0x00665C34u /* int32: headers the list has room for, 16 at a time */
+#define ADDR_CRT_SBH_IND_GROUP_DEFER 0x00665C38u /* int32: the group whose decommit is deferred */
+#define ADDR_CRT_SBH_PHEADER_SCAN 0x00665C3Cu /* HEADER *: where the next allocation starts looking */
+#define ADDR_CRT_SBH_PHEADER_DEFER 0x00665C40u /* HEADER *: the region of the deferred group, or NULL */
+#define ADDR_CRT_SBH_CNT_HEADER_LIST 0x00665C44u /* int32 */
+#define ADDR_CRT_SBH_PHEADER_LIST 0x00665C48u /* HEADER *: 20 bytes each {bitvEntryHi, bitvEntryLo, bitvCommit, pHeapData, pRegion} */
+#define ADDR_CRT_CRTHEAP       0x00665C4Cu  /* HANDLE _crtheap */
+#define ADDR_CRT_SEH_OLD_FILTER 0x006647DCu /* LPTOP_LEVEL_EXCEPTION_FILTER: what SetUnhandledExceptionFilter answered at startup */
 #define ADDR_MODE_RB        0x00474170u  /* "rb" */
 
 /* ---- typed accessors -------------------------------------------------- */

@@ -478,6 +478,34 @@ work and the second inherits it. Reset that state before each stack, or
 the second stack's computation is never compared at all -- it was not,
 until the timezone globals were snapshotted after each run.
 
+**AN ORACLE OVER SHARED STATE IS COUNTERFACTUAL OR IT IS NOTHING, and a
+snapshot makes it exact.** The heap check's first version asked "free a
+block with one stack, then does the other hand the same block back?" --
+and failed on a correct reconstruction, because after a free the block
+has merged with its neighbours and the next allocation comes from the
+head of whatever list serves it; the original promises nothing of the
+kind either. What the two stacks CAN be asked is the same question from
+the same state: snapshot every committed page, every region's bitmaps
+and the five globals, run the operation through one stack, digest, put
+the snapshot back, run it through the other, digest, compare. 24,279
+operations that way, and every one of thirteen mutations fails. The one
+thing a snapshot cannot undo is an unmapped region, so a step that
+releases one is counted and skipped, not compared. Three of the
+thirteen survived the first corpus and every survival was the corpus:
+a "permutation" whose product overflowed before its modulus and so left
+363 blocks unfreed, and no group ever empty; a growth probe that
+alternated stacks, so the original repaired the table the mutation
+left short; and no free entry in an earlier region while the scan
+pointer sat on a later one. A mutation that passes names the input the
+corpus lacks; build that input before calling the gap a theorem.
+
+**AND A BLOCK'S OWNER DECIDES, NOT ITS SIZE.** A block reallocated above
+the threshold and back down stays HeapAlloc's -- the original keeps it
+there -- and the check, classifying by size, freed it through both
+stacks: a double free of the host's block that MALLOC_CHECK_ reported
+sixty operations later as corruption in the reconstruction. Ask
+`__sbh_find_block` whose it is, which is what free itself does.
+
 **A MUTATION PASS THAT RESTORES WITH `git checkout` DESTROYS AN UNTRACKED
 FILE'S WORK AND RESETS A TRACKED ONE'S.** Nine mutations over two new
 modules, restored with `git checkout -- FILE` after each: the untracked

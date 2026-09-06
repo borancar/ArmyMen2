@@ -951,6 +951,474 @@ static void ck_memcpy(void)
     }
 }
 
+/* ---- the heap ----------------------------------------------------------- */
+
+typedef void    *(__cdecl *AM2_CkMalloc)(uint32_t);
+typedef void     (__cdecl *AM2_CkFreeFn)(void *);
+typedef void    *(__cdecl *AM2_CkRealloc)(void *, uint32_t);
+typedef uint32_t (__cdecl *AM2_CkMsize)(const void *);
+
+typedef struct AM2_CkHeapStack {
+    const char   *name;
+    AM2_CkMalloc  malloc;
+    AM2_CkFreeFn  free;
+    AM2_CkRealloc realloc;
+    AM2_CkMsize   msize;
+} AM2_CkHeapStack;
+
+static const AM2_CkHeapStack kHeapOrig = {
+    "orig", (AM2_CkMalloc)(uintptr_t)ADDR_CRT_MALLOC, (AM2_CkFreeFn)(uintptr_t)ADDR_CRT_FREE,
+    (AM2_CkRealloc)(uintptr_t)ADDR_CRT_REALLOC, (AM2_CkMsize)(uintptr_t)ADDR_CRT_MSIZE,
+};
+static const AM2_CkHeapStack kHeapOurs = { "ours", crt_malloc, crt_free, crt_realloc, crt_msize };
+
+static int32_t ck_heap_bad, ck_heap_ops;
+
+#define ckh_list   (*(CRT_SBH_HEADER **)(uintptr_t)AM2_IMAGE(ADDR_CRT_SBH_PHEADER_LIST))
+#define ckh_count  (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_SBH_CNT_HEADER_LIST))
+#define ckh_scan   (*(CRT_SBH_HEADER **)(uintptr_t)AM2_IMAGE(ADDR_CRT_SBH_PHEADER_SCAN))
+#define ckh_defer  (*(CRT_SBH_HEADER **)(uintptr_t)AM2_IMAGE(ADDR_CRT_SBH_PHEADER_DEFER))
+#define ckh_idefer (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_SBH_IND_GROUP_DEFER))
+#define CKH_REGION 0x41C4
+#define CKH_GROUP  0x8000
+
+/* The small-block heap's whole state -- the header list, every region's
+ * bitmaps and lists, every committed group's 32 KB, and the five globals
+ * -- walked in one order for a snapshot, a restore, or a digest. The
+ * memory outside it, HeapAlloc's, is the host's and is not compared. */
+static uint8_t *ck_snap;
+static uint32_t ck_snap_cap;
+
+static uint32_t ck_sbh_walk(uint8_t *out, int32_t restore, uint32_t *digest)
+{
+    CRT_SBH_HEADER *h = ckh_list;
+    int32_t         n = ckh_count, i, g;
+    uint32_t        used = 0;
+    uint32_t        hsh = 2166136261u;
+    uint32_t        globals[6];
+
+#define CK_BLOCK(ptr, len) do { \
+        if (out) { if (restore) memcpy((ptr), out + used, (len)); else memcpy(out + used, (ptr), (len)); } \
+        if (digest) { const uint8_t *b_ = (const uint8_t *)(ptr); uint32_t k_; \
+            for (k_ = 0; k_ < (len); k_++) hsh = (hsh ^ b_[k_]) * 16777619u; } \
+        used += (len); } while (0)
+
+    globals[0] = (uint32_t)(uintptr_t)ckh_list;
+    globals[1] = (uint32_t)n;
+    globals[2] = (uint32_t)(uintptr_t)ckh_scan;
+    globals[3] = (uint32_t)(uintptr_t)ckh_defer;
+    globals[4] = (uint32_t)ckh_idefer;
+    globals[5] = 0;
+    CK_BLOCK(globals, sizeof globals);
+    if (restore) {
+        ckh_scan = (CRT_SBH_HEADER *)(uintptr_t)globals[2];
+        ckh_defer = (CRT_SBH_HEADER *)(uintptr_t)globals[3];
+        ckh_idefer = (int32_t)globals[4];
+    }
+    for (i = 0; i < n; i++, h++) {
+        uint32_t commit;
+
+        CK_BLOCK(h, sizeof *h);
+        commit = h->bitvCommit;
+        CK_BLOCK(h->pRegion, CKH_REGION);
+        for (g = 0; g < 32; g++)
+            if (!(commit & (0x80000000u >> g)))
+                CK_BLOCK(h->pHeapData + g * CKH_GROUP, CKH_GROUP);
+    }
+#undef CK_BLOCK
+    if (digest)
+        *digest = hsh;
+    return used;
+}
+
+/* A snapshot can be put back only over the header list it was taken
+ * from: a step that added or released a region is left as the first
+ * stack made it and not compared. */
+static int32_t ck_sbh_restorable(void)
+{
+    uint32_t g[2];
+
+    memcpy(g, ck_snap, sizeof g);
+    return g[0] == (uint32_t)(uintptr_t)ckh_list && g[1] == (uint32_t)ckh_count;
+}
+
+static void ck_sbh_snapshot(void)
+{
+    uint32_t need = ck_sbh_walk(NULL, 0, NULL);
+
+    if (need > ck_snap_cap) {
+        free(ck_snap);
+        ck_snap_cap = need + 0x100000;
+        ck_snap = (uint8_t *)malloc(ck_snap_cap);
+        if (!ck_snap) {
+            fprintf(stderr, "crtcheck: cannot snapshot the heap\n");
+            am2_host_exit(2);
+        }
+    }
+    ck_sbh_walk(ck_snap, 0, NULL);
+}
+
+static void ck_heap_expect(const char *what, int32_t i, uint32_t n, int32_t ok,
+                           uint32_t a, uint32_t b)
+{
+    ck_heap_ops++;
+    if (ok)
+        return;
+    ck_heap_bad++;
+    if (ck_shown++ < 40)
+        fprintf(stderr, "crtcheck: MISMATCH heap %s #%d size %u: orig 0x%08x, ours 0x%08x\n",
+                what, i, n, a, b);
+}
+
+/* One heap, two allocators over it, and an EXACT comparison: the whole
+ * small-block heap is snapshotted, one operation is run through each
+ * stack from that same state, and the two resulting states are digested
+ * and compared, along with the answer. Then the state is left as the
+ * original made it and the sequence goes on. A block above the threshold
+ * is the host's HeapAlloc's, whose address nothing controls, so for those
+ * the digest and null-ness are what is compared. A free that releases a
+ * whole region unmaps it, which a snapshot cannot put back: the header
+ * count is checked, and such a step is skipped rather than compared. */
+static void ck_heap(void)
+{
+    static const uint32_t sizes[] = {
+        0, 1, 2, 3, 4, 7, 8, 9, 15, 16, 17, 24, 31, 32, 33, 47, 48, 63, 64, 65, 100, 127, 128,
+        200, 255, 256, 300, 500, 511, 512, 513, 1000, 1008, 1015, 1016, 1017, 1024, 2000,
+        4000, 4096, 8000, 0x10000, 0x40000,
+    };
+    static void    *pool[8192];
+    static uint32_t psize[8192];
+    static uint8_t  pfill[8192];
+    int32_t         npool = 0, i, k, skipped = 0;
+
+    if (getenv("AM2_CRTCHECK_ONLY"))
+        return;
+    if (ck_trace)
+        fprintf(stderr, "crtcheck: heap\n");
+    ck_rng = 0xC0FFEE11u;
+    for (i = 0; i < 6000; i++) {
+        uint32_t r = ck_rnd();
+        uint32_t n = sizes[(r >> 1) % (sizeof sizes / sizeof *sizes)];
+        uint32_t op = (r >> 8) % 10;
+        int32_t  big = n > 1016;
+        void    *pa, *pb;
+        uint32_t da, db, sa, sb;
+
+        if (ck_trace > 1)
+            fprintf(stderr, "crtcheck:   heap #%d op %u size %u pool %d headers %d\n", i, op, n, npool, ckh_count);
+        if (op < 5 || npool == 0) {
+            /* malloc. */
+            ck_sbh_snapshot();
+            pb = crt_malloc(n);
+            if (!ck_sbh_restorable()) {
+                skipped++;
+                pa = pb;
+                goto keep;
+            }
+            ck_sbh_walk(NULL, 0, &db);
+            sb = pb ? crt_msize(pb) : 0;
+            if (pb && big)
+                kHeapOurs.free(pb);
+            ck_sbh_walk(ck_snap, 1, NULL);
+            pa = kHeapOrig.malloc(n);
+            ck_sbh_walk(NULL, 0, &da);
+            sa = pa ? kHeapOrig.msize(pa) : 0;
+            if (ck_trace > 1)
+                fprintf(stderr, "crtcheck:   malloc %u: orig %p ours %p (skipped %d)\n", n, pa, pb, skipped);
+            ck_heap_expect("malloc state", i, n, da == db, da, db);
+            ck_heap_expect("malloc answer", i, n, big ? (!pa == !pb) : pa == pb,
+                           (uint32_t)(uintptr_t)pa, (uint32_t)(uintptr_t)pb);
+            ck_heap_expect("msize", i, n, big ? (sa >= n && sb >= n) : sa == sb, sa, sb);
+keep:
+            if (pa && npool < 4096) {
+                memset(pa, (uint8_t)r, n);
+                pool[npool] = pa;
+                psize[npool] = n;
+                pfill[npool] = (uint8_t)r;
+                npool++;
+            } else if (pa) {
+                kHeapOrig.free(pa);
+            }
+        } else if (op < 8) {
+            /* free. */
+            int32_t j = (int32_t)((r >> 12) % (uint32_t)npool);
+            void   *p = pool[j];
+
+            /* Whose block it is decides, not its size: one reallocated
+             * above the threshold and back down stays HeapAlloc's, as the
+             * original keeps it, and freeing that through both stacks
+             * would free the host's block twice. */
+            n = psize[j];
+            big = crt_sbh_find_block(p) == NULL;
+            if (!big) {
+                ck_sbh_snapshot();
+                crt_free(p);
+                if (!ck_sbh_restorable()) {
+                    /* A region went away: nothing to restore into. */
+                    skipped++;
+                } else {
+                    ck_sbh_walk(NULL, 0, &db);
+                    ck_sbh_walk(ck_snap, 1, NULL);
+                    kHeapOrig.free(p);
+                    ck_sbh_walk(NULL, 0, &da);
+                    ck_heap_expect("free state", i, n, da == db, da, db);
+                }
+            } else {
+                ((r & 1) ? &kHeapOurs : &kHeapOrig)->free(p);
+                ck_heap_ops++;
+            }
+            pool[j] = pool[--npool];
+            psize[j] = psize[npool];
+            pfill[j] = pfill[npool];
+        } else {
+            /* realloc, contents kept. */
+            int32_t  j = (int32_t)((r >> 12) % (uint32_t)npool);
+            void    *p = pool[j];
+            uint32_t n2 = n, keep = psize[j] < n2 ? psize[j] : n2;
+            int32_t  oldbig = crt_sbh_find_block(p) == NULL;
+
+            if (ck_trace > 1)
+                fprintf(stderr, "crtcheck:   realloc pool[%d] %p old %u -> %u\n", j, p, psize[j], n2);
+
+            if (n2 == 0) {
+                void *q = ((r & 1) ? &kHeapOurs : &kHeapOrig)->realloc(p, 0);
+
+                ck_heap_expect("realloc to 0", i, n2, q == NULL, (uint32_t)(uintptr_t)q, 0);
+                pool[j] = pool[--npool];
+                psize[j] = psize[npool];
+                pfill[j] = pfill[npool];
+                continue;
+            }
+            if (oldbig || big) {
+                /* At least one side is the host's: contents and size only. */
+                void *q = ((r & 1) ? &kHeapOurs : &kHeapOrig)->realloc(p, n2);
+
+                if (!q) {
+                    ck_heap_expect("realloc", i, n2, 0, (uint32_t)(uintptr_t)p, 0);
+                    continue;
+                }
+                for (k = 0; k < (int32_t)keep; k++)
+                    if (((uint8_t *)q)[k] != pfill[j]) {
+                        ck_heap_expect("realloc contents", i, n2, 0, (uint32_t)(uintptr_t)p, (uint32_t)(uintptr_t)q);
+                        break;
+                    }
+                ck_heap_expect("realloc size", i, n2, kHeapOrig.msize(q) >= n2 && crt_msize(q) >= n2,
+                               kHeapOrig.msize(q), crt_msize(q));
+                memset(q, pfill[j], n2);
+                pool[j] = q;
+                psize[j] = n2;
+                continue;
+            }
+            ck_sbh_snapshot();
+            pb = crt_realloc(p, n2);
+            if (!ck_sbh_restorable()) {
+                skipped++;
+                pa = pb;
+            } else {
+                ck_sbh_walk(NULL, 0, &db);
+                sb = pb ? crt_msize(pb) : 0;
+                ck_sbh_walk(ck_snap, 1, NULL);
+                pa = kHeapOrig.realloc(p, n2);
+                ck_sbh_walk(NULL, 0, &da);
+                sa = pa ? kHeapOrig.msize(pa) : 0;
+                ck_heap_expect("realloc state", i, n2, da == db, da, db);
+                ck_heap_expect("realloc answer", i, n2, pa == pb, (uint32_t)(uintptr_t)pa, (uint32_t)(uintptr_t)pb);
+                ck_heap_expect("realloc msize", i, n2, sa == sb, sa, sb);
+            }
+            if (!pa) {
+                ck_heap_expect("realloc", i, n2, 0, (uint32_t)(uintptr_t)p, 0);
+                continue;
+            }
+            for (k = 0; k < (int32_t)keep; k++)
+                if (((uint8_t *)pa)[k] != pfill[j]) {
+                    ck_heap_expect("realloc contents", i, n2, 0, (uint32_t)(uintptr_t)p, (uint32_t)(uintptr_t)pa);
+                    break;
+                }
+            memset(pa, pfill[j], n2);
+            pool[j] = pa;
+            psize[j] = n2;
+        }
+    }
+    /* Everything back, each block through the stack the sequence names. */
+    for (i = 0; i < npool; i++)
+        ((i & 1) ? &kHeapOurs : &kHeapOrig)->free(pool[i]);
+    npool = 0;
+
+    /* A burst: enough 500-byte blocks for three regions, so the scan
+     * pointer has somewhere to point, then every one freed in a scrambled
+     * order, so groups empty and the deferred decommit fires -- each
+     * compared the same way. A region's release unmaps it and is skipped. */
+    for (i = 0; i < 3600; i++) {
+        uint32_t n = 500;
+        void    *pa, *pb;
+        uint32_t da, db;
+
+        ck_sbh_snapshot();
+        pb = crt_malloc(n);
+        if (!ck_sbh_restorable()) {
+            skipped++;
+            pa = pb;
+        } else {
+            ck_sbh_walk(NULL, 0, &db);
+            ck_sbh_walk(ck_snap, 1, NULL);
+            pa = kHeapOrig.malloc(n);
+            ck_sbh_walk(NULL, 0, &da);
+            ck_heap_expect("burst malloc state", i, n, da == db, da, db);
+            ck_heap_expect("burst malloc answer", i, n, pa == pb, (uint32_t)(uintptr_t)pa, (uint32_t)(uintptr_t)pb);
+        }
+        pool[npool++] = pa;
+    }
+    /* Twenty freed from the first region while the scan pointer sits on
+     * the last, then twenty asked for: the original serves them from the
+     * scan region, not from the holes. */
+    for (i = 0; i < 20; i++) {
+        uint32_t da, db;
+
+        ck_sbh_snapshot();
+        crt_free(pool[i]);
+        if (!ck_sbh_restorable()) {
+            skipped++;
+        } else {
+            ck_sbh_walk(NULL, 0, &db);
+            ck_sbh_walk(ck_snap, 1, NULL);
+            kHeapOrig.free(pool[i]);
+            ck_sbh_walk(NULL, 0, &da);
+            ck_heap_expect("hole free state", i, 500, da == db, da, db);
+        }
+        pool[i] = NULL;
+    }
+    for (i = 0; i < 20; i++) {
+        void    *pa, *pb;
+        uint32_t da, db;
+
+        ck_sbh_snapshot();
+        pb = crt_malloc(500);
+        if (!ck_sbh_restorable()) {
+            skipped++;
+            pa = pb;
+        } else {
+            ck_sbh_walk(NULL, 0, &db);
+            ck_sbh_walk(ck_snap, 1, NULL);
+            pa = kHeapOrig.malloc(500);
+            ck_sbh_walk(NULL, 0, &da);
+            ck_heap_expect("scan malloc state", i, 500, da == db, da, db);
+            ck_heap_expect("scan malloc answer", i, 500, pa == pb, (uint32_t)(uintptr_t)pa, (uint32_t)(uintptr_t)pb);
+        }
+        pool[i] = pa;
+    }
+    /* Every block freed in a scrambled order: 1237 is prime to 3600, so
+     * this is a permutation and every group empties. */
+    for (i = 0; i < 3600; i++) {
+        int32_t  j = (int32_t)((uint32_t)i * 1237u % 3600u);
+        void    *p = pool[j];
+        uint32_t da, db;
+
+        if (!p)
+            continue;
+        ck_sbh_snapshot();
+        crt_free(p);
+        if (!ck_sbh_restorable()) {
+            skipped++;
+        } else {
+            ck_sbh_walk(NULL, 0, &db);
+            ck_sbh_walk(ck_snap, 1, NULL);
+            kHeapOrig.free(p);
+            ck_sbh_walk(NULL, 0, &da);
+            ck_heap_expect("burst free state", i, 500, da == db, da, db);
+        }
+        pool[j] = NULL;
+    }
+    npool = 0;
+    if (ck_trace)
+        fprintf(stderr, "crtcheck: heap %d operations compared, %d skipped\n", ck_heap_ops, skipped);
+    ck_scripts++;
+    ck_ops += ck_heap_ops;
+    ck_mismatches += ck_heap_bad;
+}
+
+/* ---- atexit and the exit path --------------------------------------------- */
+
+typedef int32_t (__cdecl *AM2_CkAtexit)(CRT_ExitFn);
+typedef void    (__cdecl *AM2_CkDoexit)(int32_t, int32_t, int32_t);
+
+static int32_t ck_exit_order[64], ck_exit_n;
+static void __cdecl ck_h0(void) { ck_exit_order[ck_exit_n++] = 0; }
+static void __cdecl ck_h1(void) { ck_exit_order[ck_exit_n++] = 1; }
+static void __cdecl ck_h2(void) { ck_exit_order[ck_exit_n++] = 2; }
+static void __cdecl ck_h3(void) { ck_exit_order[ck_exit_n++] = 3; }
+static void __cdecl ck_h4(void) { ck_exit_order[ck_exit_n++] = 4; }
+static void __cdecl ck_h5(void) { ck_exit_order[ck_exit_n++] = 5; }
+
+/* Three handlers registered through each stack into the one table, then
+ * each stack's doexit with retcaller set, which runs the table from the
+ * end and the two terminator tables and comes back. Last, because the
+ * pre-terminator closes every stream. */
+static void ck_exit(void)
+{
+    static const CRT_ExitFn fns[6] = { ck_h0, ck_h1, ck_h2, ck_h3, ck_h4, ck_h5 };
+    AM2_CkAtexit  oat = (AM2_CkAtexit)(uintptr_t)ADDR_CRT_ATEXIT;
+    AM2_CkDoexit  odo = (AM2_CkDoexit)(uintptr_t)ADDR_CRT_DOEXIT;
+    CRT_ExitFn  **begin = (CRT_ExitFn **)(uintptr_t)AM2_IMAGE(ADDR_CRT_ONEXITBEGIN);
+    CRT_ExitFn  **end = (CRT_ExitFn **)(uintptr_t)AM2_IMAGE(ADDR_CRT_ONEXITEND);
+    int32_t       i, side, before, after, n0 = 0;
+    int32_t       order[2][64], counts[2];
+
+    if (getenv("AM2_CRTCHECK_ONLY"))
+        return;
+    before = (int32_t)(*end - *begin);
+    for (i = 0; i < 6; i++) {
+        int32_t rc = (i & 1) ? crt_atexit(fns[i]) : oat(fns[i]);
+
+        ck_dn[0] = 0;
+        if (rc != 0) {
+            ck_mismatches++;
+            fprintf(stderr, "crtcheck: MISMATCH atexit #%d answered %d\n", i, rc);
+        }
+    }
+    after = (int32_t)(*end - *begin);
+    if (after != before + 6) {
+        ck_mismatches++;
+        fprintf(stderr, "crtcheck: MISMATCH onexit table grew by %d, not 6\n", after - before);
+    }
+    for (i = 0; i < 6; i++)
+        if ((*end)[i - 6] != fns[i]) {
+            ck_mismatches++;
+            fprintf(stderr, "crtcheck: MISMATCH onexit entry %d is not handler %d\n", i - 6, i);
+        }
+    /* Past the 32 entries startup gave the table: it must grow, four at a
+     * time, and hold what it holds. All through the reconstruction, since
+     * the original's would repair a table ours failed to grow. */
+    for (i = 0; i < 40; i++) {
+        int32_t  rc = crt_atexit(ck_h5);
+        uint32_t cap = crt_msize(*begin), used = (uint32_t)((uint8_t *)*end - (uint8_t *)*begin);
+
+        if (rc != 0 || cap < used || (*end)[-1] != ck_h5) {
+            ck_mismatches++;
+            if (ck_shown++ < 40)
+                fprintf(stderr, "crtcheck: MISMATCH onexit growth #%d: rc %d, %u bytes used of %u\n", i, rc, used, cap);
+        }
+    }
+    for (side = 0; side < 2; side++) {
+        ck_exit_n = 0;
+        if (side)
+            crt_doexit(0, 0, 1);
+        else
+            odo(0, 0, 1);
+        counts[side] = ck_exit_n;
+        memcpy(order[side], ck_exit_order, sizeof order[side]);
+    }
+    n0 = counts[0];
+    if (counts[0] != counts[1] || memcmp(order[0], order[1], sizeof order[0]) != 0
+        || n0 < 6 || order[0][40] != 5 || order[0][45] != 0) {
+        ck_mismatches++;
+        fprintf(stderr, "crtcheck: MISMATCH exit ran %d then %d handlers; first order %d %d %d %d %d %d\n",
+                counts[0], counts[1], order[0][0], order[0][1], order[0][2], order[0][3],
+                order[0][4], order[0][5]);
+    }
+    ck_scripts++;
+    ck_ops += 6 + counts[0] + counts[1];
+}
+
 static const char *const kReadModes[] = {
     "r", "rb", "rt", "r+", "rb+", "r+t", "rS", "rR", "rT", "rc", "rn", "r+ +", "rbb", "rtb",
 };
@@ -990,6 +1458,8 @@ extern "C" int32_t WINAPI am2_crtcheck_main(HINSTANCE inst, HINSTANCE prev, LPST
     ck_dirs(dir);
     ck_strtod();
     ck_memcpy();
+    ck_heap();
+    ck_exit();
 
     fprintf(stderr, "crtcheck: %d scripts, %d calls, %d files: %d mismatching calls, %d differing files\n",
             ck_scripts, ck_ops, ck_nfiles, ck_mismatches, ck_filediffs);

@@ -147,11 +147,13 @@ extern const uint8_t am2_pickup_kind_index[29];
 #undef ADDR_REALLOC
 #undef ADDR_MEMMOVE
 #undef ADDR_VSPRINTF
+#undef ADDR_CRT_ENDSTDIO
+#undef ADDR_CRT_SEH_RESTORE
 #undef ADDR_DIRECTDRAWCREATE
 #undef ADDR_DIRECTINPUTCREATE
 #undef ADDR_DIRECTSOUNDCREATE
 
-#define ADDR_CRT_ATEXIT       AM2_SA(atexit)
+#define ADDR_CRT_ATEXIT       AM2_SA(crt_atexit)
 #define ADDR_CRT_ATOI         AM2_SA(crt_atoi)
 #define ADDR_CRT_BSEARCH      AM2_SA(crt_bsearch)
 #define ADDR_CRT_CHDIR        AM2_SA(crt_chdir)
@@ -161,12 +163,12 @@ extern const uint8_t am2_pickup_kind_index[29];
 #define ADDR_CRT_FINDCLOSE    AM2_SA(crt_findclose)
 #define ADDR_CRT_FINDFIRST    AM2_SA(crt_findfirst)
 #define ADDR_CRT_FINDNEXT     AM2_SA(crt_findnext)
-#define ADDR_CRT_FREE         AM2_SA(free)
+#define ADDR_CRT_FREE         AM2_SA(crt_free)
 #define ADDR_CRT_GETCWD       AM2_SA(crt_getcwd)
-#define ADDR_CRT_MALLOC       AM2_SA(malloc)
+#define ADDR_CRT_MALLOC       AM2_SA(crt_malloc)
 #define ADDR_CRT_MKDIR        AM2_SA(crt_mkdir)
 #define ADDR_CRT_QSORT        AM2_SA(crt_qsort)
-#define ADDR_CRT_REALLOC      AM2_SA(realloc)
+#define ADDR_CRT_REALLOC      AM2_SA(crt_realloc)
 #define ADDR_CRT_REMOVE       AM2_SA(crt_remove)
 #define ADDR_CRT_RMDIR        AM2_SA(crt_rmdir)
 #define ADDR_CRT_STRCHR       AM2_SA(crt_strchr)
@@ -188,15 +190,20 @@ extern const uint8_t am2_pickup_kind_index[29];
 #define ADDR_FSEEK            AM2_SA(crt_fseek)
 #define ADDR_FWRITE           AM2_SA(crt_fwrite)
 #define ADDR_GAME_DELETE      AM2_SA(am2_sa_operator_delete)
-#define ADDR_GAME_MALLOC      AM2_SA(malloc)
+#define ADDR_GAME_MALLOC      AM2_SA(crt_malloc)
 #define ADDR_GAME_OPERATOR_NEW AM2_SA(am2_sa_operator_new)
 #define ADDR_GAME_RAND        AM2_SA(crt_rand)
 #define ADDR_GAME_SPRINTF     AM2_SA(crt_sprintf)
 #define ADDR_GAME_STRICMP     AM2_SA(crt_stricmp)
 #define ADDR_LOG              AM2_SA(am2_sa_log)
-#define ADDR_REALLOC          AM2_SA(realloc)
-#define ADDR_MEMMOVE          AM2_SA(memmove)
+#define ADDR_REALLOC          AM2_SA(crt_realloc)
+#define ADDR_MEMMOVE          AM2_SA(crt_memmove)
 #define ADDR_VSPRINTF         AM2_SA(crt_vsprintf)
+/* The two entries the image's terminator tables hold, which mkglobals
+ * rewrites in the carried .rdata to these: exit.cpp's doexit walks the
+ * tables and finds the reconstructions there. */
+#define ADDR_CRT_ENDSTDIO     AM2_SA(crt_endstdio)
+#define ADDR_CRT_SEH_RESTORE  AM2_SA(crt_seh_restore)
 #define ADDR_DIRECTDRAWCREATE  AM2_SA(am2_sa_ddraw_create)
 #define ADDR_DIRECTINPUTCREATE AM2_SA(am2_sa_dinput_create)
 #define ADDR_DIRECTSOUNDCREATE AM2_SA(am2_sa_dsound_create)
@@ -206,7 +213,7 @@ extern const uint8_t am2_pickup_kind_index[29];
 #undef ADDR_FREE_ARMY_LISTS_ALIAS
 #undef ADDR_SCRIPT_PARSE_ACTION
 #define ADDR_FTELL            AM2_SA(crt_ftell)
-#define ADDR_GAME_FREE        AM2_SA(free)
+#define ADDR_GAME_FREE        AM2_SA(crt_free)
 #define ADDR_FREE_ARMY_LISTS_ALIAS AM2_SA(am2_sa_free_army_lists)
 
 /* The DEVELOPMENT binary (make native-dev, AM2_DEVTOOLS) puts every game

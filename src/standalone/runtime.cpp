@@ -189,8 +189,8 @@ extern "C" int32_t __stdcall am2_sa_dsound_create(void *guid, void **out, void *
 extern "C" void *am2_sa_operator_new(size_t n) { return am2_malloc(n); }
 extern "C" void am2_sa_operator_delete(void *p) { am2_free(p); }
 #else
-extern "C" void *am2_sa_operator_new(size_t n) { return malloc(n); }
-extern "C" void am2_sa_operator_delete(void *p) { free(p); }
+extern "C" void *am2_sa_operator_new(size_t n) { return crt_operator_new((uint32_t)n); }
+extern "C" void am2_sa_operator_delete(void *p) { crt_operator_delete(p); }
 #endif
 
 extern "C" void am2_sa_free_army_lists(void) { FreeArmyObjLists(); }
@@ -279,9 +279,15 @@ extern "C" void am2_standalone_init(void)
         am2_free = am2_dev_free;
     }
 #else
-    am2_malloc = malloc;
-    am2_realloc = realloc;
-    am2_free = free;
+    /* The CRT's own heap, src/platform/crt/heap.cpp: one allocator for the
+     * game and the CRT's internals, so a block crossing between them --
+     * a FILE's buffer, getcwd's malloc'd answer -- is freed where it was
+     * made. The development binary keeps its arena for the game's blocks
+     * and the CRT's internals stay on the small-block heap; the one
+     * crossing there is getcwd(NULL), which the game does not do. */
+    am2_malloc = crt_malloc;
+    am2_realloc = crt_realloc;
+    am2_free = crt_free;
 #endif
     am2_log = am2_sa_log;
     /* The directory calls too: crt.cpp's defaults are the host's chdir and
@@ -336,6 +342,12 @@ extern "C" void am2_standalone_init(void)
 namespace {
 struct AM2_StandaloneStartup {
     AM2_StandaloneStartup() { am2_standalone_init(); }
+    /* And the way out: the original's startup calls exit after WinMain
+     * returns, which runs the onexit table the game's atexit calls filled
+     * and the two terminator tables. Here the host's exit runs this
+     * destructor, and doexit with retcaller set does the same and comes
+     * back. */
+    ~AM2_StandaloneStartup() { crt_doexit(0, 0, 1); }
 };
 AM2_StandaloneStartup am2_standalone_startup;
 }

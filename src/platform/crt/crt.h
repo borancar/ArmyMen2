@@ -410,6 +410,69 @@ int32_t __cdecl crt_mbsnbicoll(const char *a, const char *b, uint32_t n);
  * byte. */
 int32_t __cdecl crt_mbctoupper(int32_t c);
 
+/* ---- heap.cpp ---------------------------------------------------------- */
+
+/* One region of the small-block heap: a reserved megabyte, committed in
+ * 32 KB groups of eight pages, with a bitmap per size class. */
+typedef struct CRT_SBH_HEADER {
+    uint32_t bitvEntryHi;   /* classes 0..31 with a free entry somewhere in the region */
+    uint32_t bitvEntryLo;   /* classes 32..63 */
+    uint32_t bitvCommit;    /* groups NOT committed */
+    uint8_t *pHeapData;
+    struct CRT_SBH_REGION *pRegion;
+} CRT_SBH_HEADER;
+
+/* 0x004647F8 / 0x00464900 / 0x004646A9 / 0x004648F5 / 0x004646D8 /
+ * 0x0046C18E / 0x00469629. The CRT's allocator: blocks of 1016 bytes and
+ * under from the small-block heap, larger ones from HeapAlloc, and a
+ * retry through the new handler when _newmode (or operator new) asks. */
+void *__cdecl crt_malloc(uint32_t n);
+void *__cdecl crt_operator_new(uint32_t n);
+void  __cdecl crt_free(void *p);
+void  __cdecl crt_operator_delete(void *p);
+void *__cdecl crt_realloc(void *p, uint32_t n);
+void *__cdecl crt_calloc(uint32_t count, uint32_t size);
+uint32_t __cdecl crt_msize(const void *p);
+/* 0x0046480A / 0x00464836 / 0x00467EFF. */
+void *__cdecl crt_nh_malloc(uint32_t n, int32_t nhflag);
+void *__cdecl crt_heap_alloc(uint32_t n);
+int32_t __cdecl crt_callnewh(uint32_t n);
+/* 0x00467384 / 0x004673C0. Startup's; the first allocation runs them here. */
+int32_t __cdecl crt_heap_init(int32_t mtflag);
+int32_t __cdecl crt_sbh_heap_init(void);
+/* 0x004673FE / 0x00467754 / 0x00467429 / 0x00467C09 / 0x00467A5D /
+ * 0x00467B0E. The small-block heap itself. */
+CRT_SBH_HEADER *__cdecl crt_sbh_find_block(const void *p);
+void *__cdecl crt_sbh_alloc_block(uint32_t n);
+void  __cdecl crt_sbh_free_block(CRT_SBH_HEADER *h, void *p);
+int32_t __cdecl crt_sbh_resize_block(CRT_SBH_HEADER *h, void *p, uint32_t n);
+CRT_SBH_HEADER *__cdecl crt_sbh_alloc_new_region(void);
+int32_t __cdecl crt_sbh_alloc_new_group(CRT_SBH_HEADER *h);
+
+/* ---- exit.cpp ---------------------------------------------------------- */
+
+typedef void (__cdecl *CRT_ExitFn)(void);
+
+/* 0x00465011 / 0x00464FA4 / 0x00465023. The onexit table: 32 entries from
+ * startup, four more each time it fills. */
+int32_t __cdecl crt_atexit(CRT_ExitFn fn);
+CRT_ExitFn __cdecl crt_onexit(CRT_ExitFn fn);
+void __cdecl crt_onexitinit(void);
+/* 0x0046930F / 0x00469320 / 0x00469331. exit runs the onexit table from
+ * the end, then the two terminator tables, then ExitProcess; _exit skips
+ * the onexit table; doexit with retcaller set comes back instead. */
+void __cdecl crt_exit(int32_t code);
+void __cdecl crt_exit_quick(int32_t code);
+void __cdecl crt_doexit(int32_t code, int32_t quick, int32_t retcaller);
+/* 0x004693CA. Every non-NULL pointer between the two, in order. */
+void __cdecl crt_initterm(CRT_ExitFn *begin, CRT_ExitFn *end);
+/* 0x00469C8B / 0x0046C20B. What the pre-terminator table holds. */
+void __cdecl crt_endstdio(void);
+int32_t __cdecl crt_fcloseall(void);
+/* 0x0046B3AD / 0x0046B3BE. The terminator table's entry, and its pair. */
+void __cdecl crt_seh_set(void);
+void __cdecl crt_seh_restore(void);
+
 /* ---- standin.cpp -- NOT reconstructions -------------------------------- */
 
 /* 0x0046D236 __crtCompareStringA and 0x0046D1C8 __wtomb_environ are not
@@ -421,12 +484,8 @@ int32_t __cdecl crt_compare_string_a(uint32_t lcid, uint32_t flags, const char *
 int32_t __cdecl crt_wtomb_environ(void);
 
 
-/* The heap (malloc 0x004647F8, free 0x004646A9, calloc 0x0046C18E) and
- * _amsg_exit (0x004665B6) are not read yet. These forward to the host so the
- * modules above can link; heap.cpp replaces the first three. */
-void *__cdecl crt_malloc(uint32_t n);
-void *__cdecl crt_calloc(uint32_t count, uint32_t size);
-void  __cdecl crt_free(void *p);
+/* _amsg_exit (0x004665B6) is not read yet: it ends the process with a
+ * runtime-error message. This forwards to the host. */
 void  __cdecl crt_amsg_exit(int32_t code);
 
 /* ---- rand.cpp ---------------------------------------------------------- */

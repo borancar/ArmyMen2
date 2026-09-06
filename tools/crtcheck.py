@@ -74,6 +74,36 @@ other, compared on the whole buffer. The original copies from the end
 when the destination lies inside the source's span, so it is memmove
 under the other name; copying forward there fails 2,008 cases.
 
+A fifth section is the heap, and its oracle is exact where the FILE
+tables' could not be: one small-block heap is shared by both stacks, so
+the check snapshots all of it -- every committed group's 32 KB, every
+region's bitmaps and lists, the header list and the five globals -- runs
+one malloc, free or realloc through each stack from that state, and
+compares the two resulting states' digests and answers. 6,000 random
+operations over sizes on both sides of the 1016-byte threshold, then a
+burst of 3,600 blocks that fills three regions, twenty freed from the
+first while the scan pointer sits on the last and twenty asked for, and
+everything freed in a permuted order so that groups empty and the
+deferred decommit fires: 24,279 operations, 0 differ, 3 skipped because
+a region's release unmaps what a snapshot cannot put back. A block above
+the threshold is HeapAlloc's, whose address nothing controls; there the
+digest and null-ness are what is compared, and a block that was
+reallocated above and back down is HeapAlloc's still, as the original
+keeps it. Thirteen mutations, all failing: scanning from the list start
+40, ignoring the last-used group 3,930, leaving a remainder on its old
+list 1,294, not absorbing the next block 375, not the previous 411,
+never deferring the decommit 63, refusing to grow in place 110, keeping
+the whole block on a shrink 670, pages of 0xFE0 instead of 0xFF0 14,
+realloc copying the new size 259, _msize off by eight 3,173, the onexit
+table run forwards 1, and the table never grown 14.
+
+A sixth is atexit and the exit path: three handlers registered through
+each stack into the one table, forty more through the reconstruction so
+it grows past its 32 entries, and each stack's doexit with retcaller set,
+which runs the table from the end and the two terminator tables and comes
+back -- the same 46 in the same reverse order both times. Last, because
+the pre-terminator closes every stream.
+
 What the corpus cannot reach: the _read arm for a read whose entire
 content is one CR with an LF behind it, which through the FILE layer needs
 a read of exactly one byte and the smallest is the two-byte fallback
@@ -100,7 +130,16 @@ CHECKS = ("crt_fopen", "crt_fsopen", "crt_openfile", "crt_getstream",
           "crt_tzset_body", "crt_isindst", "crt_cvtdate", "crt_getenv",
           "crt_mbsnbicoll",
           "crt_strtod", "crt_fltin2", "crt_strgtold12", "crt_mtold12",
-          "crt_ld12tod", "crt_ld12cvt", "crt_isctype", "crt_memcpy")
+          "crt_ld12tod", "crt_ld12cvt", "crt_isctype", "crt_memcpy",
+          "crt_malloc", "crt_operator_new", "crt_free", "crt_operator_delete",
+          "crt_realloc", "crt_calloc", "crt_msize", "crt_nh_malloc",
+          "crt_heap_alloc", "crt_callnewh", "crt_heap_init", "crt_sbh_heap_init",
+          "crt_sbh_find_block", "crt_sbh_alloc_block", "crt_sbh_free_block",
+          "crt_sbh_resize_block", "crt_sbh_alloc_new_region",
+          "crt_sbh_alloc_new_group", "crt_atexit", "crt_onexit",
+          "crt_onexitinit", "crt_exit", "crt_exit_quick", "crt_doexit",
+          "crt_initterm", "crt_endstdio", "crt_fcloseall", "crt_seh_set",
+          "crt_seh_restore")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

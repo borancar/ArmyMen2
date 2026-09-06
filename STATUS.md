@@ -78,7 +78,7 @@ original answered under Unicorn:
   takes the API arm; and the `_mbctype` tables, so `_mbctoupper` answers
   its argument. Both are stated in the modules.
 
-The game's stdio, directories, `time`, `strtod`, `sprintf`, `qsort`, `bsearch`,
+The game's heap, stdio, directories, `time`, `strtod`, `sprintf`, `qsort`, `bsearch`,
 `rand`, `atoi`, `strtol` and the string functions above now run on the
 CRT in both the standalone and the native build; the lockstep comparison
 is unchanged by all of it, as it should be. `standin.cpp` holds what the
@@ -101,8 +101,37 @@ and says so in its name.
   between runs, a faulted try left the direction flag set, and 117
   vectors of two functions were recorded wrong; CLAUDE.md has it.
 
-Next: `atexit` with the exit path, and the heap, which retires most of
-`standin.cpp`; then the startup, which is what fills the tables above.
+- `heap.cpp` and `exit.cpp` (2026-09-06): `malloc`, `operator new`,
+  `free`, `operator delete`, `realloc`, `calloc` and `_msize` over MSVC 6's
+  small-block heap -- `__sbh_alloc_block`, `__sbh_free_block`,
+  `__sbh_resize_block`, the region and group allocators, `__sbh_find_block`,
+  `_heap_init` -- with `HeapAlloc` above the 1016-byte threshold; and
+  `atexit` with `_onexit`, `exit`, `_exit`, `doexit`, `_initterm`,
+  `_endstdio` and `_fcloseall`. The whole native build runs on it now,
+  the game's blocks and the CRT's own, and the lockstep A/B is unchanged.
+  The oracle is exact where the FILE tables' was not: the check snapshots
+  the entire small-block heap, runs one operation through each stack from
+  the same state, and compares the two states' digests -- 24,279
+  operations including a burst that fills three regions and empties them
+  again, 0 differ, three region releases skipped because an unmapped
+  region cannot be put back. Exit: handlers registered through both stacks land
+  in one table, both `doexit`s run them in the same reverse order, and
+  the table grows past its 32 entries. `mkglobals` rewrites the image's
+  two terminator-table entries to `crt_endstdio` and `crt_seh_restore`,
+  so the native exit path walks the same tables the original does.
+  Thirteen mutations, all failing.
+
+Every seam in `standalone.h` now names a reconstruction except the three
+`standin.cpp` holds -- `_amsg_exit`, `__crtCompareStringA`,
+`__wtomb_environ` -- and the DirectX creators, which are the platform's.
+The development binary keeps its fixed-address arena for the game's blocks
+(savestates need it); the CRT's own allocations there are on the
+small-block heap, and the one block that could cross, `getcwd(NULL)`'s,
+the game never asks for.
+
+Next: the startup -- `_ioinit`, `__initstdio`, `_setmbcp`, `_setenvp` and
+the rest of what fills the tables the modules above read lazily -- and
+`_amsg_exit`.
 
 ## THE ORIGINAL AND THE RECONSTRUCTION RUN IN LOCKSTEP
 
