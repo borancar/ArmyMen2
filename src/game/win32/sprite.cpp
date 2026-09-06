@@ -35,9 +35,12 @@
 #include "../../inject/patch.h"
 
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define g_screenClip     (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
+extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
 #define g_surfaceLocked  (*(int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
 #define g_drawTarget  (*(void *const *)(uintptr_t)ADDR_DRAW_TARGET)
 #define g_primarySurface (*(void *const *)(uintptr_t)ADDR_PRIMARY_SURFACE)
@@ -70,6 +73,18 @@ void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y, int32_t mode)
 
     if (!ClipRect(&spr->bounds, &g_screenClip, &x, &y, &clipped))
         return;
+
+    {
+        /* AM2_TRACE_SPRITE=1: one line per draw, the same line the hybrid's
+         * dev loader logs over the original. */
+        static int32_t trace = -1;
+        if (trace < 0)
+            trace = getenv("AM2_TRACE_SPRITE") != 0;
+        if (trace)
+            fprintf(stderr, "SPRITE pump %u id=%u fmt=%u flags=%x at=%d,%d src=%d,%d-%d,%d mode=%d\n",
+                    (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u), spr->id, spr->format, spr->flags,
+                    x, y, clipped.left, clipped.top, clipped.right, clipped.bottom, mode);
+    }
 
     DrawSpriteClipped(spr, x, y, &clipped, mode);
 }

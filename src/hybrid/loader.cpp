@@ -272,6 +272,57 @@ extern "C" uint8_t __cdecl am2_hybrid_trace_angle_between(const int16_t *from, c
     return h;
 }
 
+/* The reconstruction's DrawMapObject (win32/mapdraw.cpp) with a log line
+ * per draw, calling the ORIGINAL DrawSpriteClipped; dev builds only. */
+typedef void (__cdecl *am2_draw_sprite_clipped_fn)(void *spr, int32_t x, int32_t y, const RECT *src, int32_t mode);
+extern "C" void __cdecl am2_hybrid_trace_draw_map_object(void *obj, const RECT *world)
+{
+    uint8_t    *o      = (uint8_t *)obj;
+    const RECT *bounds = (const RECT *)(o + OBJ_OFF_BOUNDS);
+    const RECT *view   = (const RECT *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
+    RECT        clip, src;
+    uint8_t    *spr;
+
+    if (!IntersectRect(&clip, bounds, world))
+        return;
+    if (!(*(const uint8_t *)(o + MAPOBJ_OFF_FLAGS) & MAPOBJ_FLAG_VISIBLE))
+        return;
+    src.left = clip.left - bounds->left; src.top = clip.top - bounds->top;
+    src.right = clip.right - bounds->left; src.bottom = clip.bottom - bounds->top;
+    if (src.top == src.bottom || src.left == src.right)
+        return;
+    spr = *(uint8_t **)(o + MAPOBJ_OFF_SPRITE);
+    *(uint8_t **)(spr + 0x34) = *(uint8_t **)(o + MAPOBJ_OFF_LUT);
+    *(void **)(spr + 0x38)    = *(void **)(o + MAPOBJ_OFF_PALETTE);
+    fprintf(stderr, "MAPOBJ pump %u bounds=%ld,%ld-%ld,%ld world=%ld,%ld-%ld,%ld clip=%ld,%ld-%ld,%ld dst=%ld,%ld spr=%u fmt=%u flags=%x\n",
+            (unsigned)am2_host_pump_number(), (long)bounds->left, (long)bounds->top, (long)bounds->right, (long)bounds->bottom,
+            (long)world->left, (long)world->top, (long)world->right, (long)world->bottom,
+            (long)clip.left, (long)clip.top, (long)clip.right, (long)clip.bottom,
+            (long)(clip.left - view->left), (long)(clip.top - view->top),
+            *(unsigned *)spr, *(unsigned *)(spr + 8), *(unsigned *)(spr + 0xC));
+    ((am2_draw_sprite_clipped_fn)(uintptr_t)ADDR_DRAW_SPRITE_CLIPPED)(spr, clip.left - view->left, clip.top - view->top, &src, 0);
+}
+
+/* The reconstruction's DrawSprite (win32/sprite.cpp) with a log line per
+ * draw, calling the ORIGINAL ClipRect and DrawSpriteClipped. */
+typedef int32_t (__cdecl *am2_clip_rect_fn)(const RECT *src, const RECT *clip, int32_t *x, int32_t *y, RECT *out);
+extern "C" void __cdecl am2_hybrid_trace_draw_sprite(uint8_t *spr, int32_t x, int32_t y, int32_t mode)
+{
+    RECT clipped;
+    if (!spr)
+        return;
+    if (!*(void **)(spr + 0x10) && !*(void **)(spr + 0x30))
+        return;
+    x -= *(const int16_t *)(spr + 0x24);
+    y -= *(const int16_t *)(spr + 0x26);
+    if (!((am2_clip_rect_fn)(uintptr_t)ADDR_CLIP_RECT)((const RECT *)(spr + 0x14), (const RECT *)(uintptr_t)ADDR_SCREEN_CLIP, &x, &y, &clipped))
+        return;
+    fprintf(stderr, "SPRITE pump %u id=%u fmt=%u flags=%x at=%d,%d src=%ld,%ld-%ld,%ld mode=%d\n",
+            (unsigned)am2_host_pump_number(), *(unsigned *)spr, *(unsigned *)(spr + 8), *(unsigned *)(spr + 0xC),
+            x, y, (long)clipped.left, (long)clipped.top, (long)clipped.right, (long)clipped.bottom, mode);
+    ((am2_draw_sprite_clipped_fn)(uintptr_t)ADDR_DRAW_SPRITE_CLIPPED)(spr, x, y, &clipped, mode);
+}
+
 static void am2_hybrid_patch_jmp(uintptr_t at, const void *to)
 {
     uint8_t *p = (uint8_t *)at;
@@ -508,6 +559,14 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
      * number, so the two games' calls can be compared line for line. */
     if (getenv("AM2_TRACE_ANGLE"))
         am2_hybrid_patch_jmp(ADDR_ANGLE_BETWEEN, (const void *)&am2_hybrid_trace_angle_between);
+    /* AM2_TRACE_MAPOBJ=1: the same over DrawMapObject, logging every map
+     * object drawn with its bounds, clip and sprite, in draw order. */
+    if (getenv("AM2_TRACE_MAPOBJ"))
+        am2_hybrid_patch_jmp(ADDR_DRAW_MAP_OBJECT, (const void *)&am2_hybrid_trace_draw_map_object);
+    /* AM2_TRACE_SPRITE=1: the same over DrawSprite, every clipped sprite draw
+     * with its screen position and source rectangle. */
+    if (getenv("AM2_TRACE_SPRITE"))
+        am2_hybrid_patch_jmp(ADDR_DRAW_SPRITE, (const void *)&am2_hybrid_trace_draw_sprite);
 #endif
 
     am2_plat_log("running %s from its entry point 0x%08lx", path, (unsigned long)(uintptr_t)entry);

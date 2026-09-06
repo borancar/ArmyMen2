@@ -527,6 +527,7 @@ bad:
 #define g_blitRect   ((AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT)
 /* Not const: ScrollDecay shifts all four edges every frame. */
 #define g_viewRect   ((AM2_Rect *)(uintptr_t)ADDR_VIEW_ORIGIN_X)
+extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
 #define g_fullRedraw (*(int32_t *)(uintptr_t)ADDR_FULL_REDRAW)
 #define g_backBuffer (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
 
@@ -694,6 +695,21 @@ void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
     spr = *(AM2_Sprite **)(o + MAPOBJ_OFF_SPRITE);
     spr->lut     = *(uint8_t **)(o + MAPOBJ_OFF_LUT);
     spr->palette = *(void **)(o + MAPOBJ_OFF_PALETTE);
+
+    {
+        /* AM2_TRACE_MAPOBJ=1: one line per draw, the same line the hybrid's
+         * dev loader logs over the original, so draw orders compare. */
+        static int32_t trace = -1;
+        if (trace < 0)
+            trace = getenv("AM2_TRACE_MAPOBJ") != 0;
+        if (trace)
+            fprintf(stderr, "MAPOBJ pump %u bounds=%d,%d-%d,%d world=%d,%d-%d,%d clip=%ld,%ld-%ld,%ld dst=%ld,%ld spr=%u fmt=%u flags=%x\n",
+                    (unsigned)am2_host_pump_number(), bounds->left, bounds->top, bounds->right, bounds->bottom,
+                    world->left, world->top, world->right, world->bottom,
+                    (long)clip.left, (long)clip.top, (long)clip.right, (long)clip.bottom,
+                    (long)(clip.left - g_viewRect->left), (long)(clip.top - g_viewRect->top),
+                    spr->id, spr->format, spr->flags);
+    }
 
     DrawSpriteClipped(spr,
                       clip.left - g_viewRect->left,
