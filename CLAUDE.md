@@ -505,6 +505,17 @@ were not run. `tools/espmap.py --site` on every slot, the call target of
 every block, and the pushes of every call are the mechanical form, and
 now every recorded session is a regression that runs in a minute.
 
+**A LIVE DIVERGENCE THE RECORDING CANNOT REPRODUCE IS THE TOOL'S, and the
+tell was a round number.** After a trap the live run diverged by half the
+frame while the headless replay of its own recording ran clean, and so
+did the replay paused at that pump for forty seconds with the sockets
+busy. The recording held exactly 64 host lines at the pump after the
+trap: the platform kept host-event notes in 64 fixed slots, a held window
+queues hundreds of motions, and the 65th onward reached the leader and
+never the follower. The buffer grows now. When the replay disagrees with
+the run it was recorded from, suspect what carries the inputs before
+either game.
+
 **AND A RECORDING IS THE FIRST THING A LIVE TOOL NEEDS.** The very first
 live trap -- Sarge diving prone in the original and standing in the port
 -- was lost, because nothing had written the inputs down. Everything

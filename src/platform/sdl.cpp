@@ -848,8 +848,14 @@ static size_t   am2_step_len;
 static uint64_t am2_step_hashes[64];
 static uint32_t am2_step_indexes[64];
 static int32_t  am2_step_nframes;
-static char     am2_step_host[64][64];
-static int32_t  am2_step_nhost;
+/* Host events applied since the last report, one line each, in a buffer
+ * that GROWS. It was 64 fixed lines, and a trap that holds the leader's
+ * window for a while queues hundreds of motions: the 65th onward were
+ * applied to the leader and never told to the follower, whose cursor then
+ * lagged for good. A recording with exactly 64 host lines at one pump is
+ * the tell. */
+static char    *am2_step_host;
+static size_t   am2_step_host_len, am2_step_host_cap;
 static uint8_t *am2_step_last;
 static int32_t  am2_step_last_w, am2_step_last_h;
 static PALETTEENTRY am2_step_last_pal[256];
@@ -916,12 +922,27 @@ static void am2_step_send(const char *line)
 static void am2_step_note_host(const char *fmt, ...)
 {
     va_list ap;
-    if (am2_step_nhost >= 64)
-        return;
+    char    line[128];
+    size_t  n;
+
     va_start(ap, fmt);
-    vsnprintf(am2_step_host[am2_step_nhost], sizeof am2_step_host[0], fmt, ap);
+    vsnprintf(line, sizeof line, fmt, ap);
     va_end(ap);
-    am2_step_nhost++;
+    n = strlen(line);
+    if (am2_step_host_len + n + 2 > am2_step_host_cap) {
+        size_t cap = am2_step_host_cap ? am2_step_host_cap * 2 : 4096;
+        char  *grown;
+        while (cap < am2_step_host_len + n + 2)
+            cap *= 2;
+        grown = (char *)realloc(am2_step_host, cap);
+        if (!grown)
+            return;
+        am2_step_host = grown;
+        am2_step_host_cap = cap;
+    }
+    memcpy(am2_step_host + am2_step_host_len, line, n);
+    am2_step_host[am2_step_host_len + n] = '\n';
+    am2_step_host_len += n + 1;
 }
 
 static void am2_step_report(void)
@@ -936,12 +957,12 @@ static void am2_step_report(void)
                  (unsigned long long)am2_step_hashes[i]);
         am2_step_send(line);
     }
-    for (i = 0; i < am2_step_nhost; i++) {
-        snprintf(line, sizeof line, "%s\n", am2_step_host[i]);
-        am2_step_send(line);
+    if (am2_step_host_len) {
+        am2_step_host[am2_step_host_len] = 0;
+        am2_step_send(am2_step_host);
+        am2_step_host_len = 0;
     }
     am2_step_nframes = 0;
-    am2_step_nhost = 0;
     am2_step_send("ready\n");
 }
 

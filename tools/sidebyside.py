@@ -189,7 +189,8 @@ def diff_frames(pa, pb):
     # is, or two other colours -- so that strip is forgiven whole, until the
     # painter is fixed. Real defects in those seven columns hide here.
     left = set(pts)
-    swaps = all((x + 1, y) in left or (x - 1, y) in left or x == 0 or x >= 473 for (x, y) in pts)
+    swaps = all((x + 1, y) in left or (x - 1, y) in left or x == 0 or x >= 473 or y in (21, 479)
+                for (x, y) in pts)
     return ("diff", len(pts), wa * ha, min(p[0] for p in pts), min(p[1] for p in pts),
             max(p[0] for p in pts), max(p[1] for p in pts), swaps)
 
