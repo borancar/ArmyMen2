@@ -18279,6 +18279,49 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CRT_DOSERRNO      0x00664604u  /* uint32 _doserrno */
 #define ADDR_CRT_FMODE         0x006648B0u  /* int32 _fmode: 0 is text, 0x8000 binary */
 #define ADDR_CRT_UMASKVAL      0x00664608u  /* int32 _umaskval */
+
+/* The directory, time and environment layer; src/platform/crt/dir.cpp,
+ * time.cpp, env.cpp and mbcs.cpp. */
+#define ADDR_CRT_GETDCWD       0x00465DC8u  /* char *(drive, buf, max) */
+#define ADDR_CRT_VALIDDRIVE    0x00465E99u  /* int32(drive): GetDriveTypeA on "X:\" */
+#define ADDR_CRT_TIMET_FROM_FT 0x00465D51u  /* int32(FILETIME *): local time through __loctotime_t, dst -1 */
+#define ADDR_CRT_LOCTOTIME     0x00469652u  /* int32(yr, mo, dy, hr, mn, sec, dst): __loctotime_t */
+#define ADDR_CRT_TZSET         0x0046B615u  /* void(void): __tzset, once */
+#define ADDR_CRT_TZSET_BODY    0x0046B62Au  /* void(void): TZ, else GetTimeZoneInformation */
+#define ADDR_CRT_ISINDST       0x0046B888u  /* int32(struct tm *) */
+#define ADDR_CRT_CVTDATE       0x0046BA34u  /* void(trantype, datetype, year, month, week, dayofweek, date, hour, min, sec, msec) */
+#define ADDR_CRT_GETENV        0x0046CDFAu  /* char *(name) over _environ */
+#define ADDR_CRT_MBSNBICOLL    0x0046D189u  /* int32(s1, s2, n): __crtCompareStringA, NORM_IGNORECASE */
+#define ADDR_CRT_CRTCOMPARESTRINGA 0x0046D236u /* the locale layer's CompareStringA wrapper; NOT read, standin.cpp */
+#define ADDR_CRT_WTOMB_ENVIRON 0x0046D1C8u  /* int32(void): _wenviron -> _environ; unreachable in this ANSI image */
+#define ADDR_CRT_MBCTOUPPER    0x00469DF7u  /* int32(c): _mbctoupper over _mbctype/_mbcasemap */
+#define ADDR_CRT_STRCMP        0x0046B420u  /* int32(a, b): -1, 0, 1 */
+#define ADDR_CRT_TIMEZONE      0x0048D400u  /* int32 _timezone, seconds west; ships 28800 */
+#define ADDR_CRT_DAYLIGHT      0x0048D404u  /* int32 _daylight; ships 1 */
+#define ADDR_CRT_DSTBIAS       0x0048D408u  /* int32 _dstbias; ships -3600 */
+#define ADDR_CRT_TZNAME        0x0048D48Cu  /* char *_tzname[2] -> two 64-byte buffers, "PST" and "PDT" */
+#define ADDR_CRT_DST_START_YEAR 0x0048D498u /* _isindst's cache: the year the two rules below were computed for */
+#define ADDR_CRT_DST_START_YDAY 0x0048D49Cu
+#define ADDR_CRT_DST_START_MS   0x0048D4A0u
+#define ADDR_CRT_DST_END_YEAR   0x0048D4A8u
+#define ADDR_CRT_DST_END_YDAY   0x0048D4ACu
+#define ADDR_CRT_DST_END_MS     0x0048D4B0u
+#define ADDR_CRT_LPDAYS        0x0048D4B4u  /* int32[13] _lpdays {-1, 30, 59, ...}: days before each month, leap year */
+#define ADDR_CRT_DAYS          0x0048D4E8u  /* int32[13] _days  {-1, 30, 58, ...}: the same, common year */
+#define ADDR_CRT_TIME_DST_CACHE 0x006645B0u /* int32: time()'s dst answer for the minute in ADDR_CRT_TIME_SYSTIME_CACHE */
+#define ADDR_CRT_TIME_SYSTIME_CACHE 0x006645B8u /* SYSTEMTIME: the last GetSystemTime time() looked at */
+#define ADDR_CRT_ENVIRON       0x00664628u  /* char **_environ */
+#define ADDR_CRT_WENVIRON      0x00664630u  /* wchar_t **_wenviron: never set here */
+#define ADDR_CRT_ENV_INITIALIZED 0x00665C24u /* int32: startup has built _environ; getenv answers NULL until then */
+#define ADDR_CRT_LC_CODEPAGE   0x00664684u  /* uint32 __lc_codepage */
+#define ADDR_CRT_TZ_API_USED   0x006647E0u  /* int32: __tzset took the GetTimeZoneInformation arm */
+#define ADDR_CRT_TZ_INFO       0x006647E8u  /* TIME_ZONE_INFORMATION, 0xAC bytes, from that call */
+#define ADDR_CRT_LAST_TZ       0x00664894u  /* char *: a copy of the TZ string last parsed */
+#define ADDR_CRT_TZSET_DONE    0x00664898u  /* int32: __tzset has run */
+#define ADDR_CRT_MBCASEMAP     0x006648E0u  /* uint8[256] _mbcasemap: _setmbcp fills it at startup */
+#define ADDR_CRT_MBLCID        0x006648CCu  /* uint32 __mblcid */
+#define ADDR_CRT_MBCTYPE       0x006649E0u  /* uint8[257] _mbctype, indexed c+1: _setmbcp fills it at startup */
+#define ADDR_CRT_MBCODEPAGE    0x00664AE4u  /* uint32 __mbcodepage */
 #define ADDR_MODE_RB        0x00474170u  /* "rb" */
 
 /* ---- typed accessors -------------------------------------------------- */

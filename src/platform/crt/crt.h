@@ -121,6 +121,8 @@ int32_t __cdecl crt_sprintf(char *buf, const char *format, ...);
 int32_t __cdecl crt_strlen(const char *s);
 /* 0x00469CA0 and 0x00465710. */
 char *__cdecl crt_strcpy(char *dst, const char *src);
+/* 0x0046B420. strcmp: -1, 0 or 1. */
+int32_t __cdecl crt_strcmp(const char *a, const char *b);
 /* 0x00466D80. memcpy. */
 void *__cdecl crt_memcpy(void *dst, const void *src, uint32_t n);
 void *__cdecl crt_memmove(void *dst, const void *src, uint32_t n);
@@ -279,7 +281,91 @@ void __cdecl crt_dosmaperr(uint32_t oserr);
  * original; the first crt_alloc_osfhnd runs it here. */
 void __cdecl crt_ioinit(void);
 
+/* ---- dir.cpp ----------------------------------------------------------- */
+
+/* The CRT's _finddata_t: 0x118 bytes. */
+typedef struct CRT_FINDDATA {
+    uint32_t attrib;
+    int32_t  time_create;
+    int32_t  time_access;
+    int32_t  time_write;
+    uint32_t size;
+    char     name[260];
+} CRT_FINDDATA;
+
+/* 0x00465BA3 / 0x00465C6D / 0x00465D32. FindFirstFileA and its two
+ * siblings, with the record translated: attrib 0 for NORMAL, the three
+ * times through crt_timet_from_ft, the low size, the name. */
+int32_t __cdecl crt_findfirst(const char *spec, CRT_FINDDATA *out);
+int32_t __cdecl crt_findnext(int32_t handle, CRT_FINDDATA *out);
+int32_t __cdecl crt_findclose(int32_t handle);
+/* 0x00465ED0. SetCurrentDirectoryA, then the =X: variable Win32 keeps per
+ * drive, unless the directory is a UNC path. */
+int32_t __cdecl crt_chdir(const char *path);
+/* 0x00465DB5 / 0x00465DC8. The current directory of drive 0 (current) or
+ * 1..26, into `buf` or a malloc'd one of at least `max`. */
+char *__cdecl crt_getcwd(char *buf, int32_t max);
+char *__cdecl crt_getdcwd(int32_t drive, char *buf, int32_t max);
+/* 0x00465E99. */
+int32_t __cdecl crt_validdrive(int32_t drive);
+/* 0x00465F56 / 0x00466496 / 0x0046646C / 0x00466359. */
+int32_t __cdecl crt_mkdir(const char *path);
+int32_t __cdecl crt_rmdir(const char *path);
+int32_t __cdecl crt_remove(const char *path);
+int32_t __cdecl crt_chmod(const char *path, int32_t pmode);
+
+/* ---- time.cpp ---------------------------------------------------------- */
+
+/* The tm _isindst reads; only the four fields __loctotime_t sets matter. */
+typedef struct CRT_TM {
+    int32_t tm_sec, tm_min, tm_hour, tm_mday, tm_mon, tm_year, tm_wday, tm_yday, tm_isdst;
+} CRT_TM;
+
+/* 0x00465052. GetLocalTime through __loctotime_t; the DST answer for the
+ * current minute is cached in the image. */
+int32_t __cdecl crt_time(int32_t *out);
+/* 0x00469652. Broken-down local time to seconds since 1970, applying
+ * _timezone and, for dst 1 or for dst -1 with _isindst, _dstbias. -1
+ * outside 1970..2038. */
+int32_t __cdecl crt_loctotime_t(int32_t yr, int32_t mo, int32_t dy, int32_t hr, int32_t mn, int32_t sec, int32_t dst);
+/* 0x00465D51. A FILETIME to local seconds since 1970; -1 for zero or failure. */
+int32_t __cdecl crt_timet_from_ft(const void *ft);
+/* 0x0046B615 / 0x0046B62A. Once: TZ if set, else GetTimeZoneInformation,
+ * into _timezone, _daylight, _dstbias and _tzname. */
+void __cdecl crt_tzset(void);
+void __cdecl crt_tzset_body(void);
+/* 0x0046B888. Whether the tm's day and time fall inside daylight saving,
+ * by the two rules crt_cvtdate caches for its year. */
+int32_t __cdecl crt_isindst(const CRT_TM *tb);
+/* 0x0046BA34. One DST transition rule -- a week-and-weekday or an absolute
+ * date -- to a day of the year and a millisecond of the day, cached. */
+void __cdecl crt_cvtdate(int32_t trantype, int32_t datetype, int32_t year, int32_t month,
+                         int32_t week, int32_t dayofweek, int32_t date, int32_t hour,
+                         int32_t min, int32_t sec, int32_t msec);
+
+/* ---- env.cpp / mbcs.cpp ------------------------------------------------ */
+
+/* 0x0046CDFA. Over _environ, case-insensitively; NULL until startup has
+ * built the table. */
+char *__cdecl crt_getenv(const char *name);
+/* 0x0046D189. Compare `n` bytes ignoring case through the locale; 0 equal,
+ * 0x7FFFFFFF when the comparison itself fails. */
+int32_t __cdecl crt_mbsnbicoll(const char *a, const char *b, uint32_t n);
+/* 0x00469DF7. _mbctoupper: one byte through _mbctype and _mbcasemap. The
+ * multibyte arm for c > 0xFF is not reproduced; its one caller passes a
+ * byte. */
+int32_t __cdecl crt_mbctoupper(int32_t c);
+
 /* ---- standin.cpp -- NOT reconstructions -------------------------------- */
+
+/* 0x0046D236 __crtCompareStringA and 0x0046D1C8 __wtomb_environ are not
+ * read. The first reaches CompareStringA with its own arguments and this
+ * one does the same; the second converts a wide environment this ANSI
+ * image never has. */
+int32_t __cdecl crt_compare_string_a(uint32_t lcid, uint32_t flags, const char *a, int32_t na,
+                                     const char *b, int32_t nb, uint32_t codepage);
+int32_t __cdecl crt_wtomb_environ(void);
+
 
 /* The heap (malloc 0x004647F8, free 0x004646A9, calloc 0x0046C18E) and
  * _amsg_exit (0x004665B6) are not read yet. These forward to the host so the

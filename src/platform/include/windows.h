@@ -221,6 +221,7 @@ HRESULT WINAPI CoCreateInstance(REFCLSID clsid, IUnknown *outer, DWORD ctx,
 #define ERROR_INVALID_PARAMETER 87
 #define ERROR_ALREADY_EXISTS   183
 #define ERROR_BROKEN_PIPE      109
+#define ERROR_INVALID_DRIVE    15
 #define ERROR_NEGATIVE_SEEK    131
 #define WAIT_OBJECT_0          0
 #define WAIT_TIMEOUT           0x102
@@ -421,6 +422,11 @@ PVOID WINAPI AddVectoredExceptionHandler(ULONG first,
 #define CP_ACP 0
 #define CP_OEMCP 1
 #define NORM_IGNORECASE 0x01
+#define WC_SEPCHARS       0x20
+#define WC_COMPOSITECHECK 0x200
+#define TIME_ZONE_ID_INVALID 0xFFFFFFFFu
+#define TIME_ZONE_ID_STANDARD 1
+#define TIME_ZONE_ID_DAYLIGHT 2
 #define CT_CTYPE1 1
 #define C1_UPPER  0x001
 #define C1_LOWER  0x002

@@ -17,6 +17,14 @@
  * _ioinit, __initstdio, the heap -- has run and the two stacks share the
  * tables it built. tools/crtcheck.sh drives it, headless.
  *
+ * A second section does the same for the directory and time calls: the
+ * find family over a small tree and several patterns, chdir and getcwd,
+ * mkdir, rmdir, remove and chmod, and time. Those share more than the
+ * FILE tables -- __tzset runs once and time() caches its minute -- so the
+ * check resets that state before each stack runs, and compares the
+ * timezone globals each leaves behind. tools/crtcheck.sh runs it with TZ
+ * unset and with TZ=PST8PDT, which are __tzset's two arms.
+ *
  * What the corpus reaches, by construction: CR LF pairs split across the
  * 0x1000 buffer boundary and across the 0x200 one fseek shrinks to, a CR
  * as the last byte of a file, Ctrl-Z in the middle and at the end, a
@@ -36,6 +44,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <time.h>
 
 typedef CRT_FILE *(__cdecl *AM2_CkFopen)(const char *, const char *);
 typedef int32_t   (__cdecl *AM2_CkFclose)(CRT_FILE *);
@@ -484,6 +494,294 @@ static void ck_compare(const char *dir, const AM2_CkFile *cf, const char *mode,
     unlink(pb);
 }
 
+/* ---- directories and time --------------------------------------------- */
+
+typedef int32_t (__cdecl *AM2_CkFindFirst)(const char *, CRT_FINDDATA *);
+typedef int32_t (__cdecl *AM2_CkFindNext)(int32_t, CRT_FINDDATA *);
+typedef int32_t (__cdecl *AM2_CkIntFn)(int32_t);
+typedef int32_t (__cdecl *AM2_CkPathFn)(const char *);
+typedef int32_t (__cdecl *AM2_CkChmod)(const char *, int32_t);
+typedef char   *(__cdecl *AM2_CkGetcwd)(char *, int32_t);
+typedef int32_t (__cdecl *AM2_CkTime)(int32_t *);
+typedef void    (__cdecl *AM2_CkFree)(void *);
+
+typedef struct AM2_CkDirStack {
+    const char     *name;
+    AM2_CkFindFirst findfirst;
+    AM2_CkFindNext  findnext;
+    AM2_CkIntFn     findclose;
+    AM2_CkPathFn    chdir;
+    AM2_CkGetcwd    getcwd;
+    AM2_CkPathFn    mkdir;
+    AM2_CkPathFn    rmdir;
+    AM2_CkPathFn    remove;
+    AM2_CkChmod     chmod;
+    AM2_CkTime      time;
+    AM2_CkFree      free;
+    char         *(__cdecl *getenv)(const char *);
+} AM2_CkDirStack;
+
+static const AM2_CkDirStack kDirOrig = {
+    "orig",
+    (AM2_CkFindFirst)(uintptr_t)ADDR_CRT_FINDFIRST, (AM2_CkFindNext)(uintptr_t)ADDR_CRT_FINDNEXT,
+    (AM2_CkIntFn)(uintptr_t)ADDR_CRT_FINDCLOSE, (AM2_CkPathFn)(uintptr_t)ADDR_CRT_CHDIR,
+    (AM2_CkGetcwd)(uintptr_t)ADDR_CRT_GETCWD, (AM2_CkPathFn)(uintptr_t)ADDR_CRT_MKDIR,
+    (AM2_CkPathFn)(uintptr_t)ADDR_CRT_RMDIR, (AM2_CkPathFn)(uintptr_t)ADDR_CRT_REMOVE,
+    (AM2_CkChmod)(uintptr_t)ADDR_CRT_CHMOD, (AM2_CkTime)(uintptr_t)ADDR_CRT_TIME,
+    (AM2_CkFree)(uintptr_t)ADDR_CRT_FREE,
+    (char *(__cdecl *)(const char *))(uintptr_t)ADDR_CRT_GETENV,
+};
+static const AM2_CkDirStack kDirOurs = {
+    "ours",
+    crt_findfirst, crt_findnext, crt_findclose, crt_chdir, crt_getcwd, crt_mkdir,
+    crt_rmdir, crt_remove, crt_chmod, crt_time, crt_free, crt_getenv,
+};
+
+#define CK_DIR_VALUES 2048
+static int32_t ck_dv[2][CK_DIR_VALUES];
+static char    ck_dd[2][CK_DIR_VALUES][CK_DESC];
+static int32_t ck_dn[2];
+
+static void ck_push(int32_t side, const char *desc, int32_t v)
+{
+    int32_t n = ck_dn[side];
+
+    if (n >= CK_DIR_VALUES) {
+        fprintf(stderr, "crtcheck: too many directory values\n");
+        am2_host_exit(2);
+    }
+    snprintf(ck_dd[side][n], CK_DESC, "%s", desc);
+    ck_dv[side][n] = v;
+    ck_dn[side] = n + 1;
+}
+
+static int32_t ck_strhash(const char *s)
+{
+    return s ? (int32_t)ck_hash((const uint8_t *)s, (uint32_t)strlen(s)) : -1;
+}
+
+#define ck_g32(addr) (*(int32_t *)(uintptr_t)AM2_IMAGE(addr))
+
+/* Forget what __tzset, _isindst and time() cached, so the stack about to
+ * run computes it for itself. The TZ copy is dropped rather than freed:
+ * it was the other stack's allocation. */
+static void ck_reset_time_state(void)
+{
+    ck_g32(ADDR_CRT_TZSET_DONE) = 0;
+    *(char **)(uintptr_t)AM2_IMAGE(ADDR_CRT_LAST_TZ) = NULL;
+    ck_g32(ADDR_CRT_DST_START_YEAR) = -1;
+    ck_g32(ADDR_CRT_DST_END_YEAR) = -1;
+    memset((void *)(uintptr_t)AM2_IMAGE(ADDR_CRT_TIME_SYSTIME_CACHE), 0, 16);
+    ck_g32(ADDR_CRT_TIME_DST_CACHE) = 0;
+}
+
+static void ck_push_tz_state(int32_t side)
+{
+    char **tzname = (char **)(uintptr_t)AM2_IMAGE(ADDR_CRT_TZNAME);
+
+    ck_push(side, "_timezone", ck_g32(ADDR_CRT_TIMEZONE));
+    ck_push(side, "_daylight", ck_g32(ADDR_CRT_DAYLIGHT));
+    ck_push(side, "_dstbias", ck_g32(ADDR_CRT_DSTBIAS));
+    ck_push(side, "tz api used", ck_g32(ADDR_CRT_TZ_API_USED));
+    ck_push(side, "tzname[0]", ck_strhash(tzname[0]));
+    ck_push(side, "tzname[1]", ck_strhash(tzname[1]));
+    ck_push(side, "dst start yday", ck_g32(ADDR_CRT_DST_START_YDAY));
+    ck_push(side, "dst start ms", ck_g32(ADDR_CRT_DST_START_MS));
+    ck_push(side, "dst end yday", ck_g32(ADDR_CRT_DST_END_YDAY));
+    ck_push(side, "dst end ms", ck_g32(ADDR_CRT_DST_END_MS));
+}
+
+static void ck_push_find(int32_t side, const char *what, int32_t ret, const CRT_FINDDATA *fd)
+{
+    char d[CK_DESC];
+
+    snprintf(d, sizeof d, "%s ret", what);
+    ck_push(side, d, ret);
+    snprintf(d, sizeof d, "%s errno", what);
+    ck_push(side, d, ck_errno);
+    if (ret == -1)
+        return;
+    snprintf(d, sizeof d, "%s attrib", what);
+    ck_push(side, d, (int32_t)fd->attrib);
+    snprintf(d, sizeof d, "%s time_create", what);
+    ck_push(side, d, fd->time_create);
+    snprintf(d, sizeof d, "%s time_access", what);
+    ck_push(side, d, fd->time_access);
+    snprintf(d, sizeof d, "%s time_write", what);
+    ck_push(side, d, fd->time_write);
+    snprintf(d, sizeof d, "%s size", what);
+    ck_push(side, d, (int32_t)fd->size);
+    snprintf(d, sizeof d, "%s name", what);
+    ck_push(side, d, ck_strhash(fd->name));
+}
+
+static void ck_run_dir(int32_t side, const AM2_CkDirStack *s, const char *dir, const char *tree)
+{
+    /* A handle the platform never issued is not probed: Win32 would answer
+     * ERROR_INVALID_HANDLE, and src/platform's FindClose, which is what
+     * both stacks reach here, dereferences what it is given. */
+    static const char *const patterns[] = {
+        "%s/*", "%s/*.txt", "%s/*.TXT", "%s/nomatch*", "%s/sub/*", "%s/a.txt",
+        "%s/sub", "%s/nowhere/*", "%s/*.*", "%s/?.txt",
+    };
+    char    path[4096], back[2048], name[64];
+    int32_t i, r, t0, t1, t2;
+
+    ck_dn[side] = 0;
+    if (ck_trace)
+        fprintf(stderr, "crtcheck: %s directories\n", s->name);
+
+    /* The find family, pattern by pattern, every record until it ends. */
+    for (i = 0; i < (int32_t)(sizeof patterns / sizeof *patterns); i++) {
+        CRT_FINDDATA fd;
+        int32_t      h, n = 0;
+
+        snprintf(path, sizeof path, patterns[i], tree);
+        memset(&fd, 0xEE, sizeof fd);
+        ck_errno = 0;
+        h = s->findfirst(path, &fd);
+        snprintf(name, sizeof name, "findfirst %s", patterns[i]);
+        ck_push_find(side, name, h == -1 ? -1 : 0, &fd);
+        if (h == -1)
+            continue;
+        for (;;) {
+            memset(&fd, 0xEE, sizeof fd);
+            ck_errno = 0;
+            r = s->findnext(h, &fd);
+            snprintf(name, sizeof name, "findnext %s #%d", patterns[i], n++);
+            ck_push_find(side, name, r, &fd);
+            if (r == -1 || n > 64)
+                break;
+        }
+        ck_errno = 0;
+        r = s->findclose(h);
+        ck_push(side, "findclose ret", r);
+        ck_push(side, "findclose errno", ck_errno);
+    }
+    /* chdir and getcwd. */
+    ck_errno = 0;
+    ck_push(side, "getcwd start", ck_strhash(s->getcwd(back, sizeof back)));
+    ck_push(side, "getcwd start errno", ck_errno);
+    ck_errno = 0;
+    ck_push(side, "chdir tree", s->chdir(tree));
+    ck_push(side, "chdir tree errno", ck_errno);
+    ck_errno = 0;
+    ck_push(side, "getcwd tree", ck_strhash(s->getcwd(path, sizeof path)));
+    ck_push(side, "getcwd tree errno", ck_errno);
+    {
+        char *m;
+
+        ck_errno = 0;
+        m = s->getcwd(NULL, 0);
+        ck_push(side, "getcwd malloc", ck_strhash(m));
+        ck_push(side, "getcwd malloc errno", ck_errno);
+        if (m)
+            s->free(m);
+        ck_errno = 0;
+        m = s->getcwd(path, 4);
+        ck_push(side, "getcwd short", m == NULL ? -1 : 0);
+        ck_push(side, "getcwd short errno", ck_errno);
+    }
+    snprintf(path, sizeof path, "%s/nope", dir);
+    ck_errno = 0;
+    ck_push(side, "chdir missing", s->chdir(path));
+    ck_push(side, "chdir missing errno", ck_errno);
+    ck_errno = 0;
+    ck_push(side, "chdir back", s->chdir(back));
+    ck_push(side, "chdir back errno", ck_errno);
+    ck_push(side, "getcwd back", ck_strhash(s->getcwd(path, sizeof path)));
+
+    /* mkdir, rmdir, remove, chmod, each on a path of its own side. */
+    snprintf(path, sizeof path, "%s/mk-%s", dir, s->name);
+    ck_errno = 0; ck_push(side, "mkdir", s->mkdir(path)); ck_push(side, "mkdir errno", ck_errno);
+    ck_errno = 0; ck_push(side, "mkdir again", s->mkdir(path)); ck_push(side, "mkdir again errno", ck_errno);
+    ck_errno = 0; ck_push(side, "rmdir", s->rmdir(path)); ck_push(side, "rmdir errno", ck_errno);
+    ck_errno = 0; ck_push(side, "rmdir again", s->rmdir(path)); ck_push(side, "rmdir again errno", ck_errno);
+    snprintf(path, sizeof path, "%s/rm-%s.txt", dir, s->name);
+    ck_write_host(path, (const uint8_t *)"x", 1);
+    ck_errno = 0; ck_push(side, "remove", s->remove(path)); ck_push(side, "remove errno", ck_errno);
+    ck_errno = 0; ck_push(side, "remove again", s->remove(path)); ck_push(side, "remove again errno", ck_errno);
+    snprintf(path, sizeof path, "%s/ch-%s.txt", dir, s->name);
+    ck_write_host(path, (const uint8_t *)"x", 1);
+    ck_errno = 0; ck_push(side, "chmod ro", s->chmod(path, 0x100)); ck_push(side, "chmod ro errno", ck_errno);
+    ck_push(side, "chmod ro attrs", (int32_t)(GetFileAttributesA(path) & FILE_ATTRIBUTE_READONLY));
+    ck_errno = 0; ck_push(side, "chmod rw", s->chmod(path, 0x80)); ck_push(side, "chmod rw errno", ck_errno);
+    ck_push(side, "chmod rw attrs", (int32_t)(GetFileAttributesA(path) & FILE_ATTRIBUTE_READONLY));
+    unlink(path);
+    ck_errno = 0; ck_push(side, "chmod missing", s->chmod(path, 0x80)); ck_push(side, "chmod missing errno", ck_errno);
+
+    /* getenv, by name in both cases: the table is the original startup's. */
+    {
+        static const char *const names[] = { "TZ", "tz", "PATH", "path", "HOME", "AM2_CRTCHECK", "am2_crtcheck", "NOPE_X", "" };
+
+        for (i = 0; i < (int32_t)(sizeof names / sizeof *names); i++) {
+            snprintf(name, sizeof name, "getenv \"%s\"", names[i]);
+            ck_push(side, name, ck_strhash(s->getenv(names[i])));
+        }
+        ck_push(side, "getenv NULL", ck_strhash(s->getenv(NULL)));
+    }
+
+    /* time: bracketed by the host clock, and the two ways of asking. */
+    ck_reset_time_state();
+    t0 = (int32_t)time(NULL);
+    t1 = s->time(&t2);
+    ck_push(side, "time in bracket", t1 >= t0 - 1 && t1 <= t0 + 2);
+    ck_push(side, "time out matches", t1 == t2);
+    ck_push(side, "time again", s->time(NULL) - t1 <= 1);
+    ck_push_tz_state(side);
+}
+
+static void ck_dirs(const char *dir)
+{
+    static const char *const files[] = { "a.txt", "B.TXT", "readme.md", "big.bin", "sub/inner.txt", "ro.txt" };
+    static const uint32_t     sizes[] = { 0, 5, 0x1234, 0x20000, 7, 3 };
+    static uint8_t            buf[0x20000];
+    char                      tree[2048], path[4096];
+    int32_t                   i, side;
+
+    snprintf(tree, sizeof tree, "%s/tree", dir);
+    mkdir(tree, 0777);
+    snprintf(path, sizeof path, "%s/sub", tree);
+    mkdir(path, 0777);
+    for (i = 0; i < 0x20000; i++)
+        buf[i] = (uint8_t)i;
+    for (i = 0; i < 6; i++) {
+        snprintf(path, sizeof path, "%s/%s", tree, files[i]);
+        ck_write_host(path, buf, sizes[i]);
+    }
+    snprintf(path, sizeof path, "%s/ro.txt", tree);
+    SetFileAttributesA(path, FILE_ATTRIBUTE_READONLY);
+
+    for (side = 0; side < 2; side++) {
+        const char *only = getenv("AM2_CRTCHECK_ONLY");
+
+        if (only && strcmp(only, side ? "ours" : "orig") != 0) {
+            ck_dn[side] = 0;
+            continue;
+        }
+        ck_reset_time_state();
+        ck_run_dir(side, side ? &kDirOurs : &kDirOrig, dir, tree);
+    }
+    if (ck_dn[0] == 0 || ck_dn[1] == 0)
+        return;
+    ck_scripts++;
+    ck_ops += ck_dn[0];
+    for (i = 0; i < ck_dn[0] || i < ck_dn[1]; i++) {
+        if (i >= ck_dn[0] || i >= ck_dn[1] || ck_dv[0][i] != ck_dv[1][i]
+            || strcmp(ck_dd[0][i], ck_dd[1][i]) != 0) {
+            ck_mismatches++;
+            if (ck_shown++ < 40)
+                fprintf(stderr, "crtcheck: MISMATCH directories value %d: orig %s = %d, ours %s = %d\n",
+                        i, i < ck_dn[0] ? ck_dd[0][i] : "(none)", i < ck_dn[0] ? ck_dv[0][i] : 0,
+                        i < ck_dn[1] ? ck_dd[1][i] : "(none)", i < ck_dn[1] ? ck_dv[1][i] : 0);
+            if (i >= ck_dn[0] || i >= ck_dn[1])
+                break;
+        }
+    }
+    snprintf(path, sizeof path, "%s/ro.txt", tree);
+    SetFileAttributesA(path, FILE_ATTRIBUTE_NORMAL);
+}
+
 static const char *const kReadModes[] = {
     "r", "rb", "rt", "r+", "rb+", "r+t", "rS", "rR", "rT", "rc", "rn", "r+ +", "rbb", "rtb",
 };
@@ -520,6 +818,7 @@ extern "C" int32_t WINAPI am2_crtcheck_main(HINSTANCE inst, HINSTANCE prev, LPST
     ck_compare(dir, &ck_files[3], "r+", seed++, 1, 0);
     ck_compare(dir, &ck_files[3], "a", seed++, 1, 0);
     ck_compare(dir, &ck_files[3], "w", seed++, 1, 0);
+    ck_dirs(dir);
 
     fprintf(stderr, "crtcheck: %d scripts, %d calls, %d files: %d mismatching calls, %d differing files\n",
             ck_scripts, ck_ops, ck_nfiles, ck_mismatches, ck_filediffs);

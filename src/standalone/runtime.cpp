@@ -181,22 +181,6 @@ extern "C" int32_t __stdcall am2_sa_dsound_create(void *guid, void **out, void *
                                       (IUnknown *)outer);
 }
 
-/* The find-file family shares a struct with its caller. mingw's _finddata_t
- * matches MSVC 6's layout for the fields the game reads, so these pass it
- * straight through -- and they exist as wrappers so that if it ever stops
- * matching there is one place to fix. */
-extern "C" intptr_t am2_sa_findfirst(const char *spec, void *data)
-{
-    return _findfirst(spec, (struct _finddata_t *)data);
-}
-
-extern "C" int am2_sa_findnext(intptr_t handle, void *data)
-{
-    return _findnext(handle, (struct _finddata_t *)data);
-}
-
-extern "C" int am2_sa_findclose(intptr_t handle) { return _findclose(handle); }
-
 /* VC6's operator new answers NULL rather than throwing, and the game TESTS
  * the result -- CLAUDE.md notes 0x00451251 doing exactly that. The nothrow
  * form keeps that true, which is also what makes the widget destructors'

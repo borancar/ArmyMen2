@@ -64,16 +64,31 @@ original answered under Unicorn:
   Eight of nine mutations fail it and the ninth is unreachable through the
   FILE layer; the letters S, R, T and D stay verified by reading.
 
-The game's stdio, `sprintf`, `qsort`, `bsearch`, `rand`, `atoi`, `strtol`
-and the string functions above now run on the CRT in both the standalone
-and the native build; the lockstep comparison is unchanged by all of it,
-as it should be. `standin.cpp` holds what the modules need and nothing
-has read yet -- `malloc`, `calloc`, `free` and `_amsg_exit` over the host
--- and says so in its name.
+- `dir.cpp`, `time.cpp`, `env.cpp` and `mbcs.cpp` (2026-09-06): the
+  find family, `_chdir`, `_getcwd` with `_getdcwd` and `_validdrive`,
+  `_mkdir`, `_rmdir`, `remove`, `_chmod`; `time` with `__loctotime_t`,
+  `__tzset` (the TZ parser and the `GetTimeZoneInformation` arm),
+  `_isindst`, its `cvtdate` and the FILETIME conversion `_findfirst`
+  uses; `getenv` over `_environ`, `_mbsnbicoll` and `_mbctoupper`. The
+  same hybrid check covers them, run under three TZ settings, 308 values
+  each: eleven of fourteen mutations fail and the three that pass are
+  theorems on this platform, listed in `tools/crtcheck.py`. Two things
+  the native build cannot have without the original's startup: an
+  environment table, so `getenv` answers NULL there and `__tzset` always
+  takes the API arm; and the `_mbctype` tables, so `_mbctoupper` answers
+  its argument. Both are stated in the modules.
 
-Next: the directory and time functions (`_findfirst` and its family,
-`_chdir`, `_getcwd`, `_mkdir`, `_rmdir`, `remove`, `_chmod`, `time`),
-`strtod`, `memcpy`'s vectors, and the heap, which retires `standin.cpp`.
+The game's stdio, directories, `time`, `sprintf`, `qsort`, `bsearch`,
+`rand`, `atoi`, `strtol` and the string functions above now run on the
+CRT in both the standalone and the native build; the lockstep comparison
+is unchanged by all of it, as it should be. `standin.cpp` holds what the
+modules need and nothing has read yet -- `malloc`, `calloc`, `free`,
+`_amsg_exit`, `__crtCompareStringA` and `__wtomb_environ` over the host --
+and says so in its name.
+
+Next: `strtod`, `memcpy`'s vectors, `atexit`, and the heap, which retires
+most of `standin.cpp`; then the startup, which is what fills the tables
+above.
 
 ## THE ORIGINAL AND THE RECONSTRUCTION RUN IN LOCKSTEP
 

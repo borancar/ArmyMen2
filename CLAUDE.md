@@ -465,6 +465,19 @@ process down on that until the scripts stopped asking; a mutation that
 makes writes fail reaches it again through a failed flush. Say what a
 corpus must NOT do as well as what it reaches.
 
+**A CRT FUNCTION THAT READS A TABLE STARTUP FILLS IS RIGHT AND EMPTY IN
+THE NATIVE BUILD, and the two have to be told apart when it is compared.**
+`getenv` walks `_environ`, `_mbctoupper` reads `_mbctype`, `__tzset`
+consults both; the original's startup fills all three and nothing in the
+native build does, so there they answer as if the table were empty --
+which is faithful and is not what the original answers. The hybrid is
+where the comparison is exact, because its startup has run. The other
+half is state the two stacks SHARE in that process: `__tzset` runs once
+and `time()` caches its minute, so whichever stack runs first does the
+work and the second inherits it. Reset that state before each stack, or
+the second stack's computation is never compared at all -- it was not,
+until the timezone globals were snapshotted after each run.
+
 **A MUTATION PASS THAT RESTORES WITH `git checkout` DESTROYS AN UNTRACKED
 FILE'S WORK AND RESETS A TRACKED ONE'S.** Nine mutations over two new
 modules, restored with `git checkout -- FILE` after each: the untracked
