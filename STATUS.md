@@ -151,10 +151,19 @@ game never installs. `standin.cpp` holds the three locale wrappers and the
 wide-environment conversion, each forwarding to the one kernel32 call its
 original makes.
 
-Next: the CRT is complete for what the game reaches. What remains of the
+**The CRT is complete for what the game reaches, measured two ways.**
+Every one of the 63 seams in `standalone.h` resolves to a reconstruction
+-- the one outside the CRT set is the DirectInput import thunk, the
+platform's -- and the native build plays Boot Camp under lockstep on all
+of it. What the reconstruction's own source still takes from the host is
+the pure string and memory functions the original mostly inlined --
+`strcpy` 119 call sites, `memset` 98, `memcpy` 59, `strlen` 44, `strcmp`
+26, `strstr` 18, `strcat` 17 -- whose answers cannot differ, and the
+probes and dump code (`getenv`, `fopen`, `sprintf` in anim dumps and the
+script sweep), which are the harness's; every `rand()` in `src/game` is
+in a comment, the calls go through `am2_rand`. What remains of the
 image's runtime is the C++ exception dispatcher and the locale wrappers,
-which nothing reaches, and the vector set could still take `strcmp` and
-`strcat`.
+which nothing reaches.
 
 ## THE ORIGINAL AND THE RECONSTRUCTION RUN IN LOCKSTEP
 
