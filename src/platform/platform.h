@@ -87,6 +87,28 @@ int32_t  am2_host_lockstep(void);
 /* Nanoseconds: the virtual clock in lockstep, the host's otherwise. */
 uint64_t am2_host_clock_ns(void);
 uint32_t am2_host_pump_number(void);   /* lockstep: the pump about to run, 0 before the first */
+
+/* The deterministic heap, src/platform/fixedheap.cpp: HeapAlloc's blocks
+ * and VirtualAlloc's reservations at addresses that depend only on the
+ * sequence of calls, so two games over this platform allocate alike.
+ * On unless AM2_FIXED_HEAP=0. */
+int32_t  am2_fixed_heap_on(void);
+void    *am2_fixed_alloc(size_t n, uint32_t pc);
+void    *am2_fixed_realloc(void *p, size_t n, uint32_t pc);
+void     am2_fixed_free(void *p);
+size_t   am2_fixed_size(const void *p);
+int32_t  am2_fixed_owns(const void *p);
+void    *am2_fixed_reserve(size_t size);
+int32_t  am2_fixed_release(void *addr);
+int32_t  am2_fixed_is_reservation(const void *addr);
+uint8_t *am2_fixed_heap_base(void);
+uint32_t am2_fixed_heap_used(void);
+uint32_t am2_fixed_heap_limit(void);
+uint8_t *am2_fixed_resv_base(void);
+uint32_t am2_fixed_resv_used(void);
+void     am2_fixed_resv_mark(uint32_t used);
+void     am2_fixed_stats(uint32_t *allocs, uint32_t *frees, void **free_head);
+void     am2_fixed_frame_check(void);
 /* Sleep on the game thread in lockstep: the clock moves, the host does not. */
 void     am2_host_clock_advance_ms(uint32_t ms);
 int32_t  am2_host_on_game_thread(void);

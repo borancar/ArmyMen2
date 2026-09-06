@@ -5,7 +5,7 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-06**, the hybrid landing (see the first section).
+Last updated: **2026-09-07**, the fixed heap (see the first section).
 
 ## OPEN DIVERGENCES, newest first
 
@@ -16,9 +16,19 @@ returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
 (none open -- every replay under tests/replays runs IDENTICAL, frame for
-frame, hybrid against port: bootcamp.txt and the five sessions.)
+frame, hybrid against port: bootcamp.txt and the six sessions. Last
+checked 2026-09-07 with the fixed heap in, no tolerance flags.)
 
 FIXED by this rule so far, each with the replay that reproduces it:
+one pixel of a corner where two sandbags overlap
+(`sessions/corner-1276.txt`, pump 1276, pixel 479,479): the original's
+depth comparator breaks an exact tie by comparing the two objects'
+POINTERS, so which segment is drawn last is decided by where the heap put
+them -- and the hybrid's HeapAlloc went to glibc while the port's went to
+the dev arena. Not a transcription defect: the comparator was right on
+both sides and the heaps were not the same heap. The platform owns a
+deterministic heap now (`src/platform/fixedheap.cpp`, below) and both
+games allocate identically;
 the 26 pixels from frame 80 of every comparison since the first lockstep
 -- the ORIGINAL's overlay blitter stores a two-pixel run at an address of
 1 mod 4 with its mapped bytes exchanged (0x0041C5A6), and ours mapped in
@@ -547,11 +557,24 @@ owns -- surfaces, sound buffers, open files -- so it is valid within the
 session and mission it was taken in; the game's own SAVE GAME is the
 portable one.
 
+**THE ARENA IS THE PLATFORM'S NOW (2026-09-07), AND EVERY BINARY HAS
+IT.** `src/platform/fixedheap.cpp` is the heap under the CRT's `HeapAlloc`
+and the reservations under its `VirtualAlloc`: a first-fit heap over 96 MB
+at 0x0A000000 and 1 MB slots over 64 MB at 0x12000000, both at fixed
+addresses, both mapped `MAP_NORESERVE`. The dev binary's own arena and
+its `AM2_DEV_NOARENA` switch are gone with it; the game's allocations go
+through `crt_malloc` in both native binaries, and the hybrid -- running
+the ORIGINAL CRT over the same `HeapAlloc` -- lands every object at the
+same address the port does. That is what the corner divergence above
+needed: the depth comparator's pointer tie-break. `AM2_FIXED_HEAP=0` is
+the bisecting switch (glibc and `mmap(NULL)` again). The savestate
+snapshots both regions, so a `snap` carries the small-block heap too.
+
 **THE ARENA'S ADDRESS IS NOT A FREE CHOICE.** The game overloads fields
 with a uid or a pointer and tells them apart by value; uids carry their
 kind in the high nibble (`200003E8`, `800003E9`), so the arena has to sit
-where the MSVC heap and glibc's brk heap both do, below 0x10000000. Three
-bisecting switches stay in: `AM2_DEV_NOARENA=1` (libc's allocator),
+where the MSVC heap and glibc's brk heap both do, below 0x10000000. The
+other switches stay in:
 `AM2_DEV_NOREUSE=1` (freed blocks never handed out again),
 `AM2_DEV_POISON=1` and `AM2_DEV_CANARY=1` (freed blocks filled with 0xDD
 and checked every frame, naming a block written after its free by size and

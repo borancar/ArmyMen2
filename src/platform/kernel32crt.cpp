@@ -115,10 +115,17 @@ HANDLE WINAPI HeapCreate(DWORD options, SIZE_T initial, SIZE_T max)
 
 BOOL WINAPI HeapDestroy(HANDLE heap) { (void)heap; return TRUE; }
 
+/* Blocks come from the deterministic heap (fixedheap.cpp) unless
+ * AM2_FIXED_HEAP=0, so the original and the reconstruction hold their
+ * objects at the same addresses -- which the game's depth comparator
+ * compares. glibc otherwise. */
 LPVOID WINAPI HeapAlloc(HANDLE heap, DWORD flags, SIZE_T n)
 {
-    void *p = malloc(n ? n : 1);
+    void *p;
     (void)heap;
+    if (am2_fixed_heap_on())
+        return am2_fixed_alloc(n, (uint32_t)(uintptr_t)__builtin_return_address(0));
+    p = malloc(n ? n : 1);
     if (p && (flags & HEAP_ZERO_MEMORY))
         memset(p, 0, n);
     return p;
@@ -127,16 +134,25 @@ LPVOID WINAPI HeapAlloc(HANDLE heap, DWORD flags, SIZE_T n)
 BOOL WINAPI HeapFree(HANDLE heap, DWORD flags, LPVOID p)
 {
     (void)heap; (void)flags;
-    free(p);
+    if (am2_fixed_heap_on() && am2_fixed_owns(p))
+        am2_fixed_free(p);
+    else
+        free(p);
     return TRUE;
 }
 
 LPVOID WINAPI HeapReAlloc(HANDLE heap, DWORD flags, LPVOID p, SIZE_T n)
 {
-    size_t old = p ? malloc_usable_size(p) : 0;
+    size_t old;
     void  *q;
 
     (void)heap;
+    if (am2_fixed_heap_on() && (!p || am2_fixed_owns(p))) {
+        if (flags & HEAP_REALLOC_IN_PLACE_ONLY)
+            return n <= am2_fixed_size(p) ? p : NULL;
+        return am2_fixed_realloc(p, n, (uint32_t)(uintptr_t)__builtin_return_address(0));
+    }
+    old = p ? malloc_usable_size(p) : 0;
     if (flags & HEAP_REALLOC_IN_PLACE_ONLY)
         return n <= old ? p : NULL;
     q = realloc(p, n ? n : 1);
@@ -148,6 +164,8 @@ LPVOID WINAPI HeapReAlloc(HANDLE heap, DWORD flags, LPVOID p, SIZE_T n)
 SIZE_T WINAPI HeapSize(HANDLE heap, DWORD flags, LPCVOID p)
 {
     (void)heap; (void)flags;
+    if (am2_fixed_heap_on() && am2_fixed_owns(p))
+        return am2_fixed_size(p);
     return p ? malloc_usable_size((void *)p) : 0;
 }
 
@@ -172,6 +190,16 @@ LPVOID WINAPI VirtualAlloc(LPVOID addr, SIZE_T size, DWORD type, DWORD prot)
 
     if (size == 0)
         return NULL;
+    if (((type & MEM_RESERVE) || !addr) && am2_fixed_heap_on()) {
+        /* A reservation at a fixed, sequence-determined address; see
+         * fixedheap.cpp. The pages are there already, and zero. */
+        p = am2_fixed_reserve(am2_page_round(size));
+        if (!p) {
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return NULL;
+        }
+        return p;
+    }
     if ((type & MEM_RESERVE) || !addr) {
         p = mmap(addr, am2_page_round(size),
                  PROT_READ | PROT_WRITE | (exec ? PROT_EXEC : 0),
@@ -198,6 +226,8 @@ BOOL WINAPI VirtualFree(LPVOID addr, SIZE_T size, DWORD type)
 {
     size_t i;
 
+    if ((type & MEM_RELEASE) && am2_fixed_is_reservation(addr))
+        return am2_fixed_release(addr) ? TRUE : FALSE;
     if (type & MEM_RELEASE) {
         pthread_mutex_lock(&am2_vm_lock);
         for (i = 0; i < sizeof am2_vm / sizeof am2_vm[0]; i++)

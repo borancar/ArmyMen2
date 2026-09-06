@@ -74,6 +74,7 @@ enum { FILL_SOLID, FILL_COPY, FILL_REMAP, FILL_DESTLUT };
  * jb/jae the compiler emitted, and the running x advances by different amounts
  * on the skipped and drawn paths. Both are load-bearing.
  */
+extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
 static int32_t trace_px = -1, trace_py = -1;   /* AM2_TRACE_PIX=x,y */
 
 static void blit_core(int32_t x, int32_t y, const uint8_t *data, AM2_Rect src,
@@ -89,7 +90,8 @@ static void blit_core(int32_t x, int32_t y, const uint8_t *data, AM2_Rect src,
     }
     if (trace_px >= 0 && y <= trace_py && trace_py < y + (src.bottom - src.top)
         && x <= trace_px && trace_px < x + (src.right - src.left))
-        fprintf(stderr, "PIX fill=%d at=%d,%d src=%d,%d-%d,%d wide=%d before=%02x\n", fill, x, y,
+        fprintf(stderr, "PIX pump %u fill=%d at=%d,%d src=%d,%d-%d,%d wide=%d before=%02x\n",
+                (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u), fill, x, y,
                 src.left, src.top, src.right, src.bottom, offset32,
                 g_frameBuf[(uint32_t)(trace_py * g_pitch + trace_px)]);
     const uint8_t *rowPtr = data + src.top * step + 4;

@@ -570,6 +570,20 @@ took both games down mid-comparison in a way that read as the verbose flag
 crashing the logger. The command refuses an unreadable address now, as
 `dump` always did. Write socket addresses with `0x`.
 
+**A HEAP ADDRESS IS PART OF THE GAME'S STATE, SO THE PLATFORM'S HEAP IS
+FIXED.** The depth comparator (`0x0041D740`) breaks an exact tie between
+two objects by comparing their POINTERS, so which of two overlapping
+sandbags is drawn last -- and one corner pixel -- is decided by where
+malloc put them. Faithfully reproduced on both sides, the hybrid and the
+port still differed: the original CRT's `HeapAlloc` reached glibc and the
+port's reached the dev arena. `src/platform/fixedheap.cpp` is one heap
+for both, at fixed addresses, under `HeapAlloc` and `VirtualAlloc`'s
+reservations; `AM2_FIXED_HEAP=0` bisects it. `sessions/corner-1276.txt`
+is the replay, identical since. The reading to carry: when both
+transcriptions are right and the frames still differ, the difference is
+below the game, and the platform is where every remaining source of
+nondeterminism has turned out to live.
+
 **THE CRT IS RECONSTRUCTED LIKE THE GAME, under `src/platform/crt/`, and
 its names carry a `crt_` prefix.** The image's MSVC 6 runtime is 231
 functions the game reaches 44 of, and glibc behind those names is a second

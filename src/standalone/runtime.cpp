@@ -264,31 +264,16 @@ static void am2_sa_cursor_set(int32_t x, int32_t y)
  * heap and the question does not arise. */
 extern "C" void am2_standalone_init(void)
 {
-#ifdef AM2_DEVTOOLS
-    /* The development binary's fixed-address arena, so a savestate can
-     * carry the heap. See src/standalone/devtools.cpp. AM2_DEV_NOARENA=1
-     * keeps libc's, which turns the savestates off and is how a behaviour
-     * difference between the two binaries is bisected. */
-    if (getenv("AM2_DEV_NOARENA")) {
-        am2_malloc = malloc;
-        am2_realloc = realloc;
-        am2_free = free;
-    } else {
-        am2_malloc = am2_dev_malloc;
-        am2_realloc = am2_dev_realloc;
-        am2_free = am2_dev_free;
-    }
-#else
     /* The CRT's own heap, src/platform/crt/heap.cpp: one allocator for the
      * game and the CRT's internals, so a block crossing between them --
      * a FILE's buffer, getcwd's malloc'd answer -- is freed where it was
-     * made. The development binary keeps its arena for the game's blocks
-     * and the CRT's internals stay on the small-block heap; the one
-     * crossing there is getcwd(NULL), which the game does not do. */
+     * made. Both binaries, now: the development one used to keep a
+     * fixed-address arena of its own so a savestate could carry the heap,
+     * and that arena is the platform's (src/platform/fixedheap.cpp), under
+     * the CRT's HeapAlloc and VirtualAlloc, where the hybrid has it too. */
     am2_malloc = crt_malloc;
     am2_realloc = crt_realloc;
     am2_free = crt_free;
-#endif
     am2_log = am2_sa_log;
     /* The directory calls too: crt.cpp's defaults are the host's chdir and
      * getcwd, which under mingw understand a backslash and under glibc do
