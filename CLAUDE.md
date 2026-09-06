@@ -483,6 +483,28 @@ in the port; the first differing line read `s-0.35` against `s0`. When a
 parser's blocks all look alike, list the CALL TARGETS before believing
 the repetition: three defects in these two parsers were exactly that.
 
+**THE FOURTH WAS ARGUMENT IDENTITY, four instructions from the call.**
+`TrooperPickupItem`'s swap arm pushes ESI -- the picked-up ITEM -- at
+0x0044865F, then stores three fields through EDI and EBX, then calls
+DestroyByType. Read with the nearest register, it destroyed the HELD
+weapon; the original marks that one replaced for the item sweep and takes
+the new one off the map. Both games log `FreeItem` for the old rifle, by
+different routes, so the log agreed and the picked-up weapon stayed on the
+map, drawn over Sarge as he carried it. The push is the argument, wherever
+the call is.
+
+Four defects in an hour of play, and every one of them is a class this
+file already names: a slot on the other side of a push, two locals four
+bytes apart, identical blocks whose only difference is the call target, a
+push separated from its call. None was an offset, so `checkoffsetuse`
+passed all four; none is reached by a scripted drive, so every A/B passed
+all four. What they share is that each was READ as a pattern -- twelve
+blocks alike, two pointers alike -- where resolving the operand
+mechanically would have answered in seconds. The rules were written; they
+were not run. `tools/espmap.py --site` on every slot, the call target of
+every block, and the pushes of every call are the mechanical form, and
+now every recorded session is a regression that runs in a minute.
+
 **AND A RECORDING IS THE FIRST THING A LIVE TOOL NEEDS.** The very first
 live trap -- Sarge diving prone in the original and standing in the port
 -- was lost, because nothing had written the inputs down. Everything

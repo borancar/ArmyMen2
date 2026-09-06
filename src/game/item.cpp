@@ -12874,7 +12874,16 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
             *(uint32_t *)(t + OBJ_OFF_WEAPON_UID + (uint32_t)slot * 4) =
                 ((const AM2_Object *)w)->uid;
             *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
-            DestroyByType(held);
+            /* THE ITEM IS DESTROYED, NOT THE HELD WEAPON: `push esi` at
+             * 0x0044865F, before the flag store, is the item, and the held
+             * weapon gets only OBJ_FLAG_REPLACED -- the item sweep frees it
+             * later, which is why both games log `FreeItem` for it. Written
+             * as DestroyByType(held), the picked-up weapon stayed on the
+             * map with its flags at 1 and was drawn over Sarge as he
+             * carried it. Found by tools/sidebyside.py on a hand-played
+             * pickup; the item's flags read 5 against 1 at the pump he
+             * reached it. */
+            DestroyByType(w);
 
             if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
                 SendPairMessage(t, w, (int32_t)slot,
