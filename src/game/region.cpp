@@ -9489,8 +9489,16 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
         int32_t bearing;
 
         g_mouseGrab = -1;
+        /* THE DISTANCE IS TO `at` AND THE BEARING IS TO `aim`, and they are
+         * one slot apart: `lea eax,[esp+0x14]` at 0x0044A8C0 is +0x10 with
+         * one push outstanding, `lea ecx,[esp+0x18]` at 0x0044A8DA is +0x0C
+         * with three. Both were written as `at`. With the rifle raised the
+         * overlay is three pixels, so a held click aimed two facing units
+         * off the original's -- invisible to every replay, found by
+         * tools/sidebyside.py on a hand-played click, and settled by logging
+         * AngleBetween's arguments in both games (AM2_TRACE_ANGLE). */
         dist    = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &at);
-        bearing = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), &at);
+        bearing = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), &aim);
         w[4]    = (uint8_t)bearing;
 
         /* Close in, or already facing far enough away, keep the old facing. */

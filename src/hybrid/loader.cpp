@@ -244,6 +244,34 @@ extern "C" void am2_hybrid_log_line(const char *fmt, va_list ap)
     fflush(fh);
 }
 
+/* The reconstruction's AngleOfDelta over the image's own tables, with a log
+ * line per call; dev builds only, installed by AM2_TRACE_ANGLE. */
+extern "C" uint8_t __cdecl am2_hybrid_trace_angle_between(const int16_t *from, const int16_t *to)
+{
+    int32_t dx = (int32_t)to[0] - (int32_t)from[0];
+    int32_t dy = (int32_t)to[1] - (int32_t)from[1];
+    int32_t adx = dx < 0 ? -dx : dx, ady = dy < 0 ? -dy : dy;
+    const int8_t *atanCos = (const int8_t *)(uintptr_t)ADDR_TRIG_ATAN_COS;
+    const int8_t *atanSin = (const int8_t *)(uintptr_t)ADDR_TRIG_ATAN_SIN;
+    uint8_t h;
+
+    if (adx > ady) {
+        h = (uint8_t)atanCos[(dy << 9) / dx];
+    } else if (dx == 0) {
+        h = dy < 0 ? 0u : 0x80u;
+        fprintf(stderr, "ANGLE pump %u from=(%d,%d) to=(%d,%d) -> %d\n", (unsigned)am2_host_pump_number(),
+                from[0], from[1], to[0], to[1], h);
+        return h;
+    } else {
+        h = (uint8_t)atanSin[(dx << 9) / dy];
+    }
+    if (dx > 0)
+        h = (uint8_t)(h + 0x80u);
+    fprintf(stderr, "ANGLE pump %u from=(%d,%d) to=(%d,%d) -> %d\n", (unsigned)am2_host_pump_number(),
+            from[0], from[1], to[0], to[1], h);
+    return h;
+}
+
 static void am2_hybrid_patch_jmp(uintptr_t at, const void *to)
 {
     uint8_t *p = (uint8_t *)at;
@@ -475,6 +503,11 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
      * both stacks share the tables it built. */
     if (getenv("AM2_CRTCHECK"))
         am2_hybrid_patch_jmp(ADDR_WIN_MAIN, (const void *)&am2_crtcheck_main);
+    /* AM2_TRACE_ANGLE=1: replace the original's AngleBetween with a copy of
+     * the reconstruction that logs its arguments and answer with the pump
+     * number, so the two games' calls can be compared line for line. */
+    if (getenv("AM2_TRACE_ANGLE"))
+        am2_hybrid_patch_jmp(ADDR_ANGLE_BETWEEN, (const void *)&am2_hybrid_trace_angle_between);
 #endif
 
     am2_plat_log("running %s from its entry point 0x%08lx", path, (unsigned long)(uintptr_t)entry);

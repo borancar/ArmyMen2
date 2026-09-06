@@ -86,6 +86,7 @@ void am2_host_exit(int32_t code) __attribute__((noreturn));
 int32_t  am2_host_lockstep(void);
 /* Nanoseconds: the virtual clock in lockstep, the host's otherwise. */
 uint64_t am2_host_clock_ns(void);
+uint32_t am2_host_pump_number(void);   /* lockstep: the pump about to run, 0 before the first */
 /* Sleep on the game thread in lockstep: the clock moves, the host does not. */
 void     am2_host_clock_advance_ms(uint32_t ms);
 int32_t  am2_host_on_game_thread(void);

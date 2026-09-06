@@ -178,18 +178,14 @@ def diff_frames(pa, pb):
                 pts.append((x, y))
     if not pts:
         return ("same", wa, ha)
-    # Are the differences all swapped horizontal pairs (A,B against B,A)?
-    def px(buf, w, x, y):
-        return buf[(y * w + x) * 3:(y * w + x) * 3 + 3]
+    # Are the differences all two-pixel horizontal units? The known terrain
+    # defect is a 16-bit unit painted wrong where its two pixels differ --
+    # usually the two colours exchanged, near the map view's right edge the
+    # clipped unit as two other colours -- so every differing pixel has a
+    # differing horizontal neighbour, except a unit straddling the map
+    # view's edge at x 0 or at x 479, where the HUD covers the partner.
     left = set(pts)
-    swaps = True
-    for (x, y) in pts:
-        if (x + 1, y) in left and px(a, wa, x, y) == px(b, wb, x + 1, y) and px(a, wa, x + 1, y) == px(b, wb, x, y):
-            continue
-        if (x - 1, y) in left and px(a, wa, x, y) == px(b, wb, x - 1, y) and px(a, wa, x - 1, y) == px(b, wb, x, y):
-            continue
-        swaps = False
-        break
+    swaps = all((x + 1, y) in left or (x - 1, y) in left or x in (0, 479) for (x, y) in pts)
     return ("diff", len(pts), wa * ha, min(p[0] for p in pts), min(p[1] for p in pts),
             max(p[0] for p in pts), max(p[1] for p in pts), swaps)
 
@@ -210,9 +206,8 @@ def main():
     ap.add_argument("--tolerance", type=int, default=0,
                     help="pixels a frame may differ by without trapping (each such frame is diffed and counted)")
     ap.add_argument("--tolerate-swaps", action="store_true",
-                    help="do not trap on a frame whose every difference is a horizontal pair of pixels with "
-                         "the two colours swapped between the sides -- the known terrain defect, which grows "
-                         "with the scroll and so cannot be a pixel count")
+                    help="do not trap on a frame whose every difference is a two-pixel horizontal unit -- the "
+                         "known terrain defect, which grows with the scroll and so cannot be a pixel count")
     ap.add_argument("--timeout", type=float, default=600, help="seconds to wait for a game to connect or pump")
     ap.add_argument("extra", nargs="*", help="arguments passed to both games")
     args = ap.parse_args()
@@ -234,7 +229,7 @@ def main():
     def finish(code):
         for s in sides.values():
             s.stop()
-        print("sidebyside: artifacts in %s" % out)
+        print("sidebyside: artifacts in %s (input.txt replays the session)" % out)
         sys.exit(code)
 
     signal.signal(signal.SIGTERM, lambda *_: finish(2))
@@ -256,6 +251,12 @@ def main():
         interval = 1.0 / fps if fps > 0 else 0.0
         state = {"next_at": time.monotonic(), "last_index": -1, "actions": [], "tolerated": 0,
                  "breaks": set(int(x) for x in args.breaks.split(",") if x.strip())}
+        # Every input both games took, by pump, in the replay grammar: the
+        # replay's own lines and the leader's window events as `host` lines.
+        # A session is reproducible only if this exists, and the first live
+        # trap of this tool was lost for want of it.
+        record = open(os.path.join(out, "input.txt"), "w")
+        record.write("# recorded by tools/sidebyside.py; replay with --replay or AM2_REPLAY\n")
 
         def pump_once():
             """Step the leader, then the follower through the same pump.
@@ -275,6 +276,12 @@ def main():
             if rl is None:
                 return None
             frames_l, host_l = rl
+            for line in actions:
+                record.write("%d %s\n" % (pump, line))
+            for line in host_l:
+                record.write("%d %s\n" % (pump, line))
+            if actions or host_l:
+                record.flush()
             for line in actions:
                 follower.send(line)
             for line in host_l:

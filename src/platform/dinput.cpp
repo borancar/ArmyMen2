@@ -83,6 +83,9 @@ static void am2_mouse_push(DWORD ofs, DWORD data)
     e->dwTimeStamp = GetTickCount();
     e->dwSequence = ++d->sequence;
     d->count++;
+    if (getenv("AM2_TRACE_DI"))
+        fprintf(stderr, "DI pump %u push ofs=%u data=%d queued=%d\n", (unsigned)am2_host_pump_number(),
+                (unsigned)ofs, (int)data, (int)d->count);
 }
 
 void am2_di_mouse_motion(int32_t dx, int32_t dy)
@@ -249,6 +252,10 @@ static HRESULT STDMETHODCALLTYPE Dev_GetDeviceData(IDirectInputDeviceA *p, DWORD
     while (got < want && d->count > 0) {
         if (out)
             out[got] = d->ring[d->head];
+        if (getenv("AM2_TRACE_DI"))
+            fprintf(stderr, "DI pump %u take ofs=%u data=%d left=%d%s\n", (unsigned)am2_host_pump_number(),
+                    (unsigned)d->ring[d->head].dwOfs, (int)d->ring[d->head].dwData, (int)d->count - 1,
+                    (flags & 1) ? " (peek)" : "");
         got++;
         if (!(flags & 1)) {                /* DIGDD_PEEK is 1 */
             d->head = (d->head + 1) % AM2_DI_RING;

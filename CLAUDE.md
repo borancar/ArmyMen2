@@ -442,6 +442,38 @@ tables agreed because nothing moves in a sign. Stepping both games pump by
 pump with the timer table, the clock and the sub-state read out over the
 sockets took it to one line in one function, below.
 
+**TWENTY MINUTES OF HAND PLAY FOUND TWO DEFECTS NO REPLAY HAD REACHED, and
+both were argument slots.** The first shot anyone fired in the port
+detonated on Sarge's own position: `DefWeaponLine` read the twelve numbers
+of a weapon line in order, and the original stores the FOURTH at rec[5]
+and the FIFTH at rec[4] -- two parse blocks whose `lea` sits on the other
+side of a push from their neighbours -- so every weapon's range was its
+following field and the rifle's was 0. Then a held click aimed two facing
+units off: the held arm of `Type2PlayerInput` takes the distance to the
+raw point and the BEARING to the overlay-adjusted one, +0x10 and +0x0C,
+and both had been written as the raw point. Neither is visible to any
+replay in the tree, because no replay fires or holds a click over the map;
+both were in the first minute of someone playing.
+
+The way each was found is the method, and it is cheap once the tool
+exists. Record the session (`input.txt` is a replay file). Reproduce the
+trap headless. Step both games pump by pump over the sockets, dumping the
+one record that differs, until the FIRST pump on which they diverge --
+Sarge's fire point, then his facing. Grep the image for every store to
+that offset (`disasm` over `.text`, a `mov` whose destination carries the
+displacement) and match the sites to the reconstruction. When the
+reconstruction's writer looks right, log its INPUTS on both sides:
+`AM2_TRACE_ANGLE` installs a logging copy of `AngleBetween` over the
+original in the hybrid and the same log in the port, and one line each --
+`to=(1834,1057)` against `to=(1834,1060)` -- named the slot. Then
+`tools/espmap.py FUNC --site=ADDR` on every point the function passes,
+which is the check that should have been run when it was written.
+
+**AND A RECORDING IS THE FIRST THING A LIVE TOOL NEEDS.** The very first
+live trap -- Sarge diving prone in the original and standing in the port
+-- was lost, because nothing had written the inputs down. Everything
+found since came from `input.txt`.
+
 **AND THE ORIGINAL'S OWN EVENT TRACE IS ONE `poke` AWAY IN THE HYBRID.**
 Every log line in the event layer is behind the comm object's
 `COMM_OFF_VERBOSE`, so writing 1 there through both sockets at a break

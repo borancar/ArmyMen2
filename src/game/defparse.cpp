@@ -881,9 +881,22 @@ int32_t __cdecl DefWeaponLine(int32_t cmd, char *line)
 
     for (i = 2; i < (int32_t)(AM2_MISSILE_DEF_REC_SIZE / 4); i++) {
         const char *tok = am2_strtok((char *)0, kSep);
+        /* FIELDS 4 AND 5 LAND IN EACH OTHER'S SLOT. The fourth number is
+         * stored at rec[5] and the fifth at rec[4]: in the original every
+         * parse block is `lea` of the slot, `push`, `call`, and those two
+         * blocks take the `lea` on the other side of a push from their
+         * neighbours -- `lea edx,[esp+0x1c]` before the push at 0x0046059F
+         * is +0x14, `lea eax,[esp+0x1c]` after it at 0x004605C7 is +0x10.
+         * Read as twelve numbers in order, the rifle's range (the file's
+         * fourth field, 250) went to rec[4] where the item-type builder
+         * reads rec[5]: the port's rifle had range 0, and its first shot
+         * detonated on Sarge's own position. Found by tools/sidebyside.py
+         * on the first shot anyone fired in the port, reproduced from the
+         * recorded input, and settled by espmap --site on the two blocks. */
+        int32_t     slot = (i == 4) ? 5 : (i == 5) ? 4 : i;
         int32_t     ok  = (i == 7 || i == 10)
-                          ? DefParseBoolean(&rec[i], tok)
-                          : DefParseNumber(&rec[i], tok);
+                          ? DefParseBoolean(&rec[slot], tok)
+                          : DefParseNumber(&rec[slot], tok);
 
         if (!ok)
             return i + 1;

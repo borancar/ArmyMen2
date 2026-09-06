@@ -214,6 +214,11 @@ static uint64_t  am2_step_ns;           /* one pump's worth of it */
 static uint32_t  am2_pump_count;        /* the replay's frame number */
 static uint32_t  am2_present_count;     /* the frame log's index */
 
+uint32_t am2_host_pump_number(void)
+{
+    return am2_pump_count;
+}
+
 int32_t am2_host_lockstep(void)
 {
     static int32_t on = -1;
@@ -608,6 +613,10 @@ void (*am2_host_cursor_set)(int32_t x, int32_t y);
  *   N cursor X Y                the game's cursor, as the socket's `cursor`
  *   N dump FILE                 the next frame presented, as a PPM
  *   N exit                      leave, exit code 0
+ *   N host EVENT...             a window event as tools/sidebyside.py records
+ *                               them (key DIK VK 0|1, char C, motion X Y,
+ *                               button B 0|1, wheel D), applied through the
+ *                               same handlers a real one takes
  */
 typedef struct AM2_ReplayLine {
     uint32_t frame;
@@ -678,6 +687,8 @@ static int am2_replay_order(const void *x, const void *y)
 
 static void am2_replay_parse(int32_t n, uint32_t frame, const char *verb,
                              const char *w1, const char *w2);
+static void am2_step_host_apply(const char *w, int32_t echo);
+static void am2_mouse_flush(void);
 
 static void am2_replay_load(void)
 {
@@ -706,6 +717,12 @@ static void am2_replay_load(void)
             *hash = 0;
         if (sscanf(line, "%u %15s %511s %63s", &frame, verb, w1, w2) < 2)
             continue;
+        if (!strcmp(verb, "host")) {
+            /* Everything after the verb, as one string. */
+            char *rest = strstr(line, "host");
+            am2_replay_parse(n, frame, verb, rest + 4, "");
+            continue;
+        }
         am2_replay_parse(n, frame, verb, w1, w2);
     }
     fclose(fh);
@@ -745,6 +762,10 @@ static void am2_replay_parse(int32_t n, uint32_t frame, const char *verb,
             am2_replay_add(frame, verb, 0, 0, w1);
         } else if (!strcmp(verb, "exit")) {
             am2_replay_add(frame, verb, 0, 0, NULL);
+        } else if (!strcmp(verb, "host")) {
+            char text[600];
+            snprintf(text, sizeof text, "%s %s", w1, w2);
+            am2_replay_add(frame, verb, 0, 0, text);
         } else {
             am2_plat_log("replay: line %d: unknown verb %s", n, verb);
         }
@@ -778,6 +799,12 @@ static void am2_replay_apply(void)
             am2_plat_log("replay: exit at pump %u, %u frames presented",
                          (unsigned)am2_pump_count, (unsigned)am2_present_count);
             am2_host_exit(0);
+        } else if (!strcmp(l->verb, "host")) {
+            const char *t = l->text;
+            while (*t == ' ')
+                t++;
+            am2_step_host_apply(t, 0);
+            am2_mouse_flush();
         }
     }
 }
@@ -986,8 +1013,12 @@ static void am2_step_wait(void)
                 am2_step_send(reply);
                 continue;
             }
-            if (sscanf(line, "%15s %511s %63s", verb, w1, w2) >= 1)
-                am2_replay_parse(0, am2_pump_count + 1, verb, w1, w2);
+            if (sscanf(line, "%15s %511s %63s", verb, w1, w2) >= 1) {
+                if (!strcmp(verb, "host"))
+                    am2_replay_parse(0, am2_pump_count + 1, verb, line + 4, "");
+                else
+                    am2_replay_parse(0, am2_pump_count + 1, verb, w1, w2);
+            }
         }
         {
             struct pollfd pfd;

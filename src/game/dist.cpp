@@ -29,6 +29,8 @@
 #include "../inject/patch.h"
 
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 int32_t __cdecl ApproxDist(const AM2_Point *a, const AM2_Point *b)
 {
@@ -157,11 +159,25 @@ uint8_t __cdecl AngleOfDelta(int32_t dx, int32_t dy)
     return h;
 }
 
+extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
+
 uint8_t __cdecl AngleBetween(const AM2_Point *from, const AM2_Point *to)
 {
     /* Inlined in the original; one copy here. */
-    return AngleOfDelta((int32_t)to->x - (int32_t)from->x,
-                        (int32_t)to->y - (int32_t)from->y);
+    uint8_t h = AngleOfDelta((int32_t)to->x - (int32_t)from->x,
+                             (int32_t)to->y - (int32_t)from->y);
+    /* AM2_TRACE_ANGLE=1 logs every call with its pump; the hybrid's dev
+     * loader installs the same log over the original, so the two games'
+     * calls compare line for line. Cached: this runs thousands of times a
+     * frame. */
+    static int32_t trace = -1;
+    if (trace < 0)
+        trace = getenv("AM2_TRACE_ANGLE") != 0;
+    if (trace)
+        fprintf(stderr, "ANGLE pump %u from=(%d,%d) to=(%d,%d) -> %d\n",
+                (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
+                from->x, from->y, to->x, to->y, h);
+    return h;
 }
 
 void __cdecl DistAndAngle(const AM2_Point *a, const AM2_Point *b,
