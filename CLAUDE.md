@@ -584,6 +584,23 @@ transcriptions are right and the frames still differ, the difference is
 below the game, and the platform is where every remaining source of
 nondeterminism has turned out to live.
 
+**A BLIT-INVOCATION TRACE DIFFS THE TWO GAMES' DRAW CALLS, and its first
+run said "same parameters, different ORDER".** `AM2_TRACE_BLIT=1` logs
+every blit (name, pump, x, y, source rect) on both sides: the port's
+`blit_core` prints it directly, and the hybrid gets a TRAMPOLINE DETOUR
+over each original blit entry (`src/hybrid/loader.cpp`) -- the five blits
+share one 6-byte prologue and pass their rect as an `AM2_Rect` by value,
+which flattens to the same __fastcall stack as four ints, so one signature
+serves the log hook and the trampoline that runs the original body. The
+raw data pointer is left out because it is a heap address. Pointed at the
+bottom-edge divergence it showed two overlapping sprites drawn in opposite
+order with byte-identical parameters, so the cause is DRAW ORDER, not the
+blitter -- which with an identical heap means the depth key, i.e. the same
+item-height divergence STATUS.md already tracks. A parameter trace answers
+"is it the caller, the callee, or the order" before a single blit body is
+read; reach for it when two builds' pixels differ but the object tables do
+not.
+
 **THE HEAP'S LAYOUT IS THE SEQUENCE OF CALLS, AND FOUR THINGS OUTSIDE
 THE GAME WERE IN THAT SEQUENCE.** With one fixed heap under both games the
 trees at pump 120685 still sat at different addresses, and the port's and

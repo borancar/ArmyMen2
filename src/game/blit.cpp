@@ -79,11 +79,37 @@ enum { FILL_SOLID, FILL_COPY, FILL_REMAP, FILL_DESTLUT };
 extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
 static int32_t trace_px = -1, trace_py = -1;   /* AM2_TRACE_PIX=x,y */
 
+/* AM2_TRACE_BLIT=1: one line per blit with its position and source rect, so
+ * the port's blits can be diffed against the hybrid's -- the hybrid installs
+ * a trampoline logger over the original blit entries (src/hybrid/loader.cpp)
+ * that emits the same line. The raw data pointer is left out on purpose: it is
+ * a heap address and differs between the builds, which would be noise; x, y and
+ * the rect are what a caller computes and what a divergence in a caller shows.
+ * Window-gated by AM2_TRACE_FROM/TO like the other traces. */
+static const char *am2_blit_name(int fill, int offset32)
+{
+    switch (fill) {
+    case FILL_SOLID:   return "BlitGlyph";
+    case FILL_COPY:    return offset32 ? "BlitCopy32" : "BlitCopy16";
+    case FILL_REMAP:   return "BlitRemap16";
+    default:           return "BlitOverlay";   /* FILL_DESTLUT */
+    }
+}
+
 static void blit_core(int32_t x, int32_t y, const uint8_t *data, AM2_Rect src,
                       uintptr_t param, int fill, int offset32)
 {
     const int32_t  step   = offset32 ? 4 : 2;
     uint8_t       *dst    = g_frameBuf + (uint32_t)(y * g_pitch + x);
+    {
+        static int32_t tb = -1;
+        if (tb < 0) tb = getenv("AM2_TRACE_BLIT") != 0;
+        if (tb && AM2_TRACE_ON())
+            fprintf(stderr, "BLIT %s pump %u x=%d y=%d src=%d,%d-%d,%d\n",
+                    am2_blit_name(fill, offset32),
+                    (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
+                    x, y, src.left, src.top, src.right, src.bottom);
+    }
     if (trace_px == -1) {
         const char *e = getenv("AM2_TRACE_PIX");
         trace_px = -2;

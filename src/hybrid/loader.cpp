@@ -377,6 +377,74 @@ static void am2_hybrid_patch_jmp(uintptr_t at, const void *to)
     memcpy(p + 1, &rel, 4);
 }
 
+/* ---- AM2_TRACE_BLIT: log the ORIGINAL's blit invocations ------------------
+ *
+ * The five blits are __fastcall(x=ecx, y=edx, data, AM2_Rect src) and all open
+ * with the same 6-byte prologue (push ebp; mov ebp,esp; sub esp,imm8). A
+ * DETOUR WITH A TRAMPOLINE logs each call's parameters and then runs the
+ * original body untouched, so the hybrid stays the oracle -- its pixels are
+ * still the original's -- and merely emits a line the port's blit_core matches
+ * (src/game/blit.cpp, AM2_TRACE_BLIT). The rect is flattened to four ints,
+ * which is the same __fastcall stack layout as one AM2_Rect passed by value,
+ * so the trampoline can be called with the same signature. The data pointer is
+ * left out: it is a heap address and differs between the builds by design. */
+typedef void (__fastcall *am2_blit_tramp_fn)(int32_t, int32_t, const void *,
+                                             int32_t, int32_t, int32_t, int32_t);
+
+static uint8_t         *am2_blit_tramp_page;
+static uint32_t         am2_blit_tramp_used;
+static am2_blit_tramp_fn am2_blit_tramp[5];   /* copy16, copy32, remap16, overlay, glyph */
+
+static void am2_blit_log(const char *name, int32_t x, int32_t y,
+                         int32_t l, int32_t t, int32_t r, int32_t b)
+{
+    if (am2_trace_window())
+        fprintf(stderr, "BLIT %s pump %u x=%d y=%d src=%d,%d-%d,%d\n",
+                name, (unsigned)am2_host_pump_number(), x, y, l, t, r, b);
+}
+
+#define AM2_BLIT_HOOK(idx, name)                                              \
+    static void __fastcall am2_blit_hook_##idx(int32_t x, int32_t y,         \
+            const void *data, int32_t l, int32_t t, int32_t r, int32_t b)     \
+    {                                                                         \
+        am2_blit_log(name, x, y, l, t, r, b);                                 \
+        am2_blit_tramp[idx](x, y, data, l, t, r, b);                          \
+    }
+AM2_BLIT_HOOK(0, "BlitCopy16")
+AM2_BLIT_HOOK(1, "BlitCopy32")
+AM2_BLIT_HOOK(2, "BlitRemap16")
+AM2_BLIT_HOOK(3, "BlitOverlay")
+AM2_BLIT_HOOK(4, "BlitGlyph")
+
+/* Build a trampoline holding the original's first 6 bytes and a jmp back to
+ * addr+6, then patch the entry to jump to the hook. 6 bytes is a clean
+ * instruction boundary for every one of the five (verified against the image);
+ * ecx and edx (x, y) survive the prologue untouched, so the resumed body reads
+ * them as the caller set them. */
+static void am2_blit_install(uintptr_t addr, int idx, const void *hook)
+{
+    uint8_t *tr;
+
+    if (!am2_blit_tramp_page) {
+        am2_blit_tramp_page = (uint8_t *)mmap(NULL, 4096,
+            PROT_READ | PROT_WRITE | PROT_EXEC,
+            MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (am2_blit_tramp_page == MAP_FAILED) {
+            am2_plat_log("AM2_TRACE_BLIT: cannot map trampoline page");
+            am2_blit_tramp_page = NULL;
+            return;
+        }
+    }
+    tr = am2_blit_tramp_page + am2_blit_tramp_used;
+    am2_blit_tramp_used += 16;
+    memcpy(tr, (const void *)addr, 6);
+    tr[6] = 0xE9;
+    { uint32_t rel = (uint32_t)((addr + 6) - ((uintptr_t)tr + 6 + 5));
+      memcpy(tr + 7, &rel, 4); }
+    am2_blit_tramp[idx] = (am2_blit_tramp_fn)tr;
+    am2_hybrid_patch_jmp(addr, hook);
+}
+
 /* ---- the cursor ------------------------------------------------------------------------ */
 
 static void am2_hybrid_cursor_query(int32_t *x, int32_t *y)
@@ -629,6 +697,15 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
         am2_hybrid_patch_jmp(ADDR_GAME_OPERATOR_NEW, (const void *)&crt_operator_new);
         am2_hybrid_patch_jmp(ADDR_CRT_FREE, (const void *)&crt_free);
         am2_hybrid_patch_jmp(ADDR_CRT_REALLOC, (const void *)&crt_realloc);
+    }
+    /* AM2_TRACE_BLIT=1: log every original blit's position and source rect,
+     * matching the port's blit_core log, to diff the two games' blits. */
+    if (getenv("AM2_TRACE_BLIT")) {
+        am2_blit_install(ADDR_BLIT_COPY16,  0, (const void *)&am2_blit_hook_0);
+        am2_blit_install(ADDR_BLIT_COPY32,  1, (const void *)&am2_blit_hook_1);
+        am2_blit_install(ADDR_BLIT_REMAP16, 2, (const void *)&am2_blit_hook_2);
+        am2_blit_install(ADDR_BLIT_OVERLAY, 3, (const void *)&am2_blit_hook_3);
+        am2_blit_install(ADDR_BLIT_GLYPH,   4, (const void *)&am2_blit_hook_4);
     }
 #endif
 
