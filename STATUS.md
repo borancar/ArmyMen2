@@ -15,18 +15,22 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
-- **OPEN (2026-09-07): 4 pixels in the BOTTOM scanline (y=479, x
-  260..267) at pump 1,706,982 of a long live Boot Camp session
-  (`scratch keep/input-play15-botrow.txt`).** Flagged by sidebyside as
-  swapped horizontal pairs, but it is not a clean swap -- the content
-  genuinely differs, a=313021/293a24/213410 against b=424531/315531/314121.
-  BlitOverlay's FILL_DESTLUT arm was re-disassembled in full and every
-  lead-in and tail keeps pixel order except the misalignment-1 count-2
-  case already reconstructed, so this is NOT the overlay blitter; the
-  source (a different bottom-edge blit or clip) is unpinned. Reproduction
-  needs ~1.7M pumps, so it is expensive; the recording is saved but no
-  shorter repro exists yet -- every committed replay under tests/replays
-  is still identical.
+- **OPEN (2026-09-07): the BOTTOM two scanlines differ where the view
+  scrolls new terrain in, cheaply reproduced at pump 965 of
+  `tests/replays/sessions/botrow-965.txt` (10 pixels, y=478-479).** Same
+  class seen at pump 1.7M in a long live run. NOT the overlay blitter and
+  NOT a lead-in/tail swap: the differing pixels span all four dword
+  alignments, and `AM2_TRACE_PIX=292,478` shows the covering overlay
+  (fill=3) faithfully remaps an underlying value that already differs. The
+  value under it is drawn by a 2-row bottom-CLIPPED copy blit (fill=1 at
+  264,478, src rows 5-7), so the tile/terrain painter's bottom-edge clip
+  is the suspect. Heaps and object state are identical; every prior frame
+  matches, so it is fresh at the frame the new terrain row appears. To pin:
+  instrument the hybrid's bottom copy blit (a loader hook like
+  AM2_TRACE_DEPTH) and compare its output row against ours for src rows
+  5-7. The 1.7M recording is kept as `keep/input-play15-botrow.txt`; this
+  965 one supersedes it as the repro.
+
 - **OPEN (2026-09-07): 300 pixels at pump 120685 of
   `tests/replays/sessions/depth-120685.txt`.** The heap is byte-identical
   now (`AM2_TRACE_HEAP=1`, 30,359 operations agree), so this is the game.
