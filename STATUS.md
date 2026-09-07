@@ -15,8 +15,20 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
-(none open -- every replay under tests/replays runs identical, hybrid
-against port, with no tolerance flags. Last checked 2026-09-07.)
+- **OPEN (2026-09-07): the HUD ammo count is drawn 1 pixel to the left in
+  the port, in a multiplayer skirmish HUD; repro
+  `tests/replays/sessions/hudcount-2823.txt`, pump 2823 (42 px near the
+  radar).** The value is right (both show 15), it is only the horizontal
+  position. AM2_TRACE_BLIT localised it to two stacked glyphs at x=630
+  (hybrid) vs x=629 (port); AM2_TRACE_TEXTV (a DrawTextVertical trampoline)
+  showed the incoming CENTER differs -- the labels SARGE/GREN center at 632
+  on both, but the ammo count centers at 633 in the hybrid and 632 in the
+  port. Our HudEdgePaint draws the count through EdgeText, which centers on
+  the WIDGET rect (632); the original draws it with a direct
+  DrawTextVertical at HUD_EDGE_PAINT+0x693 whose center x (633) comes from a
+  separate rect (a helper at [0x46f258], likely the ammo SPRITE's rect, not
+  the widget's). Fix: center the ammo count where the original does, not on
+  the widget. Cosmetic (1 px), deferred behind the larger fixes.
 
 FIXED by this rule so far, each with the replay that reproduces it:
 the bottom-edge terrain and the depth-120685 item order, ONE ROOT: our
