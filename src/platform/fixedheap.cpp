@@ -17,8 +17,8 @@
  * this reason.
  *
  * TWO REGIONS, BOTH FIXED. Blocks (HeapAlloc) come from a first-fit heap
- * over 96 MB at 0x0A000000 -- the development build's old arena, moved here
- * so the hybrid has it too -- and reservations (VirtualAlloc MEM_RESERVE,
+ * over 96 MB at 0x0C000000 -- the development build's old arena, moved here
+ * so the hybrid has it too and clear of the randomised brk heap -- and reservations (VirtualAlloc MEM_RESERVE,
  * the small-block heap's megabytes) are 1 MB slots over 64 MB at
  * 0x12000000. Both are mapped with MAP_FIXED_NOREPLACE and MAP_NORESERVE,
  * so the kernel commits pages as they are touched; a Boot Camp mission
@@ -49,7 +49,14 @@
 #include <string.h>
 #include <sys/mman.h>
 
-#define HEAP_BASE   ((uint8_t *)0x0A000000u)
+/* NOT 0x0A000000, where the development arena used to be. An i386 ELF's
+ * brk heap starts up to 32 MB past its bss under ASLR -- the hybrid's has
+ * been seen at 0x0903D000 -- and MAP_FIXED_NOREPLACE then fails with
+ * EEXIST on the run where it lands high, which is about one run in
+ * thirty and reads as a broken build. 0x0C000000 is past the highest brk
+ * base either binary can draw, and its high nibble is still neither 2
+ * nor 8, which is how the game tells a uid from a pointer. */
+#define HEAP_BASE   ((uint8_t *)0x0C000000u)
 #define HEAP_SIZE   (96u << 20)
 #define HEAP_ALIGN  16u
 #define BLOCK_MAGIC 0x41524E41u   /* 'ARNA' */

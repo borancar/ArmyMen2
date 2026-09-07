@@ -301,6 +301,38 @@ extern "C" void am2_standalone_init(void)
      * initializers the globals they fill stay null: SetGamePalette writes
      * through one, g_remapIdent, and faulted on address 0. Fixups first,
      * for that reason. */
+    /* The command line has to be the CRT's BEFORE its startup parses it:
+     * this runs from a static constructor, ahead of main(), so main's own
+     * am2_set_command_line came too late and the CRT's argv was built from
+     * the bare program name -- 21 bytes of heap where the original's
+     * startup, seeing "-nointro -dbg", took 43. Every heap address after
+     * that differed between the two games. glibc has not handed us argv
+     * yet, so read it back from the kernel. */
+    {
+        static char line[4096];
+        FILE  *fp = fopen("/proc/self/cmdline", "rb");
+        size_t used = 0, n, i, start = 0, args = 0;
+        char   raw[4096];
+
+        if (fp) {
+            n = fread(raw, 1, sizeof raw - 1, fp);
+            fclose(fp);
+            raw[n] = 0;
+            for (i = 0; i < n; i++) {
+                if (raw[i])
+                    continue;
+                if (args++ && used + (i - start) + 2 < sizeof line) {
+                    if (used)
+                        line[used++] = ' ';
+                    memcpy(line + used, raw + start, i - start);
+                    used += i - start;
+                    line[used] = 0;
+                }
+                start = i + 1;
+            }
+            am2_set_command_line(line);
+        }
+    }
     crt_startup();
 
     /* The injected queue the control socket writes into. dllmain.c does this

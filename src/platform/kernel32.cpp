@@ -336,18 +336,22 @@ const void *am2_export_lookup(const char *module, const char *name)
     return NULL;
 }
 
+/* CANONICAL, like the environment (kernel32crt.cpp): the CRT's startup
+ * copies this into its heap as the program name, so a binary's own path
+ * here -- armymen2-dev against armymen2-hybrid-dev -- shifted every heap
+ * address after it between the two games. Nothing in the game reads it;
+ * the CRT shows it in a runtime-error box and nowhere else. */
 DWORD WINAPI GetModuleFileNameA(HMODULE mod, LPSTR out, DWORD cap)
 {
-    ssize_t n;
+    static const char kName[] = "C:\\GOG Games\\Army Men II\\ArmyMen2.exe";
+    size_t n = sizeof kName - 1;
 
     (void)mod;
     if (!out || cap == 0)
         return 0;
-    n = readlink("/proc/self/exe", out, cap - 1);
-    if (n < 0) {
-        out[0] = 0;
-        return 0;
-    }
+    if (n > cap - 1)
+        n = cap - 1;
+    memcpy(out, kName, n);
     out[n] = 0;
     return (DWORD)n;
 }

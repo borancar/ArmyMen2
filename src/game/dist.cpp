@@ -31,6 +31,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+extern "C" int32_t am2_trace_window(void) __attribute__((weak));
+#define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())
 
 int32_t __cdecl ApproxDist(const AM2_Point *a, const AM2_Point *b)
 {
@@ -173,7 +175,7 @@ uint8_t __cdecl AngleBetween(const AM2_Point *from, const AM2_Point *to)
     static int32_t trace = -1;
     if (trace < 0)
         trace = getenv("AM2_TRACE_ANGLE") != 0;
-    if (trace)
+    if (trace && AM2_TRACE_ON())
         fprintf(stderr, "ANGLE pump %u from=(%d,%d) to=(%d,%d) -> %d\n",
                 (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
                 from->x, from->y, to->x, to->y, h);

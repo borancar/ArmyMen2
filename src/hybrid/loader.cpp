@@ -33,6 +33,7 @@
  */
 #include "../platform/platform.h"
 #include "../inject/orig.h"
+#include "../platform/crt/crt.h"
 
 #include <sys/mman.h>
 #include <sys/syscall.h>
@@ -259,7 +260,8 @@ extern "C" uint8_t __cdecl am2_hybrid_trace_angle_between(const int16_t *from, c
         h = (uint8_t)atanCos[(dy << 9) / dx];
     } else if (dx == 0) {
         h = dy < 0 ? 0u : 0x80u;
-        fprintf(stderr, "ANGLE pump %u from=(%d,%d) to=(%d,%d) -> %d\n", (unsigned)am2_host_pump_number(),
+        if (am2_trace_window())
+            fprintf(stderr, "ANGLE pump %u from=(%d,%d) to=(%d,%d) -> %d\n", (unsigned)am2_host_pump_number(),
                 from[0], from[1], to[0], to[1], h);
         return h;
     } else {
@@ -267,7 +269,8 @@ extern "C" uint8_t __cdecl am2_hybrid_trace_angle_between(const int16_t *from, c
     }
     if (dx > 0)
         h = (uint8_t)(h + 0x80u);
-    fprintf(stderr, "ANGLE pump %u from=(%d,%d) to=(%d,%d) -> %d\n", (unsigned)am2_host_pump_number(),
+    if (am2_trace_window())
+        fprintf(stderr, "ANGLE pump %u from=(%d,%d) to=(%d,%d) -> %d\n", (unsigned)am2_host_pump_number(),
             from[0], from[1], to[0], to[1], h);
     return h;
 }
@@ -294,7 +297,8 @@ extern "C" void __cdecl am2_hybrid_trace_draw_map_object(void *obj, const RECT *
     spr = *(uint8_t **)(o + MAPOBJ_OFF_SPRITE);
     *(uint8_t **)(spr + 0x34) = *(uint8_t **)(o + MAPOBJ_OFF_LUT);
     *(void **)(spr + 0x38)    = *(void **)(o + MAPOBJ_OFF_PALETTE);
-    fprintf(stderr, "MAPOBJ pump %u bounds=%ld,%ld-%ld,%ld world=%ld,%ld-%ld,%ld clip=%ld,%ld-%ld,%ld dst=%ld,%ld spr=%u fmt=%u flags=%x\n",
+    if (am2_trace_window())
+        fprintf(stderr, "MAPOBJ pump %u bounds=%ld,%ld-%ld,%ld world=%ld,%ld-%ld,%ld clip=%ld,%ld-%ld,%ld dst=%ld,%ld spr=%u fmt=%u flags=%x\n",
             (unsigned)am2_host_pump_number(), (long)bounds->left, (long)bounds->top, (long)bounds->right, (long)bounds->bottom,
             (long)world->left, (long)world->top, (long)world->right, (long)world->bottom,
             (long)clip.left, (long)clip.top, (long)clip.right, (long)clip.bottom,
@@ -317,7 +321,8 @@ extern "C" void __cdecl am2_hybrid_trace_draw_sprite(uint8_t *spr, int32_t x, in
     y -= *(const int16_t *)(spr + 0x26);
     if (!((am2_clip_rect_fn)(uintptr_t)ADDR_CLIP_RECT)((const RECT *)(spr + 0x14), (const RECT *)(uintptr_t)ADDR_SCREEN_CLIP, &x, &y, &clipped))
         return;
-    fprintf(stderr, "SPRITE pump %u id=%u fmt=%u flags=%x at=%d,%d src=%ld,%ld-%ld,%ld mode=%d\n",
+    if (am2_trace_window())
+        fprintf(stderr, "SPRITE pump %u id=%u fmt=%u flags=%x at=%d,%d src=%ld,%ld-%ld,%ld mode=%d\n",
             (unsigned)am2_host_pump_number(), *(unsigned *)spr, *(unsigned *)(spr + 8), *(unsigned *)(spr + 0xC),
             x, y, (long)clipped.left, (long)clipped.top, (long)clipped.right, (long)clipped.bottom, mode);
     ((am2_draw_sprite_clipped_fn)(uintptr_t)ADDR_DRAW_SPRITE_CLIPPED)(spr, x, y, &clipped, mode);
@@ -356,7 +361,8 @@ extern "C" int32_t __cdecl am2_hybrid_trace_depth_compare(const uint8_t *pa, con
         }
         if (r == 0)
             r = (int16_t)ay > (int16_t)by ? 1 : (int16_t)ay < (int16_t)by ? -1 : ((pb < pa) ? 1 : -1);
-        fprintf(stderr, "DEPTH pump %u a=(l%d s%g %d,%d) b=(l%d s%g %d,%d) -> %d\n", (unsigned)am2_host_pump_number(),
+        if (am2_trace_window())
+            fprintf(stderr, "DEPTH pump %u a=(l%d s%g %d,%d) b=(l%d s%g %d,%d) -> %d\n", (unsigned)am2_host_pump_number(),
                 la, (double)sa, ax, ay, lb, (double)sb, bx, by, r);
     }
     return r;
@@ -612,6 +618,18 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
      * or the insertion are. */
     if (getenv("AM2_TRACE_DEPTH"))
         am2_hybrid_patch_jmp(ADDR_DEPTH_COMPARE, (const void *)&am2_hybrid_trace_depth_compare);
+    /* AM2_TRACE_HEAP=1: the reconstruction's _nh_malloc, free and realloc
+     * over the original's, logging every call. They run on the image's own
+     * heap state, which the original's startup has already built, and
+     * tools/crtcheck.py holds them exact against the original operation by
+     * operation -- so the hybrid's heap behaves as before and merely logs. */
+    if (getenv("AM2_TRACE_HEAP")) {
+        am2_hybrid_patch_jmp(ADDR_CRT_NH_MALLOC, (const void *)&crt_nh_malloc);
+        am2_hybrid_patch_jmp(ADDR_CRT_MALLOC, (const void *)&crt_malloc);
+        am2_hybrid_patch_jmp(ADDR_GAME_OPERATOR_NEW, (const void *)&crt_operator_new);
+        am2_hybrid_patch_jmp(ADDR_CRT_FREE, (const void *)&crt_free);
+        am2_hybrid_patch_jmp(ADDR_CRT_REALLOC, (const void *)&crt_realloc);
+    }
 #endif
 
     am2_plat_log("running %s from its entry point 0x%08lx", path, (unsigned long)(uintptr_t)entry);

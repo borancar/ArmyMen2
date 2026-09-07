@@ -7751,8 +7751,17 @@ void __cdecl OpenTitleScreen(void)
         const AM2_TitleButton *b = &kTitleButtons[i];
         AM2_Widget            *btn;
 
-        if (i == AM2_TITLE_MULTIPLAYER_ROW && !restore_multiplayer())
+        if (i == AM2_TITLE_MULTIPLAYER_ROW && !restore_multiplayer()) {
+            /* The shipped image's patch (docs/binarypatches.md) turns the
+             * `je` after this row's `new` (0x0044D8FE) into a `jmp` to the
+             * failure arm, so the 0x78-byte button is still ALLOCATED --
+             * never constructed, never freed -- and AddChild gets NULL.
+             * Allocate it too: skipping it moved every heap address after
+             * this by one block, and the depth comparator breaks ties on
+             * those addresses. Found by AM2_TRACE_HEAP, not by any frame. */
+            (void)orig_operator_new(AM2_BUTTON_SIZE);
             continue;
+        }
         btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
         if (btn) {
             AM2_Rect box;

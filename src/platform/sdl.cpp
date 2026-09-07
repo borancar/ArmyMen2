@@ -1560,3 +1560,22 @@ int main(int argc, char **argv)
     SDL_Quit();
     return rc;
 }
+
+/* AM2_TRACE_FROM=N / AM2_TRACE_TO=M: the pump range a trace switch logs in,
+ * so a per-draw trace over a 120,000-pump recording is a few hundred
+ * lines around the pump under study rather than gigabytes. Unset, every
+ * pump logs, as before. */
+extern "C" int32_t am2_trace_window(void)
+{
+    static int32_t init; static uint32_t from, to = 0xFFFFFFFFu;
+    uint32_t pump;
+    if (!init) {
+        const char *e = getenv("AM2_TRACE_FROM");
+        if (e) from = (uint32_t)strtoul(e, NULL, 0);
+        e = getenv("AM2_TRACE_TO");
+        if (e) to = (uint32_t)strtoul(e, NULL, 0);
+        init = 1;
+    }
+    pump = am2_host_pump_number();
+    return pump >= from && pump <= to;
+}

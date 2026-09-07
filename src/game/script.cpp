@@ -3014,8 +3014,11 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             act.extra = objname;
 
         int32_t n = cond->nactions++;
-        cond->actions = (AM2_ScriptAction *)am2_realloc(
-            cond->actions, (size_t)cond->nactions * sizeof act);
+        /* The first array by malloc (0x00443326), growth by realloc: the
+         * same heap either way, but AM2_TRACE_HEAP diffs the CALLS. */
+        cond->actions = cond->actions
+            ? (AM2_ScriptAction *)am2_realloc(cond->actions, (size_t)cond->nactions * sizeof act)
+            : (AM2_ScriptAction *)am2_malloc((size_t)cond->nactions * sizeof act);
         cond->actions[n] = act;
 
         if (*at >= ctx->count)
@@ -3089,7 +3092,15 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
     if (am2_dump_actions)
         am2_log("READSCRIPT %s\n", path);
 
-    FILE *fh = fopen(path, "rt");
+    /* The GAME's stdio, not the host's. The original opens and reads the
+     * script through its own CRT (0x00444CEF fopen, 0x00444D40 fgets,
+     * 0x00444D6B fclose), whose first fgets allocates the stream's
+     * 4,096-byte buffer on the CRT heap; the host's fopen allocated
+     * nothing there, and every heap address the mission built after its
+     * script was one block off the original's -- which the depth
+     * comparator's pointer tie-break turned into a differing pixel. The
+     * feof is the original's inlined test of the FILE's flag word. */
+    am2_FILE *fh = orig_fopen(path, "rt");
     if (!fh) {
         am2_log("ReadScript: Could not open %s for reading.\n", path);
         ok = 0;
@@ -3099,11 +3110,11 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
     int32_t at = ctx->count;    /* resume past whatever is already parsed */
 
     if (ok) {
-        while (!feof(fh) && fgets(line, sizeof line, fh)) {
+        while (!orig_feof(fh) && orig_fgets(line, (int32_t)sizeof line, fh)) {
             ScriptNextToken(line, ctx, lines);
             lines++;
         }
-        fclose(fh);
+        orig_fclose(fh);
     }
 
     /* Second pass: walk the tokens and dispatch each statement. */

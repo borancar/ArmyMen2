@@ -22,6 +22,9 @@
  * the two allocators on one shared state.
  */
 #include "crt.h"
+
+#include <stdio.h>
+#include <stdlib.h>
 #include "../../inject/win32.h"
 #include "../../inject/orig.h"
 #include "../../game/image.h"
@@ -512,7 +515,31 @@ void *__cdecl crt_heap_alloc(uint32_t n)
     return HeapAlloc(crt_crtheap, 0, rounded);
 }
 
-void *__cdecl crt_nh_malloc(uint32_t n, int32_t nhflag)
+/* AM2_TRACE_HEAP=1: one line per allocation, free and realloc, with the
+ * pump number, so two games' heaps can be compared call for call. The
+ * hybrid installs these three over the original's entries under the same
+ * switch (src/hybrid/loader.cpp), so both sides log the same code. */
+static int32_t heap_trace = -1;
+static const void *heap_site;   /* the game's call site, from the entry that took it */
+#ifdef __linux__
+#include <sys/syscall.h>
+#include <unistd.h>
+extern "C" uint32_t am2_host_pump_number(void);
+#define HEAP_TID  ((unsigned)syscall(SYS_gettid))
+#define HEAP_PUMP ((unsigned)am2_host_pump_number())
+#else                         /* the mingw selftest: no platform, no pumps */
+#define HEAP_TID  0u
+#define HEAP_PUMP 0u
+#endif
+
+static inline int32_t heap_tracing(void)
+{
+    if (heap_trace < 0)
+        heap_trace = getenv("AM2_TRACE_HEAP") != NULL;
+    return heap_trace;
+}
+
+static void *nh_malloc_body(uint32_t n, int32_t nhflag)
 {
     if (n > 0xFFFFFFE0u)
         return NULL;
@@ -528,13 +555,27 @@ void *__cdecl crt_nh_malloc(uint32_t n, int32_t nhflag)
     }
 }
 
+void *__cdecl crt_nh_malloc(uint32_t n, int32_t nhflag)
+{
+    void *p = nh_malloc_body(n, nhflag);
+
+    if (heap_tracing()) {
+        fprintf(stderr, "HEAP pump %u tid %u alloc %u -> %p site %p\n", HEAP_PUMP, HEAP_TID,
+                (unsigned)n, p, heap_site);
+        heap_site = NULL;
+    }
+    return p;
+}
+
 void *__cdecl crt_malloc(uint32_t n)
 {
+    heap_site = __builtin_return_address(0);
     return crt_nh_malloc(n, crt_newmode);
 }
 
 void *__cdecl crt_operator_new(uint32_t n)
 {
+    heap_site = __builtin_return_address(0);
     return crt_nh_malloc(n, 1);
 }
 
@@ -542,6 +583,9 @@ void __cdecl crt_free(void *p)
 {
     CRT_SBH_HEADER *h;
 
+    if (heap_tracing())
+        fprintf(stderr, "HEAP pump %u tid %u free %p site %p\n", HEAP_PUMP, HEAP_TID, p,
+                __builtin_return_address(0));
     if (!p)
         return;
     ensure_heap();
@@ -599,7 +643,7 @@ void *__cdecl crt_calloc(uint32_t count, uint32_t size)
     }
 }
 
-void *__cdecl crt_realloc(void *p, uint32_t n)
+static void *realloc_body(void *p, uint32_t n)
 {
     CRT_SBH_HEADER *h;
     uint32_t        rounded = 0;
@@ -651,4 +695,14 @@ void *__cdecl crt_realloc(void *p, uint32_t n)
         if (!crt_callnewh(rounded))
             return NULL;
     }
+}
+
+void *__cdecl crt_realloc(void *p, uint32_t n)
+{
+    void *q = realloc_body(p, n);
+
+    if (heap_tracing())
+        fprintf(stderr, "HEAP pump %u tid %u realloc %p %u -> %p site %p\n", HEAP_PUMP, HEAP_TID, p,
+                (unsigned)n, q, __builtin_return_address(0));
+    return q;
 }

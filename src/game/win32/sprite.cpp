@@ -38,6 +38,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+extern "C" int32_t am2_trace_window(void) __attribute__((weak));
+#define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())
 
 #define g_screenClip     (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
 extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
@@ -80,7 +82,7 @@ void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y, int32_t mode)
         static int32_t trace = -1;
         if (trace < 0)
             trace = getenv("AM2_TRACE_SPRITE") != 0;
-        if (trace)
+        if (trace && AM2_TRACE_ON())
             fprintf(stderr, "SPRITE pump %u id=%u fmt=%u flags=%x at=%d,%d src=%d,%d-%d,%d mode=%d\n",
                     (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u), spr->id, spr->format, spr->flags,
                     x, y, clipped.left, clipped.top, clipped.right, clipped.bottom, mode);

@@ -18503,6 +18503,12 @@ typedef int32_t (__cdecl *am2_blit_bitmap_in_fn)(void *dest, int32_t pitch,
  * the game's CRT cannot be read or closed by ours. */
 #define orig_fopen   (*(am2_fopen_fn)ADDR_FOPEN)
 #define orig_fclose  (*(am2_fclose_fn)ADDR_FCLOSE)
+typedef char *(__cdecl *am2_fgets_fn)(char *buf, int32_t n, am2_FILE *fp);
+#define orig_fgets   (*(am2_fgets_fn)ADDR_CRT_FGETS)
+/* feof, which MSVC inlines as a test of the FILE's flag word (+0xC) against
+ * _IOEOF; ReadScript's loop tests it that way before every fgets. */
+#define AM2_FILE_FLAG_EOF 0x10
+#define orig_feof(fp) ((((const int32_t *)(fp))[3] & AM2_FILE_FLAG_EOF) != 0)
 #define orig_fseek   (*(am2_fseek_fn)ADDR_FSEEK)
 typedef int32_t (__cdecl *am2_ftell_fn)(am2_FILE *fp);
 #define orig_ftell   (*(am2_ftell_fn)ADDR_FTELL)

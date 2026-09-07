@@ -38,10 +38,8 @@ typedef double (__cdecl *AM2_StrtodFn)(const char *s, char **end);
 #define kDefKeywords ((const AM2_DefKeyword *)AM2_IMAGE(ADDR_DEF_NAME_TABLE))
 
 typedef am2_FILE *(__cdecl *AM2_FopenFn)(const char *path, const char *mode);
-typedef char *(__cdecl *AM2_FgetsFn)(char *buf, int32_t n, am2_FILE *fp);
 typedef char *(__cdecl *AM2_StrlwrFn)(char *s);
 #define orig_def_fopen  (*(AM2_FopenFn)AM2_IMAGE(ADDR_FOPEN))
-#define orig_fgets      (*(AM2_FgetsFn)AM2_IMAGE(ADDR_CRT_FGETS))
 #define orig_strlwr     (*(AM2_StrlwrFn)AM2_IMAGE(ADDR_CRT_STRLWR))
 #define kSep            ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
 #define kFileMode       ((const char *)AM2_IMAGE(ADDR_STR_DEF_FILE_MODE))

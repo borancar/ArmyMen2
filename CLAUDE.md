@@ -584,6 +584,36 @@ transcriptions are right and the frames still differ, the difference is
 below the game, and the platform is where every remaining source of
 nondeterminism has turned out to live.
 
+**THE HEAP'S LAYOUT IS THE SEQUENCE OF CALLS, AND FOUR THINGS OUTSIDE
+THE GAME WERE IN THAT SEQUENCE.** With one fixed heap under both games the
+trees at pump 120685 still sat at different addresses, and the port's and
+the hybrid's object tables were IDENTICAL while their pointers were not
+-- the table prints values on purpose, so the one thing that differed was
+the one thing it cannot show. `AM2_TRACE_HEAP=1` logs every `_nh_malloc`,
+`free` and `realloc` with the pump, the thread and the CALL SITE, and the
+hybrid installs the reconstruction's three over the original's entries so
+both sides log the same code; `diff` on the two logs, identities rather
+than addresses, named each cause in one run. None was in the game: the
+MSVC startup copies the ENVIRONMENT and the MODULE NAME into the heap and
+the platform was handing each process its own (both canonical now); the
+port's CRT parsed argv before `main()` had set the command line, so it saw
+one argument where the hybrid saw three (the constructor reads
+`/proc/self/cmdline`); and the shipped image's patch that hides
+MULTI-PLAYER turns a `je` into a `jmp` AFTER the `new`, so the original
+still allocates the button it never shows, and our loop, skipping the row,
+did not. A `diff` of the sequence is a tool the game cannot lie to; reach
+for it the moment two builds' pointers differ, before reading a single
+comparator.
+
+**AND ONCE THE HEAP IS IDENTICAL, A FRAME THAT STILL DIFFERS IS THE
+GAME.** `input-play14.txt` traps at pump 120685 with 30,359 heap
+operations agreeing exactly on both sides, so the 300 pixels there are a
+real reconstruction divergence, not a pointer tie-break: one item's
+`OBJ_OFF_HEIGHT_SET` reads 50 against 0, which halves its depth layer.
+The heap trace's whole value is that it takes the heap OFF the table of
+suspects -- when it comes back clean, the difference is above it, and the
+depth trace (`AM2_TRACE_DEPTH`) reads the field out. Open in STATUS.md.
+
 **THE CRT IS RECONSTRUCTED LIKE THE GAME, under `src/platform/crt/`, and
 its names carry a `crt_` prefix.** The image's MSVC 6 runtime is 231
 functions the game reaches 44 of, and glibc behind those names is a second

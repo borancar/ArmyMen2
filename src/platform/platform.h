@@ -86,7 +86,8 @@ void am2_host_exit(int32_t code) __attribute__((noreturn));
 int32_t  am2_host_lockstep(void);
 /* Nanoseconds: the virtual clock in lockstep, the host's otherwise. */
 uint64_t am2_host_clock_ns(void);
-uint32_t am2_host_pump_number(void);   /* lockstep: the pump about to run, 0 before the first */
+uint32_t am2_host_pump_number(void);
+int32_t  am2_trace_window(void);        /* AM2_TRACE_FROM..AM2_TRACE_TO holds the current pump */   /* lockstep: the pump about to run, 0 before the first */
 
 /* The deterministic heap, src/platform/fixedheap.cpp: HeapAlloc's blocks
  * and VirtualAlloc's reservations at addresses that depend only on the

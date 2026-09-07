@@ -32,6 +32,8 @@
 #include <stdlib.h>
 #include "crt.h"       /* am2_malloc -- the game's own */
 #include "../inject/orig.h"
+extern "C" int32_t am2_trace_window(void) __attribute__((weak));
+#define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())
 #include "../inject/patch.h"
 
 /* DirtyCollect is reconstructed, in dirty.cpp, and has no header of its own
@@ -155,7 +157,7 @@ int32_t __cdecl DepthCompare(void *a, void *b)
     static int32_t trace = -1;
     if (trace < 0)
         trace = getenv("AM2_TRACE_DEPTH") != 0;
-    if (trace && a && b) {
+    if (trace && a && b && AM2_TRACE_ON()) {
         const uint8_t *pa = (const uint8_t *)a, *pb = (const uint8_t *)b;
         fprintf(stderr, "DEPTH pump %u a=(l%d s%g %d,%d) b=(l%d s%g %d,%d) -> %d\n",
                 (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),

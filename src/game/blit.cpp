@@ -54,6 +54,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+extern "C" int32_t am2_trace_window(void) __attribute__((weak));
+#define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())
 
 #define g_pitch    (*(const int32_t *)(uintptr_t)ADDR_SCREEN_PITCH)
 #define g_frameBuf (*(uint8_t *const *)(uintptr_t)ADDR_FRAMEBUFFER)
@@ -88,7 +90,7 @@ static void blit_core(int32_t x, int32_t y, const uint8_t *data, AM2_Rect src,
         if (e && sscanf(e, "%d,%d", &trace_px, &trace_py) != 2)
             trace_px = -2;
     }
-    if (trace_px >= 0 && y <= trace_py && trace_py < y + (src.bottom - src.top)
+    if (trace_px >= 0 && AM2_TRACE_ON() && y <= trace_py && trace_py < y + (src.bottom - src.top)
         && x <= trace_px && trace_px < x + (src.right - src.left))
         fprintf(stderr, "PIX pump %u fill=%d at=%d,%d src=%d,%d-%d,%d wide=%d before=%02x\n",
                 (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u), fill, x, y,

@@ -249,25 +249,29 @@ BOOL WINAPI VirtualFree(LPVOID addr, SIZE_T size, DWORD type)
 
 /* ---- the environment ----------------------------------------------------------- */
 
+/* THE ENVIRONMENT IS CANONICAL, not the host's. The MSVC CRT's startup
+ * copies every variable into its heap (_setenvp), so the game's heap
+ * layout -- and with it every pointer the game compares, the depth
+ * comparator's tie-break among them -- depends on what this returns. Two
+ * processes on one host already differ in their first variable, and the
+ * game reads none of them: the only getenv in the image is the CRT's own
+ * __tzset asking for TZ. So every process gets this block and no other. */
+static const char kEnvironment[] =
+    "COMSPEC=C:\\WINDOWS\\COMMAND.COM\0"
+    "PATH=C:\\WINDOWS;C:\\WINDOWS\\SYSTEM\0"
+    "SystemRoot=C:\\WINDOWS\0"
+    "TEMP=C:\\TEMP\0"
+    "TMP=C:\\TEMP\0"
+    "windir=C:\\WINDOWS\0";
+
 LPSTR WINAPI GetEnvironmentStrings(void)
 {
-    size_t total = 1, i;
-    char  *block, *p;
+    char *block = (char *)malloc(sizeof kEnvironment + 1);
 
-    for (i = 0; environ && environ[i]; i++)
-        total += strlen(environ[i]) + 1;
-    block = (char *)malloc(total + 1);
     if (!block)
         return NULL;
-    p = block;
-    for (i = 0; environ && environ[i]; i++) {
-        size_t n = strlen(environ[i]) + 1;
-        memcpy(p, environ[i], n);
-        p += n;
-    }
-    *p++ = 0;
-    if (p == block + 1)
-        *p = 0;
+    memcpy(block, kEnvironment, sizeof kEnvironment);
+    block[sizeof kEnvironment] = 0;
     return block;
 }
 

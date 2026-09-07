@@ -44,6 +44,8 @@
 
 #include <stdint.h>
 #include <stdio.h>   /* SEEK_CUR only */
+extern "C" int32_t am2_trace_window(void) __attribute__((weak));
+#define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())
 
 #define g_drawTarget (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)
 /* The OFFSCREEN surface, not the back buffer. This file used to call it
@@ -702,7 +704,7 @@ void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
         static int32_t trace = -1;
         if (trace < 0)
             trace = getenv("AM2_TRACE_MAPOBJ") != 0;
-        if (trace)
+        if (trace && AM2_TRACE_ON())
             fprintf(stderr, "MAPOBJ pump %u bounds=%d,%d-%d,%d world=%d,%d-%d,%d clip=%ld,%ld-%ld,%ld dst=%ld,%ld spr=%u fmt=%u flags=%x\n",
                     (unsigned)am2_host_pump_number(), bounds->left, bounds->top, bounds->right, bounds->bottom,
                     world->left, world->top, world->right, world->bottom,
