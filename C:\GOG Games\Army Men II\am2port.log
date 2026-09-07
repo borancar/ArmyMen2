@@ -1,0 +1,5 @@
+control: listening on 127.0.0.1:31455
+devtools: arena at 0xc000000, savestates on `snap save|load FILE`; F5 saves the game, F9 reloads it
+Missing cpuinf32.dllUsing High Performance Counter
+Lobby start: about to call ReadMpMapsFile
+Releasing Comm Connection 

@@ -2549,7 +2549,27 @@ void __attribute__((thiscall)) HudEdgePaint(AM2_Widget *w, RECT clip)
         else
             am2_sprintf(text, (const char *)AM2_IMAGE(AM2_HUD_STR_AMMO_FMT), n);
 
-        EdgeText(w, pen, text, &clip);
+        /* NOT EdgeText: the count is centered ONE PIXEL RIGHT of the widget
+         * middle. The original (HUD_EDGE_PAINT+0x5B1) computes the same mid as
+         * EdgeText -- `left + (right-left)/2` -- but then `lea eax,[eax+ecx+1]`
+         * adds one, and draws the count there over the widget rect clipped to
+         * the caller's. The labels above use the plain mid; only the count
+         * carries the +1, so it cannot share EdgeText. Missing it drew every
+         * ammo count one pixel left (sessions/hudcount-2823.txt). */
+        {
+            int32_t mid = w->rect.left + (w->rect.right - w->rect.left) / 2;
+            RECT    box;
+            RECT    vis;
+
+            RectSet((AM2_Rect *)&box, w->rect.left, w->rect.top,
+                    w->rect.right, w->rect.bottom);
+            if (IntersectRect(&vis, &box, &clip)
+                && LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)) {
+                DrawTextVertical(mid + 1, pen, text, 1, vis,
+                                 *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
+                UnlockSurface();
+            }
+        }
     }
 }
 
