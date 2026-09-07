@@ -13234,12 +13234,16 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
      * two that scale the missile's speed. Identical but for the sound and for
      * arm 1 raising the muzzle 0x10 first.
      *
-     * The range is measured from a ballistically adjusted aim spot.at, clamped
-     * into the def's own [min, max] pair at +0x14 and +0x10, and the speed is
-     * that fraction of the maximum. With no target spot.at the distance IS the
-     * maximum, so the scale is exactly 1.0 and the shot is flat -- which is
-     * why the two readings agree on every unaimed shot and only diverge once
-     * something is aimed at. */
+     * `a` IS A MEASURING POINT, NOT THE LAUNCH POINT. Its y is the aim y
+     * pulled back toward the muzzle (a ballistic lead), and `a` exists solely
+     * to measure the range with ApproxDist and clamp it into the def's [min,
+     * max] at +0x14 and +0x10 -- the speed is that fraction of the maximum.
+     * The missile still LEAVES from the muzzle `from`: at 0x0045F9C2 the
+     * original loads `at` from frame slot +0x18, which is `from`, not the
+     * +0x10 that holds `a`. Passing `a` as the launch point dropped a lobbed
+     * grenade's start ~20px below the muzzle -- an arc thrown from the waist
+     * rather than over the head. With no target spot.at the distance IS the
+     * maximum, so the scale is exactly 1.0 and the shot is flat. */
     case 2: case 5: {
         AM2_Point a, b;
         int32_t   d, lo, hi, clamped;
@@ -13290,7 +13294,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
          * spot fell short and one thrown at your feet sailed away. Reported
          * from play as "the aim logic is inverse"; no A/B could see it,
          * since nothing in the suite throws anything. */
-        CreateMissile(weapon, unit, AM2_PACK_POINT(a.x, a.y), facing,
+        CreateMissile(weapon, unit, from, facing,
                       height, spot.ground, 1,
                       AM2_FLOAT_BITS(scale), 0, 0, seed);
         return 1;
