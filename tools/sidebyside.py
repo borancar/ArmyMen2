@@ -209,7 +209,7 @@ def main():
     ap.add_argument("--video", action="store_true", help="the leader gets a real window")
     ap.add_argument("--fps", type=float, default=None)
     ap.add_argument("-o", "--out")
-    ap.add_argument("--on-trap", choices=("quit", "wait"), default=None)
+    ap.add_argument("--on-trap", choices=("quit", "wait", "hold"), default=None)
     ap.add_argument("--ports", nargs=2, type=int, default=(31341, 31342))
     ap.add_argument("--break", dest="breaks", default="",
                     help="comma-separated pump numbers to stop at as if trapped (the prompt's `c N` sets one too)")
@@ -393,6 +393,16 @@ def main():
                 rc = 1
             if on_trap == "quit":
                 finish(rc if not same else 0)
+            if on_trap == "hold":
+                # Keep both games alive and their control sockets answering,
+                # indefinitely, so an inspector can attach. Killed by signal.
+                print("sidebyside: HOLDING; control sockets %d and %d answer; kill to end"
+                      % (leader.port, follower.port))
+                sys.stdout.flush()
+                import signal as _sig
+                _sig.pause()
+                while True:
+                    _sig.pause()
             # Hold here: step one pump at a time, or run on to the next difference.
             while True:
                 sys.stdout.write("sidebyside [s]tep [c]ontinue [c N: to pump N] [q]uit> ")

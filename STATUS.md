@@ -15,28 +15,26 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
-- **OPEN (2026-09-07): 300 pixels at pump 120685 of the live session
-  `tests/replays/sessions/depth-120685.txt`, the frame after a radar
-  click scrolls the view.** The HEAP is now byte-identical between the two
-  games for the whole run (`AM2_TRACE_HEAP=1` diffs every `_nh_malloc`,
-  `free` and `realloc` -- pump, size, result and free target all agree,
-  30,359 operations), so this is NOT the heap: it is one type-1 item
-  (uid pattern 0x800009xx) at world (2488,1597), tile 25499, whose height
-  byte `OBJ_OFF_HEIGHT_SET` reads 50 in the hybrid and 0 in the port. That
-  drives its row's depth layer (`ScaleBy32Blocks(50)`=2000 against
-  `ScaleBy32Blocks(0)`=1000), so `DepthCompare` sorts it to a different
-  slot and one two-tree overlap draws in the other order. Neither
-  `ApplyObjHeight` nor `ApplyHeightItem` is called for tile 25499 anywhere
-  in the run, so the writer is one of the other `OBJ_OFF_HEIGHT_SET` sites
-  (a dropped item inherits its unit's height at item.cpp:6912; the vehicle
-  respawns and the explosion spawn are the others) -- not yet pinned. The
-  fix that got here first: four heap-sequence differences outside the game
-  (host environment, module name, argv parsed before the command line was
-  set, the hidden MULTI-PLAYER button the shipped patch still allocates),
-  all closed; `ReadScript` now reads through the game's own CRT stdio so
-  its 4 KB stream buffer lands on the shared heap. `AM2_TRACE_HEIGHT=1`
-  (window-gated) logs the height calls; add a trace to the remaining
-  writers to pin it.
+- **OPEN (2026-09-07): 300 pixels at pump 120685 of
+  `tests/replays/sessions/depth-120685.txt`.** The heap is byte-identical
+  now (`AM2_TRACE_HEAP=1`, 30,359 operations agree), so this is the game.
+  Fourteen type-1 items across the map read `OBJ_OFF_HEIGHT_SET` 50 in the
+  hybrid and 0 in the port -- 50 is the terrain height at each (their
+  tiles all have attribute 50), so their row depth layer is
+  `ScaleBy32Blocks(50)`=2000 against `ScaleBy32Blocks(0)`=1000 and
+  `DepthCompare` sorts one two-tree overlap the other way. `ApplyObjHeight`
+  and `ApplyHeightItem` are never called for any of these tiles in the port
+  over the whole run (`AM2_TRACE_HEIGHT`, tile filter), so the port never
+  sets their height from the terrain while the hybrid does. The item
+  creators (`CreateItem`, `CreateWeapon`, `CreateWatchedItem/Type`) were
+  read: none is obviously wrong, and `CreateWatchedItem` correctly inherits
+  its source's height and calls `ObjTileChanged(item, hset, force=1)`.
+  Still to pin: which creation or refresh path the original runs for these
+  items that ours skips -- pause both games with
+  `tools/sidebyside.py --on-trap hold` (new), find one of the 14 items
+  (its hset differs by uid), and trace the +0x65 writers with an object
+  filter. The four heap-sequence fixes and the `ReadScript` stdio change
+  that got the heap identical are committed.
 
 FIXED by this rule so far, each with the replay that reproduces it:
 one pixel of a corner where two sandbags overlap
