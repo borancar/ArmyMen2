@@ -100,6 +100,14 @@ static int32_t         noreuse, poison, canary;
 static Canary         *canaries;
 static uint32_t        canary_count;
 static uint8_t         slot_used[RESV_SLOTS];
+/* The number of slots in the reservation that STARTS at this slot; 0 for a
+ * free slot or an interior slot of a multi-slot reservation. Release frees
+ * exactly this many, so two reservations that happen to be adjacent -- with
+ * no free slot between them -- are not run together into one. Without it,
+ * releasing one reservation madvise-zeroed the live one beside it, and a
+ * later free of a block in that zeroed region walked a null free-list link.
+ * That is the whole grenade-recording heap crash. */
+static uint8_t         slot_run[RESV_SLOTS];
 
 static void heap_init(void)
 {
@@ -292,6 +300,7 @@ void *am2_fixed_reserve(size_t size)
         if (j == need) {
             for (j = 0; j < need; j++)
                 slot_used[i + j] = 1;
+            slot_run[i] = (uint8_t)need;
             pthread_mutex_unlock(&lock);
             return RESV_BASE + (size_t)i * RESV_SLOT;
         }
@@ -308,11 +317,21 @@ int32_t am2_fixed_release(void *addr)
         return 0;
     first = (uint32_t)(((uint8_t *)addr - RESV_BASE) / RESV_SLOT);
     pthread_mutex_lock(&lock);
-    /* Release the run of slots from this one to the next free slot; a
-     * reservation is one such run. The pages read as zero again afterwards,
-     * as a fresh reservation's would. */
-    for (i = first; i < RESV_SLOTS && slot_used[i]; i++)
-        slot_used[i] = 0;
+    /* Free EXACTLY this reservation's slots -- not every used slot up to the
+     * next gap, which would swallow an adjacent reservation. */
+    {
+        uint32_t n = slot_run[first];
+
+        if (n == 0) {             /* not a reservation start */
+            pthread_mutex_unlock(&lock);
+            return 0;
+        }
+        slot_run[first] = 0;
+        for (i = first; i < first + n; i++)
+            slot_used[i] = 0;
+    }
+    /* The pages read as zero again afterwards, as a fresh reservation's
+     * would. */
     madvise(RESV_BASE + (size_t)first * RESV_SLOT, (size_t)(i - first) * RESV_SLOT, MADV_DONTNEED);
     pthread_mutex_unlock(&lock);
     return 1;

@@ -132,6 +132,117 @@ static void sbh_link_head(CRT_SBH_HEADER *h, CRT_SBH_REGION *r, int32_t indGroup
         sbh_set_bits(h, r, indGroup, ind);
 }
 
+/* AM2_HEAP_CHECK=1: walk every committed small-block page before each
+ * free/alloc and report the first corrupted free entry -- a free block
+ * whose list links have been overwritten (the null-link crash's cause) or
+ * whose size/end-tag disagree. It also names the live block PHYSICALLY
+ * BEFORE the corrupted one, since a contiguous overflow comes from there;
+ * cross-reference its user pointer and size against an AM2_TRACE_HEAP log
+ * to find the allocating call site. Reports once per `when` phase and
+ * keeps running, so the pump it first appears on brackets the writer. */
+#ifdef __linux__
+extern "C" uint32_t am2_host_pump_number(void);
+#define HEAPCK_PUMP ((unsigned)am2_host_pump_number())
+#else
+#define HEAPCK_PUMP 0u
+#endif
+
+static int32_t heapck_on = -1;
+static int32_t heapck_hit;
+
+static inline int32_t heapck_enabled(void)
+{
+    if (heapck_on < 0)
+        heapck_on = getenv("AM2_HEAP_CHECK") != NULL;
+    return heapck_on;
+}
+
+/* A pointer that could be a free-list link: non-null, 4-aligned, and high
+ * enough not to be a smashed-in small integer (a coordinate, a flag). */
+static inline int32_t heapck_linkish(const void *q)
+{
+    uintptr_t v = (uintptr_t)q;
+    return v >= 0x10000u && (v & 3u) == 0;
+}
+
+static void heapck_report(const char *when, uint8_t *page, CRT_SBH_ENTRY *bad,
+                          const char *why)
+{
+    CRT_SBH_ENTRY *e = ENTRY_AT(page, 0xC), *prev = NULL;
+
+    while (e < bad && e->sizeFront != -1) {
+        prev = e;
+        e = ENTRY_AT(e, e->sizeFront & ~1);
+    }
+    fprintf(stderr,
+            "HEAPCK pump %u %s: %s at entry %p size=0x%x next=%p prev=%p; "
+            "prev block user=%p size=0x%x (the overflower)\n",
+            HEAPCK_PUMP, when, why, (void *)bad, (unsigned)bad->sizeFront,
+            (void *)bad->pNext, (void *)bad->pPrev,
+            prev ? (void *)((uint8_t *)prev + 4) : NULL,
+            prev ? (unsigned)(prev->sizeFront & ~1) : 0u);
+    {
+        /* Dump 0x40 bytes from the previous page's tail through the bad
+         * entry, so a recognisable game pattern (coordinates, pointers,
+         * ASCII) or a run of zeros is visible. */
+        const uint8_t *d = (const uint8_t *)bad - 0x20;
+        int32_t         i;
+        for (i = 0; i < 0x60; i += 16) {
+            fprintf(stderr, "HEAPCK  %p:", (const void *)(d + i));
+            for (int32_t j = 0; j < 16; j++)
+                fprintf(stderr, " %02x", d[i + j]);
+            fprintf(stderr, "\n");
+        }
+    }
+}
+
+static void heapck_walk(const char *when)
+{
+    CRT_SBH_HEADER *h, *end;
+
+    if (!heapck_enabled() || crt_pHeaderList == NULL)
+        return;
+    end = crt_pHeaderList + crt_cntHeaderList;
+    for (h = crt_pHeaderList; h < end; h++) {
+        int32_t ind;
+        for (ind = 0; ind < SBH_GROUPS; ind++) {
+            uint8_t *base, *page, *last;
+
+            if (h->bitvCommit & (0x80000000u >> ind))   /* uncommitted */
+                continue;
+            base = h->pHeapData + ind * SBH_GROUP_BYTES;
+            last = base + 7 * SBH_PAGE_BYTES;
+            for (page = base; page <= last; page += SBH_PAGE_BYTES) {
+                CRT_SBH_ENTRY *e = ENTRY_AT(page, 0xC);
+                uint8_t       *stop = page + 0xFFC;
+
+                while ((uint8_t *)e < stop && e->sizeFront != -1) {
+                    int32_t size = e->sizeFront & ~1;
+                    int32_t tag;
+
+                    if (size < 0x10 || (uint8_t *)e + size > stop) {
+                        if (!heapck_hit++)
+                            heapck_report(when, page, e, "bad size");
+                        break;
+                    }
+                    tag = *(int32_t *)((uint8_t *)e + size - 4);
+                    if (tag != e->sizeFront) {
+                        if (!heapck_hit++)
+                            heapck_report(when, page, e, "end tag != size");
+                    }
+                    if (!(e->sizeFront & 1)) {           /* a free entry */
+                        if (!heapck_linkish(e->pNext) || !heapck_linkish(e->pPrev)) {
+                            if (!heapck_hit++)
+                                heapck_report(when, page, e, "dead free link");
+                        }
+                    }
+                    e = ENTRY_AT(e, size);
+                }
+            }
+        }
+    }
+}
+
 int32_t __cdecl crt_sbh_heap_init(void)
 {
     CRT_SBH_HEADER *list = (CRT_SBH_HEADER *)HeapAlloc(crt_crtheap, 0, SBH_HEADER_ALLOC);
@@ -269,6 +380,9 @@ void *__cdecl crt_sbh_alloc_block(uint32_t n)
     CRT_SBH_GROUP  *g;
     CRT_SBH_ENTRY  *e, *alloc;
     int32_t         sizeEntry = (int32_t)((n + 0x17) & ~0xFu);
+
+    heapck_walk("alloc");
+
     int32_t         ind = (sizeEntry >> 4) - 1;
     uint32_t        maskHi, maskLo, bits;
     int32_t         indGroup, indEntry, sizeLeft, indLeft;
@@ -365,6 +479,9 @@ void *__cdecl crt_sbh_alloc_block(uint32_t n)
 void __cdecl crt_sbh_free_block(CRT_SBH_HEADER *h, void *p)
 {
     CRT_SBH_REGION *r = h->pRegion;
+
+    heapck_walk("free");
+
     int32_t         indGroup = (int32_t)(((uint8_t *)p - h->pHeapData) >> 15);
     CRT_SBH_GROUP  *g = &r->grpHeadList[indGroup];
     CRT_SBH_ENTRY  *e = ENTRY_AT(p, -4), *next;
