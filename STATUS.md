@@ -29,8 +29,11 @@ FIXED below when that replay runs identical.
   creators (`CreateItem`, `CreateWeapon`, `CreateWatchedItem/Type`) were
   read: none is obviously wrong, and `CreateWatchedItem` correctly inherits
   its source's height and calls `ObjTileChanged(item, hset, force=1)`.
-  Still to pin: which creation or refresh path the original runs for these
-  items that ours skips -- pause both games with
+  The mission is Boot Camp and these are its MAP items (placed by
+  BuildMapObjects, which does not set height); short `bootcamp.txt` is
+  clean, so the divergence develops over the long session -- the original
+  sets their terrain height at some point our code does not. Still to pin:
+  which refresh path the original runs for them that ours skips -- pause both games with
   `tools/sidebyside.py --on-trap hold` (new), find one of the 14 items
   (its hset differs by uid), and trace the +0x65 writers with an object
   filter. The four heap-sequence fixes and the `ReadScript` stdio change
