@@ -15,19 +15,24 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
-- **OPEN (2026-09-07): a FLAMETHROWER's flame renders one gradient step
-  off, live trap pump 5197 (80 px, box 187,196-203,214).** NOT object
-  state: the object tables are byte-identical (1605 each), so the
-  flamethrower unit and everything else match. The differing pixels are the
-  flame plume's heat gradient (red 254, green stepping 146..218, blue 2),
-  off by ~one green step per pixel (e.g. hybrid green 178 vs port 190). So
-  it is a rendering/effect divergence of the flame with identical game
-  state -- an animation phase, a per-frame value, or a palette/remap the
-  flame renderer indexes, not a launch or lifetime bug. Next: find what
-  draws the flame gradient and why it lands one step off from the same
-  state.
+(No open divergences: every replay under `tests/replays` runs identical,
+hybrid against port.)
 
 FIXED by this rule so far, each with the replay that reproduces it:
+a FLAMETHROWER's flame ran one animation frame AHEAD
+(`sessions/flame-5197.txt`, trap pump 5197, 80 px, box 187,196-203,214):
+the flame is a def-3 trail missile whose sprite comes from `TimedDirFrame`
+(0x00461F90), `col = (clock - STAMP_54) / N` indexing the direction grid.
+Object tables were byte-identical (1605 each) and only the row's
+ROW_OFF_SPRITE differed -- port GRID[9], hybrid GRID[8], one column apart.
+The original's reciprocal is `mov eax,0x51EB851F; mul ecx; shr edx,6`: the
+`mul` puts the high dword in edx (a >>32) and `shr 6` takes it to >>38, and
+0x51EB851F/2^38 is exactly 1/200 -- so the divisor is 200, not 100. The
+reconstruction had `/100u` (the same constant's /100 form is `shr 5`), so
+at elapsed 100 the port advanced the column where the original waits for
+200. Under lockstep the whole recording plus 100k idle pumps now run
+byte-identical; `make check` and all seven self-terminating lockstep
+replays stay IDENTICAL.
 a thrown grenade LAUNCHED ~20px too low (`sessions/grenade-live-16065.txt`,
 pump 16053): FireWeapon's lobbed arm (item.cpp case 2/5) passed the
 arc-measuring point `a` as CreateMissile's launch point, but `a` exists

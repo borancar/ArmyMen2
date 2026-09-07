@@ -1855,11 +1855,16 @@ void __cdecl LeaveRemainsRow(const void *src)
  * since the row was stamped, write it into the row, and answer whether the
  * sequence has more frames left.
  *
- * THE DIVISION IS BY 100 AND IS WRITTEN AS A MULTIPLY. `mov eax, 0x51EB851F;
- * mul ecx; shr edx, 6` is the compiler's reciprocal for /100 -- the constant
- * is 2^38/100 rounded up and the shift takes the high half down by six. So
- * the frame advances ten times a second, which no constant in the function
- * says.
+ * THE DIVISION IS BY 200 AND IS WRITTEN AS A MULTIPLY. `mov eax, 0x51EB851F;
+ * mul ecx; shr edx, 6` is the compiler's reciprocal for /200: 0x51EB851F is
+ * round(2^37/100), the `mul` leaves the product's high dword in edx (a >>32),
+ * and `shr edx, 6` takes it down a further six for a total shift of 38 --
+ * 0x51EB851F / 2^38 is exactly 1/200. So the frame advances FIVE times a
+ * second, not ten. The `shr 6` was first misread as /100 (one shift short,
+ * the reciprocal for /100 is the same constant with `shr 5`); it cost a
+ * one-frame-early flame, the port advancing a def-3 trail's column at
+ * elapsed 100 where the original waits for 200. No constant in the function
+ * says 200 either -- the shift is the whole of it.
  *
  * IT CLAMPS THE COLUMN AND THEN REPORTS THE CLAMP. The elapsed frame is
  * pinned to cols-1, and the return value is `col < cols - 1` computed from
@@ -1878,7 +1883,7 @@ int32_t __cdecl TimedDirFrame(void *rows, int32_t dir)
     int32_t  band;
 
     elapsed = (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-               - *(const uint32_t *)(r + ROW_OFF_STAMP_54)) / 100u;
+               - *(const uint32_t *)(r + ROW_OFF_STAMP_54)) / 200u;
 
     col = (int32_t)elapsed;
     if (col >= cols - 1)
