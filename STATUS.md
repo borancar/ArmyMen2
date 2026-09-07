@@ -15,6 +15,18 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
+- **OPEN (2026-09-07): 4 pixels in the BOTTOM scanline (y=479, x
+  260..267) at pump 1,706,982 of a long live Boot Camp session
+  (`scratch keep/input-play15-botrow.txt`).** Flagged by sidebyside as
+  swapped horizontal pairs, but it is not a clean swap -- the content
+  genuinely differs, a=313021/293a24/213410 against b=424531/315531/314121.
+  BlitOverlay's FILL_DESTLUT arm was re-disassembled in full and every
+  lead-in and tail keeps pixel order except the misalignment-1 count-2
+  case already reconstructed, so this is NOT the overlay blitter; the
+  source (a different bottom-edge blit or clip) is unpinned. Reproduction
+  needs ~1.7M pumps, so it is expensive; the recording is saved but no
+  shorter repro exists yet -- every committed replay under tests/replays
+  is still identical.
 - **OPEN (2026-09-07): 300 pixels at pump 120685 of
   `tests/replays/sessions/depth-120685.txt`.** The heap is byte-identical
   now (`AM2_TRACE_HEAP=1`, 30,359 operations agree), so this is the game.
