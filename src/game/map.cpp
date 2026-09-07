@@ -1623,16 +1623,27 @@ static void BuildMapObjects(uint8_t *objs, int32_t count)
             /* BOTH POINTS ARE PASSED: the one before SettlePointInRegion and
              * the one it may have moved.  The original keeps the first in a
              * register and hands the slot Settle writes as a separate
-             * argument, so they are two arguments and not one. */
+             * argument. The weapon is placed at the point BEFORE Settle
+             * (the original's ARG4 is the un-settled point in ebp); Settle
+             * runs but its written-back point is not what the weapon uses,
+             * and it is certainly NOT the weapon's quantity. */
             settled = *(const uint32_t *)&at;
             SettlePointInRegion(TileOfPoint(settled), (uint32_t *)&at);
 
-            /* AND THE ARMY IS THE LITERAL 4, not the record's owner: the
-             * register that carried the owner has been reused twice by here,
-             * first for the key and then for the point. */
+            /* QUANTITY IS 0, NOT THE SETTLED POINT. The original reads its
+             * quantity argument from `[esp+0x30]` at 0x0042D2D1 while the
+             * SettlePointInRegion push is still outstanding, so the -4 shift
+             * makes it a DIFFERENT frame slot -- a zero local -- than the
+             * +0x34 slot Settle wrote the point to (espmap confirms +0x2c vs
+             * +0x34). So every map weapon is created with quantity 0, which
+             * CreateWeapon turns into the default ammo of 3. Passing the
+             * settled point here instead made ammo a packed point, which the
+             * inventory panel showed as a grenade count of 99.
+             *
+             * AND THE ARMY IS THE LITERAL 4, not the record's owner: the
+             * register that carried the owner has been reused twice by here. */
             obj = CreateWeapon(*(char **)(r + MAPREC_OFF_SCRIPT), 4,
-                                  aai, settled, flags,
-                                  (int32_t)*(const uint32_t *)&at, 1, 0);
+                                  aai, settled, flags, 0, 1, 0);
         }
 
         /* THE SHARED HEIGHT TAIL (0x0042D2ED), reached by both arms: the map

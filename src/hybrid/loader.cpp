@@ -479,6 +479,27 @@ static void __cdecl am2_objh_hook_1(void *obj, int32_t height)
     am2_objh_tramp[1](obj, height);
 }
 
+/* AM2_TRACE_WEAPON: the original CreateWeapon, logging the quantity arg (ARG6)
+ * and the ammo it stored, to match item.cpp. __cdecl, 8 args, returns the obj;
+ * prologue is 5 bytes (mov eax,[abs]). */
+typedef void *(__cdecl *am2_cw_fn)(const char *, int32_t, int32_t, uint32_t,
+                                   int32_t, int32_t, int32_t, int32_t);
+static am2_cw_fn am2_cw_tramp;
+static void *__cdecl am2_cw_hook(const char *name, int32_t army, int32_t key,
+                                 uint32_t at, int32_t flags, int32_t quantity,
+                                 int32_t remote, int32_t uid)
+{
+    void *o = am2_cw_tramp(name, army, key, at, flags, quantity, remote, uid);
+    if (am2_trace_window()) {
+        const uint8_t *ob = (const uint8_t *)o;
+        fprintf(stderr, "WEAPON pump %u pos=%d,%d quantity=%d ammo=%d\n",
+                (unsigned)am2_host_pump_number(),
+                ob ? *(const int16_t *)(ob + 0x12) : 0, ob ? *(const int16_t *)(ob + 0x14) : 0,
+                quantity, ob ? *(const int32_t *)(ob + 0xCC) : 0);
+    }
+    return o;
+}
+
 /* ---- the cursor ------------------------------------------------------------------------ */
 
 static void am2_hybrid_cursor_query(int32_t *x, int32_t *y)
@@ -747,6 +768,8 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
         am2_objh_tramp[0] = (am2_objh_fn)am2_tramp_install(ADDR_APPLY_OBJ_HEIGHT, 5, (const void *)&am2_objh_hook_0);
         am2_objh_tramp[1] = (am2_objh_fn)am2_tramp_install(ADDR_APPLY_HEIGHT_1_4, 7, (const void *)&am2_objh_hook_1);
     }
+    if (getenv("AM2_TRACE_WEAPON"))
+        am2_cw_tramp = (am2_cw_fn)am2_tramp_install(ADDR_CREATE_WEAPON, 5, (const void *)&am2_cw_hook);
 #endif
 
     am2_plat_log("running %s from its entry point 0x%08lx", path, (unsigned long)(uintptr_t)entry);

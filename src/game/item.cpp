@@ -14059,6 +14059,16 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
         ammo = 3;
     *(int32_t *)(o + 0xCCu) = ammo;
 
+    {
+        static int32_t tw = -1;
+        if (tw < 0) tw = getenv("AM2_TRACE_WEAPON") != 0;
+        if (tw && (!am2_trace_window || am2_trace_window()))
+            fprintf(stderr, "WEAPON pump %u pos=%d,%d kb=%d quantity=%d ammo=%d\n",
+                    (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
+                    *(const int16_t *)(o + OBJ_OFF_POS), *(const int16_t *)(o + OBJ_OFF_Y),
+                    kb, quantity, ammo);
+    }
+
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
         && ammo > *(const int32_t *)(def + 0x18u)
         && *(const int32_t *)(def + 0x18u) > 0)
