@@ -15,8 +15,20 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
-(none open -- every replay under tests/replays runs identical, hybrid
-against port, with no tolerance flags. Last checked 2026-09-07.)
+- **OPEN (2026-09-07): a MISSILE's trajectory diverges in live combat,
+  repro `tests/replays/sessions/missile-11062.txt`, pump 11062 (30 px on
+  and below Sarge as he fires).** Object uid 3f7, type 5 (missile, per
+  docs/objects.md), is at world y=1624 in the hybrid and 1645 in the port
+  -- a POSITION divergence of 21, not rendering: its row draws at screen
+  y=230 vs 251 and in a different depth order as a consequence. This is the
+  COMBAT layer docs/combat.md said no configuration reached; the live
+  side-by-side now does (Sarge firing). Needs a missile-step
+  investigation: find the first pump the missile's position diverges and
+  trace its per-frame update (CreateMissile / the type-5 step /
+  MoveStepPoint), the same method the earlier argument-slot combat defects
+  used. Found with AM2_TRACE_BLIT (a 7x5 row at y=230 vs 251) then
+  AM2_TRACE_MAPOBJ (identical world bounds, the row 21px off) then the
+  object table (uid 3f7 pos 1624 vs 1645).
 
 FIXED by this rule so far, each with the replay that reproduces it:
 the HUD ammo count drawn one pixel left (`sessions/hudcount-2823.txt`):
