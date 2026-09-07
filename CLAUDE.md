@@ -601,6 +601,24 @@ item-height divergence STATUS.md already tracks. A parameter trace answers
 read; reach for it when two builds' pixels differ but the object tables do
 not.
 
+**A `continue` THAT SKIPS A SHARED TAIL IS A DROPPED CALL, and it cost
+every map item its height.** `BuildMapObjects` has an item arm and a
+weapon arm; the original's item arm (0x0042D1C3) JMPs into the SAME tail
+the weapon arm falls through to, and that tail is the
+`ApplyHeightItem(obj, tileAttr + elev)` at 0x0042D30B. The reconstruction
+ended the item arm with `continue`, so map items kept height 0 instead of
+the terrain's -- which halved their depth layer and drew overlapping
+ground sprites in the wrong ORDER, the bottom-edge divergence. Two traces
+found it without reading a blit body: `AM2_TRACE_BLIT` said the params
+matched but the order did not, and `AM2_TRACE_HEIGHT` -- the port's
+`ApplyObjHeight`/`ApplyHeightItem` logged in item.cpp, the hybrid's the
+same two through a trampoline detour in the loader -- showed the hybrid
+calling `ApplyHeightItem hin=50` for the items where the port called
+nothing. The lesson is the "An exit NOTED is not an exit reproduced" one
+in reverse: when the original's arms CONVERGE on a shared tail, a
+per-arm `continue` silently drops it. Read where each arm's jump LANDS,
+not just what it does.
+
 **THE HEAP'S LAYOUT IS THE SEQUENCE OF CALLS, AND FOUR THINGS OUTSIDE
 THE GAME WERE IN THAT SEQUENCE.** With one fixed heap under both games the
 trees at pump 120685 still sat at different addresses, and the port's and

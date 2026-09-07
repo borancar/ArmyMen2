@@ -1545,7 +1545,7 @@ static void BuildMapObjects(uint8_t *objs, int32_t count)
         int32_t   army  = owner != 0 ? (int32_t)owner - 1 : 4;
         int32_t   flags = 0;
         AM2_Point at;
-        void     *obj;
+        void     *obj = 0;
 
         if (trig & 0x20)
             flags = 4;
@@ -1570,12 +1570,17 @@ static void BuildMapObjects(uint8_t *objs, int32_t count)
             if (obj != 0 && ObjIsWatchedKind(obj)
                 && (int32_t)g_defaultOwner != army)
                 ObjConceal(obj, 1);
-            continue;
-        }
+            /* NOT `continue`: the item arm falls into the SHARED HEIGHT TAIL
+             * below, exactly as the original does (0x0042D1C3 jmps to the
+             * ApplyHeightItem at 0x0042D30B that the weapon arm reaches by
+             * falling through). Skipping it left every map item's height at 0
+             * instead of the terrain's, which halved its depth layer and drew
+             * overlapping ground sprites in the wrong order -- the bottom-edge
+             * divergence AM2_TRACE_HEIGHT traced to this call. */
+        } else {
 
         /* A WEAPON, and the branch where a kind of 0x64 or more is either
          * substituted from the respawn pool or reduced by 0x64. */
-        {
             int32_t  aai = -1, key = PackKey(type + 0x14, kind, 0);
             uint32_t settled;
             int32_t  code = kind;
@@ -1628,13 +1633,17 @@ static void BuildMapObjects(uint8_t *objs, int32_t count)
             obj = CreateWeapon(*(char **)(r + MAPREC_OFF_SCRIPT), 4,
                                   aai, settled, flags,
                                   (int32_t)*(const uint32_t *)&at, 1, 0);
-            if (obj != 0) {
-                const uint8_t *attrs =
-                    *(const uint8_t **)(uintptr_t)ADDR_TILE_ATTRS;
-                int32_t tile = *(const uint16_t *)((uint8_t *)obj + 0x1A);
+        }
 
-                ApplyHeightItem(obj, (int8_t)attrs[tile] + r[MAPREC_OFF_ELEV]);
-            }
+        /* THE SHARED HEIGHT TAIL (0x0042D2ED), reached by both arms: the map
+         * record's own height is the tile's terrain attribute plus the
+         * record's elevation byte, applied to whichever object was made. */
+        if (obj != 0) {
+            const uint8_t *attrs =
+                *(const uint8_t **)(uintptr_t)ADDR_TILE_ATTRS;
+            int32_t tile = *(const uint16_t *)((uint8_t *)obj + 0x1A);
+
+            ApplyHeightItem(obj, (int8_t)attrs[tile] + r[MAPREC_OFF_ELEV]);
         }
     }
 }

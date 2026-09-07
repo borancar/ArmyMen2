@@ -416,12 +416,12 @@ AM2_BLIT_HOOK(2, "BlitRemap16")
 AM2_BLIT_HOOK(3, "BlitOverlay")
 AM2_BLIT_HOOK(4, "BlitGlyph")
 
-/* Build a trampoline holding the original's first 6 bytes and a jmp back to
- * addr+6, then patch the entry to jump to the hook. 6 bytes is a clean
- * instruction boundary for every one of the five (verified against the image);
- * ecx and edx (x, y) survive the prologue untouched, so the resumed body reads
- * them as the caller set them. */
-static void am2_blit_install(uintptr_t addr, int idx, const void *hook)
+/* Build a trampoline holding the original's first `plen` bytes (a clean
+ * instruction boundary >= 5) and a jmp back to addr+plen, then patch the entry
+ * to jump to `hook`. Returns the trampoline, which the hook calls to run the
+ * original body; registers and the stack survive the copied prologue, so the
+ * resumed body reads its arguments as the caller left them. */
+static void *am2_tramp_install(uintptr_t addr, int plen, const void *hook)
 {
     uint8_t *tr;
 
@@ -430,19 +430,53 @@ static void am2_blit_install(uintptr_t addr, int idx, const void *hook)
             PROT_READ | PROT_WRITE | PROT_EXEC,
             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         if (am2_blit_tramp_page == MAP_FAILED) {
-            am2_plat_log("AM2_TRACE_BLIT: cannot map trampoline page");
+            am2_plat_log("AM2 trace: cannot map trampoline page");
             am2_blit_tramp_page = NULL;
-            return;
+            return NULL;
         }
     }
     tr = am2_blit_tramp_page + am2_blit_tramp_used;
-    am2_blit_tramp_used += 16;
-    memcpy(tr, (const void *)addr, 6);
-    tr[6] = 0xE9;
-    { uint32_t rel = (uint32_t)((addr + 6) - ((uintptr_t)tr + 6 + 5));
-      memcpy(tr + 7, &rel, 4); }
-    am2_blit_tramp[idx] = (am2_blit_tramp_fn)tr;
+    am2_blit_tramp_used += (uint32_t)plen + 8;
+    memcpy(tr, (const void *)addr, (size_t)plen);
+    tr[plen] = 0xE9;
+    { uint32_t rel = (uint32_t)((addr + (uint32_t)plen) - ((uintptr_t)tr + plen + 5));
+      memcpy(tr + plen + 1, &rel, 4); }
     am2_hybrid_patch_jmp(addr, hook);
+    return tr;
+}
+
+/* The five blits share a 6-byte prologue; ecx/edx (x, y) survive it. */
+static void am2_blit_install(uintptr_t addr, int idx, const void *hook)
+{
+    am2_blit_tramp[idx] = (am2_blit_tramp_fn)am2_tramp_install(addr, 6, hook);
+}
+
+/* AM2_TRACE_HEIGHT: the hybrid's ApplyObjHeight and ApplyHeightItem, logged to
+ * match item.cpp's port-side line, so the two games' height calls diff. Both
+ * are __cdecl(obj, height): obj at [esp+4] on entry, so the hook's own first
+ * argument is it. ApplyObjHeight's clean prologue is 5 bytes (mov eax,[esp+8];
+ * push esi), ApplyHeightItem's is 7 (push ebx/ebp/esi; mov esi,[esp+0x10]). */
+typedef void (__cdecl *am2_objh_fn)(void *obj, int32_t height);
+static am2_objh_fn am2_objh_tramp[2];
+
+static void am2_objh_log(const char *name, const void *obj, int32_t hin)
+{
+    const uint8_t *o = (const uint8_t *)obj;
+    if (o && am2_trace_window())
+        fprintf(stderr, "HEIGHT %s pump %u pos=%d,%d tile=%d hin=%d hset=%d\n", name,
+                (unsigned)am2_host_pump_number(),
+                *(const int16_t *)(o + 0x12), *(const int16_t *)(o + 0x14),
+                *(const uint16_t *)(o + 0x1A), hin, *(const signed char *)(o + 0x65));
+}
+static void __cdecl am2_objh_hook_0(void *obj, int32_t height)
+{
+    am2_objh_log("ApplyObjHeight", obj, height);
+    am2_objh_tramp[0](obj, height);
+}
+static void __cdecl am2_objh_hook_1(void *obj, int32_t height)
+{
+    am2_objh_log("ApplyHeightItem", obj, height);
+    am2_objh_tramp[1](obj, height);
 }
 
 /* ---- the cursor ------------------------------------------------------------------------ */
@@ -706,6 +740,12 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
         am2_blit_install(ADDR_BLIT_REMAP16, 2, (const void *)&am2_blit_hook_2);
         am2_blit_install(ADDR_BLIT_OVERLAY, 3, (const void *)&am2_blit_hook_3);
         am2_blit_install(ADDR_BLIT_GLYPH,   4, (const void *)&am2_blit_hook_4);
+    }
+    /* AM2_TRACE_HEIGHT=1: log the original's height setters, matching the port
+     * (src/game/item.cpp), to diff which height calls each game makes. */
+    if (getenv("AM2_TRACE_HEIGHT")) {
+        am2_objh_tramp[0] = (am2_objh_fn)am2_tramp_install(ADDR_APPLY_OBJ_HEIGHT, 5, (const void *)&am2_objh_hook_0);
+        am2_objh_tramp[1] = (am2_objh_fn)am2_tramp_install(ADDR_APPLY_HEIGHT_1_4, 7, (const void *)&am2_objh_hook_1);
     }
 #endif
 

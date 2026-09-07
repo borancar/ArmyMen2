@@ -8,12 +8,34 @@
  */
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 #include "definfo.h"  /* AM2_DefFindFn -- MedkitHeal */
 #include "item.h"
 #include "misc.h"      /* ClearPtrList */
 #include "defparse.h"  /* DefFindObjRec -- reconstructed */
 #include "pad.h"      /* ObjTileHook -- reconstructed */
+
+/* AM2_TRACE_HEIGHT=1: one line per height-setting call, matched by the hybrid
+ * (src/hybrid/loader.cpp installs the same log over the originals), so the two
+ * games' height calls diff. A missing line on one side is a call it skips --
+ * which is how a 50-vs-0 depth divergence is traced to its setter. The object
+ * position is logged so a specific object is greppable; window-gated by
+ * AM2_TRACE_FROM/TO. */
+extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
+extern "C" int32_t am2_trace_window(void) __attribute__((weak));
+static void am2_height_log(const char *name, const void *obj, int32_t hin)
+{
+    static int32_t tr = -1;
+    const uint8_t *o = (const uint8_t *)obj;
+    if (tr < 0) tr = getenv("AM2_TRACE_HEIGHT") != 0;
+    if (tr && o && (!am2_trace_window || am2_trace_window()))
+        fprintf(stderr, "HEIGHT %s pump %u pos=%d,%d tile=%d hin=%d hset=%d\n", name,
+                (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
+                *(const int16_t *)(o + OBJ_OFF_POS), *(const int16_t *)(o + OBJ_OFF_Y),
+                *(const uint16_t *)(o + OBJ_OFF_TILE), hin, *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
+}
 
 /* ShakeAt lives in win32/mapdraw.h and item.cpp is flat, so it is declared
  * here the way script.cpp declares PreloadSprite. Its signature names no Win32
@@ -1268,6 +1290,7 @@ void __cdecl ApplyHeightItem(void *obj, int32_t height)
 
     if (!obj)
         return;
+    am2_height_log("ApplyHeightItem", obj, height);
     if (!*(void **)(o + OBJ_OFF_FIELD_94))
         return;
 
@@ -1472,6 +1495,8 @@ void __cdecl ApplyObjHeight(void *obj, int32_t height)
 {
     uint8_t *o = (uint8_t *)obj;
     uint8_t *rows;
+
+    am2_height_log("ApplyObjHeight", obj, height);
 
     if (height == 0)
         height = TileAttrAt(*(const uint16_t *)(o + OBJ_OFF_TILE));

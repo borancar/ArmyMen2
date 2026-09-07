@@ -15,47 +15,23 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
-- **OPEN (2026-09-07): the BOTTOM two scanlines differ where the view
-  scrolls new terrain in, cheaply reproduced at pump 965 of
-  `tests/replays/sessions/botrow-965.txt` (10 pixels, y=478-479).** Same
-  class seen at pump 1.7M in a long live run. NOT the overlay blitter and
-  NOT a lead-in/tail swap: the differing pixels span all four dword
-  alignments, and `AM2_TRACE_PIX=292,478` shows the covering overlay
-  (fill=3) faithfully remaps an underlying value that already differs. The
-  value under it is drawn by a 2-row bottom-CLIPPED copy blit (fill=1 at
-  264,478, src rows 5-7), so the tile/terrain painter's bottom-edge clip
-  is the suspect. Heaps and object state are identical; every prior frame
-  matches, so it is fresh at the frame the new terrain row appears. To pin:
-  instrument the hybrid's bottom copy blit (a loader hook like
-  AM2_TRACE_DEPTH) and compare its output row against ours for src rows
-  5-7. The 1.7M recording is kept as `keep/input-play15-botrow.txt`; this
-  965 one supersedes it as the repro.
-
-- **OPEN (2026-09-07): 300 pixels at pump 120685 of
-  `tests/replays/sessions/depth-120685.txt`.** The heap is byte-identical
-  now (`AM2_TRACE_HEAP=1`, 30,359 operations agree), so this is the game.
-  Fourteen type-1 items across the map read `OBJ_OFF_HEIGHT_SET` 50 in the
-  hybrid and 0 in the port -- 50 is the terrain height at each (their
-  tiles all have attribute 50), so their row depth layer is
-  `ScaleBy32Blocks(50)`=2000 against `ScaleBy32Blocks(0)`=1000 and
-  `DepthCompare` sorts one two-tree overlap the other way. `ApplyObjHeight`
-  and `ApplyHeightItem` are never called for any of these tiles in the port
-  over the whole run (`AM2_TRACE_HEIGHT`, tile filter), so the port never
-  sets their height from the terrain while the hybrid does. The item
-  creators (`CreateItem`, `CreateWeapon`, `CreateWatchedItem/Type`) were
-  read: none is obviously wrong, and `CreateWatchedItem` correctly inherits
-  its source's height and calls `ObjTileChanged(item, hset, force=1)`.
-  The mission is Boot Camp and these are its MAP items (placed by
-  BuildMapObjects, which does not set height); short `bootcamp.txt` is
-  clean, so the divergence develops over the long session -- the original
-  sets their terrain height at some point our code does not. Still to pin:
-  which refresh path the original runs for them that ours skips -- pause both games with
-  `tools/sidebyside.py --on-trap hold` (new), find one of the 14 items
-  (its hset differs by uid), and trace the +0x65 writers with an object
-  filter. The four heap-sequence fixes and the `ReadScript` stdio change
-  that got the heap identical are committed.
+(none open -- every replay under tests/replays runs identical, hybrid
+against port, with no tolerance flags. Last checked 2026-09-07.)
 
 FIXED by this rule so far, each with the replay that reproduces it:
+the bottom-edge terrain and the depth-120685 item order, ONE ROOT: our
+`BuildMapObjects` (map.cpp) called `ApplyHeightItem` only in the weapon
+arm, while the original's item arm FALLS INTO the same shared tail
+(0x0042D1C3 jmps to the `ApplyHeightItem` at 0x0042D30B the weapon arm
+reaches by falling through). Our item arm did `continue`, so every map
+item kept height 0 instead of the terrain's, which halved its depth layer
+(`ScaleBy32Blocks(0)`=1000 vs 2000) and sorted overlapping ground sprites
+the wrong way. Found with `AM2_TRACE_BLIT` (identical blit params, opposite
+ORDER) then `AM2_TRACE_HEIGHT` (the hybrid calls `ApplyHeightItem hin=50`
+at pump 193 for the items, the port never does). Fixed by making both arms
+share the height tail; `sessions/botrow-965.txt` and
+`sessions/depth-120685.txt` are the repros, identical since.
+
 one pixel of a corner where two sandbags overlap
 (`sessions/corner-1276.txt`, pump 1276, pixel 479,479): the original's
 depth comparator breaks an exact tie by comparing the two objects'
