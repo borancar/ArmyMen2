@@ -15,28 +15,52 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
-- **OPEN (2026-09-07): a thrown grenade's LAUNCH POINT diverges, repro
-  `tests/replays/sessions/grenade-live-16065.txt` (pump 16053 the throw,
-  trap at 16065).** Confirmed a real reconstruction divergence, NOT a heap
-  symptom (the heap fix below stopped the crash; only the missile object
-  differs, 1 of 1607). Traced end to end with `AM2_TRACE_MISSILE`:
-  missile uid 3f7 (type 5) launches at y=1661 (port) vs 1638 (hybrid).
-  CreateMissile's `at.y` comes from FireWeapon's lobbed arm (grenade
-  kind=1, item.cpp case 2/5): the port takes the ARC branch
-  (`spot.at.x > 0`) giving `FTOL(1599 - (1599-1638)*1.2 + 16) = 1661`,
-  the hybrid takes the FLAT `else` (`a.y = fromP.y = 1638`). The arc
-  constants match the image (K=1.2 @0x46f2f0, BIAS=16 @0x46fd60) and Sarge
-  and his firing sprite are byte-identical, so it is the branch: `spot.at`
-  differs. TrooperFire (0x00449FD0, region.cpp) reads `spot.at` from the
-  sight struct at SIGHTCOUT_OFF_X (0x14) -- port 3063, hybrid <=0 -- so the
-  aim point is filled differently UPSTREAM, in the sighting scan that
-  populates `out` before TrooperFire (its callers at region.cpp:8309 and
-  8590). Next: trace what writes SIGHTCOUT_OFF_X on each side. The
-  `AM2_TRACE_MISSILE` traces (FireWeapon entry+FWMUZZLE+ret in item.cpp,
-  CreateMissile in gameproc.cpp, trampolines in loader.cpp) are the tool;
-  they land with the fix for this bug, not with the heap commit.
+- **OPEN (2026-09-07): a FLAMETHROWER's flame renders one gradient step
+  off, live trap pump 5197 (80 px, box 187,196-203,214).** NOT object
+  state: the object tables are byte-identical (1605 each), so the
+  flamethrower unit and everything else match. The differing pixels are the
+  flame plume's heat gradient (red 254, green stepping 146..218, blue 2),
+  off by ~one green step per pixel (e.g. hybrid green 178 vs port 190). So
+  it is a rendering/effect divergence of the flame with identical game
+  state -- an animation phase, a per-frame value, or a palette/remap the
+  flame renderer indexes, not a launch or lifetime bug. Next: find what
+  draws the flame gradient and why it lands one step off from the same
+  state.
 
 FIXED by this rule so far, each with the replay that reproduces it:
+a thrown grenade LAUNCHED ~20px too low (`sessions/grenade-live-16065.txt`,
+pump 16053): FireWeapon's lobbed arm (item.cpp case 2/5) passed the
+arc-measuring point `a` as CreateMissile's launch point, but `a` exists
+only to measure the range for the speed-scale (via ApproxDist) -- the
+missile LEAVES from the muzzle `from`. The original loads `at` from frame
+slot +0x18 (`from`) at 0x0045F9C2, not the +0x10 that holds `a`. Passing
+`a` dropped the grenade's start below the muzzle (an arc from the waist,
+not over the head); `CreateMissile(..., from, ...)` fixes it. Verified: at
+the throw both missiles launch at (2945,1637), object tables identical.
+a map WEAPON created with the wrong ammo, then consumed and REMOVED
+(`sessions/weapon-6117.txt`, missing weapon uid 80000615 at trap pump
+6117): `BuildMapObjects` (map.cpp) passed `quantity=0` to CreateWeapon, so
+a crate specifying NUMB=30 got the default 3 rounds, was used up and freed,
+and the port was short a whole object thousands of pumps later. The
+quantity is the record's NUMB field: the original reads frame slot +0x2c
+(the raw `[esp+0x30]` at 0x0042D2D1 is one slot off because
+SettlePointInRegion's push is still down -- espmap confirms +0x2c), which
+0x0042CBF1 sets from `movsx byte [numb]`. A prior reconstruction called
+that slot "a zero local" -- the SAME espmap-shift class as the grenade
+bug. `CreateWeapon(..., (int8_t)r[MAPREC_OFF_NUMB], ...)` fixes it.
+Verified: port weapon now quantity=30/ammo=30, object tables identical at
+pump 6116, the weapon present in both.
+the grenade/teardown HEAP CORRUPTION (`sessions/grenade-1845.txt`,
+`sessions/missile-11062.txt`, replay headless under `AM2_HEAP_CHECK=1`):
+at level teardown the small-block heap released a 1 MB reservation with
+`VirtualFree(MEM_RELEASE)`, and `am2_fixed_release` (fixedheap.cpp) freed
+EVERY consecutive used slot up to the next gap -- so releasing the
+reservation at `0x12100000` also madvise-ZEROED the live reservation at
+`0x12200000` beside it. A later `free` of a block in that zeroed region
+read `sizeFront=0` and walked a null free-list link, faulting in
+`crt_sbh_free_block`/`resize_block` (port) and the original's
+`__sbh_free_block` (hybrid) -- both, because both call the one shared
+platform release. `slot_run[]` now records each reservation's slot-count
 the grenade/teardown HEAP CORRUPTION (`sessions/grenade-1845.txt`,
 `sessions/missile-11062.txt`, replay headless under `AM2_HEAP_CHECK=1`):
 at level teardown the small-block heap released a 1 MB reservation with

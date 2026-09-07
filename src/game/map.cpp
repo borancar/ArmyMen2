@@ -1630,20 +1630,26 @@ static void BuildMapObjects(uint8_t *objs, int32_t count)
             settled = *(const uint32_t *)&at;
             SettlePointInRegion(TileOfPoint(settled), (uint32_t *)&at);
 
-            /* QUANTITY IS 0, NOT THE SETTLED POINT. The original reads its
-             * quantity argument from `[esp+0x30]` at 0x0042D2D1 while the
-             * SettlePointInRegion push is still outstanding, so the -4 shift
-             * makes it a DIFFERENT frame slot -- a zero local -- than the
-             * +0x34 slot Settle wrote the point to (espmap confirms +0x2c vs
-             * +0x34). So every map weapon is created with quantity 0, which
-             * CreateWeapon turns into the default ammo of 3. Passing the
-             * settled point here instead made ammo a packed point, which the
-             * inventory panel showed as a grenade count of 99.
+            /* QUANTITY IS THE RECORD'S NUMB FIELD, NOT ZERO AND NOT THE
+             * SETTLED POINT. The original reads its quantity from frame slot
+             * +0x2c at 0x0042D2D1 (with SettlePointInRegion's push still
+             * outstanding, so the raw `[esp+0x30]` is one slot off -- espmap
+             * confirms +0x2c). That slot is NOT a zero local: it is set at
+             * 0x0042CBF1 from `movsx byte [numb]`, the record's NUMB field.
+             * A prior reconstruction misread the slot as zero, so every map
+             * weapon was created with quantity 0 -> CreateWeapon's default
+             * ammo of 3, and a weapon crate specifying NUMB=30 came out with
+             * 3 rounds; the port's under-stocked crate was then consumed and
+             * removed while the original's survived, so the port was missing
+             * a whole weapon object a few thousand pumps later. (Passing the
+             * SETTLED POINT instead makes ammo a packed point -- a grenade
+             * count of 99 -- which is a different wrong slot.)
              *
              * AND THE ARMY IS THE LITERAL 4, not the record's owner: the
              * register that carried the owner has been reused twice by here. */
             obj = CreateWeapon(*(char **)(r + MAPREC_OFF_SCRIPT), 4,
-                                  aai, settled, flags, 0, 1, 0);
+                                  aai, settled, flags,
+                                  *(const int8_t *)(r + MAPREC_OFF_NUMB), 1, 0);
         }
 
         /* THE SHARED HEIGHT TAIL (0x0042D2ED), reached by both arms: the map
