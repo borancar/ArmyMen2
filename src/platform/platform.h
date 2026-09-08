@@ -128,6 +128,13 @@ void am2_host_pump(void);
  * development binary hangs its savestates on it. */
 extern void (*am2_host_frame_hook)(void);
 
+/* Run a line of Lua on the game thread, at a pump boundary, from the step
+ * socket's `lua` action -- so a give-weapon or poke lands on the SAME pump in
+ * two lockstepped games and they stay frame-exact, where the control socket's
+ * async `lua` would race the pump. The dev runtimes install it (only they
+ * link the console); null in the retail build, where the verb just logs. */
+extern const char *(*am2_host_lua)(const char *code);
+
 /* Keyboard state as DirectInput scancodes, 256 bytes, 0x80 when down. */
 void am2_host_keyboard_state(uint8_t *out);
 

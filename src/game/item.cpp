@@ -4270,9 +4270,14 @@ void __cdecl PlaceObj(void *obj, uint32_t where)
     if (!obj)
         return;
 
+    /* Already at `where` and NOT destroyed: nothing to do. The original
+     * PROCEEDS when the object is destroyed even if it is already there --
+     * that is the re-place/revive case, e.g. a dropped weapon dragged to the
+     * trooper's own position. `test [esi+8],al` (al=4=DESTROYED) then
+     * `je RETURN`, so it returns on the clear bit, not the set one. */
     if (*(const int16_t *)(o + OBJ_OFF_POS) == (int16_t)where
         && *(const int16_t *)(o + OBJ_OFF_POS + 2) == (int16_t)(where >> 16)
-        && (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED))
+        && !(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED))
         return;
 
     if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
@@ -13305,14 +13310,18 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
     case 11:
         AM2_FW_MUZZLE();
         PlaySoundAt(0x10, 0, 0, fromP[0], fromP[1]);
+        /* The fourth argument is the FIRER'S FACING, not its army: the original
+         * pushes `[esi+0x40]` (OBJ_OFF_FACING) at 0x0045FB4E, and
+         * CreateWatchedItem uses it only to drop the charge Cos8/Sin8 behind the
+         * muzzle. Passing the army planted every mine due east. */
         CreateWatchedItem(0, unit, from,
-                          *(const int8_t *)(u + OBJ_OFF_ARMY));
+                          *(const uint8_t *)(u + OBJ_OFF_FACING));
         return 1;
 
     case 12:
         AM2_FW_MUZZLE();
         CreateWatchedType(0, unit, from,
-                          *(const int8_t *)(u + OBJ_OFF_ARMY));
+                          *(const uint8_t *)(u + OBJ_OFF_FACING));
         return 1;
 
     /* arm 17 -- 0x0045FBA4, four kinds. Retag an object's table pair, which is

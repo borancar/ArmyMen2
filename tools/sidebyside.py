@@ -260,7 +260,62 @@ def main():
 
         interval = 1.0 / fps if fps > 0 else 0.0
         state = {"next_at": time.monotonic(), "last_index": -1, "actions": [], "tolerated": 0,
+                 "skip": 0,
                  "breaks": set(int(x) for x in args.breaks.split(",") if x.strip())}
+        # A Lua modification (give-weapon, teleport, poke) is applied over the
+        # control socket on the socket thread, so it is NOT pump-synced: one
+        # game takes it a pump or two before the other and the frames diverge
+        # for the handful of pumps it takes to settle. Writing a number N into
+        # this file grants N pumps whose comparison is skipped -- enough to
+        # cover the give -- and, when the tool is HELD at a trap, wakes it.
+        skip_file = os.path.join(out, "skip")
+        print("sidebyside: skip file %s (echo N > it to ignore the next N frames)" % skip_file)
+
+        # The frame-exact way to apply a Lua modification: each line written to
+        # this file is sent to BOTH games as an action for the SAME pump, so a
+        # give-weapon or poke lands on the same frame on both and they stay in
+        # lockstep -- no skipping, nothing hidden. `lua <code>` runs on the game
+        # thread at the pump boundary (see am2_replay_apply). Any replay verb
+        # works too (key/button/cursor/...). Consumed once, then the file is
+        # removed. Also resumes a held trap, like the skip file.
+        inject_file = os.path.join(out, "inject")
+        print("sidebyside: inject file %s (echo 'lua <code>' > it to run it on the same pump on both)" % inject_file)
+
+        def poll_inject():
+            try:
+                with open(inject_file) as f:
+                    lines = [ln.rstrip("\n") for ln in f if ln.strip()]
+            except (FileNotFoundError, IsADirectoryError):
+                return []
+            try:
+                os.remove(inject_file)
+            except FileNotFoundError:
+                pass
+            if lines:
+                print("sidebyside: injecting %d line(s) at pump %d: %s"
+                      % (len(lines), leader.pump, "; ".join(lines)))
+                sys.stdout.flush()
+            return lines
+
+        def poll_skip():
+            try:
+                with open(skip_file) as f:
+                    txt = f.read().strip()
+            except (FileNotFoundError, IsADirectoryError):
+                return
+            try:
+                os.remove(skip_file)
+            except FileNotFoundError:
+                pass
+            try:
+                n = int(txt)
+            except ValueError:
+                return
+            if n > 0:
+                state["skip"] += n
+                print("sidebyside: skipping the next %d frame(s) on request (skip=%d)"
+                      % (n, state["skip"]))
+                sys.stdout.flush()
         # Every input both games took, by pump, in the replay grammar: the
         # replay's own lines and the leader's window events as `host` lines.
         # A session is reproducible only if this exists, and the first live
@@ -277,7 +332,8 @@ def main():
                 if now < state["next_at"]:
                     time.sleep(state["next_at"] - now)
                 state["next_at"] = max(state["next_at"] + interval, now - interval)
-            actions = replay.get(pump, [])
+            actions = list(replay.get(pump, []))
+            actions += poll_inject()
             state["actions"] = actions
             for line in actions:
                 leader.send(line)
@@ -381,6 +437,10 @@ def main():
             if res is None:
                 left()
             frames_l, frames_f = res
+            poll_skip()
+            if state["skip"] > 0:
+                state["skip"] -= 1
+                continue
             same = frames_l == frames_f or within_tolerance(frames_l, frames_f)
             if same and (leader.pump - 1) not in state["breaks"]:
                 continue
@@ -394,15 +454,18 @@ def main():
             if on_trap == "quit":
                 finish(rc if not same else 0)
             if on_trap == "hold":
-                # Keep both games alive and their control sockets answering,
-                # indefinitely, so an inspector can attach. Killed by signal.
-                print("sidebyside: HOLDING; control sockets %d and %d answer; kill to end"
-                      % (leader.port, follower.port))
+                # Keep both games alive and their control sockets answering, so
+                # an inspector can attach. Writing N to the skip file resumes
+                # the run and ignores the next N frames -- the way past a trap
+                # caused by a Lua modification that is settling.
+                print("sidebyside: HOLDING; control sockets %d and %d answer; echo N > %s (or a line > %s) to resume, or kill to end"
+                      % (leader.port, follower.port, skip_file, inject_file))
                 sys.stdout.flush()
-                import signal as _sig
-                _sig.pause()
-                while True:
-                    _sig.pause()
+                while state["skip"] <= 0 and not os.path.exists(inject_file):
+                    poll_skip()
+                    if state["skip"] <= 0 and not os.path.exists(inject_file):
+                        time.sleep(0.2)
+                continue
             # Hold here: step one pump at a time, or run on to the next difference.
             while True:
                 sys.stdout.write("sidebyside [s]tep [c]ontinue [c N: to pump N] [q]uit> ")

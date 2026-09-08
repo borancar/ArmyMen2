@@ -11,6 +11,8 @@
 #include "../game/crt.h"
 #include "../game/gameproc.h"
 #include "../inject/control.h"
+#include "../inject/luaconsole.h"
+#include "../platform/platform.h"
 
 #include <stdarg.h>
 #include <stdint.h>
@@ -360,6 +362,9 @@ extern "C" void am2_standalone_init(void)
 #ifdef AM2_DEVTOOLS
     control_start();
     devtools_init();
+    /* Let the step socket's `lua` action run on the game thread at a pump
+     * boundary, so a give-weapon is frame-exact across two lockstep games. */
+    am2_host_lua = am2_lua_eval;
 #endif
 }
 

@@ -5505,17 +5505,26 @@ typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
 
 /* The same promote-and-engage block in the SIGHTC base rather than the SIGHT
  * one -- four bytes higher on every field. AiApproachLeader inlines it twice,
- * for the reason AM2_ROACH_PROMOTE_FOUND's comment already gives. */
+ * for the reason AM2_ROACH_PROMOTE_FOUND's comment already gives.
+ *
+ * GUARDED on FOUND being non-null: the original tests `[esi+0x20]` and jumps
+ * past the whole block when it is zero (0x0040605A/0x0040609E), so a promote
+ * with nothing found leaves the engage fields alone rather than dereferencing
+ * NULL. Rallying with no unit in sight reaches it with FOUND null and read as
+ * `found->OWNER` (+4) took the port down at 0x00741BFB. */
 #define AM2_SIGHTC_PROMOTE_FOUND(o_, c_)                                      \
     do {                                                                      \
         uint8_t *found_ = *(uint8_t **)((c_) + SIGHTC_OFF_FOUND);             \
-        *(uint32_t *)((o_) + OBJ_OFF_TARGET_UID) =                            \
-            *(const uint32_t *)(found_ + OBJ_OFF_OWNER);                      \
-        *(void **)((c_) + SIGHTC_OFF_OBSERVER) =                              \
-            *(void **)((c_) + SIGHTC_OFF_FOUND);                              \
-        *(int32_t *)((c_) + SIGHTC_OFF_RANGE) =                               \
-            *(const int32_t *)((c_) + SIGHTC_OFF_FOUND_RANGE);                \
-        *((c_) + SIGHTC_OFF_BEARING) = *((c_) + SIGHTC_OFF_FOUND_BEARING);    \
+        if (found_) {                                                         \
+            *(uint32_t *)((o_) + OBJ_OFF_TARGET_UID) =                        \
+                *(const uint32_t *)(found_ + OBJ_OFF_OWNER);                  \
+            *(void **)((c_) + SIGHTC_OFF_OBSERVER) =                          \
+                *(void **)((c_) + SIGHTC_OFF_FOUND);                          \
+            *(int32_t *)((c_) + SIGHTC_OFF_RANGE) =                           \
+                *(const int32_t *)((c_) + SIGHTC_OFF_FOUND_RANGE);            \
+            *((c_) + SIGHTC_OFF_BEARING) =                                    \
+                *((c_) + SIGHTC_OFF_FOUND_BEARING);                          \
+        }                                                                     \
     } while (0)
 
 /* AiApproachLeader -- original 0x00405DB0, two callers: SargeAiStep and
@@ -7479,11 +7488,17 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
 
     if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
         >= *(const uint32_t *)(o + OBJ_OFF_FIELD_FC))
+        /* SightScan's sixth argument is the SARGE flag, ARG3 of this function
+         * (espmap: `[esp+0x1c]` at 0x00404942 = ARG3, one slot past the anchor
+         * at [esp+0x18]). It gates the weapon arm and the hittable-vs-live
+         * predicate, so only Sarge scans for weapons to pick up. Passing
+         * `anchor` (a packed point, always non-zero) made every follower target
+         * and fire at nearby weapons when no enemy was in sight. */
         *(int32_t *)(c + SIGHTC_OFF_FOUND) =
             (int32_t)(intptr_t)SightScan(obj, (int32_t *)(c + SIGHTC_OFF_FOUND_RANGE),
                              c + SIGHTC_OFF_FOUND_BEARING,
                              (int32_t *)(o + OBJ_OFF_FIELD_114), (int32_t *)(o + OBJ_OFF_FIELD_110),
-                             (int32_t)anchor);
+                             sarge);
 
     if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
         *(int32_t *)(c + SIGHTC_OFF_DEST_DIST) =

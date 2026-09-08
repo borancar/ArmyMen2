@@ -602,6 +602,7 @@ extern "C" void devtools_hotkey(int32_t which);
 /* ---- lockstep: the replay ---------------------------------------------------------- */
 
 void (*am2_host_cursor_set)(int32_t x, int32_t y);
+const char *(*am2_host_lua)(const char *code);
 
 /* AM2_REPLAY=<file>: one line per action, applied at the pump whose number
  * begins it. `#` starts a comment.
@@ -723,6 +724,14 @@ static void am2_replay_load(void)
             am2_replay_parse(n, frame, verb, rest + 4, "");
             continue;
         }
+        if (!strcmp(verb, "lua")) {
+            /* Whole code line unsplit, like `host`, so a chunk with spaces
+             * survives -- the step socket's inject file records it here. */
+            char *rest = strstr(line, "lua ");
+            if (rest)
+                am2_replay_parse(n, frame, verb, rest + 4, "");
+            continue;
+        }
         am2_replay_parse(n, frame, verb, w1, w2);
     }
     fclose(fh);
@@ -766,6 +775,10 @@ static void am2_replay_parse(int32_t n, uint32_t frame, const char *verb,
             char text[600];
             snprintf(text, sizeof text, "%s %s", w1, w2);
             am2_replay_add(frame, verb, 0, 0, text);
+        } else if (!strcmp(verb, "lua")) {
+            /* w1 is the whole code line: the step-socket path hands it in
+             * unsplit (like `host`), so a chunk with spaces survives. */
+            am2_replay_add(frame, verb, 0, 0, w1);
         } else {
             am2_plat_log("replay: line %d: unknown verb %s", n, verb);
         }
@@ -805,6 +818,13 @@ static void am2_replay_apply(void)
                 t++;
             am2_step_host_apply(t, 0);
             am2_mouse_flush();
+        } else if (!strcmp(l->verb, "lua")) {
+            /* On the game thread, at the pump boundary, before the frame runs:
+             * a give-weapon or poke lands on the same pump in both games. */
+            if (am2_host_lua)
+                am2_plat_log("lua: %s", am2_host_lua(l->text));
+            else
+                am2_plat_log("lua: this binary has no console");
         }
     }
 }
@@ -1023,6 +1043,11 @@ static void am2_step_wait(void)
                 return;
             if (!strncmp(line, "host ", 5)) {
                 am2_step_host_apply(line + 5, 0);
+                continue;
+            }
+            if (!strncmp(line, "lua ", 4)) {
+                /* Queue for THIS pump, whole line unsplit, like the file's. */
+                am2_replay_parse(0, am2_pump_count + 1, "lua", line + 4, "");
                 continue;
             }
             if (!strncmp(line, "last ", 5)) {

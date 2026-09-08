@@ -33,6 +33,7 @@
  */
 #include "../platform/platform.h"
 #include "../inject/orig.h"
+#include "../inject/luaconsole.h"
 #include "../platform/crt/crt.h"
 
 #include <sys/mman.h>
@@ -716,6 +717,9 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
      * they do there. */
     input_init();
     control_start();
+    /* Let the step socket's `lua` action run on the game thread at a pump
+     * boundary, so a give-weapon is frame-exact across two lockstep games. */
+    am2_host_lua = am2_lua_eval;
 
     /* AM2_CRTCHECK=<dir>: run src/hybrid/crtcheck.cpp instead of the game.
      * It takes over at WinMain, so the original CRT's startup has run and

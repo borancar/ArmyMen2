@@ -5,7 +5,24 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-07**, the fixed heap (see the first section).
+Last updated: **2026-09-08**, frame-exact Lua injection over the step socket
+(see TOOLING below).
+
+## TOOLING (2026-09-08): frame-exact Lua injection
+
+`tools/sidebyside.py` gained an **inject file** (`<out>/inject`): a line
+written to it is sent to BOTH lockstepped games as an action for the SAME pump.
+A `lua <code>` line runs through the new `am2_host_lua` hook in
+`am2_replay_apply` -- on the game thread, at the pump boundary, before that
+pump's frame is produced -- so a give/poke lands identically on both and they
+stay frame-exact, replacing the earlier "skip the next N frames" hack (the skip
+file remains for other transients). The dev runtimes install the hook after
+`control_start()` (native `runtime.cpp`, hybrid `loader.cpp`); the retail build
+links sdl.cpp but not the console, so the hook is null and the verb just logs.
+The same chunk resolves `CheatLine` in either build: `sym("CheatLine")` native,
+raw `0x00417B80` hybrid (`sym` returns 0 there; 0 is truthy in Lua, so test
+`==0`). Injected lines are recorded to the run's `input.txt`, so replays
+reproduce the give. See docs/lua.md.
 
 ## OPEN DIVERGENCES, newest first
 
@@ -15,6 +32,60 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
+- **OPEN (2026-09-08): pause menu, SECOND open with the cursor already resting
+  on a button -- one-pump hover-focus lag, ~1336 px over the button column
+  (box 267,138-376,268).** Found hand-playing under `tools/sidebyside.py`
+  (trap pump 11034, frame 10850; repro `sessions/pausefocus-11034.txt`
+  = the run's recorded input.txt). At the trap: same dialog (308328080), same firstChild
+  (308327952), same cursor (289,265, inside the ABORT rect 245,250,397,275) --
+  the ONLY difference is `focusedChild` (dialog +0x34): the hybrid keeps it on
+  the construct default (RETURN, the first child) while the port has moved it to
+  the hovered button (ABORT). The highlight sprite follows `focusedChild`
+  (ButtonPaint), so ABORT lights on the port and RETURN on the hybrid.
+
+  Mechanism: `ButtonUpdate` (device.cpp path) takes hover-focus with
+  `if (orig_mouse_moved) FOCUS(w,1)` when the cursor is in its rect -- faithful.
+  So the port's `orig_mouse_moved` (ADDR_MOUSE_MOVED 0x00485494) was 1 at the
+  open pump where the hybrid's was 0: the cursor was STATIONARY over ABORT on
+  the 2nd open, so the original leaves focus at the default, but the port stole
+  it. NOT persistent -- resuming and letting the cursor move (317,255) took BOTH
+  to focusedChild=308334384 (ABORT), so the frames re-converge; it is a
+  one-pump LEAD of the port's mouse-moved flag at the pause-menu open. The two
+  run DIFFERENT `PollMouse` (port = our device.cpp reconstruction with the
+  `input_take_events`/`input_pump` path; hybrid = the original), both reading
+  the platform DI buffer, so the suspect is a one-pump timing difference in when
+  `g_mouseMoved` is set/cleared relative to the dialog-open pump (ESC-release
+  edge) between the two.
+
+  To root-cause (needs a headless replay, so do it when no live run is up, to
+  avoid rebuilding under one): replay sessions/pausefocus-11034.txt under
+  `tools/lockstep.sh` with a per-pump trace of `g_mouseMoved`, the dialog
+  pointer at 0x0065A058 and its +0x34, and the ESC key edge, on both builds;
+  find the first pump where the port sets mouseMoved and the hybrid does not.
+
+- **OPEN (2026-09-08): the SQUAD panel's "MV" stat differs after entering a
+  vehicle (port 3, hybrid 4 "cm/s"), ~23 px in the HUD.** Found hand-playing
+  under `tools/sidebyside.py` (trap pump 46446, frame 45681; repro
+  `sessions/vehicle-46446.txt`; digit at ~576,309, the SQUAD panel's Convoy
+  Truck readout). Confirmed with a screenshot: it is the "MV:" line, not ammo
+  or a countdown (two earlier readings of this were WRONG -- a coincidental
+  "swapped pairs" match, then the SARGE inventory ammo path). Ruled out: not a
+  blit bug (BlitGlyph calls byte-identical, x=556..603 y=309), not float (native
+  is `-mfpmath=387`/x87, matching the original). `HudSquadDetail` (0x00416340)
+  formats MV as `%d cm/s` from `obj + VEHICLE_OFF_KIND` (0x52C), and the ORIGINAL
+  reads the SAME offset (disasm 0x00416BC7 = `[esi+0x52c]`) -- so the MV code is
+  faithful; the display value diverges upstream. But the vehicle Sarge rides
+  (uid 0x3f6) was byte-identical on both (all 1376 bytes, so its 0x52C matches),
+  which means the SQUAD panel is showing a DIFFERENT vehicle / squad-detail
+  selection on each build, or 0x52C on the shown vehicle diverged.
+
+  NEXT (trap was lost -- a bad Lua `call` to a guessed WeaponByUid crashed the
+  live run): re-run `sessions/vehicle-46446.txt` step-locked, trap at 46446,
+  and read the SQUAD panel's detail uid (`HudSquadDetail`'s arg, from
+  `SQUAD_REC_DETAIL_ARG`) on both plus that object's 0x52C. Different uid = a
+  selection divergence; same uid with different 0x52C = a write divergence.
+  Read with objdump, never a raw Lua `call` to a guessed address.
+
 - **OPEN (2026-09-08): the flamethrower's flame trail renders one animation
   frame off while firing, ~80 px, box near the plume.** Found hand-playing the
   flamethrower under `tools/sidebyside.py`; trapped twice (pumps 3587, 3014).
@@ -23,25 +94,113 @@ FIXED below when that replay runs identical.
   28->27), shifting its sprite rect a pixel. Every end-of-pump field on Sarge,
   his SIGHTCOUT, and the object tables are byte-identical.
 
-  Pinned with a CreateMissile trampoline (now removed) to one argument:
-  spot.ground (a6) into CreateMissile is 0 in the hybrid (which FireWeapon
-  defaults to height=28, so VZ=0) and -4 in the port (kept, so
-  VZ=(-4-28)<<1=-64). A TrooperFire-entry trace showed the SIGHTCOUT aim GROUND
-  (+0x18) frame-identical on both, so the divergence is a TRANSIENT at the
-  instant of firing -- the aim ground reaches the fire as -4 on one side and 0
-  on the other for the one pump the trail segment is created, and both converge
-  to -4 by end-of-pump. TrooperFire and FireWeapon both read spot.ground from
-  the same SIGHTCOUT +0x18, so it is not a read-site bug; the value there
-  differs for one pump. Not the aim fix (different code path; Sarge's facing is
-  identical here). Independent of the flame /200 and the click-to-move fixes.
+  ROOT-CAUSED (2026-09-08) to a SUB-PUMP ORDERING of a height-settling value,
+  via `sessions/flamevz-32208.txt` replayed step-locked under sidebyside (the
+  headless file-replay under lockstep.sh does NOT reproduce it -- see the note
+  below). `CreateMissile`'s a6 = `spot.ground` (item.cpp:13156) and it computes
+  `VZ = (spot.ground - height) << 1` with height=28. TrooperFire's no-target
+  arm (the flamethrower's) sets `spot.ground = *(int16 *)(SIGHTCOUT + 0x18)` =
+  `obj + 0x594`. That one address is BOTH `SIGHTCOUT_OFF_YADJ`
+  (SIGHT_OUT_T2 0x57C + 0x18) and `UNIT_OFF_FIRE_Z` -- the sight-resolve
+  (`ConsiderSightingC`, which writes the OBSERVED object's `OBJ_OFF_ROW0_Y_ADJUST`
+  there) and the fire share it. Traced with a FLAMEZ line (region.cpp
+  TrooperFire + a hybrid TrooperFire trampoline, both now reverted): on the
+  PORT every fire read `ground=28` EXCEPT the last (the trap pump), which read
+  `-4`; `ground == sightYadj` on the port on every fire, so it is always the
+  no-target arm. At the trap BOTH read `-4` (targetUid=0, hit=0, fireZ=-4,
+  fireX=3670 -- byte-identical), so obj+0x594 transitions 28 -> -4 DURING pump
+  32208 and the port's TrooperFire reads it AFTER the write while the hybrid
+  reads it BEFORE: port a6=-4 (VZ=-64), hybrid a6=28 (VZ=0). So it is not a
+  read-site or branch bug -- it is the observed object's row0y settling by one
+  pump, the same CLASS as the flame /200 and item-height divergences, feeding
+  the aim-ground read.
 
-  To resume: give the flamethrower via the Lua console instead of walking --
-  `lua poke32(0x004FCF94,1); call(sym("CheatLine"),"phoenix!")` on the native
-  port, `call(0x00417B80,...)` on the hybrid (docs/lua.md) -- then reproduce
-  under sidebyside and trace when SIGHTCOUT +0x18 (the aim ground) first
-  reaches the fire as -4 vs 0, per-pump.
+  On aligning traces: `ADDR_GAME_CLOCK_MS` IS identical on both builds when
+  they are genuinely in sync -- step-locked under sidebyside it read 44032 at
+  pump 3000 and 159982 at pump 10000 on BOTH. (An earlier note here claimed it
+  diverged even step-locked; that was a mis-sample -- the FLAMEZ clocks that
+  looked different, 157k vs 176k, were fire events from LATE in the run, after
+  the pause-focus divergence at 11034 had been skipped past, so the two builds
+  had been allowed to drift. Not same-pump readings.) The clock resets to 0 at
+  level load and only accumulates during gameplay frames, so clk/pump < the
+  16.67 ms pump step is expected. Still align traces by PUMP, since clk resets
+  and, once any divergence is tolerated, drifts.
+
+  NEXT: find which object's `OBJ_OFF_ROW0_Y_ADJUST` transitions 28 -> -4 at
+  pump 32208 (the observer the sight cone picks up) and why the two builds
+  settle it a pump apart -- then the fix is the same shape as the other
+  height-settling fixes. Repro: replay `sessions/flamevz-32208.txt` step-locked
+  under `tools/sidebyside.py --replay` (skip past the pause-focus trap at 11034
+  with `echo 150 > <out>/skip`); it traps at the flame at pump 32208. Give the
+  flamethrower live with `"village people"` (case 12, keeps the rifle) or
+  `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+RALLIED FOLLOWERS FIRED AT NOTHING -- a following trooper targeted and shot a
+dropped weapon on the ground when no enemy was in sight, on the PORT only
+(~514 px, box 204,198-238,242; trap pump 11074, repro
+`sessions/rallyfollow-11074.txt`). At pump 11073 the WHOLE object table was
+byte-identical (1616=1616); at 11074 follower 3fb (aimode 3) acquired target
+0x800009b7 (a type-4 weapon) and fired missile 3fd, while the hybrid found
+nothing. `SightScan` (0x00403B40, ours) returned the weapon as its `alt`
+pickup fallback; the original returned NULL. The cause: `TrooperBuildContext`
+(0x00404730) passed SightScan's sixth arg -- the SARGE flag -- as
+`(int32_t)anchor` (a packed point, always non-zero) instead of ARG3 `sarge`.
+espmap: the original reads `[esp+0x1c]` at 0x00404942 = ARG3, one slot past the
+anchor it had stored at [esp+0x18]. That flag gates SightScan's weapon arm and
+its hittable-vs-live predicate, so with it always set every follower scanned
+for weapons and engaged them; only Sarge should. Fixed by passing `sarge`; the
+other four SightScan callers already pass 0 correctly. Replay then runs clean
+past 11074 (53k+ frames, no trap). The wrong-argument class again -- a
+plausible nearby value (anchor) for a function argument -- invisible to every
+A/B and to `checkoffsetuse`. (Distinct from the rally CRASH below, which was a
+NULL guard; this is why the crash had to be fixed first to even reach it.)
+RALLY WITH TROOPS NEARBY crashed the PORT (not the hybrid) -- a NULL dereference,
+SIGSEGV at eip 0x00741BFB addr 0x4, hand-playing under `tools/sidebyside.py`
+(pump 34013; repro `sessions/rallycrash-34013.txt`). nm put the fault in
+`AiApproachLeader` (0x00405DB0), which rally runs on nearby troops. The
+`AM2_SIGHTC_PROMOTE_FOUND` macro copied `found->OWNER` (found = ctx +
+SIGHTC_OFF_FOUND) with NO null check, and rallying with nothing in a unit's
+sight reaches the promote tail with FOUND null -> `*(NULL+4)`. The original
+GUARDS it: `mov eax,[esi+0x20]; test eax,eax; je` skips the whole promote block
+at 0x0040605A and 0x0040609E (both macro sites). Fixed by wrapping the macro
+body in `if (found_)`; the sibling `AM2_ROACH_PROMOTE_FOUND` was already guarded
+externally at all three of its sites, so it needed nothing. Replay then runs
+clean past 34013 (61k+ frames, no fault, no trap). A NULL-guard the port dropped
+-- invisible to every A/B, since no scripted drive rallies with an empty sight.
+PLACING A MINE put it a few pixels off on the port (~91 px, box 254,231-273,246)
+-- reached hand-playing under `tools/sidebyside.py` (trap pump 6735, frame 6412;
+repro `sessions/mineplace-6735.txt`). The mine (uid 461, type-1 item) was planted
+at a point differing by (9,8): port Sarge+(19,-16), hybrid Sarge+(28,-8), same
+Sarge pos/pose/facing/RNG. A WATCHLAY trace (item.cpp CreateWatchedItem + a
+hybrid CreateWatchedItem trampoline, both reverted) showed the muzzle `at`, the
+sprite and its attach IDENTICAL on both -- the ONLY difference was the fourth
+argument to `CreateWatchedItem`: hybrid 191 (Sarge's OBJ_OFF_FACING 0xbf), port 0
+(his OBJ_OFF_ARMY). `FireWeapon` case 11 (kind 11, lay charge) and case 12
+passed `OBJ_OFF_ARMY` (0x10) where the original pushes `[esi+0x40]`
+OBJ_OFF_FACING at 0x0045FB4E/0x0045FB84; `CreateWatchedItem` uses it only to drop
+the charge Cos8/Sin8 behind the muzzle, so the wrong field planted every mine due
+east instead of behind the firer. Fixed by passing OBJ_OFF_FACING in both arms;
+the replay then runs identical (51k+ frames, no trap). The `ADDR_ENTER_VEHICLE`
+class -- a wrong-field argument -- invisible to every A/B (no drive lays a mine)
+and to `checkoffsetuse` (the offset is present, just the wrong field).
+DROPPING A HELD WEAPON left it on the map at the wrong place on the port
+(~559 px, box 220,234-260,269) -- reached hand-playing under
+`tools/sidebyside.py` (trap pump 15230, frame 15190; repro
+`sessions/weapondrop-15230.txt`). `PlaceObj` (0x00429220) had its early-return
+condition INVERTED: the original returns when the object is already at `where`
+and NOT destroyed (already placed, nothing to do -- `test [esi+8],al`, al=4=
+DESTROYED, `je RETURN` on the clear bit) and PROCEEDS when destroyed, which is
+the re-place/revive case. A dropped weapon is destroyed and its pos is dragged
+to the trooper every step, so pos==`where`; the reconstruction returned on the
+SET bit, skipping the re-registration, so tile/hit-rect/cells stayed stale from
+where the weapon last sat while the original re-placed it and cleared DESTROYED.
+Confirmed by the object diff: same uid 80000618 type-4, same ammo (0x3a) and pos
+(2972,3364) on both, differing only in flags (port 5 with 0x4 set vs hybrid 1),
+tile and hit rect. Fixed by inverting the test in `item.cpp` `PlaceObj`; the
+replay then runs identical (23,526 frames each, no trap). Invisible to every
+A/B and to the offset checks -- a destroyed object re-placed at its own position
+is only reached by a hand drop, and no scripted drive drops a weapon.
 the IN-MISSION GAME MENU showed SAVE and LOAD where the original hides them --
 reached by pausing in Boot Camp under `tools/sidebyside.py` (~10k px over the
 button column, port 6 buttons vs hybrid 4). `DlgGameMenuConstruct`
