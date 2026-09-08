@@ -15,8 +15,17 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
-- **OPEN (2026-09-08): the flamethrower's flame trail renders one animation
-  frame off while firing, ~80 px, box near the plume.** Found hand-playing the
+- **OPEN (2026-09-08): a pause/in-game menu builds a DIFFERENT NUMBER OF
+  BUTTONS, port 6 vs hybrid 4 (trap ~pump 2408, ~10,242 px over the menu
+  box 245,176-396,354).** `ctl widgets` on both shows the SAME dialog object
+  (0x12606b00) with different children: the port has button rows at
+  y=130,170,210,250,290,330 and the hybrid only the first four. The per-row
+  sprite ids also differ. It is NOT a shipped binary patch -- the six in
+  docs/binarypatches.md are five copy-protection branches and the one
+  MULTIPLAYER title button, none here -- so the menu's own constructor builds
+  a different count. Reproduce with the Lua console to open the menu, then
+  `ctl widgets` and diff; find the constructor that loops the button rows and
+  why it emits two extra. Reached only by hand play so far; no replay yet. Found hand-playing the
   flamethrower under `tools/sidebyside.py`; trapped twice (pumps 3587, 3014).
   Only ONE object differs -- the newest def-3 flame-trail segment -- and only
   its VZ: port -64.0, hybrid 0.0, which makes the port's segment FALL (height
