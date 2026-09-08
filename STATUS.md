@@ -113,6 +113,25 @@ FIXED below when that replay runs identical.
   `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+BOARDING A JEEP AUTO-FIRED ITS MOUNTED GUN on the port where the hybrid never
+fired (trap pump 2276, frame 2100; 1 px at first, then a stream of missiles;
+repro `sessions/jeepfire-2276.txt`; hand-played boarding a jeep with the fire
+button held). The only object difference was an extra type-5 (missile) on the
+port -- 0x3f7, then 0x3f8..0x3fc as it kept firing. Traced by tracing object
+registration (AddToItemList) to its type, then FireWeapon: the port's
+Step3Drive fired the jeep's weapon (r+4 == 1) every cooldown while the hybrid's
+did not. Every readable input matched -- weapon uid, WEAPON_FN_SLOT3, cooldown,
+mouse button/changed, menu row 3, MOUSE_GRAB -1, boarding state -- so the
+divergence was the ONE unreadable local, `steered`. Step3Input's mouse-fire
+gate is `if (row != 1 && steered != 1) return`, and `steered` is set by the
+four steering KEYS only (0x0045C1B8/C227/C257/C285); the mouse block does not
+touch it (the sole `[esp+0x18]` reference in the block is the read at
+0x0045C581). The reconstruction had a spurious `steered = 1` at the end of the
+mouse block, so with the fire button held the mouse-fire path fired at HUD row
+3 with no steering key down. Removed it; the replay then runs identical (no
+trap past 2100, 20k+ frames). Invisible to every A/B: no scripted drive boards
+a weaponised vehicle and holds fire, and `steered` is a stack local no dump can
+show -- it was found only by eliminating every global the gate reads.
 THE SQUAD PANEL'S "MV" READ 4 FOR THE JEEP where the hybrid read 5 (trap pump
 2393, frame 2333; ~23 px, box 576,311-580,318; repro `sessions/jeepMV-2393.txt`;
 hand-played boarding a jeep). This corrects the per-kind speed-table fix below

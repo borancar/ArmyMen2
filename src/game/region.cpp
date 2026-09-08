@@ -10776,7 +10776,13 @@ void __cdecl Step3Input(void *obj, void *rec)
                     *r = (uint8_t)(*r + 0x80);
                 }
             }
-            steered = 1;
+            /* The mouse block does NOT set `steered` -- only the four steering
+             * KEYS do (0x0045C1B8/C227/C257/C285), and `steered` is read once,
+             * at the mouse-fire gate (0x0045C581 `cmp [esp+0x18],1; jne`). A
+             * spurious `steered = 1` here let the mouse-fire path fire at HUD
+             * row 3 with no steering key held: boarding a jeep with the fire
+             * button down auto-fired the mounted gun every cooldown, where the
+             * original does not. Removed. */
         }
     }
 
