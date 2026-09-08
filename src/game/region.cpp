@@ -9835,6 +9835,27 @@ void __cdecl Step3ChooseFacing(void *obj, void *out)
     int32_t  local;
     int32_t  tries;
 
+    /* THREE early returns at 0x0045C8D0, and only the last was reconstructed.
+     * Missing the second drove the AI candidate search on the PLAYER's
+     * vehicle: with the player steering, Step3TurnBlocked's search fought the
+     * input, and on the frame the truck met a tree it picked a facing that
+     * was NOT blocked -- so the hull turned aside, gunFacing went 0x1f -> 0,
+     * Step3Drive's block check sampled the wrong mask direction, missed the
+     * tree and drove through. The original skips the whole search for a
+     * player-driven vehicle. (sessions/truckTree-34847.txt.) */
+
+    /* A networked client only steers a vehicle it owns. */
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
+        return;
+
+    /* A vehicle a player is riding is steered by the player, not the AI
+     * candidate search below -- unless FIELD_10C says otherwise. */
+    if (ListFirstField548(obj) != 0
+        && *(const int32_t *)(o + OBJ_OFF_FIELD_10C) == 0)
+        return;
+
     /* Nothing to decide when the record already wants the current facing and
      * its state says so. */
     if (*(const uint8_t *)out == *(const uint8_t *)(o + OBJ_OFF_FACING)

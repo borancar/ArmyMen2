@@ -113,6 +113,31 @@ FIXED below when that replay runs identical.
   `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+THE CONVOY TRUCK DROVE THROUGH A TREE on the port where the hybrid stopped
+(whole play area diverged, ~158k px, box 0,21-479,479; trap pump 34847, frame
+34786; repro `sessions/truckTree-34847.txt`; hand-played hitting a tree with
+the truck). Only one object differed -- the truck (uid 3f6), pos y 2670 (port)
+vs 2672 (hybrid), a 2-unit MoveStepPoint step -- and the camera follows it, so
+the whole screen moved. The port's Step3Drive block check read
+`FIELD_44`(speed)=0xa0/`0xD8`(blocked)=0 where the hybrid read 0/1: the port
+did NOT detect the tree. A VBW trace (item.cpp + a hybrid trampoline over
+0x0045BC70, both reverted) showed VehicleBlockWeight itself was correct --
+both returned 15 (blocked) for `facing=1f` -- but the port's Step3Drive block
+check passed `gunFacing=0` where the original passed 0x1f, so it sampled the
+wrong mask direction and missed the tree. An S3D entry trace
+(0x0045CB30 trampoline) traced that to `out[0]` (the record's wanted facing):
+port 0x1b vs hybrid 0xfa, with the candidate counter `+0x574` advanced to 2 on
+the port and 0 on the hybrid. So the port ran the AI CANDIDATE SEARCH on the
+PLAYER's vehicle. Root cause: `Step3ChooseFacing` (0x0045C8D0) has THREE early
+returns and only the third was reconstructed. The missing second --
+`if (ListFirstField548(obj) && obj[OBJ_OFF_FIELD_10C]==0) return` -- is what
+skips the search for a player-driven vehicle; without it the search fought the
+player's input and, at the tree, chose a facing that was not blocked, turning
+the hull aside (gunFacing 0x1f -> 0). Fixed by adding the two missing guards
+(the MP-ownership guard too, for faithfulness); the replay then runs identical
+(51,608 frames, no trap). Invisible to every A/B: no scripted drive boards a
+vehicle and drives it into an obstacle, and ADDR_MP_SESSION is 0 here so the
+first guard is inert regardless.
 THE SQUAD PANEL'S "MV" STAT read 3 cm/s on the port where the hybrid read
 4, after Sarge boards a vehicle (~23 px in the HUD; trap pump 46446, frame
 45681; repro `sessions/vehicle-46446.txt`; digit at ~576,309, the Convoy
