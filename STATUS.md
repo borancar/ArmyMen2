@@ -113,6 +113,44 @@ FIXED below when that replay runs identical.
   `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+EXITING A VEHICLE DIVERGED TWO WAYS AT ONCE, both on the same frame (trap
+pump 4557, frame 4514; repro `sessions/vehexit-4557.txt`; hand-played getting
+Sarge out of the convoy truck). The object table showed only the truck's pos
+off by 1, but the render differed by ~9k px: the SQUAD panel was empty on the
+port where the hybrid showed Sarge, and the truck's health bar was missing.
+Two independent bugs:
+
+  1. THE VEHICLE DID NOT STOP FOR THE UNIT LEAVING IT. Same signature as the
+     tree: port `FIELD_44`(speed)=0x1c/`0xD8`(blocked)=0, hybrid 0/1. But this
+     time `VehicleBlockWeight` returned 15 on the hybrid and 0 on the port for
+     BYTE-IDENTICAL inputs (facing=9, at=2071..; traced via item.cpp + a hybrid
+     trampoline over 0x0045BC70, reverted). The block came from Sarge, freshly
+     exited, sampled at a mask point -- a type-2 trooper. `BlockWeightTroops`'
+     trooper arm was INVERTED: the original blocks an ALLIED trooper and passes
+     an enemy (0x0045B877 `test eax; je w=0; else mov eax,0xF` -- a vehicle
+     stops for its own side and runs an enemy over), and the reconstruction had
+     `ObjsAreAllied(f,o,0) ? 0 : AM2_BLOCK_FULL`, backwards. Fixed by swapping
+     the ternary. The header comment was confidently wrong too and is fixed.
+
+  2. THE SELECTION LIST LOST THE OCCUPANT. On exit the original re-selects the
+     unit (`SelectUnit(occupant); DeselectUnit(vehicle)` in ExitOneFromVehicle,
+     which both games reach identically), leaving the squad panel showing
+     Sarge. The port left the selection EMPTY. Traced (item.cpp/objtable.cpp
+     SEL/DESEL traces + hybrid trampolines over SelectUnit/DeselectUnit,
+     reverted) to `OnSelectionChanged`'s "leader becomes element zero" SWAP,
+     which the original does as `edx=uids[0]; ecx=uids[leaderIdx];
+     uids[leaderIdx]=edx; uids[0]=ecx` (0x00427B1B). The reconstruction read
+     only uids[0] and wrote it to BOTH slots, never reading the leader -- so
+     whenever the leader was not already at index 0 (the occupant is appended,
+     then promoted), it DUPLICATED element zero and dropped the leader. The
+     matching DeselectUnit removes every copy, emptying the list. Fixed by
+     reading both ends before writing either.
+
+The replay then runs identical (9,269 frames, no trap). Both are invisible to
+every A/B: no scripted drive boards a vehicle, so the trooper-block arm and the
+non-first-leader swap are never exercised. Bug 2 is the sharper lesson -- a
+swap that reads one end twice is a duplicate, and it only bites when the two
+ends differ, which single-selection never does.
 THE CONVOY TRUCK DROVE THROUGH A TREE on the port where the hybrid stopped
 (whole play area diverged, ~158k px, box 0,21-479,479; trap pump 34847, frame
 34786; repro `sessions/truckTree-34847.txt`; hand-played hitting a tree with

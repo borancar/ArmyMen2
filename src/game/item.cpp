@@ -3722,11 +3722,14 @@ int32_t __cdecl ObjCollidesWith(void *from, void *obj)
  * inserts one arm for a type 2 -- a trooper -- between the item case and the
  * type 3/8 case. That arm is the whole reason this function exists.
  *
- * A TROOPER BLOCKS ONLY IF IT IS AN ENEMY. The inlined arm asks
+ * A TROOPER BLOCKS ONLY IF IT IS FRIENDLY. The inlined arm asks
  * ObjsAreAllied(from, obj, 0) and contributes AM2_BLOCK_FULL when the answer
- * is no and nothing when it is yes -- so friendly troopers are walked through
- * and hostile ones are not. Neither of the other two variants has this; they
- * treat every object the same way whoever owns it.
+ * is YES and nothing when it is no (0x0045B877: `test eax; je w=0; else
+ * mov eax,0xF`) -- so a vehicle STOPS for its own side and drives THROUGH an
+ * enemy, running it over rather than being blocked by it. This was read
+ * backwards at first: the sense of the `je` is that a NON-allied trooper is
+ * passable. Neither of the other two variants has this arm; they treat every
+ * object the same way whoever owns it.
  *
  * WITH ONE EXCEPTION, AND IT IS THE PLAYER'S OWN UNIT. Before the alliance
  * question, three things are checked together: the viewer's army is the
@@ -3796,7 +3799,7 @@ int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
                 if (skip)
                     w = 0;
                 else
-                    w = ObjsAreAllied(f, o, 0) ? 0 : AM2_BLOCK_FULL;
+                    w = ObjsAreAllied(f, o, 0) ? AM2_BLOCK_FULL : 0;
             }
         } else if (f
                    && (ObjIsType3((const AM2_Object *)o)
@@ -11326,14 +11329,22 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint)
         i++;
     }
 
-    /* The leader becomes element zero. */
+    /* The leader becomes element zero -- a SWAP, so read both ends before
+     * writing either. The original (0x00427B1B) does `edx=uids[0];
+     * ecx=uids[leaderIdx]; uids[leaderIdx]=edx; uids[0]=ecx`. This had read
+     * only uids[0] and written it to BOTH slots, which duplicated element
+     * zero and dropped the leader whenever leaderIdx != 0 -- so a unit added
+     * to the selection anywhere but the front (e.g. the occupant re-selected
+     * as a vehicle is exited) left the list with a repeated uid, and the
+     * matching DeselectUnit then removed every copy. */
     {
-        uint32_t *uids = *(uint32_t **)(list + SUBREC_OFF_ROWS);
-        uint32_t  first = uids[0];
+        uint32_t *uids      = *(uint32_t **)(list + SUBREC_OFF_ROWS);
+        uint32_t  first     = uids[0];
+        uint32_t  leaderUid = uids[leaderIdx];
 
         uids[leaderIdx] = first;
         uids = *(uint32_t **)(list + SUBREC_OFF_ROWS);
-        uids[0] = first;
+        uids[0] = leaderUid;
     }
 
     if (leader != 0)
