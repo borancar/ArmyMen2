@@ -1072,22 +1072,28 @@ static void am2_step_wait(void)
  * consumed the key (the completing modifier of the combo), so the caller does
  * not also forward it. A no-op headless, where there is no window. */
 static int am2_grabbed;
+static int am2_grab_both;   /* ctrl+alt were both down at the last key event */
 static int am2_grab_combo(const SDL_Event *ev)
 {
-    SDL_Keymod m;
+    int both;
 
-    if (ev->type != SDL_EVENT_KEY_DOWN || ev->key.repeat)
+    /* Edge-triggered on both modifiers becoming down, from the event's own
+     * mod state -- robust to which of the two is pressed first and to any WM
+     * that reorders them. Reset when either lifts, so each press toggles once.
+     * Does not swallow the keys; the game seeing a stray ctrl/alt is harmless
+     * and swallowing an edge is fiddly. */
+    if (ev->type != SDL_EVENT_KEY_DOWN && ev->type != SDL_EVENT_KEY_UP)
         return 0;
-    switch (ev->key.scancode) {
-    case SDL_SCANCODE_LCTRL: case SDL_SCANCODE_RCTRL:
-    case SDL_SCANCODE_LALT:  case SDL_SCANCODE_RALT:  break;
-    default: return 0;
+    both = (ev->key.mod & SDL_KMOD_CTRL) && (ev->key.mod & SDL_KMOD_ALT);
+    if (!both) {
+        am2_grab_both = 0;
+        return 0;
     }
-    m = SDL_GetModState();
-    if (!(m & SDL_KMOD_CTRL) || !(m & SDL_KMOD_ALT))
+    if (am2_grab_both)
         return 0;
+    am2_grab_both = 1;
     if (!am2_sdl_window)
-        return 1;
+        return 0;
     am2_grabbed = !am2_grabbed;
     SDL_SetWindowMouseGrab(am2_sdl_window, am2_grabbed);
     if (am2_grabbed)
@@ -1095,7 +1101,7 @@ static int am2_grab_combo(const SDL_Event *ev)
     else
         SDL_ShowCursor();
     am2_plat_log("window %s (ctrl+alt)", am2_grabbed ? "grabbed" : "released");
-    return 1;
+    return 0;
 }
 
 /* The window's own events, in step mode: applied and echoed. */
