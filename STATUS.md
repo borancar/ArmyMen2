@@ -42,6 +42,19 @@ FIXED below when that replay runs identical.
   reaches the fire as -4 vs 0, per-pump.
 
 FIXED by this rule so far, each with the replay that reproduces it:
+the IN-MISSION GAME MENU showed SAVE and LOAD where the original hides them --
+reached by pausing in Boot Camp under `tools/sidebyside.py` (~10k px over the
+button column, port 6 buttons vs hybrid 4). `DlgGameMenuConstruct`
+(0x00452AA0) skips the SAVE (i=1) and LOAD (i=2) rows when either
+ADDR_MP_SESSION or ADDR_WIN_ENABLED is set -- the original does
+`cmp [0x00511DA0],0; jne` then `cmp [0x00512304],0; jne 0x00452C82` right after
+RETURN, jumping clean past both `new`s -- and both are set in Boot Camp, so its
+menu is RETURN/CONTROLS/AUDIO/ABORT. The rows below a skipped pair move up (the
+top is a running counter), so the reconstruction's plain six-row loop drew all
+six at the wrong offsets. Now gated with a running `row`; identified by `ctl
+widgets` diffing the two dialogs (same object, 6 vs 4 children). Invisible to
+every A/B because the game menu needs ADDR_GAME_STATE 2, unreachable from the
+title.
 the TITLE MENU built a different button set -- reached at once under
 `tools/sidebyside.py` (~pump 684, ~10k px over the button column). The port
 built the MULTI-PLAYER button on a coin toss because

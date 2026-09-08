@@ -4749,25 +4749,49 @@ AM2_Widget *__attribute__((thiscall)) DlgGameMenuConstruct(AM2_Widget *w,
     *(void **)((uint8_t *)w + DLG_OFF_LIST) = (void *)0;
     w->flag44 = 1;
 
-    for (i = 0; i < 6; i++) {
-        AM2_Widget *btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+    /* SAVE (i=1) and LOAD (i=2) are omitted -- their `new`s jumped clean past,
+     * not built and hidden -- when either ADDR_MP_SESSION or ADDR_WIN_ENABLED
+     * is set: the original does `cmp [0x00511DA0],0; jne` then
+     * `cmp [0x00512304],0; jne` to 0x00452C82 (the CONTROLS arm) right after
+     * RETURN. Both are set in Boot Camp, so its in-mission menu is the four
+     * RETURN/CONTROLS/AUDIO/ABORT. The rows below a skipped pair move up:
+     * RETURN's `edi` top runs (0x82 = 130, +step per row) and CONTROLS reuses
+     * it, so a running `row` gives the original's consecutive column in both
+     * states -- 130,170,210,250 gated and 130..330 whole. The reconstruction
+     * had the plain `i` loop with neither the gate nor the run, so it always
+     * drew all six; the divergence was invisible to every A/B because this
+     * dialog is unreachable from the title (ADDR_GAME_STATE must be 2). */
+    {
+        int32_t noSaveLoad =
+            *(const int32_t *)(uintptr_t)ADDR_MP_SESSION  != 0
+            || *(const int32_t *)(uintptr_t)ADDR_WIN_ENABLED != 0;
+        int32_t row = 0;
 
-        if (btn) {
-            RectSet(&box, AM2_GAMEMENU_LEFT,
-                    AM2_GAMEMENU_TOP + i * AM2_GAMEMENU_STEP,
-                    AM2_GAMEMENU_WIDTH, AM2_GAMEMENU_HEIGHT);
-            btn = ButtonConstruct(btn, kGameMenuButtons[i].b0,
-                                  kGameMenuButtons[i].b1,
-                                  kGameMenuButtons[i].b2, 0, box,
-                                  (void (__cdecl *)(AM2_Widget *))
-                                      AM2_IMAGE(kGameMenuButtons[i].handler),
-                                  (void (__cdecl *)(AM2_Widget *))0);
-        }
-        WidgetAddChild(w, btn);
+        for (i = 0; i < 6; i++) {
+            AM2_Widget *btn;
 
-        if (i == 0) {
-            w->focusedChild = btn;
-            ((AM2_WidgetFocusFn *)btn->vtable)[WIDGET_VSLOT_FOCUS](btn, 0);
+            if ((i == 1 || i == 2) && noSaveLoad)
+                continue;
+
+            btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
+            if (btn) {
+                RectSet(&box, AM2_GAMEMENU_LEFT,
+                        AM2_GAMEMENU_TOP + row * AM2_GAMEMENU_STEP,
+                        AM2_GAMEMENU_WIDTH, AM2_GAMEMENU_HEIGHT);
+                btn = ButtonConstruct(btn, kGameMenuButtons[i].b0,
+                                      kGameMenuButtons[i].b1,
+                                      kGameMenuButtons[i].b2, 0, box,
+                                      (void (__cdecl *)(AM2_Widget *))
+                                          AM2_IMAGE(kGameMenuButtons[i].handler),
+                                      (void (__cdecl *)(AM2_Widget *))0);
+            }
+            WidgetAddChild(w, btn);
+
+            if (row == 0) {
+                w->focusedChild = btn;
+                ((AM2_WidgetFocusFn *)btn->vtable)[WIDGET_VSLOT_FOCUS](btn, 0);
+            }
+            row++;
         }
     }
 
