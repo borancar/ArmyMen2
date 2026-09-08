@@ -1065,6 +1065,39 @@ static void am2_step_wait(void)
     }
 }
 
+/* Ctrl+Alt toggles the mouse grab, so a real window can be played in without
+ * the pointer escaping to the desktop and without trapping it there. Confine
+ * only -- motion stays absolute, as the game expects -- plus the cursor,
+ * hidden while grabbed since the game draws its own. Returns 1 when it
+ * consumed the key (the completing modifier of the combo), so the caller does
+ * not also forward it. A no-op headless, where there is no window. */
+static int am2_grabbed;
+static int am2_grab_combo(const SDL_Event *ev)
+{
+    SDL_Keymod m;
+
+    if (ev->type != SDL_EVENT_KEY_DOWN || ev->key.repeat)
+        return 0;
+    switch (ev->key.scancode) {
+    case SDL_SCANCODE_LCTRL: case SDL_SCANCODE_RCTRL:
+    case SDL_SCANCODE_LALT:  case SDL_SCANCODE_RALT:  break;
+    default: return 0;
+    }
+    m = SDL_GetModState();
+    if (!(m & SDL_KMOD_CTRL) || !(m & SDL_KMOD_ALT))
+        return 0;
+    if (!am2_sdl_window)
+        return 1;
+    am2_grabbed = !am2_grabbed;
+    SDL_SetWindowMouseGrab(am2_sdl_window, am2_grabbed);
+    if (am2_grabbed)
+        SDL_HideCursor();
+    else
+        SDL_ShowCursor();
+    am2_plat_log("window %s (ctrl+alt)", am2_grabbed ? "grabbed" : "released");
+    return 1;
+}
+
 /* The window's own events, in step mode: applied and echoed. */
 static void am2_step_host_events(void)
 {
@@ -1082,6 +1115,8 @@ static void am2_step_host_events(void)
             char    w[64];
             uint8_t dik = ev.key.scancode < SDL_SCANCODE_COUNT
                         ? am2_dik_of_scancode[ev.key.scancode] : 0;
+            if (am2_grab_combo(&ev))
+                break;
             if (ev.key.repeat)
                 break;
             snprintf(w, sizeof w, "key %d %u %d", dik, (unsigned)am2_vk_of(ev.key.key), ev.key.down ? 1 : 0);
@@ -1190,6 +1225,8 @@ void am2_host_pump(void)
         case SDL_EVENT_KEY_UP: {
             uint8_t dik = ev.key.scancode < SDL_SCANCODE_COUNT
                         ? am2_dik_of_scancode[ev.key.scancode] : 0;
+            if (am2_grab_combo(&ev))
+                break;
 #ifdef AM2_DEVTOOLS
             /* The development binary's quick savestate keys; the game never
              * reads F5 or F9 itself. */
