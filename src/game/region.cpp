@@ -9634,8 +9634,16 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
                                          &at);
             *(uint16_t *)(o + OBJ_OFF_FIELD_574) = w[4];
             *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&at;
+            /* The snap writes back into FIELD_C0, not the local: the original
+             * (0x0044AC0A) loads `lea eax,[esi+0xc0]` for the out pointer and
+             * hands the SAME &FIELD_C0 to NearestAllowedTile, so the move goal
+             * becomes the nearest allowed TILE CENTRE, not the raw click. This
+             * had been `&at`, which left FIELD_C0 unsnapped -- on a quick
+             * release the drawn facing came off the raw point (218) where the
+             * original faces the snapped one (212). Invisible to every replay
+             * but a hand-played click; `sessions/aim-3261.txt` reproduces it. */
             NearestAllowedTile(o, TileOfPoint(*(const uint32_t *)&at),
-                               (uint32_t *)&at);
+                               (uint32_t *)(o + OBJ_OFF_FIELD_C0));
             *(int32_t *)(o + OBJ_OFF_DEADLINE_D0) = 0;
             *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 1;
             *(uint16_t *)(o + OBJ_OFF_PREV_REGION) = 0xFFFF;

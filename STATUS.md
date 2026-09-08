@@ -15,39 +15,30 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
-- **OPEN (2026-09-08): a click-to-move on the player diverges on a quick
-  button RELEASE (`sessions/aim-3261.txt`, trap pump 3261, 764 px, box
-  217,218-274,261).** Found by hand-playing under `tools/sidebyside.py`;
-  reproduces headless under lockstep, first differing frame exactly 3261.
-  Only Sarge (uid 0x3e8) differs and only in his aim/route sub-state:
-  FACING 218(port) vs 212(hybrid), plus FIELD_C0 / ROUTE_GOAL / MOVE_TO /
-  SUBPIXEL / DEADLINE_D0. Pump 3260 is byte-identical, so it is introduced
-  entirely within pump 3261 (the button-up pump).
-
-  Traced to the point handed to AngleBetween. `AM2_TRACE_ANGLE` over both
-  builds shows two calls at 3261: call #1 is identical (to=(3587,2646) ->
-  218); call #2 diverges -- hybrid to=(3592,2664) -> 212, port to=(3587,2646)
-  -> 218 -- and #2 sets the drawn facing. The hybrid's #2 point is its route
-  goal from the MARCH arm of `Type2PlayerInput` (0x0044A420); the port took
-  the TAP arm instead (FIELD_C0 = NearestAllowedTile(at), D0=0). Tap-vs-march
-  turns on the mouse button: at 3261 the port sees button 0 RELEASED while the
-  hybrid still sees it HELD. Both agree button=1 at 3260 and button=0 by
-  end-of-3261; every decision global (cursor 354,179; viewRect 3234,2466;
-  pressMs; deadline) is byte-identical. So the release is consumed one pump
-  apart -- the port's #2 point uses `at`=(3587,2646), the hybrid's a cursor
-  moved +5 in x, i.e. a different count of motion events processed relative to
-  the button within the poll.
-
-  The replay feeds BOTH builds one DirectInput buffer (am2_di_mouse_button ->
-  GetDeviceData), so this is a mouse-poll event-ordering seam, not a
-  `Type2PlayerInput` logic error -- and which side is canonical (the port's
-  tap on a quick release looks like correct gameplay) is not yet settled.
-  Next: trampoline the hybrid's PollMouse to log each motion/button event with
-  its pump, diff against the port's drain, and decide whether the fix is in
-  the reconstruction's PollMouse drain or in the platform's replay delivery.
-  INDEPENDENT of the flame fix (8d04c7e); pre-existing, surfaced by play.
+(No open divergences: every replay under `tests/replays` runs identical,
+hybrid against port.)
 
 FIXED by this rule so far, each with the replay that reproduces it:
+a click-to-move on the player faced the RAW click, not the snapped move goal
+(`sessions/aim-3261.txt`, trap pump 3261, 764 px, box 217,218-274,261):
+found hand-playing under `tools/sidebyside.py`, reproduces headless under
+lockstep with the first differing frame exactly 3261. Only Sarge (uid 0x3e8)
+differed and only in his aim/route sub-state -- FACING 218(port) vs
+212(hybrid). Pump 3260 byte-identical, so it is born in pump 3261 (the
+button-up pump). Two false trails ruled out by measurement: the mouse button
+release is pushed AND taken at pump 3261 on both (`AM2_TRACE_DI`), so not an
+input-timing seam; and every decision global (cursor 354,179; viewRect
+3234,2466; button; pressMs) is byte-identical, so not the input. `AM2_TRACE_ANGLE`
+pinned it to the second AngleBetween (the move step reading FIELD_C0): hybrid
+to=(3592,2664)->212, port to=(3587,2646)->218. The TAP arm of `Type2PlayerInput`
+(0x0044A420) sets the move goal: `FIELD_C0 = at; NearestAllowedTile(o,
+TileOfPoint(at), &FIELD_C0)` -- the original (0x0044AC0A) hands the snap its
+OWN &FIELD_C0, so the goal becomes the nearest allowed TILE CENTRE. The
+reconstruction passed `&at`, the local, so FIELD_C0 kept the raw click and the
+move step faced the un-snapped point. One-argument fix; verified identical over
+the recording plus 96k idle pumps, `make check` and all seven lockstep replays
+still IDENTICAL. Invisible to every scripted replay -- no drive click-releases
+over the map. Independent of the flame fix (8d04c7e).
 a FLAMETHROWER's flame ran one animation frame AHEAD
 (`sessions/flame-5197.txt`, trap pump 5197, 80 px, box 187,196-203,214):
 the flame is a def-3 trail missile whose sprite comes from `TimedDirFrame`
