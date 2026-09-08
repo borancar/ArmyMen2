@@ -15150,9 +15150,20 @@ void __attribute__((thiscall)) HudSquadDetail(AM2_Widget *w, int32_t uid)
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_2, line);
 
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_3, "MV:");
-        /* VEHICLE_OFF_KIND under a "cm/s" format -- see its note in orig.h. */
-        am2_sprintf(line, "%d cm/s",
-                    *(const int32_t *)(obj + VEHICLE_OFF_KIND));
+        /* MV is not the raw VEHICLE_OFF_KIND -- the kind INDEXES a per-kind
+         * speed table the original builds on its stack and prints
+         * `table[kind]` from (HudSquadDetail 0x00416bc7: `mov edx,[esi+0x52c];
+         * mov eax,[esp+edx*4+0x58]`). The table is filled at the top of the
+         * function (0x0041634c..0x00416502): eax=4 written to slots 0,1,3,
+         * then 1<-5, 2<-3, 5<-2. Slot 4 is left uninitialised by the original
+         * (stack garbage); no shipped vehicle uses that kind, so it is given
+         * the default-fill 4 here rather than reproduced. Sarge's convoy truck
+         * is kind 3 -> 4 cm/s. Reading the kind raw drew "3 cm/s". */
+        {
+            static const int32_t kVehicleSpeed[6] = { 4, 5, 3, 4, 4, 2 };
+            int32_t kind = *(const int32_t *)(obj + VEHICLE_OFF_KIND);
+            am2_sprintf(line, "%d cm/s", kVehicleSpeed[kind]);
+        }
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_3, line);
 
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_HP, "HP:");

@@ -63,29 +63,6 @@ FIXED below when that replay runs identical.
   pointer at 0x0065A058 and its +0x34, and the ESC key edge, on both builds;
   find the first pump where the port sets mouseMoved and the hybrid does not.
 
-- **OPEN (2026-09-08): the SQUAD panel's "MV" stat differs after entering a
-  vehicle (port 3, hybrid 4 "cm/s"), ~23 px in the HUD.** Found hand-playing
-  under `tools/sidebyside.py` (trap pump 46446, frame 45681; repro
-  `sessions/vehicle-46446.txt`; digit at ~576,309, the SQUAD panel's Convoy
-  Truck readout). Confirmed with a screenshot: it is the "MV:" line, not ammo
-  or a countdown (two earlier readings of this were WRONG -- a coincidental
-  "swapped pairs" match, then the SARGE inventory ammo path). Ruled out: not a
-  blit bug (BlitGlyph calls byte-identical, x=556..603 y=309), not float (native
-  is `-mfpmath=387`/x87, matching the original). `HudSquadDetail` (0x00416340)
-  formats MV as `%d cm/s` from `obj + VEHICLE_OFF_KIND` (0x52C), and the ORIGINAL
-  reads the SAME offset (disasm 0x00416BC7 = `[esi+0x52c]`) -- so the MV code is
-  faithful; the display value diverges upstream. But the vehicle Sarge rides
-  (uid 0x3f6) was byte-identical on both (all 1376 bytes, so its 0x52C matches),
-  which means the SQUAD panel is showing a DIFFERENT vehicle / squad-detail
-  selection on each build, or 0x52C on the shown vehicle diverged.
-
-  NEXT (trap was lost -- a bad Lua `call` to a guessed WeaponByUid crashed the
-  live run): re-run `sessions/vehicle-46446.txt` step-locked, trap at 46446,
-  and read the SQUAD panel's detail uid (`HudSquadDetail`'s arg, from
-  `SQUAD_REC_DETAIL_ARG`) on both plus that object's 0x52C. Different uid = a
-  selection divergence; same uid with different 0x52C = a write divergence.
-  Read with objdump, never a raw Lua `call` to a guessed address.
-
 - **OPEN (2026-09-08): the flamethrower's flame trail renders one animation
   frame off while firing, ~80 px, box near the plume.** Found hand-playing the
   flamethrower under `tools/sidebyside.py`; trapped twice (pumps 3587, 3014).
@@ -136,6 +113,23 @@ FIXED below when that replay runs identical.
   `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+THE SQUAD PANEL'S "MV" STAT read 3 cm/s on the port where the hybrid read
+4, after Sarge boards a vehicle (~23 px in the HUD; trap pump 46446, frame
+45681; repro `sessions/vehicle-46446.txt`; digit at ~576,309, the Convoy
+Truck readout). VEHICLE_OFF_KIND (0x52C) was byte-identical (3) on both, so
+this was NOT a raw-field divergence -- the original does not print the kind.
+`HudSquadDetail` (0x00416340) builds a per-kind SPEED TABLE on its stack at
+the top of the function (0x0041634c..0x00416502: eax=4 written to slots 0,1,3,
+then 1<-5, 2<-3, 5<-2) and prints `table[kind]` (0x00416bc7: `mov edx,
+[esi+0x52c]; mov eax,[esp+edx*4+0x58]`). The base is S+0x28, so the table is
+`{4,5,3,4,uninit,2}` and kind 3 (the convoy truck) -> 4 cm/s. The
+reconstruction printed the raw kind (3). Fixed by indexing a `kVehicleSpeed[6]`
+table in the vehicle arm; the replay then runs identical (103,614 frames, no
+trap -- the full recording). Slot 4 is left uninitialised by the original
+(stack garbage) and no shipped vehicle uses that kind, so it is given the
+default-fill 4 rather than reproduced. Invisible to every A/B: no scripted
+drive boards a vehicle and opens the squad panel, and the KIND field the code
+reads is identical -- only the table LOOKUP the original interposes differs.
 RALLIED FOLLOWERS FIRED AT NOTHING -- a following trooper targeted and shot a
 dropped weapon on the ground when no enemy was in sight, on the PORT only
 (~514 px, box 204,198-238,242; trap pump 11074, repro
