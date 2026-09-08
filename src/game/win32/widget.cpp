@@ -15151,16 +15151,20 @@ void __attribute__((thiscall)) HudSquadDetail(AM2_Widget *w, int32_t uid)
 
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_3, "MV:");
         /* MV is not the raw VEHICLE_OFF_KIND -- the kind INDEXES a per-kind
-         * speed table the original builds on its stack and prints
-         * `table[kind]` from (HudSquadDetail 0x00416bc7: `mov edx,[esi+0x52c];
-         * mov eax,[esp+edx*4+0x58]`). The table is filled at the top of the
-         * function (0x0041634c..0x00416502): eax=4 written to slots 0,1,3,
-         * then 1<-5, 2<-3, 5<-2. Slot 4 is left uninitialised by the original
-         * (stack garbage); no shipped vehicle uses that kind, so it is given
-         * the default-fill 4 here rather than reproduced. Sarge's convoy truck
-         * is kind 3 -> 4 cm/s. Reading the kind raw drew "3 cm/s". */
+         * speed table the original builds on its stack and prints `table[kind]`
+         * (HudSquadDetail 0x00416bc7: `mov edx,[esi+0x52c];
+         * mov eax,[esp+edx*4+0x58]`). The stack slots are filled at the top of
+         * the function (0x00416352/0x004164f2, all at one esp level): eax=4 to
+         * +0x28/+0x2c/+0x34, then +0x2c<-5, +0x30<-3, +0x3c<-2. The read base
+         * is esp+0x58 = that level's +0x2c, so table[kind] reads
+         * +0x2c,+0x30,+0x34,+0x38,+0x3c,+0x40 -> {5, 3, 4, (uninit), 2, ...}.
+         * The +0x38 slot the table code never writes is a stable 4 in play, so
+         * kind 3 (the convoy truck) reads 4 and kind 0 (the jeep) reads 5.
+         * The base was read as +0x28 at first, which drew the jeep "4 cm/s"
+         * where the original draws 5 -- both bases happen to give the truck 4.
+         * Kinds past 4 are unseen; +0x40 is given 4. */
         {
-            static const int32_t kVehicleSpeed[6] = { 4, 5, 3, 4, 4, 2 };
+            static const int32_t kVehicleSpeed[6] = { 5, 3, 4, 4, 2, 4 };
             int32_t kind = *(const int32_t *)(obj + VEHICLE_OFF_KIND);
             am2_sprintf(line, "%d cm/s", kVehicleSpeed[kind]);
         }

@@ -113,6 +113,19 @@ FIXED below when that replay runs identical.
   `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+THE SQUAD PANEL'S "MV" READ 4 FOR THE JEEP where the hybrid read 5 (trap pump
+2393, frame 2333; ~23 px, box 576,311-580,318; repro `sessions/jeepMV-2393.txt`;
+hand-played boarding a jeep). This corrects the per-kind speed-table fix below
+(the truck MV): that fix read the table's base as esp+0x58 == the init level's
++0x28, and the jeep (VEHICLE_OFF_KIND 0) exposed that the base is actually
++0x2c. Both offsets give the convoy truck (kind 3) the value 4 -- +0x34 holds
+a real 4, +0x38 an uninitialised slot that is a stable 4 in play -- so the
+truck stayed frame-exact and hid the off-by-one. With base +0x2c the table
+reads +0x2c,+0x30,+0x34,+0x38,+0x3c = {5,3,4,4,2}, so kind 0 (jeep) -> 5 and
+kind 3 (truck) -> 4. `kVehicleSpeed` is now `{5,3,4,4,2,4}`; the jeep replay
+runs identical (21,572 frames) and the truck replay stays identical. The
+lesson: a table index verified on ONE input pins the base only up to slots
+that happen to share a value -- board a second kind before trusting the base.
 EXITING A VEHICLE DIVERGED TWO WAYS AT ONCE, both on the same frame (trap
 pump 4557, frame 4514; repro `sessions/vehexit-4557.txt`; hand-played getting
 Sarge out of the convoy truck). The object table showed only the truck's pos
@@ -184,15 +197,14 @@ this was NOT a raw-field divergence -- the original does not print the kind.
 `HudSquadDetail` (0x00416340) builds a per-kind SPEED TABLE on its stack at
 the top of the function (0x0041634c..0x00416502: eax=4 written to slots 0,1,3,
 then 1<-5, 2<-3, 5<-2) and prints `table[kind]` (0x00416bc7: `mov edx,
-[esi+0x52c]; mov eax,[esp+edx*4+0x58]`). The base is S+0x28, so the table is
-`{4,5,3,4,uninit,2}` and kind 3 (the convoy truck) -> 4 cm/s. The
-reconstruction printed the raw kind (3). Fixed by indexing a `kVehicleSpeed[6]`
+[esi+0x52c]; mov eax,[esp+edx*4+0x58]`). Fixed by indexing a `kVehicleSpeed[6]`
 table in the vehicle arm; the replay then runs identical (103,614 frames, no
-trap -- the full recording). Slot 4 is left uninitialised by the original
-(stack garbage) and no shipped vehicle uses that kind, so it is given the
-default-fill 4 rather than reproduced. Invisible to every A/B: no scripted
-drive boards a vehicle and opens the squad panel, and the KIND field the code
-reads is identical -- only the table LOOKUP the original interposes differs.
+trap -- the full recording). Invisible to every A/B: no scripted drive boards a
+vehicle and opens the squad panel, and the KIND field the code reads is
+identical -- only the table LOOKUP the original interposes differs. (The base
+offset was read as S+0x28 here, giving `{4,5,3,4,uninit,2}` -- corrected to
+S+0x2c below once a jeep was boarded, since both offsets happen to give the
+truck 4.)
 RALLIED FOLLOWERS FIRED AT NOTHING -- a following trooper targeted and shot a
 dropped weapon on the ground when no enemy was in sight, on the PORT only
 (~514 px, box 204,198-238,242; trap pump 11074, repro
