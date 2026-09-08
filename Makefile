@@ -104,8 +104,15 @@ HOOK_CXX := src/game/savetag.cpp \
             src/game/win32/movie.cpp \
             src/game/win32/audio.cpp
 
+# The Lua console (third_party/lua + luaconsole.c) links into every build that
+# carries the control socket -- see src/inject/luaconsole.h. Vendored Lua 5.4,
+# portable C, compiles under both mingw and the native gcc. Defined here
+# because HOOK_OBJ below expands it immediately.
+LUA_CSRC := $(wildcard third_party/lua/*.c) src/inject/luaconsole.c
+
 HOOK_OBJ := $(patsubst %.c,$(BUILD)/obj/%.o,$(HOOK_C)) \
-            $(patsubst %.cpp,$(BUILD)/obj/%.o,$(HOOK_CXX))
+            $(patsubst %.cpp,$(BUILD)/obj/%.o,$(HOOK_CXX)) \
+            $(patsubst %.c,$(BUILD)/obj/%.o,$(LUA_CSRC))
 
 # ws2_32 for the control socket; gdi32/user32 for the runtime font generator,
 # which draws each glyph with GDI before encoding it.
@@ -426,6 +433,7 @@ SA_SRC   := $(wildcard src/game/*.cpp) $(wildcard src/game/win32/*.cpp) \
 SA_CSRC  := src/inject/control.c src/inject/input.c
 SA_OBJ   := $(patsubst %.cpp,$(BUILD)/sa/%.o,$(SA_SRC)) \
             $(patsubst %.c,$(BUILD)/sa/%.o,$(SA_CSRC)) \
+            $(patsubst %.c,$(BUILD)/sa/%.o,$(LUA_CSRC)) \
             $(BUILD)/sa/origdata.o $(BUILD)/sa/origgap.o
 SA_FLAGS := $(CXXFLAGS) -DAM2_STANDALONE -Ibuild/standalone
 SA_LIBS  := -lddraw -ldinput -ldsound -lwinmm -lole32 -ldxguid -lws2_32
@@ -509,6 +517,7 @@ NATIVE_OBJ   := $(patsubst %.cpp,$(BUILD)/native/%.o,$(NATIVE_SRC)) \
 DEV_CSRC     := $(SA_CSRC)
 DEV_OBJ      := $(patsubst %.cpp,$(BUILD)/native-dev/%.o,$(NATIVE_SRC)) \
                 $(patsubst %.c,$(BUILD)/native-dev/%.o,$(DEV_CSRC)) \
+                $(patsubst %.c,$(BUILD)/native-dev/%.o,$(LUA_CSRC)) \
                 $(BUILD)/native-dev/origdata.o $(BUILD)/native-dev/origgap.o
 NATIVE_DEFS  := -DAM2_STANDALONE -DAM2_NATIVE -Ibuild/standalone \
                 -isystem src/platform/include -include callconv.h
@@ -552,7 +561,8 @@ HYBRID_LDF   := $(NATIVE_ARCH) -static-libgcc \
 HYBRID_DEV_SRC := $(HYBRID_SRC) src/hybrid/devtools.cpp src/hybrid/crtcheck.cpp \
                   src/game/image.cpp $(wildcard src/platform/crt/*.cpp)
 HYBRID_DEV_OBJ := $(patsubst %.cpp,$(BUILD)/hybrid-dev/%.o,$(HYBRID_DEV_SRC)) \
-                  $(patsubst %.c,$(BUILD)/hybrid-dev/%.o,$(SA_CSRC))
+                  $(patsubst %.c,$(BUILD)/hybrid-dev/%.o,$(SA_CSRC)) \
+                  $(patsubst %.c,$(BUILD)/hybrid-dev/%.o,$(LUA_CSRC))
 HYBRID_CF    := $(NATIVE_ARCH) -O2 -g -Wall -Wextra -std=gnu11 -fno-strict-aliasing \
                 $(DEPFLAGS) $(HYBRID_DEFS)
 
@@ -579,7 +589,7 @@ $(BUILD)/armymen2-hybrid: $(HYBRID_OBJ)
 	@echo "hybrid: $@"
 
 $(BUILD)/armymen2-hybrid-dev: $(HYBRID_DEV_OBJ)
-	$(NATIVE_CXX) -o $@ $(HYBRID_DEV_OBJ) $(HYBRID_LDF) $(NATIVE_LIBS)
+	$(NATIVE_CXX) -o $@ $(HYBRID_DEV_OBJ) $(HYBRID_LDF) -rdynamic $(NATIVE_LIBS) -ldl
 	@echo "hybrid-dev: $@"
 
 .PHONY: native native-dev
@@ -641,7 +651,7 @@ $(BUILD)/armymen2: $(NATIVE_OBJ)
 	@echo "native: $@"
 
 $(BUILD)/armymen2-dev: $(DEV_OBJ)
-	$(NATIVE_CXX) -o $@ $(DEV_OBJ) $(NATIVE_LDF) $(NATIVE_LIBS)
+	$(NATIVE_CXX) -o $@ $(DEV_OBJ) $(NATIVE_LDF) -rdynamic $(NATIVE_LIBS) -ldl
 	@echo "native-dev: $@"
 
 clean:

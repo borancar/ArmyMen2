@@ -3,6 +3,7 @@
 #include "input.h"
 #include "trace.h"
 #include "orig.h"
+#include "luaconsole.h"
 
 #include <winsock2.h>
 #include <windows.h>
@@ -332,6 +333,22 @@ static void handle_line(SOCKET s, char *line)
             Sleep(TYPE_GAP_MS);
         }
         reply(s, "ok typed %d char(s)", n);
+        return;
+    }
+
+    /* `lua <code>` -- run a chunk in the persistent Lua console. Like `type`
+     * it takes the rest of the line verbatim, before tokenising eats the
+     * spaces. See luaconsole.c for the bindings (peek/poke/call). */
+    if (!strncmp(line, "lua ", 4)) {
+        const char *out = am2_lua_eval(line + 4);
+        /* reply frames on newline, so send the console output as one line
+         * with newlines turned into `|`. */
+        char one[MAX_LINE];
+        size_t i, j = 0;
+        for (i = 0; out[i] && j < sizeof one - 1; i++)
+            one[j++] = (out[i] == '\n') ? '|' : out[i];
+        one[j] = 0;
+        reply(s, "ok %s", one);
         return;
     }
 
