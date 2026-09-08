@@ -15,8 +15,31 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
-(No open divergences: every replay under `tests/replays` runs identical,
-hybrid against port.)
+- **OPEN (2026-09-08): the flamethrower's flame trail renders one animation
+  frame off while firing, ~80 px, box near the plume.** Found hand-playing the
+  flamethrower under `tools/sidebyside.py`; trapped twice (pumps 3587, 3014).
+  Only ONE object differs -- the newest def-3 flame-trail segment -- and only
+  its VZ: port -64.0, hybrid 0.0, which makes the port's segment FALL (height
+  28->27), shifting its sprite rect a pixel. Every end-of-pump field on Sarge,
+  his SIGHTCOUT, and the object tables are byte-identical.
+
+  Pinned with a CreateMissile trampoline (now removed) to one argument:
+  spot.ground (a6) into CreateMissile is 0 in the hybrid (which FireWeapon
+  defaults to height=28, so VZ=0) and -4 in the port (kept, so
+  VZ=(-4-28)<<1=-64). A TrooperFire-entry trace showed the SIGHTCOUT aim GROUND
+  (+0x18) frame-identical on both, so the divergence is a TRANSIENT at the
+  instant of firing -- the aim ground reaches the fire as -4 on one side and 0
+  on the other for the one pump the trail segment is created, and both converge
+  to -4 by end-of-pump. TrooperFire and FireWeapon both read spot.ground from
+  the same SIGHTCOUT +0x18, so it is not a read-site bug; the value there
+  differs for one pump. Not the aim fix (different code path; Sarge's facing is
+  identical here). Independent of the flame /200 and the click-to-move fixes.
+
+  To resume: give the flamethrower via the Lua console instead of walking --
+  `lua poke32(0x004FCF94,1); call(sym("CheatLine"),"phoenix!")` on the native
+  port, `call(0x00417B80,...)` on the hybrid (docs/lua.md) -- then reproduce
+  under sidebyside and trace when SIGHTCOUT +0x18 (the aim ground) first
+  reaches the fire as -4 vs 0, per-pump.
 
 FIXED by this rule so far, each with the replay that reproduces it:
 a click-to-move on the player faced the RAW click, not the snapped move goal
