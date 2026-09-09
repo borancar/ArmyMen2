@@ -8812,7 +8812,15 @@ void __cdecl StepType3(void *obj)
             goto post;
         RowFaceSprite(row);
 
-        /* The table's order, not the arms'. See the header. */
+        /* EVERY arm destroys the vehicle after its kind's death effect. The
+         * original's jump table (0x0045D74C -> 0x0045D954) sends kinds 0-3 and
+         * the default (kind 4 / >5) to a shared LeaveRemainsRow + DestroyByType
+         * tail at 0x0045D777, and kind 5 to a DestroyByType with NO remains at
+         * 0x0045D7AE. Playing the sound and stopping left a dead vehicle of
+         * kind 0/1/2/3/5 undestroyed -- OBJ_FLAG_DESTROYED (set only inside
+         * DestroyObjCommon, 0x00429399) stayed clear, so a half-track killed in
+         * a minefield kept taking damage the original ignores. The table's
+         * order is for the SOUNDS, not the arms. See the header. */
         switch (*(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND)) {
         case 0:
             PlaySoundAt(AM2_SND_VEH_KIND0, 0, 0,
@@ -8830,17 +8838,22 @@ void __cdecl StepType3(void *obj)
                         *(const int16_t *)(o + OBJ_OFF_POS + 2));
             break;
         case 5:
+            /* Sound, then destroy with NO remains row (0x0045D7AE). */
             PlaySoundAt(AM2_SND_VEH_KIND5, 0, 0,
                         *(const int16_t *)(o + OBJ_OFF_POS),
                         *(const int16_t *)(o + OBJ_OFF_POS + 2));
-            break;
-        default:
-            /* kind 4 and anything above 5: no sound, finish and destroy */
             *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
-            LeaveRemainsRow(row);
             DestroyByType(obj);
             goto post;
+        default:
+            /* kind 4 and anything above 5: no sound. */
+            break;
         }
+
+        /* Kinds 0, 1, 2, 3 and the default share this tail (0x0045D777). */
+        *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
+        LeaveRemainsRow(row);
+        DestroyByType(obj);
     }
     goto post;
 

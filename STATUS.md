@@ -113,6 +113,26 @@ FIXED below when that replay runs identical.
   `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+A HALF-TRACK KILLED IN A MINEFIELD WAS NEVER MARKED DESTROYED on the port (trap
+pump 26439, frame 26162; repro `sessions/htmine-26439.txt`; hand-played driving
+a half-track into mines). Tables identical but for the vehicle's flags -- port
+0x820, hybrid 0x824, bit 0x4 = OBJ_FLAG_DESTROYED. Pinned it: at pump 26435
+both read 0x820 with the half-track already dead (health 0), so the hybrid SETS
+0x4 during the death sequence and the port never does. OBJ_FLAG_DESTROYED is
+set in exactly ONE place in the image -- `DestroyObjCommon` (0x00429399,
+`or ebx,4`) -- reached through DestroyByType. StepType3's dead-vehicle path
+dispatches on the vehicle kind through a jump table (0x0045D74C -> 0x0045D954)
+and EVERY arm ends in DestroyByType: kinds 0-3 and the default share a
+LeaveRemainsRow + DestroyByType tail (0x0045D777), kind 5 destroys with no
+remains (0x0045D7AE). The reconstruction had played the kind's death sound and
+`break`-ed, calling DestroyByType only in the default arm -- so a dead vehicle
+of kind 0/1/2/3/5 was never destroyed. This one CASCADES rather than staying
+cosmetic: DamageObject early-returns on `flags & DESTROYED`, so without it the
+port keeps re-damaging the dead wreck as more mines go off. Fixed by giving
+every arm the destroy tail. The replay then runs identical (no trap past 26162,
+27k+ frames). Invisible to every A/B: no scripted drive kills a vehicle, so the
+whole dead-vehicle dispatch is cold -- found by tracing the single DESTROYED
+setter back through its callers once the flag was the only thing left differing.
 A HALF-TRACK UNDER A MOVE ORDER SWUNG ITS AIMED GUN BACK TO THE HULL on the
 port where the hybrid kept it pointed (trap pump 3552, frame 3319; 153 px, box
 218,222-233,255 -- the mounted gun's barrel angle; repro
