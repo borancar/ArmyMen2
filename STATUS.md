@@ -113,6 +113,29 @@ FIXED below when that replay runs identical.
   `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+A FOLLOWER VEHICLE'S FACING DRIFTED because Step3ChooseFacing never reset its
+AI facing-search counter on the give-up exits (trap pump 6591, frame 5934;
+repro `sessions/vehmove2-6591.txt`; hand-played ordering multiple vehicles to
+move, exposed only once the formation fix above let a follower actually reach
+its slot and cluster). Every comparable input was byte-identical -- the full
+object (0x00..0x600), its row structure, the RNG seed, the view/cursor globals,
+the frame delta -- yet OBJ_OFF_FIELD_574 (`o+0x574`, a PERSISTENT search
+counter) read 3 on the port and 0 on the original, which fed Step3NextCandidate
+a different facing and cascaded to a 4,495-pixel divergence. A hybrid
+trampoline over VehicleBlockWeight showed the block weights and the CALL COUNT
+identical on both -- same search work -- so the port was not searching more, it
+was failing to RESET. Step3ChooseFacing (0x0045C8D0) has one reset block at
+0x0045CA85 (`mov [esi+0x570],ebx; mov [esi+0x574],ebx` with ebx==0) that FOUR
+exits jump to: the three early returns (MP, player-driven, record-satisfied)
+and the past-the-interval arm's "current heading is clear" exit (0x0045CA05).
+The reconstruction had written all four as a plain `return`, so 0x574
+accumulated across frames on the port where the original zeroed it. Fixed by
+resetting 0x570 and 0x574 to 0 on those four exits; the short-interval arm's
+clear exit and the search-loop exits return WITHOUT the reset, as the image
+has them. Replay then runs identical (no trap past frame 5934). Invisible to
+every A/B: both drivable missions start with a squad of one, so nothing places
+a follower to cluster. (Found the hard way with rebuild+trampoline traces; a
+gdb watchpoint on 0x574 in the hybrid would have named 0x0045CA85 in one step.)
 A FOLLOWER VEHICLE ORDERED INTO A GROUP MOVE STOOD ON ITS LEADER instead of in
 its formation slot (trap pump 11373, frame 11243; repro
 `sessions/vehmove-11373.txt`; hand-played selecting two vehicles and ordering

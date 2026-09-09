@@ -9906,31 +9906,47 @@ void __cdecl Step3ChooseFacing(void *obj, void *out)
      * was NOT blocked -- so the hull turned aside, gunFacing went 0x1f -> 0,
      * Step3Drive's block check sampled the wrong mask direction, missed the
      * tree and drove through. The original skips the whole search for a
-     * player-driven vehicle. (sessions/truckTree-34847.txt.) */
+     * player-driven vehicle. (sessions/truckTree-34847.txt.)
+     *
+     * ALL THREE early returns, AND the "current heading is clear" exit of the
+     * past-the-interval arm, do NOT just return: they RESET the search state
+     * (0x0045CA85 sets both 0x570 and 0x574 to 0 with ebx==0). 0x574 is the
+     * PERSISTENT facing-search counter, so failing to reset it here let it
+     * accumulate across frames on the port where the original zeroed it -- a
+     * follower held in formation searched, gave up satisfied, and never reset,
+     * so the counter drifted and picked different candidate facings a few
+     * frames later. Only the SEARCH-LOOP exits below, and the short-interval
+     * arm's own clear exit, return without the reset. (vehmove2-6591.txt.) */
+    #define AM2_STEP3_STOP_SEARCH() do {                                       \
+        *(int32_t *)(o + 0x570u) = 0;                                         \
+        *(int32_t *)(o + 0x574u) = 0;                                         \
+        return;                                                                \
+    } while (0)
 
     /* A networked client only steers a vehicle it owns. */
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
         && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
-        return;
+        AM2_STEP3_STOP_SEARCH();
 
     /* A vehicle a player is riding is steered by the player, not the AI
      * candidate search below -- unless FIELD_10C says otherwise. */
     if (ListFirstField548(obj) != 0
         && *(const int32_t *)(o + OBJ_OFF_FIELD_10C) == 0)
-        return;
+        AM2_STEP3_STOP_SEARCH();
 
     /* Nothing to decide when the record already wants the current facing and
      * its state says so. */
     if (*(const uint8_t *)out == *(const uint8_t *)(o + OBJ_OFF_FACING)
         && *(const int32_t *)((const uint8_t *)out + 0x08u) == 1)
-        return;
+        AM2_STEP3_STOP_SEARCH();
 
     if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
         - *(const uint32_t *)(o + 0x56Cu) >= 0x4B0u) {
-        /* Past the interval: test the heading as it stands first. */
+        /* Past the interval: test the heading as it stands first. The clear
+         * exit resets the search state (0x0045CA05 -> 0x0045CA85). */
         if (!Step3TurnBlocked(o, out, &local))
-            return;
+            AM2_STEP3_STOP_SEARCH();
         *(uint32_t *)(o + 0x56Cu) =
             *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
         if (*(const int32_t *)(o + 0x570u) == 0)
@@ -9957,6 +9973,7 @@ void __cdecl Step3ChooseFacing(void *obj, void *out)
         if (++tries >= 7)
             return;
     }
+    #undef AM2_STEP3_STOP_SEARCH
 }
 
 /* 0x0045CAB0, one caller. Decide the vehicle's turn STATE from the gap
