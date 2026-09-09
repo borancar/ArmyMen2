@@ -113,6 +113,24 @@ FIXED below when that replay runs identical.
   `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+A HALF-TRACK UNDER A MOVE ORDER SWUNG ITS AIMED GUN BACK TO THE HULL on the
+port where the hybrid kept it pointed (trap pump 3552, frame 3319; 153 px, box
+218,222-233,255 -- the mounted gun's barrel angle; repro
+`sessions/halftrack-3552.txt`; hand-played driving a half-track). Object tables
+identical; the divergence was the turret facing (o+0x530: port 0xf9, hybrid
+0x08) and behind it the turret target r[1] (o+0x579: port 0xb1 == the hull
+target r[0], hybrid 0x08 independent). `Step3RouteAndBoard` (0x0045D4B0)
+branches on o+0x10C into two mutually-exclusive paths: with a route in progress
+(o+0x10C != 0) it runs AiRouteToward and ONLY an arrival check, jumping to the
+tail if not arrived (0x45d4d9); the heading/turret block -- `*r=a; r+8=4;
+if (o+0x548==0) r[1]=r[0]` and the tolerance ladder -- runs ONLY when
+o+0x10C == 0 (0x45d51a). The reconstruction had folded them into one
+`if arrived / else`, so the `r[1]=r[0]` (turret tracks hull) ran DURING a route
+too, dragging the manually-aimed gun back onto the hull. Split the branch to
+match; the replay then runs identical (no trap past 3319, 20k+ frames). Only a
+multi-part vehicle (a turret) under a move order shows it, and the turret
+facing is not in any object dump -- found by reading o+0x530/r[1] over the
+sockets after the tables came back clean.
 BOARDING A JEEP AUTO-FIRED ITS MOUNTED GUN on the port where the hybrid never
 fired (trap pump 2276, frame 2100; 1 px at first, then a stream of missiles;
 repro `sessions/jeepfire-2276.txt`; hand-played boarding a jeep with the fire

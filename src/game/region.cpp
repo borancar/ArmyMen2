@@ -9951,16 +9951,27 @@ void __cdecl Step3RouteAndBoard(void *obj, void *rec)
     uint8_t *r = (uint8_t *)rec;
     int32_t  i;
 
+    /* o+0x10C splits this into TWO branches (0x0045D4CF), not one. When a route
+     * is in progress (o+0x10C != 0) the original runs AiRouteToward and ONLY an
+     * arrival check -- if it has not arrived it jumps to the tail, leaving the
+     * heading, the turret and the tolerance flags alone. The heading/turret
+     * block (including `if (o+0x548==0) r[1]=r[0]`, which drags the turret onto
+     * the hull) runs ONLY when o+0x10C == 0. Folding them into one `if arrived
+     * / else` ran that block during a route too, so a half-track under a move
+     * order swung its manually-aimed gun back to the hull -- the turret facing
+     * (o+0x530) then diverged. (0x45d4d9 vs 0x45d51a.) */
     if (*(const uint16_t *)(o + 0xC0u) != 0) {
         int32_t local;
 
-        if (*(const int32_t *)(o + 0x10Cu) != 0)
+        if (*(const int32_t *)(o + 0x10Cu) != 0) {
             AiRouteToward(o, o + 0x578u, &local, 1);
 
-        if (ApproxDist((const AM2_Point *)(o + 0x12u),
-                       (const AM2_Point *)(o + 0xC0u)) < 0x30) {
-            *(int32_t *)(r + 0x08u) = 1;
-            *(int32_t *)(o + 0x10Cu) = 0;
+            if (ApproxDist((const AM2_Point *)(o + 0x12u),
+                           (const AM2_Point *)(o + 0xC0u)) < 0x30) {
+                *(int32_t *)(r + 0x08u) = 1;
+                *(int32_t *)(o + 0x10Cu) = 0;
+            }
+            /* else: routing but not arrived -- do NOT touch heading/turret. */
         } else {
             uint8_t a = AngleBetween((const AM2_Point *)(o + 0x12u),
                                      (const AM2_Point *)(o + 0xC0u));
