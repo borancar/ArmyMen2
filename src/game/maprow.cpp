@@ -1580,10 +1580,23 @@ void __cdecl SeqCtxInit(void *ctxv, int32_t capacity, int32_t margin,
     }
 }
 
-/* 0x00460E30. Free every record's row. Opens with an early-out on a NULL
- * record array, which the hardcoded teardowns have no need of because their
- * arrays are static and always there -- a real difference between the two
- * shapes, not an oversight in either. */
+/* 0x00460E30. Free every record's row AND the records array itself, then wipe
+ * the context header. Opens with an early-out on a NULL record array, which the
+ * hardcoded teardowns have no need of because their arrays are static and
+ * always there -- a real difference between the two shapes, not an oversight in
+ * either.
+ *
+ * THREE THINGS BEYOND THE ROW FREE, and the first reading dropped all three --
+ * a leak invisible to the frame but not to the heap. Each record's NEXT and
+ * PREV are reset to -1 UNCONDITIONALLY (the row test's je lands past the free
+ * but before these), so a record whose row was already null is still unlinked.
+ * After the loop the records array is freed and five header fields cleared, in
+ * the original's order. This is a mission-teardown path (SeqCtxFree runs on a
+ * section change), and dropping the array free desynchronised the fixed heap
+ * from that point on -- every later allocation landed at a shifted address,
+ * which a pointer tie-break downstream then resolved the other way. Found by
+ * diffing AM2_TRACE_HEAP: the original's `am2_free([esi+0x10])` at 0x460e9f had
+ * no counterpart here. */
 void __cdecl SeqCtxFree(void *ctxv)
 {
     uint8_t *ctx = (uint8_t *)ctxv;
@@ -1601,7 +1614,16 @@ void __cdecl SeqCtxFree(void *ctxv)
             am2_free(row);
             *(void **)(rec + SEQ_OFF_ROW) = 0;
         }
+        *(int16_t *)(rec + SEQ_OFF_NEXT) = -1;
+        *(int16_t *)(rec + SEQ_OFF_PREV) = -1;
     }
+
+    am2_free(*(void **)(ctx + SEQ_CTX_OFF_RECORDS));
+    *(void **)(ctx + SEQ_CTX_OFF_RECORDS)  = 0;
+    *(int32_t *)(ctx + SEQ_CTX_OFF_TAIL)     = 0;
+    *(int32_t *)(ctx + SEQ_CTX_OFF_COUNT)    = 0;
+    *(int32_t *)(ctx + SEQ_CTX_OFF_MARGIN)   = 0;
+    *(int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY) = 0;
 }
 
 /* 0x00460EC0. THE CONTEXT IS THE FIRST ARGUMENT and the record the second --

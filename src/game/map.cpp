@@ -1305,6 +1305,13 @@ uint32_t __cdecl AmmChecksum(const char *map, const char *)
  * declaration enough. */
 extern "C" void __cdecl FreeMapSurfaces(void);
 
+/* FreeSpriteRegistry is reconstructed in win32/sprite.cpp; declared here (not
+ * included) for the same flat-side reason, and its `void(void)` names nothing
+ * platform. FreeAaiTables lives in defparse.cpp (flat, C++ linkage). Both are
+ * FreeMapLayers's own tail in the original -- see below. */
+void __cdecl FreeSpriteRegistry(void);
+void __cdecl FreeAaiTables(void);
+
 /* FreeMapLayers -- original 0x0042D3D0, two callers: the level teardown and
  * the map loader, which clears before it fills. Free every per-map allocation.
  *
@@ -1318,17 +1325,22 @@ extern "C" void __cdecl FreeMapSurfaces(void);
  * reloads both globals inside the loop, which matters only if `free` could
  * change them; it cannot, and they are reloaded anyway. Reproduced.
  *
- * TWELVE POINTERS THEN FOLLOW, each guarded against null, freed and cleared --
- * and the clear is what makes calling this twice safe, which is exactly what
- * the loader relies on. The list was extracted from the disassembly by script;
- * twelve near-identical blocks is the shape a hand copy skips one of.
- */
+ * TEN POINTERS THEN FOLLOW, then the four TILE_REVEAL_GRIDS as a loop, then
+ * TILE_COVER -- each guarded against null, freed and cleared, and the clear is
+ * what makes calling this twice safe, which is exactly what the loader relies
+ * on. The list was extracted from the disassembly by script; the reveal-grid
+ * loop (0x0042D51C, esi from ADDR_TILE_REVEAL_GRIDS up to ADDR_TILE_COVER, four
+ * `uint8_t *` freed) was dropped in the first reading -- exactly the "a hand
+ * copy skips one of near-identical blocks" hazard, found by an AM2_TRACE_HEAP
+ * diff at the level teardown: the original freed four pointers here the port
+ * did not, desynchronising the fixed heap from that point on. Order is the
+ * original's, so TILE_COVER stays last. */
 void __cdecl FreeMapLayers(void)
 {
     static const uint32_t kLayers[] = {
         ADDR_REGION_NEXT, ADDR_REGION_COST, ADDR_MAP_TILES, ADDR_TILE_ATTRS,
         ADDR_CELL_WEIGHTS, ADDR_MAP_PADBIT_LAYER, ADDR_MAP_PAD_LAYER,
-        ADDR_TILE_KIND, ADDR_REGION_OF_CELL, ADDR_TILE_FLAGS, ADDR_TILE_COVER,
+        ADDR_TILE_KIND, ADDR_REGION_OF_CELL, ADDR_TILE_FLAGS,
     };
     uint32_t i;
 
@@ -1357,6 +1369,40 @@ void __cdecl FreeMapLayers(void)
             *p = 0;
         }
     }
+
+    for (i = 0; i < AM2_REVEAL_ARMIES; i++) {
+        void **g = (void **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS + i;
+
+        if (*g) {
+            am2_free(*g);
+            *g = 0;
+        }
+    }
+
+    {
+        void **p = (void **)(uintptr_t)ADDR_TILE_COVER;
+
+        if (*p) {
+            am2_free(*p);
+            *p = 0;
+        }
+    }
+
+    /* THE TAIL: the original ends by tearing down the object registry, both
+     * map descriptors, the AAI tables and the sprite registry, in this order
+     * (0x0042D550..0x0042D571). The first reading dropped all five, which left
+     * those frees to happen later -- ItemsReset at the next LoadItems, the rest
+     * at their own reset paths -- so the mission-section teardown freed in a
+     * different ORDER than the original and the fixed heap drifted from that
+     * point on, which an AM2_TRACE_HEAP diff showed as the port running
+     * FreeAnimTable where the original was still inside ItemsReset. Every one
+     * of the five is idempotent (each guards its pointer and clears it), so
+     * running them here as well as at load is safe. */
+    ItemsReset();
+    MapDescFree((void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+    MapDescFree((void *)(uintptr_t)ADDR_MAP_DESC);
+    FreeAaiTables();
+    FreeSpriteRegistry();
 }
 
 

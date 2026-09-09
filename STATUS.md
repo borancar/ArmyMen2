@@ -32,6 +32,25 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
+- **OPEN (2026-09-09): a tan enemy trooper drops into the kneel/fire pose in
+  the original but not the port, so it never fires (the "missing missile").**
+  Found hand-playing Boot Camp's combat section under `tools/sidebyside.py`
+  (traps at pump 1304 on trooper 0x3ef and, with the fixed heap, pump 1460 on
+  0x3ed; box at the bottom edge where the shot appears). ISOLATED, after the
+  heap-alignment fixes above removed the confound: at the last identical frame
+  every object is byte-identical across the builds INCLUDING every pointer (heap
+  now aligned), the RNG seed and clock match, and the ONLY differing byte on the
+  diverging trooper is `OBJ_OFF_SCRIPT_ID` (0xb0) -- 0 on the port,
+  the goal point on the original -- dropped at the unit's aimode-6 spawn. Poking
+  0xb0 to the correct value at the pre-trap frame MOVES the trap one frame later,
+  so it is implicated, but `AiEngageStep` (the aim-6 arm) reads 0xb4/0xb8, not
+  0xb0 -- so the effect is INDIRECT (0xb0's sibling meaning is a SHOT's
+  penetration power, item.cpp:3281), and the exact write the port drops at spawn
+  is not yet found. The 0xb4->0xb0 copy lives only in AiPatrolStep/AiGuardStep
+  (aim 0/1/4/5), which an aim-6 unit does not run, so the spawn path that sets
+  0xb0 in the original is still to be located. Next: a hybrid trampoline or gdb
+  watchpoint on the object's 0xb0 (its address is now stable and predictable,
+  the heap being aligned) to name the writer.
 - **OPEN (2026-09-08): pause menu, SECOND open with the cursor already resting
   on a button -- one-pump hover-focus lag, ~1336 px over the button column
   (box 267,138-376,268).** Found hand-playing under `tools/sidebyside.py`
@@ -113,6 +132,29 @@ FIXED below when that replay runs identical.
   `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+THE MISSION-SECTION TEARDOWN LEFT THE FIXED HEAP MISALIGNED, because three
+reconstructed teardown functions dropped frees, so every allocation after the
+teardown landed at a shifted address. Found hand-playing Boot Camp's combat
+section under `tools/sidebyside.py` and diffing `AM2_TRACE_HEAP` logs: the two
+games' heaps were byte-identical up to the section change (pump 398/580 in the
+recordings), then the port ran fewer/reordered frees. Three drops, each a
+disassembly-confirmed omission: `SeqCtxFree` (0x00460E30) freed each record's
+row but not the records ARRAY itself, and skipped the five header clears and
+the per-record NEXT/PREV = -1 resets; `FreeMapLayers` (0x0042D3D0) dropped the
+`TILE_REVEAL_GRIDS[4]` free loop between TILE_FLAGS and TILE_COVER; and the same
+function dropped its whole TAIL (0x0042D550..0x0042D571) -- `ItemsReset`, both
+`MapDescFree`s, `FreeAaiTables`, `FreeSpriteRegistry` -- which deferred those
+frees to the next load and so ran them in a different ORDER, the point the trace
+showed the port in FreeAnimTable where the original was still inside ItemsReset.
+All five tail functions are idempotent (each guards its pointer and clears it),
+so running them at teardown as well as at load is safe. With the three fixed the
+heap is byte-identical across the builds through the whole combat sequence
+(every object at pump 1459 sits at the SAME address, where before the delta was
+~0x1470), and `make check` plus five committed replays (board, halftrack,
+jeepfire, mineplace, rallyfollow) run frame-exact. NOTE: this did NOT clear the
+combat trap it was found chasing -- see the OPEN combat entry; with the heap
+aligned that divergence is isolated to a trooper's OBJ_OFF_SCRIPT_ID (0xb0)
+dropped at spawn, which is a separate AI bug rather than a pointer tie-break.
 A FOLLOWER VEHICLE'S FACING DRIFTED because Step3ChooseFacing never reset its
 AI facing-search counter on the give-up exits (trap pump 6591, frame 5934;
 repro `sessions/vehmove2-6591.txt`; hand-played ordering multiple vehicles to
