@@ -40,8 +40,28 @@ FIXED below when that replay runs identical.
   byte-identical; at 2464 only 0x3ee differs (type 2, army 0, aimode 1, so its
   arm is AiGuardStep). aimode 1 dispatches the same in both tables, so this is a
   separate divergence inside the guard step (or its inputs), not another
-  case-6 split. Next: the same method -- catch the first field that splits, then
-  read the arm that writes OBJ_OFF_FIELD_C0 for an aimode-1 unit.
+  case-6 split. NARROWED (gdb, aligned heap): 0x3ee's AiGuardStep sets
+  OBJ_OFF_FIELD_C0 at region.cpp:4900 because `AiCanSee(0x3ee, seen)` returns
+  FALSE on the port and TRUE on the hybrid, for `seen` = the sighted tan trooper
+  0x200003ef. Every scalar input is identical -- both heights (mine=28, his=18),
+  the range (LEAD 205 vs WANT 270), the leader pointer, and SIGHT_GENERATION
+  (580) -- but the DIRECTIONAL SIGHT CACHE differs: `ADDR_SIGHT_BLOCK_BY_DIR`'s
+  MID/HIGH bands read 208 on the port and 224 on the hybrid (one tile, 16 units)
+  for the records stamped at gen 580, so with dist=209 the port says out of
+  sight (209>208) and the hybrid says in sight (209<=224). LOW matches. So the
+  root is a sight-trace band written one tile short on the port, in a PRIOR
+  pump (the cache is stamped 580, before 2464). The band writer that makes
+  LOW differ from MID/HIGH is `AddSightBlocker` (air.cpp:1535): it writes each
+  covered direction's LOW/MID/HIGH to the blocker's silhouette distance `d`,
+  split three ways by the blocker's height vs the viewer's (hb>hv: all=d;
+  hb+STEP>=hv: MID/HIGH=d, LOW=range; else: HIGH=d, LOW/MID=range). So the
+  208-vs-224 gap is one blocker's `d` (or which blockers covered that heading)
+  differing by a tile. Next: a gdb watchpoint on the diverging record's MID
+  (e.g. rec 30 at ADDR_SIGHT_BLOCK_BY_DIR+30*16+2) armed before gen 580 is
+  written, to name the blocker/viewer whose scan wrote 208 vs 224 -- the same
+  method that named the missile. It is a PRE-EXISTING sight bug only now
+  reachable (combat was trapped at 1460 before the dispatch fix), not a
+  regression from it.
 - **OPEN (2026-09-08): pause menu, SECOND open with the cursor already resting
   on a button -- one-pump hover-focus lag, ~1336 px over the button column
   (box 267,138-376,268).** Found hand-playing under `tools/sidebyside.py`
