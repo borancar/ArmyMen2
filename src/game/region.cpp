@@ -6764,7 +6764,19 @@ static int32_t AiStepReact(void *obj, void *out, uint8_t *ctx)
     return 0;
 }
 
-static void AiStepDispatch(void *obj, void *out, uint8_t *ctx)
+/* CASE 6 IS THE ONE PLACE SARGE AND A TROOPER DIVERGE. The original has two
+ * separate jump tables -- SargeAiStep's at 0x0040716C and TrooperAiStep's at
+ * 0x0040643C -- and diffing them byte for byte they agree on every arm but
+ * AI_MODE 6 (attack): Sarge's calls AiEngageStep (0x00406B30), a trooper's
+ * goes through the thunk 0x00405D10 to AiPatrolStep (0x004057D0). Merging them
+ * into one dispatch and always taking AiEngageStep was Sarge's behaviour
+ * applied to every trooper -- and since AiPatrolStep is what copies
+ * OBJ_OFF_SCRIPT_STATE into OBJ_OFF_SCRIPT_ID (the AI saved-point) at its head
+ * while AiEngageStep never touches 0xb0, an aimode-6 enemy trooper lost that
+ * save at spawn and then made a different pose/facing decision. Found by a gdb
+ * watchpoint on the object's 0xb0 in the hybrid: the write landed in
+ * AiPatrolStep, reached from TrooperAiStep's AI_MODE-6 arm. */
+static void AiStepDispatch(void *obj, void *out, uint8_t *ctx, int32_t sarge)
 {
     uint8_t *o = (uint8_t *)obj;
 
@@ -6772,7 +6784,11 @@ static void AiStepDispatch(void *obj, void *out, uint8_t *ctx)
     case 0:  AiPatrolStep(obj, out, ctx);  break;
     case 2:  AiWalkStep(obj, out, ctx);    break;
     case 3:  AiApproachLeader(obj, out, ctx);  break;
-    case 6:  AiEngageStep(obj, out, ctx);  break;
+    case 6:  if (sarge)
+                 AiEngageStep(obj, out, ctx);
+             else
+                 AiPatrolStep(obj, out, ctx);
+             break;
     case 7:  Call405220((int32_t)(intptr_t)obj, (int32_t)(intptr_t)out,
                         (int32_t)(intptr_t)ctx);
              break;
@@ -6782,11 +6798,12 @@ static void AiStepDispatch(void *obj, void *out, uint8_t *ctx)
 }
 
 /* Sarge's middle: react, then -- unless the shortcut was taken -- dispatch. No
- * board arm; that one is the trooper's, in TrooperAiStep below. */
+ * board arm; that one is the trooper's, in TrooperAiStep below. Sarge's table
+ * is the one whose AI_MODE 6 is AiEngageStep, so this passes sarge=1. */
 static void AiStepReactAndDispatch(void *obj, void *out, uint8_t *ctx)
 {
     if (!AiStepReact(obj, out, ctx))
-        AiStepDispatch(obj, out, ctx);
+        AiStepDispatch(obj, out, ctx, 1);
 }
 
 /* Where the unit is standing, recorded on the object every frame. Both
@@ -6933,7 +6950,7 @@ void __cdecl TrooperAiStep(void *obj, void *out)
             EnterVehicle(obj, veh);
             return;
         }
-        AiStepDispatch(obj, out, ctx);
+        AiStepDispatch(obj, out, ctx, 0);
     }
     AiStepRecordRegion(o);
 
