@@ -7018,11 +7018,16 @@ static uint8_t *SightResolve(uint32_t *uid, uint32_t *dead_clears, void **slot)
  * OBJ_OFF_POS. Two notions of where the object is, in one function, and the
  * twin at 0x00408060 uses the raw position for all three.
  *
- * THE TWIN IS LESS ALIKE THAN IT LOOKS. It fills 0x40 bytes to this one's
- * 0x44, resolves a FORMATION point for the leader where this copies the
- * leader's position, and writes fixed ranges where this reads the weapon --
- * 48 and 70, which are this function's own 0.75 and 1.1 over a default range
- * of 64. Three differences, not one.
+ * THE TWIN IS LESS ALIKE THAN IT LOOKS, but LESS DIFFERENT than a first
+ * reading made it. It fills 0x40 bytes to this one's 0x44 and writes fixed
+ * ranges where this reads the weapon -- 48 and 70, which are this function's
+ * own 0.75 and 1.1 over a default range of 64. What it does NOT differ on is
+ * the destination: BOTH resolve a formation point for an allied 2/3/8 leader
+ * and copy the raw position otherwise (this at 0x00407DE6, the twin at
+ * 0x00408?..), and the only difference there is ObjsAreAllied's third
+ * argument -- 0 here, 1 in the twin. An earlier note called the formation a
+ * difference and had this arm copy the position unconditionally; a follower
+ * ordered into formation then stood on the leader instead of in its slot.
  *
  * A ZERO-HEALTH LEADER CLEARS THE TARGET UID rather than the follow uid its
  * two neighbouring arms clear. Both builders do it, so it is the original's
@@ -7048,8 +7053,19 @@ void __cdecl AiBuildContext(void *obj, void *out)
                           (uint32_t *)(o + OBJ_OFF_TARGET_UID),
                           (void **)(s + SIGHT_OFF_LEADER));
     if (leader) {
-        *(uint32_t *)(s + SIGHT_OFF_DEST) =
-            *(const uint32_t *)(leader + OBJ_OFF_POS);
+        /* A formation point when the leader is an allied 2/3/8, its raw
+         * position otherwise -- the same choice the twin makes (0x00407DE6),
+         * differing only in ObjsAreAllied's third argument, 0 here against the
+         * twin's 1. An earlier reading had this arm copy the leader's position
+         * unconditionally, which left a follower ordered into formation
+         * standing where the leader is rather than in its slot. */
+        if (ObjsAreAllied(obj, leader, 0)
+            && ObjIsTypeIn238((const AM2_Object *)leader))
+            ResolveFormationPoint(obj, leader,
+                                  (AM2_Point *)(s + SIGHT_OFF_DEST));
+        else
+            *(uint32_t *)(s + SIGHT_OFF_DEST) =
+                *(const uint32_t *)(leader + OBJ_OFF_POS);
         DistAndAngle((const AM2_Point *)&anchor,
                      (const AM2_Point *)(s + SIGHT_OFF_DEST),
                      (int32_t *)(s + SIGHT_OFF_LEAD_RANGE),

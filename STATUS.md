@@ -113,6 +113,31 @@ FIXED below when that replay runs identical.
   `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+A FOLLOWER VEHICLE ORDERED INTO A GROUP MOVE STOOD ON ITS LEADER instead of in
+its formation slot (trap pump 11373, frame 11243; repro
+`sessions/vehmove-11373.txt`; hand-played selecting two vehicles and ordering
+them to a point). Everything was byte-identical through pump 11350; on the
+order pump the follower 0x3f4 was attached to leader 0x3f6 (FOLLOW_UID and
+aimode 3 set correctly on both), but the original wrote its destination
+OBJ_OFF_FIELD_C0 to a FORMATION point (1227,2707), 128 west of the leader,
+while the port left C0 at the leader's raw position -- so the port read as
+arrived (out state 1) where the original kept routing to the slot (out state
+4). AiBuildContext (0x00407D70), the vehicle AI context builder, had been
+reconstructed to copy the leader's raw position into SIGHT_OFF_DEST
+UNCONDITIONALLY, on a note that only its twin TrooperBuildContext resolves a
+formation point. The disassembly at 0x00407DE6 shows otherwise: it resolves a
+formation point too -- `ResolveFormationPoint(obj, leader, &DEST)` when the
+leader is an allied type 2/3/8, the raw position only otherwise -- and the one
+real difference from the twin is ObjsAreAllied's third argument, 0 here against
+the twin's 1. The follower's mode-3 step AiStepFollow copies SIGHT_OFF_DEST
+into C0, so the dropped branch put the slot at the leader's feet. Fixed by
+giving AiBuildContext the same conditional the twin has. Found by a live
+side-by-side trace of the original's ResolveFormationPoint: on the order pump
+it fired once -- foll=0x3f4 lead=0x3f6 out=1227,2707 -- from caller 0x407e11 =
+AiBuildContext+0xA1, a call the port did not make. Replay then runs identical
+(no trap past 11243). Invisible to every A/B: both drivable missions start with
+a squad of ONE, so no scripted drive ever places a follower (tools/blindspots
+and formationcheck already say the whole follow layer is cold here).
 A NON-SARGE UNIT ORDERED ONTO A VEHICLE BOARDED ONE PUMP LATE on the port (trap
 pump 3355, frame 3197; repro `sessions/board-3355.txt`; hand-played sending a
 second soldier to a jeep the first had already entered). Every measurable input
