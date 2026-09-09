@@ -113,6 +113,35 @@ FIXED below when that replay runs identical.
   `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+A NON-SARGE UNIT ORDERED ONTO A VEHICLE BOARDED ONE PUMP LATE on the port (trap
+pump 3355, frame 3197; repro `sessions/board-3355.txt`; hand-played sending a
+second soldier to a jeep the first had already entered). Every measurable input
+was byte-identical the pump before the board -- the soldier's 1536-byte record,
+its row structure, the RNG seed, the game clock and the frame delta all agreed
+on both sides at pump 3354 -- yet the original boarded at pump 3355 and the port
+did not until 3356. That ruled out drifting state and pointed at a missing code
+path. A live side-by-side trace of the ORIGINAL's `EnterVehicle` caller (a
+trampoline detour in the hybrid, logging `__builtin_return_address(0)`) settled
+it: the first soldier boarded from `UpdateTrooperAction` (0x44b36f) on BOTH
+builds, but the second boarded from **`TrooperAiStep`+0x77 (0x406327)** in the
+original -- a call the port did not have. `TrooperAiStep` (0x004062B0) has a
+BOARD arm between the hit-react (`AiHitReact`) and the AI-mode dispatch: if the
+sight context's claimed vehicle (`SIGHTC_OFF_VEHICLE`, 0x2C) is within
+`AM2_BOARD_NEAR` (0x40 = 64) at `SIGHTC_OFF_VEHICLE_DIST` (0x30), it calls
+`EnterVehicle(obj, veh)` and RETURNS, skipping the dispatch and the 0x540 tail.
+`SargeAiStep` (0x00407020) has no such arm -- its react is followed straight by
+the dispatch. The reconstruction had factored react+dispatch into one shared
+helper (`AiStepReactAndDispatch`) on the belief the middle was identical "to the
+instruction"; it is not, and the fold dropped the trooper's board -- so a
+non-Sarge unit boarded only later, through `UpdateTrooperAction`'s tighter
+blocked-by-rect path (stepPoint must enter the vehicle's hit rect), one pump
+behind the original's distance-64 board. Fixed by splitting the helper into
+`AiStepReact` (returns whether the kind-7 shortcut skips the dispatch) and
+`AiStepDispatch`; `SargeAiStep` keeps the react-then-dispatch wrapper,
+`TrooperAiStep` inserts the board between them. Replay then runs identical (no
+trap past 3197, 104k+ frames). Invisible to every A/B: no scripted drive boards
+a vehicle, and after boarding the rider is off-map, so the one divergent frame
+self-heals on screen.
 A HALF-TRACK KILLED IN A MINEFIELD WAS NEVER MARKED DESTROYED on the port (trap
 pump 26439, frame 26162; repro `sessions/htmine-26439.txt`; hand-played driving
 a half-track into mines). Tables identical but for the vehicle's flags -- port

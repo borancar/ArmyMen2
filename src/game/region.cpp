@@ -6729,23 +6729,27 @@ typedef void (__cdecl *AM2_AiArmFn)(void *obj, void *out, void *ctx);
 typedef void (__cdecl *AM2_AiFillFn)(void *obj, void *ctx, int32_t sarge);
 /* Arm 3 is AiApproachLeader, reconstructed above and called by name. */
 
-/* The middle both dispatchers share, to the instruction. Kind 7 reacts to
- * being hit and can finish the step outright -- AM2_POSE_KIND7 in the output
- * state means there is nothing further to decide this frame -- while kind 8
- * reacts and carries on. Every other kind skips the reaction entirely.
+/* THE REACT AND THE DISPATCH ARE SPLIT because the trooper has a step BETWEEN
+ * them that Sarge does not, and folding them into one helper dropped it. Kind 7
+ * reacts to being hit and can finish the step outright -- AM2_POSE_KIND7 in the
+ * output state means there is nothing further to decide this frame -- while
+ * kind 8 reacts and carries on; every other kind skips the reaction. The
+ * shortcut (kind 7, POSE_KIND7) skips the DISPATCH and the trooper's BOARD arm
+ * below, but not the region write or the 0x540 tail: in the original it is a
+ * `jmp` to the region write, which is where the dispatch arms fall to anyway.
  *
- * THE SHORTCUT SKIPS THE DISPATCH AND NOTHING ELSE, in both callers. It is a
- * `jmp` to the region write, which is where the dispatch arms fall to anyway
- * -- so in Sarge that is the last thing either path does, and in the trooper
- * the 0x540 tail below runs either way. Written as a void helper for that
- * reason: a flag returned to the callers would invite exactly the wrong
- * reading, which is the mistake this comment exists to prevent. The first
- * version of this file had the trooper RETURN on the shortcut and skip its
- * tail; the original falls through.
- *
- * The original has this inline in both, which is what a `jmp` into a shared
- * tail compiles to; one helper says it once instead of twice. */
-static void AiStepReactAndDispatch(void *obj, void *out, uint8_t *ctx)
+ * AiStepReact returns 1 when the shortcut was taken, so the caller skips both
+ * the dispatch and -- for the trooper -- the board. An earlier version made
+ * this ONE void helper doing react+dispatch, on the belief the middle was
+ * shared "to the instruction"; it is not. TrooperAiStep (0x004062B0) boards a
+ * claimed vehicle between the react (AiHitReact) and the dispatch, and
+ * SargeAiStep (0x00407020) has no such arm -- the react is followed straight
+ * by the AI_MODE switch. Bundling the two hid the board, so a non-Sarge unit
+ * only boarded later through UpdateTrooperAction's tighter blocked-by-rect
+ * path, one pump behind the original. Found by a live side-by-side trace of
+ * EnterVehicle's caller: the original's second boarder returned to
+ * TrooperAiStep+0x77, a call the port did not have. */
+static int32_t AiStepReact(void *obj, void *out, uint8_t *ctx)
 {
     uint8_t *o = (uint8_t *)obj;
 
@@ -6753,10 +6757,16 @@ static void AiStepReactAndDispatch(void *obj, void *out, uint8_t *ctx)
         AiHitReact(obj, out, ctx);
         if (*(const int32_t *)((uint8_t *)out + SIGHTCOUT_OFF_STATE)
             == AM2_POSE_KIND7)
-            return;
+            return 1;
     } else if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 8) {
         AiHitReact(obj, out, ctx);
     }
+    return 0;
+}
+
+static void AiStepDispatch(void *obj, void *out, uint8_t *ctx)
+{
+    uint8_t *o = (uint8_t *)obj;
 
     switch (*(const int32_t *)(o + OBJ_OFF_AI_MODE)) {
     case 0:  AiPatrolStep(obj, out, ctx);  break;
@@ -6769,6 +6779,14 @@ static void AiStepReactAndDispatch(void *obj, void *out, uint8_t *ctx)
     /* 1, 4, 5 and everything above 7 -- `evade` is 5 and takes this arm. */
     default: AiGuardStep(obj, out, ctx); break;
     }
+}
+
+/* Sarge's middle: react, then -- unless the shortcut was taken -- dispatch. No
+ * board arm; that one is the trooper's, in TrooperAiStep below. */
+static void AiStepReactAndDispatch(void *obj, void *out, uint8_t *ctx)
+{
+    if (!AiStepReact(obj, out, ctx))
+        AiStepDispatch(obj, out, ctx);
 }
 
 /* Where the unit is standing, recorded on the object every frame. Both
@@ -6899,7 +6917,24 @@ void __cdecl TrooperAiStep(void *obj, void *out)
 
     TrooperBuildContext(obj, ctx, 0);
 
-    AiStepReactAndDispatch(obj, out, ctx);
+    if (!AiStepReact(obj, out, ctx)) {
+        /* BOARD, before the AI dispatch: a claimed vehicle within
+         * AM2_BOARD_NEAR is boarded here (0x00406311..0x0040632f), and
+         * boarding RETURNS -- skipping the dispatch, the region write and the
+         * 0x540 tail. This is the arm SargeAiStep does not have; folding
+         * react+dispatch into one helper had dropped it, so a non-Sarge unit
+         * boarded only later through UpdateTrooperAction's blocked-by-rect
+         * path, one pump behind the original. TrooperBuildContext fills
+         * SIGHTC_OFF_VEHICLE and SIGHTC_OFF_VEHICLE_DIST. */
+        uint8_t *veh = *(uint8_t **)(ctx + SIGHTC_OFF_VEHICLE);
+
+        if (veh
+            && *(const int32_t *)(ctx + SIGHTC_OFF_VEHICLE_DIST) < AM2_BOARD_NEAR) {
+            EnterVehicle(obj, veh);
+            return;
+        }
+        AiStepDispatch(obj, out, ctx);
+    }
     AiStepRecordRegion(o);
 
     c0 = *(const int32_t *)(ctx + SIGHTC_OFF_FIELD_00);
