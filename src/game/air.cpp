@@ -1607,13 +1607,18 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
         a0 = AngleOfDelta(dx0, dy0);
         d1 = ApproxDistXY(dx1, dy1);
         a1 = AngleOfDelta(dx1, dy1);
-        dist = d0 > d1 ? d0 : d1;
+        /* The original pads the silhouette distance by one tile once (the
+         * `add esi,0x10` at 0x004038AD), and every later use -- the range
+         * check below and the band stores in the loop -- reads the padded
+         * value.  The pad was previously applied only in the range check,
+         * leaving the cache bands one tile short. */
+        dist = (d0 > d1 ? d0 : d1) + AM2_SIGHT_DIST_PAD;
     }
 
     rank = (const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
          + (uint32_t)*(const int32_t *)(v + OBJ_OFF_RANK) * RANK_REC_BYTES;
 
-    if ((int32_t)(int16_t)(dist + AM2_SIGHT_DIST_PAD)
+    if ((int32_t)(int16_t)dist
         > *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE))
         return;
 

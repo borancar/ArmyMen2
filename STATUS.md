@@ -32,49 +32,6 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
-- **OPEN (2026-09-10): a GREEN (army 0) trooper's guard step diverges -- pos
-  off by one, `OBJ_OFF_FIELD_C0` (0xC0, the destination point) set on the port
-  and 0 on the original, pose 2 vs 1.** Uncovered by the AI-dispatch fix below,
-  which took the combat replay from trap 1460 to trap 2464 (frame 2158;
-  `/tmp/sbs/input.txt`, the recorded combat run). At pump 2463 every object is
-  byte-identical; at 2464 only 0x3ee differs (type 2, army 0, aimode 1, so its
-  arm is AiGuardStep). aimode 1 dispatches the same in both tables, so this is a
-  separate divergence inside the guard step (or its inputs), not another
-  case-6 split. NARROWED (gdb, aligned heap): 0x3ee's AiGuardStep sets
-  OBJ_OFF_FIELD_C0 at region.cpp:4900 because `AiCanSee(0x3ee, seen)` returns
-  FALSE on the port and TRUE on the hybrid, for `seen` = the sighted tan trooper
-  0x200003ef. Every scalar input is identical -- both heights (mine=28, his=18),
-  the range (LEAD 205 vs WANT 270), the leader pointer, and SIGHT_GENERATION
-  (580) -- but the DIRECTIONAL SIGHT CACHE differs: `ADDR_SIGHT_BLOCK_BY_DIR`'s
-  MID/HIGH bands read 208 on the port and 224 on the hybrid (one tile, 16 units)
-  for the records stamped at gen 580, so with dist=209 the port says out of
-  sight (209>208) and the hybrid says in sight (209<=224). LOW matches. So the
-  root is a sight-trace band written one tile short on the port, in a PRIOR
-  pump (the cache is stamped 580, before 2464). The band writer that makes
-  LOW differ from MID/HIGH is `AddSightBlocker` (air.cpp:1535): it writes each
-  covered direction's LOW/MID/HIGH to the blocker's silhouette distance `d`,
-  split three ways by the blocker's height vs the viewer's (hb>hv: all=d;
-  hb+STEP>=hv: MID/HIGH=d, LOW=range; else: HIGH=d, LOW/MID=range). So the
-  208-vs-224 gap is one blocker's `d` (or which blockers covered that heading)
-  differing by a tile. Next: a gdb watchpoint on the diverging record's MID
-  (e.g. rec 30 at ADDR_SIGHT_BLOCK_BY_DIR+30*16+2) armed before gen 580 is
-  written, to name the blocker/viewer whose scan wrote 208 vs 224 -- the same
-  method that named the missile. It is a PRE-EXISTING sight bug only now
-  reachable (combat was trapped at 1460 before the dispatch fix), not a
-  regression from it.
-  DEEPER (gdb cache reads bisected to 2438): the diverging band is whichever
-  AddSightBlocker writes to a blocker's silhouette distance `d`, and the port's
-  `d` is EXACTLY 16 (one tile) less than the hybrid's, every gen, for a moving
-  blocker (records 23-25 d=167/183 at 2438, 0-2 148/164 at 2450, 28-41 208/224
-  at 2463). The object --table is byte-identical at 2438, so AddSightBlocker
-  (air.cpp:1535) computes `d` one tile short from identical inputs, or the
-  moving blocker has a hidden-field difference. `d = max(ApproxDistXY(near),
-  ApproxDistXY(far))` over the SightSilhouette corners (air.cpp:1516, generated
-  from 0x00403AE0/0x00403ABC) of the blocker's box (hit-rect or BOX+pos,
-  air.cpp:1566-1581). Suspects in order: the box read, SightSilhouette's corner
-  pick, ApproxDistXY. Next: catch one divergent (viewer, blocker) pair -- break
-  AddSightBlocker (0x004036F0) on both, log (v_uid, b_uid, dist) across one pump
-  near 2438, and diff to name the pair, then compare that blocker's box bytes.
 - **OPEN (2026-09-08): pause menu, SECOND open with the cursor already resting
   on a button -- one-pump hover-focus lag, ~1336 px over the button column
   (box 267,138-376,268).** Found hand-playing under `tools/sidebyside.py`
@@ -156,6 +113,32 @@ FIXED below when that replay runs identical.
   `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+ADDSIGHTBLOCKER DROPPED THE ONE-TILE DISTANCE PAD IN THE BAND WRITE, so every
+directional sight-cache band the port wrote was 16 units (one tile) short, and a
+green trooper's `AiCanSee` therefore read out-of-sight where the original read
+in-sight -- the pump-2464 green-trooper divergence (repro the combat run's
+recorded input.txt, `/tmp/sbs/input.txt`; trap was frame 2158 on 0x3ee, a type-2
+army-0 aimode-1 trooper whose AiGuardStep set OBJ_OFF_FIELD_C0 on the port and 0
+on the original). The original `AddSightBlocker` (0x004036F0) computes the
+silhouette distance `dist = max(ApproxDistXY(near), ApproxDistXY(far))` and then
+does `add esi,0x10` ONCE (at 0x004038AD), so both the sight-range check AND the
+LOW/MID/HIGH band stores read `dist + 16` (AM2_SIGHT_DIST_PAD). The
+reconstruction (air.cpp) added the pad only in the range check and wrote the
+UNPADDED `dist` into the bands, leaving every band exactly one tile short. NAMED
+BY A GDB CAPTURE ON THE ALIGNED HEAP: at gen 565 both builds' viewer roach
+(0x400003ec) and blocker (0x800004fb) were byte-identical (box, pos, facing 70,
+heights 32/32) yet the port wrote 167 to record 23's HIGH where the hybrid wrote
+183 -- exactly 16 apart at every diverging record and pump (167/183, 148/164,
+208/224), which a geometry difference could not produce but a missing constant
+does. The hybrid's AddSightBlocker frame at the record-23 store showed
+`esi=0xb7=183` right after `add esi,0x10`. Fixed by folding the pad into `dist`
+once, so the range check and the bands both read the padded value, matching the
+single `add esi,0x10`. The combat replay then runs frame-exact from 2464 to the
+END of the recording (94,139 frames, no differing frame; sight cache
+byte-identical at gen 565 after the fix). Invisible to every A/B and every prior
+replay -- no drive reached a sighting through a moving blocker in combat, which
+only became reachable once the AI-dispatch fix below carried the replay past
+1460.
 A TROOPER'S AIMODE-6 DISPATCH RAN SARGE'S ARM, so an enemy soldier that should
 attack (kneel and fire) never dropped into the firing pose -- the "missing
 missile" (trap pump 1304 on 0x3ef, then 1460 on 0x3ed once the heap was aligned;
