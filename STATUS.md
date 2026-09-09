@@ -62,6 +62,19 @@ FIXED below when that replay runs identical.
   method that named the missile. It is a PRE-EXISTING sight bug only now
   reachable (combat was trapped at 1460 before the dispatch fix), not a
   regression from it.
+  DEEPER (gdb cache reads bisected to 2438): the diverging band is whichever
+  AddSightBlocker writes to a blocker's silhouette distance `d`, and the port's
+  `d` is EXACTLY 16 (one tile) less than the hybrid's, every gen, for a moving
+  blocker (records 23-25 d=167/183 at 2438, 0-2 148/164 at 2450, 28-41 208/224
+  at 2463). The object --table is byte-identical at 2438, so AddSightBlocker
+  (air.cpp:1535) computes `d` one tile short from identical inputs, or the
+  moving blocker has a hidden-field difference. `d = max(ApproxDistXY(near),
+  ApproxDistXY(far))` over the SightSilhouette corners (air.cpp:1516, generated
+  from 0x00403AE0/0x00403ABC) of the blocker's box (hit-rect or BOX+pos,
+  air.cpp:1566-1581). Suspects in order: the box read, SightSilhouette's corner
+  pick, ApproxDistXY. Next: catch one divergent (viewer, blocker) pair -- break
+  AddSightBlocker (0x004036F0) on both, log (v_uid, b_uid, dist) across one pump
+  near 2438, and diff to name the pair, then compare that blocker's box bytes.
 - **OPEN (2026-09-08): pause menu, SECOND open with the cursor already resting
   on a button -- one-pump hover-focus lag, ~1336 px over the button column
   (box 267,138-376,268).** Found hand-playing under `tools/sidebyside.py`
