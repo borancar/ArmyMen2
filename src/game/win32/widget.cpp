@@ -15009,8 +15009,9 @@ typedef int32_t (__cdecl *AM2_StrncmpFn)(const char *, const char *, size_t);
  * recorded wrongly once, before the arms were separated.
  *
  * The soldier's NAME has three sources tried in order: the script name from
- * ADDR_SCRIPT_NAMES when it begins "green", title-cased; else
- * SoldierNameOf for a trooper carrying a name index; else UnitClassName.
+ * ADDR_SCRIPT_NAMES when it does NOT begin "green" (a "green..." id is an
+ * internal name and is skipped), title-cased; else SoldierNameOf for a
+ * trooper carrying a name index; else UnitClassName.
  *
  * EVERY NUMBER IS CLAMPED BEFORE FORMATTING -- 9999 for experience, 999 for
  * health -- because the formats are %4d and %3d and a wider number would
@@ -15074,8 +15075,15 @@ void __attribute__((thiscall)) HudSquadDetail(AM2_Widget *w, int32_t uid)
                 ((const uint8_t *)*(void *const *)
                      (uintptr_t)ADDR_SCRIPT_NAMES
                  + (uint32_t)script * AM2_NAME_TABLE_STRIDE);
+            /* Show the scripted name UNLESS it is an internal "green..." id
+             * (e.g. "greensarge1"), which falls through to a personal name.
+             * The original jumps to the SoldierNameOf path when the name
+             * STARTS WITH "green" (0x004166FE: strncmp; je 0x0041677F), so the
+             * script name is used when it does NOT -- the sense was inverted
+             * here, which hid a custom name like "wildblood" behind a random
+             * soldier name. */
             if (orig_strncmp(s, (const char *)AM2_IMAGE(ADDR_STR_GREEN),
-                              5) == 0) {
+                              5) != 0) {
                 strcpy(name, s);
                 TitleCaseName(name);
                 SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, name);

@@ -113,6 +113,27 @@ FIXED below when that replay runs identical.
   `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+THE SQUAD PANEL'S NAME GUARD WAS INVERTED, so a green trooper carrying a custom
+scripted name (e.g. "wildblood") showed a RANDOM soldier-table name in the HUD
+SQUAD detail instead of the scripted one -- the original drew "Wildblood", the
+port "D. DuBois" (found live under tools/sidebyside.py, trap pump 4479 / frame
+4397, 161 green pixels in the HUD box 556,275-603,282; repro
+scratchpad/live-4479.txt). HudSquadDetail (0x00416340) tries the scripted name
+from ADDR_SCRIPT_NAMES first: at 0x004166FE it does `strncmp(name,"green",5)`
+and `je` to the SoldierNameOf path -- so it uses the scripted name when it does
+NOT begin "green" (a "green..." id is internal and is skipped for a personal
+name). The reconstruction (widget.cpp HudSquadDetail) had the sense inverted
+(`== 0`), so it used the scripted name ONLY when it began "green" and hid every
+custom name behind a random one from ADDR_SOLDIER_NAMES. Everything readable was
+identical -- selection (unit 0x3ea on both), cursor, hover, view origin, RNG
+seed, the soldier-name "taken" table (empty on both), and the scripted-name
+index itself (obj+0x0C = 26 -> "wildblood" on both) -- which is what pointed at
+the DISPLAY guard rather than any state: same inputs, different rendered name.
+Fixed by inverting the guard to `!= 0`. The recording then replays frame-exact
+past 4479 (50,980+ frames, no differing frame). Invisible to every A/B: the
+squad detail is only drawn when a unit is selected in a live mission, which no
+scripted drive does, and the object tables it dumps do not include the rendered
+name.
 ADDSIGHTBLOCKER DROPPED THE ONE-TILE DISTANCE PAD IN THE BAND WRITE, so every
 directional sight-cache band the port wrote was 16 units (one tile) short, and a
 green trooper's `AiCanSee` therefore read out-of-sight where the original read
