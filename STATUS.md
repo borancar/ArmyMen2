@@ -52,11 +52,25 @@ FIXED below when that replay runs identical.
   it is a per-object/row temporary the reconstruction allocates-and-frees where
   the original does not, which reorders the allocator's free list and shifts
   every later address. The 8583 sight divergence did NOT show this because that
-  session began from a replay recorded AFTER the load, already aligned. Next:
-  narrow the ~1250 extra pairs to the one reconstruction site whose alloc/free
-  the original does not make (diff the per-site alloc counts at pump 490 against
-  the hybrid, then read that function against the disasm) -- a heap-alignment
-  dig like the teardown-free trio, not a heading dig.
+  session began from a replay recorded AFTER the load, already aligned.
+  ROOTED (AM2_TRACE_HEAP op-sequence diff, sites via addr2line): both builds are
+  aligned through op 1058 (`alloc 268`, BuildRespawnPool). Then they FORK on the
+  order of the SPRITE-SET RELOAD versus BuildMapObjects, and this is a from-SAVE
+  load so it is in the save-load chain Boran flagged (docs/saveload.md). The
+  HYBRID, right after BuildRespawnPool, does the reload as a BLOCK -- 16x
+  free(NULL) over the sprite-set array (FreeSpriteSets, winmain.cpp:410) then a
+  batch of GrowSpriteList/LoadSpriteSet -- and THEN creates the map objects. The
+  PORT runs BuildMapObjects FIRST (op 1059+: PreloadSprite, SpriteLoadFromDataFile,
+  CreateItem, ObjInitCommon, BuildRowsFromDef, RowAlloc, per object) and does the
+  same free-16 + LoadSpriteSet reload block ~1600 allocations later (op 2674).
+  So the sprite buffers and the object/row blocks are allocated in OPPOSITE order
+  and every later address shifts. free(NULL) is a no-op and does not shift the
+  heap; the real reorder is the LoadSpriteSet batch vs the CreateItem/RowAlloc
+  run. Fix: reorder the port's save-load sequence so the sprite-set reload runs
+  before BuildMapObjects, matching the original -- but it sits beside the
+  deliberate LoadItems/ItemsReset deviation and the original's latent cell-grid
+  use-after-free, so place it by reading State2Enter's load chain against the
+  disasm rather than by moving a call blindly. Repro sessions/roachheap-1575.txt.
 - **OPEN (2026-09-10): a hit roach's heading diverges -- the port's roach
   SightScan finds an observer the hybrid's does not, so it turns toward it.**
   Found live under tools/sidebyside.py after firing a bazooka at a roach (trap
