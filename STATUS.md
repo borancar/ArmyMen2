@@ -2873,3 +2873,20 @@ suite today, and each would be closed by a drive nobody has written.
 The durable half of all this is in `docs/combat.md` -- that no configuration
 reaches combat is one measurement rather than a dozen mysteries -- and in
 `docs/oracles.md`, which lists what checks those functions instead.
+
+  - **CONTINUED (2026-09-11): narrowed to AiTrooperStep's region-hop, still not
+    the instruction.** At pump 2151, 0x3fa: the port takes the region hop and
+    replans to a direct move; the hybrid takes the region-hop SKIP (line 3435:
+    `(ROUTE_GOAL==pt && PREV_REGION==fromRegion) || toRegion==fromRegion`) and
+    keeps its A* route. Yet fromRegion(41), PREV_REGION(42), toRegion, pos,
+    dest, and the FULL region graph are byte-identical: kRegionOfCell md5,
+    kRegionNext[41], region 41's 61 link records (to/from/into), kRegionCost,
+    cell weights, and the reveal grid at every candidate tile all match, and
+    MiddleRegionLink/NearestAllowedTile/TraceTileLine/BeginMoveTo/PointRuleDefault
+    all match the disasm. So the skip condition evaluates differently from
+    identical inputs -- impossible for correct deterministic code. The one thing
+    NOT yet diffed instruction-by-instruction is AiTrooperStep's OWN region
+    block (region.cpp:3420-3488, orig 0x004049C0's region section: how it
+    derives fromRegion/toRegion, the skip test, and pt) -- the prime remaining
+    suspect for a transcription bug, since its callees are all verified. NEXT:
+    diff that block against 0x004049C0 line by line.
