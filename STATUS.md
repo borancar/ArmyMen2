@@ -32,6 +32,27 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
+- **OPEN (2026-09-10): a hit roach's heading diverges -- the port's roach
+  SightScan finds an observer the hybrid's does not, so it turns toward it.**
+  Found live under tools/sidebyside.py after firing a bazooka at a roach (trap
+  pump 8583, frame 8414; repro sessions/bazookaroach-8583.txt, replayed with
+  --tolerance 12 to pass the magnifying-glass 4-px residual first). At the trap
+  only roach 0x400003ec (type 8, army 2) differs: OBJ_OFF_FACING 23 vs 41,
+  OBJ_OFF_FIELD_540 (the target heading) 237 vs 68, subpixels, and pos.y by 1 --
+  all downstream of FIELD_540. RNG seed (0x2f0c6a4a), game clock and
+  ADDR_SIGHT_GENERATION (0x0e6c) are IDENTICAL, so it is deterministic, not an
+  RNG desync. NARROWED (gdb watchpoint on FIELD_540): RoachBehaviour
+  (region.cpp:9061) routes the roach to heading 237 on both, then its tail
+  `CopyByteIfSet(obj, &FIELD_540, ctx)` (region.cpp:9116, misc.cpp:61) overrides
+  it with `ctx[SIGHT_OFF_BEARING=0x18]` IFF `ctx[SIGHT_OFF_OBSERVER=0x10] != 0`.
+  On the port ctx.observer is set (roach sees a threat -> F540<-68); on the
+  hybrid it is 0 (sees nothing -> keeps 237). So the port's per-frame roach
+  SightScan (RoachBuildContext -> 0x00403B40) finds an observer the hybrid does
+  not. Same subsystem as the pump-2464 sight bug, a different instance and the
+  opposite direction (there the port UNDER-saw; here it OVER-sees). Next: catch
+  the roach's SightScan on both -- which object it accepts as the observer, and
+  why AiCanSee / the directional cache answers differently for the roach's
+  bearing -- the method that fixed 2464.
 - **OPEN (2026-09-10): the magnifying glass's aim marker has a 4-px 2x2
   refraction residual (box 476,32-477,33) after the aim-cursor fix below.**
   With UNIT_OFF_FIRE_X now identical, `DrawEffectLayer` (0x004123D0,
