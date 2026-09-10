@@ -26,7 +26,19 @@ reproduce the give. See docs/lua.md.
 
 ## OPEN DIVERGENCES, newest first
 
-- **OPEN (2026-09-10): an off-screen enemy attack-squad diverges -- a trooper's
+- **FIXED (2026-09-11): AiTrooperStep dropped the 0x00404A90 "keep the current
+  route" check before the region hop, so a trooper walking a multi-waypoint A*
+  path re-derived its region link every frame and replanned into a direct move
+  when a line cleared -- shifting an off-screen enemy squad's minimap blips a
+  tile. Restored the check (PointsEqual(ROUTE_GOAL,pt) && MOVE_COUNT>0 &&
+  MOVE_AT<MOVE_COUNT-1 -> after_region). sessions/radartroop-2164 now frame-exact
+  (912 objects), level2pass and roachbite unregressed, make check green. The
+  long investigation below is kept as the record of how it was cornered -- every
+  other suspect (reveal grid, RNG, region graph/cache, cell weights, subpixel,
+  and each callee vs the disasm) was verified identical, which is what isolated
+  the one dropped branch.**
+
+- **[WAS OPEN] an off-screen enemy attack-squad diverges -- a trooper's
   region-link waypoint is snapped one tile row off, so it takes a direct move
   where the original still pathfinds.** Shows only on the RADAR: the unit's
   reveal flag / blip position differs (box ~533,113, "swapped pairs"). Repro
