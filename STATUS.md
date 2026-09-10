@@ -26,6 +26,37 @@ reproduce the give. See docs/lua.md.
 
 ## OPEN DIVERGENCES, newest first
 
+- **OPEN (2026-09-10): an off-screen enemy attack-squad diverges -- a trooper's
+  region-link waypoint is snapped one tile row off, so it takes a direct move
+  where the original still pathfinds.** Shows only on the RADAR: the unit's
+  reveal flag / blip position differs (box ~533,113, "swapped pairs"). Repro
+  sessions/radartroop-2164.txt (trap frame 2458); the same class hits early in
+  any campaign play with enemy troops. Chased in depth:
+  - The trap object is an army-1 aimode-6 trooper (0x3f8/0x3fa/0x404); its
+    position and OBJ_FLAG_REVEALED (0x800) diverge, so its blip lands elsewhere
+    on the port.
+  - First divergence pump 2153 (radartroop). A gdb watchpoint on OBJ_OFF_MOVE_COUNT
+    named the writer: BeginMoveTo (region.cpp:1595) sets MOVE_COUNT=2 (a direct
+    two-waypoint move) via AiTrooperStep <- AiPatrolStep. On the port BeginMoveTo
+    returns 1 (its straight tile-line is clear); on the hybrid it returns 0
+    (a tile is refused, so it keeps its 16-waypoint A* path).
+  - The divergence is the SECOND BeginMoveTo (AiTrooperStep region block,
+    line 3478), whose `to` is the region-link waypoint from line 3459's
+    NearestAllowedTile. That waypoint is (1624,2360) on the port and (1624,2376)
+    on the hybrid -- one tile row (16) off in Y.
+  - EVERYTHING feeding it is byte-identical at pump 2152/2153: pos, dest
+    (FIELD_C0), OBJ_OFF_REGION/PREV_REGION/STUCK_COUNT, and the region-path
+    cache (kRegionCost/kRegionNext row for from=41, stride 211, stamp 1). So
+    MiddleRegionLink -> kLinks[link].into -> NearestAllowedTile should be
+    deterministic, yet the port's pt.y is 16 less.
+  - NEXT: gdb both builds at AiTrooperStep's region block (line 3441-3460) for
+    this trooper at pump 2153 and diff the first differing intermediate -- the
+    link index, kLinks[link].into tile, or NearestAllowedTile's spiral result
+    (region.cpp:837, ADDR_SPIRAL_DX/DY order/leg logic). A trace helper note:
+    am2_host_pump_number() reads 0 inside region.cpp (weak-link quirk), so gate
+    region.cpp traces on object state, not the pump.
+  - Pre-existing and independent of today's three fixes; off-screen-only.
+
 The rule (2026-09-07): `tools/sidebyside.py` runs EXACT -- no tolerance,
 no forgiven pixel class -- and the first differing frame is the issue.
 Newest first: a divergence found while fixing another is fixed before
