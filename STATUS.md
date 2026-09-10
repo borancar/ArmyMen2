@@ -32,6 +32,22 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
+- **OPEN (2026-09-10): the magnifying glass's aim marker has a 4-px 2x2
+  refraction residual (box 476,32-477,33) after the aim-cursor fix below.**
+  With UNIT_OFF_FIRE_X now identical, `DrawEffectLayer` (0x004123D0,
+  mapdraw.cpp:2421) draws the marker in the right place, but its 112x112
+  refraction block -- which reads displaced offscreen pixels through
+  `g_framebuffer[sy*g_pitch + sx]` (ADDR_AIM_DISPLACE_MAP at 0x00478CDC, in
+  .data and carried) and writes them back -- differs at one 2x2 cell: hybrid
+  (66,69,66) vs port (123,121,123). It is the ONLY differing block in the
+  frame. DrawEffectLayer is cold (no drive reached a pointer-mode aim weapon
+  before this), so its refraction has never been A/B'd; the 4 px are a
+  distinct issue from the .text-gap read fixed below, only now reachable.
+  Repro sessions/magnifyingglass-7655.txt (traps at pump 7655, now 4 px).
+  Next: catch the refraction mid-draw (g_pitch and the source sx,sy are 0
+  post-frame, set only under Lock) -- break in DrawEffectLayer's read loop on
+  both builds and compare the offscreen source pixel and g_pitch for the 2x2
+  cell.
 - **OPEN (2026-09-08): pause menu, SECOND open with the cursor already resting
   on a button -- one-pump hover-focus lag, ~1336 px over the button column
   (box 267,138-376,268).** Found hand-playing under `tools/sidebyside.py`
