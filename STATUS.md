@@ -140,6 +140,23 @@ FIXED below when that replay runs identical.
   post-frame, set only under Lock) -- break in DrawEffectLayer's read loop on
   both builds and compare the offscreen source pixel and g_pitch for the 2x2
   cell.
+- **OPEN (2026-09-10): a roach attacking Sarge diverges by 1 px -- the port
+  REFUSES a move step the original takes.** Live repro sessions/roachattack-1391.txt
+  (trap pump 1391, frame 1519, 810 px box 212,199-303,268). Heap aligned, RNG
+  identical; only roach 0x400003ef differs, pos (2108,762) vs (2109,761), and
+  its OBJ_OFF_FIELD_44 (speed) is 130 on the hybrid but 0 on the port -- same
+  facing (63), same OBJ_OFF_FIELD_540 (63), same subpixel and pos through pump
+  1390. So this is NOT the heading/CopyByteIfSet path of the 8583 entry; it is
+  the SPEED path. RoachStepTailA (0x0043D750, item.cpp) refuses the step when
+  `RoachMaskWeight(obj, next, landing, 1) >= RoachMaskWeight(obj, cur, pos, 0)`
+  (the landing is no better than here) -> speed 0. The port refuses at 1391, the
+  hybrid does not. Since pos/facing/subpixel match going in, the divergence is
+  in RoachMaskWeight (cell weights / footprint mask) or in the ctrl record
+  RoachBehaviour hands RoachStepTailA (ROACHSTEP_OFF_STATE/FACING/FLAG18). Next:
+  catch RoachStepTailA on both at 1391 and compare `here`, `next`, `at` and the
+  two RoachMaskWeight results -- if those inputs match, the weight table
+  diverged; if not, it is the RoachBehaviour ctrl (same subsystem as 8583).
+  MAY share a root with the 8583/1575 roach entries.
 - **OPEN (2026-09-08): pause menu, SECOND open with the cursor already resting
   on a button -- one-pump hover-focus lag, ~1336 px over the button column
   (box 267,138-376,268).** Found hand-playing under `tools/sidebyside.py`
