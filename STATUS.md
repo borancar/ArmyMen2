@@ -56,6 +56,26 @@ reproduce the give. See docs/lua.md.
     am2_host_pump_number() reads 0 inside region.cpp (weak-link quirk), so gate
     region.cpp traces on object state, not the pump.
   - Pre-existing and independent of today's three fixes; off-screen-only.
+  - **REFRAMED via gdb on both builds (2026-09-10): this is NOT a pathing bug --
+    it is downstream of the reveal grid / sight system.** The gdb walk: at pump
+    2153 the trooper's BeginMoveTo(dest) returns 1 (line clear -> two-waypoint
+    direct move, MOVE_UNTIL := CLOCK+0x1F4) on the port but 0 (blocked -> keep
+    the A* path) on the hybrid, from byte-identical pos/dest. The two functions
+    the trooper's AiTrooperStep uses -- NearestAllowedTile (region.cpp:837) and
+    MiddleRegionLink (484) -- plus TraceTileLine (map.cpp:619) and BeginMoveTo
+    (1595) were each diffed against the disasm and MATCH; the region graph
+    (kRegionOfCell md5), region cache (kRegionCost/kRegionNext), and cell
+    weights are all byte-identical. What BeginMoveTo's line-clear rule
+    (PointRuleDefault, region.cpp:388) also reads is ADDR_TILE_REVEAL_GRIDS
+    [army][tile] -- the DYNAMIC per-army reveal grid. So the same sight/reveal
+    divergence that flips the blip's OBJ_FLAG_REVEALED also flips one tile of
+    army 1's reveal grid on the trooper's straight line, which flips the
+    line-clear, which triggers the spurious direct move. Root is the sight
+    system (SightScan 0x00403B40 / ConsiderSighting / RevealObj and what writes
+    the reveal grid), i.e. the SAME open sight-family bug the roach residuals
+    below describe -- the trooper pathing and the radar blip are two symptoms of
+    it. NEXT: bisect when army 1's reveal grid first diverges (earlier than
+    2153; not visible in the object table) and read the sight/reveal writer.
 
 The rule (2026-09-07): `tools/sidebyside.py` runs EXACT -- no tolerance,
 no forgiven pixel class -- and the first differing frame is the issue.
