@@ -9063,83 +9063,102 @@ void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
     uint8_t *o = (uint8_t *)obj;
     uint8_t *c = (uint8_t *)ctx;
 
-    /* The original nests these: `if (RANGE > 0)` FIRST (0x00408654 `test; jle`
-     * to the RANGE<=0 arm at 0x0040868D), and only INSIDE it the far test
-     * (0x00408658 `cmp; jle`). So ANY positive range goes to the tail after --
-     * far when RANGE > WANT, otherwise straight to the tail keeping the
-     * bearing. The DEST_DIST / arrived logic is reached ONLY when RANGE <= 0.
-     * This had been flattened to `if (RANGE > 0 && RANGE > WANT)`, which let a
-     * roach with 0 < RANGE <= WANT fall through into `arrived`, overwrite its
-     * bearing with the leader's, and turn the wrong way (FIELD_540 63 vs 95). */
+    /* THE FIVE ARMS AND WHICH ONE CALLS CopyByteIfSet. The original nests the
+     * two range tests -- `if (RANGE > 0)` first (0x00408654 `test; jle` to the
+     * RANGE<=0 arm at 0x0040868D), the far test only inside it (0x00408658
+     * `cmp; jle`) -- and then diverges on how each arm reaches the shared
+     * ConsiderSightingB tail at 0x00408A42:
+     *
+     *   far        (RANGE>WANT, 0x00408978)  route, promote found, -> tail
+     *   within     (0<RANGE<=WANT, 0x0040866F)  CopyByteIfSet,      -> tail
+     *   dest-route (DEST_DIST>12, 0x004086A3)  route, promote found, -> tail
+     *   has-leader (arrived+leader, 0x004089BB)  promote leader,
+     *                                            ConsumePending, CopyByteIfSet
+     *   no-leader  (arrived, 0x004089F3)  ConsumePending, promote found,
+     *                                      CopyByteIfSet, FOLLOW_UID persist
+     *
+     * The far and dest-route arms jmp STRAIGHT to 0x00408A42 and never call
+     * CopyByteIfSet. That matters: RoachRouteToward writes the route heading
+     * into the out record's bearing byte, and CopyByteIfSet would overwrite it
+     * with the sight-context bearing (`if (ctx[OBSERVER]) *out = ctx[BEARING]`).
+     * After promote-found that context bearing is the FOUND bearing, so a
+     * shared tail calling CopyByteIfSet turned a roach routing toward its
+     * destination (heading 0x95) into one facing the object it had just spotted
+     * (heading 0x1d) -- the roachattack pump-1443 divergence. Only the three
+     * arrived/within arms commit through CopyByteIfSet.
+     *
+     * FOLLOW_UID (0x00408A3C) is persisted by the NO-LEADER arm alone, gated on
+     * the observer slot after the found-promote; the has-leader arm jmps past
+     * it, and the two routing arms never reach it. */
     if (*(const int32_t *)(c + SIGHT_OFF_RANGE) > 0) {
         if (*(const int32_t *)(c + SIGHT_OFF_RANGE)
             > *(const int32_t *)(c + ROACHCTX_OFF_WANT_RANGE)) {
-            /* Far: head for what we are engaging and look again. */
+            /* Far: route toward the observer, promote a fresh sighting, and
+             * commit WITHOUT CopyByteIfSet so the route heading survives. */
             *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
                 *(const uint32_t *)(*(uint8_t **)(c + SIGHT_OFF_OBSERVER)
                                     + OBJ_OFF_POS);
             RoachRouteToward(obj, out, ctx);
             if (*(void **)(c + SIGHT_OFF_FOUND))
                 AM2_ROACH_PROMOTE_FOUND(o, c);
+            ConsiderSightingB(obj, out, ctx);
+            return;
         }
-        /* RANGE within WANT: nothing extra -- fall to the tail as-is. */
-        goto tail;
+        /* Within range: commit the sighting through CopyByteIfSet. */
+        CopyByteIfSet((uint32_t)(uintptr_t)obj, (uint8_t *)out, ctx);
+        ConsiderSightingB(obj, out, ctx);
+        return;
     }
 
     if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
-        /* Not arrived: keep the destination and look again. */
+        /* Not arrived: route toward the remembered destination, promote a
+         * fresh sighting, and commit without CopyByteIfSet (as the far arm). */
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
         RoachRouteToward(obj, out, ctx);
         if (*(void **)(c + SIGHT_OFF_FOUND))
             AM2_ROACH_PROMOTE_FOUND(o, c);
-        goto tail;
+        ConsiderSightingB(obj, out, ctx);
+        return;
     }
 
     /* Arrived. */
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
         *(const uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_ZERO_POINT);
 
-    if (!*(void **)(c + SIGHT_OFF_LEADER)) {
-        /* No leader: take whatever is pending, then engage what was found. */
-        ConsumePendingByte(obj, out, ctx);
-        if (*(void **)(c + SIGHT_OFF_FOUND))
-            AM2_ROACH_PROMOTE_FOUND(o, c);
-        goto tail;
-    }
-
-    /* Following a leader: promote the LEADER triple rather than the found one,
-     * which is the only site in the band that promotes from that source. */
-    {
+    if (*(void **)(c + SIGHT_OFF_LEADER)) {
+        /* HAS-LEADER: the original runs a formation-approach block first
+         * (0x004086FF..0x004089B6 -- resolve the formation point, decide
+         * between routing to it and closing on the leader) that is NOT yet
+         * reconstructed. What is here is the promote-leader tail at
+         * 0x004089BB: adopt the leader as the observer, then commit. Cold in
+         * every fixture -- no roach in the recorded sessions follows a leader.
+         * TODO: reconstruct the formation block. */
         uint8_t *leader = *(uint8_t **)(c + SIGHT_OFF_LEADER);
 
         *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-            *(const uint32_t *)(leader + OBJ_OFF_OWNER);
+            *(const uint32_t *)(leader + OBJ_OFF_UID);
         *(void **)(c + SIGHT_OFF_OBSERVER) = leader;
         *(int32_t *)(c + SIGHT_OFF_RANGE) =
             *(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE);
         *(c + SIGHT_OFF_BEARING) = *(c + SIGHT_OFF_LEAD_BEARING);
         ConsumePendingByte(obj, out, ctx);
+        CopyByteIfSet((uint32_t)(uintptr_t)obj, (uint8_t *)out, ctx);
+        ConsiderSightingB(obj, out, ctx);
+        return;
     }
 
-tail:
-    /* The shared tail runs three things on every path (0x00408A27..0x00408A45),
-     * and only the first was here. The other two are why the roach never kept a
-     * target on the port: (1) persist the current observer as the follow uid,
-     * so the roach re-acquires it next frame instead of losing it; (2)
-     * ConsiderSightingB, which commits the sighting -- the bearing and the
-     * BITE state (FIELD_530 = 4). Dropping them left every roach stuck one
-     * step behind the original: no follow target (SIGHT_OFF_LEADER 0 in the
-     * ctx), so RoachBehaviour took its no-leader branch, and it never entered
-     * the bite state -- the heading (8583/1575), speed (1391) and bite
-     * (1112) divergences were all this one dropped tail. */
+    /* No leader (0x004089F3): take whatever is pending, promote what the scan
+     * found, commit it, then persist the FOLLOW_UID -- this arm alone writes
+     * OBJ_OFF_FOLLOW_UID (0x00408A3C), gated on the observer slot being set. */
+    ConsumePendingByte(obj, out, ctx);
+    if (*(void **)(c + SIGHT_OFF_FOUND))
+        AM2_ROACH_PROMOTE_FOUND(o, c);
     CopyByteIfSet((uint32_t)(uintptr_t)obj, (uint8_t *)out, ctx);
-
     if (*(void *const *)(c + SIGHT_OFF_OBSERVER))
         *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
             *(const uint32_t *)(*(const uint8_t *const *)(c + SIGHT_OFF_OBSERVER)
                                 + OBJ_OFF_UID);
-
     ConsiderSightingB(obj, out, ctx);
 }
 
