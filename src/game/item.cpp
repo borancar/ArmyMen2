@@ -12709,9 +12709,14 @@ after_flight:
     RowUpdate(rows, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
     ObjTileChanged(o, *(const int16_t *)(o + MISSILE_OFF_HEIGHT), 0);
 
-    /* Crossed onto open ground from blocked: lift the whole flight so the
-     * missile clears the new terrain, and move the GROUND with it rather than
-     * the height, so the trajectory is untouched. */
+    /* Crossed from open ground onto blocked: clamp the flight DOWN to just
+     * clear the new terrain (want = ground + overhead), and move the GROUND
+     * with it rather than the height, so the trajectory is untouched. The
+     * original adjusts when HEIGHT > want (`cmp; jle` past the block at
+     * 0x0043C54A), i.e. only when the missile is HIGHER than it needs to be --
+     * this was written `<` (raise when lower), the opposite sense, which left
+     * the port's missile one tile too high crossing a boundary so it detonated
+     * a pixel off. */
     if ((int32_t)*(const uint16_t *)(o + OBJ_OFF_TILE)
         != *(const int32_t *)(o + OBJ_OFF_PREV_TILE)) {
         const uint8_t *flags = *(const uint8_t *const *)(uintptr_t)
@@ -12724,7 +12729,7 @@ after_flight:
                                *(const uint32_t *)(o + OBJ_OFF_POS))
                            + AM2_SIGHT_OVERHEAD;
 
-            if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) < (int16_t)want) {
+            if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) > (int16_t)want) {
                 *(int32_t *)(o + MISSILE_OFF_GROUND) +=
                     want - *(const int16_t *)(o + MISSILE_OFF_HEIGHT);
                 *(int16_t *)(o + MISSILE_OFF_HEIGHT) = (int16_t)want;

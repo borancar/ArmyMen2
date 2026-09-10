@@ -32,6 +32,20 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
+- **FIXED (2026-09-10): a bazooka missile's terrain-crossing height clamp was
+  inverted, so it detonated a pixel off.** Found live (trap pump 1772, frame
+  1905, 143 px in box 50,197-65,212 -- the explosion; repro
+  sessions/bazookamissile-1772.txt). The missile (type 5, 0x58f) flew identically
+  to pump 1771; at 1772 the hybrid clamped MISSILE_OFF_HEIGHT (0x42) from 28 to
+  24 as it crossed from open onto blocked terrain, while the port left it 28, so
+  it detonated at x=1428 vs 1427 and spawned a different explosion set. StepType5
+  (item.cpp) clamps the height when crossing tiles: the original adjusts when
+  HEIGHT > want (`cmp; jle` past the block at 0x0043C54A; want = ground +
+  overhead), clamping the flight DOWN; the reconstruction had `if (HEIGHT <
+  want)`, the opposite sense, so it never lowered a too-high missile. Fixed the
+  comparison to `>`. The recording then replays frame-exact past 1772 (55,447+
+  frames, no differing frame). RNG/heap identical, so it was a pure StepType5
+  transcription bug.
 - **PARTLY FIXED (2026-09-10): a FROM-SAVE load desynced the heap by running
   BuildMapObjects on the load** -- the port's LoadMap (map.cpp) called
   BuildMapObjects unconditionally, but the original skips it on a load (after
