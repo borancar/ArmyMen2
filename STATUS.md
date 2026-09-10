@@ -140,6 +140,21 @@ FIXED below when that replay runs identical.
   post-frame, set only under Lock) -- break in DrawEffectLayer's read loop on
   both builds and compare the offscreen source pixel and g_pitch for the 2x2
   cell.
+- **OPEN (2026-09-10): a roach's BITE-state transition diverges -- hybrid bites
+  Sarge, port still approaches.** Live repro sessions/roachbite-1112.txt (trap
+  pump 1112, frame 1238, 1274 px box 218,193-312,268). Object tables, RNG and
+  all positions identical; roach 0x400003ef's OBJ_OFF_FIELD_530 is 4 (biting) on
+  the hybrid and 2 (approaching) on the port, with OBJ_OFF_DEADLINE_58 and the
+  bite fields (0x54c-0x55d, 0xc4) set only on the hybrid -- so the sprite is the
+  bite animation vs the walk. FOURTH manifestation of one recurring roach bug,
+  all in RoachBehaviour/RoachStepTailA and all deterministic from identical
+  state: 8583 and 1575 diverge on FIELD_540 (heading / which observer it faces),
+  1391 on FIELD_44 (speed 0, move refused), 1112 on FIELD_530 (arrived->bite vs
+  approach). Common root is the roach's sight/distance decision in RoachBehaviour
+  answering differently from byte-identical inputs -- so the fix is one dig into
+  RoachBuildContext->SightScan (0x00403B40) / the AiCanSee cache the roach reads,
+  not four separate ones. Recommend chasing it as a dedicated RoachBehaviour
+  investigation rather than per-manifestation.
 - **OPEN (2026-09-10): a roach attacking Sarge diverges by 1 px -- the port
   REFUSES a move step the original takes.** Live repro sessions/roachattack-1391.txt
   (trap pump 1391, frame 1519, 810 px box 212,199-303,268). Heap aligned, RNG
