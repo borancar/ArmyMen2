@@ -3396,6 +3396,22 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
         goto two_waypoints;
     }
 
+    /* Still routing to this goal with waypoints left before the last: keep the
+     * route we have and do NOT re-derive the region hop (0x00404A90 --
+     * `PointsEqual(ROUTE_GOAL, pt) && MOVE_COUNT > 0 && MOVE_AT < MOVE_COUNT-1`
+     * jumps to the after-region tail). This check was dropped entirely, so a
+     * trooper that was cleanly walking a multi-waypoint A* route recomputed the
+     * region link every frame; when that link's waypoint made a direct line
+     * clear it replanned a 15-waypoint path into a 2-waypoint straight move,
+     * one step off from the original. Only the radar showed it -- an off-screen
+     * enemy squad's blips drifting a tile (sessions/radartroop-2164). */
+    if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
+                    *(const uint32_t *)&pt)
+        && *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) != 0
+        && (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
+           < (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1)
+        goto after_region;
+
     fromTile   = TileOfPoint(*(const uint32_t *)pos);
     fromRegion = kRegionOfCell[(uint32_t)fromTile & 0xFFFFu];
     toTile     = TileOfPoint(*(const uint32_t *)&pt);
