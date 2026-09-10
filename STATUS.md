@@ -94,6 +94,32 @@ reproduce the give. See docs/lua.md.
     instruction by instruction against the disasm to find the first differing
     field write. Multiple army-1 troopers (0x3f8, 0x3fa) diverge at 2153 at
     once, so the cause is a shared per-step global, not per-trooper.
+  - **FULL CAUSAL CHAIN traced by gdb watchpoints (2026-09-11), first
+    divergence pinned to pump 2151 with IDENTICAL trooper position.** Working
+    from the blip inward on trooper 0x3fa: (1) radar blip differs <- world pos
+    differs; (2) pos written by ObjMoveAlongFacing (item.cpp:10830, moves along
+    facing) <- UpdateTrooperAction (region.cpp:8577); (3) facing written at
+    region.cpp:8390 as `facing = w[4]`; (4) w[4] (the AI heading) written at
+    AiTrooperStep region.cpp:3531 `w[4] = AngleBetween(pos, pt)` <- AiPatrolStep
+    (4748) <- AiStepDispatch (6790) <- TrooperAiStep (6953) <- StepType2; (5)
+    pos identical, so the waypoint `pt` diverges; (6) pt = MOVE_FROM[MOVE_AT] --
+    the trooper's PATH, which diverged at pump 2151: the port replanned 0x3fa to
+    a 2-waypoint direct move (mcnt 15->2) while the hybrid kept its 15-waypoint
+    A* path, SAME goal (rgoal=c006c806); (7) that replan is BeginMoveTo(dest)
+    returning clear on the port and blocked on the hybrid at pump 2151, where
+    the trooper's pos, facing, subpixel (0x4c/0x50), region and prev-region are
+    ALL byte-identical. Also verified identical at 2151: RNG seed, game clock,
+    region graph/cache, cell weights; and for 0x3f8's blocking tile the reveal
+    grid + cell weight matched too. So the seed is BeginMoveTo's straight-line
+    clear-check flipping from identical trooper state -- either a nearby object
+    in its BlockWeightRoute chain (item.cpp:2999) that diverged even earlier (a
+    cascade among the squad), or a BlockWeightRoute chain-order/transcription
+    issue. NEXT: freeze both games at pump 2151's 0x3fa BeginMoveTo (single hit,
+    no continue) and diff the rule-loop tile list + each rule result, then the
+    BlockWeightRoute chain contents, to name the one tile/object that flips. The
+    gdb tile-loop reads keep fighting the post-2151 desync; a compiled
+    obj-gated trace in BeginMoveTo (pump gate is useless -- am2_host_pump_number
+    reads 0 in region.cpp) is the more reliable instrument.
 
 The rule (2026-09-07): `tools/sidebyside.py` runs EXACT -- no tolerance,
 no forgiven pixel class -- and the first differing frame is the issue.
