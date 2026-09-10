@@ -971,6 +971,42 @@ int32_t __cdecl PlaceScenario(void)
             if (*(const int16_t *)(row + SCEN_ROW_OFF_POS) <= 0)
                 continue;
 
+            /* WHEN A SAVED PLATOON EXISTS, OUR ARMY IS NOT PLACED FROM THE
+             * SCENARIO -- it comes from default.cof (LoadDefaultCof). The
+             * original guards the creation at 0x0043DE16: with
+             * ADDR_HAVE_DEFAULT_COF set and this row's army our own, it creates
+             * NOTHING here. For the leader row (0x8005) it instead records the
+             * spawn point into ADDR_LEADER_POS / ADDR_LEADER_FACING and parks
+             * the view on it, so the .cof form-up pass below can move the
+             * cof-loaded leader here; every other of our rows it simply drops.
+             *
+             * Without this the scenario leader is created as a SECOND Sarge
+             * beside the cof-loaded one -- the campaign level-2 divergence,
+             * 907 objects against 905, two sarge=1 units against one. It was
+             * invisible until now because default.cof does not ship: single
+             * levels leave ADDR_HAVE_DEFAULT_COF at 0 and this arm never runs.
+             * The LookupOwnerObj call is the original's and its result is
+             * discarded there too. */
+            if (*(const int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF
+                && (uint32_t)army == g_defaultOwner) {
+                if (kind == AM2_SCEN_KIND_LEADER) {
+                    uint8_t amt;
+
+                    (void)LookupOwnerObj(g_defaultOwner);
+                    *(int16_t *)(uintptr_t)ADDR_LEADER_POS =
+                        *(const int16_t *)(row + SCEN_ROW_OFF_POS);
+                    *(int16_t *)((uintptr_t)ADDR_LEADER_POS + 2) =
+                        *(const int16_t *)(row + SCEN_ROW_OFF_POS + 2);
+                    amt = *(const uint8_t *)(row + SCEN_ROW_OFF_AMOUNT);
+                    *(uint8_t *)(uintptr_t)ADDR_LEADER_FACING =
+                        amt < 1 ? 1 : amt;
+                    *(int32_t *)(uintptr_t)ADDR_VIEW_HOLD = 1;
+                    *(uint32_t *)(uintptr_t)ADDR_VIEW_TARGET =
+                        *(const uint32_t *)(uintptr_t)ADDR_LEADER_POS;
+                }
+                continue;
+            }
+
             /* THE NAME IS THE ROW'S OWN, at +0x13 -- not the shared scratch
              * buffer every other creator in this tree passes. And the flags
              * are 4 or 0 chosen by SCEN_ROW_OFF_FLAG, not a constant.
@@ -1012,7 +1048,7 @@ int32_t __cdecl PlaceScenario(void)
                 SetLeadsAndAct(unit);
                 *(int32_t *)(unit + OBJ_OFF_RANK) = 7;   /* the leader outranks */
 
-                if ((uint32_t)slot == g_defaultOwner) {
+                if ((uint32_t)army == g_defaultOwner) {
                     g_ourLeaderUid = *(const uint32_t *)(unit + OBJ_OFF_UID);
                     *(int16_t *)(uintptr_t)ADDR_LEADER_POS =
                         *(const int16_t *)(row + SCEN_ROW_OFF_POS);
