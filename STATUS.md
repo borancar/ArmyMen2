@@ -76,6 +76,24 @@ reproduce the give. See docs/lua.md.
     below describe -- the trooper pathing and the radar blip are two symptoms of
     it. NEXT: bisect when army 1's reveal grid first diverges (earlier than
     2153; not visible in the object table) and read the sight/reveal writer.
+  - **CORRECTION (2026-09-10): the reveal-grid reframe above is WRONG.** A gdb
+    rule-loop walk on both builds showed the hybrid trooper's BeginMoveTo line
+    blocks at tile 35172, but that tile's reveal grid (0) AND cell weight (15)
+    are BYTE-IDENTICAL on both builds -- so PointRuleDefault gives the same
+    answer and the reveal grid is not the cause. A clean single-pump gdb stop at
+    the trooper's BeginMoveTo showed the destination `to` IDENTICAL (06c806c0)
+    but the trooper's POS already different (HYB 1491,2620 vs PRT 1507,2588).
+    So the divergence is UPSTREAM of BeginMoveTo -- the trooper's position/step
+    itself diverges around pump 2153 -- not the line-clear rule and not the
+    reveal grid. Also ruled out at 2153: RNG seed and game clock (identical),
+    region graph/cache, cell weights. ROOT STILL UNIDENTIFIED. The obstacle to a
+    clean isolation is that the two games DESYNC at pump 2153, so gdb
+    breakpoints on later calls land at different pumps; a definitive read needs
+    both games frozen at the SAME pump-2153 step (single hit, no continue) and
+    the trooper's step (AiTrooperStep <- AiPatrolStep <- AiStepDispatch) walked
+    instruction by instruction against the disasm to find the first differing
+    field write. Multiple army-1 troopers (0x3f8, 0x3fa) diverge at 2153 at
+    once, so the cause is a shared per-step global, not per-trooper.
 
 The rule (2026-09-07): `tools/sidebyside.py` runs EXACT -- no tolerance,
 no forgiven pixel class -- and the first differing frame is the issue.
