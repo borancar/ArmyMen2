@@ -32,6 +32,31 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
+- **OPEN (2026-09-10): a FROM-MENU session desyncs the heap at mission load
+  (~pump 490), and a roaming roach then diverges downstream.** Found live
+  (fresh `--video`, no replay; trap pump 1575, frame 1703; repro
+  sessions/roachheap-1575.txt). At the trap only roach 0x400003ea (type 8,
+  FULL health -- not hit) differs, pos (2452,1174) vs (2451,1169), and its
+  FIELD_540/facing diverge with RNG IDENTICAL -- the same heading mechanism as
+  the 8583 entry. BUT the cause here is different: EVERY object is at a
+  different heap address between builds (Sarge 0x3e8 at 0c650bdc vs 0c1d45ec),
+  so the heap is globally desynced and the roach's sight-scan iteration/tiebreak
+  order shifts. AM2_TRACE_HEAP diff (both builds, replay of the recording):
+  identical through op 1058, then at PUMP 490 the port makes ~1254 MORE
+  allocations (and ~1242 more frees) than the hybrid -- ~1250 extra alloc/free
+  pairs during the sprite/object load, spread across CreateItem (192B, item.cpp
+  :12249), BuildRowsFromDef (96B, maprow.cpp:1099), MakeRecordList
+  (objtype.cpp:264), LoadMaskPacked (misc.cpp:532), PreloadSprite/
+  SpriteLoadFromDataFile (64B, sprite.cpp) and ObjInitCommon. The named sprite
+  loads MATCH in count (alloc 3517 x1 both), so it is not an extra sprite --
+  it is a per-object/row temporary the reconstruction allocates-and-frees where
+  the original does not, which reorders the allocator's free list and shifts
+  every later address. The 8583 sight divergence did NOT show this because that
+  session began from a replay recorded AFTER the load, already aligned. Next:
+  narrow the ~1250 extra pairs to the one reconstruction site whose alloc/free
+  the original does not make (diff the per-site alloc counts at pump 490 against
+  the hybrid, then read that function against the disasm) -- a heap-alignment
+  dig like the teardown-free trio, not a heading dig.
 - **OPEN (2026-09-10): a hit roach's heading diverges -- the port's roach
   SightScan finds an observer the hybrid's does not, so it turns toward it.**
   Found live under tools/sidebyside.py after firing a bazooka at a roach (trap
