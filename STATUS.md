@@ -155,7 +155,23 @@ FIXED below when that replay runs identical.
   RoachBuildContext->SightScan (0x00403B40) / the AiCanSee cache the roach reads,
   not four separate ones. Recommend chasing it as a dedicated RoachBehaviour
   investigation rather than per-manifestation.
-- **OPEN (2026-09-10): a roach attacking Sarge diverges by 1 px -- the port
+- **OPEN (2026-09-10): after the RoachBehaviour dropped-tail FIX, a roach's
+  SightScan bearing still diverges from byte-identical state.** With the tail
+  restored the roach now bites on both builds, and roachbite-1112 advances to a
+  trap at 1116. NARROWED: the roach is byte-identical through pump 1114
+  (position, subpixel, facing, FIELD_540, state 4, deadline) and at 1115 its
+  FIELD_540 diverges 63(hyb)/95(prt) -- CopyByteIfSet writes FIELD_540 =
+  ctx[SIGHT_OFF_BEARING], and that bearing is 100 vs 95 despite identical roach
+  and Sarge positions. So the roach's SightScan (RoachBuildContext ->
+  0x00403B40) answers a different bearing/observer from identical inputs -- the
+  same directional-sight subsystem as the pump-2464 bug (AddSightBlocker /
+  ADDR_SIGHT_BLOCK_BY_DIR / AiCanSee), a residual instance the target-acquisition
+  fix now exposes. Repro sessions/roachbite-1112.txt (traps 1116). Next: catch
+  the roach's SightScan on both at 1115, compare what it finds and the
+  directional cache it reads for the bearing. This SUPERSEDES the earlier
+  "move-refusal" framing: the move refusal (speed 0) was downstream of this
+  heading divergence, not a separate RoachMaskWeight bug.
+- **SUPERSEDED (see above): a roach attacking Sarge diverges by 1 px -- the port
   REFUSES a move step the original takes.** Live repro sessions/roachattack-1391.txt
   (trap pump 1391, frame 1519, 810 px box 212,199-303,268). Heap aligned, RNG
   identical; only roach 0x400003ef differs, pos (2108,762) vs (2109,761), and
