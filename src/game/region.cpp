@@ -9358,7 +9358,20 @@ typedef void (__cdecl *am2_char_fn)(uint32_t wparam, int32_t lo, int32_t hi);
 #define kActionKey1   ((const int32_t *)(uintptr_t)0x004750CCu)
 #define kActionKey4   ((const int32_t *)(uintptr_t)0x004750D8u)
 #define kActionKey5   ((const int32_t *)(uintptr_t)0x004750E4u)
-#define kCursorCodeFilter ((const uint8_t *)(uintptr_t)0x0044AD24u)
+/* The weapon-code filter for the aim-cursor write in Type2PlayerInput, from
+ * the byte table the original's jump table indexes at 0x0044AD24. It is the
+ * dispatch selector for `jmp [ecx*4 + 0x0044AD1C]`: 0 selects the cursor-write
+ * arm (0x0044AAB9), 1 the tail. It lives in the image's .TEXT, which the
+ * native build fills with 0xCC rather than carrying -- so reading it through
+ * its address gave garbage on the standalone, the aim-cursor write never fired
+ * for any pointer-mode weapon, and the magnifying glass (and every other
+ * aim weapon) aimed one weapon-range along the heading instead of at the
+ * cursor. Baked from the image; the values are the original's. checkgap.py
+ * cannot see a raw-address `#define`, only ADDR_ macros, which is why this
+ * escaped it. Cursor codes: 0x18, 0x19, 0x1A, 0x27, 0x28. */
+static const uint8_t kCursorCodeFilter[17] = {
+    0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0
+};
 
 #define AM2_TURN_REPEAT_MS      0x32
 #define AM2_CLICK_THROTTLE_MS   0x12C
