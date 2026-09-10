@@ -3217,7 +3217,7 @@ void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
             RegionSolvePair(from, to);
 
         if (from == *(const int16_t *)(o + OBJ_OFF_PREV_REGION)
-            && *(const int32_t *)(o + OBJ_OFF_STUCK_COUNT))
+            && !*(const int32_t *)(o + OBJ_OFF_STUCK_COUNT))
             goto waypoint;
 
         link = (int16_t)MiddleRegionLink(
@@ -3611,7 +3611,7 @@ void __cdecl RoachRouteToward(void *obj, void *out, const void *ctx)
             RegionSolvePair(from, to);
 
         if (from == *(const int16_t *)(o + OBJ_OFF_PREV_REGION)
-            && *(const int32_t *)(o + OBJ_OFF_STUCK_COUNT))
+            && !*(const int32_t *)(o + OBJ_OFF_STUCK_COUNT))
             goto waypoint;
 
         link = (int16_t)MiddleRegionLink(
