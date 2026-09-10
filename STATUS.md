@@ -32,6 +32,42 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
+- **FIXED (2026-09-10): entering campaign level 2 created a DUPLICATE Sarge --
+  PlaceScenario placed our army from the scenario even when a saved platoon
+  existed.** Found live under tools/sidebyside.py passing from level 1 to level 2
+  (trap frame 4310, ~4600 px; repro sessions/level2pass-4325.txt). The port had
+  907 objects against the hybrid's 905, two sarge=1 troopers against one: a
+  scenario leader at (1702,3500) beside the cof-loaded one left at (3425,1725).
+  The original PlaceScenario (0x0043DE16) skips creating OUR army from the
+  scenario when ADDR_HAVE_DEFAULT_COF is set -- those units come from
+  default.cof (LoadDefaultCof) -- recording only the leader's spawn point into
+  ADDR_LEADER_POS/FACING for the .cof form-up pass; the reconstruction placed
+  every row unconditionally. Invisible until a campaign transition because
+  default.cof does not ship and single levels leave HAVE_DEFAULT_COF at 0.
+  A leader-swap A/B ruled out a shared-save-file harness artifact (the port
+  over-created whether it led or followed); the heap trace named the extra
+  CreateTrooper and the disasm the missing guard. Also corrected the normal
+  path's g_defaultOwner test to compare the army, not the slot (0x0043DF1E).
+  Now frame-exact end to end, object tables byte-identical at 905.
+
+- **FIXED (2026-09-10): the roach turned toward a just-spotted target instead of
+  its route -- RoachBehaviour's far/dest-route arms wrongly called
+  CopyByteIfSet.** Found live (roachattack, trap pump 1443): identical object
+  table, RNG seed and sight context, but the port committed FIELD_540 heading
+  0x1d where the hybrid kept 0x95. The original jmps the far (RANGE>WANT) and
+  dest-route (DEST_DIST>12) arms straight to ConsiderSightingB (0x00408A42) and
+  never calls CopyByteIfSet; the reconstruction routed them through a shared
+  tail that did, so after the found-promote CopyByteIfSet
+  (`if (ctx[OBSERVER]) *out = ctx[BEARING]`) overwrote RoachRouteToward's route
+  heading with the found bearing. Rewrote RoachBehaviour to map all five arms
+  to 0x00408640 exactly and moved the FOLLOW_UID persist (0x00408A3C) to the
+  no-leader arm where the original has it. The live side-by-side now plays all
+  of campaign level 1 frame-exact through every roach interaction. The
+  has-leader formation block (0x004086FF..0x004089B6) is a documented remaining
+  gap, cold in every fixture. The older roach fixtures (bazookaroach-8583,
+  roachbite-1112, roachheap-1575) share this RoachBehaviour root and should be
+  re-run to confirm; the OPEN entries below predate this fix.
+
 - **FIXED (2026-09-10): a bazooka missile's terrain-crossing height clamp was
   inverted, so it detonated a pixel off.** Found live (trap pump 1772, frame
   1905, 143 px in box 50,197-65,212 -- the explosion; repro
