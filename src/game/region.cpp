@@ -9113,7 +9113,24 @@ void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
     }
 
 tail:
+    /* The shared tail runs three things on every path (0x00408A27..0x00408A45),
+     * and only the first was here. The other two are why the roach never kept a
+     * target on the port: (1) persist the current observer as the follow uid,
+     * so the roach re-acquires it next frame instead of losing it; (2)
+     * ConsiderSightingB, which commits the sighting -- the bearing and the
+     * BITE state (FIELD_530 = 4). Dropping them left every roach stuck one
+     * step behind the original: no follow target (SIGHT_OFF_LEADER 0 in the
+     * ctx), so RoachBehaviour took its no-leader branch, and it never entered
+     * the bite state -- the heading (8583/1575), speed (1391) and bite
+     * (1112) divergences were all this one dropped tail. */
     CopyByteIfSet((uint32_t)(uintptr_t)obj, (uint8_t *)out, ctx);
+
+    if (*(void *const *)(c + SIGHT_OFF_OBSERVER))
+        *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
+            *(const uint32_t *)(*(const uint8_t *const *)(c + SIGHT_OFF_OBSERVER)
+                                + OBJ_OFF_UID);
+
+    ConsiderSightingB(obj, out, ctx);
 }
 
 

@@ -253,6 +253,23 @@ FIXED below when that replay runs identical.
   `phoenix!` (case 9, swaps it out but is equipped and fires at once).
 
 FIXED by this rule so far, each with the replay that reproduces it:
+- **FIXED (2026-09-10): RoachBehaviour dropped two statements of its shared
+  tail, so a roach never kept a target -- the root behind all four roach
+  divergences (8583/1575 heading, 1391 speed, 1112 bite).** The original tail
+  (0x00408A27..0x00408A45) runs three things on every path; only the first was
+  reconstructed. Added the other two: (2) `if (ctx.OBSERVER) OBJ_OFF_FOLLOW_UID
+  = OBSERVER->uid` -- persist the sighted target so it re-acquires next frame
+  (0x00408A3C); (3) `ConsiderSightingB(obj, out, ctx)` -- commit the sighting,
+  which is what writes the BITE state FIELD_530=4 (0x00408A45). Without them the
+  port's roach always had SIGHT_OFF_LEADER 0 in its ctx (took RoachBehaviour's
+  no-leader branch) and never bit. Verified: the port now acquires FOLLOW_UID
+  0x3e8 at pump 1000 like the hybrid; make check green; tests/replays/bootcamp
+  frame-exact (no regression to fresh starts). Fixtures sessions/roachbite-1112,
+  roachattack-1391, roachheap-1575, roachbite-... reproduce the family. A
+  SEPARATE residual remains (see the roach move-refusal OPEN below): with the
+  target now kept, roachbite advances 1112->1116 where the roach's move step
+  still diverges by ~2 px -- the RoachStepTailA / RoachMaskWeight speed path of
+  the 1391 entry, next to chase.
 THE SQUAD PANEL'S NAME GUARD WAS INVERTED, so a green trooper carrying a custom
 scripted name (e.g. "wildblood") showed a RANDOM soldier-table name in the HUD
 SQUAD detail instead of the scripted one -- the original drew "Wildblood", the
