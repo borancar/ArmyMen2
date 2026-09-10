@@ -9063,16 +9063,26 @@ void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
     uint8_t *o = (uint8_t *)obj;
     uint8_t *c = (uint8_t *)ctx;
 
-    if (*(const int32_t *)(c + SIGHT_OFF_RANGE) > 0
-        && *(const int32_t *)(c + SIGHT_OFF_RANGE)
-           > *(const int32_t *)(c + ROACHCTX_OFF_WANT_RANGE)) {
-        /* Far: head for what we are engaging and look again. */
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(*(uint8_t **)(c + SIGHT_OFF_OBSERVER)
-                                + OBJ_OFF_POS);
-        RoachRouteToward(obj, out, ctx);
-        if (*(void **)(c + SIGHT_OFF_FOUND))
-            AM2_ROACH_PROMOTE_FOUND(o, c);
+    /* The original nests these: `if (RANGE > 0)` FIRST (0x00408654 `test; jle`
+     * to the RANGE<=0 arm at 0x0040868D), and only INSIDE it the far test
+     * (0x00408658 `cmp; jle`). So ANY positive range goes to the tail after --
+     * far when RANGE > WANT, otherwise straight to the tail keeping the
+     * bearing. The DEST_DIST / arrived logic is reached ONLY when RANGE <= 0.
+     * This had been flattened to `if (RANGE > 0 && RANGE > WANT)`, which let a
+     * roach with 0 < RANGE <= WANT fall through into `arrived`, overwrite its
+     * bearing with the leader's, and turn the wrong way (FIELD_540 63 vs 95). */
+    if (*(const int32_t *)(c + SIGHT_OFF_RANGE) > 0) {
+        if (*(const int32_t *)(c + SIGHT_OFF_RANGE)
+            > *(const int32_t *)(c + ROACHCTX_OFF_WANT_RANGE)) {
+            /* Far: head for what we are engaging and look again. */
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+                *(const uint32_t *)(*(uint8_t **)(c + SIGHT_OFF_OBSERVER)
+                                    + OBJ_OFF_POS);
+            RoachRouteToward(obj, out, ctx);
+            if (*(void **)(c + SIGHT_OFF_FOUND))
+                AM2_ROACH_PROMOTE_FOUND(o, c);
+        }
+        /* RANGE within WANT: nothing extra -- fall to the tail as-is. */
         goto tail;
     }
 

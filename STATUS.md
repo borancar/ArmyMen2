@@ -155,8 +155,21 @@ FIXED below when that replay runs identical.
   RoachBuildContext->SightScan (0x00403B40) / the AiCanSee cache the roach reads,
   not four separate ones. Recommend chasing it as a dedicated RoachBehaviour
   investigation rather than per-manifestation.
-- **OPEN (2026-09-10): after the RoachBehaviour dropped-tail FIX, a roach's
-  SightScan bearing still diverges from byte-identical state.** With the tail
+- **PARTLY FIXED (2026-09-10): RoachBehaviour flattened a nested branch, so a
+  roach with 0 < RANGE <= WANT wrongly ran the "arrived" path.** The input ctx
+  was byte-identical yet FIELD_540 diverged (63 vs 95) -- a transcription error
+  in the branch structure, not SightScan. The original nests it: `if (RANGE>0)
+  { if (RANGE>WANT) far; goto tail; } else { if (DEST_DIST>12) route; else
+  arrived; }` (0x00408654 tests RANGE>0 first and jumps the whole DEST/arrived
+  arm to 0x0040868D; 0x00408658 tests far inside it). The reconstruction had it
+  flat -- `if (RANGE>0 && RANGE>WANT) far; if (DEST_DIST>REACHED) route; else
+  arrived` -- so a positive range within WANT fell through to arrived and
+  overwrote BEARING with the leader's. Restored the nesting. roachbite-1112 now
+  runs frame-exact 1116 -> 24150 (a fresh, unrelated trap there). STILL OPEN:
+  other roaches in the same recordings diverge later -- roachattack-1391 now
+  traps at 1456 on a DIFFERENT roach (0x3ea, roaming, pos off by 2,-26),
+  roachheap-1575 still at 1575 -- likely more of the same roach subsystem or
+  the pump-2464 directional-cache class; chase them next. With the tail
   restored the roach now bites on both builds, and roachbite-1112 advances to a
   trap at 1116. NARROWED: the roach is byte-identical through pump 1114
   (position, subpixel, facing, FIELD_540, state 4, deadline) and at 1115 its
