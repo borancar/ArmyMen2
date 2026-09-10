@@ -1948,7 +1948,16 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
 
     BuildRespawnPool(*(const int32_t *)(uintptr_t)ADDR_GAME_SEED);
 
-    BuildMapObjects(objs, objCount);
+    /* Only build the map's objects on a FRESH start. On a load the objects
+     * come from the save (LoadItems), so the original skips this: after
+     * BuildRespawnPool at 0x0042D0B2 it tests ADDR_LOAD_PENDING and `jne`s past
+     * the build loop to the free-temp tail (0x0042D325). We were calling it
+     * unconditionally, which rebuilt the map's objects on every load -- ~1250
+     * extra alloc/free churn that desynced the fixed heap globally (all objects
+     * ended up at different addresses between builds), and downstream a roach's
+     * sight scan then iterated in a different order and diverged. */
+    if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0)
+        BuildMapObjects(objs, objCount);
 
     am2_log("freeing temporary map load data...\n");
     for (i = 0; i < objCount; i++) {

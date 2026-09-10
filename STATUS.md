@@ -32,8 +32,26 @@ Newest first: a divergence found while fixing another is fixed before
 returning to it. Each entry names its reproduction; an entry moves to
 FIXED below when that replay runs identical.
 
+- **PARTLY FIXED (2026-09-10): a FROM-SAVE load desynced the heap by running
+  BuildMapObjects on the load** -- the port's LoadMap (map.cpp) called
+  BuildMapObjects unconditionally, but the original skips it on a load (after
+  BuildRespawnPool at 0x0042D0B2 it tests ADDR_LOAD_PENDING and `jne`s past the
+  build loop to the free-temp tail 0x0042D325), because the objects come from
+  the save (LoadItems). Rebuilding the map's objects on every load was ~1250
+  extra alloc/free ops that shifted every fixed-heap address. Fixed by guarding
+  the call `if (ADDR_LOAD_PENDING == 0)`, matching the camera guard just above
+  it. Verified: sessions/roachheap-1575.txt now has the heap ALIGNED (Sarge and
+  the roach at identical addresses on both builds), and a fresh-start replay
+  (tests/replays/bootcamp.txt) stays frame-exact -- so BuildMapObjects still
+  runs on a fresh start. What REMAINS at that trap is the roach heading
+  divergence itself, now proven INDEPENDENT of the heap (roach 0x400003ea still
+  pos 2452,1174 vs 2451,1169 with the heap aligned): it is the SAME sight-scan
+  bug as the 8583 entry below, so the fixture still traps at 1575 until that is
+  fixed.
 - **OPEN (2026-09-10): a FROM-MENU session desyncs the heap at mission load
-  (~pump 490), and a roaming roach then diverges downstream.** Found live
+  (~pump 490), and a roaming roach then diverges downstream.** [SUPERSEDED by
+  the PARTLY FIXED entry above -- the heap desync was BuildMapObjects on load;
+  the roach divergence is the 8583 sight bug, independent of the heap.] Found live
   (fresh `--video`, no replay; trap pump 1575, frame 1703; repro
   sessions/roachheap-1575.txt). At the trap only roach 0x400003ea (type 8,
   FULL health -- not hit) differs, pos (2452,1174) vs (2451,1169), and its
