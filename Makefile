@@ -335,7 +335,7 @@ vectors:
 .PHONY: check
 check:
 	@rc=0; \
-	for t in coverage comcalls merges checkcom checkhooks binpatches blindspots checkclaims crt scripttokens scriptactions screens checkpatches checkprose checkseams checkinstalled checkcallers checkglobals checkoffsets checksplit checkthis checkgap checkvtables checkimagedata glyphdump qsortcheck printfcheck crtcheck moviecheck posecheck formationcheck shakecheck roachcheck rlecheck mprowcheck weaponcheck listcheck placementcheck aicheck hitreactcheck savetagcheck numberkeycheck aiignorecheck aitwincheck aiwalkcheck aifollowcheck aikeeprangecheck rowreleasecheck stateleavecheck refreshcheck vehpointcheck roachbitecheck pathplancheck vehexitcheck tilesetcheck damagecheck shotcheck shotdmgcheck rectquerycheck ringcheck boolcheck explcheck collectcheck firepose regioncheck pathcheck tilepathcheck cheats; do \
+	for t in coverage comcalls merges checkcom checkhooks binpatches blindspots checkclaims crt scripttokens scriptactions screens checkpatches checkprose checkseams checkinstalled checkcallers checkglobals checkoffsets checksplit checkthis checkgap checkvtables checkimagedata checkplacement glyphdump qsortcheck printfcheck crtcheck moviecheck posecheck formationcheck shakecheck roachcheck rlecheck mprowcheck weaponcheck listcheck placementcheck aicheck hitreactcheck savetagcheck numberkeycheck aiignorecheck aitwincheck aiwalkcheck aifollowcheck aikeeprangecheck rowreleasecheck stateleavecheck refreshcheck vehpointcheck roachbitecheck pathplancheck vehexitcheck tilesetcheck damagecheck shotcheck shotdmgcheck rectquerycheck ringcheck boolcheck explcheck collectcheck firepose regioncheck pathcheck tilepathcheck cheats; do \
 	    printf '  %-12s ' "$$t"; \
 	    if ./.venv/bin/python tools/$$t.py >/dev/null 2>&1; then \
 	        echo ok; \
@@ -447,6 +447,7 @@ SA_LDF   := -mwindows -static -static-libgcc -static-libstdc++ \
 .PHONY: standalone standalone-generate
 standalone-generate:
 	./.venv/bin/python tools/mkglobals.py
+	./.venv/bin/python tools/placement.py
 
 $(BUILD)/sa/%.o: %.cpp | standalone-generate
 	@mkdir -p $(dir $@)
@@ -513,23 +514,27 @@ NATIVE_CC    := gcc
 NATIVE_SRC   := $(SA_SRC) $(wildcard src/platform/*.cpp) \
                 src/standalone/noinput.cpp src/standalone/devtools.cpp
 NATIVE_OBJ   := $(patsubst %.cpp,$(BUILD)/native/%.o,$(NATIVE_SRC)) \
-                $(BUILD)/native/origdata.o $(BUILD)/native/origgap.o
+                $(BUILD)/native/origchunks.o $(BUILD)/native/origgap.o
 DEV_CSRC     := $(SA_CSRC)
 DEV_OBJ      := $(patsubst %.cpp,$(BUILD)/native-dev/%.o,$(NATIVE_SRC)) \
                 $(patsubst %.c,$(BUILD)/native-dev/%.o,$(DEV_CSRC)) \
                 $(patsubst %.c,$(BUILD)/native-dev/%.o,$(LUA_CSRC)) \
-                $(BUILD)/native-dev/origdata.o $(BUILD)/native-dev/origgap.o
+                $(BUILD)/native-dev/origchunks.o $(BUILD)/native-dev/origgap.o
 NATIVE_DEFS  := -DAM2_STANDALONE -DAM2_NATIVE -Ibuild/standalone \
                 -isystem src/platform/include -include callconv.h
 NATIVE_ARCH  := -m32 -fno-pie -no-pie
+# -fdata-sections gives every global its own input section, so tools/placement.py
+# can place the transcribed globals at their original VAs via build/standalone/
+# place.ld (see that tool). Native (ELF) only; the SA/mingw-PE build keeps the
+# --section-start path.
 NATIVE_CXXF  := $(NATIVE_ARCH) -O2 -g -Wall -Wextra -std=gnu++14 \
-                -fno-strict-aliasing -fno-exceptions -fno-rtti $(DEPFLAGS) \
-                $(NATIVE_DEFS)
+                -fno-strict-aliasing -fno-exceptions -fno-rtti -fdata-sections \
+                $(DEPFLAGS) $(NATIVE_DEFS)
 NATIVE_CF    := $(NATIVE_ARCH) -O2 -g -Wall -Wextra -std=gnu11 \
-                -fno-strict-aliasing $(DEPFLAGS) $(NATIVE_DEFS)
+                -fno-strict-aliasing -fdata-sections $(DEPFLAGS) $(NATIVE_DEFS)
 NATIVE_LDF   := $(NATIVE_ARCH) -static-libgcc \
                 -Wl,--section-start,.origgap=0x00401000 \
-                -Wl,--section-start,.origdat=0x0046F000 \
+                -Wl,-T,build/standalone/place.ld \
                 -Wl,--section-start,.origbss=$$(cat build/standalone/origbss.addr) \
                 -Wl,-Ttext=0x00700000 -Wl,-z,norelro -Wl,--no-warn-rwx-segments
 NATIVE_LIBS  := -lSDL3 -lpthread -lm
@@ -619,7 +624,7 @@ $(BUILD)/native/%.o: %.c | standalone-generate
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_CF) -c $< -o $@
 
-$(BUILD)/native/origdata.o: build/standalone/origdata.S | standalone-generate
+$(BUILD)/native/origchunks.o: build/standalone/origchunks.S | standalone-generate
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
 
@@ -635,7 +640,7 @@ $(BUILD)/native-dev/%.o: %.c | standalone-generate
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_CF) -DAM2_DEVTOOLS -c $< -o $@
 
-$(BUILD)/native-dev/origdata.o: build/standalone/origdata.S | standalone-generate
+$(BUILD)/native-dev/origchunks.o: build/standalone/origchunks.S | standalone-generate
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
 

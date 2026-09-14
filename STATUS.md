@@ -8,6 +8,33 @@ command that produces it, so it can be re-measured rather than believed.
 Last updated: **2026-09-11**, first global structures transcribed out of the
 carried data blob (see MIGRATION below).
 
+## LINKER PLACEMENT (2026-09-14): transcribed globals live at their real VAs
+
+The migration first redirected each `ADDR_X` to a C symbol the linker scattered
+into `.rodata` at an address corresponding to nothing in the image -- which left
+a stale blob byte at the real VA (breaking stored pointers), and made the region
+unverifiable. Fixed for the NATIVE (ELF) build: each pure-data global is now
+PLACED at its original VA. `-fdata-sections` gives every global its own input
+section; `tools/placement.py` carves the carried blob around the migrated
+symbols and emits `build/standalone/place.ld`, a fragment that lays the surviving
+blob chunks and the placed symbols' input sections end to end under one writable
+`.origdat` at 0x0046F000 with `SUBALIGN(1)` (so the location counter flows to
+each VA), `INSERT AFTER .bss`. The `standalone.h` redirects stay -- once a symbol
+is at its VA, `&am2_x` equals the numeric `ADDR_X`, so they agree, and a
+mis-placement makes the byte-diff fail.
+
+**111 symbols placed at their exact VAs; the built `.origdat` region
+[0x46F000,0x48E000) is byte-identical to the original image**, 34.9% of the
+meaningful (non-zero) bytes now hand-written C. `tools/checkplacement.py` (in
+`make check`) is the continuous form of that measurement: it verifies each
+placed symbol's C bytes equal the image AND, when the native build exists,
+byte-diffs the linked `.origdat` against the blob. NOT placed: the ~10
+pointer/fn-ptr tables (their bytes are our pointers, not the image's -- they
+stay scattered redirects, dereference-verified by checkimagedata) and
+`build_menu_rects` (it overlaps the packed `pointer_modes` table). The SA/mingw
+build keeps the `--section-start` blob path (PE linker scripts differ); the
+native build was the stated priority.
+
 ## MIGRATION (2026-09-11): global structures transcribed out of the blob
 
 The native/standalone builds carry the original's `.rdata`/`.data` as one blob
@@ -2095,7 +2122,7 @@ clean.
 
 ## In flight
 
-Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **68** analysis
+Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **69** analysis
 tools in `make check` (`tools/checkpatches.py`; `tools/checkclaims.py` counts
 the recipe).
 
