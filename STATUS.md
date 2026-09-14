@@ -240,6 +240,27 @@ not shrink the carried blob (the zeros sit mid-`.origdat`), but it makes the
 The other ~4.2 KB of printable runs the raw sweep flags are kept: they are still
 pointed at (char* tables not yet transcribed) or still read by address.
 
+**FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
+`LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a
+single blob pointer DOWNWARD -- `ADDR_STR_PALETTE0 - i*16` -- because in the
+image palette5.bmp..palette0.bmp sit sixteen bytes apart with palette0 highest.
+The string-fold rewrote the base to a `.rodata` literal, `"palette0.bmp" -
+i*16`, which is pointer arithmetic off the front of one C literal: i=0 gave
+palette0.bmp, i=1..5 read whatever the linker placed before it (garbage), so
+five of the six palette files never loaded. Invisible on Boot Camp (the whole
+function is gated on ADDR_TILESET_RESERVE, zero there); on a cycling map
+(campaign.txt's `cycling? = true` -- homeland/level 2, tankstore, mania, ...)
+CyclePalette steps `which = 0,1,2,3,4,5,4,3,2,1` through the six slots, so the
+water/fire shimmer was correct on step 0 and wrong on the other five -- the
+"palette shifts for water" divergence. Fixed by spelling the six names as an
+array in load order (correct AND blob-free). Found via sidebyside: both games
+loaded `sarge/map2_mission1` byte-identically through the load; the mechanism
+was confirmed by compiling both expressions (i=1..5 broken vs. the array). NB
+the live water frame still can't be watched through loadgame -- the separate,
+open DrawSelection SIGFPE on campaign-save render (below) exits the port on
+mission entry. This was the ONLY literal-arithmetic fold bug; a src sweep for
+`"literal" +/- ` and `"literal"[` found no others in game code.
+
 ## DONE (2026-09-11): the .bss working memory is a named C struct
 
 The whole 1,887 KB .bss zero region (0x0048E000..0x00666000) is now

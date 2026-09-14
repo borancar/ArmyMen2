@@ -629,11 +629,17 @@ void __cdecl PaletteLoaded(void)
  * that elsewhere selects a loading MODE selects here whether the step happens
  * at all.
  *
- * THE SIX NAME STRINGS RUN BACKWARDS. palette5.bmp is at the low address and
- * palette0.bmp at the high one, sixteen bytes apart, so the natural
- * `base + i * stride` walks away from them. Written as the subtraction it is;
- * a forward walk would read whatever the linker put after palette0.bmp and
- * hand it to fopen.
+ * THE SIX NAME STRINGS RUN BACKWARDS IN THE IMAGE. palette5.bmp is at the low
+ * address and palette0.bmp at the high one, sixteen bytes apart, so the
+ * original walked a single blob pointer DOWNWARD: `ADDR_STR_PALETTE0 -
+ * i * stride`, reading palette0 then palette1 .. palette5 from consecutive
+ * blob slots. Folding the base to a `.rodata` literal ("palette0.bmp") silently
+ * broke that -- the arithmetic then walked off the front of one C literal into
+ * whatever the linker placed before it, so every slot but palette0 read
+ * garbage and fopen missed the file. It is invisible until a WATER/FIRE map,
+ * because ADDR_TILESET_RESERVE gates the whole function and Boot Camp leaves it
+ * zero. Spelled out as the six literals in load order, which is both correct
+ * and free of the blob: palette0 -> slot 0 .. palette5 -> slot 5, as before.
  *
  * The chdir happens once, before all six, and is never undone -- the caller
  * owns that. SetGameDir's answer is discarded here as it is at most of its
@@ -642,6 +648,10 @@ void __cdecl PaletteLoaded(void)
  */
 void __cdecl LoadTilesetPalettes(void)
 {
+    static const char *const kNames[AM2_TILESET_PALETTES] = {
+        "palette0.bmp", "palette1.bmp", "palette2.bmp",
+        "palette3.bmp", "palette4.bmp", "palette5.bmp",
+    };
     uint32_t i;
 
     if (!*(const int32_t *)(uintptr_t)ADDR_TILESET_RESERVE)
@@ -650,8 +660,7 @@ void __cdecl LoadTilesetPalettes(void)
     SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_BLOCK));
 
     for (i = 0; i < AM2_TILESET_PALETTES; i++)
-        LoadPaletteFile("palette0.bmp"
-                            - i * AM2_PALETTE_NAME_STRIDE,
+        LoadPaletteFile(kNames[i],
                         (uint8_t *)AM2_IMAGE(ADDR_TILESET_PALETTES)
                             + i * AM2_TILESET_PALETTE_BYTES);
 }
