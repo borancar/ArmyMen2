@@ -27,6 +27,66 @@
 #include "gameproc.h" /* NoteKind31 -- reconstructed */
 #include "maprow.h"   /* RowUpdate -- reconstructed */
 
+#ifdef AM2_STANDALONE
+/* Global structures transcribed out of the carried .rdata blob -- the air
+ * strike's path/drop tables and the formation slot table. See STATUS.md's
+ * MIGRATION note; each is byte-identical to the image and referenced only from
+ * reconstructed code. */
+
+/* am2_formation_slots -- 0x00473EA0, twelve 6-byte slot records: byte 0 is the
+ * facing, bytes 2..3 an int16 distance, the rest padding (FormationPoint reads
+ * `*rec` and `*(int16 *)(rec+2)`; stride AM2_FORMATION_SLOT_STRIDE = 6). */
+extern "C" const uint8_t am2_formation_slots[72] = {
+    128,0,  64,0, 0,0,    96,0,  48,0, 0,0,   160,255, 48,0, 0,0,
+    128,0,  96,0, 0,0,    32,0,  96,0, 0,0,   224,255, 96,0, 0,0,
+     64,0,  64,0, 0,0,   192,255, 64,0, 0,0,     0,0, 128,0, 0,0,
+     96,0,  96,0, 0,0,   160,255, 96,0, 0,0,   128,0, 128,0, 0,0,
+};
+
+/* am2_air_drop_offsets -- 0x00473F74, three {int16 dx, int16 dy} drop points. */
+extern "C" const int16_t am2_air_drop_offsets[6] = { 0, 0, -48, 32, 48, 32 };
+
+/* am2_air_drop_facings -- 0x00473F80, the facing for each of the three drops. */
+extern "C" const uint8_t am2_air_drop_facings[3] = { 0, 96, 160 };
+
+/* am2_air_frame_hotspots -- 0x00473FB0, eleven {int16 x, int16 y} sprite
+ * hotspots for the transport's animation frames. */
+extern "C" const int16_t am2_air_frame_hotspots[22] = {
+    118, 87, 112, 78, 109, 67, 109, 64, 108, 66, 105, 68,
+    108, 71, 105, 71, 101, 67,  91, 60,  77, 66,
+};
+
+/* am2_air_strike_kinds -- 0x00473FDC, the six object kinds an air strike can
+ * deliver. */
+extern "C" const int32_t am2_air_strike_kinds[6] = { 129, 130, 140, 120, 148, 149 };
+
+/* The air-strike gauge and flight-path scalars, read as *(const int32_t/double/
+ * int16_t *) at their own addresses (0x00473F20..0x00473F74). Types are the
+ * readers': the three slopes are double at 8-byte spacing, the four PATH_TURN/
+ * AWAY values are int16 packed two-per-dword just below AIR_DROP_OFFSETS. */
+extern "C" const int32_t am2_air_gauge_x0    = -278;    /* 0x00473F20 */
+extern "C" const int32_t am2_air_gauge_y0    = 320;     /* 0x00473F24 */
+extern "C" const double  am2_air_gauge_slope = 0.43;    /* 0x00473F28 */
+extern "C" const int32_t am2_air_gauge_ms    = 2500;    /* 0x00473F30 */
+extern "C" const int32_t am2_air_pass_ms     = 3000;    /* 0x00473F34 */
+extern "C" const int32_t am2_air_cycle_ms    = 1000;    /* 0x00473F38 */
+extern "C" const int32_t am2_air_run_ms      = 2000;    /* 0x00473F3C */
+extern "C" const int32_t am2_air_leg1_ms     = 800;     /* 0x00473F40 */
+extern "C" const int32_t am2_air_leg2_ms     = 1200;    /* 0x00473F44 */
+extern "C" const int32_t am2_air_path_in_y   = 520;     /* 0x00473F48 */
+extern "C" const int32_t am2_air_path_out_y  = -100;    /* 0x00473F4C */
+extern "C" const double  am2_air_leg1_slope  = 0.95;    /* 0x00473F50 */
+extern "C" const double  am2_air_leg3_slope  = 1.18;    /* 0x00473F58 */
+extern "C" const int32_t am2_air_path_mid_y  = 240;     /* 0x00473F60 */
+extern "C" const int32_t am2_air_path_apex_x = 340;     /* 0x00473F64 */
+extern "C" const int32_t am2_air_path_half_y = 80;      /* 0x00473F68 */
+extern "C" const int16_t am2_air_path_turn_x     = 300; /* 0x00473F6C */
+extern "C" const int16_t am2_air_path_away_x     = 300; /* 0x00473F70 */
+/* 0x00473F6E TURN_Y_IN and 0x00473F72 TURN_Y_OUT are NOT migrated: they are
+ * runtime state, recomputed by AirInitTurnYIn/Out at init (see below), so they
+ * stay at their writable .origdat placement rather than a read-only C const. */
+#endif
+
 #define kAirSaveBlock ((void *)(uintptr_t)AM2_IMAGE(ADDR_AIR_SAVE_BLOCK))
 
 int32_t __cdecl SaveAirSection(am2_FILE *fp)
@@ -39,7 +99,7 @@ int32_t __cdecl SaveAirSection(am2_FILE *fp)
 int32_t __cdecl LoadAirSection(am2_FILE *fp)
 {
     if (!CheckSaveTag(fp, AM2_SAVETAG_AIR,
-                      (const char *)AM2_IMAGE(ADDR_STR_AIR_CPP), 0x28B))
+                      "C:\\ArmyMen2\\source\\air.cpp", 0x28B))
         return 0;
 
     orig_fread(kAirSaveBlock, AM2_AIR_SAVE_SIZE, 1, fp);
@@ -137,7 +197,7 @@ int32_t __cdecl PeerShouldNack(void *peer, uint32_t seq)
 
         if (*(const int32_t *)((const uint8_t *)
                 *(void *const *)(uintptr_t)ADDR_COMM_OBJECT + COMM_OFF_VERBOSE))
-            am2_log((const char *)AM2_IMAGE(ADDR_STR_NACKING),
+            am2_log("Nacking %6d to %x at %d  >?  %d  ( %d ) Interval = %d Latency = %d count = %d nackinterval = %d\n",
                     seq, *(const uint32_t *)(p + PEER_OFF_ID), now,
                     *(const uint32_t *)(rec + NACKREC_OFF_TIME) + capped,
                     now - *(const uint32_t *)(rec + NACKREC_OFF_TIME) - capped,
@@ -161,7 +221,7 @@ int32_t __cdecl PeerShouldNack(void *peer, uint32_t seq)
         *(int32_t *)(p + PEER_OFF_NACK_COUNT) = count + 1;
         if (count + 1 >= AM2_NACK_RECS_MAX) {
             *(int32_t *)(p + PEER_OFF_NACK_COUNT) = count;
-            am2_log((const char *)AM2_IMAGE(ADDR_STR_NACK_FULL),
+            am2_log(" Nack Rec Array full for ID %x, %d\n",
                     *(const uint32_t *)(p + PEER_OFF_ID), count);
         }
 
@@ -1133,13 +1193,13 @@ int32_t __cdecl ThingCode(const void *who, const void *owner)
     case 10: case 28:     return 0x1E;
     case 15:              return AM2_NOT_AT_FLAG_BASE;
     case 16: return AtFlagBase(w, o, 0,
-                               (const char *)AM2_IMAGE(ADDR_STR_FLAGBASE_GREEN));
+                               "gflagbase");
     case 17: return AtFlagBase(w, o, 1,
-                               (const char *)AM2_IMAGE(ADDR_STR_FLAGBASE_TAN));
+                               "tflagbase");
     case 18: return AtFlagBase(w, o, 2,
-                               (const char *)AM2_IMAGE(ADDR_STR_FLAGBASE_BLUE));
+                               "bflagbase");
     case 19: return AtFlagBase(w, o, 3,
-                               (const char *)AM2_IMAGE(ADDR_STR_FLAGBASE_GREY));
+                               "grflagbase");
     case 21:              return 0x21;
     case 22: {
         int32_t max    = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);

@@ -25,6 +25,14 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
+#ifdef AM2_STANDALONE
+/* am2_hit_pose_by_class -- 0x00475198, the pose a hit trooper takes, indexed
+ * by SIGHTC_OFF_FIELD_00 * 2 + high-bit (0..5, orig.h: "exactly SIX usable").
+ * One of the pose tables transcribed out of the carried blob; six int32
+ * entries, bounded by ADDR_ARMY_TABLE (a pointer global) 24 bytes on. */
+extern "C" const int32_t am2_hit_pose_by_class[6] = { 12, 13, 14, 15, 16, 17 };
+#endif
+
 #define kRegionOfCell (*(uint8_t **)AM2_IMAGE(ADDR_REGION_OF_CELL))
 #define kRegionCost   (*(uint8_t **)AM2_IMAGE(ADDR_REGION_COST))
 #define kRegionNext   (*(uint8_t **)AM2_IMAGE(ADDR_REGION_NEXT))
@@ -7233,7 +7241,7 @@ void __cdecl RoachBuildContext(void *obj, void *out)
                             (const AM2_Point *)
                                 (*(uint8_t **)(s + SIGHT_OFF_OBSERVER)
                                  + OBJ_OFF_POS)))
-            orig_log((const char *)AM2_IMAGE(ADDR_STR_BAD));
+            orig_log("Bad!\n");
     }
 
     if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS

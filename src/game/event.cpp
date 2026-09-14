@@ -535,7 +535,7 @@ int32_t __cdecl LoadEventSection(am2_FILE *fp)
     int32_t tag, unused, key, kind, idx;
 
     if (!CheckSaveTag(fp, AM2_SAVETAG_EVENT,
-                      (const char *)AM2_IMAGE(ADDR_STR_EVENT_CPP), 0xCCA))
+                      "C:\\ArmyMen2\\source\\event.cpp", 0xCCA))
         return 0;
 
     orig_fread(&tag, 4, 1, fp);
@@ -629,7 +629,7 @@ int32_t __cdecl LoadScriptConditions(am2_FILE *fp)
     FreeScriptConditions();
 
     if (!CheckSaveTag(fp, AM2_SAVETAG_CONDS,
-                      (const char *)AM2_IMAGE(ADDR_STR_EVENT_CPP), 0x173))
+                      "C:\\ArmyMen2\\source\\event.cpp", 0x173))
         return 0;
 
     orig_fread(&tag, 4, 1, fp);
@@ -682,12 +682,12 @@ int32_t __cdecl SaveEventBlock(am2_FILE *fp)
 int32_t __cdecl LoadEventBlock(am2_FILE *fp)
 {
     if (!CheckSaveTag(fp, AM2_SAVETAG_EVENT_BLOCK,
-                      (const char *)AM2_IMAGE(ADDR_STR_EVENT_CPP), 0xD9))
+                      "C:\\ArmyMen2\\source\\event.cpp", 0xD9))
         return 0;
 
     /* The size, through the same helper, one source line later. */
     if (!CheckSaveTag(fp, AM2_EVENT_BLOCK_SIZE,
-                      (const char *)AM2_IMAGE(ADDR_STR_EVENT_CPP), 0xDB))
+                      "C:\\ArmyMen2\\source\\event.cpp", 0xDB))
         return 0;
 
     orig_fread(kEventBlock, AM2_EVENT_BLOCK_SIZE, 1, fp);
@@ -869,7 +869,7 @@ void __cdecl MissionStartup(void)
     if (level <= 0)
         level = 1;
 
-    sprintf(name, (const char *)AM2_IMAGE(ADDR_STR_STARTUP_FMT), level);
+    sprintf(name, "startup%d", level);
     id = ScriptNameUid(name);
     if (id > 0)
         EventNotify(0, id, 0, 0, 0, 0, 0, 0, 1, 0);
@@ -883,7 +883,7 @@ void __cdecl MissionStartup(void)
     if (*(const int32_t *)(uintptr_t)ADDR_WIN_ENABLED)
         return;
 
-    sprintf(name, (const char *)AM2_IMAGE(ADDR_STR_MISSION_SAV_FMT),
+    sprintf(name, "map%d_mission%d.sav",
             *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID,
             *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX);
     SaveGame(name);
@@ -1824,7 +1824,7 @@ void __cdecl EvtRuleA(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
 
     if (*(const int8_t *)(obj + OBJ_OFF_ARMY)
         == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
-        PlayDynamicSound((const char *)AM2_IMAGE(ADDR_STR_MP_POP_WAV),
+        PlayDynamicSound("mp_pop.wav",
                          0, 0, 0, 0, 3, 2, 0);
 }
 
@@ -2192,7 +2192,7 @@ extern "C" void *__cdecl LoadBitmap(const char *name, int32_t flags);
  * fails still leaves the game paused. */
 void __cdecl EvtShowBitmap(const char *name)
 {
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
+    SetGameDir("bitmaps");
 
     *(int32_t *)AM2_IMAGE(ADDR_MENU_MODE) = AM2_SUBSTATE_BITMAP;
     *(int32_t *)AM2_IMAGE(ADDR_OVERLAY_DIRTY)      = 1;
@@ -2205,7 +2205,7 @@ void __cdecl EvtShowBitmap(const char *name)
 
 void __cdecl EvtShowBitmapNoPause(const char *name)
 {
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
+    SetGameDir("bitmaps");
 
     FreeBitmap((void **)AM2_IMAGE(ADDR_CURRENT_BITMAP));
     *(void **)AM2_IMAGE(ADDR_CURRENT_BITMAP) = LoadBitmap(name, 0);
@@ -2326,7 +2326,7 @@ void __cdecl MissionEnded(int32_t lost)
 
     if (*(const int32_t *)(uintptr_t)ADDR_WIN_ENABLED) {
         SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
-        am2_sprintf(path, (const char *)AM2_IMAGE(ADDR_STR_LEVEL_FILE_FMT),
+        am2_sprintf(path, "%s%d.txt",
                     (const char *)(uintptr_t)ADDR_MAP_NAME,
                     *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX + 1);
 
@@ -2370,7 +2370,7 @@ void __cdecl MissionEnded(int32_t lost)
 
     if (!lost && *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID > 0) {
         SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
-        am2_sprintf(path, (const char *)AM2_IMAGE(ADDR_STR_LEVEL_FILE_FMT),
+        am2_sprintf(path, "%s%d.txt",
                     (const char *)(uintptr_t)ADDR_MAP_NAME,
                     *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX + 1);
 
@@ -2439,7 +2439,7 @@ void __cdecl MissionEnded(int32_t lost)
 
     if (!strlen((const char *)(uintptr_t)ADDR_MOVIE_TO_PLAY))
         strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY,
-               (const char *)AM2_IMAGE(ADDR_STR_GRAVE_MOVIE));
+               "grave");
 
     RequestState(3);
     *(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG = 1;
@@ -3573,7 +3573,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
 
         if (GetVarValue(act->xvar, &v) == 0)
             return;
-        am2_sprintf(text, (const char *)(uintptr_t)ADDR_STR_PCT_D, v);
+        am2_sprintf(text, "%d", v);
         HudMessage(text, 0);
         return;
     }

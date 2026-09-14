@@ -96,6 +96,97 @@ int32_t am2_sa_unimplemented(void);
  * into build/standalone/tables.cpp rather than transcribed. */
 extern const uint8_t am2_pickup_kind_index[29];
 
+/* Global structures carved out of the carried .rdata/.data blob and
+ * transcribed by hand into typed C, so the reconstruction reads them from our
+ * own data rather than from the placed image. See the definitions for the
+ * address each replaces and why the migration is complete. */
+extern const int32_t am2_weapon_pose_frames[104];   /* was 0x00474FE0 */
+extern const int32_t am2_pose_by_class[3];           /* was 0x00475180 */
+extern const int32_t am2_death_anim_by_code[3];      /* was 0x0047518C */
+extern const int32_t am2_hit_pose_by_class[6];       /* was 0x00475198 */
+extern const uint8_t am2_formation_slots[72];        /* was 0x00473EA0 */
+extern const int16_t am2_air_drop_offsets[6];        /* was 0x00473F74 */
+extern const uint8_t am2_air_drop_facings[3];        /* was 0x00473F80 */
+extern const int16_t am2_air_frame_hotspots[22];     /* was 0x00473FB0 */
+extern const int32_t am2_air_strike_kinds[6];        /* was 0x00473FDC */
+extern const uint8_t am2_army_pal_base[4];           /* was 0x00474174 */
+/* Air-strike gauge/flight-path scalars (air.cpp). */
+extern const int32_t am2_air_gauge_x0, am2_air_gauge_y0, am2_air_gauge_ms;
+extern const int32_t am2_air_pass_ms, am2_air_cycle_ms, am2_air_run_ms;
+extern const int32_t am2_air_leg1_ms, am2_air_leg2_ms, am2_air_path_in_y;
+extern const int32_t am2_air_path_out_y, am2_air_path_mid_y, am2_air_path_apex_x;
+extern const int32_t am2_air_path_half_y;
+extern const double  am2_air_gauge_slope, am2_air_leg1_slope, am2_air_leg3_slope;
+extern const int16_t am2_air_path_turn_x, am2_air_path_away_x;
+/* TURN_Y_IN/TURN_Y_OUT are runtime state (AirInitTurnYIn/Out), not migrated. */
+/* Roach creature parameters (item.cpp). */
+extern const int16_t am2_roach_health, am2_roach_start_frame;
+extern const int32_t am2_roach_armour, am2_roach_damage, am2_roach_forvel;
+extern const int32_t am2_roach_revvel, am2_roach_foracc, am2_roach_revacc;
+extern const int32_t am2_roach_box[4], am2_roach_bite_box[4], am2_roach_row_spec[4];
+extern const int32_t am2_field_530_frames;
+/* Object hit-boxes and row-specs, int32[4] rects (item.cpp). */
+extern const int32_t am2_explosion_box[4], am2_explosion_area_16[4];
+extern const int32_t am2_explosion_area_24[4], am2_explosion_area_32[4];
+extern const int32_t am2_explosion_row_spec[4], am2_missile_box[4], am2_missile_row_spec[4];
+extern const int32_t am2_trooper_box[4], am2_trooper_row_spec[4];
+extern const int32_t am2_vehicle_box[4], am2_vehicle_row_spec[4], am2_kind7_box[4];
+/* Gameplay scalar parameters (misc.cpp). */
+extern const int16_t am2_pillbox_trooper_health, am2_seq_k4_rise;
+extern const float   am2_gravity, am2_difficulty_scale;
+extern const int32_t am2_view_speed;
+/* tick_interval_ms / path_max_nodes are runtime state, not migrated. */
+extern const int32_t am2_path_max_searches, am2_path_retry_ms, am2_seq_grid_rows;
+extern const int32_t am2_seq_tail_frames, am2_seq_advance_ms, am2_seq_emit_ms;
+extern const int32_t am2_seq_k4_step_ms, am2_seq_k4_drift_x, am2_seq_k4_drift_y;
+/* Small pointer-free lookup tables (item.cpp; seq_k4_hold in misc.cpp). */
+extern const int32_t  am2_trooper_class_value[4], am2_kind_frames[8];
+extern const int32_t  am2_vehicle_height_by_kind[6], am2_spiral_dx[4], am2_spiral_dy[4];
+extern const uint32_t am2_bit_from_n[4], am2_seq_k4_hold[4];
+extern const int16_t  am2_mp_row_coords[32], am2_drop_ring[12];
+/* HUD layout (widget.cpp), sprite-grid/counts (sprite.cpp), palette cycle count. */
+extern const uint8_t am2_build_menu_rects[12];
+/* am2_hud_cmd_spec is runtime-written (HudCmdConstruct) and 280 bytes; not migrated. */
+extern const int16_t am2_hud_cmd_offsets[6], am2_hud_sarge_offsets[8];
+extern const int32_t am2_sprite_grid_rows, am2_sprite_grid_cols, am2_seq_sprite_5_count;
+extern const int32_t am2_decal_sprite_count, am2_mark_sprite_count, am2_mp_mark_cols[2];
+extern const int32_t am2_palette_cycle_count;
+extern const int32_t am2_shake_presets[44];          /* mapdraw.cpp, was 0x00486170 */
+extern const int16_t am2_aim_displace_map[25088];    /* mapdraw.cpp, was 0x00478CDC */
+extern const int32_t am2_pad_bit_table[66];          /* pad.cpp, was 0x00486444 */
+extern const uint32_t am2_respawn_kind_mask[44];     /* maprow.cpp, was 0x0048C530 */
+extern const uint8_t am2_key_defaults[24];           /* gameproc.cpp, was 0x0048AE80 */
+extern const int32_t am2_game_version;               /* commmsg.cpp, was 0x00475894 */
+/* char* name arrays (verified by dereference). */
+extern const char *const am2_item_type_names[44], *const am2_unit_class_names[45];
+extern const char *const am2_movie_names[12], *const am2_vehicle_names[6];
+extern const char *const am2_sprite_set_dirs[46];
+extern const AM2_StateAction am2_state_actions[5];   /* movie.cpp, was 0x0048654C */
+/* One per-item-kind weapon-handler record: slots 0/1 are handler pointers,
+ * 2/3 int params. Defined here so both the definition (widget.cpp) and this
+ * declaration share the type. */
+struct AM2_WeaponHandler { const void *fn0, *fn1; int32_t p2, p3; };
+extern const struct AM2_WeaponHandler am2_weapon_handlers[44]; /* widget.cpp, 0x00489880 */
+/* One OPTIONS-dialog declaration record (the reader walks it by byte offset;
+ * this struct is only the transcription's, so it lives here). */
+struct AM2_Option { int32_t widget, x, y, group, first, last, bit, which;
+                    const char *caption; };
+extern const struct AM2_Option am2_option_table[43];  /* widget.cpp, 0x004865B8 */
+extern const int16_t am2_keyrow_positions[42];        /* widget.cpp, 0x0048AEC8 */
+extern const AM2_FontDesc am2_font_descs[3];          /* font.cpp, 0x004897E8 */
+/* One cursor-mode record: three handler pointers + seven ints (reader uses
+ * AM2_POINTER_MODE_SIZE byte offsets, so this struct is the transcription's). */
+struct AM2_PointerMode { const void *pick, *action, *invoke;
+                         int32_t a, b, c, d, e, f, g; };
+extern const struct AM2_PointerMode am2_pointer_modes[7]; /* widget.cpp, 0x004761B8 */
+/* Scalar float/double constants (misc.cpp), read as *(const double/float *). */
+extern const double am2_weapon_range_hi, am2_weapon_range_lo, am2_weapon_range_k3;
+extern const double am2_sight_range_want, am2_enemy_health_share;
+extern const double am2_dbl_zero, am2_dbl_max_period, am2_dbl_ms_per_sec;
+extern const double am2_dbl_512, am2_dbl_sin_scale, am2_dbl_one_256, am2_dbl_two_pi;
+extern const float  am2_f_one, am2_f_one_hundredth, am2_float_zero;
+extern const float  am2_hud_slide_shut, am2_hud_slide_open, am2_roach_reach, am2_ms_to_sec;
+
 #ifdef __cplusplus
 }
 #endif
@@ -254,5 +345,282 @@ void  devtools_init(void);
 #define AM2_ITEM_KIND_IS_SPECIAL(kind) \
     ((uint32_t)((kind) - 1) <= 0x1Cu \
      && am2_pickup_kind_index[(kind) - 1] == 0)
+
+/* The transcribed global structures replace the image's copy at their own
+ * addresses. am2_image_slide is 0 in every placed build (image.cpp), so the
+ * call sites' AM2_IMAGE() wrapper leaves these pointers untouched. */
+#undef ADDR_WEAPON_POSE_FRAMES
+#define ADDR_WEAPON_POSE_FRAMES ((uintptr_t)(const void *)am2_weapon_pose_frames)
+#undef ADDR_POSE_BY_CLASS
+#define ADDR_POSE_BY_CLASS      ((uintptr_t)(const void *)am2_pose_by_class)
+#undef ADDR_DEATH_ANIM_BY_CODE
+#define ADDR_DEATH_ANIM_BY_CODE ((uintptr_t)(const void *)am2_death_anim_by_code)
+#undef ADDR_HIT_POSE_BY_CLASS
+#define ADDR_HIT_POSE_BY_CLASS  ((uintptr_t)(const void *)am2_hit_pose_by_class)
+
+/* AI_MOVE_STATE and its ALT are not separate storage: they OVERLAP
+ * am2_weapon_pose_frames. 0x004750B4 is that array's index 53 (0xD4/4) and
+ * 0x004750C0 is index 56, and the six entries there read {2,8,9,3,8,9} --
+ * exactly the two int32[3] tables orig.h documents. So they alias into the
+ * transcribed array rather than duplicating it. */
+#undef ADDR_AI_MOVE_STATE
+#define ADDR_AI_MOVE_STATE      ((uintptr_t)(const void *)&am2_weapon_pose_frames[53])
+#undef ADDR_AI_MOVE_STATE_ALT
+#define ADDR_AI_MOVE_STATE_ALT  ((uintptr_t)(const void *)&am2_weapon_pose_frames[56])
+
+#undef ADDR_FORMATION_SLOTS
+#define ADDR_FORMATION_SLOTS    ((uintptr_t)(const void *)am2_formation_slots)
+#undef ADDR_AIR_DROP_OFFSETS
+#define ADDR_AIR_DROP_OFFSETS   ((uintptr_t)(const void *)am2_air_drop_offsets)
+#undef ADDR_AIR_DROP_FACINGS
+#define ADDR_AIR_DROP_FACINGS   ((uintptr_t)(const void *)am2_air_drop_facings)
+#undef ADDR_AIR_FRAME_HOTSPOTS
+#define ADDR_AIR_FRAME_HOTSPOTS ((uintptr_t)(const void *)am2_air_frame_hotspots)
+#undef ADDR_AIR_STRIKE_KINDS
+#define ADDR_AIR_STRIKE_KINDS   ((uintptr_t)(const void *)am2_air_strike_kinds)
+#undef ADDR_ARMY_PAL_BASE
+#define ADDR_ARMY_PAL_BASE      ((uintptr_t)(const void *)am2_army_pal_base)
+
+#undef ADDR_AIR_GAUGE_X0
+#define ADDR_AIR_GAUGE_X0       ((uintptr_t)(const void *)&am2_air_gauge_x0)
+#undef ADDR_AIR_GAUGE_Y0
+#define ADDR_AIR_GAUGE_Y0       ((uintptr_t)(const void *)&am2_air_gauge_y0)
+#undef ADDR_AIR_GAUGE_SLOPE
+#define ADDR_AIR_GAUGE_SLOPE    ((uintptr_t)(const void *)&am2_air_gauge_slope)
+/* ADDR_AIR_STRIKE_SLOPE is the same 0x00473F28 double (0.43): the gauge slope
+ * doubles as the strike slope. One constant, two names -- same C symbol. */
+#undef ADDR_AIR_STRIKE_SLOPE
+#define ADDR_AIR_STRIKE_SLOPE   ((uintptr_t)(const void *)&am2_air_gauge_slope)
+#undef ADDR_AIR_GAUGE_MS
+#define ADDR_AIR_GAUGE_MS       ((uintptr_t)(const void *)&am2_air_gauge_ms)
+#undef ADDR_AIR_PASS_MS
+#define ADDR_AIR_PASS_MS        ((uintptr_t)(const void *)&am2_air_pass_ms)
+#undef ADDR_AIR_CYCLE_MS
+#define ADDR_AIR_CYCLE_MS       ((uintptr_t)(const void *)&am2_air_cycle_ms)
+#undef ADDR_AIR_RUN_MS
+#define ADDR_AIR_RUN_MS         ((uintptr_t)(const void *)&am2_air_run_ms)
+#undef ADDR_AIR_LEG1_MS
+#define ADDR_AIR_LEG1_MS        ((uintptr_t)(const void *)&am2_air_leg1_ms)
+#undef ADDR_AIR_LEG2_MS
+#define ADDR_AIR_LEG2_MS        ((uintptr_t)(const void *)&am2_air_leg2_ms)
+#undef ADDR_AIR_PATH_IN_Y
+#define ADDR_AIR_PATH_IN_Y      ((uintptr_t)(const void *)&am2_air_path_in_y)
+#undef ADDR_AIR_PATH_OUT_Y
+#define ADDR_AIR_PATH_OUT_Y     ((uintptr_t)(const void *)&am2_air_path_out_y)
+#undef ADDR_AIR_LEG1_SLOPE
+#define ADDR_AIR_LEG1_SLOPE     ((uintptr_t)(const void *)&am2_air_leg1_slope)
+#undef ADDR_AIR_LEG3_SLOPE
+#define ADDR_AIR_LEG3_SLOPE     ((uintptr_t)(const void *)&am2_air_leg3_slope)
+#undef ADDR_AIR_PATH_MID_Y
+#define ADDR_AIR_PATH_MID_Y     ((uintptr_t)(const void *)&am2_air_path_mid_y)
+#undef ADDR_AIR_PATH_APEX_X
+#define ADDR_AIR_PATH_APEX_X    ((uintptr_t)(const void *)&am2_air_path_apex_x)
+#undef ADDR_AIR_PATH_HALF_Y
+#define ADDR_AIR_PATH_HALF_Y    ((uintptr_t)(const void *)&am2_air_path_half_y)
+#undef ADDR_AIR_PATH_TURN_X
+#define ADDR_AIR_PATH_TURN_X    ((uintptr_t)(const void *)&am2_air_path_turn_x)
+#undef ADDR_AIR_PATH_AWAY_X
+#define ADDR_AIR_PATH_AWAY_X    ((uintptr_t)(const void *)&am2_air_path_away_x)
+/* ADDR_AIR_PATH_TURN_Y_IN / _OUT are runtime state written by AirInitTurnYIn/Out;
+ * left at their writable .origdat placement rather than redirected to a const. */
+
+#undef ADDR_ROACH_HEALTH
+#define ADDR_ROACH_HEALTH       ((uintptr_t)(const void *)&am2_roach_health)
+#undef ADDR_ROACH_ARMOUR
+#define ADDR_ROACH_ARMOUR       ((uintptr_t)(const void *)&am2_roach_armour)
+#undef ADDR_ROACH_DAMAGE
+#define ADDR_ROACH_DAMAGE       ((uintptr_t)(const void *)&am2_roach_damage)
+#undef ADDR_ROACH_FORVEL
+#define ADDR_ROACH_FORVEL       ((uintptr_t)(const void *)&am2_roach_forvel)
+#undef ADDR_ROACH_REVVEL
+#define ADDR_ROACH_REVVEL       ((uintptr_t)(const void *)&am2_roach_revvel)
+#undef ADDR_ROACH_FORACC
+#define ADDR_ROACH_FORACC       ((uintptr_t)(const void *)&am2_roach_foracc)
+#undef ADDR_ROACH_REVACC
+#define ADDR_ROACH_REVACC       ((uintptr_t)(const void *)&am2_roach_revacc)
+#undef ADDR_ROACH_BOX
+#define ADDR_ROACH_BOX          ((uintptr_t)(const void *)am2_roach_box)
+#undef ADDR_ROACH_BITE_BOX
+#define ADDR_ROACH_BITE_BOX     ((uintptr_t)(const void *)am2_roach_bite_box)
+#undef ADDR_ROACH_ROW_SPEC
+#define ADDR_ROACH_ROW_SPEC     ((uintptr_t)(const void *)am2_roach_row_spec)
+#undef ADDR_FIELD_530_FRAMES
+#define ADDR_FIELD_530_FRAMES   ((uintptr_t)(const void *)&am2_field_530_frames)
+#undef ADDR_ROACH_START_FRAME
+#define ADDR_ROACH_START_FRAME  ((uintptr_t)(const void *)&am2_roach_start_frame)
+
+#undef ADDR_EXPLOSION_BOX
+#define ADDR_EXPLOSION_BOX      ((uintptr_t)(const void *)am2_explosion_box)
+#undef ADDR_EXPLOSION_AREA_16
+#define ADDR_EXPLOSION_AREA_16  ((uintptr_t)(const void *)am2_explosion_area_16)
+#undef ADDR_EXPLOSION_AREA_24
+#define ADDR_EXPLOSION_AREA_24  ((uintptr_t)(const void *)am2_explosion_area_24)
+#undef ADDR_EXPLOSION_AREA_32
+#define ADDR_EXPLOSION_AREA_32  ((uintptr_t)(const void *)am2_explosion_area_32)
+#undef ADDR_EXPLOSION_ROW_SPEC
+#define ADDR_EXPLOSION_ROW_SPEC ((uintptr_t)(const void *)am2_explosion_row_spec)
+#undef ADDR_MISSILE_BOX
+#define ADDR_MISSILE_BOX        ((uintptr_t)(const void *)am2_missile_box)
+#undef ADDR_MISSILE_ROW_SPEC
+#define ADDR_MISSILE_ROW_SPEC   ((uintptr_t)(const void *)am2_missile_row_spec)
+#undef ADDR_TROOPER_BOX
+#define ADDR_TROOPER_BOX        ((uintptr_t)(const void *)am2_trooper_box)
+#undef ADDR_TROOPER_ROW_SPEC
+#define ADDR_TROOPER_ROW_SPEC   ((uintptr_t)(const void *)am2_trooper_row_spec)
+#undef ADDR_VEHICLE_BOX
+#define ADDR_VEHICLE_BOX        ((uintptr_t)(const void *)am2_vehicle_box)
+#undef ADDR_VEHICLE_ROW_SPEC
+#define ADDR_VEHICLE_ROW_SPEC   ((uintptr_t)(const void *)am2_vehicle_row_spec)
+#undef ADDR_KIND7_BOX
+#define ADDR_KIND7_BOX          ((uintptr_t)(const void *)am2_kind7_box)
+
+#undef ADDR_PILLBOX_TROOPER_HEALTH
+#define ADDR_PILLBOX_TROOPER_HEALTH ((uintptr_t)(const void *)&am2_pillbox_trooper_health)
+#undef ADDR_GRAVITY
+#define ADDR_GRAVITY            ((uintptr_t)(const void *)&am2_gravity)
+#undef ADDR_VIEW_SPEED
+#define ADDR_VIEW_SPEED         ((uintptr_t)(const void *)&am2_view_speed)
+/* ADDR_TICK_INTERVAL_MS is runtime state (ResetLevelState); not redirected. */
+#undef ADDR_DIFFICULTY_SCALE
+#define ADDR_DIFFICULTY_SCALE   ((uintptr_t)(const void *)&am2_difficulty_scale)
+/* ADDR_PATH_MAX_NODES adapts at runtime (RegionBudget); not redirected. */
+#undef ADDR_PATH_MAX_SEARCHES
+#define ADDR_PATH_MAX_SEARCHES  ((uintptr_t)(const void *)&am2_path_max_searches)
+#undef ADDR_PATH_RETRY_MS
+#define ADDR_PATH_RETRY_MS      ((uintptr_t)(const void *)&am2_path_retry_ms)
+#undef ADDR_SEQ_GRID_ROWS
+#define ADDR_SEQ_GRID_ROWS      ((uintptr_t)(const void *)&am2_seq_grid_rows)
+#undef ADDR_SEQ_TAIL_FRAMES
+#define ADDR_SEQ_TAIL_FRAMES    ((uintptr_t)(const void *)&am2_seq_tail_frames)
+#undef ADDR_SEQ_ADVANCE_MS
+#define ADDR_SEQ_ADVANCE_MS     ((uintptr_t)(const void *)&am2_seq_advance_ms)
+#undef ADDR_SEQ_EMIT_MS
+#define ADDR_SEQ_EMIT_MS        ((uintptr_t)(const void *)&am2_seq_emit_ms)
+#undef ADDR_SEQ_K4_STEP_MS
+#define ADDR_SEQ_K4_STEP_MS     ((uintptr_t)(const void *)&am2_seq_k4_step_ms)
+#undef ADDR_SEQ_K4_RISE
+#define ADDR_SEQ_K4_RISE        ((uintptr_t)(const void *)&am2_seq_k4_rise)
+#undef ADDR_SEQ_K4_DRIFT_X
+#define ADDR_SEQ_K4_DRIFT_X     ((uintptr_t)(const void *)&am2_seq_k4_drift_x)
+#undef ADDR_SEQ_K4_DRIFT_Y
+#define ADDR_SEQ_K4_DRIFT_Y     ((uintptr_t)(const void *)&am2_seq_k4_drift_y)
+
+#undef ADDR_TROOPER_CLASS_VALUE
+#define ADDR_TROOPER_CLASS_VALUE ((uintptr_t)(const void *)am2_trooper_class_value)
+#undef ADDR_BIT_FROM_N
+#define ADDR_BIT_FROM_N         ((uintptr_t)(const void *)am2_bit_from_n)
+#undef ADDR_KIND_FRAMES
+#define ADDR_KIND_FRAMES        ((uintptr_t)(const void *)am2_kind_frames)
+#undef ADDR_VEHICLE_HEIGHT_BY_KIND
+#define ADDR_VEHICLE_HEIGHT_BY_KIND ((uintptr_t)(const void *)am2_vehicle_height_by_kind)
+#undef ADDR_MP_ROW_COORDS
+#define ADDR_MP_ROW_COORDS      ((uintptr_t)(const void *)am2_mp_row_coords)
+#undef ADDR_DROP_RING
+#define ADDR_DROP_RING          ((uintptr_t)(const void *)am2_drop_ring)
+#undef ADDR_SPIRAL_DX
+#define ADDR_SPIRAL_DX          ((uintptr_t)(const void *)am2_spiral_dx)
+#undef ADDR_SPIRAL_DY
+#define ADDR_SPIRAL_DY          ((uintptr_t)(const void *)am2_spiral_dy)
+#undef ADDR_SEQ_K4_HOLD
+#define ADDR_SEQ_K4_HOLD        ((uintptr_t)(const void *)am2_seq_k4_hold)
+
+/* ADDR_HUD_CMD_SPEC is runtime-written and 280 bytes; not redirected (blob). */
+#undef ADDR_BUILD_MENU_RECTS
+#define ADDR_BUILD_MENU_RECTS   ((uintptr_t)(const void *)am2_build_menu_rects)
+#undef ADDR_HUD_CMD_OFFSETS
+#define ADDR_HUD_CMD_OFFSETS    ((uintptr_t)(const void *)am2_hud_cmd_offsets)
+#undef ADDR_HUD_SARGE_OFFSETS
+#define ADDR_HUD_SARGE_OFFSETS  ((uintptr_t)(const void *)am2_hud_sarge_offsets)
+#undef ADDR_SPRITE_GRID_ROWS
+#define ADDR_SPRITE_GRID_ROWS   ((uintptr_t)(const void *)&am2_sprite_grid_rows)
+#undef ADDR_SPRITE_GRID_COLS
+#define ADDR_SPRITE_GRID_COLS   ((uintptr_t)(const void *)&am2_sprite_grid_cols)
+#undef ADDR_SEQ_SPRITE_5_COUNT
+#define ADDR_SEQ_SPRITE_5_COUNT ((uintptr_t)(const void *)&am2_seq_sprite_5_count)
+#undef ADDR_DECAL_SPRITE_COUNT
+#define ADDR_DECAL_SPRITE_COUNT ((uintptr_t)(const void *)&am2_decal_sprite_count)
+#undef ADDR_MARK_SPRITE_COUNT
+#define ADDR_MARK_SPRITE_COUNT  ((uintptr_t)(const void *)&am2_mark_sprite_count)
+#undef ADDR_MP_MARK_COLS
+#define ADDR_MP_MARK_COLS       ((uintptr_t)(const void *)am2_mp_mark_cols)
+#undef ADDR_PALETTE_CYCLE_COUNT
+#define ADDR_PALETTE_CYCLE_COUNT ((uintptr_t)(const void *)&am2_palette_cycle_count)
+#undef ADDR_SHAKE_PRESETS
+#define ADDR_SHAKE_PRESETS      ((uintptr_t)(const void *)am2_shake_presets)
+#undef ADDR_AIM_DISPLACE_MAP
+#define ADDR_AIM_DISPLACE_MAP   ((uintptr_t)(const void *)am2_aim_displace_map)
+#undef ADDR_PAD_BIT_TABLE
+#define ADDR_PAD_BIT_TABLE      ((uintptr_t)(const void *)am2_pad_bit_table)
+#undef ADDR_RESPAWN_KIND_MASK
+#define ADDR_RESPAWN_KIND_MASK  ((uintptr_t)(const void *)am2_respawn_kind_mask)
+#undef ADDR_KEY_DEFAULTS
+#define ADDR_KEY_DEFAULTS       ((uintptr_t)(const void *)am2_key_defaults)
+#undef ADDR_GAME_VERSION
+#define ADDR_GAME_VERSION       ((uintptr_t)(const void *)&am2_game_version)
+#undef ADDR_ITEM_TYPE_NAMES
+#define ADDR_ITEM_TYPE_NAMES    ((uintptr_t)(const void *)am2_item_type_names)
+#undef ADDR_UNIT_CLASS_NAMES
+#define ADDR_UNIT_CLASS_NAMES   ((uintptr_t)(const void *)am2_unit_class_names)
+#undef ADDR_MOVIE_NAMES
+#define ADDR_MOVIE_NAMES        ((uintptr_t)(const void *)am2_movie_names)
+#undef ADDR_VEHICLE_NAMES
+#define ADDR_VEHICLE_NAMES      ((uintptr_t)(const void *)am2_vehicle_names)
+#undef ADDR_SPRITE_SET_DIRS
+#define ADDR_SPRITE_SET_DIRS    ((uintptr_t)(const void *)am2_sprite_set_dirs)
+#undef ADDR_STATE_ACTIONS
+#define ADDR_STATE_ACTIONS      ((uintptr_t)(const void *)am2_state_actions)
+#undef ADDR_WEAPON_HANDLERS
+#define ADDR_WEAPON_HANDLERS    ((uintptr_t)(const void *)am2_weapon_handlers)
+#undef ADDR_OPTION_TABLE
+#define ADDR_OPTION_TABLE       ((uintptr_t)(const void *)am2_option_table)
+/* The reader loops rec < OPTION_TABLE_END, so the bound must be one past OUR
+ * array, not the blob's. */
+#undef ADDR_OPTION_TABLE_END
+#define ADDR_OPTION_TABLE_END   ((uintptr_t)(const void *)&am2_option_table[43])
+#undef ADDR_KEYROW_POSITIONS
+#define ADDR_KEYROW_POSITIONS   ((uintptr_t)(const void *)am2_keyrow_positions)
+#undef ADDR_FONT_DESCS
+#define ADDR_FONT_DESCS         ((uintptr_t)(const void *)am2_font_descs)
+#undef ADDR_POINTER_MODES
+#define ADDR_POINTER_MODES      ((uintptr_t)(const void *)am2_pointer_modes)
+
+#undef ADDR_WEAPON_RANGE_HI
+#define ADDR_WEAPON_RANGE_HI    ((uintptr_t)(const void *)&am2_weapon_range_hi)
+#undef ADDR_WEAPON_RANGE_LO
+#define ADDR_WEAPON_RANGE_LO    ((uintptr_t)(const void *)&am2_weapon_range_lo)
+#undef ADDR_WEAPON_RANGE_K3
+#define ADDR_WEAPON_RANGE_K3    ((uintptr_t)(const void *)&am2_weapon_range_k3)
+#undef ADDR_SIGHT_RANGE_WANT
+#define ADDR_SIGHT_RANGE_WANT   ((uintptr_t)(const void *)&am2_sight_range_want)
+#undef ADDR_ENEMY_HEALTH_SHARE
+#define ADDR_ENEMY_HEALTH_SHARE ((uintptr_t)(const void *)&am2_enemy_health_share)
+#undef ADDR_DBL_ZERO
+#define ADDR_DBL_ZERO           ((uintptr_t)(const void *)&am2_dbl_zero)
+#undef ADDR_DBL_MAX_PERIOD
+#define ADDR_DBL_MAX_PERIOD     ((uintptr_t)(const void *)&am2_dbl_max_period)
+#undef ADDR_DBL_MS_PER_SEC
+#define ADDR_DBL_MS_PER_SEC     ((uintptr_t)(const void *)&am2_dbl_ms_per_sec)
+#undef ADDR_DBL_512
+#define ADDR_DBL_512            ((uintptr_t)(const void *)&am2_dbl_512)
+#undef ADDR_DBL_SIN_SCALE
+#define ADDR_DBL_SIN_SCALE      ((uintptr_t)(const void *)&am2_dbl_sin_scale)
+#undef ADDR_DBL_ONE_256
+#define ADDR_DBL_ONE_256        ((uintptr_t)(const void *)&am2_dbl_one_256)
+#undef ADDR_DBL_TWO_PI
+#define ADDR_DBL_TWO_PI         ((uintptr_t)(const void *)&am2_dbl_two_pi)
+#undef ADDR_F_ONE
+#define ADDR_F_ONE              ((uintptr_t)(const void *)&am2_f_one)
+#undef ADDR_F_ONE_HUNDREDTH
+#define ADDR_F_ONE_HUNDREDTH    ((uintptr_t)(const void *)&am2_f_one_hundredth)
+#undef ADDR_FLOAT_ZERO
+#define ADDR_FLOAT_ZERO         ((uintptr_t)(const void *)&am2_float_zero)
+#undef ADDR_HUD_SLIDE_SHUT
+#define ADDR_HUD_SLIDE_SHUT     ((uintptr_t)(const void *)&am2_hud_slide_shut)
+#undef ADDR_HUD_SLIDE_OPEN
+#define ADDR_HUD_SLIDE_OPEN     ((uintptr_t)(const void *)&am2_hud_slide_open)
+#undef ADDR_ROACH_REACH
+#define ADDR_ROACH_REACH        ((uintptr_t)(const void *)&am2_roach_reach)
+#undef ADDR_MS_TO_SEC
+#define ADDR_MS_TO_SEC          ((uintptr_t)(const void *)&am2_ms_to_sec)
 
 #endif /* AM2_STANDALONE_H */

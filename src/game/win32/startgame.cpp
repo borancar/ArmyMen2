@@ -130,7 +130,7 @@ void __cdecl StartSelectedGame(void)
 
         *(int32_t *)(slot + COMM_SLOT_OFF_TAKEN) = 1;
         orig_sprintf((char *)(slot + COMM_SLOT_OFF_NAME),
-                     (const char *)(uintptr_t)ADDR_FMT_COMPUTER_N, i);
+                     "Computer%d", i);
     }
 
     g_menuRequest    = REQUEST_LOCAL;
@@ -183,10 +183,10 @@ void __cdecl StartMultiplayerGame(void)
     /* A compact install leaves the multiplayer maps on the CD. This one is a
      * real check with a real conditional -- unlike the five copy-protection
      * checks, it was not patched, so this dialog can appear. */
-    if (!SetGameDir((const char *)(uintptr_t)ADDR_MP_DATA_PROBE)) {
+    if (!SetGameDir("data\\mpalpine")) {
         MessageBoxA(GetActiveWindow(),
-                    (const char *)(uintptr_t)ADDR_DATA_MISSING_TEXT,
-                    (const char *)(uintptr_t)ADDR_DATA_MISSING_CAPTION,
+                    "The ARMYMEN2 CD must be in the drive to play multi-player with a compact installation.",
+                    "Data Missing",
                     MB_ICONHAND);
         g_menuRequest    = REQUEST_REFUSED;
         g_menuRequestSet = 1;
@@ -467,7 +467,7 @@ void __cdecl OnEnterNameOk(void)
         return;
     }
 
-    SetGameDir((const char *)(uintptr_t)ADDR_STR_SAVE_DIR);
+    SetGameDir("save");
     CopyName(path, name);
 
     handle = orig_findfirst(path, find);

@@ -9,7 +9,7 @@
 #include "definfo.h"   /* DefParseInfoFile -- reconstructed */
 #include "crt.h"       /* am2_log, am2_free */
 #include "map.h"
-#define kMapSep ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
+#define kMapSep (" \t\n;,")
 #include "rect.h"      /* AM2_Rect, RectSet, MakePoint */
 #include "dist.h"      /* Log2Mask */
 #include "maprow.h"    /* MapDescInit */
@@ -41,7 +41,7 @@ int32_t __cdecl SaveMapSection(am2_FILE *fp)
 int32_t __cdecl LoadMapSection(am2_FILE *fp)
 {
     if (!CheckSaveTag(fp, AM2_SAVETAG_MAP,
-                      (const char *)AM2_IMAGE(ADDR_STR_MAP_CPP), 0x906))
+                      "C:\\ArmyMen2\\source\\map.cpp", 0x906))
         return 0;
 
     orig_fread(kMapSaveBlock, AM2_MAP_SAVE_SIZE, 1, fp);
@@ -69,7 +69,7 @@ uint32_t __cdecl Checksum(const char *path)
 
     orig_log("Checksum of %s ", path);
 
-    fp = orig_fopen(path, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    fp = orig_fopen(path, "rb");
 
     if (fp != (am2_FILE *)0) {
         while (orig_fread(&word, 4, 1, fp) != 0)
@@ -157,13 +157,13 @@ uint32_t __cdecl RulesChecksum(void)
 {
     uint32_t sum;
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_AAI_DIR));
+    SetGameDir("aai");
 
-    sum  = Checksum((const char *)AM2_IMAGE(ADDR_STR_GAME_AAI));
-    sum ^= Checksum((const char *)AM2_IMAGE(ADDR_STR_OBJECT_AAI));
-    sum ^= Checksum((const char *)AM2_IMAGE(ADDR_STR_TROOP_AAI));
-    sum ^= Checksum((const char *)AM2_IMAGE(ADDR_STR_VEHICLE_AAI));
-    sum ^= Checksum((const char *)AM2_IMAGE(ADDR_STR_WEAPON_AAI));
+    sum  = Checksum("game.aai");
+    sum ^= Checksum("object.aai");
+    sum ^= Checksum("troop.aai");
+    sum ^= Checksum("vehicle.aai");
+    sum ^= Checksum("weapon.aai");
     return sum;
 }
 
@@ -178,8 +178,8 @@ uint32_t __cdecl MpScriptChecksum(void)
     if (!ScriptListFind((char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME)))
         return 0;
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_RULES_DIR));
-    sprintf(path, (const char *)AM2_IMAGE(ADDR_FMT_DOT_TXT),
+    SetGameDir("rules");
+    sprintf(path, "%s.txt",
             (const char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME));
     return Checksum(path);
 }
@@ -193,7 +193,7 @@ uint32_t __cdecl MapChecksum(void)
                                (const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
 
     SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
-    return sum ^ Checksum((const char *)AM2_IMAGE(ADDR_STR_OBJECT_AAI));
+    return sum ^ Checksum("object.aai");
 }
 
 /* 0x0043ED50, ten callers -- everything that chooses a level goes through it:
@@ -295,22 +295,22 @@ static void ReadLevelFile(const char *name)
     SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
 
     if (!DefParseInfoFile(name))
-        am2_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE), name);
+        am2_log("Couldn't parse %s!\n", name);
 }
 
 void __cdecl ReadCampaignLevels(void)
 {
-    ReadLevelFile((const char *)AM2_IMAGE(ADDR_STR_CAMPAIGN_TXT));
+    ReadLevelFile("campaign.txt");
 }
 
 void __cdecl ReadMpMapList(void)
 {
-    ReadLevelFile((const char *)AM2_IMAGE(ADDR_STR_MPMAPS_TXT));
+    ReadLevelFile("mpmaps.txt");
 }
 
 void __cdecl ReadBootcampLevels(void)
 {
-    ReadLevelFile((const char *)AM2_IMAGE(ADDR_STR_BOOTCAMP_TXT));
+    ReadLevelFile("bootcamp.txt");
 }
 
 /* Still original: the CRT lower-caser. ReadMpMapList beside it is ours, and
@@ -374,11 +374,11 @@ void *__cdecl FindLevelByName(char *name)
 static int32_t TakeMapColumn(char *dst)
 {
     char *tok = am2_strtok((char *)0,
-                           (const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS));
+                           " \t\n;,");
 
     if (!tok)
         return 0;
-    if (!strcmp(tok, (const char *)AM2_IMAGE(ADDR_STR_NONE_LOWER)))
+    if (!strcmp(tok, "none"))
         tok = (char *)AM2_IMAGE(ADDR_DIR_SCRATCH);
     strcpy(dst, tok);
     return 1;
@@ -458,13 +458,13 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
     *(int32_t *)(rec + LEVEL_OFF_ID) =
         *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT) + 1;
 
-    tok = am2_strtok(line, (const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS));
+    tok = am2_strtok(line, " \t\n;,");
     if (!tok)
         return 2;
     strcpy((char *)rec + LEVEL_OFF_MAP_NAME, tok);
 
     tok = am2_strtok((char *)0,
-                     (const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS));
+                     " \t\n;,");
     if (!tok)
         return 3;
     strcpy((char *)rec + LEVEL_OFF_NAME, tok);
@@ -479,11 +479,11 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
     TitleCaseName((char *)rec + LEVEL_OFF_NAME);
 
     tok = am2_strtok((char *)0,
-                     (const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS));
+                     " \t\n;,");
     if (!tok)
         return 4;
     strcpy((char *)rec + LEVEL_OFF_FOLDER,
-           (const char *)AM2_IMAGE(ADDR_STR_DATA_BACKSLASH));
+           "data\\");
     strcat((char *)rec + LEVEL_OFF_FOLDER, tok);
 
     if (!TakeMapColumn((char *)rec + LEVEL_OFF_WIN_MOVIE))
@@ -502,8 +502,7 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
     /* No null check -- see above. */
     if (!DefParseBoolean((int32_t *)(rec + LEVEL_OFF_CYCLE),
                          am2_strtok((char *)0,
-                                    (const char *)
-                                        AM2_IMAGE(ADDR_DEF_SEPARATORS))))
+                                    " \t\n;,")))
         return 11;
 
     col = 12;
@@ -514,7 +513,7 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
 
     *(int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX) = 0;
     tok = am2_strtok((char *)0,
-                     (const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS));
+                     " \t\n;,");
     if (tok)
         DefParseNumber((int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX), tok);
 
@@ -895,7 +894,7 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
         p += AM2_SCENARIO_HDR_BYTES;
         remaining -= (int32_t)AM2_SCENARIO_HDR_BYTES;
 
-        if (memcmp(hdr, (const void *)AM2_IMAGE(ADDR_STR_SCENARIO),
+        if (memcmp(hdr, (const void *)"Scenario",
                    AM2_SCENARIO_TAG_BYTES) != 0)
             return 0;
 
@@ -1275,9 +1274,9 @@ uint32_t __cdecl AmmChecksum(const char *map, const char *)
 
     SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
 
-    am2_sprintf(name, (const char *)AM2_IMAGE(ADDR_FMT_DOT_AMM), map);
+    am2_sprintf(name, "%s.amm", map);
 
-    fp = orig_fopen(name, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    fp = orig_fopen(name, "rb");
     if (!fp)
         return sum;
 

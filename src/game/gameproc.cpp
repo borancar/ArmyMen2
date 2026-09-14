@@ -39,6 +39,16 @@ typedef int32_t (__cdecl *AM2_AtExitFn)(void (__cdecl *)(void));
 #include "crt.h"       /* am2_realloc, am2_free -- the game's own */
 #include "region.h"   /* AiPatrolStep -- reconstructed, and this forwards to it */
 
+#ifdef AM2_STANDALONE
+/* am2_key_defaults -- 0x0048AE80, the 21 default key scancodes (uint8, three
+ * trailing zeros pad to 24) the controls dialog rebuilds ADDR_KEY_BINDINGS
+ * from. A read-only source, so const; the bindings themselves stay a macro. */
+extern "C" const uint8_t am2_key_defaults[24] = {
+    17, 31, 30, 32, 16, 18, 46, 33, 56, 57, 42, 15, 41, 45, 19, 34,
+    20, 21, 35, 14, 59, 0, 0, 0,
+};
+#endif
+
 #define kBlock  ((char *)(uintptr_t)AM2_IMAGE(ADDR_GAMEPROC_BLOCK))
 #define kStrB   ((char *)(uintptr_t)AM2_IMAGE(ADDR_GAMEPROC_STR_B))
 #define kVolZero   (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_VOLUME_AT_ZERO))
@@ -78,7 +88,7 @@ int32_t __cdecl LoadGameProcSection(am2_FILE *fp)
     volStream = kVolStream;
 
     if (!CheckSaveTag(fp, AM2_GAMEPROC_SAVE_SIZE,
-                      (const char *)AM2_IMAGE(ADDR_STR_GAMEPROC_CPP), 0x8CD))
+                      "C:\\ArmyMen2\\source\\gameproc.cpp", 0x8CD))
         return 0;
 
     orig_fread(kBlock, AM2_GAMEPROC_SAVE_SIZE, 1, fp);
@@ -173,8 +183,8 @@ void __cdecl LoadOptions(void)
 
     SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
 
-    fp = orig_fopen((const char *)AM2_IMAGE(ADDR_STR_OPTIONS_CFG),
-                    (const char *)AM2_IMAGE(ADDR_STR_MODE_R));
+    fp = orig_fopen("Options.cfg",
+                    "r");
     if (!fp)
         goto defaults;
 
@@ -229,7 +239,7 @@ defaults:
      * defaults go into every OTHER byte, matching the one-in-two stride
      * SaveOptions writes and this function reads -- so only the primary of
      * each binding is restored and the alternate is left as it was. */
-    orig_log((const char *)AM2_IMAGE(ADDR_STR_OPTIONS_NOREAD));
+    orig_log("Failed to open Options.cfg for reading\n");
 
     *(int32_t *)AM2_IMAGE(ADDR_VOLUME_AT_ZERO) = 0;
     *(int32_t *)AM2_IMAGE(ADDR_STREAM_VOLUME)  = 0;
@@ -287,12 +297,12 @@ void __cdecl SaveOptions(void)
 
     SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
 
-    orig_chmod((const char *)AM2_IMAGE(ADDR_STR_OPTIONS_CFG), AM2_CHMOD_RW);
+    orig_chmod("Options.cfg", AM2_CHMOD_RW);
 
-    fp = orig_fopen((const char *)AM2_IMAGE(ADDR_STR_OPTIONS_CFG),
-                    (const char *)AM2_IMAGE(ADDR_MODE_W));
+    fp = orig_fopen("Options.cfg",
+                    "w");
     if (!fp) {
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_OPTIONS_NOWRITE));
+        orig_log("Failed to open Options.cfg for writing\n");
         return;
     }
 
@@ -375,12 +385,12 @@ int32_t __cdecl SaveDefaultCof(void)
     am2_FILE *fp;
     int32_t   i = 0;
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
+    SetGameDir("save");
 
-    orig_chmod((const char *)AM2_IMAGE(ADDR_STR_DEFAULT_COF), AM2_CHMOD_RW);
+    orig_chmod("default.cof", AM2_CHMOD_RW);
 
-    fp = orig_fopen((const char *)AM2_IMAGE(ADDR_STR_DEFAULT_COF),
-                    (const char *)AM2_IMAGE(ADDR_MODE_WB));
+    fp = orig_fopen("default.cof",
+                    "wb");
     if (!fp)
         return 0;
 
@@ -508,15 +518,15 @@ int32_t __cdecl LoadDefaultCof(void)
     uint32_t  tag;
     int32_t   green = 0;
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
+    SetGameDir("save");
 
-    fp = orig_fopen((const char *)AM2_IMAGE(ADDR_STR_DEFAULT_COF),
-                    (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    fp = orig_fopen("default.cof",
+                    "rb");
     if (!fp)
         return 0;
 
     if (!CheckSaveTag(fp, AM2_SAVETAG_COF,
-                      (const char *)AM2_IMAGE(ADDR_STR_UNIT_CPP),
+                      "C:\\ArmyMen2\\source\\unit.cpp",
                       AM2_COF_TAG_LINE)) {
         orig_fclose(fp);
         return 0;
@@ -544,7 +554,7 @@ int32_t __cdecl LoadDefaultCof(void)
     RemapInventoryUids();
     UidRemapClear();
 
-    SetVarValueByName((const char *)AM2_IMAGE(ADDR_STR_NUMGREEN), green);
+    SetVarValueByName("numgreen", green);
 
     orig_fclose(fp);
     return 1;
@@ -602,7 +612,7 @@ int32_t __cdecl SaveGame(const char *name)
     if (!*name)
         return 0;
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
+    SetGameDir("save");
 
     strcpy(lvl, (const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
 
@@ -615,11 +625,11 @@ int32_t __cdecl SaveGame(const char *name)
         orig_findclose(h);
     }
 
-    orig_sprintf(path, (const char *)AM2_IMAGE(ADDR_STR_SAVE_PLAYER_FMT),
+    orig_sprintf(path, "save\\%s",
                  (const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
     SetGameDir(path);
 
-    fp = orig_fopen(name, (const char *)AM2_IMAGE(ADDR_MODE_WB));
+    fp = orig_fopen(name, "wb");
     if (!fp)
         return 0;
 
@@ -648,7 +658,7 @@ fail:
 int32_t __cdecl LoadGame(am2_FILE *fp)
 {
     if (!CheckSaveTag(fp, AM2_SAVETAG_GAMEPROC,
-                      (const char *)AM2_IMAGE(ADDR_STR_GAMEPROC_CPP), 0x53D))
+                      "C:\\ArmyMen2\\source\\gameproc.cpp", 0x53D))
         goto fail;
 
     ScriptResetTokens((AM2_ScriptCtx *)AM2_IMAGE(ADDR_SCRIPT_CONTEXT));
@@ -677,7 +687,7 @@ fail:
 
 typedef char *(__cdecl *AM2_StrtokFn)(char *s, const char *sep);
 #define orig_strtok (*(AM2_StrtokFn)AM2_IMAGE(ADDR_CRT_STRTOK))
-#define kSep        ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
+#define kSep        (" \t\n;,")
 #define kGameConst  ((int32_t *)AM2_IMAGE(ADDR_GAME_CONSTANTS))
 
 /* 0x00424780. The .aai handler for twenty game-constant keywords.
@@ -2705,17 +2715,17 @@ am2_FILE *__cdecl OpenSaveForLoad(void)
     if (!*(const char *)(uintptr_t)ADDR_GAMEPROC_BLOCK)
         return (am2_FILE *)0;
 
-    am2_sprintf(path, (const char *)(uintptr_t)ADDR_STR_SAVE_PLAYER_FMT,
+    am2_sprintf(path, "save\\%s",
                  (const char *)(uintptr_t)ADDR_GAMEPROC_BLOCK);
     SetGameDir(path);
 
     fp = orig_fopen((const char *)(uintptr_t)ADDR_GAMEPROC_STR_B,
-                    (const char *)(uintptr_t)ADDR_MODE_RB);
+                    "rb");
     if (!fp)
         return fp;
 
     if (!CheckSaveTag(fp, AM2_SAVETAG_GAMEPROC,
-                      (const char *)(uintptr_t)ADDR_STR_GAMEPROC_CPP,
+                      "C:\\ArmyMen2\\source\\gameproc.cpp",
                       AM2_GAMEPROC_TAG_LINE)
         || !LoadGameProcSection(fp)) {
         orig_fclose(fp);

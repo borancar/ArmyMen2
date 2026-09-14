@@ -5476,6 +5476,9 @@ typedef struct {
     am2_state_action_fn onMessage;  /* WndProc calls this, while state == 0 */
     uint32_t            id;
 } AM2_StateAction;
+/* The layout of ADDR_FONT_DESCS's records. Here rather than in font.cpp so the
+ * standalone build's transcription (am2_font_descs) and the reader share it. */
+typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDesc;
 #define ADDR_ON_APP_ACTIVATED    0x004269B0u  /* void(void) */
 /* Three of the four functions in the 96-byte run around ADDR_GAME_OVER_STATE
  * were already named -- ADDR_CLEAR_GAME_OVER at 0x0042E580, reconstructed as
@@ -7272,7 +7275,12 @@ typedef struct {
 #define AM2_SEQ_GRID_BASE         0x1C2
 #define ADDR_LOAD_SEQ_GRID        0x00462F50u  /* void(void) */
 #define ADDR_FREE_SEQ_GRID        0x00462FF0u  /* void(void) */
-#define ADDR_SPRITE_GROUPS_C_END  ADDR_SPRITE_GRID_ROWS
+/* The group-C table ends where ADDR_SPRITE_GRID_ROWS begins in the ORIGINAL
+ * layout (0x0048CA38). This is a layout BOUNDARY, so it must be the literal
+ * address, not `ADDR_SPRITE_GRID_ROWS` -- that macro is migrated to a const C
+ * symbol under AM2_STANDALONE, which relocates its address off into .rodata and
+ * would send this loop off the end of the table. */
+#define ADDR_SPRITE_GROUPS_C_END  0x0048CA38u
 #define SPRITEGRP_C_OFF_COUNT     0x00u
 #define SPRITEGRP_C_OFF_SPRITES   0x04u
 #define AM2_SPRITEGRP_C_BYTES     0x0Cu

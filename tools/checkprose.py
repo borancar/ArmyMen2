@@ -47,7 +47,14 @@ DOCS = ("CLAUDE.md", "STATUS.md",
         "docs/combat.md",
         "docs/abnotes.md",
         "docs/tables.md",
-        "docs/objects.md")
+        "docs/objects.md",
+        "docs/winmain.md",
+        "docs/verification.md",
+        "docs/tooling.md",
+        "docs/reconstruction-lessons.md",
+        "docs/lockstep.md",
+        "docs/crt-notes.md",
+        "docs/script.md")
 
 # Present-tense claims that an address has NOT been reconstructed.  "was left
 # original" and "used to be" are history and are not matched.

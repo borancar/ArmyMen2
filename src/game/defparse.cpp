@@ -14,7 +14,7 @@
 /* strtok now comes through crt.h, which is the same seam under one name
  * -- see there for why the cursor has to be shared. */
 
-#define kSep ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
+#define kSep (" \t\n;,")
 
 #define kDefObjRecCap  (*(int32_t *)AM2_IMAGE(ADDR_DEF_OBJ_REC_CAP))
 

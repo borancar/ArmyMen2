@@ -326,13 +326,13 @@ int32_t __cdecl CommRegisterSelf(uint32_t id)
             break;
 
     if (rec >= end) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_FLOWQ_FAILED, id);
+        orig_log("Create FlowQ failed for ID %x \n", id);
         return 0;
     }
 
     if (comm_u32(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT,
                  COMM_OFF_VERBOSE) != 0)
-        orig_log((const char *)(uintptr_t)ADDR_STR_FLOWQ_MAKING, id);
+        orig_log("Creating Flow Queue for Player id %x\n", id);
 
     own  = 1u << slot;
     want = 1u << (slot + AM2_PLAYER_WANT_SHIFT);
@@ -432,7 +432,7 @@ int32_t __attribute__((thiscall)) CommRemovePlayer(void *self, int32_t id)
     comm_u32(comm, COMM_OFF_PLAYER_COUNT) -= 1;
 
     comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
-    orig_log((const char *)(uintptr_t)ADDR_STR_REMOVE_PLAYER,
+    orig_log("Remove Player numPlayers now = %d \n",
             comm_u32(comm, COMM_OFF_PLAYER_COUNT));
 
     if (id != -1)
@@ -526,7 +526,7 @@ void *__attribute__((thiscall)) CommConstruct(void *comm)
     CommResetStats(comm);
 
     /* The one key the game ever touches. Created, never read. */
-    RegCreateKeyExA(HKEY_LOCAL_MACHINE, (const char *)(uintptr_t)ADDR_REGISTRY_KEY,
+    RegCreateKeyExA(HKEY_LOCAL_MACHINE, "Software\\The 3DO Company\\Army Men II",
                     0, NULL, 0, KEY_ALL_ACCESS, NULL,
                     (PHKEY)(self + 0x204), (LPDWORD)(self + 0x208));
 
@@ -633,11 +633,11 @@ BOOL FAR PASCAL EnumPlayersCb(DPID dpId, DWORD dwPlayerType, LPCDPNAME lpName,
     (void)dwPlayerType;
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_INIT_JOIN),
+        orig_log("InitJoin dpId = %x PlayerName = %s (%s), Flags = %x , context = %x slot = %d \n",
                  dpId, lpName->lpszLongNameA, lpName->lpszShortNameA,
                  dwFlags, lpContext, g_commEnumCount);
 
-    orig_log((const char *)AM2_IMAGE(ADDR_STR_PLAYER_DPID),
+    orig_log("%s's dpid: %d\n",
              lpName->lpszShortNameA, dpId);
 
     if (dpId == *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID)) {
@@ -729,7 +729,7 @@ BOOL FAR PASCAL EnumSessionsCb(LPCDPSESSIONDESC2 lpThisSD, LPDWORD lpdwTimeOut,
         row[1] = (char)*(const uint8_t *)(uintptr_t)ADDR_LIST_INK_HOT_SEL;
         row[2] = '\0';
         strcat(row, lpThisSD->lpszSessionNameA);
-        strcat(row, (const char *)AM2_IMAGE(ADDR_STR_IN_PROGRESS));
+        strcat(row, "  --  In Progress");
     } else {
         strcpy(row, lpThisSD->lpszSessionNameA);
     }
@@ -838,10 +838,10 @@ BOOL FAR PASCAL EnumConnectionsCb(LPCGUID lpguidSP, LPVOID lpConnection,
         return TRUE;
 
     if (strcmp(lpName->lpszShortNameA,
-               (const char *)AM2_IMAGE(ADDR_STR_SP_MPLAYER)) == 0)
+               "Play on Mplayer") == 0)
         return TRUE;
     if (strcmp(lpName->lpszShortNameA,
-               (const char *)AM2_IMAGE(ADDR_STR_SP_HEAT)) == 0)
+               "Play on HEAT") == 0)
         return TRUE;
 
     copy = orig_malloc(dwConnectionSize);
@@ -877,7 +877,7 @@ int32_t __attribute__((thiscall)) CommEnumConnections(void *comm, void *list)
     /* Read back through the global rather than the argument, as the original
      * does -- they are the same object, but only because nothing reassigned it. */
     ListAdd(g_connectionList,
-                  (const char *)(uintptr_t)ADDR_STR_COMPUTER_ONLY, NULL);
+                  "Play Against Computer Only", NULL);
     return 1;
 }
 
@@ -947,9 +947,9 @@ int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
 
         /* Only these two are reported; anything else fails silently. */
         if (hr == E_INVALIDARG)
-            orig_log((const char *)(uintptr_t)ADDR_STR_SEND_BADPARAM, idTo);
+            orig_log("DPLAY ERROR: INVALID PARAMETERS IN SEND TO ID %x\n", idTo);
         else if (hr == (HRESULT)DPERR_INVALIDPLAYER)
-            orig_log((const char *)(uintptr_t)ADDR_STR_SEND_BADPLAYER, idTo);
+            orig_log("DPLAY ERROR: INVALID PLAYER IN SEND TO ID %x\n", idTo);
         else
             return 0;
 
@@ -962,7 +962,7 @@ int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
             }
         }
         if (!found)
-            orig_log((const char *)(uintptr_t)ADDR_STR_SEND_NOENTRY, idTo);
+            orig_log("-- No Players Entry for player id %x\n", idTo);
 
         PostMessageA(g_hwnd, AM2_WM_COMM_SEND_FAILED, (WPARAM)idTo, 0);
         return 0;
@@ -1114,11 +1114,11 @@ int32_t __attribute__((thiscall)) CommOnConnected(void *self)
         return 0;
 
     if (g_commDebug(self)) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_CAPS_HEAD);
-        orig_log((const char *)(uintptr_t)ADDR_STR_CAPS_PACKET, caps->dwMaxBufferSize);
-        orig_log((const char *)(uintptr_t)ADDR_STR_CAPS_HEADER, caps->dwHeaderLength);
-        orig_log((const char *)(uintptr_t)ADDR_STR_CAPS_LATENCY, caps->dwLatency);
-        orig_log((const char *)(uintptr_t)ADDR_STR_CAPS_TIMEOUT, caps->dwTimeout);
+        orig_log("DPLAY CAPS: \n");
+        orig_log("   MaxPacketSize %8d \n", caps->dwMaxBufferSize);
+        orig_log("   HeaderSize    %8d \n", caps->dwHeaderLength);
+        orig_log("   Latency       %8d \n", caps->dwLatency);
+        orig_log("   TimeOut       %8d \n", caps->dwTimeout);
         orig_log((const char *)(uintptr_t)
                  ((caps->dwFlags & DPCAPS_GUARANTEEDSUPPORTED)
                   ? ADDR_STR_CAPS_GUAR_YES : ADDR_STR_CAPS_GUAR_NO));
@@ -1133,7 +1133,7 @@ int32_t __attribute__((thiscall)) CommOnConnected(void *self)
         comm_u32(comm, COMM_OFF_BUFFER_DEFAULT) = usable;
 
     if (g_commDebug(self))
-        orig_log((const char *)(uintptr_t)ADDR_STR_CAPS_BUFFERS,
+        orig_log(" Max Buffer Size = %d Default buffer size to %d bytes\n",
                  comm_u32(comm, COMM_OFF_BUFFER_MAX),
                  comm_u32(comm, COMM_OFF_BUFFER_DEFAULT));
     return 1;
@@ -1182,7 +1182,7 @@ int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
     }
     comm_u32(self, 0x3DC) = 0;
 
-    orig_log((const char *)(uintptr_t)ADDR_STR_RELEASING_COMM);
+    orig_log("Releasing Comm Connection \n");
 
     comm_u32(self, COMM_OFF_PLAYER_COUNT) = 1;   /* just us again */
     comm_u32(self, 0x3E4) = 0;
@@ -1299,7 +1299,7 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
     const char          *playerName;
 
     comm_u32(self, COMM_OFF_LOBBY_STARTING) = 1;
-    orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_START);
+    orig_log("Lobby start: about to call ReadMpMapsFile\n");
     ReadMpMapList();
 
     /* Answers 0 or 1, never negative, so this test can only ever pass -- the
@@ -1312,7 +1312,7 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
     conn = (LPDPLCONNECTION)orig_malloc(size);
     *(void **)(self + COMM_OFF_LOBBY_BUF) = conn;
     if (!conn) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_NOMEM);
+        orig_log("Out of Memory trying to allocate LobbyConnectionBuffer\n");
         return 0;
     }
 
@@ -1325,17 +1325,17 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
             LobbyGiveUp(self);
             return 0;
         }
-        orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_GCS_FAIL, hr);
+        orig_log(" Lobby GetConnectionSettings failed with  %x\n", hr);
         if (hr == (HRESULT)DPERR_BUFFERTOOSMALL)
-            orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_E_SMALL);
+            orig_log("DPERR_BUFFERTOOSMALL \n");
         else if (hr == (HRESULT)DPERR_INVALIDINTERFACE)
-            orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_E_IFACE);
+            orig_log("DPERR_INVALIDINTERFACE \n");
         else if (hr == (HRESULT)DPERR_INVALIDOBJECT)
-            orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_E_OBJECT);
+            orig_log("DPERR_INVALIDOBJECT \n");
         else if (hr == E_INVALIDARG)
-            orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_E_PARAMS);
+            orig_log("DPERR_INVALIDPARAMS \n");
         else if (hr == E_OUTOFMEMORY)
-            orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_E_MEMORY);
+            orig_log("DPERR_OUTOFMEMORY \n");
         return 0;
     }
 
@@ -1360,11 +1360,11 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
             0, 0, conn) < 0)
         return 0;
 
-    orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_CONNECT);
+    orig_log("Lobby start: about to call m_pLobby->Connect\n");
     hr = IDirectPlayLobby_Connect(
              *(LPDIRECTPLAYLOBBY3A *)(g_commObject + COMM_OFF_LOBBY),
              0, &dp2, NULL);
-    orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_CONNRET, hr);
+    orig_log(" Lobby Connect returned %x\n", hr);
     if (hr < 0)
         return 0;
 
@@ -1473,7 +1473,7 @@ int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
     hr = IDirectPlayX_CreatePlayer(dp, (LPDPID)(self + COMM_OFF_OUR_PLAYER_ID),
                                    &who, event, data, length, 0);
     if (hr != DP_OK) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_CREATE_PLAYER_FAIL, hr);
+        orig_log("CreatePlayer Failed  returned %x \n", hr);
         return 0;
     }
 
@@ -1482,7 +1482,7 @@ int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
     } else {
         /* One more of us. */
         comm_u32(shared, COMM_OFF_PLAYER_COUNT) += 1;
-        orig_log((const char *)(uintptr_t)ADDR_STR_NUM_PLAYERS,
+        orig_log("numDPPlayers is %d \n",
                  comm_u32(shared, COMM_OFF_PLAYER_COUNT));
     }
 
@@ -1583,7 +1583,7 @@ int32_t __attribute__((thiscall)) CommReceive(void *comm, DPID *from, DPID *to,
 
         if (free > COMM_FLOW_FREE_OK
                 && (GetPauseFlags() & COMM_FLOW_PAUSED_BIT)) {
-            orig_log((const char *)(uintptr_t)ADDR_STR_FLOW_UNPAUSE, free);
+            orig_log("FLOW UNPAUSE nfree = %d\n", free);
             UnPauseGame(COMM_FLOW_PAUSED_BIT);
         }
     }
@@ -1623,7 +1623,7 @@ int32_t __attribute__((thiscall)) CommJoinSession(void *comm, const GUID *instan
 
     hr = IDirectPlayX_Open(dp, &desc, DPOPEN_JOIN);
     if (hr != DP_OK) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_OPEN_FAILED, hr);
+        orig_log(" Open Session Failed returned %x \n", hr);
         return 0;
     }
 
@@ -1857,12 +1857,12 @@ int32_t __cdecl RecvThreadProc(void *param)
             if (!msg) {
                 msg = MsgListRemHead((void *)(uintptr_t)ADDR_MSG_LIST_POOL);
                 if (!msg) {
-                    orig_log((const char *)AM2_IMAGE(ADDR_FMT_RECV_NO_NODE),
+                    orig_log(" ????? m = %x  freelistsize = %d\n",
                              msg,
                              MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL));
                     msg = MsgListRemHead(
                         (void *)(uintptr_t)ADDR_MSG_LIST_POOL);
-                    orig_log((const char *)AM2_IMAGE(ADDR_FMT_RECV_NOW_NODE),
+                    orig_log(" ????? NOW m = %x freelistsize = %d\n",
                              msg,
                              MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL));
                 }
@@ -1870,11 +1870,11 @@ int32_t __cdecl RecvThreadProc(void *param)
 
             if (!msg) {
                 /* No node twice: take the packet and drop it. */
-                orig_log((const char *)AM2_IMAGE(ADDR_FMT_RECV_NO_BUFFERS),
+                orig_log(" Low-Level Comm Error No Recieve Buffers free = %d inuse = %d sendq = %d \n",
                          MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL),
                          MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_B),
                          MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ));
-                orig_log((const char *)AM2_IMAGE(ADDR_FMT_RECV_DUMPING));
+                orig_log(" Dumping incoming message on the floor\n");
 
                 CommReceive(*(void **)(uintptr_t)ADDR_COMM_OBJECT, &from, &to,
                             1, (void *)(uintptr_t)ADDR_RECV_SCRATCH, &size);
@@ -1908,7 +1908,7 @@ int32_t __cdecl RecvThreadProc(void *param)
                          AM2_WM_PACKETS_READY, 0, 0);
     }
 
-    orig_log((const char *)AM2_IMAGE(ADDR_STR_RECV_GOT_EVENT_0));
+    orig_log(" Receive thread got event 0 \n");
     WaitForSingleObject(*(HANDLE *)(uintptr_t)ADDR_PACKET_EVENT_A, INFINITE);
     return 0;
 }
@@ -1976,7 +1976,7 @@ void __cdecl PacketSlotReset(uint32_t slot);
                                   NULL, 0,
                                   (LPDWORD)(uintptr_t)ADDR_PACKET_THREAD_ID);
     if (!g_packetThread) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_THREAD_FAILED, 0, 0, 0);
+        orig_log("Error launching packet thread\n", 0, 0, 0);
         return 0;
     }
     return SetThreadPriority(g_packetThread, THREAD_PRIORITY_HIGHEST) != 0;
@@ -2106,7 +2106,7 @@ void __attribute__((thiscall)) CommReportStats(void *comm)
         if (samples) {
             uint32_t over = *(const uint32_t *)(c + COMM_OFF_STAT_BW_OVER);
 
-            orig_stat_log((const char *)AM2_IMAGE(ADDR_STR_SEND_BANDWIDTH),
+            orig_stat_log(" SEND    BANDWIDTH (%6d samples) MAX was %6d;  %6d (%3d%%) exceeded design spec(%d) \n",
                           samples,
                           *(const uint32_t *)(c + COMM_OFF_STAT_BW_MAX),
                           over, over * 100u / samples,
@@ -2120,7 +2120,7 @@ void __attribute__((thiscall)) CommReportStats(void *comm)
         if (samples) {
             uint32_t over = *(const uint32_t *)(c + COMM_OFF_RX_BW_OVER);
 
-            orig_stat_log((const char *)AM2_IMAGE(ADDR_STR_RECV_BANDWIDTH),
+            orig_stat_log(" RECEIVE BANDWIDTH (%6d samples) MAX was %6d;  %6d (%3d%%) exceeded design spec(%d) \n",
                           samples,
                           *(const uint32_t *)(c + COMM_OFF_RX_BW_MAX),
                           over, over * 100u / samples,
@@ -2138,7 +2138,7 @@ void __attribute__((thiscall)) CommReportStats(void *comm)
         if (packets) {
             uint32_t bytes = *(const uint32_t *)(c + COMM_OFF_STAT_BYTES);
 
-            orig_stat_log((const char *)AM2_IMAGE(ADDR_STR_SENT_PACKETS),
+            orig_stat_log(" Sent     %8d Packets Max Size: %6d Ave Size: %6d Ave Packets/Second: %6d  Ave Bytes/Second: %6d  elapsed: %d \n",
                           packets,
                           *(const uint32_t *)(c + COMM_OFF_STAT_MAX),
                           bytes / packets, packets / secs, bytes / secs, secs);
@@ -2151,7 +2151,7 @@ void __attribute__((thiscall)) CommReportStats(void *comm)
         if (packets) {
             uint32_t bytes = *(const uint32_t *)(c + COMM_OFF_RX_BYTES);
 
-            orig_stat_log((const char *)AM2_IMAGE(ADDR_STR_RECV_PACKETS),
+            orig_stat_log(" Received %8d Packets Max Size: %6d Ave Size: %6d Ave Packets/Second: %6d  Ave Bytes/Second: %6d  elapsed: %d\n",
                           packets,
                           *(const uint32_t *)(c + COMM_OFF_RX_MAX),
                           bytes / packets, packets / secs, bytes / secs, secs);
@@ -2185,7 +2185,7 @@ void __cdecl CommNoBuffers(void)
         return;
 
     g_noBuffersLatch = 1;
-    orig_stat_log((const char *)AM2_IMAGE(ADDR_STR_NO_BUFFERS));
+    orig_stat_log("COMM ERROR: NO BUFFERS\n");
     PostMessageA(*(HWND *)(uintptr_t)ADDR_HWND, WM_CLOSE, 0, 0);
 }
 
@@ -2399,17 +2399,17 @@ void __cdecl OnLobbySlave(void)
     comm = g_commObject;
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE)) {
         sd = *(LPDPSESSIONDESC2 *)(comm + COMM_OFF_SESSION_DESC);
-        orig_log((const char *)AM2_IMAGE(ADDR_FMT_SESSION_MAX),
+        orig_log("Session Max Players: %d\n",
                 (int32_t)sd->dwMaxPlayers);
 
         comm = g_commObject;
         sd   = *(LPDPSESSIONDESC2 *)(comm + COMM_OFF_SESSION_DESC);
-        orig_log((const char *)AM2_IMAGE(ADDR_FMT_SESSION_CUR),
+        orig_log("Session Cur Players: %d\n",
                 (int32_t)sd->dwCurrentPlayers);
 
         comm = g_commObject;
         sd   = *(LPDPSESSIONDESC2 *)(comm + COMM_OFF_SESSION_DESC);
-        orig_log((const char *)AM2_IMAGE(ADDR_FMT_SESSION_NAME),
+        orig_log("Session Name: %s\n",
                 sd->lpszSessionNameA);
 
         comm = g_commObject;
@@ -2488,7 +2488,7 @@ void __attribute__((thiscall)) CommReopenSession(void *comm)
                 &= ~(uint32_t)AM2_SESSION_FLAGS_START;
 
             if (CommSetSessionDesc(comm, desc, 0) < 0)
-                orig_log((const char *)(uintptr_t)ADDR_STR_SET_SESSION_FAIL);
+                orig_log("Set Session Failed to reopen Session\n");
         }
     }
 
@@ -2790,16 +2790,16 @@ void __cdecl DumpMsgList(void *list)
 
     WaitForSingleObject(*(HANDLE *)(l + MSGLIST_OFF_MUTEX), INFINITE);
 
-    orig_log((const char *)AM2_IMAGE(ADDR_STR_LIST_HEAD));
+    orig_log("List: ");
 
     for (n = *(const uint8_t *const *)(l + MSGLIST_OFF_HEAD); n;
          n = *(const uint8_t *const *)(n + MSGNODE_OFF_NEXT))
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_LIST_NODE),
+        orig_log("(%d %d)",
                      *(const int32_t *)(n + MSGNODE_OFF_KEY),
                      *(const int32_t *)(*(const uint8_t *const *)
                                             (n + MSGNODE_OFF_BODY) + 8));
 
-    orig_log((const char *)AM2_IMAGE(ADDR_STR_NEWLINE));
+    orig_log("\n");
 
     ReleaseMutex(*(HANDLE *)(l + MSGLIST_OFF_MUTEX));
 }
@@ -3194,7 +3194,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
     switch ((int32_t)m->dwType) {
     case DPSYS_DESTROYPLAYERORGROUP:
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            orig_log((const char *)(uintptr_t)ADDR_STR_SYS_DESTROY_PLAYER,
+            orig_log("DestroyPlayer Id=%x, to = %x\n",
                      m->dpId, to);
         PostMessageA(*(HWND *)(uintptr_t)ADDR_HWND, AM2_WM_PLAYER_GONE,
                      (WPARAM)m->dpId, (LPARAM)msg);
@@ -3202,7 +3202,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
 
     case DPSYS_CREATEPLAYERORGROUP:
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE)) {
-            orig_log((const char *)(uintptr_t)ADDR_STR_SYS_CREATE_PLAYER,
+            orig_log("CreatePlayer to=%x, name = %s id = %x\n",
                      to, m->dpnName.lpszShortNameA, m->dpId);
             comm = g_commObject;
         }
@@ -3307,12 +3307,12 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
         return;
 
     case DPSYS_SESSIONLOST:
-        orig_log((const char *)(uintptr_t)ADDR_STR_SYS_SESSION_LOST,
+        orig_log("SESSIONLOST   from=%x, to = %x\n",
                  from, to, 0);
         return;
 
     case DPSYS_HOST:
-        orig_log((const char *)(uintptr_t)ADDR_STR_SYS_HOST, size, from, to);
+        orig_log("DPSYS_HOST Size=%d, from=%x, to = %x\n", size, from, to);
         PostMessageA(*(HWND *)(uintptr_t)ADDR_HWND, AM2_WM_HOST_CHANGED, 0, 0);
         return;
 
@@ -3322,7 +3322,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
         return;
 
     default:
-        orig_log((const char *)(uintptr_t)ADDR_STR_SYS_UNHANDLED,
+        orig_log("UnHandled System Message %x %d \n",
                  m->dwType, m->dwType, 0);
         return;
     }
@@ -3745,7 +3745,7 @@ void __cdecl CheckPlayerTimeout(void)
                 && *(const uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT
                 && now - *(const uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT
                        > AM2_TIMEOUT_PLAYER_MS) {
-                orig_log((const char *)(uintptr_t)ADDR_STR_TIMING_OUT, i,
+                orig_log("TIMING OUT PLAYER %d %s\n", i,
                          slot + COMM_SLOT_OFF_NAME);
                 *(uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT = now;
             }
@@ -3776,7 +3776,7 @@ void __cdecl CheckPlayerTimeout(void)
             && *(const uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT
             && now - *(const uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT
                    > AM2_TIMEOUT_HOST_MS) {
-            orig_log((const char *)(uintptr_t)ADDR_STR_LOST_HOST, i,
+            orig_log("EXITING - HAVE NOT HEARD FROM HOST: %d %s\n", i,
                      slot + COMM_SLOT_OFF_NAME);
             *(uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT = now;
         }

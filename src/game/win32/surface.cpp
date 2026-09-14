@@ -606,7 +606,7 @@ static void SeqBarFill(int32_t left, int32_t top, int32_t right, int32_t bottom,
 
     if (IDirectDrawSurface_Blt(g_backBuffer, &dest, NULL, NULL,
                                DDBLT_COLORFILL | DDBLT_WAIT, &fx) != DD_OK)
-        orig_log((const char *)(uintptr_t)ADDR_STR_SEQ_BLT_FAIL);
+        orig_log("Couldn't Blt Seq Pixels\n");
 }
 
 void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint32_t colour,
@@ -775,7 +775,7 @@ void *__cdecl ReadDibChunk(am2_FILE *fp, void *header)
     orig_fread(&bi->bmiHeader, sizeof(bi->bmiHeader), 1, fp);
 
     if (bi->bmiHeader.biBitCount > 8) {
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_TOO_MANY_COLOURS));
+        orig_log("Too many colors in bitmap.\n");
         return (void *)0;
     }
 
@@ -799,7 +799,7 @@ void *__cdecl ReadDibChunk(am2_FILE *fp, void *header)
 
     pixels = orig_malloc((size_t)size);
     if (!pixels) {
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_DIB_MALLOC_FAIL));
+        orig_log("malloc failed in ReadBitmap()\n");
         return (void *)0;
     }
 
@@ -822,7 +822,7 @@ void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size)
     if (!path || !path[0])
         return (void *)0;
 
-    fp = orig_fopen(path, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    fp = orig_fopen(path, "rb");
     if (!fp)
         return (void *)0;
 
@@ -1052,15 +1052,15 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
 
         if (IDirectDraw2_CreateSurface(g_ddraw2obj, &ddsd, &surf, NULL) != DD_OK) {
             if (*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SYSMEM) {
-                orig_log((const char *)(uintptr_t)ADDR_STR_BMP_NO_SURF);
+                orig_log("CreateSurface failed in MakeBitmap()\n");
                 return 0;
             }
             /* Only worth saying when video memory was what we asked for. */
-            orig_log((const char *)(uintptr_t)ADDR_STR_BMP_NO_VIDMEM);
+            orig_log("Failed to put surface into video memory!\n");
             *(uint32_t *)(dest + BMP_OFF_FLAGS) |= BMP_FLAG_SYSMEM;
             ddsd.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
             if (IDirectDraw2_CreateSurface(g_ddraw2obj, &ddsd, &surf, NULL) != DD_OK) {
-                orig_log((const char *)(uintptr_t)ADDR_STR_BMP_NO_SURF);
+                orig_log("CreateSurface failed in MakeBitmap()\n");
                 return 0;
             }
         }
@@ -1068,7 +1068,7 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
         IDirectDrawSurface_Restore(surf);
         if (IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL) != DD_OK) {
             IDirectDrawSurface_Release(surf);
-            orig_log((const char *)(uintptr_t)ADDR_STR_BMP_NO_LOCK);
+            orig_log("Error on Lock in DDCopyBitmap()");
             return 0;
         }
 
@@ -1076,7 +1076,7 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
                                      remap, (uint32_t *)(dest + BMP_OFF_KEY));
         if (!copied) {
             IDirectDrawSurface_Release(surf);
-            orig_log((const char *)(uintptr_t)ADDR_STR_BMP_NO_LOCK);
+            orig_log("Error on Lock in DDCopyBitmap()");
             return 0;
         }
 

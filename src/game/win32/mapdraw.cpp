@@ -47,6 +47,34 @@
 extern "C" int32_t am2_trace_window(void) __attribute__((weak));
 #define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())
 
+#ifdef AM2_STANDALONE
+/* am2_shake_presets -- 0x00486170, the screen-shake presets ShakeAt selects
+ * with `base + index*4`. orig.h calls it int32[4][4], but ShakeAt's index is
+ * (strength*scale) with strength clamped to 10, so it reaches row 10 -- the
+ * documented "indexes PAST" behaviour. The rows continue as a real pattern to
+ * index 10 (string data begins just after, at ADDR_STR_PALETTE0), so the
+ * faithful extent is 11 rows of 4 = int32[44]. Each row is {period, dx, dy,
+ * decay}; row 0 is all-zero and the `< 1` index test skips it. */
+extern "C" const int32_t am2_shake_presets[44] = {
+       0,   0,   0, 0,
+     250,  25,  12, 2,
+     500,  16,  35, 2,
+     750,  45,  17, 2,
+    1000,  22,  55, 3,
+    1250,  65,  26, 3,
+    1500,  29,  75, 3,
+    1750,  85,  33, 4,
+    2000,  36,  95, 4,
+    2250, 105,  40, 5,
+    2500,  43, 115, 5,
+};
+
+/* am2_aim_displace_map -- 0x00478CDC, a 112x112 block of int16 {sx,sy}
+ * displacement pairs (25088 values), transcribed into a committed .inc that
+ * the build does NOT regenerate. See the .inc header and checkimagedata. */
+#include "aimdisplace.inc"
+#endif
+
 #define g_drawTarget (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)
 /* The OFFSCREEN surface, not the back buffer. This file used to call it
  * g_backBuffer, which made one identifier mean two different surfaces in two
@@ -310,7 +338,7 @@ int32_t __cdecl LoadAtlFile(const char *path)
     uint32_t  magic, formSize, chunkId, chunkSize;
     int32_t   offset;
 
-    fp = orig_fopen(path, (const char *)(uintptr_t)ADDR_MODE_RB);
+    fp = orig_fopen(path, "rb");
     if (!fp)
         return 0;
 
@@ -386,7 +414,7 @@ int32_t __cdecl LoadAtlFile(const char *path)
     return 1;
 
 bad:
-    orig_log((const char *)(uintptr_t)ADDR_MSG_TILESET_LOAD);
+    orig_log("Error in loadtileset()\n");
     orig_fclose(fp);
     return 0;
 }
@@ -414,11 +442,11 @@ void __cdecl RestoreTileSet(void)
      * because of it. It went in as `orig_path_exists`, which made the chdir
      * look like a side effect rather than the reason it is here. */
     SetGameDir(g_tilesetPath);
-    orig_sprintf(path, (const char *)(uintptr_t)ADDR_FMT_ATL, g_tilesetName);
+    orig_sprintf(path, "%s.atl", g_tilesetName);
 
-    fp = orig_fopen(path, (const char *)(uintptr_t)ADDR_MODE_RB);
+    fp = orig_fopen(path, "rb");
     if (!fp) {
-        orig_log((const char *)(uintptr_t)ADDR_MSG_TILESET_OPEN);
+        orig_log("Unable to open tileset\n");
         return;
     }
 
@@ -481,7 +509,7 @@ void __cdecl RestoreTileSet(void)
                                     width, height, remap, &scratch))
                 IDirectDrawSurface_Unlock(surf, desc.lpSurface);
             else
-                orig_log((const char *)(uintptr_t)ADDR_MSG_TILESET_LOCK);
+                orig_log("Error on Lock in RestoreTileSet()");
         }
 
         orig_free(pixels);
@@ -491,7 +519,7 @@ void __cdecl RestoreTileSet(void)
     return;
 
 bad:
-    orig_log((const char *)(uintptr_t)ADDR_MSG_TILESET_LOAD);
+    orig_log("Error in loadtileset()\n");
     orig_fclose(fp);
 }
 
@@ -2321,7 +2349,7 @@ void __cdecl AirFrameDraw(void)
             else
                 frame = (half / 2 + into * 5) / half + 1;
 
-            orig_log((const char *)(uintptr_t)ADDR_MSG_AIR_FRAME,
+            orig_log("Air frame %d, pt %d,%d\n",
                      frame, x, y);
         } else {
             int32_t into = t - leg2;

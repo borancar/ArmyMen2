@@ -359,27 +359,27 @@ void __cdecl DeclareBuiltinNames(void)
 {
     FreeScriptNames();
 
-    g_svarId15 = AddNameTableName((const char *)AM2_IMAGE(ADDR_STR_SVAR_ALL),
+    g_svarId15 = AddNameTableName("all",
                                   AM2_NAME_TYPE_REF, AM2_SVAR_UID_ALL);
-    g_svarGreen = AddNameTableName((const char *)AM2_IMAGE(ADDR_STR_GREEN),
+    g_svarGreen = AddNameTableName("green",
                                    AM2_NAME_TYPE_REF, AM2_SVAR_UID_GREEN);
-    g_svarTan = AddNameTableName((const char *)AM2_IMAGE(ADDR_STR_TAN),
+    g_svarTan = AddNameTableName("tan",
                                  AM2_NAME_TYPE_REF, AM2_SVAR_UID_TAN);
-    g_svarBlue = AddNameTableName((const char *)AM2_IMAGE(ADDR_STR_BLUE),
+    g_svarBlue = AddNameTableName("blue",
                                   AM2_NAME_TYPE_REF, AM2_SVAR_UID_BLUE);
-    g_svarGrey = AddNameTableName((const char *)AM2_IMAGE(ADDR_STR_GREY),
+    g_svarGrey = AddNameTableName("grey",
                                   AM2_NAME_TYPE_REF, AM2_SVAR_UID_GREY);
-    g_svarMe = AddNameTableName((const char *)AM2_IMAGE(ADDR_STR_SVAR_ME),
+    g_svarMe = AddNameTableName("me",
                                 AM2_NAME_TYPE_REF, AM2_SVAR_UID_ME);
 
     g_svarDifficulty = AddNameTableName(
-        (const char *)AM2_IMAGE(ADDR_STR_DIFFICULTY), AM2_NAME_TYPE_INTEGER,
+        "difficulty", AM2_NAME_TYPE_INTEGER,
         *(const int32_t *)AM2_IMAGE(ADDR_DIFFICULTY));
     g_svarSystemSpeed = AddNameTableName(
-        (const char *)AM2_IMAGE(ADDR_STR_SYSTEMSPEED), AM2_NAME_TYPE_INTEGER,
+        "systemspeed", AM2_NAME_TYPE_INTEGER,
         *(const int32_t *)AM2_IMAGE(ADDR_FAST_MACHINE));
     g_svarNumGreen = AddNameTableName(
-        (const char *)AM2_IMAGE(ADDR_STR_NUMGREEN), AM2_NAME_TYPE_INTEGER, 0);
+        "numgreen", AM2_NAME_TYPE_INTEGER, 0);
 }
 
 /* 0x0043F910, one caller, and that caller is LoadScriptName. Bind a loaded
@@ -495,7 +495,7 @@ int32_t __cdecl LoadScriptSection(am2_FILE *fp)
     int32_t count;
 
     if (!CheckSaveTag(fp, AM2_SAVETAG_SCRIPT,
-                      (const char *)AM2_IMAGE(ADDR_STR_SCRIPT_CPP), 0x1F8))
+                      "C:\\ArmyMen2\\source\\script.cpp", 0x1F8))
         return 0;
 
     /* After the tag check, so a foreign save leaves the table alone. */

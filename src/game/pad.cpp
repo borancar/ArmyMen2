@@ -15,6 +15,22 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
+#ifdef AM2_STANDALONE
+/* am2_pad_bit_table -- 0x00486444, 66 int32: the set-bit masks 1<<0..1<<31,
+ * then the clear-bit masks ~(1<<n), then 0x7FFFFFFF and two zeros. Read as
+ * `table[n]` by the pad bit logic. Transcribed out of the blob. */
+extern "C" const int32_t am2_pad_bit_table[66] = {
+    1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384,
+    32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608,
+    16777216, 33554432, 67108864, 134217728, 268435456, 536870912, 1073741824,
+    (int32_t)0x80000000,
+    -2, -3, -5, -9, -17, -33, -65, -129, -257, -513, -1025, -2049, -4097,
+    -8193, -16385, -32769, -65537, -131073, -262145, -524289, -1048577,
+    -2097153, -4194305, -8388609, -16777217, -33554433, -67108865, -134217729,
+    -268435457, -536870913, -1073741825, 2147483647, 0, 0,
+};
+#endif
+
 #define kPads        ((void *)(uintptr_t)AM2_IMAGE(ADDR_PADS))
 #define kPadNumbers  ((void *)(uintptr_t)AM2_IMAGE(ADDR_PAD_NUMBERS))
 #define kPadCount    (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_PAD_COUNT))
@@ -47,7 +63,7 @@ int32_t __cdecl LoadPadSection(am2_FILE *fp)
     ResetPads();
 
     if (!CheckSaveTag(fp, AM2_SAVETAG_PAD,
-                      (const char *)AM2_IMAGE(ADDR_STR_PAD_CPP), 0x1AD))
+                      "C:\\ArmyMen2\\source\\pad.cpp", 0x1AD))
         return 0;
 
     orig_fread(&count, 4, 1, fp);
@@ -148,7 +164,7 @@ void __cdecl PadNumberLeave(void *obj, void *padNumber)
                               *(const int32_t *)(pad + PAD_OFF_TRIGGER), obj)) {
                 *(int32_t *)(pad + PAD_OFF_ITEM_COUNT) -= 1;
                 if (*(const int32_t *)(pad + PAD_OFF_ITEM_COUNT) < 0) {
-                    am2_log((const char *)AM2_IMAGE(ADDR_STR_PAD_UNDERFLOW),
+                    am2_log("pad # %d thinks there are less than zero items on it\n",
                             (int32_t)(((const uint8_t *)pn
                                        - (const uint8_t *)kPadNumbers)
                                       / AM2_PAD_NUMBER_STRIDE));

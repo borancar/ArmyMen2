@@ -48,6 +48,12 @@ void __cdecl SendPlayerMsg(int32_t arg);
 #include "image.h"      /* AM2_IMAGE */
 #include "../inject/patch.h"
 
+#ifdef AM2_STANDALONE
+/* am2_game_version -- 0x00475894, the protocol version the multiplayer
+ * handshake compares (read as a single int32). Transcribed out of the blob. */
+extern "C" const int32_t am2_game_version = 1;
+#endif
+
 /* Three comm methods, forward-declared rather than reached by address.
  *
  * They live in win32/dplay.cpp and are declared in win32/dplay.h, which this
@@ -1403,19 +1409,19 @@ void __cdecl RecvTrooperSetWeapon(void *msg)
     trooperUid = UidOnWire(*(const uint32_t *)(m + MSG_SETWEAPON_OFF_TROOPER));
     weaponUid  = UidOnWire(*(const uint32_t *)(m + MSG_SETWEAPON_OFF_WEAPON));
 
-    orig_log((const char *)AM2_IMAGE(ADDR_STR_RECV_SETW_LINK),
+    orig_log("Received TrooperSetWeapon message: linking trooper %08x to weapon %08x\n",
              trooperUid, weaponUid);
 
     trooper = (uint8_t *)ObjByUidAlias(trooperUid);
     if (!trooper) {
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_RECV_SETW_NO_TROOP),
+        orig_log("Received TrooperSetWeapon message: trooper %08x not found\n",
                  trooperUid);
         return;
     }
 
     weapon = WeaponByUid(weaponUid);
     if (!weapon) {
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_RECV_SETW_NO_WEAP),
+        orig_log("Received TrooperSetWeapon message: weapon %08x not found\n",
                  weaponUid);
         return;
     }
@@ -1493,18 +1499,18 @@ void __cdecl TroopMessageRecv(void *msg, int32_t army)
 
     case AM2_MSG_TROOPER_DROP_ITEM:
         if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
-            orig_log((const char *)AM2_IMAGE(ADDR_STR_GOT_DROP_ITEM));
+            orig_log("troopMessageReceive: got eTROOPER_DROP_ITEM_MESSAGE\n");
         RecvTrooperDropItem(msg);
         return;
 
     case AM2_MSG_TROOPER_WEAPON:
         if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
-            orig_log((const char *)AM2_IMAGE(ADDR_STR_GOT_SET_WEAPON));
+            orig_log("troopMessageReceive: got eTROOPER_SET_WEAPON_MESSAGE\n");
         RecvTrooperSetWeapon(msg);
         return;
 
     default:
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_UNKNOWN_TROOP_MSG), kind);
+        orig_log("Unknown Troop Message of type %d Received\n", kind);
         return;
     }
 }
@@ -1568,7 +1574,7 @@ void __cdecl RecvVehicleExit(void *msg)
     void          *vehicle;
 
     if (*(const int32_t *)(kCommObj + COMM_OFF_VERBOSE))
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_VEH_EXIT_RECV),
+        orig_log("-->Vehicle Exit Received: Vehicle: %x, trooper: %x\n",
                  UidOnWire(*(const uint32_t *)(m + 4)),
                  UidOnWire(*(const uint32_t *)(m + 8)));
 
@@ -1627,7 +1633,7 @@ void __cdecl VehicleMsgRecv(void *msg, int32_t army)
         RecvVehicleExit(msg);
         return;
     default:
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_UNKNOWN_VEH_MSG), kind);
+        orig_log("Unknown Vehicle Message of type %d Received\n", kind);
         return;
     }
 }
@@ -2652,7 +2658,7 @@ void __cdecl CommTuneChangeLimit(void)
 
             comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
             *(uint32_t *)(uintptr_t)ADDR_BANDWIDTH_LAST_SEQ = seq;
-            orig_log((const char *)(uintptr_t)ADDR_STR_BANDWIDTH_UP, sent,
+            orig_log("Exceeded bandwidth (%d), enoughChangeLimit increased to %d\n", sent,
                      *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT));
             comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
 
@@ -2666,7 +2672,7 @@ void __cdecl CommTuneChangeLimit(void)
 
                 comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
                 *(uint32_t *)(uintptr_t)ADDR_BANDWIDTH_LAST_SEQ = seq;
-                orig_log((const char *)(uintptr_t)ADDR_STR_BANDWIDTH_DOWN, sent,
+                orig_log("Less than half bandwidth (%d), enoughChangeLimit decreased to %d\n", sent,
                          *(const uint32_t *)(comm
                                              + COMM_OFF_ENOUGH_CHANGE_LIMIT));
                 comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
@@ -2879,14 +2885,14 @@ static void FlowRetireThrough(uint8_t *flow, uint32_t ackedThrough,
         uint8_t *sent;
 
         /* Not behind COMM_OFF_VERBOSE, unlike almost everything else here. */
-        am2_log((const char *)AM2_IMAGE(ADDR_STR_GOT_PULSE_ACK), seq);
+        am2_log(" Got Pulse Ack for  seq %d\n", seq);
 
         sent = (uint8_t *)MsgListSetFlag(
             (void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, (int32_t)seq, 0,
             (int32_t)mask);
         if (sent == 0) {
             if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-                am2_log((const char *)AM2_IMAGE(ADDR_STR_ACK_NOT_IN_SENDQ),
+                am2_log("Flow Ack for Message not in sendqueue sequence %d from %x  %d mask %x  \n",
                         seq, from, from, mask);
             /* A SECOND line on the same path, and the two arms do not share
              * it: the PULSE ACK arm prints the id with %d and the DATA arm
@@ -2907,7 +2913,7 @@ static void FlowRetireThrough(uint8_t *flow, uint32_t ackedThrough,
         if ((*(const uint32_t *)(uintptr_t)ADDR_PLAYER_SLOT_MASK
              & *(uint32_t *)(sent + MSGNODE_OFF_FLAGS)) == 0) {
             if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-                am2_log((const char *)AM2_IMAGE(ADDR_STR_PULSE_FREELIST),
+                am2_log("PULSE Adding to freelist from sendque Buffer seq %d  elelment %x \n",
                         seq, sent);
             MsgListRemove((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, sent);
             MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, sent);
@@ -2951,7 +2957,7 @@ static int32_t FlowRecvNack(uint8_t *node, uint8_t *msg, uint8_t *sender,
     uint32_t seq;
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-        am2_log((const char *)AM2_IMAGE(ADDR_STR_GOT_NACK),
+        am2_log("GOT NACK: seq %d thru %d from %d (%x)  nxtSeq = %d \n",
                 first, last, from, from,
                 *(const uint32_t *)(me + FLOW_OFF_SEQUENCE));
 
@@ -2963,14 +2969,14 @@ static int32_t FlowRecvNack(uint8_t *node, uint8_t *msg, uint8_t *sender,
 
         if (copy == 0) {
             /* Already retired -- ordinary, so log and keep going. */
-            am2_log((const char *)AM2_IMAGE(ADDR_STR_NACK_NOT_FOUND),
+            am2_log("Flow Nack Resend: Msg not found seq %d hehas %d\n",
                     seq, *(const uint32_t *)(sender + FLOW_OFF_HE_HAS));
             continue;
         }
 
         if (resent >= AM2_FLOW_RESEND_BURST) {
             if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-                am2_log((const char *)AM2_IMAGE(ADDR_STR_ADDING_RESENDQ),
+                am2_log("ADDING to Resend Queue seq %d to id %x  mask %x\n",
                         seq, from, mask);
             MsgListSetFlag((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ,
                            (int32_t)seq, 1, (int32_t)mask);
@@ -2988,14 +2994,14 @@ static int32_t FlowRecvNack(uint8_t *node, uint8_t *msg, uint8_t *sender,
             int32_t rc = CommSend((void *)(uintptr_t)comm, from, 0, copy,
                                   *(const uint32_t *)(copy + PACKET_OFF_LEN));
             if (rc < 0)
-                am2_log((const char *)AM2_IMAGE(ADDR_STR_DPLAY_SEND_FAIL),
+                am2_log("DPlaySend Failure %x to %x size %d\n",
                         rc, from,
                         *(const uint32_t *)(copy + PACKET_OFF_LEN));
         }
 
         MsgSlotA2(sender, seq);
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            am2_log((const char *)AM2_IMAGE(ADDR_STR_RESEND_SEQ),
+            am2_log("Resend: seq %d to %d (%x)  nxtSeq = %d\n",
                     seq, from, from,
                     *(const uint32_t *)(me + FLOW_OFF_SEQUENCE));
 
@@ -3032,13 +3038,13 @@ static int32_t FlowRecvData(uint8_t *node, uint8_t *msg, uint8_t *sender,
     uint32_t now;
 
     if (seq < AM2_FLOW_TRACE_FIRST)
-        am2_log((const char *)AM2_IMAGE(ADDR_STR_RECEIVED_SEQ),
+        am2_log("Received seq %d  expected %d from %x, he has my seqthru  %d\t\n",
                 seq, expected, from,
                 *(const uint32_t *)(sender + FLOW_OFF_HE_HAS));
 
     /* A corrupt message is DROPPED, not queued -- hence the 1. */
     if (XorChecksum(msg) != 0) {
-        am2_log((const char *)AM2_IMAGE(ADDR_STR_BAD_CHECKSUM),
+        am2_log("Ack for sequence %d had bad checksum %x\n",
                 seq, *(const uint32_t *)(msg + PACKET_OFF_CHECKSUM));
         *(uint32_t *)(sender + FLOW_OFF_BAD_CHECKSUMS) += 1;
         return 1;
@@ -3048,7 +3054,7 @@ static int32_t FlowRecvData(uint8_t *node, uint8_t *msg, uint8_t *sender,
         && *(const uint32_t *)(me + FLOW_OFF_READY) == 0) {
         if (*(const int32_t *)(comm + COMM_OFF_IS_HOST) == 0) {
             if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-                am2_log((const char *)AM2_IMAGE(ADDR_STR_SLAVE_SESSION),
+                am2_log("Starting Slave Session, from %x, Received seq %d, flow->gotseq=%d, flow->hehas=%d, myFlow->active=%d\n",
                         from, seq,
                         *(const uint32_t *)(sender + FLOW_OFF_HE_HAS),
                         expected - 1,
@@ -3067,7 +3073,7 @@ static int32_t FlowRecvData(uint8_t *node, uint8_t *msg, uint8_t *sender,
         }
     } else if (*(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) == 0) {
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            am2_log((const char *)AM2_IMAGE(ADDR_STR_FIRST_MESSAGE),
+            am2_log("First message received from player %x, Received seq %d\n",
                     from, seq);
         *(uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) = seq - 1;
         expected = seq;
@@ -3083,7 +3089,7 @@ static int32_t FlowRecvData(uint8_t *node, uint8_t *msg, uint8_t *sender,
      * sequence 10 nothing is dropped for being far ahead. */
     if (expected < 10 && seq > expected && seq - expected > 50) {
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            am2_log((const char *)AM2_IMAGE(ADDR_STR_RESIDUAL_MSG),
+            am2_log("Residual Message from %x: expected  %d received %d  from %x hehas %d \n",
                     from, expected, seq, from,
                     *(const uint32_t *)(msg + PACKET_OFF_ACK));
         return 1;
@@ -3099,13 +3105,13 @@ static int32_t FlowRecvData(uint8_t *node, uint8_t *msg, uint8_t *sender,
         if (acked > heHas
             && acked < *(const uint32_t *)(me + FLOW_OFF_SEQUENCE)) {
             if (seq == 1 && *(const int32_t *)(comm + COMM_OFF_VERBOSE)) {
-                am2_log((const char *)AM2_IMAGE(ADDR_STR_NEW_PLAYER_FLOW),
+                am2_log("New Player joining flow he first got my seq %d hehas was %d  \n",
                         acked, heHas);
                 DumpMsgList((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ);
             }
             /* A WARNING, NOT A GUARD: it proceeds either way. */
             if (acked - heHas > AM2_FLOW_ACK_WARN)
-                am2_log((const char *)AM2_IMAGE(ADDR_STR_TOO_MANY_ACKS),
+                am2_log(" No many acks in one packet\t %d thru %d \n",
                         acked, heHas);
             FlowRetireThrough(sender, acked, mask, now, from,
                               ADDR_STR_REMOTE_ACKING_X);
@@ -3122,7 +3128,7 @@ static int32_t FlowRecvData(uint8_t *node, uint8_t *msg, uint8_t *sender,
     if (seq < *(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) + 1) {
         *(uint32_t *)(sender + FLOW_OFF_DUPLICATES) += 1;
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            am2_log((const char *)AM2_IMAGE(ADDR_STR_DUPLICATE_SEQ),
+            am2_log("Duplicate: expected %d received %d  from %x hehas %d \n",
                     *(const uint32_t *)(sender + FLOW_OFF_NEXT_EXPECTED) + 1,
                     seq, from,
                     *(const uint32_t *)(msg + PACKET_OFF_ACK));
@@ -3169,13 +3175,13 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
         mask = GetPlayerMask(from);
         sender = (uint8_t *)FindPlayerById(from);
         if (sender == 0) {
-            am2_log((const char *)AM2_IMAGE(ADDR_STR_CANT_FIND_SEQ),
+            am2_log("Can't Find FlowQ for id %x  seq \n",
                     from, *(const uint32_t *)(msg + PACKET_OFF_SEQ));
             return 1;
         }
         me = (uint8_t *)FindPlayerById(mine);
         if (me == 0) {
-            am2_log((const char *)AM2_IMAGE(ADDR_STR_CANT_FIND_MINE), mine);
+            am2_log("Can't Find my FlowQ for id %x\n", mine);
             return 1;
         }
         return FlowRecvData(node, msg, sender, me, mask, from);
@@ -3184,11 +3190,11 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
         sender = (uint8_t *)FindPlayerById(from);
         me = (uint8_t *)FindPlayerById(mine);
         if (sender == 0) {
-            am2_log((const char *)AM2_IMAGE(ADDR_STR_CANT_FIND_FLOWQ), from);
+            am2_log("Interrupt Level Can't find FlowQ for %x\n", from);
             return 0;
         }
         if (me == 0) {
-            am2_log((const char *)AM2_IMAGE(ADDR_STR_CANT_FIND_FLOWQ), mine);
+            am2_log("Interrupt Level Can't find FlowQ for %x\n", mine);
             return 0;
         }
         mask = GetPlayerMask(from);
@@ -3216,11 +3222,11 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
         sender = (uint8_t *)FindPlayerById(from);
         me = (uint8_t *)FindPlayerById(mine);
         if (sender == 0) {
-            am2_log((const char *)AM2_IMAGE(ADDR_STR_CANT_FIND_FLOWQ), from);
+            am2_log("Interrupt Level Can't find FlowQ for %x\n", from);
             return 0;
         }
         if (me == 0) {
-            am2_log((const char *)AM2_IMAGE(ADDR_STR_CANT_FIND_FLOWQ), mine);
+            am2_log("Interrupt Level Can't find FlowQ for %x\n", mine);
             return 0;
         }
         return FlowRecvNack(node, msg, sender, me);
@@ -3310,7 +3316,7 @@ void __cdecl RecvVehicle24(void *msg)
     void          *vehicle;
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_VEHICLE_ENTER_RECV),
+        am2_log((const char *)(uintptr_t)"-->Vehicle Enter Received: Vehicle: %x, trooper: %x\n",
                 UidOnWire(*(const uint32_t *)(m + 4)),
                 UidOnWire(*(const uint32_t *)(m + 8)));
 
@@ -3417,7 +3423,7 @@ uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army)
 
     if (*(const int32_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT
                            + COMM_OFF_VERBOSE))
-        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_VEHICLE_UNPACK),
+        am2_log((const char *)(uintptr_t)"-->vehicleUpdateMessageUnpack: ID:%x, Change:%d%d%d, Pos (%d,%d), facing:%d, gunfacing:%d, intent.facing:%d, intent.gunfacing:%d, action:%d, rev:%d, half:%d, slow:%d\n",
                 *(const uint32_t *)(o + OBJ_OFF_UID),
                 head >> 31, (head >> 30) & 1u, (head >> 29) & 1u,
                 *(const int16_t *)(o + OBJ_OFF_POS),
@@ -3476,7 +3482,7 @@ void __cdecl RecvVehicle1D(void *msg)
     int32_t        request;
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_VEH_WANT_ITEM_RECV),
+        am2_log((const char *)(uintptr_t)"-->Vehicle Want Item Received: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d \n",
                 UidOnWire(*(const uint32_t *)(m + 4)),
                 UidOnWire(*(const uint32_t *)(m + 8)),
                 *(const int32_t *)(m + 0x10),
@@ -3511,14 +3517,14 @@ void __cdecl RecvVehicle1D(void *msg)
 
     if (request == 2) {
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_TELL_PICKUP),
+            am2_log((const char *)(uintptr_t)"Tell pickup item received; ammo %d\n",
                     *(const int32_t *)(m + 0x14));
         return;
     }
 
     if (request == 3) {
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_TELL_DROP),
+            am2_log((const char *)(uintptr_t)"Tell Drop item received; ammo %d\n",
                     *(const int32_t *)(m + 0x14));
         /* The answer is discarded -- the original calls it and drops it. */
         (void)CommMustBroadcast(comm,
@@ -3537,17 +3543,17 @@ void __cdecl RecvVehicle1D(void *msg)
 
             SendVehicleWantItem(vehicle, item, 2,
                                 (int8_t)*(const uint8_t *)(m + 0x18), granted);
-            am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_REQ_PICKUP_OK),
+            am2_log((const char *)(uintptr_t)"Request pickup item received & OKed; ammo %d\n",
                     granted);
         } else {
-            am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_REQ_PICKUP_DENY));
+            am2_log((const char *)(uintptr_t)"Request pickup item received & denied\n");
         }
         return;
     }
 
     if (request == 1) {
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_REQ_DROP),
+            am2_log((const char *)(uintptr_t)"Request drop item received; ammo %d\n",
                     *(const int32_t *)(m + 0x14));
     }
 }
@@ -3585,7 +3591,7 @@ void __cdecl RecvVehicle1F(void *msg)
     void          *item;
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_VEH_DROP_ITEM_RECV),
+        am2_log((const char *)(uintptr_t)"-->Vehicle Drop Item Received: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d \n",
                 UidOnWire(*(const uint32_t *)(m + 4)),
                 UidOnWire(*(const uint32_t *)(m + 8)),
                 *(const int32_t *)(m + 0x10),
@@ -3609,7 +3615,7 @@ void __cdecl RecvVehicle1F(void *msg)
         if ((*(const uint32_t *)(w + 8) & 2u) == 0)
             return;
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_RECV_DROP_GONE));
+            am2_log((const char *)(uintptr_t)"Weapon destroyed before dropping; but we handled it\n");
         return;
     }
 
@@ -3617,7 +3623,7 @@ void __cdecl RecvVehicle1F(void *msg)
         return;
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_RECV_DROP_DONE),
+        am2_log((const char *)(uintptr_t)"Drop item received & performed; ammo %d\n",
                 *(const int32_t *)(m + 0x14));
 
     if (!CommMustBroadcast(comm,
@@ -3625,7 +3631,7 @@ void __cdecl RecvVehicle1F(void *msg)
         return;
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_RECV_DROP_MINE));
+        am2_log((const char *)(uintptr_t)"\tDrop Item already handled (it's my unit)\n");
 }
 
 /* RecvVehicle1C -- original 0x0045E980, one caller. Message kind 0x1C, the
@@ -3675,7 +3681,7 @@ void __cdecl RecvVehicle1C(void *msg)
 
     if (*(const int32_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT
                            + COMM_OFF_VERBOSE))
-        am2_log((const char *)(uintptr_t)AM2_IMAGE(ADDR_STR_VEHICLE_FIRE_RECV),
+        am2_log((const char *)(uintptr_t)"Vehicle Fire Rec, vehicle: %x,  gunface:%d, pos (%d,%d,%d), loctarg %x, globTarg %x\n",
                 vehUid,
                 (uint32_t)*(const uint8_t *)(veh + OBJ_OFF_FIELD_530),
                 (int32_t)*(const int16_t *)(m + 0x0C),

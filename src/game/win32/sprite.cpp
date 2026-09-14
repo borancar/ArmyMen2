@@ -41,6 +41,29 @@
 extern "C" int32_t am2_trace_window(void) __attribute__((weak));
 #define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())
 
+#ifdef AM2_STANDALONE
+/* Sprite-grid and sequence sprite-count constants transcribed out of the blob;
+ * all int32, read-only. */
+extern "C" const int32_t am2_sprite_grid_rows   = 8;        /* 0x0048CA38 */
+extern "C" const int32_t am2_sprite_grid_cols   = 8;        /* 0x0048CA3C */
+extern "C" const int32_t am2_seq_sprite_5_count = 4;        /* 0x0048CBAC */
+extern "C" const int32_t am2_decal_sprite_count = 6;        /* 0x0048CBA4 */
+extern "C" const int32_t am2_mark_sprite_count  = 2;        /* 0x0048CBB4 */
+extern "C" const int32_t am2_mp_mark_cols[2]    = { 5, 1 }; /* 0x0048CBBC */
+/* Sprite-set directory names, char*[46] indexed by set number. Several bands
+ * share one string ("01-title" for 1..9, "10-dash" for 10..18); the empty ""
+ * entries are unused set numbers. Verified by dereference (checkimagedata). */
+extern "C" const char *const am2_sprite_set_dirs[46] = {   /* 0x00489554 */
+    "00-cursors", "01-title", "01-title", "01-title", "01-title", "01-title",
+    "01-title", "01-title", "01-title", "01-title", "10-dash", "10-dash",
+    "10-dash", "10-dash", "10-dash", "10-dash", "10-dash", "10-dash",
+    "10-dash", "19-other", "20-rocks", "21-bush", "22-trees", "23-ground",
+    "", "25-fence", "26-wall", "27-bridge", "", "29-explosive", "",
+    "31-aagun", "32-tent", "33-garage", "", "", "", "37-building",
+    "38-pillbox", "", "", "", "42-radar", "43-miscellaneous", "", "45-powerups",
+};
+#endif
+
 #define g_screenClip     (*(const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP)
 extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
 #define g_surfaceLocked  (*(int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
@@ -210,7 +233,7 @@ void __cdecl RestoreSpriteSurface(AM2_Sprite *spr)
     if (spr->source) {
         if (SpriteReloadNamed(spr, spr->source, flags))
             return;
-        orig_log((const char *)(uintptr_t)ADDR_STR_RESTORE_FAIL_S, spr->source);
+        orig_log("unable to restore sprite %s.\n", spr->source);
         return;
     }
 
@@ -221,7 +244,7 @@ void __cdecl RestoreSpriteSurface(AM2_Sprite *spr)
         if (SpriteRebuildAlt(spr, flags))
             return;
     }
-    orig_log((const char *)(uintptr_t)ADDR_STR_RESTORE_FAIL_X, spr->id);
+    orig_log("unable to restore sprite %x.\n", spr->id);
 }
 
 /* ---- sprite lifetime ---------------------------------------------------
@@ -307,7 +330,7 @@ void __cdecl ReleaseSprite(AM2_Sprite *spr)
     if (spr->id != 0xFFFFFFFFu) {
         slot = SpriteSlotOf(spr->id);
         if (slot < 0) {
-            orig_log((const char *)(uintptr_t)ADDR_STR_RELEASE_MISSING);
+            orig_log("Error in release: Sprite not found!\n");
         } else if (g_spriteTable[slot] != spr) {
             /* The slot holds something other than us. Complain only if it
              * holds SOMETHING -- an empty slot is an ordinary double release
@@ -323,7 +346,7 @@ void __cdecl ReleaseSprite(AM2_Sprite *spr)
              * behaviour. Nothing reaches this path before shutdown, which is
              * why it survived every A/B until the teardown was exercised. */
             if (g_spriteTable[slot] != NULL)
-                orig_log((const char *)(uintptr_t)ADDR_STR_RELEASE_WRONG);
+                orig_log("Error in release: Wrong sprite!\n");
         } else {
             if (spr->refs > 0)
                 spr->refs--;
@@ -649,7 +672,7 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
 
     spr->overlay = (AM2_Rle16 *)0;
 
-    fp = orig_fopen(path, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    fp = orig_fopen(path, "rb");
     if (!fp)
         return 0;
 
@@ -785,15 +808,15 @@ int32_t __cdecl SpriteLoadTriple(AM2_Sprite *spr, int32_t set, int32_t index,
         return SpriteLoadFromDataFile(spr, set, index, frame, flags);
 
     if (set >= 20)
-        orig_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_FMT_DIR_SUB),
+        orig_sprintf(dir, "%s\\%s",
                      (const char *)AM2_IMAGE(ADDR_MAP_BLOCK),
                      g_spriteSetDirs[set]);
     else
-        orig_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_FMT_S),
+        orig_sprintf(dir, "%s",
                      g_spriteSetDirs[set]);
     SetGameDir(dir);
 
-    orig_sprintf(pattern, (const char *)AM2_IMAGE(ADDR_STR_GLOB_BMP),
+    orig_sprintf(pattern, "%02d_%03d_%02d_*.bmp",
                  set, index, frame);
     handle = orig_findfirst(pattern, found);
     if (handle == -1) {
@@ -804,7 +827,7 @@ int32_t __cdecl SpriteLoadTriple(AM2_Sprite *spr, int32_t set, int32_t index,
         orig_findclose(handle);
     }
 
-    orig_sprintf(pattern, (const char *)AM2_IMAGE(ADDR_STR_GLOB_SHA),
+    orig_sprintf(pattern, "%02d_%03d_%02d_*.sha",
                  set, index, frame);
     handle = orig_findfirst(pattern, found);
     if (handle == -1) {
@@ -815,7 +838,7 @@ int32_t __cdecl SpriteLoadTriple(AM2_Sprite *spr, int32_t set, int32_t index,
     }
 
     if (!spr->image.rle16 && !spr->overlay) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_SPRITE_MISSING, pattern);
+        orig_log("Sprite file not found %s\n", pattern);
         return 0;
     }
     return 1;
@@ -842,9 +865,9 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
     if (!name || !name[0])
         return 0;
 
-    fp = orig_fopen(name, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    fp = orig_fopen(name, "rb");
     if (!fp) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_BITMAP_OPEN_FAIL);
+        orig_log("Couldn't open bitmap file!\n");
         return 0;
     }
 
@@ -1082,29 +1105,29 @@ int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id)
     char folder[0x40];
     char file[0x40];
 
-    if (strcmp(name, (const char *)AM2_IMAGE(ADDR_STR_SET_TITLE)) == 0) {
+    if (strcmp(name, "title") == 0) {
         void *rec = (void *)AM2_IMAGE(ADDR_SPRITE_SET_TITLE);
 
         *set = rec;
         *id  = AM2_DAT_ID_TITLE;
         if (strcmp(SET_NAME(rec),
-                   (const char *)AM2_IMAGE(ADDR_STR_DAT_TITLE)) == 0)
+                   "title.dat") == 0)
             return 1;
         SET_FOLDER(rec)[0] = '\0';
-        strcpy(SET_NAME(rec), (const char *)AM2_IMAGE(ADDR_STR_DAT_TITLE));
+        strcpy(SET_NAME(rec), "title.dat");
         return 0;
     }
 
-    if (strcmp(name, (const char *)AM2_IMAGE(ADDR_STR_SET_SHARED)) == 0) {
+    if (strcmp(name, "shared") == 0) {
         void *rec = (void *)AM2_IMAGE(ADDR_SPRITE_SET_SHARED);
 
         *set = rec;
         *id  = AM2_DAT_ID_SHARED;
         if (strcmp(SET_NAME(rec),
-                   (const char *)AM2_IMAGE(ADDR_STR_DAT_SHARED)) == 0)
+                   "shared.dat") == 0)
             return 1;
         SET_FOLDER(rec)[0] = '\0';
-        strcpy(SET_NAME(rec), (const char *)AM2_IMAGE(ADDR_STR_DAT_SHARED));
+        strcpy(SET_NAME(rec), "shared.dat");
         return 0;
     }
 
@@ -1113,9 +1136,9 @@ int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id)
 
         *set = rec;
         *id  = AM2_DAT_ID_OBJECTS;
-        orig_sprintf(folder, (const char *)AM2_IMAGE(ADDR_STR_FMT_OBJECTS_DIR),
+        orig_sprintf(folder, "%s\\objects",
                      name);
-        strcpy(file, (const char *)AM2_IMAGE(ADDR_STR_DAT_OBJECTS));
+        strcpy(file, "objects.dat");
         if (strcmp(SET_FOLDER(rec), folder) == 0)
             return 1;
         strcpy(SET_FOLDER(rec), folder);
@@ -1187,9 +1210,9 @@ int32_t __cdecl SpriteSetLoad(const char *name)
     strcpy(SET_NAME(set), file);
 
     SET_FILE(set) = orig_fopen(SET_NAME(set),
-                               (const char *)AM2_IMAGE(ADDR_MODE_RB));
+                               "rb");
     if (!SET_FILE(set)) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_DAT_OPEN_FAIL,
+        orig_log("Unable to open object data file <%s>\n",
                  SET_NAME(set));
         return 0;
     }
@@ -1197,7 +1220,7 @@ int32_t __cdecl SpriteSetLoad(const char *name)
 
     orig_fread(&id, 4, 1, fp);
     if (id != want) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_DAT_BAD_ID, SET_NAME(set));
+        orig_log("Invalid file id in object data file <%s>\n", SET_NAME(set));
         return 0;
     }
 
@@ -1305,14 +1328,14 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
     dir = SET_DIR(sset);
 
     if (orig_fseek(fp, (int32_t)dir[slot].offset, 0) != 0) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_DF_SEEK_FAIL,
+        orig_log("Error seeking to location %d in data file.\n",
                  dir[slot].offset);
     } else {
         orig_fread(&value, 4, 1, fp);
         if ((uint32_t)value == key)
             ok = 1;
         else
-            orig_log((const char *)(uintptr_t)ADDR_STR_DF_BAD_OBJECT);
+            orig_log("Error in validating object in data file.\n");
     }
 
     if (!ok) {
@@ -1419,15 +1442,15 @@ int32_t __cdecl SpriteRebuildAlt(AM2_Sprite *spr, int32_t flags)
     uint32_t frame = id & 0x7Fu;
 
     if (set >= 20)
-        orig_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_FMT_DIR_SUB),
+        orig_sprintf(dir, "%s\\%s",
                      (const char *)AM2_IMAGE(ADDR_MAP_BLOCK),
                      g_spriteSetDirs[set]);
     else
-        orig_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_FMT_S),
+        orig_sprintf(dir, "%s",
                      g_spriteSetDirs[set]);
     SetGameDir(dir);
 
-    orig_sprintf(pattern, (const char *)AM2_IMAGE(ADDR_STR_GLOB_BMP),
+    orig_sprintf(pattern, "%02d_%03d_%02d_*.bmp",
                  (int32_t)set, (int32_t)index, (int32_t)frame);
     handle = orig_findfirst(pattern, found);
     if (handle == -1) {
@@ -1484,7 +1507,7 @@ int32_t __cdecl SpriteRebuildDf(AM2_Sprite *spr, int32_t flags)
     dir = SET_DIR(sset);
 
     if (orig_fseek(fp, (int32_t)dir[slot].offset, 0) != 0) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_DF_SEEK_FAIL,
+        orig_log("Error seeking to location %d in data file.\n",
                  dir[slot].offset);
     } else {
         orig_fread(&value, 4, 1, fp);
@@ -1497,7 +1520,7 @@ int32_t __cdecl SpriteRebuildDf(AM2_Sprite *spr, int32_t flags)
             if (len > 0 && spr->format == 0)
                 ok = 1;
         } else {
-            orig_log((const char *)(uintptr_t)ADDR_STR_DF_BAD_OBJECT);
+            orig_log("Error in validating object in data file.\n");
         }
     }
 
@@ -2035,10 +2058,10 @@ AM2_Sprite *__cdecl LoadBitmap(const char *name, int32_t flags)
     memset(spr, 0, sizeof(AM2_Sprite));
 
     if (!SpriteReloadNamed(spr, name, flags))
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_LOAD_SPRITE_FAIL), name);
+        orig_log("Unable to load sprite %s\n", name);
 
     am2_getcwd(path, (int32_t)sizeof(path));
-    strcat(path, (const char *)AM2_IMAGE(ADDR_STR_PATH_SEP));
+    strcat(path, "\\");
     strcat(path, name);
 
     spr->source = (char *)am2_malloc(strlen(path) + 1);

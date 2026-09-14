@@ -25,6 +25,30 @@
 #include <stdint.h>
 #include <string.h>
 
+#ifdef AM2_STANDALONE
+/* am2_state_actions -- 0x0048654C, the game-state action table StateEnter0 and
+ * WndProc dispatch through. Five 12-byte AM2_StateAction records {onEnter,
+ * onMessage, id}; the handlers cast from their int32_t(void) reconstructions
+ * to the table's void(void) slot type, exactly as the image stores the raw
+ * addresses. Record 4's `id` field OVERLAPS the credits string the linker
+ * placed right after (0x64657263 == "cred"); it is transcribed as that value
+ * for byte-fidelity, and nothing reads record 4's id. This is the first
+ * function-pointer table off the generator's fixups -- checkimagedata verifies
+ * each pointer against the reconstruction that patches the image's address. */
+extern "C" const AM2_StateAction am2_state_actions[5] = {
+    { (am2_state_action_fn)StateEnterLogoMovie,
+      (am2_state_action_fn)StateMessageLogoMovie,    1 },
+    { (am2_state_action_fn)StateEnterAct1Movie,
+      (am2_state_action_fn)StateMessageMovieToMenu,  2 },
+    { (am2_state_action_fn)ReturnZero,
+      (am2_state_action_fn)ReturnZero,               3 },
+    { (am2_state_action_fn)ReturnZero,
+      (am2_state_action_fn)ReturnZero,               4 },
+    { (am2_state_action_fn)StateEnterCreditsMovie,
+      (am2_state_action_fn)StateMessageMovieToMenu,  0x64657263u },
+};
+#endif
+
 /* Fields of the movie object, by offset. */
 #define MOVIE_VTABLE   0x00u   /* re-stamped on stop */
 #define MOVIE_SURFACE  0x04u   /* the surface it decodes onto */
@@ -575,8 +599,8 @@ void __cdecl PlayMovie(const char *name, int32_t big)
     void   *movie;
     int32_t volume;
 
-    if (strncmp((const char *)AM2_IMAGE(ADDR_STR_MOVIE_3DO), name, 3) == 0
-        || strncmp((const char *)AM2_IMAGE(ADDR_STR_MOVIE_CREDITS),
+    if (strncmp("3do", name, 3) == 0
+        || strncmp("credits",
                    name, 7) == 0)
         SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
     else
@@ -656,7 +680,7 @@ int32_t __cdecl StateEnterLogoMovie(void)
 {
     char name[0x20];
 
-    MovieBuildName(name, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_3DO));
+    MovieBuildName(name, "3do");
     PlayMovie(name, 0);
     return 0;
 }
@@ -667,7 +691,7 @@ int32_t __cdecl StateEnterAct1Movie(void)
 
     /* The directory table's first entry, which is "avi". */
     SetGameDir(*(const char *const *)AM2_IMAGE(ADDR_STR_AVI_DIR));
-    MovieBuildName(name, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_ACT1));
+    MovieBuildName(name, "act1");
     PlayMovie(name, 0);
     return 0;
 }
@@ -676,7 +700,7 @@ int32_t __cdecl StateEnterCreditsMovie(void)
 {
     char name[0x20];
 
-    MovieBuildName(name, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_CREDITS));
+    MovieBuildName(name, "credits");
     PlayMovie(name, 0);
     return 0;
 }

@@ -320,16 +320,12 @@ def main():
                  "am2_origdata:\n"
                  "    .incbin \"%s\"\n"
                  "\n"
-                 "#ifdef __ELF__\n"
-                 "    .section %s,\"aw\",@nobits\n"
-                 "#else\n"
-                 "    .section %s,\"bw\"\n"
-                 "#endif\n"
-                 "    .globl am2_origbss\n"
-                 "am2_origbss:\n"
-                 "    .space %d\n"
+                 " /* The .origbss zero region (0x%08X..0x%08X) is no longer a\n"
+                 "  * .space here -- it is src/game/origstate.cpp's am2_origstate\n"
+                 "  * struct, a named C transcription placed in .origbss at the\n"
+                 "  * same address. origbss.addr still gives the link its start. */\n"
                  % (split, BLOB_HI - split, SECTION, SECTION, binpath,
-                    BSS_SECTION, BSS_SECTION, BLOB_HI - split))
+                    split, BLOB_HI))
     # The link line reads this rather than repeating the number, so the
     # section start and the split cannot disagree.
     with emit(os.path.join(OUT, "origbss.addr")) as fh:
@@ -378,9 +374,24 @@ def main():
         if nm:
             si.append(nm)
 
+    # Function-pointer TABLES that have been transcribed into hand-written C
+    # (src/game, redirected under AM2_STANDALONE) no longer need their blob
+    # copies fixed up -- the copy is dead, read through the C symbol instead.
+    # checkimagedata.py verifies the C against the image. See STATUS.md's
+    # MIGRATION note.
+    MIGRATED = (
+        (0x0048654C, 0x00486584),      # am2_state_actions   (movie.cpp)
+        (0x00489880, 0x00489B40),      # am2_weapon_handlers  (widget.cpp)
+        (0x004761B8, 0x004762D0),      # am2_pointer_modes    (widget.cpp)
+    )
+    def migrated(a):
+        return any(lo <= a < hi for lo, hi in MIGRATED)
+
     fixups = []
     for off in range(0, len(blob) - 3, 4):
         v = struct.unpack_from("<I", blob, off)[0]
+        if migrated(BLOB_LO + off):
+            continue
         if v in done and v in a2n:
             fixups.append((BLOB_LO + off, a2n[v]))
         elif v in seams:

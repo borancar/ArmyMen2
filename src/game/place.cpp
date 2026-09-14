@@ -33,7 +33,7 @@
 #define kMapName      ((const char *)AM2_IMAGE(ADDR_MAP_NAME))
 #define kMapFolder    ((const char *)AM2_IMAGE(ADDR_MAP_FOLDER))
 
-#define kSep         ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
+#define kSep         (" \t\n;,")
 
 #define kUnitType(i) ((const uint8_t *)AM2_IMAGE(ADDR_UNIT_TYPES) \
                       + (size_t)(i) * AM2_UNIT_TYPE_STRIDE)
@@ -100,14 +100,14 @@ char *__cdecl BuildPlacementPath(char *dest, int32_t slot)
                                             + COMM_ARMY_OFF_COLOUR);
 
     switch (army) {
-    case 0: colour = (const char *)AM2_IMAGE(ADDR_STR_GREEN); break;
-    case 1: colour = (const char *)AM2_IMAGE(ADDR_STR_TAN);   break;
-    case 2: colour = (const char *)AM2_IMAGE(ADDR_STR_BLUE);  break;
-    case 3: colour = (const char *)AM2_IMAGE(ADDR_STR_GREY);  break;
+    case 0: colour = "green"; break;
+    case 1: colour = "tan";   break;
+    case 2: colour = "blue";  break;
+    case 3: colour = "grey";  break;
     default: break;
     }
 
-    am2_sprintf(dest, (const char *)AM2_IMAGE(ADDR_FMT_PLACE_FILE),
+    am2_sprintf(dest, "%s_%s_place.txt",
                 kMapName, colour);
     return dest;
 }
@@ -132,7 +132,7 @@ void __cdecl LoadArmyPlacement(int32_t slot)
     SetGameDir(kMapFolder);
     BuildPlacementPath(path, slot);
     if (!DefParseInfoFile(path))
-        am2_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE), path);
+        am2_log("Couldn't parse %s!\n", path);
 
     points = g_armyPoints[slot];
 
@@ -223,7 +223,7 @@ int32_t __cdecl ParsePlaceLine(int32_t cmd, char *line)
     if (!tok)
         return 7;
     strcpy(rec.name, tok);
-    if (!strcmp(rec.name, (const char *)AM2_IMAGE(ADDR_STR_PLACE_NO_NAME)))
+    if (!strcmp(rec.name, "-"))
         rec.name[0] = '\0';
 
     AddPlacement(&rec);

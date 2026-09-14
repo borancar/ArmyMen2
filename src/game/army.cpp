@@ -13,6 +13,14 @@
 #include "../inject/patch.h"
 #include "armymsg.h"  /* DamageBroadcast */
 
+#ifdef AM2_STANDALONE
+/* Vehicle name table, char*[6] indexed by vehicle kind. Index 4 is the "???"
+ * NULL-path placeholder. Transcribed as literals (verified by dereference). */
+extern "C" const char *const am2_vehicle_names[6] = {   /* 0x0048BE50 */
+    "Jeep", "Tank", "Half Track", "Convoy Truck", "???", "PT Boat",
+};
+#endif
+
 #define g_allyMatrix   ((int32_t *)(uintptr_t)ADDR_ALLY_MATRIX)
 #define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
 #define g_mpSession    (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)

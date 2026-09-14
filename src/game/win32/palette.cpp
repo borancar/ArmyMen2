@@ -42,6 +42,16 @@
 
 #include <stdint.h>
 
+#ifdef AM2_STANDALONE
+/* am2_army_pal_base -- 0x00474174, the four palette indices an army's remap
+ * strip starts at. Transcribed out of the carried .rdata blob (STATUS.md's
+ * MIGRATION note); read only by SetArmyPalette below. */
+extern "C" const uint8_t am2_army_pal_base[4] = { 206, 216, 186, 196 };
+/* am2_palette_cycle_count -- 0x00486164, how many cycling-palette entries.
+ * (The cycle INDEX at 0x00486160 is runtime state and stays a macro.) */
+extern "C" const int32_t am2_palette_cycle_count = 10;
+#endif
+
 /* The strip is drawn this far into the surface, on both axes. */
 #define PROBE_ORIGIN 0x20
 #define PALETTE_ENTRIES 256
@@ -407,7 +417,7 @@ int32_t __cdecl ReadBitmapPalette(const char *path, BITMAPINFO *out)
     BITMAPFILEHEADER  fh;
     am2_FILE         *fp;
 
-    fp = orig_fopen(path, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    fp = orig_fopen(path, "rb");
     if (!fp)
         return 0;
 
@@ -637,7 +647,7 @@ void __cdecl LoadTilesetPalettes(void)
     SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_BLOCK));
 
     for (i = 0; i < AM2_TILESET_PALETTES; i++)
-        LoadPaletteFile((const char *)AM2_IMAGE(ADDR_STR_PALETTE0)
+        LoadPaletteFile("palette0.bmp"
                             - i * AM2_PALETTE_NAME_STRIDE,
                         (uint8_t *)AM2_IMAGE(ADDR_TILESET_PALETTES)
                             + i * AM2_TILESET_PALETTE_BYTES);

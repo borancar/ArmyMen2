@@ -831,13 +831,13 @@ int32_t __cdecl FillSoundBuffer(LPDIRECTSOUNDBUFFER buf, const uint8_t *data,
     DWORD  firstLen, secondLen;
 
     if (!buf || !data || !size) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_SND_NO_ARGS);
+        orig_log("Fill sound buffer missing arguments\n");
         return 0;
     }
 
     if (IDirectSoundBuffer_Lock(buf, 0, size, &first, &firstLen,
                                 &second, &secondLen, 0) != DS_OK) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_SND_LOCK_FAIL);
+        orig_log("Unable to lock sound buffer\n");
         return 0;
     }
 
@@ -957,11 +957,11 @@ int32_t __cdecl ParseWave(void *file, LPWAVEFORMATEX *fmt, void **samples,
 
     size = *(const uint32_t *)(p + 4);
     if (*(const uint32_t *)p != AM2_RIFF_TAG_RIFF) {
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_NOT_RIFF));
+        orig_log("not a riff compatible file!\n");
         return 0;
     }
     if (*(const uint32_t *)(p + 8) != AM2_RIFF_TAG_WAVE) {
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_NOT_WAVE));
+        orig_log("not a wave file!\n");
         return 0;
     }
 
@@ -977,7 +977,7 @@ int32_t __cdecl ParseWave(void *file, LPWAVEFORMATEX *fmt, void **samples,
         if (id == AM2_RIFF_TAG_FMT) {
             if (fmt && *fmt == (LPWAVEFORMATEX)0) {
                 if (len < AM2_WAVEFMT_MIN) {
-                    orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_BAD_HDR));
+                    orig_log("Invalid header for wave file\n");
                     return 0;
                 }
                 *fmt = (LPWAVEFORMATEX)p;
@@ -1053,20 +1053,20 @@ int32_t __cdecl ReadWaveFile(int32_t unused, const char *name,
 
     (void)unused;
 
-    fp = orig_fopen(name, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    fp = orig_fopen(name, "rb");
     if (!fp) {
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_NOLOAD), name);
+        orig_log("Unable to load wave file %s\n", name);
         return 0;
     }
 
     if (orig_fseek(fp, 0, SEEK_END)) {
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_SEEK_END), name);
+        orig_log("Error seeking end of file %s\n", name);
         return 0;   /* the handle stays open -- see above */
     }
 
     size = orig_ftell(fp);
     if (size <= 0) {
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_EMPTY), name);
+        orig_log("Empty sound file %s\n", name);
         return 0;   /* and here */
     }
 
@@ -1080,7 +1080,7 @@ int32_t __cdecl ReadWaveFile(int32_t unused, const char *name,
     orig_fclose(fp);
 
     if (!ParseWave(*owned, format, samples, length)) {
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_WAVE_PARSE), name);
+        orig_log("Error parsing wave file %s\n", name);
         orig_free(*owned);
         return 0;
     }
@@ -1220,10 +1220,10 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
     }
 
     /* Probed and the answer discarded, as in InitWaveSounds. */
-    SetGameDir((const char *)(uintptr_t)ADDR_VOS_DIR);
+    SetGameDir("audio\\vos");
 
     if (!rec) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOMEM_DATA);
+        orig_log("Unable to allocate memory for wave data\n");
         return;
     }
 
@@ -1242,7 +1242,7 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
         copy = (char *)orig_malloc(n);
         *(void **)(rec + SOUND_REC_OFF_NAME) = copy;
         if (!copy) {
-            orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOMEM_NAME);
+            orig_log("Unable to allocate memory for wave name\n");
             goto drop_record;
         }
         memcpy(copy, name, n);
@@ -1250,7 +1250,7 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
         memset(&desc, 0, sizeof desc);
         if (!ReadWaveFile(0, name, &desc.lpwfxFormat, &raw,
                             &desc.dwBufferBytes, &owned)) {
-            orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOLOAD, name);
+            orig_log("Unable to load wave file %s\n", name);
             goto drop_name;
         }
 
@@ -1263,7 +1263,7 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
                 g_dsound, &desc,
                 (LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER),
                 NULL) != DS_OK) {
-            orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOBUFFER, name);
+            orig_log("Unable to create sound buffer for %s\n", name);
             goto drop_samples;
         }
 
@@ -1272,7 +1272,7 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
         if (!FillSoundBuffer(
                 *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER),
                 (const uint8_t *)raw, desc.dwBufferBytes)) {
-            orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOFILL, name);
+            orig_log("Unable to fill sound buffer data for %s\n", name);
             IDirectSoundBuffer_Release(
                 *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER));
             goto drop_samples;
@@ -1664,7 +1664,7 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
     rec = (uint8_t *)orig_malloc(SOUND_RECORD_SIZE);
     *slot = rec;
     if (!rec) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOMEM_DATA);
+        orig_log("Unable to allocate memory for wave data\n");
         return 0;
     }
 
@@ -1676,7 +1676,7 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
     nameCopy = (char *)orig_malloc(n);
     *(void **)(rec + SOUND_REC_OFF_NAME) = nameCopy;
     if (!nameCopy) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOMEM_NAME);
+        orig_log("Unable to allocate memory for wave name\n");
         orig_free(rec);
         *slot = NULL;
         return 0;
@@ -1689,7 +1689,7 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
      * answers, not ours. */
     if (!ReadWaveFile(0, name, &desc.lpwfxFormat, &raw, &desc.dwBufferBytes,
                         &owned)) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOLOAD, name);
+        orig_log("Unable to load wave file %s\n", name);
         goto give_up;
     }
 
@@ -1701,7 +1701,7 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
     if (IDirectSound_CreateSoundBuffer(
             ds, &desc, (LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER),
             NULL) != DS_OK) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOBUFFER, name);
+        orig_log("Unable to create sound buffer for %s\n", name);
         goto give_up;
     }
 
@@ -1709,7 +1709,7 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
 
     if (!FillSoundBuffer(*(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER),
                          (const uint8_t *)raw, desc.dwBufferBytes)) {
-        orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_NOFILL, name);
+        orig_log("Unable to fill sound buffer data for %s\n", name);
         IDirectSoundBuffer_Release(
             *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER));
         goto give_up;
@@ -1767,7 +1767,7 @@ int32_t __cdecl InitWaveSounds(void)
         DSBCAPS  caps;
 
         if (!LoadWaveSound((void **)slot, g_dsound, g_waveNames[i])) {
-            orig_log((const char *)(uintptr_t)ADDR_STR_WAVE_INIT_FAIL, i);
+            orig_log("Unable to initialize wave %d\n", i);
             *(void **)slot = NULL;
             continue;
         }
@@ -1891,7 +1891,7 @@ int32_t __cdecl LoadAudioSection(am2_FILE *fp)
     char name[256];
 
     if (!CheckSaveTag(fp, AM2_SAVETAG_AUDIO,
-                      (const char *)AM2_IMAGE(ADDR_STR_AUDIO_CPP), 0x240))
+                      "C:\\ArmyMen2\\source\\audio.cpp", 0x240))
         return 0;
 
     for (int32_t i = 0; i < SOUND_DYNAMIC_SAVED; i++) {

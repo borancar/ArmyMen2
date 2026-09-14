@@ -32,6 +32,16 @@
 #include <stdlib.h>
 #include "crt.h"       /* am2_malloc -- the game's own */
 #include "../inject/orig.h"
+#ifdef AM2_STANDALONE
+/* am2_respawn_kind_mask -- 0x0048C530, uint32[44] indexed by item kind (the
+ * same 0..43 space as ADDR_ITEM_TYPE_NAMES): the respawn-eligibility mask bits.
+ * Transcribed out of the blob (the item-name strings begin at index 44). */
+extern "C" const uint32_t am2_respawn_kind_mask[44] = {
+    0, 0, 0, 0, 0x8000, 0x800, 0, 0, 0x400, 0, 0, 0x20, 0, 0, 0, 0,
+    0, 0, 0, 0, 0x40, 0, 0, 0, 0x4, 0x8, 0x10, 0, 0, 0x10000, 0x200, 0,
+    0, 0, 0, 0x80, 0x80, 0x80, 0x80, 0x2000, 0x1000, 0x100, 0x4000, 0,
+};
+#endif
 extern "C" int32_t am2_trace_window(void) __attribute__((weak));
 #define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())
 #include "../inject/patch.h"

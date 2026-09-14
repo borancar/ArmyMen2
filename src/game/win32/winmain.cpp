@@ -173,7 +173,7 @@ void __cdecl CheckBasePath(void)
     }
 
     if (!am2_getcwd((char *)(uintptr_t)ADDR_GAME_DIR, 0xFF))
-        FatalError((const char *)(uintptr_t)ADDR_STR_BASE_PATH_LONG);
+        FatalError("The base path is longer than 255 characters!\n");
 }
 
 /* 0x00426C50. Take the high-performance counter, or decide not to.
@@ -209,7 +209,7 @@ void __cdecl InitTimer(void)
     }
 
     if (*freq > 0)
-        orig_log((const char *)(uintptr_t)ADDR_STR_HIGH_PERF);
+        orig_log("Using High Performance Counter\n");
 }
 
 /* 0x0040B220. The whole teardown, ending in the mutex.
@@ -328,8 +328,8 @@ void __cdecl ResetToTitle(void)
     SetGamePalette(palette);
 
     if (*(const int32_t *)(uintptr_t)ADDR_OPT_DF) {
-        SpriteSetLoad((const char *)(uintptr_t)ADDR_STR_SET_TITLE);
-        SpriteSetLoad((const char *)(uintptr_t)ADDR_STR_SET_SHARED);
+        SpriteSetLoad("title");
+        SpriteSetLoad("shared");
     }
 
     static const uint32_t kCleared[] = {
@@ -431,14 +431,14 @@ void __cdecl ReportLeaks(void)
     int32_t shown = total < 50 ? total : 50;
 
     name[4] = 0;
-    orig_log((const char *)(uintptr_t)ADDR_STR_LEAK_HEADER, total);
+    orig_log("Unreleased memory (%d) blocks:\n", total);
 
     for (int32_t i = 0; i < shown; i++) {
         const uint8_t *rec = *(const uint8_t *const *)(uintptr_t)ADDR_LEAK_RECORDS
                              + (size_t)i * 16;
 
         orig_strncpy(name, (const char *)(rec + 4), 4);
-        orig_log((const char *)(uintptr_t)ADDR_STR_LEAK_ROW,
+        orig_log("%08d bytes  file: %s  line: %d\n",
                  *(const int32_t *)(rec + 12), name,
                  *(const int32_t *)(rec + 8));
     }
@@ -477,7 +477,7 @@ void __cdecl FreeMemTracker(void)
 #define g_cdPresent   (*(int32_t *)(uintptr_t)ADDR_CD_PRESENT)
 #define g_cdFoundFlag (*(int32_t *)(uintptr_t)ADDR_CD_FOUND_FLAG)
 #define g_cdPath      ((char *)(uintptr_t)ADDR_CD_PATH)
-#define g_cdLabel     ((const char *)(uintptr_t)ADDR_CD_LABEL)
+#define g_cdLabel     ("ARMYMEN2")
 
 typedef int32_t (__cdecl *am2_stricmp_fn)(const char *, const char *);
 typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);

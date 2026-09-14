@@ -41,8 +41,8 @@ typedef am2_FILE *(__cdecl *AM2_FopenFn)(const char *path, const char *mode);
 typedef char *(__cdecl *AM2_StrlwrFn)(char *s);
 #define orig_def_fopen  (*(AM2_FopenFn)AM2_IMAGE(ADDR_FOPEN))
 #define orig_strlwr     (*(AM2_StrlwrFn)AM2_IMAGE(ADDR_CRT_STRLWR))
-#define kSep            ((const char *)AM2_IMAGE(ADDR_DEF_SEPARATORS))
-#define kFileMode       ((const char *)AM2_IMAGE(ADDR_STR_DEF_FILE_MODE))
+#define kSep            (" \t\n;,")
+#define kFileMode       ("rt")
 
 /* 0x0041A250. Parse one token as a number.
  *
@@ -153,7 +153,7 @@ int32_t __cdecl DefParseBoolean(int32_t *out, const char *tok)
             return 1;
         }
 
-    orig_log((const char *)AM2_IMAGE(ADDR_STR_BAD_BOOLEAN));
+    orig_log("Bad or missing Boolean\n");
     *out = 0;
     return 0;
 }
@@ -308,29 +308,29 @@ void __cdecl LoadDefTables(void)
     DefFreeTrooperRecs();
     orig_log_noargs();
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_AAI_DIR));
+    SetGameDir("aai");
 
-    if (!DefParseInfoFile((const char *)AM2_IMAGE(ADDR_STR_DEF_TROOP_AAI)))
-        orig_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE),
-                 AM2_IMAGE(ADDR_STR_DEF_TROOP_AAI));
-    if (!DefParseInfoFile((const char *)AM2_IMAGE(ADDR_STR_DEF_WEAPON_AAI)))
-        orig_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE),
-                 AM2_IMAGE(ADDR_STR_DEF_WEAPON_AAI));
-    if (!DefParseInfoFile((const char *)AM2_IMAGE(ADDR_STR_VEHICLE_AAI)))
-        orig_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE),
-                 AM2_IMAGE(ADDR_STR_VEHICLE_AAI));
-    if (!DefParseInfoFile((const char *)AM2_IMAGE(ADDR_STR_DEF_OBJECT_AAI)))
-        orig_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE),
-                 AM2_IMAGE(ADDR_STR_DEF_OBJECT_AAI));
-    if (!DefParseInfoFile((const char *)AM2_IMAGE(ADDR_STR_DEF_GAME_AAI)))
-        orig_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE),
-                 AM2_IMAGE(ADDR_STR_DEF_GAME_AAI));
+    if (!DefParseInfoFile("Troop.aai"))
+        orig_log("Couldn't parse %s!\n",
+                 "Troop.aai");
+    if (!DefParseInfoFile("Weapon.aai"))
+        orig_log("Couldn't parse %s!\n",
+                 "Weapon.aai");
+    if (!DefParseInfoFile("vehicle.aai"))
+        orig_log("Couldn't parse %s!\n",
+                 "vehicle.aai");
+    if (!DefParseInfoFile("Object.aai"))
+        orig_log("Couldn't parse %s!\n",
+                 "Object.aai");
+    if (!DefParseInfoFile("Game.aai"))
+        orig_log("Couldn't parse %s!\n",
+                 "Game.aai");
 
     /* The override pass. */
     SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
-    if (!DefParseInfoFile((const char *)AM2_IMAGE(ADDR_STR_DEF_OBJECT_AAI)))
-        orig_log((const char *)AM2_IMAGE(ADDR_FMT_COULDNT_PARSE),
-                 AM2_IMAGE(ADDR_STR_DEF_OBJECT_AAI));
+    if (!DefParseInfoFile("Object.aai"))
+        orig_log("Couldn't parse %s!\n",
+                 "Object.aai");
 
     DefFinish();
 

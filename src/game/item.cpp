@@ -439,7 +439,7 @@ void *__cdecl WeaponByUid(uint32_t uid)
         return (void *)0;
     if (obj[0] == AM2_OBJ_TYPE_WEAPON)
         return obj;
-    am2_log((const char *)AM2_IMAGE(ADDR_STR_NOT_A_WEAPON));
+    am2_log("uid wasn't a weapon!\n");
     return (void *)0;
 }
 
@@ -504,7 +504,7 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
     ItemsReset();
 
     if (!CheckSaveTag(fp, AM2_SAVE_TAG_ITEMS,
-                      (const char *)AM2_IMAGE(ADDR_STR_ITEM_CPP), 0x4A8))
+                      "C:\\ArmyMen2\\source\\item.cpp", 0x4A8))
         return 0;
 
     orig_fread(&mark, 4, 1, fp);
@@ -4447,7 +4447,7 @@ void __cdecl PortalSpawn(void)
     static const int32_t kWeapons[4] = { 0x1E, 0x0A, 4, 2 };
     int32_t i;
 
-    PlayDynamicSound((const char *)(uintptr_t)ADDR_STR_PORTAL_WAV,
+    PlayDynamicSound("portal2_8bit.wav",
                      0, 0, 0, 0, 0x10, 3, 0);
 
     for (i = 0; i < AM2_PORTAL_COUNT; i++) {
@@ -4462,7 +4462,7 @@ void __cdecl PortalSpawn(void)
         orig_spawn_at(x, y, AM2_PORTAL_EFFECT, 0, 0, 0, 0, 0, 0, 0);
 
         trooper = (uint8_t *)orig_create_trooper(
-                      (char *)(uintptr_t)ADDR_STR_ONE_LETTER,
+                      (char *)"a",
                       x, y, 1, 1, 0, 0, 0, 1, 0);
         if (!trooper)
             continue;
@@ -5229,7 +5229,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, int32_t d, int32_t kind,
                     *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
 
                 if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-                    orig_log((const char *)AM2_IMAGE(ADDR_STR_DROPPING_ARMOR),
+                    orig_log("DamageTrooper: droping armor uid:%x\n",
                              *(const uint32_t *)(armour + OBJ_OFF_UID));
 
                 TrooperDropItemSend(o, armour, slot, 0,
@@ -7042,6 +7042,124 @@ void __cdecl ObjDie(void *obj, int32_t kind, uint32_t by)
     TriggerItemDestroyed(obj, attacker);
     ObjDeathCleanup(obj);
 }
+
+#ifdef AM2_STANDALONE
+/* am2_weapon_pose_frames -- the pose->frame table at 0x00474FE0, transcribed.
+ *
+ * ONE OF THE GLOBAL STRUCTURES CARVED OUT OF THE CARRIED .rdata BLOB. The
+ * standalone/native builds otherwise read this array out of the placed image;
+ * transcribing it into typed C is one less table depending on the layout, the
+ * migration tools/mkglobals.py's docstring describes ("every table carved out
+ * of the blob and written as typed, named C data is one less thing depending
+ * on the layout").
+ *
+ * A pose index -- what WeaponPoseIndex returns, or a unit's OBJ_OFF_POSE -- maps
+ * to an animation frame id here. 104 int32 entries, bounded by ADDR_POSE_BY_CLASS
+ * at 0x00475180 (0x1A0 bytes on). region.cpp reads the low 16 bits of an entry
+ * (`*(int16_t *)(base + pose*4)`); every value fits, so the element type is the
+ * int32 both item.cpp and AnimStepPoint index it as.
+ *
+ * The six readers are all reconstructed .text sites and nothing in the data
+ * blob points at 0x00474FE0, so redirecting ADDR_WEAPON_POSE_FRAMES (in
+ * standalone.h) to this array is complete: `am2.Image().refs_to(0x00474FE0)`
+ * is six code addresses and no data one.
+ */
+extern "C" const int32_t am2_weapon_pose_frames[104] = {
+     1,  1,  5,  3, 12, 14, 13, 15, 16, 17,
+    20, 59, 19, 50, 49, 51, 53, 52, 64,  9,
+    10, 11, 40, 42, 60, 44, 45, 69,  6,  7,
+     8, 70, 35, 32, 31, 33, 34, 61, 65, 23,
+    23,  2,  2, 26,  5,  7,  6,  5,  4,  4,
+    10, 11,  6,  2,  8,  9,  3,  8,  9, 18,
+     8,  9, 13, 15, 17, 12, 14, 16, 25, 26,
+     6, 25, 26,  6, 25, 26,  6,  1,  4,  6,
+     5,  4,  4,  1,  4,  4,  1,  1,  1,  1,
+     1,  1,  1,  1,  1, 19, 20, 20,  5,  4,
+     4, 22, 23, 23,
+};
+
+/* am2_pose_by_class -- 0x00475180, the default arm's pose by unit class.
+ * Indexed by ClassifyByCode74 (0..2, kCode74Class is all {0,1,2}); the next
+ * table starts 12 bytes on, so it is exactly three entries. */
+extern "C" const int32_t am2_pose_by_class[3] = { 1, 4, 6 };
+
+/* am2_death_anim_by_code -- 0x0047518C, death animation id by unit class,
+ * also indexed by ClassifyByCode74 (item.cpp's ObjDeathCleanup arm). Three
+ * entries, bounded by ADDR_HIT_POSE_BY_CLASS 12 bytes on. */
+extern "C" const int32_t am2_death_anim_by_code[3] = { 33, 34, 35 };
+
+/* The roach (giant ant) creature parameters at 0x00487BAC..0x00487C00,
+ * transcribed. Health and start-frame are int16 (2-byte fields in 4-byte
+ * slots); armour/damage/velocity/acceleration are int32; the three rects are
+ * int32[4] (AM2_Rect / row-spec). Read by item.cpp and gameproc.cpp. */
+extern "C" const int16_t am2_roach_health      = 60;   /* 0x00487BAC */
+extern "C" const int32_t am2_roach_armour      = 2;    /* 0x00487BB0 */
+extern "C" const int32_t am2_roach_damage      = 16;   /* 0x00487BB4 */
+extern "C" const int32_t am2_roach_forvel      = 130;  /* 0x00487BB8 */
+extern "C" const int32_t am2_roach_revvel      = 80;   /* 0x00487BBC */
+extern "C" const int32_t am2_roach_foracc      = 100;  /* 0x00487BC0 */
+extern "C" const int32_t am2_roach_revacc      = 80;   /* 0x00487BC4 */
+extern "C" const int32_t am2_roach_box[4]      = { -32, -32, 32, 32 };  /* 0x00487BC8 */
+extern "C" const int32_t am2_roach_bite_box[4] = { -24, -24, 24, 24 };  /* 0x00487BD8 */
+extern "C" const int32_t am2_roach_row_spec[4] = { -48, -48, 96, 96 };  /* 0x00487BE8 */
+extern "C" const int32_t am2_field_530_frames  = 81;   /* 0x00487BF8 */
+extern "C" const int16_t am2_roach_start_frame = 81;   /* 0x00487BFC */
+
+/* Object hit-boxes and row-specs -- each an int32[4] rect (AM2_Rect, or a
+ * {0,0,w,h} row-spec). Transcribed out of the blob; read by item.cpp (all but
+ * missile) and gameproc.cpp (missile). */
+extern "C" const int32_t am2_explosion_box[4]      = { -24, -24, 24, 24 }; /* 0x004788E0 */
+extern "C" const int32_t am2_explosion_area_16[4]  = { -16, -16, 16, 16 }; /* 0x004788F0 */
+extern "C" const int32_t am2_explosion_area_24[4]  = { -24, -24, 24, 24 }; /* 0x00478900 */
+extern "C" const int32_t am2_explosion_area_32[4]  = { -32, -32, 32, 32 }; /* 0x00478910 */
+extern "C" const int32_t am2_explosion_row_spec[4] = {   0,   0, 48, 48 }; /* 0x00478920 */
+extern "C" const int32_t am2_missile_box[4]        = {  -3,  -3,  3,  3 }; /* 0x00487B78 */
+extern "C" const int32_t am2_missile_row_spec[4]   = {   0,   0, 16, 16 }; /* 0x00487B88 */
+extern "C" const int32_t am2_trooper_box[4]        = { -16, -32, 16, 16 }; /* 0x00489850 */
+extern "C" const int32_t am2_trooper_row_spec[4]   = {   0,   0, 48, 48 }; /* 0x00489860 */
+extern "C" const int32_t am2_vehicle_box[4]        = { -48, -48, 48, 48 }; /* 0x0048BE10 */
+extern "C" const int32_t am2_vehicle_row_spec[4]   = { -48, -48, 96, 96 }; /* 0x0048BE20 */
+extern "C" const int32_t am2_kind7_box[4]          = {   0,   0,  1,  1 }; /* 0x00487420 */
+
+/* Small pointer-free lookup tables, transcribed. Each is indexed by a small
+ * enum whose range the reader bounds (class 0..3, kind 0..7, direction 0..3). */
+extern "C" const int32_t  am2_trooper_class_value[4]   = { 28, 18, 12, 0 };      /* 0x00489840, by class */
+extern "C" const uint32_t am2_bit_from_n[4] = { 0xF0E0C080u, 0xFFFEFCF8u,        /* 0x00487814, bit masks */
+                                                0x0F1F3F7Fu, 0x00010307u };
+extern "C" const int32_t  am2_kind_frames[8] = { 81, 81, 80, 82, 83, 85, 4, 5 }; /* 0x0048BE30, by kind */
+extern "C" const int32_t  am2_vehicle_height_by_kind[6] = { 24, 32, 24, 24, 24, 33 }; /* 0x0048BDF8 */
+extern "C" const int16_t  am2_mp_row_coords[32] = {                              /* 0x0048C768 */
+    0, 21, 0, 0, 0, 0, 0, 0, 0, 21, 366, 21, 0, 0, 0, 0,
+    0, 21, 183, 21, 366, 21, 0, 0, 0, 21, 122, 21, 244, 21, 366, 21 };
+extern "C" const int16_t  am2_drop_ring[12] = { 0,0, 0,40, 40,0, 0,-40, -40,0, 0,0 }; /* 0x00489DE8 */
+extern "C" const int32_t  am2_spiral_dx[4] = {  0, 1, 0, -1 };  /* 0x0048782C, dir up/right/down/left */
+extern "C" const int32_t  am2_spiral_dy[4] = { -1, 0, 1,  0 };  /* 0x0048783C */
+
+/* Name arrays -- char* tables indexed by item type / unit class. Transcribed
+ * as C string literals; the image's pointers point at blob strings, so
+ * checkimagedata verifies these by DEREFERENCE (content), not pointer value.
+ * Repeats ("None", "Rifle", "Spy") mirror the image, where several indices
+ * share one string. */
+extern "C" const char *const am2_item_type_names[44] = {   /* 0x0048C480 */
+    "None", "Rifle", "Grenades", "Flamethrower", "Bazooka", "Mortar",
+    "Cannon", "Medium MG", "Heavy MG", "Rifle", "Autorifle", "Mines",
+    "Explosives", "None", "None", "Flag", "Green Flag", "Tan Flag",
+    "Blue Flag", "Grey Flag", "Minesweeper", "None", "Medpack", "Medkit",
+    "Airstrike", "Paratroopers", "Recon", "Note", "Flak Jacket", "Vulcan",
+    "Sniper Rifle", "None", "None", "Nitro", "Camouflage", "Green Uniform",
+    "Tan Uniform", "Blue Uniform", "Grey Uniform", "Magnifying Glass",
+    "Aerosol", "Wrench", "M80", "ZombieHands",
+};
+extern "C" const char *const am2_unit_class_names[45] = {   /* 0x00489B44 */
+    "", "Rifleman", "Grenadier", "Flamethrower", "Bazookaman", "Mortarman",
+    "", "", "", "Rifleman", "Machine Gunner", "Miner", "Demolitions", "None",
+    "None", "Bannerman", "Bannerman", "Bannerman", "Bannerman", "Bannerman",
+    "Minesweeper", "None", "Medic", "Medic", "None", "None", "Spy", "None",
+    "Flak Jacket", "Heavy Weapons", "Sniper", "None", "None", "None", "None",
+    "Spy", "Spy", "Spy", "Spy", "None", "None", "Mechanic", "None", "Zombie",
+    0,
+};
+#endif
 
 /* WeaponPoseIndex -- original 0x004494A0, three callers.
  *
@@ -11031,7 +11149,7 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
 
     if (*(const int32_t *)(*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
                            + COMM_OFF_VERBOSE) != 0)
-        orig_log((const char *)AM2_IMAGE(ADDR_FMT_DEPLOY_TROOPER),
+        orig_log("DeployTrooper: uid:%x, pos=(%d,%d)\n",
                  ((const AM2_Object *)o)->uid, x, y);
 
     *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_DESTROYED;
@@ -11946,7 +12064,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
 
     def = (const uint8_t *)VehicleDefFind(kind);
     if (def == (const uint8_t *)0) {
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_VEHICLE_NO_AAI), kind);
+        orig_log("Vehicle aai entry not found for type %d\n", kind);
         return (void *)0;
     }
 
@@ -14048,7 +14166,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
     int32_t        ammo;
 
     if (*(const int32_t *)(uintptr_t)ADDR_DEBUG_ITEMLIST)
-        am2_log((const char *)AM2_IMAGE(ADDR_STR_CREATE_WEAPON), name, army,
+        am2_log("CreateWeapon: %s, %d, %d, (%d,%d), %d, %d, %d, %x\n", name, army,
                 key, (int32_t)(int16_t)(at & 0xFFFF),
                 (int32_t)(int16_t)(at >> 16), flags, quantity, remote, uid);
 
@@ -14063,7 +14181,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
     if (!InitObjFromAai(o, (char *)name, army, key, at, flags, remote, uid, 0)) {
         if (*(const int32_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT
                                + COMM_OFF_VERBOSE))
-            am2_log((const char *)AM2_IMAGE(ADDR_STR_CREATE_WEAPON_FAIL));
+            am2_log("CreateWeapon\n");
         am2_free(o);
         return (void *)0;
     }

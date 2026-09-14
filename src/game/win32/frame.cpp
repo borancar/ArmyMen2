@@ -124,7 +124,7 @@ void __cdecl MissionInput(void)
     if (!g_mpSession) {
         if (ActionKeyReleased(AM2_ACTION_SHOW_INFO)) {
             if (*(const char *)(uintptr_t)ADDR_LEVEL_STR_C) {
-                SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
+                SetGameDir("bitmaps");
                 FreeBitmap(&g_currentBitmap);
                 g_currentBitmap = LoadBitmap(
                     (const char *)(uintptr_t)ADDR_LEVEL_STR_C, 0);
@@ -322,10 +322,10 @@ void __cdecl MissionPausedFrame(void)
     if (g_currentBitmap)
         return;
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
+    SetGameDir("bitmaps");
     FreeBitmap(&g_currentBitmap);
     g_currentBitmap = LoadBitmap(
-        (const char *)AM2_IMAGE(ADDR_STR_MAPWAIT_BMP), 0);
+        "mapwait.bmp", 0);
 
     SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
 
@@ -362,7 +362,7 @@ void __cdecl PauseGame(uint32_t bits)
 
     *flags |= bits;
     if (*(const int32_t *)(g_comm + COMM_OFF_VERBOSE))
-        orig_log((const char *)(uintptr_t)ADDR_STR_PAUSE_GAME, *flags, bits);
+        orig_log("PauseGame: %x (set: %x)\n", *flags, bits);
 }
 
 void __cdecl UnPauseGame(uint32_t bits)
@@ -371,7 +371,7 @@ void __cdecl UnPauseGame(uint32_t bits)
 
     *flags &= ~bits;
     if (*(const int32_t *)(g_comm + COMM_OFF_VERBOSE))
-        orig_log((const char *)(uintptr_t)ADDR_STR_UNPAUSE_GAME, *flags, bits);
+        orig_log("UnPauseGame: %x (reset: %x)\n", *flags, bits);
 }
 
 /* Every comm step in the pre and post is behind the same field. */
@@ -494,7 +494,7 @@ void __cdecl State1Enter(void)
 {
     ClearBothSurfaces();
     SetGameDir(*(const char *const *)(uintptr_t)ADDR_DIR_TITLE_PTR);
-    LoadPaletteFile((const char *)(uintptr_t)ADDR_STR_SCREEN_BMP,
+    LoadPaletteFile("01_000_00_screen.bmp",
                     *(void **)(uintptr_t)ADDR_ACTIVE_PALETTE);
     SetGamePalette(*(uint8_t **)(uintptr_t)ADDR_ACTIVE_PALETTE);
 
@@ -531,7 +531,7 @@ void __cdecl State1Enter(void)
     }
 
     *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
-    StartAudioStream((void *)(uintptr_t)ADDR_STR_TITLE_WAV, 0);
+    StartAudioStream((void *)"title.wav", 0);
 }
 
 /* The twenty-one screen openers, in MENU MODE order, and every one of them is
@@ -865,7 +865,7 @@ void __cdecl State2Enter(void)
     }
 
     SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
-    LoadPaletteFile((const char *)AM2_IMAGE(ADDR_STR_LEVEL_PAL),
+    LoadPaletteFile("palette.bmp",
                     *(void **)(uintptr_t)ADDR_ACTIVE_PALETTE);
     SetGamePalette(*(uint8_t **)(uintptr_t)ADDR_ACTIVE_PALETTE);
 
@@ -891,19 +891,19 @@ void __cdecl State2Enter(void)
         && *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID > 1) {
         uint8_t find[AM2_FINDDATA_BYTES];
 
-        SetGameDir((const char *)(uintptr_t)ADDR_STR_SAVE_DIR);
+        SetGameDir("save");
         int32_t h = orig_findfirst(
-            (const char *)(uintptr_t)ADDR_STR_DEFAULT_COF, find);
+            "default.cof", find);
         if (h != -1) {
             *(int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF = 1;
             orig_findclose(h);
         }
     }
 
-    SetGameDir((const char *)(uintptr_t)ADDR_STR_BITMAPS_DIR);
+    SetGameDir("bitmaps");
     splash = LoadBitmap((const char *)(uintptr_t)ADDR_LEVEL_STR_B, 1);
     if (!splash)
-        splash = LoadBitmap((const char *)AM2_IMAGE(ADDR_STR_LOADING_BMP), 1);
+        splash = LoadBitmap("load_default.bmp", 1);
     if (splash) {
         SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
         DrawSprite(splash,
@@ -977,9 +977,9 @@ void __cdecl State2Enter(void)
         int32_t n = *(const int32_t *)(uintptr_t)ADDR_ATTEMPT_COUNT + 1;
         *(int32_t *)(uintptr_t)ADDR_MISSION_RETRY = 0;
         *(int32_t *)(uintptr_t)ADDR_ATTEMPT_COUNT = n;
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_ATTEMPT), n);
+        orig_log("Attempt# %d\n", n);
     }
-    orig_log((const char *)AM2_IMAGE(ADDR_STR_REGION_DATA));
+    orig_log("calculating region data...\n");
 
     BuildRegionGraph();
 
@@ -1273,7 +1273,7 @@ void __cdecl StateEnter3(void)
 {
     char name[0x40];
 
-    LoadPaletteFile((const char *)AM2_IMAGE(ADDR_STR_GREYSCALE_BMP),
+    LoadPaletteFile("avi\\greyscale.bmp",
                     (void *)g_activePalette);
     SetGamePalette((uint8_t *)(uintptr_t)g_activePalette);
     ClearBothSurfaces();
@@ -1330,7 +1330,7 @@ void __cdecl StateEnter0(void)
 {
     int32_t over;
 
-    LoadPaletteFile((const char *)AM2_IMAGE(ADDR_STR_GREYSCALE_BMP),
+    LoadPaletteFile("avi\\greyscale.bmp",
                     (void *)g_activePalette);
     SetGamePalette((uint8_t *)(uintptr_t)g_activePalette);
     ClearBothSurfaces();
@@ -1451,7 +1451,7 @@ void __cdecl ShowMpResult(int32_t result)
     void *comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
 
     UnPauseGame(AM2_MP_RESULT_UNPAUSE);
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
+    SetGameDir("bitmaps");
     SetDrawTarget(g_primarySurface);
 
     PausedFrameStep();
@@ -1461,15 +1461,15 @@ void __cdecl ShowMpResult(int32_t result)
     if (result == AM2_MP_RESULT_WON) {
         FreeBitmap(&g_currentBitmap);
         g_currentBitmap =
-            LoadBitmap((const char *)AM2_IMAGE(ADDR_STR_MP_WON), 0);
+            LoadBitmap("mpwon.bmp", 0);
     } else if (result == AM2_MP_RESULT_LOST) {
         FreeBitmap(&g_currentBitmap);
         g_currentBitmap =
-            LoadBitmap((const char *)AM2_IMAGE(ADDR_STR_MP_LOST), 0);
+            LoadBitmap("mplost.bmp", 0);
     } else if (result == AM2_MP_RESULT_HOST_LEFT) {
         FreeBitmap(&g_currentBitmap);
         g_currentBitmap =
-            LoadBitmap((const char *)AM2_IMAGE(ADDR_STR_MP_HOST_LEFT), 0);
+            LoadBitmap("mphostleft.bmp", 0);
     }
 
     *(int32_t *)(uintptr_t)ADDR_MENU_MODE     = AM2_SUBSTATE_ESCAPE;
@@ -1960,7 +1960,7 @@ void __cdecl PausedFrameStep(void)
         if (variant <= 2)
             continue;
 
-        am2_sprintf(buf, (const char *)AM2_IMAGE(ADDR_STR_PCT_D),
+        am2_sprintf(buf, "%d",
                     GetArmyScore(comm, slot));
         TextExtent(buf, 1, ext);
         if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
@@ -1970,7 +1970,7 @@ void __cdecl PausedFrameStep(void)
         UnlockSurface();
 
         if (mates > 1) {
-            am2_sprintf(buf, (const char *)AM2_IMAGE(ADDR_STR_PCT_D),
+            am2_sprintf(buf, "%d",
                         CommTeamScore(comm, slot));
             TextExtent(buf, 1, ext);
             if (!LockSurface(
@@ -2002,7 +2002,7 @@ void __cdecl PausedFrameStep(void)
         char buf[128];
         RECT clip;
 
-        am2_sprintf(buf, (const char *)AM2_IMAGE(ADDR_STR_GAME_TYPE_GOAL),
+        am2_sprintf(buf, "Game type: %s, Goal: %d",
                     (const char *)ScriptListFind(
                         (char *)(uintptr_t)ADDR_MP_SCRIPT_NAME) + 0x80,
                     *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT);

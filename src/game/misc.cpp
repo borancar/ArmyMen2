@@ -18,6 +18,60 @@
 #include "image.h"
 #include "../inject/orig.h"
 
+#ifdef AM2_STANDALONE
+/* The float/double CONSTANTS the reconstruction reads out of the carried
+ * .rdata blob, transcribed into typed C (STATUS.md's MIGRATION note). Each is
+ * verified to round-trip to the image's exact bit pattern -- the decimal
+ * literals below reproduce the stored bytes byte-for-byte -- and every reader
+ * is a `*(const double *)` or `*(const float *)` at a known address (the type
+ * is the reader's, not the byte spacing: WEAPON_RANGE is double at 8-byte
+ * spacing). Centralised here because a bare numeric constant has no natural
+ * owning module the way the pose and air TABLES do. */
+extern "C" const double am2_weapon_range_hi   = 1.1;         /* 0x0046F2E0 */
+extern "C" const double am2_weapon_range_lo   = 0.9;         /* 0x0046F2E8 */
+extern "C" const double am2_weapon_range_k3   = 1.2;         /* 0x0046F2F0 */
+extern "C" const double am2_sight_range_want  = 0.75;        /* 0x0046F2F8 */
+extern "C" const double am2_enemy_health_share= 0.33;        /* 0x0046FD50 */
+extern "C" const double am2_dbl_zero          = 0.0;         /* 0x0046F920 */
+extern "C" const double am2_dbl_max_period    = 1.0;         /* 0x0046F988 */
+extern "C" const double am2_dbl_ms_per_sec    = 1000.0;      /* 0x0046F990 */
+extern "C" const double am2_dbl_512           = 512.0;       /* 0x0046F9B0 */
+extern "C" const double am2_dbl_sin_scale     = -0.85;       /* 0x0046F9B8 */
+extern "C" const double am2_dbl_one_256       = 0.00390625;  /* 0x0046F9C0 */
+extern "C" const double am2_dbl_two_pi        = 6.283185307; /* 0x0046F9C8 */
+extern "C" const float  am2_f_one             = 1.0f;        /* 0x0046F2D8 */
+extern "C" const float  am2_f_one_hundredth   = 0.01f;       /* 0x0046F2DC */
+extern "C" const float  am2_float_zero        = 0.0f;        /* 0x0046F928 */
+extern "C" const float  am2_hud_slide_shut    = -320.0f;     /* 0x0046F958 */
+extern "C" const float  am2_hud_slide_open    = 320.0f;      /* 0x0046F95C */
+extern "C" const float  am2_roach_reach       = 24.0f;       /* 0x0046FAA8 */
+extern "C" const float  am2_ms_to_sec         = 0.001f;      /* 0x0046F980 */
+
+/* Gameplay scalar parameters, transcribed from the blob. Types are the
+ * readers' (int16/int32/float); centralised here for the same reason the
+ * float constants above are -- a bare tunable has no owning-module the way a
+ * table does. */
+extern "C" const int16_t am2_pillbox_trooper_health = 55;    /* 0x00473E44 */
+extern "C" const float   am2_gravity                = 440.0f;/* 0x004852EC */
+extern "C" const int32_t am2_view_speed             = 1000;  /* 0x004852E0 */
+/* 0x00485104 tick_interval_ms is runtime state (ResetLevelState recomputes it),
+ * so it is NOT migrated -- it stays at its writable .origdat placement. */
+extern "C" const float   am2_difficulty_scale       = 4.0f;  /* 0x00489870 */
+/* 0x0048788C path_max_nodes ships 10000 but ADAPTS at runtime (RegionBudget),
+ * so it too stays at its writable .origdat placement rather than a C const. */
+extern "C" const int32_t am2_path_max_searches      = 10;    /* 0x00487890 */
+extern "C" const int32_t am2_path_retry_ms          = 500;   /* 0x00487894 */
+extern "C" const int32_t am2_seq_grid_rows          = 3;     /* 0x0048CB88 */
+extern "C" const int32_t am2_seq_tail_frames        = 2;     /* 0x0048CB90 */
+extern "C" const int32_t am2_seq_advance_ms         = 40;    /* 0x0048CB94 */
+extern "C" const int32_t am2_seq_emit_ms            = 300;   /* 0x0048CBE4 */
+extern "C" const int32_t am2_seq_k4_step_ms         = 120;   /* 0x0048CBC4 */
+extern "C" const int16_t am2_seq_k4_rise            = 3;     /* 0x0048CBE0 */
+extern "C" const int32_t am2_seq_k4_drift_x         = 3;     /* 0x0048CBD8 */
+extern "C" const int32_t am2_seq_k4_drift_y         = -1;    /* 0x0048CBDC */
+extern "C" const uint32_t am2_seq_k4_hold[4] = { 2, 3, 4, 5 };/* 0x0048CBC8, per-cell hold */
+#endif
+
 /* The original inlines `repne scasb` for length; a plain loop is the same
  * function and the vectors confirm it. */
 static uint32_t StrLen(const char *s)
@@ -500,7 +554,7 @@ int32_t __cdecl LoadMaskPacked(void *out, int32_t set, int32_t index,
 
     if (orig_fseek_m(fp, ((const int32_t *)(*(void **)(ss + SPRITE_SET_OFF_DIR)))
                        [dir * 2 + 1], 0) != 0) {
-        orig_log_m((const char *)AM2_IMAGE(ADDR_STR_DF_SEEK_FAIL),
+        orig_log_m("Error seeking to location %d in data file.\n",
                  ((const int32_t *)(*(void **)(ss + SPRITE_SET_OFF_DIR)))
                      [dir * 2 + 1]);
         goto fail;
@@ -508,7 +562,7 @@ int32_t __cdecl LoadMaskPacked(void *out, int32_t set, int32_t index,
 
     orig_fread_m(&got, 4, 1, fp);
     if (key != got) {
-        orig_log_m((const char *)AM2_IMAGE(ADDR_STR_DF_BAD_OBJECT));
+        orig_log_m("Error in validating object in data file.\n");
         goto fail;
     }
 
@@ -557,12 +611,12 @@ void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)
     if (set < AM2_SPRITE_SET_MAP_FIRST)
         return;
 
-    am2_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_FMT_MASK_DIR),
+    am2_sprintf(dir, "%s\\%s\\masks",
                 (const char *)AM2_IMAGE(ADDR_MAP_BLOCK),
                 ((const char *const *)AM2_IMAGE(ADDR_SPRITE_SET_DIRS))[set]);
     SetGameDir(dir);
 
-    am2_sprintf(pattern, (const char *)AM2_IMAGE(ADDR_STR_GLOB_MSK),
+    am2_sprintf(pattern, "%02d_%03d_%02d_*.msk",
                 set, index, frame);
 
     if (orig_findfirst(pattern, find) == -1)
@@ -2016,15 +2070,15 @@ void __cdecl MovieBuildName(char *dst, const char *name)
 {
     strcpy(dst, name);
 
-    if (strcmp(name, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_3DO)) != 0
-        && strcmp(name, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_CREDITS)) != 0
-        && strcmp(name, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_ACT2)) != 0
-        && strcmp(name, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_PORTAL)) != 0
+    if (strcmp(name, "3do") != 0
+        && strcmp(name, "credits") != 0
+        && strcmp(name, "act2") != 0
+        && strcmp(name, "portal") != 0
         && *(const int32_t *)AM2_IMAGE(ADDR_SLOW_MACHINE)
         && !*(const int32_t *)AM2_IMAGE(ADDR_OPT_BIG_MOVIES))
-        strcat(dst, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_SMALL));
+        strcat(dst, "sml");
 
-    strcat(dst, (const char *)AM2_IMAGE(ADDR_STR_MOVIE_EXT));
+    strcat(dst, ".smk");
 }
 
 /* SeqStepKind2 -- original 0x00461310, and BOTH kinds 2 and 3 reach it.
@@ -2552,7 +2606,7 @@ void __attribute__((thiscall)) ClearPtrListAtA4(void *obj)
  * sprintf is this function. */
 int32_t __cdecl WriteDotString(char *dst)
 {
-    am2_sprintf(dst, (const char *)AM2_IMAGE(ADDR_STR_DOT));
+    am2_sprintf(dst, ".");
     return 1;
 }
 

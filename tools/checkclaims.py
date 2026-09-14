@@ -326,6 +326,13 @@ PROSE = (
     "docs/abnotes.md",
     "docs/tables.md",
     "docs/objects.md",
+    "docs/winmain.md",
+    "docs/verification.md",
+    "docs/tooling.md",
+    "docs/reconstruction-lessons.md",
+    "docs/lockstep.md",
+    "docs/crt-notes.md",
+    "docs/script.md",
 )
 
 

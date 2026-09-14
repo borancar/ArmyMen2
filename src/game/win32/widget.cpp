@@ -37,6 +37,156 @@
 #include <stddef.h>
 #include <string.h>
 
+#ifdef AM2_STANDALONE
+/* HUD layout tables transcribed out of the blob. HUD_CMD_SPEC and
+ * BUILD_MENU_RECTS are read byte-wise (uint8_t*); the two offset tables are
+ * int16 {x,y} pairs. All read-only, drawn from. */
+/* 0x004761A8 HUD_CMD_SPEC is NOT migrated: it is a 7 x 0x28 = 280-byte table
+ * (overlapping ADDR_POINTER_MODES at +0x10), and HudCmdConstruct WRITES each
+ * record's sprite pointer at +0x0C. Runtime-written and larger than one const
+ * could faithfully hold, so it stays at its writable .origdat placement. */
+extern "C" const uint8_t am2_build_menu_rects[12] = { 6,0,0,0, 190,0,0,0, 43,0,0,0 }; /* 0x004762C0 */
+extern "C" const int16_t am2_hud_cmd_offsets[6]   = { 6,22, 50,22, 94,22 };       /* 0x004766F8 */
+extern "C" const int16_t am2_hud_sarge_offsets[8] = { 6,21, 50,21, 94,21, 6,49 }; /* 0x004766B0 */
+/* Movie base-name table, char*[12] -- transcribed as literals (verified by
+ * dereference; see checkimagedata). */
+extern "C" const char *const am2_movie_names[12] = {   /* 0x0048AE98 */
+    "act1", "act2", "act3", "act4", "grave", "mag",
+    "airfld", "inter", "m80", "monkey", "hosp", "weapon",
+};
+
+/* am2_weapon_handlers -- 0x00489880, the per-item-kind handler table
+ * SelectInventorySlot installs into the WEAPON_FN_SLOT0..3 globals. 44 records
+ * of four raw dwords: slots 0/1 are the pointer-pick and set-target handlers
+ * (or NULL), slots 2/3 are int params (or -1 for an empty record). The handler
+ * functions are reconstructed; checkimagedata verifies each pointer against the
+ * reconstruction that patches the image's address, and the int slots by value.
+ * A function-pointer table off the generator's fixups. (AM2_WeaponHandler is
+ * declared in standalone.h so the decl and this definition share the type.) */
+extern "C" const AM2_WeaponHandler am2_weapon_handlers[44] = {
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { (const void *)PointerPickWatchedItem, (const void *)SetWeaponTargetSweeper, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { (const void *)PointerPickHeal, (const void *)SetWeaponTargetMedic, 3, 0 },
+    { 0, (const void *)SetWeaponTarget, 15, 1 },
+    { 0, (const void *)SetWeaponTarget, 16, 1 },
+    { 0, (const void *)SetWeaponTarget, 14, 1 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { 0, 0, -1, 0 },
+    { (const void *)PointerPickBoard, (const void *)SetWeaponTargetAimed, 3, 0 },
+    { (const void *)PointerPickBoard, (const void *)SetWeaponTargetAimed, 3, 0 },
+    { (const void *)PointerPickBoard, (const void *)SetWeaponTargetAimed, 3, 0 },
+    { (const void *)PointerPickBoard, (const void *)SetWeaponTargetAimed, 3, 0 },
+    { 0, (const void *)SetWeaponTarget, 1, 1 },
+    { 0, (const void *)SetWeaponTarget, 1, 1 },
+    { (const void *)PointerPickRepair, (const void *)SetWeaponTargetWrench, 3, 0 },
+    { (const void *)PointerPickEnemyTrooper, (const void *)SetWeaponTargetKind2A, 3, 0 },
+    { 0, 0, -1, 0 },
+};
+
+/* am2_keyrow_positions -- 0x0048AEC8, the controls-dialog key-row {x,y}
+ * coordinates, int16 pairs (21 rows). Transcribed; read as int16[]. */
+extern "C" const int16_t am2_keyrow_positions[42] = {
+    54,74, 54,99, 54,124, 54,149, 54,174, 54,199, 54,224,
+    54,249, 54,274, 54,299, 54,324, 54,349, 54,374, 54,399,
+    298,74, 298,99, 298,124, 298,149, 298,174, 298,257, 298,282,
+};
+
+/* am2_option_table -- 0x004865B8, the OPTIONS dialog declaration: 43 records,
+ * each eight int32 fields (widget index, x, y, group, first, last, bit, which)
+ * and a caption string pointer. Transcribed as literals; checkimagedata
+ * dereferences the caption and byte-compares the ints. (AM2_Option is declared
+ * in standalone.h so the decl and this definition share it.) */
+extern "C" const AM2_Option am2_option_table[43] = {
+    { 0, 62, 40, 1, 1, 16, 1, 1, "POWER-UPS" },
+    { 1, 72, 57, 0, 0, 0, 2, 1, "Random Power-up" },
+    { 2, 72, 74, 0, 0, 0, 4, 1, "Air Strike" },
+    { 3, 72, 91, 0, 0, 0, 8, 1, "Paratroopers" },
+    { 4, 72, 108, 0, 0, 0, 16, 1, "Reconnaissance" },
+    { 5, 72, 125, 0, 0, 0, 32, 1, "Mines" },
+    { 6, 72, 142, 0, 0, 0, 64, 1, "Minesweeper" },
+    { 7, 72, 159, 0, 0, 0, 128, 1, "Disguise" },
+    { 8, 72, 176, 0, 0, 0, 256, 1, "Wrench" },
+    { 9, 72, 193, 0, 0, 0, 512, 1, "Sniper Rifle" },
+    { 10, 72, 210, 0, 0, 0, 1024, 1, "Heavy MG" },
+    { 11, 72, 227, 0, 0, 0, 2048, 1, "Mortar" },
+    { 12, 72, 244, 0, 0, 0, 4096, 1, "Aerosol" },
+    { 13, 72, 261, 0, 0, 0, 8192, 1, "Magnifying Glass" },
+    { 14, 72, 278, 0, 0, 0, 16384, 1, "M80" },
+    { 15, 72, 295, 0, 0, 0, 32768, 1, "Bazooka" },
+    { 16, 72, 312, 0, 0, 0, 65536, 1, "Vulcan" },
+    { 17, 62, 329, 1, 18, 21, 131072, 1, "MISCELLANEOUS" },
+    { 18, 72, 346, 0, 0, 0, 262144, 1, "Fog of War" },
+    { 19, 72, 363, 0, 0, 0, 524288, 1, "Casualties Replaced" },
+    { 20, 72, 380, 0, 0, 0, 1048576, 1, "Power-ups Replenished" },
+    { 21, 72, 397, 0, 0, 0, 2097152, 1, "Corpses Spawn Zombies" },
+    { 22, 305, 40, 1, 23, 27, 1, 0, "TROOPERS" },
+    { 23, 315, 57, 0, 0, 0, 2, 0, "Bazooka man" },
+    { 24, 315, 74, 0, 0, 0, 4, 0, "Flame Throwers" },
+    { 25, 315, 91, 0, 0, 0, 8, 0, "Grenadiers" },
+    { 26, 315, 108, 0, 0, 0, 16, 0, "Riflemen" },
+    { 27, 315, 125, 0, 0, 0, 32, 0, "Mortar men" },
+    { 28, 305, 142, 1, 29, 33, 64, 0, "VEHICLES" },
+    { 29, 315, 159, 0, 0, 0, 128, 0, "Jeeps" },
+    { 30, 315, 176, 0, 0, 0, 256, 0, "Half-tracks" },
+    { 31, 315, 193, 0, 0, 0, 512, 0, "Tanks" },
+    { 32, 315, 210, 0, 0, 0, 1024, 0, "Trucks" },
+    { 33, 315, 227, 0, 0, 0, 2048, 0, "PT Boats" },
+    { 34, 305, 244, 1, 35, 42, 4096, 0, "ASSETS" },
+    { 35, 315, 261, 0, 0, 0, 8192, 0, "Mines" },
+    { 36, 315, 278, 0, 0, 0, 16384, 0, "Medical Tent" },
+    { 37, 315, 295, 0, 0, 0, 32768, 0, "Repair Facility" },
+    { 38, 315, 312, 0, 0, 0, 65536, 0, "Radar Building" },
+    { 39, 315, 329, 0, 0, 0, 131072, 0, "Anti-Aircraft Gun" },
+    { 40, 315, 346, 0, 0, 0, 262144, 0, "Rifle Pillbox" },
+    { 41, 315, 363, 0, 0, 0, 524288, 0, "Bazooka Pillbox" },
+    { 42, 315, 380, 0, 0, 0, 1048576, 0, "Heavy MG Pillbox" },
+};
+
+/* am2_pointer_modes -- 0x004761B8, seven 40-byte cursor-mode records: three
+ * handler pointers (pick / action / invoke, any NULL) and seven int fields.
+ * The handlers are reconstructed. Mode 6's last four ints {6,190,43,27}
+ * OVERLAP am2_build_menu_rects in the image -- the linker packed that table
+ * into mode 6's unused tail -- so they are transcribed as those values for
+ * byte-fidelity; in C the two tables are separate storage. A function-pointer
+ * table off the generator's fixups. */
+extern "C" const AM2_PointerMode am2_pointer_modes[7] = {
+    { (const void *)PointerPickMode0, (const void *)PointerSelect, 0, 3, 0, 0, 15, 0, 0, 0 },
+    { 0, (const void *)PointerActionFollow, 0, 0, 0, 0, 15, 1, 0, 0 },
+    { 0, 0, (const void *)PointerInvokeFreezeArmy, 3, 0, 0, 15, 2, 0, 0 },
+    { 0, (const void *)PointerDropItem, 0, 0, 0, 0, 15, 3, 0, 0 },
+    { (const void *)PointerPickMode4, (const void *)PointerActionMode4, (const void *)PointerInvokeClick, 5, 0, 1, 15, 4, 0, 0 },
+    { (const void *)PointerPickMode5, (const void *)PointerActionMode5, (const void *)PointerInvokeClick, 6, 0, 1, 15, 1, 0, 0 },
+    { (const void *)PointerPickMode6, (const void *)PointerActionMode6, (const void *)PointerInvokeFreezeSelected, 7, 0, 1, 6, 190, 43, 27 },
+};
+#endif
+
 /* The seven title-screen handlers live in startgame.cpp, beside the other
  * menu handler that starts a game. They are declared void(void) because that
  * is what their bodies are; a button handler is called with the widget, and
@@ -343,7 +493,7 @@ void __attribute__((thiscall)) KeyRowUpdate(AM2_Widget *w)
     {
         AM2_Widget **rows =
             (AM2_Widget **)((uint8_t *)w->parent + KEYROW_PARENT_ROWS);
-        const char  *none = (const char *)AM2_IMAGE(ADDR_STR_NONE);
+        const char  *none = "None";
         int32_t      i;
 
         for (i = 0; i < KEYROW_ROW_COUNT; i++) {
@@ -3408,7 +3558,7 @@ void __attribute__((thiscall)) CountButtonPaint(AM2_Widget *w, RECT clip)
 
     WidgetPaint(w, clip);
 
-    am2_sprintf(text, (const char *)AM2_IMAGE(ADDR_STR_PCT_D),
+    am2_sprintf(text, "%d",
                 *(const int32_t *)(self + COUNTBTN_OFF_COUNT));
     width = TextExtent(text, 0, NULL);
 
@@ -3579,7 +3729,7 @@ void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip)
 
         ((int32_t (__cdecl *)(char *, const char *, ...))
             AM2_IMAGE(ADDR_GAME_SPRINTF))(
-                text, (const char *)AM2_IMAGE(ADDR_STR_PCT_D), count);
+                text, "%d", count);
 
         DrawText(AM2_HUD_SARGE_CELL_W
                  - TextExtent(text, AM2_HUD_SARGE_FONT, (int32_t *)0)
@@ -3748,7 +3898,7 @@ void __attribute__((thiscall)) HudRadarUpdate(AM2_Widget *w)
         strcpy((char *)((uint8_t *)*(AM2_Widget **)
                             (uintptr_t)ADDR_HUD_WIDGET_B
                             + HUDPANEL_OFF_CAPTION),
-                   (const char *)AM2_IMAGE(ADDR_STR_STRATMAP));
+                   "Stratmap");
 }
 
 /* 0x0044E510. The film archive's destructor: give back the twelve thumbnail
@@ -4849,7 +4999,7 @@ AM2_Widget *__attribute__((thiscall)) DlgSaveListConstruct(AM2_Widget *w,
 
     ScreenBaseConstruct(w, bmp, flag);
     w->vtable = (void *)AM2_IMAGE(VTABLE_SAVE_LIST);
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
+    SetGameDir("save");
 
     /* Make the player's folder if it is missing, or if the name is taken by
      * something that is not a directory. */
@@ -4863,7 +5013,7 @@ AM2_Widget *__attribute__((thiscall)) DlgSaveListConstruct(AM2_Widget *w,
         orig_findclose(h);
     }
 
-    am2_sprintf(path, (const char *)AM2_IMAGE(ADDR_STR_SAVE_PLAYER_FMT),
+    am2_sprintf(path, "save\\%s",
                 (const char *)(uintptr_t)ADDR_GAMEPROC_BLOCK);
     SetGameDir(path);
 
@@ -4872,7 +5022,7 @@ AM2_Widget *__attribute__((thiscall)) DlgSaveListConstruct(AM2_Widget *w,
         *(void **)(self + DLG_OFF_LIST) = rec ? RecordCtor(rec, 1) : (void *)0;
     }
 
-    strcpy(dir, (const char *)AM2_IMAGE(ADDR_STR_GLOB_SAV));
+    strcpy(dir, "*.sav");
     h = orig_findfirst(dir, find);
     if (h != -1) {
         do {
@@ -5022,7 +5172,7 @@ AM2_Widget *__attribute__((thiscall)) DlgOverwriteConstruct(AM2_Widget *w,
     }
     WidgetAddChild(w, btn);
 
-    am2_sprintf(text, (const char *)AM2_IMAGE(ADDR_STR_OVERWRITE_ASK),
+    am2_sprintf(text, "Are you sure you want to overwrite savefile '%s'?",
                 (const char *)(uintptr_t)ADDR_PENDING_CONFIRM);
 
     typer = (AM2_Widget *)orig_operator_new(AM2_TYPER_BYTES);
@@ -5745,7 +5895,7 @@ void __cdecl OpenMpHost(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_MP_PANEL_SIZE, (AM2_ScreenCtorFn)MpPanelConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_MPHOST_BMP));
+               "01_001_00_mphost.bmp");
     g_mpSession = AM2_MP_SESSION_HOST;
     RefreshMapSelection();
 }
@@ -5754,7 +5904,7 @@ void __cdecl OpenMpJoin(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_MP_PANEL_SIZE, (AM2_ScreenCtorFn)MpPanelConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_MPJOIN_BMP));
+               "01_002_00_mpjoin.bmp");
     g_mpSession = AM2_MP_SESSION_JOIN;
 }
 
@@ -5762,14 +5912,14 @@ void __cdecl OpenMpOptions(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_MP_OPTIONS_SIZE, (AM2_ScreenCtorFn)MpOptionsConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_MPHOSTOPTS_BMP));
+               "01_001_03_mphostoptions.bmp");
 }
 
 void __cdecl OpenSelectMap(void)
 {
     CloseCurrentScreen();
     OpenScreen(AM2_MP_SELECT_MAP_SIZE, (AM2_ScreenCtorFn)SelectMapConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+               "01_000_00_screen.bmp");
 }
 
 void __cdecl OpenSelectPlayer(void)
@@ -5777,7 +5927,7 @@ void __cdecl OpenSelectPlayer(void)
     CloseCurrentScreen();
     OpenScreen(AM2_SELECT_PLAYER_SIZE,
                (AM2_ScreenCtorFn)SelectPlayerConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+               "01_000_00_screen.bmp");
 }
 
 void __cdecl OpenEnterName(void)
@@ -5785,7 +5935,7 @@ void __cdecl OpenEnterName(void)
     CloseCurrentScreen();
     OpenScreen(AM2_ENTER_NAME_SIZE,
                (AM2_ScreenCtorFn)EnterNameConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+               "01_000_00_screen.bmp");
 }
 
 void __cdecl OpenWarMenu(void)
@@ -5793,7 +5943,7 @@ void __cdecl OpenWarMenu(void)
     CloseCurrentScreen();
     OpenScreen(AM2_WAR_MENU_SIZE,
                (AM2_ScreenCtorFn)WarMenuConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+               "01_000_00_screen.bmp");
 }
 
 void __cdecl OpenBattleName(void)
@@ -5801,7 +5951,7 @@ void __cdecl OpenBattleName(void)
     CloseCurrentScreen();
     OpenScreen(AM2_BATTLE_NAME_SIZE,
                (AM2_ScreenCtorFn)BattleNameConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+               "01_000_00_screen.bmp");
 }
 
 void __cdecl OpenBattleJoin(void)
@@ -5809,7 +5959,7 @@ void __cdecl OpenBattleJoin(void)
     CloseCurrentScreen();
     OpenScreen(AM2_BATTLE_JOIN_SIZE,
                (AM2_ScreenCtorFn)DlgBattleJoinConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+               "01_000_00_screen.bmp");
 }
 
 void __cdecl OpenMovies(void)
@@ -5817,7 +5967,7 @@ void __cdecl OpenMovies(void)
     CloseCurrentScreen();
     OpenScreen(AM2_MOVIES_SIZE,
                (AM2_ScreenCtorFn)MoviesConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+               "01_000_00_screen.bmp");
 }
 
 void __cdecl OpenOptionsMenu(void)
@@ -5825,7 +5975,7 @@ void __cdecl OpenOptionsMenu(void)
     CloseCurrentScreen();
     OpenScreen(AM2_OPTIONS_MENU_SIZE,
                (AM2_ScreenCtorFn)OptionsMenuConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+               "01_000_00_screen.bmp");
 }
 
 void __cdecl OpenControls(void)
@@ -5833,7 +5983,7 @@ void __cdecl OpenControls(void)
     CloseCurrentScreen();
     OpenScreen(AM2_CONTROLS_SIZE,
                (AM2_ScreenCtorFn)ControlsDialogConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_CONTROLS_BMP));
+               "01_003_00_controls.bmp");
 }
 
 void __cdecl OpenDifficulty(void)
@@ -5841,7 +5991,7 @@ void __cdecl OpenDifficulty(void)
     CloseCurrentScreen();
     OpenScreen(AM2_DIFFICULTY_SIZE,
                (AM2_ScreenCtorFn)DifficultyDialogConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+               "01_000_00_screen.bmp");
 }
 
 void __cdecl OpenQuitConfirm(void)
@@ -5849,7 +5999,7 @@ void __cdecl OpenQuitConfirm(void)
     CloseCurrentScreen();
     OpenScreen(AM2_QUIT_CONFIRM_SIZE,
                (AM2_ScreenCtorFn)QuitDialogConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+               "01_000_00_screen.bmp");
 }
 
 void __cdecl OpenReplayPrompt(void)
@@ -5857,7 +6007,7 @@ void __cdecl OpenReplayPrompt(void)
     CloseCurrentScreen();
     OpenScreen(AM2_REPLAY_PROMPT_SIZE,
                (AM2_ScreenCtorFn)ReplayDialogConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+               "01_000_00_screen.bmp");
 }
 
 void __cdecl OpenDeletePlayer(void)
@@ -5865,7 +6015,7 @@ void __cdecl OpenDeletePlayer(void)
     CloseCurrentScreen();
     OpenScreen(AM2_DELETE_PLAYER_SIZE,
                (AM2_ScreenCtorFn)DelPlayerDialogConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+               "01_000_00_screen.bmp");
 }
 
 /* The two-argument form. Five of the twenty-one screens exist in two
@@ -5897,7 +6047,7 @@ void __cdecl OpenCommPanel(void)
     CommCreateDirectPlay(g_commObject, (void *)0);
     OpenScreen(AM2_COMM_PANEL_SIZE,
                (AM2_ScreenCtorFn)CommPanelConstruct,
-               (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP));
+               "01_000_00_screen.bmp");
 }
 
 /* Arm 19. AUDIO CONTROLS -- the three volume sliders. The repaint comes
@@ -5915,11 +6065,11 @@ void __cdecl OpenAudioOptions(void)
         RefreshScreen();
         OpenScreen2(AM2_AUDIO_OPTIONS_SIZE,
                     (AM2_ScreenCtor2Fn)AudioDialogConstruct,
-                    (const char *)AM2_IMAGE(ADDR_STR_AUDIO_BMP), 0);
+                    "02_013_00_audio.bmp", 0);
     } else {
         OpenScreen2(AM2_AUDIO_OPTIONS_SIZE,
                     (AM2_ScreenCtor2Fn)AudioDialogConstruct,
-                    (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP), 1);
+                    "01_000_00_screen.bmp", 1);
     }
 }
 
@@ -5931,11 +6081,11 @@ void __cdecl OpenDeleteGame(void)
         RefreshScreen();
         OpenScreen2(AM2_DELETE_GAME_SIZE,
                     (AM2_ScreenCtor2Fn)DeleteGameConstruct,
-                    (const char *)AM2_IMAGE(ADDR_STR_DELGAME_BMP), 0);
+                    "02_011_00_delgame.bmp", 0);
     } else {
         OpenScreen2(AM2_DELETE_GAME_SIZE,
                     (AM2_ScreenCtor2Fn)DeleteGameConstruct,
-                    (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP), 1);
+                    "01_000_00_screen.bmp", 1);
     }
 }
 
@@ -5969,7 +6119,7 @@ void __cdecl OpenSaveGame(void)
 {
     CloseCurrentScreen();
     OpenScreen2(AM2_SAVE_LIST_SIZE, (AM2_ScreenCtor2Fn)DlgSaveListConstruct,
-                (const char *)AM2_IMAGE(ADDR_STR_SAVEGAME_BMP), 0);
+                "02_008_00_savegame.bmp", 0);
     RefreshScreen();
 }
 
@@ -5978,14 +6128,14 @@ void __cdecl OpenOverwriteGame(void)
     CloseCurrentScreen();
     RefreshScreen();
     OpenScreen2(AM2_OVERWRITE_SIZE, (AM2_ScreenCtor2Fn)DlgOverwriteConstruct,
-                (const char *)AM2_IMAGE(ADDR_STR_OVRGAME_BMP), 0);
+                "02_018_00_ovrgame.bmp", 0);
 }
 
 void __cdecl OpenGameMenu(void)
 {
     CloseCurrentScreen();
     OpenScreen2(AM2_GAMEMENU_SIZE, (AM2_ScreenCtor2Fn)DlgGameMenuConstruct,
-                (const char *)AM2_IMAGE(ADDR_STR_BLANK_BMP), 0);
+                "00_999_99_blank.bmp", 0);
     RefreshScreen();
 }
 
@@ -6006,14 +6156,14 @@ void __cdecl OpenLoadGame(void)
         if (obj) {
             screen = (uint8_t *)LoadGameConstruct(
                 (AM2_Widget *)obj,
-                (const char *)AM2_IMAGE(ADDR_STR_LOADGAME_BMP), 0);
+                "02_007_00_loadgame.bmp", 0);
         }
         RefreshScreen();
         g_paintObject = screen;
     } else {
         OpenScreen2(AM2_LOAD_GAME_SIZE,
                     (AM2_ScreenCtor2Fn)LoadGameConstruct,
-                    (const char *)AM2_IMAGE(ADDR_STR_SCREEN_BMP), 1);
+                    "01_000_00_screen.bmp", 1);
     }
 }
 
@@ -6194,7 +6344,7 @@ static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
 
     ScreenBaseConstruct(w, bmp, 1);
     w->vtable = (void *)AM2_IMAGE(vtable);
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_ALPINE));
+    SetGameDir("alpine");
 
     panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
     if (panel) {
@@ -6294,7 +6444,7 @@ AM2_Widget *__attribute__((thiscall)) WarMenuConstruct(AM2_Widget *w,
     if (panel) {
         RectSet(&box, 0xBD, 0x48, 0x106, 0x35);
         panel = PanelConstruct(panel,
-                               (const char *)AM2_IMAGE(ADDR_STR_BLANK_BMP),
+                               "00_999_99_blank.bmp",
                                1, box);
     }
     WidgetAddChild(w, panel);
@@ -6393,7 +6543,7 @@ AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
     if (panel) {
         RectSet(&box, 0x6C, 0x98, 0x1A7, 0xB0);
         panel = PanelConstruct(panel,
-                                (const char *)AM2_IMAGE(ADDR_STR_DIFFICULTY_BMP),
+                                "02_014_00_difficulty.bmp",
                                 0, box);
     }
     WidgetAddChild(w, panel);
@@ -6402,9 +6552,9 @@ AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
     rows = orig_operator_new(AM2_ROWS_SIZE);
     if (rows)
         rows = RecordCtor(rows, 0);
-    ListAdd(rows, (const char *)AM2_IMAGE(ADDR_STR_EASY),   (void *)0);
-    ListAdd(rows, (const char *)AM2_IMAGE(ADDR_STR_MEDIUM), (void *)1);
-    ListAdd(rows, (const char *)AM2_IMAGE(ADDR_STR_HARD),   (void *)2);
+    ListAdd(rows, "Easy",   (void *)0);
+    ListAdd(rows, "Medium", (void *)1);
+    ListAdd(rows, "Hard",   (void *)2);
 
     list = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_SIZE);
     if (list) {
@@ -6730,7 +6880,7 @@ AM2_Widget *__attribute__((thiscall)) AudioDialogConstruct(AM2_Widget *w,
         if (panel) {
             RectSet(&box, offX, offY, 0x16E, 0xED);
             panel = PanelConstruct(panel,
-                                    (const char *)AM2_IMAGE(ADDR_STR_AUDIO_BMP),
+                                    "02_013_00_audio.bmp",
                                     0, box);
         }
         WidgetAddChild(w, panel);
@@ -6860,7 +7010,7 @@ AM2_Widget *__attribute__((thiscall)) BattleNameConstruct(AM2_Widget *w,
     if (panel) {
         RectSet(&box, 0x6C, 0x8F, 0x1A7, 0xC1);
         panel = PanelConstruct(panel,
-                                (const char *)AM2_IMAGE(ADDR_STR_BATTLE_PANEL),
+                                "02_002_00_host.bmp",
                                 0, box);
     }
     WidgetAddChild(w, panel);
@@ -6921,7 +7071,7 @@ AM2_Widget *__attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w,
     if (panel) {
         RectSet(&box, 0x40, 0x62, 0x200, 0x11C);
         panel = PanelConstruct(panel,
-                                (const char *)AM2_IMAGE(ADDR_STR_COMMPANEL_BMP),
+                                "02_001_00_commpanel.bmp",
                                 0, box);
     }
     WidgetAddChild(w, panel);
@@ -7010,7 +7160,7 @@ AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
     ScreenBaseConstruct(w, bmp, 1);
     w->vtable = (void *)AM2_IMAGE(VTABLE_SELECT_PLAYER);
     ReadCampaignLevels();
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
+    SetGameDir("save");
     g_currentPlayer[0] = '\0';
 
     rows = orig_operator_new(AM2_ROWS_SIZE);
@@ -7018,7 +7168,7 @@ AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
         rows = RecordCtor(rows, 1);
     *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = rows;
 
-    strcpy(pattern, (const char *)AM2_IMAGE(ADDR_STR_GLOB_ALL));
+    strcpy(pattern, "*");
     handle = orig_findfirst(pattern, found);
     if (handle != -1) {
         do {
@@ -7035,8 +7185,7 @@ AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
     panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
     if (panel) {
         RectSet(&box, 0x7D, 0x62, 0x186, 0x11C);
-        panel = PanelConstruct(panel, (const char *)
-                                AM2_IMAGE(ADDR_STR_SELECTPLAYER_BMP), 0, box);
+        panel = PanelConstruct(panel, "02_005_00_selectplayer.bmp", 0, box);
     }
     WidgetAddChild(w, panel);
     w->focusedChild = panel;
@@ -7705,7 +7854,7 @@ AM2_Widget *__attribute__((thiscall)) TyperConstruct(AM2_Widget *w,
         orig_strncpy(line, message + start, (uint32_t)(cur - start));
         line[cur - start] = '\0';
         strcat(text, line);
-        strcat(text, (const char *)AM2_IMAGE(ADDR_STR_LINE_BREAK));
+        strcat(text, "|");
         start = cur;
     }
 
@@ -7718,7 +7867,7 @@ AM2_Widget *__attribute__((thiscall)) TyperConstruct(AM2_Widget *w,
             orig_strncpy(line, message + start, (uint32_t)(cur - start));
             line[cur - start] = '\0';
             strcat(text, line);
-            strcat(text, (const char *)AM2_IMAGE(ADDR_STR_LINE_BREAK));
+            strcat(text, "|");
             start = cur;
         }
     }
@@ -7786,8 +7935,7 @@ void __cdecl OpenTitleScreen(void)
 
     screen = (AM2_Widget *)orig_operator_new(AM2_TITLE_SCREEN_SIZE);
     if (screen)
-        screen = ScreenBaseConstruct(screen, (const char *)
-                                     AM2_IMAGE(ADDR_STR_SCREEN_BMP), 1);
+        screen = ScreenBaseConstruct(screen, "01_000_00_screen.bmp", 1);
     g_paintObject = (uint8_t *)screen;
     screen->flag44 = 1;
 
@@ -8441,12 +8589,12 @@ void __cdecl OnDelPlayerOk(AM2_Widget *w)
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
 
     if (strlen((const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK)) != 0) {
-        am2_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR_FMT),
+        am2_sprintf(dir, "Save\\%s",
                     (const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
         SetGameDir(dir);
     }
 
-    strcpy(pattern, (const char *)AM2_IMAGE(ADDR_STR_ANY_FILE));
+    strcpy(pattern, "*.*");
     h = orig_findfirst(pattern, find);
     if (h != -1) {
         do {
@@ -8460,7 +8608,7 @@ void __cdecl OnDelPlayerOk(AM2_Widget *w)
         orig_findclose(h);
     }
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
+    SetGameDir("save");
     orig_rmdir((const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
     *(char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK) = '\0';
 
@@ -8584,7 +8732,7 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
     (void)lo;
     (void)hi;
     if (!edit) {
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_KEY_HANDLER_LEAK));
+        orig_log("Error: Key handler not freed\n");
         return;
     }
 
@@ -8732,8 +8880,7 @@ AM2_Widget *__attribute__((thiscall)) SelectMapConstruct(AM2_Widget *w,
     panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
     if (panel) {
         RectSet(&box, 0x7D, 0x62, 0x186, 0x11C);
-        panel = PanelConstruct(panel, (const char *)
-                                AM2_IMAGE(ADDR_STR_SELECTMAP_BMP), 0, box);
+        panel = PanelConstruct(panel, "02_004_00_selectmap.bmp", 0, box);
     }
     WidgetAddChild(w, panel);
     w->focusedChild = panel;
@@ -8795,14 +8942,13 @@ AM2_Widget *__attribute__((thiscall)) EnterNameConstruct(AM2_Widget *w,
 
     ScreenBaseConstruct(w, bmp, 1);
     w->vtable = (void *)AM2_IMAGE(VTABLE_ENTER_NAME);
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR));
+    SetGameDir("save");
     text[0] = '\0';
 
     panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
     if (panel) {
         RectSet(&box, 0x6C, 0xAE, 0x1A7, 0x83);
-        panel = PanelConstruct(panel, (const char *)
-                                AM2_IMAGE(ADDR_STR_NAME_BMP), 0, box);
+        panel = PanelConstruct(panel, "02_006_00_name.bmp", 0, box);
     }
     WidgetAddChild(w, panel);
     w->focusedChild = panel;
@@ -8878,8 +9024,7 @@ AM2_Widget *__attribute__((thiscall)) DeleteGameConstruct(AM2_Widget *w,
 
         if (panel) {
             RectSet(&box, 0x6C, 0x98, 0x1A7, 0xB0);
-            panel = PanelConstruct(panel, (const char *)
-                                    AM2_IMAGE(ADDR_STR_DELGAME_BMP), 0, box);
+            panel = PanelConstruct(panel, "02_011_00_delgame.bmp", 0, box);
         }
         WidgetAddChild(w, panel);
         dx = 0;
@@ -8902,7 +9047,7 @@ AM2_Widget *__attribute__((thiscall)) DeleteGameConstruct(AM2_Widget *w,
     if (msg) {
         RectSet(&box, dx + 0x28, dy + 0x41, 0xF0, 0x34);
         msg = TyperConstruct(msg, box.left, box.top, box.right, box.bottom,
-                             (const char *)AM2_IMAGE(ADDR_STR_DELGAME_ASK));
+                             "Are you sure you want to delete this game?");
     }
     WidgetAddChild(parent, msg);
 
@@ -8983,13 +9128,12 @@ AM2_Widget *__attribute__((thiscall)) MoviesConstruct(AM2_Widget *w,
 
     ScreenBaseConstruct(w, bmp, 1);
     w->vtable = (void *)AM2_IMAGE(VTABLE_MOVIES);
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_ALPINE));
+    SetGameDir("alpine");
 
     panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
     if (panel) {
         RectSet(&box, 0x43, 0x20, 0x1FA, 0x19F);
-        panel = PanelConstruct(panel, (const char *)
-                                AM2_IMAGE(ADDR_STR_MOVIES_BMP), 0, box);
+        panel = PanelConstruct(panel, "02_012_00_movies.bmp", 0, box);
     }
     WidgetAddChild(w, panel);
     panel->flag44 = 1;
@@ -9071,11 +9215,11 @@ AM2_Widget *__attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w,
         rows = RecordCtor(rows, 1);
     *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = rows;
 
-    orig_sprintf(path, (const char *)AM2_IMAGE(ADDR_STR_SAVE_PLAYER_FMT),
+    orig_sprintf(path, "save\\%s",
                  g_currentPlayer);
     SetGameDir(path);
 
-    strcpy(pattern, (const char *)AM2_IMAGE(ADDR_STR_GLOB_SAV));
+    strcpy(pattern, "*.sav");
     handle = orig_findfirst(pattern, found);
     if (handle != -1) {
         do {
@@ -9092,8 +9236,7 @@ AM2_Widget *__attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w,
 
         if (panel) {
             RectSet(&box, 0x7D, 0x62, 0x186, 0x11C);
-            panel = PanelConstruct(panel, (const char *)
-                                    AM2_IMAGE(ADDR_STR_LOADGAME_BMP), 0, box);
+            panel = PanelConstruct(panel, "02_007_00_loadgame.bmp", 0, box);
         }
         WidgetAddChild(w, panel);
         w->focusedChild = panel;
@@ -9254,7 +9397,7 @@ void __cdecl OnLoadGameNew(AM2_Widget *w)
 
     (void)w;
     PlaySoundAt(2, 0, 0, 0, 0);
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_DATA_DIR));
+    SetGameDir("data");
     level = FindLevelRecord(1);
     if (!level)
         return;
@@ -9712,7 +9855,7 @@ void __cdecl OnMpName(AM2_Widget *w)
         /* Numbered from the first computer slot, not from the row. */
         orig_sprintf((char *)(comm + (uint32_t)row * AM2_PLAYER_STRIDE
                               + COMM_OFF_PLAYERS + COMM_SLOT_OFF_NAME),
-                     (const char *)AM2_IMAGE(ADDR_FMT_COMPUTER_N),
+                     "Computer%d",
                      row - *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT) + 1);
     }
 
@@ -9796,14 +9939,14 @@ void __attribute__((thiscall)) MpPanelUpdate(AM2_Widget *w)
     }
 
     orig_sprintf((char *)(self + MP_PANEL_OFF_SCORE_TEXT),
-                 (const char *)AM2_IMAGE(ADDR_FMT_INT),
+                 "%i",
                  *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT);
 
     for (i = 0; i < AM2_PLAYERS_MAX; i++) {
         uint8_t *inner = *(uint8_t **)((uint8_t *)rows[i] + AM2_MP_ROW_INNER);
 
         orig_sprintf(*(char **)(inner + EDIT_OFF_TEXT),
-                     (const char *)AM2_IMAGE(ADDR_FMT_INT), setting[i]);
+                     "%i", setting[i]);
     }
 }
 
@@ -9828,9 +9971,9 @@ void __cdecl FillListFromRules(const char *path, void *panel)
     am2_FILE *fp;
     void     *rows;
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_RULES_DIR));
+    SetGameDir("rules");
 
-    fp = orig_fopen(path, (const char *)AM2_IMAGE(ADDR_STR_DEF_FILE_MODE));
+    fp = orig_fopen(path, "rt");
     if (!fp)
         return;
 
@@ -10015,7 +10158,7 @@ void __cdecl OnMpLaunch(AM2_Widget *w)
     if (*(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT) > 1
         && !CommAllPlayersAgreed(comm)) {
         PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
-        Announce((const char *)AM2_IMAGE(ADDR_MSG_VERSION_MISMATCH));
+        Announce("Not everybody has the same version/map/rules.");
         return;
     }
 
@@ -10027,7 +10170,7 @@ void __cdecl OnMpLaunch(AM2_Widget *w)
     if (!CommAllPlayersReady(comm)) {
         PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
         SendPlayerMsg(1);
-        Announce((const char *)AM2_IMAGE(ADDR_MSG_HOST_WAITING));
+        Announce("Host is ready - waiting for players to press ready.");
         return;
     }
 
@@ -10137,7 +10280,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
                             row);
         }
 
-        am2_sprintf(path, (const char *)AM2_IMAGE(ADDR_FMT_DOT_TXT),
+        am2_sprintf(path, "%s.txt",
                     (const char *)(rec + MP_GAMETYPE_OFF_RULES));
         FillListFromRules(path, panel);
 
@@ -10205,7 +10348,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
     /* The map is listed and the totals agree; the FILE still has to be there.
      * This is the second exit that answers 2, for a different reason. */
     SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
-    am2_sprintf(path, (const char *)AM2_IMAGE(ADDR_FMT_DOT_AMM),
+    am2_sprintf(path, "%s.amm",
                 (const char *)AM2_IMAGE(ADDR_MAP_NAME));
     if (!FileExists(path)) {
         MpComplain(panel, ADDR_MSG_NO_MAP);
@@ -10217,7 +10360,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
         char        bmp[AM2_MP_COMPLAINT_BYTES];
 
         SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
-        am2_sprintf(bmp, (const char *)AM2_IMAGE(ADDR_FMT_PREV_BMP),
+        am2_sprintf(bmp, "%s_prev.bmp",
                     (const char *)AM2_IMAGE(ADDR_MAP_NAME));
         MpPreviewSetBitmap(preview, bmp);
 
@@ -10267,7 +10410,7 @@ void __cdecl SaveListOnPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
            rows->text + (size_t)row * LIST_ROW_STRIDE);
 
     dot = orig_strstr((char *)(dlg + SAVELIST_OFF_NAME),
-                      (const char *)AM2_IMAGE(ADDR_STR_DOT_SAV));
+                      ".sav");
     if (dot)
         *dot = '\0';
 
@@ -10306,7 +10449,7 @@ void __cdecl SaveListOnDelete(AM2_Widget *w)
     }
 
     strcpy(g_pendingDelete, (const char *)(dlg + SAVELIST_OFF_NAME));
-    strcat(g_pendingDelete, (const char *)AM2_IMAGE(ADDR_STR_DOT_SAV));
+    strcat(g_pendingDelete, ".sav");
 
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
 
@@ -10349,8 +10492,8 @@ void __cdecl SaveListOnSave(AM2_Widget *w)
     }
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
 
-    if (!orig_strstr(name, (const char *)AM2_IMAGE(ADDR_STR_DOT)))
-        strcat(name, (const char *)AM2_IMAGE(ADDR_STR_DOT_SAV));
+    if (!orig_strstr(name, "."))
+        strcat(name, ".sav");
 
     h = orig_findfirst(name, find);
     if (h == -1) {
@@ -10393,7 +10536,7 @@ void __cdecl DlgOverwriteOk(AM2_Widget *w)
     (void)w;
 
     if (strlen((const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK)) != 0) {
-        am2_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR_FMT),
+        am2_sprintf(dir, "Save\\%s",
                     (const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
         SetGameDir(dir);
     }
@@ -10578,8 +10721,8 @@ void __cdecl ShowBadMapPreview(AM2_Widget *preview)
 {
     char name[0x100];
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_STR_BITMAPS_DIR));
-    strcpy(name, (const char *)AM2_IMAGE(ADDR_STR_BAD_MP_PREV));
+    SetGameDir("bitmaps");
+    strcpy(name, "bad_mp_prev.bmp");
 
     MpPreviewSetBitmap(preview, name);
     ((AM2_WidgetPaintFn *)preview->vtable)[WIDGET_VSLOT_PAINT](
@@ -10618,7 +10761,7 @@ void __cdecl RefreshMapSelection(void)
         preview = ((AM2_Widget **)(g_paintObject + MP_PANEL_OFF_PREVIEW))[0];
 
     SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
-    orig_sprintf(path, (const char *)AM2_IMAGE(ADDR_FMT_DOT_AMM),
+    orig_sprintf(path, "%s.amm",
                  (const char *)AM2_IMAGE(ADDR_MAP_NAME));
 
     if (!FileExists(path)) {
@@ -10636,7 +10779,7 @@ void __cdecl RefreshMapSelection(void)
     SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
 
     if (preview) {
-        orig_sprintf(path, (const char *)AM2_IMAGE(ADDR_FMT_PREV_BMP),
+        orig_sprintf(path, "%s_prev.bmp",
                      (const char *)AM2_IMAGE(ADDR_MAP_NAME));
         MpPreviewSetBitmap(preview, path);
         ((AM2_WidgetPaintFn *)preview->vtable)[WIDGET_VSLOT_PAINT](
@@ -12964,7 +13107,7 @@ static void HudShowPoints(void)
     AM2_Widget *field;
 
     am2_sprintf((char *)panel + HUDPANEL_OFF_POINTS_TEXT,
-                (const char *)AM2_IMAGE(ADDR_FMT_INT),
+                "%i",
                 *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS);
 
     field = *(AM2_Widget **)((uint8_t *)panel + HUDPANEL_OFF_POINTS_FIELD);
@@ -13216,7 +13359,7 @@ static void SpinApply(AM2_Widget *spin, int32_t value)
                      + EDIT_OFF_TEXT);
     void (__cdecl *fn)(AM2_Widget *);
 
-    orig_sprintf(text, (const char *)AM2_IMAGE(ADDR_FMT_INT), value);
+    orig_sprintf(text, "%i", value);
 
     fn = *(void (__cdecl **)(AM2_Widget *))((uint8_t *)spin + SPIN_OFF_HANDLER);
     if (fn)
@@ -13778,7 +13921,7 @@ void __cdecl MpReadyToLoad(void)
 
     slot = g_commObject + COMM_OFF_PLAYERS
            + (uintptr_t)g_defaultOwner * COMM_PLAYER_STRIDE;
-    am2_sprintf(text, (const char *)AM2_IMAGE(ADDR_STR_IS_READY),
+    am2_sprintf(text, "%s is ready.",
                 slot + COMM_SLOT_OFF_NAME);
     Announce(text);
 }
@@ -13993,7 +14136,7 @@ void __cdecl OnDelGameOk(AM2_Widget *w)
     char dir[0x100];
 
     if (strlen(g_currentPlayer) != 0) {
-        am2_sprintf(dir, (const char *)AM2_IMAGE(ADDR_STR_SAVE_DIR_FMT),
+        am2_sprintf(dir, "Save\\%s",
                     g_currentPlayer);
         SetGameDir(dir);
     }
@@ -15082,7 +15225,7 @@ void __attribute__((thiscall)) HudSquadDetail(AM2_Widget *w, int32_t uid)
              * script name is used when it does NOT -- the sense was inverted
              * here, which hid a custom name like "wildblood" behind a random
              * soldier name. */
-            if (orig_strncmp(s, (const char *)AM2_IMAGE(ADDR_STR_GREEN),
+            if (orig_strncmp(s, "green",
                               5) != 0) {
                 strcpy(name, s);
                 TitleCaseName(name);
@@ -15908,7 +16051,7 @@ void __cdecl HudChatChar(uint32_t ch, uint32_t lo, uint32_t hi)
     (void)lo;
     (void)hi;
     if (!w) {
-        orig_log((const char *)AM2_IMAGE(ADDR_STR_KEY_HANDLER_LEAK));
+        orig_log("Error: Key handler not freed\n");
         return;
     }
 
@@ -16215,7 +16358,7 @@ AM2_Widget *__attribute__((thiscall)) MpSpinConstruct(
                  + ARROW_OFF_FLAG5C) = 1;
 
     am2_sprintf((char *)(self + MPSPIN_OFF_TEXT),
-                (const char *)AM2_IMAGE(ADDR_FMT_INT), value);
+                "%i", value);
 
     kid = (AM2_Widget *)orig_operator_new(AM2_HUD_EDIT_BYTES);
     if (kid)
@@ -16311,7 +16454,7 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
 
             if (*(const int32_t *)(comm + COMM_OFF_PLAYER_SLOTS
                                    + (size_t)i * AM2_COMM_SLOT_STRIDE) != 0)
-                am2_sprintf(name, (const char *)(uintptr_t)ADDR_STR_FMT_S,
+                am2_sprintf(name, "%s",
                             comm + COMM_OFF_SLOT_NAME
                             + (size_t)i * AM2_COMM_SLOT_STRIDE);
             else
@@ -16652,7 +16795,7 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
 
             strcpy((char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME),
                    (const char *)(rec + NAMEREC_OFF_NAME));
-            am2_sprintf(path, (const char *)AM2_IMAGE(ADDR_FMT_DOT_TXT),
+            am2_sprintf(path, "%s.txt",
                         (const char *)(rec + NAMEREC_OFF_NAME2));
             FillListFromRules(path, w);
         }
@@ -16784,7 +16927,7 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
     /* The score limit as TEXT, in the panel's own buffer, shown by a label
      * that does not own it. */
     am2_sprintf((char *)(p + MP_PANEL_OFF_SCORE_TEXT),
-                (const char *)(uintptr_t)ADDR_FMT_INT,
+                "%i",
                 *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT);
     {
         AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x64);
@@ -16806,11 +16949,11 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
         AM2_Widget *child;
 
         SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
-        am2_sprintf(path, (const char *)(uintptr_t)ADDR_FMT_PREV_BMP,
+        am2_sprintf(path, "%s_prev.bmp",
                     (const char *)(uintptr_t)ADDR_MAP_NAME);
         if (!FileExists(path)) {
-            SetGameDir((const char *)(uintptr_t)ADDR_STR_BITMAPS_DIR);
-            strcpy(path, (const char *)(uintptr_t)ADDR_STR_BAD_MP_PREV);
+            SetGameDir("bitmaps");
+            strcpy(path, "bad_mp_prev.bmp");
         }
 
         child = (AM2_Widget *)orig_operator_new(0x60);

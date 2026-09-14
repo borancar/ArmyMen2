@@ -200,7 +200,7 @@ static void ReopenSession(uint8_t *comm)
         return;
     *(uint32_t *)((uint8_t *)desc + 4) &= ~0x21u;
     if (CommSetSessionDesc(comm, desc, 0) < 0)
-        orig_log((const char *)(uintptr_t)ADDR_STR_SET_SESSION_FAIL);
+        orig_log("Set Session Failed to reopen Session\n");
 }
 
 /* 0x0046C. A player record was destroyed. Three outcomes: in a menu it is a
@@ -214,7 +214,7 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
     char     text[128];
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-        orig_log((const char *)(uintptr_t)ADDR_STR_DESTROYPLAYER, id);
+        orig_log("DESTROYPLAYER Win Message for player %x\n", id);
 
     if (!id || id == 0xFFFFFFFFu)
         return 1;
@@ -246,7 +246,7 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
 
             ((am2_paint_flush_fn)vt[2])(obj);
             ((am2_repaint_fn)vt[1])(*(const RECT *)(obj + PAINT_OFF_DAMAGE));
-            orig_sprintf(text, (const char *)(uintptr_t)ADDR_STR_LEFT_GAME, name);
+            orig_sprintf(text, "Player %s has left the game.", name);
             MenuMessage(text, 4, 1);
         }
 
@@ -279,7 +279,7 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
          * like a call. See army.h. */
         ForEachArmyObject(slot, ObjToAI);
 
-    orig_sprintf(text, (const char *)(uintptr_t)ADDR_STR_LEFT_AI,
+    orig_sprintf(text, "Player %s has left the game - now AI controlled.",
                  PlayerName(comm, slot));
     HudMessage(text, g_hudColour);
     return 1;
@@ -301,7 +301,7 @@ static LRESULT OnHostMigrated(void)
     if (*(const uint32_t *)(comm + COMM_OFF_PLAYER_COUNT) < 4)
         ReopenSession(comm);
 
-    orig_sprintf(text, (const char *)(uintptr_t)ADDR_STR_HOST_NOW,
+    orig_sprintf(text, "Player %s is now the host.",
                  PlayerName(comm, g_ourSlot));
     if (g_gameState == 2)
         HudMessage(text, g_hudColour);
@@ -318,7 +318,7 @@ static LRESULT OnSetupDone(void)
 
     g_netGame = 0;
     SetFogOfWar((int32_t)((g_gameOverFlags >> 18) & 1u));
-    PlayDynamicSound((const char *)(uintptr_t)ADDR_STR_ALLRIGHT_WAV,
+    PlayDynamicSound("AllRight.wav",
                       0, 0, 0, 0, 0, 3, 0);
     BuildHudWidgets();
     CommResetStats(comm);

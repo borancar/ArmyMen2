@@ -17,7 +17,7 @@ int32_t __cdecl SetGameDir(const char *subdir)
     char path[0x100];
 
     strcpy(path, (const char *)AM2_IMAGE(ADDR_GAME_DIR));
-    strcat(path, (const char *)AM2_IMAGE(ADDR_STR_PATH_SEP));
+    strcat(path, "\\");
     strcat(path, subdir);
 
     if (am2_chdir(path) == 0) {
@@ -48,7 +48,7 @@ int32_t __cdecl SetGameDir(const char *subdir)
  * pushes and there is no reason to improve on it. */
 int32_t __cdecl FileExists(const char *path)
 {
-    am2_FILE *fp = orig_fopen(path, (const char *)AM2_IMAGE(ADDR_STR_MODE_R));
+    am2_FILE *fp = orig_fopen(path, "r");
 
     if (fp == (am2_FILE *)0)
         return 0;
@@ -81,7 +81,7 @@ int32_t __cdecl FileHasSaveTag(const char *path)
     am2_FILE *fp;
     uint32_t  tag;
 
-    fp = orig_fopen(path, (const char *)AM2_IMAGE(ADDR_MODE_RB));
+    fp = orig_fopen(path, "rb");
     if (!fp)
         return 0;
 

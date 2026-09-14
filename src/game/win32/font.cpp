@@ -227,7 +227,18 @@ HFONT __cdecl CreateGameFont(const char *face, int32_t height, uint16_t style)
  * otherwise end up inside the letters. */
 #define GLYPH_SCRATCH 0x8000
 
-typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDesc;
+/* AM2_FontDesc is in orig.h, shared with the standalone transcription. */
+
+#ifdef AM2_STANDALONE
+/* am2_font_descs -- 0x004897E8, the three GDI fonts the game builds (face,
+ * pixel height, style). Transcribed out of the blob; the face pointers are
+ * verified by dereference, the ints by value (the uint16 style's dword is 0). */
+extern "C" const AM2_FontDesc am2_font_descs[3] = {
+    { "ArialNarrow", 12, 0 },
+    { "ArialNarrow", 14, 0 },
+    { "ArialBlack",  18, 0 },
+};
+#endif
 
 #define g_fontDescs   ((const AM2_FontDesc *)(uintptr_t)ADDR_FONT_DESCS)
 #define g_backgroundColour  (*(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR)

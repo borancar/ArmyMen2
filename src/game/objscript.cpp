@@ -629,7 +629,7 @@ int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
     FreeObjScripts();
 
     if (!CheckSaveTag(fp, AM2_SAVETAG_OBJSCRIPT,
-                      (const char *)AM2_IMAGE(ADDR_STR_OBJSCRIPT_CPP), 0x68))
+                      "C:\\ArmyMen2\\source\\objscript.cpp", 0x68))
         return 0;
 
     orig_fread(&count, 4, 1, fp);
