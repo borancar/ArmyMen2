@@ -23,17 +23,24 @@ each VA), `INSERT AFTER .bss`. The `standalone.h` redirects stay -- once a symbo
 is at its VA, `&am2_x` equals the numeric `ADDR_X`, so they agree, and a
 mis-placement makes the byte-diff fail.
 
-**111 symbols placed at their exact VAs; the built `.origdat` region
-[0x46F000,0x48E000) is byte-identical to the original image**, 34.9% of the
-meaningful (non-zero) bytes now hand-written C. `tools/checkplacement.py` (in
-`make check`) is the continuous form of that measurement: it verifies each
-placed symbol's C bytes equal the image AND, when the native build exists,
-byte-diffs the linked `.origdat` against the blob. NOT placed: the ~10
-pointer/fn-ptr tables (their bytes are our pointers, not the image's -- they
-stay scattered redirects, dereference-verified by checkimagedata) and
-`build_menu_rects` (it overlaps the packed `pointer_modes` table). The SA/mingw
-build keeps the `--section-start` blob path (PE linker scripts differ); the
-native build was the stated priority.
+**119 symbols placed at their exact VAs** -- 110 pure-data plus **9 of the 10
+pointer/fn-ptr tables** (2026-09-14): `weapon_handlers`, `option_table`,
+`state_actions`, `font_descs`, `sprite_set_dirs`, and the four `char*` name
+arrays. A placed fn-ptr table holds OUR reconstructed-function addresses at the
+canonical VA, so anything reaching it by address gets our table, not the stale
+image copy (whose function pointers are dead in the native build). Their bytes
+differ from the image by design, so `tools/checkplacement.py` byte-diffs the
+region EXCEPT the pointer-table ranges (checkimagedata dereference-verifies
+their values) and confirms each pointer table's symbol sits at its VA; the
+pure-data region stays byte-identical to the image (34.9% of meaningful bytes,
+byte-checked). Confirmed live: `state_actions` is RunFrame's per-frame
+state-dispatch table, and the native build runs dispatching through it.
+
+NOT placed: `pointer_modes` and `build_menu_rects`, which physically overlap
+(the linker packed the latter into the former), so both stay scattered
+redirects / blob (pointer_modes is dereference-verified either way). The
+SA/mingw build keeps the `--section-start` blob path (PE linker scripts differ);
+native was the stated priority.
 
 ## MIGRATION (2026-09-11): global structures transcribed out of the blob
 

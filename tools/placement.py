@@ -47,12 +47,13 @@ SH = os.path.join(REPO, "src", "inject", "standalone.h")
 
 
 def manifest():
-    """[(va, size, symbol)] for every migrated symbol, deduped by symbol.
+    """[(va, size, symbol, is_ptr)] for every migrated symbol, deduped.
 
-    Pure-data only: char*/mixed (pointer tables) are excluded -- their bytes
-    are not the image's. Size is the packed byte length, which for numeric,
-    float and byte-array data equals the compiled section size, so the linker's
-    location counter flows correctly.
+    is_ptr marks a char*/mixed table (name arrays, fn-ptr tables): its bytes are
+    OUR pointers, not the image's, so it is placed at its VA but its range is
+    excluded from the byte-diff (checkimagedata dereference-verifies it). Size is
+    the packed byte length, which equals the compiled section size (4*count for a
+    pointer table, sizeof for byte-packed data), so the location counter flows.
     """
     sh = open(SH).read()
     addrs = C.orig_addresses()
@@ -67,13 +68,12 @@ def manifest():
         if not dfn:
             continue
         typ, vals = dfn
-        if typ in ("char*", "mixed"):
-            continue                       # pointer table -- not placed
-        size = len(C.pack(typ, vals))
+        is_ptr = typ in ("char*", "mixed")
+        size = 4 * len(vals) if is_ptr else len(C.pack(typ, vals))
         if not (BLOB_LO <= addr < 0x0048E000):
             continue
-        by_sym.setdefault(sym, (addr, size))   # dedupe aliases
-    return sorted((a, s, sym) for sym, (a, s) in by_sym.items())
+        by_sym.setdefault(sym, (addr, size, is_ptr))   # dedupe aliases
+    return sorted((a, s, sym, p) for sym, (a, s, p) in by_sym.items())
 
 
 def split():
@@ -83,18 +83,19 @@ def split():
 def placed_set(man, blob_hi):
     """Drop any symbol whose range overlaps another migrated symbol.
 
-    `build_menu_rects` overlaps the `pointer_modes` table the linker packed it
-    into; such a symbol cannot be placed without colliding, so it stays in the
-    blob (its bytes are the image's there anyway).
+    Only `pointer_modes` and the `build_menu_rects` the linker packed into it
+    overlap; both are dropped and stay scattered redirects (pointer_modes'
+    bytes are our pointers, so it loses nothing byte-checkable, and
+    build_menu_rects' bytes are the image's, kept in the blob).
     """
     man = [m for m in man if BLOB_LO <= m[0] and m[0] + m[1] <= blob_hi]
     keep = []
-    for i, (a, s, sym) in enumerate(man):
+    for i, (a, s, sym, p) in enumerate(man):
         clash = any(j != i and a < man[j][0] + man[j][1] and man[j][0] < a + s
                     for j in range(len(man)))
         if clash:
             continue
-        keep.append((a, s, sym))
+        keep.append((a, s, sym, p))
     return keep
 
 
@@ -108,7 +109,7 @@ def main():
     pieces = []          # ("chunk", start, length) | ("sym", symbol)
     cur = BLOB_LO
     chunk_files = []
-    for a, s, sym in placed:
+    for a, s, sym, _p in placed:
         if a > cur:
             pieces.append(("chunk", cur, a - cur))
         pieces.append(("sym", sym))
@@ -151,8 +152,11 @@ def main():
     with open(os.path.join(OUT, "place.ld"), "w") as fh:
         fh.write("\n".join(ld) + "\n")
 
-    print("placement: %d symbols placed at their VAs, %d blob chunks, "
-          "%d bytes placed" % (len(placed), k, sum(s for _, s, _ in placed)))
+    npure = sum(1 for _, _, _, p in placed if not p)
+    nptr = sum(1 for _, _, _, p in placed if p)
+    print("placement: %d symbols placed at their VAs (%d pure-data, %d pointer "
+          "tables), %d blob chunks, %d bytes"
+          % (len(placed), npure, nptr, k, sum(s for _, s, _, _ in placed)))
 
 
 if __name__ == "__main__":

@@ -58,43 +58,59 @@ def main():
     blob = open(BLOB, "rb").read()
     hi = BLOB_LO + len(blob)
     placed = P.placed_set(P.manifest(), hi)
+    pure = [(a, s, sym) for a, s, sym, p in placed if not p]
+    ptr = [(a, s, sym) for a, s, sym, p in placed if p]
+    ptr_ranges = [(a, a + s) for a, s, _ in ptr]
 
-    # OFFLINE: each placed symbol's C bytes == blob at its VA; ranges tile.
+    def in_ptr(va):
+        return any(lo <= va < hi2 for lo, hi2 in ptr_ranges)
+
+    # OFFLINE: each PURE symbol's C bytes == blob at its VA (pointer tables are
+    # our pointers, not the image's -- checked by dereference in checkimagedata).
     bad = 0
-    cur = BLOB_LO
-    for a, s, sym in placed:
-        if a < cur:
-            print("checkplacement: OVERLAP %s at 0x%08X" % (sym, a)); bad += 1
+    for a, s, sym in pure:
         if _packed(sym) != blob[a - BLOB_LO:a - BLOB_LO + s]:
             print("checkplacement: %s C bytes != image at 0x%08X" % (sym, a))
             bad += 1
-        cur = a + s
     if bad:
         return 1
 
     nz = sum(1 for b in blob if b)
-    pnz = sum(1 for a, s, _ in placed
+    pnz = sum(1 for a, s, _ in pure
               for b in blob[a - BLOB_LO:a - BLOB_LO + s] if b)
-    print("checkplacement: %d symbols placed at their VAs, C bytes match the "
-          "image; %d of %d meaningful bytes are hand-written C (%.1f%%)"
-          % (len(placed), pnz, nz, 100.0 * pnz / nz))
+    print("checkplacement: %d symbols placed at their VAs (%d pure-data byte-"
+          "verified, %d pointer tables dereference-verified); %d of %d "
+          "meaningful bytes are byte-checked hand-written C (%.1f%%)"
+          % (len(placed), len(pure), len(ptr), pnz, nz, 100.0 * pnz / nz))
 
-    # BUILT: the linked binary's .origdat must equal the blob.
-    if os.path.exists(BIN):
-        addr, built = elf_origdat(BIN)
-        if addr != BLOB_LO:
-            print("checkplacement: .origdat at 0x%08X, expected 0x%08X"
-                  % (addr, BLOB_LO)); return 1
-        built = built[:len(blob)]
-        if built != blob:
-            for i in range(min(len(built), len(blob))):
-                if built[i] != blob[i]:
-                    print("checkplacement: built MISMATCH at 0x%08X "
-                          "(0x%02X != 0x%02X) -- placement drift"
-                          % (BLOB_LO + i, built[i], blob[i])); return 1
-        print("  build/armymen2-dev .origdat is byte-identical to the image.")
-    else:
+    if not os.path.exists(BIN):
         print("  (build/armymen2-dev not built; offline check only.)")
+        return 0
+
+    # BUILT: .origdat equals the blob EXCEPT at pointer-table ranges (our
+    # pointers there), and every pointer table's symbol sits at its VA.
+    addr, built = elf_origdat(BIN)
+    if addr != BLOB_LO:
+        print("checkplacement: .origdat at 0x%08X, expected 0x%08X"
+              % (addr, BLOB_LO)); return 1
+    built = built[:len(blob)]
+    for i in range(len(blob)):
+        if built[i] != blob[i] and not in_ptr(BLOB_LO + i):
+            print("checkplacement: built MISMATCH at 0x%08X (0x%02X != 0x%02X)"
+                  " -- placement drift" % (BLOB_LO + i, built[i], blob[i]))
+            return 1
+    syms = {}
+    for line in subprocess.run(["nm", BIN], capture_output=True,
+                               text=True).stdout.splitlines():
+        p = line.split()
+        if len(p) == 3:
+            syms[p[2]] = int(p[0], 16)
+    for a, s, sym in ptr:
+        if syms.get(sym) != a:
+            print("checkplacement: pointer table %s at 0x%08X, expected 0x%08X"
+                  % (sym, syms.get(sym, 0), a)); return 1
+    print("  build/armymen2-dev: pure-data region byte-identical to the image, "
+          "%d pointer tables at their VAs." % len(ptr))
     return 0
 
 
