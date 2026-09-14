@@ -31,6 +31,8 @@
  * One of the pose tables transcribed out of the carried blob; six int32
  * entries, bounded by ADDR_ARMY_TABLE (a pointer global) 24 bytes on. */
 extern "C" const int32_t am2_hit_pose_by_class[6] = { 12, 13, 14, 15, 16, 17 };
+/* ADDR_AI_MOVE_STATE / _ALT are not separate symbols: they alias into
+ * am2_weapon_pose_frames[53]/[56] (0x004750B4/C0), handled in standalone.h. */
 #endif
 
 #define kRegionOfCell (*(uint8_t **)AM2_IMAGE(ADDR_REGION_OF_CELL))

@@ -150,9 +150,14 @@ extern const int16_t  am2_mp_row_coords[32], am2_drop_ring[12];
  * pointer_modes + blob).
  * am2_hud_cmd_spec is runtime-written (HudCmdConstruct) and 280 bytes; not migrated. */
 extern const int16_t am2_hud_cmd_offsets[6], am2_hud_sarge_offsets[8];
+extern const int16_t am2_hud_squad_slot_xy[24];
+extern const int32_t am2_spiral_step[8];
+extern const uint32_t am2_map_field_descs[14];
 extern const int32_t am2_sprite_grid_rows, am2_sprite_grid_cols, am2_seq_sprite_5_count;
 extern const int32_t am2_decal_sprite_count, am2_mark_sprite_count, am2_mp_mark_cols[2];
 extern const int32_t am2_palette_cycle_count;
+extern const uint32_t am2_palette_cycle_seq[10], am2_palette_cycle_interval;
+extern const uint8_t am2_guid_sys_mouse[16], am2_guid_sys_keyboard[16];
 extern const int32_t am2_shake_presets[44];          /* mapdraw.cpp, was 0x00486170 */
 extern const int16_t am2_aim_displace_map[25088];    /* mapdraw.cpp, was 0x00478CDC */
 extern const int32_t am2_pad_bit_table[66];          /* pad.cpp, was 0x00486444 */
@@ -529,6 +534,12 @@ void  devtools_init(void);
 /* ADDR_HUD_CMD_SPEC is runtime-written and 280 bytes; not redirected (blob).
  * ADDR_BUILD_MENU_RECTS is numeric too: rect 0 shares am2_pointer_modes[6]'s
  * placed tail, rect 1+ is blob. */
+#undef ADDR_HUD_SQUAD_SLOT_XY
+#define ADDR_HUD_SQUAD_SLOT_XY  ((uintptr_t)(const void *)am2_hud_squad_slot_xy)
+#undef ADDR_SPIRAL_STEP
+#define ADDR_SPIRAL_STEP        ((uintptr_t)(const void *)am2_spiral_step)
+#undef ADDR_MAP_FIELD_DESCS
+#define ADDR_MAP_FIELD_DESCS    ((uintptr_t)(const void *)am2_map_field_descs)
 #undef ADDR_HUD_CMD_OFFSETS
 #define ADDR_HUD_CMD_OFFSETS    ((uintptr_t)(const void *)am2_hud_cmd_offsets)
 #undef ADDR_HUD_SARGE_OFFSETS
@@ -547,6 +558,14 @@ void  devtools_init(void);
 #define ADDR_MP_MARK_COLS       ((uintptr_t)(const void *)am2_mp_mark_cols)
 #undef ADDR_PALETTE_CYCLE_COUNT
 #define ADDR_PALETTE_CYCLE_COUNT ((uintptr_t)(const void *)&am2_palette_cycle_count)
+#undef ADDR_PALETTE_CYCLE_SEQ
+#define ADDR_PALETTE_CYCLE_SEQ  ((uintptr_t)(const void *)am2_palette_cycle_seq)
+#undef ADDR_PALETTE_CYCLE_INTERVAL
+#define ADDR_PALETTE_CYCLE_INTERVAL ((uintptr_t)(const void *)&am2_palette_cycle_interval)
+#undef ADDR_GUID_SYS_MOUSE
+#define ADDR_GUID_SYS_MOUSE     ((uintptr_t)(const void *)am2_guid_sys_mouse)
+#undef ADDR_GUID_SYS_KEYBOARD
+#define ADDR_GUID_SYS_KEYBOARD  ((uintptr_t)(const void *)am2_guid_sys_keyboard)
 #undef ADDR_SHAKE_PRESETS
 #define ADDR_SHAKE_PRESETS      ((uintptr_t)(const void *)am2_shake_presets)
 #undef ADDR_AIM_DISPLACE_MAP

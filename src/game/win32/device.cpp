@@ -36,6 +36,14 @@
 #include "report.h"
 #include "../rect.h"
 #include "../../inject/patch.h"
+
+/* The DirectInput device GUIDs the image carries in its own .rdata (GUID_SysMouse
+ * / GUID_SysKeyboard), transcribed as their 16 bytes. 0x0046F5A8 / 0x0046F5B8. */
+extern "C" const uint8_t am2_guid_sys_mouse[16] =
+    { 0x60,0x2b,0x1d,0x6f, 0xa0,0xd5,0xcf,0x11, 0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00 };
+extern "C" const uint8_t am2_guid_sys_keyboard[16] =
+    { 0x61,0x2b,0x1d,0x6f, 0xa0,0xd5,0xcf,0x11, 0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00 };
+
 #ifdef AM2_STANDALONE
 /* The injected build reaches the input queue through dinput_hook.c,
  * which wraps the device's own GetDeviceState and GetDeviceData. The

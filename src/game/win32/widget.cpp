@@ -52,6 +52,10 @@
  * (rect 0) and the blob (rect 1+). */
 extern "C" const int16_t am2_hud_cmd_offsets[6]   = { 6,22, 50,22, 94,22 };       /* 0x004766F8 */
 extern "C" const int16_t am2_hud_sarge_offsets[8] = { 6,21, 50,21, 94,21, 6,49 }; /* 0x004766B0 */
+extern "C" const int16_t am2_hud_squad_slot_xy[24] = {   /* 0x004766C8, int16[12][2] x,y */
+    6,22, 50,22, 94,22, 6,60, 50,60, 94,60,
+    6,98, 50,98, 94,98, 6,136, 50,136, 94,136,
+};
 /* Movie base-name table, char*[12] -- transcribed as literals (verified by
  * dereference; see checkimagedata). */
 extern "C" const char *const am2_movie_names[12] = {   /* 0x0048AE98 */

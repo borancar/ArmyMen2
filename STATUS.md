@@ -23,10 +23,14 @@ each VA), `INSERT AFTER .bss`. The `standalone.h` redirects stay -- once a symbo
 is at its VA, `&am2_x` equals the numeric `ADDR_X`, so they agree, and a
 mis-placement makes the byte-diff fail.
 
-**120 symbols placed at their exact VAs** -- 110 pure-data plus **all 10
+**127 symbols placed at their exact VAs** -- 117 pure-data plus **all 10
 pointer/fn-ptr tables** (2026-09-14): `weapon_handlers`, `option_table`,
 `state_actions`, `font_descs`, `sprite_set_dirs`, `pointer_modes`, and the four
-`char*` name arrays. A placed fn-ptr table holds OUR reconstructed-function addresses at the
+`char*` name arrays. A further batch of small named const tables was transcribed
+into the pure-data set: `hud_squad_slot_xy`, `spiral_step`, `map_field_descs`,
+`palette_cycle_seq`/`_interval`, and the two DirectInput device GUIDs
+(`guid_sys_mouse`/`_keyboard`); `AI_MOVE_STATE`/`_ALT` needed nothing -- they
+already alias into placed `weapon_pose_frames[53]`/`[56]`. A placed fn-ptr table holds OUR reconstructed-function addresses at the
 canonical VA, so anything reaching it by address gets our table, not the stale
 image copy (whose function pointers are dead in the native build). Their bytes
 differ from the image by design, so `tools/checkplacement.py` byte-diffs the

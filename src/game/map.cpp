@@ -21,6 +21,13 @@
 #include "savetag.h"
 #include "image.h"
 #include "../inject/orig.h"
+
+/* The map file's field descriptors: {FourCC tag, dword count}[7] -- INDX(4),
+ * MOVE, ELOW, TRIG, RESV, ELEV, OWNR (each 1). Transcribed from 0x00485FB8. */
+extern "C" const uint32_t am2_map_field_descs[14] = {
+    0x58444E49u, 4, 0x45564F4Du, 1, 0x574F4C45u, 1, 0x47495254u, 1,
+    0x56534552u, 1, 0x56454C45u, 1, 0x524E574Fu, 1,
+};
 #include "../inject/patch.h"
 
 /* Reconstructed in win32/mapdraw.cpp beside RestoreTileSet, which reads the

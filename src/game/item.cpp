@@ -7082,6 +7082,7 @@ extern "C" const int32_t am2_weapon_pose_frames[104] = {
  * Indexed by ClassifyByCode74 (0..2, kCode74Class is all {0,1,2}); the next
  * table starts 12 bytes on, so it is exactly three entries. */
 extern "C" const int32_t am2_pose_by_class[3] = { 1, 4, 6 };
+extern "C" const int32_t am2_spiral_step[8] = { 0,-1, 1,0, 0,1, -1,0 }; /* 0x00485340 {dx,dy}[4] */
 
 /* am2_death_anim_by_code -- 0x0047518C, death animation id by unit class,
  * also indexed by ClassifyByCode74 (item.cpp's ObjDeathCleanup arm). Three

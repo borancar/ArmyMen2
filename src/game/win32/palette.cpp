@@ -50,6 +50,9 @@ extern "C" const uint8_t am2_army_pal_base[4] = { 206, 216, 186, 196 };
 /* am2_palette_cycle_count -- 0x00486164, how many cycling-palette entries.
  * (The cycle INDEX at 0x00486160 is runtime state and stays a macro.) */
 extern "C" const int32_t am2_palette_cycle_count = 10;
+extern "C" const uint32_t am2_palette_cycle_seq[10] = {  /* 0x00486138, ping-pong */
+    0, 1, 2, 3, 4, 5, 4, 3, 2, 1 };
+extern "C" const uint32_t am2_palette_cycle_interval = 160; /* 0x00486168, ms */
 #endif
 
 /* The strip is drawn this far into the surface, on both axes. */
