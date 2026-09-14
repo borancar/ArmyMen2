@@ -23,10 +23,10 @@ each VA), `INSERT AFTER .bss`. The `standalone.h` redirects stay -- once a symbo
 is at its VA, `&am2_x` equals the numeric `ADDR_X`, so they agree, and a
 mis-placement makes the byte-diff fail.
 
-**119 symbols placed at their exact VAs** -- 110 pure-data plus **9 of the 10
+**120 symbols placed at their exact VAs** -- 110 pure-data plus **all 10
 pointer/fn-ptr tables** (2026-09-14): `weapon_handlers`, `option_table`,
-`state_actions`, `font_descs`, `sprite_set_dirs`, and the four `char*` name
-arrays. A placed fn-ptr table holds OUR reconstructed-function addresses at the
+`state_actions`, `font_descs`, `sprite_set_dirs`, `pointer_modes`, and the four
+`char*` name arrays. A placed fn-ptr table holds OUR reconstructed-function addresses at the
 canonical VA, so anything reaching it by address gets our table, not the stale
 image copy (whose function pointers are dead in the native build). Their bytes
 differ from the image by design, so `tools/checkplacement.py` byte-diffs the
@@ -36,11 +36,16 @@ pure-data region stays byte-identical to the image (34.9% of meaningful bytes,
 byte-checked). Confirmed live: `state_actions` is RunFrame's per-frame
 state-dispatch table, and the native build runs dispatching through it.
 
-NOT placed: `pointer_modes` and `build_menu_rects`, which physically overlap
-(the linker packed the latter into the former), so both stay scattered
-redirects / blob (pointer_modes is dereference-verified either way). The
-SA/mingw build keeps the `--section-start` blob path (PE linker scripts differ);
-native was the stated priority.
+`build_menu_rects` is no longer its own symbol: `ADDR_BUILD_MENU_RECTS`
+(0x004762C0, a stride-0x38 rect table) shares its FIRST rect `{6,190,43,27}` with
+`pointer_modes[6]`'s unused tail ints -- the linker packed it there -- so it is
+reached numerically, into the placed `pointer_modes` (rect 0) and the blob
+(rect 1+); this also fixed a latent OOB read (the old 12-byte symbol was short of
+the 16-byte rect). `hud_cmd_spec` (0x004761A8, the sprite view of the same
+physical records, runtime-written by HudCmdConstruct) stays numeric/blob and
+reads records 1-6 from the placed `pointer_modes` storage -- consistent because
+it is one physical table. The SA/mingw build keeps the `--section-start` blob
+path (PE linker scripts differ); native was the stated priority.
 
 ## MIGRATION (2026-09-11): global structures transcribed out of the blob
 

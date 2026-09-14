@@ -145,8 +145,10 @@ extern const int32_t  am2_vehicle_height_by_kind[6], am2_spiral_dx[4], am2_spira
 extern const uint32_t am2_bit_from_n[4], am2_seq_k4_hold[4];
 extern const int16_t  am2_mp_row_coords[32], am2_drop_ring[12];
 /* HUD layout (widget.cpp), sprite-grid/counts (sprite.cpp), palette cycle count. */
-extern const uint8_t am2_build_menu_rects[12];
-/* am2_hud_cmd_spec is runtime-written (HudCmdConstruct) and 280 bytes; not migrated. */
+/* am2_build_menu_rects is not a symbol: its first rect shares storage with
+ * am2_pointer_modes[6]'s tail; ADDR_BUILD_MENU_RECTS is numeric (into placed
+ * pointer_modes + blob).
+ * am2_hud_cmd_spec is runtime-written (HudCmdConstruct) and 280 bytes; not migrated. */
 extern const int16_t am2_hud_cmd_offsets[6], am2_hud_sarge_offsets[8];
 extern const int32_t am2_sprite_grid_rows, am2_sprite_grid_cols, am2_seq_sprite_5_count;
 extern const int32_t am2_decal_sprite_count, am2_mark_sprite_count, am2_mp_mark_cols[2];
@@ -524,9 +526,9 @@ void  devtools_init(void);
 #undef ADDR_SEQ_K4_HOLD
 #define ADDR_SEQ_K4_HOLD        ((uintptr_t)(const void *)am2_seq_k4_hold)
 
-/* ADDR_HUD_CMD_SPEC is runtime-written and 280 bytes; not redirected (blob). */
-#undef ADDR_BUILD_MENU_RECTS
-#define ADDR_BUILD_MENU_RECTS   ((uintptr_t)(const void *)am2_build_menu_rects)
+/* ADDR_HUD_CMD_SPEC is runtime-written and 280 bytes; not redirected (blob).
+ * ADDR_BUILD_MENU_RECTS is numeric too: rect 0 shares am2_pointer_modes[6]'s
+ * placed tail, rect 1+ is blob. */
 #undef ADDR_HUD_CMD_OFFSETS
 #define ADDR_HUD_CMD_OFFSETS    ((uintptr_t)(const void *)am2_hud_cmd_offsets)
 #undef ADDR_HUD_SARGE_OFFSETS

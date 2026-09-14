@@ -45,7 +45,11 @@
  * (overlapping ADDR_POINTER_MODES at +0x10), and HudCmdConstruct WRITES each
  * record's sprite pointer at +0x0C. Runtime-written and larger than one const
  * could faithfully hold, so it stays at its writable .origdat placement. */
-extern "C" const uint8_t am2_build_menu_rects[12] = { 6,0,0,0, 190,0,0,0, 43,0,0,0 }; /* 0x004762C0 */
+/* 0x004762C0 build_menu_rects is NOT a separate symbol: its first rect
+ * {6,190,43,27} shares storage with am2_pointer_modes[6]'s unused tail ints
+ * (the linker packed them), and it is a stride-0x38 rect table, not 12 bytes.
+ * ADDR_BUILD_MENU_RECTS resolves to the numeric VA, into placed pointer_modes
+ * (rect 0) and the blob (rect 1+). */
 extern "C" const int16_t am2_hud_cmd_offsets[6]   = { 6,22, 50,22, 94,22 };       /* 0x004766F8 */
 extern "C" const int16_t am2_hud_sarge_offsets[8] = { 6,21, 50,21, 94,21, 6,49 }; /* 0x004766B0 */
 /* Movie base-name table, char*[12] -- transcribed as literals (verified by
