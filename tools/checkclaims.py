@@ -305,7 +305,25 @@ def status_claims():
         ("STATUS.md: the verification split",
          r"\*\*That list is now (\d+) of (\d+)\*\*",
          unexercised_split(open(os.path.join(REPO, "docs", "oracles.md")).read())),
+        ("STATUS.md: dead strings zeroed",
+         r"\*\*(\d+) strings, ([\d,]+) bytes zeroed\*\*", deadstring_totals()),
     ]
+
+
+def deadstring_totals():
+    """(count, bytes) from build/standalone/deadstrings.txt, the sweep's own
+    record -- guarded end-to-end by tools/checkdeadstrings.py.  (0, 0) if the
+    sweep has not been generated, which STATUS.md's sentence will not match."""
+    path = os.path.join(REPO, "build", "standalone", "deadstrings.txt")
+    if not os.path.exists(path):
+        return (0, 0)
+    n = tot = 0
+    for line in open(path):
+        parts = line.split()
+        if parts:
+            n += 1
+            tot += int(parts[1])
+    return (n, tot)
 
 
 # CLAUDE.md and the narratives extracted OUT of it.  A checked claim moved to

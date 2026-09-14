@@ -211,6 +211,35 @@ native builds clean. 319 string macros folded; 0 real strings remain. NOT
 folded (not strings): the `ADDR_MSG_*` window-message codes, `MSG_LIST_*`/
 `NAME_TABLE_*` pool/state pointers, and `ADDR_STR_AVI_DIR` (pointer-to-pointer).
 
+**DEAD-STRING SWEEP (2026-09-14).** Folding the 462 sites orphaned the blob's
+own copies of those strings: nothing in the native/SA build reaches them (there
+is no original `.text` in either build, so a blob string is live only if a
+reconstructed function reads it by address or a carried char* dword points at
+it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
+`build/standalone/origdata.bin` during `standalone-generate`, between
+`mkglobals.py` and `placement.py`. **184 strings, 2,808 bytes zeroed** -- log,
+error, cheat, and `printf`-format strings that the original pushed as code
+immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
+`"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`).
+
+The safety rule is what makes this non-trivial: a naive "printable
+NUL-terminated run" sweep also matches coincidental ASCII *inside* binary
+structs -- the DirectInput device GUIDs carry `Data4 = BF C7 44 45 53 54 00 00`,
+so `"DEST"` looks like a string at every GUID's +6, and the same shape appears
+in any record array of fixed name fields read by `base + i*stride` (only
+record[0]'s field is pointed at). So a run counts as a genuine string only if
+its **exact start VA is referenced in the original image** (a code immediate or
+a data dword); a mid-GUID fragment or a record[1..N] field is never referenced
+at its start and is left untouched. A genuine string is then zeroed only when no
+dword in the current blob points into it and neither its `ADDR_` macro nor its
+hex address appears in `src/`. `tools/checkdeadstrings.py` (in `make check`)
+recomputes the set from a pristine blob and re-proves every zeroed range
+unreachable. Native still boots to window + audio init with no fault. This does
+not shrink the carried blob (the zeros sit mid-`.origdat`), but it makes the
+"still-opaque bytes" figure count only data that is genuinely still load-bearing.
+The other ~4.2 KB of printable runs the raw sweep flags are kept: they are still
+pointed at (char* tables not yet transcribed) or still read by address.
+
 ## DONE (2026-09-11): the .bss working memory is a named C struct
 
 The whole 1,887 KB .bss zero region (0x0048E000..0x00666000) is now
@@ -2138,7 +2167,7 @@ clean.
 
 ## In flight
 
-Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **69** analysis
+Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **70** analysis
 tools in `make check` (`tools/checkpatches.py`; `tools/checkclaims.py` counts
 the recipe).
 
