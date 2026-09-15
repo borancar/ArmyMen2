@@ -874,6 +874,12 @@ extern uint8_t am2_logpalette[1028];
 extern int32_t am2_tick_interval_ms;
 #undef ADDR_TICK_INTERVAL_MS
 #define ADDR_TICK_INTERVAL_MS   ((uintptr_t)(const void *)&am2_tick_interval_ms)
+/* The rebindable key bindings (gameproc.cpp), walked as bytes; END is the bound. */
+extern uint8_t am2_key_bindings[42];
+#undef ADDR_KEY_BINDINGS
+#define ADDR_KEY_BINDINGS       ((uintptr_t)(const void *)am2_key_bindings)
+#undef ADDR_KEY_BINDINGS_END
+#define ADDR_KEY_BINDINGS_END   ((uintptr_t)(const void *)&am2_key_bindings[42])
 
 /* Runtime-written game scalars: screen dims / fog / overlay (frame.cpp, read
  * across the win32 layer) and the debug blast kind (widget.cpp, local). */
