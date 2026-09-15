@@ -757,6 +757,12 @@ extern int16_t am2_air_path_turn_y_in[1], am2_air_path_turn_y_out[1];
 /* The DirectInput buffer-size property struct (device.cpp), const. */
 #undef ADDR_DIPROP_BUFFER_SIZE
 #define ADDR_DIPROP_BUFFER_SIZE ((uintptr_t)(const void *)am2_diprop_buffer_size)
+/* The image's DIDATAFORMAT structs (device.cpp), placed byte-identically so the
+ * blob drops them; native reads the SDK's own structs, these only the hybrid. */
+#undef ADDR_DF_KEYBOARD
+#define ADDR_DF_KEYBOARD        ((uintptr_t)(const void *)am2_df_keyboard)
+#undef ADDR_DF_MOUSE
+#define ADDR_DF_MOUSE           ((uintptr_t)(const void *)am2_df_mouse)
 
 /* The CRT "(null)" printf string slot (printf.cpp), a one-entry char* table. */
 #undef ADDR_CRT_NULLSTRING

@@ -73,6 +73,16 @@ int32_t am2_mouse_state[25] = { 0, 0, 0, 320, 200 };
 extern "C" const uint32_t am2_diprop_buffer_size[6] = {
     0x00000014u, 0x00000010u, 0x00000000u, 0x00000000u, 0x00000020u, 0x00000000u,
 };
+/* The image's c_dfDIKeyboard / c_dfDIMouse DIDATAFORMAT structs at 0x0046FD68 /
+ * 0x0046FD80 (their trailing rgodf pointer is an image .text address; native
+ * uses the SDK's own structs instead, so these are read only in the hybrid).
+ * Transcribed byte-identically so the blob no longer carries them. */
+extern "C" const uint32_t am2_df_keyboard[6] = {
+    0x00000018u, 0x00000010u, 0x00000002u, 0x00000100u, 0x00000100u, 0x004633A0u,
+};
+extern "C" const uint32_t am2_df_mouse[6] = {
+    0x00000018u, 0x00000010u, 0x00000002u, 0x00000010u, 0x00000007u, 0x004643A0u,
+};
 
 /* The screen-geometry block at 0x00485310 (12 dwords): SCREEN_CLIP {0,0,640,480}
  * (BITMAP_AREA_W/H view its right/bottom), BLIT_RECT {0,21,624,480} (HUD_PANEL_X
