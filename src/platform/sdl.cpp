@@ -1090,43 +1090,54 @@ static void am2_step_wait(void)
     }
 }
 
-/* Ctrl+Alt toggles the mouse grab, so a real window can be played in without
- * the pointer escaping to the desktop and without trapping it there. Confine
- * only -- motion stays absolute, as the game expects -- plus the cursor,
- * hidden while grabbed since the game draws its own. Returns 1 when it
- * consumed the key (the completing modifier of the combo), so the caller does
- * not also forward it. A no-op headless, where there is no window. */
+/* The pointer grab, as SDL relative-mouse mode -- the same way the other
+ * src/platform ports do it (cf. ../TIM's reconstruct/sdl.c). SDL_SetWindowMouseGrab
+ * is only a soft confine and does not reliably hold the pointer (least of all
+ * under Wayland); relative mode locks it, hides it, and delivers unbounded
+ * xrel/yrel, which is the shape the game wants anyway -- it accumulates
+ * DirectInput deltas into a cursor of its own and clamps that to the screen, so
+ * at a map edge the motion keeps arriving and the scroll continues instead of
+ * the host pointer walking off into the desktop. Grab is taken on the first
+ * click in the window (that click is the grab's, not the game's, as DOSBox
+ * trained everyone to expect) and handed back with Ctrl+Alt. Cursor visibility
+ * is left to the game (am2_host_cursor_visible): relative mode hides while
+ * grabbed and restores that state on release, so there is never a second
+ * cursor. A no-op headless, where there is no window. */
 static int am2_grabbed;
 static int am2_grab_both;   /* ctrl+alt were both down at the last key event */
-static int am2_grab_combo(const SDL_Event *ev)
+
+static void am2_set_grab(int on)
+{
+    if (!am2_sdl_window || am2_grabbed == on)
+        return;
+    if (!SDL_SetWindowRelativeMouseMode(am2_sdl_window, on != 0)) {
+        am2_plat_log("SDL_SetWindowRelativeMouseMode: %s", SDL_GetError());
+        return;
+    }
+    am2_grabbed = on;
+    am2_plat_log("window %s", on ? "grabbed (ctrl+alt releases)" : "released");
+}
+
+/* Ctrl+Alt hands the pointer back. Edge-triggered on both modifiers becoming
+ * down, from the event's own mod state -- robust to press order and to a WM
+ * that reorders them -- and reset when either lifts, so each press releases
+ * once. Does not swallow the keys; a stray ctrl/alt reaching the game is
+ * harmless. */
+static void am2_grab_release(const SDL_Event *ev)
 {
     int both;
 
-    /* Edge-triggered on both modifiers becoming down, from the event's own
-     * mod state -- robust to which of the two is pressed first and to any WM
-     * that reorders them. Reset when either lifts, so each press toggles once.
-     * Does not swallow the keys; the game seeing a stray ctrl/alt is harmless
-     * and swallowing an edge is fiddly. */
     if (ev->type != SDL_EVENT_KEY_DOWN && ev->type != SDL_EVENT_KEY_UP)
-        return 0;
+        return;
     both = (ev->key.mod & SDL_KMOD_CTRL) && (ev->key.mod & SDL_KMOD_ALT);
     if (!both) {
         am2_grab_both = 0;
-        return 0;
+        return;
     }
     if (am2_grab_both)
-        return 0;
+        return;
     am2_grab_both = 1;
-    if (!am2_sdl_window)
-        return 0;
-    am2_grabbed = !am2_grabbed;
-    SDL_SetWindowMouseGrab(am2_sdl_window, am2_grabbed);
-    if (am2_grabbed)
-        SDL_HideCursor();
-    else
-        SDL_ShowCursor();
-    am2_plat_log("window %s (ctrl+alt)", am2_grabbed ? "grabbed" : "released");
-    return 0;
+    am2_set_grab(0);
 }
 
 /* The window's own events, in step mode: applied and echoed. */
@@ -1146,8 +1157,7 @@ static void am2_step_host_events(void)
             char    w[64];
             uint8_t dik = ev.key.scancode < SDL_SCANCODE_COUNT
                         ? am2_dik_of_scancode[ev.key.scancode] : 0;
-            if (am2_grab_combo(&ev))
-                break;
+            am2_grab_release(&ev);
             if (ev.key.repeat)
                 break;
             snprintf(w, sizeof w, "key %d %u %d", dik, (unsigned)am2_vk_of(ev.key.key), ev.key.down ? 1 : 0);
@@ -1256,8 +1266,7 @@ void am2_host_pump(void)
         case SDL_EVENT_KEY_UP: {
             uint8_t dik = ev.key.scancode < SDL_SCANCODE_COUNT
                         ? am2_dik_of_scancode[ev.key.scancode] : 0;
-            if (am2_grab_combo(&ev))
-                break;
+            am2_grab_release(&ev);
 #ifdef AM2_DEVTOOLS
             /* The development binary's quick savestate keys; the game never
              * reads F5 or F9 itself. */
@@ -1295,21 +1304,39 @@ void am2_host_pump(void)
             break;
         }
         case SDL_EVENT_MOUSE_MOTION: {
-            int32_t lx, ly;
-            am2_mouse_to_logical(&ev, &lx, &ly);
-            am2_mouse_moved(lx, ly);
+            if (am2_grabbed) {
+                /* Relative: the device delta itself, in the game's own pixels
+                 * (the same render transform the absolute path uses), fed
+                 * straight to the accumulator DirectInput drains. */
+                SDL_ConvertEventToRenderCoordinates(am2_sdl_renderer, &ev);
+                am2_mouse_dx += (int32_t)ev.motion.xrel;
+                am2_mouse_dy += (int32_t)ev.motion.yrel;
+            } else {
+                int32_t lx, ly;
+                am2_mouse_to_logical(&ev, &lx, &ly);
+                am2_mouse_moved(lx, ly);
+            }
             moved = 1;
             break;
         }
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
         case SDL_EVENT_MOUSE_BUTTON_UP: {
-            int32_t lx, ly, b;
-            am2_mouse_to_logical(&ev, &lx, &ly);
-            am2_mouse_moved(lx, ly);
+            int32_t b;
+            /* The first click in the window takes the grab and is not the
+             * game's, exactly as ../TIM and DOSBox do it. */
+            if (ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN && !am2_grabbed && am2_sdl_window) {
+                am2_set_grab(1);
+                break;
+            }
+            if (!am2_grabbed) {
+                int32_t lx, ly;
+                am2_mouse_to_logical(&ev, &lx, &ly);
+                am2_mouse_moved(lx, ly);   /* the press is at the pointer */
+            }
             b = ev.button.button == SDL_BUTTON_LEFT ? 0
               : ev.button.button == SDL_BUTTON_RIGHT ? 1
               : ev.button.button == SDL_BUTTON_MIDDLE ? 2 : -1;
-            am2_mouse_flush();             /* the press is at the pointer */
+            am2_mouse_flush();
             if (b >= 0)
                 am2_mouse_button(b, ev.button.down);
             break;
