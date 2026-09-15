@@ -187,6 +187,8 @@ extern const CRT_CVTINFO am2_crt_cvtinfo_double[2];
 /* Defined in fltcvt.cpp; POW10_TABLE's address is also crt_setmbcp's scan
  * bound in startup.cpp, so its declaration is shared. */
 extern const uint8_t am2_crt_pow10_table[352];
+/* The init/term tables (startup.cpp); XP/XT are read in exit.cpp, so shared. */
+extern const uint32_t am2_crt_inittab[36];
 /* Runtime-written .data-init CRT scalars, each read from more than one TU:
  * __mb_cur_max (conv.cpp), __app_type (startup.cpp), and the decimal-point
  * string (fltcvt.cpp). Non-const; initial bytes still equal the image. */

@@ -770,6 +770,26 @@ void  devtools_init(void);
 #undef ADDR_CRT_DST_END_MS
 #define ADDR_CRT_DST_END_MS     ((uintptr_t)(const void *)&am2_crt_dst_end[2])
 
+/* CRT init/term function-pointer tables (startup.cpp); base places, ends alias.
+ * Dead in native (the initterm walk is not reached), transcribed byte-exact. */
+extern const uint32_t am2_crt_inittab[36];
+#undef ADDR_CRT_XC_BEGIN
+#define ADDR_CRT_XC_BEGIN       ((uintptr_t)(const void *)am2_crt_inittab)
+#undef ADDR_CRT_XC_END
+#define ADDR_CRT_XC_END         ((uintptr_t)(const void *)&am2_crt_inittab[22])
+#undef ADDR_CRT_XI_BEGIN
+#define ADDR_CRT_XI_BEGIN       ((uintptr_t)(const void *)&am2_crt_inittab[23])
+#undef ADDR_CRT_XI_END
+#define ADDR_CRT_XI_END         ((uintptr_t)(const void *)&am2_crt_inittab[28])
+#undef ADDR_CRT_XP_BEGIN
+#define ADDR_CRT_XP_BEGIN       ((uintptr_t)(const void *)&am2_crt_inittab[29])
+#undef ADDR_CRT_XP_END
+#define ADDR_CRT_XP_END         ((uintptr_t)(const void *)&am2_crt_inittab[31])
+#undef ADDR_CRT_XT_BEGIN
+#define ADDR_CRT_XT_BEGIN       ((uintptr_t)(const void *)&am2_crt_inittab[32])
+#undef ADDR_CRT_XT_END
+#define ADDR_CRT_XT_END         ((uintptr_t)(const void *)&am2_crt_inittab[34])
+
 /* CRT Pentium-FDIV self-test doubles (startup.cpp) and small-block-heap
  * threshold (heap.cpp), each read in one TU. */
 #undef ADDR_CRT_FDIV_NUM

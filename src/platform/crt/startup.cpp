@@ -41,6 +41,20 @@ extern "C" int32_t am2_crt_app_type = 2;
  * 4195835.0 / 3145727.0 division _adjust_fdiv runs). Read-only const doubles. */
 extern "C" const double am2_crt_fdiv_num = 4195835.0;
 extern "C" const double am2_crt_fdiv_den = 3145727.0;
+/* The C-runtime init/term function-pointer tables at 0x00473000 (XC/XI/XP/XT,
+ * walked by crt_initterm). Their entries are IMAGE .text addresses that map to
+ * the 0xCC .origgap in the native build, so crt_cinit's initterm walk is not
+ * reached natively (the boot proves it -- calling one would trap); the reads
+ * are dead. Transcribed byte-identically so behaviour is preserved exactly and
+ * the blob dependency drops; the _BEGIN/_END macros alias into it. */
+extern "C" const uint32_t am2_crt_inittab[36] = {
+    0x00000000u, 0x00408AB0u, 0x00408AE0u, 0x00408B10u, 0x00408B40u, 0x00408B90u,
+    0x00408BE0u, 0x00408C30u, 0x00408C60u, 0x00408C90u, 0x00408CC0u, 0x00408CF0u,
+    0x0040DB40u, 0x0041A190u, 0x0041A830u, 0x0041A850u, 0x0041A870u, 0x0041A890u,
+    0x00424890u, 0x00424BA0u, 0x00427630u, 0x00462390u, 0x00000000u, 0x00000000u,
+    0x00465023u, 0x00469BE6u, 0x0046C627u, 0x0046B3ADu, 0x00000000u, 0x00000000u,
+    0x00469C8Bu, 0x00000000u, 0x00000000u, 0x0046B3BEu, 0x00000000u, 0x00000000u,
+};
 
 struct AM2_RtErr { int32_t num; const char *msg; };
 extern "C" const AM2_RtErr am2_crt_rterr_table[18] = {
