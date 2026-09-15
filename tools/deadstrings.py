@@ -53,11 +53,20 @@ MIN_LEN = 4
 
 
 def src_text():
+    """The reconstruction's source as CODE only: comments stripped, and the
+    `#define ADDR_x 0x..` lines stripped. Otherwise the "coded" keep below fires
+    on a macro's OWN definition in orig.h (and on a mention in a comment), so a
+    string that is merely NAMED but never read -- the multiplayer debug/log
+    format strings, say -- looks referenced and is kept though it is dead."""
     t = []
     for f in (glob.glob(os.path.join(REPO, "src", "**", "*.c*"), recursive=True) +
               glob.glob(os.path.join(REPO, "src", "**", "*.h"), recursive=True)):
         t.append(open(f, errors="replace").read())
-    return "\n".join(t)
+    src = "\n".join(t)
+    src = re.sub(r'/\*.*?\*/', ' ', src, flags=re.S)
+    src = re.sub(r'//[^\n]*', ' ', src)
+    src = re.sub(r'(?m)^\s*#\s*define\s+ADDR_\w+\b.*$', ' ', src)
+    return src
 
 
 def referenced_in_original(va, img):
