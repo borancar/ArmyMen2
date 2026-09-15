@@ -77,6 +77,38 @@ def reconstruction_map(addrs):
     return out
 
 
+def _split_top_commas(s):
+    """Split on commas that are NOT inside a double-quoted string, so a name
+    like "NUM ," or the "," key is one field. A plain str.split(",") tore those
+    in half and mis-sized the table."""
+    out, buf, i = [], "", 0
+    while i < len(s):
+        c = s[i]
+        if c == '"':
+            buf += c
+            i += 1
+            while i < len(s):
+                buf += s[i]
+                if s[i] == '\\' and i + 1 < len(s):
+                    buf += s[i + 1]
+                    i += 2
+                    continue
+                if s[i] == '"':
+                    i += 1
+                    break
+                i += 1
+            continue
+        if c == ',':
+            out.append(buf)
+            buf = ""
+            i += 1
+            continue
+        buf += c
+        i += 1
+    out.append(buf)
+    return out
+
+
 def find_definition(symbol):
     """(type, values-as-python-numbers) for a transcribed C symbol, or None.
 
@@ -121,7 +153,7 @@ def find_definition(symbol):
                 # read one token per dword -- an integer, or a function name.
                 flat = body.replace("{", " ").replace("}", " ")
                 toks = []
-                for el in flat.split(","):
+                for el in _split_top_commas(flat):
                     el = el.strip()
                     if not el:
                         continue

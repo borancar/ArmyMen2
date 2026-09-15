@@ -174,6 +174,9 @@ extern const char *const am2_item_type_names[44], *const am2_unit_class_names[45
 extern const char *const am2_movie_names[12], *const am2_vehicle_names[6];
 extern const char *const am2_sprite_set_dirs[46];
 extern const AM2_StateAction am2_state_actions[5];   /* movie.cpp, was 0x0048654C */
+/* am2_key_names (AM2_KeyName[95], widget.cpp, was 0x0048AF28) is declared in
+ * widget.cpp where AM2_KeyName is defined and used only there; the redirect
+ * macros below expand in that TU, so no extern is needed here. */
 /* One per-item-kind weapon-handler record: slots 0/1 are handler pointers,
  * 2/3 int params. Defined here so both the definition (widget.cpp) and this
  * declaration share the type. */
@@ -593,6 +596,10 @@ void  devtools_init(void);
 #define ADDR_WAVE_NAMES         ((uintptr_t)(const void *)am2_wave_names)
 #undef ADDR_WAVE_NAMES_END
 #define ADDR_WAVE_NAMES_END     ((uintptr_t)(const void *)(am2_wave_names + 56))
+#undef ADDR_KEY_NAME_TABLE
+#define ADDR_KEY_NAME_TABLE     ((uintptr_t)(const void *)am2_key_names)
+#undef ADDR_KEY_NAME_TABLE_END
+#define ADDR_KEY_NAME_TABLE_END ((uintptr_t)(const void *)(am2_key_names + 95))
 #undef ADDR_SHAKE_PRESETS
 #define ADDR_SHAKE_PRESETS      ((uintptr_t)(const void *)am2_shake_presets)
 #undef ADDR_AIM_DISPLACE_MAP
