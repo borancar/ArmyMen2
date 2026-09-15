@@ -31,6 +31,10 @@
 
 #include <stdint.h>
 
+/* IID_IDirectSound3DListener, queried on the primary buffer. 0x0046F3E8. */
+extern "C" const uint8_t am2_iid_ds3d_listener[16] =
+    { 0x84,0xfa,0x9a,0x27, 0x81,0x49,0xce,0x11, 0xa5,0x21,0x00,0x20,0xaf,0x0b,0xe5,0x60 };
+
 static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 
 #define g_audioEnabled  (*(const int32_t *)(uintptr_t)ADDR_AUDIO_ENABLED)

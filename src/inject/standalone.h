@@ -158,6 +158,10 @@ extern const int32_t am2_decal_sprite_count, am2_mark_sprite_count, am2_mp_mark_
 extern const int32_t am2_palette_cycle_count;
 extern const uint32_t am2_palette_cycle_seq[10], am2_palette_cycle_interval;
 extern const uint8_t am2_guid_sys_mouse[16], am2_guid_sys_keyboard[16];
+extern const uint8_t am2_iid_directdraw2[16], am2_iid_ds3d_listener[16];
+extern const uint8_t am2_iid_directplay4a[16], am2_clsid_directplay[16];
+extern const uint8_t am2_iid_dplay_lobby3a[16], am2_clsid_dplay_lobby[16];
+extern const uint8_t am2_guid_game_property[16], am2_app_guid[16], am2_guid_null[16];
 extern const int32_t am2_shake_presets[44];          /* mapdraw.cpp, was 0x00486170 */
 extern const int16_t am2_aim_displace_map[25088];    /* mapdraw.cpp, was 0x00478CDC */
 extern const int32_t am2_pad_bit_table[66];          /* pad.cpp, was 0x00486444 */
@@ -566,6 +570,24 @@ void  devtools_init(void);
 #define ADDR_GUID_SYS_MOUSE     ((uintptr_t)(const void *)am2_guid_sys_mouse)
 #undef ADDR_GUID_SYS_KEYBOARD
 #define ADDR_GUID_SYS_KEYBOARD  ((uintptr_t)(const void *)am2_guid_sys_keyboard)
+#undef ADDR_IID_DIRECTDRAW2
+#define ADDR_IID_DIRECTDRAW2    ((uintptr_t)(const void *)am2_iid_directdraw2)
+#undef ADDR_IID_DS3D_LISTENER
+#define ADDR_IID_DS3D_LISTENER  ((uintptr_t)(const void *)am2_iid_ds3d_listener)
+#undef ADDR_IID_DIRECTPLAY4A
+#define ADDR_IID_DIRECTPLAY4A   ((uintptr_t)(const void *)am2_iid_directplay4a)
+#undef ADDR_CLSID_DIRECTPLAY
+#define ADDR_CLSID_DIRECTPLAY   ((uintptr_t)(const void *)am2_clsid_directplay)
+#undef ADDR_IID_DPLAY_LOBBY3A
+#define ADDR_IID_DPLAY_LOBBY3A  ((uintptr_t)(const void *)am2_iid_dplay_lobby3a)
+#undef ADDR_CLSID_DPLAY_LOBBY
+#define ADDR_CLSID_DPLAY_LOBBY  ((uintptr_t)(const void *)am2_clsid_dplay_lobby)
+#undef ADDR_GUID_GAME_PROPERTY
+#define ADDR_GUID_GAME_PROPERTY ((uintptr_t)(const void *)am2_guid_game_property)
+#undef ADDR_APP_GUID
+#define ADDR_APP_GUID           ((uintptr_t)(const void *)am2_app_guid)
+#undef ADDR_GUID_NULL
+#define ADDR_GUID_NULL          ((uintptr_t)(const void *)am2_guid_null)
 #undef ADDR_SHAKE_PRESETS
 #define ADDR_SHAKE_PRESETS      ((uintptr_t)(const void *)am2_shake_presets)
 #undef ADDR_AIM_DISPLACE_MAP
