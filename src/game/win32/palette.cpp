@@ -43,6 +43,12 @@
 #include <stdint.h>
 
 #ifdef AM2_STANDALONE
+/* The palette-cycle phase index at 0x00486160 (starts at 1); runtime-written
+ * as the animated palette rotates, non-const, initial byte-checked. */
+int32_t am2_palette_cycle_index = 1;
+#endif
+
+#ifdef AM2_STANDALONE
 /* am2_army_pal_base -- 0x00474174, the four palette indices an army's remap
  * strip starts at. Transcribed out of the carried .rdata blob (STATUS.md's
  * MIGRATION note); read only by SetArmyPalette below. */

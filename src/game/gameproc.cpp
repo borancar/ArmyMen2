@@ -47,6 +47,10 @@ extern "C" const uint8_t am2_key_defaults[24] = {
     17, 31, 30, 32, 16, 18, 46, 33, 56, 57, 42, 15, 41, 45, 19, 34,
     20, 21, 35, 14, 59, 0, 0, 0,
 };
+/* The frame tick interval at 0x00485104 (1000 ms base), read here and in
+ * item.cpp; runtime-written, non-const, initial byte-checked. Plain linkage to
+ * match standalone.h's shared declaration. */
+int32_t am2_tick_interval_ms = 1000;
 #endif
 
 #define kBlock  ((char *)(uintptr_t)AM2_IMAGE(ADDR_GAMEPROC_BLOCK))

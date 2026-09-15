@@ -23,6 +23,12 @@
 /* The six heading-sweep deltas at 0x00489E00 the stuck-trooper turn walks
  * through (step[0..5]). Pure const int32 data, placed at its VA. */
 extern "C" const int32_t am2_step_facing_sweep[6] = { 32, -64, 96, -128, -96, 32 };
+/* Path-search runtime state (region.cpp): the node budget (0x0048788C, 10000),
+ * the resume point (0x00487828) and the search-state word (0x00487824), the
+ * last two -1 = idle. Runtime-written, non-const, initial bytes byte-checked. */
+int32_t am2_path_max_nodes = 10000;
+int32_t am2_path_resume = -1;
+int32_t am2_region_search_state = -1;
 #endif
 #include "gameproc.h" /* Call405220 -- the `defend` arm's thunk */
 #include "item.h"     /* ObjectsHitByPoint -- reconstructed */

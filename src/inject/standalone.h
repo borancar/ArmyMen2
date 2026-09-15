@@ -846,6 +846,20 @@ extern int32_t am2_screen_geom[12];
 #undef ADDR_ORIGIN_DY
 #define ADDR_ORIGIN_DY          ((uintptr_t)(const void *)&am2_screen_geom[9])
 
+/* Path-search state (region.cpp), palette-cycle index (palette.cpp), and the
+ * frame tick interval (gameproc.cpp, also read by item.cpp). */
+#undef ADDR_PATH_MAX_NODES
+#define ADDR_PATH_MAX_NODES     ((uintptr_t)(const void *)&am2_path_max_nodes)
+#undef ADDR_PATH_RESUME
+#define ADDR_PATH_RESUME        ((uintptr_t)(const void *)&am2_path_resume)
+#undef ADDR_REGION_SEARCH_STATE
+#define ADDR_REGION_SEARCH_STATE ((uintptr_t)(const void *)&am2_region_search_state)
+#undef ADDR_PALETTE_CYCLE_INDEX
+#define ADDR_PALETTE_CYCLE_INDEX ((uintptr_t)(const void *)&am2_palette_cycle_index)
+extern int32_t am2_tick_interval_ms;
+#undef ADDR_TICK_INTERVAL_MS
+#define ADDR_TICK_INTERVAL_MS   ((uintptr_t)(const void *)&am2_tick_interval_ms)
+
 /* Runtime-written game scalars: screen dims / fog / overlay (frame.cpp, read
  * across the win32 layer) and the debug blast kind (widget.cpp, local). */
 extern int32_t am2_screen_w, am2_screen_h, am2_fog_of_war, am2_info_overlay_on;
