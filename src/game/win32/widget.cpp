@@ -16444,7 +16444,7 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
 
         for (i = 0; slot < (AM2_Sprite **)(uintptr_t)ADDR_MENU_MSG_LIST;
              slot++, i++) {
-            am2_sprintf(name, (const char *)AM2_IMAGE(0x004871ACu), i);
+            am2_sprintf(name, "03_013_0%i_color.bmp", i);
             *slot = PreloadSpriteName(name, 1, 1);
         }
     }
@@ -17016,17 +17016,17 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
         if (child) {
             if (host)
                 ButtonConstruct(child,
-                                (const char *)AM2_IMAGE(0x00476E7Cu),
-                                (const char *)AM2_IMAGE(0x00476E90u),
-                                (const char *)AM2_IMAGE(0x00476EA4u), 1,
+                                "03_016_00_start.bmp",
+                                "03_016_01_start.bmp",
+                                "03_016_02_start.bmp", 1,
                                 *RectSet(&r, 0x21F, 0x11A, 0x51, 0x20),
                                 OnMpLaunch,
                                 0);
             else
                 ButtonConstruct(child,
-                                (const char *)AM2_IMAGE(0x0048713Cu),
-                                (const char *)AM2_IMAGE(0x00487150u),
-                                (const char *)AM2_IMAGE(0x00487164u), 1,
+                                "03_030_00_ready.bmp",
+                                "03_030_01_ready.bmp",
+                                "03_030_02_ready.bmp", 1,
                                 *RectSet(&r, 0x21F, 0x11A, 0x51, 0x20),
                                 (void (__cdecl *)(AM2_Widget *))MpReadyToLoad,
                                 0);
@@ -17042,9 +17042,9 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
 
         if (child)
             ButtonConstruct(child,
-                            (const char *)AM2_IMAGE(0x004870F4u),
-                            (const char *)AM2_IMAGE(0x0048710Cu),
-                            (const char *)AM2_IMAGE(0x00487124u), 1,
+                            "03_015_00_options.bmp",
+                            "03_015_01_options.bmp",
+                            "03_015_02_options.bmp", 1,
                             *RectSet(&r, 0x21F, 0x142, 0x51, 0x20),
                             (void (__cdecl *)(AM2_Widget *))MpRequestOptions,
                             0);
@@ -17053,8 +17053,8 @@ AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
         child = (AM2_Widget *)orig_operator_new(0x78);
         if (child)
             ButtonConstruct(child, 0,
-                            (const char *)AM2_IMAGE(0x00486E04u),
-                            (const char *)AM2_IMAGE(0x00486E1Cu), 1,
+                            "03_018_01_cancel.bmp",
+                            "03_018_02_cancel.bmp", 1,
                             *RectSet(&r, 0x21F, 0x16B, 0x51, 0x20),
                             (void (__cdecl *)(AM2_Widget *))MpLeaveSession,
                             0);

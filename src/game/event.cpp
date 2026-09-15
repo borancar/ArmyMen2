@@ -3418,7 +3418,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         if (act->text != 0) {
             strcpy((char *)(uintptr_t)ADDR_MESSAGE_TEXT, act->text);
             strcpy((char *)(uintptr_t)ADDR_MESSAGE_BMP_NAME,
-                   (const char *)AM2_IMAGE(0x004787D4));
+                   "02_016_00_failure.bmp");
             g_subState = 0x18;
             g_overlayDirty = 1;
         }
@@ -3427,7 +3427,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         if (act->text != 0) {
             strcpy((char *)(uintptr_t)ADDR_MESSAGE_TEXT, act->text);
             strcpy((char *)(uintptr_t)ADDR_MESSAGE_BMP_NAME,
-                   (const char *)AM2_IMAGE(0x004787C0));
+                   "02_017_00_hq.bmp");
             g_subState = 0x18;
             g_overlayDirty = 1;
         }
