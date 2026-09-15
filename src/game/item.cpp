@@ -7123,10 +7123,13 @@ extern "C" const int32_t am2_spiral_step[8] = { 0,-1, 1,0, 0,1, -1,0 }; /* 0x004
  * entries, bounded by ADDR_HIT_POSE_BY_CLASS 12 bytes on. */
 extern "C" const int32_t am2_death_anim_by_code[3] = { 33, 34, 35 };
 
-/* The roach (giant ant) creature parameters at 0x00487BAC..0x00487C00,
- * transcribed. Health and start-frame are int16 (2-byte fields in 4-byte
- * slots); armour/damage/velocity/acceleration are int32; the three rects are
- * int32[4] (AM2_Rect / row-spec). Read by item.cpp and gameproc.cpp. */
+/* The roach (giant ant) creature parameters at 0x00487BA8..0x00487C00,
+ * transcribed. Height is the game-constants block base (index 0, read as a byte
+ * out of a dword that ships 32); health and start-frame are int16 (2-byte
+ * fields in 4-byte slots); armour/damage/velocity/acceleration are int32; the
+ * three rects are int32[4] (AM2_Rect / row-spec). Read by item.cpp and
+ * gameproc.cpp (kGameConst walks the eight contiguous dwords from here). */
+extern "C" const int32_t am2_roach_height      = 32;   /* 0x00487BA8, block idx 0 */
 extern "C" const int16_t am2_roach_health      = 60;   /* 0x00487BAC */
 extern "C" const int32_t am2_roach_armour      = 2;    /* 0x00487BB0 */
 extern "C" const int32_t am2_roach_damage      = 16;   /* 0x00487BB4 */

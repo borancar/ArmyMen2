@@ -66,7 +66,7 @@ reads records 1-6 from the placed `pointer_modes` storage -- consistent because
 it is one physical table. The SA/mingw build keeps the `--section-start` blob
 path (PE linker scripts differ); native was the stated priority.
 
-**UPDATE (2026-09-16): 222 symbols placed, 64.9% of meaningful bytes.** Later
+**UPDATE (2026-09-16): 223 symbols placed, 64.9% of meaningful bytes.** Later
 batches: `UNIT_TYPES` (720B of pure data, inline names -- the sweep now skips
 runs inside a placed symbol so those names are not zeroed), `VOICE_GROUPS` (30
 pickup voice-line records), `SCRIPT_KIND_NAMES`, `SOLDIER_NAMES` (62 records,
@@ -98,6 +98,27 @@ non-zero element so it stays in `.data`, and alias the fields into it. A separat
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
 sweep to **1,370 strings, 32,203 bytes zeroed**.
+
+**UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
+live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
+(0x00487BA8) is the base of the eight-dword ROACH_* block that `DefGameParse`
+fills from `game.aai`; indices 1..7 were already the placed `am2_roach_*`
+symbols, but index 0 (`ROACH_HEIGHT`, ships 32) was still blob. Placed it as
+`am2_roach_height` (item.cpp) at its VA so the block base and `kGameConst[i]`
+now flow across the contiguous placed set. An audit of every `ADDR_*` macro
+resolving into `.origdat` (0x46F000-0x48E000) that is LIVE in reconstructed code
+(comments stripped) leaves **7 macros**, of which 3 resolve into *placed*
+storage (`BUILD_MENU_RECTS`/`HUD_CMD_SPRITES_END` into `am2_pointer_modes`,
+`SPRITE_GROUPS_C_END` a bound into `am2_sprite_grid_rows`) and are not blob
+reads. The genuine remaining blob reads are just: the **RANK** cluster
+(`RANK_RECORDS`/`RANK_EXP_TABLE`, runtime-written across the placed
+`pillbox_trooper_health` field -- needs an in-mission verify, reserved for
+SCOPE) and **`MOVIE_VTABLE`** (six reconstructed-function slots; the correct
+form is a named fn-ptr table, not a byte copy, and the movie player is stubbed,
+so it becomes a clean migration once that is reconstructed). The other ~319
+`ADDR_STR_*`/`FMT_*`/`MSG_*` macros in the range are read ONLY by
+unreconstructed original functions, which the native build maps to `0xCC`
+`.origgap` traps and never executes -- so they are carried, not depended on.
 
 ## MIGRATION (2026-09-11): global structures transcribed out of the blob
 

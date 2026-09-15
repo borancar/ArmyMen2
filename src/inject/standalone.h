@@ -119,7 +119,9 @@ extern const int32_t am2_air_path_half_y;
 extern const double  am2_air_gauge_slope, am2_air_leg1_slope, am2_air_leg3_slope;
 extern const int16_t am2_air_path_turn_x, am2_air_path_away_x;
 /* TURN_Y_IN/TURN_Y_OUT are runtime state (AirInitTurnYIn/Out), not migrated. */
-/* Roach creature parameters (item.cpp). */
+/* Roach creature parameters (item.cpp). am2_roach_height is the game-constants
+ * block base at 0x00487BA8 (index 0); ADDR_GAME_CONSTANTS aliases it below. */
+extern const int32_t am2_roach_height;
 extern const int16_t am2_roach_health, am2_roach_start_frame;
 extern const int32_t am2_roach_armour, am2_roach_damage, am2_roach_forvel;
 extern const int32_t am2_roach_revvel, am2_roach_foracc, am2_roach_revacc;
@@ -867,6 +869,15 @@ extern uint32_t am2_sprite_grid[1];
 extern uint32_t am2_opt_df;
 #undef ADDR_OPT_DF
 #define ADDR_OPT_DF             ((uintptr_t)(const void *)&am2_opt_df)
+
+/* The roach game-constants BLOCK base at 0x00487BA8 (gameproc.cpp's kGameConst
+ * and item.cpp read index 0 as ROACH_HEIGHT). Indices 1..7 are already placed
+ * as the individual am2_roach_* symbols above; only index 0 was still in the
+ * blob, so it is placed here as am2_roach_height and the block base aliases it.
+ * The eight VAs are contiguous, so kGameConst[i] flows across the placed set.
+ * am2_roach_height is declared with the other roach externs above. */
+#undef ADDR_GAME_CONSTANTS
+#define ADDR_GAME_CONSTANTS     ((uintptr_t)(const void *)&am2_roach_height)
 
 /* The comm-object slot / army table / enum count (commmsg.cpp), read across
  * the game; base aliases ARMY_TABLE and COMM_OBJECT, the count is at +1. */
