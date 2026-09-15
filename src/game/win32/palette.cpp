@@ -51,6 +51,11 @@ int32_t am2_palette_cycle_index = 1;
  * LPLOGPALETTE and, past the 4-byte header, as the entry array; migrated as a
  * byte block (non-zero header keeps it in .data), the entries aliased at +4. */
 uint8_t am2_logpalette[1028] = { 0x00, 0x03, 0x00, 0x01 };
+/* The GDI palette-entry array at 0x00477E6C (256 PALETTEENTRYs, zero at init,
+ * filled from the system palette at runtime). All zero, so it would land in
+ * .bss where placement cannot gather it -- force it into .data. */
+uint8_t am2_gdi_palette[1024]
+    __attribute__((section(".data.am2_gdi_palette"))) = { 0 };
 #endif
 
 #ifdef AM2_STANDALONE

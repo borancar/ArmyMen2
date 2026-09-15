@@ -43,6 +43,18 @@ typedef int32_t (__cdecl *AM2_AtExitFn)(void (__cdecl *)(void));
 #define orig_atexit (*(AM2_AtExitFn)AM2_IMAGE(ADDR_CRT_ATEXIT))
 #include "../image.h"  /* AM2_IMAGE */
 
+#ifdef AM2_STANDALONE
+/* The comm state block at 0x0048D8D8 (0x728 bytes to 0x0048E000): the two
+ * message-list heads, the comm/packet event handles, and the start of the
+ * packet-buffer pool -- whose tail (ADDR_PACKET_BUFFERS_END = 0x004F1978, a
+ * 400KB pool) runs on into .origbss. All zero at init and runtime-written by
+ * the comm layer, so forced into .data (an all-zero global would land in .bss
+ * where placement cannot gather it); each ADDR_ macro is aliased to its slot,
+ * and the pool stays contiguous with the origbss storage above 0x0048E000. */
+uint8_t am2_comm_block[1832]
+    __attribute__((section(".data.am2_comm_block"))) = { 0 };
+#endif
+
 #include <stdint.h>
 
 /* The DirectPlay COM identifiers the image carries in its own .rdata,

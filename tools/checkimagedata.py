@@ -142,8 +142,14 @@ def find_definition(symbol):
             # bytes still equal the image and are checked here (a pointer field
             # is dereference-checked, an int field byte-checked, both at their
             # image value before any write).
+            # An all-zero runtime buffer would land in .bss (which placement's
+            # ld does not gather), so it is forced into .data with a
+            # `__attribute__((section(".data.<sym>")))` between the `]` and `=`;
+            # tolerate it here so the definition still parses.
             m = re.search(r'(?:const\s+)?(\w+)\s+' + re.escape(symbol) +
-                          r'\s*\[\s*(\d*)\s*\]\s*=\s*\{(.*?)\};', text, re.S)
+                          r'\s*\[\s*(\d*)\s*\]\s*'
+                          r'(?:__attribute__\s*\(\(.*?\)\)\s*)?=\s*\{(.*?)\};',
+                          text, re.S)
             if m:
                 # strip comments from the initializer first -- an address in a
                 # /* 0x... */ note inside the braces is not a value

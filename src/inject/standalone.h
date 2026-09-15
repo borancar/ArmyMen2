@@ -871,6 +871,28 @@ extern uint8_t am2_logpalette[1028];
 #define ADDR_LOGPALETTE         ((uintptr_t)(const void *)am2_logpalette)
 #undef ADDR_LOGPALETTE_ENTRIES
 #define ADDR_LOGPALETTE_ENTRIES ((uintptr_t)(const void *)&am2_logpalette[4])
+extern uint8_t am2_gdi_palette[1024];
+#undef ADDR_GDI_PALETTE
+#define ADDR_GDI_PALETTE        ((uintptr_t)(const void *)am2_gdi_palette)
+
+/* The comm state block (dplay.cpp): message-list heads, event handles, and the
+ * packet pool head (which continues into origbss). Base places it; each field
+ * aliases to its slot. Read by dplay.cpp and commmsg.cpp. */
+extern uint8_t am2_comm_block[1832];
+#undef ADDR_MSG_LIST_SENDQ
+#define ADDR_MSG_LIST_SENDQ     ((uintptr_t)(const void *)am2_comm_block)
+#undef ADDR_MSG_LIST_POOL
+#define ADDR_MSG_LIST_POOL      ((uintptr_t)(const void *)&am2_comm_block[0x10])
+#undef ADDR_COMM_EVENT
+#define ADDR_COMM_EVENT         ((uintptr_t)(const void *)&am2_comm_block[0x20])
+#undef ADDR_PACKET_EVENT_A
+#define ADDR_PACKET_EVENT_A     ((uintptr_t)(const void *)&am2_comm_block[0x20])
+#undef ADDR_COMM_EVENT_2
+#define ADDR_COMM_EVENT_2       ((uintptr_t)(const void *)&am2_comm_block[0x24])
+#undef ADDR_PACKET_EVENT_B
+#define ADDR_PACKET_EVENT_B     ((uintptr_t)(const void *)&am2_comm_block[0x24])
+#undef ADDR_PACKET_BUFFERS
+#define ADDR_PACKET_BUFFERS     ((uintptr_t)(const void *)&am2_comm_block[0xA0])
 extern int32_t am2_tick_interval_ms;
 #undef ADDR_TICK_INTERVAL_MS
 #define ADDR_TICK_INTERVAL_MS   ((uintptr_t)(const void *)&am2_tick_interval_ms)
