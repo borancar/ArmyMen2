@@ -783,6 +783,49 @@ extern uint32_t am2_rand_seed;
 #undef ADDR_RAND_SEED
 #define ADDR_RAND_SEED          ((uintptr_t)(const void *)&am2_rand_seed)
 
+/* The mouse/cursor input-state block (device.cpp): one array, each field
+ * aliased to its slot. Read/written across the win32 layer and the C control
+ * socket, so the declaration is shared here. */
+extern int32_t am2_mouse_state[25];
+#undef ADDR_MOUSE_DX
+#define ADDR_MOUSE_DX           ((uintptr_t)(const void *)am2_mouse_state)
+#undef ADDR_MOUSE_DY
+#define ADDR_MOUSE_DY           ((uintptr_t)(const void *)&am2_mouse_state[1])
+#undef ADDR_MOUSE_DZ
+#define ADDR_MOUSE_DZ           ((uintptr_t)(const void *)&am2_mouse_state[2])
+#undef ADDR_CURSOR_X
+#define ADDR_CURSOR_X           ((uintptr_t)(const void *)&am2_mouse_state[3])
+#undef ADDR_CURSOR_Y
+#define ADDR_CURSOR_Y           ((uintptr_t)(const void *)&am2_mouse_state[4])
+#undef ADDR_CURSOR_POINT
+#define ADDR_CURSOR_POINT       ((uintptr_t)(const void *)&am2_mouse_state[5])
+#undef ADDR_MOUSE_BUTTON
+#define ADDR_MOUSE_BUTTON       ((uintptr_t)(const void *)&am2_mouse_state[6])
+#undef ADDR_MOUSE_BUTTON1
+#define ADDR_MOUSE_BUTTON1      ((uintptr_t)(const void *)&am2_mouse_state[7])
+#undef ADDR_MOUSE_CHANGED
+#define ADDR_MOUSE_CHANGED      ((uintptr_t)(const void *)&am2_mouse_state[9])
+#undef ADDR_MOUSE_CHANGED1
+#define ADDR_MOUSE_CHANGED1     ((uintptr_t)(const void *)&am2_mouse_state[10])
+#undef ADDR_MOUSE_CLAIMED
+#define ADDR_MOUSE_CLAIMED      ((uintptr_t)(const void *)&am2_mouse_state[12])
+#undef ADDR_MOUSE_MOVED
+#define ADDR_MOUSE_MOVED        ((uintptr_t)(const void *)&am2_mouse_state[15])
+#undef ADDR_MOUSE_PRESS
+#define ADDR_MOUSE_PRESS        ((uintptr_t)(const void *)&am2_mouse_state[16])
+#undef ADDR_MOUSE_PRESS_MS
+#define ADDR_MOUSE_PRESS_MS     ((uintptr_t)(const void *)&am2_mouse_state[17])
+#undef ADDR_MOUSE_PRESS2
+#define ADDR_MOUSE_PRESS2       ((uintptr_t)(const void *)&am2_mouse_state[18])
+#undef ADDR_MOUSE_PRESS2_MS
+#define ADDR_MOUSE_PRESS2_MS    ((uintptr_t)(const void *)&am2_mouse_state[19])
+#undef ADDR_MOUSE_ACTIVITY
+#define ADDR_MOUSE_ACTIVITY     ((uintptr_t)(const void *)&am2_mouse_state[22])
+#undef ADDR_MOUSE_GRAB
+#define ADDR_MOUSE_GRAB         ((uintptr_t)(const void *)&am2_mouse_state[23])
+#undef ADDR_POINTER_HOVER_UID
+#define ADDR_POINTER_HOVER_UID  ((uintptr_t)(const void *)&am2_mouse_state[24])
+
 /* Runtime-written game scalars: screen dims / fog / overlay (frame.cpp, read
  * across the win32 layer) and the debug blast kind (widget.cpp, local). */
 extern int32_t am2_screen_w, am2_screen_h, am2_fog_of_war, am2_info_overlay_on;

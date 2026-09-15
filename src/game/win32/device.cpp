@@ -58,6 +58,17 @@ extern "C" const uint8_t am2_iid_directdraw2[16] =
 
 #include <stdint.h>
 
+#ifdef AM2_STANDALONE
+/* The mouse/cursor input state block at 0x00485458 (25 dwords, 0x485458..
+ * 0x004854BC): deltas, cursor X/Y (init 320,200) and packed point, button and
+ * change bits, press timers, activity, grab, hover uid, with a few unused
+ * gap dwords the reader indexes past. It is one physical block written by
+ * UpdateMouseState and the control socket and read all over, so it is migrated
+ * as a single non-const array (initial bytes byte-checked) with each ADDR_
+ * macro aliased to its slot; the cursor init keeps it in .data. */
+int32_t am2_mouse_state[25] = { 0, 0, 0, 320, 200 };
+#endif
+
 /* GetDeviceCaps index, and the depth everything the game draws assumes. */
 #define BITS_PER_PIXEL 8
 

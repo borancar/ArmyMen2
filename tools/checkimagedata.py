@@ -143,17 +143,25 @@ def find_definition(symbol):
             # is dereference-checked, an int field byte-checked, both at their
             # image value before any write).
             m = re.search(r'(?:const\s+)?(\w+)\s+' + re.escape(symbol) +
-                          r'\s*\[\s*\d*\s*\]\s*=\s*\{(.*?)\};', text, re.S)
+                          r'\s*\[\s*(\d*)\s*\]\s*=\s*\{(.*?)\};', text, re.S)
             if m:
                 # strip comments from the initializer first -- an address in a
                 # /* 0x... */ note inside the braces is not a value
-                body = re.sub(r'/\*.*?\*/|//[^\n]*', ' ', m.group(2), flags=re.S)
+                declared = int(m.group(2)) if m.group(2) else 0
+                body = re.sub(r'/\*.*?\*/|//[^\n]*', ' ', m.group(3), flags=re.S)
                 if m.group(1) in TYPES:
                     # hex or decimal; the (?<![\w.]) skips digits embedded in an
                     # identifier, e.g. the "32" of a (int32_t) cast.
                     toks = re.findall(
                         r'(?<![\w.])-?0[xX][0-9A-Fa-f]+|(?<![\w.])-?\d+', body)
-                    return m.group(1), [int(t, 0) for t in toks]
+                    vals = [int(t, 0) for t in toks]
+                    # C zero-fills a declared size larger than the initializer,
+                    # so a mostly-zero array can list only its leading values
+                    # (am2_mouse_state[25] = {0,0,0,320,200}); the placed section
+                    # is the declared length, so the size accounting must be too.
+                    if declared > len(vals):
+                        vals += [0] * (declared - len(vals))
+                    return m.group(1), vals
                 # a struct / function-pointer table: flatten the braces and
                 # read one token per dword -- an integer, or a function name.
                 flat = body.replace("{", " ").replace("}", " ")
