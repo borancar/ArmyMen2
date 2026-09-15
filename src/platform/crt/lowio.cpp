@@ -18,6 +18,27 @@
 #include "../../inject/orig.h"
 #include "../../game/image.h"
 
+#ifdef AM2_STANDALONE
+/* The OS-error -> errno map at 0x0048D140 (45 {oserr, errno} pairs) that
+ * crt_dosmaperr scans, ending at ADDR_CRT_ERRTABLE_END. Pure const data, so
+ * the blob copy drops -- placed at its VA and byte-verified. ERRTABLE_END is
+ * the loop bound, one past the array. */
+extern "C" const uint32_t am2_crt_errtable[90] = {
+    0x00000001u, 22u, 0x00000002u, 2u,  0x00000003u, 2u,  0x00000004u, 24u,
+    0x00000005u, 13u, 0x00000006u, 9u,  0x00000007u, 12u, 0x00000008u, 12u,
+    0x00000009u, 12u, 0x0000000Au, 7u,  0x0000000Bu, 8u,  0x0000000Cu, 22u,
+    0x0000000Du, 22u, 0x0000000Fu, 2u,  0x00000010u, 13u, 0x00000011u, 18u,
+    0x00000012u, 2u,  0x00000021u, 13u, 0x00000035u, 2u,  0x00000041u, 13u,
+    0x00000043u, 2u,  0x00000050u, 17u, 0x00000052u, 13u, 0x00000053u, 13u,
+    0x00000057u, 22u, 0x00000059u, 11u, 0x0000006Cu, 13u, 0x0000006Du, 32u,
+    0x00000070u, 28u, 0x00000072u, 9u,  0x00000006u, 22u, 0x00000080u, 10u,
+    0x00000081u, 10u, 0x00000082u, 9u,  0x00000083u, 22u, 0x00000084u, 13u,
+    0x00000091u, 41u, 0x0000009Eu, 13u, 0x000000A1u, 2u,  0x000000A4u, 11u,
+    0x000000A7u, 13u, 0x000000B7u, 17u, 0x000000CEu, 2u,  0x000000D7u, 11u,
+    0x00000718u, 12u,
+};
+#endif
+
 #define crt_nhandle     (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_NHANDLE))
 #define crt_pioinfo_tab ((CRT_IOINFO **)(uintptr_t)AM2_IMAGE(ADDR_CRT_PIOINFO))
 #define crt_errno       (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ERRNO))
