@@ -826,6 +826,26 @@ extern int32_t am2_mouse_state[25];
 #undef ADDR_POINTER_HOVER_UID
 #define ADDR_POINTER_HOVER_UID  ((uintptr_t)(const void *)&am2_mouse_state[24])
 
+/* The screen-geometry block (device.cpp): one array, overlapping RECT/scalar
+ * views aliased to their slots. Read across the win32 layer. */
+extern int32_t am2_screen_geom[12];
+#undef ADDR_SCREEN_CLIP
+#define ADDR_SCREEN_CLIP        ((uintptr_t)(const void *)am2_screen_geom)
+#undef ADDR_BITMAP_AREA_W
+#define ADDR_BITMAP_AREA_W      ((uintptr_t)(const void *)&am2_screen_geom[2])
+#undef ADDR_BITMAP_AREA_H
+#define ADDR_BITMAP_AREA_H      ((uintptr_t)(const void *)&am2_screen_geom[3])
+#undef ADDR_BLIT_RECT
+#define ADDR_BLIT_RECT          ((uintptr_t)(const void *)&am2_screen_geom[4])
+#undef ADDR_HUD_PANEL_X
+#define ADDR_HUD_PANEL_X        ((uintptr_t)(const void *)&am2_screen_geom[6])
+#undef ADDR_ORIGIN_DX
+#define ADDR_ORIGIN_DX          ((uintptr_t)(const void *)&am2_screen_geom[8])
+#undef ADDR_SCREEN_RECT
+#define ADDR_SCREEN_RECT        ((uintptr_t)(const void *)&am2_screen_geom[8])
+#undef ADDR_ORIGIN_DY
+#define ADDR_ORIGIN_DY          ((uintptr_t)(const void *)&am2_screen_geom[9])
+
 /* Runtime-written game scalars: screen dims / fog / overlay (frame.cpp, read
  * across the win32 layer) and the debug blast kind (widget.cpp, local). */
 extern int32_t am2_screen_w, am2_screen_h, am2_fog_of_war, am2_info_overlay_on;

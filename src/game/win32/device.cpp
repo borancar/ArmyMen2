@@ -67,6 +67,13 @@ extern "C" const uint8_t am2_iid_directdraw2[16] =
  * as a single non-const array (initial bytes byte-checked) with each ADDR_
  * macro aliased to its slot; the cursor init keeps it in .data. */
 int32_t am2_mouse_state[25] = { 0, 0, 0, 320, 200 };
+
+/* The screen-geometry block at 0x00485310 (12 dwords): SCREEN_CLIP {0,0,640,480}
+ * (BITMAP_AREA_W/H view its right/bottom), BLIT_RECT {0,21,624,480} (HUD_PANEL_X
+ * views field 2), and SCREEN_RECT/ORIGIN_DX/DY. One physical block read as RECTs
+ * and scalars, migrated as a single non-const array with each macro aliased to
+ * its slot; the non-zero dimensions keep it in .data. */
+int32_t am2_screen_geom[12] = { 0, 0, 640, 480, 0, 21, 624, 480, 0, 0, 0, 0 };
 #endif
 
 /* GetDeviceCaps index, and the depth everything the game draws assumes. */
