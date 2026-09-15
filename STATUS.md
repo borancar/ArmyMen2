@@ -217,10 +217,14 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **184 strings, 2,808 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **351 strings, 4,796 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
-`"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`).
+`"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus
+the strings that only a MIGRATED pointer table reached (e.g. the wave-effect
+filenames once `am2_wave_names` became C literals): placement carves those
+tables out and replaces their pointers with C `.rodata`, so the sweep excludes
+the carved ranges from its pointer scan and the orphaned strings drop too.
 
 The safety rule is what makes this non-trivial: a naive "printable
 NUL-terminated run" sweep also matches coincidental ASCII *inside* binary
@@ -237,8 +241,9 @@ recomputes the set from a pristine blob and re-proves every zeroed range
 unreachable. Native still boots to window + audio init with no fault. This does
 not shrink the carried blob (the zeros sit mid-`.origdat`), but it makes the
 "still-opaque bytes" figure count only data that is genuinely still load-bearing.
-The other ~4.2 KB of printable runs the raw sweep flags are kept: they are still
-pointed at (char* tables not yet transcribed) or still read by address.
+The remaining printable runs are kept: they are still pointed at (name tables
+not yet transcribed) or still read by address. Each further name-table migration
+drops its strings the same way.
 
 **FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
 `LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a

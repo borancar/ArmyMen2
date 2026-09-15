@@ -162,6 +162,7 @@ extern const uint8_t am2_iid_directdraw2[16], am2_iid_ds3d_listener[16];
 extern const uint8_t am2_iid_directplay4a[16], am2_clsid_directplay[16];
 extern const uint8_t am2_iid_dplay_lobby3a[16], am2_clsid_dplay_lobby[16];
 extern const uint8_t am2_guid_game_property[16], am2_app_guid[16], am2_guid_null[16];
+extern const char *const am2_wave_names[56];
 extern const int32_t am2_shake_presets[44];          /* mapdraw.cpp, was 0x00486170 */
 extern const int16_t am2_aim_displace_map[25088];    /* mapdraw.cpp, was 0x00478CDC */
 extern const int32_t am2_pad_bit_table[66];          /* pad.cpp, was 0x00486444 */
@@ -588,6 +589,10 @@ void  devtools_init(void);
 #define ADDR_APP_GUID           ((uintptr_t)(const void *)am2_app_guid)
 #undef ADDR_GUID_NULL
 #define ADDR_GUID_NULL          ((uintptr_t)(const void *)am2_guid_null)
+#undef ADDR_WAVE_NAMES
+#define ADDR_WAVE_NAMES         ((uintptr_t)(const void *)am2_wave_names)
+#undef ADDR_WAVE_NAMES_END
+#define ADDR_WAVE_NAMES_END     ((uintptr_t)(const void *)(am2_wave_names + 56))
 #undef ADDR_SHAKE_PRESETS
 #define ADDR_SHAKE_PRESETS      ((uintptr_t)(const void *)am2_shake_presets)
 #undef ADDR_AIM_DISPLACE_MAP

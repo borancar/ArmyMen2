@@ -78,9 +78,18 @@ def main():
             bad += 1
             break
 
-    # (3) no dword in the pristine blob points into any zeroed range
+    # (3) no SURVIVING dword points into any zeroed range. Dwords inside a
+    # migrated pointer table are carved out by placement and replaced with C
+    # literals, so they do not survive -- exclude them exactly as dead_ranges
+    # does, or a string only a migrated name table reached looks reachable here.
+    import placement
+    carved = [(a, a + s) for (a, s, _sym, is_ptr)
+              in placement.placed_set(placement.manifest(), placement.split())
+              if is_ptr]
     targets = set()
     for off in range(0, len(pristine) - 3, 4):
+        if any(lo <= ds.BLOB_LO + off < hi for lo, hi in carved):
+            continue
         v = struct.unpack("<I", pristine[off:off + 4])[0]
         if ds.BLOB_LO <= v < ds.BLOB_HI:
             targets.add(v)

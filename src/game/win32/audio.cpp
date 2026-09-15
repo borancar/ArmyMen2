@@ -1752,6 +1752,31 @@ give_up:
  * into, and the loader fails at the first step. */
 static_assert(sizeof(DSBCAPS) == 0x14, "DSBCAPS");
 
+#ifdef AM2_STANDALONE
+/* The 56 wave-effect filenames the image carries as a const char*[] at
+ * 0x00474360, transcribed to C literals (the blob's own copies then go dead and
+ * the dead-string sweep drops them). ADDR_WAVE_NAMES_END is redirected to the
+ * array's end so WAVE_COUNT below still computes 56; the separate voice-group
+ * table that shares that address (ADDR_VOICE_GROUPS) is untouched. */
+extern "C" const char *const am2_wave_names[56] = {
+    "click.wav", "ts_highlight.wav", "ts_select.wav", "error.wav",
+    "trooperhit.wav", "trooperdie.wav", "burndie.wav", "sargerifle.wav",
+    "sargeauto.wav", "sargeheavyMG.wav", "sargevulcan.wav", "sargeprime.wav",
+    "sargethrow.wav", "sargemofire.wav", "sargeflamefire.wav", "sargebaz.wav",
+    "sargemnlay.wav", "sargemnget.wav", "heal.wav", "sargewrench.wav",
+    "disguise.wav", "tankfire.wav", "tankturret.wav", "tankmove.wav",
+    "jeepmove.wav", "htrackmove.wav", "ptboatmove.wav", "tankidle.wav",
+    "jeepidle.wav", "htrackidle.wav", "ptboatidle.wav", "tankdeath.wav",
+    "jeepdeath.wav", "htrackdeath.wav", "ptboatdeath.wav", "tankcollide.wav",
+    "jeepcollide.wav", "htrackcollide.wav", "explosionwater.wav",
+    "explosionm80.wav", "explosionbarrel.wav", "explosionmortar.wav",
+    "explosiongrenade.wav", "magnifying.wav", "aerosol.wav", "m80sizzle.wav",
+    "planeoverhead.wav", "planeshotdown.wav", "roachnearby.wav",
+    "roachattack.wav", "roachdie.wav", "zombienearby.wav", "zombieattack.wav",
+    "zombiehit.wav", "zombiedie.wav", "distancepickup.wav",
+};
+#endif
+
 #define g_waveNames    ((const char *const *)(uintptr_t)ADDR_WAVE_NAMES)
 #define g_soundSlots   ((uint8_t *)(uintptr_t)ADDR_SOUND_SLOTS)
 #define g_dsound       (*(LPDIRECTSOUND *)(uintptr_t)ADDR_DSOUND)

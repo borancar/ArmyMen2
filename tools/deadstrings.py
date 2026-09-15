@@ -79,9 +79,26 @@ def dead_ranges(blob):
     src = src_text()
     img = am2.Image()
 
+    # Ranges of migrated POINTER tables (char*/mixed): placement carves these
+    # out of the blob and replaces their pointers with C literals pointing at
+    # the native binary's own .rodata, not here. So a blob dword sitting inside
+    # one is NOT a live pointer in the native build -- skip it, so a string that
+    # only a migrated name table reached becomes dead and is dropped too. A
+    # pure-data migrated symbol keeps its bytes byte-identical, so its dwords
+    # still point where they did and are NOT skipped.
+    import placement
+    carved = [(a, a + s) for (a, s, _sym, is_ptr)
+              in placement.placed_set(placement.manifest(), placement.split())
+              if is_ptr]
+
+    def in_carved(va):
+        return any(lo <= va < hi for lo, hi in carved)
+
     # dwords in the CURRENT blob that could point into the image data region
     targets = set()
     for off in range(0, len(blob) - 3, 4):
+        if in_carved(BLOB_LO + off):
+            continue
         v = struct.unpack("<I", blob[off:off + 4])[0]
         if BLOB_LO <= v < BLOB_HI:
             targets.add(v)
