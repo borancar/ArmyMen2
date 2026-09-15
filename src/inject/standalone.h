@@ -865,6 +865,12 @@ extern int32_t am2_screen_geom[12];
 #define ADDR_REGION_SEARCH_STATE ((uintptr_t)(const void *)&am2_region_search_state)
 #undef ADDR_PALETTE_CYCLE_INDEX
 #define ADDR_PALETTE_CYCLE_INDEX ((uintptr_t)(const void *)&am2_palette_cycle_index)
+/* The LOGPALETTE block (palette.cpp): base places it, entries alias at +4. */
+extern uint8_t am2_logpalette[1028];
+#undef ADDR_LOGPALETTE
+#define ADDR_LOGPALETTE         ((uintptr_t)(const void *)am2_logpalette)
+#undef ADDR_LOGPALETTE_ENTRIES
+#define ADDR_LOGPALETTE_ENTRIES ((uintptr_t)(const void *)&am2_logpalette[4])
 extern int32_t am2_tick_interval_ms;
 #undef ADDR_TICK_INTERVAL_MS
 #define ADDR_TICK_INTERVAL_MS   ((uintptr_t)(const void *)&am2_tick_interval_ms)

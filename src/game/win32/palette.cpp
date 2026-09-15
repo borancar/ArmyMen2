@@ -46,6 +46,11 @@
 /* The palette-cycle phase index at 0x00486160 (starts at 1); runtime-written
  * as the animated palette rotates, non-const, initial byte-checked. */
 int32_t am2_palette_cycle_index = 1;
+/* The LOGPALETTE at 0x00477A60: a {version=0x300, count=256} header then 256
+ * PALETTEENTRYs (zero at init, filled at runtime). One physical block read as
+ * LPLOGPALETTE and, past the 4-byte header, as the entry array; migrated as a
+ * byte block (non-zero header keeps it in .data), the entries aliased at +4. */
+uint8_t am2_logpalette[1028] = { 0x00, 0x03, 0x00, 0x01 };
 #endif
 
 #ifdef AM2_STANDALONE
