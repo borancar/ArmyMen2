@@ -35,6 +35,48 @@
 extern "C" const uint8_t am2_iid_ds3d_listener[16] =
     { 0x84,0xfa,0x9a,0x27, 0x81,0x49,0xce,0x11, 0xa5,0x21,0x00,0x20,0xaf,0x0b,0xe5,0x60 };
 
+
+#ifdef AM2_STANDALONE
+/* The 30 voice-line groups at 0x00474440 ({int32 count; const char *[4]}
+ * -- what a trooper says on a pickup), transcribed to C literals; the
+ * blob .wav-name strings then go dead. It sits immediately after
+ * am2_wave_names, so &am2_wave_names[56] (ADDR_WAVE_NAMES_END) and this
+ * coincide, as they did in the blob. */
+struct AM2_VoiceGroup { int32_t count; const char *n[4]; };
+extern "C" const AM2_VoiceGroup am2_voice_groups[30] = {
+    {1, {"Aerosol.wav", 0, 0, 0}},
+    {1, {"AirStrike.wav", 0, 0, 0}},
+    {1, {"AutoRifle.wav", 0, 0, 0}},
+    {1, {"Bazooka.wav", 0, 0, 0}},
+    {1, {"Disguise.wav", 0, 0, 0}},
+    {1, {"Explosives.wav", 0, 0, 0}},
+    {1, {"FlakJack.wav", 0, 0, 0}},
+    {1, {"FlameThrower.wav", 0, 0, 0}},
+    {1, {"Grenades.wav", 0, 0, 0}},
+    {1, {"HeavyMacGun.wav", 0, 0, 0}},
+    {1, {"M80s.wav", 0, 0, 0}},
+    {1, {"MagnifyingGlass.wav", 0, 0, 0}},
+    {1, {"MedKit.wav", 0, 0, 0}},
+    {1, {"Mines.wav", 0, 0, 0}},
+    {1, {"MineSweeper.wav", 0, 0, 0}},
+    {1, {"Mortar.wav", 0, 0, 0}},
+    {1, {"ParaTroopers.wav", 0, 0, 0}},
+    {1, {"Reconn.wav", 0, 0, 0}},
+    {1, {"SniperRifle.wav", 0, 0, 0}},
+    {1, {"VulcanGun.wav", 0, 0, 0}},
+    {1, {"Wrench.wav", 0, 0, 0}},
+    {1, {"moreAmmo.wav", 0, 0, 0}},
+    {1, {"HQairStrike.wav", 0, 0, 0}},
+    {1, {"HQReinforcements.wav", 0, 0, 0}},
+    {1, {"HQreconn.wav", 0, 0, 0}},
+    {3, {"Uooh.wav", "Ungh.wav", "Ungh2.wav", 0}},
+    {3, {"HitsSpot.wav", "IneededThat.wav", "StingOut.wav", 0}},
+    {4, {"Aah.wav", "Aah2.wav", "Aah3.wav", "Aah4.wav"}},
+    {4, {"overHere.wav", "RallyRoundBoys.wav", "coverMe.wav", "fallin.wav"}},
+    {3, {"freeze.wav", "Halt.wav", "HoldIt.wav", 0}},
+};
+#endif
+
 static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 
 #define g_audioEnabled  (*(const int32_t *)(uintptr_t)ADDR_AUDIO_ENABLED)

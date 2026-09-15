@@ -600,6 +600,11 @@ void  devtools_init(void);
 #define ADDR_WAVE_NAMES         ((uintptr_t)(const void *)am2_wave_names)
 #undef ADDR_WAVE_NAMES_END
 #define ADDR_WAVE_NAMES_END     ((uintptr_t)(const void *)(am2_wave_names + 56))
+/* am2_voice_groups (audio.cpp, AM2_VoiceGroup[30], was 0x00474440) is used
+ * only there; the redirect expands in that TU. It sits right after
+ * am2_wave_names, so it and ADDR_WAVE_NAMES_END resolve to the same address. */
+#undef ADDR_VOICE_GROUPS
+#define ADDR_VOICE_GROUPS       ((uintptr_t)(const void *)am2_voice_groups)
 #undef ADDR_KEY_NAME_TABLE
 #define ADDR_KEY_NAME_TABLE     ((uintptr_t)(const void *)am2_key_names)
 #undef ADDR_KEY_NAME_TABLE_END
