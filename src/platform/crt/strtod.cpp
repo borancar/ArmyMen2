@@ -21,6 +21,17 @@
 #include "../../inject/orig.h"
 #include "../../game/image.h"
 
+#ifdef AM2_STANDALONE
+/* The two __ld12cvt parameter blocks at 0x0048D3C8: [0] double (IEEE-754
+ * binary64) and [1] single (binary32); __ld12cvt for a double reads [0].
+ * Pure const data, so the blob copy drops -- placed at its VA, verified.
+ * (Its ADDRESS is also crt_nmsg_write's scan bound for the RTERR table.) */
+extern "C" const CRT_CVTINFO am2_crt_cvtinfo_double[2] = {
+    { 1024, -1023, 53, 11, 64, 1023 },   /* double: max/min exp, 53 mant, 11 exp, 8 bytes, bias 1023 */
+    {  128,  -127, 24,  8, 32,  127 },   /* single: 24 mant, 8 exp, 4 bytes, bias 127 */
+};
+#endif
+
 #define crt_errno       (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ERRNO))
 #define crt_mb_cur_max  (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MB_CUR_MAX))
 #define crt_pctype_tab  (*(const uint16_t **)(uintptr_t)AM2_IMAGE(ADDR_CRT_PCTYPE))

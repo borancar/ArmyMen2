@@ -179,6 +179,13 @@ typedef struct CRT_CVTINFO {
     int32_t max_exp, min_exp, mantbits, expbits, size, bias;
 } CRT_CVTINFO;
 
+#ifdef AM2_STANDALONE
+/* Defined in strtod.cpp, placed at 0x0048D3C8; read there and (by address, as
+ * the RTERR scan bound) in startup.cpp, so the declaration is shared here.
+ * (Already inside crt.h's extern "C" block, so no linkage keyword here.) */
+extern const CRT_CVTINFO am2_crt_cvtinfo_double[2];
+#endif
+
 /* 0x004653B7. Leading space skipped, then _fltin2: an overflow answers
  * +/-HUGE_VAL with ERANGE, an underflow 0 with ERANGE, no digits 0 with
  * *end at `s`. */
