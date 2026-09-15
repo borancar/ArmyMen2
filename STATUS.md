@@ -40,6 +40,21 @@ pure-data region stays byte-identical to the image (34.9% of meaningful bytes,
 byte-checked). Confirmed live: `state_actions` is RunFrame's per-frame
 state-dispatch table, and the native build runs dispatching through it.
 
+**UPDATE (2026-09-15): 140 symbols placed, 38.1% of meaningful bytes.** A run of
+name/keyword tables joined the placed set: the nine remaining COM GUIDs
+(IID/CLSID/APP/NULL), `am2_wave_names` (56 wave filenames), `am2_key_names` (the
+95-row controls-dialog key-name table), `am2_cheat_words` (41 cheat phrases),
+and `am2_def_keywords` (the 100-row .aai vocabulary, every handler a
+reconstructed line parser). Two pipeline improvements landed with them: the
+dead-string sweep now excludes migrated pointer-table ranges from its pointer
+scan, so a string only a migrated name table reached goes dead and is dropped
+too (184 -> 484 strings, 6,232 bytes zeroed); and find_definition's "mixed"
+tokenizer splits only top-level commas, so a label with a comma ("NUM ,") no
+longer mis-sizes a table. The clean named const/name tables are now essentially
+exhausted -- what remains in the blob is CRT data (src/platform/crt's remit),
+runtime-written state (needs the graph/relocate approach in SCOPE, runtime-
+verified), unnamed pointer bands, and the pointer-graph core.
+
 `build_menu_rects` is no longer its own symbol: `ADDR_BUILD_MENU_RECTS`
 (0x004762C0, a stride-0x38 rect table) shares its FIRST rect `{6,190,43,27}` with
 `pointer_modes[6]`'s unused tail ints -- the linker packed it there -- so it is
