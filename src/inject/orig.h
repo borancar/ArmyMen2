@@ -11215,6 +11215,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_DEF_LINK_GROW          0x14
 /* strtok's resumption pointer, the byte after the last token it cut. */
 #define ADDR_CRT_PCTYPE        0x0048CC98u /* const uint16_t *: the CRT's _pctype, a pointer to its 256-word classification table */
+#define ADDR_CRT_CTYPE_TABLE   0x0048CCA0u /* uint16_t[257]: the classification table itself; _pctype (0x0048CCA2) is this + 1, so index -1 (EOF) is entry 0 */
 #define ADDR_CRT_MB_CUR_MAX    0x0048CEA4u /* int32_t: __mb_cur_max, 1 under code page 1252 */
 #define ADDR_CRT_ERRNO         0x00664600u /* int32_t: the CRT's errno */
 #define ADDR_CRT_LC_HANDLE_CTYPE 0x00664674u /* int32_t: __lc_handle[LC_CTYPE], 0 while the locale is "C" -- _stricmp and _strlwr take their ASCII arm on it */

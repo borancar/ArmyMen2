@@ -66,7 +66,7 @@ reads records 1-6 from the placed `pointer_modes` storage -- consistent because
 it is one physical table. The SA/mingw build keeps the `--section-start` blob
 path (PE linker scripts differ); native was the stated priority.
 
-**UPDATE (2026-09-15): 159 symbols placed, 61.6% of meaningful bytes.** Later
+**UPDATE (2026-09-15): 160 symbols placed, 61.9% of meaningful bytes.** Later
 batches: `UNIT_TYPES` (720B of pure data, inline names -- the sweep now skips
 runs inside a placed symbol so those names are not zeroed), `VOICE_GROUPS` (30
 pickup voice-line records), `SCRIPT_KIND_NAMES`, `SOLDIER_NAMES` (62 records,
@@ -83,7 +83,10 @@ run of `src/platform/crt` const tables the reconstructed CRT reads via
 `uint8_t` blobs the byte-addressed reader wants), plus the `HUGE_VAL` (+inf)
 constant. A last handful of small game tables joined: the trooper heading-sweep
 deltas `step_facing_sweep`, the nine airstrike slot records `slot_recs`, and the
-one-entry `unit_name_sarge` char* slot (which freed its "Sarge" blob string). A separate lever dropped code-read strings: 36
+one-entry `unit_name_sarge` char* slot (which freed its "Sarge" blob string).
+Finally the CRT `_pctype` classification table (257 words at 0x0048CCA0):
+transcribed under a new `ADDR_CRT_CTYPE_TABLE` base macro, with the existing
+`_pctype` blob pointer slot left pointing one entry into the placed copy. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
 sweep to **1,356 strings, 31,985 bytes zeroed**.

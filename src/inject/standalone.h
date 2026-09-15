@@ -740,6 +740,11 @@ void  devtools_init(void);
 #undef ADDR_CRT_HUGE_VAL
 #define ADDR_CRT_HUGE_VAL       ((uintptr_t)(const void *)am2_crt_huge_val)
 
+/* The CRT _pctype classification table (conv.cpp), pure const uint16 data; the
+ * ADDR_CRT_PCTYPE blob slot still points one entry into it, so it stays. */
+#undef ADDR_CRT_CTYPE_TABLE
+#define ADDR_CRT_CTYPE_TABLE    ((uintptr_t)(const void *)am2_crt_ctype)
+
 /* Small game const tables: the trooper heading-sweep deltas (region.cpp), the
  * airstrike slot records (air.cpp), and the "Sarge" unit-name slot (item.cpp). */
 #undef ADDR_STEP_FACING_SWEEP
