@@ -22,6 +22,20 @@
 #include "../../inject/orig.h"
 #include "../../game/image.h"
 
+#ifdef AM2_STANDALONE
+/* The CRT's two cumulative day-of-year tables at 0x0048D4B4 (_lpdays) and
+ * 0x0048D4E8 (_days): the day count at the start of month `m` is table[m-1],
+ * with a leading -1 so day-of-month arithmetic lands on the right index. Pure
+ * constant data read by crt_cvtdate below, so the blob copies drop -- placed at
+ * their VAs and byte-verified by tools/checkplacement.py. */
+extern "C" const int32_t am2_crt_lpdays[13] = {
+    -1, 30, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365,
+};
+extern "C" const int32_t am2_crt_days[13] = {
+    -1, 30, 58, 89, 119, 150, 180, 211, 242, 272, 303, 333, 364,
+};
+#endif
+
 #define G32(addr)  (*(int32_t *)(uintptr_t)AM2_IMAGE(addr))
 #define crt_timezone        G32(ADDR_CRT_TIMEZONE)
 #define crt_daylight        G32(ADDR_CRT_DAYLIGHT)

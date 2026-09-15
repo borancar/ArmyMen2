@@ -66,6 +66,17 @@ reads records 1-6 from the placed `pointer_modes` storage -- consistent because
 it is one physical table. The SA/mingw build keeps the `--section-start` blob
 path (PE linker scripts differ); native was the stated priority.
 
+**UPDATE (2026-09-15): 148 symbols placed, 59.1% of meaningful bytes.** Later
+batches: `UNIT_TYPES` (720B of pure data, inline names -- the sweep now skips
+runs inside a placed symbol so those names are not zeroed), `VOICE_GROUPS` (30
+pickup voice-line records), `SCRIPT_KIND_NAMES`, `SOLDIER_NAMES` (62 records,
+migrated NON-const because `TakeSoldierName` marks one taken at runtime -- the
+parser now accepts a non-const table and byte-checks its initial value), and the
+CRT day-of-year tables `_lpdays`/`_days` (time.cpp, pure const int32). A separate
+lever dropped code-read strings: 36 macro-read blob strings folded to C literals
+(`tools/foldstrings.py`), then 14 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded
+too, taking the dead-string sweep to **1,343 strings, 31,567 bytes zeroed**.
+
 ## MIGRATION (2026-09-11): global structures transcribed out of the blob
 
 The native/standalone builds carry the original's `.rdata`/`.data` as one blob
