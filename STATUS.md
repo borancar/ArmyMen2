@@ -66,16 +66,22 @@ reads records 1-6 from the placed `pointer_modes` storage -- consistent because
 it is one physical table. The SA/mingw build keeps the `--section-start` blob
 path (PE linker scripts differ); native was the stated priority.
 
-**UPDATE (2026-09-15): 148 symbols placed, 59.1% of meaningful bytes.** Later
+**UPDATE (2026-09-15): 153 symbols placed, 60.1% of meaningful bytes.** Later
 batches: `UNIT_TYPES` (720B of pure data, inline names -- the sweep now skips
 runs inside a placed symbol so those names are not zeroed), `VOICE_GROUPS` (30
 pickup voice-line records), `SCRIPT_KIND_NAMES`, `SOLDIER_NAMES` (62 records,
 migrated NON-const because `TakeSoldierName` marks one taken at runtime -- the
-parser now accepts a non-const table and byte-checks its initial value), and the
-CRT day-of-year tables `_lpdays`/`_days` (time.cpp, pure const int32). A separate
-lever dropped code-read strings: 36 macro-read blob strings folded to C literals
-(`tools/foldstrings.py`), then 14 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded
-too, taking the dead-string sweep to **1,343 strings, 31,567 bytes zeroed**.
+parser now accepts a non-const table and byte-checks its initial value). Then a
+run of `src/platform/crt` const tables the reconstructed CRT reads via
+`AM2_IMAGE`: the day-of-year tables `_lpdays`/`_days`, the OS-error->errno map
+`errtable` (+`_END`), the multibyte-codepage init tables
+`mbctype_range_flags`/`mbcp_table` (932/936/949/950/1361), the two `__ld12cvt`
+`CVTINFO` parameter blocks, and the runtime-error message table `rterr_table`
+(18 `{int, char*}` pairs, migrated mixed -- which also freed its ~600 bytes of
+`R60xx` message strings). A separate lever dropped code-read strings: 36
+macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
+bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
+sweep to **1,355 strings, 31,979 bytes zeroed**.
 
 ## MIGRATION (2026-09-11): global structures transcribed out of the blob
 
@@ -243,7 +249,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **1,343 strings, 31,567 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **1,355 strings, 31,979 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus

@@ -29,6 +29,34 @@
 #include "../../game/image.h"
 
 #ifdef AM2_STANDALONE
+/* The runtime-error message table at 0x0048D338 that crt_nmsg_write scans:
+ * 18 {error number, message} pairs, up to ADDR_CRT_CVTINFO_DOUBLE. Migrating
+ * it to C literals drops both the table and its ~600 bytes of message strings
+ * from the blob (the sweep no longer sees a live pointer into them). On -m32
+ * int32_t and const char* are both 4 bytes, so the int32* stride the reader
+ * uses still lands one field per step. */
+struct AM2_RtErr { int32_t num; const char *msg; };
+extern "C" const AM2_RtErr am2_crt_rterr_table[18] = {
+    { 0x0002, "R6002\r\n- floating point not loaded\r\n" },
+    { 0x0008, "R6008\r\n- not enough space for arguments\r\n" },
+    { 0x0009, "R6009\r\n- not enough space for environment\r\n" },
+    { 0x000A, "\r\nabnormal program termination\r\n" },
+    { 0x0010, "R6016\r\n- not enough space for thread data\r\n" },
+    { 0x0011, "R6017\r\n- unexpected multithread lock error\r\n" },
+    { 0x0012, "R6018\r\n- unexpected heap error\r\n" },
+    { 0x0013, "R6019\r\n- unable to open console device\r\n" },
+    { 0x0018, "R6024\r\n- not enough space for _onexit/atexit table\r\n" },
+    { 0x0019, "R6025\r\n- pure virtual function call\r\n" },
+    { 0x001A, "R6026\r\n- not enough space for stdio initialization\r\n" },
+    { 0x001B, "R6027\r\n- not enough space for lowio initialization\r\n" },
+    { 0x001C, "R6028\r\n- unable to initialize heap\r\n" },
+    { 0x0078, "DOMAIN error\r\n" },
+    { 0x0079, "SING error\r\n" },
+    { 0x007A, "TLOSS error\r\n" },
+    { 0x00FC, "\r\n" },
+    { 0x00FF, "runtime error " },
+};
+
 /* The multibyte-codepage init data crt_setmbcp reads: eight range-set flag
  * bytes at 0x0048D520, and the five-record codepage table at 0x0048D528
  * (932/936/949/950/1361; 0x30 bytes each, scanned up to ADDR_CRT_POW10_TABLE).
