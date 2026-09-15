@@ -19,6 +19,11 @@
 #include "../inject/orig.h"
 
 #ifdef AM2_STANDALONE
+/* The -df debug-mode flag at 0x0047894C (ships as 1, so -df is OFF by default;
+ * `-df` on the command line clears it). Read across winmain/frame/misc/sprite,
+ * runtime-written, so non-const; initial value byte-checked. Plain linkage to
+ * match standalone.h's shared declaration. */
+uint32_t am2_opt_df = 1u;
 /* The float/double CONSTANTS the reconstruction reads out of the carried
  * .rdata blob, transcribed into typed C (STATUS.md's MIGRATION note). Each is
  * verified to round-trip to the image's exact bit pattern -- the decimal

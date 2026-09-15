@@ -824,6 +824,11 @@ extern const uint32_t am2_crt_inittab[36];
 #undef ADDR_CRT_IOB
 #define ADDR_CRT_IOB            ((uintptr_t)(const void *)am2_crt_iob)
 
+/* The -df debug-mode flag (misc.cpp), read across the win32 layer. */
+extern uint32_t am2_opt_df;
+#undef ADDR_OPT_DF
+#define ADDR_OPT_DF             ((uintptr_t)(const void *)&am2_opt_df)
+
 /* The comm-object slot / army table / enum count (commmsg.cpp), read across
  * the game; base aliases ARMY_TABLE and COMM_OBJECT, the count is at +1. */
 extern uint32_t am2_comm_object[2];
