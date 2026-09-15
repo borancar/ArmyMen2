@@ -18,6 +18,12 @@
 #include "armymsg.h"  /* DamageBroadcast */
 #include "commmsg.h" /* TrooperFireSend -- reconstructed */
 #include "item.h"     /* ObjClearFootprint, ObjClearRoachFootprint */
+
+#ifdef AM2_STANDALONE
+/* The six heading-sweep deltas at 0x00489E00 the stuck-trooper turn walks
+ * through (step[0..5]). Pure const int32 data, placed at its VA. */
+extern "C" const int32_t am2_step_facing_sweep[6] = { 32, -64, 96, -128, -96, 32 };
+#endif
 #include "gameproc.h" /* Call405220 -- the `defend` arm's thunk */
 #include "item.h"     /* ObjectsHitByPoint -- reconstructed */
 #include "image.h"

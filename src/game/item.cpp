@@ -66,6 +66,10 @@ void __cdecl ShakeAt(const AM2_Point *at, int32_t strength);
 #include "trig.h"     /* Cos8, Sin8 -- reconstructed */
 
 #ifdef AM2_STANDALONE
+/* The pointer slot at 0x00489B40 holding the "Sarge" unit name UnitClassName
+ * returns for a sergeant. A one-entry char* table so the blob "Sarge" drops. */
+extern "C" const char *const am2_unit_name_sarge[1] = { "Sarge" };
+
 /* The 62 soldier names at 0x00489BF8 ({const char *name; int32 taken}).
  * NON-const: TakeSoldierName marks a name taken at runtime; the initial
  * taken is 0 and the names are literals, so the blob name strings drop. */

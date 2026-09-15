@@ -30,6 +30,11 @@ extern "C" const CRT_CVTINFO am2_crt_cvtinfo_double[2] = {
     { 1024, -1023, 53, 11, 64, 1023 },   /* double: max/min exp, 53 mant, 11 exp, 8 bytes, bias 1023 */
     {  128,  -127, 24,  8, 32,  127 },   /* single: 24 mant, 8 exp, 4 bytes, bias 127 */
 };
+
+/* The double crt_strtod answers on overflow: +HUGE_VAL (0x7FF0..0 = +inf) at
+ * 0x0048CEB0. Transcribed as the byte pattern (a numeric long-double literal
+ * would not byte-match); read back as a double. */
+extern "C" const uint8_t am2_crt_huge_val[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0x7F };
 #endif
 
 #define crt_errno       (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ERRNO))
