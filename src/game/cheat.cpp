@@ -40,6 +40,23 @@ typedef int32_t (__cdecl *am2_stricmp_fn)(const char *a, const char *b);
 
 /* The phrase table: entry 0 is the master switch, 1..39 are the cheats and
  * entry 40 is a sentinel the walk stops at rather than compares. */
+#ifdef AM2_STANDALONE
+/* Transcribed to C literals out of the blob at 0x00476704 (const char*[41]);
+ * the blob's phrase strings then go dead and the sweep drops them. */
+extern "C" const char *const am2_cheat_words[41] = {
+    "when all else fails...", "santini", "warp 6", "jumpjets",
+    "spidey senses tingling", "moleman", "doctor doctor", "ucla",
+    "armageddon", "surprise party", "phoenix!", "cliche ending",
+    "i have a rock", "village people", "no rocket launcher", "a better tomorrow",
+    "acme discs", "gnomish inventions", "pooper scooper", "shrink wrap",
+    "metal sheeting", "smorfs", "aluminum foil", "ruby ray",
+    "roach spray", "fourth of july", "beautiful nikita", "geronimo!",
+    "watchtower in the sky", "paper dolls", "rubber cement", "techno",
+    "god of gamblers", "ninja arts", "suicide kings", "night of the walking dead",
+    "fond memories", "veni vidi vinci", "i give up", "patton's speach",
+    "xxx",
+};
+#endif
 #define kCheatWords  ((const char *const *)(uintptr_t)ADDR_CHEAT_WORDS)
 
 #define g_cheatEnabled  (*(int32_t *)(uintptr_t)ADDR_CHEAT_ENABLED)

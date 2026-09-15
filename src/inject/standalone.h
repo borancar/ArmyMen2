@@ -163,6 +163,7 @@ extern const uint8_t am2_iid_directplay4a[16], am2_clsid_directplay[16];
 extern const uint8_t am2_iid_dplay_lobby3a[16], am2_clsid_dplay_lobby[16];
 extern const uint8_t am2_guid_game_property[16], am2_app_guid[16], am2_guid_null[16];
 extern const char *const am2_wave_names[56];
+extern const char *const am2_cheat_words[41];
 extern const int32_t am2_shake_presets[44];          /* mapdraw.cpp, was 0x00486170 */
 extern const int16_t am2_aim_displace_map[25088];    /* mapdraw.cpp, was 0x00478CDC */
 extern const int32_t am2_pad_bit_table[66];          /* pad.cpp, was 0x00486444 */
@@ -600,6 +601,8 @@ void  devtools_init(void);
 #define ADDR_KEY_NAME_TABLE     ((uintptr_t)(const void *)am2_key_names)
 #undef ADDR_KEY_NAME_TABLE_END
 #define ADDR_KEY_NAME_TABLE_END ((uintptr_t)(const void *)(am2_key_names + 95))
+#undef ADDR_CHEAT_WORDS
+#define ADDR_CHEAT_WORDS        ((uintptr_t)(const void *)am2_cheat_words)
 #undef ADDR_SHAKE_PRESETS
 #define ADDR_SHAKE_PRESETS      ((uintptr_t)(const void *)am2_shake_presets)
 #undef ADDR_AIM_DISPLACE_MAP
