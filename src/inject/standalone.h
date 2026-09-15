@@ -164,6 +164,7 @@ extern const uint8_t am2_iid_dplay_lobby3a[16], am2_clsid_dplay_lobby[16];
 extern const uint8_t am2_guid_game_property[16], am2_app_guid[16], am2_guid_null[16];
 extern const char *const am2_wave_names[56];
 extern const char *const am2_cheat_words[41];
+extern const char *const am2_script_kind_names[7];   /* script.cpp, was 0x00487C74 */
 extern const uint8_t am2_frame_heading_bias[152];    /* maprow.cpp, was 0x004740CC */
 extern const uint8_t am2_unit_types[720];            /* place.cpp, was 0x00487898 */
 extern const int32_t am2_menu_save_slot[4];          /* surface.cpp, was 0x00476198 */
@@ -605,6 +606,8 @@ void  devtools_init(void);
  * am2_wave_names, so it and ADDR_WAVE_NAMES_END resolve to the same address. */
 #undef ADDR_VOICE_GROUPS
 #define ADDR_VOICE_GROUPS       ((uintptr_t)(const void *)am2_voice_groups)
+#undef ADDR_SCRIPT_KIND_NAMES
+#define ADDR_SCRIPT_KIND_NAMES  ((uintptr_t)(const void *)am2_script_kind_names)
 #undef ADDR_KEY_NAME_TABLE
 #define ADDR_KEY_NAME_TABLE     ((uintptr_t)(const void *)am2_key_names)
 #undef ADDR_KEY_NAME_TABLE_END

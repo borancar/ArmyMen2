@@ -19,6 +19,15 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
+#ifdef AM2_STANDALONE
+/* The seven token-kind names at 0x00487C74 (a const char*[7], indexed by
+ * kKindName), transcribed to C literals; the blob's name strings then drop. */
+extern "C" const char *const am2_script_kind_names[7] = {
+    "Unknown", "Control Character", "Reserved", "Integer",
+    "Float", "String", "Name",
+};
+#endif
+
 /* PreloadSprite is reconstructed, in win32/sprite.cpp with the rest of the
  * sprite record. It is declared here rather than by including that header
  * because script.cpp is on the flat side of the split and must name no Win32
