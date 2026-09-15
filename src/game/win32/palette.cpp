@@ -46,6 +46,12 @@
 /* The palette-cycle phase index at 0x00486160 (starts at 1); runtime-written
  * as the animated palette rotates, non-const, initial byte-checked. */
 int32_t am2_palette_cycle_index = 1;
+/* The active-palette pointer at 0x00477A58 (also read as MOVIE_PALETTE_OWNER)
+ * and the remap-tint pointer at 0x0047826C: runtime-written pointers into the
+ * placed origbss palette buffers, so the raw init value resolves. Plain linkage
+ * (active_palette is read across the win32 layer via standalone.h). */
+uint32_t am2_active_palette = 0x004FD770u;
+uint32_t am2_remap_tint = 0x004FE1B0u;
 /* The LOGPALETTE at 0x00477A60: a {version=0x300, count=256} header then 256
  * PALETTEENTRYs (zero at init, filled at runtime). One physical block read as
  * LPLOGPALETTE and, past the 4-byte header, as the entry array; migrated as a

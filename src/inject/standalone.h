@@ -899,6 +899,20 @@ extern int32_t am2_screen_geom[12];
 #define ADDR_REGION_SEARCH_STATE ((uintptr_t)(const void *)&am2_region_search_state)
 #undef ADDR_PALETTE_CYCLE_INDEX
 #define ADDR_PALETTE_CYCLE_INDEX ((uintptr_t)(const void *)&am2_palette_cycle_index)
+/* Runtime-written palette/charset pointer slots (palette.cpp / widget.cpp),
+ * pointing into placed origbss/origdat buffers, so the raw values resolve. */
+extern uint32_t am2_active_palette, am2_remap_tint;
+#undef ADDR_ACTIVE_PALETTE
+#define ADDR_ACTIVE_PALETTE     ((uintptr_t)(const void *)&am2_active_palette)
+#undef ADDR_MOVIE_PALETTE_OWNER
+#define ADDR_MOVIE_PALETTE_OWNER ((uintptr_t)(const void *)&am2_active_palette)
+#undef ADDR_REMAP_TINT
+#define ADDR_REMAP_TINT         ((uintptr_t)(const void *)&am2_remap_tint)
+#undef ADDR_EDIT_CHARSET_PTR
+#define ADDR_EDIT_CHARSET_PTR   ((uintptr_t)(const void *)&am2_edit_charset_ptr)
+#undef ADDR_CRT_TZNAME
+#define ADDR_CRT_TZNAME         ((uintptr_t)(const void *)am2_crt_tzname)
+
 /* The LOGPALETTE block (palette.cpp): base places it, entries alias at +4. */
 extern uint8_t am2_logpalette[1028];
 #undef ADDR_LOGPALETTE

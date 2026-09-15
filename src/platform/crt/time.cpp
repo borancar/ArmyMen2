@@ -45,6 +45,10 @@ extern "C" const int32_t am2_crt_days[13] = {
 extern "C" int32_t am2_crt_tz_state[3] = { 28800, 1, -3600 };  /* timezone, daylight, dstbias */
 extern "C" int32_t am2_crt_dst_start[3] = { -1, 0, 0 };        /* year, yday, ms */
 extern "C" int32_t am2_crt_dst_end[3] = { -1, 0, 0 };
+/* The _tzname[2] array at 0x0048D48C: two char* into the placed origdat name
+ * buffers (init "PST"/"PDT" at 0x0048D40C/0x0048D44C, which __tzset overwrites);
+ * the raw pointers resolve because those buffers stay in the blob region. */
+extern "C" uint32_t am2_crt_tzname[2] = { 0x0048D40Cu, 0x0048D44Cu };
 #endif
 
 #define G32(addr)  (*(int32_t *)(uintptr_t)AM2_IMAGE(addr))

@@ -41,6 +41,9 @@
 /* The debug blast-kind selector at 0x00476FB4 (default kind 121), used only
  * here; runtime-written, migrated non-const, initial byte-checked. */
 int32_t am2_debug_blast_kind = 121;
+/* The active edit-field charset pointer at 0x00485308 (runtime-written; points
+ * at the placed origdat charset buffer, so the raw init value resolves). */
+uint32_t am2_edit_charset_ptr = 0x00485360u;
 /* The default edit-field character set at 0x00485304 (a char* slot); the blob
  * string then drops. EDIT_CHARSET_PTR stays -- it is a runtime-written pointer. */
 extern "C" const char *const am2_edit_charset_default[1] = {
