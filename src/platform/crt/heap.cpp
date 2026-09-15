@@ -29,6 +29,13 @@
 #include "../../inject/orig.h"
 #include "../../game/image.h"
 
+#ifdef AM2_STANDALONE
+/* The small-block-heap threshold at 0x0048CC74 (1016 = 0x3F8, the largest
+ * request the SBH satisfies); runtime-written by the heap init, non-const,
+ * initial byte-checked. */
+extern "C" uint32_t am2_crt_sbh_threshold = 1016;
+#endif
+
 #define G32(a)  (*(int32_t *)(uintptr_t)AM2_IMAGE(a))
 #define GU32(a) (*(uint32_t *)(uintptr_t)AM2_IMAGE(a))
 #define crt_sbh_threshold   GU32(ADDR_CRT_SBH_THRESHOLD)

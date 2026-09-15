@@ -770,6 +770,15 @@ void  devtools_init(void);
 #undef ADDR_CRT_DST_END_MS
 #define ADDR_CRT_DST_END_MS     ((uintptr_t)(const void *)&am2_crt_dst_end[2])
 
+/* CRT Pentium-FDIV self-test doubles (startup.cpp) and small-block-heap
+ * threshold (heap.cpp), each read in one TU. */
+#undef ADDR_CRT_FDIV_NUM
+#define ADDR_CRT_FDIV_NUM       ((uintptr_t)(const void *)&am2_crt_fdiv_num)
+#undef ADDR_CRT_FDIV_DEN
+#define ADDR_CRT_FDIV_DEN       ((uintptr_t)(const void *)&am2_crt_fdiv_den)
+#undef ADDR_CRT_SBH_THRESHOLD
+#define ADDR_CRT_SBH_THRESHOLD  ((uintptr_t)(const void *)&am2_crt_sbh_threshold)
+
 /* More CRT runtime .data-init scalars (conv/startup/fltcvt.cpp). */
 #undef ADDR_CRT_MB_CUR_MAX
 #define ADDR_CRT_MB_CUR_MAX     ((uintptr_t)(const void *)&am2_crt_mb_cur_max)

@@ -37,6 +37,10 @@
  * uses still lands one field per step. */
 /* __app_type at 0x0048CC54 (2 = GUI; __set_app_type writes it at startup). */
 extern "C" int32_t am2_crt_app_type = 2;
+/* The Pentium-FDIV self-test operands at 0x0046FDB8/0x0046FDC0 (the famous
+ * 4195835.0 / 3145727.0 division _adjust_fdiv runs). Read-only const doubles. */
+extern "C" const double am2_crt_fdiv_num = 4195835.0;
+extern "C" const double am2_crt_fdiv_den = 3145727.0;
 
 struct AM2_RtErr { int32_t num; const char *msg; };
 extern "C" const AM2_RtErr am2_crt_rterr_table[18] = {
