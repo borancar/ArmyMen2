@@ -35,6 +35,9 @@ extern "C" const CRT_CVTINFO am2_crt_cvtinfo_double[2] = {
  * 0x0048CEB0. Transcribed as the byte pattern (a numeric long-double literal
  * would not byte-match); read back as a double. */
 extern "C" const uint8_t am2_crt_huge_val[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0x7F };
+/* The _fltin2 result-record pointer slot at 0x0048CEB8 (points at a CRT_FLT in
+ * origbss, which is placed, so the raw value resolves); runtime-written. */
+extern "C" uint32_t am2_crt_flt_ptr = 0x00664650u;
 #endif
 
 #define crt_errno       (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ERRNO))

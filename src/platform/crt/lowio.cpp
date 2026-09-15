@@ -23,6 +23,9 @@
  * crt_dosmaperr scans, ending at ADDR_CRT_ERRTABLE_END. Pure const data, so
  * the blob copy drops -- placed at its VA and byte-verified. ERRTABLE_END is
  * the loop bound, one past the array. */
+/* The __badioinfo sentinel at 0x0048CC90 ({osfhnd=-1, osfile=0, pipech=0x0A,
+ * pad}) that _pioinfo returns for a bad fd. A fixed CRT_IOINFO, byte-checked. */
+extern "C" const uint8_t am2_crt_badioinfo[8] = { 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0A, 0x00, 0x00 };
 extern "C" const uint32_t am2_crt_errtable[90] = {
     0x00000001u, 22u, 0x00000002u, 2u,  0x00000003u, 2u,  0x00000004u, 24u,
     0x00000005u, 13u, 0x00000006u, 9u,  0x00000007u, 12u, 0x00000008u, 12u,

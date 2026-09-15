@@ -802,6 +802,17 @@ extern const uint32_t am2_crt_inittab[36];
 #undef ADDR_CRT_SBH_THRESHOLD
 #define ADDR_CRT_SBH_THRESHOLD  ((uintptr_t)(const void *)&am2_crt_sbh_threshold)
 
+/* CRT pointer slots: _fpinit/_exit (startup.cpp, dead image ptrs), the _fltin2
+ * result pointer (strtod.cpp), and the __badioinfo sentinel (lowio.cpp). */
+#undef ADDR_CRT_FPINIT_PTR
+#define ADDR_CRT_FPINIT_PTR     ((uintptr_t)(const void *)&am2_crt_fpinit_ptr)
+#undef ADDR_CRT_EXIT_FN_PTR
+#define ADDR_CRT_EXIT_FN_PTR    ((uintptr_t)(const void *)&am2_crt_exit_fn_ptr)
+#undef ADDR_CRT_FLT_PTR
+#define ADDR_CRT_FLT_PTR        ((uintptr_t)(const void *)&am2_crt_flt_ptr)
+#undef ADDR_CRT_BADIOINFO
+#define ADDR_CRT_BADIOINFO      ((uintptr_t)(const void *)am2_crt_badioinfo)
+
 /* More CRT runtime .data-init scalars (conv/startup/fltcvt.cpp). */
 #undef ADDR_CRT_MB_CUR_MAX
 #define ADDR_CRT_MB_CUR_MAX     ((uintptr_t)(const void *)&am2_crt_mb_cur_max)

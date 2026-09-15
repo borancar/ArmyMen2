@@ -37,6 +37,11 @@
  * uses still lands one field per step. */
 /* __app_type at 0x0048CC54 (2 = GUI; __set_app_type writes it at startup). */
 extern "C" int32_t am2_crt_app_type = 2;
+/* The _fpinit and _exit function-pointer slots at 0x0048CC28 / 0x0048CC50: image
+ * .text addresses, so crt_cinit's call through them is dead in native (the boot
+ * proves it -- see the init/term tables). Transcribed byte-exact as pointers. */
+extern "C" const uint32_t am2_crt_fpinit_ptr = 0x0046443Eu;
+extern "C" const uint32_t am2_crt_exit_fn_ptr = 0x00469320u;
 /* The Pentium-FDIV self-test operands at 0x0046FDB8/0x0046FDC0 (the famous
  * 4195835.0 / 3145727.0 division _adjust_fdiv runs). Read-only const doubles. */
 extern "C" const double am2_crt_fdiv_num = 4195835.0;
