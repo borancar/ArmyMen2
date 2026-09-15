@@ -4943,6 +4943,7 @@
  * original does -- `call dword ptr [0x0046F084]` -- and air.cpp is on the flat
  * side of the split, where naming a Win32 declaration is what
  * tools/checksplit.py exists to refuse. */
+#define ADDR_IAT_BASE            0x0046F000u  /* base of the 180-slot import address table (0x0046F000..0x0046F2D0) */
 #define ADDR_IAT_GET_TICK_COUNT  0x0046F084u  /* uint32_t (__stdcall *)(void) */
 /* USER32!IntersectRect. Reached through the game's own IAT slot, not imported
  * by am2hook.dll -- the convention device.cpp keeps for DirectInput, where an

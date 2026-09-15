@@ -875,6 +875,34 @@ extern uint8_t am2_gdi_palette[1024];
 #undef ADDR_GDI_PALETTE
 #define ADDR_GDI_PALETTE        ((uintptr_t)(const void *)am2_gdi_palette)
 
+/* The import address table (runtime.cpp): base places the 180-slot array,
+ * imports.cpp fills it by raw address, reconstructed code reads a few slots. */
+extern uint8_t am2_iat[720];
+#undef ADDR_IAT_BASE
+#define ADDR_IAT_BASE           ((uintptr_t)(const void *)am2_iat)
+#undef ADDR_IAT_GET_TICK_COUNT
+#define ADDR_IAT_GET_TICK_COUNT ((uintptr_t)(const void *)&am2_iat[0x84])
+#undef ADDR_IAT_INTERSECT_RECT
+#define ADDR_IAT_INTERSECT_RECT ((uintptr_t)(const void *)&am2_iat[0x258])
+#undef ADDR_IAT_SMACK_VOLUMEPAN
+#define ADDR_IAT_SMACK_VOLUMEPAN ((uintptr_t)(const void *)&am2_iat[0x2AC])
+#undef ADDR_IAT_SMACK_TO_BUFFER
+#define ADDR_IAT_SMACK_TO_BUFFER ((uintptr_t)(const void *)&am2_iat[0x2B0])
+#undef ADDR_IAT_SMACK_DO_FRAME
+#define ADDR_IAT_SMACK_DO_FRAME  ((uintptr_t)(const void *)&am2_iat[0x2B4])
+#undef ADDR_IAT_SMACK_NEXT_FRAME
+#define ADDR_IAT_SMACK_NEXT_FRAME ((uintptr_t)(const void *)&am2_iat[0x2B8])
+#undef ADDR_IAT_SMACK_WAIT
+#define ADDR_IAT_SMACK_WAIT      ((uintptr_t)(const void *)&am2_iat[0x2BC])
+#undef ADDR_IAT_SMACK_CLOSE
+#define ADDR_IAT_SMACK_CLOSE     ((uintptr_t)(const void *)&am2_iat[0x2C0])
+#undef ADDR_IAT_SMACK_USE_DSOUND
+#define ADDR_IAT_SMACK_USE_DSOUND ((uintptr_t)(const void *)&am2_iat[0x2C4])
+#undef ADDR_IAT_SMACK_OPEN
+#define ADDR_IAT_SMACK_OPEN      ((uintptr_t)(const void *)&am2_iat[0x2C8])
+#undef ADDR_IAT_SMACK_DDTYPE
+#define ADDR_IAT_SMACK_DDTYPE    ((uintptr_t)(const void *)&am2_iat[0x2CC])
+
 /* The comm state block (dplay.cpp): message-list heads, event handles, and the
  * packet pool head (which continues into origbss). Base places it; each field
  * aliases to its slot. Read by dplay.cpp and commmsg.cpp. */
