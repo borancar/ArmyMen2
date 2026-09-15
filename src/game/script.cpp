@@ -26,6 +26,12 @@ extern "C" const char *const am2_script_kind_names[7] = {
     "Unknown", "Control Character", "Reserved", "Integer",
     "Float", "String", "Name",
 };
+/* The five score-variable name slots at 0x00487C60 (const char*[5]), read by
+ * name-table registration; transcribed so the blob name strings drop. The base
+ * places the array, the other four alias into it. */
+extern "C" const char *const am2_name_score_vars[5] = {
+    "gamescorelimit", "greenscore", "tanscore", "bluescore", "greyscore",
+};
 #endif
 
 /* PreloadSprite is reconstructed, in win32/sprite.cpp with the rest of the

@@ -783,6 +783,18 @@ extern uint32_t am2_rand_seed;
 #undef ADDR_RAND_SEED
 #define ADDR_RAND_SEED          ((uintptr_t)(const void *)&am2_rand_seed)
 
+/* The five score-variable name slots (script.cpp); base places, fields alias. */
+#undef ADDR_NAME_SCORE_LIMIT
+#define ADDR_NAME_SCORE_LIMIT   ((uintptr_t)(const void *)am2_name_score_vars)
+#undef ADDR_NAME_GREENSCORE
+#define ADDR_NAME_GREENSCORE    ((uintptr_t)(const void *)&am2_name_score_vars[1])
+#undef ADDR_NAME_TANSCORE
+#define ADDR_NAME_TANSCORE      ((uintptr_t)(const void *)&am2_name_score_vars[2])
+#undef ADDR_NAME_BLUESCORE
+#define ADDR_NAME_BLUESCORE     ((uintptr_t)(const void *)&am2_name_score_vars[3])
+#undef ADDR_NAME_GREYSCORE
+#define ADDR_NAME_GREYSCORE     ((uintptr_t)(const void *)&am2_name_score_vars[4])
+
 /* Small game const tables: the trooper heading-sweep deltas (region.cpp), the
  * airstrike slot records (air.cpp), and the "Sarge" unit-name slot (item.cpp). */
 #undef ADDR_STEP_FACING_SWEEP
