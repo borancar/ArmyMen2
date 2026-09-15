@@ -42,6 +42,16 @@ extern "C" int32_t am2_trace_window(void) __attribute__((weak));
 #define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())
 
 #ifdef AM2_STANDALONE
+/* The sprite-slot pointer slots the load path fills (0 at init, set to a
+ * PreloadSprite result array and cleared on teardown): decal (0x0048CBA0),
+ * seq-5 (0x0048CBA8), seq-7 (0x0048CB98), mark (0x0048CBB0) and the MP mark
+ * grid (0x0048CBB8), each a single dword between the placed count fields.
+ * All-zero, so forced into .data (placement cannot gather a .bss global). */
+uint32_t am2_seq_sprites_7[1] __attribute__((section(".data.am2_seq_sprites_7"))) = { 0 };
+uint32_t am2_decal_sprites[1] __attribute__((section(".data.am2_decal_sprites"))) = { 0 };
+uint32_t am2_seq_sprites_5[1] __attribute__((section(".data.am2_seq_sprites_5"))) = { 0 };
+uint32_t am2_mark_sprites[1]  __attribute__((section(".data.am2_mark_sprites")))  = { 0 };
+uint32_t am2_mp_mark_grid[1]  __attribute__((section(".data.am2_mp_mark_grid")))  = { 0 };
 /* Sprite-grid and sequence sprite-count constants transcribed out of the blob;
  * all int32, read-only. */
 extern "C" const int32_t am2_sprite_grid_rows   = 8;        /* 0x0048CA38 */

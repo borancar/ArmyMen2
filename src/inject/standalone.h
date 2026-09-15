@@ -824,6 +824,20 @@ extern const uint32_t am2_crt_inittab[36];
 #undef ADDR_CRT_IOB
 #define ADDR_CRT_IOB            ((uintptr_t)(const void *)am2_crt_iob)
 
+/* The load-filled sprite-slot pointer slots (sprite.cpp), read across the game. */
+extern uint32_t am2_seq_sprites_7[1], am2_decal_sprites[1], am2_seq_sprites_5[1];
+extern uint32_t am2_mark_sprites[1], am2_mp_mark_grid[1];
+#undef ADDR_SEQ_SPRITES_7
+#define ADDR_SEQ_SPRITES_7      ((uintptr_t)(const void *)am2_seq_sprites_7)
+#undef ADDR_DECAL_SPRITES
+#define ADDR_DECAL_SPRITES      ((uintptr_t)(const void *)am2_decal_sprites)
+#undef ADDR_SEQ_SPRITES_5
+#define ADDR_SEQ_SPRITES_5      ((uintptr_t)(const void *)am2_seq_sprites_5)
+#undef ADDR_MARK_SPRITES
+#define ADDR_MARK_SPRITES       ((uintptr_t)(const void *)am2_mark_sprites)
+#undef ADDR_MP_MARK_GRID
+#define ADDR_MP_MARK_GRID       ((uintptr_t)(const void *)am2_mp_mark_grid)
+
 /* The -df debug-mode flag (misc.cpp), read across the win32 layer. */
 extern uint32_t am2_opt_df;
 #undef ADDR_OPT_DF
