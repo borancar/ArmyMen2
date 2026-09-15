@@ -103,12 +103,21 @@ def dead_ranges(blob):
         if BLOB_LO <= v < BLOB_HI:
             targets.add(v)
 
+    # A string byte is printable ASCII, or one of the whitespace controls a C
+    # string legitimately carries -- tab, CR, LF. Log/format strings are full of
+    # \n, and stopping the run at the first \n left them undetected (and so
+    # never dropped) even though they are dead: only .text push-immediates name
+    # them, which the genuine-string gate below sees but the native build cannot
+    # reach. A run must still START on a real printable byte.
+    def is_str_byte(b):
+        return 32 <= b < 127 or b in (9, 10, 13)
+
     out = []
     i, n = 0, len(blob)
     while i < n:
         if 32 <= blob[i] < 127:
             j = i
-            while j < n and 32 <= blob[j] < 127:
+            while j < n and is_str_byte(blob[j]):
                 j += 1
             if j < n and blob[j] == 0 and j - i >= MIN_LEN:
                 va = BLOB_LO + i
