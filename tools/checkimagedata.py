@@ -136,8 +136,13 @@ def find_definition(symbol):
                     lits.append(tok.group(1) if tok.group(1) is not None
                                 else None)
                 return "char*", lits
-            # array (scalar element type) OR a struct/fn-pointer table
-            m = re.search(r'const\s+(\w+)\s+' + re.escape(symbol) +
+            # array (scalar element type) OR a struct/fn-pointer table. `const`
+            # is optional: a table with a runtime-WRITTEN field (SOLDIER_NAMES'
+            # `taken`) is migrated non-const so the write is legal; its INITIAL
+            # bytes still equal the image and are checked here (a pointer field
+            # is dereference-checked, an int field byte-checked, both at their
+            # image value before any write).
+            m = re.search(r'(?:const\s+)?(\w+)\s+' + re.escape(symbol) +
                           r'\s*\[\s*\d*\s*\]\s*=\s*\{(.*?)\};', text, re.S)
             if m:
                 # strip comments from the initializer first -- an address in a

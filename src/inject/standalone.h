@@ -608,6 +608,11 @@ void  devtools_init(void);
 #define ADDR_VOICE_GROUPS       ((uintptr_t)(const void *)am2_voice_groups)
 #undef ADDR_SCRIPT_KIND_NAMES
 #define ADDR_SCRIPT_KIND_NAMES  ((uintptr_t)(const void *)am2_script_kind_names)
+/* am2_soldier_names (AM2_SoldierName[62], item.cpp, was 0x00489BF8) is used and
+ * declared only in item.cpp; this redirect expands there. Non-const because
+ * TakeSoldierName writes the `taken` field. */
+#undef ADDR_SOLDIER_NAMES
+#define ADDR_SOLDIER_NAMES      ((uintptr_t)(const void *)am2_soldier_names)
 #undef ADDR_KEY_NAME_TABLE
 #define ADDR_KEY_NAME_TABLE     ((uintptr_t)(const void *)am2_key_names)
 #undef ADDR_KEY_NAME_TABLE_END

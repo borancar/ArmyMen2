@@ -64,6 +64,36 @@ void __cdecl ShakeAt(const AM2_Point *at, int32_t strength);
 #include "maprow.h"   /* RowUpdate, SetAnimFrame -- reconstructed */
 #include "anim.h"     /* AM2_Anim -- the frame count SetUnitPose waits on */
 #include "trig.h"     /* Cos8, Sin8 -- reconstructed */
+
+#ifdef AM2_STANDALONE
+/* The 62 soldier names at 0x00489BF8 ({const char *name; int32 taken}).
+ * NON-const: TakeSoldierName marks a name taken at runtime; the initial
+ * taken is 0 and the names are literals, so the blob name strings drop. */
+struct AM2_SoldierName { const char *name; int32_t taken; };
+extern "C" AM2_SoldierName am2_soldier_names[62] = {
+    {"D. DuBois", 0}, {"R. Pavey", 0}, {"D. Lee", 0},
+    {"D. Fruin", 0}, {"A. Muolic", 0}, {"J. Wildblood", 0},
+    {"J. Bates", 0}, {"M. Bates", 0}, {"S. Ruggels", 0},
+    {"C. Chan", 0}, {"G. Amor", 0}, {"G. Ogle", 0},
+    {"J. Tso", 0}, {"N. Earl", 0}, {"M. Mendheim", 0},
+    {"J. Lencioni", 0}, {"Prego", 0}, {"R. Hicks", 0},
+    {"D. Casso", 0}, {"R. Campbell", 0}, {"S. Sutton", 0},
+    {"M. Calica", 0}, {"R. Ruckel", 0}, {"D. Lucca", 0},
+    {"J. Castillo", 0}, {"C. Jung", 0}, {"T. Hawkins", 0},
+    {"A. Werner", 0}, {"A. Emerson", 0}, {"A. Cree", 0},
+    {"B. Lopez", 0}, {"B.J.", 0}, {"D. Maynard", 0},
+    {"B. Wilcox", 0}, {"C. Stevens", 0}, {"I. Angel", 0},
+    {"J. Maynard", 0}, {"M. Devine", 0}, {"N. Robinson", 0},
+    {"P. Vu", 0}, {"R. Zalot", 0}, {"R. Banez", 0},
+    {"T. Chapman", 0}, {"V. Mayol", 0}, {"S. Amann", 0},
+    {"B. Tings", 0}, {"Ace", 0}, {"Santini", 0},
+    {"Dawg", 0}, {"Crusher", 0}, {"Brick", 0},
+    {"Red", 0}, {"Greenie", 0}, {"One Eye", 0},
+    {"T. Bone", 0}, {"N. Potts", 0}, {"C. Moore", 0},
+    {"Monty", 0}, {"D.R. Allgood", 0}, {"R. Gently", 0},
+    {"Joe Flash", 0}, {"Razor Limb", 0},
+};
+#endif
 #include "script.h"   /* AM2_Pad */
 #include "map.h"      /* TileOfPoint */
 #include "air.h"      /* RevealNearby */
