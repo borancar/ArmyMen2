@@ -165,6 +165,7 @@ extern const uint8_t am2_guid_game_property[16], am2_app_guid[16], am2_guid_null
 extern const char *const am2_wave_names[56];
 extern const char *const am2_cheat_words[41];
 extern const uint8_t am2_frame_heading_bias[152];    /* maprow.cpp, was 0x004740CC */
+extern const uint8_t am2_unit_types[720];            /* place.cpp, was 0x00487898 */
 extern const int32_t am2_menu_save_slot[4];          /* surface.cpp, was 0x00476198 */
 extern const int32_t am2_shake_presets[44];          /* mapdraw.cpp, was 0x00486170 */
 extern const int16_t am2_aim_displace_map[25088];    /* mapdraw.cpp, was 0x00478CDC */
@@ -613,6 +614,8 @@ void  devtools_init(void);
 #define ADDR_FRAME_HEADING_BIAS ((uintptr_t)(const void *)am2_frame_heading_bias)
 #undef ADDR_MENU_SAVE_SLOT
 #define ADDR_MENU_SAVE_SLOT     ((uintptr_t)(const void *)am2_menu_save_slot)
+#undef ADDR_UNIT_TYPES
+#define ADDR_UNIT_TYPES         ((uintptr_t)(const void *)am2_unit_types)
 #undef ADDR_SHAKE_PRESETS
 #define ADDR_SHAKE_PRESETS      ((uintptr_t)(const void *)am2_shake_presets)
 #undef ADDR_AIM_DISPLACE_MAP

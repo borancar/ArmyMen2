@@ -125,9 +125,16 @@ def dead_ranges(blob):
     # pure-data migrated symbol keeps its bytes byte-identical, so its dwords
     # still point where they did and are NOT skipped.
     import placement
-    carved = [(a, a + s) for (a, s, _sym, is_ptr)
-              in placement.placed_set(placement.manifest(), placement.split())
-              if is_ptr]
+    placed = placement.placed_set(placement.manifest(), placement.split())
+    carved = [(a, a + s) for (a, s, _sym, is_ptr) in placed if is_ptr]
+    # EVERY placed symbol's bytes -- pure-data too -- are restored byte-exact by
+    # placement, so the sweep must not zero a run inside one (a pure-data table
+    # like UNIT_TYPES carries INLINE name strings; zeroing one would leave the
+    # blob and the placed C bytes disagreeing).
+    placed_ranges = [(a, a + s) for (a, s, _sym, _p) in placed]
+
+    def in_placed(va, end):
+        return any(lo < end and va < hi for lo, hi in placed_ranges)
     # Dead pointer tables count like carved ranges: their pointers do not
     # survive into the native build, so a string only they reached is dead.
     deadtabs = dead_tables()
@@ -169,8 +176,8 @@ def dead_ranges(blob):
             if j < n and blob[j] == 0 and j - i >= MIN_LEN:
                 va = BLOB_LO + i
                 end = va + (j - i)
-                # (1) genuine string: its exact start is referenced in the original
-                if referenced_in_original(va, img):
+                # (1) genuine string, and NOT inside a placed symbol
+                if not in_placed(va, end) and referenced_in_original(va, img):
                     pointed = any(va <= t < end for t in targets)
                     mac = addr_macro.get(va)
                     coded = va not in folded and (
