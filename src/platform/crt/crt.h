@@ -187,6 +187,12 @@ extern const CRT_CVTINFO am2_crt_cvtinfo_double[2];
 /* Defined in fltcvt.cpp; POW10_TABLE's address is also crt_setmbcp's scan
  * bound in startup.cpp, so its declaration is shared. */
 extern const uint8_t am2_crt_pow10_table[352];
+/* Runtime-written .data-init CRT scalars, each read from more than one TU:
+ * __mb_cur_max (conv.cpp), __app_type (startup.cpp), and the decimal-point
+ * string (fltcvt.cpp). Non-const; initial bytes still equal the image. */
+extern int32_t am2_crt_mb_cur_max;
+extern int32_t am2_crt_app_type;
+extern uint8_t am2_crt_decimal_point[2];
 #endif
 
 /* 0x004653B7. Leading space skipped, then _fltin2: an overflow answers

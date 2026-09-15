@@ -35,6 +35,9 @@
  * from the blob (the sweep no longer sees a live pointer into them). On -m32
  * int32_t and const char* are both 4 bytes, so the int32* stride the reader
  * uses still lands one field per step. */
+/* __app_type at 0x0048CC54 (2 = GUI; __set_app_type writes it at startup). */
+extern "C" int32_t am2_crt_app_type = 2;
+
 struct AM2_RtErr { int32_t num; const char *msg; };
 extern "C" const AM2_RtErr am2_crt_rterr_table[18] = {
     { 0x0002, "R6002\r\n- floating point not loaded\r\n" },

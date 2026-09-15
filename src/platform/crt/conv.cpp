@@ -18,6 +18,8 @@
  * 2, _DIGIT 4, _SPACE 8, _HEX 0x80, _ALPHA 0x100. Pure const data placed at
  * its VA; _pctype (0x0048CCA2, the blob pointer slot) already points at
  * &table[1], so no slide changes and every reader lands on this copy. */
+/* __mb_cur_max at 0x0048CEA4 (1 under code page 1252; _setmbcp writes it). */
+extern "C" int32_t am2_crt_mb_cur_max = 1;
 extern "C" const uint16_t am2_crt_ctype[257] = {
     0x0000, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0028, 0x0028,
     0x0028, 0x0028, 0x0028, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020,

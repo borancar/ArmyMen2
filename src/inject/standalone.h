@@ -770,6 +770,19 @@ void  devtools_init(void);
 #undef ADDR_CRT_DST_END_MS
 #define ADDR_CRT_DST_END_MS     ((uintptr_t)(const void *)&am2_crt_dst_end[2])
 
+/* More CRT runtime .data-init scalars (conv/startup/fltcvt.cpp). */
+#undef ADDR_CRT_MB_CUR_MAX
+#define ADDR_CRT_MB_CUR_MAX     ((uintptr_t)(const void *)&am2_crt_mb_cur_max)
+#undef ADDR_CRT_APP_TYPE
+#define ADDR_CRT_APP_TYPE       ((uintptr_t)(const void *)&am2_crt_app_type)
+#undef ADDR_CRT_DECIMAL_POINT
+#define ADDR_CRT_DECIMAL_POINT  ((uintptr_t)(const void *)am2_crt_decimal_point)
+
+/* The shared rand seed (rand.cpp), read/written by the CRT and the game. */
+extern uint32_t am2_rand_seed;
+#undef ADDR_RAND_SEED
+#define ADDR_RAND_SEED          ((uintptr_t)(const void *)&am2_rand_seed)
+
 /* Small game const tables: the trooper heading-sweep deltas (region.cpp), the
  * airstrike slot records (air.cpp), and the "Sarge" unit-name slot (item.cpp). */
 #undef ADDR_STEP_FACING_SWEEP

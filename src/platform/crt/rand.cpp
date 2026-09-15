@@ -10,6 +10,15 @@
 #include "../../inject/orig.h"
 #include "../../game/image.h"
 
+#ifdef AM2_STANDALONE
+/* The shared rand seed at 0x0048CC1C (initial _holdrand = 1). Written by both
+ * crt_srand here and GameSrand in maprow.cpp, so migrated non-const; the
+ * initial byte value equals the image and is byte-checked. (Plain linkage to
+ * match standalone.h's shared declaration; a global's symbol name is unmangled
+ * regardless, so maprow.cpp and rand.cpp resolve to the one object.) */
+uint32_t am2_rand_seed = 1;
+#endif
+
 #define crt_holdrand (*(uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_RAND_SEED))
 
 int32_t __cdecl crt_rand(void)

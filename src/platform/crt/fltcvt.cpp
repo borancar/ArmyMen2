@@ -31,6 +31,10 @@
  * 0x0048D778: seven 12-byte 80-bit long-double entries per octal-digit group
  * (10^1..10^7, then 10^8.., etc.), addressed bytewise. Pure const float data,
  * so the blob copies drop -- placed at their VAs and byte-verified. */
+/* The "." decimal-point string at 0x0048CEA8 (localeconv would rewrite it; the
+ * game keeps the "C" locale). Read as a single char; kept 2 bytes so the run
+ * is a clean symbol. */
+extern "C" uint8_t am2_crt_decimal_point[2] = { 0x2E, 0x00 };
 extern "C" const uint8_t am2_crt_pow10_table[352] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xA0, 0x02, 0x40, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0xC8, 0x05, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
