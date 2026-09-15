@@ -174,11 +174,18 @@ def find_definition(symbol):
                         ids = re.findall(r'[A-Za-z_]\w*', el)
                         toks.append(("fn", ids[-1] if ids else el))
                 return "mixed", toks
-            # scalar
-            m = re.search(r'const\s+(\w+)\s+' + re.escape(symbol) +
-                          r'\s*=\s*([^;,]+?)[fF]?\s*;', text)
+            # scalar. `const` is optional: a runtime-WRITTEN .data-init global
+            # (the CRT's _timezone, a rand seed) is migrated non-const so the
+            # write is legal, but its INITIAL value still equals the image and
+            # is byte-checked here. Integer types parse as int (so a decimal or
+            # hex literal round-trips through pack); float/double as a float.
+            m = re.search(r'(?:const\s+)?(\w+)\s+' + re.escape(symbol) +
+                          r'\s*=\s*([^;,]+?)[fFuU]?\s*;', text)
             if m:
-                return m.group(1), [float(m.group(2))]
+                typ, lit = m.group(1), m.group(2).strip()
+                if typ in TYPES and TYPES[typ][0] not in ("<f", "<d"):
+                    return typ, [int(lit, 0)]
+                return typ, [float(lit)]
     return None
 
 

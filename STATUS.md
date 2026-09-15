@@ -86,7 +86,15 @@ deltas `step_facing_sweep`, the nine airstrike slot records `slot_recs`, and the
 one-entry `unit_name_sarge` char* slot (which freed its "Sarge" blob string).
 Finally the CRT `_pctype` classification table (257 words at 0x0048CCA0):
 transcribed under a new `ADDR_CRT_CTYPE_TABLE` base macro, with the existing
-`_pctype` blob pointer slot left pointing one entry into the placed copy. A separate lever dropped code-read strings: 36
+`_pctype` blob pointer slot left pointing one entry into the placed copy.
+
+Phase 2 (SCOPE) began: the first **runtime-written .data-init state** moved to
+non-const placed C -- the CRT time-zone/DST cluster (`_timezone`/`_daylight`/
+`_dstbias` and the two DST cache triples). `find_definition` learned to accept a
+non-const scalar. GOTCHA: an all-zero non-const scalar (`_dstbias`=0-style)
+lands in `.bss`, not `.data`, so it falls out of the placement flow and shifts
+every symbol after it -- group a contiguous cluster into one array holding a
+non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
 sweep to **1,357 strings, 31,992 bytes zeroed**.

@@ -749,6 +749,27 @@ void  devtools_init(void);
 #undef ADDR_CRT_NULLSTRING
 #define ADDR_CRT_NULLSTRING     ((uintptr_t)(const void *)am2_crt_nullstring)
 
+/* CRT time-zone / DST runtime state (time.cpp), non-const .data-init arrays.
+ * The cluster base places the array; the other two fields alias into it. */
+#undef ADDR_CRT_TIMEZONE
+#define ADDR_CRT_TIMEZONE       ((uintptr_t)(const void *)am2_crt_tz_state)
+#undef ADDR_CRT_DAYLIGHT
+#define ADDR_CRT_DAYLIGHT       ((uintptr_t)(const void *)&am2_crt_tz_state[1])
+#undef ADDR_CRT_DSTBIAS
+#define ADDR_CRT_DSTBIAS        ((uintptr_t)(const void *)&am2_crt_tz_state[2])
+#undef ADDR_CRT_DST_START_YEAR
+#define ADDR_CRT_DST_START_YEAR ((uintptr_t)(const void *)am2_crt_dst_start)
+#undef ADDR_CRT_DST_START_YDAY
+#define ADDR_CRT_DST_START_YDAY ((uintptr_t)(const void *)&am2_crt_dst_start[1])
+#undef ADDR_CRT_DST_START_MS
+#define ADDR_CRT_DST_START_MS   ((uintptr_t)(const void *)&am2_crt_dst_start[2])
+#undef ADDR_CRT_DST_END_YEAR
+#define ADDR_CRT_DST_END_YEAR   ((uintptr_t)(const void *)am2_crt_dst_end)
+#undef ADDR_CRT_DST_END_YDAY
+#define ADDR_CRT_DST_END_YDAY   ((uintptr_t)(const void *)&am2_crt_dst_end[1])
+#undef ADDR_CRT_DST_END_MS
+#define ADDR_CRT_DST_END_MS     ((uintptr_t)(const void *)&am2_crt_dst_end[2])
+
 /* Small game const tables: the trooper heading-sweep deltas (region.cpp), the
  * airstrike slot records (air.cpp), and the "Sarge" unit-name slot (item.cpp). */
 #undef ADDR_STEP_FACING_SWEEP

@@ -34,6 +34,17 @@ extern "C" const int32_t am2_crt_lpdays[13] = {
 extern "C" const int32_t am2_crt_days[13] = {
     -1, 30, 58, 89, 119, 150, 180, 211, 242, 272, 303, 333, 364,
 };
+
+/* The CRT's time-zone state: _timezone/_daylight/_dstbias at 0x0048D400 (their
+ * .data initial values -- __tzset overwrites them at runtime) and the two DST
+ * transition-rule cache triples crt_cvtdate fills ({year, yday, ms}, the -1
+ * year meaning "not yet computed"). Runtime-WRITTEN, so migrated NON-const; the
+ * initial bytes still equal the image and are byte-checked. Grouped as arrays
+ * (each holds a non-zero element) so the compiler keeps them in .data -- an
+ * all-zero scalar would land in .bss and fall out of the placement flow. */
+extern "C" int32_t am2_crt_tz_state[3] = { 28800, 1, -3600 };  /* timezone, daylight, dstbias */
+extern "C" int32_t am2_crt_dst_start[3] = { -1, 0, 0 };        /* year, yday, ms */
+extern "C" int32_t am2_crt_dst_end[3] = { -1, 0, 0 };
 #endif
 
 #define G32(addr)  (*(int32_t *)(uintptr_t)AM2_IMAGE(addr))
