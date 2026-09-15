@@ -132,6 +132,11 @@ def dead_ranges(blob):
     # survive into the native build, so a string only they reached is dead.
     deadtabs = dead_tables()
     carved += [(a, a + s) for a, s in deadtabs]
+    # Strings folded to C literals (tools/foldstrings.py): the reconstruction
+    # now reads the literal, so the blob copy is dead even though the macro
+    # still appears in code. Treat their VAs as not code-referenced.
+    import foldstrings
+    folded = foldstrings.folded_vas()
 
     def in_carved(va):
         return any(lo <= va < hi for lo, hi in carved)
@@ -168,9 +173,10 @@ def dead_ranges(blob):
                 if referenced_in_original(va, img):
                     pointed = any(va <= t < end for t in targets)
                     mac = addr_macro.get(va)
-                    coded = (mac is not None and re.search(r'\b' + mac + r'\b', src)) \
-                        or ("0x%08x" % va) in src.lower() \
-                        or ("0x%x" % va) in src
+                    coded = va not in folded and (
+                        (mac is not None and re.search(r'\b' + mac + r'\b', src))
+                        or ("0x%08x" % va) in src.lower()
+                        or ("0x%x" % va) in src)
                     # (2) dead: nothing in the native build reaches it
                     if not pointed and not coded:
                         out.append((va, j - i + 1))   # include the NUL

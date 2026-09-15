@@ -447,6 +447,7 @@ SA_LDF   := -mwindows -static -static-libgcc -static-libstdc++ \
 .PHONY: standalone standalone-generate
 standalone-generate:
 	./.venv/bin/python tools/mkglobals.py
+	./.venv/bin/python tools/foldstrings.py
 	./.venv/bin/python tools/deadstrings.py
 	./.venv/bin/python tools/placement.py
 
