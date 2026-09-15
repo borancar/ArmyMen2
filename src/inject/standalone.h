@@ -748,6 +748,9 @@ void  devtools_init(void);
 /* The CRT "(null)" printf string slot (printf.cpp), a one-entry char* table. */
 #undef ADDR_CRT_NULLSTRING
 #define ADDR_CRT_NULLSTRING     ((uintptr_t)(const void *)am2_crt_nullstring)
+/* crt_output's format state-machine table (printf.cpp), pure const bytes. */
+#undef ADDR_CRT_PRINTF_TABLE
+#define ADDR_CRT_PRINTF_TABLE   ((uintptr_t)(const void *)am2_crt_printf_table)
 
 /* CRT time-zone / DST runtime state (time.cpp), non-const .data-init arrays.
  * The cluster base places the array; the other two fields alias into it. */
