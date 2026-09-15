@@ -783,6 +783,24 @@ extern uint32_t am2_rand_seed;
 #undef ADDR_RAND_SEED
 #define ADDR_RAND_SEED          ((uintptr_t)(const void *)&am2_rand_seed)
 
+/* Default map/script/rules names and dir names (gamedir.cpp), char* slots. */
+extern const char *const am2_dir_defaults[3];
+extern const char *const am2_dir_names[4];
+#undef ADDR_MAP_NAME_DEFAULT
+#define ADDR_MAP_NAME_DEFAULT   ((uintptr_t)(const void *)am2_dir_defaults)
+#undef ADDR_MP_SCRIPT_DEFAULT
+#define ADDR_MP_SCRIPT_DEFAULT  ((uintptr_t)(const void *)&am2_dir_defaults[1])
+#undef ADDR_RULES_DIR_STR
+#define ADDR_RULES_DIR_STR      ((uintptr_t)(const void *)&am2_dir_defaults[2])
+#undef ADDR_STR_AVI_DIR
+#define ADDR_STR_AVI_DIR        ((uintptr_t)(const void *)am2_dir_names)
+#undef ADDR_WAVE_DIR
+#define ADDR_WAVE_DIR           ((uintptr_t)(const void *)&am2_dir_names[1])
+#undef ADDR_DIR_TITLE_PTR
+#define ADDR_DIR_TITLE_PTR      ((uintptr_t)(const void *)&am2_dir_names[2])
+#undef ADDR_AUDIO_PATH_ARG
+#define ADDR_AUDIO_PATH_ARG     ((uintptr_t)(const void *)&am2_dir_names[3])
+
 /* The five score-variable name slots (script.cpp); base places, fields alias. */
 #undef ADDR_NAME_SCORE_LIMIT
 #define ADDR_NAME_SCORE_LIMIT   ((uintptr_t)(const void *)am2_name_score_vars)

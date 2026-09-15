@@ -8,6 +8,17 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
+#ifdef AM2_STANDALONE
+/* Default map/script/rules names (0x00485108) and the AVI/audio/title/music
+ * directory names (0x004852C8), each a char* pointer slot the reconstruction
+ * dereferences. Transcribed as char* tables (base placed, other slots aliased)
+ * so the blob's dir strings drop. */
+/* Plain linkage to match standalone.h's shared declaration (a global array's
+ * symbol name is unmangled, so every TU resolves to the one object). */
+const char *const am2_dir_defaults[3] = { "kitchen", "death.txt", "rules" };
+const char *const am2_dir_names[4] = { "avi", "audio", "01-title", "audio\\music" };
+#endif
+
 /* The original's buffer is 0x100 bytes on the stack and it uses plain strcpy
  * and strcat, so a long enough install path overruns it. Kept as it is: the
  * paths are the ones the installer wrote, and a bounded copy here would be a
