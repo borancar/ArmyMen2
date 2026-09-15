@@ -837,6 +837,20 @@ extern uint32_t am2_mark_sprites[1], am2_mp_mark_grid[1];
 #define ADDR_MARK_SPRITES       ((uintptr_t)(const void *)am2_mark_sprites)
 #undef ADDR_MP_MARK_GRID
 #define ADDR_MP_MARK_GRID       ((uintptr_t)(const void *)am2_mp_mark_grid)
+/* The sprite-group definition table (base, +4 PARTICLE_KINDS, two end bounds)
+ * and the sprite-grid pointer slot (sprite.cpp; PARTICLE_KINDS read in maprow). */
+extern const uint8_t am2_sprite_groups[552];
+extern uint32_t am2_sprite_grid[1];
+#undef ADDR_SPRITE_GROUPS
+#define ADDR_SPRITE_GROUPS      ((uintptr_t)(const void *)am2_sprite_groups)
+#undef ADDR_PARTICLE_KINDS
+#define ADDR_PARTICLE_KINDS     ((uintptr_t)(const void *)&am2_sprite_groups[4])
+#undef ADDR_SPRITE_GROUPS_END
+#define ADDR_SPRITE_GROUPS_END  ((uintptr_t)(const void *)&am2_sprite_groups[0xF0])
+#undef ADDR_SPRITE_GROUPS_B_END
+#define ADDR_SPRITE_GROUPS_B_END ((uintptr_t)(const void *)&am2_sprite_groups[0x228])
+#undef ADDR_SPRITE_GRID
+#define ADDR_SPRITE_GRID        ((uintptr_t)(const void *)am2_sprite_grid)
 
 /* The -df debug-mode flag (misc.cpp), read across the win32 layer. */
 extern uint32_t am2_opt_df;
