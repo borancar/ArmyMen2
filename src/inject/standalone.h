@@ -740,10 +740,18 @@ void  devtools_init(void);
 #undef ADDR_CRT_HUGE_VAL
 #define ADDR_CRT_HUGE_VAL       ((uintptr_t)(const void *)am2_crt_huge_val)
 
-/* The CRT _pctype classification table (conv.cpp), pure const uint16 data; the
- * ADDR_CRT_PCTYPE blob slot still points one entry into it, so it stays. */
+/* The CRT _pctype classification table (conv.cpp) and its pointer slot (which
+ * points one entry into it), plus the wide "(null)" slot (printf.cpp). */
 #undef ADDR_CRT_CTYPE_TABLE
 #define ADDR_CRT_CTYPE_TABLE    ((uintptr_t)(const void *)am2_crt_ctype)
+#undef ADDR_CRT_PCTYPE
+#define ADDR_CRT_PCTYPE         ((uintptr_t)(const void *)&am2_crt_pctype)
+#undef ADDR_CRT_WNULLSTRING
+#define ADDR_CRT_WNULLSTRING    ((uintptr_t)(const void *)&am2_crt_wnullstring)
+
+/* The DirectInput buffer-size property struct (device.cpp), const. */
+#undef ADDR_DIPROP_BUFFER_SIZE
+#define ADDR_DIPROP_BUFFER_SIZE ((uintptr_t)(const void *)am2_diprop_buffer_size)
 
 /* The CRT "(null)" printf string slot (printf.cpp), a one-entry char* table. */
 #undef ADDR_CRT_NULLSTRING

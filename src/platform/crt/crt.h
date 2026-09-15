@@ -191,6 +191,8 @@ extern const uint8_t am2_crt_pow10_table[352];
 extern const uint32_t am2_crt_inittab[36];
 /* The __badioinfo sentinel (lowio.cpp); also read in stdio.cpp, so shared. */
 extern const uint8_t am2_crt_badioinfo[8];
+/* The _pctype pointer slot (conv.cpp); read across four CRT TUs, so shared. */
+extern uint32_t am2_crt_pctype;
 /* Runtime-written .data-init CRT scalars, each read from more than one TU:
  * __mb_cur_max (conv.cpp), __app_type (startup.cpp), and the decimal-point
  * string (fltcvt.cpp). Non-const; initial bytes still equal the image. */

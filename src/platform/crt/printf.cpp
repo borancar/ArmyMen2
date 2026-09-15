@@ -26,6 +26,9 @@
  * the blob "(null)" drops. (The wide sibling WNULLSTRING stays -- a UTF-16
  * slot does not fit the char* placement tooling.) */
 extern "C" const char *const am2_crt_nullstring[1] = { "(null)" };
+/* The wide "(null)" pointer slot at 0x0048CC8C: points at the UTF-16 "(null)"
+ * still carried in the blob at 0x0046FECC (placed), so the raw value resolves. */
+extern "C" const uint32_t am2_crt_wnullstring = 0x0046FECCu;
 /* crt_output's format state machine at 0x0046FE70: table[ch-' '] classifies a
  * character in its low nibble, table[class*8 + state] gives the next state in
  * its high nibble. Pure const data, placed at its VA. */

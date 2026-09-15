@@ -68,6 +68,12 @@ extern "C" const uint8_t am2_iid_directdraw2[16] =
  * macro aliased to its slot; the cursor init keeps it in .data. */
 int32_t am2_mouse_state[25] = { 0, 0, 0, 320, 200 };
 
+/* The DirectInput buffer-size property at 0x004854F8 (a DIPROPDWORD: header
+ * {size 0x14, hdrsize 0x10, obj 0, how 0} then dwData=0x20). Const, byte-checked. */
+extern "C" const uint32_t am2_diprop_buffer_size[6] = {
+    0x00000014u, 0x00000010u, 0x00000000u, 0x00000000u, 0x00000020u, 0x00000000u,
+};
+
 /* The screen-geometry block at 0x00485310 (12 dwords): SCREEN_CLIP {0,0,640,480}
  * (BITMAP_AREA_W/H view its right/bottom), BLIT_RECT {0,21,624,480} (HUD_PANEL_X
  * views field 2), and SCREEN_RECT/ORIGIN_DX/DY. One physical block read as RECTs

@@ -20,6 +20,10 @@
  * &table[1], so no slide changes and every reader lands on this copy. */
 /* __mb_cur_max at 0x0048CEA4 (1 under code page 1252; _setmbcp writes it). */
 extern "C" int32_t am2_crt_mb_cur_max = 1;
+/* The _pctype pointer slot at 0x0048CC98: points one entry into the placed
+ * classification table (0x0048CCA2 = &am2_crt_ctype[1]); setlocale may rewrite
+ * it, so non-const. The raw value resolves because am2_crt_ctype is placed. */
+extern "C" uint32_t am2_crt_pctype = 0x0048CCA2u;
 extern "C" const uint16_t am2_crt_ctype[257] = {
     0x0000, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0028, 0x0028,
     0x0028, 0x0028, 0x0028, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020,
