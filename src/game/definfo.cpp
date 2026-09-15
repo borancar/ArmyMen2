@@ -10,8 +10,10 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 #include "defparse.h"  /* DefFreeTables, DefFreeTrooperRecs -- reconstructed */
-#include "gameproc.h"  /* DefFinish -- reconstructed */
+#include "gameproc.h"  /* DefFinish, DefGameParse -- reconstructed */
 #include "gamedir.h"   /* SetGameDir -- ADDR_SET_DATA_DIR is it */
+#include "place.h"     /* ParsePlaceLine -- reconstructed */
+#include "map.h"       /* DefMapLine, DefRulesLine, DefRuleMapLine -- reconstructed */
 
 /* The seams LoadDefTables needs. All are original and reached by address;
  * none is on the patch list. There were five -- the fifth was
@@ -35,6 +37,115 @@ typedef double (__cdecl *AM2_StrtodFn)(const char *s, char **end);
 #define orig_strtol (*(AM2_StrtolFn)AM2_IMAGE(ADDR_CRT_STRTOL))
 #define orig_strtod (*(AM2_StrtodFn)AM2_IMAGE(ADDR_CRT_STRTOD))
 
+#ifdef AM2_STANDALONE
+/* The .aai vocabulary, 100 {name, value, handler} rows plus an empty-name
+ * terminator, transcribed out of the blob at 0x00476FE0. Each handler is a
+ * reconstructed line-parser; the blob's keyword strings go dead and the sweep
+ * drops them. Redirect below points ADDR_DEF_NAME_TABLE at this array. */
+extern "C" const AM2_DefKeyword am2_def_keywords[101] = {
+    {"#", 0, 0},
+    {"trooperlevel1", 45, (void *)DefTrooperLine},
+    {"trooperlevel2", 46, (void *)DefTrooperLine},
+    {"trooperlevel3", 47, (void *)DefTrooperLine},
+    {"trooperlevel4", 48, (void *)DefTrooperLine},
+    {"trooperlevel5", 49, (void *)DefTrooperLine},
+    {"trooperlevel6", 50, (void *)DefTrooperLine},
+    {"trooperlevel7", 51, (void *)DefTrooperLine},
+    {"trooperlevel8", 52, (void *)DefTrooperLine},
+    {"noweapon", 1, (void *)DefWeaponLine},
+    {"trooperrifle", 2, (void *)DefWeaponLine},
+    {"grenade", 3, (void *)DefWeaponLine},
+    {"flamer", 4, (void *)DefWeaponLine},
+    {"bazooka", 5, (void *)DefWeaponLine},
+    {"mortar", 6, (void *)DefWeaponLine},
+    {"largecannon", 7, (void *)DefWeaponLine},
+    {"mediummg", 8, (void *)DefWeaponLine},
+    {"heavymg", 9, (void *)DefWeaponLine},
+    {"rifle", 10, (void *)DefWeaponLine},
+    {"autorifle", 11, (void *)DefWeaponLine},
+    {"mine", 12, (void *)DefWeaponLine},
+    {"explosive", 13, (void *)DefWeaponLine},
+    {"detonator", 14, (void *)DefWeaponLine},
+    {"hottarget", 15, (void *)DefWeaponLine},
+    {"flag", 16, (void *)DefWeaponLine},
+    {"greenflag", 17, (void *)DefWeaponLine},
+    {"tanflag", 18, (void *)DefWeaponLine},
+    {"blueflag", 19, (void *)DefWeaponLine},
+    {"greyflag", 20, (void *)DefWeaponLine},
+    {"sweeper", 21, (void *)DefWeaponLine},
+    {"guardtowerrifle", 22, (void *)DefWeaponLine},
+    {"medkit", 23, (void *)DefWeaponLine},
+    {"medpack", 24, (void *)DefWeaponLine},
+    {"airstrike", 25, (void *)DefWeaponLine},
+    {"paratrooper", 26, (void *)DefWeaponLine},
+    {"recon", 27, (void *)DefWeaponLine},
+    {"note", 28, (void *)DefWeaponLine},
+    {"flakjacket", 29, (void *)DefWeaponLine},
+    {"vulcan", 30, (void *)DefWeaponLine},
+    {"sniper", 31, (void *)DefWeaponLine},
+    {"vehicleammo", 32, (void *)DefWeaponLine},
+    {"vehiclearmor", 33, (void *)DefWeaponLine},
+    {"vehiclenitro", 34, (void *)DefWeaponLine},
+    {"camouflage", 35, (void *)DefWeaponLine},
+    {"disguisegreen", 36, (void *)DefWeaponLine},
+    {"disguisetan", 37, (void *)DefWeaponLine},
+    {"disguiseblue", 38, (void *)DefWeaponLine},
+    {"disguisegrey", 39, (void *)DefWeaponLine},
+    {"magnifying", 40, (void *)DefWeaponLine},
+    {"aerosol", 41, (void *)DefWeaponLine},
+    {"wrench", 42, (void *)DefWeaponLine},
+    {"m80", 43, (void *)DefWeaponLine},
+    {"zombiehands", 44, (void *)DefWeaponLine},
+    {"jeep", 53, (void *)DefVehicleLine},
+    {"tank", 54, (void *)DefVehicleLine},
+    {"half_track", 55, (void *)DefVehicleLine},
+    {"convoy", 56, (void *)DefVehicleLine},
+    {"sarge", 57, (void *)DefVehicleLine},
+    {"boat", 58, (void *)DefVehicleLine},
+    {"vehicle_danger", 59, (void *)DefGameParse},
+    {"vehicle_standoff", 60, (void *)DefGameParse},
+    {"trooper_turn_rate", 61, (void *)DefGameParse},
+    {"trooper_pose_rate", 62, (void *)DefGameParse},
+    {"trooper_slide_rate", 63, (void *)DefGameParse},
+    {"defense_radius", 64, (void *)DefGameParse},
+    {"attack_radius", 65, (void *)DefGameParse},
+    {"attack_hunt", 66, (void *)DefGameParse},
+    {"follow_radius", 67, (void *)DefGameParse},
+    {"follow_engaged_radius", 68, (void *)DefGameParse},
+    {"gravity", 69, (void *)DefGameParse},
+    {"scroll_speed", 70, (void *)DefGameParse},
+    {"roach_height", 71, (void *)DefGameParse},
+    {"roach_health", 72, (void *)DefGameParse},
+    {"roach_armor", 73, (void *)DefGameParse},
+    {"roach_damage", 74, (void *)DefGameParse},
+    {"roach_forvel", 75, (void *)DefGameParse},
+    {"roach_revvel", 76, (void *)DefGameParse},
+    {"roach_foracc", 77, (void *)DefGameParse},
+    {"roach_revacc", 78, (void *)DefGameParse},
+    {"rocks", 79, (void *)DefObjLine},
+    {"bush", 80, (void *)DefObjLine},
+    {"trees", 81, (void *)DefObjLine},
+    {"ground", 82, (void *)DefObjLine},
+    {"fence", 83, (void *)DefObjLine},
+    {"wall", 84, (void *)DefObjLine},
+    {"bridge", 85, (void *)DefObjLine},
+    {"barrel", 86, (void *)DefObjLine},
+    {"building", 87, (void *)DefObjLine},
+    {"pillbox", 88, (void *)DefObjLine},
+    {"aagun", 89, (void *)DefObjLine},
+    {"tent", 90, (void *)DefObjLine},
+    {"garage", 91, (void *)DefObjLine},
+    {"radar", 92, (void *)DefObjLine},
+    {"miscellaneous", 93, (void *)DefObjLine},
+    {"powerups", 94, (void *)DefObjLine},
+    {"link", 95, (void *)DefLinkParse},
+    {"map", 96, (void *)DefMapLine},
+    {"rules", 97, (void *)DefRulesLine},
+    {"rulemap", 98, (void *)DefRuleMapLine},
+    {"place", 99, (void *)ParsePlaceLine},
+    {"", 0, 0},
+};
+#endif
 #define kDefKeywords ((const AM2_DefKeyword *)AM2_IMAGE(ADDR_DEF_NAME_TABLE))
 
 typedef am2_FILE *(__cdecl *AM2_FopenFn)(const char *path, const char *mode);

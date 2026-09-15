@@ -603,6 +603,10 @@ void  devtools_init(void);
 #define ADDR_KEY_NAME_TABLE_END ((uintptr_t)(const void *)(am2_key_names + 95))
 #undef ADDR_CHEAT_WORDS
 #define ADDR_CHEAT_WORDS        ((uintptr_t)(const void *)am2_cheat_words)
+/* am2_def_keywords (AM2_DefKeyword[101], definfo.cpp, was 0x00476FE0) is
+ * declared and used only in definfo.cpp, where this macro expands. */
+#undef ADDR_DEF_NAME_TABLE
+#define ADDR_DEF_NAME_TABLE     ((uintptr_t)(const void *)am2_def_keywords)
 #undef ADDR_SHAKE_PRESETS
 #define ADDR_SHAKE_PRESETS      ((uintptr_t)(const void *)am2_shake_presets)
 #undef ADDR_AIM_DISPLACE_MAP
