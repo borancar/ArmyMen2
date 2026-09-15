@@ -1370,11 +1370,22 @@ void __cdecl DrawMenuCursor(void)
 
         SetDrawTarget(g_backBuffer);
 
-        /* Put back whatever the cursor covered last tick. */
-        if (g_savedValid)
+        /* Put back whatever the cursor covered last tick. The slot is a fixed
+         * 32x32 corner of the menu surface, but only the cursor-sized top-left
+         * of it was written; read back exactly that, so this is a 1:1 copy and
+         * not a 32x32 -> NxM stretch. A stretch here is lossy (nearest-neighbour
+         * at a non-integer ratio), and on a FROZEN background -- the pause menu
+         * over a stopped mission -- the loss is not overpainted and accumulates
+         * into a smear along the pointer's path. (On the title screen the whole
+         * frame repaints each tick, which is why the 0-pixel title A/B never
+         * saw it.) */
+        if (g_savedValid) {
+            RECT src = *g_saveSlot;
+            src.right  = src.left + (g_savedRect->right  - g_savedRect->left);
+            src.bottom = src.top  + (g_savedRect->bottom - g_savedRect->top);
             IDirectDrawSurface_Blt(g_drawTarget, (LPRECT)g_savedRect,
-                                   g_menuSurface2, g_saveSlot,
-                                   DDBLT_WAIT, NULL);
+                                   g_menuSurface2, &src, DDBLT_WAIT, NULL);
+        }
 
         {
             am2_paint_fn *vt = *(am2_paint_fn **)g_paintObj;
@@ -1387,9 +1398,13 @@ void __cdecl DrawMenuCursor(void)
         cur.right  = cur.left + sfld32(spr, SPR_OFF_W);
         cur.bottom = cur.top  + sfld32(spr, SPR_OFF_H);
 
-        /* Save what is about to be covered. */
+        /* Save what is about to be covered, into the cursor-sized top-left of
+         * the slot (see the restore above -- 1:1, never a stretch). */
         if (IntersectRect((LPRECT)&clipped, (const RECT *)&cur, g_clipRect)) {
-            IDirectDrawSurface_Blt(g_menuSurface2, g_saveSlot, g_backBuffer,
+            RECT dstSlot = *g_saveSlot;
+            dstSlot.right  = dstSlot.left + (clipped.right  - clipped.left);
+            dstSlot.bottom = dstSlot.top  + (clipped.bottom - clipped.top);
+            IDirectDrawSurface_Blt(g_menuSurface2, &dstSlot, g_backBuffer,
                                    (LPRECT)&clipped, DDBLT_WAIT, NULL);
             *g_savedRect = clipped;
             g_savedValid = 1;

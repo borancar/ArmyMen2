@@ -391,6 +391,32 @@ reproduce the give. See docs/lua.md.
 
 ## OPEN DIVERGENCES, newest first
 
+- **FIXED (2026-09-15): the pause-menu cursor smeared the frozen background as
+  it moved -- a garbled trail that only cleared on a full repaint (moving the
+  host pointer out of the window and back set ADDR_OVERLAY_DIRTY via
+  WM_ACTIVATEAPP). DrawMenuCursor's save-under (0x00412FE0) copies the pixels
+  under the cursor into ADDR_MENU_SAVE_SLOT and restores them next tick. The
+  slot is a fixed 32x32 corner of the menu surface, but the menu cursor is
+  12x16, and the reconstruction passed the WHOLE slot rect as the save's
+  destination and the restore's source -- so both blts went through am2_stretch
+  (12x16 <-> 32x32), a lossy nearest-neighbour round trip that scrambled the
+  background every frame. On the title screen the whole frame repaints each tick
+  so it never showed (which is why the 0-pixel title A/B passed); on the pause
+  menu's frozen mission it accumulated. Fixed by sizing the slot sub-rect to the
+  cursor so save and restore are 1:1 copies (surface.cpp). Reproduced and
+  confirmed clean on the live native build (bootcamp -> ESC -> sweep the cursor
+  over the stone wall). make check green.**
+
+- **FIXED (2026-09-15): mouse grab did not hold the pointer like the other
+  src/platform ports. It used SDL_SetWindowMouseGrab -- a soft confine that is
+  unreliable (worst on Wayland) -- as a Ctrl+Alt toggle. Reworked to SDL relative
+  mouse mode, matching ../TIM (reconstruct/sdl.c): grab on the first click in the
+  window (that click is the grab's, not the game's), Ctrl+Alt releases, and while
+  grabbed the device xrel/yrel are fed straight to the DirectInput accumulator
+  (the game already works in deltas). Cursor visibility is left to the game, so
+  relative mode's hide/restore no longer fights the game's own ShowCursor state
+  (fixing a latent double-cursor the old SDL_ShowCursor-on-release could leave). sdl.cpp; builds, boots, make check green.**
+
 - **FIXED (2026-09-11): AiTrooperStep dropped the 0x00404A90 "keep the current
   route" check before the region hop, so a trooper walking a multi-waypoint A*
   path re-derived its region link every frame and replanned into a direct move
