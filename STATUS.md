@@ -66,7 +66,7 @@ reads records 1-6 from the placed `pointer_modes` storage -- consistent because
 it is one physical table. The SA/mingw build keeps the `--section-start` blob
 path (PE linker scripts differ); native was the stated priority.
 
-**UPDATE (2026-09-15): 216 symbols placed, 64.2% of meaningful bytes.** Later
+**UPDATE (2026-09-15): 218 symbols placed, 64.2% of meaningful bytes.** Later
 batches: `UNIT_TYPES` (720B of pure data, inline names -- the sweep now skips
 runs inside a placed symbol so those names are not zeroed), `VOICE_GROUPS` (30
 pickup voice-line records), `SCRIPT_KIND_NAMES`, `SOLDIER_NAMES` (62 records,

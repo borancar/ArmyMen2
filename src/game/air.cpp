@@ -26,6 +26,11 @@
  * uint8 angle, pad, int16 dist}, 8 bytes each) that SlotFormationPoint reads
  * for slots 1..8 (record 0 is the -1 sentinel). Read through a uint8_t* at
  * byte offsets, so transcribed as the byte blob it is; placed at its VA. */
+/* The two air-path turn-Y scratch words at 0x00473F6E/0x00473F72 (int16, zero
+ * at init, written by the airstrike path setup), each between placed int16
+ * neighbours. All-zero, so forced into .data. */
+int16_t am2_air_path_turn_y_in[1]  __attribute__((section(".data.am2_air_path_turn_y_in")))  = { 0 };
+int16_t am2_air_path_turn_y_out[1] __attribute__((section(".data.am2_air_path_turn_y_out"))) = { 0 };
 extern "C" const uint8_t am2_slot_recs[72] = {
     0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00,   /* [0] parent -1 */
     0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x50, 0x00,   /* [1] angle 128 dist 80 */

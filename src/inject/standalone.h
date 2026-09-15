@@ -441,6 +441,11 @@ void  devtools_init(void);
 #define ADDR_AIR_PATH_TURN_X    ((uintptr_t)(const void *)&am2_air_path_turn_x)
 #undef ADDR_AIR_PATH_AWAY_X
 #define ADDR_AIR_PATH_AWAY_X    ((uintptr_t)(const void *)&am2_air_path_away_x)
+extern int16_t am2_air_path_turn_y_in[1], am2_air_path_turn_y_out[1];
+#undef ADDR_AIR_PATH_TURN_Y_IN
+#define ADDR_AIR_PATH_TURN_Y_IN  ((uintptr_t)(const void *)am2_air_path_turn_y_in)
+#undef ADDR_AIR_PATH_TURN_Y_OUT
+#define ADDR_AIR_PATH_TURN_Y_OUT ((uintptr_t)(const void *)am2_air_path_turn_y_out)
 /* ADDR_AIR_PATH_TURN_Y_IN / _OUT are runtime state written by AirInitTurnYIn/Out;
  * left at their writable .origdat placement rather than redirected to a const. */
 
