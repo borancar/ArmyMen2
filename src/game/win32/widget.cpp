@@ -38,6 +38,9 @@
 #include <string.h>
 
 #ifdef AM2_STANDALONE
+/* The debug blast-kind selector at 0x00476FB4 (default kind 121), used only
+ * here; runtime-written, migrated non-const, initial byte-checked. */
+int32_t am2_debug_blast_kind = 121;
 /* The controls dialog's scancode->label table, 95 read-only {dik, name}
  * records the image carries at 0x0048AF28. Transcribed to C literals (the
  * blob's name strings then go dead and the sweep drops them);

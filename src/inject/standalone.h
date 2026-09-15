@@ -783,6 +783,20 @@ extern uint32_t am2_rand_seed;
 #undef ADDR_RAND_SEED
 #define ADDR_RAND_SEED          ((uintptr_t)(const void *)&am2_rand_seed)
 
+/* Runtime-written game scalars: screen dims / fog / overlay (frame.cpp, read
+ * across the win32 layer) and the debug blast kind (widget.cpp, local). */
+extern int32_t am2_screen_w, am2_screen_h, am2_fog_of_war, am2_info_overlay_on;
+#undef ADDR_SCREEN_W
+#define ADDR_SCREEN_W           ((uintptr_t)(const void *)&am2_screen_w)
+#undef ADDR_SCREEN_H
+#define ADDR_SCREEN_H           ((uintptr_t)(const void *)&am2_screen_h)
+#undef ADDR_FOG_OF_WAR
+#define ADDR_FOG_OF_WAR         ((uintptr_t)(const void *)&am2_fog_of_war)
+#undef ADDR_INFO_OVERLAY_ON
+#define ADDR_INFO_OVERLAY_ON    ((uintptr_t)(const void *)&am2_info_overlay_on)
+#undef ADDR_DEBUG_BLAST_KIND
+#define ADDR_DEBUG_BLAST_KIND   ((uintptr_t)(const void *)&am2_debug_blast_kind)
+
 /* Default map/script/rules names and dir names (gamedir.cpp), char* slots. */
 extern const char *const am2_dir_defaults[3];
 extern const char *const am2_dir_names[4];

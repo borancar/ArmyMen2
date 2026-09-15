@@ -48,6 +48,17 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot);
 #include "../anim.h"      /* the four Free*Anims */
 #include "../map.h"       /* FreeScenarios, FreeMapLayers */
 
+#ifdef AM2_STANDALONE
+/* Runtime-written .data-init game scalars read across the win32 layer: the
+ * 640x480 screen dimensions, the fog-of-war flag (cheat-toggled), and the
+ * info-overlay flag. Non-const; initial bytes byte-checked, plain linkage to
+ * match standalone.h's shared declarations. */
+int32_t am2_screen_w = 640;
+int32_t am2_screen_h = 480;
+int32_t am2_fog_of_war = 1;
+int32_t am2_info_overlay_on = 1;
+#endif
+
 /* ---- what stays in the original image --------------------------------- */
 
 typedef void    (__cdecl *am2_void_fn)(void);
