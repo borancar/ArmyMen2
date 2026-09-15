@@ -66,7 +66,7 @@ reads records 1-6 from the placed `pointer_modes` storage -- consistent because
 it is one physical table. The SA/mingw build keeps the `--section-start` blob
 path (PE linker scripts differ); native was the stated priority.
 
-**UPDATE (2026-09-15): 153 symbols placed, 60.1% of meaningful bytes.** Later
+**UPDATE (2026-09-15): 155 symbols placed, 61.5% of meaningful bytes.** Later
 batches: `UNIT_TYPES` (720B of pure data, inline names -- the sweep now skips
 runs inside a placed symbol so those names are not zeroed), `VOICE_GROUPS` (30
 pickup voice-line records), `SCRIPT_KIND_NAMES`, `SOLDIER_NAMES` (62 records,
@@ -76,9 +76,11 @@ run of `src/platform/crt` const tables the reconstructed CRT reads via
 `AM2_IMAGE`: the day-of-year tables `_lpdays`/`_days`, the OS-error->errno map
 `errtable` (+`_END`), the multibyte-codepage init tables
 `mbctype_range_flags`/`mbcp_table` (932/936/949/950/1361), the two `__ld12cvt`
-`CVTINFO` parameter blocks, and the runtime-error message table `rterr_table`
+`CVTINFO` parameter blocks, the runtime-error message table `rterr_table`
 (18 `{int, char*}` pairs, migrated mixed -- which also freed its ~600 bytes of
-`R60xx` message strings). A separate lever dropped code-read strings: 36
+`R60xx` message strings), and the two 352-byte base-ten scaling tables
+`pow10_table`/`pow10_neg_table` (80-bit long-double groups, transcribed as the
+`uint8_t` blobs the byte-addressed reader wants). A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
 sweep to **1,355 strings, 31,979 bytes zeroed**.

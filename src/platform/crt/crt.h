@@ -184,6 +184,9 @@ typedef struct CRT_CVTINFO {
  * the RTERR scan bound) in startup.cpp, so the declaration is shared here.
  * (Already inside crt.h's extern "C" block, so no linkage keyword here.) */
 extern const CRT_CVTINFO am2_crt_cvtinfo_double[2];
+/* Defined in fltcvt.cpp; POW10_TABLE's address is also crt_setmbcp's scan
+ * bound in startup.cpp, so its declaration is shared. */
+extern const uint8_t am2_crt_pow10_table[352];
 #endif
 
 /* 0x004653B7. Leading space skipped, then _fltin2: an overflow answers
