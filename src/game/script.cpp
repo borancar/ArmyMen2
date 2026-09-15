@@ -32,6 +32,9 @@ extern "C" const char *const am2_script_kind_names[7] = {
 extern "C" const char *const am2_name_score_vars[5] = {
     "gamescorelimit", "greenscore", "tanscore", "bluescore", "greyscore",
 };
+/* The "unknown" word kUnknownWord returns for an unrecognised token: a char*
+ * slot at 0x00488258 pointing at the string just after it. */
+extern "C" const char *const am2_script_unknown_str[1] = { "unknown" };
 #endif
 
 /* PreloadSprite is reconstructed, in win32/sprite.cpp with the rest of the

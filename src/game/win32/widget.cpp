@@ -41,6 +41,11 @@
 /* The debug blast-kind selector at 0x00476FB4 (default kind 121), used only
  * here; runtime-written, migrated non-const, initial byte-checked. */
 int32_t am2_debug_blast_kind = 121;
+/* The default edit-field character set at 0x00485304 (a char* slot); the blob
+ * string then drops. EDIT_CHARSET_PTR stays -- it is a runtime-written pointer. */
+extern "C" const char *const am2_edit_charset_default[1] = {
+    " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`~!@#$%^&*()-_+={[}]|\\:;\"',<.>?/\t"
+};
 /* The controls dialog's scancode->label table, 95 read-only {dik, name}
  * records the image carries at 0x0048AF28. Transcribed to C literals (the
  * blob's name strings then go dead and the sweep drops them);

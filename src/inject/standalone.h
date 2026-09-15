@@ -827,6 +827,13 @@ extern const char *const am2_dir_names[4];
 #undef ADDR_NAME_GREYSCORE
 #define ADDR_NAME_GREYSCORE     ((uintptr_t)(const void *)&am2_name_score_vars[4])
 
+/* The script "unknown" word (script.cpp) and the edit-field charset (widget.cpp),
+ * both read-only char* slots. */
+#undef ADDR_SCRIPT_UNKNOWN_STR
+#define ADDR_SCRIPT_UNKNOWN_STR ((uintptr_t)(const void *)am2_script_unknown_str)
+#undef ADDR_EDIT_CHARSET_DEFAULT
+#define ADDR_EDIT_CHARSET_DEFAULT ((uintptr_t)(const void *)am2_edit_charset_default)
+
 /* Small game const tables: the trooper heading-sweep deltas (region.cpp), the
  * airstrike slot records (air.cpp), and the "Sarge" unit-name slot (item.cpp). */
 #undef ADDR_STEP_FACING_SWEEP
