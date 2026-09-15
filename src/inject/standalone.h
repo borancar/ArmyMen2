@@ -1057,6 +1057,20 @@ extern int32_t am2_screen_w, am2_screen_h, am2_fog_of_war, am2_info_overlay_on;
 #define ADDR_INFO_OVERLAY_ON    ((uintptr_t)(const void *)&am2_info_overlay_on)
 #undef ADDR_DEBUG_BLAST_KIND
 #define ADDR_DEBUG_BLAST_KIND   ((uintptr_t)(const void *)&am2_debug_blast_kind)
+/* HUD_CMD_SPEC record 0 (widget.cpp); records 1-6 fall through into the placed
+ * pointer_modes storage. HUD_CMD_SPRITES is its sprite field at +0xC. */
+extern int32_t am2_hud_cmd_spec[4];
+#undef ADDR_HUD_CMD_SPEC
+#define ADDR_HUD_CMD_SPEC       ((uintptr_t)(const void *)am2_hud_cmd_spec)
+#undef ADDR_HUD_CMD_SPRITES
+#define ADDR_HUD_CMD_SPRITES    ((uintptr_t)(const void *)&am2_hud_cmd_spec[3])
+/* The build-menu table (widget.cpp); its tail 16 bytes are am2_hud_sarge_offsets
+ * (placed), so BUILD_MENU_END aliases past that int16[8]. */
+extern const uint8_t am2_build_menu[992];
+#undef ADDR_BUILD_MENU
+#define ADDR_BUILD_MENU         ((uintptr_t)(const void *)am2_build_menu)
+#undef ADDR_BUILD_MENU_END
+#define ADDR_BUILD_MENU_END     ((uintptr_t)(const void *)&am2_hud_sarge_offsets[8])
 
 /* Default map/script/rules names and dir names (gamedir.cpp), char* slots. */
 extern const char *const am2_dir_defaults[3];
