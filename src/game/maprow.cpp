@@ -41,6 +41,21 @@ extern "C" const uint32_t am2_respawn_kind_mask[44] = {
     0, 0, 0, 0, 0x40, 0, 0, 0, 0x4, 0x8, 0x10, 0, 0, 0x10000, 0x200, 0,
     0, 0, 0, 0x80, 0x80, 0x80, 0x80, 0x2000, 0x1000, 0x100, 0x4000, 0,
 };
+/* am2_frame_heading_bias -- 0x004740CC, uint8_t[152] indexed by sprite frame:
+ * a per-frame bias added (8-bit, wrapping) to a row's heading. Read-only LUT,
+ * transcribed out of the blob (an unrelated format string sits just past it). */
+extern "C" const uint8_t am2_frame_heading_bias[152] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 192, 64, 64, 64, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128,
+    128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+};
 #endif
 extern "C" int32_t am2_trace_window(void) __attribute__((weak));
 #define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())

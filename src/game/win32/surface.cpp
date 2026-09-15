@@ -1223,6 +1223,11 @@ static_assert(DDBLT_WAIT == 0x01000000, "DDBLT_WAIT");
 #define g_cursorSprite  (*(uint8_t **)(uintptr_t)ADDR_MENU_SPRITES_END)
 #define g_savedValid    (*(int32_t *)(uintptr_t)ADDR_MENU_SAVED_VALID)
 #define g_savedRect     ((AM2_Rect *)(uintptr_t)ADDR_MENU_SAVED_RECT)
+#ifdef AM2_STANDALONE
+/* The fixed 32x32 corner of the menu surface the cursor save-under occupies
+ * (a read-only RECT {0,0,32,32}), transcribed out of the blob at 0x00476198. */
+extern "C" const int32_t am2_menu_save_slot[4] = { 0, 0, 32, 32 };
+#endif
 #define g_saveSlot      ((RECT *)(uintptr_t)ADDR_MENU_SAVE_SLOT)
 #define g_cursorRect    ((AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_RECT)
 #define g_cursorPrev    ((AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_PREV)
