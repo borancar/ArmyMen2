@@ -232,7 +232,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **1,029 strings, 26,558 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **1,188 strings, 29,473 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus

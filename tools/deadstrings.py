@@ -69,6 +69,35 @@ def src_text():
     return src
 
 
+# Pointer tables the ORIGINAL read but the reconstruction does not, because the
+# reconstruction carries its own C copy. Their bytes are dead in the native
+# build, and so are the strings they -- and only they -- point at. Each is
+# (start_va, end_va, name); dead_tables() drops any whose address IS reached
+# from code, so a future rewiring cannot silently zero a live table.
+#   SCRIPT_TOKENS: ScriptLookupToken walks am2_script_tokens (scripttokens.h),
+#   never 0x00487C90; the 185 blob entries and their keyword strings are dead.
+_DEAD_TABLE_DECL = [
+    (0x00487C90, 0x00488258, "SCRIPT_TOKENS"),
+]
+
+
+def dead_tables():
+    """[(va, size)] for the dead pointer tables above, minus any still reached
+    from code (macro or bare hex, comments and #defines already stripped)."""
+    src = src_text()
+    oh = open(os.path.join(REPO, "src", "inject", "orig.h")).read()
+    out = []
+    for start, end, name in _DEAD_TABLE_DECL:
+        macs = re.findall(r'#define\s+(ADDR_\w+)\s+0x0*%X' % start, oh)
+        hexes = ("0x%08x" % start, "0x%x" % start)
+        used = any(re.search(r'\b' + m + r'\b', src) for m in macs) \
+            or any(h in src.lower() for h in hexes)
+        if used:
+            continue          # someone reads it now -- do not touch it
+        out.append((start, end - start))
+    return out
+
+
 def referenced_in_original(va, img):
     """True if the 4-byte LE of `va` occurs in any section of the original image
     (a code immediate or a stored pointer -- i.e. the program points at `va`)."""
@@ -99,6 +128,10 @@ def dead_ranges(blob):
     carved = [(a, a + s) for (a, s, _sym, is_ptr)
               in placement.placed_set(placement.manifest(), placement.split())
               if is_ptr]
+    # Dead pointer tables count like carved ranges: their pointers do not
+    # survive into the native build, so a string only they reached is dead.
+    deadtabs = dead_tables()
+    carved += [(a, a + s) for a, s in deadtabs]
 
     def in_carved(va):
         return any(lo <= va < hi for lo, hi in carved)
@@ -144,6 +177,10 @@ def dead_ranges(blob):
             i = j + 1
         else:
             i += 1
+    # And the dead tables themselves: their pointer/id dwords are dead too.
+    for a, s in deadtabs:
+        out.append((a, s))
+    out.sort()
     return out
 
 

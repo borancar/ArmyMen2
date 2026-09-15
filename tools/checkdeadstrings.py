@@ -86,6 +86,7 @@ def main():
     carved = [(a, a + s) for (a, s, _sym, is_ptr)
               in placement.placed_set(placement.manifest(), placement.split())
               if is_ptr]
+    carved += [(a, a + s) for a, s in ds.dead_tables()]
     targets = set()
     for off in range(0, len(pristine) - 3, 4):
         if any(lo <= ds.BLOB_LO + off < hi for lo, hi in carved):
