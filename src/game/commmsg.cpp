@@ -52,6 +52,11 @@ void __cdecl SendPlayerMsg(int32_t arg);
 /* am2_game_version -- 0x00475894, the protocol version the multiplayer
  * handshake compares (read as a single int32). Transcribed out of the blob. */
 extern "C" const int32_t am2_game_version = 1;
+/* The comm-object slot at 0x004751B0 (also read as ARMY_TABLE) and the enum
+ * count at 0x004751B4: the object pointer is runtime-written into placed
+ * origbss, the count seeds at 999. Plain linkage -- COMM_OBJECT is read across
+ * the whole game via standalone.h. */
+uint32_t am2_comm_object[2] = { 0x004FA480u, 999u };
 #endif
 
 /* Three comm methods, forward-declared rather than reached by address.

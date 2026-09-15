@@ -34,6 +34,7 @@ OUT = os.path.join(REPO, "build", "standalone")
 # macro used as an address (comparisons, loop bounds, pointer arithmetic).
 FOLD = [
     "STR_KERNEL32", "STR_USER32", "STR_MESSAGEBOXA",
+    "STR_ISPROCESSORFEATUREPRESENT",
     "STR_GETLASTACTIVEPOPUP", "STR_GETACTIVEWINDOW",
     "STR_RTERR_CAPTION", "STR_RTERR_BANNER", "STR_RTERR_NONAME",
     "CRT_EXPONENT_TEXT",

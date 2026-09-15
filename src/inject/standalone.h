@@ -812,6 +812,19 @@ extern const uint32_t am2_crt_inittab[36];
 #define ADDR_CRT_FLT_PTR        ((uintptr_t)(const void *)&am2_crt_flt_ptr)
 #undef ADDR_CRT_BADIOINFO
 #define ADDR_CRT_BADIOINFO      ((uintptr_t)(const void *)am2_crt_badioinfo)
+/* The _iob FILE array (stdio.cpp), non-const runtime state. */
+#undef ADDR_CRT_IOB
+#define ADDR_CRT_IOB            ((uintptr_t)(const void *)am2_crt_iob)
+
+/* The comm-object slot / army table / enum count (commmsg.cpp), read across
+ * the game; base aliases ARMY_TABLE and COMM_OBJECT, the count is at +1. */
+extern uint32_t am2_comm_object[2];
+#undef ADDR_ARMY_TABLE
+#define ADDR_ARMY_TABLE         ((uintptr_t)(const void *)am2_comm_object)
+#undef ADDR_COMM_OBJECT
+#define ADDR_COMM_OBJECT        ((uintptr_t)(const void *)am2_comm_object)
+#undef ADDR_COMM_ENUM_COUNT
+#define ADDR_COMM_ENUM_COUNT    ((uintptr_t)(const void *)&am2_comm_object[1])
 
 /* More CRT runtime .data-init scalars (conv/startup/fltcvt.cpp). */
 #undef ADDR_CRT_MB_CUR_MAX
