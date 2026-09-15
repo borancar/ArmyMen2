@@ -745,6 +745,10 @@ void  devtools_init(void);
 #undef ADDR_CRT_CTYPE_TABLE
 #define ADDR_CRT_CTYPE_TABLE    ((uintptr_t)(const void *)am2_crt_ctype)
 
+/* The CRT "(null)" printf string slot (printf.cpp), a one-entry char* table. */
+#undef ADDR_CRT_NULLSTRING
+#define ADDR_CRT_NULLSTRING     ((uintptr_t)(const void *)am2_crt_nullstring)
+
 /* Small game const tables: the trooper heading-sweep deltas (region.cpp), the
  * airstrike slot records (air.cpp), and the "Sarge" unit-name slot (item.cpp). */
 #undef ADDR_STEP_FACING_SWEEP

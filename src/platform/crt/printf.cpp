@@ -20,6 +20,14 @@
 #include "../../inject/orig.h"
 #include "../../game/image.h"
 
+#ifdef AM2_STANDALONE
+/* The "(null)" printf substitutes for a null %s: the pointer slot at
+ * 0x0048CC88 (crt_slid_pointer dereferences it). A one-entry char* table so
+ * the blob "(null)" drops. (The wide sibling WNULLSTRING stays -- a UTF-16
+ * slot does not fit the char* placement tooling.) */
+extern "C" const char *const am2_crt_nullstring[1] = { "(null)" };
+#endif
+
 /* Three pointer VARIABLES in the image, each holding an image address: the
  * slide applies to the variable and again to what it holds. */
 static const void *crt_slid_pointer(uintptr_t var)

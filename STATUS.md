@@ -66,7 +66,7 @@ reads records 1-6 from the placed `pointer_modes` storage -- consistent because
 it is one physical table. The SA/mingw build keeps the `--section-start` blob
 path (PE linker scripts differ); native was the stated priority.
 
-**UPDATE (2026-09-15): 160 symbols placed, 61.9% of meaningful bytes.** Later
+**UPDATE (2026-09-15): 161 symbols placed, 61.9% of meaningful bytes.** Later
 batches: `UNIT_TYPES` (720B of pure data, inline names -- the sweep now skips
 runs inside a placed symbol so those names are not zeroed), `VOICE_GROUPS` (30
 pickup voice-line records), `SCRIPT_KIND_NAMES`, `SOLDIER_NAMES` (62 records,
@@ -89,7 +89,7 @@ transcribed under a new `ADDR_CRT_CTYPE_TABLE` base macro, with the existing
 `_pctype` blob pointer slot left pointing one entry into the placed copy. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **1,356 strings, 31,985 bytes zeroed**.
+sweep to **1,357 strings, 31,992 bytes zeroed**.
 
 ## MIGRATION (2026-09-11): global structures transcribed out of the blob
 
@@ -257,7 +257,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **1,356 strings, 31,985 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **1,357 strings, 31,992 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus
