@@ -124,6 +124,15 @@ _DEAD_TABLE_DECL = [
     (0x0046F6E8, 0x0046F768, "DX_GUID_GAP_4"),
     (0x0046F788, 0x0046F888, "DX_GUID_GAP_5"),
     (0x0046F898, 0x0046F8A8, "DX_GUID_GAP_6"),
+    # The MSVC C++ exception-handling data: 93 __ehfuncinfo tables (each starts
+    # with the VC6 EH magic 0x19930520) and their unwind/tryblock/handler sub-maps,
+    # one per function the original compiled with try/catch. They point at handler
+    # code in .text (0xCC .origgap in native) and at each other. The native build
+    # compiles -fno-exceptions -fno-rtti and links no MSVC EH runtime, so nothing
+    # walks them: 0 src refs and 0 blob dwords point into the region from outside
+    # (checked). The C++ error strings the CRT error path still uses (R6025 pure-
+    # virtual, etc.) sit BELOW this range and are left to the head at 0x0046FECC.
+    (0x004702B8, 0x004716C8, "CXX_EH_FUNCINFO"),
 ]
 
 

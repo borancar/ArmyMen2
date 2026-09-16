@@ -97,7 +97,7 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **1,573 dead ranges, 41,597 bytes zeroed**.
+sweep to **1,574 dead ranges, 46,733 bytes zeroed**.
 
 **UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
 Auditing the surviving strings showed the remainder is table-structured, not
@@ -198,10 +198,24 @@ c_dfDIKeyboard rgodf arrays (which live in .text -- 0xCC .origgap in native -- a
 feed SetDataFormat, whose platform stub only null-checks the format). Seven .rdata
 gaps between the placed live GUIDs (0x0046F300..0x0046F8A8, 1,180 bytes) are
 declared dead in `_DEAD_TABLE_DECL` (0 src refs, 0 blob dwords point in, checked).
-The guarded metric becomes **1,573 dead ranges, 41,597 bytes zeroed**; the
-still-live .rdata is now just the CRT constants (0x0046FECC..0x004716C8) plus two
-small CRT record/EH blocks left alone. The still-live blob is ~3.3K non-zero
-bytes, most of it the CRT constants and the writable .data record tables.
+The metric went to 1,573 ranges / 41,597 bytes; the still-live .rdata was then the
+CRT constants (0x0046FECC..0x004716C8) plus the record/EH blocks inside it.
+
+**UPDATE (2026-09-16, cont.): the C++ exception-handling tables dropped -- the
+last big .rdata region.** The bulk of what looked like "CRT constants" at
+0x004702B8..0x004716C8 (1,975 non-zero bytes) is the MSVC C++ EH data: 93
+`__ehfuncinfo` tables, each starting with the VC6 EH magic 0x19930520, plus their
+unwind/tryblock/handler sub-maps -- one per function the original compiled with
+try/catch. They point at handler code in .text (0xCC `.origgap` in native) and at
+each other. The native build compiles `-fno-exceptions -fno-rtti` and links no
+MSVC EH runtime, so nothing walks them (0 src refs, 0 external blob dwords point
+in -- checked). Declared dead in `_DEAD_TABLE_DECL` as `CXX_EH_FUNCINFO`. The
+guarded metric becomes **1,574 dead ranges, 46,733 bytes zeroed**. The remaining
+live .rdata is now only the ~315-byte head at 0x0046FECC -- the printf classifier
+table, the "(null)" string, the folded runtime-error/user32 message strings, and
+a few still-referenced R60xx error strings. The still-live blob is ~1.3K non-zero
+bytes: that CRT head plus the writable .data record tables (object-type/keyword
+names), which is the graph/relocate remainder.
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
@@ -493,7 +507,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **1,573 dead ranges, 41,597 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **1,574 dead ranges, 46,733 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus
