@@ -97,7 +97,23 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **1,370 strings, 32,203 bytes zeroed**.
+sweep to **1,461 strings, 34,167 bytes zeroed**.
+
+**UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
+Auditing the surviving strings showed the remainder is table-structured, not
+loose: most are the targets of char* tables the reconstruction already carries
+in C, and a handful are tables the reconstruction never reads at all (no ADDR_
+macro, no bare hex in src) -- the original's input/animation/menu code walked
+them, and that code is 0xCC `.origgap` in the native build. Added those to
+`deadstrings.py`'s `_DEAD_TABLE_DECL` (which already held SCRIPT_TOKENS): the
+255-slot scancode display-name table (0x00485510, nulls for undefined codes,
+its own string pool at 0x0048590C -- ESC/F1/PAD 7/...), the animation POSE
+names (0x0048A5B4 -- Null/Stand/Run/.../Last), and the small BOOL, flag-team and
+lowercase-colour name tables. Declaring the pointer array dead carves it, so the
+private strings it alone pointed at fall out too, while shared targets (the
+ON/OFF words, the code-referenced colour names) are kept by the per-string
+pointed/coded gate. checkdeadstrings re-derives and confirms all 1,461 zeroed
+ranges are unreachable; the unplaced non-zero blob fell ~11.5K -> ~10.4K.
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
@@ -389,7 +405,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **1,370 strings, 32,203 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **1,461 strings, 34,167 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus

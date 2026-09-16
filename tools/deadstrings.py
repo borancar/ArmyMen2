@@ -76,8 +76,24 @@ def src_text():
 # from code, so a future rewiring cannot silently zero a live table.
 #   SCRIPT_TOKENS: ScriptLookupToken walks am2_script_tokens (scripttokens.h),
 #   never 0x00487C90; the 185 blob entries and their keyword strings are dead.
+# The five below are char* name tables the reconstruction never reads (no ADDR_
+# macro, no bare hex in src -- confirmed by grep, comments and #defines aside):
+# the original's input, animation and menu code walked them, and that code is
+# 0xCC .origgap in the native build. Each is a run of pointer/NULL dwords ending
+# exactly where its string pool begins (verified byte-by-byte, no placed symbol
+# inside); declaring the pointer array dead carves it, so the private strings it
+# alone pointed at fall out too, while any shared target (the ON/OFF bool words,
+# the code-referenced colour names) is kept by the per-string pointed/coded gate.
+#   SCANCODE_NAMES: a 255-slot scancode-indexed table (0x485510), nulls for the
+#   undefined codes, then its own strings at 0x0048590C (ESC, F1, PAD 7, ...).
+#   POSE_NAMES: the animation-pose names (Null, Stand, Run, ... Last).
 _DEAD_TABLE_DECL = [
     (0x00487C90, 0x00488258, "SCRIPT_TOKENS"),
+    (0x00485510, 0x0048590C, "SCANCODE_NAMES"),
+    (0x0048A5B4, 0x0048A668, "POSE_NAMES"),
+    (0x00476FBC, 0x00476FD0, "BOOL_NAMES"),
+    (0x004751B8, 0x004751C8, "FLAG_TEAM_NAMES"),
+    (0x004852F0, 0x00485304, "LC_COLOR_NAMES"),
 ]
 
 
