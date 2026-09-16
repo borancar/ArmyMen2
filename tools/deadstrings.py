@@ -105,6 +105,25 @@ _DEAD_TABLE_DECL = [
     (0x004751B8, 0x004751C8, "FLAG_TEAM_NAMES"),
     (0x004852F0, 0x00485304, "LC_COLOR_NAMES"),
     (0x004716C8, 0x00472658, "IMPORT_MACHINERY"),
+    # The DirectInput/DirectDraw/DirectSound interface data the image carries in
+    # .rdata but the native platform never dereferences. The live GUIDs -- the
+    # ones device.cpp/audio.cpp actually pass (IID_IDirectDraw2 0x46F338,
+    # IID_IDirectSound3DListener 0x46F3E8, GUID_SysMouse 0x46F5A8, GUID_SysKeyboard
+    # 0x46F5B8) -- are placed symbols and sit OUTSIDE these gaps. What is left is
+    # the DIOBJECTDATAFORMAT axis/button GUIDs (GUID_XAxis/YAxis/ZAxis/Button/Key)
+    # and the DI property/format blocks: reached only through the c_dfDIMouse /
+    # c_dfDIKeyboard rgodf arrays, which live in .text (0xCC .origgap in native) and
+    # feed SetDataFormat -- and src/platform/dinput.cpp's Dev_SetDataFormat only
+    # null-checks the format, never walking it. So nothing in the ELF build reads
+    # these (0 src refs, 0 blob dwords point in -- checked). Each gap sits between
+    # placed live GUIDs, so the ranges are stable.
+    (0x0046F300, 0x0046F338, "DX_GUID_GAP_1"),
+    (0x0046F348, 0x0046F3E8, "DX_GUID_GAP_2"),
+    (0x0046F3F8, 0x0046F5A8, "DI_OBJFMT_GUIDS"),
+    (0x0046F5C8, 0x0046F6C8, "DX_GUID_GAP_3"),
+    (0x0046F6E8, 0x0046F768, "DX_GUID_GAP_4"),
+    (0x0046F788, 0x0046F888, "DX_GUID_GAP_5"),
+    (0x0046F898, 0x0046F8A8, "DX_GUID_GAP_6"),
 ]
 
 

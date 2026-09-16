@@ -97,7 +97,7 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **1,566 dead ranges, 40,293 bytes zeroed**.
+sweep to **1,573 dead ranges, 41,597 bytes zeroed**.
 
 **UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
 Auditing the surviving strings showed the remainder is table-structured, not
@@ -180,13 +180,28 @@ own descriptor/thunk dwords point at the names inside it, which is why the strin
 sweep could not see the names dead (a name is referenced only at the hint word two
 bytes before it). checkdeadstrings re-derives it and its step-3 (no surviving
 dword points into a zeroed range) holds because the region joins the carved set.
-The guarded metric becomes **1,566 dead ranges, 40,293 bytes zeroed** (1,565
-strings + the one import region); the still-live blob falls to ~4.5K non-zero
-bytes -- the CRT date/FP constants (live, read by the reconstructed CRT), the COM
-GUID data, and the object/keyword record tables. (The IAT itself is NOT among
-these: its 720-byte storage at 0x0046F000 was already migrated to the placed C
-array `am2_iat` in `src/standalone/runtime.cpp` -- filled at startup by the native
+The guarded metric became 1,566 ranges / 40,293 bytes (1,565 strings + the one
+import region); the still-live blob fell to ~4.5K non-zero bytes -- the CRT
+date/FP constants (live, read by the reconstructed CRT), the COM/DirectX GUID
+data, and the object/keyword record tables. (The IAT itself is NOT among these:
+its 720-byte storage at 0x0046F000 was already migrated to the placed C array
+`am2_iat` in `src/standalone/runtime.cpp` -- filled at startup by the native
 import resolver, its image bytes byte-checked -- so it is placed, not carried.)
+
+**UPDATE (2026-09-16, cont.): the dead DirectX interface data dropped too.** The
+remaining .rdata (0x0046F000..0x004716C8, all read-only) splits into live data the
+port reads -- the four DirectX GUIDs device.cpp/audio.cpp pass (placed symbols),
+the CRT constants at 0x0046FECC (live) -- and DEAD DirectInput/DirectDraw/
+DirectSound data the port never dereferences: the DIOBJECTDATAFORMAT axis/button
+GUIDs and DI property/format blocks, reached only through the c_dfDIMouse /
+c_dfDIKeyboard rgodf arrays (which live in .text -- 0xCC .origgap in native -- and
+feed SetDataFormat, whose platform stub only null-checks the format). Seven .rdata
+gaps between the placed live GUIDs (0x0046F300..0x0046F8A8, 1,180 bytes) are
+declared dead in `_DEAD_TABLE_DECL` (0 src refs, 0 blob dwords point in, checked).
+The guarded metric becomes **1,573 dead ranges, 41,597 bytes zeroed**; the
+still-live .rdata is now just the CRT constants (0x0046FECC..0x004716C8) plus two
+small CRT record/EH blocks left alone. The still-live blob is ~3.3K non-zero
+bytes, most of it the CRT constants and the writable .data record tables.
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
@@ -478,7 +493,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **1,566 dead ranges, 40,293 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **1,573 dead ranges, 41,597 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus
