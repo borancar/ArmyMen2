@@ -182,6 +182,7 @@ extern const char *const am2_item_type_names[44], *const am2_unit_class_names[45
 extern const char *const am2_movie_names[12], *const am2_vehicle_names[6];
 extern const char *const am2_sprite_set_dirs[46];
 extern const AM2_StateAction am2_state_actions[5];   /* movie.cpp, was 0x0048654C */
+extern const am2_movie_vfn am2_movie_vtable[6];      /* movie.cpp, was 0x0046FAB4 */
 /* am2_key_names (AM2_KeyName[95], widget.cpp, was 0x0048AF28) is declared in
  * widget.cpp where AM2_KeyName is defined and used only there; the redirect
  * macros below expand in that TU, so no extern is needed here. */
@@ -663,6 +664,8 @@ extern int16_t am2_air_path_turn_y_in[1], am2_air_path_turn_y_out[1];
 #define ADDR_SPRITE_SET_DIRS    ((uintptr_t)(const void *)am2_sprite_set_dirs)
 #undef ADDR_STATE_ACTIONS
 #define ADDR_STATE_ACTIONS      ((uintptr_t)(const void *)am2_state_actions)
+#undef ADDR_MOVIE_VTABLE
+#define ADDR_MOVIE_VTABLE       ((uintptr_t)(const void *)am2_movie_vtable)
 #undef ADDR_WEAPON_HANDLERS
 #define ADDR_WEAPON_HANDLERS    ((uintptr_t)(const void *)am2_weapon_handlers)
 #undef ADDR_OPTION_TABLE

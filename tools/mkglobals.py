@@ -381,6 +381,7 @@ def main():
     # MIGRATION note.
     MIGRATED = (
         (0x0048654C, 0x00486584),      # am2_state_actions   (movie.cpp)
+        (0x0046FAB4, 0x0046FACC),      # am2_movie_vtable    (movie.cpp)
         (0x00489880, 0x00489B40),      # am2_weapon_handlers  (widget.cpp)
         (0x004761B8, 0x004762D0),      # am2_pointer_modes    (widget.cpp)
     )

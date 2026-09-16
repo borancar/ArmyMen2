@@ -125,19 +125,31 @@ macros (and the ex-pillbox symbol, now removed as a standalone) aliasing into
 it. Placed as a `uint8[]` byte array -- the records hold only small ints and
 floats, no pointers, so checkseams passes. 223 symbols placed, pure-data region
 byte-identical, 65.1% of meaningful bytes; boot clean; make check green
-(roachcheck/roachbitecheck included). **MOVIE_VTABLE** is the last live blob
-read, and it is blocked on FUNCTION reconstruction, not data transcription.
-ADDR_MOVIE_VTABLE (0x0046FAB4) is the movie widget's vtable; reconstructed code
-only stamps its address into the movie object, never builds the table. Its
-entries are the movie frame-draw method plus the widget base slots
-(WIDGET_PAINT_FWD2/UPDATE_CANCEL/TAKE_FOCUS/REPAINT), and none of them is in
-sites.h -- they are still original functions, so in native they map to 0xCC
-.origgap. A fn-ptr table cannot be built (no C functions to name) and a
-byte-identical copy would hold 0xCC-invalid pointers (which checkseams rightly
-rejects), so it becomes a clean fn-ptr migration only after those methods are
-reconstructed. Every other in-range macro is either redirected, folded, a view
-into a placed symbol, or read only by 0xCC-trapped code -- so with MOVIE_VTABLE
-set aside, the transcription of blob DATA is complete.
+(roachcheck/roachbitecheck included). **MOVIE_VTABLE** is now migrated: ADDR_MOVIE_VTABLE (0x0046FAB4) is the movie
+widget's 6-slot vtable, transcribed as the fn-ptr table `am2_movie_vtable`
+(movie.cpp) -- `{MoviePoll, DlgSelectMapDelete, WidgetPaintFwd2,
+WidgetUpdateCancel, WidgetTakeFocus, WidgetRepaint}`, each referencing the
+reconstructed C function directly (so checkseams passes) and dereference-verified
+by checkimagedata against the image's original addresses. (My earlier reading
+that these were "not reconstructed" was wrong -- I checked sites.h, but the
+reconstruction record is the `patch_replace` list, and all six are patched.)
+224 symbols placed, 27 pointer tables, 65.1%; checks green; boots clean.
+
+**THE REAL REMAINING origdata DEPENDENCY IS THE FIXUP TABLE.** `mkglobals.py`
+generates `build/standalone/fixups.cpp`, which at startup rewrites every
+blob-stored function pointer -- "the 33 menu vtables among them" -- to the
+reconstructed C functions, because the original .text is not in the binary.
+Those blob-stored pointers ARE an origdata dependency: the vtables live in the
+carried `.origdat` and are patched in place at load. Migrating one out (giving
+it a named C fn-ptr table and adding its address range to the `MIGRATED` list in
+mkglobals.py, so the blob copy goes unused) is exactly what was done for
+`am2_state_actions`, `am2_pointer_modes`, `am2_weapon_handlers`, and now
+`am2_movie_vtable`. **~389 fixup entries remain** (the menu-widget vtables and
+the CRT static-init thunks); each is migratable by the same pattern, and when
+the last one goes the blob's function-pointer dependency is gone. This -- not
+the ADDR_ macro scan -- is the accurate measure of what "no longer depends on
+origdata" still requires. The scalar/string/const/struct DATA is complete; the
+vtable fixups are the remaining, well-defined, piecewise work.
 
 ## MIGRATION (2026-09-11): global structures transcribed out of the blob
 

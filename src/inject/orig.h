@@ -5321,6 +5321,11 @@
 #define ADDR_MOVIE_STOP          0x00445120u  /* thiscall void(this) */
 #define ADDR_MOVIE_SET_VOLUME    0x00445280u  /* thiscall void(this, int32) */
 #define ADDR_MOVIE_VTABLE        0x0046FAB4u  /* stamped into the object */
+/* The movie widget's vtable slot type: thiscall, one object argument. The six
+ * slots have different real signatures (poll returns int, paint takes a RECT,
+ * ...); like the image's raw addresses they are cast to this common type for
+ * storage in am2_movie_vtable (movie.cpp). */
+typedef void (__attribute__((thiscall)) *am2_movie_vfn)(void *);
 #define ADDR_MOVIE_SOUND_READY   0x006598A8u  /* int32_t; set once Smacker has sound */
 #define ADDR_MOVIE_OPEN          0x00444FC0u  /* thiscall this(this,name,w,h,big) */
 #define ADDR_MOVIE_MAKE_SURFACE  0x00445690u  /* surface *(w, h), stays original */
