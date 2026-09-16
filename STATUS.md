@@ -97,7 +97,7 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **1,574 dead ranges, 46,733 bytes zeroed**.
+sweep to **1,410 dead ranges, 47,896 bytes zeroed**.
 
 **UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
 Auditing the surviving strings showed the remainder is table-structured, not
@@ -210,13 +210,13 @@ try/catch. They point at handler code in .text (0xCC `.origgap` in native) and a
 each other. The native build compiles `-fno-exceptions -fno-rtti` and links no
 MSVC EH runtime, so nothing walks them (0 src refs, 0 external blob dwords point
 in -- checked). Declared dead in `_DEAD_TABLE_DECL` as `CXX_EH_FUNCINFO`. The
-guarded metric becomes **1,574 dead ranges, 46,733 bytes zeroed**. The remaining
-live .rdata is now only the ~315-byte head at 0x0046FECC -- the printf classifier
-table, the "(null)" string, the folded runtime-error/user32 message strings, and
-a few still-referenced R60xx error strings. The still-live blob is ~1.9K non-zero
+metric went to 1,574 ranges / 46,733 bytes. The remaining live .rdata is now only
+the ~315-byte head at 0x0046FECC -- the printf classifier table, the "(null)"
+string, the folded runtime-error/user32 message strings, and a few
+still-referenced R60xx error strings. The still-live blob was then ~1.9K non-zero
 bytes across 51 chunks: that CRT head plus the writable .data record tables
-(object-type/keyword names, MP message strings held by dispatch tables), which is
-the per-structure graph/relocate remainder.
+(object-type/keyword names, MP message strings held by dispatch tables), the
+per-structure graph/relocate remainder.
 
 **UPDATE (2026-09-17): folds and dead-drops exhausted; remainder is
 per-structure placement.** A live-chunk sweep of the swept blob confirmed 0
@@ -227,9 +227,21 @@ address or by a carried pointer, each needing its own placed symbol. First of
 these: the edit widget's accepted-character-set string (0x00485360, 70 bytes,
 " a-z A-Z 0-9 !'&+-_") -- dereferenced through the raw pointer `am2_edit_charset_ptr`
 = 0x00485360 -- transcribed as the placed `am2_edit_charset` in `widget.cpp` (276
-symbols placed now). The rest (movement/facing tables, MP dispatch strings, key
-defaults, CRT record head) is the incremental tail, best transcribed alongside
-the subsystems that own them.
+symbols placed now). Then the biggest remaining chunk turned out to be DEAD, not
+data to place: 0x00489E18..0x0048AE80 (4,200 bytes, 633 non-zero) is the
+multiplayer network debug/log format strings ("TrooperPickupItem %x",
+"UpdateTrooperAction: ask...", etc.) plus a small dead offset table, sitting
+between the placed `am2_step_facing_sweep` (ends 0x00489E18) and `am2_key_defaults`
+(0x0048AE80). The MP send/recv code that logged them is unreconstructed (0xCC
+`.origgap`); the ONLY reconstructed macro in the whole span is
+`ADDR_STEP_FACING_SWEEP` (that placed symbol, outside the range). Declared dead as
+`MP_NET_DEBUG_STRINGS` (0 src refs, 0 blob dwords point in -- checked; many begin
+with a tab, which the string sweep skips, so they had survived). This coalesced
+~164 already-individually-zeroed strings inside the span into one range, so the
+count falls while bytes rise: **1,410 dead ranges, 47,896 bytes zeroed**. The
+still-live blob is ~1.3K non-zero. The rest (movement tables, key defaults, the
+CRT record head, object/keyword name tables) is the incremental tail, best
+transcribed alongside the subsystems that own them.
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
@@ -521,7 +533,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **1,574 dead ranges, 46,733 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **1,410 dead ranges, 47,896 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus

@@ -133,6 +133,17 @@ _DEAD_TABLE_DECL = [
     # (checked). The C++ error strings the CRT error path still uses (R6025 pure-
     # virtual, etc.) sit BELOW this range and are left to the head at 0x0046FECC.
     (0x004702B8, 0x004716C8, "CXX_EH_FUNCINFO"),
+    # The multiplayer network debug/log format strings ("TrooperPickupItem %x",
+    # "TrooperHostApprovedPickup...", "UpdateTrooperAction: ask...", etc.) and a
+    # small dead offset table, in .data right after the placed am2_step_facing_sweep
+    # (which ends at 0x00489E18) and before the placed am2_key_defaults (0x0048AE80).
+    # The MP send/recv code that logged them is unreconstructed (0xCC .origgap in
+    # native); the ONLY reconstructed macro anywhere in 0x00489E00..0x0048AE80 is
+    # ADDR_STEP_FACING_SWEEP, which is that placed symbol OUTSIDE this range. 0 src
+    # refs and 0 blob dwords point in (checked). Many of these strings begin with a
+    # tab, which is why the string sweep -- it only starts a run on a printable
+    # byte -- never saw them as dead on its own.
+    (0x00489E18, 0x0048AE80, "MP_NET_DEBUG_STRINGS"),
 ]
 
 
