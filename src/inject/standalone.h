@@ -985,8 +985,9 @@ extern int16_t am2_air_path_turn_y_in[1], am2_air_path_turn_y_out[1];
 #define ADDR_CRT_DST_END_MS     ((uintptr_t)(const void *)&am2_crt_dst_end[2])
 
 /* CRT init/term function-pointer tables (startup.cpp); base places, ends alias.
- * Dead in native (the initterm walk is not reached), transcribed byte-exact. */
-extern const uint32_t am2_crt_inittab[36];
+ * A table of the reconstructions themselves -- crt_cinit's initterm walk IS
+ * reached natively and calls straight through it, so no startup fixup. */
+extern const am2_init_fn am2_crt_inittab[36];
 #undef ADDR_CRT_XC_BEGIN
 #define ADDR_CRT_XC_BEGIN       ((uintptr_t)(const void *)am2_crt_inittab)
 #undef ADDR_CRT_XC_END

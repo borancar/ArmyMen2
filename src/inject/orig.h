@@ -5331,6 +5331,11 @@ typedef void (__attribute__((thiscall)) *am2_movie_vfn)(void *);
  * methods with varying real signatures, cast to this common type for storage
  * in the am2_vtable_* arrays (widget.cpp). */
 typedef void (__attribute__((thiscall)) *am2_widget_vfn)(void *);
+/* A C-runtime init/term table entry -- the __cdecl void(void) the MSVC
+ * .CRT$XC, XI, XP and XT tables hold and crt_initterm calls; two of the C++
+ * static initializers return int32 and are cast, as the image stores the raw
+ * addresses. Used by am2_crt_inittab (startup.cpp). */
+typedef void (__cdecl *am2_init_fn)(void);
 #define ADDR_MOVIE_SOUND_READY   0x006598A8u  /* int32_t; set once Smacker has sound */
 #define ADDR_MOVIE_OPEN          0x00444FC0u  /* thiscall this(this,name,w,h,big) */
 #define ADDR_MOVIE_MAKE_SURFACE  0x00445690u  /* surface *(w, h), stays original */

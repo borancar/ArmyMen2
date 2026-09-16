@@ -46,19 +46,81 @@ extern "C" const uint32_t am2_crt_exit_fn_ptr = 0x00469320u;
  * 4195835.0 / 3145727.0 division _adjust_fdiv runs). Read-only const doubles. */
 extern "C" const double am2_crt_fdiv_num = 4195835.0;
 extern "C" const double am2_crt_fdiv_den = 3145727.0;
-/* The C-runtime init/term function-pointer tables at 0x00473000 (XC/XI/XP/XT,
- * walked by crt_initterm). Their entries are IMAGE .text addresses that map to
- * the 0xCC .origgap in the native build, so crt_cinit's initterm walk is not
- * reached natively (the boot proves it -- calling one would trap); the reads
- * are dead. Transcribed byte-identically so behaviour is preserved exactly and
- * the blob dependency drops; the _BEGIN/_END macros alias into it. */
-extern "C" const uint32_t am2_crt_inittab[36] = {
-    0x00000000u, 0x00408AB0u, 0x00408AE0u, 0x00408B10u, 0x00408B40u, 0x00408B90u,
-    0x00408BE0u, 0x00408C30u, 0x00408C60u, 0x00408C90u, 0x00408CC0u, 0x00408CF0u,
-    0x0040DB40u, 0x0041A190u, 0x0041A830u, 0x0041A850u, 0x0041A870u, 0x0041A890u,
-    0x00424890u, 0x00424BA0u, 0x00427630u, 0x00462390u, 0x00000000u, 0x00000000u,
-    0x00465023u, 0x00469BE6u, 0x0046C627u, 0x0046B3ADu, 0x00000000u, 0x00000000u,
-    0x00469C8Bu, 0x00000000u, 0x00000000u, 0x0046B3BEu, 0x00000000u, 0x00000000u,
+/* The C-runtime init/term function-pointer tables at 0x00473000: XC (the C++
+ * static initializers, 0x473000..0x473058), XI (0x47305C..0x473070), XP
+ * (0x473074..0x47307C) and XT (0x473080..0x473088), each 0-terminated at both
+ * ends. crt_cinit walks XI then XC through crt_initterm at startup and exit
+ * walks XP and XT -- and that walk IS reached natively: every entry is a
+ * reconstruction. (An earlier note here called the walk dead; it was live all
+ * along -- the original stored jmp THUNKS into its own .text and mkglobals
+ * rewrote each slot to ours before WinMain, which is what InitRemapIdentity
+ * needs to fill g_remapIdent before SetGamePalette writes through it.)
+ * Transcribed as a named table of the reconstructions themselves, so no fixup
+ * is needed: checkimagedata follows each image thunk to its target and checks
+ * it names the same function, and the range sits in mkglobals.py's MIGRATED
+ * list. The _BEGIN/_END macros alias into it (standalone.h). The 21 XC entries
+ * are game initializers, declared here with their exact extern "C" __cdecl
+ * signatures (air.h, dplay.h, surface.h, gameproc.h, item.h) rather than by
+ * pulling those headers into the CRT. */
+extern "C" {
+void    __cdecl AirInitLeg2MsSpan(void);
+void    __cdecl AirInitTurnYIn(void);
+void    __cdecl AirInitTurnYOut(void);
+void    __cdecl AirInitLeg2Divisor(void);
+void    __cdecl AirInitLeg1X0(void);
+void    __cdecl AirInitLeg3X1(void);
+void    __cdecl AirInitLeg1Dx(void);
+void    __cdecl AirInitLeg1Dy(void);
+void    __cdecl AirInitLeg3Dx(void);
+void    __cdecl AirInitLeg3Dy(void);
+void    __cdecl AirInitLeg2Dy(void);
+int32_t __cdecl CommGlobalInit(void);
+void    __cdecl InitViewColourCopy(void);
+void    __cdecl InitRemapIdentity(void);
+void    __cdecl InitDefaultPalette(void);
+void    __cdecl InitRemapBright(void);
+void    __cdecl InitOverlayPalette(void);
+void    __cdecl InitStartupColours(void);
+void    __cdecl InitStartupColoursB(void);
+}
+/* These two are declared OUTSIDE their headers' extern "C" blocks (item.h,
+ * gameproc.h) and so carry C++ linkage; the forward declaration has to match
+ * or the link fails -- linkage mismatches go both ways. */
+int32_t __cdecl SelListInit(void);
+void    __cdecl InitItemHeaderSize(void);
+extern "C" const am2_init_fn am2_crt_inittab[36] = {
+    0,                                             /* XC begin */
+    (am2_init_fn)AirInitLeg2MsSpan,
+    (am2_init_fn)AirInitTurnYIn,
+    (am2_init_fn)AirInitTurnYOut,
+    (am2_init_fn)AirInitLeg2Divisor,
+    (am2_init_fn)AirInitLeg1X0,
+    (am2_init_fn)AirInitLeg3X1,
+    (am2_init_fn)AirInitLeg1Dx,
+    (am2_init_fn)AirInitLeg1Dy,
+    (am2_init_fn)AirInitLeg3Dx,
+    (am2_init_fn)AirInitLeg3Dy,
+    (am2_init_fn)AirInitLeg2Dy,
+    (am2_init_fn)CommGlobalInit,
+    (am2_init_fn)InitViewColourCopy,
+    (am2_init_fn)InitRemapIdentity,
+    (am2_init_fn)InitDefaultPalette,
+    (am2_init_fn)InitRemapBright,
+    (am2_init_fn)InitOverlayPalette,
+    (am2_init_fn)SelListInit,
+    (am2_init_fn)InitStartupColours,
+    (am2_init_fn)InitItemHeaderSize,
+    (am2_init_fn)InitStartupColoursB,
+    0, 0,                                          /* XC end, XI begin */
+    (am2_init_fn)crt_onexitinit,
+    (am2_init_fn)crt_initstdio,
+    (am2_init_fn)crt_initmbctable,
+    (am2_init_fn)crt_seh_set,
+    0, 0,                                          /* XI end, XP begin */
+    (am2_init_fn)crt_endstdio,
+    0, 0,                                          /* XP end, XT begin */
+    (am2_init_fn)crt_seh_restore,
+    0, 0,                                          /* XT end, pad */
 };
 
 struct AM2_RtErr { int32_t num; const char *msg; };

@@ -169,6 +169,29 @@ init-order tables (AirInit*/CommGlobalInit/CRT static-init at 0x473004+, ~29) an
 ~110 scattered single function pointers; the vtable region, the biggest and most
 regular chunk, is done.
 
+**UPDATE (2026-09-16, cont.): the init-order tables are transcribed -- fixups
+139 -> 110, and the CRT init walk is now honest.** `am2_crt_inittab` (0x00473000,
+the .CRT XC/XI/XP/XT tables) was already placed but held the image's raw slot
+values and got rewritten at startup like a vtable; it is now a table of the
+reconstructions themselves -- the 21 C++ static initializers (AirInit*×11,
+CommGlobalInit, InitViewColourCopy/InitRemapIdentity/InitDefaultPalette/
+InitRemapBright/InitOverlayPalette, SelListInit, InitStartupColours/B,
+InitItemHeaderSize) and the 6 CRT init/term routines (crt_onexitinit,
+crt_initstdio, crt_initmbctable, crt_seh_set, crt_endstdio, crt_seh_restore),
+with the 0 sentinels in place, typed am2_init_fn (orig.h). The old comment on
+that table said crt_cinit's walk was "dead in native"; it was live all along --
+am2_apply_fixups patched the slots before crt_startup, which is what let
+InitRemapIdentity fill g_remapIdent. Two tooling pieces: verify_mixed now follows
+the XC entries' `jmp` thunks to their targets (the image stores thunks, not the
+initializers), and mkglobals' by-position static-init rewrite skips a MIGRATED
+range like the blob scan does. Two of the 21 (SelListInit, InitItemHeaderSize)
+are declared outside their headers' extern "C" blocks and so carry C++ linkage
+-- the forward declarations in startup.cpp had to match, which the link caught.
+Verified: checkseams clean; native boots through the live init walk and drives
+its title widgets without fault. **110 fixups remain -- all scattered single
+function pointers embedded in data structs** (102 singletons + 4 pairs), the
+long tail: each is migrated by placing the struct that holds it.
+
 ## MIGRATION (2026-09-11): global structures transcribed out of the blob
 
 The native/standalone builds carry the original's `.rdata`/`.data` as one blob

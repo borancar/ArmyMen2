@@ -382,6 +382,7 @@ def main():
     MIGRATED = (
         (0x0048654C, 0x00486584),      # am2_state_actions   (movie.cpp)
         (0x0046FAB4, 0x0046FACC),      # am2_movie_vtable    (movie.cpp)
+        (0x00473000, 0x00473090),      # am2_crt_inittab     (startup.cpp) XC/XI/XP/XT
         # --- the menu/HUD widget class vtables (widget.cpp) ---
         (0x0046F8B8, 0x0046F8CC),      # am2_vtable_hud_radar
         (0x0046F8CC, 0x0046F8E0),      # am2_vtable_hud_sarge
@@ -452,8 +453,13 @@ def main():
     # scan above cannot match, so they are rewritten here by position: the
     # CRT's _cinit, reconstructed in src/platform/crt/startup.cpp, walks
     # the table itself and must find the reconstructions in it.
+    # ... unless the table has itself been transcribed (am2_crt_inittab holds
+    # the reconstructions directly), in which case its range is MIGRATED and
+    # the by-position rewrite is skipped like any other placed table's.
     if si_addr is not None:
         for k, t in enumerate(si_entries):
+            if migrated(si_addr + 4 * k):
+                continue
             nm = patch_names.get(t) or a2n.get(t)
             if nm:
                 fixups.append((si_addr + 4 * k, nm))

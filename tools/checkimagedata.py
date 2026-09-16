@@ -264,17 +264,40 @@ def seams_map(addrs):
     return out
 
 
+def _thunk_target(img, dw):
+    """The MSVC C++ static-initializer table (.CRT$XC*) holds `jmp` THUNKS into
+    .text rather than the initializers themselves, so a slot's dword is not
+    the reconstructed address -- the jmp's target is. Follow one hop, as
+    mkglobals.find_static_init does; None if it is not a jmp."""
+    TEXT_LO, TEXT_HI = 0x00401000, 0x0046F000
+    if not (TEXT_LO <= dw < TEXT_HI):
+        return None
+    try:
+        import capstone
+        md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+        ins = next(md.disasm(img.read(dw, 8), dw))
+        if ins.mnemonic == "jmp":
+            return int(ins.op_str, 16)
+    except Exception:
+        pass
+    return None
+
+
 def verify_mixed(img, addr, tokens, recon, seams=None):
     """A struct / function-pointer table: each dword is either an int (byte-
     compared) or a function pointer. For a pointer, the image holds the
-    ORIGINAL function address, so it must name the reconstruction (or seam) the
-    C entry does."""
+    ORIGINAL function address (or a jmp thunk to it), so it must name the
+    reconstruction (or seam) the C entry does."""
     seams = seams or {}
     TEXT_LO, TEXT_HI = 0x00401000, 0x0046F000
     for i, (kind, val) in enumerate(tokens):
         dw = struct.unpack("<I", img.read(addr + 4 * i, 4))[0]
         if kind == "fn":
             want = recon.get(dw, seams.get(dw))
+            if want is None:
+                t = _thunk_target(img, dw)
+                if t is not None:
+                    want = recon.get(t, seams.get(t))
             if want is None:
                 return ("entry %d: C names %s but image 0x%08X is not a "
                         "reconstructed function or seam" % (i, val, dw))

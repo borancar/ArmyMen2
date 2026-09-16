@@ -187,8 +187,6 @@ extern const CRT_CVTINFO am2_crt_cvtinfo_double[2];
 /* Defined in fltcvt.cpp; POW10_TABLE's address is also crt_setmbcp's scan
  * bound in startup.cpp, so its declaration is shared. */
 extern const uint8_t am2_crt_pow10_table[352];
-/* The init/term tables (startup.cpp); XP/XT are read in exit.cpp, so shared. */
-extern const uint32_t am2_crt_inittab[36];
 /* The __badioinfo sentinel (lowio.cpp); also read in stdio.cpp, so shared. */
 extern const uint8_t am2_crt_badioinfo[8];
 /* The _pctype pointer slot (conv.cpp); read across four CRT TUs, so shared. */
@@ -476,6 +474,11 @@ int32_t __cdecl crt_sbh_alloc_new_group(CRT_SBH_HEADER *h);
 /* ---- exit.cpp ---------------------------------------------------------- */
 
 typedef void (__cdecl *CRT_ExitFn)(void);
+/* The init/term tables (startup.cpp); XP/XT are read in exit.cpp, so shared. A
+ * table of the reconstructions themselves, not raw addresses -- crt_initterm
+ * calls straight through it. CRT_ExitFn is the same type as orig.h's
+ * am2_init_fn, which is what the definition and standalone.h's extern use. */
+extern const CRT_ExitFn am2_crt_inittab[36];
 
 /* 0x00465011 / 0x00464FA4 / 0x00465023. The onexit table: 32 entries from
  * startup, four more each time it fills. */
