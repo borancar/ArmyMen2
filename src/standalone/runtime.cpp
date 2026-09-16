@@ -78,7 +78,6 @@ uint8_t am2_iat[720]
 #include <io.h>
 
 extern "C" void am2_apply_fixups(void);
-extern "C" void am2_run_static_init(void);
 extern "C" void am2_bind_imports(void);
 
 /* ---- what the harness provided -------------------------------------- */
