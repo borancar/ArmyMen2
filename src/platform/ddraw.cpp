@@ -274,16 +274,19 @@ static void am2_copy(AM2_DDSurface *dst, int32_t dx, int32_t dy,
     }
 }
 
-/* Stretch src's rectangle onto dst's, nearest neighbour -- with WINED3D'S
- * ARITHMETIC, not the exact one. The source coordinate is a 16.16 sum of a
- * TRUNCATED increment, (src << 16) / dst, stepped once per destination
- * pixel. That is not floor(x * src / dst): restoring a 32-row slot into 22
- * rows takes source row 15 for destination row 11 where exact division
- * takes 16. The game's cursor is saved and restored through such a slot
- * every frame (DrawMenuCursor), the round trip is lossy either way, and
- * the residue it leaves behind the pointer is only the original's if the
- * rounding is the original's -- 118 pixels of one Boot Camp dialog frame
- * against Wine said so. */
+/* Stretch src's rectangle onto dst's, nearest neighbour, sampling each
+ * destination pixel's CENTRE: a 16.16 increment (src << 16) / dst, started at
+ * half a step and stepped once per destination pixel.
+ *
+ * HISTORY. This used to reproduce wined3d's arithmetic instead -- the same
+ * increment accumulated from ZERO and truncated -- calibrated against a Wine
+ * A/B (118 pixels of a Boot Camp dialog frame), on the reasoning that the
+ * residue the pointer's save/restore slot leaves is only the original's if
+ * the rounding is. That got the provenance backwards: the truncation is
+ * Wine's DirectDraw, not the game's, and it is exactly what made the slot
+ * round trip lossy (see the note at the loop below). With centre sampling
+ * the round trip is exact and the hybrid and the port agree; a Wine frame
+ * that differs behind the pointer now differs because Wine smears. */
 static void am2_stretch(AM2_DDSurface *dst, const RECT *dstRect,
                         const AM2_DDSurface *src, const RECT *srcRect, int32_t keyed)
 {
@@ -299,14 +302,31 @@ static void am2_stretch(AM2_DDSurface *dst, const RECT *dstRect,
     sh = s.bottom - s.top;
     if (dw <= 0 || dh <= 0 || sw <= 0 || sh <= 0)
         return;
+    /* CENTRE SAMPLING, NOT wined3d's TRUNCATED STEP. The increment used to be
+     * accumulated from 0 and truncated, which is what wined3d does and what
+     * a Wine A/B was calibrated against. But the game round-trips the pointer's
+     * 12x16 background through a 32x32 save slot every tick (DrawMenuCursor:
+     * stretch up on save, stretch down on restore), and under truncation
+     * 12 -> 32 -> 12 lands every column past the first ONE PIXEL LEFT of where
+     * it came from -- so the restore leaves a shifted residue, and on a screen
+     * that does not repaint each tick (the briefing, the pause menu) it
+     * accumulates into a smear along the pointer's path. That is a DirectDraw
+     * IMPLEMENTATION artifact copied from Wine, not the game's behaviour, and
+     * it showed as a 40-pixel divergence at pump 104 of the bootcamp side-by-
+     * side. Sampling each destination pixel's CENTRE ((x + 0.5) * src/dst)
+     * makes the 12<->32 and 16<->32 round trips exact (simulated: both return
+     * the identity), so the slot gives back precisely what was saved. Both the
+     * hybrid and the port share this, so the oracle and the reconstruction
+     * agree, and the reconstruction can make the original's whole-slot calls
+     * rather than work around the platform with a 1:1 sub-rect. */
     xinc = ((uint32_t)sw << 16) / (uint32_t)dw;
     yinc = ((uint32_t)sh << 16) / (uint32_t)dh;
-    for (y = 0, sy16 = 0; y < dh; y++, sy16 += yinc) {
+    for (y = 0, sy16 = yinc >> 1; y < dh; y++, sy16 += yinc) {
         int32_t sy = s.top + (int32_t)(sy16 >> 16);
         int32_t dy = d.top + y;
         if (dy < 0 || dy >= dst->height || sy < 0 || sy >= src->height)
             continue;
-        for (x = 0, sx16 = 0; x < dw; x++, sx16 += xinc) {
+        for (x = 0, sx16 = xinc >> 1; x < dw; x++, sx16 += xinc) {
             int32_t sx = s.left + (int32_t)(sx16 >> 16);
             int32_t dx = d.left + x;
             uint8_t v;

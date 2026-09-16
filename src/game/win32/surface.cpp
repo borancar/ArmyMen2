@@ -1375,22 +1375,23 @@ void __cdecl DrawMenuCursor(void)
 
         SetDrawTarget(g_backBuffer);
 
-        /* Put back whatever the cursor covered last tick. The slot is a fixed
-         * 32x32 corner of the menu surface, but only the cursor-sized top-left
-         * of it was written; read back exactly that, so this is a 1:1 copy and
-         * not a 32x32 -> NxM stretch. A stretch here is lossy (nearest-neighbour
-         * at a non-integer ratio), and on a FROZEN background -- the pause menu
-         * over a stopped mission -- the loss is not overpainted and accumulates
-         * into a smear along the pointer's path. (On the title screen the whole
-         * frame repaints each tick, which is why the 0-pixel title A/B never
-         * saw it.) */
-        if (g_savedValid) {
-            RECT src = *g_saveSlot;
-            src.right  = src.left + (g_savedRect->right  - g_savedRect->left);
-            src.bottom = src.top  + (g_savedRect->bottom - g_savedRect->top);
+        /* Put back whatever the cursor covered last tick, exactly as the
+         * original does (0x004130D4): the WHOLE 32x32 slot stretched back down
+         * onto the saved rect. Save and restore are a stretch round trip
+         * (12x16 -> 32x32 -> 12x16), which is only lossless if the platform's
+         * nearest-neighbour samples pixel centres -- am2_stretch does; the
+         * truncating rounding it used to copy from wined3d left the restore a
+         * pixel left of where it came from, and on a screen that is not
+         * repainted each tick (the pause menu, the briefing) that residue
+         * accumulated into a smear. That smear was the platform's, not the
+         * game's, and for a while this code worked around it with a 1:1
+         * sub-rect -- which diverged from the hybrid oracle (bootcamp
+         * side-by-side, pump 104). The platform is fixed; the call is the
+         * original's again. */
+        if (g_savedValid)
             IDirectDrawSurface_Blt(g_drawTarget, (LPRECT)g_savedRect,
-                                   g_menuSurface2, &src, DDBLT_WAIT, NULL);
-        }
+                                   g_menuSurface2, g_saveSlot,
+                                   DDBLT_WAIT, NULL);
 
         {
             am2_paint_fn *vt = *(am2_paint_fn **)g_paintObj;
@@ -1403,13 +1404,12 @@ void __cdecl DrawMenuCursor(void)
         cur.right  = cur.left + sfld32(spr, SPR_OFF_W);
         cur.bottom = cur.top  + sfld32(spr, SPR_OFF_H);
 
-        /* Save what is about to be covered, into the cursor-sized top-left of
-         * the slot (see the restore above -- 1:1, never a stretch). */
+        /* Save what is about to be covered -- the original's call (0x00413172):
+         * the clipped cursor rect stretched UP into the whole 32x32 slot, the
+         * other half of the round trip the restore above stretches back down.
+         * Exact under centre-sampled nearest neighbour; see the restore. */
         if (IntersectRect((LPRECT)&clipped, (const RECT *)&cur, g_clipRect)) {
-            RECT dstSlot = *g_saveSlot;
-            dstSlot.right  = dstSlot.left + (clipped.right  - clipped.left);
-            dstSlot.bottom = dstSlot.top  + (clipped.bottom - clipped.top);
-            IDirectDrawSurface_Blt(g_menuSurface2, &dstSlot, g_backBuffer,
+            IDirectDrawSurface_Blt(g_menuSurface2, g_saveSlot, g_backBuffer,
                                    (LPRECT)&clipped, DDBLT_WAIT, NULL);
             *g_savedRect = clipped;
             g_savedValid = 1;

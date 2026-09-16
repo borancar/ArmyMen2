@@ -42,8 +42,13 @@ saves and restores only its arrow; its overlays are software sprites nothing
 restores, so that spot holds whatever was drawn there last, which two
 unsynchronised drives never agree on. Ask what the pointer LEAVES before
 asking what it draws, and compare on a screen that repaints the spot.
-The stretch rounding was a real finding on the way -- the platform now steps
-wined3d's truncated 16.16 increment -- but it was not the cause.
+The stretch rounding was a real finding on the way -- for a while the platform
+stepped wined3d's truncated 16.16 increment to match that Wine frame -- but it
+was not the cause. (And the truncation turned out to be Wine's artifact, not
+the game's: it made the pointer's 12x16 -> 32x32 -> 12x16 save/restore round
+trip land a pixel left of where it came from, the residue that smears on
+non-repainting screens. am2_stretch samples pixel centres now, which makes the
+round trip exact -- see its comment and STATUS's 2026-09-16 entry.)
 
 **`-isystem` HEADERS ARE INVISIBLE TO `-MMD`, AND A HEADER CHANGE THEN
 REBUILDS ONE SIDE OF AN INTERFACE.** Reordering the platform's `IDirectDraw`

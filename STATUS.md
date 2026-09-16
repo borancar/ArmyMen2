@@ -568,6 +568,46 @@ reproduce the give. See docs/lua.md.
 
 ## OPEN DIVERGENCES, newest first
 
+- **FIXED (2026-09-16): the 09-15 pause-cursor fix diverged from the oracle from
+  the briefing transition on -- bootcamp side-by-side trapped at pump 104 -- and
+  the real bug was the PLATFORM's stretch rounding, fixed there for both builds.**
+  Found
+  re-running `tools/sidebyside.py --replay tests/replays/bootcamp.txt` (exact)
+  after the blob transcriptions: frame 91 differs by 40 pixels in the cursor's
+  rect, and the difference GROWS each tick (50 at frame 92, >60 by 95). NOT the
+  transcriptions: the release port built 09-15 19:24, before all of them, traps
+  at the same pump with the same frame hashes. At the trap every piece of state
+  compared on the two live games is identical -- cursor (306,143), animation
+  frame/next-tick, the cursor sprite pointer and its decoded pixels, the save
+  slot rect {0,0,32,32}, g_savedRect {306,143,318,159}. What differs is the
+  SAVE SLOT'S CONTENT: the hybrid's holds a 12->32 up-stretch (the original's
+  save blt at 0x00413172 stretches the cursor rect INTO the whole 32x32 slot,
+  and its restore at 0x004130D4 stretches the whole slot back), the port's holds
+  the 09-15 fix's 1:1 copy. The hybrid's up-stretched row decodes to the true
+  row shifted right by one: its backbuffer already carried the residue of the
+  previous tick's lossy round trip, and on a screen that does not repaint each
+  tick (the briefing; the pause menu) that residue accumulates -- which IS the
+  "smear". am2_stretch's rounding was calibrated against Wine to reproduce
+  exactly that residue (118 pixels of a Boot Camp dialog frame), so the hybrid
+  here is the original's behaviour, and the 09-15 fix removed a genuine quirk of
+  the original from the port -- or so it read. Boran's call: the smear is not
+  the game's, it is OURS, and the fix belongs in the platform, for the hybrid
+  too. Simulating am2_stretch's arithmetic confirmed it: the accumulated,
+  truncated 16.16 step it copied from wined3d makes 12 -> 32 -> 12 land every
+  column past the first ONE PIXEL LEFT ([0,0,1,...,10]) -- exactly the frame's
+  uniform shift -- while sampling pixel centres makes both the 12<->32 and
+  16<->32 round trips the identity. So: am2_stretch now samples centres (the
+  increment starts at half a step), which fixes the round trip for the hybrid
+  and the port alike, and DrawMenuCursor makes the original's whole-slot save
+  (0x00413172) and restore (0x004130D4) calls again -- the 1:1 sub-rect was a
+  game-side workaround for a platform bug. docs/lockstep.md's note that the
+  platform "steps wined3d's truncated increment" is corrected. A stock-under-
+  Wine check on Xvfb was attempted first but was inconclusive (Wine's DirectDraw
+  presents nothing capturable without GL, and the old rounding was Wine's own
+  anyway). Verified: `tools/sidebyside.py --replay tests/replays/bootcamp.txt`,
+  exact, is IDENTICAL through presented frame 627 -- the whole replay, title to
+  mission to both dialogs to the walk -- where it trapped at frame 91 before.
+
 - **FIXED (2026-09-15): the pause-menu cursor smeared the frozen background as
   it moved -- a garbled trail that only cleared on a full repaint (moving the
   host pointer out of the window and back set ADDR_OVERLAY_DIRTY via
