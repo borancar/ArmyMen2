@@ -87,6 +87,16 @@ def src_text():
 #   SCANCODE_NAMES: a 255-slot scancode-indexed table (0x485510), nulls for the
 #   undefined codes, then its own strings at 0x0048590C (ESC, F1, PAD 7, ...).
 #   POSE_NAMES: the animation-pose names (Null, Stand, Run, ... Last).
+#   IMPORT_MACHINERY: the PE import section -- the IMAGE_IMPORT_DESCRIPTOR array
+#   (0x004716C8, dir[1]), every DLL's import-lookup thunks, and the hint/name and
+#   DLL-name string pool that follows. The native build is an ELF: there is no PE
+#   image mapped at 0x400000 and no loader that walks these, so nothing reads the
+#   region (0 refs anywhere in 0x004716C8..0x00472658, checked; imports resolve
+#   through src/platform, and mkglobals binds them from the real image, not this
+#   blob). Unlike the others this is a DATA range, not a pointer table: its own
+#   descriptor/thunk dwords point at the names inside it, which is exactly why the
+#   string sweep cannot see the names as dead (a name is referenced only at the
+#   hint word two bytes before it) and why the whole region is declared here.
 _DEAD_TABLE_DECL = [
     (0x00487C90, 0x00488258, "SCRIPT_TOKENS"),
     (0x00485510, 0x0048590C, "SCANCODE_NAMES"),
@@ -94,6 +104,7 @@ _DEAD_TABLE_DECL = [
     (0x00476FBC, 0x00476FD0, "BOOL_NAMES"),
     (0x004751B8, 0x004751C8, "FLAG_TEAM_NAMES"),
     (0x004852F0, 0x00485304, "LC_COLOR_NAMES"),
+    (0x004716C8, 0x00472658, "IMPORT_MACHINERY"),
 ]
 
 
@@ -192,8 +203,12 @@ def dead_ranges(blob):
             if j < n and blob[j] == 0 and j - i >= MIN_LEN:
                 va = BLOB_LO + i
                 end = va + (j - i)
-                # (1) genuine string, and NOT inside a placed symbol
-                if not in_placed(va, end) and referenced_in_original(va, img):
+                # (1) genuine string, NOT inside a placed symbol, and NOT inside
+                # a declared dead range (its bytes are already zeroed wholesale --
+                # e.g. the DLL-name strings inside IMPORT_MACHINERY -- so counting
+                # them again here would double-record the same VAs).
+                if (not in_placed(va, end) and not in_carved(va)
+                        and referenced_in_original(va, img)):
                     pointed = any(va <= t < end for t in targets)
                     mac = addr_macro.get(va)
                     coded = va not in folded and (
@@ -226,7 +241,7 @@ def main():
     with open(os.path.join(OUT, "deadstrings.txt"), "w") as fh:
         for va, ln in ranges:
             fh.write("0x%08X %d\n" % (va, ln))
-    print("deadstrings: zeroed %d dead strings, %d bytes" % (len(ranges), total))
+    print("deadstrings: zeroed %d dead ranges, %d bytes" % (len(ranges), total))
 
 
 if __name__ == "__main__":

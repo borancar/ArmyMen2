@@ -305,8 +305,8 @@ def status_claims():
         ("STATUS.md: the verification split",
          r"\*\*That list is now (\d+) of (\d+)\*\*",
          unexercised_split(open(os.path.join(REPO, "docs", "oracles.md")).read())),
-        ("STATUS.md: dead strings zeroed",
-         r"\*\*([\d,]+) strings, ([\d,]+) bytes zeroed\*\*", deadstring_totals()),
+        ("STATUS.md: dead ranges zeroed",
+         r"\*\*([\d,]+) dead ranges, ([\d,]+) bytes zeroed\*\*", deadstring_totals()),
     ]
 
 

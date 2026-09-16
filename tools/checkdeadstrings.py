@@ -103,7 +103,7 @@ def main():
     if bad:
         return 1
     total = sum(ln for _, ln in recorded)
-    print("checkdeadstrings: OK %d dead strings, %d bytes, all unreachable"
+    print("checkdeadstrings: OK %d dead ranges, %d bytes, all unreachable"
           % (len(recorded), total))
     return 0
 

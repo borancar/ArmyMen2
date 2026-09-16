@@ -97,7 +97,7 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **1,565 strings, 36,309 bytes zeroed**.
+sweep to **1,566 dead ranges, 40,293 bytes zeroed**.
 
 **UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
 Auditing the surviving strings showed the remainder is table-structured, not
@@ -165,6 +165,26 @@ string read -- left alone. What remains live is now only buckets (c) and (d): no
 reconstructed function reads a game string from the blob by address any more; the
 object/keyword char* tables (a table-fold) and the IAT/CRT/GUID structural bytes
 (separate work) are what is left.
+
+**UPDATE (2026-09-16, cont.): the PE import machinery dropped -- the biggest
+single lever.** After the fold, a per-chunk sweep put the still-live blob at
+~8.4K non-zero bytes across 58 chunks, 67% of it in one region: the PE import
+section (the `IMAGE_IMPORT_DESCRIPTOR` array at 0x004716C8, every DLL's
+import-lookup thunks, and the hint/name + DLL-name string pool through
+0x00472658 -- 3,984 bytes). The native build is an ELF: nothing maps a PE image
+at 0x400000 and no loader walks these tables (imports resolve through
+`src/platform`; `mkglobals` binds them from the real image, not the blob), and a
+scan confirmed 0 references anywhere in the region. So it is declared dead in
+`deadstrings.py`'s `_DEAD_TABLE_DECL` -- as a DATA range, not a pointer table: its
+own descriptor/thunk dwords point at the names inside it, which is why the string
+sweep could not see the names dead (a name is referenced only at the hint word two
+bytes before it). checkdeadstrings re-derives it and its step-3 (no surviving
+dword points into a zeroed range) holds because the region joins the carved set.
+The guarded metric becomes **1,566 dead ranges, 40,293 bytes zeroed** (1,565
+strings + the one import region); the still-live blob falls to ~4.5K non-zero
+bytes -- the CRT date/FP constants (live, read by the reconstructed CRT), the COM
+GUID data, the IAT slots themselves (0x0046F000, still referenced), and the
+object/keyword record tables.
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
@@ -456,7 +476,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **1,565 strings, 36,309 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **1,566 dead ranges, 40,293 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus
