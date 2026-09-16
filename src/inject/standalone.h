@@ -1017,9 +1017,9 @@ extern const am2_init_fn am2_crt_inittab[36];
 /* CRT pointer slots: _fpinit/_exit (startup.cpp, dead image ptrs), the _fltin2
  * result pointer (strtod.cpp), and the __badioinfo sentinel (lowio.cpp). */
 #undef ADDR_CRT_FPINIT_PTR
-#define ADDR_CRT_FPINIT_PTR     ((uintptr_t)(const void *)&am2_crt_fpinit_ptr)
+#define ADDR_CRT_FPINIT_PTR     ((uintptr_t)(const void *)am2_crt_fpinit_ptr)
 #undef ADDR_CRT_EXIT_FN_PTR
-#define ADDR_CRT_EXIT_FN_PTR    ((uintptr_t)(const void *)&am2_crt_exit_fn_ptr)
+#define ADDR_CRT_EXIT_FN_PTR    ((uintptr_t)(const void *)am2_crt_exit_fn_ptr)
 #undef ADDR_CRT_FLT_PTR
 #define ADDR_CRT_FLT_PTR        ((uintptr_t)(const void *)&am2_crt_flt_ptr)
 #undef ADDR_CRT_BADIOINFO
@@ -1080,6 +1080,12 @@ extern uint8_t am2_rank_records[224];
 #define ADDR_RANK_RECORDS       ((uintptr_t)(const void *)am2_rank_records)
 #undef ADDR_RANK_EXP_TABLE
 #define ADDR_RANK_EXP_TABLE     ((uintptr_t)(const void *)&am2_rank_records[0x18])
+
+/* The dead {WriteDotString, "FOO"} record (misc.cpp); nothing reads it, it is
+ * placed so its handler slot needs no startup fixup. */
+extern const AM2_WriteDotRecord am2_write_dot_record[1];
+#undef ADDR_WRITE_DOT_RECORD
+#define ADDR_WRITE_DOT_RECORD   ((uintptr_t)(const void *)am2_write_dot_record)
 
 /* The comm-object slot / army table / enum count (commmsg.cpp), read across
  * the game; base aliases ARMY_TABLE and COMM_OBJECT, the count is at +1. */

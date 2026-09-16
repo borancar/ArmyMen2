@@ -188,9 +188,40 @@ range like the blob scan does. Two of the 21 (SelListInit, InitItemHeaderSize)
 are declared outside their headers' extern "C" blocks and so carry C++ linkage
 -- the forward declarations in startup.cpp had to match, which the link caught.
 Verified: checkseams clean; native boots through the live init walk and drives
-its title widgets without fault. **110 fixups remain -- all scattered single
+its title widgets without fault. **110 fixups remained -- all scattered single
 function pointers embedded in data structs** (102 singletons + 4 pairs), the
 long tail: each is migrated by placing the struct that holds it.
+
+**UPDATE (2026-09-16, cont.): the fixup table is EMPTY -- fixups 110 -> 0, and
+`am2_apply_fixups()` now has no body.** The "long tail" turned out to be four
+buckets, three of them already placed C that only lacked a MIGRATED range:
+ - **99 in `am2_def_keywords`** (0x00476FE0, 101 x 12): the .aai vocabulary's
+   handler field already named the reconstructed line-parsers (DefTrooperLine,
+   DefWeaponLine, ...); the fixups were rewriting a correct C table with the
+   same values. MIGRATED range only.
+ - **8 in `am2_aim_displace_map` -- a real bug, now fixed.** The map is 112x112
+   int16 {sx,sy} cells (0x00478CDC, 0xC400 bytes). Eight of them -- {32,66} and
+   {64,66}, in consecutive pairs -- pack to exactly ADDR_EVT_SET_BYTE40
+   (0x00420020) and ADDR_EVT_SET_BYTE530 (0x00420040), so mkglobals' blob scan
+   took them for function pointers and am2_apply_fixups overwrote eight
+   displacement cells with EvtSetByte40/EvtSetByte530's addresses at every
+   native startup. The placed .inc holds the byte-verified real cells; the
+   range is MIGRATED so the scan skips it.
+ - **2 CRT slots** (`am2_crt_fpinit_ptr` 0x0048CC28, `am2_crt_exit_fn_ptr`
+   0x0048CC50): were byte-exact image addresses rewritten to crt_fpmath /
+   crt_exit_quick at startup, under a note calling their calls "dead in
+   native" -- they ran through the fixed-up slots. Now one-element tables of
+   the reconstructions (am2_init_fn / a new am2_exit_fn), verified through the
+   AM2_SA seam map.
+ - **1 lone record** at 0x0047588C: {WriteDotString, -> "FOO"}, eight bytes up
+   to ADDR_GAME_VERSION, referenced by nothing. Transcribed as
+   `am2_write_dot_record` (misc.cpp, new ADDR_WRITE_DOT_RECORD) so its handler
+   slot needs no fixup.
+Verified so far: checkseams clean; native boots with the empty fixup table
+(crt_cinit reaches fpinit through its slot) and drives its title widgets.
+**With this, no function pointer in the carried blob is rewritten at
+startup: every one the native build reads is a placed, named C table of the
+reconstructions themselves.**
 
 ## MIGRATION (2026-09-11): global structures transcribed out of the blob
 

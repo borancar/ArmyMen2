@@ -60,6 +60,17 @@ extern "C" const float  am2_ms_to_sec         = 0.001f;      /* 0x0046F980 */
  * the image aliases it onto rank record 4's max-health field, so it is a view
  * into am2_rank_records (item.cpp); see ADDR_PILLBOX_TROOPER_HEALTH in
  * standalone.h. */
+/* The {handler, name} record at 0x0047588C: WriteDotString and a pointer to
+ * "FOO", eight bytes up to ADDR_GAME_VERSION. Nothing references its base, so
+ * its consumer is unidentified and it is dead; it is transcribed anyway so the
+ * carried blob's copy of the handler slot needs no startup fixup -- the last
+ * such slot outside a table. checkimagedata dereference-checks both fields.
+ * Plain linkage, matching standalone.h's shared declaration (the rank-records
+ * precedent): an extern "C" definition against that C++-linkage extern is a
+ * conflicting-declaration error. */
+const AM2_WriteDotRecord am2_write_dot_record[1] = {
+    { (void *)WriteDotString, "FOO" },
+};
 extern "C" const float   am2_gravity                = 440.0f;/* 0x004852EC */
 extern "C" const int32_t am2_view_speed             = 1000;  /* 0x004852E0 */
 /* 0x00485104 tick_interval_ms is runtime state (ResetLevelState recomputes it),

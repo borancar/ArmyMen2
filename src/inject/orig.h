@@ -5336,6 +5336,9 @@ typedef void (__attribute__((thiscall)) *am2_widget_vfn)(void *);
  * static initializers return int32 and are cast, as the image stores the raw
  * addresses. Used by am2_crt_inittab (startup.cpp). */
 typedef void (__cdecl *am2_init_fn)(void);
+/* The CRT's _exit-style slot: void(int32 code). Used by am2_crt_exit_fn_ptr
+ * (startup.cpp), the one function-pointer slot in the table with an argument. */
+typedef void (__cdecl *am2_exit_fn)(int32_t);
 #define ADDR_MOVIE_SOUND_READY   0x006598A8u  /* int32_t; set once Smacker has sound */
 #define ADDR_MOVIE_OPEN          0x00444FC0u  /* thiscall this(this,name,w,h,big) */
 #define ADDR_MOVIE_MAKE_SURFACE  0x00445690u  /* surface *(w, h), stays original */
@@ -6900,6 +6903,15 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
  * "FOO" -- and nothing references that record's base, so its consumer is not
  * identified and the name describes the body only. */
 #define ADDR_WRITE_DOT_STRING    0x0040FB90u  /* int32_t(char *dst) */
+/* That record: {handler = WriteDotString, name -> "FOO"} at 0x0047588C, eight
+ * bytes up to ADDR_GAME_VERSION. Nothing reads it, so it is transcribed only so
+ * the carried blob's copy of the handler slot needs no startup fixup
+ * (am2_write_dot_record, misc.cpp). */
+#define ADDR_WRITE_DOT_RECORD    0x0047588Cu
+typedef struct {
+    void       *handler;  /* +0x00; WriteDotString */
+    const char *name;     /* +0x04; "FOO" */
+} AM2_WriteDotRecord;
 /* 0x00464D40, 19 callers, in the CRT band: two arguments, a byte-wise
  * substring scan with the empty-needle and single-character cases spelled
  * out. It is strstr, identified from its own body the way crt.py identifies

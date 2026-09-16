@@ -37,11 +37,15 @@
  * uses still lands one field per step. */
 /* __app_type at 0x0048CC54 (2 = GUI; __set_app_type writes it at startup). */
 extern "C" int32_t am2_crt_app_type = 2;
-/* The _fpinit and _exit function-pointer slots at 0x0048CC28 / 0x0048CC50: image
- * .text addresses, so crt_cinit's call through them is dead in native (the boot
- * proves it -- see the init/term tables). Transcribed byte-exact as pointers. */
-extern "C" const uint32_t am2_crt_fpinit_ptr = 0x0046443Eu;
-extern "C" const uint32_t am2_crt_exit_fn_ptr = 0x00469320u;
+/* The _fpinit and _exit function-pointer slots at 0x0048CC28 / 0x0048CC50, read
+ * by crt_cinit and crt_exit_entry. The image holds _fpmath and _exit's own
+ * addresses; mkglobals used to rewrite them to crt_fpmath / crt_exit_quick at
+ * startup, so the note here that called the calls "dead in native" was wrong
+ * -- they ran through the fixed-up slots. Held as the reconstructions directly
+ * (one-element tables so checkimagedata verifies them through the AM2_SA seam
+ * map); their ranges are in mkglobals.py's MIGRATED list. */
+extern "C" const am2_init_fn am2_crt_fpinit_ptr[1]  = { (am2_init_fn)crt_fpmath };
+extern "C" const am2_exit_fn am2_crt_exit_fn_ptr[1] = { (am2_exit_fn)crt_exit_quick };
 /* The Pentium-FDIV self-test operands at 0x0046FDB8/0x0046FDC0 (the famous
  * 4195835.0 / 3145727.0 division _adjust_fdiv runs). Read-only const doubles. */
 extern "C" const double am2_crt_fdiv_num = 4195835.0;

@@ -383,6 +383,16 @@ def main():
         (0x0048654C, 0x00486584),      # am2_state_actions   (movie.cpp)
         (0x0046FAB4, 0x0046FACC),      # am2_movie_vtable    (movie.cpp)
         (0x00473000, 0x00473090),      # am2_crt_inittab     (startup.cpp) XC/XI/XP/XT
+        (0x00476FE0, 0x0047749C),      # am2_def_keywords    (definfo.cpp) 101 x 12: handlers are ours
+        (0x0047588C, 0x00475894),      # am2_write_dot_record (misc.cpp)
+        (0x0048CC28, 0x0048CC2C),      # am2_crt_fpinit_ptr  (startup.cpp)
+        (0x0048CC50, 0x0048CC54),      # am2_crt_exit_fn_ptr (startup.cpp)
+        # NOT a pointer table -- the aim-displacement map is int16 {sx,sy} cells,
+        # and eight of them ({32,66} and {64,66}, twice each) pack to exactly
+        # ADDR_EVT_SET_BYTE40 / ADDR_EVT_SET_BYTE530, so the scan above used to
+        # rewrite those cells to function pointers at startup. The placed .inc
+        # holds the real bytes; skip the range like any other transcribed table.
+        (0x00478CDC, 0x004850DC),      # am2_aim_displace_map (mapdraw.cpp) 112x112 int16 pairs
         # --- the menu/HUD widget class vtables (widget.cpp) ---
         (0x0046F8B8, 0x0046F8CC),      # am2_vtable_hud_radar
         (0x0046F8CC, 0x0046F8E0),      # am2_vtable_hud_sarge
