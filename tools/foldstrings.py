@@ -64,6 +64,11 @@ FOLD = [
 # ADDR_OPTION_TABLE_END) are deliberately NOT here.
 FOLD_MACROS = [
     "ADDR_STR_ISPROCESSORFEATUREPRESENT",
+    "AM2_BMP_02_009_00", "AM2_BMP_02_010_00", "AM2_BMP_02_015_00",
+    "AM2_STR_CONFIRM_QUIT", "AM2_STR_CONFIRM_REPLAY",
+    "AM2_STR_CONFIRM_DELPLAYER",
+    "AM2_STR_COLOUR_GREEN", "AM2_STR_COLOUR_TAN", "AM2_STR_COLOUR_BLUE",
+    "AM2_STR_COLOUR_GREY",
     "AM2_BMP_03_100_00", "AM2_BMP_03_100_01", "AM2_BMP_03_100_02",
     "AM2_BMP_03_101_00", "AM2_BMP_03_101_01", "AM2_BMP_03_101_02",
     "AM2_BMP_03_102_00", "AM2_BMP_03_102_01", "AM2_BMP_03_102_02",
@@ -100,7 +105,7 @@ FOLD_MACROS = [
 # Files a FOLD_MACROS name may be #defined in (widget.cpp carries the button
 # bitmap macros under `#ifndef` guards that a standalone-side #define wins).
 _MACRO_FILES = ("src/inject/orig.h", "src/game/win32/widget.h",
-                "src/game/win32/widget.cpp")
+                "src/game/win32/widget.cpp", "src/game/script.cpp")
 
 
 def _c_literal(s):

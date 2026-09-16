@@ -3290,8 +3290,22 @@ void __cdecl LoadLevelScript(void)
     ScriptReadWithLog(path);
 
     if (kMpSession) {
+    /* MP team-colour names, folded to literals in the standalone build. */
+#ifndef AM2_STR_COLOUR_GREEN
+#define AM2_STR_COLOUR_GREEN   0x00476A68u  /* green */
+#endif
+#ifndef AM2_STR_COLOUR_TAN
+#define AM2_STR_COLOUR_TAN     0x00485148u  /* tan */
+#endif
+#ifndef AM2_STR_COLOUR_BLUE
+#define AM2_STR_COLOUR_BLUE    0x00485140u  /* blue */
+#endif
+#ifndef AM2_STR_COLOUR_GREY
+#define AM2_STR_COLOUR_GREY    0x00485138u  /* grey */
+#endif
         static const uint32_t kColourName[4] = {
-            0x00476A68u, 0x00485148u, 0x00485140u, 0x00485138u,
+            AM2_STR_COLOUR_GREEN, AM2_STR_COLOUR_TAN,
+            AM2_STR_COLOUR_BLUE, AM2_STR_COLOUR_GREY,
         };
         char aipath[0x40];
 

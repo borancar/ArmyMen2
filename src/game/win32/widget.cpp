@@ -7072,26 +7072,48 @@ AM2_Widget *__attribute__((thiscall)) WarMenuConstruct(AM2_Widget *w,
     return w;
 }
 
+/* Confirm-dialog captions and their panel bitmaps -- bare image addresses
+ * in the hybrid, folded to literals by foldstrings in the standalone build
+ * (see the AM2_BMP_OK0 block).  #ifndef so foldstr.h wins. */
+#ifndef AM2_STR_CONFIRM_QUIT
+#define AM2_STR_CONFIRM_QUIT       0x0048B74Cu  /* Are you sure you want to quit? */
+#endif
+#ifndef AM2_BMP_02_009_00
+#define AM2_BMP_02_009_00          0x0048B76Cu  /* 02_009_00_quitgame */
+#endif
+#ifndef AM2_STR_CONFIRM_REPLAY
+#define AM2_STR_CONFIRM_REPLAY     0x0048B780u  /* Do you wish to reattempt your failed mission? */
+#endif
+#ifndef AM2_BMP_02_015_00
+#define AM2_BMP_02_015_00          0x0048B7B0u  /* 02_015_00_replay */
+#endif
+#ifndef AM2_STR_CONFIRM_DELPLAYER
+#define AM2_STR_CONFIRM_DELPLAYER  0x0048B984u  /* Caution: All saved games ... deleted! */
+#endif
+#ifndef AM2_BMP_02_010_00
+#define AM2_BMP_02_010_00          0x0048B9C4u  /* 02_010_00_delplayer */
+#endif
+
 AM2_Widget *__attribute__((thiscall)) QuitDialogConstruct(AM2_Widget *w,
                                                           const char *bmp)
 {
-    return ConfirmDialogBuild(w, bmp, VTABLE_QUIT_DIALOG, 0x0048B76C,
-                              kOnQuitOk, 0x0048B74C, kOnMenuBack);
+    return ConfirmDialogBuild(w, bmp, VTABLE_QUIT_DIALOG, AM2_BMP_02_009_00,
+                              kOnQuitOk, AM2_STR_CONFIRM_QUIT, kOnMenuBack);
 }
 
 AM2_Widget *__attribute__((thiscall)) ReplayDialogConstruct(AM2_Widget *w,
                                                             const char *bmp)
 {
-    return ConfirmDialogBuild(w, bmp, VTABLE_REPLAY_DIALOG, 0x0048B7B0,
-                              kOnReplayOk, 0x0048B780,
+    return ConfirmDialogBuild(w, bmp, VTABLE_REPLAY_DIALOG, AM2_BMP_02_015_00,
+                              kOnReplayOk, AM2_STR_CONFIRM_REPLAY,
                               kOnMenuBack);
 }
 
 AM2_Widget *__attribute__((thiscall)) DelPlayerDialogConstruct(AM2_Widget *w,
                                                                const char *bmp)
 {
-    return ConfirmDialogBuild(w, bmp, VTABLE_DELPLAYER_DIALOG, 0x0048B9C4,
-                              OnDelPlayerOk, 0x0048B984,
+    return ConfirmDialogBuild(w, bmp, VTABLE_DELPLAYER_DIALOG, AM2_BMP_02_010_00,
+                              OnDelPlayerOk, AM2_STR_CONFIRM_DELPLAYER,
                               kOnDelPlayerCancel);
 }
 
