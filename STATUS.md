@@ -97,7 +97,7 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **1,523 strings, 35,377 bytes zeroed**.
+sweep to **1,556 strings, 36,097 bytes zeroed**.
 
 **UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
 Auditing the surviving strings showed the remainder is table-structured, not
@@ -131,6 +131,19 @@ bytes. Native boots and the bootcamp side-by-side is IDENTICAL through frame 627
 ~40 bitmaps read by BARE HEX with no macro (a follow-up: give each a macro, then
 fold) and the ~207 dead-in-native binary fragments (GUID Data4 tails, record
 name fields) that are not strings.
+
+**UPDATE (2026-09-16, cont.): the 33 bare-hex menu-bitmap reads folded too.**
+The title and options menus hold their button bitmaps in reconstructed C tables
+(`kTitleButtons[]`, `kOptionsButtons[]` in `widget.cpp`) whose `bmp[3]` cells
+were bare image addresses read as `(const char *)AM2_IMAGE(b->bmp[i])` -- shared
+with the hybrid, where `AM2_IMAGE` maps the cell as an image address, so a bare
+literal there would break the oracle. Each got an `AM2_BMP_NN_NNN_NN` macro
+(`#ifndef`-guarded so `foldstr.h` wins in the standalone build, the hex applies
+in the hybrid) and joined `FOLD_MACROS`: foldstrings folds 114 -> 147 strings,
+the dead-string sweep 1,523 -> **1,556 strings, 35,377 -> 36,097 bytes**. Native
+boots and the title-screen side-by-side (click-509) is IDENTICAL through frame
+435. What remains of the live blob is now only the ~207 dead-in-native binary
+fragments (GUID Data4 tails, record name fields), which are not strings.
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
@@ -422,7 +435,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **1,523 strings, 35,377 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **1,556 strings, 36,097 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus

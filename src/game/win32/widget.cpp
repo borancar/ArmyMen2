@@ -6677,6 +6677,109 @@ void __cdecl OpenLoadGame(void)
  * It returns `this`, which its factory stores. */
 
 
+/* Menu/title button bitmap names -- bare image addresses in the hybrid,
+ * folded to string literals by tools/foldstrings.py in the standalone
+ * build (see the AM2_BMP_OK0 block below).  #ifndef so foldstr.h wins. */
+#ifndef AM2_BMP_03_106_00
+#define AM2_BMP_03_106_00      0x0048B47Cu  /* 03_106_00_quit.bmp */
+#endif
+#ifndef AM2_BMP_03_106_01
+#define AM2_BMP_03_106_01      0x0048B490u  /* 03_106_01_quit.bmp */
+#endif
+#ifndef AM2_BMP_03_106_02
+#define AM2_BMP_03_106_02      0x0048B4A4u  /* 03_106_02_quit.bmp */
+#endif
+#ifndef AM2_BMP_03_105_00
+#define AM2_BMP_03_105_00      0x0048B4B8u  /* 03_105_00_credits.bmp */
+#endif
+#ifndef AM2_BMP_03_105_01
+#define AM2_BMP_03_105_01      0x0048B4D0u  /* 03_105_01_credits.bmp */
+#endif
+#ifndef AM2_BMP_03_105_02
+#define AM2_BMP_03_105_02      0x0048B4E8u  /* 03_105_02_credits.bmp */
+#endif
+#ifndef AM2_BMP_03_104_00
+#define AM2_BMP_03_104_00      0x0048B500u  /* 03_104_00_movies.bmp */
+#endif
+#ifndef AM2_BMP_03_104_01
+#define AM2_BMP_03_104_01      0x0048B518u  /* 03_104_01_movies.bmp */
+#endif
+#ifndef AM2_BMP_03_104_02
+#define AM2_BMP_03_104_02      0x0048B530u  /* 03_104_02_movies.bmp */
+#endif
+#ifndef AM2_BMP_03_103_00
+#define AM2_BMP_03_103_00      0x0048B548u  /* 03_103_00_options.bmp */
+#endif
+#ifndef AM2_BMP_03_103_01
+#define AM2_BMP_03_103_01      0x0048B560u  /* 03_103_01_options.bmp */
+#endif
+#ifndef AM2_BMP_03_103_02
+#define AM2_BMP_03_103_02      0x0048B578u  /* 03_103_02_options.bmp */
+#endif
+#ifndef AM2_BMP_03_101_00
+#define AM2_BMP_03_101_00      0x0048B590u  /* 03_101_00_multiplay.bmp */
+#endif
+#ifndef AM2_BMP_03_101_01
+#define AM2_BMP_03_101_01      0x0048B5A8u  /* 03_101_01_multiplay.bmp */
+#endif
+#ifndef AM2_BMP_03_101_02
+#define AM2_BMP_03_101_02      0x0048B5C0u  /* 03_101_02_multiplay.bmp */
+#endif
+#ifndef AM2_BMP_03_100_00
+#define AM2_BMP_03_100_00      0x0048B5D8u  /* 03_100_00_oneplay.bmp */
+#endif
+#ifndef AM2_BMP_03_100_01
+#define AM2_BMP_03_100_01      0x0048B5F0u  /* 03_100_01_oneplay.bmp */
+#endif
+#ifndef AM2_BMP_03_100_02
+#define AM2_BMP_03_100_02      0x0048B608u  /* 03_100_02_oneplay.bmp */
+#endif
+#ifndef AM2_BMP_03_102_00
+#define AM2_BMP_03_102_00      0x0048B620u  /* 03_102_00_bootcamp.bmp */
+#endif
+#ifndef AM2_BMP_03_102_01
+#define AM2_BMP_03_102_01      0x0048B638u  /* 03_102_01_bootcamp.bmp */
+#endif
+#ifndef AM2_BMP_03_102_02
+#define AM2_BMP_03_102_02      0x0048B650u  /* 03_102_02_bootcamp.bmp */
+#endif
+#ifndef AM2_BMP_03_111_00
+#define AM2_BMP_03_111_00      0x0048B7D8u  /* 03_111_00_back.bmp */
+#endif
+#ifndef AM2_BMP_03_111_01
+#define AM2_BMP_03_111_01      0x0048B7ECu  /* 03_111_01_back.bmp */
+#endif
+#ifndef AM2_BMP_03_111_02
+#define AM2_BMP_03_111_02      0x0048B800u  /* 03_111_02_back.bmp */
+#endif
+#ifndef AM2_BMP_03_126_00
+#define AM2_BMP_03_126_00      0x0048B814u  /* 03_126_00_difficulty.bmp */
+#endif
+#ifndef AM2_BMP_03_126_01
+#define AM2_BMP_03_126_01      0x0048B830u  /* 03_126_01_difficulty.bmp */
+#endif
+#ifndef AM2_BMP_03_126_02
+#define AM2_BMP_03_126_02      0x0048B84Cu  /* 03_126_02_difficulty.bmp */
+#endif
+#ifndef AM2_BMP_03_121_00
+#define AM2_BMP_03_121_00      0x0048B868u  /* 03_121_00_controls.bmp */
+#endif
+#ifndef AM2_BMP_03_121_01
+#define AM2_BMP_03_121_01      0x0048B880u  /* 03_121_01_controls.bmp */
+#endif
+#ifndef AM2_BMP_03_121_02
+#define AM2_BMP_03_121_02      0x0048B898u  /* 03_121_02_controls.bmp */
+#endif
+#ifndef AM2_BMP_03_120_00
+#define AM2_BMP_03_120_00      0x0048B8B0u  /* 03_120_00_audio.bmp */
+#endif
+#ifndef AM2_BMP_03_120_01
+#define AM2_BMP_03_120_01      0x0048B8C4u  /* 03_120_01_audio.bmp */
+#endif
+#ifndef AM2_BMP_03_120_02
+#define AM2_BMP_03_120_02      0x0048B8D8u  /* 03_120_02_audio.bmp */
+#endif
+
 typedef struct {
     int32_t     top;
     void      (__cdecl *handler)(AM2_Widget *);
@@ -6686,13 +6789,13 @@ typedef struct {
 /* Rows 0xA0, 0xC8, 0xF0, 0x118 -- 40 apart. */
 static const AM2_MenuButton kOptionsButtons[] = {
     { 0x00A0, kOnAudioButton,
-      { 0x0048B8B0, 0x0048B8C4, 0x0048B8D8 } },  /* 03_120_0N_audio */
+      { AM2_BMP_03_120_00, AM2_BMP_03_120_01, AM2_BMP_03_120_02 } },  /* 03_120_0N_audio */
     { 0x00C8, kOnControlsButton,
-      { 0x0048B868, 0x0048B880, 0x0048B898 } },  /* 03_121_0N_controls */
+      { AM2_BMP_03_121_00, AM2_BMP_03_121_01, AM2_BMP_03_121_02 } },  /* 03_121_0N_controls */
     { 0x00F0, kOnDifficultyButton,
-      { 0x0048B814, 0x0048B830, 0x0048B84C } },  /* 03_126_0N_difficulty */
+      { AM2_BMP_03_126_00, AM2_BMP_03_126_01, AM2_BMP_03_126_02 } },  /* 03_126_0N_difficulty */
     { 0x0118, kOnMenuBack,
-      { 0x0048B7D8, 0x0048B7EC, 0x0048B800 } },  /* 03_111_0N_back */
+      { AM2_BMP_03_111_00, AM2_BMP_03_111_01, AM2_BMP_03_111_02 } },  /* 03_111_0N_back */
 };
 
 #define AM2_OPTIONS_BUTTON_LEFT   0xE7
@@ -8388,19 +8491,19 @@ typedef struct {
 
 static const AM2_TitleButton kTitleButtons[] = {
     { 0x0082, kOnBootCamp,
-      { 0x0048B620, 0x0048B638, 0x0048B650 } },  /* 03_102 bootcamp  */
+      { AM2_BMP_03_102_00, AM2_BMP_03_102_01, AM2_BMP_03_102_02 } },  /* 03_102 bootcamp  */
     { 0x00AA, kOnSinglePlayer,
-      { 0x0048B5D8, 0x0048B5F0, 0x0048B608 } },  /* 03_100 oneplay   */
+      { AM2_BMP_03_100_00, AM2_BMP_03_100_01, AM2_BMP_03_100_02 } },  /* 03_100 oneplay   */
     { 0x00D2, kOnMultiPlayer,
-      { 0x0048B590, 0x0048B5A8, 0x0048B5C0 } },  /* 03_101 multiplay */
+      { AM2_BMP_03_101_00, AM2_BMP_03_101_01, AM2_BMP_03_101_02 } },  /* 03_101 multiplay */
     { 0x00FA, kOnOptionsMenu,
-      { 0x0048B548, 0x0048B560, 0x0048B578 } },  /* 03_103 options   */
+      { AM2_BMP_03_103_00, AM2_BMP_03_103_01, AM2_BMP_03_103_02 } },  /* 03_103 options   */
     { 0x0122, kOnMovies,
-      { 0x0048B500, 0x0048B518, 0x0048B530 } },  /* 03_104 movies    */
+      { AM2_BMP_03_104_00, AM2_BMP_03_104_01, AM2_BMP_03_104_02 } },  /* 03_104 movies    */
     { 0x014A, kOnCredits,
-      { 0x0048B4B8, 0x0048B4D0, 0x0048B4E8 } },  /* 03_105 credits   */
+      { AM2_BMP_03_105_00, AM2_BMP_03_105_01, AM2_BMP_03_105_02 } },  /* 03_105 credits   */
     { 0x0172, kOnQuit,
-      { 0x0048B47C, 0x0048B490, 0x0048B4A4 } },  /* 03_106 quit      */
+      { AM2_BMP_03_106_00, AM2_BMP_03_106_01, AM2_BMP_03_106_02 } },  /* 03_106 quit      */
 };
 #define AM2_TITLE_MULTIPLAYER_ROW 2
 
