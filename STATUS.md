@@ -183,8 +183,10 @@ dword points into a zeroed range) holds because the region joins the carved set.
 The guarded metric becomes **1,566 dead ranges, 40,293 bytes zeroed** (1,565
 strings + the one import region); the still-live blob falls to ~4.5K non-zero
 bytes -- the CRT date/FP constants (live, read by the reconstructed CRT), the COM
-GUID data, the IAT slots themselves (0x0046F000, still referenced), and the
-object/keyword record tables.
+GUID data, and the object/keyword record tables. (The IAT itself is NOT among
+these: its 720-byte storage at 0x0046F000 was already migrated to the placed C
+array `am2_iat` in `src/standalone/runtime.cpp` -- filled at startup by the native
+import resolver, its image bytes byte-checked -- so it is placed, not carried.)
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
