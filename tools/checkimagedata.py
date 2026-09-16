@@ -47,15 +47,22 @@ TYPES = {
 #   #define ADDR_X ((uintptr_t)(const void *)&am2_sym)          (scalar)
 #   #define ADDR_X ((uintptr_t)(const void *)&am2_sym[53])      (alias slice)
 REDIRECT = re.compile(
-    r"#define\s+(ADDR_\w+)\s+\(\(uintptr_t\)\(const void \*\)\s*&?"
+    r"#define\s+((?:ADDR|VTABLE)_\w+)\s+\(\(uintptr_t\)\(const void \*\)\s*&?"
     r"(am2_\w+)(\[(\d+)\])?\)")
 
 
+WIDGET_H = os.path.join(ROOT, "src", "game", "win32", "widget.h")
+
+
 def orig_addresses():
+    """ADDR_* and VTABLE_* macro -> address. VTABLE_* (the widget class vtables)
+    live in orig.h and in widget.h's `#ifndef` fallbacks; both are read so a
+    placed fn-ptr table redirected off a VTABLE_ macro resolves to its VA."""
     out = {}
-    for m in re.finditer(r"^#define\s+(ADDR_\w+)\s+0x([0-9A-Fa-f]+)u?",
-                         open(ORIG).read(), re.M):
-        out.setdefault(m.group(1), int(m.group(2), 16))
+    for path in (ORIG, WIDGET_H):
+        for m in re.finditer(r"^#define\s+((?:ADDR|VTABLE)_\w+)\s+0x([0-9A-Fa-f]+)u?",
+                             open(path).read(), re.M):
+            out.setdefault(m.group(1), int(m.group(2), 16))
     return out
 
 
@@ -241,21 +248,39 @@ def _image_cstr(img, ptr):
     return b[:n] if n >= 0 else b
 
 
-def verify_mixed(img, addr, tokens, recon):
+def seams_map(addrs):
+    """{original .text address -> the C function a `#define ADDR_X AM2_SA(fn)`
+    seam maps it to}. A widget vtable slot can point at a retail stub (ADDR_LOG
+    at 0x0045CAA0, a bare `ret`) that the standalone build routes to a C function
+    (am2_sa_log) rather than a reconstruction proper -- so a fn-ptr table naming
+    it verifies against this map when it is not in the reconstruction map. Same
+    source mkglobals.py reads to emit those seams' blob fixups."""
+    out = {}
+    sa = open(SA).read()
+    for m in re.finditer(r"^#define\s+(ADDR_\w+)\s+AM2_SA\((\w+)\)", sa, re.M):
+        a = addrs.get(m.group(1))
+        if a is not None:
+            out.setdefault(a, m.group(2))
+    return out
+
+
+def verify_mixed(img, addr, tokens, recon, seams=None):
     """A struct / function-pointer table: each dword is either an int (byte-
     compared) or a function pointer. For a pointer, the image holds the
-    ORIGINAL function address, so it must appear in the reconstruction map and
-    name the same reconstruction the C entry does."""
+    ORIGINAL function address, so it must name the reconstruction (or seam) the
+    C entry does."""
+    seams = seams or {}
     TEXT_LO, TEXT_HI = 0x00401000, 0x0046F000
     for i, (kind, val) in enumerate(tokens):
         dw = struct.unpack("<I", img.read(addr + 4 * i, 4))[0]
         if kind == "fn":
-            if dw not in recon:
+            want = recon.get(dw, seams.get(dw))
+            if want is None:
                 return ("entry %d: C names %s but image 0x%08X is not a "
-                        "reconstructed function" % (i, val, dw))
-            if recon[dw] != val:
+                        "reconstructed function or seam" % (i, val, dw))
+            if want != val:
                 return ("entry %d: C names %s but image 0x%08X is %s"
-                        % (i, val, dw, recon[dw]))
+                        % (i, val, dw, want))
         elif kind == "str":            # a string-pointer field: dereference
             if not (0x0046F000 <= dw < 0x00700000):
                 return "entry %d: C is a string but image 0x%08X is not a ptr" \
@@ -327,6 +352,7 @@ def check_origstate(addrs):
 def main():
     addrs = orig_addresses()
     recon = reconstruction_map(addrs)
+    seams = seams_map(addrs)
     img = am2.Image()
     sa = open(SA).read()
 
@@ -348,7 +374,7 @@ def main():
             continue
         typ, values = found
         if typ == "mixed":
-            bad = verify_mixed(img, addr, values, recon)
+            bad = verify_mixed(img, addr, values, recon, seams)
             if bad:
                 fail.append("%s (fn-ptr table, 0x%08X): %s"
                             % (symbol, addr, bad))

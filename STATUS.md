@@ -151,6 +151,24 @@ the ADDR_ macro scan -- is the accurate measure of what "no longer depends on
 origdata" still requires. The scalar/string/const/struct DATA is complete; the
 vtable fixups are the remaining, well-defined, piecewise work.
 
+**UPDATE (2026-09-16, cont.): the widget vtable region is transcribed -- fixups
+389 -> 139.** All 50 menu/HUD widget-class vtables (0x0046F8B8..0x0046FD48) are
+now named fn-ptr tables `am2_vtable_*` (widget.cpp), 5 slots each {dtor, paint,
+update, focus, repaint}, every slot referencing the reconstructed C function
+directly. Each `VTABLE_*` macro (66 names, 15 aliased) redirects to its table in
+standalone.h, and the 50 ranges are in mkglobals.py's MIGRATED list so their blob
+fixups are dropped; VTABLE_SELECT_MAP aliases into am2_movie_vtable. The tooling
+learned three things to make this verifiable: `orig_addresses()` now also parses
+`VTABLE_*` (from orig.h and widget.h), checkimagedata's REDIRECT regex accepts
+`VTABLE_*`, and verify_mixed falls back to the `AM2_SA` seam map so the one stub
+slot (VTABLE_MP_SPIN's ADDR_LOG -> am2_sa_log) verifies. Result: **274 symbols
+placed, 77 pointer tables dereference-verified, byte-identical, 65.1%**;
+checkimagedata 291 globals match / 0 failures; checkseams clean; native boots and
+its title-screen widgets drive without fault. **139 fixups remain** -- the
+init-order tables (AirInit*/CommGlobalInit/CRT static-init at 0x473004+, ~29) and
+~110 scattered single function pointers; the vtable region, the biggest and most
+regular chunk, is done.
+
 ## MIGRATION (2026-09-11): global structures transcribed out of the blob
 
 The native/standalone builds carry the original's `.rdata`/`.data` as one blob

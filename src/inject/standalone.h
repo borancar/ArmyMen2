@@ -183,6 +183,57 @@ extern const char *const am2_movie_names[12], *const am2_vehicle_names[6];
 extern const char *const am2_sprite_set_dirs[46];
 extern const AM2_StateAction am2_state_actions[5];   /* movie.cpp, was 0x0048654C */
 extern const am2_movie_vfn am2_movie_vtable[6];      /* movie.cpp, was 0x0046FAB4 */
+/* The menu/HUD widget class vtables (widget.cpp); VTABLE_* redirect to these. */
+extern const am2_widget_vfn am2_vtable_hud_radar[5];
+extern const am2_widget_vfn am2_vtable_hud_sarge[5];
+extern const am2_widget_vfn am2_vtable_hud_squad[5];
+extern const am2_widget_vfn am2_vtable_hud_commands[5];
+extern const am2_widget_vfn am2_vtable_hud_top_strip[5];
+extern const am2_widget_vfn am2_vtable_count_button[5];
+extern const am2_widget_vfn am2_vtable_hud_panel[5];
+extern const am2_widget_vfn am2_vtable_hud_edge_strip[5];
+extern const am2_widget_vfn am2_vtable_comm_panel[5];
+extern const am2_widget_vfn am2_vtable_war_menu[5];
+extern const am2_widget_vfn am2_vtable_battle_join[5];
+extern const am2_widget_vfn am2_vtable_battle_name_dlg[5];
+extern const am2_widget_vfn am2_vtable_mp_panel[5];
+extern const am2_widget_vfn am2_vtable_options_menu_mp[5];
+extern const am2_widget_vfn am2_vtable_mp_name[5];
+extern const am2_widget_vfn am2_vtable_mp_colour[5];
+extern const am2_widget_vfn am2_vtable_mp_team[5];
+extern const am2_widget_vfn am2_vtable_text_list[5];
+extern const am2_widget_vfn am2_vtable_movies[5];
+extern const am2_widget_vfn am2_vtable_dlg_difficulty[5];
+extern const am2_widget_vfn am2_vtable_quit_dialog[5];
+extern const am2_widget_vfn am2_vtable_dlg_replay[5];
+extern const am2_widget_vfn am2_vtable_dlg_audio[5];
+extern const am2_widget_vfn am2_vtable_dlg_options[5];
+extern const am2_widget_vfn am2_vtable_delete_game[5];
+extern const am2_widget_vfn am2_vtable_dlg_overwrite[5];
+extern const am2_widget_vfn am2_vtable_dlg_delplayer[5];
+extern const am2_widget_vfn am2_vtable_keyrow[5];
+extern const am2_widget_vfn am2_vtable_dlg_controls[5];
+extern const am2_widget_vfn am2_vtable_select_player[5];
+extern const am2_widget_vfn am2_vtable_enter_name[5];
+extern const am2_widget_vfn am2_vtable_load_game[5];
+extern const am2_widget_vfn am2_vtable_dlg_message[5];
+extern const am2_widget_vfn am2_vtable_dlg_gamemenu[5];
+extern const am2_widget_vfn am2_vtable_save_list[5];
+extern const am2_widget_vfn am2_vtable_widget_base[5];
+extern const am2_widget_vfn am2_vtable_button[5];
+extern const am2_widget_vfn am2_vtable_button_base[5];
+extern const am2_widget_vfn am2_vtable_checkbox[5];
+extern const am2_widget_vfn am2_vtable_icon[5];
+extern const am2_widget_vfn am2_vtable_dialog[5];
+extern const am2_widget_vfn am2_vtable_edit[5];
+extern const am2_widget_vfn am2_vtable_label[5];
+extern const am2_widget_vfn am2_vtable_list[5];
+extern const am2_widget_vfn am2_vtable_arrow[5];
+extern const am2_widget_vfn am2_vtable_arrowbar[5];
+extern const am2_widget_vfn am2_vtable_scrollbar[5];
+extern const am2_widget_vfn am2_vtable_mp_spin[5];
+extern const am2_widget_vfn am2_vtable_typer[5];
+extern const am2_widget_vfn am2_vtable_blinker[5];
 /* am2_key_names (AM2_KeyName[95], widget.cpp, was 0x0048AF28) is declared in
  * widget.cpp where AM2_KeyName is defined and used only there; the redirect
  * macros below expand in that TU, so no extern is needed here. */
@@ -666,6 +717,139 @@ extern int16_t am2_air_path_turn_y_in[1], am2_air_path_turn_y_out[1];
 #define ADDR_STATE_ACTIONS      ((uintptr_t)(const void *)am2_state_actions)
 #undef ADDR_MOVIE_VTABLE
 #define ADDR_MOVIE_VTABLE       ((uintptr_t)(const void *)am2_movie_vtable)
+/* The widget class vtables (widget.cpp), redirected off the mkglobals fixups. */
+#undef VTABLE_HUD_RADAR
+#define VTABLE_HUD_RADAR           ((uintptr_t)(const void *)am2_vtable_hud_radar)
+#undef VTABLE_HUD_SARGE
+#define VTABLE_HUD_SARGE           ((uintptr_t)(const void *)am2_vtable_hud_sarge)
+#undef VTABLE_HUD_SQUAD
+#define VTABLE_HUD_SQUAD           ((uintptr_t)(const void *)am2_vtable_hud_squad)
+#undef VTABLE_HUD_COMMANDS
+#define VTABLE_HUD_COMMANDS        ((uintptr_t)(const void *)am2_vtable_hud_commands)
+#undef VTABLE_HUD_TOP_STRIP
+#define VTABLE_HUD_TOP_STRIP       ((uintptr_t)(const void *)am2_vtable_hud_top_strip)
+#undef VTABLE_COUNT_BUTTON
+#define VTABLE_COUNT_BUTTON        ((uintptr_t)(const void *)am2_vtable_count_button)
+#undef VTABLE_HUD_PANEL
+#define VTABLE_HUD_PANEL           ((uintptr_t)(const void *)am2_vtable_hud_panel)
+#undef VTABLE_HUD_EDGE_STRIP
+#define VTABLE_HUD_EDGE_STRIP      ((uintptr_t)(const void *)am2_vtable_hud_edge_strip)
+#undef VTABLE_COMM_PANEL
+#define VTABLE_COMM_PANEL          ((uintptr_t)(const void *)am2_vtable_comm_panel)
+#undef VTABLE_WAR_MENU
+#define VTABLE_WAR_MENU            ((uintptr_t)(const void *)am2_vtable_war_menu)
+#undef VTABLE_BATTLE_JOIN
+#define VTABLE_BATTLE_JOIN         ((uintptr_t)(const void *)am2_vtable_battle_join)
+#undef VTABLE_BATTLE_NAME_DLG
+#define VTABLE_BATTLE_NAME_DLG     ((uintptr_t)(const void *)am2_vtable_battle_name_dlg)
+#undef VTABLE_MP_PANEL
+#define VTABLE_MP_PANEL            ((uintptr_t)(const void *)am2_vtable_mp_panel)
+#undef VTABLE_OPTIONS_MENU_MP
+#define VTABLE_OPTIONS_MENU_MP     ((uintptr_t)(const void *)am2_vtable_options_menu_mp)
+#undef VTABLE_MP_NAME
+#define VTABLE_MP_NAME             ((uintptr_t)(const void *)am2_vtable_mp_name)
+#undef VTABLE_MP_COLOUR
+#define VTABLE_MP_COLOUR           ((uintptr_t)(const void *)am2_vtable_mp_colour)
+#undef VTABLE_MP_TEAM
+#define VTABLE_MP_TEAM             ((uintptr_t)(const void *)am2_vtable_mp_team)
+#undef VTABLE_TEXT_LIST
+#define VTABLE_TEXT_LIST           ((uintptr_t)(const void *)am2_vtable_text_list)
+#undef VTABLE_DLG_SELECTMAP
+#define VTABLE_DLG_SELECTMAP       ((uintptr_t)(const void *)&am2_movie_vtable[1])
+#undef VTABLE_SELECT_MAP
+#define VTABLE_SELECT_MAP          ((uintptr_t)(const void *)&am2_movie_vtable[1])
+#undef VTABLE_MOVIES
+#define VTABLE_MOVIES              ((uintptr_t)(const void *)am2_vtable_movies)
+#undef VTABLE_DIFFICULTY_DIALOG
+#define VTABLE_DIFFICULTY_DIALOG   ((uintptr_t)(const void *)am2_vtable_dlg_difficulty)
+#undef VTABLE_DLG_DIFFICULTY
+#define VTABLE_DLG_DIFFICULTY      ((uintptr_t)(const void *)am2_vtable_dlg_difficulty)
+#undef VTABLE_DLG_QUITGAME
+#define VTABLE_DLG_QUITGAME        ((uintptr_t)(const void *)am2_vtable_quit_dialog)
+#undef VTABLE_QUIT_DIALOG
+#define VTABLE_QUIT_DIALOG         ((uintptr_t)(const void *)am2_vtable_quit_dialog)
+#undef VTABLE_DLG_REPLAY
+#define VTABLE_DLG_REPLAY          ((uintptr_t)(const void *)am2_vtable_dlg_replay)
+#undef VTABLE_REPLAY_DIALOG
+#define VTABLE_REPLAY_DIALOG       ((uintptr_t)(const void *)am2_vtable_dlg_replay)
+#undef VTABLE_AUDIO_DIALOG
+#define VTABLE_AUDIO_DIALOG        ((uintptr_t)(const void *)am2_vtable_dlg_audio)
+#undef VTABLE_DLG_AUDIO
+#define VTABLE_DLG_AUDIO           ((uintptr_t)(const void *)am2_vtable_dlg_audio)
+#undef VTABLE_DLG_OPTIONS
+#define VTABLE_DLG_OPTIONS         ((uintptr_t)(const void *)am2_vtable_dlg_options)
+#undef VTABLE_OPTIONS_MENU
+#define VTABLE_OPTIONS_MENU        ((uintptr_t)(const void *)am2_vtable_dlg_options)
+#undef VTABLE_DELETE_GAME
+#define VTABLE_DELETE_GAME         ((uintptr_t)(const void *)am2_vtable_delete_game)
+#undef VTABLE_DLG_DELGAME
+#define VTABLE_DLG_DELGAME         ((uintptr_t)(const void *)am2_vtable_delete_game)
+#undef VTABLE_DLG_OVERWRITE
+#define VTABLE_DLG_OVERWRITE       ((uintptr_t)(const void *)am2_vtable_dlg_overwrite)
+#undef VTABLE_DELPLAYER_DIALOG
+#define VTABLE_DELPLAYER_DIALOG    ((uintptr_t)(const void *)am2_vtable_dlg_delplayer)
+#undef VTABLE_DLG_DELPLAYER
+#define VTABLE_DLG_DELPLAYER       ((uintptr_t)(const void *)am2_vtable_dlg_delplayer)
+#undef VTABLE_KEYROW
+#define VTABLE_KEYROW              ((uintptr_t)(const void *)am2_vtable_keyrow)
+#undef VTABLE_CONTROLS_DIALOG
+#define VTABLE_CONTROLS_DIALOG     ((uintptr_t)(const void *)am2_vtable_dlg_controls)
+#undef VTABLE_DLG_CONTROLS
+#define VTABLE_DLG_CONTROLS        ((uintptr_t)(const void *)am2_vtable_dlg_controls)
+#undef VTABLE_DLG_SELECTPLAYER
+#define VTABLE_DLG_SELECTPLAYER    ((uintptr_t)(const void *)am2_vtable_select_player)
+#undef VTABLE_SELECT_PLAYER
+#define VTABLE_SELECT_PLAYER       ((uintptr_t)(const void *)am2_vtable_select_player)
+#undef VTABLE_DLG_NAMEENTRY
+#define VTABLE_DLG_NAMEENTRY       ((uintptr_t)(const void *)am2_vtable_enter_name)
+#undef VTABLE_ENTER_NAME
+#define VTABLE_ENTER_NAME          ((uintptr_t)(const void *)am2_vtable_enter_name)
+#undef VTABLE_DLG_LOADGAME
+#define VTABLE_DLG_LOADGAME        ((uintptr_t)(const void *)am2_vtable_load_game)
+#undef VTABLE_LOAD_GAME
+#define VTABLE_LOAD_GAME           ((uintptr_t)(const void *)am2_vtable_load_game)
+#undef VTABLE_DLG_MESSAGE
+#define VTABLE_DLG_MESSAGE         ((uintptr_t)(const void *)am2_vtable_dlg_message)
+#undef VTABLE_DLG_GAMEMENU
+#define VTABLE_DLG_GAMEMENU        ((uintptr_t)(const void *)am2_vtable_dlg_gamemenu)
+#undef VTABLE_SAVE_LIST
+#define VTABLE_SAVE_LIST           ((uintptr_t)(const void *)am2_vtable_save_list)
+#undef VTABLE_WIDGET_BASE
+#define VTABLE_WIDGET_BASE         ((uintptr_t)(const void *)am2_vtable_widget_base)
+#undef VTABLE_BUTTON
+#define VTABLE_BUTTON              ((uintptr_t)(const void *)am2_vtable_button)
+#undef VTABLE_BUTTON_BASE
+#define VTABLE_BUTTON_BASE         ((uintptr_t)(const void *)am2_vtable_button_base)
+#undef VTABLE_CHECKBOX
+#define VTABLE_CHECKBOX            ((uintptr_t)(const void *)am2_vtable_checkbox)
+#undef VTABLE_ICON
+#define VTABLE_ICON                ((uintptr_t)(const void *)am2_vtable_icon)
+#undef VTABLE_PANEL
+#define VTABLE_PANEL               ((uintptr_t)(const void *)am2_vtable_icon)
+#undef VTABLE_DIALOG
+#define VTABLE_DIALOG              ((uintptr_t)(const void *)am2_vtable_dialog)
+#undef VTABLE_EDIT
+#define VTABLE_EDIT                ((uintptr_t)(const void *)am2_vtable_edit)
+#undef VTABLE_LABEL
+#define VTABLE_LABEL               ((uintptr_t)(const void *)am2_vtable_label)
+#undef VTABLE_LIST
+#define VTABLE_LIST                ((uintptr_t)(const void *)am2_vtable_list)
+#undef VTABLE_LISTBOX
+#define VTABLE_LISTBOX             ((uintptr_t)(const void *)am2_vtable_list)
+#undef VTABLE_ARROW
+#define VTABLE_ARROW               ((uintptr_t)(const void *)am2_vtable_arrow)
+#undef VTABLE_ARROWBAR
+#define VTABLE_ARROWBAR            ((uintptr_t)(const void *)am2_vtable_arrowbar)
+#undef VTABLE_SCROLLBAR
+#define VTABLE_SCROLLBAR           ((uintptr_t)(const void *)am2_vtable_scrollbar)
+#undef VTABLE_MP_SPIN
+#define VTABLE_MP_SPIN             ((uintptr_t)(const void *)am2_vtable_mp_spin)
+#undef VTABLE_TYPER
+#define VTABLE_TYPER               ((uintptr_t)(const void *)am2_vtable_typer)
+#undef VTABLE_BLINKER
+#define VTABLE_BLINKER             ((uintptr_t)(const void *)am2_vtable_blinker)
+#undef VTABLE_MULTISPRITE
+#define VTABLE_MULTISPRITE         ((uintptr_t)(const void *)am2_vtable_blinker)
 #undef ADDR_WEAPON_HANDLERS
 #define ADDR_WEAPON_HANDLERS    ((uintptr_t)(const void *)am2_weapon_handlers)
 #undef ADDR_OPTION_TABLE

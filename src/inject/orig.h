@@ -5326,6 +5326,11 @@
  * ...); like the image's raw addresses they are cast to this common type for
  * storage in am2_movie_vtable (movie.cpp). */
 typedef void (__attribute__((thiscall)) *am2_movie_vfn)(void *);
+/* The widget vtable slot type, same shape: the menu/HUD widget classes each
+ * carry a 5-slot vtable {dtor, paint, update, focus, repaint} of thiscall
+ * methods with varying real signatures, cast to this common type for storage
+ * in the am2_vtable_* arrays (widget.cpp). */
+typedef void (__attribute__((thiscall)) *am2_widget_vfn)(void *);
 #define ADDR_MOVIE_SOUND_READY   0x006598A8u  /* int32_t; set once Smacker has sound */
 #define ADDR_MOVIE_OPEN          0x00444FC0u  /* thiscall this(this,name,w,h,big) */
 #define ADDR_MOVIE_MAKE_SURFACE  0x00445690u  /* surface *(w, h), stays original */
