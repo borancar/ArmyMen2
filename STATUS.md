@@ -126,11 +126,18 @@ it. Placed as a `uint8[]` byte array -- the records hold only small ints and
 floats, no pointers, so checkseams passes. 223 symbols placed, pure-data region
 byte-identical, 65.1% of meaningful bytes; boot clean; make check green
 (roachcheck/roachbitecheck included). **MOVIE_VTABLE** is the last live blob
-read: its six entries are reconstructed-function slots, so the correct form is a
-named fn-ptr table (not a byte copy, which checkseams rightly rejects), and the
-movie player is stubbed in native -- it becomes a clean fn-ptr migration once
-the player is reconstructed. Every other in-range macro is either redirected,
-folded, a view into a placed symbol, or read only by 0xCC-trapped code.
+read, and it is blocked on FUNCTION reconstruction, not data transcription.
+ADDR_MOVIE_VTABLE (0x0046FAB4) is the movie widget's vtable; reconstructed code
+only stamps its address into the movie object, never builds the table. Its
+entries are the movie frame-draw method plus the widget base slots
+(WIDGET_PAINT_FWD2/UPDATE_CANCEL/TAKE_FOCUS/REPAINT), and none of them is in
+sites.h -- they are still original functions, so in native they map to 0xCC
+.origgap. A fn-ptr table cannot be built (no C functions to name) and a
+byte-identical copy would hold 0xCC-invalid pointers (which checkseams rightly
+rejects), so it becomes a clean fn-ptr migration only after those methods are
+reconstructed. Every other in-range macro is either redirected, folded, a view
+into a placed symbol, or read only by 0xCC-trapped code -- so with MOVIE_VTABLE
+set aside, the transcription of blob DATA is complete.
 
 ## MIGRATION (2026-09-11): global structures transcribed out of the blob
 
