@@ -110,15 +110,27 @@ resolving into `.origdat` (0x46F000-0x48E000) that is LIVE in reconstructed code
 (comments stripped) leaves **7 macros**, of which 3 resolve into *placed*
 storage (`BUILD_MENU_RECTS`/`HUD_CMD_SPRITES_END` into `am2_pointer_modes`,
 `SPRITE_GROUPS_C_END` a bound into `am2_sprite_grid_rows`) and are not blob
-reads. The genuine remaining blob reads are just: the **RANK** cluster
-(`RANK_RECORDS`/`RANK_EXP_TABLE`, runtime-written across the placed
-`pillbox_trooper_health` field -- needs an in-mission verify, reserved for
-SCOPE) and **`MOVIE_VTABLE`** (six reconstructed-function slots; the correct
-form is a named fn-ptr table, not a byte copy, and the movie player is stubbed,
-so it becomes a clean migration once that is reconstructed). The other ~319
-`ADDR_STR_*`/`FMT_*`/`MSG_*` macros in the range are read ONLY by
+reads. The genuine remaining blob reads were the **RANK** cluster and **`MOVIE_VTABLE`**.
+The other ~319 `ADDR_STR_*`/`FMT_*`/`MSG_*` macros in the range are read ONLY by
 unreconstructed original functions, which the native build maps to `0xCC`
 `.origgap` traps and never executes -- so they are carried, not depended on.
+
+**UPDATE (2026-09-16, cont.): the RANK cluster placed; only MOVIE_VTABLE now
+reads the blob from live code.** RANK_RECORDS (0x00473DC0) is eight 28-byte
+runtime-written records; RANK_EXP_TABLE is the +0x18 XP-field view of the same
+records (stride 28), and am2_pillbox_trooper_health (0x00473E44) turned out to
+be record 4's max-health field -- the image aliases the pillbox trooper's health
+onto it. So it is ONE 224-byte non-const array, placed at its VA, with both
+macros (and the ex-pillbox symbol, now removed as a standalone) aliasing into
+it. Placed as a `uint8[]` byte array -- the records hold only small ints and
+floats, no pointers, so checkseams passes. 223 symbols placed, pure-data region
+byte-identical, 65.1% of meaningful bytes; boot clean; make check green
+(roachcheck/roachbitecheck included). **MOVIE_VTABLE** is the last live blob
+read: its six entries are reconstructed-function slots, so the correct form is a
+named fn-ptr table (not a byte copy, which checkseams rightly rejects), and the
+movie player is stubbed in native -- it becomes a clean fn-ptr migration once
+the player is reconstructed. Every other in-range macro is either redirected,
+folded, a view into a placed symbol, or read only by 0xCC-trapped code.
 
 ## MIGRATION (2026-09-11): global structures transcribed out of the blob
 

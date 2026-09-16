@@ -133,8 +133,9 @@ extern const int32_t am2_explosion_area_24[4], am2_explosion_area_32[4];
 extern const int32_t am2_explosion_row_spec[4], am2_missile_box[4], am2_missile_row_spec[4];
 extern const int32_t am2_trooper_box[4], am2_trooper_row_spec[4];
 extern const int32_t am2_vehicle_box[4], am2_vehicle_row_spec[4], am2_kind7_box[4];
-/* Gameplay scalar parameters (misc.cpp). */
-extern const int16_t am2_pillbox_trooper_health, am2_seq_k4_rise;
+/* Gameplay scalar parameters (misc.cpp). am2_pillbox_trooper_health is a view
+ * into am2_rank_records (see ADDR_PILLBOX_TROOPER_HEALTH below), not a symbol. */
+extern const int16_t am2_seq_k4_rise;
 extern const float   am2_gravity, am2_difficulty_scale;
 extern const int32_t am2_view_speed;
 /* tick_interval_ms / path_max_nodes are runtime state, not migrated. */
@@ -501,8 +502,10 @@ extern int16_t am2_air_path_turn_y_in[1], am2_air_path_turn_y_out[1];
 #undef ADDR_KIND7_BOX
 #define ADDR_KIND7_BOX          ((uintptr_t)(const void *)am2_kind7_box)
 
+/* Record 4's max-health field in am2_rank_records (declared with the rank block
+ * below) -- the image aliases the pillbox trooper's health onto it. */
 #undef ADDR_PILLBOX_TROOPER_HEALTH
-#define ADDR_PILLBOX_TROOPER_HEALTH ((uintptr_t)(const void *)&am2_pillbox_trooper_health)
+#define ADDR_PILLBOX_TROOPER_HEALTH ((uintptr_t)(const void *)&am2_rank_records[132])
 #undef ADDR_GRAVITY
 #define ADDR_GRAVITY            ((uintptr_t)(const void *)&am2_gravity)
 #undef ADDR_VIEW_SPEED
@@ -878,6 +881,17 @@ extern uint32_t am2_opt_df;
  * am2_roach_height is declared with the other roach externs above. */
 #undef ADDR_GAME_CONSTANTS
 #define ADDR_GAME_CONSTANTS     ((uintptr_t)(const void *)&am2_roach_height)
+
+/* The rank records (item.cpp): eight 28-byte runtime-written records at
+ * 0x00473DC0, placed as one 224-byte array. ADDR_RANK_RECORDS is the base;
+ * ADDR_RANK_EXP_TABLE is the +0x18 XP-field view of the same records (stride 28)
+ * and ADDR_PILLBOX_TROOPER_HEALTH (above) is record 4's max-health field at
+ * +132 -- both alias into this array. */
+extern uint8_t am2_rank_records[224];
+#undef ADDR_RANK_RECORDS
+#define ADDR_RANK_RECORDS       ((uintptr_t)(const void *)am2_rank_records)
+#undef ADDR_RANK_EXP_TABLE
+#define ADDR_RANK_EXP_TABLE     ((uintptr_t)(const void *)&am2_rank_records[0x18])
 
 /* The comm-object slot / army table / enum count (commmsg.cpp), read across
  * the game; base aliases ARMY_TABLE and COMM_OBJECT, the count is at +1. */

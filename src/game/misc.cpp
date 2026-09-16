@@ -56,7 +56,10 @@ extern "C" const float  am2_ms_to_sec         = 0.001f;      /* 0x0046F980 */
  * readers' (int16/int32/float); centralised here for the same reason the
  * float constants above are -- a bare tunable has no owning-module the way a
  * table does. */
-extern "C" const int16_t am2_pillbox_trooper_health = 55;    /* 0x00473E44 */
+/* am2_pillbox_trooper_health (0x00473E44, value 55) is NOT a separate symbol:
+ * the image aliases it onto rank record 4's max-health field, so it is a view
+ * into am2_rank_records (item.cpp); see ADDR_PILLBOX_TROOPER_HEALTH in
+ * standalone.h. */
 extern "C" const float   am2_gravity                = 440.0f;/* 0x004852EC */
 extern "C" const int32_t am2_view_speed             = 1000;  /* 0x004852E0 */
 /* 0x00485104 tick_interval_ms is runtime state (ResetLevelState recomputes it),
