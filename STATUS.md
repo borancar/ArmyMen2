@@ -213,9 +213,23 @@ in -- checked). Declared dead in `_DEAD_TABLE_DECL` as `CXX_EH_FUNCINFO`. The
 guarded metric becomes **1,574 dead ranges, 46,733 bytes zeroed**. The remaining
 live .rdata is now only the ~315-byte head at 0x0046FECC -- the printf classifier
 table, the "(null)" string, the folded runtime-error/user32 message strings, and
-a few still-referenced R60xx error strings. The still-live blob is ~1.3K non-zero
-bytes: that CRT head plus the writable .data record tables (object-type/keyword
-names), which is the graph/relocate remainder.
+a few still-referenced R60xx error strings. The still-live blob is ~1.9K non-zero
+bytes across 51 chunks: that CRT head plus the writable .data record tables
+(object-type/keyword names, MP message strings held by dispatch tables), which is
+the per-structure graph/relocate remainder.
+
+**UPDATE (2026-09-17): folds and dead-drops exhausted; remainder is
+per-structure placement.** A live-chunk sweep of the swept blob confirmed 0
+foldable strings remain (the one candidate, `ADDR_STR_AVI_DIR`, is read
+`*(const char *const *)` -- a pointer-table deref already served by placed
+`am2_dir_names`, not a string). What is left is genuine live data reached by
+address or by a carried pointer, each needing its own placed symbol. First of
+these: the edit widget's accepted-character-set string (0x00485360, 70 bytes,
+" a-z A-Z 0-9 !'&+-_") -- dereferenced through the raw pointer `am2_edit_charset_ptr`
+= 0x00485360 -- transcribed as the placed `am2_edit_charset` in `widget.cpp` (276
+symbols placed now). The rest (movement/facing tables, MP dispatch strings, key
+defaults, CRT record head) is the incremental tail, best transcribed alongside
+the subsystems that own them.
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`

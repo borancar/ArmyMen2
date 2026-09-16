@@ -1194,6 +1194,10 @@ extern uint32_t am2_active_palette, am2_remap_tint;
 #define ADDR_REMAP_TINT         ((uintptr_t)(const void *)&am2_remap_tint)
 #undef ADDR_EDIT_CHARSET_PTR
 #define ADDR_EDIT_CHARSET_PTR   ((uintptr_t)(const void *)&am2_edit_charset_ptr)
+/* am2_edit_charset_ptr (above) still holds 0x00485360; placing the string there
+ * as C makes that raw pointer resolve without the carried blob. */
+#undef ADDR_EDIT_CHARSET_STR
+#define ADDR_EDIT_CHARSET_STR   ((uintptr_t)(const void *)am2_edit_charset)
 #undef ADDR_CRT_TZNAME
 #define ADDR_CRT_TZNAME         ((uintptr_t)(const void *)am2_crt_tzname)
 

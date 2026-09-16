@@ -6433,6 +6433,7 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
  * " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!..." --
  * so the field is a whitelist and not a length limit. */
 #define ADDR_EDIT_CHARSET_PTR    0x00485308u /* const char ** */
+#define ADDR_EDIT_CHARSET_STR    0x00485360u /* the accepted-character set string am2_edit_charset_ptr points at */
 #define EDIT_OFF_CHARSET         0x68u
 #define EDIT_OFF_DOT             0x70u
 /* The byte immediately below ADDR_BACKGROUND_COLOUR. The edit box is handed
