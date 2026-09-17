@@ -962,6 +962,8 @@ extern int16_t am2_air_path_turn_y_in[1], am2_air_path_turn_y_out[1];
 /* crt_output's format state-machine table (printf.cpp), pure const bytes. */
 #undef ADDR_CRT_PRINTF_TABLE
 #define ADDR_CRT_PRINTF_TABLE   ((uintptr_t)(const void *)am2_crt_printf_table)
+#undef ADDR_CRT_RTERR_POOL
+#define ADDR_CRT_RTERR_POOL     ((uintptr_t)(const void *)am2_crt_rterr_pool)
 
 /* CRT time-zone / DST runtime state (time.cpp), non-const .data-init arrays.
  * The cluster base places the array; the other two fields alias into it. */

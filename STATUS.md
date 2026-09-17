@@ -97,7 +97,7 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **974 dead ranges, 49,568 bytes zeroed**.
+sweep to **962 dead ranges, 49,156 bytes zeroed**.
 
 **UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
 Auditing the surviving strings showed the remainder is table-structured, not
@@ -328,8 +328,8 @@ method applied to the individual dead strings whose naming char* tables are alre
 placed with literals: "FOO" (am2_write_dot_record), "map"/"m80"/"#"
 (am2_def_keywords), "mag" (am2_movie_names), "avi" (am2_dir_names), and "Heavy MG
 Pillbox" (am2_option_table's loop-bound target). Each survived only as <4 chars or
-via a redirected bound; none is read through an unfolded macro (checked). **974
-dead ranges, 49,568 bytes zeroed.** The still-live blob (~440 non-zero bytes) is
+via a redirected bound; none is read through an unfolded macro (checked). **962
+dead ranges, 49,156 bytes zeroed.** The still-live blob (~440 non-zero bytes) is
 now: strings pointed by BLOB char* tables not yet migrated (the ON/OFF bool words,
 team-colour names, a scancode F/T/0 table), and CRT runtime state (the _tzname
 PST/PDT buffers, ctype/pctype, wnullstring). Reaching literally zero needs those
@@ -626,7 +626,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **974 dead ranges, 49,568 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **962 dead ranges, 49,156 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus
@@ -653,6 +653,25 @@ not shrink the carried blob (the zeros sit mid-`.origdat`), but it makes the
 The remaining printable runs are kept: they are still pointed at (name tables
 not yet transcribed) or still read by address. Each further name-table migration
 drops its strings the same way.
+
+**UPDATE (2026-09-17): full semantic re-transcribe begins -- the CRT
+runtime-error pool.** Directive change: rather than declaring a residual region
+dead (which zeroes the blob copy but names nothing), re-transcribe each residual
+region as meaningful named C AT its VA and REPOINT the existing table at that
+placed VA. First region: the CRT runtime-error message pool. The 18
+`am2_crt_rterr_table` records (startup.cpp) held hand-written string LITERALS, so
+the image's own 649-byte pool at 0x0046FF00..0x00470189 (the R60xx/DOMAIN/SING/
+TLOSS/`abnormal program termination` texts, packed in reverse) was orphaned --
+neither placed nor coded, so it sat as unplaced non-zero blob. Now
+`am2_crt_rterr_pool[649]` is a byte-exact `extern "C" const uint8_t` array placed
+at 0x0046FF00 (ADDR_CRT_RTERR_POOL, redirected in standalone.h), and
+`am2_crt_rterr_table` is repointed into it (`am2_crt_rterr_pool + 0xNNN` per
+record) instead of carrying its own literals. So there is ONE copy of each
+string, at its original VA, semantically named -- and `deadstrings`'
+`in_placed()` now excludes 0x46FF00..0x470189, dropping those runs from the sweep
+(**974 -> 962 dead ranges**, the pool's bytes moving from swept-zero to
+placed-and-byte-verified). `checkimagedata` byte-verifies the 649-byte pool
+against the image; title and mission side-by-sides IDENTICAL.
 
 **FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
 `LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a

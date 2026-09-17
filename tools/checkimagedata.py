@@ -185,11 +185,21 @@ def find_definition(symbol):
                         continue
                     s = re.search(r'"((?:[^"\\]|\\.)*)"', el)
                     num = re.fullmatch(r'-?0[xX][0-9A-Fa-f]+u?|-?\d+u?|NULL', el)
+                    so = re.search(r'(am2_\w+)\s*\+\s*'
+                                   r'(0[xX][0-9A-Fa-f]+|\d+)', el)
                     if s:
                         toks.append(("str", s.group(1)))   # string-pointer field
                     elif num:
                         toks.append(("int", 0 if el == "NULL"
                                      else int(el.rstrip("uU"), 0)))
+                    elif so:
+                        # a pointer INTO a placed symbol: `am2_pool + 0xNNN`.
+                        # The stored pointer is that symbol's VA plus the offset;
+                        # verify_mixed resolves the symbol's placed VA and checks
+                        # it equals the image dword (a repointed table entry --
+                        # e.g. am2_crt_rterr_table into am2_crt_rterr_pool).
+                        toks.append(("symoff", (so.group(1),
+                                                int(so.group(2), 0))))
                     else:
                         # the last identifier -- ignore any (cast) or & prefix
                         ids = re.findall(r'[A-Za-z_]\w*', el)
@@ -283,16 +293,30 @@ def _thunk_target(img, dw):
     return None
 
 
-def verify_mixed(img, addr, tokens, recon, seams=None):
+def verify_mixed(img, addr, tokens, recon, seams=None, symva=None):
     """A struct / function-pointer table: each dword is either an int (byte-
-    compared) or a function pointer. For a pointer, the image holds the
-    ORIGINAL function address (or a jmp thunk to it), so it must name the
-    reconstruction (or seam) the C entry does."""
+    compared), a function pointer, or a pointer INTO another placed symbol.
+    For a function pointer the image holds the ORIGINAL function address (or a
+    jmp thunk to it), so it must name the reconstruction (or seam) the C entry
+    does. For a `symbol + offset` field (a repointed table -- e.g.
+    am2_crt_rterr_table pointing into the placed am2_crt_rterr_pool) the stored
+    pointer is that symbol's placed VA plus the offset, which must equal the
+    image dword (the original pointed at the same VA)."""
     seams = seams or {}
+    symva = symva or {}
     TEXT_LO, TEXT_HI = 0x00401000, 0x0046F000
     for i, (kind, val) in enumerate(tokens):
         dw = struct.unpack("<I", img.read(addr + 4 * i, 4))[0]
-        if kind == "fn":
+        if kind == "symoff":
+            sym, off = val
+            base = symva.get(sym)
+            if base is None:
+                return ("entry %d: C points into %s+0x%X but that symbol has "
+                        "no placed VA" % (i, sym, off))
+            if base + off != dw:
+                return ("entry %d: C %s+0x%X = 0x%08X != image 0x%08X"
+                        % (i, sym, off, base + off, dw))
+        elif kind == "fn":
             want = recon.get(dw, seams.get(dw))
             if want is None:
                 t = _thunk_target(img, dw)
@@ -379,6 +403,14 @@ def main():
     img = am2.Image()
     sa = open(SA).read()
 
+    # symbol -> placed VA, so a repointed table entry (`am2_pool + off`) can be
+    # resolved against the symbol it points into.
+    symva = {}
+    for m in REDIRECT.finditer(sa):
+        a = addrs.get(m.group(1))
+        if m.group(4) is None and a is not None:
+            symva[m.group(2)] = a
+
     checked = skipped = 0
     fail = []
     for m in REDIRECT.finditer(sa):
@@ -397,7 +429,7 @@ def main():
             continue
         typ, values = found
         if typ == "mixed":
-            bad = verify_mixed(img, addr, values, recon, seams)
+            bad = verify_mixed(img, addr, values, recon, seams, symva)
             if bad:
                 fail.append("%s (fn-ptr table, 0x%08X): %s"
                             % (symbol, addr, bad))

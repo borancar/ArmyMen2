@@ -11261,6 +11261,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CRT_POW10_TABLE       0x0048D618u /* twelve-byte long doubles: 10^1..10^7, 10^8..10^56, ... in groups of seven */
 #define ADDR_CRT_POW10_NEG_TABLE   0x0048D778u /* the same for 10^-1 downward */
 #define ADDR_CRT_EXPONENT_TEXT     0x0046FDF0u /* "e+000", the exponent _cftoe starts from */
+#define ADDR_CRT_RTERR_POOL        0x0046FF00u /* the runtime-error message pool am2_crt_rterr_table names */
 #define ADDR_CRT_STRTOK_NEXT 0x006645C8u /* char * */
 #define ADDR_CRT_STRTOK            0x0046551Cu  /* the game's own; the state is
                                                  * shared with DefObjParse, so
