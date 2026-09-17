@@ -97,7 +97,7 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **1,331 dead ranges, 48,402 bytes zeroed**.
+sweep to **1,126 dead ranges, 48,837 bytes zeroed**.
 
 **UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
 Auditing the surviving strings showed the remainder is table-structured, not
@@ -259,10 +259,24 @@ letter/digit/punctuation key names, through 0x00485B28). Since the pointer table
 already dead (boot-verified) and the pool is reached only through it, extend the
 range to 0x00485510..0x00485B28 (0 external blob dwords point in -- checked). This
 coalesces the pool's individual strings into the one range: **1,331 dead ranges,
-48,402 bytes zeroed**. The remaining tail (movement tables, key defaults, the CRT
-record head, object/keyword name tables, and other small dead gaps between placed
-symbols) is incremental per-structure work, best done alongside the subsystems that
-own each.
+48,402 bytes zeroed**.
+
+**UPDATE (2026-09-17, cont.): the script.cpp string pool dropped.** The
+0x0048825C..0x00489554 region (between the dead SCRIPT_TOKENS table and the placed
+`am2_sprite_set_dirs`) is the script module's string constants: the variable names
+("all", "me", "difficulty", "systemspeed", "numgreen", ...), short keyword
+fragments ("hit"/"and"/"npc"/"pad" -- which the sweep's MIN_LEN=4 had skipped), the
+startup/mission-save filename formats, and the "script.cpp" module name. The
+reconstructed `script.cpp` registers every variable with its OWN C literal
+(`AddNameTableName("all", ...)` etc.) and reads the integer VALUE slots through
+separate `ADDR_SVAR_*` addresses -- none of the `ADDR_STR_*` string macros here
+appear in reconstructed src, and no blob dword points in (both checked). Declared
+dead as `SCRIPT_STRING_POOL`; the region's ~205 individually-zeroed strings coalesce
+into the one range: **1,126 dead ranges, 48,837 bytes zeroed**. Verified with a
+mission-loading side-by-side (which exercises the script name-table init), not just
+the title screen. The remaining tail (movement tables, key defaults, the CRT record
+head, object/keyword name tables, and other small dead gaps between placed symbols)
+is incremental per-structure work, best done alongside the subsystems that own each.
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
@@ -554,7 +568,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **1,331 dead ranges, 48,402 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **1,126 dead ranges, 48,837 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus

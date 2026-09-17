@@ -155,6 +155,19 @@ _DEAD_TABLE_DECL = [
     # original loader used them; the reconstruction does not).
     (0x00478950, 0x00478CDC, "BITMAP_LOADER_DEBUG"),
     (0x00486220, 0x00486444, "REGION_DEBUG_AND_FMT"),
+    # The script.cpp module's string pool, between the (dead) SCRIPT_TOKENS table
+    # and the placed am2_sprite_set_dirs (0x00489554): the script variable names
+    # ("all", "me", "difficulty", "systemspeed", "numgreen", ...), a few short
+    # keyword fragments ("hit"/"and"/"npc"/"pad", which the string sweep's MIN_LEN=4
+    # skipped), the startup/mission-save filename formats, and the "script.cpp"
+    # module name. The reconstructed script.cpp registers every variable with its
+    # OWN C literal (AddNameTableName("all", ...), etc.), and none of the ADDR_STR_*
+    # macros here are read in reconstructed src (they resolve the integer VALUE
+    # slots via separate ADDR_SVAR_* addresses, not these strings) -- so nothing in
+    # the ELF build reads this pool (0 src refs, 0 blob dwords point in -- checked;
+    # verified with a mission-loading side-by-side, which exercises the script
+    # name-table init).
+    (0x0048825C, 0x00489554, "SCRIPT_STRING_POOL"),
 ]
 
 
