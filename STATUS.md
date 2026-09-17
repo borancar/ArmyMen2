@@ -713,6 +713,17 @@ UNPLACED **381 -> 304** (237 -> 215 runs). Skipped: `0x46FA98` (`double 1.5`,
 already has an `AM2_CONST_1_5` macro -- same prefix issue as the `AM2_STR_`
 labels). make check green; title + mission side-by-sides IDENTICAL.
 
+**UPDATE (2026-09-18, cont.): the CRT exception-action tables placed
+(`am2_crt_xcpt_tables`).** The 136-byte block at `0x0048D2B0` (just before
+`am2_crt_rterr_table`) is the CRT's `_XcptActTab` -- the NTSTATUS->signal map
+(`0xC0000005` access-violation, `0xC000001D` illegal-instruction, `0xC0000096`
+privileged-instruction, `0xC000008D..93` the eight float exceptions), each with
+its signal -- followed by the four-entry FPE subcode table `{3,7,10,0x8C}`.
+Read-only CRT const (nothing in `src/` writes `0x48D2xx`), placed as a `uint8_t`
+byte pool. Placement 308 -> 309; checkimagedata 325 -> 326 match; blob non-zero
+UNPLACED **304 -> 270** (215 -> 209 runs). make check green; title + mission
+side-by-sides IDENTICAL.
+
 **FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
 `LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a
 single blob pointer DOWNWARD -- `ADDR_STR_PALETTE0 - i*16` -- because in the

@@ -18599,6 +18599,7 @@ typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
 #define ADDR_CRT_EH_CATCH_1                0x0046FEE8u /* dead C++ EH catch-handler table (-fno-exceptions) */
 #define ADDR_CRT_EH_CATCH_2                0x00470238u /* dead C++ EH catch-handler table */
 #define ADDR_CRT_EH_CATCH_3                0x004702A0u /* dead C++ EH catch-handler table */
+#define ADDR_CRT_XCPT_TABLES               0x0048D2B0u /* CRT NTSTATUS->signal + FPE-subcode exception tables */
 
 #ifdef AM2_STANDALONE
 #include "standalone.h"
