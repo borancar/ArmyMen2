@@ -97,7 +97,7 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **1,126 dead ranges, 48,837 bytes zeroed**.
+sweep to **993 dead ranges, 49,139 bytes zeroed**.
 
 **UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
 Auditing the surviving strings showed the remainder is table-structured, not
@@ -272,11 +272,24 @@ reconstructed `script.cpp` registers every variable with its OWN C literal
 separate `ADDR_SVAR_*` addresses -- none of the `ADDR_STR_*` string macros here
 appear in reconstructed src, and no blob dword points in (both checked). Declared
 dead as `SCRIPT_STRING_POOL`; the region's ~205 individually-zeroed strings coalesce
-into the one range: **1,126 dead ranges, 48,837 bytes zeroed**. Verified with a
+into the one range (1,331 -> 1,126 ranges / 48,837 bytes). Verified with a
 mission-loading side-by-side (which exercises the script name-table init), not just
-the title screen. The remaining tail (movement tables, key defaults, the CRT record
-head, object/keyword name tables, and other small dead gaps between placed symbols)
-is incremental per-structure work, best done alongside the subsystems that own each.
+the title screen.
+
+**UPDATE (2026-09-17, cont.): the HUD/gameplay display strings dropped.** The
+0x004767A8..0x00476FB0 gap (between the placed `am2_cheat_words` at 0x00476704 and
+`am2_fog_of_war` at 0x00476FB0) holds the squad-info stat labels ("HP:"/"MV:"/"WT:"/
+"HT:"), the weapon abbreviations ("BAZ"/"MAG"/"M80"/...), and a scatter of
+format/misc strings ("%d", stratmap/portal names). The reconstructed HUD writes
+every one with its OWN C literal (`widget.cpp` `SQD_TEXT("HP:")`, the
+"GREN"/"FLAM"/"BAZ" weapon-abbrev array, `item.cpp`'s item names) and reads none of
+the `ADDR_STR_*` macros here; no placed symbol lies inside the gap and no blob dword
+points in (all checked; the cheat-word char* table `am2_cheat_words` is placed, so
+its blob pointers are carved). Many are three chars, which the sweep's MIN_LEN=4 had
+skipped. Declared dead as `HUD_LABELS_AND_ABBREVS`: **993 dead ranges, 49,139 bytes
+zeroed**; verified with mission-loading side-by-sides that show the HUD. The
+remaining tail (movement tables, key defaults, the CRT record head, folded-but-
+table-pointed strings) is incremental per-structure work.
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
@@ -568,7 +581,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **1,126 dead ranges, 48,837 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **993 dead ranges, 49,139 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus

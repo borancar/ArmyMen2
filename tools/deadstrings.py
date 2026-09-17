@@ -168,6 +168,16 @@ _DEAD_TABLE_DECL = [
     # verified with a mission-loading side-by-side, which exercises the script
     # name-table init).
     (0x0048825C, 0x00489554, "SCRIPT_STRING_POOL"),
+    # HUD/gameplay display strings in the .data gap between the placed
+    # am2_cheat_words (0x00476704) and am2_fog_of_war (0x00476FB0): the squad-info
+    # stat labels ("HP:"/"MV:"/"WT:"/"HT:"), the weapon abbreviations ("BAZ", "MAG",
+    # "M80", ...), and a scatter of format/misc strings ("%d", the stratmap/portal
+    # names). The reconstructed HUD writes every one of these with its OWN C literal
+    # (widget.cpp SQD_TEXT("HP:") etc., the "GREN"/"FLAM"/"BAZ" weapon-abbrev array,
+    # item.cpp's item names) and reads none of the ADDR_STR_* macros here -- all are
+    # orig.h-only, no placed symbol lies inside, and no blob dword points in (all
+    # checked). Many are three chars, which the string sweep's MIN_LEN=4 skipped.
+    (0x004767A8, 0x00476FB0, "HUD_LABELS_AND_ABBREVS"),
 ]
 
 
