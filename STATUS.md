@@ -97,7 +97,7 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **967 dead ranges, 49,529 bytes zeroed**.
+sweep to **974 dead ranges, 49,568 bytes zeroed**.
 
 **UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
 Auditing the surviving strings showed the remainder is table-structured, not
@@ -318,10 +318,23 @@ surgically: the CONTROLS dialog key names (del/ins/f1..f15/letters/tab,
 `am2_key_names`, so the dialog reads literals and nothing reads the blob pool. This
 needed a `dead_tables()` fix: a macro REDIRECTED in standalone.h (like the loop
 bound ADDR_KEY_NAME_TABLE_END = `am2_key_names + 95`) resolves to a placed symbol,
-not the blob VA, so its use in src must not veto the pool. **967 dead ranges,
-49,529 bytes zeroed.** LESSON: never batch-declare wide gaps dead; fold the reads
+not the blob VA, so its use in src must not veto the pool. The metric went to 967
+ranges / 49,529 bytes. LESSON: never batch-declare wide gaps dead; fold the reads
 first, carve exact pools, and a green `make check` is not the gate -- boot + title
 + mission side-by-sides are.
+
+**UPDATE (2026-09-17, cont.): the scattered placed-table strings dropped.** Same
+method applied to the individual dead strings whose naming char* tables are already
+placed with literals: "FOO" (am2_write_dot_record), "map"/"m80"/"#"
+(am2_def_keywords), "mag" (am2_movie_names), "avi" (am2_dir_names), and "Heavy MG
+Pillbox" (am2_option_table's loop-bound target). Each survived only as <4 chars or
+via a redirected bound; none is read through an unfolded macro (checked). **974
+dead ranges, 49,568 bytes zeroed.** The still-live blob (~440 non-zero bytes) is
+now: strings pointed by BLOB char* tables not yet migrated (the ON/OFF bool words,
+team-colour names, a scancode F/T/0 table), and CRT runtime state (the _tzname
+PST/PDT buffers, ctype/pctype, wnullstring). Reaching literally zero needs those
+tables transcribed to placed C and the CRT buffers placed as writable symbols --
+per-structure work, but the method (fold reads, then place/drop) is settled.
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
@@ -613,7 +626,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **967 dead ranges, 49,529 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **974 dead ranges, 49,568 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus

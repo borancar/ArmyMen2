@@ -200,6 +200,18 @@ _DEAD_TABLE_DECL = [
     # they are all <4 chars (MIN_LEN=4 skips them). Surgical range -- it stops well
     # before the *.* / * / | strings at 0x0048B9D8+ (those are folded, read live).
     (0x0048B220, 0x0048B3D8, "KEY_NAME_POOL"),
+    # Scattered short strings whose naming char* tables are already placed with C
+    # literals, so the reconstruction reads the literal and these blob copies are
+    # dead -- they survived only because they are <4 chars (or, for "Heavy MG
+    # Pillbox", reached by the redirected loop bound ADDR_OPTION_TABLE_END). None
+    # is read through an unfolded macro (checked). Placed table in ():
+    (0x0047589C, 0x004758A0, "WRITE_DOT_FOO"),        # am2_write_dot_record
+    (0x004774B4, 0x004774B8, "DEFKW_MAP"),            # am2_def_keywords
+    (0x004776D8, 0x004776DC, "MOVIE_M80"),            # am2_movie_names/def_keywords
+    (0x00477928, 0x0047792A, "DEFKW_HASH"),           # am2_def_keywords
+    (0x0048B40C, 0x0048B410, "MOVIE_MAG"),            # am2_movie_names
+    (0x00485434, 0x00485438, "DIRNAME_AVI"),          # am2_dir_names
+    (0x00486BC4, 0x00486BD5, "OPTION_TABLE_END_STR"), # am2_option_table bound
 ]
 
 
