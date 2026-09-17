@@ -673,6 +673,27 @@ string, at its original VA, semantically named -- and `deadstrings`'
 placed-and-byte-verified). `checkimagedata` byte-verifies the 649-byte pool
 against the image; title and mission side-by-sides IDENTICAL.
 
+**UPDATE (2026-09-17, cont.): the residual short strings placed at their VAs
+(new `src/standalone/origtail.cpp`).** Continuing the re-transcribe pass, the 22
+leftover short `.rdata` strings the folds/dead-sweep could not reach (they read
+via a folded literal now, or are under the 4-char sweep floor) are placed
+byte-identical at their VAs in a dedicated `origtail.cpp`: the CRT asctime
+weekday/month name tables, the wide `L"(null)"`, the `IsProcessorFeaturePresent`
+import name, the rterr `"\n\n"`/`"..."` punctuation, `fopen` mode and printf
+format strings, the `-nm`/`-sm`/`-bm`/`-df` command-line flags, the `ON`/`OFF`
+boolean words, and the `its`/`3do`/`sml` movie type strings. Each ADDR_ macro is
+redirected to its placed pool (which sits at the same VA, so every reader --
+folded literal or numeric `AM2_IMAGE` -- resolves to the same bytes); a folded
+macro among them is re-redirected by foldstr.h to its literal, harmless because
+the pool is still placed and byte-verified. Placement 277 -> 299 symbols;
+`checkimagedata` 294 -> 316 match; the carried blob's non-zero UNPLACED bytes
+fell **535 -> 381** (271 -> 237 runs). Deferred (need care, not in this batch):
+the writable tzname PST/PDT buffers (`__tzset` overwrites them, so non-const +
+full buffer size), the three `AM2_STR_`-prefixed slot/suffix labels
+(checkimagedata only scans `ADDR_`/`VTABLE_` redirects), and the ~346 bytes of
+binary FP/EH/pointer fragments. make check green; title + mission side-by-sides
+IDENTICAL.
+
 **FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
 `LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a
 single blob pointer DOWNWARD -- `ADDR_STR_PALETTE0 - i*16` -- because in the

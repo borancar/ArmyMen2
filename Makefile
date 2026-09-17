@@ -422,7 +422,8 @@ endif
 # layout in place.
 SA_SRC   := $(wildcard src/game/*.cpp) $(wildcard src/game/win32/*.cpp) \
             $(wildcard src/platform/crt/*.cpp) \
-            src/standalone/runtime.cpp build/standalone/fixups.cpp \
+            src/standalone/runtime.cpp src/standalone/origtail.cpp \
+            build/standalone/fixups.cpp \
             build/standalone/imports.cpp \
             build/standalone/tables.cpp
 # control.c and input.c come from the harness unchanged: the socket is what

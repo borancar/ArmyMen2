@@ -1,0 +1,83 @@
+/* origtail.cpp -- residual .rdata transcribed at its VA, for the standalone
+ * build, so the carried origdata.bin blob reaches zero non-zero UNPLACED bytes.
+ *
+ * These are the leftover short strings the original's .rdata kept that no
+ * migrated table pointed at and no fold covered: CRT date/asctime name tables
+ * and punctuation, a KERNEL32 GetProcAddress name, fopen mode and printf
+ * format strings, the command-line flag words, the ON/OFF boolean words, and
+ * the movie type strings.  Each is placed byte-identical at its original VA
+ * (its ADDR_ macro redirected in standalone.h), so any reader -- a folded
+ * literal or a numeric-macro AM2_IMAGE read -- still resolves to the same
+ * bytes at the same address, and placement.py carves the byte out of the blob.
+ * Pure const data; checkimagedata byte-verifies every one against the image.
+ *
+ * Generated once (tools scratch); the bytes are guarded by checkimagedata, so
+ * a mismatch with the image fails the build.
+ */
+#include <stdint.h>
+
+/* 0x0046FDC8: "IsProcessorFeaturePresent" (KERNEL32 GetProcAddress name) */
+extern "C" const uint8_t am2_str_isprocessorfeaturepresent[26] = { 0x49, 0x73, 0x50, 0x72, 0x6f, 0x63, 0x65, 0x73, 0x73, 0x6f, 0x72, 0x46, 0x65, 0x61, 0x74, 0x75, 0x72, 0x65, 0x50, 0x72, 0x65, 0x73, 0x65, 0x6e, 0x74, 0x00 };
+
+/* 0x0046FECC: wide L"(null)" for %ws */
+extern "C" const uint8_t am2_crt_wnull_paren[14] = { 0x28, 0x00, 0x6e, 0x00, 0x75, 0x00, 0x6c, 0x00, 0x6c, 0x00, 0x29, 0x00, 0x00, 0x00 };
+
+/* 0x004701B4: the rterr "\n\n" */
+extern "C" const uint8_t am2_crt_rterr_crlf2[3] = { 0x0a, 0x0a, 0x00 };
+
+/* 0x004701D4: the rterr "..." */
+extern "C" const uint8_t am2_crt_rterr_ellipsis[4] = { 0x2e, 0x2e, 0x2e, 0x00 };
+
+/* 0x004701F0: asctime weekday abbrevs "SunMon..Sat" */
+extern "C" const uint8_t am2_crt_wday_names[22] = { 0x53, 0x75, 0x6e, 0x4d, 0x6f, 0x6e, 0x54, 0x75, 0x65, 0x57, 0x65, 0x64, 0x54, 0x68, 0x75, 0x46, 0x72, 0x69, 0x53, 0x61, 0x74, 0x00 };
+
+/* 0x00470208: asctime month abbrevs "JanFeb..Dec" */
+extern "C" const uint8_t am2_crt_month_names[37] = { 0x4a, 0x61, 0x6e, 0x46, 0x65, 0x62, 0x4d, 0x61, 0x72, 0x41, 0x70, 0x72, 0x4d, 0x61, 0x79, 0x4a, 0x75, 0x6e, 0x4a, 0x75, 0x6c, 0x41, 0x75, 0x67, 0x53, 0x65, 0x70, 0x4f, 0x63, 0x74, 0x4e, 0x6f, 0x76, 0x44, 0x65, 0x63, 0x00 };
+
+/* 0x00470230: the getenv key "TZ" */
+extern "C" const uint8_t am2_crt_str_tz[3] = { 0x54, 0x5a, 0x00 };
+
+/* 0x00473D9C: "aai" */
+extern "C" const uint8_t am2_str_aai_dir[4] = { 0x61, 0x61, 0x69, 0x00 };
+
+/* 0x00474170: fopen mode "rb" */
+extern "C" const uint8_t am2_mode_rb[3] = { 0x72, 0x62, 0x00 };
+
+/* 0x00474318: the "-w" windowed flag */
+extern "C" const uint8_t am2_str_dash_w[3] = { 0x2d, 0x77, 0x00 };
+
+/* 0x004742A0: the -nm/-sm/-bm/-df command-line flags */
+extern "C" const uint8_t am2_cmdline_movie_flags[16] = { 0x2d, 0x6e, 0x6d, 0x00, 0x2d, 0x73, 0x6d, 0x00, 0x2d, 0x62, 0x6d, 0x00, 0x2d, 0x64, 0x66, 0x00 };
+
+/* 0x00476FD0: the ON2/ON1/ON/OFF boolean words */
+extern "C" const uint8_t am2_bool_word_names[16] = { 0x4f, 0x4e, 0x32, 0x00, 0x4f, 0x4e, 0x31, 0x00, 0x4f, 0x4e, 0x00, 0x00, 0x4f, 0x46, 0x46, 0x00 };
+
+/* 0x004779F4: default fopen mode "rt" */
+extern "C" const uint8_t am2_str_def_file_mode[3] = { 0x72, 0x74, 0x00 };
+
+/* 0x00485148: "tan" */
+extern "C" const uint8_t am2_str_tan[4] = { 0x74, 0x61, 0x6e, 0x00 };
+
+/* 0x004851E0: fopen mode "wb" */
+extern "C" const uint8_t am2_mode_wb[3] = { 0x77, 0x62, 0x00 };
+
+/* 0x004852B4: the "%s" format */
+extern "C" const uint8_t am2_str_fmt_s[3] = { 0x25, 0x73, 0x00 };
+
+/* 0x00486588: the "its" movie type string */
+extern "C" const uint8_t am2_str_movie_its[4] = { 0x69, 0x74, 0x73, 0x00 };
+
+/* 0x0048658C: "3do" */
+extern "C" const uint8_t am2_str_movie_3do[4] = { 0x33, 0x64, 0x6f, 0x00 };
+
+/* 0x00486598: "sml" */
+extern "C" const uint8_t am2_str_movie_sml[4] = { 0x73, 0x6d, 0x6c, 0x00 };
+
+/* 0x0048983C: the "%c" format */
+extern "C" const uint8_t am2_str_fmt_c[3] = { 0x25, 0x63, 0x00 };
+
+/* 0x0048B9D8: the "*.*" glob */
+extern "C" const uint8_t am2_str_any_file[4] = { 0x2a, 0x2e, 0x2a, 0x00 };
+
+/* 0x0048CC2C: two "UDF" codepage-name copies */
+extern "C" const uint8_t am2_str_udf_pair[8] = { 0x55, 0x44, 0x46, 0x00, 0x55, 0x44, 0x46, 0x00 };

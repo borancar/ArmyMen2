@@ -18576,6 +18576,21 @@ typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
  * 47 .text seams -- the CRT, rand, the logger and the DirectX creators --
  * which are the only .text addresses the reconstruction uses for anything
  * but a patch_replace.  The injected build includes none of it. */
+
+/* Residual .rdata short strings transcribed at their VAs (src/standalone/
+ * origtail.cpp) so the carried blob reaches zero non-zero unplaced bytes.
+ * These addresses had no ADDR_ macro of their own; the reused ones keep theirs. */
+#define ADDR_CRT_WNULL_PAREN               0x0046FECCu /* wide L"(null)" for %ws */
+#define ADDR_CRT_WDAY_NAMES                0x004701F0u /* asctime weekday abbrevs "SunMon..Sat" */
+#define ADDR_CRT_MONTH_NAMES               0x00470208u /* asctime month abbrevs "JanFeb..Dec" */
+#define ADDR_CRT_STR_TZ                    0x00470230u /* the getenv key "TZ" */
+#define ADDR_STR_DASH_W                    0x00474318u /* the "-w" windowed flag */
+#define ADDR_CMDLINE_MOVIE_FLAGS           0x004742A0u /* the -nm/-sm/-bm/-df command-line flags */
+#define ADDR_BOOL_WORD_NAMES               0x00476FD0u /* the ON2/ON1/ON/OFF boolean words */
+#define ADDR_STR_MOVIE_ITS                 0x00486588u /* the "its" movie type string */
+#define ADDR_STR_FMT_C                     0x0048983Cu /* the "%c" format */
+#define ADDR_STR_UDF_PAIR                  0x0048CC2Cu /* two "UDF" codepage-name copies */
+
 #ifdef AM2_STANDALONE
 #include "standalone.h"
 #endif
