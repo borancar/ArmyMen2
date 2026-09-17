@@ -724,6 +724,21 @@ byte pool. Placement 308 -> 309; checkimagedata 325 -> 326 match; blob non-zero
 UNPLACED **304 -> 270** (215 -> 209 runs). make check green; title + mission
 side-by-sides IDENTICAL.
 
+**UPDATE (2026-09-18, cont.): four read-only game const tables placed.** Moving
+from the dead CRT `.rdata` into the game's own read-only lookup data (each sits
+between already-migrated const symbols, and the mission side-by-side exercises
+its code path -- the write-safety gate): `am2_air_bit_masks` (0x473F88, the
+air-path bit/shift masks `{32,16,8,4,2}`,`{-2,-4,-8,-16,-32}`, between the placed
+air-path scalars and `am2_air_frame_hotspots`); `am2_mp_pause_bits` (0x48C7A8,
+reusing `ADDR_MP_PAUSE_BITS_A`, the MP pause bit-mask A/B/C sets);
+`am2_map_field_tables` (0x485FFC, the map field descriptor count/index tables,
+between `am2_map_field_descs` and `am2_palette_cycle_seq`); `am2_spiral_path_const`
+(0x48784C, between `am2_spiral_dy` and `am2_path_max_nodes`). All placed as
+`uint8_t` byte pools; the mission side-by-side (map load + pathfinding + MP)
+running IDENTICAL confirms none is runtime-written. Placement 309 -> 313;
+checkimagedata 326 -> 330 match; blob non-zero UNPLACED **270 -> 174** (209 ->
+~150 runs). make check green; title + mission side-by-sides IDENTICAL.
+
 **FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
 `LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a
 single blob pointer DOWNWARD -- `ADDR_STR_PALETTE0 - i*16` -- because in the

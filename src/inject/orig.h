@@ -18600,6 +18600,9 @@ typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
 #define ADDR_CRT_EH_CATCH_2                0x00470238u /* dead C++ EH catch-handler table */
 #define ADDR_CRT_EH_CATCH_3                0x004702A0u /* dead C++ EH catch-handler table */
 #define ADDR_CRT_XCPT_TABLES               0x0048D2B0u /* CRT NTSTATUS->signal + FPE-subcode exception tables */
+#define ADDR_AIR_BIT_MASKS                 0x00473F88u /* air-path bit/shift mask table {32,16,8,4,2},{-2,-4,-8,-16,-32} */
+#define ADDR_MAP_FIELD_TABLES              0x00485FFCu /* map field descriptor count/index tables */
+#define ADDR_SPIRAL_PATH_CONST             0x0048784Cu /* spiral/path-node const data */
 
 #ifdef AM2_STANDALONE
 #include "standalone.h"
