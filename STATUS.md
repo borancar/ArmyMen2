@@ -97,7 +97,7 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **995 dead ranges, 49,275 bytes zeroed**.
+sweep to **967 dead ranges, 49,529 bytes zeroed**.
 
 **UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
 Auditing the surviving strings showed the remainder is table-structured, not
@@ -300,9 +300,28 @@ placed FDIV constants (`am2_crt_fdiv`, 0x0046FDB8), the folded
 "IsProcessorFeaturePresent"/"KERNEL32"/"e+000" strings the CRT startup reads
 (startup.cpp:891/895), and the placed printf table (0x0046FE70). Declared dead as
 `CRT_EH_RECORD_FDIV` / `CRT_EH_RECORDS_STDIO`: **995 dead ranges, 49,275 bytes
-zeroed**. Native still boots (the key check for CRT-head changes). The remaining
-tail (movement tables, key defaults, folded-but-table-pointed strings, sub-20-byte
-gaps) is the dregs -- incremental per-structure work.
+zeroed**. Native still boots (the key check for CRT-head changes).
+
+**UPDATE (2026-09-17, cont.): the dregs, done right -- fold the reads, then drop
+the pools.** A first attempt DECLARED the remaining 22 gaps dead in one batch;
+`make check` passed but click-509 trapped at frame 271 (2065-px title box). Cause:
+one gap swallowed 0x004852B4 "%s" (ADDR_STR_FMT_S), which the title reads through
+the macro to build a filename -- so zeroing the blob copy broke it. Reverted. The
+right method, matching how independence actually works: the remaining live strings
+are nearly all < 4 chars (the string sweep's MIN_LEN=4 skips them) and are either
+read via an ADDR macro or pointed by a placed char* table. (a) FOLD the macro reads
+so the port carries its own literal -- 13 more (STR_FMT_S "%s", STR_NEWLINE,
+STR_DOT, the movie/dir/mode fragments, ...); foldstrings 157 -> 170. (b) Then a
+short-string POOL whose table is placed-with-literals can be declared dead
+surgically: the CONTROLS dialog key names (del/ins/f1..f15/letters/tab,
+0x0048B220..0x0048B3D8) -- the {scancode,char*} table that names them is the placed
+`am2_key_names`, so the dialog reads literals and nothing reads the blob pool. This
+needed a `dead_tables()` fix: a macro REDIRECTED in standalone.h (like the loop
+bound ADDR_KEY_NAME_TABLE_END = `am2_key_names + 95`) resolves to a placed symbol,
+not the blob VA, so its use in src must not veto the pool. **967 dead ranges,
+49,529 bytes zeroed.** LESSON: never batch-declare wide gaps dead; fold the reads
+first, carve exact pools, and a green `make check` is not the gate -- boot + title
++ mission side-by-sides are.
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
@@ -594,7 +613,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **995 dead ranges, 49,275 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **967 dead ranges, 49,529 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus

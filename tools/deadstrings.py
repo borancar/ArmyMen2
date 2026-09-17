@@ -191,17 +191,35 @@ _DEAD_TABLE_DECL = [
     # symbols inside, 0 blob dwords point in (all checked).
     (0x0046FDA8, 0x0046FDB8, "CRT_EH_RECORD_FDIV"),
     (0x0046FDF8, 0x0046FE70, "CRT_EH_RECORDS_STDIO"),
+    # The CONTROLS dialog's key-name string pool (del, ins, end, f1..f15, the
+    # letter/digit/punctuation keys, tab -- 0x0048B220..0x0048B3D8). The 95-record
+    # {scancode, char*name} table that names them (0x0048AF28) is already the placed
+    # am2_key_names, transcribed to C LITERALS (widget.cpp), so the dialog reads the
+    # literals and nothing reads this blob pool; its pointer array is carved, so no
+    # surviving dword points in. The names survived the string sweep only because
+    # they are all <4 chars (MIN_LEN=4 skips them). Surgical range -- it stops well
+    # before the *.* / * / | strings at 0x0048B9D8+ (those are folded, read live).
+    (0x0048B220, 0x0048B3D8, "KEY_NAME_POOL"),
 ]
 
 
 def dead_tables():
     """[(va, size)] for the dead pointer tables above, minus any still reached
-    from code (macro or bare hex, comments and #defines already stripped)."""
+    from code (macro or bare hex, comments and #defines already stripped).
+
+    A macro REDIRECTED in standalone.h (`#undef ADDR_X`) resolves to a placed C
+    symbol, not this blob VA, so its use in src does NOT read the blob and must
+    not veto the declaration -- e.g. ADDR_KEY_NAME_TABLE_END (the loop bound at
+    the pool's start) is redirected to `am2_key_names + 95`, so it never reads
+    0x0048B220. Only a macro that STILL resolves to the raw VA can keep it live."""
     src = src_text()
     oh = open(os.path.join(REPO, "src", "inject", "orig.h")).read()
+    sh = open(os.path.join(REPO, "src", "inject", "standalone.h")).read()
+    redirected = set(re.findall(r'#undef\s+(ADDR_\w+)', sh))
     out = []
     for start, end, name in _DEAD_TABLE_DECL:
-        macs = re.findall(r'#define\s+(ADDR_\w+)\s+0x0*%X' % start, oh)
+        macs = [m for m in re.findall(r'#define\s+(ADDR_\w+)\s+0x0*%X' % start, oh)
+                if m not in redirected]
         hexes = ("0x%08x" % start, "0x%x" % start)
         used = any(re.search(r'\b' + m + r'\b', src) for m in macs) \
             or any(h in src.lower() for h in hexes)
