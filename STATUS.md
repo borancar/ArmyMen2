@@ -97,7 +97,7 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **993 dead ranges, 49,139 bytes zeroed**.
+sweep to **995 dead ranges, 49,275 bytes zeroed**.
 
 **UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
 Auditing the surviving strings showed the remainder is table-structured, not
@@ -287,9 +287,22 @@ the `ADDR_STR_*` macros here; no placed symbol lies inside the gap and no blob d
 points in (all checked; the cheat-word char* table `am2_cheat_words` is placed, so
 its blob pointers are carved). Many are three chars, which the sweep's MIN_LEN=4 had
 skipped. Declared dead as `HUD_LABELS_AND_ABBREVS`: **993 dead ranges, 49,139 bytes
-zeroed**; verified with mission-loading side-by-sides that show the HUD. The
-remaining tail (movement tables, key defaults, the CRT record head, folded-but-
-table-pointed strings) is incremental per-structure work.
+zeroed**; verified with mission-loading side-by-sides that show the HUD.
+
+**UPDATE (2026-09-17, cont.): two more C++ EH record blocks in the CRT head.**
+The same `{-1, handler, handler, 0}` EH shape as `CXX_EH_FUNCINFO`, but sitting in
+the CRT-string head rather than the big 0x004702B8 block: one record at 0x0046FDA8
+(for the FDIV self-test function) and a run at 0x0046FDF8..0x0046FE70 (for the CRT
+string/printf functions), their handlers all in 0xCC `.origgap` .text. The build is
+`-fno-exceptions`, so nothing walks them (0 src refs, 0 placed symbols inside, 0
+blob dwords point in). The live neighbours are left intact and lie outside: the
+placed FDIV constants (`am2_crt_fdiv`, 0x0046FDB8), the folded
+"IsProcessorFeaturePresent"/"KERNEL32"/"e+000" strings the CRT startup reads
+(startup.cpp:891/895), and the placed printf table (0x0046FE70). Declared dead as
+`CRT_EH_RECORD_FDIV` / `CRT_EH_RECORDS_STDIO`: **995 dead ranges, 49,275 bytes
+zeroed**. Native still boots (the key check for CRT-head changes). The remaining
+tail (movement tables, key defaults, folded-but-table-pointed strings, sub-20-byte
+gaps) is the dregs -- incremental per-structure work.
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
@@ -581,7 +594,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **993 dead ranges, 49,139 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **995 dead ranges, 49,275 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus

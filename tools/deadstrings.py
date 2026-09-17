@@ -178,6 +178,19 @@ _DEAD_TABLE_DECL = [
     # orig.h-only, no placed symbol lies inside, and no blob dword points in (all
     # checked). Many are three chars, which the string sweep's MIN_LEN=4 skipped.
     (0x004767A8, 0x00476FB0, "HUD_LABELS_AND_ABBREVS"),
+    # Two more C++ EH record blocks, the same shape as CXX_EH_FUNCINFO above but
+    # sitting in the CRT-string head rather than the big 0x004702B8 block: a
+    # `{-1, handler, handler, 0}` record at 0x0046FDA8 (for the FDIV self-test
+    # function, whose .text handlers are 0xCC .origgap in native) and a run of them
+    # at 0x0046FDF8..0x0046FE70 (for the CRT string/printf functions). The build is
+    # -fno-exceptions with no MSVC EH runtime, so nothing walks them. The LIVE
+    # neighbours are left intact and lie OUTSIDE these ranges: the FDIV constants
+    # (placed am2_crt_fdiv at 0x0046FDB8), the folded "IsProcessorFeaturePresent" /
+    # "KERNEL32" / "e+000" strings the CRT startup still reads (0x0046FDC8..0x0046FDF8),
+    # and the placed printf classifier table (0x0046FE70). 0 src refs, 0 placed
+    # symbols inside, 0 blob dwords point in (all checked).
+    (0x0046FDA8, 0x0046FDB8, "CRT_EH_RECORD_FDIV"),
+    (0x0046FDF8, 0x0046FE70, "CRT_EH_RECORDS_STDIO"),
 ]
 
 
