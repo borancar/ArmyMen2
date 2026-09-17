@@ -97,7 +97,7 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **1,410 dead ranges, 47,896 bytes zeroed**.
+sweep to **1,369 dead ranges, 48,094 bytes zeroed**.
 
 **UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
 Auditing the surviving strings showed the remainder is table-structured, not
@@ -238,10 +238,22 @@ between the placed `am2_step_facing_sweep` (ends 0x00489E18) and `am2_key_defaul
 `MP_NET_DEBUG_STRINGS` (0 src refs, 0 blob dwords point in -- checked; many begin
 with a tab, which the string sweep skips, so they had survived). This coalesced
 ~164 already-individually-zeroed strings inside the span into one range, so the
-count falls while bytes rise: **1,410 dead ranges, 47,896 bytes zeroed**. The
-still-live blob is ~1.3K non-zero. The rest (movement tables, key defaults, the
-CRT record head, object/keyword name tables) is the incremental tail, best
-transcribed alongside the subsystems that own them.
+count falls while bytes rise: to 1,410 ranges / 47,896 bytes. Still-live blob
+~1.3K non-zero.
+
+**UPDATE (2026-09-17, cont.): the confirmed-dead debug strings dropped.** Two
+chunks are debug/error/log format strings from subsystems unreconstructed in
+native (0xCC `.origgap`, nothing in the ELF reads them -- 0 src refs, 0 blob dwords
+point in): the bitmap loader's errors ("ERROR: invalid file size in %s.",
+"ERROR: %s not in 1-bit mode") at 0x00478950..0x00478CDC, and the
+region-activation debug line plus the `%s.atl`/`%s.amm` file-name format strings
+(their `ADDR_FMT_ATL`/`ADDR_FMT_DOT_AMM` macros appear only in orig.h -- the
+original loader used them, the reconstruction does not) at 0x00486220..0x00486444.
+Declared dead as `BITMAP_LOADER_DEBUG` and `REGION_DEBUG_AND_FMT`: **1,369 dead
+ranges, 48,094 bytes zeroed**. The remaining tail (movement tables, key defaults,
+the CRT record head, object/keyword name tables, and other small dead gaps between
+placed symbols) is incremental per-structure work, best done alongside the
+subsystems that own each.
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
@@ -533,7 +545,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **1,410 dead ranges, 47,896 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **1,369 dead ranges, 48,094 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus

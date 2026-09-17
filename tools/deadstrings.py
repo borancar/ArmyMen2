@@ -144,6 +144,15 @@ _DEAD_TABLE_DECL = [
     # tab, which is why the string sweep -- it only starts a run on a printable
     # byte -- never saw them as dead on its own.
     (0x00489E18, 0x0048AE80, "MP_NET_DEBUG_STRINGS"),
+    # Debug/error/log format strings from subsystems that are unreconstructed in
+    # native (0xCC .origgap), so nothing in the ELF build reads them (0 src refs,
+    # 0 blob dwords point in -- checked): the bitmap loader's error messages
+    # ("ERROR: invalid file size in %s.", "ERROR: %s not in 1-bit mode"), and the
+    # region-activation debug line plus the %s.atl/%s.amm file-name format strings
+    # (their ADDR_FMT_ATL/ADDR_FMT_DOT_AMM macros appear only in orig.h -- the
+    # original loader used them; the reconstruction does not).
+    (0x00478950, 0x00478CDC, "BITMAP_LOADER_DEBUG"),
+    (0x00486220, 0x00486444, "REGION_DEBUG_AND_FMT"),
 ]
 
 
