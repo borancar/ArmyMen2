@@ -18603,6 +18603,9 @@ typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
 #define ADDR_AIR_BIT_MASKS                 0x00473F88u /* air-path bit/shift mask table {32,16,8,4,2},{-2,-4,-8,-16,-32} */
 #define ADDR_MAP_FIELD_TABLES              0x00485FFCu /* map field descriptor count/index tables */
 #define ADDR_SPIRAL_PATH_CONST             0x0048784Cu /* spiral/path-node const data */
+#define ADDR_RANK_THRESHOLDS               0x00473DA0u /* ascending int thresholds before am2_rank_records */
+#define ADDR_TZNAME_STD                    0x0048D40Cu /* the writable STD tzname buffer (__tzset writes it) */
+#define ADDR_TZNAME_DST                    0x0048D44Cu /* the writable DST tzname buffer (__tzset writes it) */
 
 #ifdef AM2_STANDALONE
 #include "standalone.h"

@@ -739,6 +739,23 @@ running IDENTICAL confirms none is runtime-written. Placement 309 -> 313;
 checkimagedata 326 -> 330 match; blob non-zero UNPLACED **270 -> 174** (209 ->
 ~150 runs). make check green; title + mission side-by-sides IDENTICAL.
 
+**UPDATE (2026-09-18, cont.): rank thresholds + the WRITABLE tzname buffers.**
+`am2_rank_thresholds` (0x473DA0, ascending int thresholds {96,240,380,480,1000,
+3000} before `am2_rank_records`) placed const. The tzname STD/DST buffers
+(0x48D40C/0x48D44C) are the first RUNTIME-WRITTEN target: `__tzset` (time.cpp)
+overwrites them through `am2_crt_tzname`, so they are placed NON-const
+(`am2_tzname_std`/`am2_tzname_dst`), sized to the full 64-byte original buffers,
+with their "PST"/"PDT" init keeping them in `.data` (defined inside an
+`extern "C" {}` block so the initialized definition needs no `extern` storage
+class -- avoids the -Wextra warning). `am2_crt_tzname` still holds 0x48D40C/
+0x48D44C, so it points at the placed buffers and `__tzset`'s writes land in
+writable `.data`. The side-by-sides run `__tzset` at CRT startup, so their
+IDENTICAL result is the write-safety proof. Placement 313 -> 316; checkimagedata
+330 -> 333 match; blob non-zero UNPLACED **174 -> 157**. Deferred still: the
+sprite load-fill graphs, `KEY_BINDINGS`, the CRT linked-list sentinel, and the
+`AM2_STR_`/`AM2_CONST_`/`AM2_SEQ_`-prefixed labels (need prefix tooling). make
+check green; title + mission side-by-sides IDENTICAL.
+
 **FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
 `LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a
 single blob pointer DOWNWARD -- `ADDR_STR_PALETTE0 - i*16` -- because in the
