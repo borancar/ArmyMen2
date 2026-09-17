@@ -97,7 +97,7 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **1,369 dead ranges, 48,094 bytes zeroed**.
+sweep to **1,331 dead ranges, 48,402 bytes zeroed**.
 
 **UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
 Auditing the surviving strings showed the remainder is table-structured, not
@@ -249,11 +249,20 @@ point in): the bitmap loader's errors ("ERROR: invalid file size in %s.",
 region-activation debug line plus the `%s.atl`/`%s.amm` file-name format strings
 (their `ADDR_FMT_ATL`/`ADDR_FMT_DOT_AMM` macros appear only in orig.h -- the
 original loader used them, the reconstruction does not) at 0x00486220..0x00486444.
-Declared dead as `BITMAP_LOADER_DEBUG` and `REGION_DEBUG_AND_FMT`: **1,369 dead
-ranges, 48,094 bytes zeroed**. The remaining tail (movement tables, key defaults,
-the CRT record head, object/keyword name tables, and other small dead gaps between
-placed symbols) is incremental per-structure work, best done alongside the
-subsystems that own each.
+Declared dead as `BITMAP_LOADER_DEBUG` and `REGION_DEBUG_AND_FMT`: 1,369 ranges /
+48,094 bytes.
+
+**UPDATE (2026-09-17, cont.): the scancode display-name string pool dropped.**
+`SCANCODE_NAMES` had covered only the 255-slot pointer table (0x00485510..0x0048590C);
+the string pool it alone points at survived (ESC, F1..F15, DEL, TAB, the
+letter/digit/punctuation key names, through 0x00485B28). Since the pointer table was
+already dead (boot-verified) and the pool is reached only through it, extend the
+range to 0x00485510..0x00485B28 (0 external blob dwords point in -- checked). This
+coalesces the pool's individual strings into the one range: **1,331 dead ranges,
+48,402 bytes zeroed**. The remaining tail (movement tables, key defaults, the CRT
+record head, object/keyword name tables, and other small dead gaps between placed
+symbols) is incremental per-structure work, best done alongside the subsystems that
+own each.
 
 **UPDATE (2026-09-16, cont.): the roach game-constants block base placed; the
 live-code origdata dependency is now fully characterized.** `GAME_CONSTANTS`
@@ -545,7 +554,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **1,369 dead ranges, 48,094 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **1,331 dead ranges, 48,402 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus

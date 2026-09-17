@@ -85,7 +85,9 @@ def src_text():
 # alone pointed at fall out too, while any shared target (the ON/OFF bool words,
 # the code-referenced colour names) is kept by the per-string pointed/coded gate.
 #   SCANCODE_NAMES: a 255-slot scancode-indexed table (0x485510), nulls for the
-#   undefined codes, then its own strings at 0x0048590C (ESC, F1, PAD 7, ...).
+#   undefined codes, then its own string pool through 0x485B28 (ESC, F1..F15, DEL,
+#   TAB, the letter/digit/punctuation keys, ...) -- the range covers both, since
+#   the pool is reached only through the (dead) pointer table.
 #   POSE_NAMES: the animation-pose names (Null, Stand, Run, ... Last).
 #   IMPORT_MACHINERY: the PE import section -- the IMAGE_IMPORT_DESCRIPTOR array
 #   (0x004716C8, dir[1]), every DLL's import-lookup thunks, and the hint/name and
@@ -99,7 +101,7 @@ def src_text():
 #   hint word two bytes before it) and why the whole region is declared here.
 _DEAD_TABLE_DECL = [
     (0x00487C90, 0x00488258, "SCRIPT_TOKENS"),
-    (0x00485510, 0x0048590C, "SCANCODE_NAMES"),
+    (0x00485510, 0x00485B28, "SCANCODE_NAMES"),
     (0x0048A5B4, 0x0048A668, "POSE_NAMES"),
     (0x00476FBC, 0x00476FD0, "BOOL_NAMES"),
     (0x004751B8, 0x004751C8, "FLAG_TEAM_NAMES"),
