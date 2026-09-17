@@ -18590,6 +18590,15 @@ typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
 #define ADDR_STR_MOVIE_ITS                 0x00486588u /* the "its" movie type string */
 #define ADDR_STR_FMT_C                     0x0048983Cu /* the "%c" format */
 #define ADDR_STR_UDF_PAIR                  0x0048CC2Cu /* two "UDF" codepage-name copies */
+#define ADDR_FLT_230                       0x0046F92Cu /* float 230.0f (widget/HUD .rdata constant) */
+#define ADDR_DBL_0P7                       0x0046F978u /* double 0.7 (widget/HUD .rdata constant) */
+#define ADDR_DBL_CONSTS_A                  0x0046F998u /* doubles -2.0, 2.0, 1/512 (widget/HUD .rdata) */
+#define ADDR_DBL_32                        0x0046FAA0u /* double 32.0 / floats 18.0f,3.0f (widget/HUD .rdata) */
+#define ADDR_FLT_100_80                    0x0046FAACu /* floats 100.0f, 80.0f (widget/HUD .rdata) */
+#define ADDR_FP_CONSTS_B                   0x0046FD58u /* floats -10.0f, 0.5f, 2.75f (DirectInput-adjacent .rdata) */
+#define ADDR_CRT_EH_CATCH_1                0x0046FEE8u /* dead C++ EH catch-handler table (-fno-exceptions) */
+#define ADDR_CRT_EH_CATCH_2                0x00470238u /* dead C++ EH catch-handler table */
+#define ADDR_CRT_EH_CATCH_3                0x004702A0u /* dead C++ EH catch-handler table */
 
 #ifdef AM2_STANDALONE
 #include "standalone.h"

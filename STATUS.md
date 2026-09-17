@@ -694,6 +694,25 @@ full buffer size), the three `AM2_STR_`-prefixed slot/suffix labels
 binary FP/EH/pointer fragments. make check green; title + mission side-by-sides
 IDENTICAL.
 
+**UPDATE (2026-09-18): the CRT-head binary fragments placed (9 more pools in
+`origtail.cpp`).** The genuinely-carried non-zero binary bytes in the CRT/widget
+`.rdata` head are placed byte-identical: six floating-point constant slots
+(`230.0f`; `0.7`; the `-2.0`/`2.0`/`1/512` double triple; `32.0`; `100.0f`/
+`80.0f`; `-10.0f`/`0.5f`/`2.75f`) and three dead C++ EH catch-handler tables
+(`0x46FEE8`, `0x470238`, `0x4702A0` -- `0xffffffff` + `.text`-pointer triples,
+unreachable under `-fno-exceptions`). Placed as `uint8_t` byte pools so the value
+interpretation carries no risk; checkimagedata byte-verifies each. IMPORTANT
+safety note confirmed: the EH pads hold `.text` pointers, but `build/standalone/
+fixups.cpp`'s `am2_apply_fixups()` is empty and stays empty -- mkglobals' fixup
+scan runs on the (unchanged) origdata.bin, so a placed byte pool creates no
+load-time write into `const .rodata`. Note the region just past the rterr pool is
+dead-*swept* MSVC banner/import strings ("Microsoft Visual C++ Runtime
+Library...", "GetActiveWindow", "user32.dll"), already zeroed in the blob -- NOT
+placed. Placement 299 -> 308; checkimagedata 316 -> 325 match; blob non-zero
+UNPLACED **381 -> 304** (237 -> 215 runs). Skipped: `0x46FA98` (`double 1.5`,
+already has an `AM2_CONST_1_5` macro -- same prefix issue as the `AM2_STR_`
+labels). make check green; title + mission side-by-sides IDENTICAL.
+
 **FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
 `LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a
 single blob pointer DOWNWARD -- `ADDR_STR_PALETTE0 - i*16` -- because in the
