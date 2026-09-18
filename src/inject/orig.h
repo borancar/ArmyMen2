@@ -18615,6 +18615,14 @@ typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
 #define ADDR_CRT_SIG_HANDLERS_A            0x0048CC58u /* CRT signal/exception default-handler table (dead .text) */
 #define ADDR_CRT_SIG_HANDLERS_B            0x0048CC78u /* more CRT default-handler pointers (dead .text) */
 #define ADDR_CRT_PCTYPE_ALIAS              0x0048CC9Cu /* a second pointer into the placed ctype table */
+#define ADDR_KEY_ACTION_DEFAULTS           0x004854E6u /* default action-id table after the key bindings */
+#define ADDR_WRITE_DOT_FLAG                0x00475888u /* a flag before am2_write_dot_record */
+#define ADDR_WRITE_DOT_FLOAT               0x00475898u /* the orphaned WriteDot float */
+#define ADDR_CRT_EH_MAGIC                  0x0048CC34u /* MSVC C++ EH magic 0x19930520 (dead) */
+#define ADDR_PALETTE_CYCLE_TAIL            0x0048616Cu /* a palette-cycle value (600) before am2_shake_presets */
+#define ADDR_DEBUG_BLAST_FLAG              0x00476FB8u /* a value after am2_debug_blast_kind */
+#define ADDR_CRT_ONE                       0x0048CEACu /* a CRT const 1 between decimal_point and huge_val */
+#define ADDR_LOGPALETTE_HDR_SMALL          0x00477E68u /* a small LOGPALETTE header {0x300,1} (read-only) */
 
 #ifdef AM2_STANDALONE
 #include "standalone.h"

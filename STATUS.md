@@ -97,7 +97,7 @@ every symbol after it -- group a contiguous cluster into one array holding a
 non-zero element so it stays in `.data`, and alias the fields into it. A separate lever dropped code-read strings: 36
 macro-read blob strings folded to C literals (`tools/foldstrings.py`), then 14
 bare-hex `AM2_IMAGE(0xNNNu)` string reads folded too, taking the dead-string
-sweep to **962 dead ranges, 49,156 bytes zeroed**.
+sweep to **960 dead ranges, 49,144 bytes zeroed**.
 
 **UPDATE (2026-09-16): five more dead POINTER tables declared, +91 strings.**
 Auditing the surviving strings showed the remainder is table-structured, not
@@ -328,8 +328,8 @@ method applied to the individual dead strings whose naming char* tables are alre
 placed with literals: "FOO" (am2_write_dot_record), "map"/"m80"/"#"
 (am2_def_keywords), "mag" (am2_movie_names), "avi" (am2_dir_names), and "Heavy MG
 Pillbox" (am2_option_table's loop-bound target). Each survived only as <4 chars or
-via a redirected bound; none is read through an unfolded macro (checked). **962
-dead ranges, 49,156 bytes zeroed.** The still-live blob (~440 non-zero bytes) is
+via a redirected bound; none is read through an unfolded macro (checked). **960
+dead ranges, 49,144 bytes zeroed.** The still-live blob (~440 non-zero bytes) is
 now: strings pointed by BLOB char* tables not yet migrated (the ON/OFF bool words,
 team-colour names, a scancode F/T/0 table), and CRT runtime state (the _tzname
 PST/PDT buffers, ctype/pctype, wnullstring). Reaching literally zero needs those
@@ -626,7 +626,7 @@ is no original `.text` in either build, so a blob string is live only if a
 reconstructed function reads it by address or a carried char* dword points at
 it). `tools/deadstrings.py` zeroes the provably-unreachable ones in
 `build/standalone/origdata.bin` during `standalone-generate`, between
-`mkglobals.py` and `placement.py`. **962 dead ranges, 49,156 bytes zeroed** -- log,
+`mkglobals.py` and `placement.py`. **960 dead ranges, 49,144 bytes zeroed** -- log,
 error, cheat, and `printf`-format strings that the original pushed as code
 immediates (e.g. `"Error on Lock in CreateBitmapSurface()"`, the
 `"unnamed Event_* %d"` debug formats, `"Victory is belongs to Caesar!"`), plus
@@ -800,6 +800,37 @@ Placement 327 -> 333; checkimagedata 344 -> 350 match; blob non-zero UNPLACED
 CRT-owned pools now scattered through `origtail.cpp` are to be relocated into
 `src/platform/crt/` in a follow-up so the CRT is an extractable, reusable module
 (code + data) and `origtail.cpp` keeps only game data.
+
+**UPDATE (2026-09-18, cont.): down to 3 non-zero UNPLACED bytes.** Ten more
+small const clusters placed: the key-binding default action ids (0x4854E6, the
+const table right after the writable bindings end), the orphaned WriteDot
+flag/data, the bool display strings (0x47795C -- one pool restoring the
+dead-swept "False"/"false", so the dead sweep drops 962->960 / 49,156->49,144
+bytes), the HUD build-menu end data, the dead MSVC EH magic `0x19930520`, a
+palette-cycle value, a debug-blast value, the sequence variant stride, and a CRT
+const 1. Placement 333 -> 343; checkimagedata 350 -> 360 match; blob non-zero
+UNPLACED **33 -> 3**. The only bytes left are the LOGPALETTE header at 0x477E68
+(`palVersion=0x300, palNumEntries=1`) -- deferred as possibly GDI-written. make
+check green; title + mission side-by-sides IDENTICAL.
+
+**MILESTONE (2026-09-18): the carried blob is ZERO -- 0 non-zero UNPLACED
+bytes.** Two fixes finished it: `am2_write_dot_data` was split (its "FOO" is
+dead-swept in the blob, so a pure-data pool cannot span it -- checkplacement
+compares placed pure-data against `origdata.bin`, not the pristine image; now
+only the float `am2_write_dot_float` and the "." `am2_str_dot` are placed, the
+swept "FOO" stays a zero chunk), the bool pool was extended to 40 bytes to
+include "True"'s "T", and the small LOGPALETTE header at 0x477E68 (distinct from
+the 1028-byte `am2_logpalette` at 0x477A60; only the 4-byte header fits before
+`am2_gdi_palette`) was placed read-only. Every non-zero byte of
+`build/standalone/origdata.bin` is now a placed, named C symbol (345 in range);
+`checkimagedata` 362 match / 0 FAIL, `checkplacement` clean, title (click-509)
+and mission (grenade-live-16065) side-by-sides IDENTICAL. Guarded dead-string
+count now **960 dead ranges / 49,144 bytes** (the bool pool moved "False"/"false"
+from swept-zero to placed). The port no longer carries any un-named non-zero
+`.rdata`/`.data` byte -- the "drop origdata" goal is functionally met.
+FOLLOW-UP (per Boran): relocate the CRT-owned pools out of `origtail.cpp` into
+`src/platform/crt/` so the CRT is an extractable, reusable module, leaving
+`origtail.cpp` game-only.
 
 **FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
 `LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a

@@ -213,3 +213,46 @@ extern "C" const uint8_t am2_str_glob_all[1] = { 0x2a };
 
 /* 0x0048BD8C: the "|" line-break char */
 extern "C" const uint8_t am2_str_line_break[1] = { 0x7c };
+
+/* --- the final residual clusters: small read-only consts in gaps between
+ * placed symbols, the orphaned WriteDot/bool display data, the dead EH magic,
+ * and a HUD build-menu bound. Each verified read-only by the side-by-sides. --- */
+/* 0x004854E6: default action-id table after the key bindings (read-only, bindings end here) */
+extern "C" const uint8_t am2_key_action_defaults[18] = { 0x02, 0x00, 0x03, 0x00, 0x04, 0x00, 0x05, 0x00, 0x06, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
+/* 0x00475888: a flag before am2_write_dot_record */
+extern "C" const uint8_t am2_write_dot_flag[4] = { 0x01, 0x00, 0x00, 0x00 };
+
+/* 0x00475898: the orphaned WriteDot float (the "FOO" that followed it is dead-
+ * swept in the blob, so it is not spanned here; the "." at 0x004758A0 is
+ * am2_str_dot below). */
+extern "C" const uint8_t am2_write_dot_float[4] = { 0x65, 0x23, 0xf6, 0xc6 };
+
+/* 0x004758A0: the "." string (WriteDot builds "foo.dot"); folded, blob dropped */
+extern "C" const uint8_t am2_str_dot[1] = { 0x2e };
+
+/* 0x0047795C: the 0/1/f/F/t/T + False/false/True boolean display strings */
+extern "C" const uint8_t am2_bool_display_strings[40] = { 0x30, 0x00, 0x00, 0x00, 0x66, 0x00, 0x00, 0x00, 0x46, 0x00, 0x00, 0x00, 0x46, 0x61, 0x6c, 0x73, 0x65, 0x00, 0x00, 0x00, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x00, 0x00, 0x00, 0x31, 0x00, 0x00, 0x00, 0x74, 0x00, 0x00, 0x00, 0x54, 0x00, 0x00, 0x00 };
+
+/* 0x004766C0: HUD build-menu end data between the sarge-offset and squad-slot tables */
+extern "C" const uint8_t am2_build_menu_end_data[8] = { 0x32, 0x00, 0x31, 0x00, 0x5e, 0x00, 0x31, 0x00 };
+
+/* 0x0048CC34: the MSVC C++ EH magic 0x19930520 (dead under -fno-exceptions) */
+extern "C" const uint8_t am2_crt_eh_magic[4] = { 0x20, 0x05, 0x93, 0x19 };
+
+/* 0x0048616C: a palette-cycle count/interval (600) before am2_shake_presets */
+extern "C" const uint8_t am2_palette_cycle_extra[4] = { 0x58, 0x02, 0x00, 0x00 };
+
+/* 0x00476FB8: a value after am2_debug_blast_kind */
+extern "C" const uint8_t am2_debug_blast_flag[4] = { 0x05, 0x00, 0x00, 0x00 };
+
+/* 0x0048CB8C: the sequence variant stride (8) */
+extern "C" const uint8_t am2_seq_variant_stride[4] = { 0x08, 0x00, 0x00, 0x00 };
+
+/* 0x0048CEAC: a CRT const 1 between am2_crt_decimal_point and am2_crt_huge_val */
+extern "C" const uint8_t am2_crt_one[4] = { 0x01, 0x00, 0x00, 0x00 };
+
+/* 0x00477E68: a small LOGPALETTE header {palVersion=0x0300, palNumEntries=1},
+ * distinct from the big am2_logpalette at 0x00477A60; only the 4-byte header
+ * sits here (am2_gdi_palette follows immediately), so it is read-only. */
+extern "C" const uint8_t am2_logpalette_hdr_small[4] = { 0x00, 0x03, 0x00, 0x01 };
