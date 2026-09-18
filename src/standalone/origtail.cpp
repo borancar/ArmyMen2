@@ -192,3 +192,24 @@ extern "C" const uint8_t am2_str_unique_suffix[6] = { 0x25, 0x73, 0x5f, 0x25, 0x
 
 /* 0x0046FA98: double 1.5 (reuses AM2_CONST_1_5) */
 extern "C" const uint8_t am2_dbl_1_5[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x3f };
+
+/* --- dead CRT signal/exception default-handler tables (their .text targets
+ * are 0xCC .origgap in native, so unreached), a ctype-table alias pointer,
+ * and three single-char strings whose reads are folded elsewhere. --- */
+/* 0x0048CC58: CRT signal/exception default-handler pointer table (dead .text in native) + a count */
+extern "C" const uint8_t am2_crt_sig_handlers_a[28] = { 0x78, 0xae, 0x46, 0x00, 0x78, 0xae, 0x46, 0x00, 0x78, 0xae, 0x46, 0x00, 0x78, 0xae, 0x46, 0x00, 0x78, 0xae, 0x46, 0x00, 0x78, 0xae, 0x46, 0x00, 0x10, 0x00, 0x00, 0x00 };
+
+/* 0x0048CC78: more CRT default-handler pointers (dead .text) */
+extern "C" const uint8_t am2_crt_sig_handlers_b[16] = { 0x67, 0xb3, 0x46, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x8a, 0x46, 0x00, 0x2c, 0x8a, 0x46, 0x00 };
+
+/* 0x0048CC9C: a second pointer into the placed ctype table (0x48CCA2) */
+extern "C" const uint8_t am2_crt_pctype_alias[4] = { 0xa2, 0xcc, 0x48, 0x00 };
+
+/* 0x00473104: the "\n" string (folded elsewhere) */
+extern "C" const uint8_t am2_str_newline[1] = { 0x0a };
+
+/* 0x0048BAA0: the "*" glob char */
+extern "C" const uint8_t am2_str_glob_all[1] = { 0x2a };
+
+/* 0x0048BD8C: the "|" line-break char */
+extern "C" const uint8_t am2_str_line_break[1] = { 0x7c };

@@ -789,6 +789,18 @@ mission side-by-sides IDENTICAL. Remaining ~67 B: dead CRT `.text`-handler
 tables at 0x48CC58/0x48CC78 (read-only), the folded BOOL display strings, the
 KEY_BINDINGS region, and small scattered singles.
 
+**UPDATE (2026-09-18, cont.): the dead CRT signal-handler tables + folded
+single-char strings placed.** `am2_crt_sig_handlers_a/b` (0x48CC58/0x48CC78, the
+CRT signal/exception default-handler pointer tables whose `.text` targets are
+0xCC `.origgap` in native, so unreached and unwritten), `am2_crt_pctype_alias`
+(0x48CC9C, a second pointer into the placed ctype table), and the three folded
+single-char strings `am2_str_newline`/`am2_str_glob_all`/`am2_str_line_break`.
+Placement 327 -> 333; checkimagedata 344 -> 350 match; blob non-zero UNPLACED
+**67 -> 33**. make check green; side-by-sides IDENTICAL. NOTE (per Boran): the
+CRT-owned pools now scattered through `origtail.cpp` are to be relocated into
+`src/platform/crt/` in a follow-up so the CRT is an extractable, reusable module
+(code + data) and `origtail.cpp` keeps only game data.
+
 **FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
 `LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a
 single blob pointer DOWNWARD -- `ADDR_STR_PALETTE0 - i*16` -- because in the
