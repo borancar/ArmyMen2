@@ -846,6 +846,32 @@ symbol wherever it lives -- so it is byte-identical: blob still 0, checkimagedat
 362 match, both side-by-sides IDENTICAL, make check green. The CRT reconstruction
 (`src/platform/crt/`) is now code + data together, extractable for reuse.
 
+**MILESTONE (2026-09-18): the native port BUILDS WITHOUT `ArmyMen2.exe`.** With
+the blob at zero, the image is no longer needed to build -- only to regenerate
+and to run `make check`'s byte-verification. Two changes:
+- `tools/placement.py` emits the region's gaps as **zero-fill** (`.space`)
+  instead of `.incbin` of the dumped blob, so the native build carries no
+  `origdata.bin`. It still verifies (when the blob IS present) that every gap is
+  all-zero -- a non-zero gap errors, which keeps the zero-fill honest as new data
+  appears. The VA placement pins are unchanged (kept for the side-by-side).
+- The EXE-derived generated SOURCE is now COMMITTED under `src/`, like
+  `origstate.cpp`: `src/standalone/imports.cpp` (the import table),
+  `src/standalone/tables.cpp` (data the original kept in .text),
+  `src/standalone/fixups.cpp` (now a trivial empty hook -- every fixup is a
+  placed table), `src/standalone/origgap.S` (the 0xCC `.text` fill), and
+  `src/inject/foldstr.h` (the folded string literals). `mkglobals`/`foldstrings`
+  write these paths; `am2.exe_present()` makes those tools and `deadstrings` skip
+  regeneration when the image is absent (leaving the committed files), and
+  `origbss.addr` is hardcoded `0x0048E000` in the Makefile.
+
+VERIFIED: with `ArmyMen2.exe` moved aside, `make clean && make native-dev` builds
+`build/armymen2-dev` (rc 0); restoring the image, that same binary's title
+(click-509) and mission (grenade-live-16065) side-by-sides are IDENTICAL. The
+image is still needed for the injected/Wine (`sa`/hybrid) builds and for
+`make check`. Still open (the other half of independence): the reconstruction is
+piecewise, so `.origgap` (0xCC) remains where functions are unreconstructed -- a
+reachable one traps; closing those is the ongoing reconstruction.
+
 **FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
 `LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a
 single blob pointer DOWNWARD -- `ADDR_STR_PALETTE0 - i*16` -- because in the

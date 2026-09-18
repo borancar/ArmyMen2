@@ -345,6 +345,10 @@ def dead_ranges(blob):
 
 
 def main():
+    if not am2.exe_present():
+        print("deadstrings: ArmyMen2.exe absent -- keeping committed "
+              "deadstrings.txt (a check artifact; the native build zero-fills)")
+        return
     path = os.path.join(OUT, "origdata.bin")
     blob = bytearray(open(path, "rb").read())
     ranges = dead_ranges(blob)

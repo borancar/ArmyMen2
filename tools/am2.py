@@ -16,6 +16,15 @@ GAME_DIR = os.path.join(
 EXE = os.path.join(GAME_DIR, "ArmyMen2.exe")
 
 
+def exe_present(path=EXE):
+    """True when the original image is available.  The blob-generating tools
+    (mkglobals/foldstrings/deadstrings) read it to regenerate their outputs;
+    when it is absent they leave the committed generated files in place so the
+    native port builds without it.  The image is still needed to regenerate or
+    to run `make check`'s byte-verification."""
+    return os.path.exists(path)
+
+
 class Image:
     """A loaded PE, flattened so we can address it by VA."""
 

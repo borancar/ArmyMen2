@@ -423,9 +423,9 @@ endif
 SA_SRC   := $(wildcard src/game/*.cpp) $(wildcard src/game/win32/*.cpp) \
             $(wildcard src/platform/crt/*.cpp) \
             src/standalone/runtime.cpp src/standalone/origtail.cpp \
-            build/standalone/fixups.cpp \
-            build/standalone/imports.cpp \
-            build/standalone/tables.cpp
+            src/standalone/fixups.cpp \
+            src/standalone/imports.cpp \
+            src/standalone/tables.cpp
 # control.c and input.c come from the harness unchanged: the socket is what
 # makes a standalone run drivable and dumpable, and input.c turned out to have
 # no DirectInput dependency at all -- it is a state store the hook reads, so
@@ -440,7 +440,7 @@ SA_LIBS  := -lddraw -ldinput -ldsound -lwinmm -lole32 -ldxguid -lws2_32
 SA_LDF   := -mwindows -static -static-libgcc -static-libstdc++ \
             -Wl,--image-base,0x400000 \
             -Wl,--section-start,.origdat=0x0046F000 \
-            -Wl,--section-start,.origbss=$$(cat build/standalone/origbss.addr) \
+            -Wl,--section-start,.origbss=0x0048E000 \
             -Wl,--section-start,.origgap=0x00401000 \
             -Wl,-Ttext,0x00700000
 
@@ -463,7 +463,7 @@ $(BUILD)/sa/origdata.o: build/standalone/origdata.S | standalone-generate
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@
 
-$(BUILD)/sa/origgap.o: build/standalone/origgap.S | standalone-generate
+$(BUILD)/sa/origgap.o: src/standalone/origgap.S | standalone-generate
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@
 
@@ -537,7 +537,7 @@ NATIVE_CF    := $(NATIVE_ARCH) -O2 -g -Wall -Wextra -std=gnu11 \
 NATIVE_LDF   := $(NATIVE_ARCH) -static-libgcc \
                 -Wl,--section-start,.origgap=0x00401000 \
                 -Wl,-T,build/standalone/place.ld \
-                -Wl,--section-start,.origbss=$$(cat build/standalone/origbss.addr) \
+                -Wl,--section-start,.origbss=0x0048E000 \
                 -Wl,-Ttext=0x00700000 -Wl,-z,norelro -Wl,--no-warn-rwx-segments
 NATIVE_LIBS  := -lSDL3 -lpthread -lm
 
@@ -630,7 +630,7 @@ $(BUILD)/native/origchunks.o: build/standalone/origchunks.S | standalone-generat
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
 
-$(BUILD)/native/origgap.o: build/standalone/origgap.S | standalone-generate
+$(BUILD)/native/origgap.o: src/standalone/origgap.S | standalone-generate
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
 
@@ -646,7 +646,7 @@ $(BUILD)/native-dev/origchunks.o: build/standalone/origchunks.S | standalone-gen
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
 
-$(BUILD)/native-dev/origgap.o: build/standalone/origgap.S | standalone-generate
+$(BUILD)/native-dev/origgap.o: src/standalone/origgap.S | standalone-generate
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
 
