@@ -832,6 +832,20 @@ FOLLOW-UP (per Boran): relocate the CRT-owned pools out of `origtail.cpp` into
 `src/platform/crt/` so the CRT is an extractable, reusable module, leaving
 `origtail.cpp` game-only.
 
+**UPDATE (2026-09-18): CRT / game data separated.** The residual `.rdata`/`.data`
+pools are now split by owner: the 23 CRT-owned symbols (date/asctime name tables,
+wide `"(null)"`, fopen mode strings, codepage names, the exception-action and
+signal-default-handler tables, the dead C++ EH records, `IsProcessorFeaturePresent`,
+and the writable tzname buffers) moved to a new `src/platform/crt/crtdata.cpp`
+(auto-globbed into `SA_SRC` alongside the CRT code), while `src/standalone/
+origtail.cpp` keeps only the 45 game-owned pools (command-line flags, boolean/
+movie display strings, widget FP constants, the air/MP/map/sprite/rank/roach
+tables, MP slot labels). Pure relocation of definitions between files -- macros,
+externs and standalone.h redirects are unchanged, and `find_definition` locates a
+symbol wherever it lives -- so it is byte-identical: blob still 0, checkimagedata
+362 match, both side-by-sides IDENTICAL, make check green. The CRT reconstruction
+(`src/platform/crt/`) is now code + data together, extractable for reuse.
+
 **FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
 `LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a
 single blob pointer DOWNWARD -- `ADDR_STR_PALETTE0 - i*16` -- because in the
