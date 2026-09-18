@@ -18607,6 +18607,11 @@ typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
 #define ADDR_TZNAME_STD                    0x0048D40Cu /* the writable STD tzname buffer (__tzset writes it) */
 #define ADDR_TZNAME_DST                    0x0048D44Cu /* the writable DST tzname buffer (__tzset writes it) */
 #define ADDR_SPRITE_GRID_DATA              0x0048CA44u /* sprite grid dimension/index metadata (read-only) */
+#define ADDR_ROACH_SCORE_INTS              0x00487C00u /* roach score/config ints */
+#define ADDR_ITEM_TYPE_OFFSETS             0x0048C470u /* item-type offset ints {-10,-10,10,10} */
+#define ADDR_DIFFICULTY_CONSTS             0x00489874u /* difficulty scale consts (2.0, 1.5) */
+#define ADDR_SCREEN_CONSTS                 0x004852E4u /* screen/gravity consts {750,100} */
+#define ADDR_CRT_OSVER_PAIR                0x0048CC20u /* CRT value pair before am2_crt_fpinit_ptr */
 
 #ifdef AM2_STANDALONE
 #include "standalone.h"

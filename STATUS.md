@@ -768,6 +768,14 @@ UNPLACED **157 -> 123**. make check green; title + mission side-by-sides
 IDENTICAL. Remaining ~123 B: `KEY_BINDINGS`, the CRT linked-list sentinel, the
 `AM2_STR_`/`AM2_CONST_`/`AM2_SEQ_` prefix labels, and small scattered clusters.
 
+**UPDATE (2026-09-18, cont.): five small read-only const clusters placed.** Each
+sits between placed const symbols: `am2_roach_score_ints` (0x487C00),
+`am2_item_type_offsets` (0x48C470, {-10,-10,10,10}), `am2_difficulty_consts`
+(0x489874, 2.0/1.5), `am2_screen_consts` (0x4852E4, {750,100}, after
+`am2_view_speed`), `am2_crt_osver_pair` (0x48CC20, {0x9875,0x9873}). Placed const;
+mission side-by-side IDENTICAL. Placement 318 -> 323; checkimagedata 335 -> 340
+match; blob non-zero UNPLACED **123 -> 98**. make check green.
+
 **FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
 `LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a
 single blob pointer DOWNWARD -- `ADDR_STR_PALETTE0 - i*16` -- because in the
