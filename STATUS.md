@@ -751,10 +751,22 @@ class -- avoids the -Wextra warning). `am2_crt_tzname` still holds 0x48D40C/
 0x48D44C, so it points at the placed buffers and `__tzset`'s writes land in
 writable `.data`. The side-by-sides run `__tzset` at CRT startup, so their
 IDENTICAL result is the write-safety proof. Placement 313 -> 316; checkimagedata
-330 -> 333 match; blob non-zero UNPLACED **174 -> 157**. Deferred still: the
-sprite load-fill graphs, `KEY_BINDINGS`, the CRT linked-list sentinel, and the
-`AM2_STR_`/`AM2_CONST_`/`AM2_SEQ_`-prefixed labels (need prefix tooling). make
-check green; title + mission side-by-sides IDENTICAL.
+330 -> 333 match; blob non-zero UNPLACED **174 -> 157**. make check green; title +
+mission side-by-sides IDENTICAL.
+
+**UPDATE (2026-09-18, cont.): the sprite metadata tables placed.** The sprite
+region turned out to be READ-ONLY source data, not the load-filled pointer graph
+that was feared -- the load-filled DESTINATION (`am2_sprite_groups`) is already
+placed, and what remained is the const dimension/index data the sprite/grid
+LOADERS read: `am2_sprite_group_b` (0x48CA08, the group-B dimension/count records
+read via `[esi+0x48CA08]`, reusing `ADDR_SPRITE_GROUPS_B_END`) and
+`am2_sprite_grid_data` (0x48CA44, 324B of grid dimension/index metadata between
+`am2_sprite_grid` and `am2_seq_grid_rows`). Placed const; the mission side-by-side
+(Boot Camp sprite load + render) running IDENTICAL is the proof they are
+read-only. Placement 316 -> 318; checkimagedata 333 -> 335 match; blob non-zero
+UNPLACED **157 -> 123**. make check green; title + mission side-by-sides
+IDENTICAL. Remaining ~123 B: `KEY_BINDINGS`, the CRT linked-list sentinel, the
+`AM2_STR_`/`AM2_CONST_`/`AM2_SEQ_` prefix labels, and small scattered clusters.
 
 **FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
 `LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a

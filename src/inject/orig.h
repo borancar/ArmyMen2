@@ -18606,6 +18606,7 @@ typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
 #define ADDR_RANK_THRESHOLDS               0x00473DA0u /* ascending int thresholds before am2_rank_records */
 #define ADDR_TZNAME_STD                    0x0048D40Cu /* the writable STD tzname buffer (__tzset writes it) */
 #define ADDR_TZNAME_DST                    0x0048D44Cu /* the writable DST tzname buffer (__tzset writes it) */
+#define ADDR_SPRITE_GRID_DATA              0x0048CA44u /* sprite grid dimension/index metadata (read-only) */
 
 #ifdef AM2_STANDALONE
 #include "standalone.h"
