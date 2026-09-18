@@ -177,3 +177,18 @@ extern "C" const uint8_t am2_screen_consts[8] = { 0xee, 0x02, 0x00, 0x00, 0x64, 
 
 /* 0x0048CC20: a CRT value pair {0x9875,0x9873} before am2_crt_fpinit_ptr */
 extern "C" const uint8_t am2_crt_osver_pair[8] = { 0x75, 0x98, 0x00, 0x00, 0x73, 0x98, 0x00, 0x00 };
+
+/* --- residual data behind the older AM2_STR_/AM2_CONST_ macro names (now
+ * recognised by checkimagedata's redirect scan): the MP slot labels, the
+ * unique-name format, and the 1.5 double. Reuse their existing macros. --- */
+/* 0x004873DC: "-- Computer --" MP slot label (reuses AM2_STR_COMPUTER_SLOT) */
+extern "C" const uint8_t am2_str_computer_slot[15] = { 0x2d, 0x2d, 0x20, 0x43, 0x6f, 0x6d, 0x70, 0x75, 0x74, 0x65, 0x72, 0x20, 0x2d, 0x2d, 0x00 };
+
+/* 0x004871A0: "-- Open --" MP slot label (reuses AM2_STR_OPEN_SLOT) */
+extern "C" const uint8_t am2_str_open_slot[11] = { 0x2d, 0x2d, 0x20, 0x4f, 0x70, 0x65, 0x6e, 0x20, 0x2d, 0x2d, 0x00 };
+
+/* 0x00485D90: "%s_%d" unique-name format (reuses AM2_STR_UNIQUE_SUFFIX) */
+extern "C" const uint8_t am2_str_unique_suffix[6] = { 0x25, 0x73, 0x5f, 0x25, 0x64, 0x00 };
+
+/* 0x0046FA98: double 1.5 (reuses AM2_CONST_1_5) */
+extern "C" const uint8_t am2_dbl_1_5[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x3f };

@@ -46,8 +46,12 @@ TYPES = {
 #   #define ADDR_X ((uintptr_t)(const void *)am2_sym)
 #   #define ADDR_X ((uintptr_t)(const void *)&am2_sym)          (scalar)
 #   #define ADDR_X ((uintptr_t)(const void *)&am2_sym[53])      (alias slice)
+# ADDR_/VTABLE_ are the usual macro families; AM2_STR_/AM2_CONST_/AM2_SEQ_ are
+# the older-named residual string/constant labels a few .rdata bytes still use,
+# redirected to placed origtail.cpp pools the same way.
+_MACRO_PREFIX = r"(?:ADDR|VTABLE|AM2_STR|AM2_CONST|AM2_SEQ)_\w+"
 REDIRECT = re.compile(
-    r"#define\s+((?:ADDR|VTABLE)_\w+)\s+\(\(uintptr_t\)\(const void \*\)\s*&?"
+    r"#define\s+(" + _MACRO_PREFIX + r")\s+\(\(uintptr_t\)\(const void \*\)\s*&?"
     r"(am2_\w+)(\[(\d+)\])?\)")
 
 
@@ -60,7 +64,8 @@ def orig_addresses():
     placed fn-ptr table redirected off a VTABLE_ macro resolves to its VA."""
     out = {}
     for path in (ORIG, WIDGET_H):
-        for m in re.finditer(r"^#define\s+((?:ADDR|VTABLE)_\w+)\s+0x([0-9A-Fa-f]+)u?",
+        for m in re.finditer(r"^#define\s+(" + _MACRO_PREFIX +
+                             r")\s+0x([0-9A-Fa-f]+)u?",
                              open(path).read(), re.M):
             out.setdefault(m.group(1), int(m.group(2), 16))
     return out

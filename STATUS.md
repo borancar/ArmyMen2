@@ -776,6 +776,19 @@ sits between placed const symbols: `am2_roach_score_ints` (0x487C00),
 mission side-by-side IDENTICAL. Placement 318 -> 323; checkimagedata 335 -> 340
 match; blob non-zero UNPLACED **123 -> 98**. make check green.
 
+**UPDATE (2026-09-18, cont.): the AM2_STR_/AM2_CONST_ prefix labels placed.**
+checkimagedata's `orig_addresses()` and `REDIRECT` scan now also recognise the
+older `AM2_STR_`/`AM2_CONST_`/`AM2_SEQ_` macro names (regex `_MACRO_PREFIX`), so
+the residual bytes behind those labels can be redirected to placed
+origtail.cpp pools like any `ADDR_` macro. Placed (reusing each label's macro):
+`am2_str_computer_slot` (0x4873DC "-- Computer --"), `am2_str_open_slot`
+(0x4871A0 "-- Open --"), `am2_str_unique_suffix` (0x485D90 "%s_%d"), and
+`am2_dbl_1_5` (0x46FA98, the double 1.5). Placement 323 -> 327; checkimagedata
+340 -> 344 match; blob non-zero UNPLACED **98 -> 67**. make check green; title +
+mission side-by-sides IDENTICAL. Remaining ~67 B: dead CRT `.text`-handler
+tables at 0x48CC58/0x48CC78 (read-only), the folded BOOL display strings, the
+KEY_BINDINGS region, and small scattered singles.
+
 **FOLD REGRESSION FIXED -- water/fire palette on cycling maps (2026-09-14).**
 `LoadTilesetPalettes` (0x0042B120) loaded the six tileset palettes by walking a
 single blob pointer DOWNWARD -- `ADDR_STR_PALETTE0 - i*16` -- because in the
