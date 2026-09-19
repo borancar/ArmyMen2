@@ -1059,12 +1059,40 @@ reproduce the give. See docs/lua.md.
   (RESURRECT/ORDER of the bridge saboteur) fires on the original but not the
   reconstruction -- a reconstruction bug in the event/script/pad EVALUATION
   (event.cpp / pad.cpp / script.cpp), NOT AI pathing (the saboteurs are
-  identical) and NOT data. NEXT: a code-level event trace -- gdb or added
-  logging on the event dispatch (event.cpp EventNotify / the pad hooks) at
-  pumps 5286-5289 on both, to name the one event whose handler fires the spawn
-  on the hybrid but is skipped on the port. Watch object 200003f3 / bridge
-  health 8000043a (OBJ_OFF_HEALTH 0x62), not pixels; repro
-  sessions/tankstore-bridge-5289.txt.
+  identical) and NOT data. 200003f3 is type=1 (the saboteur type; the visible
+  saboteurs 200003ea/ec/ee/f0 are type 1, player troops are type 2), army 1,
+  hp6, box 32x32, at 1011,1092.
+  CODE-LEVEL TRACE (2026-09-19), via gdb on the HELD sidebyside hybrid (attach
+  at a 5286/5288 break, step to 5292/5293 -- the AM2_REPLAY-alone game does NOT
+  reproduce the scenario, only the lockstep replay does, so gdb must attach to
+  the held sidebyside hybrid). Eight higher-level create/deploy/reveal functions
+  breakpointed (conditioned on the uid where possible) caught NOTHING as
+  200003f3 entered the table: CreateTrooper 0x00447620 (makes type 2, wrong
+  type), ScriptResurrectItem 0x0041FEC0, MakePlacedUnit 0x0043ACF0, DeployItem
+  0x00428CA0, ScriptAllocUid 0x0041E7F0, FireWeaponAtPoint 0x004200F0, ObjReveal
+  0x004296E0, SetObjTablePair 0x0044BA70 -- all ELIMINATED. THE MECHANISM WAS
+  FOUND with a HARDWARE WATCHPOINT on OBJ_COUNT (0x00514F04): 200003f3 (and
+  200003f4, and the explosive 445/446) are added by **AddToItemList
+  (ADDR_ADD_TO_ITEM_LIST 0x00429740)** -- the low-level object-list insertion,
+  reached via the object-init path (ObjInitCommon 0x00429940), NOT via any of
+  the eight higher-level functions. The saboteur adds carried a distinctive
+  local 0x101 where the explosives carried 0x1/0x0. So the object IS genuinely
+  created at pump ~5289 through AddToItemList; the divergence is its CALLER (the
+  create/event one frame above AddToItemList) which the original reaches and the
+  reconstruction does not, from byte-identical state. NEXT (the caller is the
+  answer): breakpoint AddToItemList entry `break *0x00429740 if
+  *(int*)(*(int*)($esp+4)+4)==0x200003f3` (OBJ_OFF_UID=0x04, so this is
+  obj->uid), then `x/48wx $esp` -- [esp] is the caller return address and the
+  0x004xxxxx values up the stack are the create/event chain to name. gdb recipe:
+  `tools/sidebyside.py --replay sessions/tankstore-bridge-5289.txt --break
+  5286,5293 --on-trap hold` (headless, SDL_VIDEODRIVER=dummy), wait for the 5286
+  BREAK, `pgrep armymen2-hybrid-dev`, `gdb -p PID -batch -x <bpfile>`, sleep,
+  then `echo 1 > <out>/skip` to step 5286->5293 (the spawn is at 5289). NB the
+  gdb-on-held-lockstep orchestration is fragile (stale gdb/ports between runs --
+  pkill gdb/armymen2/sidebyside and confirm ports 31341/31342 free first).
+  Watch object 200003f3 / bridge health 8000043a (OBJ_OFF_HEALTH 0x62), not
+  pixels; the frames in a raw bt are garbage (no frame pointers) -- read the
+  stack with x/ and pick out 0x004xxxxx return addresses.
 
 - **CONFIRMED FIXED (2026-09-19): the whole roach SightScan/RoachBehaviour
   divergence cluster is closed -- re-running the fixtures on a fresh build
