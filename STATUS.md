@@ -1049,13 +1049,22 @@ reproduce the give. See docs/lua.md.
     INMODE ATTACK`, `IF PADON Bridge1 -> FIREWEAPON explosive1 BRIDSAB1
     (1017,1065)`, `IF killed trainbridge -> showpda failure`. The pad system is
     pad.cpp (EvtPadOn/Off, PadNumberEnter/Leave, ObjTileHook).
-  NEXT: replay to pump ~5285 and diff the two games at the spawn -- identify
-  what 200003f3 is (charge vs saboteur; type=1 army=1 hp6) and which of {padon
-  thirdramp / PADON Bridge1 fired, RESURRECT ran, FIREWEAPON spawned} differs.
-  Since every object matches through 5280, the trigger is a script-var/pad-event
-  or a spawn-side call that fires on the original but not the reconstruction --
-  NOT a saboteur pathing drift (the saboteurs are identical). The pixel trap is
-  downstream; watch object 200003f3 / bridge health 8000043a, not pixels.
+  NAILED TO ONE PUMP (2026-09-19): the two games have IDENTICAL object sets
+  through pump 5285. At pump ~5289 the SAME explosive pair 00000443 (type 7
+  effect) + 00000444 (type 6, army 1, a projectile at 2085,1368) dies on BOTH
+  builds, but the HYBRID then spawns 200003f3 (saboteur; type=1 army=1 flags
+  0x200401 = same flags as saboteurs 200003ea/ec/ee/f0, hp6, at the bridge pad
+  1011,1092) and the PORT does not (the port loses only 443/444; no spawn, no
+  200003f3 at any pump). So from BYTE-IDENTICAL state a scripted spawn
+  (RESURRECT/ORDER of the bridge saboteur) fires on the original but not the
+  reconstruction -- a reconstruction bug in the event/script/pad EVALUATION
+  (event.cpp / pad.cpp / script.cpp), NOT AI pathing (the saboteurs are
+  identical) and NOT data. NEXT: a code-level event trace -- gdb or added
+  logging on the event dispatch (event.cpp EventNotify / the pad hooks) at
+  pumps 5286-5289 on both, to name the one event whose handler fires the spawn
+  on the hybrid but is skipped on the port. Watch object 200003f3 / bridge
+  health 8000043a (OBJ_OFF_HEALTH 0x62), not pixels; repro
+  sessions/tankstore-bridge-5289.txt.
 
 - **CONFIRMED FIXED (2026-09-19): the whole roach SightScan/RoachBehaviour
   divergence cluster is closed -- re-running the fixtures on a fresh build
