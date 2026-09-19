@@ -1042,6 +1042,18 @@ reproduce the give. See docs/lua.md.
   inputs" family (8583, 1575, 1112, 1391) no longer reproduces. The individual
   09-10 OPEN entries below are kept as the record of how each was cornered.
 
+- **REVERTED for now (2026-09-19): the SDL relative-mouse grab (6ef718ce) made
+  native mouse control feel sluggish; restored the prior absolute-mouse behavior
+  (revert c9a9a1bc).** In relative mode the grabbed-path deltas were run through
+  `SDL_ConvertEventToRenderCoordinates`, which scales window-space xrel/yrel by
+  the render scale -- so on a window larger than the 640x480 render (the common
+  live case) the deltas shrink and the pointer crawls. The old path maps the
+  ABSOLUTE host position to logical coords (`am2_mouse_to_logical` ->
+  `am2_mouse_moved`) with a Ctrl+Alt soft-grab toggle, so it tracks the physical
+  pointer 1:1 regardless of window scale. To redo relative mode properly later:
+  feed the RAW device delta (don't scale by render coords), or scale by the
+  inverse of the render scale, so sensitivity is window-size-independent.
+
 - **WHOLE FIXTURE SUITE GREEN (2026-09-19): every recorded reproducible fixture
   now plays frame-exact with no trap and no divergence.** Beyond the roach
   cluster and magnifying glass, a sweep of the rest all PASS far past their old
