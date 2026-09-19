@@ -1096,18 +1096,31 @@ reproduce the give. See docs/lua.md.
   -> the mission-script event `IF PADON Bridge1 ... TESTVAR BRIDEXPSET = 0 THEN
   FIREWEAPON explosive1 BRIDSAB1 (1017,1065)` triggers on the original and not
   the reconstruction, from byte-identical state. Since BRIDSAB1/200003ee is
-  identical, the bug is in the EVENT/PAD evaluation (event.cpp/pad.cpp/
-  script.cpp): the PADON Bridge1 pad-occupancy transition, its AFTER clause, or
-  the TESTVAR BRIDEXPSET gate. NEXT: read the reconstruction's FIREWEAPON script
-  action + the PADON/AFTER/TESTVAR event-condition handling vs the disasm, OR
-  breakpoint the PORT's FireWeaponAtPoint 0x004200F0 to confirm the FIREWEAPON is
-  never reached (event never fires). Repro sessions/tankstore-bridge-5289.txt;
-  working gdb harness is the scratch run_bp.sh + bpf.gdb (hold at 5286, attach,
-  `echo 1 > <out>/skip` to step to 5293). The gdb-on-held-lockstep orchestration
-  is fragile -- pkill gdb/armymen2/sidebyside and confirm ports 31341/31342 free
-  first. Watch object 200003f3 / bridge health 8000043a (OBJ_OFF_HEALTH 0x62),
-  not pixels; a raw bt is garbage (no frame pointers) -- read x/ and pick out
-  the 0x004xxxxx return addresses.
+  identical at 5285, the trigger was suspected in the pad/event evaluation --
+  BUT the ROOT is one layer earlier and is an OFF-SCREEN ENEMY-AI PATHING
+  DIVERGENCE (2026-09-19). Dual-build gdb on EventNotify (0x0041F4A0, filtered to
+  pad event types 2/3) over the 5286->5293 step: the HYBRID raises `PADON type=3
+  id=3 uid=200003ee` (BRIDSAB1 entering the Bridge1 pad); the PORT raises NO pad
+  event. And BRIDSAB1 (200003ee) is at DIFFERENT positions on the two builds
+  ALREADY by pump 5287 -- PORT pos 996,1136 tile 18238 vs HYB 997,1134 tile
+  17982; pump 5289 PORT 856,1438 vs HYB 850,1422. So BRIDSAB1's path diverges
+  off-screen (invisible to the pixel compare) BEFORE 5287: the hybrid's walks
+  onto the Bridge1 pad -> PADON -> FIREWEAPON -> charge 200003f3 -> bridge
+  destroyed -> failure; the port's takes a different path, never reaches the pad,
+  never fires. SAME FAMILY as the radartroop "off-screen enemy AI diverges"
+  entry below. NEXT (radartroop method): bisect BRIDSAB1/200003ee's position
+  back to the FIRST pump it differs (< 5287; identical at map load, so a specific
+  AI step diverges from identical state), then gdb both builds at that step for
+  this trooper (AiTrooperStep/AiPatrolStep region block / BeginMoveTo / the
+  region-link + NearestAllowedTile pathing in region.cpp) and diff the first
+  differing field write -- as the radartroop entry was chased. Repro
+  sessions/tankstore-bridge-5289.txt; the working gdb harness is the scratch
+  run_bp.sh/run_evt.sh/run_ee.sh + *.gdb (hold at a break, attach, `echo 1 >
+  <out>/skip` to step). Watch BRIDSAB1 (200003ee) position, not pixels; a raw bt
+  is garbage (no frame pointers) -- read x/ and pick out 0x004xxxxx returns; the
+  gdb-on-held-lockstep orchestration is fragile (pkill gdb/armymen2/sidebyside,
+  confirm ports 31341/31342 free, and WRITE scripts to files -- heredocs inside
+  a shell command mangle; `PPID` is a bash readonly, use another name).
 
 - **CONFIRMED FIXED (2026-09-19): the whole roach SightScan/RoachBehaviour
   divergence cluster is closed -- re-running the fixtures on a fresh build
