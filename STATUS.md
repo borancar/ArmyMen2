@@ -1042,6 +1042,22 @@ reproduce the give. See docs/lua.md.
   inputs" family (8583, 1575, 1112, 1391) no longer reproduces. The individual
   09-10 OPEN entries below are kept as the record of how each was cornered.
 
+- **WHOLE FIXTURE SUITE GREEN (2026-09-19): every recorded reproducible fixture
+  now plays frame-exact with no trap and no divergence.** Beyond the roach
+  cluster and magnifying glass, a sweep of the rest all PASS far past their old
+  trap pumps (native-dev vs hybrid-dev, `--leader a --replay`, no `left at
+  pump`): bazookamissile-1772 (to 10380), jeepfire-2276 (12713), jeepMV-2393
+  (12550), board-3355 (16165), halftrack-3552 (16208), level2pass-4325 (18331,
+  the L1->L2 transition, 317 items), vehmove2-6591 (21910), vehmove-11373
+  (29017), htmine-26439 (42261). So there is currently **no reproducible frame
+  divergence and no reachable `.origgap` trap in any recorded fixture** -- the
+  09-10 OPEN list is fully closed. The only non-passing entry is roachbite-1112,
+  whose FIXTURE is stale (empty "default" mission; needs re-recording, above).
+  The remaining reconstruction frontier is therefore code paths NO current
+  fixture exercises (other campaign levels, MP, cold branches like the roach
+  has-leader formation block 0x004086FF..0x004089B6) -- found by extending
+  coverage, not by the existing replays.
+
 - **CONFIRMED FIXED (2026-09-19): the magnifying-glass 4-px refraction residual
   (DrawEffectLayer, old trap magnifyingglass-7655) no longer reproduces.**
   Re-run identical through pump 52474 (317-item map, aim exercised, "Saved 317
