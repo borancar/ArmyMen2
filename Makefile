@@ -333,7 +333,11 @@ vectors:
 # docs/ -- 185 keyword constants read from the table the game itself walks, so
 # a case label cannot disagree with the binary about what a number means.
 .PHONY: check
-check:
+# `make check` is the thorough half and regenerates first: the native build no
+# longer runs the generators (see native), so check runs standalone-generate to
+# produce build/standalone/origdata.bin for the data checks AND to refresh the
+# committed generated sources, which the drift step then compares against git.
+check: standalone-generate
 	@rc=0; \
 	for t in coverage comcalls merges checkcom checkhooks binpatches blindspots checkclaims crt scripttokens scriptactions screens checkpatches checkprose checkseams checkinstalled checkcallers checkglobals checkoffsets checksplit checkthis checkgap checkvtables checkimagedata checkplacement checkdeadstrings glyphdump qsortcheck printfcheck crtcheck moviecheck posecheck formationcheck shakecheck roachcheck rlecheck mprowcheck weaponcheck listcheck placementcheck aicheck hitreactcheck savetagcheck numberkeycheck aiignorecheck aitwincheck aiwalkcheck aifollowcheck aikeeprangecheck rowreleasecheck stateleavecheck refreshcheck vehpointcheck roachbitecheck pathplancheck vehexitcheck tilesetcheck damagecheck shotcheck shotdmgcheck rectquerycheck ringcheck boolcheck explcheck collectcheck firepose regioncheck pathcheck tilepathcheck cheats; do \
 	    printf '  %-12s ' "$$t"; \
@@ -353,9 +357,9 @@ check:
 	    echo "    needs the module the function now lives in."; \
 	    rc=1; \
 	fi; \
-	if [ -n "$$(git status --porcelain docs/ src/game/scripttokens.h src/platform/glyphs.inc)" ]; then \
+	if [ -n "$$(git status --porcelain docs/ src/game/scripttokens.h src/platform/glyphs.inc src/standalone/imports.cpp src/standalone/tables.cpp src/standalone/fixups.cpp src/standalone/origgap.S src/standalone/place.ld src/standalone/origchunks.S src/inject/foldstr.h)" ]; then \
 	    echo "  generated files DRIFTED from what is committed:"; \
-	    git status --short docs/ src/game/scripttokens.h src/platform/glyphs.inc | sed 's/^/    /'; \
+	    git status --short docs/ src/game/scripttokens.h src/platform/glyphs.inc src/standalone/imports.cpp src/standalone/tables.cpp src/standalone/fixups.cpp src/standalone/origgap.S src/standalone/place.ld src/standalone/origchunks.S src/inject/foldstr.h | sed 's/^/    /'; \
 	    echo "    regenerate and commit, or find out why a tool changed its mind"; \
 	    rc=1; \
 	else \
@@ -522,12 +526,14 @@ DEV_OBJ      := $(patsubst %.cpp,$(BUILD)/native-dev/%.o,$(NATIVE_SRC)) \
                 $(patsubst %.c,$(BUILD)/native-dev/%.o,$(DEV_CSRC)) \
                 $(patsubst %.c,$(BUILD)/native-dev/%.o,$(LUA_CSRC)) \
                 $(BUILD)/native-dev/origchunks.o $(BUILD)/native-dev/origgap.o
-NATIVE_DEFS  := -DAM2_STANDALONE -DAM2_NATIVE -Ibuild/standalone \
+NATIVE_DEFS  := -DAM2_STANDALONE -DAM2_NATIVE \
                 -isystem src/platform/include -include callconv.h
 NATIVE_ARCH  := -m32 -fno-pie -no-pie
 # -fdata-sections gives every global its own input section, so tools/placement.py
-# can place the transcribed globals at their original VAs via build/standalone/
-# place.ld (see that tool). Native (ELF) only; the SA/mingw-PE build keeps the
+# can place the transcribed globals at their original VAs via src/standalone/
+# place.ld (see that tool). place.ld and origchunks.S are COMMITTED generated
+# artifacts (like imports.cpp), so the native build compiles from sources with no
+# generator run. Native (ELF) only; the SA/mingw-PE build keeps the
 # --section-start path.
 NATIVE_CXXF  := $(NATIVE_ARCH) -O2 -g -Wall -Wextra -std=gnu++14 \
                 -fno-strict-aliasing -fno-exceptions -fno-rtti -fdata-sections \
@@ -536,7 +542,7 @@ NATIVE_CF    := $(NATIVE_ARCH) -O2 -g -Wall -Wextra -std=gnu11 \
                 -fno-strict-aliasing -fdata-sections $(DEPFLAGS) $(NATIVE_DEFS)
 NATIVE_LDF   := $(NATIVE_ARCH) -static-libgcc \
                 -Wl,--section-start,.origgap=0x00401000 \
-                -Wl,-T,build/standalone/place.ld \
+                -Wl,-T,src/standalone/place.ld \
                 -Wl,--section-start,.origbss=0x0048E000 \
                 -Wl,-Ttext=0x00700000 -Wl,-z,norelro -Wl,--no-warn-rwx-segments
 NATIVE_LIBS  := -lSDL3 -lpthread -lm
@@ -606,11 +612,14 @@ $(BUILD)/armymen2-hybrid-dev: $(HYBRID_DEV_OBJ)
 # having nothing say so. The player's binary is the one that matters and the
 # development one is the one that gets run, which is the wrong way round for
 # a target that builds only the first.
-# NOT `native: standalone-generate`. Every object rule already has it as an
-# order-only prerequisite, so the sub-make runs it once; naming it here too
-# ran the generator TWICE per `make native`, printing its summary twice for
-# no work. It is cheap, but a build that says it did something twice invites
-# the reader to believe it had to.
+# The native build does NOT run the generators. mkglobals/foldstrings/
+# deadstrings/placement all read the original image and are slow (placement
+# alone is minutes); their outputs the native build needs are COMMITTED under
+# src/standalone/ (imports/tables/fixups/origgap.S, place.ld, origchunks.S) and
+# src/inject/foldstr.h. So `make native` just compiles those sources. When a
+# placement or transcription changes, run `make standalone-generate` to
+# regenerate the committed files (needs the image); `make check`'s drift step
+# catches a stale one.
 native:
 	$(MAKE) $(BUILD)/armymen2 $(BUILD)/armymen2-dev
 
@@ -618,46 +627,47 @@ native:
 native-dev:
 	$(MAKE) $(BUILD)/armymen2-dev
 
-$(BUILD)/native/%.o: %.cpp | standalone-generate
+$(BUILD)/native/%.o: %.cpp
 	@mkdir -p $(dir $@)
 	$(NATIVE_CXX) $(NATIVE_CXXF) -c $< -o $@
 
-$(BUILD)/native/%.o: %.c | standalone-generate
+$(BUILD)/native/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_CF) -c $< -o $@
 
-$(BUILD)/native/origchunks.o: build/standalone/origchunks.S | standalone-generate
+$(BUILD)/native/origchunks.o: src/standalone/origchunks.S
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
 
-$(BUILD)/native/origgap.o: src/standalone/origgap.S | standalone-generate
+$(BUILD)/native/origgap.o: src/standalone/origgap.S
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
 
-$(BUILD)/native-dev/%.o: %.cpp | standalone-generate
+$(BUILD)/native-dev/%.o: %.cpp
 	@mkdir -p $(dir $@)
 	$(NATIVE_CXX) $(NATIVE_CXXF) -DAM2_DEVTOOLS -c $< -o $@
 
-$(BUILD)/native-dev/%.o: %.c | standalone-generate
+$(BUILD)/native-dev/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_CF) -DAM2_DEVTOOLS -c $< -o $@
 
-$(BUILD)/native-dev/origchunks.o: build/standalone/origchunks.S | standalone-generate
+$(BUILD)/native-dev/origchunks.o: src/standalone/origchunks.S
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
 
-$(BUILD)/native-dev/origgap.o: src/standalone/origgap.S | standalone-generate
+$(BUILD)/native-dev/origgap.o: src/standalone/origgap.S
 	@mkdir -p $(dir $@)
 	$(NATIVE_CC) $(NATIVE_ARCH) -c $< -o $@
 
 -include $(NATIVE_OBJ:.o=.d)
 -include $(DEV_OBJ:.o=.d)
 
-$(BUILD)/armymen2: $(NATIVE_OBJ)
+# place.ld is a link input, so relink when the committed placement changes.
+$(BUILD)/armymen2: $(NATIVE_OBJ) src/standalone/place.ld
 	$(NATIVE_CXX) -o $@ $(NATIVE_OBJ) $(NATIVE_LDF) $(NATIVE_LIBS)
 	@echo "native: $@"
 
-$(BUILD)/armymen2-dev: $(DEV_OBJ)
+$(BUILD)/armymen2-dev: $(DEV_OBJ) src/standalone/place.ld
 	$(NATIVE_CXX) -o $@ $(DEV_OBJ) $(NATIVE_LDF) -rdynamic $(NATIVE_LIBS) -ldl
 	@echo "native-dev: $@"
 
