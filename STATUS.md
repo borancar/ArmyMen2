@@ -1079,20 +1079,35 @@ reproduce the give. See docs/lua.md.
   local 0x101 where the explosives carried 0x1/0x0. So the object IS genuinely
   created at pump ~5289 through AddToItemList; the divergence is its CALLER (the
   create/event one frame above AddToItemList) which the original reaches and the
-  reconstruction does not, from byte-identical state. NEXT (the caller is the
-  answer): breakpoint AddToItemList entry `break *0x00429740 if
-  *(int*)(*(int*)($esp+4)+4)==0x200003f3` (OBJ_OFF_UID=0x04, so this is
-  obj->uid), then `x/48wx $esp` -- [esp] is the caller return address and the
-  0x004xxxxx values up the stack are the create/event chain to name. gdb recipe:
-  `tools/sidebyside.py --replay sessions/tankstore-bridge-5289.txt --break
-  5286,5293 --on-trap hold` (headless, SDL_VIDEODRIVER=dummy), wait for the 5286
-  BREAK, `pgrep armymen2-hybrid-dev`, `gdb -p PID -batch -x <bpfile>`, sleep,
-  then `echo 1 > <out>/skip` to step 5286->5293 (the spawn is at 5289). NB the
-  gdb-on-held-lockstep orchestration is fragile (stale gdb/ports between runs --
-  pkill gdb/armymen2/sidebyside and confirm ports 31341/31342 free first).
-  Watch object 200003f3 / bridge health 8000043a (OBJ_OFF_HEALTH 0x62), not
-  pixels; the frames in a raw bt are garbage (no frame pointers) -- read the
-  stack with x/ and pick out 0x004xxxxx return addresses.
+  reconstruction does not, from byte-identical state.
+  CREATION CHAIN NAMED (2026-09-19, gdb stack walk on the held hybrid at pump
+  5289; breakpoint ObjInitCommon 0x00429940, read x/96wx $esp, resolve each
+  0x004xxxxx to its containing ADDR_ macro):
+    RunScriptAction 0x00420410 (ret +0xe16)   <- the script FIREWEAPON action
+     -> FireWeaponAtPoint ADDR_FIRE_WEAPON_AT_POINT 0x004200F0 (+0xa0)
+      -> FireWeapon ADDR_FIRE_WEAPON 0x0045F460 (+0x734)
+       -> CreateWatchedType (+0x62) -> CreateItem ADDR_CREATE_ITEM (+0x1dc)
+        -> InitObjFromAAI ADDR_INIT_OBJ_FROM_AAI (+0x68)
+         -> ObjInitCommon 0x00429940 -> AddToItemList 0x00429740.
+  So 200003f3 is the EXPLOSIVE CHARGE from the scripted FIREWEAPON action (the
+  "explosive1" projectile; type 1 army 1 hp6), fired FROM saboteur 200003ee
+  (= BRIDSAB1, byte-identical on both builds), NOT a spawned unit. The divergence
+  is: RunScriptAction runs the FIREWEAPON action on the hybrid but NOT the port
+  -> the mission-script event `IF PADON Bridge1 ... TESTVAR BRIDEXPSET = 0 THEN
+  FIREWEAPON explosive1 BRIDSAB1 (1017,1065)` triggers on the original and not
+  the reconstruction, from byte-identical state. Since BRIDSAB1/200003ee is
+  identical, the bug is in the EVENT/PAD evaluation (event.cpp/pad.cpp/
+  script.cpp): the PADON Bridge1 pad-occupancy transition, its AFTER clause, or
+  the TESTVAR BRIDEXPSET gate. NEXT: read the reconstruction's FIREWEAPON script
+  action + the PADON/AFTER/TESTVAR event-condition handling vs the disasm, OR
+  breakpoint the PORT's FireWeaponAtPoint 0x004200F0 to confirm the FIREWEAPON is
+  never reached (event never fires). Repro sessions/tankstore-bridge-5289.txt;
+  working gdb harness is the scratch run_bp.sh + bpf.gdb (hold at 5286, attach,
+  `echo 1 > <out>/skip` to step to 5293). The gdb-on-held-lockstep orchestration
+  is fragile -- pkill gdb/armymen2/sidebyside and confirm ports 31341/31342 free
+  first. Watch object 200003f3 / bridge health 8000043a (OBJ_OFF_HEALTH 0x62),
+  not pixels; a raw bt is garbage (no frame pointers) -- read x/ and pick out
+  the 0x004xxxxx return addresses.
 
 - **CONFIRMED FIXED (2026-09-19): the whole roach SightScan/RoachBehaviour
   divergence cluster is closed -- re-running the fixtures on a fresh build
