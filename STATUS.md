@@ -1026,6 +1026,37 @@ reproduce the give. See docs/lua.md.
 
 ## OPEN DIVERGENCES, newest first
 
+- **OPEN (2026-09-19): in the tankstore mission the enemy destroys the train
+  bridge (mission failure) on the hybrid but NOT the port -- an off-screen
+  spawn/AI divergence found live, then bisected on a saved replay.** Repro:
+  `tools/sidebyside.py --replay sessions/tankstore-bridge-5289.txt` (campaign
+  level "The Tank Store", data/tankstore/tankstore2.txt). Surfaced as a pixel
+  trap at frame 6705 / pump 5898: the hybrid shows a "MESSAGE FROM HQ" dialog
+  ("The bridge is destroyed!!! You have failed in your mission.", the script's
+  `showpda` action 0x05 -> g_subState=0x18, event.cpp:3426) that the port does
+  not. Root, found by bisecting object state on the two held games with
+  `tools/objdump.py --uid 8000043a --at 0x62` (OBJ_OFF_HEALTH) and object-count
+  diffs:
+  - the bridge is objects 8000043a/8000043b (army=4 structures at 691,782):
+    health 100 on the port, -1 (destroyed) on the hybrid, first differing at
+    pump 5897;
+  - upstream, the two builds are byte-identical through pump 5280 (750 objects
+    each), and at **pump ~5289 the hybrid spawns object 200003f3 at the bridge
+    pad (1011,1092), health 6; the port never spawns it.** Every other object
+    (incl. the visible saboteurs 200003ea/ec/ee/f0) is identical on both.
+  - the mission's bridge assault is scripted: `padon thirdramp -> RESURRECT
+    BRIDSAB1 (804,1320)`, `IF assaultbridge -> ORDER BRIDSAB1 goto (1017,1065)
+    INMODE ATTACK`, `IF PADON Bridge1 -> FIREWEAPON explosive1 BRIDSAB1
+    (1017,1065)`, `IF killed trainbridge -> showpda failure`. The pad system is
+    pad.cpp (EvtPadOn/Off, PadNumberEnter/Leave, ObjTileHook).
+  NEXT: replay to pump ~5285 and diff the two games at the spawn -- identify
+  what 200003f3 is (charge vs saboteur; type=1 army=1 hp6) and which of {padon
+  thirdramp / PADON Bridge1 fired, RESURRECT ran, FIREWEAPON spawned} differs.
+  Since every object matches through 5280, the trigger is a script-var/pad-event
+  or a spawn-side call that fires on the original but not the reconstruction --
+  NOT a saboteur pathing drift (the saboteurs are identical). The pixel trap is
+  downstream; watch object 200003f3 / bridge health 8000043a, not pixels.
+
 - **CONFIRMED FIXED (2026-09-19): the whole roach SightScan/RoachBehaviour
   divergence cluster is closed -- re-running the fixtures on a fresh build
   (native-dev vs hybrid-dev, `tools/sidebyside.py --leader a --replay`) plays
