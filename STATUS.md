@@ -5,8 +5,11 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-11**, first global structures transcribed out of the
-carried data blob (see MIGRATION below).
+Last updated: **2026-09-19**: the port now builds without ArmyMen2.exe (see the
+build note below), and the roach SightScan divergence cluster is confirmed
+closed (see OPEN DIVERGENCES). Blob-migration history from **2026-09-11**, when
+the first global structures were transcribed out of the carried data blob (see
+MIGRATION below).
 
 ## LINKER PLACEMENT (2026-09-14): transcribed globals live at their real VAs
 
@@ -1022,6 +1025,37 @@ raw `0x00417B80` hybrid (`sym` returns 0 there; 0 is truthy in Lua, so test
 reproduce the give. See docs/lua.md.
 
 ## OPEN DIVERGENCES, newest first
+
+- **CONFIRMED FIXED (2026-09-19): the whole roach SightScan/RoachBehaviour
+  divergence cluster is closed -- re-running the fixtures on a fresh build
+  (native-dev vs hybrid-dev, `tools/sidebyside.py --leader a --replay`) plays
+  each frame-exact far past its old trap pump.** The 09-10 RoachBehaviour
+  nesting + tail fixes and the 09-10 BuildMapObjects-on-load guard resolved all
+  of them; this is the "should be re-run to confirm" the 09-10 entries asked
+  for. Results (317-item campaign map on each real fixture, no `left at pump`):
+  - bazookaroach-8583 -- identical through pump 32922 (old trap 8583).
+  - roachheap-1575 -- identical through pump 44611, 317 items (old trap 1575,
+    both the heap-desync and the sight divergence gone).
+  - roachattack-1391 -- identical through pump 25519, 317 items (old trap
+    1391/1456).
+  So the FIELD_540/FIELD_530 "roach sees a different observer from identical
+  inputs" family (8583, 1575, 1112, 1391) no longer reproduces. The individual
+  09-10 OPEN entries below are kept as the record of how each was cornered.
+
+- **CONFIRMED FIXED (2026-09-19): the magnifying-glass 4-px refraction residual
+  (DrawEffectLayer, old trap magnifyingglass-7655) no longer reproduces.**
+  Re-run identical through pump 52474 (317-item map, aim exercised, "Saved 317
+  items"), far past the old frame-8414 trap -- no `left at pump`. Closed
+  alongside the roach cluster on the same fresh build; kept here as the last
+  reproducible OPEN entry from the 09-10 batch, now green.
+  **roachbite-1112 is a SEPARATE, non-reconstruction problem: its fixture is
+  stale.** Replaying it now (both hybrid AND port, so not a port bug) navigates
+  the menus to an empty "default" mission -- `load_default.bmp`, "Failed to open
+  Object.aai", "Loaded 0 items" -- and exits at pump 255 before any roach. The
+  recorded from-menu clicks no longer select campaign level 1 (kitchen) on this
+  checkout; it needs re-recording against the current menu/save state, not a
+  code fix. (The port itself is healthy: tests/replays/bootcamp.txt is identical
+  through frame 627.)
 
 - **FIXED (2026-09-16): the 09-15 pause-cursor fix diverged from the oracle from
   the briefing transition on -- bootcamp side-by-side trapped at pump 104 -- and
