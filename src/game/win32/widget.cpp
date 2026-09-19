@@ -5433,10 +5433,19 @@ AM2_Widget *__attribute__((thiscall)) DlgGameMenuConstruct(AM2_Widget *w,
             }
             WidgetAddChild(w, btn);
 
-            if (row == 0) {
-                w->focusedChild = btn;
+            if (row == 0)
+                /* JUST the focus-slot call, NOT a focusedChild pre-set. The
+                 * original (0x00452b63 WidgetAddChild, then 0x00452b6e calls the
+                 * button's focus slot) leaves w->focusedChild unset here, so
+                 * WidgetTakeFocus takes its `!had` arm -- which sets focusedChild
+                 * to firstChild (== btn) AND runs its PollInput/LatchKeyState.
+                 * Pre-assigning w->focusedChild = btn made WidgetTakeFocus
+                 * early-return on `had == w` and skip that PollInput, leaving
+                 * g_mouseMoved set; the SAME-frame ButtonUpdate then re-focused
+                 * whatever item the cursor sat over as the pause menu opened
+                 * (highlighting LOAD GAME instead of the default RETURN TO GAME).
+                 * The re-poll is what clears the moved flag so the default sticks. */
                 ((AM2_WidgetFocusFn *)btn->vtable)[WIDGET_VSLOT_FOCUS](btn, 0);
-            }
             row++;
         }
     }

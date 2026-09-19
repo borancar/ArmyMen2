@@ -1028,6 +1028,44 @@ reproduce the give. See docs/lua.md.
 
 ## OPEN DIVERGENCES, newest first
 
+- **CONFIRMED FIXED (2026-09-20): the in-game PAUSE menu (DlgGameMenu) showed
+  the focus highlight on the wrong item -- LOAD GAME instead of RETURN TO GAME --
+  when the menu opened with the cursor over an item. ROOT: DlgGameMenuConstruct
+  (widget.cpp:5386, orig 0x00452AA0) had an EXTRA `w->focusedChild = btn;`
+  before the default-focus call that the original does not have.** The original
+  does `WidgetAddChild(dialog, btn)` (0x00452b63) then calls the button's focus
+  slot `WidgetTakeFocus(btn, 0)` (0x00452b6e) with focusedChild still unset, so
+  WidgetTakeFocus takes its `!had` arm -- which sets focusedChild to firstChild
+  (== btn) AND runs its `PollInput()`/`LatchKeyState()`. That re-poll drains the
+  frame's mouse motion and clears g_mouseMoved to 0, so the SAME-frame
+  ButtonUpdate does NOT re-focus the hovered button and the default sticks.
+  Pre-assigning focusedChild = btn made WidgetTakeFocus early-return on `had == w`
+  and SKIP that PollInput, leaving g_mouseMoved set -- so ButtonUpdate re-focused
+  whatever item the cursor was over as the menu opened. Fix: delete the extra
+  line, leaving only the focus-slot call as in the original.
+  HOW FOUND: proved it was a real deterministic bug (not a live-`--video`
+  artifact) by replaying the recorded session in NON-video lockstep -- traps at
+  pump 8269, box 267,138-376,228. Read the two held games via lua (g_paintObject
+  0x0065A058 -> +0x34 focusedChild): byte-identical heap and cursor, only
+  focusedChild differed. Instrumented ButtonUpdate/DlgGameMenuConstruct on the
+  port (AM2_MENULOG) -> saw CONSTRUCT then a same-frame FOCUS(LOAD GAME) with
+  moved=1; the disasm of DlgGameMenuConstruct showed the original never writes
+  focusedChild before the focus call. Repro: sessions/menu-diff-session-input.txt.
+  VERIFIED: `tools/sidebyside.py --replay sessions/menu-diff-session-input.txt`
+  now runs with ZERO traps (both present 112,318 identical frames; old trap was
+  pump 8269).
+
+- **NOTE (2026-09-19): the "small pixel divergences" seen during live
+  `--video` play (17-px swapped-pair sprite edges, ~1000-px animating-sprite
+  blobs) are LIVE-MODE ARTIFACTS, not port bugs.** In `--video` the leader takes
+  real SDL input and presents in real time while the follower runs one pump
+  behind on lockstep replay, so any animating sprite differs by one frame and the
+  object state is byte-identical (verified: 761 objects, all fields match). Proof:
+  replaying the exact recorded session in NON-video mode (both games on the same
+  replay path) traps ONLY on the menu bug above -- none of the small diffs
+  reproduce. So exact side-by-side is for deterministic replays; live `--video`
+  is inherently noisy on animating content and is not a divergence source.
+
 - **CONFIRMED FIXED (2026-09-19): the tankstore bridge divergence -- the enemy
   destroyed the train bridge (mission failure) on the hybrid but NOT the port.
   ROOT: `RunScriptAction` (event.cpp, ADDR_RUN_SCRIPT_ACTION 0x00420410) case
