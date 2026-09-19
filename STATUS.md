@@ -1100,28 +1100,38 @@ reproduce the give. See docs/lua.md.
   byte-identical state -- NOT AI pathing (a 2px "position difference" seen in one
   run was a READ ARTIFACT: at a hold the two lockstep games can be one frame
   apart, and re-reads showed BRIDSAB1 IDENTICAL). Evidence (2026-09-19):
-  - dual-build gdb on EventNotify (0x0041F4A0, filtered to pad event types 2/3)
-    over the 5286->5293 step: the HYBRID raises `PADON type=3 id=3 uid=200003ee`
-    (BRIDSAB1 entering the Bridge1 pad #3); the PORT raises NO pad event.
   - clean re-reads of BRIDSAB1 (200003ee) AND bridge 8000043a at pumps 5287/5289/
     5291 are byte-IDENTICAL on both builds (pos 996,1136->997,1134->998,1132,
     tile 17982; bridge hp100,100). The ONLY difference is the bridge at pump 5898
     (hybrid hp-1, port hp100).
-  So from IDENTICAL BRIDSAB1 state the hybrid raises PADON Bridge1 and the port
-  does not, so FireWeaponAtPoint runs (charge 200003f3, bridge destroyed) only on
-  the hybrid. The bug is in the reconstructed pad-occupancy -> PADON chain:
-  ObjTileHook (pad.cpp:296) -> PadNumberEnter (150-ish) -> the scheduled
-  EvtPadOn 0x00437570 -> EvtPadRaise (pad.cpp:400, the `pad+field != want` uid
-  match) -> EventNotify(AM2_EVT_PADON=3). NEXT: gdb both builds over the same
-  step with breakpoints on PadNumberEnter and EvtPadOn (find their addresses;
-  EvtPadOn=ADDR_EVT_PAD_ON 0x00437570) and diff -- which side schedules/raises
-  the enter for uid 200003ee pad #3; then read that reconstructed function vs the
-  disasm. Repro sessions/tankstore-bridge-5289.txt; harness = scratch run_evt.sh
-  / run_ee3.sh + *.gdb (hold at a break, attach both games, `echo 1 > <out>/skip`
-  to step). Compare BRIDSAB1 (200003ee) with STABLE re-reads (a lone hold read
-  can be a frame off); the gdb-on-held-lockstep orchestration is fragile (pkill
-  gdb/armymen2/sidebyside, confirm ports 31341/31342 free, WRITE scripts to files
-  -- heredocs inside a shell command mangle; `PPID` is a bash readonly).
+  - PadFinalise(pad #3) runs on BOTH builds with byte-identical pad state:
+    `id=3 inside=0 itemcount=1 cmpA=0 cmpOp=2 compared=1 evtEnter=0` (only the obj
+    heap pointer differs). So the PORT DOES process BRIDSAB1 entering the Bridge1
+    pad and fires the same PADON notify -- the pad occupancy is NOT the bug.
+  So the divergence is DOWNSTREAM of the pad: from an identical PADON(Bridge1)
+  notify, the FIREWEAPON *event* runs on the hybrid but not the port -- the
+  script event `IF PADON Bridge1 AFTER PADOFF Bridge1 TESTVAR BRIDEXPSET = 0 THEN
+  FIREWEAPON explosive1 BRIDSAB1 (1017,1065)` fires only on the original. So the
+  bug is in the reconstructed EVENT DISPATCH / CONDITION: the AFTER-PADOFF
+  ordering, the TESTVAR BRIDEXPSET gate, or the event-match on the PADON notify
+  (event.cpp). ***METHOD CORRECTION (important): for the PORT, gdb MUST use the
+  RECONSTRUCTED addresses (nm build/armymen2-dev: EventNotify 0x007103e0,
+  FireWeaponAtPoint 0x00710de0, PadFinalise 0x00733e80, ObjTileHook 0x007341e0),
+  NOT the original 0x004xxxxx -- the native port never executes original code
+  (0xCC .origgap), so breakpointing 0x004xxxxx in the port catches nothing and
+  gives a FALSE "never called". An earlier note here claiming "the PORT raises no
+  PADON" was that artifact and is WRONG; the hybrid uses original addresses.***
+  NEXT: with correct per-build addresses, confirm the port's FireWeaponAtPoint
+  0x00710de0 is never reached, then trace the port's event dispatch for the PADON
+  notify -- compare the AFTER/TESTVAR/event-match evaluation (event.cpp) against
+  the hybrid, and read the reconstructed condition code vs the disasm. Repro
+  sessions/tankstore-bridge-5289.txt; harness = scratch run_padfin.sh (per-build
+  gdb files padfin_hyb.gdb 0x004375A0 / padfin_port.gdb 0x00733e80) -- hold at a
+  break, attach BOTH games, `echo 1 > <out>/skip` to step. Compare BRIDSAB1
+  (200003ee) with STABLE re-reads (a lone hold read can be a frame off); the
+  orchestration is fragile (pkill gdb/armymen2/sidebyside, confirm ports
+  31341/31342 free, WRITE scripts to files -- heredocs in a shell command mangle;
+  `PPID` is a bash readonly).
 
 - **CONFIRMED FIXED (2026-09-19): the whole roach SightScan/RoachBehaviour
   divergence cluster is closed -- re-running the fixtures on a fresh build
