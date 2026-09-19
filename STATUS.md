@@ -1042,23 +1042,20 @@ reproduce the give. See docs/lua.md.
   inputs" family (8583, 1575, 1112, 1391) no longer reproduces. The individual
   09-10 OPEN entries below are kept as the record of how each was cornered.
 
-- **OPEN (2026-09-19): the port does not draw the star icons in a right-edge
-  HUD count element -- found live playing a campaign mission side by side.** The
-  far-right vertical HUD strip shows a count "2" over two white star/asterisk
-  icons; the ORACLE draws the two stars, the PORT leaves that slot the HUD
-  background colour (24,60,33). The count digit "2" and the box draw identically
-  on both -- only the star icons are missing. Trap: `tools/sidebyside.py --video`
-  live play, frame 4445, box 632,423-634,437 (14 px; the tool mis-flags it "all
-  swapped horizontal pairs" because each 3x4 glyph is symmetric -- it is NOT a
-  rounding swap, the port draws nothing there). Frames saved at
-  job tmp/sbs_live/{a,b}-4445.ppm. Likely a CountButton/right-edge HUD element:
-  CountButtonPaint (widget.cpp) draws the count text and one sprite and both are
-  present, so the missing stars come from whatever draws a per-count icon row
-  (the strip container, or a second sprite/glyph the reconstruction skips).
-  NEXT: relaunch to the mission (campaign level, 724 items), find the widget at
-  screen x~632 y~423-437 (dump the HUD widget tree / its sprites on both builds),
-  and compare what draws the star row. Not yet reproduced as a saved replay --
-  the from-menu navigation was live.
+- **FIXED (2026-09-19, eb14298d): the port drew no infinite-ammo indicator --
+  found live playing a campaign mission side by side.** The far-right HUD strip
+  is the weapon AMMO display; for infinite ammo (n > 99) HudEdgePaint draws
+  AM2_HUD_STR_AMMO_OVER = "**" (two stars, DrawTextVertical), reading it via
+  AM2_IMAGE(AM2_HUD_STR_AMMO_OVER). The port left the slot blank (background
+  colour 24,60,33) -- box 632,423-634,437, first seen at a --video trap frame
+  4445 (the tool mis-flags the symmetric 3x4 glyphs as "swapped horizontal
+  pairs"). ROOT: its sibling AM2_HUD_STR_AMMO_FMT ("%02d") was in foldstrings'
+  FOLD_MACROS but AMMO_OVER was omitted, so it stayed a raw blob read at
+  0x476FA4 -- a zero-filled gap between placed symbols (am2_cheat_words ..
+  am2_fog_of_war) in the native build -> empty string. Proven at the held trap:
+  peekstr(0x476FA4) = "" on the port, "**" on the oracle; poking "**" restored
+  it. Fixed by adding AM2_HUD_STR_AMMO_OVER to FOLD_MACROS; the native binary
+  now carries the "**" literal.
 
 - **REVERTED for now (2026-09-19): the SDL relative-mouse grab (6ef718ce) made
   native mouse control feel sluggish; restored the prior absolute-mouse behavior
