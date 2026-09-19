@@ -336,6 +336,8 @@
 #define AM2_BMP_UPARROW2 ((uintptr_t)(const char *)"03_008_02_uparrow.bmp")
 #undef AM2_HUD_STR_AMMO_FMT
 #define AM2_HUD_STR_AMMO_FMT ((uintptr_t)(const char *)"%02d")
+#undef AM2_HUD_STR_AMMO_OVER
+#define AM2_HUD_STR_AMMO_OVER ((uintptr_t)(const char *)"**")
 #undef AM2_HUD_STR_SARGE
 #define AM2_HUD_STR_SARGE ((uintptr_t)(const char *)"SARGE")
 #undef AM2_STR_CHILD_SUFFIX
