@@ -1096,31 +1096,32 @@ reproduce the give. See docs/lua.md.
   -> the mission-script event `IF PADON Bridge1 ... TESTVAR BRIDEXPSET = 0 THEN
   FIREWEAPON explosive1 BRIDSAB1 (1017,1065)` triggers on the original and not
   the reconstruction, from byte-identical state. Since BRIDSAB1/200003ee is
-  identical at 5285, the trigger was suspected in the pad/event evaluation --
-  BUT the ROOT is one layer earlier and is an OFF-SCREEN ENEMY-AI PATHING
-  DIVERGENCE (2026-09-19). Dual-build gdb on EventNotify (0x0041F4A0, filtered to
-  pad event types 2/3) over the 5286->5293 step: the HYBRID raises `PADON type=3
-  id=3 uid=200003ee` (BRIDSAB1 entering the Bridge1 pad); the PORT raises NO pad
-  event. And BRIDSAB1 (200003ee) is at DIFFERENT positions on the two builds
-  ALREADY by pump 5287 -- PORT pos 996,1136 tile 18238 vs HYB 997,1134 tile
-  17982; pump 5289 PORT 856,1438 vs HYB 850,1422. So BRIDSAB1's path diverges
-  off-screen (invisible to the pixel compare) BEFORE 5287: the hybrid's walks
-  onto the Bridge1 pad -> PADON -> FIREWEAPON -> charge 200003f3 -> bridge
-  destroyed -> failure; the port's takes a different path, never reaches the pad,
-  never fires. SAME FAMILY as the radartroop "off-screen enemy AI diverges"
-  entry below. NEXT (radartroop method): bisect BRIDSAB1/200003ee's position
-  back to the FIRST pump it differs (< 5287; identical at map load, so a specific
-  AI step diverges from identical state), then gdb both builds at that step for
-  this trooper (AiTrooperStep/AiPatrolStep region block / BeginMoveTo / the
-  region-link + NearestAllowedTile pathing in region.cpp) and diff the first
-  differing field write -- as the radartroop entry was chased. Repro
-  sessions/tankstore-bridge-5289.txt; the working gdb harness is the scratch
-  run_bp.sh/run_evt.sh/run_ee.sh + *.gdb (hold at a break, attach, `echo 1 >
-  <out>/skip` to step). Watch BRIDSAB1 (200003ee) position, not pixels; a raw bt
-  is garbage (no frame pointers) -- read x/ and pick out 0x004xxxxx returns; the
-  gdb-on-held-lockstep orchestration is fragile (pkill gdb/armymen2/sidebyside,
-  confirm ports 31341/31342 free, and WRITE scripts to files -- heredocs inside
-  a shell command mangle; `PPID` is a bash readonly, use another name).
+  identical, the ROOT is a DETERMINISTIC PAD/EVENT-EVALUATION divergence from
+  byte-identical state -- NOT AI pathing (a 2px "position difference" seen in one
+  run was a READ ARTIFACT: at a hold the two lockstep games can be one frame
+  apart, and re-reads showed BRIDSAB1 IDENTICAL). Evidence (2026-09-19):
+  - dual-build gdb on EventNotify (0x0041F4A0, filtered to pad event types 2/3)
+    over the 5286->5293 step: the HYBRID raises `PADON type=3 id=3 uid=200003ee`
+    (BRIDSAB1 entering the Bridge1 pad #3); the PORT raises NO pad event.
+  - clean re-reads of BRIDSAB1 (200003ee) AND bridge 8000043a at pumps 5287/5289/
+    5291 are byte-IDENTICAL on both builds (pos 996,1136->997,1134->998,1132,
+    tile 17982; bridge hp100,100). The ONLY difference is the bridge at pump 5898
+    (hybrid hp-1, port hp100).
+  So from IDENTICAL BRIDSAB1 state the hybrid raises PADON Bridge1 and the port
+  does not, so FireWeaponAtPoint runs (charge 200003f3, bridge destroyed) only on
+  the hybrid. The bug is in the reconstructed pad-occupancy -> PADON chain:
+  ObjTileHook (pad.cpp:296) -> PadNumberEnter (150-ish) -> the scheduled
+  EvtPadOn 0x00437570 -> EvtPadRaise (pad.cpp:400, the `pad+field != want` uid
+  match) -> EventNotify(AM2_EVT_PADON=3). NEXT: gdb both builds over the same
+  step with breakpoints on PadNumberEnter and EvtPadOn (find their addresses;
+  EvtPadOn=ADDR_EVT_PAD_ON 0x00437570) and diff -- which side schedules/raises
+  the enter for uid 200003ee pad #3; then read that reconstructed function vs the
+  disasm. Repro sessions/tankstore-bridge-5289.txt; harness = scratch run_evt.sh
+  / run_ee3.sh + *.gdb (hold at a break, attach both games, `echo 1 > <out>/skip`
+  to step). Compare BRIDSAB1 (200003ee) with STABLE re-reads (a lone hold read
+  can be a frame off); the gdb-on-held-lockstep orchestration is fragile (pkill
+  gdb/armymen2/sidebyside, confirm ports 31341/31342 free, WRITE scripts to files
+  -- heredocs inside a shell command mangle; `PPID` is a bash readonly).
 
 - **CONFIRMED FIXED (2026-09-19): the whole roach SightScan/RoachBehaviour
   divergence cluster is closed -- re-running the fixtures on a fresh build
