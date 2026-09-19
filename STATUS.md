@@ -6,8 +6,10 @@ is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
 Last updated: **2026-09-19**: the port now builds without ArmyMen2.exe (see the
-build note below), and the roach SightScan divergence cluster is confirmed
-closed (see OPEN DIVERGENCES). Blob-migration history from **2026-09-11**, when
+build note below), the roach SightScan divergence cluster is confirmed closed,
+and the tankstore bridge divergence is fixed -- `RunScriptAction` case 0x36 had
+dropped the point-target FIREWEAPON branch (see OPEN DIVERGENCES). Blob-migration
+history from **2026-09-11**, when
 the first global structures were transcribed out of the carried data blob (see
 MIGRATION below).
 
@@ -1026,112 +1028,47 @@ reproduce the give. See docs/lua.md.
 
 ## OPEN DIVERGENCES, newest first
 
-- **OPEN (2026-09-19): in the tankstore mission the enemy destroys the train
-  bridge (mission failure) on the hybrid but NOT the port -- an off-screen
-  spawn/AI divergence found live, then bisected on a saved replay.** Repro:
-  `tools/sidebyside.py --replay sessions/tankstore-bridge-5289.txt` (campaign
-  level "The Tank Store", data/tankstore/tankstore2.txt). Surfaced as a pixel
-  trap at frame 6705 / pump 5898: the hybrid shows a "MESSAGE FROM HQ" dialog
-  ("The bridge is destroyed!!! You have failed in your mission.", the script's
-  `showpda` action 0x05 -> g_subState=0x18, event.cpp:3426) that the port does
-  not. Root, found by bisecting object state on the two held games with
-  `tools/objdump.py --uid 8000043a --at 0x62` (OBJ_OFF_HEALTH) and object-count
-  diffs:
-  - the bridge is objects 8000043a/8000043b (army=4 structures at 691,782):
-    health 100 on the port, -1 (destroyed) on the hybrid, first differing at
-    pump 5897;
-  - upstream, the two builds are byte-identical through pump 5280 (750 objects
-    each), and at **pump ~5289 the hybrid spawns object 200003f3 at the bridge
-    pad (1011,1092), health 6; the port never spawns it.** Every other object
-    (incl. the visible saboteurs 200003ea/ec/ee/f0) is identical on both.
-  - the mission's bridge assault is scripted: `padon thirdramp -> RESURRECT
-    BRIDSAB1 (804,1320)`, `IF assaultbridge -> ORDER BRIDSAB1 goto (1017,1065)
-    INMODE ATTACK`, `IF PADON Bridge1 -> FIREWEAPON explosive1 BRIDSAB1
-    (1017,1065)`, `IF killed trainbridge -> showpda failure`. The pad system is
-    pad.cpp (EvtPadOn/Off, PadNumberEnter/Leave, ObjTileHook).
-  NAILED TO ONE PUMP (2026-09-19): the two games have IDENTICAL object sets
-  through pump 5285. At pump ~5289 the SAME explosive pair 00000443 (type 7
-  effect) + 00000444 (type 6, army 1, a projectile at 2085,1368) dies on BOTH
-  builds, but the HYBRID then spawns 200003f3 (saboteur; type=1 army=1 flags
-  0x200401 = same flags as saboteurs 200003ea/ec/ee/f0, hp6, at the bridge pad
-  1011,1092) and the PORT does not (the port loses only 443/444; no spawn, no
-  200003f3 at any pump). So from BYTE-IDENTICAL state a scripted spawn
-  (RESURRECT/ORDER of the bridge saboteur) fires on the original but not the
-  reconstruction -- a reconstruction bug in the event/script/pad EVALUATION
-  (event.cpp / pad.cpp / script.cpp), NOT AI pathing (the saboteurs are
-  identical) and NOT data. 200003f3 is type=1 (the saboteur type; the visible
-  saboteurs 200003ea/ec/ee/f0 are type 1, player troops are type 2), army 1,
-  hp6, box 32x32, at 1011,1092.
-  CODE-LEVEL TRACE (2026-09-19), via gdb on the HELD sidebyside hybrid (attach
-  at a 5286/5288 break, step to 5292/5293 -- the AM2_REPLAY-alone game does NOT
-  reproduce the scenario, only the lockstep replay does, so gdb must attach to
-  the held sidebyside hybrid). Eight higher-level create/deploy/reveal functions
-  breakpointed (conditioned on the uid where possible) caught NOTHING as
-  200003f3 entered the table: CreateTrooper 0x00447620 (makes type 2, wrong
-  type), ScriptResurrectItem 0x0041FEC0, MakePlacedUnit 0x0043ACF0, DeployItem
-  0x00428CA0, ScriptAllocUid 0x0041E7F0, FireWeaponAtPoint 0x004200F0, ObjReveal
-  0x004296E0, SetObjTablePair 0x0044BA70 -- all ELIMINATED. THE MECHANISM WAS
-  FOUND with a HARDWARE WATCHPOINT on OBJ_COUNT (0x00514F04): 200003f3 (and
-  200003f4, and the explosive 445/446) are added by **AddToItemList
-  (ADDR_ADD_TO_ITEM_LIST 0x00429740)** -- the low-level object-list insertion,
-  reached via the object-init path (ObjInitCommon 0x00429940), NOT via any of
-  the eight higher-level functions. The saboteur adds carried a distinctive
-  local 0x101 where the explosives carried 0x1/0x0. So the object IS genuinely
-  created at pump ~5289 through AddToItemList; the divergence is its CALLER (the
-  create/event one frame above AddToItemList) which the original reaches and the
-  reconstruction does not, from byte-identical state.
-  CREATION CHAIN NAMED (2026-09-19, gdb stack walk on the held hybrid at pump
-  5289; breakpoint ObjInitCommon 0x00429940, read x/96wx $esp, resolve each
-  0x004xxxxx to its containing ADDR_ macro):
-    RunScriptAction 0x00420410 (ret +0xe16)   <- the script FIREWEAPON action
-     -> FireWeaponAtPoint ADDR_FIRE_WEAPON_AT_POINT 0x004200F0 (+0xa0)
-      -> FireWeapon ADDR_FIRE_WEAPON 0x0045F460 (+0x734)
-       -> CreateWatchedType (+0x62) -> CreateItem ADDR_CREATE_ITEM (+0x1dc)
-        -> InitObjFromAAI ADDR_INIT_OBJ_FROM_AAI (+0x68)
-         -> ObjInitCommon 0x00429940 -> AddToItemList 0x00429740.
-  So 200003f3 is the EXPLOSIVE CHARGE from the scripted FIREWEAPON action (the
-  "explosive1" projectile; type 1 army 1 hp6), fired FROM saboteur 200003ee
-  (= BRIDSAB1, byte-identical on both builds), NOT a spawned unit. The divergence
-  is: RunScriptAction runs the FIREWEAPON action on the hybrid but NOT the port
-  -> the mission-script event `IF PADON Bridge1 ... TESTVAR BRIDEXPSET = 0 THEN
-  FIREWEAPON explosive1 BRIDSAB1 (1017,1065)` triggers on the original and not
-  the reconstruction, from byte-identical state. Since BRIDSAB1/200003ee is
-  identical, the ROOT is a DETERMINISTIC PAD/EVENT-EVALUATION divergence from
-  byte-identical state -- NOT AI pathing (a 2px "position difference" seen in one
-  run was a READ ARTIFACT: at a hold the two lockstep games can be one frame
-  apart, and re-reads showed BRIDSAB1 IDENTICAL). Evidence (2026-09-19):
-  - clean re-reads of BRIDSAB1 (200003ee) AND bridge 8000043a at pumps 5287/5289/
-    5291 are byte-IDENTICAL on both builds (pos 996,1136->997,1134->998,1132,
-    tile 17982; bridge hp100,100). The ONLY difference is the bridge at pump 5898
-    (hybrid hp-1, port hp100).
-  - PadFinalise(pad #3) runs on BOTH builds with byte-identical pad state:
-    `id=3 inside=0 itemcount=1 cmpA=0 cmpOp=2 compared=1 evtEnter=0` (only the obj
-    heap pointer differs). So the PORT DOES process BRIDSAB1 entering the Bridge1
-    pad and fires the same PADON notify -- the pad occupancy is NOT the bug.
-  So the divergence is DOWNSTREAM of the pad: from an identical PADON(Bridge1)
-  notify, the FIREWEAPON *event* runs on the hybrid but not the port -- the
-  script event `IF PADON Bridge1 AFTER PADOFF Bridge1 TESTVAR BRIDEXPSET = 0 THEN
-  FIREWEAPON explosive1 BRIDSAB1 (1017,1065)` fires only on the original. So the
-  bug is in the reconstructed EVENT DISPATCH / CONDITION: the AFTER-PADOFF
-  ordering, the TESTVAR BRIDEXPSET gate, or the event-match on the PADON notify
-  (event.cpp). ***METHOD CORRECTION (important): for the PORT, gdb MUST use the
-  RECONSTRUCTED addresses (nm build/armymen2-dev: EventNotify 0x007103e0,
-  FireWeaponAtPoint 0x00710de0, PadFinalise 0x00733e80, ObjTileHook 0x007341e0),
-  NOT the original 0x004xxxxx -- the native port never executes original code
-  (0xCC .origgap), so breakpointing 0x004xxxxx in the port catches nothing and
-  gives a FALSE "never called". An earlier note here claiming "the PORT raises no
-  PADON" was that artifact and is WRONG; the hybrid uses original addresses.***
-  NEXT: with correct per-build addresses, confirm the port's FireWeaponAtPoint
-  0x00710de0 is never reached, then trace the port's event dispatch for the PADON
-  notify -- compare the AFTER/TESTVAR/event-match evaluation (event.cpp) against
-  the hybrid, and read the reconstructed condition code vs the disasm. Repro
-  sessions/tankstore-bridge-5289.txt; harness = scratch run_padfin.sh (per-build
-  gdb files padfin_hyb.gdb 0x004375A0 / padfin_port.gdb 0x00733e80) -- hold at a
-  break, attach BOTH games, `echo 1 > <out>/skip` to step. Compare BRIDSAB1
-  (200003ee) with STABLE re-reads (a lone hold read can be a frame off); the
-  orchestration is fragile (pkill gdb/armymen2/sidebyside, confirm ports
-  31341/31342 free, WRITE scripts to files -- heredocs in a shell command mangle;
-  `PPID` is a bash readonly).
+- **CONFIRMED FIXED (2026-09-19): the tankstore bridge divergence -- the enemy
+  destroyed the train bridge (mission failure) on the hybrid but NOT the port.
+  ROOT: `RunScriptAction` (event.cpp, ADDR_RUN_SCRIPT_ACTION 0x00420410) case
+  0x36 (fireweapon) had DROPPED the point-target branch.** Both `FIREWEAPON` and
+  `UNITFIRE` parse to code 0x36/0x37 (script.cpp:2439) and the point-vs-object
+  choice is made at RUNTIME: the original's 0x36 arm branches on
+  `xvar>0 || relative!=0 || (word)pos.x!=0` -- a POINT calls FireWeaponAtPoint
+  (0x004200F0, original point arm at 0x004211fa), else the fall-through calls
+  FireWeaponAtObject (0x004201A0, at 0x004211b8). The reconstruction kept only
+  the object fall-through and turned the point case into a bare `return`, so a
+  point-target `FIREWEAPON ... (x,y)` NEVER fired on the native port -- the
+  classic dropped-branch pitfall (nothing static caught it: the function still
+  compiled, installed, and passed every fixture, none of which fires a
+  point-weapon). The bridge event `IF PADON Bridge1 AFTER PADOFF Bridge1 TESTVAR
+  BRIDEXPSET = 0 THEN FIREWEAPON explosive1 BRIDSAB1 (1017,1065)` therefore ran
+  its condition identically on both builds but its FIREWEAPON action was a no-op
+  on the port, so the explosive charge (object 200003f3) was never created and
+  the bridge (8000043a/b) kept hp100. Fix: restore the point arm --
+  `FireWeaponAtPoint(ResolveUid(subject,0), ResolveUid(army,owner), n0,
+  ActionPoint(act,owner))` -- transcribed from the disasm (weapon & unit resolve
+  the same as the object arm; only the last arg differs, ActionPoint vs
+  ResolveUid(target,owner)).
+  HOW FOUND (2026-09-19): instrumented the reconstructed `EvtCondition`/AFTER
+  arm and `FireWeaponAtPoint` (env-gated, temporary), ran the port ALONE through
+  the replay with `AM2_LOCKSTEP=1 AM2_REPLAY=...` (self-clocked; the replay is
+  applied only inside the lockstep branch, sdl.cpp:1230) -- every AFTER condition
+  reached AFTER-RUN but FireWeaponAtPoint was called ZERO times, which pointed
+  straight at the dispatcher. Disassembling 0x00420410 showed two fire calls
+  (0x4211eb object, 0x42122a point); the recon had one.
+  VERIFIED: `tools/sidebyside.py --replay sessions/tankstore-bridge-5289.txt
+  --break 5289,5300,5400` now BREAKs (not TRAPs) at the old trap pump 5289 and
+  runs clean past 5300/5400; a free 600s lockstep run reached ~207k frames with
+  zero TRAP. After the fix the port fires `FireWeaponAtPoint unit=200003ee
+  at=(1017,1065)` (= BRIDSAB1) exactly as the hybrid.
+  This CORRECTS the earlier long trail here (now removed): it was NOT an AI/spawn
+  divergence, NOT a pad-occupancy bug, and NOT the AFTER/TESTVAR condition -- the
+  condition fired identically; only the action's point branch was missing. (The
+  hybrid runs ORIGINAL code at 0x004xxxxx; the native port runs RECONSTRUCTED
+  code, so a dropped reconstruction branch diverges from the hybrid even though
+  the identical source compiles into both the injected build's patches and the
+  port.)
 
 - **CONFIRMED FIXED (2026-09-19): the whole roach SightScan/RoachBehaviour
   divergence cluster is closed -- re-running the fixtures on a fresh build

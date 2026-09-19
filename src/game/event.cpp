@@ -3680,12 +3680,23 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                             : act->army);
         return;
 
-    case 0x36:                                  /* fireweapon at an object */
-        /* Refused unless the action names no point at all: no variable, no
-         * relative flag, and a zero x.  Three separate tests, and the third
-         * is a WORD. */
-        if (act->xvar > 0 || act->relative != 0 || act->u.pos.x != 0)
+    case 0x36:                                  /* fireweapon at a point or object */
+        /* Two arms of one `case`: an action that names a POINT -- a coordinate
+         * variable (xvar), a relative `+` flag, or a nonzero WORD x -- fires at
+         * that point; otherwise it fires at the named object. The third test is
+         * a WORD. ORIGINAL 0x00420410: the point arm at 0x004211fa, the object
+         * arm the fall-through at 0x004211b8; both resolve the weapon as
+         * ResolveUid(subject, 0) and the unit as ResolveUid(army, owner), and
+         * differ only in the last argument -- ActionPoint for the point,
+         * ResolveUid(target, owner) for the object. */
+        if (act->xvar > 0 || act->relative != 0 || act->u.pos.x != 0) {
+            FireWeaponAtPoint(ResolveUid(act->subject, 0),
+                              ResolveUid(act->army,
+                                         (uint32_t)(uintptr_t)owner),
+                              act->n0,
+                              ActionPoint(act, (uint32_t)(uintptr_t)owner));
             return;
+        }
         FireWeaponAtObject(ResolveUid(act->subject, 0),
                            ResolveUid(act->army,
                                       (uint32_t)(uintptr_t)owner),
