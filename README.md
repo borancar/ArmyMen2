@@ -133,3 +133,13 @@ binary also exist there. Project policy is to use it for **naming and data
 structure layout hints only**. All logic is derived from disassembly of
 `ArmyMen2.exe`. That material is never copied into this repository; anything
 consulted stays in the ignored `reference/` directory.
+
+## License
+
+This project's reconstructed source is licensed under the **GNU General Public
+License, version 2** — see [`LICENSE`](LICENSE) for the full text.
+
+The license covers the reconstruction in this repository only. It does not grant
+any rights to *Army Men II* itself or its assets: the original game, its data
+files, and `ArmyMen2.exe` remain the property of their respective owners, are
+not distributed here, and you must own a copy to use this port.
