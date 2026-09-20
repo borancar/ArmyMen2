@@ -10,3 +10,6 @@ am2-*.log
 /setup.exe
 .claude/*.local.md
 am2port.log
+# Runtime logs the game writes to a Windows-style absolute path, which land as a
+# single literal file at the repo root under Wine/the port.
+/C:*
