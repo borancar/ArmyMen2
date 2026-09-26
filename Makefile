@@ -605,6 +605,22 @@ $(BUILD)/armymen2-hybrid-dev: $(HYBRID_DEV_OBJ)
 	$(NATIVE_CXX) -o $@ $(HYBRID_DEV_OBJ) $(HYBRID_LDF) -rdynamic $(NATIVE_LIBS) -ldl
 	@echo "hybrid-dev: $@"
 
+# The VC6 HOST: run the original Visual C++ 6.0 toolchain (CL/c1/c1xx/c2/LINK)
+# natively on Linux with no Wine -- our own PE loader (src/vc6/vc6host.cpp) over
+# a Win32/CRT shim (src/vc6/shim.c), the same idea as the hybrid game loader.
+# Point it at the install with VC6_ROOT (default hardcoded in vc6host.cpp).
+#     make vc6
+#     build/vc6host "$VC6_ROOT/VC98/BIN/CL.EXE" -c foo.c
+VC6_CF := -m32 -fno-pie -no-pie -O2 -g -Wall -D_GNU_SOURCE
+.PHONY: vc6
+vc6: $(BUILD)/vc6host
+$(BUILD)/vc6host: src/vc6/vc6host.cpp src/vc6/shim.c
+	@mkdir -p $(BUILD)
+	$(NATIVE_CC)  $(VC6_CF) -w -c src/vc6/shim.c    -o $(BUILD)/vc6-shim.o
+	$(NATIVE_CXX) $(VC6_CF)    -c src/vc6/vc6host.cpp -o $(BUILD)/vc6-host.o
+	$(NATIVE_CXX) -m32 -fno-pie -no-pie $(BUILD)/vc6-host.o $(BUILD)/vc6-shim.o -o $@
+	@echo "vc6: $@"
+
 .PHONY: native native-dev
 # BOTH, because the two go out of step silently otherwise: every drive and
 # every fixture in tools/ runs build/armymen2-dev, so a `make native` that
