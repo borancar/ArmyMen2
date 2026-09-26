@@ -423,13 +423,21 @@ extern "C" int vc6_spawn(int wait_mode, const char *file, char *const *argv)
         return WIFEXITED(st) ? WEXITSTATUS(st) : -1;
     }
 
-    /* A real EXE (link, cvtres, ...): exec it under a fresh vc6host. */
-    char pe[4096];
+    /* A real EXE (link, cvtres, ...): exec it under a fresh vc6host. DOS names
+     * are UPPERCASE, so try case variants of the basename in the bin dirs. */
+    char pe[4096]; pe[0] = 0;
+    char nm[128]; snprintf(nm, sizeof nm, "%s", b);
+    if (!strchr(nm, '.')) strncat(nm, ".exe", sizeof nm - strlen(nm) - 1);
+    char up[128], lo[128];
+    size_t nl = strlen(nm);
+    for (size_t i = 0; i < nl && i < 127; i++) { up[i] = (char)toupper((unsigned char)nm[i]); lo[i] = (char)tolower((unsigned char)nm[i]); }
+    up[nl < 127 ? nl : 127] = 0; lo[nl < 127 ? nl : 127] = 0;
     if (!access(file, F_OK)) snprintf(pe, sizeof pe, "%s", file);
-    else { char nm[128]; snprintf(nm, sizeof nm, "%s", b);
-           if (!strchr(nm, '.')) strncat(nm, ".EXE", sizeof nm - strlen(nm) - 1);
-           snprintf(pe, sizeof pe, "%s/%s", vc6_bindir(), nm); }
-    if (access(pe, F_OK)) { vc6_log("spawn: %s not found (%s)", file, pe); errno = ENOENT; return -1; }
+    else { const char *ds[] = { vc6_bindir(), vc6_msdevdir(), 0 };
+        for (int d = 0; ds[d] && !pe[0]; d++) { const char *vv[] = { nm, up, lo, 0 };
+            for (int v = 0; vv[v]; v++) { char c[4096]; snprintf(c, sizeof c, "%s/%s", ds[d], vv[v]);
+                if (!access(c, F_OK)) { snprintf(pe, sizeof pe, "%s", c); break; } } } }
+    if (!pe[0] || access(pe, F_OK)) { vc6_log("spawn: %s not found", file); errno = ENOENT; return -1; }
     char self[4096];
     ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
     if (n < 0) return -1; self[n] = 0;
