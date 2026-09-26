@@ -30,7 +30,7 @@ static void am2_height_log(const char *name, const void *obj, int32_t hin)
     static int32_t tr = -1;
     const uint8_t *o = (const uint8_t *)obj;
     if (tr < 0) tr = getenv("AM2_TRACE_HEIGHT") != 0;
-    if (tr && o && (!am2_trace_window || am2_trace_window()))
+    if (tr && o && (!(&am2_trace_window) || am2_trace_window()))
         fprintf(stderr, "HEIGHT %s pump %u pos=%d,%d tile=%d hin=%d hset=%d\n", name,
                 (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
                 *(const int16_t *)(o + OBJ_OFF_POS), *(const int16_t *)(o + OBJ_OFF_Y),
@@ -14278,7 +14278,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
     {
         static int32_t tw = -1;
         if (tw < 0) tw = getenv("AM2_TRACE_WEAPON") != 0;
-        if (tw && (!am2_trace_window || am2_trace_window()))
+        if (tw && (!(&am2_trace_window) || am2_trace_window()))
             fprintf(stderr, "WEAPON pump %u pos=%d,%d kb=%d quantity=%d ammo=%d\n",
                     (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
                     *(const int16_t *)(o + OBJ_OFF_POS), *(const int16_t *)(o + OBJ_OFF_Y),

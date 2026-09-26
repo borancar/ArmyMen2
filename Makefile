@@ -621,6 +621,16 @@ $(BUILD)/vc6host: src/vc6/vc6host.cpp src/vc6/shim.c
 	$(NATIVE_CXX) -m32 -fno-pie -no-pie $(BUILD)/vc6-host.o $(BUILD)/vc6-shim.o -o $@
 	@echo "vc6: $@"
 
+# Recompile the reconstruction with the hosted MSVC 6.0 and byte-match it
+# against the shipped binary, one function at a time -- the ultimate check that
+# a reconstruction is right is that the original compiler reproduces its bytes.
+# A REPORT, not a gate (it needs the external VC6 install), so it is not in
+# `make check`.  VC6_ROOT points at the install; see src/vc6/README.md.
+VC6_ROOT ?= $(HOME)/claude/en_vs6_ent
+.PHONY: vc6-match
+vc6-match: $(BUILD)/vc6host
+	VC6_ROOT=$(VC6_ROOT) ./.venv/bin/python src/vc6/bytematch.py $(ARGS)
+
 .PHONY: native native-dev
 # BOTH, because the two go out of step silently otherwise: every drive and
 # every fixture in tools/ runs build/armymen2-dev, so a `make native` that

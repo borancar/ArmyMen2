@@ -55,7 +55,7 @@
 #include <stdlib.h>
 #include <string.h>
 extern "C" int32_t am2_trace_window(void) __attribute__((weak));
-#define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())
+#define AM2_TRACE_ON() (!(&am2_trace_window) || am2_trace_window())
 
 #define g_pitch    (*(const int32_t *)(uintptr_t)ADDR_SCREEN_PITCH)
 #define g_frameBuf (*(uint8_t *const *)(uintptr_t)ADDR_FRAMEBUFFER)

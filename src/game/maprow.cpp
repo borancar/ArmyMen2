@@ -58,7 +58,7 @@ extern "C" const uint8_t am2_frame_heading_bias[152] = {
 };
 #endif
 extern "C" int32_t am2_trace_window(void) __attribute__((weak));
-#define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())
+#define AM2_TRACE_ON() (!(&am2_trace_window) || am2_trace_window())
 #include "../inject/patch.h"
 
 /* DirtyCollect is reconstructed, in dirty.cpp, and has no header of its own

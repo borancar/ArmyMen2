@@ -45,7 +45,7 @@
 #include <stdint.h>
 #include <stdio.h>   /* SEEK_CUR only */
 extern "C" int32_t am2_trace_window(void) __attribute__((weak));
-#define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())
+#define AM2_TRACE_ON() (!(&am2_trace_window) || am2_trace_window())
 
 #ifdef AM2_STANDALONE
 /* am2_shake_presets -- 0x00486170, the screen-shake presets ShakeAt selects

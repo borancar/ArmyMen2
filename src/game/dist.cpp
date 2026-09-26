@@ -32,7 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 extern "C" int32_t am2_trace_window(void) __attribute__((weak));
-#define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())
+#define AM2_TRACE_ON() (!(&am2_trace_window) || am2_trace_window())
 
 int32_t __cdecl ApproxDist(const AM2_Point *a, const AM2_Point *b)
 {

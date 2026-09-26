@@ -5,13 +5,34 @@ have to re-derive it. **`CLAUDE.md` and `docs/` are authoritative**; this file
 is a summary and can be stale between updates. Every number below carries the
 command that produces it, so it can be re-measured rather than believed.
 
-Last updated: **2026-09-19**: the port now builds without ArmyMen2.exe (see the
-build note below), the roach SightScan divergence cluster is confirmed closed,
-and the tankstore bridge divergence is fixed -- `RunScriptAction` case 0x36 had
-dropped the point-target FIREWEAPON branch (see OPEN DIVERGENCES). Blob-migration
-history from **2026-09-11**, when
+Last updated: **2026-09-27**: the VC6 toolchain runs natively (no Wine) and the
+reconstruction now recompiles to byte-identical machine code for a first tranche
+of functions (see VC6 BYTE-MATCH below). Earlier, **2026-09-19**: the port builds
+without ArmyMen2.exe (see the build note below), the roach SightScan divergence
+cluster is confirmed closed, and the tankstore bridge divergence is fixed --
+`RunScriptAction` case 0x36 had dropped the point-target FIREWEAPON branch (see
+OPEN DIVERGENCES). Blob-migration history from **2026-09-11**, when
 the first global structures were transcribed out of the carried data blob (see
 MIGRATION below).
+
+## VC6 BYTE-MATCH (2026-09-27): the reconstruction recompiles to the shipped bytes
+
+The Visual C++ 6.0 toolchain now runs natively on Linux with no Wine, via our
+own PE loader over a Win32/CRT shim (`src/vc6/`, `make vc6` -> `build/vc6host`,
+the same trick as the hybrid game loader). `make vc6-match` recompiles each
+`patch_replace`'d reconstruction with the *original* compiler at /O2 and
+byte-compares it to `ArmyMen2.exe` -- the strongest correctness check there is.
+
+First run: **166 of 939 flat `src/game` functions are byte-identical as
+written** (ApproxDist, PackKey, Clamp, PointInRect, …). Re-measure with
+`make vc6-match`. The remaining diffs are source-SHAPE, not behaviour: the
+reconstruction is equivalent but written in a form MSVC 6 compiles differently
+(e.g. MakePoint works in 32-bit masks where the original used 16-bit words).
+A flag sweep confirmed /O2 (blend model) is the original's setting. `win32/*`
+(~700 fns) does not compile yet: windows.h/ddraw.h trips a delay-load gap in the
+hosted c1xx (`RaiseException 0xc06d007e`) -- the next shim milestone. `LINK.EXE`
+(whole-binary match) is deprioritised; it is not needed for function-code match.
+Worklist: `make vc6-match ARGS=--diffs`. See `src/vc6/README.md`.
 
 ## LINKER PLACEMENT (2026-09-14): transcribed globals live at their real VAs
 

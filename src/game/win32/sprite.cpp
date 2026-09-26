@@ -39,7 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 extern "C" int32_t am2_trace_window(void) __attribute__((weak));
-#define AM2_TRACE_ON() (!am2_trace_window || am2_trace_window())
+#define AM2_TRACE_ON() (!(&am2_trace_window) || am2_trace_window())
 
 #ifdef AM2_STANDALONE
 /* The sprite-slot pointer slots the load path fills (0 at init, set to a
