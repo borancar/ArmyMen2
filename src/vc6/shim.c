@@ -14,6 +14,8 @@
 #include <strings.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <fnmatch.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -80,8 +82,10 @@ static void CDECL sh__amsg_exit(int code)
 static void CDECL sh__purecall(void) { fprintf(stderr, "vc6host: pure virtual call\n"); _exit(255); }
 static void CDECL sh__setmbcp(int) {}
 
-/* cl builds Windows paths (backslash separators); translate to POSIX at every
- * file-open boundary, and fold a leading drive letter "X:" away. */
+/* cl/link build Windows paths (backslash separators, drive letters, DOS
+ * UPPERCASE names). At every file-open boundary: translate '\'->'/', drop a
+ * leading "X:", and resolve case-insensitively against the (case-sensitive)
+ * Linux filesystem so lower-cased opens find UPPERCASE files. */
 static const char *winpath(const char *p, char *buf, size_t cap)
 {
     if (!p) return p;
@@ -91,7 +95,51 @@ static const char *winpath(const char *p, char *buf, size_t cap)
     buf[j] = 0;
     return buf;
 }
-#define WP(p) winpath((p), (char[4096]){0}, 4096)
+static int ci_resolve(const char *path, char *out, size_t cap)
+{
+    if (!path || !*path) return 0;
+    if (!access(path, F_OK)) { snprintf(out, cap, "%s", path); return 1; }
+    char tmp[4096]; snprintf(tmp, sizeof tmp, "%s", path);
+    char built[4096]; size_t bl = 0; built[0] = 0;
+    const char *p = tmp;
+    if (*p == '/') { built[0] = '/'; built[1] = 0; bl = 1; p++; }
+    while (*p) {
+        const char *slash = strchr(p, '/');
+        size_t clen = slash ? (size_t)(slash - p) : strlen(p);
+        char comp[256]; if (clen >= sizeof comp) clen = sizeof comp - 1;
+        memcpy(comp, p, clen); comp[clen] = 0;
+        char cand[4096];
+        snprintf(cand, sizeof cand, "%s%s%s", built, (bl && built[bl-1] != '/') ? "/" : "", comp);
+        if (!access(cand, F_OK) || !strcmp(comp, ".") || !strcmp(comp, "..")) {
+            snprintf(built, sizeof built, "%s", cand); bl = strlen(built);
+        } else {
+            DIR *d = opendir(bl ? built : "."); int found = 0;
+            if (d) { struct dirent *e;
+                while ((e = readdir(d))) if (!strcasecmp(e->d_name, comp)) {
+                    snprintf(cand, sizeof cand, "%s%s%s", built, (bl && built[bl-1] != '/') ? "/" : "", e->d_name);
+                    found = 1; break; }
+                closedir(d); }
+            snprintf(built, sizeof built, "%s", cand); bl = strlen(built);
+            (void)found;
+        }
+        if (!slash) break;
+        p = slash + 1;
+    }
+    snprintf(out, cap, "%s", built);
+    return !access(out, F_OK);
+}
+static const char *xpath(const char *p, char *buf, size_t cap)
+{
+    char t[4096]; winpath(p, t, sizeof t);
+    /* Only case-fold things that look like a single path: a ':' means a
+     * path-list (e.g. an env var handed to a file op), not a filename. */
+    if (strchr(t, ':') || strlen(t) > 1024 || !access(t, F_OK))
+        snprintf(buf, cap, "%s", t);
+    else if (!ci_resolve(t, buf, cap))
+        snprintf(buf, cap, "%s", t);       /* create-path: use as-is */
+    return buf;
+}
+#define WP(p) xpath((p), (char[4096]){0}, 4096)
 
 /* ------------------------------------------------------------------- stdio  */
 /* MSVC FILE: ptr,cnt,base,flag,file,charbuf,bufsiz,tmpfname (32 bytes). We run
@@ -315,7 +363,7 @@ static int  CDECL sh__chsize(int fd, long sz) { return ftruncate(fd, sz); }
 static intptr_t CDECL sh__get_osfhandle(int fd) { return fd; }
 static int  CDECL sh__setmode(int fd, int mode) { (void)fd; (void)mode; return 0x4000; }
 static int  CDECL sh__commit(int fd) { return fsync(fd); }
-static int  CDECL sh__unlink(const char *p) { return unlink(WP(p)); }
+static int  CDECL sh__unlink(const char *p) { if (getenv("VC6_KEEPTMP")) return 0; return unlink(WP(p)); }
 
 /* MSVC struct _stat: dev,ino,mode,nlink,uid,gid,rdev(all short bar dev/rdev),
  * off, then atime/mtime/ctime as 32-bit time_t. 36 bytes. */
@@ -703,7 +751,7 @@ static void STDCALL sh_RaiseException(DWORD code, DWORD f, DWORD n, const void *
   _exit(4); }
 static void STDCALL sh_DebugBreak(void) { fprintf(stderr, "vc6host: DebugBreak\n"); _exit(4); }
 
-static int CDECL sh_remove(const char *p) { return remove(WP(p)); }
+static int CDECL sh_remove(const char *p) { if (getenv("VC6_KEEPTMP")) return 0; return remove(WP(p)); }
 static int CDECL sh_rename(const char *a, const char *b) { char t[4096]; winpath(a,t,sizeof t);
     char u[4096]; winpath(b,u,sizeof u); return rename(t, u); }
 
@@ -727,9 +775,41 @@ static BOOL STDCALL sh_CopyFileA(const char *src, const char *dst, BOOL failIfEx
     while ((r = read(in, buf, sizeof buf)) > 0) if (write(out, buf, r) != r) { ok = 0; break; }
     close(in); close(out); return ok;
 }
-static HANDLE STDCALL sh_FindFirstFileA(const char *pat, void *data) { (void)pat; (void)data; s_last_error = 2; return INVALID_HANDLE; }
-static BOOL   STDCALL sh_FindNextFileA(HANDLE h, void *data) { (void)h; (void)data; return 0; }
-static BOOL   STDCALL sh_FindClose(HANDLE h) { (void)h; return 1; }
+/* WIN32_FIND_DATAA: attrs @+0, sizeLow @+0x14, cFileName @+0x2C. */
+typedef struct { DIR *dir; char dirpath[1024]; char pat[260]; } FindState;
+static void find_fill(void *data, const char *dir, const char *name)
+{
+    memset(data, 0, 320);
+    char full[2048]; snprintf(full, sizeof full, "%s/%s", dir[0] ? dir : ".", name);
+    struct stat st; DWORD attr = 0x80;                 /* FILE_ATTRIBUTE_NORMAL */
+    if (!stat(full, &st)) { if (S_ISDIR(st.st_mode)) attr = 0x10; ((DWORD *)data)[5] = (DWORD)st.st_size; }
+    ((DWORD *)data)[0] = attr;
+    strncpy((char *)data + 0x2C, name, 259);
+}
+static HANDLE STDCALL sh_FindFirstFileA(const char *pat, void *data)
+{
+    char p[4096]; winpath(pat, p, sizeof p);
+    char dir[1024], fp[260]; char *slash = strrchr(p, '/');
+    if (slash) { size_t dl = (size_t)(slash - p); if (dl >= sizeof dir) dl = sizeof dir - 1;
+                 memcpy(dir, p, dl); dir[dl] = 0; snprintf(fp, sizeof fp, "%s", slash + 1); }
+    else { dir[0] = 0; snprintf(fp, sizeof fp, "%s", p); }
+    DIR *d = opendir(dir[0] ? dir : ".");
+    if (!d) { s_last_error = 2; return INVALID_HANDLE; }
+    FindState *fs = (FindState *)malloc(sizeof *fs);
+    fs->dir = d; snprintf(fs->dirpath, sizeof fs->dirpath, "%s", dir); snprintf(fs->pat, sizeof fs->pat, "%s", fp);
+    struct dirent *e;
+    while ((e = readdir(d))) if (!fnmatch(fs->pat, e->d_name, FNM_CASEFOLD)) { find_fill(data, fs->dirpath, e->d_name); return (HANDLE)fs; }
+    closedir(d); free(fs); s_last_error = 2; return INVALID_HANDLE;
+}
+static BOOL STDCALL sh_FindNextFileA(HANDLE h, void *data)
+{
+    FindState *fs = (FindState *)h; if (!fs || h == INVALID_HANDLE) return 0;
+    struct dirent *e;
+    while ((e = readdir(fs->dir))) if (!fnmatch(fs->pat, e->d_name, FNM_CASEFOLD)) { find_fill(data, fs->dirpath, e->d_name); return 1; }
+    s_last_error = 18; return 0;                        /* ERROR_NO_MORE_FILES */
+}
+static BOOL STDCALL sh_FindClose(HANDLE h)
+{ FindState *fs = (FindState *)h; if (fs && h != INVALID_HANDLE) { closedir(fs->dir); free(fs); } return 1; }
 static DWORD  STDCALL sh_SearchPathA(const char *path, const char *file, const char *ext, DWORD len, char *buf, char **filepart)
 { (void)path;(void)file;(void)ext;(void)len;(void)buf; if (filepart) *filepart = 0; return 0; }
 static BOOL   STDCALL sh_GetFileInformationByHandle(HANDLE h, void *info)
