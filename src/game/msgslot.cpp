@@ -38,14 +38,14 @@ uint32_t __cdecl MsgField12(const void *msg)
 /* cdq/and 0x1F/add/sar is the compiler's signed divide by 32, not a shift. */
 int32_t __cdecl CommMean32(const void *comm)
 {
-    const int32_t *p = (const int32_t *)((const uint8_t *)comm + 0x3A0);
     int32_t        sum = 0;
     int32_t        i;
+    const int32_t *p = (const int32_t *)((const uint8_t *)comm + 0x3A0);
 
     for (i = 0; i < 32; i++)
         sum += p[i];
 
-    return (sum + (sum < 0 ? 31 : 0)) >> 5;
+    return sum / 32;
 }
 
 /* 0x00402EC0. The same mean, by player ID rather than by pointer, and 0 for a
