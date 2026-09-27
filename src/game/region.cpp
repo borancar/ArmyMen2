@@ -47,16 +47,16 @@ extern "C" const int32_t am2_hit_pose_by_class[6] = { 12, 13, 14, 15, 16, 17 };
  * am2_weapon_pose_frames[53]/[56] (0x004750B4/C0), handled in standalone.h. */
 #endif
 
-#define kRegionOfCell (*(uint8_t **)AM2_IMAGE(ADDR_REGION_OF_CELL))
-#define kRegionCost   (*(uint8_t **)AM2_IMAGE(ADDR_REGION_COST))
-#define kRegionNext   (*(uint8_t **)AM2_IMAGE(ADDR_REGION_NEXT))
+#define kRegionOfCell (*(uint8_t **)((void *)(uintptr_t)(ADDR_REGION_OF_CELL)))
+#define kRegionCost   (*(uint8_t **)((void *)(uintptr_t)(ADDR_REGION_COST)))
+#define kRegionNext   (*(uint8_t **)((void *)(uintptr_t)(ADDR_REGION_NEXT)))
 /* Spelled as army.cpp spells it, so checkglobals sees one name per
  * address rather than two. */
 #define g_armyObjLists ((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
 /* 0x00514EF0 holds a POINTER to the array, not the array. Same shape as the
  * cell map above; getting this wrong took the game down on the first run. */
-#define kRegions      (*(uint8_t **)AM2_IMAGE(ADDR_REGIONS))
-#define kTracePF      (*(const int32_t *)AM2_IMAGE(ADDR_OPT_TRACE_PF))
+#define kRegions      (*(uint8_t **)((void *)(uintptr_t)(ADDR_REGIONS)))
+#define kTracePF      (*(const int32_t *)((void *)(uintptr_t)(ADDR_OPT_TRACE_PF)))
 
 #define kNLinks(r)  (*(uint8_t *)(kRegions + (r) * AM2_REGION_SIZE \
                                  + REGION_OFF_NLINKS))
@@ -175,14 +175,14 @@ void __cdecl BuildRegionGraph(void)
 
     weights = *(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
 
-    tile = *(const int32_t *)AM2_IMAGE(ADDR_MAP_TILES_W) * AM2_REGION_MARGIN
+    tile = *(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_W)) * AM2_REGION_MARGIN
            + AM2_REGION_MARGIN;
 
     for (y = AM2_REGION_MARGIN;
-         y < *(const int32_t *)AM2_IMAGE(ADDR_MAP_TILES_H) - AM2_REGION_MARGIN;
+         y < *(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_H)) - AM2_REGION_MARGIN;
          y++, tile += AM2_REGION_MARGIN * 2) {
         for (x = AM2_REGION_MARGIN;
-             x < *(const int32_t *)AM2_IMAGE(ADDR_MAP_TILES_W)
+             x < *(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_W))
                  - AM2_REGION_MARGIN;
              x++, tile++) {
             uint32_t at = (uint32_t)tile & 0xFFFFu;
@@ -204,14 +204,14 @@ void __cdecl BuildRegionGraph(void)
             if (!region)
                 continue;
 
-            if (region >= *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE)) {
-                int32_t old = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
+            if (region >= *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE))) {
+                int32_t old = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
 
                 kRegions = (uint8_t *)am2_realloc(kRegions,
                     (size_t)(region + 1) * AM2_REGION_SIZE);
                 memset(kRegions + (uint32_t)old * AM2_REGION_SIZE, 0,
                        (size_t)(region - old + 1) * AM2_REGION_SIZE);
-                *(int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE) =
+                *(int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)) =
                     (int16_t)(region + 1);
             }
 
@@ -229,7 +229,7 @@ void __cdecl BuildRegionGraph(void)
             /* Up, left, right, down -- four inlined tests in the original
              * and four here, in its order. Each is linked when its region
              * differs and its weight is under AM2_BLOCK_FULL. */
-            w = *(const int32_t *)AM2_IMAGE(ADDR_MAP_TILES_W);
+            w = *(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_W));
 
             n = (int32_t)(at - (uint32_t)w);
             if ((int32_t)kRegionOfCell[n] != region
@@ -254,7 +254,7 @@ void __cdecl BuildRegionGraph(void)
     }
 
     {
-        int32_t stride = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
+        int32_t stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
         size_t  bytes  = (size_t)(stride * stride);
 
         kRegionNext = (uint8_t *)am2_malloc(bytes);
@@ -263,7 +263,7 @@ void __cdecl BuildRegionGraph(void)
         kRegionCost = (uint8_t *)am2_malloc(bytes);
         memset(kRegionCost, 0, bytes);
 
-        *(uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP) = 1;
+        *(uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)) = 1;
     }
 }
 
@@ -564,7 +564,7 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
     if (from == to)
         return 0;
 
-    stride = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
+    stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
 
     /* CORRECTED. This compared `!=` and called that "already solved", which is
        the original's test inverted: 0x00406492 is `cmp cl, al; je` PAST the
@@ -573,18 +573,18 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
        write the stamp byte into the cost entry as the last thing they do. The
        inverted version re-solved every solved pair and skipped every unsolved
        one; see ActivateRegion for why nothing here caught it. */
-    if ((*(const uint8_t *const *)AM2_IMAGE(ADDR_REGION_COST))
+    if ((*(const uint8_t *const *)((void *)(uintptr_t)(ADDR_REGION_COST)))
             [from * stride + to]
-        == *(const uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP)) {
+        == *(const uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP))) {
         /* already solved */
     } else if (!solve) {
         return -1;
     } else {
         RegionSolvePair(from, to);
-        stride = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
+        stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
     }
 
-    next = *(const uint8_t *const *)AM2_IMAGE(ADDR_REGION_NEXT);
+    next = *(const uint8_t *const *)((void *)(uintptr_t)(ADDR_REGION_NEXT));
     at   = from;
     hops = 0;
 
@@ -611,7 +611,7 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
  * and "unsolved" together with "far away". */
 int32_t __cdecl RegionsNear(const void *a, const void *b, int32_t solve)
 {
-    const uint8_t *cells = *(const uint8_t *const *)AM2_IMAGE(ADDR_REGION_OF_CELL);
+    const uint8_t *cells = *(const uint8_t *const *)((void *)(uintptr_t)(ADDR_REGION_OF_CELL));
     int32_t        rb, ra, hops;
 
     rb = cells[(uint32_t)TileOfPoint(
@@ -673,34 +673,34 @@ void __cdecl ActivateRegion(int32_t region)
 {
     uint8_t *rec;
 
-    if (region >= *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE))
+    if (region >= *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
         return;
 
-    rec = *(uint8_t *const *)AM2_IMAGE(ADDR_REGIONS)
+    rec = *(uint8_t *const *)((void *)(uintptr_t)(ADDR_REGIONS))
           + region * AM2_REGION_SIZE + REGION_OFF_ACTIVE;
 
     if (*(const int32_t *)rec != 0)
         return;
 
     *(int32_t *)rec = 1;
-    (*(uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP))++;
+    (*(uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)))++;
 }
 
 void __cdecl InactivateRegion(int32_t region)
 {
     uint8_t *rec;
 
-    if (region >= *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE))
+    if (region >= *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
         return;
 
-    rec = *(uint8_t *const *)AM2_IMAGE(ADDR_REGIONS)
+    rec = *(uint8_t *const *)((void *)(uintptr_t)(ADDR_REGIONS))
           + region * AM2_REGION_SIZE + REGION_OFF_ACTIVE;
 
     if (*(const int32_t *)rec == 0)
         return;
 
     *(int32_t *)rec = 0;
-    (*(uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP))++;
+    (*(uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)))++;
 }
 
 typedef int32_t (__cdecl *AM2_PointRuleFn)(int32_t tile);
@@ -1529,7 +1529,7 @@ int32_t __cdecl FindPath(int32_t from, int32_t to, uint16_t *out, int32_t *n,
 int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg)
 {
     uint8_t  *o = (uint8_t *)obj;
-    uint16_t *route = (uint16_t *)AM2_IMAGE(ADDR_TILE_LINE_BUF);
+    uint16_t *route = (uint16_t *)((void *)(uintptr_t)(ADDR_TILE_LINE_BUF));
     int32_t   n = 0;
     int32_t   i;
 
@@ -3229,13 +3229,13 @@ void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
     }
 
     if (to > 0 && from > 0 && to != from) {
-        int16_t stride = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
+        int16_t stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
         int32_t link;
 
         *(int16_t *)(o + OBJ_OFF_GOAL_REGION) = (int16_t)to;
 
         if (kRegionCost[(uint32_t)(from * stride + to)]
-            != *(const uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP))
+            != *(const uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)))
             RegionSolvePair(from, to);
 
         if (from == *(const int16_t *)(o + OBJ_OFF_PREV_REGION)
@@ -3456,11 +3456,11 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
         goto after_region;
 
     {
-        int16_t stride = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
+        int16_t stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
         int32_t link;
 
         if (kRegionCost[(uint32_t)(fromRegion * stride + toRegion)]
-            != *(const uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP))
+            != *(const uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)))
             RegionSolvePair(fromRegion, toRegion);
 
         link = (int16_t)MiddleRegionLink(
@@ -3639,13 +3639,13 @@ void __cdecl RoachRouteToward(void *obj, void *out, const void *ctx)
     }
 
     if (to > 0 && from > 0 && to != from) {
-        int16_t stride = *(const int16_t *)AM2_IMAGE(ADDR_REGION_STRIDE);
+        int16_t stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
         int32_t link;
 
         *(int16_t *)(o + OBJ_OFF_GOAL_REGION) = (int16_t)to;
 
         if (kRegionCost[(uint32_t)(from * stride + to)]
-            != *(const uint8_t *)AM2_IMAGE(ADDR_REGION_STAMP))
+            != *(const uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)))
             RegionSolvePair(from, to);
 
         if (from == *(const int16_t *)(o + OBJ_OFF_PREV_REGION)
@@ -7361,7 +7361,7 @@ void __cdecl AiStepAttach(void *obj, void *out)
         int32_t r;
 
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-            *(const uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_ZERO_POINT);
+            *(const uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_ZERO_POINT));
 
         r = orig_region_rand();
 
@@ -9163,7 +9163,7 @@ void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
 
     /* Arrived. */
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-        *(const uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_ZERO_POINT);
+        *(const uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_ZERO_POINT));
 
     if (*(void **)(c + SIGHT_OFF_LEADER)) {
         /* HAS-LEADER: the original runs a formation-approach block first
@@ -9428,7 +9428,7 @@ typedef void (__cdecl *am2_char_fn)(uint32_t wparam, int32_t lo, int32_t hi);
 #define g_cursorY      (*(int32_t *)(uintptr_t)ADDR_CURSOR_Y)
 #define g_viewRect   ((AM2_Rect *)(uintptr_t)ADDR_VIEW_ORIGIN_X)
 #define g_frameDeltaMs (*(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
-#define g_gameClockMs   (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
+#define g_gameClockMs   (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
 #define g_defaultPos    (*(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT)
 #define g_turnRepeatMs (*(int32_t *)(uintptr_t)ADDR_TURN_REPEAT_MS)
 #define g_throttleDeadline (*(uint32_t *)(uintptr_t)ADDR_THROTTLE_DEADLINE)

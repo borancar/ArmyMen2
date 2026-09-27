@@ -62,11 +62,11 @@ uint8_t am2_key_bindings[42] = {
 };
 #endif
 
-#define kBlock  ((char *)(uintptr_t)AM2_IMAGE(ADDR_GAMEPROC_BLOCK))
-#define kStrB   ((char *)(uintptr_t)AM2_IMAGE(ADDR_GAMEPROC_STR_B))
-#define kVolZero   (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_VOLUME_AT_ZERO))
-#define kVolStream (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_STREAM_VOLUME))
-#define kVolVoice  (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_VOLUME_VOICE))
+#define kBlock  ((char *)(uintptr_t)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)))
+#define kStrB   ((char *)(uintptr_t)((void *)(uintptr_t)(ADDR_GAMEPROC_STR_B)))
+#define kVolZero   (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)))
+#define kVolStream (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)))
+#define kVolVoice  (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)))
 /* SaveDefaultCof's three. The first two are spelled as army.cpp spells them,
  * so checkglobals sees one name per address and not two. */
 #define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
@@ -194,7 +194,7 @@ void __cdecl LoadOptions(void)
     uint8_t  *key;
     int32_t   len;
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
 
     fp = orig_fopen("Options.cfg",
                     "r");
@@ -209,41 +209,41 @@ void __cdecl LoadOptions(void)
         goto defaults;
     orig_fseek(fp, 0, 0);
 
-    orig_fread((void *)AM2_IMAGE(ADDR_VOLUME_AT_ZERO), 4, 1, fp);
-    orig_fread((void *)AM2_IMAGE(ADDR_STREAM_VOLUME), 4, 1, fp);
-    orig_fread((void *)AM2_IMAGE(ADDR_VOLUME_VOICE), 4, 1, fp);
-    orig_fread((void *)AM2_IMAGE(ADDR_MOVIE_COUNT), 4, 1, fp);
+    orig_fread((void *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)), 4, 1, fp);
+    orig_fread((void *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)), 4, 1, fp);
+    orig_fread((void *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)), 4, 1, fp);
+    orig_fread((void *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT)), 4, 1, fp);
 
     for (key = (uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS);
          key < (uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS_END);
          key += 2)
         orig_fread(key, 1, 1, fp);
 
-    orig_fread((void *)AM2_IMAGE(ADDR_DIFFICULTY), 4, 1, fp);
-    orig_fread((void *)AM2_IMAGE(ADDR_HOST_MASK_A), 4, 1, fp);
-    orig_fread((void *)AM2_IMAGE(ADDR_HOST_MASK_B), 4, 1, fp);
-    orig_fread((void *)AM2_IMAGE(ADDR_HOST_VALUE_3E8), 4, 1, fp);
+    orig_fread((void *)((void *)(uintptr_t)(ADDR_DIFFICULTY)), 4, 1, fp);
+    orig_fread((void *)((void *)(uintptr_t)(ADDR_HOST_MASK_A)), 4, 1, fp);
+    orig_fread((void *)((void *)(uintptr_t)(ADDR_HOST_MASK_B)), 4, 1, fp);
+    orig_fread((void *)((void *)(uintptr_t)(ADDR_HOST_VALUE_3E8)), 4, 1, fp);
 
     len = 0;
     orig_fread(&len, 4, 1, fp);
-    orig_fread((void *)AM2_IMAGE(ADDR_SAVED_PLAYER_NAME), 1, (size_t)len, fp);
-    ((char *)AM2_IMAGE(ADDR_SAVED_PLAYER_NAME))[len] = '\0';
+    orig_fread((void *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)), 1, (size_t)len, fp);
+    ((char *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)))[len] = '\0';
 
     len = 0;
     orig_fread(&len, 4, 1, fp);
-    orig_fread((void *)AM2_IMAGE(ADDR_SAVED_BATTLE_NAME), 1, (size_t)len, fp);
-    ((char *)AM2_IMAGE(ADDR_SAVED_BATTLE_NAME))[len] = '\0';
+    orig_fread((void *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)), 1, (size_t)len, fp);
+    ((char *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)))[len] = '\0';
 
     orig_fflush(fp);
     orig_fclose(fp);
 
     /* Migrate an old file's "quiet" to "silent". Only these three. */
-    if (*(int32_t *)AM2_IMAGE(ADDR_VOLUME_AT_ZERO) == AM2_VOLUME_SENTINEL)
-        *(int32_t *)AM2_IMAGE(ADDR_VOLUME_AT_ZERO) = AM2_VOLUME_SILENT;
-    if (*(int32_t *)AM2_IMAGE(ADDR_STREAM_VOLUME) == AM2_VOLUME_SENTINEL)
-        *(int32_t *)AM2_IMAGE(ADDR_STREAM_VOLUME) = AM2_VOLUME_SILENT;
-    if (*(int32_t *)AM2_IMAGE(ADDR_VOLUME_VOICE) == AM2_VOLUME_SENTINEL)
-        *(int32_t *)AM2_IMAGE(ADDR_VOLUME_VOICE) = AM2_VOLUME_SILENT;
+    if (*(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)) == AM2_VOLUME_SENTINEL)
+        *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)) = AM2_VOLUME_SILENT;
+    if (*(int32_t *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)) == AM2_VOLUME_SENTINEL)
+        *(int32_t *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)) = AM2_VOLUME_SILENT;
+    if (*(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)) == AM2_VOLUME_SENTINEL)
+        *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)) = AM2_VOLUME_SILENT;
     return;
 
 defaults:
@@ -254,10 +254,10 @@ defaults:
      * each binding is restored and the alternate is left as it was. */
     orig_log("Failed to open Options.cfg for reading\n");
 
-    *(int32_t *)AM2_IMAGE(ADDR_VOLUME_AT_ZERO) = 0;
-    *(int32_t *)AM2_IMAGE(ADDR_STREAM_VOLUME)  = 0;
-    *(int32_t *)AM2_IMAGE(ADDR_VOLUME_VOICE)   = 0;
-    *(int32_t *)AM2_IMAGE(ADDR_MOVIE_COUNT)    = 0;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)) = 0;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME))  = 0;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE))   = 0;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT))    = 0;
 
     {
         const uint8_t *src = (const uint8_t *)AM2_IMAGE(ADDR_KEY_DEFAULTS);
@@ -308,7 +308,7 @@ void __cdecl SaveOptions(void)
     const uint8_t *key;
     int32_t   len;
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
 
     orig_chmod("Options.cfg", AM2_CHMOD_RW);
 
@@ -319,29 +319,29 @@ void __cdecl SaveOptions(void)
         return;
     }
 
-    orig_fwrite((const void *)AM2_IMAGE(ADDR_VOLUME_AT_ZERO), 4, 1, fp);
-    orig_fwrite((const void *)AM2_IMAGE(ADDR_STREAM_VOLUME), 4, 1, fp);
-    orig_fwrite((const void *)AM2_IMAGE(ADDR_VOLUME_VOICE), 4, 1, fp);
-    orig_fwrite((const void *)AM2_IMAGE(ADDR_MOVIE_COUNT), 4, 1, fp);
+    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)), 4, 1, fp);
+    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)), 4, 1, fp);
+    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)), 4, 1, fp);
+    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT)), 4, 1, fp);
 
     for (key = (const uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS);
          key < (const uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS_END);
          key += 2)
         orig_fwrite(key, 1, 1, fp);
 
-    orig_fwrite((const void *)AM2_IMAGE(ADDR_DIFFICULTY), 4, 1, fp);
-    orig_fwrite((const void *)AM2_IMAGE(ADDR_HOST_MASK_A), 4, 1, fp);
-    orig_fwrite((const void *)AM2_IMAGE(ADDR_HOST_MASK_B), 4, 1, fp);
-    orig_fwrite((const void *)AM2_IMAGE(ADDR_HOST_VALUE_3E8), 4, 1, fp);
+    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_DIFFICULTY)), 4, 1, fp);
+    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_HOST_MASK_A)), 4, 1, fp);
+    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_HOST_MASK_B)), 4, 1, fp);
+    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_HOST_VALUE_3E8)), 4, 1, fp);
 
-    len = (int32_t)strlen((const char *)AM2_IMAGE(ADDR_SAVED_PLAYER_NAME));
+    len = (int32_t)strlen((const char *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)));
     orig_fwrite(&len, 4, 1, fp);
-    orig_fwrite((const void *)AM2_IMAGE(ADDR_SAVED_PLAYER_NAME),
+    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)),
                 1, (size_t)len, fp);
 
-    len = (int32_t)strlen((const char *)AM2_IMAGE(ADDR_SAVED_BATTLE_NAME));
+    len = (int32_t)strlen((const char *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)));
     orig_fwrite(&len, 4, 1, fp);
-    orig_fwrite((const void *)AM2_IMAGE(ADDR_SAVED_BATTLE_NAME),
+    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)),
                 1, (size_t)len, fp);
 
     orig_fflush(fp);
@@ -433,7 +433,7 @@ int32_t __cdecl SaveDefaultCof(void)
             ObjDropAltRecord(obj);
             Type238Action(obj, (g_levelId * 5 + 5) * 2);
             *(uint32_t *)(obj + OBJ_OFF_FIELD_C0) =
-                *(const uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_ZERO_POINT);
+                *(const uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_ZERO_POINT));
 
             if (*(const uint32_t *)(obj + OBJ_OFF_RIDING)) {
                 void *rows = *(void **)(obj + OBJ_OFF_ROWS);
@@ -620,14 +620,14 @@ int32_t __cdecl SaveGame(const char *name)
     am2_FILE  *fp;
     int32_t    h;
 
-    if (!*(const char *)(uintptr_t)AM2_IMAGE(ADDR_GAMEPROC_BLOCK))
+    if (!*(const char *)(uintptr_t)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)))
         return 0;
     if (!*name)
         return 0;
 
     SetGameDir("save");
 
-    strcpy(lvl, (const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
+    strcpy(lvl, (const char *)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)));
 
     h = orig_findfirst(lvl, fd);
     if (h == -1) {
@@ -639,7 +639,7 @@ int32_t __cdecl SaveGame(const char *name)
     }
 
     orig_sprintf(path, "save\\%s",
-                 (const char *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
+                 (const char *)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)));
     SetGameDir(path);
 
     fp = orig_fopen(name, "wb");
@@ -674,7 +674,7 @@ int32_t __cdecl LoadGame(am2_FILE *fp)
                       "C:\\ArmyMen2\\source\\gameproc.cpp", 0x53D))
         goto fail;
 
-    ScriptResetTokens((AM2_ScriptCtx *)AM2_IMAGE(ADDR_SCRIPT_CONTEXT));
+    ScriptResetTokens((AM2_ScriptCtx *)((void *)(uintptr_t)(ADDR_SCRIPT_CONTEXT)));
 
     if (!LoadGameProcSection(fp))   goto fail;
     if (!LoadMapSection(fp))        goto fail;
@@ -1314,7 +1314,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
     frame = (def == 2 || def == 5) ? AM2_MISSILE_FRAME_A : AM2_MISSILE_FRAME_B;
 
     *(int8_t *)(o + OBJ_OFF_ARMY) = *(const int8_t *)(w + OBJ_OFF_ARMY);
-    ObjInitCommon(o, (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+    ObjInitCommon(o, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                   AM2_OBJ_TYPE_MISSILE, at,
                   (const int32_t *)AM2_IMAGE(ADDR_MISSILE_BOX),
                   initUnused, uid);
@@ -1429,7 +1429,7 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
 
     *(int8_t *)(o + OBJ_OFF_ARMY) = *(const int8_t *)(h + OBJ_OFF_ARMY);
 
-    ObjInitCommon(o, (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+    ObjInitCommon(o, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                          AM2_OBJ_TYPE_MISSILE,
                          *(const uint32_t *)(h + OBJ_OFF_POS),
                          (const int32_t *)AM2_IMAGE(ADDR_MISSILE_BOX),
@@ -1507,7 +1507,7 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
 
     o = (uint8_t *)CreateRoach(
             *(const int32_t *)(rec + 0x498),
-            (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+            (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
             *(const int16_t *)(h + OBJ_OFF_POS),
             *(const int16_t *)(h + OBJ_OFF_POS + 2),
             *(const int8_t *)(h + OBJ_OFF_ARMY),
@@ -1606,7 +1606,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
 
     if (renumber) {
         o = (uint8_t *)CreateTrooper(
-                (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                 *(const int16_t *)(h + OBJ_OFF_POS),
                 *(const int16_t *)(h + OBJ_OFF_POS + 2),
                 *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT),
@@ -1623,7 +1623,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
         *(int32_t *)(rec + TYPE2_REC_OFF_CLEAR_4DC) = 0;
     } else {
         o = (uint8_t *)CreateTrooper(
-                (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                 *(const int16_t *)(h + OBJ_OFF_POS),
                 *(const int16_t *)(h + OBJ_OFF_POS + 2),
                 *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT),
@@ -1801,7 +1801,7 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
     orig_fread(rec, AM2_TYPE3_RECORD_SIZE, 1, fp);
 
     o = (uint8_t *)CreateVehicle(*(const int32_t *)(rec + TYPE3_REC_OFF_KIND),
-                                 (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                                 (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                                  *(const int16_t *)(h + OBJ_OFF_POS),
                                  *(const int16_t *)(h + OBJ_OFF_POS + 2),
                                  *(const int32_t *)(rec + TYPE3_REC_OFF_ARG5),
@@ -1937,7 +1937,7 @@ void *__cdecl LoadType1(am2_FILE *fp, const void *hdr)
     orig_fread(&tag, 4, 1, fp);
 
     obj = (uint8_t *)CreateItem(
-        (char *)AM2_IMAGE(ADDR_DIR_SCRATCH), AM2_ARMY_NEUTRAL,
+        (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), AM2_ARMY_NEUTRAL,
         (int32_t)tag,
         *(const int32_t *)((const uint8_t *)hdr + OBJ_OFF_POS),
         *(const int32_t *)((const uint8_t *)hdr + OBJ_OFF_FLAGS), 1,
@@ -2786,12 +2786,12 @@ void __attribute__((thiscall)) AM2_SelList::SelListDestruct()
  * mentioned. */
 void *__cdecl SelListConstructThunk(void)
 {
-    return SelListConstruct((void *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
+    return SelListConstruct((void *)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)));
 }
 
 void __cdecl SelListDestructThunk(void)
 {
-    SelListDestruct((void *)AM2_IMAGE(ADDR_GAMEPROC_BLOCK));
+    SelListDestruct((void *)((void *)(uintptr_t)(ADDR_GAMEPROC_BLOCK)));
 }
 
 /* 0x004248B0. Hands the destructor thunk to the CRT's atexit and returns its
@@ -3028,7 +3028,7 @@ void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber)
 
     if (renumber) {
         w = (uint8_t *)CreateWeapon(
-                (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH), AM2_ARMY_NEUTRAL, aai,
+                (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), AM2_ARMY_NEUTRAL, aai,
                 *(const int32_t *)(h + OBJ_OFF_POS),
                 *(const int32_t *)(h + OBJ_OFF_FLAGS),
                 (int32_t)extra, 1, 0);
@@ -3037,7 +3037,7 @@ void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber)
         *(uint32_t *)(h + OBJ_OFF_UID) = *(const uint32_t *)(w + OBJ_OFF_UID);
     } else {
         w = (uint8_t *)CreateWeapon(
-                (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH), AM2_ARMY_NEUTRAL, aai,
+                (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), AM2_ARMY_NEUTRAL, aai,
                 *(const int32_t *)(h + OBJ_OFF_POS),
                 *(const int32_t *)(h + OBJ_OFF_FLAGS),
                 (int32_t)extra, 1,

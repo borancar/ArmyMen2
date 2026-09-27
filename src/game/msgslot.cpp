@@ -254,7 +254,7 @@ extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
  * `system` is only ever tested for zero, so the 4 is not a flag value. */
 void __cdecl SendChatMsg(char *text, int32_t system)
 {
-    uint8_t *record = (uint8_t *)AM2_IMAGE(ADDR_MSG_CHAT);
+    uint8_t *record = (uint8_t *)((void *)(uintptr_t)(ADDR_MSG_CHAT));
     uint8_t  sender;
 
     if (strlen(text) > 0xFF)

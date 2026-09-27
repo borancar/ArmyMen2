@@ -23,8 +23,8 @@ typedef uint32_t (__stdcall *AM2_TickFn)(void);
 #define orig_get_tick_count (*(AM2_TickFn *)AM2_IMAGE(ADDR_IAT_GET_TICK_COUNT))
 
 #define kComm       (*(uint8_t **)AM2_IMAGE(ADDR_COMM_OBJECT))
-#define kPacket     ((uint8_t *)AM2_IMAGE(ADDR_ARMY_PACKET))
-#define kPacketLen  (*(int32_t *)AM2_IMAGE(ADDR_ARMY_PACKET_LEN))
+#define kPacket     ((uint8_t *)((void *)(uintptr_t)(ADDR_ARMY_PACKET)))
+#define kPacketLen  (*(int32_t *)((void *)(uintptr_t)(ADDR_ARMY_PACKET_LEN)))
 
 #define kCommField(off) (*(const int32_t *)(kComm + (off)))
 
@@ -100,7 +100,7 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
         return 0;
 
     seq = *(const int32_t *)(me + FLOW_OFF_SEQUENCE);
-    *(int32_t *)AM2_IMAGE(ADDR_ARMY_PACKET_SEQ) = seq;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_ARMY_PACKET_SEQ)) = seq;
 
     for (i = 0, off = 0;
          i < kCommField(COMM_OFF_PLAYER_COUNT);
@@ -215,7 +215,7 @@ void __cdecl ArmyMessageSend(const void *msg)
  * literals and reports our own player id, so a capture shows who paused. */
 void __cdecl SendGamePause(int32_t pause, int32_t flags)
 {
-    uint8_t *msg = (uint8_t *)AM2_IMAGE(ADDR_MSG_GAME_PAUSE);
+    uint8_t *msg = (uint8_t *)((void *)(uintptr_t)(ADDR_MSG_GAME_PAUSE));
 
     if (kCommField(COMM_OFF_JOINED) == 0)
         return;

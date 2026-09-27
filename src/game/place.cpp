@@ -75,16 +75,16 @@ extern "C" const uint8_t am2_unit_types[720] = {
 };
 #endif
 
-#define g_placements     (*(AM2_Placement **)AM2_IMAGE(ADDR_PLACEMENTS))
-#define g_placementCount (*(int32_t *)AM2_IMAGE(ADDR_PLACEMENT_COUNT))
-#define g_placementCap   (*(int32_t *)AM2_IMAGE(ADDR_PLACEMENT_CAP))
+#define g_placements     (*(AM2_Placement **)((void *)(uintptr_t)(ADDR_PLACEMENTS)))
+#define g_placementCount (*(int32_t *)((void *)(uintptr_t)(ADDR_PLACEMENT_COUNT)))
+#define g_placementCap   (*(int32_t *)((void *)(uintptr_t)(ADDR_PLACEMENT_CAP)))
 #define g_gameSetting22C (*(uint32_t *)(uintptr_t)ADDR_GAME_SETTING_22C)
 #define g_armyPoints     ((const int32_t *)(uintptr_t)ADDR_ARMY_POINTS)
 #define g_commObject   (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
 /* Spelled as script.cpp spells them, which is the file already reaching
  * these two -- g_mapName is taken, on a DIFFERENT address. */
-#define kMapName      ((const char *)AM2_IMAGE(ADDR_MAP_NAME))
-#define kMapFolder    ((const char *)AM2_IMAGE(ADDR_MAP_FOLDER))
+#define kMapName      ((const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)))
+#define kMapFolder    ((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)))
 
 #define kSep         (" \t\n;,")
 
@@ -700,9 +700,9 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
         ObjSetFieldA(made, (uint32_t)group);
 
         weapon = (uint8_t *)CreateWeapon(
-                     (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH), slot,
+                     (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), slot,
                      KeyLookupTriple(AM2_WEAPON_KEY_KIND, (uint32_t)kind, 0),
-                     *(const uint32_t *)AM2_IMAGE(ADDR_ZERO_POINT),
+                     *(const uint32_t *)((void *)(uintptr_t)(ADDR_ZERO_POINT)),
                      AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
 
         if (weapon) {
@@ -726,7 +726,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
         int32_t i;
 
         made = (uint8_t *)CreateVehicle(
-                   kind, (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                   kind, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                    (int16_t)where, (int16_t)(where >> 16), slot,
                    CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT, slot),
                    0, 0, 0, facing);
@@ -807,7 +807,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
                                     : AM2_PILLBOX_WEAPON_BAZOOKA;
 
             occupant = (uint8_t *)CreateTrooper(
-                           (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+                           (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                            (int16_t)where, (int16_t)(where >> 16), slot,
                            CommArmyOfSlot(
                                *(void **)(uintptr_t)ADDR_COMM_OBJECT, slot),
@@ -815,10 +815,10 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
             ObjSetFieldA(occupant, (uint32_t)group);
 
             weapon = (uint8_t *)CreateWeapon(
-                         (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH), slot,
+                         (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), slot,
                          KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                          (uint32_t)wkind, 0),
-                         *(const uint32_t *)AM2_IMAGE(ADDR_ZERO_POINT),
+                         *(const uint32_t *)((void *)(uintptr_t)(ADDR_ZERO_POINT)),
                          AM2_OBJ_TYPE_WEAPON, -1, 0, 0);
 
             if (weapon) {

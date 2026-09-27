@@ -695,11 +695,11 @@ void __cdecl MsgListRemove(void *list, void *node)
 
 void __cdecl ExitGamePostClose(void)
 {
-    *(int32_t *)AM2_IMAGE(ADDR_EXIT_GAME_FLAG) = 1;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_EXIT_GAME_FLAG)) = 1;
 
     orig_log("Exit Game Posting WM_CLOSE from 3DONetwork\n");
 
-    orig_post_message(*(void **)AM2_IMAGE(ADDR_HWND), AM2_WM_CLOSE, 0, 0);
+    orig_post_message(*(void **)((void *)(uintptr_t)(ADDR_HWND)), AM2_WM_CLOSE, 0, 0);
 }
 
 typedef void *(__cdecl *AM2_FindPlayerFn)(uint32_t id);

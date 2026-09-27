@@ -36,7 +36,7 @@ extern "C" const uint32_t am2_map_field_descs[14] = {
  * this at 181, outside it. */
 int32_t __cdecl LoadAtlFile(const char *path);
 
-#define kMapSaveBlock ((void *)(uintptr_t)AM2_IMAGE(ADDR_MAP_BLOCK))
+#define kMapSaveBlock ((void *)(uintptr_t)((void *)(uintptr_t)(ADDR_MAP_BLOCK)))
 
 int32_t __cdecl SaveMapSection(am2_FILE *fp)
 {
@@ -182,12 +182,12 @@ uint32_t __cdecl MpScriptChecksum(void)
 {
     char path[0x100];
 
-    if (!ScriptListFind((char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME)))
+    if (!ScriptListFind((char *)((void *)(uintptr_t)(ADDR_MP_SCRIPT_NAME))))
         return 0;
 
     SetGameDir("rules");
     sprintf(path, "%s.txt",
-            (const char *)AM2_IMAGE(ADDR_MP_SCRIPT_NAME));
+            (const char *)((void *)(uintptr_t)(ADDR_MP_SCRIPT_NAME)));
     return Checksum(path);
 }
 
@@ -196,10 +196,10 @@ uint32_t __cdecl MpScriptChecksum(void)
  * object table the map was authored against. */
 uint32_t __cdecl MapChecksum(void)
 {
-    uint32_t sum = AmmChecksum((const char *)AM2_IMAGE(ADDR_MAP_NAME),
-                               (const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
+    uint32_t sum = AmmChecksum((const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)),
+                               (const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
+    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
     return sum ^ Checksum("object.aai");
 }
 
@@ -227,15 +227,15 @@ void __cdecl SelectLevel(const void *record)
     if (!r)
         return;
 
-    strcpy((char *)AM2_IMAGE(ADDR_MAP_NAME),          r + LEVEL_OFF_MAP_NAME);
-    strcpy((char *)AM2_IMAGE(ADDR_MAP_FOLDER),        r + LEVEL_OFF_FOLDER);
-    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_B),       r + LEVEL_OFF_LOAD_SCREEN);
-    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_A),       r + LEVEL_OFF_LOAD_MUSIC);
-    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_C),       r + LEVEL_OFF_BRIEFING);
-    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_SOUND_NAME),  r + LEVEL_OFF_BRIEF_SFX);
-    strcpy((char *)AM2_IMAGE(ADDR_LEVEL_STR_D),       r + LEVEL_OFF_STRAT_MAP);
+    strcpy((char *)((void *)(uintptr_t)(ADDR_MAP_NAME)),          r + LEVEL_OFF_MAP_NAME);
+    strcpy((char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)),        r + LEVEL_OFF_FOLDER);
+    strcpy((char *)((void *)(uintptr_t)(ADDR_LEVEL_STR_B)),       r + LEVEL_OFF_LOAD_SCREEN);
+    strcpy((char *)((void *)(uintptr_t)(ADDR_LEVEL_STR_A)),       r + LEVEL_OFF_LOAD_MUSIC);
+    strcpy((char *)((void *)(uintptr_t)(ADDR_LEVEL_STR_C)),       r + LEVEL_OFF_BRIEFING);
+    strcpy((char *)((void *)(uintptr_t)(ADDR_LEVEL_SOUND_NAME)),  r + LEVEL_OFF_BRIEF_SFX);
+    strcpy((char *)((void *)(uintptr_t)(ADDR_LEVEL_STR_D)),       r + LEVEL_OFF_STRAT_MAP);
 
-    *(int32_t *)AM2_IMAGE(ADDR_TILESET_RESERVE) =
+    *(int32_t *)((void *)(uintptr_t)(ADDR_TILESET_RESERVE)) =
         *(const int32_t *)(r + LEVEL_OFF_CYCLE);
 }
 
@@ -250,22 +250,22 @@ void __cdecl SelectLevel(const void *record)
  * could not have said. */
 void __cdecl FreeLevelTables(void)
 {
-    void *levels = *(void **)AM2_IMAGE(ADDR_LEVEL_TABLE);
+    void *levels = *(void **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE));
     void *names;
 
-    *(int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT) = 0;
-    *(int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_CAP)   = 0;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT)) = 0;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_CAP))   = 0;
     if (levels)
         am2_free(levels);
 
-    names = *(void **)AM2_IMAGE(ADDR_NAME_TABLE_BASE);
-    *(void **)AM2_IMAGE(ADDR_LEVEL_TABLE) = (void *)0;
-    *(int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT) = 0;
-    *(int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_CAP)   = 0;
+    names = *(void **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE));
+    *(void **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE)) = (void *)0;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT)) = 0;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_CAP))   = 0;
     if (names)
         am2_free(names);
 
-    *(void **)AM2_IMAGE(ADDR_NAME_TABLE_BASE) = (void *)0;
+    *(void **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE)) = (void *)0;
 }
 
 /* 0x0043E1F0 -- find a level record by id, with the CRT's own bsearch over
@@ -282,8 +282,8 @@ void *__cdecl FindLevelRecord(int32_t id)
     *(int32_t *)key = id;
 
     return ((AM2_BsearchFn)AM2_IMAGE(ADDR_CRT_BSEARCH))(
-               key, *(void **)AM2_IMAGE(ADDR_LEVEL_TABLE),
-               (uint32_t)*(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT),
+               key, *(void **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE)),
+               (uint32_t)*(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT)),
                AM2_LEVEL_RECORD_SIZE,
                (const void *)CompareDword);
 }
@@ -299,7 +299,7 @@ void *__cdecl FindLevelRecord(int32_t id)
 static void ReadLevelFile(const char *name)
 {
     FreeLevelTables();
-    SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
 
     if (!DefParseInfoFile(name))
         am2_log("Couldn't parse %s!\n", name);
@@ -357,8 +357,8 @@ void *__cdecl FindLevelByName(char *name)
 
     orig_strlwr(name);
 
-    for (i = 0; i < *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT); i++) {
-        base = *(char **)AM2_IMAGE(ADDR_LEVEL_TABLE);
+    for (i = 0; i < *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT)); i++) {
+        base = *(char **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE));
         if (!strcmp(base + (uint32_t)i * AM2_LEVEL_RECORD_SIZE
                         + LEVEL_OFF_MAP_NAME,
                     name))
@@ -386,7 +386,7 @@ static int32_t TakeMapColumn(char *dst)
     if (!tok)
         return 0;
     if (!strcmp(tok, "none"))
-        tok = (char *)AM2_IMAGE(ADDR_DIR_SCRATCH);
+        tok = (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH));
     strcpy(dst, tok);
     return 1;
 }
@@ -463,7 +463,7 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
 
     memset(rec, 0, sizeof rec);
     *(int32_t *)(rec + LEVEL_OFF_ID) =
-        *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT) + 1;
+        *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT)) + 1;
 
     tok = am2_strtok(line, " \t\n;,");
     if (!tok)
@@ -563,13 +563,13 @@ void *__cdecl ScriptListFind(char *name)
     if (!name)
         return (void *)0;
 
-    if (!*(const int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT))
+    if (!*(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT)))
         ReadMpMapList();
 
     orig_strlwr(name);
 
-    base = *(char **)AM2_IMAGE(ADDR_NAME_TABLE_BASE);
-    for (i = 0; i < *(const int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT); i++) {
+    base = *(char **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE));
+    for (i = 0; i < *(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT)); i++) {
         char *rec = base + (uint32_t)i * AM2_NAME_RECORD_SIZE;
 
         if (!strcmp(rec, name))
@@ -690,7 +690,7 @@ void __cdecl TraceTileLine(uint32_t from, uint32_t to,
  * that path does not reach. The counter is not blind. */
 int32_t __cdecl LevelCount(void)
 {
-    return *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT);
+    return *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT));
 }
 
 /* ParseScenarioPart -- original 0x0043DAA0, one caller, which is
@@ -1016,7 +1016,7 @@ void __cdecl FreeScenarios(void)
  */
 void __cdecl AddLevelRecord(const void *record)
 {
-    uint8_t *table = *(uint8_t **)AM2_IMAGE(ADDR_LEVEL_TABLE);
+    uint8_t *table = *(uint8_t **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE));
     int32_t  cap;
     int32_t  count;
 
@@ -1024,29 +1024,29 @@ void __cdecl AddLevelRecord(const void *record)
         table = (uint8_t *)am2_malloc((size_t)AM2_LEVEL_TABLE_FIRST
                                       * AM2_LEVEL_RECORD_SIZE);
         cap   = AM2_LEVEL_TABLE_FIRST;
-        *(uint8_t **)AM2_IMAGE(ADDR_LEVEL_TABLE)    = table;
-        *(int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_CAP) = cap;
+        *(uint8_t **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE))    = table;
+        *(int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_CAP)) = cap;
     } else {
-        cap = *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_CAP);
+        cap = *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_CAP));
     }
 
-    count = *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT);
+    count = *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT));
 
     if (count >= cap) {
         cap += AM2_LEVEL_TABLE_GROW;
-        *(int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_CAP) = cap;
+        *(int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_CAP)) = cap;
 
         table = (uint8_t *)am2_realloc(table,
                                        (size_t)cap * AM2_LEVEL_RECORD_SIZE);
-        *(uint8_t **)AM2_IMAGE(ADDR_LEVEL_TABLE) = table;
+        *(uint8_t **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE)) = table;
 
-        count = *(const int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT);
+        count = *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT));
     }
 
     memcpy(table + (size_t)count * AM2_LEVEL_RECORD_SIZE, record,
            AM2_LEVEL_RECORD_SIZE);
 
-    *(int32_t *)AM2_IMAGE(ADDR_LEVEL_TABLE_COUNT) = count + 1;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT)) = count + 1;
 }
 
 /* The `rules` / `rulemap` trio -- originals 0x0043EA30, 0x0043EAC0 and
@@ -1196,7 +1196,7 @@ int32_t __cdecl DefRuleMapLine(int32_t cmd, char *line)
  */
 void __cdecl AddNameRecord(const void *record)
 {
-    uint8_t *table = *(uint8_t **)AM2_IMAGE(ADDR_NAME_TABLE_BASE);
+    uint8_t *table = *(uint8_t **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE));
     int32_t  cap;
     int32_t  count;
 
@@ -1204,29 +1204,29 @@ void __cdecl AddNameRecord(const void *record)
         table = (uint8_t *)am2_malloc((size_t)AM2_LEVEL_TABLE_FIRST
                                       * AM2_NAME_RECORD_SIZE);
         cap   = AM2_LEVEL_TABLE_FIRST;
-        *(uint8_t **)AM2_IMAGE(ADDR_NAME_TABLE_BASE) = table;
-        *(int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_CAP)   = cap;
+        *(uint8_t **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE)) = table;
+        *(int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_CAP))   = cap;
     } else {
-        cap = *(const int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_CAP);
+        cap = *(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_CAP));
     }
 
-    count = *(const int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT);
+    count = *(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT));
 
     if (count >= cap) {
         cap += AM2_LEVEL_TABLE_GROW;
-        *(int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_CAP) = cap;
+        *(int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_CAP)) = cap;
 
         table = (uint8_t *)am2_realloc(table,
                                        (size_t)cap * AM2_NAME_RECORD_SIZE);
-        *(uint8_t **)AM2_IMAGE(ADDR_NAME_TABLE_BASE) = table;
+        *(uint8_t **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE)) = table;
 
-        count = *(const int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT);
+        count = *(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT));
     }
 
     memcpy(table + (size_t)count * AM2_NAME_RECORD_SIZE, record,
            AM2_NAME_RECORD_SIZE);
 
-    *(int32_t *)AM2_IMAGE(ADDR_NAME_TABLE_COUNT) = count + 1;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT)) = count + 1;
 }
 
 /* AmmChecksum -- original 0x0042C350, one caller.
@@ -1279,7 +1279,7 @@ uint32_t __cdecl AmmChecksum(const char *map, const char *)
     uint32_t  len;
     am2_FILE *fp;
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
+    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
 
     am2_sprintf(name, "%s.amm", map);
 

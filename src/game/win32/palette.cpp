@@ -679,7 +679,7 @@ void __cdecl LoadTilesetPalettes(void)
     if (!*(const int32_t *)(uintptr_t)ADDR_TILESET_RESERVE)
         return;
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_BLOCK));
+    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_BLOCK)));
 
     for (i = 0; i < AM2_TILESET_PALETTES; i++)
         LoadPaletteFile(kNames[i],

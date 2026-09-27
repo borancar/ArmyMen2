@@ -37,7 +37,7 @@ typedef void    (__cdecl *am2_event_notify_fn)(int32_t, int32_t, int32_t,
                                                int32_t);
 
 
-#define kScriptConditions (*(AM2_ScriptCond **)AM2_IMAGE(ADDR_SCRIPT_CONDITIONS))
+#define kScriptConditions (*(AM2_ScriptCond **)((void *)(uintptr_t)(ADDR_SCRIPT_CONDITIONS)))
 
 /* ---- the registration table -------------------------------------------
  *
@@ -62,7 +62,7 @@ typedef struct AM2_EventEntry {
     struct AM2_EventEntry   *next;
 } AM2_EventEntry;
 
-#define kEventTable ((AM2_EventEntry **)AM2_IMAGE(ADDR_EVENT_TABLE))
+#define kEventTable ((AM2_EventEntry **)((void *)(uintptr_t)(ADDR_EVENT_TABLE)))
 #define kImageFn(a)       ((const void *)AM2_IMAGE(a))
 
 /* The eight that exist whether a script mentions them or not. Each is declared
@@ -485,7 +485,7 @@ void __cdecl SaveScriptCond(am2_FILE *fp, const AM2_ScriptCond *cond)
 #define orig_fread  (*(am2_fread_fn)ADDR_FREAD)
 #define orig_malloc (*(am2_malloc_fn)ADDR_GAME_MALLOC)
 
-#define kScriptContext (*(AM2_ScriptCtx *)AM2_IMAGE(ADDR_SCRIPT_CONTEXT))
+#define kScriptContext (*(AM2_ScriptCtx *)((void *)(uintptr_t)(ADDR_SCRIPT_CONTEXT)))
 
 void __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond)
 {
@@ -669,7 +669,7 @@ int32_t __cdecl SaveScriptConditions(am2_FILE *fp)
     return 1;
 }
 
-#define kEventBlock ((void *)(uintptr_t)AM2_IMAGE(ADDR_EVENT_BLOCK))
+#define kEventBlock ((void *)(uintptr_t)((void *)(uintptr_t)(ADDR_EVENT_BLOCK)))
 
 int32_t __cdecl SaveEventBlock(am2_FILE *fp)
 {
@@ -922,7 +922,7 @@ void __cdecl MissionStartup(void)
 void __cdecl TimerTick(void)
 {
     AM2_Timer *timers = (AM2_Timer *)(uintptr_t)ADDR_TIMER_TABLE;
-    uint32_t   now    = *(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS);
+    uint32_t   now    = *(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS));
     uint32_t  *last   = (uint32_t *)(uintptr_t)ADDR_EVENT_BLOCK;
     int32_t    i;
 
@@ -944,7 +944,7 @@ void __cdecl TimerTick(void)
             t->id = 0;
             (*(int32_t *)(uintptr_t)ADDR_TIMER_COUNT)--;
         } else {
-            t->start = *(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS)
+            t->start = *(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS))
                        + t->period;
         }
     }
@@ -1357,7 +1357,7 @@ void __cdecl ResetScriptState(void)
     FreeScriptConditions();
     EventClearAll();
 
-    *(int32_t *)AM2_IMAGE(ADDR_SCRIPT_STATE_FLAG) = 0;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_SCRIPT_STATE_FLAG)) = 0;
 }
 
 /* 0x0041FEA0. Resolve a uid and act on the object, if there is one.
@@ -1405,7 +1405,7 @@ uint32_t __cdecl ResolveUid(int32_t name, uint32_t me)
     if (name < 0 || name >= am2_script_name_count())
         return 0;
 
-    if (name == *(const int32_t *)AM2_IMAGE(ADDR_SVAR_ME)) {
+    if (name == *(const int32_t *)((void *)(uintptr_t)(ADDR_SVAR_ME))) {
         if (me != 0)
             return me;
 
@@ -1861,7 +1861,7 @@ void __cdecl EvtRuleB(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
     army = *(const int8_t *)(obj + OBJ_OFF_ARMY);
 
     unit = (uint8_t *)CreateTrooper(
-               (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+               (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                *(const int16_t *)(obj + OBJ_OFF_POS),
                *(const int16_t *)(obj + OBJ_OFF_POS + 2),
                CommArmyOfSlot(kCommObject, army),
@@ -2009,16 +2009,16 @@ void __cdecl EvtPushObjCtx(uint32_t uid)
     if (obj == (uint8_t *)0)
         return;
 
-    *(void **)AM2_IMAGE(ADDR_OBJ_CTX_OBJ_PREV) =
-        *(void **)AM2_IMAGE(ADDR_OBJ_CTX_OBJ);
-    *(int32_t *)AM2_IMAGE(ADDR_OBJ_CTX_VAL_PREV) =
-        *(const int32_t *)AM2_IMAGE(ADDR_OBJ_CTX_VAL);
-    *(int32_t *)AM2_IMAGE(ADDR_OBJ_CTX_SET_PREV) =
-        *(const int32_t *)AM2_IMAGE(ADDR_OBJ_CTX_SET);
+    *(void **)((void *)(uintptr_t)(ADDR_OBJ_CTX_OBJ_PREV)) =
+        *(void **)((void *)(uintptr_t)(ADDR_OBJ_CTX_OBJ));
+    *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_VAL_PREV)) =
+        *(const int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_VAL));
+    *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_SET_PREV)) =
+        *(const int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_SET));
 
-    *(void **)AM2_IMAGE(ADDR_OBJ_CTX_OBJ)  = obj;
-    *(int32_t *)AM2_IMAGE(ADDR_OBJ_CTX_VAL) = *(const int32_t *)(obj + 4);
-    *(int32_t *)AM2_IMAGE(ADDR_OBJ_CTX_SET) = 1;
+    *(void **)((void *)(uintptr_t)(ADDR_OBJ_CTX_OBJ))  = obj;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_VAL)) = *(const int32_t *)(obj + 4);
+    *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_SET)) = 1;
 }
 
 /* 0x0041F570 and 0x0041F5C0. A pair over one object flag bit and one global,
@@ -2041,11 +2041,11 @@ void __cdecl EvtFlag40Clear(int32_t name, uint32_t me)
 {
     uint8_t *obj;
 
-    if (name == *(const int32_t *)AM2_IMAGE(ADDR_SVAR_ID15)) {
-        *(int32_t *)AM2_IMAGE(ADDR_EVT_ID15_FLAG) = 1;
+    if (name == *(const int32_t *)((void *)(uintptr_t)(ADDR_SVAR_ID15))) {
+        *(int32_t *)((void *)(uintptr_t)(ADDR_EVT_ID15_FLAG)) = 1;
 
         obj = (uint8_t *)LookupByUID(
-                  *(const uint32_t *)AM2_IMAGE(ADDR_EVT_ID15_UID));
+                  *(const uint32_t *)((void *)(uintptr_t)(ADDR_EVT_ID15_UID)));
 
         if (obj != (uint8_t *)0)
             *(uint32_t *)(obj + OBJ_OFF_FLAGS) |= OBJ_FLAG8_BIT40;
@@ -2063,8 +2063,8 @@ void __cdecl EvtFlag40Set(int32_t name, uint32_t me)
 {
     uint8_t *obj;
 
-    if (name == *(const int32_t *)AM2_IMAGE(ADDR_SVAR_ID15)) {
-        *(int32_t *)AM2_IMAGE(ADDR_EVT_ID15_FLAG) = 0;
+    if (name == *(const int32_t *)((void *)(uintptr_t)(ADDR_SVAR_ID15))) {
+        *(int32_t *)((void *)(uintptr_t)(ADDR_EVT_ID15_FLAG)) = 0;
         return;
     }
 
@@ -2194,21 +2194,21 @@ void __cdecl EvtShowBitmap(const char *name)
 {
     SetGameDir("bitmaps");
 
-    *(int32_t *)AM2_IMAGE(ADDR_MENU_MODE) = AM2_SUBSTATE_BITMAP;
-    *(int32_t *)AM2_IMAGE(ADDR_OVERLAY_DIRTY)      = 1;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_MENU_MODE)) = AM2_SUBSTATE_BITMAP;
+    *(int32_t *)((void *)(uintptr_t)(ADDR_OVERLAY_DIRTY))      = 1;
 
     SendGamePause(1, AM2_EVENT_FLAG_8);
 
-    FreeBitmap((void **)AM2_IMAGE(ADDR_CURRENT_BITMAP));
-    *(void **)AM2_IMAGE(ADDR_CURRENT_BITMAP) = LoadBitmap(name, 0);
+    FreeBitmap((void **)((void *)(uintptr_t)(ADDR_CURRENT_BITMAP)));
+    *(void **)((void *)(uintptr_t)(ADDR_CURRENT_BITMAP)) = LoadBitmap(name, 0);
 }
 
 void __cdecl EvtShowBitmapNoPause(const char *name)
 {
     SetGameDir("bitmaps");
 
-    FreeBitmap((void **)AM2_IMAGE(ADDR_CURRENT_BITMAP));
-    *(void **)AM2_IMAGE(ADDR_CURRENT_BITMAP) = LoadBitmap(name, 0);
+    FreeBitmap((void **)((void *)(uintptr_t)(ADDR_CURRENT_BITMAP)));
+    *(void **)((void *)(uintptr_t)(ADDR_CURRENT_BITMAP)) = LoadBitmap(name, 0);
 }
 
 /* ------------------------------------------- object table record ---- */
@@ -2239,7 +2239,7 @@ void __cdecl ScriptSetObjTable(uint32_t uid, int32_t index)
     if (obj == (uint8_t *)0)
         return;
 
-    rec = (uint8_t *)AM2_IMAGE(ADDR_OBJ_TABLE_RECORDS)
+    rec = (uint8_t *)((void *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
         + (uint32_t)index * AM2_OBJ_TABLE_REC_SIZE;
     sub = obj + OBJ_OFF_SUBRECORD;
 
@@ -2495,7 +2495,7 @@ int32_t __cdecl EvalCondTests(const AM2_ScriptCond *c)
  * the body at the OTHER end of the call as well as this one. */
 void __cdecl AdvanceMission(int32_t a, int32_t b)
 {
-    if (*(const int32_t *)AM2_IMAGE(ADDR_MP_SESSION) == 0) {
+    if (*(const int32_t *)((void *)(uintptr_t)(ADDR_MP_SESSION)) == 0) {
         orig_mission_local(a);
         return;
     }
@@ -2750,11 +2750,11 @@ void __cdecl EventNotify(int32_t type, int32_t num1, uint32_t uid1,
 {
     const uint8_t *comm = *(const uint8_t **)AM2_IMAGE(ADDR_COMM_OBJECT);
 
-    if (*(const int32_t *)AM2_IMAGE(ADDR_MP_SESSION) != 0
+    if (*(const int32_t *)((void *)(uintptr_t)(ADDR_MP_SESSION)) != 0
         && *(const int32_t *)(comm + COMM_OFF_IS_HOST) == 0)
         return;
 
-    if (*(const int32_t *)AM2_IMAGE(ADDR_MENU_MODE)
+    if (*(const int32_t *)((void *)(uintptr_t)(ADDR_MENU_MODE))
         == AM2_SUBSTATE_ESCAPE)
         return;
 
@@ -2844,9 +2844,9 @@ void __cdecl EventTriggerDelayed(int32_t type, int32_t num, int32_t uid,
 }
 
 /* The mission clock and the timer table, all in the image. */
-#define g_gameClockMs  (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
-#define g_timerCount   (*(int32_t *)AM2_IMAGE(ADDR_TIMER_COUNT))
-#define g_timers       ((AM2_Timer *)AM2_IMAGE(ADDR_TIMER_TABLE))
+#define g_gameClockMs  (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
+#define g_timerCount   (*(int32_t *)((void *)(uintptr_t)(ADDR_TIMER_COUNT)))
+#define g_timers       ((AM2_Timer *)((void *)(uintptr_t)(ADDR_TIMER_TABLE)))
 
 int32_t __cdecl CreateTimer(uint32_t start, int32_t absolute, uint32_t period,
                             int32_t count, int32_t id, int32_t lowPriority)

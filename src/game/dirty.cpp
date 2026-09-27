@@ -17,9 +17,9 @@
  * ZERO's own prev and next, and the third is the tail. See ADDR_DIRTY_TAIL. */
 void __cdecl ResetDirtyList(void)
 {
-    *(uint16_t *)AM2_IMAGE(ADDR_DIRTY_HEAD)  = 0;
-    *(uint16_t *)AM2_IMAGE(ADDR_DIRTY_PREV_HEAD) = 0;
-    *(uint16_t *)AM2_IMAGE(ADDR_DIRTY_TAIL) = 0;
+    *(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_HEAD))  = 0;
+    *(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_PREV_HEAD)) = 0;
+    *(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)) = 0;
 }
 
 
@@ -62,13 +62,13 @@ void __cdecl ResetDirtyList(void)
 void __cdecl AddDirtyRect(int32_t left, int32_t top, int32_t right,
                           int32_t bottom)
 {
-    uint8_t *recs = (uint8_t *)AM2_IMAGE(ADDR_DIRTY_RECTS);
-    uint16_t tail = *(const uint16_t *)AM2_IMAGE(ADDR_DIRTY_TAIL);
+    uint8_t *recs = (uint8_t *)((void *)(uintptr_t)(ADDR_DIRTY_RECTS));
+    uint16_t tail = *(const uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL));
     uint16_t next = (uint16_t)(tail + 1);
     uint8_t *rec;
 
     if (next >= AM2_DEPTH_MAX) {
-        *(int32_t *)AM2_IMAGE(ADDR_FULL_REDRAW) = 1;
+        *(int32_t *)((void *)(uintptr_t)(ADDR_FULL_REDRAW)) = 1;
         return;
     }
 
@@ -82,7 +82,7 @@ void __cdecl AddDirtyRect(int32_t left, int32_t top, int32_t right,
 
     *(uint16_t *)(recs + (uint32_t)tail * AM2_DIRTY_RECORD_SIZE
                   + DIRTY_OFF_NEXT) = next;
-    *(uint16_t *)AM2_IMAGE(ADDR_DIRTY_TAIL) = next;
+    *(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)) = next;
 }
 
 int dirty_install(void)

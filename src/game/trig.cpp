@@ -6,11 +6,11 @@
 #include "../inject/orig.h"
 #include "../inject/patch.h"
 
-#define kCos   ((float *)AM2_IMAGE(ADDR_TRIG_COS))
-#define kSin   ((float *)AM2_IMAGE(ADDR_TRIG_SIN))
+#define kCos   ((float *)((void *)(uintptr_t)(ADDR_TRIG_COS)))
+#define kSin   ((float *)((void *)(uintptr_t)(ADDR_TRIG_SIN)))
 /* Centres, so these are indexed by the signed ratio directly -- see orig.h. */
-#define kAtanC ((int8_t *)AM2_IMAGE(ADDR_TRIG_ATAN_COS))
-#define kAtanS ((int8_t *)AM2_IMAGE(ADDR_TRIG_ATAN_SIN))
+#define kAtanC ((int8_t *)((void *)(uintptr_t)(ADDR_TRIG_ATAN_COS)))
+#define kAtanS ((int8_t *)((void *)(uintptr_t)(ADDR_TRIG_ATAN_SIN)))
 
 #define kD(a)  (*(const double *)AM2_IMAGE(a))
 

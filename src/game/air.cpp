@@ -110,7 +110,7 @@ extern "C" const int16_t am2_air_path_away_x     = 300; /* 0x00473F70 */
  * stay at their writable .origdat placement rather than a read-only C const. */
 #endif
 
-#define kAirSaveBlock ((void *)(uintptr_t)AM2_IMAGE(ADDR_AIR_SAVE_BLOCK))
+#define kAirSaveBlock ((void *)(uintptr_t)((void *)(uintptr_t)(ADDR_AIR_SAVE_BLOCK)))
 
 int32_t __cdecl SaveAirSection(am2_FILE *fp)
 {
@@ -511,7 +511,7 @@ uint32_t __cdecl ObjAnchorPoint(const void *obj)
     int32_t        rows;
 
     if (!obj)
-        return *(const uint32_t *)AM2_IMAGE(ADDR_ZERO_POINT);
+        return *(const uint32_t *)((void *)(uintptr_t)(ADDR_ZERO_POINT));
 
     pt   = *(const AM2_Point *)(o + OBJ_OFF_POS);
     rows = *(const int32_t *)(o + OBJ_OFF_ROW_COUNT);
@@ -534,10 +534,10 @@ uint32_t __cdecl ObjAnchorPoint(const void *obj)
 }
 
 
-#define g_mapBoundsLeft   (*(const int32_t *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT))
-#define g_mapBoundsTop    (*(const int32_t *)AM2_IMAGE(ADDR_MAP_BOUNDS_TOP))
-#define g_mapBoundsRight  (*(const int32_t *)AM2_IMAGE(ADDR_MAP_BOUNDS_RIGHT))
-#define g_mapBoundsBottom (*(const int32_t *)AM2_IMAGE(ADDR_MAP_BOUNDS_BOTTOM))
+#define g_mapBoundsLeft   (*(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)))
+#define g_mapBoundsTop    (*(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_TOP)))
+#define g_mapBoundsRight  (*(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_RIGHT)))
+#define g_mapBoundsBottom (*(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_BOTTOM)))
 
 /* FormationPointFar -- original 0x004042A0, one caller, which is
  * FormationPoint below. It is what happens past slot 11, where the twelve-entry
@@ -839,7 +839,7 @@ void __cdecl ResolveFormationPoint(void *follower, void *leader,
 
 /* Spelled exactly as event.cpp spells it, AM2_IMAGE and all, so the two
  * stay one definition. */
-#define g_gameClockMs (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
+#define g_gameClockMs (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
 
 void __cdecl RevealNearby(AM2_Point where, int32_t radius, int32_t delayMs)
 {
@@ -1492,9 +1492,9 @@ void __cdecl AirPassesDraw(void)
 void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
                                 uint32_t *out)
 {
-    int32_t  *isVehicle = (int32_t *)AM2_IMAGE(ADDR_SLOT_IS_VEHICLE);
-    uint32_t *slotPos   = (uint32_t *)AM2_IMAGE(ADDR_SLOT_POSITIONS);
-    uint8_t  *headings  = (uint8_t *)AM2_IMAGE(ADDR_SLOT_HEADINGS);
+    int32_t  *isVehicle = (int32_t *)((void *)(uintptr_t)(ADDR_SLOT_IS_VEHICLE));
+    uint32_t *slotPos   = (uint32_t *)((void *)(uintptr_t)(ADDR_SLOT_POSITIONS));
+    uint8_t  *headings  = (uint8_t *)((void *)(uintptr_t)(ADDR_SLOT_HEADINGS));
     const uint8_t *o = (const uint8_t *)obj;
     uint8_t   heading = 0;
     int32_t   parent, dist;

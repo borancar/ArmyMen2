@@ -33,7 +33,7 @@ extern "C" const int32_t am2_pad_bit_table[66] = {
 
 #define kPads        ((void *)(uintptr_t)AM2_IMAGE(ADDR_PADS))
 #define kPadNumbers  ((void *)(uintptr_t)AM2_IMAGE(ADDR_PAD_NUMBERS))
-#define kPadCount    (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_PAD_COUNT))
+#define kPadCount    (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_PAD_COUNT)))
 
 void __cdecl ResetPads(void)
 {

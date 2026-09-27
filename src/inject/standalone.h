@@ -1583,4 +1583,315 @@ extern const uint8_t am2_logpalette_hdr_small[4];
 #undef ADDR_ARMY_OBJ_LISTS
 #define ADDR_ARMY_OBJ_LISTS ((uintptr_t)(const void *)am2_origstate.army_obj_lists)
 
+/* Bulk .bss data-global redirects (am2_origstate members), so their
+ * AM2_IMAGE sites -- converted to (uintptr_t)ADDR below -- are symbol-relative. */
+#undef ADDR_AIM_DEADLINE_A
+#define ADDR_AIM_DEADLINE_A ((uintptr_t)(const void *)am2_origstate.aim_deadline_a)
+#undef ADDR_AIM_DEADLINE_B
+#define ADDR_AIM_DEADLINE_B ((uintptr_t)(const void *)am2_origstate.aim_deadline_b)
+#undef ADDR_AIM_LIVE_A
+#define ADDR_AIM_LIVE_A ((uintptr_t)(const void *)am2_origstate.aim_live_a)
+#undef ADDR_AIM_LIVE_B
+#define ADDR_AIM_LIVE_B ((uintptr_t)(const void *)am2_origstate.aim_live_b)
+#undef ADDR_AIM_POINT_A
+#define ADDR_AIM_POINT_A ((uintptr_t)(const void *)am2_origstate.aim_point_a)
+#undef ADDR_AIM_POINT_B
+#define ADDR_AIM_POINT_B ((uintptr_t)(const void *)am2_origstate.aim_point_b)
+#undef ADDR_AIM_STAMP_A
+#define ADDR_AIM_STAMP_A ((uintptr_t)(const void *)am2_origstate.aim_stamp_a)
+#undef ADDR_AIM_STAMP_B
+#define ADDR_AIM_STAMP_B ((uintptr_t)(const void *)am2_origstate.aim_stamp_b)
+#undef ADDR_AIR_SAVE_BLOCK
+#define ADDR_AIR_SAVE_BLOCK ((uintptr_t)(const void *)am2_origstate.air_save_block)
+#undef ADDR_ARMY_PACKET
+#define ADDR_ARMY_PACKET ((uintptr_t)(const void *)am2_origstate.army_packet)
+#undef ADDR_ARMY_PACKET_LEN
+#define ADDR_ARMY_PACKET_LEN ((uintptr_t)(const void *)am2_origstate.army_packet_len)
+#undef ADDR_ARMY_PACKET_SEQ
+#define ADDR_ARMY_PACKET_SEQ ((uintptr_t)(const void *)am2_origstate.army_packet_seq)
+#undef ADDR_CD_PATH
+#define ADDR_CD_PATH ((uintptr_t)(const void *)am2_origstate.cd_path)
+#undef ADDR_CD_PRESENT
+#define ADDR_CD_PRESENT ((uintptr_t)(const void *)am2_origstate.cd_present)
+#undef ADDR_COMM_GLOBAL
+#define ADDR_COMM_GLOBAL ((uintptr_t)(const void *)am2_origstate.comm_global)
+#undef ADDR_CURRENT_BITMAP
+#define ADDR_CURRENT_BITMAP ((uintptr_t)(const void *)am2_origstate.current_bitmap)
+#undef ADDR_CURRENT_OBJ_SCRIPT
+#define ADDR_CURRENT_OBJ_SCRIPT ((uintptr_t)(const void *)am2_origstate.current_obj_script)
+#undef ADDR_DEFAULT_OWNER
+#define ADDR_DEFAULT_OWNER ((uintptr_t)(const void *)am2_origstate.default_owner)
+#undef ADDR_DEF_LINKS
+#define ADDR_DEF_LINKS ((uintptr_t)(const void *)am2_origstate.def_links)
+#undef ADDR_DEF_LINK_CAP
+#define ADDR_DEF_LINK_CAP ((uintptr_t)(const void *)am2_origstate.def_link_cap)
+#undef ADDR_DEF_LINK_COUNT
+#define ADDR_DEF_LINK_COUNT ((uintptr_t)(const void *)am2_origstate.def_link_count)
+#undef ADDR_DEF_OBJ_RECS
+#define ADDR_DEF_OBJ_RECS ((uintptr_t)(const void *)am2_origstate.def_obj_recs)
+#undef ADDR_DEF_OBJ_REC_CAP
+#define ADDR_DEF_OBJ_REC_CAP ((uintptr_t)(const void *)am2_origstate.def_obj_rec_cap)
+#undef ADDR_DEF_OBJ_REC_COUNT
+#define ADDR_DEF_OBJ_REC_COUNT ((uintptr_t)(const void *)am2_origstate.def_obj_rec_count)
+#undef ADDR_DEF_TROOPER_CAP
+#define ADDR_DEF_TROOPER_CAP ((uintptr_t)(const void *)am2_origstate.def_trooper_cap)
+#undef ADDR_DEF_TROOPER_COUNT
+#define ADDR_DEF_TROOPER_COUNT ((uintptr_t)(const void *)am2_origstate.def_trooper_count)
+#undef ADDR_DEF_TROOPER_RECS
+#define ADDR_DEF_TROOPER_RECS ((uintptr_t)(const void *)am2_origstate.def_trooper_recs)
+#undef ADDR_DIFFICULTY
+#define ADDR_DIFFICULTY ((uintptr_t)(const void *)am2_origstate.difficulty)
+#undef ADDR_DIRTY_HEAD
+#define ADDR_DIRTY_HEAD ((uintptr_t)(const void *)am2_origstate.dirty_head)
+#undef ADDR_DIRTY_PREV_HEAD
+#define ADDR_DIRTY_PREV_HEAD ((uintptr_t)(const void *)am2_origstate.dirty_prev_head)
+#undef ADDR_DIRTY_RECTS
+#define ADDR_DIRTY_RECTS ((uintptr_t)(const void *)am2_origstate.dirty_rects)
+#undef ADDR_DIRTY_TAIL
+#define ADDR_DIRTY_TAIL ((uintptr_t)(const void *)am2_origstate.dirty_tail)
+#undef ADDR_DIR_SCRATCH
+#define ADDR_DIR_SCRATCH ((uintptr_t)(const void *)am2_origstate.dir_scratch)
+#undef ADDR_EVENT_BLOCK
+#define ADDR_EVENT_BLOCK ((uintptr_t)(const void *)am2_origstate.event_block)
+#undef ADDR_EVENT_TABLE
+#define ADDR_EVENT_TABLE ((uintptr_t)(const void *)am2_origstate.event_table)
+#undef ADDR_EVT_ID15_FLAG
+#define ADDR_EVT_ID15_FLAG ((uintptr_t)(const void *)am2_origstate.evt_id15_flag)
+#undef ADDR_EVT_ID15_UID
+#define ADDR_EVT_ID15_UID ((uintptr_t)(const void *)am2_origstate.evt_id15_uid)
+#undef ADDR_EXIT_GAME_FLAG
+#define ADDR_EXIT_GAME_FLAG ((uintptr_t)(const void *)am2_origstate.exit_game_flag)
+#undef ADDR_FAST_MACHINE
+#define ADDR_FAST_MACHINE ((uintptr_t)(const void *)am2_origstate.fast_machine)
+#undef ADDR_FULL_REDRAW
+#define ADDR_FULL_REDRAW ((uintptr_t)(const void *)am2_origstate.full_redraw)
+#undef ADDR_GAMEPROC_BLOCK
+#define ADDR_GAMEPROC_BLOCK ((uintptr_t)(const void *)am2_origstate.gameproc_block)
+#undef ADDR_GAMEPROC_STR_B
+#define ADDR_GAMEPROC_STR_B ((uintptr_t)(const void *)am2_origstate.gameproc_str_b)
+#undef ADDR_GAME_CLOCK_MS
+#define ADDR_GAME_CLOCK_MS ((uintptr_t)(const void *)am2_origstate.game_clock_ms)
+#undef ADDR_GAME_DIR
+#define ADDR_GAME_DIR ((uintptr_t)(const void *)am2_origstate.game_dir)
+#undef ADDR_HOST_MASK_A
+#define ADDR_HOST_MASK_A ((uintptr_t)(const void *)am2_origstate.host_mask_a)
+#undef ADDR_HOST_MASK_B
+#define ADDR_HOST_MASK_B ((uintptr_t)(const void *)am2_origstate.host_mask_b)
+#undef ADDR_HOST_VALUE_3E8
+#define ADDR_HOST_VALUE_3E8 ((uintptr_t)(const void *)am2_origstate.host_value_3e8)
+#undef ADDR_HWND
+#define ADDR_HWND ((uintptr_t)(const void *)am2_origstate.hwnd)
+#undef ADDR_LEVEL_INDEX
+#define ADDR_LEVEL_INDEX ((uintptr_t)(const void *)am2_origstate.level_index)
+#undef ADDR_LEVEL_SOUND_NAME
+#define ADDR_LEVEL_SOUND_NAME ((uintptr_t)(const void *)am2_origstate.level_sound_name)
+#undef ADDR_LEVEL_STR_A
+#define ADDR_LEVEL_STR_A ((uintptr_t)(const void *)am2_origstate.level_str_a)
+#undef ADDR_LEVEL_STR_B
+#define ADDR_LEVEL_STR_B ((uintptr_t)(const void *)am2_origstate.level_str_b)
+#undef ADDR_LEVEL_STR_C
+#define ADDR_LEVEL_STR_C ((uintptr_t)(const void *)am2_origstate.level_str_c)
+#undef ADDR_LEVEL_STR_D
+#define ADDR_LEVEL_STR_D ((uintptr_t)(const void *)am2_origstate.level_str_d)
+#undef ADDR_LEVEL_TABLE
+#define ADDR_LEVEL_TABLE ((uintptr_t)(const void *)am2_origstate.level_table)
+#undef ADDR_LEVEL_TABLE_CAP
+#define ADDR_LEVEL_TABLE_CAP ((uintptr_t)(const void *)am2_origstate.level_table_cap)
+#undef ADDR_LEVEL_TABLE_COUNT
+#define ADDR_LEVEL_TABLE_COUNT ((uintptr_t)(const void *)am2_origstate.level_table_count)
+#undef ADDR_MAP_BLOCK
+#define ADDR_MAP_BLOCK ((uintptr_t)(const void *)am2_origstate.map_block)
+#undef ADDR_MAP_BOUNDS_BOTTOM
+#define ADDR_MAP_BOUNDS_BOTTOM ((uintptr_t)(const void *)am2_origstate.map_bounds_bottom)
+#undef ADDR_MAP_BOUNDS_LEFT
+#define ADDR_MAP_BOUNDS_LEFT ((uintptr_t)(const void *)am2_origstate.map_bounds_left)
+#undef ADDR_MAP_BOUNDS_RIGHT
+#define ADDR_MAP_BOUNDS_RIGHT ((uintptr_t)(const void *)am2_origstate.map_bounds_right)
+#undef ADDR_MAP_BOUNDS_TOP
+#define ADDR_MAP_BOUNDS_TOP ((uintptr_t)(const void *)am2_origstate.map_bounds_top)
+#undef ADDR_MAP_DESC
+#define ADDR_MAP_DESC ((uintptr_t)(const void *)am2_origstate.map_desc)
+#undef ADDR_MAP_FOLDER
+#define ADDR_MAP_FOLDER ((uintptr_t)(const void *)am2_origstate.map_folder)
+#undef ADDR_MAP_NAME
+#define ADDR_MAP_NAME ((uintptr_t)(const void *)am2_origstate.map_name)
+#undef ADDR_MAP_PADBIT_LAYER
+#define ADDR_MAP_PADBIT_LAYER ((uintptr_t)(const void *)am2_origstate.map_padbit_layer)
+#undef ADDR_MAP_PAD_LAYER
+#define ADDR_MAP_PAD_LAYER ((uintptr_t)(const void *)am2_origstate.map_pad_layer)
+#undef ADDR_MAP_TILES_H
+#define ADDR_MAP_TILES_H ((uintptr_t)(const void *)am2_origstate.map_tiles_h)
+#undef ADDR_MAP_TILES_W
+#define ADDR_MAP_TILES_W ((uintptr_t)(const void *)am2_origstate.map_tiles_w)
+#undef ADDR_MENU_MODE
+#define ADDR_MENU_MODE ((uintptr_t)(const void *)am2_origstate.menu_mode)
+#undef ADDR_MESSAGE_BMP_NAME
+#define ADDR_MESSAGE_BMP_NAME ((uintptr_t)(const void *)am2_origstate.message_bmp_name)
+#undef ADDR_MISSILE_DEFS
+#define ADDR_MISSILE_DEFS ((uintptr_t)(const void *)am2_origstate.missile_defs)
+#undef ADDR_MOVIE_COUNT
+#define ADDR_MOVIE_COUNT ((uintptr_t)(const void *)am2_origstate.movie_count)
+#undef ADDR_MP_SCRIPT_NAME
+#define ADDR_MP_SCRIPT_NAME ((uintptr_t)(const void *)am2_origstate.mp_script_name)
+#undef ADDR_MP_SESSION
+#define ADDR_MP_SESSION ((uintptr_t)(const void *)am2_origstate.mp_session)
+#undef ADDR_MSG_CHAT
+#define ADDR_MSG_CHAT ((uintptr_t)(const void *)am2_origstate.msg_chat)
+#undef ADDR_MSG_GAME_PAUSE
+#define ADDR_MSG_GAME_PAUSE ((uintptr_t)(const void *)am2_origstate.msg_game_pause)
+#undef ADDR_NAME_TABLE_BASE
+#define ADDR_NAME_TABLE_BASE ((uintptr_t)(const void *)am2_origstate.name_table_base)
+#undef ADDR_NAME_TABLE_CAP
+#define ADDR_NAME_TABLE_CAP ((uintptr_t)(const void *)am2_origstate.name_table_cap)
+#undef ADDR_NAME_TABLE_COUNT
+#define ADDR_NAME_TABLE_COUNT ((uintptr_t)(const void *)am2_origstate.name_table_count)
+#undef ADDR_NEXT_UID
+#define ADDR_NEXT_UID ((uintptr_t)(const void *)am2_origstate.next_uid)
+#undef ADDR_OBJ_CTX_OBJ
+#define ADDR_OBJ_CTX_OBJ ((uintptr_t)(const void *)am2_origstate.obj_ctx_obj)
+#undef ADDR_OBJ_CTX_OBJ_PREV
+#define ADDR_OBJ_CTX_OBJ_PREV ((uintptr_t)(const void *)am2_origstate.obj_ctx_obj_prev)
+#undef ADDR_OBJ_CTX_SET
+#define ADDR_OBJ_CTX_SET ((uintptr_t)(const void *)am2_origstate.obj_ctx_set)
+#undef ADDR_OBJ_CTX_SET_PREV
+#define ADDR_OBJ_CTX_SET_PREV ((uintptr_t)(const void *)am2_origstate.obj_ctx_set_prev)
+#undef ADDR_OBJ_CTX_VAL
+#define ADDR_OBJ_CTX_VAL ((uintptr_t)(const void *)am2_origstate.obj_ctx_val)
+#undef ADDR_OBJ_CTX_VAL_PREV
+#define ADDR_OBJ_CTX_VAL_PREV ((uintptr_t)(const void *)am2_origstate.obj_ctx_val_prev)
+#undef ADDR_OBJ_MAP_DESC
+#define ADDR_OBJ_MAP_DESC ((uintptr_t)(const void *)am2_origstate.obj_map_desc)
+#undef ADDR_OBJ_SCRIPTS
+#define ADDR_OBJ_SCRIPTS ((uintptr_t)(const void *)am2_origstate.obj_scripts)
+#undef ADDR_OBJ_SCRIPT_CAP
+#define ADDR_OBJ_SCRIPT_CAP ((uintptr_t)(const void *)am2_origstate.obj_script_cap)
+#undef ADDR_OBJ_TABLE_RECORDS
+#define ADDR_OBJ_TABLE_RECORDS ((uintptr_t)(const void *)am2_origstate.obj_table_records)
+#undef ADDR_OPT_BIG_MOVIES
+#define ADDR_OPT_BIG_MOVIES ((uintptr_t)(const void *)am2_origstate.opt_big_movies)
+#undef ADDR_OPT_TRACE_PF
+#define ADDR_OPT_TRACE_PF ((uintptr_t)(const void *)am2_origstate.opt_trace_pf)
+#undef ADDR_OVERLAY_DIRTY
+#define ADDR_OVERLAY_DIRTY ((uintptr_t)(const void *)am2_origstate.overlay_dirty)
+#undef ADDR_PAD_COUNT
+#define ADDR_PAD_COUNT ((uintptr_t)(const void *)am2_origstate.pad_count)
+#undef ADDR_PLACEMENTS
+#define ADDR_PLACEMENTS ((uintptr_t)(const void *)am2_origstate.placements)
+#undef ADDR_PLACEMENT_CAP
+#define ADDR_PLACEMENT_CAP ((uintptr_t)(const void *)am2_origstate.placement_cap)
+#undef ADDR_PLACEMENT_COUNT
+#define ADDR_PLACEMENT_COUNT ((uintptr_t)(const void *)am2_origstate.placement_count)
+#undef ADDR_REGIONS
+#define ADDR_REGIONS ((uintptr_t)(const void *)am2_origstate.regions)
+#undef ADDR_REGION_COST
+#define ADDR_REGION_COST ((uintptr_t)(const void *)am2_origstate.region_cost)
+#undef ADDR_REGION_NEXT
+#define ADDR_REGION_NEXT ((uintptr_t)(const void *)am2_origstate.region_next)
+#undef ADDR_REGION_OF_CELL
+#define ADDR_REGION_OF_CELL ((uintptr_t)(const void *)am2_origstate.region_of_cell)
+#undef ADDR_REGION_STAMP
+#define ADDR_REGION_STAMP ((uintptr_t)(const void *)am2_origstate.region_stamp)
+#undef ADDR_REGION_STRIDE
+#define ADDR_REGION_STRIDE ((uintptr_t)(const void *)am2_origstate.region_stride)
+#undef ADDR_ROACH_MASK
+#define ADDR_ROACH_MASK ((uintptr_t)(const void *)am2_origstate.roach_mask)
+#undef ADDR_ROACH_MASK_COUNT
+#define ADDR_ROACH_MASK_COUNT ((uintptr_t)(const void *)am2_origstate.roach_mask_count)
+#undef ADDR_ROW_LUT_DOUBLES
+#define ADDR_ROW_LUT_DOUBLES ((uintptr_t)(const void *)am2_origstate.row_lut_doubles)
+#undef ADDR_SAVED_BATTLE_NAME
+#define ADDR_SAVED_BATTLE_NAME ((uintptr_t)(const void *)am2_origstate.saved_battle_name)
+#undef ADDR_SAVED_PLAYER_NAME
+#define ADDR_SAVED_PLAYER_NAME ((uintptr_t)(const void *)am2_origstate.saved_player_name)
+#undef ADDR_SCORE_LIMIT
+#define ADDR_SCORE_LIMIT ((uintptr_t)(const void *)am2_origstate.score_limit)
+#undef ADDR_SCRIPT_CONDITIONS
+#define ADDR_SCRIPT_CONDITIONS ((uintptr_t)(const void *)am2_origstate.script_conditions)
+#undef ADDR_SCRIPT_CONTEXT
+#define ADDR_SCRIPT_CONTEXT ((uintptr_t)(const void *)am2_origstate.script_context)
+#undef ADDR_SCRIPT_NAMES
+#define ADDR_SCRIPT_NAMES ((uintptr_t)(const void *)am2_origstate.script_names)
+#undef ADDR_SCRIPT_NAME_CAP
+#define ADDR_SCRIPT_NAME_CAP ((uintptr_t)(const void *)am2_origstate.script_name_cap)
+#undef ADDR_SCRIPT_NAME_COUNT
+#define ADDR_SCRIPT_NAME_COUNT ((uintptr_t)(const void *)am2_origstate.script_name_count)
+#undef ADDR_SCRIPT_STATE_FLAG
+#define ADDR_SCRIPT_STATE_FLAG ((uintptr_t)(const void *)am2_origstate.script_state_flag)
+#undef ADDR_SCRIPT_WORD_BUF
+#define ADDR_SCRIPT_WORD_BUF ((uintptr_t)(const void *)am2_origstate.script_word_buf)
+#undef ADDR_SLOT_HEADINGS
+#define ADDR_SLOT_HEADINGS ((uintptr_t)(const void *)am2_origstate.slot_headings)
+#undef ADDR_SLOT_IS_VEHICLE
+#define ADDR_SLOT_IS_VEHICLE ((uintptr_t)(const void *)am2_origstate.slot_is_vehicle)
+#undef ADDR_SLOT_POSITIONS
+#define ADDR_SLOT_POSITIONS ((uintptr_t)(const void *)am2_origstate.slot_positions)
+#undef ADDR_SLOW_MACHINE
+#define ADDR_SLOW_MACHINE ((uintptr_t)(const void *)am2_origstate.slow_machine)
+#undef ADDR_SPRITE_SET_SHARED
+#define ADDR_SPRITE_SET_SHARED ((uintptr_t)(const void *)am2_origstate.sprite_set_shared)
+#undef ADDR_SPRITE_SET_THIRD
+#define ADDR_SPRITE_SET_THIRD ((uintptr_t)(const void *)am2_origstate.sprite_set_third)
+#undef ADDR_SPRITE_SET_TITLE
+#define ADDR_SPRITE_SET_TITLE ((uintptr_t)(const void *)am2_origstate.sprite_set_title)
+#undef ADDR_STREAM_VOLUME
+#define ADDR_STREAM_VOLUME ((uintptr_t)(const void *)am2_origstate.stream_volume)
+#undef ADDR_SVAR_BLUE
+#define ADDR_SVAR_BLUE ((uintptr_t)(const void *)am2_origstate.svar_blue)
+#undef ADDR_SVAR_BLUESCORE
+#define ADDR_SVAR_BLUESCORE ((uintptr_t)(const void *)am2_origstate.svar_bluescore)
+#undef ADDR_SVAR_DIFFICULTY
+#define ADDR_SVAR_DIFFICULTY ((uintptr_t)(const void *)am2_origstate.svar_difficulty)
+#undef ADDR_SVAR_GREEN
+#define ADDR_SVAR_GREEN ((uintptr_t)(const void *)am2_origstate.svar_green)
+#undef ADDR_SVAR_GREENSCORE
+#define ADDR_SVAR_GREENSCORE ((uintptr_t)(const void *)am2_origstate.svar_greenscore)
+#undef ADDR_SVAR_GREY
+#define ADDR_SVAR_GREY ((uintptr_t)(const void *)am2_origstate.svar_grey)
+#undef ADDR_SVAR_GREYSCORE
+#define ADDR_SVAR_GREYSCORE ((uintptr_t)(const void *)am2_origstate.svar_greyscore)
+#undef ADDR_SVAR_ID15
+#define ADDR_SVAR_ID15 ((uintptr_t)(const void *)am2_origstate.svar_id15)
+#undef ADDR_SVAR_ME
+#define ADDR_SVAR_ME ((uintptr_t)(const void *)am2_origstate.svar_me)
+#undef ADDR_SVAR_NUMGREEN
+#define ADDR_SVAR_NUMGREEN ((uintptr_t)(const void *)am2_origstate.svar_numgreen)
+#undef ADDR_SVAR_SYSTEMSPEED
+#define ADDR_SVAR_SYSTEMSPEED ((uintptr_t)(const void *)am2_origstate.svar_systemspeed)
+#undef ADDR_SVAR_TAN
+#define ADDR_SVAR_TAN ((uintptr_t)(const void *)am2_origstate.svar_tan)
+#undef ADDR_SVAR_TANSCORE
+#define ADDR_SVAR_TANSCORE ((uintptr_t)(const void *)am2_origstate.svar_tanscore)
+#undef ADDR_TILESET_RESERVE
+#define ADDR_TILESET_RESERVE ((uintptr_t)(const void *)am2_origstate.tileset_reserve)
+#undef ADDR_TILE_LINE_BUF
+#define ADDR_TILE_LINE_BUF ((uintptr_t)(const void *)am2_origstate.tile_line_buf)
+#undef ADDR_TIMER_COUNT
+#define ADDR_TIMER_COUNT ((uintptr_t)(const void *)am2_origstate.timer_count)
+#undef ADDR_TIMER_TABLE
+#define ADDR_TIMER_TABLE ((uintptr_t)(const void *)am2_origstate.timer_table)
+#undef ADDR_TRIG_ATAN_COS
+#define ADDR_TRIG_ATAN_COS ((uintptr_t)(const void *)am2_origstate.trig_atan_cos)
+#undef ADDR_TRIG_ATAN_SIN
+#define ADDR_TRIG_ATAN_SIN ((uintptr_t)(const void *)am2_origstate.trig_atan_sin)
+#undef ADDR_TRIG_COS
+#define ADDR_TRIG_COS ((uintptr_t)(const void *)am2_origstate.trig_cos)
+#undef ADDR_TRIG_SIN
+#define ADDR_TRIG_SIN ((uintptr_t)(const void *)am2_origstate.trig_sin)
+#undef ADDR_TURRET_ANIMS
+#define ADDR_TURRET_ANIMS ((uintptr_t)(const void *)am2_origstate.turret_anims)
+#undef ADDR_VEHICLE_ANIMS
+#define ADDR_VEHICLE_ANIMS ((uintptr_t)(const void *)am2_origstate.vehicle_anims)
+#undef ADDR_VEHICLE_MASK
+#define ADDR_VEHICLE_MASK ((uintptr_t)(const void *)am2_origstate.vehicle_mask)
+#undef ADDR_VEHICLE_MASK_COUNT
+#define ADDR_VEHICLE_MASK_COUNT ((uintptr_t)(const void *)am2_origstate.vehicle_mask_count)
+#undef ADDR_VIEW_RECT_PREV
+#define ADDR_VIEW_RECT_PREV ((uintptr_t)(const void *)am2_origstate.view_rect_prev)
+#undef ADDR_VOLUME_AT_ZERO
+#define ADDR_VOLUME_AT_ZERO ((uintptr_t)(const void *)am2_origstate.volume_at_zero)
+#undef ADDR_VOLUME_VOICE
+#define ADDR_VOLUME_VOICE ((uintptr_t)(const void *)am2_origstate.volume_voice)
+#undef ADDR_ZERO_POINT
+#define ADDR_ZERO_POINT ((uintptr_t)(const void *)am2_origstate.zero_point)
+
 #endif /* AM2_STANDALONE_H */

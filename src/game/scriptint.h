@@ -47,13 +47,13 @@ extern "C" {
 #define kCommObject      (*(uint8_t *const *)AM2_IMAGE(ADDR_COMM_OBJECT))
 
 /* Image data the reconstruction WRITES. */
-#define kScriptWord      ((char *)AM2_IMAGE(ADDR_SCRIPT_WORD_BUF))
-#define kScriptNames     (*(AM2_ScriptName **)AM2_IMAGE(ADDR_SCRIPT_NAMES))
-#define kScriptNameCount (*(int32_t *)AM2_IMAGE(ADDR_SCRIPT_NAME_COUNT))
-#define kScriptNameCap   (*(int32_t *)AM2_IMAGE(ADDR_SCRIPT_NAME_CAP))
-#define kObjScripts      (*(AM2_ObjScript **)AM2_IMAGE(ADDR_OBJ_SCRIPTS))
-#define kObjScriptCount  (*(int32_t *)AM2_IMAGE(ADDR_CURRENT_OBJ_SCRIPT))
-#define kObjScriptCap    (*(int32_t *)AM2_IMAGE(ADDR_OBJ_SCRIPT_CAP))
+#define kScriptWord      ((char *)((void *)(uintptr_t)(ADDR_SCRIPT_WORD_BUF)))
+#define kScriptNames     (*(AM2_ScriptName **)((void *)(uintptr_t)(ADDR_SCRIPT_NAMES)))
+#define kScriptNameCount (*(int32_t *)((void *)(uintptr_t)(ADDR_SCRIPT_NAME_COUNT)))
+#define kScriptNameCap   (*(int32_t *)((void *)(uintptr_t)(ADDR_SCRIPT_NAME_CAP)))
+#define kObjScripts      (*(AM2_ObjScript **)((void *)(uintptr_t)(ADDR_OBJ_SCRIPTS)))
+#define kObjScriptCount  (*(int32_t *)((void *)(uintptr_t)(ADDR_CURRENT_OBJ_SCRIPT)))
+#define kObjScriptCap    (*(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_SCRIPT_CAP)))
 
 /* Advance one token and check its kind, with the two messages the original
  * writes out at every argument. NULL after logging; *at moves either way. */

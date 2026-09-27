@@ -654,7 +654,7 @@ void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)
         return;
 
     am2_sprintf(dir, "%s\\%s\\masks",
-                (const char *)AM2_IMAGE(ADDR_MAP_BLOCK),
+                (const char *)((void *)(uintptr_t)(ADDR_MAP_BLOCK)),
                 ((const char *const *)AM2_IMAGE(ADDR_SPRITE_SET_DIRS))[set]);
     SetGameDir(dir);
 
@@ -2154,8 +2154,8 @@ void __cdecl MovieBuildName(char *dst, const char *name)
         && strcmp(name, "credits") != 0
         && strcmp(name, "act2") != 0
         && strcmp(name, "portal") != 0
-        && *(const int32_t *)AM2_IMAGE(ADDR_SLOW_MACHINE)
-        && !*(const int32_t *)AM2_IMAGE(ADDR_OPT_BIG_MOVIES))
+        && *(const int32_t *)((void *)(uintptr_t)(ADDR_SLOW_MACHINE))
+        && !*(const int32_t *)((void *)(uintptr_t)(ADDR_OPT_BIG_MOVIES)))
         strcat(dst, "sml");
 
     strcat(dst, ".smk");
@@ -2220,7 +2220,7 @@ void __cdecl SeqAddKind6(const int32_t *at, int32_t variant)
     uint8_t *seq;
     uint8_t *row;
 
-    if (!PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT),
+    if (!PointInRect((const AM2_Rect *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)),
                      (const AM2_Point *)at))
         return;
 
@@ -2284,7 +2284,7 @@ void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust)
     uint8_t *seq;
     uint8_t *row;
 
-    if (!PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT),
+    if (!PointInRect((const AM2_Rect *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)),
                      (const AM2_Point *)at))
         return;
 
@@ -2382,7 +2382,7 @@ int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
 
         *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
 
-        if (!PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT),
+        if (!PointInRect((const AM2_Rect *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)),
                          (const AM2_Point *)(row + ROW_OFF_X)))
             return SeqRetire(ctx, rec);
 
@@ -2558,7 +2558,7 @@ void __cdecl SeqAddKind5(const int32_t *at, int32_t owner, int32_t life)
     uint8_t *seq;
     uint8_t *row;
 
-    if (!PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT),
+    if (!PointInRect((const AM2_Rect *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)),
                      (const AM2_Point *)at))
         return;
 
@@ -2594,7 +2594,7 @@ void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
     (void)b;
     (void)c;
 
-    if (!PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT),
+    if (!PointInRect((const AM2_Rect *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)),
                      (const AM2_Point *)at))
         return;
 

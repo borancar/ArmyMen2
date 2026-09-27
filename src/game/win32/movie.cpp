@@ -633,7 +633,7 @@ void __cdecl PlayMovie(const char *name, int32_t big)
     if (strncmp("3do", name, 3) == 0
         || strncmp("credits",
                    name, 7) == 0)
-        SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+        SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
     else
         SetGameDir(*(const char *const *)AM2_IMAGE(ADDR_STR_AVI_DIR));
 

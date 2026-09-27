@@ -245,7 +245,7 @@ void __cdecl MissionInput(void)
  * once, and the mission plays normally. */
 void __cdecl FrameClockStep(void)
 {
-    uint32_t *clock   = (uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS);
+    uint32_t *clock   = (uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS));
     uint32_t *last    = (uint32_t *)(uintptr_t)ADDR_LAST_TICK_MS;
     int32_t  *deltaMs = (int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
     uint32_t  delta;

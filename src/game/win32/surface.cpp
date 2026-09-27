@@ -1246,7 +1246,7 @@ extern "C" const int32_t am2_menu_save_slot[4] = { 0, 0, 32, 32 };
 #define g_overlayBInk   (*(int32_t *)(uintptr_t)ADDR_MENU_OVERLAY_B_INK)
 
 #define g_netGame       (*(int32_t *)(uintptr_t)ADDR_NET_GAME)
-#define g_gameClockMs   (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
+#define g_gameClockMs   (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
 #define g_menuRowStamp  (*(uint32_t *)(uintptr_t)ADDR_MENU_ROW_STAMP)
 
 /* 0x00412D30, thirty callers -- everything that highlights a menu row goes

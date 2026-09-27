@@ -3035,22 +3035,22 @@ int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out)
  */
 void __cdecl DirtyCollect(const AM2_Rect *r)
 {
-    uint8_t  *recs = (uint8_t *)AM2_IMAGE(ADDR_DIRTY_RECTS);
+    uint8_t  *recs = (uint8_t *)((void *)(uintptr_t)(ADDR_DIRTY_RECTS));
     AM2_Rect  cur;
     AM2_Rect  hit;
     uint16_t  at;
 
     if (!IntersectRect((LPRECT)&cur, (const RECT *)r,
-                       (const RECT *)AM2_IMAGE(ADDR_VIEW_RECT_PREV)))
+                       (const RECT *)((void *)(uintptr_t)(ADDR_VIEW_RECT_PREV))))
         return;
 
-    if ((int32_t)(uint16_t)*(const uint16_t *)AM2_IMAGE(ADDR_DIRTY_TAIL) + 1
+    if ((int32_t)(uint16_t)*(const uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)) + 1
         >= AM2_DEPTH_MAX) {
-        *(int32_t *)AM2_IMAGE(ADDR_FULL_REDRAW) = 1;
+        *(int32_t *)((void *)(uintptr_t)(ADDR_FULL_REDRAW)) = 1;
         return;
     }
 
-    for (at = *(const uint16_t *)AM2_IMAGE(ADDR_DIRTY_HEAD); at;
+    for (at = *(const uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_HEAD)); at;
          at = *(const uint16_t *)(recs + (uint32_t)at * AM2_DIRTY_RECORD_SIZE
                                   + DIRTY_OFF_NEXT)) {
         AM2_Rect *e = (AM2_Rect *)(recs
@@ -3186,7 +3186,7 @@ void __cdecl DirtyCollect(const AM2_Rect *r)
             *(uint16_t *)(recs + (uint32_t)prev * AM2_DIRTY_RECORD_SIZE
                           + DIRTY_OFF_NEXT) = next;
             if (!next)
-                *(uint16_t *)AM2_IMAGE(ADDR_DIRTY_TAIL) = prev;
+                *(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)) = prev;
             else
                 *(uint16_t *)(recs + (uint32_t)next * AM2_DIRTY_RECORD_SIZE
                               + DIRTY_OFF_PREV) = prev;

@@ -35,7 +35,7 @@
  * incremented the count, so the one being built is the last. */
 static AM2_ObjScript *ScriptCurrentObj(void)
 {
-    return &kObjScripts[*(const int32_t *)AM2_IMAGE(ADDR_CURRENT_OBJ_SCRIPT)
+    return &kObjScripts[*(const int32_t *)((void *)(uintptr_t)(ADDR_CURRENT_OBJ_SCRIPT))
                         - 1];
 }
 
@@ -212,7 +212,7 @@ int32_t __cdecl ScriptObjState(AM2_ScriptCtx *ctx, int32_t *at)
 static void ScriptAttachTo(uint8_t *obj)
 {
     *(int32_t *)(obj + AM2_OBJ_SCRIPT) =
-        *(const int32_t *)AM2_IMAGE(ADDR_CURRENT_OBJ_SCRIPT);
+        *(const int32_t *)((void *)(uintptr_t)(ADDR_CURRENT_OBJ_SCRIPT));
     *(int32_t *)(obj + AM2_OBJ_SCRIPT_PC) = 0;
     *(int32_t *)(obj + AM2_OBJ_SCRIPT_WAIT) = -1;
     *(int32_t *)(obj + AM2_OBJ_SCRIPT_STATE) = 0;
@@ -314,7 +314,7 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
  * frame. This comment used to say the opposite -- "It is NOT a clock, probed
  * at 500 for twelve seconds of play" -- on a probe taken with a dialog up,
  * which pauses it. See ADDR_GAME_CLOCK_MS in orig.h. */
-#define kScriptTiming (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
+#define kScriptTiming (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
 
 /* SetObjScriptState -- original 0x004372A0, one caller, which is
  * RunScriptAction: the `setobjstate` action. It names itself twice, in two
@@ -622,7 +622,7 @@ done:
  * against it. Reproduced; no name in a shipped script comes close. */
 int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
 {
-    AM2_ScriptCtx *ctx = (AM2_ScriptCtx *)AM2_IMAGE(ADDR_SCRIPT_CONTEXT);
+    AM2_ScriptCtx *ctx = (AM2_ScriptCtx *)((void *)(uintptr_t)(ADDR_SCRIPT_CONTEXT));
     char           buf[2048];
     int32_t        count;
 
@@ -756,11 +756,11 @@ int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, void *obj)
     if (byName) {
         const AM2_ScriptName *rec;
 
-        if (sel < 0 || sel >= *(const int32_t *)AM2_IMAGE(ADDR_SCRIPT_NAME_COUNT))
+        if (sel < 0 || sel >= *(const int32_t *)((void *)(uintptr_t)(ADDR_SCRIPT_NAME_COUNT)))
             return 0;
 
         rec = &(*(const AM2_ScriptName *const *)
-                    AM2_IMAGE(ADDR_SCRIPT_NAMES))[sel];
+                    ((void *)(uintptr_t)(ADDR_SCRIPT_NAMES)))[sel];
 
         if (rec->type != AM2_NAME_TYPE_REF)
             return 0;
@@ -784,7 +784,7 @@ int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, void *obj)
 
     if ((sel & AM2_SEL_ARMY_LOCAL)
         && *(const int8_t *)(o + OBJ_OFF_ARMY)
-           != (int8_t)*(const uint32_t *)AM2_IMAGE(ADDR_DEFAULT_OWNER))
+           != (int8_t)*(const uint32_t *)((void *)(uintptr_t)(ADDR_DEFAULT_OWNER)))
         return 0;
     if ((sel & AM2_SEL_ARMY_1) && *(const uint8_t *)(o + OBJ_OFF_ARMY) != 1)
         return 0;

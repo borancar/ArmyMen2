@@ -1205,7 +1205,7 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
     }
 
     if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED))
-        ItemLinkCells(obj, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC));
+        ItemLinkCells(obj, (void *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC)));
 
     return bytes;
 }

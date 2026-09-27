@@ -2850,12 +2850,12 @@ void __cdecl DumpMsgList(void *list)
  * not ADDR_COMM_OBJECT, which is the pointer at it. */
 void *__cdecl CommGlobalCtorThunk(void)
 {
-    return CommConstruct((void *)AM2_IMAGE(ADDR_COMM_GLOBAL));
+    return CommConstruct((void *)((void *)(uintptr_t)(ADDR_COMM_GLOBAL)));
 }
 
 void __cdecl CommGlobalDtorThunk(void)
 {
-    CommDestruct((void *)AM2_IMAGE(ADDR_COMM_GLOBAL));
+    CommDestruct((void *)((void *)(uintptr_t)(ADDR_COMM_GLOBAL)));
 }
 
 /* 0x0040DB60. Hands the teardown to the CRT's atexit and returns its answer,

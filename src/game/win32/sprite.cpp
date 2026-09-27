@@ -863,7 +863,7 @@ int32_t __cdecl SpriteLoadTriple(AM2_Sprite *spr, int32_t set, int32_t index,
 
     if (set >= 20)
         orig_sprintf(dir, "%s\\%s",
-                     (const char *)AM2_IMAGE(ADDR_MAP_BLOCK),
+                     (const char *)((void *)(uintptr_t)(ADDR_MAP_BLOCK)),
                      g_spriteSetDirs[set]);
     else
         orig_sprintf(dir, "%s",
@@ -1097,10 +1097,10 @@ void *__cdecl SpriteSetForKey(uint32_t key)
     int32_t set = (int32_t)KeyFieldA(key);
 
     if (set >= 20)
-        return (void *)AM2_IMAGE(ADDR_SPRITE_SET_THIRD);
+        return (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_THIRD));
     if (set < 1 || set > 9)
-        return (void *)AM2_IMAGE(ADDR_SPRITE_SET_SHARED);
-    return (void *)AM2_IMAGE(ADDR_SPRITE_SET_TITLE);
+        return (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_SHARED));
+    return (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_TITLE));
 }
 
 /* 0x00423D50. The directory index for a key, or -1.
@@ -1160,7 +1160,7 @@ int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id)
     char file[0x40];
 
     if (strcmp(name, "title") == 0) {
-        void *rec = (void *)AM2_IMAGE(ADDR_SPRITE_SET_TITLE);
+        void *rec = (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_TITLE));
 
         *set = rec;
         *id  = AM2_DAT_ID_TITLE;
@@ -1173,7 +1173,7 @@ int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id)
     }
 
     if (strcmp(name, "shared") == 0) {
-        void *rec = (void *)AM2_IMAGE(ADDR_SPRITE_SET_SHARED);
+        void *rec = (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_SHARED));
 
         *set = rec;
         *id  = AM2_DAT_ID_SHARED;
@@ -1186,7 +1186,7 @@ int32_t __cdecl SpriteSetResolve(const char *name, void **set, uint32_t *id)
     }
 
     {
-        void *rec = (void *)AM2_IMAGE(ADDR_SPRITE_SET_THIRD);
+        void *rec = (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_THIRD));
 
         *set = rec;
         *id  = AM2_DAT_ID_OBJECTS;
@@ -1251,7 +1251,7 @@ int32_t __cdecl SpriteSetLoad(const char *name)
     int32_t   i;
     int32_t   count;
 
-    SetGameDir((const char *)AM2_IMAGE(ADDR_DIR_SCRATCH));
+    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
 
     if (SpriteSetResolve(name, (void **)&set, &want))
         return SET_FILE(set) != 0;
@@ -1497,7 +1497,7 @@ int32_t __cdecl SpriteRebuildAlt(AM2_Sprite *spr, int32_t flags)
 
     if (set >= 20)
         orig_sprintf(dir, "%s\\%s",
-                     (const char *)AM2_IMAGE(ADDR_MAP_BLOCK),
+                     (const char *)((void *)(uintptr_t)(ADDR_MAP_BLOCK)),
                      g_spriteSetDirs[set]);
     else
         orig_sprintf(dir, "%s",

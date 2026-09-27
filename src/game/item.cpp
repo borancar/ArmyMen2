@@ -527,7 +527,7 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
      * keeps `ab.sh combat` and the rest out of the blast radius.
      *
      * Revert this and tools/loadcheck.sh fails again. */
-    if (*(void *const *)((const uint8_t *)AM2_IMAGE(ADDR_OBJ_MAP_DESC)
+    if (*(void *const *)((const uint8_t *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC))
                          + MAPDESC_OFF_CELLS)) {
         for (i = 0; i < g_objCount; i++)
             ItemPreDestroy(g_objTable[i].obj,
@@ -1421,7 +1421,7 @@ void *__cdecl MakeKind7(uint32_t pt, int32_t unused, int32_t army,
     *(o + OBJ_OFF_ARMY)             = (uint8_t)army;
     *(uint32_t *)(o + OBJ_OFF_FLAGS) = 1;
 
-    ObjInitCommon(o, (char *)AM2_IMAGE(ADDR_DIR_SCRATCH), 7, pt,
+    ObjInitCommon(o, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), 7, pt,
                          (const int32_t *)AM2_IMAGE(ADDR_KIND7_BOX), e, f);
 
     *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
@@ -1692,7 +1692,7 @@ void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force)
         && force == 0)
         return;
 
-    ObjRemap(o, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC), force);
+    ObjRemap(o, (void *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC)), force);
     ApplyObjHeight(o, height);
 }
 
@@ -1813,7 +1813,7 @@ int32_t __cdecl BlockWeightAt(void *from, uint32_t at, uint32_t ref)
     uint32_t tile;
 
     o = (uint8_t *)ObjectsAtPoint(
-            &at, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC));
+            &at, (void *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC)));
 
     for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
         total += ObjBlockWeight(from, o, (int32_t)at, ref);
@@ -1947,9 +1947,9 @@ void __cdecl ObjSetRoachFootprint(void *obj)
     slot = (uint32_t)dir * AM2_MASK_STRIDE;
 
     for (i = 0; i < ((const int32_t *)((const uint8_t *)
-             AM2_IMAGE(ADDR_ROACH_MASK_COUNT) + slot))[0]; i++) {
+             ((void *)(uintptr_t)(ADDR_ROACH_MASK_COUNT)) + slot))[0]; i++) {
         const int16_t *pts = (const int16_t *)
-            ((const uint8_t *)AM2_IMAGE(ADDR_ROACH_MASK) + slot);
+            ((const uint8_t *)((void *)(uintptr_t)(ADDR_ROACH_MASK)) + slot);
         uint32_t  at;
         uint16_t *mark;
         int32_t   tile;
@@ -2162,9 +2162,9 @@ static void ObjFootprint(void *obj, int32_t set)
            * AM2_MASK_STRIDE;
 
     count = *(const int32_t *)((const uint8_t *)
-                AM2_IMAGE(ADDR_VEHICLE_MASK_COUNT) + slot);
+                ((void *)(uintptr_t)(ADDR_VEHICLE_MASK_COUNT)) + slot);
     pts   = (const int16_t *)((const uint8_t *)
-                AM2_IMAGE(ADDR_VEHICLE_MASK) + slot);
+                ((void *)(uintptr_t)(ADDR_VEHICLE_MASK)) + slot);
 
     for (i = 0; i < count; i++) {
         uint32_t  at;
@@ -2802,9 +2802,9 @@ void __cdecl ObjClearRoachFootprint(void *obj)
     slot = (uint32_t)dir * AM2_MASK_STRIDE;
 
     for (i = 0; i < ((const int32_t *)((const uint8_t *)
-             AM2_IMAGE(ADDR_ROACH_MASK_COUNT) + slot))[0]; i++) {
+             ((void *)(uintptr_t)(ADDR_ROACH_MASK_COUNT)) + slot))[0]; i++) {
         const int16_t *pts = (const int16_t *)
-            ((const uint8_t *)AM2_IMAGE(ADDR_ROACH_MASK) + slot);
+            ((const uint8_t *)((void *)(uintptr_t)(ADDR_ROACH_MASK)) + slot);
         uint32_t  at;
         uint16_t *mark;
         int32_t   tile;
@@ -2870,9 +2870,9 @@ int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
 {
     uint32_t       slot  = (uint32_t)(dir & 0xFF) * AM2_MASK_STRIDE;
     const int32_t *count = (const int32_t *)
-        ((const uint8_t *)AM2_IMAGE(ADDR_ROACH_MASK_COUNT) + slot);
+        ((const uint8_t *)((void *)(uintptr_t)(ADDR_ROACH_MASK_COUNT)) + slot);
     const int16_t *pts = (const int16_t *)
-        ((const uint8_t *)AM2_IMAGE(ADDR_ROACH_MASK) + slot);
+        ((const uint8_t *)((void *)(uintptr_t)(ADDR_ROACH_MASK)) + slot);
     int32_t total = 0;
     int32_t i;
 
@@ -3928,7 +3928,7 @@ int32_t __cdecl MaskBlockWeight(int32_t kind, int32_t heading, uint32_t at)
 
         /* NOTE: the BASE point, not `here`. */
         chain = (uint8_t *)ObjectsAtPoint(&at,
-                                      (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC));
+                                      (void *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC)));
 
         total += (kind == AM2_MASK_CHAIN_KIND)
                  ? BlockWeightChain((void *)0, here, chain, at)
@@ -3966,7 +3966,7 @@ uint8_t __cdecl HeightAtPoint(uint32_t packedPoint)
 {
     int8_t  best = (int8_t)TileAttrAt((uint32_t)TileOfPoint(packedPoint));
     uint8_t *o   = (uint8_t *)ObjectsAtPoint(
-                       &packedPoint, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC));
+                       &packedPoint, (void *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC)));
 
     for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
         int8_t h;
@@ -4219,7 +4219,7 @@ void __cdecl DestroyObjCommon(void *obj)
                        + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
         ObjFlagClear0(row);
-        RowUpdate(row, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));
+        RowUpdate(row, 0, (void *)((void *)(uintptr_t)(ADDR_MAP_DESC)));
     }
 
     if (ObjIsItem((const AM2_Object *)obj))
@@ -4505,7 +4505,7 @@ void __cdecl PortalSpawn(void)
         pick = orig_game_rand() & 3;
 
         weapon = (uint8_t *)orig_create_weapon(
-                     (char *)AM2_IMAGE(ADDR_DIR_SCRATCH), 1,
+                     (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), 1,
                      KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                      (uint32_t)kWeapons[pick], 0),
                      *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
@@ -4564,7 +4564,7 @@ void __cdecl FlameTick(void)
     if (!*(const int32_t *)(uintptr_t)ADDR_FLAME_ON)
         return;
 
-    now = *(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS);
+    now = *(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS));
     if (now <= *(const uint32_t *)(uintptr_t)ADDR_FLAME_NEXT_MS)
         return;
 
@@ -4608,7 +4608,7 @@ void __cdecl FlameTick(void)
 void __cdecl PadAdvanceDeadlines(void)
 {
     AM2_Pad *pads = (AM2_Pad *)(uintptr_t)ADDR_PADS;
-    uint32_t now  = *(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS);
+    uint32_t now  = *(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS));
     int32_t  n    = *(const int32_t *)(uintptr_t)ADDR_PAD_COUNT;
     int32_t  i;
 
@@ -4714,7 +4714,7 @@ void __cdecl ObjFrameSweep(void)
  * Measured at 17,791 calls, the same once-a-frame as the sweep above. */
 void __cdecl AdvanceSecondDeadline(void)
 {
-    uint32_t now = *(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS);
+    uint32_t now = *(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS));
 
     if (now > g_secondDeadline)
         g_secondDeadline =
@@ -5202,7 +5202,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, int32_t d, int32_t kind,
 
             if (pick < 0)
                 pick = ((pick - 1) | ~3) + 1;
-            rec = (int32_t)(uintptr_t)AM2_IMAGE(ADDR_OBJ_TABLE_RECORDS)
+            rec = (int32_t)(uintptr_t)((void *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
                 + pick * AM2_OBJ_TABLE_REC_SIZE;
         } else {
             rec = *(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND);
@@ -7010,7 +7010,7 @@ void __cdecl Type2ActionA(void *obj)
     if (old)
         *(uint32_t *)((uint8_t *)old + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
 
-    made = CreateWeapon((char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+    made = CreateWeapon((char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                             (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
                             KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                             AM2_WEAPON_KEY_2B, 0),
@@ -7396,7 +7396,7 @@ void __cdecl StepRowAnim(void *row)
 
     hold = cell->hold;
     if (*(const void *const *)(r + MAPOBJ_OFF_LUT)
-            == (const void *)AM2_IMAGE(ADDR_ROW_LUT_DOUBLES))
+            == (const void *)((void *)(uintptr_t)(ADDR_ROW_LUT_DOUBLES)))
         hold >>= 1;
 
     now = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
@@ -7714,7 +7714,7 @@ void __cdecl RankPromote(void *obj)
         *(uint32_t *)((uint8_t *)old + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
 
     made = (uint8_t *)CreateWeapon(
-        (const char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+        (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
         *(const int8_t *)(o + OBJ_OFF_ARMY),
         KeyLookupTriple(AM2_RANK_WEAPON_GROUP, weaponId, 0),
         *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
@@ -8154,7 +8154,7 @@ void __cdecl EnterVehicle(void *unit, void *vehicle)
     }
 
     *(uint32_t *)(u + OBJ_OFF_SCRIPT_STATE) =
-        *(const uint32_t *)AM2_IMAGE(ADDR_ZERO_POINT);
+        *(const uint32_t *)((void *)(uintptr_t)(ADDR_ZERO_POINT));
     *(uint32_t *)(u + OBJ_OFF_UID_56C) = 0;
 
     if (*(const uint32_t *)(u + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED) {
@@ -10076,8 +10076,8 @@ int32_t __cdecl VehicleBlockWeight(void *veh, int32_t facing, uint32_t at,
                                    int32_t apply)
 {
     uint8_t       *v       = (uint8_t *)veh;
-    const int32_t *counts  = (const int32_t *)AM2_IMAGE(ADDR_VEHICLE_MASK_COUNT);
-    const uint8_t *masks   = (const uint8_t *)AM2_IMAGE(ADDR_VEHICLE_MASK);
+    const int32_t *counts  = (const int32_t *)((void *)(uintptr_t)(ADDR_VEHICLE_MASK_COUNT));
+    const uint8_t *masks   = (const uint8_t *)((void *)(uintptr_t)(ADDR_VEHICLE_MASK));
     uint32_t       base    = at;    /* argument 3's slot, and the boat's sample */
     uint32_t       pt      = 0;     /* argument 2's, once the facing is copied */
     int32_t        weight  = 0;
@@ -10298,7 +10298,7 @@ void __cdecl NearestClearVehiclePoint(void *veh, int32_t facing, uint32_t from,
     for (;;) {
         const uint8_t *entry;
 
-        if (PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT), out)
+        if (PointInRect((const AM2_Rect *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)), out)
             && VehicleBlockWeight(veh, snapped,
                                          *(const uint32_t *)out, 0)
                < AM2_VEHICLE_CLEAR_WEIGHT)
@@ -10367,7 +10367,7 @@ void __cdecl NearestClearPoint(uint32_t from, void *outPt)
     for (;;) {
         const uint8_t *entry;
 
-        if (PointInRect((const AM2_Rect *)AM2_IMAGE(ADDR_MAP_BOUNDS_LEFT), out)
+        if (PointInRect((const AM2_Rect *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)), out)
             && BlockWeightAt((void *)0, *(const uint32_t *)out,
                              *(const uint32_t *)out) < AM2_BLOCK_CLEAR)
             return;
@@ -11054,7 +11054,7 @@ void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
         *(int32_t *)(row0 + ROW_OFF_X) = *(const int32_t *)(o + OBJ_OFF_POS);
         *(int16_t *)(row0 + ROW_OFF_Y_ADJUST) =
             *(const int16_t *)(o + OBJ_OFF_ROW0_Y_ADJUST);
-        RowUpdate(row0, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));
+        RowUpdate(row0, 0, (void *)((void *)(uintptr_t)(ADDR_MAP_DESC)));
     }
 
     for (i = 1; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
@@ -11071,7 +11071,7 @@ void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
         *(int16_t *)(r + ROW_OFF_Y) = (int16_t)
             (*(const int16_t *)(r + ROW_OFF_Y)
              + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y));
-        RowUpdate(r, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));
+        RowUpdate(r, 0, (void *)((void *)(uintptr_t)(ADDR_MAP_DESC)));
     }
 
     ObjTileChanged(o, tileArg, 0);
@@ -11124,7 +11124,7 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
     row0 = *(uint8_t **)(o + OBJ_OFF_ROWS);
     *(uint32_t *)(row0 + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
     ObjFlagSet0(row0);
-    RowUpdate(row0, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));
+    RowUpdate(row0, 0, (void *)((void *)(uintptr_t)(ADDR_MAP_DESC)));
 
     *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
         *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
@@ -11144,7 +11144,7 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
             (*(const int16_t *)(r + ROW_OFF_Y)
              + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y));
         ObjFlagSet0(r);
-        RowUpdate(r, 0, (void *)AM2_IMAGE(ADDR_MAP_DESC));
+        RowUpdate(r, 0, (void *)((void *)(uintptr_t)(ADDR_MAP_DESC)));
     }
 
     ResetType2Fields(o);
@@ -11164,7 +11164,7 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
         *(int32_t *)(o + OBJ_OFF_RANK) = 0;
         *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME) = 0;
 
-        ObjRemap(o, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC), 1);
+        ObjRemap(o, (void *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC)), 1);
 
         if (!ObjIsFriendly(o))
             ObjConceal(o, 0);
@@ -11236,7 +11236,7 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
     row0 = *(uint8_t **)(o + OBJ_OFF_ROWS);
     *(uint32_t *)(row0 + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
     ObjFlagSet0(row0);
-    RowUpdate(row0, 1, (void *)AM2_IMAGE(ADDR_MAP_DESC));   /* force 1 here */
+    RowUpdate(row0, 1, (void *)((void *)(uintptr_t)(ADDR_MAP_DESC)));   /* force 1 here */
 
     *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
         *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
@@ -11261,7 +11261,7 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
 
         *(int32_t *)(o + OBJ_OFF_RIDING)    = 0;
         *(int32_t *)(o + OBJ_OFF_FIELD_5A4) = 0;
-        ObjRemap(o, (void *)AM2_IMAGE(ADDR_OBJ_MAP_DESC), 1);
+        ObjRemap(o, (void *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC)), 1);
         *(int32_t *)(o + OBJ_OFF_POSE) = 0;
 
         if (!ObjIsFriendly(o))
@@ -11763,7 +11763,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
             *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + delay;
 
     *(int8_t *)(o + OBJ_OFF_ARMY) = (int8_t)army;
-    ObjInitCommon(o, (char *)AM2_IMAGE(ADDR_DIR_SCRATCH),
+    ObjInitCommon(o, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                   AM2_OBJ_TYPE_EXPLOSION, at,
                   (const int32_t *)AM2_IMAGE(ADDR_EXPLOSION_BOX),
                   unused, uid);
@@ -12184,10 +12184,10 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     *(uint32_t *)(o + TROOPER_OFF_SPAWN_POS) =
         *(const uint32_t *)(o + OBJ_OFF_POS);
     *(const void **)(o + OBJ_OFF_TABLE_REC_SLOT) =
-        (const uint8_t *)AM2_IMAGE(ADDR_OBJ_TABLE_RECORDS)
+        (const uint8_t *)((void *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
         + (uint32_t)table * AM2_OBJ_TABLE_REC_SIZE;
 
-    turret = (const uint8_t *)AM2_IMAGE(ADDR_TURRET_ANIMS)
+    turret = (const uint8_t *)((void *)(uintptr_t)(ADDR_TURRET_ANIMS))
            + (uint32_t)kind * AM2_ANIM_TABLE_BYTES;
     rowCount = (*(const int32_t *)turret > 0) ? 2 : 1;
 
@@ -12240,7 +12240,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
         && (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
             || CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
                                  (int16_t)army))) {
-        void *w = CreateWeapon((char *)AM2_IMAGE(ADDR_DIR_SCRATCH), army,
+        void *w = CreateWeapon((char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), army,
                                KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                                (uint32_t)weaponKind, 0),
                                *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
@@ -12258,7 +12258,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
 
     rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
     *(const void **)(rows + ROW_OFF_ANIM_CUR) =
-        (const uint8_t *)AM2_IMAGE(ADDR_VEHICLE_ANIMS)
+        (const uint8_t *)((void *)(uintptr_t)(ADDR_VEHICLE_ANIMS))
         + (uint32_t)kind * AM2_ANIM_TABLE_BYTES;
     *(int16_t *)(rows + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
     *(uint32_t *)rows |= ROW_FLAG_BIT8 | ROW_FLAG_BIT6;
@@ -13215,7 +13215,7 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
 void __cdecl AimStart(uint32_t uid, int8_t army, uint32_t at);
 void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at);
 
-#define g_gameClockMs  (*(const uint32_t *)AM2_IMAGE(ADDR_GAME_CLOCK_MS))
+#define g_gameClockMs  (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
 #define g_ourLeaderUid (*(uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID)
 
 #define g_createWatchedKind (*(int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND)

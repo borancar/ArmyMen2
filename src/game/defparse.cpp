@@ -16,21 +16,21 @@
 
 #define kSep (" \t\n;,")
 
-#define kDefObjRecCap  (*(int32_t *)AM2_IMAGE(ADDR_DEF_OBJ_REC_CAP))
+#define kDefObjRecCap  (*(int32_t *)((void *)(uintptr_t)(ADDR_DEF_OBJ_REC_CAP)))
 
 typedef void (__cdecl *AM2_QsortFn)(void *base, uint32_t n, uint32_t size,
                                     const void *cmp);
 #define orig_qsort (*(AM2_QsortFn)AM2_IMAGE(ADDR_CRT_QSORT))
 #define orig_bsearch (*(AM2_BsearchFn)AM2_IMAGE(ADDR_CRT_BSEARCH))
-#define kDefLinkCap    (*(int32_t *)AM2_IMAGE(ADDR_DEF_LINK_CAP))
-#define kDefObjRecs      (*(void **)AM2_IMAGE(ADDR_DEF_OBJ_RECS))
-#define kDefTrooperRecs  (*(void **)AM2_IMAGE(ADDR_DEF_TROOPER_RECS))
-#define kDefTrooperCount (*(int32_t *)AM2_IMAGE(ADDR_DEF_TROOPER_COUNT))
-#define kDefTrooperCap   (*(int32_t *)AM2_IMAGE(ADDR_DEF_TROOPER_CAP))
-#define kDefObjRecCount  (*(int32_t *)AM2_IMAGE(ADDR_DEF_OBJ_REC_COUNT))
+#define kDefLinkCap    (*(int32_t *)((void *)(uintptr_t)(ADDR_DEF_LINK_CAP)))
+#define kDefObjRecs      (*(void **)((void *)(uintptr_t)(ADDR_DEF_OBJ_RECS)))
+#define kDefTrooperRecs  (*(void **)((void *)(uintptr_t)(ADDR_DEF_TROOPER_RECS)))
+#define kDefTrooperCount (*(int32_t *)((void *)(uintptr_t)(ADDR_DEF_TROOPER_COUNT)))
+#define kDefTrooperCap   (*(int32_t *)((void *)(uintptr_t)(ADDR_DEF_TROOPER_CAP)))
+#define kDefObjRecCount  (*(int32_t *)((void *)(uintptr_t)(ADDR_DEF_OBJ_REC_COUNT)))
 
-#define kDefLinks      (*(AM2_DefLink **)AM2_IMAGE(ADDR_DEF_LINKS))
-#define kDefLinkCount  (*(int32_t *)AM2_IMAGE(ADDR_DEF_LINK_COUNT))
+#define kDefLinks      (*(AM2_DefLink **)((void *)(uintptr_t)(ADDR_DEF_LINKS)))
+#define kDefLinkCount  (*(int32_t *)((void *)(uintptr_t)(ADDR_DEF_LINK_COUNT)))
 
 /* Read the next whitespace-delimited field. Only the first call passes the
  * line; the rest continue from strtok's own state. */

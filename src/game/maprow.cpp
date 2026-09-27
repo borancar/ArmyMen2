@@ -1009,7 +1009,7 @@ void __cdecl BuildRowSet(void *set, int32_t count, const void *specs,
 
         RowInit(row, (void *)0, spec[0] + dx, spec[1] + dy);
         ObjFlagSet0(row);
-        RowAlloc(spec[2], spec[3], row, (void *)AM2_IMAGE(ADDR_MAP_DESC));
+        RowAlloc(spec[2], spec[3], row, (void *)((void *)(uintptr_t)(ADDR_MAP_DESC)));
     }
 
     *(int32_t *)(h + 0x0C) = 0;
@@ -1826,7 +1826,7 @@ int32_t __cdecl RandomRespawnKind(int32_t *out)
                 % *(const int32_t *)(uintptr_t)ADDR_RESPAWN_KIND_COUNT;
     int32_t kind = (*(int32_t *const *)(uintptr_t)ADDR_RESPAWN_KINDS)[r];
 
-    *out = *(const int32_t *)((const uint8_t *)AM2_IMAGE(ADDR_MISSILE_DEFS)
+    *out = *(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_MISSILE_DEFS))
                                + kind * AM2_MISSILE_DEF_BYTES
                                + MISSILEDEF_OFF_FIELD_30);
     return kind;

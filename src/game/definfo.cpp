@@ -438,7 +438,7 @@ void __cdecl LoadDefTables(void)
                  "Game.aai");
 
     /* The override pass. */
-    SetGameDir((const char *)AM2_IMAGE(ADDR_MAP_FOLDER));
+    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
     if (!DefParseInfoFile("Object.aai"))
         orig_log("Couldn't parse %s!\n",
                  "Object.aai");
@@ -447,7 +447,7 @@ void __cdecl LoadDefTables(void)
 
     /* The missile definitions. Thirteen dwords per entry, five of them moved:
      * 0x10 and 0x14 swap, and 0x1C -> 0x24 -> 0x20 -> 0x1C. */
-    dst = (uint8_t *)AM2_IMAGE(ADDR_MISSILE_DEFS);
+    dst = (uint8_t *)((void *)(uintptr_t)(ADDR_MISSILE_DEFS));
     for (id = 0; id < AM2_MISSILE_DEF_COUNT;
          id++, dst += AM2_MISSILE_DEF_BYTES) {
         const uint8_t *src;
