@@ -136,7 +136,7 @@ void __cdecl CopyByteIfSet(uint32_t unused, uint8_t *dst, const void *src)
 
 int32_t __cdecl ScaleBy32Blocks(int32_t v)
 {
-    int32_t blocks = (v + (v < 0 ? 31 : 0)) >> 5;
+    int32_t blocks = v / 32;
 
     return (blocks + 1) * 1000;
 }
@@ -749,11 +749,11 @@ uint32_t __cdecl XorChecksum(const void *record)
     int32_t         n = (int32_t)(d[1] >> 2);
     uint32_t        acc = 0;
 
-    if (n <= 0)
-        return 0;
-    do {
-        acc ^= *d++;
-    } while (--n);
+    if (n > 0) {
+        do {
+            acc ^= *d++;
+        } while (--n);
+    }
     return acc;
 }
 
@@ -1172,11 +1172,11 @@ int32_t __cdecl MeetsAllThree(const void *p)
 {
     const uint8_t *b = (const uint8_t *)p;
 
-    if (b[8] & 4)
-        return 0;
-    if (*(const int32_t *)b != 1)
-        return 0;
-    return (**(const int32_t *const *)(b + 0x94) == 0x1F) ? 1 : 0;
+    if (!(b[8] & 4)
+        && *(const int32_t *)b == 1
+        && **(const int32_t *const *)(b + 0x94) == 0x1F)
+        return 1;
+    return 0;
 }
 
 int32_t __attribute__((thiscall)) AM2_Comm::CommSlotForArmy(int32_t army)

@@ -1798,15 +1798,11 @@ int32_t __cdecl RespawnKindAllowed(int32_t kind)
 {
     uint32_t mask;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
-        return 1;
-
-    mask = ((const uint32_t *)(uintptr_t)ADDR_RESPAWN_KIND_MASK)[kind];
-    if (mask == 0)
-        return 1;
-    if ((*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS & mask) != 0)
-        return 1;
-    return 0;
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
+        && (mask = ((const uint32_t *)(uintptr_t)ADDR_RESPAWN_KIND_MASK)[kind]) != 0
+        && (*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS & mask) == 0)
+        return 0;
+    return 1;
 }
 
 /* 0x004601D0. Pick a respawn kind at random.
