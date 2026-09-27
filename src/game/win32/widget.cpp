@@ -2163,15 +2163,16 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DialogDelete(int32_t flags)
  * parameter because the shape is not the dialogs' alone: the multiplayer name
  * button has the identical pair and jumps to WidgetDestruct instead. */
 #define AM2_CLASS_DTOR(name, vt, base)                                   \
-    void __attribute__((thiscall)) name##Destruct(AM2_Widget *w)             \
+    void __attribute__((thiscall)) AM2_Widget::name##Destruct()              \
     {                                                                        \
+        AM2_Widget *w = this;                                                \
         w->vtable = (void *)AM2_IMAGE(vt);                                   \
-        base(w);                                                             \
+        ::base(w);                                                           \
     }                                                                        \
-    AM2_Widget *__attribute__((thiscall)) name##Delete(AM2_Widget *w,        \
-                                                       int32_t flags)        \
+    AM2_Widget *__attribute__((thiscall)) AM2_Widget::name##Delete(int32_t flags) \
     {                                                                        \
-        name##Destruct(w);                                                   \
+        AM2_Widget *w = this;                                                \
+        ::name##Destruct(w);                                                 \
         if (flags & 1)                                                       \
             am2_free(w);                                                     \
         return w;                                                            \
@@ -15549,109 +15550,109 @@ int widget_install(void)
     rc |= patch_replace(ADDR_SAVE_LIST_DELETE, (const void *)SaveListDelete,
                         "SaveListDelete", 1);
     rc |= patch_replace(ADDR_COMM_PANEL_DESTRUCT,
-                        (const void *)CommPanelDestruct,
+                        pmf_addr(&AM2_Widget::CommPanelDestruct),
                         "CommPanelDestruct", 1);
-    rc |= patch_replace(ADDR_COMM_PANEL_DELETE, (const void *)CommPanelDelete,
+    rc |= patch_replace(ADDR_COMM_PANEL_DELETE, pmf_addr(&AM2_Widget::CommPanelDelete),
                         "CommPanelDelete", 1);
     rc |= patch_replace(ADDR_BATTLE_JOIN_DESTRUCT,
-                        (const void *)BattleJoinDestruct,
+                        pmf_addr(&AM2_Widget::BattleJoinDestruct),
                         "BattleJoinDestruct", 1);
     rc |= patch_replace(ADDR_BATTLE_JOIN_DELETE,
-                        (const void *)BattleJoinDelete,
+                        pmf_addr(&AM2_Widget::BattleJoinDelete),
                         "BattleJoinDelete", 1);
-    rc |= patch_replace(ADDR_MP_NAME_DESTRUCT, (const void *)MpNameDestruct,
+    rc |= patch_replace(ADDR_MP_NAME_DESTRUCT, pmf_addr(&AM2_Widget::MpNameDestruct),
                         "MpNameDestruct", 1);
-    rc |= patch_replace(ADDR_MP_NAME_DELETE, (const void *)MpNameDelete,
+    rc |= patch_replace(ADDR_MP_NAME_DELETE, pmf_addr(&AM2_Widget::MpNameDelete),
                         "MpNameDelete", 1);
     rc |= patch_replace(ADDR_DLG_SELECTMAP_DESTRUCT,
-                        (const void *)DlgSelectMapDestruct,
+                        pmf_addr(&AM2_Widget::DlgSelectMapDestruct),
                         "DlgSelectMapDestruct", 1);
     rc |= patch_replace(ADDR_DLG_SELECTMAP_DELETE,
-                        (const void *)DlgSelectMapDelete,
+                        pmf_addr(&AM2_Widget::DlgSelectMapDelete),
                         "DlgSelectMapDelete", 1);
     rc |= patch_replace(ADDR_DLG_DIFFICULTY_DESTRUCT,
-                        (const void *)DlgDifficultyDestruct,
+                        pmf_addr(&AM2_Widget::DlgDifficultyDestruct),
                         "DlgDifficultyDestruct", 1);
     rc |= patch_replace(ADDR_DLG_DIFFICULTY_DELETE,
-                        (const void *)DlgDifficultyDelete,
+                        pmf_addr(&AM2_Widget::DlgDifficultyDelete),
                         "DlgDifficultyDelete", 1);
     rc |= patch_replace(ADDR_DLG_QUITGAME_DESTRUCT,
-                        (const void *)DlgQuitGameDestruct,
+                        pmf_addr(&AM2_Widget::DlgQuitGameDestruct),
                         "DlgQuitGameDestruct", 1);
     rc |= patch_replace(ADDR_DLG_QUITGAME_DELETE,
-                        (const void *)DlgQuitGameDelete,
+                        pmf_addr(&AM2_Widget::DlgQuitGameDelete),
                         "DlgQuitGameDelete", 1);
     rc |= patch_replace(ADDR_DLG_REPLAY_DESTRUCT,
-                        (const void *)DlgReplayDestruct,
+                        pmf_addr(&AM2_Widget::DlgReplayDestruct),
                         "DlgReplayDestruct", 1);
     rc |= patch_replace(ADDR_DLG_REPLAY_DELETE,
-                        (const void *)DlgReplayDelete,
+                        pmf_addr(&AM2_Widget::DlgReplayDelete),
                         "DlgReplayDelete", 1);
     rc |= patch_replace(ADDR_DLG_AUDIO_DESTRUCT,
-                        (const void *)DlgAudioDestruct,
+                        pmf_addr(&AM2_Widget::DlgAudioDestruct),
                         "DlgAudioDestruct", 1);
     rc |= patch_replace(ADDR_DLG_AUDIO_DELETE,
-                        (const void *)DlgAudioDelete,
+                        pmf_addr(&AM2_Widget::DlgAudioDelete),
                         "DlgAudioDelete", 1);
     rc |= patch_replace(ADDR_DLG_OPTIONS_DESTRUCT,
-                        (const void *)DlgOptionsDestruct,
+                        pmf_addr(&AM2_Widget::DlgOptionsDestruct),
                         "DlgOptionsDestruct", 1);
     rc |= patch_replace(ADDR_DLG_OPTIONS_DELETE,
-                        (const void *)DlgOptionsDelete,
+                        pmf_addr(&AM2_Widget::DlgOptionsDelete),
                         "DlgOptionsDelete", 1);
     rc |= patch_replace(ADDR_DLG_DELGAME_DESTRUCT,
-                        (const void *)DlgDelGameDestruct,
+                        pmf_addr(&AM2_Widget::DlgDelGameDestruct),
                         "DlgDelGameDestruct", 1);
     rc |= patch_replace(ADDR_DLG_DELGAME_DELETE,
-                        (const void *)DlgDelGameDelete,
+                        pmf_addr(&AM2_Widget::DlgDelGameDelete),
                         "DlgDelGameDelete", 1);
     rc |= patch_replace(ADDR_DLG_OVERWRITE_DESTRUCT,
-                        (const void *)DlgOverwriteDestruct,
+                        pmf_addr(&AM2_Widget::DlgOverwriteDestruct),
                         "DlgOverwriteDestruct", 1);
     rc |= patch_replace(ADDR_DLG_OVERWRITE_DELETE,
-                        (const void *)DlgOverwriteDelete,
+                        pmf_addr(&AM2_Widget::DlgOverwriteDelete),
                         "DlgOverwriteDelete", 1);
     rc |= patch_replace(ADDR_DLG_DELPLAYER_DESTRUCT,
-                        (const void *)DlgDelPlayerDestruct,
+                        pmf_addr(&AM2_Widget::DlgDelPlayerDestruct),
                         "DlgDelPlayerDestruct", 1);
     rc |= patch_replace(ADDR_DLG_DELPLAYER_DELETE,
-                        (const void *)DlgDelPlayerDelete,
+                        pmf_addr(&AM2_Widget::DlgDelPlayerDelete),
                         "DlgDelPlayerDelete", 1);
     rc |= patch_replace(ADDR_DLG_CONTROLS_DESTRUCT,
-                        (const void *)DlgControlsDestruct,
+                        pmf_addr(&AM2_Widget::DlgControlsDestruct),
                         "DlgControlsDestruct", 1);
     rc |= patch_replace(ADDR_DLG_CONTROLS_DELETE,
-                        (const void *)DlgControlsDelete,
+                        pmf_addr(&AM2_Widget::DlgControlsDelete),
                         "DlgControlsDelete", 1);
     rc |= patch_replace(ADDR_DLG_SELECTPLAYER_DESTRUCT,
-                        (const void *)DlgSelectPlayerDestruct,
+                        pmf_addr(&AM2_Widget::DlgSelectPlayerDestruct),
                         "DlgSelectPlayerDestruct", 1);
     rc |= patch_replace(ADDR_DLG_SELECTPLAYER_DELETE,
-                        (const void *)DlgSelectPlayerDelete,
+                        pmf_addr(&AM2_Widget::DlgSelectPlayerDelete),
                         "DlgSelectPlayerDelete", 1);
     rc |= patch_replace(ADDR_DLG_NAMEENTRY_DESTRUCT,
-                        (const void *)DlgNameEntryDestruct,
+                        pmf_addr(&AM2_Widget::DlgNameEntryDestruct),
                         "DlgNameEntryDestruct", 1);
     rc |= patch_replace(ADDR_DLG_NAMEENTRY_DELETE,
-                        (const void *)DlgNameEntryDelete,
+                        pmf_addr(&AM2_Widget::DlgNameEntryDelete),
                         "DlgNameEntryDelete", 1);
     rc |= patch_replace(ADDR_DLG_LOADGAME_DESTRUCT,
-                        (const void *)DlgLoadGameDestruct,
+                        pmf_addr(&AM2_Widget::DlgLoadGameDestruct),
                         "DlgLoadGameDestruct", 1);
     rc |= patch_replace(ADDR_DLG_LOADGAME_DELETE,
-                        (const void *)DlgLoadGameDelete,
+                        pmf_addr(&AM2_Widget::DlgLoadGameDelete),
                         "DlgLoadGameDelete", 1);
     rc |= patch_replace(ADDR_DLG_MESSAGE_DESTRUCT,
-                        (const void *)DlgMessageDestruct,
+                        pmf_addr(&AM2_Widget::DlgMessageDestruct),
                         "DlgMessageDestruct", 1);
     rc |= patch_replace(ADDR_DLG_MESSAGE_DELETE,
-                        (const void *)DlgMessageDelete,
+                        pmf_addr(&AM2_Widget::DlgMessageDelete),
                         "DlgMessageDelete", 1);
     rc |= patch_replace(ADDR_DLG_GAMEMENU_DESTRUCT,
-                        (const void *)DlgGameMenuDestruct,
+                        pmf_addr(&AM2_Widget::DlgGameMenuDestruct),
                         "DlgGameMenuDestruct", 1);
     rc |= patch_replace(ADDR_DLG_GAMEMENU_DELETE,
-                        (const void *)DlgGameMenuDelete,
+                        pmf_addr(&AM2_Widget::DlgGameMenuDelete),
                         "DlgGameMenuDelete", 1);
     rc |= patch_replace(ADDR_TYPER_PAINT, pmf_addr(&AM2_Widget::TyperPaint),
                         "TyperPaint", 1);

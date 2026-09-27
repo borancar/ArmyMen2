@@ -133,6 +133,42 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) ArrowDelete(int32_t flags);
     void __attribute__((thiscall)) DialogDestruct();
     AM2_Widget * __attribute__((thiscall)) DialogDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgSelectMapDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgSelectMapDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgDifficultyDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgDifficultyDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgQuitGameDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgQuitGameDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgReplayDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgReplayDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgAudioDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgAudioDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgOptionsDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgOptionsDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgDelGameDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgDelGameDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgOverwriteDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgOverwriteDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgDelPlayerDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgDelPlayerDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgControlsDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgControlsDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgSelectPlayerDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgSelectPlayerDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgNameEntryDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgNameEntryDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgLoadGameDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgLoadGameDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgMessageDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgMessageDelete(int32_t flags);
+    void __attribute__((thiscall)) DlgGameMenuDestruct();
+    AM2_Widget * __attribute__((thiscall)) DlgGameMenuDelete(int32_t flags);
+    void __attribute__((thiscall)) CommPanelDestruct();
+    AM2_Widget * __attribute__((thiscall)) CommPanelDelete(int32_t flags);
+    void __attribute__((thiscall)) BattleJoinDestruct();
+    AM2_Widget * __attribute__((thiscall)) BattleJoinDelete(int32_t flags);
+    void __attribute__((thiscall)) MpNameDestruct();
+    AM2_Widget * __attribute__((thiscall)) MpNameDelete(int32_t flags);
     void __attribute__((thiscall)) HudPanelUpdate();
     void __attribute__((thiscall)) HudTopPaint(RECT clip);
     void __attribute__((thiscall)) HudTopUpdate();
@@ -898,19 +934,58 @@ static inline AM2_Widget * __attribute__((thiscall)) DialogDelete(AM2_Widget *w,
     AM2_Widget *__attribute__((thiscall)) name##Delete(AM2_Widget *w,        \
                                                        int32_t flags)
 
-AM2_DECLARE_CLASS_DTOR(DlgSelectMap);
-AM2_DECLARE_CLASS_DTOR(DlgDifficulty);
-AM2_DECLARE_CLASS_DTOR(DlgQuitGame);
-AM2_DECLARE_CLASS_DTOR(DlgReplay);
-AM2_DECLARE_CLASS_DTOR(DlgAudio);
-AM2_DECLARE_CLASS_DTOR(DlgOptions);
-AM2_DECLARE_CLASS_DTOR(DlgDelGame);
-AM2_DECLARE_CLASS_DTOR(DlgOverwrite);
-AM2_DECLARE_CLASS_DTOR(DlgDelPlayer);
-AM2_DECLARE_CLASS_DTOR(DlgControls);
-AM2_DECLARE_CLASS_DTOR(DlgSelectPlayer);
-AM2_DECLARE_CLASS_DTOR(DlgNameEntry);
-AM2_DECLARE_CLASS_DTOR(DlgLoadGame);
+static inline void __attribute__((thiscall)) DlgSelectMapDestruct(AM2_Widget *w)
+{ w->DlgSelectMapDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgSelectMapDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgSelectMapDelete(flags); }
+static inline void __attribute__((thiscall)) DlgDifficultyDestruct(AM2_Widget *w)
+{ w->DlgDifficultyDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgDifficultyDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgDifficultyDelete(flags); }
+static inline void __attribute__((thiscall)) DlgQuitGameDestruct(AM2_Widget *w)
+{ w->DlgQuitGameDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgQuitGameDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgQuitGameDelete(flags); }
+static inline void __attribute__((thiscall)) DlgReplayDestruct(AM2_Widget *w)
+{ w->DlgReplayDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgReplayDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgReplayDelete(flags); }
+static inline void __attribute__((thiscall)) DlgAudioDestruct(AM2_Widget *w)
+{ w->DlgAudioDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgAudioDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgAudioDelete(flags); }
+static inline void __attribute__((thiscall)) DlgOptionsDestruct(AM2_Widget *w)
+{ w->DlgOptionsDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgOptionsDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgOptionsDelete(flags); }
+static inline void __attribute__((thiscall)) DlgDelGameDestruct(AM2_Widget *w)
+{ w->DlgDelGameDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgDelGameDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgDelGameDelete(flags); }
+static inline void __attribute__((thiscall)) DlgOverwriteDestruct(AM2_Widget *w)
+{ w->DlgOverwriteDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgOverwriteDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgOverwriteDelete(flags); }
+static inline void __attribute__((thiscall)) DlgDelPlayerDestruct(AM2_Widget *w)
+{ w->DlgDelPlayerDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgDelPlayerDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgDelPlayerDelete(flags); }
+static inline void __attribute__((thiscall)) DlgControlsDestruct(AM2_Widget *w)
+{ w->DlgControlsDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgControlsDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgControlsDelete(flags); }
+static inline void __attribute__((thiscall)) DlgSelectPlayerDestruct(AM2_Widget *w)
+{ w->DlgSelectPlayerDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgSelectPlayerDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgSelectPlayerDelete(flags); }
+static inline void __attribute__((thiscall)) DlgNameEntryDestruct(AM2_Widget *w)
+{ w->DlgNameEntryDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgNameEntryDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgNameEntryDelete(flags); }
+static inline void __attribute__((thiscall)) DlgLoadGameDestruct(AM2_Widget *w)
+{ w->DlgLoadGameDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgLoadGameDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgLoadGameDelete(flags); }
 /* 0x00452750, thiscall. The plain message box, centred on its own backdrop. */
 static inline AM2_Widget * __attribute__((thiscall)) DlgMessageConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
 { return w->DlgMessageConstruct(bmp, flag); }
@@ -966,15 +1041,30 @@ void __cdecl HudChatChar(uint32_t ch, uint32_t lo, uint32_t hi);
 static inline void __attribute__((thiscall)) HudChatSend(AM2_Widget *w)
 { w->HudChatSend(); }
 
-AM2_DECLARE_CLASS_DTOR(DlgMessage);
-AM2_DECLARE_CLASS_DTOR(DlgGameMenu);
+static inline void __attribute__((thiscall)) DlgMessageDestruct(AM2_Widget *w)
+{ w->DlgMessageDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgMessageDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgMessageDelete(flags); }
+static inline void __attribute__((thiscall)) DlgGameMenuDestruct(AM2_Widget *w)
+{ w->DlgGameMenuDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DlgGameMenuDelete(AM2_Widget *w, int32_t flags)
+{ return w->DlgGameMenuDelete(flags); }
 
 /* Original: 0x0042ECC0/0x0042ECE0, 0x0042F850/0x0042F870 and
  * 0x00432A40/0x00432A60 -- the same pair for the COMM. CHANNEL SELECT panel,
  * the battle-join screen and one multiplayer row's name button. */
-AM2_DECLARE_CLASS_DTOR(CommPanel);
-AM2_DECLARE_CLASS_DTOR(BattleJoin);
-AM2_DECLARE_CLASS_DTOR(MpName);
+static inline void __attribute__((thiscall)) CommPanelDestruct(AM2_Widget *w)
+{ w->CommPanelDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) CommPanelDelete(AM2_Widget *w, int32_t flags)
+{ return w->CommPanelDelete(flags); }
+static inline void __attribute__((thiscall)) BattleJoinDestruct(AM2_Widget *w)
+{ w->BattleJoinDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) BattleJoinDelete(AM2_Widget *w, int32_t flags)
+{ return w->BattleJoinDelete(flags); }
+static inline void __attribute__((thiscall)) MpNameDestruct(AM2_Widget *w)
+{ w->MpNameDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) MpNameDelete(AM2_Widget *w, int32_t flags)
+{ return w->MpNameDelete(flags); }
 
 /* The HUD classes' destructor pairs. Named from what `ctl widgets` shows each
  * node drawing in a live mission; see orig.h. Five distinct bodies, so the
