@@ -23,7 +23,7 @@ the same trick as the hybrid game loader). `make vc6-match` recompiles each
 `patch_replace`'d reconstruction with the *original* compiler at /O2 and
 byte-compares it to `ArmyMen2.exe` -- the strongest correctness check there is.
 
-Baseline: **350 of ~1580 compiled `src/game` functions are byte-identical as
+Baseline: **352 of ~1580 compiled `src/game` functions are byte-identical as
 written** (ApproxDist, PackKey, Clamp, PointInRect, …). Re-measure with
 `make vc6-match`; worklist is `make vc6-match ARGS=--diffs`. The pure-signedness
 class (unsigned `jb` where the original compared signed `jl`) is closed --
@@ -98,10 +98,21 @@ main result so far (details in `src/vc6/README.md`):
   *headers* of functions whose full 250-600-byte bodies call engine code. After
   excluding those (full-function size from `docs/functions.tsv`, and any body
   with a `call` or a jump-table dispatch), the genuinely fully-compared,
-  call-free, jump-table-free leaf diffs are **30** (down from 39 after the dtor
-  cluster matched). The InitRemap trio (leaf-not-*pure* writers) is the main
-  remaining writer set; the rest are computational and dominated by register
-  allocation.
+  call-free, jump-table-free leaf diffs are **28** (down from 39). Two more that
+  *looked* like register allocation were actually source shape and closed:
+  SwapColourBytes (the original builds the result byte-by-byte in a stack
+  buffer, not shift/mask) and FindPlayerById (a pointer-bound walk compared
+  SIGNED against the end address, not an index counter). Lesson: a first-
+  divergence that pushes an extra callee-saved register, or reads/writes via a
+  byte buffer, is often a source-shape diff worth reshaping -- distinguish it
+  from a pure register rename before calling it irreducible. The remaining ~28
+  are: pure register swaps (`eax`/`ecx`/`edx` for identical instructions --
+  irreducible, verified by restructuring PointRuleDefault and AllocUid to no
+  effect), two binary searches (SpriteSlotOf, FindRecordList) whose diff is
+  MSVC6's first-iteration loop *peel* plus cascading register use, a handful of
+  leaf-not-*pure* writers (InitRemap trio, InitStartupColours, AirInit*), and
+  instruction-selection (BitmapBitSet 8-vs-32-bit shift count, AirInitLeg2Divisor
+  `fidiv` vs `fild`+`fdiv`).
 - **Holdouts within leaf+pure:** MSVC6's jump-table *density* heuristic
   (TypesCompatible: a `case` whose body equals `default` is merged away before
   the table decision, dropping below threshold, so no table -- not
