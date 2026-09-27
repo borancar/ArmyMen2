@@ -1574,5 +1574,13 @@ extern const uint8_t am2_logpalette_hdr_small[4];
  * am2_origstate reserves the whole region, so the member address is its VA. */
 #undef ADDR_ALLY_MATRIX
 #define ADDR_ALLY_MATRIX ((uintptr_t)(const void *)am2_origstate.ally_matrix)
+#undef ADDR_PADS
+#define ADDR_PADS ((uintptr_t)(const void *)am2_origstate.pads)
+#undef ADDR_PAD_NUMBERS
+#define ADDR_PAD_NUMBERS ((uintptr_t)(const void *)am2_origstate.pad_numbers)
+#undef ADDR_MENU_SPRITES
+#define ADDR_MENU_SPRITES ((uintptr_t)(const void *)am2_origstate.menu_sprites)
+#undef ADDR_ARMY_OBJ_LISTS
+#define ADDR_ARMY_OBJ_LISTS ((uintptr_t)(const void *)am2_origstate.army_obj_lists)
 
 #endif /* AM2_STANDALONE_H */
