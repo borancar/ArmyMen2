@@ -32,7 +32,9 @@
 #include "../src/game/image.h"
 #include "../src/game/crt.h"
 
-#include "loadimage.h"
+#ifndef AM2_STANDALONE
+#include "loadimage.h"           /* Wine PE build: maps the image + slide */
+#endif
 #include "vectors.h"
 #include "scriptvec.h"
 #include "placevec.h"
@@ -356,10 +358,14 @@ int main(void)
 {
     int32_t pass = 0, fail = 0;
 
-    /* The CRT's vectors reach the image's own data -- strtok's resumption
-     * pointer, the ctype table -- through AM2_IMAGE, so the slide has to
-     * exist before the first replay. */
+    /* The tested functions reach the image's own data -- strtok's resumption
+     * pointer, the ctype table, the script token table -- as placed symbols.
+     * The standalone/native build places them at their VAs (origdata + the
+     * am2_origstate .bss), so nothing is mapped and no slide is needed; only the
+     * Wine PE build maps the image and records the slide. */
+#ifndef AM2_STANDALONE
     am2_load_image(".wine/drive_c/GOG Games/Army Men II/ArmyMen2.exe");
+#endif
 
     for (uint32_t v = 0; v < sizeof kVectors / sizeof kVectors[0]; v++) {
         const AM2_Vector *t = &kVectors[v];
