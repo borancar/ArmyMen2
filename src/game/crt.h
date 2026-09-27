@@ -26,20 +26,35 @@
 extern "C" {
 #endif
 
-extern void *(__cdecl *am2_malloc)(size_t);
-extern void *(__cdecl *am2_realloc)(void *, size_t);
-extern void  (__cdecl *am2_free)(void *);
+/* These stand for functions inside the image's own statically-linked CRT.  In
+ * every build that RUNS -- native, injected, offline test -- they are runtime
+ * pointers (see the header comment): the offline test maps the image as inert
+ * data and points them at the host libc instead.  In the whole-image relink
+ * byte-match (src/vc6/relink.py, which compiles with AM2_RELINK and never runs
+ * the code) they are instead plain functions, so a call compiles to a direct
+ * `e8` that relink.py resolves to the game CRT VA each one stands for -- exactly
+ * the direct call the original linked, which the pointer form (`call [ptr]`,
+ * ff15) could never match piecewise. */
+#ifdef AM2_RELINK
+#define AM2_ORIGFN(ret, name, params) extern ret __cdecl name params
+#else
+#define AM2_ORIGFN(ret, name, params) extern ret(__cdecl *name) params
+#endif
+
+AM2_ORIGFN(void *, am2_malloc, (size_t));
+AM2_ORIGFN(void *, am2_realloc, (void *, size_t));
+AM2_ORIGFN(void, am2_free, (void *));
 
 /* The game's own logger. Same seam and the same reason: it is a function in
  * the image, so the offline test -- which maps the image as inert data -- has
  * to point it somewhere else. Defaults to dropping the message. */
-extern void (__cdecl *am2_log)(const char *, ...);
+AM2_ORIGFN(void, am2_log, (const char *, ...));
 
 /* The game's own strtol. Not a shared-state seam like the two below -- this
  * one is here so ParsePlaceLine's whole chain is callable offline, which is
  * the only reason DefParseNumber could not run without the game. Base 0, so
  * "0x" and a leading "0" mean what C says they mean. */
-extern int32_t (__cdecl *am2_strtol)(const char *, char **, int32_t);
+AM2_ORIGFN(int32_t, am2_strtol, (const char *, char **, int32_t));
 
 /* The game's own strtok, and the state is the point: DefParseInfoFile reads a
  * line and the handlers below it tokenise from the SAME static cursor, so a
@@ -47,25 +62,25 @@ extern int32_t (__cdecl *am2_strtol)(const char *, char **, int32_t);
  * a line nobody had advanced. Offline there is no original to share with, and
  * host strtok has a cursor of its own that is equally consistent -- which is
  * what makes ParsePlaceLine testable without the game. */
-extern char *(__cdecl *am2_strtok)(char *, const char *);
+AM2_ORIGFN(char *, am2_strtok, (char *, const char *));
 
 /* The game's own sprintf. Same seam again: BuildPlacementPath formats a
  * filename with it, and it has to be the CRT the rest of the image uses --
  * a NULL passed to %s is the one place the two could disagree, and both this
  * one and glibc write "(null)". The offline test points it at the host's. */
-extern int32_t (__cdecl *am2_sprintf)(char *, const char *, ...);
+AM2_ORIGFN(int32_t, am2_sprintf, (char *, const char *, ...));
 
 /* The game's own _chdir -- SetCurrentDirectoryA with the CRT's drive-relative
  * bookkeeping behind it. Same seam again: SetGameDir is the one reconstructed
  * function that changes the process's directory, and the process it has to
  * change is the game's, through the CRT the rest of the image is already
  * using. The offline test points it at the host's. */
-extern int32_t (__cdecl *am2_chdir)(const char *);
+AM2_ORIGFN(int32_t, am2_chdir, (const char *));
 
 /* The game's own _getcwd. CheckBasePath asks it for the directory the
  * executable was launched from, and everything SetGameDir builds is relative
  * to that -- so both ends of the path handling go through the same CRT. */
-extern char *(__cdecl *am2_getcwd)(char *, int32_t);
+AM2_ORIGFN(char *, am2_getcwd, (char *, int32_t));
 
 /* Point them at the game's own CRT. Called once by the harness, after the
  * image is known to be mapped at its base. */

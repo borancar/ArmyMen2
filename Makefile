@@ -631,6 +631,18 @@ VC6_ROOT ?= $(HOME)/claude/en_vs6_ent
 vc6-match: $(BUILD)/vc6host
 	VC6_ROOT=$(VC6_ROOT) ./.venv/bin/python src/vc6/bytematch.py $(ARGS)
 
+# The whole-image relink byte-match: instead of wildcarding every relocated slot
+# like vc6-match, lay each reconstructed function at its real VA and RESOLVE the
+# relocations to the addresses the linker would fill in.  Compiled with
+# AM2_RELINK so the reconstruction calls un-reconstructed CRT/engine code by
+# symbol (direct e8) rather than through a runtime pointer (ff15) -- the form the
+# original linked, which the piecewise harness can never reproduce.  See
+# src/vc6/relink.py.  ARGS: --newly (list what the relink closes), --diffs,
+# --unresolved (targets the next phase must place).
+.PHONY: vc6-relink
+vc6-relink: $(BUILD)/vc6host
+	VC6_ROOT=$(VC6_ROOT) ./.venv/bin/python src/vc6/relink.py $(ARGS)
+
 .PHONY: native native-dev
 # BOTH, because the two go out of step silently otherwise: every drive and
 # every fixture in tools/ runs build/armymen2-dev, so a `make native` that

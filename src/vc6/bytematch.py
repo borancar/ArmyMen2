@@ -161,7 +161,7 @@ def manifest():
 
 # ---- compile ------------------------------------------------------------
 
-def compile_file(relpath, outdir):
+def compile_file(relpath, outdir, extra=()):
     src = os.path.join(REPO, relpath)
     obj = os.path.join(outdir, os.path.basename(relpath)[:-4] + ".obj")
     env = dict(os.environ)
@@ -170,7 +170,8 @@ def compile_file(relpath, outdir):
         os.remove(obj)
     except OSError:
         pass
-    subprocess.run([HOST, CL, "/O2", "/c", "/Fo" + obj, os.path.basename(src)],
+    subprocess.run([HOST, CL, "/O2", "/c"] + list(extra) +
+                   ["/Fo" + obj, os.path.basename(src)],
                    cwd=os.path.dirname(src), env=env,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return obj if os.path.exists(obj) else None
