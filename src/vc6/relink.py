@@ -49,6 +49,42 @@ def import_map():
     return m
 
 
+def string_va(sym, secs, symlist, symidx, img, cache):
+    """VA of an MSVC string constant (??_C@_0..) by finding its bytes in the
+    shipped .rdata.  The reconstruction's literals are the SAME strings the
+    original carried, at fixed .rdata VAs, so a content search resolves them."""
+    if not sym.startswith("??_C@_0"):        # _0 = narrow char array
+        return None
+    if sym in cache:
+        return cache[sym]
+    _, secnum, value = symlist[symidx]
+    if secnum <= 0:
+        return None
+    data = secs[secnum - 1]["data"]
+    end = data.find(b"\0", value)
+    s = bytes(data[value:end + 1]) if end >= 0 else bytes(data[value:])
+    va = None
+    if len(s) >= 2:
+        hits = _find_all(img, s)
+        if len(hits) == 1:
+            va = hits[0]
+    cache[sym] = va
+    return va
+
+
+def _find_all(img, needle):
+    """All VAs where `needle` occurs in .rdata/.data."""
+    out = []
+    for name, start, _end, blob in img.sections:
+        if name not in (".rdata", ".data"):
+            continue
+        i = blob.find(needle)
+        while i >= 0:
+            out.append(start + i)
+            i = blob.find(needle, i + 1)
+    return out
+
+
 def import_va(sym, imap):
     """VA for a COFF __imp_ symbol, e.g. __imp__IntersectRect@12 -> IAT slot."""
     if not sym.startswith("__imp_"):
@@ -130,8 +166,14 @@ def main():
         "_am2_chdir":   addr["ADDR_CRT_CHDIR"],
         "_am2_getcwd":  addr["ADDR_CRT_GETCWD"],
     }
+    # Compiler/CRT helpers the reconstruction calls directly (e8) with no source
+    # change -- the compiler emits the call, the CRT is in the image at a fixed VA.
+    HELPER_VA = {
+        "__ftol": addr["ADDR_FTOL"],       # float->long cast helper
+    }
 
     sym_va = dict(ORIGFN_VA)     # coff symbol name -> real VA
+    sym_va.update(HELPER_VA)
     imap = import_map()         # base import name -> IAT slot VA
     compiled = {}               # file -> (secs, symlist, names, base)
     with tempfile.TemporaryDirectory() as od, tempfile.TemporaryDirectory() as odb:
@@ -156,12 +198,61 @@ def main():
                 sym = BM.resolve_sym(names, fn)
                 if sym:
                     sym_va[sym] = va
+        # Fallback for installed functions whose defining TU is SKIP'd (trig.cpp,
+        # crt.cpp -- Cos8/Sin8/... ) or otherwise not compiled here: a C-linkage
+        # caller references `_fn`, so map that from the manifest VA.  setdefault
+        # never overrides a symbol a compiled definer already placed.
+        for f, fn, va in man:
+            sym_va.setdefault("_" + fn, va)
+
+        # ---- discovery: learn the VAs of static/un-installed reconstructed
+        # helpers (CloseCurrentScreen, OpenScreen, ...) that have no ADDR.  An
+        # installed caller's SHIPPED bytes already hold the e8 to the helper at
+        # the call site, so read the target straight out of the image.  A wrong
+        # guess cannot create a false match -- the final byte compare rejects it
+        # -- so this is safe.  Iterate to a fixpoint (a discovered helper may
+        # itself call another).  Guard on the e8 opcode actually being there.
+        def discover():
+            found = 0
+            for f in sorted(byfile):
+                if f not in compiled:
+                    continue
+                secs, symlist, names, _ = compiled[f]
+                for fn, va in byfile[f]:
+                    sym = BM.resolve_sym(names, fn)
+                    if not sym:
+                        continue
+                    secnum, value = names[sym]
+                    sec = secs[secnum - 1]
+                    n = len(sec["data"])
+                    for off, symidx, typ in sec["rels"]:
+                        if typ != IMAGE_REL_I386_REL32:
+                            continue
+                        roff = off - value
+                        if not (0 <= roff < n):
+                            continue
+                        tname = symlist[symidx][0]
+                        if tname in sym_va:
+                            continue
+                        site = va + roff
+                        if img.read(site - 1, 1) != b"\xe8":
+                            continue
+                        rel = struct.unpack("<i", img.read(site, 4))[0]
+                        tgt = (site + 4 + rel) & 0xffffffff
+                        if 0x00401000 <= tgt < 0x0048e000:   # .text range
+                            sym_va[tname] = tgt
+                            found += 1
+            return found
+        rounds = 0
+        while discover() and rounds < 8:
+            rounds += 1
 
         # ---- pass 2: resolve and compare, holding the .objs in memory.
         match = diff = 0
         unresolved_hist = collections.Counter()
         diffs = []
         newly = []              # relink matches that the piecewise harness misses
+        strcache = {}           # string constant symbol -> image VA (or None)
         for f in sorted(byfile):
             if f not in compiled:
                 continue
@@ -192,6 +283,9 @@ def main():
                     tgt_va = sym_va.get(tgt_name)
                     if tgt_va is None:
                         tgt_va = import_va(tgt_name, imap)
+                    if tgt_va is None:
+                        tgt_va = string_va(tgt_name, secs, symlist, symidx,
+                                           img, strcache)
                     if tgt_va is None:
                         unresolved_hist[tgt_name] += 1
                         for k in range(4):
