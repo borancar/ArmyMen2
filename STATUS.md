@@ -23,7 +23,7 @@ the same trick as the hybrid game loader). `make vc6-match` recompiles each
 `patch_replace`'d reconstruction with the *original* compiler at /O2 and
 byte-compares it to `ArmyMen2.exe` -- the strongest correctness check there is.
 
-Baseline: **328 of ~1580 compiled `src/game` functions are byte-identical as
+Baseline: **350 of ~1580 compiled `src/game` functions are byte-identical as
 written** (ApproxDist, PackKey, Clamp, PointInRect, …). Re-measure with
 `make vc6-match`; worklist is `make vc6-match ARGS=--diffs`. The pure-signedness
 class (unsigned `jb` where the original compared signed `jl`) is closed --
@@ -66,6 +66,20 @@ main result so far (details in `src/vc6/README.md`):
   loop bound (`jl`/`jb`), statement order (scheduling), 16- vs 32-bit exprs,
   operand order (`*p==c` vs `c==*p`). ResetTimers (signed address cursor) was
   the first closed; KeyNameIndexOf closed operand-order+signedness together.
+- **The shared-return-tail class** (XorChecksum, MeetsAllThree,
+  RespawnKindAllowed): where the original branches every early-out to ONE
+  epilogue, a reconstruction that returns inline per check gets its own `ret`
+  each time and diverges. Structuring the checks as a single `&&`
+  short-circuit that returns the one value, else the shared other value
+  (`if (a && b && c) return X; return Y;`), or `acc=0; if(n>0){do..}; return
+  acc` for a guarded loop, reproduces the `jXX <shared tail>` chain.
+- **Signed divide-by-power-of-two** (ScaleBy32Blocks): `(v+(v<0?31:0))>>5`
+  written as `v / 32` emits MSVC6's `cdq;and;add;sar` idiom, which is what the
+  original was; the explicit branch form compiled to a conditional.
+- **The AM2_CLASS_DTOR dtor cluster** (+18): the dialog Destruct/Delete pairs
+  were free `__attribute__((thiscall))` functions (compiled __cdecl, extra
+  `mov ecx,[esp+4]`); modelled as AM2_Widget methods like the other 147, they
+  match. See the thiscall-class note above.
 - **The switch-shape class** (KindInSetA/B, ObjCodeUnmapped, MapCode18To28):
   where the original was a `switch` MSVC6 compiled to an index-byte-table plus a
   jump table (`mov cl,[idx+tbl]; jmp [ecx*4+jmptbl]`), a reconstruction written
@@ -78,6 +92,16 @@ main result so far (details in `src/vc6/README.md`):
   reproduce the original's early default-value preset (`xor eax,eax`) and the
   register allocation that flows from it -- return-per-arm gets the jump table
   but the wrong registers.
+- **True leaf+pure accounting:** a raw "no call in the compared bytes" scan
+  over-counts diffs, because it compares *truncated* bytes -- 5-15-byte
+  thiscall forwarders for constructors/dtors, and the ~24-byte switch dispatch
+  *headers* of functions whose full 250-600-byte bodies call engine code. After
+  excluding those (full-function size from `docs/functions.tsv`, and any body
+  with a `call` or a jump-table dispatch), the genuinely fully-compared,
+  call-free, jump-table-free leaf diffs are **30** (down from 39 after the dtor
+  cluster matched). The InitRemap trio (leaf-not-*pure* writers) is the main
+  remaining writer set; the rest are computational and dominated by register
+  allocation.
 - **Holdouts within leaf+pure:** MSVC6's jump-table *density* heuristic
   (TypesCompatible: a `case` whose body equals `default` is merged away before
   the table decision, dropping below threshold, so no table -- not
