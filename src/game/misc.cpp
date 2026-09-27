@@ -1152,16 +1152,18 @@ int32_t __cdecl MapCode18To28(int32_t code)
  * Read out of the image along with the two-entry jump table at 0x00449F1C. */
 int32_t __cdecl ObjCodeUnmapped(const void *obj)
 {
-    static const uint8_t kAnswer[17] = {
-        0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
-    };
     const uint8_t  *o    = (const uint8_t *)obj;
     const uint32_t *link = *(const uint32_t *const *)(o + 0xC0);
-    uint32_t        i    = (uint32_t)(*link - 0x18);
 
-    if (i > 0x10)
-        return 1;
-    return kAnswer[i];
+    switch (*link) {
+    case 0x18:
+    case 0x19:
+    case 0x1a:
+    case 0x27:
+    case 0x28:
+        return 0;
+    }
+    return 1;
 }
 
 int32_t __cdecl MeetsAllThree(const void *p)
