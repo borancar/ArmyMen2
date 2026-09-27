@@ -23,7 +23,7 @@ the same trick as the hybrid game loader). `make vc6-match` recompiles each
 `patch_replace`'d reconstruction with the *original* compiler at /O2 and
 byte-compares it to `ArmyMen2.exe` -- the strongest correctness check there is.
 
-Baseline: **353 of ~1580 compiled `src/game` functions are byte-identical as
+Baseline: **354 of ~1580 compiled `src/game` functions are byte-identical as
 written** (ApproxDist, PackKey, Clamp, PointInRect, …). Re-measure with
 `make vc6-match`; worklist is `make vc6-match ARGS=--diffs`. The pure-signedness
 class (unsigned `jb` where the original compared signed `jl`) is closed --
@@ -98,9 +98,10 @@ main result so far (details in `src/vc6/README.md`):
   *headers* of functions whose full 250-600-byte bodies call engine code. After
   excluding those (full-function size from `docs/functions.tsv`, and any body
   with a `call` or a jump-table dispatch), the genuinely fully-compared,
-  call-free, jump-table-free leaf diffs are **27** (down from 39). THREE that
-  *looked* like register allocation were actually source shape and were closed
-  by reshaping -- do not call a leaf diff irreducible before trying these:
+  call-free, jump-table-free leaf diffs are **26** (down from 39). FOUR that
+  *looked* like register allocation or instruction selection were actually
+  source shape and were closed by reshaping -- do not call a leaf diff
+  irreducible before trying these:
   - SwapColourBytes: the original builds the result byte-by-byte in a stack
     buffer, not shift/mask.
   - FindPlayerById: a pointer-bound walk compared SIGNED against the end
@@ -109,8 +110,12 @@ main result so far (details in `src/vc6/README.md`):
     `xor eax,eax` early, so the argument loads straight into the pointer
     register -- **statement order steers register allocation**, so a prologue-
     order diff is NOT the irreducible wall.
-  Each remaining diff was then *attempted*, not just characterised. The 27 that
-  resisted split into genuinely-irreducible kinds: **pervasive arg-vs-global
+  - BitmapBitSet: `(uint8_t)` on a shift amount (`7-(x%8)`, always 0..14) makes
+    MSVC compute it 8-bit (`mov cl,7; sub cl,al`) as the original did, not
+    32-bit -- an "instruction-selection" diff that WAS steerable.
+  Each remaining diff was then *attempted* with multiple transformations, not
+  just characterised. The 26 that resisted split into genuinely-irreducible
+  kinds: **pervasive arg-vs-global
   register swaps** (PointRuleDefault/Vehicle/Boat -- the argument and a global
   land in swapped registers throughout; declaration reorder does not flip it),
   a **peephole choice** (AllocUid `lea ecx,[eax+1]` vs `mov eax,ecx;inc ecx` --
@@ -118,8 +123,9 @@ main result so far (details in `src/vc6/README.md`):
   (SpriteSlotOf/FindRecordList/SpriteDirIndex -- the `while` form kills the peel
   but the register/load-motion residual remains), leaf-not-*pure* writers
   (InitRemap trio, InitStartupColours, AirInit*, RowAnimFinished's coupled
-  shared-tail+register), and instruction-selection (BitmapBitSet 8-vs-32-bit
-  shift count, AirInitLeg2Divisor `fidiv` vs `fild`+`fdiv`).
+  shared-tail+register), and one instruction-selection case
+  (AirInitLeg2Divisor `fidiv` vs `fild`+`fdiv` -- a single FPU-op choice; the
+  loop and everything else match).
 - **Holdouts within leaf+pure:** MSVC6's jump-table *density* heuristic
   (TypesCompatible: a `case` whose body equals `default` is merged away before
   the table decision, dropping below threshold, so no table -- not
