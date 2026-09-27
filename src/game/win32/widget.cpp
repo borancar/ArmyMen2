@@ -5105,12 +5105,14 @@ void __attribute__((thiscall)) RecordResetAlias(void *rec)
 
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode)
 {
-    const uint8_t *rec = (const uint8_t *)(uintptr_t)ADDR_KEY_NAME_TABLE;
     int32_t        i   = 0;
+    const uint8_t *rec = (const uint8_t *)(uintptr_t)ADDR_KEY_NAME_TABLE;
 
-    for (; rec < (const uint8_t *)(uintptr_t)ADDR_KEY_NAME_TABLE_END;
+    /* signed pointer compare (`jl`), and `scancode == *rec` (the original's
+     * `cmp dl,[ecx]` operand order) -- both are how the shipped code reads */
+    for (; (int32_t)(uintptr_t)rec < (int32_t)ADDR_KEY_NAME_TABLE_END;
          rec += 8, i++)
-        if (*rec == scancode)
+        if (scancode == *rec)
             return i;
     return -1;
 }
