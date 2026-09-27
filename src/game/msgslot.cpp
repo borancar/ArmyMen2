@@ -210,14 +210,16 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommMustBroadcast(int16_t army)
 
 void *__cdecl FindPlayerById(uint32_t id)
 {
-    uint8_t *rec = (uint8_t *)(uintptr_t)ADDR_PLAYER_RECORDS;
     void    *found = 0;
-    int32_t  i;
+    int32_t  rec = (int32_t)ADDR_PLAYER_RECORDS;
+    int32_t  end = rec + AM2_FLOW_RECORDS * AM2_FLOW_STRIDE;
 
-    /* No break: every record is looked at and the last match is the answer. */
-    for (i = 0; i < AM2_FLOW_RECORDS; i++, rec += AM2_FLOW_STRIDE)
-        if (*(const uint32_t *)rec == id)
-            found = rec;
+    /* No break: every record is looked at and the last match is the answer.
+     * A pointer-bound walk, not an index -- the original compares the cursor
+     * against the end address (SIGNED, jl) rather than carrying a counter. */
+    for (; rec < end; rec += AM2_FLOW_STRIDE)
+        if (*(const uint32_t *)(uintptr_t)rec == id)
+            found = (void *)(uintptr_t)rec;
     return found;
 }
 

@@ -178,10 +178,16 @@ int32_t __cdecl IsKind7(const void *p)
 
 uint32_t __cdecl SwapColourBytes(uint32_t colour, uint32_t unused)
 {
+    const uint8_t *in = (const uint8_t *)&colour;
+    uint32_t       out;
+    uint8_t       *o = (uint8_t *)&out;
+
     (void)unused;
-    return ((colour >> 16) & 0xFFu)
-         | (((colour >> 8) & 0xFFu) << 8)
-         | ((colour & 0xFFu) << 16);
+    o[3] = 0;
+    o[0] = in[2];
+    o[1] = in[1];
+    o[2] = in[0];
+    return out;
 }
 
 void __stdcall NullStub4(uint32_t arg) { (void)arg; }
