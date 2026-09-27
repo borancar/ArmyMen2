@@ -27,6 +27,7 @@
  */
 
 #include "surface.h"
+#include "../pmf.h"
 #include "../blit.h"   /* BlitBitmapIn -- reconstructed */
 #include "../image.h"  /* AM2_IMAGE, for the clock global's one spelling */
 #include "sprite.h"
@@ -675,8 +676,10 @@ static_assert((DDBLT_WAIT | DDBLT_ASYNC) == 0x01000200, "the blit flags");
 #define g_originDx (*(const int32_t *)(uintptr_t)ADDR_ORIGIN_DX)
 #define g_originDy (*(const int32_t *)(uintptr_t)ADDR_ORIGIN_DY)
 
-void __attribute__((thiscall)) BlitCentred(void *self, LPDIRECTDRAWSURFACE dest)
+void __attribute__((thiscall)) AM2_Bitmap::BlitCentred(LPDIRECTDRAWSURFACE dest)
 {
+    void *self = this;
+
     const int32_t *desc =
         *(const int32_t **)((uint8_t *)self + BLIT_SRC_OFF_DESC);
     LPDIRECTDRAWSURFACE src =
@@ -1603,7 +1606,7 @@ int surface_install(void)
                         "ReloadBitmapSurface", 7);
     rc |= patch_replace(ADDR_DRAW_SEQ_BAR, (const void *)DrawSeqBar,
                         "DrawSeqBar", 5);
-    rc |= patch_replace(ADDR_BLIT_CENTRED, (const void *)BlitCentred,
+    rc |= patch_replace(ADDR_BLIT_CENTRED, pmf_addr(&AM2_Bitmap::BlitCentred),
                         "BlitCentred", 1);
     rc |= patch_replace(ADDR_MAKE_BITMAP, (const void *)MakeBitmap,
                         "MakeBitmap", 4);

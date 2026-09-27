@@ -9,6 +9,14 @@
 #include <stdint.h>
 #include "../inject/orig.h"   /* am2_FILE */
 
+
+#ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
+struct AM2_SelList {
+    void * __attribute__((thiscall)) SelListConstruct();
+    void __attribute__((thiscall)) SelListDestruct();
+};
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 /* Six small teardown steps, none over thirty-two bytes; four of them run from
@@ -225,10 +233,12 @@ am2_FILE *__cdecl OpenSaveForLoad(void);
 
 /* 0x004248E0. Construct the selected-units list inside the gameproc block and
  * answer the block. */
-void *__attribute__((thiscall)) SelListConstruct(void *block);
+static inline void * __attribute__((thiscall)) SelListConstruct(void *block)
+{ return ((AM2_SelList *)block)->SelListConstruct(); }
 
 /* 0x004248D0. Tear the same list down. */
-void __attribute__((thiscall)) SelListDestruct(void *block);
+static inline void __attribute__((thiscall)) SelListDestruct(void *block)
+{ ((AM2_SelList *)block)->SelListDestruct(); }
 
 /* 0x004248A0 / 0x004248C0. The two thunks that name the global. */
 void *__cdecl SelListConstructThunk(void);

@@ -20,6 +20,13 @@
 #include "../../inject/orig.h"
 #include "../../inject/win32.h"
 
+
+#ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
+struct AM2_Bitmap {
+    void __attribute__((thiscall)) BlitCentred(LPDIRECTDRAWSURFACE dest);
+};
+#endif
+
 /* The harness in src/inject is C; these are C++. Keep the linkage
  * compatible so dllmain.c can still call the install hooks. */
 #ifdef __cplusplus
@@ -222,7 +229,8 @@ void __cdecl DrawMenuOverlay(void);
 
 /* 0x00445500, thiscall. Put a picture in the middle of the screen -- the
  * movie player's way of showing a frame. */
-void __attribute__((thiscall)) BlitCentred(void *self, LPDIRECTDRAWSURFACE dest);
+static inline void __attribute__((thiscall)) BlitCentred(void *self, LPDIRECTDRAWSURFACE dest)
+{ ((AM2_Bitmap *)self)->BlitCentred(dest); }
 
 /* 0x00412DE0, eight callers. Two stores: clear the menu's saved-overlay flag
  * and set whether the menu draws at all. It carried "stays original" in

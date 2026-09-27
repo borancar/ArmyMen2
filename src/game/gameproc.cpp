@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "gameproc.h"
+#include "pmf.h"
 #include "packkey.h"  /* KeyFieldA, KeyFieldB -- reconstructed */
 #include "gamedir.h"  /* SetGameDir -- the chdir into the save directory */
 #include "savetag.h"
@@ -2764,15 +2765,19 @@ am2_FILE *__cdecl OpenSaveForLoad(void)
 /* 0x004248E0, thiscall. Construct the member and answer the OUTER object --
  * `mov eax, esi` restores the block, not the list, which is what a C++
  * constructor returns. */
-void *__attribute__((thiscall)) SelListConstruct(void *block)
+void * __attribute__((thiscall)) AM2_SelList::SelListConstruct()
 {
+    void *block = this;
+
     InitPtrList((uint8_t *)block + GAMEPROC_OFF_SELECTED);
     return block;
 }
 
 /* 0x004248D0, thiscall. One `add ecx` and a tail jump. */
-void __attribute__((thiscall)) SelListDestruct(void *block)
+void __attribute__((thiscall)) AM2_SelList::SelListDestruct()
 {
+    void *block = this;
+
     ClearPtrListAlias((uint8_t *)block + GAMEPROC_OFF_SELECTED);
 }
 
@@ -2951,9 +2956,9 @@ void gameproc_install(void)
                   "SelListAtExit", 1);
     patch_replace(ADDR_SEL_LIST_DTOR_THUNK, (const void *)SelListDestructThunk,
                   "SelListDestructThunk", 1);
-    patch_replace(ADDR_SEL_LIST_DTOR, (const void *)SelListDestruct,
+    patch_replace(ADDR_SEL_LIST_DTOR, pmf_addr(&AM2_SelList::SelListDestruct),
                   "SelListDestruct", 1);
-    patch_replace(ADDR_SEL_LIST_CTOR, (const void *)SelListConstruct,
+    patch_replace(ADDR_SEL_LIST_CTOR, pmf_addr(&AM2_SelList::SelListConstruct),
                   "SelListConstruct", 1);
     patch_replace(ADDR_LOAD_TYPE4, (const void *)LoadType4,
                   "LoadType4", 3);
