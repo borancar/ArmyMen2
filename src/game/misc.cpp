@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "misc.h"
+#include "pmf.h"
 #include "packkey.h"  /* PackKey -- reconstructed */
 #include "rect.h"   /* PointInRect -- reconstructed */
 #include "map.h"    /* TileOfPoint -- reconstructed */
@@ -1411,8 +1412,10 @@ int32_t __cdecl GetMenuRow(void)
     return g_menuRow;
 }
 
-void *__attribute__((thiscall)) InitPtrList(void *rec)
+void * __attribute__((thiscall)) AM2_Rec::InitPtrList()
 {
+    void *rec = this;
+
     int32_t *r = (int32_t *)rec;
 
     r[0] = 0;
@@ -1421,9 +1424,11 @@ void *__attribute__((thiscall)) InitPtrList(void *rec)
     return rec;
 }
 
-void __attribute__((thiscall)) ClearPtrListAlias(void *rec)
+void __attribute__((thiscall)) AM2_Rec::ClearPtrListAlias()
 {
-    ClearPtrList(rec);
+    void *rec = this;
+
+    ::ClearPtrList(rec);
 }
 
 /* TakeNumberKey -- original 0x00413A80, one caller. The 1..8 keys latch 0..7
@@ -1574,8 +1579,10 @@ int32_t __cdecl ColourDistance(const void *a, const void *b)
     return d0 * d0 + d1 * d1 + d2 * d2;
 }
 
-void __attribute__((thiscall)) PtrListGrow(void *rec)
+void __attribute__((thiscall)) AM2_Rec::PtrListGrow()
 {
+    void *rec = this;
+
     int32_t *r = (int32_t *)rec;
 
     r[0] = r[0] + AM2_PTR_LIST_SLACK;
@@ -1583,8 +1590,10 @@ void __attribute__((thiscall)) PtrListGrow(void *rec)
                                            (size_t)r[0] * 4);
 }
 
-void __attribute__((thiscall)) PtrListShrink(void *rec)
+void __attribute__((thiscall)) AM2_Rec::PtrListShrink()
 {
+    void *rec = this;
+
     int32_t *r = (int32_t *)rec;
 
     r[0] = r[0] - AM2_PTR_LIST_SLACK;
@@ -1597,20 +1606,24 @@ void __attribute__((thiscall)) PtrListShrink(void *rec)
                                            (size_t)r[0] * 4);
 }
 
-void __attribute__((thiscall)) PtrListPush(void *rec, void *item)
+void __attribute__((thiscall)) AM2_Rec::PtrListPush(void *item)
 {
+    void *rec = this;
+
     int32_t *r = (int32_t *)rec;
 
     if (r[1] >= r[0])
-        PtrListGrow(rec);
+        ::PtrListGrow(rec);
     /* Re-read the count after the grow, as the original does. */
     ((void **)r[2])[r[1]] = item;
     r[1] = r[1] + 1;
 }
 
 #define AM2_PTR_LIST_SLACK 20
-void __attribute__((thiscall)) ListRemoveAt(void *rec, int32_t index)
+void __attribute__((thiscall)) AM2_Rec::ListRemoveAt(int32_t index)
 {
+    void *rec = this;
+
     int32_t *r = (int32_t *)rec;
     int32_t  count;
 
@@ -1622,11 +1635,13 @@ void __attribute__((thiscall)) ListRemoveAt(void *rec, int32_t index)
         memmove((void **)r[2] + index, (void **)r[2] + index + 1,
                 (size_t)(count - index) * 4);
     if (count + AM2_PTR_LIST_SLACK < r[0])
-        PtrListShrink(rec);
+        ::PtrListShrink(rec);
 }
 
-void __attribute__((thiscall)) ClearPtrList(void *rec)
+void __attribute__((thiscall)) AM2_Rec::ClearPtrList()
 {
+    void *rec = this;
+
     int32_t *r     = (int32_t *)rec;
     void    *items = (void *)(uintptr_t)r[2];
 
@@ -2653,9 +2668,9 @@ int misc_install(void)
                   "SeqRunBoth", 0);
     patch_replace(ADDR_COLOUR_DISTANCE, (const void *)ColourDistance,
                   "ColourDistance", 2);
-    patch_replace(ADDR_PTR_LIST_GROW, (const void *)PtrListGrow,
+    patch_replace(ADDR_PTR_LIST_GROW, pmf_addr(&AM2_Rec::PtrListGrow),
                   "PtrListGrow", 1);
-    patch_replace(ADDR_PTR_LIST_SHRINK, (const void *)PtrListShrink,
+    patch_replace(ADDR_PTR_LIST_SHRINK, pmf_addr(&AM2_Rec::PtrListShrink),
                   "PtrListShrink", 1);
     patch_replace(ADDR_FIELD_53C, (const void *)Field53C, "Field53C", 1);
     patch_replace(ADDR_ADD_BYTE_SAT, (const void *)AddByteSat, "AddByteSat", 2);
@@ -2785,16 +2800,16 @@ int misc_install(void)
                   "DismissKeyReleased", 4);
     patch_replace(ADDR_COMM_ARMY_OF_SLOT, (const void *)CommArmyOfSlot,
                   "CommArmyOfSlot", 20);
-    patch_replace(ADDR_PTR_LIST_PUSH, (const void *)PtrListPush,
+    patch_replace(ADDR_PTR_LIST_PUSH, pmf_addr(&AM2_Rec::PtrListPush),
                   "PtrListPush", 2);
-    patch_replace(ADDR_LIST_REMOVE_AT, (const void *)ListRemoveAt,
+    patch_replace(ADDR_LIST_REMOVE_AT, pmf_addr(&AM2_Rec::ListRemoveAt),
                   "ListRemoveAt", 2);
-    patch_replace(ADDR_CLEAR_PTR_LIST, (const void *)ClearPtrList,
+    patch_replace(ADDR_CLEAR_PTR_LIST, pmf_addr(&AM2_Rec::ClearPtrList),
                   "ClearPtrList", 1);
     patch_replace(ADDR_KEY_CHANGED, (const void *)KeyChanged, "KeyChanged", 1);
-    patch_replace(ADDR_INIT_PTR_LIST, (const void *)InitPtrList,
+    patch_replace(ADDR_INIT_PTR_LIST, pmf_addr(&AM2_Rec::InitPtrList),
                   "InitPtrList", 1);
-    patch_replace(ADDR_CLEAR_PTR_LIST_ALIAS, (const void *)ClearPtrListAlias,
+    patch_replace(ADDR_CLEAR_PTR_LIST_ALIAS, pmf_addr(&AM2_Rec::ClearPtrListAlias),
                   "ClearPtrListAlias", 1);
     patch_replace(ADDR_LIST_GROW_FIND, (const void *)ListGrowFind,
                   "ListGrowFind", 1);

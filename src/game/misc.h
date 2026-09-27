@@ -11,6 +11,19 @@
 
 #include "dist.h"   /* AM2_Point, which ObjMaskBitAt takes */
 
+
+#ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
+struct AM2_Rec {
+    void * __attribute__((thiscall)) InitPtrList();
+    void __attribute__((thiscall)) ClearPtrListAlias();
+    void __attribute__((thiscall)) PtrListGrow();
+    void __attribute__((thiscall)) PtrListShrink();
+    void __attribute__((thiscall)) PtrListPush(void *item);
+    void __attribute__((thiscall)) ListRemoveAt(int32_t index);
+    void __attribute__((thiscall)) ClearPtrList();
+};
+#endif
+
 /* IsBlank and IsScriptDelim moved to script.cpp: 0x0043EE80 and 0x0043EEA0
  * are inside script.cpp's own address band, and they are the tokeniser's two
  * character predicates. */
@@ -663,8 +676,10 @@ int32_t __cdecl GetMenuRow(void);
  * 0x0040A628 stores the result. Declared `void` this is the RecordCtor defect
  * exactly -- see widget.h -- and it was found by the same sweep rather than by
  * anything going wrong, because nothing has reached that caller yet. */
-void *__attribute__((thiscall)) InitPtrList(void *rec);
-void __attribute__((thiscall)) ClearPtrListAlias(void *rec);
+static inline void * __attribute__((thiscall)) InitPtrList(void *rec)
+{ return ((AM2_Rec *)rec)->InitPtrList(); }
+static inline void __attribute__((thiscall)) ClearPtrListAlias(void *rec)
+{ ((AM2_Rec *)rec)->ClearPtrListAlias(); }
 
 /* 0x0043CCE0. Empty the pointer list embedded at +0xA4 of the object. */
 void __attribute__((thiscall)) ClearPtrListAtA4(void *obj);
@@ -679,7 +694,8 @@ int32_t __cdecl WriteDotString(char *dst);
  * record's five. Zero the capacity and the count, free the items if there are
  * any, zero that too. The two fields are cleared BEFORE the free, which is
  * what the original does and what makes it safe to call twice. */
-void __attribute__((thiscall)) ClearPtrList(void *rec);
+static inline void __attribute__((thiscall)) ClearPtrList(void *rec)
+{ ((AM2_Rec *)rec)->ClearPtrList(); }
 
 /* 0x00427450 and 0x00427470, 33 and 21 callers -- the two keyboard predicates
  * everything in the game tests a key with. Both mask the scancode to 8 bits
@@ -746,14 +762,17 @@ int32_t __attribute__((thiscall)) CommArmyOfSlot(void *comm, int32_t slot);
 /* 0x0042A6E0, 13 callers. Append to the {capacity, count, items} record
  * InitPtrList clears, growing it first when the count has caught the
  * capacity. The grow is still original. */
-void __attribute__((thiscall)) PtrListPush(void *rec, void *item);
+static inline void __attribute__((thiscall)) PtrListPush(void *rec, void *item)
+{ ((AM2_Rec *)rec)->PtrListPush(item); }
 
 /* 0x0042A6B0 and 0x0042A710. The same record's two capacity moves, and they
  * are not symmetric: the grow adds twenty and reallocs, while the shrink
  * takes twenty off and FREES the array outright when that leaves nothing,
  * rather than reallocing to zero. Neither touches the count. */
-void __attribute__((thiscall)) PtrListGrow(void *rec);
-void __attribute__((thiscall)) PtrListShrink(void *rec);
+static inline void __attribute__((thiscall)) PtrListGrow(void *rec)
+{ ((AM2_Rec *)rec)->PtrListGrow(); }
+static inline void __attribute__((thiscall)) PtrListShrink(void *rec)
+{ ((AM2_Rec *)rec)->PtrListShrink(); }
 
 /* 0x0042A750, 33 callers -- the same record's remove. Drop the entry at
  * `index`, shift what follows down with the CRT's memmove, and hand the
@@ -763,7 +782,8 @@ void __attribute__((thiscall)) PtrListShrink(void *rec);
  * MSVC wrote the byte count as `((index << 30) - index + count) << 2`, which
  * is `(count - index) * 4` because the shifted term leaves the register
  * entirely. Written as the multiply it is. */
-void __attribute__((thiscall)) ListRemoveAt(void *rec, int32_t index);
+static inline void __attribute__((thiscall)) ListRemoveAt(void *rec, int32_t index)
+{ ((AM2_Rec *)rec)->ListRemoveAt(index); }
 
 /* 0x00434C80, one caller. Free a pointer unless it is null, and nothing else.
  * The CRT's own free makes the same test, so this exists to save a call rather
