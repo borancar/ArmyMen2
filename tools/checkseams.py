@@ -138,8 +138,15 @@ def main():
             patched.add(addr[n])
 
     bad = []
+    # The `*.c*` glob is greedy -- it also matches a stray `*.cpython-XX.pyc`
+    # under a __pycache__ (left when a src/ tool is imported rather than run),
+    # which is bytecode, not source, and crashes the UTF-8 read. Keep only real
+    # source extensions so a build artefact cannot fail the seam gate.
+    SRC_EXT = (".c", ".cc", ".cxx", ".cpp", ".h", ".hpp")
     for f in sorted(glob.glob(os.path.join(ROOT, "src/**/*.c*"), recursive=True)
                     + glob.glob(os.path.join(ROOT, "src/**/*.h"), recursive=True)):
+        if "__pycache__" in f or not f.endswith(SRC_EXT):
+            continue
         rel = os.path.relpath(f, ROOT)
         # Comments are blanked for the by-address rule and only for it. The
         # other three match code shapes that do not occur in prose; this one
