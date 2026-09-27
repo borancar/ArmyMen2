@@ -23,9 +23,12 @@ the same trick as the hybrid game loader). `make vc6-match` recompiles each
 `patch_replace`'d reconstruction with the *original* compiler at /O2 and
 byte-compares it to `ArmyMen2.exe` -- the strongest correctness check there is.
 
-Baseline: **~238 of ~1580 compiled `src/game` functions are byte-identical as
+Baseline: **~242 of ~1580 compiled `src/game` functions are byte-identical as
 written** (ApproxDist, PackKey, Clamp, PointInRect, …). Re-measure with
-`make vc6-match`; worklist is `make vc6-match ARGS=--diffs`.
+`make vc6-match`; worklist is `make vc6-match ARGS=--diffs`. The pure-signedness
+class (unsigned `jb` where the original compared signed `jl`) is closed --
+ResetTimers and the four sprite/sound table-walk loops now spell the compare
+`(int32_t)`.
 
 What matches is bounded by the piecewise model, and characterising that is the
 main result so far (details in `src/vc6/README.md`):
