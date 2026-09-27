@@ -23,12 +23,19 @@ the same trick as the hybrid game loader). `make vc6-match` recompiles each
 `patch_replace`'d reconstruction with the *original* compiler at /O2 and
 byte-compares it to `ArmyMen2.exe` -- the strongest correctness check there is.
 
-Baseline: **~285 of ~1580 compiled `src/game` functions are byte-identical as
+Baseline: **328 of ~1580 compiled `src/game` functions are byte-identical as
 written** (ApproxDist, PackKey, Clamp, PointInRect, …). Re-measure with
 `make vc6-match`; worklist is `make vc6-match ARGS=--diffs`. The pure-signedness
 class (unsigned `jb` where the original compared signed `jl`) is closed --
 ResetTimers and the four sprite/sound table-walk loops now spell the compare
 `(int32_t)`.
+
+**The `AM2_IMAGE` fold (+36)** was the largest single lever: in the injected and
+byte-match builds `am2_image_slide` is always 0, so `AM2_IMAGE(addr)` now folds
+to the plain `((void*)(uintptr_t)addr)` there (only the relocatable standalone
+build keeps the runtime `addr + slide`). That reproduces the original's direct
+`[addr]` access instead of an `addr + slide` read it never had -- see
+`src/game/image.h`.
 
 **Thiscall functions are now modelled as C++ classes** so MSVC 6 recompiles them
 as the thiscall members they were (a free `__attribute__((thiscall))` function
@@ -56,8 +63,30 @@ main result so far (details in `src/vc6/README.md`):
   the origdata symbol migration feeds this. So LINK is not a sideshow; it is the
   path to matching the majority.
 - **Fixable per function now:** true source-shape diffs -- signed vs unsigned
-  loop bound (`jl`/`jb`), statement order (scheduling), 16- vs 32-bit exprs.
-  ResetTimers (signed address cursor) was the first closed.
+  loop bound (`jl`/`jb`), statement order (scheduling), 16- vs 32-bit exprs,
+  operand order (`*p==c` vs `c==*p`). ResetTimers (signed address cursor) was
+  the first closed; KeyNameIndexOf closed operand-order+signedness together.
+- **The switch-shape class** (KindInSetA/B, ObjCodeUnmapped, MapCode18To28):
+  where the original was a `switch` MSVC6 compiled to an index-byte-table plus a
+  jump table (`mov cl,[idx+tbl]; jmp [ecx*4+jmptbl]`), a reconstruction written
+  as an array lookup (`return tbl[i]`) or an if-else chain compiles to a
+  byte-*value* table or a compare chain and every byte diverges. Written as the
+  `switch` it was, it byte-matches. Two sub-rules learned: (1) arms must branch
+  to a *shared* return tail (`break` to one `return`), not return inline;
+  (2) a switch returning distinct constants with a default needs the
+  `result`-variable form (`int r = 0; switch{ case: r = N; } return r`) to
+  reproduce the original's early default-value preset (`xor eax,eax`) and the
+  register allocation that flows from it -- return-per-arm gets the jump table
+  but the wrong registers.
+- **Holdouts within leaf+pure:** MSVC6's jump-table *density* heuristic
+  (TypesCompatible: a `case` whose body equals `default` is merged away before
+  the table decision, dropping below threshold, so no table -- not
+  reproducible), and multi-arm arithmetic where each arm's register
+  allocation/scheduling differs (UnitKindMatches, SoldierKindForWeapon, the
+  other "1-byte" switch headers -- the diff is only the `ja` default
+  displacement, driven by cumulative arm size). SetFacing08/14 are a shared
+  helper the original inlined twice, so they need forced inlining (a
+  readability trade) rather than a shape fix.
 
 A flag sweep confirmed /O2 (blend) is the original's setting. Calling-convention
 attributes are honoured (`__attribute__((stdcall))` -> `__stdcall`); free-
