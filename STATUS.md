@@ -53,15 +53,27 @@ main result so far (details in `src/vc6/README.md`):
 
 - **Matches now:** leaf functions, and functions that touch original globals
   only as absolute scalars (`mov [abs]`) or call reconstructed siblings.
-- **Needs the full relink:** any function that reaches original *code* or
-  *indexed data* by absolute constant address -- the reconstruction's
-  `call [ptr]` (ff15) vs the original's direct `call rel32` (e8), and a
-  `((T*)ADDR)` indexed global folding `base/4` into the index vs the original's
-  `[idx*4 + &symbol]`. Equivalent and correct; they differ only constant-vs-
-  symbol. The endgame is compiling every TU and LINKing with all functions and
-  migrated globals as symbols at their real VAs -- which is also why finishing
-  the origdata symbol migration feeds this. So LINK is not a sideshow; it is the
-  path to matching the majority.
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`) -- STARTED,
+  384 vs the piecewise 354.** Rather than a bit-exact PE (unneeded for *function*
+  byte-match), it simulates the link: lays every reconstructed function at its
+  real VA and RESOLVES each relocation to the address the linker would fill,
+  comparing with no wildcarding. Compiled with `AM2_RELINK`, so the
+  reconstruction calls the game CRT by symbol (direct `e8`) via `crt.h`'s
+  `AM2_ORIGFN` rather than a runtime pointer (`ff15`) -- the form the original
+  linked, which the piecewise harness can never reproduce. Resolves siblings
+  (manifest), the CRT (`AM2_ORIGFN`->`ADDR_*`), Win32 imports (IAT), `__ftol`,
+  string literals (`.rdata` content), and discovers static-helper VAs from
+  installed callers' shipped call targets. **This closed the call-form class
+  (ff15->e8): +30 free/malloc/log-heavy functions** (FreeIfNotNull,
+  PtrListGrow/Shrink, FreeRecordList; `ARGS=--newly`).
+  - **The second relink class -- the `((T*)ADDR)` indexed-global fold** (base
+    folded into the index vs the original's `[idx*4 + &symbol]`) -- is the next
+    phase: it needs the migrated globals declared as SYMBOLS under `AM2_RELINK`
+    (the data analogue of `AM2_ORIGFN`), which is why finishing the origdata
+    symbol migration feeds this. `ARGS=--unresolved` names what remains (the C++
+    static screen helpers, and the global symbols).
+  - Register-allocation and other source-shape diffs are unchanged by the relink
+    -- same classes as piecewise, closed per function.
 - **Fixable per function now:** true source-shape diffs -- signed vs unsigned
   loop bound (`jl`/`jb`), statement order (scheduling), 16- vs 32-bit exprs,
   operand order (`*p==c` vs `c==*p`). ResetTimers (signed address cursor) was

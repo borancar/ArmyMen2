@@ -116,5 +116,22 @@ image, so what can match is bounded by that:
 - ✅ `src/game/win32/*` compiles too (all but dplay.cpp) -- the shim grew the
   ole32/DWORD_PTR/static_assert/dplobby pieces above.  ~1580 of 1642 functions
   now compile and compare.
-- ☐ close the source-shape diffs, and `LINK.EXE` for a whole-binary match
-  (which is what most cross-call / indexed-global diffs need).
+- ✅ **the whole-image relink** (`relink.py`, `make vc6-relink`): rather than a
+  bit-exact PE from `LINK.EXE` (unneeded for *function* byte-match), it simulates
+  the link -- lays every reconstructed function at its real VA and RESOLVES each
+  relocation to the address the linker would fill, comparing with no wildcarding.
+  Compiled with `AM2_RELINK` so the reconstruction calls the game CRT by symbol
+  (direct `e8`) via `crt.h`'s `AM2_ORIGFN`.  Resolves reconstructed siblings (the
+  manifest), the game CRT (`AM2_ORIGFN` -> `ADDR_*`), Win32 imports (the IAT),
+  `__ftol`, narrow string literals (by `.rdata` content), and discovers static
+  helper VAs from installed callers' shipped call targets.  **384 byte-identical
+  vs the piecewise 354** -- the relink closes the call-form class (ff15->e8):
+  FreeIfNotNull, PtrListGrow/Shrink, FreeRecordList, ... (`ARGS=--newly`).
+- ☐ the second relink class -- the **indexed-global fold** (`((T*)ADDR)[i]`
+  folding the base into the index vs the original's `[idx*4 + &symbol]`) -- needs
+  the migrated globals declared as SYMBOLS under `AM2_RELINK`, the data analogue
+  of `AM2_ORIGFN`.  `ARGS=--unresolved` names the remaining targets (the C++
+  static screen helpers CloseCurrentScreen/OpenScreen/SeqRecord, whose callers
+  must first align for discovery, and the global symbols).
+- ☐ close the residual source-shape diffs (register allocation and the like),
+  which the relink does not change -- they are the same classes as piecewise.
