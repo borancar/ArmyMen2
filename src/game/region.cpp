@@ -3798,7 +3798,8 @@ void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx)
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
         *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
-    if (*(const uint8_t *)(o + OBJ_OFF_HIT_DIR)) {
+    if (*(const uint8_t *)(o + OBJ_OFF_HIT_DIR) > 0) {   /* unsigned; `> 0` is the
+                                       * original's `test; jbe`-skip spelling */
         if (!*(const void *const *)(c + SIGHT_OFF_OBSERVER))
             w[1] = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
         *(o + OBJ_OFF_HIT_DIR) = 0;

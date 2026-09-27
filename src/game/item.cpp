@@ -3998,7 +3998,8 @@ void *__cdecl UnitByUid(uint32_t uid)
 {
     const int32_t *o;
 
-    if (uid == 0)
+    if (uid <= 0)   /* uid is unsigned; `<= 0` is `== 0`, and the original's
+                     * `test; jbe` is how MSVC 6 spelled the unsigned guard */
         return (void *)0;
 
     o = (const int32_t *)LookupByUID(uid);
