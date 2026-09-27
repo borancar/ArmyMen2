@@ -11556,8 +11556,9 @@ void __cdecl FreeAimSprites(void)
     AM2_Sprite **spr;
     int32_t      i;
 
+    /* signed address compares, as the original walked them (`jl`, not `jb`) */
     for (spr = (AM2_Sprite **)(uintptr_t)ADDR_AIM_SPRITES_A;
-         spr < (AM2_Sprite **)(uintptr_t)ADDR_AIM_LIVE_A; spr++)
+         (int32_t)(uintptr_t)spr < (int32_t)ADDR_AIM_LIVE_A; spr++)
         ReleaseSprite(*spr);
 
     for (i = 0; i < (int32_t)AM2_AIM_ARMIES; i++) {
@@ -11566,7 +11567,7 @@ void __cdecl FreeAimSprites(void)
     }
 
     for (spr = (AM2_Sprite **)(uintptr_t)ADDR_AIM_SPRITES_B;
-         spr < (AM2_Sprite **)(uintptr_t)ADDR_AIM_LIVE_B; spr++)
+         (int32_t)(uintptr_t)spr < (int32_t)ADDR_AIM_LIVE_B; spr++)
         ReleaseSprite(*spr);
 
     for (i = 0; i < (int32_t)AM2_AIM_ARMIES; i++) {

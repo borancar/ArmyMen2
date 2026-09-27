@@ -2240,14 +2240,15 @@ void __cdecl LoadAirSprites(void)
     *(AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_2 =
         PreloadSprite(AM2_AIR_SPRITE_SET, 2, 0, 0x1000, 1);
 
+    /* signed address compares, as the original walked them (`jl`, not `jb`) */
     i = 0;
     for (p = (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_3;
-         p < (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_6; p++, i++)
+         (int32_t)(uintptr_t)p < (int32_t)ADDR_AIR_SPRITES_6; p++, i++)
         *p = PreloadSprite(AM2_AIR_SPRITE_SET, 3, i, 0x1000, 1);
 
     i = 0;
     for (p = (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_6;
-         p < (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_EDGE; p++, i++)
+         (int32_t)(uintptr_t)p < (int32_t)ADDR_AIR_SPRITES_EDGE; p++, i++)
         *p = PreloadSprite(AM2_AIR_SPRITE_SET, 6, i, 0x1000, 1);
 }
 
@@ -2257,12 +2258,13 @@ void __cdecl FreeAirSprites(void)
 
     ReleaseSprite(*(AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_2);
 
+    /* signed address compares, as the original walked them (`jl`, not `jb`) */
     for (p = (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_3;
-         p < (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_6; p++)
+         (int32_t)(uintptr_t)p < (int32_t)ADDR_AIR_SPRITES_6; p++)
         ReleaseSprite(*p);
 
     for (p = (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_6;
-         p < (AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_EDGE; p++)
+         (int32_t)(uintptr_t)p < (int32_t)ADDR_AIR_SPRITES_EDGE; p++)
         ReleaseSprite(*p);
 
     /* 179 dwords, not the 32 released above -- see the note. */

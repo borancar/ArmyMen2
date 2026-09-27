@@ -406,8 +406,9 @@ void __cdecl FreeWaveSounds(void)
 {
     uint8_t **slot;
 
+    /* signed address compare, as the original walked it (`jl`, not `jb`) */
     for (slot = (uint8_t **)(uintptr_t)ADDR_SOUND_SLOTS;
-         slot < (uint8_t **)(uintptr_t)ADDR_SOUND_SLOTS_END;
+         (int32_t)(uintptr_t)slot < (int32_t)ADDR_SOUND_SLOTS_END;
          slot = (uint8_t **)((uint8_t *)slot + SOUND_SLOT_STRIDE)) {
         if (*slot) {
             FreeSound(*slot);
