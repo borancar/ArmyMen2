@@ -699,7 +699,7 @@ int32_t __cdecl BitmapBitSet(const void *base, int32_t x, int32_t y,
                              int32_t height, int32_t stride)
 {
     const uint8_t *bytes = (const uint8_t *)base;
-    int32_t        bit   = 1 << (7 - (x % 8));
+    int32_t        bit   = 1 << (uint8_t)(7 - (x % 8));
     const uint8_t *row   = bytes + (height - y - 1) * stride;
 
     return bit & row[x >> 3];
