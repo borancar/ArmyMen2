@@ -18627,7 +18627,7 @@ typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
 #define ADDR_CRT_ONE                       0x0048CEACu /* a CRT const 1 between decimal_point and huge_val */
 #define ADDR_LOGPALETTE_HDR_SMALL          0x00477E68u /* a small LOGPALETTE header {0x300,1} (read-only) */
 
-#ifdef AM2_STANDALONE
+#if defined(AM2_STANDALONE) || defined(AM2_RELINK)
 #include "standalone.h"
 #endif
 

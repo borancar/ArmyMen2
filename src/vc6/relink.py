@@ -32,6 +32,18 @@ IMAGE_REL_I386_DIR32 = 0x06
 IMAGE_REL_I386_REL32 = 0x14
 
 
+def resolve_member_first(names, fn):
+    """Like BM.resolve_sym, but prefer the C++ member symbol ?fn@Class@@ over a
+    cdecl `_fn`.  Under AM2_STANDALONE the vtables take the address of the inline
+    thiscall forwarders, so `_fn` (the forwarder) gets emitted alongside the real
+    method -- and the function installed at the manifest VA is the METHOD, not
+    the 13-byte forwarder."""
+    for s in names:
+        if s.startswith("?" + fn + "@"):
+            return s
+    return BM.resolve_sym(names, fn)
+
+
 def import_map():
     """{base import name -> IAT slot VA}.  A reconstruction that calls a Win32
     import compiles `call [__imp__Foo@n]` (ff15 through the IAT) -- the SAME form
@@ -174,13 +186,28 @@ def main():
 
     sym_va = dict(ORIGFN_VA)     # coff symbol name -> real VA
     sym_va.update(HELPER_VA)
+
+    # Migrated-global symbols: standalone.h (now included under AM2_RELINK too)
+    # redirects each ADDR_X to &am2_x, so the reconstruction's ((T*)ADDR_X)[i]
+    # compiles to symbol-relative [idx*scale + am2_x] -- the original's form, not
+    # the constant-base fold.  Map each am2_x symbol to the VA its ADDR_X names.
+    gv = re.compile(r"#define\s+(ADDR_[A-Z0-9_]+)\s+"
+                    r"\(\(uintptr_t\)\(const (?:void|char) \*\)&?(am2_[A-Za-z0-9_]+)")
+    ng = 0
+    for line in open(os.path.join(BM.REPO, "src/inject/standalone.h")):
+        m = gv.match(line.strip())
+        if m and m.group(1) in addr:
+            sym_va.setdefault("_" + m.group(2), addr[m.group(1)])
+            ng += 1
+    if "--unresolved" in sys.argv:
+        sys.stderr.write("migrated-global symbols mapped: %d\n" % ng)
     imap = import_map()         # base import name -> IAT slot VA
     compiled = {}               # file -> (secs, symlist, names, base)
     with tempfile.TemporaryDirectory() as od, tempfile.TemporaryDirectory() as odb:
         for f in sorted(byfile):
             if os.path.basename(f) in BM.SKIP_FILE:
                 continue
-            obj = BM.compile_file(f, od, extra=["/DAM2_RELINK"])
+            obj = BM.compile_file(f, od, extra=["/DAM2_STANDALONE", "/DAM2_RELINK"])
             if obj is None:
                 continue
             secs, symlist = parse_coff_full(obj)
@@ -195,7 +222,7 @@ def main():
             base = BM.parse_coff(base_obj) if base_obj else None
             compiled[f] = (secs, symlist, names, base)
             for fn, va in byfile[f]:
-                sym = BM.resolve_sym(names, fn)
+                sym = resolve_member_first(names, fn)
                 if sym:
                     sym_va[sym] = va
         # Fallback for installed functions whose defining TU is SKIP'd (trig.cpp,
@@ -219,7 +246,7 @@ def main():
                     continue
                 secs, symlist, names, _ = compiled[f]
                 for fn, va in byfile[f]:
-                    sym = BM.resolve_sym(names, fn)
+                    sym = resolve_member_first(names, fn)
                     if not sym:
                         continue
                     secnum, value = names[sym]
@@ -252,13 +279,14 @@ def main():
         unresolved_hist = collections.Counter()
         diffs = []
         newly = []              # relink matches that the piecewise harness misses
+        regressed = []
         strcache = {}           # string constant symbol -> image VA (or None)
         for f in sorted(byfile):
             if f not in compiled:
                 continue
             secs, symlist, names, base = compiled[f]
             for fn, va in byfile[f]:
-                sym = BM.resolve_sym(names, fn)
+                sym = resolve_member_first(names, fn)
                 if not sym:
                     continue
                 secnum, value = names[sym]
@@ -319,14 +347,20 @@ def main():
                     if not piece_ok:
                         newly.append((fn, va, os.path.basename(f)))
                 else:
+                    if piece_ok:
+                        regressed.append((fn, va, os.path.basename(f)))
                     diff += 1
                     nd = sum(1 for i in range(n)
                              if not wildcard[i] and cur[i] != orig[i])
                     diffs.append((nd, fn, va, os.path.basename(f)))
 
-    print("=== relink byte-match (siblings + AM2_ORIGFN CRT + Win32 IAT resolved) ===")
+    print("=== relink byte-match (siblings + CRT + IAT + migrated globals resolved) ===")
     print("  match %d   diff %d   (relink closes %d the piecewise harness cannot)"
           % (match, diff, len(newly)))
+    if regressed:
+        print("  REGRESSED (matched piecewise, not under relink): %d" % len(regressed))
+        for fn, va, f in sorted(regressed, key=lambda x: x[1])[:20]:
+            print("  -  %-26s 0x%08x %s" % (fn, va, f))
     if "--newly" in sys.argv:
         for fn, va, f in sorted(newly, key=lambda x: x[1]):
             print("  +  %-26s 0x%08x %s" % (fn, va, f))

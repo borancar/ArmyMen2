@@ -37,7 +37,7 @@ extern int32_t am2_image_slide;
  * address: that reproduces the original's direct `[addr]` access instead of an
  * `addr + slide` read the original never had.  Only the relocatable standalone
  * build carries the runtime slide. */
-#ifdef AM2_STANDALONE
+#if defined(AM2_STANDALONE) && !defined(AM2_RELINK)
 #define AM2_IMAGE(addr) \
     ((void *)((uint8_t *)(uintptr_t)(addr) + am2_image_slide))
 #else
