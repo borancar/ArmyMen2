@@ -1137,14 +1137,16 @@ int32_t __cdecl FacingFromDelta14(const void *rec, int32_t delta)
  * both halves at once. */
 int32_t __cdecl MapCode18To28(int32_t code)
 {
-    static const uint8_t kMap[17] = {
-        8, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 6,
-    };
-    uint32_t i = (uint32_t)(code - 0x18);
+    int32_t result = 0;
 
-    if (i > 0x10)
-        return 0;
-    return kMap[i];
+    switch (code) {
+    case 0x18: result = 8; break;
+    case 0x19: result = 2; break;
+    case 0x1a: result = 1; break;
+    case 0x27: result = 4; break;
+    case 0x28: result = 6; break;
+    }
+    return result;
 }
 
 /* The index table at 0x00449F24 selects between two arms, and its entries are
