@@ -23,12 +23,23 @@ the same trick as the hybrid game loader). `make vc6-match` recompiles each
 `patch_replace`'d reconstruction with the *original* compiler at /O2 and
 byte-compares it to `ArmyMen2.exe` -- the strongest correctness check there is.
 
-Baseline: **~242 of ~1580 compiled `src/game` functions are byte-identical as
+Baseline: **~285 of ~1580 compiled `src/game` functions are byte-identical as
 written** (ApproxDist, PackKey, Clamp, PointInRect, …). Re-measure with
 `make vc6-match`; worklist is `make vc6-match ARGS=--diffs`. The pure-signedness
 class (unsigned `jb` where the original compared signed `jl`) is closed --
 ResetTimers and the four sprite/sound table-walk loops now spell the compare
 `(int32_t)`.
+
+**Thiscall functions are now modelled as C++ classes** so MSVC 6 recompiles them
+as the thiscall members they were (a free `__attribute__((thiscall))` function
+can't be spelled thiscall in VC6, so the byte-match compiled it __cdecl and it
+never matched). ~178 functions across 6 classes -- AM2_Widget (147), AM2_Comm
+(14, spanning msgslot+misc), AM2_Movie (7), AM2_Rec (7), AM2_SelList (2),
+AM2_Bitmap (1). The body is untouched (first param re-aliased to `this`), inline
+thiscall forwarders keep every call site and the caller codegen byte-identical,
+and install goes through `pmf_addr(&Class::Fn)`; verified codegen-neutral for
+the GCC build. Left free: functions flat modules forward-declare with `void *`
+(comm-networking in commmsg/dplay) and the AM2_*_DTOR macro pairs.
 
 What matches is bounded by the piecewise model, and characterising that is the
 main result so far (details in `src/vc6/README.md`):
