@@ -32,8 +32,17 @@ extern "C" {
  * mapped the image somewhere else. */
 extern int32_t am2_image_slide;
 
+/* The image maps at its own base in the injected and byte-match builds
+ * (am2_image_slide is always 0 there -- see standalone.h), so fold to the plain
+ * address: that reproduces the original's direct `[addr]` access instead of an
+ * `addr + slide` read the original never had.  Only the relocatable standalone
+ * build carries the runtime slide. */
+#ifdef AM2_STANDALONE
 #define AM2_IMAGE(addr) \
     ((void *)((uint8_t *)(uintptr_t)(addr) + am2_image_slide))
+#else
+#define AM2_IMAGE(addr) ((void *)(uintptr_t)(addr))
+#endif
 
 #ifdef __cplusplus
 }
