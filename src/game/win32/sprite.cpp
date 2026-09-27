@@ -651,11 +651,11 @@ typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
 typedef int32_t (__cdecl *am2_findfirst_fn)(const char *pattern, void *data);
 typedef int32_t (__cdecl *am2_findclose_fn)(int32_t handle);
 
-#define orig_sprintf        ((am2_sprintf_fn)AM2_IMAGE(ADDR_GAME_SPRINTF))
+#define orig_sprintf        ((am2_sprintf_fn)((void *)(uintptr_t)(ADDR_GAME_SPRINTF)))
 /* LoadShadowBmp is reconstructed above and called by name. */
-#define orig_findfirst      ((am2_findfirst_fn)AM2_IMAGE(ADDR_CRT_FINDFIRST))
-#define orig_findclose      ((am2_findclose_fn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
-#define g_spriteSetDirs     ((const char *const *)AM2_IMAGE(ADDR_SPRITE_SET_DIRS))
+#define orig_findfirst      ((am2_findfirst_fn)((void *)(uintptr_t)(ADDR_CRT_FINDFIRST)))
+#define orig_findclose      ((am2_findclose_fn)((void *)(uintptr_t)(ADDR_CRT_FINDCLOSE)))
+#define g_spriteSetDirs     ((const char *const *)((void *)(uintptr_t)(ADDR_SPRITE_SET_DIRS)))
 
 /* LoadShadowBmp -- original 0x00423300, one caller: SpriteLoadTriple's loose
  * `.sha` half, so it runs only under -df. orig.h had it as "a 1-bit DIB read
@@ -736,7 +736,7 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
 
     if (*(const int16_t *)(infoHdr + BMPINFO_OFF_BITCOUNT) != 1) {
         orig_fclose(fp);
-        orig_log((const char *)AM2_IMAGE(AM2_STR_SHA_NOT_1BIT), path);
+        orig_log((const char *)((void *)(uintptr_t)(AM2_STR_SHA_NOT_1BIT)), path);
         return 0;
     }
 
@@ -747,7 +747,7 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
     bytes = *(const int32_t *)(infoHdr + BMPINFO_OFF_SIZEIMAGE);
     if (bytes <= 0) {
         orig_fclose(fp);
-        orig_log((const char *)AM2_IMAGE(AM2_STR_SHA_BAD_SIZE), path);
+        orig_log((const char *)((void *)(uintptr_t)(AM2_STR_SHA_BAD_SIZE)), path);
         return 0;
     }
 

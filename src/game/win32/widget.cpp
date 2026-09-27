@@ -694,7 +694,7 @@ extern "C" const AM2_PointerMode am2_pointer_modes[7] = {
 /* A handler that is still the ORIGINAL's, as a pointer. The address form is
  * the general case -- the reconstruction owns a few dozen of these and the
  * image owns the rest -- so the two spellings sit side by side on purpose. */
-#define kImageHandler(a)       AM2_BUTTON_HANDLER(AM2_IMAGE(a))
+#define kImageHandler(a)       AM2_BUTTON_HANDLER(((void *)(uintptr_t)(a)))
 #define kOnBootCamp     AM2_BUTTON_HANDLER(OnBootCamp)
 /* Reconstructed too, so it is named rather than reached through the image. */
 #define kOnEnterNameOk  AM2_BUTTON_HANDLER(OnEnterNameOk)
@@ -766,7 +766,7 @@ void __attribute__((thiscall)) AM2_Widget::WidgetDestruct()
 
     AM2_Widget *child;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_WIDGET_BASE);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_WIDGET_BASE));
 
     child = w->firstChild;
     while (child) {
@@ -796,7 +796,7 @@ void __attribute__((thiscall)) AM2_Widget::LabelDestruct()
 {
     AM2_Widget *w = this;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_LABEL);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_LABEL));
     ::WidgetDestruct(w);
 }
 
@@ -947,8 +947,8 @@ static void ButtonRepaintSelf(AM2_Widget *w)
 
 int32_t __cdecl FindPressedKey(void)
 {
-    const AM2_KeyName *e   = (const AM2_KeyName *)AM2_IMAGE(ADDR_KEY_NAME_TABLE);
-    const AM2_KeyName *end = (const AM2_KeyName *)AM2_IMAGE(ADDR_KEY_NAME_TABLE_END);
+    const AM2_KeyName *e   = (const AM2_KeyName *)((void *)(uintptr_t)(ADDR_KEY_NAME_TABLE));
+    const AM2_KeyName *end = (const AM2_KeyName *)((void *)(uintptr_t)(ADDR_KEY_NAME_TABLE_END));
     int32_t            idx = 0;
 
     for (; e < end; e++, idx++) {
@@ -989,7 +989,7 @@ void __attribute__((thiscall)) AM2_Widget::KeyRowUpdate()
 
     {
         const AM2_KeyName *table =
-            (const AM2_KeyName *)AM2_IMAGE(ADDR_KEY_NAME_TABLE);
+            (const AM2_KeyName *)((void *)(uintptr_t)(ADDR_KEY_NAME_TABLE));
 
         *(int32_t *)(self + KEYROW_OFF_KEY)      = key;
         *(const char **)(self + LABEL_OFF_TEXT)  = table[key].name;
@@ -1127,7 +1127,7 @@ void __attribute__((thiscall)) AM2_Widget::ListDestruct()
 
     uint8_t *self = (uint8_t *)w;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_LIST);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_LIST));
 
     if (*(const int32_t *)(self + LIST_OFF_OWNS_ROWS)) {
         void *rows = *(void **)(self + LIST_OFF_ROWS);
@@ -1466,7 +1466,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::TextListConstruct(int32_t lef
 
     ::ListBoxConstruct(w, left, top, right, bottom, rows, callback, 0, ownsRows);
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_TEXT_LIST);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_TEXT_LIST));
 
     colours = (int32_t *)(self + TEXTLIST_OFF_COLOURS);
     colours[0] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_DARK_GREEN;
@@ -1603,7 +1603,7 @@ void __attribute__((thiscall)) AM2_Widget::IconDestruct()
 
     uint8_t *self = (uint8_t *)w;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_ICON);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_ICON));
     /* No null test, as in the original. */
     ReleaseSprite(*(AM2_Sprite **)(self + ICON_OFF_SPRITE));
     ::WidgetDestruct(w);
@@ -1625,7 +1625,7 @@ void __attribute__((thiscall)) AM2_Widget::BlinkerDestruct()
 
     uint8_t *self = (uint8_t *)w;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_BLINKER);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_BLINKER));
     /* Settle the live sprite on the OFF one before letting the ON one go.
      * Nothing reads it after this; kept because the original does it. */
     w->sprite = *(AM2_Sprite **)(self + TOGGLE_OFF_SPRITE_OFF);
@@ -1649,7 +1649,7 @@ void __attribute__((thiscall)) AM2_Widget::ButtonDestruct()
 
     uint8_t *self = (uint8_t *)w;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_BUTTON);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_BUTTON));
 
     if (*(const uint8_t *)(self + BUTTON_OFF_OWNS_SPRITES)) {
         AM2_Sprite *s;
@@ -1851,7 +1851,7 @@ void __attribute__((thiscall)) AM2_Widget::EditDestruct()
 {
     AM2_Widget *w = this;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_EDIT);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_EDIT));
     EditReleaseFocus(w);
     ::WidgetDestruct(w);
 }
@@ -2019,7 +2019,7 @@ void __attribute__((thiscall)) AM2_Widget::ScrollBarDestruct()
     uint8_t *self = (uint8_t *)w;
     AM2_Sprite *bar = *(AM2_Sprite **)(self + SCROLLBAR_OFF_BAR);
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_SCROLLBAR);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_SCROLLBAR));
     /* Tested here, where the icon's identical release is not. */
     if (bar)
         ReleaseSprite(bar);
@@ -2145,7 +2145,7 @@ void __attribute__((thiscall)) AM2_Widget::DialogDestruct()
 {
     AM2_Widget *w = this;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_DIALOG);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_DIALOG));
     ::IconDestruct(w);
 }
 
@@ -2166,7 +2166,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DialogDelete(int32_t flags)
     void __attribute__((thiscall)) AM2_Widget::name##Destruct()              \
     {                                                                        \
         AM2_Widget *w = this;                                                \
-        w->vtable = (void *)AM2_IMAGE(vt);                                   \
+        w->vtable = (void *)((void *)(uintptr_t)(vt));                                   \
         ::base(w);                                                           \
     }                                                                        \
     AM2_Widget *__attribute__((thiscall)) AM2_Widget::name##Delete(int32_t flags) \
@@ -2226,7 +2226,7 @@ void __attribute__((thiscall)) HudTopDestruct(AM2_Widget *w)
 {
     uint8_t *self = (uint8_t *)w;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_TOP_STRIP);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_TOP_STRIP));
 
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE0));
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE1));
@@ -2249,7 +2249,7 @@ AM2_Widget *__attribute__((thiscall)) HudTopDelete(AM2_Widget *w, int32_t flags)
  * builds the radar, Sarge, squad and commands children. One sprite. */
 void __attribute__((thiscall)) HudPanelDestruct(AM2_Widget *w)
 {
-    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_PANEL);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_PANEL));
     ReleaseSprite(*(AM2_Sprite **)((uint8_t *)w + HUD_OFF_SPRITE0));
     WidgetDestruct(w);
 }
@@ -2273,7 +2273,7 @@ void __attribute__((thiscall)) HudRadarDestruct(AM2_Widget *w)
 {
     void **slot = (void **)((uint8_t *)w + HUD_OFF_SPRITE0);
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_RADAR);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_RADAR));
     FreeBitmap(slot);
     *slot = (void *)0;
     WidgetDestruct(w);
@@ -2299,7 +2299,7 @@ void __attribute__((thiscall)) HudSquadDestruct(AM2_Widget *w)
     uint8_t *self = (uint8_t *)w;
     int32_t  i;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_SQUAD);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_SQUAD));
 
     for (i = 0; i < AM2_HUD_SQUAD_SLOTS; i++) {
         ReleaseSprite(*(AM2_Sprite **)(self + HUD_SQUAD_PAIR_LO + i * 4));
@@ -2328,7 +2328,7 @@ void __attribute__((thiscall)) HudEdgeDestruct(AM2_Widget *w)
 {
     uint8_t *self = (uint8_t *)w;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_EDGE_STRIP);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_EDGE_STRIP));
 
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE0));
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE1));
@@ -2353,7 +2353,7 @@ void __attribute__((thiscall)) HudSargeDestruct(AM2_Widget *w)
     uint8_t *self = (uint8_t *)w;
     int32_t  i;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_SARGE);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_SARGE));
 
     for (i = 0; i < AM2_HUD_SARGE_SLOTS; i++)
         ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE0 + i * 4));
@@ -2388,10 +2388,10 @@ void __attribute__((thiscall)) HudCommandsDestruct(AM2_Widget *w)
 {
     AM2_Sprite **spr;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_COMMANDS);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_COMMANDS));
 
-    for (spr = (AM2_Sprite **)AM2_IMAGE(ADDR_HUD_CMD_SPRITES);
-         spr < (AM2_Sprite **)AM2_IMAGE(ADDR_HUD_CMD_SPRITES_END);
+    for (spr = (AM2_Sprite **)((void *)(uintptr_t)(ADDR_HUD_CMD_SPRITES));
+         spr < (AM2_Sprite **)((void *)(uintptr_t)(ADDR_HUD_CMD_SPRITES_END));
          spr = (AM2_Sprite **)((uint8_t *)spr + AM2_POINTER_MODE_SIZE))
         ReleaseSprite(*spr);
 
@@ -2470,7 +2470,7 @@ void __attribute__((thiscall)) AM2_Widget::HudPanelUpdate()
 
         if (w->x > stop) {
             w->x -= (int32_t)((double)*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
-                              * *(const float *)AM2_IMAGE(ADDR_HUD_SLIDE_OPEN));
+                              * *(const float *)((void *)(uintptr_t)(ADDR_HUD_SLIDE_OPEN)));
             if (w->x < stop)
                 w->x = stop;
             *(int32_t *)(uintptr_t)(ADDR_BLIT_RECT + 8) = w->x;
@@ -2478,7 +2478,7 @@ void __attribute__((thiscall)) AM2_Widget::HudPanelUpdate()
     } else if (w->x < *(const int32_t *)(uintptr_t)ADDR_SCREEN_W
                        - HudPanelWidth()) {
         w->x -= (int32_t)((double)*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
-                          * *(const float *)AM2_IMAGE(ADDR_HUD_SLIDE_SHUT));
+                          * *(const float *)((void *)(uintptr_t)(ADDR_HUD_SLIDE_SHUT)));
         if (w->x > *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - HudPanelWidth())
             w->x = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - HudPanelWidth();
         *(int32_t *)(uintptr_t)(ADDR_BLIT_RECT + 8) = w->x;
@@ -2487,9 +2487,9 @@ void __attribute__((thiscall)) AM2_Widget::HudPanelUpdate()
     if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
         AM2_Widget *const *slot =
             (AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_TABLE;
-        const uint8_t     *rec = (const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU);
+        const uint8_t     *rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU));
 
-        for (; rec < (const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU_END);
+        for (; rec < (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU_END));
              rec += AM2_BUILD_MENU_STRIDE, slot++) {
             int32_t id = *(const int32_t *)(rec + BUILD_MENU_OFF_ID);
 
@@ -3240,9 +3240,9 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
     pen = w->rect.top + 2;
 
     /* SARGE, then the strip sprite under it, then the trooper's health. */
-    if (!EdgeText(w, pen, (const char *)AM2_IMAGE(AM2_HUD_STR_SARGE), &clip))
+    if (!EdgeText(w, pen, (const char *)((void *)(uintptr_t)(AM2_HUD_STR_SARGE)), &clip))
         return;
-    pen += TextStackHeight((const char *)AM2_IMAGE(AM2_HUD_STR_SARGE), 1)
+    pen += TextStackHeight((const char *)((void *)(uintptr_t)(AM2_HUD_STR_SARGE)), 1)
            + AM2_HUD_EDGE_GAP;
 
     EdgeSprite(w, pen, spr, &clip);
@@ -3287,9 +3287,9 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
         pen += 3;
 
         if (n > AM2_HUD_AMMO_MAX)
-            strcpy(text, (const char *)AM2_IMAGE(AM2_HUD_STR_AMMO_OVER));
+            strcpy(text, (const char *)((void *)(uintptr_t)(AM2_HUD_STR_AMMO_OVER)));
         else
-            am2_sprintf(text, (const char *)AM2_IMAGE(AM2_HUD_STR_AMMO_FMT), n);
+            am2_sprintf(text, (const char *)((void *)(uintptr_t)(AM2_HUD_STR_AMMO_FMT)), n);
 
         /* NOT EdgeText: the count is centered ONE PIXEL RIGHT of the widget
          * middle. The original (HUD_EDGE_PAINT+0x5B1) computes the same mid as
@@ -3478,7 +3478,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadPaint(RECT clip)
     AM2_Widget *w = this;
 
     uint8_t        *self = (uint8_t *)w;
-    const int16_t  *grid = (const int16_t *)AM2_IMAGE(ADDR_HUD_SQUAD_SLOT_XY);
+    const int16_t  *grid = (const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SQUAD_SLOT_XY));
     RECT            vis;
     int32_t         slot;
 
@@ -3658,7 +3658,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
     AM2_Widget *w = this;
 
     uint8_t        *self = (uint8_t *)w;
-    const int16_t  *grid = (const int16_t *)AM2_IMAGE(ADDR_HUD_SARGE_OFFSETS);
+    const int16_t  *grid = (const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SARGE_OFFSETS));
     uint8_t        *obj;
     int32_t         i;
 
@@ -3984,7 +3984,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::CountButtonConstruct(int32_t 
 
     ::ButtonBaseConstruct(w);
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_COUNT_BUTTON);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_COUNT_BUTTON));
 
     *(void **)(self + COUNTBTN_OFF_SPR) =
         PreloadArmySprite(AM2_COUNT_SPRITE_SET, index, army, 0);
@@ -4042,7 +4042,7 @@ void __attribute__((thiscall)) CheckBoxDestruct(AM2_Widget *w)
 {
     uint8_t *self = (uint8_t *)w;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_CHECKBOX);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_CHECKBOX));
 
     ReleaseSprite(*(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON));
     ReleaseSprite(*(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF));
@@ -4079,7 +4079,7 @@ void __attribute__((thiscall)) AM2_Widget::CountButtonDestruct()
 
     uint8_t *self = (uint8_t *)w;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_COUNT_BUTTON);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_COUNT_BUTTON));
 
     ReleaseSprite(*(AM2_Sprite **)(self + COUNTBTN_OFF_SPR));
     ReleaseSprite(*(AM2_Sprite **)(self + COUNTBTN_OFF_SPR_OFF));
@@ -4242,22 +4242,22 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
             dots[n] = '\0';
 
             am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
-                        (const char *)AM2_IMAGE(AM2_STR_NOT_RESPONDING), dots);
+                        (const char *)((void *)(uintptr_t)(AM2_STR_NOT_RESPONDING)), dots);
             ::MpNameSetInk(w, *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
             *(uint8_t *)(self + MPNAME_OFF_PAPER) =
                 *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
         } else {
             am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
-                        (const char *)AM2_IMAGE(AM2_STR_PCT_S),
+                        (const char *)((void *)(uintptr_t)(AM2_STR_PCT_S)),
                         rec + COMM_OFF_PLAYERS + COMM_SLOT_OFF_NAME);
             ::MpNameSetInk(w, MpNameInk(slot));
             *(uint8_t *)(self + MPNAME_OFF_PAPER) = MpNamePaper(slot);
         }
     } else {
         am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
-                    (const char *)AM2_IMAGE(
+                    (const char *)((void *)(uintptr_t)(
                         *(const int32_t *)(rec + AM2_PLAYER_ACTIVE)
-                        ? AM2_STR_COMPUTER_SLOT : AM2_STR_OPEN_SLOT));
+                        ? AM2_STR_COMPUTER_SLOT : AM2_STR_OPEN_SLOT)));
         ::MpNameSetInk(w, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
         *(uint8_t *)(self + MPNAME_OFF_PAPER) =
             *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR;
@@ -4283,11 +4283,11 @@ void __attribute__((thiscall)) AM2_Widget::HudSargePaint(RECT clip)
     RECT           vis;
     int32_t        i;
 
-    if (!IntersectRect(&vis, &clip, (const RECT *)AM2_IMAGE(ADDR_SCREEN_CLIP)))
+    if (!IntersectRect(&vis, &clip, (const RECT *)((void *)(uintptr_t)(ADDR_SCREEN_CLIP))))
         return;
 
     for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
-        const int16_t *off = (const int16_t *)AM2_IMAGE(ADDR_HUD_SARGE_OFFSETS)
+        const int16_t *off = (const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SARGE_OFFSETS))
                              + i * 2;
         const uint8_t *rec = self + HUDSARGE_OFF_SLOTS
                              + i * HUDSARGE_REC_STRIDE;
@@ -4337,7 +4337,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargePaint(RECT clip)
             return;
 
         ((int32_t (__cdecl *)(char *, const char *, ...))
-            AM2_IMAGE(ADDR_GAME_SPRINTF))(
+            ((void *)(uintptr_t)(ADDR_GAME_SPRINTF)))(
                 text, "%d", count);
 
         DrawText(AM2_HUD_SARGE_CELL_W
@@ -4358,11 +4358,11 @@ void __attribute__((thiscall)) AM2_Widget::HudCommandsPaint(RECT clip)
     RECT           vis;
     int32_t        i;
 
-    if (!IntersectRect(&vis, &clip, (const RECT *)AM2_IMAGE(ADDR_SCREEN_CLIP)))
+    if (!IntersectRect(&vis, &clip, (const RECT *)((void *)(uintptr_t)(ADDR_SCREEN_CLIP))))
         return;
 
     for (i = 0; i < AM2_HUD_CMD_SLOTS; i++) {
-        const int16_t *off = (const int16_t *)AM2_IMAGE(ADDR_HUD_CMD_OFFSETS)
+        const int16_t *off = (const int16_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_OFFSETS))
                              + i * 2;
         int32_t        slot = *(const int32_t *)(self + HUDCMD_OFF_SLOTS
                                                  + i * 4);
@@ -4374,7 +4374,7 @@ void __attribute__((thiscall)) AM2_Widget::HudCommandsPaint(RECT clip)
         if (slot < 0)
             continue;
 
-        spr = *(AM2_Sprite **)((uint8_t *)AM2_IMAGE(ADDR_HUD_CMD_SPRITES)
+        spr = *(AM2_Sprite **)((uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPRITES))
                                + slot * AM2_POINTER_MODE_SIZE);
         if (!spr)
             continue;
@@ -4426,9 +4426,9 @@ void __attribute__((thiscall)) AM2_Widget::HudPanelPaint(RECT clip)
     if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
         const uint8_t *rec;
 
-        for (rec = (const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU)
+        for (rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU))
                    + BUILD_MENU_OFF_RECT;
-             rec < (const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU_END)
+             rec < (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU_END))
                    + BUILD_MENU_OFF_RECT - AM2_BUILD_MENU_STRIDE;
              rec += AM2_BUILD_MENU_STRIDE) {
             AM2_Rect box;
@@ -4533,7 +4533,7 @@ void __attribute__((thiscall)) MoviesDestruct(AM2_Widget *w)
     AM2_Sprite **pair;
     int32_t      i;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_MOVIES);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_MOVIES));
 
     pair = (AM2_Sprite **)((uint8_t *)w + MOVIES_OFF_SPRITES);
     for (i = 0; i < AM2_MOVIE_PAGE_SIZE * 3; i++, pair += 2) {
@@ -4566,7 +4566,7 @@ void __attribute__((thiscall)) ArrowBarDestruct(AM2_Widget *w)
     uint8_t    *self = (uint8_t *)w;
     AM2_Sprite *spr;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_ARROWBAR);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_ARROWBAR));
 
     spr = *(AM2_Sprite **)(self + ARROWBAR_OFF_SPRITE0);
     if (spr)
@@ -4600,7 +4600,7 @@ AM2_Widget *__attribute__((thiscall)) ArrowBarDelete(AM2_Widget *w,
  * would be worth less than the gap. */
 void __attribute__((thiscall)) SaveListDestruct(AM2_Widget *w)
 {
-    w->vtable = (void *)AM2_IMAGE(VTABLE_SAVE_LIST);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_SAVE_LIST));
     FreeFont(AM2_SAVE_LIST_FONT);
     DialogDestruct(w);
 }
@@ -4897,11 +4897,11 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudCmdConstruct()
 {
     AM2_Widget *w = this;
 
-    uint8_t *rec = (uint8_t *)AM2_IMAGE(ADDR_HUD_CMD_SPEC);
+    uint8_t *rec = (uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPEC));
     int32_t  i;
 
     ::WidgetConstruct(w);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_COMMANDS);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_COMMANDS));
 
     for (i = 0; i < AM2_HUD_CMD_SPRITES; i++, rec += AM2_HUD_CMD_SPR_STRIDE) {
         void *spr = PreloadArmySprite(
@@ -4955,7 +4955,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudEdgeConstruct()
     AM2_Sprite *spr;
 
     ::WidgetConstruct(w);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_EDGE_STRIP);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_EDGE_STRIP));
 
     spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 0, 0, 1);
     *(void **)(self + HUD_OFF_SPRITE0) = spr;
@@ -4981,7 +4981,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::WidgetConstruct()
 
     AM2_Rect zero;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_WIDGET_BASE);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_WIDGET_BASE));
 
     /* Both rectangles are built in a temporary and copied, which is what a
      * `m_rect = Rect(0,0,0,0)` compiles to when Rect returns by value -- the
@@ -5029,7 +5029,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::LabelConstruct(const char *te
     *(uint8_t *)(self + LABEL_OFF_INK)       = (uint8_t)ink;
     *(uint8_t *)(self + LABEL_OFF_PAPER)     = (uint8_t)paper;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_LABEL);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_LABEL));
     w->x = x;
     w->y = y;
     w->w = width;
@@ -5347,7 +5347,7 @@ typedef void *(__attribute__((thiscall)) *AM2_ScreenCtorFn)(void *obj,
                                                             const char *bmp);
 typedef void (__cdecl *AM2_VoidFn)(void);
 
-#define orig_operator_new     ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
+#define orig_operator_new     ((AM2_OperatorNewFn)((void *)(uintptr_t)(ADDR_GAME_OPERATOR_NEW)))
 
 /* HudCmdInvoke -- original 0x00417180, 56 bytes, thiscall, six callers (one
  * per command). Pick command `mode` if the bar is currently offering it.
@@ -5379,7 +5379,7 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdInvoke(int32_t mode)
 
         SetPointerMode(mode);
         {
-            const uint8_t *rec = (const uint8_t *)AM2_IMAGE(ADDR_HUD_CMD_SPEC)
+            const uint8_t *rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPEC))
                                + (size_t)mode * AM2_HUD_CMD_SPR_STRIDE;
             void (*handler)(void) =
                 *(void (**)(void))(rec + HUDCMDSPR_OFF_HANDLER);
@@ -5425,7 +5425,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgBattleJoinConstruct(const 
     AM2_Rect    box;
 
     ::ScreenBaseConstruct(w, bmp, 1);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_BATTLE_JOIN);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_BATTLE_JOIN));
     SetGameDir((const char *)(uintptr_t)ADDR_DIR_SCRATCH);
     strcpy((char *)(self + BATTLEJOIN_OFF_NAME),
            (const char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME);
@@ -5542,7 +5542,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgGameMenuConstruct(const ch
     int32_t  i;
 
     ::ScreenBaseConstruct(w, bmp, flag);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_DLG_GAMEMENU);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_DLG_GAMEMENU));
     *(void **)((uint8_t *)w + DLG_OFF_LIST) = (void *)0;
     w->flag44 = 1;
 
@@ -5579,7 +5579,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgGameMenuConstruct(const ch
                                       kGameMenuButtons[i].b1,
                                       kGameMenuButtons[i].b2, 0, box,
                                       (void (__cdecl *)(AM2_Widget *))
-                                          AM2_IMAGE(kGameMenuButtons[i].handler),
+                                          ((void *)(uintptr_t)(kGameMenuButtons[i].handler)),
                                       (void (__cdecl *)(AM2_Widget *))0);
             }
             ::WidgetAddChild(w, btn);
@@ -5610,10 +5610,10 @@ typedef int32_t (__cdecl *AM2_FindFirstFn3)(const char *, void *);
 typedef int32_t (__cdecl *AM2_FindNextFn)(int32_t, void *);
 typedef int32_t (__cdecl *AM2_FindCloseFn2)(int32_t);
 typedef int32_t (__cdecl *AM2_MkdirFn)(const char *);
-#define orig_findfirst ((AM2_FindFirstFn3)AM2_IMAGE(ADDR_CRT_FINDFIRST))
-#define orig_findnext  ((AM2_FindNextFn)AM2_IMAGE(ADDR_CRT_FINDNEXT))
-#define orig_findclose ((AM2_FindCloseFn2)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
-#define orig_mkdir     ((AM2_MkdirFn)AM2_IMAGE(ADDR_CRT_MKDIR))
+#define orig_findfirst ((AM2_FindFirstFn3)((void *)(uintptr_t)(ADDR_CRT_FINDFIRST)))
+#define orig_findnext  ((AM2_FindNextFn)((void *)(uintptr_t)(ADDR_CRT_FINDNEXT)))
+#define orig_findclose ((AM2_FindCloseFn2)((void *)(uintptr_t)(ADDR_CRT_FINDCLOSE)))
+#define orig_mkdir     ((AM2_MkdirFn)((void *)(uintptr_t)(ADDR_CRT_MKDIR)))
 
 /* DlgSaveListConstruct -- original 0x00453280, 1456 bytes, thiscall `ret 8`.
  * The SAVE GAME dialog: a name edit, the list of existing saves, a
@@ -5654,7 +5654,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgSaveListConstruct(const ch
     int32_t     h;
 
     ::ScreenBaseConstruct(w, bmp, flag);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_SAVE_LIST);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_SAVE_LIST));
     SetGameDir("save");
 
     /* Make the player's folder if it is missing, or if the name is taken by
@@ -5802,7 +5802,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgOverwriteConstruct(const c
     char        text[AM2_DLG_TEXT_BYTES];
 
     ::ScreenBaseConstruct(w, bmp, flag);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_DLG_OVERWRITE);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_DLG_OVERWRITE));
     w->flag44 = 1;
 
     btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
@@ -5886,7 +5886,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgMessageConstruct(const cha
     int32_t           oy;
 
     ::ScreenBaseConstruct(w, bmp, flag);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_DLG_MESSAGE);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_DLG_MESSAGE));
     w->flag44 = 1;
 
     back = *(const AM2_Sprite *const *)((uint8_t *)w + HUD_OFF_SPRITE0);
@@ -5984,7 +5984,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudPanelConstruct()
     int32_t     x;
 
     ::WidgetConstruct(w);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_PANEL);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_PANEL));
 
     spr = (AM2_Sprite *)PreloadArmySprite(0x0B, 0, net != 0 ? 1 : 0, 1);
     *(void **)(self + HUD_OFF_SPRITE0) = spr;
@@ -6030,8 +6030,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudPanelConstruct()
      * found by reading ADDR_BUILD_ON_TOGGLE, which indexes an 18-row table
      * with +0x78 -- coherent only if that field is the row. */
     {
-        const uint8_t *rec  = (const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU);
-        const uint8_t *rect = (const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU_RECTS);
+        const uint8_t *rec  = (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU));
+        const uint8_t *rect = (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU_RECTS));
         AM2_Widget   **slot = (AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_TABLE;
         int32_t        army = CommArmyOfSlot(
                                   *(void **)(uintptr_t)ADDR_COMM_OBJECT,
@@ -6136,7 +6136,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudSquadConstruct()
     int32_t  i;
 
     ::WidgetConstruct(w);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_SQUAD);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_SQUAD));
 
     /* Its own pip, and NOT from either pair set: 0x0A index 0x14. */
     *(void **)(self + HUD_SQUAD_ICON_SPRITE) =
@@ -6207,7 +6207,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudRadarConstruct()
     int32_t     i;
 
     ::WidgetConstruct(w);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_RADAR);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_RADAR));
 
     SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
     am2_sprintf(name, "%s.bmp", (const char *)(uintptr_t)ADDR_MAP_NAME);
@@ -6252,7 +6252,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudSargeConstruct()
     int32_t  i;
 
     ::WidgetConstruct(w);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_SARGE);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_SARGE));
 
     ArmySpriteBase();
 
@@ -6316,7 +6316,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudTopConstruct()
     int32_t     i;
 
     ::WidgetConstruct(w);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_HUD_TOP_STRIP);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_TOP_STRIP));
 
     if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME == 0) {
         frame = 0;
@@ -6991,7 +6991,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::OptionsMenuConstruct(const ch
     uint32_t i;
 
     ::ScreenBaseConstruct(w, bmp, 1);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_OPTIONS_MENU);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_OPTIONS_MENU));
     w->flag44 = 1;
 
     for (i = 0; i < sizeof kOptionsButtons / sizeof kOptionsButtons[0]; i++) {
@@ -7003,12 +7003,12 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::OptionsMenuConstruct(const ch
             RectSet(&box, AM2_OPTIONS_BUTTON_LEFT, b->top,
                     AM2_OPTIONS_BUTTON_WIDTH, AM2_OPTIONS_BUTTON_HEIGHT);
             btn = ::ButtonConstruct(btn,
-                                   (const char *)AM2_IMAGE(b->bmp[0]),
-                                   (const char *)AM2_IMAGE(b->bmp[1]),
-                                   (const char *)AM2_IMAGE(b->bmp[2]),
+                                   (const char *)((void *)(uintptr_t)(b->bmp[0])),
+                                   (const char *)((void *)(uintptr_t)(b->bmp[1])),
+                                   (const char *)((void *)(uintptr_t)(b->bmp[2])),
                                    0, box,
                                    (void (__cdecl *)(AM2_Widget *))
-                                   AM2_IMAGE(b->handler), 0);
+                                   ((void *)(uintptr_t)(b->handler)), 0);
         }
         ::WidgetAddChild(w, btn);
 
@@ -7095,9 +7095,9 @@ static AM2_Widget *MakeButton(int32_t left, int32_t top, uint32_t b0,
     if (!btn)
         return (AM2_Widget *)0;
     RectSet(&box, left, top, 0x51, 0x20);
-    return ButtonConstruct(btn, (const char *)AM2_IMAGE(b0),
-                            (const char *)AM2_IMAGE(b1),
-                            (const char *)AM2_IMAGE(b2), 1, box, handler, 0);
+    return ButtonConstruct(btn, (const char *)((void *)(uintptr_t)(b0)),
+                            (const char *)((void *)(uintptr_t)(b1)),
+                            (const char *)((void *)(uintptr_t)(b2)), 1, box, handler, 0);
 }
 
 
@@ -7113,13 +7113,13 @@ static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
     AM2_Rect    box;
 
     ScreenBaseConstruct(w, bmp, 1);
-    w->vtable = (void *)AM2_IMAGE(vtable);
+    w->vtable = (void *)((void *)(uintptr_t)(vtable));
     SetGameDir("alpine");
 
     panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
     if (panel) {
         RectSet(&box, 0x6C, 0x98, 0x1A7, 0xB0);
-        panel = PanelConstruct(panel, (const char *)AM2_IMAGE(panelBmp), 0,
+        panel = PanelConstruct(panel, (const char *)((void *)(uintptr_t)(panelBmp)), 0,
                                 box);
     }
     WidgetAddChild(w, panel);
@@ -7141,15 +7141,15 @@ static AM2_Widget *ConfirmDialogBuild(AM2_Widget *w, const char *bmp,
         RectSet(&box, 0x28, 0x41, 0xF0, 0x34);
         text = TyperConstruct(text, box.left, box.top, box.right,
                               box.bottom,
-                              (const char *)AM2_IMAGE(message));
+                              (const char *)((void *)(uintptr_t)(message)));
     }
     WidgetAddChild(panel, text);
 
     dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
     if (dot) {
         RectSet(&box, 0x23, 0x95, 0x11, 0x10);
-        dot = MultiSpriteConstruct(dot, (const char *)AM2_IMAGE(AM2_BMP_RED0),
-                                    (const char *)AM2_IMAGE(AM2_BMP_RED1), 1,
+        dot = MultiSpriteConstruct(dot, (const char *)((void *)(uintptr_t)(AM2_BMP_RED0)),
+                                    (const char *)((void *)(uintptr_t)(AM2_BMP_RED1)), 1,
                                     box);
     }
     WidgetAddChild(panel, dot);
@@ -7204,7 +7204,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::WarMenuConstruct(const char *
     AM2_Rect    box;
 
     ::ScreenBaseConstruct(w, bmp, 1);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_WAR_MENU);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_WAR_MENU));
 
     /* Every dialog constructor in this family opens with this, and
      * ADDR_DIR_SCRATCH is uninitialised at load -- so unless something has
@@ -7223,9 +7223,9 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::WarMenuConstruct(const char *
     host = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
     if (host) {
         RectSet(&box, 0xF4, 0xD2, 0x98, 0x19);
-        host = ::ButtonConstruct(host, (const char *)AM2_IMAGE(AM2_BMP_HOST0),
-                               (const char *)AM2_IMAGE(AM2_BMP_HOST1),
-                               (const char *)AM2_IMAGE(AM2_BMP_HOST2), 1, box,
+        host = ::ButtonConstruct(host, (const char *)((void *)(uintptr_t)(AM2_BMP_HOST0)),
+                               (const char *)((void *)(uintptr_t)(AM2_BMP_HOST1)),
+                               (const char *)((void *)(uintptr_t)(AM2_BMP_HOST2)), 1, box,
                                OnStartWar, 0);
     }
     ::WidgetAddChild(w, host);
@@ -7235,9 +7235,9 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::WarMenuConstruct(const char *
     join = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
     if (join) {
         RectSet(&box, 0xF4, 0xFA, 0x98, 0x19);
-        join = ::ButtonConstruct(join, (const char *)AM2_IMAGE(AM2_BMP_JOIN0),
-                               (const char *)AM2_IMAGE(AM2_BMP_JOIN1),
-                               (const char *)AM2_IMAGE(AM2_BMP_JOIN2), 1, box,
+        join = ::ButtonConstruct(join, (const char *)((void *)(uintptr_t)(AM2_BMP_JOIN0)),
+                               (const char *)((void *)(uintptr_t)(AM2_BMP_JOIN1)),
+                               (const char *)((void *)(uintptr_t)(AM2_BMP_JOIN2)), 1, box,
                                kOnStartMultiplayer, 0);
     }
     ::WidgetAddChild(w, join);
@@ -7246,9 +7246,9 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::WarMenuConstruct(const char *
     if (cancel) {
         RectSet(&box, 0xF4, 0x122, 0x98, 0x19);
         cancel = ::ButtonConstruct(cancel,
-                                 (const char *)AM2_IMAGE(AM2_BMP_CANCEL0),
-                                 (const char *)AM2_IMAGE(AM2_BMP_CANCEL1),
-                                 (const char *)AM2_IMAGE(AM2_BMP_CANCEL2), 1,
+                                 (const char *)((void *)(uintptr_t)(AM2_BMP_CANCEL0)),
+                                 (const char *)((void *)(uintptr_t)(AM2_BMP_CANCEL1)),
+                                 (const char *)((void *)(uintptr_t)(AM2_BMP_CANCEL2)), 1,
                                  box, OnMenuBack, 0);
     }
     ::WidgetAddChild(w, cancel);
@@ -7334,7 +7334,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DifficultyDialogConstruct(con
     AM2_Rect    box;
 
     ::ScreenBaseConstruct(w, bmp, 1);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_DIFFICULTY_DIALOG);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_DIFFICULTY_DIALOG));
 
     panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
     if (panel) {
@@ -7373,8 +7373,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DifficultyDialogConstruct(con
     dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
     if (dot) {
         RectSet(&box, 0x23, 0x95, 0x11, 0x10);
-        dot = ::MultiSpriteConstruct(dot, (const char *)AM2_IMAGE(AM2_BMP_RED0),
-                                    (const char *)AM2_IMAGE(AM2_BMP_RED1), 1,
+        dot = ::MultiSpriteConstruct(dot, (const char *)((void *)(uintptr_t)(AM2_BMP_RED0)),
+                                    (const char *)((void *)(uintptr_t)(AM2_BMP_RED1)), 1,
                                     box);
     }
     ::WidgetAddChild(panel, dot);
@@ -7418,19 +7418,19 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ControlsDialogConstruct(const
 {
     AM2_Widget *w = this;
 
-    const uint8_t *binding = (const uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS);
-    const int16_t *place   = (const int16_t *)AM2_IMAGE(ADDR_KEYROW_POSITIONS);
-    const uint8_t *names   = (const uint8_t *)AM2_IMAGE(ADDR_KEY_NAME_TABLE);
+    const uint8_t *binding = (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS));
+    const int16_t *place   = (const int16_t *)((void *)(uintptr_t)(ADDR_KEYROW_POSITIONS));
+    const uint8_t *names   = (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_NAME_TABLE));
     AM2_Widget   **rows;
     AM2_Widget    *first;
     AM2_Widget    *ok;
     AM2_Rect       box;
 
     ::ScreenBaseConstruct(w, bmp, 1);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_CONTROLS_DIALOG);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_CONTROLS_DIALOG));
     rows = (AM2_Widget **)((uint8_t *)w + KEYROW_PARENT_ROWS);
 
-    while (binding < (const uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS)
+    while (binding < (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS))
                      + KEYROW_ROW_COUNT * 2) {
         int32_t     index = KeyNameIndexOf(*binding);
         AM2_Widget *row   = (AM2_Widget *)orig_operator_new(AM2_KEYROW_SIZE);
@@ -7508,11 +7508,11 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpOptionsConstruct(const char
     AM2_Rect       box;
 
     ::ScreenBaseConstruct(w, bmp, 1);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_OPTIONS_MENU_MP);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_OPTIONS_MENU_MP));
     SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
 
-    for (rec = (const uint8_t *)AM2_IMAGE(ADDR_OPTION_TABLE);
-         rec < (const uint8_t *)AM2_IMAGE(ADDR_OPTION_TABLE_END);
+    for (rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_OPTION_TABLE));
+         rec < (const uint8_t *)((void *)(uintptr_t)(ADDR_OPTION_TABLE_END));
          rec += AM2_OPTION_STRIDE) {
         AM2_Widget *cb = (AM2_Widget *)orig_operator_new(AM2_CHECKBOX_SIZE);
         uint32_t    bit = (uint32_t)OPT_REC(rec, AM2_OPTION_OFF_BIT);
@@ -7521,10 +7521,10 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpOptionsConstruct(const char
         if (cb) {
             RectSet(&box, OPT_REC(rec, 0x04), OPT_REC(rec, 0x08), 0xC8, 0x0D);
             cb = ::CheckBoxConstruct(cb,
-                                   (const char *)AM2_IMAGE(AM2_BMP_CHECK0),
-                                   (const char *)AM2_IMAGE(AM2_BMP_CHECK1),
-                                   (const char *)AM2_IMAGE(AM2_BMP_CHECK2),
-                                   (const char *)AM2_IMAGE(AM2_BMP_CHECK3),
+                                   (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK0)),
+                                   (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK1)),
+                                   (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK2)),
+                                   (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK3)),
                                    box.left, box.top, box.right, box.bottom,
                                    record,
                                    *(const char *const *)(rec + 0x20),
@@ -7545,8 +7545,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpOptionsConstruct(const char
     }
 
     if (host) {
-        for (rec = (const uint8_t *)AM2_IMAGE(ADDR_OPTION_TABLE);
-             rec < (const uint8_t *)AM2_IMAGE(ADDR_OPTION_TABLE_END);
+        for (rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_OPTION_TABLE));
+             rec < (const uint8_t *)((void *)(uintptr_t)(ADDR_OPTION_TABLE_END));
              rec += AM2_OPTION_STRIDE) {
             AM2_Widget *head;
             int32_t     i;
@@ -7667,7 +7667,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::AudioDialogConstruct(const ch
     AM2_Rect     box;
 
     ::ScreenBaseConstruct(w, bmp, flag);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_AUDIO_DIALOG);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_AUDIO_DIALOG));
 
     if (g_gameState == AM2_STATE_MISSION) {
         w->flag44 = 1;
@@ -7724,9 +7724,9 @@ static AM2_Widget *MakeWideButton(int32_t left, int32_t top, uint32_t b0,
     if (!btn)
         return (AM2_Widget *)0;
     RectSet(&box, left, top, 0x4E, 0x20);
-    return ButtonConstruct(btn, (const char *)AM2_IMAGE(b0),
-                            (const char *)AM2_IMAGE(b1),
-                            (const char *)AM2_IMAGE(b2), 1, box, handler, 0);
+    return ButtonConstruct(btn, (const char *)((void *)(uintptr_t)(b0)),
+                            (const char *)((void *)(uintptr_t)(b1)),
+                            (const char *)((void *)(uintptr_t)(b2)), 1, box, handler, 0);
 }
 
 /* 0x0042FB00, thiscall. ENTER BATTLE NAME -- two edit boxes, a green dot
@@ -7781,8 +7781,8 @@ static AM2_Widget *MakeNameField(AM2_Widget *panel, char *buf, int32_t top,
     if (dot) {
         RectSet(&box, 0xB3, dotTop, 0x11, 0x10);
         dot = MultiSpriteConstruct(dot,
-                                    (const char *)AM2_IMAGE(AM2_BMP_GREEN0),
-                                    (const char *)AM2_IMAGE(AM2_BMP_GREEN1),
+                                    (const char *)((void *)(uintptr_t)(AM2_BMP_GREEN0)),
+                                    (const char *)((void *)(uintptr_t)(AM2_BMP_GREEN1)),
                                     1, box);
     }
     WidgetAddChild(panel, dot);
@@ -7798,7 +7798,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::BattleNameConstruct(const cha
     AM2_Rect    box;
 
     ::ScreenBaseConstruct(w, bmp, 1);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_BATTLE_NAME_DLG);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_BATTLE_NAME_DLG));
 
     strcpy((char *)w + 0x64,
                (const char *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)));
@@ -7859,7 +7859,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::CommPanelConstruct(const char
     AM2_Rect    box;
 
     ::ScreenBaseConstruct(w, bmp, 1);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_COMM_PANEL);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_COMM_PANEL));
     SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
 
     rows = orig_operator_new(AM2_ROWS_SIZE);
@@ -7885,7 +7885,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::CommPanelConstruct(const char
                                 box.bottom,
                                 *(void **)((uint8_t *)w
                                            + COMMPANEL_OFF_ROWS),
-                                (int32_t)AM2_IMAGE(ADDR_LOG), 0, 1);
+                                (int32_t)((void *)(uintptr_t)(ADDR_LOG)), 0, 1);
     }
     *(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST) = list;
     ::WidgetAddChild(panel, list);
@@ -7900,8 +7900,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::CommPanelConstruct(const char
         RectSet(&box, 0x15E, 0x3C, 0x13, 0xBA);
         bar = ::ArrowBarConstruct(bar, box.left, box.top, box.right,
                                 box.bottom, panel,
-                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
-                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
+                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                 0x92, 0);
     }
     ::WidgetAddChild(panel, bar);
@@ -7940,10 +7940,10 @@ typedef void (__cdecl *AM2_ReadCampaignFn)(void);
 
 /* The game's own sprintf -- the CRT inside the image, as crt.h explains. */
 typedef int32_t (__cdecl *AM2_SprintfFn)(char *, const char *, ...);
-#define orig_sprintf    ((AM2_SprintfFn)AM2_IMAGE(ADDR_GAME_SPRINTF))
-#define orig_findfirst  ((AM2_FindFirstFn)AM2_IMAGE(ADDR_CRT_FINDFIRST))
-#define orig_findnext   ((AM2_FindNextFn)AM2_IMAGE(ADDR_CRT_FINDNEXT))
-#define orig_findclose  ((AM2_FindCloseFn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
+#define orig_sprintf    ((AM2_SprintfFn)((void *)(uintptr_t)(ADDR_GAME_SPRINTF)))
+#define orig_findfirst  ((AM2_FindFirstFn)((void *)(uintptr_t)(ADDR_CRT_FINDFIRST)))
+#define orig_findnext   ((AM2_FindNextFn)((void *)(uintptr_t)(ADDR_CRT_FINDNEXT)))
+#define orig_findclose  ((AM2_FindCloseFn)((void *)(uintptr_t)(ADDR_CRT_FINDCLOSE)))
 #define g_currentPlayer ((char *)(uintptr_t)ADDR_GAMEPROC_BLOCK)
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectPlayerConstruct(const char *bmp)
@@ -7960,7 +7960,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectPlayerConstruct(const c
     int32_t     handle;
 
     ::ScreenBaseConstruct(w, bmp, 1);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_SELECT_PLAYER);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_SELECT_PLAYER));
     ReadCampaignLevels();
     SetGameDir("save");
     g_currentPlayer[0] = '\0';
@@ -8020,8 +8020,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectPlayerConstruct(const c
         RectSet(&box, 0xD5, 0x3C, 0x13, 0xBA);
         bar = ::ArrowBarConstruct(bar, box.left, box.top, box.right,
                                 box.bottom, panel,
-                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
-                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
+                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                 0x92, 0);
     }
     ::WidgetAddChild(panel, bar);
@@ -8066,7 +8066,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::PanelConstruct(const char *bm
     AM2_Sprite *spr;
 
     ::WidgetConstruct(w);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_PANEL);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_PANEL));
     spr = PreloadSpriteName(bmp, flag, 1);
     *(AM2_Sprite **)((uint8_t *)w + PANEL_OFF_SPRITE) = spr;
     w->sprite = spr;
@@ -8108,7 +8108,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::KeyRowConstruct(int32_t nameI
     ::LabelConstruct(w, caption, left, top, width, height, font, stale, ink3);
 
     self[FOCUSLABEL_OFF_INK]  = (uint8_t)ink;
-    w->vtable = (void *)AM2_IMAGE(VTABLE_KEYROW);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_KEYROW));
     *(int32_t *)(self + KEYROW_OFF_KEY) = nameIndex;
     self[FOCUSLABEL_OFF_INK_FOCUS] = (uint8_t)ink2;
     self[FOCUSLABEL_OFF_PAPER] = (uint8_t)ink3;
@@ -8133,7 +8133,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ScreenBaseConstruct(const cha
     RectSet(&box, 0, 0, *(const int32_t *)(uintptr_t)ADDR_SCREEN_W,
             *(const int32_t *)(uintptr_t)ADDR_SCREEN_H);
     ::PanelConstruct(w, bmp, flag, box);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_DIALOG);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_DIALOG));
     w->flag44 = 1;
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = 0;
     return w;
@@ -8162,7 +8162,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ButtonConstruct(const char *b
     uint8_t *self = (uint8_t *)w;
 
     ::ButtonBaseConstruct(w);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_BUTTON);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_BUTTON));
 
     if (b0) {
         *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL) =
@@ -8217,7 +8217,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::EditConstruct(char *buf, int3
     self[EDIT_OFF_PAPER]     = (uint8_t)paper;
     *(int32_t *)(self + EDIT_OFF_ARG78) = a;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_EDIT);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_EDIT));
     *(void **)(self + EDIT_OFF_ON_ENTER) = (void *)onEnter;
     *(int32_t *)(self + EDIT_OFF_ARG7C)  = b;
     *(int32_t *)(self + EDIT_OFF_CARET)  = 0;
@@ -8263,7 +8263,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MultiSpriteConstruct(const ch
 
     *(AM2_Sprite **)(self + MULTISPR_OFF_SPRITES + 4) = (AM2_Sprite *)0;
     *(int32_t *)(self + MULTISPR_OFF_INDEX) = 0;
-    w->vtable = (void *)AM2_IMAGE(VTABLE_MULTISPRITE);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_MULTISPRITE));
     *(AM2_Sprite **)(self + MULTISPR_OFF_SPRITE0) = w->sprite;
     *(AM2_Sprite **)(self + MULTISPR_OFF_SPRITES) =
         PreloadSpriteName(b1, flag, 1);
@@ -8306,7 +8306,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ListBoxConstruct(int32_t left
     w->y = top;
     w->w = right;
     w->h = bottom;
-    w->vtable = (void *)AM2_IMAGE(VTABLE_LISTBOX);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_LISTBOX));
 
     *(void **)(self + LIST_OFF_ROWS)       = rows;
     *(int32_t *)(self + LIST_OFF_OWNS_ROWS) = ownsRows;
@@ -8356,7 +8356,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::CheckBoxConstruct(const char 
     uint8_t *self = (uint8_t *)w;
 
     ::ButtonBaseConstruct(w);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_CHECKBOX);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_CHECKBOX));
 
     *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF)  =
         PreloadSpriteName(b0, 1, 1);
@@ -8417,11 +8417,11 @@ static AM2_Widget *MakeArrow(AM2_Widget *bar, int32_t x, int32_t y,
     if (!arrow)
         return (AM2_Widget *)0;
     RectSet(&box, x, y, 9, 0x13);
-    ButtonConstruct(arrow, (const char *)0, (const char *)AM2_IMAGE(b1),
-                    (const char *)AM2_IMAGE(b2), 1, box,
-                    (void (__cdecl *)(AM2_Widget *))AM2_IMAGE(handler),
+    ButtonConstruct(arrow, (const char *)0, (const char *)((void *)(uintptr_t)(b1)),
+                    (const char *)((void *)(uintptr_t)(b2)), 1, box,
+                    (void (__cdecl *)(AM2_Widget *))((void *)(uintptr_t)(handler)),
                     (void (__cdecl *)(AM2_Widget *))0);
-    arrow->vtable = (void *)AM2_IMAGE(VTABLE_ARROW);
+    arrow->vtable = (void *)((void *)(uintptr_t)(VTABLE_ARROW));
     *(AM2_Widget **)((uint8_t *)arrow + ARROW_OFF_OWNER) = bar;
     return arrow;
 }
@@ -8438,7 +8438,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ScrollBarConstruct(int32_t le
     w->y = top;
     w->w = width;
     w->h = height;
-    w->vtable = (void *)AM2_IMAGE(VTABLE_SCROLLBAR);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_SCROLLBAR));
 
     arrow = MakeArrow(w, w->x, w->y, AM2_BMP_LTARROW1, AM2_BMP_LTARROW2,
                       kOnArrowLeft);
@@ -8455,7 +8455,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ScrollBarConstruct(int32_t le
                  + ARROW_OFF_FLAG5C) = 1;
 
     *(AM2_Sprite **)(self + SCROLLBAR_OFF_BAR) =
-        PreloadSpriteName((const char *)AM2_IMAGE(AM2_BMP_HSCROLLBAR),
+        PreloadSpriteName((const char *)((void *)(uintptr_t)(AM2_BMP_HSCROLLBAR)),
                              1, 1);
     ::WidgetScreenRect(w);
 
@@ -8493,11 +8493,11 @@ static AM2_Widget *MakeVArrow(AM2_Widget *bar, AM2_Widget *parent,
 
     if (arrow) {
         RectSet(&box, x, y, 0x13, 9);
-        ButtonConstruct(arrow, (const char *)0, (const char *)AM2_IMAGE(b1),
-                        (const char *)AM2_IMAGE(b2), 1, box,
-                        (void (__cdecl *)(AM2_Widget *))AM2_IMAGE(handler),
+        ButtonConstruct(arrow, (const char *)0, (const char *)((void *)(uintptr_t)(b1)),
+                        (const char *)((void *)(uintptr_t)(b2)), 1, box,
+                        (void (__cdecl *)(AM2_Widget *))((void *)(uintptr_t)(handler)),
                         (void (__cdecl *)(AM2_Widget *))0);
-        arrow->vtable = (void *)AM2_IMAGE(VTABLE_ARROW);
+        arrow->vtable = (void *)((void *)(uintptr_t)(VTABLE_ARROW));
         *(AM2_Widget **)((uint8_t *)arrow + ARROW_OFF_OWNER) = bar;
     }
     WidgetAddChild(parent, arrow);
@@ -8517,7 +8517,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ArrowBarConstruct(int32_t lef
     w->y = top;
     w->w = width;
     w->h = height;
-    w->vtable = (void *)AM2_IMAGE(VTABLE_ARROWBAR);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_ARROWBAR));
 
     *(AM2_Widget **)(self + ARROWBAR_OFF_UP) =
         MakeVArrow(w, parent, w->x, w->y, AM2_BMP_UPARROW1, AM2_BMP_UPARROW2,
@@ -8569,8 +8569,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ArrowBarConstruct(int32_t lef
  * the `ret`, so eax is the answer. Fixed in font.cpp with this. */
 typedef char *(__cdecl *AM2_StrchrFn)(const char *s, int32_t c);
 typedef char *(__cdecl *AM2_StrncpyFn)(char *d, const char *s, uint32_t n);
-#define orig_strchr  ((AM2_StrchrFn)AM2_IMAGE(ADDR_CRT_STRCHR))
-#define orig_strncpy ((AM2_StrncpyFn)AM2_IMAGE(ADDR_CRT_STRNCPY))
+#define orig_strchr  ((AM2_StrchrFn)((void *)(uintptr_t)(ADDR_CRT_STRCHR)))
+#define orig_strncpy ((AM2_StrncpyFn)((void *)(uintptr_t)(ADDR_CRT_STRNCPY)))
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::TyperConstruct(int32_t left, int32_t top, int32_t width, int32_t height, const char *message)
 {
@@ -8582,7 +8582,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::TyperConstruct(int32_t left, 
     int32_t  cur   = 0;
 
     ::WidgetConstruct(w);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_TYPER);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_TYPER));
     w->x = left;
     w->y = top;
     w->w = width;
@@ -8713,9 +8713,9 @@ void __cdecl OpenTitleScreen(void)
 
             RectSet(&box, AM2_TITLE_BUTTON_LEFT, b->top,
                     AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT);
-            btn = ButtonConstruct(btn, (const char *)AM2_IMAGE(b->bmp[0]),
-                                  (const char *)AM2_IMAGE(b->bmp[1]),
-                                  (const char *)AM2_IMAGE(b->bmp[2]), 0, box,
+            btn = ButtonConstruct(btn, (const char *)((void *)(uintptr_t)(b->bmp[0])),
+                                  (const char *)((void *)(uintptr_t)(b->bmp[1])),
+                                  (const char *)((void *)(uintptr_t)(b->bmp[2])), 0, box,
                                   b->handler,
                                   (void (__cdecl *)(AM2_Widget *))0);
         }
@@ -8949,10 +8949,10 @@ void __cdecl OnDifficultyOk(AM2_Widget *w)
  * with stride 4. */
 void __cdecl OnControlsOk(AM2_Widget *w)
 {
-    uint8_t *binding = (uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS);
+    uint8_t *binding = (uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS));
     AM2_Widget *const *rows =
         (AM2_Widget *const *)((const uint8_t *)w->parent + KEYROW_PARENT_ROWS);
-    const AM2_KeyName *keys = (const AM2_KeyName *)AM2_IMAGE(ADDR_KEY_NAME_TABLE);
+    const AM2_KeyName *keys = (const AM2_KeyName *)((void *)(uintptr_t)(ADDR_KEY_NAME_TABLE));
     int32_t i;
 
     for (i = 0; i < KEYROW_ROW_COUNT; i++) {
@@ -8973,10 +8973,10 @@ void __cdecl OnControlsOk(AM2_Widget *w)
  * untouched until OK is pressed. */
 void __cdecl OnControlsDefault(AM2_Widget *w)
 {
-    const uint8_t *defaults = (const uint8_t *)AM2_IMAGE(ADDR_KEY_DEFAULTS);
+    const uint8_t *defaults = (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_DEFAULTS));
     AM2_Widget *const *rows =
         (AM2_Widget *const *)((const uint8_t *)w->parent + KEYROW_PARENT_ROWS);
-    const AM2_KeyName *keys = (const AM2_KeyName *)AM2_IMAGE(ADDR_KEY_NAME_TABLE);
+    const AM2_KeyName *keys = (const AM2_KeyName *)((void *)(uintptr_t)(ADDR_KEY_NAME_TABLE));
     int32_t i;
 
     for (i = 0; i < KEYROW_ROW_COUNT; i++) {
@@ -9305,8 +9305,8 @@ void __cdecl OnDelPlayerCancel(AM2_Widget *w)
 }
 
 typedef int32_t (__cdecl *AM2_RemoveFn)(const char *);
-#define orig_remove ((AM2_RemoveFn)AM2_IMAGE(ADDR_CRT_REMOVE))
-#define orig_rmdir  ((AM2_RemoveFn)AM2_IMAGE(ADDR_CRT_RMDIR))
+#define orig_remove ((AM2_RemoveFn)((void *)(uintptr_t)(ADDR_CRT_REMOVE)))
+#define orig_rmdir  ((AM2_RemoveFn)((void *)(uintptr_t)(ADDR_CRT_RMDIR)))
 
 /* OnDelPlayerOk -- original 0x00450A60, 272 bytes, one exit.
  *
@@ -9560,7 +9560,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ButtonBaseConstruct()
     uint8_t *self = (uint8_t *)w;
 
     ::WidgetConstruct(w);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_BUTTON_BASE);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_BUTTON_BASE));
     *(int32_t *)(self + BUTTON_BASE_OFF_A) = 0;
     *(int32_t *)(self + BUTTON_BASE_OFF_B) = 0;
     *(int32_t *)(self + BUTTON_BASE_OFF_C) = 0;
@@ -9615,7 +9615,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectMapConstruct(const char
     int32_t     i;
 
     ::ScreenBaseConstruct(w, bmp, 1);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_SELECT_MAP);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_SELECT_MAP));
     ReadCampaignLevels();
 
     rows = orig_operator_new(AM2_ROWS_SIZE);
@@ -9662,8 +9662,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectMapConstruct(const char
         RectSet(&box, 0xD5, 0x3C, 0x13, 0xBA);
         bar = ::ArrowBarConstruct(bar, box.left, box.top, box.right,
                                 box.bottom, panel,
-                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
-                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
+                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                 0x92, 1);
     }
     ::WidgetAddChild(panel, bar);
@@ -9700,7 +9700,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::EnterNameConstruct(const char
     char       *text = (char *)w + ENTER_NAME_OFF_TEXT;
 
     ::ScreenBaseConstruct(w, bmp, 1);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_ENTER_NAME);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_ENTER_NAME));
     SetGameDir("save");
     text[0] = '\0';
 
@@ -9735,8 +9735,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::EnterNameConstruct(const char
     dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
     if (dot) {
         RectSet(&box, 0x23, 0x68, 0x11, 0x10);
-        dot = ::MultiSpriteConstruct(dot, (const char *)AM2_IMAGE(AM2_BMP_GREEN0),
-                                    (const char *)AM2_IMAGE(AM2_BMP_GREEN1), 1,
+        dot = ::MultiSpriteConstruct(dot, (const char *)((void *)(uintptr_t)(AM2_BMP_GREEN0)),
+                                    (const char *)((void *)(uintptr_t)(AM2_BMP_GREEN1)), 1,
                                     box);
     }
     ::WidgetAddChild(panel, dot);
@@ -9774,7 +9774,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DeleteGameConstruct(const cha
     int32_t     dy = 0x98;
 
     ::ScreenBaseConstruct(w, bmp, flag);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_DELETE_GAME);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_DELETE_GAME));
 
     if (g_gameState == 2) {
         w->flag44 = 1;
@@ -9813,8 +9813,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DeleteGameConstruct(const cha
     dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
     if (dot) {
         RectSet(&box, dx + 0x23, dy + 0x95, 0x11, 0x10);
-        dot = ::MultiSpriteConstruct(dot, (const char *)AM2_IMAGE(AM2_BMP_RED0),
-                                    (const char *)AM2_IMAGE(AM2_BMP_RED1), 1,
+        dot = ::MultiSpriteConstruct(dot, (const char *)((void *)(uintptr_t)(AM2_BMP_RED0)),
+                                    (const char *)((void *)(uintptr_t)(AM2_BMP_RED1)), 1,
                                     box);
     }
     ::WidgetAddChild(parent, dot);
@@ -9887,7 +9887,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MoviesConstruct(const char *b
     int32_t      at = 0;
 
     ::ScreenBaseConstruct(w, bmp, 1);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_MOVIES);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_MOVIES));
     SetGameDir("alpine");
 
     panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
@@ -9967,7 +9967,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::LoadGameConstruct(const char 
     int32_t     dy = 0x62;
 
     ::ScreenBaseConstruct(w, bmp, flag);
-    w->vtable = (void *)AM2_IMAGE(VTABLE_LOAD_GAME);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_LOAD_GAME));
     *((char *)w + LOAD_GAME_OFF_NAME) = '\0';
 
     rows = orig_operator_new(AM2_ROWS_SIZE);
@@ -10037,8 +10037,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::LoadGameConstruct(const char 
         RectSet(&box, dx + 0xD5, dy + 0x3C, 0x13, 0xBA);
         bar = ::ArrowBarConstruct(bar, box.left, box.top, box.right,
                                 box.bottom, parent,
-                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
-                                (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
+                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                 0x90, 0);
     }
     ::WidgetAddChild(parent, bar);
@@ -10302,7 +10302,7 @@ void __cdecl OnMovieNextPage(AM2_Widget *w)
 void __cdecl OnMoviePlay(AM2_Widget *w)
 {
     const char *const *names = (const char *const *)
-        AM2_IMAGE(ADDR_MOVIE_NAMES);
+        ((void *)(uintptr_t)(ADDR_MOVIE_NAMES));
     int32_t idx;
 
     PlaySoundAt(2, 0, 0, 0, 0);
@@ -10378,7 +10378,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpNameConstruct(const char *t
     w->y = top;
     w->w = width;
     w->h = height;
-    w->vtable = (void *)AM2_IMAGE(VTABLE_MP_NAME);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_MP_NAME));
     ::WidgetScreenRect(w);
     *(uint32_t *)(self + BUTTON_OFF_ON_LEFT) = (uint32_t)(uintptr_t)OnMpName;
     *(int32_t *)(self + MPBTN_OFF_ROW) = row;
@@ -10401,7 +10401,7 @@ static AM2_Widget *MpSmallConstruct(AM2_Widget *w, int32_t left, int32_t top,
     AM2_Rect box;
 
     ButtonBaseConstruct(w);
-    w->vtable = (void *)AM2_IMAGE(vtable);
+    w->vtable = (void *)((void *)(uintptr_t)(vtable));
     RectSet(&box, left, top, AM2_MP_SMALL_W, AM2_MP_SMALL_H);
     w->x = box.left;
     w->y = box.top;
@@ -10621,7 +10621,7 @@ void __cdecl OnMpName(AM2_Widget *w)
 /* The game's own stdio, for the same reason crt.h gives for its allocator: a
  * FILE opened by the game's CRT cannot be read or closed by ours. */
 typedef char *(__cdecl *AM2_FgetsFn)(char *buf, int32_t n, am2_FILE *fp);
-#define orig_fgets_line (*(AM2_FgetsFn)AM2_IMAGE(ADDR_CRT_FGETS))
+#define orig_fgets_line (*(AM2_FgetsFn)((void *)(uintptr_t)(ADDR_CRT_FGETS)))
 
 /* 0x00430480 -- the multiplayer panel's destructor, slot 0.
  *
@@ -10639,7 +10639,7 @@ void __attribute__((thiscall)) AM2_Widget::MpPanelDestruct()
 
     AM2_Sprite **p;
 
-    w->vtable = (void *)AM2_IMAGE(VTABLE_MP_PANEL);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_MP_PANEL));
 
     for (p = (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_A;
          p < (AM2_Sprite **)(uintptr_t)ADDR_MENU_MSG_LIST; p++)
@@ -10956,7 +10956,7 @@ static void MpComplain(uint8_t *panel, uint32_t fmt)
         return;
 
     ShowBadMapPreview(*(AM2_Widget **)(panel + MP_PANEL_OFF_PREVIEW));
-    am2_sprintf(line, (const char *)AM2_IMAGE(fmt),
+    am2_sprintf(line, (const char *)((void *)(uintptr_t)(fmt)),
                 (const char *)(g_commObject + COMM_OFF_PLAYERS
                     + (size_t)*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
                       * AM2_COMM_SLOT_STRIDE + COMM_SLOT_OFF_NAME));
@@ -11131,7 +11131,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
 }
 
 typedef char *(__cdecl *AM2_StrstrFn)(const char *, const char *);
-#define orig_strstr ((AM2_StrstrFn)AM2_IMAGE(ADDR_CRT_STRSTR))
+#define orig_strstr ((AM2_StrstrFn)((void *)(uintptr_t)(ADDR_CRT_STRSTR)))
 
 /* The save dialogs' shared shape, which is worth stating once for the four
  * handlers below: THE LIST HANDLERS ONLY PREPARE AND THE OK HANDLERS DO THE
@@ -13799,7 +13799,7 @@ void __cdecl PointerActionFollow(void *obj, uint32_t at)
  */
 void __cdecl SetPointerMode(int32_t mode)
 {
-    const uint8_t *rec = (const uint8_t *)AM2_IMAGE(ADDR_POINTER_MODES)
+    const uint8_t *rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_POINTER_MODES))
                          + (size_t)mode * AM2_POINTER_MODE_SIZE;
     AM2_PointerPickFn   pick;
     AM2_PointerActionFn act;
@@ -13989,7 +13989,7 @@ void __cdecl PlacementScreenClick(uint32_t at)
         return;
     }
 
-    type = *(const int32_t *)((const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU)
+    type = *(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU))
                               + (uintptr_t)AM2_BUILD_MENU_STRIDE
                                     * (uintptr_t)*(const int32_t *)(uintptr_t)
                                           ADDR_HUD_INDEX
@@ -14988,7 +14988,7 @@ void __cdecl BuildOnToggle(AM2_Widget *w)
 
     if (*(const int32_t *)(uintptr_t)ADDR_OUR_POINTS
             >= (int32_t)UnitTypeCost(
-                   *(const int32_t *)((const uint8_t *)AM2_IMAGE(ADDR_BUILD_MENU)
+                   *(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU))
                                       + row * AM2_BUILD_MENU_STRIDE
                                       + BUILD_MENU_OFF_ID))) {
         *(int32_t *)(uintptr_t)ADDR_HUD_DIRTY         = 1;
@@ -15891,7 +15891,7 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot);
 /* strncmp, case-SENSITIVE: the original at 0x00465160 folds no case, and the
  * standalone had mapped this seam to _strnicmp for as long as it existed. */
 typedef int32_t (__cdecl *AM2_StrncmpFn)(const char *, const char *, size_t);
-#define orig_strncmp ((AM2_StrncmpFn)AM2_IMAGE(ADDR_CRT_STRNCMP))
+#define orig_strncmp ((AM2_StrncmpFn)((void *)(uintptr_t)(ADDR_CRT_STRNCMP)))
 
 /* The squad detail panel is a 2-column, 5-row grid, and all 28 of the
  * function's text placements sit on it. Extracted from the image by walking
@@ -16310,7 +16310,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
     /* Pass one: the mouse, but only while the panel is open. */
     if (*(const int32_t *)(panel + HUDPANEL_OFF_OPEN)) {
         const int16_t *grid =
-            (const int16_t *)AM2_IMAGE(ADDR_HUD_SQUAD_SLOT_XY);
+            (const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SQUAD_SLOT_XY));
 
         for (i = 0; i < AM2_HUD_SQUAD_SLOTS; i++) {
             uint8_t          *rec = self + HUD_SQUAD_RECS
@@ -16657,7 +16657,7 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
     /* Pass two: the mouse, but only while the panel is open. */
     if (*(const int32_t *)(panel + HUDPANEL_OFF_OPEN)) {
         const int16_t *grid =
-            (const int16_t *)AM2_IMAGE(ADDR_HUD_SQUAD_SLOT_XY);
+            (const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SQUAD_SLOT_XY));
 
         for (i = 0; i < AM2_HUD_CMD_SLOTS; i++) {
             int32_t           idx = slots[i];
@@ -16670,7 +16670,7 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
             if (idx < 0)
                 continue;
 
-            spec = (const uint8_t *)AM2_IMAGE(ADDR_HUD_CMD_SPEC)
+            spec = (const uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPEC))
                    + (uint32_t)idx * AM2_HUD_CMD_SPR_STRIDE;
             spr  = *(const AM2_Sprite *const *)(spec + HUDCMDSPR_OFF_SPRITE);
 
@@ -16703,7 +16703,7 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
              * original does and costs nothing to keep. */
             {
                 void (__cdecl *fn)(void) = *(void (__cdecl *const *)(void))(
-                    (const uint8_t *)AM2_IMAGE(ADDR_HUD_CMD_SPEC)
+                    (const uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPEC))
                     + (uint32_t)slots[i] * AM2_HUD_CMD_SPR_STRIDE
                     + HUDCMDSPR_OFF_HANDLER);
 
@@ -17066,7 +17066,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpSpinConstruct(int32_t left,
     w->y = top;
     w->w = width;
     w->h = height;
-    w->vtable = (void *)AM2_IMAGE(VTABLE_MP_SPIN);
+    w->vtable = (void *)((void *)(uintptr_t)(VTABLE_MP_SPIN));
     ::WidgetScreenRect(w);
 
     *(int32_t *)(self + SPIN_OFF_MIN)   = lo;
@@ -17083,7 +17083,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpSpinConstruct(int32_t left,
                               "03_008_02_uparrow.bmp", 1, box,
                               SpinUp,
                               (void (__cdecl *)(AM2_Widget *))0);
-        kid->vtable = (void *)AM2_IMAGE(VTABLE_ARROW);
+        kid->vtable = (void *)((void *)(uintptr_t)(VTABLE_ARROW));
         *(void **)((uint8_t *)kid + ARROW_OFF_OWNER) = w;
     }
     /* THE SPIN KEEPS ITS THREE CHILDREN, and this whole layer was missing.
@@ -17130,7 +17130,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpSpinConstruct(int32_t left,
                               "03_009_02_dnarrow.bmp", 1, box,
                               SpinDown,
                               (void (__cdecl *)(AM2_Widget *))0);
-        kid->vtable = (void *)AM2_IMAGE(VTABLE_ARROW);
+        kid->vtable = (void *)((void *)(uintptr_t)(VTABLE_ARROW));
         *(void **)((uint8_t *)kid + ARROW_OFF_OWNER) = w;
     }
     *(AM2_Widget **)(self + SPIN_OFF_DOWN) = kid;
@@ -17240,7 +17240,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpPanelConstruct(const char *
                             comm + COMM_OFF_SLOT_NAME
                             + (size_t)i * AM2_COMM_SLOT_STRIDE);
             else
-                am2_sprintf(name, (const char *)AM2_IMAGE(AM2_STR_OPEN_SLOT));
+                am2_sprintf(name, (const char *)((void *)(uintptr_t)(AM2_STR_OPEN_SLOT)));
         }
 
         child = (AM2_Widget *)orig_operator_new(0x74);
@@ -17387,8 +17387,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpPanelConstruct(const char *
         child = (AM2_Widget *)orig_operator_new(0x78);
         if (child)
             ::ArrowBarConstruct(child, 0x121, 0xC2, 0x13, 0x68, w,
-                              (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
-                              (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                              (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
+                              (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                               0x40, 1);
         ::WidgetAddChild(w, child);
 
@@ -17407,8 +17407,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpPanelConstruct(const char *
         child = (AM2_Widget *)orig_operator_new(0x80);
         if (child)
             ::MultiSpriteConstruct(child,
-                                 (const char *)AM2_IMAGE(AM2_BMP_GREEN0),
-                                 (const char *)AM2_IMAGE(AM2_BMP_GREEN1),
+                                 (const char *)((void *)(uintptr_t)(AM2_BMP_GREEN0)),
+                                 (const char *)((void *)(uintptr_t)(AM2_BMP_GREEN1)),
                                  1, *RectSet(&r, 0xA0, 0x139, 0x11, 0x10));
         *(AM2_Widget **)(p + MP_PANEL_OFF_BLINKER_0) = child;
         ::WidgetAddChild(w, child);
@@ -17421,8 +17421,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpPanelConstruct(const char *
 
         if (child)
             ::MultiSpriteConstruct(child,
-                                 (const char *)AM2_IMAGE(AM2_BMP_RED0),
-                                 (const char *)AM2_IMAGE(AM2_BMP_RED1),
+                                 (const char *)((void *)(uintptr_t)(AM2_BMP_RED0)),
+                                 (const char *)((void *)(uintptr_t)(AM2_BMP_RED1)),
                                  1, *RectSet(&r, 0xD5, 0x139, 0x11, 0x10));
         *(AM2_Widget **)(p + MP_PANEL_OFF_BLINKER_1) = child;
         ::WidgetAddChild(w, child);
@@ -17499,8 +17499,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpPanelConstruct(const char *
 
             if (bar)
                 bar = ::ArrowBarConstruct(bar, 0x121, 0x172, 0x13, 0x55, w,
-                                        (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
-                                        (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                                        (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
+                                        (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                         0x2C, 1);
             ::WidgetAddChild(w, bar);
 
@@ -17598,8 +17598,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpPanelConstruct(const char *
 
             if (bar)
                 bar = ::ArrowBarConstruct(bar, 0x1FA, 0x2E, 0x13, 0x50, w,
-                                        (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
-                                        (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                                        (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
+                                        (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                         0x2A, 1);
             *(AM2_Widget **)(p + MP_PANEL_OFF_GAME_BAR) = bar;
             ::WidgetAddChild(w, bar);
@@ -17677,8 +17677,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpPanelConstruct(const char *
 
             if (bar)
                 bar = ::ArrowBarConstruct(bar, 0x25B, 0xA6, 0x13, 0x57, w,
-                                        (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR0),
-                                        (const char *)AM2_IMAGE(AM2_BMP_SCROLLBAR1),
+                                        (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
+                                        (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                         0x2F, 1);
             *(AM2_Widget **)(p + MP_PANEL_OFF_MAP_BAR) = bar;
             ::WidgetAddChild(w, bar);

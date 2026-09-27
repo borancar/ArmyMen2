@@ -308,11 +308,11 @@ const char *__cdecl UnitClassName(void *unit)
 {
     const uint8_t      *u = (const uint8_t *)unit;
     const char *const  *names =
-        (const char *const *)AM2_IMAGE(ADDR_UNIT_CLASS_NAMES);
+        (const char *const *)((void *)(uintptr_t)(ADDR_UNIT_CLASS_NAMES));
     const uint8_t      *w;
 
     if (*(const int32_t *)(u + OBJ_OFF_SARGE))
-        return *(const char *const *)AM2_IMAGE(ADDR_UNIT_NAME_SARGE);
+        return *(const char *const *)((void *)(uintptr_t)(ADDR_UNIT_NAME_SARGE));
 
     w = (const uint8_t *)WeaponByUid(
             *(const uint32_t *)(u + TROOPER_OFF_WEAPON_UID));
@@ -442,10 +442,10 @@ void __cdecl ObjDropAltRecord(void *obj)
  */
 int32_t __cdecl TakeSoldierName(void)
 {
-    uint8_t *tab   = (uint8_t *)AM2_IMAGE(ADDR_SOLDIER_NAMES);
+    uint8_t *tab   = (uint8_t *)((void *)(uintptr_t)(ADDR_SOLDIER_NAMES));
     /* orig_rand's macro is defined further down this file, past here. */
     int32_t  start = (int32_t)((uint32_t)
-        ((int32_t (__cdecl *)(void))AM2_IMAGE(ADDR_GAME_RAND))()
+        ((int32_t (__cdecl *)(void))((void *)(uintptr_t)(ADDR_GAME_RAND)))()
         % AM2_SOLDIER_NAMES);
     int32_t  i     = start;
 
@@ -791,7 +791,7 @@ void __cdecl ItemPreDestroy(void *obj, int32_t cells)
 }
 
 #define kCommDbg \
-    (*(const int32_t *)((const uint8_t *)*(void **)AM2_IMAGE(ADDR_COMM_OBJECT) \
+    (*(const int32_t *)((const uint8_t *)*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)) \
                         + COMM_OFF_VERBOSE))
 
 /* 0x00429C80. Release an item object's allocation, by its own log line.
@@ -1057,7 +1057,7 @@ void __cdecl DestroyItemObject(void *obj, int32_t arg, int32_t notify)
  * A sentence beside a seam goes stale exactly when the seam closes. */
 
 #define kCommDebug \
-    (*(const int32_t *)((const uint8_t *)*(void **)AM2_IMAGE(ADDR_COMM_OBJECT) \
+    (*(const int32_t *)((const uint8_t *)*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)) \
                         + COMM_OFF_VERBOSE))
 
 /* 0x004285F0. Destroy one item, dispatching on its kind.
@@ -1128,7 +1128,7 @@ void __cdecl RemoveInventoryItem(void *unit, int32_t slot)
 
     /* The same comm field msgslot.cpp calls AM2_COMM_LOG_ENABLED, reached the
      * same way. Logged BEFORE the null check, as the original does. */
-    if (*(const int32_t *)((const uint8_t *)*(void **)AM2_IMAGE(ADDR_COMM_OBJECT)
+    if (*(const int32_t *)((const uint8_t *)*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT))
                            + 0x418))
         orig_log("RemoveInventoryItem\n");
 
@@ -1422,7 +1422,7 @@ void *__cdecl MakeKind7(uint32_t pt, int32_t unused, int32_t army,
     *(uint32_t *)(o + OBJ_OFF_FLAGS) = 1;
 
     ObjInitCommon(o, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), 7, pt,
-                         (const int32_t *)AM2_IMAGE(ADDR_KIND7_BOX), e, f);
+                         (const int32_t *)((void *)(uintptr_t)(ADDR_KIND7_BOX)), e, f);
 
     *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
         *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + AM2_KIND7_FUSE_MS;
@@ -1990,7 +1990,7 @@ void __cdecl ObjSetRoachFootprint(void *obj)
  * agree in the game, where the slide is zero, and differ under
  * tests/loadimage.h, where it is not. Moved up here so there is one. */
 typedef int32_t (__cdecl *AM2_GameRandFn)(void);
-#define orig_game_rand ((AM2_GameRandFn)AM2_IMAGE(ADDR_GAME_RAND))
+#define orig_game_rand ((AM2_GameRandFn)((void *)(uintptr_t)(ADDR_GAME_RAND)))
 
 /* CreateRoach -- original 0x0043CDD0, two callers: LoadType8, which rebuilds
  * a saved roach, and the spawner at 0x00420B33, which makes a fresh one.
@@ -2044,10 +2044,10 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
     /* Index 0 of the block, which aai/game.aai calls ROACH_HEIGHT; read as a
      * byte out of a dword that ships 32. */
     *(int8_t *)(o + OBJ_OFF_HEIGHT_ADJ) =
-        *(const int8_t *)AM2_IMAGE(ADDR_GAME_CONSTANTS);
+        *(const int8_t *)((void *)(uintptr_t)(ADDR_GAME_CONSTANTS));
     *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
-        *(const int16_t *)AM2_IMAGE(ADDR_ROACH_HEALTH);
-    SetMaxHealth(o, *(const int32_t *)AM2_IMAGE(ADDR_ROACH_HEALTH));
+        *(const int16_t *)((void *)(uintptr_t)(ADDR_ROACH_HEALTH));
+    SetMaxHealth(o, *(const int32_t *)((void *)(uintptr_t)(ADDR_ROACH_HEALTH)));
     *(int16_t *)(o + OBJ_OFF_HEALTH) =
         *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
 
@@ -2057,10 +2057,10 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
         + *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
 
     ObjInitCommon(o, name, 8, at,
-                         (const int32_t *)AM2_IMAGE(ADDR_ROACH_BOX), a7, uid);
+                         (const int32_t *)((void *)(uintptr_t)(ADDR_ROACH_BOX)), a7, uid);
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
-                (const void *)AM2_IMAGE(ADDR_ROACH_ROW_SPEC), x, y,
-                (const void *)AM2_IMAGE(ADDR_ROACH_BOX));
+                (const void *)((void *)(uintptr_t)(ADDR_ROACH_ROW_SPEC)), x, y,
+                (const void *)((void *)(uintptr_t)(ADDR_ROACH_BOX)));
 
     if ((flags & (int32_t)OBJ_FLAG_DESTROYED) != 0)
         SubrecHideRows(o + OBJ_OFF_SUBRECORD);
@@ -2077,7 +2077,7 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
     *(int32_t *)(o + OBJ_OFF_DEATH_STATE) = 1;
     *(uint8_t *)(o + OBJ_OFF_FIELD_540)   = 0;
 
-    SetAnimFrame(rows, *(const int16_t *)AM2_IMAGE(ADDR_ROACH_START_FRAME), 0);
+    SetAnimFrame(rows, *(const int16_t *)((void *)(uintptr_t)(ADDR_ROACH_START_FRAME)), 0);
     SetObjField530(o, 1);
 
     if (*(const int32_t *)(uintptr_t)ADDR_STATE_ENTERED == 0)
@@ -2474,17 +2474,17 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
                               (uintptr_t)ADDR_FRAME_DELTA_SEC;
 
         if (reverse) {
-            int32_t cap = *(const int32_t *)AM2_IMAGE(ADDR_ROACH_REVVEL);
+            int32_t cap = *(const int32_t *)((void *)(uintptr_t)(ADDR_ROACH_REVVEL));
             int32_t v   = (int32_t)((double)*(const int32_t *)
                                         (o + OBJ_OFF_FIELD_44)
                                     - (double)*(const int32_t *)
-                                        AM2_IMAGE(ADDR_ROACH_REVACC) * delta);
+                                        ((void *)(uintptr_t)(ADDR_ROACH_REVACC)) * delta);
 
             speed = (-cap > v) ? -cap : v;
         } else {
-            int32_t cap = *(const int32_t *)AM2_IMAGE(ADDR_ROACH_FORVEL);
+            int32_t cap = *(const int32_t *)((void *)(uintptr_t)(ADDR_ROACH_FORVEL));
             int32_t v   = (int32_t)((double)*(const int32_t *)
-                                        AM2_IMAGE(ADDR_ROACH_FORACC) * delta
+                                        ((void *)(uintptr_t)(ADDR_ROACH_FORACC)) * delta
                                     + (double)*(const int32_t *)
                                         (o + OBJ_OFF_FIELD_44));
 
@@ -2735,7 +2735,7 @@ void __cdecl RoachBite(void *roach)
     while (hit) {
         if (!ObjsAreAllied(o, hit, 0))
             DamageObject(hit,
-                         *(const int32_t *)AM2_IMAGE(ADDR_ROACH_DAMAGE),
+                         *(const int32_t *)((void *)(uintptr_t)(ADDR_ROACH_DAMAGE)),
                          AM2_ROACH_DAMAGE_KIND,
                          *(const uint32_t *)(o + 4),
                          (uint8_t)(facing + 0x80), 0);
@@ -2953,7 +2953,7 @@ int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
 
         if (ObjIsWatchedKind(o)
             && (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-                || CommMustBroadcast((void *)AM2_IMAGE(ADDR_COMM_OBJECT),
+                || CommMustBroadcast((void *)((void *)(uintptr_t)(ADDR_COMM_OBJECT)),
                                      (int16_t)*(const int8_t *)
                                          (o + OBJ_OFF_ARMY))))
             DamageObject(o, AM2_BLOCK_WEAR_AMOUNT, AM2_BLOCK_WEAR_KIND,
@@ -3199,7 +3199,7 @@ int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
 /* The game's own rand, spelled as event.cpp spells it -- through AM2_IMAGE,
  * because it is CRT code the offline test maps as data. */
 typedef int32_t (__cdecl *AM2_RandFn)(void);
-#define orig_rand ((AM2_RandFn)AM2_IMAGE(ADDR_GAME_RAND))
+#define orig_rand ((AM2_RandFn)((void *)(uintptr_t)(ADDR_GAME_RAND)))
 
 /* ShooterReact -- original 0x00457DA0, one caller: ShotStrike, once a shot
  * has damaged something it is not allied with. What it actually does is award
@@ -3912,7 +3912,7 @@ int32_t __cdecl MaskBlockWeight(int32_t kind, int32_t heading, uint32_t at)
     int32_t        total = 0;
     int32_t        i;
 
-    rec = (const uint8_t *)AM2_IMAGE(ADDR_VEHICLE_MASK - 4)
+    rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_VEHICLE_MASK - 4))
           + (size_t)(kind * AM2_VEHICLE_MASK_DIRS + dir)
             * AM2_VEHICLE_MASK_STRIDE;
 
@@ -4718,7 +4718,7 @@ void __cdecl AdvanceSecondDeadline(void)
 
     if (now > g_secondDeadline)
         g_secondDeadline =
-            now + (uint32_t)*(const int32_t *)AM2_IMAGE(ADDR_TICK_INTERVAL_MS);
+            now + (uint32_t)*(const int32_t *)((void *)(uintptr_t)(ADDR_TICK_INTERVAL_MS));
 }
 
 /* 0x00427E80, and its only caller is HealObject. Event kind 6 -- healed -- and
@@ -5330,7 +5330,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, int32_t d, int32_t kind,
          * of the table, and the loop has no bound past its five entries. */
         if (*(const int32_t *)(o + OBJ_OFF_SARGE) != 0
             && *(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0) {
-            const int16_t *step = (const int16_t *)AM2_IMAGE(ADDR_DROP_RING);
+            const int16_t *step = (const int16_t *)((void *)(uintptr_t)(ADDR_DROP_RING));
 
             while (((const uint32_t *)(o + UNIT_OFF_INVENTORY))
                        [AM2_TROOPER_DROP_SLOT] != 0) {
@@ -6837,7 +6837,7 @@ void __cdecl StepType1And4(void *obj)
 void __cdecl UseInventoryItem(void *unit, int32_t slot)
 {
     uint8_t *u = (uint8_t *)unit;
-    uint8_t *comm = (uint8_t *)AM2_IMAGE(ADDR_COMM_OBJECT);
+    uint8_t *comm = (uint8_t *)((void *)(uintptr_t)(ADDR_COMM_OBJECT));
     uint8_t *item;
     int32_t  ammo;
 
@@ -6932,9 +6932,9 @@ void __cdecl TrooperDropItem(void *unit, int32_t slot, uint32_t at)
 
     SettlePointInRegion(TileOfPoint(at), &at);
 
-    if (CommMustBroadcast((void *)AM2_IMAGE(ADDR_COMM_OBJECT),
+    if (CommMustBroadcast((void *)((void *)(uintptr_t)(ADDR_COMM_OBJECT)),
                           (int16_t)*(const int8_t *)(u + OBJ_OFF_ARMY))) {
-        if (*(const int32_t *)((const uint8_t *)AM2_IMAGE(ADDR_COMM_OBJECT)
+        if (*(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_COMM_OBJECT))
                                + COMM_OFF_VERBOSE))
             am2_log("TrooperDropItem  %x\n", ((const AM2_Object *)item)->uid);
 
@@ -7274,12 +7274,12 @@ int32_t __cdecl WeaponPoseIndex(void *obj, void *weapon)
     int32_t        code;
 
     if (!weapon)
-        return ((const int32_t *)AM2_IMAGE(ADDR_POSE_BY_CLASS))[cls];
+        return ((const int32_t *)((void *)(uintptr_t)(ADDR_POSE_BY_CLASS)))[cls];
 
     code = **(const int32_t *const *)((const uint8_t *)weapon
                                       + OBJ_OFF_FIELD_C0) - 1;
     if ((uint32_t)code >= AM2_WEAPON_CODE_MAX)
-        return ((const int32_t *)AM2_IMAGE(ADDR_POSE_BY_CLASS))[cls];
+        return ((const int32_t *)((void *)(uintptr_t)(ADDR_POSE_BY_CLASS)))[cls];
 
     armed = *(const int32_t *)(o + OBJ_OFF_FIELD_578) != 0;
 
@@ -7302,7 +7302,7 @@ int32_t __cdecl WeaponPoseIndex(void *obj, void *weapon)
         return AM2_POSE_STAND;
 
     default:
-        return ((const int32_t *)AM2_IMAGE(ADDR_POSE_BY_CLASS))[cls];
+        return ((const int32_t *)((void *)(uintptr_t)(ADDR_POSE_BY_CLASS)))[cls];
     }
 }
 
@@ -7959,7 +7959,7 @@ void __cdecl SetUnitPose(void *obj, int32_t pose)
 
     *(int32_t *)(o + OBJ_OFF_POSE) = pose;
 
-    frame = ((const int32_t *)AM2_IMAGE(ADDR_WEAPON_POSE_FRAMES))[pose];
+    frame = ((const int32_t *)((void *)(uintptr_t)(ADDR_WEAPON_POSE_FRAMES)))[pose];
 
     switch (frame) {
     case 10: case 12: case 14: case 19:
@@ -8162,7 +8162,7 @@ void __cdecl EnterVehicle(void *unit, void *vehicle)
         SelectUnit(v);
     }
 
-    if (CommMustBroadcast((void *)AM2_IMAGE(ADDR_COMM_OBJECT),
+    if (CommMustBroadcast((void *)((void *)(uintptr_t)(ADDR_COMM_OBJECT)),
                           (int16_t)*(const int8_t *)(v + OBJ_OFF_ARMY)))
         SendVehicleEnter(v, u);
 
@@ -8273,7 +8273,7 @@ int32_t __cdecl ItemIsReady(const void *item)
  * at all. */
 const char *__cdecl ItemTypeName(uint32_t kind)
 {
-    const char *const *names = (const char *const *)AM2_IMAGE(ADDR_ITEM_TYPE_NAMES);
+    const char *const *names = (const char *const *)((void *)(uintptr_t)(ADDR_ITEM_TYPE_NAMES));
 
     return names[kind];
 }
@@ -8371,7 +8371,7 @@ void __cdecl SoldierNameOf(const void *obj, char *out)
         return;
 
     strcpy(out, *(const char *const *)
-        ((const uint8_t *)AM2_IMAGE(ADDR_SOLDIER_NAMES)
+        ((const uint8_t *)((void *)(uintptr_t)(ADDR_SOLDIER_NAMES))
          + (size_t)n * AM2_SOLDIER_NAME_BYTES + SOLDIER_NAME_OFF_NAME));
 }
 
@@ -9632,7 +9632,7 @@ void __cdecl TrooperDiedTail(void *obj, int32_t kind)
         noise = big;
         break;
     case 2: {
-        anim = ((const int32_t *)AM2_IMAGE(ADDR_DEATH_ANIM_BY_CODE))
+        anim = ((const int32_t *)((void *)(uintptr_t)(ADDR_DEATH_ANIM_BY_CODE)))
                    [ClassifyByCode74(o)];
         noise = 5;
         if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) < big && anim == 0x21)
@@ -9649,11 +9649,11 @@ void __cdecl TrooperDiedTail(void *obj, int32_t kind)
     case 5:
         anim = (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= big)
                    ? 0x21
-                   : ((const int32_t *)AM2_IMAGE(ADDR_DEATH_ANIM_BY_CODE))
+                   : ((const int32_t *)((void *)(uintptr_t)(ADDR_DEATH_ANIM_BY_CODE)))
                          [ClassifyByCode74(o)];
         break;
     default:
-        anim = ((const int32_t *)AM2_IMAGE(ADDR_DEATH_ANIM_BY_CODE))
+        anim = ((const int32_t *)((void *)(uintptr_t)(ADDR_DEATH_ANIM_BY_CODE)))
                    [ClassifyByCode74(o)];
         break;
     }
@@ -10316,7 +10316,7 @@ void __cdecl NearestClearVehiclePoint(void *veh, int32_t facing, uint32_t from,
             }
         }
 
-        entry = (const uint8_t *)AM2_IMAGE(ADDR_SPIRAL_STEP)
+        entry = (const uint8_t *)((void *)(uintptr_t)(ADDR_SPIRAL_STEP))
                 + (uint32_t)dir * AM2_SPIRAL_STEP_STRIDE;
 
         out->x = (int16_t)(out->x
@@ -10384,7 +10384,7 @@ void __cdecl NearestClearPoint(uint32_t from, void *outPt)
             }
         }
 
-        entry = (const uint8_t *)AM2_IMAGE(ADDR_SPIRAL_STEP)
+        entry = (const uint8_t *)((void *)(uintptr_t)(ADDR_SPIRAL_STEP))
                 + (uint32_t)dir * AM2_SPIRAL_STEP_STRIDE;
 
         out->x = (int16_t)(out->x
@@ -11708,7 +11708,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
 
     *(int32_t *)(o + BLAST_OFF_DAMAGE)     = damage;
     *(int32_t *)(o + OBJ_OFF_FIELD_94)     = kind;
-    memcpy(o + BLAST_OFF_RECT, (const void *)AM2_IMAGE(ADDR_EXPLOSION_AREA_16),
+    memcpy(o + BLAST_OFF_RECT, (const void *)((void *)(uintptr_t)(ADDR_EXPLOSION_AREA_16)),
            sizeof(AM2_Rect));
     *(uint32_t *)(o + BLAST_OFF_SOURCE_UID) = src;
 
@@ -11718,7 +11718,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
     case 0x78: case 0x82: case 0x8C: case 0x94:
         *(int32_t *)(o + BLAST_OFF_MODE) = AM2_BLAST_MODE_16;
         memcpy(o + BLAST_OFF_RECT,
-               (const void *)AM2_IMAGE(ADDR_EXPLOSION_AREA_16),
+               (const void *)((void *)(uintptr_t)(ADDR_EXPLOSION_AREA_16)),
                sizeof(AM2_Rect));
         MakeKind7(at, 4, *(const int8_t *)(o + OBJ_OFF_ARMY), facing, 0, 0);
         *(int32_t *)(o + BLAST_OFF_SOUND_PENDING) = 1;
@@ -11727,7 +11727,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
     case 0x81: case 0x95:
         *(int32_t *)(o + BLAST_OFF_MODE) = AM2_BLAST_MODE_24;
         memcpy(o + BLAST_OFF_RECT,
-               (const void *)AM2_IMAGE(ADDR_EXPLOSION_AREA_24),
+               (const void *)((void *)(uintptr_t)(ADDR_EXPLOSION_AREA_24)),
                sizeof(AM2_Rect));
         MakeKind7(at, 4, *(const int8_t *)(o + OBJ_OFF_ARMY), facing, 0, 0);
         *(int32_t *)(o + BLAST_OFF_SOUND_PENDING) = 1;
@@ -11736,7 +11736,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
     case 0x83: case 0x8A: case 0x8B:
         *(int32_t *)(o + BLAST_OFF_MODE) = AM2_BLAST_MODE_32;
         memcpy(o + BLAST_OFF_RECT,
-               (const void *)AM2_IMAGE(ADDR_EXPLOSION_AREA_32),
+               (const void *)((void *)(uintptr_t)(ADDR_EXPLOSION_AREA_32)),
                sizeof(AM2_Rect));
         MakeKind7(at, 4, *(const int8_t *)(o + OBJ_OFF_ARMY), facing, 0, 0);
         *(int32_t *)(o + BLAST_OFF_SOUND_PENDING) = 1;
@@ -11765,7 +11765,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
     *(int8_t *)(o + OBJ_OFF_ARMY) = (int8_t)army;
     ObjInitCommon(o, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                   AM2_OBJ_TYPE_EXPLOSION, at,
-                  (const int32_t *)AM2_IMAGE(ADDR_EXPLOSION_BOX),
+                  (const int32_t *)((void *)(uintptr_t)(ADDR_EXPLOSION_BOX)),
                   unused, uid);
 
     tile = TileOfPoint(at);
@@ -11774,7 +11774,7 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
                   + AM2_EXPL_HEIGHT_BIAS);
 
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
-                (const void *)AM2_IMAGE(ADDR_EXPLOSION_ROW_SPEC), x, y,
+                (const void *)((void *)(uintptr_t)(ADDR_EXPLOSION_ROW_SPEC)), x, y,
                 (const void *)(uintptr_t)ADDR_ZERO_RECT);
 
     rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
@@ -11999,10 +11999,10 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
         *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REVEALED;
 
     *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
-        *(const int16_t *)((const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+        *(const int16_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
                            + RANK_REC_OFF_MAX_HEALTH);
     SetMaxHealth(o, *(const int32_t *)((const uint8_t *)
-                                       AM2_IMAGE(ADDR_RANK_RECORDS)
+                                       ((void *)(uintptr_t)(ADDR_RANK_RECORDS))
                                        + RANK_REC_OFF_MAX_HEALTH));
     *(int16_t *)(o + OBJ_OFF_HEALTH) = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
     *(int16_t *)(o + OBJ_OFF_FIELD_574) =
@@ -12016,7 +12016,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
         *(int32_t *)(o + OBJ_OFF_AI_MODE) = AM2_TROOPER_AI_THEIRS;
 
     ObjInitCommon(o, name, AM2_OBJ_TYPE_TROOPER, where,
-                  (const int32_t *)AM2_IMAGE(ADDR_TROOPER_BOX), remote, uid);
+                  (const int32_t *)((void *)(uintptr_t)(ADDR_TROOPER_BOX)), remote, uid);
 
     *(int8_t *)(o + OBJ_OFF_HEIGHT_ADJ) = AM2_TROOPER_HEIGHT_ADJ;
     *(const uint8_t **)(o + OBJ_OFF_TABLE_REC_KIND) =
@@ -12042,7 +12042,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
 
     RectSet(&box, -0x10, -0x10, 0x10, 0x10);
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
-                (const void *)AM2_IMAGE(ADDR_TROOPER_ROW_SPEC), x, y, &box);
+                (const void *)((void *)(uintptr_t)(ADDR_TROOPER_ROW_SPEC)), x, y, &box);
     SetFieldInAll(o + OBJ_OFF_SUBRECORD,
                   *(void **)(o + OBJ_OFF_TABLE_REC_KIND));
 
@@ -12176,10 +12176,10 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     *(int32_t *)(o + VEHICLE_OFF_KIND) = kind;
     /* An int32 table read one byte at a time -- all six values fit. */
     *(uint8_t *)(o + OBJ_OFF_HEIGHT_ADJ) = (uint8_t)
-        ((const int32_t *)AM2_IMAGE(ADDR_VEHICLE_HEIGHT_BY_KIND))[kind];
+        ((const int32_t *)((void *)(uintptr_t)(ADDR_VEHICLE_HEIGHT_BY_KIND)))[kind];
 
     ObjInitCommon(o, name, AM2_OBJ_TYPE_VEHICLE, at,
-                  (const int32_t *)AM2_IMAGE(ADDR_VEHICLE_BOX), remote, uid);
+                  (const int32_t *)((void *)(uintptr_t)(ADDR_VEHICLE_BOX)), remote, uid);
 
     *(uint32_t *)(o + TROOPER_OFF_SPAWN_POS) =
         *(const uint32_t *)(o + OBJ_OFF_POS);
@@ -12192,8 +12192,8 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     rowCount = (*(const int32_t *)turret > 0) ? 2 : 1;
 
     BuildRowSet(o + OBJ_OFF_SUBRECORD, rowCount,
-                (const void *)AM2_IMAGE(ADDR_VEHICLE_ROW_SPEC), x, y,
-                (const void *)AM2_IMAGE(ADDR_VEHICLE_BOX));
+                (const void *)((void *)(uintptr_t)(ADDR_VEHICLE_ROW_SPEC)), x, y,
+                (const void *)((void *)(uintptr_t)(ADDR_VEHICLE_BOX)));
     SetFieldInAll(o + OBJ_OFF_SUBRECORD,
                   *(void **)(o + OBJ_OFF_TABLE_REC_SLOT));
 
@@ -12392,7 +12392,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, uint32_t at,
 
                 if (name)
                     am2_sprintf(child,
-                                (const char *)AM2_IMAGE(AM2_STR_CHILD_SUFFIX),
+                                (const char *)((void *)(uintptr_t)(AM2_STR_CHILD_SUFFIX)),
                                 name, n);
                 else
                     child[0] = '\0';
@@ -13065,7 +13065,7 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
         ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
                           MedkitHealOne);
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            orig_log((const char *)AM2_IMAGE(AM2_STR_TROOPER_PICKUP),
+            orig_log((const char *)((void *)(uintptr_t)(AM2_STR_TROOPER_PICKUP)),
                      ((const AM2_Object *)w)->uid);
         *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
         WeaponRespawn(w);
@@ -13158,7 +13158,7 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
                 *(const int32_t *)(w + OBJ_OFF_TARGET_UID);
 
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            orig_log((const char *)AM2_IMAGE(AM2_STR_TROOPER_PICKUP_2),
+            orig_log((const char *)((void *)(uintptr_t)(AM2_STR_TROOPER_PICKUP_2)),
                      ((const AM2_Object *)w)->uid);
 
         *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
@@ -13187,7 +13187,7 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
 
     if (kind == AM2_ITEM_KIND_HOT_TARGET) {
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            orig_log((const char *)AM2_IMAGE(AM2_STR_TROOPER_PICKUP),
+            orig_log((const char *)((void *)(uintptr_t)(AM2_STR_TROOPER_PICKUP)),
                      ((const AM2_Object *)w)->uid);
         DestroyByType(w);
         return;
@@ -13197,7 +13197,7 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
         ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
                           MedkitHealOne);
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            orig_log((const char *)AM2_IMAGE(AM2_STR_TROOPER_PICKUP),
+            orig_log((const char *)((void *)(uintptr_t)(AM2_STR_TROOPER_PICKUP)),
                      ((const AM2_Object *)w)->uid);
         *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
         WeaponRespawn(w);

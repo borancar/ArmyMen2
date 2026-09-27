@@ -37,7 +37,7 @@
 /* GetTickCount through the game's own IAT slot, the same seam air.cpp uses:
  * an import of our own would resolve through our IAT, and this file is flat. */
 typedef uint32_t (__stdcall *AM2_TickFn)(void);
-#define orig_get_tick_count (*(AM2_TickFn *)AM2_IMAGE(ADDR_IAT_GET_TICK_COUNT))
+#define orig_get_tick_count (*(AM2_TickFn *)((void *)(uintptr_t)(ADDR_IAT_GET_TICK_COUNT)))
 /* SendPlayerMsg is reconstructed, in win32/dplay.cpp. Declared here rather
  * than by including that header because commmsg.cpp is on the flat side of
  * the split; its signature names no Win32 type. */
@@ -2562,7 +2562,7 @@ void __cdecl CommInitDefaults(void)
     uint32_t i;
 
     for (i = 0; i < sizeof kCommMessages / sizeof kCommMessages[0]; i++) {
-        uint8_t *rec = (uint8_t *)AM2_IMAGE(kCommMessages[i].addr);
+        uint8_t *rec = (uint8_t *)((void *)(uintptr_t)(kCommMessages[i].addr));
 
         *(int32_t *)(rec + COMMMSG_OFF_KIND) = kCommMessages[i].kind;
         *(int32_t *)(rec + COMMMSG_OFF_SIZE) = kCommMessages[i].size;
@@ -2903,7 +2903,7 @@ static void FlowRetireThrough(uint8_t *flow, uint32_t ackedThrough,
              * it: the PULSE ACK arm prints the id with %d and the DATA arm
              * with %x. Hence the format string being a parameter. */
             if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-                am2_log((const char *)AM2_IMAGE(ackingStr),
+                am2_log((const char *)((void *)(uintptr_t)(ackingStr)),
                         from, ackedThrough,
                         *(uint32_t *)(flow + FLOW_OFF_HE_HAS));
             continue;

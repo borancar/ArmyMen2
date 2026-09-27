@@ -935,7 +935,7 @@ void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force)
     *(int16_t *)(r + ROW_OFF_FRAME) = frame;
     *(AM2_Anim **)(r + ROW_OFF_ANIM_PLAYING) = e->anim;
     *(uint8_t *)(r + ROW_OFF_HEADING_BIAS) =
-        ((const uint8_t *)AM2_IMAGE(ADDR_FRAME_HEADING_BIAS))[frame];
+        ((const uint8_t *)((void *)(uintptr_t)(ADDR_FRAME_HEADING_BIAS)))[frame];
     *(int16_t *)(r + ROW_OFF_ANIM_NEXT_ID) = (int16_t)e->next;
 
     anim    = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
@@ -1495,7 +1495,7 @@ static int32_t RowPoolRelease(const AM2_RowPool *p, uint8_t *e)
 typedef int32_t (__stdcall *AM2_IntersectRectFn)(void *dst, const void *a,
                                                  const void *b);
 #define orig_intersect_rect \
-    (*(AM2_IntersectRectFn *)AM2_IMAGE(ADDR_IAT_INTERSECT_RECT))
+    (*(AM2_IntersectRectFn *)((void *)(uintptr_t)(ADDR_IAT_INTERSECT_RECT)))
 
 static void RowPoolEvict(const AM2_RowPool *p)
 {
@@ -1785,7 +1785,7 @@ void *__cdecl SeqAlloc(void *ctxv)
 /* region.cpp spells this the same way; ADDR_GAME_RAND is above the nominal
  * CRT line but is the game's own LCG, not libc's. */
 typedef int32_t (__cdecl *AM2_GameRandFn)(void);
-#define orig_game_rand ((AM2_GameRandFn)(uintptr_t)AM2_IMAGE(ADDR_GAME_RAND))
+#define orig_game_rand ((AM2_GameRandFn)(uintptr_t)((void *)(uintptr_t)(ADDR_GAME_RAND)))
 
 
 /* 0x004600F0. May this weapon kind respawn?

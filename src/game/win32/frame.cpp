@@ -274,7 +274,7 @@ void __cdecl FrameClockStep(void)
      * multiply, which would round twice. */
     *(float *)(uintptr_t)ADDR_FRAME_DELTA_SEC =
         (float)((double)delta
-                * (double)*(const float *)AM2_IMAGE(ADDR_MS_TO_SEC));
+                * (double)*(const float *)((void *)(uintptr_t)(ADDR_MS_TO_SEC)));
 }
 
 typedef void  (__cdecl *AM2_VoidFn0)(void);
@@ -810,8 +810,8 @@ void __cdecl LevelTeardown(void)
  * entirely for that one frame. */
 typedef int32_t (__cdecl *AM2_FindFirstFn2)(const char *, void *);
 typedef int32_t (__cdecl *AM2_FindCloseFn)(int32_t);
-#define orig_findfirst ((AM2_FindFirstFn2)AM2_IMAGE(ADDR_CRT_FINDFIRST))
-#define orig_findclose ((AM2_FindCloseFn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
+#define orig_findfirst ((AM2_FindFirstFn2)((void *)(uintptr_t)(ADDR_CRT_FINDFIRST)))
+#define orig_findclose ((AM2_FindCloseFn)((void *)(uintptr_t)(ADDR_CRT_FINDCLOSE)))
 
 /* State2Enter -- original 0x00425300, 1168 bytes, one caller: RunFrame's
  * state-2 arm, reached once per mission start. Tear down the previous
@@ -880,7 +880,7 @@ void __cdecl State2Enter(void)
                     *(void **)(uintptr_t)ADDR_ACTIVE_PALETTE);
     SetGamePalette(*(uint8_t **)(uintptr_t)ADDR_ACTIVE_PALETTE);
 
-    if (*(const int32_t *)AM2_IMAGE(ADDR_OPT_DF))
+    if (*(const int32_t *)((void *)(uintptr_t)(ADDR_OPT_DF)))
         SpriteSetLoad((const char *)(uintptr_t)ADDR_MAP_FOLDER);
 
     ZeroUnread50C34C();

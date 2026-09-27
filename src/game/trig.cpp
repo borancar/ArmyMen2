@@ -12,7 +12,7 @@
 #define kAtanC ((int8_t *)((void *)(uintptr_t)(ADDR_TRIG_ATAN_COS)))
 #define kAtanS ((int8_t *)((void *)(uintptr_t)(ADDR_TRIG_ATAN_SIN)))
 
-#define kD(a)  (*(const double *)AM2_IMAGE(a))
+#define kD(a)  (*(const double *)((void *)(uintptr_t)(a)))
 
 /* fsin and fcos, not libm's. The original computes both from one loaded angle
  * with the x87 instructions, and glibc's sin and cos are not required to agree

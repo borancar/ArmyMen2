@@ -45,7 +45,7 @@ extern "C" AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
 /* The CRT's _strlwr, which ObjInitCommon applies to the CALLER's buffer. Same
  * seam map.cpp and definfo.cpp use; it is CRT, so it stays original. */
 typedef char *(__cdecl *AM2_StrlwrFn)(char *);
-#define orig_strlwr ((AM2_StrlwrFn)AM2_IMAGE(ADDR_CRT_STRLWR))
+#define orig_strlwr ((AM2_StrlwrFn)((void *)(uintptr_t)(ADDR_CRT_STRLWR)))
 #include "../inject/patch.h"
 
 #include <stdint.h>
@@ -1131,7 +1131,7 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
                 break;
             }
 
-            am2_sprintf(tried, (const char *)AM2_IMAGE(AM2_STR_UNIQUE_SUFFIX),
+            am2_sprintf(tried, (const char *)((void *)(uintptr_t)(AM2_STR_UNIQUE_SUFFIX)),
                         name, n);
             n++;
         }

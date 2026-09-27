@@ -331,7 +331,7 @@ int32_t __cdecl ScriptFindName(const char *name)
 /* Still original: the CRT lower-caser, the same seam map.cpp and definfo.cpp
  * already have. ScriptBindUniqueName calls it on its caller's buffer. */
 typedef char *(__cdecl *AM2_StrlwrFn)(char *);
-#define orig_strlwr       ((AM2_StrlwrFn)AM2_IMAGE(ADDR_CRT_STRLWR))
+#define orig_strlwr       ((AM2_StrlwrFn)((void *)(uintptr_t)(ADDR_CRT_STRLWR)))
 
 /* The nine globals DeclareBuiltinNames fills, each the name table INDEX of
  * one built-in name. */
@@ -455,7 +455,7 @@ void __cdecl ScriptBindUniqueName(void *rec, char *name)
             return;
         }
 
-        am2_sprintf(tried, (const char *)AM2_IMAGE(AM2_STR_UNIQUE_SUFFIX),
+        am2_sprintf(tried, (const char *)((void *)(uintptr_t)(AM2_STR_UNIQUE_SUFFIX)),
                     name, n);
         n++;
     }
@@ -826,7 +826,7 @@ int32_t __cdecl ScriptResolveName(AM2_ScriptCtx *ctx, int32_t *at,
                         ScriptTokenText(tok, kScriptWord));
             return 0;
         }
-        *out = *(const int32_t *)AM2_IMAGE(g);
+        *out = *(const int32_t *)((void *)(uintptr_t)(g));
         (*at)++;
         return 1;
     }
@@ -1016,9 +1016,9 @@ int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
     return 1;
 }
 
-#define kPads       ((AM2_Pad *)AM2_IMAGE(ADDR_PADS))
+#define kPads       ((AM2_Pad *)((void *)(uintptr_t)(ADDR_PADS)))
 #define kPadCount   (*(int32_t *)((void *)(uintptr_t)(ADDR_PAD_COUNT)))
-#define kPadNumbers ((AM2_PadNumber *)AM2_IMAGE(ADDR_PAD_NUMBERS))
+#define kPadNumbers ((AM2_PadNumber *)((void *)(uintptr_t)(ADDR_PAD_NUMBERS)))
 
 /* One coordinate of a location: an integer, or `refvar <name>`. */
 static int32_t ScriptCoord(AM2_ScriptCtx *ctx, int32_t *at,
@@ -1418,7 +1418,7 @@ int32_t __cdecl ScriptArmyColour(AM2_ScriptCtx *ctx, int32_t *at)
         return -1;
     }
 
-    int32_t rc = CommSlotForArmy(*(void **)AM2_IMAGE(ADDR_ARMY_TABLE), army);
+    int32_t rc = CommSlotForArmy(*(void **)((void *)(uintptr_t)(ADDR_ARMY_TABLE)), army);
 
     (*at)++;
     return rc;
@@ -3330,7 +3330,7 @@ void __cdecl LoadLevelScript(void)
              * carries one, and this is the original's own omission. */
             const char *colour = 0;
             if ((uint32_t)army <= 3)
-                colour = (const char *)AM2_IMAGE(kColourName[army]);
+                colour = (const char *)((void *)(uintptr_t)(kColourName[army]));
 
             sprintf(aipath, "%s_ai_%s.txt", kMpScriptName, colour);
             ScriptReadWithLog(aipath);

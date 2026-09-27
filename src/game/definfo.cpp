@@ -34,8 +34,8 @@ typedef void    (__cdecl *AM2_VoidFn)(void);
  * parsing, which must use the game's tokeniser. */
 typedef int32_t (__cdecl *AM2_StrtolFn)(const char *s, char **end, int32_t base);
 typedef double (__cdecl *AM2_StrtodFn)(const char *s, char **end);
-#define orig_strtol (*(AM2_StrtolFn)AM2_IMAGE(ADDR_CRT_STRTOL))
-#define orig_strtod (*(AM2_StrtodFn)AM2_IMAGE(ADDR_CRT_STRTOD))
+#define orig_strtol (*(AM2_StrtolFn)((void *)(uintptr_t)(ADDR_CRT_STRTOL)))
+#define orig_strtod (*(AM2_StrtodFn)((void *)(uintptr_t)(ADDR_CRT_STRTOD)))
 
 #ifdef AM2_STANDALONE
 /* The .aai vocabulary, 100 {name, value, handler} rows plus an empty-name
@@ -146,12 +146,12 @@ extern "C" const AM2_DefKeyword am2_def_keywords[101] = {
     {"", 0, 0},
 };
 #endif
-#define kDefKeywords ((const AM2_DefKeyword *)AM2_IMAGE(ADDR_DEF_NAME_TABLE))
+#define kDefKeywords ((const AM2_DefKeyword *)((void *)(uintptr_t)(ADDR_DEF_NAME_TABLE)))
 
 typedef am2_FILE *(__cdecl *AM2_FopenFn)(const char *path, const char *mode);
 typedef char *(__cdecl *AM2_StrlwrFn)(char *s);
-#define orig_def_fopen  (*(AM2_FopenFn)AM2_IMAGE(ADDR_FOPEN))
-#define orig_strlwr     (*(AM2_StrlwrFn)AM2_IMAGE(ADDR_CRT_STRLWR))
+#define orig_def_fopen  (*(AM2_FopenFn)((void *)(uintptr_t)(ADDR_FOPEN)))
+#define orig_strlwr     (*(AM2_StrlwrFn)((void *)(uintptr_t)(ADDR_CRT_STRLWR)))
 #define kSep            (" \t\n;,")
 #define kFileMode       ("rt")
 
@@ -253,13 +253,13 @@ int32_t __cdecl DefParseBoolean(int32_t *out, const char *tok)
         return 0;
 
     for (i = 0; i < sizeof kTrue / sizeof kTrue[0]; i++)
-        if (strcmp(tok, (const char *)AM2_IMAGE(kTrue[i])) == 0) {
+        if (strcmp(tok, (const char *)((void *)(uintptr_t)(kTrue[i]))) == 0) {
             *out = 1;
             return 1;
         }
 
     for (i = 0; i < sizeof kFalse / sizeof kFalse[0]; i++)
-        if (strcmp(tok, (const char *)AM2_IMAGE(kFalse[i])) == 0) {
+        if (strcmp(tok, (const char *)((void *)(uintptr_t)(kFalse[i]))) == 0) {
             *out = 0;
             return 1;
         }
@@ -478,7 +478,7 @@ void __cdecl LoadDefTables(void)
      * [ptr - 4], which is why ADDR_RANK_RECORDS is where it is. Written here
      * against the record base, which is the same addresses. */
     for (id = 0; id < AM2_RANK_COUNT; id++) {
-        uint8_t       *rec = (uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+        uint8_t       *rec = (uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
                              + (uint32_t)id * RANK_REC_BYTES;
         const uint8_t *src = (const uint8_t *)DefFindTrooperRec(id);
         float          pct;
@@ -497,8 +497,8 @@ void __cdecl LoadDefTables(void)
          * this is the record's only float, which is what confirms the whole
          * permutation. */
         pct = (float)((long double)*(const int32_t *)(src + RANK_SRC_OFF_FIRE_PCT)
-                      * (long double)*(const float *)AM2_IMAGE(ADDR_F_ONE_HUNDREDTH));
-        if (pct < *(const float *)AM2_IMAGE(ADDR_F_ONE))
+                      * (long double)*(const float *)((void *)(uintptr_t)(ADDR_F_ONE_HUNDREDTH)));
+        if (pct < *(const float *)((void *)(uintptr_t)(ADDR_F_ONE)))
             pct = 1.0f;
         *(float *)(rec + RANK_REC_OFF_FIRE_SCALE) = pct;
 
@@ -526,7 +526,7 @@ void __cdecl LoadDefTables(void)
  * return, and this function ends where the qsort does. */
 typedef void (__cdecl *AM2_QsortFn)(void *base, size_t n, size_t width,
                                     const void *cmp);
-#define orig_qsort ((AM2_QsortFn)AM2_IMAGE(ADDR_CRT_QSORT))
+#define orig_qsort ((AM2_QsortFn)((void *)(uintptr_t)(ADDR_CRT_QSORT)))
 
 void __cdecl SortVehicleDefs(void)
 {
@@ -712,9 +712,9 @@ void __cdecl AddMissileDef(const void *rec)
  * it is the same one DefSortMissileRecs sorts these tables with, so the sort
  * and the search agree by construction, which is what makes a binary search
  * over them legitimate at all. Passed by name; reaching it through
- * AM2_IMAGE(ADDR_COMPARE_DWORD) would be a seam into our own code, and
+ * ((void *)(uintptr_t)(ADDR_COMPARE_DWORD)) would be a seam into our own code, and
  * checkseams said so. */
-#define orig_bsearch ((AM2_BsearchFn)AM2_IMAGE(ADDR_CRT_BSEARCH))
+#define orig_bsearch ((AM2_BsearchFn)((void *)(uintptr_t)(ADDR_CRT_BSEARCH)))
 
 /* VehicleDefFind -- original 0x0045EBF0, two callers. Binary-search the
  * vehicle def table for a record whose first dword is `id`, or NULL.

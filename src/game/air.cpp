@@ -152,7 +152,7 @@ extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
 
 typedef uint32_t (__stdcall *AM2_GetTickCountFn)(void);
 #define orig_get_tick_count \
-    (*(AM2_GetTickCountFn *)AM2_IMAGE(ADDR_IAT_GET_TICK_COUNT))
+    (*(AM2_GetTickCountFn *)((void *)(uintptr_t)(ADDR_IAT_GET_TICK_COUNT)))
 
 /* PeerShouldNack -- original 0x00402C30, one caller. Should a NACK go out for
  * this sequence number, or has one gone recently enough? It names itself twice
@@ -681,7 +681,7 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
         shift        = 0;
     }
 
-    rec    = (const uint8_t *)AM2_IMAGE(ADDR_FORMATION_SLOTS)
+    rec    = (const uint8_t *)((void *)(uintptr_t)(ADDR_FORMATION_SLOTS))
              + (uint32_t)slot * AM2_FORMATION_SLOT_STRIDE;
     dist   = (int32_t)*(const int16_t *)(rec + 2) << shift;
     facing = (uint8_t)(*rec + leaderFacing);
@@ -713,7 +713,7 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
 }
 
 typedef int32_t (__cdecl *AM2_AirRandFn)(void);
-#define orig_air_rand ((AM2_AirRandFn)AM2_IMAGE(ADDR_GAME_RAND))
+#define orig_air_rand ((AM2_AirRandFn)((void *)(uintptr_t)(ADDR_GAME_RAND)))
 
 /* RandomPointToward -- original 0x00404E50, two callers, and the same
  * function as
@@ -1366,7 +1366,7 @@ void __cdecl AirDeliver(void)
         uint32_t who;
 
         dy -= (int32_t)((double)dx
-                        * *(const double *)AM2_IMAGE(ADDR_AIR_STRIKE_SLOPE));
+                        * *(const double *)((void *)(uintptr_t)(ADDR_AIR_STRIKE_SLOPE)));
         dy -= AM2_AIR_STRIKE_Y_BIAS;
 
         delay = orig_air_rand() % AM2_AIR_STRIKE_JITTER
@@ -1375,7 +1375,7 @@ void __cdecl AirDeliver(void)
         who = g_airFrom[0];
         orig_spawn_at((int16_t)g_airWhere[0] + dx,
                       (int16_t)g_airWhere[1] + dy,
-                      ((const int32_t *)AM2_IMAGE(ADDR_AIR_STRIKE_KINDS))
+                      ((const int32_t *)((void *)(uintptr_t)(ADDR_AIR_STRIKE_KINDS)))
                           [(uint32_t)orig_air_rand() % AM2_AIR_STRIKE_KINDS],
                       (int32_t)UidArmy(who), who, AM2_AIR_STRIKE_EXTRA,
                       delay, 0, 0, 0);
@@ -1385,7 +1385,7 @@ void __cdecl AirDeliver(void)
         uint32_t who = g_airFrom[0];
 
         orig_spawn_at((int16_t)g_airWhere[0], (int16_t)g_airWhere[1],
-                      ((const int32_t *)AM2_IMAGE(ADDR_AIR_STRIKE_KINDS))
+                      ((const int32_t *)((void *)(uintptr_t)(ADDR_AIR_STRIKE_KINDS)))
                           [(uint32_t)orig_air_rand() % AM2_AIR_STRIKE_KINDS],
                       (int32_t)UidArmy(who), who, AM2_AIR_STRIKE_EXTRA,
                       AM2_AIR_STRIKE_JITTER, 0, 0, 0);
@@ -1419,7 +1419,7 @@ void __cdecl AirDeliver(void)
  */
 void __cdecl AirPassesDraw(void)
 {
-    int32_t ms   = *(const int32_t *)AM2_IMAGE(ADDR_AIR_PASS_MS);
+    int32_t ms   = *(const int32_t *)((void *)(uintptr_t)(ADDR_AIR_PASS_MS));
     int32_t half = ms / 2;
     int32_t i;
 
@@ -1515,7 +1515,7 @@ void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
         uint8_t angle;
 
         if (slot < 9) {
-            const uint8_t *rec = (const uint8_t *)AM2_IMAGE(ADDR_SLOT_RECS)
+            const uint8_t *rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_SLOT_RECS))
                                  + (uint32_t)slot * AM2_SLOT_REC_BYTES;
 
             parent = *(const int32_t *)(rec + SLOT_REC_OFF_PARENT);
@@ -1698,7 +1698,7 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
         dist = (d0 > d1 ? d0 : d1) + AM2_SIGHT_DIST_PAD;
     }
 
-    rank = (const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+    rank = (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
          + (uint32_t)*(const int32_t *)(v + OBJ_OFF_RANK) * RANK_REC_BYTES;
 
     if ((int32_t)(int16_t)dist

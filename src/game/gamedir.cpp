@@ -34,7 +34,7 @@ int32_t __cdecl SetGameDir(const char *subdir)
     if (am2_chdir(path) == 0) {
         /* Latched, never cleared here: leaving the directory again does not
          * put it back. Only the name matters, not where we ended up. */
-        if (strcmp(subdir, *(const char *const *)AM2_IMAGE(ADDR_STR_AVI_DIR)) == 0)
+        if (strcmp(subdir, *(const char *const *)((void *)(uintptr_t)(ADDR_STR_AVI_DIR))) == 0)
             *(int32_t *)((void *)(uintptr_t)(ADDR_OPT_BIG_MOVIES)) = 1;
         return 1;
     }

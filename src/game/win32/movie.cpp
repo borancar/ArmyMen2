@@ -137,7 +137,7 @@ typedef void (__cdecl *am2_delete_fn)(void *);
 #define orig_delete (*(am2_delete_fn)ADDR_GAME_DELETE)
 /* Spelled as widget.cpp spells it, so the two stay one definition. */
 typedef void *(__cdecl *AM2_OperatorNewFn)(uint32_t size);
-#define orig_operator_new     ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
+#define orig_operator_new     ((AM2_OperatorNewFn)((void *)(uintptr_t)(ADDR_GAME_OPERATOR_NEW)))
 
 #define g_movieDSound (*(void **)(uintptr_t)ADDR_DSOUND)
 #define g_soundReady  (*(int32_t *)(uintptr_t)ADDR_MOVIE_SOUND_READY)
@@ -635,7 +635,7 @@ void __cdecl PlayMovie(const char *name, int32_t big)
                    name, 7) == 0)
         SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
     else
-        SetGameDir(*(const char *const *)AM2_IMAGE(ADDR_STR_AVI_DIR));
+        SetGameDir(*(const char *const *)((void *)(uintptr_t)(ADDR_STR_AVI_DIR)));
 
     if (!FileExists(name)
         || *(const int32_t *)(uintptr_t)ADDR_OPT_NO_MOVIES) {
@@ -721,7 +721,7 @@ int32_t __cdecl StateEnterAct1Movie(void)
     char name[0x20];
 
     /* The directory table's first entry, which is "avi". */
-    SetGameDir(*(const char *const *)AM2_IMAGE(ADDR_STR_AVI_DIR));
+    SetGameDir(*(const char *const *)((void *)(uintptr_t)(ADDR_STR_AVI_DIR)));
     MovieBuildName(name, "act1");
     PlayMovie(name, 0);
     return 0;

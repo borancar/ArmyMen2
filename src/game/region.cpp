@@ -223,7 +223,7 @@ void __cdecl BuildRegionGraph(void)
 
                 if (kTracePF)
                     orig_log((const char *)
-                             AM2_IMAGE(AM2_STR_ACTIVATING_REGION), region);
+                             ((void *)(uintptr_t)(AM2_STR_ACTIVATING_REGION)), region);
             }
 
             /* Up, left, right, down -- four inlined tests in the original
@@ -766,8 +766,8 @@ uint16_t __cdecl SettlePointInRegion(int32_t tile, uint32_t *pt)
     tried = 0;
 
     for (;;) {
-        x += ((const int32_t *)AM2_IMAGE(ADDR_SPIRAL_DX))[dir];
-        y += ((const int32_t *)AM2_IMAGE(ADDR_SPIRAL_DY))[dir];
+        x += ((const int32_t *)((void *)(uintptr_t)(ADDR_SPIRAL_DX)))[dir];
+        y += ((const int32_t *)((void *)(uintptr_t)(ADDR_SPIRAL_DY)))[dir];
 
         if (x > 0 && x < w && y > 0 && y < h) {
             int32_t cand = (y << shift) + x;
@@ -888,8 +888,8 @@ uint16_t __cdecl NearestAllowedTile(void *obj, int32_t tile, uint32_t *pt)
     tried = 0;
 
     for (;;) {
-        x += ((const int32_t *)AM2_IMAGE(ADDR_SPIRAL_DX))[dir];
-        y += ((const int32_t *)AM2_IMAGE(ADDR_SPIRAL_DY))[dir];
+        x += ((const int32_t *)((void *)(uintptr_t)(ADDR_SPIRAL_DX)))[dir];
+        y += ((const int32_t *)((void *)(uintptr_t)(ADDR_SPIRAL_DY)))[dir];
 
         if (x > 0 && x < w && y > 0 && y < h) {
             int32_t cand = (y << shift) + x;
@@ -1067,7 +1067,7 @@ int32_t __cdecl AnimStepPoint(void *obj, int32_t heading, int32_t pose,
     AM2_Point *out  = (AM2_Point *)outPt;
     uint8_t   *rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
     int32_t    animId =
-        ((const int32_t *)AM2_IMAGE(ADDR_WEAPON_POSE_FRAMES))[pose];
+        ((const int32_t *)((void *)(uintptr_t)(ADDR_WEAPON_POSE_FRAMES)))[pose];
     const AM2_AnimTable *table;
     int32_t              i;
     int32_t              speed;
@@ -1102,7 +1102,7 @@ int32_t __cdecl AnimStepPoint(void *obj, int32_t heading, int32_t pose,
         speed += speed;
 
     return MoveStepPoint(obj, heading, ((const uint8_t *)
-                             AM2_IMAGE(ADDR_FRAME_HEADING_BIAS))[animId],
+                             ((void *)(uintptr_t)(ADDR_FRAME_HEADING_BIAS)))[animId],
                          speed, 0, 0, out);
 }
 
@@ -1544,7 +1544,7 @@ int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg)
                         TileOfPoint(*at), route, &n, arg)) {
         *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
             *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-            + *(const int32_t *)AM2_IMAGE(ADDR_PATH_RETRY_MS);
+            + *(const int32_t *)((void *)(uintptr_t)(ADDR_PATH_RETRY_MS));
         return 0;
     }
 
@@ -2077,7 +2077,7 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
     uint8_t        *cells = rec + TILEMASK_OFF_CELLS;
     int32_t        *ring  = (int32_t *)(uintptr_t)ADDR_TILEMASK_NEIGHBOURS;
     const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
-                                AM2_IMAGE(ADDR_BIT_FROM_N);
+                                ((void *)(uintptr_t)(ADDR_BIT_FROM_N));
     const AM2_Rect *hit;
     const uint8_t  *m;
     const uint8_t  *bits;
@@ -2674,7 +2674,7 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     uint8_t        *cells = rec + TILEMASK_OFF_CELLS;
     int32_t        *ring  = (int32_t *)(uintptr_t)ADDR_TILEMASK_NEIGHBOURS;
     const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
-                                AM2_IMAGE(ADDR_BIT_FROM_N);
+                                ((void *)(uintptr_t)(ADDR_BIT_FROM_N));
     const uint8_t  *m;
     const uint8_t  *bits;
     const uint8_t  *spr;
@@ -2898,13 +2898,13 @@ void __cdecl UnitWeaponInfo(void *unit, void *out)
 
         if (kind == AM2_WEAPON_KIND_TIMED)
             range = (int32_t)((double)range
-                              * *(const double *)AM2_IMAGE(ADDR_WEAPON_RANGE_K3));
+                              * *(const double *)((void *)(uintptr_t)(ADDR_WEAPON_RANGE_K3)));
 
         v = (double)range;
         *(int32_t *)(c + SIGHTC_OFF_WANT_RANGE) =
-            (int32_t)(v * *(const double *)AM2_IMAGE(ADDR_WEAPON_RANGE_LO));
+            (int32_t)(v * *(const double *)((void *)(uintptr_t)(ADDR_WEAPON_RANGE_LO)));
         *(int32_t *)(c + SIGHTC_OFF_MAX_RANGE) =
-            (int32_t)(v * *(const double *)AM2_IMAGE(ADDR_WEAPON_RANGE_HI));
+            (int32_t)(v * *(const double *)((void *)(uintptr_t)(ADDR_WEAPON_RANGE_HI)));
     }
 
     elapsed = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
@@ -2915,7 +2915,7 @@ void __cdecl UnitWeaponInfo(void *unit, void *out)
             ((uint32_t)*(const int32_t *)(rec + ITEMTYPE_OFF_COOLDOWN)
              < elapsed) ? 1 : 0;
     } else {
-        const uint8_t *rank = (const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+        const uint8_t *rank = (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
             + (uint32_t)*(const int32_t *)(u + OBJ_OFF_RANK) * RANK_REC_BYTES;
         uint32_t wait = (uint32_t)(double)
             ((double)(uint32_t)*(const int32_t *)(rec + ITEMTYPE_OFF_COOLDOWN)
@@ -3571,10 +3571,10 @@ walk:
     /* Indexed by the AI context's class -- SIGHTC_OFF_FIELD_00, which
      * TrooperBuildContext fills from ClassifyByCode74, so 0, 1 or 2. */
     *(int32_t *)(w + 8) =
-        ((const int32_t *)AM2_IMAGE(
+        ((const int32_t *)((void *)(uintptr_t)(
              *(const int32_t *)(o + OBJ_OFF_MOVE_STATE_ALT)
                  ? ADDR_AI_MOVE_STATE_ALT
-                 : ADDR_AI_MOVE_STATE))[*(const int32_t *)ctx];
+                 : ADDR_AI_MOVE_STATE)))[*(const int32_t *)ctx];
     if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == AM2_AI_KIND_FORCES_ALT)
         *(int32_t *)(w + 8) = 3;
 
@@ -3990,7 +3990,7 @@ void __cdecl AiAttackBody(void *obj, void *out, void *ctx)
     uint8_t       *o = (uint8_t *)obj;
     uint8_t       *w = (uint8_t *)out;
     uint8_t       *c = (uint8_t *)ctx;
-    const uint8_t *rank = (const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+    const uint8_t *rank = (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
                           + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
                                 * RANK_REC_BYTES;
     uint8_t *leader;
@@ -4316,7 +4316,7 @@ void __cdecl AiEngageStep(void *obj, void *out, void *ctx)
     uint8_t       *o = (uint8_t *)obj;
     uint8_t       *w = (uint8_t *)out;
     uint8_t       *c = (uint8_t *)ctx;
-    const uint8_t *rank = (const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+    const uint8_t *rank = (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
                           + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
                                 * RANK_REC_BYTES;
     uint8_t *seen;
@@ -4543,7 +4543,7 @@ done:
  * AiSightTrace below is the inner 38 that all four DO share. */
 static int32_t AiCanSee(const uint8_t *o, const uint8_t *seen)
 {
-    const uint8_t *rank = (const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+    const uint8_t *rank = (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
                           + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
                                 * RANK_REC_BYTES;
     uint8_t  facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
@@ -5039,8 +5039,8 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
  * pointer renders bytes as text and cannot fault. */
 typedef void (__cdecl *AM2_LogOneFn)(void *obj);
 typedef void (__cdecl *AM2_LogSixFn)(const char *, ...);
-#define orig_log_six ((AM2_LogSixFn)(uintptr_t)AM2_IMAGE(ADDR_LOG))
-#define orig_log_one ((AM2_LogOneFn)(uintptr_t)AM2_IMAGE(ADDR_LOG))
+#define orig_log_six ((AM2_LogSixFn)(uintptr_t)((void *)(uintptr_t)(ADDR_LOG)))
+#define orig_log_one ((AM2_LogOneFn)(uintptr_t)((void *)(uintptr_t)(ADDR_LOG)))
 
 /* SightScan -- original 0x00403B40, 1,888 bytes over a 0x84C frame, five
  * callers. What fills SIGHT_OFF_FOUND and the range and bearing beside it, so
@@ -5147,7 +5147,7 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
     ++*(int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
     orig_log_one(o);
 
-    reach = *(const int32_t *)((const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+    reach = *(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
                                + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
                                      * RANK_REC_BYTES
                                + RANK_REC_OFF_SIGHT_RANGE);
@@ -5291,7 +5291,7 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
                 delta = -delta;
             {
                 const uint8_t *rank =
-                    (const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+                    (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
                     + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
                           * RANK_REC_BYTES;
 
@@ -5801,7 +5801,7 @@ void __cdecl AiHitReact(void *obj, void *out, void *ctx)
     } else if (kind != 8
                && *(const int32_t *)(c + SIGHTC_OFF_KIND) != 3) {
         int32_t limit = *(const int32_t *)
-            ((const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+            ((const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
              + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
                * RANK_REC_BYTES
              + RANK_REC_OFF_THRESHOLD);
@@ -5812,7 +5812,7 @@ void __cdecl AiHitReact(void *obj, void *out, void *ctx)
                            + (v >= 0x80 ? 1 : 0);
 
             *(int32_t *)(w + 8) =
-                ((const int32_t *)AM2_IMAGE(ADDR_HIT_POSE_BY_CLASS))[slot];
+                ((const int32_t *)((void *)(uintptr_t)(ADDR_HIT_POSE_BY_CLASS)))[slot];
         } else if ((int32_t)v < limit) {
             *(int32_t *)(w + 8) = AM2_POSE_HIT_HEAVY;
         }
@@ -7013,8 +7013,8 @@ void __cdecl TrooperAiStep(void *obj, void *out)
 
 typedef int32_t  (__cdecl *AM2_ScanFn)(void *obj, void *range, void *bearing,
                                        void *a, void *b, int32_t z);
-#define kRangeWant (*(const double *)AM2_IMAGE(ADDR_SIGHT_RANGE_WANT))
-#define kRangeHi   (*(const double *)AM2_IMAGE(ADDR_WEAPON_RANGE_HI))
+#define kRangeWant (*(const double *)((void *)(uintptr_t)(ADDR_SIGHT_RANGE_WANT)))
+#define kRangeHi   (*(const double *)((void *)(uintptr_t)(ADDR_WEAPON_RANGE_HI)))
 
 /* One of the two reference blocks both builders share: resolve a uid to an
  * object and drop it if it has gone, been destroyed, been concealed, or is at
@@ -7570,7 +7570,7 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
                          (int32_t *)(c + SIGHTC_OFF_RANGE),
                          c + SIGHTC_OFF_BEARING);
 
-            rank = (const uint8_t *)AM2_IMAGE(ADDR_RANK_RECORDS)
+            rank = (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
                    + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
                      * RANK_REC_BYTES;
 
@@ -7690,7 +7690,7 @@ void __cdecl RoachAliveStepA(void *obj, void *out)
  * this file is flat. */
 typedef uint32_t (__stdcall *AM2_RegionTickFn)(void);
 #define orig_get_tick_count \
-    (*(AM2_RegionTickFn *)AM2_IMAGE(ADDR_IAT_GET_TICK_COUNT))
+    (*(AM2_RegionTickFn *)((void *)(uintptr_t)(ADDR_IAT_GET_TICK_COUNT)))
 
 /* Type2PlayerStep -- original 0x0044AD40, one caller: StepType2's player arm,
  * which runs when the object is Sarge AND belongs to the default owner. So
@@ -7831,7 +7831,7 @@ void __cdecl Type2PlayerStep(void *obj, void *out)
             (HeldWeaponCode(obj) == AM2_POSE_WEAPON_CODE)
                 ? AM2_POSE_INDEX_SPECIAL : AM2_POSE_INDEX_DEFAULT;
 
-    frame = *(const int16_t *)((const uint8_t *)AM2_IMAGE(ADDR_WEAPON_POSE_FRAMES)
+    frame = *(const int16_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_WEAPON_POSE_FRAMES))
                                + (uint32_t)*(const int32_t *)(w + 8) * 4);
 
     if (RowAnimField4(*(const void *const *)(o + OBJ_OFF_ROWS),
@@ -7841,7 +7841,7 @@ void __cdecl Type2PlayerStep(void *obj, void *out)
     /* Button zero's press tick -- ADDR_MOUSE_PRESS + 4; win32/device.cpp
      * spells the same two fields as AM2_MousePress, privately. */
     if (orig_get_tick_count()
-            - ((const uint32_t *)AM2_IMAGE(ADDR_MOUSE_PRESS))[1]
+            - ((const uint32_t *)((void *)(uintptr_t)(ADDR_MOUSE_PRESS)))[1]
         > AM2_VIEW_SNAP_MS
         && !*(const int32_t *)(o + OBJ_OFF_FIELD_10C)) {
         *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP  = 1;
@@ -7905,7 +7905,7 @@ typedef void (__cdecl *AM2_Step2BFn)(void *obj, void *out);
 
 
 typedef int32_t (__cdecl *AM2_GameRandFn)(void);
-#define orig_game_rand ((AM2_GameRandFn)(uintptr_t)AM2_IMAGE(ADDR_GAME_RAND))
+#define orig_game_rand ((AM2_GameRandFn)(uintptr_t)((void *)(uintptr_t)(ADDR_GAME_RAND)))
 
 /* The four stores TrooperFire makes twice when a trooper turns to aim, and
  * the original writes them out both times. One helper here: they are four
@@ -8234,7 +8234,7 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
     if (*(const int16_t *)(*(uint8_t *const *)(o + OBJ_OFF_ROWS) + 0x3C) <= 0
         && RowAnimField4(*(uint8_t *const *)(o + OBJ_OFF_ROWS),
                          (uint16_t)*(const int16_t *)(
-                             (const uint8_t *)AM2_IMAGE(ADDR_WEAPON_POSE_FRAMES)
+                             (const uint8_t *)((void *)(uintptr_t)(ADDR_WEAPON_POSE_FRAMES))
                              + (uint32_t)*(const int32_t *)(w + 8) * 4)) <= 0) {
         *(int16_t *)(o + OBJ_OFF_FIELD_D6) = 0;
         *(int32_t *)(o + OBJ_OFF_STUCK_COUNT) = 0;
@@ -8326,8 +8326,8 @@ sweep:
         && !*(const int32_t *)(o + OBJ_OFF_FIELD_10C))
         tries = AM2_STEP_SWEEP_PLAYER;
     {
-        const int32_t *step = (const int32_t *)AM2_IMAGE(
-                                  ADDR_STEP_FACING_SWEEP);
+        const int32_t *step = (const int32_t *)((void *)(uintptr_t)(
+                                  ADDR_STEP_FACING_SWEEP));
         /* The original counts tries from ONE -- `mov [esp+0x1c], 1` at
          * 0x0044B174 -- and stops when the count reaches the limit, so the
          * limit is one more than the headings tried: three for the player's
@@ -8507,9 +8507,9 @@ settle_facing:
                         (const uint8_t *)*(void *const *)(uintptr_t)
                             ADDR_COMM_OBJECT + 0x418))
                     orig_log_six(
-                        (const char *)AM2_IMAGE(AM2_STR_ASKING_FOR_ITEM),
-                        (const char *)AM2_IMAGE(old ? AM2_STR_YES
-                                                    : AM2_STR_NO),
+                        (const char *)((void *)(uintptr_t)(AM2_STR_ASKING_FOR_ITEM)),
+                        (const char *)((void *)(uintptr_t)(old ? AM2_STR_YES
+                                                    : AM2_STR_NO)),
                         cap,
                         *(const int32_t *)(
                             *(uint8_t *const *)(at + OBJ_OFF_FIELD_C0)
@@ -8616,8 +8616,8 @@ pose:
         ObjMoveAlongFacing(o, v, 0, 0);
     }
 
-    *(o + OBJ_OFF_HEIGHT_ADJ) = (uint8_t)((const int32_t *)AM2_IMAGE(
-        ADDR_TROOPER_CLASS_VALUE))[klass];
+    *(o + OBJ_OFF_HEIGHT_ADJ) = (uint8_t)((const int32_t *)((void *)(uintptr_t)(
+        ADDR_TROOPER_CLASS_VALUE)))[klass];
 
     /* DRAG THE HELD WEAPONS ALONG. This is the loop whose absence bootcamp's
      * object dump caught: a dropped weapon left at 0,0 instead of at the
@@ -10240,7 +10240,7 @@ void __cdecl Step3RouteAndBoard(void *obj, void *rec)
  * air.cpp reach it -- it lives above the CRT line, so the selftest's slide
  * applies. */
 typedef int32_t (__cdecl *AM2_Step3RandFn)(void);
-#define orig_step3_rand ((AM2_Step3RandFn)AM2_IMAGE(ADDR_GAME_RAND))
+#define orig_step3_rand ((AM2_Step3RandFn)((void *)(uintptr_t)(ADDR_GAME_RAND)))
 
 /* 0x0045CB30, one caller in StepType3, and the largest function in the
  * vehicle block at 769 instructions. The whole per-frame step of a driven

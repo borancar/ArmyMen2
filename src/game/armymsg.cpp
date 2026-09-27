@@ -20,9 +20,9 @@
 #include "msgslot.h"  /* FindPlayerById, MsgField12 */
 
 typedef uint32_t (__stdcall *AM2_TickFn)(void);
-#define orig_get_tick_count (*(AM2_TickFn *)AM2_IMAGE(ADDR_IAT_GET_TICK_COUNT))
+#define orig_get_tick_count (*(AM2_TickFn *)((void *)(uintptr_t)(ADDR_IAT_GET_TICK_COUNT)))
 
-#define kComm       (*(uint8_t **)AM2_IMAGE(ADDR_COMM_OBJECT))
+#define kComm       (*(uint8_t **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)))
 #define kPacket     ((uint8_t *)((void *)(uintptr_t)(ADDR_ARMY_PACKET)))
 #define kPacketLen  (*(int32_t *)((void *)(uintptr_t)(ADDR_ARMY_PACKET_LEN)))
 
@@ -130,7 +130,7 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
     *(int32_t *)(me + FLOW_OFF_SEQUENCE) += 1;
     *(int32_t *)(kComm + COMM_OFF_SEND_STAMP) = (int32_t)orig_get_tick_count();
     kPacketLen = (int32_t)AM2_ARMY_PACKET_HDR;
-    (void)MsgField12((const void *)AM2_IMAGE(ADDR_MSG_LIST_POOL));
+    (void)MsgField12((const void *)((void *)(uintptr_t)(ADDR_MSG_LIST_POOL)));
     return 1;
 }
 
@@ -527,7 +527,7 @@ void __cdecl TellOneSlot(int32_t slot)
     h->uid  = 0;
 
     list = (const uint8_t *)
-        ((void *const *)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
+        ((void *const *)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[slot];
     if (*(const int32_t *)(list + LIST_OFF_COUNT) <= 0)
         return;
 
@@ -550,7 +550,7 @@ void __cdecl TellOneSlot(int32_t slot)
         }
 
         list = (const uint8_t *)
-            ((void *const *)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
+            ((void *const *)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[slot];
         i++;
     } while (i < *(const int32_t *)(list + LIST_OFF_COUNT));
 
@@ -1991,7 +1991,7 @@ void __cdecl SendVehicleUpdates(int32_t slot)
     h->uid  = 0;
 
     list = (const uint8_t *)
-        ((void *const *)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
+        ((void *const *)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[slot];
     if (*(const int32_t *)(list + LIST_OFF_COUNT) <= 0)
         return;
 
@@ -2014,7 +2014,7 @@ void __cdecl SendVehicleUpdates(int32_t slot)
         }
 
         list = (const uint8_t *)
-            ((void *const *)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
+            ((void *const *)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[slot];
         i++;
     } while (i < *(const int32_t *)(list + LIST_OFF_COUNT));
 

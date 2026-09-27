@@ -40,7 +40,7 @@
 
 /* The CRT's atexit, above the CRT line and not on the patch list. */
 typedef int32_t (__cdecl *AM2_AtExitFn)(void (__cdecl *)(void));
-#define orig_atexit (*(AM2_AtExitFn)AM2_IMAGE(ADDR_CRT_ATEXIT))
+#define orig_atexit (*(AM2_AtExitFn)((void *)(uintptr_t)(ADDR_CRT_ATEXIT)))
 #include "../image.h"  /* AM2_IMAGE */
 
 #ifdef AM2_STANDALONE

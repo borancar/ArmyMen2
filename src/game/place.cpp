@@ -88,7 +88,7 @@ extern "C" const uint8_t am2_unit_types[720] = {
 
 #define kSep         (" \t\n;,")
 
-#define kUnitType(i) ((const uint8_t *)AM2_IMAGE(ADDR_UNIT_TYPES) \
+#define kUnitType(i) ((const uint8_t *)((void *)(uintptr_t)(ADDR_UNIT_TYPES)) \
                       + (size_t)(i) * AM2_UNIT_TYPE_STRIDE)
 
 /* 0x0043B3D0. The three globals are cleared in the original's order --
@@ -614,8 +614,8 @@ int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
 
     slot = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT, army);
 
-    for (rec = (const uint8_t *)AM2_IMAGE(ADDR_UNIT_TYPES);
-         rec < (const uint8_t *)AM2_IMAGE(ADDR_UNIT_TYPES)
+    for (rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_UNIT_TYPES));
+         rec < (const uint8_t *)((void *)(uintptr_t)(ADDR_UNIT_TYPES))
                + AM2_UNIT_TYPE_COUNT * AM2_UNIT_TYPE_STRIDE;
          rec += AM2_UNIT_TYPE_STRIDE) {
         if (*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER)
@@ -683,7 +683,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
                             int32_t *points, int32_t facing, int32_t group,
                             const char *name)
 {
-    const uint8_t *rec = (const uint8_t *)AM2_IMAGE(ADDR_UNIT_TYPES)
+    const uint8_t *rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_UNIT_TYPES))
                          + (uintptr_t)type * AM2_UNIT_TYPE_STRIDE;
     const int32_t  kind = *(const int32_t *)(rec + UNIT_TYPE_OFF_KIND);
     uint8_t       *made;
@@ -837,9 +837,9 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
 
             *(int32_t *)(occupant + OBJ_OFF_RANK) = 4;
             *(int16_t *)(occupant + OBJ_OFF_MAX_HEALTH) =
-                *(const int16_t *)AM2_IMAGE(ADDR_PILLBOX_TROOPER_HEALTH);
+                *(const int16_t *)((void *)(uintptr_t)(ADDR_PILLBOX_TROOPER_HEALTH));
             *(int16_t *)(occupant + OBJ_OFF_HEALTH) =
-                *(const int16_t *)AM2_IMAGE(ADDR_PILLBOX_TROOPER_HEALTH);
+                *(const int16_t *)((void *)(uintptr_t)(ADDR_PILLBOX_TROOPER_HEALTH));
             /* +0x540, not OBJ_OFF_SOLDIER_KIND at +0x544 -- four bytes
              * apart, and tools/checkoffsetuse.py is what caught the slip. */
             *(int32_t *)(occupant + OBJ_OFF_FIELD_94)  = 1;

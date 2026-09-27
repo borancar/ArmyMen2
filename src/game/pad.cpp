@@ -31,8 +31,8 @@ extern "C" const int32_t am2_pad_bit_table[66] = {
 };
 #endif
 
-#define kPads        ((void *)(uintptr_t)AM2_IMAGE(ADDR_PADS))
-#define kPadNumbers  ((void *)(uintptr_t)AM2_IMAGE(ADDR_PAD_NUMBERS))
+#define kPads        ((void *)(uintptr_t)((void *)(uintptr_t)(ADDR_PADS)))
+#define kPadNumbers  ((void *)(uintptr_t)((void *)(uintptr_t)(ADDR_PAD_NUMBERS)))
 #define kPadCount    (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_PAD_COUNT)))
 
 void __cdecl ResetPads(void)
@@ -307,7 +307,7 @@ int32_t __cdecl ObjTileHook(void *obj)
 
     /* The damage pass, before the early exit. */
     if (padLayer != 0 && padLayer[tile] > 0) {
-        const uint8_t *num = (const uint8_t *)AM2_IMAGE(ADDR_PAD_NUMBERS)
+        const uint8_t *num = (const uint8_t *)((void *)(uintptr_t)(ADDR_PAD_NUMBERS))
                              + (uint32_t)padLayer[tile] * AM2_PAD_NUMBER_STRIDE;
 
         if (*(const int32_t *)(num + PADNUM_OFF_PADS) != 0
@@ -316,7 +316,7 @@ int32_t __cdecl ObjTileHook(void *obj)
             int32_t        n = *(const int16_t *)(num + PADNUM_OFF_COUNT);
 
             for (i = 0; i < n; i++) {
-                const uint8_t *pad = (const uint8_t *)AM2_IMAGE(ADDR_PADS)
+                const uint8_t *pad = (const uint8_t *)((void *)(uintptr_t)(ADDR_PADS))
                                      + (uint32_t)ids[i] * AM2_PAD_STRIDE;
 
                 if (*(const int32_t *)(pad + PAD_OFF_DAMAGE) != 0
@@ -343,8 +343,8 @@ int32_t __cdecl ObjTileHook(void *obj)
         if (curBits != prevBits) {
             uint8_t entered = (uint8_t)(~prevBits & curBits);
             uint8_t left    = (uint8_t)(~curBits  & prevBits);
-            const int32_t *mask = (const int32_t *)AM2_IMAGE(ADDR_PAD_BIT_TABLE);
-            uint8_t *num = (uint8_t *)AM2_IMAGE(ADDR_PAD_NUMBERS);
+            const int32_t *mask = (const int32_t *)((void *)(uintptr_t)(ADDR_PAD_BIT_TABLE));
+            uint8_t *num = (uint8_t *)((void *)(uintptr_t)(ADDR_PAD_NUMBERS));
 
             for (i = 0; i < AM2_PAD_BITS; i++, num += AM2_PAD_NUMBER_STRIDE) {
                 if (mask[i] & entered)
@@ -363,10 +363,10 @@ int32_t __cdecl ObjTileHook(void *obj)
 
         if (curPad != prevPad) {
             if (curPad != 0)
-                PadNumberEnter(o, (uint8_t *)AM2_IMAGE(ADDR_PAD_NUMBERS)
+                PadNumberEnter(o, (uint8_t *)((void *)(uintptr_t)(ADDR_PAD_NUMBERS))
                                   + (uint32_t)curPad * AM2_PAD_NUMBER_STRIDE);
             if (prevPad != 0)
-                PadNumberLeave(o, (uint8_t *)AM2_IMAGE(ADDR_PAD_NUMBERS)
+                PadNumberLeave(o, (uint8_t *)((void *)(uintptr_t)(ADDR_PAD_NUMBERS))
                                   + (uint32_t)prevPad * AM2_PAD_NUMBER_STRIDE);
             changed = 1;
         }

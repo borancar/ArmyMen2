@@ -63,7 +63,7 @@ typedef struct AM2_EventEntry {
 } AM2_EventEntry;
 
 #define kEventTable ((AM2_EventEntry **)((void *)(uintptr_t)(ADDR_EVENT_TABLE)))
-#define kImageFn(a)       ((const void *)AM2_IMAGE(a))
+#define kImageFn(a)       ((const void *)((void *)(uintptr_t)(a)))
 
 /* The eight that exist whether a script mentions them or not. Each is declared
  * into the name table on the spot -- ScriptNameUid creates the entry when the
@@ -175,15 +175,15 @@ void __cdecl DeclareRuleVars(void)
     EventClearAll();
 
     for (uint32_t i = 0; i < sizeof kWinConditions / sizeof kWinConditions[0]; i++)
-        EventRegister(0, ScriptNameUid((const char *)AM2_IMAGE(
-                                   kWinConditions[i].name)),
+        EventRegister(0, ScriptNameUid((const char *)((void *)(uintptr_t)(
+                                   kWinConditions[i].name))),
                             0, kWinConditions[i].handler,
                             (void *)(uintptr_t)kWinConditions[i].army, 0);
 
     for (uint32_t i = 0; i < sizeof kRuleEvents / sizeof kRuleEvents[0]; i++) {
         int32_t uid = AllocUid();
 
-        *(int32_t *)AM2_IMAGE(kRuleEvents[i].uidslot) = uid;
+        *(int32_t *)((void *)(uintptr_t)(kRuleEvents[i].uidslot)) = uid;
         EventRegister(0, uid, 0, kRuleEvents[i].handler, 0, 0);
     }
 
@@ -528,7 +528,7 @@ void __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond)
         orig_fread((uint8_t *)cond->tests + i * 0x1C, 0x1C, 1, fp);
 }
 
-#define kPads ((AM2_Pad *)AM2_IMAGE(ADDR_PADS))
+#define kPads ((AM2_Pad *)((void *)(uintptr_t)(ADDR_PADS)))
 
 int32_t __cdecl LoadEventSection(am2_FILE *fp)
 {
@@ -753,7 +753,7 @@ void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame)
  * because the call sites are what carry the format strings that named these
  * functions in the first place. */
 #define kEventDebug \
-    (*(const int32_t *)((const uint8_t *)*(void **)AM2_IMAGE(ADDR_COMM_OBJECT) \
+    (*(const int32_t *)((const uint8_t *)*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)) \
                         + COMM_OFF_VERBOSE))
 
 
@@ -1118,9 +1118,9 @@ void __cdecl ScriptResurrectItem(uint32_t uid, uint32_t where)
 void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
                             int32_t relative)
 {
-    void    *comm = *(void **)AM2_IMAGE(ADDR_COMM_OBJECT);
+    void    *comm = *(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT));
     int32_t  slot = CommSlotForArmy(comm, army);
-    uint8_t *list = ((uint8_t **)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
+    uint8_t *list = ((uint8_t **)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[slot];
     uint16_t x    = (uint16_t)(point & 0xFFFFu);
     uint16_t y    = (uint16_t)(point >> 16);
     int32_t  i    = 0;
@@ -1428,7 +1428,7 @@ typedef int32_t (__cdecl *AM2_RandFn)(void);
  * the one thing under the condition layer still not reconstructed. */
 typedef void (__cdecl *AM2_RunScriptActionFn)(AM2_ScriptAction *act,
                                               void *arg);
-#define orig_rand        (*(AM2_RandFn)AM2_IMAGE(ADDR_GAME_RAND))
+#define orig_rand        (*(AM2_RandFn)((void *)(uintptr_t)(ADDR_GAME_RAND)))
 
 /* 0x00421410. Run the i'th action of a condition.
  *
@@ -2090,9 +2090,9 @@ void __cdecl EvtFlag40Set(int32_t name, uint32_t me)
  * defect recorded there does not apply. */
 void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
 {
-    void    *comm = *(void **)AM2_IMAGE(ADDR_COMM_OBJECT);
+    void    *comm = *(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT));
     int32_t  slot = CommSlotForArmy(comm, army);
-    uint8_t *list = ((uint8_t **)AM2_IMAGE(ADDR_ARMY_OBJ_LISTS))[slot];
+    uint8_t *list = ((uint8_t **)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[slot];
     int32_t  i    = 0;
 
     while (i < *(const int32_t *)(list + LIST_OFF_COUNT)) {
@@ -2267,8 +2267,8 @@ typedef int32_t (__cdecl *AM2_EvalOperandFn)(int32_t a, int32_t b, int32_t c);
 typedef void (__cdecl *AM2_MissionNetFn)(int32_t a, int32_t b);
 typedef int32_t (__cdecl *AM2_FindFirstFn)(const char *spec, void *data);
 typedef int32_t (__cdecl *AM2_FindCloseFn)(int32_t handle);
-#define orig_findfirst (*(AM2_FindFirstFn)AM2_IMAGE(ADDR_CRT_FINDFIRST))
-#define orig_findclose (*(AM2_FindCloseFn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
+#define orig_findfirst (*(AM2_FindFirstFn)((void *)(uintptr_t)(ADDR_CRT_FINDFIRST)))
+#define orig_findclose (*(AM2_FindCloseFn)((void *)(uintptr_t)(ADDR_CRT_FINDCLOSE)))
 /* MissionEnded is reconstructed below and called by name; its typedef went
  * with the seam. */
 #define orig_mission_local  MissionEnded
@@ -2748,7 +2748,7 @@ void __cdecl EventNotify(int32_t type, int32_t num1, uint32_t uid1,
                         int32_t maskB, int32_t delay, int32_t removeevent,
                         int32_t arg)
 {
-    const uint8_t *comm = *(const uint8_t **)AM2_IMAGE(ADDR_COMM_OBJECT);
+    const uint8_t *comm = *(const uint8_t **)((void *)(uintptr_t)(ADDR_COMM_OBJECT));
 
     if (*(const int32_t *)((void *)(uintptr_t)(ADDR_MP_SESSION)) != 0
         && *(const int32_t *)(comm + COMM_OFF_IS_HOST) == 0)

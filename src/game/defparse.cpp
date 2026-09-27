@@ -20,8 +20,8 @@
 
 typedef void (__cdecl *AM2_QsortFn)(void *base, uint32_t n, uint32_t size,
                                     const void *cmp);
-#define orig_qsort (*(AM2_QsortFn)AM2_IMAGE(ADDR_CRT_QSORT))
-#define orig_bsearch (*(AM2_BsearchFn)AM2_IMAGE(ADDR_CRT_BSEARCH))
+#define orig_qsort (*(AM2_QsortFn)((void *)(uintptr_t)(ADDR_CRT_QSORT)))
+#define orig_bsearch (*(AM2_BsearchFn)((void *)(uintptr_t)(ADDR_CRT_BSEARCH)))
 #define kDefLinkCap    (*(int32_t *)((void *)(uintptr_t)(ADDR_DEF_LINK_CAP)))
 #define kDefObjRecs      (*(void **)((void *)(uintptr_t)(ADDR_DEF_OBJ_RECS)))
 #define kDefTrooperRecs  (*(void **)((void *)(uintptr_t)(ADDR_DEF_TROOPER_RECS)))

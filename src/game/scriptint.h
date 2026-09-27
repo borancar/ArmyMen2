@@ -35,16 +35,16 @@ extern "C" {
 /* The keyword table is no longer among these: it is written out in
  * scripttokens.h and carried, so nothing has to be mapped to answer what a
  * word means. See the comment there. */
-#define kKindName(k)     ((const char *)AM2_IMAGE( \
-                             ((const uint32_t *)AM2_IMAGE( \
-                                 ADDR_SCRIPT_KIND_NAMES))[k]))
-#define kUnknownWord     ((const char *)AM2_IMAGE( \
-                             *(const uint32_t *)AM2_IMAGE( \
-                                 ADDR_SCRIPT_UNKNOWN_STR)))
-#define kPadBit(n)       (((const int32_t *)AM2_IMAGE(ADDR_PAD_BIT_TABLE))[n])
-#define kImageStr(a)     ((const char *)AM2_IMAGE( \
-                             *(const uint32_t *)AM2_IMAGE(a)))
-#define kCommObject      (*(uint8_t *const *)AM2_IMAGE(ADDR_COMM_OBJECT))
+#define kKindName(k)     ((const char *)((void *)(uintptr_t)( \
+                             ((const uint32_t *)((void *)(uintptr_t)( \
+                                 ADDR_SCRIPT_KIND_NAMES)))[k])))
+#define kUnknownWord     ((const char *)((void *)(uintptr_t)( \
+                             *(const uint32_t *)((void *)(uintptr_t)( \
+                                 ADDR_SCRIPT_UNKNOWN_STR)))))
+#define kPadBit(n)       (((const int32_t *)((void *)(uintptr_t)(ADDR_PAD_BIT_TABLE)))[n])
+#define kImageStr(a)     ((const char *)((void *)(uintptr_t)( \
+                             *(const uint32_t *)((void *)(uintptr_t)(a)))))
+#define kCommObject      (*(uint8_t *const *)((void *)(uintptr_t)(ADDR_COMM_OBJECT)))
 
 /* Image data the reconstruction WRITES. */
 #define kScriptWord      ((char *)((void *)(uintptr_t)(ADDR_SCRIPT_WORD_BUF)))

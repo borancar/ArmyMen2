@@ -2450,7 +2450,7 @@ void __cdecl DrawEffectLayer(void)
 {
     uint8_t             block[AM2_AIM_BLOCK * AM2_AIM_BLOCK];
     LPDIRECTDRAWSURFACE target = g_drawTarget;
-    const int16_t      *map    = (const int16_t *)AM2_IMAGE(ADDR_AIM_DISPLACE_MAP);
+    const int16_t      *map    = (const int16_t *)((void *)(uintptr_t)(ADDR_AIM_DISPLACE_MAP));
     int32_t             army;
 
     for (army = 0; army < AM2_COMM_SLOTS; army++) {
@@ -2476,7 +2476,7 @@ void __cdecl DrawEffectLayer(void)
         box.right  = x + AM2_AIM_BOX_RIGHT;
         box.bottom = y + AM2_AIM_BOX_BOTTOM;
 
-        if (IntersectRect(&hit, &box, (const RECT *)AM2_IMAGE(ADDR_SCREEN_CLIP))) {
+        if (IntersectRect(&hit, &box, (const RECT *)((void *)(uintptr_t)(ADDR_SCREEN_CLIP)))) {
             int32_t row, col;
 
             /* Read: every pixel of the visible part of the block, taken from

@@ -29,7 +29,7 @@ extern "C" {
 #endif
 
 /* Zero in the game, where the image is at its own base. Set once by whoever
- * mapped the image somewhere else. */
+ * mapped the image somewhere else (the offline selftest). */
 extern int32_t am2_image_slide;
 
 /* The image maps at its own base in the injected and byte-match builds

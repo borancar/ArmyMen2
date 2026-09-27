@@ -281,7 +281,7 @@ void *__cdecl FindLevelRecord(int32_t id)
 
     *(int32_t *)key = id;
 
-    return ((AM2_BsearchFn)AM2_IMAGE(ADDR_CRT_BSEARCH))(
+    return ((AM2_BsearchFn)((void *)(uintptr_t)(ADDR_CRT_BSEARCH)))(
                key, *(void **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE)),
                (uint32_t)*(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT)),
                AM2_LEVEL_RECORD_SIZE,
@@ -323,7 +323,7 @@ void __cdecl ReadBootcampLevels(void)
 /* Still original: the CRT lower-caser. ReadMpMapList beside it is ours, and
  * declared above. */
 typedef char *(__cdecl *AM2_StrlwrFn)(char *);
-#define orig_strlwr       ((AM2_StrlwrFn)AM2_IMAGE(ADDR_CRT_STRLWR))
+#define orig_strlwr       ((AM2_StrlwrFn)((void *)(uintptr_t)(ADDR_CRT_STRLWR)))
 
 /* FindLevelByName -- original 0x0043E230, six callers, 144 bytes. The LEVEL
  * table's by-name search, and the name ScriptListFind below could not have.

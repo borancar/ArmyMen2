@@ -403,9 +403,9 @@ void __cdecl OnBootCamp(void)
 typedef int32_t (__cdecl *am2_findfirst_fn)(const char *, void *);
 typedef int32_t (__cdecl *am2_findclose_fn)(int32_t);
 typedef int32_t (__cdecl *am2_mkdir_fn)(const char *);
-#define orig_findfirst ((am2_findfirst_fn)AM2_IMAGE(ADDR_CRT_FINDFIRST))
-#define orig_findclose ((am2_findclose_fn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
-#define orig_mkdir     ((am2_mkdir_fn)AM2_IMAGE(ADDR_CRT_MKDIR))
+#define orig_findfirst ((am2_findfirst_fn)((void *)(uintptr_t)(ADDR_CRT_FINDFIRST)))
+#define orig_findclose ((am2_findclose_fn)((void *)(uintptr_t)(ADDR_CRT_FINDCLOSE)))
+#define orig_mkdir     ((am2_mkdir_fn)((void *)(uintptr_t)(ADDR_CRT_MKDIR)))
 
 /* 0x00451990. The OK button of RECRUIT's ENTER NAME dialog -- 0x00451AF0
  * builds it and is the only thing that references this address. Take the

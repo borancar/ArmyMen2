@@ -469,7 +469,7 @@ static int32_t MaskSolid(uint32_t x, uint32_t y, const void *mask,
 /* The one the loose arm still needs: MSVC's _findfirst. The packed half was
  * here too until it was reconstructed. */
 typedef int32_t (__cdecl *AM2_FindFirstFn)(const char *pattern, void *data);
-#define orig_findfirst  ((AM2_FindFirstFn)AM2_IMAGE(ADDR_CRT_FINDFIRST))
+#define orig_findfirst  ((AM2_FindFirstFn)((void *)(uintptr_t)(ADDR_CRT_FINDFIRST)))
 /* LoadDibFlipped is reconstructed, in win32/surface.cpp. Declared here rather
  * than by including that header, for the reason script.cpp declares
  * PreloadSprite: misc.cpp is on the FLAT side of the split and must name no
@@ -535,9 +535,9 @@ extern "C" {
 void *__cdecl SpriteSetForKey(uint32_t key);
 int32_t __cdecl SpriteDirIndex(void *set, uint32_t key);
 }
-#define orig_fread_m (*(am2_fread_fn)AM2_IMAGE(ADDR_FREAD))
-#define orig_fseek_m (*(am2_fseek_fn)AM2_IMAGE(ADDR_FSEEK))
-#define orig_log_m   (*(am2_log_fn)AM2_IMAGE(ADDR_LOG))
+#define orig_fread_m (*(am2_fread_fn)((void *)(uintptr_t)(ADDR_FREAD)))
+#define orig_fseek_m (*(am2_fseek_fn)((void *)(uintptr_t)(ADDR_FSEEK)))
+#define orig_log_m   (*(am2_log_fn)((void *)(uintptr_t)(ADDR_LOG)))
 
 /* LoadMaskPacked -- original 0x00424590, 496 bytes, one caller: LoadMask's
  * non-`-df` branch, which is the DEFAULT, so this is the arm that actually
@@ -645,7 +645,7 @@ void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)
     uint8_t  find[AM2_FINDDATA_BYTES];
     uint8_t  desc[AM2_DIB_DESC_BYTES];
 
-    if (*(const int32_t *)AM2_IMAGE(ADDR_OPT_DF)) {
+    if (*(const int32_t *)((void *)(uintptr_t)(ADDR_OPT_DF))) {
         LoadMaskPacked(out, set, index, frame);
         return;
     }
@@ -655,7 +655,7 @@ void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)
 
     am2_sprintf(dir, "%s\\%s\\masks",
                 (const char *)((void *)(uintptr_t)(ADDR_MAP_BLOCK)),
-                ((const char *const *)AM2_IMAGE(ADDR_SPRITE_SET_DIRS))[set]);
+                ((const char *const *)((void *)(uintptr_t)(ADDR_SPRITE_SET_DIRS)))[set]);
     SetGameDir(dir);
 
     am2_sprintf(pattern, "%02d_%03d_%02d_*.msk",
@@ -1811,7 +1811,7 @@ int32_t __cdecl DismissKeyReleased(void)
  * call into it, so this goes through AM2_IMAGE like the rest of misc.cpp's
  * seams -- and atoi is stateless, so the two agree anyway. */
 typedef int32_t (__cdecl *AM2_AtoiFn)(const char *s);
-#define orig_atoi ((AM2_AtoiFn)AM2_IMAGE(ADDR_CRT_ATOI))
+#define orig_atoi ((AM2_AtoiFn)((void *)(uintptr_t)(ADDR_CRT_ATOI)))
 
 typedef void (__cdecl *AM2_SeqRunFn)(void *ctx);
 
@@ -2115,7 +2115,7 @@ int32_t __cdecl RandomAround(int32_t centre, int32_t spread)
         n = 1;
 
     for (i = 0; i < n; i++)
-        total += ((AM2_RandFn)AM2_IMAGE(ADDR_GAME_RAND))() % (centre * 2);
+        total += ((AM2_RandFn)((void *)(uintptr_t)(ADDR_GAME_RAND)))() % (centre * 2);
 
     return total / n;
 }
@@ -2239,8 +2239,8 @@ void __cdecl SeqAddKind6(const int32_t *at, int32_t variant)
     *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
     *(int32_t *)(row + 0)                = 1;
     *(void **)(row + ROW_OFF_SPRITE)     =
-        (*(void *const *const *)AM2_IMAGE(ADDR_SEQ_SPRITES_7))
-            [variant * *(const int32_t *)AM2_IMAGE(AM2_SEQ_VARIANT_STRIDE)];
+        (*(void *const *const *)((void *)(uintptr_t)(ADDR_SEQ_SPRITES_7)))
+            [variant * *(const int32_t *)((void *)(uintptr_t)(AM2_SEQ_VARIANT_STRIDE))];
     *(int32_t *)(row + ROW_OFF_X)        = *at;
     *(int16_t *)(row + ROW_OFF_Y_ADJUST) = 0;
     *(int32_t *)(row + ROW_OFF_FIELD_2C) = 0;
@@ -2294,23 +2294,23 @@ void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust)
     *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND4;
     *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
     *(int32_t *)(seq + SEQ_OFF_FIELD_0C) =
-        *(const int32_t *)AM2_IMAGE(ADDR_SEQ_K4_DRIFT_X);
+        *(const int32_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_DRIFT_X));
     *(int32_t *)(seq + SEQ_OFF_FIELD_10) =
-        *(const int32_t *)AM2_IMAGE(ADDR_SEQ_K4_DRIFT_Y);
+        *(const int32_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_DRIFT_Y));
     *(int32_t *)(seq + SEQ_OFF_OWNER)    = 0;
     *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
     *(int32_t *)(seq + SEQ_OFF_LIFE)     =
-        *(const int32_t *)AM2_IMAGE(ADDR_SEQ_K4_STEP_MS);
+        *(const int32_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_STEP_MS));
 
     *(uint8_t *)(row + ROW_OFF_CELL)     = 0;
     *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
     *(int32_t *)(row + 0)                = 1;
     *(void **)(row + ROW_OFF_SPRITE)     =
-        **(void *const *const *)AM2_IMAGE(ADDR_SEQ_SPRITES_5);
+        **(void *const *const *)((void *)(uintptr_t)(ADDR_SEQ_SPRITES_5));
     *(int32_t *)(row + ROW_OFF_X)        = *at;
     *(int16_t *)(row + ROW_OFF_Y_ADJUST) = (int16_t)yAdjust;
     *(void **)(row + ROW_OFF_FIELD_2C)   =
-        *(void *const *)AM2_IMAGE(ADDR_REMAP_SHADES);
+        *(void *const *)((void *)(uintptr_t)(ADDR_REMAP_SHADES));
     *(int16_t *)(row + ROW_OFF_FIELD_26) = AM2_SEQ_DEPTH_BIAS;
 }
 
@@ -2358,7 +2358,7 @@ int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
 
         *(uint32_t *)(r + SEQ_OFF_GATE) = step;
 
-        if (step > ((const uint32_t *)AM2_IMAGE(ADDR_SEQ_K4_HOLD))[cell]) {
+        if (step > ((const uint32_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_HOLD)))[cell]) {
             cell++;
             *(uint8_t *)(row + ROW_OFF_CELL) = (uint8_t)cell;
 
@@ -2366,15 +2366,15 @@ int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
                 return SeqRetire(ctx, rec);
 
             *(void **)(row + ROW_OFF_SPRITE) =
-                (*(void *const *const *)AM2_IMAGE(ADDR_SEQ_SPRITES_5))[cell];
+                (*(void *const *const *)((void *)(uintptr_t)(ADDR_SEQ_SPRITES_5)))[cell];
             *(void **)(row + ROW_OFF_FIELD_2C) =
-                ((void *const *)AM2_IMAGE(ADDR_REMAP_SHADES))[cell];
+                ((void *const *)((void *)(uintptr_t)(ADDR_REMAP_SHADES)))[cell];
 
             *(uint32_t *)(r + SEQ_OFF_GATE) = 1;
         }
 
         *(int16_t *)(row + ROW_OFF_Y_ADJUST) +=
-            *(const int16_t *)AM2_IMAGE(ADDR_SEQ_K4_RISE);
+            *(const int16_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_RISE));
         *(int16_t *)(row + ROW_OFF_X) +=
             (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_0C);
         *(int16_t *)(row + ROW_OFF_Y) +=
@@ -2432,7 +2432,7 @@ int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx)
         return SeqRetire(ctx, rec);
 
     if (*(const uint32_t *)(r + SEQ_OFF_GATE)
-            > *(const uint32_t *)AM2_IMAGE(ADDR_SEQ_EMIT_MS)) {
+            > *(const uint32_t *)((void *)(uintptr_t)(ADDR_SEQ_EMIT_MS))) {
         int32_t pt = *(const int32_t *)(row + ROW_OFF_X);
 
         *(int16_t *)&pt = (int16_t)(*(const int16_t *)&pt
@@ -2440,7 +2440,7 @@ int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx)
         SeqAddKind4(&pt, AM2_SEQ_EMIT_ARG);
 
         *(int32_t *)(r + SEQ_OFF_GATE) -=
-            *(const int32_t *)AM2_IMAGE(ADDR_SEQ_EMIT_MS);
+            *(const int32_t *)((void *)(uintptr_t)(ADDR_SEQ_EMIT_MS));
     }
 
     step = *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
@@ -2578,7 +2578,7 @@ void __cdecl SeqAddKind5(const int32_t *at, int32_t owner, int32_t life)
     *(int32_t *)(row + ROW_OFF_STAMP_54)  = 0;
     *(int32_t *)(row + 0)                 = 0;
     *(void **)(row + ROW_OFF_SPRITE)      =
-        **(void ***)AM2_IMAGE(ADDR_SEQ_SPRITES_5);
+        **(void ***)((void *)(uintptr_t)(ADDR_SEQ_SPRITES_5));
     *(int32_t *)(row + ROW_OFF_X)         = *at;
     *(int16_t *)(row + ROW_OFF_Y_ADJUST)  = 0;
     *(int32_t *)(row + ROW_OFF_FIELD_2C)  = 0;
@@ -2613,7 +2613,7 @@ void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
     *(uint8_t *)(row + ROW_OFF_CELL)      = 0;
     *(int32_t *)(row + ROW_OFF_STAMP_54)  = 0;
     *(void **)(row + ROW_OFF_SPRITE)      =
-        **(void ***)AM2_IMAGE(ADDR_SEQ_SPRITES_7);
+        **(void ***)((void *)(uintptr_t)(ADDR_SEQ_SPRITES_7));
     *(int32_t *)(row + ROW_OFF_X)         = *at;
     *(int16_t *)(row + ROW_OFF_Y_ADJUST)  = 0;
     *(int32_t *)(row + ROW_OFF_FIELD_2C)  = 0;

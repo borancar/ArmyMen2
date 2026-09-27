@@ -683,13 +683,13 @@ void __cdecl LoadTilesetPalettes(void)
 
     for (i = 0; i < AM2_TILESET_PALETTES; i++)
         LoadPaletteFile(kNames[i],
-                        (uint8_t *)AM2_IMAGE(ADDR_TILESET_PALETTES)
+                        (uint8_t *)((void *)(uintptr_t)(ADDR_TILESET_PALETTES))
                             + i * AM2_TILESET_PALETTE_BYTES);
 }
 /* The game's own rand, through the image, the way event.cpp and item.cpp
  * reach it -- BuildRemapTables below picks a base per row with it. */
 typedef int32_t (__cdecl *AM2_PalRandFn)(void);
-#define orig_rand ((AM2_PalRandFn)AM2_IMAGE(ADDR_GAME_RAND))
+#define orig_rand ((AM2_PalRandFn)((void *)(uintptr_t)(ADDR_GAME_RAND)))
 
 
 /* BuildRemapTables -- original 0x0040A4B0, one caller, and it is not a free.
@@ -729,7 +729,7 @@ typedef int32_t (__cdecl *AM2_PalRandFn)(void);
  */
 void __cdecl BuildRemapTables(void)
 {
-    const uint8_t  *base = (const uint8_t *)AM2_IMAGE(ADDR_ARMY_PAL_BASE);
+    const uint8_t  *base = (const uint8_t *)((void *)(uintptr_t)(ADDR_ARMY_PAL_BASE));
     const uint8_t  *pal  = (const uint8_t *)(uintptr_t)ADDR_PALETTE_COPY;
     uint8_t        *obj  = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS;
     uint8_t        *ramp = (uint8_t *)(uintptr_t)ADDR_ARMY_RAMP_TABLES;

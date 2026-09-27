@@ -34,7 +34,7 @@ void __cdecl FreeSpriteRegistry(void);
 
 /* The CRT's atexit, above the CRT line and not on the patch list. */
 typedef int32_t (__cdecl *AM2_AtExitFn)(void (__cdecl *)(void));
-#define orig_atexit (*(AM2_AtExitFn)AM2_IMAGE(ADDR_CRT_ATEXIT))
+#define orig_atexit (*(AM2_AtExitFn)((void *)(uintptr_t)(ADDR_CRT_ATEXIT)))
 #include "../inject/patch.h"
 #include "misc.h"      /* ReturnOne */
 #include "crt.h"       /* am2_realloc, am2_free -- the game's own */
@@ -154,16 +154,16 @@ typedef int32_t (__cdecl *AM2_FindFirstFn2)(const char *pattern, void *data);
 typedef int32_t (__cdecl *AM2_FindCloseFn)(int32_t handle);
 typedef int32_t (__cdecl *AM2_MkdirFn)(const char *path);
 typedef int32_t (__cdecl *AM2_SprintfFn2)(char *dst, const char *fmt, ...);
-#define orig_findfirst ((AM2_FindFirstFn2)AM2_IMAGE(ADDR_CRT_FINDFIRST))
-#define orig_findclose ((AM2_FindCloseFn)AM2_IMAGE(ADDR_CRT_FINDCLOSE))
-#define orig_mkdir     ((AM2_MkdirFn)AM2_IMAGE(ADDR_CRT_MKDIR))
-#define orig_sprintf   ((AM2_SprintfFn2)AM2_IMAGE(ADDR_GAME_SPRINTF))
+#define orig_findfirst ((AM2_FindFirstFn2)((void *)(uintptr_t)(ADDR_CRT_FINDFIRST)))
+#define orig_findclose ((AM2_FindCloseFn)((void *)(uintptr_t)(ADDR_CRT_FINDCLOSE)))
+#define orig_mkdir     ((AM2_MkdirFn)((void *)(uintptr_t)(ADDR_CRT_MKDIR)))
+#define orig_sprintf   ((AM2_SprintfFn2)((void *)(uintptr_t)(ADDR_GAME_SPRINTF)))
 
 /* _chmod and fflush, neither of which this tree had needed before. */
 typedef int32_t (__cdecl *AM2_ChmodFn)(const char *path, int32_t mode);
-#define orig_chmod  ((AM2_ChmodFn)AM2_IMAGE(ADDR_CRT_CHMOD))
+#define orig_chmod  ((AM2_ChmodFn)((void *)(uintptr_t)(ADDR_CRT_CHMOD)))
 typedef int32_t (__cdecl *AM2_FflushFn)(am2_FILE *fp);
-#define orig_fflush ((AM2_FflushFn)AM2_IMAGE(ADDR_CRT_FFLUSH))
+#define orig_fflush ((AM2_FflushFn)((void *)(uintptr_t)(ADDR_CRT_FFLUSH)))
 
 /* LoadOptions -- original 0x0044D110, 395 bytes, one caller. SaveOptions's
  * other half, and it agrees with it field for field: the same four volumes,
@@ -214,8 +214,8 @@ void __cdecl LoadOptions(void)
     orig_fread((void *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)), 4, 1, fp);
     orig_fread((void *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT)), 4, 1, fp);
 
-    for (key = (uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS);
-         key < (uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS_END);
+    for (key = (uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS));
+         key < (uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS_END));
          key += 2)
         orig_fread(key, 1, 1, fp);
 
@@ -260,11 +260,11 @@ defaults:
     *(int32_t *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT))    = 0;
 
     {
-        const uint8_t *src = (const uint8_t *)AM2_IMAGE(ADDR_KEY_DEFAULTS);
-        uint8_t       *dst = (uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS);
+        const uint8_t *src = (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_DEFAULTS));
+        uint8_t       *dst = (uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS));
         int32_t        i   = 0;
 
-        while (dst < (uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS_END)) {
+        while (dst < (uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS_END))) {
             *dst = src[i++];
             dst += 2;
         }
@@ -324,8 +324,8 @@ void __cdecl SaveOptions(void)
     orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)), 4, 1, fp);
     orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT)), 4, 1, fp);
 
-    for (key = (const uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS);
-         key < (const uint8_t *)AM2_IMAGE(ADDR_KEY_BINDINGS_END);
+    for (key = (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS));
+         key < (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS_END));
          key += 2)
         orig_fwrite(key, 1, 1, fp);
 
@@ -699,9 +699,9 @@ fail:
 /* ------------------------------------------------ game constants ---- */
 
 typedef char *(__cdecl *AM2_StrtokFn)(char *s, const char *sep);
-#define orig_strtok (*(AM2_StrtokFn)AM2_IMAGE(ADDR_CRT_STRTOK))
+#define orig_strtok (*(AM2_StrtokFn)((void *)(uintptr_t)(ADDR_CRT_STRTOK)))
 #define kSep        (" \t\n;,")
-#define kGameConst  ((int32_t *)AM2_IMAGE(ADDR_GAME_CONSTANTS))
+#define kGameConst  ((int32_t *)((void *)(uintptr_t)(ADDR_GAME_CONSTANTS)))
 
 /* 0x00424780. The .aai handler for twenty game-constant keywords.
  *
@@ -1316,11 +1316,11 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
     *(int8_t *)(o + OBJ_OFF_ARMY) = *(const int8_t *)(w + OBJ_OFF_ARMY);
     ObjInitCommon(o, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                   AM2_OBJ_TYPE_MISSILE, at,
-                  (const int32_t *)AM2_IMAGE(ADDR_MISSILE_BOX),
+                  (const int32_t *)((void *)(uintptr_t)(ADDR_MISSILE_BOX)),
                   initUnused, uid);
 
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
-                (const void *)AM2_IMAGE(ADDR_MISSILE_ROW_SPEC),
+                (const void *)((void *)(uintptr_t)(ADDR_MISSILE_ROW_SPEC)),
                 (int16_t)at, (int16_t)(at >> 16),
                 (const void *)(uintptr_t)ADDR_ZERO_RECT);
 
@@ -1432,7 +1432,7 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
     ObjInitCommon(o, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                          AM2_OBJ_TYPE_MISSILE,
                          *(const uint32_t *)(h + OBJ_OFF_POS),
-                         (const int32_t *)AM2_IMAGE(ADDR_MISSILE_BOX),
+                         (const int32_t *)((void *)(uintptr_t)(ADDR_MISSILE_BOX)),
                          1, *(const int32_t *)(h + 4));
 
     memcpy(o, h, (size_t)*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE);
@@ -1451,7 +1451,7 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
     frame = (def == 2 || def == 5) ? AM2_MISSILE_FRAME_A : AM2_MISSILE_FRAME_B;
 
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
-                (const void *)AM2_IMAGE(ADDR_MISSILE_ROW_SPEC),
+                (const void *)((void *)(uintptr_t)(ADDR_MISSILE_ROW_SPEC)),
                 *(const int16_t *)(h + OBJ_OFF_POS),
                 *(const int16_t *)(h + OBJ_OFF_POS + 2),
                 (const void *)(uintptr_t)ADDR_ZERO_RECT);
@@ -1523,7 +1523,7 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
 
         part = (float)((double)*(const int16_t *)(o + OBJ_OFF_HEALTH)
                        / (double)was);
-        SetMaxHealth(o, *(const int32_t *)AM2_IMAGE(ADDR_ROACH_HEALTH));
+        SetMaxHealth(o, *(const int32_t *)((void *)(uintptr_t)(ADDR_ROACH_HEALTH)));
 
         now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
         *(int16_t *)(o + OBJ_OFF_HEALTH) =
@@ -1657,7 +1657,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
         part = (float)((double)*(const int16_t *)(o + OBJ_OFF_HEALTH)
                        / (double)*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH));
         SetMaxHealth(o, *(const int32_t *)((const uint8_t *)
-                                           AM2_IMAGE(ADDR_RANK_RECORDS)
+                                           ((void *)(uintptr_t)(ADDR_RANK_RECORDS))
                                            + (uintptr_t)rank * RANK_REC_BYTES
                                            + RANK_REC_OFF_MAX_HEALTH));
 
@@ -2430,9 +2430,9 @@ typedef void (__cdecl *AM2_TeardownFn)(void);
 typedef void *(__cdecl *AM2_OperatorNewFn)(uint32_t size);
 typedef void  (__cdecl *AM2_OperatorDeleteFn)(void *p);
 #define orig_operator_new \
-    ((AM2_OperatorNewFn)AM2_IMAGE(ADDR_GAME_OPERATOR_NEW))
+    ((AM2_OperatorNewFn)((void *)(uintptr_t)(ADDR_GAME_OPERATOR_NEW)))
 #define orig_operator_delete \
-    ((AM2_OperatorDeleteFn)AM2_IMAGE(ADDR_GAME_DELETE))
+    ((AM2_OperatorDeleteFn)((void *)(uintptr_t)(ADDR_GAME_DELETE)))
 typedef void (__cdecl *AM2_Call3Fn)(int32_t a, int32_t b, int32_t c);
 
 #define orig_teardown_log   ((am2_log_fn)(uintptr_t)ADDR_LOG)

@@ -137,8 +137,8 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj))
 /* Both constants come out of the image rather than being written here: same
  * bits, and nothing to mistype. The table is FLOATS and the share is a
  * DOUBLE, which is what `fmul dword` and `fmul qword` say. */
-#define g_difficultyScale ((const float *)AM2_IMAGE(ADDR_DIFFICULTY_SCALE))
-#define g_enemyHealthShare (*(const double *)AM2_IMAGE(ADDR_ENEMY_HEALTH_SHARE))
+#define g_difficultyScale ((const float *)((void *)(uintptr_t)(ADDR_DIFFICULTY_SCALE)))
+#define g_enemyHealthShare (*(const double *)((void *)(uintptr_t)(ADDR_ENEMY_HEALTH_SHARE)))
 
 void __cdecl SetMaxHealth(void *obj, int32_t amount)
 {
@@ -918,7 +918,7 @@ int army_install(void)
 const char *__cdecl VehicleKindName(const void *vehicle)
 {
     const char *const *names =
-        (const char *const *)AM2_IMAGE(ADDR_VEHICLE_NAMES);
+        (const char *const *)((void *)(uintptr_t)(ADDR_VEHICLE_NAMES));
 
     if (vehicle == 0)
         return names[AM2_VEHICLE_NAME_UNKNOWN];
