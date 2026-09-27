@@ -2613,8 +2613,9 @@ void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
  * is the compiler's way of saying 260 and is why the stride shows up twice in
  * different forms. One name for it.
  */
-int32_t __attribute__((thiscall)) ListGrowFind(void *self, int32_t key)
+int32_t __attribute__((thiscall)) AM2_Rec::ListGrowFind(int32_t key)
 {
+    void *self = this;
     uint8_t *s = (uint8_t *)self;
     int32_t  n = ++*(int32_t *)s;
     uint8_t *items;
@@ -2830,7 +2831,7 @@ int misc_install(void)
                   "InitPtrList", 1);
     patch_replace(ADDR_CLEAR_PTR_LIST_ALIAS, pmf_addr(&AM2_Rec::ClearPtrListAlias),
                   "ClearPtrListAlias", 1);
-    patch_replace(ADDR_LIST_GROW_FIND, (const void *)ListGrowFind,
+    patch_replace(ADDR_LIST_GROW_FIND, pmf_addr(&AM2_Rec::ListGrowFind),
                   "ListGrowFind", 1);
     patch_replace(ADDR_SEQ_RUN, (const void *)SeqRun, "SeqRun", 2);
     patch_replace(ADDR_SEQ_STEP2, (const void *)SeqStepKind2,

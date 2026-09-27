@@ -26,6 +26,7 @@ struct AM2_Rec {
     void __attribute__((thiscall)) PtrListPush(void *item);
     void __attribute__((thiscall)) ListRemoveAt(int32_t index);
     void __attribute__((thiscall)) ClearPtrList();
+    int32_t __attribute__((thiscall)) ListGrowFind(int32_t key);
 };
 #endif
 
@@ -72,7 +73,8 @@ void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
 /* 0x00453AB0, thiscall. Grow a list of 260-byte records by one, then search
  * it for a key at +0x100 -- including the record just allocated, which is
  * uninitialised. See misc.cpp. */
-int32_t __attribute__((thiscall)) ListGrowFind(void *self, int32_t key);
+static inline int32_t __attribute__((thiscall)) ListGrowFind(void *self, int32_t key)
+{ return ((AM2_Rec *)self)->ListGrowFind(key); }
 
 #endif
 
