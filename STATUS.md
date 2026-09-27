@@ -53,8 +53,21 @@ main result so far (details in `src/vc6/README.md`):
 
 - **Matches now:** leaf functions, and functions that touch original globals
   only as absolute scalars (`mov [abs]`) or call reconstructed siblings.
+- **AM2_IMAGE is gone (917 sites -> 0).** Every global the reconstruction
+  reached through the `((T*)AM2_IMAGE(ADDR))` slide-wrapper is now a spelled-out
+  placed symbol reached directly: 154 .bss globals migrated to typed
+  `am2_origstate` members (extracted to `src/game/origstate.h` so standalone.h
+  can name them), the rest redirected to their existing placed symbols, and all
+  sites converted to `((void*)(uintptr_t)(ADDR))`.  `am2_image_slide` is 0 in
+  every build that runs the reconstruction, so the conversion is identical
+  codegen for native/injected/hybrid (all build clean) and the relink; piecewise
+  stays 354, relink 468, checkplacement/imagedata/seams green.  `am2_image_slide`
+  survives only for the offline selftest's image loader -- and that Wine PE still
+  MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
+  style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
+  is unaffected.
 - **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`) -- STARTED,
-  384 vs the piecewise 354.** Rather than a bit-exact PE (unneeded for *function*
+  384 vs the piecewise 354, now 468 after the global migration.** Rather than a bit-exact PE (unneeded for *function*
   byte-match), it simulates the link: lays every reconstructed function at its
   real VA and RESOLVES each relocation to the address the linker would fill,
   comparing with no wildcarding. Compiled with `AM2_RELINK`, so the
