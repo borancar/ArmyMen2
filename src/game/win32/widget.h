@@ -83,6 +83,155 @@ typedef struct AM2_Widget {
     void   (__cdecl *activate)(struct AM2_Widget *w);
                                     /* 0x0054  fired by SPACE or RETURN on the
                                      * focused child. Constructed null. */
+#ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
+    void __attribute__((thiscall)) WidgetDestruct();
+    AM2_Widget * __attribute__((thiscall)) WidgetDelete(int32_t flags);
+    void __attribute__((thiscall)) LabelDestruct();
+    AM2_Widget * __attribute__((thiscall)) LabelDelete(int32_t flags);
+    void __attribute__((thiscall)) WidgetPaint(RECT clip);
+    void __attribute__((thiscall)) KeyRowUpdate();
+    void __attribute__((thiscall)) MultiSpritePaint(RECT clip);
+    void __attribute__((thiscall)) BlinkerUpdate();
+    void __attribute__((thiscall)) TogglePaint(RECT clip);
+    void __attribute__((thiscall)) ListDestruct();
+    AM2_Widget * __attribute__((thiscall)) ListDelete(int32_t flags);
+    void __attribute__((thiscall)) ListUpdate();
+    AM2_Widget * __attribute__((thiscall)) TextListConstruct(int32_t left, int32_t top, int32_t right, int32_t bottom, void *rows, int32_t callback, int32_t ownsRows);
+    AM2_Widget * __attribute__((thiscall)) TextListDelete(int32_t flags);
+    void __attribute__((thiscall)) ListDraw(RECT clip);
+    void __attribute__((thiscall)) ListTakeFocus(int32_t announce);
+    void __attribute__((thiscall)) IconDestruct();
+    AM2_Widget * __attribute__((thiscall)) IconDelete(int32_t flags);
+    void __attribute__((thiscall)) BlinkerDestruct();
+    AM2_Widget * __attribute__((thiscall)) BlinkerDelete(int32_t flags);
+    void __attribute__((thiscall)) ButtonDestruct();
+    AM2_Widget * __attribute__((thiscall)) ButtonDelete(int32_t flags);
+    void __attribute__((thiscall)) ButtonUpdate();
+    void __attribute__((thiscall)) ButtonPaint(RECT clip);
+    void __attribute__((thiscall)) EditDraw(RECT clip);
+    void __attribute__((thiscall)) EditTakeFocus(int32_t announce);
+    void __attribute__((thiscall)) EditRepaint();
+    void __attribute__((thiscall)) EditDestruct();
+    AM2_Widget * __attribute__((thiscall)) EditDelete(int32_t flags);
+    void __attribute__((thiscall)) EditUpdate();
+    void __attribute__((thiscall)) WidgetDestructThunk();
+    AM2_Widget * __attribute__((thiscall)) WidgetDeleteAlt(int32_t flags);
+    void __attribute__((thiscall)) FocusLabelDestruct();
+    AM2_Widget * __attribute__((thiscall)) FocusLabelDelete(int32_t flags);
+    void __attribute__((thiscall)) FocusLabelDraw(RECT clip);
+    void __attribute__((thiscall)) FocusLabelTakeFocus(int32_t announce);
+    void __attribute__((thiscall)) WidgetPaintFwd1(RECT clip);
+    void __attribute__((thiscall)) WidgetPaintFwd2(RECT clip);
+    void __attribute__((thiscall)) WidgetUpdateThunk();
+    void __attribute__((thiscall)) MultiUpdateThunk();
+    void __attribute__((thiscall)) ScrollBarPaint(RECT clip);
+    void __attribute__((thiscall)) ScrollBarDestruct();
+    AM2_Widget * __attribute__((thiscall)) ScrollBarDelete(int32_t flags);
+    void __attribute__((thiscall)) ArrowDestruct();
+    void __attribute__((thiscall)) TyperPaint(RECT clip);
+    void __attribute__((thiscall)) TyperUpdate();
+    AM2_Widget * __attribute__((thiscall)) ArrowDelete(int32_t flags);
+    void __attribute__((thiscall)) DialogDestruct();
+    AM2_Widget * __attribute__((thiscall)) DialogDelete(int32_t flags);
+    void __attribute__((thiscall)) HudPanelUpdate();
+    void __attribute__((thiscall)) HudTopPaint(RECT clip);
+    void __attribute__((thiscall)) HudTopUpdate();
+    void __attribute__((thiscall)) HudEdgeUpdate();
+    void __attribute__((thiscall)) HudEdgePaint(RECT clip);
+    void __attribute__((thiscall)) HudRadarPaint(RECT clip);
+    void __attribute__((thiscall)) HudSquadPaint(RECT clip);
+    void __attribute__((thiscall)) HudSargeUpdate();
+    void __attribute__((thiscall)) TextListPaint(RECT clip);
+    void __attribute__((thiscall)) CheckboxPaint(RECT clip);
+    AM2_Widget * __attribute__((thiscall)) CountButtonConstruct(int32_t index, int32_t army, int32_t x, int32_t y, int32_t cw, int32_t ch, int32_t menuRow, int32_t count, void (__cdecl *onToggle)(AM2_Widget *));
+    void __attribute__((thiscall)) CountButtonDestruct();
+    AM2_Widget * __attribute__((thiscall)) CountButtonDelete(int32_t flags);
+    void __attribute__((thiscall)) CountButtonPaint(RECT clip);
+    void __attribute__((thiscall)) MpNamePaint(RECT clip);
+    void __attribute__((thiscall)) HudSargePaint(RECT clip);
+    void __attribute__((thiscall)) HudCommandsPaint(RECT clip);
+    void __attribute__((thiscall)) HudPanelPaint(RECT clip);
+    void __attribute__((thiscall)) HudRadarUpdate();
+    void __attribute__((thiscall)) WidgetRepaintThunk();
+    void __attribute__((thiscall)) WidgetAddChild(AM2_Widget *child);
+    AM2_Widget * __attribute__((thiscall)) WidgetLastSibling();
+    void __attribute__((thiscall)) WidgetFocusNext(int32_t announce);
+    void __attribute__((thiscall)) WidgetFocusPrev(int32_t announce);
+    void __attribute__((thiscall)) WidgetUpdate();
+    void __attribute__((thiscall)) WidgetUpdateCancel();
+    void __attribute__((thiscall)) WidgetTakeFocus(int32_t announce);
+    void __attribute__((thiscall)) WidgetRepaint();
+    AM2_Widget * __attribute__((thiscall)) HudCmdConstruct();
+    AM2_Widget * __attribute__((thiscall)) HudEdgeConstruct();
+    AM2_Widget * __attribute__((thiscall)) WidgetConstruct();
+    AM2_Widget * __attribute__((thiscall)) LabelConstruct(const char *text, int32_t x, int32_t y, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t paper);
+    void __attribute__((thiscall)) WidgetScreenRect();
+    void __attribute__((thiscall)) LabelDraw(RECT clip);
+    void __attribute__((thiscall)) MpDialogDestruct();
+    void __attribute__((thiscall)) OptionsUpdate();
+    void __attribute__((thiscall)) HudCmdInvoke(int32_t mode);
+    AM2_Widget * __attribute__((thiscall)) DlgBattleJoinConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) DlgGameMenuConstruct(const char *bmp, int32_t flag);
+    AM2_Widget * __attribute__((thiscall)) DlgSaveListConstruct(const char *bmp, int32_t flag);
+    AM2_Widget * __attribute__((thiscall)) DlgOverwriteConstruct(const char *bmp, int32_t flag);
+    AM2_Widget * __attribute__((thiscall)) DlgMessageConstruct(const char *bmp, int32_t flag);
+    AM2_Widget * __attribute__((thiscall)) HudPanelConstruct();
+    AM2_Widget * __attribute__((thiscall)) HudSquadConstruct();
+    AM2_Widget * __attribute__((thiscall)) HudRadarConstruct();
+    AM2_Widget * __attribute__((thiscall)) HudSargeConstruct();
+    AM2_Widget * __attribute__((thiscall)) HudTopConstruct();
+    AM2_Widget * __attribute__((thiscall)) OptionsMenuConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) WarMenuConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) QuitDialogConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) ReplayDialogConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) DelPlayerDialogConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) DifficultyDialogConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) ControlsDialogConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) MpOptionsConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) AudioDialogConstruct(const char *bmp, int32_t flag);
+    AM2_Widget * __attribute__((thiscall)) BattleNameConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) CommPanelConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) SelectPlayerConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) PanelConstruct(const char *bmp, int32_t flag, AM2_Rect box);
+    AM2_Widget * __attribute__((thiscall)) KeyRowConstruct(int32_t nameIndex, const char *caption, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t ink2, int32_t ink3, int32_t ink4);
+    AM2_Widget * __attribute__((thiscall)) ScreenBaseConstruct(const char *bmp, int32_t flag);
+    AM2_Widget * __attribute__((thiscall)) ButtonConstruct(const char *b0, const char *b1, const char *b2, int32_t flag, AM2_Rect box, void (__cdecl *onLeft)(AM2_Widget *), void (__cdecl *onRight)(AM2_Widget *));
+    AM2_Widget * __attribute__((thiscall)) EditConstruct(char *buf, int32_t maxChars, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t inkFocus, int32_t ink, int32_t paper, void (__cdecl *onEnter)(AM2_Widget *), int32_t a, int32_t b);
+    AM2_Widget * __attribute__((thiscall)) MultiSpriteConstruct(const char *b0, const char *b1, int32_t flag, AM2_Rect box);
+    AM2_Widget * __attribute__((thiscall)) ListBoxConstruct(int32_t left, int32_t top, int32_t right, int32_t bottom, void *rows, int32_t callback, int32_t arg6C, int32_t ownsRows);
+    AM2_Widget * __attribute__((thiscall)) CheckBoxConstruct(const char *b0, const char *b1, const char *b2, const char *b3, int32_t left, int32_t top, int32_t width, int32_t height, int32_t group, const char *caption, void (__cdecl *onChange)(AM2_Widget *));
+    AM2_Widget * __attribute__((thiscall)) ScrollBarConstruct(int32_t left, int32_t top, int32_t width, int32_t height, AM2_Widget *parent, int32_t span);
+    AM2_Widget * __attribute__((thiscall)) ArrowBarConstruct(int32_t left, int32_t top, int32_t width, int32_t height, AM2_Widget *parent, const char *b0, const char *b1, int32_t span, int32_t flag50);
+    AM2_Widget * __attribute__((thiscall)) TyperConstruct(int32_t left, int32_t top, int32_t width, int32_t height, const char *message);
+    void __attribute__((thiscall)) ArrowBarShowRow(int32_t row);
+    AM2_Widget * __attribute__((thiscall)) ButtonBaseConstruct();
+    AM2_Widget * __attribute__((thiscall)) SelectMapConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) EnterNameConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) DeleteGameConstruct(const char *bmp, int32_t flag);
+    AM2_Widget * __attribute__((thiscall)) MoviesConstruct(const char *bmp);
+    AM2_Widget * __attribute__((thiscall)) LoadGameConstruct(const char *bmp, int32_t flag);
+    void __attribute__((thiscall)) RepaintAncestor(RECT clip);
+    AM2_Widget * __attribute__((thiscall)) MpNameConstruct(const char *text, int32_t left, int32_t top, int32_t width, int32_t height, int32_t flag, uint8_t ink, uint8_t paper, int32_t row);
+    AM2_Widget * __attribute__((thiscall)) MpColourConstruct(int32_t left, int32_t top, int32_t row);
+    AM2_Widget * __attribute__((thiscall)) MpTeamConstruct(int32_t left, int32_t top, int32_t row);
+    void __attribute__((thiscall)) MpPanelDestruct();
+    void __attribute__((thiscall)) MpPanelUpdate();
+    void __attribute__((thiscall)) GameMenuUpdate();
+    void __attribute__((thiscall)) MpNameSetInk(uint8_t ink);
+    AM2_Widget * __attribute__((thiscall)) MpPanelDelete(int32_t flags);
+    AM2_Widget * __attribute__((thiscall)) MpDialogDelete(int32_t flags);
+    void __attribute__((thiscall)) MpPanelPaint(RECT clip);
+    void __attribute__((thiscall)) TextListDestruct();
+    void __attribute__((thiscall)) MpSpinRepaint();
+    void __attribute__((thiscall)) MpTeamPaint(RECT clip);
+    void __attribute__((thiscall)) MpColourPaint(RECT clip);
+    void __attribute__((thiscall)) HudSquadDetail(int32_t uid);
+    void __attribute__((thiscall)) HudSquadUpdate();
+    void __attribute__((thiscall)) HudCmdUpdate();
+    void __attribute__((thiscall)) HudChatSend();
+    AM2_Widget * __attribute__((thiscall)) MpSpinConstruct(int32_t left, int32_t top, int32_t width, int32_t height, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row);
+    AM2_Widget * __attribute__((thiscall)) MpPanelConstruct(const char *bmp);
+#endif
 } AM2_Widget;
 
 /* The base class's vtable, stored by its constructor and restored by its
@@ -248,20 +397,22 @@ typedef AM2_Widget *(__attribute__((thiscall)) *AM2_WidgetDeleteFn)(
  *
  * Children are freed; the widget itself is not. That is the deleting
  * destructor's job and it is the caller who decides. */
-void __attribute__((thiscall)) WidgetDestruct(AM2_Widget *w);
+static inline void __attribute__((thiscall)) WidgetDestruct(AM2_Widget *w)
+{ w->WidgetDestruct(); }
 
 /* Original: 0x00453BA0, thiscall, slot 0 of the base class. */
-AM2_Widget *__attribute__((thiscall)) WidgetDelete(AM2_Widget *w,
-                                                   int32_t flags);
+static inline AM2_Widget * __attribute__((thiscall)) WidgetDelete(AM2_Widget *w, int32_t flags)
+{ return w->WidgetDelete(flags); }
 
 /* Original: 0x00454EF0, thiscall. The label's destructor. It owns nothing --
  * the text it points at is not its to free -- so it is the vtable store and a
  * tail call to the base. */
-void __attribute__((thiscall)) LabelDestruct(AM2_Widget *w);
+static inline void __attribute__((thiscall)) LabelDestruct(AM2_Widget *w)
+{ w->LabelDestruct(); }
 
 /* Original: 0x00454ED0, thiscall, slot 0 of the label. */
-AM2_Widget *__attribute__((thiscall)) LabelDelete(AM2_Widget *w,
-                                                  int32_t flags);
+static inline AM2_Widget * __attribute__((thiscall)) LabelDelete(AM2_Widget *w, int32_t flags)
+{ return w->LabelDelete(flags); }
 
 /* Slot 4's signature. */
 typedef void (__attribute__((thiscall)) *AM2_WidgetRepaintFn)(AM2_Widget *w);
@@ -285,7 +436,8 @@ typedef void (__attribute__((thiscall)) *AM2_WidgetRepaintFn)(AM2_Widget *w);
  * The input pair after it is PollInput followed by latching the key buffer,
  * which together mean "and do not let the keystroke that got us here be seen
  * again". */
-void __attribute__((thiscall)) WidgetTakeFocus(AM2_Widget *w, int32_t announce);
+static inline void __attribute__((thiscall)) WidgetTakeFocus(AM2_Widget *w, int32_t announce)
+{ w->WidgetTakeFocus(announce); }
 
 /* Original: 0x00453FF0, thiscall, slot 4 of 29 classes. Repaint this widget.
  *
@@ -298,7 +450,8 @@ void __attribute__((thiscall)) WidgetTakeFocus(AM2_Widget *w, int32_t announce);
  *
  * The walk stops at the first match and falls through to painting self if it
  * reaches the top without one. */
-void __attribute__((thiscall)) WidgetRepaint(AM2_Widget *w);
+static inline void __attribute__((thiscall)) WidgetRepaint(AM2_Widget *w)
+{ w->WidgetRepaint(); }
 
 /* Original: 0x00453BF0, thiscall, 33 direct callers -- the shared base helper
  * of the whole hierarchy, and the reason the layout above is known rather than
@@ -312,7 +465,8 @@ void __attribute__((thiscall)) WidgetRepaint(AM2_Widget *w);
  * Note what it does NOT do: it never walks further than one level up. The
  * parent's own rectangle is read as already correct, so a container has to
  * have been placed before its children are, and nothing here enforces that. */
-void __attribute__((thiscall)) WidgetScreenRect(AM2_Widget *w);
+static inline void __attribute__((thiscall)) WidgetScreenRect(AM2_Widget *w)
+{ w->WidgetScreenRect(); }
 
 /* Original: 0x00454F00, vtable slot 1 of the class constructed at 0x00454E70.
  * Paints a static text label: clip against the caller's rectangle, clear the
@@ -334,7 +488,8 @@ void __attribute__((thiscall)) WidgetScreenRect(AM2_Widget *w);
  * OPTIONS -> CONTROLS. That second one is how it is exercised here: the
  * CONTROLS dialog is 78,174 calls of it, and every caption on that screen,
  * from "SARGE CONTROLS" to "EXIT VEHICLE", comes out of this function. */
-void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip)
+{ w->LabelDraw(clip); }
 
 /* Original: 0x00453B00, thiscall, the base constructor every one of the
  * thirty-three classes chains to. Zeroes both rectangles through RectSet and
@@ -357,36 +512,39 @@ void __attribute__((thiscall)) LabelDraw(AM2_Widget *w, RECT clip);
  * split completely by ADDR_NET_GAME -- four children in single player, the
  * radar plus eighteen build buttons in a network game. */
 /* 0x00417180, thiscall. Pick a command mode if the bar is offering it. */
-void __attribute__((thiscall)) HudCmdInvoke(AM2_Widget *w, int32_t mode);
+static inline void __attribute__((thiscall)) HudCmdInvoke(AM2_Widget *w, int32_t mode)
+{ w->HudCmdInvoke(mode); }
 
-AM2_Widget *__attribute__((thiscall)) HudPanelConstruct(AM2_Widget *w);
+static inline AM2_Widget * __attribute__((thiscall)) HudPanelConstruct(AM2_Widget *w)
+{ return w->HudPanelConstruct(); }
 
-AM2_Widget *__attribute__((thiscall)) HudSquadConstruct(AM2_Widget *w);
+static inline AM2_Widget * __attribute__((thiscall)) HudSquadConstruct(AM2_Widget *w)
+{ return w->HudSquadConstruct(); }
 
-AM2_Widget *__attribute__((thiscall)) HudRadarConstruct(AM2_Widget *w);
+static inline AM2_Widget * __attribute__((thiscall)) HudRadarConstruct(AM2_Widget *w)
+{ return w->HudRadarConstruct(); }
 
-AM2_Widget *__attribute__((thiscall)) HudSargeConstruct(AM2_Widget *w);
+static inline AM2_Widget * __attribute__((thiscall)) HudSargeConstruct(AM2_Widget *w)
+{ return w->HudSargeConstruct(); }
 
-AM2_Widget *__attribute__((thiscall)) HudTopConstruct(AM2_Widget *w);
+static inline AM2_Widget * __attribute__((thiscall)) HudTopConstruct(AM2_Widget *w)
+{ return w->HudTopConstruct(); }
 
-AM2_Widget *__attribute__((thiscall)) HudEdgeConstruct(AM2_Widget *w);
+static inline AM2_Widget * __attribute__((thiscall)) HudEdgeConstruct(AM2_Widget *w)
+{ return w->HudEdgeConstruct(); }
 
-AM2_Widget *__attribute__((thiscall)) HudCmdConstruct(AM2_Widget *w);
+static inline AM2_Widget * __attribute__((thiscall)) HudCmdConstruct(AM2_Widget *w)
+{ return w->HudCmdConstruct(); }
 
-AM2_Widget *__attribute__((thiscall)) WidgetConstruct(AM2_Widget *w);
+static inline AM2_Widget * __attribute__((thiscall)) WidgetConstruct(AM2_Widget *w)
+{ return w->WidgetConstruct(); }
 
 /* Original: 0x00454E70, thiscall. The label's constructor: base first, then
  * its own four fields and the four rectangle components, then place itself.
  * The argument order is the original's and is not the field order --
  * (text, x, y, w, h, font, ink, paper). */
-AM2_Widget *__attribute__((thiscall)) LabelConstruct(AM2_Widget *w,
-                                                     const char *text,
-                                                     int32_t x, int32_t y,
-                                                     int32_t width,
-                                                     int32_t height,
-                                                     int32_t font,
-                                                     int32_t ink,
-                                                     int32_t paper);
+static inline AM2_Widget * __attribute__((thiscall)) LabelConstruct(AM2_Widget *w, const char *text, int32_t x, int32_t y, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t paper)
+{ return w->LabelConstruct(text, x, y, width, height, font, ink, paper); }
 
 /* Slot 3's signature. */
 typedef void (__attribute__((thiscall)) *AM2_WidgetFocusFn)(AM2_Widget *w,
@@ -407,7 +565,8 @@ typedef void (__attribute__((thiscall)) *AM2_WidgetFocusFn)(AM2_Widget *w,
  * The centring halves each side before subtracting -- `(w >> 1) - (sw >> 1)`,
  * not `(w - sw) >> 1` -- which differs by a pixel whenever exactly one of the
  * two is odd. Kept as written. */
-void __attribute__((thiscall)) WidgetPaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) WidgetPaint(AM2_Widget *w, RECT clip)
+{ w->WidgetPaint(clip); }
 
 /* Original: 0x00454A90 and 0x00454BA0, thiscall, 48 bytes each. Two levels of
  * forwarding onto WidgetPaint, and 0x00454BA0 is the one 18 of the 33 vtables
@@ -420,8 +579,10 @@ void __attribute__((thiscall)) WidgetPaint(AM2_Widget *w, RECT clip);
  * the two classes that declared them are not recoverable from the image, and
  * inventing class names for them would be a guess where the addresses are a
  * fact. */
-void __attribute__((thiscall)) WidgetPaintFwd1(AM2_Widget *w, RECT clip);
-void __attribute__((thiscall)) WidgetPaintFwd2(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) WidgetPaintFwd1(AM2_Widget *w, RECT clip)
+{ w->WidgetPaintFwd1(clip); }
+static inline void __attribute__((thiscall)) WidgetPaintFwd2(AM2_Widget *w, RECT clip)
+{ w->WidgetPaintFwd2(clip); }
 
 /* Original: 0x00454AC0 and 0x00455100 -- two more shared virtuals, one
  * instruction each.
@@ -439,8 +600,10 @@ void __attribute__((thiscall)) WidgetPaintFwd2(AM2_Widget *w, RECT clip);
  * identical-COMDAT folding merges. Reconstruct
  * it and the game runs perfectly with its log silenced, which blinds exactly
  * the half of the A/B that would have told you. */
-void __attribute__((thiscall)) WidgetUpdateThunk(AM2_Widget *w);
-void __attribute__((thiscall)) WidgetRepaintThunk(AM2_Widget *w);
+static inline void __attribute__((thiscall)) WidgetUpdateThunk(AM2_Widget *w)
+{ w->WidgetUpdateThunk(); }
+static inline void __attribute__((thiscall)) WidgetRepaintThunk(AM2_Widget *w)
+{ w->WidgetRepaintThunk(); }
 
 /* Original: 0x00453D50, thiscall. Append a child to the end of this widget's
  * child list and point it back at this widget as its parent.
@@ -449,14 +612,15 @@ void __attribute__((thiscall)) WidgetRepaintThunk(AM2_Widget *w);
  * append path writes one -- so this depends on the constructor having zeroed
  * it. It never writes the new child's `nextSibling` either. Both are what the
  * original does and both are safe only because WidgetConstruct clears them. */
-void __attribute__((thiscall)) WidgetAddChild(AM2_Widget *w,
-                                              AM2_Widget *child);
+static inline void __attribute__((thiscall)) WidgetAddChild(AM2_Widget *w, AM2_Widget *child)
+{ w->WidgetAddChild(child); }
 
 /* Original: 0x00453D90, thiscall. Follow the sibling chain from this widget to
  * its end and answer the last one -- which is `this` when there is no next.
  * It is the wrap for moving backwards: a widget with no previous sibling is
  * the first child, so the last of its own chain is the last child. */
-AM2_Widget *__attribute__((thiscall)) WidgetLastSibling(AM2_Widget *w);
+static inline AM2_Widget * __attribute__((thiscall)) WidgetLastSibling(AM2_Widget *w)
+{ return w->WidgetLastSibling(); }
 
 /* Original: 0x00453DB0 and 0x00453E20, thiscall. Move the focus to the next or
  * the previous ELIGIBLE sibling and dispatch slot 3 on it. Both wrap: forwards
@@ -472,8 +636,10 @@ AM2_Widget *__attribute__((thiscall)) WidgetLastSibling(AM2_Widget *w);
  * skipped going down and landed on going up. Nothing in the menus shipped here
  * has been seen to set 0x004C, so which of the two is the bug is not
  * established -- only that they differ. */
-void __attribute__((thiscall)) WidgetFocusNext(AM2_Widget *w, int32_t announce);
-void __attribute__((thiscall)) WidgetFocusPrev(AM2_Widget *w, int32_t announce);
+static inline void __attribute__((thiscall)) WidgetFocusNext(AM2_Widget *w, int32_t announce)
+{ w->WidgetFocusNext(announce); }
+static inline void __attribute__((thiscall)) WidgetFocusPrev(AM2_Widget *w, int32_t announce)
+{ w->WidgetFocusPrev(announce); }
 
 /* Original: 0x00453E80, thiscall, 21 direct callers -- the base per-frame
  * update and the whole keyboard interface of a dialog.
@@ -496,7 +662,8 @@ void __attribute__((thiscall)) WidgetFocusPrev(AM2_Widget *w, int32_t announce);
  * The focused child is re-read before each block because the movement keys can
  * change it. It is NOT re-checked for null in the last three, and the original
  * dereferences it there unguarded; reproduced. */
-void __attribute__((thiscall)) WidgetUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) WidgetUpdate(AM2_Widget *w)
+{ w->WidgetUpdate(); }
 
 /* Original: 0x00454BD0, thiscall, slot 2 of 17 classes. The per-frame update
  * for a widget that has a cancel handler: if ESCAPE has just been RELEASED,
@@ -511,15 +678,17 @@ void __attribute__((thiscall)) WidgetUpdate(AM2_Widget *w);
  * vtable has the base update in slot 2 rather than this, which is what makes
  * that safe and is the clearest evidence the subclasses lay their own tails
  * out independently. */
-void __attribute__((thiscall)) WidgetUpdateCancel(AM2_Widget *w);
+static inline void __attribute__((thiscall)) WidgetUpdateCancel(AM2_Widget *w)
+{ w->WidgetUpdateCancel(); }
 
 /* Original: 0x00456970 over 0x00456990 -- a second scalar deleting destructor
  * and the `jmp` thunk it calls, which lands on the base destructor. Slot 0 in
  * three vtables. Identical in shape to WidgetDelete over WidgetDestruct; the
  * original has two because two different classes declared one. */
-AM2_Widget *__attribute__((thiscall)) WidgetDeleteAlt(AM2_Widget *w,
-                                                      int32_t flags);
-void __attribute__((thiscall)) WidgetDestructThunk(AM2_Widget *w);
+static inline AM2_Widget * __attribute__((thiscall)) WidgetDeleteAlt(AM2_Widget *w, int32_t flags)
+{ return w->WidgetDeleteAlt(flags); }
+static inline void __attribute__((thiscall)) WidgetDestructThunk(AM2_Widget *w)
+{ w->WidgetDestructThunk(); }
 
 /* The label subclass that highlights when it holds the focus -- vtable
  * 0x0046FB80, and what the CONTROLS panel builds its captions from.
@@ -535,12 +704,14 @@ void __attribute__((thiscall)) WidgetDestructThunk(AM2_Widget *w);
  *
  * Its destructor tail-calls the label's, which is what establishes the
  * inheritance, and its slot 3 is a plain forward to WidgetTakeFocus. */
-AM2_Widget *__attribute__((thiscall)) FocusLabelDelete(AM2_Widget *w,
-                                                       int32_t flags);
-void __attribute__((thiscall)) FocusLabelDestruct(AM2_Widget *w);
-void __attribute__((thiscall)) FocusLabelDraw(AM2_Widget *w, RECT clip);
-void __attribute__((thiscall)) FocusLabelTakeFocus(AM2_Widget *w,
-                                                   int32_t announce);
+static inline AM2_Widget * __attribute__((thiscall)) FocusLabelDelete(AM2_Widget *w, int32_t flags)
+{ return w->FocusLabelDelete(flags); }
+static inline void __attribute__((thiscall)) FocusLabelDestruct(AM2_Widget *w)
+{ w->FocusLabelDestruct(); }
+static inline void __attribute__((thiscall)) FocusLabelDraw(AM2_Widget *w, RECT clip)
+{ w->FocusLabelDraw(clip); }
+static inline void __attribute__((thiscall)) FocusLabelTakeFocus(AM2_Widget *w, int32_t announce)
+{ w->FocusLabelTakeFocus(announce); }
 
 /* One entry of the CONTROLS dialog's key table. */
 typedef struct AM2_KeyName {
@@ -571,7 +742,8 @@ int32_t __cdecl FindPressedKey(void);
  * all twenty-one of the parent's rows and clears the same key off any OTHER
  * row that had it, setting that row back to "None". A key can be bound in one
  * place only, and this is where that is enforced. */
-void __attribute__((thiscall)) KeyRowUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) KeyRowUpdate(AM2_Widget *w)
+{ w->KeyRowUpdate(); }
 
 /* An indexed sprite widget: an array of sprites at 0x0064 chosen by a state at
  * 0x006C, with two vertical tweaks.
@@ -608,7 +780,8 @@ void __attribute__((thiscall)) KeyRowUpdate(AM2_Widget *w);
  * before the draw. So the placement and the array index are exercised and
  * everything past `if (!spr)` -- the centring, the two intersects and the blit
  * -- is verified by reading. A clean A/B here says less than it looks. */
-void __attribute__((thiscall)) MultiSpritePaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) MultiSpritePaint(AM2_Widget *w, RECT clip)
+{ w->MultiSpritePaint(clip); }
 
 /* The two-state indicator is a BLINKER, and its update says so: it flips
  * 0x006C on a timer, counts flashes down, and stops. On the multiplayer dialog
@@ -631,7 +804,8 @@ void __attribute__((thiscall)) MultiSpritePaint(AM2_Widget *w, RECT clip);
  *
  * 0x0078 is written before the period test, so it holds the elapsed time even
  * on the frames that do nothing -- it is a readout, not a working value. */
-void __attribute__((thiscall)) BlinkerUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) BlinkerUpdate(AM2_Widget *w)
+{ w->BlinkerUpdate(); }
 
 /* Original: 0x00456DC0, thiscall. Start a blink: on, active, remember the
  * period and the number of flips, stamp the clock, and repaint immediately so
@@ -650,12 +824,14 @@ void __attribute__((thiscall)) BlinkerStart(AM2_Widget *w, uint32_t periodMs,
 /* Original: 0x00456D00, thiscall. Choose the sprite from the flag, store it in
  * the widget's own sprite field, and paint exactly as the base does -- the
  * same shape as ButtonPaint, with one bit instead of three states. */
-void __attribute__((thiscall)) TogglePaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) TogglePaint(AM2_Widget *w, RECT clip)
+{ w->TogglePaint(clip); }
 
 /* Original: 0x00455D50 -- one instruction, `jmp WidgetScreenRect`. Slot 2 of
  * the multi-sprite class, whose whole per-frame update is therefore
  * "recompute my absolute rectangle". */
-void __attribute__((thiscall)) MultiUpdateThunk(AM2_Widget *w);
+static inline void __attribute__((thiscall)) MultiUpdateThunk(AM2_Widget *w)
+{ w->MultiUpdateThunk(); }
 
 /* Original: 0x00456240, slot 1 of the scroll bar. Draw the bar sprite, and
  * only the bar -- it paints no children, where the base painter would.
@@ -669,16 +845,18 @@ void __attribute__((thiscall)) MultiUpdateThunk(AM2_Widget *w);
  * Both halves shift right by one AFTER the subtraction, where WidgetPaint's
  * centring halves each side BEFORE it -- a different rounding on odd values,
  * kept as each has it. */
-void __attribute__((thiscall)) ScrollBarPaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) ScrollBarPaint(AM2_Widget *w, RECT clip)
+{ w->ScrollBarPaint(clip); }
 
 /* Original: 0x004561E0 and 0x004561C0. The bar sprite IS null-tested before
  * being released, where the icon's otherwise identical destructor does not
  * test at all -- the two disagree and both are kept as written. The two arrow
  * children are not released here: they are children, so the base destructor
  * takes them with the rest of the list. */
-void __attribute__((thiscall)) ScrollBarDestruct(AM2_Widget *w);
-AM2_Widget *__attribute__((thiscall)) ScrollBarDelete(AM2_Widget *w,
-                                                      int32_t flags);
+static inline void __attribute__((thiscall)) ScrollBarDestruct(AM2_Widget *w)
+{ w->ScrollBarDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) ScrollBarDelete(AM2_Widget *w, int32_t flags)
+{ return w->ScrollBarDelete(flags); }
 
 /* Original: 0x00455B70 and 0x00455B50, the scroll bar's arrow children.
  *
@@ -687,15 +865,18 @@ AM2_Widget *__attribute__((thiscall)) ScrollBarDelete(AM2_Widget *w,
  * Its destructor is a single `jmp` to the button's, so it re-stamps
  * VTABLE_BUTTON rather than its own -- which for a widget about to be freed
  * changes nothing, and is reproduced rather than corrected. */
-void __attribute__((thiscall)) ArrowDestruct(AM2_Widget *w);
-AM2_Widget *__attribute__((thiscall)) ArrowDelete(AM2_Widget *w, int32_t flags);
+static inline void __attribute__((thiscall)) ArrowDestruct(AM2_Widget *w)
+{ w->ArrowDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) ArrowDelete(AM2_Widget *w, int32_t flags)
+{ return w->ArrowDelete(flags); }
 
 /* Original: 0x00454B90 and 0x00454B70, the DIALOG base class -- one level
  * under the icon, whose destructor it jumps straight to. Every full-screen
  * dialog derives from it, so this pair runs whenever any of them closes. */
-void __attribute__((thiscall)) DialogDestruct(AM2_Widget *w);
-AM2_Widget *__attribute__((thiscall)) DialogDelete(AM2_Widget *w,
-                                                   int32_t flags);
+static inline void __attribute__((thiscall)) DialogDestruct(AM2_Widget *w)
+{ w->DialogDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) DialogDelete(AM2_Widget *w, int32_t flags)
+{ return w->DialogDelete(flags); }
 
 /* The fifteen dialog subclasses whose destructor is the same two instructions:
  * stamp my own vtable, then jump to DialogDestruct. The image really does hold
@@ -731,40 +912,33 @@ AM2_DECLARE_CLASS_DTOR(DlgSelectPlayer);
 AM2_DECLARE_CLASS_DTOR(DlgNameEntry);
 AM2_DECLARE_CLASS_DTOR(DlgLoadGame);
 /* 0x00452750, thiscall. The plain message box, centred on its own backdrop. */
-AM2_Widget *__attribute__((thiscall)) DlgMessageConstruct(AM2_Widget *w,
-                                                          const char *bmp,
-                                                          int32_t flag);
+static inline AM2_Widget * __attribute__((thiscall)) DlgMessageConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
+{ return w->DlgMessageConstruct(bmp, flag); }
 
 /* 0x00450320, thiscall. The overwrite prompt: OK, Cancel, message, icon.
  * Unlike DlgMessage its coordinates are ABSOLUTE. */
-AM2_Widget *__attribute__((thiscall)) DlgOverwriteConstruct(AM2_Widget *w,
-                                                            const char *bmp,
-                                                            int32_t flag);
+static inline AM2_Widget * __attribute__((thiscall)) DlgOverwriteConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
+{ return w->DlgOverwriteConstruct(bmp, flag); }
 
 /* 0x00452AA0, thiscall. The in-mission menu: RETURN, SAVE, LOAD, CONTROLS,
  * AUDIO, ABORT -- six buttons down one column, 0x28 apart. */
-AM2_Widget *__attribute__((thiscall)) DlgGameMenuConstruct(AM2_Widget *w,
-                                                           const char *bmp,
-                                                           int32_t flag);
+static inline AM2_Widget * __attribute__((thiscall)) DlgGameMenuConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
+{ return w->DlgGameMenuConstruct(bmp, flag); }
 
 /* 0x0042F4C0, thiscall. CHOOSE A BATTLE. Its tree is TWO levels: one panel
  * child, and the list, edit, two buttons and icon hang off THAT. */
-AM2_Widget *__attribute__((thiscall)) DlgBattleJoinConstruct(AM2_Widget *w,
-                                                             const char *bmp);
+static inline AM2_Widget * __attribute__((thiscall)) DlgBattleJoinConstruct(AM2_Widget *w, const char *bmp)
+{ return w->DlgBattleJoinConstruct(bmp); }
 
 /* 0x00453280, thiscall. The SAVE GAME dialog. Creates the player's save
  * folder before listing it. */
-AM2_Widget *__attribute__((thiscall)) DlgSaveListConstruct(AM2_Widget *w,
-                                                           const char *bmp,
-                                                           int32_t flag);
+static inline AM2_Widget * __attribute__((thiscall)) DlgSaveListConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
+{ return w->DlgSaveListConstruct(bmp, flag); }
 
 /* 0x00456300, thiscall. The SPIN control: two arrows and a numeric edit,
  * all laid out from the widget's own rect. */
-AM2_Widget *__attribute__((thiscall)) MpSpinConstruct(
-    AM2_Widget *w, int32_t left, int32_t top, int32_t width, int32_t height,
-    int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent,
-    void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2,
-    int32_t row);
+static inline AM2_Widget * __attribute__((thiscall)) MpSpinConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t width, int32_t height, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row)
+{ return w->MpSpinConstruct(left, top, width, height, value, lo, hi, step, parent, commit, c0, c1, c2, row); }
 
 /* 0x00414F20, seven callers. Pick a weapon slot; picking the one already
  * selected DESELECTS instead. */
@@ -772,11 +946,14 @@ void __cdecl SelectWeapon(void *unit, int32_t slot);
 
 /* 0x00416340, thiscall. The squad panel's detail slot: three arms on one
  * 2-column, 5-row grid. */
-void __attribute__((thiscall)) HudSquadDetail(AM2_Widget *w, int32_t uid);
+static inline void __attribute__((thiscall)) HudSquadDetail(AM2_Widget *w, int32_t uid)
+{ w->HudSquadDetail(uid); }
 /* 0x004158D0 -- the squad panel's per-frame update: hit-test, clear, refill. */
-void __attribute__((thiscall)) HudSquadUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) HudSquadUpdate(AM2_Widget *w)
+{ w->HudSquadUpdate(); }
 /* 0x004171C0 -- the command panel's per-frame update: hotkeys, mouse, refill. */
-void __attribute__((thiscall)) HudCmdUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) HudCmdUpdate(AM2_Widget *w)
+{ w->HudCmdUpdate(); }
 
 /* 0x00418480, thiscall. Finish a chat line -- and run it as a cheat when it
  * starts with `!` and there is no session. */
@@ -786,7 +963,8 @@ void __attribute__((thiscall)) HudCmdUpdate(AM2_Widget *w);
  * rather than by a call -- which is why the standalone build needed it. */
 void __cdecl HudChatChar(uint32_t ch, uint32_t lo, uint32_t hi);
 
-void __attribute__((thiscall)) HudChatSend(AM2_Widget *w);
+static inline void __attribute__((thiscall)) HudChatSend(AM2_Widget *w)
+{ w->HudChatSend(); }
 
 AM2_DECLARE_CLASS_DTOR(DlgMessage);
 AM2_DECLARE_CLASS_DTOR(DlgGameMenu);
@@ -803,7 +981,8 @@ AM2_DECLARE_CLASS_DTOR(MpName);
  * macro declares them and each is written out. */
 /* The count button destructor pair. Delete was written first and reached
  * Destruct through a seam until Destruct itself was reconstructed. */
-void __attribute__((thiscall)) CountButtonDestruct(AM2_Widget *w);
+static inline void __attribute__((thiscall)) CountButtonDestruct(AM2_Widget *w)
+{ w->CountButtonDestruct(); }
 
 /* 0x004547C0 and 0x00454740. The checkbox releases four faces. */
 AM2_DECLARE_CLASS_DTOR(CheckBox);
@@ -818,56 +997,72 @@ AM2_DECLARE_CLASS_DTOR(HudCommands);
 
 /* Original: 0x004193C0, vtable slot 2 of the right-hand HUD panel. Slide the
  * panel, grey the build menu in a network game, then the base update. */
-void __attribute__((thiscall)) HudPanelUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) HudPanelUpdate(AM2_Widget *w)
+{ w->HudPanelUpdate(); }
 
 /* Original: 0x00414890, vtable slot 2 of the radar. Click it to jump the view;
  * after a second of mouse silence, caption the panel "Stratmap". */
-void __attribute__((thiscall)) HudRadarUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) HudRadarUpdate(AM2_Widget *w)
+{ w->HudRadarUpdate(); }
 
 /* Original: 0x00414620. Draw a tooltip for `text` at the cursor. */
 void __cdecl DrawTooltip(const char *text, uint8_t colour);
 
 /* Original: 0x004194E0, vtable slot 1 of the right-hand HUD panel. */
-void __attribute__((thiscall)) HudPanelPaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) HudPanelPaint(AM2_Widget *w, RECT clip)
+{ w->HudPanelPaint(clip); }
 
 /* Original: 0x00417440, vtable slot 1 of the COMMANDS panel. */
-void __attribute__((thiscall)) HudCommandsPaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) HudCommandsPaint(AM2_Widget *w, RECT clip)
+{ w->HudCommandsPaint(clip); }
 
 /* Original: 0x004155A0, vtable slot 1 of the SARGE panel. */
-void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) HudSargePaint(AM2_Widget *w, RECT clip)
+{ w->HudSargePaint(clip); }
 
 /* Original: 0x00418A20, vtable slot 1 of the top strip. */
-void __attribute__((thiscall)) HudTopPaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) HudTopPaint(AM2_Widget *w, RECT clip)
+{ w->HudTopPaint(clip); }
 
 /* Original: 0x00418660, vtable slot 2 of the same class. */
-void __attribute__((thiscall)) HudTopUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) HudTopUpdate(AM2_Widget *w)
+{ w->HudTopUpdate(); }
 
 /* Original: 0x004196E0, vtable slot 2 of the edge strip. */
-void __attribute__((thiscall)) HudEdgeUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) HudEdgeUpdate(AM2_Widget *w)
+{ w->HudEdgeUpdate(); }
 
 /* Original: 0x00419AC0, vtable slot 1 of the edge strip. */
-void __attribute__((thiscall)) HudEdgePaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) HudEdgePaint(AM2_Widget *w, RECT clip)
+{ w->HudEdgePaint(clip); }
 
 /* Original: 0x00414B50, vtable slot 1 of the radar. */
-void __attribute__((thiscall)) HudRadarPaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) HudRadarPaint(AM2_Widget *w, RECT clip)
+{ w->HudRadarPaint(clip); }
 
 /* Original: 0x00416DA0, vtable slot 1 of the squad panel. */
-void __attribute__((thiscall)) HudSquadPaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) HudSquadPaint(AM2_Widget *w, RECT clip)
+{ w->HudSquadPaint(clip); }
 
 /* Original: 0x004150F0, vtable slot 2 of the sarge panel. */
-void __attribute__((thiscall)) HudSargeUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) HudSargeUpdate(AM2_Widget *w)
+{ w->HudSargeUpdate(); }
 
 /* Original: 0x00433360, vtable slot 1 of the scrolling text list. */
-void __attribute__((thiscall)) TextListPaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) TextListPaint(AM2_Widget *w, RECT clip)
+{ w->TextListPaint(clip); }
 
 /* Original: 0x00454840, vtable slot 1 of the checkbox. */
-void __attribute__((thiscall)) CheckboxPaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) CheckboxPaint(AM2_Widget *w, RECT clip)
+{ w->CheckboxPaint(clip); }
 
 /* Original: 0x00418DC0, vtable slot 1 of the count button. */
-void __attribute__((thiscall)) CountButtonPaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) CountButtonPaint(AM2_Widget *w, RECT clip)
+{ w->CountButtonPaint(clip); }
 
 /* Original: 0x00432A70, vtable slot 1 of the multiplayer name row. */
-void __attribute__((thiscall)) MpNamePaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) MpNamePaint(AM2_Widget *w, RECT clip)
+{ w->MpNamePaint(clip); }
 
 /* Original: 0x0044E4F0/0x0044E510, 0x00455B80/0x00455BA0 and
  * 0x00453810/0x00453830 -- three destructors that do real work between the
@@ -893,7 +1088,8 @@ AM2_DECLARE_CLASS_DTOR(SaveList);
  *
  * Note it walks exactly `shown` characters and never looks for the
  * terminator: the update is what keeps that count inside the string. */
-void __attribute__((thiscall)) TyperPaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) TyperPaint(AM2_Widget *w, RECT clip)
+{ w->TyperPaint(clip); }
 
 /* Original: 0x00456B20, slot 2. Reveal one more character every 100 ms until
  * the whole string is out, ticking the blinker and playing sound 0 on each --
@@ -903,7 +1099,8 @@ void __attribute__((thiscall)) TyperPaint(AM2_Widget *w, RECT clip);
  * The elapsed test is `> 100`, not `>=`, and the reveal is one character per
  * tick however long the frame took -- so the effect runs slower on a machine
  * that cannot keep 10 fps rather than skipping ahead. The original's. */
-void __attribute__((thiscall)) TyperUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) TyperUpdate(AM2_Widget *w)
+{ w->TyperUpdate(); }
 
 /* The list box. Its rows are 14 pixels tall and start 4 below the widget's
  * top, which is read off the arithmetic in ListTakeFocus rather than assumed:
@@ -983,21 +1180,28 @@ typedef struct AM2_ListRows {
  *
  * The SEH prologue is not reproduced; see CLAUDE.md. */
 /* 0x00455340 -- slot 2 of BOTH the list box and the text list. */
-void __attribute__((thiscall)) ListUpdate(AM2_Widget *w);
-void __attribute__((thiscall)) ListDestruct(AM2_Widget *w);
+static inline void __attribute__((thiscall)) ListUpdate(AM2_Widget *w)
+{ w->ListUpdate(); }
+static inline void __attribute__((thiscall)) ListDestruct(AM2_Widget *w)
+{ w->ListDestruct(); }
 
 /* 0x00433350. The text list's destructor -- one `jmp` to ListDestruct. */
-void __attribute__((thiscall)) TextListDestruct(AM2_Widget *w);
+static inline void __attribute__((thiscall)) TextListDestruct(AM2_Widget *w)
+{ w->TextListDestruct(); }
 
 /* 0x00456570. VTABLE_MP_SPIN slot 4: drop the focused child, then repaint. */
-void __attribute__((thiscall)) MpSpinRepaint(AM2_Widget *w);
+static inline void __attribute__((thiscall)) MpSpinRepaint(AM2_Widget *w)
+{ w->MpSpinRepaint(); }
 
 /* 0x00433240. VTABLE_MP_TEAM slot 1: team sprite, then the base painter. */
-void __attribute__((thiscall)) MpTeamPaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) MpTeamPaint(AM2_Widget *w, RECT clip)
+{ w->MpTeamPaint(clip); }
 
 /* 0x00432FC0. VTABLE_MP_COLOUR slot 1: the player's colour, or the blank. */
-void __attribute__((thiscall)) MpColourPaint(AM2_Widget *w, RECT clip);
-AM2_Widget *__attribute__((thiscall)) ListDelete(AM2_Widget *w, int32_t flags);
+static inline void __attribute__((thiscall)) MpColourPaint(AM2_Widget *w, RECT clip)
+{ w->MpColourPaint(clip); }
+static inline AM2_Widget * __attribute__((thiscall)) ListDelete(AM2_Widget *w, int32_t flags)
+{ return w->ListDelete(flags); }
 
 /* Original: 0x00455180, thiscall, slot 1 of the list box. Clear the whole list
  * to 0x00502AD9, then walk the visible rows drawing each one's text.
@@ -1015,7 +1219,8 @@ AM2_Widget *__attribute__((thiscall)) ListDelete(AM2_Widget *w, int32_t flags);
  * text is still drawn, with whatever that rectangle held from the row before.
  * Same shape as the Restore defect in LockSurface, and kept for the same
  * reason. */
-void __attribute__((thiscall)) ListDraw(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) ListDraw(AM2_Widget *w, RECT clip)
+{ w->ListDraw(clip); }
 
 /* Original: 0x00455110, thiscall, slot 3 of the list box. Place, and if a row
  * is selected AND the caller asked for the change to be announced, repaint
@@ -1023,7 +1228,8 @@ void __attribute__((thiscall)) ListDraw(AM2_Widget *w, RECT clip);
  * before taking focus the ordinary way.
  *
  * With no row selected, or with announce clear, it is exactly the base. */
-void __attribute__((thiscall)) ListTakeFocus(AM2_Widget *w, int32_t announce);
+static inline void __attribute__((thiscall)) ListTakeFocus(AM2_Widget *w, int32_t announce)
+{ w->ListTakeFocus(announce); }
 
 /* A button's handlers and its auto-repeat state. 0x005C and 0x0060 are the
  * font and the ink in a LABEL -- the subclass tails do not agree and must not
@@ -1060,7 +1266,8 @@ void __attribute__((thiscall)) ListTakeFocus(AM2_Widget *w, int32_t announce);
  * Every arm ends the same way -- repaint self through slot 1 with its own
  * rectangle, then run the base update -- which is what makes a kilobyte out of
  * this much logic. */
-void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w)
+{ w->ButtonUpdate(); }
 
 /* A three-state button's sprites. The dialog builders load them in triples --
  * `03_007_00_ok.bmp`, `03_007_01_ok.bmp`, `03_007_02_ok.bmp` -- which is the
@@ -1087,7 +1294,8 @@ void __attribute__((thiscall)) ButtonUpdate(AM2_Widget *w);
  * checked on both paths rather than only the no-hover one.
  *
  * A button with no parent picks nothing and keeps whatever sprite it had. */
-void __attribute__((thiscall)) ButtonPaint(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) ButtonPaint(AM2_Widget *w, RECT clip)
+{ w->ButtonPaint(clip); }
 
 /* Original: 0x00454A30 / 0x00454A10, thiscall -- the one-sprite icon's
  * destructor and its deleting wrapper. Restore the vtable, release the sprite
@@ -1102,11 +1310,14 @@ void __attribute__((thiscall)) ButtonPaint(AM2_Widget *w, RECT clip);
  * what the original does. Its release is unconditional too.
  *
  * Neither SEH prologue is reproduced; see CLAUDE.md. */
-void __attribute__((thiscall)) IconDestruct(AM2_Widget *w);
-AM2_Widget *__attribute__((thiscall)) IconDelete(AM2_Widget *w, int32_t flags);
-void __attribute__((thiscall)) BlinkerDestruct(AM2_Widget *w);
-AM2_Widget *__attribute__((thiscall)) BlinkerDelete(AM2_Widget *w,
-                                                    int32_t flags);
+static inline void __attribute__((thiscall)) IconDestruct(AM2_Widget *w)
+{ w->IconDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) IconDelete(AM2_Widget *w, int32_t flags)
+{ return w->IconDelete(flags); }
+static inline void __attribute__((thiscall)) BlinkerDestruct(AM2_Widget *w)
+{ w->BlinkerDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) BlinkerDelete(AM2_Widget *w, int32_t flags)
+{ return w->BlinkerDelete(flags); }
 
 /* Original: 0x004541E0 and 0x004541C0, thiscall -- the three-state button's
  * destructor and the MSVC deleting wrapper over it. Restore the vtable,
@@ -1115,9 +1326,10 @@ AM2_Widget *__attribute__((thiscall)) BlinkerDelete(AM2_Widget *w,
  *
  * The original's SEH prologue is not reproduced; see CLAUDE.md for why that is
  * safe here and what it would cost if it were not. */
-void __attribute__((thiscall)) ButtonDestruct(AM2_Widget *w);
-AM2_Widget *__attribute__((thiscall)) ButtonDelete(AM2_Widget *w,
-                                                   int32_t flags);
+static inline void __attribute__((thiscall)) ButtonDestruct(AM2_Widget *w)
+{ w->ButtonDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) ButtonDelete(AM2_Widget *w, int32_t flags)
+{ return w->ButtonDelete(flags); }
 
 /* The edit box's own fields. Note the two ink bytes are the OPPOSITE way round
  * from the focus label's: here 0x0064 is the focused colour and 0x0065 the
@@ -1159,7 +1371,8 @@ AM2_Widget *__attribute__((thiscall)) ButtonDelete(AM2_Widget *w,
  *
  * Reached through LockSurface like every other rasteriser here; a failed lock
  * leaves the cleared background with no text over it, as in LabelDraw. */
-void __attribute__((thiscall)) EditDraw(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) EditDraw(AM2_Widget *w, RECT clip)
+{ w->EditDraw(clip); }
 
 /* The edit box -- vtable 0x0046FC98, and the class CLAUDE.md names when it says
  * porting g_charHandler means porting the text-field system.
@@ -1176,11 +1389,16 @@ void __attribute__((thiscall)) EditDraw(AM2_Widget *w, RECT clip);
  *
  * Its update is hover-to-focus and nothing else, which is how clicking a text
  * field gives it the caret and the keyboard. */
-AM2_Widget *__attribute__((thiscall)) EditDelete(AM2_Widget *w, int32_t flags);
-void __attribute__((thiscall)) EditDestruct(AM2_Widget *w);
-void __attribute__((thiscall)) EditTakeFocus(AM2_Widget *w, int32_t announce);
-void __attribute__((thiscall)) EditRepaint(AM2_Widget *w);
-void __attribute__((thiscall)) EditUpdate(AM2_Widget *w);
+static inline AM2_Widget * __attribute__((thiscall)) EditDelete(AM2_Widget *w, int32_t flags)
+{ return w->EditDelete(flags); }
+static inline void __attribute__((thiscall)) EditDestruct(AM2_Widget *w)
+{ w->EditDestruct(); }
+static inline void __attribute__((thiscall)) EditTakeFocus(AM2_Widget *w, int32_t announce)
+{ w->EditTakeFocus(announce); }
+static inline void __attribute__((thiscall)) EditRepaint(AM2_Widget *w)
+{ w->EditRepaint(); }
+static inline void __attribute__((thiscall)) EditUpdate(AM2_Widget *w)
+{ w->EditUpdate(); }
 
 /* 0x00453910 and 0x00453930, both thiscall over the same three-field record.
  * The first is its constructor -- two zeros and the argument -- and the second
@@ -1230,8 +1448,10 @@ void __cdecl OptionsSyncGroup(AM2_Widget *header);
 /* Originals: 0x004326F0 and 0x00432700, one `jmp` each into DialogDestruct and
  * WidgetUpdateCancel. The alias shape: the OPTIONS dialog wants those two
  * behaviours under its own vtable slots and the linker gave it thunks. */
-void __attribute__((thiscall)) MpDialogDestruct(AM2_Widget *w);
-void __attribute__((thiscall)) OptionsUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) MpDialogDestruct(AM2_Widget *w)
+{ w->MpDialogDestruct(); }
+static inline void __attribute__((thiscall)) OptionsUpdate(AM2_Widget *w)
+{ w->OptionsUpdate(); }
 
 /* The menu screen factories -- see widget.cpp for the shape they share.
  *
@@ -1267,8 +1487,8 @@ void __cdecl OpenWarMenu(void);
 
 /* Original: 0x0042EED0, thiscall, `ret 4`. The war menu's constructor: a
  * blank panel and the three buttons. */
-AM2_Widget *__attribute__((thiscall)) WarMenuConstruct(AM2_Widget *w,
-                                                       const char *bmp);
+static inline AM2_Widget * __attribute__((thiscall)) WarMenuConstruct(AM2_Widget *w, const char *bmp)
+{ return w->WarMenuConstruct(bmp); }
 
 /* Original: 0x0042FF60. ENTER BATTLE NAME -- two text fields and an OK, which ab.sh multi drives. */
 void __cdecl OpenBattleName(void);
@@ -1324,103 +1544,86 @@ void __cdecl OpenMessage(void);
  * and four buttons, AUDIO / CONTROLS / DIFFICULTY / BACK. See widget.cpp for
  * why the rectangle is passed by value in the middle of the argument list and
  * how `ret 0x28` confirms the reading. Returns `this`. */
-AM2_Widget *__attribute__((thiscall)) OptionsMenuConstruct(AM2_Widget *w,
-                                                           const char *bmp);
+static inline AM2_Widget * __attribute__((thiscall)) OptionsMenuConstruct(AM2_Widget *w, const char *bmp)
+{ return w->OptionsMenuConstruct(bmp); }
 
 /* Originals: 0x0044EB50, 0x0044EED0, 0x00450730. The three CONFIRM dialogs --
  * CONFIRM GAME EXIT, the replay prompt and DELETE PLAYER. One body three
  * times, differing in the vtable, the panel bitmap, the OK handler, the
  * message and (for DELETE PLAYER alone) the CANCEL handler. See widget.cpp
  * for the shape and for the three stores the original leaves unguarded. */
-AM2_Widget *__attribute__((thiscall)) QuitDialogConstruct(AM2_Widget *w,
-                                                          const char *bmp);
-AM2_Widget *__attribute__((thiscall)) ReplayDialogConstruct(AM2_Widget *w,
-                                                            const char *bmp);
-AM2_Widget *__attribute__((thiscall)) DelPlayerDialogConstruct(AM2_Widget *w,
-                                                               const char *bmp);
+static inline AM2_Widget * __attribute__((thiscall)) QuitDialogConstruct(AM2_Widget *w, const char *bmp)
+{ return w->QuitDialogConstruct(bmp); }
+static inline AM2_Widget * __attribute__((thiscall)) ReplayDialogConstruct(AM2_Widget *w, const char *bmp)
+{ return w->ReplayDialogConstruct(bmp); }
+static inline AM2_Widget * __attribute__((thiscall)) DelPlayerDialogConstruct(AM2_Widget *w, const char *bmp)
+{ return w->DelPlayerDialogConstruct(bmp); }
 
 /* Original: 0x0044E730, thiscall. The DIFFICULTY dialog: the confirm-dialog
  * shape with a list box where they have a message. See widget.cpp for which
  * two of the list's fields the current difficulty seeds. */
-AM2_Widget *__attribute__((thiscall)) DifficultyDialogConstruct(
-    AM2_Widget *w, const char *bmp);
+static inline AM2_Widget * __attribute__((thiscall)) DifficultyDialogConstruct(AM2_Widget *w, const char *bmp)
+{ return w->DifficultyDialogConstruct(bmp); }
 
 /* Original: 0x00450E10, thiscall. The CONTROLS dialog -- twenty-one
  * key-capture rows out of three parallel tables, then three buttons. See
  * widget.cpp for the tables and for why three of the row constructor's
  * arguments carry stale upper bytes in the original. */
-AM2_Widget *__attribute__((thiscall)) ControlsDialogConstruct(AM2_Widget *w,
-                                                              const char *bmp);
+static inline AM2_Widget * __attribute__((thiscall)) ControlsDialogConstruct(AM2_Widget *w, const char *bmp)
+{ return w->ControlsDialogConstruct(bmp); }
 
 /* Original: 0x00432320, thiscall. MULTIPLAYER OPTIONS -- 43 checkboxes out of
  * the declarative table, then three buttons for a host and one for anyone
  * else. See widget.cpp for the three things that depend on being the host. */
-AM2_Widget *__attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w,
-                                                         const char *bmp);
+static inline AM2_Widget * __attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w, const char *bmp)
+{ return w->MpOptionsConstruct(bmp); }
 
 /* Original: 0x0044F370, thiscall, `ret 8`. AUDIO CONTROLS -- three volume
  * sliders. The only screen whose SHAPE depends on where it was opened from:
  * see widget.cpp. */
-AM2_Widget *__attribute__((thiscall)) AudioDialogConstruct(AM2_Widget *w,
-                                                           const char *bmp,
-                                                           int32_t flag);
+static inline AM2_Widget * __attribute__((thiscall)) AudioDialogConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
+{ return w->AudioDialogConstruct(bmp, flag); }
 
 /* Original: 0x0042FB00, thiscall. ENTER BATTLE NAME. The two fields are
  * seeded from the saved names and edit the dialog's own buffers in place,
  * which is why HostBattle can read them back out of globals. See widget.cpp. */
-AM2_Widget *__attribute__((thiscall)) BattleNameConstruct(AM2_Widget *w,
-                                                          const char *bmp);
+static inline AM2_Widget * __attribute__((thiscall)) BattleNameConstruct(AM2_Widget *w, const char *bmp)
+{ return w->BattleNameConstruct(bmp); }
 
 /* Original: 0x0042E9C0, thiscall. COMM. CHANNEL SELECT -- the connection
  * list, filled by our own CommEnumConnections. Its list box takes ADDR_LOG as
  * a callback, which is the folded empty-virtual address; see widget.cpp. */
-AM2_Widget *__attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w,
-                                                         const char *bmp);
+static inline AM2_Widget * __attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w, const char *bmp)
+{ return w->CommPanelConstruct(bmp); }
 
 /* Original: 0x00451400, thiscall. SELECT PLAYER -- the one screen whose rows
  * come off the FILESYSTEM. See widget.cpp. */
-AM2_Widget *__attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w,
-                                                            const char *bmp);
+static inline AM2_Widget * __attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w, const char *bmp)
+{ return w->SelectPlayerConstruct(bmp); }
 
 /* Original: 0x00454980, thiscall, `ret 0x18`. The PANEL -- a widget whose
  * whole job is to hold a backdrop sprite, and what eight of the reconstructed
  * screens hang everything else off. It keeps the sprite twice, at 0x0038 and
  * 0x0058; see widget.cpp. */
-AM2_Widget *__attribute__((thiscall)) PanelConstruct(AM2_Widget *w,
-                                                     const char *bmp,
-                                                     int32_t flag,
-                                                     AM2_Rect box);
+static inline AM2_Widget * __attribute__((thiscall)) PanelConstruct(AM2_Widget *w, const char *bmp, int32_t flag, AM2_Rect box)
+{ return w->PanelConstruct(bmp, flag, box); }
 
 /* Original: 0x00450C50, thiscall, `ret 0x2C`. The key-capture ROW. It passes
  * an UNINITIALISED byte to the label constructor as the ink, which is the
  * original's and is harmless for a reason worth reading in widget.cpp. */
-AM2_Widget *__attribute__((thiscall)) KeyRowConstruct(AM2_Widget *w,
-                                                      int32_t nameIndex,
-                                                      const char *caption,
-                                                      int32_t left, int32_t top,
-                                                      int32_t width,
-                                                      int32_t height,
-                                                      int32_t font, int32_t ink,
-                                                      int32_t ink2, int32_t ink3,
-                                                      int32_t ink4);
+static inline AM2_Widget * __attribute__((thiscall)) KeyRowConstruct(AM2_Widget *w, int32_t nameIndex, const char *caption, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t ink2, int32_t ink3, int32_t ink4)
+{ return w->KeyRowConstruct(nameIndex, caption, left, top, width, height, font, ink, ink2, ink3, ink4); }
 
 /* Original: 0x00454B00, thiscall, `ret 8`. The SCREEN BASE -- a panel over the
  * whole 640x480 with the dialog vtable on top. Every screen starts here. */
-AM2_Widget *__attribute__((thiscall)) ScreenBaseConstruct(AM2_Widget *w,
-                                                          const char *bmp,
-                                                          int32_t flag);
+static inline AM2_Widget * __attribute__((thiscall)) ScreenBaseConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
+{ return w->ScreenBaseConstruct(bmp, flag); }
 
 /* Original: 0x004540F0, thiscall, `ret 0x28`. The BUTTON: three sprites by
  * name, a rectangle by value, and two handlers. Only the first bitmap is
  * tested for null; see widget.cpp. */
-AM2_Widget *__attribute__((thiscall)) ButtonConstruct(AM2_Widget *w,
-                                                      const char *b0,
-                                                      const char *b1,
-                                                      const char *b2,
-                                                      int32_t flag,
-                                                      AM2_Rect box,
-                                                      void (__cdecl *onLeft)(AM2_Widget *),
-                                                      void (__cdecl *onRight)(AM2_Widget *));
+static inline AM2_Widget * __attribute__((thiscall)) ButtonConstruct(AM2_Widget *w, const char *b0, const char *b1, const char *b2, int32_t flag, AM2_Rect box, void (__cdecl *onLeft)(AM2_Widget *), void (__cdecl *onRight)(AM2_Widget *))
+{ return w->ButtonConstruct(b0, b1, b2, flag, box, onLeft, onRight); }
 
 /* Original: 0x00454C10, thiscall, `ret 0x34` -- THIRTEEN stack arguments:
  * the buffer, the maximum, four of rectangle, a font, three colours, the
@@ -1430,106 +1633,58 @@ AM2_Widget *__attribute__((thiscall)) ButtonConstruct(AM2_Widget *w,
  * `~!@#$%^& in it -- and a caller that wants a narrower field overwrites
  * EDIT_OFF_CHARSET afterwards, which is exactly what ENTER BATTLE NAME does
  * with the letters-and-digits set at 0x00485308. */
-AM2_Widget *__attribute__((thiscall)) EditConstruct(AM2_Widget *w, char *buf,
-                                                    int32_t maxChars,
-                                                    int32_t left, int32_t top,
-                                                    int32_t width,
-                                                    int32_t height,
-                                                    int32_t font, int32_t inkFocus,
-                                                    int32_t ink, int32_t paper,
-                                                    void (__cdecl *onEnter)(AM2_Widget *),
-                                                    int32_t a, int32_t b);
+static inline AM2_Widget * __attribute__((thiscall)) EditConstruct(AM2_Widget *w, char *buf, int32_t maxChars, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t inkFocus, int32_t ink, int32_t paper, void (__cdecl *onEnter)(AM2_Widget *), int32_t a, int32_t b)
+{ return w->EditConstruct(buf, maxChars, left, top, width, height, font, inkFocus, ink, paper, onEnter, a, b); }
 
 /* Original: 0x00456BC0, thiscall, `ret 0x1C`. The two-sprite widget -- the
  * flashing "send" and "receive" dots. A PANEL underneath, then the SECOND
  * bitmap into sprites[0] and the first parked at MULTISPR_OFF_SPRITE0. */
-AM2_Widget *__attribute__((thiscall)) MultiSpriteConstruct(AM2_Widget *w,
-                                                           const char *b0,
-                                                           const char *b1,
-                                                           int32_t flag,
-                                                           AM2_Rect box);
+static inline AM2_Widget * __attribute__((thiscall)) MultiSpriteConstruct(AM2_Widget *w, const char *b0, const char *b1, int32_t flag, AM2_Rect box)
+{ return w->MultiSpriteConstruct(b0, b1, flag, box); }
 
 /* 0x00433290 and 0x00433330, one caller. The TEXT LIST -- the message log's
  * list box. The LIST BOX with a different vtable, five colours and the
  * read-only flag set, and no storage of its own. */
-AM2_Widget *__attribute__((thiscall)) TextListConstruct(AM2_Widget *w,
-                                                        int32_t left,
-                                                        int32_t top,
-                                                        int32_t right,
-                                                        int32_t bottom,
-                                                        void *rows,
-                                                        int32_t callback,
-                                                        int32_t ownsRows);
-AM2_Widget *__attribute__((thiscall)) TextListDelete(AM2_Widget *w,
-                                                     int32_t flags);
+static inline AM2_Widget * __attribute__((thiscall)) TextListConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t right, int32_t bottom, void *rows, int32_t callback, int32_t ownsRows)
+{ return w->TextListConstruct(left, top, right, bottom, rows, callback, ownsRows); }
+static inline AM2_Widget * __attribute__((thiscall)) TextListDelete(AM2_Widget *w, int32_t flags)
+{ return w->TextListDelete(flags); }
 
 /* Original: 0x00454F90, thiscall, `ret 0x20`. The LIST BOX. It works out how
  * many rows fit by dividing by SEVEN -- a magic-number division that is the
  * only place the row height appears. Its hot row starts at -1 and becomes 0
  * if the rows it was given are not empty. */
-AM2_Widget *__attribute__((thiscall)) ListBoxConstruct(AM2_Widget *w,
-                                                       int32_t left,
-                                                       int32_t top,
-                                                       int32_t right,
-                                                       int32_t bottom,
-                                                       void *rows,
-                                                       int32_t callback,
-                                                       int32_t arg6C,
-                                                       int32_t ownsRows);
+static inline AM2_Widget * __attribute__((thiscall)) ListBoxConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t right, int32_t bottom, void *rows, int32_t callback, int32_t arg6C, int32_t ownsRows)
+{ return w->ListBoxConstruct(left, top, right, bottom, rows, callback, arg6C, ownsRows); }
 
 /* Original: 0x00454640, thiscall, `ret 0x2C`. The CHECKBOX -- four sprites,
  * a rectangle, its record index, a caption and a change handler.
  *
  * Its LEFT-click action is written by the constructor, not by the caller:
  * ADDR_CHECKBOX_TOGGLE. The caller's handler goes to CHECK_OFF_ON_CHANGE. */
-AM2_Widget *__attribute__((thiscall)) CheckBoxConstruct(AM2_Widget *w,
-                                                        const char *b0,
-                                                        const char *b1,
-                                                        const char *b2,
-                                                        const char *b3,
-                                                        int32_t left, int32_t top,
-                                                        int32_t width,
-                                                        int32_t height,
-                                                        int32_t group,
-                                                        const char *caption,
-                                                        void (__cdecl *onChange)(AM2_Widget *));
+static inline AM2_Widget * __attribute__((thiscall)) CheckBoxConstruct(AM2_Widget *w, const char *b0, const char *b1, const char *b2, const char *b3, int32_t left, int32_t top, int32_t width, int32_t height, int32_t group, const char *caption, void (__cdecl *onChange)(AM2_Widget *))
+{ return w->CheckBoxConstruct(b0, b1, b2, b3, left, top, width, height, group, caption, onChange); }
 
 /* Original: 0x00455FF0, thiscall, `ret 0x18`. The SCROLL BAR -- the three
  * volume sliders. It builds its own two arrows, each a BUTTON with a NULL
  * first bitmap and VTABLE_ARROW stamped over the button's, which is the one
  * place the null-bitmap branch is taken. Its RANGE is a literal twenty. */
-AM2_Widget *__attribute__((thiscall)) ScrollBarConstruct(AM2_Widget *w,
-                                                         int32_t left,
-                                                         int32_t top,
-                                                         int32_t width,
-                                                         int32_t height,
-                                                         AM2_Widget *parent,
-                                                         int32_t span);
+static inline AM2_Widget * __attribute__((thiscall)) ScrollBarConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t width, int32_t height, AM2_Widget *parent, int32_t span)
+{ return w->ScrollBarConstruct(left, top, width, height, parent, span); }
 
 /* Original: 0x00455970, thiscall, `ret 0x24` -- nine stack arguments. The
  * VERTICAL bar with arrows: the connection list's and the player list's. The
  * horizontal scroll bar transposed, with the same two-arrows-from-buttons
  * trick. */
-AM2_Widget *__attribute__((thiscall)) ArrowBarConstruct(AM2_Widget *w,
-                                                        int32_t left,
-                                                        int32_t top,
-                                                        int32_t width,
-                                                        int32_t height,
-                                                        AM2_Widget *parent,
-                                                        const char *b0,
-                                                        const char *b1,
-                                                        int32_t span,
-                                                        int32_t flag50);
+static inline AM2_Widget * __attribute__((thiscall)) ArrowBarConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t width, int32_t height, AM2_Widget *parent, const char *b0, const char *b1, int32_t span, int32_t flag50)
+{ return w->ArrowBarConstruct(left, top, width, height, parent, b0, b1, span, flag50); }
 
 /* Original: 0x004566F0, thiscall, `ret 0x14`. The TYPEWRITER, and the
  * WORD-WRAP is the constructor: it folds the message into TYPER_OFF_TEXT with
  * `|` between the lines rather than storing it. See widget.cpp for the two
  * offsets the loop keeps and what a too-wide word does. */
-AM2_Widget *__attribute__((thiscall)) TyperConstruct(AM2_Widget *w,
-                                                     int32_t left, int32_t top,
-                                                     int32_t width,
-                                                     int32_t height,
-                                                     const char *message);
+static inline AM2_Widget * __attribute__((thiscall)) TyperConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t width, int32_t height, const char *message)
+{ return w->TyperConstruct(left, top, width, height, message); }
 
 /* Original: 0x0044D730. The TITLE SCREEN -- the one arm of the menu table
  * that builds its screen inline rather than calling a constructor. It also
@@ -1576,7 +1731,8 @@ void __attribute__((thiscall)) ArrowBarFollowEnd(AM2_Widget *bar);
 
 /* 0x00455E10, thiscall. Scroll a row into view, moving the top row the
  * smallest distance that shows it -- and not at all if it already is. */
-void __attribute__((thiscall)) ArrowBarShowRow(AM2_Widget *bar, int32_t row);
+static inline void __attribute__((thiscall)) ArrowBarShowRow(AM2_Widget *bar, int32_t row)
+{ bar->ArrowBarShowRow(row); }
 void __cdecl OnArrowLeft(AM2_Widget *w);
 void __cdecl OnArrowRight(AM2_Widget *w);
 
@@ -1605,21 +1761,19 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi);
 
 /* Original: 0x004542F0, thiscall. The base button's constructor -- returns
  * `this`, as every i386 MSVC constructor does. */
-AM2_Widget *__attribute__((thiscall)) ButtonBaseConstruct(AM2_Widget *w);
+static inline AM2_Widget * __attribute__((thiscall)) ButtonBaseConstruct(AM2_Widget *w)
+{ return w->ButtonBaseConstruct(); }
 
 /* 0x00418C20, 0x00418CE0 and 0x00418D00 -- the COUNT BUTTON's constructor,
  * deleting destructor and activate handler. Nine arguments; two faces from one
  * sprite index; the activate toggles COUNTBTN_OFF_LIT, repaints through the
  * vtable and then fires the optional COUNTBTN_OFF_ON_TOGGLE. In no widget tree
  * this project can dump, so verified by reading. */
-AM2_Widget *__attribute__((thiscall))
-CountButtonConstruct(AM2_Widget *w, int32_t index, int32_t frame,
-                     int32_t x, int32_t y, int32_t cw, int32_t ch,
-                     int32_t arg7, int32_t count,
-                     void (__cdecl *onToggle)(AM2_Widget *));
+static inline AM2_Widget * __attribute__((thiscall)) CountButtonConstruct(AM2_Widget *w, int32_t index, int32_t army, int32_t x, int32_t y, int32_t cw, int32_t ch, int32_t menuRow, int32_t count, void (__cdecl *onToggle)(AM2_Widget *))
+{ return w->CountButtonConstruct(index, army, x, y, cw, ch, menuRow, count, onToggle); }
 void __cdecl CountButtonActivate(AM2_Widget *w);
-AM2_Widget *__attribute__((thiscall))
-CountButtonDelete(AM2_Widget *w, int32_t flags);
+static inline AM2_Widget * __attribute__((thiscall)) CountButtonDelete(AM2_Widget *w, int32_t flags)
+{ return w->CountButtonDelete(flags); }
 
 /* Original: 0x00454760. Every checkbox's left-click handler, installed by the
  * constructor. Toggles the tick, repaints, then calls the caller's own
@@ -1628,32 +1782,30 @@ void __cdecl CheckboxToggle(AM2_Widget *w);
 
 /* Original: 0x0044DBB0, thiscall. SELECT MAP -- the campaign's level picker,
  * and the one screen whose list comes out of a PARSED FILE. */
-AM2_Widget *__attribute__((thiscall)) SelectMapConstruct(AM2_Widget *w,
-                                                         const char *bmp);
+static inline AM2_Widget * __attribute__((thiscall)) SelectMapConstruct(AM2_Widget *w, const char *bmp)
+{ return w->SelectMapConstruct(bmp); }
 
 /* Original: 0x00451AF0, thiscall. ENTER NAME -- RECRUIT's dialog, and the
  * simplest screen that owns an edit box. */
-AM2_Widget *__attribute__((thiscall)) EnterNameConstruct(AM2_Widget *w,
-                                                         const char *bmp);
+static inline AM2_Widget * __attribute__((thiscall)) EnterNameConstruct(AM2_Widget *w, const char *bmp)
+{ return w->EnterNameConstruct(bmp); }
 
 /* Original: 0x0044FE50, thiscall. DELETE GAME -- the one screen in the table
  * built two ways: a panel on the title screen, and straight onto the screen
  * with the panel's offset folded into every rectangle when in a mission. */
-AM2_Widget *__attribute__((thiscall)) DeleteGameConstruct(AM2_Widget *w,
-                                                          const char *bmp,
-                                                          int32_t flag);
+static inline AM2_Widget * __attribute__((thiscall)) DeleteGameConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
+{ return w->DeleteGameConstruct(bmp, flag); }
 
 /* Original: 0x0044DFA0, thiscall. MOVIES -- twelve thumbnails in three pages
  * of four, and the only screen that builds its buttons out of SPRITES it
  * loaded itself rather than out of bitmap names. */
-AM2_Widget *__attribute__((thiscall)) MoviesConstruct(AM2_Widget *w,
-                                                      const char *bmp);
+static inline AM2_Widget * __attribute__((thiscall)) MoviesConstruct(AM2_Widget *w, const char *bmp)
+{ return w->MoviesConstruct(bmp); }
 
 /* Original: 0x004520E0, thiscall. LOAD GAME -- the campaign's save picker,
  * and the second of the two screens built two ways. */
-AM2_Widget *__attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w,
-                                                        const char *bmp,
-                                                        int32_t flag);
+static inline AM2_Widget * __attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
+{ return w->LoadGameConstruct(bmp, flag); }
 
 /* The three button classes the multiplayer host/join panel builds one of per
  * player row: 0x004329A0, 0x00432E20 and 0x00433030. All three derive from
@@ -1661,26 +1813,15 @@ AM2_Widget *__attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w,
 /* 0x00430530. The multiplayer host/join panel. ONE class for both roles:
  * COMM_OFF_IS_HOST decides which children are greyed, which are built at all,
  * and whether the corner button says START or READY. */
-AM2_Widget *__attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w,
-                                                       const char *bmp);
+static inline AM2_Widget * __attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w, const char *bmp)
+{ return w->MpPanelConstruct(bmp); }
 
-AM2_Widget *__attribute__((thiscall)) MpNameConstruct(AM2_Widget *w,
-                                                      const char *text,
-                                                      int32_t left, int32_t top,
-                                                      int32_t width,
-                                                      int32_t height,
-                                                      int32_t flag,
-                                                      uint8_t ink,
-                                                      uint8_t paper,
-                                                      int32_t row);
-AM2_Widget *__attribute__((thiscall)) MpColourConstruct(AM2_Widget *w,
-                                                        int32_t left,
-                                                        int32_t top,
-                                                        int32_t row);
-AM2_Widget *__attribute__((thiscall)) MpTeamConstruct(AM2_Widget *w,
-                                                         int32_t left,
-                                                         int32_t top,
-                                                         int32_t row);
+static inline AM2_Widget * __attribute__((thiscall)) MpNameConstruct(AM2_Widget *w, const char *text, int32_t left, int32_t top, int32_t width, int32_t height, int32_t flag, uint8_t ink, uint8_t paper, int32_t row)
+{ return w->MpNameConstruct(text, left, top, width, height, flag, ink, paper, row); }
+static inline AM2_Widget * __attribute__((thiscall)) MpColourConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t row)
+{ return w->MpColourConstruct(left, top, row); }
+static inline AM2_Widget * __attribute__((thiscall)) MpTeamConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t row)
+{ return w->MpTeamConstruct(left, top, row); }
 
 /* Their left handlers, 0x00432EC0 and 0x004330E0 -- and what named the two
  * classes. A guest changes nothing locally: it sends and waits. */
@@ -1697,7 +1838,8 @@ void __cdecl OnChatEnter(AM2_Widget *w);
  * palette index in AL. */
 uint8_t __cdecl MpNameInk(int32_t row);
 uint8_t __cdecl MpNamePaper(int32_t row);
-void __attribute__((thiscall)) MpNameSetInk(AM2_Widget *w, uint8_t ink);
+static inline void __attribute__((thiscall)) MpNameSetInk(AM2_Widget *w, uint8_t ink)
+{ w->MpNameSetInk(ink); }
 
 /* The map thumbnail and what keeps it, the checksums and the ready flag in
  * step with the chosen map. RefreshMapSelection is called from three places
@@ -1723,7 +1865,8 @@ void __cdecl GameMenuAbort(AM2_Widget *w);
 void __cdecl DlgClose(AM2_Widget *w);
 void __cdecl SaveListOnCancel(AM2_Widget *w);
 void __cdecl DlgOverwriteCancel(AM2_Widget *w);
-void __attribute__((thiscall)) GameMenuUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) GameMenuUpdate(AM2_Widget *w)
+{ w->GameMenuUpdate(); }
 /* 0x00453080 -- SAVE's SAVE: extension, existence test, save or confirm. */
 void __cdecl SaveListOnSave(AM2_Widget *w);
 /* 0x00450610 -- the overwrite confirmation's OK; it does the saving. */
@@ -1737,11 +1880,13 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
 
 /* 0x004316D0, slot 2 of the multiplayer panel: grey the row buttons on the
  * same policy their handlers guard on, then push five numbers into text. */
-void __attribute__((thiscall)) MpPanelUpdate(AM2_Widget *w);
+static inline void __attribute__((thiscall)) MpPanelUpdate(AM2_Widget *w)
+{ w->MpPanelUpdate(); }
 
 /* 0x00430480, slot 0: release the panel's two GLOBAL sprite arrays and chain
  * to the dialog base. */
-void __attribute__((thiscall)) MpPanelDestruct(AM2_Widget *w);
+static inline void __attribute__((thiscall)) MpPanelDestruct(AM2_Widget *w)
+{ w->MpPanelDestruct(); }
 
 /* 0x00430510, 0x00431790, 0x0042FF40. The slots that complete those classes:
  * the two scalar deleting destructors and the panel's paint forward. */
@@ -1768,9 +1913,12 @@ void __cdecl BuildOnToggle(AM2_Widget *w);
 void __cdecl OnDelGameOk(AM2_Widget *w);
 void __cdecl BattleJoinPoll(AM2_Widget *w);
 
-AM2_Widget *__attribute__((thiscall)) MpPanelDelete(AM2_Widget *w, int32_t f);
-AM2_Widget *__attribute__((thiscall)) MpDialogDelete(AM2_Widget *w, int32_t f);
-void __attribute__((thiscall)) MpPanelPaint(AM2_Widget *w, RECT clip);
+static inline AM2_Widget * __attribute__((thiscall)) MpPanelDelete(AM2_Widget *w, int32_t flags)
+{ return w->MpPanelDelete(flags); }
+static inline AM2_Widget * __attribute__((thiscall)) MpDialogDelete(AM2_Widget *w, int32_t flags)
+{ return w->MpDialogDelete(flags); }
+static inline void __attribute__((thiscall)) MpPanelPaint(AM2_Widget *w, RECT clip)
+{ w->MpPanelPaint(clip); }
 void __cdecl RefreshMapSelection(void);
 
 /* The save-game family's buttons: 0x00451AC0, 0x00452010, 0x00451F10,
@@ -1784,7 +1932,8 @@ void __cdecl OnLoadGameNew(AM2_Widget *w);
 /* Original: 0x00455C10, thiscall `ret 0x10`. Repaint through the nearest
  * ancestor that owns a sprite, CLIPPED TO THIS WIDGET's rectangle -- which
  * is what makes it not WidgetRepaint. The clip argument is ignored. */
-void __attribute__((thiscall)) RepaintAncestor(AM2_Widget *w, RECT clip);
+static inline void __attribute__((thiscall)) RepaintAncestor(AM2_Widget *w, RECT clip)
+{ w->RepaintAncestor(clip); }
 
 /* The two remaining row callbacks: 0x0044DEA0 and 0x00451EA0. */
 void __cdecl SelectMapRow(AM2_Widget *list, AM2_ListRows *rows,

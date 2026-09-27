@@ -77,8 +77,12 @@ def reconstruction_map(addrs):
     image's dword is the ORIGINAL function address, and the C entry names the
     reconstruction that replaces it."""
     import glob
+    # Two install spellings: a plain function `(const void *)Fn`, and a thiscall
+    # method installed by address `pmf_addr(&Class::Fn)` (see src/game/pmf.h).
+    # A function-pointer table names the reconstruction by its bare name either
+    # way, so capture that name from both.
     pat = re.compile(r"patch_replace\(\s*(ADDR_\w+)\s*,\s*"
-                     r"\(const void \*\)\s*&?(\w+)")
+                     r"(?:\(const void \*\)\s*&?|pmf_addr\(&(?:\w+::)?)(\w+)")
     out = {}
     for p in (glob.glob(os.path.join(ROOT, "src/game/*.cpp"))
               + glob.glob(os.path.join(ROOT, "src/game/win32/*.cpp"))):
