@@ -28,21 +28,12 @@
 extern "C" {
 #endif
 
-/* Zero in the game, where the image is at its own base. Set once by whoever
- * mapped the image somewhere else (the offline selftest). */
+/* Retained only for the offline selftest's image loader (tests/loadimage.h),
+ * which maps ArmyMen2.exe at a base Wine leaves free and records the offset
+ * here.  The reconstruction no longer reads it: AM2_IMAGE -- the old
+ * `(void*)(addr + slide)` wrapper -- is gone; every global is spelled out as a
+ * placed symbol and reached directly.  A placed selftest needs neither. */
 extern int32_t am2_image_slide;
-
-/* The image maps at its own base in the injected and byte-match builds
- * (am2_image_slide is always 0 there -- see standalone.h), so fold to the plain
- * address: that reproduces the original's direct `[addr]` access instead of an
- * `addr + slide` read the original never had.  Only the relocatable standalone
- * build carries the runtime slide. */
-#if defined(AM2_STANDALONE) && !defined(AM2_RELINK)
-#define AM2_IMAGE(addr) \
-    ((void *)((uint8_t *)(uintptr_t)(addr) + am2_image_slide))
-#else
-#define AM2_IMAGE(addr) ((void *)(uintptr_t)(addr))
-#endif
 
 #ifdef __cplusplus
 }

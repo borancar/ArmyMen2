@@ -46,7 +46,7 @@ extern "C" const uint8_t am2_crt_printf_table[92] = {
  * slide applies to the variable and again to what it holds. */
 static const void *crt_slid_pointer(uintptr_t var)
 {
-    return (const void *)(uintptr_t)AM2_IMAGE(*(const uint32_t *)(uintptr_t)AM2_IMAGE(var));
+    return (const void *)(uintptr_t)((void *)(uintptr_t)(*(const uint32_t *)(uintptr_t)((void *)(uintptr_t)(var))));
 }
 #define crt_pctype_table() ((const uint16_t *)crt_slid_pointer(ADDR_CRT_PCTYPE))
 
@@ -116,7 +116,7 @@ static int32_t crt_wctomb_out(char *out, uint32_t wc)
 
 int32_t __cdecl crt_output(CRT_FILE *stream, const char *format, va_list argptr)
 {
-    const uint8_t *table = (const uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_PRINTF_TABLE);
+    const uint8_t *table = (const uint8_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_PRINTF_TABLE));
     const char *nullstring = (const char *)crt_slid_pointer(ADDR_CRT_NULLSTRING);
     const uint16_t *wnullstring = (const uint16_t *)crt_slid_pointer(ADDR_CRT_WNULLSTRING);
     const uint16_t *pctype = crt_pctype_table();

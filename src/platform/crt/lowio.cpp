@@ -42,14 +42,14 @@ extern "C" const uint32_t am2_crt_errtable[90] = {
 };
 #endif
 
-#define crt_nhandle     (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_NHANDLE))
-#define crt_pioinfo_tab ((CRT_IOINFO **)(uintptr_t)AM2_IMAGE(ADDR_CRT_PIOINFO))
-#define crt_errno       (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ERRNO))
-#define crt_doserrno    (*(uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_DOSERRNO))
-#define crt_fmode       (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_FMODE))
-#define crt_umaskval    (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_UMASKVAL))
-#define crt_app_type    (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_APP_TYPE))
-#define crt_badioinfo   ((CRT_IOINFO *)(uintptr_t)AM2_IMAGE(ADDR_CRT_BADIOINFO))
+#define crt_nhandle     (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_NHANDLE)))
+#define crt_pioinfo_tab ((CRT_IOINFO **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_PIOINFO)))
+#define crt_errno       (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ERRNO)))
+#define crt_doserrno    (*(uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_DOSERRNO)))
+#define crt_fmode       (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_FMODE)))
+#define crt_umaskval    (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_UMASKVAL)))
+#define crt_app_type    (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_APP_TYPE)))
+#define crt_badioinfo   ((CRT_IOINFO *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_BADIOINFO)))
 
 #define CRT_IOINFO_ARRAYS   64
 #define CRT_IOINFO_ARRAY_ELTS 32
@@ -247,8 +247,8 @@ intptr_t __cdecl crt_get_osfhandle(int32_t fd)
 
 void __cdecl crt_dosmaperr(uint32_t oserr)
 {
-    const uint32_t *t   = (const uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ERRTABLE);
-    const uint32_t *end = (const uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ERRTABLE_END);
+    const uint32_t *t   = (const uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ERRTABLE));
+    const uint32_t *end = (const uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ERRTABLE_END));
 
     crt_doserrno = oserr;
     for (; t < end; t += 2) {

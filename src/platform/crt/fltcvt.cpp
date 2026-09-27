@@ -274,13 +274,13 @@ zero:
  * above half taken one below. */
 void crt_multtenpow12(CRT_LD12 *x, int32_t pow, int32_t rounding)
 {
-    const uint8_t *table = (const uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_POW10_TABLE) - 0x60;
+    const uint8_t *table = (const uint8_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_POW10_TABLE)) - 0x60;
 
     if (pow == 0)
         return;
     if (pow < 0) {
         pow = -pow;
-        table = (const uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_POW10_NEG_TABLE) - 0x60;
+        table = (const uint8_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_POW10_NEG_TABLE)) - 0x60;
     }
     if (rounding == 0)
         crt_ld_set_w(x, 0, 0);
@@ -475,8 +475,8 @@ typedef struct CRT_StrFlt {
     char   *mantissa;
 } CRT_StrFlt;
 
-#define crt_fltraw  ((CRT_FltRaw *)(uintptr_t)AM2_IMAGE(ADDR_CRT_FLTOUT_RAW))
-#define crt_strflt  ((CRT_StrFlt *)(uintptr_t)AM2_IMAGE(ADDR_CRT_STRFLT))
+#define crt_fltraw  ((CRT_FltRaw *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_FLTOUT_RAW)))
+#define crt_strflt  ((CRT_StrFlt *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_STRFLT)))
 
 /* 0x0046ACFD: seventeen digits of the value into the CRT's static
  * records, answering the STRFLT view of them. */
@@ -529,11 +529,11 @@ static void crt_fptostr(char *buf, int32_t ndigits, CRT_StrFlt *flt)
 
 /* ---- the layouts --------------------------------------------------------------- */
 
-#define crt_g_fmt        (*(uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_CFTOG_ACTIVE))
-#define crt_g_pflt       (*(CRT_StrFlt **)(uintptr_t)AM2_IMAGE(ADDR_CRT_CFTOG_PFLT))
-#define crt_g_magnitude  (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_CFTOG_MAGNITUDE))
-#define crt_g_expansion  (*(uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_CFTOG_EXPANSION))
-#define crt_decimal_point (*(const char *)(uintptr_t)AM2_IMAGE(ADDR_CRT_DECIMAL_POINT))
+#define crt_g_fmt        (*(uint8_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_CFTOG_ACTIVE)))
+#define crt_g_pflt       (*(CRT_StrFlt **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_CFTOG_PFLT)))
+#define crt_g_magnitude  (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_CFTOG_MAGNITUDE)))
+#define crt_g_expansion  (*(uint8_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_CFTOG_EXPANSION)))
+#define crt_decimal_point (*(const char *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_DECIMAL_POINT)))
 
 /* 0x00466A8E: open `dist` bytes at `s`. */
 static void crt_shift(char *s, int32_t dist)
@@ -616,7 +616,7 @@ static char *crt_cftoe(const double *value, char *buf, int32_t ndec, int32_t cap
         *p = crt_decimal_point;
     }
     e = p + ndec + (crt_g_fmt ? 0 : 1);
-    crt_strcpy(e, (const char *)(uintptr_t)AM2_IMAGE(ADDR_CRT_EXPONENT_TEXT));
+    crt_strcpy(e, (const char *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_EXPONENT_TEXT)));
     if (caps)
         *e = 'E';
     e++;

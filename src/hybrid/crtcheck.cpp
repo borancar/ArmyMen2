@@ -80,8 +80,8 @@ static const AM2_CkStack kOurs = {
     crt_fopen, crt_fclose, crt_fread, crt_fwrite, crt_fgets, crt_fseek, crt_ftell, crt_fflush,
 };
 
-#define ck_errno    (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ERRNO))
-#define ck_doserrno (*(uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_DOSERRNO))
+#define ck_errno    (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ERRNO)))
+#define ck_doserrno (*(uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_DOSERRNO)))
 
 /* ---- corpus ------------------------------------------------------------ */
 
@@ -560,7 +560,7 @@ static int32_t ck_strhash(const char *s)
     return s ? (int32_t)ck_hash((const uint8_t *)s, (uint32_t)strlen(s)) : -1;
 }
 
-#define ck_g32(addr) (*(int32_t *)(uintptr_t)AM2_IMAGE(addr))
+#define ck_g32(addr) (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(addr)))
 
 /* Forget what __tzset, _isindst and time() cached, so the stack about to
  * run computes it for itself. The TZ copy is dropped rather than freed:
@@ -568,16 +568,16 @@ static int32_t ck_strhash(const char *s)
 static void ck_reset_time_state(void)
 {
     ck_g32(ADDR_CRT_TZSET_DONE) = 0;
-    *(char **)(uintptr_t)AM2_IMAGE(ADDR_CRT_LAST_TZ) = NULL;
+    *(char **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_LAST_TZ)) = NULL;
     ck_g32(ADDR_CRT_DST_START_YEAR) = -1;
     ck_g32(ADDR_CRT_DST_END_YEAR) = -1;
-    memset((void *)(uintptr_t)AM2_IMAGE(ADDR_CRT_TIME_SYSTIME_CACHE), 0, 16);
+    memset((void *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_TIME_SYSTIME_CACHE)), 0, 16);
     ck_g32(ADDR_CRT_TIME_DST_CACHE) = 0;
 }
 
 static void ck_push_tz_state(int32_t side)
 {
-    char **tzname = (char **)(uintptr_t)AM2_IMAGE(ADDR_CRT_TZNAME);
+    char **tzname = (char **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_TZNAME));
 
     ck_push(side, "_timezone", ck_g32(ADDR_CRT_TIMEZONE));
     ck_push(side, "_daylight", ck_g32(ADDR_CRT_DAYLIGHT));
@@ -974,11 +974,11 @@ static const AM2_CkHeapStack kHeapOurs = { "ours", crt_malloc, crt_free, crt_rea
 
 static int32_t ck_heap_bad, ck_heap_ops;
 
-#define ckh_list   (*(CRT_SBH_HEADER **)(uintptr_t)AM2_IMAGE(ADDR_CRT_SBH_PHEADER_LIST))
-#define ckh_count  (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_SBH_CNT_HEADER_LIST))
-#define ckh_scan   (*(CRT_SBH_HEADER **)(uintptr_t)AM2_IMAGE(ADDR_CRT_SBH_PHEADER_SCAN))
-#define ckh_defer  (*(CRT_SBH_HEADER **)(uintptr_t)AM2_IMAGE(ADDR_CRT_SBH_PHEADER_DEFER))
-#define ckh_idefer (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_SBH_IND_GROUP_DEFER))
+#define ckh_list   (*(CRT_SBH_HEADER **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_SBH_PHEADER_LIST)))
+#define ckh_count  (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_SBH_CNT_HEADER_LIST)))
+#define ckh_scan   (*(CRT_SBH_HEADER **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_SBH_PHEADER_SCAN)))
+#define ckh_defer  (*(CRT_SBH_HEADER **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_SBH_PHEADER_DEFER)))
+#define ckh_idefer (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_SBH_IND_GROUP_DEFER)))
 #define CKH_REGION 0x41C4
 #define CKH_GROUP  0x8000
 
@@ -1358,8 +1358,8 @@ static void ck_exit(void)
     static const CRT_ExitFn fns[6] = { ck_h0, ck_h1, ck_h2, ck_h3, ck_h4, ck_h5 };
     AM2_CkAtexit  oat = (AM2_CkAtexit)(uintptr_t)ADDR_CRT_ATEXIT;
     AM2_CkDoexit  odo = (AM2_CkDoexit)(uintptr_t)ADDR_CRT_DOEXIT;
-    CRT_ExitFn  **begin = (CRT_ExitFn **)(uintptr_t)AM2_IMAGE(ADDR_CRT_ONEXITBEGIN);
-    CRT_ExitFn  **end = (CRT_ExitFn **)(uintptr_t)AM2_IMAGE(ADDR_CRT_ONEXITEND);
+    CRT_ExitFn  **begin = (CRT_ExitFn **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ONEXITBEGIN));
+    CRT_ExitFn  **end = (CRT_ExitFn **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ONEXITEND));
     int32_t       i, side, before, after, n0 = 0;
     int32_t       order[2][64], counts[2];
 
@@ -1426,7 +1426,7 @@ typedef char *(__cdecl *AM2_CkWincmdln)(void);
 typedef int32_t (__cdecl *AM2_CkSetmbcp)(int32_t);
 typedef uint32_t (__cdecl *AM2_CkControl87)(uint32_t, uint32_t);
 
-#define ck_acmdln (*(char **)(uintptr_t)AM2_IMAGE(ADDR_CRT_ACMDLN))
+#define ck_acmdln (*(char **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ACMDLN)))
 
 /* The command-line parser on a corpus of lines, both passes, compared on
  * argc, the character count and every argument; __wincmdln on the same
@@ -1505,12 +1505,12 @@ static void ck_startup(void)
         for (side = 0; side < 2; side++) {
             int32_t rc = side ? crt_setmbcp(cps[i]) : osetmbcp(cps[i]);
 
-            memcpy(tables[side], (const void *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBCTYPE), 0x101);
-            memcpy(tables[side] + 0x101, (const void *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBCASEMAP), 0x100);
-            memcpy(tables[side] + 0x201, (const void *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBULINFO), 12);
-            memcpy(tables[side] + 0x20D, (const void *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBCODEPAGE), 4);
-            memcpy(tables[side] + 0x211, (const void *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBLCID), 4);
-            memcpy(tables[side] + 0x215, (const void *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ISMBCODEPAGE), 4);
+            memcpy(tables[side], (const void *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MBCTYPE)), 0x101);
+            memcpy(tables[side] + 0x101, (const void *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MBCASEMAP)), 0x100);
+            memcpy(tables[side] + 0x201, (const void *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MBULINFO)), 12);
+            memcpy(tables[side] + 0x20D, (const void *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MBCODEPAGE)), 4);
+            memcpy(tables[side] + 0x211, (const void *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MBLCID)), 4);
+            memcpy(tables[side] + 0x215, (const void *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ISMBCODEPAGE)), 4);
             snprintf(desc, sizeof desc, "setmbcp %d rc", cps[i]);
             ck_push(side, desc, rc);
             snprintf(desc, sizeof desc, "setmbcp %d tables", cps[i]);

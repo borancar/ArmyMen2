@@ -19,7 +19,7 @@
 uint32_t am2_rand_seed = 1;
 #endif
 
-#define crt_holdrand (*(uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_RAND_SEED))
+#define crt_holdrand (*(uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_RAND_SEED)))
 
 int32_t __cdecl crt_rand(void)
 {

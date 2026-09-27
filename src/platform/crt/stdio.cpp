@@ -40,12 +40,12 @@ extern "C" uint8_t am2_crt_iob[640] = {
 };
 #endif
 
-#define crt_iob      ((CRT_FILE *)(uintptr_t)AM2_IMAGE(ADDR_CRT_IOB))
-#define crt_piob     (*(CRT_FILE ***)(uintptr_t)AM2_IMAGE(ADDR_CRT_PIOB))
-#define crt_nstream  (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_NSTREAM))
-#define crt_commode  (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_COMMODE))
-#define crt_cflush   (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_CFLUSH))
-#define crt_errno    (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ERRNO))
+#define crt_iob      ((CRT_FILE *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_IOB)))
+#define crt_piob     (*(CRT_FILE ***)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_PIOB)))
+#define crt_nstream  (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_NSTREAM)))
+#define crt_commode  (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_COMMODE)))
+#define crt_cflush   (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_CFLUSH)))
+#define crt_errno    (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ERRNO)))
 #define crt_stdout   (crt_iob + 1)
 #define crt_stderr   (crt_iob + 2)
 
@@ -59,7 +59,7 @@ extern "C" uint8_t am2_crt_iob[640] = {
 static CRT_IOINFO *crt_ioinfo_or_bad(int32_t fd)
 {
     return fd != -1 ? crt_pioinfo(fd)
-                    : (CRT_IOINFO *)(uintptr_t)AM2_IMAGE(ADDR_CRT_BADIOINFO);
+                    : (CRT_IOINFO *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_BADIOINFO));
 }
 
 void __cdecl crt_initstdio(void)
@@ -81,7 +81,7 @@ void __cdecl crt_initstdio(void)
         crt_piob[i] = &crt_iob[i];
     /* A standard stream with no handle behind it gets fd -1. The original
      * has run _ioinit by now; here the table may still be empty. */
-    if (((CRT_IOINFO **)(uintptr_t)AM2_IMAGE(ADDR_CRT_PIOINFO))[0] == NULL)
+    if (((CRT_IOINFO **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_PIOINFO)))[0] == NULL)
         crt_ioinit();
     for (i = 0; i < 3; i++) {
         intptr_t h = crt_pioinfo(i)->osfhnd;

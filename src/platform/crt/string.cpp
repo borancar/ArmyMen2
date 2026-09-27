@@ -14,7 +14,7 @@
 
 /* strtok's resumption point, the image's own word: a caller that passes
  * NULL continues from where the last call on any build left off. */
-#define crt_strtok_next (*(char **)(uintptr_t)AM2_IMAGE(ADDR_CRT_STRTOK_NEXT))
+#define crt_strtok_next (*(char **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_STRTOK_NEXT)))
 
 char *__cdecl crt_strtok(char *str, const char *delims)
 {
@@ -125,7 +125,7 @@ int32_t __cdecl crt_strncmp(const char *a, const char *b, uint32_t n)
  * malloc'd copy for _strlwr and tolower per byte for _stricmp, is not
  * reproduced; a build that somehow set a locale would fold ASCII here
  * where the original would fold the locale's letters. */
-#define crt_lc_handle_ctype (*(const int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_LC_HANDLE_CTYPE))
+#define crt_lc_handle_ctype (*(const int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_LC_HANDLE_CTYPE)))
 
 /* 0x00465F90. The C-locale arm folds A..Z only, on both strings, and
  * answers -1, 0 or 1 from the first pair that still differs. Equal RAW

@@ -50,9 +50,9 @@ extern "C" const uint16_t am2_crt_ctype[257] = {
 };
 #endif
 
-#define crt_pctype     (*(const uint16_t **)(uintptr_t)AM2_IMAGE(ADDR_CRT_PCTYPE))
-#define crt_mb_cur_max (*(const int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MB_CUR_MAX))
-#define crt_errno      (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ERRNO))
+#define crt_pctype     (*(const uint16_t **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_PCTYPE)))
+#define crt_mb_cur_max (*(const int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MB_CUR_MAX)))
+#define crt_errno      (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ERRNO)))
 
 #define CRT_UPPER  0x001
 #define CRT_LOWER  0x002
@@ -67,7 +67,7 @@ extern "C" const uint16_t am2_crt_ctype[257] = {
  * be reached under 1252 and is not reproduced. */
 static uint32_t crt_ctype(uint32_t c)
 {
-    const uint16_t *table = (const uint16_t *)(uintptr_t)AM2_IMAGE((uintptr_t)crt_pctype);
+    const uint16_t *table = (const uint16_t *)(uintptr_t)((void *)(uintptr_t)((uintptr_t)crt_pctype));
     return table[c & 0xFF];
 }
 
@@ -77,7 +77,7 @@ static uint32_t crt_ctype(uint32_t c)
  * passes one and that arm is not reproduced. */
 int32_t __cdecl crt_isctype(int32_t c, int32_t mask)
 {
-    const uint16_t *table = (const uint16_t *)(uintptr_t)AM2_IMAGE((uintptr_t)crt_pctype);
+    const uint16_t *table = (const uint16_t *)(uintptr_t)((void *)(uintptr_t)((uintptr_t)crt_pctype));
 
     if ((uint32_t)(c + 1) > 0x100)
         return c & mask;   /* unreachable: see above */

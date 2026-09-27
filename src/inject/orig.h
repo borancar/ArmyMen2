@@ -15101,7 +15101,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_PICKUP_KIND_INDEX   0x00433770u  /* uint8_t[29] */
 #define AM2_ITEM_KIND_IS_SPECIAL(kind) \
     ((uint32_t)((kind) - 1) <= 0x1Cu \
-     && ((const uint8_t *)AM2_IMAGE(ADDR_PICKUP_KIND_INDEX))[(kind) - 1] == 0)
+     && ((const uint8_t *)((void *)(uintptr_t)(ADDR_PICKUP_KIND_INDEX)))[(kind) - 1] == 0)
 /* 0x00406800, one caller. Which inventory slot should take this weapon, and
  * may it be taken at all? The slot goes to an out-parameter and the answer is
  * the return: -1 means the kind needs no slot, -2 that all six are full. */

@@ -849,8 +849,8 @@ static int FirePoses(int *passed)
     return fail;
 }
 
-#define kPlacements     (*(AM2_Placement **)AM2_IMAGE(0x00654C7Cu))
-#define kPlacementCount (*(int32_t *)AM2_IMAGE(0x00654C80u))
+#define kPlacements     (*(AM2_Placement **)((void *)(uintptr_t)(0x00654C7Cu)))
+#define kPlacementCount (*(int32_t *)((void *)(uintptr_t)(0x00654C80u)))
 
 static int PlaceLines(int *passed)
 {
@@ -923,8 +923,8 @@ static int DirtyList(int *passed)
         return 1;
     }
 
-    unsigned char *region = (unsigned char *)AM2_IMAGE(ADDR_DIRTY_TAIL);
-    int32_t       *full   = (int32_t *)AM2_IMAGE(ADDR_FULL_REDRAW);
+    unsigned char *region = (unsigned char *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL));
+    int32_t       *full   = (int32_t *)((void *)(uintptr_t)(ADDR_FULL_REDRAW));
     int            pass = 0, fail = 0;
 
     for (uint32_t v = 0; v < sizeof am2_dirty_vectors /

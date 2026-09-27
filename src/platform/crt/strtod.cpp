@@ -40,13 +40,13 @@ extern "C" const uint8_t am2_crt_huge_val[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0
 extern "C" uint32_t am2_crt_flt_ptr = 0x00664650u;
 #endif
 
-#define crt_errno       (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ERRNO))
-#define crt_mb_cur_max  (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MB_CUR_MAX))
-#define crt_pctype_tab  (*(const uint16_t **)(uintptr_t)AM2_IMAGE(ADDR_CRT_PCTYPE))
-#define crt_decimal_pt  (*(const char *)(uintptr_t)AM2_IMAGE(ADDR_CRT_DECIMAL_POINT))
-#define crt_huge_val    (*(const double *)(uintptr_t)AM2_IMAGE(ADDR_CRT_HUGE_VAL))
-#define crt_flt         (*(CRT_FLT **)(uintptr_t)AM2_IMAGE(ADDR_CRT_FLT_PTR))
-#define crt_cvt_double  ((const CRT_CVTINFO *)(uintptr_t)AM2_IMAGE(ADDR_CRT_CVTINFO_DOUBLE))
+#define crt_errno       (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ERRNO)))
+#define crt_mb_cur_max  (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MB_CUR_MAX)))
+#define crt_pctype_tab  (*(const uint16_t **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_PCTYPE)))
+#define crt_decimal_pt  (*(const char *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_DECIMAL_POINT)))
+#define crt_huge_val    (*(const double *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_HUGE_VAL)))
+#define crt_flt         (*(CRT_FLT **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_FLT_PTR)))
+#define crt_cvt_double  ((const CRT_CVTINFO *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_CVTINFO_DOUBLE)))
 
 #define CRT_ERANGE      34
 #define CRT_SPACE_MASK  8

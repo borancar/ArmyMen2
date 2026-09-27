@@ -13,10 +13,10 @@
 #include "../../inject/orig.h"
 #include "../../game/image.h"
 
-#define crt_mbctype    ((const uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBCTYPE))
-#define crt_mbcasemap  ((const uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBCASEMAP))
-#define crt_mbcodepage (*(uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBCODEPAGE))
-#define crt_mblcid     (*(uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBLCID))
+#define crt_mbctype    ((const uint8_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MBCTYPE)))
+#define crt_mbcasemap  ((const uint8_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MBCASEMAP)))
+#define crt_mbcodepage (*(uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MBCODEPAGE)))
+#define crt_mblcid     (*(uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MBLCID)))
 
 #define CRT_MB_SBLOW 0x20   /* _mbctype: single-byte lower case */
 

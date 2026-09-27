@@ -13,8 +13,8 @@
 #include "../../inject/orig.h"
 #include "../../game/image.h"
 
-#define crt_errno    (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ERRNO))
-#define crt_doserrno (*(uint32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_DOSERRNO))
+#define crt_errno    (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ERRNO)))
+#define crt_doserrno (*(uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_DOSERRNO)))
 
 #define CRT_ENOENT  2
 #define CRT_ENOMEM  12

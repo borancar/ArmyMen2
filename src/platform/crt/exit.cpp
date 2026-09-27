@@ -19,15 +19,15 @@
 #include "../../inject/orig.h"
 #include "../../game/image.h"
 
-#define crt_onexitbegin   (*(CRT_ExitFn **)(uintptr_t)AM2_IMAGE(ADDR_CRT_ONEXITBEGIN))
-#define crt_onexitend     (*(CRT_ExitFn **)(uintptr_t)AM2_IMAGE(ADDR_CRT_ONEXITEND))
-#define crt_exit_done     (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_EXIT_DONE))
-#define crt_exit_started  (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_EXIT_STARTED))
-#define crt_exit_retcaller (*(uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_EXIT_RETCALLER))
-#define crt_piob          (*(CRT_FILE ***)(uintptr_t)AM2_IMAGE(ADDR_CRT_PIOB))
-#define crt_nstream       (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_NSTREAM))
-#define crt_old_filter    (*(LPTOP_LEVEL_EXCEPTION_FILTER *)(uintptr_t)AM2_IMAGE(ADDR_CRT_SEH_OLD_FILTER))
-#define CRT_TABLE(a)      ((CRT_ExitFn *)(uintptr_t)AM2_IMAGE(a))
+#define crt_onexitbegin   (*(CRT_ExitFn **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ONEXITBEGIN)))
+#define crt_onexitend     (*(CRT_ExitFn **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ONEXITEND)))
+#define crt_exit_done     (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_EXIT_DONE)))
+#define crt_exit_started  (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_EXIT_STARTED)))
+#define crt_exit_retcaller (*(uint8_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_EXIT_RETCALLER)))
+#define crt_piob          (*(CRT_FILE ***)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_PIOB)))
+#define crt_nstream       (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_NSTREAM)))
+#define crt_old_filter    (*(LPTOP_LEVEL_EXCEPTION_FILTER *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_SEH_OLD_FILTER)))
+#define CRT_TABLE(a)      ((CRT_ExitFn *)(uintptr_t)((void *)(uintptr_t)(a)))
 
 void __cdecl crt_onexitinit(void)
 {

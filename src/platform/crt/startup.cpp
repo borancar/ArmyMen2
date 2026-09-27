@@ -223,29 +223,29 @@ extern "C" const uint8_t am2_crt_mbcp_table[240] = {
 };
 #endif
 
-#define G32(a)   (*(int32_t *)(uintptr_t)AM2_IMAGE(a))
-#define GU32(a)  (*(uint32_t *)(uintptr_t)AM2_IMAGE(a))
+#define G32(a)   (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(a)))
+#define GU32(a)  (*(uint32_t *)(uintptr_t)((void *)(uintptr_t)(a)))
 typedef void (__cdecl *CRT_VoidFn)(void);
 typedef void (__cdecl *CRT_IntFn)(int32_t);
-#define GVAL(t, a) (*(t *)(uintptr_t)AM2_IMAGE(a))
-#define STR(a)   ((const char *)(uintptr_t)AM2_IMAGE(a))
+#define GVAL(t, a) (*(t *)(uintptr_t)((void *)(uintptr_t)(a)))
+#define STR(a)   ((const char *)(uintptr_t)((void *)(uintptr_t)(a)))
 
 #define crt_acmdln       GVAL(char *, ADDR_CRT_ACMDLN)
 #define crt_aenvptr      GVAL(char *, ADDR_CRT_AENVPTR)
 #define crt_pgmptr       GVAL(char *, ADDR_CRT_PGMPTR)
-#define crt_pgmname      ((char *)(uintptr_t)AM2_IMAGE(ADDR_CRT_PGMNAME))
+#define crt_pgmname      ((char *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_PGMNAME)))
 #define crt_argv         GVAL(char **, ADDR_CRT_ARGV)
 #define crt_argc         G32(ADDR_CRT_ARGC)
 #define crt_environ      GVAL(char **, ADDR_CRT_ENVIRON)
 #define crt_env_initialized G32(ADDR_CRT_ENV_INITIALIZED)
 #define crt_env_kind     G32(ADDR_CRT_ENV_KIND)
 #define crt_mbctable_init G32(ADDR_CRT_MBCTABLE_INIT)
-#define crt_mbctype      ((uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBCTYPE))
-#define crt_mbcasemap    ((uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBCASEMAP))
+#define crt_mbctype      ((uint8_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MBCTYPE)))
+#define crt_mbcasemap    ((uint8_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MBCASEMAP)))
 #define crt_mbcodepage   GU32(ADDR_CRT_MBCODEPAGE)
 #define crt_mblcid       GU32(ADDR_CRT_MBLCID)
 #define crt_ismbcodepage G32(ADDR_CRT_ISMBCODEPAGE)
-#define crt_mbulinfo     ((uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBULINFO))
+#define crt_mbulinfo     ((uint8_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MBULINFO)))
 #define crt_mbcp_from_system G32(ADDR_CRT_MBCP_FROM_SYSTEM)
 #define crt_lc_codepage  GU32(ADDR_CRT_LC_CODEPAGE)
 #define crt_error_mode   G32(ADDR_CRT_ERROR_MODE)
@@ -662,9 +662,9 @@ void __cdecl crt_setsbuplow(void)
 
 int32_t __cdecl crt_setmbcp(int32_t cp)
 {
-    const uint8_t *table = (const uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBCP_TABLE);
-    const uint8_t *table_end = (const uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_POW10_TABLE);
-    const uint8_t *flags = (const uint8_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MBCTYPE_RANGE_FLAGS);
+    const uint8_t *table = (const uint8_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MBCP_TABLE));
+    const uint8_t *table_end = (const uint8_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_POW10_TABLE));
+    const uint8_t *flags = (const uint8_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MBCTYPE_RANGE_FLAGS));
     const uint8_t *entry;
     CPINFO         info;
     int32_t        i;
@@ -753,9 +753,9 @@ int32_t __cdecl crt_messagebox(const char *text, const char *caption, uint32_t t
     typedef int32_t (WINAPI *MsgBoxFn)(HWND, LPCSTR, LPCSTR, UINT);
     typedef HWND (WINAPI *WndFn)(void);
     typedef HWND (WINAPI *PopupFn)(HWND);
-    MsgBoxFn *msgbox = (MsgBoxFn *)(uintptr_t)AM2_IMAGE(ADDR_CRT_MSGBOX_FN);
-    WndFn    *active = (WndFn *)(uintptr_t)AM2_IMAGE(ADDR_CRT_GETACTIVEWINDOW_FN);
-    PopupFn  *popup = (PopupFn *)(uintptr_t)AM2_IMAGE(ADDR_CRT_GETLASTACTIVEPOPUP_FN);
+    MsgBoxFn *msgbox = (MsgBoxFn *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_MSGBOX_FN));
+    WndFn    *active = (WndFn *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_GETACTIVEWINDOW_FN));
+    PopupFn  *popup = (PopupFn *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_GETLASTACTIVEPOPUP_FN));
     HWND      owner = NULL;
 
     if (*msgbox == NULL) {
@@ -779,8 +779,8 @@ int32_t __cdecl crt_messagebox(const char *text, const char *caption, uint32_t t
 
 void __cdecl crt_nmsg_write(int32_t rterrnum)
 {
-    const int32_t *table = (const int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_RTERR_TABLE);
-    const int32_t *end = (const int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_CVTINFO_DOUBLE);
+    const int32_t *table = (const int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_RTERR_TABLE));
+    const int32_t *end = (const int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_CVTINFO_DOUBLE));
     const char    *text;
     char           name[0x104];
     char           message[0x74];
@@ -791,7 +791,7 @@ void __cdecl crt_nmsg_write(int32_t rterrnum)
             break;
     if (table >= end)
         return;
-    text = (const char *)(uintptr_t)AM2_IMAGE((uintptr_t)table[1]);
+    text = (const char *)(uintptr_t)((void *)(uintptr_t)((uintptr_t)table[1]));
     if (crt_error_mode == 1 || (crt_error_mode == 0 && crt_app_type == 1)) {
         /* A console application: the text to stderr. */
         DWORD wrote;
@@ -982,10 +982,10 @@ void __cdecl crt_cinit(void)
 
     if (fpinit != NULL)
         fpinit();
-    crt_initterm((CRT_ExitFn *)(uintptr_t)AM2_IMAGE(ADDR_CRT_XI_BEGIN),
-                 (CRT_ExitFn *)(uintptr_t)AM2_IMAGE(ADDR_CRT_XI_END));
-    crt_initterm((CRT_ExitFn *)(uintptr_t)AM2_IMAGE(ADDR_CRT_XC_BEGIN),
-                 (CRT_ExitFn *)(uintptr_t)AM2_IMAGE(ADDR_CRT_XC_END));
+    crt_initterm((CRT_ExitFn *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_XI_BEGIN)),
+                 (CRT_ExitFn *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_XI_END)));
+    crt_initterm((CRT_ExitFn *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_XC_BEGIN)),
+                 (CRT_ExitFn *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_XC_END)));
 }
 
 void __cdecl crt_startup(void)

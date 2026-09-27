@@ -36,17 +36,17 @@
 extern "C" uint32_t am2_crt_sbh_threshold = 1016;
 #endif
 
-#define G32(a)  (*(int32_t *)(uintptr_t)AM2_IMAGE(a))
-#define GU32(a) (*(uint32_t *)(uintptr_t)AM2_IMAGE(a))
+#define G32(a)  (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(a)))
+#define GU32(a) (*(uint32_t *)(uintptr_t)((void *)(uintptr_t)(a)))
 #define crt_sbh_threshold   GU32(ADDR_CRT_SBH_THRESHOLD)
 #define crt_newmode         G32(ADDR_CRT_NEWMODE)
-#define crt_pnhheap         (*(int32_t (__cdecl **)(uint32_t))(uintptr_t)AM2_IMAGE(ADDR_CRT_PNHHEAP))
-#define crt_crtheap         (*(HANDLE *)(uintptr_t)AM2_IMAGE(ADDR_CRT_CRTHEAP))
-#define crt_pHeaderList     (*(CRT_SBH_HEADER **)(uintptr_t)AM2_IMAGE(ADDR_CRT_SBH_PHEADER_LIST))
+#define crt_pnhheap         (*(int32_t (__cdecl **)(uint32_t))(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_PNHHEAP)))
+#define crt_crtheap         (*(HANDLE *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_CRTHEAP)))
+#define crt_pHeaderList     (*(CRT_SBH_HEADER **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_SBH_PHEADER_LIST)))
 #define crt_cntHeaderList   G32(ADDR_CRT_SBH_CNT_HEADER_LIST)
 #define crt_sizeHeaderList  G32(ADDR_CRT_SBH_SIZE_HEADER_LIST)
-#define crt_pHeaderScan     (*(CRT_SBH_HEADER **)(uintptr_t)AM2_IMAGE(ADDR_CRT_SBH_PHEADER_SCAN))
-#define crt_pHeaderDefer    (*(CRT_SBH_HEADER **)(uintptr_t)AM2_IMAGE(ADDR_CRT_SBH_PHEADER_DEFER))
+#define crt_pHeaderScan     (*(CRT_SBH_HEADER **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_SBH_PHEADER_SCAN)))
+#define crt_pHeaderDefer    (*(CRT_SBH_HEADER **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_SBH_PHEADER_DEFER)))
 #define crt_indGroupDefer   G32(ADDR_CRT_SBH_IND_GROUP_DEFER)
 
 #define SBH_REGION_BYTES    0x100000

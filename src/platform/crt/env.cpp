@@ -11,9 +11,9 @@
 #include "../../inject/orig.h"
 #include "../../game/image.h"
 
-#define crt_env_initialized (*(int32_t *)(uintptr_t)AM2_IMAGE(ADDR_CRT_ENV_INITIALIZED))
-#define crt_environ         (*(char ***)(uintptr_t)AM2_IMAGE(ADDR_CRT_ENVIRON))
-#define crt_wenviron        (*(void **)(uintptr_t)AM2_IMAGE(ADDR_CRT_WENVIRON))
+#define crt_env_initialized (*(int32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ENV_INITIALIZED)))
+#define crt_environ         (*(char ***)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_ENVIRON)))
+#define crt_wenviron        (*(void **)(uintptr_t)((void *)(uintptr_t)(ADDR_CRT_WENVIRON)))
 
 char *__cdecl crt_getenv(const char *name)
 {
