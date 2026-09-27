@@ -29,6 +29,7 @@
 #include <direct.h>
 #include <io.h>
 #include "../platform/crt/crt.h"
+#include "../game/origstate.h"   /* AM2_OrigState, so redirects can name members */
 
 #ifdef __cplusplus
 extern "C" {
@@ -1565,5 +1566,13 @@ extern const uint8_t am2_logpalette_hdr_small[4];
  * tools/foldstrings.py; the redirects must come after orig.h's ADDR defines,
  * so this is last. deadstrings.py drops the blob copies. */
 #include "foldstr.h"
+
+/* .bss working-state globals reached by a scaled index: redirect their ADDR to
+ * the am2_origstate member so the access is symbol-relative ([idx*scale + &sym])
+ * -- the original's form -- rather than the constant-base fold MSVC emits for a
+ * numeric address ([idx*scale + ADDR/scale in the index]).  See src/vc6/relink.py.
+ * am2_origstate reserves the whole region, so the member address is its VA. */
+#undef ADDR_ALLY_MATRIX
+#define ADDR_ALLY_MATRIX ((uintptr_t)(const void *)am2_origstate.ally_matrix)
 
 #endif /* AM2_STANDALONE_H */

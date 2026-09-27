@@ -199,6 +199,11 @@ def main():
         if m and m.group(1) in addr:
             sym_va.setdefault("_" + m.group(2), addr[m.group(1)])
             ng += 1
+    # am2_origstate is the single struct reserving the whole .bss working region
+    # at ORIGBSS; a member redirect (ADDR_X -> &am2_origstate.member) compiles to
+    # a reloc against am2_origstate whose ADDEND is the member offset, so the base
+    # symbol resolves to ORIGBSS (not the member VA the gv loop guessed above).
+    sym_va["_am2_origstate"] = 0x0048E000
     if "--unresolved" in sys.argv:
         sys.stderr.write("migrated-global symbols mapped: %d\n" % ng)
     imap = import_map()         # base import name -> IAT slot VA
