@@ -753,9 +753,10 @@ uint32_t __cdecl ChainField14(const void *p)
 void __cdecl ListPushFront(void *node, void **head)
 {
     uint8_t *n = (uint8_t *)node;
-    void    *old = *head;
 
-    *(void **)(n + 4) = 0;              /* prev */
+    *(void **)(n + 4) = 0;              /* prev -- zeroed before *head is read,
+                                        * the order the original emits */
+    void *old = *head;
     *(void **)(n + 8) = old;            /* next */
     if (old)
         *(void **)((uint8_t *)old + 4) = node;
