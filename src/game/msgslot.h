@@ -490,6 +490,17 @@ struct AM2_Comm {
     void    __attribute__((thiscall)) CommClearSlotRemote(int32_t slot);
     int32_t __attribute__((thiscall)) CommSlotRemote(int16_t slot);
     int32_t __attribute__((thiscall)) CommMustBroadcast(int16_t army);
+    /* defined in misc.cpp (the accessors) -- one class, several files */
+    int32_t __attribute__((thiscall)) CommSlotForArmy(int32_t army);
+    int32_t __attribute__((thiscall)) GetArmyScore(int32_t slot);
+    int32_t __attribute__((thiscall)) CommTeamScore(int32_t slot);
+    int32_t __attribute__((thiscall)) CommWasHereForArmy(int32_t army);
+    int32_t __attribute__((thiscall)) CommSetArmyColour(int32_t slot, int32_t colour);
+    int32_t __attribute__((thiscall)) CommSlotHasPlayer(int32_t slot);
+    int32_t __attribute__((thiscall)) CommArmyOfSlot(int32_t slot);
+    int32_t __attribute__((thiscall)) CommPlayerId(int32_t slot);
+    int32_t __attribute__((thiscall)) CommAllPlayersAgreed();
+    int32_t __attribute__((thiscall)) CommAllPlayersReady();
 };
 static inline void CommSetSlotRemote(void *comm, int32_t slot)
 { ((AM2_Comm *)comm)->CommSetSlotRemote(slot); }

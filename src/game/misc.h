@@ -12,6 +12,11 @@
 #include "dist.h"   /* AM2_Point, which ObjMaskBitAt takes */
 
 
+/* AM2_Comm (its comm accessors are defined in misc.cpp) lives in msgslot.h --
+ * one class across files; the comm forwarders below need it visible. */
+#include "msgslot.h"
+
+
 #ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
 struct AM2_Rec {
     void * __attribute__((thiscall)) InitPtrList();
@@ -618,11 +623,13 @@ int32_t __cdecl MeetsAllThree(const void *p);
  * The second answers whether a slot still holds a real player, by testing the
  * DirectPlay id the find-by-id search matches on. See ADDR_COMM_SLOT_HAS_PLAYER
  * in orig.h for why it is not the "is AI" it was first taken for. */
-int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army);
+static inline int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army)
+{ return ((AM2_Comm *)comm)->CommSlotForArmy(army); }
 
 /* 0x0040F2F0. The DirectPlay id of a comm slot; slot -1 answers 0, and there
  * is no upper bound. */
-int32_t __attribute__((thiscall)) CommPlayerId(void *comm, int32_t slot);
+static inline int32_t __attribute__((thiscall)) CommPlayerId(void *comm, int32_t slot)
+{ return ((AM2_Comm *)comm)->CommPlayerId(slot); }
 
 /* 0x00402F00. A random value averaging `centre`: `100 - spread` draws of
  * rand() % (centre * 2), divided by that count. `spread` is an inverse
@@ -631,19 +638,24 @@ int32_t __cdecl RandomAround(int32_t centre, int32_t spread);
 
 /* 0x0040F8A0 and 0x0040F8E0. Does every player with a real AM2_PLAYER_ID have
  * AM2_PLAYER_AGREED, and AM2_PLAYER_READY, set? An empty table answers yes. */
-int32_t __attribute__((thiscall)) CommAllPlayersAgreed(void *comm);
-int32_t __attribute__((thiscall)) CommAllPlayersReady(void *comm);
+static inline int32_t __attribute__((thiscall)) CommAllPlayersAgreed(void *comm)
+{ return ((AM2_Comm *)comm)->CommAllPlayersAgreed(); }
+static inline int32_t __attribute__((thiscall)) CommAllPlayersReady(void *comm)
+{ return ((AM2_Comm *)comm)->CommAllPlayersReady(); }
 
 /* 0x0040F1C0, thiscall. The same walk, answering the matching slot's
  * COMM_ARMY_OFF_WAS_HERE rather than its index. */
-int32_t __attribute__((thiscall)) CommWasHereForArmy(void *comm, int32_t army);
+static inline int32_t __attribute__((thiscall)) CommWasHereForArmy(void *comm, int32_t army)
+{ return ((AM2_Comm *)comm)->CommWasHereForArmy(army); }
 
 /* 0x0040F960, thiscall. One army's score, out of the script name table. */
-int32_t __attribute__((thiscall)) GetArmyScore(void *comm, int32_t slot);
+static inline int32_t __attribute__((thiscall)) GetArmyScore(void *comm, int32_t slot)
+{ return ((AM2_Comm *)comm)->GetArmyScore(slot); }
 
 /* 0x0040F990, thiscall. The `teamscore` keyword's answer: a slot with no team
  * scores alone, otherwise every taken slot on its team is summed. */
-int32_t __attribute__((thiscall)) CommTeamScore(void *comm, int32_t slot);
+static inline int32_t __attribute__((thiscall)) CommTeamScore(void *comm, int32_t slot)
+{ return ((AM2_Comm *)comm)->CommTeamScore(slot); }
 
 /* 0x0042F170, six callers. Copy the saved/host settings into the live ones,
  * renumber every comm slot and clear its team, and seed the four army point
@@ -654,13 +666,14 @@ void __cdecl ApplyGameSettings(void);
  * screen. The argument it passes on is "LOST", not "won" -- both arms invert
  * a `sete` before the call. */
 void __cdecl MissionNetworked(int32_t army, int32_t teamGame);
-int32_t __attribute__((thiscall)) CommSlotHasPlayer(void *comm, int32_t slot);
+static inline int32_t __attribute__((thiscall)) CommSlotHasPlayer(void *comm, int32_t slot)
+{ return ((AM2_Comm *)comm)->CommSlotHasPlayer(slot); }
 
 /* 0x0040F280, thiscall. Gives a slot an army colour, SWAPPING with whoever
  * already held it, so no two players end up the same. -1 for a negative
  * colour; otherwise the slot it was given. Only the host rearranges. */
-int32_t __attribute__((thiscall)) CommSetArmyColour(void *comm, int32_t slot,
-                                                    int32_t colour);
+static inline int32_t __attribute__((thiscall)) CommSetArmyColour(void *comm, int32_t slot, int32_t colour)
+{ return ((AM2_Comm *)comm)->CommSetArmyColour(slot, colour); }
 
 /* 0x00412DD0, 21 callers and five bytes of body: one load of the menu row and
  * a `ret`. A getter over a global, which is why so much of the menu code goes
@@ -757,7 +770,8 @@ int32_t __cdecl DismissKeyReleased(void);
 
 /* 0x0040F190, 47 callers -- CommSlotForArmy's inverse. Slot 4 answers 4
  * without touching the object, the same convention army 4 has everywhere. */
-int32_t __attribute__((thiscall)) CommArmyOfSlot(void *comm, int32_t slot);
+static inline int32_t __attribute__((thiscall)) CommArmyOfSlot(void *comm, int32_t slot)
+{ return ((AM2_Comm *)comm)->CommArmyOfSlot(slot); }
 
 /* 0x0042A6E0, 13 callers. Append to the {capacity, count, items} record
  * InitPtrList clears, growing it first when the count has caught the

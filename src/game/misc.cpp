@@ -1158,8 +1158,10 @@ int32_t __cdecl MeetsAllThree(const void *p)
     return (**(const int32_t *const *)(b + 0x94) == 0x1F) ? 1 : 0;
 }
 
-int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army)
+int32_t __attribute__((thiscall)) AM2_Comm::CommSlotForArmy(int32_t army)
 {
+    void *comm = this;
+
     if (army == 4)
         return 4;
 
@@ -1189,12 +1191,14 @@ int32_t __attribute__((thiscall)) CommSlotForArmy(void *comm, int32_t army)
  * The original reuses its own incoming argument slot as that local, which is
  * the same MSVC idiom ParsePlaceLine turned out to use. Nothing observes the
  * difference; written as an ordinary local here. */
-int32_t __attribute__((thiscall)) GetArmyScore(void *comm, int32_t slot)
+int32_t __attribute__((thiscall)) AM2_Comm::GetArmyScore(int32_t slot)
 {
+    void *comm = this;
+
     const int32_t *vars = (const int32_t *)(uintptr_t)ADDR_SVAR_GREENSCORE;
     int32_t        out  = 0;
 
-    GetVarValue(vars[CommSlotForArmy(comm, slot)], &out);
+    GetVarValue(vars[::CommSlotForArmy(comm, slot)], &out);
     return out;
 }
 
@@ -1291,8 +1295,10 @@ void __cdecl ApplyGameSettings(void)
  * the `+4` beside it is COMM_SLOT_OFF_TAKEN (0x50). Nothing here needed a new
  * name; the literal confirms the existing layout rather than competing with
  * it, which is the useful direction for a function this small. */
-int32_t __attribute__((thiscall)) CommTeamScore(void *comm, int32_t slot)
+int32_t __attribute__((thiscall)) AM2_Comm::CommTeamScore(int32_t slot)
 {
+    void *comm = this;
+
     const uint8_t *players = (const uint8_t *)comm + COMM_OFF_PLAYERS;
     int32_t        team;
     int32_t        total;
@@ -1301,14 +1307,14 @@ int32_t __attribute__((thiscall)) CommTeamScore(void *comm, int32_t slot)
     team = *(const int32_t *)(players + (size_t)slot * AM2_COMM_SLOT_STRIDE
                               + COMM_SLOT_OFF_TEAM);
     if (team == 0)
-        return GetArmyScore(comm, slot);
+        return ::GetArmyScore(comm, slot);
 
     total = 0;
     for (i = 0; i < AM2_COMM_SLOTS; i++) {
         const uint8_t *rec = players + (size_t)i * AM2_COMM_SLOT_STRIDE;
         if (*(const int32_t *)(rec + COMM_SLOT_OFF_TAKEN) != 0
             && *(const int32_t *)(rec + COMM_SLOT_OFF_TEAM) == team)
-            total += GetArmyScore(comm, i);
+            total += ::GetArmyScore(comm, i);
     }
     return total;
 }
@@ -1324,8 +1330,10 @@ int32_t __attribute__((thiscall)) CommTeamScore(void *comm, int32_t slot)
  *
  * No match and a slot whose field is 0 are indistinguishable, exactly as in
  * CommSlotForArmy. Reproduced. */
-int32_t __attribute__((thiscall)) CommWasHereForArmy(void *comm, int32_t army)
+int32_t __attribute__((thiscall)) AM2_Comm::CommWasHereForArmy(int32_t army)
 {
+    void *comm = this;
+
     const uint8_t *p = (const uint8_t *)comm + COMM_ARMY_OFF_COLOUR;
     int32_t        i;
 
@@ -1374,13 +1382,14 @@ int32_t __attribute__((thiscall)) CommWasHereForArmy(void *comm, int32_t army)
  * beside the renumbered pointer for exactly this reason -- and the frame goes
  * to 826 pixels against a budget of 300. Two independent detectors, neither of
  * which is the log. The -1 arm and the skip arm stay verified by reading. */
-int32_t __attribute__((thiscall)) CommSetArmyColour(void *comm, int32_t slot,
-                                                    int32_t colour)
+int32_t __attribute__((thiscall)) AM2_Comm::CommSetArmyColour(int32_t slot, int32_t colour)
 {
+    void *comm = this;
+
     if (colour < 0)
         return -1;
 
-    int32_t        held  = CommSlotForArmy(comm, colour);
+    int32_t        held  = ::CommSlotForArmy(comm, colour);
     const uint8_t *world = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
 
     if (*(const int32_t *)(world + COMM_OFF_IS_HOST)
@@ -1395,8 +1404,10 @@ int32_t __attribute__((thiscall)) CommSetArmyColour(void *comm, int32_t slot,
     return slot;
 }
 
-int32_t __attribute__((thiscall)) CommSlotHasPlayer(void *comm, int32_t slot)
+int32_t __attribute__((thiscall)) AM2_Comm::CommSlotHasPlayer(int32_t slot)
 {
+    void *comm = this;
+
     int32_t id = *(const int32_t *)((const uint8_t *)comm +
                                     (size_t)slot * AM2_PLAYER_STRIDE +
                                     AM2_PLAYER_ID);
@@ -1535,8 +1546,10 @@ int32_t __cdecl ActionKeyDown(int32_t action)
     return 0;
 }
 
-int32_t __attribute__((thiscall)) CommArmyOfSlot(void *comm, int32_t slot)
+int32_t __attribute__((thiscall)) AM2_Comm::CommArmyOfSlot(int32_t slot)
 {
+    void *comm = this;
+
     if (slot == 4)
         return 4;
     return *(const int32_t *)((const uint8_t *)comm
@@ -1959,8 +1972,10 @@ void __cdecl MissionNetworked(int32_t army, int32_t teamGame)
  * verified by reading. The counter is not blind -- that caller is the
  * original's.
  */
-int32_t __attribute__((thiscall)) CommPlayerId(void *comm, int32_t slot)
+int32_t __attribute__((thiscall)) AM2_Comm::CommPlayerId(int32_t slot)
 {
+    void *comm = this;
+
     if (slot == -1)
         return 0;
 
@@ -2021,13 +2036,17 @@ static int32_t CommAllPlayersFlagged(void *comm, uint32_t flag)
     return 1;
 }
 
-int32_t __attribute__((thiscall)) CommAllPlayersAgreed(void *comm)
+int32_t __attribute__((thiscall)) AM2_Comm::CommAllPlayersAgreed()
 {
+    void *comm = this;
+
     return CommAllPlayersFlagged(comm, AM2_PLAYER_AGREED);
 }
 
-int32_t __attribute__((thiscall)) CommAllPlayersReady(void *comm)
+int32_t __attribute__((thiscall)) AM2_Comm::CommAllPlayersReady()
 {
+    void *comm = this;
+
     return CommAllPlayersFlagged(comm, AM2_PLAYER_READY);
 }
 
@@ -2736,29 +2755,29 @@ int misc_install(void)
                   "MeetsAllThree", 1);
     patch_replace(ADDR_MISSION_NETWORKED, (const void *)MissionNetworked,
                   "MissionNetworked", 1);
-    patch_replace(ADDR_COMM_SLOT_FOR_ARMY, (const void *)CommSlotForArmy,
+    patch_replace(ADDR_COMM_SLOT_FOR_ARMY, pmf_addr(&AM2_Comm::CommSlotForArmy),
                   "CommSlotForArmy", 20);
-    patch_replace(ADDR_COMM_PLAYER_ID, (const void *)CommPlayerId,
+    patch_replace(ADDR_COMM_PLAYER_ID, pmf_addr(&AM2_Comm::CommPlayerId),
                   "CommPlayerId", 1);
     patch_replace(ADDR_RANDOM_AROUND, (const void *)RandomAround,
                   "RandomAround", 1);
-    patch_replace(ADDR_ALL_PLAYERS_AGREED, (const void *)CommAllPlayersAgreed,
+    patch_replace(ADDR_ALL_PLAYERS_AGREED, pmf_addr(&AM2_Comm::CommAllPlayersAgreed),
                   "CommAllPlayersAgreed", 1);
-    patch_replace(ADDR_ALL_PLAYERS_READY, (const void *)CommAllPlayersReady,
+    patch_replace(ADDR_ALL_PLAYERS_READY, pmf_addr(&AM2_Comm::CommAllPlayersReady),
                   "CommAllPlayersReady", 1);
-    patch_replace(ADDR_COMM_WAS_HERE_FOR_ARMY, (const void *)CommWasHereForArmy,
+    patch_replace(ADDR_COMM_WAS_HERE_FOR_ARMY, pmf_addr(&AM2_Comm::CommWasHereForArmy),
                   "CommWasHereForArmy", 1);
     patch_replace(ADDR_LOAD_MASK_PACKED, (const void *)LoadMaskPacked,
                   "LoadMaskPacked", 1);
     patch_replace(ADDR_APPLY_GAME_SETTINGS, (const void *)ApplyGameSettings,
                   "ApplyGameSettings", 6);
-    patch_replace(ADDR_COMM_TEAM_SCORE, (const void *)CommTeamScore,
+    patch_replace(ADDR_COMM_TEAM_SCORE, pmf_addr(&AM2_Comm::CommTeamScore),
                   "CommTeamScore", 1);
-    patch_replace(ADDR_GET_ARMY_SCORE, (const void *)GetArmyScore,
+    patch_replace(ADDR_GET_ARMY_SCORE, pmf_addr(&AM2_Comm::GetArmyScore),
                   "GetArmyScore", 3);
-    patch_replace(ADDR_COMM_SLOT_HAS_PLAYER, (const void *)CommSlotHasPlayer,
+    patch_replace(ADDR_COMM_SLOT_HAS_PLAYER, pmf_addr(&AM2_Comm::CommSlotHasPlayer),
                   "CommSlotHasPlayer", 5);
-    patch_replace(ADDR_COMM_SET_ARMY_COLOUR, (const void *)CommSetArmyColour,
+    patch_replace(ADDR_COMM_SET_ARMY_COLOUR, pmf_addr(&AM2_Comm::CommSetArmyColour),
                   "CommSetArmyColour", 2);
     patch_replace(ADDR_BITMAP_BIT_SET, (const void *)BitmapBitSet,
                   "BitmapBitSet", 5);
@@ -2798,7 +2817,7 @@ int misc_install(void)
                   "ActionKeyReleased", 4);
     patch_replace(ADDR_DISMISS_KEY_RELEASED, (const void *)DismissKeyReleased,
                   "DismissKeyReleased", 4);
-    patch_replace(ADDR_COMM_ARMY_OF_SLOT, (const void *)CommArmyOfSlot,
+    patch_replace(ADDR_COMM_ARMY_OF_SLOT, pmf_addr(&AM2_Comm::CommArmyOfSlot),
                   "CommArmyOfSlot", 20);
     patch_replace(ADDR_PTR_LIST_PUSH, pmf_addr(&AM2_Rec::PtrListPush),
                   "PtrListPush", 2);
