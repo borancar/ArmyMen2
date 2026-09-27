@@ -378,31 +378,47 @@ int32_t __cdecl ClassifyByCode74(const void *obj)
  * 41-entry table; outside 2..42 the answer is no. */
 int32_t __cdecl KindInSetA(int32_t kind)
 {
-    static const uint8_t yes[41] = {
-        1,1,1,1,1, 0,0,0,0, 1,1, 0,0,0,0,0,0,0,0,
-        1,1,1,1,1,1, 0,0,0, 1, 0,0,0,0,
-        1,1,1,1,1,1,1,1,
-    };
-    uint32_t i = (uint32_t)(kind - 2);
-
-    if (i > 0x28)
-        return 0;
-    return yes[i];
+    switch (kind) {
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+    case 6:
+    case 11:
+    case 12:
+    case 21:
+    case 22:
+    case 23:
+    case 24:
+    case 25:
+    case 26:
+    case 30:
+    case 35:
+    case 36:
+    case 37:
+    case 38:
+    case 39:
+    case 40:
+    case 41:
+    case 42:
+        return 1;
+    }
+    return 0;
 }
 
 /* 0x00433520. Accepts 1, 7-10 and 29. Biased by 1 over a 29-entry table. */
 int32_t __cdecl KindInSetB(int32_t kind)
 {
-    static const uint8_t yes[29] = {
-        1, 0,0,0,0,0, 1,1,1,1,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        1,
-    };
-    uint32_t i = (uint32_t)(kind - 1);
-
-    if (i > 0x1C)
-        return 0;
-    return yes[i];
+    switch (kind) {
+    case 1:
+    case 7:
+    case 8:
+    case 9:
+    case 10:
+    case 29:
+        return 1;
+    }
+    return 0;
 }
 
 /* Shared body. `wide_rows` selects the row table's entry width, which is the
