@@ -23,16 +23,33 @@ the same trick as the hybrid game loader). `make vc6-match` recompiles each
 `patch_replace`'d reconstruction with the *original* compiler at /O2 and
 byte-compares it to `ArmyMen2.exe` -- the strongest correctness check there is.
 
-First run: **166 of 939 flat `src/game` functions are byte-identical as
+Baseline: **~168 of ~945 flat `src/game` functions are byte-identical as
 written** (ApproxDist, PackKey, Clamp, PointInRect, …). Re-measure with
-`make vc6-match`. The remaining diffs are source-SHAPE, not behaviour: the
-reconstruction is equivalent but written in a form MSVC 6 compiles differently
-(e.g. MakePoint works in 32-bit masks where the original used 16-bit words).
-A flag sweep confirmed /O2 (blend model) is the original's setting. `win32/*`
-(~700 fns) does not compile yet: windows.h/ddraw.h trips a delay-load gap in the
-hosted c1xx (`RaiseException 0xc06d007e`) -- the next shim milestone. `LINK.EXE`
-(whole-binary match) is deprioritised; it is not needed for function-code match.
-Worklist: `make vc6-match ARGS=--diffs`. See `src/vc6/README.md`.
+`make vc6-match`; worklist is `make vc6-match ARGS=--diffs`.
+
+What matches is bounded by the piecewise model, and characterising that is the
+main result so far (details in `src/vc6/README.md`):
+
+- **Matches now:** leaf functions, and functions that touch original globals
+  only as absolute scalars (`mov [abs]`) or call reconstructed siblings.
+- **Needs the full relink:** any function that reaches original *code* or
+  *indexed data* by absolute constant address -- the reconstruction's
+  `call [ptr]` (ff15) vs the original's direct `call rel32` (e8), and a
+  `((T*)ADDR)` indexed global folding `base/4` into the index vs the original's
+  `[idx*4 + &symbol]`. Equivalent and correct; they differ only constant-vs-
+  symbol. The endgame is compiling every TU and LINKing with all functions and
+  migrated globals as symbols at their real VAs -- which is also why finishing
+  the origdata symbol migration feeds this. So LINK is not a sideshow; it is the
+  path to matching the majority.
+- **Fixable per function now:** true source-shape diffs -- signed vs unsigned
+  loop bound (`jl`/`jb`), statement order (scheduling), 16- vs 32-bit exprs.
+  ResetTimers (signed address cursor) was the first closed.
+
+A flag sweep confirmed /O2 (blend) is the original's setting. Calling-convention
+attributes are honoured (`__attribute__((stdcall))` -> `__stdcall`); free-
+function `thiscall` can't be spelled in VC6 so those (all in win32/) won't match.
+`win32/*` (~700 fns) does not compile yet: windows.h/ddraw.h trips a delay-load
+gap in the hosted c1xx (`RaiseException 0xc06d007e`) -- a shim milestone.
 
 ## LINKER PLACEMENT (2026-09-14): transcribed globals live at their real VAs
 

@@ -93,7 +93,13 @@ def parse_coff(path):
 def resolve_sym(syms, func):
     if "_" + func in syms:
         return "_" + func
-    for s in syms:
+    # __stdcall decorates as _name@bytes, __fastcall as @name@bytes.
+    for pre in ("_", "@"):
+        p = pre + func + "@"
+        for s in syms:
+            if s.startswith(p) and s[len(p):].isdigit():
+                return s
+    for s in syms:                      # C++ mangled ?name@@...
         if s.startswith("?" + func + "@"):
             return s
     return None

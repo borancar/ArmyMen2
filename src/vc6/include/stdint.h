@@ -6,7 +6,22 @@
  * in force before orig.h and the bodies.  All of this is gated to non-GCC so
  * the real Linux build never sees it. */
 #ifndef __GNUC__
-#define __attribute__(x)
+/* Map the GCC attributes the reconstruction uses to their MSVC 6 equivalent
+ * rather than dropping them wholesale -- dropping `stdcall` miscompiled every
+ * __stdcall reconstruction to __cdecl (wrong `ret N`, wrong ABI for the byte
+ * compare).  `__attribute__((X))` -> `AM2_ATTR (X)` -> `AM2_ATTR(X)`, which
+ * token-pastes to `AM2_ATTR_X`: a calling convention becomes the MSVC keyword,
+ * everything else (weak, section(...)) becomes nothing.  `thiscall` cannot be
+ * spelled in VC6 (the keyword post-dates it; thiscall is implicit on members
+ * only), so a free-function thiscall reconstruction compiles as cdecl and
+ * simply will not match -- they are all in src/game/win32 regardless. */
+#define __attribute__(x) AM2_ATTR x
+#define AM2_ATTR(a) AM2_ATTR_ ## a
+#define AM2_ATTR_stdcall  __stdcall
+#define AM2_ATTR_cdecl    __cdecl
+#define AM2_ATTR_thiscall
+#define AM2_ATTR_weak
+#define AM2_ATTR_section(x)
 /* MSVC6 leaks a for-init declaration into the enclosing scope (pre-standard
  * for-scope), so two `for (int i ...)` in one block collide.  This gives each
  * loop its own scope with no codegen change (verified byte-identical at /O2).

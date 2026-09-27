@@ -2916,8 +2916,11 @@ void __cdecl ResetTimers(void)
     *(int32_t *)(uintptr_t)ADDR_TIMER_COUNT = 0;
     /* From the first record's id field to one past the last, sixteen bytes at
      * a time -- the records themselves are left alone. */
+    /* Signed address compare -- the original walks the table with a signed
+     * int32 cursor (`jl`, not `jb`); both ends are below 0x80000000 so the
+     * result is identical, but the signedness is what MSVC 6 compiled. */
     for (id = (uint32_t *)(uintptr_t)(ADDR_TIMER_TABLE + 0xC);
-         id < (uint32_t *)(uintptr_t)ADDR_TIMER_TABLE_ID_END;
+         (int32_t)(uintptr_t)id < (int32_t)ADDR_TIMER_TABLE_ID_END;
          id = (uint32_t *)((uint8_t *)id + 0x10))
         *id = 0;
 }

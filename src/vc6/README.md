@@ -69,6 +69,34 @@ Scope today: the flat `src/game/*.cpp` (pure computation) compile and compare.
 hosted `c1xx` (`RaiseException 0xc06d007e`) not yet covered by the shim -- those
 are reported SKIP.  `crt.cpp`/`trig.cpp` are GCC-only (POSIX, inline `__asm__`).
 
+### What matches piecewise, and what needs the relink
+
+The reconstruction is compiled ONE .obj at a time and compared to the shipped
+image, so what can match is bounded by that:
+
+- **Matches now:** leaf functions over their args/stack, and functions that
+  touch original globals only as absolute scalars (`mov [0x50c368], ecx`) -- the
+  shipped image baked the address in, so our compile-time constant produces the
+  identical bytes.  Direct calls to reconstructed siblings match too (the call's
+  4-byte target is a relocation, wildcarded).
+- **Cannot match until a full relink:** the piecewise reconstruction reaches
+  original *code* and *indexed data* by absolute constant address, which MSVC
+  folds differently than the original's relocatable symbols did.  Two systematic
+  shapes: (1) a call to un-reconstructed code goes through a pointer variable
+  (`call [am2_free]`, `ff15`) where the original linked a direct `call rel32`
+  (`e8`); (2) an indexed global `g_tbl[i]` behind a `((T*)ADDR)` macro folds the
+  base into the index math (`lea ...+base/4` / `[idx*4+0]`) where the original,
+  with `g_tbl` a real symbol, emitted `[idx*4 + &g_tbl]`.  Both are *equivalent*
+  and *correct*; they differ only because address is constant here, symbol there.
+  Closing them means the endgame: compile every TU and LINK with all functions
+  and migrated globals as symbols placed at their original VAs -- at which point
+  the fold/indirect forms become the original's direct/symbol forms.  This is
+  also why finishing the origdata symbol migration feeds the byte-match.
+- **Fixable per function now:** genuine source-shape diffs -- a signed vs
+  unsigned loop bound (`jl` vs `jb`), a statement order that changes scheduling,
+  a 16-bit vs 32-bit expression.  ResetTimers (signed address cursor) was the
+  first closed this way.
+
 ## Status
 
 - ✅ `CL.EXE` runs and prints its banner.
