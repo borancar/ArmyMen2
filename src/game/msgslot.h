@@ -429,8 +429,9 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid);
  * Twenty-seven bytes each, and the only difference is the constant. Written as
  * two functions rather than one with a flag because that is what the image
  * holds: two entry points, four callers between them. */
-void __attribute__((thiscall)) CommSetSlotRemote(void *comm, int32_t slot);
-void __attribute__((thiscall)) CommClearSlotRemote(void *comm, int32_t slot);
+/* CommSetSlotRemote / CommClearSlotRemote are AM2_Comm methods (below) -- they
+ * were thiscall members, so they are modelled as C++ methods to recompile to
+ * the shipped bytes; free-function forwarders keep the call sites unchanged. */
 
 /* Original: 0x0040F5A0, thiscall. Three-valued, and only the first branch
  * reads the field the two above write.
@@ -443,7 +444,7 @@ void __attribute__((thiscall)) CommClearSlotRemote(void *comm, int32_t slot);
  *
  * The slot arrives as a SIGNED WORD, alone in this family; every other
  * accessor takes a full int32_t. A negative would index backwards. */
-int32_t __attribute__((thiscall)) CommSlotRemote(void *comm, int16_t slot);
+/* CommSlotRemote is an AM2_Comm method (below). */
 
 /* Original: 0x0040F560, thiscall, and the name is ours. "Must I tell the other
  * players what this army just did?" -- TrooperDropItem and its relatives ask
@@ -461,7 +462,7 @@ int32_t __attribute__((thiscall)) CommSlotRemote(void *comm, int16_t slot);
  *
  * NOT pure, unlike the three accessors above: it reads the multiplayer-session
  * global, so it cannot have vectors. */
-int32_t __attribute__((thiscall)) CommMustBroadcast(void *comm, int16_t army);
+/* CommMustBroadcast is an AM2_Comm method (below). */
 
 /* 0x00402990, 27 callers -- the record for a DirectPlay id, or null.
  *
@@ -477,6 +478,27 @@ int msgslot_install(void);
 
 #ifdef __cplusplus
 }
+
+/* The multiplayer comm object.  Opaque here -- its methods reach fields by
+ * offset, as the original's thiscall members did; the class exists so the
+ * hosted MSVC 6 recompiles them to the shipped thiscall bytes (src/vc6).  The
+ * free-function forwarders keep every existing call site -- CommFoo(comm, ...)
+ * -- unchanged: at -O2 each inlines to the method call with byte-identical
+ * caller code, so the injected build is unaffected. */
+struct AM2_Comm {
+    void    __attribute__((thiscall)) CommSetSlotRemote(int32_t slot);
+    void    __attribute__((thiscall)) CommClearSlotRemote(int32_t slot);
+    int32_t __attribute__((thiscall)) CommSlotRemote(int16_t slot);
+    int32_t __attribute__((thiscall)) CommMustBroadcast(int16_t army);
+};
+static inline void CommSetSlotRemote(void *comm, int32_t slot)
+{ ((AM2_Comm *)comm)->CommSetSlotRemote(slot); }
+static inline void CommClearSlotRemote(void *comm, int32_t slot)
+{ ((AM2_Comm *)comm)->CommClearSlotRemote(slot); }
+static inline int32_t CommSlotRemote(void *comm, int16_t slot)
+{ return ((AM2_Comm *)comm)->CommSlotRemote(slot); }
+static inline int32_t CommMustBroadcast(void *comm, int16_t army)
+{ return ((AM2_Comm *)comm)->CommMustBroadcast(army); }
 #endif
 
 /* 0x00401050. Append a node to the tail of a mutex-guarded list. Twelve

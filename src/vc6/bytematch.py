@@ -144,8 +144,12 @@ def manifest():
         m = pat.match(line.strip())
         if m:
             addr[m.group(1)] = int(m.group(2), 16)
+    # Two install spellings: a plain function cast `(const void *)Foo`, and a
+    # thiscall method installed by address `pmf_addr(&Class::Foo)`.  Capture the
+    # (method) name either way; resolve_sym finds the member's mangled symbol.
     call = re.compile(
-        r'patch_replace\(\s*(ADDR_[A-Z0-9_]+)\s*,\s*\(const void \*\)\s*'
+        r'patch_replace\(\s*(ADDR_[A-Z0-9_]+)\s*,\s*'
+        r'(?:\(const void \*\)\s*|pmf_addr\(&(?:[A-Za-z_][A-Za-z0-9_]*::)?)'
         r'([A-Za-z_][A-Za-z0-9_]*)')
     out = []
     for path in am2.game_sources():

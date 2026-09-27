@@ -10,6 +10,7 @@
 #include "image.h"      /* AM2_IMAGE */
 #include "../inject/patch.h"
 #include "misc.h"   /* CommArmyOfSlot -- reconstructed */
+#include "pmf.h"    /* pmf_addr -- installing a thiscall method by address */
 
 /* The null check comes first in every one of the six, before the division, so
  * a null record costs nothing and never divides.
@@ -155,21 +156,21 @@ uint32_t __cdecl GetReSendMask(uint32_t id)
 
 #define AM2_ARMY_STRIDE 112u
 
-void __attribute__((thiscall)) CommSetSlotRemote(void *comm, int32_t slot)
+void __attribute__((thiscall)) AM2_Comm::CommSetSlotRemote(int32_t slot)
 {
-    *(int32_t *)((uint8_t *)comm + (uint32_t)slot * AM2_ARMY_STRIDE
+    *(int32_t *)((uint8_t *)this + (uint32_t)slot * AM2_ARMY_STRIDE
                  + COMM_ARMY_OFF_REMOTE) = 1;
 }
 
-void __attribute__((thiscall)) CommClearSlotRemote(void *comm, int32_t slot)
+void __attribute__((thiscall)) AM2_Comm::CommClearSlotRemote(int32_t slot)
 {
-    *(int32_t *)((uint8_t *)comm + (uint32_t)slot * AM2_ARMY_STRIDE
+    *(int32_t *)((uint8_t *)this + (uint32_t)slot * AM2_ARMY_STRIDE
                  + COMM_ARMY_OFF_REMOTE) = 0;
 }
 
-int32_t __attribute__((thiscall)) CommSlotRemote(void *comm, int16_t slot)
+int32_t __attribute__((thiscall)) AM2_Comm::CommSlotRemote(int16_t slot)
 {
-    const uint8_t *rec = (const uint8_t *)comm
+    const uint8_t *rec = (const uint8_t *)this
                          + (uint32_t)(int32_t)slot * AM2_ARMY_STRIDE;
     int32_t        id  = *(const int32_t *)(rec + AM2_PLAYER_ID);
 
@@ -180,14 +181,14 @@ int32_t __attribute__((thiscall)) CommSlotRemote(void *comm, int16_t slot)
 
     /* An empty slot that once held someone answers a different question. */
     if (*(const int32_t *)(rec + COMM_ARMY_OFF_WAS_HERE))
-        return *(const int32_t *)((const uint8_t *)comm + COMM_OFF_IS_HOST) == 0;
+        return *(const int32_t *)((const uint8_t *)this + COMM_OFF_IS_HOST) == 0;
 
     return -1;
 }
 
 #define g_mpSession (*(int32_t *)(uintptr_t)ADDR_MP_SESSION)
 
-int32_t __attribute__((thiscall)) CommMustBroadcast(void *comm, int16_t army)
+int32_t __attribute__((thiscall)) AM2_Comm::CommMustBroadcast(int16_t army)
 {
     /* Nobody to tell. */
     if (!g_mpSession)
@@ -195,11 +196,11 @@ int32_t __attribute__((thiscall)) CommMustBroadcast(void *comm, int16_t army)
 
     /* The neutral army is the host's to speak for. */
     if (army == 4)
-        return *(const int32_t *)((const uint8_t *)comm + COMM_OFF_IS_HOST)
+        return *(const int32_t *)((const uint8_t *)this + COMM_OFF_IS_HOST)
                != 0;
 
     /* `== 0`, as the original's neg/sbb/inc spells it -- not a logical not. */
-    return CommSlotRemote(comm, army) == 0;
+    return this->CommSlotRemote(army) == 0;
 }
 
 /* NOT AM2_PLAYER_STRIDE -- orig.h already has that name on 0x70, the comm
@@ -273,13 +274,13 @@ int msgslot_install(void)
 {
     patch_replace(ADDR_FIND_PLAYER_BY_ID, (const void *)FindPlayerById,
                   "FindPlayerById", 1);
-    patch_replace(ADDR_COMM_SET_REMOTE, (const void *)CommSetSlotRemote,
+    patch_replace(ADDR_COMM_SET_REMOTE, pmf_addr(&AM2_Comm::CommSetSlotRemote),
                   "CommSetSlotRemote", 4);
-    patch_replace(ADDR_COMM_CLEAR_REMOTE, (const void *)CommClearSlotRemote,
+    patch_replace(ADDR_COMM_CLEAR_REMOTE, pmf_addr(&AM2_Comm::CommClearSlotRemote),
                   "CommClearSlotRemote", 2);
-    patch_replace(ADDR_COMM_MUST_BROADCAST, (const void *)CommMustBroadcast,
+    patch_replace(ADDR_COMM_MUST_BROADCAST, pmf_addr(&AM2_Comm::CommMustBroadcast),
                   "CommMustBroadcast", 9);
-    patch_replace(ADDR_COMM_SLOT_REMOTE, (const void *)CommSlotRemote,
+    patch_replace(ADDR_COMM_SLOT_REMOTE, pmf_addr(&AM2_Comm::CommSlotRemote),
                   "CommSlotRemote", 1);
     patch_replace(ADDR_MSGSLOT_A0, (const void *)MsgSlotA0, "MsgSlotA0", 2);
     patch_replace(ADDR_MSGSLOT_A1, (const void *)MsgSlotA1, "MsgSlotA1", 2);
