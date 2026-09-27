@@ -14,6 +14,7 @@
  */
 
 #include "surface.h"
+#include "../pmf.h"
 #include "movie.h"
 #include "widget.h"      /* the widget vtable slots + DlgSelectMapDelete (movie vtable) */
 #include "../gamedir.h"   /* SetGameDir, FileExists -- reconstructed */
@@ -189,8 +190,10 @@ LPDIRECTDRAWSURFACE __cdecl MovieMakeSurface(int32_t w, int32_t h)
 #define SMACK_TRACK_COUNT 7
 #define SMACK_PAN_CENTRE  0x7FF6u
 
-void __attribute__((thiscall)) MovieStop(void *movie)
+void __attribute__((thiscall)) AM2_Movie::MovieStop()
 {
+    void *movie = this;
+
     /* Re-stamped before anything else, and unconditionally -- so it happens
      * even on the early returns below. */
     fld(movie, MOVIE_VTABLE, uint32_t) = ADDR_MOVIE_VTABLE;
@@ -214,8 +217,10 @@ void __attribute__((thiscall)) MovieStop(void *movie)
     smack_close(fld(movie, MOVIE_SMACK, void *));
 }
 
-void __attribute__((thiscall)) MovieSetVolume(void *movie, int32_t volume)
+void __attribute__((thiscall)) AM2_Movie::MovieSetVolume(int32_t volume)
 {
+    void *movie = this;
+
     uint32_t track;
     int32_t  i;
 
@@ -237,9 +242,10 @@ void __attribute__((thiscall)) MovieSetVolume(void *movie, int32_t volume)
  *
  * The peFlags byte of each entry is stepped over rather than written, so the
  * NOCOLLAPSE marks survive a palette change. */
-void __attribute__((thiscall)) MovieApplyPalette(void *movie,
-                                                 LPDIRECTDRAWSURFACE surf)
+void __attribute__((thiscall)) AM2_Movie::MovieApplyPalette(LPDIRECTDRAWSURFACE surf)
 {
+    void *movie = this;
+
     LPDIRECTDRAWPALETTE pal = NULL;
     const uint8_t      *src;
     LPPALETTEENTRY      dst = (LPPALETTEENTRY)(uintptr_t)ADDR_SYSTEM_PALETTE;
@@ -270,8 +276,10 @@ void __attribute__((thiscall)) MovieApplyPalette(void *movie,
  * If the timer cannot be had the movie is not merely abandoned, it is destroyed
  * and the state machine told to move on, because there is nothing else to drive
  * it and the game would otherwise sit on a still frame forever. */
-int32_t __attribute__((thiscall)) MovieStart(void *movie, void *arg)
+int32_t __attribute__((thiscall)) AM2_Movie::MovieStart(void *arg)
 {
+    void *movie = this;
+
     (void)arg;
 
     if (!fld(movie, MOVIE_SMACK, void *))
@@ -305,7 +313,7 @@ int32_t __attribute__((thiscall)) MovieStart(void *movie, void *arg)
         void *current = g_movieCurrent;
 
         if (current) {
-            MovieStop(current);
+            ::MovieStop(current);
             orig_delete(current);
         }
         g_movieCurrent = NULL;
@@ -327,10 +335,10 @@ int32_t __attribute__((thiscall)) MovieStart(void *movie, void *arg)
  * when there is no DirectSound to hand over -- as here, where there is none.
  *
  * Returns `this`, in the way a C++ constructor-ish method does. */
-void *__attribute__((thiscall)) MovieOpen(void *movie, const char *name,
-                                          int32_t wantW, int32_t wantH,
-                                          int32_t big)
+void * __attribute__((thiscall)) AM2_Movie::MovieOpen(const char *name, int32_t wantW, int32_t wantH, int32_t big)
 {
+    void *movie = this;
+
     void *smack;
 
     fld(movie, MOVIE_WANT_H, int32_t) = wantH;
@@ -427,8 +435,10 @@ void __cdecl MovieFinished(void)
  *   recognises the surface, so MOVIE_DD_TYPE is non-zero and the whole block is
  *   skipped. The intro plays, which is the evidence.
  */
-void __attribute__((thiscall)) MovieDrawFrame(void *movie, void *arg)
+void __attribute__((thiscall)) AM2_Movie::MovieDrawFrame(void *arg)
 {
+    void *movie = this;
+
     DDSURFACEDESC ddsd;
     void         *smack = fld(movie, MOVIE_SMACK, void *);
     LPDIRECTDRAWSURFACE surf = fld(movie, MOVIE_SURFACE, LPDIRECTDRAWSURFACE);
@@ -440,7 +450,7 @@ void __attribute__((thiscall)) MovieDrawFrame(void *movie, void *arg)
 
     if (fld(smack, SMACK_NEW_PALETTE, int32_t) &&
         !fld(movie, MOVIE_DD_TYPE, int32_t)) {
-        MovieApplyPalette(movie, (LPDIRECTDRAWSURFACE)arg);
+        ::MovieApplyPalette(movie, (LPDIRECTDRAWSURFACE)arg);
 
         /* See the standing note: a lock used as a question, never answered. */
         hr = IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL);
@@ -450,7 +460,7 @@ void __attribute__((thiscall)) MovieDrawFrame(void *movie, void *arg)
             IDirectDrawSurface_SetPalette(
                 surf, *(LPDIRECTDRAWPALETTE *)(g_moviePaletteOwner +
                                                MOVIE_PALETTE_OFF));
-            MovieApplyPalette(movie, (LPDIRECTDRAWSURFACE)arg);
+            ::MovieApplyPalette(movie, (LPDIRECTDRAWSURFACE)arg);
         }
     }
 
@@ -490,11 +500,13 @@ void __attribute__((thiscall)) MovieDrawFrame(void *movie, void *arg)
  *
  * Note the surface it draws to is the primary, passed straight through. That is
  * what MovieDrawFrame's second argument has been all along. */
-int32_t __attribute__((thiscall)) MoviePoll(void *movie)
+int32_t __attribute__((thiscall)) AM2_Movie::MoviePoll()
 {
+    void *movie = this;
+
     if (fld(movie, MOVIE_TIMER_RUN, int32_t) &&
         smack_wait(fld(movie, MOVIE_SMACK, void *)) == 0)
-        MovieDrawFrame(movie, *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
+        ::MovieDrawFrame(movie, *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
     return 1;
 }
 
@@ -770,10 +782,10 @@ int movie_install(void)
 
     rc |= patch_replace(ADDR_MOVIE_MAKE_SURFACE, (const void *)MovieMakeSurface,
                         "MovieMakeSurface", 2);
-    rc |= patch_replace(ADDR_MOVIE_STOP, (const void *)MovieStop, "MovieStop", 0);
-    rc |= patch_replace(ADDR_MOVIE_SET_VOLUME, (const void *)MovieSetVolume,
+    rc |= patch_replace(ADDR_MOVIE_STOP, pmf_addr(&AM2_Movie::MovieStop), "MovieStop", 0);
+    rc |= patch_replace(ADDR_MOVIE_SET_VOLUME, pmf_addr(&AM2_Movie::MovieSetVolume),
                         "MovieSetVolume", 1);
-    rc |= patch_replace(ADDR_MOVIE_DRAW_FRAME, (const void *)MovieDrawFrame,
+    rc |= patch_replace(ADDR_MOVIE_DRAW_FRAME, pmf_addr(&AM2_Movie::MovieDrawFrame),
                         "MovieDrawFrame", 1);
     rc |= patch_replace(ADDR_MOVIE_SET_CURRENT, (const void *)MovieSetCurrent,
                         "MovieSetCurrent", 1);
@@ -787,12 +799,12 @@ int movie_install(void)
                         "StateLeave", 4);
     rc |= patch_replace(ADDR_MOVIE_FINISHED, (const void *)MovieFinished,
                         "MovieFinished", 0);
-    rc |= patch_replace(ADDR_MOVIE_OPEN, (const void *)MovieOpen, "MovieOpen", 4);
-    rc |= patch_replace(ADDR_MOVIE_START, (const void *)MovieStart, "MovieStart", 1);
+    rc |= patch_replace(ADDR_MOVIE_OPEN, pmf_addr(&AM2_Movie::MovieOpen), "MovieOpen", 4);
+    rc |= patch_replace(ADDR_MOVIE_START, pmf_addr(&AM2_Movie::MovieStart), "MovieStart", 1);
     rc |= patch_replace(ADDR_PLAY_MOVIE, (const void *)PlayMovie,
                         "PlayMovie", 4);
-    rc |= patch_replace(ADDR_MOVIE_POLL, (const void *)MoviePoll, "MoviePoll", 0);
-    rc |= patch_replace(ADDR_MOVIE_APPLY_PALETTE, (const void *)MovieApplyPalette,
+    rc |= patch_replace(ADDR_MOVIE_POLL, pmf_addr(&AM2_Movie::MoviePoll), "MoviePoll", 0);
+    rc |= patch_replace(ADDR_MOVIE_APPLY_PALETTE, pmf_addr(&AM2_Movie::MovieApplyPalette),
                         "MovieApplyPalette", 1);
     rc |= patch_replace(ADDR_STATE_ENTER_LOGO,
                         (const void *)StateEnterLogoMovie,

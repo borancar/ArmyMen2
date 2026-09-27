@@ -1,6 +1,20 @@
 #ifndef AM2_MOVIE_H
 #define AM2_MOVIE_H
 
+#ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
+struct AM2_Movie {
+    void __attribute__((thiscall)) MovieStop();
+    void __attribute__((thiscall)) MovieSetVolume(int32_t volume);
+    void __attribute__((thiscall)) MovieApplyPalette(LPDIRECTDRAWSURFACE surf);
+    int32_t __attribute__((thiscall)) MovieStart(void *arg);
+    void * __attribute__((thiscall)) MovieOpen(const char *name, int32_t wantW, int32_t wantH, int32_t big);
+    void __attribute__((thiscall)) MovieDrawFrame(void *arg);
+    int32_t __attribute__((thiscall)) MoviePoll();
+};
+static inline void __attribute__((thiscall)) MovieApplyPalette(void *movie, LPDIRECTDRAWSURFACE surf)
+{ ((AM2_Movie *)movie)->MovieApplyPalette(surf); }
+#endif
+
 #include <stdint.h>
 #include "../../inject/orig.h"
 #include "../../inject/win32.h"
@@ -32,7 +46,8 @@ extern "C" {
  * the movie was decoding onto, and closes the Smacker handle. Does nothing at
  * all unless both a handle and an active flag are present, so it is safe to
  * call on a movie that never started. */
-void __attribute__((thiscall)) MovieStop(void *movie);
+static inline void __attribute__((thiscall)) MovieStop(void *movie)
+{ ((AM2_Movie *)movie)->MovieStop(); }
 
 /* Original: 0x00445280, 1 call site. Set the volume on every audio track.
  *
@@ -40,12 +55,14 @@ void __attribute__((thiscall)) MovieStop(void *movie);
  * same volume with a fixed pan -- so it is one call written out seven times
  * rather than a loop. Skipped entirely when the movie subsystem never got sound
  * going. */
-void __attribute__((thiscall)) MovieSetVolume(void *movie, int32_t volume);
+static inline void __attribute__((thiscall)) MovieSetVolume(void *movie, int32_t volume)
+{ ((AM2_Movie *)movie)->MovieSetVolume(volume); }
 
 /* Original: 0x004453C0, 1 call site. Decode one frame into the movie surface
  * and put it on screen. Driven by a multimedia timer, so it checks the window
  * still has focus first -- the timer keeps firing after an alt-tab. */
-void __attribute__((thiscall)) MovieDrawFrame(void *movie, void *arg);
+static inline void __attribute__((thiscall)) MovieDrawFrame(void *movie, void *arg)
+{ ((AM2_Movie *)movie)->MovieDrawFrame(arg); }
 
 /* Original: 0x00445600, 2 call sites. Post WM_USER to say the movie ended,
  * which is how a finished cutscene becomes a game state change. */
@@ -53,14 +70,14 @@ void __cdecl MovieFinished(void);
 
 /* Original: 0x00444FC0, 1 call site. Open a .SMK and prepare to play it. A
  * `wantW` of -1 means "whatever size the film is". Returns `this`. */
-void *__attribute__((thiscall)) MovieOpen(void *movie, const char *name,
-                                          int32_t wantW, int32_t wantH,
-                                          int32_t big);
+static inline void * __attribute__((thiscall)) MovieOpen(void *movie, const char *name, int32_t wantW, int32_t wantH, int32_t big)
+{ return ((AM2_Movie *)movie)->MovieOpen(name, wantW, wantH, big); }
 
 /* Original: 0x00445390, 2 call sites. Draw a frame if Smacker says one is due.
  * Called from the game loop rather than the timer -- both drive playback, and
  * SmackWait is what stops them drawing the same frame twice. */
-int32_t __attribute__((thiscall)) MoviePoll(void *movie);
+static inline int32_t __attribute__((thiscall)) MoviePoll(void *movie)
+{ return ((AM2_Movie *)movie)->MoviePoll(); }
 
 /* The four one-liners around the "current movie" global at 0x006568A0.
  * Between them they are the whole of how the rest of the game touches a
@@ -103,7 +120,8 @@ int32_t __cdecl StateMessageLogoMovie(void);
 int32_t __cdecl StateMessageMovieToMenu(void);
 
 /* 0x004451F0. Put the multimedia timer on a movie. */
-int32_t __attribute__((thiscall)) MovieStart(void *movie, void *arg);
+static inline int32_t __attribute__((thiscall)) MovieStart(void *movie, void *arg)
+{ return ((AM2_Movie *)movie)->MovieStart(arg); }
 
 int movie_install(void);
 
