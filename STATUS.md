@@ -23,7 +23,7 @@ the same trick as the hybrid game loader). `make vc6-match` recompiles each
 `patch_replace`'d reconstruction with the *original* compiler at /O2 and
 byte-compares it to `ArmyMen2.exe` -- the strongest correctness check there is.
 
-Baseline: **~168 of ~945 flat `src/game` functions are byte-identical as
+Baseline: **~238 of ~1580 compiled `src/game` functions are byte-identical as
 written** (ApproxDist, PackKey, Clamp, PointInRect, …). Re-measure with
 `make vc6-match`; worklist is `make vc6-match ARGS=--diffs`.
 
@@ -47,9 +47,13 @@ main result so far (details in `src/vc6/README.md`):
 
 A flag sweep confirmed /O2 (blend) is the original's setting. Calling-convention
 attributes are honoured (`__attribute__((stdcall))` -> `__stdcall`); free-
-function `thiscall` can't be spelled in VC6 so those (all in win32/) won't match.
-`win32/*` (~700 fns) does not compile yet: windows.h/ddraw.h trips a delay-load
-gap in the hosted c1xx (`RaiseException 0xc06d007e`) -- a shim milestone.
+function `thiscall` can't be spelled in VC6, so the win32 member layer (widget
+&c.) compiles but won't match. **~1580 of 1642 functions now compile** -- the
+win32 layer was unblocked by growing the shim (ole32!CLSIDFromString for the
+C++ frontend's COM probe, a DWORD_PTR typedef, a static_assert strip, a forward
+LPDIRECTPLAYLOBBY3A for VC98's DX6.0 headers) and by writing AM2_SHAKE_FALLOFF
+as a literal (MSVC6's /O2 folder rejects `1.0/512.0` in a ternary). Only
+dplay.cpp is left (needs Lobby3 methods VC98 lacks).
 
 ## LINKER PLACEMENT (2026-09-14): transcribed globals live at their real VAs
 

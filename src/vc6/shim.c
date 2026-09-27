@@ -842,6 +842,43 @@ typedef struct { const char *module, *name; const void *fn; } Vc6Export;
 #define K(nm, fn) { "KERNEL32.dll", nm, (const void *)(fn) }
 #define U(nm, fn) { "USER32.dll", nm, (const void *)(fn) }
 
+/* ---- ole32: just enough for the C++ frontend --------------------------- */
+/* c1xx delay-loads ole32 the moment windows.h pulls in COM and calls
+ * CLSIDFromString to parse a GUID string (the SDK interfaces carry uuids).
+ * Parsing a `{8-4-4-4-12}` string into a 16-byte CLSID needs no COM runtime. */
+static int sh_hexw(unsigned c)
+{
+    if (c >= '0' && c <= '9') return (int)(c - '0');
+    if (c >= 'a' && c <= 'f') return (int)(c - 'a' + 10);
+    if (c >= 'A' && c <= 'F') return (int)(c - 'A' + 10);
+    return -1;
+}
+static long STDCALL sh_CLSIDFromString(const uint16_t *s, void *out)
+{
+    uint8_t *g = (uint8_t *)out;      /* GUID: Data1(4 LE), Data2(2 LE), Data3(2 LE), Data4[8] */
+    unsigned long v; int d, n;
+    if (!s || !g) return 0x80004003L; /* E_POINTER */
+    if (*s == '{') s++;
+    /* Data1: 8 hex, little-endian */
+    v = 0; for (n = 0; n < 8; n++) { d = sh_hexw(s[n]); if (d < 0) return 0x800401F3L; v = (v << 4) | (unsigned)d; }
+    g[0] = (uint8_t)v; g[1] = (uint8_t)(v >> 8); g[2] = (uint8_t)(v >> 16); g[3] = (uint8_t)(v >> 24);
+    s += 8; if (*s == '-') s++;
+    /* Data2, Data3: 4 hex each, little-endian */
+    for (int f = 0; f < 2; f++) {
+        v = 0; for (n = 0; n < 4; n++) { d = sh_hexw(s[n]); if (d < 0) return 0x800401F3L; v = (v << 4) | (unsigned)d; }
+        g[4 + f * 2] = (uint8_t)v; g[5 + f * 2] = (uint8_t)(v >> 8);
+        s += 4; if (*s == '-') s++;
+    }
+    /* Data4: 8 raw bytes (16 hex), big-endian; a '-' after the first two */
+    for (n = 0; n < 8; n++) {
+        int hi = sh_hexw(s[0]), lo = sh_hexw(s[1]);
+        if (hi < 0 || lo < 0) return 0x800401F3L;
+        g[8 + n] = (uint8_t)((hi << 4) | lo);
+        s += 2; if (n == 1 && *s == '-') s++;
+    }
+    return 0;                         /* S_OK */
+}
+
 static const Vc6Export vc6_exports[] = {
     /* CRT startup */
     M("__set_app_type", sh___set_app_type),
@@ -993,6 +1030,7 @@ static const Vc6Export vc6_exports[] = {
     K("SetEnvironmentVariableA", sh_SetEnvironmentVariableA),
     K("GetEnvironmentVariableA", sh_GetEnvironmentVariableA),
     U("LoadStringA", sh_LoadStringA),
+    { "ole32.dll", "CLSIDFromString", (const void *)sh_CLSIDFromString },
     { 0, 0, 0 },
 };
 

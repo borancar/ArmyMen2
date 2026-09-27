@@ -19,11 +19,14 @@ an address the linker has not filled in yet (0 in the .obj, a real VA in the
 binary), so those slots are wildcarded; every other byte must be identical.
 Trailing 0x90/0xCC padding is trimmed from both.
 
-SCOPE.  The flat `src/game/*.cpp` (pure computation) compile under the host
-today.  `src/game/win32/*` pulls in windows.h/ddraw.h and trips a delay-load
-gap in the hosted c1xx (RaiseException 0xc06d007e) that the shim does not yet
-cover -- those are reported as SKIP, not diff.  crt.cpp (POSIX) and trig.cpp
-(GCC `__asm__`) are GCC-only and skipped too.
+SCOPE.  Almost every reconstructed TU compiles under the host now, including
+`src/game/win32/*` (the shim grew ole32!CLSIDFromString, DWORD_PTR, a
+static_assert strip and a forward LPDIRECTPLAYLOBBY3A to get there).  The one
+holdout is dplay.cpp, which calls IDirectPlayLobby3 methods VC98's DirectX 6.0
+headers don't declare -- reported nocompile.  crt.cpp (POSIX) and trig.cpp (GCC
+`__asm__`) are GCC-only and SKIP.  Note the win32 layer is mostly thiscall
+member functions, which VC6 cannot spell (no __thiscall keyword) and so cannot
+match -- expect a low match rate there even though it compiles.
 
 This is a REPORT, not a gate: it needs the external VC6 install and prints
 coverage.  Run it with `make vc6-match` (which sets VC6_ROOT), or directly.
@@ -195,8 +198,7 @@ def main():
     with tempfile.TemporaryDirectory() as outdir:
         for f in sorted(byfile):
             base = os.path.basename(f)
-            win32 = "/win32/" in f
-            if base in SKIP_FILE or win32:
+            if base in SKIP_FILE:
                 res["skip"] += len(byfile[f])
                 per[f] = ("skip", 0, len(byfile[f]))
                 continue
@@ -224,7 +226,7 @@ def main():
                     diffs.append((f, fn, va, n, len(relocs)))
             per[f] = ("ok", m, m + d)
 
-    print("=== vc6 byte-match coverage (flat src/game, /O2) ===")
+    print("=== vc6 byte-match coverage (src/game, /O2) ===")
     for k in ("match", "diff", "nosym", "nocompile", "skip"):
         print("  %-10s %d" % (k, res[k]))
     denom = res["match"] + res["diff"]

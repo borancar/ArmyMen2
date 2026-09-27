@@ -28,6 +28,10 @@
  * The `{}` (not `;`) keeps a trailing `else` bound to the user's own if. */
 #define for if (0) {} else for
 #define __builtin_memcpy memcpy   /* type-pun helper; <string.h> declares it */
+/* VC6 predates static_assert and has no variadic macros; strip the common
+ * two-argument form (the real GCC build still enforces every one).  A bare `;`
+ * is a valid empty declaration at file scope, so the check simply vanishes. */
+#define static_assert(cond, msg)
 #endif
 typedef signed char        int8_t;
 typedef unsigned char      uint8_t;
@@ -39,4 +43,18 @@ typedef __int64            int64_t;
 typedef unsigned __int64   uint64_t;
 typedef int                intptr_t;
 typedef unsigned int       uintptr_t;
+/* VC98's basetsd.h has INT_PTR/UINT_PTR/LONG_PTR/ULONG_PTR but NOT DWORD_PTR
+ * (that one arrived with the Win64 SDK); the reconstruction's win32 headers use
+ * it, so provide the i386 (32-bit) form.  Defining only the missing one avoids
+ * a "different basic types" clash with basetsd.h's own typedefs. */
+#ifndef __GNUC__
+typedef unsigned long      DWORD_PTR;
+/* VC98 bundles the DirectX 5/6.0 headers, whose DPLOBBY.H stops at
+ * IDirectPlayLobby2; the reconstruction uses the DX6.1 IDirectPlayLobby3A the
+ * original's 1999 SDK had.  Forward-declare just the pointer type so the many
+ * files that only NAME it (via dplay.h's CreateDirectPlayLobby declaration)
+ * compile; dplay.cpp, which calls its methods, needs the full interface and is
+ * not reachable from this compiler-only install. */
+typedef struct IDirectPlayLobby3A *LPDIRECTPLAYLOBBY3A;
+#endif
 #endif

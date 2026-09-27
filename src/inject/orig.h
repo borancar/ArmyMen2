@@ -2573,7 +2573,10 @@
 #define AM2_SHAKE_STRENGTH_MAX   10
 #define AM2_SHAKE_NEAR           0x140   /* full strength within this */
 #define AM2_SHAKE_FAR            0x340   /* nothing at all beyond this */
-#define AM2_SHAKE_FALLOFF        (1.0 / 512.0)  /* the double at 0x0046F9A8 */
+#define AM2_SHAKE_FALLOFF        0.001953125    /* 1/512, the double at 0x0046F9A8;
+    written as the exact literal, not (1.0/512.0), because MSVC 6's /O2 constant
+    folder rejects that division inside a ternary (C2124) -- and a precomputed
+    double is what the original stored anyway. Byte-identical under GCC. */
 #define AM2_SHAKE_PRESETS        4
 #define SHAKE_PRESET_BYTES       0x10u
 /* Not a shake constant, despite living in this block and being read by the

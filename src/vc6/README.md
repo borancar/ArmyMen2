@@ -64,10 +64,17 @@ The one source change the host needed was spelling the weak-symbol trace guard
 `!(&am2_trace_window)` instead of `!am2_trace_window` (MSVC6 won't apply `!` to
 a function designator); GCC compiles both to identical code.
 
-Scope today: the flat `src/game/*.cpp` (pure computation) compile and compare.
-`src/game/win32/*` pulls in windows.h/ddraw.h and trips a delay-load gap in the
-hosted `c1xx` (`RaiseException 0xc06d007e`) not yet covered by the shim -- those
-are reported SKIP.  `crt.cpp`/`trig.cpp` are GCC-only (POSIX, inline `__asm__`).
+Scope today: almost every reconstructed TU compiles -- the flat `src/game/*.cpp`
+and `src/game/win32/*` alike.  Getting the win32 layer to compile took the shim
+growing `ole32!CLSIDFromString` (the C++ frontend delay-loads ole32 and parses a
+GUID string the moment windows.h pulls in COM), a `DWORD_PTR` typedef (VC98
+predates it), a `static_assert` strip (VC6 has neither the keyword nor variadic
+macros), and a forward `LPDIRECTPLAYLOBBY3A` (VC98's DirectX 6.0 headers stop at
+IDirectPlayLobby2).  The one holdout is `dplay.cpp`, which calls Lobby3 methods
+those headers don't declare -- reported nocompile.  `crt.cpp`/`trig.cpp` are
+GCC-only (POSIX, inline `__asm__`) and SKIP.  The win32 layer is mostly thiscall
+member functions, which VC6 cannot spell (no `__thiscall` keyword) so they won't
+match even though they compile -- expect a low match rate there.
 
 ### What matches piecewise, and what needs the relink
 
@@ -106,5 +113,8 @@ image, so what can match is bounded by that:
   (ApproxDist, PackKey, Clamp, PointInRect, …) reproduce the shipped bytes
   exactly; run `make vc6-match` for the live count.  The rest are source-shape
   diffs to close one function at a time.
-- ☐ `src/game/win32/*` (needs the c1xx delay-load shim gap closed), then
-  `LINK.EXE` for a whole-binary match.
+- ✅ `src/game/win32/*` compiles too (all but dplay.cpp) -- the shim grew the
+  ole32/DWORD_PTR/static_assert/dplobby pieces above.  ~1580 of 1642 functions
+  now compile and compare.
+- ☐ close the source-shape diffs, and `LINK.EXE` for a whole-binary match
+  (which is what most cross-call / indexed-global diffs need).

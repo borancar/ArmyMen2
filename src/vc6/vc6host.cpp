@@ -351,7 +351,26 @@ extern "C" uint32_t vc6_loadlibrary(const char *name)
             if (!access(cand, F_OK)) { snprintf(path, sizeof path, "%s", cand); break; }
         }
     }
-    if (!path[0] || access(path, F_OK)) { vc6_log("LoadLibrary(%s): not found", name); return 0; }
+    if (!path[0] || access(path, F_OK)) {
+        /* Not on disk -> a Windows system DLL we don't ship (ole32, oleaut32,
+         * ...): the C++ frontend delay-loads ole32 the moment windows.h pulls
+         * in COM.  Register a SYNTHETIC stub module (image == 0) so the probe
+         * succeeds; vc6_getproc hands back logging abort-stubs, so we only die
+         * -- naming the function -- if the pass actually CALLS into it.  This
+         * is the "stub, then implement in hit order" rule applied to whole
+         * DLLs.  A genuinely-needed toolchain DLL would still be found on disk
+         * above; anything reaching here is a system DLL. */
+        if (g_nmod >= (int)(sizeof g_mod / sizeof g_mod[0])) vc6_die("too many modules");
+        Vc6Module *stub = &g_mod[g_nmod++];
+        size_t k = 0; for (; b[k] && k < sizeof stub->name - 1; k++)
+            stub->name[k] = (char)tolower((unsigned char)b[k]);
+        stub->name[k] = 0;
+        stub->image = 0;                 /* marks it synthetic */
+        stub->base  = 0x0E000000u + (uint32_t)(g_nmod * 0x10000);
+        stub->entry = 0; stub->size = 0; stub->is_dll = 1;
+        vc6_log("LoadLibrary(%s): synthesised stub module @ 0x%08x", name, stub->base);
+        return stub->base;
+    }
     if (g_nmod >= (int)(sizeof g_mod / sizeof g_mod[0])) vc6_die("too many modules");
     Vc6Module *mod = &g_mod[g_nmod++];       /* reserve the slot BEFORE mapping,
                                               * so recursive loads use later slots */
@@ -367,7 +386,13 @@ extern "C" uint32_t vc6_loadlibrary(const char *name)
 extern "C" uint32_t vc6_getproc(uint32_t hmod, const char *name)
 {
     const Vc6Module *m = mod_by_base(hmod);
-    return m ? (uint32_t)(uintptr_t)vc6_get_proc(m, name) : 0;
+    if (!m) return 0;
+    if (!m->image) {  /* synthetic system-DLL stub: a shimmed export if we have
+                       * one (e.g. ole32!CLSIDFromString), else an abort-stub */
+        const void *fn = vc6_shim_lookup(m->name, name);
+        return (uint32_t)(uintptr_t)(fn ? fn : vc6_make_stub(m->name, name));
+    }
+    return (uint32_t)(uintptr_t)vc6_get_proc(m, name);
 }
 
 extern "C" uint32_t vc6_module_base(const char *name)
