@@ -881,10 +881,11 @@ typedef void (__cdecl *AM2_RawLogFn)(const void *a, int32_t b, int32_t c);
  *
  * A missing slot, a null object and a kind of zero are all indistinguishable
  * in the answer. */
-/* 0x0040F330, thiscall. The slot holding this DirectPlay id -- and what it
- * returns is the slot's own INDEX FIELD, not the loop counter. The two are
- * the same in every state this project has driven; they are separate fields
- * and the original reads the stored one, so this does too.
+/* 0x0040F330, thiscall. Find the slot holding this DirectPlay id and answer
+ * that slot's ARMY (AM2_PLAYER_ARMY, +0x210) -- not the loop counter, and not
+ * AM2_PLAYER_INDEX (+0x20C). It returned the index field until the VC6
+ * relink compared the resolved bytes: `mov eax, [edx + ecx + 0x210]`. The two
+ * fields agree in single player, which is why nothing had shown it.
  *
  * -1 when the count is zero or nothing matches. */
 int32_t __attribute__((thiscall)) AM2_Comm::CommFindPlayer(int32_t dpid)
@@ -899,7 +900,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommFindPlayer(int32_t dpid)
         if (*(const int32_t *)(c + (uint32_t)i * AM2_PLAYER_STRIDE
                                + AM2_PLAYER_ID) == dpid)
             return *(const int32_t *)(c + (uint32_t)i * AM2_PLAYER_STRIDE
-                                      + AM2_PLAYER_INDEX);
+                                      + AM2_PLAYER_ARMY);
     return -1;
 }
 

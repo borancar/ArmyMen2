@@ -430,8 +430,9 @@ void __cdecl FramePost(void)
     FlushDelayedSends();
     ProcessResendQueue();
 
-    if (MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL)
-        < AM2_COMM_MIN_BUFFERS)
+    /* Signed, as the original's `jge`. */
+    if ((int32_t)MsgField12((void *)(uintptr_t)ADDR_MSG_LIST_POOL)
+        < (int32_t)AM2_COMM_MIN_BUFFERS)
         CommNoBuffers();
 }
 

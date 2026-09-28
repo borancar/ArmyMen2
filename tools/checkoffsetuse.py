@@ -136,9 +136,14 @@ def c_offsets(path, func):
     # exactly as the whole menu layer once did. Any convention this tree
     # actually writes has to be listed here; the failure is silent and reads
     # like a typo in the invocation.
+    #
+    # AND A MEMBER is `Class::Name`: every thiscall function in the tree is a
+    # member now (the VC6 byte-match cannot spell a thiscall free function),
+    # so without the qualifier nearly the whole thiscall layer answered "no
+    # definition of" -- CommFindPlayer did, the day it returned the wrong field.
     m = re.search(r'^\w[\w \*]*(?:__cdecl|__attribute__\(\(thiscall\)\)'
                   r'|FAR PASCAL|PASCAL|__stdcall|WINAPI|CALLBACK)\s+'
-                  + func + r'\(', src, re.M)
+                  r'(?:\w+::)?' + func + r'\(', src, re.M)
     if not m:
         raise SystemExit('no definition of ' + func)
     i = m.start()

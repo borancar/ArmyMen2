@@ -37,7 +37,6 @@
 #include "../objtable.h"
 #include "../commmsg.h"  /* CommInitDefaults -- reconstructed */
 #include "../../inject/patch.h"
-#include "winmain.h"   /* Ticks */
 
 /* The CRT's atexit, above the CRT line and not on the patch list. */
 typedef int32_t (__cdecl *AM2_AtExitFn)(void (__cdecl *)(void));
@@ -2191,7 +2190,7 @@ void __attribute__((thiscall)) AM2_Comm::CommReportStats()
         }
     }
 
-    secs = (Ticks() - *(const uint32_t *)(c + COMM_OFF_STATS_SINCE)) / 1000u;
+    secs = (GetTickCount() - *(const uint32_t *)(c + COMM_OFF_STATS_SINCE)) / 1000u;
     if (secs < 1u)
         secs = 1u;
 
@@ -2280,7 +2279,7 @@ void __attribute__((thiscall)) AM2_Comm::CommResetStats()
     void *comm = this;
 
     uint8_t *c   = (uint8_t *)comm;
-    uint32_t now = Ticks();
+    uint32_t now = GetTickCount();
     int32_t  i;
 
     *(uint32_t *)(c + COMM_OFF_STATS_SINCE) = now;
@@ -3344,7 +3343,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
         comm = g_commObject;
         slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
         *(uint32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
-                      + COMM_OFF_SLOT_JOINED_MS) = Ticks();
+                      + COMM_OFF_SLOT_JOINED_MS) = GetTickCount();
 
         comm = g_commObject;
         slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
@@ -3376,9 +3375,9 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
         }
 
         /* One second with nothing pumped -- see the note above. */
-        t0 = Ticks();
-        if (Ticks() - t0 < AM2_COMM_JOIN_SETTLE_MS)
-            while (Ticks() - t0 < AM2_COMM_JOIN_SETTLE_MS)
+        t0 = GetTickCount();
+        if (GetTickCount() - t0 < AM2_COMM_JOIN_SETTLE_MS)
+            while (GetTickCount() - t0 < AM2_COMM_JOIN_SETTLE_MS)
                 ;
 
         RefreshMapSelection();
