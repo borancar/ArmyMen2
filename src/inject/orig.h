@@ -13,6 +13,17 @@
 #ifndef AM2_ORIG_H
 #define AM2_ORIG_H
 
+/* C++ linkage for a game function declared inside an extern "C" block. The
+ * original is C++ throughout, and VC6 (/GX) treats an extern "C" callee as
+ * unable to throw -- so a caller's unwind states around it, and whether it
+ * needs an unwind frame at all, come out differently. Used on the functions
+ * the reconstructed constructors, destructors and `new` sites call. */
+#ifdef __cplusplus
+#define AM2_CXX extern "C++"
+#else
+#define AM2_CXX
+#endif
+
 #include <stdint.h>
 #include <stddef.h>
 

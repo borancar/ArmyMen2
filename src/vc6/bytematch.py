@@ -100,6 +100,10 @@ def parse_coff(path):
     return secs, syms
 
 def resolve_sym(syms, func):
+    if func.startswith(("??0", "??1")):     # constructor / destructor
+        # the installed one, never the AM2_NoInit transition overload
+        cands = [s for s in syms if s.startswith(func + "@@") and "NoInit" not in s]
+        return cands[0] if cands else None
     if "_" + func in syms:
         return "_" + func
     # __stdcall decorates as _name@bytes, __fastcall as @name@bytes.
@@ -159,13 +163,18 @@ def manifest():
     # (method) name either way; resolve_sym finds the member's mangled symbol.
     call = re.compile(
         r'patch_replace\(\s*(ADDR_[A-Z0-9_]+)\s*,\s*'
-        r'(?:\(const void \*\)\s*|pmf_addr\(&(?:[A-Za-z_][A-Za-z0-9_]*::)?)'
+        r'(?:\(const void \*\)\s*|pmf_addr\(&(?:[A-Za-z_][A-Za-z0-9_]*::)?'
+        r'|AM2_(CTOR|DTOR)\()'
         r'([A-Za-z_][A-Za-z0-9_]*)')
     out = []
     for path in am2.game_sources():
         for m in call.finditer(open(path).read()):
             if m.group(1) in addr:
-                out.append((os.path.relpath(path, REPO), m.group(2),
+                # A constructor / destructor install names the CLASS; its
+                # symbol is MSVC's ??0Class@@ / ??1Class@@.
+                name = ({"CTOR": "??0", "DTOR": "??1"}.get(m.group(2), "")
+                        + m.group(3))
+                out.append((os.path.relpath(path, REPO), name,
                             addr[m.group(1)]))
     return out
 

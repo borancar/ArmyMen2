@@ -38,9 +38,10 @@ def resolve_member_first(names, fn):
     thiscall forwarders, so `_fn` (the forwarder) gets emitted alongside the real
     method -- and the function installed at the manifest VA is the METHOD, not
     the 13-byte forwarder."""
-    for s in names:
-        if s.startswith("?" + fn + "@"):
-            return s
+    if not fn.startswith("??"):
+        for s in names:
+            if s.startswith("?" + fn + "@"):
+                return s
     return BM.resolve_sym(names, fn)
 
 
@@ -279,6 +280,18 @@ def main():
     # the original data range count -- one outside it was not placed.
     placed = placed_data_symbols()
     ng = len(placed)
+    # Polymorphic widget classes (relink build): the compiler stores
+    # ??_7Class@@6B@ into each object; widget.h's AM2_CLASS_VTABLE(Class, VT)
+    # says which original vtable that is.
+    vtaddr = {}
+    for hdr in ("src/inject/orig.h", "src/game/win32/widget.h"):
+        for mm in re.finditer(r"#define\s+(VTABLE_\w+)\s+0x([0-9A-Fa-f]+)u?",
+                              open(os.path.join(BM.REPO, hdr)).read()):
+            vtaddr.setdefault(mm.group(1), int(mm.group(2), 16))
+    for mm in re.finditer(r"^AM2_CLASS_VTABLE\((\w+),\s*(\w+)\)",
+                          open(os.path.join(BM.REPO, "src/game/win32/widget.h")).read(), re.M):
+        if mm.group(2) in vtaddr:
+            sym_va["??_7%s@@6B@" % mm.group(1)] = vtaddr[mm.group(2)]
     # Standalone stand-ins for original functions: standalone.h redirects
     # ADDR_X to AM2_SA(am2_sa_y) (operator new/delete, the logger, the DirectX
     # creators), so a call compiles to a direct e8 at am2_sa_y -- which stands
@@ -293,6 +306,7 @@ def main():
         sys.stderr.write("placed data symbols mapped: %d\n" % ng)
     imap = import_map()         # base import name -> IAT slot VA
     compiled = {}               # file -> (secs, symlist, names, base)
+    failed_tus = []
     with tempfile.TemporaryDirectory() as od, tempfile.TemporaryDirectory() as odb:
         for f in sorted(byfile):
             if os.path.basename(f) in BM.SKIP_FILE:
@@ -300,6 +314,10 @@ def main():
             obj = BM.compile_file(f, od, extra=["/DAM2_STANDALONE", "/DAM2_RELINK"]
                                   + os.environ.get("RELINK_CFLAGS", "").split())
             if obj is None:
+                # Loud: a TU that does not compile silently drops every
+                # function in it from the comparison, which once read as a
+                # 180-function regression with no error anywhere.
+                failed_tus.append(f)
                 continue
             secs, symlist = parse_coff_full(obj)
             # name -> (secnum, value) for defined symbols, like bytematch.syms
@@ -481,6 +499,8 @@ def main():
         with open(path, "w") as fh:
             json.dump(dump, fh)
     print("=== relink byte-match (siblings + CRT + IAT + migrated globals resolved) ===")
+    for f in failed_tus:
+        print("  COMPILE FAILED under VC6: %s -- its functions are not compared" % f)
     print("  match %d   diff %d   (relink closes %d the piecewise harness cannot)"
           % (match, diff, len(newly)))
     if regressed:

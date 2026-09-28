@@ -144,7 +144,7 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
 /* 0x00445CF0. A sprite by NAME: parsed into {set, index, frame} when the name
  * carries them, and otherwise loaded as a bitmap and registered under set 99
  * with an index that counts up. */
-AM2_Sprite *__cdecl PreloadSpriteName(const char *name, int32_t flags,
+AM2_CXX AM2_Sprite *__cdecl PreloadSpriteName(const char *name, int32_t flags,
                                       int32_t addref);
 
 void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y, int32_t mode);
@@ -197,7 +197,7 @@ void __cdecl ClearSprite(AM2_Sprite *spr);
  * least one and leaves an existing count alone. NULL if the load failed. */
 AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index, int32_t frame,
                                   int32_t flags, int32_t addref);
-void __cdecl ReleaseSprite(AM2_Sprite *spr);
+AM2_CXX void __cdecl ReleaseSprite(AM2_Sprite *spr);
 
 /* 0x00414AD0 and 0x00414B00. The sprite table has a hundred indices per army
  * over a shared block: the first gives the player's own army's offset, and the

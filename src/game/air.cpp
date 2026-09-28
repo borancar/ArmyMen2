@@ -867,7 +867,7 @@ void __cdecl RevealNearby(AM2_Point where, int32_t radius, int32_t delayMs)
  * an LPDIRECTDRAWSURFACE in it -- the same reason script.cpp declares
  * PreloadSprite. An incomplete type is all this needs. */
 struct AM2_Sprite;
-extern "C" void __cdecl ReleaseSprite(AM2_Sprite *spr);
+void __cdecl ReleaseSprite(AM2_Sprite *spr);   /* C++ linkage, as sprite.h declares it */
 
 /* DrawSprite is reconstructed too, and declared here for the same reason.
  * Its four arguments name no Win32 type once AM2_Sprite is opaque. */

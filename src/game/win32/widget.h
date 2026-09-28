@@ -3,6 +3,13 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#ifdef __cplusplus
+#if defined(_MSC_VER) && !defined(__GNUC__)
+#include <new.h>
+#else
+#include <new>
+#endif
+#endif
 #include "../../inject/orig.h"
 #include "../misc.h"
 #include "../../inject/win32.h"
@@ -31,8 +38,27 @@ void __cdecl AimMarkerAge(void);
  * unread, so this struct stops at the parent rather than inventing names for
  * the gap, and the label's own fields are reached by offset below.
  */
+/* Byte-match (VC6 relink) builds make the widget classes POLYMORPHIC: the
+ * compiler then writes each vtable pointer itself, and a destructor's comes
+ * FIRST -- before the unwind state that opens the body, where no statement
+ * of ours can go. The hidden vptr sits at offset 0, where every other build
+ * keeps an explicit field. AM2_VTBL(w) reaches it either way; stores inside
+ * converted constructors/destructors are AM2_CTOR_VTABLE, which the
+ * polymorphic build leaves to the compiler. */
+#if defined(__cplusplus) && defined(_MSC_VER) && !defined(__GNUC__) && defined(AM2_RELINK)
+#define AM2_POLYMORPHIC 1
+#endif
+#ifdef AM2_POLYMORPHIC
+#define AM2_VTBL(w)            (*(void **)(void *)(w))
+#define AM2_CTOR_VTABLE(w, vt) ((void)0)
+#else
+#define AM2_VTBL(w)            ((w)->vtable)
+#define AM2_CTOR_VTABLE(w, vt) ((w)->vtable = (void *)(uintptr_t)(vt))
+#endif
 typedef struct AM2_Widget {
+#ifndef AM2_POLYMORPHIC
     void    *vtable;                /* 0x0000 */
+#endif
     int32_t  x;                     /* 0x0004  offset within the parent */
     int32_t  y;                     /* 0x0008 */
     int32_t  w;                     /* 0x000C */
@@ -86,7 +112,6 @@ typedef struct AM2_Widget {
                                     /* 0x0054  fired by SPACE or RETURN on the
                                      * focused child. Constructed null. */
 #ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
-    void __attribute__((thiscall)) WidgetDestruct();
     AM2_Widget * __attribute__((thiscall)) WidgetDelete(int32_t flags);
     void __attribute__((thiscall)) LabelDestruct();
     AM2_Widget * __attribute__((thiscall)) LabelDelete(int32_t flags);
@@ -102,7 +127,6 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) TextListDelete(int32_t flags);
     void __attribute__((thiscall)) ListDraw(RECT clip);
     void __attribute__((thiscall)) ListTakeFocus(int32_t announce);
-    void __attribute__((thiscall)) IconDestruct();
     AM2_Widget * __attribute__((thiscall)) IconDelete(int32_t flags);
     void __attribute__((thiscall)) BlinkerDestruct();
     AM2_Widget * __attribute__((thiscall)) BlinkerDelete(int32_t flags);
@@ -201,7 +225,6 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) WidgetRepaint();
     AM2_Widget * __attribute__((thiscall)) HudCmdConstruct();
     AM2_Widget * __attribute__((thiscall)) HudEdgeConstruct();
-    AM2_Widget * __attribute__((thiscall)) WidgetConstruct();
     AM2_Widget * __attribute__((thiscall)) LabelConstruct(const char *text, int32_t x, int32_t y, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t paper);
     void __attribute__((thiscall)) WidgetScreenRect();
     void __attribute__((thiscall)) LabelDraw(RECT clip);
@@ -230,7 +253,6 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) BattleNameConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) CommPanelConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) SelectPlayerConstruct(const char *bmp);
-    AM2_Widget * __attribute__((thiscall)) PanelConstruct(const char *bmp, int32_t flag, AM2_Rect box);
     AM2_Widget * __attribute__((thiscall)) KeyRowConstruct(int32_t nameIndex, const char *caption, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t ink2, int32_t ink3, int32_t ink4);
     AM2_Widget * __attribute__((thiscall)) ScreenBaseConstruct(const char *bmp, int32_t flag);
     AM2_Widget * __attribute__((thiscall)) ButtonConstruct(const char *b0, const char *b1, const char *b2, int32_t flag, AM2_Rect box, void (__cdecl *onLeft)(AM2_Widget *), void (__cdecl *onRight)(AM2_Widget *));
@@ -292,17 +314,58 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) MoviesDestruct();
     AM2_Widget * __attribute__((thiscall)) SaveListDelete(int32_t flags);
     void __attribute__((thiscall)) SaveListDestruct();
+    /* The ROOT of the original's widget classes: a real constructor
+     * (0x00453B00) and destructor (0x00453BC0), so every class built on it
+     * gets them implicitly, with the /GX unwind states that come with them.
+     * The AM2_NoInit overload constructs nothing: it is for classes that
+     * still forward to an old construct function, which builds the base
+     * itself. */
+    AM2_Widget();
+    struct AM2_NoInit { };
+    explicit AM2_Widget(AM2_NoInit) { }
+#ifdef AM2_POLYMORPHIC
+    virtual ~AM2_Widget();
+#else
+    ~AM2_Widget();
+#endif
 #if defined(__GNUC__)
     /* `new T(...)` on the game's heap. GCC only: under VC6 a `new` must call
-     * the GLOBAL operator new (??2), as every original `new` does. */
+     * the GLOBAL operator new (??2), as every original `new` does -- and a
+     * class-scope operator new of any form would hide it, so placement goes
+     * through the global `::new (p)` in both compilers. */
     static void *operator new(size_t n);
-    static void *operator new(size_t, void *where) { return where; }
     static void operator delete(void *p);
 #endif
 #endif
 } AM2_Widget;
 
 #ifdef __cplusplus
+/* Which original vtable each class's constructor and destructor install --
+ * the compiler's ??_7Class@@6B@ in the polymorphic (relink) build, which
+ * src/vc6/relink.py maps to that address. Expands to nothing. */
+#define AM2_CLASS_VTABLE(Class, VT)
+AM2_CLASS_VTABLE(AM2_Widget, VTABLE_WIDGET_BASE)
+AM2_CLASS_VTABLE(AM2_Panel, VTABLE_PANEL)
+
+/* Installing a constructor or destructor at the original's address. GCC
+ * builds install a thiscall thunk (constructors must answer `this` in eax, as
+ * MSVC's do and the original's callers expect); VC6 never runs install code,
+ * and the byte-match manifest reads AM2_CTOR(C)/AM2_DTOR(C) as C's ??0/??1. */
+#if defined(__GNUC__)
+#define AM2_CTOR(Class) ((const void *)am2_ctor_##Class)
+#define AM2_DTOR(Class) ((const void *)am2_dtor_##Class)
+#else
+#define AM2_CTOR(Class) ((const void *)0)
+#define AM2_DTOR(Class) ((const void *)0)
+#endif
+
+struct AM2_Panel : AM2_Widget {
+    uint8_t pad_AM2_Panel[AM2_PANEL_SIZE - sizeof(AM2_Widget)];
+    AM2_Panel(const char *bmp, int32_t flag, AM2_Rect box);
+    explicit AM2_Panel(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+    ~AM2_Panel();
+};
+
 /* Screen classes, as the original's C++ had them: `new T(bmp)` allocates
  * with the global operator new and calls T's constructor, all inside the /GX
  * unwind frame the original's openers carry. Each constructor here forwards
@@ -611,7 +674,7 @@ typedef AM2_Widget *(__attribute__((thiscall)) *AM2_WidgetDeleteFn)(
  * Children are freed; the widget itself is not. That is the deleting
  * destructor's job and it is the caller who decides. */
 static inline void __attribute__((thiscall)) WidgetDestruct(AM2_Widget *w)
-{ w->WidgetDestruct(); }
+{ w->AM2_Widget::~AM2_Widget(); }
 
 /* Original: 0x00453BA0, thiscall, slot 0 of the base class. */
 static inline AM2_Widget * __attribute__((thiscall)) WidgetDelete(AM2_Widget *w, int32_t flags)
@@ -750,7 +813,7 @@ static inline AM2_Widget * __attribute__((thiscall)) HudCmdConstruct(AM2_Widget 
 { return w->HudCmdConstruct(); }
 
 static inline AM2_Widget * __attribute__((thiscall)) WidgetConstruct(AM2_Widget *w)
-{ return w->WidgetConstruct(); }
+{ return ::new (w) AM2_Widget(); }
 
 /* Original: 0x00454E70, thiscall. The label's constructor: base first, then
  * its own four fields and the four rectangle components, then place itself.
@@ -779,26 +842,26 @@ typedef void (AM2_Widget::*AM2_WidgetUpdatePmf)();
 typedef void (AM2_Widget::*AM2_WidgetFocusPmf)(int32_t announce);
 typedef void (AM2_Widget::*AM2_WidgetRepaintPmf)();
 static inline AM2_Widget *WidgetVDelete(AM2_Widget *w, int32_t flags)
-{ return (w->*((AM2_WidgetDeletePmf *)w->vtable)[WIDGET_VSLOT_DTOR])(flags); }
+{ return (w->*((AM2_WidgetDeletePmf *)AM2_VTBL(w))[WIDGET_VSLOT_DTOR])(flags); }
 static inline void WidgetVPaint(AM2_Widget *w, RECT clip)
-{ (w->*((AM2_WidgetPaintPmf *)w->vtable)[WIDGET_VSLOT_PAINT])(clip); }
+{ (w->*((AM2_WidgetPaintPmf *)AM2_VTBL(w))[WIDGET_VSLOT_PAINT])(clip); }
 static inline void WidgetVUpdate(AM2_Widget *w)
-{ (w->*((AM2_WidgetUpdatePmf *)w->vtable)[WIDGET_VSLOT_UPDATE])(); }
+{ (w->*((AM2_WidgetUpdatePmf *)AM2_VTBL(w))[WIDGET_VSLOT_UPDATE])(); }
 static inline void WidgetVFocus(AM2_Widget *w, int32_t announce)
-{ (w->*((AM2_WidgetFocusPmf *)w->vtable)[WIDGET_VSLOT_FOCUS])(announce); }
+{ (w->*((AM2_WidgetFocusPmf *)AM2_VTBL(w))[WIDGET_VSLOT_FOCUS])(announce); }
 static inline void WidgetVRepaint(AM2_Widget *w)
-{ (w->*((AM2_WidgetRepaintPmf *)w->vtable)[WIDGET_VSLOT_REPAINT])(); }
+{ (w->*((AM2_WidgetRepaintPmf *)AM2_VTBL(w))[WIDGET_VSLOT_REPAINT])(); }
 #else
 static inline AM2_Widget *WidgetVDelete(AM2_Widget *w, int32_t flags)
-{ return ((AM2_WidgetDeleteFn *)w->vtable)[WIDGET_VSLOT_DTOR](w, flags); }
+{ return ((AM2_WidgetDeleteFn *)AM2_VTBL(w))[WIDGET_VSLOT_DTOR](w, flags); }
 static inline void WidgetVPaint(AM2_Widget *w, RECT clip)
-{ ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, clip); }
+{ ((AM2_WidgetPaintFn *)AM2_VTBL(w))[WIDGET_VSLOT_PAINT](w, clip); }
 static inline void WidgetVUpdate(AM2_Widget *w)
-{ ((AM2_WidgetUpdateFn *)w->vtable)[WIDGET_VSLOT_UPDATE](w); }
+{ ((AM2_WidgetUpdateFn *)AM2_VTBL(w))[WIDGET_VSLOT_UPDATE](w); }
 static inline void WidgetVFocus(AM2_Widget *w, int32_t announce)
-{ ((AM2_WidgetFocusFn *)w->vtable)[WIDGET_VSLOT_FOCUS](w, announce); }
+{ ((AM2_WidgetFocusFn *)AM2_VTBL(w))[WIDGET_VSLOT_FOCUS](w, announce); }
 static inline void WidgetVRepaint(AM2_Widget *w)
-{ ((AM2_WidgetRepaintFn *)w->vtable)[WIDGET_VSLOT_REPAINT](w); }
+{ ((AM2_WidgetRepaintFn *)AM2_VTBL(w))[WIDGET_VSLOT_REPAINT](w); }
 #endif
 
 /* Original: 0x00453C40, thiscall. The base painter, and what 18 of the 33
@@ -1614,7 +1677,7 @@ static inline void __attribute__((thiscall)) ButtonPaint(AM2_Widget *w, RECT cli
  *
  * Neither SEH prologue is reproduced; see CLAUDE.md. */
 static inline void __attribute__((thiscall)) IconDestruct(AM2_Widget *w)
-{ w->IconDestruct(); }
+{ ((AM2_Panel *)w)->AM2_Panel::~AM2_Panel(); }
 static inline AM2_Widget * __attribute__((thiscall)) IconDelete(AM2_Widget *w, int32_t flags)
 { return w->IconDelete(flags); }
 static inline void __attribute__((thiscall)) BlinkerDestruct(AM2_Widget *w)
@@ -1909,7 +1972,7 @@ static inline AM2_Widget * __attribute__((thiscall)) SelectPlayerConstruct(AM2_W
  * screens hang everything else off. It keeps the sprite twice, at 0x0038 and
  * 0x0058; see widget.cpp. */
 static inline AM2_Widget * __attribute__((thiscall)) PanelConstruct(AM2_Widget *w, const char *bmp, int32_t flag, AM2_Rect box)
-{ return w->PanelConstruct(bmp, flag, box); }
+{ return ::new (w) AM2_Panel(bmp, flag, box); }
 
 /* Original: 0x00450C50, thiscall, `ret 0x2C`. The key-capture ROW. It passes
  * an UNINITIALISED byte to the label constructor as the ink, which is the
@@ -2221,12 +2284,7 @@ static inline AM2_Widget * __attribute__((thiscall)) MpDialogDelete(AM2_Widget *
 { return w->MpDialogDelete(flags); }
 static inline void __attribute__((thiscall)) MpPanelPaint(AM2_Widget *w, RECT clip)
 { w->MpPanelPaint(clip); }
-/* C++ linkage: a caller's /GX unwind state is reset before a call that may
- * throw, and under /EHsc an extern "C" callee is assumed not to. */
-#ifdef __cplusplus
-extern "C++"
-#endif
-void __cdecl RefreshMapSelection(void);
+AM2_CXX void __cdecl RefreshMapSelection(void);  /* C++: see AM2_CXX */
 
 /* The save-game family's buttons: 0x00451AC0, 0x00452010, 0x00451F10,
  * 0x00450180 and 0x00451FB0. */
