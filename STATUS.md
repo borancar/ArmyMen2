@@ -66,10 +66,44 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 627 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 686 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
-  layout. What moved it from 510 to 606:
+  layout, 627 before the widget classes. What moved it from 627 to 686:
+  - **The widget layer is real C++ now, class by class.** Widget, Panel,
+    ScreenBase, Label, ButtonBase, Button, Arrow, CheckBox, ListBox, TextList,
+    ArrowBar, ScrollBar, Edit and MpSpin are classes: constructors build their
+    base in the mem-initializer, destructors end in the compiler's base call,
+    and `new T(...)` is `new`. Under `AM2_RELINK` they are polymorphic and
+    `AM2_CLASS_VTABLE` maps each `??_7` to the original's vtable; GCC keeps
+    the explicit vtable field and installs through `am2_ctor_`/`am2_dtor_`
+    thunks. Still to convert: the HUD classes, Typer, MultiSprite, Blinker,
+    MpName/MpColour/MpTeam, and every screen (their `AM2_XScreen` classes
+    still forward to the old construct functions).
+  - **VC6 drops a constructor's unwind frame for a callee DEFINED EARLIER IN
+    THE SAME TU that cannot throw** -- and only then. So definition order
+    matters (the original's is its address order), and the converse is
+    evidence about the original's files: MpSpin's `new AM2_Edit` keeps an
+    unwind state in the original, so the Edit constructor (0x00454C10) was in
+    a different source file from MpSpin (0x00456300). Ours are one TU, which
+    is why MpSpin cannot match yet.
+  - **Rectangles pass by value.** Label, Button, CheckBox, ListBox, Edit,
+    ArrowBar, ScrollBar and MpSpin take `AM2_Rect box` where we had four
+    ints -- the same stack ABI, visible as `lea r, [esi+4]` and four stores.
+  - **Each .bss global is its own symbol in the relink build**
+    (`src/vc6/relinkos.py`): as members of one `am2_origstate` struct VC6
+    loaded a byte global as `mov eax,[g]; and eax,0xFF`; the original's lone
+    global is `xor eax,eax; mov al,[g]`. The `aim_*` members stay on the
+    struct -- the original walked them as one object.
+  - **A real bug:** a spinner's edit was given the caller's commit handler
+    where the original gives it `SpinCommit`, so typing into a multiplayer
+    spinner skipped the parse and clamp and called the handler with the
+    edit rather than the spinner.
+  - **A VC6 quirk:** a base mem-initializer fails with C2437 ("already
+    initialized") when the constructor is the class's first member; a class
+    with no fields of its own (TextList) leads with a typedef.
+
+  What moved it from 510 to 606:
   - **Harness fixes.** Data symbols resolve from the native placed build's own
     symbol table (placement lays each at its original VA). `AM2_SA` stand-ins
     map to the `ADDR_` they replace. References into a function's own jump
@@ -105,7 +139,7 @@ main result so far (details in `src/vc6/README.md`):
     original calls `GetTickCount`, and `StateEnter3` did the same.
     `Ticks` uses the performance counter, so stamps and readers could be on
     different clocks.
-  - **The next big lever is the C++ object model: 95 functions.** 95 of the
+  - **The C++ object model: 95 functions** (conversion under way, above). 95 of the
     diffs have, in the original, the `/GX` unwind frame (`push -1; push
     handler; mov eax, fs:[0]`): 42 widget constructors, 25 `Open*` screen
     openers, and 28 destructors and builders. A scratch prototype reproduces
