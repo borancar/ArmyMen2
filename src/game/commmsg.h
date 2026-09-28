@@ -23,11 +23,9 @@ int32_t __cdecl UidObjKind(uint32_t uid);
  * -- and it returns the slot's own INDEX FIELD rather than the loop counter.
  * The two agree in every state driven so far; the original reads the stored
  * one. */
-int32_t __attribute__((thiscall)) CommFindPlayer(void *comm, int32_t dpid);
 
 /* Original: 0x0040F920, thiscall. Is the army owning this uid still playing?
  * Army 4 is neutral and answers yes without touching the object. */
-int32_t __attribute__((thiscall)) ArmyInPlay(void *comm, uint32_t uid);
 
 /* 0x0044CC90 and 0x0044C960, two arms of the trooper dispatcher: kind 0x16 is
  * a batch of variable-length sub-records, kind 0x18 a (trooper, weapon) pair

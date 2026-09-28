@@ -24,6 +24,7 @@
  */
 
 #include "../gameproc.h"
+#include "../pmf.h"
 #include "../map.h"      /* the level table -- reconstructed */
 #include "widget.h"   /* ListAdd */
 #include "dplay.h"
@@ -98,21 +99,18 @@ static inline LPDIRECTPLAY4A *DirectPlaySlot(void *comm)
 }
 
 /* All defined further down; called from here. */
-int32_t __attribute__((thiscall)) CommOnConnected(void *self);
-int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm);
-int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
-                                                   HANDLE event, void *data,
-                                                   DWORD length);
 
-int32_t __attribute__((thiscall)) CommCreateDirectPlay(void *comm, void *connection)
+int32_t __attribute__((thiscall)) AM2_Comm::CommCreateDirectPlay(void *connection)
 {
+    void *comm = this;
+
     LPDIRECTPLAY4A *slot = DirectPlaySlot(comm);
     HRESULT         hr;
 
     /* Whatever is there now goes first; creating a second one over the top
      * would leak the interface and the socket underneath it. */
     if (*slot)
-        CommDropDirectPlay(comm);
+        ::CommDropDirectPlay(comm);
 
     hr = CoCreateInstance(kCLSID_DirectPlay, NULL, CLSCTX_INPROC_SERVER,
                           kIID_IDirectPlay4A, (LPVOID *)slot);
@@ -126,7 +124,7 @@ int32_t __attribute__((thiscall)) CommCreateDirectPlay(void *comm, void *connect
         hr = IDirectPlayX_InitializeConnection(*slot, connection, 0);
         if (hr != S_OK)
             return 0;
-        CommOnConnected(comm);
+        ::CommOnConnected(comm);
     }
     return 1;
 }
@@ -199,9 +197,10 @@ int32_t __cdecl CommClose(void)
     return IDirectPlayX_Close(dp) == DP_OK;
 }
 
-int32_t __attribute__((thiscall)) CommInitializeConnection(void *comm,
-                                                           void *connection)
+int32_t __attribute__((thiscall)) AM2_Comm::CommInitializeConnection(void *connection)
 {
+    void *comm = this;
+
     LPDIRECTPLAY4A dp = *DirectPlaySlot(comm);
 
     /* No object, so nothing to point anywhere -- and the original answers 0
@@ -216,9 +215,10 @@ int32_t __attribute__((thiscall)) CommInitializeConnection(void *comm,
     return 1;
 }
 
-int32_t __attribute__((thiscall)) CommSetSessionDesc(void *comm, void *desc,
-                                                     uint32_t flags)
+int32_t __attribute__((thiscall)) AM2_Comm::CommSetSessionDesc(void *desc, uint32_t flags)
 {
+    void *comm = this;
+
     LPDIRECTPLAY4A dp = *DirectPlaySlot(comm);
 
     if (!dp)
@@ -233,8 +233,10 @@ static_assert((uint32_t)DPERR_BUFFERTOOSMALL == 0x8877001Eu,
               "DPERR_BUFFERTOOSMALL");
 
 
-int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm)
+int32_t __attribute__((thiscall)) AM2_Comm::CommGetSessionDesc()
 {
+    void *comm = this;
+
     LPDIRECTPLAY4A dp   = *DirectPlaySlot(comm);
     void         **slot = (void **)((uint8_t *)comm + COMM_OFF_SESSION_DESC);
     DWORD          size;
@@ -449,11 +451,13 @@ int32_t __cdecl CommRegisterSelf(uint32_t id)
  * can drive, which is exactly why the distinction has to be preserved rather
  * than tidied.
  */
-int32_t __attribute__((thiscall)) CommRemovePlayer(void *self, int32_t id)
+int32_t __attribute__((thiscall)) AM2_Comm::CommRemovePlayer(int32_t id)
 {
+    void *self = this;
+
     uint8_t *me = (uint8_t *)self;
     uint8_t *comm;
-    int32_t  slot = CommPlayerSlot(self, id);
+    int32_t  slot = ::CommPlayerSlot(self, id);
     int32_t  index;
     int32_t  n;
 
@@ -518,8 +522,10 @@ int32_t __attribute__((thiscall)) CommRemovePlayer(void *self, int32_t id)
     return 1;
 }
 
-void *__attribute__((thiscall)) CommConstruct(void *comm)
+void * __attribute__((thiscall)) AM2_Comm::CommConstruct()
 {
+    void *comm = this;
+
     uint8_t *self = (uint8_t *)comm;
     uint32_t now;
     int32_t  i;
@@ -552,7 +558,7 @@ void *__attribute__((thiscall)) CommConstruct(void *comm)
     comm_u32(self, 0x408) = now;
     comm_u32(self, 0x004) = 0;
     comm_u32(self, 0x410) = 0x400;
-    CommResetStats(comm);
+    ::CommResetStats(comm);
 
     /* The one key the game ever touches. Created, never read. */
     RegCreateKeyExA(HKEY_LOCAL_MACHINE, "Software\\The 3DO Company\\Army Men II",
@@ -582,11 +588,13 @@ void *__attribute__((thiscall)) CommConstruct(void *comm)
     return comm;
 }
 
-void __attribute__((thiscall)) CommDestruct(void *comm)
+void __attribute__((thiscall)) AM2_Comm::CommDestruct()
 {
+    void *comm = this;
+
     uint8_t *self = (uint8_t *)comm;
 
-    CommDropDirectPlay(comm);
+    ::CommDropDirectPlay(comm);
     CommShutdown();
     comm_u32(self, 0x3DC) = 0;
     comm_u32(self, 0x404) = 0;
@@ -770,8 +778,10 @@ BOOL FAR PASCAL EnumSessionsCb(LPCDPSESSIONDESC2 lpThisSD, LPDWORD lpdwTimeOut,
 /* lpContext for both enumerations is the game window; see orig.h. */
 #define g_enumContext  (*(void **)(uintptr_t)ADDR_HWND)
 
-int32_t __attribute__((thiscall)) CommEnumSessions(void *comm, void *list)
+int32_t __attribute__((thiscall)) AM2_Comm::CommEnumSessions(void *list)
 {
+    void *comm = this;
+
     DPSESSIONDESC2  desc;
     LPDIRECTPLAY4A  dp;
     const GUID     *app;
@@ -883,8 +893,10 @@ BOOL FAR PASCAL EnumConnectionsCb(LPCGUID lpguidSP, LPVOID lpConnection,
 }
 
 
-int32_t __attribute__((thiscall)) CommEnumConnections(void *comm, void *list)
+int32_t __attribute__((thiscall)) AM2_Comm::CommEnumConnections(void *list)
 {
+    void *comm = this;
+
     LPDIRECTPLAY4A dp = *DirectPlaySlot(comm);
     const GUID    *app;
     HRESULT        hr;
@@ -942,10 +954,10 @@ typedef void (__cdecl *am2_set_flags_fn)(uint32_t bits);
 
 /* 0x046C -- WndProc forwards this one to the original. */
 #define AM2_WM_COMM_SEND_FAILED 0x046Cu
-int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
-                                           uint32_t flags, void *data,
-                                           uint32_t size)
+int32_t __attribute__((thiscall)) AM2_Comm::CommSend(uint32_t idTo, uint32_t flags, void *data, uint32_t size)
 {
+    void *comm = this;
+
     uint8_t       *self = (uint8_t *)comm;
     LPDIRECTPLAY4A dp   = *DirectPlaySlot(comm);
     uint32_t       at, i, n;
@@ -1050,8 +1062,10 @@ typedef int32_t (__cdecl *am2_msg_free_fn)(void *list);
 
 #define AM2_MAX_PLAYERS 4
 
-int32_t __attribute__((thiscall)) CommOpenSession(void *self, const char *name)
+int32_t __attribute__((thiscall)) AM2_Comm::CommOpenSession(const char *name)
 {
+    void *self = this;
+
     uint8_t        *comm = g_commObject;
     DPSESSIONDESC2  desc;
     LPDIRECTPLAY4A  dp;
@@ -1128,8 +1142,10 @@ static_assert(DPCAPS_GUARANTEEDSUPPORTED == 0x40, "DPCAPS_GUARANTEEDSUPPORTED");
 
 #define g_commDebug(self) comm_u32((uint8_t *)(self), COMM_OFF_VERBOSE)
 
-int32_t __attribute__((thiscall)) CommOnConnected(void *self)
+int32_t __attribute__((thiscall)) AM2_Comm::CommOnConnected()
 {
+    void *self = this;
+
     LPDIRECTPLAY4A dp   = *DirectPlaySlot(self);
     uint8_t       *comm = g_commObject;
     LPDPCAPS       caps = (LPDPCAPS)(comm + COMM_OFF_CAPS);
@@ -1188,8 +1204,10 @@ int32_t __attribute__((thiscall)) CommOnConnected(void *self)
  * Returns 0 always, which every caller ignores. */
 #define g_noBuffersLatch       (*(int32_t *)(uintptr_t)ADDR_COMM_NO_BUFFERS_LATCH)
 
-int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
+int32_t __attribute__((thiscall)) AM2_Comm::CommDropDirectPlay()
 {
+    void *comm = this;
+
     uint8_t             *self = (uint8_t *)comm;
     LPDIRECTPLAY4A      *dp    = DirectPlaySlot(comm);
     LPDIRECTPLAYLOBBY3A *lobby =
@@ -1314,8 +1332,10 @@ static void LobbyGiveUp(uint8_t *self)
     }
 }
 
-int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
+int32_t __attribute__((thiscall)) AM2_Comm::CommLobbyStart()
 {
+    void *comm = this;
+
     uint8_t             *self  = (uint8_t *)comm;
     LPDIRECTPLAYLOBBY3A *lobby = (LPDIRECTPLAYLOBBY3A *)(self + COMM_OFF_LOBBY);
     uint8_t             *shared;
@@ -1417,13 +1437,13 @@ int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
 
     if (!comm_u32(g_commObject, COMM_OFF_IS_HOST)) {
         /* A slave has to be told how many players there are. */
-        CommGetSessionDesc(g_commObject);
+        ::CommGetSessionDesc(g_commObject);
         comm_u32(g_commObject, COMM_OFF_PLAYER_COUNT) =
             ((LPDPSESSIONDESC2)*(void **)(g_commObject + COMM_OFF_SESSION_DESC))
                 ->dwCurrentPlayers;
     }
 
-    if (CommCreatePlayer(g_commObject, playerName, NULL, NULL, 0) < 0)
+    if (::CommCreatePlayer(g_commObject, playerName, NULL, NULL, 0) < 0)
         return 0;
 
     orig_log((const char *)(uintptr_t)
@@ -1468,10 +1488,13 @@ static_assert(sizeof(DPNAME) == 0x10, "DPNAME");
 typedef void (__cdecl *am2_register_self_fn)(DPID id);
 #define g_defaultPlayerEvent (*(HANDLE *)(uintptr_t)ADDR_DEFAULT_PLAYER_EVT)
 
-int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
-                                                   HANDLE event, void *data,
-                                                   DWORD length)
+int32_t __attribute__((thiscall)) AM2_Comm::CommCreatePlayer(const char *name,
+                                                             void *event_, void *data,
+                                                             uint32_t length_)
 {
+    void  *comm   = this;
+    HANDLE event  = (HANDLE)event_;
+    DWORD  length = (DWORD)length_;
     uint8_t        *self   = (uint8_t *)comm;
     uint8_t        *shared = g_commObject;
     LPDIRECTPLAY4A  dp;
@@ -1548,10 +1571,15 @@ int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
  * Finally, flow control. If the message list has more than 300 entries free and
  * the paused bit is set, it is cleared and the fact logged -- the counterpart
  * of whatever set it when the list filled up. */
-int32_t __attribute__((thiscall)) CommReceive(void *comm, DPID *from, DPID *to,
-                                              DWORD flags, void *data,
-                                              DWORD *size)
+int32_t __attribute__((thiscall)) AM2_Comm::CommReceive(uint32_t *from_, uint32_t *to_,
+                                                        uint32_t flags_, void *data,
+                                                        uint32_t *size_)
 {
+    void  *comm  = this;
+    DPID  *from  = (DPID *)from_;
+    DPID  *to    = (DPID *)to_;
+    DWORD  flags = (DWORD)flags_;
+    DWORD *size  = (DWORD *)size_;
     uint8_t        *self = (uint8_t *)comm;
     LPDIRECTPLAY4A  dp   = *DirectPlaySlot(comm);
     uint8_t        *shared;
@@ -1577,7 +1605,7 @@ int32_t __attribute__((thiscall)) CommReceive(void *comm, DPID *from, DPID *to,
         at = 0;
     comm_u32(self, COMM_OFF_RX_INDEX) = at;
 
-    slot = CommSlotOfId(comm, *from);
+    slot = ::CommSlotOfId(comm, *from);
 
     /* Type 0x0B is the acknowledgement: it wipes the outstanding count. */
     if (*(uint32_t *)data == COMM_MSG_TYPE_ACK)
@@ -1631,8 +1659,10 @@ int32_t __attribute__((thiscall)) CommReceive(void *comm, DPID *from, DPID *to,
  * records the current player count in the hosting slot. CommOpenSession puts
  * the host's slot index in dwUser1, so a zero there means the host did not say
  * -- and the player count is what is used instead. */
-int32_t __attribute__((thiscall)) CommJoinSession(void *comm, const GUID *instance)
+int32_t __attribute__((thiscall)) AM2_Comm::CommJoinSession(const void *instance_)
 {
+    void       *comm     = this;
+    const GUID *instance = (const GUID *)instance_;
     uint8_t         *self = (uint8_t *)comm;
     LPDIRECTPLAY4A   dp   = *DirectPlaySlot(comm);
     DPSESSIONDESC2   desc;
@@ -1656,7 +1686,7 @@ int32_t __attribute__((thiscall)) CommJoinSession(void *comm, const GUID *instan
         return 0;
     }
 
-    if (!CommGetSessionDesc(comm))
+    if (!::CommGetSessionDesc(comm))
         return 0;
 
     {
@@ -1689,8 +1719,10 @@ static_assert(DPLSYS_SETPROPERTY == 5, "DPLSYS_SETPROPERTY");
 static_assert(DPL_NOCONFIRMATION == 0, "DPL_NOCONFIRMATION");
 static_assert(sizeof(DPLMSG_SETPROPERTY) == 0x30, "DPLMSG_SETPROPERTY");
 
-int32_t __attribute__((thiscall)) CommSendLobbyProperty(void *comm, uint32_t value)
+int32_t __attribute__((thiscall)) AM2_Comm::CommSendLobbyProperty(uint32_t value)
 {
+    void *comm = this;
+
     uint8_t             *self = (uint8_t *)comm;
     LPDIRECTPLAYLOBBY3A  lobby;
     DPLMSG_SETPROPERTY   msg;
@@ -2124,8 +2156,10 @@ typedef void (__cdecl *AM2_StatLogFn)(const char *fmt, ...);
  * function has NO side effects at all -- it reads fields and logs -- so its
  * entire observable output is those four lines, and a session that reached
  * them would compare them exactly through the harness's log capture. */
-void __attribute__((thiscall)) CommReportStats(void *comm)
+void __attribute__((thiscall)) AM2_Comm::CommReportStats()
 {
+    void *comm = this;
+
     const uint8_t *c = (const uint8_t *)comm;
     uint32_t       secs;
 
@@ -2241,8 +2275,10 @@ void __cdecl CommNoBuffers(void)
  * Its counter is NOT blind -- one of the three callers is still original -- and
  * it read 0 on the multiplayer drive anyway, so a probe was used rather than a
  * guess: it fires once, during comm setup, on the mpoptions path. */
-void __attribute__((thiscall)) CommResetStats(void *comm)
+void __attribute__((thiscall)) AM2_Comm::CommResetStats()
 {
+    void *comm = this;
+
     uint8_t *c   = (uint8_t *)comm;
     uint32_t now = Ticks();
     int32_t  i;
@@ -2271,26 +2307,34 @@ void __attribute__((thiscall)) CommResetStats(void *comm)
     *(int32_t *)(c + COMM_OFF_RX_BW_OVER)      = 0;
 }
 
-void __attribute__((thiscall)) CommSessionOver(void *comm)
+void __attribute__((thiscall)) AM2_Comm::CommSessionOver()
 {
-    CommSendLobbyProperty(comm, 1);
+    void *comm = this;
+
+    ::CommSendLobbyProperty(comm, 1);
 }
 
-int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id)
+int32_t __attribute__((thiscall)) AM2_Comm::CommPlayerSlot(uint32_t id)
 {
-    return CommSlotOfId(comm, id);
+    void *comm = this;
+
+    return ::CommSlotOfId(comm, id);
 }
 
-int32_t __attribute__((thiscall)) CommDropSession(void *comm)
+int32_t __attribute__((thiscall)) AM2_Comm::CommDropSession()
 {
+    void *comm = this;
+
     *(int32_t *)(g_commObject + COMM_OFF_MSGS_ENABLED) = 0;
-    return CommDropDirectPlay(comm);
+    return ::CommDropDirectPlay(comm);
 }
 
 #define COMM_OFF_PLAYER_COUNT 0x3D0u
 
-int32_t __attribute__((thiscall)) CommSlotOfId(void *comm, uint32_t id)
+int32_t __attribute__((thiscall)) AM2_Comm::CommSlotOfId(uint32_t id)
 {
+    void *comm = this;
+
     const uint8_t *p = g_commObject + AM2_PLAYER_ID;
     int32_t        n = *(const int32_t *)(g_commObject + COMM_OFF_PLAYER_COUNT);
     int32_t        i;
@@ -2351,9 +2395,11 @@ void __cdecl PacketSlotReset(uint32_t slot)
  * The property send itself declines unless the comm object is lobbied, is the
  * host, and has a lobby interface -- three tests, all inside the callee -- so
  * this forwards unconditionally and lets that decide. */
-void __attribute__((thiscall)) CommPublishResult(void *comm)
+void __attribute__((thiscall)) AM2_Comm::CommPublishResult()
 {
-    CommSendLobbyProperty(comm, AM2_COMM_PROPERTY_RESULT);
+    void *comm = this;
+
+    ::CommSendLobbyProperty(comm, AM2_COMM_PROPERTY_RESULT);
 }
 
 
@@ -2380,8 +2426,10 @@ void __attribute__((thiscall)) CommPublishResult(void *comm)
  *
  * Verified by reading, and behind the same wall as CommReportStats: its one
  * caller needs a live session with a peer. */
-int32_t __attribute__((thiscall)) CommRecentTotal(void *comm)
+int32_t __attribute__((thiscall)) AM2_Comm::CommRecentTotal()
 {
+    void *comm = this;
+
     const uint8_t *c     = (const uint8_t *)comm;
     uint32_t       now   = GetTickCount();
     int32_t        total = 0;
@@ -2488,8 +2536,10 @@ void __cdecl OnLobbySlave(void)
 typedef int32_t (__attribute__((thiscall)) *am2_comm_remove_fn)(void *comm,
                                                                 int32_t id);
 
-void __attribute__((thiscall)) CommReopenSession(void *comm)
+void __attribute__((thiscall)) AM2_Comm::CommReopenSession()
 {
+    void *comm = this;
+
     uint8_t *c = (uint8_t *)comm;
     int32_t  i;
 
@@ -2499,7 +2549,7 @@ void __attribute__((thiscall)) CommReopenSession(void *comm)
 
         if (id == -1) {
             /* No step: the slot is looked at again. See above. */
-            CommRemovePlayer(comm, id);
+            ::CommRemovePlayer(comm, id);
             continue;
         }
         i++;
@@ -2509,14 +2559,14 @@ void __attribute__((thiscall)) CommReopenSession(void *comm)
         && *(const uint32_t *)(c + COMM_OFF_PLAYER_COUNT) < AM2_COMM_SLOTS) {
         void *desc;
 
-        CommGetSessionDesc(comm);
+        ::CommGetSessionDesc(comm);
 
         desc = *(void **)(c + COMM_OFF_SESSION_DESC);
         if (desc) {
             *(uint32_t *)((uint8_t *)desc + AM2_DPSESSION_OFF_FLAGS)
                 &= ~(uint32_t)AM2_SESSION_FLAGS_START;
 
-            if (CommSetSessionDesc(comm, desc, 0) < 0)
+            if (::CommSetSessionDesc(comm, desc, 0) < 0)
                 orig_log("Set Session Failed to reopen Session\n");
         }
     }
@@ -2749,8 +2799,10 @@ int32_t __cdecl MsgListTakeFlags(void *list, void *dst)
  *
  * `ret 4` on a thiscall: one stack argument, `this` in ecx.
  */
-int32_t __attribute__((thiscall)) CommPlayerLeft(void *comm, int32_t id)
+int32_t __attribute__((thiscall)) AM2_Comm::CommPlayerLeft(int32_t id)
 {
+    void *comm = this;
+
     uint8_t *c = (uint8_t *)comm;
     int32_t  slot;
 
@@ -2761,11 +2813,11 @@ int32_t __attribute__((thiscall)) CommPlayerLeft(void *comm, int32_t id)
 
     DestroyFlow((uint32_t)id);
 
-    slot = CommPlayerSlot(c, id);
+    slot = ::CommPlayerSlot(c, id);
 
     *(int32_t *)(c + (size_t)slot * COMM_PLAYER_STRIDE + AM2_PLAYER_ID) = -1;
 
-    CommClearSlotRemote(c, slot);
+    ::CommClearSlotRemote(c, slot);
 
     switch (slot) {
     case 0:
@@ -3839,20 +3891,20 @@ int dplay_install(void)
 
     rc |= patch_replace(ADDR_COMM_SYSTEM_MSG, (const void *)CommSystemMessage,
                         "CommSystemMessage", 1);
-    rc |= patch_replace(ADDR_COMM_CREATE_DPLAY, (const void *)CommCreateDirectPlay,
+    rc |= patch_replace(ADDR_COMM_CREATE_DPLAY, pmf_addr(&AM2_Comm::CommCreateDirectPlay),
                         "CommCreateDirectPlay", 1);
     rc |= patch_replace(ADDR_CREATE_LOBBY, (const void *)CreateDirectPlayLobby,
                         "CreateDirectPlayLobby", 1);
     rc |= patch_replace(ADDR_COMM_SHUTDOWN, (const void *)CommShutdown,
                         "CommShutdown", 0);
     rc |= patch_replace(ADDR_COMM_CLOSE, (const void *)CommClose, "CommClose", 0);
-    rc |= patch_replace(ADDR_COMM_INIT_CONN, (const void *)CommInitializeConnection,
+    rc |= patch_replace(ADDR_COMM_INIT_CONN, pmf_addr(&AM2_Comm::CommInitializeConnection),
                         "CommInitializeConnection", 1);
-    rc |= patch_replace(ADDR_COMM_SET_SESSION, (const void *)CommSetSessionDesc,
+    rc |= patch_replace(ADDR_COMM_SET_SESSION, pmf_addr(&AM2_Comm::CommSetSessionDesc),
                         "CommSetSessionDesc", 2);
-    rc |= patch_replace(ADDR_COMM_GET_SESSION, (const void *)CommGetSessionDesc,
+    rc |= patch_replace(ADDR_COMM_GET_SESSION, pmf_addr(&AM2_Comm::CommGetSessionDesc),
                         "CommGetSessionDesc", 0);
-    rc |= patch_replace(ADDR_COMM_REOPEN_SESSION, (const void *)CommReopenSession,
+    rc |= patch_replace(ADDR_COMM_REOPEN_SESSION, pmf_addr(&AM2_Comm::CommReopenSession),
                         "CommReopenSession", 1);
     rc |= patch_replace(ADDR_DUMP_MSG_LIST, (const void *)DumpMsgList,
                         "DumpMsgList", 1);
@@ -3873,7 +3925,7 @@ int dplay_install(void)
                         "SendPlayerMsg", 15);
     rc |= patch_replace(ADDR_MSG_LIST_INSERT, (const void *)MsgListInsert,
                         "MsgListInsert", 1);
-    rc |= patch_replace(ADDR_COMM_PLAYER_LEFT, (const void *)CommPlayerLeft,
+    rc |= patch_replace(ADDR_COMM_PLAYER_LEFT, pmf_addr(&AM2_Comm::CommPlayerLeft),
                         "CommPlayerLeft", 2);
     rc |= patch_replace(ADDR_START_PACKET_THREAD, (const void *)StartPacketThread,
                         "StartPacketThread", 0);
@@ -3895,9 +3947,9 @@ int dplay_install(void)
     rc |= patch_replace(ADDR_COMM_GLOBAL_DTOR,
                         (const void *)CommGlobalDtorThunk,
                         "CommGlobalDtorThunk", 1);
-    rc |= patch_replace(ADDR_COMM_CONSTRUCT, (const void *)CommConstruct,
+    rc |= patch_replace(ADDR_COMM_CONSTRUCT, pmf_addr(&AM2_Comm::CommConstruct),
                         "CommConstruct", 0);
-    rc |= patch_replace(ADDR_COMM_DESTRUCT, (const void *)CommDestruct,
+    rc |= patch_replace(ADDR_COMM_DESTRUCT, pmf_addr(&AM2_Comm::CommDestruct),
                         "CommDestruct", 0);
     rc |= patch_replace(ADDR_ENUM_PLAYERS_CB,
                         (const void *)EnumPlayersCb,
@@ -3908,54 +3960,54 @@ int dplay_install(void)
     rc |= patch_replace(ADDR_ENUM_CONNECTIONS_CB,
                         (const void *)EnumConnectionsCb,
                         "EnumConnectionsCb", 6);
-    rc |= patch_replace(ADDR_COMM_ENUM_SESSIONS, (const void *)CommEnumSessions,
+    rc |= patch_replace(ADDR_COMM_ENUM_SESSIONS, pmf_addr(&AM2_Comm::CommEnumSessions),
                         "CommEnumSessions", 1);
-    rc |= patch_replace(ADDR_COMM_ENUM_CONNECTIONS, (const void *)CommEnumConnections,
+    rc |= patch_replace(ADDR_COMM_ENUM_CONNECTIONS, pmf_addr(&AM2_Comm::CommEnumConnections),
                         "CommEnumConnections", 1);
     rc |= patch_replace(ADDR_SEND_GAME_START, (const void *)SendGameStartMsg,
                         "SendGameStartMsg", 3);
-    rc |= patch_replace(ADDR_COMM_SEND, (const void *)CommSend, "CommSend", 4);
+    rc |= patch_replace(ADDR_COMM_SEND, pmf_addr(&AM2_Comm::CommSend), "CommSend", 4);
     rc |= patch_replace(ADDR_COMM_REMOVE_PLAYER,
-                        (const void *)CommRemovePlayer,
+                        pmf_addr(&AM2_Comm::CommRemovePlayer),
                         "CommRemovePlayer", 3);
     rc |= patch_replace(ADDR_COMM_REGISTER_SELF,
                         (const void *)CommRegisterSelf,
                         "CommRegisterSelf", 5);
-    rc |= patch_replace(ADDR_COMM_OPEN_SESSION, (const void *)CommOpenSession,
+    rc |= patch_replace(ADDR_COMM_OPEN_SESSION, pmf_addr(&AM2_Comm::CommOpenSession),
                         "CommOpenSession", 1);
-    rc |= patch_replace(ADDR_COMM_CONNECTED, (const void *)CommOnConnected,
+    rc |= patch_replace(ADDR_COMM_CONNECTED, pmf_addr(&AM2_Comm::CommOnConnected),
                         "CommOnConnected", 0);
-    rc |= patch_replace(ADDR_COMM_DROP_DPLAY, (const void *)CommDropDirectPlay,
+    rc |= patch_replace(ADDR_COMM_DROP_DPLAY, pmf_addr(&AM2_Comm::CommDropDirectPlay),
                         "CommDropDirectPlay", 0);
-    rc |= patch_replace(ADDR_COMM_LOBBY_START, (const void *)CommLobbyStart,
+    rc |= patch_replace(ADDR_COMM_LOBBY_START, pmf_addr(&AM2_Comm::CommLobbyStart),
                         "CommLobbyStart", 0);
-    rc |= patch_replace(ADDR_COMM_JOIN_SESSION, (const void *)CommJoinSession,
+    rc |= patch_replace(ADDR_COMM_JOIN_SESSION, pmf_addr(&AM2_Comm::CommJoinSession),
                         "CommJoinSession", 1);
-    rc |= patch_replace(ADDR_COMM_RECEIVE, (const void *)CommReceive,
+    rc |= patch_replace(ADDR_COMM_RECEIVE, pmf_addr(&AM2_Comm::CommReceive),
                         "CommReceive", 5);
-    rc |= patch_replace(ADDR_COMM_CREATE_PLAYER, (const void *)CommCreatePlayer,
+    rc |= patch_replace(ADDR_COMM_CREATE_PLAYER, pmf_addr(&AM2_Comm::CommCreatePlayer),
                         "CommCreatePlayer", 4);
-    rc |= patch_replace(ADDR_COMM_SLOT_OF_ID, (const void *)CommSlotOfId,
+    rc |= patch_replace(ADDR_COMM_SLOT_OF_ID, pmf_addr(&AM2_Comm::CommSlotOfId),
                         "CommSlotOfId", 2);
-    rc |= patch_replace(ADDR_COMM_PLAYER_SLOT, (const void *)CommPlayerSlot,
+    rc |= patch_replace(ADDR_COMM_PLAYER_SLOT, pmf_addr(&AM2_Comm::CommPlayerSlot),
                         "CommPlayerSlot", 2);
-    rc |= patch_replace(ADDR_COMM_DROP_SESSION, (const void *)CommDropSession,
+    rc |= patch_replace(ADDR_COMM_DROP_SESSION, pmf_addr(&AM2_Comm::CommDropSession),
                         "CommDropSession", 1);
     rc |= patch_replace(ADDR_COMM_MARK_LOBBIED, (const void *)CommMarkLobbied,
                         "CommMarkLobbied", 0);
-    rc |= patch_replace(ADDR_COMM_SESSION_OVER, (const void *)CommSessionOver,
+    rc |= patch_replace(ADDR_COMM_SESSION_OVER, pmf_addr(&AM2_Comm::CommSessionOver),
                         "CommSessionOver", 1);
-    rc |= patch_replace(ADDR_COMM_RESET_STATE, (const void *)CommResetStats,
+    rc |= patch_replace(ADDR_COMM_RESET_STATE, pmf_addr(&AM2_Comm::CommResetStats),
                         "CommResetStats", 3);
-    rc |= patch_replace(ADDR_COMM_REPORT_STATS, (const void *)CommReportStats,
+    rc |= patch_replace(ADDR_COMM_REPORT_STATS, pmf_addr(&AM2_Comm::CommReportStats),
                         "CommReportStats", 3);
     rc |= patch_replace(ADDR_COMM_NO_BUFFERS, (const void *)CommNoBuffers,
                         "CommNoBuffers", 2);
-    rc |= patch_replace(ADDR_COMM_PUBLISH_RESULT, (const void *)CommPublishResult,
+    rc |= patch_replace(ADDR_COMM_PUBLISH_RESULT, pmf_addr(&AM2_Comm::CommPublishResult),
                         "CommPublishResult", 1);
-    rc |= patch_replace(ADDR_COMM_SEND_PROPERTY, (const void *)CommSendLobbyProperty,
+    rc |= patch_replace(ADDR_COMM_SEND_PROPERTY, pmf_addr(&AM2_Comm::CommSendLobbyProperty),
                         "CommSendLobbyProperty", 1);
-    rc |= patch_replace(ADDR_COMM_RECENT_TOTAL, (const void *)CommRecentTotal,
+    rc |= patch_replace(ADDR_COMM_RECENT_TOTAL, pmf_addr(&AM2_Comm::CommRecentTotal),
                         "CommRecentTotal", 1);
     rc |= patch_replace(ADDR_ON_LOBBY_SLAVE, (const void *)OnLobbySlave,
                         "OnLobbySlave", 2);

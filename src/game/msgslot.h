@@ -503,7 +503,96 @@ struct AM2_Comm {
     int32_t __attribute__((thiscall)) CommAllPlayersReady();
     /* defined in army.cpp */
     int32_t __attribute__((thiscall)) AllyFlag(int32_t a, int32_t b);
+    int32_t __attribute__((thiscall)) ArmyInPlay(uint32_t uid);
+    void * __attribute__((thiscall)) CommConstruct();
+    int32_t __attribute__((thiscall)) CommCreateDirectPlay(void *connection);
+    void __attribute__((thiscall)) CommDestruct();
+    int32_t __attribute__((thiscall)) CommDropDirectPlay();
+    int32_t __attribute__((thiscall)) CommDropSession();
+    int32_t __attribute__((thiscall)) CommEnumConnections(void *list);
+    int32_t __attribute__((thiscall)) CommEnumSessions(void *list);
+    int32_t __attribute__((thiscall)) CommFindPlayer(int32_t dpid);
+    int32_t __attribute__((thiscall)) CommGetSessionDesc();
+    int32_t __attribute__((thiscall)) CommInitializeConnection(void *connection);
+    int32_t __attribute__((thiscall)) CommLobbyStart();
+    int32_t __attribute__((thiscall)) CommOnConnected();
+    int32_t __attribute__((thiscall)) CommOpenSession(const char *name);
+    int32_t __attribute__((thiscall)) CommPlayerLeft(int32_t id);
+    int32_t __attribute__((thiscall)) CommPlayerSlot(uint32_t id);
+    void __attribute__((thiscall)) CommPublishResult();
+    int32_t __attribute__((thiscall)) CommRecentTotal();
+    int32_t __attribute__((thiscall)) CommRemovePlayer(int32_t id);
+    void __attribute__((thiscall)) CommReopenSession();
+    void __attribute__((thiscall)) CommReportStats();
+    void __attribute__((thiscall)) CommResetStats();
+    int32_t __attribute__((thiscall)) CommSend(uint32_t idTo, uint32_t flags, void *data, uint32_t size);
+    int32_t __attribute__((thiscall)) CommSendLobbyProperty(uint32_t value);
+    void __attribute__((thiscall)) CommSessionOver();
+    int32_t __attribute__((thiscall)) CommSetSessionDesc(void *desc, uint32_t flags);
+    int32_t __attribute__((thiscall)) CommSlotOfId(uint32_t id);
+    /* Win32-typed in dplay.h's forwarders; flat here (GUID * / HANDLE /
+     * DWORD / DPID * are pointer- or 32-bit-sized), cast back in the bodies. */
+    int32_t __attribute__((thiscall)) CommJoinSession(const void *instance);
+    int32_t __attribute__((thiscall)) CommCreatePlayer(const char *name, void *event,
+                                                       void *data, uint32_t length);
+    int32_t __attribute__((thiscall)) CommReceive(uint32_t *from, uint32_t *to,
+                                                  uint32_t flags, void *data,
+                                                  uint32_t *size);
 };
+static inline int32_t __attribute__((thiscall)) ArmyInPlay(void *comm, uint32_t uid)
+{ return ((AM2_Comm *)comm)->ArmyInPlay(uid); }
+static inline void * __attribute__((thiscall)) CommConstruct(void *comm)
+{ return ((AM2_Comm *)comm)->CommConstruct(); }
+static inline int32_t __attribute__((thiscall)) CommCreateDirectPlay(void *comm, void *connection)
+{ return ((AM2_Comm *)comm)->CommCreateDirectPlay(connection); }
+static inline void __attribute__((thiscall)) CommDestruct(void *comm)
+{ ((AM2_Comm *)comm)->CommDestruct(); }
+static inline int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm)
+{ return ((AM2_Comm *)comm)->CommDropDirectPlay(); }
+static inline int32_t __attribute__((thiscall)) CommDropSession(void *comm)
+{ return ((AM2_Comm *)comm)->CommDropSession(); }
+static inline int32_t __attribute__((thiscall)) CommEnumConnections(void *comm, void *list)
+{ return ((AM2_Comm *)comm)->CommEnumConnections(list); }
+static inline int32_t __attribute__((thiscall)) CommEnumSessions(void *comm, void *list)
+{ return ((AM2_Comm *)comm)->CommEnumSessions(list); }
+static inline int32_t __attribute__((thiscall)) CommFindPlayer(void *comm, int32_t dpid)
+{ return ((AM2_Comm *)comm)->CommFindPlayer(dpid); }
+static inline int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm)
+{ return ((AM2_Comm *)comm)->CommGetSessionDesc(); }
+static inline int32_t __attribute__((thiscall)) CommInitializeConnection(void *comm, void *connection)
+{ return ((AM2_Comm *)comm)->CommInitializeConnection(connection); }
+static inline int32_t __attribute__((thiscall)) CommLobbyStart(void *comm)
+{ return ((AM2_Comm *)comm)->CommLobbyStart(); }
+static inline int32_t __attribute__((thiscall)) CommOnConnected(void *self)
+{ return ((AM2_Comm *)self)->CommOnConnected(); }
+static inline int32_t __attribute__((thiscall)) CommOpenSession(void *self, const char *name)
+{ return ((AM2_Comm *)self)->CommOpenSession(name); }
+static inline int32_t __attribute__((thiscall)) CommPlayerLeft(void *comm, int32_t id)
+{ return ((AM2_Comm *)comm)->CommPlayerLeft(id); }
+static inline int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id)
+{ return ((AM2_Comm *)comm)->CommPlayerSlot(id); }
+static inline void __attribute__((thiscall)) CommPublishResult(void *comm)
+{ ((AM2_Comm *)comm)->CommPublishResult(); }
+static inline int32_t __attribute__((thiscall)) CommRecentTotal(void *comm)
+{ return ((AM2_Comm *)comm)->CommRecentTotal(); }
+static inline int32_t __attribute__((thiscall)) CommRemovePlayer(void *self, int32_t id)
+{ return ((AM2_Comm *)self)->CommRemovePlayer(id); }
+static inline void __attribute__((thiscall)) CommReopenSession(void *comm)
+{ ((AM2_Comm *)comm)->CommReopenSession(); }
+static inline void __attribute__((thiscall)) CommReportStats(void *comm)
+{ ((AM2_Comm *)comm)->CommReportStats(); }
+static inline void __attribute__((thiscall)) CommResetStats(void *comm)
+{ ((AM2_Comm *)comm)->CommResetStats(); }
+static inline int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo, uint32_t flags, void *data, uint32_t size)
+{ return ((AM2_Comm *)comm)->CommSend(idTo, flags, data, size); }
+static inline int32_t __attribute__((thiscall)) CommSendLobbyProperty(void *comm, uint32_t value)
+{ return ((AM2_Comm *)comm)->CommSendLobbyProperty(value); }
+static inline void __attribute__((thiscall)) CommSessionOver(void *comm)
+{ ((AM2_Comm *)comm)->CommSessionOver(); }
+static inline int32_t __attribute__((thiscall)) CommSetSessionDesc(void *comm, void *desc, uint32_t flags)
+{ return ((AM2_Comm *)comm)->CommSetSessionDesc(desc, flags); }
+static inline int32_t __attribute__((thiscall)) CommSlotOfId(void *comm, uint32_t id)
+{ return ((AM2_Comm *)comm)->CommSlotOfId(id); }
 static inline void CommSetSlotRemote(void *comm, int32_t slot)
 { ((AM2_Comm *)comm)->CommSetSlotRemote(slot); }
 static inline void CommClearSlotRemote(void *comm, int32_t slot)

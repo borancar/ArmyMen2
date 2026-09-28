@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "../../inject/orig.h"
+#include "../msgslot.h"
 #include "../../inject/win32.h"
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
@@ -34,7 +35,6 @@ void __cdecl DumpMsgList(void *list);
  * connection -- initialises it and runs the connected hook. Returns 1 on
  * success, 0 on any failure. A null connection is not an error: it creates the
  * object and stops there, which is what enumerating providers wants. */
-int32_t __attribute__((thiscall)) CommCreateDirectPlay(void *comm, void *connection);
 
 /* Original: 0x0040DDD0. Create the IDirectPlayLobby3A. stdcall, one argument.
  *
@@ -58,8 +58,6 @@ int32_t __cdecl CommClose(void);
  *
  * The same InitializeConnection CommCreateDirectPlay makes, reached separately
  * for a session that already has an object. Names the failure in the log. */
-int32_t __attribute__((thiscall)) CommInitializeConnection(void *comm,
-                                                           void *connection);
 
 /* It lives HERE and not in msgslot.cpp because it calls three comm methods
  * that do -- and msgslot.cpp is in the selftest link, which does not pull in
@@ -87,8 +85,6 @@ int32_t __attribute__((thiscall)) CommInitializeConnection(void *comm,
 void __cdecl SendGameStartMsg(void);
 
 /* Original: 0x0040E630. Set the session description. */
-int32_t __attribute__((thiscall)) CommSetSessionDesc(void *comm, void *desc,
-                                                     uint32_t flags);
 
 /* Original: 0x0040E5A0. Fetch the current session description into the comm
  * object, replacing whatever was there.
@@ -96,19 +92,18 @@ int32_t __attribute__((thiscall)) CommSetSessionDesc(void *comm, void *desc,
  * Asked for twice on purpose: DirectPlay will not say how large the description
  * is except by refusing to write it, so the first call passes no buffer and
  * reads the size out of the complaint. Returns 1 on success. */
-int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm);
 
 /* 0x0040E7B0. Join the session with this instance GUID. Declared here for the
  * first time -- it was defined in dplay.cpp and used only there until the
  * battle browser's OK needed it. */
-int32_t __attribute__((thiscall)) CommJoinSession(void *comm,
-                                                  const GUID *instance);
+static inline int32_t __attribute__((thiscall)) CommJoinSession(void *comm,
+                                                                const GUID *instance)
+{ return ((AM2_Comm *)comm)->CommJoinSession((const void *)instance); }
 
 /* Original: 0x0040FA00, one caller -- ShowMpResult, which tail-jumps to it.
  * Put a finished game back in the lobby: drop the departed players, clear
  * DPSESSION_NEWPLAYERSDISABLED and DPSESSION_JOINDISABLED, reset the ready
  * flags and empty the menu message log. */
-void __attribute__((thiscall)) CommReopenSession(void *comm);
 
 /* Original: 0x0040DB80 and 0x0040DCC0, thiscall on the single global comm
  * object. The game's entire registry surface lives in these two: the key is
@@ -124,8 +119,6 @@ void __cdecl CommGlobalDtorThunk(void);
 /* 0x0040DB60. Register the comm teardown with the CRT's atexit. */
 int32_t __cdecl CommGlobalAtExit(void);
 
-void *__attribute__((thiscall)) CommConstruct(void *comm);
-void  __attribute__((thiscall)) CommDestruct(void *comm);
 
 /* Original: 0x0040E3B0, thiscall. Enumerate the DirectPlay sessions matching
  * the game's application GUID, into the object the caller supplies.
@@ -134,25 +127,23 @@ void  __attribute__((thiscall)) CommDestruct(void *comm);
  * so it asks for every Army Men II session on the transport. Answers non-zero
  * when the request was accepted, which is not the same as any session having
  * been found; the callback at 0x0040E280 does the finding. */
-int32_t __attribute__((thiscall)) CommEnumSessions(void *comm, void *list);
 
 /* Original: 0x0040E530, thiscall. List the DirectPlay service providers that
  * can carry this game, as menu rows, with "Play Against Computer Only" always
  * appended last. The callback drops the two dead matchmaking services. */
-int32_t __attribute__((thiscall)) CommEnumConnections(void *comm, void *list);
 
 /* Original: 0x0040DFC0, thiscall. Create the DirectPlay session -- START A WAR.
  *
  * DPOPEN_CREATE, host migration on, four players, named by whatever the player
  * typed. A local game skips the whole thing and reports success, because there
  * is no session to make. */
-int32_t __attribute__((thiscall)) CommOpenSession(void *self, const char *name);
 
 /* Original: 0x0040DE10. Create the local player in the open session and record
  * its DPID. Declared here now that HostBattle calls it directly. */
-int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
-                                                   HANDLE event, void *data,
-                                                   DWORD length);
+static inline int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
+                                                                 HANDLE event, void *data,
+                                                                 DWORD length)
+{ return ((AM2_Comm *)comm)->CommCreatePlayer(name, (void *)event, data, (uint32_t)length); }
 
 /* Original: 0x0040EA40, thiscall. Give the DirectPlay connection back.
  *
@@ -162,7 +153,6 @@ int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, const char *name,
  * rather than inside it, so it outlives the slots that name it.
  *
  * Returns 0 always; every caller ignores it. */
-int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm);
 
 /* Original: 0x0040E660, thiscall. Ask the provider what it can carry and trim
  * the comm object's buffer sizes to fit.
@@ -170,7 +160,6 @@ int32_t __attribute__((thiscall)) CommDropDirectPlay(void *comm);
  * UNREACHABLE in this build: its only caller is CommCreateDirectPlay's
  * `if (connection)` branch, and the one call to that passes a literal 0. See
  * dplay.cpp. */
-int32_t __attribute__((thiscall)) CommOnConnected(void *self);
 
 /* Original: 0x0040E200. Empty the four player slots and ask DirectPlay to
  * enumerate the session's players into them. Answers 1 on DP_OK. */
@@ -194,14 +183,12 @@ void __cdecl EventClose(void *holder);
 
 /* 0x0040ED10, thiscall. StartIntro brings the lobby up before deciding
  * anything, with the comm object already in ecx from the field it just read. */
-int32_t __attribute__((thiscall)) CommLobbyStart(void *comm);
 
 /* 0x0040F130 and 0x0040FB70, one caller each and both named in orig.h before
  * they were written. The first sets the lobby flag at comm+0x404; the second
  * is a thiscall that tail-calls CommSendLobbyProperty with 1, which is the
  * value that says the session is over. */
 void __cdecl CommMarkLobbied(void);
-void __attribute__((thiscall)) CommSessionOver(void *comm);
 
 /* 0x0040F380, thiscall. Clears the four 30-sample traffic rings and the six
  * bandwidth counters, and restarts the window they are measured over. The two
@@ -210,22 +197,18 @@ void __attribute__((thiscall)) CommSessionOver(void *comm);
  * latch is the point: buffers run out repeatedly once they run out at all. */
 void __cdecl CommNoBuffers(void);
 
-void __attribute__((thiscall)) CommResetStats(void *comm);
 
 /* 0x0040F400. Prints the four statistics lines CommResetStats clears. Each
  * line is gated on its own denominator; nothing prints when nothing moved. */
-void __attribute__((thiscall)) CommReportStats(void *comm);
 
 /* 0x00411C20. Time a silent player out, or discover the host has gone. */
 void __cdecl CheckPlayerTimeout(void);
 
 /* 0x0040FB80. Eight bytes: forwards to CommSendLobbyProperty with id 2. */
-void __attribute__((thiscall)) CommPublishResult(void *comm);
 
 /* 0x0040F320, six callers, sixteen bytes: a thiscall that pushes its one
  * argument and tail-calls 0x0040F160, which is thiscall too and so already has
  * the object in ecx. A pass-through under a second name. */
-int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id);
 
 /* 0x0040F140, three callers -- CommMarkLobbied's counterpart. Clear the same
  * field and tail-jump to CommDropDirectPlay.
@@ -234,7 +217,6 @@ int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id);
  * call sites load ecx with the comm object first, and the tail jump hands it
  * on. The store still goes through the GLOBAL rather than through `this` --
  * the same object either way, and reproduced as written. */
-int32_t __attribute__((thiscall)) CommDropSession(void *comm);
 
 /* 0x0040F160, 15 callers -- what CommPlayerSlot forwards to. The slot holding
  * this DirectPlay id, or 0.
@@ -242,10 +224,8 @@ int32_t __attribute__((thiscall)) CommDropSession(void *comm);
  * THISCALL by its `ret 4`, and it ignores `this` entirely: it loads the comm
  * object from the global instead, which is the same shape CommDropSession has.
  * Not found and slot 0 share an answer, as they do in CommSlotForArmy. */
-int32_t __attribute__((thiscall)) CommSlotOfId(void *comm, uint32_t id);
 
 /* 0x0040F520, thiscall. A windowed sum over the thirty rate slots. */
-int32_t __attribute__((thiscall)) CommRecentTotal(void *comm);
 
 /* 0x00410F70, two callers. Fetch the session description, log it when the comm
  * object is verbose, publish the player count and enumerate. */
@@ -308,12 +288,16 @@ void *__cdecl MsgListInsert(void *list, void *node);
 
 /* 0x0040F790, two callers. Take a departed player out: drop it, clear its
  * slot, release the three pause reasons it held, mark its army ready. */
-int32_t __attribute__((thiscall)) CommPlayerLeft(void *comm, int32_t id);
 
 /* 0x0040F640, three callers. Take a player out of the comm object: drop the
  * count, tell the packet layer, close the gap in the record array by copying
  * eleven named fields down a slot, and stamp the six fields that record who
  * went. Always answers 1. */
-int32_t __attribute__((thiscall)) CommRemovePlayer(void *self, int32_t id);
+
+static inline int32_t __attribute__((thiscall)) CommReceive(void *comm, DPID *from, DPID *to,
+                                                            DWORD flags, void *data,
+                                                            DWORD *size)
+{ return ((AM2_Comm *)comm)->CommReceive((uint32_t *)from, (uint32_t *)to,
+                                         (uint32_t)flags, data, (uint32_t *)size); }
 
 #endif /* AM2_DPLAY_H */

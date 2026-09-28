@@ -23,6 +23,7 @@
 #include <string.h>
 
 #include "commmsg.h"
+#include "pmf.h"
 #include "msgslot.h"   /* FindPlayerById */
 #include "gameproc.h"  /* RequestState -- reconstructed */
 #include "item.h"      /* UidOnWire, UidArmy -- reconstructed */
@@ -82,9 +83,6 @@ extern "C" {
  * a void *, so it declares here for exactly the reason the other four do. */
 void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
                                int32_t to);
-int32_t __attribute__((thiscall)) CommSlotOfId(void *comm, uint32_t id);
-int32_t __attribute__((thiscall)) CommGetSessionDesc(void *comm);
-int32_t __attribute__((thiscall)) CommPlayerSlot(void *comm, uint32_t id);
 /* A fourth, and cdecl rather than thiscall -- it registers a DirectPlay id
  * into the player-record table and takes no comm object at all. */
 int32_t __cdecl CommRegisterSelf(uint32_t id);
@@ -888,8 +886,10 @@ typedef void (__cdecl *AM2_RawLogFn)(const void *a, int32_t b, int32_t c);
  * and the original reads the stored one, so this does too.
  *
  * -1 when the count is zero or nothing matches. */
-int32_t __attribute__((thiscall)) CommFindPlayer(void *comm, int32_t dpid)
+int32_t __attribute__((thiscall)) AM2_Comm::CommFindPlayer(int32_t dpid)
 {
+    void *comm = this;
+
     const uint8_t *c = (const uint8_t *)comm;
     int32_t        n = *(const int32_t *)(c + COMM_OFF_PLAYER_COUNT);
     int32_t        i;
@@ -907,8 +907,10 @@ int32_t __attribute__((thiscall)) CommFindPlayer(void *comm, int32_t dpid)
  * Army 4 is the neutral one and answers YES without touching the object,
  * which is the same special case CommArmyOfSlot and CommSlotForArmy both
  * carry. Everything else reads the slot's active flag. */
-int32_t __attribute__((thiscall)) ArmyInPlay(void *comm, uint32_t uid)
+int32_t __attribute__((thiscall)) AM2_Comm::ArmyInPlay(uint32_t uid)
 {
+    void *comm = this;
+
     int32_t army = UidArmy((int32_t)UidOnWire(uid));
 
     if (army == AM2_PLAYERS_MAX)
@@ -2422,9 +2424,6 @@ const void *__cdecl TroopSubParse(const void *rec, int32_t army)
  * commmsg.cpp is on the flat side of the split and dplay.h pulls in win32.h --
  * the same reason script.cpp forward-declares PreloadSprite. Its four
  * arguments are exactly four of the delayed node's fields. */
-int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
-                                           uint32_t flags, void *data,
-                                           uint32_t size);
 
 /* And CommRecentTotal beside it, for the same reason: bytes sent in the last
  * 100 ms, which is the only thing the governor below measures.
@@ -2434,8 +2433,7 @@ int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo,
  * declare CommSend at all -- that name's only declaration is the line above,
  * so both sides of it are C++. The linkage has to match the header that
  * exists, not the one next to it. */
-extern "C" int32_t __attribute__((thiscall)) CommRecentTotal(void *comm);
-
+extern "C" 
 /* FlushDelayedSends -- original 0x00402F50, one caller, the frame chain's
  * post-work. It lives here rather than in air.cpp, whose band the image
  * suggests, for two reasons that point the same way: this file already owns
@@ -2748,9 +2746,9 @@ int commmsg_install(void)
                   "RecvVehicleExit", 1);
     patch_replace(ADDR_VEHICLE_TAKE_OUT, (const void *)VehicleTakeOutOccupant,
                   "VehicleTakeOutOccupant", 1);
-    patch_replace(ADDR_COMM_FIND_PLAYER, (const void *)CommFindPlayer,
+    patch_replace(ADDR_COMM_FIND_PLAYER, pmf_addr(&AM2_Comm::CommFindPlayer),
                   "CommFindPlayer", 2);
-    patch_replace(ADDR_ARMY_IN_PLAY, (const void *)ArmyInPlay,
+    patch_replace(ADDR_ARMY_IN_PLAY, pmf_addr(&AM2_Comm::ArmyInPlay),
                   "ArmyInPlay", 2);
     patch_replace(ADDR_UID_OBJ_KIND, (const void *)UidObjKind,
                   "UidObjKind", 1);
