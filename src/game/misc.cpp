@@ -1196,12 +1196,14 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSlotForArmy(int32_t army)
     if (army == 4)
         return 4;
 
-    const uint8_t *p = (const uint8_t *)comm + AM2_PLAYER_ARMY;
+    const uint8_t *p;
+    uint32_t       i;                   /* unsigned: the loop test is `jb` */
 
-    for (int32_t i = 0; i < AM2_PLAYERS_MAX; i++) {
+    /* i before p, and i++ before p's step: the original's order. */
+    for (i = 0, p = (const uint8_t *)comm + AM2_PLAYER_ARMY;
+         i < AM2_PLAYERS_MAX; i++, p += AM2_PLAYER_STRIDE) {
         if (*(const int32_t *)p == army)
-            return i;
-        p += AM2_PLAYER_STRIDE;
+            return (int32_t)i;
     }
     /* No match and slot 0 share an answer. */
     return 0;
@@ -2048,16 +2050,22 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommPlayerId(int32_t slot)
  * where the names come from, so the naming is no better verified than the
  * bodies are.
  */
-static int32_t CommAllPlayersFlagged(void *comm, uint32_t flag)
+/* `inline` is load-bearing: the original has this body at every call site,
+ * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
+ * each caller compiled to push/call/pop -- the relink found it. */
+static inline int32_t CommAllPlayersFlagged(void *comm, uint32_t flag)
 {
-    const uint8_t *rec  = (const uint8_t *)comm + AM2_PLAYER_ID;
+    const uint8_t *rec;
     int32_t        n    = *(const int32_t *)
                               ((const uint8_t *)*(void *const *)
                                    (uintptr_t)ADDR_COMM_OBJECT
                                + COMM_OFF_PLAYER_COUNT);
     int32_t        i;
 
-    for (i = 0; i < n; i++, rec += AM2_PLAYER_STRIDE) {
+    /* The record pointer is set up after the count, inside the loop header:
+     * the original tests the count first. */
+    for (i = 0, rec = (const uint8_t *)comm + AM2_PLAYER_ID; i < n;
+         i++, rec += AM2_PLAYER_STRIDE) {
         int32_t id = *(const int32_t *)rec;
 
         if (id == 0 || id == -1)

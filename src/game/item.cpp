@@ -9002,8 +9002,10 @@ int32_t __cdecl SelectIfOwn(void *obj)
 
     if (!o)
         return 0;
-    if (*(const int8_t *)(o + OBJ_OFF_ARMY)
-        != (int8_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+    /* Sign-extended and compared as an int (`movsx; cmp eax, [owner]`),
+     * not byte against byte. */
+    if ((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
+        != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
         return 0;
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
         return 0;

@@ -3260,8 +3260,8 @@ uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army);
 void __cdecl RecvVehicle1B(void *msg, int32_t army)
 {
     uint8_t       *m   = (uint8_t *)msg;
-    const uint8_t *end = m + *(const uint16_t *)m;
-    uint8_t       *at  = m + 8;
+    uint8_t       *at  = m + 8;                     /* before end, as the */
+    const uint8_t *end = m + *(const uint16_t *)m;  /* original computes  */
 
     while (at < end)
         at = VehicleUpdateApply(at, army);

@@ -386,7 +386,10 @@ void __cdecl UnPauseGame(uint32_t bits)
 }
 
 /* Every comm step in the pre and post is behind the same field. */
-static int32_t CommActive(void)
+/* `inline` is load-bearing: the original has this body at every call site,
+ * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
+ * each caller compiled to push/call/pop -- the relink found it. */
+static inline int32_t CommActive(void)
 {
     return *(const int32_t *)(g_comm + AM2_COMM_OFF_ACTIVE) != 0;
 }
@@ -1295,7 +1298,10 @@ void __cdecl StateEnter3(void)
 
     LatchKeyState();
 
-    *(uint32_t *)(uintptr_t)ADDR_STATE0_TICK   = Ticks();
+    /* GetTickCount itself, not Ticks: the original calls the import here,
+     * so this stamp is milliseconds since boot even where Ticks would use the
+     * performance counter. */
+    *(uint32_t *)(uintptr_t)ADDR_STATE0_TICK   = GetTickCount();
     *(int32_t  *)(uintptr_t)ADDR_STATE_ENTERED = 0;
 }
 
