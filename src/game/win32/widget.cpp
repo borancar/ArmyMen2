@@ -2211,21 +2211,19 @@ AM2_CLASS_DTOR(MpName, VTABLE_MP_NAME, WidgetDestruct)
  * strip. It still has to be reproduced, and the reason is sharper than
  * tidiness: leave the slot set and a handler inside freed memory is what
  * WndProc calls on the next keystroke. */
-void __attribute__((thiscall)) AM2_Widget::HudTopDestruct()
+AM2_HudTop::~AM2_HudTop()
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_HUD_TOP_STRIP));
+    AM2_CTOR_VTABLE(w, VTABLE_HUD_TOP_STRIP);
 
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE0));
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE1));
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE2));
 
     *(void **)(uintptr_t)ADDR_CHAR_HANDLER = (void *)0;
-
-    ::WidgetDestruct(w);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudTopDelete(int32_t flags)
@@ -2240,13 +2238,12 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudTopDelete(int32_t flags)
 
 /* 0x00419360. The right-hand panel -- HUD widget B, the one whose constructor
  * builds the radar, Sarge, squad and commands children. One sprite. */
-void __attribute__((thiscall)) AM2_Widget::HudPanelDestruct()
+AM2_HudPanel::~AM2_HudPanel()
 {
     AM2_Widget *w = this;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_HUD_PANEL));
+    AM2_CTOR_VTABLE(w, VTABLE_HUD_PANEL);
     ReleaseSprite(*(AM2_Sprite **)((uint8_t *)w + HUD_OFF_SPRITE0));
-    ::WidgetDestruct(w);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudPanelDelete(int32_t flags)
@@ -3978,15 +3975,13 @@ void __attribute__((thiscall)) AM2_Widget::CheckboxPaint(RECT clip)
  * The sound is PlaySoundAt with five zeros -- index 0 at the origin -- which
  * is the same call item.cpp already documents as the game's generic click.
  */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::CountButtonConstruct(int32_t index, int32_t army, int32_t x, int32_t y, int32_t cw, int32_t ch, int32_t menuRow, int32_t count, void (__cdecl *onToggle)(AM2_Widget *))
+AM2_CountButton::AM2_CountButton(int32_t index, int32_t army, AM2_Rect box, int32_t menuRow, int32_t count, void (__cdecl *onToggle)(AM2_Widget *))
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
 
-    ::ButtonBaseConstruct(w);
-
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_COUNT_BUTTON));
+    AM2_CTOR_VTABLE(w, VTABLE_COUNT_BUTTON);
 
     *(void **)(self + COUNTBTN_OFF_SPR) =
         PreloadArmySprite(AM2_COUNT_SPRITE_SET, index, army, 0);
@@ -3996,10 +3991,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::CountButtonConstruct(int32_t 
     w->sprite = *(AM2_Sprite **)(self + COUNTBTN_OFF_SPR);
     *(uint8_t *)(self + COUNTBTN_OFF_LIT) = 0;
 
-    w->x = x;
-    w->y = y;
-    w->w = cw;
-    w->h = ch;
+    *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
     ::WidgetScreenRect(w);
 
     *(int32_t *)(self + COUNTBTN_OFF_COUNT) = count;
@@ -4007,7 +3999,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::CountButtonConstruct(int32_t 
     w->activate = CountButtonActivate;
     *(void **)(self + COUNTBTN_OFF_ON_TOGGLE) = (void *)onToggle;
 
-    return w;
 }
 
 void __cdecl CountButtonActivate(AM2_Widget *w)
@@ -4076,18 +4067,16 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::CheckBoxDelete(int32_t flags)
  * original's order, as the other five HUD destructors are.
  *
  * The MSVC SEH prologue is not reproduced -- the standing decision. */
-void __attribute__((thiscall)) AM2_Widget::CountButtonDestruct()
+AM2_CountButton::~AM2_CountButton()
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_COUNT_BUTTON));
+    AM2_CTOR_VTABLE(w, VTABLE_COUNT_BUTTON);
 
     ReleaseSprite(*(AM2_Sprite **)(self + COUNTBTN_OFF_SPR));
     ReleaseSprite(*(AM2_Sprite **)(self + COUNTBTN_OFF_SPR_OFF));
-
-    ::WidgetDestruct(w);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::CountButtonDelete(int32_t flags)
@@ -5480,6 +5469,27 @@ void __attribute__((thiscall)) am2_dtor_AM2_HudEdge(AM2_Widget *w)
 #endif
 
 #if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_CountButton(void *mem, int32_t index, int32_t army, AM2_Rect box, int32_t menuRow, int32_t count, void (__cdecl *onToggle)(AM2_Widget *))
+{ return ::new (mem) AM2_CountButton(index, army, box, menuRow, count, onToggle); }
+void __attribute__((thiscall)) am2_dtor_AM2_CountButton(AM2_Widget *w)
+{ ((AM2_CountButton *)w)->AM2_CountButton::~AM2_CountButton(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_HudPanel(void *mem)
+{ return ::new (mem) AM2_HudPanel(); }
+void __attribute__((thiscall)) am2_dtor_AM2_HudPanel(AM2_Widget *w)
+{ ((AM2_HudPanel *)w)->AM2_HudPanel::~AM2_HudPanel(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_HudTop(void *mem)
+{ return ::new (mem) AM2_HudTop(); }
+void __attribute__((thiscall)) am2_dtor_AM2_HudTop(AM2_Widget *w)
+{ ((AM2_HudTop *)w)->AM2_HudTop::~AM2_HudTop(); }
+#endif
+
+#if defined(__GNUC__)
 /* Install thunks: a constructor at its original address must answer `this`
  * in eax, as MSVC's do and the original's callers expect. */
 AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Widget(void *mem)
@@ -6212,16 +6222,6 @@ static const char *const kBuildStartSprites[3] = {
 /* Make a child of `size`, construct it with `ctor`, and hand it to the
  * parent -- the shape the panel repeats six times. A failed allocation adds
  * a NULL child rather than skipping the call, which is the original's. */
-static AM2_Widget *HudAddChild(AM2_Widget *parent, uint32_t size,
-                               AM2_Widget *(__attribute__((thiscall)) *ctor)(AM2_Widget *))
-{
-    AM2_Widget *c = (AM2_Widget *)orig_operator_new(size);
-
-    c = c ? ctor(c) : (AM2_Widget *)0;
-    WidgetAddChild(parent, c);
-    return c;
-}
-
 /* HudPanelConstruct -- original 0x00418FB0, 905 bytes, thiscall. The HUD
  * panel: the parent every other HUD widget hangs off, and the largest of the
  * six constructors.
@@ -6251,42 +6251,39 @@ static AM2_Widget *HudAddChild(AM2_Widget *parent, uint32_t size,
  * afforded, [0]+0x4C for the edit, [0]+0x44 for the button. The original
  * crashes there and so does this; the alternative is inventing a guard the
  * game does not have. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudPanelConstruct()
+AM2_HudPanel::AM2_HudPanel()
 {
     AM2_Widget *w = this;
 
     uint8_t    *self = (uint8_t *)w;
     AM2_Sprite *spr;
-    int32_t     net = *(const int32_t *)(uintptr_t)ADDR_NET_GAME;
-    int32_t     x;
+    AM2_CTOR_VTABLE(w, VTABLE_HUD_PANEL);
 
-    ::WidgetConstruct(w);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_HUD_PANEL));
-
-    spr = (AM2_Sprite *)PreloadArmySprite(0x0B, 0, net != 0 ? 1 : 0, 1);
+    /* The net-game flag is re-read at each use, as the original does. */
+    spr = (AM2_Sprite *)PreloadArmySprite(0x0B, 0,
+              *(const int32_t *)(uintptr_t)ADDR_NET_GAME ? 1 : 0, 1);
     *(void **)(self + HUD_OFF_SPRITE0) = spr;
     if (!spr)
-        return w;
+        return;
     w->sprite = spr;
 
-    x = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - spr->bounds.right;
-    if (net == 0)
-        x -= AM2_HUD_PANEL_SP_INSET;   /* the inset is SINGLE player's */
-    w->x = x;
+    w->x = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - spr->bounds.right;
+    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME == 0)
+        w->x -= AM2_HUD_PANEL_SP_INSET;   /* the inset is SINGLE player's */
     w->y = AM2_HUD_EDGE_TOP;
     w->w = spr->bounds.right;
     w->h = spr->bounds.bottom;
-    *(int32_t *)(self + HUDPANEL_OFF_STOP) = x;
+    *(int32_t *)(self + HUDPANEL_OFF_STOP) = w->x;
     *(int32_t *)(self + HUDPANEL_OFF_OPEN) = 1;
-    *(int32_t *)(uintptr_t)ADDR_HUD_PANEL_X = x;
+    *(int32_t *)(uintptr_t)ADDR_HUD_PANEL_X = w->x;
 
-    HudAddChild(w, AM2_HUD_RADAR_BYTES, ::HudRadarConstruct);
+    ::WidgetAddChild(w, new AM2_HudRadar);
 
-    if (net == 0) {
-        HudAddChild(w, AM2_HUD_SARGE_BYTES, ::HudSargeConstruct);
-        HudAddChild(w, AM2_HUD_SQUAD_BYTES, ::HudSquadConstruct);
-        HudAddChild(w, AM2_HUD_CMD_BYTES,   ::HudCmdConstruct);
-        return w;
+    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME == 0) {
+        ::WidgetAddChild(w, new AM2_HudSarge);
+        ::WidgetAddChild(w, new AM2_HudSquad);
+        ::WidgetAddChild(w, new AM2_HudCmd);
+        return;
     }
 
     /* The network half, inline rather than factored: it is one contiguous
@@ -6322,14 +6319,9 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudPanelConstruct()
             int32_t kind = *(const int32_t *)(rec + BUILD_MENU_OFF_KIND);
             const int32_t *r = (const int32_t *)rect;
 
-            btn = (AM2_Widget *)orig_operator_new(AM2_COUNT_BUTTON_BYTES);
-            if (btn)
-                /* ARMY is the sprite FRAME and the row is arg7, not the
-                 * other way round -- see the note above the loop. */
-                btn = ::CountButtonConstruct(btn, kind, army,
-                                           r[0], r[1], r[2], r[3],
-                                           i, (int32_t)UnitTypeCost(id),
-                                           BuildOnToggle);
+            /* ARMY is the sprite FRAME and the row is arg7, not the
+            * other way round -- see the note above the loop. */
+            btn = new AM2_CountButton(kind, army, *(const AM2_Rect *)r, i, (int32_t)UnitTypeCost(id), BuildOnToggle);
             ::WidgetAddChild(w, btn);
             *slot = btn;
 
@@ -6346,41 +6338,27 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudPanelConstruct()
         points = (char *)(self + HUDPANEL_OFF_POINTS_TEXT);
         am2_sprintf(points, "%d", *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS);
 
-        btn = (AM2_Widget *)orig_operator_new(AM2_HUD_EDIT_BYTES);
-        if (btn) {
-            /* The edit takes its rectangle as FOUR ints, not a struct. The
-             * original still routes them through RectSet and copies the
-             * result back over the same four pushes, which is why the values
-             * appear twice in the disassembly. */
-            /* Both already named for other users -- the view rect's colour
-             * and the background's. Reused rather than given a third and
-             * fourth spelling; checkpatches refused the aliases. */
-            int32_t ink   = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
-            int32_t paper = *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR;
-
-            btn = ::EditConstruct(btn, points, 0x0C,
-                                0x5A, 0x98, 0x26, 0x0E,
-                                1, ink, ink, paper, 0, 0, 0);
-        }
+        /* The edit takes its rectangle as FOUR ints, not a struct. The
+         * original still routes them through RectSet and copies the
+         * result back over the same four pushes, which is why the values
+         * appear twice in the disassembly. */
+        /* Both already named for other users -- the view rect's colour
+         * and the background's. Reused rather than given a third and
+         * fourth spelling; checkpatches refused the aliases. */
+        btn = new AM2_Edit(points, 0x0C, *RectSet(AM2_TEMP(AM2_Rect), 0x5A, 0x98, 0x26, 0x0E), 1,
+                           *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
+                           *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
+                           *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
+                           (void (__cdecl *)(AM2_Widget *))0, 0, 0);
         *(void **)(self + HUDPANEL_OFF_POINTS_FIELD) = btn;
         *(int32_t *)((uint8_t *)btn + COUNTBTN_OFF_DISABLED) = 1;
         ::WidgetAddChild(w, *(AM2_Widget **)(self + HUDPANEL_OFF_POINTS_FIELD));
 
-        btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
-        if (btn) {
-            AM2_Rect box;
-            RectSet(&box, 0x1F, 0x1A6, 0x51, 0x20);
-            btn = ::ButtonConstruct(btn, kBuildStartSprites[0], kBuildStartSprites[1],
-                                  kBuildStartSprites[2], 1, box,
-                                  (void (__cdecl *)(AM2_Widget *))
-                                      BuildStartHandler,
-                                  (void (__cdecl *)(AM2_Widget *))0);
-        }
+        btn = new AM2_Button(kBuildStartSprites[0], kBuildStartSprites[1], kBuildStartSprites[2], 1, *RectSet(AM2_TEMP(AM2_Rect), 0x1F, 0x1A6, 0x51, 0x20), (void (__cdecl *)(AM2_Widget *)) BuildStartHandler, (void (__cdecl *)(AM2_Widget *))0);
         ::WidgetAddChild(w, btn);
         w->focusedChild = btn;
         *(int32_t *)((uint8_t *)btn + BUTTON_OFF_FLAG44) = 1;
     }
-    return w;
 }
 
 /* HudSquadConstruct -- original 0x00415730, 247 bytes, thiscall. The squad
@@ -6573,38 +6551,34 @@ static const char *const kChatToSprites[4] = {
  * player's slot has a team, which is the same COMM_SLOT_OFF_TEAM test
  * CommTeamScore makes. Otherwise the child pointer is explicitly nulled --
  * not left, nulled, on a path of its own. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudTopConstruct()
+AM2_HudTop::AM2_HudTop()
 {
     AM2_Widget *w = this;
 
     uint8_t    *self = (uint8_t *)w;
     AM2_Sprite *spr;
     int32_t     frame;
-    int32_t     buttonX;
     int32_t     i;
-
-    ::WidgetConstruct(w);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_HUD_TOP_STRIP));
+    AM2_CTOR_VTABLE(w, VTABLE_HUD_TOP_STRIP);
 
     if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME == 0) {
         frame = 0;
-        buttonX = 2;
+        *(int32_t *)(self + HUDLOG_OFF_BUTTON_X) = 2;
     } else {
         frame = 1;
-        buttonX = 0x10;
+        *(int32_t *)(self + HUDLOG_OFF_BUTTON_X) = 0x10;
     }
-    *(int32_t *)(self + HUDLOG_OFF_BUTTON_X) = buttonX;
 
     spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 1, frame, 0);
     *(void **)(self + HUD_OFF_SPRITE0) = spr;
     if (!spr)
-        return w;
+        return;
 
     w->sprite = spr;
 
     *(int32_t *)(self + HUDLOG_OFF_TYPED_Y)  = 3;
-    *(int32_t *)(self + HUDLOG_OFF_TYPED_X)  = buttonX + 0x19;
-    *(int32_t *)(self + HUDLOG_OFF_VIEW_W)   = 0x258 - buttonX;
+    *(int32_t *)(self + HUDLOG_OFF_TYPED_X)  = *(const int32_t *)(self + HUDLOG_OFF_BUTTON_X) + 0x19;
+    *(int32_t *)(self + HUDLOG_OFF_VIEW_W)   = 0x258 - *(const int32_t *)(self + HUDLOG_OFF_BUTTON_X);
     *(int32_t *)(self + HUDLOG_OFF_FIELD_5B4) = 0x0A;
     *(int32_t *)(self + HUDLOG_OFF_TYPING)    = 0;
     *(int32_t *)(self + HUDLOG_OFF_JUST_SENT) = 0;
@@ -6631,12 +6605,12 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudTopConstruct()
     spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 2, 1, 1);
     *(void **)(self + HUDLOG_OFF_SPRITE_DOWN) = spr;
     if (!spr)
-        return w;
+        return;
 
     spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 2, 2, 1);
     *(void **)(self + HUDLOG_OFF_SPRITE_HOT) = spr;
     if (!spr)
-        return w;
+        return;
 
     if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME != 0) {
         const uint8_t *comm = *(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
@@ -6645,20 +6619,18 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudTopConstruct()
         if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
                                + (size_t)me * AM2_COMM_SLOT_STRIDE
                                + COMM_SLOT_OFF_TEAM) != 0) {
-            AM2_Widget *cb = (AM2_Widget *)orig_operator_new(AM2_HUD_CHECKBOX_BYTES);
+            AM2_Widget *cb = new AM2_CheckBox(kChatToSprites[0], kChatToSprites[1],
+                                              kChatToSprites[2], kChatToSprites[3],
+                                              *RectSet(AM2_TEMP(AM2_Rect), 2, 4, 0x0D, 0x0D),
+                                              0, 0, 0);
 
-            if (cb)
-                cb = ::CheckBoxConstruct(cb, kChatToSprites[0], kChatToSprites[1],
-                                       kChatToSprites[2], kChatToSprites[3],
-                                       2, 4, 0x0D, 0x0D, 0, 0, 0);
             *(void **)(self + HUD_A_OFF_CHECKBOX) = cb;
             ::WidgetAddChild(w, cb);
-            return w;
+            return;
         }
     }
 
     *(void **)(self + HUD_A_OFF_CHECKBOX) = 0;
-    return w;
 }
 
 
@@ -6759,34 +6731,25 @@ void __cdecl FreeHudWidgets(void)
  * by 0x00411000 and lowered by the 0x046E handler, which reads more like "we
  * are in multiplayer SETUP" than "this is a network game". Twenty-one sites
  * read it and one caller is not evidence enough to rename it here. */
-typedef void *(__attribute__((thiscall)) *AM2_HudCtorFn)(void *obj);
 typedef void (__cdecl *AM2_NoArgLogFn)(void);
 
 
 
 #define orig_log_noargs   ((AM2_NoArgLogFn)(uintptr_t)ADDR_LOG)
 
-static AM2_Widget *NewHudWidget(uint32_t size, AM2_HudCtorFn ctor)
-{
-    void *obj = orig_operator_new(size);
-
-    return obj ? (AM2_Widget *)ctor(obj) : (AM2_Widget *)0;
-}
-
 void __cdecl BuildHudWidgets(void)
 {
     AM2_Widget *a;
     AM2_Widget *box;
-    int32_t     ticked = 0;
+    int32_t     ticked;
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
-        a = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A;
-        if (a) {
-            box = *(AM2_Widget **)((uint8_t *)a + HUD_A_OFF_CHECKBOX);
-            if (box && *((uint8_t *)box + CHECKBOX_OFF_CHECKED))
-                ticked = 1;
-        }
-    }
+    if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME
+        && (a = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A) != 0
+        && (box = *(AM2_Widget **)((uint8_t *)a + HUD_A_OFF_CHECKBOX)) != 0
+        && *((uint8_t *)box + CHECKBOX_OFF_CHECKED))
+        ticked = 1;
+    else
+        ticked = 0;
 
     FreeHudWidgets();
 
@@ -6800,13 +6763,13 @@ void __cdecl BuildHudWidgets(void)
     }
 
     *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A =
-        NewHudWidget(AM2_HUD_A_BYTES, (AM2_HudCtorFn)HudTopConstruct);
+        new AM2_HudTop;
     *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B =
-        NewHudWidget(AM2_HUD_B_BYTES, (AM2_HudCtorFn)HudPanelConstruct);
+        new AM2_HudPanel;
 
     if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME)
         *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C =
-            NewHudWidget(AM2_HUD_C_BYTES, (AM2_HudCtorFn)HudEdgeConstruct);
+            new AM2_HudEdge;
 
     if (ticked) {
         /* No null test on A -- the original's. */
@@ -15191,12 +15154,12 @@ int widget_install(void)
     rc |= patch_replace(ADDR_CHECKBOX_DELETE, pmf_addr(&AM2_Widget::CheckBoxDelete),
                         "CheckBoxDelete", 1);
     rc |= patch_replace(ADDR_COUNT_BUTTON_DTOR,
-                        pmf_addr(&AM2_Widget::CountButtonDestruct),
+                        AM2_DTOR(AM2_CountButton),
                         "CountButtonDestruct", 1);
     rc |= patch_replace(ADDR_HUD_CMD_INVOKE, pmf_addr(&AM2_Widget::HudCmdInvoke),
                         "HudCmdInvoke", 6);
     rc |= patch_replace(ADDR_HUD_PANEL_CONSTRUCT,
-                        pmf_addr(&AM2_Widget::HudPanelConstruct),
+                        AM2_CTOR(AM2_HudPanel),
                         "HudPanelConstruct", 1);
     rc |= patch_replace(ADDR_HUD_SQUAD_CONSTRUCT,
                         AM2_CTOR(AM2_HudSquad),
@@ -15208,7 +15171,7 @@ int widget_install(void)
                         AM2_CTOR(AM2_HudSarge),
                         "HudSargeConstruct", 1);
     rc |= patch_replace(ADDR_HUD_TOP_CONSTRUCT,
-                        pmf_addr(&AM2_Widget::HudTopConstruct),
+                        AM2_CTOR(AM2_HudTop),
                         "HudTopConstruct", 1);
     rc |= patch_replace(ADDR_HUD_EDGE_CONSTRUCT,
                         AM2_CTOR(AM2_HudEdge),
@@ -15627,7 +15590,7 @@ int widget_install(void)
     rc |= patch_replace(ADDR_COUNT_BUTTON_PAINT, pmf_addr(&AM2_Widget::CountButtonPaint),
                         "CountButtonPaint", 1);
     rc |= patch_replace(ADDR_COUNT_BUTTON_CTOR,
-                        pmf_addr(&AM2_Widget::CountButtonConstruct),
+                        AM2_CTOR(AM2_CountButton),
                         "CountButtonConstruct", 1);
     rc |= patch_replace(ADDR_COUNT_BUTTON_DELETE,
                         pmf_addr(&AM2_Widget::CountButtonDelete),
@@ -15649,12 +15612,12 @@ int widget_install(void)
                         "HudCommandsDestruct", 1);
     rc |= patch_replace(ADDR_HUD_CMD_DELETE, pmf_addr(&AM2_Widget::HudCommandsDelete),
                         "HudCommandsDelete", 1);
-    rc |= patch_replace(ADDR_HUD_TOP_DESTRUCT, pmf_addr(&AM2_Widget::HudTopDestruct),
+    rc |= patch_replace(ADDR_HUD_TOP_DESTRUCT, AM2_DTOR(AM2_HudTop),
                         "HudTopDestruct", 1);
     rc |= patch_replace(ADDR_HUD_TOP_DELETE, pmf_addr(&AM2_Widget::HudTopDelete),
                         "HudTopDelete", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_DESTRUCT,
-                        pmf_addr(&AM2_Widget::HudPanelDestruct),
+                        AM2_DTOR(AM2_HudPanel),
                         "HudPanelDestruct", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_DELETE, pmf_addr(&AM2_Widget::HudPanelDelete),
                         "HudPanelDelete", 1);

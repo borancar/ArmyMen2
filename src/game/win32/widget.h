@@ -197,8 +197,6 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) HudSargeUpdate();
     void __attribute__((thiscall)) TextListPaint(RECT clip);
     void __attribute__((thiscall)) CheckboxPaint(RECT clip);
-    AM2_Widget * __attribute__((thiscall)) CountButtonConstruct(int32_t index, int32_t army, int32_t x, int32_t y, int32_t cw, int32_t ch, int32_t menuRow, int32_t count, void (__cdecl *onToggle)(AM2_Widget *));
-    void __attribute__((thiscall)) CountButtonDestruct();
     AM2_Widget * __attribute__((thiscall)) CountButtonDelete(int32_t flags);
     void __attribute__((thiscall)) CountButtonPaint(RECT clip);
     void __attribute__((thiscall)) MpNamePaint(RECT clip);
@@ -225,8 +223,6 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) DlgSaveListConstruct(const char *bmp, int32_t flag);
     AM2_Widget * __attribute__((thiscall)) DlgOverwriteConstruct(const char *bmp, int32_t flag);
     AM2_Widget * __attribute__((thiscall)) DlgMessageConstruct(const char *bmp, int32_t flag);
-    AM2_Widget * __attribute__((thiscall)) HudPanelConstruct();
-    AM2_Widget * __attribute__((thiscall)) HudTopConstruct();
     AM2_Widget * __attribute__((thiscall)) OptionsMenuConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) WarMenuConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) QuitDialogConstruct(const char *bmp);
@@ -271,12 +267,10 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) HudCommandsDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) HudEdgeDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) HudPanelDelete(int32_t flags);
-    void __attribute__((thiscall)) HudPanelDestruct();
     AM2_Widget * __attribute__((thiscall)) HudRadarDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) HudSargeDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) HudSquadDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) HudTopDelete(int32_t flags);
-    void __attribute__((thiscall)) HudTopDestruct();
     AM2_Widget * __attribute__((thiscall)) MoviesDelete(int32_t flags);
     void __attribute__((thiscall)) MoviesDestruct();
     AM2_Widget * __attribute__((thiscall)) SaveListDelete(int32_t flags);
@@ -341,6 +335,9 @@ AM2_CLASS_VTABLE(AM2_HudSarge, VTABLE_HUD_SARGE)
 AM2_CLASS_VTABLE(AM2_HudSquad, VTABLE_HUD_SQUAD)
 AM2_CLASS_VTABLE(AM2_HudCmd, VTABLE_HUD_COMMANDS)
 AM2_CLASS_VTABLE(AM2_HudEdge, VTABLE_HUD_EDGE_STRIP)
+AM2_CLASS_VTABLE(AM2_CountButton, VTABLE_COUNT_BUTTON)
+AM2_CLASS_VTABLE(AM2_HudPanel, VTABLE_HUD_PANEL)
+AM2_CLASS_VTABLE(AM2_HudTop, VTABLE_HUD_TOP_STRIP)
 
 /* Installing a constructor or destructor at the original's address. GCC
  * builds install a thiscall thunk (constructors must answer `this` in eax, as
@@ -538,6 +535,27 @@ struct AM2_HudEdge : AM2_Widget {
     ~AM2_HudEdge();
 };
 
+struct AM2_CountButton : AM2_ButtonBase {
+    uint8_t pad_AM2_CountButton[AM2_COUNT_BUTTON_BYTES - sizeof(AM2_ButtonBase)];
+    AM2_CountButton(int32_t index, int32_t army, AM2_Rect box, int32_t menuRow, int32_t count, void (__cdecl *onToggle)(AM2_Widget *));
+    explicit AM2_CountButton(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
+    ~AM2_CountButton();
+};
+
+struct AM2_HudPanel : AM2_Widget {
+    uint8_t pad_AM2_HudPanel[AM2_HUD_B_BYTES - sizeof(AM2_Widget)];
+    AM2_HudPanel();
+    explicit AM2_HudPanel(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+    ~AM2_HudPanel();
+};
+
+struct AM2_HudTop : AM2_Widget {
+    uint8_t pad_AM2_HudTop[AM2_HUD_A_BYTES - sizeof(AM2_Widget)];
+    AM2_HudTop();
+    explicit AM2_HudTop(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+    ~AM2_HudTop();
+};
+
 /* Screen classes, as the original's C++ had them: `new T(bmp)` allocates
  * with the global operator new and calls T's constructor, all inside the /GX
  * unwind frame the original's openers carry. Each constructor here forwards
@@ -655,7 +673,7 @@ static inline void __attribute__((thiscall)) HudEdgeDestruct(AM2_Widget *w)
 static inline AM2_Widget * __attribute__((thiscall)) HudPanelDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->HudPanelDelete(flags); }
 static inline void __attribute__((thiscall)) HudPanelDestruct(AM2_Widget *w)
-{ ((AM2_Widget *)w)->HudPanelDestruct(); }
+{ ((AM2_HudPanel *)w)->AM2_HudPanel::~AM2_HudPanel(); }
 static inline AM2_Widget * __attribute__((thiscall)) HudRadarDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->HudRadarDelete(flags); }
 static inline void __attribute__((thiscall)) HudRadarDestruct(AM2_Widget *w)
@@ -671,7 +689,7 @@ static inline void __attribute__((thiscall)) HudSquadDestruct(AM2_Widget *w)
 static inline AM2_Widget * __attribute__((thiscall)) HudTopDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->HudTopDelete(flags); }
 static inline void __attribute__((thiscall)) HudTopDestruct(AM2_Widget *w)
-{ ((AM2_Widget *)w)->HudTopDestruct(); }
+{ ((AM2_HudTop *)w)->AM2_HudTop::~AM2_HudTop(); }
 static inline AM2_Widget * __attribute__((thiscall)) MoviesDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->MoviesDelete(flags); }
 static inline void __attribute__((thiscall)) MoviesDestruct(AM2_Widget *w)
@@ -964,7 +982,7 @@ static inline void __attribute__((thiscall)) HudCmdInvoke(AM2_Widget *w, int32_t
 { w->HudCmdInvoke(mode); }
 
 static inline AM2_Widget * __attribute__((thiscall)) HudPanelConstruct(AM2_Widget *w)
-{ return w->HudPanelConstruct(); }
+{ return ::new (w) AM2_HudPanel(); }
 
 static inline AM2_Widget * __attribute__((thiscall)) HudSquadConstruct(AM2_Widget *w)
 { return ::new (w) AM2_HudSquad(); }
@@ -976,7 +994,7 @@ static inline AM2_Widget * __attribute__((thiscall)) HudSargeConstruct(AM2_Widge
 { return ::new (w) AM2_HudSarge(); }
 
 static inline AM2_Widget * __attribute__((thiscall)) HudTopConstruct(AM2_Widget *w)
-{ return w->HudTopConstruct(); }
+{ return ::new (w) AM2_HudTop(); }
 
 static inline AM2_Widget * __attribute__((thiscall)) HudEdgeConstruct(AM2_Widget *w)
 { return ::new (w) AM2_HudEdge(); }
@@ -1522,7 +1540,7 @@ static inline AM2_Widget * __attribute__((thiscall)) MpNameDelete(AM2_Widget *w,
 /* The count button destructor pair. Delete was written first and reached
  * Destruct through a seam until Destruct itself was reconstructed. */
 static inline void __attribute__((thiscall)) CountButtonDestruct(AM2_Widget *w)
-{ w->CountButtonDestruct(); }
+{ ((AM2_CountButton *)w)->AM2_CountButton::~AM2_CountButton(); }
 
 /* 0x004547C0 and 0x00454740. The checkbox releases four faces. */
 AM2_DECLARE_CLASS_DTOR(CheckBox);
@@ -2315,7 +2333,8 @@ static inline AM2_Widget * __attribute__((thiscall)) ButtonBaseConstruct(AM2_Wid
  * vtable and then fires the optional COUNTBTN_OFF_ON_TOGGLE. In no widget tree
  * this project can dump, so verified by reading. */
 static inline AM2_Widget * __attribute__((thiscall)) CountButtonConstruct(AM2_Widget *w, int32_t index, int32_t army, int32_t x, int32_t y, int32_t cw, int32_t ch, int32_t menuRow, int32_t count, void (__cdecl *onToggle)(AM2_Widget *))
-{ return w->CountButtonConstruct(index, army, x, y, cw, ch, menuRow, count, onToggle); }
+{ AM2_Rect box = { x, y, cw, ch };
+  return ::new (w) AM2_CountButton(index, army, box, menuRow, count, onToggle); }
 void __cdecl CountButtonActivate(AM2_Widget *w);
 static inline AM2_Widget * __attribute__((thiscall)) CountButtonDelete(AM2_Widget *w, int32_t flags)
 { return w->CountButtonDelete(flags); }
@@ -2656,7 +2675,7 @@ void __cdecl FreeHudWidgets(void);
 /* Original: 0x00413480, two callers. The other half: free the three HUD
  * widgets and build three new ones, preserving the checkbox's ticked state
  * across the rebuild when this is not a net game. */
-void __cdecl BuildHudWidgets(void);
+AM2_CXX void __cdecl BuildHudWidgets(void);
 int widget_install(void);
 
 #ifdef __cplusplus
