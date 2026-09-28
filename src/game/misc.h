@@ -88,14 +88,17 @@ static inline void __attribute__((thiscall)) ClearVehicleLists(void *obj)
 struct AM2_Blinker {
     void __attribute__((thiscall)) BlinkerStart(uint32_t periodMs, int32_t flips);
 };
-struct AM2_ArrowBar {
+/* The scroll bar's one method the flat half calls. Not the bar class itself
+ * (win32/widget.h's AM2_ArrowBar, which this half cannot see): `this` is a
+ * bar all the same. */
+struct AM2_ArrowBarOps {
     void __attribute__((thiscall)) ArrowBarFollowEnd();
 };
 static inline void __attribute__((thiscall)) BlinkerStart(void *w, uint32_t periodMs,
                                                           int32_t flips)
 { ((AM2_Blinker *)w)->BlinkerStart(periodMs, flips); }
 static inline void __attribute__((thiscall)) ArrowBarFollowEnd(void *bar)
-{ ((AM2_ArrowBar *)bar)->ArrowBarFollowEnd(); }
+{ ((AM2_ArrowBarOps *)bar)->ArrowBarFollowEnd(); }
 #endif
 
 /* IsBlank and IsScriptDelim moved to script.cpp: 0x0043EE80 and 0x0043EEA0

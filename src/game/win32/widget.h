@@ -133,7 +133,6 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) EditDraw(RECT clip);
     void __attribute__((thiscall)) EditTakeFocus(int32_t announce);
     void __attribute__((thiscall)) EditRepaint();
-    void __attribute__((thiscall)) EditDestruct();
     AM2_Widget * __attribute__((thiscall)) EditDelete(int32_t flags);
     void __attribute__((thiscall)) EditUpdate();
     void __attribute__((thiscall)) WidgetDestructThunk();
@@ -147,7 +146,6 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) WidgetUpdateThunk();
     void __attribute__((thiscall)) MultiUpdateThunk();
     void __attribute__((thiscall)) ScrollBarPaint(RECT clip);
-    void __attribute__((thiscall)) ScrollBarDestruct();
     AM2_Widget * __attribute__((thiscall)) ScrollBarDelete(int32_t flags);
     void __attribute__((thiscall)) ArrowDestruct();
     void __attribute__((thiscall)) TyperPaint(RECT clip);
@@ -248,10 +246,7 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) CommPanelConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) SelectPlayerConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) KeyRowConstruct(int32_t nameIndex, const char *caption, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t ink2, int32_t ink3, int32_t ink4);
-    AM2_Widget * __attribute__((thiscall)) EditConstruct(char *buf, int32_t maxChars, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t inkFocus, int32_t ink, int32_t paper, void (__cdecl *onEnter)(AM2_Widget *), int32_t a, int32_t b);
     AM2_Widget * __attribute__((thiscall)) MultiSpriteConstruct(const char *b0, const char *b1, int32_t flag, AM2_Rect box);
-    AM2_Widget * __attribute__((thiscall)) ScrollBarConstruct(int32_t left, int32_t top, int32_t width, int32_t height, AM2_Widget *parent, int32_t span);
-    AM2_Widget * __attribute__((thiscall)) ArrowBarConstruct(int32_t left, int32_t top, int32_t width, int32_t height, AM2_Widget *parent, const char *b0, const char *b1, int32_t span, int32_t flag50);
     AM2_Widget * __attribute__((thiscall)) TyperConstruct(int32_t left, int32_t top, int32_t width, int32_t height, const char *message);
     void __attribute__((thiscall)) ArrowBarShowRow(int32_t row);
     AM2_Widget * __attribute__((thiscall)) SelectMapConstruct(const char *bmp);
@@ -277,11 +272,9 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) HudSquadUpdate();
     void __attribute__((thiscall)) HudCmdUpdate();
     void __attribute__((thiscall)) HudChatSend();
-    AM2_Widget * __attribute__((thiscall)) MpSpinConstruct(int32_t left, int32_t top, int32_t width, int32_t height, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row);
     AM2_Widget * __attribute__((thiscall)) MpPanelConstruct(const char *bmp);
     void __attribute__((thiscall)) MpPreviewSetBitmap(const char *name);
     AM2_Widget * __attribute__((thiscall)) ArrowBarDelete(int32_t flags);
-    void __attribute__((thiscall)) ArrowBarDestruct();
     AM2_Widget * __attribute__((thiscall)) CheckBoxDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) HudCommandsDelete(int32_t flags);
     void __attribute__((thiscall)) HudCommandsDestruct();
@@ -346,9 +339,14 @@ AM2_CLASS_VTABLE(AM2_ScreenBase, VTABLE_DIALOG)
 AM2_CLASS_VTABLE(AM2_Label, VTABLE_LABEL)
 AM2_CLASS_VTABLE(AM2_ButtonBase, VTABLE_BUTTON_BASE)
 AM2_CLASS_VTABLE(AM2_Button, VTABLE_BUTTON)
+AM2_CLASS_VTABLE(AM2_Arrow, VTABLE_ARROW)
 AM2_CLASS_VTABLE(AM2_CheckBox, VTABLE_CHECKBOX)
 AM2_CLASS_VTABLE(AM2_ListBox, VTABLE_LISTBOX)
 AM2_CLASS_VTABLE(AM2_TextList, VTABLE_TEXT_LIST)
+AM2_CLASS_VTABLE(AM2_ArrowBar, VTABLE_ARROWBAR)
+AM2_CLASS_VTABLE(AM2_ScrollBar, VTABLE_SCROLLBAR)
+AM2_CLASS_VTABLE(AM2_Edit, VTABLE_EDIT)
+AM2_CLASS_VTABLE(AM2_MpSpin, VTABLE_MP_SPIN)
 
 /* Installing a constructor or destructor at the original's address. GCC
  * builds install a thiscall thunk (constructors must answer `this` in eax, as
@@ -399,6 +397,21 @@ struct AM2_Button : AM2_ButtonBase {
     explicit AM2_Button(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
     ~AM2_Button();
 };
+/* A scroll arrow: a Button with no normal-state bitmap, its own vtable and a
+ * pointer back to the bar that owns it. The constructor is inline -- no
+ * arrow constructor exists in the image; each `new` site carries the Button
+ * call, the vtable store and the owner store itself. */
+struct AM2_Arrow : AM2_Button {
+    AM2_Widget *owner;              /* 0x0078  ARROW_OFF_OWNER */
+    AM2_Arrow(AM2_Widget *owner_, AM2_Rect box, const char *b1, const char *b2,
+              void (__cdecl *onLeft)(AM2_Widget *))
+        : AM2_Button((const char *)0, b1, b2, 1, box, onLeft,
+                     (void (__cdecl *)(AM2_Widget *))0)
+    {
+        AM2_CTOR_VTABLE(this, VTABLE_ARROW);
+        owner = owner_;
+    }
+};
 
 struct AM2_CheckBox : AM2_ButtonBase {
     AM2_Sprite *sprOn;              /* 0x0068  CHECKBOX_OFF_SPR_ON */
@@ -434,6 +447,45 @@ struct AM2_TextList : AM2_ListBox {
      * so something has to precede it. */
     typedef AM2_ListBox Base;
     AM2_TextList(AM2_Rect box, void *rows, int32_t callback, int32_t ownsRows);
+};
+
+struct AM2_ArrowBar : AM2_Widget {
+    uint8_t pad_AM2_ArrowBar[AM2_ARROWBAR_SIZE - sizeof(AM2_Widget)];
+    AM2_ArrowBar(AM2_Rect box, AM2_Widget *parent, const char *b0, const char *b1, int32_t span, int32_t flag50);
+    explicit AM2_ArrowBar(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+    ~AM2_ArrowBar();
+};
+
+struct AM2_ScrollBar : AM2_Widget {
+    uint8_t pad_AM2_ScrollBar[AM2_SCROLLBAR_SIZE - sizeof(AM2_Widget)];
+    AM2_ScrollBar(AM2_Rect box, AM2_Widget *parent, int32_t span);
+    explicit AM2_ScrollBar(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+    ~AM2_ScrollBar();
+};
+
+struct AM2_Edit : AM2_Widget {
+    char       *text;               /* 0x0058  EDIT_OFF_TEXT */
+    int32_t     maxChars;           /* 0x005C  EDIT_OFF_MAX */
+    int32_t     font;               /* 0x0060  EDIT_OFF_FONT */
+    uint8_t     inkFocus;           /* 0x0064  EDIT_OFF_INK_FOCUS */
+    uint8_t     ink;                /* 0x0065  EDIT_OFF_INK */
+    uint8_t     paper;              /* 0x0066  EDIT_OFF_PAPER */
+    uint8_t     pad67;
+    const char *charset;            /* 0x0068  EDIT_OFF_CHARSET */
+    int32_t     caret;              /* 0x006C  EDIT_OFF_CARET */
+    int32_t     dot;                /* 0x0070  EDIT_OFF_DOT */
+    void      (__cdecl *onEnter)(AM2_Widget *);   /* 0x0074  EDIT_OFF_ON_ENTER */
+    int32_t     arg78;              /* 0x0078  EDIT_OFF_ARG78 */
+    int32_t     arg7C;              /* 0x007C  EDIT_OFF_ARG7C */
+    AM2_Edit(char *buf, int32_t maxChars, AM2_Rect box, int32_t font, int32_t inkFocus, int32_t ink, int32_t paper, void (__cdecl *onEnter)(AM2_Widget *), int32_t a, int32_t b);
+    explicit AM2_Edit(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+    ~AM2_Edit();
+};
+
+struct AM2_MpSpin : AM2_Widget {
+    uint8_t pad_AM2_MpSpin[AM2_MP_SPIN_SIZE - sizeof(AM2_Widget)];
+    AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row);
+    explicit AM2_MpSpin(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
 };
 
 /* Screen classes, as the original's C++ had them: `new T(bmp)` allocates
@@ -537,7 +589,7 @@ struct AM2_WarMenuScreen : AM2_Widget {
 static inline AM2_Widget * __attribute__((thiscall)) ArrowBarDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->ArrowBarDelete(flags); }
 static inline void __attribute__((thiscall)) ArrowBarDestruct(AM2_Widget *w)
-{ ((AM2_Widget *)w)->ArrowBarDestruct(); }
+{ ((AM2_ArrowBar *)w)->AM2_ArrowBar::~AM2_ArrowBar(); }
 static inline AM2_Widget * __attribute__((thiscall)) CheckBoxDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->CheckBoxDelete(flags); }
 static inline void __attribute__((thiscall)) CheckBoxDestruct(AM2_Widget *w)
@@ -1237,7 +1289,7 @@ static inline void __attribute__((thiscall)) ScrollBarPaint(AM2_Widget *w, RECT 
  * children are not released here: they are children, so the base destructor
  * takes them with the rest of the list. */
 static inline void __attribute__((thiscall)) ScrollBarDestruct(AM2_Widget *w)
-{ w->ScrollBarDestruct(); }
+{ ((AM2_ScrollBar *)w)->AM2_ScrollBar::~AM2_ScrollBar(); }
 static inline AM2_Widget * __attribute__((thiscall)) ScrollBarDelete(AM2_Widget *w, int32_t flags)
 { return w->ScrollBarDelete(flags); }
 
@@ -1360,7 +1412,8 @@ static inline AM2_Widget * __attribute__((thiscall)) DlgSaveListConstruct(AM2_Wi
 /* 0x00456300, thiscall. The SPIN control: two arrows and a numeric edit,
  * all laid out from the widget's own rect. */
 static inline AM2_Widget * __attribute__((thiscall)) MpSpinConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t width, int32_t height, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row)
-{ return w->MpSpinConstruct(left, top, width, height, value, lo, hi, step, parent, commit, c0, c1, c2, row); }
+{ AM2_Rect box = { left, top, width, height };
+  return ::new (w) AM2_MpSpin(box, value, lo, hi, step, parent, commit, c0, c1, c2, row); }
 
 /* 0x00414F20, seven callers. Pick a weapon slot; picking the one already
  * selected DESELECTS instead. */
@@ -1829,7 +1882,7 @@ static inline void __attribute__((thiscall)) EditDraw(AM2_Widget *w, RECT clip)
 static inline AM2_Widget * __attribute__((thiscall)) EditDelete(AM2_Widget *w, int32_t flags)
 { return w->EditDelete(flags); }
 static inline void __attribute__((thiscall)) EditDestruct(AM2_Widget *w)
-{ w->EditDestruct(); }
+{ ((AM2_Edit *)w)->AM2_Edit::~AM2_Edit(); }
 static inline void __attribute__((thiscall)) EditTakeFocus(AM2_Widget *w, int32_t announce)
 { w->EditTakeFocus(announce); }
 static inline void __attribute__((thiscall)) EditRepaint(AM2_Widget *w)
@@ -2071,7 +2124,8 @@ static inline AM2_Widget * __attribute__((thiscall)) ButtonConstruct(AM2_Widget 
  * EDIT_OFF_CHARSET afterwards, which is exactly what ENTER BATTLE NAME does
  * with the letters-and-digits set at 0x00485308. */
 static inline AM2_Widget * __attribute__((thiscall)) EditConstruct(AM2_Widget *w, char *buf, int32_t maxChars, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t inkFocus, int32_t ink, int32_t paper, void (__cdecl *onEnter)(AM2_Widget *), int32_t a, int32_t b)
-{ return w->EditConstruct(buf, maxChars, left, top, width, height, font, inkFocus, ink, paper, onEnter, a, b); }
+{ AM2_Rect box = { left, top, width, height };
+  return ::new (w) AM2_Edit(buf, maxChars, box, font, inkFocus, ink, paper, onEnter, a, b); }
 
 /* Original: 0x00456BC0, thiscall, `ret 0x1C`. The two-sprite widget -- the
  * flashing "send" and "receive" dots. A PANEL underneath, then the SECOND
@@ -2110,14 +2164,16 @@ static inline AM2_Widget * __attribute__((thiscall)) CheckBoxConstruct(AM2_Widge
  * first bitmap and VTABLE_ARROW stamped over the button's, which is the one
  * place the null-bitmap branch is taken. Its RANGE is a literal twenty. */
 static inline AM2_Widget * __attribute__((thiscall)) ScrollBarConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t width, int32_t height, AM2_Widget *parent, int32_t span)
-{ return w->ScrollBarConstruct(left, top, width, height, parent, span); }
+{ AM2_Rect box = { left, top, width, height };
+  return ::new (w) AM2_ScrollBar(box, parent, span); }
 
 /* Original: 0x00455970, thiscall, `ret 0x24` -- nine stack arguments. The
  * VERTICAL bar with arrows: the connection list's and the player list's. The
  * horizontal scroll bar transposed, with the same two-arrows-from-buttons
  * trick. */
 static inline AM2_Widget * __attribute__((thiscall)) ArrowBarConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t width, int32_t height, AM2_Widget *parent, const char *b0, const char *b1, int32_t span, int32_t flag50)
-{ return w->ArrowBarConstruct(left, top, width, height, parent, b0, b1, span, flag50); }
+{ AM2_Rect box = { left, top, width, height };
+  return ::new (w) AM2_ArrowBar(box, parent, b0, b1, span, flag50); }
 
 /* Original: 0x004566F0, thiscall, `ret 0x14`. The TYPEWRITER, and the
  * WORD-WRAP is the constructor: it folds the message into TYPER_OFF_TEXT with

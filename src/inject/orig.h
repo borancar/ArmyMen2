@@ -6368,6 +6368,7 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
 #define ADDR_PANEL_CTOR          0x00454980u /* thiscall w *(w, bmp, f, rect) */
 #define AM2_PANEL_SIZE           0x60u
 #define AM2_LABEL_SIZE           0x64u  /* LabelConstruct's allocation */
+#define AM2_MP_SPIN_SIZE         0x84u  /* MpSpinConstruct's allocation */
 #define ADDR_TYPER_CTOR          0x004566F0u /* thiscall w *(w, rect, msg) */
 #define AM2_TYPER_SIZE           0x464u
 #define ADDR_MULTISPRITE_CTOR    0x00456BC0u /* thiscall w *(w, b0, b1, f, rect) */
