@@ -312,6 +312,94 @@ struct AM2_DifficultyDialog : AM2_Widget {
     uint8_t pad_[AM2_DIFFICULTY_SIZE - sizeof(AM2_Widget)];
     AM2_DifficultyDialog(const char *bmp);
 };
+struct AM2_DlgMessageScreen : AM2_Widget {
+    uint8_t pad_[AM2_MESSAGE_SIZE - sizeof(AM2_Widget)];
+    AM2_DlgMessageScreen(const char *bmp, int32_t flag);
+};
+struct AM2_AudioDialogScreen : AM2_Widget {
+    uint8_t pad_[AM2_AUDIO_OPTIONS_SIZE - sizeof(AM2_Widget)];
+    AM2_AudioDialogScreen(const char *bmp, int32_t flag);
+};
+struct AM2_BattleNameScreen : AM2_Widget {
+    uint8_t pad_[AM2_BATTLE_NAME_SIZE - sizeof(AM2_Widget)];
+    AM2_BattleNameScreen(const char *bmp);
+};
+struct AM2_CommPanelScreen : AM2_Widget {
+    uint8_t pad_[AM2_COMM_PANEL_SIZE - sizeof(AM2_Widget)];
+    AM2_CommPanelScreen(const char *bmp);
+};
+struct AM2_ControlsDialogScreen : AM2_Widget {
+    uint8_t pad_[AM2_CONTROLS_SIZE - sizeof(AM2_Widget)];
+    AM2_ControlsDialogScreen(const char *bmp);
+};
+struct AM2_DelPlayerDialogScreen : AM2_Widget {
+    uint8_t pad_[AM2_DELETE_PLAYER_SIZE - sizeof(AM2_Widget)];
+    AM2_DelPlayerDialogScreen(const char *bmp);
+};
+struct AM2_DeleteGameScreen : AM2_Widget {
+    uint8_t pad_[AM2_DELETE_GAME_SIZE - sizeof(AM2_Widget)];
+    AM2_DeleteGameScreen(const char *bmp, int32_t flag);
+};
+struct AM2_DlgBattleJoinScreen : AM2_Widget {
+    uint8_t pad_[AM2_BATTLE_JOIN_SIZE - sizeof(AM2_Widget)];
+    AM2_DlgBattleJoinScreen(const char *bmp);
+};
+struct AM2_DlgGameMenuScreen : AM2_Widget {
+    uint8_t pad_[AM2_GAMEMENU_SIZE - sizeof(AM2_Widget)];
+    AM2_DlgGameMenuScreen(const char *bmp, int32_t flag);
+};
+struct AM2_DlgOverwriteScreen : AM2_Widget {
+    uint8_t pad_[AM2_OVERWRITE_SIZE - sizeof(AM2_Widget)];
+    AM2_DlgOverwriteScreen(const char *bmp, int32_t flag);
+};
+struct AM2_DlgSaveListScreen : AM2_Widget {
+    uint8_t pad_[AM2_SAVE_LIST_SIZE - sizeof(AM2_Widget)];
+    AM2_DlgSaveListScreen(const char *bmp, int32_t flag);
+};
+struct AM2_EnterNameScreen : AM2_Widget {
+    uint8_t pad_[AM2_ENTER_NAME_SIZE - sizeof(AM2_Widget)];
+    AM2_EnterNameScreen(const char *bmp);
+};
+struct AM2_LoadGameScreen : AM2_Widget {
+    uint8_t pad_[AM2_LOAD_GAME_SIZE - sizeof(AM2_Widget)];
+    AM2_LoadGameScreen(const char *bmp, int32_t flag);
+};
+struct AM2_MoviesScreen : AM2_Widget {
+    uint8_t pad_[AM2_MOVIES_SIZE - sizeof(AM2_Widget)];
+    AM2_MoviesScreen(const char *bmp);
+};
+struct AM2_MpOptionsScreen : AM2_Widget {
+    uint8_t pad_[AM2_MP_OPTIONS_SIZE - sizeof(AM2_Widget)];
+    AM2_MpOptionsScreen(const char *bmp);
+};
+struct AM2_MpPanelScreen : AM2_Widget {
+    uint8_t pad_[AM2_MP_PANEL_SIZE - sizeof(AM2_Widget)];
+    AM2_MpPanelScreen(const char *bmp);
+};
+struct AM2_OptionsMenuScreen : AM2_Widget {
+    uint8_t pad_[AM2_OPTIONS_MENU_SIZE - sizeof(AM2_Widget)];
+    AM2_OptionsMenuScreen(const char *bmp);
+};
+struct AM2_QuitDialogScreen : AM2_Widget {
+    uint8_t pad_[AM2_QUIT_CONFIRM_SIZE - sizeof(AM2_Widget)];
+    AM2_QuitDialogScreen(const char *bmp);
+};
+struct AM2_ReplayDialogScreen : AM2_Widget {
+    uint8_t pad_[AM2_REPLAY_PROMPT_SIZE - sizeof(AM2_Widget)];
+    AM2_ReplayDialogScreen(const char *bmp);
+};
+struct AM2_SelectMapScreen : AM2_Widget {
+    uint8_t pad_[AM2_MP_SELECT_MAP_SIZE - sizeof(AM2_Widget)];
+    AM2_SelectMapScreen(const char *bmp);
+};
+struct AM2_SelectPlayerScreen : AM2_Widget {
+    uint8_t pad_[AM2_SELECT_PLAYER_SIZE - sizeof(AM2_Widget)];
+    AM2_SelectPlayerScreen(const char *bmp);
+};
+struct AM2_WarMenuScreen : AM2_Widget {
+    uint8_t pad_[AM2_WAR_MENU_SIZE - sizeof(AM2_Widget)];
+    AM2_WarMenuScreen(const char *bmp);
+};
 #endif
 static inline AM2_Widget * __attribute__((thiscall)) ArrowBarDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->ArrowBarDelete(flags); }
@@ -1673,32 +1761,32 @@ static inline void __attribute__((thiscall)) OptionsUpdate(AM2_Widget *w)
  * Original: 0x004317C0. The multiplayer HOST panel: the lobby with the player
  * rows, the game-type and map lists and the comms field. It takes the session
  * role with it (ADDR_MP_SESSION = 1) and then refreshes the panel. */
-void __cdecl OpenMpHost(void);
+extern "C++" void __cdecl OpenMpHost(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x00433480. The multiplayer JOIN panel. The SAME class and the
  * same 0x278 bytes as the host panel -- only the backdrop and the role differ,
  * which is the clearest statement in the image that MP_SESSION is host versus
  * client and not something else. */
-void __cdecl OpenMpJoin(void);
+extern "C++" void __cdecl OpenMpJoin(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x00432910. MULTIPLAYER OPTIONS, the 43-checkbox screen the
  * OPTIONS button on the host panel opens. */
-void __cdecl OpenMpOptions(void);
+extern "C++" void __cdecl OpenMpOptions(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x0044DF20. SELECT MAP -- the campaign's map chooser, a list and a preview. */
-void __cdecl OpenSelectMap(void);
+extern "C++" void __cdecl OpenSelectMap(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x00451910. SELECT PLAYER -- the saved-player list, with RECRUIT and DELETE. */
-void __cdecl OpenSelectPlayer(void);
+extern "C++" void __cdecl OpenSelectPlayer(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x00451E10. ENTER NAME -- the edit box RECRUIT opens. */
-void __cdecl OpenEnterName(void);
+extern "C++" void __cdecl OpenEnterName(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x0042F440. THE WAR MENU -- START A WAR, JOIN A WAR, CANCEL, which
  * COMM. CHANNEL SELECT's SELECT reaches. This was OpenCdPrompt, named for the
  * "Copy Protection" MessageBox that is in one of its BUTTONS rather than in
  * the screen; see ADDR_OPEN_WAR_MENU in orig.h. */
-void __cdecl OpenWarMenu(void);
+extern "C++" void __cdecl OpenWarMenu(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x0042EED0, thiscall, `ret 4`. The war menu's constructor: a
  * blank panel and the three buttons. */
@@ -1706,54 +1794,54 @@ static inline AM2_Widget * __attribute__((thiscall)) WarMenuConstruct(AM2_Widget
 { return w->WarMenuConstruct(bmp); }
 
 /* Original: 0x0042FF60. ENTER BATTLE NAME -- two text fields and an OK, which ab.sh multi drives. */
-void __cdecl OpenBattleName(void);
+extern "C++" void __cdecl OpenBattleName(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x0042F880. CHOOSE A BATTLE -- the session browser. */
-void __cdecl OpenBattleJoin(void);
+extern "C++" void __cdecl OpenBattleJoin(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x0044E6A0. the movie viewer. */
-void __cdecl OpenMovies(void);
+extern "C++" void __cdecl OpenMovies(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x0044FDD0. the OPTIONS menu itself -- the AUDIO, CONTROLS and DIFFICULTY buttons.
  * It pushes no caption and no backdrop of its own; its identity is in the
  * three button bitmaps its constructor loads. */
-void __cdecl OpenOptionsMenu(void);
+extern "C++" void __cdecl OpenOptionsMenu(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x00451210. CONTROLS -- the twenty-one key-capture rows ab.sh controls drives. */
-void __cdecl OpenControls(void);
+extern "C++" void __cdecl OpenControls(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x0044EAD0. DIFFICULTY -- the Easy/Medium/Hard list. */
 extern "C++" void __cdecl OpenDifficulty(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x0044EE50. CONFIRM GAME EXIT: "Are you sure you want to quit?". */
-void __cdecl OpenQuitConfirm(void);
+extern "C++" void __cdecl OpenQuitConfirm(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x0044F220. "Do you wish to reattempt your failed mission?". */
-void __cdecl OpenReplayPrompt(void);
+extern "C++" void __cdecl OpenReplayPrompt(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x00450B70. "Caution: All saved games for this player will also be deleted!". */
-void __cdecl OpenDeletePlayer(void);
+extern "C++" void __cdecl OpenDeletePlayer(void);  /* C++: `new` needs its /GX unwind frame */
 /* Original: 0x0042EE40. COMM CHANNEL SELECT, and the one factory that does
  * something before it allocates: CommCreateDirectPlay with a null connection. */
-void __cdecl OpenCommPanel(void);
+extern "C++" void __cdecl OpenCommPanel(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x0044F9E0. AUDIO CONTROLS -- the three volume sliders. */
-void __cdecl OpenAudioOptions(void);
+extern "C++" void __cdecl OpenAudioOptions(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x00450250. DELETE GAME. */
-void __cdecl OpenDeleteGame(void);
+extern "C++" void __cdecl OpenDeleteGame(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x00452680. LOAD GAME. Its repaint comes after the construction
  * where its two siblings put it before the allocation; see widget.cpp. */
-void __cdecl OpenLoadGame(void);
+extern "C++" void __cdecl OpenLoadGame(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x00453890, 0x004506A0, 0x00452F50 and 0x00452990 -- the last four
  * arms of frame.cpp's sub-state painter table. Each closes whatever screen is
  * up and builds one dialog on a backdrop. */
-void __cdecl OpenSaveGame(void);
-void __cdecl OpenOverwriteGame(void);
-void __cdecl OpenGameMenu(void);
-void __cdecl OpenMessage(void);
+extern "C++" void __cdecl OpenSaveGame(void);  /* C++: `new` needs its /GX unwind frame */
+extern "C++" void __cdecl OpenOverwriteGame(void);  /* C++: `new` needs its /GX unwind frame */
+extern "C++" void __cdecl OpenGameMenu(void);  /* C++: `new` needs its /GX unwind frame */
+extern "C++" void __cdecl OpenMessage(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x0044FAB0, thiscall. The OPTIONS menu's constructor: a backdrop
  * and four buttons, AUDIO / CONTROLS / DIFFICULTY / BACK. See widget.cpp for

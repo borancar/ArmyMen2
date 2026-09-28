@@ -5383,8 +5383,6 @@ void __attribute__((thiscall)) AM2_Widget::OptionsUpdate()
 #define g_currentBitmap  (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
 
 typedef void *(__cdecl *AM2_OperatorNewFn)(uint32_t size);
-typedef void *(__attribute__((thiscall)) *AM2_ScreenCtorFn)(void *obj,
-                                                            const char *bmp);
 typedef void (__cdecl *AM2_VoidFn)(void);
 
 #define orig_operator_new     ((AM2_OperatorNewFn)((void *)(uintptr_t)(ADDR_GAME_OPERATOR_NEW)))
@@ -5397,6 +5395,116 @@ void AM2_Widget::operator delete(void *p) { orig_delete(p); }
 AM2_DifficultyDialog::AM2_DifficultyDialog(const char *bmp)
 {
     ::DifficultyDialogConstruct(this, bmp);
+}
+
+AM2_DlgMessageScreen::AM2_DlgMessageScreen(const char *bmp, int32_t flag)
+{
+    ::DlgMessageConstruct(this, bmp, flag);
+}
+
+AM2_AudioDialogScreen::AM2_AudioDialogScreen(const char *bmp, int32_t flag)
+{
+    ::AudioDialogConstruct(this, bmp, flag);
+}
+
+AM2_BattleNameScreen::AM2_BattleNameScreen(const char *bmp)
+{
+    ::BattleNameConstruct(this, bmp);
+}
+
+AM2_CommPanelScreen::AM2_CommPanelScreen(const char *bmp)
+{
+    ::CommPanelConstruct(this, bmp);
+}
+
+AM2_ControlsDialogScreen::AM2_ControlsDialogScreen(const char *bmp)
+{
+    ::ControlsDialogConstruct(this, bmp);
+}
+
+AM2_DelPlayerDialogScreen::AM2_DelPlayerDialogScreen(const char *bmp)
+{
+    ::DelPlayerDialogConstruct(this, bmp);
+}
+
+AM2_DeleteGameScreen::AM2_DeleteGameScreen(const char *bmp, int32_t flag)
+{
+    ::DeleteGameConstruct(this, bmp, flag);
+}
+
+AM2_DlgBattleJoinScreen::AM2_DlgBattleJoinScreen(const char *bmp)
+{
+    ::DlgBattleJoinConstruct(this, bmp);
+}
+
+AM2_DlgGameMenuScreen::AM2_DlgGameMenuScreen(const char *bmp, int32_t flag)
+{
+    ::DlgGameMenuConstruct(this, bmp, flag);
+}
+
+AM2_DlgOverwriteScreen::AM2_DlgOverwriteScreen(const char *bmp, int32_t flag)
+{
+    ::DlgOverwriteConstruct(this, bmp, flag);
+}
+
+AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
+{
+    ::DlgSaveListConstruct(this, bmp, flag);
+}
+
+AM2_EnterNameScreen::AM2_EnterNameScreen(const char *bmp)
+{
+    ::EnterNameConstruct(this, bmp);
+}
+
+AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
+{
+    ::LoadGameConstruct(this, bmp, flag);
+}
+
+AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
+{
+    ::MoviesConstruct(this, bmp);
+}
+
+AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
+{
+    ::MpOptionsConstruct(this, bmp);
+}
+
+AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
+{
+    ::MpPanelConstruct(this, bmp);
+}
+
+AM2_OptionsMenuScreen::AM2_OptionsMenuScreen(const char *bmp)
+{
+    ::OptionsMenuConstruct(this, bmp);
+}
+
+AM2_QuitDialogScreen::AM2_QuitDialogScreen(const char *bmp)
+{
+    ::QuitDialogConstruct(this, bmp);
+}
+
+AM2_ReplayDialogScreen::AM2_ReplayDialogScreen(const char *bmp)
+{
+    ::ReplayDialogConstruct(this, bmp);
+}
+
+AM2_SelectMapScreen::AM2_SelectMapScreen(const char *bmp)
+{
+    ::SelectMapConstruct(this, bmp);
+}
+
+AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
+{
+    ::SelectPlayerConstruct(this, bmp);
+}
+
+AM2_WarMenuScreen::AM2_WarMenuScreen(const char *bmp)
+{
+    ::WarMenuConstruct(this, bmp);
 }
 
 /* HudCmdInvoke -- original 0x00417180, 56 bytes, thiscall, six callers (one
@@ -6603,18 +6711,11 @@ void __cdecl BuildHudWidgets(void)
  * of these sites -- VC6's does answer null rather than throwing, and the game
  * tests it -- so the global ends up null rather than holding a constructor's
  * idea of an uninitialised object. */
-static void OpenScreen(uint32_t size, AM2_ScreenCtorFn ctor, const char *bmp)
-{
-    void *obj = orig_operator_new(size);
-
-    g_paintObject = obj ? (uint8_t *)ctor(obj, bmp) : (uint8_t *)0;
-}
 
 void __cdecl OpenMpHost(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_MP_PANEL_SIZE, (AM2_ScreenCtorFn)MpPanelConstruct,
-               "01_001_00_mphost.bmp");
+    g_paintObject = (uint8_t *)new AM2_MpPanelScreen("01_001_00_mphost.bmp");
     g_mpSession = AM2_MP_SESSION_HOST;
     RefreshMapSelection();
 }
@@ -6622,87 +6723,68 @@ void __cdecl OpenMpHost(void)
 void __cdecl OpenMpJoin(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_MP_PANEL_SIZE, (AM2_ScreenCtorFn)MpPanelConstruct,
-               "01_002_00_mpjoin.bmp");
+    g_paintObject = (uint8_t *)new AM2_MpPanelScreen("01_002_00_mpjoin.bmp");
     g_mpSession = AM2_MP_SESSION_JOIN;
 }
 
 void __cdecl OpenMpOptions(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_MP_OPTIONS_SIZE, (AM2_ScreenCtorFn)MpOptionsConstruct,
-               "01_001_03_mphostoptions.bmp");
+    g_paintObject = (uint8_t *)new AM2_MpOptionsScreen("01_001_03_mphostoptions.bmp");
 }
 
 void __cdecl OpenSelectMap(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_MP_SELECT_MAP_SIZE, (AM2_ScreenCtorFn)SelectMapConstruct,
-               "01_000_00_screen.bmp");
+    g_paintObject = (uint8_t *)new AM2_SelectMapScreen("01_000_00_screen.bmp");
 }
 
 void __cdecl OpenSelectPlayer(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_SELECT_PLAYER_SIZE,
-               (AM2_ScreenCtorFn)SelectPlayerConstruct,
-               "01_000_00_screen.bmp");
+    g_paintObject = (uint8_t *)new AM2_SelectPlayerScreen("01_000_00_screen.bmp");
 }
 
 void __cdecl OpenEnterName(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_ENTER_NAME_SIZE,
-               (AM2_ScreenCtorFn)EnterNameConstruct,
-               "01_000_00_screen.bmp");
+    g_paintObject = (uint8_t *)new AM2_EnterNameScreen("01_000_00_screen.bmp");
 }
 
 void __cdecl OpenWarMenu(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_WAR_MENU_SIZE,
-               (AM2_ScreenCtorFn)WarMenuConstruct,
-               "01_000_00_screen.bmp");
+    g_paintObject = (uint8_t *)new AM2_WarMenuScreen("01_000_00_screen.bmp");
 }
 
 void __cdecl OpenBattleName(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_BATTLE_NAME_SIZE,
-               (AM2_ScreenCtorFn)BattleNameConstruct,
-               "01_000_00_screen.bmp");
+    g_paintObject = (uint8_t *)new AM2_BattleNameScreen("01_000_00_screen.bmp");
 }
 
 void __cdecl OpenBattleJoin(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_BATTLE_JOIN_SIZE,
-               (AM2_ScreenCtorFn)DlgBattleJoinConstruct,
-               "01_000_00_screen.bmp");
+    g_paintObject = (uint8_t *)new AM2_DlgBattleJoinScreen("01_000_00_screen.bmp");
 }
 
 void __cdecl OpenMovies(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_MOVIES_SIZE,
-               (AM2_ScreenCtorFn)MoviesConstruct,
-               "01_000_00_screen.bmp");
+    g_paintObject = (uint8_t *)new AM2_MoviesScreen("01_000_00_screen.bmp");
 }
 
 void __cdecl OpenOptionsMenu(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_OPTIONS_MENU_SIZE,
-               (AM2_ScreenCtorFn)OptionsMenuConstruct,
-               "01_000_00_screen.bmp");
+    g_paintObject = (uint8_t *)new AM2_OptionsMenuScreen("01_000_00_screen.bmp");
 }
 
 void __cdecl OpenControls(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_CONTROLS_SIZE,
-               (AM2_ScreenCtorFn)ControlsDialogConstruct,
-               "01_003_00_controls.bmp");
+    g_paintObject = (uint8_t *)new AM2_ControlsDialogScreen("01_003_00_controls.bmp");
 }
 
 void __cdecl OpenDifficulty(void)
@@ -6714,41 +6796,25 @@ void __cdecl OpenDifficulty(void)
 void __cdecl OpenQuitConfirm(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_QUIT_CONFIRM_SIZE,
-               (AM2_ScreenCtorFn)QuitDialogConstruct,
-               "01_000_00_screen.bmp");
+    g_paintObject = (uint8_t *)new AM2_QuitDialogScreen("01_000_00_screen.bmp");
 }
 
 void __cdecl OpenReplayPrompt(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_REPLAY_PROMPT_SIZE,
-               (AM2_ScreenCtorFn)ReplayDialogConstruct,
-               "01_000_00_screen.bmp");
+    g_paintObject = (uint8_t *)new AM2_ReplayDialogScreen("01_000_00_screen.bmp");
 }
 
 void __cdecl OpenDeletePlayer(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_DELETE_PLAYER_SIZE,
-               (AM2_ScreenCtorFn)DelPlayerDialogConstruct,
-               "01_000_00_screen.bmp");
+    g_paintObject = (uint8_t *)new AM2_DelPlayerDialogScreen("01_000_00_screen.bmp");
 }
 
 /* The two-argument form. Five of the twenty-one screens exist in two
  * contexts and their constructors take a backdrop AND a flag; the flag is 0
  * in a mission and 1 on the title screen. */
-typedef void *(__attribute__((thiscall)) *AM2_ScreenCtor2Fn)(void *obj,
-                                                             const char *bmp,
-                                                             int32_t flag);
 
-static void OpenScreen2(uint32_t size, AM2_ScreenCtor2Fn ctor,
-                        const char *bmp, int32_t flag)
-{
-    void *obj = orig_operator_new(size);
-
-    g_paintObject = obj ? (uint8_t *)ctor(obj, bmp, flag) : (uint8_t *)0;
-}
 
 #define g_gameState (*(int32_t *)(uintptr_t)ADDR_GAME_STATE)
 
@@ -6762,9 +6828,7 @@ void __cdecl OpenCommPanel(void)
 {
     CloseCurrentScreen();
     CommCreateDirectPlay(g_commObject, (void *)0);
-    OpenScreen(AM2_COMM_PANEL_SIZE,
-               (AM2_ScreenCtorFn)CommPanelConstruct,
-               "01_000_00_screen.bmp");
+    g_paintObject = (uint8_t *)new AM2_CommPanelScreen("01_000_00_screen.bmp");
 }
 
 /* Arm 19. AUDIO CONTROLS -- the three volume sliders. The repaint comes
@@ -6780,13 +6844,9 @@ void __cdecl OpenAudioOptions(void)
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
         RefreshScreen();
-        OpenScreen2(AM2_AUDIO_OPTIONS_SIZE,
-                    (AM2_ScreenCtor2Fn)AudioDialogConstruct,
-                    "02_013_00_audio.bmp", 0);
+        g_paintObject = (uint8_t *)new AM2_AudioDialogScreen("02_013_00_audio.bmp", 0);
     } else {
-        OpenScreen2(AM2_AUDIO_OPTIONS_SIZE,
-                    (AM2_ScreenCtor2Fn)AudioDialogConstruct,
-                    "01_000_00_screen.bmp", 1);
+        g_paintObject = (uint8_t *)new AM2_AudioDialogScreen("01_000_00_screen.bmp", 1);
     }
 }
 
@@ -6796,13 +6856,9 @@ void __cdecl OpenDeleteGame(void)
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
         RefreshScreen();
-        OpenScreen2(AM2_DELETE_GAME_SIZE,
-                    (AM2_ScreenCtor2Fn)DeleteGameConstruct,
-                    "02_011_00_delgame.bmp", 0);
+        g_paintObject = (uint8_t *)new AM2_DeleteGameScreen("02_011_00_delgame.bmp", 0);
     } else {
-        OpenScreen2(AM2_DELETE_GAME_SIZE,
-                    (AM2_ScreenCtor2Fn)DeleteGameConstruct,
-                    "01_000_00_screen.bmp", 1);
+        g_paintObject = (uint8_t *)new AM2_DeleteGameScreen("01_000_00_screen.bmp", 1);
     }
 }
 
@@ -6835,8 +6891,7 @@ void __cdecl OpenDeleteGame(void)
 void __cdecl OpenSaveGame(void)
 {
     CloseCurrentScreen();
-    OpenScreen2(AM2_SAVE_LIST_SIZE, (AM2_ScreenCtor2Fn)DlgSaveListConstruct,
-                "02_008_00_savegame.bmp", 0);
+    g_paintObject = (uint8_t *)new AM2_DlgSaveListScreen("02_008_00_savegame.bmp", 0);
     RefreshScreen();
 }
 
@@ -6844,23 +6899,21 @@ void __cdecl OpenOverwriteGame(void)
 {
     CloseCurrentScreen();
     RefreshScreen();
-    OpenScreen2(AM2_OVERWRITE_SIZE, (AM2_ScreenCtor2Fn)DlgOverwriteConstruct,
-                "02_018_00_ovrgame.bmp", 0);
+    g_paintObject = (uint8_t *)new AM2_DlgOverwriteScreen("02_018_00_ovrgame.bmp", 0);
 }
 
 void __cdecl OpenGameMenu(void)
 {
     CloseCurrentScreen();
-    OpenScreen2(AM2_GAMEMENU_SIZE, (AM2_ScreenCtor2Fn)DlgGameMenuConstruct,
-                "00_999_99_blank.bmp", 0);
+    g_paintObject = (uint8_t *)new AM2_DlgGameMenuScreen("00_999_99_blank.bmp", 0);
     RefreshScreen();
 }
 
 void __cdecl OpenMessage(void)
 {
     CloseCurrentScreen();
-    OpenScreen2(AM2_MESSAGE_SIZE, (AM2_ScreenCtor2Fn)DlgMessageConstruct,
-                (const char *)((void *)(uintptr_t)(ADDR_MESSAGE_BMP_NAME)), 0);
+    g_paintObject = (uint8_t *)new AM2_DlgMessageScreen(
+        (const char *)((void *)(uintptr_t)(ADDR_MESSAGE_BMP_NAME)), 0);
 }
 
 void __cdecl OpenLoadGame(void)
@@ -6878,9 +6931,7 @@ void __cdecl OpenLoadGame(void)
         RefreshScreen();
         g_paintObject = screen;
     } else {
-        OpenScreen2(AM2_LOAD_GAME_SIZE,
-                    (AM2_ScreenCtor2Fn)LoadGameConstruct,
-                    "01_000_00_screen.bmp", 1);
+        g_paintObject = (uint8_t *)new AM2_LoadGameScreen("01_000_00_screen.bmp", 1);
     }
 }
 
