@@ -104,7 +104,7 @@ void __cdecl FreeAllFonts(void);
  * typewriter's word-wrap calls it with a null `out` and compares the return,
  * which is what surfaced it -- every earlier caller passes a real `out` and
  * ignores eax, so nothing could see it. */
-int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2]);
+AM2_CXX int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2]);
 
 int font_install(void);
 

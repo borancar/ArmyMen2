@@ -1057,14 +1057,14 @@ void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points)
  * an LPDIRECTDRAWSURFACE in it. An incomplete type keeps the SIGNATURES exact,
  * which a `void *` stand-in would not. */
 struct AM2_Sprite;
-extern "C" AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind,
+AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind,
                                                  uint32_t heading);
-extern "C" AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind,
+AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind,
                                                  uint32_t heading);
-extern "C" AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind,
+AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind,
                                                 uint32_t heading);
 
-extern "C" AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
+AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
                                                   int32_t b);
 
 #define SET_CURSOR(x) (*(void **)(uintptr_t)ADDR_MENU_SPRITES_END = (void *)(x))

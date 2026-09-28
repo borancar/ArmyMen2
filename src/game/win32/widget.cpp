@@ -1088,7 +1088,7 @@ void __attribute__((thiscall)) AM2_Widget::BlinkerUpdate()
     WidgetVPaint(w, w->rect);
 }
 
-void __attribute__((thiscall)) AM2_Blinker::BlinkerStart(uint32_t periodMs, int32_t flips)
+void __attribute__((thiscall)) AM2_BlinkerOps::BlinkerStart(uint32_t periodMs, int32_t flips)
 {
     AM2_Widget *w = (AM2_Widget *)(void *)this;
     uint8_t *self = (uint8_t *)w;
@@ -1613,18 +1613,17 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::IconDelete(int32_t flags)
     return w;
 }
 
-void __attribute__((thiscall)) AM2_Widget::BlinkerDestruct()
+AM2_Blinker::~AM2_Blinker()
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_BLINKER));
+    AM2_CTOR_VTABLE(w, VTABLE_BLINKER);
     /* Settle the live sprite on the OFF one before letting the ON one go.
      * Nothing reads it after this; kept because the original does it. */
     w->sprite = *(AM2_Sprite **)(self + TOGGLE_OFF_SPRITE_OFF);
     ReleaseSprite(*(AM2_Sprite **)(self + TOGGLE_OFF_SPRITE_ON));
-    ::IconDestruct(w);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::BlinkerDelete(int32_t flags)
@@ -2266,16 +2265,15 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudPanelDelete(int32_t flags)
  * The dump agrees from the other end: the radar node prints sid=0 where every
  * other node prints a real sprite id, because what it holds at +0x58 is not a
  * sprite at all. Two independent readings of the same field. */
-void __attribute__((thiscall)) AM2_Widget::HudRadarDestruct()
+AM2_HudRadar::~AM2_HudRadar()
 {
     AM2_Widget *w = this;
 
     void **slot = (void **)((uint8_t *)w + HUD_OFF_SPRITE0);
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_HUD_RADAR));
+    AM2_CTOR_VTABLE(w, VTABLE_HUD_RADAR);
     FreeBitmap(slot);
     *slot = (void *)0;
-    ::WidgetDestruct(w);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudRadarDelete(int32_t flags)
@@ -2294,14 +2292,14 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudRadarDelete(int32_t flags)
  * adjacent -- one pointer steps four bytes at a time and reads 0x30 below
  * itself as well, so the two arrays are 0x5C.. and 0x8C.. and the loop covers
  * both in twelve turns. Twelve is the squad. */
-void __attribute__((thiscall)) AM2_Widget::HudSquadDestruct()
+AM2_HudSquad::~AM2_HudSquad()
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
     int32_t  i;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_HUD_SQUAD));
+    AM2_CTOR_VTABLE(w, VTABLE_HUD_SQUAD);
 
     for (i = 0; i < AM2_HUD_SQUAD_SLOTS; i++) {
         ReleaseSprite(*(AM2_Sprite **)(self + HUD_SQUAD_PAIR_LO + i * 4));
@@ -2309,8 +2307,6 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDestruct()
     }
 
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE0));
-
-    ::WidgetDestruct(w);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudSquadDelete(int32_t flags)
@@ -2327,19 +2323,17 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudSquadDelete(int32_t flags)
  * strip and no character handler -- which is what says that clearing it up
  * there is the top strip's own business rather than something every strip
  * does. */
-void __attribute__((thiscall)) AM2_Widget::HudEdgeDestruct()
+AM2_HudEdge::~AM2_HudEdge()
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_HUD_EDGE_STRIP));
+    AM2_CTOR_VTABLE(w, VTABLE_HUD_EDGE_STRIP);
 
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE0));
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE1));
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE2));
-
-    ::WidgetDestruct(w);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudEdgeDelete(int32_t flags)
@@ -2354,19 +2348,17 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudEdgeDelete(int32_t flags)
 
 /* 0x00414EB0. The SARGE panel: 31 sprites of its own, from the 31 slots its
  * constructor fills with set 13 indices 0..30. Ordinary per-object state. */
-void __attribute__((thiscall)) AM2_Widget::HudSargeDestruct()
+AM2_HudSarge::~AM2_HudSarge()
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
     int32_t  i;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_HUD_SARGE));
+    AM2_CTOR_VTABLE(w, VTABLE_HUD_SARGE);
 
     for (i = 0; i < AM2_HUD_SARGE_SLOTS; i++)
         ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE0 + i * 4));
-
-    ::WidgetDestruct(w);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudSargeDelete(int32_t flags)
@@ -2393,20 +2385,19 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudSargeDelete(int32_t flags)
  * state. The bound is the table's end and not a count, which is how the
  * original writes it.
  */
-void __attribute__((thiscall)) AM2_Widget::HudCommandsDestruct()
+AM2_HudCmd::~AM2_HudCmd()
 {
     AM2_Widget *w = this;
 
     AM2_Sprite **spr;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_HUD_COMMANDS));
+    AM2_CTOR_VTABLE(w, VTABLE_HUD_COMMANDS);
 
+    /* signed address compare, as the original (`jl`) */
     for (spr = (AM2_Sprite **)((void *)(uintptr_t)(ADDR_HUD_CMD_SPRITES));
-         spr < (AM2_Sprite **)((void *)(uintptr_t)(ADDR_HUD_CMD_SPRITES_END));
+         (int32_t)(uintptr_t)spr < (int32_t)(uintptr_t)ADDR_HUD_CMD_SPRITES_END;
          spr = (AM2_Sprite **)((uint8_t *)spr + AM2_POINTER_MODE_SIZE))
         ReleaseSprite(*spr);
-
-    ::WidgetDestruct(w);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudCommandsDelete(int32_t flags)
@@ -4913,24 +4904,25 @@ void __attribute__((thiscall)) AM2_Widget::WidgetRepaint()
  *
  * All seven records name sprite set 15; the indices are 0, 0, 1, 2, 3, 4, 1,
  * so two pairs share a sprite rather than there being seven distinct ones. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudCmdConstruct()
+AM2_HudCmd::AM2_HudCmd()
 {
     AM2_Widget *w = this;
 
-    uint8_t *rec = (uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPEC));
-    int32_t  i;
+    uint8_t *rec;
+    AM2_CTOR_VTABLE(w, VTABLE_HUD_COMMANDS);
 
-    ::WidgetConstruct(w);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_HUD_COMMANDS));
-
-    for (i = 0; i < AM2_HUD_CMD_SPRITES; i++, rec += AM2_HUD_CMD_SPR_STRIDE) {
+    /* By pointer, to a signed bound (`jl`) that is the NEXT object -- the
+     * build-menu rectangles start where the seventh record would. */
+    for (rec = (uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPEC));
+         (int32_t)(uintptr_t)rec < (int32_t)(uintptr_t)ADDR_BUILD_MENU_RECTS;
+         rec += AM2_HUD_CMD_SPR_STRIDE) {
         void *spr = PreloadArmySprite(
             *(const int32_t *)(rec + HUDCMDSPR_OFF_SET),
             *(const int32_t *)(rec + HUDCMDSPR_OFF_INDEX),
             *(const int32_t *)(rec + HUDCMDSPR_OFF_FRAME), 0);
         *(void **)(rec + HUDCMDSPR_OFF_SPRITE) = spr;
         if (!spr)
-            return w;                 /* the tail below is SKIPPED */
+            return;                 /* the tail below is SKIPPED */
     }
 
     ((int32_t *)((uint8_t *)w + HUDCMD_OFF_SLOTS))[0] = -1;
@@ -4941,7 +4933,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudCmdConstruct()
     w->y = AM2_HUD_CMD_TOP;
     w->w = AM2_HUD_CMD_WIDTH;
     w->h = AM2_HUD_CMD_HEIGHT;
-    return w;
 }
 
 /* HudEdgeConstruct -- original 0x004195B0, thiscall. The HUD edge strip: the
@@ -4967,24 +4958,22 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudCmdConstruct()
  * widget's own AM2_Widget::sprite at 0x38, which WidgetPaint draws as the
  * backdrop. That second store is a real struct field and not a fourth slot,
  * which is why nothing new is named here. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudEdgeConstruct()
+AM2_HudEdge::AM2_HudEdge()
 {
     AM2_Widget *w = this;
 
     uint8_t   *self = (uint8_t *)w;
     AM2_Sprite *spr;
-
-    ::WidgetConstruct(w);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_HUD_EDGE_STRIP));
+    AM2_CTOR_VTABLE(w, VTABLE_HUD_EDGE_STRIP);
 
     spr = (AM2_Sprite *)PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 0, 0, 1);
     *(void **)(self + HUD_OFF_SPRITE0) = spr;
     if (!spr)
-        return w;
+        return;
 
     w->sprite = spr;              /* its own backdrop, not a fourth slot */
-    w->y = AM2_HUD_EDGE_TOP;
     w->x = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - spr->bounds.right;
+    w->y = AM2_HUD_EDGE_TOP;
     w->w = spr->bounds.right;
     w->h = spr->bounds.bottom;
 
@@ -4992,7 +4981,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudEdgeConstruct()
         PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 0x0B, 0, 1);
     *(void **)(self + HUD_OFF_SPRITE2) =
         PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, 0x0A, 0, 1);
-    return w;
 }
 
 AM2_Widget::AM2_Widget()
@@ -5442,6 +5430,53 @@ void __attribute__((thiscall)) am2_dtor_AM2_Edit(AM2_Widget *w)
 #if defined(__GNUC__)
 AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_MpSpin(void *mem, AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row)
 { return ::new (mem) AM2_MpSpin(box, value, lo, hi, step, parent, commit, c0, c1, c2, row); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Blinker(void *mem, const char *b0, const char *b1, int32_t flag, AM2_Rect box)
+{ return ::new (mem) AM2_Blinker(b0, b1, flag, box); }
+void __attribute__((thiscall)) am2_dtor_AM2_Blinker(AM2_Widget *w)
+{ ((AM2_Blinker *)w)->AM2_Blinker::~AM2_Blinker(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Typer(void *mem, AM2_Rect box, const char *message)
+{ return ::new (mem) AM2_Typer(box, message); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_HudRadar(void *mem)
+{ return ::new (mem) AM2_HudRadar(); }
+void __attribute__((thiscall)) am2_dtor_AM2_HudRadar(AM2_Widget *w)
+{ ((AM2_HudRadar *)w)->AM2_HudRadar::~AM2_HudRadar(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_HudSarge(void *mem)
+{ return ::new (mem) AM2_HudSarge(); }
+void __attribute__((thiscall)) am2_dtor_AM2_HudSarge(AM2_Widget *w)
+{ ((AM2_HudSarge *)w)->AM2_HudSarge::~AM2_HudSarge(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_HudSquad(void *mem)
+{ return ::new (mem) AM2_HudSquad(); }
+void __attribute__((thiscall)) am2_dtor_AM2_HudSquad(AM2_Widget *w)
+{ ((AM2_HudSquad *)w)->AM2_HudSquad::~AM2_HudSquad(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_HudCmd(void *mem)
+{ return ::new (mem) AM2_HudCmd(); }
+void __attribute__((thiscall)) am2_dtor_AM2_HudCmd(AM2_Widget *w)
+{ ((AM2_HudCmd *)w)->AM2_HudCmd::~AM2_HudCmd(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_HudEdge(void *mem)
+{ return ::new (mem) AM2_HudEdge(); }
+void __attribute__((thiscall)) am2_dtor_AM2_HudEdge(AM2_Widget *w)
+{ ((AM2_HudEdge *)w)->AM2_HudEdge::~AM2_HudEdge(); }
 #endif
 
 #if defined(__GNUC__)
@@ -6370,31 +6405,31 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudPanelConstruct()
  * three.
  *
  * y and h are THE SAME CONSTANT, 0xE6, written from one register. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudSquadConstruct()
+AM2_HudSquad::AM2_HudSquad()
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
     int32_t  i;
-
-    ::WidgetConstruct(w);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_HUD_SQUAD));
+    AM2_CTOR_VTABLE(w, VTABLE_HUD_SQUAD);
 
     /* Its own pip, and NOT from either pair set: 0x0A index 0x14. */
     *(void **)(self + HUD_SQUAD_ICON_SPRITE) =
         PreloadArmySprite(AM2_HUD_EDGE_SPRITE_SET, AM2_HUD_SQUAD_ICON_INDEX,
                           0, 0);
 
-    for (i = 0; i < AM2_HUD_SQUAD_SLOTS; i++) {
-        /* 1..7, then 10..14 -- the original's two loops, one index. */
-        int32_t idx = (i < AM2_HUD_SQUAD_SPLIT)
-                    ? i + 1
-                    : i + 1 + AM2_HUD_SQUAD_GAP;
-
+    /* Indices 1..7, then 10..14: the original's two loops. */
+    for (i = 0; i < AM2_HUD_SQUAD_SPLIT; i++) {
         ((void **)(self + HUD_SQUAD_PAIR_LO))[i] =
-            PreloadArmySprite(AM2_HUD_SQUAD_SET_LO, idx, 0, 0);
+            PreloadArmySprite(AM2_HUD_SQUAD_SET_LO, i + 1, 0, 0);
         ((void **)(self + HUD_SQUAD_PAIR_HI))[i] =
-            PreloadArmySprite(AM2_HUD_SQUAD_SET_HI, idx, 0, 1);
+            PreloadArmySprite(AM2_HUD_SQUAD_SET_HI, i + 1, 0, 1);
+    }
+    for (i = AM2_HUD_SQUAD_SPLIT; i < AM2_HUD_SQUAD_SLOTS; i++) {
+        ((void **)(self + HUD_SQUAD_PAIR_LO))[i] =
+            PreloadArmySprite(AM2_HUD_SQUAD_SET_LO, i + 1 + AM2_HUD_SQUAD_GAP, 0, 0);
+        ((void **)(self + HUD_SQUAD_PAIR_HI))[i] =
+            PreloadArmySprite(AM2_HUD_SQUAD_SET_HI, i + 1 + AM2_HUD_SQUAD_GAP, 0, 1);
     }
 
     for (i = 0; i < AM2_HUD_SQUAD_SLOTS; i++)
@@ -6405,20 +6440,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudSquadConstruct()
     w->y = AM2_HUD_SQUAD_TOP;
     w->w = AM2_HUD_SQUAD_WIDTH;
     w->h = AM2_HUD_SQUAD_TOP;      /* the same constant, one register */
-    return w;
 }
-
-/* The radar's ten palette indices, in the order the constructor writes them:
- * five light/dark pairs indexed by RadarBlipColour's answer. Generated from
- * the destinations rather than the instruction order -- the original
- * interleaves the copies so no two adjacent ones belong to the same pair. */
-static const uint32_t kRadarColourSrc[AM2_RADAR_COLOUR_PAIRS * 2] = {
-    ADDR_COLOUR_LIGHT_GREEN, ADDR_COLOUR_DARK_GREEN,
-    ADDR_COLOUR_CREAM,       ADDR_COLOUR_OLIVE,
-    ADDR_COLOUR_LIGHT_BLUE,  ADDR_COLOUR_STEEL_BLUE,
-    ADDR_COLOUR_LIGHT_GREY,  ADDR_COLOUR_DARK_GREY,
-    ADDR_COLOUR_WHITE_B,     ADDR_COLOUR_BLACK,
-};
 
 /* HudRadarConstruct -- original 0x00414700, 259 bytes, thiscall. The radar
  * panel: load the map's own bitmap, size to it, and gather the blip palette.
@@ -6438,7 +6460,7 @@ static const uint32_t kRadarColourSrc[AM2_RADAR_COLOUR_PAIRS * 2] = {
  * destination they are five light/dark pairs: the four army colours with a
  * shade each, then white/black for the index 4 that a multiplayer soldier
  * kind 7 produces. See ADDR_RADAR_COLOURS. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudRadarConstruct()
+AM2_HudRadar::AM2_HudRadar()
 {
     AM2_Widget *w = this;
 
@@ -6446,10 +6468,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudRadarConstruct()
     uint8_t    *dst  = (uint8_t *)(uintptr_t)ADDR_RADAR_COLOURS;
     AM2_Sprite *bmp;
     char        name[AM2_RADAR_NAME_BYTES];
-    int32_t     i;
-
-    ::WidgetConstruct(w);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_HUD_RADAR));
+    AM2_CTOR_VTABLE(w, VTABLE_HUD_RADAR);
 
     SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
     am2_sprintf(name, "%s.bmp", (const char *)(uintptr_t)ADDR_MAP_NAME);
@@ -6463,10 +6482,20 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudRadarConstruct()
     w->w = bmp->bounds.right;     /* no null test -- the original's */
     w->h = bmp->bounds.bottom;
 
-    for (i = 0; i < AM2_RADAR_COLOUR_PAIRS * 2; i++)
-        dst[i] = *(const uint8_t *)(uintptr_t)kRadarColourSrc[i];
+    /* The blip palette: five light/dark pairs indexed by RadarBlipColour's
+     * answer, ten separate byte copies -- the original's compiler interleaves
+     * them, so no two adjacent stores belong to the same pair. */
+    dst[0] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LIGHT_GREEN;
+    dst[1] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_DARK_GREEN;
+    dst[2] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_CREAM;
+    dst[3] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_OLIVE;
+    dst[4] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LIGHT_BLUE;
+    dst[5] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STEEL_BLUE;
+    dst[6] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LIGHT_GREY;
+    dst[7] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_DARK_GREY;
+    dst[8] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE_B;
+    dst[9] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BLACK;
 
-    return w;
 }
 
 /* HudSargeConstruct -- original 0x00414DF0, 157 bytes, thiscall. The Sarge
@@ -6486,15 +6515,13 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudRadarConstruct()
  *
  * ArmySpriteBase is called for its side effect and its answer discarded; the
  * original does not test it either. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudSargeConstruct()
+AM2_HudSarge::AM2_HudSarge()
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
     int32_t  i;
-
-    ::WidgetConstruct(w);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_HUD_SARGE));
+    AM2_CTOR_VTABLE(w, VTABLE_HUD_SARGE);
 
     ArmySpriteBase();
 
@@ -6510,7 +6537,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudSargeConstruct()
     w->y = AM2_HUD_SARGE_TOP;
     w->w = AM2_HUD_SARGE_WIDTH;
     w->h = AM2_HUD_SARGE_HEIGHT;
-    return w;
 }
 
 static const char *const kChatToSprites[4] = {
@@ -8410,28 +8436,20 @@ AM2_Edit::AM2_Edit(char *buf, int32_t maxChars_, AM2_Rect box, int32_t font_, in
  *
  * The rectangle is written twice -- once by the panel and again here -- and
  * WidgetScreenRect runs after both. Reproduced. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::MultiSpriteConstruct(const char *b0, const char *b1, int32_t flag, AM2_Rect box)
+AM2_Blinker::AM2_Blinker(const char *b0, const char *b1, int32_t flag, AM2_Rect box)
+    : AM2_Panel(b0, flag, box)
 {
     AM2_Widget *w = this;
 
-    uint8_t *self = (uint8_t *)w;
+    sprites[1] = (AM2_Sprite *)0;
+    index      = 0;
+    AM2_CTOR_VTABLE(w, VTABLE_BLINKER);
+    sprite0    = w->sprite;
+    sprites[0] = PreloadSpriteName(b1, flag, 1);
 
-    ::PanelConstruct(w, b0, flag, box);
-
-    *(AM2_Sprite **)(self + MULTISPR_OFF_SPRITES + 4) = (AM2_Sprite *)0;
-    *(int32_t *)(self + MULTISPR_OFF_INDEX) = 0;
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_MULTISPRITE));
-    *(AM2_Sprite **)(self + MULTISPR_OFF_SPRITE0) = w->sprite;
-    *(AM2_Sprite **)(self + MULTISPR_OFF_SPRITES) =
-        PreloadSpriteName(b1, flag, 1);
-
-    w->x = box.left;
-    w->y = box.top;
-    w->w = box.right;
-    w->h = box.bottom;
-    *(int32_t *)(self + 0x50) = 0;
+    *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
+    w->flag50 = 0;
     ::WidgetScreenRect(w);
-    return w;
 }
 
 /* 0x00454F90, thiscall, `ret 0x20`. The LIST BOX -- the DIFFICULTY rows, the
@@ -8669,7 +8687,7 @@ typedef char *(__cdecl *AM2_StrncpyFn)(char *d, const char *s, uint32_t n);
 #define orig_strchr  ((AM2_StrchrFn)((void *)(uintptr_t)(ADDR_CRT_STRCHR)))
 #define orig_strncpy ((AM2_StrncpyFn)((void *)(uintptr_t)(ADDR_CRT_STRNCPY)))
 
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::TyperConstruct(int32_t left, int32_t top, int32_t width, int32_t height, const char *message)
+AM2_Typer::AM2_Typer(AM2_Rect box, const char *message)
 {
     AM2_Widget *w = this;
 
@@ -8677,13 +8695,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::TyperConstruct(int32_t left, 
     char     line[AM2_TYPER_LINE_MAX];
     int32_t  start = 0;
     int32_t  cur   = 0;
-
-    ::WidgetConstruct(w);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_TYPER));
-    w->x = left;
-    w->y = top;
-    w->w = width;
-    w->h = height;
+    AM2_CTOR_VTABLE(w, VTABLE_TYPER);
+    *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
     ::WidgetScreenRect(w);
     text[0] = '\0';
 
@@ -8727,7 +8740,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::TyperConstruct(int32_t left, 
     *(int32_t *)((uint8_t *)w + TYPER_OFF_SHOWN)    = 0;
     *(int32_t *)((uint8_t *)w + 0x50)               = 0;
     *(AM2_Widget **)((uint8_t *)w + TYPER_OFF_BLINKER) = (AM2_Widget *)0;
-    return w;
 }
 
 /* 0x0044D730, cdecl. The TITLE SCREEN -- arm 1 of the menu table, and the one
@@ -15187,21 +15199,21 @@ int widget_install(void)
                         pmf_addr(&AM2_Widget::HudPanelConstruct),
                         "HudPanelConstruct", 1);
     rc |= patch_replace(ADDR_HUD_SQUAD_CONSTRUCT,
-                        pmf_addr(&AM2_Widget::HudSquadConstruct),
+                        AM2_CTOR(AM2_HudSquad),
                         "HudSquadConstruct", 1);
     rc |= patch_replace(ADDR_HUD_RADAR_CONSTRUCT,
-                        pmf_addr(&AM2_Widget::HudRadarConstruct),
+                        AM2_CTOR(AM2_HudRadar),
                         "HudRadarConstruct", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_CONSTRUCT,
-                        pmf_addr(&AM2_Widget::HudSargeConstruct),
+                        AM2_CTOR(AM2_HudSarge),
                         "HudSargeConstruct", 1);
     rc |= patch_replace(ADDR_HUD_TOP_CONSTRUCT,
                         pmf_addr(&AM2_Widget::HudTopConstruct),
                         "HudTopConstruct", 1);
     rc |= patch_replace(ADDR_HUD_EDGE_CONSTRUCT,
-                        pmf_addr(&AM2_Widget::HudEdgeConstruct),
+                        AM2_CTOR(AM2_HudEdge),
                         "HudEdgeConstruct", 1);
-    rc |= patch_replace(ADDR_HUD_CMD_CONSTRUCT, pmf_addr(&AM2_Widget::HudCmdConstruct),
+    rc |= patch_replace(ADDR_HUD_CMD_CONSTRUCT, AM2_CTOR(AM2_HudCmd),
                         "HudCmdConstruct", 1);
     rc |= patch_replace(ADDR_FREE_AIM_SPRITES, (const void *)FreeAimSprites,
                         "FreeAimSprites", 0);
@@ -15226,7 +15238,7 @@ int widget_install(void)
                         "KeyRowUpdate", 1);
     rc |= patch_replace(ADDR_BLINKER_UPDATE, pmf_addr(&AM2_Widget::BlinkerUpdate),
                         "BlinkerUpdate", 1);
-    rc |= patch_replace(ADDR_BLINKER_START, pmf_addr(&AM2_Blinker::BlinkerStart),
+    rc |= patch_replace(ADDR_BLINKER_START, pmf_addr(&AM2_BlinkerOps::BlinkerStart),
                         "BlinkerStart", 1);
     rc |= patch_replace(ADDR_MULTI_SPRITE_PAINT,
                         pmf_addr(&AM2_Widget::MultiSpritePaint),
@@ -15245,7 +15257,7 @@ int widget_install(void)
                         "IconDestruct", 1);
     rc |= patch_replace(ADDR_ICON_DELETE, pmf_addr(&AM2_Widget::IconDelete),
                         "IconDelete", 1);
-    rc |= patch_replace(ADDR_BLINKER_DESTRUCT, pmf_addr(&AM2_Widget::BlinkerDestruct),
+    rc |= patch_replace(ADDR_BLINKER_DESTRUCT, AM2_DTOR(AM2_Blinker),
                         "BlinkerDestruct", 1);
     rc |= patch_replace(ADDR_BLINKER_DELETE, pmf_addr(&AM2_Widget::BlinkerDelete),
                         "BlinkerDelete", 1);
@@ -15474,7 +15486,7 @@ int widget_install(void)
 
     rc |= patch_replace(ADDR_OPEN_TITLE_SCREEN,
                         (const void *)OpenTitleScreen, "OpenTitleScreen", 0);
-    rc |= patch_replace(ADDR_TYPER_CTOR, pmf_addr(&AM2_Widget::TyperConstruct),
+    rc |= patch_replace(ADDR_TYPER_CTOR, AM2_CTOR(AM2_Typer),
                         "TyperConstruct", 5);
     rc |= patch_replace(ADDR_ARROWBAR_CTOR, AM2_CTOR(AM2_ArrowBar),
                         "ArrowBarConstruct", 9);
@@ -15490,7 +15502,7 @@ int widget_install(void)
     rc |= patch_replace(ADDR_TEXTLIST_DELETE, pmf_addr(&AM2_Widget::TextListDelete),
                         "TextListDelete", 1);
     rc |= patch_replace(ADDR_MULTISPRITE_CTOR,
-                        pmf_addr(&AM2_Widget::MultiSpriteConstruct),
+                        AM2_CTOR(AM2_Blinker),
                         "MultiSpriteConstruct", 7);
     rc |= patch_replace(ADDR_EDIT_CTOR, AM2_CTOR(AM2_Edit),
                         "EditConstruct", 13);
@@ -15628,12 +15640,12 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_PANEL_UPDATE, pmf_addr(&AM2_Widget::HudPanelUpdate),
                         "HudPanelUpdate", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_DESTRUCT,
-                        pmf_addr(&AM2_Widget::HudSargeDestruct),
+                        AM2_DTOR(AM2_HudSarge),
                         "HudSargeDestruct", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_DELETE, pmf_addr(&AM2_Widget::HudSargeDelete),
                         "HudSargeDelete", 1);
     rc |= patch_replace(ADDR_HUD_CMD_DESTRUCT,
-                        pmf_addr(&AM2_Widget::HudCommandsDestruct),
+                        AM2_DTOR(AM2_HudCmd),
                         "HudCommandsDestruct", 1);
     rc |= patch_replace(ADDR_HUD_CMD_DELETE, pmf_addr(&AM2_Widget::HudCommandsDelete),
                         "HudCommandsDelete", 1);
@@ -15647,16 +15659,16 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_PANEL_DELETE, pmf_addr(&AM2_Widget::HudPanelDelete),
                         "HudPanelDelete", 1);
     rc |= patch_replace(ADDR_HUD_RADAR_DESTRUCT,
-                        pmf_addr(&AM2_Widget::HudRadarDestruct),
+                        AM2_DTOR(AM2_HudRadar),
                         "HudRadarDestruct", 1);
     rc |= patch_replace(ADDR_HUD_RADAR_DELETE, pmf_addr(&AM2_Widget::HudRadarDelete),
                         "HudRadarDelete", 1);
     rc |= patch_replace(ADDR_HUD_SQUAD_DESTRUCT,
-                        pmf_addr(&AM2_Widget::HudSquadDestruct),
+                        AM2_DTOR(AM2_HudSquad),
                         "HudSquadDestruct", 1);
     rc |= patch_replace(ADDR_HUD_SQUAD_DELETE, pmf_addr(&AM2_Widget::HudSquadDelete),
                         "HudSquadDelete", 1);
-    rc |= patch_replace(ADDR_HUD_EDGE_DESTRUCT, pmf_addr(&AM2_Widget::HudEdgeDestruct),
+    rc |= patch_replace(ADDR_HUD_EDGE_DESTRUCT, AM2_DTOR(AM2_HudEdge),
                         "HudEdgeDestruct", 1);
     rc |= patch_replace(ADDR_HUD_EDGE_DELETE, pmf_addr(&AM2_Widget::HudEdgeDelete),
                         "HudEdgeDelete", 1);

@@ -36,10 +36,10 @@
  * below reaches the sprite through byte offsets, never a member. Same reason
  * and same shape as script.cpp's declaration of the first of the two. */
 struct AM2_Sprite;
-extern "C" AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index,
+AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index,
                                              int32_t frame, int32_t flags,
                                              int32_t addref);
-extern "C" AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
+AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
                                                   int32_t b);
 
 /* The CRT's _strlwr, which ObjInitCommon applies to the CALLER's buffer. Same

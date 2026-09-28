@@ -451,7 +451,7 @@ void __cdecl EventDefaultName(int32_t kind, int32_t number, char *out)
  * LPDIRECTDRAWSURFACE and this module is on the flat side. FreeBitmap's own
  * signature does not, which is what makes the declaration legal here -- the
  * same reason script.cpp forward-declares PreloadSprite. */
-extern "C" void __cdecl FreeBitmap(void **pp);
+void __cdecl FreeBitmap(void **pp);
 
 #define orig_fwrite (*(am2_fwrite_fn)ADDR_FWRITE)
 
@@ -2168,7 +2168,7 @@ typedef void (__cdecl *AM2_FreeBitmapFn)(void **slot);
    the definition returns AM2_Sprite *, which cannot be spelled here, so this
    says void *. The two agree on a 32-bit pointer ABI and nothing checks it;
    said plainly rather than left for someone to find. */
-extern "C" void *__cdecl LoadBitmap(const char *name, int32_t flags);
+void *__cdecl LoadBitmap(const char *name, int32_t flags);
 
 /* 0x0041F600 and 0x0041F650. Put a full-screen bitmap up, pausing or not.
  *

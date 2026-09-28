@@ -1422,7 +1422,7 @@ void __cdecl FreeMapLayers(void)
  * LPDIRECTDRAWSURFACE.  An incomplete type is enough -- only two int16 fields
  * of the returned sprite are read, and those are reached by offset. */
 struct AM2_Sprite;
-extern "C" AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
+AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
                                                   int32_t b);
 
 /* The map declares its own per-record field layout, so ADDR_MAP_FIELD_DESCS is

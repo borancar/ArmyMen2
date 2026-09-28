@@ -85,7 +85,8 @@ static inline void __attribute__((thiscall)) ClearPtrListAtA4(void *obj)
 { ((AM2_ObjLists *)obj)->ClearPtrListAtA4(); }
 static inline void __attribute__((thiscall)) ClearVehicleLists(void *obj)
 { ((AM2_ObjLists *)obj)->ClearVehicleLists(); }
-struct AM2_Blinker {
+/* Likewise the blinker's (win32/widget.h's AM2_Blinker). */
+struct AM2_BlinkerOps {
     void __attribute__((thiscall)) BlinkerStart(uint32_t periodMs, int32_t flips);
 };
 /* The scroll bar's one method the flat half calls. Not the bar class itself
@@ -96,7 +97,7 @@ struct AM2_ArrowBarOps {
 };
 static inline void __attribute__((thiscall)) BlinkerStart(void *w, uint32_t periodMs,
                                                           int32_t flips)
-{ ((AM2_Blinker *)w)->BlinkerStart(periodMs, flips); }
+{ ((AM2_BlinkerOps *)w)->BlinkerStart(periodMs, flips); }
 static inline void __attribute__((thiscall)) ArrowBarFollowEnd(void *bar)
 { ((AM2_ArrowBarOps *)bar)->ArrowBarFollowEnd(); }
 #endif

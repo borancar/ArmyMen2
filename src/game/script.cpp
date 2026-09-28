@@ -43,7 +43,7 @@ extern "C" const char *const am2_script_unknown_str[1] = { "unknown" };
  * or COM type -- and AM2_Sprite has an LPDIRECTDRAWSURFACE in it. An
  * incomplete type is enough: the statement discards the sprite. */
 struct AM2_Sprite;
-extern "C" AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index,
+AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index,
                                              int32_t frame, int32_t flags,
                                              int32_t addref);
 

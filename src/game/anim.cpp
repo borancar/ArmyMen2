@@ -34,12 +34,12 @@ struct AM2_Sprite;   /* incomplete: it has an LPDIRECTDRAWSURFACE in it and
  * script.cpp forward-declares PreloadSprite: that header names
  * LPDIRECTDRAWSURFACE and this module must not. None of these three
  * signatures does, so the declaration costs nothing. */
-extern "C" int32_t __cdecl LoadSpriteFile(const char *path,
+int32_t __cdecl LoadSpriteFile(const char *path,
                                           AM2_AnimTable *anims,
                                           const AM2_AnimTable *fallback,
                                           int32_t from, uint32_t flags);
-extern "C" void __cdecl BuildRoachMask(void);
-extern "C" void __cdecl BuildVehicleMask(int32_t kind);
+void __cdecl BuildRoachMask(void);
+void __cdecl BuildVehicleMask(int32_t kind);
 
 #define g_explosionAnims ((AM2_AnimTable *)(uintptr_t)ADDR_EXPLOSION_ANIMS)
 #define g_missileAnims   ((AM2_AnimTable *)(uintptr_t)ADDR_MISSILE_ANIMS)

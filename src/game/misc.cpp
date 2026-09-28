@@ -531,14 +531,9 @@ extern "C" void *__cdecl LoadDibFlipped(const char *path, void *hdr,
  * AM2_Sprite's LPDIRECTDRAWSURFACE across it and fail checksplit. The same
  * reason script.cpp forward-declares PreloadSprite.
  *
- * WITH extern "C", unlike AimStart's pair: sprite.h opens its block at line
- * 14 and both of these are declared inside it, where widget.h closes its
- * block BEFORE AimStart. Match the header, not the module -- the rule cuts
- * both ways and this is the other way. */
-extern "C" {
+ * C++ linkage, matching sprite.h (which has no extern "C" block). */
 void *__cdecl SpriteSetForKey(uint32_t key);
 int32_t __cdecl SpriteDirIndex(void *set, uint32_t key);
-}
 #define orig_fread_m (*(am2_fread_fn)((void *)(uintptr_t)(ADDR_FREAD)))
 #define orig_fseek_m (*(am2_fseek_fn)((void *)(uintptr_t)(ADDR_FSEEK)))
 #define orig_log_m   (*(am2_log_fn)((void *)(uintptr_t)(ADDR_LOG)))

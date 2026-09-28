@@ -8,11 +8,10 @@
 #include "../rect.h"
 #include "../anim.h"
 
-/* The harness in src/inject is C; these are C++. Keep the linkage
- * compatible so dllmain.c can still call the install hooks. */
-#ifdef __cplusplus
-extern "C" {
-#endif
+/* C++ linkage, as the original's: VC6 (/GX) takes an extern "C" callee to
+ * be unable to throw, which changes the unwind frames of every constructor
+ * and `new` that calls into this module. Only the install hook is C, for
+ * dllmain.c. */
 
 /* A drawable sprite. Only the fields the drawing path touches are named; the
  * real structure is larger.
@@ -317,11 +316,10 @@ AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind, uint32_t heading);
 AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind, uint32_t heading);
 AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind, uint32_t heading);
 
-int sprite_install(void);
-
 #ifdef __cplusplus
-}
+extern "C"
 #endif
+int sprite_install(void);
 
 /* 0x00445F40, three callers. Take the sprite registry down: close the file,
  * force-release every sprite, free both tables, zero the count and capacity. */

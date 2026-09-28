@@ -871,7 +871,7 @@ void __cdecl ReleaseSprite(AM2_Sprite *spr);   /* C++ linkage, as sprite.h decla
 
 /* DrawSprite is reconstructed too, and declared here for the same reason.
  * Its four arguments name no Win32 type once AM2_Sprite is opaque. */
-extern "C" void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y,
+void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y,
                                    int32_t mode);
 
 #define g_spriteList    (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_LIST)

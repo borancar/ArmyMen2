@@ -125,7 +125,6 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) ListDraw(RECT clip);
     void __attribute__((thiscall)) ListTakeFocus(int32_t announce);
     AM2_Widget * __attribute__((thiscall)) IconDelete(int32_t flags);
-    void __attribute__((thiscall)) BlinkerDestruct();
     AM2_Widget * __attribute__((thiscall)) BlinkerDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) ButtonDelete(int32_t flags);
     void __attribute__((thiscall)) ButtonUpdate();
@@ -216,8 +215,6 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) WidgetUpdateCancel();
     void __attribute__((thiscall)) WidgetTakeFocus(int32_t announce);
     void __attribute__((thiscall)) WidgetRepaint();
-    AM2_Widget * __attribute__((thiscall)) HudCmdConstruct();
-    AM2_Widget * __attribute__((thiscall)) HudEdgeConstruct();
     void __attribute__((thiscall)) WidgetScreenRect();
     void __attribute__((thiscall)) LabelDraw(RECT clip);
     void __attribute__((thiscall)) MpDialogDestruct();
@@ -229,9 +226,6 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) DlgOverwriteConstruct(const char *bmp, int32_t flag);
     AM2_Widget * __attribute__((thiscall)) DlgMessageConstruct(const char *bmp, int32_t flag);
     AM2_Widget * __attribute__((thiscall)) HudPanelConstruct();
-    AM2_Widget * __attribute__((thiscall)) HudSquadConstruct();
-    AM2_Widget * __attribute__((thiscall)) HudRadarConstruct();
-    AM2_Widget * __attribute__((thiscall)) HudSargeConstruct();
     AM2_Widget * __attribute__((thiscall)) HudTopConstruct();
     AM2_Widget * __attribute__((thiscall)) OptionsMenuConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) WarMenuConstruct(const char *bmp);
@@ -246,8 +240,6 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) CommPanelConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) SelectPlayerConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) KeyRowConstruct(int32_t nameIndex, const char *caption, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t ink2, int32_t ink3, int32_t ink4);
-    AM2_Widget * __attribute__((thiscall)) MultiSpriteConstruct(const char *b0, const char *b1, int32_t flag, AM2_Rect box);
-    AM2_Widget * __attribute__((thiscall)) TyperConstruct(int32_t left, int32_t top, int32_t width, int32_t height, const char *message);
     void __attribute__((thiscall)) ArrowBarShowRow(int32_t row);
     AM2_Widget * __attribute__((thiscall)) SelectMapConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) EnterNameConstruct(const char *bmp);
@@ -277,17 +269,12 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) ArrowBarDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) CheckBoxDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) HudCommandsDelete(int32_t flags);
-    void __attribute__((thiscall)) HudCommandsDestruct();
     AM2_Widget * __attribute__((thiscall)) HudEdgeDelete(int32_t flags);
-    void __attribute__((thiscall)) HudEdgeDestruct();
     AM2_Widget * __attribute__((thiscall)) HudPanelDelete(int32_t flags);
     void __attribute__((thiscall)) HudPanelDestruct();
     AM2_Widget * __attribute__((thiscall)) HudRadarDelete(int32_t flags);
-    void __attribute__((thiscall)) HudRadarDestruct();
     AM2_Widget * __attribute__((thiscall)) HudSargeDelete(int32_t flags);
-    void __attribute__((thiscall)) HudSargeDestruct();
     AM2_Widget * __attribute__((thiscall)) HudSquadDelete(int32_t flags);
-    void __attribute__((thiscall)) HudSquadDestruct();
     AM2_Widget * __attribute__((thiscall)) HudTopDelete(int32_t flags);
     void __attribute__((thiscall)) HudTopDestruct();
     AM2_Widget * __attribute__((thiscall)) MoviesDelete(int32_t flags);
@@ -347,6 +334,13 @@ AM2_CLASS_VTABLE(AM2_ArrowBar, VTABLE_ARROWBAR)
 AM2_CLASS_VTABLE(AM2_ScrollBar, VTABLE_SCROLLBAR)
 AM2_CLASS_VTABLE(AM2_Edit, VTABLE_EDIT)
 AM2_CLASS_VTABLE(AM2_MpSpin, VTABLE_MP_SPIN)
+AM2_CLASS_VTABLE(AM2_Blinker, VTABLE_BLINKER)
+AM2_CLASS_VTABLE(AM2_Typer, VTABLE_TYPER)
+AM2_CLASS_VTABLE(AM2_HudRadar, VTABLE_HUD_RADAR)
+AM2_CLASS_VTABLE(AM2_HudSarge, VTABLE_HUD_SARGE)
+AM2_CLASS_VTABLE(AM2_HudSquad, VTABLE_HUD_SQUAD)
+AM2_CLASS_VTABLE(AM2_HudCmd, VTABLE_HUD_COMMANDS)
+AM2_CLASS_VTABLE(AM2_HudEdge, VTABLE_HUD_EDGE_STRIP)
 
 /* Installing a constructor or destructor at the original's address. GCC
  * builds install a thiscall thunk (constructors must answer `this` in eax, as
@@ -386,6 +380,7 @@ struct AM2_Label : AM2_Widget {
 };
 
 struct AM2_ButtonBase : AM2_Widget {
+    typedef AM2_Widget Base;        /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_ButtonBase[0x68 - sizeof(AM2_Widget)];
     AM2_ButtonBase();
     explicit AM2_ButtonBase(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
@@ -442,9 +437,11 @@ struct AM2_ListBox : AM2_Widget {
 };
 
 struct AM2_TextList : AM2_ListBox {
-    /* No fields of its own. VC6 rejects the base mem-initializer (C2437,
-     * "already initialized") when a constructor is a class's FIRST member,
-     * so something has to precede it. */
+    /* VC6 can reject a base mem-initializer in a class with no destructor
+     * of its own (C2437, "already initialized") -- depending on what the TU
+     * declared before it, so one file compiles and another does not. A
+     * member typedef ahead of the constructor avoids it; every class here
+     * without a destructor carries one. */
     typedef AM2_ListBox Base;
     AM2_TextList(AM2_Rect box, void *rows, int32_t callback, int32_t ownsRows);
 };
@@ -483,9 +480,62 @@ struct AM2_Edit : AM2_Widget {
 };
 
 struct AM2_MpSpin : AM2_Widget {
+    typedef AM2_Widget Base;        /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_MpSpin[AM2_MP_SPIN_SIZE - sizeof(AM2_Widget)];
     AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row);
     explicit AM2_MpSpin(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+};
+
+struct AM2_Blinker : AM2_Panel {
+    AM2_Sprite *sprite0;            /* 0x0060  MULTISPR_OFF_SPRITE0, the first bitmap's */
+    AM2_Sprite *sprites[2];         /* 0x0064  MULTISPR_OFF_SPRITES */
+    int32_t     index;              /* 0x006C  MULTISPR_OFF_INDEX */
+    uint8_t     pad70[0x80 - 0x70];
+    AM2_Blinker(const char *b0, const char *b1, int32_t flag, AM2_Rect box);
+    explicit AM2_Blinker(AM2_Widget::AM2_NoInit n) : AM2_Panel(n) { }
+    ~AM2_Blinker();
+};
+
+struct AM2_Typer : AM2_Widget {
+    typedef AM2_Widget Base;        /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_AM2_Typer[AM2_TYPER_BYTES - sizeof(AM2_Widget)];
+    AM2_Typer(AM2_Rect box, const char *message);
+    explicit AM2_Typer(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+};
+
+struct AM2_HudRadar : AM2_Widget {
+    uint8_t pad_AM2_HudRadar[AM2_HUD_RADAR_BYTES - sizeof(AM2_Widget)];
+    AM2_HudRadar();
+    explicit AM2_HudRadar(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+    ~AM2_HudRadar();
+};
+
+struct AM2_HudSarge : AM2_Widget {
+    uint8_t pad_AM2_HudSarge[AM2_HUD_SARGE_BYTES - sizeof(AM2_Widget)];
+    AM2_HudSarge();
+    explicit AM2_HudSarge(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+    ~AM2_HudSarge();
+};
+
+struct AM2_HudSquad : AM2_Widget {
+    uint8_t pad_AM2_HudSquad[AM2_HUD_SQUAD_BYTES - sizeof(AM2_Widget)];
+    AM2_HudSquad();
+    explicit AM2_HudSquad(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+    ~AM2_HudSquad();
+};
+
+struct AM2_HudCmd : AM2_Widget {
+    uint8_t pad_AM2_HudCmd[AM2_HUD_CMD_BYTES - sizeof(AM2_Widget)];
+    AM2_HudCmd();
+    explicit AM2_HudCmd(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+    ~AM2_HudCmd();
+};
+
+struct AM2_HudEdge : AM2_Widget {
+    uint8_t pad_AM2_HudEdge[AM2_HUD_C_BYTES - sizeof(AM2_Widget)];
+    AM2_HudEdge();
+    explicit AM2_HudEdge(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+    ~AM2_HudEdge();
 };
 
 /* Screen classes, as the original's C++ had them: `new T(bmp)` allocates
@@ -597,11 +647,11 @@ static inline void __attribute__((thiscall)) CheckBoxDestruct(AM2_Widget *w)
 static inline AM2_Widget * __attribute__((thiscall)) HudCommandsDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->HudCommandsDelete(flags); }
 static inline void __attribute__((thiscall)) HudCommandsDestruct(AM2_Widget *w)
-{ ((AM2_Widget *)w)->HudCommandsDestruct(); }
+{ ((AM2_HudCmd *)w)->AM2_HudCmd::~AM2_HudCmd(); }
 static inline AM2_Widget * __attribute__((thiscall)) HudEdgeDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->HudEdgeDelete(flags); }
 static inline void __attribute__((thiscall)) HudEdgeDestruct(AM2_Widget *w)
-{ ((AM2_Widget *)w)->HudEdgeDestruct(); }
+{ ((AM2_HudEdge *)w)->AM2_HudEdge::~AM2_HudEdge(); }
 static inline AM2_Widget * __attribute__((thiscall)) HudPanelDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->HudPanelDelete(flags); }
 static inline void __attribute__((thiscall)) HudPanelDestruct(AM2_Widget *w)
@@ -609,15 +659,15 @@ static inline void __attribute__((thiscall)) HudPanelDestruct(AM2_Widget *w)
 static inline AM2_Widget * __attribute__((thiscall)) HudRadarDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->HudRadarDelete(flags); }
 static inline void __attribute__((thiscall)) HudRadarDestruct(AM2_Widget *w)
-{ ((AM2_Widget *)w)->HudRadarDestruct(); }
+{ ((AM2_HudRadar *)w)->AM2_HudRadar::~AM2_HudRadar(); }
 static inline AM2_Widget * __attribute__((thiscall)) HudSargeDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->HudSargeDelete(flags); }
 static inline void __attribute__((thiscall)) HudSargeDestruct(AM2_Widget *w)
-{ ((AM2_Widget *)w)->HudSargeDestruct(); }
+{ ((AM2_HudSarge *)w)->AM2_HudSarge::~AM2_HudSarge(); }
 static inline AM2_Widget * __attribute__((thiscall)) HudSquadDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->HudSquadDelete(flags); }
 static inline void __attribute__((thiscall)) HudSquadDestruct(AM2_Widget *w)
-{ ((AM2_Widget *)w)->HudSquadDestruct(); }
+{ ((AM2_HudSquad *)w)->AM2_HudSquad::~AM2_HudSquad(); }
 static inline AM2_Widget * __attribute__((thiscall)) HudTopDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->HudTopDelete(flags); }
 static inline void __attribute__((thiscall)) HudTopDestruct(AM2_Widget *w)
@@ -917,22 +967,22 @@ static inline AM2_Widget * __attribute__((thiscall)) HudPanelConstruct(AM2_Widge
 { return w->HudPanelConstruct(); }
 
 static inline AM2_Widget * __attribute__((thiscall)) HudSquadConstruct(AM2_Widget *w)
-{ return w->HudSquadConstruct(); }
+{ return ::new (w) AM2_HudSquad(); }
 
 static inline AM2_Widget * __attribute__((thiscall)) HudRadarConstruct(AM2_Widget *w)
-{ return w->HudRadarConstruct(); }
+{ return ::new (w) AM2_HudRadar(); }
 
 static inline AM2_Widget * __attribute__((thiscall)) HudSargeConstruct(AM2_Widget *w)
-{ return w->HudSargeConstruct(); }
+{ return ::new (w) AM2_HudSarge(); }
 
 static inline AM2_Widget * __attribute__((thiscall)) HudTopConstruct(AM2_Widget *w)
 { return w->HudTopConstruct(); }
 
 static inline AM2_Widget * __attribute__((thiscall)) HudEdgeConstruct(AM2_Widget *w)
-{ return w->HudEdgeConstruct(); }
+{ return ::new (w) AM2_HudEdge(); }
 
 static inline AM2_Widget * __attribute__((thiscall)) HudCmdConstruct(AM2_Widget *w)
-{ return w->HudCmdConstruct(); }
+{ return ::new (w) AM2_HudCmd(); }
 
 static inline AM2_Widget * __attribute__((thiscall)) WidgetConstruct(AM2_Widget *w)
 { return ::new (w) AM2_Widget(); }
@@ -1805,7 +1855,7 @@ static inline void __attribute__((thiscall)) IconDestruct(AM2_Widget *w)
 static inline AM2_Widget * __attribute__((thiscall)) IconDelete(AM2_Widget *w, int32_t flags)
 { return w->IconDelete(flags); }
 static inline void __attribute__((thiscall)) BlinkerDestruct(AM2_Widget *w)
-{ w->BlinkerDestruct(); }
+{ ((AM2_Blinker *)w)->AM2_Blinker::~AM2_Blinker(); }
 static inline AM2_Widget * __attribute__((thiscall)) BlinkerDelete(AM2_Widget *w, int32_t flags)
 { return w->BlinkerDelete(flags); }
 
@@ -2131,7 +2181,7 @@ static inline AM2_Widget * __attribute__((thiscall)) EditConstruct(AM2_Widget *w
  * flashing "send" and "receive" dots. A PANEL underneath, then the SECOND
  * bitmap into sprites[0] and the first parked at MULTISPR_OFF_SPRITE0. */
 static inline AM2_Widget * __attribute__((thiscall)) MultiSpriteConstruct(AM2_Widget *w, const char *b0, const char *b1, int32_t flag, AM2_Rect box)
-{ return w->MultiSpriteConstruct(b0, b1, flag, box); }
+{ return ::new (w) AM2_Blinker(b0, b1, flag, box); }
 
 /* 0x00433290 and 0x00433330, one caller. The TEXT LIST -- the message log's
  * list box. The LIST BOX with a different vtable, five colours and the
@@ -2180,7 +2230,8 @@ static inline AM2_Widget * __attribute__((thiscall)) ArrowBarConstruct(AM2_Widge
  * `|` between the lines rather than storing it. See widget.cpp for the two
  * offsets the loop keeps and what a too-wide word does. */
 static inline AM2_Widget * __attribute__((thiscall)) TyperConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t width, int32_t height, const char *message)
-{ return w->TyperConstruct(left, top, width, height, message); }
+{ AM2_Rect box = { left, top, width, height };
+  return ::new (w) AM2_Typer(box, message); }
 
 /* Original: 0x0044D730. The TITLE SCREEN -- the one arm of the menu table
  * that builds its screen inline rather than calling a constructor. It also
