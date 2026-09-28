@@ -280,7 +280,8 @@ def main():
         for f in sorted(byfile):
             if os.path.basename(f) in BM.SKIP_FILE:
                 continue
-            obj = BM.compile_file(f, od, extra=["/DAM2_STANDALONE", "/DAM2_RELINK"])
+            obj = BM.compile_file(f, od, extra=["/DAM2_STANDALONE", "/DAM2_RELINK"]
+                                  + os.environ.get("RELINK_CFLAGS", "").split())
             if obj is None:
                 continue
             secs, symlist = parse_coff_full(obj)

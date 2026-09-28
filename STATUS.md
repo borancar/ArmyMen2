@@ -23,7 +23,7 @@ the same trick as the hybrid game loader). `make vc6-match` recompiles each
 `patch_replace`'d reconstruction with the *original* compiler at /O2 and
 byte-compares it to `ArmyMen2.exe` -- the strongest correctness check there is.
 
-Piecewise: **361 of ~1640 compiled `src/game` functions are byte-identical as
+Piecewise: **399 of ~1640 compiled `src/game` functions are byte-identical as
 written** (ApproxDist, PackKey, Clamp, PointInRect, …). Re-measure with
 `make vc6-match`; worklist is `make vc6-match ARGS=--diffs`. The pure-signedness
 class (unsigned `jb` where the original compared signed `jl`) is closed --
@@ -66,8 +66,8 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 606 of
-  1640 byte-identical (2026-09-28), piecewise 361.** Earlier: 384 at start,
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 627 of
+  1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout. What moved it from 510 to 606:
   - **Harness fixes.** Data symbols resolve from the native placed build's own
@@ -99,8 +99,28 @@ main result so far (details in `src/vc6/README.md`):
     fields): `TellEachSlot` tested `COMM_ARMY_OFF_REMOTE` instead of
     `COMM_ARMY_OFF_WAS_HERE`. `AiStep` had two switch arms in the wrong
     source order; the same jump table, but not the same code.
-  - **What is left** is dominated by register choice (227), frame and prologue
-    scheduling (sub esp size, push/mov order), and per-function shape. Rather than a bit-exact PE (unneeded for *function*
+  - **More real bugs from the resolved compare (2026-09-29).**
+    `CommFindPlayer` returned `AM2_PLAYER_INDEX` where the original returns
+    `AM2_PLAYER_ARMY`. The comm layer used `Ticks()` in six places where the
+    original calls `GetTickCount`, and `StateEnter3` did the same.
+    `Ticks` uses the performance counter, so stamps and readers could be on
+    different clocks.
+  - **The next big lever is the C++ object model: 95 functions.** 95 of the
+    diffs have, in the original, the `/GX` unwind frame (`push -1; push
+    handler; mov eax, fs:[0]`): 42 widget constructors, 25 `Open*` screen
+    openers, and 28 destructors and builders. A scratch prototype reproduces
+    `OpenDifficulty` instruction for instruction as `delete g_paintObject;
+    g_paintObject = new DifficultyScreen("…");`. So the original widget layer
+    is real C++: virtual deleting destructors, constructors that return
+    `this`, and `new` and `delete`. Our reconstruction models it with explicit
+    vtables and constructor functions called by hand. `/GX` is now the
+    harnesses' default, which is neutral today. The conversion itself is not
+    started, because GCC constructors do not return `this` in `eax` and the
+    original callers rely on it, so the injected and hybrid builds need a
+    plan.
+  - **What else is left** is dominated by register choice (~227), frame and
+    prologue scheduling (sub esp size, push/mov order), and per-function
+    shape. Rather than a bit-exact PE (unneeded for *function*
   byte-match), it simulates the link: lays every reconstructed function at its
   real VA and RESOLVES each relocation to the address the linker would fill,
   comparing with no wildcarding. Compiled with `AM2_RELINK`, so the

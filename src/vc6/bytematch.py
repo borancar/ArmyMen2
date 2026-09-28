@@ -180,7 +180,12 @@ def compile_file(relpath, outdir, extra=()):
         os.remove(obj)
     except OSError:
         pass
-    subprocess.run([HOST, CL, "/O2", "/c"] + list(extra) +
+    # /GX: the original was compiled with C++ exception handling -- 95 of its
+    # functions carry the `push -1; push handler; mov eax, fs:[0]` unwind
+    # frame that only /GX emits (around `new T(...)`, and in constructors and
+    # destructors of classes with destructible parts). Neutral for code that
+    # has none of those, which is all of the reconstruction today.
+    subprocess.run([HOST, CL, "/O2", "/GX", "/c"] + list(extra) +
                    ["/Fo" + obj, os.path.basename(src)],
                    cwd=os.path.dirname(src), env=env,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

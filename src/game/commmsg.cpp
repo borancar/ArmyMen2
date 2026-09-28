@@ -1500,12 +1500,14 @@ void __cdecl TroopMessageRecv(void *msg, int32_t army)
         RecvTrooperFire(msg);
         return;
 
-    case AM2_MSG_PAIR:
-        RecvTroopPair(msg);
-        return;
-
+    /* 0x19 before PAIR: arm bodies follow source order, and the original's
+     * third arm is the want-item one. */
     case 0x19:
         RecvTrooperWantItem(msg);
+        return;
+
+    case AM2_MSG_PAIR:
+        RecvTroopPair(msg);
         return;
 
     case AM2_MSG_TROOPER_DROP_ITEM:
