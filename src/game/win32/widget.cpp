@@ -792,12 +792,11 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::WidgetDelete(int32_t flags)
     return w;
 }
 
-void __attribute__((thiscall)) AM2_Widget::LabelDestruct()
+AM2_Label::~AM2_Label()
 {
     AM2_Widget *w = this;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_LABEL));
-    ::WidgetDestruct(w);
+    AM2_CTOR_VTABLE(w, VTABLE_LABEL);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::LabelDelete(int32_t flags)
@@ -5040,29 +5039,6 @@ AM2_Widget::AM2_Widget()
     w->activate    = 0;
 }
 
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::LabelConstruct(const char *text, int32_t x, int32_t y, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t paper)
-{
-    AM2_Widget *w = this;
-
-    uint8_t *self = (uint8_t *)w;
-
-    ::WidgetConstruct(w);
-
-    *(const char **)(self + LABEL_OFF_TEXT)  = text;
-    *(int32_t *)(self + LABEL_OFF_FONT)      = font;
-    *(uint8_t *)(self + LABEL_OFF_INK)       = (uint8_t)ink;
-    *(uint8_t *)(self + LABEL_OFF_PAPER)     = (uint8_t)paper;
-
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_LABEL));
-    w->x = x;
-    w->y = y;
-    w->w = width;
-    w->h = height;
-
-    ::WidgetScreenRect(w);
-    return w;
-}
-
 void __attribute__((thiscall)) AM2_Widget::WidgetScreenRect()
 {
     AM2_Widget *w = this;
@@ -5082,6 +5058,21 @@ void __attribute__((thiscall)) AM2_Widget::WidgetScreenRect()
     w->rect.right  = left + w->w;
     w->rect.top    = top;
     w->rect.bottom = top  + w->h;
+}
+
+AM2_Label::AM2_Label(const char *text_, AM2_Rect box, int32_t font_, int32_t ink_, int32_t paper_)
+{
+    AM2_Widget *w = this;
+
+    text  = text_;
+    font  = font_;
+    ink   = (uint8_t)ink_;
+    paper = (uint8_t)paper_;
+
+    AM2_CTOR_VTABLE(w, VTABLE_LABEL);
+    *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
+
+    ::WidgetScreenRect(w);
 }
 
 void __attribute__((thiscall)) AM2_Widget::LabelDraw(RECT clip)
@@ -5395,6 +5386,13 @@ AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_ScreenBase(void *mem, const c
 { return ::new (mem) AM2_ScreenBase(bmp, flag); }
 void __attribute__((thiscall)) am2_dtor_AM2_ScreenBase(AM2_Widget *w)
 { ((AM2_ScreenBase *)w)->AM2_ScreenBase::~AM2_ScreenBase(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Label(void *mem, const char *text, AM2_Rect box, int32_t font, int32_t ink, int32_t paper)
+{ return ::new (mem) AM2_Label(text, box, font, ink, paper); }
+void __attribute__((thiscall)) am2_dtor_AM2_Label(AM2_Widget *w)
+{ ((AM2_Label *)w)->AM2_Label::~AM2_Label(); }
 #endif
 
 #if defined(__GNUC__)
@@ -15855,7 +15853,7 @@ int widget_install(void)
                         "WidgetDestruct", 2);
     rc |= patch_replace(ADDR_WIDGET_DELETE, pmf_addr(&AM2_Widget::WidgetDelete),
                         "WidgetDelete", 1);
-    rc |= patch_replace(ADDR_LABEL_DESTRUCT, pmf_addr(&AM2_Widget::LabelDestruct),
+    rc |= patch_replace(ADDR_LABEL_DESTRUCT, AM2_DTOR(AM2_Label),
                         "LabelDestruct", 1);
     rc |= patch_replace(ADDR_LABEL_DELETE, pmf_addr(&AM2_Widget::LabelDelete),
                         "LabelDelete", 1);
@@ -15865,7 +15863,7 @@ int widget_install(void)
                         "WidgetRepaint", 29);
     rc |= patch_replace(ADDR_WIDGET_CONSTRUCT, AM2_CTOR(AM2_Widget),
                         "WidgetConstruct", 33);
-    rc |= patch_replace(ADDR_LABEL_CONSTRUCT, pmf_addr(&AM2_Widget::LabelConstruct),
+    rc |= patch_replace(ADDR_LABEL_CONSTRUCT, AM2_CTOR(AM2_Label),
                         "LabelConstruct", 2);
     rc |= patch_replace(ADDR_WIDGET_SCREEN_RECT, pmf_addr(&AM2_Widget::WidgetScreenRect),
                         "WidgetScreenRect", 33);

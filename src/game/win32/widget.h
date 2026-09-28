@@ -113,7 +113,6 @@ typedef struct AM2_Widget {
                                      * focused child. Constructed null. */
 #ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
     AM2_Widget * __attribute__((thiscall)) WidgetDelete(int32_t flags);
-    void __attribute__((thiscall)) LabelDestruct();
     AM2_Widget * __attribute__((thiscall)) LabelDelete(int32_t flags);
     void __attribute__((thiscall)) WidgetPaint(RECT clip);
     void __attribute__((thiscall)) KeyRowUpdate();
@@ -224,7 +223,6 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) WidgetRepaint();
     AM2_Widget * __attribute__((thiscall)) HudCmdConstruct();
     AM2_Widget * __attribute__((thiscall)) HudEdgeConstruct();
-    AM2_Widget * __attribute__((thiscall)) LabelConstruct(const char *text, int32_t x, int32_t y, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t paper);
     void __attribute__((thiscall)) WidgetScreenRect();
     void __attribute__((thiscall)) LabelDraw(RECT clip);
     void __attribute__((thiscall)) MpDialogDestruct();
@@ -354,6 +352,7 @@ typedef struct AM2_Widget {
 AM2_CLASS_VTABLE(AM2_Widget, VTABLE_WIDGET_BASE)
 AM2_CLASS_VTABLE(AM2_Panel, VTABLE_PANEL)
 AM2_CLASS_VTABLE(AM2_ScreenBase, VTABLE_DIALOG)
+AM2_CLASS_VTABLE(AM2_Label, VTABLE_LABEL)
 
 /* Installing a constructor or destructor at the original's address. GCC
  * builds install a thiscall thunk (constructors must answer `this` in eax, as
@@ -379,6 +378,17 @@ struct AM2_ScreenBase : AM2_Panel {
     AM2_ScreenBase(const char *bmp, int32_t flag);
     explicit AM2_ScreenBase(AM2_Widget::AM2_NoInit n) : AM2_Panel(n) { }
     ~AM2_ScreenBase();
+};
+
+struct AM2_Label : AM2_Widget {
+    const char *text;               /* 0x0058  LABEL_OFF_TEXT */
+    int32_t     font;               /* 0x005C  LABEL_OFF_FONT */
+    uint8_t     ink;                /* 0x0060  LABEL_OFF_INK */
+    uint8_t     paper;              /* 0x0061  LABEL_OFF_PAPER */
+    uint8_t     pad_AM2_Label[AM2_LABEL_SIZE - 0x62];
+    AM2_Label(const char *text, AM2_Rect box, int32_t font, int32_t ink, int32_t paper);
+    explicit AM2_Label(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+    ~AM2_Label();
 };
 
 /* Screen classes, as the original's C++ had them: `new T(bmp)` allocates
@@ -699,7 +709,7 @@ static inline AM2_Widget * __attribute__((thiscall)) WidgetDelete(AM2_Widget *w,
  * the text it points at is not its to free -- so it is the vtable store and a
  * tail call to the base. */
 static inline void __attribute__((thiscall)) LabelDestruct(AM2_Widget *w)
-{ w->LabelDestruct(); }
+{ ((AM2_Label *)w)->AM2_Label::~AM2_Label(); }
 
 /* Original: 0x00454ED0, thiscall, slot 0 of the label. */
 static inline AM2_Widget * __attribute__((thiscall)) LabelDelete(AM2_Widget *w, int32_t flags)
@@ -835,7 +845,8 @@ static inline AM2_Widget * __attribute__((thiscall)) WidgetConstruct(AM2_Widget 
  * The argument order is the original's and is not the field order --
  * (text, x, y, w, h, font, ink, paper). */
 static inline AM2_Widget * __attribute__((thiscall)) LabelConstruct(AM2_Widget *w, const char *text, int32_t x, int32_t y, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t paper)
-{ return w->LabelConstruct(text, x, y, width, height, font, ink, paper); }
+{ AM2_Rect box = { x, y, width, height };
+  return ::new (w) AM2_Label(text, box, font, ink, paper); }
 
 /* Slot 3's signature. */
 typedef void (__attribute__((thiscall)) *AM2_WidgetFocusFn)(AM2_Widget *w,
