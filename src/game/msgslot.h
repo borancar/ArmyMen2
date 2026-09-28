@@ -501,6 +501,8 @@ struct AM2_Comm {
     int32_t __attribute__((thiscall)) CommPlayerId(int32_t slot);
     int32_t __attribute__((thiscall)) CommAllPlayersAgreed();
     int32_t __attribute__((thiscall)) CommAllPlayersReady();
+    /* defined in army.cpp */
+    int32_t __attribute__((thiscall)) AllyFlag(int32_t a, int32_t b);
 };
 static inline void CommSetSlotRemote(void *comm, int32_t slot)
 { ((AM2_Comm *)comm)->CommSetSlotRemote(slot); }

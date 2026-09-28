@@ -84,6 +84,35 @@ def string_va(sym, secs, symlist, symidx, img, cache):
     return va
 
 
+def content_va(sym, secs, symlist, symidx, img, site, addend):
+    """A content-addressed constant -- a string literal (??_C@) or a floating
+    constant (__real@) -- that occurs more than once in the image, so a
+    search cannot pick its VA.  The original's own pointer at this site
+    settles it: accept it when the bytes it points at ARE our constant.
+    Equal bytes make the two references equivalent, so this proves the
+    reference rather than assuming it."""
+    if not (sym.startswith("??_C@") or sym.startswith("__real@")):
+        return None
+    _, secnum, value = symlist[symidx]
+    if secnum <= 0:
+        return None
+    data = secs[secnum - 1]["data"]
+    if sym.startswith("__real@"):
+        want = bytes(data[value:value + (8 if sym.startswith("__real@8") else 4)])
+    else:
+        end = data.find(b"\0", value)
+        want = bytes(data[value:end + 1]) if end >= 0 else bytes(data[value:])
+    if not want:
+        return None
+    ptr = struct.unpack("<I", img.read(site, 4))[0]
+    base = (ptr - addend) & 0xffffffff
+    try:
+        got = img.read(base, len(want))
+    except Exception:
+        return None
+    return base if got == want else None
+
+
 def _find_all(img, needle):
     """All VAs where `needle` occurs in .rdata/.data."""
     out = []
@@ -372,6 +401,10 @@ def main():
                     if tgt_va is None:
                         tgt_va = string_va(tgt_name, secs, symlist, symidx,
                                            img, strcache)
+                    if tgt_va is None and typ == IMAGE_REL_I386_DIR32:
+                        tgt_va = content_va(tgt_name, secs, symlist, symidx,
+                                            img, va + roff,
+                                            struct.unpack_from("<i", cur, roff)[0])
                     if tgt_va is None:
                         unresolved_hist[tgt_name] += 1
                         for k in range(4):

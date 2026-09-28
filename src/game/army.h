@@ -21,12 +21,14 @@
 extern "C" {
 #endif
 
-/* 0x0040F230, two callers, and STDCALL rather than cdecl -- it is a `ret 8`
- * that reads both arguments off the stack, and both call sites load `ecx` with
- * the comm object first and then ignore it.
+/* 0x0040F230: AllyFlag is AM2_Comm::AllyFlag (msgslot.h), a THISCALL member
+ * that never uses `this` -- `ret 8`, both arguments off the stack, `ecx`
+ * ignored. It was declared stdcall, which is the same callee-cleans frame and
+ * so ran correctly; but every original caller loads `ecx` with the comm object
+ * first, and only a member call reproduces that. The forwarder below (C++
+ * only, after the extern "C" block) keeps the two-argument spelling.
  *
  * A raw read of the matrix: no bounds check, no special case for army 4. */
-int32_t __attribute__((stdcall)) AllyFlag(int32_t a, int32_t b);
 
 /* 0x00458070, twenty callers. Detach an object from whatever it is attached
  * to, then attach it to a target if one is given -- a NULL target is the pure
@@ -161,6 +163,14 @@ int army_install(void);
 
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+#include "msgslot.h"
+#include "../inject/orig.h"
+/* Through the comm object, as every original caller does (see above). */
+static inline int32_t AllyFlag(int32_t a, int32_t b)
+{ return (*(AM2_Comm *const *)(uintptr_t)ADDR_COMM_OBJECT)->AllyFlag(a, b); }
 #endif
 
 /* 0x00403600, 0x00403660 and 0x004036C0 -- three target predicates sharing

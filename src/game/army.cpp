@@ -8,6 +8,7 @@
 #include "msgslot.h"   /* CommMustBroadcast */
 #include "objtype.h"   /* ObjType2Field548 */
 #include "crt.h"
+#include "pmf.h"
 #include "image.h"
 #include "../inject/orig.h"
 #include "../inject/patch.h"
@@ -41,7 +42,7 @@ extern "C" const char *const am2_vehicle_names[6] = {   /* 0x0048BE50 */
 #define AM2_ARMY_COUNT   4
 #define AM2_OBJ_TYPE_2   2
 
-int32_t __attribute__((stdcall)) AllyFlag(int32_t a, int32_t b)
+int32_t __attribute__((thiscall)) AM2_Comm::AllyFlag(int32_t a, int32_t b)
 {
     return g_allyMatrix[a * AM2_ARMY_COUNT + b];
 }
@@ -873,7 +874,7 @@ int army_install(void)
                         "ListFirstObj", 1);
     rc |= patch_replace(ADDR_LIST_FIRST_FIELD548, (const void *)ListFirstField548,
                         "ListFirstField548", 1);
-    rc |= patch_replace(ADDR_ALLY_FLAG, (const void *)AllyFlag, "AllyFlag", 2);
+    rc |= patch_replace(ADDR_ALLY_FLAG, pmf_addr(&AM2_Comm::AllyFlag), "AllyFlag", 2);
     rc |= patch_replace(ADDR_OBJ_ATTACH_TO, (const void *)ObjAttachTo,
                         "ObjAttachTo", 2);
     rc |= patch_replace(ADDR_OBJ_IS_OURS, (const void *)ObjIsOurs,

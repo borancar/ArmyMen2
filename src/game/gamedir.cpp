@@ -61,11 +61,13 @@ int32_t __cdecl FileExists(const char *path)
 {
     am2_FILE *fp = orig_fopen(path, "r");
 
-    if (fp == (am2_FILE *)0)
-        return 0;
-
-    orig_fclose(fp);
-    return 1;
+    /* The success path first, as the original lays it out: `je` to the
+     * return-0 tail, the fclose path falling through. */
+    if (fp != (am2_FILE *)0) {
+        orig_fclose(fp);
+        return 1;
+    }
+    return 0;
 }
 
 /* FileHasSaveTag -- original 0x00423620, two callers, both save-game dialogs.
