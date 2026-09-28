@@ -9050,7 +9050,10 @@ static int32_t ThumbShift(int32_t pos, int32_t range, int32_t travel)
 /* 0x004557F0 and 0x004558B0. The list scrolls by one row; the guards are the
  * two ends of the range and the DOWN one computes its own limit, count less
  * how many rows fit, rather than keeping it anywhere. */
-static void ArrowBarScroll(AM2_Widget *arrow, int32_t delta)
+/* `inline` is load-bearing: the original has this body at every call site,
+ * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
+ * each caller compiled to push/call/pop -- the relink found it. */
+static inline void ArrowBarScroll(AM2_Widget *arrow, int32_t delta)
 {
     AM2_Widget *bar  = *(AM2_Widget **)((uint8_t *)arrow + ARROW_OFF_OWNER);
     AM2_Widget *list = *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST);
@@ -9218,7 +9221,10 @@ void __attribute__((thiscall)) AM2_ArrowBar::ArrowBarFollowEnd()
 /* 0x00455ED0 and 0x00455F60. The scroll bar's own position, one step, and
  * then its onChange if it has one -- which the AUDIO dialog's three bars do,
  * so an arrow click is a volume change. Nothing here touches a list. */
-static void ScrollBarStep(AM2_Widget *arrow, int32_t delta)
+/* `inline` is load-bearing: the original has this body at every call site,
+ * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
+ * each caller compiled to push/call/pop -- the relink found it. */
+static inline void ScrollBarStep(AM2_Widget *arrow, int32_t delta)
 {
     AM2_Widget *bar = *(AM2_Widget **)((uint8_t *)arrow + ARROW_OFF_OWNER);
     uint8_t    *b   = (uint8_t *)bar;

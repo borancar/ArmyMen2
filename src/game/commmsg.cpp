@@ -697,7 +697,8 @@ void __cdecl ExitGamePostClose(void)
 {
     *(int32_t *)((void *)(uintptr_t)(ADDR_EXIT_GAME_FLAG)) = 1;
 
-    orig_log("Exit Game Posting WM_CLOSE from 3DONetwork\n");
+    /* Three trailing zeros, as the original pushes them: `add esp, 0x10`. */
+    orig_log("Exit Game Posting WM_CLOSE from 3DONetwork\n", 0, 0, 0);
 
     orig_post_message(*(void **)((void *)(uintptr_t)(ADDR_HWND)), AM2_WM_CLOSE, 0, 0);
 }

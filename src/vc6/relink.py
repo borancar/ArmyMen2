@@ -287,7 +287,8 @@ def main():
             # name -> (secnum, value) for defined symbols, like bytematch.syms
             names = {}
             for s in symlist:
-                if s and s[0] not in names:
+                # a defined entry wins over an earlier undefined reference
+                if s and (s[0] not in names or (names[s[0]][0] <= 0 < s[1])):
                     names[s[0]] = (s[1], s[2])
             # the piecewise baseline: same TU WITHOUT the relink source form,
             # compiled into a separate dir so the .obj paths do not collide.
@@ -323,6 +324,8 @@ def main():
                     if not sym:
                         continue
                     secnum, value = names[sym]
+                    if secnum <= 0:
+                        continue
                     sec = secs[secnum - 1]
                     n = len(sec["data"])
                     for off, symidx, typ in sec["rels"]:
@@ -364,6 +367,8 @@ def main():
                 if not sym:
                     continue
                 secnum, value = names[sym]
+                if secnum <= 0:
+                    continue            # never defined in this TU
                 sec = secs[secnum - 1]
                 data = sec["data"]
                 # function extent: value .. next defined symbol in this section

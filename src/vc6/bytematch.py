@@ -89,7 +89,13 @@ def parse_coff(path):
                else raw.split(b"\0")[0].decode("latin1")
         _, secnum = struct.unpack_from("<ih", d, b+8)
         aux = d[b+17]
-        syms.setdefault(name, (secnum, struct.unpack_from("<i", d, b+8)[0]))
+        # A DEFINED entry wins over an undefined one of the same name: a
+        # function referenced before its definition in its own file appears
+        # first as an external (section 0), and keeping that read "section
+        # -1" -- the last one -- as the function's bytes.
+        entry = (secnum, struct.unpack_from("<i", d, b+8)[0])
+        if name not in syms or (syms[name][0] <= 0 < secnum):
+            syms[name] = entry
         i += 1 + aux
     return secs, syms
 

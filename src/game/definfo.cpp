@@ -735,9 +735,12 @@ void __cdecl AddMissileDef(const void *rec)
  * appends and DefFreeTables frees -- three functions agreeing on it. */
 void *__cdecl VehicleDefFind(int32_t id)
 {
-    int32_t key = id;
+    /* A whole record as the key, id in its first field -- the original's
+     * `sub esp, 0x24` is one record, not one dword. */
+    uint8_t key[AM2_VEHICLE_DEF_REC_SIZE];
 
-    return orig_bsearch(&key,
+    *(int32_t *)key = id;
+    return orig_bsearch(key,
                         *(void *const *)(uintptr_t)ADDR_VEHICLE_DEFS,
                         (size_t)*(const int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT,
                         AM2_VEHICLE_DEF_REC_SIZE,
@@ -753,9 +756,11 @@ void *__cdecl VehicleDefFind(int32_t id)
  * only thing that ever differs between them. */
 void *__cdecl MissileDefFind(int32_t id)
 {
-    int32_t key = id;
+    /* A whole record as the key, as VehicleDefFind (`sub esp, 0x34`). */
+    uint8_t key[AM2_MISSILE_DEF_REC_SIZE];
 
-    return orig_bsearch(&key,
+    *(int32_t *)key = id;
+    return orig_bsearch(key,
                         *(void *const *)(uintptr_t)ADDR_DEF_MISSILE_RECS,
                         (size_t)*(const int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT,
                         AM2_MISSILE_DEF_REC_SIZE,

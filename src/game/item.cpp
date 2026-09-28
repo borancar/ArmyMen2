@@ -2127,7 +2127,10 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
  * interchangeable: ADDR_OBJ_MARK is at 0x00661E20 and ADDR_ROACH_MARK at
  * 0x00656128.
  */
-static void ObjFootprint(void *obj, int32_t set)
+/* `inline` is load-bearing: the original has this body at every call site,
+ * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
+ * each caller compiled to push/call/pop -- the relink found it. */
+static inline void ObjFootprint(void *obj, int32_t set)
 {
     uint8_t        *o = (uint8_t *)obj;
     const uint8_t  *rows;
