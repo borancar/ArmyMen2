@@ -139,8 +139,12 @@ struct AM2_RoachParams {
     int32_t box[4];            /* +0x20  AM2_Rect */
     int32_t bite_box[4];       /* +0x30  AM2_Rect */
     int32_t row_spec[4];       /* +0x40 */
-    int32_t field_530_frames;  /* +0x50 */
-    int32_t start_frame;       /* +0x54  read as int16 */
+    /* +0x50: seven frame ids indexed by the NEW field-530 state, unbounded
+     * (81, 81, 80, 85, 6, 35, 84); [1] is also ROACH_START_FRAME, read as
+     * int16. Once two scalars here plus a separate 20-byte
+     * am2_roach_score_ints, so states 2..6 read past the struct wherever a
+     * linker put it (found by the view-extent scan, not by a crash). */
+    int32_t field_530_frames[7];
 };
 extern struct AM2_RoachParams am2_roach;
 /* Object hit-boxes and row-specs, int32[4] rects (item.cpp). */
@@ -280,6 +284,7 @@ struct AM2_HudCommandBlock {
     struct AM2_HudCommand cmd[7];      /* 0x004761A8 */
     int32_t  build_rect0[4];           /* 0x004762C0  button 0's rect */
     uint32_t build_menu[252];          /* 0x004762D0  18 records of 0x38 */
+    uint32_t sarge_tail[2];            /* 0x004766C0  HUD_SARGE_OFFSETS cells 4-5 */
 };
 extern struct AM2_HudCommandBlock am2_hud_commands;
 /* Scalar float/double constants (misc.cpp), read as *(const double/float *). */
@@ -564,9 +569,9 @@ extern int16_t am2_air_path_turn_y_in[1], am2_air_path_turn_y_out[1];
 #undef ADDR_ROACH_ROW_SPEC
 #define ADDR_ROACH_ROW_SPEC     ((uintptr_t)(const void *)&am2_roach.row_spec)
 #undef ADDR_FIELD_530_FRAMES
-#define ADDR_FIELD_530_FRAMES   ((uintptr_t)(const void *)&am2_roach.field_530_frames)
+#define ADDR_FIELD_530_FRAMES   ((uintptr_t)(const void *)am2_roach.field_530_frames)
 #undef ADDR_ROACH_START_FRAME
-#define ADDR_ROACH_START_FRAME  ((uintptr_t)(const void *)&am2_roach.start_frame)
+#define ADDR_ROACH_START_FRAME  ((uintptr_t)(const void *)&am2_roach.field_530_frames[1])
 
 #undef ADDR_EXPLOSION_BOX
 #define ADDR_EXPLOSION_BOX      ((uintptr_t)(const void *)am2_explosion_box)
@@ -1447,7 +1452,6 @@ extern uint8_t am2_tzname_std[64];
 extern uint8_t am2_tzname_dst[64];
 extern uint8_t am2_sprite_group_b[48];   /* groups C, runtime-written */
 extern const uint8_t am2_sprite_grid_data[324];
-extern const uint8_t am2_roach_score_ints[20];
 extern const uint8_t am2_item_type_offsets[16];
 extern const uint8_t am2_screen_consts[8];
 extern const uint8_t am2_crt_osver_pair[8];
@@ -1466,7 +1470,6 @@ extern const uint8_t am2_write_dot_flag[4];
 extern const uint8_t am2_write_dot_float[4];
 extern const uint8_t am2_str_dot[1];
 extern const uint8_t am2_bool_display_strings[40];
-extern const uint8_t am2_build_menu_end_data[8];
 extern const uint8_t am2_crt_eh_magic[4];
 extern const uint8_t am2_palette_cycle_extra[4];
 extern const uint8_t am2_debug_blast_flag[4];
@@ -1565,8 +1568,6 @@ extern const uint8_t am2_logpalette_hdr_small[4];
 #define ADDR_SPRITE_GROUPS_C_END           ((uintptr_t)(const void *)&am2_sprite_group_b[48])
 #undef ADDR_SPRITE_GRID_DATA
 #define ADDR_SPRITE_GRID_DATA              ((uintptr_t)(const void *)am2_sprite_grid_data)
-#undef ADDR_ROACH_SCORE_INTS
-#define ADDR_ROACH_SCORE_INTS              ((uintptr_t)(const void *)am2_roach_score_ints)
 #undef ADDR_ITEM_TYPE_OFFSETS
 #define ADDR_ITEM_TYPE_OFFSETS             ((uintptr_t)(const void *)am2_item_type_offsets)
 #undef ADDR_DIFFICULTY_CONSTS
@@ -1605,8 +1606,6 @@ extern const uint8_t am2_logpalette_hdr_small[4];
 #define ADDR_STR_DOT                       ((uintptr_t)(const void *)am2_str_dot)
 #undef ADDR_STR_BOOL_0
 #define ADDR_STR_BOOL_0                    ((uintptr_t)(const void *)am2_bool_display_strings)
-#undef ADDR_BUILD_MENU_END_DATA
-#define ADDR_BUILD_MENU_END_DATA           ((uintptr_t)(const void *)am2_build_menu_end_data)
 #undef ADDR_CRT_EH_MAGIC
 #define ADDR_CRT_EH_MAGIC                  ((uintptr_t)(const void *)am2_crt_eh_magic)
 #undef ADDR_PALETTE_CYCLE_TAIL

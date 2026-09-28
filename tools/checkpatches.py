@@ -40,11 +40,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # What is aliased today. See the ratchet below before changing it.
-# 22: ADDR_BUILD_MENU_END_DATA (2026-09-28) -- the table's end sentinel and the
-# separate 8-byte object that starts there, split once ADDR_BUILD_MENU_END
-# became a pointer past am2_hud_commands.build_menu (the SOUND_DYNAMIC /
-# SOUND_SLOTS_END shape).
-MAX_ALIASES = 22
+MAX_ALIASES = 21
 
 
 def macros():

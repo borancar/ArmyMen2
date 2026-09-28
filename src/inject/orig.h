@@ -786,9 +786,6 @@
  * because whoever builds buttons from these rectangles will. */
 #define ADDR_BUILD_MENU        0x004762D0u  /* 18 records of 0x38 */
 #define ADDR_BUILD_MENU_END    0x004766C0u
-/* The eight bytes that follow the table (same VA as its end, a different
- * object: origtail.cpp's am2_build_menu_end_data). */
-#define ADDR_BUILD_MENU_END_DATA 0x004766C0u
 #define AM2_BUILD_MENU_STRIDE  0x38u
 #define BUILD_MENU_OFF_ID      0x00u  /* into ADDR_UNIT_TYPES, NOT the index */
 #define BUILD_MENU_OFF_KIND    0x04u
@@ -18632,7 +18629,6 @@ typedef int32_t (__cdecl *am2_change_object_frame_fn)(void *obj, int32_t frame,
 #define ADDR_TZNAME_STD                    0x0048D40Cu /* the writable STD tzname buffer (__tzset writes it) */
 #define ADDR_TZNAME_DST                    0x0048D44Cu /* the writable DST tzname buffer (__tzset writes it) */
 #define ADDR_SPRITE_GRID_DATA              0x0048CA44u /* sprite grid dimension/index metadata (read-only) */
-#define ADDR_ROACH_SCORE_INTS              0x00487C00u /* roach score/config ints */
 #define ADDR_ITEM_TYPE_OFFSETS             0x0048C470u /* item-type offset ints {-10,-10,10,10} */
 #define ADDR_DIFFICULTY_CONSTS             0x00489874u /* difficulty scale consts (2.0, 1.5) */
 #define ADDR_SCREEN_CONSTS                 0x004852E4u /* screen/gravity consts {750,100} */

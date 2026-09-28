@@ -607,8 +607,14 @@ extern "C" const AM2_Option am2_option_table[43] = {
  *                     are build_rect0
  *   BUILD_MENU_RECTS  button i's rect, stride 0x38, rect 0 = build_rect0 and
  *                     rect i = build_menu record (i-1) + 0x28
- *   BUILD_MENU        the 18 records of 0x38; its last 16 bytes are also read
- *                     as HUD_SARGE_OFFSETS
+ *   BUILD_MENU        the 18 records of 0x38
+ *   HUD_SARGE_OFFSETS the sarge panel's six int16 (x,y) cells, 24 bytes from
+ *                     0x004766B0: the build menu's last 16 bytes AND the 8
+ *                     past its end (sarge_tail). Those 8 were once a separate
+ *                     am2_build_menu_end_data; under VC6 LINK it landed
+ *                     elsewhere, cells 4-5 read foreign bytes, and after a
+ *                     load the sarge panel drew two weapons where there were
+ *                     six.
  *
  * NOT const: HudCmdConstruct stores each record's sprite. The build menu is
  * written as the image's dwords (records hold ids, kinds, names, rects). */
@@ -667,6 +673,7 @@ struct AM2_HudCommandBlock am2_hud_commands = {
         0x656E694Du, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
         0x00000000u, 0x00000000u, 0x00150006u, 0x00150032u, 0x0015005Eu, 0x00310006u,
     },
+    { 0x00310032u, 0x0031005Eu },
 };
 #endif
 

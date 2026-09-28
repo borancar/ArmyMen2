@@ -7143,7 +7143,7 @@ struct AM2_RoachParams am2_roach = {        /* 0x00487BA8 */
     { -32, -32, 32, 32 },                  /* box      0x00487BC8 */
     { -24, -24, 24, 24 },                  /* bite_box 0x00487BD8 */
     { -48, -48, 96, 96 },                  /* row_spec 0x00487BE8 */
-    81, 81,                                /* field_530_frames 0x00487BF8, start_frame 0x00487BFC */
+    { 81, 81, 80, 85, 6, 35, 84 },         /* field_530_frames 0x00487BF8 ([1] = start_frame) */
 };
 
 /* The rank records at 0x00473DC0: eight 28-byte records (RANK_REC_BYTES),
