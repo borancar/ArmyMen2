@@ -2169,24 +2169,91 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DialogDelete(int32_t flags)
 
 #define AM2_DIALOG_DTOR(name, vt) AM2_CLASS_DTOR(name, vt, DialogDestruct)
 
-AM2_DIALOG_DTOR(DlgSelectMap, VTABLE_DLG_SELECTMAP)
-AM2_DIALOG_DTOR(DlgDifficulty, VTABLE_DLG_DIFFICULTY)
+/* The deleting half alone, for a class whose destructor is a real C++ one. */
+#define AM2_CLASS_DELETE(name)                                           \
+    AM2_Widget *__attribute__((thiscall)) AM2_Widget::name##Delete(int32_t flags) \
+    {                                                                        \
+        AM2_Widget *w = this;                                                \
+        ::name##Destruct(w);                                                 \
+        if (flags & 1)                                                       \
+            orig_delete(w);                                                  \
+        return w;                                                            \
+    }
+
+AM2_CLASS_DELETE(DlgSelectMap)
+AM2_SelectMapScreen::~AM2_SelectMapScreen()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_SELECT_MAP);
+}
+AM2_CLASS_DELETE(DlgDifficulty)
+AM2_DifficultyDialog::~AM2_DifficultyDialog()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_DIFFICULTY_DIALOG);
+}
 AM2_DIALOG_DTOR(DlgQuitGame, VTABLE_DLG_QUITGAME)
 AM2_DIALOG_DTOR(DlgReplay, VTABLE_DLG_REPLAY)
-AM2_DIALOG_DTOR(DlgAudio, VTABLE_DLG_AUDIO)
-AM2_DIALOG_DTOR(DlgOptions, VTABLE_DLG_OPTIONS)
-AM2_DIALOG_DTOR(DlgDelGame, VTABLE_DLG_DELGAME)
-AM2_DIALOG_DTOR(DlgOverwrite, VTABLE_DLG_OVERWRITE)
+AM2_CLASS_DELETE(DlgAudio)
+AM2_AudioDialogScreen::~AM2_AudioDialogScreen()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_AUDIO_DIALOG);
+}
+AM2_CLASS_DELETE(DlgOptions)
+AM2_OptionsMenuScreen::~AM2_OptionsMenuScreen()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_OPTIONS_MENU);
+}
+AM2_CLASS_DELETE(DlgDelGame)
+AM2_DeleteGameScreen::~AM2_DeleteGameScreen()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_DELETE_GAME);
+}
+AM2_CLASS_DELETE(DlgOverwrite)
+AM2_DlgOverwriteScreen::~AM2_DlgOverwriteScreen()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_DLG_OVERWRITE);
+}
 AM2_DIALOG_DTOR(DlgDelPlayer, VTABLE_DLG_DELPLAYER)
-AM2_DIALOG_DTOR(DlgControls, VTABLE_DLG_CONTROLS)
-AM2_DIALOG_DTOR(DlgSelectPlayer, VTABLE_DLG_SELECTPLAYER)
-AM2_DIALOG_DTOR(DlgNameEntry, VTABLE_DLG_NAMEENTRY)
-AM2_DIALOG_DTOR(DlgLoadGame, VTABLE_DLG_LOADGAME)
-AM2_DIALOG_DTOR(DlgMessage, VTABLE_DLG_MESSAGE)
-AM2_DIALOG_DTOR(DlgGameMenu, VTABLE_DLG_GAMEMENU)
+AM2_CLASS_DELETE(DlgControls)
+AM2_ControlsDialogScreen::~AM2_ControlsDialogScreen()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_CONTROLS_DIALOG);
+}
+AM2_CLASS_DELETE(DlgSelectPlayer)
+AM2_SelectPlayerScreen::~AM2_SelectPlayerScreen()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_SELECT_PLAYER);
+}
+AM2_CLASS_DELETE(DlgNameEntry)
+AM2_EnterNameScreen::~AM2_EnterNameScreen()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_ENTER_NAME);
+}
+AM2_CLASS_DELETE(DlgLoadGame)
+AM2_LoadGameScreen::~AM2_LoadGameScreen()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_LOAD_GAME);
+}
+AM2_CLASS_DELETE(DlgMessage)
+AM2_DlgMessageScreen::~AM2_DlgMessageScreen()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_DLG_MESSAGE);
+}
+AM2_CLASS_DELETE(DlgGameMenu)
+AM2_DlgGameMenuScreen::~AM2_DlgGameMenuScreen()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_DLG_GAMEMENU);
+}
 
-AM2_DIALOG_DTOR(CommPanel, VTABLE_COMM_PANEL)
-AM2_DIALOG_DTOR(BattleJoin, VTABLE_BATTLE_JOIN)
+AM2_CLASS_DELETE(CommPanel)
+AM2_CommPanelScreen::~AM2_CommPanelScreen()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_COMM_PANEL);
+}
+AM2_CLASS_DELETE(BattleJoin)
+AM2_DlgBattleJoinScreen::~AM2_DlgBattleJoinScreen()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_BATTLE_JOIN);
+}
 AM2_CLASS_DTOR(MpName, VTABLE_MP_NAME, WidgetDestruct)
 
 /* The HUD's own classes. Every name is from the widget dump: `ctl widgets` in
@@ -5071,7 +5138,7 @@ void __attribute__((thiscall)) AM2_Widget::LabelDraw(RECT clip)
     UnlockSurface();
 }
 
-void * __attribute__((thiscall)) AM2_Rec::RecordCtor(int32_t value)
+AM2_Rec::AM2_Rec(int32_t value)
 {
     void *rec = this;
 
@@ -5080,8 +5147,12 @@ void * __attribute__((thiscall)) AM2_Rec::RecordCtor(int32_t value)
     r[0] = 0;
     r[1] = 0;
     r[2] = value;
-    return rec;
 }
+
+#if defined(__GNUC__)
+void *__attribute__((thiscall)) am2_ctor_AM2_Rec(void *mem, int32_t value)
+{ return ::new (mem) AM2_Rec(value); }
+#endif
 
 void __attribute__((thiscall)) AM2_Rec::RecordResetAlias()
 {
@@ -5339,6 +5410,8 @@ typedef void (__cdecl *AM2_VoidFn)(void);
 #if defined(__GNUC__)
 void *AM2_Widget::operator new(size_t n) { return orig_operator_new(n); }
 void AM2_Widget::operator delete(void *p) { orig_delete(p); }
+void *AM2_Rec::operator new(size_t n) { return orig_operator_new(n); }
+void AM2_Rec::operator delete(void *p) { orig_delete(p); }
 #endif
 
 #if defined(__GNUC__)
@@ -5490,6 +5563,104 @@ void __attribute__((thiscall)) am2_dtor_AM2_HudTop(AM2_Widget *w)
 #endif
 
 #if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_DifficultyDialog(void *mem, const char *bmp)
+{ return ::new (mem) AM2_DifficultyDialog(bmp); }
+void __attribute__((thiscall)) am2_dtor_AM2_DifficultyDialog(AM2_Widget *w)
+{ ((AM2_DifficultyDialog *)w)->AM2_DifficultyDialog::~AM2_DifficultyDialog(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_DlgMessageScreen(void *mem, const char *bmp, int32_t flag)
+{ return ::new (mem) AM2_DlgMessageScreen(bmp, flag); }
+void __attribute__((thiscall)) am2_dtor_AM2_DlgMessageScreen(AM2_Widget *w)
+{ ((AM2_DlgMessageScreen *)w)->AM2_DlgMessageScreen::~AM2_DlgMessageScreen(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_AudioDialogScreen(void *mem, const char *bmp, int32_t flag)
+{ return ::new (mem) AM2_AudioDialogScreen(bmp, flag); }
+void __attribute__((thiscall)) am2_dtor_AM2_AudioDialogScreen(AM2_Widget *w)
+{ ((AM2_AudioDialogScreen *)w)->AM2_AudioDialogScreen::~AM2_AudioDialogScreen(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_CommPanelScreen(void *mem, const char *bmp)
+{ return ::new (mem) AM2_CommPanelScreen(bmp); }
+void __attribute__((thiscall)) am2_dtor_AM2_CommPanelScreen(AM2_Widget *w)
+{ ((AM2_CommPanelScreen *)w)->AM2_CommPanelScreen::~AM2_CommPanelScreen(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_ControlsDialogScreen(void *mem, const char *bmp)
+{ return ::new (mem) AM2_ControlsDialogScreen(bmp); }
+void __attribute__((thiscall)) am2_dtor_AM2_ControlsDialogScreen(AM2_Widget *w)
+{ ((AM2_ControlsDialogScreen *)w)->AM2_ControlsDialogScreen::~AM2_ControlsDialogScreen(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_DeleteGameScreen(void *mem, const char *bmp, int32_t flag)
+{ return ::new (mem) AM2_DeleteGameScreen(bmp, flag); }
+void __attribute__((thiscall)) am2_dtor_AM2_DeleteGameScreen(AM2_Widget *w)
+{ ((AM2_DeleteGameScreen *)w)->AM2_DeleteGameScreen::~AM2_DeleteGameScreen(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_DlgBattleJoinScreen(void *mem, const char *bmp)
+{ return ::new (mem) AM2_DlgBattleJoinScreen(bmp); }
+void __attribute__((thiscall)) am2_dtor_AM2_DlgBattleJoinScreen(AM2_Widget *w)
+{ ((AM2_DlgBattleJoinScreen *)w)->AM2_DlgBattleJoinScreen::~AM2_DlgBattleJoinScreen(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_DlgGameMenuScreen(void *mem, const char *bmp, int32_t flag)
+{ return ::new (mem) AM2_DlgGameMenuScreen(bmp, flag); }
+void __attribute__((thiscall)) am2_dtor_AM2_DlgGameMenuScreen(AM2_Widget *w)
+{ ((AM2_DlgGameMenuScreen *)w)->AM2_DlgGameMenuScreen::~AM2_DlgGameMenuScreen(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_DlgOverwriteScreen(void *mem, const char *bmp, int32_t flag)
+{ return ::new (mem) AM2_DlgOverwriteScreen(bmp, flag); }
+void __attribute__((thiscall)) am2_dtor_AM2_DlgOverwriteScreen(AM2_Widget *w)
+{ ((AM2_DlgOverwriteScreen *)w)->AM2_DlgOverwriteScreen::~AM2_DlgOverwriteScreen(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_EnterNameScreen(void *mem, const char *bmp)
+{ return ::new (mem) AM2_EnterNameScreen(bmp); }
+void __attribute__((thiscall)) am2_dtor_AM2_EnterNameScreen(AM2_Widget *w)
+{ ((AM2_EnterNameScreen *)w)->AM2_EnterNameScreen::~AM2_EnterNameScreen(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_LoadGameScreen(void *mem, const char *bmp, int32_t flag)
+{ return ::new (mem) AM2_LoadGameScreen(bmp, flag); }
+void __attribute__((thiscall)) am2_dtor_AM2_LoadGameScreen(AM2_Widget *w)
+{ ((AM2_LoadGameScreen *)w)->AM2_LoadGameScreen::~AM2_LoadGameScreen(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_OptionsMenuScreen(void *mem, const char *bmp)
+{ return ::new (mem) AM2_OptionsMenuScreen(bmp); }
+void __attribute__((thiscall)) am2_dtor_AM2_OptionsMenuScreen(AM2_Widget *w)
+{ ((AM2_OptionsMenuScreen *)w)->AM2_OptionsMenuScreen::~AM2_OptionsMenuScreen(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_SelectMapScreen(void *mem, const char *bmp)
+{ return ::new (mem) AM2_SelectMapScreen(bmp); }
+void __attribute__((thiscall)) am2_dtor_AM2_SelectMapScreen(AM2_Widget *w)
+{ ((AM2_SelectMapScreen *)w)->AM2_SelectMapScreen::~AM2_SelectMapScreen(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_SelectPlayerScreen(void *mem, const char *bmp)
+{ return ::new (mem) AM2_SelectPlayerScreen(bmp); }
+void __attribute__((thiscall)) am2_dtor_AM2_SelectPlayerScreen(AM2_Widget *w)
+{ ((AM2_SelectPlayerScreen *)w)->AM2_SelectPlayerScreen::~AM2_SelectPlayerScreen(); }
+#endif
+
+#if defined(__GNUC__)
 /* Install thunks: a constructor at its original address must answer `this`
  * in eax, as MSVC's do and the original's callers expect. */
 AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Widget(void *mem)
@@ -5498,40 +5669,10 @@ void __attribute__((thiscall)) am2_dtor_AM2_Widget(AM2_Widget *w)
 { w->AM2_Widget::~AM2_Widget(); }
 #endif
 
-AM2_DifficultyDialog::AM2_DifficultyDialog(const char *bmp)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::DifficultyDialogConstruct(this, bmp);
-}
-
-AM2_DlgMessageScreen::AM2_DlgMessageScreen(const char *bmp, int32_t flag)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::DlgMessageConstruct(this, bmp, flag);
-}
-
-AM2_AudioDialogScreen::AM2_AudioDialogScreen(const char *bmp, int32_t flag)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::AudioDialogConstruct(this, bmp, flag);
-}
-
 AM2_BattleNameScreen::AM2_BattleNameScreen(const char *bmp)
     : AM2_Widget(AM2_Widget::AM2_NoInit())
 {
     ::BattleNameConstruct(this, bmp);
-}
-
-AM2_CommPanelScreen::AM2_CommPanelScreen(const char *bmp)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::CommPanelConstruct(this, bmp);
-}
-
-AM2_ControlsDialogScreen::AM2_ControlsDialogScreen(const char *bmp)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::ControlsDialogConstruct(this, bmp);
 }
 
 AM2_DelPlayerDialogScreen::AM2_DelPlayerDialogScreen(const char *bmp)
@@ -5540,46 +5681,10 @@ AM2_DelPlayerDialogScreen::AM2_DelPlayerDialogScreen(const char *bmp)
     ::DelPlayerDialogConstruct(this, bmp);
 }
 
-AM2_DeleteGameScreen::AM2_DeleteGameScreen(const char *bmp, int32_t flag)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::DeleteGameConstruct(this, bmp, flag);
-}
-
-AM2_DlgBattleJoinScreen::AM2_DlgBattleJoinScreen(const char *bmp)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::DlgBattleJoinConstruct(this, bmp);
-}
-
-AM2_DlgGameMenuScreen::AM2_DlgGameMenuScreen(const char *bmp, int32_t flag)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::DlgGameMenuConstruct(this, bmp, flag);
-}
-
-AM2_DlgOverwriteScreen::AM2_DlgOverwriteScreen(const char *bmp, int32_t flag)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::DlgOverwriteConstruct(this, bmp, flag);
-}
-
 AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
     : AM2_Widget(AM2_Widget::AM2_NoInit())
 {
     ::DlgSaveListConstruct(this, bmp, flag);
-}
-
-AM2_EnterNameScreen::AM2_EnterNameScreen(const char *bmp)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::EnterNameConstruct(this, bmp);
-}
-
-AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::LoadGameConstruct(this, bmp, flag);
 }
 
 AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
@@ -5600,12 +5705,6 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
     ::MpPanelConstruct(this, bmp);
 }
 
-AM2_OptionsMenuScreen::AM2_OptionsMenuScreen(const char *bmp)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::OptionsMenuConstruct(this, bmp);
-}
-
 AM2_QuitDialogScreen::AM2_QuitDialogScreen(const char *bmp)
     : AM2_Widget(AM2_Widget::AM2_NoInit())
 {
@@ -5616,18 +5715,6 @@ AM2_ReplayDialogScreen::AM2_ReplayDialogScreen(const char *bmp)
     : AM2_Widget(AM2_Widget::AM2_NoInit())
 {
     ::ReplayDialogConstruct(this, bmp);
-}
-
-AM2_SelectMapScreen::AM2_SelectMapScreen(const char *bmp)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::SelectMapConstruct(this, bmp);
-}
-
-AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::SelectPlayerConstruct(this, bmp);
 }
 
 AM2_WarMenuScreen::AM2_WarMenuScreen(const char *bmp)
@@ -5702,82 +5789,39 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdInvoke(int32_t mode)
  * The list's rows come from ADDR_SESSION_OBJECT, which is what makes this the
  * session browser rather than a map list. It is given focus through vtable
  * slot 3 right after being added. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgBattleJoinConstruct(const char *bmp)
+AM2_DlgBattleJoinScreen::AM2_DlgBattleJoinScreen(const char *bmp)
+    : AM2_ScreenBase(bmp, 1)
 {
     AM2_Widget *w = this;
 
     uint8_t    *self = (uint8_t *)w;
     AM2_Widget *panel;
     AM2_Widget *kid;
-    AM2_Rect    box;
-
-    ::ScreenBaseConstruct(w, bmp, 1);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_BATTLE_JOIN));
+    AM2_CTOR_VTABLE(w, VTABLE_BATTLE_JOIN);
     SetGameDir((const char *)(uintptr_t)ADDR_DIR_SCRATCH);
     strcpy((char *)(self + BATTLEJOIN_OFF_NAME),
            (const char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME);
 
-    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_BYTES);
-    if (panel) {
-        RectSet(&box, 0x6C, 0x54, 0x1A7, 0x138);
-        panel = ::PanelConstruct(panel, "02_003_00_join.bmp", 0, box);
-    }
+    panel = new AM2_Panel("02_003_00_join.bmp", 0, *RectSet(AM2_TEMP(AM2_Rect), 0x6C, 0x54, 0x1A7, 0x138));
     ::WidgetAddChild(w, panel);
     w->focusedChild = panel;
     panel->flag44 = 1;            /* faults on a failed alloc -- original's */
 
-    kid = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_BYTES);
-    if (kid) {
-        RectSet(&box, 0x26, 0x42, 0xCE, 0x6E);
-        kid = ::ListBoxConstruct(kid, box.left, box.top, box.right, box.bottom,
-                               *(void **)(uintptr_t)ADDR_SESSION_OBJECT,
-                               (int32_t)(uintptr_t)BattleJoinSelect,
-                               (int32_t)(uintptr_t)BattleJoinPoll, 0);
-    }
+    kid = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x26, 0x42, 0xCE, 0x6E), *(void **)(uintptr_t)ADDR_SESSION_OBJECT, (int32_t)(uintptr_t)BattleJoinSelect, (int32_t)(uintptr_t)BattleJoinPoll, 0);
     ::WidgetAddChild(panel, kid);
     WidgetVFocus(kid, 0);
 
-    kid = (AM2_Widget *)orig_operator_new(AM2_HUD_EDIT_BYTES);
-    if (kid)
-        kid = ::EditConstruct(kid, (char *)(self + BATTLEJOIN_OFF_NAME), 0x18,
-                            0x26, 0xFF, 0xF3, 0x0E, 1,
-                            *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
-                            *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
-                            *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
-                            (void (__cdecl *)(AM2_Widget *))
-                                BattleJoinOk, 0, 0);
+    kid = new AM2_Edit((char *)(self + BATTLEJOIN_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0x26, 0xFF, 0xF3, 0x0E), 1, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR, *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR, (void (__cdecl *)(AM2_Widget *)) BattleJoinOk, 0, 0);
     ::WidgetAddChild(panel, kid);
 
-    kid = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
-    if (kid) {
-        RectSet(&box, 0x14C, 0x37, 0x4E, 0x20);
-        kid = ::ButtonConstruct(kid, "03_007_00_ok.bmp", "03_007_01_ok.bmp",
-                              "03_007_02_ok.bmp", 1, box,
-                              (void (__cdecl *)(AM2_Widget *))
-                                  BattleJoinOk,
-                              (void (__cdecl *)(AM2_Widget *))0);
-    }
+    kid = new AM2_Button("03_007_00_ok.bmp", "03_007_01_ok.bmp", "03_007_02_ok.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x14C, 0x37, 0x4E, 0x20), (void (__cdecl *)(AM2_Widget *)) BattleJoinOk, (void (__cdecl *)(AM2_Widget *))0);
     ::WidgetAddChild(panel, kid);
 
-    kid = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
-    if (kid) {
-        RectSet(&box, 0x14C, 0x69, 0x4E, 0x20);
-        kid = ::ButtonConstruct(kid, "03_018_00_cancel.bmp",
-                              "03_018_01_cancel.bmp", "03_018_02_cancel.bmp",
-                              1, box,
-                              OnMenuBack,
-                              (void (__cdecl *)(AM2_Widget *))0);
-    }
+    kid = new AM2_Button("03_018_00_cancel.bmp", "03_018_01_cancel.bmp", "03_018_02_cancel.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x14C, 0x69, 0x4E, 0x20), OnMenuBack, (void (__cdecl *)(AM2_Widget *))0);
     ::WidgetAddChild(panel, kid);
 
-    kid = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_BYTES);
-    if (kid) {
-        RectSet(&box, 0xA6, 0xE2, 0x11, 0x10);
-        kid = ::MultiSpriteConstruct(kid, "03_028_00_green.bmp",
-                                   "03_028_01_green.bmp", 1, box);
-    }
+    kid = new AM2_Blinker("03_028_00_green.bmp", "03_028_01_green.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0xA6, 0xE2, 0x11, 0x10));
     ::WidgetAddChild(panel, kid);
-    return w;
 }
 
 /* The in-mission game menu's six buttons, in the order the constructor adds
@@ -5821,15 +5865,13 @@ static const struct {
  *
  * DLG_OFF_LIST is nulled before anything is built -- this dialog has no list
  * and says so explicitly, where DlgOverwriteConstruct simply leaves it. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgGameMenuConstruct(const char *bmp, int32_t flag)
+AM2_DlgGameMenuScreen::AM2_DlgGameMenuScreen(const char *bmp, int32_t flag)
+    : AM2_ScreenBase(bmp, flag)
 {
     AM2_Widget *w = this;
 
-    AM2_Rect box;
     int32_t  i;
-
-    ::ScreenBaseConstruct(w, bmp, flag);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_DLG_GAMEMENU));
+    AM2_CTOR_VTABLE(w, VTABLE_DLG_GAMEMENU);
     *(void **)((uint8_t *)w + DLG_OFF_LIST) = (void *)0;
     w->flag44 = 1;
 
@@ -5857,18 +5899,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgGameMenuConstruct(const ch
             if ((i == 1 || i == 2) && noSaveLoad)
                 continue;
 
-            btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
-            if (btn) {
-                RectSet(&box, AM2_GAMEMENU_LEFT,
-                        AM2_GAMEMENU_TOP + row * AM2_GAMEMENU_STEP,
-                        AM2_GAMEMENU_WIDTH, AM2_GAMEMENU_HEIGHT);
-                btn = ::ButtonConstruct(btn, kGameMenuButtons[i].b0,
-                                      kGameMenuButtons[i].b1,
-                                      kGameMenuButtons[i].b2, 0, box,
-                                      (void (__cdecl *)(AM2_Widget *))
-                                          ((void *)(uintptr_t)(kGameMenuButtons[i].handler)),
-                                      (void (__cdecl *)(AM2_Widget *))0);
-            }
+            btn = new AM2_Button(kGameMenuButtons[i].b0, kGameMenuButtons[i].b1, kGameMenuButtons[i].b2, 0, *RectSet(AM2_TEMP(AM2_Rect), AM2_GAMEMENU_LEFT, AM2_GAMEMENU_TOP + row * AM2_GAMEMENU_STEP, AM2_GAMEMENU_WIDTH, AM2_GAMEMENU_HEIGHT), (void (__cdecl *)(AM2_Widget *)) ((void *)(uintptr_t)(kGameMenuButtons[i].handler)), (void (__cdecl *)(AM2_Widget *))0);
             ::WidgetAddChild(w, btn);
 
             if (row == 0)
@@ -5890,7 +5921,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgGameMenuConstruct(const ch
 
     *(void **)((uint8_t *)w + DLG_OFF_ESCAPE) =
         (void *)DlgClose;
-    return w;
 }
 
 typedef int32_t (__cdecl *AM2_FindFirstFn3)(const char *, void *);
@@ -6078,63 +6108,37 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgSaveListConstruct(const ch
  *
  * The four children are added whether or not their allocation succeeded, the
  * family habit; the OK button also becomes the focused child. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgOverwriteConstruct(const char *bmp, int32_t flag)
+AM2_DlgOverwriteScreen::AM2_DlgOverwriteScreen(const char *bmp, int32_t flag)
+    : AM2_ScreenBase(bmp, flag)
 {
     AM2_Widget *w = this;
 
     AM2_Widget *btn;
     AM2_Widget *typer;
     AM2_Widget *icon;
-    AM2_Rect    box;
     char        text[AM2_DLG_TEXT_BYTES];
-
-    ::ScreenBaseConstruct(w, bmp, flag);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_DLG_OVERWRITE));
+    AM2_CTOR_VTABLE(w, VTABLE_DLG_OVERWRITE);
     w->flag44 = 1;
 
-    btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
-    if (btn) {
-        RectSet(&box, 0x1B5, 0xD0, 0x51, 0x20);
-        btn = ::ButtonConstruct(btn, "03_007_00_ok.bmp", "03_007_01_ok.bmp",
-                              "03_007_02_ok.bmp", 1, box,
-                              (void (__cdecl *)(AM2_Widget *))
-                                  DlgOverwriteOk,
-                              (void (__cdecl *)(AM2_Widget *))0);
-    }
+    btn = new AM2_Button("03_007_00_ok.bmp", "03_007_01_ok.bmp", "03_007_02_ok.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x1B5, 0xD0, 0x51, 0x20), (void (__cdecl *)(AM2_Widget *)) DlgOverwriteOk, (void (__cdecl *)(AM2_Widget *))0);
     ::WidgetAddChild(w, btn);
     w->focusedChild = btn;
 
-    btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
-    if (btn) {
-        RectSet(&box, 0x1B5, 0xF9, 0x51, 0x20);
-        btn = ::ButtonConstruct(btn, "03_018_00_cancel.bmp",
-                              "03_018_01_cancel.bmp", "03_018_02_cancel.bmp",
-                              1, box,
-                              DlgOverwriteCancel,
-                              (void (__cdecl *)(AM2_Widget *))0);
-    }
+    btn = new AM2_Button("03_018_00_cancel.bmp", "03_018_01_cancel.bmp", "03_018_02_cancel.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x1B5, 0xF9, 0x51, 0x20), DlgOverwriteCancel, (void (__cdecl *)(AM2_Widget *))0);
     ::WidgetAddChild(w, btn);
 
     am2_sprintf(text, "Are you sure you want to overwrite savefile '%s'?",
                 (const char *)(uintptr_t)ADDR_PENDING_CONFIRM);
 
-    typer = (AM2_Widget *)orig_operator_new(AM2_TYPER_BYTES);
-    if (typer)
-        typer = ::TyperConstruct(typer, 0x94, 0xD9, 0xF0, 0x34, text);
+    typer = new AM2_Typer(*RectSet(AM2_TEMP(AM2_Rect), 0x94, 0xD9, 0xF0, 0x34), text);
     ::WidgetAddChild(w, typer);
 
-    icon = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_BYTES);
-    if (icon) {
-        RectSet(&box, 0x8F, 0x12D, 0x11, 0x10);
-        icon = ::MultiSpriteConstruct(icon, "03_029_00_red.bmp",
-                                    "03_029_01_red.bmp", 1, box);
-    }
+    icon = new AM2_Blinker("03_029_00_red.bmp", "03_029_01_red.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x8F, 0x12D, 0x11, 0x10));
     ::WidgetAddChild(w, icon);
 
     /* Escape does what Cancel does. */
     *(void **)((uint8_t *)w + DLG_OFF_ESCAPE) =
         (void *)DlgOverwriteCancel;
-    return w;
 }
 
 /* DlgMessageConstruct -- original 0x00452750, 560 bytes, thiscall `ret 8`.
@@ -6160,7 +6164,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgOverwriteConstruct(const c
  * shape HudPanelConstruct has. The button also becomes the focused child,
  * and the icon is stored into the TYPER at +0x460 rather than into this
  * dialog -- so the typer owns it and this is not a fourth child slot. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgMessageConstruct(const char *bmp, int32_t flag)
+AM2_DlgMessageScreen::AM2_DlgMessageScreen(const char *bmp, int32_t flag)
+    : AM2_ScreenBase(bmp, flag)
 {
     AM2_Widget *w = this;
 
@@ -6168,12 +6173,9 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgMessageConstruct(const cha
     AM2_Widget       *btn;
     AM2_Widget       *typer;
     AM2_Widget       *icon;
-    AM2_Rect          box;
     int32_t           ox;
     int32_t           oy;
-
-    ::ScreenBaseConstruct(w, bmp, flag);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_DLG_MESSAGE));
+    AM2_CTOR_VTABLE(w, VTABLE_DLG_MESSAGE);
     w->flag44 = 1;
 
     back = *(const AM2_Sprite *const *)((uint8_t *)w + HUD_OFF_SPRITE0);
@@ -6182,34 +6184,18 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgMessageConstruct(const cha
     oy = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H
           - back->bounds.bottom) / 2;
 
-    btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
-    if (btn) {
-        RectSet(&box, ox + 0x149, oy + 0x38, 0x51, 0x20);
-        btn = ::ButtonConstruct(btn, "03_007_00_ok.bmp", "03_007_01_ok.bmp",
-                              "03_007_02_ok.bmp", 1, box,
-                              DlgClose,
-                              (void (__cdecl *)(AM2_Widget *))0);
-    }
+    btn = new AM2_Button("03_007_00_ok.bmp", "03_007_01_ok.bmp", "03_007_02_ok.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), ox + 0x149, oy + 0x38, 0x51, 0x20), DlgClose, (void (__cdecl *)(AM2_Widget *))0);
     ::WidgetAddChild(w, btn);
     w->focusedChild = btn;
 
-    typer = (AM2_Widget *)orig_operator_new(AM2_TYPER_BYTES);
-    if (typer)
-        typer = ::TyperConstruct(typer, ox + 0x28, oy + 0x41, 0xF0, 0x34,
-                               (const char *)(uintptr_t)ADDR_MESSAGE_TEXT);
+    typer = new AM2_Typer(*RectSet(AM2_TEMP(AM2_Rect), ox + 0x28, oy + 0x41, 0xF0, 0x34), (const char *)(uintptr_t)ADDR_MESSAGE_TEXT);
     ::WidgetAddChild(w, typer);
 
-    icon = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_BYTES);
-    if (icon) {
-        RectSet(&box, ox + 0x23, oy + 0x95, 0x11, 0x10);
-        icon = ::MultiSpriteConstruct(icon, "03_029_00_red.bmp",
-                                    "03_029_01_red.bmp", 1, box);
-    }
+    icon = new AM2_Blinker("03_029_00_red.bmp", "03_029_01_red.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), ox + 0x23, oy + 0x95, 0x11, 0x10));
     ::WidgetAddChild(w, icon);
 
     /* The icon belongs to the TYPER, not to this dialog. */
     *(void **)((uint8_t *)typer + TYPER_OFF_BLINKER) = icon;
-    return w;
 }
 
 /* The build screen's START button. Read out of the image rather than guessed
@@ -7154,14 +7140,13 @@ static const AM2_MenuButton kOptionsButtons[] = {
 #define AM2_OPTIONS_BUTTON_WIDTH  0x98
 #define AM2_OPTIONS_BUTTON_HEIGHT 0x19
 
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::OptionsMenuConstruct(const char *bmp)
+AM2_OptionsMenuScreen::AM2_OptionsMenuScreen(const char *bmp)
+    : AM2_ScreenBase(bmp, 1)
 {
     AM2_Widget *w = this;
 
     uint32_t i;
-
-    ::ScreenBaseConstruct(w, bmp, 1);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_OPTIONS_MENU));
+    AM2_CTOR_VTABLE(w, VTABLE_OPTIONS_MENU);
     w->flag44 = 1;
 
     for (i = 0; i < sizeof kOptionsButtons / sizeof kOptionsButtons[0]; i++) {
@@ -7193,7 +7178,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::OptionsMenuConstruct(const ch
     }
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnMenuBack;
-    return w;
 }
 
 /* The three CONFIRM dialogs: CONFIRM GAME EXIT (0x0044EB50), the replay
@@ -7491,7 +7475,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DelPlayerDialogConstruct(cons
 
 #define g_difficulty      (*(int32_t *)(uintptr_t)ADDR_DIFFICULTY)
 
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::DifficultyDialogConstruct(const char *bmp)
+AM2_DifficultyDialog::AM2_DifficultyDialog(const char *bmp)
+    : AM2_ScreenBase(bmp, 1)
 {
     AM2_Widget *w = this;
 
@@ -7499,34 +7484,18 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DifficultyDialogConstruct(con
     AM2_Widget *list;
     AM2_Widget *dot;
     void       *rows;
-    AM2_Rect    box;
+    AM2_CTOR_VTABLE(w, VTABLE_DIFFICULTY_DIALOG);
 
-    ::ScreenBaseConstruct(w, bmp, 1);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_DIFFICULTY_DIALOG));
-
-    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
-    if (panel) {
-        RectSet(&box, 0x6C, 0x98, 0x1A7, 0xB0);
-        panel = ::PanelConstruct(panel,
-                                "02_014_00_difficulty.bmp",
-                                0, box);
-    }
+    panel = new AM2_Panel("02_014_00_difficulty.bmp", 0, *RectSet(AM2_TEMP(AM2_Rect), 0x6C, 0x98, 0x1A7, 0xB0));
     ::WidgetAddChild(w, panel);
     panel->flag44 = 1;
 
-    rows = orig_operator_new(AM2_ROWS_SIZE);
-    if (rows)
-        rows = RecordCtor(rows, 0);
+    rows = new AM2_Rec(0);
     ListAdd(rows, "Easy",   (void *)0);
     ListAdd(rows, "Medium", (void *)1);
     ListAdd(rows, "Hard",   (void *)2);
 
-    list = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_SIZE);
-    if (list) {
-        RectSet(&box, 0x28, 0x3F, 0xF4, 0x3A);
-        list = ::ListBoxConstruct(list, box.left, box.top, box.right, box.bottom,
-                                 rows, 0, 0, 1);
-    }
+    list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x28, 0x3F, 0xF4, 0x3A), rows, 0, 0, 1);
     *(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST) = list;
     ::WidgetAddChild(panel, list);
 
@@ -7538,24 +7507,21 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DifficultyDialogConstruct(con
         *(int32_t *)((uint8_t *)sel + LIST_OFF_SELECTED) = g_difficulty;
     }
 
-    dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
-    if (dot) {
-        RectSet(&box, 0x23, 0x95, 0x11, 0x10);
-        dot = ::MultiSpriteConstruct(dot, (const char *)((void *)(uintptr_t)(AM2_BMP_RED0)),
-                                    (const char *)((void *)(uintptr_t)(AM2_BMP_RED1)), 1,
-                                    box);
-    }
+    dot = new AM2_Blinker((const char *)((void *)(uintptr_t)(AM2_BMP_RED0)), (const char *)((void *)(uintptr_t)(AM2_BMP_RED1)), 1, *RectSet(AM2_TEMP(AM2_Rect), 0x23, 0x95, 0x11, 0x10));
     ::WidgetAddChild(panel, dot);
     *(AM2_Widget **)((uint8_t *)*(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST)
                      + LIST_OFF_BLINKER) = dot;
 
-    ::WidgetAddChild(panel, MakeButton(0x149, 0x38, AM2_BMP_OK0, AM2_BMP_OK1,
-                                       AM2_BMP_OK2, kOnDifficultyOk));
-    ::WidgetAddChild(panel, MakeButton(0x149, 0x61, AM2_BMP_CAN0, AM2_BMP_CAN1,
-                                       AM2_BMP_CAN2, kOnOptionsMenu));
+    ::WidgetAddChild(panel, new AM2_Button((const char *)(uintptr_t)AM2_BMP_OK0, (const char *)(uintptr_t)AM2_BMP_OK1,
+                                   (const char *)(uintptr_t)AM2_BMP_OK2, 1,
+                                   *RectSet(AM2_TEMP(AM2_Rect), 0x149, 0x38, 0x51, 0x20),
+                                   kOnDifficultyOk, (void (__cdecl *)(AM2_Widget *))0));
+    ::WidgetAddChild(panel, new AM2_Button((const char *)(uintptr_t)AM2_BMP_CAN0, (const char *)(uintptr_t)AM2_BMP_CAN1,
+                                   (const char *)(uintptr_t)AM2_BMP_CAN2, 1,
+                                   *RectSet(AM2_TEMP(AM2_Rect), 0x149, 0x61, 0x51, 0x20),
+                                   kOnOptionsMenu, (void (__cdecl *)(AM2_Widget *))0));
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnOptionsMenu;
-    return w;
 }
 
 /* 0x00450E10, thiscall. The CONTROLS dialog: twenty-one key-capture rows and
@@ -7582,7 +7548,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DifficultyDialogConstruct(con
 #define AM2_KEYROW_WIDTH   0x41
 #define AM2_KEYROW_HEIGHT  0x0D
 
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::ControlsDialogConstruct(const char *bmp)
+AM2_ControlsDialogScreen::AM2_ControlsDialogScreen(const char *bmp)
+    : AM2_ScreenBase(bmp, 1)
 {
     AM2_Widget *w = this;
 
@@ -7593,9 +7560,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ControlsDialogConstruct(const
     AM2_Widget    *first;
     AM2_Widget    *ok;
     AM2_Rect       box;
-
-    ::ScreenBaseConstruct(w, bmp, 1);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_CONTROLS_DIALOG));
+    AM2_CTOR_VTABLE(w, VTABLE_CONTROLS_DIALOG);
     rows = (AM2_Widget **)((uint8_t *)w + KEYROW_PARENT_ROWS);
 
     while (binding < (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS))
@@ -7640,7 +7605,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ControlsDialogConstruct(const
                                    AM2_BMP_CAN2, kOnControlsCancel));
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnControlsCancel;
-    return w;
 }
 
 /* 0x00432320, thiscall. The MULTIPLAYER OPTIONS screen: 43 checkboxes out of
@@ -7823,7 +7787,8 @@ static AM2_Widget *MakeVolumeBar(AM2_Widget *parent, int32_t x, int32_t y,
     return bar;
 }
 
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::AudioDialogConstruct(const char *bmp, int32_t flag)
+AM2_AudioDialogScreen::AM2_AudioDialogScreen(const char *bmp, int32_t flag)
+    : AM2_ScreenBase(bmp, flag)
 {
     AM2_Widget *w = this;
 
@@ -7833,9 +7798,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::AudioDialogConstruct(const ch
     int32_t      offX = 0x89;
     int32_t      offY = 0x79;
     AM2_Rect     box;
-
-    ::ScreenBaseConstruct(w, bmp, flag);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_AUDIO_DIALOG));
+    AM2_CTOR_VTABLE(w, VTABLE_AUDIO_DIALOG);
 
     if (g_gameState == AM2_STATE_MISSION) {
         w->flag44 = 1;
@@ -7878,7 +7841,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::AudioDialogConstruct(const ch
                                         kOnAudioCancel));
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnAudioCancel;
-    return w;
 }
 
 /* This dialog's buttons are 0x4E wide where every other screen's are 0x51. */
@@ -8016,7 +7978,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::BattleNameConstruct(const cha
  * other afterwards, the list at 0x007C and the bar at 0x0058. */
 
 
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::CommPanelConstruct(const char *bmp)
+AM2_CommPanelScreen::AM2_CommPanelScreen(const char *bmp)
+    : AM2_ScreenBase(bmp, 1)
 {
     AM2_Widget *w = this;
 
@@ -8024,10 +7987,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::CommPanelConstruct(const char
     AM2_Widget *list;
     AM2_Widget *bar;
     void       *rows;
-    AM2_Rect    box;
-
-    ::ScreenBaseConstruct(w, bmp, 1);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_COMM_PANEL));
+    AM2_CTOR_VTABLE(w, VTABLE_COMM_PANEL);
     SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
 
     rows = orig_operator_new(AM2_ROWS_SIZE);
@@ -8036,25 +7996,11 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::CommPanelConstruct(const char
     *(void **)((uint8_t *)w + COMMPANEL_OFF_ROWS) = rows;
     CommEnumConnections(g_commObject, rows);
 
-    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
-    if (panel) {
-        RectSet(&box, 0x40, 0x62, 0x200, 0x11C);
-        panel = ::PanelConstruct(panel,
-                                "02_001_00_commpanel.bmp",
-                                0, box);
-    }
+    panel = new AM2_Panel("02_001_00_commpanel.bmp", 0, *RectSet(AM2_TEMP(AM2_Rect), 0x40, 0x62, 0x200, 0x11C));
     ::WidgetAddChild(w, panel);
     panel->flag44 = 1;
 
-    list = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_SIZE);
-    if (list) {
-        RectSet(&box, 0x2A, 0x44, 0x11F, 0xAA);
-        list = ::ListBoxConstruct(list, box.left, box.top, box.right,
-                                box.bottom,
-                                *(void **)((uint8_t *)w
-                                           + COMMPANEL_OFF_ROWS),
-                                (int32_t)((void *)(uintptr_t)(ADDR_LOG)), 0, 1);
-    }
+    list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x2A, 0x44, 0x11F, 0xAA), *(void **)((uint8_t *)w + COMMPANEL_OFF_ROWS), (int32_t)((void *)(uintptr_t)(ADDR_LOG)), 0, 1);
     *(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST) = list;
     ::WidgetAddChild(panel, list);
     {
@@ -8063,15 +8009,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::CommPanelConstruct(const char
         WidgetVFocus(l, 0);
     }
 
-    bar = (AM2_Widget *)orig_operator_new(AM2_ARROWBAR_SIZE);
-    if (bar) {
-        RectSet(&box, 0x15E, 0x3C, 0x13, 0xBA);
-        bar = ::ArrowBarConstruct(bar, box.left, box.top, box.right,
-                                box.bottom, panel,
-                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
-                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
-                                0x92, 0);
-    }
+    bar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x15E, 0x3C, 0x13, 0xBA), panel, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x92, 0);
     ::WidgetAddChild(panel, bar);
     *(AM2_Widget **)((uint8_t *)*(AM2_Widget **)((uint8_t *)w
                                                  + COMMPANEL_OFF_LIST)
@@ -8084,7 +8022,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::CommPanelConstruct(const char
                                      kStartSelectedGame));
     ::WidgetAddChild(panel, MakeButton(0x19C, 0x94, AM2_BMP_CAN0, AM2_BMP_CAN1,
                                      AM2_BMP_CAN2, kOnMenuBack));
-    return w;
 }
 
 /* 0x00451400, thiscall. SELECT PLAYER -- and the one screen whose rows come
@@ -8114,7 +8051,8 @@ typedef int32_t (__cdecl *AM2_SprintfFn)(char *, const char *, ...);
 #define orig_findclose  ((AM2_FindCloseFn)((void *)(uintptr_t)(ADDR_CRT_FINDCLOSE)))
 #define g_currentPlayer ((char *)(uintptr_t)ADDR_GAMEPROC_BLOCK)
 
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectPlayerConstruct(const char *bmp)
+AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
+    : AM2_ScreenBase(bmp, 1)
 {
     AM2_Widget *w = this;
 
@@ -8122,13 +8060,10 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectPlayerConstruct(const c
     AM2_Widget *list;
     AM2_Widget *bar;
     void       *rows;
-    AM2_Rect    box;
     char        pattern[264];
     uint8_t     found[0x11C];
     int32_t     handle;
-
-    ::ScreenBaseConstruct(w, bmp, 1);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_SELECT_PLAYER));
+    AM2_CTOR_VTABLE(w, VTABLE_SELECT_PLAYER);
     ReadCampaignLevels();
     SetGameDir("save");
     g_currentPlayer[0] = '\0';
@@ -8152,25 +8087,12 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectPlayerConstruct(const c
         orig_findclose(handle);
     }
 
-    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
-    if (panel) {
-        RectSet(&box, 0x7D, 0x62, 0x186, 0x11C);
-        panel = ::PanelConstruct(panel, "02_005_00_selectplayer.bmp", 0, box);
-    }
+    panel = new AM2_Panel("02_005_00_selectplayer.bmp", 0, *RectSet(AM2_TEMP(AM2_Rect), 0x7D, 0x62, 0x186, 0x11C));
     ::WidgetAddChild(w, panel);
     w->focusedChild = panel;
     panel->flag44 = 1;
 
-    list = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_SIZE);
-    if (list) {
-        RectSet(&box, 0x29, 0x43, 0x96, 0xAB);
-        list = ::ListBoxConstruct(list, box.left, box.top, box.right,
-                                box.bottom,
-                                *(void **)((uint8_t *)w
-                                           + COMMPANEL_OFF_LIST),
-                                (int32_t)(uintptr_t)SelectPlayerRow,
-                                0, 1);
-    }
+    list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x29, 0x43, 0x96, 0xAB), *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST), (int32_t)(uintptr_t)SelectPlayerRow, 0, 1);
     ::WidgetAddChild(panel, list);
     WidgetVFocus(list, 0);
 
@@ -8183,15 +8105,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectPlayerConstruct(const c
             strcpy(g_currentPlayer, *(const char *const *)(r + 1));
     }
 
-    bar = (AM2_Widget *)orig_operator_new(AM2_ARROWBAR_SIZE);
-    if (bar) {
-        RectSet(&box, 0xD5, 0x3C, 0x13, 0xBA);
-        bar = ::ArrowBarConstruct(bar, box.left, box.top, box.right,
-                                box.bottom, panel,
-                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
-                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
-                                0x92, 0);
-    }
+    bar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0x3C, 0x13, 0xBA), panel, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x92, 0);
     ::WidgetAddChild(panel, bar);
     *(AM2_Widget **)((uint8_t *)list + LIST_OFF_ARROWBAR) = bar;
     *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) = list;
@@ -8210,7 +8124,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectPlayerConstruct(const c
                                        kOnMenuBack));
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnMenuBack;
-    return w;
 }
 
 /* 0x00454980, thiscall, `ret 0x18`. The PANEL: a widget whose whole job is to
@@ -9674,7 +9587,8 @@ void __cdecl CheckboxToggle(AM2_Widget *w)
  * `i - 1`, so it runs for ids 1..count -- a table whose ids are not
  * contiguous would simply skip the gaps, since a missing record is a NULL
  * from the lookup and not an error. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectMapConstruct(const char *bmp)
+AM2_SelectMapScreen::AM2_SelectMapScreen(const char *bmp)
+    : AM2_ScreenBase(bmp, 1)
 {
     AM2_Widget *w = this;
 
@@ -9682,11 +9596,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectMapConstruct(const char
     AM2_Widget *list;
     AM2_Widget *bar;
     void       *rows;
-    AM2_Rect    box;
     int32_t     i;
-
-    ::ScreenBaseConstruct(w, bmp, 1);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_SELECT_MAP));
+    AM2_CTOR_VTABLE(w, VTABLE_SELECT_MAP);
     ReadCampaignLevels();
 
     rows = orig_operator_new(AM2_ROWS_SIZE);
@@ -9706,37 +9617,16 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectMapConstruct(const char
         }
     }
 
-    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
-    if (panel) {
-        RectSet(&box, 0x7D, 0x62, 0x186, 0x11C);
-        panel = ::PanelConstruct(panel, "02_004_00_selectmap.bmp", 0, box);
-    }
+    panel = new AM2_Panel("02_004_00_selectmap.bmp", 0, *RectSet(AM2_TEMP(AM2_Rect), 0x7D, 0x62, 0x186, 0x11C));
     ::WidgetAddChild(w, panel);
     w->focusedChild = panel;
     panel->flag44 = 1;
 
-    list = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_SIZE);
-    if (list) {
-        RectSet(&box, 0x2A, 0x44, 0x95, 0xAA);
-        list = ::ListBoxConstruct(list, box.left, box.top, box.right,
-                                box.bottom,
-                                *(void **)((uint8_t *)w
-                                           + COMMPANEL_OFF_LIST),
-                                (int32_t)(uintptr_t)SelectMapRow,
-                                0, 1);
-    }
+    list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x2A, 0x44, 0x95, 0xAA), *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST), (int32_t)(uintptr_t)SelectMapRow, 0, 1);
     ::WidgetAddChild(panel, list);
     WidgetVFocus(list, 0);
 
-    bar = (AM2_Widget *)orig_operator_new(AM2_ARROWBAR_SIZE);
-    if (bar) {
-        RectSet(&box, 0xD5, 0x3C, 0x13, 0xBA);
-        bar = ::ArrowBarConstruct(bar, box.left, box.top, box.right,
-                                box.bottom, panel,
-                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
-                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
-                                0x92, 1);
-    }
+    bar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0x3C, 0x13, 0xBA), panel, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x92, 1);
     ::WidgetAddChild(panel, bar);
     *(AM2_Widget **)((uint8_t *)list + LIST_OFF_ARROWBAR) = bar;
     *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) = list;
@@ -9745,7 +9635,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectMapConstruct(const char
                                      AM2_BMP_CAN2, kOnMenuBack));
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnMenuBack;
-    return w;
 }
 
 /* 0x00451AF0, thiscall. ENTER NAME -- RECRUIT's dialog, and the simplest of
@@ -9760,38 +9649,25 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectMapConstruct(const char
  * The character set is ADDR_EDIT_CHARSET_PTR rather than the constructor's
  * default, installed AFTER the constructor exactly as ENTER BATTLE NAME
  * installs its own. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::EnterNameConstruct(const char *bmp)
+AM2_EnterNameScreen::AM2_EnterNameScreen(const char *bmp)
+    : AM2_ScreenBase(bmp, 1)
 {
     AM2_Widget *w = this;
 
     AM2_Widget *panel;
     AM2_Widget *edit;
     AM2_Widget *dot;
-    AM2_Rect    box;
     char       *text = (char *)w + ENTER_NAME_OFF_TEXT;
-
-    ::ScreenBaseConstruct(w, bmp, 1);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_ENTER_NAME));
+    AM2_CTOR_VTABLE(w, VTABLE_ENTER_NAME);
     SetGameDir("save");
     text[0] = '\0';
 
-    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
-    if (panel) {
-        RectSet(&box, 0x6C, 0xAE, 0x1A7, 0x83);
-        panel = ::PanelConstruct(panel, "02_006_00_name.bmp", 0, box);
-    }
+    panel = new AM2_Panel("02_006_00_name.bmp", 0, *RectSet(AM2_TEMP(AM2_Rect), 0x6C, 0xAE, 0x1A7, 0x83));
     ::WidgetAddChild(w, panel);
     w->focusedChild = panel;
     panel->flag44 = 1;
 
-    edit = (AM2_Widget *)orig_operator_new(AM2_EDIT_SIZE);
-    if (edit) {
-        RectSet(&box, 0x24, 0x39, 0xF7, 0x12);
-        edit = ::EditConstruct(edit, text, AM2_ENTER_NAME_MAX, box.left,
-                             box.top, box.right, box.bottom, 1,
-                             g_hiliteColour, g_whiteInk, g_backgroundColour,
-                             kOnEnterNameOk, 0, 0);
-    }
+    edit = new AM2_Edit(text, AM2_ENTER_NAME_MAX, *RectSet(AM2_TEMP(AM2_Rect), 0x24, 0x39, 0xF7, 0x12), 1, g_hiliteColour, g_whiteInk, g_backgroundColour, kOnEnterNameOk, 0, 0);
     ::WidgetAddChild(panel, edit);
     WidgetVFocus(edit, 0);
     *(const char **)((uint8_t *)edit + EDIT_OFF_CHARSET) = g_editCharset;
@@ -9803,19 +9679,12 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::EnterNameConstruct(const char
                                      AM2_BMP_CAN2,
                                      kOnEnterNameCancel));
 
-    dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
-    if (dot) {
-        RectSet(&box, 0x23, 0x68, 0x11, 0x10);
-        dot = ::MultiSpriteConstruct(dot, (const char *)((void *)(uintptr_t)(AM2_BMP_GREEN0)),
-                                    (const char *)((void *)(uintptr_t)(AM2_BMP_GREEN1)), 1,
-                                    box);
-    }
+    dot = new AM2_Blinker((const char *)((void *)(uintptr_t)(AM2_BMP_GREEN0)), (const char *)((void *)(uintptr_t)(AM2_BMP_GREEN1)), 1, *RectSet(AM2_TEMP(AM2_Rect), 0x23, 0x68, 0x11, 0x10));
     ::WidgetAddChild(panel, dot);
     *(AM2_Widget **)((uint8_t *)edit + EDIT_OFF_DOT) = dot;
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
         (uint32_t)(uintptr_t)kOnEnterNameCancel;
-    return w;
 }
 
 /* 0x0044FE50, thiscall. DELETE GAME -- and the ONE screen in the table that
@@ -9832,7 +9701,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::EnterNameConstruct(const char
  * `flag` is passed straight through to the base rather than being consumed
  * here, which is what makes this constructor take two arguments where most
  * take one. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::DeleteGameConstruct(const char *bmp, int32_t flag)
+AM2_DeleteGameScreen::AM2_DeleteGameScreen(const char *bmp, int32_t flag)
+    : AM2_ScreenBase(bmp, flag)
 {
     AM2_Widget *w = this;
 
@@ -9843,9 +9713,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DeleteGameConstruct(const cha
     AM2_Rect    box;
     int32_t     dx = 0x6C;
     int32_t     dy = 0x98;
-
-    ::ScreenBaseConstruct(w, bmp, flag);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_DELETE_GAME));
+    AM2_CTOR_VTABLE(w, VTABLE_DELETE_GAME);
 
     if (g_gameState == 2) {
         w->flag44 = 1;
@@ -9873,27 +9741,15 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DeleteGameConstruct(const cha
                               AM2_BMP_CAN1, AM2_BMP_CAN2,
                               kOnDelGameCancel));
 
-    msg = (AM2_Widget *)orig_operator_new(AM2_TYPER_SIZE);
-    if (msg) {
-        RectSet(&box, dx + 0x28, dy + 0x41, 0xF0, 0x34);
-        msg = ::TyperConstruct(msg, box.left, box.top, box.right, box.bottom,
-                             "Are you sure you want to delete this game?");
-    }
+    msg = new AM2_Typer(*RectSet(AM2_TEMP(AM2_Rect), dx + 0x28, dy + 0x41, 0xF0, 0x34), "Are you sure you want to delete this game?");
     ::WidgetAddChild(parent, msg);
 
-    dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
-    if (dot) {
-        RectSet(&box, dx + 0x23, dy + 0x95, 0x11, 0x10);
-        dot = ::MultiSpriteConstruct(dot, (const char *)((void *)(uintptr_t)(AM2_BMP_RED0)),
-                                    (const char *)((void *)(uintptr_t)(AM2_BMP_RED1)), 1,
-                                    box);
-    }
+    dot = new AM2_Blinker((const char *)((void *)(uintptr_t)(AM2_BMP_RED0)), (const char *)((void *)(uintptr_t)(AM2_BMP_RED1)), 1, *RectSet(AM2_TEMP(AM2_Rect), dx + 0x23, dy + 0x95, 0x11, 0x10));
     ::WidgetAddChild(parent, dot);
     *(AM2_Widget **)((uint8_t *)msg + TYPER_OFF_BLINKER) = dot;
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
         (uint32_t)(uintptr_t)kOnDelGameCancel;
-    return w;
 }
 
 /* 0x0044DFA0, thiscall. MOVIES -- twelve thumbnails in three pages of four,
@@ -10021,7 +9877,8 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MoviesConstruct(const char *b
  * not, and the second is written after the list exists rather than before.
  * Both are the original's, and reading only one of the two arms gets the
  * focus wrong on the other. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::LoadGameConstruct(const char *bmp, int32_t flag)
+AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
+    : AM2_ScreenBase(bmp, flag)
 {
     AM2_Widget *w = this;
 
@@ -10036,9 +9893,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::LoadGameConstruct(const char 
     int32_t     handle;
     int32_t     dx = 0x7D;
     int32_t     dy = 0x62;
-
-    ::ScreenBaseConstruct(w, bmp, flag);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_LOAD_GAME));
+    AM2_CTOR_VTABLE(w, VTABLE_LOAD_GAME);
     *((char *)w + LOAD_GAME_OFF_NAME) = '\0';
 
     rows = orig_operator_new(AM2_ROWS_SIZE);
@@ -10077,16 +9932,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::LoadGameConstruct(const char 
         parent = panel;
     }
 
-    list = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_SIZE);
-    if (list) {
-        RectSet(&box, dx + 0x2A, dy + 0x44, 0x95, 0xAA);
-        list = ::ListBoxConstruct(list, box.left, box.top, box.right,
-                                box.bottom,
-                                *(void **)((uint8_t *)w
-                                           + COMMPANEL_OFF_LIST),
-                                (int32_t)(uintptr_t)LoadGameRow,
-                                0, 1);
-    }
+    list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), dx + 0x2A, dy + 0x44, 0x95, 0xAA), *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST), (int32_t)(uintptr_t)LoadGameRow, 0, 1);
     ::WidgetAddChild(parent, list);
     if (g_gameState == 2)
         w->focusedChild = list;
@@ -10103,15 +9949,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::LoadGameConstruct(const char 
     }
     list->flag44 = 1;
 
-    bar = (AM2_Widget *)orig_operator_new(AM2_ARROWBAR_SIZE);
-    if (bar) {
-        RectSet(&box, dx + 0xD5, dy + 0x3C, 0x13, 0xBA);
-        bar = ::ArrowBarConstruct(bar, box.left, box.top, box.right,
-                                box.bottom, parent,
-                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
-                                (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
-                                0x90, 0);
-    }
+    bar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), dx + 0xD5, dy + 0x3C, 0x13, 0xBA), parent, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x90, 0);
     ::WidgetAddChild(parent, bar);
     *(AM2_Widget **)((uint8_t *)list + LIST_OFF_ARROWBAR) = bar;
     *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) = list;
@@ -10132,7 +9970,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::LoadGameConstruct(const char 
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
         (uint32_t)(uintptr_t)kOnLoadGameBack;
-    return w;
 }
 
 /* ------------------------------------------------------------------ *
@@ -15135,16 +14972,16 @@ int widget_install(void)
                         pmf_addr(&AM2_Widget::DlgSaveListConstruct),
                         "DlgSaveListConstruct", 1);
     rc |= patch_replace(ADDR_BATTLE_JOIN_CTOR,
-                        pmf_addr(&AM2_Widget::DlgBattleJoinConstruct),
+                        AM2_CTOR(AM2_DlgBattleJoinScreen),
                         "DlgBattleJoinConstruct", 1);
     rc |= patch_replace(ADDR_GAMEMENU_CTOR,
-                        pmf_addr(&AM2_Widget::DlgGameMenuConstruct),
+                        AM2_CTOR(AM2_DlgGameMenuScreen),
                         "DlgGameMenuConstruct", 1);
     rc |= patch_replace(ADDR_OVERWRITE_CTOR,
-                        pmf_addr(&AM2_Widget::DlgOverwriteConstruct),
+                        AM2_CTOR(AM2_DlgOverwriteScreen),
                         "DlgOverwriteConstruct", 1);
     rc |= patch_replace(ADDR_MESSAGE_CTOR,
-                        pmf_addr(&AM2_Widget::DlgMessageConstruct),
+                        AM2_CTOR(AM2_DlgMessageScreen),
                         "DlgMessageConstruct", 1);
     rc |= patch_replace(ADDR_ARROWBAR_SHOW_ROW,
                         pmf_addr(&AM2_Widget::ArrowBarShowRow),
@@ -15355,22 +15192,22 @@ int widget_install(void)
     rc |= patch_replace(ADDR_MP_TEAM_CTOR, pmf_addr(&AM2_Widget::MpTeamConstruct),
                         "MpTeamConstruct", 3);
 
-    rc |= patch_replace(ADDR_LOAD_GAME_CTOR, pmf_addr(&AM2_Widget::LoadGameConstruct),
+    rc |= patch_replace(ADDR_LOAD_GAME_CTOR, AM2_CTOR(AM2_LoadGameScreen),
                         "LoadGameConstruct", 1);
 
     rc |= patch_replace(ADDR_MOVIES_CTOR, pmf_addr(&AM2_Widget::MoviesConstruct),
                         "MoviesConstruct", 1);
 
     rc |= patch_replace(ADDR_DELETE_GAME_CTOR,
-                        pmf_addr(&AM2_Widget::DeleteGameConstruct),
+                        AM2_CTOR(AM2_DeleteGameScreen),
                         "DeleteGameConstruct", 1);
 
     rc |= patch_replace(ADDR_ENTER_NAME_CTOR,
-                        pmf_addr(&AM2_Widget::EnterNameConstruct),
+                        AM2_CTOR(AM2_EnterNameScreen),
                         "EnterNameConstruct", 1);
 
     rc |= patch_replace(ADDR_MP_SELECT_MAP_CTOR,
-                        pmf_addr(&AM2_Widget::SelectMapConstruct),
+                        AM2_CTOR(AM2_SelectMapScreen),
                         "SelectMapConstruct", 1);
 
     rc |= patch_replace(ADDR_BUTTON_BASE_CTOR,
@@ -15479,25 +15316,25 @@ int widget_install(void)
     rc |= patch_replace(ADDR_PANEL_CTOR, AM2_CTOR(AM2_Panel),
                         "PanelConstruct", 6);
     rc |= patch_replace(ADDR_SELECT_PLAYER_CTOR,
-                        pmf_addr(&AM2_Widget::SelectPlayerConstruct),
+                        AM2_CTOR(AM2_SelectPlayerScreen),
                         "SelectPlayerConstruct", 1);
     rc |= patch_replace(ADDR_COMM_PANEL_CTOR,
-                        pmf_addr(&AM2_Widget::CommPanelConstruct),
+                        AM2_CTOR(AM2_CommPanelScreen),
                         "CommPanelConstruct", 1);
     rc |= patch_replace(ADDR_BATTLE_NAME_CTOR,
                         pmf_addr(&AM2_Widget::BattleNameConstruct),
                         "BattleNameConstruct", 1);
     rc |= patch_replace(ADDR_AUDIO_OPTIONS_CTOR,
-                        pmf_addr(&AM2_Widget::AudioDialogConstruct),
+                        AM2_CTOR(AM2_AudioDialogScreen),
                         "AudioDialogConstruct", 2);
     rc |= patch_replace(ADDR_MP_OPTIONS_CTOR,
                         pmf_addr(&AM2_Widget::MpOptionsConstruct),
                         "MpOptionsConstruct", 1);
     rc |= patch_replace(ADDR_CONTROLS_CTOR,
-                        pmf_addr(&AM2_Widget::ControlsDialogConstruct),
+                        AM2_CTOR(AM2_ControlsDialogScreen),
                         "ControlsDialogConstruct", 1);
     rc |= patch_replace(ADDR_DIFFICULTY_CTOR,
-                        pmf_addr(&AM2_Widget::DifficultyDialogConstruct),
+                        AM2_CTOR(AM2_DifficultyDialog),
                         "DifficultyDialogConstruct", 1);
     rc |= patch_replace(ADDR_QUIT_CONFIRM_CTOR,
                         pmf_addr(&AM2_Widget::QuitDialogConstruct),
@@ -15509,7 +15346,7 @@ int widget_install(void)
                         pmf_addr(&AM2_Widget::DelPlayerDialogConstruct),
                         "DelPlayerDialogConstruct", 1);
     rc |= patch_replace(ADDR_OPTIONS_MENU_CTOR,
-                        pmf_addr(&AM2_Widget::OptionsMenuConstruct),
+                        AM2_CTOR(AM2_OptionsMenuScreen),
                         "OptionsMenuConstruct", 1);
     rc |= patch_replace(ADDR_OPEN_COMM_PANEL, (const void *)OpenCommPanel,
                         "OpenCommPanel", 0);
@@ -15542,7 +15379,7 @@ int widget_install(void)
                         "ListDropOldest", 1);
     rc |= patch_replace(ADDR_KEY_NAME_INDEX_OF, (const void *)KeyNameIndexOf,
                         "KeyNameIndexOf", 1);
-    rc |= patch_replace(ADDR_RECORD_CTOR, pmf_addr(&AM2_Rec::RecordCtor),
+    rc |= patch_replace(ADDR_RECORD_CTOR, AM2_CTOR(AM2_Rec),
                         "RecordCtor", 2);
     rc |= patch_replace(ADDR_LIST_ROWS_CLEANUP, pmf_addr(&AM2_Rec::RecordResetAlias),
                         "RecordResetAlias", 1);
@@ -15648,12 +15485,12 @@ int widget_install(void)
     rc |= patch_replace(ADDR_SAVE_LIST_DELETE, pmf_addr(&AM2_Widget::SaveListDelete),
                         "SaveListDelete", 1);
     rc |= patch_replace(ADDR_COMM_PANEL_DESTRUCT,
-                        pmf_addr(&AM2_Widget::CommPanelDestruct),
+                        AM2_DTOR(AM2_CommPanelScreen),
                         "CommPanelDestruct", 1);
     rc |= patch_replace(ADDR_COMM_PANEL_DELETE, pmf_addr(&AM2_Widget::CommPanelDelete),
                         "CommPanelDelete", 1);
     rc |= patch_replace(ADDR_BATTLE_JOIN_DESTRUCT,
-                        pmf_addr(&AM2_Widget::BattleJoinDestruct),
+                        AM2_DTOR(AM2_DlgBattleJoinScreen),
                         "BattleJoinDestruct", 1);
     rc |= patch_replace(ADDR_BATTLE_JOIN_DELETE,
                         pmf_addr(&AM2_Widget::BattleJoinDelete),
@@ -15663,13 +15500,13 @@ int widget_install(void)
     rc |= patch_replace(ADDR_MP_NAME_DELETE, pmf_addr(&AM2_Widget::MpNameDelete),
                         "MpNameDelete", 1);
     rc |= patch_replace(ADDR_DLG_SELECTMAP_DESTRUCT,
-                        pmf_addr(&AM2_Widget::DlgSelectMapDestruct),
+                        AM2_DTOR(AM2_SelectMapScreen),
                         "DlgSelectMapDestruct", 1);
     rc |= patch_replace(ADDR_DLG_SELECTMAP_DELETE,
                         pmf_addr(&AM2_Widget::DlgSelectMapDelete),
                         "DlgSelectMapDelete", 1);
     rc |= patch_replace(ADDR_DLG_DIFFICULTY_DESTRUCT,
-                        pmf_addr(&AM2_Widget::DlgDifficultyDestruct),
+                        AM2_DTOR(AM2_DifficultyDialog),
                         "DlgDifficultyDestruct", 1);
     rc |= patch_replace(ADDR_DLG_DIFFICULTY_DELETE,
                         pmf_addr(&AM2_Widget::DlgDifficultyDelete),
@@ -15687,25 +15524,25 @@ int widget_install(void)
                         pmf_addr(&AM2_Widget::DlgReplayDelete),
                         "DlgReplayDelete", 1);
     rc |= patch_replace(ADDR_DLG_AUDIO_DESTRUCT,
-                        pmf_addr(&AM2_Widget::DlgAudioDestruct),
+                        AM2_DTOR(AM2_AudioDialogScreen),
                         "DlgAudioDestruct", 1);
     rc |= patch_replace(ADDR_DLG_AUDIO_DELETE,
                         pmf_addr(&AM2_Widget::DlgAudioDelete),
                         "DlgAudioDelete", 1);
     rc |= patch_replace(ADDR_DLG_OPTIONS_DESTRUCT,
-                        pmf_addr(&AM2_Widget::DlgOptionsDestruct),
+                        AM2_DTOR(AM2_OptionsMenuScreen),
                         "DlgOptionsDestruct", 1);
     rc |= patch_replace(ADDR_DLG_OPTIONS_DELETE,
                         pmf_addr(&AM2_Widget::DlgOptionsDelete),
                         "DlgOptionsDelete", 1);
     rc |= patch_replace(ADDR_DLG_DELGAME_DESTRUCT,
-                        pmf_addr(&AM2_Widget::DlgDelGameDestruct),
+                        AM2_DTOR(AM2_DeleteGameScreen),
                         "DlgDelGameDestruct", 1);
     rc |= patch_replace(ADDR_DLG_DELGAME_DELETE,
                         pmf_addr(&AM2_Widget::DlgDelGameDelete),
                         "DlgDelGameDelete", 1);
     rc |= patch_replace(ADDR_DLG_OVERWRITE_DESTRUCT,
-                        pmf_addr(&AM2_Widget::DlgOverwriteDestruct),
+                        AM2_DTOR(AM2_DlgOverwriteScreen),
                         "DlgOverwriteDestruct", 1);
     rc |= patch_replace(ADDR_DLG_OVERWRITE_DELETE,
                         pmf_addr(&AM2_Widget::DlgOverwriteDelete),
@@ -15717,37 +15554,37 @@ int widget_install(void)
                         pmf_addr(&AM2_Widget::DlgDelPlayerDelete),
                         "DlgDelPlayerDelete", 1);
     rc |= patch_replace(ADDR_DLG_CONTROLS_DESTRUCT,
-                        pmf_addr(&AM2_Widget::DlgControlsDestruct),
+                        AM2_DTOR(AM2_ControlsDialogScreen),
                         "DlgControlsDestruct", 1);
     rc |= patch_replace(ADDR_DLG_CONTROLS_DELETE,
                         pmf_addr(&AM2_Widget::DlgControlsDelete),
                         "DlgControlsDelete", 1);
     rc |= patch_replace(ADDR_DLG_SELECTPLAYER_DESTRUCT,
-                        pmf_addr(&AM2_Widget::DlgSelectPlayerDestruct),
+                        AM2_DTOR(AM2_SelectPlayerScreen),
                         "DlgSelectPlayerDestruct", 1);
     rc |= patch_replace(ADDR_DLG_SELECTPLAYER_DELETE,
                         pmf_addr(&AM2_Widget::DlgSelectPlayerDelete),
                         "DlgSelectPlayerDelete", 1);
     rc |= patch_replace(ADDR_DLG_NAMEENTRY_DESTRUCT,
-                        pmf_addr(&AM2_Widget::DlgNameEntryDestruct),
+                        AM2_DTOR(AM2_EnterNameScreen),
                         "DlgNameEntryDestruct", 1);
     rc |= patch_replace(ADDR_DLG_NAMEENTRY_DELETE,
                         pmf_addr(&AM2_Widget::DlgNameEntryDelete),
                         "DlgNameEntryDelete", 1);
     rc |= patch_replace(ADDR_DLG_LOADGAME_DESTRUCT,
-                        pmf_addr(&AM2_Widget::DlgLoadGameDestruct),
+                        AM2_DTOR(AM2_LoadGameScreen),
                         "DlgLoadGameDestruct", 1);
     rc |= patch_replace(ADDR_DLG_LOADGAME_DELETE,
                         pmf_addr(&AM2_Widget::DlgLoadGameDelete),
                         "DlgLoadGameDelete", 1);
     rc |= patch_replace(ADDR_DLG_MESSAGE_DESTRUCT,
-                        pmf_addr(&AM2_Widget::DlgMessageDestruct),
+                        AM2_DTOR(AM2_DlgMessageScreen),
                         "DlgMessageDestruct", 1);
     rc |= patch_replace(ADDR_DLG_MESSAGE_DELETE,
                         pmf_addr(&AM2_Widget::DlgMessageDelete),
                         "DlgMessageDelete", 1);
     rc |= patch_replace(ADDR_DLG_GAMEMENU_DESTRUCT,
-                        pmf_addr(&AM2_Widget::DlgGameMenuDestruct),
+                        AM2_DTOR(AM2_DlgGameMenuScreen),
                         "DlgGameMenuDestruct", 1);
     rc |= patch_replace(ADDR_DLG_GAMEMENU_DELETE,
                         pmf_addr(&AM2_Widget::DlgGameMenuDelete),

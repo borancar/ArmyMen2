@@ -19,6 +19,11 @@
 
 
 #ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
+#if defined(_MSC_VER) && !defined(__GNUC__)
+#include <new.h>
+#else
+#include <new>
+#endif
 struct AM2_Rec {
     void * __attribute__((thiscall)) InitPtrList();
     void __attribute__((thiscall)) ClearPtrListAlias();
@@ -30,7 +35,15 @@ struct AM2_Rec {
     int32_t __attribute__((thiscall)) ListGrowFind(int32_t key);
     void __attribute__((thiscall)) ListAdd(const char *name, void *value);
     void __attribute__((thiscall)) ListDropOldest();
-    void * __attribute__((thiscall)) RecordCtor(int32_t value);
+    /* 0x00453910: a real constructor -- the original allocates the rows
+     * with `new` around it. */
+    explicit AM2_Rec(int32_t value);
+#if defined(__GNUC__)
+    /* `new` on the game's heap, as AM2_Widget's: ListDestruct frees rows
+     * there. Defined in widget.cpp. */
+    static void *operator new(size_t n);
+    static void operator delete(void *p);
+#endif
     void __attribute__((thiscall)) RecordReset();
     void __attribute__((thiscall)) RecordResetAlias();
 };
@@ -39,7 +52,7 @@ static inline void __attribute__((thiscall)) ListAdd(void *list, const char *nam
 static inline void __attribute__((thiscall)) ListDropOldest(void *list)
 { ((AM2_Rec *)list)->ListDropOldest(); }
 static inline void * __attribute__((thiscall)) RecordCtor(void *rec, int32_t value)
-{ return ((AM2_Rec *)rec)->RecordCtor(value); }
+{ return ::new (rec) AM2_Rec(value); }
 static inline void __attribute__((thiscall)) RecordReset(void *rec)
 { ((AM2_Rec *)rec)->RecordReset(); }
 static inline void __attribute__((thiscall)) RecordResetAlias(void *rec)

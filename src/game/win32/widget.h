@@ -151,39 +151,25 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) TyperUpdate();
     AM2_Widget * __attribute__((thiscall)) ArrowDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) DialogDelete(int32_t flags);
-    void __attribute__((thiscall)) DlgSelectMapDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgSelectMapDelete(int32_t flags);
-    void __attribute__((thiscall)) DlgDifficultyDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgDifficultyDelete(int32_t flags);
     void __attribute__((thiscall)) DlgQuitGameDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgQuitGameDelete(int32_t flags);
     void __attribute__((thiscall)) DlgReplayDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgReplayDelete(int32_t flags);
-    void __attribute__((thiscall)) DlgAudioDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgAudioDelete(int32_t flags);
-    void __attribute__((thiscall)) DlgOptionsDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgOptionsDelete(int32_t flags);
-    void __attribute__((thiscall)) DlgDelGameDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgDelGameDelete(int32_t flags);
-    void __attribute__((thiscall)) DlgOverwriteDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgOverwriteDelete(int32_t flags);
     void __attribute__((thiscall)) DlgDelPlayerDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgDelPlayerDelete(int32_t flags);
-    void __attribute__((thiscall)) DlgControlsDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgControlsDelete(int32_t flags);
-    void __attribute__((thiscall)) DlgSelectPlayerDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgSelectPlayerDelete(int32_t flags);
-    void __attribute__((thiscall)) DlgNameEntryDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgNameEntryDelete(int32_t flags);
-    void __attribute__((thiscall)) DlgLoadGameDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgLoadGameDelete(int32_t flags);
-    void __attribute__((thiscall)) DlgMessageDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgMessageDelete(int32_t flags);
-    void __attribute__((thiscall)) DlgGameMenuDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgGameMenuDelete(int32_t flags);
-    void __attribute__((thiscall)) CommPanelDestruct();
     AM2_Widget * __attribute__((thiscall)) CommPanelDelete(int32_t flags);
-    void __attribute__((thiscall)) BattleJoinDestruct();
     AM2_Widget * __attribute__((thiscall)) BattleJoinDelete(int32_t flags);
     void __attribute__((thiscall)) MpNameDestruct();
     AM2_Widget * __attribute__((thiscall)) MpNameDelete(int32_t flags);
@@ -218,30 +204,16 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) MpDialogDestruct();
     void __attribute__((thiscall)) OptionsUpdate();
     void __attribute__((thiscall)) HudCmdInvoke(int32_t mode);
-    AM2_Widget * __attribute__((thiscall)) DlgBattleJoinConstruct(const char *bmp);
-    AM2_Widget * __attribute__((thiscall)) DlgGameMenuConstruct(const char *bmp, int32_t flag);
     AM2_Widget * __attribute__((thiscall)) DlgSaveListConstruct(const char *bmp, int32_t flag);
-    AM2_Widget * __attribute__((thiscall)) DlgOverwriteConstruct(const char *bmp, int32_t flag);
-    AM2_Widget * __attribute__((thiscall)) DlgMessageConstruct(const char *bmp, int32_t flag);
-    AM2_Widget * __attribute__((thiscall)) OptionsMenuConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) WarMenuConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) QuitDialogConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) ReplayDialogConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) DelPlayerDialogConstruct(const char *bmp);
-    AM2_Widget * __attribute__((thiscall)) DifficultyDialogConstruct(const char *bmp);
-    AM2_Widget * __attribute__((thiscall)) ControlsDialogConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) MpOptionsConstruct(const char *bmp);
-    AM2_Widget * __attribute__((thiscall)) AudioDialogConstruct(const char *bmp, int32_t flag);
     AM2_Widget * __attribute__((thiscall)) BattleNameConstruct(const char *bmp);
-    AM2_Widget * __attribute__((thiscall)) CommPanelConstruct(const char *bmp);
-    AM2_Widget * __attribute__((thiscall)) SelectPlayerConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) KeyRowConstruct(int32_t nameIndex, const char *caption, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t ink2, int32_t ink3, int32_t ink4);
     void __attribute__((thiscall)) ArrowBarShowRow(int32_t row);
-    AM2_Widget * __attribute__((thiscall)) SelectMapConstruct(const char *bmp);
-    AM2_Widget * __attribute__((thiscall)) EnterNameConstruct(const char *bmp);
-    AM2_Widget * __attribute__((thiscall)) DeleteGameConstruct(const char *bmp, int32_t flag);
     AM2_Widget * __attribute__((thiscall)) MoviesConstruct(const char *bmp);
-    AM2_Widget * __attribute__((thiscall)) LoadGameConstruct(const char *bmp, int32_t flag);
     void __attribute__((thiscall)) RepaintAncestor(RECT clip);
     AM2_Widget * __attribute__((thiscall)) MpNameConstruct(const char *text, int32_t left, int32_t top, int32_t width, int32_t height, int32_t flag, uint8_t ink, uint8_t paper, int32_t row);
     AM2_Widget * __attribute__((thiscall)) MpColourConstruct(int32_t left, int32_t top, int32_t row);
@@ -338,6 +310,20 @@ AM2_CLASS_VTABLE(AM2_HudEdge, VTABLE_HUD_EDGE_STRIP)
 AM2_CLASS_VTABLE(AM2_CountButton, VTABLE_COUNT_BUTTON)
 AM2_CLASS_VTABLE(AM2_HudPanel, VTABLE_HUD_PANEL)
 AM2_CLASS_VTABLE(AM2_HudTop, VTABLE_HUD_TOP_STRIP)
+AM2_CLASS_VTABLE(AM2_DifficultyDialog, VTABLE_DIFFICULTY_DIALOG)
+AM2_CLASS_VTABLE(AM2_DlgMessageScreen, VTABLE_DLG_MESSAGE)
+AM2_CLASS_VTABLE(AM2_AudioDialogScreen, VTABLE_AUDIO_DIALOG)
+AM2_CLASS_VTABLE(AM2_CommPanelScreen, VTABLE_COMM_PANEL)
+AM2_CLASS_VTABLE(AM2_ControlsDialogScreen, VTABLE_CONTROLS_DIALOG)
+AM2_CLASS_VTABLE(AM2_DeleteGameScreen, VTABLE_DELETE_GAME)
+AM2_CLASS_VTABLE(AM2_DlgBattleJoinScreen, VTABLE_BATTLE_JOIN)
+AM2_CLASS_VTABLE(AM2_DlgGameMenuScreen, VTABLE_DLG_GAMEMENU)
+AM2_CLASS_VTABLE(AM2_DlgOverwriteScreen, VTABLE_DLG_OVERWRITE)
+AM2_CLASS_VTABLE(AM2_EnterNameScreen, VTABLE_ENTER_NAME)
+AM2_CLASS_VTABLE(AM2_LoadGameScreen, VTABLE_LOAD_GAME)
+AM2_CLASS_VTABLE(AM2_OptionsMenuScreen, VTABLE_OPTIONS_MENU)
+AM2_CLASS_VTABLE(AM2_SelectMapScreen, VTABLE_SELECT_MAP)
+AM2_CLASS_VTABLE(AM2_SelectPlayerScreen, VTABLE_SELECT_PLAYER)
 
 /* Installing a constructor or destructor at the original's address. GCC
  * builds install a thiscall thunk (constructors must answer `this` in eax, as
@@ -561,61 +547,83 @@ struct AM2_HudTop : AM2_Widget {
  * unwind frame the original's openers carry. Each constructor here forwards
  * to the construct function installed at the original constructor's
  * address; the size is the class's allocation. */
-struct AM2_DifficultyDialog : AM2_Widget {
-    uint8_t pad_[AM2_DIFFICULTY_SIZE - sizeof(AM2_Widget)];
+struct AM2_DifficultyDialog : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_DIFFICULTY_SIZE - sizeof(AM2_ScreenBase)];
     AM2_DifficultyDialog(const char *bmp);
+    ~AM2_DifficultyDialog();
 };
-struct AM2_DlgMessageScreen : AM2_Widget {
-    uint8_t pad_[AM2_MESSAGE_SIZE - sizeof(AM2_Widget)];
+struct AM2_DlgMessageScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_MESSAGE_SIZE - sizeof(AM2_ScreenBase)];
     AM2_DlgMessageScreen(const char *bmp, int32_t flag);
+    ~AM2_DlgMessageScreen();
 };
-struct AM2_AudioDialogScreen : AM2_Widget {
-    uint8_t pad_[AM2_AUDIO_OPTIONS_SIZE - sizeof(AM2_Widget)];
+struct AM2_AudioDialogScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_AUDIO_OPTIONS_SIZE - sizeof(AM2_ScreenBase)];
     AM2_AudioDialogScreen(const char *bmp, int32_t flag);
+    ~AM2_AudioDialogScreen();
 };
 struct AM2_BattleNameScreen : AM2_Widget {
     uint8_t pad_[AM2_BATTLE_NAME_SIZE - sizeof(AM2_Widget)];
     AM2_BattleNameScreen(const char *bmp);
 };
-struct AM2_CommPanelScreen : AM2_Widget {
-    uint8_t pad_[AM2_COMM_PANEL_SIZE - sizeof(AM2_Widget)];
+struct AM2_CommPanelScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_COMM_PANEL_SIZE - sizeof(AM2_ScreenBase)];
     AM2_CommPanelScreen(const char *bmp);
+    ~AM2_CommPanelScreen();
 };
-struct AM2_ControlsDialogScreen : AM2_Widget {
-    uint8_t pad_[AM2_CONTROLS_SIZE - sizeof(AM2_Widget)];
+struct AM2_ControlsDialogScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_CONTROLS_SIZE - sizeof(AM2_ScreenBase)];
     AM2_ControlsDialogScreen(const char *bmp);
+    ~AM2_ControlsDialogScreen();
 };
 struct AM2_DelPlayerDialogScreen : AM2_Widget {
     uint8_t pad_[AM2_DELETE_PLAYER_SIZE - sizeof(AM2_Widget)];
     AM2_DelPlayerDialogScreen(const char *bmp);
 };
-struct AM2_DeleteGameScreen : AM2_Widget {
-    uint8_t pad_[AM2_DELETE_GAME_SIZE - sizeof(AM2_Widget)];
+struct AM2_DeleteGameScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_DELETE_GAME_SIZE - sizeof(AM2_ScreenBase)];
     AM2_DeleteGameScreen(const char *bmp, int32_t flag);
+    ~AM2_DeleteGameScreen();
 };
-struct AM2_DlgBattleJoinScreen : AM2_Widget {
-    uint8_t pad_[AM2_BATTLE_JOIN_SIZE - sizeof(AM2_Widget)];
+struct AM2_DlgBattleJoinScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_BATTLE_JOIN_SIZE - sizeof(AM2_ScreenBase)];
     AM2_DlgBattleJoinScreen(const char *bmp);
+    ~AM2_DlgBattleJoinScreen();
 };
-struct AM2_DlgGameMenuScreen : AM2_Widget {
-    uint8_t pad_[AM2_GAMEMENU_SIZE - sizeof(AM2_Widget)];
+struct AM2_DlgGameMenuScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_GAMEMENU_SIZE - sizeof(AM2_ScreenBase)];
     AM2_DlgGameMenuScreen(const char *bmp, int32_t flag);
+    ~AM2_DlgGameMenuScreen();
 };
-struct AM2_DlgOverwriteScreen : AM2_Widget {
-    uint8_t pad_[AM2_OVERWRITE_SIZE - sizeof(AM2_Widget)];
+struct AM2_DlgOverwriteScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_OVERWRITE_SIZE - sizeof(AM2_ScreenBase)];
     AM2_DlgOverwriteScreen(const char *bmp, int32_t flag);
+    ~AM2_DlgOverwriteScreen();
 };
 struct AM2_DlgSaveListScreen : AM2_Widget {
     uint8_t pad_[AM2_SAVE_LIST_SIZE - sizeof(AM2_Widget)];
     AM2_DlgSaveListScreen(const char *bmp, int32_t flag);
 };
-struct AM2_EnterNameScreen : AM2_Widget {
-    uint8_t pad_[AM2_ENTER_NAME_SIZE - sizeof(AM2_Widget)];
+struct AM2_EnterNameScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_ENTER_NAME_SIZE - sizeof(AM2_ScreenBase)];
     AM2_EnterNameScreen(const char *bmp);
+    ~AM2_EnterNameScreen();
 };
-struct AM2_LoadGameScreen : AM2_Widget {
-    uint8_t pad_[AM2_LOAD_GAME_SIZE - sizeof(AM2_Widget)];
+struct AM2_LoadGameScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_LOAD_GAME_SIZE - sizeof(AM2_ScreenBase)];
     AM2_LoadGameScreen(const char *bmp, int32_t flag);
+    ~AM2_LoadGameScreen();
 };
 struct AM2_MoviesScreen : AM2_Widget {
     uint8_t pad_[AM2_MOVIES_SIZE - sizeof(AM2_Widget)];
@@ -629,9 +637,11 @@ struct AM2_MpPanelScreen : AM2_Widget {
     uint8_t pad_[AM2_MP_PANEL_SIZE - sizeof(AM2_Widget)];
     AM2_MpPanelScreen(const char *bmp);
 };
-struct AM2_OptionsMenuScreen : AM2_Widget {
-    uint8_t pad_[AM2_OPTIONS_MENU_SIZE - sizeof(AM2_Widget)];
+struct AM2_OptionsMenuScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_OPTIONS_MENU_SIZE - sizeof(AM2_ScreenBase)];
     AM2_OptionsMenuScreen(const char *bmp);
+    ~AM2_OptionsMenuScreen();
 };
 struct AM2_QuitDialogScreen : AM2_Widget {
     uint8_t pad_[AM2_QUIT_CONFIRM_SIZE - sizeof(AM2_Widget)];
@@ -641,13 +651,17 @@ struct AM2_ReplayDialogScreen : AM2_Widget {
     uint8_t pad_[AM2_REPLAY_PROMPT_SIZE - sizeof(AM2_Widget)];
     AM2_ReplayDialogScreen(const char *bmp);
 };
-struct AM2_SelectMapScreen : AM2_Widget {
-    uint8_t pad_[AM2_MP_SELECT_MAP_SIZE - sizeof(AM2_Widget)];
+struct AM2_SelectMapScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_MP_SELECT_MAP_SIZE - sizeof(AM2_ScreenBase)];
     AM2_SelectMapScreen(const char *bmp);
+    ~AM2_SelectMapScreen();
 };
-struct AM2_SelectPlayerScreen : AM2_Widget {
-    uint8_t pad_[AM2_SELECT_PLAYER_SIZE - sizeof(AM2_Widget)];
+struct AM2_SelectPlayerScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_SELECT_PLAYER_SIZE - sizeof(AM2_ScreenBase)];
     AM2_SelectPlayerScreen(const char *bmp);
+    ~AM2_SelectPlayerScreen();
 };
 struct AM2_WarMenuScreen : AM2_Widget {
     uint8_t pad_[AM2_WAR_MENU_SIZE - sizeof(AM2_Widget)];
@@ -1402,11 +1416,11 @@ static inline AM2_Widget * __attribute__((thiscall)) DialogDelete(AM2_Widget *w,
                                                        int32_t flags)
 
 static inline void __attribute__((thiscall)) DlgSelectMapDestruct(AM2_Widget *w)
-{ w->DlgSelectMapDestruct(); }
+{ ((AM2_SelectMapScreen *)w)->AM2_SelectMapScreen::~AM2_SelectMapScreen(); }
 static inline AM2_Widget * __attribute__((thiscall)) DlgSelectMapDelete(AM2_Widget *w, int32_t flags)
 { return w->DlgSelectMapDelete(flags); }
 static inline void __attribute__((thiscall)) DlgDifficultyDestruct(AM2_Widget *w)
-{ w->DlgDifficultyDestruct(); }
+{ ((AM2_DifficultyDialog *)w)->AM2_DifficultyDialog::~AM2_DifficultyDialog(); }
 static inline AM2_Widget * __attribute__((thiscall)) DlgDifficultyDelete(AM2_Widget *w, int32_t flags)
 { return w->DlgDifficultyDelete(flags); }
 static inline void __attribute__((thiscall)) DlgQuitGameDestruct(AM2_Widget *w)
@@ -1418,19 +1432,19 @@ static inline void __attribute__((thiscall)) DlgReplayDestruct(AM2_Widget *w)
 static inline AM2_Widget * __attribute__((thiscall)) DlgReplayDelete(AM2_Widget *w, int32_t flags)
 { return w->DlgReplayDelete(flags); }
 static inline void __attribute__((thiscall)) DlgAudioDestruct(AM2_Widget *w)
-{ w->DlgAudioDestruct(); }
+{ ((AM2_AudioDialogScreen *)w)->AM2_AudioDialogScreen::~AM2_AudioDialogScreen(); }
 static inline AM2_Widget * __attribute__((thiscall)) DlgAudioDelete(AM2_Widget *w, int32_t flags)
 { return w->DlgAudioDelete(flags); }
 static inline void __attribute__((thiscall)) DlgOptionsDestruct(AM2_Widget *w)
-{ w->DlgOptionsDestruct(); }
+{ ((AM2_OptionsMenuScreen *)w)->AM2_OptionsMenuScreen::~AM2_OptionsMenuScreen(); }
 static inline AM2_Widget * __attribute__((thiscall)) DlgOptionsDelete(AM2_Widget *w, int32_t flags)
 { return w->DlgOptionsDelete(flags); }
 static inline void __attribute__((thiscall)) DlgDelGameDestruct(AM2_Widget *w)
-{ w->DlgDelGameDestruct(); }
+{ ((AM2_DeleteGameScreen *)w)->AM2_DeleteGameScreen::~AM2_DeleteGameScreen(); }
 static inline AM2_Widget * __attribute__((thiscall)) DlgDelGameDelete(AM2_Widget *w, int32_t flags)
 { return w->DlgDelGameDelete(flags); }
 static inline void __attribute__((thiscall)) DlgOverwriteDestruct(AM2_Widget *w)
-{ w->DlgOverwriteDestruct(); }
+{ ((AM2_DlgOverwriteScreen *)w)->AM2_DlgOverwriteScreen::~AM2_DlgOverwriteScreen(); }
 static inline AM2_Widget * __attribute__((thiscall)) DlgOverwriteDelete(AM2_Widget *w, int32_t flags)
 { return w->DlgOverwriteDelete(flags); }
 static inline void __attribute__((thiscall)) DlgDelPlayerDestruct(AM2_Widget *w)
@@ -1438,39 +1452,39 @@ static inline void __attribute__((thiscall)) DlgDelPlayerDestruct(AM2_Widget *w)
 static inline AM2_Widget * __attribute__((thiscall)) DlgDelPlayerDelete(AM2_Widget *w, int32_t flags)
 { return w->DlgDelPlayerDelete(flags); }
 static inline void __attribute__((thiscall)) DlgControlsDestruct(AM2_Widget *w)
-{ w->DlgControlsDestruct(); }
+{ ((AM2_ControlsDialogScreen *)w)->AM2_ControlsDialogScreen::~AM2_ControlsDialogScreen(); }
 static inline AM2_Widget * __attribute__((thiscall)) DlgControlsDelete(AM2_Widget *w, int32_t flags)
 { return w->DlgControlsDelete(flags); }
 static inline void __attribute__((thiscall)) DlgSelectPlayerDestruct(AM2_Widget *w)
-{ w->DlgSelectPlayerDestruct(); }
+{ ((AM2_SelectPlayerScreen *)w)->AM2_SelectPlayerScreen::~AM2_SelectPlayerScreen(); }
 static inline AM2_Widget * __attribute__((thiscall)) DlgSelectPlayerDelete(AM2_Widget *w, int32_t flags)
 { return w->DlgSelectPlayerDelete(flags); }
 static inline void __attribute__((thiscall)) DlgNameEntryDestruct(AM2_Widget *w)
-{ w->DlgNameEntryDestruct(); }
+{ ((AM2_EnterNameScreen *)w)->AM2_EnterNameScreen::~AM2_EnterNameScreen(); }
 static inline AM2_Widget * __attribute__((thiscall)) DlgNameEntryDelete(AM2_Widget *w, int32_t flags)
 { return w->DlgNameEntryDelete(flags); }
 static inline void __attribute__((thiscall)) DlgLoadGameDestruct(AM2_Widget *w)
-{ w->DlgLoadGameDestruct(); }
+{ ((AM2_LoadGameScreen *)w)->AM2_LoadGameScreen::~AM2_LoadGameScreen(); }
 static inline AM2_Widget * __attribute__((thiscall)) DlgLoadGameDelete(AM2_Widget *w, int32_t flags)
 { return w->DlgLoadGameDelete(flags); }
 /* 0x00452750, thiscall. The plain message box, centred on its own backdrop. */
 static inline AM2_Widget * __attribute__((thiscall)) DlgMessageConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
-{ return w->DlgMessageConstruct(bmp, flag); }
+{ return ::new (w) AM2_DlgMessageScreen(bmp, flag); }
 
 /* 0x00450320, thiscall. The overwrite prompt: OK, Cancel, message, icon.
  * Unlike DlgMessage its coordinates are ABSOLUTE. */
 static inline AM2_Widget * __attribute__((thiscall)) DlgOverwriteConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
-{ return w->DlgOverwriteConstruct(bmp, flag); }
+{ return ::new (w) AM2_DlgOverwriteScreen(bmp, flag); }
 
 /* 0x00452AA0, thiscall. The in-mission menu: RETURN, SAVE, LOAD, CONTROLS,
  * AUDIO, ABORT -- six buttons down one column, 0x28 apart. */
 static inline AM2_Widget * __attribute__((thiscall)) DlgGameMenuConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
-{ return w->DlgGameMenuConstruct(bmp, flag); }
+{ return ::new (w) AM2_DlgGameMenuScreen(bmp, flag); }
 
 /* 0x0042F4C0, thiscall. CHOOSE A BATTLE. Its tree is TWO levels: one panel
  * child, and the list, edit, two buttons and icon hang off THAT. */
 static inline AM2_Widget * __attribute__((thiscall)) DlgBattleJoinConstruct(AM2_Widget *w, const char *bmp)
-{ return w->DlgBattleJoinConstruct(bmp); }
+{ return ::new (w) AM2_DlgBattleJoinScreen(bmp); }
 
 /* 0x00453280, thiscall. The SAVE GAME dialog. Creates the player's save
  * folder before listing it. */
@@ -1510,11 +1524,11 @@ static inline void __attribute__((thiscall)) HudChatSend(AM2_Widget *w)
 { w->HudChatSend(); }
 
 static inline void __attribute__((thiscall)) DlgMessageDestruct(AM2_Widget *w)
-{ w->DlgMessageDestruct(); }
+{ ((AM2_DlgMessageScreen *)w)->AM2_DlgMessageScreen::~AM2_DlgMessageScreen(); }
 static inline AM2_Widget * __attribute__((thiscall)) DlgMessageDelete(AM2_Widget *w, int32_t flags)
 { return w->DlgMessageDelete(flags); }
 static inline void __attribute__((thiscall)) DlgGameMenuDestruct(AM2_Widget *w)
-{ w->DlgGameMenuDestruct(); }
+{ ((AM2_DlgGameMenuScreen *)w)->AM2_DlgGameMenuScreen::~AM2_DlgGameMenuScreen(); }
 static inline AM2_Widget * __attribute__((thiscall)) DlgGameMenuDelete(AM2_Widget *w, int32_t flags)
 { return w->DlgGameMenuDelete(flags); }
 
@@ -1522,11 +1536,11 @@ static inline AM2_Widget * __attribute__((thiscall)) DlgGameMenuDelete(AM2_Widge
  * 0x00432A40/0x00432A60 -- the same pair for the COMM. CHANNEL SELECT panel,
  * the battle-join screen and one multiplayer row's name button. */
 static inline void __attribute__((thiscall)) CommPanelDestruct(AM2_Widget *w)
-{ w->CommPanelDestruct(); }
+{ ((AM2_CommPanelScreen *)w)->AM2_CommPanelScreen::~AM2_CommPanelScreen(); }
 static inline AM2_Widget * __attribute__((thiscall)) CommPanelDelete(AM2_Widget *w, int32_t flags)
 { return w->CommPanelDelete(flags); }
 static inline void __attribute__((thiscall)) BattleJoinDestruct(AM2_Widget *w)
-{ w->BattleJoinDestruct(); }
+{ ((AM2_DlgBattleJoinScreen *)w)->AM2_DlgBattleJoinScreen::~AM2_DlgBattleJoinScreen(); }
 static inline AM2_Widget * __attribute__((thiscall)) BattleJoinDelete(AM2_Widget *w, int32_t flags)
 { return w->BattleJoinDelete(flags); }
 static inline void __attribute__((thiscall)) MpNameDestruct(AM2_Widget *w)
@@ -2103,7 +2117,7 @@ extern "C++" void __cdecl OpenMessage(void);  /* C++: `new` needs its /GX unwind
  * why the rectangle is passed by value in the middle of the argument list and
  * how `ret 0x28` confirms the reading. Returns `this`. */
 static inline AM2_Widget * __attribute__((thiscall)) OptionsMenuConstruct(AM2_Widget *w, const char *bmp)
-{ return w->OptionsMenuConstruct(bmp); }
+{ return ::new (w) AM2_OptionsMenuScreen(bmp); }
 
 /* Originals: 0x0044EB50, 0x0044EED0, 0x00450730. The three CONFIRM dialogs --
  * CONFIRM GAME EXIT, the replay prompt and DELETE PLAYER. One body three
@@ -2121,14 +2135,14 @@ static inline AM2_Widget * __attribute__((thiscall)) DelPlayerDialogConstruct(AM
  * shape with a list box where they have a message. See widget.cpp for which
  * two of the list's fields the current difficulty seeds. */
 static inline AM2_Widget * __attribute__((thiscall)) DifficultyDialogConstruct(AM2_Widget *w, const char *bmp)
-{ return w->DifficultyDialogConstruct(bmp); }
+{ return ::new (w) AM2_DifficultyDialog(bmp); }
 
 /* Original: 0x00450E10, thiscall. The CONTROLS dialog -- twenty-one
  * key-capture rows out of three parallel tables, then three buttons. See
  * widget.cpp for the tables and for why three of the row constructor's
  * arguments carry stale upper bytes in the original. */
 static inline AM2_Widget * __attribute__((thiscall)) ControlsDialogConstruct(AM2_Widget *w, const char *bmp)
-{ return w->ControlsDialogConstruct(bmp); }
+{ return ::new (w) AM2_ControlsDialogScreen(bmp); }
 
 /* Original: 0x00432320, thiscall. MULTIPLAYER OPTIONS -- 43 checkboxes out of
  * the declarative table, then three buttons for a host and one for anyone
@@ -2140,7 +2154,7 @@ static inline AM2_Widget * __attribute__((thiscall)) MpOptionsConstruct(AM2_Widg
  * sliders. The only screen whose SHAPE depends on where it was opened from:
  * see widget.cpp. */
 static inline AM2_Widget * __attribute__((thiscall)) AudioDialogConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
-{ return w->AudioDialogConstruct(bmp, flag); }
+{ return ::new (w) AM2_AudioDialogScreen(bmp, flag); }
 
 /* Original: 0x0042FB00, thiscall. ENTER BATTLE NAME. The two fields are
  * seeded from the saved names and edit the dialog's own buffers in place,
@@ -2152,12 +2166,12 @@ static inline AM2_Widget * __attribute__((thiscall)) BattleNameConstruct(AM2_Wid
  * list, filled by our own CommEnumConnections. Its list box takes ADDR_LOG as
  * a callback, which is the folded empty-virtual address; see widget.cpp. */
 static inline AM2_Widget * __attribute__((thiscall)) CommPanelConstruct(AM2_Widget *w, const char *bmp)
-{ return w->CommPanelConstruct(bmp); }
+{ return ::new (w) AM2_CommPanelScreen(bmp); }
 
 /* Original: 0x00451400, thiscall. SELECT PLAYER -- the one screen whose rows
  * come off the FILESYSTEM. See widget.cpp. */
 static inline AM2_Widget * __attribute__((thiscall)) SelectPlayerConstruct(AM2_Widget *w, const char *bmp)
-{ return w->SelectPlayerConstruct(bmp); }
+{ return ::new (w) AM2_SelectPlayerScreen(bmp); }
 
 /* Original: 0x00454980, thiscall, `ret 0x18`. The PANEL -- a widget whose
  * whole job is to hold a backdrop sprite, and what eight of the reconstructed
@@ -2347,18 +2361,18 @@ void __cdecl CheckboxToggle(AM2_Widget *w);
 /* Original: 0x0044DBB0, thiscall. SELECT MAP -- the campaign's level picker,
  * and the one screen whose list comes out of a PARSED FILE. */
 static inline AM2_Widget * __attribute__((thiscall)) SelectMapConstruct(AM2_Widget *w, const char *bmp)
-{ return w->SelectMapConstruct(bmp); }
+{ return ::new (w) AM2_SelectMapScreen(bmp); }
 
 /* Original: 0x00451AF0, thiscall. ENTER NAME -- RECRUIT's dialog, and the
  * simplest screen that owns an edit box. */
 static inline AM2_Widget * __attribute__((thiscall)) EnterNameConstruct(AM2_Widget *w, const char *bmp)
-{ return w->EnterNameConstruct(bmp); }
+{ return ::new (w) AM2_EnterNameScreen(bmp); }
 
 /* Original: 0x0044FE50, thiscall. DELETE GAME -- the one screen in the table
  * built two ways: a panel on the title screen, and straight onto the screen
  * with the panel's offset folded into every rectangle when in a mission. */
 static inline AM2_Widget * __attribute__((thiscall)) DeleteGameConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
-{ return w->DeleteGameConstruct(bmp, flag); }
+{ return ::new (w) AM2_DeleteGameScreen(bmp, flag); }
 
 /* Original: 0x0044DFA0, thiscall. MOVIES -- twelve thumbnails in three pages
  * of four, and the only screen that builds its buttons out of SPRITES it
@@ -2369,7 +2383,7 @@ static inline AM2_Widget * __attribute__((thiscall)) MoviesConstruct(AM2_Widget 
 /* Original: 0x004520E0, thiscall. LOAD GAME -- the campaign's save picker,
  * and the second of the two screens built two ways. */
 static inline AM2_Widget * __attribute__((thiscall)) LoadGameConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
-{ return w->LoadGameConstruct(bmp, flag); }
+{ return ::new (w) AM2_LoadGameScreen(bmp, flag); }
 
 /* The three button classes the multiplayer host/join panel builds one of per
  * player row: 0x004329A0, 0x00432E20 and 0x00433030. All three derive from
