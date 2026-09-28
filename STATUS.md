@@ -23,7 +23,7 @@ the same trick as the hybrid game loader). `make vc6-match` recompiles each
 `patch_replace`'d reconstruction with the *original* compiler at /O2 and
 byte-compares it to `ArmyMen2.exe` -- the strongest correctness check there is.
 
-Baseline: **354 of ~1580 compiled `src/game` functions are byte-identical as
+Piecewise: **361 of ~1640 compiled `src/game` functions are byte-identical as
 written** (ApproxDist, PackKey, Clamp, PointInRect, …). Re-measure with
 `make vc6-match`; worklist is `make vc6-match ARGS=--diffs`. The pure-signedness
 class (unsigned `jb` where the original compared signed `jl`) is closed --
@@ -66,8 +66,41 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`) -- STARTED,
-  384 vs the piecewise 354, now 468 after the global migration.** Rather than a bit-exact PE (unneeded for *function*
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 606 of
+  1640 byte-identical (2026-09-28), piecewise 361.** Earlier: 384 at start,
+  468 after the global migration, 510 once the VC6 LINK work settled the data
+  layout. What moved it from 510 to 606:
+  - **Harness fixes.** Data symbols resolve from the native placed build's own
+    symbol table (placement lays each at its original VA). `AM2_SA` stand-ins
+    map to the `ADDR_` they replace. References into a function's own jump
+    tables resolve. A duplicated string or float constant resolves to the
+    original's own pointer when the bytes there are ours.
+  - **A comparison bug in BOTH harnesses.** A function ended at the next symbol
+    in its section, and MSVC emits case labels as `$L…` symbols, so every
+    switch function was compared only up to its first case label. Fixed; the
+    counts stayed level as false matches left and real ones arrived.
+  - **Every free thiscall function is now a member** (no
+    `__attribute__((thiscall))` free definition is left in `src/game`). That
+    covers 30 comm functions into `AM2_Comm` (flat `msgslot.h`, forwarders for
+    the flat callers), the list records into `AM2_Rec`, the widget
+    destructor pairs, and three small opaque classes. `AllyFlag` is a comm
+    member that ignores `this`.
+  - **Deleting destructors call `operator delete`** (0x004648F5), not `free`
+    (+33).
+  - **Inline helpers.** VC6's `/O2` implies `/Ob1`, which inlines only functions
+    declared `inline`, so helpers the original inlined must say so
+    (`RequestScreen`, `GameMenuGoto`, `SetSlot`, `ReturnToOptions`). Tried on 23
+    and kept only those with evidence; `BarVolume` is out of line in the
+    original.
+  - **Per-function source shape,** ranked by instruction edit distance
+    (`relink.py --json`): statement order, a switch where a function-pointer
+    table was written, signedness, and buffer sizes.
+  - **Real bugs the resolved compare exposed** (piecewise wildcards targets and
+    fields): `TellEachSlot` tested `COMM_ARMY_OFF_REMOTE` instead of
+    `COMM_ARMY_OFF_WAS_HERE`. `AiStep` had two switch arms in the wrong
+    source order; the same jump table, but not the same code.
+  - **What is left** is dominated by register choice (227), frame and prologue
+    scheduling (sub esp size, push/mov order), and per-function shape. Rather than a bit-exact PE (unneeded for *function*
   byte-match), it simulates the link: lays every reconstructed function at its
   real VA and RESOLVES each relocation to the address the linker would fill,
   comparing with no wildcarding. Compiled with `AM2_RELINK`, so the
