@@ -137,14 +137,65 @@ main result so far (details in `src/vc6/README.md`):
     (`ArmyMen2.map` translated the crash EIP).  That it gets this far at
     non-matching addresses is the proof the reconstruction uses proper
     structs/function-pointers, not absolute-address UB.
-  - **The two reliances the run has surfaced so far:** (1) `crt_findfirst` is a
-    milestone stub returning "no files", so every wave fails to load; (2) the
-    NULL write in SetGamePalette is `g_remapIdent` uninitialised -- the game's
-    OWN `_cinit` static-init table (0x473004, 21 entries) is not walked, because
-    the real MSVCRT runs only its own `.CRT$XC` (our C++ ctors), not the blob's
-    table the excluded reconstructed CRT used to walk via `crt_cinit`.  Next:
-    walk that table (or run the specific initialisers), and give `crt_findfirst`
-    a real `_finddata_t`<->`CRT_FINDDATA` mapping.
+  - **It now PLAYS Boot Camp at non-matching addresses, matching stock
+    (2026-09-28).** Title and briefing are pixel-identical to the stock GOG
+    binary. The live mission shows the same HUD (Sarge selected, HP 140/140, the
+    squad panel), and the edge-scroll matches too: VC6-vs-stock differs by 22,744
+    px after 8 s of scrolling, while stock-vs-stock run to run differs by 19,369
+    (the scroll distance depends on frame timing). Drive: `wine explorer
+    /desktop=am2drv,640x480 "C:\GOG Games\Army Men II\<exe>" -nointro` on
+    Xvfb :99 (a virtual desktop gives full colour; the GDI `-w` path went
+    black after mission start for stock too), cwd = the game folder, BOOT CAMP
+    at (307,142), then Return and space.
+    - **No carried blob.** The `--run` image links NO copy of the original
+      data. A `.guard` section (0x270000 bytes, patched to
+      CNT_UNINITIALIZED_DATA only, so no access) sits where the original data
+      range would have been, and any raw original-VA access faults. Linked
+      `/MT` against LIBCMT (single-threaded LIBC crashed a diagnostic watcher
+      thread in `_flsbuf`). The game's own 21-entry `_cinit` table is walked
+      from a static ctor in `vc6run.cpp` after `am2_bind_imports()`.
+    - **What running at other addresses found, in order.** Each item compiled,
+      placed, and passed every static check; each surfaced only because it
+      stopped holding once LINK put things somewhere else. (1) 455 `.bss`
+      globals redirected into `am2_origstate` members. (2) Pointer tables whose
+      entries were raw VAs (kNamedColours, kCommMessages, kCleared, region's
+      kAction*, armymsg's row coords) rewritten by name. (3) Tables written at
+      runtime but transcribed `const`: the roach params (`am2_roach` struct),
+      map field descs, sprite groups. (4) The HUD command records, the pointer
+      modes and the build menu as ONE struct (`am2_hud_commands`), since they
+      are views of one table. (5) SPRITE_GROUPS B/C bounds: C was aliased to
+      B's end, which produced a 3.4 GB malloc. (6) Four comm-object
+      dereference bugs (UseInventoryItem, TrooperDropItem, BlockWeightDamaging,
+      EnterVehicle passed the SLOT's address as `this`; checked against the
+      disassembly). (7) sprite.cpp's 18 `patch_replace` calls, spliced into
+      LoadBitmapDescriptor's body since c1455272, moved back to
+      `sprite_install`. (8) **`am2_difficulty_scale` was a lone float; it is
+      `float[3]`** (4.0, 2.0, 1.5), indexed by difficulty. Only index 0 ever
+      read correctly. Under VC6 the neighbour was 0, so every friendly trooper
+      spawned with 0 HP, and the per-frame selection prune dropped the Sarge
+      (empty squad panel, no health bar). A scan of the original's indexed
+      accesses against every scalar redirect found no other case.
+    - **Two vc6host toolchain bugs, both in the FPU path.** (a) `_atoldbl` was
+      a zeroing stub, so every float constant was 0.0 and game time froze.
+      (b) `_vc6_ftol`'s `fistpll` overwrote its own saved control word.
+      After any negative conversion the "restore" left the FPU in round
+      toward zero, and glibc's `strtold` (which honours the rounding mode)
+      then truncated every literal that should round up: `0.001f` came out
+      `0x3A83126E` against the original's `0x3A83126F`. That one ulp made the
+      frame delta in seconds sit under 0.001 on a 1 ms frame, so the
+      edge-scroll step `1000*dt` truncated to 0 and the view never scrolled.
+      `_ftol` has its own stack slots now, `_atoldbl` forces round-to-nearest
+      (MSVCRT's parser ignores the FPU mode), and `_controlfp` is real rather
+      than a constant. Byte-match after the fix: 360/1637.
+    - **Detectors** (`src/vc6/`): `rawaddr.py` disassembles the VC6 objects
+      for unrelocated values in the original data range (or `--text` for the
+      code range). Data range: 2716 -> 1, and that one is an ASCII false
+      positive inside `am2_hud_commands`. Code range: one real gap,
+      ADDR_MP_ON_MAP_PICK, an unreconstructed callback in MpPanelConstruct.
+      `constwrites.py` flags direct writes into `const` symbols.
+    - **Still open:** multiplayer and comm paths are unexercised in this image.
+      The injected `am2hook.dll` build fails at HEAD (misc.h's AM2_Comm in a C
+      TU); this is pre-existing, unrelated, and not yet fixed.
 - **Fixable per function now:** true source-shape diffs -- signed vs unsigned
   loop bound (`jl`/`jb`), statement order (scheduling), 16- vs 32-bit exprs,
   operand order (`*p==c` vs `c==*p`). ResetTimers (signed address cursor) was
