@@ -53,10 +53,12 @@ void __cdecl SendPlayerMsg(int32_t arg);
  * handshake compares (read as a single int32). Transcribed out of the blob. */
 extern "C" const int32_t am2_game_version = 1;
 /* The comm-object slot at 0x004751B0 (also read as ARMY_TABLE) and the enum
- * count at 0x004751B4: the object pointer is runtime-written into placed
- * origbss, the count seeds at 999. Plain linkage -- COMM_OBJECT is read across
- * the whole game via standalone.h. */
-uint32_t am2_comm_object[2] = { 0x004FA480u, 999u };
+ * count at 0x004751B4: a pointer to the comm object (the static instance in
+ * origbss, am2_origstate.comm_global) and a count that seeds at 999. A real
+ * pointer, not the number 0x004FA480 -- that only resolved while the struct
+ * sat at its original VA. Plain linkage -- COMM_OBJECT is read across the
+ * whole game via standalone.h. */
+struct AM2_CommObjectSlot am2_comm_object = { am2_origstate.comm_global, 999 };
 #endif
 
 /* Three comm methods, forward-declared rather than reached by address.
@@ -2531,30 +2533,30 @@ void __cdecl FlushDelayedSends(void)
  * line plus a header, and ADDR_MSG_COLOR and ADDR_MSG_TEAM are both 0x0C.
  */
 static const struct {
-    uint32_t addr;
+    uintptr_t addr;   /* by name: an am2_origstate member under the placed model */
     int32_t  kind;
     int32_t  size;
 } kCommMessages[] = {
-    { 0x004FC3B8, 0x08, 0x238 },
-    { 0x004FBF80, 0x01, 0x404 },
-    { 0x004F48E8, 0x02, 0x010 },
-    { 0x004FA910, 0x03, 0x108 },   /* ADDR_MSG_CHAT */
-    { 0x004FBB80, 0x04, 0x010 },
-    { 0x004FC5F0, 0x05, 0x194 },   /* ADDR_MSG_GAME_START */
-    { 0x004FAA50, 0x06, 0x010 },
-    { 0x004FAA18, 0x12, 0x00C },
-    { 0x004FAA28, 0x07, 0x00C },
-    { 0x004FB770, 0x0F, 0x010 },
-    { 0x004FC898, 0x09, 0x00C },   /* ADDR_MSG_COLOR */
-    { 0x004FC8A8, 0x11, 0x00C },   /* ADDR_MSG_TEAM */
-    { 0x004FC3A8, 0x0A, 0x008 },
-    { 0x004FC788, 0x0D, 0x10C },
-    { 0x004FAE68, 0x0B, 0x400 },
-    { 0x004FAA68, 0x0B, 0x014 },
-    { 0x004FB270, 0x0B, 0x014 },
-    { 0x004FB780, 0x0B, 0x400 },
-    { 0x004FC388, 0x0C, 0x010 },
-    { 0x004FAA38, 0x10, 0x014 },
+    { ADDR_PLAYER_MSG       , 0x08, 0x238 },
+    { ADDR_MSG_KIND01       , 0x01, 0x404 },
+    { ADDR_MSG_KIND02       , 0x02, 0x010 },
+    { ADDR_MSG_CHAT         , 0x03, 0x108 },
+    { ADDR_MSG_KIND04       , 0x04, 0x010 },
+    { ADDR_MSG_GAME_START   , 0x05, 0x194 },
+    { ADDR_MSG_GAME_PAUSE   , 0x06, 0x010 },
+    { ADDR_MSG_READY_TO_LOAD, 0x12, 0x00C },
+    { ADDR_MSG_GAME_READY   , 0x07, 0x00C },
+    { ADDR_MSG_MAP          , 0x0F, 0x010 },
+    { ADDR_MSG_COLOR        , 0x09, 0x00C },
+    { ADDR_MSG_TEAM         , 0x11, 0x00C },
+    { ADDR_MSG_END_SETUP    , 0x0A, 0x008 },
+    { ADDR_MSG_KIND0D       , 0x0D, 0x10C },
+    { ADDR_RESEND_BUF       , 0x0B, 0x400 },
+    { ADDR_ARMY_PACKET      , 0x0B, 0x014 },
+    { ADDR_ARMY_PACKET_B    , 0x0B, 0x014 },
+    { ADDR_RESEND_SCRATCH   , 0x0B, 0x400 },
+    { ADDR_MSG_KIND0C       , 0x0C, 0x010 },
+    { ADDR_MSG_KIND10       , 0x10, 0x014 },
 };
 
 void __cdecl CommInitDefaults(void)

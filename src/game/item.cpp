@@ -2953,7 +2953,7 @@ int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
 
         if (ObjIsWatchedKind(o)
             && (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-                || CommMustBroadcast((void *)((void *)(uintptr_t)(ADDR_COMM_OBJECT)),
+                || CommMustBroadcast(*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)),
                                      (int16_t)*(const int8_t *)
                                          (o + OBJ_OFF_ARMY))))
             DamageObject(o, AM2_BLOCK_WEAR_AMOUNT, AM2_BLOCK_WEAR_KIND,
@@ -6837,7 +6837,12 @@ void __cdecl StepType1And4(void *obj)
 void __cdecl UseInventoryItem(void *unit, int32_t slot)
 {
     uint8_t *u = (uint8_t *)unit;
-    uint8_t *comm = (uint8_t *)((void *)(uintptr_t)(ADDR_COMM_OBJECT));
+    /* The comm OBJECT, loaded through its slot: `mov ecx, [0x004751B0]` then
+     * `[ecx+0x418]`. This took the slot's own address instead, so the verbose
+     * test read 0x418 bytes past the slot and CommMustBroadcast got the wrong
+     * `this` -- invisible while the slot sat in the carried blob at its VA,
+     * flagged by -Warray-bounds once the slot became a sized struct. */
+    uint8_t *comm = *(uint8_t **)((void *)(uintptr_t)(ADDR_COMM_OBJECT));
     uint8_t *item;
     int32_t  ammo;
 
@@ -6932,9 +6937,12 @@ void __cdecl TrooperDropItem(void *unit, int32_t slot, uint32_t at)
 
     SettlePointInRegion(TileOfPoint(at), &at);
 
-    if (CommMustBroadcast((void *)((void *)(uintptr_t)(ADDR_COMM_OBJECT)),
+    /* Both reads go THROUGH the slot (`mov ecx, [0x004751B0]`), as in
+     * UseInventoryItem -- this passed the slot's own address as `this` and
+     * read the verbose flag 0x418 bytes past it. */
+    if (CommMustBroadcast(*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)),
                           (int16_t)*(const int8_t *)(u + OBJ_OFF_ARMY))) {
-        if (*(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_COMM_OBJECT))
+        if (*(const int32_t *)(*(const uint8_t **)((void *)(uintptr_t)(ADDR_COMM_OBJECT))
                                + COMM_OFF_VERBOSE))
             am2_log("TrooperDropItem  %x\n", ((const AM2_Object *)item)->uid);
 
@@ -7130,19 +7138,13 @@ extern "C" const int32_t am2_death_anim_by_code[3] = { 33, 34, 35 };
  * fields in 4-byte slots); armour/damage/velocity/acceleration are int32; the
  * three rects are int32[4] (AM2_Rect / row-spec). Read by item.cpp and
  * gameproc.cpp (kGameConst walks the eight contiguous dwords from here). */
-extern "C" const int32_t am2_roach_height      = 32;   /* 0x00487BA8, block idx 0 */
-extern "C" const int16_t am2_roach_health      = 60;   /* 0x00487BAC */
-extern "C" const int32_t am2_roach_armour      = 2;    /* 0x00487BB0 */
-extern "C" const int32_t am2_roach_damage      = 16;   /* 0x00487BB4 */
-extern "C" const int32_t am2_roach_forvel      = 130;  /* 0x00487BB8 */
-extern "C" const int32_t am2_roach_revvel      = 80;   /* 0x00487BBC */
-extern "C" const int32_t am2_roach_foracc      = 100;  /* 0x00487BC0 */
-extern "C" const int32_t am2_roach_revacc      = 80;   /* 0x00487BC4 */
-extern "C" const int32_t am2_roach_box[4]      = { -32, -32, 32, 32 };  /* 0x00487BC8 */
-extern "C" const int32_t am2_roach_bite_box[4] = { -24, -24, 24, 24 };  /* 0x00487BD8 */
-extern "C" const int32_t am2_roach_row_spec[4] = { -48, -48, 96, 96 };  /* 0x00487BE8 */
-extern "C" const int32_t am2_field_530_frames  = 81;   /* 0x00487BF8 */
-extern "C" const int16_t am2_roach_start_frame = 81;   /* 0x00487BFC */
+struct AM2_RoachParams am2_roach = {        /* 0x00487BA8 */
+    32, 60, 2, 16, 130, 80, 100, 80,       /* height health armour damage forvel revvel foracc revacc */
+    { -32, -32, 32, 32 },                  /* box      0x00487BC8 */
+    { -24, -24, 24, 24 },                  /* bite_box 0x00487BD8 */
+    { -48, -48, 96, 96 },                  /* row_spec 0x00487BE8 */
+    81, 81,                                /* field_530_frames 0x00487BF8, start_frame 0x00487BFC */
+};
 
 /* The rank records at 0x00473DC0: eight 28-byte records (RANK_REC_BYTES),
  * rank 0..7, each {sight_range, field_04, field_08, fire_scale(float),
@@ -8162,7 +8164,7 @@ void __cdecl EnterVehicle(void *unit, void *vehicle)
         SelectUnit(v);
     }
 
-    if (CommMustBroadcast((void *)((void *)(uintptr_t)(ADDR_COMM_OBJECT)),
+    if (CommMustBroadcast(*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)),
                           (int16_t)*(const int8_t *)(v + OBJ_OFF_ARMY)))
         SendVehicleEnter(v, u);
 

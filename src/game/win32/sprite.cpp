@@ -54,9 +54,11 @@ uint32_t am2_mark_sprites[1]  __attribute__((section(".data.am2_mark_sprites")))
 uint32_t am2_mp_mark_grid[1]  __attribute__((section(".data.am2_mp_mark_grid")))  = { 0 };
 /* The sprite-group definition table at 0x0048C7E0 that LoadGroupRange walks
  * to [SPRITE_GROUPS_END) and [SPRITE_GROUPS_B_END); PARTICLE_KINDS reads its
- * records too. Pure const data (no pointers), placed at its VA; the two end
- * bounds and PARTICLE_KINDS alias into it. */
-const uint8_t am2_sprite_groups[552] = {
+ * records too. Placed at its VA; the two end bounds and PARTICLE_KINDS alias
+ * into it. NOT const: LoadGroupRange stores each record's malloc'd sprite-slot
+ * array into it (SPRITEGRP_OFF_SPRITES), which only worked while place.ld put
+ * this .rodata into a writable section -- a relocated image maps it read-only. */
+uint8_t am2_sprite_groups[552] = {
     0x64, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFD, 0xFF, 0xFF, 0xFF,
     0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x65, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,
@@ -932,60 +934,6 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
 
     rc = MakeBitmap((const uint32_t *)header, pixels, (uint8_t *)out, 0);
     orig_free(pixels);
-    rc |= patch_replace(ADDR_LOAD_SPRITE_GROUPS,
-                        (const void *)LoadSpriteGroups,
-                        "LoadSpriteGroups", 1);
-    rc |= patch_replace(ADDR_FREE_SPRITE_GROUPS,
-                        (const void *)FreeSpriteGroups,
-                        "FreeSpriteGroups", 1);
-    rc |= patch_replace(ADDR_LOAD_SPRITE_GROUPS_B,
-                        (const void *)LoadSpriteGroupsB,
-                        "LoadSpriteGroupsB", 1);
-    rc |= patch_replace(ADDR_FREE_SPRITE_GROUPS_B,
-                        (const void *)FreeSpriteGroupsB,
-                        "FreeSpriteGroupsB", 1);
-    rc |= patch_replace(ADDR_LOAD_SPRITE_GROUPS_C,
-                        (const void *)LoadSpriteGroupsC,
-                        "LoadSpriteGroupsC", 1);
-    rc |= patch_replace(ADDR_FREE_SPRITE_GROUPS_C,
-                        (const void *)FreeSpriteGroupsC,
-                        "FreeSpriteGroupsC", 1);
-    rc |= patch_replace(ADDR_LOAD_SPRITE_GRID,
-                        (const void *)LoadSpriteGrid,
-                        "LoadSpriteGrid", 1);
-    rc |= patch_replace(ADDR_FREE_SPRITE_GRID,
-                        (const void *)FreeSpriteGrid,
-                        "FreeSpriteGrid", 1);
-    rc |= patch_replace(ADDR_LOAD_DECAL_SPRITES,
-                        (const void *)LoadDecalSprites,
-                        "LoadDecalSprites", 1);
-    rc |= patch_replace(ADDR_FREE_DECAL_SPRITES,
-                        (const void *)FreeDecalSprites,
-                        "FreeDecalSprites", 1);
-    rc |= patch_replace(ADDR_LOAD_SEQ_SPRITES_5,
-                        (const void *)LoadSeqSprites5,
-                        "LoadSeqSprites5", 1);
-    rc |= patch_replace(ADDR_FREE_SEQ_SPRITES_5,
-                        (const void *)FreeSeqSprites5,
-                        "FreeSeqSprites5", 1);
-    rc |= patch_replace(ADDR_LOAD_SEQ_GRID,
-                        (const void *)LoadSeqGrid,
-                        "LoadSeqGrid", 1);
-    rc |= patch_replace(ADDR_FREE_SEQ_GRID,
-                        (const void *)FreeSeqGrid,
-                        "FreeSeqGrid", 1);
-    rc |= patch_replace(ADDR_LOAD_MARK_SPRITES,
-                        (const void *)LoadMarkSprites,
-                        "LoadMarkSprites", 1);
-    rc |= patch_replace(ADDR_FREE_MARK_SPRITES,
-                        (const void *)FreeMarkSprites,
-                        "FreeMarkSprites", 1);
-    rc |= patch_replace(ADDR_LOAD_ALL_SPRITES,
-                        (const void *)LoadAllSprites,
-                        "LoadAllSprites", 1);
-    rc |= patch_replace(ADDR_FREE_ALL_SPRITES,
-                        (const void *)FreeAllSprites,
-                        "FreeAllSprites", 1);
     return rc;
 }
 
@@ -2477,6 +2425,65 @@ int sprite_install(void)
                         "InitMenuScreen", 2);
     rc |= patch_replace(ADDR_PRELOAD_SPRITE, (const void *)PreloadSprite,
                         "PreloadSprite", 37);
+    /* The eighteen sprite-group/table loaders and releasers. These lived in
+     * LoadBitmapDescriptor's body by accident -- an edit meant for this
+     * function's `return rc;` matched that one's first -- so the injected
+     * build installed them only on the first bitmap load, and every load
+     * re-ran the installer and OR'd its answers into the bitmap result. */
+    rc |= patch_replace(ADDR_LOAD_SPRITE_GROUPS,
+                        (const void *)LoadSpriteGroups,
+                        "LoadSpriteGroups", 1);
+    rc |= patch_replace(ADDR_FREE_SPRITE_GROUPS,
+                        (const void *)FreeSpriteGroups,
+                        "FreeSpriteGroups", 1);
+    rc |= patch_replace(ADDR_LOAD_SPRITE_GROUPS_B,
+                        (const void *)LoadSpriteGroupsB,
+                        "LoadSpriteGroupsB", 1);
+    rc |= patch_replace(ADDR_FREE_SPRITE_GROUPS_B,
+                        (const void *)FreeSpriteGroupsB,
+                        "FreeSpriteGroupsB", 1);
+    rc |= patch_replace(ADDR_LOAD_SPRITE_GROUPS_C,
+                        (const void *)LoadSpriteGroupsC,
+                        "LoadSpriteGroupsC", 1);
+    rc |= patch_replace(ADDR_FREE_SPRITE_GROUPS_C,
+                        (const void *)FreeSpriteGroupsC,
+                        "FreeSpriteGroupsC", 1);
+    rc |= patch_replace(ADDR_LOAD_SPRITE_GRID,
+                        (const void *)LoadSpriteGrid,
+                        "LoadSpriteGrid", 1);
+    rc |= patch_replace(ADDR_FREE_SPRITE_GRID,
+                        (const void *)FreeSpriteGrid,
+                        "FreeSpriteGrid", 1);
+    rc |= patch_replace(ADDR_LOAD_DECAL_SPRITES,
+                        (const void *)LoadDecalSprites,
+                        "LoadDecalSprites", 1);
+    rc |= patch_replace(ADDR_FREE_DECAL_SPRITES,
+                        (const void *)FreeDecalSprites,
+                        "FreeDecalSprites", 1);
+    rc |= patch_replace(ADDR_LOAD_SEQ_SPRITES_5,
+                        (const void *)LoadSeqSprites5,
+                        "LoadSeqSprites5", 1);
+    rc |= patch_replace(ADDR_FREE_SEQ_SPRITES_5,
+                        (const void *)FreeSeqSprites5,
+                        "FreeSeqSprites5", 1);
+    rc |= patch_replace(ADDR_LOAD_SEQ_GRID,
+                        (const void *)LoadSeqGrid,
+                        "LoadSeqGrid", 1);
+    rc |= patch_replace(ADDR_FREE_SEQ_GRID,
+                        (const void *)FreeSeqGrid,
+                        "FreeSeqGrid", 1);
+    rc |= patch_replace(ADDR_LOAD_MARK_SPRITES,
+                        (const void *)LoadMarkSprites,
+                        "LoadMarkSprites", 1);
+    rc |= patch_replace(ADDR_FREE_MARK_SPRITES,
+                        (const void *)FreeMarkSprites,
+                        "FreeMarkSprites", 1);
+    rc |= patch_replace(ADDR_LOAD_ALL_SPRITES,
+                        (const void *)LoadAllSprites,
+                        "LoadAllSprites", 1);
+    rc |= patch_replace(ADDR_FREE_ALL_SPRITES,
+                        (const void *)FreeAllSprites,
+                        "FreeAllSprites", 1);
     return rc;
 }
 

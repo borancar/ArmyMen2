@@ -2209,7 +2209,7 @@ void __cdecl DrawLatencyBar(int32_t slot, int32_t row)
     if (mean > 1750)
         colour = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
 
-    xy = (const int16_t *)((const uint8_t *)(uintptr_t)0x0048C768u
+    xy = (const int16_t *)((const uint8_t *)(uintptr_t)ADDR_MP_ROW_COORDS
                            + (uint32_t)(slot + row * 4) * 4u);
     DrawSeqBar(xy[0] + 0x37, xy[1] + 0x12, colour,
                *(const int32_t *)(player + 0x28u),

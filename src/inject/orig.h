@@ -786,6 +786,9 @@
  * because whoever builds buttons from these rectangles will. */
 #define ADDR_BUILD_MENU        0x004762D0u  /* 18 records of 0x38 */
 #define ADDR_BUILD_MENU_END    0x004766C0u
+/* The eight bytes that follow the table (same VA as its end, a different
+ * object: origtail.cpp's am2_build_menu_end_data). */
+#define ADDR_BUILD_MENU_END_DATA 0x004766C0u
 #define AM2_BUILD_MENU_STRIDE  0x38u
 #define BUILD_MENU_OFF_ID      0x00u  /* into ADDR_UNIT_TYPES, NOT the index */
 #define BUILD_MENU_OFF_KIND    0x04u
@@ -4673,6 +4676,13 @@
 #define ADDR_AI_MOVE_STATE       0x004750B4u  /* int32[3]: 2, 8, 9 */
 #define ADDR_AI_MOVE_STATE_ALT   0x004750C0u  /* int32[3]: 3, 8, 9 */
 #define AM2_AI_MOVE_STATES       3
+/* Their neighbours in the same run of int32[3] action tables (Type2PlayerInput
+ * reads a row of each by trooper class). */
+#define ADDR_ACTION_CROUCH       0x00475090u  /* int32[3]: 5, 7, 6 */
+#define ADDR_ACTION_PRONE        0x004750A8u  /* int32[3]: 10, 11, 6 */
+#define ADDR_ACTION_KEY1         0x004750CCu  /* int32[3]: 18, 8, 9 */
+#define ADDR_ACTION_KEY4         0x004750D8u  /* int32[3]: 13, 15, 17 */
+#define ADDR_ACTION_KEY5         0x004750E4u  /* int32[3]: 12, 14, 16 */
 /* Selects between them, and nothing read so far writes it -- so which arm a
  * trooper takes is not established, only that class 0 is the only class the
  * choice can reach. */
@@ -7266,7 +7276,10 @@ typedef struct {
  * +4 and reads [edi-4] for the count.
  *
  * It begins where table B ends, so the four tables tile. */
-#define ADDR_SPRITE_GROUPS_C      ADDR_SPRITE_GROUPS_B_END
+/* The same VA as ADDR_SPRITE_GROUPS_B_END -- the C table follows B directly --
+ * but its own name, not an alias: they are two tables, and only in the image
+ * are they guaranteed adjacent. */
+#define ADDR_SPRITE_GROUPS_C      0x0048CA08u
 /* Table C's end is the address of the NEXT global, which is the fourth
  * subsystem's row count -- the loop-bound-is-the-next-global pattern, and it
  * confirms C's extent for free. Spelled from the row count so the adjacency
@@ -13199,6 +13212,15 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * +8 and the text inline from +9, and the eight bytes before that are set up
  * in .data and never written at runtime. */
 #define ADDR_MSG_CHAT            0x004FA910u
+/* The CommInitDefaults message records that had no name (commmsg.cpp's
+ * kCommMessages): named by kind until their handlers say more. */
+#define ADDR_MSG_KIND01        0x004FBF80u  /* kind 1, 0x404 bytes */
+#define ADDR_MSG_KIND02        0x004F48E8u  /* kind 2, 0x10 bytes */
+#define ADDR_MSG_KIND04        0x004FBB80u  /* kind 4, 0x10 bytes */
+#define ADDR_MSG_KIND0C        0x004FC388u  /* kind 0xC, 0x10 bytes */
+#define ADDR_MSG_KIND0D        0x004FC788u  /* kind 0xD, 0x10C bytes */
+#define ADDR_MSG_KIND10        0x004FAA38u  /* kind 0x10, 0x14 bytes */
+#define ADDR_ARMY_PACKET_B     0x004FB270u  /* kind 0xB, 0x14 bytes -- ADDR_ARMY_PACKET's twin */
 #define AM2_MSG_CHAT_SENDER      8u
 #define AM2_MSG_CHAT_TEXT        9u
 /* No orig_ macro for ADDR_COMM_ARMY_OF_SLOT: it is reconstructed, so call

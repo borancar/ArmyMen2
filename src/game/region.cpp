@@ -9438,11 +9438,11 @@ typedef void (__cdecl *am2_char_fn)(uint32_t wparam, int32_t lo, int32_t hi);
 /* Read out of the image rather than retyped. Two of the eight consecutive
  * int32[3] tables already have names (ADDR_AI_MOVE_STATE and its ALT), which
  * is why no single base is introduced over the run. */
-#define kActionCrouch ((const int32_t *)(uintptr_t)0x00475090u)
-#define kActionProne  ((const int32_t *)(uintptr_t)0x004750A8u)
-#define kActionKey1   ((const int32_t *)(uintptr_t)0x004750CCu)
-#define kActionKey4   ((const int32_t *)(uintptr_t)0x004750D8u)
-#define kActionKey5   ((const int32_t *)(uintptr_t)0x004750E4u)
+#define kActionCrouch ((const int32_t *)(uintptr_t)ADDR_ACTION_CROUCH)
+#define kActionProne  ((const int32_t *)(uintptr_t)ADDR_ACTION_PRONE)
+#define kActionKey1   ((const int32_t *)(uintptr_t)ADDR_ACTION_KEY1)
+#define kActionKey4   ((const int32_t *)(uintptr_t)ADDR_ACTION_KEY4)
+#define kActionKey5   ((const int32_t *)(uintptr_t)ADDR_ACTION_KEY5)
 /* The weapon-code filter for the aim-cursor write in Type2PlayerInput, from
  * the byte table the original's jump table indexes at 0x0044AD24. It is the
  * dispatch selector for `jmp [ecx*4 + 0x0044AD1C]`: 0 selects the cursor-write

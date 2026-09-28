@@ -125,6 +125,53 @@ def _split_top_commas(s):
     return out
 
 
+
+_OS_MEMBERS = None
+
+
+def origstate_members():
+    """{member: VA} for src/game/origstate.h's AM2_OrigState (every member line
+    carries its VA in a trailing comment), so a pointer spelled
+    `am2_origstate.member` resolves to the address the image stored."""
+    global _OS_MEMBERS
+    if _OS_MEMBERS is None:
+        _OS_MEMBERS = {}
+        for ln in open(os.path.join(ROOT, "src", "game", "origstate.h")):
+            m = re.match(r'\s*[^/*][^;]*?\b([A-Za-z_]\w*)\s*(?:\[[^;]*\])?\s*;'
+                         r'\s*/\*\s*(0x[0-9A-Fa-f]{8})', ln)
+            if m:
+                _OS_MEMBERS[m.group(1)] = int(m.group(2), 16)
+    return _OS_MEMBERS
+
+
+def _ptr_token(el):
+    """A pointer initializer element naming a symbol, as a ("symoff", ...)
+    token: `am2_origstate.member` (its origstate VA, relative to the struct's
+    0x0048E000) or a bare `am2_sym` / `&am2_sym` (offset 0). None otherwise."""
+    m = re.search(r'\bam2_origstate\s*\.\s*(\w+)', el)
+    if m:
+        va = origstate_members().get(m.group(1))
+        if va is not None:
+            return ("symoff", ("am2_origstate", va - 0x0048E000))
+    if re.fullmatch(r'\s*(?:\([^()]*\)\s*)*&?\s*(am2_\w+)\s*', el):
+        name = re.findall(r'am2_\w+', el)[-1]
+        if name in _data_symbols():          # a placed DATA symbol, not a function
+            return ("symoff", (name, 0))
+    return None
+
+
+_DATA_SYMS = None
+
+
+def _data_symbols():
+    """The placed data symbols: every am2_ symbol a standalone.h ADDR_ redirect
+    names. (Functions reached through AM2_SA(fn) are not in this form.)"""
+    global _DATA_SYMS
+    if _DATA_SYMS is None:
+        _DATA_SYMS = set(m.group(2) for m in REDIRECT.finditer(open(SA).read()))
+    return _DATA_SYMS
+
+
 def find_definition(symbol):
     """(type, values-as-python-numbers) for a transcribed C symbol, or None.
 
@@ -171,6 +218,15 @@ def find_definition(symbol):
                 # /* 0x... */ note inside the braces is not a value
                 declared = int(m.group(2)) if m.group(2) else 0
                 body = re.sub(r'/\*.*?\*/|//[^\n]*', ' ', m.group(3), flags=re.S)
+                if m.group(1) in ("float", "double"):
+                    # float literals (4.0f, 1.5, -2e3): the integer scan below
+                    # would split "4.0f" into 4 and 0.
+                    toks = re.findall(r'(?<![\w.])-?(?:\d+\.\d*|\.\d+|\d+)'
+                                      r'(?:[eE][-+]?\d+)?[fF]?', body)
+                    vals = [float(t.rstrip("fF")) for t in toks]
+                    if declared > len(vals):
+                        vals += [0.0] * (declared - len(vals))
+                    return m.group(1), vals
                 if m.group(1) in TYPES:
                     # hex or decimal; the (?<![\w.]) skips digits embedded in an
                     # identifier, e.g. the "32" of a (int32_t) cast.
@@ -209,11 +265,39 @@ def find_definition(symbol):
                         # e.g. am2_crt_rterr_table into am2_crt_rterr_pool).
                         toks.append(("symoff", (so.group(1),
                                                 int(so.group(2), 0))))
+                    elif _ptr_token(el):
+                        toks.append(_ptr_token(el))   # a pointer to placed data
                     else:
                         # the last identifier -- ignore any (cast) or & prefix
                         ids = re.findall(r'[A-Za-z_]\w*', el)
                         toks.append(("fn", ids[-1] if ids else el))
                 return "mixed", toks
+            # A struct scalar (`struct T sym = { ... };`, e.g. the comm-object
+            # slot {pointer, count}) or a pointer scalar (`void *sym = expr;`):
+            # its initializer names placed data (am2_origstate.member / am2_x),
+            # so it is a "mixed" record -- each field a symoff or an int -- and
+            # is dereference-checked against the image dword, not byte-packed.
+            m = re.search(r'struct\s+\w+\s+' + re.escape(symbol) +
+                          r'\s*=\s*\{(.*?)\};', text, re.S)
+            if m:
+                toks = []
+                body = re.sub(r'/\*.*?\*/', ' ', m.group(1), flags=re.S)
+                body = body.replace("{", " ").replace("}", " ")   # nested arrays
+                for el in _split_top_commas(body):
+                    el = el.strip()
+                    if not el:
+                        continue
+                    num = re.fullmatch(r'-?0[xX][0-9A-Fa-f]+u?|-?\d+u?', el)
+                    if num:
+                        toks.append(("int", int(el.rstrip("uU"), 0)))
+                    else:
+                        ids = re.findall(r'[A-Za-z_]\w*', el)
+                        toks.append(_ptr_token(el) or ("fn", ids[-1] if ids else el))
+                return "mixed", toks
+            m = re.search(r'(?:const\s+)?\w+\s*\*\s*(?:const\s+)?' +
+                          re.escape(symbol) + r'\s*=\s*([^;]+?)\s*;', text)
+            if m and _ptr_token(m.group(1)):
+                return "mixed", [_ptr_token(m.group(1))]
             # scalar. `const` is optional: a runtime-WRITTEN .data-init global
             # (the CRT's _timezone, a rand seed) is migrated non-const so the
             # write is legal, but its INITIAL value still equals the image and
@@ -414,7 +498,7 @@ def main():
 
     # symbol -> placed VA, so a repointed table entry (`am2_pool + off`) can be
     # resolved against the symbol it points into.
-    symva = {}
+    symva = {"am2_origstate": 0x0048E000}   # the .bss struct's fixed VA
     for m in REDIRECT.finditer(sa):
         a = addrs.get(m.group(1))
         if m.group(4) is None and a is not None:

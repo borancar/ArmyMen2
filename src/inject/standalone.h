@@ -120,14 +120,29 @@ extern const int32_t am2_air_path_half_y;
 extern const double  am2_air_gauge_slope, am2_air_leg1_slope, am2_air_leg3_slope;
 extern const int16_t am2_air_path_turn_x, am2_air_path_away_x;
 /* TURN_Y_IN/TURN_Y_OUT are runtime state (AirInitTurnYIn/Out), not migrated. */
-/* Roach creature parameters (item.cpp). am2_roach_height is the game-constants
- * block base at 0x00487BA8 (index 0); ADDR_GAME_CONSTANTS aliases it below. */
-extern const int32_t am2_roach_height;
-extern const int16_t am2_roach_health, am2_roach_start_frame;
-extern const int32_t am2_roach_armour, am2_roach_damage, am2_roach_forvel;
-extern const int32_t am2_roach_revvel, am2_roach_foracc, am2_roach_revacc;
-extern const int32_t am2_roach_box[4], am2_roach_bite_box[4], am2_roach_row_spec[4];
-extern const int32_t am2_field_530_frames;
+/* The roach (giant ant) creature parameters, 0x00487BA8..0x00487C00, as ONE
+ * record (item.cpp). Its first eight dwords are the game-constants block that
+ * DefGameParse fills from the .aai by index (ADDR_GAME_CONSTANTS), so it is one
+ * object and NOT const -- it used to be thirteen separate const scalars that
+ * only formed an indexable block while place.ld laid them end to end in a
+ * writable section. Every slot is a dword; health and start_frame are read as
+ * int16 out of theirs, height as a byte. */
+struct AM2_RoachParams {
+    int32_t height;            /* +0x00  game-constants block [0] */
+    int32_t health;            /* +0x04  [1], read as int16 */
+    int32_t armour;            /* +0x08  [2] */
+    int32_t damage;            /* +0x0C  [3] */
+    int32_t forvel;            /* +0x10  [4] */
+    int32_t revvel;            /* +0x14  [5] */
+    int32_t foracc;            /* +0x18  [6] */
+    int32_t revacc;            /* +0x1C  [7] */
+    int32_t box[4];            /* +0x20  AM2_Rect */
+    int32_t bite_box[4];       /* +0x30  AM2_Rect */
+    int32_t row_spec[4];       /* +0x40 */
+    int32_t field_530_frames;  /* +0x50 */
+    int32_t start_frame;       /* +0x54  read as int16 */
+};
+extern struct AM2_RoachParams am2_roach;
 /* Object hit-boxes and row-specs, int32[4] rects (item.cpp). */
 extern const int32_t am2_explosion_box[4], am2_explosion_area_16[4];
 extern const int32_t am2_explosion_area_24[4], am2_explosion_area_32[4];
@@ -137,7 +152,7 @@ extern const int32_t am2_vehicle_box[4], am2_vehicle_row_spec[4], am2_kind7_box[
 /* Gameplay scalar parameters (misc.cpp). am2_pillbox_trooper_health is a view
  * into am2_rank_records (see ADDR_PILLBOX_TROOPER_HEALTH below), not a symbol. */
 extern const int16_t am2_seq_k4_rise;
-extern const float   am2_gravity, am2_difficulty_scale;
+extern const float   am2_gravity, am2_difficulty_scale[3];
 extern const int32_t am2_view_speed;
 /* tick_interval_ms / path_max_nodes are runtime state, not migrated. */
 extern const int32_t am2_path_max_searches, am2_path_retry_ms, am2_seq_grid_rows;
@@ -153,10 +168,10 @@ extern const int16_t  am2_mp_row_coords[32], am2_drop_ring[12];
  * am2_pointer_modes[6]'s tail; ADDR_BUILD_MENU_RECTS is numeric (into placed
  * pointer_modes + blob).
  * am2_hud_cmd_spec is runtime-written (HudCmdConstruct) and 280 bytes; not migrated. */
-extern const int16_t am2_hud_cmd_offsets[6], am2_hud_sarge_offsets[8];
+extern const int16_t am2_hud_cmd_offsets[6];
 extern const int16_t am2_hud_squad_slot_xy[24];
 extern const int32_t am2_spiral_step[8];
-extern const uint32_t am2_map_field_descs[14];
+extern uint32_t am2_map_field_descs[14];   /* runtime-written (LoadMap) */
 extern const int32_t am2_sprite_grid_rows, am2_sprite_grid_cols, am2_seq_sprite_5_count;
 extern const int32_t am2_decal_sprite_count, am2_mark_sprite_count, am2_mp_mark_cols[2];
 extern const int32_t am2_palette_cycle_count;
@@ -254,7 +269,19 @@ extern const AM2_FontDesc am2_font_descs[3];          /* font.cpp, 0x004897E8 */
  * AM2_POINTER_MODE_SIZE byte offsets, so this struct is the transcription's). */
 struct AM2_PointerMode { const void *pick, *action, *invoke;
                          int32_t a, b, c, d, e, f, g; };
-extern const struct AM2_PointerMode am2_pointer_modes[7]; /* widget.cpp, 0x004761B8 */
+/* The HUD command block (widget.cpp), 0x004761A8..0x004766C0, one object. */
+struct AM2_HudCommand {                /* 0x28 bytes */
+    int32_t     set, index, frame;     /* +0x00  PreloadArmySprite's arguments */
+    void       *sprite;                /* +0x0C  stored by HudCmdConstruct */
+    const void *pick, *action, *invoke;/* +0x10  the pointer mode's handlers */
+    int32_t     a, b, c;               /* +0x1C */
+};
+struct AM2_HudCommandBlock {
+    struct AM2_HudCommand cmd[7];      /* 0x004761A8 */
+    int32_t  build_rect0[4];           /* 0x004762C0  button 0's rect */
+    uint32_t build_menu[252];          /* 0x004762D0  18 records of 0x38 */
+};
+extern struct AM2_HudCommandBlock am2_hud_commands;
 /* Scalar float/double constants (misc.cpp), read as *(const double/float *). */
 extern const double am2_weapon_range_hi, am2_weapon_range_lo, am2_weapon_range_k3;
 extern const double am2_sight_range_want, am2_enemy_health_share;
@@ -443,6 +470,17 @@ void  devtools_init(void);
 #define ADDR_AI_MOVE_STATE      ((uintptr_t)(const void *)&am2_weapon_pose_frames[53])
 #undef ADDR_AI_MOVE_STATE_ALT
 #define ADDR_AI_MOVE_STATE_ALT  ((uintptr_t)(const void *)&am2_weapon_pose_frames[56])
+/* The neighbouring action rows alias into the same array (base 0x00474FE0). */
+#undef ADDR_ACTION_CROUCH
+#define ADDR_ACTION_CROUCH      ((uintptr_t)(const void *)&am2_weapon_pose_frames[44])
+#undef ADDR_ACTION_PRONE
+#define ADDR_ACTION_PRONE       ((uintptr_t)(const void *)&am2_weapon_pose_frames[50])
+#undef ADDR_ACTION_KEY1
+#define ADDR_ACTION_KEY1        ((uintptr_t)(const void *)&am2_weapon_pose_frames[59])
+#undef ADDR_ACTION_KEY4
+#define ADDR_ACTION_KEY4        ((uintptr_t)(const void *)&am2_weapon_pose_frames[62])
+#undef ADDR_ACTION_KEY5
+#define ADDR_ACTION_KEY5        ((uintptr_t)(const void *)&am2_weapon_pose_frames[65])
 
 #undef ADDR_FORMATION_SLOTS
 #define ADDR_FORMATION_SLOTS    ((uintptr_t)(const void *)am2_formation_slots)
@@ -506,29 +544,29 @@ extern int16_t am2_air_path_turn_y_in[1], am2_air_path_turn_y_out[1];
  * left at their writable .origdat placement rather than redirected to a const. */
 
 #undef ADDR_ROACH_HEALTH
-#define ADDR_ROACH_HEALTH       ((uintptr_t)(const void *)&am2_roach_health)
+#define ADDR_ROACH_HEALTH       ((uintptr_t)(const void *)&am2_roach.health)
 #undef ADDR_ROACH_ARMOUR
-#define ADDR_ROACH_ARMOUR       ((uintptr_t)(const void *)&am2_roach_armour)
+#define ADDR_ROACH_ARMOUR       ((uintptr_t)(const void *)&am2_roach.armour)
 #undef ADDR_ROACH_DAMAGE
-#define ADDR_ROACH_DAMAGE       ((uintptr_t)(const void *)&am2_roach_damage)
+#define ADDR_ROACH_DAMAGE       ((uintptr_t)(const void *)&am2_roach.damage)
 #undef ADDR_ROACH_FORVEL
-#define ADDR_ROACH_FORVEL       ((uintptr_t)(const void *)&am2_roach_forvel)
+#define ADDR_ROACH_FORVEL       ((uintptr_t)(const void *)&am2_roach.forvel)
 #undef ADDR_ROACH_REVVEL
-#define ADDR_ROACH_REVVEL       ((uintptr_t)(const void *)&am2_roach_revvel)
+#define ADDR_ROACH_REVVEL       ((uintptr_t)(const void *)&am2_roach.revvel)
 #undef ADDR_ROACH_FORACC
-#define ADDR_ROACH_FORACC       ((uintptr_t)(const void *)&am2_roach_foracc)
+#define ADDR_ROACH_FORACC       ((uintptr_t)(const void *)&am2_roach.foracc)
 #undef ADDR_ROACH_REVACC
-#define ADDR_ROACH_REVACC       ((uintptr_t)(const void *)&am2_roach_revacc)
+#define ADDR_ROACH_REVACC       ((uintptr_t)(const void *)&am2_roach.revacc)
 #undef ADDR_ROACH_BOX
-#define ADDR_ROACH_BOX          ((uintptr_t)(const void *)am2_roach_box)
+#define ADDR_ROACH_BOX          ((uintptr_t)(const void *)&am2_roach.box)
 #undef ADDR_ROACH_BITE_BOX
-#define ADDR_ROACH_BITE_BOX     ((uintptr_t)(const void *)am2_roach_bite_box)
+#define ADDR_ROACH_BITE_BOX     ((uintptr_t)(const void *)&am2_roach.bite_box)
 #undef ADDR_ROACH_ROW_SPEC
-#define ADDR_ROACH_ROW_SPEC     ((uintptr_t)(const void *)am2_roach_row_spec)
+#define ADDR_ROACH_ROW_SPEC     ((uintptr_t)(const void *)&am2_roach.row_spec)
 #undef ADDR_FIELD_530_FRAMES
-#define ADDR_FIELD_530_FRAMES   ((uintptr_t)(const void *)&am2_field_530_frames)
+#define ADDR_FIELD_530_FRAMES   ((uintptr_t)(const void *)&am2_roach.field_530_frames)
 #undef ADDR_ROACH_START_FRAME
-#define ADDR_ROACH_START_FRAME  ((uintptr_t)(const void *)&am2_roach_start_frame)
+#define ADDR_ROACH_START_FRAME  ((uintptr_t)(const void *)&am2_roach.start_frame)
 
 #undef ADDR_EXPLOSION_BOX
 #define ADDR_EXPLOSION_BOX      ((uintptr_t)(const void *)am2_explosion_box)
@@ -565,7 +603,7 @@ extern int16_t am2_air_path_turn_y_in[1], am2_air_path_turn_y_out[1];
 #define ADDR_VIEW_SPEED         ((uintptr_t)(const void *)&am2_view_speed)
 /* ADDR_TICK_INTERVAL_MS is runtime state (ResetLevelState); not redirected. */
 #undef ADDR_DIFFICULTY_SCALE
-#define ADDR_DIFFICULTY_SCALE   ((uintptr_t)(const void *)&am2_difficulty_scale)
+#define ADDR_DIFFICULTY_SCALE   ((uintptr_t)(const void *)am2_difficulty_scale)
 /* ADDR_PATH_MAX_NODES adapts at runtime (RegionBudget); not redirected. */
 #undef ADDR_PATH_MAX_SEARCHES
 #define ADDR_PATH_MAX_SEARCHES  ((uintptr_t)(const void *)&am2_path_max_searches)
@@ -619,7 +657,7 @@ extern int16_t am2_air_path_turn_y_in[1], am2_air_path_turn_y_out[1];
 #undef ADDR_HUD_CMD_OFFSETS
 #define ADDR_HUD_CMD_OFFSETS    ((uintptr_t)(const void *)am2_hud_cmd_offsets)
 #undef ADDR_HUD_SARGE_OFFSETS
-#define ADDR_HUD_SARGE_OFFSETS  ((uintptr_t)(const void *)am2_hud_sarge_offsets)
+#define ADDR_HUD_SARGE_OFFSETS  ((uintptr_t)(const void *)&am2_hud_commands.build_menu[248])  /* tail view */
 #undef ADDR_SPRITE_GRID_ROWS
 #define ADDR_SPRITE_GRID_ROWS   ((uintptr_t)(const void *)&am2_sprite_grid_rows)
 #undef ADDR_SPRITE_GRID_COLS
@@ -864,7 +902,7 @@ extern int16_t am2_air_path_turn_y_in[1], am2_air_path_turn_y_out[1];
 #undef ADDR_FONT_DESCS
 #define ADDR_FONT_DESCS         ((uintptr_t)(const void *)am2_font_descs)
 #undef ADDR_POINTER_MODES
-#define ADDR_POINTER_MODES      ((uintptr_t)(const void *)am2_pointer_modes)
+#define ADDR_POINTER_MODES      ((uintptr_t)(const void *)&am2_hud_commands.cmd[0].pick)
 
 #undef ADDR_WEAPON_RANGE_HI
 #define ADDR_WEAPON_RANGE_HI    ((uintptr_t)(const void *)&am2_weapon_range_hi)
@@ -1046,7 +1084,7 @@ extern uint32_t am2_mark_sprites[1], am2_mp_mark_grid[1];
 #define ADDR_MP_MARK_GRID       ((uintptr_t)(const void *)am2_mp_mark_grid)
 /* The sprite-group definition table (base, +4 PARTICLE_KINDS, two end bounds)
  * and the sprite-grid pointer slot (sprite.cpp; PARTICLE_KINDS read in maprow). */
-extern const uint8_t am2_sprite_groups[552];
+extern uint8_t am2_sprite_groups[552];   /* runtime-written sprite slots */
 extern uint32_t am2_sprite_grid[1];
 #undef ADDR_SPRITE_GROUPS
 #define ADDR_SPRITE_GROUPS      ((uintptr_t)(const void *)am2_sprite_groups)
@@ -1065,13 +1103,11 @@ extern uint32_t am2_opt_df;
 #define ADDR_OPT_DF             ((uintptr_t)(const void *)&am2_opt_df)
 
 /* The roach game-constants BLOCK base at 0x00487BA8 (gameproc.cpp's kGameConst
- * and item.cpp read index 0 as ROACH_HEIGHT). Indices 1..7 are already placed
- * as the individual am2_roach_* symbols above; only index 0 was still in the
- * blob, so it is placed here as am2_roach_height and the block base aliases it.
- * The eight VAs are contiguous, so kGameConst[i] flows across the placed set.
- * am2_roach_height is declared with the other roach externs above. */
+ * writes indices 0..7 from the .aai; item.cpp reads index 0 as ROACH_HEIGHT):
+ * the first eight dwords of am2_roach, one object, so the indexing stays
+ * inside it wherever the linker puts it. */
 #undef ADDR_GAME_CONSTANTS
-#define ADDR_GAME_CONSTANTS     ((uintptr_t)(const void *)&am2_roach_height)
+#define ADDR_GAME_CONSTANTS     ((uintptr_t)(const void *)&am2_roach)
 
 /* The rank records (item.cpp): eight 28-byte runtime-written records at
  * 0x00473DC0, placed as one 224-byte array. ADDR_RANK_RECORDS is the base;
@@ -1092,13 +1128,17 @@ extern const AM2_WriteDotRecord am2_write_dot_record[1];
 
 /* The comm-object slot / army table / enum count (commmsg.cpp), read across
  * the game; base aliases ARMY_TABLE and COMM_OBJECT, the count is at +1. */
-extern uint32_t am2_comm_object[2];
+struct AM2_CommObjectSlot {
+    void   *obj;         /* 0x004751B0: the comm object (am2_origstate.comm_global) */
+    int32_t enum_count;  /* 0x004751B4: seeds at 999 */
+};
+extern struct AM2_CommObjectSlot am2_comm_object;
 #undef ADDR_ARMY_TABLE
-#define ADDR_ARMY_TABLE         ((uintptr_t)(const void *)am2_comm_object)
+#define ADDR_ARMY_TABLE         ((uintptr_t)(const void *)&am2_comm_object)  /* == &.obj */
 #undef ADDR_COMM_OBJECT
-#define ADDR_COMM_OBJECT        ((uintptr_t)(const void *)am2_comm_object)
+#define ADDR_COMM_OBJECT        ((uintptr_t)(const void *)&am2_comm_object)  /* == &.obj */
 #undef ADDR_COMM_ENUM_COUNT
-#define ADDR_COMM_ENUM_COUNT    ((uintptr_t)(const void *)&am2_comm_object[1])
+#define ADDR_COMM_ENUM_COUNT    ((uintptr_t)(const void *)&am2_comm_object.enum_count)
 
 /* More CRT runtime .data-init scalars (conv/startup/fltcvt.cpp). */
 #undef ADDR_CRT_MB_CUR_MAX
@@ -1186,9 +1226,9 @@ extern int32_t am2_screen_geom[12];
 #define ADDR_REGION_SEARCH_STATE ((uintptr_t)(const void *)&am2_region_search_state)
 #undef ADDR_PALETTE_CYCLE_INDEX
 #define ADDR_PALETTE_CYCLE_INDEX ((uintptr_t)(const void *)&am2_palette_cycle_index)
-/* Runtime-written palette/charset pointer slots (palette.cpp / widget.cpp),
- * pointing into placed origbss/origdat buffers, so the raw values resolve. */
-extern uint32_t am2_active_palette, am2_remap_tint;
+/* Runtime-written palette/charset pointer slots (palette.cpp / widget.cpp):
+ * real pointers, initialised to the am2_origstate buffers / placed charset. */
+extern void *am2_active_palette, *am2_remap_tint;
 #undef ADDR_ACTIVE_PALETTE
 #define ADDR_ACTIVE_PALETTE     ((uintptr_t)(const void *)&am2_active_palette)
 #undef ADDR_MOVIE_PALETTE_OWNER
@@ -1219,6 +1259,16 @@ extern uint8_t am2_gdi_palette[1024];
 extern uint8_t am2_iat[720];
 #undef ADDR_IAT_BASE
 #define ADDR_IAT_BASE           ((uintptr_t)(const void *)am2_iat)
+/* The IAT_* spellings of four slots (orig.h) reached them by raw VA, bypassing
+ * the ADDR_IAT_* redirects below; routed into am2_iat the same way. */
+#undef IAT_GET_TICK_COUNT
+#define IAT_GET_TICK_COUNT      ((uintptr_t)(const void *)&am2_iat[0x084])
+#undef IAT_WAIT_FOR_SINGLE_OBJECT
+#define IAT_WAIT_FOR_SINGLE_OBJECT ((uintptr_t)(const void *)&am2_iat[0x080])
+#undef IAT_RELEASE_MUTEX
+#define IAT_RELEASE_MUTEX       ((uintptr_t)(const void *)&am2_iat[0x060])
+#undef IAT_POST_MESSAGE_A
+#define IAT_POST_MESSAGE_A      ((uintptr_t)(const void *)&am2_iat[0x1CC])
 #undef ADDR_IAT_GET_TICK_COUNT
 #define ADDR_IAT_GET_TICK_COUNT ((uintptr_t)(const void *)&am2_iat[0x84])
 #undef ADDR_IAT_INTERSECT_RECT
@@ -1285,18 +1335,21 @@ extern int32_t am2_screen_w, am2_screen_h, am2_fog_of_war, am2_info_overlay_on;
 #define ADDR_DEBUG_BLAST_KIND   ((uintptr_t)(const void *)&am2_debug_blast_kind)
 /* HUD_CMD_SPEC record 0 (widget.cpp); records 1-6 fall through into the placed
  * pointer_modes storage. HUD_CMD_SPRITES is its sprite field at +0xC. */
-extern int32_t am2_hud_cmd_spec[4];
 #undef ADDR_HUD_CMD_SPEC
-#define ADDR_HUD_CMD_SPEC       ((uintptr_t)(const void *)am2_hud_cmd_spec)
+#define ADDR_HUD_CMD_SPEC       ((uintptr_t)(const void *)&am2_hud_commands)
 #undef ADDR_HUD_CMD_SPRITES
-#define ADDR_HUD_CMD_SPRITES    ((uintptr_t)(const void *)&am2_hud_cmd_spec[3])
-/* The build-menu table (widget.cpp); its tail 16 bytes are am2_hud_sarge_offsets
- * (placed), so BUILD_MENU_END aliases past that int16[8]. */
-extern const uint8_t am2_build_menu[992];
+#define ADDR_HUD_CMD_SPRITES    ((uintptr_t)(const void *)&am2_hud_commands.cmd[0].sprite)
+/* One past the seventh record's sprite field: the loops step by the record
+ * stride and stop here, inside the block (it lands in build_rect0). */
+#undef ADDR_HUD_CMD_SPRITES_END
+#define ADDR_HUD_CMD_SPRITES_END ((uintptr_t)(const void *)&am2_hud_commands.build_rect0[3])
+#undef ADDR_BUILD_MENU_RECTS
+#define ADDR_BUILD_MENU_RECTS   ((uintptr_t)(const void *)am2_hud_commands.build_rect0)
+/* The build-menu table: am2_hud_commands.build_menu (18 records of 0x38). */
 #undef ADDR_BUILD_MENU
-#define ADDR_BUILD_MENU         ((uintptr_t)(const void *)am2_build_menu)
+#define ADDR_BUILD_MENU         ((uintptr_t)(const void *)am2_hud_commands.build_menu)
 #undef ADDR_BUILD_MENU_END
-#define ADDR_BUILD_MENU_END     ((uintptr_t)(const void *)&am2_hud_sarge_offsets[8])
+#define ADDR_BUILD_MENU_END     ((uintptr_t)(const void *)&am2_hud_commands.build_menu[252])
 
 /* Default map/script/rules names and dir names (gamedir.cpp), char* slots. */
 extern const char *const am2_dir_defaults[3];
@@ -1392,11 +1445,10 @@ extern const uint8_t am2_spiral_path_const[64];
 extern const uint8_t am2_rank_thresholds[32];
 extern uint8_t am2_tzname_std[64];
 extern uint8_t am2_tzname_dst[64];
-extern const uint8_t am2_sprite_group_b[48];
+extern uint8_t am2_sprite_group_b[48];   /* groups C, runtime-written */
 extern const uint8_t am2_sprite_grid_data[324];
 extern const uint8_t am2_roach_score_ints[20];
 extern const uint8_t am2_item_type_offsets[16];
-extern const uint8_t am2_difficulty_consts[12];
 extern const uint8_t am2_screen_consts[8];
 extern const uint8_t am2_crt_osver_pair[8];
 extern const uint8_t am2_str_computer_slot[15];
@@ -1502,8 +1554,15 @@ extern const uint8_t am2_logpalette_hdr_small[4];
 #define ADDR_TZNAME_STD                    ((uintptr_t)(const void *)am2_tzname_std)
 #undef ADDR_TZNAME_DST
 #define ADDR_TZNAME_DST                    ((uintptr_t)(const void *)am2_tzname_dst)
-#undef ADDR_SPRITE_GROUPS_B_END
-#define ADDR_SPRITE_GROUPS_B_END           ((uintptr_t)(const void *)am2_sprite_group_b)
+/* Groups C's own table (NOT ADDR_SPRITE_GROUPS_B_END, which is the end of the
+ * A+B table above: redefining B_END here sent the group-B loop from
+ * am2_sprite_groups off to wherever this separate symbol landed). */
+#undef ADDR_SPRITE_GROUPS_C
+#define ADDR_SPRITE_GROUPS_C               ((uintptr_t)(const void *)am2_sprite_group_b)
+/* ...and its end, which the loaders use as a bound: one past the array, not
+ * the raw VA of whatever the linker put next (am2_sprite_grid_rows). */
+#undef ADDR_SPRITE_GROUPS_C_END
+#define ADDR_SPRITE_GROUPS_C_END           ((uintptr_t)(const void *)&am2_sprite_group_b[48])
 #undef ADDR_SPRITE_GRID_DATA
 #define ADDR_SPRITE_GRID_DATA              ((uintptr_t)(const void *)am2_sprite_grid_data)
 #undef ADDR_ROACH_SCORE_INTS
@@ -1511,7 +1570,7 @@ extern const uint8_t am2_logpalette_hdr_small[4];
 #undef ADDR_ITEM_TYPE_OFFSETS
 #define ADDR_ITEM_TYPE_OFFSETS             ((uintptr_t)(const void *)am2_item_type_offsets)
 #undef ADDR_DIFFICULTY_CONSTS
-#define ADDR_DIFFICULTY_CONSTS             ((uintptr_t)(const void *)am2_difficulty_consts)
+#define ADDR_DIFFICULTY_CONSTS             ((uintptr_t)(const void *)&am2_difficulty_scale[1])  /* the table's tail */
 #undef ADDR_SCREEN_CONSTS
 #define ADDR_SCREEN_CONSTS                 ((uintptr_t)(const void *)am2_screen_consts)
 #undef ADDR_CRT_OSVER_PAIR
@@ -1546,8 +1605,8 @@ extern const uint8_t am2_logpalette_hdr_small[4];
 #define ADDR_STR_DOT                       ((uintptr_t)(const void *)am2_str_dot)
 #undef ADDR_STR_BOOL_0
 #define ADDR_STR_BOOL_0                    ((uintptr_t)(const void *)am2_bool_display_strings)
-#undef ADDR_BUILD_MENU_END
-#define ADDR_BUILD_MENU_END                ((uintptr_t)(const void *)am2_build_menu_end_data)
+#undef ADDR_BUILD_MENU_END_DATA
+#define ADDR_BUILD_MENU_END_DATA           ((uintptr_t)(const void *)am2_build_menu_end_data)
 #undef ADDR_CRT_EH_MAGIC
 #define ADDR_CRT_EH_MAGIC                  ((uintptr_t)(const void *)am2_crt_eh_magic)
 #undef ADDR_PALETTE_CYCLE_TAIL
@@ -1893,5 +1952,940 @@ extern const uint8_t am2_logpalette_hdr_small[4];
 #define ADDR_VOLUME_VOICE ((uintptr_t)(const void *)am2_origstate.volume_voice)
 #undef ADDR_ZERO_POINT
 #define ADDR_ZERO_POINT ((uintptr_t)(const void *)am2_origstate.zero_point)
+
+/* Every remaining .bss ADDR the game uses, redirected to its am2_origstate
+ * member (matched by exact VA; each member already existed).  Without these
+ * the reconstruction reached them by raw number, which only worked while the
+ * struct sat at 0x0048E000 -- the VC6 LINK.EXE image places it elsewhere and
+ * ApplyGameSettings walked ADDR_ARMY_POINTS (raw) up to ADDR_SCORE_LIMIT
+ * (migrated), straight off the end of .bss.  `&member` so scalar and array
+ * members alike yield their address. */
+#undef ADDR_PACKET_BUFFERS_END
+#define ADDR_PACKET_BUFFERS_END ((uintptr_t)(const void *)&am2_origstate.packet_buffers_end)
+#undef ADDR_PLAYER_RECORDS
+#define ADDR_PLAYER_RECORDS ((uintptr_t)(const void *)&am2_origstate.player_records)
+#undef ADDR_DEFAULT_PLAYER_EVT
+#define ADDR_DEFAULT_PLAYER_EVT ((uintptr_t)(const void *)&am2_origstate.default_player_evt)
+#undef ADDR_PACKET_EVENT_B2
+#define ADDR_PACKET_EVENT_B2 ((uintptr_t)(const void *)&am2_origstate.default_player_evt)
+#undef ADDR_MSG_LIST_B
+#define ADDR_MSG_LIST_B ((uintptr_t)(const void *)&am2_origstate.msg_list_b)
+#undef ADDR_PACKET_THREAD
+#define ADDR_PACKET_THREAD ((uintptr_t)(const void *)&am2_origstate.packet_thread)
+#undef ADDR_PLAYER_SLOT_MASK
+#define ADDR_PLAYER_SLOT_MASK ((uintptr_t)(const void *)&am2_origstate.player_slot_mask)
+#undef ADDR_COMM_NO_BUFFERS_LATCH
+#define ADDR_COMM_NO_BUFFERS_LATCH ((uintptr_t)(const void *)&am2_origstate.comm_no_buffers_latch)
+#undef ADDR_LAST_MSG_VALUE
+#define ADDR_LAST_MSG_VALUE ((uintptr_t)(const void *)&am2_origstate.last_msg_value)
+#undef ADDR_LAST_MSG_CHECKSUM
+#define ADDR_LAST_MSG_CHECKSUM ((uintptr_t)(const void *)&am2_origstate.last_msg_checksum)
+#undef ADDR_PACKET_RECORDS
+#define ADDR_PACKET_RECORDS ((uintptr_t)(const void *)&am2_origstate.packet_records)
+#undef ADDR_PACKET_STATE
+#define ADDR_PACKET_STATE ((uintptr_t)(const void *)&am2_origstate.packet_state)
+#undef ADDR_MSG_LIST_DELAYED
+#define ADDR_MSG_LIST_DELAYED ((uintptr_t)(const void *)&am2_origstate.msg_list_delayed)
+#undef ADDR_RECV_SCRATCH
+#define ADDR_RECV_SCRATCH ((uintptr_t)(const void *)&am2_origstate.recv_scratch)
+#undef ADDR_PACKET_THREAD_ID
+#define ADDR_PACKET_THREAD_ID ((uintptr_t)(const void *)&am2_origstate.packet_thread_id)
+#undef ADDR_MSG_WANTED_FLAGS
+#define ADDR_MSG_WANTED_FLAGS ((uintptr_t)(const void *)&am2_origstate.msg_wanted_flags)
+#undef ADDR_SEND_ROLL
+#define ADDR_SEND_ROLL ((uintptr_t)(const void *)&am2_origstate.send_roll)
+#undef ADDR_SIGHT_BLOCK_BY_DIR
+#define ADDR_SIGHT_BLOCK_BY_DIR ((uintptr_t)(const void *)&am2_origstate.sight_block_by_dir)
+#undef ADDR_PERFRAME_COUNT_A
+#define ADDR_PERFRAME_COUNT_A ((uintptr_t)(const void *)&am2_origstate.perframe_count_a)
+#undef ADDR_PERFRAME_COUNT_B
+#define ADDR_PERFRAME_COUNT_B ((uintptr_t)(const void *)&am2_origstate.perframe_count_b)
+#undef ADDR_SIGHT_GENERATION
+#define ADDR_SIGHT_GENERATION ((uintptr_t)(const void *)&am2_origstate.sight_generation)
+#undef ADDR_AIR_LEG1_DY
+#define ADDR_AIR_LEG1_DY ((uintptr_t)(const void *)&am2_origstate.air_leg1_dy)
+#undef ADDR_AIR_LEG2_DIVISOR
+#define ADDR_AIR_LEG2_DIVISOR ((uintptr_t)(const void *)&am2_origstate.air_leg2_divisor)
+#undef ADDR_AIR_LEG2_MS_SPAN
+#define ADDR_AIR_LEG2_MS_SPAN ((uintptr_t)(const void *)&am2_origstate.air_leg2_ms_span)
+#undef ADDR_AIR_LEG3_DX
+#define ADDR_AIR_LEG3_DX ((uintptr_t)(const void *)&am2_origstate.air_leg3_dx)
+#undef ADDR_AIR_SPRITES_2
+#define ADDR_AIR_SPRITES_2 ((uintptr_t)(const void *)&am2_origstate.air_sprites_2)
+#undef ADDR_AIR_SPRITES_3
+#define ADDR_AIR_SPRITES_3 ((uintptr_t)(const void *)&am2_origstate.air_sprites_3)
+#undef ADDR_AIR_SPRITES_6
+#define ADDR_AIR_SPRITES_6 ((uintptr_t)(const void *)&am2_origstate.air_sprites_6)
+#undef ADDR_AIR_SPRITES_EDGE
+#define ADDR_AIR_SPRITES_EDGE ((uintptr_t)(const void *)&am2_origstate.air_sprites_edge)
+#undef ADDR_AIR_LEG2_DY
+#define ADDR_AIR_LEG2_DY ((uintptr_t)(const void *)&am2_origstate.air_leg2_dy)
+#undef ADDR_AIR_LEG3_DY
+#define ADDR_AIR_LEG3_DY ((uintptr_t)(const void *)&am2_origstate.air_leg3_dy)
+#undef ADDR_AIR_LEG1_X0
+#define ADDR_AIR_LEG1_X0 ((uintptr_t)(const void *)&am2_origstate.air_leg1_x0)
+#undef ADDR_AIR_LEG1_DX
+#define ADDR_AIR_LEG1_DX ((uintptr_t)(const void *)&am2_origstate.air_leg1_dx)
+#undef ADDR_AIR_LEG3_X1
+#define ADDR_AIR_LEG3_X1 ((uintptr_t)(const void *)&am2_origstate.air_leg3_x1)
+#undef ADDR_SPRITE_LIST_CAP
+#define ADDR_SPRITE_LIST_CAP ((uintptr_t)(const void *)&am2_origstate.sprite_list_cap)
+#undef ADDR_SPRITE_LIST_COUNT
+#define ADDR_SPRITE_LIST_COUNT ((uintptr_t)(const void *)&am2_origstate.sprite_list_count)
+#undef ADDR_SPRITE_LIST
+#define ADDR_SPRITE_LIST ((uintptr_t)(const void *)&am2_origstate.sprite_list)
+#undef ADDR_ARMY_RAMP_TABLES
+#define ADDR_ARMY_RAMP_TABLES ((uintptr_t)(const void *)&am2_origstate.army_ramp_tables)
+#undef ADDR_CHAT_COLOUR_TABLE
+#define ADDR_CHAT_COLOUR_TABLE ((uintptr_t)(const void *)&am2_origstate.chat_colour_table)
+#undef ADDR_TYPE2_ACTION_LIST
+#define ADDR_TYPE2_ACTION_LIST ((uintptr_t)(const void *)&am2_origstate.type2_action_list)
+#undef ADDR_WINCPUID_FN
+#define ADDR_WINCPUID_FN ((uintptr_t)(const void *)&am2_origstate.wincpuid_fn)
+#undef ADDR_LAST_MESSAGE
+#define ADDR_LAST_MESSAGE ((uintptr_t)(const void *)&am2_origstate.last_message)
+#undef ADDR_CPUNORMSPEED_FN
+#define ADDR_CPUNORMSPEED_FN ((uintptr_t)(const void *)&am2_origstate.cpunormspeed_fn)
+#undef ADDR_OPT_MAP_NAME
+#define ADDR_OPT_MAP_NAME ((uintptr_t)(const void *)&am2_origstate.opt_map_name)
+#undef ADDR_APP_ACTIVE
+#define ADDR_APP_ACTIVE ((uintptr_t)(const void *)&am2_origstate.app_active)
+#undef ADDR_PRESENT_ENABLED
+#define ADDR_PRESENT_ENABLED ((uintptr_t)(const void *)&am2_origstate.present_enabled)
+#undef ADDR_APP_MUTEX
+#define ADDR_APP_MUTEX ((uintptr_t)(const void *)&am2_origstate.app_mutex)
+#undef ADDR_OPT_NO_INTRO
+#define ADDR_OPT_NO_INTRO ((uintptr_t)(const void *)&am2_origstate.opt_no_intro)
+#undef ADDR_SOUND_SLOTS
+#define ADDR_SOUND_SLOTS ((uintptr_t)(const void *)&am2_origstate.sound_slots)
+#undef ADDR_SOUND_DYNAMIC
+#define ADDR_SOUND_DYNAMIC ((uintptr_t)(const void *)&am2_origstate.sound_slots_end)
+#undef ADDR_SOUND_SLOTS_END
+#define ADDR_SOUND_SLOTS_END ((uintptr_t)(const void *)&am2_origstate.sound_slots_end)
+#undef ADDR_SOUND_DYNAMIC_LAST
+#define ADDR_SOUND_DYNAMIC_LAST ((uintptr_t)(const void *)&am2_origstate.sound_dynamic_last)
+#undef ADDR_AUDIO_BUFFER
+#define ADDR_AUDIO_BUFFER ((uintptr_t)(const void *)&am2_origstate.audio_buffer)
+#undef ADDR_AUDIO_TIMER_ID
+#define ADDR_AUDIO_TIMER_ID ((uintptr_t)(const void *)&am2_origstate.audio_timer_id)
+#undef ADDR_AUDIO_WAVEFORMAT
+#define ADDR_AUDIO_WAVEFORMAT ((uintptr_t)(const void *)&am2_origstate.audio_waveformat)
+#undef ADDR_AUDIO_HMMIO
+#define ADDR_AUDIO_HMMIO ((uintptr_t)(const void *)&am2_origstate.audio_hmmio)
+#undef ADDR_AUDIO_DATA_CHUNK
+#define ADDR_AUDIO_DATA_CHUNK ((uintptr_t)(const void *)&am2_origstate.audio_data_chunk)
+#undef ADDR_AUDIO_RIFF_CHUNK
+#define ADDR_AUDIO_RIFF_CHUNK ((uintptr_t)(const void *)&am2_origstate.audio_riff_chunk)
+#undef ADDR_AUDIO_BUFFER_2
+#define ADDR_AUDIO_BUFFER_2 ((uintptr_t)(const void *)&am2_origstate.audio_buffer_2)
+#undef ADDR_AUDIO_BUFFER_SIZE
+#define ADDR_AUDIO_BUFFER_SIZE ((uintptr_t)(const void *)&am2_origstate.audio_buffer_size)
+#undef ADDR_AUDIO_PERIOD
+#define ADDR_AUDIO_PERIOD ((uintptr_t)(const void *)&am2_origstate.audio_period)
+#undef ADDR_AUDIO_CURSOR_B
+#define ADDR_AUDIO_CURSOR_B ((uintptr_t)(const void *)&am2_origstate.audio_cursor_b)
+#undef ADDR_AUDIO_CURSOR_A
+#define ADDR_AUDIO_CURSOR_A ((uintptr_t)(const void *)&am2_origstate.audio_cursor_a)
+#undef ADDR_AUDIO_VALID_BYTES
+#define ADDR_AUDIO_VALID_BYTES ((uintptr_t)(const void *)&am2_origstate.audio_valid_bytes)
+#undef ADDR_AUDIO_READ_FAILED
+#define ADDR_AUDIO_READ_FAILED ((uintptr_t)(const void *)&am2_origstate.audio_read_failed)
+#undef ADDR_AUDIO_LOOPING
+#define ADDR_AUDIO_LOOPING ((uintptr_t)(const void *)&am2_origstate.audio_looping)
+#undef ADDR_AUDIO_AT_END
+#define ADDR_AUDIO_AT_END ((uintptr_t)(const void *)&am2_origstate.audio_at_end)
+#undef ADDR_AUDIO_TIMER_RUN
+#define ADDR_AUDIO_TIMER_RUN ((uintptr_t)(const void *)&am2_origstate.audio_timer_run)
+#undef ADDR_AUDIO_ENABLED
+#define ADDR_AUDIO_ENABLED ((uintptr_t)(const void *)&am2_origstate.audio_enabled)
+#undef ADDR_DSOUND
+#define ADDR_DSOUND ((uintptr_t)(const void *)&am2_origstate.dsound)
+#undef ADDR_DS_PRIMARY
+#define ADDR_DS_PRIMARY ((uintptr_t)(const void *)&am2_origstate.ds_primary)
+#undef ADDR_DS_LISTENER
+#define ADDR_DS_LISTENER ((uintptr_t)(const void *)&am2_origstate.ds_listener)
+#undef ADDR_AUDIO_IN_CALLBACK
+#define ADDR_AUDIO_IN_CALLBACK ((uintptr_t)(const void *)&am2_origstate.audio_in_callback)
+#undef ADDR_CONNECTION_LIST
+#define ADDR_CONNECTION_LIST ((uintptr_t)(const void *)&am2_origstate.connection_list)
+#undef ADDR_OUR_SLOT
+#define ADDR_OUR_SLOT ((uintptr_t)(const void *)&am2_origstate.our_slot)
+#undef ADDR_SESSION_LIST
+#define ADDR_SESSION_LIST ((uintptr_t)(const void *)&am2_origstate.session_list)
+#undef ADDR_MSG_READY_TO_LOAD
+#define ADDR_MSG_READY_TO_LOAD ((uintptr_t)(const void *)&am2_origstate.msg_ready_to_load)
+#undef ADDR_MSG_GAME_READY
+#define ADDR_MSG_GAME_READY ((uintptr_t)(const void *)&am2_origstate.msg_game_ready)
+#undef ADDR_RESEND_BUF
+#define ADDR_RESEND_BUF ((uintptr_t)(const void *)&am2_origstate.resend_buf)
+#undef ADDR_MSG_MAP
+#define ADDR_MSG_MAP ((uintptr_t)(const void *)&am2_origstate.msg_map)
+#undef ADDR_RESEND_SCRATCH
+#define ADDR_RESEND_SCRATCH ((uintptr_t)(const void *)&am2_origstate.resend_scratch)
+#undef ADDR_MSG_END_SETUP
+#define ADDR_MSG_END_SETUP ((uintptr_t)(const void *)&am2_origstate.msg_end_setup)
+#undef ADDR_PLAYER_MSG
+#define ADDR_PLAYER_MSG ((uintptr_t)(const void *)&am2_origstate.player_msg)
+#undef ADDR_MSG_GAME_START
+#define ADDR_MSG_GAME_START ((uintptr_t)(const void *)&am2_origstate.msg_game_start)
+#undef ADDR_GAME_SEED_SENT
+#define ADDR_GAME_SEED_SENT ((uintptr_t)(const void *)&am2_origstate.game_seed_sent)
+#undef ADDR_MSG_COLOR
+#define ADDR_MSG_COLOR ((uintptr_t)(const void *)&am2_origstate.msg_color)
+#undef ADDR_MSG_TEAM
+#define ADDR_MSG_TEAM ((uintptr_t)(const void *)&am2_origstate.msg_team)
+#undef ADDR_DATA_CHECKSUM
+#define ADDR_DATA_CHECKSUM ((uintptr_t)(const void *)&am2_origstate.data_checksum)
+#undef ADDR_TIMEOUT_LOGGED_AT
+#define ADDR_TIMEOUT_LOGGED_AT ((uintptr_t)(const void *)&am2_origstate.timeout_logged_at)
+#undef ADDR_CHANGE_LIMIT_FLOOR
+#define ADDR_CHANGE_LIMIT_FLOOR ((uintptr_t)(const void *)&am2_origstate.change_limit_floor)
+#undef ADDR_BANDWIDTH_LAST_SEQ
+#define ADDR_BANDWIDTH_LAST_SEQ ((uintptr_t)(const void *)&am2_origstate.bandwidth_last_seq)
+#undef ADDR_AIM_SPRITES_A
+#define ADDR_AIM_SPRITES_A ((uintptr_t)(const void *)&am2_origstate.aim_sprites_a)
+#undef ADDR_AIM_SPRITES_B
+#define ADDR_AIM_SPRITES_B ((uintptr_t)(const void *)&am2_origstate.aim_sprites_b)
+#undef ADDR_AIM_FRAME_B
+#define ADDR_AIM_FRAME_B ((uintptr_t)(const void *)&am2_origstate.aim_frame_b)
+#undef ADDR_PALETTE_GLYPHS
+#define ADDR_PALETTE_GLYPHS ((uintptr_t)(const void *)&am2_origstate.palette_glyphs)
+#undef ADDR_MENU_SAVED_RECT
+#define ADDR_MENU_SAVED_RECT ((uintptr_t)(const void *)&am2_origstate.menu_saved_rect)
+#undef ADDR_MENU_ROW
+#define ADDR_MENU_ROW ((uintptr_t)(const void *)&am2_origstate.menu_row)
+#undef ADDR_MENU_SPRITES_END
+#define ADDR_MENU_SPRITES_END ((uintptr_t)(const void *)&am2_origstate.menu_sprites_end)
+#undef ADDR_MENU_OVERLAY_A
+#define ADDR_MENU_OVERLAY_A ((uintptr_t)(const void *)&am2_origstate.menu_overlay_a)
+#undef ADDR_MENU_OVERLAY_B
+#define ADDR_MENU_OVERLAY_B ((uintptr_t)(const void *)&am2_origstate.menu_overlay_b)
+#undef ADDR_MENU_INK
+#define ADDR_MENU_INK ((uintptr_t)(const void *)&am2_origstate.menu_ink)
+#undef ADDR_MENU_OVERLAY_A_INK
+#define ADDR_MENU_OVERLAY_A_INK ((uintptr_t)(const void *)&am2_origstate.menu_overlay_a_ink)
+#undef ADDR_MENU_OVERLAY_B_INK
+#define ADDR_MENU_OVERLAY_B_INK ((uintptr_t)(const void *)&am2_origstate.menu_overlay_b_ink)
+#undef ADDR_MENU_CURSOR_DX
+#define ADDR_MENU_CURSOR_DX ((uintptr_t)(const void *)&am2_origstate.menu_cursor_dx)
+#undef ADDR_MENU_OVERLAY_A_DX
+#define ADDR_MENU_OVERLAY_A_DX ((uintptr_t)(const void *)&am2_origstate.menu_overlay_a_dx)
+#undef ADDR_MENU_OVERLAY_B_DX
+#define ADDR_MENU_OVERLAY_B_DX ((uintptr_t)(const void *)&am2_origstate.menu_overlay_b_dx)
+#undef ADDR_MENU_CURSOR_PREV
+#define ADDR_MENU_CURSOR_PREV ((uintptr_t)(const void *)&am2_origstate.menu_cursor_prev)
+#undef ADDR_MENU_CURSOR_RECT
+#define ADDR_MENU_CURSOR_RECT ((uintptr_t)(const void *)&am2_origstate.menu_cursor_rect)
+#undef ADDR_MENU_ANIM_NEXT
+#define ADDR_MENU_ANIM_NEXT ((uintptr_t)(const void *)&am2_origstate.menu_anim_next)
+#undef ADDR_MENU_ANIM_FRAME
+#define ADDR_MENU_ANIM_FRAME ((uintptr_t)(const void *)&am2_origstate.menu_anim_frame)
+#undef ADDR_MENU_ROW_STAMP
+#define ADDR_MENU_ROW_STAMP ((uintptr_t)(const void *)&am2_origstate.menu_row_stamp)
+#undef ADDR_MENU_SURFACE
+#define ADDR_MENU_SURFACE ((uintptr_t)(const void *)&am2_origstate.menu_surface)
+#undef ADDR_FLAME_RECORD
+#define ADDR_FLAME_RECORD ((uintptr_t)(const void *)&am2_origstate.flame_record)
+#undef ADDR_MENU_ENABLED
+#define ADDR_MENU_ENABLED ((uintptr_t)(const void *)&am2_origstate.menu_enabled)
+#undef ADDR_MENU_SAVED_VALID
+#define ADDR_MENU_SAVED_VALID ((uintptr_t)(const void *)&am2_origstate.menu_saved_valid)
+#undef ADDR_HUD_WIDGET_A
+#define ADDR_HUD_WIDGET_A ((uintptr_t)(const void *)&am2_origstate.hud_widget_a)
+#undef ADDR_HUD_WIDGET_TABLE
+#define ADDR_HUD_WIDGET_TABLE ((uintptr_t)(const void *)&am2_origstate.hud_widget_table)
+#undef ADDR_HUD_WIDGET_C
+#define ADDR_HUD_WIDGET_C ((uintptr_t)(const void *)&am2_origstate.hud_widget_c)
+#undef ADDR_HUD_INDEX
+#define ADDR_HUD_INDEX ((uintptr_t)(const void *)&am2_origstate.hud_index)
+#undef ADDR_HUD_WIDGET_B
+#define ADDR_HUD_WIDGET_B ((uintptr_t)(const void *)&am2_origstate.hud_widget_b)
+#undef ADDR_VIEW_RECT_ON
+#define ADDR_VIEW_RECT_ON ((uintptr_t)(const void *)&am2_origstate.view_rect_on)
+#undef ADDR_RADAR_COLOURS
+#define ADDR_RADAR_COLOURS ((uintptr_t)(const void *)&am2_origstate.radar_colours)
+#undef ADDR_DRAG_ANCHOR
+#define ADDR_DRAG_ANCHOR ((uintptr_t)(const void *)&am2_origstate.drag_anchor)
+#undef ADDR_VIEW_RECT
+#define ADDR_VIEW_RECT ((uintptr_t)(const void *)&am2_origstate.view_rect)
+#undef ADDR_POINTER_MODE
+#define ADDR_POINTER_MODE ((uintptr_t)(const void *)&am2_origstate.pointer_mode)
+#undef ADDR_HUD_DIRTY
+#define ADDR_HUD_DIRTY ((uintptr_t)(const void *)&am2_origstate.hud_dirty)
+#undef ADDR_PLACE_FLAG_4FCF88
+#define ADDR_PLACE_FLAG_4FCF88 ((uintptr_t)(const void *)&am2_origstate.place_flag_4fcf88)
+#undef ADDR_PLACE_FACING
+#define ADDR_PLACE_FACING ((uintptr_t)(const void *)&am2_origstate.place_facing)
+#undef ADDR_NUMBER_KEY_SLOT
+#define ADDR_NUMBER_KEY_SLOT ((uintptr_t)(const void *)&am2_origstate.number_key_slot)
+#undef ADDR_CHEAT_ENABLED
+#define ADDR_CHEAT_ENABLED ((uintptr_t)(const void *)&am2_origstate.cheat_enabled)
+#undef ADDR_CHEAT_LEVEL_SELECT
+#define ADDR_CHEAT_LEVEL_SELECT ((uintptr_t)(const void *)&am2_origstate.cheat_level_select)
+#undef ADDR_OUR_POINTS
+#define ADDR_OUR_POINTS ((uintptr_t)(const void *)&am2_origstate.our_points)
+#undef ADDR_FLAME_ON
+#define ADDR_FLAME_ON ((uintptr_t)(const void *)&am2_origstate.flame_on)
+#undef ADDR_FLAME_NEXT_MS
+#define ADDR_FLAME_NEXT_MS ((uintptr_t)(const void *)&am2_origstate.flame_next_ms)
+#undef ADDR_VIEW_COLOUR_COPY
+#define ADDR_VIEW_COLOUR_COPY ((uintptr_t)(const void *)&am2_origstate.view_colour_copy)
+#undef ADDR_DEBUG_ITEMLIST
+#define ADDR_DEBUG_ITEMLIST ((uintptr_t)(const void *)&am2_origstate.opt_rob)
+#undef ADDR_OPT_ROB
+#define ADDR_OPT_ROB ((uintptr_t)(const void *)&am2_origstate.opt_rob)
+#undef ADDR_OPT_DAN
+#define ADDR_OPT_DAN ((uintptr_t)(const void *)&am2_origstate.opt_dan)
+#undef ADDR_OPT_PETER
+#define ADDR_OPT_PETER ((uintptr_t)(const void *)&am2_origstate.opt_peter)
+#undef ADDR_OPT_4FD748
+#define ADDR_OPT_4FD748 ((uintptr_t)(const void *)&am2_origstate.opt_4fd748)
+#undef ADDR_COLOUR_DARK_BLUE
+#define ADDR_COLOUR_DARK_BLUE ((uintptr_t)(const void *)&am2_origstate.colour_dark_blue)
+#undef ADDR_REMAP_IDENTITY
+#define ADDR_REMAP_IDENTITY ((uintptr_t)(const void *)&am2_origstate.remap_identity)
+#undef ADDR_COLOUR_WHITE
+#define ADDR_COLOUR_WHITE ((uintptr_t)(const void *)&am2_origstate.colour_white)
+#undef ADDR_COLOUR_DARK_GREEN
+#define ADDR_COLOUR_DARK_GREEN ((uintptr_t)(const void *)&am2_origstate.colour_dark_green)
+#undef ADDR_COLOUR_CREAM
+#define ADDR_COLOUR_CREAM ((uintptr_t)(const void *)&am2_origstate.colour_cream)
+#undef ADDR_DIRECTDRAW
+#define ADDR_DIRECTDRAW ((uintptr_t)(const void *)&am2_origstate.directdraw)
+#undef ADDR_COLOUR_BLUE
+#define ADDR_COLOUR_BLUE ((uintptr_t)(const void *)&am2_origstate.colour_blue)
+#undef ADDR_SURFACE_LOCKED
+#define ADDR_SURFACE_LOCKED ((uintptr_t)(const void *)&am2_origstate.surface_locked)
+#undef ADDR_DEFAULT_PALETTE
+#define ADDR_DEFAULT_PALETTE ((uintptr_t)(const void *)&am2_origstate.default_palette)
+#undef ADDR_REMAP_DARK
+#define ADDR_REMAP_DARK ((uintptr_t)(const void *)&am2_origstate.default_palette)
+#undef ADDR_COLOUR_STEEL_BLUE
+#define ADDR_COLOUR_STEEL_BLUE ((uintptr_t)(const void *)&am2_origstate.colour_steel_blue)
+#undef ADDR_VIEW_RECT_COLOUR
+#define ADDR_VIEW_RECT_COLOUR ((uintptr_t)(const void *)&am2_origstate.view_rect_colour)
+#undef ADDR_BACK_BUFFER
+#define ADDR_BACK_BUFFER ((uintptr_t)(const void *)&am2_origstate.back_buffer)
+#undef ADDR_COLOUR_STALE
+#define ADDR_COLOUR_STALE ((uintptr_t)(const void *)&am2_origstate.colour_stale)
+#undef ADDR_COLOUR_LIGHT_GREEN
+#define ADDR_COLOUR_LIGHT_GREEN ((uintptr_t)(const void *)&am2_origstate.colour_light_green)
+#undef ADDR_COLOUR_LAG_MID
+#define ADDR_COLOUR_LAG_MID ((uintptr_t)(const void *)&am2_origstate.colour_lag_mid)
+#undef ADDR_COLOUR_LIGHT_GREY
+#define ADDR_COLOUR_LIGHT_GREY ((uintptr_t)(const void *)&am2_origstate.colour_light_grey)
+#undef ADDR_COLOUR_BLACK
+#define ADDR_COLOUR_BLACK ((uintptr_t)(const void *)&am2_origstate.colour_black)
+#undef ADDR_DIRECTDRAW2
+#define ADDR_DIRECTDRAW2 ((uintptr_t)(const void *)&am2_origstate.directdraw2)
+#undef ADDR_REMAP_BRIGHT_BUF
+#define ADDR_REMAP_BRIGHT_BUF ((uintptr_t)(const void *)&am2_origstate.remap_bright_buf)
+#undef ADDR_OVERLAY_PALETTE
+#define ADDR_OVERLAY_PALETTE ((uintptr_t)(const void *)&am2_origstate.overlay_palette)
+#undef ADDR_FRAMEBUFFER
+#define ADDR_FRAMEBUFFER ((uintptr_t)(const void *)&am2_origstate.framebuffer)
+#undef ADDR_COLOUR_LIGHT_BLUE
+#define ADDR_COLOUR_LIGHT_BLUE ((uintptr_t)(const void *)&am2_origstate.colour_light_blue)
+#undef ADDR_COLOUR_WHITE_B
+#define ADDR_COLOUR_WHITE_B ((uintptr_t)(const void *)&am2_origstate.colour_white_b)
+#undef ADDR_COLOUR_OLIVE
+#define ADDR_COLOUR_OLIVE ((uintptr_t)(const void *)&am2_origstate.colour_olive)
+#undef ADDR_REMAP_SHADES
+#define ADDR_REMAP_SHADES ((uintptr_t)(const void *)&am2_origstate.remap_shades)
+#undef ADDR_VARIATION_BLOCKS
+#define ADDR_VARIATION_BLOCKS ((uintptr_t)(const void *)&am2_origstate.variation_blocks)
+#undef ADDR_VARIATION_END
+#define ADDR_VARIATION_END ((uintptr_t)(const void *)&am2_origstate.variation_end)
+#undef ADDR_PALETTE_COPY
+#define ADDR_PALETTE_COPY ((uintptr_t)(const void *)&am2_origstate.palette_copy)
+#undef ADDR_LIST_INK_HOT_SEL
+#define ADDR_LIST_INK_HOT_SEL ((uintptr_t)(const void *)&am2_origstate.list_ink_hot_sel)
+#undef ADDR_SCREEN_PITCH
+#define ADDR_SCREEN_PITCH ((uintptr_t)(const void *)&am2_origstate.screen_pitch)
+#undef ADDR_PRIMARY_SURFACE
+#define ADDR_PRIMARY_SURFACE ((uintptr_t)(const void *)&am2_origstate.primary_surface)
+#undef ADDR_COLOUR_BELOW_BG
+#define ADDR_COLOUR_BELOW_BG ((uintptr_t)(const void *)&am2_origstate.colour_below_bg)
+#undef ADDR_BACKGROUND_COLOUR
+#define ADDR_BACKGROUND_COLOUR ((uintptr_t)(const void *)&am2_origstate.background_colour)
+#undef ADDR_DEFAULT_PALETTE_BUF
+#define ADDR_DEFAULT_PALETTE_BUF ((uintptr_t)(const void *)&am2_origstate.default_palette_buf)
+#undef ADDR_COLOUR_DARK_GREY
+#define ADDR_COLOUR_DARK_GREY ((uintptr_t)(const void *)&am2_origstate.colour_dark_grey)
+#undef ADDR_COLOUR_NO_MAP
+#define ADDR_COLOUR_NO_MAP ((uintptr_t)(const void *)&am2_origstate.colour_no_map)
+#undef ADDR_REMAP_SHADE_STORE
+#define ADDR_REMAP_SHADE_STORE ((uintptr_t)(const void *)&am2_origstate.remap_shade_store)
+#undef ADDR_OFFSCREEN_SURFACE
+#define ADDR_OFFSCREEN_SURFACE ((uintptr_t)(const void *)&am2_origstate.offscreen_surface)
+#undef ADDR_TILESET_PALETTES
+#define ADDR_TILESET_PALETTES ((uintptr_t)(const void *)&am2_origstate.tileset_palettes)
+#undef ADDR_DRAW_TARGET
+#define ADDR_DRAW_TARGET ((uintptr_t)(const void *)&am2_origstate.draw_target)
+#undef ADDR_KIND7_NAMES
+#define ADDR_KIND7_NAMES ((uintptr_t)(const void *)&am2_origstate.kind7_names)
+#undef ADDR_VARIATION_TABLE
+#define ADDR_VARIATION_TABLE ((uintptr_t)(const void *)&am2_origstate.variation_table)
+#undef ADDR_REMAP_BRIGHT
+#define ADDR_REMAP_BRIGHT ((uintptr_t)(const void *)&am2_origstate.remap_bright)
+#undef ADDR_HUD_MESSAGE_COLOUR
+#define ADDR_HUD_MESSAGE_COLOUR ((uintptr_t)(const void *)&am2_origstate.hud_message_colour)
+#undef ADDR_REMAP_IDENTITY_BUF
+#define ADDR_REMAP_IDENTITY_BUF ((uintptr_t)(const void *)&am2_origstate.remap_identity_buf)
+#undef ADDR_DD_CLIPPER
+#define ADDR_DD_CLIPPER ((uintptr_t)(const void *)&am2_origstate.dd_clipper)
+#undef ADDR_OPT_WINDOWED
+#define ADDR_OPT_WINDOWED ((uintptr_t)(const void *)&am2_origstate.opt_windowed)
+#undef ADDR_DEPTH_CURSOR
+#define ADDR_DEPTH_CURSOR ((uintptr_t)(const void *)&am2_origstate.depth_cursor)
+#undef ADDR_DEPTH_NODES
+#define ADDR_DEPTH_NODES ((uintptr_t)(const void *)&am2_origstate.depth_nodes)
+#undef ADDR_DEPTH_COUNT
+#define ADDR_DEPTH_COUNT ((uintptr_t)(const void *)&am2_origstate.depth_count)
+#undef ADDR_DEPTH_HEAD
+#define ADDR_DEPTH_HEAD ((uintptr_t)(const void *)&am2_origstate.depth_head)
+#undef ADDR_DEPTH_FIELD_DC
+#define ADDR_DEPTH_FIELD_DC ((uintptr_t)(const void *)&am2_origstate.depth_field_dc)
+#undef ADDR_ERROR_TEXT_DD
+#define ADDR_ERROR_TEXT_DD ((uintptr_t)(const void *)&am2_origstate.error_text_dd)
+#undef ADDR_ERROR_TEXT
+#define ADDR_ERROR_TEXT ((uintptr_t)(const void *)&am2_origstate.error_text)
+#undef ADDR_LEAK_TOTAL
+#define ADDR_LEAK_TOTAL ((uintptr_t)(const void *)&am2_origstate.leak_total)
+#undef ADDR_LEAK_COUNT
+#define ADDR_LEAK_COUNT ((uintptr_t)(const void *)&am2_origstate.leak_count)
+#undef ADDR_LEAK_RECORDS
+#define ADDR_LEAK_RECORDS ((uintptr_t)(const void *)&am2_origstate.leak_records)
+#undef ADDR_UNREAD_50C34C
+#define ADDR_UNREAD_50C34C ((uintptr_t)(const void *)&am2_origstate.unread_50c34c)
+#undef ADDR_SCRIPT_RELOADING
+#define ADDR_SCRIPT_RELOADING ((uintptr_t)(const void *)&am2_origstate.script_reloading)
+#undef ADDR_OPT_TRACE_WIN
+#define ADDR_OPT_TRACE_WIN ((uintptr_t)(const void *)&am2_origstate.opt_trace_win)
+#undef ADDR_OPT_DBG
+#define ADDR_OPT_DBG ((uintptr_t)(const void *)&am2_origstate.opt_dbg)
+#undef ADDR_OPT_TRACE_VEH
+#define ADDR_OPT_TRACE_VEH ((uintptr_t)(const void *)&am2_origstate.opt_trace_veh)
+#undef ADDR_TIMER_TABLE_ID_END
+#define ADDR_TIMER_TABLE_ID_END ((uintptr_t)(const void *)&am2_origstate.timer_table_id_end)
+#undef ADDR_RULE_UID_A
+#define ADDR_RULE_UID_A ((uintptr_t)(const void *)&am2_origstate.rule_uid_a)
+#undef ADDR_RULE_UID_B
+#define ADDR_RULE_UID_B ((uintptr_t)(const void *)&am2_origstate.rule_uid_b)
+#undef ADDR_RULE_UID_C
+#define ADDR_RULE_UID_C ((uintptr_t)(const void *)&am2_origstate.rule_uid_c)
+#undef ADDR_EXPLOSION_ANIMS
+#define ADDR_EXPLOSION_ANIMS ((uintptr_t)(const void *)&am2_origstate.explosion_anims)
+#undef ADDR_STATE0_TICK
+#define ADDR_STATE0_TICK ((uintptr_t)(const void *)&am2_origstate.state0_tick)
+#undef ADDR_MOVIE_TO_PLAY
+#define ADDR_MOVIE_TO_PLAY ((uintptr_t)(const void *)&am2_origstate.movie_to_play)
+#undef ADDR_SCRIPT_RELOAD_PATH
+#define ADDR_SCRIPT_RELOAD_PATH ((uintptr_t)(const void *)&am2_origstate.script_reload_path)
+#undef ADDR_MAP_CHECKSUM_VAL
+#define ADDR_MAP_CHECKSUM_VAL ((uintptr_t)(const void *)&am2_origstate.map_checksum_val)
+#undef ADDR_MP_SCRIPT_CHKSUM_VAL
+#define ADDR_MP_SCRIPT_CHKSUM_VAL ((uintptr_t)(const void *)&am2_origstate.mp_script_chksum_val)
+#undef ADDR_RULES_CHECKSUM_VAL
+#define ADDR_RULES_CHECKSUM_VAL ((uintptr_t)(const void *)&am2_origstate.rules_checksum_val)
+#undef ADDR_LEVEL_ID
+#define ADDR_LEVEL_ID ((uintptr_t)(const void *)&am2_origstate.level_id)
+#undef ADDR_GAME_STATE
+#define ADDR_GAME_STATE ((uintptr_t)(const void *)&am2_origstate.game_state)
+#undef ADDR_STATE_ENTERED
+#define ADDR_STATE_ENTERED ((uintptr_t)(const void *)&am2_origstate.state_entered)
+#undef ADDR_STATE_PENDING
+#define ADDR_STATE_PENDING ((uintptr_t)(const void *)&am2_origstate.state_pending)
+#undef ADDR_STATE_WANTED
+#define ADDR_STATE_WANTED ((uintptr_t)(const void *)&am2_origstate.state_wanted)
+#undef ADDR_GAME_STATE_ARG
+#define ADDR_GAME_STATE_ARG ((uintptr_t)(const void *)&am2_origstate.game_state_arg)
+#undef ADDR_MENU_REQUEST_SET
+#define ADDR_MENU_REQUEST_SET ((uintptr_t)(const void *)&am2_origstate.menu_request_set)
+#undef ADDR_MENU_REQUEST
+#define ADDR_MENU_REQUEST ((uintptr_t)(const void *)&am2_origstate.menu_request)
+#undef ADDR_SCRIPT_RELOAD
+#define ADDR_SCRIPT_RELOAD ((uintptr_t)(const void *)&am2_origstate.script_reload)
+#undef ADDR_STATE_ENTER_ONCE
+#define ADDR_STATE_ENTER_ONCE ((uintptr_t)(const void *)&am2_origstate.state_enter_once)
+#undef ADDR_NET_GAME
+#define ADDR_NET_GAME ((uintptr_t)(const void *)&am2_origstate.net_game)
+#undef ADDR_LOAD_PENDING
+#define ADDR_LOAD_PENDING ((uintptr_t)(const void *)&am2_origstate.load_pending)
+#undef ADDR_HAVE_DEFAULT_COF
+#define ADDR_HAVE_DEFAULT_COF ((uintptr_t)(const void *)&am2_origstate.have_default_cof)
+#undef ADDR_UID_COUNTERS
+#define ADDR_UID_COUNTERS ((uintptr_t)(const void *)&am2_origstate.uid_counters)
+#undef ADDR_CLOCK_BASE_MS
+#define ADDR_CLOCK_BASE_MS ((uintptr_t)(const void *)&am2_origstate.clock_base_ms)
+#undef ADDR_FRAME_DELTA_MS
+#define ADDR_FRAME_DELTA_MS ((uintptr_t)(const void *)&am2_origstate.frame_delta_ms)
+#undef ADDR_LAST_TICK_MS
+#define ADDR_LAST_TICK_MS ((uintptr_t)(const void *)&am2_origstate.last_tick_ms)
+#undef ADDR_FRAME_DELTA_SEC
+#define ADDR_FRAME_DELTA_SEC ((uintptr_t)(const void *)&am2_origstate.frame_delta_sec)
+#undef ADDR_GAME_OVER_SOURCE
+#define ADDR_GAME_OVER_SOURCE ((uintptr_t)(const void *)&am2_origstate.game_over_source)
+#undef ADDR_OBJ_CTX_VAL_A
+#define ADDR_OBJ_CTX_VAL_A ((uintptr_t)(const void *)&am2_origstate.obj_ctx_val_a)
+#undef ADDR_LEVEL_FLAG_E30
+#define ADDR_LEVEL_FLAG_E30 ((uintptr_t)(const void *)&am2_origstate.level_flag_e30)
+#undef ADDR_VIEW_SNAP
+#define ADDR_VIEW_SNAP ((uintptr_t)(const void *)&am2_origstate.view_snap)
+#undef ADDR_VIEW_HOLD
+#define ADDR_VIEW_HOLD ((uintptr_t)(const void *)&am2_origstate.view_hold)
+#undef ADDR_INPUT_SUPPRESS
+#define ADDR_INPUT_SUPPRESS ((uintptr_t)(const void *)&am2_origstate.input_suppress)
+#undef ADDR_OUR_LEADER_UID
+#define ADDR_OUR_LEADER_UID ((uintptr_t)(const void *)&am2_origstate.our_leader_uid)
+#undef ADDR_LEADER_POS
+#define ADDR_LEADER_POS ((uintptr_t)(const void *)&am2_origstate.leader_pos)
+#undef ADDR_LEADER_FACING
+#define ADDR_LEADER_FACING ((uintptr_t)(const void *)&am2_origstate.leader_facing)
+#undef ADDR_WEAPON_OWNER_ID
+#define ADDR_WEAPON_OWNER_ID ((uintptr_t)(const void *)&am2_origstate.weapon_owner_id)
+#undef ADDR_WEAPON_SLOT
+#define ADDR_WEAPON_SLOT ((uintptr_t)(const void *)&am2_origstate.weapon_slot)
+#undef ADDR_MESSAGE_TEXT
+#define ADDR_MESSAGE_TEXT ((uintptr_t)(const void *)&am2_origstate.message_text)
+#undef ADDR_OBJ_CTX_OBJ_A
+#define ADDR_OBJ_CTX_OBJ_A ((uintptr_t)(const void *)&am2_origstate.obj_ctx_obj_a)
+#undef ADDR_WEAPON_FN_SLOT0
+#define ADDR_WEAPON_FN_SLOT0 ((uintptr_t)(const void *)&am2_origstate.weapon_fn_slot0)
+#undef ADDR_WEAPON_FN_SLOT1
+#define ADDR_WEAPON_FN_SLOT1 ((uintptr_t)(const void *)&am2_origstate.weapon_fn_slot1)
+#undef ADDR_WEAPON_FN_SLOT3
+#define ADDR_WEAPON_FN_SLOT3 ((uintptr_t)(const void *)&am2_origstate.weapon_fn_slot3)
+#undef ADDR_POINTER_PICK
+#define ADDR_POINTER_PICK ((uintptr_t)(const void *)&am2_origstate.pointer_pick)
+#undef ADDR_POINTER_ACTION
+#define ADDR_POINTER_ACTION ((uintptr_t)(const void *)&am2_origstate.pointer_action)
+#undef ADDR_POINTER_F10
+#define ADDR_POINTER_F10 ((uintptr_t)(const void *)&am2_origstate.pointer_f10)
+#undef ADDR_POINTER_F14
+#define ADDR_POINTER_F14 ((uintptr_t)(const void *)&am2_origstate.pointer_f14)
+#undef ADDR_WEAPON_FN_SLOT2
+#define ADDR_WEAPON_FN_SLOT2 ((uintptr_t)(const void *)&am2_origstate.weapon_fn_slot2)
+#undef ADDR_POINTER_OVERLAY
+#define ADDR_POINTER_OVERLAY ((uintptr_t)(const void *)&am2_origstate.pointer_overlay)
+#undef ADDR_SECOND_DEADLINE
+#define ADDR_SECOND_DEADLINE ((uintptr_t)(const void *)&am2_origstate.second_deadline)
+#undef ADDR_PAUSE_FLAGS
+#define ADDR_PAUSE_FLAGS ((uintptr_t)(const void *)&am2_origstate.pause_flags)
+#undef ADDR_GAME_WINNER
+#define ADDR_GAME_WINNER ((uintptr_t)(const void *)&am2_origstate.game_winner)
+#undef ADDR_WIN_ENABLED
+#define ADDR_WIN_ENABLED ((uintptr_t)(const void *)&am2_origstate.win_enabled)
+#undef ADDR_SELECTED_UIDS
+#define ADDR_SELECTED_UIDS ((uintptr_t)(const void *)&am2_origstate.selected_uids)
+#undef ADDR_SELECTED_COUNT
+#define ADDR_SELECTED_COUNT ((uintptr_t)(const void *)&am2_origstate.selected_count)
+#undef ADDR_SELECTED_ITEMS
+#define ADDR_SELECTED_ITEMS ((uintptr_t)(const void *)&am2_origstate.selected_items)
+#undef ADDR_GAME_SEED
+#define ADDR_GAME_SEED ((uintptr_t)(const void *)&am2_origstate.game_seed)
+#undef ADDR_MISSION_RETRY
+#define ADDR_MISSION_RETRY ((uintptr_t)(const void *)&am2_origstate.mission_retry)
+#undef ADDR_ATTEMPT_COUNT
+#define ADDR_ATTEMPT_COUNT ((uintptr_t)(const void *)&am2_origstate.attempt_count)
+#undef ADDR_LEVEL_ATTEMPT
+#define ADDR_LEVEL_ATTEMPT ((uintptr_t)(const void *)&am2_origstate.attempt_count)
+#undef ADDR_STARTUP_COLOURS
+#define ADDR_STARTUP_COLOURS ((uintptr_t)(const void *)&am2_origstate.startup_colours)
+#undef ADDR_NET_SETTLE_COUNT
+#define ADDR_NET_SETTLE_COUNT ((uintptr_t)(const void *)&am2_origstate.net_settle_count)
+#undef ADDR_PERF_FREQ
+#define ADDR_PERF_FREQ ((uintptr_t)(const void *)&am2_origstate.perf_freq)
+#undef ADDR_CHEAT_INVULNERABLE
+#define ADDR_CHEAT_INVULNERABLE ((uintptr_t)(const void *)&am2_origstate.cheat_invulnerable)
+#undef ADDR_AIM_X
+#define ADDR_AIM_X ((uintptr_t)(const void *)&am2_origstate.aim_x)
+#undef ADDR_AIM_Y
+#define ADDR_AIM_Y ((uintptr_t)(const void *)&am2_origstate.aim_y)
+#undef ADDR_AIM_Z
+#define ADDR_AIM_Z ((uintptr_t)(const void *)&am2_origstate.aim_z)
+#undef ADDR_PERF_PERIOD
+#define ADDR_PERF_PERIOD ((uintptr_t)(const void *)&am2_origstate.perf_period)
+#undef ADDR_PERF_START
+#define ADDR_PERF_START ((uintptr_t)(const void *)&am2_origstate.perf_start)
+#undef ADDR_HINSTANCE
+#define ADDR_HINSTANCE ((uintptr_t)(const void *)&am2_origstate.hinstance)
+#undef ADDR_CD_FOUND_FLAG
+#define ADDR_CD_FOUND_FLAG ((uintptr_t)(const void *)&am2_origstate.cd_found_flag)
+#undef ADDR_FIXED_STEP
+#define ADDR_FIXED_STEP ((uintptr_t)(const void *)&am2_origstate.fixed_step)
+#undef ADDR_OPT_NO_MOVIES
+#define ADDR_OPT_NO_MOVIES ((uintptr_t)(const void *)&am2_origstate.opt_no_movies)
+#undef ADDR_ZERO_RECT
+#define ADDR_ZERO_RECT ((uintptr_t)(const void *)&am2_origstate.zero_rect)
+#undef ADDR_CHAR_HANDLER
+#define ADDR_CHAR_HANDLER ((uintptr_t)(const void *)&am2_origstate.char_handler)
+#undef ADDR_KEYS_BUFFER_A
+#define ADDR_KEYS_BUFFER_A ((uintptr_t)(const void *)&am2_origstate.keys_buffer_a)
+#undef ADDR_KEYS_BUFFER_B
+#define ADDR_KEYS_BUFFER_B ((uintptr_t)(const void *)&am2_origstate.keys_buffer_b)
+#undef ADDR_KEYS_NOW_PTR
+#define ADDR_KEYS_NOW_PTR ((uintptr_t)(const void *)&am2_origstate.keys_now_ptr)
+#undef ADDR_KEYS_PREV_PTR
+#define ADDR_KEYS_PREV_PTR ((uintptr_t)(const void *)&am2_origstate.keys_prev_ptr)
+#undef ADDR_KEY_REPEAT_AT
+#define ADDR_KEY_REPEAT_AT ((uintptr_t)(const void *)&am2_origstate.key_repeat_at)
+#undef ADDR_KEY_PRESSED
+#define ADDR_KEY_PRESSED ((uintptr_t)(const void *)&am2_origstate.key_pressed)
+#undef ADDR_DINPUT
+#define ADDR_DINPUT ((uintptr_t)(const void *)&am2_origstate.dinput)
+#undef ADDR_DI_MOUSE
+#define ADDR_DI_MOUSE ((uintptr_t)(const void *)&am2_origstate.di_mouse)
+#undef ADDR_DI_KEYBOARD
+#define ADDR_DI_KEYBOARD ((uintptr_t)(const void *)&am2_origstate.di_keyboard)
+#undef ADDR_DI_DEVICE_3
+#define ADDR_DI_DEVICE_3 ((uintptr_t)(const void *)&am2_origstate.di_device_3)
+#undef ADDR_DI_MOUSE_ACQUIRED
+#define ADDR_DI_MOUSE_ACQUIRED ((uintptr_t)(const void *)&am2_origstate.di_mouse_acquired)
+#undef ADDR_ITEM_HEADER_SIZE
+#define ADDR_ITEM_HEADER_SIZE ((uintptr_t)(const void *)&am2_origstate.item_header_size)
+#undef ADDR_UID_REMAP_CAP
+#define ADDR_UID_REMAP_CAP ((uintptr_t)(const void *)&am2_origstate.uid_remap_cap)
+#undef ADDR_UID_REMAP_COUNT
+#define ADDR_UID_REMAP_COUNT ((uintptr_t)(const void *)&am2_origstate.uid_remap_count)
+#undef ADDR_UID_REMAP
+#define ADDR_UID_REMAP ((uintptr_t)(const void *)&am2_origstate.uid_remap)
+#undef ADDR_ITER_STAMP
+#define ADDR_ITER_STAMP ((uintptr_t)(const void *)&am2_origstate.iter_stamp)
+#undef ADDR_MAP_EXTENT_X
+#define ADDR_MAP_EXTENT_X ((uintptr_t)(const void *)&am2_origstate.map_extent_x)
+#undef ADDR_MAP_EXTENT_Y
+#define ADDR_MAP_EXTENT_Y ((uintptr_t)(const void *)&am2_origstate.map_extent_y)
+#undef ADDR_MAP_EXTENT_SHIFT
+#define ADDR_MAP_EXTENT_SHIFT ((uintptr_t)(const void *)&am2_origstate.map_extent_shift)
+#undef ADDR_MAP_ROW_SHIFT
+#define ADDR_MAP_ROW_SHIFT ((uintptr_t)(const void *)&am2_origstate.map_row_shift)
+#undef ADDR_MAP_BOUNDS
+#define ADDR_MAP_BOUNDS ((uintptr_t)(const void *)&am2_origstate.map_bounds)
+#undef ADDR_VIEW_TARGET
+#define ADDR_VIEW_TARGET ((uintptr_t)(const void *)&am2_origstate.view_target)
+#undef ADDR_LISTENER_POS
+#define ADDR_LISTENER_POS ((uintptr_t)(const void *)&am2_origstate.listener_pos)
+#undef ADDR_LISTENER_POS_PREV
+#define ADDR_LISTENER_POS_PREV ((uintptr_t)(const void *)&am2_origstate.listener_pos_prev)
+#undef ADDR_VIEW_ORIGIN_X
+#define ADDR_VIEW_ORIGIN_X ((uintptr_t)(const void *)&am2_origstate.view_origin_x)
+#undef ADDR_VIEW_ORIGIN_Y
+#define ADDR_VIEW_ORIGIN_Y ((uintptr_t)(const void *)&am2_origstate.view_origin_y)
+#undef ADDR_VIEW_FAR_X
+#define ADDR_VIEW_FAR_X ((uintptr_t)(const void *)&am2_origstate.view_far_x)
+#undef ADDR_VIEW_FAR_Y
+#define ADDR_VIEW_FAR_Y ((uintptr_t)(const void *)&am2_origstate.view_far_y)
+#undef ADDR_SECOND_RECT
+#define ADDR_SECOND_RECT ((uintptr_t)(const void *)&am2_origstate.second_rect)
+#undef ADDR_SECOND_RECT_PREV
+#define ADDR_SECOND_RECT_PREV ((uintptr_t)(const void *)&am2_origstate.second_rect_prev)
+#undef ADDR_VIEW_CLIPPED
+#define ADDR_VIEW_CLIPPED ((uintptr_t)(const void *)&am2_origstate.view_clipped)
+#undef ADDR_SHAKE_TIME
+#define ADDR_SHAKE_TIME ((uintptr_t)(const void *)&am2_origstate.shake_time)
+#undef ADDR_SHAKE_PHASE_X
+#define ADDR_SHAKE_PHASE_X ((uintptr_t)(const void *)&am2_origstate.shake_phase_x)
+#undef ADDR_SHAKE_STEP_X
+#define ADDR_SHAKE_STEP_X ((uintptr_t)(const void *)&am2_origstate.shake_step_x)
+#undef ADDR_SHAKE_PHASE_Y
+#define ADDR_SHAKE_PHASE_Y ((uintptr_t)(const void *)&am2_origstate.shake_phase_y)
+#undef ADDR_SHAKE_STEP_Y
+#define ADDR_SHAKE_STEP_Y ((uintptr_t)(const void *)&am2_origstate.shake_step_y)
+#undef ADDR_SHAKE_AMPLITUDE
+#define ADDR_SHAKE_AMPLITUDE ((uintptr_t)(const void *)&am2_origstate.shake_amplitude)
+#undef ADDR_MAP_SURFACE
+#define ADDR_MAP_SURFACE ((uintptr_t)(const void *)&am2_origstate.map_surface)
+#undef ADDR_MAP_CACHE_SURFACE
+#define ADDR_MAP_CACHE_SURFACE ((uintptr_t)(const void *)&am2_origstate.map_cache_surface)
+#undef ADDR_TILE_SHIFT_LOG
+#define ADDR_TILE_SHIFT_LOG ((uintptr_t)(const void *)&am2_origstate.tile_shift_log)
+#undef ADDR_VIEW_TILES_W
+#define ADDR_VIEW_TILES_W ((uintptr_t)(const void *)&am2_origstate.view_tiles_w)
+#undef ADDR_VIEW_TILES_H
+#define ADDR_VIEW_TILES_H ((uintptr_t)(const void *)&am2_origstate.view_tiles_h)
+#undef ADDR_CAMERA_X
+#define ADDR_CAMERA_X ((uintptr_t)(const void *)&am2_origstate.visible_tiles)
+#undef ADDR_VISIBLE_TILES
+#define ADDR_VISIBLE_TILES ((uintptr_t)(const void *)&am2_origstate.visible_tiles)
+#undef ADDR_CAMERA_Y
+#define ADDR_CAMERA_Y ((uintptr_t)(const void *)&am2_origstate.camera_y)
+#undef ADDR_MAP_TILES
+#define ADDR_MAP_TILES ((uintptr_t)(const void *)&am2_origstate.map_tiles)
+#undef ADDR_TILE_ATTRS
+#define ADDR_TILE_ATTRS ((uintptr_t)(const void *)&am2_origstate.tile_attrs)
+#undef ADDR_CELL_WEIGHTS
+#define ADDR_CELL_WEIGHTS ((uintptr_t)(const void *)&am2_origstate.cell_weights)
+#undef ADDR_TILE_FLAGS
+#define ADDR_TILE_FLAGS ((uintptr_t)(const void *)&am2_origstate.tile_flags)
+#undef ADDR_TILE_KIND
+#define ADDR_TILE_KIND ((uintptr_t)(const void *)&am2_origstate.tile_kind)
+#undef ADDR_TILE_REVEAL_GRIDS
+#define ADDR_TILE_REVEAL_GRIDS ((uintptr_t)(const void *)&am2_origstate.tile_reveal_grids)
+#undef ADDR_TILE_COVER
+#define ADDR_TILE_COVER ((uintptr_t)(const void *)&am2_origstate.tile_cover)
+#undef ADDR_OBJ_CAPACITY
+#define ADDR_OBJ_CAPACITY ((uintptr_t)(const void *)&am2_origstate.obj_capacity)
+#undef ADDR_OBJ_COUNT
+#define ADDR_OBJ_COUNT ((uintptr_t)(const void *)&am2_origstate.obj_count)
+#undef ADDR_ITER_CURSOR
+#define ADDR_ITER_CURSOR ((uintptr_t)(const void *)&am2_origstate.iter_cursor)
+#undef ADDR_OBJ_TABLE
+#define ADDR_OBJ_TABLE ((uintptr_t)(const void *)&am2_origstate.obj_table)
+#undef ADDR_PALETTE_CYCLE_STAMP
+#define ADDR_PALETTE_CYCLE_STAMP ((uintptr_t)(const void *)&am2_origstate.palette_cycle_stamp)
+#undef ADDR_GAME_OVER_STATE
+#define ADDR_GAME_OVER_STATE ((uintptr_t)(const void *)&am2_origstate.game_over_state)
+#undef ADDR_GAME_OVER_SAVED
+#define ADDR_GAME_OVER_SAVED ((uintptr_t)(const void *)&am2_origstate.game_over_saved)
+#undef ADDR_STATE_MOVIE
+#define ADDR_STATE_MOVIE ((uintptr_t)(const void *)&am2_origstate.state_movie)
+#undef ADDR_MP_PANEL_SPRITES_B
+#define ADDR_MP_PANEL_SPRITES_B ((uintptr_t)(const void *)&am2_origstate.mp_panel_sprites_b)
+#undef ADDR_MP_PANEL_SPRITES_B_END
+#define ADDR_MP_PANEL_SPRITES_B_END ((uintptr_t)(const void *)&am2_origstate.mp_panel_sprites_b_end)
+#undef ADDR_GAME_OVER_FLAGS
+#define ADDR_GAME_OVER_FLAGS ((uintptr_t)(const void *)&am2_origstate.game_over_flags)
+#undef ADDR_GAME_SETTING_22C
+#define ADDR_GAME_SETTING_22C ((uintptr_t)(const void *)&am2_origstate.game_setting_22c)
+#undef ADDR_ARMY_POINTS
+#define ADDR_ARMY_POINTS ((uintptr_t)(const void *)&am2_origstate.army_points)
+#undef ADDR_LIVE_PLAYER_NAME
+#define ADDR_LIVE_PLAYER_NAME ((uintptr_t)(const void *)&am2_origstate.live_player_name)
+#undef ADDR_LIVE_BATTLE_NAME
+#define ADDR_LIVE_BATTLE_NAME ((uintptr_t)(const void *)&am2_origstate.live_battle_name)
+#undef ADDR_MP_PANEL_SPRITES_A
+#define ADDR_MP_PANEL_SPRITES_A ((uintptr_t)(const void *)&am2_origstate.mp_panel_sprites_a)
+#undef ADDR_MENU_MSG_LIST
+#define ADDR_MENU_MSG_LIST ((uintptr_t)(const void *)&am2_origstate.menu_msg_list)
+#undef ADDR_SESSION_OBJECT
+#define ADDR_SESSION_OBJECT ((uintptr_t)(const void *)&am2_origstate.session_object)
+#undef ADDR_RECORD_LIST_CAP
+#define ADDR_RECORD_LIST_CAP ((uintptr_t)(const void *)&am2_origstate.record_list_cap)
+#undef ADDR_RECORD_LIST_COUNT
+#define ADDR_RECORD_LIST_COUNT ((uintptr_t)(const void *)&am2_origstate.record_list_count)
+#undef ADDR_RECORD_LISTS
+#define ADDR_RECORD_LISTS ((uintptr_t)(const void *)&am2_origstate.record_lists)
+#undef ADDR_AAI_RECORD_CAP
+#define ADDR_AAI_RECORD_CAP ((uintptr_t)(const void *)&am2_origstate.aai_record_cap)
+#undef ADDR_KEY_TABLE_COUNT
+#define ADDR_KEY_TABLE_COUNT ((uintptr_t)(const void *)&am2_origstate.key_table_count)
+#undef ADDR_AAI_RECORDS
+#define ADDR_AAI_RECORDS ((uintptr_t)(const void *)&am2_origstate.aai_records)
+#undef ADDR_KEY_TABLE
+#define ADDR_KEY_TABLE ((uintptr_t)(const void *)&am2_origstate.key_table)
+#undef ADDR_RECORD_LIST_INDEX
+#define ADDR_RECORD_LIST_INDEX ((uintptr_t)(const void *)&am2_origstate.record_list_index)
+#undef ADDR_AAI_KEY_980000
+#define ADDR_AAI_KEY_980000 ((uintptr_t)(const void *)&am2_origstate.aai_key_980000)
+#undef ADDR_AAI_KEY_980080
+#define ADDR_AAI_KEY_980080 ((uintptr_t)(const void *)&am2_origstate.aai_key_980080)
+#undef ADDR_CREATE_WATCHED_KIND
+#define ADDR_CREATE_WATCHED_KIND ((uintptr_t)(const void *)&am2_origstate.create_watched_kind)
+#undef ADDR_WATCHED_TYPE_ID
+#define ADDR_WATCHED_TYPE_ID ((uintptr_t)(const void *)&am2_origstate.watched_type_id)
+#undef ADDR_AAI_KEY_980100
+#define ADDR_AAI_KEY_980100 ((uintptr_t)(const void *)&am2_origstate.aai_key_980100)
+#undef ADDR_KIND7_COUNT
+#define ADDR_KIND7_COUNT ((uintptr_t)(const void *)&am2_origstate.kind7_count)
+#undef ADDR_REGION_INSERT_PREV
+#define ADDR_REGION_INSERT_PREV ((uintptr_t)(const void *)&am2_origstate.region_insert_prev)
+#undef ADDR_REGION_NEIGHBOUR
+#define ADDR_REGION_NEIGHBOUR ((uintptr_t)(const void *)&am2_origstate.region_neighbour)
+#undef ADDR_TILE_STEP8
+#define ADDR_TILE_STEP8 ((uintptr_t)(const void *)&am2_origstate.tile_step8)
+#undef ADDR_REGION_GOAL
+#define ADDR_REGION_GOAL ((uintptr_t)(const void *)&am2_origstate.region_goal)
+#undef ADDR_REGION_OPEN_HEAD
+#define ADDR_REGION_OPEN_HEAD ((uintptr_t)(const void *)&am2_origstate.region_open_head)
+#undef ADDR_PATH_RESUME_HEAD
+#define ADDR_PATH_RESUME_HEAD ((uintptr_t)(const void *)&am2_origstate.path_resume_head)
+#undef ADDR_REGION_RESUME_GOALID
+#define ADDR_REGION_RESUME_GOALID ((uintptr_t)(const void *)&am2_origstate.region_resume_goalid)
+#undef ADDR_REGION_WALK
+#define ADDR_REGION_WALK ((uintptr_t)(const void *)&am2_origstate.region_walk)
+#undef ADDR_POINT_RULE_ARMY
+#define ADDR_POINT_RULE_ARMY ((uintptr_t)(const void *)&am2_origstate.point_rule_army)
+#undef ADDR_POINT_RULE
+#define ADDR_POINT_RULE ((uintptr_t)(const void *)&am2_origstate.point_rule)
+#undef ADDR_TILE_RING8
+#define ADDR_TILE_RING8 ((uintptr_t)(const void *)&am2_origstate.tile_ring8)
+#undef ADDR_REGION_RESUME_NODE
+#define ADDR_REGION_RESUME_NODE ((uintptr_t)(const void *)&am2_origstate.region_resume_node)
+#undef ADDR_TILE_RING4
+#define ADDR_TILE_RING4 ((uintptr_t)(const void *)&am2_origstate.tile_ring4)
+#undef ADDR_PATH_RESUME_GOAL
+#define ADDR_PATH_RESUME_GOAL ((uintptr_t)(const void *)&am2_origstate.path_resume_goal)
+#undef ADDR_TILEMASK_NEIGHBOURS
+#define ADDR_TILEMASK_NEIGHBOURS ((uintptr_t)(const void *)&am2_origstate.tilemask_neighbours)
+#undef ADDR_PATH_NODES
+#define ADDR_PATH_NODES ((uintptr_t)(const void *)&am2_origstate.path_nodes)
+#undef ADDR_TILE_NEIGHBOURS
+#define ADDR_TILE_NEIGHBOURS ((uintptr_t)(const void *)&am2_origstate.tile_neighbours)
+#undef ADDR_REGION_CURRENT
+#define ADDR_REGION_CURRENT ((uintptr_t)(const void *)&am2_origstate.region_current)
+#undef ADDR_REGION_GENERATION
+#define ADDR_REGION_GENERATION ((uintptr_t)(const void *)&am2_origstate.region_generation)
+#undef ADDR_PATH_GENERATION
+#define ADDR_PATH_GENERATION ((uintptr_t)(const void *)&am2_origstate.path_generation)
+#undef ADDR_PATH_FRAME_MS
+#define ADDR_PATH_FRAME_MS ((uintptr_t)(const void *)&am2_origstate.path_frame_ms)
+#undef ADDR_PATH_FRAME_STAMP
+#define ADDR_PATH_FRAME_STAMP ((uintptr_t)(const void *)&am2_origstate.path_frame_stamp)
+#undef ADDR_MISSILE_ANIMS
+#define ADDR_MISSILE_ANIMS ((uintptr_t)(const void *)&am2_origstate.missile_anims)
+#undef ADDR_ROACH_ANIMS
+#define ADDR_ROACH_ANIMS ((uintptr_t)(const void *)&am2_origstate.roach_anims)
+#undef ADDR_ROACH_MASK_DIRECTIONS
+#define ADDR_ROACH_MASK_DIRECTIONS ((uintptr_t)(const void *)&am2_origstate.roach_mask_directions)
+#undef ADDR_ROACH_MARK
+#define ADDR_ROACH_MARK ((uintptr_t)(const void *)&am2_origstate.roach_mark)
+#undef ADDR_ROACH_MARK_STAMP
+#define ADDR_ROACH_MARK_STAMP ((uintptr_t)(const void *)&am2_origstate.roach_mark_stamp)
+#undef ADDR_SCENARIO_UNREAD
+#define ADDR_SCENARIO_UNREAD ((uintptr_t)(const void *)&am2_origstate.scenario_unread)
+#undef ADDR_SCENARIO_COUNT
+#define ADDR_SCENARIO_COUNT ((uintptr_t)(const void *)&am2_origstate.scenario_count)
+#undef ADDR_SCENARIOS
+#define ADDR_SCENARIOS ((uintptr_t)(const void *)&am2_origstate.scenarios)
+#undef ADDR_SYSTEM_PALETTE
+#define ADDR_SYSTEM_PALETTE ((uintptr_t)(const void *)&am2_origstate.system_palette)
+#undef ADDR_MOVIE_CURRENT
+#define ADDR_MOVIE_CURRENT ((uintptr_t)(const void *)&am2_origstate.movie_current)
+#undef ADDR_MOVIE_SOUND_READY
+#define ADDR_MOVIE_SOUND_READY ((uintptr_t)(const void *)&am2_origstate.movie_sound_ready)
+#undef ADDR_SPRITE_FILE
+#define ADDR_SPRITE_FILE ((uintptr_t)(const void *)&am2_origstate.sprite_file)
+#undef ADDR_SPRITE_REG_CAP
+#define ADDR_SPRITE_REG_CAP ((uintptr_t)(const void *)&am2_origstate.sprite_reg_cap)
+#undef ADDR_SPRITE_REG_COUNT
+#define ADDR_SPRITE_REG_COUNT ((uintptr_t)(const void *)&am2_origstate.sprite_reg_count)
+#undef ADDR_SPRITE_TABLE
+#define ADDR_SPRITE_TABLE ((uintptr_t)(const void *)&am2_origstate.sprite_table)
+#undef ADDR_SPRITE_REG_PAIRS
+#define ADDR_SPRITE_REG_PAIRS ((uintptr_t)(const void *)&am2_origstate.sprite_reg_pairs)
+#undef ADDR_GLYPH_SIZE
+#define ADDR_GLYPH_SIZE ((uintptr_t)(const void *)&am2_origstate.glyph_size)
+#undef ADDR_GLYPH_OFFSETS
+#define ADDR_GLYPH_OFFSETS ((uintptr_t)(const void *)&am2_origstate.glyph_offsets)
+#undef ADDR_GLYPH_OFFSET_SPACE
+#define ADDR_GLYPH_OFFSET_SPACE ((uintptr_t)(const void *)&am2_origstate.glyph_offset_space)
+#undef ADDR_FONT_BASES
+#define ADDR_FONT_BASES ((uintptr_t)(const void *)&am2_origstate.font_bases)
+#undef ADDR_THROTTLE_DEADLINE
+#define ADDR_THROTTLE_DEADLINE ((uintptr_t)(const void *)&am2_origstate.throttle_deadline)
+#undef ADDR_SOLDIER_ANIMS
+#define ADDR_SOLDIER_ANIMS ((uintptr_t)(const void *)&am2_origstate.soldier_anims)
+#undef ADDR_TURN_REPEAT_MS
+#define ADDR_TURN_REPEAT_MS ((uintptr_t)(const void *)&am2_origstate.turn_repeat_ms)
+#undef ADDR_PENDING_CONFIRM
+#define ADDR_PENDING_CONFIRM ((uintptr_t)(const void *)&am2_origstate.pending_confirm)
+#undef ADDR_PAINT_OBJECT
+#define ADDR_PAINT_OBJECT ((uintptr_t)(const void *)&am2_origstate.paint_object)
+#undef ADDR_FOCUSED_EDIT
+#define ADDR_FOCUSED_EDIT ((uintptr_t)(const void *)&am2_origstate.focused_edit)
+#undef ADDR_MOVIE_PAGE
+#define ADDR_MOVIE_PAGE ((uintptr_t)(const void *)&am2_origstate.movie_page)
+#undef ADDR_VEHICLE_MASK_DIRECTIONS
+#define ADDR_VEHICLE_MASK_DIRECTIONS ((uintptr_t)(const void *)&am2_origstate.vehicle_mask_directions)
+#undef ADDR_OBJ_MARK
+#define ADDR_OBJ_MARK ((uintptr_t)(const void *)&am2_origstate.obj_mark)
+#undef ADDR_OBJ_MARK_STAMP
+#define ADDR_OBJ_MARK_STAMP ((uintptr_t)(const void *)&am2_origstate.obj_mark_stamp)
+#undef ADDR_VEHICLE_DEFS
+#define ADDR_VEHICLE_DEFS ((uintptr_t)(const void *)&am2_origstate.vehicle_defs)
+#undef ADDR_VEHICLE_DEF_COUNT
+#define ADDR_VEHICLE_DEF_COUNT ((uintptr_t)(const void *)&am2_origstate.vehicle_def_count)
+#undef ADDR_VEHICLE_DEF_CAP
+#define ADDR_VEHICLE_DEF_CAP ((uintptr_t)(const void *)&am2_origstate.vehicle_def_cap)
+#undef ADDR_SPAWN_KIND_TABLE
+#define ADDR_SPAWN_KIND_TABLE ((uintptr_t)(const void *)&am2_origstate.spawn_kind_table)
+#undef ADDR_UNUSED_662288
+#define ADDR_UNUSED_662288 ((uintptr_t)(const void *)&am2_origstate.unused_662288)
+#undef ADDR_SPAWN_EXTRA_6622BC
+#define ADDR_SPAWN_EXTRA_6622BC ((uintptr_t)(const void *)&am2_origstate.spawn_extra_6622bc)
+#undef ADDR_PICK_REACH_662450
+#define ADDR_PICK_REACH_662450 ((uintptr_t)(const void *)&am2_origstate.pick_reach_662450)
+#undef ADDR_PICK_REACH_6624EC
+#define ADDR_PICK_REACH_6624EC ((uintptr_t)(const void *)&am2_origstate.pick_reach_6624ec)
+#undef ADDR_MEDIC_HEAL_PCT
+#define ADDR_MEDIC_HEAL_PCT ((uintptr_t)(const void *)&am2_origstate.medic_heal_pct)
+#undef ADDR_PICK_REACH_66275C
+#define ADDR_PICK_REACH_66275C ((uintptr_t)(const void *)&am2_origstate.pick_reach_66275c)
+#undef ADDR_AIM_LIFE_HALF_A
+#define ADDR_AIM_LIFE_HALF_A ((uintptr_t)(const void *)&am2_origstate.aim_life_half_a)
+#undef ADDR_AIM_DAMAGE
+#define ADDR_AIM_DAMAGE ((uintptr_t)(const void *)&am2_origstate.aim_damage)
+#undef ADDR_AIM_LIFE_HALF_B
+#define ADDR_AIM_LIFE_HALF_B ((uintptr_t)(const void *)&am2_origstate.aim_life_half_b)
+#undef ADDR_AIM_SPAWN_ARG
+#define ADDR_AIM_SPAWN_ARG ((uintptr_t)(const void *)&am2_origstate.aim_spawn_arg)
+#undef ADDR_PICK_REACH_662894
+#define ADDR_PICK_REACH_662894 ((uintptr_t)(const void *)&am2_origstate.pick_reach_662894)
+#undef ADDR_REPAIR_HEAL_PCT
+#define ADDR_REPAIR_HEAL_PCT ((uintptr_t)(const void *)&am2_origstate.repair_heal_pct)
+#undef ADDR_PICK_REACH_6628C8
+#define ADDR_PICK_REACH_6628C8 ((uintptr_t)(const void *)&am2_origstate.pick_reach_6628c8)
+#undef ADDR_SPAWN_EXTRA_6628D4
+#define ADDR_SPAWN_EXTRA_6628D4 ((uintptr_t)(const void *)&am2_origstate.spawn_extra_6628d4)
+#undef ADDR_SWEEP_DISTANCE
+#define ADDR_SWEEP_DISTANCE ((uintptr_t)(const void *)&am2_origstate.sweep_distance)
+#undef ADDR_SWEEP_DAMAGE
+#define ADDR_SWEEP_DAMAGE ((uintptr_t)(const void *)&am2_origstate.sweep_damage)
+#undef ADDR_RESPAWN_KINDS
+#define ADDR_RESPAWN_KINDS ((uintptr_t)(const void *)&am2_origstate.respawn_kinds)
+#undef ADDR_RESPAWN_KIND_COUNT
+#define ADDR_RESPAWN_KIND_COUNT ((uintptr_t)(const void *)&am2_origstate.respawn_kind_count)
+#undef ADDR_DEF_MISSILE_RECS
+#define ADDR_DEF_MISSILE_RECS ((uintptr_t)(const void *)&am2_origstate.def_missile_recs)
+#undef ADDR_DEF_MISSILE_COUNT
+#define ADDR_DEF_MISSILE_COUNT ((uintptr_t)(const void *)&am2_origstate.def_missile_count)
+#undef ADDR_DEF_MISSILE_CAP
+#define ADDR_DEF_MISSILE_CAP ((uintptr_t)(const void *)&am2_origstate.def_missile_cap)
+#undef ADDR_ROWPOOL_A_COUNT
+#define ADDR_ROWPOOL_A_COUNT ((uintptr_t)(const void *)&am2_origstate.rowpool_a_count)
+#undef ADDR_ROWPOOL_A_TAIL
+#define ADDR_ROWPOOL_A_TAIL ((uintptr_t)(const void *)&am2_origstate.rowpool_a_tail)
+#undef ADDR_ROWPOOL_A_ENTRIES
+#define ADDR_ROWPOOL_A_ENTRIES ((uintptr_t)(const void *)&am2_origstate.rowpool_a_entries)
+#undef ADDR_SPAWN_KIND_TABLE_END
+#define ADDR_SPAWN_KIND_TABLE_END ((uintptr_t)(const void *)&am2_origstate.spawn_kind_table_end)
+#undef ADDR_SEQ_CTX_B
+#define ADDR_SEQ_CTX_B ((uintptr_t)(const void *)&am2_origstate.seq_ctx_b)
+#undef ADDR_ROWPOOL_B_COUNT
+#define ADDR_ROWPOOL_B_COUNT ((uintptr_t)(const void *)&am2_origstate.rowpool_b_count)
+#undef ADDR_ROWPOOL_B_TAIL
+#define ADDR_ROWPOOL_B_TAIL ((uintptr_t)(const void *)&am2_origstate.rowpool_b_tail)
+#undef ADDR_ROWPOOL_B_ENTRIES
+#define ADDR_ROWPOOL_B_ENTRIES ((uintptr_t)(const void *)&am2_origstate.rowpool_b_entries)
+#undef ADDR_SEQ_CTX_A
+#define ADDR_SEQ_CTX_A ((uintptr_t)(const void *)&am2_origstate.seq_ctx_a)
+#undef ADDR_MP_MARK_A
+#define ADDR_MP_MARK_A ((uintptr_t)(const void *)&am2_origstate.mp_mark_a)
+#undef ADDR_MP_MARK_B
+#define ADDR_MP_MARK_B ((uintptr_t)(const void *)&am2_origstate.mp_mark_b)
+#undef ADDR_MP_MARK_C
+#define ADDR_MP_MARK_C ((uintptr_t)(const void *)&am2_origstate.mp_mark_c)
+#undef ADDR_MP_TEAM_SPRITES
+#define ADDR_MP_TEAM_SPRITES ((uintptr_t)(const void *)&am2_origstate.mp_team_sprites)
+#undef ADDR_STARTUP_COLOURS_B
+#define ADDR_STARTUP_COLOURS_B ((uintptr_t)(const void *)&am2_origstate.startup_colours_b)
+
+/* The comm message records named for kCommMessages (split out of the members
+ * that used to swallow them). */
+#undef ADDR_MSG_KIND01
+#define ADDR_MSG_KIND01 ((uintptr_t)(const void *)&am2_origstate.msg_kind01)
+#undef ADDR_MSG_KIND02
+#define ADDR_MSG_KIND02 ((uintptr_t)(const void *)&am2_origstate.msg_kind02)
+#undef ADDR_MSG_KIND04
+#define ADDR_MSG_KIND04 ((uintptr_t)(const void *)&am2_origstate.msg_kind04)
+#undef ADDR_MSG_KIND0C
+#define ADDR_MSG_KIND0C ((uintptr_t)(const void *)&am2_origstate.msg_kind0c)
+#undef ADDR_MSG_KIND0D
+#define ADDR_MSG_KIND0D ((uintptr_t)(const void *)&am2_origstate.msg_kind0d)
+#undef ADDR_MSG_KIND10
+#define ADDR_MSG_KIND10 ((uintptr_t)(const void *)&am2_origstate.msg_kind10)
+#undef ADDR_ARMY_PACKET_B
+#define ADDR_ARMY_PACKET_B ((uintptr_t)(const void *)&am2_origstate.army_packet_b)
 
 #endif /* AM2_STANDALONE_H */

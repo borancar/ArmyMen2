@@ -47,11 +47,13 @@
  * as the animated palette rotates, non-const, initial byte-checked. */
 int32_t am2_palette_cycle_index = 1;
 /* The active-palette pointer at 0x00477A58 (also read as MOVIE_PALETTE_OWNER)
- * and the remap-tint pointer at 0x0047826C: runtime-written pointers into the
- * placed origbss palette buffers, so the raw init value resolves. Plain linkage
+ * and the remap-tint pointer at 0x0047826C: runtime-written pointers whose
+ * initial targets are the origbss buffers at 0x004FD770 and 0x004FE1B0 --
+ * spelled as those am2_origstate members, not as the raw numbers, which only
+ * resolved while the struct sat at its original VA. Plain linkage
  * (active_palette is read across the win32 layer via standalone.h). */
-uint32_t am2_active_palette = 0x004FD770u;
-uint32_t am2_remap_tint = 0x004FE1B0u;
+void *am2_active_palette = am2_origstate.active_palette_buf;
+void *am2_remap_tint = am2_origstate.remap_tint_buf;
 /* The LOGPALETTE at 0x00477A60: a {version=0x300, count=256} header then 256
  * PALETTEENTRYs (zero at init, filled at runtime). One physical block read as
  * LPLOGPALETTE and, past the 4-byte header, as the entry array; migrated as a
@@ -293,20 +295,24 @@ static uint8_t MatchRGB(const void *pal, uint32_t r, uint32_t g, uint32_t b)
     return NearestPalIndexRGB((const uint32_t *)pal, r, g, b, 9);
 }
 
-/* Every colour the engine looks up by name, in the original's order. */
-static const struct { uint32_t addr, r, g, b; } kNamedColours[] = {
-    { 0x00502AD9, 0x00, 0x00, 0x00 }, { 0x004FD768, 0xFF, 0xFF, 0xFF },
-    { 0x004FE090, 0xC0, 0xC0, 0xC0 }, { 0x004FE089, 0x00, 0xFF, 0x00 },
-    { 0x00507234, 0xDA, 0x4E, 0x00 }, { 0x004FDF7C, 0x00, 0x00, 0xFF },
-    { 0x0050712C, 0xAC, 0xE8, 0x00 }, { 0x00502ACC, 0x88, 0x88, 0x88 },
-    { 0x00502AD8, 0x00, 0x84, 0x00 }, { 0x00502CE5, 0xAC, 0x00, 0x00 },
-    { 0x004FD760, 0x00, 0x00, 0xAC }, { 0x005022C0, 0x88, 0xC0, 0x00 },
-    { 0x004FE092, 0xFF, 0xFF, 0x00 }, { 0x004FE091, 0x69, 0xA9, 0x52 },
-    { 0x004FDF74, 0x32, 0x71, 0x26 }, { 0x004FDF75, 0xEF, 0xD9, 0xA0 },
-    { 0x004FE1AE, 0x65, 0x57, 0x30 }, { 0x004FE1AC, 0x92, 0xB8, 0xDF },
-    { 0x004FE088, 0x32, 0x5D, 0x8A }, { 0x004FE093, 0xAB, 0xAB, 0xAB },
-    { 0x00502CE4, 0x54, 0x54, 0x54 }, { 0x004FE1AD, 0xFF, 0xFF, 0xFF },
-    { 0x004FE094, 0x00, 0x00, 0x00 },
+/* Every colour the engine looks up by name, in the original's order. Each slot
+ * is spelled by its ADDR_ name, not its raw VA: under the placed model those
+ * are am2_origstate members, so the table holds relocated addresses and works
+ * wherever the struct lands. (A few names are aliases for the same colour
+ * byte -- KIND7_NAMES, LIST_INK_HOT_SEL, VARIATION_END -- same address.) */
+static const struct { uintptr_t addr; uint32_t r, g, b; } kNamedColours[] = {
+    { ADDR_BACKGROUND_COLOUR,  0x00, 0x00, 0x00 }, { ADDR_COLOUR_WHITE,       0xFF, 0xFF, 0xFF },
+    { ADDR_COLOUR_STALE,       0xC0, 0xC0, 0xC0 }, { ADDR_VIEW_RECT_COLOUR,   0x00, 0xFF, 0x00 },
+    { ADDR_HUD_MESSAGE_COLOUR, 0xDA, 0x4E, 0x00 }, { ADDR_COLOUR_BLUE,        0x00, 0x00, 0xFF },
+    { ADDR_KIND7_NAMES,        0xAC, 0xE8, 0x00 }, { ADDR_LIST_INK_HOT_SEL,   0x88, 0x88, 0x88 },
+    { ADDR_COLOUR_BELOW_BG,    0x00, 0x84, 0x00 }, { ADDR_COLOUR_NO_MAP,      0xAC, 0x00, 0x00 },
+    { ADDR_COLOUR_DARK_BLUE,   0x00, 0x00, 0xAC }, { ADDR_VARIATION_END,      0x88, 0xC0, 0x00 },
+    { ADDR_COLOUR_LAG_MID,     0xFF, 0xFF, 0x00 }, { ADDR_COLOUR_LIGHT_GREEN, 0x69, 0xA9, 0x52 },
+    { ADDR_COLOUR_DARK_GREEN,  0x32, 0x71, 0x26 }, { ADDR_COLOUR_CREAM,       0xEF, 0xD9, 0xA0 },
+    { ADDR_COLOUR_OLIVE,       0x65, 0x57, 0x30 }, { ADDR_COLOUR_LIGHT_BLUE,  0x92, 0xB8, 0xDF },
+    { ADDR_COLOUR_STEEL_BLUE,  0x32, 0x5D, 0x8A }, { ADDR_COLOUR_LIGHT_GREY,  0xAB, 0xAB, 0xAB },
+    { ADDR_COLOUR_DARK_GREY,   0x54, 0x54, 0x54 }, { ADDR_COLOUR_WHITE_B,     0xFF, 0xFF, 0xFF },
+    { ADDR_COLOUR_BLACK,       0x00, 0x00, 0x00 },
 };
 
 void __cdecl SetGamePalette(uint8_t *pal)

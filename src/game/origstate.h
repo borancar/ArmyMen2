@@ -85,7 +85,8 @@ struct AM2_OrigState {
     uint8_t msg_list_b[16];  /* 0x004F48C8 */
     uint8_t packet_thread[4];  /* 0x004F48D8 */
     uint8_t player_slot_mask[4];  /* 0x004F48DC */
-    uint8_t comm_no_buffers_latch[16];  /* 0x004F48E0 */
+    uint8_t comm_no_buffers_latch[8];  /* 0x004F48E0 */
+    uint8_t msg_kind02[8];  /* 0x004F48E8 */
     uint8_t last_msg_value[4];  /* 0x004F48F0 */
     uint8_t last_msg_checksum[4];  /* 0x004F48F4 */
     struct AM2_OS_PacketRecord packet_records[400];  /* 0x004F48F8 */
@@ -163,18 +164,24 @@ struct AM2_OrigState {
     uint8_t session_list[8];  /* 0x004FA908 */
     uint8_t msg_chat[264];  /* 0x004FA910 */
     uint8_t msg_ready_to_load[16];  /* 0x004FAA18 */
-    uint8_t msg_game_ready[40];  /* 0x004FAA28 */
+    uint8_t msg_game_ready[16];  /* 0x004FAA28 */
+    uint8_t msg_kind10[24];  /* 0x004FAA38 */
     uint8_t msg_game_pause[24];  /* 0x004FAA50 */
     uint8_t army_packet[4];  /* 0x004FAA68 */
     uint8_t army_packet_len[4];  /* 0x004FAA6C */
     uint8_t army_packet_seq[1016];  /* 0x004FAA70 */
-    uint8_t resend_buf[2312];  /* 0x004FAE68 */
+    uint8_t resend_buf[1032];  /* 0x004FAE68 */
+    uint8_t army_packet_b[1280];  /* 0x004FB270 */
     uint8_t msg_map[16];  /* 0x004FB770 */
-    uint8_t resend_scratch[3112];  /* 0x004FB780 */
+    uint8_t resend_scratch[1024];  /* 0x004FB780 */
+    uint8_t msg_kind04[1024];  /* 0x004FBB80 */
+    uint8_t msg_kind01[1032];  /* 0x004FBF80 */
+    uint8_t msg_kind0c[32];  /* 0x004FC388 */
     uint8_t msg_end_setup[16];  /* 0x004FC3A8 */
     uint8_t player_msg[568];  /* 0x004FC3B8 */
     uint8_t msg_game_start[400];  /* 0x004FC5F0 */
-    uint8_t game_seed_sent[280];  /* 0x004FC780 */
+    uint8_t game_seed_sent[8];  /* 0x004FC780 */
+    uint8_t msg_kind0d[272];  /* 0x004FC788 */
     uint8_t msg_color[16];  /* 0x004FC898 */
     uint8_t msg_team[12];  /* 0x004FC8A8 */
     uint8_t data_checksum[4];  /* 0x004FC8B4 */
@@ -240,7 +247,8 @@ struct AM2_OrigState {
     uint8_t opt_4fd748[24];  /* 0x004FD748 */
     uint8_t colour_dark_blue[4];  /* 0x004FD760 */
     uint8_t remap_identity[4];  /* 0x004FD764 */
-    uint8_t colour_white[2060];  /* 0x004FD768 */
+    uint8_t colour_white[8];  /* 0x004FD768 */
+    uint8_t active_palette_buf[2052];  /* 0x004FD770 */
     uint8_t colour_dark_green[1];  /* 0x004FDF74 */
     uint8_t colour_cream[3];  /* 0x004FDF75 */
     uint8_t directdraw[4];  /* 0x004FDF78 */
@@ -261,7 +269,8 @@ struct AM2_OrigState {
     uint8_t framebuffer[4];  /* 0x004FE1A8 */
     uint8_t colour_light_blue[1];  /* 0x004FE1AC */
     uint8_t colour_white_b[1];  /* 0x004FE1AD */
-    uint8_t colour_olive[258];  /* 0x004FE1AE */
+    uint8_t colour_olive[2];  /* 0x004FE1AE */
+    uint8_t remap_tint_buf[256];  /* 0x004FE1B0 */
     uint8_t *remap_shades[4];  /* 0x004FE2B0 */
     uint8_t variation_blocks[64][256];  /* 0x004FE2C0 */
     uint8_t variation_end[8];  /* 0x005022C0 */

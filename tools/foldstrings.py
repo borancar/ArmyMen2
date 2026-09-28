@@ -106,6 +106,12 @@ FOLD_MACROS = [
     "AM2_BMP_SELECT1", "AM2_BMP_SELECT2", "AM2_BMP_UPARROW1",
     "AM2_BMP_UPARROW2", "AM2_HUD_STR_AMMO_FMT", "AM2_HUD_STR_AMMO_OVER",
     "AM2_HUD_STR_SARGE", "AM2_STR_CHILD_SUFFIX", "AM2_STR_NOT_RESPONDING",
+    # Log/format strings the relocated (VC6 LINK.EXE) image showed still reached
+    # by raw VA -- string-only, no address arithmetic (checked).
+    "AM2_STR_SHA_BAD_SIZE", "AM2_STR_SHA_NOT_1BIT", "AM2_STR_PCT_S",
+    "AM2_STR_ACTIVATING_REGION", "AM2_STR_TROOPER_PICKUP_2",
+    "AM2_STR_TROOPER_PICKUP", "AM2_STR_ASKING_FOR_ITEM", "AM2_STR_NO",
+    "AM2_STR_YES",
 ]
 
 # Files a FOLD_MACROS name may be #defined in (widget.cpp carries the button

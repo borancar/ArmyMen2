@@ -76,7 +76,11 @@ extern "C" const float   am2_gravity                = 440.0f;/* 0x004852EC */
 extern "C" const int32_t am2_view_speed             = 1000;  /* 0x004852E0 */
 /* 0x00485104 tick_interval_ms is runtime state (ResetLevelState recomputes it),
  * so it is NOT migrated -- it stays at its writable .origdat placement. */
-extern "C" const float   am2_difficulty_scale       = 4.0f;  /* 0x00489870 */
+/* float[3], indexed by ADDR_DIFFICULTY: easy, normal, hard. Once a lone
+ * float, which only ever read correctly at difficulty 0 -- anywhere else it
+ * indexed whatever the linker put next (a VC6 link put a zero there, and every
+ * friendly trooper spawned with 0 health). */
+extern "C" const float   am2_difficulty_scale[3]    = { 4.0f, 2.0f, 1.5f };  /* 0x00489870 */
 /* 0x0048788C path_max_nodes ships 10000 but ADAPTS at runtime (RegionBudget),
  * so it too stays at its writable .origdat placement rather than a C const. */
 extern "C" const int32_t am2_path_max_searches      = 10;    /* 0x00487890 */

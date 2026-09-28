@@ -138,63 +138,61 @@
     .section .origdat.c066,"aw"
     .space 16
     .section .origdat.c067,"aw"
-    .space 2
-    .section .origdat.c068,"aw"
-    .space 2
-    .section .origdat.c069,"aw"
     .space 76
-    .section .origdat.c070,"aw"
+    .section .origdat.c068,"aw"
     .space 1480
-    .section .origdat.c071,"aw"
+    .section .origdat.c069,"aw"
     .space 4856
-    .section .origdat.c072,"aw"
+    .section .origdat.c070,"aw"
     .space 476
-    .section .origdat.c073,"aw"
+    .section .origdat.c071,"aw"
     .space 48
-    .section .origdat.c074,"aw"
+    .section .origdat.c072,"aw"
     .space 1
-    .section .origdat.c075,"aw"
+    .section .origdat.c073,"aw"
+    .space 4
+    .section .origdat.c074,"aw"
     .space 4200
-    .section .origdat.c076,"aw"
+    .section .origdat.c075,"aw"
     .space 12
-    .section .origdat.c077,"aw"
+    .section .origdat.c076,"aw"
     .space 1976
-    .section .origdat.c078,"aw"
+    .section .origdat.c077,"aw"
     .space 196
-    .section .origdat.c079,"aw"
+    .section .origdat.c078,"aw"
     .space 747
-    .section .origdat.c080,"aw"
+    .section .origdat.c079,"aw"
     .space 3
-    .section .origdat.c081,"aw"
+    .section .origdat.c080,"aw"
     .space 32
-    .section .origdat.c082,"aw"
+    .section .origdat.c081,"aw"
     .space 1544
-    .section .origdat.c083,"aw"
+    .section .origdat.c082,"aw"
     .space 392
+    .section .origdat.c083,"aw"
+    .space 4
     .section .origdat.c084,"aw"
     .space 4
     .section .origdat.c085,"aw"
-    .space 4
-    .section .origdat.c086,"aw"
     .space 2
-    .section .origdat.c087,"aw"
+    .section .origdat.c086,"aw"
     .space 52
-    .section .origdat.c088,"aw"
+    .section .origdat.c087,"aw"
     .space 24
+    .section .origdat.c088,"aw"
+    .space 2
     .section .origdat.c089,"aw"
     .space 2
     .section .origdat.c090,"aw"
-    .space 2
-    .section .origdat.c091,"aw"
     .space 4
+    .section .origdat.c091,"aw"
+    .space 8
     .section .origdat.c092,"aw"
     .space 8
     .section .origdat.c093,"aw"
-    .space 8
+    .space 4
     .section .origdat.c094,"aw"
     .space 4
     .section .origdat.c095,"aw"
-    .space 4
-    .section .origdat.c096,"aw"
     .space 4
 #endif

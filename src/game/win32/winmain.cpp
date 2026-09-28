@@ -332,9 +332,13 @@ void __cdecl ResetToTitle(void)
         SpriteSetLoad("shared");
     }
 
-    static const uint32_t kCleared[] = {
-        ADDR_MP_SESSION, 0x00511E14u, 0x00511E18u, 0x00511E1Cu, 0x005122CCu,
-        0x00511E28u, 0x005122D0u, 0x00511E2Cu, 0x00511E44u,
+    /* By name, not by raw VA: under the placed model each is an am2_origstate
+     * member. The game-over snapshot is int32[3], cleared element by element. */
+    static const uintptr_t kCleared[] = {
+        ADDR_MP_SESSION,
+        ADDR_GAME_OVER_SOURCE, ADDR_GAME_OVER_SOURCE + 4u, ADDR_GAME_OVER_SOURCE + 8u,
+        ADDR_OBJ_CTX_OBJ, ADDR_OBJ_CTX_VAL, ADDR_OBJ_CTX_OBJ_PREV,
+        ADDR_OBJ_CTX_VAL_PREV, ADDR_INPUT_SUPPRESS,
     };
     for (uint32_t i = 0; i < sizeof kCleared / sizeof kCleared[0]; i++)
         *(int32_t *)(uintptr_t)kCleared[i] = 0;

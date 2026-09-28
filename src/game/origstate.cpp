@@ -29,6 +29,7 @@ static_assert(offsetof(struct AM2_OrigState, msg_list_b) == 0x004F48C8u - 0x0048
 static_assert(offsetof(struct AM2_OrigState, packet_thread) == 0x004F48D8u - 0x0048E000u, "packet_thread");
 static_assert(offsetof(struct AM2_OrigState, player_slot_mask) == 0x004F48DCu - 0x0048E000u, "player_slot_mask");
 static_assert(offsetof(struct AM2_OrigState, comm_no_buffers_latch) == 0x004F48E0u - 0x0048E000u, "comm_no_buffers_latch");
+static_assert(offsetof(struct AM2_OrigState, msg_kind02) == 0x004F48E8u - 0x0048E000u, "msg_kind02");
 static_assert(offsetof(struct AM2_OrigState, last_msg_value) == 0x004F48F0u - 0x0048E000u, "last_msg_value");
 static_assert(offsetof(struct AM2_OrigState, last_msg_checksum) == 0x004F48F4u - 0x0048E000u, "last_msg_checksum");
 static_assert(offsetof(struct AM2_OrigState, packet_records) == 0x004F48F8u - 0x0048E000u, "packet_records");
@@ -107,17 +108,23 @@ static_assert(offsetof(struct AM2_OrigState, session_list) == 0x004FA908u - 0x00
 static_assert(offsetof(struct AM2_OrigState, msg_chat) == 0x004FA910u - 0x0048E000u, "msg_chat");
 static_assert(offsetof(struct AM2_OrigState, msg_ready_to_load) == 0x004FAA18u - 0x0048E000u, "msg_ready_to_load");
 static_assert(offsetof(struct AM2_OrigState, msg_game_ready) == 0x004FAA28u - 0x0048E000u, "msg_game_ready");
+static_assert(offsetof(struct AM2_OrigState, msg_kind10) == 0x004FAA38u - 0x0048E000u, "msg_kind10");
 static_assert(offsetof(struct AM2_OrigState, msg_game_pause) == 0x004FAA50u - 0x0048E000u, "msg_game_pause");
 static_assert(offsetof(struct AM2_OrigState, army_packet) == 0x004FAA68u - 0x0048E000u, "army_packet");
 static_assert(offsetof(struct AM2_OrigState, army_packet_len) == 0x004FAA6Cu - 0x0048E000u, "army_packet_len");
 static_assert(offsetof(struct AM2_OrigState, army_packet_seq) == 0x004FAA70u - 0x0048E000u, "army_packet_seq");
 static_assert(offsetof(struct AM2_OrigState, resend_buf) == 0x004FAE68u - 0x0048E000u, "resend_buf");
+static_assert(offsetof(struct AM2_OrigState, army_packet_b) == 0x004FB270u - 0x0048E000u, "army_packet_b");
 static_assert(offsetof(struct AM2_OrigState, msg_map) == 0x004FB770u - 0x0048E000u, "msg_map");
 static_assert(offsetof(struct AM2_OrigState, resend_scratch) == 0x004FB780u - 0x0048E000u, "resend_scratch");
+static_assert(offsetof(struct AM2_OrigState, msg_kind04) == 0x004FBB80u - 0x0048E000u, "msg_kind04");
+static_assert(offsetof(struct AM2_OrigState, msg_kind01) == 0x004FBF80u - 0x0048E000u, "msg_kind01");
+static_assert(offsetof(struct AM2_OrigState, msg_kind0c) == 0x004FC388u - 0x0048E000u, "msg_kind0c");
 static_assert(offsetof(struct AM2_OrigState, msg_end_setup) == 0x004FC3A8u - 0x0048E000u, "msg_end_setup");
 static_assert(offsetof(struct AM2_OrigState, player_msg) == 0x004FC3B8u - 0x0048E000u, "player_msg");
 static_assert(offsetof(struct AM2_OrigState, msg_game_start) == 0x004FC5F0u - 0x0048E000u, "msg_game_start");
 static_assert(offsetof(struct AM2_OrigState, game_seed_sent) == 0x004FC780u - 0x0048E000u, "game_seed_sent");
+static_assert(offsetof(struct AM2_OrigState, msg_kind0d) == 0x004FC788u - 0x0048E000u, "msg_kind0d");
 static_assert(offsetof(struct AM2_OrigState, msg_color) == 0x004FC898u - 0x0048E000u, "msg_color");
 static_assert(offsetof(struct AM2_OrigState, msg_team) == 0x004FC8A8u - 0x0048E000u, "msg_team");
 static_assert(offsetof(struct AM2_OrigState, data_checksum) == 0x004FC8B4u - 0x0048E000u, "data_checksum");
@@ -184,6 +191,7 @@ static_assert(offsetof(struct AM2_OrigState, opt_4fd748) == 0x004FD748u - 0x0048
 static_assert(offsetof(struct AM2_OrigState, colour_dark_blue) == 0x004FD760u - 0x0048E000u, "colour_dark_blue");
 static_assert(offsetof(struct AM2_OrigState, remap_identity) == 0x004FD764u - 0x0048E000u, "remap_identity");
 static_assert(offsetof(struct AM2_OrigState, colour_white) == 0x004FD768u - 0x0048E000u, "colour_white");
+static_assert(offsetof(struct AM2_OrigState, active_palette_buf) == 0x004FD770u - 0x0048E000u, "active_palette_buf");
 static_assert(offsetof(struct AM2_OrigState, colour_dark_green) == 0x004FDF74u - 0x0048E000u, "colour_dark_green");
 static_assert(offsetof(struct AM2_OrigState, colour_cream) == 0x004FDF75u - 0x0048E000u, "colour_cream");
 static_assert(offsetof(struct AM2_OrigState, directdraw) == 0x004FDF78u - 0x0048E000u, "directdraw");
@@ -205,6 +213,7 @@ static_assert(offsetof(struct AM2_OrigState, framebuffer) == 0x004FE1A8u - 0x004
 static_assert(offsetof(struct AM2_OrigState, colour_light_blue) == 0x004FE1ACu - 0x0048E000u, "colour_light_blue");
 static_assert(offsetof(struct AM2_OrigState, colour_white_b) == 0x004FE1ADu - 0x0048E000u, "colour_white_b");
 static_assert(offsetof(struct AM2_OrigState, colour_olive) == 0x004FE1AEu - 0x0048E000u, "colour_olive");
+static_assert(offsetof(struct AM2_OrigState, remap_tint_buf) == 0x004FE1B0u - 0x0048E000u, "remap_tint_buf");
 static_assert(offsetof(struct AM2_OrigState, remap_shades) == 0x004FE2B0u - 0x0048E000u, "remap_shades");
 static_assert(offsetof(struct AM2_OrigState, variation_blocks) == 0x004FE2C0u - 0x0048E000u, "variation_blocks");
 static_assert(offsetof(struct AM2_OrigState, variation_end) == 0x005022C0u - 0x0048E000u, "variation_end");

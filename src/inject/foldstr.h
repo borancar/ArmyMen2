@@ -344,5 +344,23 @@
 #define AM2_STR_CHILD_SUFFIX ((uintptr_t)(const char *)"%s-%d")
 #undef AM2_STR_NOT_RESPONDING
 #define AM2_STR_NOT_RESPONDING ((uintptr_t)(const char *)"Not responding%s")
+#undef AM2_STR_SHA_BAD_SIZE
+#define AM2_STR_SHA_BAD_SIZE ((uintptr_t)(const char *)"ERROR: invalid file size in %s.\n")
+#undef AM2_STR_SHA_NOT_1BIT
+#define AM2_STR_SHA_NOT_1BIT ((uintptr_t)(const char *)"ERROR: %s not in 1-bit mode\n")
+#undef AM2_STR_PCT_S
+#define AM2_STR_PCT_S ((uintptr_t)(const char *)"%s")
+#undef AM2_STR_ACTIVATING_REGION
+#define AM2_STR_ACTIVATING_REGION ((uintptr_t)(const char *)"Activating Region %d\n")
+#undef AM2_STR_TROOPER_PICKUP_2
+#define AM2_STR_TROOPER_PICKUP_2 ((uintptr_t)(const char *)"TrooperPickupItem 2 %x\n")
+#undef AM2_STR_TROOPER_PICKUP
+#define AM2_STR_TROOPER_PICKUP ((uintptr_t)(const char *)"TrooperPickupItem %x\n")
+#undef AM2_STR_ASKING_FOR_ITEM
+#define AM2_STR_ASKING_FOR_ITEM ((uintptr_t)(const char *)"UpdateTrooperAction: asking for an item (2); oldweapon: %s; maxammo: %d (%d); oldweap ammo: %d; actual:%d; owner: %d\n")
+#undef AM2_STR_NO
+#define AM2_STR_NO ((uintptr_t)(const char *)"No")
+#undef AM2_STR_YES
+#define AM2_STR_YES ((uintptr_t)(const char *)"Yes")
 
 #endif
