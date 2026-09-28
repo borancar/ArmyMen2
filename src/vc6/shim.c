@@ -51,7 +51,62 @@ static int  *CDECL sh___p__fmode(void)   { return &s_fmode; }
 static int  *CDECL sh___p__commode(void) { return &s_commode; }
 static char***CDECL sh___p___initenv(void){ return &vc6_env; }
 static char**CDECL sh___p__pgmptr(void)  { return &s_pgmptr; }
-static unsigned CDECL sh__controlfp(unsigned, unsigned) { return 0x9001F; }
+/* _controlfp: MSVCRT's view of the x87 control word, in its own bit encoding
+ * (exception masks, _MCW_RC 0x300, _MCW_PC 0x30000).  C2.DLL calls it, and
+ * the compiler then narrows every floating literal's 80-bit value to float /
+ * double ON THE FPU -- so the live rounding and precision control IS the
+ * rounding of every constant it emits.  This was a stub returning a fixed
+ * word and setting nothing. */
+static unsigned x87_to_ms(unsigned cw)
+{
+    unsigned r = 0;
+    if (cw & 0x01) r |= 0x10;       /* IM -> _EM_INVALID    */
+    if (cw & 0x02) r |= 0x80000;    /* DM -> _EM_DENORMAL   */
+    if (cw & 0x04) r |= 0x08;       /* ZM -> _EM_ZERODIVIDE */
+    if (cw & 0x08) r |= 0x04;       /* OM -> _EM_OVERFLOW   */
+    if (cw & 0x10) r |= 0x02;       /* UM -> _EM_UNDERFLOW  */
+    if (cw & 0x20) r |= 0x01;       /* PM -> _EM_INEXACT    */
+    r |= ((cw >> 10) & 3) << 8;     /* RC: near/down/up/chop, same order */
+    switch ((cw >> 8) & 3) {        /* PC */
+    case 0:  r |= 0x20000; break;   /* _PC_24 */
+    case 2:  r |= 0x10000; break;   /* _PC_53 */
+    default: break;                 /* _PC_64 = 0 */
+    }
+    return r;
+}
+static unsigned ms_to_x87(unsigned ms, unsigned cw)
+{
+    cw &= ~0x0F3Fu;
+    if (ms & 0x10)    cw |= 0x01;
+    if (ms & 0x80000) cw |= 0x02;
+    if (ms & 0x08)    cw |= 0x04;
+    if (ms & 0x04)    cw |= 0x08;
+    if (ms & 0x02)    cw |= 0x10;
+    if (ms & 0x01)    cw |= 0x20;
+    cw |= ((ms >> 8) & 3) << 10;
+    switch (ms & 0x30000) {
+    case 0x20000: break;               /* 24-bit: PC = 0 */
+    case 0x10000: cw |= 0x200; break;  /* 53-bit */
+    default:      cw |= 0x300; break;  /* 64-bit */
+    }
+    return cw;
+}
+static unsigned CDECL sh__controlfp(unsigned newval, unsigned mask)
+{
+    unsigned short cw;
+    unsigned cur;
+    __asm__ volatile("fnstcw %0" : "=m"(cw));
+    cur = x87_to_ms(cw);
+    if (mask) {
+        unsigned short ncw;
+        cur = (cur & ~mask) | (newval & mask);
+        ncw = (unsigned short)ms_to_x87(cur, cw);
+        __asm__ volatile("fldcw %0" : : "m"(ncw));
+    }
+    if (getenv("VC6_FPLOG"))
+        fprintf(stderr, "_controlfp(%#x, %#x): cw %#x -> %#x\n", newval, mask, cw, cur);
+    return cur;
+}
 
 static void CDECL sh__initterm(PVFV *begin, PVFV *end)
 {
@@ -391,21 +446,26 @@ static void  CDECL sh__tzset(void) { }
 static void  CDECL sh__seh_longjmp_unwind(void *mark) { (void)mark; }
 int _adj_fdiv_r = 0;                        /* FDIV-fix helper (data)          */
 
-/* _ftol: convert st(0) to a truncated 64-bit int in edx:eax, popping st(0). */
+/* _ftol: convert st(0) to a truncated 64-bit int in edx:eax, popping st(0).
+ * The two control words sit ABOVE the 8-byte result slot.  They once shared
+ * it: fistpll overwrote the saved word, and the "restore" loaded the result's
+ * top 16 bits -- 0xFFFF after any negative conversion, i.e. round toward zero
+ * left on for the rest of the compile.  That is how c1 came to parse every
+ * literal truncated (see _atoldbl). */
 __attribute__((naked)) long long _vc6_ftol(void)
 {
     __asm__ volatile(
-        "sub $8, %esp\n\t"
-        "fnstcw 6(%esp)\n\t"
-        "movzwl 6(%esp), %eax\n\t"
+        "sub $12, %esp\n\t"
+        "fnstcw 8(%esp)\n\t"           /* saved control word  */
+        "movzwl 8(%esp), %eax\n\t"
         "orb $0x0C, %ah\n\t"           /* round toward zero */
-        "movw %ax, 4(%esp)\n\t"
-        "fldcw 4(%esp)\n\t"
-        "fistpll (%esp)\n\t"
-        "fldcw 6(%esp)\n\t"
+        "movw %ax, 10(%esp)\n\t"
+        "fldcw 10(%esp)\n\t"
+        "fistpll (%esp)\n\t"           /* result: 0..7 */
+        "fldcw 8(%esp)\n\t"
         "mov (%esp), %eax\n\t"
         "mov 4(%esp), %edx\n\t"
-        "add $8, %esp\n\t"
+        "add $12, %esp\n\t"
         "ret\n\t");
 }
 
@@ -442,7 +502,36 @@ __attribute__((naked)) void _vc6_longjmp(void)
         "jmp *20(%ecx)\n\t");
 }
 
-static void CDECL sh__atoldbl(void *ld, const char *s) { if (ld) memset(ld, 0, 10); (void)s; }
+/* _atoldbl: the compiler front ends (c1/c1xx) parse EVERY floating-point
+ * literal through this -- string to the 80-bit x87 extended format, which the
+ * back end then rounds to float/double.  It was a stub that zeroed the result,
+ * so every float and double constant compiled under the host came out 0.0 (the
+ * piecewise byte-match never saw it: those constants live in relocated .rdata,
+ * which it wildcards).  vc6host is i386, where long double IS the x87 extended
+ * format, so glibc's correctly-rounded strtold yields exactly the ten bytes --
+ * PROVIDED it runs round-to-nearest.  glibc honours the dynamic rounding mode;
+ * MSVCRT's _atoldbl is a software parser that rounds to nearest whatever the
+ * FPU is set to.  So the parse runs under a forced round-to-nearest / 64-bit
+ * control word and c1's own is put back after.  Not hypothetical: _vc6_ftol
+ * above once left the FPU in round-toward-zero, every literal whose correct
+ * rounding is upward came out one ulp low (0.1 as ...CCCC, 0.001f as
+ * 0x3A83126E), and the game showed it -- the frame delta in seconds
+ * (delta_ms * 0.001f) sat a hair under 0.001, the edge-scroll step
+ * 1000 * dt truncated to 0 on a 1 ms frame, and the view never scrolled.
+ * Returns 0 (success), as MSVCRT's does when the value is representable. */
+static int CDECL sh__atoldbl(void *ld, const char *s)
+{
+    unsigned short cw, nearest;
+    long double v;
+
+    __asm__ volatile("fnstcw %0" : "=m"(cw));
+    nearest = (unsigned short)((cw & ~0x0F00u) | 0x0300u);   /* RC=near, PC=64 */
+    __asm__ volatile("fldcw %0" : : "m"(nearest));
+    v = s ? strtold(s, NULL) : 0.0L;
+    __asm__ volatile("fldcw %0" : : "m"(cw));
+    if (ld) memcpy(ld, &v, 10);
+    return 0;
+}
 static int  CDECL sh__futime(int fd, void *t) { (void)fd; (void)t; return 0; }
 
 /* __unDName: leave the name mangled (diagnostics only). */
