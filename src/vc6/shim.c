@@ -382,6 +382,13 @@ static int CDECL sh__stat(const char *p, MsvcStat *d) { struct stat s; if (stat(
 /* ----------------------------------------------------- C++ / math / misc CRT */
 static void *CDECL sh_op_new(size_t n) { return malloc(n ? n : 1); }
 static void  CDECL sh_op_delete(void *p) { free(p); }
+/* _tzset: initialise the CRT timezone globals.  LINK calls it before stamping
+ * the PE header's timestamp; the shim's time is UTC, so a no-op suffices. */
+static void  CDECL sh__tzset(void) { }
+/* _seh_longjmp_unwind: MSVCRT's SEH-aware longjmp runs registered unwind
+ * handlers here before the jump.  Our longjmp (_vc6_longjmp) does a bare
+ * register restore with no SEH frames to unwind, so this is a no-op. */
+static void  CDECL sh__seh_longjmp_unwind(void *mark) { (void)mark; }
 int _adj_fdiv_r = 0;                        /* FDIV-fix helper (data)          */
 
 /* _ftol: convert st(0) to a truncated 64-bit int in edx:eax, popping st(0). */
@@ -676,12 +683,12 @@ static int STDCALL sh_LoadStringA(void *hinst, uint32_t id, char *buf, int maxch
 
 /* -------------------------------------------------- kernel32 files/handles  */
 enum { H_FILE = 1, H_SEM, H_EVENT, H_MAP };
-typedef struct { int type, fd; uint32_t map_size; } HObj;
+typedef struct { int type, fd; uint32_t map_size, map_prot; } HObj;
 static HObj s_htab[2048];
 static int  s_hn = 1;                        /* index 0 == NULL handle */
 #define INVALID_HANDLE ((HANDLE)(intptr_t)-1)
 static HANDLE h_alloc(int type, int fd) { if (s_hn >= 2048) return INVALID_HANDLE;
-    int i = s_hn++; s_htab[i].type = type; s_htab[i].fd = fd; s_htab[i].map_size = 0; return (HANDLE)(intptr_t)i; }
+    int i = s_hn++; s_htab[i].type = type; s_htab[i].fd = fd; s_htab[i].map_size = 0; s_htab[i].map_prot = 0; return (HANDLE)(intptr_t)i; }
 static HObj *h_obj(HANDLE h) { intptr_t i = (intptr_t)h; return (i <= 0 || i >= s_hn) ? 0 : &s_htab[i]; }
 
 static HANDLE STDCALL sh_CreateFileA(const char *name, DWORD access, DWORD share,
@@ -713,16 +720,41 @@ static BOOL STDCALL sh_GetFileTime(HANDLE h, DWORD *ct, DWORD *at, DWORD *wt) { 
     struct stat st; if (fstat(o->fd, &st)) return 0; ft_from_unix(st.st_ctime, ct); ft_from_unix(st.st_atime, at); ft_from_unix(st.st_mtime, wt); return 1; }
 static BOOL STDCALL sh_SetFileTime(HANDLE h, const void *a, const void *b, const void *c) { (void)h;(void)a;(void)b;(void)c; return 1; }
 
+/* PAGE_* protection constants CreateFileMapping takes. */
+#define PAGE_READWRITE 0x04
+#define PAGE_WRITECOPY 0x08
 static HANDLE STDCALL sh_CreateFileMappingA(HANDLE hf, void *sa, DWORD prot, DWORD szHi, DWORD szLo, const char *name)
-{ (void)sa; (void)prot; (void)szHi; (void)name; HObj *o = h_obj(hf);
-  HANDLE m = h_alloc(H_MAP, o ? o->fd : -1); HObj *mo = h_obj(m); if (mo) mo->map_size = szLo; return m; }
+{
+    (void)sa; (void)szHi; (void)name; HObj *o = h_obj(hf);
+    HANDLE m = h_alloc(H_MAP, o ? o->fd : -1); HObj *mo = h_obj(m);
+    if (mo) { mo->map_size = szLo; mo->map_prot = prot; }
+    /* Win32 grows the backing file to the mapping size; a Linux file mapping
+     * SIGBUSes on any access past EOF, so a writable mapping (LINK's output)
+     * must ftruncate the file up front.  Read-only input mappings do not. */
+    if (o && o->fd >= 0 && szLo && (prot == PAGE_READWRITE || prot == PAGE_WRITECOPY)) {
+        struct stat st;
+        if (!fstat(o->fd, &st) && (uint32_t)st.st_size < szLo)
+            if (ftruncate(o->fd, szLo) != 0) { /* best effort */ }
+    }
+    return m;
+}
 static void *STDCALL sh_MapViewOfFileEx(HANDLE hm, DWORD access, DWORD offHi, DWORD offLo, DWORD size, void *base)
 {
     (void)access; (void)offHi; HObj *o = h_obj(hm); if (!o) return 0;
     size_t len = size ? size : o->map_size;
     if (!len && o->fd >= 0) { struct stat st; if (!fstat(o->fd, &st)) len = st.st_size; }
-    void *p = mmap(base, len ? len : 0x1000, PROT_READ | PROT_WRITE,
-                   MAP_PRIVATE | (base ? MAP_FIXED_NOREPLACE : 0), o->fd, offLo);
+    int writable = (o->map_prot == PAGE_READWRITE || o->map_prot == PAGE_WRITECOPY);
+    /* A writable view must be MAP_SHARED so LINK's writes reach the output file;
+     * MAP_PRIVATE (copy-on-write) would leave the file all-zero.  Grow the file
+     * to cover this view's window if the mapping size did not already. */
+    if (writable && o->fd >= 0) {
+        struct stat st;
+        if (!fstat(o->fd, &st) && st.st_size < (off_t)(offLo + len))
+            if (ftruncate(o->fd, offLo + len) != 0) { /* best effort */ }
+    }
+    int prot = writable ? (PROT_READ | PROT_WRITE) : PROT_READ;
+    int flags = (writable ? MAP_SHARED : MAP_PRIVATE) | (base ? MAP_FIXED_NOREPLACE : 0);
+    void *p = mmap(base, len ? len : 0x1000, prot, flags, o->fd, offLo);
     return p == MAP_FAILED ? 0 : p;
 }
 static BOOL STDCALL sh_UnmapViewOfFile(void *p) { (void)p; return 1; }   /* leak-ok for a short compile */
@@ -764,6 +796,10 @@ static BOOL   STDCALL sh_HeapDestroy(HANDLE h) { (void)h; return 1; }
 static HANDLE STDCALL sh_GetProcessHeap(void) { return (HANDLE)(intptr_t)1; }
 static HANDLE STDCALL sh_GetCurrentThread(void) { return (HANDLE)(intptr_t)-2; }
 static BOOL   STDCALL sh_SetThreadPriority(HANDLE h, int p) { (void)h;(void)p; return 1; }
+
+/* KERNEL32 DeleteFileA: BOOL (nonzero success). LINK removes a stale output
+ * before writing the new one.  Honour VC6_KEEPTMP like the CRT removers. */
+static BOOL STDCALL sh_DeleteFileA(const char *p) { if (getenv("VC6_KEEPTMP")) return 1; return unlink(WP(p)) == 0; }
 
 static BOOL STDCALL sh_CopyFileA(const char *src, const char *dst, BOOL failIfExists)
 {
@@ -941,6 +977,7 @@ static const Vc6Export vc6_exports[] = {
     M("??2@YAPAXI@Z", sh_op_new), M("??3@YAXPAX@Z", sh_op_delete),
     M("_ftol", _vc6_ftol), M("_adj_fdiv_r", &_adj_fdiv_r),
     M("_setjmp3", _vc6_setjmp3), M("longjmp", _vc6_longjmp),
+    M("_seh_longjmp_unwind", sh__seh_longjmp_unwind), M("_tzset", sh__tzset),
     M("_atoldbl", sh__atoldbl), M("_futime", sh__futime),
     M("__unDName", sh___unDName),
     M("wcslen", sh_wcslen), M("wcscmp", sh_wcscmp), M("wcscpy", sh_wcscpy),
@@ -1018,7 +1055,8 @@ static const Vc6Export vc6_exports[] = {
     K("HeapReAlloc", sh_HeapReAlloc), K("HeapFree", sh_HeapFree),
     K("HeapDestroy", sh_HeapDestroy), K("GetProcessHeap", sh_GetProcessHeap),
     K("GetCurrentThread", sh_GetCurrentThread), K("SetThreadPriority", sh_SetThreadPriority),
-    K("CopyFileA", sh_CopyFileA), K("FindFirstFileA", sh_FindFirstFileA),
+    K("CopyFileA", sh_CopyFileA), K("DeleteFileA", sh_DeleteFileA),
+    K("FindFirstFileA", sh_FindFirstFileA),
     K("FindNextFileA", sh_FindNextFileA), K("FindClose", sh_FindClose),
     K("SearchPathA", sh_SearchPathA), K("GetFileInformationByHandle", sh_GetFileInformationByHandle),
     K("GetSystemTime", sh_GetSystemTime), K("SystemTimeToFileTime", sh_SystemTimeToFileTime),

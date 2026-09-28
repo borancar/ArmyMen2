@@ -154,6 +154,7 @@ static const void *vc6_make_stub(const char *module, const char *name)
     }
     if (!what || vc6_stub_used + 16 > (1 << 20)) vc6_die("too many missing imports");
     sprintf(what, "%s!%s", module, name);
+    if (getenv("VC6_VERBOSE")) vc6_log("stub: %s", what);
     s = vc6_stub_page + vc6_stub_used; vc6_stub_used += 16;
     s[0] = 0x68; memcpy(s + 1, &what, 4);              /* push what          */
     s[5] = 0xE8;                                        /* call vc6_missing   */
@@ -498,6 +499,9 @@ static const ResEntry *res_find_id(const uint8_t *rbase, uint32_t diroff, uint32
 extern "C" int vc6_load_string(uint32_t hinst, uint32_t id, char *buf, int maxch)
 {
     if (!maxch) return 0;
+    /* hinst == 0 means the main module (Win32 LoadString(NULL, ...)); LINK.EXE
+     * loads its diagnostic strings this way. g_mod[0] is always the main EXE. */
+    if (!hinst && g_nmod) hinst = g_mod[0].base;
     uint8_t *base = (uint8_t *)(uintptr_t)hinst;
     uint32_t lfanew = *(uint32_t *)(base + 0x3C);
     const PeOptionalHeader *oh = (const PeOptionalHeader *)(base + lfanew + 4 + sizeof(PeFileHeader));
