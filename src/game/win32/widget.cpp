@@ -10852,6 +10852,48 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     }
 }
 
+/* OnMpMapPick -- original 0x00431D80, 135 bytes, one exit.
+ *
+ * The multiplayer panel's MAP list row callback, OnMpGameType's sibling:
+ * pushed into the map list-box constructor in MpPanelConstruct and called
+ * from nowhere. It was the last reconstructed code still passing an ORIGINAL
+ * code address around -- MpPanelConstruct handed the list 0x00431D80 as a
+ * literal, which a relocatable (VC6 LINK) image cannot honour, and
+ * src/vc6/rawaddr.py --text reported it as the one remaining raw address.
+ *
+ * Host-only, bounds-checked, and the same double menu sound as its sibling;
+ * the row's value is the level record the type list stored with ListAdd.
+ * Between the two sounds it clears ADDR_LEVEL_ID, whether or not the row
+ * turns out to carry a record. Then the level is selected, the map
+ * selection refreshed, the change sent (SendPlayerMsg(1)), and announced.
+ *
+ * NOT EXERCISED, like OnMpGameType: it needs the multiplayer options panel.
+ * Verified by reading and offset check. */
+void __cdecl OnMpMapPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
+{
+    const void *lvl;
+
+    (void)w;
+    if (!*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST))
+        return;
+    if (!rows || row < 0 || row >= rows->count)
+        return;
+
+    PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
+    *(int32_t *)(uintptr_t)ADDR_LEVEL_ID = 0;
+
+    lvl = *(const void *const *)(rows->text + (size_t)row * LIST_ROW_STRIDE
+                                 + AM2_LIST_ROW_VALUE);
+    if (!lvl)
+        return;
+
+    PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
+    SelectLevel(lvl);
+    RefreshMapSelection();
+    SendPlayerMsg(1);
+    Announce("Map changed by host.");
+}
+
 /* OnMpLaunch -- original 0x00431850, 208 bytes, four exits.
  *
  * The multiplayer panel's launch button, pushed into a ButtonConstruct by
@@ -15743,6 +15785,8 @@ int widget_install(void)
                         "CheckMapRules", 3);
     rc |= patch_replace(ADDR_MP_ON_GAME_TYPE, (const void *)OnMpGameType,
                         "OnMpGameType", 3);
+    rc |= patch_replace(ADDR_MP_ON_MAP_PICK, (const void *)OnMpMapPick,
+                        "OnMpMapPick", 3);
     rc |= patch_replace(ADDR_POINTER_ACTION_FOLLOW,
                         (const void *)PointerActionFollow,
                         "PointerActionFollow", 2);
@@ -17650,7 +17694,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpPanelConstruct(const char *
 
         child = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_BYTES);
         *slot = child ? ::ListBoxConstruct(child, 0x154, 0xAD, 0xF6, 0x48, rows,
-                                         (int32_t)ADDR_MP_ON_MAP_PICK, 0, 1)
+                                         (int32_t)(uintptr_t)OnMpMapPick, 0, 1)
                       : (AM2_Widget *)0;
         ::WidgetAddChild(w, *slot);
 

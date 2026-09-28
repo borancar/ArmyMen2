@@ -1941,6 +1941,7 @@ void __cdecl ShowBadMapPreview(AM2_Widget *preview);
 void __cdecl FillListFromRules(const char *path, void *panel);
 /* 0x00431A30 -- the MP panel's game-type list row-pick callback. */
 void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row);
+void __cdecl OnMpMapPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row);
 /* 0x00431E10 -- the multiplayer installation check; AM2_MAPCHECK_* codes. */
 /* 0x00450A60 -- DELETE PLAYER's OK: wipe the player's save folder. */
 void __cdecl OnDelPlayerOk(AM2_Widget *w);

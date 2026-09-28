@@ -14078,7 +14078,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* The MAP list's row callback, and the function the note above says begins at
  * 0x00431D80. Named from the list-box constructor's callback slot in
  * MpPanelConstruct -- the same route that named OnMpGameType, and the only
- * route there is: nothing CALLS either address. Still original. */
+ * route there is: nothing CALLS either address. Reconstructed as OnMpMapPick. */
 #define ADDR_MP_ON_MAP_PICK      0x00431D80u  /* void(w, rows, row) */
 #define ADDR_GAME_OPERATOR_NEW   0x00464900u  /* void *(size_t); MSVC operator new */
 #define ADDR_START_MULTIPLAYER   0x0042F310u  /* void(void), a button handler */
