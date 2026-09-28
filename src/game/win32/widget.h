@@ -119,17 +119,14 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) MultiSpritePaint(RECT clip);
     void __attribute__((thiscall)) BlinkerUpdate();
     void __attribute__((thiscall)) TogglePaint(RECT clip);
-    void __attribute__((thiscall)) ListDestruct();
     AM2_Widget * __attribute__((thiscall)) ListDelete(int32_t flags);
     void __attribute__((thiscall)) ListUpdate();
-    AM2_Widget * __attribute__((thiscall)) TextListConstruct(int32_t left, int32_t top, int32_t right, int32_t bottom, void *rows, int32_t callback, int32_t ownsRows);
     AM2_Widget * __attribute__((thiscall)) TextListDelete(int32_t flags);
     void __attribute__((thiscall)) ListDraw(RECT clip);
     void __attribute__((thiscall)) ListTakeFocus(int32_t announce);
     AM2_Widget * __attribute__((thiscall)) IconDelete(int32_t flags);
     void __attribute__((thiscall)) BlinkerDestruct();
     AM2_Widget * __attribute__((thiscall)) BlinkerDelete(int32_t flags);
-    void __attribute__((thiscall)) ButtonDestruct();
     AM2_Widget * __attribute__((thiscall)) ButtonDelete(int32_t flags);
     void __attribute__((thiscall)) ButtonUpdate();
     void __attribute__((thiscall)) ButtonPaint(RECT clip);
@@ -251,16 +248,12 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) CommPanelConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) SelectPlayerConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) KeyRowConstruct(int32_t nameIndex, const char *caption, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t ink2, int32_t ink3, int32_t ink4);
-    AM2_Widget * __attribute__((thiscall)) ButtonConstruct(const char *b0, const char *b1, const char *b2, int32_t flag, AM2_Rect box, void (__cdecl *onLeft)(AM2_Widget *), void (__cdecl *onRight)(AM2_Widget *));
     AM2_Widget * __attribute__((thiscall)) EditConstruct(char *buf, int32_t maxChars, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t inkFocus, int32_t ink, int32_t paper, void (__cdecl *onEnter)(AM2_Widget *), int32_t a, int32_t b);
     AM2_Widget * __attribute__((thiscall)) MultiSpriteConstruct(const char *b0, const char *b1, int32_t flag, AM2_Rect box);
-    AM2_Widget * __attribute__((thiscall)) ListBoxConstruct(int32_t left, int32_t top, int32_t right, int32_t bottom, void *rows, int32_t callback, int32_t arg6C, int32_t ownsRows);
-    AM2_Widget * __attribute__((thiscall)) CheckBoxConstruct(const char *b0, const char *b1, const char *b2, const char *b3, int32_t left, int32_t top, int32_t width, int32_t height, int32_t group, const char *caption, void (__cdecl *onChange)(AM2_Widget *));
     AM2_Widget * __attribute__((thiscall)) ScrollBarConstruct(int32_t left, int32_t top, int32_t width, int32_t height, AM2_Widget *parent, int32_t span);
     AM2_Widget * __attribute__((thiscall)) ArrowBarConstruct(int32_t left, int32_t top, int32_t width, int32_t height, AM2_Widget *parent, const char *b0, const char *b1, int32_t span, int32_t flag50);
     AM2_Widget * __attribute__((thiscall)) TyperConstruct(int32_t left, int32_t top, int32_t width, int32_t height, const char *message);
     void __attribute__((thiscall)) ArrowBarShowRow(int32_t row);
-    AM2_Widget * __attribute__((thiscall)) ButtonBaseConstruct();
     AM2_Widget * __attribute__((thiscall)) SelectMapConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) EnterNameConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) DeleteGameConstruct(const char *bmp, int32_t flag);
@@ -277,7 +270,6 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) MpPanelDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) MpDialogDelete(int32_t flags);
     void __attribute__((thiscall)) MpPanelPaint(RECT clip);
-    void __attribute__((thiscall)) TextListDestruct();
     void __attribute__((thiscall)) MpSpinRepaint();
     void __attribute__((thiscall)) MpTeamPaint(RECT clip);
     void __attribute__((thiscall)) MpColourPaint(RECT clip);
@@ -291,7 +283,6 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) ArrowBarDelete(int32_t flags);
     void __attribute__((thiscall)) ArrowBarDestruct();
     AM2_Widget * __attribute__((thiscall)) CheckBoxDelete(int32_t flags);
-    void __attribute__((thiscall)) CheckBoxDestruct();
     AM2_Widget * __attribute__((thiscall)) HudCommandsDelete(int32_t flags);
     void __attribute__((thiscall)) HudCommandsDestruct();
     AM2_Widget * __attribute__((thiscall)) HudEdgeDelete(int32_t flags);
@@ -353,6 +344,11 @@ AM2_CLASS_VTABLE(AM2_Widget, VTABLE_WIDGET_BASE)
 AM2_CLASS_VTABLE(AM2_Panel, VTABLE_PANEL)
 AM2_CLASS_VTABLE(AM2_ScreenBase, VTABLE_DIALOG)
 AM2_CLASS_VTABLE(AM2_Label, VTABLE_LABEL)
+AM2_CLASS_VTABLE(AM2_ButtonBase, VTABLE_BUTTON_BASE)
+AM2_CLASS_VTABLE(AM2_Button, VTABLE_BUTTON)
+AM2_CLASS_VTABLE(AM2_CheckBox, VTABLE_CHECKBOX)
+AM2_CLASS_VTABLE(AM2_ListBox, VTABLE_LISTBOX)
+AM2_CLASS_VTABLE(AM2_TextList, VTABLE_TEXT_LIST)
 
 /* Installing a constructor or destructor at the original's address. GCC
  * builds install a thiscall thunk (constructors must answer `this` in eax, as
@@ -389,6 +385,55 @@ struct AM2_Label : AM2_Widget {
     AM2_Label(const char *text, AM2_Rect box, int32_t font, int32_t ink, int32_t paper);
     explicit AM2_Label(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_Label();
+};
+
+struct AM2_ButtonBase : AM2_Widget {
+    uint8_t pad_AM2_ButtonBase[0x68 - sizeof(AM2_Widget)];
+    AM2_ButtonBase();
+    explicit AM2_ButtonBase(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+};
+
+struct AM2_Button : AM2_ButtonBase {
+    uint8_t pad_AM2_Button[AM2_BUTTON_SIZE - sizeof(AM2_ButtonBase)];
+    AM2_Button(const char *b0, const char *b1, const char *b2, int32_t flag, AM2_Rect box, void (__cdecl *onLeft)(AM2_Widget *), void (__cdecl *onRight)(AM2_Widget *));
+    explicit AM2_Button(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
+    ~AM2_Button();
+};
+
+struct AM2_CheckBox : AM2_ButtonBase {
+    AM2_Sprite *sprOn;              /* 0x0068  CHECKBOX_OFF_SPR_ON */
+    AM2_Sprite *sprOff;             /* 0x006C  CHECKBOX_OFF_SPR_OFF */
+    AM2_Sprite *sprOnFoc;           /* 0x0070  CHECKBOX_OFF_SPR_ON_FOC */
+    AM2_Sprite *sprOffFoc;          /* 0x0074  CHECKBOX_OFF_SPR_OFF_FOC */
+    uint8_t     checked;            /* 0x0078  CHECKBOX_OFF_CHECKED */
+    uint8_t     pad79[3];
+    void      (__cdecl *onChange)(AM2_Widget *);  /* 0x007C  CHECK_OFF_ON_CHANGE */
+    int32_t     group;              /* 0x0080  CHECK_OFF_GROUP */
+    uint8_t     inkOn;              /* 0x0084  CHECKBOX_OFF_INK_ON */
+    uint8_t     inkOff;             /* 0x0085 */
+    uint8_t     inkOnFoc;           /* 0x0086 */
+    uint8_t     inkOffFoc;          /* 0x0087 */
+    const char *caption;            /* 0x0088  CHECKBOX_OFF_CAPTION */
+    uint8_t     forcePlain;         /* 0x008C  CHECKBOX_OFF_FORCE_PLAIN */
+    uint8_t     pad8D[AM2_CHECKBOX_SIZE - 0x8D];
+    AM2_CheckBox(const char *b0, const char *b1, const char *b2, const char *b3, AM2_Rect box, int32_t group, const char *caption, void (__cdecl *onChange)(AM2_Widget *));
+    explicit AM2_CheckBox(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
+    ~AM2_CheckBox();
+};
+
+struct AM2_ListBox : AM2_Widget {
+    uint8_t pad_AM2_ListBox[AM2_LISTBOX_SIZE - sizeof(AM2_Widget)];
+    AM2_ListBox(AM2_Rect box, void *rows, int32_t callback, int32_t arg6C, int32_t ownsRows);
+    explicit AM2_ListBox(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
+    ~AM2_ListBox();
+};
+
+struct AM2_TextList : AM2_ListBox {
+    /* No fields of its own. VC6 rejects the base mem-initializer (C2437,
+     * "already initialized") when a constructor is a class's FIRST member,
+     * so something has to precede it. */
+    typedef AM2_ListBox Base;
+    AM2_TextList(AM2_Rect box, void *rows, int32_t callback, int32_t ownsRows);
 };
 
 /* Screen classes, as the original's C++ had them: `new T(bmp)` allocates
@@ -496,7 +541,7 @@ static inline void __attribute__((thiscall)) ArrowBarDestruct(AM2_Widget *w)
 static inline AM2_Widget * __attribute__((thiscall)) CheckBoxDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->CheckBoxDelete(flags); }
 static inline void __attribute__((thiscall)) CheckBoxDestruct(AM2_Widget *w)
-{ ((AM2_Widget *)w)->CheckBoxDestruct(); }
+{ ((AM2_CheckBox *)w)->AM2_CheckBox::~AM2_CheckBox(); }
 static inline AM2_Widget * __attribute__((thiscall)) HudCommandsDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->HudCommandsDelete(flags); }
 static inline void __attribute__((thiscall)) HudCommandsDestruct(AM2_Widget *w)
@@ -1575,11 +1620,11 @@ typedef struct AM2_ListRows {
 static inline void __attribute__((thiscall)) ListUpdate(AM2_Widget *w)
 { w->ListUpdate(); }
 static inline void __attribute__((thiscall)) ListDestruct(AM2_Widget *w)
-{ w->ListDestruct(); }
+{ ((AM2_ListBox *)w)->AM2_ListBox::~AM2_ListBox(); }
 
 /* 0x00433350. The text list's destructor -- one `jmp` to ListDestruct. */
 static inline void __attribute__((thiscall)) TextListDestruct(AM2_Widget *w)
-{ w->TextListDestruct(); }
+{ ((AM2_TextList *)w)->AM2_TextList::~AM2_TextList(); }
 
 /* 0x00456570. VTABLE_MP_SPIN slot 4: drop the focused child, then repaint. */
 static inline void __attribute__((thiscall)) MpSpinRepaint(AM2_Widget *w)
@@ -1719,7 +1764,7 @@ static inline AM2_Widget * __attribute__((thiscall)) BlinkerDelete(AM2_Widget *w
  * The original's SEH prologue is not reproduced; see CLAUDE.md for why that is
  * safe here and what it would cost if it were not. */
 static inline void __attribute__((thiscall)) ButtonDestruct(AM2_Widget *w)
-{ w->ButtonDestruct(); }
+{ ((AM2_Button *)w)->AM2_Button::~AM2_Button(); }
 static inline AM2_Widget * __attribute__((thiscall)) ButtonDelete(AM2_Widget *w, int32_t flags)
 { return w->ButtonDelete(flags); }
 
@@ -2015,7 +2060,7 @@ static inline AM2_Widget * __attribute__((thiscall)) ScreenBaseConstruct(AM2_Wid
  * name, a rectangle by value, and two handlers. Only the first bitmap is
  * tested for null; see widget.cpp. */
 static inline AM2_Widget * __attribute__((thiscall)) ButtonConstruct(AM2_Widget *w, const char *b0, const char *b1, const char *b2, int32_t flag, AM2_Rect box, void (__cdecl *onLeft)(AM2_Widget *), void (__cdecl *onRight)(AM2_Widget *))
-{ return w->ButtonConstruct(b0, b1, b2, flag, box, onLeft, onRight); }
+{ return ::new (w) AM2_Button(b0, b1, b2, flag, box, onLeft, onRight); }
 
 /* Original: 0x00454C10, thiscall, `ret 0x34` -- THIRTEEN stack arguments:
  * the buffer, the maximum, four of rectangle, a font, three colours, the
@@ -2038,7 +2083,8 @@ static inline AM2_Widget * __attribute__((thiscall)) MultiSpriteConstruct(AM2_Wi
  * list box. The LIST BOX with a different vtable, five colours and the
  * read-only flag set, and no storage of its own. */
 static inline AM2_Widget * __attribute__((thiscall)) TextListConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t right, int32_t bottom, void *rows, int32_t callback, int32_t ownsRows)
-{ return w->TextListConstruct(left, top, right, bottom, rows, callback, ownsRows); }
+{ AM2_Rect box = { left, top, right, bottom };
+  return ::new (w) AM2_TextList(box, rows, callback, ownsRows); }
 static inline AM2_Widget * __attribute__((thiscall)) TextListDelete(AM2_Widget *w, int32_t flags)
 { return w->TextListDelete(flags); }
 
@@ -2047,7 +2093,8 @@ static inline AM2_Widget * __attribute__((thiscall)) TextListDelete(AM2_Widget *
  * only place the row height appears. Its hot row starts at -1 and becomes 0
  * if the rows it was given are not empty. */
 static inline AM2_Widget * __attribute__((thiscall)) ListBoxConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t right, int32_t bottom, void *rows, int32_t callback, int32_t arg6C, int32_t ownsRows)
-{ return w->ListBoxConstruct(left, top, right, bottom, rows, callback, arg6C, ownsRows); }
+{ AM2_Rect box = { left, top, right, bottom };
+  return ::new (w) AM2_ListBox(box, rows, callback, arg6C, ownsRows); }
 
 /* Original: 0x00454640, thiscall, `ret 0x2C`. The CHECKBOX -- four sprites,
  * a rectangle, its record index, a caption and a change handler.
@@ -2055,7 +2102,8 @@ static inline AM2_Widget * __attribute__((thiscall)) ListBoxConstruct(AM2_Widget
  * Its LEFT-click action is written by the constructor, not by the caller:
  * ADDR_CHECKBOX_TOGGLE. The caller's handler goes to CHECK_OFF_ON_CHANGE. */
 static inline AM2_Widget * __attribute__((thiscall)) CheckBoxConstruct(AM2_Widget *w, const char *b0, const char *b1, const char *b2, const char *b3, int32_t left, int32_t top, int32_t width, int32_t height, int32_t group, const char *caption, void (__cdecl *onChange)(AM2_Widget *))
-{ return w->CheckBoxConstruct(b0, b1, b2, b3, left, top, width, height, group, caption, onChange); }
+{ AM2_Rect box = { left, top, width, height };
+  return ::new (w) AM2_CheckBox(b0, b1, b2, b3, box, group, caption, onChange); }
 
 /* Original: 0x00455FF0, thiscall, `ret 0x18`. The SCROLL BAR -- the three
  * volume sliders. It builds its own two arrows, each a BUTTON with a NULL
@@ -2152,7 +2200,7 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi);
 /* Original: 0x004542F0, thiscall. The base button's constructor -- returns
  * `this`, as every i386 MSVC constructor does. */
 static inline AM2_Widget * __attribute__((thiscall)) ButtonBaseConstruct(AM2_Widget *w)
-{ return w->ButtonBaseConstruct(); }
+{ return ::new (w) AM2_ButtonBase(); }
 
 /* 0x00418C20, 0x00418CE0 and 0x00418D00 -- the COUNT BUTTON's constructor,
  * deleting destructor and activate handler. Nine arguments; two faces from one

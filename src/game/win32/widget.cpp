@@ -1118,13 +1118,13 @@ void __attribute__((thiscall)) AM2_Widget::TogglePaint(RECT clip)
     ::WidgetPaint(w, clip);
 }
 
-void __attribute__((thiscall)) AM2_Widget::ListDestruct()
+AM2_ListBox::~AM2_ListBox()
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_LIST));
+    AM2_CTOR_VTABLE(w, VTABLE_LISTBOX);
 
     if (*(const int32_t *)(self + LIST_OFF_OWNS_ROWS)) {
         void *rows = *(void **)(self + LIST_OFF_ROWS);
@@ -1134,7 +1134,6 @@ void __attribute__((thiscall)) AM2_Widget::ListDestruct()
             am2_free(rows);
         }
     }
-    ::WidgetDestruct(w);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::ListDelete(int32_t flags)
@@ -1454,16 +1453,15 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
  * -- the selected-row colour, the highlight, and the whole keyboard arm of the
  * update -- so a text list cannot be selected in or typed at.
  */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::TextListConstruct(int32_t left, int32_t top, int32_t right, int32_t bottom, void *rows, int32_t callback, int32_t ownsRows)
+AM2_TextList::AM2_TextList(AM2_Rect box, void *rows, int32_t callback, int32_t ownsRows)
+    : AM2_ListBox(box, rows, callback, 0, ownsRows)
 {
     AM2_Widget *w = this;
 
     uint8_t  *self = (uint8_t *)w;
     int32_t  *colours;
 
-    ::ListBoxConstruct(w, left, top, right, bottom, rows, callback, 0, ownsRows);
-
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_TEXT_LIST));
+    AM2_CTOR_VTABLE(w, VTABLE_TEXT_LIST);
 
     colours = (int32_t *)(self + TEXTLIST_OFF_COLOURS);
     colours[0] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_DARK_GREEN;
@@ -1474,7 +1472,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::TextListConstruct(int32_t lef
 
     *(int32_t *)(self + LISTBOX_OFF_READ_ONLY) = 1;
     *(int32_t *)(self + LIST_OFF_CHOSEN)  = -1;
-    return w;
 }
 
 /* TextListDelete -- original 0x00433330, the scalar deleting destructor, and
@@ -1640,13 +1637,13 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::BlinkerDelete(int32_t flags)
     return w;
 }
 
-void __attribute__((thiscall)) AM2_Widget::ButtonDestruct()
+AM2_Button::~AM2_Button()
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_BUTTON));
+    AM2_CTOR_VTABLE(w, VTABLE_BUTTON);
 
     if (*(const uint8_t *)(self + BUTTON_OFF_OWNS_SPRITES)) {
         AM2_Sprite *s;
@@ -1661,7 +1658,6 @@ void __attribute__((thiscall)) AM2_Widget::ButtonDestruct()
         if (s)
             ReleaseSprite(s);
     }
-    ::WidgetDestruct(w);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::ButtonDelete(int32_t flags)
@@ -4055,20 +4051,18 @@ void __cdecl CountButtonActivate(AM2_Widget *w)
  *
  * The `push 1` into vtable slot 0 is the MSVC scalar deleting destructor and
  * is what distinguishes this from a COM QueryInterface, per the abi note. */
-void __attribute__((thiscall)) AM2_Widget::CheckBoxDestruct()
+AM2_CheckBox::~AM2_CheckBox()
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_CHECKBOX));
+    AM2_CTOR_VTABLE(w, VTABLE_CHECKBOX);
 
     ReleaseSprite(*(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON));
     ReleaseSprite(*(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF));
     ReleaseSprite(*(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON_FOC));
     ReleaseSprite(*(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF_FOC));
-
-    ::WidgetDestruct(w);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::CheckBoxDelete(int32_t flags)
@@ -5393,6 +5387,39 @@ AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Label(void *mem, const char *
 { return ::new (mem) AM2_Label(text, box, font, ink, paper); }
 void __attribute__((thiscall)) am2_dtor_AM2_Label(AM2_Widget *w)
 { ((AM2_Label *)w)->AM2_Label::~AM2_Label(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_ButtonBase(void *mem)
+{ return ::new (mem) AM2_ButtonBase(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Button(void *mem, const char *b0, const char *b1, const char *b2, int32_t flag, AM2_Rect box, void (__cdecl *onLeft)(AM2_Widget *), void (__cdecl *onRight)(AM2_Widget *))
+{ return ::new (mem) AM2_Button(b0, b1, b2, flag, box, onLeft, onRight); }
+void __attribute__((thiscall)) am2_dtor_AM2_Button(AM2_Widget *w)
+{ ((AM2_Button *)w)->AM2_Button::~AM2_Button(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_CheckBox(void *mem, const char *b0, const char *b1, const char *b2, const char *b3, AM2_Rect box, int32_t group, const char *caption, void (__cdecl *onChange)(AM2_Widget *))
+{ return ::new (mem) AM2_CheckBox(b0, b1, b2, b3, box, group, caption, onChange); }
+void __attribute__((thiscall)) am2_dtor_AM2_CheckBox(AM2_Widget *w)
+{ ((AM2_CheckBox *)w)->AM2_CheckBox::~AM2_CheckBox(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_ListBox(void *mem, AM2_Rect box, void *rows, int32_t callback, int32_t arg6C, int32_t ownsRows)
+{ return ::new (mem) AM2_ListBox(box, rows, callback, arg6C, ownsRows); }
+void __attribute__((thiscall)) am2_dtor_AM2_ListBox(AM2_Widget *w)
+{ ((AM2_ListBox *)w)->AM2_ListBox::~AM2_ListBox(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_TextList(void *mem, AM2_Rect box, void *rows, int32_t callback, int32_t ownsRows)
+{ return ::new (mem) AM2_TextList(box, rows, callback, ownsRows); }
+void __attribute__((thiscall)) am2_dtor_AM2_TextList(AM2_Widget *w)
+{ ((AM2_TextList *)w)->AM2_TextList::~AM2_TextList(); }
 #endif
 
 #if defined(__GNUC__)
@@ -8278,14 +8305,12 @@ AM2_ScreenBase::AM2_ScreenBase(const char *bmp, int32_t flag)
  *
  * 0x0075 goes in as 1 -- BUTTON_OFF_OWNS_SPRITES -- which is what makes
  * ButtonDestruct release all three. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::ButtonConstruct(const char *b0, const char *b1, const char *b2, int32_t flag, AM2_Rect box, void (__cdecl *onLeft)(AM2_Widget *), void (__cdecl *onRight)(AM2_Widget *))
+AM2_Button::AM2_Button(const char *b0, const char *b1, const char *b2, int32_t flag, AM2_Rect box, void (__cdecl *onLeft)(AM2_Widget *), void (__cdecl *onRight)(AM2_Widget *))
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
-
-    ::ButtonBaseConstruct(w);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_BUTTON));
+    AM2_CTOR_VTABLE(w, VTABLE_BUTTON);
 
     if (b0) {
         *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL) =
@@ -8300,16 +8325,12 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ButtonConstruct(const char *b
         PreloadSpriteName(b2, flag, 1);
 
     w->sprite = *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL);
-    w->x = box.left;
-    w->y = box.top;
-    w->w = box.right;
-    w->h = box.bottom;
+    *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
     self[BUTTON_OFF_OWNS_SPRITES] = 1;
     ::WidgetScreenRect(w);
 
-    *(void **)(self + BUTTON_OFF_ON_RIGHT) = (void *)onRight;
     *(void **)(self + BUTTON_OFF_ON_LEFT)  = (void *)onLeft;
-    return w;
+    *(void **)(self + BUTTON_OFF_ON_RIGHT) = (void *)onRight;
 }
 
 /* 0x00454C10, thiscall, `ret 0x34` -- thirteen stack arguments, which is the
@@ -8417,32 +8438,27 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MultiSpriteConstruct(const ch
  * the rows it was handed are not empty. Note it tests the ROWS pointer and
  * then its count, so an empty list leaves the hot row at -1 and a list with
  * rows opens with the first one hot. The SELECTED row is 0 either way. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::ListBoxConstruct(int32_t left, int32_t top, int32_t right, int32_t bottom, void *rows, int32_t callback, int32_t arg6C, int32_t ownsRows)
+AM2_ListBox::AM2_ListBox(AM2_Rect box, void *rows, int32_t callback, int32_t arg6C, int32_t ownsRows)
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
 
-    ::WidgetConstruct(w);
-
-    w->x = left;
-    w->y = top;
-    w->w = right;
-    w->h = bottom;
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_LISTBOX));
+    *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
+    AM2_CTOR_VTABLE(w, VTABLE_LISTBOX);
 
     *(void **)(self + LIST_OFF_ROWS)       = rows;
     *(int32_t *)(self + LIST_OFF_OWNS_ROWS) = ownsRows;
     *(int32_t *)(self + LIST_OFF_ARG70)     = 0;
-    *(int32_t *)(self + LIST_OFF_ON_TICK)     = arg6C;
     *(int32_t *)(self + LIST_OFF_CALLBACK)  = callback;
+    *(int32_t *)(self + LIST_OFF_ON_TICK)     = arg6C;
     *(int32_t *)(self + LIST_OFF_CHOSEN)       = -1;
     *(int32_t *)(self + LIST_OFF_SELECTED)  = 0;
 
     ::WidgetScreenRect(w);
 
     *(int32_t *)(self + LIST_OFF_VISIBLE) =
-        (bottom - AM2_LIST_ROW_INSET) / AM2_LIST_ROW_HEIGHT;
+        (box.bottom - AM2_LIST_ROW_INSET) / AM2_LIST_ROW_HEIGHT;
     *(int32_t *)(self + LIST_OFF_TOP_ROW) = 0;
 
     *(int32_t *)(self + LIST_OFF_INK) = g_whiteInk;
@@ -8455,7 +8471,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ListBoxConstruct(int32_t left
 
     if (rows && *(const int32_t *)rows > 0)
         *(int32_t *)(self + LIST_OFF_CHOSEN) = 0;
-    return w;
 }
 
 /* 0x00454640, thiscall, `ret 0x2C`. The CHECKBOX -- the 43 boxes on
@@ -8472,42 +8487,31 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ListBoxConstruct(int32_t left
  * that decides whether there is a group to sync.
  *
  * Four hardcoded palette indices go in at 0x0084: 0xD4, 0xD4, 0xFB, 0xFB. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::CheckBoxConstruct(const char *b0, const char *b1, const char *b2, const char *b3, int32_t left, int32_t top, int32_t width, int32_t height, int32_t group, const char *caption, void (__cdecl *onChange)(AM2_Widget *))
+AM2_CheckBox::AM2_CheckBox(const char *b0, const char *b1, const char *b2, const char *b3, AM2_Rect box, int32_t group_, const char *caption_, void (__cdecl *onChange_)(AM2_Widget *))
 {
     AM2_Widget *w = this;
 
-    uint8_t *self = (uint8_t *)w;
+    AM2_CTOR_VTABLE(w, VTABLE_CHECKBOX);
 
-    ::ButtonBaseConstruct(w);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_CHECKBOX));
+    sprOff    = PreloadSpriteName(b0, 1, 1);
+    sprOn     = PreloadSpriteName(b1, 1, 1);
+    sprOffFoc = PreloadSpriteName(b2, 1, 1);
+    sprOnFoc  = PreloadSpriteName(b3, 1, 1);
+    w->sprite = sprOff;
 
-    *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF)  =
-        PreloadSpriteName(b0, 1, 1);
-    *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON) =
-        PreloadSpriteName(b1, 1, 1);
-    *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF_FOC)   =
-        PreloadSpriteName(b2, 1, 1);
-    *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON_FOC)   =
-        PreloadSpriteName(b3, 1, 1);
-    w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF);
-
-    w->x = left;
-    w->y = top;
-    w->w = width;
-    w->h = height;
-    self[CHECKBOX_OFF_CHECKED] = 0;
+    *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
+    checked = 0;
     ::WidgetScreenRect(w);
 
-    *(int32_t *)(self + CHECK_OFF_GROUP)   = group;
-    *(const char **)(self + CHECKBOX_OFF_CAPTION) = caption;
-    self[CHECKBOX_OFF_INK_ON]      = 0xD4;
-    self[CHECKBOX_OFF_INK_OFF]     = 0xD4;
-    self[CHECKBOX_OFF_INK_ON_FOC]  = 0xFB;
-    self[CHECKBOX_OFF_INK_OFF_FOC] = 0xFB;
-    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT) = (uint32_t)(uintptr_t)CheckboxToggle;
-    *(void **)(self + CHECK_OFF_ON_CHANGE) = (void *)onChange;
-    self[CHECKBOX_OFF_FORCE_PLAIN] = 0;
-    return w;
+    group     = group_;
+    caption   = caption_;
+    inkOn     = 0xD4;
+    inkOff    = 0xD4;
+    inkOnFoc  = 0xFB;
+    inkOffFoc = 0xFB;
+    w->activate = CheckboxToggle;
+    onChange  = onChange_;
+    forcePlain = 0;
 }
 
 /* 0x00455FF0, thiscall, `ret 0x18`. The SCROLL BAR -- the three volume
@@ -9678,18 +9682,15 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
  * every checkbox derives from it, and it returns `this` the way an i386 MSVC
  * constructor does -- which is the mistake that killed the multiplayer path
  * for eleven commits, so tools/checkthis.py now refuses a `void` here. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::ButtonBaseConstruct()
+AM2_ButtonBase::AM2_ButtonBase()
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
-
-    ::WidgetConstruct(w);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_BUTTON_BASE));
+    AM2_CTOR_VTABLE(w, VTABLE_BUTTON_BASE);
     *(int32_t *)(self + BUTTON_BASE_OFF_A) = 0;
     *(int32_t *)(self + BUTTON_BASE_OFF_B) = 0;
     *(int32_t *)(self + BUTTON_BASE_OFF_C) = 0;
-    return w;
 }
 
 /* 0x00454760. Every checkbox's LEFT-click handler, written by the CONSTRUCTOR
@@ -14984,13 +14985,6 @@ void __cdecl BattleJoinOk(void)
 /* 0x00433350, the TEXT LIST's destructor: one `jmp` to ADDR_LIST_DESTRUCT.
  * Reconstructed as the alias it is rather than as a jump somewhere else --
  * the FreeSpriteListAlias precedent. */
-void __attribute__((thiscall)) AM2_Widget::TextListDestruct()
-{
-    AM2_Widget *w = this;
-
-    ::ListDestruct(w);
-}
-
 /* 0x00456570, slot 4 of VTABLE_MP_SPIN. Clear the focused child, then defer to
  * the base repaint -- an override that ADDS one store rather than replacing
  * anything, which is why it is two instructions and a tail jump.
@@ -15210,7 +15204,7 @@ int widget_install(void)
     rc |= patch_replace(ADDR_ARROWBAR_SHOW_ROW,
                         pmf_addr(&AM2_Widget::ArrowBarShowRow),
                         "ArrowBarShowRow", 3);
-    rc |= patch_replace(ADDR_CHECKBOX_DTOR, pmf_addr(&AM2_Widget::CheckBoxDestruct),
+    rc |= patch_replace(ADDR_CHECKBOX_DTOR, AM2_DTOR(AM2_CheckBox),
                         "CheckBoxDestruct", 1);
     rc |= patch_replace(ADDR_CHECKBOX_DELETE, pmf_addr(&AM2_Widget::CheckBoxDelete),
                         "CheckBoxDelete", 1);
@@ -15269,7 +15263,7 @@ int widget_install(void)
                         "MultiSpritePaint", 1);
     rc |= patch_replace(ADDR_TOGGLE_PAINT, pmf_addr(&AM2_Widget::TogglePaint),
                         "TogglePaint", 1);
-    rc |= patch_replace(ADDR_LIST_DESTRUCT, pmf_addr(&AM2_Widget::ListDestruct),
+    rc |= patch_replace(ADDR_LIST_DESTRUCT, AM2_DTOR(AM2_ListBox),
                         "ListDestruct", 1);
     rc |= patch_replace(ADDR_LIST_DELETE, pmf_addr(&AM2_Widget::ListDelete),
                         "ListDelete", 1);
@@ -15285,7 +15279,7 @@ int widget_install(void)
                         "BlinkerDestruct", 1);
     rc |= patch_replace(ADDR_BLINKER_DELETE, pmf_addr(&AM2_Widget::BlinkerDelete),
                         "BlinkerDelete", 1);
-    rc |= patch_replace(ADDR_BUTTON_DESTRUCT, pmf_addr(&AM2_Widget::ButtonDestruct),
+    rc |= patch_replace(ADDR_BUTTON_DESTRUCT, AM2_DTOR(AM2_Button),
                         "ButtonDestruct", 1);
     rc |= patch_replace(ADDR_BUTTON_DELETE, pmf_addr(&AM2_Widget::ButtonDelete),
                         "ButtonDelete", 1);
@@ -15435,7 +15429,7 @@ int widget_install(void)
                         "SelectMapConstruct", 1);
 
     rc |= patch_replace(ADDR_BUTTON_BASE_CTOR,
-                        pmf_addr(&AM2_Widget::ButtonBaseConstruct),
+                        AM2_CTOR(AM2_ButtonBase),
                         "ButtonBaseConstruct", 1);
     rc |= patch_replace(ADDR_CHECKBOX_TOGGLE, (const void *)CheckboxToggle,
                         "CheckboxToggle", 0);
@@ -15517,11 +15511,11 @@ int widget_install(void)
     rc |= patch_replace(ADDR_SCROLLBAR_CTOR,
                         pmf_addr(&AM2_Widget::ScrollBarConstruct), "ScrollBarConstruct",
                         6);
-    rc |= patch_replace(ADDR_CHECKBOX_CTOR, pmf_addr(&AM2_Widget::CheckBoxConstruct),
+    rc |= patch_replace(ADDR_CHECKBOX_CTOR, AM2_CTOR(AM2_CheckBox),
                         "CheckBoxConstruct", 11);
-    rc |= patch_replace(ADDR_LISTBOX_CTOR, pmf_addr(&AM2_Widget::ListBoxConstruct),
+    rc |= patch_replace(ADDR_LISTBOX_CTOR, AM2_CTOR(AM2_ListBox),
                         "ListBoxConstruct", 8);
-    rc |= patch_replace(ADDR_TEXTLIST_CTOR, pmf_addr(&AM2_Widget::TextListConstruct),
+    rc |= patch_replace(ADDR_TEXTLIST_CTOR, AM2_CTOR(AM2_TextList),
                         "TextListConstruct", 1);
     rc |= patch_replace(ADDR_TEXTLIST_DELETE, pmf_addr(&AM2_Widget::TextListDelete),
                         "TextListDelete", 1);
@@ -15533,7 +15527,7 @@ int widget_install(void)
     rc |= patch_replace(ADDR_SCREEN_BASE_CTOR,
                         AM2_CTOR(AM2_ScreenBase),
                         "ScreenBaseConstruct", 2);
-    rc |= patch_replace(ADDR_BUTTON_CTOR, pmf_addr(&AM2_Widget::ButtonConstruct),
+    rc |= patch_replace(ADDR_BUTTON_CTOR, AM2_CTOR(AM2_Button),
                         "ButtonConstruct", 10);
     rc |= patch_replace(ADDR_KEYROW_CTOR, pmf_addr(&AM2_Widget::KeyRowConstruct),
                         "KeyRowConstruct", 11);
@@ -16023,7 +16017,7 @@ int widget_install(void)
     rc |= patch_replace(ADDR_BATTLE_JOIN_OK, (const void *)BattleJoinOk,
                         "BattleJoinOk", 0);
     rc |= patch_replace(ADDR_TEXTLIST_DESTRUCT,
-                        pmf_addr(&AM2_Widget::TextListDestruct),
+                        AM2_DTOR(AM2_TextList),
                         "TextListDestruct", 1);
     rc |= patch_replace(ADDR_MP_SPIN_REPAINT, pmf_addr(&AM2_Widget::MpSpinRepaint),
                         "MpSpinRepaint", 1);
