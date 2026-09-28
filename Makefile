@@ -655,8 +655,19 @@ vc6-relink: $(BUILD)/vc6host
 # code before all data, so it cannot reproduce the native layout (our code at
 # 0x700000, int3 gap, blob at its VAs).  This image LINKS and is a valid PE but
 # does NOT run correctly yet -- the blob's baked code-pointers still point at
-# original VAs.  Making it run needs the fixups dataset (the next step).  See
-# src/vc6/link.py.  ARGS=--relink reuses existing .objs (skip recompiling).
+# original VAs.  See src/vc6/link.py.  ARGS=--relink reuses existing .objs.
+#
+# ARGS=--run builds instead the RUNNABLE symbol-relative image: compiled WITH
+# AM2_STANDALONE (globals become placed C structs/symbols, the DirectX/IAT
+# imports redirect to symbols), so LINK can place sections anywhere and it runs
+# regardless -- the proof the reconstruction uses proper structs/function
+# pointers, not absolute addresses.  vc6run.cpp is its slim runtime (real
+# MSVCRT seams + the am2_sa_* DirectX wrappers + milestone stubs).  Run it under
+# Wine on Xvfb :99 with -w (windowed avoids the fullscreen mode change Xvfb
+# can't do); each absolute-address reliance the run faults on is migrated away.
+# It currently runs through init + audio to a NULL write in SetGamePalette
+# (g_remapIdent uninitialised: the game's own _cinit table is not walked under
+# real MSVCRT) -- the next reliance to close.
 .PHONY: vc6-link
 vc6-link: $(BUILD)/vc6host
 	VC6_ROOT=$(VC6_ROOT) ./.venv/bin/python src/vc6/link.py $(ARGS)

@@ -147,13 +147,19 @@ image, so what can match is bounded by that:
   `glue.cpp`.  A 49-obj + 12-lib command line overran vc6host's argv
   reconstruction (WINMM's imports dropped though the lib was searched), so the
   link goes through a `@response` file.
-- ☐ **make that PE RUN with NON-matching addresses.**  `LINK.EXE` has no
-  `--section-start` and lays sections sequentially (all code, then all data), so
-  it cannot reproduce the native layout: our `.text` lands at 0x401000 and the
-  blob at 0x666000, not 0x46F000.  Rather than force the old VAs, the goal is to
-  make the image run *anyway* -- which is the real proof the reconstruction uses
-  proper global structs and function pointers, not absolute addresses (UB).  So
-  the runnable build compiles WITH the placed-symbol model (not the link
-  milestone's absolute-VA `link.py`), and each absolute-address reliance the run
-  faults on gets migrated to a symbol/struct.  Drive it under Wine on Xvfb :99.
-  Viable on size: the VC6 `.text` is 0x626F0, inside the original 0x6E000.
+- ◐ **make that PE RUN with NON-matching addresses** (`make vc6-link ARGS=--run`,
+  `vc6run.cpp`).  `LINK.EXE` has no `--section-start` and lays sections
+  sequentially, so it cannot reproduce the native layout: our `.text` lands at
+  0x401000 and the blob at 0x666000, not 0x46F000.  Rather than force the old
+  VAs, the goal is to make the image run *anyway* -- the real proof the
+  reconstruction uses proper structs and function pointers, not absolute
+  addresses (UB).  The runnable build compiles WITH the placed-symbol model
+  (`AM2_STANDALONE`); `vc6run.cpp` supplies a slim runtime (real MSVCRT seams,
+  the `am2_sa_*` DirectX wrappers to Wine's DirectDraw/Input/Sound, milestone
+  stubs).  Under Wine on Xvfb :99 with `-w` it now runs through **init + the
+  whole audio subsystem** (172 log lines: WinMain, DirectDraw/Input create, the
+  56 waves) before a NULL write in `SetGamePalette` -- `g_remapIdent`
+  uninitialised, because the game's own `_cinit` table (0x473004) is not walked
+  under real MSVCRT.  Next: walk that table and give `crt_findfirst` a real
+  mapping, then chase the run onward.  Viable on size: the VC6 `.text` is
+  0x626F0, inside the original 0x6E000.

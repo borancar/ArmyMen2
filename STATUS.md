@@ -122,6 +122,29 @@ main result so far (details in `src/vc6/README.md`):
     VA), which is exactly the reliance to remove; the runnable build switches to
     the placed-symbol model.  Proven viable on size: the VC6 `.text` is 0x626F0
     (403 KB), inside the original `.text` extent 0x6E000 (450 KB).
+  - **The runnable symbol-relative image (`make vc6-link ARGS=--run`) RUNS
+    relocatably (2026-09-28).** Compiled WITH `AM2_STANDALONE` (globals are
+    placed C structs/symbols, DirectX/IAT imports redirect to symbols), linked
+    by `LINK.EXE` at NON-matching VAs (our `.text` at 0x401000, blob at 0x666000
+    -- not 0x46F000), with `src/vc6/vc6run.cpp` as the slim runtime (real MSVCRT
+    seams, the `am2_sa_*` DirectX wrappers to real Wine DirectDraw/Input/Sound,
+    and milestone stubs for the comm/trig/harness gaps).  Run under Wine on Xvfb
+    :99 with `-w` (windowed skips the fullscreen mode change Xvfb can't do), it
+    runs through **172 lines of init + the entire audio subsystem** -- static
+    init, WinMain, ParseCommandLine, CoInitialize, DetectCpuSpeed ("system speed
+    1"), the high-performance timer, DirectDraw + DirectInput creation, and the
+    56-entry wave table -- before a NULL write in **SetGamePalette+0xE2**
+    (`ArmyMen2.map` translated the crash EIP).  That it gets this far at
+    non-matching addresses is the proof the reconstruction uses proper
+    structs/function-pointers, not absolute-address UB.
+  - **The two reliances the run has surfaced so far:** (1) `crt_findfirst` is a
+    milestone stub returning "no files", so every wave fails to load; (2) the
+    NULL write in SetGamePalette is `g_remapIdent` uninitialised -- the game's
+    OWN `_cinit` static-init table (0x473004, 21 entries) is not walked, because
+    the real MSVCRT runs only its own `.CRT$XC` (our C++ ctors), not the blob's
+    table the excluded reconstructed CRT used to walk via `crt_cinit`.  Next:
+    walk that table (or run the specific initialisers), and give `crt_findfirst`
+    a real `_finddata_t`<->`CRT_FINDDATA` mapping.
 - **Fixable per function now:** true source-shape diffs -- signed vs unsigned
   loop bound (`jl`/`jb`), statement order (scheduling), 16- vs 32-bit exprs,
   operand order (`*p==c` vs `c==*p`). ResetTimers (signed address cursor) was

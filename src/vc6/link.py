@@ -42,17 +42,46 @@ IMPORT_LIBS = ["KERNEL32.LIB", "USER32.LIB", "GDI32.LIB", "ADVAPI32.LIB",
                "WINMM.LIB", "WS2_32.LIB", "DXGUID.LIB", "LIBC.LIB"]
 
 
-def tu_list():
+# src/standalone data/glue the RUNNABLE build needs (the placed const tables and
+# blob-glue the game TUs reference by symbol).  NOT runtime.cpp (pulls platform.h
+# + the reconstructed CRT, GCC-only) -- vc6run.cpp replaces it.
+SA_EXTRA = ["src/standalone/origtail.cpp", "src/standalone/tables.cpp",
+            "src/standalone/fixups.cpp", "src/standalone/imports.cpp"]
+
+
+def tu_list(standalone=False):
     srcs = []
     for pat in ("src/game/*.cpp", "src/game/win32/*.cpp"):
         srcs += sorted(glob.glob(os.path.join(REPO, pat)))
-    return [s for s in srcs if os.path.basename(s) not in SKIP]
+    srcs = [s for s in srcs if os.path.basename(s) not in SKIP]
+    if standalone:
+        srcs += [os.path.join(REPO, p) for p in SA_EXTRA]
+    return srcs
 
 
-def make_blob(path):
-    """Full byte-exact data image at its VAs: .origdat (0x46F000..0x48E000,
-    rdata+data initialised) and .origbss (0x48E000..0x666000, zero-fill).
-    Uncarved, so the blob's own internal pointers stay valid."""
+def make_blob(path, carved=False):
+    """The carried data as COFF sections LINK places (at whatever VA).
+
+    carved=False (link milestone): the FULL byte-exact rdata+data, so the
+    blob's own absolute self-pointers stay internally consistent.
+
+    carved=True (runnable build): the standalone build's CARVED origdata.bin
+    (holes where migrated globals were), which the game TUs define as symbols.
+    Whatever the blob still reaches by absolute VA -- its own carved-out holes,
+    or an un-migrated global -- is now at the WRONG address (the blob is not at
+    0x46F000), and that fault is the absolute-address reliance to migrate away.
+    """
+    if carved:
+        binp = os.path.join(REPO, "build", "standalone", "origdata.bin")
+        origdat = open(binp, "rb").read()
+        bss_size = 0x00666000 - 0x0048E000
+        mkcoff.emit(path, [
+            {"name": ".origdat", "chars": mkcoff.DATA, "data": origdat,
+             "syms": [("_am2_origdat_base", 0)]},
+            {"name": ".origbss", "chars": mkcoff.BSS, "bsssize": bss_size,
+             "syms": [("_am2_origbss_base", 0)]},
+        ])
+        return path
     pe = pefile.PE(am2.EXE)
     base = pe.OPTIONAL_HEADER.ImageBase
     raw = {}
@@ -77,19 +106,25 @@ def make_blob(path):
     return path
 
 
-def compile_all():
+def compile_all(standalone=False):
     os.makedirs(OUTDIR, exist_ok=True)
+    # The runnable build compiles WITH the placed-symbol model (AM2_STANDALONE):
+    # globals become C structs/symbols and the DirectX/IAT imports redirect to
+    # symbols, so LINK can place sections anywhere.  The link-only milestone
+    # compiles WITHOUT it (absolute VAs) -- which is exactly the reliance the
+    # runnable build removes.
+    extra = ("/DAM2_STANDALONE", "/I" + os.path.join(REPO, "build", "standalone")) if standalone else ()
     objs, fails = [], []
-    for s in tu_list():
+    for s in tu_list(standalone):
         rel = os.path.relpath(s, REPO)
-        obj = BM.compile_file(rel, OUTDIR)
+        obj = BM.compile_file(rel, OUTDIR, extra=extra)
         (objs if obj else fails).append(obj or rel)
-    # glue.c (CRT seam pointers)
-    g = BM.compile_file("src/vc6/glue.cpp", OUTDIR)
+    glue = "src/vc6/vc6run.cpp" if standalone else "src/vc6/glue.cpp"
+    g = BM.compile_file(glue, OUTDIR, extra=extra) if os.path.exists(os.path.join(REPO, glue)) else None
     if g:
         objs.append(g)
-    else:
-        fails.append("src/vc6/glue.cpp")
+    elif os.path.exists(os.path.join(REPO, glue)):
+        fails.append(glue)
     return objs, fails
 
 
@@ -108,6 +143,7 @@ def run_link(objs, blob):
     resp = os.path.join(OUTDIR, "link.rsp")
     with open(resp, "w") as f:
         f.write("/NOLOGO\n/FIXED\n/BASE:0x400000\n/SUBSYSTEM:WINDOWS\n")
+        f.write("/MAP:ArmyMen2.map\n")  # symbol map, to translate a run's crash EIP
         f.write("/OUT:ArmyMen2.exe\n")
         for o in objs:
             f.write(os.path.basename(o) + "\n")
@@ -126,25 +162,29 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--unresolved", action="store_true", help="list unresolved symbols only")
     ap.add_argument("--relink", action="store_true", help="reuse existing .objs, only re-link")
+    ap.add_argument("--run", action="store_true",
+                    help="build the RUNNABLE symbol-relative image (AM2_STANDALONE, carved blob)")
     # Ignore stray args: the Makefile's global ARGS (default "-nointro -dbg" for
     # `run`) is passed through to $(ARGS); this is a report tool, not the game.
     args, _ = ap.parse_known_args()
     if not os.path.exists(HOST):
         sys.exit("build/vc6host missing -- run `make vc6`")
 
+    glue_obj = "vc6run.obj" if args.run else "glue.obj"
     if args.relink:
-        objs = [os.path.join(OUTDIR, os.path.basename(s)[:-4] + ".obj") for s in tu_list()]
+        objs = [os.path.join(OUTDIR, os.path.basename(s)[:-4] + ".obj") for s in tu_list(args.run)]
         objs = [o for o in objs if os.path.exists(o)]
-        objs.append(os.path.join(OUTDIR, "glue.obj"))
+        if os.path.exists(os.path.join(OUTDIR, glue_obj)):
+            objs.append(os.path.join(OUTDIR, glue_obj))
         print("reusing %d existing objs" % len(objs))
     else:
-        print("compiling %d TUs with VC6 CL ..." % len(tu_list()))
-        objs, fails = compile_all()
+        print("compiling %d TUs with VC6 CL%s ..." % (len(tu_list(args.run)), " (AM2_STANDALONE)" if args.run else ""))
+        objs, fails = compile_all(standalone=args.run)
         print("  compiled %d, failed %d" % (len(objs), len(fails)))
         for f in fails:
             print("    FAIL", f)
 
-    blob = make_blob(os.path.join(OUTDIR, "origblob.obj"))
+    blob = make_blob(os.path.join(OUTDIR, "origblob.obj"), carved=args.run)
     print("blob: %s" % blob)
 
     out, r = run_link(objs, blob)
