@@ -1091,9 +1091,9 @@ void __attribute__((thiscall)) AM2_Widget::BlinkerUpdate()
     ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
 }
 
-void __attribute__((thiscall)) BlinkerStart(AM2_Widget *w, uint32_t periodMs,
-                                            int32_t flips)
+void __attribute__((thiscall)) AM2_Blinker::BlinkerStart(uint32_t periodMs, int32_t flips)
 {
+    AM2_Widget *w = (AM2_Widget *)(void *)this;
     uint8_t *self = (uint8_t *)w;
 
     *(int32_t *)(self + TOGGLE_OFF_STATE)     = 1;
@@ -2223,8 +2223,10 @@ AM2_CLASS_DTOR(MpName, VTABLE_MP_NAME, WidgetDestruct)
  * strip. It still has to be reproduced, and the reason is sharper than
  * tidiness: leave the slot set and a handler inside freed memory is what
  * WndProc calls on the next keystroke. */
-void __attribute__((thiscall)) HudTopDestruct(AM2_Widget *w)
+void __attribute__((thiscall)) AM2_Widget::HudTopDestruct()
 {
+    AM2_Widget *w = this;
+
     uint8_t *self = (uint8_t *)w;
 
     w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_TOP_STRIP));
@@ -2235,12 +2237,14 @@ void __attribute__((thiscall)) HudTopDestruct(AM2_Widget *w)
 
     *(void **)(uintptr_t)ADDR_CHAR_HANDLER = (void *)0;
 
-    WidgetDestruct(w);
+    ::WidgetDestruct(w);
 }
 
-AM2_Widget *__attribute__((thiscall)) HudTopDelete(AM2_Widget *w, int32_t flags)
+AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudTopDelete(int32_t flags)
 {
-    HudTopDestruct(w);
+    AM2_Widget *w = this;
+
+    ::HudTopDestruct(w);
     if (flags & 1)
         orig_delete(w);
     return w;
@@ -2248,17 +2252,20 @@ AM2_Widget *__attribute__((thiscall)) HudTopDelete(AM2_Widget *w, int32_t flags)
 
 /* 0x00419360. The right-hand panel -- HUD widget B, the one whose constructor
  * builds the radar, Sarge, squad and commands children. One sprite. */
-void __attribute__((thiscall)) HudPanelDestruct(AM2_Widget *w)
+void __attribute__((thiscall)) AM2_Widget::HudPanelDestruct()
 {
+    AM2_Widget *w = this;
+
     w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_PANEL));
     ReleaseSprite(*(AM2_Sprite **)((uint8_t *)w + HUD_OFF_SPRITE0));
-    WidgetDestruct(w);
+    ::WidgetDestruct(w);
 }
 
-AM2_Widget *__attribute__((thiscall)) HudPanelDelete(AM2_Widget *w,
-                                                     int32_t flags)
+AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudPanelDelete(int32_t flags)
 {
-    HudPanelDestruct(w);
+    AM2_Widget *w = this;
+
+    ::HudPanelDestruct(w);
     if (flags & 1)
         orig_delete(w);
     return w;
@@ -2270,20 +2277,23 @@ AM2_Widget *__attribute__((thiscall)) HudPanelDelete(AM2_Widget *w,
  * The dump agrees from the other end: the radar node prints sid=0 where every
  * other node prints a real sprite id, because what it holds at +0x58 is not a
  * sprite at all. Two independent readings of the same field. */
-void __attribute__((thiscall)) HudRadarDestruct(AM2_Widget *w)
+void __attribute__((thiscall)) AM2_Widget::HudRadarDestruct()
 {
+    AM2_Widget *w = this;
+
     void **slot = (void **)((uint8_t *)w + HUD_OFF_SPRITE0);
 
     w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_RADAR));
     FreeBitmap(slot);
     *slot = (void *)0;
-    WidgetDestruct(w);
+    ::WidgetDestruct(w);
 }
 
-AM2_Widget *__attribute__((thiscall)) HudRadarDelete(AM2_Widget *w,
-                                                     int32_t flags)
+AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudRadarDelete(int32_t flags)
 {
-    HudRadarDestruct(w);
+    AM2_Widget *w = this;
+
+    ::HudRadarDestruct(w);
     if (flags & 1)
         orig_delete(w);
     return w;
@@ -2295,8 +2305,10 @@ AM2_Widget *__attribute__((thiscall)) HudRadarDelete(AM2_Widget *w,
  * adjacent -- one pointer steps four bytes at a time and reads 0x30 below
  * itself as well, so the two arrays are 0x5C.. and 0x8C.. and the loop covers
  * both in twelve turns. Twelve is the squad. */
-void __attribute__((thiscall)) HudSquadDestruct(AM2_Widget *w)
+void __attribute__((thiscall)) AM2_Widget::HudSquadDestruct()
 {
+    AM2_Widget *w = this;
+
     uint8_t *self = (uint8_t *)w;
     int32_t  i;
 
@@ -2309,13 +2321,14 @@ void __attribute__((thiscall)) HudSquadDestruct(AM2_Widget *w)
 
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE0));
 
-    WidgetDestruct(w);
+    ::WidgetDestruct(w);
 }
 
-AM2_Widget *__attribute__((thiscall)) HudSquadDelete(AM2_Widget *w,
-                                                     int32_t flags)
+AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudSquadDelete(int32_t flags)
 {
-    HudSquadDestruct(w);
+    AM2_Widget *w = this;
+
+    ::HudSquadDestruct(w);
     if (flags & 1)
         orig_delete(w);
     return w;
@@ -2325,8 +2338,10 @@ AM2_Widget *__attribute__((thiscall)) HudSquadDelete(AM2_Widget *w,
  * strip and no character handler -- which is what says that clearing it up
  * there is the top strip's own business rather than something every strip
  * does. */
-void __attribute__((thiscall)) HudEdgeDestruct(AM2_Widget *w)
+void __attribute__((thiscall)) AM2_Widget::HudEdgeDestruct()
 {
+    AM2_Widget *w = this;
+
     uint8_t *self = (uint8_t *)w;
 
     w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_EDGE_STRIP));
@@ -2335,13 +2350,14 @@ void __attribute__((thiscall)) HudEdgeDestruct(AM2_Widget *w)
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE1));
     ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE2));
 
-    WidgetDestruct(w);
+    ::WidgetDestruct(w);
 }
 
-AM2_Widget *__attribute__((thiscall)) HudEdgeDelete(AM2_Widget *w,
-                                                    int32_t flags)
+AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudEdgeDelete(int32_t flags)
 {
-    HudEdgeDestruct(w);
+    AM2_Widget *w = this;
+
+    ::HudEdgeDestruct(w);
     if (flags & 1)
         orig_delete(w);
     return w;
@@ -2349,8 +2365,10 @@ AM2_Widget *__attribute__((thiscall)) HudEdgeDelete(AM2_Widget *w,
 
 /* 0x00414EB0. The SARGE panel: 31 sprites of its own, from the 31 slots its
  * constructor fills with set 13 indices 0..30. Ordinary per-object state. */
-void __attribute__((thiscall)) HudSargeDestruct(AM2_Widget *w)
+void __attribute__((thiscall)) AM2_Widget::HudSargeDestruct()
 {
+    AM2_Widget *w = this;
+
     uint8_t *self = (uint8_t *)w;
     int32_t  i;
 
@@ -2359,13 +2377,14 @@ void __attribute__((thiscall)) HudSargeDestruct(AM2_Widget *w)
     for (i = 0; i < AM2_HUD_SARGE_SLOTS; i++)
         ReleaseSprite(*(AM2_Sprite **)(self + HUD_OFF_SPRITE0 + i * 4));
 
-    WidgetDestruct(w);
+    ::WidgetDestruct(w);
 }
 
-AM2_Widget *__attribute__((thiscall)) HudSargeDelete(AM2_Widget *w,
-                                                     int32_t flags)
+AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudSargeDelete(int32_t flags)
 {
-    HudSargeDestruct(w);
+    AM2_Widget *w = this;
+
+    ::HudSargeDestruct(w);
     if (flags & 1)
         orig_delete(w);
     return w;
@@ -2385,8 +2404,10 @@ AM2_Widget *__attribute__((thiscall)) HudSargeDelete(AM2_Widget *w,
  * state. The bound is the table's end and not a count, which is how the
  * original writes it.
  */
-void __attribute__((thiscall)) HudCommandsDestruct(AM2_Widget *w)
+void __attribute__((thiscall)) AM2_Widget::HudCommandsDestruct()
 {
+    AM2_Widget *w = this;
+
     AM2_Sprite **spr;
 
     w->vtable = (void *)((void *)(uintptr_t)(VTABLE_HUD_COMMANDS));
@@ -2396,13 +2417,14 @@ void __attribute__((thiscall)) HudCommandsDestruct(AM2_Widget *w)
          spr = (AM2_Sprite **)((uint8_t *)spr + AM2_POINTER_MODE_SIZE))
         ReleaseSprite(*spr);
 
-    WidgetDestruct(w);
+    ::WidgetDestruct(w);
 }
 
-AM2_Widget *__attribute__((thiscall)) HudCommandsDelete(AM2_Widget *w,
-                                                        int32_t flags)
+AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudCommandsDelete(int32_t flags)
 {
-    HudCommandsDestruct(w);
+    AM2_Widget *w = this;
+
+    ::HudCommandsDestruct(w);
     if (flags & 1)
         orig_delete(w);
     return w;
@@ -4039,8 +4061,10 @@ void __cdecl CountButtonActivate(AM2_Widget *w)
  *
  * The `push 1` into vtable slot 0 is the MSVC scalar deleting destructor and
  * is what distinguishes this from a COM QueryInterface, per the abi note. */
-void __attribute__((thiscall)) CheckBoxDestruct(AM2_Widget *w)
+void __attribute__((thiscall)) AM2_Widget::CheckBoxDestruct()
 {
+    AM2_Widget *w = this;
+
     uint8_t *self = (uint8_t *)w;
 
     w->vtable = (void *)((void *)(uintptr_t)(VTABLE_CHECKBOX));
@@ -4050,13 +4074,14 @@ void __attribute__((thiscall)) CheckBoxDestruct(AM2_Widget *w)
     ReleaseSprite(*(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON_FOC));
     ReleaseSprite(*(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF_FOC));
 
-    WidgetDestruct(w);
+    ::WidgetDestruct(w);
 }
 
-AM2_Widget *__attribute__((thiscall)) CheckBoxDelete(AM2_Widget *w,
-                                                     int32_t flags)
+AM2_Widget * __attribute__((thiscall)) AM2_Widget::CheckBoxDelete(int32_t flags)
 {
-    CheckBoxDestruct(w);
+    AM2_Widget *w = this;
+
+    ::CheckBoxDestruct(w);
     if (flags & 1)
         orig_delete(w);
     return w;
@@ -4529,8 +4554,10 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarUpdate()
  * The buttons that display them do NOT own them: MakeMovieButton writes
  * BUTTON_OFF_OWNS_SPRITES as 0 for exactly this reason. The screen owns all
  * 24 and this is where they go back. */
-void __attribute__((thiscall)) MoviesDestruct(AM2_Widget *w)
+void __attribute__((thiscall)) AM2_Widget::MoviesDestruct()
 {
+    AM2_Widget *w = this;
+
     AM2_Sprite **pair;
     int32_t      i;
 
@@ -4542,12 +4569,14 @@ void __attribute__((thiscall)) MoviesDestruct(AM2_Widget *w)
         ReleaseSprite(pair[1]);
     }
 
-    DialogDestruct(w);
+    ::DialogDestruct(w);
 }
 
-AM2_Widget *__attribute__((thiscall)) MoviesDelete(AM2_Widget *w, int32_t flags)
+AM2_Widget * __attribute__((thiscall)) AM2_Widget::MoviesDelete(int32_t flags)
 {
-    MoviesDestruct(w);
+    AM2_Widget *w = this;
+
+    ::MoviesDestruct(w);
     if (flags & 1)
         orig_delete(w);
     return w;
@@ -4562,8 +4591,10 @@ AM2_Widget *__attribute__((thiscall)) MoviesDelete(AM2_Widget *w, int32_t flags)
  * safe and the difference changes no behaviour at all. It is reproduced
  * because which field a writer thought could be null is evidence about the
  * class, and making the two agree would quietly throw it away. */
-void __attribute__((thiscall)) ArrowBarDestruct(AM2_Widget *w)
+void __attribute__((thiscall)) AM2_Widget::ArrowBarDestruct()
 {
+    AM2_Widget *w = this;
+
     uint8_t    *self = (uint8_t *)w;
     AM2_Sprite *spr;
 
@@ -4575,13 +4606,14 @@ void __attribute__((thiscall)) ArrowBarDestruct(AM2_Widget *w)
 
     ReleaseSprite(*(AM2_Sprite **)(self + ARROWBAR_OFF_SPRITE1));
 
-    WidgetDestruct(w);
+    ::WidgetDestruct(w);
 }
 
-AM2_Widget *__attribute__((thiscall)) ArrowBarDelete(AM2_Widget *w,
-                                                     int32_t flags)
+AM2_Widget * __attribute__((thiscall)) AM2_Widget::ArrowBarDelete(int32_t flags)
 {
-    ArrowBarDestruct(w);
+    AM2_Widget *w = this;
+
+    ::ArrowBarDestruct(w);
     if (flags & 1)
         orig_delete(w);
     return w;
@@ -4599,17 +4631,20 @@ AM2_Widget *__attribute__((thiscall)) ArrowBarDelete(AM2_Widget *w,
  * It frees a font without having been seen to build one. That is what the code
  * does; the constructor's font handling is not read yet, and a guess about it
  * would be worth less than the gap. */
-void __attribute__((thiscall)) SaveListDestruct(AM2_Widget *w)
+void __attribute__((thiscall)) AM2_Widget::SaveListDestruct()
 {
+    AM2_Widget *w = this;
+
     w->vtable = (void *)((void *)(uintptr_t)(VTABLE_SAVE_LIST));
     FreeFont(AM2_SAVE_LIST_FONT);
-    DialogDestruct(w);
+    ::DialogDestruct(w);
 }
 
-AM2_Widget *__attribute__((thiscall)) SaveListDelete(AM2_Widget *w,
-                                                     int32_t flags)
+AM2_Widget * __attribute__((thiscall)) AM2_Widget::SaveListDelete(int32_t flags)
 {
-    SaveListDestruct(w);
+    AM2_Widget *w = this;
+
+    ::SaveListDestruct(w);
     if (flags & 1)
         orig_delete(w);
     return w;
@@ -5090,8 +5125,10 @@ void __attribute__((thiscall)) AM2_Widget::LabelDraw(RECT clip)
     UnlockSurface();
 }
 
-void *__attribute__((thiscall)) RecordCtor(void *rec, int32_t value)
+void * __attribute__((thiscall)) AM2_Rec::RecordCtor(int32_t value)
 {
+    void *rec = this;
+
     int32_t *r = (int32_t *)rec;
 
     r[0] = 0;
@@ -5100,9 +5137,11 @@ void *__attribute__((thiscall)) RecordCtor(void *rec, int32_t value)
     return rec;
 }
 
-void __attribute__((thiscall)) RecordResetAlias(void *rec)
+void __attribute__((thiscall)) AM2_Rec::RecordResetAlias()
 {
-    RecordReset(rec);
+    void *rec = this;
+
+    ::RecordReset(rec);
 }
 
 int32_t __cdecl KeyNameIndexOf(uint8_t scancode)
@@ -5119,9 +5158,10 @@ int32_t __cdecl KeyNameIndexOf(uint8_t scancode)
     return -1;
 }
 
-void __attribute__((thiscall)) ListAdd(void *list, const char *name,
-                                       void *value)
+void __attribute__((thiscall)) AM2_Rec::ListAdd(const char *name, void *value)
 {
+    void *list = this;
+
     int32_t  *count = (int32_t *)list;
     uint8_t **base  = (uint8_t **)((uint8_t *)list + 4);
     uint8_t  *row;
@@ -5151,8 +5191,10 @@ void __attribute__((thiscall)) ListAdd(void *list, const char *name,
  * count reaches zero the allocation still happens, with a size of zero, and
  * the pointer it returns is stored -- reproduced rather than special-cased,
  * because a caller that then appends expects a block it can realloc. */
-void __attribute__((thiscall)) ListDropOldest(void *list)
+void __attribute__((thiscall)) AM2_Rec::ListDropOldest()
 {
+    void *list = this;
+
     int32_t  *count = (int32_t *)list;
     uint8_t **base  = (uint8_t **)((uint8_t *)list + 4);
     uint8_t  *fresh;
@@ -9132,8 +9174,9 @@ void __cdecl OnArrowDown(AM2_Widget *w)
  * call site, which reaches it as `[chatbox + 0x7C]`. That field is
  * LIST_OFF_ARROWBAR and the object is the bar, not the box. Renamed, not
  * aliased. */
-void __attribute__((thiscall)) ArrowBarFollowEnd(AM2_Widget *bar)
+void __attribute__((thiscall)) AM2_ArrowBar::ArrowBarFollowEnd()
 {
+    AM2_Widget *bar = (AM2_Widget *)(void *)this;
     uint8_t          *b = (uint8_t *)bar;
     AM2_Widget       *list = *(AM2_Widget **)(b + ARROWBAR_OFF_LIST);
     const AM2_Sprite *thumb;
@@ -9395,8 +9438,10 @@ void __cdecl OnReplayOk(AM2_Widget *w)
  * original leans on that rather than testing. The row stride is 0x104 and the
  * string it owns is the LAST four bytes of the row, which is the same layout
  * the comm panel's connection pointer uses. */
-void __attribute__((thiscall)) RecordReset(void *rec)
+void __attribute__((thiscall)) AM2_Rec::RecordReset()
 {
+    void *rec = this;
+
     int32_t *r     = (int32_t *)rec;
     uint8_t *rows  = (uint8_t *)(uintptr_t)r[1];
     int32_t  i;
@@ -12168,8 +12213,9 @@ void __attribute__((thiscall)) AM2_Widget::MpNameSetInk(uint8_t ink)
  * either, so a missing bitmap leaves both slots null and the widget paints
  * nothing; ADDR_SHOW_BAD_PREVIEW is the caller-side answer to that.
  */
-void __attribute__((thiscall)) MpPreviewSetBitmap(void *self, const char *name)
+void __attribute__((thiscall)) AM2_Widget::MpPreviewSetBitmap(const char *name)
 {
+    void *self = this;
     uint8_t    *w = (uint8_t *)self;
     AM2_Sprite *spr;
 
@@ -15090,9 +15136,9 @@ int widget_install(void)
     rc |= patch_replace(ADDR_ARROWBAR_SHOW_ROW,
                         pmf_addr(&AM2_Widget::ArrowBarShowRow),
                         "ArrowBarShowRow", 3);
-    rc |= patch_replace(ADDR_CHECKBOX_DTOR, (const void *)CheckBoxDestruct,
+    rc |= patch_replace(ADDR_CHECKBOX_DTOR, pmf_addr(&AM2_Widget::CheckBoxDestruct),
                         "CheckBoxDestruct", 1);
-    rc |= patch_replace(ADDR_CHECKBOX_DELETE, (const void *)CheckBoxDelete,
+    rc |= patch_replace(ADDR_CHECKBOX_DELETE, pmf_addr(&AM2_Widget::CheckBoxDelete),
                         "CheckBoxDelete", 1);
     rc |= patch_replace(ADDR_COUNT_BUTTON_DTOR,
                         pmf_addr(&AM2_Widget::CountButtonDestruct),
@@ -15142,7 +15188,7 @@ int widget_install(void)
                         "KeyRowUpdate", 1);
     rc |= patch_replace(ADDR_BLINKER_UPDATE, pmf_addr(&AM2_Widget::BlinkerUpdate),
                         "BlinkerUpdate", 1);
-    rc |= patch_replace(ADDR_BLINKER_START, (const void *)BlinkerStart,
+    rc |= patch_replace(ADDR_BLINKER_START, pmf_addr(&AM2_Blinker::BlinkerStart),
                         "BlinkerStart", 1);
     rc |= patch_replace(ADDR_MULTI_SPRITE_PAINT,
                         pmf_addr(&AM2_Widget::MultiSpritePaint),
@@ -15327,7 +15373,7 @@ int widget_install(void)
                         "OnAppActivated", 1);
     rc |= patch_replace(ADDR_CLEAR_MENU_MSGS, (const void *)ClearMenuMsgs,
                         "ClearMenuMsgs", 2);
-    rc |= patch_replace(ADDR_RECORD_RESET, (const void *)RecordReset,
+    rc |= patch_replace(ADDR_RECORD_RESET, pmf_addr(&AM2_Rec::RecordReset),
                         "RecordReset", 1);
     rc |= patch_replace(ADDR_SELECT_PLAYER_ROW, (const void *)SelectPlayerRow,
                         "SelectPlayerRow", 0);
@@ -15349,7 +15395,7 @@ int widget_install(void)
     rc |= patch_replace(ADDR_ON_ARROW_DOWN, (const void *)OnArrowDown,
                         "OnArrowDown", 0);
     rc |= patch_replace(ADDR_ARROWBAR_FOLLOW_END,
-                        (const void *)ArrowBarFollowEnd,
+                        pmf_addr(&AM2_ArrowBar::ArrowBarFollowEnd),
                         "ArrowBarFollowEnd", 0);
     rc |= patch_replace(ADDR_ON_ARROW_LEFT, (const void *)OnArrowLeft,
                         "OnArrowLeft", 0);
@@ -15478,14 +15524,14 @@ int widget_install(void)
     rc |= patch_replace(ADDR_OPTIONS_UPDATE,
                         pmf_addr(&AM2_Widget::OptionsUpdate),
                         "OptionsUpdate", 1);
-    rc |= patch_replace(ADDR_LIST_ADD, (const void *)ListAdd, "ListAdd", 3);
-    rc |= patch_replace(ADDR_LIST_DROP_OLDEST, (const void *)ListDropOldest,
+    rc |= patch_replace(ADDR_LIST_ADD, pmf_addr(&AM2_Rec::ListAdd), "ListAdd", 3);
+    rc |= patch_replace(ADDR_LIST_DROP_OLDEST, pmf_addr(&AM2_Rec::ListDropOldest),
                         "ListDropOldest", 1);
     rc |= patch_replace(ADDR_KEY_NAME_INDEX_OF, (const void *)KeyNameIndexOf,
                         "KeyNameIndexOf", 1);
-    rc |= patch_replace(ADDR_RECORD_CTOR, (const void *)RecordCtor,
+    rc |= patch_replace(ADDR_RECORD_CTOR, pmf_addr(&AM2_Rec::RecordCtor),
                         "RecordCtor", 2);
-    rc |= patch_replace(ADDR_LIST_ROWS_CLEANUP, (const void *)RecordResetAlias,
+    rc |= patch_replace(ADDR_LIST_ROWS_CLEANUP, pmf_addr(&AM2_Rec::RecordResetAlias),
                         "RecordResetAlias", 1);
     rc |= patch_replace(ADDR_DIALOG_DESTRUCT, pmf_addr(&AM2_Widget::DialogDestruct),
                         "DialogDestruct", 1);
@@ -15544,49 +15590,49 @@ int widget_install(void)
     rc |= patch_replace(ADDR_HUD_PANEL_UPDATE, pmf_addr(&AM2_Widget::HudPanelUpdate),
                         "HudPanelUpdate", 1);
     rc |= patch_replace(ADDR_HUD_SARGE_DESTRUCT,
-                        (const void *)HudSargeDestruct,
+                        pmf_addr(&AM2_Widget::HudSargeDestruct),
                         "HudSargeDestruct", 1);
-    rc |= patch_replace(ADDR_HUD_SARGE_DELETE, (const void *)HudSargeDelete,
+    rc |= patch_replace(ADDR_HUD_SARGE_DELETE, pmf_addr(&AM2_Widget::HudSargeDelete),
                         "HudSargeDelete", 1);
     rc |= patch_replace(ADDR_HUD_CMD_DESTRUCT,
-                        (const void *)HudCommandsDestruct,
+                        pmf_addr(&AM2_Widget::HudCommandsDestruct),
                         "HudCommandsDestruct", 1);
-    rc |= patch_replace(ADDR_HUD_CMD_DELETE, (const void *)HudCommandsDelete,
+    rc |= patch_replace(ADDR_HUD_CMD_DELETE, pmf_addr(&AM2_Widget::HudCommandsDelete),
                         "HudCommandsDelete", 1);
-    rc |= patch_replace(ADDR_HUD_TOP_DESTRUCT, (const void *)HudTopDestruct,
+    rc |= patch_replace(ADDR_HUD_TOP_DESTRUCT, pmf_addr(&AM2_Widget::HudTopDestruct),
                         "HudTopDestruct", 1);
-    rc |= patch_replace(ADDR_HUD_TOP_DELETE, (const void *)HudTopDelete,
+    rc |= patch_replace(ADDR_HUD_TOP_DELETE, pmf_addr(&AM2_Widget::HudTopDelete),
                         "HudTopDelete", 1);
     rc |= patch_replace(ADDR_HUD_PANEL_DESTRUCT,
-                        (const void *)HudPanelDestruct,
+                        pmf_addr(&AM2_Widget::HudPanelDestruct),
                         "HudPanelDestruct", 1);
-    rc |= patch_replace(ADDR_HUD_PANEL_DELETE, (const void *)HudPanelDelete,
+    rc |= patch_replace(ADDR_HUD_PANEL_DELETE, pmf_addr(&AM2_Widget::HudPanelDelete),
                         "HudPanelDelete", 1);
     rc |= patch_replace(ADDR_HUD_RADAR_DESTRUCT,
-                        (const void *)HudRadarDestruct,
+                        pmf_addr(&AM2_Widget::HudRadarDestruct),
                         "HudRadarDestruct", 1);
-    rc |= patch_replace(ADDR_HUD_RADAR_DELETE, (const void *)HudRadarDelete,
+    rc |= patch_replace(ADDR_HUD_RADAR_DELETE, pmf_addr(&AM2_Widget::HudRadarDelete),
                         "HudRadarDelete", 1);
     rc |= patch_replace(ADDR_HUD_SQUAD_DESTRUCT,
-                        (const void *)HudSquadDestruct,
+                        pmf_addr(&AM2_Widget::HudSquadDestruct),
                         "HudSquadDestruct", 1);
-    rc |= patch_replace(ADDR_HUD_SQUAD_DELETE, (const void *)HudSquadDelete,
+    rc |= patch_replace(ADDR_HUD_SQUAD_DELETE, pmf_addr(&AM2_Widget::HudSquadDelete),
                         "HudSquadDelete", 1);
-    rc |= patch_replace(ADDR_HUD_EDGE_DESTRUCT, (const void *)HudEdgeDestruct,
+    rc |= patch_replace(ADDR_HUD_EDGE_DESTRUCT, pmf_addr(&AM2_Widget::HudEdgeDestruct),
                         "HudEdgeDestruct", 1);
-    rc |= patch_replace(ADDR_HUD_EDGE_DELETE, (const void *)HudEdgeDelete,
+    rc |= patch_replace(ADDR_HUD_EDGE_DELETE, pmf_addr(&AM2_Widget::HudEdgeDelete),
                         "HudEdgeDelete", 1);
-    rc |= patch_replace(ADDR_MOVIES_DESTRUCT, (const void *)MoviesDestruct,
+    rc |= patch_replace(ADDR_MOVIES_DESTRUCT, pmf_addr(&AM2_Widget::MoviesDestruct),
                         "MoviesDestruct", 1);
-    rc |= patch_replace(ADDR_MOVIES_DELETE, (const void *)MoviesDelete,
+    rc |= patch_replace(ADDR_MOVIES_DELETE, pmf_addr(&AM2_Widget::MoviesDelete),
                         "MoviesDelete", 1);
-    rc |= patch_replace(ADDR_ARROWBAR_DESTRUCT, (const void *)ArrowBarDestruct,
+    rc |= patch_replace(ADDR_ARROWBAR_DESTRUCT, pmf_addr(&AM2_Widget::ArrowBarDestruct),
                         "ArrowBarDestruct", 1);
-    rc |= patch_replace(ADDR_ARROWBAR_DELETE, (const void *)ArrowBarDelete,
+    rc |= patch_replace(ADDR_ARROWBAR_DELETE, pmf_addr(&AM2_Widget::ArrowBarDelete),
                         "ArrowBarDelete", 1);
-    rc |= patch_replace(ADDR_SAVE_LIST_DESTRUCT, (const void *)SaveListDestruct,
+    rc |= patch_replace(ADDR_SAVE_LIST_DESTRUCT, pmf_addr(&AM2_Widget::SaveListDestruct),
                         "SaveListDestruct", 1);
-    rc |= patch_replace(ADDR_SAVE_LIST_DELETE, (const void *)SaveListDelete,
+    rc |= patch_replace(ADDR_SAVE_LIST_DELETE, pmf_addr(&AM2_Widget::SaveListDelete),
                         "SaveListDelete", 1);
     rc |= patch_replace(ADDR_COMM_PANEL_DESTRUCT,
                         pmf_addr(&AM2_Widget::CommPanelDestruct),
@@ -15750,7 +15796,7 @@ int widget_install(void)
     rc |= patch_replace(ADDR_LABEL_DRAW, pmf_addr(&AM2_Widget::LabelDraw),
                         "LabelDraw", 2);
     rc |= patch_replace(ADDR_MP_PREVIEW_SETBITMAP,
-                        (const void *)MpPreviewSetBitmap,
+                        pmf_addr(&AM2_Widget::MpPreviewSetBitmap),
                         "MpPreviewSetBitmap", 3);
     rc |= patch_replace(ADDR_PLACE_SCREEN_CLICK,
                         (const void *)PlacementScreenClick,

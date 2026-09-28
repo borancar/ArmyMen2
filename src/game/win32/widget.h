@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "../../inject/orig.h"
+#include "../misc.h"
 #include "../../inject/win32.h"
 #include "../rect.h"   /* AM2_Rect, by value in the widget constructors */
 
@@ -268,7 +269,75 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) MpSpinConstruct(int32_t left, int32_t top, int32_t width, int32_t height, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row);
     AM2_Widget * __attribute__((thiscall)) MpPanelConstruct(const char *bmp);
 #endif
+    void __attribute__((thiscall)) MpPreviewSetBitmap(const char *name);
+    AM2_Widget * __attribute__((thiscall)) ArrowBarDelete(int32_t flags);
+    void __attribute__((thiscall)) ArrowBarDestruct();
+    AM2_Widget * __attribute__((thiscall)) CheckBoxDelete(int32_t flags);
+    void __attribute__((thiscall)) CheckBoxDestruct();
+    AM2_Widget * __attribute__((thiscall)) HudCommandsDelete(int32_t flags);
+    void __attribute__((thiscall)) HudCommandsDestruct();
+    AM2_Widget * __attribute__((thiscall)) HudEdgeDelete(int32_t flags);
+    void __attribute__((thiscall)) HudEdgeDestruct();
+    AM2_Widget * __attribute__((thiscall)) HudPanelDelete(int32_t flags);
+    void __attribute__((thiscall)) HudPanelDestruct();
+    AM2_Widget * __attribute__((thiscall)) HudRadarDelete(int32_t flags);
+    void __attribute__((thiscall)) HudRadarDestruct();
+    AM2_Widget * __attribute__((thiscall)) HudSargeDelete(int32_t flags);
+    void __attribute__((thiscall)) HudSargeDestruct();
+    AM2_Widget * __attribute__((thiscall)) HudSquadDelete(int32_t flags);
+    void __attribute__((thiscall)) HudSquadDestruct();
+    AM2_Widget * __attribute__((thiscall)) HudTopDelete(int32_t flags);
+    void __attribute__((thiscall)) HudTopDestruct();
+    AM2_Widget * __attribute__((thiscall)) MoviesDelete(int32_t flags);
+    void __attribute__((thiscall)) MoviesDestruct();
+    AM2_Widget * __attribute__((thiscall)) SaveListDelete(int32_t flags);
+    void __attribute__((thiscall)) SaveListDestruct();
 } AM2_Widget;
+static inline AM2_Widget * __attribute__((thiscall)) ArrowBarDelete(AM2_Widget *w, int32_t flags)
+{ return ((AM2_Widget *)w)->ArrowBarDelete(flags); }
+static inline void __attribute__((thiscall)) ArrowBarDestruct(AM2_Widget *w)
+{ ((AM2_Widget *)w)->ArrowBarDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) CheckBoxDelete(AM2_Widget *w, int32_t flags)
+{ return ((AM2_Widget *)w)->CheckBoxDelete(flags); }
+static inline void __attribute__((thiscall)) CheckBoxDestruct(AM2_Widget *w)
+{ ((AM2_Widget *)w)->CheckBoxDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) HudCommandsDelete(AM2_Widget *w, int32_t flags)
+{ return ((AM2_Widget *)w)->HudCommandsDelete(flags); }
+static inline void __attribute__((thiscall)) HudCommandsDestruct(AM2_Widget *w)
+{ ((AM2_Widget *)w)->HudCommandsDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) HudEdgeDelete(AM2_Widget *w, int32_t flags)
+{ return ((AM2_Widget *)w)->HudEdgeDelete(flags); }
+static inline void __attribute__((thiscall)) HudEdgeDestruct(AM2_Widget *w)
+{ ((AM2_Widget *)w)->HudEdgeDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) HudPanelDelete(AM2_Widget *w, int32_t flags)
+{ return ((AM2_Widget *)w)->HudPanelDelete(flags); }
+static inline void __attribute__((thiscall)) HudPanelDestruct(AM2_Widget *w)
+{ ((AM2_Widget *)w)->HudPanelDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) HudRadarDelete(AM2_Widget *w, int32_t flags)
+{ return ((AM2_Widget *)w)->HudRadarDelete(flags); }
+static inline void __attribute__((thiscall)) HudRadarDestruct(AM2_Widget *w)
+{ ((AM2_Widget *)w)->HudRadarDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) HudSargeDelete(AM2_Widget *w, int32_t flags)
+{ return ((AM2_Widget *)w)->HudSargeDelete(flags); }
+static inline void __attribute__((thiscall)) HudSargeDestruct(AM2_Widget *w)
+{ ((AM2_Widget *)w)->HudSargeDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) HudSquadDelete(AM2_Widget *w, int32_t flags)
+{ return ((AM2_Widget *)w)->HudSquadDelete(flags); }
+static inline void __attribute__((thiscall)) HudSquadDestruct(AM2_Widget *w)
+{ ((AM2_Widget *)w)->HudSquadDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) HudTopDelete(AM2_Widget *w, int32_t flags)
+{ return ((AM2_Widget *)w)->HudTopDelete(flags); }
+static inline void __attribute__((thiscall)) HudTopDestruct(AM2_Widget *w)
+{ ((AM2_Widget *)w)->HudTopDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) MoviesDelete(AM2_Widget *w, int32_t flags)
+{ return ((AM2_Widget *)w)->MoviesDelete(flags); }
+static inline void __attribute__((thiscall)) MoviesDestruct(AM2_Widget *w)
+{ ((AM2_Widget *)w)->MoviesDestruct(); }
+static inline AM2_Widget * __attribute__((thiscall)) SaveListDelete(AM2_Widget *w, int32_t flags)
+{ return ((AM2_Widget *)w)->SaveListDelete(flags); }
+static inline void __attribute__((thiscall)) SaveListDestruct(AM2_Widget *w)
+{ ((AM2_Widget *)w)->SaveListDestruct(); }
+
 
 /* The base class's vtable, stored by its constructor and restored by its
  * destructor. It is the twentieth of the thirty-three. */
@@ -846,8 +915,6 @@ static inline void __attribute__((thiscall)) BlinkerUpdate(AM2_Widget *w)
 /* Original: 0x00456DC0, thiscall. Start a blink: on, active, remember the
  * period and the number of flips, stamp the clock, and repaint immediately so
  * the first flash appears without waiting a period. */
-void __attribute__((thiscall)) BlinkerStart(AM2_Widget *w, uint32_t periodMs,
-                                            int32_t flips);
 
 /* A two-state indicator: one flag and two sprites. The flag being at 0x006C
  * and the sprites at 0x0060 and 0x0064 is measured; calling it a TOGGLE is the
@@ -1817,7 +1884,6 @@ void __cdecl OnArrowDown(AM2_Widget *w);
 /* Original: 0x00455D60, thiscall, no stack arguments. The arrow bar's OTHER
  * mover: jump the list to its end and put the thumb at the bottom. The chat
  * log's appender calls it, so the newest line is always the visible one. */
-void __attribute__((thiscall)) ArrowBarFollowEnd(AM2_Widget *bar);
 
 /* 0x00455E10, thiscall. Scroll a row into view, moving the top row the
  * smallest distance that shows it -- and not at all if it already is. */
@@ -1837,7 +1903,6 @@ void __cdecl OnReplayOk(AM2_Widget *w);
 
 /* Original: 0x00453940, thiscall. The three-field record's reset -- free each
  * row's own string, free the array, clear the count. */
-void __attribute__((thiscall)) RecordReset(void *rec);
 
 /* Original: 0x004512A0. SELECT PLAYER's row callback. A list box dispatches
  * `callback(list, rows, selected)`; this one ignores the first. */
@@ -2049,11 +2114,8 @@ int32_t __cdecl KeyNameIndexOf(uint8_t scancode);
  * name is copied with no bound at all, so a name of 0x100 or more runs into
  * the value and past the row. Both are the original's, and the shipped lists
  * are short. */
-void __attribute__((thiscall)) ListAdd(void *list, const char *name,
-                                       void *value);
 
 /* 0x004539A0. Drop row zero, by rebuilding the array one row shorter. */
-void __attribute__((thiscall)) ListDropOldest(void *list);
 
 /* 0x00453910, thiscall, 11 callers: the three-field record's constructor --
  * two zeroes and the caller's value.
@@ -2067,8 +2129,6 @@ void __attribute__((thiscall)) ListDropOldest(void *list);
  * PLAYER and COMM CHANNEL dialogs got a list pointer of 1 and the process
  * died inside ListAdd. See STATUS.md; nothing static caught it and the two
  * A/B configurations that reach those dialogs are the only witnesses. */
-void *__attribute__((thiscall)) RecordCtor(void *rec, int32_t value);
-void __attribute__((thiscall)) RecordResetAlias(void *rec);
 
 /* 0x00431D70. Empties the menu message log -- a null check and a thiscall
  * tail-jump into RecordReset, and nothing else. */
@@ -2080,7 +2140,8 @@ void __cdecl OnAppActivated(void);
 
 /* 0x00454AD0, thiscall. Give the multiplayer map preview a new bitmap; the
  * pointer goes in the class's own slot AND the base's sprite. */
-void __attribute__((thiscall)) MpPreviewSetBitmap(void *self, const char *name);
+static inline void __attribute__((thiscall)) MpPreviewSetBitmap(void *self, const char *name)
+{ ((AM2_Widget *)self)->MpPreviewSetBitmap(name); }
 
 /* 0x00413A30, four callers. Repaint one HUD widget if it has been marked. */
 void __cdecl HudRepaintOne(void);

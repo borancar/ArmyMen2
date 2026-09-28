@@ -27,7 +27,46 @@ struct AM2_Rec {
     void __attribute__((thiscall)) ListRemoveAt(int32_t index);
     void __attribute__((thiscall)) ClearPtrList();
     int32_t __attribute__((thiscall)) ListGrowFind(int32_t key);
+    void __attribute__((thiscall)) ListAdd(const char *name, void *value);
+    void __attribute__((thiscall)) ListDropOldest();
+    void * __attribute__((thiscall)) RecordCtor(int32_t value);
+    void __attribute__((thiscall)) RecordReset();
+    void __attribute__((thiscall)) RecordResetAlias();
 };
+static inline void __attribute__((thiscall)) ListAdd(void *list, const char *name, void *value)
+{ ((AM2_Rec *)list)->ListAdd(name, value); }
+static inline void __attribute__((thiscall)) ListDropOldest(void *list)
+{ ((AM2_Rec *)list)->ListDropOldest(); }
+static inline void * __attribute__((thiscall)) RecordCtor(void *rec, int32_t value)
+{ return ((AM2_Rec *)rec)->RecordCtor(value); }
+static inline void __attribute__((thiscall)) RecordReset(void *rec)
+{ ((AM2_Rec *)rec)->RecordReset(); }
+static inline void __attribute__((thiscall)) RecordResetAlias(void *rec)
+{ ((AM2_Rec *)rec)->RecordResetAlias(); }
+/* Two widget classes' members that flat code calls (commmsg.cpp), so their
+ * classes are declared here as opaque ones: VC6 compiles a member thiscall,
+ * and has no spelling for a thiscall free function. Defined in widget.cpp,
+ * where `this` is the AM2_Widget. */
+/* An object's own pointer lists: the two thiscall clears (misc.cpp). */
+struct AM2_ObjLists {
+    void __attribute__((thiscall)) ClearPtrListAtA4();
+    void __attribute__((thiscall)) ClearVehicleLists();
+};
+static inline void __attribute__((thiscall)) ClearPtrListAtA4(void *obj)
+{ ((AM2_ObjLists *)obj)->ClearPtrListAtA4(); }
+static inline void __attribute__((thiscall)) ClearVehicleLists(void *obj)
+{ ((AM2_ObjLists *)obj)->ClearVehicleLists(); }
+struct AM2_Blinker {
+    void __attribute__((thiscall)) BlinkerStart(uint32_t periodMs, int32_t flips);
+};
+struct AM2_ArrowBar {
+    void __attribute__((thiscall)) ArrowBarFollowEnd();
+};
+static inline void __attribute__((thiscall)) BlinkerStart(void *w, uint32_t periodMs,
+                                                          int32_t flips)
+{ ((AM2_Blinker *)w)->BlinkerStart(periodMs, flips); }
+static inline void __attribute__((thiscall)) ArrowBarFollowEnd(void *bar)
+{ ((AM2_ArrowBar *)bar)->ArrowBarFollowEnd(); }
 #endif
 
 /* IsBlank and IsScriptDelim moved to script.cpp: 0x0043EE80 and 0x0043EEA0
@@ -697,10 +736,8 @@ static inline void __attribute__((thiscall)) ClearPtrListAlias(void *rec)
 { ((AM2_Rec *)rec)->ClearPtrListAlias(); }
 
 /* 0x0043CCE0. Empty the pointer list embedded at +0xA4 of the object. */
-void __attribute__((thiscall)) ClearPtrListAtA4(void *obj);
 
 /* 0x0045A3F0. Empty both of a vehicle's pointer lists, 0x538 then 0xA4. */
-void __attribute__((thiscall)) ClearVehicleLists(void *obj);
 
 /* 0x0040FB90. Write "." into the buffer and answer 1. */
 int32_t __cdecl WriteDotString(char *dst);

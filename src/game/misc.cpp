@@ -2671,8 +2671,10 @@ int32_t __attribute__((thiscall)) AM2_Rec::ListGrowFind(int32_t key)
  * that lives there. Four callers, all of them tail jumps from game code above
  * the nominal CRT line, and not one names the enclosing object -- so the name
  * carries the OFFSET rather than a record it cannot support. */
-void __attribute__((thiscall)) ClearPtrListAtA4(void *obj)
+void __attribute__((thiscall)) AM2_ObjLists::ClearPtrListAtA4()
 {
+    void *obj = this;
+
     ClearPtrListAlias((uint8_t *)obj + 0xA4);
 }
 
@@ -2705,8 +2707,10 @@ int32_t __cdecl WriteDotString(char *dst)
  * The SEH prologue is not reproduced, per the standing decision. Its only
  * purpose here is to unwind the FIRST list if the second throws, and nothing
  * in this program throws. */
-void __attribute__((thiscall)) ClearVehicleLists(void *obj)
+void __attribute__((thiscall)) AM2_ObjLists::ClearVehicleLists()
 {
+    void *obj = this;
+
     ClearPtrListAlias((uint8_t *)obj + VEHICLE_OFF_PTR_LIST);
     ClearPtrListAlias((uint8_t *)obj + OBJ_OFF_PTR_LIST);
 }
@@ -2887,12 +2891,12 @@ int misc_install(void)
                   "SeqAddKind7", 3);
     patch_replace(ADDR_MOVIE_BUILD_NAME, (const void *)MovieBuildName,
                   "MovieBuildName", 4);
-    patch_replace(ADDR_CLEAR_PTR_LIST_A4, (const void *)ClearPtrListAtA4,
+    patch_replace(ADDR_CLEAR_PTR_LIST_A4, pmf_addr(&AM2_ObjLists::ClearPtrListAtA4),
                   "ClearPtrListAtA4", 1);
     patch_replace(ADDR_WRITE_DOT_STRING, (const void *)WriteDotString,
                   "WriteDotString", 1);
     patch_replace(ADDR_CLEAR_VEHICLE_LISTS,
-                  (const void *)ClearVehicleLists,
+                  pmf_addr(&AM2_ObjLists::ClearVehicleLists),
                   "ClearVehicleLists", 1);
     return 0;
 }

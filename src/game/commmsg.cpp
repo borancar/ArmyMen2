@@ -2166,12 +2166,6 @@ void __cdecl TrooperFireSend(void *trooper, void *target)
  * told to follow the end. It was CHATBOX_OFF_INNER until the bar's own
  * method was read; one offset, one name. */
 extern "C" {
-void __attribute__((thiscall)) BlinkerStart(void *w, uint32_t periodMs,
-                                            int32_t flips);
-void __attribute__((thiscall)) ListAdd(void *list, const char *name,
-                                       void *value);
-void __attribute__((thiscall)) ListDropOldest(void *list);
-void __attribute__((thiscall)) ArrowBarFollowEnd(void *bar);
 }
 
 typedef void (__attribute__((thiscall)) *AM2_PaintSlotFn)(void *w, AM2_Rect r);
