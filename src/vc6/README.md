@@ -135,3 +135,25 @@ image, so what can match is bounded by that:
   must first align for discovery, and the global symbols).
 - ☐ close the residual source-shape diffs (register allocation and the like),
   which the relink does not change -- they are the same classes as piecewise.
+- ✅ **a REAL PE from `LINK.EXE`** (`link.py`, `make vc6-link`): the relink only
+  *simulates*; this drives the actual MSVC6 `LINK.EXE` to emit
+  `build/vc6sa/ArmyMen2.exe` (a valid 503,808-byte PE) -- every VC6-buildable
+  game TU compiled with CL, the full byte-exact data blob (`mkcoff.py`), the CRT
+  seams bound to VC6's real MSVCRT (`glue.cpp`), and the Win32/DirectX import
+  libs.  Making `LINK.EXE` run under vc6host took five host/shim fixes (see the
+  vc6host commit: LoadString(NULL); _tzset/_seh_longjmp_unwind/DeleteFileA; and
+  the output file mapping's ftruncate + MAP_SHARED).  The comm/MP layer
+  (dplay.cpp holdout), trig, and the injected harness are milestone STUBS in
+  `glue.cpp`.  A 49-obj + 12-lib command line overran vc6host's argv
+  reconstruction (WINMM's imports dropped though the lib was searched), so the
+  link goes through a `@response` file.
+- ☐ **make that PE RUN with NON-matching addresses.**  `LINK.EXE` has no
+  `--section-start` and lays sections sequentially (all code, then all data), so
+  it cannot reproduce the native layout: our `.text` lands at 0x401000 and the
+  blob at 0x666000, not 0x46F000.  Rather than force the old VAs, the goal is to
+  make the image run *anyway* -- which is the real proof the reconstruction uses
+  proper global structs and function pointers, not absolute addresses (UB).  So
+  the runnable build compiles WITH the placed-symbol model (not the link
+  milestone's absolute-VA `link.py`), and each absolute-address reliance the run
+  faults on gets migrated to a symbol/struct.  Drive it under Wine on Xvfb :99.
+  Viable on size: the VC6 `.text` is 0x626F0, inside the original 0x6E000.

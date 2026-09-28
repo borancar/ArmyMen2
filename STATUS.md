@@ -87,6 +87,41 @@ main result so far (details in `src/vc6/README.md`):
     static screen helpers, and the global symbols).
   - Register-allocation and other source-shape diffs are unchanged by the relink
     -- same classes as piecewise, closed per function.
+- **The VC6 LINK milestone (`make vc6-link`, `src/vc6/link.py`) -- REAL PE,
+  not simulated.** Drives the actual MSVC6 `LINK.EXE` (now runnable under
+  vc6host) to produce `build/vc6sa/ArmyMen2.exe` (503,808 bytes, valid PE,
+  Subsystem WINDOWS, entry at `WinMainCRTStartup`, imports KERNEL32/USER32/
+  GDI32/ole32/WINMM): every VC6-buildable game TU compiled with CL, the full
+  byte-exact data blob (`src/vc6/mkcoff.py`), the CRT seams bound to VC6's real
+  MSVCRT (`src/vc6/glue.cpp`), and the DirectX/Win32 import libs.  Getting here
+  took: five vc6host/shim fixes so LINK runs at all (LoadString(NULL), _tzset/
+  _seh_longjmp_unwind/DeleteFileA, and the output file-mapping ftruncate +
+  MAP_SHARED); glue stubs for the comm/MP layer (dplay.cpp is the VC98-header
+  holdout), trig, and the injected harness (hooklog/restore/patch_replace); and
+  a LINK **response file** (a 49-obj + 12-lib command line overran vc6host's
+  argv reconstruction and dropped trailing libs -- WINMM went unresolved though
+  searched).
+  - **It LINKS but does NOT run correctly yet, by design (the chosen
+    "link-only first" milestone).** `LINK.EXE` has no `--section-start` and lays
+    sections sequentially, ALL CODE before ALL DATA, so it cannot reproduce the
+    native layout (our code at 0x700000, int3 gap at 0x401000, blob at its VAs):
+    it put our `.text` at 0x401000 and the carried `.origdat` blob at 0x666000
+    instead of 0x46F000.  So the blob's baked absolute code-pointers still aim
+    at original VAs and the reconstruction's global reads hit the wrong bytes.
+  - **The next goal reframed (Boran, 2026-09-28): make it RUN with NON-matching
+    addresses.** If the image only works with the blob and code at the original
+    VAs, the reconstruction still leans on absolute addresses -- undefined
+    behavior.  Getting the VC6-linked EXE to run while LINK places sections
+    *wherever* is the real proof that every global is a proper struct/symbol and
+    every call a proper function pointer -- that the data and global format are
+    genuinely extracted.  So the work is NOT a fixups dataset + exact-VA
+    placement; it is finishing the symbol/struct migration so the reached paths
+    touch ZERO absolute addresses, driven by running the LINK'd image (Wine,
+    Xvfb :99) and fixing each absolute-address reliance the run faults on.  The
+    link-only image above compiles WITHOUT the placed-symbol redirects (absolute
+    VA), which is exactly the reliance to remove; the runnable build switches to
+    the placed-symbol model.  Proven viable on size: the VC6 `.text` is 0x626F0
+    (403 KB), inside the original `.text` extent 0x6E000 (450 KB).
 - **Fixable per function now:** true source-shape diffs -- signed vs unsigned
   loop bound (`jl`/`jb`), statement order (scheduling), 16- vs 32-bit exprs,
   operand order (`*p==c` vs `c==*p`). ResetTimers (signed address cursor) was

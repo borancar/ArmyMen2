@@ -643,6 +643,24 @@ vc6-match: $(BUILD)/vc6host
 vc6-relink: $(BUILD)/vc6host
 	VC6_ROOT=$(VC6_ROOT) ./.venv/bin/python src/vc6/relink.py $(ARGS)
 
+# The VC6 LINK milestone: drive the real MSVC6 LINK.EXE (hosted, made to run in
+# the vc6host commit) to produce an ACTUAL PE -- not the simulated link of
+# vc6-relink.  Compiles every VC6-buildable game TU with CL, carries the full
+# byte-exact data blob (src/vc6/mkcoff.py), binds the CRT seams to VC6's real
+# MSVCRT (src/vc6/glue.cpp) and links against the Win32/DirectX import libs.
+# Output: build/vc6sa/ArmyMen2.exe.  A REPORT, not a gate (needs the external
+# VC6 install), so it is not in `make check`.
+#
+# NOTE: LINK.EXE has no --section-start and lays sections sequentially, all
+# code before all data, so it cannot reproduce the native layout (our code at
+# 0x700000, int3 gap, blob at its VAs).  This image LINKS and is a valid PE but
+# does NOT run correctly yet -- the blob's baked code-pointers still point at
+# original VAs.  Making it run needs the fixups dataset (the next step).  See
+# src/vc6/link.py.  ARGS=--relink reuses existing .objs (skip recompiling).
+.PHONY: vc6-link
+vc6-link: $(BUILD)/vc6host
+	VC6_ROOT=$(VC6_ROOT) ./.venv/bin/python src/vc6/link.py $(ARGS)
+
 .PHONY: native native-dev
 # BOTH, because the two go out of step silently otherwise: every drive and
 # every fixture in tools/ runs build/armymen2-dev, so a `make native` that
