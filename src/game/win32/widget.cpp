@@ -1322,7 +1322,7 @@ void __attribute__((thiscall)) am2_dtor_AM2_ScreenBase(AM2_Widget *w)
 #endif
 
 #if defined(__GNUC__)
-AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Label(void *mem, const char *text, AM2_Rect box, int32_t font, int32_t ink, int32_t paper)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Label(void *mem, const char *text, AM2_Rect box, int32_t font, uint8_t ink, uint8_t paper)
 { return ::new (mem) AM2_Label(text, box, font, ink, paper); }
 void __attribute__((thiscall)) am2_dtor_AM2_Label(AM2_Widget *w)
 { ((AM2_Label *)w)->AM2_Label::~AM2_Label(); }
@@ -1574,6 +1574,10 @@ void __attribute__((thiscall)) am2_dtor_AM2_DelPlayerDialogScreen(AM2_Widget *w)
 { ((AM2_DelPlayerDialogScreen *)w)->AM2_DelPlayerDialogScreen::~AM2_DelPlayerDialogScreen(); }
 #endif
 
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_KeyRow(void *mem, int32_t nameIndex, const char *caption, AM2_Rect box, int32_t font, uint8_t ink, uint8_t ink2, uint8_t ink3, uint8_t ink4)
+{ return ::new (mem) AM2_KeyRow(nameIndex, caption, box, font, ink, ink2, ink3, ink4); }
+#endif
 #if defined(__GNUC__)
 /* Install thunks: a constructor at its original address must answer `this`
  * in eax, as MSVC's do and the original's callers expect. */
@@ -2060,42 +2064,6 @@ typedef void (__cdecl *AM2_NoArgLogFn)(void);
  * of these handlers are reconstructed, and reaching them through the image
  * would be a seam tools/checkseams.py cannot see -- the AM2_IMAGE would be
  * applied here, to a parameter, with no ADDR_ name anywhere in the text. */
-static AM2_Widget *MakeVolumeBar(AM2_Widget *parent, int32_t x, int32_t y,
-                                 int32_t volume,
-                                 void (__cdecl *onChange)(AM2_Widget *))
-{
-    AM2_Widget *bar = (AM2_Widget *)orig_operator_new(AM2_SCROLLBAR_SIZE);
-    AM2_Rect    box;
-    int32_t     pos;
-    int32_t     travel;
-    uint8_t    *b;
-
-    if (bar) {
-        RectSet(&box, x, y, 0xBA, 0x15);
-        bar = ScrollBarConstruct(bar, box.left, box.top,
-                                 box.right, box.bottom, parent,
-                                 0x92);
-    }
-    WidgetAddChild(parent, bar);
-
-    b   = (uint8_t *)bar;
-    pos = (volume + AM2_VOLUME_FLOOR) / AM2_VOLUME_STEP;
-    if (pos < 0)
-        pos = 0;
-    *(int32_t *)(b + SCROLLBAR_OFF_POS) = pos;
-
-    travel = *(const int32_t *)(b + SCROLLBAR_OFF_SPAN)
-             - (*(AM2_Sprite **)(b + SCROLLBAR_OFF_BAR))->bounds.right;
-    *(int32_t *)(b + SCROLLBAR_OFF_SHIFT) =
-        (int32_t)((long double)pos
-                  / (long double)*(const int32_t *)(b + SCROLLBAR_OFF_RANGE)
-                  * (long double)travel);
-    *(int32_t *)(b + SCROLLBAR_OFF_FLAG50) = 0;
-    *(uint32_t *)(b + SCROLLBAR_OFF_ONCHANGE) = (uint32_t)(uintptr_t)onChange;
-    return bar;
-}
-
-
 /* This dialog's buttons are 0x4E wide where every other screen's are 0x51. */
 static AM2_Widget *MakeWideButton(int32_t left, int32_t top, uint32_t b0,
                                   uint32_t b1, uint32_t b2,
@@ -3692,7 +3660,7 @@ int widget_install(void)
                         "ScreenBaseConstruct", 2);
     rc |= patch_replace(ADDR_BUTTON_CTOR, AM2_CTOR(AM2_Button),
                         "ButtonConstruct", 10);
-    rc |= patch_replace(ADDR_KEYROW_CTOR, pmf_addr(&AM2_Widget::KeyRowConstruct),
+    rc |= patch_replace(ADDR_KEYROW_CTOR, AM2_CTOR(AM2_KeyRow),
                         "KeyRowConstruct", 11);
     rc |= patch_replace(ADDR_PANEL_CTOR, AM2_CTOR(AM2_Panel),
                         "PanelConstruct", 6);
@@ -4325,6 +4293,161 @@ static int32_t HudSquadWeaponIcon(const uint8_t *weapon, const uint8_t *table)
  * two are different limits on the same text: what may be typed, and what may
  * be sent. */
 #define AM2_HUD_CHAT_TYPED_MAX  0x50
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#define AUDIO_BAR(i)       (((AM2_Widget **)((uint8_t *)w + AUDIO_OFF_BARS))[i])
+#define SB_FIELD(bar, off) (*(int32_t *)((uint8_t *)(bar) + (off)))
 
 /* AimInit -- original 0x00412090, one caller.
  *
@@ -12218,46 +12341,86 @@ AM2_AudioDialogScreen::AM2_AudioDialogScreen(const char *bmp, int32_t flag)
 {
     AM2_Widget *w = this;
 
-    AM2_Widget **bars  = (AM2_Widget **)((uint8_t *)w + AUDIO_OFF_BARS);
-    int32_t     *saved = (int32_t *)((uint8_t *)w + AUDIO_OFF_SAVED);
-    AM2_Widget  *parent;
-    int32_t      offX = 0x89;
-    int32_t      offY = 0x79;
-    AM2_Rect     box;
+    AM2_Widget *parent;
+    int32_t     offX = 0x89;
+    int32_t     offY = 0x79;
     AM2_CTOR_VTABLE(w, VTABLE_AUDIO_DIALOG);
 
     if (g_gameState == AM2_STATE_MISSION) {
         w->flag44 = 1;
         parent = w;
     } else {
-        AM2_Widget *panel =
-            (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
-
-        if (panel) {
-            RectSet(&box, offX, offY, 0x16E, 0xED);
-            panel = ::PanelConstruct(panel,
-                                    "02_013_00_audio.bmp",
-                                    0, box);
-        }
-        ::WidgetAddChild(w, panel);
-        panel->flag44 = 1;
-        parent = panel;
+        parent = new AM2_Panel("02_013_00_audio.bmp", 0,
+                               *RectSet(AM2_TEMP(AM2_Rect), 0x89, 0x79, 0x16E, 0xED));
         offX = 0;
         offY = 0;
+        ::WidgetAddChild(w, parent);
+        parent->flag44 = 1;
     }
 
-    bars[0] = MakeVolumeBar(parent, offX + 0x25, offY + 0x38,
-                            g_volumeAtZero, OnVolumeEffects);
-    parent->focusedChild = bars[0];
-    bars[1] = MakeVolumeBar(parent, offX + 0x25, offY + 0x7D,
-                            g_streamVolume, OnVolumeMusic);
-    bars[2] = MakeVolumeBar(parent, offX + 0x25, offY + 0xC2,
-                            g_voiceVolume, OnVolumeVoice);
+    /* Three volume bars, each written out as the original has it: the bar
+     * goes straight into its member and every field after is set through
+     * that member. The position is (volume + 2000) / 100, floored at 0;
+     * the thumb's shift is that position's share of the bar's travel. */
+    AUDIO_BAR(0) = new AM2_ScrollBar(*RectSet(AM2_TEMP(AM2_Rect), offX + 0x25, offY + 0x38, 0xBA, 0x15),
+                            parent, 0x92);
+    ::WidgetAddChild(parent, AUDIO_BAR(0));
+    parent->focusedChild = AUDIO_BAR(0);
+    SB_FIELD(AUDIO_BAR(0), SCROLLBAR_OFF_POS) = (g_volumeAtZero + AM2_VOLUME_FLOOR) / AM2_VOLUME_STEP;
+    if (SB_FIELD(AUDIO_BAR(0), SCROLLBAR_OFF_POS) < 0)
+        SB_FIELD(AUDIO_BAR(0), SCROLLBAR_OFF_POS) = 0;
+    {
+        uint8_t *b = (uint8_t *)AUDIO_BAR(0);
+
+        *(int32_t *)(b + SCROLLBAR_OFF_SHIFT) =
+            (int32_t)((long double)*(const int32_t *)(b + SCROLLBAR_OFF_POS)
+                      / (long double)*(const int32_t *)(b + SCROLLBAR_OFF_RANGE)
+                      * (long double)(*(const int32_t *)(b + SCROLLBAR_OFF_SPAN)
+                          - (*(AM2_Sprite **)(b + SCROLLBAR_OFF_BAR))->bounds.right));
+    }
+    SB_FIELD(AUDIO_BAR(0), SCROLLBAR_OFF_FLAG50) = 0;
+    *(uint32_t *)((uint8_t *)AUDIO_BAR(0) + SCROLLBAR_OFF_ONCHANGE) = (uint32_t)(uintptr_t)OnVolumeEffects;
+
+    AUDIO_BAR(1) = new AM2_ScrollBar(*RectSet(AM2_TEMP(AM2_Rect), offX + 0x25, offY + 0x7D, 0xBA, 0x15),
+                            parent, 0x92);
+    ::WidgetAddChild(parent, AUDIO_BAR(1));
+    SB_FIELD(AUDIO_BAR(1), SCROLLBAR_OFF_POS) = (g_streamVolume + AM2_VOLUME_FLOOR) / AM2_VOLUME_STEP;
+    if (SB_FIELD(AUDIO_BAR(1), SCROLLBAR_OFF_POS) < 0)
+        SB_FIELD(AUDIO_BAR(1), SCROLLBAR_OFF_POS) = 0;
+    {
+        uint8_t *b = (uint8_t *)AUDIO_BAR(1);
+
+        *(int32_t *)(b + SCROLLBAR_OFF_SHIFT) =
+            (int32_t)((long double)*(const int32_t *)(b + SCROLLBAR_OFF_POS)
+                      / (long double)*(const int32_t *)(b + SCROLLBAR_OFF_RANGE)
+                      * (long double)(*(const int32_t *)(b + SCROLLBAR_OFF_SPAN)
+                          - (*(AM2_Sprite **)(b + SCROLLBAR_OFF_BAR))->bounds.right));
+    }
+    SB_FIELD(AUDIO_BAR(1), SCROLLBAR_OFF_FLAG50) = 0;
+    *(uint32_t *)((uint8_t *)AUDIO_BAR(1) + SCROLLBAR_OFF_ONCHANGE) = (uint32_t)(uintptr_t)OnVolumeMusic;
+
+    AUDIO_BAR(2) = new AM2_ScrollBar(*RectSet(AM2_TEMP(AM2_Rect), offX + 0x25, offY + 0xC2, 0xBA, 0x15),
+                            parent, 0x92);
+    ::WidgetAddChild(parent, AUDIO_BAR(2));
+    SB_FIELD(AUDIO_BAR(2), SCROLLBAR_OFF_POS) = (g_voiceVolume + AM2_VOLUME_FLOOR) / AM2_VOLUME_STEP;
+    if (SB_FIELD(AUDIO_BAR(2), SCROLLBAR_OFF_POS) < 0)
+        SB_FIELD(AUDIO_BAR(2), SCROLLBAR_OFF_POS) = 0;
+    {
+        uint8_t *b = (uint8_t *)AUDIO_BAR(2);
+
+        *(int32_t *)(b + SCROLLBAR_OFF_SHIFT) =
+            (int32_t)((long double)*(const int32_t *)(b + SCROLLBAR_OFF_POS)
+                      / (long double)*(const int32_t *)(b + SCROLLBAR_OFF_RANGE)
+                      * (long double)(*(const int32_t *)(b + SCROLLBAR_OFF_SPAN)
+                          - (*(AM2_Sprite **)(b + SCROLLBAR_OFF_BAR))->bounds.right));
+    }
+    SB_FIELD(AUDIO_BAR(2), SCROLLBAR_OFF_FLAG50) = 0;
+    *(uint32_t *)((uint8_t *)AUDIO_BAR(2) + SCROLLBAR_OFF_ONCHANGE) = (uint32_t)(uintptr_t)OnVolumeVoice;
 
     /* Kept so CANCEL can put them back. */
-    saved[0] = g_volumeAtZero;
-    saved[1] = g_streamVolume;
-    saved[2] = g_voiceVolume;
+    ((int32_t *)((uint8_t *)w + AUDIO_OFF_SAVED))[0] = g_volumeAtZero;
+    ((int32_t *)((uint8_t *)w + AUDIO_OFF_SAVED))[1] = g_streamVolume;
+    ((int32_t *)((uint8_t *)w + AUDIO_OFF_SAVED))[2] = g_voiceVolume;
 
     ::WidgetAddChild(parent, new AM2_Button((const char *)(uintptr_t)AM2_BMP_OK0, (const char *)(uintptr_t)AM2_BMP_OK1,
                    (const char *)(uintptr_t)AM2_BMP_OK2, 1,
@@ -12872,22 +13035,20 @@ int32_t __cdecl FindPressedKey(void)
  *
  * Note the seventh argument is the FONT and the tenth is used twice -- as the
  * label's paper and as the colour at 0x0066. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::KeyRowConstruct(int32_t nameIndex, const char *caption, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t ink2, int32_t ink3, int32_t ink4)
+AM2_KeyRow::AM2_KeyRow(int32_t nameIndex, const char *caption, AM2_Rect box, int32_t font,
+                       uint8_t ink, uint8_t ink2, uint8_t ink3, uint8_t ink4)
+    /* The label's ink is this class's own focInk, READ BEFORE ANYTHING HAS
+     * SET IT -- the original passes the stale byte, and overwrites it below. */
+    : AM2_Label(caption, box, font, focInk, ink3)
 {
     AM2_Widget *w = this;
 
-    uint8_t *self = (uint8_t *)w;
-    uint8_t  stale = self[FOCUSLABEL_OFF_INK];
-
-    ::LabelConstruct(w, caption, left, top, width, height, font, stale, ink3);
-
-    self[FOCUSLABEL_OFF_INK]  = (uint8_t)ink;
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_KEYROW));
-    *(int32_t *)(self + KEYROW_OFF_KEY) = nameIndex;
-    self[FOCUSLABEL_OFF_INK_FOCUS] = (uint8_t)ink2;
-    self[FOCUSLABEL_OFF_PAPER] = (uint8_t)ink3;
-    self[FOCUSLABEL_OFF_PAPER_FOCUS] = (uint8_t)ink4;
-    return w;
+    focInk = ink;
+    AM2_CTOR_VTABLE(w, VTABLE_KEYROW);
+    focInkFocus   = ink2;
+    focPaper      = ink3;
+    focPaperFocus = ink4;
+    key           = nameIndex;
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::FocusLabelDelete(int32_t flags)
@@ -15356,14 +15517,14 @@ void __attribute__((thiscall)) AM2_Widget::EditUpdate()
     ::WidgetUpdate(w);
 }
 
-AM2_Label::AM2_Label(const char *text_, AM2_Rect box, int32_t font_, int32_t ink_, int32_t paper_)
+AM2_Label::AM2_Label(const char *text_, AM2_Rect box, int32_t font_, uint8_t ink_, uint8_t paper_)
 {
     AM2_Widget *w = this;
 
     text  = text_;
     font  = font_;
-    ink   = (uint8_t)ink_;
-    paper = (uint8_t)paper_;
+    ink   = ink_;
+    paper = paper_;
 
     AM2_CTOR_VTABLE(w, VTABLE_LABEL);
     *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */

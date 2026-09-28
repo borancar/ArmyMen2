@@ -205,7 +205,6 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) WarMenuConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) MpOptionsConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) BattleNameConstruct(const char *bmp);
-    AM2_Widget * __attribute__((thiscall)) KeyRowConstruct(int32_t nameIndex, const char *caption, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t ink2, int32_t ink3, int32_t ink4);
     void __attribute__((thiscall)) ArrowBarShowRow(int32_t row);
     AM2_Widget * __attribute__((thiscall)) MoviesConstruct(const char *bmp);
     void __attribute__((thiscall)) RepaintAncestor(RECT clip);
@@ -284,6 +283,7 @@ AM2_CLASS_VTABLE(AM2_Widget, VTABLE_WIDGET_BASE)
 AM2_CLASS_VTABLE(AM2_Panel, VTABLE_PANEL)
 AM2_CLASS_VTABLE(AM2_ScreenBase, VTABLE_DIALOG)
 AM2_CLASS_VTABLE(AM2_Label, VTABLE_LABEL)
+AM2_CLASS_VTABLE(AM2_KeyRow, VTABLE_KEYROW)
 AM2_CLASS_VTABLE(AM2_ButtonBase, VTABLE_BUTTON_BASE)
 AM2_CLASS_VTABLE(AM2_Button, VTABLE_BUTTON)
 AM2_CLASS_VTABLE(AM2_Arrow, VTABLE_ARROW)
@@ -354,9 +354,21 @@ struct AM2_Label : AM2_Widget {
     uint8_t     ink;                /* 0x0060  LABEL_OFF_INK */
     uint8_t     paper;              /* 0x0061  LABEL_OFF_PAPER */
     uint8_t     pad_AM2_Label[AM2_LABEL_SIZE - 0x62];
-    AM2_Label(const char *text, AM2_Rect box, int32_t font, int32_t ink, int32_t paper);
+    AM2_Label(const char *text, AM2_Rect box, int32_t font, uint8_t ink, uint8_t paper);
     explicit AM2_Label(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_Label();
+};
+/* A key-binding row on CONTROLS: a label with focus colours and the key it
+ * shows. Its destructor is the compiler's (FocusLabelDestruct, one jump). */
+struct AM2_KeyRow : AM2_Label {
+    typedef AM2_Label Base;         /* VC6's C2437: see AM2_TextList */
+    uint8_t     focInk;             /* 0x0064  FOCUSLABEL_OFF_INK */
+    uint8_t     focInkFocus;        /* 0x0065  FOCUSLABEL_OFF_INK_FOCUS */
+    uint8_t     focPaper;           /* 0x0066  FOCUSLABEL_OFF_PAPER */
+    uint8_t     focPaperFocus;      /* 0x0067  FOCUSLABEL_OFF_PAPER_FOCUS */
+    int32_t     key;                /* 0x0068  KEYROW_OFF_KEY */
+    AM2_KeyRow(int32_t nameIndex, const char *caption, AM2_Rect box, int32_t font,
+               uint8_t ink, uint8_t ink2, uint8_t ink3, uint8_t ink4);
 };
 
 struct AM2_ButtonBase : AM2_Widget {
@@ -2187,7 +2199,8 @@ static inline AM2_Widget * __attribute__((thiscall)) PanelConstruct(AM2_Widget *
  * an UNINITIALISED byte to the label constructor as the ink, which is the
  * original's and is harmless for a reason worth reading in widget.cpp. */
 static inline AM2_Widget * __attribute__((thiscall)) KeyRowConstruct(AM2_Widget *w, int32_t nameIndex, const char *caption, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t ink2, int32_t ink3, int32_t ink4)
-{ return w->KeyRowConstruct(nameIndex, caption, left, top, width, height, font, ink, ink2, ink3, ink4); }
+{ AM2_Rect box = { left, top, width, height };
+  return ::new (w) AM2_KeyRow(nameIndex, caption, box, font, ink, ink2, ink3, ink4); }
 
 /* Original: 0x00454B00, thiscall, `ret 8`. The SCREEN BASE -- a panel over the
  * whole 640x480 with the dialog vtable on top. Every screen starts here. */
