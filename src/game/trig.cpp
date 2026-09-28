@@ -29,6 +29,27 @@
  * it is what the original executes, and the equivalence is a fact about this
  * data rather than a guarantee. Anyone who finds the asm inconvenient should
  * know it can go, and that no test here would notice. */
+#if defined(_MSC_VER) && !defined(__GNUC__)
+/* The same two instructions in MSVC's inline-assembler syntax, so the VC6
+ * build compiles this file too instead of stubbing the tables to zero. */
+static double x87cos(double a)
+{
+    double r;
+    __asm { fld a }
+    __asm { fcos }
+    __asm { fstp r }
+    return r;
+}
+
+static double x87sin(double a)
+{
+    double r;
+    __asm { fld a }
+    __asm { fsin }
+    __asm { fstp r }
+    return r;
+}
+#else
 static inline double x87cos(double a)
 {
     double r;
@@ -42,6 +63,7 @@ static inline double x87sin(double a)
     __asm__ ("fsin" : "=t" (r) : "0" (a));
     return r;
 }
+#endif
 
 void __cdecl BuildTrigTables(void)
 {

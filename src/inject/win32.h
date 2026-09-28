@@ -33,6 +33,33 @@
 #include <dplay.h>
 #include <dplobby.h>
 
+/* VISUAL C++ 6.0: VC98 ships the DirectX 6.0 headers, which stop at
+ * IDirectPlay3A and IDirectPlayLobby2A; the game (and its 1999 SDK) uses
+ * IDirectPlay4A and IDirectPlayLobby3A. Both later interfaces only APPEND
+ * methods to the earlier vtables, and every method dplay.cpp calls exists in
+ * the earlier ones at the same slot -- so the pointer types alias the earlier
+ * interfaces and the IDirectPlayX_* call macros (DX6.1's version-neutral
+ * spelling) forward to IDirectPlay3_*. The objects themselves still come from
+ * CoCreateInstance with IID_IDirectPlay4A / IID_IDirectPlayLobby3A. */
+#if defined(_MSC_VER) && _MSC_VER < 1300 && !defined(__GNUC__)
+typedef LPDIRECTPLAY3A      LPDIRECTPLAY4A;
+typedef LPDIRECTPLAYLOBBY2A LPDIRECTPLAYLOBBY3A;
+#define IDirectPlayX_Close(p)              IDirectPlay3_Close(p)
+#define IDirectPlayX_CreatePlayer(p,a,b,c,d,e,f) IDirectPlay3_CreatePlayer(p,a,b,c,d,e,f)
+#define IDirectPlayX_EnumConnections(p,a,b,c,d) IDirectPlay3_EnumConnections(p,a,b,c,d)
+#define IDirectPlayX_EnumPlayers(p,a,b,c,d) IDirectPlay3_EnumPlayers(p,a,b,c,d)
+#define IDirectPlayX_EnumSessions(p,a,b,c,d,e) IDirectPlay3_EnumSessions(p,a,b,c,d,e)
+#define IDirectPlayX_GetCaps(p,a,b)        IDirectPlay3_GetCaps(p,a,b)
+#define IDirectPlayX_GetSessionDesc(p,a,b) IDirectPlay3_GetSessionDesc(p,a,b)
+#define IDirectPlayX_InitializeConnection(p,a,b) IDirectPlay3_InitializeConnection(p,a,b)
+#define IDirectPlayX_Open(p,a,b)           IDirectPlay3_Open(p,a,b)
+#define IDirectPlayX_QueryInterface(p,a,b) IDirectPlay3_QueryInterface(p,a,b)
+#define IDirectPlayX_Receive(p,a,b,c,d,e)  IDirectPlay3_Receive(p,a,b,c,d,e)
+#define IDirectPlayX_Release(p)            IDirectPlay3_Release(p)
+#define IDirectPlayX_Send(p,a,b,c,d,e)     IDirectPlay3_Send(p,a,b,c,d,e)
+#define IDirectPlayX_SetSessionDesc(p,a,b) IDirectPlay3_SetSessionDesc(p,a,b)
+#endif
+
 #undef DrawText
 /* And winuser.h defines LoadBitmap as LoadBitmapA, which collides with the
  * game's own LoadBitmap -- 0x004462F0, the sprite loader that records an

@@ -49,12 +49,7 @@ typedef unsigned int       uintptr_t;
  * a "different basic types" clash with basetsd.h's own typedefs. */
 #ifndef __GNUC__
 typedef unsigned long      DWORD_PTR;
-/* VC98 bundles the DirectX 5/6.0 headers, whose DPLOBBY.H stops at
- * IDirectPlayLobby2; the reconstruction uses the DX6.1 IDirectPlayLobby3A the
- * original's 1999 SDK had.  Forward-declare just the pointer type so the many
- * files that only NAME it (via dplay.h's CreateDirectPlayLobby declaration)
- * compile; dplay.cpp, which calls its methods, needs the full interface and is
- * not reachable from this compiler-only install. */
-typedef struct IDirectPlayLobby3A *LPDIRECTPLAYLOBBY3A;
+/* (LPDIRECTPLAYLOBBY3A / LPDIRECTPLAY4A are aliased in src/inject/win32.h,
+ * after the DirectX headers, so dplay.cpp can call through them.) */
 #endif
 #endif

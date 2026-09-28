@@ -34,12 +34,15 @@ LINK = os.path.join(VC6_ROOT, "VC98", "BIN", "LINK.EXE")
 LIBDIR = os.path.join(VC6_ROOT, "VC98", "LIB")
 OUTDIR = os.path.join(REPO, "build", "vc6sa")
 
-# GCC-only TUs (POSIX / inline asm) and the VC6 header holdout.
-SKIP = {"crt.cpp", "trig.cpp", "dplay.cpp"}
+# GCC-only TUs (POSIX).
+SKIP = {"crt.cpp"}   # trig.cpp (_MSC_VER asm) and dplay.cpp (win32.h DirectPlay compat) compile under VC6 now
 
 IMPORT_LIBS = ["KERNEL32.LIB", "USER32.LIB", "GDI32.LIB", "ADVAPI32.LIB",
                "OLE32.LIB", "DDRAW.LIB", "DSOUND.LIB", "DINPUT.LIB",
-               "WINMM.LIB", "WS2_32.LIB", "DXGUID.LIB", "LIBC.LIB"]
+               "WINMM.LIB", "WS2_32.LIB", "DXGUID.LIB", "LIBCMT.LIB"]
+# The MULTITHREADED static CRT (and /MT below): the game runs its own threads
+# (the comm packet thread, winmm timer callbacks), and single-threaded LIBC.LIB
+# corrupts shared stdio/heap state across them.
 
 
 # src/standalone data/glue the RUNNABLE build needs (the placed const tables and
@@ -72,14 +75,16 @@ def make_blob(path, carved=False):
     0x46F000), and that fault is the absolute-address reliance to migrate away.
     """
     if carved:
-        binp = os.path.join(REPO, "build", "standalone", "origdata.bin")
-        origdat = open(binp, "rb").read()
-        bss_size = 0x00666000 - 0x0048E000
+        # NO carried blob at all -- the runnable image must not need one.  In
+        # its place, a NO-ACCESS guard section laid right after .text (bss
+        # class, so LINK puts it before .rdata/.data) and big enough to cover
+        # the original data range 0x46F000..0x666000 wherever .text ends.  Any
+        # access through a raw original address -- an un-migrated ADDR, or a
+        # pointer still baked into transcribed data -- now FAULTS at a clear
+        # address instead of silently reading some other section's bytes.
         mkcoff.emit(path, [
-            {"name": ".origdat", "chars": mkcoff.DATA, "data": origdat,
-             "syms": [("_am2_origdat_base", 0)]},
-            {"name": ".origbss", "chars": mkcoff.BSS, "bsssize": bss_size,
-             "syms": [("_am2_origbss_base", 0)]},
+            {"name": ".guard", "chars": mkcoff.CNT_UNINITIALIZED_DATA,
+             "bsssize": 0x00270000, "syms": [("_am2_guard_base", 0)]},
         ])
         return path
     pe = pefile.PE(am2.EXE)
@@ -114,6 +119,10 @@ def compile_all(standalone=False):
     # compiles WITHOUT it (absolute VAs) -- which is exactly the reliance the
     # runnable build removes.
     extra = ("/DAM2_STANDALONE", "/I" + os.path.join(REPO, "build", "standalone")) if standalone else ()
+    extra += ("/MT",)   # match LIBCMT.LIB
+    # VC6_CFLAGS adds compiler switches for a diagnostic build -- e.g. "/Oy-" keeps
+    # frame pointers so winedbg can unwind a hang (/O2 omits them).
+    extra += tuple(os.environ.get("VC6_CFLAGS", "").split())
     objs, fails = [], []
     for s in tu_list(standalone):
         rel = os.path.relpath(s, REPO)
@@ -202,7 +211,29 @@ def main():
         for ln in other[:40]:
             print(" ", ln.strip())
     if os.path.exists(out) and os.path.getsize(out):
+        if args.run:
+            guard_noaccess(out)
         print("OK: %s (%d bytes)" % (out, os.path.getsize(out)))
+
+
+def guard_noaccess(exe):
+    """LINK forces MEM_READ|MEM_WRITE onto every data section, so strip them
+    from .guard's header after the link: a section with no R/W/X is mapped
+    PAGE_NOACCESS, turning every raw original-address access into a fault."""
+    import struct
+    d = bytearray(open(exe, "rb").read())
+    pe = struct.unpack_from("<I", d, 0x3C)[0]
+    nsec = struct.unpack_from("<H", d, pe + 6)[0]
+    opt = struct.unpack_from("<H", d, pe + 20)[0]
+    sec = pe + 24 + opt
+    for i in range(nsec):
+        h = sec + 40 * i
+        if d[h:h + 8].rstrip(b"\0") == b".guard":
+            struct.pack_into("<I", d, h + 36, mkcoff.CNT_UNINITIALIZED_DATA)
+            open(exe, "wb").write(d)
+            print("guard: .guard made no-access")
+            return
+    print("guard: WARNING no .guard section found")
 
 
 if __name__ == "__main__":
