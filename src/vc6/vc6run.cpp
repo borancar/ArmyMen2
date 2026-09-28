@@ -42,12 +42,31 @@ static int vc6_fmt_ok(const char *fmt)
             return 0;
     return 1;
 }
+/* VC6RUN_LOG=<path> also writes the log to a file: under `wine explorer
+ * /desktop=...` (the full-colour way to drive it) the game's stderr is not
+ * connected to anything. */
+static FILE *vc6_logfile(void)
+{
+    static int opened;
+    static FILE *f;
+    if (!opened) {
+        const char *p = getenv("VC6RUN_LOG");
+        opened = 1;
+        if (p && *p)
+            f = fopen(p, "w");
+    }
+    return f;
+}
 static void am2_log_impl(const char *fmt, ...)
 {
     va_list ap;
+    FILE *lf;
     if (!vc6_fmt_ok(fmt))
         return;
     va_start(ap, fmt); vfprintf(stderr, fmt, ap); va_end(ap); fflush(stderr);
+    if ((lf = vc6_logfile()) != 0) {
+        va_start(ap, fmt); vfprintf(lf, fmt, ap); va_end(ap); fflush(lf);
+    }
 }
 /* VC6RUN_ZEROHEAP=1 (diagnostic): hand out zero-filled blocks, to test
  * whether a behaviour depends on memory the game never initialised. */
@@ -164,9 +183,13 @@ uint32_t input_take_events(int32_t kind, void *buf, uint32_t elem, uint32_t max)
 void am2_sa_log(const char *fmt, ...)
 {
     va_list ap;
+    FILE *lf;
     if (!vc6_fmt_ok(fmt))
         return;
     va_start(ap, fmt); vfprintf(stderr, fmt, ap); va_end(ap); fflush(stderr);
+    if ((lf = vc6_logfile()) != 0) {
+        va_start(ap, fmt); vfprintf(lf, fmt, ap); va_end(ap); fflush(lf);
+    }
 }
 
 /* Host/harness/comm symbols the excluded runtime.cpp and dplay.cpp defined;

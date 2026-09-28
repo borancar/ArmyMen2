@@ -189,10 +189,29 @@ main result so far (details in `src/vc6/README.md`):
       than a constant. Byte-match after the fix: 360/1637.
     - **Detectors** (`src/vc6/`): `rawaddr.py` disassembles the VC6 objects
       for unrelocated values in the original data range (or `--text` for the
-      code range). Data range: 2716 -> 1, and that one is an ASCII false
-      positive inside `am2_hud_commands`. Code range: one real gap,
-      ADDR_MP_ON_MAP_PICK, an unreconstructed callback in MpPanelConstruct.
-      `constwrites.py` flags direct writes into `const` symbols.
+      code range). Both ranges read **0**: data went 2716 -> 0 (the last hit
+      was ASCII inside the build-menu records, now range-whitelisted), code
+      went to 0 once `OnMpMapPick` (0x00431D80, the MP map list's row
+      callback, byte-identical under VC6) replaced the raw address
+      MpPanelConstruct passed. `constwrites.py` flags direct writes into
+      `const` symbols: 0.
+    - **Campaign and save/load (2026-09-28).** `src/vc6/vcdrive.py ROUTE --ab`
+      drives stock and the VC6 image through the same route in a Wine
+      virtual desktop and diffs every frame; it places the cursor by writing
+      the game's own cursor globals through /proc/PID/mem, because Wine's
+      relative-DirectInput pointer acceleration made synthetic motion land
+      anywhere. `campaign` (NEW -> Kitchen) plays; `load` restores a save
+      pixel-identical to stock. The load route found a divergence: the Sarge
+      panel drew two of six weapons. The data was intact; ADDR_HUD_SARGE_
+      OFFSETS is six (x,y) cells, 24 bytes, and the last 8 had been
+      transcribed as a separate `am2_build_menu_end_data` that LINK put
+      elsewhere. Now one struct member (`am2_hud_commands.sarge_tail`).
+    - **`tools/checkviewspan.py`** (in `make check`) generalises that: every
+      ADDR_ whose orig.h comment declares an extent must fit inside the one
+      placed symbol it lands in. It found a second case at once: the roach's
+      seven animation-frame ids (ADDR_FIELD_530_FRAMES, indexed unbounded by
+      state) were two struct scalars plus a separate `am2_roach_score_ints`;
+      now `am2_roach.field_530_frames[7]`. 98 declared views, 0 overruns.
     - **Still open:** multiplayer and comm paths are unexercised in this image.
       The injected `am2hook.dll` build fails at HEAD (misc.h's AM2_Comm in a C
       TU); this is pre-existing, unrelated, and not yet fixed.
@@ -3312,7 +3331,7 @@ clean.
 
 ## In flight
 
-Nothing uncommitted. **1,643 patches plus 6 REGISTERED**, **70** analysis
+Nothing uncommitted. **1,644 patches plus 6 REGISTERED**, **71** analysis
 tools in `make check` (`tools/checkpatches.py`; `tools/checkclaims.py` counts
 the recipe).
 

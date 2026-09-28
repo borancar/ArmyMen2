@@ -161,3 +161,10 @@ image, so what can match is bounded by that:
   and `_ftol` clobbered its saved control word so later literals were parsed
   round-toward-zero (one ulp low).  The list of reliances fixed, and the
   `rawaddr.py` / `constwrites.py` detectors, are in `STATUS.md`.
+- ✅ **drive it against stock**: `src/vc6/vcdrive.py ROUTE --ab` (routes
+  `bootcamp`, `campaign`, `load`) runs stock and the VC6 image through the
+  same route in a 640x480 Wine virtual desktop on Xvfb :99 and diffs every
+  frame, with shots in `build/vc6drive/`. It places the cursor by writing the
+  game's cursor globals through /proc/PID/mem; its docstring says why
+  synthetic pointer motion can't be used.  `VC6RUN_LOG=C:\path` mirrors the
+  game log to a file, since under `explorer /desktop` stderr goes nowhere.
