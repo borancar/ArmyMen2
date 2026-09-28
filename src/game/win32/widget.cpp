@@ -777,7 +777,7 @@ void __attribute__((thiscall)) AM2_Widget::WidgetDestruct()
          * reproduced. */
         AM2_Widget *next = child->nextSibling;
 
-        ((AM2_WidgetDeleteFn *)child->vtable)[WIDGET_VSLOT_DTOR](child, 1);
+        WidgetVDelete(child, 1);
         child = next;
     }
 }
@@ -814,7 +814,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::LabelDelete(int32_t flags)
  * globals and a mask each and belong to the input layer rather than here. */
 typedef int32_t (__cdecl *AM2_KeyQueryFn)(int32_t dik);
 typedef void (__cdecl *AM2_ConsumeKeyFn)(int32_t dik);
-typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
 
 /* DirectInput scancodes, which is what every query here is indexed by. */
 #define AM2_DIK_TAB    0x0F
@@ -868,7 +867,7 @@ void __attribute__((thiscall)) AM2_Widget::WidgetPaint(RECT clip)
     /* Children are painted whether or not the sprite was, and against the
      * CALLER's clip rather than the intersection worked out above. */
     for (child = w->firstChild; child; child = child->nextSibling)
-        ((AM2_WidgetPaintFn *)child->vtable)[WIDGET_VSLOT_PAINT](child, clip);
+        WidgetVPaint(child, clip);
 }
 
 /* Which edit box has the focus, and the WM_CHAR consumer WndProc dispatches
@@ -940,7 +939,7 @@ static void ButtonFire(AM2_Widget *w, int32_t off)
  * ButtonUpdate shares. */
 static void ButtonRepaintSelf(AM2_Widget *w)
 {
-    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    WidgetVPaint(w, w->rect);
 }
 
 #define BUTTON_DEADLINE(w) (*(uint32_t *)((uint8_t *)(w) + BUTTON_OFF_DEADLINE))
@@ -976,7 +975,7 @@ void __attribute__((thiscall)) AM2_Widget::KeyRowUpdate()
         w->hovered = PointInRect((const AM2_Rect *)&w->rect,
                                    (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
         if (w->hovered)
-            ((AM2_WidgetFocusFn *)w->vtable)[WIDGET_VSLOT_FOCUS](w, 1);
+            WidgetVFocus(w, 1);
     }
 
     /* Only the focused row captures. */
@@ -995,7 +994,7 @@ void __attribute__((thiscall)) AM2_Widget::KeyRowUpdate()
         *(const char **)(self + LABEL_OFF_TEXT)  = table[key].name;
     }
 
-    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    WidgetVPaint(w, w->rect);
 
     /* A key can be bound in one place only: take it off every other row. */
     {
@@ -1088,7 +1087,7 @@ void __attribute__((thiscall)) AM2_Widget::BlinkerUpdate()
         *(int32_t *)(self + TOGGLE_OFF_STATE)  = 0;
     }
 
-    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    WidgetVPaint(w, w->rect);
 }
 
 void __attribute__((thiscall)) AM2_Blinker::BlinkerStart(uint32_t periodMs, int32_t flips)
@@ -1104,7 +1103,7 @@ void __attribute__((thiscall)) AM2_Blinker::BlinkerStart(uint32_t periodMs, int3
     *(uint32_t *)(self + BLINK_OFF_ELAPSED)   = 0;
 
     /* Repaint at once, so the first flash does not wait a whole period. */
-    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    WidgetVPaint(w, w->rect);
 }
 
 void __attribute__((thiscall)) AM2_Widget::TogglePaint(RECT clip)
@@ -1168,7 +1167,7 @@ static void ListRepaintRow(AM2_Widget *w, int32_t row)
                    * LIST_ROW_HEIGHT + LIST_ROW_TOP_MARGIN;
     band.bottom = band.top + LIST_ROW_HEIGHT;
 
-    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, band);
+    WidgetVPaint(w, band);
 }
 
 /* A row whose text opens with '^' is REFUSED -- a separator or a heading. */
@@ -1252,7 +1251,7 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
             int32_t row;
 
             if (!w->flag44)
-                ((AM2_WidgetFocusFn *)w->vtable)[WIDGET_VSLOT_FOCUS](w, 1);
+                WidgetVFocus(w, 1);
 
             row = (*(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2)
                    - w->rect.top - LIST_ROW_TOP_MARGIN) / LIST_ROW_HEIGHT
@@ -1272,7 +1271,7 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
             if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED) {
                 int32_t sel;
 
-                ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+                WidgetVPaint(w, w->rect);
 
                 sel = *(const int32_t *)(self + LIST_OFF_SELECTED);
                 if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON && sel >= 0) {
@@ -1347,7 +1346,7 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
             || (IsKeyDown(AM2_DIK_RETURN) && KeyChanged(AM2_DIK_RETURN))) {
             int32_t sel;
 
-            ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+            WidgetVPaint(w, w->rect);
 
             sel = *(const int32_t *)(self + LIST_OFF_SELECTED);
             if (sel >= 0 && rows->count > 0) {
@@ -1384,7 +1383,7 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
 
         /* The window moved, so everything is stale. */
         PlaySoundAt(AM2_SND_MENU_MOVE, 0, 0, 0, 0);
-        ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+        WidgetVPaint(w, w->rect);
 
         bar = *(AM2_Widget *const *)(self + LIST_OFF_ARROWBAR);
         if (bar) {
@@ -1401,7 +1400,7 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
                            - thumb->bounds.bottom);
 
             bar = *(AM2_Widget *const *)(self + LIST_OFF_ARROWBAR);
-            ((AM2_WidgetPaintFn *)bar->vtable)[WIDGET_VSLOT_PAINT](bar,
+            WidgetVPaint(bar,
                                                                    bar->rect);
         }
         return;
@@ -1593,7 +1592,7 @@ void __attribute__((thiscall)) AM2_Widget::ListTakeFocus(int32_t announce)
         strip.right  = w->rect.right;
         strip.bottom = strip.top + LIST_ROW_HEIGHT;
 
-        ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, strip);
+        WidgetVPaint(w, strip);
     }
     ::WidgetTakeFocus(w, announce);
 }
@@ -1701,7 +1700,7 @@ void __attribute__((thiscall)) AM2_Widget::ButtonUpdate()
     }
 
     if (orig_mouse_moved)
-        ((AM2_WidgetFocusFn *)w->vtable)[WIDGET_VSLOT_FOCUS](w, 1);
+        WidgetVFocus(w, 1);
 
     repeats = *(const int32_t *)(self + BUTTON_OFF_REPEATS);
 
@@ -1879,7 +1878,7 @@ void __attribute__((thiscall)) AM2_Widget::EditUpdate()
         w->hovered = PointInRect((const AM2_Rect *)&w->rect,
                                    (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
         if (w->hovered)
-            ((AM2_WidgetFocusFn *)w->vtable)[WIDGET_VSLOT_FOCUS](w, 1);
+            WidgetVFocus(w, 1);
     }
     ::WidgetUpdate(w);
 }
@@ -2128,7 +2127,7 @@ void __attribute__((thiscall)) AM2_Widget::TyperUpdate()
         *(int32_t *)(self + TYPER_OFF_SHOWN) += 1;
     }
 
-    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    WidgetVPaint(w, w->rect);
     ::WidgetUpdate(w);
 }
 
@@ -4041,7 +4040,7 @@ void __cdecl CountButtonActivate(AM2_Widget *w)
 
     PlaySoundAt(0, 0, 0, 0, 0);
 
-    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    WidgetVPaint(w, w->rect);
 
     onToggle = *(void (**)(AM2_Widget *))(self + COUNTBTN_OFF_ON_TOGGLE);
     if (onToggle)
@@ -4723,7 +4722,7 @@ void __attribute__((thiscall)) AM2_Widget::WidgetFocusNext(int32_t announce)
         return;
     if (!cand->flag50 || cand->disabled)
         return;
-    ((AM2_WidgetFocusFn *)cand->vtable)[WIDGET_VSLOT_FOCUS](cand, announce);
+    WidgetVFocus(cand, announce);
 }
 
 void __attribute__((thiscall)) AM2_Widget::WidgetFocusPrev(int32_t announce)
@@ -4752,7 +4751,7 @@ void __attribute__((thiscall)) AM2_Widget::WidgetFocusPrev(int32_t announce)
         return;
     if (!cand->flag50)
         return;
-    ((AM2_WidgetFocusFn *)cand->vtable)[WIDGET_VSLOT_FOCUS](cand, announce);
+    WidgetVFocus(cand, announce);
 }
 
 void __attribute__((thiscall)) AM2_Widget::WidgetUpdate()
@@ -4765,7 +4764,7 @@ void __attribute__((thiscall)) AM2_Widget::WidgetUpdate()
     ::WidgetScreenRect(w);
 
     for (child = w->firstChild; child; child = child->nextSibling)
-        ((AM2_WidgetUpdateFn *)child->vtable)[WIDGET_VSLOT_UPDATE](child);
+        WidgetVUpdate(child);
 
     /* Only the widget that holds keyboard focus reads the keyboard, and only
      * when it has something focused to act on. */
@@ -4797,7 +4796,7 @@ void __attribute__((thiscall)) AM2_Widget::WidgetUpdate()
      * the release blocks below want to see the same edge. */
     if (KeyChanged(AM2_DIK_SPACE) || KeyChanged(AM2_DIK_RETURN)) {
         focus = w->focusedChild;
-        ((AM2_WidgetPaintFn *)focus->vtable)[WIDGET_VSLOT_PAINT](focus,
+        WidgetVPaint(focus,
                                                                  focus->rect);
     }
 
@@ -4860,7 +4859,7 @@ void __attribute__((thiscall)) AM2_Widget::WidgetTakeFocus(int32_t announce)
         if (had == w)
             return;
         parent->focusedChild = w;
-        ((AM2_WidgetRepaintFn *)had->vtable)[WIDGET_VSLOT_REPAINT](had);
+        WidgetVRepaint(had);
     }
 
     w->flag44 = 1;
@@ -4870,7 +4869,7 @@ void __attribute__((thiscall)) AM2_Widget::WidgetTakeFocus(int32_t announce)
 
     if (announce) {
         PlaySoundAt(1, 0, 0, 0, 0);
-        ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+        WidgetVPaint(w, w->rect);
     }
 }
 
@@ -4904,7 +4903,7 @@ void __attribute__((thiscall)) AM2_Widget::WidgetRepaint()
      * indexing it gives the slot. Writing this as a nested cast off the
      * object is how the movie object's dispatch was got wrong -- see the
      * `obj -> table -> slot` note in CLAUDE.md. */
-    ((AM2_WidgetPaintFn *)target->vtable)[WIDGET_VSLOT_PAINT](target, w->rect);
+    WidgetVPaint(target, w->rect);
 }
 
 /* HudCmdConstruct -- original 0x00417040, one caller, thiscall. Builds the
@@ -5268,7 +5267,7 @@ void __cdecl OptionsDefaults(AM2_Widget *button)
 
         box->disabled = 0;
         *((uint8_t *)box + CHECKBOX_OFF_CHECKED) = (mask & bit) != 0;
-        ((AM2_WidgetPaintFn *)box->vtable)[WIDGET_VSLOT_PAINT](box, box->rect);
+        WidgetVPaint(box, box->rect);
         rec += AM2_OPTION_STRIDE;
     } while (rec < (const uint8_t *)(uintptr_t)ADDR_OPTION_TABLE_END);
 }
@@ -5334,7 +5333,7 @@ void __cdecl OptionsSyncGroup(AM2_Widget *header)
 
         *((uint8_t *)box + CHECKBOX_OFF_CHECKED) = ticked;
         box->disabled = (ticked == 0);
-        ((AM2_WidgetPaintFn *)box->vtable)[WIDGET_VSLOT_PAINT](box, box->rect);
+        WidgetVPaint(box, box->rect);
     }
 }
 
@@ -5491,7 +5490,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgBattleJoinConstruct(const 
                                (int32_t)(uintptr_t)BattleJoinPoll, 0);
     }
     ::WidgetAddChild(panel, kid);
-    ((AM2_WidgetFocusFn *)kid->vtable)[WIDGET_VSLOT_FOCUS](kid, 0);
+    WidgetVFocus(kid, 0);
 
     kid = (AM2_Widget *)orig_operator_new(AM2_HUD_EDIT_BYTES);
     if (kid)
@@ -5639,7 +5638,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgGameMenuConstruct(const ch
                  * whatever item the cursor sat over as the pause menu opened
                  * (highlighting LOAD GAME instead of the default RETURN TO GAME).
                  * The re-poll is what clears the moved flag so the default sticks. */
-                ((AM2_WidgetFocusFn *)btn->vtable)[WIDGET_VSLOT_FOCUS](btn, 0);
+                WidgetVFocus(btn, 0);
             row++;
         }
     }
@@ -5745,7 +5744,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgSaveListConstruct(const ch
                              (void (__cdecl *)(AM2_Widget *))
                                  SaveListOnSave, 0, 0);
     ::WidgetAddChild(w, edit);
-    ((AM2_WidgetFocusFn *)edit->vtable)[WIDGET_VSLOT_FOCUS](edit, 0);
+    WidgetVFocus(edit, 0);
     *(void **)((uint8_t *)edit + EDIT_OFF_CHARSET) =
         *(void **)(uintptr_t)ADDR_EDIT_CHARSET_PTR;
     *(void **)(self + SAVELIST_OFF_EDIT) = edit;
@@ -6443,12 +6442,15 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudTopConstruct()
  * destructor, which frees as well as destructs. The global is cleared INSIDE
  * the test, which matters only in that a null one is left alone rather than
  * written; reproduced because it is one instruction either way. */
-static void CloseCurrentScreen(void)
+/* `inline` is load-bearing: the original has this body at every call site,
+ * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
+ * each caller compiled to push/call/pop -- the relink found it. */
+static inline void CloseCurrentScreen(void)
 {
     AM2_Widget *cur = (AM2_Widget *)g_paintObject;
 
     if (cur) {
-        ((AM2_WidgetDeleteFn *)cur->vtable)[WIDGET_VSLOT_DTOR](cur, 1);
+        WidgetVDelete(cur, 1);
         g_paintObject = (uint8_t *)0;
     }
 }
@@ -6488,19 +6490,19 @@ void __cdecl FreeHudWidgets(void)
 
     w = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A;
     if (w) {
-        ((AM2_WidgetDeleteFn *)w->vtable)[WIDGET_VSLOT_DTOR](w, 1);
+        WidgetVDelete(w, 1);
         *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A = (AM2_Widget *)0;
     }
 
     w = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B;
     if (w) {
-        ((AM2_WidgetDeleteFn *)w->vtable)[WIDGET_VSLOT_DTOR](w, 1);
+        WidgetVDelete(w, 1);
         *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_B = (AM2_Widget *)0;
     }
 
     w = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C;
     if (w) {
-        ((AM2_WidgetDeleteFn *)w->vtable)[WIDGET_VSLOT_DTOR](w, 1);
+        WidgetVDelete(w, 1);
         *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_C = (AM2_Widget *)0;
     }
 }
@@ -7408,7 +7410,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DifficultyDialogConstruct(con
     {
         AM2_Widget *sel = *(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST);
 
-        ((AM2_WidgetFocusFn *)sel->vtable)[WIDGET_VSLOT_FOCUS](sel, 0);
+        WidgetVFocus(sel, 0);
         *(int32_t *)((uint8_t *)sel + LIST_OFF_CHOSEN)      = g_difficulty;
         *(int32_t *)((uint8_t *)sel + LIST_OFF_SELECTED) = g_difficulty;
     }
@@ -7495,7 +7497,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ControlsDialogConstruct(const
     }
 
     first = *(AM2_Widget **)((uint8_t *)w + KEYROW_PARENT_ROWS);
-    ((AM2_WidgetFocusFn *)first->vtable)[WIDGET_VSLOT_FOCUS](first, 0);
+    WidgetVFocus(first, 0);
 
     /* Same shape as the confirm dialogs' buttons, in a column at x 0x218:
      * flag 1, size 0x51 by 0x20. The `push 0` at the top of each block is the
@@ -7506,7 +7508,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ControlsDialogConstruct(const
     ok = MakeButton(0x218, 0xAD, AM2_BMP_OK0, AM2_BMP_OK1, AM2_BMP_OK2,
                       kOnControlsOk);
     ::WidgetAddChild(w, ok);
-    ((AM2_WidgetFocusFn *)ok->vtable)[WIDGET_VSLOT_FOCUS](ok, 0);
+    WidgetVFocus(ok, 0);
 
     ::WidgetAddChild(w, MakeButton(0x218, 0xDF, AM2_BMP_DEFAULT0,
                                    AM2_BMP_DEFAULT1, AM2_BMP_DEFAULT2,
@@ -7817,7 +7819,7 @@ static AM2_Widget *MakeNameField(AM2_Widget *panel, char *buf, int32_t top,
      * left the wrong field marked dirty, which `ctl widgets` reported and no
      * pixel count would have. */
     if (focus)
-        ((AM2_WidgetFocusFn *)edit->vtable)[WIDGET_VSLOT_FOCUS](edit, 0);
+        WidgetVFocus(edit, 0);
     *(const char **)((uint8_t *)edit + EDIT_OFF_CHARSET) = g_editCharset;
 
     dot = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_SIZE);
@@ -7935,7 +7937,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::CommPanelConstruct(const char
     {
         AM2_Widget *l = *(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST);
 
-        ((AM2_WidgetFocusFn *)l->vtable)[WIDGET_VSLOT_FOCUS](l, 0);
+        WidgetVFocus(l, 0);
     }
 
     bar = (AM2_Widget *)orig_operator_new(AM2_ARROWBAR_SIZE);
@@ -8047,7 +8049,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectPlayerConstruct(const c
                                 0, 1);
     }
     ::WidgetAddChild(panel, list);
-    ((AM2_WidgetFocusFn *)list->vtable)[WIDGET_VSLOT_FOCUS](list, 0);
+    WidgetVFocus(list, 0);
 
     /* Opening the screen selects the first player. */
     {
@@ -9021,7 +9023,7 @@ void __cdecl OnControlsDefault(AM2_Widget *w)
 
         *(int32_t *)((uint8_t *)row + KEYROW_OFF_KEY) = k;
         *(const char **)((uint8_t *)row + LABEL_OFF_TEXT) = keys[k].name;
-        ((AM2_WidgetPaintFn *)row->vtable)[WIDGET_VSLOT_PAINT](row, row->rect);
+        WidgetVPaint(row, row->rect);
     }
     PlaySoundAt(2, 0, 0, 0, 0);
 }
@@ -9078,7 +9080,7 @@ static inline void ArrowBarScroll(AM2_Widget *arrow, int32_t delta)
     PlaySoundAt(1, 0, 0, 0, 0);
     top += delta;
     *(int32_t *)(l + LIST_OFF_TOP_ROW) = top;
-    ((AM2_WidgetPaintFn *)list->vtable)[WIDGET_VSLOT_PAINT](list, list->rect);
+    WidgetVPaint(list, list->rect);
 
     thumb = *(const AM2_Sprite *const *)(b + ARROWBAR_OFF_SPRITE0);
     *(int32_t *)(b + ARROWBAR_OFF_SHIFT) =
@@ -9132,7 +9134,7 @@ void __attribute__((thiscall)) AM2_Widget::ArrowBarShowRow(int32_t row)
         /* already visible -- nothing stored, and still repainted */
     }
 
-    ((AM2_WidgetPaintFn *)list->vtable)[WIDGET_VSLOT_PAINT](list, list->rect);
+    WidgetVPaint(list, list->rect);
 
     list    = *(AM2_Widget **)(b + ARROWBAR_OFF_LIST);
     l       = (uint8_t *)list;
@@ -9198,7 +9200,7 @@ void __attribute__((thiscall)) AM2_ArrowBar::ArrowBarFollowEnd()
         return;
     *(int32_t *)(l + LIST_OFF_TOP_ROW) = count - visible;
 
-    ((AM2_WidgetPaintFn *)list->vtable)[WIDGET_VSLOT_PAINT](list, list->rect);
+    WidgetVPaint(list, list->rect);
 
     /* Every field is loaded again after the paint, the list pointer included.
      * Reproduced: the painter is a virtual and could have moved any of them,
@@ -9495,7 +9497,7 @@ static void EditNotifyAndRepaint(void)
     if (onChange)
         onChange(edit);
     edit = g_focusedEdit;
-    ((AM2_WidgetPaintFn *)edit->vtable)[WIDGET_VSLOT_PAINT](edit, edit->rect);
+    WidgetVPaint(edit, edit->rect);
 }
 
 /* 0x0044D520. The text field's WM_CHAR consumer -- the function
@@ -9626,7 +9628,7 @@ void __cdecl CheckboxToggle(AM2_Widget *w)
 
     *(self + CHECKBOX_OFF_CHECKED) = (uint8_t)(*(self + CHECKBOX_OFF_CHECKED) == 0);
     PlaySoundAt(1, 0, 0, 0, 0);
-    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    WidgetVPaint(w, w->rect);
 
     onChange = *(void (__cdecl *const *)(AM2_Widget *))
                    (self + CHECK_OFF_ON_CHANGE);
@@ -9700,7 +9702,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SelectMapConstruct(const char
                                 0, 1);
     }
     ::WidgetAddChild(panel, list);
-    ((AM2_WidgetFocusFn *)list->vtable)[WIDGET_VSLOT_FOCUS](list, 0);
+    WidgetVFocus(list, 0);
 
     bar = (AM2_Widget *)orig_operator_new(AM2_ARROWBAR_SIZE);
     if (bar) {
@@ -9767,7 +9769,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::EnterNameConstruct(const char
                              kOnEnterNameOk, 0, 0);
     }
     ::WidgetAddChild(panel, edit);
-    ((AM2_WidgetFocusFn *)edit->vtable)[WIDGET_VSLOT_FOCUS](edit, 0);
+    WidgetVFocus(edit, 0);
     *(const char **)((uint8_t *)edit + EDIT_OFF_CHARSET) = g_editCharset;
 
     ::WidgetAddChild(panel, MakeButton(0x14A, 0x1F, AM2_BMP_OK0, AM2_BMP_OK1,
@@ -10064,7 +10066,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::LoadGameConstruct(const char 
     ::WidgetAddChild(parent, list);
     if (g_gameState == 2)
         w->focusedChild = list;
-    ((AM2_WidgetFocusFn *)list->vtable)[WIDGET_VSLOT_FOCUS](list, 0);
+    WidgetVFocus(list, 0);
 
     /* Opening the screen selects the first save, name and all. */
     {
@@ -10234,9 +10236,9 @@ void __attribute__((thiscall)) AM2_Widget::RepaintAncestor(RECT clip)
         up = up->parent;
 
     if (up)
-        ((AM2_WidgetPaintFn *)up->vtable)[WIDGET_VSLOT_PAINT](up, w->rect);
+        WidgetVPaint(up, w->rect);
     else
-        ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+        WidgetVPaint(w, w->rect);
 }
 
 /* 0x0044DEA0. SELECT MAP's row callback: the row's VALUE is a pointer to the
@@ -10563,7 +10565,7 @@ void __cdecl OnMpColour(AM2_Widget *w)
     for (i = 0; i < AM2_PLAYERS_MAX; i++) {
         AM2_Widget *b = ((AM2_Widget **)(screen + MP_PANEL_OFF_COLOURS))[i];
 
-        ((AM2_WidgetPaintFn *)b->vtable)[WIDGET_VSLOT_PAINT](b, b->rect);
+        WidgetVPaint(b, b->rect);
     }
 }
 
@@ -10591,7 +10593,7 @@ void __cdecl OnMpTeamLeft(AM2_Widget *w)
     *team = next;
     PlaySoundAt(2, 0, 0, 0, 0);
     SendPlayerMsg(0);
-    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    WidgetVPaint(w, w->rect);
 }
 
 /* 0x00433190 -- the TEAM button's right half.  Identical to the left except
@@ -10621,7 +10623,7 @@ void __cdecl OnMpTeamRight(AM2_Widget *w)
     *team = next;
     PlaySoundAt(2, 0, 0, 0, 0);
     SendPlayerMsg(0);
-    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    WidgetVPaint(w, w->rect);
 }
 
 /* 0x00432D50 -- the NAME button.  It is not a spinner and it has no guest
@@ -10660,7 +10662,7 @@ void __cdecl OnMpName(AM2_Widget *w)
 
     PlaySoundAt(2, 0, 0, 0, 0);
     SendPlayerMsg(0);
-    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    WidgetVPaint(w, w->rect);
 }
 
 /* The game's own stdio, for the same reason crt.h gives for its allocator: a
@@ -10866,7 +10868,7 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
         AM2_Widget *box =
             *(AM2_Widget *const *)(panel + MP_PANEL_OFF_TYPE_BOX);
 
-        ((AM2_WidgetPaintFn *)box->vtable)[WIDGET_VSLOT_PAINT](box, box->rect);
+        WidgetVPaint(box, box->rect);
     }
 
     maps = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
@@ -11130,7 +11132,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
         FillListFromRules(path, panel);
 
         type = *(AM2_Widget **)(panel + MP_PANEL_OFF_TYPE_BOX);
-        ((AM2_WidgetPaintFn *)type->vtable)[WIDGET_VSLOT_PAINT](type,
+        WidgetVPaint(type,
                                                                 type->rect);
 
         box = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
@@ -11210,8 +11212,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
         MpPreviewSetBitmap(preview, bmp);
 
         preview = *(AM2_Widget **)(panel + MP_PANEL_OFF_PREVIEW);
-        ((AM2_WidgetPaintFn *)preview->vtable)[WIDGET_VSLOT_PAINT](
-            preview, preview->rect);
+        WidgetVPaint(preview, preview->rect);
     }
 
     return AM2_MAPCHECK_OK;
@@ -11260,7 +11261,7 @@ void __cdecl SaveListOnPick(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
         *dot = '\0';
 
     edit = *(AM2_Widget **)(dlg + SAVELIST_OFF_EDIT);
-    ((AM2_WidgetPaintFn *)edit->vtable)[WIDGET_VSLOT_PAINT](edit, edit->rect);
+    WidgetVPaint(edit, edit->rect);
 
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
 }
@@ -11551,7 +11552,7 @@ void __attribute__((thiscall)) AM2_Widget::GameMenuUpdate()
 
     dlg = *(AM2_Widget **)(uintptr_t)ADDR_PAINT_OBJECT;
     if (dlg)
-        ((AM2_WidgetDeleteFn *)dlg->vtable)[WIDGET_VSLOT_DTOR](dlg, 1);
+        WidgetVDelete(dlg, 1);
     *(void **)(uintptr_t)ADDR_PAINT_OBJECT = (void *)0;
 
     if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
@@ -11575,8 +11576,7 @@ void __cdecl ShowBadMapPreview(AM2_Widget *preview)
     strcpy(name, "bad_mp_prev.bmp");
 
     MpPreviewSetBitmap(preview, name);
-    ((AM2_WidgetPaintFn *)preview->vtable)[WIDGET_VSLOT_PAINT](
-        preview, preview->rect);
+    WidgetVPaint(preview, preview->rect);
 }
 
 /* 0x004301D0 -- what runs when the chosen map changes, on the host panel and
@@ -11632,8 +11632,7 @@ void __cdecl RefreshMapSelection(void)
         orig_sprintf(path, "%s_prev.bmp",
                      (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)));
         MpPreviewSetBitmap(preview, path);
-        ((AM2_WidgetPaintFn *)preview->vtable)[WIDGET_VSLOT_PAINT](
-            preview, preview->rect);
+        WidgetVPaint(preview, preview->rect);
     }
 
     g_rulesChecksum    = RulesChecksum();
@@ -11674,7 +11673,7 @@ void __cdecl OnChatEnter(AM2_Widget *w)
     MenuMessage(text, (int32_t)(uint8_t)army, 0);
     SendChatMsg(text, 0);
     strcpy(text, (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
-    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    WidgetVPaint(w, w->rect);
 }
 
 /* 0x00432C50 -- the INK a player row's name is drawn in, chosen by how the
@@ -12069,14 +12068,11 @@ void __cdecl AimMarkerAge(void)
  * 19,492 -- the two HUD passes run once a frame each, as the pair suggests. */
 void __cdecl HudUpdate(void)
 {
-    ((AM2_WidgetUpdateFn *)g_hudWidgetA->vtable)[WIDGET_VSLOT_UPDATE](
-        g_hudWidgetA);
-    ((AM2_WidgetUpdateFn *)g_hudWidgetB->vtable)[WIDGET_VSLOT_UPDATE](
-        g_hudWidgetB);
+    WidgetVUpdate(g_hudWidgetA);
+    WidgetVUpdate(g_hudWidgetB);
 
     if (g_hudWidgetC)
-        ((AM2_WidgetUpdateFn *)g_hudWidgetC->vtable)[WIDGET_VSLOT_UPDATE](
-            g_hudWidgetC);
+        WidgetVUpdate(g_hudWidgetC);
 
     HudPostUpdate();
     AimMarkerAge();
@@ -12109,14 +12105,11 @@ void __cdecl HudPaint(void)
 {
     SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER);
 
-    ((AM2_WidgetPaintFn *)g_hudWidgetA->vtable)[WIDGET_VSLOT_PAINT](
-        g_hudWidgetA, g_hudWidgetA->rect);
-    ((AM2_WidgetPaintFn *)g_hudWidgetB->vtable)[WIDGET_VSLOT_PAINT](
-        g_hudWidgetB, g_hudWidgetB->rect);
+    WidgetVPaint(g_hudWidgetA, g_hudWidgetA->rect);
+    WidgetVPaint(g_hudWidgetB, g_hudWidgetB->rect);
 
     if (g_hudWidgetC)
-        ((AM2_WidgetPaintFn *)g_hudWidgetC->vtable)[WIDGET_VSLOT_PAINT](
-            g_hudWidgetC, g_hudWidgetC->rect);
+        WidgetVPaint(g_hudWidgetC, g_hudWidgetC->rect);
 }
 
 /* 0x00431D70, two callers. Empties the menu message log.
@@ -12177,8 +12170,8 @@ void __cdecl OnAppActivated(void)
         AM2_Widget *w = (AM2_Widget *)g_paintObject;
 
         SetDrawTarget(g_primarySurface);
-        ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
-        ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+        WidgetVPaint(w, w->rect);
+        WidgetVPaint(w, w->rect);
     }
 
     if (g_currentBitmap) {
@@ -13948,7 +13941,7 @@ void __cdecl HudRepaintOne(void)
 
     *((uint8_t *)w + HUDWIDGET_OFF_FLAG70) = 0;
 
-    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    WidgetVPaint(w, w->rect);
 }
 
 /* Rewrite the panel's points readout and repaint the widget that draws it --
@@ -13966,7 +13959,7 @@ static void HudShowPoints(void)
 
     field = *(AM2_Widget **)((uint8_t *)panel + HUDPANEL_OFF_POINTS_FIELD);
 
-    ((AM2_WidgetPaintFn *)field->vtable)[WIDGET_VSLOT_PAINT](field,
+    WidgetVPaint(field,
                                                              field->rect);
 }
 
@@ -14225,7 +14218,7 @@ static void SpinRepaint(AM2_Widget *spin)
     AM2_Widget *edit =
         *(AM2_Widget *const *)((uint8_t *)spin + SPIN_OFF_EDIT);
 
-    ((AM2_WidgetPaintFn *)edit->vtable)[WIDGET_VSLOT_PAINT](edit, edit->rect);
+    WidgetVPaint(edit, edit->rect);
     PlaySoundAt(0, 0, 0, 0, 0);
 }
 
@@ -14840,7 +14833,7 @@ void __cdecl BattleJoinPoll(AM2_Widget *w)
     RecordReset(*(void **)(self + LIST_OFF_ROWS));
     CommEnumSessions(g_commObject, *(void **)(self + LIST_OFF_ROWS));
 
-    ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, w->rect);
+    WidgetVPaint(w, w->rect);
     *(uint32_t *)(self + TEXTLIST_OFF_POLLED) = now;
 }
 

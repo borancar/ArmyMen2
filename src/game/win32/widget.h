@@ -655,6 +655,44 @@ static inline AM2_Widget * __attribute__((thiscall)) LabelConstruct(AM2_Widget *
 typedef void (__attribute__((thiscall)) *AM2_WidgetFocusFn)(AM2_Widget *w,
                                                             int32_t announce);
 
+/* The five virtual calls the reconstruction makes, as the original makes
+ * them: a THISCALL through the vtable (`mov ecx, w; mov eax, [ecx];
+ * call [eax + slot*4]`). VC6 has no spelling for a thiscall function
+ * pointer, so under it the call goes through a pointer-to-member of the
+ * slot's type (a single-inheritance PMF is one code pointer); the
+ * function-pointer form it replaces compiled `push w` and could not match
+ * at any of the ~77 call sites. GCC keeps the function-pointer call, which
+ * its thiscall attribute already makes exact. */
+typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
+#if defined(_MSC_VER) && !defined(__GNUC__)
+typedef AM2_Widget *(AM2_Widget::*AM2_WidgetDeletePmf)(int32_t flags);
+typedef void (AM2_Widget::*AM2_WidgetPaintPmf)(RECT clip);
+typedef void (AM2_Widget::*AM2_WidgetUpdatePmf)();
+typedef void (AM2_Widget::*AM2_WidgetFocusPmf)(int32_t announce);
+typedef void (AM2_Widget::*AM2_WidgetRepaintPmf)();
+static inline AM2_Widget *WidgetVDelete(AM2_Widget *w, int32_t flags)
+{ return (w->*((AM2_WidgetDeletePmf *)w->vtable)[WIDGET_VSLOT_DTOR])(flags); }
+static inline void WidgetVPaint(AM2_Widget *w, RECT clip)
+{ (w->*((AM2_WidgetPaintPmf *)w->vtable)[WIDGET_VSLOT_PAINT])(clip); }
+static inline void WidgetVUpdate(AM2_Widget *w)
+{ (w->*((AM2_WidgetUpdatePmf *)w->vtable)[WIDGET_VSLOT_UPDATE])(); }
+static inline void WidgetVFocus(AM2_Widget *w, int32_t announce)
+{ (w->*((AM2_WidgetFocusPmf *)w->vtable)[WIDGET_VSLOT_FOCUS])(announce); }
+static inline void WidgetVRepaint(AM2_Widget *w)
+{ (w->*((AM2_WidgetRepaintPmf *)w->vtable)[WIDGET_VSLOT_REPAINT])(); }
+#else
+static inline AM2_Widget *WidgetVDelete(AM2_Widget *w, int32_t flags)
+{ return ((AM2_WidgetDeleteFn *)w->vtable)[WIDGET_VSLOT_DTOR](w, flags); }
+static inline void WidgetVPaint(AM2_Widget *w, RECT clip)
+{ ((AM2_WidgetPaintFn *)w->vtable)[WIDGET_VSLOT_PAINT](w, clip); }
+static inline void WidgetVUpdate(AM2_Widget *w)
+{ ((AM2_WidgetUpdateFn *)w->vtable)[WIDGET_VSLOT_UPDATE](w); }
+static inline void WidgetVFocus(AM2_Widget *w, int32_t announce)
+{ ((AM2_WidgetFocusFn *)w->vtable)[WIDGET_VSLOT_FOCUS](w, announce); }
+static inline void WidgetVRepaint(AM2_Widget *w)
+{ ((AM2_WidgetRepaintFn *)w->vtable)[WIDGET_VSLOT_REPAINT](w); }
+#endif
+
 /* Original: 0x00453C40, thiscall. The base painter, and what 18 of the 33
  * vtables reach through two levels of forwarding thunk.
  *

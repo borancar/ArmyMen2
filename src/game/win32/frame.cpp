@@ -776,7 +776,7 @@ void __cdecl LevelTeardown(void)
     AM2_Widget *dlg = *(AM2_Widget **)(uintptr_t)ADDR_PAINT_OBJECT;
 
     if (dlg) {
-        ((AM2_WidgetDeleteFn *)dlg->vtable)[WIDGET_VSLOT_DTOR](dlg, 1);
+        WidgetVDelete(dlg, 1);
         *(AM2_Widget **)(uintptr_t)ADDR_PAINT_OBJECT = (AM2_Widget *)0;
     }
 
@@ -856,7 +856,7 @@ void __cdecl State2Enter(void)
     void       *leader;
 
     if (screen) {
-        ((AM2_WidgetDeleteFn *)screen->vtable)[WIDGET_VSLOT_DTOR](screen, 1);
+        WidgetVDelete(screen, 1);
         *(void **)(uintptr_t)ADDR_PAINT_OBJECT = (void *)0;
     }
     if (*(void **)(uintptr_t)ADDR_CURRENT_BITMAP)
