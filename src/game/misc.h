@@ -45,7 +45,8 @@ struct AM2_Rec {
     static void operator delete(void *p);
 #endif
     void __attribute__((thiscall)) RecordReset();
-    void __attribute__((thiscall)) RecordResetAlias();
+    /* 0x00453930, the one-jump destructor: RecordReset. */
+    ~AM2_Rec();
 };
 static inline void __attribute__((thiscall)) ListAdd(void *list, const char *name, void *value)
 { ((AM2_Rec *)list)->ListAdd(name, value); }
@@ -56,7 +57,7 @@ static inline void * __attribute__((thiscall)) RecordCtor(void *rec, int32_t val
 static inline void __attribute__((thiscall)) RecordReset(void *rec)
 { ((AM2_Rec *)rec)->RecordReset(); }
 static inline void __attribute__((thiscall)) RecordResetAlias(void *rec)
-{ ((AM2_Rec *)rec)->RecordResetAlias(); }
+{ ((AM2_Rec *)rec)->AM2_Rec::~AM2_Rec(); }
 /* Two widget classes' members that flat code calls (commmsg.cpp), so their
  * classes are declared here as opaque ones: VC6 compiles a member thiscall,
  * and has no spelling for a thiscall free function. Defined in widget.cpp,

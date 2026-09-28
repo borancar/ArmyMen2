@@ -1219,6 +1219,8 @@ typedef void (__cdecl *AM2_LatchKeysFn)(void);
 #if defined(__GNUC__)
 void *__attribute__((thiscall)) am2_ctor_AM2_Rec(void *mem, int32_t value)
 { return ::new (mem) AM2_Rec(value); }
+void __attribute__((thiscall)) am2_dtor_AM2_Rec(AM2_Rec *r)
+{ r->AM2_Rec::~AM2_Rec(); }
 #endif
 
 
@@ -3874,7 +3876,7 @@ int widget_install(void)
                         "KeyNameIndexOf", 1);
     rc |= patch_replace(ADDR_RECORD_CTOR, AM2_CTOR(AM2_Rec),
                         "RecordCtor", 2);
-    rc |= patch_replace(ADDR_LIST_ROWS_CLEANUP, pmf_addr(&AM2_Rec::RecordResetAlias),
+    rc |= patch_replace(ADDR_LIST_ROWS_CLEANUP, AM2_DTOR(AM2_Rec),
                         "RecordResetAlias", 1);
     rc |= patch_replace(ADDR_DIALOG_DESTRUCT, AM2_DTOR(AM2_ScreenBase),
                         "DialogDestruct", 1);
@@ -14201,7 +14203,7 @@ AM2_Rec::AM2_Rec(int32_t value)
     r[2] = value;
 }
 
-void __attribute__((thiscall)) AM2_Rec::RecordResetAlias()
+AM2_Rec::~AM2_Rec()
 {
     void *rec = this;
 
@@ -15449,12 +15451,7 @@ AM2_ListBox::~AM2_ListBox()
     AM2_CTOR_VTABLE(w, VTABLE_LISTBOX);
 
     if (*(const int32_t *)(self + LIST_OFF_OWNS_ROWS)) {
-        void *rows = *(void **)(self + LIST_OFF_ROWS);
-
-        if (rows) {
-            RecordResetAlias(rows);
-            am2_free(rows);
-        }
+        delete *(AM2_Rec **)(self + LIST_OFF_ROWS);
     }
 }
 
