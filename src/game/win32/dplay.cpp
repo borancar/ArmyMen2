@@ -82,7 +82,6 @@ static_assert(CLSCTX_INPROC_SERVER == 1, "CLSCTX_INPROC_SERVER");
 #define kIID_IDirectPlayLobby3A (*(const IID *)(uintptr_t)ADDR_IID_DPLAY_LOBBY3A)
 
 /* Both take the comm object in ecx and nothing else. */
-typedef void (__attribute__((thiscall)) *am2_comm_method_fn)(void *comm);
 
 typedef void (__cdecl *am2_destroy_list_fn)(void *list);
 
@@ -826,9 +825,6 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommEnumSessions(void *list)
  *
  * lpguidApplication is the same GUID pointer CommConstruct installs, so the
  * enumeration is filtered to providers that can carry this game. */
-typedef void (__attribute__((thiscall)) *am2_list_add_fn)(void *list,
-                                                          const char *name,
-                                                          void *data);
 #define g_connectionList  (*(void **)(uintptr_t)ADDR_CONNECTION_LIST)
 
 /* EnumConnectionsCb -- original 0x0040E460, 208 bytes, one exit.
@@ -1055,7 +1051,6 @@ static_assert(DPSESSION_MIGRATEHOST == 4, "DPSESSION_MIGRATEHOST");
 
 #define g_ourSlot     (*(int32_t *)(uintptr_t)ADDR_OUR_SLOT)
 
-typedef int32_t (__attribute__((thiscall)) *am2_slot_of_id_fn)(void *, DPID);
 typedef int32_t (__cdecl *am2_msg_free_fn)(void *list);
 #define orig_msg_list_free  (*(am2_msg_free_fn)ADDR_MSG_LIST_POOL)
 
@@ -2048,7 +2043,6 @@ typedef void (__cdecl *AM2_RequestStateFn)(int32_t state);
 
 /* The two widget slots the lobby repaint reaches, and the comm fields this
  * shares with msgslot.cpp. */
-typedef void (__attribute__((thiscall)) *AM2_DlgUpdateFn2)(void *w);
 #define AM2_START_COMM_LOG   0x418
 #define AM2_START_SELF_ID    0x3CC
 
@@ -2532,8 +2526,6 @@ void __cdecl OnLobbySlave(void)
  * needs a second player, which this machine cannot provide -- the same
  * standing as the five window messages in winproc.cpp.
  */
-typedef int32_t (__attribute__((thiscall)) *am2_comm_remove_fn)(void *comm,
-                                                                int32_t id);
 
 void __attribute__((thiscall)) AM2_Comm::CommReopenSession()
 {
@@ -3251,15 +3243,12 @@ int32_t __cdecl DestroyFlow(uint32_t id)
  * COLD, AND SAYING SO PLAINLY: this needs a live DirectPlay session with a
  * second player, which this machine cannot open. It is verified by reading and
  * by the ratchets, like the rest of the comm layer. */
-typedef void (__attribute__((thiscall)) *AM2_ScreenUpdateFn)(void *w);
-typedef void (__attribute__((thiscall)) *AM2_ScreenPaintFn)(void *w, RECT r);
 
 /* Slot 1 with the screen's own rectangle -- frame.cpp's State1Menu spells the
  * identical call, and this is the second site to want it. */
 static void ScreenPaint(void *dlg)
 {
-    ((AM2_ScreenPaintFn *)*(void **)dlg)[AM2_DLG_SLOT_PAINT](
-        dlg, *(const RECT *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
+    ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
 }
 
 void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
@@ -3370,7 +3359,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
         if (*(void **)(uintptr_t)ADDR_PAINT_OBJECT) {
             void *dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
 
-            ((AM2_ScreenUpdateFn *)*(void **)dlg)[AM2_DLG_SLOT_UPDATE](dlg);
+            ObjVUpdate(dlg);
             ScreenPaint(*(void **)(uintptr_t)ADDR_PAINT_OBJECT);
         }
 

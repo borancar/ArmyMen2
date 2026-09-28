@@ -144,7 +144,6 @@ typedef void *(__cdecl *AM2_OperatorNewFn)(uint32_t size);
 
 /* Still in the original image: the palette apply and the blit to screen are
  * game logic, and the timer callback that drives all this is never ours. */
-typedef void (__attribute__((thiscall)) *am2_movie_arg_fn)(void *movie, void *arg);
 
 #define g_moviePaletteOwner (*(uint8_t **)(uintptr_t)ADDR_MOVIE_PALETTE_OWNER)
 #define MOVIE_PALETTE_OFF 0x800u

@@ -1116,8 +1116,6 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
  * The saved-primary blit uses the screen RECT and the restore uses the clip
  * RECT; they are different rectangles and swapping them would be invisible in
  * fullscreen and wrong in a window. */
-typedef void (__attribute__((thiscall)) *am2_paint_slot1_fn)(void *self, RECT area);
-typedef void (__attribute__((thiscall)) *am2_paint_slot2_fn)(void *self);
 typedef void (__cdecl *am2_overlay_draw_fn)(void);
 typedef void (__attribute__((thiscall)) *am2_delete_fn)(void *self, int32_t flag);
 
@@ -1135,8 +1133,7 @@ void __cdecl DrawMenuOverlay(void)
     if (g_menuPending) {
         /* Going back to the game: drop the overlay and let frames through. */
         if (paint) {
-            void **vt = *(void ***)paint;
-            (*(am2_delete_fn)vt[0])(paint, 1);
+            ObjVDelete(paint, 1);
             g_paintObj = NULL;
         }
         g_subState     = MENU_MODE_PLAYING;
@@ -1149,10 +1146,8 @@ void __cdecl DrawMenuOverlay(void)
     if (g_overlayDirty) {
         g_presenting = 0;
         if (paint) {
-            void **vt = *(void ***)paint;
-
             SetDrawTarget(g_primarySurface);
-            (*(am2_paint_slot1_fn)vt[1])(paint, *(const RECT *)(paint + 0x14));
+            ObjVPaint(paint, *(const AM2_Rect *)(paint + 0x14));
         }
         /* Keep what was on screen, so the overlay can be drawn over a copy. */
         IDirectDrawSurface_BltFast(g_backBuffer, 0, 0, g_primarySurface,
@@ -1161,10 +1156,8 @@ void __cdecl DrawMenuOverlay(void)
     }
 
     SetDrawTarget(g_backBuffer);
-    if (paint) {
-        void **vt = *(void ***)paint;
-        (*(am2_paint_slot2_fn)vt[2])(paint);
-    }
+    if (paint)
+        ObjVUpdate(paint);
     SetDrawTarget(g_backBuffer);
 
     OverlayPrepare(0, 1);
@@ -1305,7 +1298,6 @@ typedef uint32_t (__cdecl *am2_ticks_fn)(void);
 
 /* The paint object's first virtual, which takes its rectangle BY VALUE. It is
  * a C++ virtual and not COM -- `this` stays in ecx and is never pushed. */
-typedef void (__attribute__((thiscall)) *am2_paint_fn)(void *self, AM2_Rect r);
 
 #define sfld16(s, off) (*(const int16_t *)((const uint8_t *)(s) + (off)))
 #define sfld32(s, off) (*(const int32_t *)((const uint8_t *)(s) + (off)))
@@ -1397,8 +1389,7 @@ void __cdecl DrawMenuCursor(void)
                                    DDBLT_WAIT, NULL);
 
         {
-            am2_paint_fn *vt = *(am2_paint_fn **)g_paintObj;
-            vt[1](g_paintObj, *(AM2_Rect *)(g_paintObj + 0x14));
+            ObjVPaint(g_paintObj, *(AM2_Rect *)(g_paintObj + 0x14));
         }
 
         spr = g_cursorSprite;

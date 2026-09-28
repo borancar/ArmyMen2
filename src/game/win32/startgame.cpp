@@ -164,8 +164,6 @@ void __cdecl StartSelectedGame(void)
  */
 
 typedef void *(__cdecl *am2_operator_new_fn)(size_t);
-typedef void (__attribute__((thiscall)) *am2_session_ctor_fn)(void *, int32_t);
-typedef int32_t (__attribute__((thiscall)) *am2_enum_sessions_fn)(void *, void *);
 
 #define orig_operator_new  (*(am2_operator_new_fn)ADDR_GAME_OPERATOR_NEW)
 

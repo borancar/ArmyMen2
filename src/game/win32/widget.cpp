@@ -887,7 +887,6 @@ typedef int32_t (__cdecl *am2_rand_fn)(void);
 #define orig_rand         (*(am2_rand_fn)ADDR_GAME_RAND)
 /* The chat send, still the original's: it reaches the comm layer and the name
  * table below it, neither of which is ours. */
-typedef void (__attribute__((thiscall)) *am2_chat_send_fn)(AM2_Widget *);
 /* The squad panel's per-slot detail painter, 3,328 bytes and still the
  * original's -- nothing about it is needed to know what HudSquadPaint does. */
 /* Selecting a weapon reaches the unit and comm layers and stays the
@@ -3966,7 +3965,6 @@ void __attribute__((thiscall)) AM2_Widget::CheckboxPaint(RECT clip)
  * both faces and runs the base's. It is the NEXT entry in docs/functions.tsv,
  * past this one's 320 bytes, so it is reached by address rather than dragged
  * into this batch. */
-typedef void (__attribute__((thiscall)) *AM2_CountDtorFn)(AM2_Widget *);
 
 /* The COUNT BUTTON's own three functions -- constructor, deleting destructor
  * and activate handler. The class already had its paint here; this completes
@@ -7093,8 +7091,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::OptionsMenuConstruct(const ch
  * null rather than throwing and the game checks it everywhere else, which is
  * what makes this an oversight rather than a convention -- but reproducing it
  * costs nothing and diverging would be a silent behavioural change. */
-typedef AM2_Widget *(__attribute__((thiscall)) *AM2_PanelCtorFn)(
-    AM2_Widget *w, const char *bmp, int32_t flag, AM2_Rect box);
 
 
 /* The four bitmaps every one of the three uses, and the one string. */
@@ -10502,9 +10498,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpTeamConstruct(int32_t left,
 
 #define g_ourSlot     (*(const int32_t *)(uintptr_t)ADDR_OUR_SLOT)
 
-typedef int32_t (__attribute__((thiscall)) *AM2_SetArmyColourFn)(void *comm,
-                                                                 int32_t slot,
-                                                                 int32_t army);
 typedef void (__cdecl *AM2_SendIntFn)(int32_t v);
 /* SendColorMsg and SendTeamMsg are ours -- msgslot.cpp -- so they are called
  * by name; CommSendPlayers is not. */

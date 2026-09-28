@@ -579,8 +579,6 @@ static AM2_OpenScreenFn const kMenuScreens[AM2_MENU_MODE_MAX] = {
     OpenDeleteGame    /* 21 */
 };
 
-typedef void (__attribute__((thiscall)) *AM2_DlgDeleteFn)(void *w, int32_t f);
-typedef void (__attribute__((thiscall)) *AM2_DlgPaintFn2)(void *w, RECT r);
 
 /* State1Menu -- original 0x00426400, two callers, both in State1Frame below.
  * The title state's menu step: take down whatever dialog is up, open the one
@@ -620,7 +618,7 @@ void __cdecl State1Menu(void)
     int32_t mode;
 
     if (dlg) {
-        ((AM2_DlgDeleteFn *)*(void **)dlg)[AM2_DLG_SLOT_DELETE](dlg, 1);
+        ObjVDelete(dlg, 1);
         *(void **)(uintptr_t)ADDR_PAINT_OBJECT = (void *)0;
     }
 
@@ -632,8 +630,7 @@ void __cdecl State1Menu(void)
     if (dlg) {
         SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_PRIMARY_SURFACE);
         dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
-        ((AM2_DlgPaintFn2 *)*(void **)dlg)[AM2_DLG_SLOT_PAINT](
-            dlg, *(const RECT *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
+        ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
     }
 
     *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 0;
@@ -1116,7 +1113,6 @@ void __cdecl State3Frame(void)
     PollMovieSkipKey();
 }
 
-typedef void (__attribute__((thiscall)) *AM2_PaintUpdateFn)(void *self);
 
 /* 0x00425EE0, one caller -- RunFrame's state 2, on every unpaused frame. The
  * in-mission driver, and the last piece of this chain: every one of its
@@ -1239,7 +1235,7 @@ void __cdecl TakeMenuRequest(void)
         void *paint = *(void *const *)(uintptr_t)ADDR_PAINT_OBJECT;
 
         if (paint)
-            ((AM2_PaintUpdateFn *)*(void **)paint)[2](paint);
+            ObjVUpdate(paint);
     }
 
     PadAdvanceDeadlines();
@@ -1754,8 +1750,7 @@ void __cdecl State1Common(void)
     SetDrawTarget(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER);
 
     dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
-    ((AM2_DlgPaintFn2 *)*(void **)dlg)[AM2_DLG_SLOT_PAINT](
-        dlg, *(const RECT *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
+    ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
 
     DrawMenuCursor();
     PresentFrame();

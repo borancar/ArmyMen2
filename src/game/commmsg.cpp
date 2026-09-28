@@ -256,8 +256,6 @@ void __cdecl MsgListAdd(void *list, void *node)
 /* The two widget slots this reaches. Declared locally rather than by including
  * win32/widget.h, which would pull a COM header into a flat module -- see
  * tools/checksplit.py. The slot numbers are widget.h's. */
-typedef void (__attribute__((thiscall)) *AM2_DlgUpdateFn)(void *w);
-typedef void (__attribute__((thiscall)) *AM2_DlgPaintFn)(void *w, AM2_Rect r);
 /* AM2_DLG_SLOT_PAINT and AM2_DLG_OFF_RECT moved to orig.h -- frame.cpp
  * needs the same two, and a second private copy is how two definitions of
  * one constant begin. */
@@ -297,10 +295,9 @@ void __cdecl SendGameReadyToLoadMsg(int32_t ready)
 
     /* No null test on the dialog, unlike the host half. The original's. */
     dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
-    ((AM2_DlgUpdateFn *)*(void **)dlg)[AM2_DLG_SLOT_UPDATE](dlg);
+    ObjVUpdate(dlg);
     dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
-    ((AM2_DlgPaintFn *)*(void **)dlg)[AM2_DLG_SLOT_PAINT](
-        dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
+    ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
 }
 
 /* PlaySoundAt is reconstructed, in win32/audio.cpp. Declared here rather than
@@ -318,9 +315,6 @@ extern "C" uint32_t __cdecl GetPauseFlags(void);
 extern "C" void     __cdecl PauseGame(uint32_t bits);
 extern "C" void     __cdecl UnPauseGame(uint32_t bits);
 
-typedef int32_t (__attribute__((thiscall)) *AM2_SetColourFn)(void *comm,
-                                                             int32_t slot,
-                                                             int32_t colour);
 
 int32_t __cdecl SendMapMsg(int32_t result, int32_t unused)
 {
@@ -390,10 +384,9 @@ static void RepaintDialogAndSendPlayers(void)
     void *dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
 
     if (dlg) {
-        ((AM2_DlgUpdateFn *)*(void **)dlg)[AM2_DLG_SLOT_UPDATE](dlg);
+        ObjVUpdate(dlg);
         dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
-        ((AM2_DlgPaintFn *)*(void **)dlg)[AM2_DLG_SLOT_PAINT](
-            dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
+        ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
     }
     SendPlayerMsg(0);
 }
@@ -558,10 +551,9 @@ void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
     /* Repaint the lobby through the widget layer's update-then-paint pair. */
     dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
     if (dlg) {
-        ((AM2_DlgUpdateFn *)*(void **)dlg)[AM2_DLG_SLOT_UPDATE](dlg);
+        ObjVUpdate(dlg);
         dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
-        ((AM2_DlgPaintFn *)*(void **)dlg)[AM2_DLG_SLOT_PAINT](
-            dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
+        ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
     }
 
     SendPlayerMsg(0);
@@ -744,7 +736,6 @@ static void DispatchChat(const uint8_t *msg)
                                         + (uintptr_t)(sender << 8)));
 }
 
-typedef int32_t (__attribute__((thiscall)) *AM2_GetSessionFn)(void *comm);
 typedef int32_t (__cdecl *AM2_RegisterSelfFn)(uint32_t dpid);
 typedef void (__cdecl *AM2_RequestStateFn)(int32_t state);
 
@@ -810,8 +801,6 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
         *(const int32_t *)((const uint8_t *)msg + MSG_START_OFF_SEED);
 }
 
-typedef int32_t (__attribute__((thiscall)) *AM2_PlayerSlotFn)(void *comm,
-                                                              int32_t dpid);
 
 #define AM2_MSG_PAUSE  8        /* non-zero: pause. zero: resume. */
 #define AM2_MSG_FLAGS  0x0C
@@ -861,8 +850,6 @@ void __cdecl RemoteGamePause(void *msg, int32_t dpid)
             dpid, slot, pause, GetPauseFlags(), mask, flags);
 }
 
-typedef int32_t (__attribute__((thiscall)) *AM2_ArmyInPlayFn)(void *comm,
-                                                              uint32_t uid);
 typedef int32_t (__cdecl *AM2_KindFn)(uint32_t wire);
 typedef int32_t (__cdecl *AM2_FilterFn)(void *msg, int32_t army);
 /* The stubbed logger, reached as a plain three-argument function so the
@@ -1821,10 +1808,9 @@ static void RepaintDialog(void)
 
     if (!dlg)
         return;
-    ((AM2_DlgUpdateFn *)*(void **)dlg)[AM2_DLG_SLOT_UPDATE](dlg);
+    ObjVUpdate(dlg);
     dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
-    ((AM2_DlgPaintFn *)*(void **)dlg)[AM2_DLG_SLOT_PAINT](
-        dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
+    ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
 }
 
 void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
@@ -2172,7 +2158,6 @@ void __cdecl TrooperFireSend(void *trooper, void *target)
 extern "C" {
 }
 
-typedef void (__attribute__((thiscall)) *AM2_PaintSlotFn)(void *w, AM2_Rect r);
 
 void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator)
 {
@@ -2200,8 +2185,7 @@ void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator)
     /* Re-read, as the original does: it loads the field again rather than
      * keeping the register it had across the call. */
     chatbox = *(uint8_t **)(screen + MP_PANEL_OFF_CHATBOX);
-    ((AM2_PaintSlotFn *)*(void **)chatbox)[1](chatbox,
-                                              *(const AM2_Rect *)(chatbox + 0x14));
+    ObjVPaint(chatbox, *(const AM2_Rect *)(chatbox + 0x14));
 
     BlinkerStart(*(void **)(screen + (indicator ? MP_PANEL_OFF_BLINKER_1
                                                 : MP_PANEL_OFF_BLINKER_0)),

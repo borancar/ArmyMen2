@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include "dist.h"   /* AM2_Point, which ObjMaskBitAt takes */
+#include "rect.h"   /* AM2_Rect, for the flat virtual-call dispatchers */
 
 
 /* AM2_Comm (its comm accessors are defined in misc.cpp) lives in msgslot.h --
@@ -47,6 +48,34 @@ static inline void __attribute__((thiscall)) RecordResetAlias(void *rec)
  * classes are declared here as opaque ones: VC6 compiles a member thiscall,
  * and has no spelling for a thiscall free function. Defined in widget.cpp,
  * where `this` is the AM2_Widget. */
+/* Virtual calls from FLAT code, which cannot see AM2_Widget: slot 0 (the
+ * deleting destructor), slot 1 (paint, the rectangle by value) and slot 2
+ * (update) of a dialog's vtable, as the
+ * thiscall the original makes. Under VC6 through a pointer-to-member of an
+ * opaque class (one code pointer; see widget.h's WidgetV* for the why), the
+ * function-pointer call under GCC. */
+struct AM2_VObj { };
+#if defined(_MSC_VER) && !defined(__GNUC__)
+typedef void (AM2_VObj::*AM2_VObjPaintPmf)(AM2_Rect r);
+typedef void (AM2_VObj::*AM2_VObjUpdatePmf)();
+typedef void *(AM2_VObj::*AM2_VObjDeletePmf)(int32_t flags);
+static inline void *ObjVDelete(void *o, int32_t flags)
+{ return (((AM2_VObj *)o)->*((AM2_VObjDeletePmf *)*(void **)o)[0])(flags); }
+static inline void ObjVPaint(void *o, AM2_Rect r)
+{ (((AM2_VObj *)o)->*((AM2_VObjPaintPmf *)*(void **)o)[1])(r); }
+static inline void ObjVUpdate(void *o)
+{ (((AM2_VObj *)o)->*((AM2_VObjUpdatePmf *)*(void **)o)[2])(); }
+#else
+typedef void (__attribute__((thiscall)) *AM2_VObjPaintFn)(void *o, AM2_Rect r);
+typedef void (__attribute__((thiscall)) *AM2_VObjUpdateFn)(void *o);
+typedef void *(__attribute__((thiscall)) *AM2_VObjDeleteFn)(void *o, int32_t flags);
+static inline void *ObjVDelete(void *o, int32_t flags)
+{ return ((AM2_VObjDeleteFn *)*(void **)o)[0](o, flags); }
+static inline void ObjVPaint(void *o, AM2_Rect r)
+{ ((AM2_VObjPaintFn *)*(void **)o)[1](o, r); }
+static inline void ObjVUpdate(void *o)
+{ ((AM2_VObjUpdateFn *)*(void **)o)[2](o); }
+#endif
 /* An object's own pointer lists: the two thiscall clears (misc.cpp). */
 struct AM2_ObjLists {
     void __attribute__((thiscall)) ClearPtrListAtA4();

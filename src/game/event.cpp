@@ -958,8 +958,6 @@ typedef void (__cdecl *AM2_Type2ActionArgFn)(void *obj, int32_t arg);
 typedef void (__cdecl *AM2_GuardedActionFn)(void *obj, int32_t a, int32_t b,
                                             int32_t c, int32_t d, int32_t e);
 typedef void (__cdecl *AM2_AtPointAFn)(int32_t a, uint32_t point, int32_t c);
-typedef void (__attribute__((thiscall)) *AM2_ListRemoveAtFn)(void *list,
-                                                             int32_t i);
 typedef void (__cdecl *AM2_PointActionFn)(void *obj, uint32_t point);
 
 /* 0x0041FE70. Deploy the object a uid names.

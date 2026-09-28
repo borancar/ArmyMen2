@@ -48,6 +48,7 @@
 #include "../commmsg.h"  /* CommFindPlayer -- reconstructed */
 #include "../rect.h"
 #include "../msgslot.h"  /* CommEndSetup, shared with both ready handlers */
+#include "../misc.h"     /* ObjVPaint / ObjVUpdate */
 #include "../gameproc.h" /* GameOverState indexes the dispatch table */
 #include "../army.h"     /* ForEachArmyObject, and the callback is not a sprite */
 #include "../air.h"    /* SetFogOfWar */
@@ -100,15 +101,11 @@ static_assert(sizeof(PAINTSTRUCT) == 64, "the 0x40 bytes of frame it reserves");
 #define g_gameState   (*(int32_t *)(uintptr_t)ADDR_GAME_STATE)
 #define g_stateArg    (*(const int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG)
 
-/* 0x0065A058. Reached as object -> table -> slot, which is the exact shape of a
- * COM call and is not one: no `this` is passed, and the argument is a RECT by
- * value that the callee pops. Slot 1 is the repaint. */
-typedef void (__stdcall *am2_repaint_fn)(RECT damage);
-/* Slot 2 is the odd one out: it takes the object in ecx and nothing on the
- * stack, so it is thiscall where slot 1 is stdcall. */
-typedef void (__attribute__((thiscall)) *am2_paint_flush_fn)(void *obj);
+/* 0x0065A058, the screen object: its vtable's slot 1 paints a rectangle
+ * (thiscall, the RECT by value) and slot 2 updates. Both are called through
+ * misc.h's ObjVPaint / ObjVUpdate. */
 #define PAINT_OFF_DAMAGE 0x14u
-typedef struct { am2_repaint_fn *slots; } AM2_PaintObject;
+typedef struct { void *const *slots; } AM2_PaintObject;
 #define g_paintObject (*(AM2_PaintObject **)(uintptr_t)ADDR_PAINT_OBJECT)
 
 /* 0x00486550. Records of three dwords, the first a function to run for the
@@ -161,12 +158,7 @@ typedef void    (__cdecl *am2_int_arg_fn)(int32_t);
 #define g_overlayDirty (*(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY)
 #define g_subState      (*(int32_t *)(uintptr_t)ADDR_MENU_MODE)
 
-typedef int32_t (__attribute__((thiscall)) *am2_comm_id_fn)(void *comm,
-                                                            uint32_t id);
 typedef void    (__attribute__((thiscall)) *am2_comm_void_fn)(void *comm);
-typedef int32_t (__attribute__((thiscall)) *am2_comm_sess_fn)(void *comm,
-                                                              void *desc,
-                                                              int32_t flags);
 typedef void (__cdecl *am2_log_fn)(const char *fmt, ...);
 typedef int32_t (__cdecl *am2_sprintf_fn)(char *out, const char *fmt, ...);
 typedef void (__cdecl *am2_str_int_fn)(const char *text, int32_t arg);
@@ -241,11 +233,17 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
         }
 
         if (g_paintObject) {
-            uint8_t     *obj = (uint8_t *)g_paintObject;
-            void *const *vt  = *(void *const **)obj;
+            /* Slot 2 (update) then slot 1 (paint the damage rectangle), both
+             * thiscall on the object, which the original re-reads from the
+             * global for the second (`mov ecx, [0x0065A058]` at 0x0040AC73).
+             * The paint was once called with no `this` at all, from a reading
+             * that missed that load. */
+            ObjVUpdate(g_paintObject);
+            {
+                uint8_t *obj = (uint8_t *)g_paintObject;
 
-            ((am2_paint_flush_fn)vt[2])(obj);
-            ((am2_repaint_fn)vt[1])(*(const RECT *)(obj + PAINT_OFF_DAMAGE));
+                ObjVPaint(obj, *(const AM2_Rect *)(obj + PAINT_OFF_DAMAGE));
+            }
             orig_sprintf(text, "Player %s has left the game.", name);
             MenuMessage(text, 4, 1);
         }
@@ -369,7 +367,8 @@ static LRESULT OnPaint(void)
                  RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 
     BeginPaint(g_hWnd, &ps);
-    g_paintObject->slots[1](damage);
+    /* thiscall on the screen object (`mov ecx, [0x0065A058]` at 0x0040A86B). */
+    ObjVPaint(g_paintObject, *(const AM2_Rect *)&damage);
     EndPaint(g_hWnd, &ps);
     return 0;
 }

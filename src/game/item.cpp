@@ -962,7 +962,6 @@ void __cdecl DestroyTrooper(void *trooper, int32_t unlink)
     am2_free(trooper);
 }
 
-typedef void (__attribute__((thiscall)) *AM2_ClearListFn)(void *rec);
 
 void __cdecl DestroyVehicle(void *vehicle, int32_t unlink)
 {
