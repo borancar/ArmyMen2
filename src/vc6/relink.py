@@ -25,6 +25,7 @@ import os, sys, struct, tempfile, collections
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bytematch as BM
+import relinkos
 sys.path.insert(0, os.path.join(BM.REPO, "tools"))
 import am2
 
@@ -302,6 +303,11 @@ def main():
         if m and m.group(1) in addr:
             placed.setdefault(m.group(2), addr[m.group(1)])
     sym_va["_am2_origstate"] = 0x0048E000
+    # The relink build's per-global view of am2_origstate (src/vc6/relinkos.py):
+    # am2_os_<member> is that member's own VA. Regenerated here so it cannot lag
+    # standalone.h's redirects.
+    relinkos.generate()
+    sym_va.update(relinkos.symbols())
     if "--unresolved" in sys.argv:
         sys.stderr.write("placed data symbols mapped: %d\n" % ng)
     imap = import_map()         # base import name -> IAT slot VA

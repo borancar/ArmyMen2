@@ -2887,4 +2887,12 @@ extern const uint8_t am2_logpalette_hdr_small[4];
 #undef ADDR_ARMY_PACKET_B
 #define ADDR_ARMY_PACKET_B ((uintptr_t)(const void *)&am2_origstate.army_packet_b)
 
+
+/* The relink build (VC6, AM2_RELINK) re-points every am2_origstate redirect
+ * above at a per-global symbol, so each reads as the original's lone global;
+ * see src/vc6/relinkos.py. Only VC6 compiles have src/vc6/include on the path. */
+#if defined(AM2_RELINK)
+#include <am2_relink_os.h>
+#endif
+
 #endif /* AM2_STANDALONE_H */
