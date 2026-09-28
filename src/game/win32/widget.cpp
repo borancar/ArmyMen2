@@ -2139,12 +2139,11 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ArrowDelete(int32_t flags)
     return w;
 }
 
-void __attribute__((thiscall)) AM2_Widget::DialogDestruct()
+AM2_ScreenBase::~AM2_ScreenBase()
 {
     AM2_Widget *w = this;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_DIALOG));
-    ::IconDestruct(w);
+    AM2_CTOR_VTABLE(w, VTABLE_DIALOG);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::DialogDelete(int32_t flags)
@@ -5392,6 +5391,13 @@ void __attribute__((thiscall)) am2_dtor_AM2_Panel(AM2_Widget *w)
 #endif
 
 #if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_ScreenBase(void *mem, const char *bmp, int32_t flag)
+{ return ::new (mem) AM2_ScreenBase(bmp, flag); }
+void __attribute__((thiscall)) am2_dtor_AM2_ScreenBase(AM2_Widget *w)
+{ ((AM2_ScreenBase *)w)->AM2_ScreenBase::~AM2_ScreenBase(); }
+#endif
+
+#if defined(__GNUC__)
 /* Install thunks: a constructor at its original address must answer `this`
  * in eax, as MSVC's do and the original's callers expect. */
 AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Widget(void *mem)
@@ -8245,19 +8251,17 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::KeyRowConstruct(int32_t nameI
  * The rectangle is (0, 0, ADDR_SCREEN_W, ADDR_SCREEN_H) -- 640 by 480 read
  * from the image rather than written down, which is why a screen's backdrop
  * covers exactly the display and not a constant somebody chose. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::ScreenBaseConstruct(const char *bmp, int32_t flag)
+AM2_ScreenBase::AM2_ScreenBase(const char *bmp, int32_t flag)
+    : AM2_Panel(bmp, flag,
+                *RectSet(AM2_TEMP(AM2_Rect), 0, 0,
+                         *(const int32_t *)(uintptr_t)ADDR_SCREEN_W,
+                         *(const int32_t *)(uintptr_t)ADDR_SCREEN_H))
 {
     AM2_Widget *w = this;
 
-    AM2_Rect box;
-
-    RectSet(&box, 0, 0, *(const int32_t *)(uintptr_t)ADDR_SCREEN_W,
-            *(const int32_t *)(uintptr_t)ADDR_SCREEN_H);
-    ::PanelConstruct(w, bmp, flag, box);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_DIALOG));
+    AM2_CTOR_VTABLE(w, VTABLE_DIALOG);
     w->flag44 = 1;
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = 0;
-    return w;
 }
 
 /* 0x004540F0, thiscall, `ret 0x28`. The BUTTON: three sprites, a rectangle,
@@ -15529,7 +15533,7 @@ int widget_install(void)
     rc |= patch_replace(ADDR_EDIT_CTOR, pmf_addr(&AM2_Widget::EditConstruct),
                         "EditConstruct", 13);
     rc |= patch_replace(ADDR_SCREEN_BASE_CTOR,
-                        pmf_addr(&AM2_Widget::ScreenBaseConstruct),
+                        AM2_CTOR(AM2_ScreenBase),
                         "ScreenBaseConstruct", 2);
     rc |= patch_replace(ADDR_BUTTON_CTOR, pmf_addr(&AM2_Widget::ButtonConstruct),
                         "ButtonConstruct", 10);
@@ -15605,7 +15609,7 @@ int widget_install(void)
                         "RecordCtor", 2);
     rc |= patch_replace(ADDR_LIST_ROWS_CLEANUP, pmf_addr(&AM2_Rec::RecordResetAlias),
                         "RecordResetAlias", 1);
-    rc |= patch_replace(ADDR_DIALOG_DESTRUCT, pmf_addr(&AM2_Widget::DialogDestruct),
+    rc |= patch_replace(ADDR_DIALOG_DESTRUCT, AM2_DTOR(AM2_ScreenBase),
                         "DialogDestruct", 1);
     rc |= patch_replace(ADDR_DIALOG_DELETE, pmf_addr(&AM2_Widget::DialogDelete),
                         "DialogDelete", 1);

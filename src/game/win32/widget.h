@@ -157,7 +157,6 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) TyperPaint(RECT clip);
     void __attribute__((thiscall)) TyperUpdate();
     AM2_Widget * __attribute__((thiscall)) ArrowDelete(int32_t flags);
-    void __attribute__((thiscall)) DialogDestruct();
     AM2_Widget * __attribute__((thiscall)) DialogDelete(int32_t flags);
     void __attribute__((thiscall)) DlgSelectMapDestruct();
     AM2_Widget * __attribute__((thiscall)) DlgSelectMapDelete(int32_t flags);
@@ -254,7 +253,6 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) CommPanelConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) SelectPlayerConstruct(const char *bmp);
     AM2_Widget * __attribute__((thiscall)) KeyRowConstruct(int32_t nameIndex, const char *caption, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t ink, int32_t ink2, int32_t ink3, int32_t ink4);
-    AM2_Widget * __attribute__((thiscall)) ScreenBaseConstruct(const char *bmp, int32_t flag);
     AM2_Widget * __attribute__((thiscall)) ButtonConstruct(const char *b0, const char *b1, const char *b2, int32_t flag, AM2_Rect box, void (__cdecl *onLeft)(AM2_Widget *), void (__cdecl *onRight)(AM2_Widget *));
     AM2_Widget * __attribute__((thiscall)) EditConstruct(char *buf, int32_t maxChars, int32_t left, int32_t top, int32_t width, int32_t height, int32_t font, int32_t inkFocus, int32_t ink, int32_t paper, void (__cdecl *onEnter)(AM2_Widget *), int32_t a, int32_t b);
     AM2_Widget * __attribute__((thiscall)) MultiSpriteConstruct(const char *b0, const char *b1, int32_t flag, AM2_Rect box);
@@ -340,12 +338,22 @@ typedef struct AM2_Widget {
 } AM2_Widget;
 
 #ifdef __cplusplus
+/* The address of a fresh temporary, for a mem-initializer that fills one
+ * through a pointer: the original's screen base passes `*RectSet(&tmp, ...)`
+ * to its base constructor with no named local. `&T()` is MSVC's extension
+ * and is what reproduces it; GCC spells the same lvalue through a cast. */
+#if defined(_MSC_VER) && !defined(__GNUC__)
+#define AM2_TEMP(T) (&T())
+#else
+#define AM2_TEMP(T) (&const_cast<T &>(static_cast<const T &>(T())))
+#endif
 /* Which original vtable each class's constructor and destructor install --
  * the compiler's ??_7Class@@6B@ in the polymorphic (relink) build, which
  * src/vc6/relink.py maps to that address. Expands to nothing. */
 #define AM2_CLASS_VTABLE(Class, VT)
 AM2_CLASS_VTABLE(AM2_Widget, VTABLE_WIDGET_BASE)
 AM2_CLASS_VTABLE(AM2_Panel, VTABLE_PANEL)
+AM2_CLASS_VTABLE(AM2_ScreenBase, VTABLE_DIALOG)
 
 /* Installing a constructor or destructor at the original's address. GCC
  * builds install a thiscall thunk (constructors must answer `this` in eax, as
@@ -364,6 +372,13 @@ struct AM2_Panel : AM2_Widget {
     AM2_Panel(const char *bmp, int32_t flag, AM2_Rect box);
     explicit AM2_Panel(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_Panel();
+};
+
+struct AM2_ScreenBase : AM2_Panel {
+    uint8_t pad_AM2_ScreenBase[0x64 - sizeof(AM2_Panel)];
+    AM2_ScreenBase(const char *bmp, int32_t flag);
+    explicit AM2_ScreenBase(AM2_Widget::AM2_NoInit n) : AM2_Panel(n) { }
+    ~AM2_ScreenBase();
 };
 
 /* Screen classes, as the original's C++ had them: `new T(bmp)` allocates
@@ -1186,7 +1201,7 @@ static inline AM2_Widget * __attribute__((thiscall)) ArrowDelete(AM2_Widget *w, 
  * under the icon, whose destructor it jumps straight to. Every full-screen
  * dialog derives from it, so this pair runs whenever any of them closes. */
 static inline void __attribute__((thiscall)) DialogDestruct(AM2_Widget *w)
-{ w->DialogDestruct(); }
+{ ((AM2_ScreenBase *)w)->AM2_ScreenBase::~AM2_ScreenBase(); }
 static inline AM2_Widget * __attribute__((thiscall)) DialogDelete(AM2_Widget *w, int32_t flags)
 { return w->DialogDelete(flags); }
 
@@ -1983,7 +1998,7 @@ static inline AM2_Widget * __attribute__((thiscall)) KeyRowConstruct(AM2_Widget 
 /* Original: 0x00454B00, thiscall, `ret 8`. The SCREEN BASE -- a panel over the
  * whole 640x480 with the dialog vtable on top. Every screen starts here. */
 static inline AM2_Widget * __attribute__((thiscall)) ScreenBaseConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
-{ return w->ScreenBaseConstruct(bmp, flag); }
+{ return ::new (w) AM2_ScreenBase(bmp, flag); }
 
 /* Original: 0x004540F0, thiscall, `ret 0x28`. The BUTTON: three sprites by
  * name, a rectangle by value, and two handlers. Only the first bitmap is
