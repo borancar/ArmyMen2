@@ -513,19 +513,20 @@ void *__cdecl DefFindObjRec(int32_t type, int32_t a, int32_t b)
  * stamp each new link with how many siblings preceded it. */
 int32_t __cdecl DefCountLinks(int32_t parentkey)
 {
-    const AM2_DefLink *p = kDefLinks;
-    int32_t            n = kDefLinkCount;
-    int32_t            hits = 0;
+    int32_t n    = kDefLinkCount;
+    int32_t hits = 0;
 
-    if (n <= 0)
-        return 0;
+    /* One return, and the table is loaded only once the count says there is
+     * one: the original's `jle` goes to the shared tail. */
+    if (n > 0) {
+        const AM2_DefLink *p = kDefLinks;
 
-    do {
-        if (p->parent == parentkey)
-            hits++;
-        p++;
-    } while (--n);
-
+        do {
+            if (p->parent == parentkey)
+                hits++;
+            p++;
+        } while (--n);
+    }
     return hits;
 }
 

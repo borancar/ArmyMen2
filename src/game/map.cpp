@@ -296,7 +296,10 @@ void *__cdecl FindLevelRecord(int32_t id)
  * The chdir target is ADDR_DIR_SCRATCH, the same eighty-reference char[] the
  * panel's chat line "clears" its field from. Here it holds a directory, which
  * is what the name says and what the other use does not. */
-static void ReadLevelFile(const char *name)
+/* `inline` is load-bearing: the original has this body at every call site,
+ * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
+ * each caller compiled to push/call/pop -- the relink found it. */
+static inline void ReadLevelFile(const char *name)
 {
     FreeLevelTables();
     SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));

@@ -1141,8 +1141,8 @@ void __cdecl AppendTroopState(void *msg, void *obj)
 void __cdecl RecvTroopBatch(void *msg, int32_t army)
 {
     const uint8_t *m   = (const uint8_t *)msg;
-    const uint8_t *end = m + *(const uint16_t *)m;
-    const uint8_t *at  = m + sizeof(AM2_ArmyMsgHdr);
+    const uint8_t *at  = m + sizeof(AM2_ArmyMsgHdr);   /* before end, as */
+    const uint8_t *end = m + *(const uint16_t *)m;     /* the original   */
 
     while (at < end)
         at = (const uint8_t *)TroopSubParse(at, army);

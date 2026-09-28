@@ -1365,15 +1365,16 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommWasHereForArmy(int32_t army)
 {
     void *comm = this;
 
-    const uint8_t *p = (const uint8_t *)comm + COMM_ARMY_OFF_COLOUR;
+    const uint8_t *p;
     int32_t        i;
 
-    for (i = 0; i < AM2_PLAYERS_MAX; i++) {
+    /* i before p, and i++ before p's step: the original's order. */
+    for (i = 0, p = (const uint8_t *)comm + COMM_ARMY_OFF_COLOUR;
+         i < AM2_PLAYERS_MAX; i++, p += AM2_PLAYER_STRIDE) {
         if (*(const int32_t *)p == army)
             return *(const int32_t *)((const uint8_t *)comm
                                       + (uint32_t)i * AM2_PLAYER_STRIDE
                                       + COMM_ARMY_OFF_WAS_HERE);
-        p += AM2_PLAYER_STRIDE;
     }
 
     return 0;

@@ -394,7 +394,6 @@ int32_t __cdecl CanPickUp(void *obj)
 void __cdecl ObjDropAltRecord(void *obj)
 {
     uint8_t *o = (uint8_t *)obj;
-    void    *rec;
 
     if (!obj)
         return;
@@ -403,11 +402,12 @@ void __cdecl ObjDropAltRecord(void *obj)
 
     *(int32_t *)(o + OBJ_OFF_FIELD_530) = AM2_OBJ_STATE_5;
 
-    rec = *(void *const *)(o + SAVED_OFF_TABLE_REC3);
-    *(void **)(o + SAVED_OFF_TABLE_REC2) = rec;
+    /* The argument is the field just written, read back -- the original's
+     * `mov edx, ecx` is that second value, not the first reused. */
+    *(void **)(o + SAVED_OFF_TABLE_REC2) = *(void *const *)(o + SAVED_OFF_TABLE_REC3);
     *(void **)(o + SAVED_OFF_TABLE_REC3) = (void *)0;
 
-    SetFieldInAll(o + OBJ_OFF_SUBRECORD, rec);
+    SetFieldInAll(o + OBJ_OFF_SUBRECORD, *(void *const *)(o + SAVED_OFF_TABLE_REC2));
 }
 
 /* 0x00447570, one caller. Take an unused soldier name.

@@ -267,15 +267,16 @@ void __cdecl EvtSetMode94(uint32_t uid, int32_t value)
 
 void __cdecl EvtSetFlag810(uint32_t uid, int32_t on)
 {
-    uint32_t *flags;
+    uint8_t *o;
 
     if (uid < AM2_UID_COUNTER_MIN)
         return;
-    flags = (uint32_t *)((uint8_t *)LookupByUID(uid) + 8);
+    /* The object, not a pointer to its +8: the original addresses [eax+8]. */
+    o = (uint8_t *)LookupByUID(uid);
     if (on)
-        *flags |= AM2_EVT_FLAG810;
+        *(uint32_t *)(o + 8) |= AM2_EVT_FLAG810;
     else
-        *flags &= ~AM2_EVT_FLAG810;
+        *(uint32_t *)(o + 8) &= ~AM2_EVT_FLAG810;
 }
 
 /* +0x10 is AM2_Object.owner, which objtable.h reads with movsx as int8_t. */
