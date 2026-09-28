@@ -2229,7 +2229,6 @@ void __cdecl SeqAddKind6(const int32_t *at, int32_t variant)
         return;
 
     seq = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_A);
-    row = *(uint8_t **)(seq + SEQ_OFF_ROW);
 
     *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND6;
     *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = (uint8_t)variant;
@@ -2239,6 +2238,7 @@ void __cdecl SeqAddKind6(const int32_t *at, int32_t variant)
     *(int32_t *)(seq + SEQ_OFF_LIFE)     = AM2_SEQ_LIFE6;
     *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
 
+    row = *(uint8_t **)(seq + SEQ_OFF_ROW);
     *(uint8_t *)(row + ROW_OFF_CELL)     = 0;
     *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
     *(int32_t *)(row + 0)                = 1;

@@ -614,8 +614,8 @@ int32_t __cdecl LoadDefaultCof(void)
  */
 int32_t __cdecl SaveGame(const char *name)
 {
-    char       lvl[0x104];
-    char       path[0xFC];
+    char       lvl[0x100];
+    char       path[0x100];
     uint8_t    fd[AM2_FINDDATA_BYTES];
     am2_FILE  *fp;
     int32_t    h;

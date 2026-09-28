@@ -463,10 +463,16 @@ void __cdecl SetPointRule(void *obj)
             return;
         }
 
-        *(uint32_t *)(uintptr_t)ADDR_POINT_RULE =
-            (uint32_t)(uintptr_t)PointRuleVehicle;
-        if (ObjIsType8((const AM2_Object *)o))
-            return;
+        {
+            /* Asked BEFORE the store and tested after it -- the original's
+             * order; the other way round scheduled the store first. */
+            int32_t roach = ObjIsType8((const AM2_Object *)o);
+
+            *(uint32_t *)(uintptr_t)ADDR_POINT_RULE =
+                (uint32_t)(uintptr_t)PointRuleVehicle;
+            if (roach)
+                return;
+        }
     }
 
     *(uint32_t *)(uintptr_t)ADDR_POINT_RULE =

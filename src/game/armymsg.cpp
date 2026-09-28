@@ -542,7 +542,7 @@ void __cdecl TellOneSlot(int32_t slot)
                     h->uid = *(const uint32_t *)(obj + 4);
                 AppendTroopState(msg, obj);
             }
-            if ((uint32_t)h->len + AM2_TROOP_BATCH_SLACK
+            if (h->len + AM2_TROOP_BATCH_SLACK
                     > AM2_TROOP_BATCH_MAX) {
                 ArmyMessageSend(msg);
                 h->len = (uint16_t)sizeof(AM2_ArmyMsgHdr);
@@ -1346,8 +1346,8 @@ void __cdecl SendVehicleExit(void *vehicle, void *occupant)
         return;
 
     msg.hdr.len  = AM2_MSG_VEHICLE_EXIT_LEN;
-    msg.hdr.kind = AM2_MSG_VEHICLE_EXIT;
     msg.hdr.uid  = UidOnWire(((const AM2_Object *)vehicle)->uid);
+    msg.hdr.kind = AM2_MSG_VEHICLE_EXIT;  /* after uid, the original's order */
     msg.occupant = UidOnWire(((const AM2_Object *)occupant)->uid);
 
     ArmyMessageSend(&msg);
@@ -2006,7 +2006,7 @@ void __cdecl SendVehicleUpdates(int32_t slot)
                     h->uid = *(const uint32_t *)(obj + OBJ_OFF_UID);
                 VehicleUpdateAppend(msg, obj);
             }
-            if ((uint32_t)h->len + AM2_TROOP_BATCH_SLACK
+            if (h->len + AM2_TROOP_BATCH_SLACK
                     > AM2_TROOP_BATCH_MAX) {
                 ArmyMessageSend(msg);
                 h->len = (uint16_t)sizeof(AM2_ArmyMsgHdr);

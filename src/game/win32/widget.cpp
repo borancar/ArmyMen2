@@ -8826,7 +8826,10 @@ void __cdecl OnVolumeVoice(AM2_Widget *w)
  * copy of it.
  * ------------------------------------------------------------------ */
 
-static void ReturnToOptions(void)
+/* `inline` is load-bearing: the original has this body at every call site,
+ * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
+ * each caller compiled to push/call/pop -- the relink found it. */
+static inline void ReturnToOptions(void)
 {
     if (g_gameState == 2) {
         g_subState     = MENU_MODE_OPTIONS;

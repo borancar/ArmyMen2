@@ -784,8 +784,8 @@ void __cdecl EventMessageSend(int32_t type, int32_t num1, uint32_t uid1,
                  "uid2=%x\n", type, num1, uid1, num2, uid2);
 
     msg.len         = 0x28;
+    msg.uid         = 0;                  /* before kind, the original's order */
     msg.kind        = AM2_ARMY_MSG_EVENT;
-    msg.uid         = 0;
     msg.type        = (uint8_t)type;
     msg.num1        = num1;
     msg.uid1        = UidOnWire(uid1);

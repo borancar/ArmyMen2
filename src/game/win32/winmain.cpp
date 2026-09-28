@@ -386,12 +386,6 @@ void __cdecl StartIntro(void)
  * then the state handler, then a post-step the original reaches by tail jump
  * from every arm INCLUDING the out-of-range one -- so a state above 4 is not
  * an error, it just runs no handler. */
-typedef void (*am2_state_fn)(void);
-
-static const am2_state_fn kStateFrame[] = {
-    State0Frame, State1Frame, State2Frame, State3Frame, State4Frame,
-};
-
 void __cdecl RunFrame(void)
 {
     if (!*(const int32_t *)(uintptr_t)ADDR_APP_ACTIVE)
@@ -401,10 +395,16 @@ void __cdecl RunFrame(void)
     PollInput();
     FramePre();
 
-    uint32_t state = *(const uint32_t *)(uintptr_t)ADDR_GAME_STATE;
-
-    if (state <= 4)
-        kStateFrame[state]();
+    /* A switch, not a table of function pointers: the original is a jump
+     * table over five arms that each CALL their state's frame, in order. An
+     * indexed `call [table]` does the same thing in a different shape. */
+    switch (*(const uint32_t *)(uintptr_t)ADDR_GAME_STATE) {
+    case 0: State0Frame(); break;
+    case 1: State1Frame(); break;
+    case 2: State2Frame(); break;
+    case 3: State3Frame(); break;
+    case 4: State4Frame(); break;
+    }
 
     FramePost();
 }

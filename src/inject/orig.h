@@ -11082,8 +11082,10 @@ typedef struct {
  * at least and NINE at most. Ten is correct and tight by one. */
 #define ADDR_TELL_ONE_SLOT       0x0044C480u  /* void(int32_t slot) */
 #define ADDR_APPEND_TROOP_STATE  0x0044BC10u  /* void(msg *, void *obj) */
-#define AM2_TROOP_BATCH_MAX      0x12Cu  /* the whole message buffer */
-#define AM2_TROOP_BATCH_SLACK    0x0Au   /* what it keeps free for one more */
+/* Plain ints: the flush test compares the promoted uint16_t length SIGNED
+ * (`jle`); a `u` suffix made it unsigned (`jbe`). */
+#define AM2_TROOP_BATCH_MAX      0x12C   /* the whole message buffer */
+#define AM2_TROOP_BATCH_SLACK    0x0A    /* what it keeps free for one more */
 /* The same number as AM2_MSG_TROOP_FIRST above, and not by accident: the
  * batch is the lowest code the trooper dispatcher handles, so the range's
  * lower bound and this kind are one value seen two ways. Spelled separately

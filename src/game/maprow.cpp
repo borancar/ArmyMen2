@@ -564,8 +564,8 @@ void __cdecl DepthLink(void *node, void **head)
     while (DEPTH_NEXT(e)) {
         e = DEPTH_NEXT(e);
         if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) <= 0) {
-            DEPTH_NEXT(n)              = e;
-            DEPTH_PREV(n)              = DEPTH_PREV(e);
+            DEPTH_PREV(n)              = DEPTH_PREV(e);  /* read first, */
+            DEPTH_NEXT(n)              = e;              /* as the original */
             DEPTH_PREV(e)              = n;
             DEPTH_NEXT(DEPTH_PREV(n))  = n;
             return;
