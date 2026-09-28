@@ -752,6 +752,14 @@ static_assert(offsetof(AM2_Widget, parent) == 0x28, "widget parent offset");
  * the rest of the line. The clip rectangle is passed by value. Still
  * original. */
 
+/* A widget's DELETING destructor frees through the game's own `operator
+ * delete` (0x004648F5), not `free` -- the `delete this` it was compiled from.
+ * Through ADDR_GAME_DELETE, which the standalone builds redirect to their
+ * am2_sa_operator_delete; calling am2_free instead was the same heap and the
+ * wrong call, 34 deleting destructors off by one call target in the relink. */
+#define orig_delete(p) \
+    ((void (__cdecl *)(void *))((void *)(uintptr_t)(ADDR_GAME_DELETE)))(p)
+
 void __attribute__((thiscall)) AM2_Widget::WidgetDestruct()
 {
     AM2_Widget *w = this;
@@ -780,7 +788,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::WidgetDelete(int32_t flags)
 
     ::WidgetDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -798,7 +806,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::LabelDelete(int32_t flags)
 
     ::LabelDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -1138,7 +1146,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ListDelete(int32_t flags)
 
     ::ListDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -1486,7 +1494,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::TextListDelete(int32_t flags)
 
     ::ListDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -1607,7 +1615,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::IconDelete(int32_t flags)
 
     ::IconDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -1631,7 +1639,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::BlinkerDelete(int32_t flags)
 
     ::BlinkerDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -1665,7 +1673,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ButtonDelete(int32_t flags)
 
     ::ButtonDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -1854,7 +1862,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::EditDelete(int32_t flags)
 
     ::EditDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -1888,7 +1896,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::WidgetDeleteAlt(int32_t flags
 
     ::WidgetDestructThunk(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -1905,7 +1913,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::FocusLabelDelete(int32_t flag
 
     ::FocusLabelDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -2024,7 +2032,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ScrollBarDelete(int32_t flags
 
     ::ScrollBarDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -2129,7 +2137,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::ArrowDelete(int32_t flags)
 
     ::ArrowDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -2147,7 +2155,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DialogDelete(int32_t flags)
 
     ::DialogDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -2166,7 +2174,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DialogDelete(int32_t flags)
         AM2_Widget *w = this;                                                \
         ::name##Destruct(w);                                                 \
         if (flags & 1)                                                       \
-            am2_free(w);                                                     \
+            orig_delete(w);                                                  \
         return w;                                                            \
     }
 
@@ -2233,7 +2241,7 @@ AM2_Widget *__attribute__((thiscall)) HudTopDelete(AM2_Widget *w, int32_t flags)
 {
     HudTopDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -2251,7 +2259,7 @@ AM2_Widget *__attribute__((thiscall)) HudPanelDelete(AM2_Widget *w,
 {
     HudPanelDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -2276,7 +2284,7 @@ AM2_Widget *__attribute__((thiscall)) HudRadarDelete(AM2_Widget *w,
 {
     HudRadarDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -2308,7 +2316,7 @@ AM2_Widget *__attribute__((thiscall)) HudSquadDelete(AM2_Widget *w,
 {
     HudSquadDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -2334,7 +2342,7 @@ AM2_Widget *__attribute__((thiscall)) HudEdgeDelete(AM2_Widget *w,
 {
     HudEdgeDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -2358,7 +2366,7 @@ AM2_Widget *__attribute__((thiscall)) HudSargeDelete(AM2_Widget *w,
 {
     HudSargeDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -2395,7 +2403,7 @@ AM2_Widget *__attribute__((thiscall)) HudCommandsDelete(AM2_Widget *w,
 {
     HudCommandsDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -4049,7 +4057,7 @@ AM2_Widget *__attribute__((thiscall)) CheckBoxDelete(AM2_Widget *w,
 {
     CheckBoxDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -4085,7 +4093,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::CountButtonDelete(int32_t fla
 
     ::CountButtonDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -4540,7 +4548,7 @@ AM2_Widget *__attribute__((thiscall)) MoviesDelete(AM2_Widget *w, int32_t flags)
 {
     MoviesDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -4574,7 +4582,7 @@ AM2_Widget *__attribute__((thiscall)) ArrowBarDelete(AM2_Widget *w,
 {
     ArrowBarDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -4602,7 +4610,7 @@ AM2_Widget *__attribute__((thiscall)) SaveListDelete(AM2_Widget *w,
 {
     SaveListDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -14605,7 +14613,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpPanelDelete(int32_t flags)
 
     ::MpPanelDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 
@@ -14615,7 +14623,7 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpDialogDelete(int32_t flags)
 
     ::MpDialogDestruct(w);
     if (flags & 1)
-        am2_free(w);
+        orig_delete(w);
     return w;
 }
 

@@ -97,6 +97,40 @@ def _find_all(img, needle):
     return out
 
 
+NATIVE_DEV = os.path.join(BM.REPO, "build", "armymen2-dev")
+DATA_LO, DATA_HI = 0x0046F000, 0x00666000
+
+
+def placed_data_symbols():
+    """{plain identifier -> original VA} for every data symbol the native
+    placed build laid inside the original data range."""
+    import subprocess
+    if not os.path.exists(NATIVE_DEV):
+        sys.exit("relink: %s not built (make native-dev)" % NATIVE_DEV)
+    out = subprocess.run(["nm", "-C", "--defined-only", NATIVE_DEV],
+                         capture_output=True, text=True).stdout
+    m = {}
+    for line in out.splitlines():
+        p = line.split(None, 2)
+        if len(p) == 3 and p[1] in "dDbBrR":
+            va = int(p[0], 16)
+            if DATA_LO <= va < DATA_HI:
+                m[p[2].split("[")[0].strip()] = va
+    return m
+
+
+def data_va(sym, placed):
+    """A COFF data symbol's original VA: `_name` (C linkage) or `?name@@3...`
+    (a C++-linkage global; `3` is MSVC's code for a global variable)."""
+    if sym.startswith("_") and sym[1:] in placed:
+        return placed[sym[1:]]
+    if sym.startswith("?") and "@@" in sym:
+        # ?name@@3... is a global variable, ?name@@YA... a free function; a
+        # class member is ?name@Class@@ and never reaches here as a bare name.
+        return placed.get(sym[1:sym.index("@@")])
+    return None
+
+
 def import_va(sym, imap):
     """VA for a COFF __imp_ symbol, e.g. __imp__IntersectRect@12 -> IAT slot."""
     if not sym.startswith("__imp_"):
@@ -187,25 +221,30 @@ def main():
     sym_va = dict(ORIGFN_VA)     # coff symbol name -> real VA
     sym_va.update(HELPER_VA)
 
-    # Migrated-global symbols: standalone.h (now included under AM2_RELINK too)
-    # redirects each ADDR_X to &am2_x, so the reconstruction's ((T*)ADDR_X)[i]
-    # compiles to symbol-relative [idx*scale + am2_x] -- the original's form, not
-    # the constant-base fold.  Map each am2_x symbol to the VA its ADDR_X names.
-    gv = re.compile(r"#define\s+(ADDR_[A-Z0-9_]+)\s+"
-                    r"\(\(uintptr_t\)\(const (?:void|char) \*\)&?(am2_[A-Za-z0-9_]+)")
-    ng = 0
+    # Migrated-global symbols.  Under AM2_STANDALONE every global the
+    # reconstruction reaches is a real C symbol (a placed table, or a member of
+    # am2_origstate, the one struct spanning the .bss working region), so
+    # ((T*)ADDR_X)[i] compiles to symbol-relative [idx*scale + am2_x] -- the
+    # original's form, not the constant-base fold.  Where each symbol LIVES is
+    # read from the native placed build rather than guessed: placement lays
+    # every one at its original VA, so build/armymen2-dev's symbol table IS the
+    # map.  (It used to be a regex over standalone.h's redirects, which gave a
+    # struct the VA of whichever member view it met first.)  Only symbols inside
+    # the original data range count -- one outside it was not placed.
+    placed = placed_data_symbols()
+    ng = len(placed)
+    # Standalone stand-ins for original functions: standalone.h redirects
+    # ADDR_X to AM2_SA(am2_sa_y) (operator new/delete, the logger, the DirectX
+    # creators), so a call compiles to a direct e8 at am2_sa_y -- which stands
+    # for the original function at ADDR_X.
+    sa = re.compile(r"#define\s+(ADDR_[A-Z0-9_]+)\s+AM2_SA\((am2_sa_[A-Za-z0-9_]+)\)")
     for line in open(os.path.join(BM.REPO, "src/inject/standalone.h")):
-        m = gv.match(line.strip())
+        m = sa.match(line.strip())
         if m and m.group(1) in addr:
-            sym_va.setdefault("_" + m.group(2), addr[m.group(1)])
-            ng += 1
-    # am2_origstate is the single struct reserving the whole .bss working region
-    # at ORIGBSS; a member redirect (ADDR_X -> &am2_origstate.member) compiles to
-    # a reloc against am2_origstate whose ADDEND is the member offset, so the base
-    # symbol resolves to ORIGBSS (not the member VA the gv loop guessed above).
+            placed.setdefault(m.group(2), addr[m.group(1)])
     sym_va["_am2_origstate"] = 0x0048E000
     if "--unresolved" in sys.argv:
-        sys.stderr.write("migrated-global symbols mapped: %d\n" % ng)
+        sys.stderr.write("placed data symbols mapped: %d\n" % ng)
     imap = import_map()         # base import name -> IAT slot VA
     compiled = {}               # file -> (secs, symlist, names, base)
     with tempfile.TemporaryDirectory() as od, tempfile.TemporaryDirectory() as odb:
@@ -284,6 +323,7 @@ def main():
         unresolved_hist = collections.Counter()
         diffs = []
         newly = []              # relink matches that the piecewise harness misses
+        dump = []               # --json: every compared function, resolved
         regressed = []
         strcache = {}           # string constant symbol -> image VA (or None)
         for f in sorted(byfile):
@@ -315,6 +355,8 @@ def main():
                     tgt_name = symlist[symidx][0]
                     tgt_va = sym_va.get(tgt_name)
                     if tgt_va is None:
+                        tgt_va = data_va(tgt_name, placed)
+                    if tgt_va is None:
                         tgt_va = import_va(tgt_name, imap)
                     if tgt_va is None:
                         tgt_va = string_va(tgt_name, secs, symlist, symidx,
@@ -334,6 +376,10 @@ def main():
                     struct.pack_into("<I", cur, roff, val & 0xffffffff)
                 orig = bytearray(img.read(va, n))
                 ok = all(wildcard[i] or cur[i] == orig[i] for i in range(n))
+                dump.append(dict(fn=fn, va=va, file=os.path.relpath(f, BM.REPO),
+                                 ok=ok, ours=bytes(cur).hex(),
+                                 orig=bytes(orig).hex(),
+                                 wild=[i for i in range(n) if wildcard[i]]))
                 # the true piecewise baseline: bytematch.py on the NON-relink .obj
                 piece_ok = False
                 if base is not None:
@@ -359,6 +405,11 @@ def main():
                              if not wildcard[i] and cur[i] != orig[i])
                     diffs.append((nd, fn, va, os.path.basename(f)))
 
+    if "--json" in sys.argv:
+        import json
+        path = sys.argv[sys.argv.index("--json") + 1]
+        with open(path, "w") as fh:
+            json.dump(dump, fh)
     print("=== relink byte-match (siblings + CRT + IAT + migrated globals resolved) ===")
     print("  match %d   diff %d   (relink closes %d the piecewise harness cannot)"
           % (match, diff, len(newly)))
