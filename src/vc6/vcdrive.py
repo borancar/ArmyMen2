@@ -6,7 +6,14 @@ same route under Wine, and compare their frames.
     vcdrive.py ROUTE --ab                                   stock, then vc6, then compare
 
 Routes: bootcamp (title -> BOOT CAMP -> mission), campaign (SINGLE PLAYER ->
-player -> SELECT -> NEW -> MAP 01 -> mission), load (... -> LOAD a save).
+player -> SELECT -> NEW -> MAP 01 -> mission), load (... -> LOAD a save),
+multi (MULTI-PLAYER -> TCP/IP -> SELECT -> START A WAR -> type a game name;
+the DirectPlay host path, ab.sh's `multi`).
+
+STOCK ALWAYS RUNS AS A COPY WITH GOG'S MULTI-PLAYER PATCH UNDONE (the byte at
+0x0044D8FE put back from `jmp` to the retail `je`; src/inject/restore.c). The
+reconstruction always builds that button now, so unpatched stock would be a
+different title screen.
 Shots land in build/vc6drive/<tag>_<NN><step>.png.
 
 HOW IT DRIVES, and why each piece is the way it is:
@@ -54,6 +61,22 @@ OUT = os.path.join(REPO, "build", "vc6drive")
 DRV = "ArmyMen2_drv.exe"
 DISPLAY = ":99"
 STOCK_CURSOR = 0x00485464            # ADDR_CURSOR_X; Y and POINT follow
+MP_JUMP = 0x0044D8FE                 # restore.c's MULTIPLAYER_JUMP: EB -> 74
+
+
+def stock_with_mp():
+    """A copy of stock with the title's MULTI-PLAYER button restored."""
+    import pefile
+    pe = pefile.PE(STOCK, fast_load=True)
+    off = pe.get_offset_from_rva(MP_JUMP - pe.OPTIONAL_HEADER.ImageBase)
+    data = bytearray(open(STOCK, "rb").read())
+    if data[off] != 0xEB:
+        sys.exit("vcdrive: 0x%08X is %02X, expected EB" % (MP_JUMP, data[off]))
+    data[off] = 0x74
+    out = os.path.join(OUT, "ArmyMen2-mp.exe")
+    os.makedirs(OUT, exist_ok=True)
+    open(out, "wb").write(bytes(data))
+    return out
 
 # (action, args..., shot-name-or-None). Coordinates are game coordinates.
 ROUTES = {
@@ -74,6 +97,18 @@ ROUTES = {
         ("key", "Return", 25, "briefing"),
         ("click", 320, 240, 8, "mission"),
         ("key", "space", 8, "mission2"),
+    ],
+    "multi": [
+        ("wait", 14, "title"),
+        ("click", 306, 222, 12, "mpconnect"),   # the list fills over ~9 s
+        ("click", 200, 176, 3, "tcprow"),
+        ("click", 515, 221, 4, "session"),
+        ("click", 321, 222, 5, "startwar"),
+        # Lowercase first: the first synthetic keystroke races its Shift, and
+        # the capital came out on either side at random. Shift is still
+        # exercised by the B mid-string.
+        ("type", "zulu^Battle Royale With Extra Cheese", 3, "typed"),
+        ("wait", 6, "later"),
     ],
     "load": [
         ("wait", 14, "title"),
@@ -148,13 +183,18 @@ def run(route, exe, side, tag):
                       "C:\\GOG Games\\Army Men II\\" + DRV, "-nointro"],
                      cwd=GAMEDIR, env=env, stdout=log, stderr=log)
     shots = []
+    # Park the X pointer inside the game window ONCE, early. It must not move
+    # again: the game reads buffered relative DirectInput, so a motion event
+    # consumed AFTER a cursor write is added on top of it -- parking right
+    # before each click made the first click of a route land off target.
+    time.sleep(3)
+    x("xdotool", "mousemove", "320", "240")
     try:
         n = 0
         for step in ROUTES[route]:
             kind = step[0]
             if kind == "wait":
                 time.sleep(step[1]); name = step[2]
-                x("xdotool", "mousemove", "320", "240")   # park, once, in-window
             elif kind == "click":
                 pid = game_pid()
                 if not pid:
@@ -164,6 +204,9 @@ def run(route, exe, side, tag):
                 x("xdotool", "mousedown", "1"); time.sleep(0.15)
                 x("xdotool", "mouseup", "1")
                 time.sleep(step[3]); name = step[4]
+            elif kind == "type":
+                x("xdotool", "type", "--delay", "60", step[1])
+                time.sleep(step[2]); name = step[3]
             else:
                 x("xdotool", "key", step[1])
                 time.sleep(step[2]); name = step[3]
@@ -202,13 +245,15 @@ def main():
     ap.add_argument("--ab", action="store_true")
     a = ap.parse_args()
     if a.ab:
-        s = run(a.route, STOCK, "stock", a.route + "-stock")
+        s = run(a.route, stock_with_mp(), "stock", a.route + "-stock")
         v = run(a.route, VC6, "vc6", a.route + "-vc6")
         for ps, pv in zip(s, v):
             print("%-24s %s px" % (os.path.basename(ps).split("_", 1)[1], ae(ps, pv)))
         return 0
     exe = {"stock": STOCK, "vc6": VC6}.get(a.exe, a.exe)
-    side = "stock" if exe == STOCK else "vc6"
+    side = "stock" if a.exe == "stock" or exe == STOCK else "vc6"
+    if side == "stock":
+        exe = stock_with_mp()
     for p in run(a.route, exe, side, a.tag or "%s-%s" % (a.route, side)):
         print(p)
     return 0

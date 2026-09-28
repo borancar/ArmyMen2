@@ -286,11 +286,12 @@ outside is game logic holding a handle it did not make.
   is what a loop back-edge looks like. With that, 16 candidates become 6 and
   all 6 are real.
 
-  **`AM2_MULTIPLAYER=1` puts the button back**, via `src/inject/restore.c`, and
-  that is the only way the reconstructed DirectPlay code can be exercised at
-  all — the whole subsystem is otherwise unreachable. It is off by default
-  because anything restored there makes the process differ from the binary it
-  is derived from, which `tools/ab.sh` will correctly flag.
+  **The patch is undone for good** (Boran, 2026-09-28). The reconstruction
+  always builds the button, and `src/inject/restore.c` and the hybrid loader
+  always put the byte back on the original side, so every build and both
+  halves of every A/B have MULTI-PLAYER. It used to be opt-in behind
+  `AM2_MULTIPLAYER=1`, which left the whole DirectPlay subsystem unreachable
+  by default.
 - **The copy protection in this executable is patched out, and that is not the
   same as absent.** `FindGameCD` is called from five places; all five branch on
   the result with `EB` (`jmp`) where a `75` (`jne`) has to have been, so the

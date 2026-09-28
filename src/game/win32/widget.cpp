@@ -26,7 +26,6 @@
 #include "../crt.h"
 #include "../../inject/patch.h"
 #include "startgame.h"
-#include "../../inject/restore.h"
 #include "mapdraw.h"   /* SetDrawTarget -- reconstructed */
 #include "winmain.h"   /* Ticks -- reconstructed */
 #include "../army.h"    /* LookupOwnerObj -- reconstructed */
@@ -8635,13 +8634,12 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::TyperConstruct(int32_t left, 
  * DirectPlay, and clears the session role and the two saved names. Coming to
  * the title screen is how a multiplayer session is torn down.
  *
- * **It also holds the binary patch that removes MULTI-PLAYER.** `0x0044D8FE`
- * is an ordinary `je` on the allocation in the retail compile and an `EB`
- * here, so that one button is skipped unconditionally -- see
- * docs/binarypatches.md. A reconstruction cannot honour a patch inside the
- * function it replaces, so this asks `restore_multiplayer()` instead. Both
- * routes read AM2_MULTIPLAYER, which is what keeps the two halves of an A/B
- * agreeing: the `orig` side still gets its button from the byte. */
+ * **The GOG build's patch that removes MULTI-PLAYER is UNDONE here, for
+ * good** (Boran, 2026-09-28). `0x0044D8FE` is an ordinary `je` on the
+ * allocation in the retail compile and an `EB` in the GOG binary, which skips
+ * the button unconditionally -- see docs/binarypatches.md. This builds all
+ * seven buttons, as the compiled code did; src/inject/restore.c and the
+ * hybrid loader put the byte back so the original side of an A/B does too. */
 typedef struct {
     int32_t  top;
     void   (__cdecl *handler)(AM2_Widget *);
@@ -8664,7 +8662,6 @@ static const AM2_TitleButton kTitleButtons[] = {
     { 0x0172, kOnQuit,
       { AM2_BMP_03_106_00, AM2_BMP_03_106_01, AM2_BMP_03_106_02 } },  /* 03_106 quit      */
 };
-#define AM2_TITLE_MULTIPLAYER_ROW 2
 
 void __cdecl OpenTitleScreen(void)
 {
@@ -8689,17 +8686,6 @@ void __cdecl OpenTitleScreen(void)
         const AM2_TitleButton *b = &kTitleButtons[i];
         AM2_Widget            *btn;
 
-        if (i == AM2_TITLE_MULTIPLAYER_ROW && !restore_multiplayer()) {
-            /* The shipped image's patch (docs/binarypatches.md) turns the
-             * `je` after this row's `new` (0x0044D8FE) into a `jmp` to the
-             * failure arm, so the 0x78-byte button is still ALLOCATED --
-             * never constructed, never freed -- and AddChild gets NULL.
-             * Allocate it too: skipping it moved every heap address after
-             * this by one block, and the depth comparator breaks ties on
-             * those addresses. Found by AM2_TRACE_HEAP, not by any frame. */
-            (void)orig_operator_new(AM2_BUTTON_SIZE);
-            continue;
-        }
         btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
         if (btn) {
             AM2_Rect box;

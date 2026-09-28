@@ -158,6 +158,13 @@ running, and both are in **`docs/verification.md`**:
   original under Unicorn, records input→output vectors, and replays them against
   our C++ — for functions pure over memory a stub or the mapped image supplies.
 
+**GOG's MULTI-PLAYER patch is undone for good** (Boran, 2026-09-28). The
+reconstruction always builds the title's MULTI-PLAYER button, and every route
+that runs the original puts the byte back (`src/inject/restore.c`, the hybrid
+loader, `src/vc6/vcdrive.py`), so both halves of an A/B have it. There is no
+`AM2_MULTIPLAYER` opt-in any more; the other GOG patches (copy protection) are
+untouched. Details in `docs/binarypatches.md`.
+
 Where the input space is small, an **enumerating oracle** beats sampling; the
 family of them (`moviecheck`, `posecheck`, `shakecheck`, `scriptcheck`, …) and
 the rules for writing one are in `docs/verification.md` and `docs/oracles.md`.

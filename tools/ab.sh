@@ -210,10 +210,9 @@ play() {
         # which has two real text fields, and types into one -- so it compares
         # the handler install as well as the painting.
         #
-        # It needs AM2_MULTIPLAYER=1, because the title screen's MULTI-PLAYER
-        # entry is patched out of this build (docs/binarypatches.md) and the
-        # whole DirectPlay subsystem is otherwise unreachable. Both sides get
-        # it, so the comparison is still like for like.
+        # The title screen's MULTI-PLAYER entry was patched out of the GOG
+        # build (docs/binarypatches.md); that patch is undone for good on both
+        # sides (restore.c always puts the byte back), so no opt-in is needed.
         multi)    args="-nointro -dbg"    ; wait=25 ;;
         # MULTIPLAYER OPTIONS -- 43 checkboxes in two columns under five group
         # headings, and the only screen in the game that is DECLARED rather
@@ -330,8 +329,6 @@ play() {
     [ -f "$optcfg" ] && cp -p "$optcfg" "$WORK/Options.cfg.$cfg.$side"
 
     local extra=""
-    [ "$cfg" = multi ] && extra="AM2_MULTIPLAYER=1"
-    [ "$cfg" = mpoptions ] && extra="AM2_MULTIPLAYER=1"
     # TRACE=1 is the default and every recorded figure in CLAUDE.md was taken
     # with it. AM2_AB_TRACE exists to answer one question -- whether the trace
     # stubs are what makes the reconstruction side slower than its recorded

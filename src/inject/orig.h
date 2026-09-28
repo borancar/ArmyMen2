@@ -6077,8 +6077,8 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
  * That offset was already named -- COMM_OFF_IS_HOST, "from DPCAPS_ISHOST" --
  * so the reading needed no new name and is corroborated by whoever named it.
  * It is also the only observable this function has that a drive could ever
- * reach: host and join differ visibly, and both are reachable with
- * AM2_MULTIPLAYER=1.
+ * reach: host and join differ visibly, and both are reachable now that the
+ * title screen's MULTI-PLAYER entry is restored.
  *
  * THE RULES LIST IS POPULATED WITH AN INLINED strcmp, which is worth
  * recognising rather than transcribing. The constructor walks the name table
@@ -6665,11 +6665,12 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
 /* The TITLE SCREEN, 0x0044D730 -- arm 1 of the menu table, and the one arm
  * that is not a factory: it builds the whole screen inline.
  *
- * It also holds the binary patch that removes MULTI-PLAYER. `0x0044D8FE` is
- * an ordinary `je` on the allocation in the retail compile and an `EB` here,
- * so the button is skipped unconditionally; docs/binarypatches.md has the
- * byte. A reconstruction cannot honour a patch inside the function it
- * replaces, so ours asks restore_multiplayer() instead. */
+ * It also holds the GOG binary patch that removes MULTI-PLAYER. `0x0044D8FE`
+ * is an ordinary `je` on the allocation in the retail compile and an `EB` in
+ * the GOG build, so the button is skipped unconditionally;
+ * docs/binarypatches.md has the byte. The patch is undone for good: ours
+ * always builds the button, and restore.c / the hybrid loader put the byte
+ * back on the original side. */
 #define ADDR_OPEN_TITLE_SCREEN   0x0044D730u  /* void(void) */
 #define ADDR_ON_BOOT_CAMP        0x0044D3F0u
 #define ADDR_ON_SINGLE_PLAYER    0x0044D2E0u

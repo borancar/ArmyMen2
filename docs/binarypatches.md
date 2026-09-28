@@ -75,13 +75,9 @@ skip the button if the allocation failed. Eight of them read
 byte different, and the button is never built. That is the gap on the
 title screen between SINGLE PLAYER and OPTIONS.
 
-It can be put back, and doing so is how the reconstructed DirectPlay
-code gets exercised at all:
-
-```
-AM2_DISPLAY=:99 tools/drive.sh start 25 AM2_MULTIPLAYER=1
-```
-
-See `src/inject/restore.c`. It is off by default because anything
-enabled there makes this process differ from the binary it is derived
-from, which is exactly what `tools/ab.sh` is built to notice.
+**This patch is undone for good** (Boran, 2026-09-28). The
+reconstruction always builds the button, and `src/inject/restore.c`
+and the hybrid loader always put the byte back on the original side,
+so every build -- and both halves of every A/B -- has MULTI-PLAYER,
+and the reconstructed DirectPlay code is reachable. It used to be
+opt-in behind `AM2_MULTIPLAYER=1`.

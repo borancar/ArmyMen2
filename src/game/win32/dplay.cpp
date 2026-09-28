@@ -1734,8 +1734,8 @@ int32_t __attribute__((thiscall)) CommSendLobbyProperty(void *comm, uint32_t val
  * spells that `neg`/`sbb`/`inc`, which is the usual MSVC idiom for
  * `hr == 0` and not a sign that anything subtle is happening.
  *
- * NOT EXERCISED HERE, and it cannot be without AM2_MULTIPLAYER=1: with the
- * button patched out the whole DirectPlay subsystem is unreachable. Verified
+ * Reachable since GOG's MULTI-PLAYER patch was undone (2026-09-28); with the
+ * button patched out the whole DirectPlay subsystem was unreachable. Verified
  * by reading, like the rest of dplay.cpp. */
 int32_t __cdecl CommEnumPlayers(void)
 {

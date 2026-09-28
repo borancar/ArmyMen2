@@ -92,19 +92,6 @@ extern "C" int patch_replace(uintptr_t addr, const void *fn, const char *name,
     return 0;
 }
 
-/* The MULTI-PLAYER button was removed from the retail binary by a
- * post-compilation patch, and src/inject/restore.c puts it back for testing.
- * A standalone build has no such patch to undo -- what it draws is decided by
- * the reconstruction, not by six overwritten branches. */
-/* Declared `int` in src/inject/restore.h and CALLED as `!restore_multiplayer()`
- * by the title-screen builder -- so a `void` stub returned whatever was in eax
- * and built the MULTI-PLAYER button on a coin toss. Match the injected side:
- * off unless AM2_MULTIPLAYER=1. */
-extern "C" int restore_multiplayer(void)
-{
-    const char *o = getenv("AM2_MULTIPLAYER");
-    return o && *o == '1';
-}
 
 static FILE *sa_logfile(void);   /* defined with the logger below */
 

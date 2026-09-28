@@ -212,9 +212,19 @@ main result so far (details in `src/vc6/README.md`):
       seven animation-frame ids (ADDR_FIELD_530_FRAMES, indexed unbounded by
       state) were two struct scalars plus a separate `am2_roach_score_ints`;
       now `am2_roach.field_530_frames[7]`. 98 declared views, 0 overruns.
-    - **Still open:** multiplayer and comm paths are unexercised in this image.
+    - **Multiplayer reached (2026-09-28).** GOG's MULTI-PLAYER patch is undone
+      for good (Boran): every build shows the button, and the original side of
+      every A/B gets the byte back (restore.c, the hybrid loader, vcdrive's
+      stock copy); `AM2_MULTIPLAYER` is gone. `vcdrive.py multi --ab` drives
+      MULTI-PLAYER -> the DirectPlay channel list -> START A WAR -> ENTER
+      BATTLE NAME and types into it: every frame within 4 px of stock, through
+      our VC6-compiled dplay.cpp. Two drive artefacts found on the way, neither
+      in the game: the channel list fills over ~9 s (TCP/IP arrives last), and
+      the first synthetic keystroke races its Shift.
+    - **Still open:** a hosted or joined session (needs a second instance).
       The injected `am2hook.dll` build fails at HEAD (misc.h's AM2_Comm in a C
-      TU); this is pre-existing, unrelated, and not yet fixed.
+      TU, and dllmain.c including C++ widget.h); pre-existing, unrelated, not
+      yet fixed.
 - **Fixable per function now:** true source-shape diffs -- signed vs unsigned
   loop bound (`jl`/`jb`), statement order (scheduling), 16- vs 32-bit exprs,
   operand order (`*p==c` vs `c==*p`). ResetTimers (signed address cursor) was

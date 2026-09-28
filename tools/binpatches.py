@@ -252,12 +252,12 @@ def main():
           "`03_101_0*_multiplay.bmp` -- reads `EB 55`. Same displacement, one\n"
           "byte different, and the button is never built. That is the gap on the\n"
           "title screen between SINGLE PLAYER and OPTIONS.\n\n")
-        w("It can be put back, and doing so is how the reconstructed DirectPlay\n"
-          "code gets exercised at all:\n\n")
-        w("```\nAM2_DISPLAY=:99 tools/drive.sh start 25 AM2_MULTIPLAYER=1\n```\n\n")
-        w("See `src/inject/restore.c`. It is off by default because anything\n"
-          "enabled there makes this process differ from the binary it is derived\n"
-          "from, which is exactly what `tools/ab.sh` is built to notice.\n")
+        w("**This patch is undone for good** (Boran, 2026-09-28). The\n"
+          "reconstruction always builds the button, and `src/inject/restore.c`\n"
+          "and the hybrid loader always put the byte back on the original side,\n"
+          "so every build -- and both halves of every A/B -- has MULTI-PLAYER,\n"
+          "and the reconstructed DirectPlay code is reachable. It used to be\n"
+          "opt-in behind `AM2_MULTIPLAYER=1`.\n")
 
     print(f"-> {os.path.relpath(OUT, REPO)}")
     print(f"{len(patches)} patched jumps, {sum(1 for p in patches if p['jump'] in KNOWN)} identified")

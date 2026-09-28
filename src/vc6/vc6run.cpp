@@ -168,7 +168,7 @@ int32_t am2_sa_unimplemented(void) { return 0; }
 /* Misc harness/CRT/input symbols the excluded TUs defined -- milestone stubs. */
 void am2_crt_use_game(void) { }
 void hooklog(const char *fmt, ...) { (void)fmt; }
-int restore_multiplayer(void) { return 0; }
+
 void input_overlay_keyboard(uint8_t *state, uint32_t len) { (void)state; (void)len; }
 void input_pump(void) { }
 uint32_t input_take_events(int32_t kind, void *buf, uint32_t elem, uint32_t max)

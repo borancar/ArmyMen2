@@ -246,8 +246,9 @@ void __cdecl StartMultiplayerGame(void)
  * Both comm calls are already ours, so this is glue over reconstructed code
  * plus one DirectDraw call.
  *
- * NOT EXERCISED without AM2_MULTIPLAYER=1 -- the whole path is behind the
- * patched-out button. Verified by reading. */
+ * Reachable since GOG's MULTI-PLAYER patch was undone (2026-09-28); until
+ * then the whole path sat behind the patched-out button. Verified by
+ * reading. */
 #define REQUEST_HOSTED 7
 
 #define g_paintObject (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)

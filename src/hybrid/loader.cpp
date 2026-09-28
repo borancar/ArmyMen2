@@ -694,6 +694,22 @@ extern "C" int32_t WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline,
                        sec[i].Name, (unsigned)(oh->ImageBase + sec[i].VirtualAddress),
                        (unsigned)n, (unsigned)sec[i].VirtualSize);
     }
+    /* Undo the GOG build's MULTI-PLAYER patch, as src/inject/restore.c does
+     * for the injected harness: at 0x0044D8FE the retail compile's `je` on
+     * the button's allocation was overwritten with `jmp`, so the title never
+     * builds MULTI-PLAYER. Undone for good (Boran, 2026-09-28) -- the port's
+     * OpenTitleScreen always builds it, and the hybrid is its oracle. Only
+     * the expected byte is replaced, so a different executable is left
+     * alone. */
+    {
+        uint8_t *jump = (uint8_t *)(uintptr_t)0x0044D8FEu;
+
+        if (*jump == 0xEB)
+            *jump = 0x74;
+        else if (*jump != 0x74)
+            am2_plat_debug("0x0044D8FE is %02x, not the GOG patch; left alone",
+                           (unsigned)*jump);
+    }
     entry = (void (*)(void))(uintptr_t)(oh->ImageBase + oh->AddressOfEntryPoint);
     am2_hybrid_bind_imports(image, &oh->DataDirectory[AM2_PE_DIR_IMPORT]);
     free(file);

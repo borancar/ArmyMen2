@@ -12,7 +12,7 @@
  * otherwise lacks: the whole comm/multiplayer layer (defined in dplay.cpp,
  * which VC98's DirectX 6.0 headers can't compile -- IDirectPlay4A/Lobby3), the
  * the injected harness's hooklog /
- * restore_multiplayer / patch_replace, and the host trace/pump hooks.
+ * patch_replace, and the host trace/pump hooks.
  *
  * These are MILESTONE stubs: they make the image LINK into a valid PE, which
  * proves the VC6 compile -> blob -> LINK.EXE pipeline end to end.  They are NOT
@@ -53,7 +53,6 @@ void am2_crt_use_game(void) { }
 int patch_replace(unsigned int target, const void *replacement, const char *name, int nargs)
 { (void)target; (void)replacement; (void)name; (void)nargs; return 0; }
 void hooklog(const char *fmt, ...) { (void)fmt; }
-int restore_multiplayer(void) { return 0; }
 
 } /* extern "C" */
 

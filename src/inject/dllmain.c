@@ -417,8 +417,8 @@ static void install(void)
      * it undoes an edit made to the shipping binary -- so it has to apply to
      * both sides of an A/B or the two runs are not the same scenario. Without
      * it here, the original side would have no MULTIPLAYER button and the
-     * multiplayer path could never be compared at all. Still off unless
-     * AM2_MULTIPLAYER=1; see restore.c. */
+     * multiplayer path could never be compared at all. Unconditional:
+     * GOG's patch is undone for good; see restore.c. */
     restore_install();
 
     {

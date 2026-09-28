@@ -6,18 +6,18 @@
  * this puts chosen ones back. `tools/binpatches.py` finds them all and
  * `docs/binarypatches.md` lists them with the evidence.
  *
- * Everything here is off unless asked for, because turning any of it on makes
- * this process behave differently from the executable it is derived from, and
- * that is exactly what `tools/ab.sh` exists to detect. An A/B run with a
- * restore enabled on one side will diverge for a reason that has nothing to do
- * with whether the reconstruction is correct.
+ * The MULTI-PLAYER restore is UNCONDITIONAL (Boran, 2026-09-28: undo GOG's
+ * patch for good). It was opt-in behind AM2_MULTIPLAYER=1; now the
+ * reconstruction always builds the button, so this must always restore it on
+ * the original side, or an A/B compares two different title screens. Any
+ * future restore that is NOT meant to be permanent would still need to apply
+ * to both sides of a run.
  */
 
 #include "patch.h"
 #include "hooklog.h"
 #include "restore.h"
 
-#include <stdlib.h>
 
 /* The MULTIPLAYER entry on the title screen.
  *
@@ -40,22 +40,8 @@
 #define MULTIPLAYER_NOW    0xEB          /* jmp -- always skip the button */
 #define MULTIPLAYER_RETAIL 0x74          /* je  -- skip only if the alloc failed */
 
-static int enabled(const char *name)
-{
-    const char *opt = getenv(name);
-    return opt && *opt == '1';
-}
-
-int restore_multiplayer(void)
-{
-    return enabled("AM2_MULTIPLAYER");
-}
-
 void restore_install(void)
 {
-    if (!enabled("AM2_MULTIPLAYER"))
-        return;
-
     if (patch_byte(MULTIPLAYER_JUMP, MULTIPLAYER_NOW, MULTIPLAYER_RETAIL,
                    "MULTIPLAYER button") == 0)
         hooklog("restore: multiplayer enabled -- the title screen gains its "

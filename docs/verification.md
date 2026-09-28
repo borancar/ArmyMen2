@@ -578,14 +578,13 @@ the shot fell mid-film and is 0 when the film has already finished — the run
 waits 40 seconds. A 0 here is neither a pass nor a failure; it means the screen
 was static at that moment. As with `mission`, the log is the evidence.
 
-**The multiplayer path is a fourth configuration, and it needs
-`AM2_MULTIPLAYER=1`.** Without it the title screen has no MULTI-PLAYER entry —
-that button was patched out of this build, see `docs/binarypatches.md` — and
-the entire DirectPlay subsystem is unreachable, so every reconstructed comm
-function is verifiable only by reading. With it:
+**The multiplayer path is a fourth configuration.** The GOG build patched the
+title screen's MULTI-PLAYER entry out (see `docs/binarypatches.md`); that
+patch is undone for good in every build, so the DirectPlay subsystem is
+reachable from the title screen without any opt-in:
 
 ```
-AM2_DISPLAY=:99 AM2_MAKEVARS="TRACE=1" tools/drive.sh start 25 AM2_MULTIPLAYER=1
+AM2_DISPLAY=:99 AM2_MAKEVARS="TRACE=1" tools/drive.sh start 25
 tools/point.py 306 222 --click     # MULTI-PLAYER
 tools/point.py 200 176 --click     # the TCP/IP row
 tools/point.py 515 221 --click     # SELECT
