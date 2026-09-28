@@ -2312,8 +2312,12 @@ void __cdecl TellEachSlot(void)
     int32_t slot;
 
     for (slot = 0; slot < AM2_COMM_SLOTS; slot++) {
+        /* WAS_HERE (+0x25C), the original's `[esi + ecx + 0x25C]`. This read
+         * COMM_ARMY_OFF_REMOTE (+0x20C) until the VC6 relink put the two side
+         * by side -- a different field of the same record, so it asked the
+         * wrong question of each slot in a multiplayer session. */
         if (!*(const int32_t *)(kCommObj + slot * COMM_ARMY_RECORD_SIZE
-                                + COMM_ARMY_OFF_REMOTE))
+                                + COMM_ARMY_OFF_WAS_HERE))
             continue;
         if (!CommMustBroadcast((void *)kCommObj, (int16_t)slot))
             continue;

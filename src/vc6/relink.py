@@ -340,7 +340,8 @@ def main():
                 # function extent: value .. next defined symbol in this section
                 end = len(data)
                 for nm, (sn, v) in names.items():
-                    if sn == secnum and v > value:
+                    # skip `$L` case labels: see bytematch.func_bytes
+                    if sn == secnum and v > value and not nm.startswith("$"):
                         end = min(end, v)
                 n = len(BM.trim(data[value:end]))
                 if n == 0:
@@ -353,7 +354,17 @@ def main():
                     if not (0 <= roff < n):
                         continue
                     tgt_name = symlist[symidx][0]
-                    tgt_va = sym_va.get(tgt_name)
+                    tgt_sec, tgt_val = symlist[symidx][1], symlist[symidx][2]
+                    tgt_va = None
+                    if tgt_sec == secnum and not tgt_name.startswith(("_", "?")):
+                        # A reference into this function's own section by a
+                        # section or local label symbol -- its switch jump
+                        # table and index table, laid right after the code.
+                        # The function sits at `va`, so the section offset
+                        # maps across by the same delta.
+                        tgt_va = va - value + tgt_val
+                    if tgt_va is None:
+                        tgt_va = sym_va.get(tgt_name)
                     if tgt_va is None:
                         tgt_va = data_va(tgt_name, placed)
                     if tgt_va is None:

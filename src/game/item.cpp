@@ -444,22 +444,24 @@ int32_t __cdecl TakeSoldierName(void)
 {
     uint8_t *tab   = (uint8_t *)((void *)(uintptr_t)(ADDR_SOLDIER_NAMES));
     /* orig_rand's macro is defined further down this file, past here. */
-    int32_t  start = (int32_t)((uint32_t)
+    /* UNSIGNED, both: the wrap test is `jb`, of a piece with the unsigned
+     * `div` the start comes from. A signed index compiles `jl`. */
+    uint32_t start = (uint32_t)
         ((int32_t (__cdecl *)(void))((void *)(uintptr_t)(ADDR_GAME_RAND)))()
-        % AM2_SOLDIER_NAMES);
-    int32_t  i     = start;
+        % AM2_SOLDIER_NAMES;
+    uint32_t i     = start;
 
     while (*(const int32_t *)(tab + (size_t)i * AM2_SOLDIER_NAME_BYTES
                               + SOLDIER_NAME_OFF_TAKEN)) {
         if (++i >= AM2_SOLDIER_NAMES)
             i = 0;
         if (i == start)
-            return start;               /* all taken; not marked */
+            return (int32_t)start;      /* all taken; not marked */
     }
 
     *(int32_t *)(tab + (size_t)i * AM2_SOLDIER_NAME_BYTES
                  + SOLDIER_NAME_OFF_TAKEN) = 1;
-    return i;
+    return (int32_t)i;
 }
 
 void *__cdecl WeaponByUid(uint32_t uid)

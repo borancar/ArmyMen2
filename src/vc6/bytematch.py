@@ -114,8 +114,12 @@ def func_bytes(secs, syms, sym):
     sec = secs[secnum - 1]
     data = sec["data"]
     end = len(data)
-    for (sn, v) in syms.values():
-        if sn == secnum and v > value:
+    # The function ends at the next FUNCTION -- not at the next symbol. MSVC
+    # emits a switch's case labels as `$L1234` symbols inside the function, and
+    # ending there compared a switch function's first few bytes only, so any
+    # function with a jump table could "match" on its prologue.
+    for nm, (sn, v) in syms.items():
+        if sn == secnum and v > value and not nm.startswith("$"):
             end = min(end, v)
     code = bytearray(data[value:end])
     relocs = [va - value for (va, typ) in sec["rels"] if value <= va < end]

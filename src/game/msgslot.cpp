@@ -16,7 +16,10 @@
  * a null record costs nothing and never divides.
  *
  * `rec`, not `comm`: these take a PLAYER record. See msgslot.h. */
-static void SetSlot(void *rec, uint32_t seq, uint32_t off, uint32_t value)
+/* `inline` is load-bearing: the original has this body at every call site,
+ * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
+ * each caller compiled to push/call/pop -- the relink found it. */
+static inline void SetSlot(void *rec, uint32_t seq, uint32_t off, uint32_t value)
 {
     if (!rec)
         return;

@@ -1483,16 +1483,17 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::TextListConstruct(int32_t lef
 /* TextListDelete -- original 0x00433330, the scalar deleting destructor, and
  * the same shape as ListDelete above.
  *
- * The class has no teardown of its own: the original reaches the base through
- * 0x00433350, which is a one-instruction `jmp` to it and is left in the image.
- * Nothing but this function refers to that thunk, and it is five bytes -- the
- * exact size of a detour -- so patching it would be all risk and no gain.
+ * The class has no teardown of its own, but it reaches the base THROUGH its own
+ * destructor, TextListDestruct (0x00433350, a one-instruction `jmp` to
+ * ListDestruct) -- the call a compiler emits for a class whose destructor adds
+ * nothing. Calling ListDestruct directly behaved the same and was the one
+ * byte-level difference in this function.
  */
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::TextListDelete(int32_t flags)
 {
     AM2_Widget *w = this;
 
-    ::ListDestruct(w);
+    ::TextListDestruct(w);
     if (flags & 1)
         orig_delete(w);
     return w;
@@ -8728,7 +8729,10 @@ void __cdecl OpenTitleScreen(void)
  * session: the four bodies really are identical apart from the code.
  * ------------------------------------------------------------------ */
 
-static void RequestScreen(int32_t code)
+/* `inline` is load-bearing: the original has this body at every call site,
+ * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
+ * each caller compiled to push/call/pop -- the relink found it. */
+static inline void RequestScreen(int32_t code)
 {
     PlaySoundAt(2, 0, 0, 0, 0);
     g_menuRequest    = code;
@@ -11344,7 +11348,10 @@ void __cdecl DlgOverwriteOk(AM2_Widget *w)
  *
  * THE MODES ARE NAMED BY THESE BUTTONS' OWN BITMAPS, which is what corrected
  * AM2_MENU_MODE_SAVE and _LOAD; see orig.h. */
-static void GameMenuGoto(int32_t mode)
+/* `inline` is load-bearing: the original has this body at every call site,
+ * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
+ * each caller compiled to push/call/pop -- the relink found it. */
+static inline void GameMenuGoto(int32_t mode)
 {
     PlaySoundAt(AM2_SND_MENU_PICK, 0, 0, 0, 0);
     *(int32_t *)(uintptr_t)ADDR_MENU_MODE     = mode;

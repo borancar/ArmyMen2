@@ -1283,7 +1283,9 @@ void __cdecl ToggleFogOfWar(void)
         } else {
             uint32_t until = *(const uint32_t *)(p + OBJ_OFF_REVEALED_UNTIL);
 
-            if (until == 0
+            /* `<= 0` on an unsigned, i.e. == 0: the original's `jbe` after
+             * `test`, where `== 0` compiles `je`. */
+            if (until <= 0u
                 || *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS < until)
                 ObjConceal(p, 0);
         }

@@ -5526,9 +5526,12 @@ void __cdecl AiStep(void *obj, void *out)
 
     AiBuildContext(obj, ctx);
 
+    /* Case 2 before case 0: arm bodies are laid out in SOURCE order, and the
+     * original's first arm calls the ignore step. Same jump table either way;
+     * only the relink, which resolves call targets, could tell. */
     switch (*(const uint32_t *)(o + OBJ_OFF_AI_MODE)) {
-    case 0:  AiAttackBody(obj, out, ctx); break;
     case 2:  AiStepIgnore(obj, out, ctx);        break;
+    case 0:  AiAttackBody(obj, out, ctx); break;
     case 3:  AiStepFollow(obj, out, ctx);        break;
     case 6:  AiStepAttack(obj, out, ctx);        break;
     case 7:  AiStepDefend(obj, out, ctx);        break;
