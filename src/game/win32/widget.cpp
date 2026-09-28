@@ -5389,6 +5389,16 @@ typedef void (__cdecl *AM2_VoidFn)(void);
 
 #define orig_operator_new     ((AM2_OperatorNewFn)((void *)(uintptr_t)(ADDR_GAME_OPERATOR_NEW)))
 
+#if defined(__GNUC__)
+void *AM2_Widget::operator new(size_t n) { return orig_operator_new(n); }
+void AM2_Widget::operator delete(void *p) { orig_delete(p); }
+#endif
+
+AM2_DifficultyDialog::AM2_DifficultyDialog(const char *bmp)
+{
+    ::DifficultyDialogConstruct(this, bmp);
+}
+
 /* HudCmdInvoke -- original 0x00417180, 56 bytes, thiscall, six callers (one
  * per command). Pick command `mode` if the bar is currently offering it.
  *
@@ -6698,9 +6708,7 @@ void __cdecl OpenControls(void)
 void __cdecl OpenDifficulty(void)
 {
     CloseCurrentScreen();
-    OpenScreen(AM2_DIFFICULTY_SIZE,
-               (AM2_ScreenCtorFn)DifficultyDialogConstruct,
-               "01_000_00_screen.bmp");
+    g_paintObject = (uint8_t *)new AM2_DifficultyDialog("01_000_00_screen.bmp");
 }
 
 void __cdecl OpenQuitConfirm(void)

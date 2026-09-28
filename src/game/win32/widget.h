@@ -2,6 +2,7 @@
 #define AM2_WIDGET_H
 
 #include <stdint.h>
+#include <stddef.h>
 #include "../../inject/orig.h"
 #include "../misc.h"
 #include "../../inject/win32.h"
@@ -268,7 +269,6 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) HudChatSend();
     AM2_Widget * __attribute__((thiscall)) MpSpinConstruct(int32_t left, int32_t top, int32_t width, int32_t height, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row);
     AM2_Widget * __attribute__((thiscall)) MpPanelConstruct(const char *bmp);
-#endif
     void __attribute__((thiscall)) MpPreviewSetBitmap(const char *name);
     AM2_Widget * __attribute__((thiscall)) ArrowBarDelete(int32_t flags);
     void __attribute__((thiscall)) ArrowBarDestruct();
@@ -292,7 +292,27 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) MoviesDestruct();
     AM2_Widget * __attribute__((thiscall)) SaveListDelete(int32_t flags);
     void __attribute__((thiscall)) SaveListDestruct();
+#if defined(__GNUC__)
+    /* `new T(...)` on the game's heap. GCC only: under VC6 a `new` must call
+     * the GLOBAL operator new (??2), as every original `new` does. */
+    static void *operator new(size_t n);
+    static void *operator new(size_t, void *where) { return where; }
+    static void operator delete(void *p);
+#endif
+#endif
 } AM2_Widget;
+
+#ifdef __cplusplus
+/* Screen classes, as the original's C++ had them: `new T(bmp)` allocates
+ * with the global operator new and calls T's constructor, all inside the /GX
+ * unwind frame the original's openers carry. Each constructor here forwards
+ * to the construct function installed at the original constructor's
+ * address; the size is the class's allocation. */
+struct AM2_DifficultyDialog : AM2_Widget {
+    uint8_t pad_[AM2_DIFFICULTY_SIZE - sizeof(AM2_Widget)];
+    AM2_DifficultyDialog(const char *bmp);
+};
+#endif
 static inline AM2_Widget * __attribute__((thiscall)) ArrowBarDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->ArrowBarDelete(flags); }
 static inline void __attribute__((thiscall)) ArrowBarDestruct(AM2_Widget *w)
@@ -1703,7 +1723,7 @@ void __cdecl OpenOptionsMenu(void);
 void __cdecl OpenControls(void);
 
 /* Original: 0x0044EAD0. DIFFICULTY -- the Easy/Medium/Hard list. */
-void __cdecl OpenDifficulty(void);
+extern "C++" void __cdecl OpenDifficulty(void);  /* C++: `new` needs its /GX unwind frame */
 
 /* Original: 0x0044EE50. CONFIRM GAME EXIT: "Are you sure you want to quit?". */
 void __cdecl OpenQuitConfirm(void);

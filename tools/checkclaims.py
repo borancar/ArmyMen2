@@ -132,7 +132,11 @@ def _strip_python_prose(src):
     return COMMENT.sub("", DOCSTRING.sub("", src))
 
 
-PATCH = re.compile(r"patch_replace\(\s*(ADDR_\w+)\s*,\s*\(const void \*\)\s*(\w+)")
+# Both install spellings: a plain function, and a thiscall member installed by
+# address -- every thiscall function is a member now (the VC6 byte-match cannot
+# spell a thiscall free function), and missing that form cost this tool a name.
+PATCH = re.compile(r"patch_replace\(\s*(ADDR_\w+)\s*,\s*"
+                   r"(?:\(const void \*\)\s*|pmf_addr\(&(?:\w+::)?)(\w+)")
 ADDRDEF = re.compile(r"^#define\s+(ADDR_\w+)\s+0x([0-9A-Fa-f]{8})u?", re.M)
 
 

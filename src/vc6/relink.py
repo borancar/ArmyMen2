@@ -113,6 +113,19 @@ def content_va(sym, secs, symlist, symidx, img, site, addend):
     return base if got == want else None
 
 
+def ehhandler_va(img, site):
+    """The /GX unwind-handler stub a function's prologue pushes (`push -1;
+    push handler`). The compiler emits one per function -- `mov eax, offset
+    FuncInfo; jmp ___CxxFrameHandler` -- in its own section, so its VA is
+    read from the original's pushed operand and accepted only when the bytes
+    there have that stub's shape."""
+    ptr = struct.unpack("<I", img.read(site, 4))[0]
+    stub = img.read(ptr, 10)
+    if len(stub) == 10 and stub[0] == 0xB8 and stub[5] == 0xE9:
+        return ptr
+    return None
+
+
 def _find_all(img, needle):
     """All VAs where `needle` occurs in .rdata/.data."""
     out = []
@@ -245,6 +258,10 @@ def main():
     # change -- the compiler emits the call, the CRT is in the image at a fixed VA.
     HELPER_VA = {
         "__ftol": addr["ADDR_FTOL"],       # float->long cast helper
+        # C++ `new` / `delete` expressions call the global operators by their
+        # MSVC names; the game's own are these two.
+        "??2@YAPAXI@Z": addr["ADDR_GAME_OPERATOR_NEW"],
+        "??3@YAXPAX@Z": addr["ADDR_GAME_DELETE"],
     }
 
     sym_va = dict(ORIGFN_VA)     # coff symbol name -> real VA
@@ -411,6 +428,9 @@ def main():
                         tgt_va = content_va(tgt_name, secs, symlist, symidx,
                                             img, va + roff,
                                             struct.unpack_from("<i", cur, roff)[0])
+                    if tgt_va is None and tgt_name.startswith("__ehhandler$") \
+                            and typ == IMAGE_REL_I386_DIR32:
+                        tgt_va = ehhandler_va(img, va + roff)
                     if tgt_va is None:
                         unresolved_hist[tgt_name] += 1
                         for k in range(4):
