@@ -145,6 +145,11 @@ void __cdecl RestoreLostSurfaces(void);
  * straight to the primary itself, and then restores the flag to whatever it
  * was rather than to 1. That last detail matters: the caller may have had
  * presenting turned off for its own reasons. */
+/* C++ linkage: a caller's /GX unwind state is reset before a call that may
+ * throw, and under /EHsc an extern "C" callee is assumed not to. */
+#ifdef __cplusplus
+extern "C++"
+#endif
 void __cdecl RefreshScreen(void);
 
 /* Original: 0x0041B6A0. Release the DirectDraw palette a holder owns and null

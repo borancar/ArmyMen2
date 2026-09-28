@@ -2221,6 +2221,11 @@ static inline AM2_Widget * __attribute__((thiscall)) MpDialogDelete(AM2_Widget *
 { return w->MpDialogDelete(flags); }
 static inline void __attribute__((thiscall)) MpPanelPaint(AM2_Widget *w, RECT clip)
 { w->MpPanelPaint(clip); }
+/* C++ linkage: a caller's /GX unwind state is reset before a call that may
+ * throw, and under /EHsc an extern "C" callee is assumed not to. */
+#ifdef __cplusplus
+extern "C++"
+#endif
 void __cdecl RefreshMapSelection(void);
 
 /* The save-game family's buttons: 0x00451AC0, 0x00452010, 0x00451F10,

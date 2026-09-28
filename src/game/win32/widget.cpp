@@ -6920,14 +6920,9 @@ void __cdecl OpenLoadGame(void)
 {
     CloseCurrentScreen();
     if (g_gameState == AM2_STATE_MISSION) {
-        void *obj = orig_operator_new(AM2_LOAD_GAME_SIZE);
-        uint8_t *screen = (uint8_t *)0;
+        /* Constructed, THEN the screen refreshed, THEN published. */
+        uint8_t *screen = (uint8_t *)new AM2_LoadGameScreen("02_007_00_loadgame.bmp", 0);
 
-        if (obj) {
-            screen = (uint8_t *)LoadGameConstruct(
-                (AM2_Widget *)obj,
-                "02_007_00_loadgame.bmp", 0);
-        }
         RefreshScreen();
         g_paintObject = screen;
     } else {
