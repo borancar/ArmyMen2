@@ -185,6 +185,17 @@ silently and report the boundary as barely started. They now share `am2.game_sou
 — one definition, for the same reason `tools/merges.py` imports
 `coverage.REGISTERED` rather than copying it.
 
+**`checkviewspan` exists because two views overran their symbol and nothing
+could see it.** An `ADDR_` whose comment declares an extent reads that many
+bytes; if they run past the end of the placed symbol they land in, the tail
+is the NEXT symbol, which is right in the native build only because
+placement lays everything at its original VA. Both cases were one table
+transcribed as two symbols (the sarge-panel cells and the build menu's
+trailing 8 bytes; the roach frame ids and a misnamed `am2_roach_score_ints`),
+and both surfaced only in the VC6 LINK image, the first as a HUD drawing two
+of six weapons after a load. It reads comment-declared extents, so a view
+with no extent in its comment goes unchecked -- a report on prose, parsed by
+pattern, like `checkoffsetuse`.
 
 ## Build and install / process-kill incidents (from CLAUDE.md)
 
