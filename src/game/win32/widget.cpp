@@ -932,20 +932,6 @@ static inline int32_t ListRowIsDead(const AM2_ListRows *rows, int32_t row)
 /* The palette index the matcher filled with white. */
 #define g_whiteInk (*(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE)
 
-/* One line of the typewriter's text, drawn at the given y. Shared by the two
- * places the original emits the same six-argument call -- on reaching a `|`
- * and once more for whatever is left after the last one. Returns 0 if the
- * surface would not lock, which is the original's early return. */
-static inline int32_t TyperDrawLine(AM2_Widget *w, const char *line, int32_t y,
-                                    RECT clip, uint8_t ink)
-{
-    if (!LockSurface(g_drawTarget))
-        return 0;
-
-    DrawTextClipped(w->rect.left, y, line, 1, clip, ink);
-    UnlockSurface();
-    return 1;
-}
 
 
 
@@ -7918,44 +7904,47 @@ void __attribute__((thiscall)) AM2_Widget::HudTopPaint(RECT clip)
 
     ClearRegion(&clip, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
 
-    if (LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)) {
-        if (*(const int32_t *)(self + HUDLOG_OFF_TYPING)) {
-            char        line[120];   /* the original's frame */
-            const char *typed = (const char *)(self + HUDLOG_OFF_TYPED);
-            size_t      n;
+    /* A failed lock returns from the whole paint -- the widget's own
+     * sprite and the button row below are not drawn either. */
+    if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+        return;
 
-            strcpy(line, typed);
-            n = strlen(line);
-            line[n]     = AM2_HUD_CARET;
-            line[n + 1] = '\0';
+    if (*(const int32_t *)(self + HUDLOG_OFF_TYPING)) {
+        char        line[120];   /* the original's frame */
+        const char *typed = (const char *)(self + HUDLOG_OFF_TYPED);
+        size_t      n;
 
-            DrawText(*(const int32_t *)(self + HUDLOG_OFF_TYPED_X)
-                         + w->rect.left,
-                     *(const int32_t *)(self + HUDLOG_OFF_TYPED_Y)
-                         + w->rect.top,
-                     line, 1, 0,
-                     *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
-        } else {
-            int32_t i;
+        strcpy(line, typed);
+        n = strlen(line);
+        line[n]     = AM2_HUD_CARET;
+        line[n + 1] = '\0';
 
-            for (i = 0; i < *(const int32_t *)(self + HUDLOG_OFF_COUNT); i++) {
-                const uint8_t *row = self + HUDLOG_OFF_ROWS
-                                     + i * AM2_HUD_MSG_SIZE;
+        DrawText(*(const int32_t *)(self + HUDLOG_OFF_TYPED_X)
+                     + w->rect.left,
+                 *(const int32_t *)(self + HUDLOG_OFF_TYPED_Y)
+                     + w->rect.top,
+                 line, 1, 0,
+                 *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
+    } else {
+        int32_t i;
 
-                x = (int32_t)((double)
-                        *(const float *)(row + HUDMSG_OFF_X)
-                        - *(const float *)(self + HUDLOG_OFF_SCROLL))
-                    + w->rect.left
-                    + *(const int32_t *)(self + HUDLOG_OFF_TYPED_X);
-                y = w->rect.top
-                    + *(const int32_t *)(self + HUDLOG_OFF_TYPED_Y);
-                DrawText(x, y, (const char *)row, 1, 0,
-                         *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STALE);
-            }
+        for (i = 0; i < *(const int32_t *)(self + HUDLOG_OFF_COUNT); i++) {
+            const uint8_t *row = self + HUDLOG_OFF_ROWS
+                                 + i * AM2_HUD_MSG_SIZE;
+
+            x = (int32_t)((double)
+                    *(const float *)(row + HUDMSG_OFF_X)
+                    - *(const float *)(self + HUDLOG_OFF_SCROLL))
+                + w->rect.left
+                + *(const int32_t *)(self + HUDLOG_OFF_TYPED_X);
+            y = *(const int32_t *)(self + HUDLOG_OFF_TYPED_Y)
+                + w->rect.top;
+            DrawText(x, y, (const char *)row, 1, 0,
+                     *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STALE);
         }
-
-        UnlockSurface();
     }
+
+    UnlockSurface();
 
     ::WidgetPaint(w, clip);
 
@@ -16625,10 +16614,9 @@ void __attribute__((thiscall)) AM2_Widget::TyperPaint(RECT clip)
     AM2_Widget *w = this;
 
     const uint8_t *self = (const uint8_t *)w;
-    const char    *text = (const char *)(self + TYPER_OFF_TEXT);
     uint8_t        ink;
     RECT           visible;
-    char           line[0x3F0];
+    char           line[0x400];
     int32_t        count;
     int32_t        yoff;
     int32_t        i;
@@ -16639,26 +16627,34 @@ void __attribute__((thiscall)) AM2_Widget::TyperPaint(RECT clip)
     if (!IntersectRect(&visible, &clip, &w->rect))
         return;
 
-    /* The count shown is read again on every pass. */
+    /* The count shown is read again on every pass, and the text is indexed
+     * from the widget itself -- which is what makes VC6 walk a pointer. */
     ink   = g_whiteInk;
     yoff  = 0;
     count = 0;
     for (i = 0; i < *(const int32_t *)(self + TYPER_OFF_SHOWN); i++) {
-        if (text[i] == '|') {
+        if (((const char *)(self + TYPER_OFF_TEXT))[i] == '|') {
             line[count] = 0;
-            if (!TyperDrawLine(w, line, w->rect.top + yoff, clip, ink))
+            if (!LockSurface(g_drawTarget))
                 return;
+            DrawTextClipped(w->rect.left, w->rect.top + yoff, line, 1, clip,
+                            ink);
+            UnlockSurface();
             count = 0;
             yoff += TYPER_LINE_HEIGHT;
         } else {
-            line[count++] = text[i];
+            line[count++] = ((const char *)(self + TYPER_OFF_TEXT))[i];
         }
     }
 
     if (count > 0) {
         line[count] = 0;
-        TyperDrawLine(w, line, w->rect.top + yoff, clip, ink);
-    }}
+        if (!LockSurface(g_drawTarget))
+            return;
+        DrawTextClipped(w->rect.left, w->rect.top + yoff, line, 1, clip, ink);
+        UnlockSurface();
+    }
+}
 
 void __attribute__((thiscall)) AM2_Widget::TyperUpdate()
 {

@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1322 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1323 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1322:
+  the near-miss sweep, 758 before the row pools. From 758 to 1323:
   - **GOG's copy-protection patch is applied LAST now** (Boran, 2026-09-29):
     the relink compares against the retail bytes (`RETAIL` in
     `src/vc6/bytematch.py` puts the five `75`s back), VC6 compiles the
@@ -106,6 +106,10 @@ main result so far (details in `src/vc6/README.md`):
     it formats "<map><n>.txt" into is 0x100 bytes in the image, not 0x10,
     and the _finddata_t beside it 0x118, not 0x110 -- a map name of eleven
     characters or more overran the stack. Same scan.
+  - **HudTopPaint returns when the surface will not lock** (2026-09-29): the
+    image's failed-lock branch goes to the epilogue, so the chat line, the
+    widget sprite and the button row are all skipped; ours had wrapped only
+    the text in the lock and painted the rest regardless.
   - **OPEN, a decision for Boran: MpNamePaint's dot buffer.** The image's
     frame (0x20: the clip rect and 16 bytes) holds a 16-byte `dots`, and the
     count is one dot per 7.5 s of silence with no clamp -- so the ORIGINAL
