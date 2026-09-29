@@ -856,7 +856,7 @@ static void ButtonFire(AM2_Widget *w, int32_t off)
 
 /* Repaint self through slot 1 with its own rectangle -- the tail every arm of
  * ButtonUpdate shares. */
-static void ButtonRepaintSelf(AM2_Widget *w)
+static inline void ButtonRepaintSelf(AM2_Widget *w)
 {
     WidgetVPaint(w, w->rect);
 }
@@ -893,7 +893,7 @@ static void ListRepaintRow(AM2_Widget *w, int32_t row)
 }
 
 /* A row whose text opens with '^' is REFUSED -- a separator or a heading. */
-static int32_t ListRowIsDead(const AM2_ListRows *rows, int32_t row)
+static inline int32_t ListRowIsDead(const AM2_ListRows *rows, int32_t row)
 {
     return rows->text[(size_t)row * LIST_ROW_STRIDE] == LIST_ROW_DEAD;
 }
@@ -2433,7 +2433,7 @@ typedef int32_t (__cdecl *AM2_RemoveFn)(const char *);
 /* Both editing arms end the same way: the field's own change callback, then
  * a repaint through its slot 1. The global is re-read between the two,
  * because the callback is free to move the focus. */
-static void EditNotifyAndRepaint(void)
+static inline void EditNotifyAndRepaint(void)
 {
     AM2_Widget *edit = g_focusedEdit;
     void      (__cdecl *onChange)(AM2_Widget *) =
@@ -2819,7 +2819,7 @@ static int32_t PointerFriendTail(uint8_t *o)
  * rather than inlined twice, and spelled as a local compared against the
  * global it came from, which is what the source said and the only form a
  * compiler takes without a tautological-compare warning. */
-static uint8_t *FollowFindLeader(void)
+static inline uint8_t *FollowFindLeader(void)
 {
     int32_t owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
 
@@ -4053,7 +4053,7 @@ typedef int32_t (__cdecl *AM2_StrncmpFn)(const char *, const char *, size_t);
  * the five already share their tail in the image, so factoring those is not
  * even a change. The AiStepTrack rule is about not flattening a REAL
  * difference; this is the case where there is none, and it was checked. */
-static void HudSquadBar(uint8_t *rec, const uint8_t *obj)
+static inline void HudSquadBar(uint8_t *rec, const uint8_t *obj)
 {
     int16_t max = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
     int16_t hp  = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
@@ -4067,7 +4067,7 @@ static void HudSquadBar(uint8_t *rec, const uint8_t *obj)
     *(int32_t *)(rec + SQUAD_REC_BAR_W) = w;
 }
 
-static void HudSquadInk(uint8_t *rec, const uint8_t *obj)
+static inline void HudSquadInk(uint8_t *rec, const uint8_t *obj)
 {
     int16_t max = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
     int16_t hp  = *(const int16_t *)(obj + OBJ_OFF_HEALTH);

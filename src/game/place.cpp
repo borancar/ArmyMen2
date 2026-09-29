@@ -1091,7 +1091,7 @@ static inline AM2_Sprite *PlaceSprite(uint32_t set, uint32_t id)
  * and 10*army + 11, so each army owns a run of ten. Both sprite slots have
  * their ink cleared; overlay B's is left as the head set it, which is the
  * asymmetry that makes the manning soldier the player's colour. */
-static void PlaceEmplacement(int32_t army, int32_t facing, int32_t kind)
+static inline void PlaceEmplacement(int32_t army, int32_t facing, int32_t kind)
 {
     SET_CURSOR(PlaceSprite(0x26, (uint32_t)(army * 5 + 5) * 2));
     *(uint8_t **)(uintptr_t)ADDR_MENU_INK = (uint8_t *)0;

@@ -890,7 +890,7 @@ int32_t __cdecl ScriptParseEvents(AM2_ScriptCtx *ctx, int32_t *at,
 
 /* Both descriptor parsers start with "is it just a name?" and resolve it the
  * same way -- find it, declare it with type 2 if new. */
-static int32_t ScriptNamedTarget(AM2_ScriptCtx *ctx, int32_t *at,
+static inline int32_t ScriptNamedTarget(AM2_ScriptCtx *ctx, int32_t *at,
                                  int32_t *out)
 {
     int32_t idx = ScriptFindName((const char *)ctx->tokens[*at].value);

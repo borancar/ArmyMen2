@@ -1318,7 +1318,7 @@ typedef void (__cdecl *am2_lobby_void_fn)(void);
 
 /* Release the lobby interface and the connection buffer, in that order. Used
  * by the quiet DPERR_NOTLOBBIED exit and by the dead copy-protection path. */
-static void LobbyGiveUp(uint8_t *self)
+static inline void LobbyGiveUp(uint8_t *self)
 {
     LPDIRECTPLAYLOBBY3A *lobby = (LPDIRECTPLAYLOBBY3A *)(self + COMM_OFF_LOBBY);
 

@@ -5011,7 +5011,7 @@ typedef void (__cdecl *AM2_HitEffectFn)(const void *at, int32_t slot,
  * cases and every input is an argument or a plain field -- and that oracle is
  * not written yet.
  */
-static int32_t PoseIsBraced(const uint8_t *o)
+static inline int32_t PoseIsBraced(const uint8_t *o)
 {
     static const int32_t kBraced[] = {
         0x19, 0x1C, 0x13, 0x1A, 0x1D, 0x14, 0x06, 0x1E, 0x15,

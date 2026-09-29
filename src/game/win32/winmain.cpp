@@ -571,7 +571,7 @@ void __cdecl DetectCpuSpeed(void)
  * matched anywhere in it and not only as a whole word. That is the original's
  * behaviour and it is kept. Order matters where two switches share a global:
  * `-bm -sm` leaves the music flag clear because `-sm` is tested second. */
-static void ParseCommandLine(char *cmdLine)
+static inline void ParseCommandLine(char *cmdLine)
 {
     char *p;
 

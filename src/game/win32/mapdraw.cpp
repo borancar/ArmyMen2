@@ -641,7 +641,7 @@ typedef struct AM2_DepthNode {
  * cursor on it. Three shapes the original writes out four times between them;
  * the only one that needs care is `after`, which the original does NOT guard
  * against a null successor because it is only reached when there is one. */
-static AM2_DepthNode *DepthLinkAfter(AM2_DepthNode *at, int32_t n)
+static inline AM2_DepthNode *DepthLinkAfter(AM2_DepthNode *at, int32_t n)
 {
     AM2_DepthNode *fresh = &g_depthNodes[n];
 

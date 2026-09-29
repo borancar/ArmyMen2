@@ -378,7 +378,7 @@ void __cdecl ReceivedMapMsg(void *msg, int32_t dpid)
  * everyone the player list. The null test is here, and the re-read of the
  * global between the two slots is the original's -- it does not reuse the
  * pointer it just called through. */
-static void RepaintDialogAndSendPlayers(void)
+static inline void RepaintDialogAndSendPlayers(void)
 {
     void *dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
 
@@ -716,7 +716,7 @@ void __cdecl MenuMessage(const char *text, uint8_t colour, int32_t indicator);
 /* The chat arm. Which of the two message sinks it uses depends on the screen
  * that is up: the three menu screens get the menu one, everything else the
  * in-game HUD. */
-static void DispatchChat(const uint8_t *msg)
+static inline void DispatchChat(const uint8_t *msg)
 {
     int32_t screen = *(const int32_t *)(uintptr_t)ADDR_MENU_MODE;
     int32_t sender = (int32_t)*(const int8_t *)(msg + AM2_MSG_SENDER);
@@ -1654,7 +1654,7 @@ void __cdecl VehicleMsgRecv(void *msg, int32_t army)
 
 /* The tail both game-over arms share: record who won, ask for menu 0x22 and
  * raise the pending flag by hand rather than through RequestState. */
-static void RecordGameOver(int32_t winner)
+static inline void RecordGameOver(int32_t winner)
 {
     *(int32_t *)(uintptr_t)ADDR_GAME_WINNER   = winner;
     *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST  = AM2_MENU_REQUEST_GAME_OVER;
@@ -2869,7 +2869,7 @@ static void FlowNoteRoundTrip(uint8_t *flow, uint32_t rtt)
  *
  * FLOW_OFF_HE_HAS is written ONCE, after the loop, not per iteration. The
  * loop bound reads it, so updating it inside would cut the walk short. */
-static void FlowRetireThrough(uint8_t *flow, uint32_t ackedThrough,
+static inline void FlowRetireThrough(uint8_t *flow, uint32_t ackedThrough,
                               uint32_t mask, uint32_t now, uint32_t from,
                               uint32_t ackingStr)
 {

@@ -1502,7 +1502,7 @@ static void DeriveMapGeometry(void)
  * elevation from ELOW's high nibble and its owner from the low one, and the
  * two single-byte fields are not used at all.  Three fields, two
  * destinations, and a precedence that is invisible from any one arm. */
-static void LoadMapRecords(am2_FILE *f, uint8_t *objs, int32_t first,
+static inline void LoadMapRecords(am2_FILE *f, uint8_t *objs, int32_t first,
                            int32_t nfields, int32_t count, int32_t *consumed)
 {
     int32_t rec;

@@ -292,7 +292,7 @@ typedef void (__cdecl *am2_void_fn)(void);
 /* Was a private helper here with the reserved-block threshold hardcoded at 9.
  * 0x0041B820 is that function and takes the threshold as a fifth argument; the
  * 23 call sites in this file all pass 9. */
-static uint8_t MatchRGB(const void *pal, uint32_t r, uint32_t g, uint32_t b)
+static inline uint8_t MatchRGB(const void *pal, uint32_t r, uint32_t g, uint32_t b)
 {
     return NearestPalIndexRGB((const uint32_t *)pal, r, g, b, 9);
 }

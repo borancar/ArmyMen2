@@ -1882,7 +1882,7 @@ void __cdecl EvtRuleB(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
 /* Free one entry's handler chain and then the entry. `owns` decides whether
  * the handler's argument goes with it -- the same flag EventRegister stores
  * and the table teardown reads. */
-static void FreeEventEntry(AM2_EventEntry *e)
+static inline void FreeEventEntry(AM2_EventEntry *e)
 {
     AM2_EventHandler *h = e->handlers;
 

@@ -1550,7 +1550,7 @@ int32_t __cdecl SpriteRebuildDf(AM2_Sprite *spr, int32_t flags)
 }
 
 /* Allocate and fill one, or give the record back for free()ing. */
-static AM2_Sprite *LoadSpriteRecord(int32_t set, int32_t index, int32_t frame,
+static inline AM2_Sprite *LoadSpriteRecord(int32_t set, int32_t index, int32_t frame,
                                     int32_t flags)
 {
     AM2_Sprite *spr = (AM2_Sprite *)orig_malloc(sizeof(AM2_Sprite));

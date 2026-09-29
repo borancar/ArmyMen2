@@ -85,7 +85,7 @@ void __cdecl DirtyCollect(const AM2_Rect *r);
  * and sign-extends that, so a projection past 32767 wraps rather than
  * saturating. Written out here because it is the one place this function can
  * surprise. */
-static int32_t DepthProject(int32_t dx, float slope, int32_t y)
+static inline int32_t DepthProject(int32_t dx, float slope, int32_t y)
 {
     return (int16_t)(int32_t)((float)dx * slope) + y;
 }

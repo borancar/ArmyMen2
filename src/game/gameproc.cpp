@@ -916,7 +916,7 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot);
  * kinds 0 and 4 share the default with everything above 5, and the five that
  * do not are 1->2, 2->3, 3->4, 5->5. Six slots, five distinct answers, and
  * two of them the default -- exactly the shape the DirtyCollect rule is for. */
-static int32_t ScenRowWeapon(int32_t kind)
+static inline int32_t ScenRowWeapon(int32_t kind)
 {
     switch (kind) {
     case 1:  return 2;

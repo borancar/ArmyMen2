@@ -1165,7 +1165,7 @@ static void PathChargeFrame(uint32_t startTicks, int32_t considered)
  * start tile as well as every step. The loop stops on a zero tile, which is
  * the start node's PARENT -- tile 0 cannot be a path element, which is the
  * same thing the entry guard relies on when it refuses a zero argument. */
-static void PathUnwind(int32_t end, uint16_t *out, int32_t *n)
+static inline void PathUnwind(int32_t end, uint16_t *out, int32_t *n)
 {
     uint8_t *const nodes = (uint8_t *)(uintptr_t)ADDR_PATH_NODES;
     int32_t        depth = *(const uint16_t *)(nodes
@@ -6404,7 +6404,7 @@ static int32_t RegionSpan(const uint8_t *a, const uint8_t *b)
     return ApproxDistXY(bx - ax, by - ay);
 }
 
-static uint8_t *RegionAt(int32_t id)
+static inline uint8_t *RegionAt(int32_t id)
 {
     return (uint8_t *)*(void *const *)(uintptr_t)ADDR_REGIONS
            + (uint32_t)id * AM2_REGION_SIZE;
@@ -6791,7 +6791,7 @@ typedef void (__cdecl *AM2_AiFillFn)(void *obj, void *ctx, int32_t sarge);
  * path, one pump behind the original. Found by a live side-by-side trace of
  * EnterVehicle's caller: the original's second boarder returned to
  * TrooperAiStep+0x77, a call the port did not have. */
-static int32_t AiStepReact(void *obj, void *out, uint8_t *ctx)
+static inline int32_t AiStepReact(void *obj, void *out, uint8_t *ctx)
 {
     uint8_t *o = (uint8_t *)obj;
 
@@ -6842,7 +6842,7 @@ static void AiStepDispatch(void *obj, void *out, uint8_t *ctx, int32_t sarge)
 /* Sarge's middle: react, then -- unless the shortcut was taken -- dispatch. No
  * board arm; that one is the trooper's, in TrooperAiStep below. Sarge's table
  * is the one whose AI_MODE 6 is AiEngageStep, so this passes sarge=1. */
-static void AiStepReactAndDispatch(void *obj, void *out, uint8_t *ctx)
+static inline void AiStepReactAndDispatch(void *obj, void *out, uint8_t *ctx)
 {
     if (!AiStepReact(obj, out, ctx))
         AiStepDispatch(obj, out, ctx, 1);
@@ -10009,7 +10009,7 @@ int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan, int32_t *out)
  * followed by `add esp, 0x18` and the other by `add esp, 0x0C` -- the first
  * cleans SetFacing08's three arguments as well as its own three, the second
  * has no preceding call and cleans exactly three. Three, from the image. */
-static int32_t Step3NextCandidate(uint8_t *o)
+static inline int32_t Step3NextCandidate(uint8_t *o)
 {
     int32_t n = *(const int32_t *)(o + 0x574) ;
     int32_t base = *(const int32_t *)(o + 0x570);

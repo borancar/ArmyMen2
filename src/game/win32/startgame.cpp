@@ -248,7 +248,7 @@ void __cdecl StartMultiplayerGame(void)
 #define g_ddraw       (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
 
 /* strcpy, which is what the original inlines as scasb-then-movsd. */
-static void CopyName(char *dst, const char *src)
+static inline void CopyName(char *dst, const char *src)
 {
     while ((*dst++ = *src++) != 0)
         ;

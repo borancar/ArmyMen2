@@ -219,7 +219,7 @@ int32_t __cdecl ScriptObjState(AM2_ScriptCtx *ctx, int32_t *at)
 }
 
 /* Stamp the current script onto one object. */
-static void ScriptAttachTo(uint8_t *obj)
+static inline void ScriptAttachTo(uint8_t *obj)
 {
     *(int32_t *)(obj + AM2_OBJ_SCRIPT) =
         *(const int32_t *)((void *)(uintptr_t)(ADDR_CURRENT_OBJ_SCRIPT));

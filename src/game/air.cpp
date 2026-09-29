@@ -1575,7 +1575,7 @@ void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
  */
 /* AngleDelta's answer with the compiler's abs() over it -- `cdq; xor; sub`,
  * which the original spells out at all four sites. */
-static int32_t AbsAngle(uint32_t from, uint32_t to)
+static inline int32_t AbsAngle(uint32_t from, uint32_t to)
 {
     int32_t d = AngleDelta(from, to);
 

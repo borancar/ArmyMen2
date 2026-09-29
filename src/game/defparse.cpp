@@ -35,12 +35,12 @@ typedef void (__cdecl *AM2_QsortFn)(void *base, uint32_t n, uint32_t size,
 
 /* Read the next whitespace-delimited field. Only the first call passes the
  * line; the rest continue from strtok's own state. */
-static int32_t NextType(char *line)
+static inline int32_t NextType(char *line)
 {
     return DefObjParse(DefFindKeyword(am2_strtok(line, kSep)));
 }
 
-static int32_t NextNumber(int32_t *out)
+static inline int32_t NextNumber(int32_t *out)
 {
     return DefParseNumber(out, am2_strtok((char *)0, kSep));
 }

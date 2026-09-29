@@ -170,7 +170,7 @@ typedef void (__cdecl *am2_clear_surface_fn)(LPDIRECTDRAWSURFACE s, uint32_t fmt
 /* The desktop is not 8-bit and we want a window on it. The only way to change
  * the display mode is to own the display, so take it, switch it, give it back.
  * Three cooperative-level changes for one mode change. */
-static HRESULT ForceEightBitDesktop(HWND hWnd)
+static inline HRESULT ForceEightBitDesktop(HWND hWnd)
 {
     HRESULT hr;
 
