@@ -66,10 +66,43 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 686 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 719 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
-  layout, 627 before the widget classes. What moved it from 627 to 686:
+  layout, 627 before the widget classes, 686 before the screens. From 686
+  to 719:
+  - **Every widget destructor matches**, and 30-odd constructors: the HUD
+    classes, KeyRow, the scroll/arrow family, and DifficultyDialog,
+    DlgMessage, Quit/Replay/DelPlayer, Options, GameMenu, Audio,
+    Overwrite, DeleteGame, EnterName, SelectMap, CommPanel and
+    SelectPlayer. Left: ControlsDialog (induction-variable merge), LoadGame
+    (local layout), BattleJoin (one unwind temporary short), HudPanel,
+    HudTop, Typer, Edit, MpSpin (a TU boundary), and the screens not yet
+    classes (BattleName, SaveList, Movies, MpOptions, MpPanel, WarMenu,
+    the Mp name/colour/team buttons) and the `Open*` openers.
+  - **widget.cpp is in the original's address order** (`src/vc6/reorder.py`,
+    rerun after adding a function): VC6 treats a callee as unable to throw
+    only if it is defined earlier in the TU, and that shows in the bytes.
+  - **Where our reconstruction factored the original's repetition, the
+    bytes want it back**: ConfirmDialogBuild, MakeButton, MakeVolumeBar,
+    the options and game-menu button tables are expanded as the original's
+    straight-line code.
+  - **VC6's scheduler is order-sensitive in ways reading does not predict.**
+    CheckBox, CountButton and KeyRow each match in exactly one order of
+    their trailing stores, found by compiling every permutation.
+  - **Byte parameters**: Label's, KeyRow's and Edit's colour arguments are
+    `uint8_t` -- the original pushes them without widening.
+  - **Bugs the comparisons exposed**: the overwrite prompt never linked its
+    typewriter to the blinking dot; CommPanel never focused its panel;
+    BattleJoin never initialised its chosen row (-1) -- a join with no row
+    clicked read allocator garbage -- and left its name field on the
+    permissive charset; a spinner's edit called the caller's commit handler
+    with the edit instead of going through SpinCommit.
+  - **A hazard worth knowing**: dropping our `AM2_Widget *w = this;` alias
+    (it changes register allocation) leaves any stray `w` bound to
+    AM2_Widget's WIDTH member -- it still compiles. Rewrite every token.
+
+  From 627 to 686:
   - **The widget layer is real C++ now, class by class.** Widget, Panel,
     ScreenBase, Label, ButtonBase, Button, Arrow, CheckBox, ListBox, TextList,
     ArrowBar, ScrollBar, Edit and MpSpin are classes: constructors build their
