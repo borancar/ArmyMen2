@@ -1909,7 +1909,7 @@ void __cdecl AirInitLeg2Divisor(void)
     int32_t run  = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_X - *(const int32_t *)(uintptr_t)ADDR_AIR_PATH_APEX_X;
 
     *(float *)(uintptr_t)ADDR_AIR_LEG2_DIVISOR =
-        (float)((double)rise * (double)rise / (double)run);
+        (float)rise * rise / run;         /* float, as the original: fidiv */
 }
 
 void __cdecl AirInitLeg3X1(void)

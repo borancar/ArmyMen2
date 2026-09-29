@@ -64,6 +64,12 @@ def reloc_only(x, y):
         return False
     if x.split()[0] in ("call", "jmp") or x.split()[0].startswith("j"):
         return True
+    # a relocated displacement: ours has none (or 0), the original an address
+    xd = re.sub(r" \+ 0\]", "]", x)
+    yd = re.sub(r" \+ (0x[0-9a-f]+)\]",
+                lambda m: "]" if int(m.group(1), 16) >= 0x400000 else m.group(0), y)
+    if xd == yd:
+        return True
     xs, ys = NUM.split(x), NUM.split(y)
     xn, yn = NUM.findall(x), NUM.findall(y)
     if xs != ys or len(xn) != len(yn):

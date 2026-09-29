@@ -2638,13 +2638,13 @@ void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
  * +0x100, answering the index or -1. Two jobs in one function, which is
  * unusual enough to be worth the name saying both.
  *
- * THE SEARCH RUNS OVER THE NEW COUNT. The count is bumped BEFORE the realloc
- * and the loop bound is the bumped value, so the last record it compares is
- * the one just allocated and never written -- uninitialised memory, read as a
- * key. A match there would answer the index of a record the caller has not
- * filled in yet. Reproduced: it is the original's, it is what the caller's
- * -1 test is written against, and "fixing" it would change which index comes
- * back on a collision nobody has observed.
+ * THE COUNT IS NOT BUMPED. The array is reallocated to count + 1 records,
+ * but the incremented count lives only in a register (`inc eax` at
+ * 0x00453AB8, never stored); the search then reloads the unchanged count.
+ * This was reconstructed as `++count` -- read as a bump that the search then
+ * ran over -- which grew the list by one uninitialised row on every call and
+ * compared that row's garbage as a key. The byte-match is what showed the
+ * missing store.
  *
  * The record size is written as `((n << 6) + n) << 2` -- n * 65 * 4 -- which
  * is the compiler's way of saying 260 and is why the stride shows up twice in
@@ -2654,12 +2654,13 @@ int32_t __attribute__((thiscall)) AM2_Rec::ListGrowFind(int32_t key)
 {
     void *self = this;
     uint8_t *s = (uint8_t *)self;
-    int32_t  n = ++*(int32_t *)s;
+    int32_t  n;
     uint8_t *items;
     int32_t  i;
 
     items = (uint8_t *)am2_realloc(*(void **)(s + 4),
-                                   (size_t)n * AM2_LIST_ROW_STRIDE);
+                                   (size_t)(*(const int32_t *)s + 1)
+                                       * AM2_LIST_ROW_STRIDE);
     *(void **)(s + 4) = items;
 
     n = *(const int32_t *)s;

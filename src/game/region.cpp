@@ -367,7 +367,7 @@ void __cdecl BuildTileDeltas(void)
 int32_t __cdecl PointRuleVehicle(int32_t tile)
 {
     const uint16_t t    = (uint16_t)tile;
-    const int32_t  army = *(const int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY;
+    int32_t        army;
 
     if ((*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)[t]
         >= (int8_t)AM2_BLOCK_FULL)
@@ -376,6 +376,7 @@ int32_t __cdecl PointRuleVehicle(int32_t tile)
     if ((*(const int8_t *const *)(uintptr_t)ADDR_TILE_COVER)[t] > 0)
         return 1;
 
+    army = *(const int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY;
     if (army < AM2_COMM_SLOTS
         && ((const int8_t *const *)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[army][t]
                > 0)
@@ -388,7 +389,7 @@ int32_t __cdecl PointRuleVehicle(int32_t tile)
 int32_t __cdecl PointRuleBoat(int32_t tile)
 {
     const uint16_t t    = (uint16_t)tile;
-    const int32_t  army = *(const int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY;
+    int32_t        army;
 
     if (!((*(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS)[t]
           & AM2_TILE_OPEN))
@@ -398,6 +399,7 @@ int32_t __cdecl PointRuleBoat(int32_t tile)
         < (int8_t)AM2_BOAT_COVER_MIN)
         return 1;
 
+    army = *(const int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY;
     if (army < AM2_COMM_SLOTS
         && ((const int8_t *const *)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[army][t]
                > 0)
