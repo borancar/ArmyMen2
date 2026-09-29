@@ -250,19 +250,21 @@ void __cdecl FrameClockStep(void)
 #define LAST     (*(uint32_t *)(uintptr_t)ADDR_LAST_TICK_MS)
 #define DELTA_MS (*(int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
     uint32_t  delta;
+    uint32_t  now;
 
     if (*(const int32_t *)(uintptr_t)ADDR_FIXED_STEP) {
-        LAST     = CLOCK;
-        delta    = AM2_FIXED_STEP_MS;
-        DELTA_MS = (int32_t)delta;
+        LAST  = CLOCK;
+        delta = AM2_FIXED_STEP_MS;
+        goto store;         /* one store, shared with the clamp's */
     } else {
-        uint32_t now = Ticks();
+        now = Ticks();
 
         delta    = now - LAST;
         LAST     = now;
         DELTA_MS = (int32_t)delta;          /* the raw one... */
         if (delta > AM2_FRAME_DELTA_CAP_MS) {
             delta    = AM2_FRAME_DELTA_CAP_MS;
+store:
             DELTA_MS = (int32_t)delta;      /* ...then the clamp over it */
         }
     }
