@@ -15292,7 +15292,7 @@ void __attribute__((thiscall)) AM2_Widget::WidgetUpdateCancel()
         return;
     }
 #undef CANCEL
-    ::WidgetUpdate(w);
+    w->WidgetUpdateThunk();   /* 0x00454AC0, the one-jump thunk, as the image calls */
 }
 
 /* 0x00454C10, thiscall, `ret 0x34` -- thirteen stack arguments, which is the

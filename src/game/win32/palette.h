@@ -76,8 +76,8 @@ uint8_t __cdecl NearestPalIndex(const uint32_t *palette, uint32_t colour,
  * original packs them into its own first argument slot and passes the dword,
  * so the top byte is whatever the red argument's byte 3 was -- stale, and
  * harmless, because the matcher masks. */
-uint8_t __cdecl NearestPalIndexRGB(const uint32_t *pal, uint32_t r, uint32_t g,
-                                   uint32_t b, uint32_t from);
+uint8_t __cdecl NearestPalIndexRGB(const uint32_t *pal, uint8_t r, uint8_t g,
+                                   uint8_t b, uint32_t from);
 
 /* 0x0040A4B0, one caller. Build every palette remap the game owns: the four
  * army tables at ADDR_OBJ_TABLE_RECORDS, four more ramps beside them, sixty-

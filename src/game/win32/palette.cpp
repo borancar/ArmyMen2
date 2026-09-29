@@ -412,11 +412,13 @@ void __cdecl SetGamePalette(uint8_t *pal)
 uint8_t __cdecl NearestPalIndex(const uint32_t *palette, uint32_t colour,
                                 uint32_t from)
 {
-    uint32_t i    = from & 0xFFu;
-    int32_t  best = AM2_COLOUR_DIST_MAX;
-    uint8_t  hit  = 0;
+    int32_t best = AM2_COLOUR_DIST_MAX;
+    uint8_t hit  = 0;
+    int32_t i;
 
-    for (; i < 256; i++) {
+    /* Signed (jge/jl), and declared last: that is what gives `hit` a stack
+     * slot of its own rather than the dead `from` argument's. */
+    for (i = (int32_t)(from & 0xFFu); i < 256; i++) {
         int32_t d = ColourDistance(&palette[i], &colour);
 
         if (d < best) {
@@ -427,11 +429,18 @@ uint8_t __cdecl NearestPalIndex(const uint32_t *palette, uint32_t colour,
     return hit;
 }
 
-uint8_t __cdecl NearestPalIndexRGB(const uint32_t *pal, uint32_t r, uint32_t g,
-                                   uint32_t b, uint32_t from)
+uint8_t __cdecl NearestPalIndexRGB(const uint32_t *pal, uint8_t r, uint8_t g,
+                                   uint8_t b, uint32_t from)
 {
-    return NearestPalIndex(pal, (r & 0xFFu) | ((g & 0xFFu) << 8)
-                                | ((b & 0xFFu) << 16), from);
+    /* A PALETTEENTRY built in place: the image stores the three bytes into
+     * the dead `r` argument slot and passes the dword, flags byte and all.
+     * NearestPalIndex reads only the three colours. */
+    PALETTEENTRY c;
+
+    c.peRed   = r;
+    c.peGreen = g;
+    c.peBlue  = b;
+    return NearestPalIndex(pal, *(const uint32_t *)&c, from);
 }
 
 /* 0x00422F60 -- read an 8-bit .bmp's HEADER and palette and nothing else.
@@ -676,21 +685,19 @@ void __cdecl PaletteLoaded(void)
  */
 void __cdecl LoadTilesetPalettes(void)
 {
-    static const char *const kNames[AM2_TILESET_PALETTES] = {
-        "palette0.bmp", "palette1.bmp", "palette2.bmp",
-        "palette3.bmp", "palette4.bmp", "palette5.bmp",
-    };
-    uint32_t i;
-
+#define TP(n) ((uint8_t *)(uintptr_t)ADDR_TILESET_PALETTES + (n) * AM2_TILESET_PALETTE_BYTES)
     if (!*(const int32_t *)(uintptr_t)ADDR_TILESET_RESERVE)
         return;
 
+    /* Six calls written out, as the image has them -- no loop, no table. */
     SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_BLOCK)));
-
-    for (i = 0; i < AM2_TILESET_PALETTES; i++)
-        LoadPaletteFile(kNames[i],
-                        (uint8_t *)((void *)(uintptr_t)(ADDR_TILESET_PALETTES))
-                            + i * AM2_TILESET_PALETTE_BYTES);
+    LoadPaletteFile("palette0.bmp", TP(0));
+    LoadPaletteFile("palette1.bmp", TP(1));
+    LoadPaletteFile("palette2.bmp", TP(2));
+    LoadPaletteFile("palette3.bmp", TP(3));
+    LoadPaletteFile("palette4.bmp", TP(4));
+    LoadPaletteFile("palette5.bmp", TP(5));
+#undef TP
 }
 /* The game's own rand, through the image, the way event.cpp and item.cpp
  * reach it -- BuildRemapTables below picks a base per row with it. */

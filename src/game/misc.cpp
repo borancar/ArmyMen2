@@ -284,68 +284,60 @@ int32_t __cdecl TypesCompatible(int32_t a, int32_t b)
 
 /* Shared body: `mode` is the value written for the wide facings, `narrow` for
  * the two that use the other one, and the offsets say which record. */
-static void SetFacing(int32_t facing, const void *src, void *out,
+static inline void SetFacing(int32_t facing, const void *src, void *out,
                       uint32_t off_mode, uint32_t off_flag,
                       int32_t wide, int32_t narrow)
 {
-    uint8_t *o = (uint8_t *)out;
-    uint8_t  base;
-
-    /* The read of src+0x40 belongs INSIDE the arms. Hoisting it here is the
-     * obvious tidy-up and it is wrong: for a facing above 7 the original never
-     * touches src at all, so a null src is harmless there and fatal if the
-     * read has been lifted. The vectors found it immediately -- a page fault
-     * reading address 0x40. */
-    if ((uint32_t)facing > 7)
-        return;
-    base = *((const uint8_t *)src + 0x40);
-
+/* The read of src+0x40 belongs INSIDE the arms. Hoisting it is the obvious
+ * tidy-up and it is wrong: for a facing above 7 the original never touches
+ * src at all, so a null src is harmless there and fatal if the read has been
+ * lifted. The vectors found it immediately -- a page fault reading 0x40.
+ * `out` is likewise read in each arm. */
+#define BASE (*((const uint8_t *)src + 0x40))
+#define O    ((uint8_t *)out)
     switch (facing) {
     case 0:
-        *(int32_t *)(o + off_mode) = wide;
-        o[0] = base;
+        *(int32_t *)(O + off_mode) = wide;
+        O[0] = BASE;
         break;
-    /* 1 is NOT grouped with 3, and it was. The jump table sends facing 1 to an
-     * arm that loads `out` and jumps straight into the common tail, while
-     * facing 3 writes off_flag first and then falls into the same tail -- so 1
-     * mirrors 7 and 3 mirrors 5, and folding 1 in with 3 broke that symmetry.
-     * The defect was invisible for as long as the vectors only checked that
-     * the expected writes happened; it writes one dword the original never
-     * writes, and every value it was expected to produce it still produced. */
+    /* 1 is NOT grouped with 3. The image sends facing 1 into 3's tail past
+     * the off_flag store -- the compiler merging two identical endings --
+     * so 1 mirrors 7 and 3 mirrors 5. Folding 1 in with 3 writes one dword
+     * the original never writes. */
     case 1:
-        *(int32_t *)(o + off_mode) = wide;
-        o[0] = (uint8_t)(base + 0x20);
-        break;
-    case 3:
-        *(int32_t *)(o + off_flag) = 1;
-        *(int32_t *)(o + off_mode) = wide;
-        o[0] = (uint8_t)(base + 0x20);
+        *(int32_t *)(O + off_mode) = wide;
+        O[0] = (uint8_t)(BASE + 0x20);
         break;
     case 2:
-        *(int32_t *)(o + off_mode) = narrow;
-        o[0] = (uint8_t)(base + 0x20);
+        *(int32_t *)(O + off_mode) = narrow;
+        O[0] = (uint8_t)(BASE + 0x20);
+        break;
+    case 3:
+        *(int32_t *)(O + off_flag) = 1;
+        *(int32_t *)(O + off_mode) = wide;
+        O[0] = (uint8_t)(BASE + 0x20);
         break;
     case 4:
-        *(int32_t *)(o + off_flag) = 1;
-        *(int32_t *)(o + off_mode) = wide;
-        o[0] = base;
+        *(int32_t *)(O + off_flag) = 1;
+        *(int32_t *)(O + off_mode) = wide;
+        O[0] = BASE;
         break;
     case 5:
-        *(int32_t *)(o + off_flag) = 1;
-        *(int32_t *)(o + off_mode) = wide;
-        o[0] = (uint8_t)(base - 0x20);
+        *(int32_t *)(O + off_flag) = 1;
+        *(int32_t *)(O + off_mode) = wide;
+        O[0] = (uint8_t)(BASE - 0x20);
         break;
     case 6:
-        *(int32_t *)(o + off_mode) = narrow;
-        o[0] = (uint8_t)(base - 0x20);
+        *(int32_t *)(O + off_mode) = narrow;
+        O[0] = (uint8_t)(BASE - 0x20);
         break;
     case 7:
-        *(int32_t *)(o + off_mode) = wide;
-        o[0] = (uint8_t)(base - 0x20);
+        *(int32_t *)(O + off_mode) = wide;
+        O[0] = (uint8_t)(BASE - 0x20);
         break;
-    default:
-        break;                       /* above 7 writes nothing */
     }
+#undef BASE
+#undef O
 }
 
 void __cdecl SetFacing14(int32_t facing, const void *src, void *out)
@@ -783,20 +775,23 @@ void __cdecl ListPushFront(void *node, void **head)
  * head arm writes through `head`. */
 void __cdecl ListUnlink(void *node, void **head)
 {
-    uint8_t *n    = (uint8_t *)node;
-    void    *prev = *(void **)(n + 4);
-    void    *next = *(void **)(n + 8);
+    /* Each link is read again at each use. */
+#define PREV (*(uint8_t **)((uint8_t *)node + 4))
+#define NEXT (*(uint8_t **)((uint8_t *)node + 8))
+    if (!PREV) {
+        *head = NEXT;
+        if (NEXT)
+            *(uint8_t **)(NEXT + 4) = PREV;
+    } else {
+        *(uint8_t **)(PREV + 8) = NEXT;
+        if (NEXT)
+            *(uint8_t **)(NEXT + 4) = PREV;
+    }
 
-    if (!prev)
-        *head = next;
-    else
-        *(void **)((uint8_t *)prev + 8) = next;
-
-    if (next)
-        *(void **)((uint8_t *)next + 4) = prev;
-
-    *(void **)(n + 8) = 0;
-    *(void **)(n + 4) = 0;
+    NEXT = 0;
+    PREV = 0;
+#undef PREV
+#undef NEXT
 }
 
 /* The remap loop walks dst with the register it was handed, so at `ret` eax is
@@ -1219,10 +1214,12 @@ int32_t __attribute__((thiscall)) AM2_Comm::GetArmyScore(int32_t slot)
 {
     void *comm = this;
 
-    const int32_t *vars = (const int32_t *)(uintptr_t)ADDR_SVAR_GREENSCORE;
-    int32_t        out  = 0;
+    int32_t idx = this->CommSlotForArmy(slot);
+    int32_t out;
 
-    GetVarValue(vars[::CommSlotForArmy(comm, slot)], &out);
+    (void)comm;
+    out = 0;
+    GetVarValue(((const int32_t *)(uintptr_t)ADDR_SVAR_GREENSCORE)[idx], &out);
     return out;
 }
 

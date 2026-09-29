@@ -4025,12 +4025,13 @@ void *__cdecl UnitByUid(uint32_t uid)
 int32_t __cdecl ObjHeight(const void *obj)
 {
     const uint8_t *o   = (const uint8_t *)obj;
-    int32_t        adj = *(const int8_t *)(o + OBJ_OFF_HEIGHT_ADJ);
     uint8_t        set = *(o + OBJ_OFF_HEIGHT_SET);
 
     if (set)
-        return adj + (int32_t)(int8_t)set;
-    return TileAttrAt(*(const uint16_t *)(o + OBJ_OFF_TILE)) + adj;
+        return *(const int8_t *)(o + OBJ_OFF_HEIGHT_ADJ) + (int32_t)(int8_t)set;
+    /* TileAttrAt's body, inline as the image has it. */
+    return *(const int8_t *)(g_tileAttrs + *(const uint16_t *)(o + OBJ_OFF_TILE))
+           + *(const int8_t *)(o + OBJ_OFF_HEIGHT_ADJ);
 }
 
 void __cdecl ObjMarkIfOverdue(void *obj)
