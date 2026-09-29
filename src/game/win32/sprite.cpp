@@ -1070,24 +1070,21 @@ void *__cdecl SpriteSetForKey(uint32_t key)
  * produces 26 bits, so nothing can tell them apart. */
 int32_t __cdecl SpriteDirIndex(void *set, uint32_t key)
 {
-    const AM2_SpriteDirEntry *dir;
     int32_t lo = 0;
     int32_t hi = SET_COUNT(set);
 
-    if (hi <= 0)
-        return -1;
+    /* The binary searches' shape: a `while` on hi > lo, a shifted
+     * midpoint -- and this one compares SIGNED. */
+    while (hi > lo) {
+        int32_t mid = ((hi - lo) >> 1) + lo;
 
-    dir = SET_DIR(set);
-    do {
-        int32_t mid = lo + ((hi - lo) >> 1);
-
-        if (dir[mid].key == key)
+        if (SET_DIR(set)[mid].key == key)
             return mid;
-        if ((int32_t)dir[mid].key < (int32_t)key)
+        if ((int32_t)SET_DIR(set)[mid].key < (int32_t)key)
             lo = mid + 1;
         else
             hi = mid;
-    } while (hi > lo);
+    }
 
     return -1;
 }

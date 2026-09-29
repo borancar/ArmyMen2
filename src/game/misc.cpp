@@ -1,6 +1,7 @@
 /* misc.cpp -- see misc.h. */
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>   /* abs */
 #include <string.h>
 
 #include "misc.h"
@@ -1625,13 +1626,11 @@ int32_t __cdecl ColourDistance(const void *a, const void *b)
 {
     const uint8_t *p = (const uint8_t *)a;
     const uint8_t *q = (const uint8_t *)b;
-    int32_t        d0 = (int32_t)p[0] - (int32_t)q[0];
-    int32_t        d1 = (int32_t)p[1] - (int32_t)q[1];
-    int32_t        d2 = (int32_t)p[2] - (int32_t)q[2];
+    /* abs() each: the `cdq; xor; sub` the image has three times. */
+    int32_t        d0 = abs((int32_t)p[0] - (int32_t)q[0]);
+    int32_t        d1 = abs((int32_t)p[1] - (int32_t)q[1]);
+    int32_t        d2 = abs((int32_t)p[2] - (int32_t)q[2]);
 
-    if (d0 < 0) d0 = -d0;
-    if (d1 < 0) d1 = -d1;
-    if (d2 < 0) d2 = -d2;
     return d0 * d0 + d1 * d1 + d2 * d2;
 }
 
@@ -2324,7 +2323,6 @@ void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust)
         return;
 
     seq = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_B);
-    row = *(uint8_t **)(seq + SEQ_OFF_ROW);
 
     *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND4;
     *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
@@ -2333,10 +2331,11 @@ void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust)
     *(int32_t *)(seq + SEQ_OFF_FIELD_10) =
         *(const int32_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_DRIFT_Y));
     *(int32_t *)(seq + SEQ_OFF_OWNER)    = 0;
-    *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
     *(int32_t *)(seq + SEQ_OFF_LIFE)     =
         *(const int32_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_STEP_MS));
+    *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
 
+    row = *(uint8_t **)(seq + SEQ_OFF_ROW);   /* taken after the seq fields */
     *(uint8_t *)(row + ROW_OFF_CELL)     = 0;
     *(int32_t *)(row + ROW_OFF_STAMP_54) = 0;
     *(int32_t *)(row + 0)                = 1;

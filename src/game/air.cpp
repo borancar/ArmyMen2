@@ -1063,22 +1063,19 @@ int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
     const uint8_t *w = (const uint8_t *)who;
     const uint8_t *o = (const uint8_t *)owner;
     const uint8_t *base;
+    int32_t        answer = AM2_NOT_AT_FLAG_BASE;
 
-    if (AM2_THE_COMM->CommArmyOfSlot(
-                       *(const int8_t *)(o + OBJ_OFF_ARMY)) != army)
-        return AM2_NOT_AT_FLAG_BASE;
+    if (AM2_THE_COMM->CommArmyOfSlot(*(const int8_t *)(o + OBJ_OFF_ARMY)) == army) {
+        base = (const uint8_t *)LookupByUID(
+                   (uint32_t)kScriptNames[ScriptFindName(name)].value);
+        if (base
+            && ApproxDist((const AM2_Point *)(base + OBJ_OFF_POS),
+                          (const AM2_Point *)(w + OBJ_OFF_POS))
+               < AM2_FLAG_BASE_RANGE)
+            answer = 0;
+    }
 
-    base = (const uint8_t *)LookupByUID(
-               (uint32_t)kScriptNames[ScriptFindName(name)].value);
-    if (!base)
-        return AM2_NOT_AT_FLAG_BASE;
-
-    if (ApproxDist((const AM2_Point *)(base + OBJ_OFF_POS),
-                   (const AM2_Point *)(w + OBJ_OFF_POS))
-        >= AM2_FLAG_BASE_RANGE)
-        return AM2_NOT_AT_FLAG_BASE;
-
-    return 0;
+    return answer;
 }
 
 /* 0x00448E60, three callers, 160 bytes. How much one object obstructs.
