@@ -8565,7 +8565,7 @@ void __cdecl SlotBandHeading(int32_t slot, int32_t *band, int32_t *index,
     *index = i;
 
     /* The table byte is stored, then stored again adjusted. */
-    *heading = ((const uint8_t *)(uintptr_t)ADDR_SLOT_HEADINGS)[*index];
+    *heading = ((const uint8_t *)(uintptr_t)ADDR_SLOT_HEADINGS)[i];
     if (slot & 1)
         *heading -= 0x10;
     else
@@ -9709,22 +9709,21 @@ tail:
 void __cdecl TrooperHostApprovedPickupItem(void *troop, void *item,
                                            int32_t slot, int32_t ammo)
 {
+#define comm (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
     uint8_t *t = (uint8_t *)troop;
     uint8_t *w = (uint8_t *)item;
-    uint8_t *comm;
     int32_t  kind;
     uint8_t *held;
 
     NotifyPickedUp(item, troop);
-
-    comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
         orig_log("TrooperHostApprovedPickupItem %x\n",
                  ((const AM2_Object *)w)->uid);
 
     kind = **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0);
 
-    if (kind == AM2_ITEM_KIND_HOT_TARGET) {
+    switch (kind) {
+    case AM2_ITEM_KIND_HOT_TARGET:
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log("\tTrooperHostApprovedPickupItem: HotTarget\n");
         DestroyByType(item);
@@ -9732,9 +9731,8 @@ void __cdecl TrooperHostApprovedPickupItem(void *troop, void *item,
             orig_log("TrooperHostApprovedPickupItem %x\n",
                      ((const AM2_Object *)w)->uid);
         return;
-    }
 
-    if (kind == AM2_ITEM_KIND_MEDKIT) {
+    case AM2_ITEM_KIND_MEDKIT:
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log("\tTrooperHostApprovedPickupItem:Medkit\n");
         ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
@@ -9746,7 +9744,56 @@ void __cdecl TrooperHostApprovedPickupItem(void *troop, void *item,
         return;
     }
 
-    if (!*(const uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4)) {
+    if (*(const uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4)) {
+        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+            orig_log("\tTrooperHostApprovedPickupItem: we've got somthing in "
+                     "that slot\n");
+
+        held = (uint8_t *)WeaponByUid(
+                   *(const uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4));
+
+        if (KindInSetB(**(const int32_t *const *)(held + OBJ_OFF_FIELD_C0))
+            && KindInSetB(**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))) {
+            int32_t k = **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0);
+
+            switch (k) {
+            case 8:
+                SpeakLine(AM2_SPEAK_HEAVYMACGUN, *(const int8_t *)(t + OBJ_OFF_ARMY));
+                break;
+            case 10:
+                SpeakLine(AM2_SPEAK_AUTORIFLE, *(const int8_t *)(t + OBJ_OFF_ARMY));
+                break;
+            case 29:
+                SpeakLine(AM2_SPEAK_VULCANGUN, *(const int8_t *)(t + OBJ_OFF_ARMY));
+                break;
+            }
+
+            *(uint32_t *)(held + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
+            *(uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4) =
+                ((const AM2_Object *)w)->uid;
+            *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
+            DestroyByType(item);
+            return;
+        }
+
+        /* Not a swap: take the ammo instead. The line is spoken only when there
+         * is room for it, and the test is made BEFORE the transfer. */
+        if (*(const int32_t *)(held + ITEM_OFF_AMMO)
+            < (*(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))
+                  [ITEMTYPE_OFF_CAPACITY / 4])
+            SpeakLine(AM2_SPEAK_MOREAMMO, *(const int8_t *)(t + OBJ_OFF_ARMY));
+
+        {
+            /* Added in place, then read back against the capacity. */
+            *(int32_t *)(held + ITEM_OFF_AMMO) += ammo;
+            if (*(const int32_t *)(held + ITEM_OFF_AMMO)
+                > (*(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))
+                      [ITEMTYPE_OFF_CAPACITY / 4])
+                *(int32_t *)(held + ITEM_OFF_AMMO) =
+                    (*(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))
+                        [ITEMTYPE_OFF_CAPACITY / 4];
+        }
+    } else {
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log("\tTrooperHostApprovedPickupItem: new weapon\n");
         *(int32_t *)(w + ITEM_OFF_AMMO) = ammo;
@@ -9755,55 +9802,12 @@ void __cdecl TrooperHostApprovedPickupItem(void *troop, void *item,
         *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
         DestroyByType(item);
         /* SpeakItemPickup, not SpeakLine: it takes the item KIND and maps it
-         * through its own two tables. The swap arm below speaks GROUPS
+         * through its own two tables. The swap arm above speaks GROUPS
          * directly instead, which is why the two look alike and are not. */
         SpeakItemPickupLine(**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0),
                         *(const int8_t *)(t + OBJ_OFF_ARMY));
-        return;
     }
-
-    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-        orig_log("\tTrooperHostApprovedPickupItem: we've got somthing in "
-                 "that slot\n");
-
-    held = (uint8_t *)WeaponByUid(
-               *(const uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4));
-
-    if (KindInSetB(**(const int32_t *const *)(held + OBJ_OFF_FIELD_C0))
-        && KindInSetB(**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))) {
-        int32_t k = **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0);
-
-        if (k == 8)
-            SpeakLine(AM2_SPEAK_HEAVYMACGUN, *(const int8_t *)(t + OBJ_OFF_ARMY));
-        else if (k == 10)
-            SpeakLine(AM2_SPEAK_AUTORIFLE, *(const int8_t *)(t + OBJ_OFF_ARMY));
-        else if (k == 29)
-            SpeakLine(AM2_SPEAK_VULCANGUN, *(const int8_t *)(t + OBJ_OFF_ARMY));
-
-        *(uint32_t *)(held + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
-        *(uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4) =
-            ((const AM2_Object *)w)->uid;
-        *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
-        DestroyByType(item);
-        return;
-    }
-
-    /* Not a swap: take the ammo instead. The line is spoken only when there
-     * is room for it, and the test is made BEFORE the transfer. */
-    if (*(const int32_t *)(held + ITEM_OFF_AMMO)
-        < (*(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))
-              [ITEMTYPE_OFF_CAPACITY / 4])
-        SpeakLine(AM2_SPEAK_MOREAMMO, *(const int8_t *)(t + OBJ_OFF_ARMY));
-
-    {
-        int32_t cap = (*(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))
-                          [ITEMTYPE_OFF_CAPACITY / 4];
-        int32_t now = *(const int32_t *)(held + ITEM_OFF_AMMO) + ammo;
-
-        *(int32_t *)(held + ITEM_OFF_AMMO) = now;
-        if (now > cap)
-            *(int32_t *)(held + ITEM_OFF_AMMO) = cap;
-    }
+#undef comm
 }
 
 /* TrooperRemotePickupItem -- original 0x00448B20, 576 bytes, one caller: the
@@ -13038,9 +13042,9 @@ gone:
  */
 void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
 {
+#define comm (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
     uint8_t       *t = (uint8_t *)trooper;
     uint8_t       *w = (uint8_t *)item;
-    const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
     int32_t        kind;
     uint8_t       *held;
 
@@ -13116,23 +13120,20 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
         }
 
         /* ---- same kind: merge the ammo ---- */
+        /* Each field re-read at each use. */
+#define AMMO(o) (*(int32_t *)((o) + OBJ_OFF_TARGET_UID))
+#define CAP     (*(const int32_t *)(*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0) \
+                                    + ITEMTYPE_OFF_CAPACITY))
         {
-            int32_t add = *(const int32_t *)(w + OBJ_OFF_TARGET_UID);
-            int32_t cap = *(const int32_t *)(
-                *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0)
-                + ITEMTYPE_OFF_CAPACITY);
-            int32_t have = *(const int32_t *)(held + OBJ_OFF_TARGET_UID);
-
-            if (add >= 0 && have + add > cap) {
-                if (have >= cap)
+            if (AMMO(w) >= 0 && AMMO(w) + AMMO(held) > CAP) {
+                if (AMMO(held) >= CAP)
                     return;
 
-                *(int32_t *)(w + OBJ_OFF_TARGET_UID) = have - cap + add;
-                *(int32_t *)(held + OBJ_OFF_TARGET_UID) = cap;
+                AMMO(w) = AMMO(held) - CAP + AMMO(w);
+                AMMO(held) = CAP;
 
                 if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
-                    SendPairMessage(t, w, (int32_t)slot,
-                                    0 /* = capacity - capacity; see above */);
+                    SendPairMessage(t, w, (int32_t)slot, CAP - AMMO(held));
 
                 SpeakLine(AM2_SPEAK_MOREAMMO,
                           *(const int8_t *)(t + OBJ_OFF_ARMY));
@@ -13157,45 +13158,48 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
             SendPairMessage(t, w, (int32_t)slot,
                             *(const int32_t *)(w + OBJ_OFF_TARGET_UID));
         return;
-    }
+    } else {
+        /* ---- the slot was empty ---- */
+        *(uint32_t *)(t + OBJ_OFF_WEAPON_UID + (uint32_t)slot * 4) =
+            ((const AM2_Object *)w)->uid;
 
-    /* ---- the slot was empty ---- */
-    *(uint32_t *)(t + OBJ_OFF_WEAPON_UID + (uint32_t)slot * 4) =
-        ((const AM2_Object *)w)->uid;
+        if (*(const int8_t *)(w + OBJ_OFF_ARMY) == AM2_ARMY_NEUTRAL)
+            *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
 
-    if (*(const int8_t *)(w + OBJ_OFF_ARMY) == AM2_ARMY_NEUTRAL)
-        *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
-
-    DestroyByType(w);
-    WeaponRespawn(w);
-
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
-        SendPairMessage(t, w, (int32_t)slot,
-                        *(const int32_t *)(w + OBJ_OFF_TARGET_UID));
-
-    kind = **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0);
-
-    if (kind == AM2_ITEM_KIND_HOT_TARGET) {
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            orig_log((const char *)((void *)(uintptr_t)(AM2_STR_TROOPER_PICKUP)),
-                     ((const AM2_Object *)w)->uid);
         DestroyByType(w);
-        return;
-    }
-
-    if (kind == AM2_ITEM_KIND_MEDKIT) {
-        ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
-                          MedkitHealOne);
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            orig_log((const char *)((void *)(uintptr_t)(AM2_STR_TROOPER_PICKUP)),
-                     ((const AM2_Object *)w)->uid);
-        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
         WeaponRespawn(w);
-        SpeakLine(AM2_SPEAK_HITSSPOT, *(const int8_t *)(t + OBJ_OFF_ARMY));
-        return;
-    }
 
-    SpeakItemPickupLine(kind, *(const int8_t *)(t + OBJ_OFF_ARMY));
+        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
+            SendPairMessage(t, w, (int32_t)slot,
+                            *(const int32_t *)(w + OBJ_OFF_TARGET_UID));
+
+        kind = **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0);
+
+        switch (kind) {
+        case AM2_ITEM_KIND_HOT_TARGET:
+            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                orig_log((const char *)((void *)(uintptr_t)(AM2_STR_TROOPER_PICKUP)),
+                         ((const AM2_Object *)w)->uid);
+            DestroyByType(w);
+            return;
+
+        case AM2_ITEM_KIND_MEDKIT:
+            ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
+                              MedkitHealOne);
+            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                orig_log((const char *)((void *)(uintptr_t)(AM2_STR_TROOPER_PICKUP)),
+                         ((const AM2_Object *)w)->uid);
+            *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
+            WeaponRespawn(w);
+            SpeakLine(AM2_SPEAK_HITSSPOT, *(const int8_t *)(t + OBJ_OFF_ARMY));
+            return;
+        }
+
+        SpeakItemPickupLine(kind, *(const int8_t *)(t + OBJ_OFF_ARMY));
+    }
+#undef AMMO
+#undef CAP
+#undef comm
 }
 
 /* Forward-declared rather than included. AimStart and AimStartB live in

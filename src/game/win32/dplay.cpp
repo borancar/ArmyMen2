@@ -3478,7 +3478,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
  */
 void __cdecl ProcessResendQueue(void)
 {
-    uint8_t  *comm;
+#define comm (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
     uint8_t  *buf = (uint8_t *)(uintptr_t)ADDR_RESEND_BUF;
     int32_t   taken;
     int32_t   drained = 0;
@@ -3486,8 +3486,6 @@ void __cdecl ProcessResendQueue(void)
     taken = MsgListTakeFlags((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, buf);
     if (!taken)
         return;
-
-    comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
 
     for (;;) {
         int32_t off;
@@ -3557,6 +3555,7 @@ void __cdecl ProcessResendQueue(void)
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE) && drained)
         orig_log("Exiting ProcessResendQueue \n");
+#undef comm
 }
 
 /* SendGameMsg -- original 0x004022D0, 928 bytes, fourteen callers. Every

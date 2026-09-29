@@ -3150,9 +3150,8 @@ static int32_t FlowRecvData(uint8_t *node, uint8_t *msg, uint8_t *sender,
  * it and it would be very easy to regularise; it is reproduced as found. */
 int32_t __cdecl FlowRecvMessage(void *nodev)
 {
+#define comm (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
     uint8_t *node = (uint8_t *)nodev;
-    const uint8_t *comm = (const uint8_t *)
-        *(void *const *)(uintptr_t)ADDR_COMM_OBJECT;
     uint32_t from = *(const uint32_t *)(node + MSGNODE_OFF_FROM);
     uint32_t mine;
     uint8_t *msg, *sender, *me;
@@ -3233,6 +3232,7 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
          * flow queue is. */
         return 0;
     }
+#undef comm
 }
 
 /* RecvVehicle1B -- original 0x0045EB10, one caller. Message kind 0x1B is a

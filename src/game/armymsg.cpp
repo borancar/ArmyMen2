@@ -1754,9 +1754,9 @@ void __cdecl SendVehicleFire(void *vehicle)
  * cursor happened to end. */
 void __cdecl VehicleUpdateAppend(void *msg, void *obj)
 {
+#define comm (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
     uint8_t  *o = (uint8_t *)obj;
     uint8_t  *m = (uint8_t *)msg;
-    uint8_t  *comm;
     uint8_t  *out, *outStart;
     uint32_t  seq, flags = 0, interval, coarse;
     int32_t   dx, dz;
@@ -1764,8 +1764,6 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
 
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
         return;
-
-    comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
     seq = *(const uint32_t *)((const uint8_t *)FindPlayerById(
               *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID))
               + FLOW_OFF_SEQUENCE);
@@ -1948,6 +1946,7 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
     }
 
     *(uint16_t *)m += (uint16_t)(out - outStart);
+#undef comm
 }
 
 /* SendVehicleUpdates -- original 0x0045E480, one caller. The vehicle batch
