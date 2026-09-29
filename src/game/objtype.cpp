@@ -1439,7 +1439,7 @@ int32_t __cdecl ObjIsSelectable(void *o)
 {
     const uint8_t *obj = (const uint8_t *)o;
 
-    if (*(const int8_t *)(obj + OBJ_OFF_ARMY) != (int8_t)g_defaultOwner)
+    if (*(const int8_t *)(obj + OBJ_OFF_ARMY) != (int32_t)g_defaultOwner)
         return 0;
 
     if (*(const int32_t *)(obj + OBJ_OFF_FLAGS) & AM2_SIGHT_DROP)

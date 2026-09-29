@@ -316,10 +316,9 @@ const char *__cdecl UnitClassName(void *unit)
 
     w = (const uint8_t *)WeaponByUid(
             *(const uint32_t *)(u + TROOPER_OFF_WEAPON_UID));
-    if (!w)
-        return names[0];
-
-    return names[**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)];
+    if (w)
+        return names[**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)];
+    return names[0];
 }
 
 /* 0x004337C0, one caller. Whether an item can be picked up.
@@ -1406,7 +1405,7 @@ typedef void (__cdecl *AM2_AfterMoveFn)(void *obj, int32_t a, int32_t b);
  * now. The name handed to the initialiser is the empty string.
  */
 void *__cdecl MakeKind7(uint32_t pt, int32_t unused, int32_t army,
-                        int32_t facing, int32_t e, int32_t f)
+                        uint8_t facing, int32_t e, int32_t f)
 {
     int32_t *count = (int32_t *)(uintptr_t)ADDR_KIND7_COUNT;
     uint8_t *o;

@@ -12116,8 +12116,8 @@ void __cdecl OnDifficultyOk(AM2_Widget *w)
     PlaySoundAt(2, 0, 0, 0, 0);
     list = *(const uint8_t *const *)((const uint8_t *)w->parent->parent
                                      + DLG_OFF_LIST);
-    g_menuRequest    = AM2_MENU_REQUEST_OPTIONS_MENU;
     g_difficulty     = *(const int32_t *)(list + LIST_OFF_CHOSEN);
+    g_menuRequest    = AM2_MENU_REQUEST_OPTIONS_MENU;
     g_menuRequestSet = 1;
     SaveOptions();
 }
