@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1271 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1274 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1271:
+  the near-miss sweep, 758 before the row pools. From 758 to 1274:
   - **GOG's copy-protection patch is applied LAST now** (Boran, 2026-09-29):
     the relink compares against the retail bytes (`RETAIL` in
     `src/vc6/bytematch.py` puts the five `75`s back), VC6 compiles the
@@ -82,6 +82,12 @@ main result so far (details in `src/vc6/README.md`):
     image pushes a byte local's whole dword slot, which is how VC6 passes a
     `uint8_t` argument, so DamageObject/Trooper/Vehicle/Item/Roach take
     `uint8_t` for it; neutral or better in all five.
+  - **PlaceObj never advances its row loop** (2026-09-29): the image re-reads
+    OBJ_OFF_ROWS (row 0) every pass and takes row 0's sprite offset, so rows
+    1+ of a multi-row object are never placed and row 0 is pushed once per
+    extra row. The reconstruction had indexed the rows; it now reproduces
+    the image. `where` is an AM2_Point by value. Lockstep unchanged (Boot
+    Camp's one PlaceObj is on a one-row object).
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own

@@ -1404,27 +1404,30 @@ void __cdecl AirDeliver(void)
  */
 void __cdecl AirPassesDraw(void)
 {
-    int32_t ms   = *(const int32_t *)((void *)(uintptr_t)(ADDR_AIR_PASS_MS));
-    int32_t half = ms / 2;
     int32_t i;
+    int32_t x;
+    int32_t y;
+    int32_t frame;
+    int32_t half;
 
+    /* The pass time is re-read, and halved with a shift, at every use. */
+#define MS (*(const int32_t *)((void *)(uintptr_t)(ADDR_AIR_PASS_MS)))
     if (g_airPassCount <= 0)
         return;
 
     for (i = 0; i < g_airPassCount; i++) {
-        int32_t t = g_airPassTimer[i];
-        int32_t x = g_airPassWhere[i * 2]
-                    - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
-        int32_t y = g_airPassWhere[i * 2 + 1]
-                    - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
-                    - AM2_AIR_PASS_LIFT;
-        int32_t frame;
+        y = g_airPassWhere[i * 2 + 1]
+            - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
+            - AM2_AIR_PASS_LIFT;
+        x = g_airPassWhere[i * 2]
+            - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
+        half = MS >> 1;
 
-        if (t < half) {
-            frame = (t * AM2_AIR_PASS_FRAMES) / half;
+        if (g_airPassTimer[i] < half) {
+            frame = (g_airPassTimer[i] * AM2_AIR_PASS_FRAMES) / half;
             y -= AM2_AIR_PASS_LIFT;
         } else {
-            frame = ((t - half) * AM2_AIR_PASS_FRAMES) / half;
+            frame = ((g_airPassTimer[i] - half) * AM2_AIR_PASS_FRAMES) / half;
         }
 
         DrawSprite(((AM2_Sprite **)(uintptr_t)ADDR_AIR_SPRITES_3)[frame],
@@ -1433,8 +1436,9 @@ void __cdecl AirPassesDraw(void)
         g_airPassTimer[i] += *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
     }
 
-    if (g_airPassTimer[0] < ms)
+    if (g_airPassTimer[0] < MS)
         return;
+#undef MS
 
     if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
         || AM2_THE_COMM->CommMustBroadcast(

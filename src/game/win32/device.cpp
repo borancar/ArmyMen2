@@ -494,14 +494,18 @@ void __cdecl UpdateMouseState(void)
 /* One button event. `changed` is against the previous state rather than a
  * simple "went down", so a release marks it too -- and only a release clears
  * the claim the menus set. */
-static void MouseButton(int32_t n, uint32_t data)
+static inline void MouseButton(int32_t n, uint32_t data)
 {
     int32_t was = g_mouseButton[n];
-    int32_t now = (data & BUTTON_DOWN) ? 1 : 0;
+    int32_t now;
 
-    g_mouseButton[n]  = now;
-    if (!now)
+    if (data & BUTTON_DOWN) {
+        now = 1;
+    } else {
+        now = 0;
         g_mouseClaimed[n] = 0;
+    }
+    g_mouseButton[n]  = now;
     g_mouseChanged[n] = (now != was);
 }
 
@@ -522,8 +526,12 @@ void __cdecl PollMouse(void)
     input_pump();
 #endif
 
-    g_mouseDX = g_mouseDY = g_mouseDZ = 0;
-    g_mouseChanged[0] = g_mouseChanged[1] = g_mouseChanged[2] = 0;
+    g_mouseDX = 0;
+    g_mouseDY = 0;
+    g_mouseDZ = 0;
+    g_mouseChanged[0] = 0;
+    g_mouseChanged[1] = 0;
+    g_mouseChanged[2] = 0;
     g_mouseMoved = 0;
 
     for (;;) {
@@ -532,8 +540,9 @@ void __cdecl PollMouse(void)
         if ((uint32_t)hr == (uint32_t)DIERR_INPUTLOST) {
             g_mouseAcquired = 0;
             AcquireMouse();
-            if (IDirectInputDevice_GetDeviceData(g_diMouse, sizeof(od),
-                                                 &od, &count, 0) != DI_OK) {
+            hr = IDirectInputDevice_GetDeviceData(g_diMouse, sizeof(od),
+                                                  &od, &count, 0);
+            if (hr != DI_OK) {
                 g_mouseAcquired = 0;
                 return;
             }

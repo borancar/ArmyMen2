@@ -2067,19 +2067,19 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
                           int32_t army, int32_t flags, int32_t a7, int32_t uid)
 {
     uint8_t  *o    = (uint8_t *)am2_malloc(AM2_ROACH_BYTES);
-    uint32_t  at   = (uint32_t)(uint16_t)(int16_t)x
-                   | ((uint32_t)(uint16_t)(int16_t)y << 16);
-    uint8_t  *rows;
+    AM2_Point at;
 
     memset(o, 0, AM2_ROACH_BYTES);
+    at.x = (int16_t)x;
+    at.y = (int16_t)y;
 
     /* Both already zero from the memset; the original writes them anyway. */
     *(uint8_t *)(o + OBJ_OFF_FACING) = 0;
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |=
         (uint32_t)flags | OBJ_FLAG_BIT0 | OBJ_FLAG_BIT4 | OBJ_FLAG_SNAP_HEADING;
 
-    *(int8_t *)(o + OBJ_OFF_ARMY)      = (int8_t)army;
     *(int32_t *)(o + VEHICLE_OFF_KIND) = kind;
+    *(int8_t *)(o + OBJ_OFF_ARMY)      = (int8_t)army;
 
     /* Index 0 of the block, which aai/game.aai calls ROACH_HEIGHT; read as a
      * byte out of a dword that ships 32. */
@@ -2091,12 +2091,12 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
     *(int16_t *)(o + OBJ_OFF_HEALTH) =
         *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
 
-    *(int32_t *)(o + OBJ_OFF_RANK) = 7;
     *(int32_t *)(o + OBJ_OFF_FIELD_FC) =
         (int32_t)(orig_game_rand() % AM2_ROACH_STAGGER_MS)
         + *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+    *(int32_t *)(o + OBJ_OFF_RANK) = 7;
 
-    ObjInitCommon(o, name, 8, at,
+    ObjInitCommon(o, name, 8, *(const uint32_t *)&at,
                          (const int32_t *)((void *)(uintptr_t)(ADDR_ROACH_BOX)), a7, uid);
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
                 (const void *)((void *)(uintptr_t)(ADDR_ROACH_ROW_SPEC)), x, y,
@@ -2108,16 +2108,18 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
     ((AM2_Rec *)((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[army])->PtrListPush(
                 *(void **)(o + 4));
 
-    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
-    *(const void **)(rows + ROW_OFF_ANIM_CUR) =
+    /* The rows pointer is re-read at every use, as the image does. */
+#define ROWS (*(uint8_t **)(o + OBJ_OFF_ROWS))
+    *(const void **)(ROWS + ROW_OFF_ANIM_CUR) =
         (const void *)(uintptr_t)ADDR_ROACH_ANIMS;
-    *(int16_t *)(rows + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
-    *(uint32_t *)rows |= ROW_FLAG_BIT8;
+    *(int16_t *)(ROWS + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
+    *(uint32_t *)ROWS |= ROW_FLAG_BIT8;
 
     *(int32_t *)(o + OBJ_OFF_DEATH_STATE) = 1;
     *(uint8_t *)(o + OBJ_OFF_FIELD_540)   = 0;
 
-    SetAnimFrame(rows, *(const int16_t *)((void *)(uintptr_t)(ADDR_ROACH_START_FRAME)), 0);
+    SetAnimFrame(ROWS, *(const int16_t *)((void *)(uintptr_t)(ADDR_ROACH_START_FRAME)), 0);
+#undef ROWS
     SetObjField530(o, 1);
 
     if (*(const int32_t *)(uintptr_t)ADDR_STATE_ENTERED == 0)
@@ -2410,15 +2412,44 @@ void __cdecl RoachAliveStepB(void *obj, uint8_t *step)
     int32_t  turn;
     uint32_t now;
     int32_t  tries;
+    int32_t  n;
+    int32_t  dir;
 
     if (step[ROACHSTEP_OFF_FACING] == *(const uint8_t *)(o + OBJ_OFF_FACING)
         && *(const int32_t *)(step + ROACHSTEP_OFF_STATE) == 1)
         goto reset;
 
+    /* The fan: alternate either side of the base direction, one step wider
+     * each time. Written out in both branches, as the image has it. */
+#define FAN_DIR(n) ((n) & 1                                                  \
+        ? ((*(const int32_t *)(o + ROACH_OFF_BASE_DIR) - ((n) >> 1)) & 7)    \
+        : ((((n) >> 1) + *(const int32_t *)(o + ROACH_OFF_BASE_DIR)) & 7))
+#define FAN_LOOP()                                                           \
+    tries = 0;                                                               \
+    while (1) {                                                              \
+        n   = ++*(int32_t *)(o + ROACH_OFF_FAN);                             \
+        dir = FAN_DIR(n);                                                    \
+        SetFacing14(dir, obj, step);                                         \
+        if (!RoachStepAllowed(obj, step, &turn))                             \
+            return;                                                          \
+        tries++;                                                             \
+        if (tries >= AM2_ROACH_FAN_LIMIT)                                    \
+            return;                                                          \
+    }
     now = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
 
     if (now - *(const uint32_t *)(o + ROACH_OFF_STAMP)
-        >= (uint32_t)AM2_ROACH_BLOCKED_MS) {
+        < (uint32_t)AM2_ROACH_BLOCKED_MS) {
+        n   = *(const int32_t *)(o + ROACH_OFF_FAN);
+        dir = FAN_DIR(n);
+        SetFacing14(dir, obj, step);
+        if (!RoachStepAllowed(obj, step, &turn))
+            return;
+
+        *(uint32_t *)(o + ROACH_OFF_STAMP) =
+            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        FAN_LOOP();
+    } else {
         *(uint32_t *)(o + ROACH_OFF_STAMP) = now;
 
         if (!RoachStepAllowed(obj, step, &turn))
@@ -2430,31 +2461,10 @@ void __cdecl RoachAliveStepB(void *obj, uint8_t *step)
         if (*(const int32_t *)(o + ROACH_OFF_BASE_DIR) == 0)
             *(int32_t *)(o + ROACH_OFF_BASE_DIR) =
                 FacingFromDelta14(step, turn);
-    } else {
-        int32_t n   = *(const int32_t *)(o + ROACH_OFF_FAN);
-        int32_t dir = (n & 1)
-            ? ((*(const int32_t *)(o + ROACH_OFF_BASE_DIR) - (n >> 1)) & 7)
-            : (((n >> 1) + *(const int32_t *)(o + ROACH_OFF_BASE_DIR)) & 7);
-
-        SetFacing14(dir, obj, step);
-        if (!RoachStepAllowed(obj, step, &turn))
-            return;
-
-        *(uint32_t *)(o + ROACH_OFF_STAMP) =
-            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        FAN_LOOP();
     }
-
-    for (tries = 0; tries < AM2_ROACH_FAN_LIMIT; tries++) {
-        int32_t n   = ++*(int32_t *)(o + ROACH_OFF_FAN);
-        int32_t dir = (n & 1)
-            ? ((*(const int32_t *)(o + ROACH_OFF_BASE_DIR) - (n >> 1)) & 7)
-            : (((n >> 1) + *(const int32_t *)(o + ROACH_OFF_BASE_DIR)) & 7);
-
-        SetFacing14(dir, obj, step);
-        if (!RoachStepAllowed(obj, step, &turn))
-            return;
-    }
-    return;
+#undef FAN_LOOP
+#undef FAN_DIR
 
 reset:
     *(int32_t *)(o + ROACH_OFF_BASE_DIR) = 0;
@@ -4312,11 +4322,14 @@ void __cdecl DestroyObjCommon(void *obj)
  * type 2 or 3 is simply moved -- which is what makes RemoveFromItemList's
  * caller reachable from a place rather than only from a destroy.
  *
- * ROW 0 IS MOVED TO THE POINT AND THE REST TO THE POINT PLUS THEIR SPRITE'S
- * ATTACH OFFSET, which is the other half of what orig.h records under
- * AM2_Sprite::attachX: "where an attached row sits relative to the one
- * carrying this sprite -- a turret on its body". PointActionC was the one
- * reader that named those fields; this is the second, and it agrees.
+ * ROW 0 IS MOVED TO THE POINT, AND THE LOOP MEANT FOR THE REST MOVES ROW 0
+ * AGAIN. The intent is the point plus each row's sprite attach offset --
+ * AM2_Sprite::attachX, "where an attached row sits relative to the one
+ * carrying this sprite -- a turret on its body", as PointActionC reads it --
+ * but the image never indexes the rows: each pass re-reads OBJ_OFF_ROWS and
+ * row 0's sprite. So a multi-row object has row 0 pushed by its own attach
+ * offset once per extra row and rows 1 and up left where they were. Found by
+ * byte-matching (2026-09-29); earlier this indexed the rows.
  *
  * Row 0 is relinked with force 1 and the rest with force 0. The first has
  * just had its position rewritten and the others may not have moved at all,
@@ -4334,10 +4347,11 @@ typedef void (__cdecl *AM2_ObjOnlyFn3)(void *obj);
 typedef void (__cdecl *AM2_AfterMoveFn)(void *obj, int32_t a, int32_t b);
 /* ObjAfterMove is reconstructed, in region.cpp, and called by name. */
 
-void __cdecl PlaceObj(void *obj, uint32_t where)
+void __cdecl PlaceObj(void *obj, AM2_Point where)
 {
     uint8_t *o = (uint8_t *)obj;
     uint8_t *row;
+    const uint8_t *const *spr;
     int32_t  i;
 
     if (!obj)
@@ -4348,8 +4362,8 @@ void __cdecl PlaceObj(void *obj, uint32_t where)
      * that is the re-place/revive case, e.g. a dropped weapon dragged to the
      * trooper's own position. `test [esi+8],al` (al=4=DESTROYED) then
      * `je RETURN`, so it returns on the clear bit, not the set one. */
-    if (*(const int16_t *)(o + OBJ_OFF_POS) == (int16_t)where
-        && *(const int16_t *)(o + OBJ_OFF_POS + 2) == (int16_t)(where >> 16)
+    if (*(const int16_t *)(o + OBJ_OFF_POS) == where.x
+        && *(const int16_t *)(o + OBJ_OFF_POS + 2) == where.y
         && !(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED))
         return;
 
@@ -4357,29 +4371,29 @@ void __cdecl PlaceObj(void *obj, uint32_t where)
         && ObjIsItem((const AM2_Object *)obj))
         ItemTeardown(obj);
 
-    *(int16_t *)(o + OBJ_OFF_POS)     = (int16_t)where;
-    *(int16_t *)(o + OBJ_OFF_POS + 2) = (int16_t)(where >> 16);
+    *(int16_t *)(o + OBJ_OFF_POS)     = where.x;
+    *(int16_t *)(o + OBJ_OFF_POS + 2) = where.y;
 
     row = *(uint8_t **)(o + OBJ_OFF_ROWS);
     *(int32_t *)(row + ROW_OFF_X) = *(const int32_t *)(o + OBJ_OFF_POS);
     ObjFlagSet0(row);
-    RowUpdate(row, 1, (void *)(uintptr_t)ADDR_MAP_DESC);
+    i = 1;
+    RowUpdate(row, i, (void *)(uintptr_t)ADDR_MAP_DESC);
 
-    for (i = 1; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
-        const uint8_t *spr;
-
-        row = *(uint8_t **)(o + OBJ_OFF_ROWS) + i * AM2_OBJ_ROW_STRIDE;
-        *(int32_t *)(row + ROW_OFF_X) = *(const int32_t *)(o + OBJ_OFF_POS);
-
-        spr = *(const uint8_t *const *)(row + ROW_OFF_SPRITE);
-        *(int16_t *)(row + ROW_OFF_X) +=
-            *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X);
-        spr = *(const uint8_t *const *)(row + ROW_OFF_SPRITE);
-        *(int16_t *)(row + ROW_OFF_Y) +=
-            *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y);
-
-        ObjFlagSet0(row);
-        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+    /* THE LOOP NEVER ADVANCES. Every pass re-reads OBJ_OFF_ROWS -- row 0 --
+     * and takes the attach offset from row 0's sprite, so the first row is
+     * offset again once per extra row and rows 1 and up are not placed at
+     * all. Reproduced; see the comment above. */
+    if (i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT)) {
+        spr = (const uint8_t *const *)(row + ROW_OFF_SPRITE);
+        do {
+            row = *(uint8_t **)(o + OBJ_OFF_ROWS);
+            *(int32_t *)(row + ROW_OFF_X) = *(const int32_t *)(o + OBJ_OFF_POS);
+            *(int16_t *)(row + ROW_OFF_X) += *(const int16_t *)(*spr + SPRITE_OFF_ATTACH_X);
+            *(int16_t *)(row + ROW_OFF_Y) += *(const int16_t *)(*spr + SPRITE_OFF_ATTACH_Y);
+            ObjFlagSet0(row);
+            RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+        } while (++i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT));
     }
 
     *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_DESTROYED;
@@ -4459,7 +4473,7 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
                             resurrect);
         break;
     default:
-        PlaceObj(obj, where);
+        PlaceObj(obj, *(const AM2_Point *)&where);
         if (resurrect)
             am2_log("Warning: check if resurrect command works with this "
                     "object type!\n");

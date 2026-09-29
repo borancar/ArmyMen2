@@ -31,7 +31,7 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
 /* 0x00429220, one caller -- the deploy dispatcher's default arm. Put an
  * object at a point: move every row, take it off the map and put it back,
  * re-apply its height. */
-void __cdecl PlaceObj(void *obj, uint32_t where);
+void __cdecl PlaceObj(void *obj, AM2_Point where);
 
 /* 0x00433C20, three callers. The height handler for types 1 and 4: stamp the
  * height, recompute the row's depth key from it, and do the same down the
