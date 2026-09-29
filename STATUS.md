@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1117 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1120 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1117:
+  the near-miss sweep, 758 before the row pools. From 758 to 1120:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -253,6 +253,12 @@ main result so far (details in `src/vc6/README.md`):
     The frame (0x5E0) says 0x428. Found by laying the locals out as the
     original does. DrawLatencyBar is `(row, slot)`, not `(slot, row)`: ours
     had both ends swapped, so it behaved and could not match.
+  - **Parameter widths read from the call sites**: PlaySoundAt's position is
+    two `int16_t` (every caller pushes words it loaded as words), as are
+    VehicleBlockWeight's facing and DrawSeqBar's/DrawRect's colour bytes;
+    SwapColourBytes and CommDispatchMessage take the argument counts their
+    callers push. A narrow parameter is visible only at the caller -- the
+    callee reads the same slot either way.
   - **Two `else` arms storing the same value are one block in the image**:
     HudSargeUpdate's `-1` store is reached from two tests, and writing both
     arms is what puts the loop pointer's bias back on the record's start.

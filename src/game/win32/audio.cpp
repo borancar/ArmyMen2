@@ -1426,7 +1426,7 @@ typedef int32_t (__cdecl *am2_points_equal_fn)(const AM2_Point *a,
 #define SOUND_FLAG_NO_INTERRUPT 2
 
 void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t unused,
-                         int32_t x, int32_t y)
+                         int16_t x, int16_t y)
 {
     uint8_t             *slot;
     LPDIRECTSOUNDBUFFER  buf;

@@ -7914,7 +7914,7 @@ void __cdecl Type2PlayerStep(void *obj, void *out)
  * says which: a C++-mangled reference to a C-linkage definition is undefined
  * at link time and compiles perfectly. */
 extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
-                                    int32_t unused, int32_t x, int32_t y);
+                                    int32_t unused, int16_t x, int16_t y);
 
 typedef void (__cdecl *AM2_Step2AFn)(void *obj, void *weapon, void *out);
 typedef void (__cdecl *AM2_Step2BFn)(void *obj, void *out);

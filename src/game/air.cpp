@@ -135,7 +135,7 @@ int32_t __cdecl LoadAirSection(am2_FILE *fp)
  * split and audio.h names Win32 types -- the same reason commmsg.cpp does it,
  * and spelled the same way so the two cannot drift. */
 extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
-                                    int32_t unused, int32_t x, int32_t y);
+                                    int32_t unused, int16_t x, int16_t y);
 
 /* Every one of these is a field of the block above -- the queue and the
  * savegame section are the same 584 bytes, which is why they are written as

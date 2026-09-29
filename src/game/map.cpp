@@ -364,7 +364,9 @@ typedef char *(__cdecl *AM2_StrlwrFn)(char *);
  */
 void *__cdecl FindLevelByName(char *name)
 {
-    char   *base;
+    /* The level table, read afresh wherever it is used. */
+#define LEVEL(i) (*(char **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE)) \
+                  + (uint32_t)(i) * AM2_LEVEL_RECORD_SIZE)
     int32_t i;
 
     if (!name)
@@ -372,15 +374,12 @@ void *__cdecl FindLevelByName(char *name)
 
     orig_strlwr(name);
 
-    for (i = 0; i < *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT)); i++) {
-        base = *(char **)((void *)(uintptr_t)(ADDR_LEVEL_TABLE));
-        if (!strcmp(base + (uint32_t)i * AM2_LEVEL_RECORD_SIZE
-                        + LEVEL_OFF_MAP_NAME,
-                    name))
-            return base + (uint32_t)i * AM2_LEVEL_RECORD_SIZE;
-    }
+    for (i = 0; i < *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT)); i++)
+        if (!strcmp(LEVEL(i) + LEVEL_OFF_MAP_NAME, name))
+            return LEVEL(i);
 
     return (void *)0;
+#undef LEVEL
 }
 
 /* One column of a MAP line: the next token, with "none" meaning the empty
@@ -572,7 +571,6 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
  */
 void *__cdecl ScriptListFind(char *name)
 {
-    char   *base;
     int32_t i;
 
     if (!name)
@@ -583,15 +581,15 @@ void *__cdecl ScriptListFind(char *name)
 
     orig_strlwr(name);
 
-    base = *(char **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE));
-    for (i = 0; i < *(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT)); i++) {
-        char *rec = base + (uint32_t)i * AM2_NAME_RECORD_SIZE;
-
-        if (!strcmp(rec, name))
-            return rec;
-    }
+    /* The name table, read afresh wherever it is used. */
+#define REC(i) (*(char **)((void *)(uintptr_t)(ADDR_NAME_TABLE_BASE)) \
+                + (uint32_t)(i) * AM2_NAME_RECORD_SIZE)
+    for (i = 0; i < *(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT)); i++)
+        if (!strcmp(REC(i), name))
+            return REC(i);
 
     return (void *)0;
+#undef REC
 }
 
 /* 0x0042E390, seven callers. The tiles a line crosses, from one packed point

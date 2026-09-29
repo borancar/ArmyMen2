@@ -305,7 +305,7 @@ void __cdecl SendGameReadyToLoadMsg(int32_t ready)
  * this module is on the flat side of the split and audio.h names Win32 types.
  * The signature is audio.h's, spelled the same way so the two cannot drift. */
 extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
-                                    int32_t unused, int32_t x, int32_t y);
+                                    int32_t unused, int16_t x, int16_t y);
 
 /* The pause trio is reconstructed, in win32/frame.cpp. Declared here rather
  * than by including that header for the same reason PlaySoundAt is: this

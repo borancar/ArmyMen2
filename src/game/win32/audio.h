@@ -155,7 +155,7 @@ void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
  * selects the wave; the two flags are restart-if-playing and
  * do-not-interrupt. The third parameter is read by nothing. */
 void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t unused,
-                         int32_t x, int32_t y);
+                         int16_t x, int16_t y);
 
 /* 0x0040B8F0. A named wave at a map position, with a slot and a priority.
  * WndProc reaches it for the comm messages that carry a sound. */

@@ -205,7 +205,7 @@ typedef void (__cdecl *AM2_GuardedActionFn2)(void *obj, int32_t amount,
  * split and audio.h names Win32 types -- the same reason air.cpp and
  * commmsg.cpp do it, and spelled the same way so the three cannot drift. */
 extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
-                                    int32_t unused, int32_t x, int32_t y);
+                                    int32_t unused, int16_t x, int16_t y);
 
 /* BoatExitPoint is reconstructed, in win32/mapdraw.cpp -- it clips with
  * IntersectRect, so it is on the platform side of the split. Declared here

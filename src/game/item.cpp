@@ -118,7 +118,7 @@ extern "C" AM2_SoldierName am2_soldier_names[62] = {
  * `extern "C"` is correct: audio.h's block spans that declaration, unlike
  * LoadAudioSection below it, which gameproc.cpp declares with C++ linkage. */
 extern "C" void __cdecl PlaySoundAt(int32_t index, int32_t flags,
-                                    int32_t unused, int32_t x, int32_t y);
+                                    int32_t unused, int16_t x, int16_t y);
 
 /* The two speech entry points, same file and same reason. BOTH are inside
  * audio.h's extern "C" block, unlike LoadAudioSection, so both get C linkage
@@ -856,30 +856,28 @@ void __cdecl RowUnregisterAll(void *row, void *desc)
 {
     uint8_t *r = (uint8_t *)row;
     int32_t  i;
-    uint32_t off;
 
+    /* The entry buffer is re-read at each use, as the image does. */
+#define ENTRY(i) (*(uint8_t **)(r + ROW_OFF_BUFFER) + (uint32_t)(i) * AM2_CELL_ENTRY_STRIDE)
+#define CELL(i)  (*(int32_t *)(ENTRY(i) + 0x0C))
     if (!r[ROW_OFF_OWNS])
         return;
-    if (*(const int32_t *)(*(uint8_t *const *)(r + ROW_OFF_BUFFER) + 0x0C) < 0)
+    if (CELL(0) < 0)
         return;
 
+    i = 0;
     orig_dirty_collect((const AM2_Rect *)(r + ROW_OFF_RECT));
 
-    if (!r[ROW_OFF_OWNS])
-        return;
-
-    for (i = 0, off = 0; i < (int32_t)r[ROW_OFF_OWNS]; i++, off += 0x10) {
-        uint8_t *entry = *(uint8_t *const *)(r + ROW_OFF_BUFFER) + off;
-        int32_t  cell  = *(const int32_t *)(entry + 0x0C);
-
-        if (cell < 0)
+    for (; i < r[ROW_OFF_OWNS]; i++) {
+        if (CELL(i) < 0)
             return;
-
-        ListUnlink(entry,
+        ListUnlink(ENTRY(i),
                    (void **)(*(uint8_t *const *)((const uint8_t *)desc + 0x0C)
-                             + (uint32_t)cell * 4));
-        *(int32_t *)(entry + 0x0C) = -1;
+                             + (uint32_t)CELL(i) * 4));
+        CELL(i) = -1;
     }
+#undef ENTRY
+#undef CELL
 }
 
 /* 0x0041D3A0, five callers -- one row's teardown.
@@ -6514,36 +6512,42 @@ void __cdecl DamageRoach(void *obj, int32_t amount, int32_t dir, int32_t kind,
 {
     uint8_t *o = (uint8_t *)obj;
     int32_t  armour;
-    int32_t  hurt;
-    int16_t  health;
 
     (void)attackerUid;
 
-    *(uint8_t *)(o + OBJ_OFF_HIT_DIR) =
-        ((uint8_t)dir >= 1u) ? (uint8_t)dir : (uint8_t)1;
+    *(uint8_t *)(o + OBJ_OFF_HIT_DIR) = ((uint8_t)dir < 1u) ? 1 : (uint8_t)dir;
     *(uint32_t *)(o + OBJ_OFF_HIT_TIME) =
         *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
 
-    armour = *(const int32_t *)(uintptr_t)ADDR_ROACH_ARMOUR;
-    if (amount < armour)
-        armour = amount;
-    hurt = amount - armour;
+    armour = amount < *(const int32_t *)(uintptr_t)ADDR_ROACH_ARMOUR
+                 ? amount : *(const int32_t *)(uintptr_t)ADDR_ROACH_ARMOUR;
+    amount -= armour;
 
-    health = *(const int16_t *)(o + OBJ_OFF_HEALTH);
-    if (hurt > (int32_t)health)
-        hurt = (int32_t)health;
-    *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(health - (int16_t)hurt);
+    {
+        int16_t *hp = (int16_t *)(o + OBJ_OFF_HEALTH);
 
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0)
-        return;
+        if (amount > *hp)
+            amount = *hp;
+        *hp -= (int16_t)amount;
+        if (*hp != 0)
+            return;
+    }
 
-    *(int32_t *)(o + OBJ_OFF_DEATH_STATE) = (kind == 1 || kind == 3) ? 5 : 6;
+    switch (kind) {
+    case 1:
+    case 3:
+        *(int32_t *)(o + OBJ_OFF_DEATH_STATE) = 5;
+        break;
+    default:
+        *(int32_t *)(o + OBJ_OFF_DEATH_STATE) = 6;
+        break;
+    }
 
     PlaySoundAt(AM2_ROACH_DEATH_SOUND, 0, 0,
-                (int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
-                (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2));
+                *(const int16_t *)(o + OBJ_OFF_POS),
+                *(const int16_t *)(o + OBJ_OFF_POS + 2));
 
-    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0) {
+    if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0) {
         ItemPreDestroyAlias(obj, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
         *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_BIT0;
     }
