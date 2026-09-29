@@ -18022,32 +18022,24 @@ int32_t __cdecl PointerPickEnemyTrooper(void *obj)
         && GetMenuRow() != AM2_MENU_ROW_0A)
         return 0;
 
-    if (!o)
-        return 0;
-    if (*(const int32_t *)o != AM2_OBJ_TYPE_TROOPER)
-        return 0;
-    if (*(const int32_t *)(o + OBJ_OFF_SARGE))
-        return 0;
-
-    /* Allied -- including either side being army 4 -- means no. */
-    if (ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
-                          o, 0))
-        return 0;
-
-    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= 6)
-        return 0;
-
-    leader = OurLeaderUnit();
-    if (!leader)
-        return 0;
-
-    if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_X),
-                   (const AM2_Point *)(leader + OBJ_OFF_X))
-        > *(const int32_t *)(uintptr_t)ADDR_PICK_REACH_6628C8)
-        return 0;
-
-    OverlayPrepare(AM2_MENU_ROW_0A, 1);
-    return 1;
+    /* Allied -- including either side being army 4 -- means no. Nested
+     * positively onto one shared `return 0`, as the image lays it out. */
+    if (o && ObjIsType2Inline(o)
+        && !(*(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
+             && *(const int32_t *)(o + OBJ_OFF_SARGE))
+        && !ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                                    o, 0)
+        && *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) < 6) {
+        leader = OurLeaderUnit();
+        if (leader
+            && ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
+                          (const AM2_Point *)(o + OBJ_OFF_X))
+               <= *(const int32_t *)(uintptr_t)ADDR_PICK_REACH_6628C8) {
+            OverlayPrepare(AM2_MENU_ROW_0A, 1);
+            return 1;
+        }
+    }
+    return 0;
 }
 
 /* PointerPickBoard -- original 0x00459DA0, 320 bytes. The PICK half of four
@@ -18152,22 +18144,18 @@ int32_t __cdecl PointerPickWatchedItem(void *obj)
     uint8_t *o = (uint8_t *)obj;
     uint8_t *leader;
 
-    if (!o)
-        return 0;
-    if (!ObjIsWatchedKind(o))
-        return 0;
-    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_CONCEALED)
-        return 0;
-
-    leader = OurLeaderUnit();
-    if (!leader)
-        return 0;
-
-    if (ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
-                   (const AM2_Point *)(o + OBJ_OFF_X))
-        > *(const int32_t *)(uintptr_t)ADDR_PICK_REACH_662450)
-        return 0;
-
-    OverlayPrepare(AM2_OVERLAY_ROW_SELL, 1);
-    return 1;
+    /* Nested positively onto one shared `return 0`, as the image lays it
+     * out. */
+    if (o && ObjIsWatchedKind(o)
+        && !(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_CONCEALED)) {
+        leader = OurLeaderUnit();
+        if (leader
+            && ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
+                          (const AM2_Point *)(o + OBJ_OFF_X))
+               <= *(const int32_t *)(uintptr_t)ADDR_PICK_REACH_662450) {
+            OverlayPrepare(AM2_OVERLAY_ROW_SELL, 1);
+            return 1;
+        }
+    }
+    return 0;
 }
