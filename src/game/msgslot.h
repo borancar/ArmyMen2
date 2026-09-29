@@ -532,7 +532,7 @@ struct AM2_Comm {
     void __attribute__((thiscall)) CommReportStats();
     void __attribute__((thiscall)) CommResetStats();
     int32_t __attribute__((thiscall)) CommSend(uint32_t idTo, uint32_t flags, void *data, uint32_t size);
-    int32_t __attribute__((thiscall)) CommSendLobbyProperty(uint32_t value);
+    uint8_t __attribute__((thiscall)) CommSendLobbyProperty(uint32_t value);
     void __attribute__((thiscall)) CommSessionOver();
     int32_t __attribute__((thiscall)) CommSetSessionDesc(void *desc, uint32_t flags);
     int32_t __attribute__((thiscall)) CommSlotOfId(uint32_t id);
@@ -591,7 +591,7 @@ static inline void __attribute__((thiscall)) CommResetStats(void *comm)
 { ((AM2_Comm *)comm)->CommResetStats(); }
 static inline int32_t __attribute__((thiscall)) CommSend(void *comm, uint32_t idTo, uint32_t flags, void *data, uint32_t size)
 { return ((AM2_Comm *)comm)->CommSend(idTo, flags, data, size); }
-static inline int32_t __attribute__((thiscall)) CommSendLobbyProperty(void *comm, uint32_t value)
+static inline uint8_t __attribute__((thiscall)) CommSendLobbyProperty(void *comm, uint32_t value)
 { return ((AM2_Comm *)comm)->CommSendLobbyProperty(value); }
 static inline void __attribute__((thiscall)) CommSessionOver(void *comm)
 { ((AM2_Comm *)comm)->CommSessionOver(); }

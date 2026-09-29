@@ -4516,7 +4516,7 @@ extern "C" void __cdecl PlayDynamicSound(const char *name, int32_t loop,
  */
 void __cdecl PortalSpawn(void)
 {
-    static const int32_t kWeapons[4] = { 0x1E, 0x0A, 4, 2 };
+    int32_t kWeapons[4] = { 0x1E, 0x0A, 4, 2 };
     int32_t i;
 
     PlayDynamicSound("portal2_8bit.wav",
@@ -4529,7 +4529,6 @@ void __cdecl PortalSpawn(void)
                       + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y;
         uint8_t  *trooper;
         uint8_t  *weapon;
-        int32_t   pick;
 
         orig_spawn_at(x, y, AM2_PORTAL_EFFECT, 0, 0, 0, 0, 0, 0, 0);
 
@@ -4539,20 +4538,19 @@ void __cdecl PortalSpawn(void)
         if (!trooper)
             continue;
 
-        pick = orig_game_rand() & 3;
-
         weapon = (uint8_t *)orig_create_weapon(
                      (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), 1,
                      KeyLookupTriple(AM2_WEAPON_KEY_KIND,
-                                     (uint32_t)kWeapons[pick], 0),
+                                     (uint32_t)kWeapons[orig_game_rand() % 4],
+                                     0),
                      *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
                      4, -1, 0, 0);
         if (!weapon)
             continue;
 
+        *(uint8_t *)(weapon + OBJ_OFF_ARMY) = 1;
         *(uint32_t *)(trooper + UNIT_OFF_INVENTORY) =
             *(const uint32_t *)(weapon + 4);
-        *(uint8_t *)(weapon + OBJ_OFF_ARMY) = 1;
 
         SoldierKindForWeapon(
             trooper, **(const int32_t *const *)(weapon + OBJ_OFF_FIELD_C0));

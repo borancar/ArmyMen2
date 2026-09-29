@@ -684,7 +684,7 @@ void __cdecl BuildAaiBuiltins(void)
  * DefFindObjRec reads 1,689 on the same run, which is its OTHER callers --
  * ours reaches it by name.
  */
-void *__cdecl MakeAaiRecord(int32_t type, int32_t key, int32_t slot,
+void *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
                             int32_t a, int32_t b, int32_t c, int32_t d)
 {
     uint8_t *rec = (uint8_t *)am2_malloc(AM2_AAI_RECORD_BYTES);
@@ -692,13 +692,16 @@ void *__cdecl MakeAaiRecord(int32_t type, int32_t key, int32_t slot,
 
     memset(rec, 0, AM2_AAI_RECORD_BYTES);
 
-    *(int32_t *)(rec + AAIREC_OFF_TYPE)      = type >= 0 ? type : 0x2E;
+    if (type < 0)
+        *(int32_t *)(rec + AAIREC_OFF_TYPE)  = 0x2E;
+    else
+        *(int32_t *)(rec + AAIREC_OFF_TYPE)  = type;
     *(int32_t *)(rec + AAIREC_OFF_KEY)       = key;
     *(int32_t *)(rec + AAIREC_OFF_SLOT)      = -1;  /* AddAaiRecord fills it */
     *(int32_t *)(rec + AAIREC_OFF_LIST_SLOT) = slot;
     *(int32_t *)(rec + 0x14)                 = a;
-    *(int32_t *)(rec + 0x18)                 = b;
     *(int32_t *)(rec + 0x1C)                 = c;
+    *(int32_t *)(rec + 0x18)                 = b;
     *(int32_t *)(rec + 0x20)                 = d;
 
     if (type < 0)
@@ -721,14 +724,15 @@ void *__cdecl MakeAaiRecord(int32_t type, int32_t key, int32_t slot,
     }
 
     if (slot > 0) {
+        /* The count and the record array are read afresh each pass: the
+         * store could alias either. */
         uint8_t *list = (uint8_t *)
             (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)[slot];
-        int32_t  n    = *(const int32_t *)(list + LISTHDR_OFF_COUNT);
-        uint8_t *ents = *(uint8_t *const *)(list + LISTHDR_OFF_RECORDS);
         int32_t  i;
 
-        for (i = 0; i < n; i++)
-            *(int32_t *)(ents + i * AM2_LIST_RECORD_BYTES + 8) =
+        for (i = 0; i < *(const int32_t *)(list + LISTHDR_OFF_COUNT); i++)
+            *(int32_t *)(*(uint8_t *const *)(list + LISTHDR_OFF_RECORDS)
+                         + i * AM2_LIST_RECORD_BYTES + 8) =
                 (int32_t)*(const uint16_t *)(rec + 0x30);
     }
 

@@ -705,7 +705,7 @@ void __cdecl InactivateRegion(int32_t region)
     (*(uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)))++;
 }
 
-typedef int32_t (__cdecl *AM2_PointRuleFn)(int32_t tile);
+typedef int32_t (__cdecl *AM2_PointRuleFn)(uint16_t tile);
 
 /* 0x00439F40, five callers. NearestAllowedTile's TWIN, and reading them
  * together is the only way to see what either one is for. Same square spiral,
@@ -1619,7 +1619,7 @@ int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg)
 int32_t __cdecl BeginMoveTo(void *obj, uint32_t *to)
 {
     uint8_t *o = (uint8_t *)obj;
-    int32_t  count = 0;
+    int32_t  count;                     /* TraceTileLine sets it */
     int32_t  i;
 
     SetPointRule(obj);
@@ -1630,11 +1630,8 @@ int32_t __cdecl BeginMoveTo(void *obj, uint32_t *to)
                   (uint16_t *)(uintptr_t)ADDR_TILE_LINE_BUF, &count);
 
     for (i = 0; i < count; i++) {
-        AM2_PointRuleFn rule =
-            *(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE;
-
-        if (rule((int32_t)((const uint16_t *)
-                     (uintptr_t)ADDR_TILE_LINE_BUF)[i]))
+        if ((*(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE)(
+                ((const uint16_t *)(uintptr_t)ADDR_TILE_LINE_BUF)[i]))
             return 0;                   /* the rule refused this tile */
     }
 
@@ -3103,22 +3100,23 @@ typedef int32_t (__cdecl *AM2_RegionRandFn)(void);
  */
 uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
 {
-    uint8_t       *regions = *(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL;
+#define REGIONS (*(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL)
+    uint8_t       *regions;
     const int8_t  *weights;
     const int32_t *ring;
     int32_t        first;
     int32_t        delta;
 
-    if (regions[tile])
-        return regions[tile];
+    if (REGIONS[tile] > 0)
+        return REGIONS[tile];
 
+    /* Both tables are read after the rand call, weights first. */
+    ring    = (const int32_t *)(uintptr_t)ADDR_TILE_RING8
+              + (orig_region_rand() & 6);
     weights = *(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
-    regions = *(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL;
-
-    ring  = (const int32_t *)(uintptr_t)ADDR_TILE_RING8
-            + (orig_region_rand() & 6);
-    first = ring[0];
-    delta = first;
+    regions = REGIONS;
+    first   = ring[0];
+    delta   = first;
 
     for (;;) {
         int32_t at = delta + (int32_t)tile;
@@ -3126,16 +3124,17 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
         if (at > 0
             && at < *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
                     * *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
-            && regions[at] != 0
+            && regions[at] > 0
             && weights[at] < (int8_t)AM2_CELL_WEIGHT_STEP) {
             regions[tile] = regions[at];
-            return (*(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL)[tile];
+            return REGIONS[tile];
         }
 
         delta = *++ring;
         if (delta == first)
             return 0;
     }
+#undef REGIONS
 }
 
 /* AiRouteToward -- original 0x00407190, NINE callers: the step every AI arm
@@ -6827,18 +6826,22 @@ static inline int32_t AiStepReact(void *obj, void *out, uint8_t *ctx)
  * save at spawn and then made a different pose/facing decision. Found by a gdb
  * watchpoint on the object's 0xb0 in the hybrid: the write landed in
  * AiPatrolStep, reached from TrooperAiStep's AI_MODE-6 arm. */
-static void AiStepDispatch(void *obj, void *out, uint8_t *ctx, int32_t sarge)
+/* Inlined into both dispatchers, whose arms are laid out 2, 0, 3, 6, 7,
+ * default -- the source order below. */
+static inline void AiStepDispatch(void *obj, void *out, uint8_t *ctx,
+                                  int32_t sarge)
 {
     uint8_t *o = (uint8_t *)obj;
 
     switch (*(const int32_t *)(o + OBJ_OFF_AI_MODE)) {
-    case 0:  AiPatrolStep(obj, out, ctx);  break;
     case 2:  AiWalkStep(obj, out, ctx);    break;
+    case 0:  AiPatrolStep(obj, out, ctx);  break;
     case 3:  AiApproachLeader(obj, out, ctx);  break;
     case 6:  if (sarge)
                  AiEngageStep(obj, out, ctx);
-             else
-                 AiPatrolStep(obj, out, ctx);
+             else                   /* through the thunk, as the image does */
+                 Call4057D0((int32_t)(intptr_t)obj, (int32_t)(intptr_t)out,
+                            (int32_t)(intptr_t)ctx);
              break;
     case 7:  Call405220((int32_t)(intptr_t)obj, (int32_t)(intptr_t)out,
                         (int32_t)(intptr_t)ctx);
@@ -6860,7 +6863,7 @@ static inline void AiStepReactAndDispatch(void *obj, void *out, uint8_t *ctx)
 /* Where the unit is standing, recorded on the object every frame. Both
  * dispatchers end with this, and the kind-7 shortcut above jumps straight to
  * it -- so the region is updated even on the frame the AI decides nothing. */
-static void AiStepRecordRegion(uint8_t *o)
+static inline void AiStepRecordRegion(uint8_t *o)
 {
     *(uint16_t *)(o + OBJ_OFF_REGION) =
         kRegionOfCell[*(const uint16_t *)(o + OBJ_OFF_TILE)];
@@ -6910,7 +6913,6 @@ void __cdecl SargeAiStep(void *obj, void *out)
 {
     uint8_t  ctx[AM2_SIGHTC_BYTES];
     uint8_t *o = (uint8_t *)obj;
-    uint8_t *item;
 
     if (!obj)
         return;
@@ -6919,26 +6921,27 @@ void __cdecl SargeAiStep(void *obj, void *out)
     TrooperBuildContext(obj, ctx, 1);
     UnitWeaponInfo(obj, ctx);
 
-    item = *(uint8_t **)(ctx + SIGHTC_OFF_FOUND);
-    if (item && ObjIsType4((const AM2_Object *)item)) {
-        uint32_t *goal = (uint32_t *)(o + OBJ_OFF_SCRIPT_FRAME);
-
-        *goal = *(const uint32_t *)(item + OBJ_OFF_POS);
+    /* The found item is read from the context at each use. */
+#define ITEM (*(uint8_t **)(ctx + SIGHTC_OFF_FOUND))
+    if (ITEM && ObjIsType4((const AM2_Object *)ITEM)) {
+#define GOAL (*(uint32_t *)(o + OBJ_OFF_SCRIPT_FRAME))
+        GOAL = *(const uint32_t *)(ITEM + OBJ_OFF_POS);
         *(uint32_t *)(o + OBJ_OFF_PICKUP_AFTER) =
-            *(const uint32_t *)(item + 4);
+            *(const uint32_t *)(ITEM + 4);
 
-        SettlePointInRegion(
-            TileOfPoint(*(const uint32_t *)(item + OBJ_OFF_POS)), goal);
+        SettlePointInRegion(TileOfPoint(GOAL), &GOAL);
 
         *(int32_t *)(ctx + SIGHTC_OFF_DEST_DIST_B) =
             ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                       (const AM2_Point *)goal);
+                       (const AM2_Point *)&GOAL);
 
         *(uint32_t *)(ctx + SIGHTC_OFF_FOUND) = 0;
     }
 
     AiStepReactAndDispatch(obj, out, ctx);
     AiStepRecordRegion(o);
+#undef ITEM
+#undef GOAL
 }
 
 /* TrooperAiStep -- original 0x004062B0, one caller, the other half of the
@@ -7007,17 +7010,31 @@ void __cdecl TrooperAiStep(void *obj, void *out)
 
     c0 = *(const int32_t *)(ctx + SIGHTC_OFF_FIELD_00);
 
+    /* Laid out 3, 2, 1, each arm an if/else with the else placed last --
+     * and arm 2 tests `c0 != 1` before `c0 == 0`, redundantly, as the image
+     * does. */
     switch (*(const int32_t *)(o + OBJ_OFF_FIELD_540)) {
-    case 1:
-        *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = c0 == 0 ? 1 : c0 == 2 ? 9 : 8;
+    case 3:
+        if (c0 != 2)
+            *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = 7;
+        else
+            *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = 6;
         break;
     case 2:
-        *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = c0 == 0 ? 5 : 4;
+        if (c0 != 1 && c0 == 0)
+            *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = 5;
+        else
+            *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = 4;
         break;
-    case 3:
-        *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = c0 == 2 ? 6 : 7;
-        break;
-    default:
+    case 1:
+        if (c0 != 0) {
+            if (c0 == 2)
+                *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = 9;
+            else
+                *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = 8;
+        } else {
+            *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = 1;
+        }
         break;
     }
 }

@@ -411,21 +411,25 @@ void __cdecl FreeSpriteSets(void)
 void __cdecl ReportLeaks(void)
 {
     char name[8];
-    int32_t total = *(const int32_t *)(uintptr_t)ADDR_LEAK_COUNT;
-    int32_t shown = total < 50 ? total : 50;
+    int32_t total;
+    int32_t shown;
 
+    total = *(const int32_t *)(uintptr_t)ADDR_LEAK_COUNT;
     name[4] = 0;
+    shown = total < 50 ? total : 50;
     orig_log("Unreleased memory (%d) blocks:\n", total);
 
-    for (int32_t i = 0; i < shown; i++) {
-        const uint8_t *rec = *(const uint8_t *const *)(uintptr_t)ADDR_LEAK_RECORDS
-                             + (size_t)i * 16;
 
-        orig_strncpy(name, (const char *)(rec + 4), 4);
+    /* The record array is read again after the copy. */
+#define REC (*(const uint8_t *const *)(uintptr_t)ADDR_LEAK_RECORDS \
+             + (size_t)i * 16)
+    for (int32_t i = 0; i < shown; i++) {
+        orig_strncpy(name, (const char *)(REC + 4), 4);
         orig_log("%08d bytes  file: %s  line: %d\n",
-                 *(const int32_t *)(rec + 12), name,
-                 *(const int32_t *)(rec + 8));
+                 *(const int32_t *)(REC + 12), name,
+                 *(const int32_t *)(REC + 8));
     }
+#undef REC
 }
 
 /* 0x0041E710. Drop the record array and the two counters with it. */

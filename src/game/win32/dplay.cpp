@@ -112,19 +112,17 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommCreateDirectPlay(void *connectio
 
     hr = CoCreateInstance(kCLSID_DirectPlay, NULL, CLSCTX_INPROC_SERVER,
                           kIID_IDirectPlay4A, (LPVOID *)slot);
-    if (hr != S_OK)
-        return 0;
 
     /* A null connection means "create the object and stop" -- which is what
      * enumerating the available providers needs, since that is done on an
-     * object that has not been pointed at one yet. */
-    if (connection) {
+     * object that has not been pointed at one yet. Every path ends in the
+     * one `hr == S_OK` test. */
+    if (hr == S_OK && connection) {
         hr = IDirectPlayX_InitializeConnection(*slot, connection, 0);
-        if (hr != S_OK)
-            return 0;
-        ::CommOnConnected(comm);
+        if (hr == S_OK)
+            ::CommOnConnected(comm);
     }
-    return 1;
+    return hr == S_OK;
 }
 
 int32_t __stdcall CreateDirectPlayLobby(LPDIRECTPLAYLOBBY3A *out)
@@ -1718,7 +1716,7 @@ static_assert(DPLSYS_SETPROPERTY == 5, "DPLSYS_SETPROPERTY");
 static_assert(DPL_NOCONFIRMATION == 0, "DPL_NOCONFIRMATION");
 static_assert(sizeof(DPLMSG_SETPROPERTY) == 0x30, "DPLMSG_SETPROPERTY");
 
-int32_t __attribute__((thiscall)) AM2_Comm::CommSendLobbyProperty(uint32_t value)
+uint8_t __attribute__((thiscall)) AM2_Comm::CommSendLobbyProperty(uint32_t value)
 {
     void *comm = this;
 
@@ -1726,23 +1724,25 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSendLobbyProperty(uint32_t value
     LPDIRECTPLAYLOBBY3A  lobby;
     DPLMSG_SETPROPERTY   msg;
 
-    if (!comm_u32(self, COMM_OFF_LOBBIED))
-        return 0;
-    if (!comm_u32(self, COMM_OFF_IS_HOST))
-        return 0;
-    lobby = *(LPDIRECTPLAYLOBBY3A *)(self + COMM_OFF_LOBBY);
-    if (!lobby)
-        return 0;
+    /* A byte result, and the three refusals share one `return 0` tail. */
+    if (comm_u32(self, COMM_OFF_LOBBIED) && comm_u32(self, COMM_OFF_IS_HOST)) {
+        lobby = *(LPDIRECTPLAYLOBBY3A *)(self + COMM_OFF_LOBBY);
+        if (lobby) {
+            msg.dwType          = DPLSYS_SETPROPERTY;
+            msg.dwRequestID     = DPL_NOCONFIRMATION;
+            msg.guidPlayer      = *(const GUID *)(uintptr_t)ADDR_GUID_NULL;
+            msg.guidPropertyTag =
+                *(const GUID *)(uintptr_t)ADDR_GUID_GAME_PROPERTY;
+            msg.dwDataSize      = sizeof value;
+            msg.dwPropertyData[0] = value;
 
-    msg.dwType          = DPLSYS_SETPROPERTY;
-    msg.dwRequestID     = DPL_NOCONFIRMATION;
-    msg.guidPlayer      = *(const GUID *)(uintptr_t)ADDR_GUID_NULL;
-    msg.guidPropertyTag = *(const GUID *)(uintptr_t)ADDR_GUID_GAME_PROPERTY;
-    msg.dwDataSize      = sizeof value;
-    msg.dwPropertyData[0] = value;
-
-    return IDirectPlayLobby_SendLobbyMessage(lobby, DPLMSG_STANDARD, 0,
-                                             &msg, sizeof msg) >= 0;
+            if (IDirectPlayLobby_SendLobbyMessage(lobby, DPLMSG_STANDARD, 0,
+                                                  &msg, sizeof msg) < 0)
+                return 0;
+            return 1;
+        }
+    }
+    return 0;
 }
 
 /* Ask DirectPlay who is in the session -- 0x0040E200.

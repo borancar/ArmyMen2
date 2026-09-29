@@ -419,20 +419,18 @@ void __cdecl ScriptBindUniqueName(void *rec, char *name)
 {
     uint8_t *r = (uint8_t *)rec;
     char     tried[AM2_SCRIPT_UNIQUE_BUF];
-    int32_t  n = 1;
+    int32_t  n;
+    int32_t  index;
 
     if (!rec || !name)
         return;
 
+    n = 1;
     orig_strlwr(name);
     strcpy(tried, name);
 
-    for (;;) {
-        int32_t index = ScriptFindName(tried);
-
-        if (index < 0)
-            break;
-
+    index = ScriptFindName(tried);
+    while (index >= 0) {
         if (kScriptNames[index].value == 0) {
             *(int32_t *)(r + SCRIPT_REF_OFF_NAME_INDEX) = index;
             kScriptNames[index].value =
@@ -441,8 +439,8 @@ void __cdecl ScriptBindUniqueName(void *rec, char *name)
         }
 
         am2_sprintf(tried, (const char *)((void *)(uintptr_t)(AM2_STR_UNIQUE_SUFFIX)),
-                    name, n);
-        n++;
+                    name, n++);
+        index = ScriptFindName(tried);
     }
 
     *(int32_t *)(r + SCRIPT_REF_OFF_NAME_INDEX) =

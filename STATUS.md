@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1142 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1158 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1142:
+  the near-miss sweep, 758 before the row pools. From 758 to 1158:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -116,7 +116,26 @@ main result so far (details in `src/vc6/README.md`):
     `je 0x004173F6` lands on its first store.
   - **Close but not matched**: HudSargeUpdate and HudTopPaint are within
     a few instructions; HudEdgeUpdate's two switches follow the
-    original's jump tables and what remains is register choice.
+    original's jump tables and what remains is register choice. So is
+    all that is left of AimMarkerAge, TileRegionOrBorrow and
+    OptionsDefaults; ArrowBarFollowEnd/ShowRow are one `sub` early;
+    MakeAaiRecord's early exits share the loop's tail where the image
+    gives them their own; AimStartB keeps its point pointer in `edi`.
+  - **Signed loop tests mean an index**: a `jl` against a strength-reduced
+    cursor is an `int32_t i` loop (OptionsApply, AimMarkerAge), a pointer
+    walk gives `jb`. The cursor's bias is the field the body reads first.
+  - **Result shapes**: `setge al`/`xor al, al` is a byte result written as
+    branches (CommSendLobbyProperty); CommCreateDirectPlay ends in one
+    `return hr == S_OK`; WaveReadFile's end-of-file `-1` goes through the
+    failure label, and its clamp is `>=`.
+  - **The AI dispatchers inline their helpers**: react, the AI_MODE switch
+    (arms laid out 2, 0, 3, 6, 7, default) and the region write are all
+    written into SargeAiStep and TrooperAiStep; the trooper's mode-6 arm
+    calls the thunk at 0x00405D10, and its 0x540 tail is if/else arms laid
+    out 3, 2, 1 -- arm 2 tests `c0 != 1` before `c0 == 0`. The point rule
+    takes a `uint16_t` tile, and BeginMoveTo's count is uninitialised (it
+    lives in the dead `obj` slot). PortalSpawn's weapon table is a stack
+    array indexed by a signed `% 4`.
   - **`[a + b]` operand order follows how the base is spelled**: a local
     alias of a parameter or global (`o = (uint8_t *)obj`, `w = g_widget`)
     flips `rows + i*stride` and `[w + len]`. Casting the parameter or

@@ -1378,19 +1378,19 @@ void __cdecl Substate22(void)
     }
 
     if (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY) {
-        void *bmp = g_currentBitmap;
-
+        /* The bitmap global is read again after the target is set. */
+#define BMP ((uint8_t *)g_currentBitmap)
         *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 0;
-        if (bmp) {
-            int32_t w = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_W);
-            int32_t h = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_H);
-
+        if (BMP) {
             SetDrawTarget(g_primarySurface);
-            DrawSprite((AM2_Sprite *)bmp,
-                       (*(const int32_t *)(uintptr_t)ADDR_SCREEN_W - w) >> 1,
-                       (*(const int32_t *)(uintptr_t)ADDR_SCREEN_H - h) >> 1,
+            DrawSprite((AM2_Sprite *)BMP,
+                       (*(const int32_t *)(uintptr_t)ADDR_SCREEN_W
+                        - *(const int32_t *)(BMP + SPR_OFF_W)) >> 1,
+                       (*(const int32_t *)(uintptr_t)ADDR_SCREEN_H
+                        - *(const int32_t *)(BMP + SPR_OFF_H)) >> 1,
                        0);
         }
+#undef BMP
     }
 
     if (DismissKeyReleased()

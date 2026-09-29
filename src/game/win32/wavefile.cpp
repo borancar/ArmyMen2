@@ -165,7 +165,7 @@ MMRESULT __cdecl WaveReadFile(HMMIO hmmio, uint32_t cbRead, uint8_t *pbDest,
     /* Never read past the end of the chunk, and charge whatever is taken
      * against what is left of it. */
     cbDataIn = cbRead;
-    if (cbDataIn > pckIn->cksize)
+    if (cbDataIn >= pckIn->cksize)
         cbDataIn = pckIn->cksize;
     pckIn->cksize -= cbDataIn;
 
@@ -182,8 +182,8 @@ MMRESULT __cdecl WaveReadFile(HMMIO hmmio, uint32_t cbRead, uint8_t *pbDest,
             if (mmioinfo.pchNext == mmioinfo.pchEndRead) {
                 /* Advanced and still empty: the file ended early. Reported as
                  * -1 rather than an MMRESULT, since no call failed. */
-                *cbActualRead = 0;
-                return (MMRESULT)-1;
+                mmr = (MMRESULT)-1;
+                goto fail;
             }
         }
 

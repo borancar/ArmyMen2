@@ -1242,7 +1242,7 @@ typedef void (__cdecl *AM2_SendPlayersFn)(int32_t which);
 /* The checkbox a record names, reached through the header's parent -- the
  * dialog holds them in an array at 0x0064, the same shape as the CONTROLS
  * dialog's key rows. */
-static AM2_Widget *OptionBox(AM2_Widget *parent, int32_t index)
+static inline AM2_Widget *OptionBox(AM2_Widget *parent, int32_t index)
 {
     return *(AM2_Widget **)((uint8_t *)parent + OPTION_PARENT_BOXES
                             + index * 4);
@@ -2368,24 +2368,26 @@ static inline void ScrollBarStep(AM2_Widget *arrow, int32_t delta)
     uint8_t    *b   = (uint8_t *)bar;
     const AM2_Sprite *thumb;
     void      (__cdecl *onChange)(AM2_Widget *);
-    int32_t     pos   = *(const int32_t *)(b + SCROLLBAR_OFF_POS);
-    int32_t     range = *(const int32_t *)(b + SCROLLBAR_OFF_RANGE);
 
+    /* The position and range are re-read from the bar at each use. */
+#define POS   (*(int32_t *)(b + SCROLLBAR_OFF_POS))
+#define RANGE (*(const int32_t *)(b + SCROLLBAR_OFF_RANGE))
     /* The guard skips the MOVE and not the NOTIFICATION -- both arms fall
      * into the same tail in the original, so holding an arrow against the end
      * of the track keeps calling onChange with an unchanged position. */
-    if (delta < 0 ? pos > 0 : pos < range) {
+    if (delta < 0 ? POS > 0 : POS < RANGE) {
         PlaySoundAt(1, 0, 0, 0, 0);
-        pos += delta;
-        *(int32_t *)(b + SCROLLBAR_OFF_POS) = pos;
+        POS += delta;
 
         thumb = *(const AM2_Sprite *const *)(b + SCROLLBAR_OFF_BAR);
         *(int32_t *)(b + SCROLLBAR_OFF_SHIFT) =
-            ThumbShift(pos, range,
+            ThumbShift(POS, RANGE,
                        *(const int32_t *)(b + SCROLLBAR_OFF_SPAN)
                        - thumb->bounds.right);
         RepaintAncestor(bar, bar->rect);
     }
+#undef POS
+#undef RANGE
 
     onChange = *(void (__cdecl *const *)(AM2_Widget *))
                    (b + SCROLLBAR_OFF_ONCHANGE);
@@ -4421,48 +4423,51 @@ void __cdecl FreeAimSprites(void)
  */
 void __cdecl AimMarkerAge(void)
 {
+    /* Indexed, not a walked pointer: the image's loop test is a signed jl. */
+#define LIVE(off)  (((int32_t *)(uintptr_t)ADDR_AIM_LIVE_A)[army + (off) / 4])
+#define XY(off)    (((int16_t *)(uintptr_t)ADDR_AIM_LIVE_A)[army * 2 + (off) / 2])
     int32_t  cursorX = *(const int32_t *)(uintptr_t)ADDR_CURSOR_X;
     int32_t  cursorY = *(const int32_t *)(uintptr_t)ADDR_CURSOR_Y;
-    uint32_t owner   = *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+    int32_t  owner   = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
     uint32_t now     = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
-    uint32_t army;
+    int32_t  army;
 
     for (army = 0; army < AM2_COMM_SLOTS; army++) {
-        uint8_t *a = (uint8_t *)(uintptr_t)ADDR_AIM_LIVE_A + army * 4;
-
         if (owner == army) {
-            if (*(const int32_t *)a) {
-                if (now >= *(const uint32_t *)(a + 0x30)) {
-                    *(int32_t *)a          = 0;
-                    *(int32_t *)(a + 0x20) = 0;
+            if (LIVE(0)) {
+                if (now >= (uint32_t)LIVE(0x30)) {
+                    LIVE(0)    = 0;
+                    LIVE(0x20) = 0;
                 }
-                *(int16_t *)(a + 0x10) = (int16_t)cursorX;
-                *(int16_t *)(a + 0x12) = (int16_t)cursorY;
+                XY(0x10) = (int16_t)cursorX;
+                XY(0x12) = (int16_t)cursorY;
             }
         }
 
-        if (*(const int32_t *)a && now >= *(const uint32_t *)(a + 0x30)) {
-            *(int32_t *)a          = 0;
-            *(int32_t *)(a + 0x20) = 0;
+        if (LIVE(0) && now >= (uint32_t)LIVE(0x30)) {
+            LIVE(0)    = 0;
+            LIVE(0x20) = 0;
         }
 
         if (owner == army) {
-            if (*(const int32_t *)(a + 0x64)) {
-                if (now >= *(const uint32_t *)(a + 0xA4)) {
-                    *(int32_t *)(a + 0x64) = 0;
-                    *(int32_t *)(a + 0x94) = 0;
+            if (LIVE(0x64)) {
+                if (now >= (uint32_t)LIVE(0xA4)) {
+                    LIVE(0x64) = 0;
+                    LIVE(0x94) = 0;
                 }
-                *(int16_t *)(a + 0x74) = (int16_t)cursorX;
-                *(int16_t *)(a + 0x76) = (int16_t)cursorY;
+                XY(0x74) = (int16_t)cursorX;
+                XY(0x76) = (int16_t)cursorY;
             }
         }
 
-        if (*(const int32_t *)(a + 0x64) && now >= *(const uint32_t *)(a + 0xA4)) {
-            *(int32_t *)(a + 0x64) = 0;
-            *(int32_t *)(a + 0x84) = 0;   /* and the frame, unlike above */
-            *(int32_t *)(a + 0x94) = 0;
+        if (LIVE(0x64) && now >= (uint32_t)LIVE(0xA4)) {
+            LIVE(0x64) = 0;
+            LIVE(0x84) = 0;   /* and the frame, unlike above */
+            LIVE(0x94) = 0;
         }
     }
+#undef LIVE
+#undef XY
 }
 
 /* AimStart -- original 0x00412230, one caller, which is FireWeapon. The A half
@@ -4558,10 +4563,12 @@ void __cdecl AimStart(uint32_t uid, int8_t army, uint32_t at)
  */
 void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at)
 {
-    int32_t   i = army;
-    int16_t  *pt = (int16_t *)((uint8_t *)((void *)(uintptr_t)(ADDR_AIM_POINT_B))
-                               + (uint32_t)i * 4);
-    int32_t   deadline;
+    /* x through the element pointer, y through the array: the image keeps
+     * the pointer live in edi across the broadcast test for the one read. */
+#define POINTS ((AM2_Point *)(uintptr_t)ADDR_AIM_POINT_B)
+    int32_t    i  = army;
+    AM2_Point *pt = &POINTS[i];
+    int32_t    deadline;
 
     ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_LIVE_B)))[i] = 1;
     *(uint32_t *)pt = at;
@@ -4581,11 +4588,12 @@ void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at)
     }
     ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_DEADLINE_B)))[i] = deadline;
 
-    orig_spawn_at_aim(pt[0] + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
-                      pt[1] + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y,
+    orig_spawn_at_aim(pt->x + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
+                      POINTS[i].y + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y,
                       AM2_AIM_SPAWN_KIND, i, uid,
                       *(const int32_t *)(uintptr_t)ADDR_AIM_SPAWN_ARG,
                       0, 0, 0, 0);
+#undef POINTS
 }
 
 void __cdecl BuildHudWidgets(void)
@@ -5379,7 +5387,7 @@ void __cdecl DrawTooltip(const char *text, uint8_t colour)
     int32_t        w   = TextExtent(text, 0, (int32_t *)0);
     int32_t        x   = cur[0] - w / 2;
     int32_t        y;
-    AM2_Rect       box;
+    RECT           box;
 
     if (x + w + AM2_TIP_PAD > *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W)
         x = *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W - w - AM2_TIP_PAD;
@@ -5390,10 +5398,11 @@ void __cdecl DrawTooltip(const char *text, uint8_t colour)
     else
         y = cur[1] + AM2_TIP_BELOW;
 
-    RectSet(&box, x, y, x + w + AM2_TIP_PAD, y + AM2_TIP_HEIGHT);
+    box = *(RECT *)RectSet(AM2_TEMP(AM2_Rect), x, y, x + w + AM2_TIP_PAD,
+                           y + AM2_TIP_HEIGHT);
 
     /* Outside the lock, and that is not a style choice -- see above. */
-    ClearRegion((const RECT *)&box,
+    ClearRegion(&box,
                 *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID);
 
     if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
@@ -10238,27 +10247,27 @@ void __cdecl OpenMpHost(void)
  * file; a plain call here, with nothing after it. */
 void __cdecl OnMpLaunch(AM2_Widget *w)
 {
-    uint8_t *comm = g_commObject;
-    uint8_t *slot;
-
+    /* The comm object is read at every use, and the player count compared
+     * unsigned (`jbe`). */
+#define COMM ((uint8_t *)g_commObject)
     (void)w;
 
-    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (!*(const int32_t *)(COMM + COMM_OFF_IS_HOST))
         return;
 
-    if (*(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT) > 1
-        && !CommAllPlayersAgreed(comm)) {
+    if (*(const uint32_t *)(COMM + COMM_OFF_PLAYER_COUNT) > 1
+        && !AM2_THE_COMM->CommAllPlayersAgreed()) {
         PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
         Announce("Not everybody has the same version/map/rules.");
         return;
     }
 
-    slot = comm + COMM_OFF_PLAYERS
-           + (size_t)*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
-             * AM2_COMM_SLOT_STRIDE;
-    *(int32_t *)(slot + COMM_SLOT_OFF_READY_TO_LOAD) = 1;
+    *(int32_t *)(COMM + COMM_OFF_PLAYERS
+                 + *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+                   * AM2_COMM_SLOT_STRIDE
+                 + COMM_SLOT_OFF_READY_TO_LOAD) = 1;
 
-    if (!CommAllPlayersReady(comm)) {
+    if (!AM2_THE_COMM->CommAllPlayersReady()) {
         PlaySoundAt(AM2_SND_MENU_REFUSE, 0, 0, 0, 0);
         SendPlayerMsg(1);
         Announce("Host is ready - waiting for players to press ready.");
@@ -10276,6 +10285,7 @@ void __cdecl OnMpLaunch(AM2_Widget *w)
         *(const int32_t *)(uintptr_t)ADDR_GAME_SETTING_22C;
 
     SaveOptions();
+#undef COMM
 }
 
 void __cdecl MpReadyToLoad(void)
@@ -10861,50 +10871,49 @@ void __attribute__((thiscall)) AM2_Widget::OptionsUpdate()
     ::WidgetUpdateCancel(w);
 }
 
+/* Both walk the table by INDEX -- the image's loop test is a signed `jl`
+ * against the strength-reduced cursor, which a pointer walk would make `jb`. */
+#define OPT(i, off) (((const int32_t (*)[AM2_OPTION_STRIDE / 4]) \
+                      (uintptr_t)ADDR_OPTION_TABLE)[i][(off) / 4])
+
 void __cdecl OptionsDefaults(AM2_Widget *button)
 {
-    AM2_Widget    *parent = button->parent;
-    const uint8_t *rec    = (const uint8_t *)(uintptr_t)ADDR_OPTION_TABLE;
-    uint32_t       flags;
-    uint32_t       other;
+    AM2_Widget *parent = button->parent;
+    uint32_t    flags;
+    uint32_t    other;
+    int32_t     i;
 
     ResetPairMask(&flags, &other);
 
-    do {
-        AM2_Widget *box =
-            OptionBox(parent, *(const int32_t *)(rec + AM2_OPTION_OFF_WIDGET));
-        uint32_t    bit = *(const uint32_t *)(rec + AM2_OPTION_OFF_BIT);
-        uint32_t    mask = *(const int32_t *)(rec + AM2_OPTION_OFF_WHICH)
-                           ? flags : other;
+    for (i = 0; i < AM2_OPTION_COUNT; i++) {
+        AM2_Widget *box;
+        uint32_t    bit, mask;
 
+        box = OptionBox(parent, OPT(i, AM2_OPTION_OFF_WIDGET));
+        mask = OPT(i, AM2_OPTION_OFF_WHICH) ? flags : other;
         box->disabled = 0;
+        bit = (uint32_t)OPT(i, AM2_OPTION_OFF_BIT);
         *((uint8_t *)box + CHECKBOX_OFF_CHECKED) = (mask & bit) != 0;
         WidgetVPaint(box, box->rect);
-        rec += AM2_OPTION_STRIDE;
-    } while (rec < (const uint8_t *)(uintptr_t)ADDR_OPTION_TABLE_END);
+    }
 }
 
 void __cdecl OptionsApply(AM2_Widget *button)
 {
-    AM2_Widget    *parent = button->parent;
-    const uint8_t *rec    = (const uint8_t *)(uintptr_t)ADDR_OPTION_TABLE;
-    uint32_t       flags  = 0;
-    uint32_t       other  = 0;
+    AM2_Widget *parent = button->parent;
+    uint32_t    flags  = 0;
+    uint32_t    other  = 0;
+    int32_t     i;
 
-    do {
-        AM2_Widget *box =
-            OptionBox(parent, *(const int32_t *)(rec + AM2_OPTION_OFF_WIDGET));
-
-        if (*((const uint8_t *)box + CHECKBOX_OFF_CHECKED)) {
-            uint32_t bit = *(const uint32_t *)(rec + AM2_OPTION_OFF_BIT);
-
-            if (*(const int32_t *)(rec + AM2_OPTION_OFF_WHICH))
-                flags |= bit;
+    for (i = 0; i < AM2_OPTION_COUNT; i++) {
+        if (*((const uint8_t *)OptionBox(parent, OPT(i, AM2_OPTION_OFF_WIDGET))
+              + CHECKBOX_OFF_CHECKED)) {
+            if (OPT(i, AM2_OPTION_OFF_WHICH))
+                flags |= (uint32_t)OPT(i, AM2_OPTION_OFF_BIT);
             else
-                other |= bit;
+                other |= (uint32_t)OPT(i, AM2_OPTION_OFF_BIT);
         }
-        rec += AM2_OPTION_STRIDE;
-    } while (rec < (const uint8_t *)(uintptr_t)ADDR_OPTION_TABLE_END);
+    }
 
     g_gameOverFlags  = flags;
     g_gameSetting22C = other;
@@ -10915,6 +10924,7 @@ void __cdecl OptionsApply(AM2_Widget *button)
     SendPlayerMsg(0);
     Announce("Options changed by host.");
 }
+#undef OPT
 
 void __cdecl OptionsRequest(void)
 {
@@ -11163,29 +11173,31 @@ void __attribute__((thiscall)) AM2_Widget::MpNameSetInk(uint8_t ink)
  * arm: a name may only be toggled on a row past the human player count. */
 void __cdecl OnMpName(AM2_Widget *w)
 {
-    uint8_t *comm = (uint8_t *)g_commObject;
-    int32_t  row;
+    /* The comm object and the row are re-read where the image re-reads
+     * them: after the flag is set. */
+#define COMM ((uint8_t *)g_commObject)
+#define ROW  (*(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW))
     int32_t *active;
 
-    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (!*(const int32_t *)(COMM + COMM_OFF_IS_HOST))
+        return;
+    if (ROW < *(const int32_t *)(COMM + COMM_OFF_PLAYER_COUNT))
         return;
 
-    row = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
-    if (row < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT))
-        return;
-
-    active = (int32_t *)(comm + (uint32_t)row * AM2_PLAYER_STRIDE
+    active = (int32_t *)(COMM + (uint32_t)ROW * AM2_PLAYER_STRIDE
                          + AM2_PLAYER_ACTIVE);
     if (*active) {
         *active = 0;
     } else {
         *active = 1;
         /* Numbered from the first computer slot, not from the row. */
-        orig_sprintf((char *)(comm + (uint32_t)row * AM2_PLAYER_STRIDE
+        orig_sprintf((char *)(COMM + (uint32_t)ROW * AM2_PLAYER_STRIDE
                               + COMM_OFF_PLAYERS + COMM_SLOT_OFF_NAME),
                      "Computer%d",
-                     row - *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT) + 1);
+                     ROW - *(const int32_t *)(COMM + COMM_OFF_PLAYER_COUNT) + 1);
     }
+#undef COMM
+#undef ROW
 
     PlaySoundAt(2, 0, 0, 0, 0);
     SendPlayerMsg(0);
@@ -11959,8 +11971,6 @@ void __cdecl OnMovieNextPage(AM2_Widget *w)
 {
     AM2_Widget  *panel;
     AM2_Widget  *screen;
-    AM2_Widget **slots;
-    int32_t      page;
     int32_t      i;
 
     if (!w)
@@ -11973,31 +11983,25 @@ void __cdecl OnMovieNextPage(AM2_Widget *w)
         return;
 
     PlaySoundAt(2, 0, 0, 0, 0);
-    page = g_moviePage + 1;
-    g_moviePage = page;
-    if (page > 2) {
-        page = 0;
+    if (++g_moviePage > 2)
         g_moviePage = 0;
-    }
 
-    slots = (AM2_Widget **)((uint8_t *)screen + MOVIES_OFF_BUTTONS);
+    /* The slot, the page and the sprite pair are each re-read per store. */
+#define SLOT(i) (*(uint8_t **)((uint8_t *)screen + MOVIES_OFF_BUTTONS + (uint32_t)(i) * 4))
+#define PAIR(n) ((AM2_Sprite *const *)((const uint8_t *)screen + MOVIES_OFF_SPRITES \
+                                        + (uint32_t)(n) * 8))
     for (i = 0; i < AM2_MOVIE_PAGE_SIZE; i++) {
-        AM2_Widget *btn = slots[i];
-        int32_t     idx = i + page * AM2_MOVIE_PAGE_SIZE;
-        AM2_Sprite *const *pair;
-        uint8_t    *self;
+        int32_t idx = i + g_moviePage * AM2_MOVIE_PAGE_SIZE;
 
-        if (!btn)
+        if (!SLOT(i))
             continue;
-        pair = (AM2_Sprite *const *)((const uint8_t *)screen
-                                     + MOVIES_OFF_SPRITES
-                                     + (uint32_t)idx * 8);
-        self = (uint8_t *)btn;
-        *(int32_t *)(self + MOVIE_BUTTON_OFF_INDEX)        = idx;
-        *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL)  = pair[1];
-        *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_FOCUS)   = pair[0];
-        *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_PRESSED) = pair[0];
+        *(int32_t *)(SLOT(i) + MOVIE_BUTTON_OFF_INDEX)        = idx;
+        *(AM2_Sprite **)(SLOT(i) + BUTTON_OFF_SPRITE_NORMAL)  = PAIR(idx)[1];
+        *(AM2_Sprite **)(SLOT(i) + BUTTON_OFF_SPRITE_FOCUS)   = PAIR(idx)[0];
+        *(AM2_Sprite **)(SLOT(i) + BUTTON_OFF_SPRITE_PRESSED) = PAIR(idx)[0];
     }
+#undef SLOT
+#undef PAIR
 }
 
 /* 0x0044E610. A thumbnail's click: name the film from the button's own slot
@@ -16097,42 +16101,32 @@ void __attribute__((thiscall)) AM2_Widget::MultiUpdateThunk()
 void __attribute__((thiscall)) AM2_ArrowBarOps::ArrowBarFollowEnd()
 {
     AM2_Widget *bar = (AM2_Widget *)(void *)this;
-    uint8_t          *b = (uint8_t *)bar;
-    AM2_Widget       *list = *(AM2_Widget **)(b + ARROWBAR_OFF_LIST);
-    const AM2_Sprite *thumb;
-    uint8_t          *l;
-    int32_t           top;
-    int32_t           visible;
-    int32_t           count;
+    uint8_t    *b   = (uint8_t *)bar;
 
-    if (!list)
+    /* The list pointer is read at every use, and the store through it is
+     * what makes VC6 load it again for the paint -- the image does too. */
+#define LIST    (*(AM2_Widget **)(b + ARROWBAR_OFF_LIST))
+#define TOP     (*(int32_t *)((uint8_t *)LIST + LIST_OFF_TOP_ROW))
+#define COUNT   (**(const int32_t *const *)((uint8_t *)LIST + LIST_OFF_ROWS))
+#define VISIBLE (*(const int32_t *)((uint8_t *)LIST + LIST_OFF_VISIBLE))
+    if (!LIST)
         return;
-    l = (uint8_t *)list;
-
-    count   = **(const int32_t *const *)(l + LIST_OFF_ROWS);
-    visible = *(const int32_t *)(l + LIST_OFF_VISIBLE);
-    if (*(const int32_t *)(l + LIST_OFF_TOP_ROW) >= count - visible)
+    if (TOP >= COUNT - VISIBLE)
         return;
-    *(int32_t *)(l + LIST_OFF_TOP_ROW) = count - visible;
+    TOP = COUNT - VISIBLE;
 
-    WidgetVPaint(list, list->rect);
+    WidgetVPaint(LIST, LIST->rect);
 
-    /* Every field is loaded again after the paint, the list pointer included.
-     * Reproduced: the painter is a virtual and could have moved any of them,
-     * and which loads the original chose to repeat is evidence about what it
-     * thought could change. */
-    list    = *(AM2_Widget **)(b + ARROWBAR_OFF_LIST);
-    l       = (uint8_t *)list;
-    top     = *(const int32_t *)(l + LIST_OFF_TOP_ROW);
-    count   = **(const int32_t *const *)(l + LIST_OFF_ROWS);
-    visible = *(const int32_t *)(l + LIST_OFF_VISIBLE);
-
-    thumb = *(const AM2_Sprite *const *)(b + ARROWBAR_OFF_SPRITE0);
     *(int32_t *)(b + ARROWBAR_OFF_SHIFT) =
-        ThumbShift(top, count - visible,
+        ThumbShift(TOP, COUNT - VISIBLE,
                    *(const int32_t *)(b + ARROWBAR_OFF_SPAN)
-                   - thumb->bounds.bottom);
+                   - (*(const AM2_Sprite *const *)(b + ARROWBAR_OFF_SPRITE0))
+                         ->bounds.bottom);
     RepaintAncestor(bar, bar->rect);
+#undef LIST
+#undef TOP
+#undef COUNT
+#undef VISIBLE
 }
 
 /* ArrowBarShowRow -- original 0x00455E10, 178 bytes, thiscall, three callers.
@@ -17363,44 +17357,14 @@ void __cdecl VehicleDismountAll(void *a, void *b)
  * verified by reading. */
 void __cdecl PointerDropItem(void *obj, uint32_t at)
 {
-    int32_t  owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
     uint8_t *unit;
     int32_t  slot;
 
     (void)obj;
     (void)at;
 
-    if (owner != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
-        /* Dead -- see above. */
-        const uint8_t *list;
-        int32_t        i;
-
-        unit = (uint8_t *)0;
-
-        if (owner >= 0 && owner < AM2_COMM_SLOTS) {
-            list = (const uint8_t *)
-                ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
-
-            for (i = 0; i < *(const int32_t *)(list + LIST_OFF_COUNT); i++) {
-                uint8_t *o = (uint8_t *)LookupByUID(
-                    (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
-
-                if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
-                    && *(const int32_t *)(o + OBJ_OFF_SARGE)) {
-                    unit = o;
-                    break;
-                }
-                /* The list pointer is re-read every turn, as it is in
-                 * ArmyMessageFlush over the same table. */
-                list = (const uint8_t *)
-                    ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
-            }
-        }
-    } else {
-        unit = (uint8_t *)LookupByUID(
-            *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
-    }
-
+    /* No null test on the leader, as the original. */
+    unit = OurLeaderUnit();
     slot = *(const int32_t *)(unit + UNIT_OFF_INVENTORY_SEL);
     if (slot > 0) {
         TrooperDropItem(unit, slot, *(const uint32_t *)(unit + OBJ_OFF_X));

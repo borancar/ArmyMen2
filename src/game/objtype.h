@@ -57,7 +57,7 @@ int32_t __cdecl FindRecordList(uint32_t owner);
 
 /* 0x004344A0. A 0x40-byte record from seven arguments, seeded from the
  * object.aai record for its (type, key) when the type is not negative. */
-void *__cdecl MakeAaiRecord(int32_t type, int32_t key, int32_t slot,
+void *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
                             int32_t a, int32_t b, int32_t c, int32_t d);
 
 /* 0x004345A0. Register one of those under its key, writing the slot back into
