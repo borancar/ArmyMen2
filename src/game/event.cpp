@@ -2013,11 +2013,10 @@ void __cdecl EvtPushObjCtx(uint32_t uid)
         *(void **)((void *)(uintptr_t)(ADDR_OBJ_CTX_OBJ));
     *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_VAL_PREV)) =
         *(const int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_VAL));
-    *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_SET_PREV)) =
-        *(const int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_SET));
-
     *(void **)((void *)(uintptr_t)(ADDR_OBJ_CTX_OBJ))  = obj;
     *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_VAL)) = *(const int32_t *)(obj + 4);
+    *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_SET_PREV)) =
+        *(const int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_SET));
     *(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_CTX_SET)) = 1;
 }
 
