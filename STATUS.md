@@ -66,11 +66,18 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1203 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1212 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1203:
+  the near-miss sweep, 758 before the row pools. From 758 to 1212:
+  - **GOG's copy-protection patch is applied LAST now** (Boran, 2026-09-29):
+    the relink compares against the retail bytes (`RETAIL` in
+    `src/vc6/bytematch.py` puts the five `75`s back), VC6 compiles the
+    retail CD check (`cdcheck.h`), and `src/vc6/link.py` flips the linked
+    image's five `call FindGameCD; test; jne` to `jmp` afterwards. OnBootCamp,
+    OnSinglePlayer and OnStartWar matched on that alone; the VC6 image plays
+    Boot Camp pixel-identical to stock with the patch applied.
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own

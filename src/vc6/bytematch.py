@@ -155,13 +155,17 @@ def mask(b, relocs, n):
 
 # ---- the reference image ---------------------------------------------------
 
-# GOG's own binary patches this project undoes for good, byte by byte: the
-# reconstruction reproduces the RETAIL code, so that is what it is compared
-# with. Only the MULTI-PLAYER one (Boran, 2026-09-28; src/inject/restore.c,
-# docs/binarypatches.md): 0x0044D8FE is `je` in retail, `jmp` in GOG's build,
-# which skips building the title screen's MULTI-PLAYER button. The copy
-# protection patches stay as shipped.
+# GOG's own binary patches, undone byte by byte: the reconstruction reproduces
+# the RETAIL code, so that is what it is compared with (docs/binarypatches.md).
+# The MULTI-PLAYER one is undone for good (Boran, 2026-09-28;
+# src/inject/restore.c): 0x0044D8FE is `je` in retail, `jmp` in GOG's build,
+# which skips building the title screen's MULTI-PLAYER button. The five copy
+# protection jumps are undone HERE ONLY (Boran, 2026-09-29): VC6 compiles the
+# retail check (src/game/win32/cdcheck.h) and link.py re-applies GOG's EB to
+# the linked image, so the game still runs without its CD.
 RETAIL = {0x0044D8FE: 0x74}
+CD_JUMPS = (0x0040EE9D, 0x0042ED4B, 0x0042F2A9, 0x0044D303, 0x0044D40A)
+RETAIL.update({va: 0x75 for va in CD_JUMPS})
 
 
 class RetailImage:

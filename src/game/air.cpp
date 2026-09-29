@@ -500,29 +500,26 @@ void __cdecl ClearFrameCounts(void)
  * the disassembly; a local is the same thing said once. */
 uint32_t __cdecl ObjAnchorPoint(const void *obj)
 {
-    const uint8_t *p = (const uint8_t *)obj;   /* the object, then its row, then the sprite */
+    const uint8_t *p = (const uint8_t *)obj;
     AM2_Point      pt;
 
     if (!p)
         return *(const uint32_t *)((void *)(uintptr_t)(ADDR_ZERO_POINT));
 
     pt = *(const AM2_Point *)(p + OBJ_OFF_POS);
-    /* One row: that row. More than one: the second. None: the point. */
     if (*(const int32_t *)(p + OBJ_OFF_ROW_COUNT) == 1)
         p = *(const uint8_t *const *)(p + OBJ_OFF_ROWS);
     else if (*(const int32_t *)(p + OBJ_OFF_ROW_COUNT) > 1)
         p = *(const uint8_t *const *)(p + OBJ_OFF_ROWS) + AM2_OBJ_ROW_STRIDE;
     else
-        return *(const uint32_t *)&pt;
-    if (!p)
-        return *(const uint32_t *)&pt;
-
-    p = *(const uint8_t *const *)(p + ROW_OFF_SPRITE);
-    if (!p)
-        return *(const uint32_t *)&pt;
-
-    pt.x = (int16_t)(pt.x - *(const int16_t *)(p + SPR_OFF_OVX));
-    pt.y = (int16_t)(pt.y - *(const int16_t *)(p + SPR_OFF_OVY));
+        p = 0;      /* no rows: the point as it is */
+    if (p) {
+        p = *(const uint8_t *const *)(p + ROW_OFF_SPRITE);
+        if (p) {
+            pt.x -= *(const int16_t *)(p + SPR_OFF_OVX);
+            pt.y -= *(const int16_t *)(p + SPR_OFF_OVY);
+        }
+    }
     return *(const uint32_t *)&pt;
 }
 

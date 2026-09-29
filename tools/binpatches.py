@@ -225,9 +225,12 @@ def main():
         w("\nThe call itself was left alone -- only the branch on its result --\n"
           "so `FindGameCD` still runs and still sets what it sets. A faithful\n"
           "reconstruction calls it and discards the answer, which is what\n"
-          "`src/game/win32/cdcheck.h` does; that header also carries the retail check\n"
-          "as compilable source behind `#ifdef AM2_COPY_PROTECTION`, off by\n"
-          "default.\n\n")
+          "`src/game/win32/cdcheck.h` does under GCC. Under VC6 that header\n"
+          "compiles the RETAIL check instead (`AM2_COPY_PROTECTION`), so the\n"
+          "code byte-matches what the compiler emitted: `src/vc6/bytematch.py`\n"
+          "puts the five `75`s back in the reference image, and\n"
+          "`src/vc6/link.py` then applies GOG's `EB` to the linked image, the\n"
+          "patch last, as GOG applied it (Boran, 2026-09-29).\n\n")
 
         w("## Can the skipped dialogs run?\n\n")
         w("A patched jump proves the block after it cannot be fallen into, and\n"

@@ -1542,6 +1542,18 @@ void __cdecl TakeNumberKey(void)
 #define g_curKeys  (*(uint8_t **)(uintptr_t)ADDR_KEYS_NOW_PTR)
 #define g_prevKeys (*(uint8_t **)(uintptr_t)ADDR_KEYS_PREV_PTR)
 
+/* The two below as the image expands them in their callers. */
+static inline int32_t IsKeyDownInline(uint8_t dik)
+{
+    return g_curKeys[(uint32_t)dik & 0xFFu] & 0x80;
+}
+
+static inline int32_t KeyChangedInline(uint8_t dik)
+{
+    return (uint32_t)((int8_t)g_curKeys[dik & 0xFF]
+                      ^ (int8_t)g_prevKeys[dik & 0xFF]) >> 7 & 1;
+}
+
 int32_t __cdecl IsKeyDown(uint8_t dik)
 {
     /* 0x80, not 1: the original masks and returns, and never normalises. */
@@ -1722,16 +1734,13 @@ void __attribute__((thiscall)) AM2_Rec::ClearPtrList()
 
 int32_t __cdecl ActionKeyPressed(int32_t action)
 {
-    int32_t i;
-
-    for (i = 0; i < 2; i++) {
-        uint32_t k = g_keyBindings[action * 2 + i];
-
-        if (!(g_curKeys[k] & 0x80))
-            continue;
-        if ((g_prevKeys[k] ^ g_curKeys[k]) & 0x80)
-            return 1;
-    }
+    /* Both bindings written out, each through the two predicates in their
+     * inline form -- the image expands them here. */
+    if ((IsKeyDownInline(g_keyBindings[action * 2])
+         && KeyChangedInline(g_keyBindings[action * 2]))
+        || (IsKeyDownInline(g_keyBindings[action * 2 + 1])
+            && KeyChangedInline(g_keyBindings[action * 2 + 1])))
+        return 1;
     return 0;
 }
 
@@ -1771,16 +1780,13 @@ int32_t __cdecl ActionKeyPressed(int32_t action)
  * It runs 11,419 times in a Boot Camp mission, so the coverage is real. */
 int32_t __cdecl ActionKeyReleased(int32_t action)
 {
-    int32_t i;
-
-    for (i = 0; i < 2; i++) {
-        uint32_t k = g_keyBindings[action * 2 + i];
-
-        if (g_curKeys[k] & 0x80)
-            continue;
-        if ((g_prevKeys[k] ^ g_curKeys[k]) & 0x80)
-            return 1;
-    }
+    /* Both bindings written out, each through the two predicates in their
+     * inline form -- the image expands them here. */
+    if ((!IsKeyDownInline(g_keyBindings[action * 2])
+         && KeyChangedInline(g_keyBindings[action * 2]))
+        || (!IsKeyDownInline(g_keyBindings[action * 2 + 1])
+            && KeyChangedInline(g_keyBindings[action * 2 + 1])))
+        return 1;
     return 0;
 }
 

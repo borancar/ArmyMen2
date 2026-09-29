@@ -62,27 +62,29 @@ void __cdecl ResetDirtyList(void)
 void __cdecl AddDirtyRect(int32_t left, int32_t top, int32_t right,
                           int32_t bottom)
 {
-    /* The record array indexed afresh for every store, as the image does. */
+    /* The record array indexed afresh for every store, as the image does,
+     * and through one view with the tail in front of it: a store into a
+     * record may land on the tail as far as the compiler knows, which is why
+     * the image reads the tail again after them. */
     struct Rec { int32_t l, t, r, b; uint16_t prev, next; };
-#define RECS ((struct Rec *)((void *)(uintptr_t)(ADDR_DIRTY_RECTS)))
-#define TAIL (*(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)))
-    uint16_t next = (uint16_t)(TAIL + 1);
+    struct List { uint16_t tail; uint16_t pad; struct Rec recs[AM2_DEPTH_MAX]; };
+#define DL (*(struct List *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)))
+    uint16_t next = (uint16_t)(DL.tail + 1);
 
     if (next >= AM2_DEPTH_MAX) {
         *(int32_t *)((void *)(uintptr_t)(ADDR_FULL_REDRAW)) = 1;
         return;
     }
 
-    RECS[next].l    = left;
-    RECS[next].t    = top;
-    RECS[next].r    = right;
-    RECS[next].b    = bottom;
-    RECS[next].next = 0;
-    RECS[next].prev = TAIL;
-    RECS[TAIL].next = next;
-    TAIL = next;
-#undef RECS
-#undef TAIL
+    DL.recs[next].l    = left;
+    DL.recs[next].t    = top;
+    DL.recs[next].r    = right;
+    DL.recs[next].b    = bottom;
+    DL.recs[next].next = 0;
+    DL.recs[next].prev = DL.tail;
+    DL.recs[DL.tail].next = next;
+    DL.tail = next;
+#undef DL
 }
 
 int dirty_install(void)

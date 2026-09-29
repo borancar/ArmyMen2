@@ -252,7 +252,48 @@ def main():
     if os.path.exists(out) and os.path.getsize(out):
         if args.run:
             guard_noaccess(out)
+        gog_cd_patch(out, os.path.join(OUTDIR, "ArmyMen2.map"))
         print("OK: %s (%d bytes)" % (out, os.path.getsize(out)))
+
+
+def gog_cd_patch(exe, mapfile):
+    """Apply GOG's copy-protection patch to the linked image, as GOG did to
+    theirs: every `call FindGameCD; test eax, eax; jne` gets its jne (75)
+    turned into jmp (EB). VC6 compiles the retail check (cdcheck.h) so the code
+    byte-matches the retail build; this puts the shipped behaviour back on top.
+    The original has five such sites (docs/binarypatches.md)."""
+    import re, struct
+    target = None
+    for ln in open(mapfile, errors="replace"):
+        m = re.match(r"\s*[0-9a-f]{4}:[0-9a-f]{8}\s+_FindGameCD\s+([0-9a-f]{8})", ln)
+        if m:
+            target = int(m.group(1), 16)
+            break
+    if target is None:
+        print("gog: WARNING _FindGameCD not in the map; image left unpatched")
+        return
+    d = bytearray(open(exe, "rb").read())
+    pe = struct.unpack_from("<I", d, 0x3C)[0]
+    nsec = struct.unpack_from("<H", d, pe + 6)[0]
+    opt = struct.unpack_from("<H", d, pe + 20)[0]
+    base = struct.unpack_from("<I", d, pe + 24 + 28)[0]
+    sites = []
+    for i in range(nsec):
+        h = pe + 24 + opt + 40 * i
+        if not struct.unpack_from("<I", d, h + 36)[0] & 0x20000000:   # EXECUTE
+            continue
+        va0 = base + struct.unpack_from("<I", d, h + 12)[0]
+        raw, off = struct.unpack_from("<II", d, h + 16)
+        for k in range(off, off + raw - 9):
+            if d[k] != 0xE8 or d[k + 5:k + 8] != b"\x85\xc0\x75":
+                continue
+            rel = struct.unpack_from("<i", d, k + 1)[0]
+            if va0 + (k - off) + 5 + rel == target:
+                d[k + 7] = 0xEB
+                sites.append(va0 + (k - off) + 7)
+    open(exe, "wb").write(d)
+    print("gog: copy protection patched at %d site(s): %s"
+          % (len(sites), " ".join("0x%08x" % v for v in sites)))
 
 
 def guard_noaccess(exe):

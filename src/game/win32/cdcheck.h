@@ -39,6 +39,18 @@
  * afterwards with its own menu state.
  */
 
+/* UNDER VC6 THE RETAIL CHECK IS WHAT IS COMPILED, and GOG's patch is applied
+ * afterwards (Boran, 2026-09-29). The byte-match target is the code the
+ * compiler emitted, which is the retail `jne`; `src/vc6/bytematch.py` puts the
+ * five 75s back in the reference image, and `src/vc6/link.py` flips the linked
+ * image's five jumps to EB the way GOG did. So the VC6 image is byte-for-byte
+ * the retail code with GOG's five bytes on top, and behaves as the shipped
+ * game. GCC builds cannot be byte-patched after the fact and keep the
+ * call-and-ignore form below, which is what the patched bytes do. */
+#if defined(_MSC_VER) && !defined(AM2_COPY_PROTECTION)
+#define AM2_COPY_PROTECTION 1
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

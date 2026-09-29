@@ -40,9 +40,12 @@ so none of those dialogs can appear:
 The call itself was left alone -- only the branch on its result --
 so `FindGameCD` still runs and still sets what it sets. A faithful
 reconstruction calls it and discards the answer, which is what
-`src/game/win32/cdcheck.h` does; that header also carries the retail check
-as compilable source behind `#ifdef AM2_COPY_PROTECTION`, off by
-default.
+`src/game/win32/cdcheck.h` does under GCC. Under VC6 that header
+compiles the RETAIL check instead (`AM2_COPY_PROTECTION`), so the
+code byte-matches what the compiler emitted: `src/vc6/bytematch.py`
+puts the five `75`s back in the reference image, and
+`src/vc6/link.py` then applies GOG's `EB` to the linked image, the
+patch last, as GOG applied it (Boran, 2026-09-29).
 
 ## Can the skipped dialogs run?
 
