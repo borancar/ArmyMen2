@@ -2424,7 +2424,6 @@ int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx)
 {
     uint8_t *r    = (uint8_t *)rec;
     uint8_t *row  = *(uint8_t **)(r + SEQ_OFF_ROW);
-    int32_t  step;
 
     (void)at;
 
@@ -2444,9 +2443,8 @@ int32_t __cdecl SeqStepKind5(int32_t at, void *rec, void *ctx)
             *(const int32_t *)((void *)(uintptr_t)(ADDR_SEQ_EMIT_MS));
     }
 
-    step = *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
-    *(int32_t *)(row + ROW_OFF_STAMP_54) += step;
-    *(int32_t *)(r + SEQ_OFF_GATE)       += step;
+    *(int32_t *)(row + ROW_OFF_STAMP_54) += *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+    *(int32_t *)(r + SEQ_OFF_GATE)       += *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
 
     return *(const int16_t *)(r + SEQ_OFF_NEXT);
 }

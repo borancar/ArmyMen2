@@ -1578,8 +1578,11 @@ void __cdecl RecvVehicleExit(void *msg)
                  UidOnWire(*(const uint32_t *)(m + 8)));
 
     vehicle = ObjByUidAlias(UidOnWire(*(const uint32_t *)(m + 4)));
-    if (vehicle)
-        VehicleTakeOutOccupant(UidOnWire(*(const uint32_t *)(m + 8)), vehicle);
+    if (vehicle) {
+        /* The trooper's uid is decoded before the vehicle is pushed. */
+        uint32_t trooper = UidOnWire(*(const uint32_t *)(m + 8));
+        VehicleTakeOutOccupant(trooper, vehicle);
+    }
 }
 
 /* VehicleMsgRecv -- original 0x0045E590, one caller.
@@ -2584,24 +2587,24 @@ void __cdecl CommInitDefaults(void)
 void __cdecl SendChatTo(char *text, int32_t slot)
 {
     uint8_t *rec = (uint8_t *)(uintptr_t)ADDR_MSG_CHAT;
-    uint8_t  ink;
 
     if (strlen(text) > AM2_CHAT_TEXT_MAX)
         text[AM2_CHAT_TEXT_MAX - 1] = 0;
 
     strcpy((char *)(rec + MSG_CHAT_OFF_TEXT), text);
 
-    ink = *((const uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
-            + (uint32_t)CommArmyOfSlot(kCommObj,
-                  *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
-              * AM2_OBJ_TABLE_REC_SIZE
-            + OBJ_TABLE_REC_OFF_INK);
-    if (!ink)
-        ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE;
+    /* Stored, then tested and overwritten: the image writes the ink
+     * before it knows whether it is zero. */
+    rec[MSG_CHAT_OFF_INK] =
+        *((const uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+          + (uint32_t)((AM2_Comm *)kCommObj)->CommArmyOfSlot(
+                *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+            * AM2_OBJ_TABLE_REC_SIZE
+          + OBJ_TABLE_REC_OFF_INK);
+    if (!rec[MSG_CHAT_OFF_INK])
+        rec[MSG_CHAT_OFF_INK] = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE;
 
-    rec[MSG_CHAT_OFF_INK] = ink;
-
-    SendGameMsg(rec, CommPlayerId(kCommObj, slot), 0);
+    SendGameMsg(rec, ((AM2_Comm *)kCommObj)->CommPlayerId(slot), 0);
 }
 
 

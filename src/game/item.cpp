@@ -6187,7 +6187,6 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot)
     uint8_t *u = (uint8_t *)unit;
     void    *w;
     int32_t  kind;
-    const uint32_t *rec;
 
     *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = slot;
 
@@ -6197,12 +6196,13 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot)
         return;
 
     kind = **(int32_t *const *)((uint8_t *)w + OBJ_OFF_FIELD_C0);
-    rec  = (const uint32_t *)(uintptr_t)ADDR_WEAPON_HANDLERS + kind * 4;
 
-    *(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT0 = rec[0];
-    *(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT1 = rec[1];
-    *(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT2 = rec[2];
-    *(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT3 = rec[3];
+#define REC ((const uint32_t *)(uintptr_t)ADDR_WEAPON_HANDLERS)
+    *(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT0 = REC[kind * 4 + 0];
+    *(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT1 = REC[kind * 4 + 1];
+    *(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT3 = REC[kind * 4 + 3];
+    *(uint32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT2 = REC[kind * 4 + 2];
+#undef REC
 
     *(uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID =
         ((const AM2_Object *)unit)->uid;

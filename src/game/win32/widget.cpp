@@ -13757,7 +13757,6 @@ void __attribute__((thiscall)) AM2_Widget::GameMenuUpdate()
 {
     AM2_Widget *w = this;
 
-    uint8_t    *comm;
     AM2_Widget *dlg;
 
     ::WidgetUpdateCancel(w);
@@ -13765,9 +13764,10 @@ void __attribute__((thiscall)) AM2_Widget::GameMenuUpdate()
     if (!*(const int32_t *)((const uint8_t *)w + GAMEMENU_OFF_ABORT))
         return;
 
-    comm = g_commObject;
-    RequestState(*(const int32_t *)(comm + COMM_OFF_LOBBIED)
-                     ? AM2_STATE_MP_LOBBY : AM2_STATE_MENU);
+    if (*(const int32_t *)(g_commObject + COMM_OFF_LOBBIED))
+        RequestState(AM2_STATE_MP_LOBBY);
+    else
+        RequestState(AM2_STATE_MENU);
 
     dlg = *(AM2_Widget **)(uintptr_t)ADDR_PAINT_OBJECT;
     if (dlg)
@@ -13777,9 +13777,9 @@ void __attribute__((thiscall)) AM2_Widget::GameMenuUpdate()
     if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
         return;
 
-    CommDropSession(comm);
-    CommReportStats(comm);
-    CommResetStats(comm);
+    CommDropSession(g_commObject);
+    CommReportStats(g_commObject);
+    CommResetStats(g_commObject);
 }
 
 /* DlgGameMenuConstruct -- original 0x00452AA0, 928 bytes, thiscall `ret 8`.
