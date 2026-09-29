@@ -1633,7 +1633,7 @@ static inline void BuildMapObjects(uint8_t *objs, int32_t count)
             }
             obj = CreateItem(*(char **)(r + MAPREC_OFF_SCRIPT), army,
                              PackKey(type + 0x14, kind, 0),
-                             *(const uint32_t *)&at, flags, 1, 0);
+                             at, flags, 1, 0);
             if (obj != 0 && ObjIsWatchedKind(obj)
                 && (int32_t)g_defaultOwner != army)
                 ObjConceal(obj, 1);
@@ -1960,7 +1960,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING == 0) {
         void *cam = CreateItem((char *)"camera", 4,
                                *(const int32_t *)(uintptr_t)ADDR_AAI_KEY_980000,
-                               *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT,
+                               *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT,
                                0, 1, 0);
 
         *(int32_t *)(uintptr_t)ADDR_EVT_ID15_UID =

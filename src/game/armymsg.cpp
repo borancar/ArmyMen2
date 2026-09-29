@@ -1186,7 +1186,7 @@ void __cdecl RecvItemCreate(void *msg)
          * MESSAGE's own bytes, which is what the original does. */
         made = CreateItem((char *)(uintptr_t)name, army,
                           *(const int32_t *)(m + MSG_CREATE_OFF_D),
-                          (uint32_t)*(const int32_t *)(m + MSG_CREATE_OFF_A),
+                          *(const AM2_Point *)(m + MSG_CREATE_OFF_A),
                           *(const int32_t *)(m + MSG_CREATE_OFF_C),
                           1, uid);
         if (*(const int32_t *)(m + MSG_CREATE_OFF_D)

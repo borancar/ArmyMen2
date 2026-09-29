@@ -2299,14 +2299,16 @@ static inline void ReturnToOptions(void)
  * all four play wave 1 rather than the menus' wave 2.
  * ------------------------------------------------------------------ */
 
-/* The thumb's offset along the bar, in both classes' own terms. The original
- * computes it in x87 and rounds through _ftol, which truncates toward zero;
- * both operands are non-negative here, so a C cast is the same function. */
+/* The arrow bar's thumb offset along its track. The original computes it in
+ * x87 and rounds through _ftol, which truncates toward zero; both operands are
+ * non-negative here, so a C cast is the same function. The scroll bar's
+ * version (ScrollBarStep) is spelled differently and compiles differently. */
 static inline int32_t ThumbShift(int32_t pos, int32_t range, int32_t travel)
 {
-    /* the range divides as an int (fidiv), the travel is converted -- the
-     * original's two spellings */
-    return (int32_t)((float)pos / range * (double)travel);
+    /* The range divides as an int (fidiv); the travel is a double and comes
+     * FIRST -- the other order schedules the count-less-visible subtraction
+     * after the span load, which the image does not. */
+    return (int32_t)((double)travel * ((float)pos / range));
 }
 
 /* 0x004557F0 and 0x004558B0. The list scrolls by one row; the guards are the
@@ -2372,11 +2374,13 @@ static inline void ScrollBarStep(AM2_Widget *arrow, int32_t delta)
         PlaySoundAt(1, 0, 0, 0, 0);
         POS += delta;
 
+        /* Not ThumbShift: this one multiplies in float with the travel
+         * last, and the image loads its operands in that order. */
         thumb = *(const AM2_Sprite *const *)(b + SCROLLBAR_OFF_BAR);
         *(int32_t *)(b + SCROLLBAR_OFF_SHIFT) =
-            ThumbShift(POS, RANGE,
-                       *(const int32_t *)(b + SCROLLBAR_OFF_SPAN)
-                       - thumb->bounds.right);
+            (int32_t)((float)POS / RANGE
+                      * (*(const int32_t *)(b + SCROLLBAR_OFF_SPAN)
+                         - thumb->bounds.right));
         RepaintAncestor(bar, bar->rect);
     }
 #undef POS

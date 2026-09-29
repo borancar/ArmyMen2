@@ -485,8 +485,12 @@ void __cdecl ShooterReact(void *shooter, void *target);
  * machine is not allowed to create it or the sprite record cannot be built.
  *
  * `name` is NOT const: ObjInitCommon lower-cases the caller's buffer in
- * place, two levels down. */
-void *__cdecl CreateItem(char *name, int32_t army, int32_t key, uint32_t at,
+ * place, two levels down.
+ *
+ * `at` is a point BY VALUE: CreateWatchedType loads the dword its point
+ * lives in before its first push, as VC6 copies a struct argument, where a
+ * uint32_t is loaded in argument order. */
+void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
                          int32_t orFlags, int32_t remote, uint32_t uid);
 
 /* 0x0045B700, two callers. Does `from` run into `obj`? Height first, then a

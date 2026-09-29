@@ -12352,7 +12352,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
  * read back off the object rather than from the argument, with a signed
  * compare on the byte.
  */
-void *__cdecl CreateItem(char *name, int32_t army, int32_t key, uint32_t at,
+void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
                          int32_t orFlags, int32_t remote, uint32_t uid)
 {
     AM2_DefLink *rec;
@@ -12374,9 +12374,10 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, uint32_t at,
         char child[AM2_CHILD_NAME_BUF];
 
         do {
-            uint16_t px = (uint16_t)((uint16_t)at + (uint16_t)rec->dx);
-            uint16_t py = (uint16_t)((uint16_t)(at >> 16) + (uint16_t)rec->dy);
-            uint32_t pt = (uint32_t)px | ((uint32_t)py << 16);
+            AM2_Point pt;
+
+            pt.x = (int16_t)((uint16_t)at.x + (uint16_t)rec->dx);
+            pt.y = (int16_t)((uint16_t)at.y + (uint16_t)rec->dy);
 
             if (!parent) {
                 parent = (uint8_t *)CreateItem(name, army, rec->child, pt,
@@ -12432,7 +12433,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, uint32_t at,
     o = (uint8_t *)am2_malloc(AM2_ITEM_BYTES);
     memset(o, 0, AM2_ITEM_BYTES);
 
-    if (!InitObjFromAai(o, name, army, slot, at, orFlags, remote,
+    if (!InitObjFromAai(o, name, army, slot, *(uint32_t *)&at, orFlags, remote,
                         (int32_t)uid, 0)) {
         am2_free(o);
         return (void *)0;
@@ -14126,13 +14127,13 @@ void __cdecl CreateWatchedItem(int32_t unused, void *obj, uint32_t at,
                                uint8_t facing)
 {
     uint8_t *o = (uint8_t *)obj;
-    uint32_t point;
+    AM2_Point point;
     void    *item;
 
     /* `at` is a packed point, read a half at a time from its slot. */
-    ((int16_t *)&point)[0] = (int16_t)(((const AM2_Point *)&at)->x
+    point.x = (int16_t)(((const AM2_Point *)&at)->x
                                        - (int32_t)(Cos8(facing) * AM2_WATCH_DROP_SCALE));
-    ((int16_t *)&point)[1] = (int16_t)(((const AM2_Point *)&at)->y
+    point.y = (int16_t)(((const AM2_Point *)&at)->y
                                        - (int32_t)(Sin8(facing) * AM2_WATCH_DROP_SCALE));
 
     item = CreateItem((char *)(uintptr_t)ADDR_DIR_SCRATCH,
@@ -14142,7 +14143,7 @@ void __cdecl CreateWatchedItem(int32_t unused, void *obj, uint32_t at,
     if (item == 0)
         return;
 
-    ItemPostCreate(*(const int8_t *)(o + OBJ_OFF_ARMY), point);
+    ItemPostCreate(*(const int8_t *)(o + OBJ_OFF_ARMY), *(uint32_t *)&point);
 
     *(uint8_t *)((uint8_t *)item + 0x65u) = *(const uint8_t *)(o + 0x65u);
     ObjTileChanged(item, *(const int8_t *)((uint8_t *)item + 0x65u), 1);
@@ -14173,7 +14174,7 @@ void __cdecl CreateWatchedType(int32_t unused, void *obj, uint32_t at,
     item = CreateItem((char *)(uintptr_t)ADDR_DIR_SCRATCH,
                       *(const int8_t *)(o + OBJ_OFF_ARMY),
                       *(const int32_t *)(uintptr_t)ADDR_WATCHED_TYPE_ID,
-                      *(uint32_t *)&point, 1, 0, 0);
+                      point, 1, 0, 0);
     if (item == 0)
         return;
 

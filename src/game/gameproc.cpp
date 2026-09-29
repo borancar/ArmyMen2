@@ -1972,7 +1972,7 @@ void *__cdecl LoadType1(am2_FILE *fp, const void *hdr)
     obj = (uint8_t *)CreateItem(
         (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), AM2_ARMY_NEUTRAL,
         (int32_t)tag,
-        *(const int32_t *)((const uint8_t *)hdr + OBJ_OFF_POS),
+        *(const AM2_Point *)((const uint8_t *)hdr + OBJ_OFF_POS),
         *(const int32_t *)((const uint8_t *)hdr + OBJ_OFF_FLAGS), 1,
         *(const uint32_t *)((const uint8_t *)hdr + 4));
     if (!obj)

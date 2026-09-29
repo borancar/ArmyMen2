@@ -767,7 +767,8 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
                         && kind <= AM2_PILLBOX_KIND_LAST)
                        ? (int32_t)OBJ_FLAG_SHOT_PROOF : 0;
 
-        made = (uint8_t *)CreateItem((char *)name, slot, key, where, flag,
+        made = (uint8_t *)CreateItem((char *)name, slot, key,
+                                     *(AM2_Point *)&where, flag,
                                      0, 0);
 
         if (made)
