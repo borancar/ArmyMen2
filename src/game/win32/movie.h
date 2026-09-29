@@ -17,6 +17,11 @@ struct AM2_Movie {
     static void operator delete(void *p);
 #endif
     void __attribute__((thiscall)) MovieStop();
+    /* MovieStop is the destructor's body -- it re-stamps the vtable first,
+     * as a destructor does -- and the original's teardowns are `delete`:
+     * test, the stop, then operator delete. Inline, so the delete sites
+     * call MovieStop by name. */
+    ~AM2_Movie() { MovieStop(); }
     /* 0x00445170, in the movie's own address band and called with the movie
      * in ecx: a member that ignores `this`. Defined in palette.cpp. */
     void __attribute__((thiscall)) SnapshotSystemPalette();

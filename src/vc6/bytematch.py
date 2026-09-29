@@ -207,7 +207,22 @@ def manifest():
                         + m.group(3))
                 out.append((os.path.relpath(path, REPO), name,
                             addr[m.group(1)]))
+    # Callbacks the game hands to someone else (tools/coverage.py's
+    # REGISTERED): reconstructed and never patched, since nothing calls the
+    # image address -- but a relink that does not know where they live
+    # leaves every reference to them unresolved.
+    for sym, rel, name in REGISTERED_FNS:
+        if sym in addr:
+            out.append((rel, name, addr[sym]))
     return out
+
+
+REGISTERED_FNS = [
+    ("ADDR_WND_PROC", "src/game/win32/winproc.cpp", "WndProc"),
+    ("ADDR_AUDIO_TIMER_PROC", "src/game/win32/audio.cpp", "AudioTimerProc"),
+    ("ADDR_MEDKIT_HEAL_ONE", "src/game/item.cpp", "MedkitHealOne"),
+    ("ADDR_MOVIE_TIMER_PROC", "src/game/win32/movie.cpp", "MovieTimerProc"),
+]
 
 # ---- compile ------------------------------------------------------------
 

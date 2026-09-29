@@ -4808,48 +4808,8 @@ static void __cdecl NotifyHealed(void *obj, void *src)
 /* Defined below, beside the rest of the animation family. */
 int32_t __cdecl ChangeObjectFrame(void *obj, int32_t frame, int32_t flag);
 
-/* Our leader, the way every pointer handler in this band gets it -- including
- * the fallback that cannot run. See ADDR_POINTER_SELECT's note in orig.h: the
- * original inlines this at eight sites and VC6 folds the second load of
- * ADDR_DEFAULT_OWNER, so the scan is unreachable at every one of them. Written
- * once here rather than eight times, which is the one liberty taken with it.
- *
- * NOT A FUNCTION IN THE ORIGINAL -- it is inlined at all eight sites, so there
- * is no address to patch and nothing to install. It lives here rather than in
- * widget.cpp because the medkit heal below needs it as well. */
-uint8_t *__cdecl OurLeaderUnit(void)
-{
-    int32_t owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+/* OurLeaderUnit is item.h's: the original inlines it at every site. */
 
-    if (owner != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
-        /* Dead. The NULL check lives in here, which is why the live path
-         * below has none. */
-        const uint8_t *list;
-        int32_t        i;
-
-        if (owner < 0 || owner >= AM2_COMM_SLOTS)
-            return (uint8_t *)0;
-
-        list = (const uint8_t *)
-            ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
-
-        for (i = 0; i < *(const int32_t *)(list + LIST_OFF_COUNT); i++) {
-            uint8_t *o = (uint8_t *)LookupByUID(
-                (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
-
-            if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
-                && *(const int32_t *)(o + OBJ_OFF_SARGE))
-                return o;
-
-            list = (const uint8_t *)
-                ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
-        }
-        return (uint8_t *)0;
-    }
-
-    return (uint8_t *)LookupByUID(
-        *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
-}
 
 /* MedkitHealOne -- original 0x00458AB0, 160 bytes, four call sites in the trooper
  * band. Heal one trooper by the MEDKIT definition's percentage.
@@ -4874,17 +4834,16 @@ uint8_t *__cdecl OurLeaderUnit(void)
  * absence is safe rather than latent, and it is reproduced either way. */
 void __cdecl MedkitHealOne(void *obj)
 {
-    const uint8_t *def;
-
     if (!obj)
         return;
-    if (*(const int32_t *)obj != AM2_OBJ_TYPE_TROOPER)
+    if (!ObjIsType2Inline(obj))
         return;
 
-    def = (const uint8_t *)MissileDefFind(
-              AM2_ITEM_KIND_MEDKIT);
-
-    HealObject(obj, *(const int32_t *)(def + MISSILEDEF_OFF_HEAL_PCT),
+    /* Right to left: the leader is found before the definition. */
+    HealObject(obj,
+               *(const int32_t *)((const uint8_t *)MissileDefFind(
+                                      AM2_ITEM_KIND_MEDKIT)
+                                  + MISSILEDEF_OFF_HEAL_PCT),
                OurLeaderUnit());
 }
 

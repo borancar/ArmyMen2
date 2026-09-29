@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1130 of
-  1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1132 of
+  1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1130:
+  the near-miss sweep, 758 before the row pools. From 758 to 1132:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -263,6 +263,13 @@ main result so far (details in `src/vc6/README.md`):
     every original call site for arguments pushed from a register last
     written by a 16- or 8-bit move finds these, once it recognises
     `xor r,r; mov r8, ...` as zero-extension (that idiom means `int`).
+  - **Callbacks the game hands to someone else are measured too**: WndProc,
+    AudioTimerProc, MedkitHealOne and MovieTimerProc are registered rather
+    than patched, so the relink's manifest never listed them and every
+    reference to them stayed unresolved (`push 0` where the image pushes the
+    address). `bytematch.REGISTERED_FNS` adds them -- five more functions
+    counted, two matching. OurLeaderUnit, which the image inlines at every
+    site, is `static inline` in item.h.
   - **Two `else` arms storing the same value are one block in the image**:
     HudSargeUpdate's `-1` store is reached from two tests, and writing both
     arms is what puts the loop pointer's bias back on the record's start.

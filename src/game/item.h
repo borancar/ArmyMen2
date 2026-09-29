@@ -12,6 +12,7 @@
 #include "../inject/orig.h"   /* am2_FILE, for the savegame pair */
 #include "image.h"       /* AM2_IMAGE -- the two seams below */
 #include "dist.h"        /* AM2_Point */
+#include "objtable.h"    /* LookupByUID, for OurLeaderUnit */
 
 #ifdef __cplusplus
 extern "C" {
@@ -169,9 +170,41 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
  * the percentage and go to full; nothing at or below zero health is healed. */
 void __cdecl HealObject(void *obj, int32_t pct, void *src);
 
-/* NOT a function in the original -- it is inlined at eight sites, dead fallback
- * and all. Our leader, or NULL. See item.cpp. */
-uint8_t *__cdecl OurLeaderUnit(void);
+/* Our leader, the way every pointer handler in this band gets it -- including
+ * the fallback that cannot run. See ADDR_POINTER_SELECT's note in orig.h: the
+ * original inlines this at eight sites and VC6 folds the second load of
+ * ADDR_DEFAULT_OWNER, so the scan is unreachable at every one of them. Written
+ * once here rather than eight times, which is the one liberty taken with it.
+ *
+ * NOT A FUNCTION IN THE ORIGINAL -- it is inlined at all eight sites, so there
+ * is no address to patch and nothing to install. `static inline` here, so it
+ * is expanded at the widget sites and in MedkitHealOne as the original has it. */
+static inline uint8_t *OurLeaderUnit(void)
+{
+    int32_t owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+
+    if (owner == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+        return (uint8_t *)LookupByUID(
+            *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
+
+    /* Dead. The NULL check lives in here, which is why the live path above
+     * has none. The army's list is re-read through its slot each time. */
+    if (owner >= 0 && owner < AM2_COMM_SLOTS) {
+        const uint8_t *const *slot =
+            &((const uint8_t *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
+        int32_t i;
+
+        for (i = 0; i < *(const int32_t *)(*slot + LIST_OFF_COUNT); i++) {
+            uint8_t *o = (uint8_t *)LookupByUID(
+                (*(const uint32_t *const *)(*slot + LIST_OFF_UIDS))[i]);
+
+            if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
+                && *(const int32_t *)(o + OBJ_OFF_SARGE))
+                return o;
+        }
+    }
+    return (uint8_t *)0;
+}
 
 /* 0x00458AB0, four call sites. Heal a trooper by the MEDKIT definition's
  * percentage, crediting our leader as the source. */

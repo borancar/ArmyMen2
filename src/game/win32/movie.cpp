@@ -317,48 +317,34 @@ void __attribute__((thiscall)) AM2_Movie::MovieApplyPalette(LPDIRECTDRAWSURFACE 
  * it and the game would otherwise sit on a still frame forever. */
 int32_t __attribute__((thiscall)) AM2_Movie::MovieStart(void *arg)
 {
-    void *movie = this;
+    void   *movie = this;
+    int32_t r = 0;
 
     (void)arg;
 
-    if (!fld(movie, MOVIE_SMACK, void *))
-        return 0;
-    if (fld(movie, MOVIE_TIMER_RUN, int32_t))
-        return 0;
-    fld(movie, MOVIE_TIMER_RUN, int32_t) = 1;
+    if (fld(movie, MOVIE_SMACK, void *) && !fld(movie, MOVIE_TIMER_RUN, int32_t)) {
+        fld(movie, MOVIE_TIMER_RUN, int32_t) = 1;
 
-    /* Slot 0 of the current movie's own table, called without `this` -- the
-     * same shape as the paint object in winproc.cpp. Two dereferences: the
-     * global holds the object, the object begins with its table. */
-    {
-        void              *current = g_movieCurrent;
-        am2_movie_slot_fn *vtbl    = *(am2_movie_slot_fn **)current;
+        /* Slot 0 of the current movie's own table, a thiscall on it. */
+        ObjVPoll(g_movieCurrent);
 
-        vtbl[0]();
-    }
+        fld(movie, MOVIE_TIMER_ID, UINT) =
+            timeSetEvent(MOVIE_TIMER_MS, MOVIE_TIMER_RES,
+                         MovieTimerProc, 0,
+                         TIME_PERIODIC);
 
-    fld(movie, MOVIE_TIMER_ID, UINT) =
-        timeSetEvent(MOVIE_TIMER_MS, MOVIE_TIMER_RES,
-                     MovieTimerProc, 0,
-                     TIME_PERIODIC);
-
-    if (fld(movie, MOVIE_TIMER_ID, UINT)) {
-        fld(movie, MOVIE_ACTIVE, int32_t) = 1;
-        return 1;
-    }
-
-    /* No timer, so no movie. Tear it down and let the game carry on. */
-    {
-        void *current = g_movieCurrent;
-
-        if (current) {
-            ::MovieStop(current);
-            orig_delete(current);
+        if (!fld(movie, MOVIE_TIMER_ID, UINT)) {
+            /* No timer, so no movie. Tear it down and let the game carry
+             * on. */
+            delete (AM2_Movie *)g_movieCurrent;
+            g_movieCurrent = NULL;
+            PostMessageA(g_hWnd, AM2_WM_STATE_ABORT, 0, 0);
+            return 0;
         }
-        g_movieCurrent = NULL;
+        fld(movie, MOVIE_ACTIVE, int32_t) = 1;
+        r = 1;
     }
-    PostMessageA(g_hWnd, AM2_WM_STATE_ABORT, 0, 0);
-    return 0;
+    return r;
 }
 
 /* Original: 0x00444FC0, 1 call site. Open a .SMK and get ready to play it.
@@ -634,10 +620,7 @@ void __cdecl StateLeave(void)
         MovieForget();
 
         movie = *(void **)(uintptr_t)ADDR_STATE_MOVIE;
-        if (movie) {
-            MovieStop(movie);
-            orig_delete(movie);
-        }
+        delete (AM2_Movie *)movie;
         *(void **)(uintptr_t)ADDR_STATE_MOVIE = (void *)0;
     }
 
