@@ -1265,14 +1265,15 @@ int32_t __cdecl TileAttrAt(uint32_t tile)
 void *__cdecl ObjectsAtPoint(const uint32_t *pt, const void *desc)
 {
     const uint8_t *d    = (const uint8_t *)desc;
-    int32_t        cols = *(const int32_t *)(d + MAPDESC_OFF_COLS);
     int32_t        cx   = (int32_t)*(const int16_t *)pt >> AM2_CELL_SHIFT;
     int32_t        cy   = (int32_t)*((const int16_t *)pt + 1) >> AM2_CELL_SHIFT;
     uint8_t       *head = (uint8_t *)0;
     uint8_t       *node;
 
-    if (cx < 0 || cx > cols - 1 || cy < 0 || cy > cols - 1)
+#define COLS (*(const int32_t *)(d + MAPDESC_OFF_COLS))
+    if (cx < 0 || cx > COLS - 1 || cy < 0 || cy > COLS - 1)
         return (void *)0;
+#undef COLS
 
     node = ((uint8_t *const *)(*(const uint8_t *const *)
                 (d + MAPDESC_OFF_CELLS)))
@@ -1292,13 +1293,15 @@ void *__cdecl ObjectsAtPoint(const uint32_t *pt, const void *desc)
                 continue;
         } else if (!*(void *const *)(o + OBJ_OFF_HIT_MASK)) {
             AM2_Rect box;
-            int32_t  x = *(const int16_t *)(o + OBJ_OFF_POS);
-            int32_t  y = *(const int16_t *)(o + OBJ_OFF_POS + 2);
 
-            box.left   = x + *(const int32_t *)(o + OBJ_OFF_BOX_LEFT);
-            box.top    = y + *(const int32_t *)(o + OBJ_OFF_BOX_TOP);
-            box.right  = x + *(const int32_t *)(o + OBJ_OFF_BOX_RIGHT);
-            box.bottom = y + *(const int32_t *)(o + OBJ_OFF_BOX_BOTTOM);
+            box.left   = *(const int32_t *)(o + OBJ_OFF_BOX_LEFT)
+                         + *(const int16_t *)(o + OBJ_OFF_POS);
+            box.right  = *(const int32_t *)(o + OBJ_OFF_BOX_RIGHT)
+                         + *(const int16_t *)(o + OBJ_OFF_POS);
+            box.top    = *(const int32_t *)(o + OBJ_OFF_BOX_TOP)
+                         + *(const int16_t *)(o + OBJ_OFF_POS + 2);
+            box.bottom = *(const int32_t *)(o + OBJ_OFF_BOX_BOTTOM)
+                         + *(const int16_t *)(o + OBJ_OFF_POS + 2);
 
             if (!PointInRect(&box, (const AM2_Point *)pt))
                 continue;
@@ -10416,7 +10419,7 @@ void __cdecl NearestClearPoint(uint32_t from, void *outPt)
             step = 0;
             if (++dir > 3)
                 dir = 0;
-            if (grew) {
+            if (grew == 1) {
                 leg++;
                 grew = 0;
             } else {

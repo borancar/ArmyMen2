@@ -3833,14 +3833,15 @@ void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx)
  * reader diffing against the disassembly should find both. */
 static inline void AiPromoteFound(uint8_t *o, uint8_t *c)
 {
-    uint8_t *found = *(uint8_t **)(c + SIGHT_OFF_FOUND);
-
-    if (!found)
+    /* The found slot is read afresh for each use. */
+#define FOUND (*(uint8_t **)(c + SIGHT_OFF_FOUND))
+    if (!FOUND)
         return;
 
     *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-        ((const AM2_Object *)found)->uid;
-    *(uint8_t **)(c + SIGHT_OFF_OBSERVER) = found;
+        ((const AM2_Object *)FOUND)->uid;
+    *(uint8_t **)(c + SIGHT_OFF_OBSERVER) = FOUND;
+#undef FOUND
     *(int32_t *)(c + SIGHT_OFF_RANGE) =
         *(const int32_t *)(c + SIGHT_OFF_FOUND_RANGE);
     *(c + SIGHT_OFF_BEARING) = *(const uint8_t *)(c + SIGHT_OFF_FOUND_BEARING);
@@ -3886,7 +3887,7 @@ void __cdecl AiStepDefend(void *obj, void *out, void *ctx)
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
-        if (hit) {
+        if (hit > 0) {
             if (!*(const void *const *)(c + SIGHT_OFF_OBSERVER))
                 w[1] = hit;
             *(o + OBJ_OFF_HIT_DIR) = 0;
@@ -3949,7 +3950,7 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
-        if (hit) {
+        if (hit > 0) {
             if (!*(const void *const *)(c + SIGHT_OFF_OBSERVER))
                 w[1] = hit;
             *(o + OBJ_OFF_HIT_DIR) = 0;
@@ -5434,30 +5435,30 @@ void __cdecl AiStepFollow(void *obj, void *out, void *ctx)
     uint8_t *o = (uint8_t *)obj;
     uint8_t *w = (uint8_t *)out;
     uint8_t *c = (uint8_t *)ctx;
-    int32_t  move;
 
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
         *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
-    move = *(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE) > AM2_AI_FOLLOW_SLACK;
-    if (!move) {
-        const uint8_t *leader =
-            *(const uint8_t *const *)(c + SIGHT_OFF_LEADER);
-
-        if (leader
-            && PointsDiffer(*(const uint32_t *)(leader + OBJ_OFF_POS),
-                            *(const uint32_t *)(leader + OBJ_OFF_PREV_POS)))
-            move = 1;
-    }
-
-    if (move) {
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(c + SIGHT_OFF_DEST);
-        AiRouteToward(obj, out, ctx, 0);
-    } else {
+    /* Two tests, each ending in the same route call -- one block in the
+     * image, which both reach. */
+#define LEADER (*(const uint8_t *const *)(c + SIGHT_OFF_LEADER))
+#define ROUTE() do { \
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = \
+            *(const uint32_t *)(c + SIGHT_OFF_DEST); \
+        AiRouteToward(obj, out, ctx, 0); \
+    } while (0)
+    if (*(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE) > AM2_AI_FOLLOW_SLACK)
+        ROUTE();
+    else if (LEADER
+             && PointsDiffer(*(const uint32_t *)(LEADER + OBJ_OFF_POS),
+                             *(const uint32_t *)(LEADER + OBJ_OFF_PREV_POS)))
+        ROUTE();
+    else {
+#undef LEADER
+#undef ROUTE
         uint8_t hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
 
-        if (hit) {
+        if (hit > 0) {
             if (!*(const void *const *)(c + SIGHT_OFF_OBSERVER))
                 w[1] = hit;
             *(o + OBJ_OFF_HIT_DIR) = 0;
