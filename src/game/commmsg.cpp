@@ -1796,7 +1796,7 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
         }
         if ((int32_t)part >= total) {
             am2_log("Received Bogus Length Message, part greater than sum\n");
-            return;
+            break;          /* into the loop's own exit, as the image has it */
         }
 
         ReceiveArmyMsg(p, slot, *(const int32_t *)(pkt + PACKET_OFF_SEQ));

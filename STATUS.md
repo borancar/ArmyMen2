@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1337 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1338 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1337:
+  the near-miss sweep, 758 before the row pools. From 758 to 1338:
   - **A member array re-read after every store** (KeyRowUpdate): the
     dialog's row pointers are `parent->rows[i]` through a typed struct, not a
     local `rows[i]` copy -- the image reloads the element after each store.

@@ -1259,52 +1259,77 @@ int32_t __cdecl ScriptParseValue(AM2_ScriptCtx *ctx, int32_t *at,
 {
     AM2_ScriptTok *tok = &ctx->tokens[*at];
 
-    if (tok->kind == AM2_TOKEN_RESERVED) {
-        int32_t id = (int32_t)(uintptr_t)tok->value;
-        /* `form` doubles as the flag for "this id IS a keyword form", so
-         * zero means none and is tested as such below -- it is not
-         * AM2_VAL_LITERAL, which the fall-through path sets instead. */
-        int32_t form = 0, names = 0, armies = 0;
-
-        switch (id) {
-        case AM2_TOK_GETDMGLVL:     form = AM2_VAL_GETDMGLVL;    names  = 1; break;
-        case AM2_TOK_GETHEALTH:     form = AM2_VAL_GETHEALTH;    names  = 1; break;
-        case AM2_TOK_GETDISGUISE:   form = AM2_VAL_GETDISGUISE;  names  = 1; break;
-        case AM2_TOK_HASITEM:       form = AM2_VAL_HASITEM;      names  = 2; break;
-        case AM2_TOK_ISCOLORINGAME: form = AM2_VAL_ISCOLORINGAME; armies = 1; break;
-        case AM2_TOK_ISALLY:        form = AM2_VAL_ISALLY;       armies = 2; break;
-        case AM2_TOK_TEAMSCORE:     form = AM2_VAL_TEAMSCORE;    armies = 1; break;
-        default: form = 0; break;
-        }
-
-        if (form) {
-            if (++(*at) >= ctx->count) {
-                am2_log("Unexpected end of script.\n");
-                return 0;
-            }
-            /* The failures below are silent: the callee has already said
-             * whatever it is going to say. */
-            if (names >= 1 && !ScriptResolveName(ctx, at, a, 0))
-                return 0;
-            if (names >= 2 && !ScriptResolveName(ctx, at, b, 0))
-                return 0;
-            if (armies >= 1)
-                *a = ScriptArmyColour(ctx, at);
-            if (armies >= 2)
-                *b = ScriptArmyColour(ctx, at);
-            *kind = form;
-            return 1;
-        }
+    /* One arm per keyword form, each testing the token afresh and each with
+     * its own exits -- the image's layout. A keyword's failures are silent:
+     * the callee has already said whatever it is going to say. */
+#define IS_KEYWORD(id) (tok->kind == AM2_TOKEN_RESERVED \
+                        && (int32_t)(uintptr_t)tok->value == (id))
+#define STEP_OR_FAIL()                                                      \
+    if (++(*at) >= ctx->count) {                                            \
+        am2_log("Unexpected end of script.\n");                             \
+        return 0;                                                           \
     }
+    if (IS_KEYWORD(AM2_TOK_GETDMGLVL)) {
+        STEP_OR_FAIL();
+        if (!ScriptResolveName(ctx, at, a, 0))
+            return 0;
+        *kind = AM2_VAL_GETDMGLVL;
+        return 1;
+    }
+    if (IS_KEYWORD(AM2_TOK_GETHEALTH)) {
+        STEP_OR_FAIL();
+        if (!ScriptResolveName(ctx, at, a, 0))
+            return 0;
+        *kind = AM2_VAL_GETHEALTH;
+        return 1;
+    }
+    if (IS_KEYWORD(AM2_TOK_GETDISGUISE)) {
+        STEP_OR_FAIL();
+        if (!ScriptResolveName(ctx, at, a, 0))
+            return 0;
+        *kind = AM2_VAL_GETDISGUISE;
+        return 1;
+    }
+    if (IS_KEYWORD(AM2_TOK_HASITEM)) {
+        STEP_OR_FAIL();
+        if (!ScriptResolveName(ctx, at, a, 0))
+            return 0;
+        if (!ScriptResolveName(ctx, at, b, 0))
+            return 0;
+        *kind = AM2_VAL_HASITEM;
+        return 1;
+    }
+    if (IS_KEYWORD(AM2_TOK_ISCOLORINGAME)) {
+        STEP_OR_FAIL();
+        *a = ScriptArmyColour(ctx, at);
+        *kind = AM2_VAL_ISCOLORINGAME;
+        return 1;
+    }
+    if (IS_KEYWORD(AM2_TOK_ISALLY)) {
+        STEP_OR_FAIL();
+        *a = ScriptArmyColour(ctx, at);
+        *b = ScriptArmyColour(ctx, at);
+        *kind = AM2_VAL_ISALLY;
+        return 1;
+    }
+    if (IS_KEYWORD(AM2_TOK_TEAMSCORE)) {
+        STEP_OR_FAIL();
+        *a = ScriptArmyColour(ctx, at);
+        *kind = AM2_VAL_TEAMSCORE;
+        return 1;
+    }
+#undef STEP_OR_FAIL
+#undef IS_KEYWORD
 
-    /* An integer literal or a variable. */
-    int32_t isliteral = 0;
-    if (!ScriptIntOrVar(ctx, at, a, &isliteral)) {
+    /* An integer literal or a variable. The is-literal flag comes back in
+     * `a`'s own argument slot -- dead once its value is passed -- which is
+     * where the image keeps it. */
+    if (!ScriptIntOrVar(ctx, at, a, (int32_t *)&a)) {
         am2_log("Line [%4d]:  Unrecognized operand in testvar clause.\n",
                 ctx->tokens[*at].line);
         return 0;
     }
-    *kind = isliteral ? AM2_VAL_LITERAL : AM2_VAL_VARIABLE;
+    *kind = *(const int32_t *)&a ? AM2_VAL_LITERAL : AM2_VAL_VARIABLE;
     return 1;
 }
 
