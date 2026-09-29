@@ -330,13 +330,18 @@ void __cdecl FreeRoachAnims(void)
 
 void __cdecl FreeSoldierAnims(void)
 {
-    int32_t i;
-
     /* Nine calls written out in the original, one per table. rifleman is
      * first, so it is freed BEFORE the eight that borrow from it -- which is
      * safe only because a borrowed entry is skipped. */
-    for (i = 0; i < AM2_SOLDIER_ANIM_TABLES; i++)
-        FreeAnimTable(&g_soldierAnims[i]);
+    FreeAnimTable(&g_soldierAnims[0]);
+    FreeAnimTable(&g_soldierAnims[1]);
+    FreeAnimTable(&g_soldierAnims[2]);
+    FreeAnimTable(&g_soldierAnims[3]);
+    FreeAnimTable(&g_soldierAnims[4]);
+    FreeAnimTable(&g_soldierAnims[5]);
+    FreeAnimTable(&g_soldierAnims[6]);
+    FreeAnimTable(&g_soldierAnims[7]);
+    FreeAnimTable(&g_soldierAnims[8]);
 }
 
 void __cdecl FreeVehicleAnims(void)

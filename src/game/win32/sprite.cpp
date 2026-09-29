@@ -347,7 +347,7 @@ int32_t __cdecl SpriteSlotOf(uint32_t id)
  * `image` is a DirectDraw surface and has to be Released, where anything else
  * means RLE pixel data on the game's heap and has to be freed. Getting that
  * backwards would either leak a surface or hand a COM object to free(). */
-static void FreeSpriteContents(AM2_Sprite *spr)
+static inline void FreeSpriteContents(AM2_Sprite *spr)
 {
     if (spr->image.surface) {
         if (spr->format == 0)
@@ -385,30 +385,32 @@ void __cdecl ReleaseSprite(AM2_Sprite *spr)
      * and nothing to unhook -- it just goes. */
     if (spr->id != 0xFFFFFFFFu) {
         slot = SpriteSlotOf(spr->id);
-        if (slot < 0) {
-            orig_log("Error in release: Sprite not found!\n");
-        } else if (g_spriteTable[slot] != spr) {
-            /* The slot holds something other than us. Complain only if it
-             * holds SOMETHING -- an empty slot is an ordinary double release
-             * and is silent.
-             *
-             * The condition is on the slot's occupant, not on this sprite.
-             * This read `spr->refs != 0` until the shutdown path was driven
-             * for the first time and produced "Error in release: Wrong
-             * sprite!" where the original produced nothing: the original
-             * tests the register still holding `table[slot]` from the compare
-             * immediately above, and I had misread it as the reference count
-             * and then written a plausible comment explaining the wrong
-             * behaviour. Nothing reaches this path before shutdown, which is
-             * why it survived every A/B until the teardown was exercised. */
-            if (g_spriteTable[slot] != NULL)
-                orig_log("Error in release: Wrong sprite!\n");
+        if (slot >= 0) {
+            if (g_spriteTable[slot] == spr) {
+                if (spr->refs > 0)
+                    spr->refs--;
+                if (spr->refs > 0)
+                    return;              /* still wanted elsewhere */
+                g_spriteTable[slot] = NULL;
+            } else {
+                /* The slot holds something other than us. Complain only if it
+                 * holds SOMETHING -- an empty slot is an ordinary double release
+                 * and is silent.
+                 *
+                 * The condition is on the slot's occupant, not on this sprite.
+                 * This read `spr->refs != 0` until the shutdown path was driven
+                 * for the first time and produced "Error in release: Wrong
+                 * sprite!" where the original produced nothing: the original
+                 * tests the register still holding `table[slot]` from the compare
+                 * immediately above, and I had misread it as the reference count
+                 * and then written a plausible comment explaining the wrong
+                 * behaviour. Nothing reaches this path before shutdown, which is
+                 * why it survived every A/B until the teardown was exercised. */
+                if (g_spriteTable[slot] != NULL)
+                    orig_log("Error in release: Wrong sprite!\n");
+            }
         } else {
-            if (spr->refs > 0)
-                spr->refs--;
-            if (spr->refs > 0)
-                return;              /* still wanted elsewhere */
-            g_spriteTable[slot] = NULL;
+            orig_log("Error in release: Sprite not found!\n");
         }
     }
 

@@ -893,21 +893,21 @@ BOOL FAR PASCAL EnumConnectionsCb(LPCGUID lpguidSP, LPVOID lpConnection,
 
 int32_t __attribute__((thiscall)) AM2_Comm::CommEnumConnections(void *list)
 {
-    void *comm = this;
+    void    *comm = this;
+    HRESULT  hr;
 
-    LPDIRECTPLAY4A dp = *DirectPlaySlot(comm);
-    const GUID    *app;
-    HRESULT        hr;
-
-    if (!dp)
+    /* The DirectPlay pointer is read again for the call: the store to the
+     * list global between the two is what makes VC6 reload it. */
+    if (!*DirectPlaySlot(comm))
         return 0;
 
     /* As with the session browser, the callback finds the list here rather
      * than through lpContext, which carries something else. */
     g_connectionList = list;
 
-    app = *(const GUID **)((uint8_t *)comm + COMM_OFF_APP_GUID);
-    hr = IDirectPlayX_EnumConnections(dp, app,
+    hr = IDirectPlayX_EnumConnections(*DirectPlaySlot(comm),
+                                      *(const GUID **)((uint8_t *)comm
+                                                       + COMM_OFF_APP_GUID),
                                       EnumConnectionsCb,
                                       g_enumContext, 0);
     if (hr != DP_OK)
@@ -2330,17 +2330,13 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommDropSession()
 
 int32_t __attribute__((thiscall)) AM2_Comm::CommSlotOfId(uint32_t id)
 {
-    void *comm = this;
-
-    const uint8_t *p = g_commObject + AM2_PLAYER_ID;
-    int32_t        n = *(const int32_t *)(g_commObject + COMM_OFF_PLAYER_COUNT);
+    /* The original ignores `this` and uses the global. */
+    const uint8_t *comm = g_commObject;
     int32_t        i;
 
-    (void)comm;   
-
-/* the original ignores `this` and uses the global */
-    for (i = 0; i < n; i++, p += AM2_PLAYER_STRIDE)
-        if (*(const uint32_t *)p == id)
+    for (i = 0; i < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT); i++)
+        if (*(const uint32_t *)(comm + i * AM2_PLAYER_STRIDE + AM2_PLAYER_ID)
+            == id)
             return i;
     return 0;
 }

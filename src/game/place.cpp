@@ -135,12 +135,11 @@ void __cdecl AddPlacement(const AM2_Placement *rec)
  * this game type does not allow is refused however many points are left. */
 int32_t __cdecl CanAffordUnit(int32_t type, int32_t points)
 {
-    const uint8_t *rec = kUnitType(type);
-
-    if (!(*(const uint32_t *)(rec + UNIT_TYPE_OFF_GAME_MASK) & g_gameSetting22C))
+    if (!(*(const uint32_t *)(kUnitType(type) + UNIT_TYPE_OFF_GAME_MASK)
+          & g_gameSetting22C))
         return 0;
 
-    return points >= *(const int32_t *)(rec + UNIT_TYPE_OFF_COST);
+    return points >= *(const int32_t *)(kUnitType(type) + UNIT_TYPE_OFF_COST);
 }
 
 /* 0x0043A560. The colour index is the comm slot's own army field, read inline

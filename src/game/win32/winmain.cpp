@@ -839,14 +839,14 @@ uint32_t __cdecl Ticks(void)
     LARGE_INTEGER  now;
     int64_t        delta;
 
-    if (*freq <= 0)
-        return GetTickCount();
-
-    QueryPerformanceCounter(&now);
-    delta = now.QuadPart - *(const int64_t *)(uintptr_t)ADDR_PERF_START;
-    return (uint32_t)(int64_t)((long double)delta
-                               * (long double)*(const double *)
-                                     (uintptr_t)ADDR_PERF_PERIOD);
+    if (*freq > 0) {
+        QueryPerformanceCounter(&now);
+        delta = now.QuadPart - *(const int64_t *)(uintptr_t)ADDR_PERF_START;
+        return (uint32_t)(int64_t)((long double)delta
+                                   * (long double)*(const double *)
+                                         (uintptr_t)ADDR_PERF_PERIOD);
+    }
+    return GetTickCount();
 }
 
 int winmain_install(void)

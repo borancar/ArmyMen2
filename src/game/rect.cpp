@@ -28,10 +28,11 @@
 AM2_Rect *__cdecl RectSet(AM2_Rect *r, int32_t left, int32_t top,
                           int32_t right, int32_t bottom)
 {
-    r->left   = left;
-    r->top    = top;
-    r->right  = right;
-    r->bottom = bottom;
+    /* Built in a temporary and copied: the original holds all four values
+     * in registers and stores them through a second copy of r. */
+    AM2_Rect tmp = { left, top, right, bottom };
+
+    *r = tmp;
     return r;                   /* callers rely on this -- see rect.h */
 }
 

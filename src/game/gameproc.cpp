@@ -2501,7 +2501,16 @@ void __cdecl Call405220(int32_t a, int32_t b, int32_t c)
 void __cdecl Teardown445F40(const char *msg)
 {
     FreeSpriteRegistry();
+#ifdef _MSC_VER
+    /* The original is `jmp Log` with nothing pushed: Log finds msg in this
+     * function's own argument slot. VC6 tail-jumps a no-argument call, so
+     * that is how it is written for VC6; GCC promises no tail jump, so it
+     * passes msg for real. The two log the same line. */
+    orig_teardown_log0();
+    (void)msg;
+#else
     orig_teardown_log(msg);
+#endif
 }
 
 /* 0x004033E0. Free four things, then log. Two of the four already had names,
@@ -2558,9 +2567,11 @@ void __cdecl FreeArmyObjLists(void)
 
     slot = (void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS;
     for (i = 0; i < AM2_COMM_SLOTS; i++) {
-        if (slot[i]) {
-            ClearPtrListAlias(slot[i]);
-            orig_operator_delete(slot[i]);
+        void *list = slot[i];
+
+        if (list) {
+            ClearPtrListAlias(list);
+            orig_operator_delete(list);
         }
     }
 }

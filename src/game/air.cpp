@@ -995,16 +995,16 @@ void __cdecl AirSupportBegin(void)
 {
     /* The head entry's `extra` decides which of the two shapes runs, and the
      * two do NOT agree about the active flag: only the first sets it. */
-    if (g_airExtra[0]) {
-        g_airFlagA = 1;
-        g_airFlagB = 1;
+    if (!g_airExtra[0]) {
+        PlaySoundAt(AM2_AIR_SOUND, 0, 0, 0, 0);
+        g_airActive = 1;
+        g_airFlagA  = 0;
+        g_airFlagB  = 0;
         return;
     }
 
-    PlaySoundAt(AM2_AIR_SOUND, 0, 0, 0, 0);
-    g_airActive = 1;
-    g_airFlagA  = 0;
-    g_airFlagB  = 0;
+    g_airFlagA = 1;
+    g_airFlagB = 1;
 }
 
 void __cdecl AirSupportClear(void)

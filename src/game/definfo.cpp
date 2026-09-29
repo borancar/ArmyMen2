@@ -196,17 +196,15 @@ int32_t __cdecl DefParseFloat(float *out, const char *tok)
 {
     char *end;
 
-    if (tok == (const char *)0)
-        return 0;
-
-    *out = (float)orig_strtod(tok, &end);
-
-    if (end == tok) {
-        orig_log("Bad or missing number\n");
-        return 0;
+    if (tok != (const char *)0) {
+        *out = (float)orig_strtod(tok, &end);
+        if (end == tok) {
+            orig_log("Bad or missing number\n");
+            return 0;
+        }
+        return 1;
     }
-
-    return 1;
+    return 0;
 }
 
 /* DefParseBoolean -- original 0x0041A2D0, three callers. The third of

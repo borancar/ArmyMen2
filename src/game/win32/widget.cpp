@@ -2253,12 +2253,14 @@ static inline void RequestScreen(int32_t code)
  * DSBVOLUME_MIN -- silence is a special case, not the end of a ramp. The
  * original writes the -2000 out as a literal and compares against it, which
  * is why the test is on the computed value rather than on `pos == 0`. */
-static int32_t BarVolume(const AM2_Widget *bar)
+static inline int32_t BarVolume(const AM2_Widget *bar)
 {
     int32_t pos = *(const int32_t *)((const uint8_t *)bar + SCROLLBAR_OFF_POS);
     int32_t vol = (pos - AM2_SCROLLBAR_RANGE) * 100;
 
-    return vol == -2000 ? DSBVOLUME_MIN : vol;
+    if (vol == -2000)
+        vol = DSBVOLUME_MIN;
+    return vol;
 }
 
 
@@ -10786,7 +10788,7 @@ void __cdecl MpCommitPoints(AM2_Widget *w)
 {
     const uint8_t *comm = (const uint8_t *)g_commObject;
     const AM2_Widget *edit;
-    int32_t           row;
+    int32_t           value;
 
     if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
         return;
@@ -10794,11 +10796,10 @@ void __cdecl MpCommitPoints(AM2_Widget *w)
     edit = *(const AM2_Widget *const *)((const uint8_t *)w + MPFIELD_OFF_EDIT);
     /* The row is read AFTER the atoi, which matters not at all -- but the
      * original reads it there and nothing between the two touches it. */
-    row  = *(const int32_t *)((const uint8_t *)w + MPFIELD_OFF_ROW);
-
-    ((int32_t *)(uintptr_t)ADDR_ARMY_POINTS)[row] =
-        orig_atoi(*(const char *const *)((const uint8_t *)edit
-                                         + EDIT_OFF_TEXT));
+    value = orig_atoi(*(const char *const *)((const uint8_t *)edit
+                                             + EDIT_OFF_TEXT));
+    ((int32_t *)(uintptr_t)ADDR_ARMY_POINTS)
+        [*(const int32_t *)((const uint8_t *)w + MPFIELD_OFF_ROW)] = value;
     SendPlayerMsg(0);
 }
 
@@ -12460,8 +12461,16 @@ void __cdecl OnAudioOk(AM2_Widget *w)
 
     PlaySoundAt(2, 0, 0, 0, 0);
 
+    /* NOT BarVolume: the OK path passes the raw (pos - 20) * 100, so a bar
+     * at the left end commits -2000 here where dragging it played silence. */
     bars = (AM2_Widget *const *)((const uint8_t *)screen + AUDIO_OFF_BARS);
-    ApplyVolumes(BarVolume(bars[0]), BarVolume(bars[1]), BarVolume(bars[2]));
+    ApplyVolumes(
+        (*(const int32_t *)((const uint8_t *)bars[0] + SCROLLBAR_OFF_POS)
+         - AM2_SCROLLBAR_RANGE) * 100,
+        (*(const int32_t *)((const uint8_t *)bars[1] + SCROLLBAR_OFF_POS)
+         - AM2_SCROLLBAR_RANGE) * 100,
+        (*(const int32_t *)((const uint8_t *)bars[2] + SCROLLBAR_OFF_POS)
+         - AM2_SCROLLBAR_RANGE) * 100);
     SetStreamVolume(0, 0);
     ReturnToOptions();
 }

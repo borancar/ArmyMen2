@@ -263,15 +263,13 @@ int32_t __cdecl HeldWeaponCode(void *unit)
     uid = *(const uint32_t *)(u + UNIT_OFF_INVENTORY
                               + (size_t)*(const int32_t *)
                                     (u + UNIT_OFF_INVENTORY_SEL) * 4);
-    if (!uid)
-        return 0;
-
-    obj = (AM2_Object *)LookupByUID(uid);
-    if (!ObjIsType4(obj))
-        return 0;
-
-    return **(const int32_t *const *)((const uint8_t *)obj
-                                      + OBJ_OFF_FIELD_C0);
+    if (uid) {
+        obj = (AM2_Object *)LookupByUID(uid);
+        if (ObjIsType4(obj))
+            return **(const int32_t *const *)((const uint8_t *)obj
+                                              + OBJ_OFF_FIELD_C0);
+    }
+    return 0;
 }
 
 /* 0x0044BAF0, one caller. A unit's class NAME.

@@ -52,14 +52,21 @@ int32_t __cdecl CommMean32(const void *comm)
 }
 
 /* 0x00402EC0. The same mean, by player ID rather than by pointer, and 0 for a
- * player nobody knows. The original inlines the loop rather than calling
- * CommMean32 -- reproduced as a call, because they are the same function and
- * one of them is already checked. */
+ * player nobody knows. The original has CommMean32's loop written out again
+ * here, with the sum zeroed before the lookup. */
 int32_t __cdecl PlayerLatency(uint32_t id)
 {
-    const void *player = FindPlayerById(id);
+    int32_t        sum = 0;
+    int32_t        i;
+    const uint8_t *player = (const uint8_t *)FindPlayerById(id);
+    const int32_t *p;
 
-    return player ? CommMean32(player) : 0;
+    if (!player)
+        return 0;
+    p = (const int32_t *)(player + 0x3A0);
+    for (i = 0; i < 32; i++)
+        sum += p[i];
+    return sum / 32;
 }
 
 #define AM2_RING32_INDEX  0x39C
@@ -173,7 +180,10 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSlotRemote(int16_t slot)
 {
     const uint8_t *rec = (const uint8_t *)this
                          + (uint32_t)(int32_t)slot * AM2_ARMY_STRIDE;
-    int32_t        id  = *(const int32_t *)(rec + AM2_PLAYER_ID);
+    int32_t        id  = *(const int32_t *)((const uint8_t *)this
+                                            + (uint32_t)(int32_t)slot
+                                              * AM2_ARMY_STRIDE
+                                            + AM2_PLAYER_ID);
 
     /* 0 and -1 are both "nobody", which is the convention CLAUDE.md records
      * for this field and which ReceiveGameReadyMsg's loop disagrees with. */

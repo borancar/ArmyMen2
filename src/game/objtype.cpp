@@ -74,11 +74,16 @@ int32_t __cdecl ObjIsType3(const AM2_Object *obj)
 
 int32_t __cdecl ObjIsTypeIn238(const AM2_Object *obj)
 {
-    if (!obj)
-        return 0;
-    /* The original tests 2 <= t <= 3 first, then 8 -- a range check plus one
-     * outlier, which is what a compiler makes of `t == 2 || t == 3 || t == 8`. */
-    return (obj->type == 2 || obj->type == 3 || obj->type == 8) ? 1 : 0;
+    if (obj) {
+        /* A switch: VC6 turns the three cases into 2 <= t <= 3, then 8. */
+        switch ((int32_t)obj->type) {
+        case 2:
+        case 3:
+        case 8:
+            return 1;
+        }
+    }
+    return 0;
 }
 
 /* 0x004574B0 and 0x0045EEB0. The two remaining single-type tests, in the same

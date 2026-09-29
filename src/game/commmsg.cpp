@@ -902,11 +902,11 @@ int32_t __attribute__((thiscall)) AM2_Comm::ArmyInPlay(uint32_t uid)
 
     int32_t army = UidArmy((int32_t)UidOnWire(uid));
 
-    if (army == AM2_PLAYERS_MAX)
-        return 1;
-    return *(const int32_t *)((const uint8_t *)comm
-                              + (uint32_t)army * AM2_PLAYER_STRIDE
-                              + AM2_PLAYER_ACTIVE);
+    if (army != AM2_PLAYERS_MAX)
+        return *(const int32_t *)((const uint8_t *)comm
+                                  + (uint32_t)army * AM2_PLAYER_STRIDE
+                                  + AM2_PLAYER_ACTIVE);
+    return 1;
 }
 
 int32_t __cdecl UidObjKind(uint32_t uid)
@@ -915,12 +915,12 @@ int32_t __cdecl UidObjKind(uint32_t uid)
     int32_t   slot = FindSlot(uid, &insert);
     uint32_t *obj;
 
-    if (slot < 0)
-        return 0;
-    obj = (uint32_t *)g_objTable[slot].obj;
-    if (!obj)
-        return 0;
-    return (int32_t)obj[0];
+    if (slot >= 0) {
+        obj = (uint32_t *)g_objTable[slot].obj;
+        if (obj)
+            return (int32_t)obj[0];
+    }
+    return 0;
 }
 
 typedef void *(__cdecl *AM2_TroopSubFn)(const void *at, int32_t army);
@@ -3288,7 +3288,12 @@ void __cdecl RecvVehicle1E(void *msg)
     if (!ObjIsType4((const AM2_Object *)item))
         return;
 
-    /* The log that is a `ret`; see above. */
+    /* The log that is a `ret`; see above. Emitted only under VC6, where
+     * ADDR_LOG really is the bare `ret`; the injected build patches it into
+     * a varargs logger that must not be handed an object as its format. */
+#ifdef _MSC_VER
+    ((void (__cdecl *)(void *, void *))(uintptr_t)ADDR_LOG)(vehicle, item);
+#endif
 }
 
 /* RecvVehicle24 -- original 0x0045EA30, one caller. Kind 0x24, the receive

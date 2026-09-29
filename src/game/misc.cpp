@@ -238,20 +238,24 @@ int32_t __cdecl ComparePair(const void *a, const void *b)
     return 0;
 }
 
-/* Read out of the byte table at 0x00406988 and the eight arms it selects
- * through 0x00406968; entries that land on the default arm are 0. */
-static const uint8_t kCodeMap[30] = {
-    1, 2, 5, 7, 6, 9, 3, 6, 1, 2, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 6, 7,
-};
-
+/* A switch, which VC6 compiled into the byte table at 0x00406988 selecting
+ * one of eight arms through 0x00406968 -- so both tables are the compiler's
+ * and not data to transcribe. The case order is the arms' order in the
+ * image. */
 int32_t __cdecl MapCode(int32_t code)
 {
-    uint32_t i = (uint32_t)(code - 1);
+    int32_t r = 0;
 
-    if (i > 0x1Du)
-        return 0;
-    return kCodeMap[i];
+    switch (code) {
+    case 1: case 9:          r = 1; break;
+    case 2: case 10:         r = 2; break;
+    case 3:                  r = 5; break;
+    case 6:                  r = 9; break;
+    case 7: case 21:         r = 3; break;
+    case 5: case 8: case 29: r = 6; break;
+    case 4: case 30:         r = 7; break;
+    }
+    return r;
 }
 
 int32_t __cdecl CompareTriple(const void *a, const void *b)

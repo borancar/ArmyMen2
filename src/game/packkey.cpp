@@ -64,7 +64,7 @@ int32_t __cdecl KeyLookupTriple(uint32_t a, uint32_t b, uint32_t c)
 {
     /* The original computes this inline rather than calling PackKey; the
      * arithmetic is identical, overflow included. */
-    return KeyLookup(PackKey(a, b, c));
+    return KeyLookup((((a << 12) + b) << 7) + c);
 }
 
 int packkey_install(void)
