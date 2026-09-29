@@ -534,14 +534,18 @@ void __cdecl State1Enter(void)
                 *(int32_t *)(uintptr_t)ADDR_MP_SESSION = 2;
             }
         } else {
-            int32_t request = *(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST;
-
-            if (request == 7 || request == 9 || request == 13
-                || request == 18) {
-                *(int32_t *)(uintptr_t)ADDR_MENU_MODE    = request;
+            switch (*(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST) {
+            case 7:
+            case 9:
+            case 13:
+            case 18:
+                *(int32_t *)(uintptr_t)ADDR_MENU_MODE    =
+                    *(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST;
                 *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST = 1;
-            } else {
+                break;
+            default:
                 *(int32_t *)(uintptr_t)ADDR_MENU_MODE = AM2_MENU_MODE_TITLE;
+                break;
             }
         }
     }

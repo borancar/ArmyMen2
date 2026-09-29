@@ -553,10 +553,15 @@ void __cdecl DetectCpuSpeed(void)
 
     /* The family test is on the low 16 bits and unsigned; the speed test is
      * signed, and zero passes. */
-    fast = ((uint16_t)family >= MIN_CPU_FAMILY && (mhz > MIN_CPU_MHZ || mhz == 0));
-
-    g_slowMachine = !fast;
-    g_fastMachine = fast;
+    if ((uint16_t)family >= MIN_CPU_FAMILY && (mhz > MIN_CPU_MHZ || mhz == 0)) {
+        fast = 1;
+        g_slowMachine = 0;
+        g_fastMachine = fast;
+    } else {
+        fast = 0;
+        g_slowMachine = 1;
+        g_fastMachine = fast;
+    }
     orig_log("system speed: %d\n", fast);
 
     FreeLibrary(dll);

@@ -764,18 +764,15 @@ int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, void *obj)
     uint8_t *o = (uint8_t *)obj;
 
     if (byName) {
-        const AM2_ScriptName *rec;
-
-        if (sel < 0 || sel >= *(const int32_t *)((void *)(uintptr_t)(ADDR_SCRIPT_NAME_COUNT)))
-            return 0;
-
-        rec = &(*(const AM2_ScriptName *const *)
-                    ((void *)(uintptr_t)(ADDR_SCRIPT_NAMES)))[sel];
-
-        if (rec->type != AM2_NAME_TYPE_REF)
-            return 0;
-
-        return rec->value == (int32_t)((const AM2_Object *)o)->uid;
+#define SCRIPT_NAME(i) ((*(const AM2_ScriptName *const *) \
+                         ((void *)(uintptr_t)(ADDR_SCRIPT_NAMES)))[i])
+        if (sel >= 0 && sel < *(const int32_t *)((void *)(uintptr_t)(ADDR_SCRIPT_NAME_COUNT))) {
+            if (SCRIPT_NAME(sel).type == AM2_NAME_TYPE_REF
+                && SCRIPT_NAME(sel).value == (int32_t)((const AM2_Object *)obj)->uid)
+                return 1;
+        }
+        return 0;
+#undef SCRIPT_NAME
     }
 
     if ((sel & AM2_SEL_TYPE_1OR4)
@@ -794,7 +791,7 @@ int32_t __cdecl ObjMatchesSel(int32_t byName, int32_t sel, void *obj)
 
     if ((sel & AM2_SEL_ARMY_LOCAL)
         && *(const int8_t *)(o + OBJ_OFF_ARMY)
-           != (int8_t)*(const uint32_t *)((void *)(uintptr_t)(ADDR_DEFAULT_OWNER)))
+           != *(const int32_t *)((void *)(uintptr_t)(ADDR_DEFAULT_OWNER)))
         return 0;
     if ((sel & AM2_SEL_ARMY_1) && *(const uint8_t *)(o + OBJ_OFF_ARMY) != 1)
         return 0;

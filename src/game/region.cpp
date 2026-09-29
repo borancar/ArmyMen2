@@ -512,27 +512,20 @@ void __cdecl SetPointRule(void *obj)
  */
 int32_t __cdecl MiddleRegionLink(int32_t region, int32_t to)
 {
-    const AM2_RegionLink *links;
     int32_t               n     = kNLinks(region);
     int32_t               count = 0;
     int32_t               half, i;
 
-    if (n > 0) {
-        links = kLinks(region);
-        for (i = 0; i < n; i++)
-            if (links[i].to == (int16_t)to)
-                count++;
-    }
+    for (i = 0; i < n; i++)
+        if (kLinks(region)[i].to == to)
+            count++;
 
     half = (count + 1) >> 1;
     if (half <= 0)
         return -1;
-    if (n <= 0)
-        return -1;
 
-    links = kLinks(region);
     for (i = 0; i < n; i++) {
-        if (links[i].to == (int16_t)to && --half <= 0)
+        if (kLinks(region)[i].to == to && --half <= 0)
             return i;
     }
 
@@ -8098,11 +8091,12 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
     if (target != (uint8_t *)0) {
         int16_t z;
 
-        spot.at = *(const uint32_t *)(target + OBJ_OFF_POS);
+        spot.at.x = ((const AM2_Point *)(target + OBJ_OFF_POS))->x;
+        spot.at.y = ((const AM2_Point *)(target + OBJ_OFF_POS))->y;
         z = (int16_t)(int8_t)((uint8_t)ObjHeight(target) - AM2_FIRE_HEIGHT_DROP);
 
-        *(uint16_t *)(o + UNIT_OFF_FIRE_X) = (uint16_t)spot.at;
-        *(uint16_t *)(o + UNIT_OFF_FIRE_Y) = (uint16_t)(spot.at >> 16);
+        *(uint16_t *)(o + UNIT_OFF_FIRE_X) = (uint16_t)spot.at.x;
+        *(uint16_t *)(o + UNIT_OFF_FIRE_Y) = (uint16_t)spot.at.y;
         *(int16_t *)(o + UNIT_OFF_FIRE_Z)  = z;
         spot.ground = z;
 
@@ -8147,9 +8141,8 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
                  + (long double)*(const int16_t *)(o + OBJ_OFF_Y));
         }
 
-        spot.at     = *(const uint32_t *)at;
-        spot.ground = *(const int16_t *)(at + 4);
-        fired = FireWeapon(w, o, ObjHeight(o), heading, spot, 0);
+        fired = FireWeapon(w, o, ObjHeight(o), heading,
+                           *(const AM2_FireSpot *)at, 0);
     }
 
     orig_log("FIRE  trooper: %x  weapon: %x  ammo: %d\n",
@@ -10536,17 +10529,15 @@ void __cdecl Step3Drive(void *obj, void *rec)
                 if (aimed != 0) {
                     /* Firing at an OBJECT: the spot is its position and its
                      * ground height, and the heading gets a +/-2 spread. */
-                    spot.at = *(const uint32_t *)(aimed + 0x12u);
+                    *(uint32_t *)&spot.at = *(const uint32_t *)(aimed + 0x12u);
                     spot.ground = *(const int16_t *)(aimed + 0x42u);
-                    spot.pad = 0;
                     fireTarget = aimed;
                     heading = (uint8_t)(*(const uint8_t *)(o + 0x530u)
                                         + (orig_step3_rand() % 5) - 2);
                 } else if (*(const uint16_t *)(r + 0x18u) != 0) {
                     /* Firing at a POINT: same spread, no target object. */
-                    spot.at = *(const uint32_t *)(r + 0x18u);
+                    *(uint32_t *)&spot.at = *(const uint32_t *)(r + 0x18u);
                     spot.ground = *(const int16_t *)(r + 0x1Cu);
-                    spot.pad = 0;
                     fireTarget = 0;
                     heading = (uint8_t)(*(const uint8_t *)(o + 0x530u)
                                         + (orig_step3_rand() % 5) - 2);
@@ -10557,9 +10548,8 @@ void __cdecl Step3Drive(void *obj, void *rec)
                     uint32_t dirs =
                         *(const uint8_t *)(*(uint8_t *const *)animRec + 8);
 
-                    spot.at = *(const uint32_t *)(r + 0x18u);
+                    *(uint32_t *)&spot.at = *(const uint32_t *)(r + 0x18u);
                     spot.ground = *(const int16_t *)(r + 0x1Cu);
-                    spot.pad = 0;
                     fireTarget = 0;
                     heading = (uint8_t)(gunFacing << (8 - dirs));
                 }

@@ -2542,16 +2542,15 @@ void __attribute__((thiscall)) AM2_Comm::CommReopenSession()
     uint8_t *c = (uint8_t *)comm;
     int32_t  i;
 
-    for (i = 0; i < AM2_COMM_SLOTS; ) {
+    for (i = 0; i < AM2_COMM_SLOTS; i++) {
         int32_t id = *(const int32_t *)(c + i * COMM_ARMY_RECORD_SIZE
                                         + AM2_PLAYER_ID);
 
         if (id == -1) {
-            /* No step: the slot is looked at again. See above. */
+            /* Stepped back: the slot is looked at again. See above. */
             ::CommRemovePlayer(comm, id);
-            continue;
+            i--;
         }
-        i++;
     }
 
     if (*(const int32_t *)(c + COMM_OFF_IS_HOST)

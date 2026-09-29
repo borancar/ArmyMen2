@@ -2030,7 +2030,6 @@ int32_t __cdecl SaveType2(am2_FILE *fp, void *obj)
     uint8_t *o = (uint8_t *)obj;
     int32_t  rec, n;
     uint8_t *weapon;
-    uint32_t tag;
 
     if (!o)
         return 0;
@@ -2044,10 +2043,10 @@ int32_t __cdecl SaveType2(am2_FILE *fp, void *obj)
 
     weapon = (uint8_t *)WeaponByUid(
                  *(const uint32_t *)(o + TROOPER_OFF_WEAPON_UID));
-    tag = weapon
-          ? **(const uint32_t *const *)(weapon + OBJ_OFF_FIELD_C0)
-          : 1u;
-    WriteSaveTag(fp, tag);
+    if (weapon)
+        WriteSaveTag(fp, **(const uint32_t *const *)(weapon + OBJ_OFF_FIELD_C0));
+    else
+        WriteSaveTag(fp, 1u);
 
     n = *(const int32_t *)(o + SAVED_OFF_LIST_COUNT);
     if (n > 0)

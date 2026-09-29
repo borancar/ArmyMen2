@@ -14372,20 +14372,13 @@ void __attribute__((thiscall)) AM2_Rec::ListDropOldest()
 
 void __attribute__((thiscall)) AM2_Rec::ListAdd(const char *name, void *value)
 {
-    void *list = this;
-
-    int32_t  *count = (int32_t *)list;
-    uint8_t **base  = (uint8_t **)((uint8_t *)list + 4);
-    uint8_t  *row;
-
-    *base = (uint8_t *)am2_realloc(*base,
-                                   (size_t)(*count + 1) * AM2_LIST_ROW_STRIDE);
-    /* The count is re-read after the realloc, as the original does, and the
-     * destination is computed from the NEW base. */
-    row = *base + (size_t)*count * AM2_LIST_ROW_STRIDE;
-    strcpy((char *)row, name);
-    *(void **)(row + AM2_LIST_ROW_VALUE) = value;
-    *count = *count + 1;
+    rows = am2_realloc(rows, (size_t)(count + 1) * AM2_LIST_ROW_STRIDE);
+    /* The row is re-addressed from the count and the NEW rows at each use,
+     * as the original does. */
+    strcpy((char *)rows + (size_t)count * AM2_LIST_ROW_STRIDE, name);
+    *(void **)((uint8_t *)rows + (size_t)count * AM2_LIST_ROW_STRIDE
+               + AM2_LIST_ROW_VALUE) = value;
+    count = count + 1;
 }
 
 AM2_Widget::AM2_Widget()

@@ -228,19 +228,19 @@ void     __cdecl ObjSetFieldA(void *obj, uint32_t value);
  * are meaningful. */
 int32_t __cdecl ObjFieldB(const void *obj);
 
-/* 0x0045F460's argument 5 and 6, which the original pushes as ONE eight-byte
- * structure. Both fields have a fallback inside the callee: a zero point is
- * filled from the target object's position and a zero ground height from the
- * shooter's own. `pad` is deliberately never written, by the original or by
- * us -- nothing correct can read it.
+/* 0x0045F460's argument 5 and 6, which the original passes as ONE six-byte
+ * structure -- three words, pushed as eight: every caller copies it with
+ * `sub esp, 8; mov ecx, esp; mov [ecx], dword; mov [ecx+4], word`, so the top
+ * two bytes of the pushed copy are whatever was on the stack. Both fields
+ * have a fallback inside the callee: a zero point is filled from the target
+ * object's position and a zero ground height from the shooter's own.
  *
  * Here rather than in event.cpp because region.cpp's TrooperFire needs the
  * same declaration, and two spellings of one prototype is how they come to
  * disagree. */
 typedef struct {
-    uint32_t at;
-    int16_t  ground;
-    int16_t  pad;
+    AM2_Point at;
+    int16_t   ground;
 } AM2_FireSpot;
 
 /* Reconstructed now, so the seam is gone and the eight call sites reach it

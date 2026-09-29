@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 971 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 984 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 971:
+  the near-miss sweep, 758 before the row pools. From 758 to 984:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -152,6 +152,12 @@ main result so far (details in `src/vc6/README.md`):
     unresolved and wildcarded. SnapshotSystemPalette is an AM2_Movie
     member (the movie is in ecx), and being C++ is what gives
     PlayMovie's `new` its EH state.
+  - **FireWeapon's spot is six bytes**, {AM2_Point at; int16 ground}: every
+    caller copies it into the argument area as a dword and a word, and the
+    point is filled a word at a time. The old eight-byte struct with a `pad`
+    could not produce that copy; all four event.cpp fire helpers match now.
+  - **ToggleSelect fixed**: toggling off the only selected unit returns
+    without OnSelectionChanged (ours called it on that path too).
   - **Parked**: the five copy-protection call sites (OnStartWar and four
     more) cannot match while the reference keeps GOG's `jmp`s -- a policy
     question, not a source one; MultiSpritePaint and OverlayPrepare

@@ -1599,7 +1599,7 @@ void __cdecl TrooperDied(void *obj, int32_t a, uint32_t by)
 
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_5A4)) {
         const uint8_t *killer = (const uint8_t *)LookupByUID(by);
-        int32_t        army   = killer
+        int16_t        army   = killer   /* a short: movsx ax, then movsx edx */
                                 ? *(const int8_t *)(killer + OBJ_OFF_ARMY)
                                 : AM2_ARMY_NEUTRAL;
 
@@ -6248,7 +6248,6 @@ typedef int32_t (__cdecl *AM2_Scan403B40Fn)(void *obj, void *a, void *b,
 void __cdecl NextInventorySlot(void *obj)
 {
     uint8_t *o = (uint8_t *)obj;
-    int32_t  sel;
 
     if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
         > *(const uint32_t *)(o + OBJ_OFF_FIELD_FC)) {
@@ -6268,16 +6267,18 @@ void __cdecl NextInventorySlot(void *obj)
             return;
     }
 
-    sel = *(const int32_t *)(o + UNIT_OFF_INVENTORY_SEL);
-    if (sel < AM2_INVENTORY_SLOTS - 1
+    /* The selection is re-read at each use, as the original does. */
+#define SEL (*(const int32_t *)(o + UNIT_OFF_INVENTORY_SEL))
+    if (SEL < AM2_INVENTORY_SLOTS - 1
         && *(const int32_t *)(o + UNIT_OFF_INVENTORY
-                              + (uint32_t)(sel + 1) * 4) != 0) {
+                              + (uint32_t)(SEL + 1) * 4) != 0) {
         PlaySoundAt(0, 0, 0, 0, 0);
-        SelectInventorySlot(obj, sel + 1);
+        SelectInventorySlot(obj, SEL + 1);
     } else {
         PlaySoundAt(0, 0, 0, 0, 0);
         SelectInventorySlot(obj, 0);
     }
+#undef SEL
 }
 
 
@@ -6574,7 +6575,6 @@ void __cdecl PointActionA(void *obj, uint32_t point)
 {
     uint8_t *o = (uint8_t *)obj;
     int32_t  type;
-    int32_t  tile;
 
     if (!obj)
         return;
@@ -6590,8 +6590,7 @@ void __cdecl PointActionA(void *obj, uint32_t point)
     *(uint16_t *)(o + OBJ_OFF_SCRIPT_ID) = 0;
     *(uint16_t *)(o + OBJ_OFF_FIELD_B2)  = 0;
 
-    tile = TileOfPoint(point);
-    NearestAllowedTile(obj, tile, &point);
+    NearestAllowedTile(obj, TileOfPoint(point), &point);
 
     *(int32_t *)(o + OBJ_OFF_FIELD_EC) =
         (*(const int32_t *)(o + OBJ_OFF_FIELD_F4) > 0) ? 1 : 0;
@@ -10018,10 +10017,10 @@ void __cdecl ToggleSelect(void *obj)
     if (!IsKeyDown(AM2_DIK_LCONTROL) && !IsKeyDown(AM2_DIK_RCONTROL))
         DeselectAll();
 
-    if (!(*(const uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS)
-          & OBJ_FLAG_SELECTED)) {
-        PtrListPush((void *)(uintptr_t)ADDR_SELECTED_UIDS,
-                    (void *)(uintptr_t)o->uid);
+    if ((*(const uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS)
+         & OBJ_FLAG_SELECTED) == 0) {
+        ((AM2_Rec *)(uintptr_t)ADDR_SELECTED_UIDS)->PtrListPush(
+            (void *)(uintptr_t)o->uid);
         *(uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
         OnSelectionChanged(
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
@@ -10030,22 +10029,24 @@ void __cdecl ToggleSelect(void *obj)
 
     n = *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT;
 
-    for (i = 0; i < n; i++)
+    for (i = 0; i < n; i++) {
         if ((*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]
-            == o->uid)
-            break;
-
-    if (i >= n || n <= 1) {
-        OnSelectionChanged(
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
-        return;
+            == o->uid) {
+            /* The last selected unit cannot be toggled off, and that
+             * refusal returns WITHOUT OnSelectionChanged -- the one exit
+             * that skips it. */
+            if (n > 1) {
+                ((AM2_Rec *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
+                *(uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
+                ObjAttachTo(o, (void *)0);
+                OnSelectionChanged(
+                    *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+            }
+            return;
+        }
     }
 
-    ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
-    *(uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
-    ObjAttachTo(o, (void *)0);
-    OnSelectionChanged(
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+    OnSelectionChanged(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
 }
 
 
@@ -13580,17 +13581,17 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
      * regular is the clearest evidence the dispatch table is read right. */
     case 24:
         SpeakLine(0x16, *(const int8_t *)(u + OBJ_OFF_ARMY));
-        DoAirSupport(0, spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
+        DoAirSupport(0, *(const uint32_t *)&spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
         return 1;
 
     case 25:
         SpeakLine(0x17, *(const int8_t *)(u + OBJ_OFF_ARMY));
-        DoAirSupport(1, spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
+        DoAirSupport(1, *(const uint32_t *)&spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
         return 1;
 
     case 26:
         SpeakLine(0x18, *(const int8_t *)(u + OBJ_OFF_ARMY));
-        DoAirSupport(2, spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
+        DoAirSupport(2, *(const uint32_t *)&spot.at, *(const uint32_t *)(u + OBJ_OFF_UID));
         return 1;
 
     /* arms 18 and 19 -- 0x0045FCAE and 0x0045FCFD. Aim rather than fire: they
@@ -13600,15 +13601,16 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
     case 39:
     case 40:
         PlaySoundAt(kind + 1u == 39 ? 0x2B : 0x2C, 1, 0,
-                    (int32_t)spot.at, (int32_t)(spot.at >> 16));
+                    (int32_t)*(const uint32_t *)&spot.at,
+                    (int32_t)(*(const uint32_t *)&spot.at >> 16));
         pt[0] = (int16_t)(pt[0] - *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X);
         pt[1] = (int16_t)(pt[1] - *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
         if (kind + 1u == 39)
             AimStart(*(const uint32_t *)(u + OBJ_OFF_UID),
-                     *(const int8_t *)(u + OBJ_OFF_ARMY), spot.at);
+                     *(const int8_t *)(u + OBJ_OFF_ARMY), *(const uint32_t *)&spot.at);
         else
             AimStartB(*(const uint32_t *)(u + OBJ_OFF_UID),
-                      *(const int8_t *)(u + OBJ_OFF_ARMY), spot.at);
+                      *(const int8_t *)(u + OBJ_OFF_ARMY), *(const uint32_t *)&spot.at);
         return 1;
 
     /* arm 11 -- 0x0045FD4B, the medic pack. Refuse a casualty who is dead or

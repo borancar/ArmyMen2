@@ -2548,7 +2548,6 @@ void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
 {
     uint8_t     *weapon = (uint8_t *)WeaponByUid((int32_t)weaponUid);
     uint8_t     *unit;
-    AM2_Point    dest;
     AM2_FireSpot spot;
     int8_t       lent;
 
@@ -2558,17 +2557,16 @@ void __cdecl FireWeaponAtPoint(uint32_t weaponUid, uint32_t unitUid,
     if (!unit)
         return;
 
-    dest.x = (int16_t)(at & 0xFFFFu);
-    dest.y = (int16_t)(at >> 16);
-
-    spot.at     = at;
+    /* `at` is a point passed by value, read a word at a time. */
+    spot.at.x   = (*(const AM2_Point *)&at).x;
+    spot.at.y   = (*(const AM2_Point *)&at).y;
     spot.ground = (int16_t)TileAttrAt((uint32_t)TileOfPoint(at));
 
     lent = *(const int8_t *)(weapon + OBJ_OFF_ARMY);
     *(int8_t *)(weapon + OBJ_OFF_ARMY) = *(const int8_t *)(unit + OBJ_OFF_ARMY);
 
     if (heading < 0)
-        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), &dest);
+        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), (const AM2_Point *)&at);
 
     FireWeapon(weapon, unit, ObjFieldB(unit), heading, spot, (void *)0);
 
@@ -2593,7 +2591,7 @@ void __cdecl FireWeaponAtObject(uint32_t weaponUid, uint32_t unitUid,
     uint8_t     *unit;
     uint8_t     *target;
     AM2_FireSpot spot;
-    int8_t       lent;
+    int32_t      lent;   /* movsx into ebx: an int, restored as a byte */
 
     if (!weapon)
         return;
@@ -2604,7 +2602,8 @@ void __cdecl FireWeaponAtObject(uint32_t weaponUid, uint32_t unitUid,
     if (!target)
         return;
 
-    spot.at     = *(const uint32_t *)(target + OBJ_OFF_POS);
+    spot.at.x   = ((const AM2_Point *)(target + OBJ_OFF_POS))->x;
+    spot.at.y   = ((const AM2_Point *)(target + OBJ_OFF_POS))->y;
     spot.ground = (int16_t)*(const int8_t *)(target + OBJ_OFF_HEIGHT_SET);
 
     if (heading < 0)
@@ -2616,7 +2615,7 @@ void __cdecl FireWeaponAtObject(uint32_t weaponUid, uint32_t unitUid,
 
     FireWeapon(weapon, unit, ObjHeight(unit), heading, spot, target);
 
-    *(int8_t *)(weapon + OBJ_OFF_ARMY) = lent;
+    *(int8_t *)(weapon + OBJ_OFF_ARMY) = (int8_t)lent;
 }
 
 /* 0x00420260. The unit's own held weapon, at a point. */
@@ -2624,7 +2623,6 @@ void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, uint32_t at)
 {
     uint8_t     *unit = (uint8_t *)UnitByUid(unitUid);
     void        *weapon;
-    AM2_Point    dest;
     AM2_FireSpot spot;
 
     if (!unit)
@@ -2633,14 +2631,13 @@ void __cdecl UnitFireAtPoint(uint32_t unitUid, int32_t heading, uint32_t at)
     if (!weapon)
         return;
 
-    dest.x = (int16_t)(at & 0xFFFFu);
-    dest.y = (int16_t)(at >> 16);
-
-    spot.at     = at;
+    /* `at` is a point passed by value, read a word at a time. */
+    spot.at.x   = (*(const AM2_Point *)&at).x;
+    spot.at.y   = (*(const AM2_Point *)&at).y;
     spot.ground = (int16_t)TileAttrAt((uint32_t)TileOfPoint(at));
 
     if (heading < 0)
-        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), &dest);
+        heading = AngleBetween((const AM2_Point *)(unit + OBJ_OFF_POS), (const AM2_Point *)&at);
 
     FireWeapon(weapon, unit, ObjFieldB(unit), heading, spot, (void *)0);
 }
@@ -2667,7 +2664,8 @@ void __cdecl UnitFireAtObject(uint32_t unitUid, int32_t heading,
     if (!target)
         return;
 
-    spot.at     = 0;
+    spot.at.x   = 0;
+    spot.at.y   = 0;
     spot.ground = 0;
 
     if (heading < 0)
