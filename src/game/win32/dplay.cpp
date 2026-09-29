@@ -2865,10 +2865,10 @@ void __cdecl DumpMsgList(void *list)
 
     WaitForSingleObject(*(HANDLE *)(l + MSGLIST_OFF_MUTEX), INFINITE);
 
+    n = *(const uint8_t *const *)(l + MSGLIST_OFF_HEAD);
     orig_log("List: ");
 
-    for (n = *(const uint8_t *const *)(l + MSGLIST_OFF_HEAD); n;
-         n = *(const uint8_t *const *)(n + MSGNODE_OFF_NEXT))
+    for (; n; n = *(const uint8_t *const *)(n + MSGNODE_OFF_NEXT))
         orig_log("(%d %d)",
                      *(const int32_t *)(n + MSGNODE_OFF_KEY),
                      *(const int32_t *)(*(const uint8_t *const *)

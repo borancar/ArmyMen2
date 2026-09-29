@@ -13213,13 +13213,12 @@ void __cdecl OnControlsOk(AM2_Widget *w)
 void __cdecl OnControlsDefault(AM2_Widget *w)
 {
     const uint8_t *defaults = (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_DEFAULTS));
-    AM2_Widget *const *rows =
-        (AM2_Widget *const *)((const uint8_t *)w->parent + KEYROW_PARENT_ROWS);
+    const uint8_t *parent = (const uint8_t *)w->parent;
     const AM2_KeyName *keys = (const AM2_KeyName *)((void *)(uintptr_t)(ADDR_KEY_NAME_TABLE));
     int32_t i;
 
     for (i = 0; i < KEYROW_ROW_COUNT; i++) {
-        AM2_Widget *row = rows[i];
+        AM2_Widget *row = ((AM2_Widget *const *)(parent + KEYROW_PARENT_ROWS))[i];
         int32_t     k   = KeyNameIndexOf(defaults[i]);
 
         *(int32_t *)((uint8_t *)row + KEYROW_OFF_KEY) = k;

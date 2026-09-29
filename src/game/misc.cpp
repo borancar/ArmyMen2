@@ -2057,11 +2057,13 @@ static inline int32_t CommAllPlayersFlagged(void *comm, uint32_t flag)
                                + COMM_OFF_PLAYER_COUNT);
     int32_t        i;
 
-    /* The record pointer is set up after the count, inside the loop header:
-     * the original tests the count first. */
-    for (i = 0, rec = (const uint8_t *)comm + AM2_PLAYER_ID; i < n;
-         i++, rec += AM2_PLAYER_STRIDE) {
-        int32_t id = *(const int32_t *)rec;
+    /* The record is indexed from the counter, which VC6 strength-reduces
+     * into a pointer set up after the count test -- the original's order. */
+    for (i = 0; i < n; i++) {
+        int32_t id;
+
+        rec = (const uint8_t *)comm + AM2_PLAYER_ID + i * AM2_PLAYER_STRIDE;
+        id  = *(const int32_t *)rec;
 
         if (id == 0 || id == -1)
             continue;                   /* no player in this slot */

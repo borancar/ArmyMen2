@@ -517,13 +517,11 @@ void __cdecl LoadDefTables(void)
  * dword, which is what makes VehicleDefFind's bsearch above legal at all --
  * the two are a pair, and the comparator is the same CompareDword.
  *
- * IT ENDS `jmp ADDR_LOG` WITH AN EMPTY ARGUMENT FRAME, and that is not a call
- * to the logger. orig.h records the reading and the measurement behind it:
- * 0x0045CAA0 is a bare `ret` that identical-COMDAT folding gave to both the
- * stubbed logger and every empty function, and a tail jump there with nothing
- * pushed would make our harness capture a garbage line -- which it does not,
- * on either side of a bootcamp A/B. So the faithful reconstruction is a plain
- * return, and this function ends where the qsort does. */
+ * IT ENDS `jmp ADDR_LOG` WITH AN EMPTY ARGUMENT FRAME: 0x0045CAA0 is a bare
+ * `ret` that identical-COMDAT folding gave to both the stubbed logger and
+ * every empty function, so the source called some empty function last and
+ * VC6 made it a tail jump. orig_log_noargs() is that call, spelled as
+ * LoadDefTables and frame.cpp spell it -- the bytes want it. */
 typedef void (__cdecl *AM2_QsortFn)(void *base, size_t n, size_t width,
                                     const void *cmp);
 #define orig_qsort ((AM2_QsortFn)((void *)(uintptr_t)(ADDR_CRT_QSORT)))
@@ -534,6 +532,7 @@ void __cdecl SortVehicleDefs(void)
                (size_t)*(const int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT,
                AM2_VEHICLE_DEF_REC_SIZE,
                (const void *)CompareDword);
+    orig_log_noargs();
 }
 
 int definfo_install(void)
