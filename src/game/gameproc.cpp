@@ -73,10 +73,11 @@ uint8_t am2_key_bindings[42] = {
 #define g_armyObjLists ((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
 #define g_levelId      (*(int32_t *)(uintptr_t)ADDR_LEVEL_ID)
 
-/* The original's frame is 0x80 with the two stashes at +0 and +0x50, so each
- * has 80 bytes and neither is bounded against the string it copies. Same size
- * here, and no guard added: a guard would be behaviour this build lacks. */
-#define AM2_GAMEPROC_STASH 0x50
+/* The original's frame is 0x80 and holds nothing but the two stashes, at
+ * +0 and +0x40 (the three volumes live in registers), so each has 64 bytes
+ * and neither is bounded against the string it copies. Same size here, and
+ * no guard added: a guard would be behaviour this build lacks. */
+#define AM2_GAMEPROC_STASH 0x40
 
 int32_t __cdecl SaveGameProcSection(am2_FILE *fp)
 {
@@ -90,15 +91,15 @@ int32_t __cdecl LoadGameProcSection(am2_FILE *fp)
 {
     char    stashA[AM2_GAMEPROC_STASH];   /* the string at +0x120 */
     char    stashB[AM2_GAMEPROC_STASH];   /* the string at the block start */
-    int32_t volZero, volStream, volVoice;
+    int32_t volStream, volVoice, volZero;
 
     /* Everything that must outlive the read is copied out first, before the
      * tag is even checked -- which costs nothing when the check fails. */
     strcpy(stashA, kStrB);
     strcpy(stashB, kBlock);
-    volVoice  = kVolVoice;
     volZero   = kVolZero;
     volStream = kVolStream;
+    volVoice  = kVolVoice;
 
     if (!CheckSaveTag(fp, AM2_GAMEPROC_SAVE_SIZE,
                       "C:\\ArmyMen2\\source\\gameproc.cpp", 0x8CD))
@@ -126,8 +127,11 @@ int32_t __cdecl LoadGameProcSection(am2_FILE *fp)
      * fresh" branch, and TakeMenuRequest reaches MissionStartup, whose retry
      * stamp then SAVES OVER the file the player asked to load. The original
      * does not, and that difference is what found this. */
-    *(int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF = 0;
-    *(int32_t *)(uintptr_t)ADDR_LOAD_PENDING     = 1;
+    /* Spelled through the block they live in: both flags are inside it, and
+     * that is what keeps VC6 from hoisting the stores above the strcpy
+     * that could overwrite them. */
+    *(int32_t *)(kBlock + GAMEPROC_OFF_HAVE_DEFAULT_COF) = 0;
+    *(int32_t *)(kBlock + GAMEPROC_OFF_LOAD_PENDING)     = 1;
     return 1;
 }
 
@@ -191,83 +195,70 @@ typedef int32_t (__cdecl *AM2_FflushFn)(am2_FILE *fp);
 void __cdecl LoadOptions(void)
 {
     am2_FILE *fp;
-    uint8_t  *key;
+    int32_t   i;
     int32_t   len;
 
     SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
 
     fp = orig_fopen("Options.cfg",
                     "r");
-    if (!fp)
-        goto defaults;
-
     /* Whole-file check: if it cannot seek this far there is nothing to read.
-     * NOTE it does NOT close the file on this path -- it falls into the same
+     * NOTE it does NOT close the file on that path -- it falls into the same
      * defaults tail as a failed open, which never had one to close. The
      * handle leaks. Reproduced. */
-    if (orig_fseek(fp, AM2_OPTIONS_MIN_BYTES, 0) != 0)
-        goto defaults;
-    orig_fseek(fp, 0, 0);
+    if (fp && orig_fseek(fp, AM2_OPTIONS_MIN_BYTES, 0) == 0) {
+        orig_fseek(fp, 0, 0);
 
-    orig_fread((void *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)), 4, 1, fp);
-    orig_fread((void *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)), 4, 1, fp);
-    orig_fread((void *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)), 4, 1, fp);
-    orig_fread((void *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT)), 4, 1, fp);
+        orig_fread((void *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)), 4, 1, fp);
+        orig_fread((void *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)), 4, 1, fp);
+        orig_fread((void *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)), 4, 1, fp);
+        orig_fread((void *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT)), 4, 1, fp);
 
-    for (key = (uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS));
-         key < (uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS_END));
-         key += 2)
-        orig_fread(key, 1, 1, fp);
+        /* Index loops, as SaveOptions': the pointer VC6 walks compares signed. */
+        for (i = 0; i < (int32_t)(ADDR_KEY_BINDINGS_END - ADDR_KEY_BINDINGS) / 2; i++)
+            orig_fread(&((uint8_t (*)[2])(uintptr_t)ADDR_KEY_BINDINGS)[i][0], 1, 1, fp);
 
-    orig_fread((void *)((void *)(uintptr_t)(ADDR_DIFFICULTY)), 4, 1, fp);
-    orig_fread((void *)((void *)(uintptr_t)(ADDR_HOST_MASK_A)), 4, 1, fp);
-    orig_fread((void *)((void *)(uintptr_t)(ADDR_HOST_MASK_B)), 4, 1, fp);
-    orig_fread((void *)((void *)(uintptr_t)(ADDR_HOST_VALUE_3E8)), 4, 1, fp);
+        orig_fread((void *)((void *)(uintptr_t)(ADDR_DIFFICULTY)), 4, 1, fp);
+        orig_fread((void *)((void *)(uintptr_t)(ADDR_HOST_MASK_A)), 4, 1, fp);
+        orig_fread((void *)((void *)(uintptr_t)(ADDR_HOST_MASK_B)), 4, 1, fp);
+        orig_fread((void *)((void *)(uintptr_t)(ADDR_HOST_VALUE_3E8)), 4, 1, fp);
 
-    len = 0;
-    orig_fread(&len, 4, 1, fp);
-    orig_fread((void *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)), 1, (size_t)len, fp);
-    ((char *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)))[len] = '\0';
+        len = 0;
+        orig_fread(&len, 4, 1, fp);
+        orig_fread((void *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)), 1, (size_t)len, fp);
+        ((char *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)))[len] = '\0';
 
-    len = 0;
-    orig_fread(&len, 4, 1, fp);
-    orig_fread((void *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)), 1, (size_t)len, fp);
-    ((char *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)))[len] = '\0';
+        /* Not re-zeroed: a short read here keeps the first length. */
+        orig_fread(&len, 4, 1, fp);
+        orig_fread((void *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)), 1, (size_t)len, fp);
+        ((char *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)))[len] = '\0';
 
-    orig_fflush(fp);
-    orig_fclose(fp);
+        orig_fflush(fp);
+        orig_fclose(fp);
 
-    /* Migrate an old file's "quiet" to "silent". Only these three. */
-    if (*(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)) == AM2_VOLUME_SENTINEL)
-        *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)) = AM2_VOLUME_SILENT;
-    if (*(int32_t *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)) == AM2_VOLUME_SENTINEL)
-        *(int32_t *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)) = AM2_VOLUME_SILENT;
-    if (*(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)) == AM2_VOLUME_SENTINEL)
-        *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)) = AM2_VOLUME_SILENT;
-    return;
+        /* Migrate an old file's "quiet" to "silent". Only these three. */
+        if (*(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)) == AM2_VOLUME_SENTINEL)
+            *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)) = AM2_VOLUME_SILENT;
+        if (*(int32_t *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)) == AM2_VOLUME_SENTINEL)
+            *(int32_t *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)) = AM2_VOLUME_SILENT;
+        if (*(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)) == AM2_VOLUME_SENTINEL)
+            *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)) = AM2_VOLUME_SILENT;
+    } else {
+        /* BOTH failure exits land here, and it is not a bare return: the settings
+         * are reset and the key bindings rebuilt from ADDR_KEY_DEFAULTS. The
+         * defaults go into every OTHER byte, matching the one-in-two stride
+         * SaveOptions writes and this function reads -- so only the primary of
+         * each binding is restored and the alternate is left as it was. */
+        orig_log("Failed to open Options.cfg for reading\n");
 
-defaults:
-    /* BOTH failure exits land here, and it is not a bare return: the settings
-     * are reset and the key bindings rebuilt from ADDR_KEY_DEFAULTS. The
-     * defaults go into every OTHER byte, matching the one-in-two stride
-     * SaveOptions writes and this function reads -- so only the primary of
-     * each binding is restored and the alternate is left as it was. */
-    orig_log("Failed to open Options.cfg for reading\n");
+        *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)) = 0;
+        *(int32_t *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME))  = 0;
+        *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE))   = 0;
+        *(int32_t *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT))    = 0;
 
-    *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)) = 0;
-    *(int32_t *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME))  = 0;
-    *(int32_t *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE))   = 0;
-    *(int32_t *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT))    = 0;
-
-    {
-        const uint8_t *src = (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_DEFAULTS));
-        uint8_t       *dst = (uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS));
-        int32_t        i   = 0;
-
-        while (dst < (uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS_END))) {
-            *dst = src[i++];
-            dst += 2;
-        }
+        for (i = 0; i < (int32_t)(ADDR_KEY_BINDINGS_END - ADDR_KEY_BINDINGS) / 2; i++)
+            ((uint8_t (*)[2])(uintptr_t)ADDR_KEY_BINDINGS)[i][0] =
+                ((const uint8_t *)(uintptr_t)ADDR_KEY_DEFAULTS)[i];
     }
 }
 
@@ -305,7 +296,7 @@ defaults:
 void __cdecl SaveOptions(void)
 {
     am2_FILE *fp;
-    const uint8_t *key;
+    int32_t   i;
     int32_t   len;
 
     SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
@@ -314,38 +305,38 @@ void __cdecl SaveOptions(void)
 
     fp = orig_fopen("Options.cfg",
                     "w");
-    if (!fp) {
+    if (fp) {
+        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)), 4, 1, fp);
+        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)), 4, 1, fp);
+        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)), 4, 1, fp);
+        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT)), 4, 1, fp);
+
+        /* An index loop over the scancode pairs: VC6 walks a pointer but
+         * compares it signed, which is what an int index strength-reduces to. */
+        for (i = 0; i < (int32_t)(ADDR_KEY_BINDINGS_END - ADDR_KEY_BINDINGS) / 2; i++)
+            orig_fwrite(&((const uint8_t (*)[2])(uintptr_t)ADDR_KEY_BINDINGS)[i][0],
+                        1, 1, fp);
+
+        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_DIFFICULTY)), 4, 1, fp);
+        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_HOST_MASK_A)), 4, 1, fp);
+        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_HOST_MASK_B)), 4, 1, fp);
+        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_HOST_VALUE_3E8)), 4, 1, fp);
+
+        len = (int32_t)strlen((const char *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)));
+        orig_fwrite(&len, 4, 1, fp);
+        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)),
+                    1, (size_t)len, fp);
+
+        len = (int32_t)strlen((const char *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)));
+        orig_fwrite(&len, 4, 1, fp);
+        orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)),
+                    1, (size_t)len, fp);
+
+        orig_fflush(fp);
+        orig_fclose(fp);
+    } else {
         orig_log("Failed to open Options.cfg for writing\n");
-        return;
     }
-
-    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_VOLUME_AT_ZERO)), 4, 1, fp);
-    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_STREAM_VOLUME)), 4, 1, fp);
-    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_VOLUME_VOICE)), 4, 1, fp);
-    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_MOVIE_COUNT)), 4, 1, fp);
-
-    for (key = (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS));
-         key < (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS_END));
-         key += 2)
-        orig_fwrite(key, 1, 1, fp);
-
-    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_DIFFICULTY)), 4, 1, fp);
-    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_HOST_MASK_A)), 4, 1, fp);
-    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_HOST_MASK_B)), 4, 1, fp);
-    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_HOST_VALUE_3E8)), 4, 1, fp);
-
-    len = (int32_t)strlen((const char *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)));
-    orig_fwrite(&len, 4, 1, fp);
-    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_SAVED_PLAYER_NAME)),
-                1, (size_t)len, fp);
-
-    len = (int32_t)strlen((const char *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)));
-    orig_fwrite(&len, 4, 1, fp);
-    orig_fwrite((const void *)((void *)(uintptr_t)(ADDR_SAVED_BATTLE_NAME)),
-                1, (size_t)len, fp);
-
-    orig_fflush(fp);
-    orig_fclose(fp);
 }
 
 /* SaveDefaultCof -- original 0x00457070, one caller, and it is the write half
@@ -419,7 +410,7 @@ int32_t __cdecl SaveDefaultCof(void)
         obj = (uint8_t *)LookupByUID(
                   ((const uint32_t *)*(void **)(list + LIST_OFF_UIDS))[i]);
         if (!obj) {
-            ListRemoveAt(list, i);
+            ((AM2_Rec *)list)->ListRemoveAt(i);
             continue;
         }
 
@@ -984,7 +975,7 @@ int32_t __cdecl PlaceScenario(void)
             && !CommWasHereForArmy(comm, slot))
             continue;
 
-        army = CommSlotForArmy(comm, slot);
+        army = ((AM2_Comm *)comm)->CommSlotForArmy(slot);
 
         for (i = 0; i < n; i++, row += SCEN_ROW_BYTES) {
             uint8_t *unit;
@@ -1043,7 +1034,7 @@ int32_t __cdecl PlaceScenario(void)
                        (char *)(row + SCEN_ROW_OFF_NAME),
                        *(const int16_t *)(row + SCEN_ROW_OFF_POS),
                        *(const int16_t *)(row + SCEN_ROW_OFF_POS + 2),
-                       CommArmyOfSlot(comm, army), army,
+                       ((AM2_Comm *)comm)->CommArmyOfSlot(army), army,
                        *(const uint8_t *)(row + SCEN_ROW_OFF_FLAG) ? 0 : 4,
                        1, 0, 1, 0);
 
@@ -1134,7 +1125,7 @@ int32_t __cdecl PlaceScenario(void)
                       ((const uint32_t *const *)list)[2][i]);
             if (!obj) {
                 /* A stale uid is REMOVED and the index does not advance. */
-                ListRemoveAt(list, i);
+                ((AM2_Rec *)list)->ListRemoveAt(i);
                 continue;
             }
             if (!(*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & 4)
@@ -1420,7 +1411,6 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
 {
     uint8_t       *o = (uint8_t *)am2_malloc(AM2_MISSILE_BYTES);
     const uint8_t *h = (const uint8_t *)hdr;
-    uint8_t       *rows;
     int32_t        def;
     int32_t        frame;
 
@@ -1446,8 +1436,15 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
     orig_fread(o + OBJ_OFF_PTR_LIST, 4, 1, fp);
     orig_fread(o + OBJ_OFF_CHAIN_NEXT_UID, 4, 1, fp);
 
-    def = **(const int32_t *const *)(o + OBJ_OFF_FIELD_94);
-    frame = (def == 2 || def == 5) ? AM2_MISSILE_FRAME_A : AM2_MISSILE_FRAME_B;
+    switch (**(const int32_t *const *)(o + OBJ_OFF_FIELD_94)) {
+    case 2:
+    case 5:
+        frame = AM2_MISSILE_FRAME_A;
+        break;
+    default:
+        frame = AM2_MISSILE_FRAME_B;
+        break;
+    }
 
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
                 (const void *)((void *)(uintptr_t)(ADDR_MISSILE_ROW_SPEC)),
@@ -1455,13 +1452,15 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
                 *(const int16_t *)(h + OBJ_OFF_POS + 2),
                 (const void *)(uintptr_t)ADDR_ZERO_RECT);
 
-    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
-    *(const void **)(rows + ROW_OFF_ANIM_CUR) =
+    /* The row pointer is re-read at every use. */
+#define ROWS (*(uint8_t **)(o + OBJ_OFF_ROWS))
+    *(const void **)(ROWS + ROW_OFF_ANIM_CUR) =
         (const void *)(uintptr_t)ADDR_MISSILE_ANIMS;
-    *(int16_t *)(rows + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
-    *(uint8_t *)(rows + ROW_OFF_HEADING) = *(const uint8_t *)(o + OBJ_OFF_FACING);
+    *(int16_t *)(ROWS + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
+    *(uint8_t *)(ROWS + ROW_OFF_HEADING) = *(const uint8_t *)(o + OBJ_OFF_FACING);
 
-    SetAnimFrame(rows, (int16_t)frame, 1);
+    SetAnimFrame(ROWS, (int16_t)frame, 1);
+#undef ROWS
     return o;
 }
 
@@ -1691,7 +1690,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
              * uid is read and thrown away. The original's own test, not a
              * shortcut. */
             if (!renumber)
-                PtrListPush(o + OBJ_OFF_PTR_LIST, (void *)(uintptr_t)uid);
+                ((AM2_Rec *)(o + OBJ_OFF_PTR_LIST))->PtrListPush((void *)(uintptr_t)uid);
         }
     }
 
@@ -1849,7 +1848,7 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
     if (*(const int32_t *)(rec + TYPE3_REC_OFF_LIST_COUNT) > 0) {
         for (i = 0; i < *(const int32_t *)(rec + TYPE3_REC_OFF_LIST_COUNT); i++) {
             orig_fread(&uid, 4, 1, fp);
-            PtrListPush(o + OBJ_OFF_PTR_LIST, (void *)(uintptr_t)uid);
+            ((AM2_Rec *)(o + OBJ_OFF_PTR_LIST))->PtrListPush((void *)(uintptr_t)uid);
         }
     }
 
@@ -1858,7 +1857,7 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
     if (*(const int32_t *)(rec + TYPE3_REC_OFF_PTR_COUNT) > 0) {
         for (i = 0; i < *(const int32_t *)(rec + TYPE3_REC_OFF_PTR_COUNT); i++) {
             orig_fread(&uid, 4, 1, fp);
-            PtrListPush(o + VEHICLE_OFF_PTR_LIST, (void *)(uintptr_t)uid);
+            ((AM2_Rec *)(o + VEHICLE_OFF_PTR_LIST))->PtrListPush((void *)(uintptr_t)uid);
         }
     }
 

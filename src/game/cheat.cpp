@@ -167,7 +167,7 @@ void __cdecl CheatLine(const char *line)
 
     /* The master switch is compared before the table is walked. */
     if (orig_stricmp(line, kCheatWords[0]) == 0) {
-        int32_t army = CommArmyOfSlot((void *)g_commObject, (int32_t)g_defaultOwner);
+        int32_t army = ((AM2_Comm *)(void *)g_commObject)->CommArmyOfSlot((int32_t)g_defaultOwner);
 
         /* The reply's colour is byte 1 of the army's own object-table record,
          * NOT a colour table of its own -- 0x004F9ACD is

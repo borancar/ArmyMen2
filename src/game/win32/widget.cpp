@@ -4515,7 +4515,7 @@ void __cdecl AimStart(uint32_t uid, int8_t army, uint32_t at)
             *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)army)) {
         ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_DEADLINE_A)))[i] =
             *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
@@ -4578,7 +4578,7 @@ void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at)
             *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)army)) {
         deadline = *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
                    + AM2_AIM_LIFE_REMOTE_MS;
@@ -4813,7 +4813,7 @@ void __cdecl PlacementScreenClick(uint32_t at)
 
     TakeNumberKey();
 
-    army = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+    army = AM2_THE_COMM->CommArmyOfSlot(
                           (int32_t)*(const uint32_t *)(uintptr_t)
                               ADDR_DEFAULT_OWNER);
 
@@ -6420,7 +6420,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
         obj = (uint8_t *)LookupByUID(
                   (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
         if (!obj) {
-            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
             continue;
         }
 
@@ -6492,7 +6492,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                     uint8_t *rrec;
 
                     if (!rider) {
-                        ListRemoveAt(obj + VEHICLE_OFF_PTR_LIST, k);
+                        ((AM2_Rec *)(obj + VEHICLE_OFF_PTR_LIST))->ListRemoveAt(k);
                         continue;
                     }
                     if (*(const int16_t *)(rider + OBJ_OFF_HEALTH) == 0)
@@ -7502,7 +7502,7 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
     line = (char *)(b + HUDLOG_OFF_TYPED);
     HudMessage(line,
         *(const uint8_t *)((const uint8_t *)(uintptr_t)ADDR_CHAT_COLOUR_TABLE
-            + ((size_t)CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+            + ((size_t)AM2_THE_COMM->CommArmyOfSlot(
                                       (int32_t)g_defaultOwner) << 8)));
 
     cb = *(uint8_t **)(b + HUD_A_OFF_CHECKBOX);
@@ -7520,7 +7520,7 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
             if (id == 0 || id == -1)
                 continue;
             if (!AllyFlag((int32_t)g_defaultOwner,
-                          CommSlotOfId(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                          AM2_THE_COMM->CommSlotOfId(
                                        (uint32_t)id)))
                 continue;
             SendChatTo(line, i);
@@ -8300,8 +8300,7 @@ AM2_HudPanel::AM2_HudPanel()
     {
         const uint8_t *menu = (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU));
         AM2_Widget   **slot = (AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_TABLE;
-        int32_t        army = CommArmyOfSlot(
-                                  *(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        int32_t        army = AM2_THE_COMM->CommArmyOfSlot(
                                   (int32_t)g_defaultOwner);
         AM2_Widget    *btn;
         char          *points;
@@ -9356,7 +9355,7 @@ void __cdecl FillListFromRules(const char *path, void *panel)
              & AM2_FILE_EOF)) {
         if (!orig_fgets_line(line, (int32_t)sizeof(line), fp))
             break;
-        ListAdd(rows, line, (void *)3);
+        ((AM2_Rec *)rows)->ListAdd(line, (void *)3);
     }
 
     orig_fclose(fp);
@@ -9889,7 +9888,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
             if (!rec)
                 continue;
-            ListAdd(rows, (const char *)(rec + NAMEREC_OFF_NAME3), rec);
+            ((AM2_Rec *)rows)->ListAdd((const char *)(rec + NAMEREC_OFF_NAME3), rec);
             if (strcmp((const char *)(rec + NAMEREC_OFF_NAME),
                        (const char *)((void *)(uintptr_t)(ADDR_MP_SCRIPT_NAME))) == 0)
                 sel = i;
@@ -9970,7 +9969,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
                     if (!lvl)
                         continue;
-                    ListAdd(rows, (const char *)(lvl + LEVEL_OFF_NAME), lvl);
+                    ((AM2_Rec *)rows)->ListAdd((const char *)(lvl + LEVEL_OFF_NAME), lvl);
                     if (strcmp((const char *)(lvl + LEVEL_OFF_MAP_NAME),
                                (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME))) == 0)
                         sel = i;
@@ -10419,7 +10418,7 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
             continue;
 
         maps = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
-        ListAdd(*(void **)(maps + LIST_OFF_ROWS),
+        ((AM2_Rec *)*(void **)(maps + LIST_OFF_ROWS))->ListAdd(
                 (const char *)(lvl + LEVEL_OFF_NAME), lvl);
 
         if (strcmp(nm, (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME))) == 0)
@@ -10468,7 +10467,7 @@ void __cdecl OnChatEnter(AM2_Widget *w)
 {
     uint8_t *self = (uint8_t *)w;
     char    *text = *(char **)(self + EDIT_OFF_TEXT);
-    int32_t  army = CommArmyOfSlot((void *)g_commObject,
+    int32_t  army = ((AM2_Comm *)(void *)g_commObject)->CommArmyOfSlot(
                                            (int32_t)g_defaultOwner);
 
     MenuMessage(text, (int32_t)(uint8_t)army, 0);
@@ -10641,7 +10640,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
         if (panel) {
             uint8_t *box = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
 
-            ListAdd(*(void **)(box + LIST_OFF_ROWS),
+            ((AM2_Rec *)*(void **)(box + LIST_OFF_ROWS))->ListAdd(
                     (const char *)(lvl + LEVEL_OFF_NAME), lvl);
         }
 
@@ -11246,13 +11245,13 @@ void __cdecl OnMpColour(AM2_Widget *w)
         next = row + 1;
     sel[row] = next;
 
-    army = CommArmyOfSlot(comm, next);
+    army = ((AM2_Comm *)comm)->CommArmyOfSlot(next);
     if (!*(const int32_t *)((const uint8_t *)comm + COMM_OFF_IS_HOST)) {
         SendColorMsg(army);
         return;
     }
 
-    CommSetArmyColour(comm,
+    ((AM2_Comm *)comm)->CommSetArmyColour(
                          *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW),
                          army);
     PlaySoundAt(2, 0, 0, 0, 0);
@@ -11289,7 +11288,7 @@ void __attribute__((thiscall)) AM2_Widget::MpColourPaint(RECT clip)
     if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
                            + row * COMM_PLAYER_STRIDE
                            + COMM_SLOT_OFF_INDEX) != 0x63)
-        which = CommArmyOfSlot(comm, row);
+        which = ((AM2_Comm *)comm)->CommArmyOfSlot(row);
 
     w->sprite = ((struct AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_A)[which];
     ::WidgetPaint(w, clip);
@@ -11723,7 +11722,7 @@ for (i = 0; i < LevelCount(); i++) {
             int32_t *id = (int32_t *)am2_malloc(sizeof *id);
 
             *id = i + 1;
-            ListAdd(*(void **)((uint8_t *)w + COMMPANEL_OFF_LIST),
+            ((AM2_Rec *)*(void **)((uint8_t *)w + COMMPANEL_OFF_LIST))->ListAdd(
                     (const char *)(rec + LEVEL_OFF_NAME), id);
         }
     }
@@ -12047,9 +12046,9 @@ AM2_DifficultyDialog::AM2_DifficultyDialog(const char *bmp)
     panel->flag44 = 1;
 
     rows = new AM2_Rec(0);
-    ListAdd(rows, "Easy",   (void *)0);
-    ListAdd(rows, "Medium", (void *)1);
-    ListAdd(rows, "Hard",   (void *)2);
+    ((AM2_Rec *)rows)->ListAdd("Easy",   (void *)0);
+    ((AM2_Rec *)rows)->ListAdd("Medium", (void *)1);
+    ((AM2_Rec *)rows)->ListAdd("Hard",   (void *)2);
 
     list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x28, 0x3F, 0xF4, 0x3A), rows, 0, 0, 1);
     *(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST) = list;
@@ -13303,7 +13302,7 @@ AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
 
             if ((found[AM2_FIND_OFF_ATTRIB] & AM2_FIND_ATTR_DIR)
                     && name[0] != '.')
-                ListAdd(*(void **)((uint8_t *)w + COMMPANEL_OFF_LIST), name,
+                ((AM2_Rec *)*(void **)((uint8_t *)w + COMMPANEL_OFF_LIST))->ListAdd(name,
                         (void *)0);
         } while (orig_findnext(handle, found) == 0);
         orig_findclose(handle);
@@ -13582,7 +13581,7 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
     handle = orig_findfirst(pattern, found);
     if (handle != -1) {
         do {
-            ListAdd(*(void **)((uint8_t *)w + COMMPANEL_OFF_LIST),
+            ((AM2_Rec *)*(void **)((uint8_t *)w + COMMPANEL_OFF_LIST))->ListAdd(
                     (const char *)(found + AM2_FIND_OFF_NAME), (void *)0);
         } while (orig_findnext(handle, found) == 0);
         orig_findclose(handle);
@@ -14160,7 +14159,7 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
     h = orig_findfirst(dir, find);
     if (h != -1) {
         do {
-            ListAdd(*(void **)(self + DLG_OFF_LIST),
+            ((AM2_Rec *)*(void **)(self + DLG_OFF_LIST))->ListAdd(
                     (const char *)(find + AM2_FIND_OFF_NAME), 0);
         } while (orig_findnext(h, find) == 0);
         orig_findclose(h);
@@ -16888,8 +16887,8 @@ void __cdecl PointerActionFollow(void *obj, uint32_t at)
 
         if (!o) {
             /* Gone: drop it and DO NOT advance. */
-            ListRemoveAt((void *)((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
-                             [*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER],
+            ((AM2_Rec *)(void *)((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
+                             [*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER])->ListRemoveAt(
                          i);
             continue;
         }
@@ -16998,7 +16997,7 @@ void __cdecl PointerActionMode4(void *target, uint32_t at)
         int32_t  ot;
 
         if (!o) {
-            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
             continue;   /* no i++ -- the removal shifts the next entry down */
         }
 
@@ -17102,7 +17101,7 @@ void __cdecl PointerActionMode5(void *target, uint32_t at)
         int32_t  ot;
 
         if (!o) {
-            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
             continue;   /* no i++ -- the removal shifts the next entry down */
         }
 
@@ -17196,7 +17195,7 @@ void __cdecl PointerActionMode6(void *target, uint32_t at)
         int32_t  ot;
 
         if (!o) {
-            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
             continue;   /* no i++ -- the removal shifts the next entry down */
         }
 
@@ -17303,7 +17302,7 @@ void __cdecl VehicleDismountAll(void *a, void *b)
 
         if (!o) {
             /* No i++ -- the removal shifts the next entry into this slot. */
-            ListRemoveAt(veh + OBJ_OFF_PTR_LIST, i);
+            ((AM2_Rec *)(veh + OBJ_OFF_PTR_LIST))->ListRemoveAt(i);
             continue;
         }
         ObjAttachTo(o, driver);

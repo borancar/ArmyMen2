@@ -967,33 +967,27 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
  */
 void __cdecl FreeScenarios(void)
 {
-    uint8_t *tab = *(uint8_t **)(uintptr_t)ADDR_SCENARIOS;
+    /* The table pointer is re-read after every free, as the original does. */
+#define TAB (*(uint8_t **)(uintptr_t)ADDR_SCENARIOS)
+#define PART_ROWS(i, k) (*(void **)(TAB + (size_t)(i) * AM2_SCENARIO_BYTES     \
+                                    + SCENARIO_OFF_PARTS                       \
+                                    + (size_t)(k) * SCENARIO_PART_BYTES        \
+                                    + SCENARIO_PART_OFF_ROWS))
+    int32_t i, k;
 
-    if (!tab)
-        return;
-
-    {
-        uint32_t i;
-
-        for (i = 0; i < *(const uint16_t *)(uintptr_t)ADDR_SCENARIO_COUNT;
-             i++) {
-            uint8_t *rec = tab + (size_t)i * AM2_SCENARIO_BYTES
-                           + SCENARIO_OFF_PARTS;
-            uint32_t k;
-
-            for (k = 0; k < AM2_SCENARIO_PARTS; k++, rec += SCENARIO_PART_BYTES) {
-                void *rows = *(void **)(rec + SCENARIO_PART_OFF_ROWS);
-
-                if (rows)
-                    am2_free(rows);
-            }
-        }
+    if (TAB) {
+        for (i = 0; i < *(const uint16_t *)(uintptr_t)ADDR_SCENARIO_COUNT; i++)
+            for (k = 0; k < (int32_t)AM2_SCENARIO_PARTS; k++)
+                if (PART_ROWS(i, k))
+                    am2_free(PART_ROWS(i, k));
+        am2_free(TAB);
     }
 
-    am2_free(tab);
-
-    *(int32_t *)(uintptr_t)ADDR_SCENARIO_UNREAD = 0;
-    *(uint8_t **)(uintptr_t)ADDR_SCENARIOS      = (uint8_t *)0;
+    /* Both are cleared with or without a table to free, as one eight-byte
+     * memset over the header (ADDR_SCENARIO_UNREAD, the count, the table). */
+    memset((void *)(uintptr_t)ADDR_SCENARIO_UNREAD, 0, 8);
+#undef PART_ROWS
+#undef TAB
 }
 
 /* AddLevelRecord -- original 0x0043E160, one caller.

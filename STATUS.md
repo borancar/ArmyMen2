@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 984 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1002 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 984:
+  the near-miss sweep, 758 before the row pools. From 758 to 1002:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -158,6 +158,25 @@ main result so far (details in `src/vc6/README.md`):
     could not produce that copy; all four event.cpp fire helpers match now.
   - **ToggleSelect fixed**: toggling off the only selected unit returns
     without OnSelectionChanged (ours called it on that path too).
+  - **GetArmyScore fixed**: it maps the slot to its army with
+    CommArmyOfSlot; ours called the inverse, CommSlotForArmy, so the
+    multiplayer score column could show the wrong army's score.
+  - **FreeScenarios fixed**: it clears the scenario header (one 8-byte
+    memset over unread/count/table) even when there is no table to free.
+  - **Comm and row-list calls are direct member calls**:
+    `AM2_THE_COMM->CommMustBroadcast(army)`, `((AM2_Rec *)list)->ListAdd(...)`.
+    The inline forwarders (`CommMustBroadcast(comm, army)`) change VC6's
+    register allocation at the call site; a sweep of ~200 call sites matched
+    RankPromote, TrooperDropItem, ExitAllFromVehicle and FlushDelayedSends
+    with no losses.
+  - **Two identical functions folded by the linker**: SeqRun has separate
+    arms for kinds 2 and 3 that both call 0x00461310. VC6 merges identical
+    arms for one callee, so the source had two functions and LINK's
+    /OPT:ICF folded them; SeqStepKind3 is the twin, uninstalled.
+  - **A store kept after a strcpy by aliasing**: LoadGameProcSection's two
+    flags live inside the saved block, and writing them through the block
+    (GAMEPROC_OFF_LOAD_PENDING) is what keeps VC6 from hoisting them above
+    the strcpy into it. Its stashes are two 0x40 buffers, not 0x50.
   - **Parked**: the five copy-protection call sites (OnStartWar and four
     more) cannot match while the reference keeps GOG's `jmp`s -- a policy
     question, not a source one; MultiSpritePaint and OverlayPrepare

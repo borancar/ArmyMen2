@@ -7403,7 +7403,7 @@ void __cdecl AiStepAttach(void *obj, void *out)
         uint32_t  from = rec ? *(const uint32_t *)(rec + 4) : 0;
 
         if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-            && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+            && !AM2_THE_COMM->CommMustBroadcast(
                                   (int16_t)army)) {
             DamageBroadcast(obj, from, AM2_AI_TIMEOUT_DAMAGE, 3,
                             o + OBJ_OFF_POS, 0);
@@ -8051,7 +8051,7 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
      * anything is fired and read again at the very bottom. */
     remote = 0;
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         remote = 1;
 
@@ -8076,7 +8076,7 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
     *(int32_t *)(out + SIGHTCOUT_OFF_SEEN) = 0;
 
     if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        || CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        || AM2_THE_COMM->CommMustBroadcast(
                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))) {
         *(int32_t *)out = 0;
         *(uint8_t *)(o + TROOPER_OFF_FIRE_FLAG) = (uint8_t)orig_game_rand();
@@ -8221,7 +8221,7 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
      * long the facing has been stable; a trooper that has just turned keeps
      * the facing it turned to. */
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !CommArmyOfSlot(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommArmyOfSlot(
                            (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY))) {
         settled = 1;
     } else {
@@ -8413,7 +8413,7 @@ no_route:
         *(w + 4) = facing;
         speed  = 0;
     } else if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-               && !CommArmyOfSlot(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
+               && !AM2_THE_COMM->CommArmyOfSlot(
                                   (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY))
                && ObjType2Field548((const AM2_Object *)o)) {
         *(int32_t *)(w + 8) = 1;
@@ -8469,10 +8469,9 @@ settle_facing:
 
                 local = 0;
                 if (*(const int32_t *)((const uint8_t *)comm + 0x3D8)
-                    && CommArmyOfSlot(comm, slot))
+                    && ((AM2_Comm *)comm)->CommArmyOfSlot(slot))
                     local = 1;
-                else if (!CommArmyOfSlot(
-                             *(void *const *)(uintptr_t)ADDR_COMM_OBJECT, 0)
+                else if (!AM2_THE_COMM->CommArmyOfSlot(0)
                          || *(const int32_t *)(
                                 (const uint8_t *)*(void *const *)(uintptr_t)
                                     ADDR_COMM_OBJECT + 0x3D8))
@@ -8536,8 +8535,7 @@ watched:
                     PlaySoundAt(AM2_SND_MINE_FOUND, 0, 0, 0, 0);
                 }
             } else if ((!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-                        || CommArmyOfSlot(
-                               *(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
+                        || AM2_THE_COMM->CommArmyOfSlot(
                                (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY)))
                        && (*(const uint8_t *)(o + OBJ_OFF_ARMY)
                                != *(const uint8_t *)(at + OBJ_OFF_ARMY)
@@ -8808,7 +8806,7 @@ void __cdecl StepType2(void *obj)
     }
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         goto tail;
 
@@ -8980,7 +8978,7 @@ alive:
         goto choose;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         goto choose;
 
@@ -8995,7 +8993,7 @@ alive:
         /* A first occupant that no longer resolves is removed, and the
          * frame ends at the chooser. */
         if (!first) {
-            ListRemoveAt(o + OBJ_OFF_POSE, 0);
+            ((AM2_Rec *)(o + OBJ_OFF_POSE))->ListRemoveAt(0);
             goto choose;
         }
         /* An order already in the record's second word: chooser only. */
@@ -9031,7 +9029,7 @@ choose:
 post:
     /* The second tail. Everything above reaches it. */
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         goto emit;
 
@@ -10043,7 +10041,7 @@ void __cdecl Step3ChooseFacing(void *obj, void *out)
 
     /* A networked client only steers a vehicle it owns. */
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         AM2_STEP3_STOP_SEARCH();
 
@@ -10518,8 +10516,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
                 height = ObjHeight(o);
 
                 if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0
-                    || CommMustBroadcast(
-                           *(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                    || AM2_THE_COMM->CommMustBroadcast(
                            (int16_t)*(const int8_t *)(o + 0x10u))) {
                     *(int32_t *)(r + 0x24u) = 0;
                     *(uint8_t *)(o + 0x529u) = (uint8_t)orig_step3_rand();
@@ -10556,7 +10553,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
 
                 FireWeapon(weapon, o, height, heading, spot, fireTarget);
 
-                if (CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                if (AM2_THE_COMM->CommMustBroadcast(
                                       (int16_t)*(const int8_t *)(o + 0x10u)))
                     SendVehicleFire(o);
 
@@ -10621,7 +10618,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
                 (*(const uint32_t *const *)(o + 0x540u))[i]);
 
             if (p == 0) {
-                ListRemoveAt(o + 0x538u, i);
+                ((AM2_Rec *)(o + 0x538u))->ListRemoveAt(i);
                 continue;
             }
 
@@ -10680,10 +10677,8 @@ void __cdecl Step3Drive(void *obj, void *rec)
                      * would broadcast, and only the second decides whether
                      * a WANT is actually sent. */
                     if (!(*(const int32_t *)((uint8_t *)comm + 0x3D8u) != 0
-                          && CommMustBroadcast(
-                                 comm, (int16_t)*(const int8_t *)(o + 0x10u)))
-                        && CommMustBroadcast(
-                               comm, (int16_t)*(const int8_t *)(o + 0x10u))
+                          && ((AM2_Comm *)comm)->CommMustBroadcast((int16_t)*(const int8_t *)(o + 0x10u)))
+                        && ((AM2_Comm *)comm)->CommMustBroadcast((int16_t)*(const int8_t *)(o + 0x10u))
                         && *(const int32_t *)((uint8_t *)comm + 0x3D8u) == 0)
                         SendVehicleWantItem(o, p, 0, 0, 0);
                 }

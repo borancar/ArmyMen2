@@ -983,53 +983,62 @@ void __cdecl CollapseEqualDeltas(uint16_t *values, int32_t *count)
     *count = kept + 1;
 }
 
-/* Shared body; `wide` is the only difference between the two arms, exactly as
- * it is between MaskPixelSolid and MaskPixelSolid32. */
-static void RemapRuns(uint8_t *rle, int32_t wide, const uint8_t *table)
-{
-    uint16_t       width  = *(const uint16_t *)rle;
-    uint16_t       height = *(const uint16_t *)(rle + 2);
-    uint32_t       step   = wide ? 4u : 2u;
-    const uint8_t *row    = rle + 4;
-    const uint8_t *end    = rle + 4 + (uint32_t)height * step;
-
-    while (row < end) {
-        uint8_t *p   = rle + (wide ? *(const uint32_t *)row
-                                   : *(const uint16_t *)row);
-        uint16_t acc = 0;
-
-        /* A width of zero skips the row entirely rather than walking it once:
-         * the original tests the width before the loop, not after. */
-        if (width != 0) {
-            do {
-                uint32_t skip = *p++;
-                uint32_t run;
-
-                acc = (uint16_t)(acc + skip);
-                run = *p++;
-                acc = (uint16_t)(acc + run);
-
-                /* The original's test is signed, on a value it has just masked
-                 * to a byte, so it is `run != 0`. */
-                if (run) {
-                    uint32_t n = run;
-
-                    do {
-                        *p = table[*p];
-                        p++;
-                    } while (--n);
-                }
-            } while (acc < width);
-        }
-        row += step;
-    }
-}
-
+/* Both arms written out, as the original has them: `wide` is the only
+ * difference -- dword row offsets or word ones -- exactly as it is between
+ * MaskPixelSolid and MaskPixelSolid32.
+ *
+ * A width of zero skips a row entirely rather than walking it once: the run
+ * walk is a `while`, tested before the first pair. The run length is a byte
+ * compared signed after masking, so it is `run != 0`; the original keeps it in
+ * the dead `table` argument slot. */
 void __cdecl RemapRleRuns(void *rle, void *unused, int32_t wide,
                           const void *table)
 {
+    uint8_t  *base   = (uint8_t *)rle;
+    uint16_t  width  = *(const uint16_t *)base;
+    uint16_t  height = *(const uint16_t *)(base + 2);
+    uint8_t  *row    = base + 4;
+    uint8_t  *end;
+    uint8_t  *p;
+    uint16_t  acc;
+    const uint8_t *map = (const uint8_t *)table;
+    uint8_t   run;
+    int32_t   i;
+
     (void)unused;
-    RemapRuns((uint8_t *)rle, wide == 1, (const uint8_t *)table);
+    if (wide == 1) {
+        for (end = base + 4 + (uint32_t)height * 4; row < end; row += 4) {
+            p   = base + *(const uint32_t *)row;
+            acc = 0;
+            while (acc < width) {
+                acc = (uint16_t)(acc + *p);
+                p++;
+                run = *p;
+                p++;
+                acc = (uint16_t)(acc + run);
+                for (i = 0; i < run; i++) {
+                    *p = map[*p];
+                    p++;
+                }
+            }
+        }
+    } else {
+        for (end = base + 4 + (uint32_t)height * 2; row < end; row += 2) {
+            p   = base + *(const uint16_t *)row;
+            acc = 0;
+            while (acc < width) {
+                acc = (uint16_t)(acc + *p);
+                p++;
+                run = *p;
+                p++;
+                acc = (uint16_t)(acc + run);
+                for (i = 0; i < run; i++) {
+                    *p = map[*p];
+                    p++;
+                }
+            }
+        }
+    }
 }
 
 int32_t __cdecl FilterMatches(int32_t wantA, int32_t wantB,
@@ -1205,7 +1214,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::GetArmyScore(int32_t slot)
 {
     void *comm = this;
 
-    int32_t idx = this->CommSlotForArmy(slot);
+    int32_t idx = this->CommArmyOfSlot(slot);
     int32_t out;
 
     (void)comm;
@@ -1856,7 +1865,7 @@ void __cdecl AiTakeAbandoned(void)
         if (!*(const int32_t *)(COMM + (uint32_t)army * AM2_PLAYER_STRIDE
                                 + COMM_ARMY_OFF_WAS_HERE))
             continue;
-        if (CommSlotHasPlayer((void *)(uintptr_t)COMM, army))
+        if (((AM2_Comm *)(void *)(uintptr_t)COMM)->CommSlotHasPlayer(army))
             continue;
 
         LoadArmyPlacement(army);
@@ -1956,7 +1965,7 @@ void __cdecl MissionNetworked(int32_t army, int32_t teamGame)
 {
     const uint8_t *comm  = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
     uint32_t       mine  = *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
-    int32_t        slot  = CommSlotForArmy((void *)(uintptr_t)comm, army);
+    int32_t        slot  = ((AM2_Comm *)(void *)(uintptr_t)comm)->CommSlotForArmy(army);
     int32_t        won;
 
     if (teamGame) {
@@ -2182,6 +2191,24 @@ void __cdecl MovieBuildName(char *dst, const char *name)
  * not.
  */
 int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx)
+{
+    uint8_t *row = *(uint8_t **)((uint8_t *)rec + SEQ_OFF_ROW);
+
+    (void)at;
+    if (++*(uint32_t *)(row + ROW_OFF_STAMP_54) > 1)
+        return SeqRetire(ctx, rec);
+
+    RowUpdate(row, 1, (void *)(uintptr_t)ADDR_MAP_DESC);
+    return *(const int16_t *)((uint8_t *)rec + SEQ_OFF_NEXT);
+}
+
+/* Kind 3's stepper: SeqStepKind2's twin, body for body. The image has one
+ * function at 0x00461310, yet SeqRun keeps two separate arms that both call it
+ * -- which VC6 does not emit for one callee (it merges identical arms), and
+ * does for two identical functions the linker then folds (/OPT:ICF). So the
+ * source had two, and this is the second. Not installed: it has no address of
+ * its own. */
+static int32_t __cdecl SeqStepKind3(int32_t at, void *rec, void *ctx)
 {
     uint8_t *row = *(uint8_t **)((uint8_t *)rec + SEQ_OFF_ROW);
 
@@ -2498,23 +2525,22 @@ void __cdecl SeqRun(void *ctx)
         uint8_t *rec = *(uint8_t **)((uint8_t *)ctx + SEQ_CTX_OFF_RECORDS)
                        + at * AM2_SEQ_RECORD_SIZE;
 
-        if (*(const uint32_t *)(rec + SEQ_OFF_GATE) == 0) {
+        if (*(const uint32_t *)(rec + SEQ_OFF_GATE) > 0) {
+            switch (*(const uint32_t *)(rec + SEQ_OFF_KIND)) {
+            case 0: at = SeqStepKind0(at, rec, ctx); break;
+            case 1: break;   /* hangs; see above */
+            case 2: at = SeqStepKind2(at, rec, ctx); break;
+            case 3: at = SeqStepKind3(at, rec, ctx); break;
+            case 4: at = SeqStepKind4(at, rec, ctx); break;
+            case 5: at = SeqStepKind5(at, rec, ctx); break;
+            case 6: at = SeqStepKind6(at, rec, ctx); break;
+            case 7: at = SeqStepKind7(at, rec, ctx); break;
+            default:
+                at = *(const int16_t *)(rec + SEQ_OFF_NEXT);
+                break;
+            }
+        } else {
             at = *(const int16_t *)(rec + SEQ_OFF_NEXT);
-            continue;
-        }
-
-        switch (*(const uint32_t *)(rec + SEQ_OFF_KIND)) {
-        case 0: at = SeqStepKind0(at, rec, ctx); break;
-        case 1: break;   /* hangs; see above */
-        case 2:          /* both reach the same stepper */
-        case 3: at = SeqStepKind2(at, rec, ctx); break;
-        case 4: at = SeqStepKind4(at, rec, ctx);   break;
-        case 5: at = SeqStepKind5(at, rec, ctx);   break;
-        case 6: at = SeqStepKind6(at, rec, ctx); break;
-        case 7: at = SeqStepKind7(at, rec, ctx); break;
-        default:
-            at = *(const int16_t *)(rec + SEQ_OFF_NEXT);
-            break;
         }
     }
 
@@ -3038,7 +3064,7 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
         *(int32_t *)(r + SEQ_OFF_FIELD_0C) += 1;
 
         if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
-            && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+            && !AM2_THE_COMM->CommMustBroadcast(
                     (int16_t)UidArmy(*(const uint32_t *)(r + SEQ_OFF_OWNER))))
             skip = 1;
 

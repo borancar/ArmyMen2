@@ -290,7 +290,7 @@ void __cdecl SelectUnit(void *obj)
         if ((*(const uint32_t *const *)&REC[2])[i] == *(const uint32_t *)(o + 4))
             return;
 
-    PtrListPush(REC, (void *)(uintptr_t)*(const uint32_t *)(o + 4));
+    ((AM2_Rec *)REC)->PtrListPush((void *)(uintptr_t)*(const uint32_t *)(o + 4));
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
     OnSelectionChanged(*(const uint32_t *)(uintptr_t)
                               ADDR_ZERO_POINT);
@@ -323,7 +323,7 @@ void __cdecl DeselectUnit(void *obj)
     i = 0;
     while (i < REC[1]) {
         if ((*(const uint32_t *const *)&REC[2])[i] == *(const uint32_t *)(o + 4)) {
-            ListRemoveAt(REC, i);
+            ((AM2_Rec *)REC)->ListRemoveAt(i);
             *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_SELECTED;
         } else {
             i++;

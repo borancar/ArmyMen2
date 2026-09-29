@@ -191,7 +191,7 @@ static void ReopenSession(uint8_t *comm)
     if (!desc)
         return;
     *(uint32_t *)((uint8_t *)desc + 4) &= ~0x21u;
-    if (CommSetSessionDesc(comm, desc, 0) < 0)
+    if (((AM2_Comm *)comm)->CommSetSessionDesc(desc, 0) < 0)
         orig_log("Set Session Failed to reopen Session\n");
 }
 
@@ -214,18 +214,18 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
         return 1;
 
     /* Each player owns three bits; drop them all. */
-    g_eventFlags &= ~(0x20810u << CommPlayerSlot(comm, id));
+    g_eventFlags &= ~(0x20810u << ((AM2_Comm *)comm)->CommPlayerSlot(id));
 
     if (g_gameState == 1 || (g_gameState == 2 && g_subState == 0x22)) {
         /* Lobby: copy the name out before the record is recycled. */
         char name[128];
 
-        slot = CommPlayerSlot(comm, id);
+        slot = ((AM2_Comm *)comm)->CommPlayerSlot(id);
         strcpy(name, PlayerName(comm, slot));
         ((char *)PlayerName(comm, slot))[0] = '\0';
 
         {
-            int32_t removed = CommRemovePlayer(comm, id);
+            int32_t removed = ((AM2_Comm *)comm)->CommRemovePlayer(id);
 
             DestroyFlow(id);
             if (removed && *(const int32_t *)(comm + COMM_OFF_IS_HOST))
@@ -256,14 +256,14 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
 
     if (id == *(const uint32_t *)(comm + COMM_OFF_PLAYER_MADE)) {
         /* It was us. Leave and show the multiplayer result screen. */
-        CommPlayerLeft(comm, id);
+        ((AM2_Comm *)comm)->CommPlayerLeft(id);
         DestroyFlow(id);
         ShowMpResult(2);
         return 1;
     }
 
-    slot = CommPlayerSlot(comm, id);
-    if (CommPlayerLeft(comm, id) && g_gameState == 2 && g_netGame
+    slot = ((AM2_Comm *)comm)->CommPlayerSlot(id);
+    if (((AM2_Comm *)comm)->CommPlayerLeft(id) && g_gameState == 2 && g_netGame
         && *(const int32_t *)(comm + COMM_OFF_IS_HOST))
         CommEndSetup();
     DestroyFlow(id);

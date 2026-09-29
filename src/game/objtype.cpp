@@ -162,7 +162,7 @@ int32_t __cdecl ObjEventMask(const AM2_Object *obj)
 {
     int32_t mask = (int32_t)0x80000000;
 
-    switch (CommArmyOfSlot(kEventComm,
+    switch (((AM2_Comm *)kEventComm)->CommArmyOfSlot(
                            *(const int8_t *)((const uint8_t *)obj + 0x10))) {
     case 0:  mask = (int32_t)0xC0000000; break;
     case 1:  mask = (int32_t)0xA0000000; break;

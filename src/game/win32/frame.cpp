@@ -1940,7 +1940,7 @@ void __cdecl PausedFrameStep(void)
             variant = 1;
         }
 
-        army = CommArmyOfSlot(comm, slot);
+        army = ((AM2_Comm *)comm)->CommArmyOfSlot(slot);
         DrawSprite((*(AM2_Sprite *const *const *)(uintptr_t)ADDR_MP_MARK_GRID)
                        [army * 5 + variant],
                    xy[0], xy[1], 0);
@@ -1965,7 +1965,7 @@ void __cdecl PausedFrameStep(void)
             DrawSprite(spr, xy[0], xy[1], 0);
         }
 
-        if (CommSlotHasPlayer(comm, slot))
+        if (((AM2_Comm *)comm)->CommSlotHasPlayer(slot))
             DrawLatencyBar(slot, active - 1);
         else
             DrawSprite(*(AM2_Sprite *const *)(uintptr_t)ADDR_MP_MARK_C,
@@ -1985,7 +1985,7 @@ void __cdecl PausedFrameStep(void)
 
         if (mates > 1) {
             am2_sprintf(buf, "%d",
-                        CommTeamScore(comm, slot));
+                        ((AM2_Comm *)comm)->CommTeamScore(slot));
             TextExtent(buf, 1, ext);
             if (!LockSurface(
                     *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))

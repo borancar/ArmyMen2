@@ -1198,7 +1198,7 @@ void __cdecl RecvItemCreate(void *msg)
                    (char *)(uintptr_t)name,
                    (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_A),
                    (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_B),
-                   CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                   AM2_THE_COMM->CommArmyOfSlot(
                                      army),
                    army,
                    *(const int32_t *)(m + MSG_CREATE_OFF_C),
@@ -1215,7 +1215,7 @@ void __cdecl RecvItemCreate(void *msg)
                    (char *)(uintptr_t)name,
                    (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_A),
                    (int32_t)*(const int16_t *)(m + MSG_CREATE_OFF_B),
-                   CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                   AM2_THE_COMM->CommArmyOfSlot(
                                      army),
                    army,
                    *(const int32_t *)(m + MSG_CREATE_OFF_C),
@@ -1428,7 +1428,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
         return;
 
     if ((request == AM2_DO_PICKUP || request == AM2_DO_DROP)
-        && !CommMustBroadcast((void *)kComm,
+        && !((AM2_Comm *)(void *)kComm)->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(t + OBJ_OFF_ARMY)))
         return;
 
@@ -1488,7 +1488,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
 
         /* NOT the same sense as the DO gate above: here a trooper we would
          * broadcast for is one we must NOT drop for. */
-        if (CommMustBroadcast((void *)kComm,
+        if (((AM2_Comm *)(void *)kComm)->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(t + OBJ_OFF_ARMY)))
             return;
 
@@ -2045,7 +2045,7 @@ void __cdecl SendAllVehicleUpdates(void)
         if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
                                + slot * COMM_PLAYER_STRIDE + 0x50) == 0)
             continue;
-        if (!CommMustBroadcast((void *)comm, (int16_t)slot))
+        if (!((AM2_Comm *)(void *)comm)->CommMustBroadcast((int16_t)slot))
             continue;
         SendVehicleUpdates(slot);
     }

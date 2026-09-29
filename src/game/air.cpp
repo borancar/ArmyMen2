@@ -1063,7 +1063,7 @@ int32_t __cdecl AtFlagBase(const void *who, const void *owner, int32_t army,
     const uint8_t *o = (const uint8_t *)owner;
     const uint8_t *base;
 
-    if (CommArmyOfSlot(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
+    if (AM2_THE_COMM->CommArmyOfSlot(
                        *(const int8_t *)(o + OBJ_OFF_ARMY)) != army)
         return AM2_NOT_AT_FLAG_BASE;
 
@@ -1335,7 +1335,8 @@ void __cdecl AirDeliver(void)
 {
     int32_t i;
 
-    if (g_airKind[0] == 1) {
+    switch (g_airKind[0]) {
+    case 1: {
         int32_t n = g_airPassCount;
 
         if (n >= AM2_AIR_PASS_SLOTS)
@@ -1346,43 +1347,34 @@ void __cdecl AirDeliver(void)
         g_airPassArmy[g_airPassCount] =
             (int16_t)UidArmy(g_airFrom[0]);
         ++g_airPassCount;
-        return;
+        break;
     }
 
-    if (g_airKind[0] != 0)
-        return;
+    case 0:
+        for (i = 0; i < AM2_AIR_STRIKE_BLASTS; i++) {
+            int32_t dx = orig_air_rand() % AM2_AIR_STRIKE_SPREAD
+                         - AM2_AIR_STRIKE_HALF;
+            int32_t dy = orig_air_rand() % AM2_AIR_STRIKE_HALF
+                         - (int32_t)((double)dx
+                                     * *(const double *)((void *)(uintptr_t)(ADDR_AIR_STRIKE_SLOPE)))
+                         - AM2_AIR_STRIKE_Y_BIAS;
+            int32_t delay = orig_air_rand() % AM2_AIR_STRIKE_JITTER
+                            + dx * AM2_AIR_STRIKE_SLIDE + AM2_AIR_STRIKE_BASE_MS;
 
-    for (i = 0; i < AM2_AIR_STRIKE_BLASTS; i++) {
-        int32_t dx = orig_air_rand() % AM2_AIR_STRIKE_SPREAD
-                     - AM2_AIR_STRIKE_HALF;
-        int32_t dy = orig_air_rand() % AM2_AIR_STRIKE_HALF;
-        int32_t delay;
-        uint32_t who;
-
-        dy -= (int32_t)((double)dx
-                        * *(const double *)((void *)(uintptr_t)(ADDR_AIR_STRIKE_SLOPE)));
-        dy -= AM2_AIR_STRIKE_Y_BIAS;
-
-        delay = orig_air_rand() % AM2_AIR_STRIKE_JITTER
-                + dx * AM2_AIR_STRIKE_SLIDE + AM2_AIR_STRIKE_BASE_MS;
-
-        who = g_airFrom[0];
-        orig_spawn_at((int16_t)g_airWhere[0] + dx,
-                      (int16_t)g_airWhere[1] + dy,
-                      ((const int32_t *)((void *)(uintptr_t)(ADDR_AIR_STRIKE_KINDS)))
-                          [(uint32_t)orig_air_rand() % AM2_AIR_STRIKE_KINDS],
-                      (int32_t)UidArmy(who), who, AM2_AIR_STRIKE_EXTRA,
-                      delay, 0, 0, 0);
-    }
-
-    {
-        uint32_t who = g_airFrom[0];
+            orig_spawn_at((int16_t)g_airWhere[0] + dx,
+                          (int16_t)g_airWhere[1] + dy,
+                          ((const int32_t *)((void *)(uintptr_t)(ADDR_AIR_STRIKE_KINDS)))
+                              [(uint32_t)orig_air_rand() % AM2_AIR_STRIKE_KINDS],
+                          (int32_t)UidArmy(g_airFrom[0]), g_airFrom[0],
+                          AM2_AIR_STRIKE_EXTRA, delay, 0, 0, 0);
+        }
 
         orig_spawn_at((int16_t)g_airWhere[0], (int16_t)g_airWhere[1],
                       ((const int32_t *)((void *)(uintptr_t)(ADDR_AIR_STRIKE_KINDS)))
                           [(uint32_t)orig_air_rand() % AM2_AIR_STRIKE_KINDS],
-                      (int32_t)UidArmy(who), who, AM2_AIR_STRIKE_EXTRA,
-                      AM2_AIR_STRIKE_JITTER, 0, 0, 0);
+                      (int32_t)UidArmy(g_airFrom[0]), g_airFrom[0],
+                      AM2_AIR_STRIKE_EXTRA, AM2_AIR_STRIKE_JITTER, 0, 0, 0);
+        break;
     }
 }
 
@@ -1446,7 +1438,7 @@ void __cdecl AirPassesDraw(void)
         return;
 
     if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        || CommMustBroadcast(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
+        || AM2_THE_COMM->CommMustBroadcast(
                              g_airPassArmy[0]))
         AirPassStrike(*(const uint32_t *)g_airPassWhere,
                              g_airPassArmy[0]);
@@ -1802,7 +1794,7 @@ void __cdecl AirPassStrike(uint32_t at, int32_t army)
         trooper = CreateTrooper((char *)(uintptr_t)ADDR_DIR_SCRATCH,
                                 (int16_t)at + off[i * 2],
                                 (int16_t)(at >> 16) + off[i * 2 + 1],
-                                CommArmyOfSlot(comm, army),
+                                ((AM2_Comm *)comm)->CommArmyOfSlot(army),
                                 army, flags, 0, 0, 1, 0);
 
         weapon = CreateWeapon((const char *)(uintptr_t)ADDR_DIR_SCRATCH, army,

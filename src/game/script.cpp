@@ -1413,7 +1413,7 @@ int32_t __cdecl ScriptArmyColour(AM2_ScriptCtx *ctx, int32_t *at)
         return -1;
     }
 
-    int32_t rc = CommSlotForArmy(*(void **)((void *)(uintptr_t)(ADDR_ARMY_TABLE)), army);
+    int32_t rc = ((AM2_Comm *)*(void **)((void *)(uintptr_t)(ADDR_ARMY_TABLE)))->CommSlotForArmy(army);
 
     (*at)++;
     return rc;
@@ -3316,7 +3316,7 @@ void __cdecl LoadLevelScript(void)
             /* A slot a real player still holds needs no AI script. The test
              * is the DirectPlay id, so this reads the opposite way round from
              * the name it first went in under -- see ADDR_COMM_SLOT_HAS_PLAYER. */
-            if (CommSlotHasPlayer(kCommObject, i))
+            if (((AM2_Comm *)kCommObject)->CommSlotHasPlayer(i))
                 continue;
 
             int32_t army = *(const int32_t *)(slot + AM2_PLAYER_ARMY);

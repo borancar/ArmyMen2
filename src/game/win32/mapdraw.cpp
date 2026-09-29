@@ -1627,7 +1627,7 @@ int32_t __cdecl RadarBlipColour(const void *objv, int32_t *blink)
     const uint8_t    *self = (const uint8_t *)objv;
     int32_t        colour;
 
-    colour = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+    colour = AM2_THE_COMM->CommArmyOfSlot(
                             *(const int8_t *)(self + OBJ_OFF_ARMY));
 
     if (ObjIsType4(obj)) {
@@ -2090,18 +2090,18 @@ void __cdecl DrawSelection(void)
         uint8_t  ink;
 
         if (!obj) {
-            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
             continue;
         }
 
         if (*(const uint32_t *)(obj + OBJ_OFF_FLAGS) & AM2_MARK_GONE) {
-            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
             *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
             continue;
         }
 
         if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) == 0) {
-            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
             *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
             continue;
         }

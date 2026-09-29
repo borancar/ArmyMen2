@@ -117,7 +117,7 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj))
         if (!obj) {
             /* Gone: drop it and do NOT advance, since everything after it has
              * just moved down one. */
-            ListRemoveAt(g_armyObjLists[army], i);
+            ((AM2_Rec *)g_armyObjLists[army])->ListRemoveAt(i);
             list = g_armyObjLists[army];
             continue;
         }
@@ -260,7 +260,7 @@ int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle)
         return 0;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               *(const int8_t *)(v + OBJ_OFF_ARMY)))
         return 0;
 
@@ -289,9 +289,9 @@ int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle)
     }
 
     *(int32_t *)(occupant + OBJ_OFF_RIDING) = 0;
-    ListRemoveAt(seats, seat);
+    ((AM2_Rec *)seats)->ListRemoveAt(seat);
 
-    if (CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+    if (AM2_THE_COMM->CommMustBroadcast(
                           *(const int8_t *)(v + OBJ_OFF_ARMY)))
         SendVehicleExit(v, occupant);
 
@@ -322,7 +322,7 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
 
         if (!ExitOneFromVehicle(seat, vehicle)
             && (!g_mpSession
-                || CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                || AM2_THE_COMM->CommMustBroadcast(
                                      (int16_t)((const AM2_Object *)v)->owner))) {
             /* Looked up a SECOND time, from a freshly re-read list pointer,
              * before the slot is removed. The original does not reuse the
@@ -330,10 +330,10 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
             uint8_t *out = (uint8_t *)LookupByUID(
                 (*(const uint32_t **)(v + VEHICLE_OFF_PTR_LIST + 8))[seat]);
 
-            ListRemoveAt(v + VEHICLE_OFF_PTR_LIST, seat);
+            ((AM2_Rec *)(v + VEHICLE_OFF_PTR_LIST))->ListRemoveAt(seat);
             if (out) {
                 *(int32_t *)(out + OBJ_OFF_RIDING) = 0;
-                if (CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                if (AM2_THE_COMM->CommMustBroadcast(
                                       (int16_t)((const AM2_Object *)v)->owner))
                     SendVehicleExit(vehicle, out);
             }
@@ -348,7 +348,7 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
             int16_t     army  = dmg ? (int16_t)dmg->owner : AM2_ARMY_ALL;
 
             if (g_mpSession
-                && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+                && !AM2_THE_COMM->CommMustBroadcast(
                                       (int16_t)army)) {
                 am2_log("ExitAllFromVehicle: I was killed in a vehicle, "
                         "damage owner not me\n");
@@ -448,7 +448,7 @@ int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3)
               : *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC2);
 
         if ((const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS
-                + (uint32_t)(CommArmyOfSlot(comm, army) << 8)) == rec)
+                + (uint32_t)(((AM2_Comm *)comm)->CommArmyOfSlot(army) << 8)) == rec)
             return 1;
 
         if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
@@ -462,7 +462,7 @@ int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3)
         else
             return 0;
 
-        if (AllyFlag(army, CommSlotForArmy(comm, idx)))
+        if (AllyFlag(army, ((AM2_Comm *)comm)->CommSlotForArmy(idx)))
             return 1;
     }
 
@@ -544,13 +544,13 @@ void __cdecl ObjAttachTo(void *subject, void *target)
                 uint8_t *other;
 
                 if (uid == ((const AM2_Object *)s)->uid) {
-                    ListRemoveAt(list, i);
+                    ((AM2_Rec *)list)->ListRemoveAt(i);
                     continue;           /* the next one shifted into i */
                 }
 
                 other = (uint8_t *)LookupByUID(uid);
                 if (!other) {
-                    ListRemoveAt(list, i);
+                    ((AM2_Rec *)list)->ListRemoveAt(i);
                     continue;
                 }
 
@@ -612,7 +612,7 @@ void __cdecl ObjAttachTo(void *subject, void *target)
          * already verified, so a second spelling here would be a second place
          * to be wrong. */
         if ((const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS
-                + (uint32_t)(CommArmyOfSlot(comm, army) << 8)) == kind)
+                + (uint32_t)(((AM2_Comm *)comm)->CommArmyOfSlot(army) << 8)) == kind)
             goto attach_and_join;
 
         if (kind == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
@@ -626,7 +626,7 @@ void __cdecl ObjAttachTo(void *subject, void *target)
         else
             goto mode_only;
 
-        if (AllyFlag(army, CommSlotForArmy(comm, idx)))
+        if (AllyFlag(army, ((AM2_Comm *)comm)->CommSlotForArmy(idx)))
             goto attach_and_join;
     }
 
@@ -651,7 +651,7 @@ attach_and_join:
 
         *(int32_t *)(s + OBJ_OFF_FORMATION_SLOT) =
             *(const int32_t *)(list + SUBREC_OFF_COUNT);
-        PtrListPush(list, (void *)(uintptr_t)
+        ((AM2_Rec *)list)->PtrListPush((void *)(uintptr_t)
                     ((const AM2_Object *)s)->uid);
     }
 }
@@ -710,7 +710,7 @@ int32_t __cdecl ArmyAlliedWithObj(int32_t army, void *b, int32_t useRec3)
               : *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC2);
 
         if ((const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS
-                + (uint32_t)(CommArmyOfSlot(comm, army) << 8)) == rec)
+                + (uint32_t)(((AM2_Comm *)comm)->CommArmyOfSlot(army) << 8)) == rec)
             return 1;
 
         if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
@@ -724,7 +724,7 @@ int32_t __cdecl ArmyAlliedWithObj(int32_t army, void *b, int32_t useRec3)
         else
             return 0;
 
-        if (AllyFlag(army, CommSlotForArmy(comm, idx)))
+        if (AllyFlag(army, ((AM2_Comm *)comm)->CommSlotForArmy(idx)))
             return 1;
     }
 

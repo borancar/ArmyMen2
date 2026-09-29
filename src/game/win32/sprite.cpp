@@ -2021,8 +2021,10 @@ void __cdecl FreeBitmap(void **pp)
 
 AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a, int32_t b)
 {
-    return PreloadSprite((int32_t)KeyFieldA(key), (int32_t)KeyFieldB(key),
-                         (int32_t)KeyFieldC(key), a, b);
+    /* KeyFieldA/B/C's bodies, inline: the original unpacks the key itself. */
+    return PreloadSprite((int32_t)((key >> 19) & 0x7F),
+                         (int32_t)((key >> 7) & 0x3FF),
+                         (int32_t)(key & 0x7F), a, b);
 }
 
 /* 0x004462F0, nine callers. Make a sprite from a file: allocate one, zero it,
@@ -2097,7 +2099,7 @@ AM2_Sprite *__cdecl LoadBitmap(const char *name, int32_t flags)
  */
 int32_t __cdecl ArmySpriteBase(void)
 {
-    int32_t army = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+    int32_t army = AM2_THE_COMM->CommArmyOfSlot(
                                   (int32_t)*(const uint32_t *)
                                       (uintptr_t)ADDR_DEFAULT_OWNER);
 

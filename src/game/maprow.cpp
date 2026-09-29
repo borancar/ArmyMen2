@@ -876,19 +876,18 @@ void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force)
 void __cdecl MapDescInit(void *desc, int32_t w, int32_t h)
 {
     uint8_t *d = (uint8_t *)desc;
-    int32_t  cols, shift, bytes;
+    int32_t  bytes;
     void    *cells;
 
     MapDescFree(d);
 
-    cols = w >> AM2_CELL_SHIFT;
-    *(int32_t *)(d + MAPDESC_OFF_COLS) = cols;
+    *(int32_t *)(d + MAPDESC_OFF_COLS) = w >> AM2_CELL_SHIFT;
     *(int32_t *)(d + MAPDESC_OFF_ROWS) = h >> AM2_CELL_SHIFT;
+    *(int32_t *)(d + MAPDESC_OFF_SHIFT) =
+        Log2Mask(*(const int32_t *)(d + MAPDESC_OFF_COLS));
 
-    shift = Log2Mask(cols);
-    *(int32_t *)(d + MAPDESC_OFF_SHIFT) = shift;
-
-    bytes = (cols << shift) << 2;
+    bytes = (*(const int32_t *)(d + MAPDESC_OFF_COLS)
+             << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) << 2;
     cells = am2_malloc((size_t)bytes);
     *(void **)(d + MAPDESC_OFF_CELLS) = cells;
     memset(cells, 0, (size_t)bytes);
@@ -1603,11 +1602,11 @@ void __cdecl BuildRowSet(void *set, int32_t count, const void *specs,
         am2_malloc((size_t)count * AM2_OBJ_ROW_STRIDE);
 
     for (i = 0; i < *(const int32_t *)(h + ROWSET_OFF_COUNT); i++) {
+        uint8_t *row = *(uint8_t *const *)(h + ROWSET_OFF_ROWS)
+                       + (size_t)i * AM2_OBJ_ROW_STRIDE;
         const int32_t *spec =
             (const int32_t *)((const uint8_t *)specs
                               + (size_t)i * AM2_ROW_SPEC_BYTES);
-        uint8_t *row = *(uint8_t *const *)(h + ROWSET_OFF_ROWS)
-                       + (size_t)i * AM2_OBJ_ROW_STRIDE;
 
         RowInit(row, (void *)0, spec[0] + dx, spec[1] + dy);
         ObjFlagSet0(row);

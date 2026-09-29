@@ -14365,6 +14365,11 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * the offset arithmetic. See the comm group above for why only half of it can
  * execute here. */
 #define GAMEPROC_OFF_SELECTED    0x8A0u
+/* ADDR_LOAD_PENDING and ADDR_HAVE_DEFAULT_COF as block members: the saved
+ * 0x438 bytes cover both, and LoadGameProcSection writes them through the
+ * block, which is why VC6 keeps those stores after the strcpys into it. */
+#define GAMEPROC_OFF_LOAD_PENDING     0x370u
+#define GAMEPROC_OFF_HAVE_DEFAULT_COF 0x374u
 #define ADDR_SEL_LIST_INIT       0x00424890u  /* cdecl, from the init table */
 #define ADDR_SEL_LIST_CTOR_THUNK 0x004248A0u  /* cdecl void *(void) */
 #define ADDR_SEL_LIST_ATEXIT     0x004248B0u  /* cdecl int32_t(void) */

@@ -1836,13 +1836,10 @@ int32_t __cdecl BlockWeightAt(void *from, uint32_t at, uint32_t ref)
 
     if (from) {
         /* TileAttrAt's body, inline for both tiles as the image has it. */
-        int32_t d = *(const int8_t *)(g_tileAttrs + ((uint32_t)tile & 0xFFFFu))
-                  - *(const int8_t *)(g_tileAttrs
-                        + *(const uint16_t *)((const uint8_t *)from + OBJ_OFF_TILE));
-
-        if (d < 0)
-            d = -d;
-        if (d > AM2_BLOCK_HEIGHT_STEP)
+        if (abs(*(const int8_t *)(g_tileAttrs + tile)
+                - *(const int8_t *)(g_tileAttrs
+                      + *(const uint16_t *)((const uint8_t *)from + OBJ_OFF_TILE)))
+            > AM2_BLOCK_HEIGHT_STEP)
             total += AM2_BLOCK_FULL;
     }
 
@@ -2070,7 +2067,7 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
     if ((flags & (int32_t)OBJ_FLAG_DESTROYED) != 0)
         SubrecHideRows(o + OBJ_OFF_SUBRECORD);
 
-    PtrListPush(((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[army],
+    ((AM2_Rec *)((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[army])->PtrListPush(
                 *(void **)(o + 4));
 
     rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
@@ -2961,7 +2958,7 @@ int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
 
         if (ObjIsWatchedKind(o)
             && (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-                || CommMustBroadcast(*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)),
+                || AM2_THE_COMM->CommMustBroadcast(
                                      (int16_t)*(const int8_t *)
                                          (o + OBJ_OFF_ARMY))))
             DamageObject(o, AM2_BLOCK_WEAR_AMOUNT, AM2_BLOCK_WEAR_KIND,
@@ -3258,7 +3255,7 @@ void __cdecl ShooterReact(void *shooter, void *target)
         return;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(s + OBJ_OFF_ARMY)))
         return;
 
@@ -4088,7 +4085,7 @@ void __cdecl DestroyByType(void *obj)
     default: DestroyObjCommon(obj); break;
     }
 
-    if (CommMustBroadcast(kItemComm,
+    if (((AM2_Comm *)kItemComm)->CommMustBroadcast(
                                  (int16_t)*(const int8_t *)((const uint8_t *)obj
                                                             + OBJ_OFF_ARMY)))
         SendObjDestroyed(obj);
@@ -4255,7 +4252,7 @@ void __cdecl DestroyObjCommon(void *obj)
 
         next = *(const uint32_t *)(cur + OBJ_OFF_CHAIN_NEXT_UID);
 
-        if (CommMustBroadcast(kItemComm,
+        if (((AM2_Comm *)kItemComm)->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(cur + OBJ_OFF_ARMY)))
             SendObjDestroyed(cur);
     }
@@ -4403,7 +4400,7 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
         (int16_t)*(const int8_t *)(o + AM2_OBJ_OWNER_OFF);
 
     if (g_mpSession && suppress == 0
-        && !CommMustBroadcast(kItemComm, owner))
+        && !((AM2_Comm *)kItemComm)->CommMustBroadcast(owner))
         return;
 
     if (resurrect) {
@@ -4443,7 +4440,7 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
 
     if (suppress)
         return;
-    if (!CommMustBroadcast(kItemComm, owner))
+    if (!((AM2_Comm *)kItemComm)->CommMustBroadcast(owner))
         return;
 
     SendItemDeploy(obj, resurrect);
@@ -5223,7 +5220,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, int32_t d, int32_t kind,
     }
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         return;
 
@@ -5268,7 +5265,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, int32_t d, int32_t kind,
         } else {
             RemoveInventoryItem(o, slot);
 
-            if (CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+            if (AM2_THE_COMM->CommMustBroadcast(
                                   (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))) {
                 const uint8_t *comm =
                     *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
@@ -5452,7 +5449,7 @@ void __cdecl DamageVehicle(void *obj, int32_t amount, int32_t d, int32_t kind,
                               *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) {
-        if (!CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        if (!AM2_THE_COMM->CommMustBroadcast(
                                *(const int8_t *)(o + OBJ_OFF_ARMY)))
             return;
     } else if (*(const int32_t *)(uintptr_t)ADDR_CHEAT_INVULNERABLE
@@ -5836,13 +5833,13 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
     }
 
     if (g_mpSession && suppress == 0
-        && !CommMustBroadcast(kItemComm, attackerOwner))
+        && !((AM2_Comm *)kItemComm)->CommMustBroadcast(attackerOwner))
         return;
 
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) <= 0) {
         NotifyDamaged(obj, attacker);
         if (g_mpSession && suppress == 0
-            && CommMustBroadcast(kItemComm, attackerOwner))
+            && ((AM2_Comm *)kItemComm)->CommMustBroadcast(attackerOwner))
             DamageBroadcast(obj, attackerUid, amount, kind,
                                   o + OBJ_OFF_POS, 0);
         return;
@@ -5868,7 +5865,7 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
     NotifyDamaged(obj, attacker);
 
     if (g_mpSession && suppress == 0
-        && CommMustBroadcast(kItemComm, attackerOwner))
+        && ((AM2_Comm *)kItemComm)->CommMustBroadcast(attackerOwner))
         DamageBroadcast(obj, attackerUid, amount, kind,
                               o + OBJ_OFF_POS, 0);
 
@@ -5876,7 +5873,7 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
         return;
 
     if (g_mpSession
-        && !CommMustBroadcast(kItemComm,
+        && !((AM2_Comm *)kItemComm)->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + AM2_OBJ_OWNER_OFF)))
         return;
 
@@ -5940,7 +5937,7 @@ void __cdecl FreeOverdueItems(void)
         uint32_t flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
 
         if ((flags & OBJ_FLAG_REPLACED) && !(flags & OBJ_FLAG_NO_SWEEP)) {
-            if (CommMustBroadcast(kItemComm,
+            if (((AM2_Comm *)kItemComm)->CommMustBroadcast(
                                   (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
                 ItemGoneMessageSend(obj);
             FreeItem(obj, 1);
@@ -6788,7 +6785,7 @@ void __cdecl StepType1And4(void *obj)
         int32_t   extra = 0;
 
         if (!*(void *const *)(uintptr_t)ADDR_MP_SESSION
-            || CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+            || AM2_THE_COMM->CommMustBroadcast(
                                  (int16_t)army))
             extra = *(const int32_t *)(uintptr_t)ADDR_SPAWN_EXTRA_6622BC;
 
@@ -6856,7 +6853,7 @@ void __cdecl UseInventoryItem(void *unit, int32_t slot)
     int32_t  ammo;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !CommMustBroadcast(comm, (int16_t)*(const int8_t *)(u + OBJ_OFF_ARMY)))
+        && !((AM2_Comm *)comm)->CommMustBroadcast((int16_t)*(const int8_t *)(u + OBJ_OFF_ARMY)))
         return;
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
@@ -6884,7 +6881,7 @@ void __cdecl UseInventoryItem(void *unit, int32_t slot)
 
     RemoveInventoryItem(u, slot);
 
-    if (CommMustBroadcast(comm,
+    if (((AM2_Comm *)comm)->CommMustBroadcast(
                           (int16_t)*(const int8_t *)(u + OBJ_OFF_ARMY))) {
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             am2_log("UseInventoryItem: droping item:%x\n",
@@ -6949,7 +6946,7 @@ void __cdecl TrooperDropItem(void *unit, int32_t slot, uint32_t at)
     /* Both reads go THROUGH the slot (`mov ecx, [0x004751B0]`), as in
      * UseInventoryItem -- this passed the slot's own address as `this` and
      * read the verbose flag 0x418 bytes past it. */
-    if (CommMustBroadcast(*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)),
+    if (AM2_THE_COMM->CommMustBroadcast(
                           (int16_t)*(const int8_t *)(u + OBJ_OFF_ARMY))) {
         if (*(const int32_t *)(*(const uint8_t **)((void *)(uintptr_t)(ADDR_COMM_OBJECT))
                                + COMM_OFF_VERBOSE))
@@ -7695,7 +7692,7 @@ void __cdecl RankPromote(void *obj)
         return;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         return;
 
@@ -7796,7 +7793,7 @@ void __cdecl Type238Action(void *obj, int32_t award)
         return;
 
     if (*(void *const *)(uintptr_t)ADDR_MP_SESSION
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         return;
 
@@ -8047,7 +8044,7 @@ void __cdecl DeselectAll(void)
                : (uint8_t *)0;
 
         if (!obj) {
-            ListRemoveAt(sel, i);       /* and do NOT advance i */
+            ((AM2_Rec *)sel)->ListRemoveAt(i);       /* and do NOT advance i */
             continue;
         }
 
@@ -8156,7 +8153,7 @@ void __cdecl EnterVehicle(void *unit, void *vehicle)
         return;
 
     *(uint32_t *)(u + OBJ_OFF_RIDING) = ((const AM2_Object *)vehicle)->uid;
-    PtrListPush(v + VEHICLE_OFF_PTR_LIST, (void *)(uintptr_t)uid);
+    ((AM2_Rec *)(v + VEHICLE_OFF_PTR_LIST))->PtrListPush((void *)(uintptr_t)uid);
 
     n = *(const int32_t *)(v + VEHICLE_OFF_PTR_LIST + 4);
     if (*(const int32_t *)(u + OBJ_OFF_SARGE) && n > 1) {
@@ -8176,7 +8173,7 @@ void __cdecl EnterVehicle(void *unit, void *vehicle)
         SelectUnit(v);
     }
 
-    if (CommMustBroadcast(*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)),
+    if (AM2_THE_COMM->CommMustBroadcast(
                           (int16_t)*(const int8_t *)(v + OBJ_OFF_ARMY)))
         SendVehicleEnter(v, u);
 
@@ -8212,7 +8209,7 @@ void __cdecl BoardVehicle(uint32_t uid, void *vehicle)
     *(uint32_t *)(unit + OBJ_OFF_RIDING) =
         ((const AM2_Object *)vehicle)->uid;
 
-    PtrListPush((uint8_t *)vehicle + VEHICLE_OFF_PTR_LIST,
+    ((AM2_Rec *)((uint8_t *)vehicle + VEHICLE_OFF_PTR_LIST))->PtrListPush(
                 (void *)(uintptr_t)uid);
 }
 
@@ -8327,7 +8324,7 @@ void __cdecl Type2ActionAll(void)
             ((const uint32_t *)g_type2List->items)[i]);
 
         if (!obj) {
-            ListRemoveAt(g_type2List, i);
+            ((AM2_Rec *)g_type2List)->ListRemoveAt(i);
             continue;   /* no step: the shifted-down entry is next */
         }
 
@@ -8428,7 +8425,7 @@ void __cdecl AwardOwnArmyXp(void)
         uint8_t *obj = (uint8_t *)LookupByUID(((const uint32_t *)LIST->items)[i]);
 
         if (!obj) {
-            ListRemoveAt(LIST, i);
+            ((AM2_Rec *)LIST)->ListRemoveAt(i);
             continue;               /* no step: the shifted-down entry is next */
         }
 
@@ -9482,7 +9479,7 @@ void __cdecl SelectionClick(void)
                 /* Found: drop it, unless it is the only one left. */
                 if (n <= 1)
                     return;
-                ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+                ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
                 *(uint32_t *)(e + OBJ_OFF_FLAGS) &=
                     ~(uint32_t)OBJ_FLAG_SELECTED;
                 /* DESELECTING DETACHES. `push 0; push esi; call 0x458070` is
@@ -9501,7 +9498,7 @@ void __cdecl SelectionClick(void)
             SetObjContext(e);
         }
 
-        PtrListPush((void *)(uintptr_t)ADDR_SELECTED_UIDS,
+        ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->PtrListPush(
                     (void *)(uintptr_t)((const AM2_Object *)e)->uid);
         *(uint32_t *)(e + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
         OnSelectionChanged(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
@@ -9562,7 +9559,7 @@ void __cdecl SelectionClick(void)
             ObjType2Field548((const AM2_Object *)e);
         }
 
-        PtrListPush((void *)(uintptr_t)ADDR_SELECTED_UIDS,
+        ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->PtrListPush(
                     (void *)(uintptr_t)((const AM2_Object *)e)->uid);
         *(uint32_t *)(e + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
     }
@@ -9933,7 +9930,7 @@ void __cdecl TrooperRemotePickupItem(void *troop, void *item, int32_t slot,
         /* The medkit is taken off the map only when this side is the one that
          * should say so -- CommMustBroadcast on the ITEM's army, not the
          * trooper's. */
-        if (CommMustBroadcast(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT,
+        if (AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(w + OBJ_OFF_ARMY))) {
             WeaponRespawn(item);
             *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
@@ -10694,7 +10691,7 @@ void __cdecl SetObjTablePair(int32_t kind, uint32_t uid)
 
     *(int32_t *)(o + OBJ_OFF_FIELD_530) = kind;
 
-    slot = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+    slot = AM2_THE_COMM->CommArmyOfSlot(
                           (int32_t)UidArmy(uid));
 
     *(void **)(o + OBJ_OFF_TABLE_REC_SLOT) =
@@ -10862,9 +10859,9 @@ int32_t __cdecl TryTakeWeapon(void *cand, void *unit)
         int32_t i;
 
         for (i = 1; i < AM2_INVENTORY_SLOTS; i++) {
-            int32_t v = ThingCode(
-                WeaponByUid(*(const uint32_t *)(u + UNIT_OFF_INVENTORY
-                                                + (size_t)i * 4)), u);
+            void   *w = WeaponByUid(*(const uint32_t *)(u + UNIT_OFF_INVENTORY
+                                                       + (size_t)i * 4));
+            int32_t v = ThingCode(w, u);
 
             if (v < best) {
                 best = v;
@@ -10924,11 +10921,11 @@ void __cdecl ForEachSelected(void (__cdecl *fn)(void *obj))
 
         if (!obj) {
             /* No step: the shifted entry is next. */
-            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
         } else {
             if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED) {
                 /* Steps -- and so skips one. */
-                ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+                ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
                 *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
             } else {
                 fn(obj);
@@ -11489,12 +11486,12 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint)
             obj = (uint8_t *)g_objTable[slot].obj;
 
         if (obj == 0) {
-            ListRemoveAt(list, i);
+            ((AM2_Rec *)list)->ListRemoveAt(i);
             continue;
         }
 
         if (*(const uint32_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED) {
-            ListRemoveAt(list, i);
+            ((AM2_Rec *)list)->ListRemoveAt(i);
             *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_DESTROYED;
             continue;
         }
@@ -11988,7 +11985,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
     AM2_Rect  box;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION && !remote
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT, army))
+        && !AM2_THE_COMM->CommMustBroadcast(army))
         return (void *)0;
 
     o = (uint8_t *)am2_malloc(AM2_TROOPER_BYTES);
@@ -12059,7 +12056,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
         HeightAtPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
 
     if (!remote
-        && CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT, army))
+        && AM2_THE_COMM->CommMustBroadcast(army))
         SendItemCreate(o);
 
     RectSet(&box, -0x10, -0x10, 0x10, 0x10);
@@ -12071,7 +12068,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
     if (flags & (int32_t)OBJ_FLAG_DESTROYED)
         SubrecHideRows(o + OBJ_OFF_SUBRECORD);
 
-    PtrListPush(((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[army],
+    ((AM2_Rec *)((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[army])->PtrListPush(
                 *(void **)(o + 4));
 
     rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
@@ -12150,7 +12147,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     int32_t        i;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION && !remote
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)army))
         return (void *)0;
 
@@ -12188,7 +12185,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
      * without one it is the army against ADDR_DEFAULT_OWNER, with one it is
      * whether that comm slot holds a live player. */
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) {
-        if (!CommSlotHasPlayer(*(void **)(uintptr_t)ADDR_COMM_OBJECT, army))
+        if (!AM2_THE_COMM->CommSlotHasPlayer(army))
             *(int32_t *)(o + OBJ_OFF_FIELD_94) = 1;
     } else if ((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
                != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
@@ -12219,7 +12216,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     SetFieldInAll(o + OBJ_OFF_SUBRECORD,
                   *(void **)(o + OBJ_OFF_TABLE_REC_SLOT));
 
-    PtrListPush(((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[army],
+    ((AM2_Rec *)((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[army])->PtrListPush(
                 *(void **)(o + OBJ_OFF_UID));
 
     *(int32_t *)(o + VEHICLE_OFF_SEATS) =
@@ -12260,7 +12257,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
 
     if (weaponKind >= 0
         && (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-            || CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+            || AM2_THE_COMM->CommMustBroadcast(
                                  (int16_t)army))) {
         void *w = CreateWeapon((char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), army,
                                KeyLookupTriple(AM2_WEAPON_KEY_KIND,
@@ -12274,7 +12271,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     }
 
     if (!remote
-        && CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && AM2_THE_COMM->CommMustBroadcast(
                              (int16_t)army))
         SendItemCreate(o);
 
@@ -12391,7 +12388,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, uint32_t at,
     int32_t      set, index, frame;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION && remote == 0
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)army))
         return (void *)0;
 
@@ -12481,7 +12478,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, uint32_t at,
     *(int32_t *)(o + OBJ_OFF_FORMATION_SLOT) = frame;
 
     if (remote == 0
-        && CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && AM2_THE_COMM->CommMustBroadcast(
                              (int16_t)army))
         SendItemCreate(o);
 
@@ -12641,7 +12638,7 @@ void __cdecl DamageItem(void *obj, int32_t amount, int32_t extra, int32_t kind,
         int32_t  sixth;
 
         if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-            && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+            && !AM2_THE_COMM->CommMustBroadcast(
                                   (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
             sixth = 0;
         else
@@ -14264,7 +14261,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
                 (int32_t)(int16_t)(at >> 16), flags, quantity, remote, uid);
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0 && remote == 0
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)army))
         return (void *)0;
 
@@ -14317,7 +14314,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
     *(int32_t *)(o + 0xC8u) = 0;
 
     if (remote == 0
-        && CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && AM2_THE_COMM->CommMustBroadcast(
                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         SendItemCreate(o);
 

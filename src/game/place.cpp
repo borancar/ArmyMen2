@@ -486,7 +486,7 @@ int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
     tile = TileOfPoint(where);
     /* `cmp ax, 0xFFFF; ja` sits here and cannot be taken -- see above. */
 
-    army = CommArmyOfSlot(comm, slot);
+    army = ((AM2_Comm *)comm)->CommArmyOfSlot(slot);
     kind = (army + 1) * AM2_TILE_KIND_ARMY_STEP;
 
     switch ((uint32_t)type) {
@@ -611,7 +611,7 @@ int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
         return 0;
     }
 
-    slot = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT, army);
+    slot = AM2_THE_COMM->CommArmyOfSlot(army);
 
     for (rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_UNIT_TYPES));
          rec < (const uint8_t *)((void *)(uintptr_t)(ADDR_UNIT_TYPES))
@@ -694,7 +694,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
     if (*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER)) {
         made = (uint8_t *)CreateTrooper(
                    (char *)name, (int16_t)where, (int16_t)(where >> 16), slot,
-                   CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT, slot),
+                   AM2_THE_COMM->CommArmyOfSlot(slot),
                    0, 0, 0, 1, facing);
         ObjSetFieldA(made, (uint32_t)group);
 
@@ -727,7 +727,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
         made = (uint8_t *)CreateVehicle(
                    kind, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                    (int16_t)where, (int16_t)(where >> 16), slot,
-                   CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT, slot),
+                   AM2_THE_COMM->CommArmyOfSlot(slot),
                    0, 0, 0, facing);
 
         rows = *(uint8_t **)(made + OBJ_OFF_ROWS);
@@ -767,7 +767,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
 
     /* ---- an ITEM, which is where the buildings live ---- */
     {
-        int32_t army = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        int32_t army = AM2_THE_COMM->CommArmyOfSlot(
                                       slot);
         int32_t key  = SpriteKeyForKind(kind, army);
         int32_t flag = (kind >= AM2_PILLBOX_KIND_FIRST
@@ -808,8 +808,7 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
             occupant = (uint8_t *)CreateTrooper(
                            (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                            (int16_t)where, (int16_t)(where >> 16), slot,
-                           CommArmyOfSlot(
-                               *(void **)(uintptr_t)ADDR_COMM_OBJECT, slot),
+                           AM2_THE_COMM->CommArmyOfSlot(slot),
                            0, 0, 0, 1, facing);
             ObjSetFieldA(occupant, (uint32_t)group);
 
@@ -956,7 +955,7 @@ void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points)
     }
 
     case AM2_OBJ_TYPE_ITEM: {
-        int32_t army = CommArmyOfSlot(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        int32_t army = AM2_THE_COMM->CommArmyOfSlot(
                                       slot);
         int32_t found = -1;
         int32_t kind;
@@ -1165,13 +1164,13 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, int32_t facing,
 
     if (ok) {
         ink = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
-              + ((uint32_t)CommArmyOfSlot(comm, owner) << 8);
+              + ((uint32_t)((AM2_Comm *)comm)->CommArmyOfSlot(owner) << 8);
         *(uint8_t **)(uintptr_t)ADDR_MENU_INK = ink;
         ink = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
-              + ((uint32_t)CommArmyOfSlot(comm, owner) << 8);
+              + ((uint32_t)((AM2_Comm *)comm)->CommArmyOfSlot(owner) << 8);
         *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = ink;
         ink = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
-              + ((uint32_t)CommArmyOfSlot(comm, owner) << 8);
+              + ((uint32_t)((AM2_Comm *)comm)->CommArmyOfSlot(owner) << 8);
     } else {
         ink = (uint8_t *)(uintptr_t)ADDR_FLAME_RECORD;
         *(uint8_t **)(uintptr_t)ADDR_MENU_INK           = ink;

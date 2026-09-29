@@ -1124,7 +1124,7 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
                             int32_t relative)
 {
     void    *comm = *(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT));
-    int32_t  slot = CommSlotForArmy(comm, army);
+    int32_t  slot = ((AM2_Comm *)comm)->CommSlotForArmy(army);
     uint8_t *list = ((uint8_t **)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[slot];
     int32_t  i    = 0;
 
@@ -1133,7 +1133,7 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
             (*(const uint32_t **)(list + LIST_OFF_UIDS))[i]);
 
         if (obj == (uint8_t *)0) {
-            ListRemoveAt(list, i);
+            ((AM2_Rec *)list)->ListRemoveAt(i);
             continue;                       /* the list shifted; do not ++ */
         }
 
@@ -1864,7 +1864,7 @@ void __cdecl EvtRuleB(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
                (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                *(const int16_t *)(obj + OBJ_OFF_POS),
                *(const int16_t *)(obj + OBJ_OFF_POS + 2),
-               CommArmyOfSlot(kCommObject, army),
+               ((AM2_Comm *)kCommObject)->CommArmyOfSlot(army),
                army, 0, 0, 0, 1, 0);
     if (!unit)
         return;
@@ -2090,7 +2090,7 @@ void __cdecl EvtFlag40Set(int32_t name, uint32_t me)
 void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
 {
     uint8_t **lists = (uint8_t **)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS));
-    int32_t   slot  = CommSlotForArmy(*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)),
+    int32_t   slot  = AM2_THE_COMM->CommSlotForArmy(
                                       army);
     int32_t   i     = 0;
 
@@ -2100,7 +2100,7 @@ void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
             (*(const uint32_t **)(lists[slot] + LIST_OFF_UIDS))[i]);
 
         if (obj == (uint8_t *)0) {
-            ListRemoveAt(lists[slot], i);
+            ((AM2_Rec *)lists[slot])->ListRemoveAt(i);
             continue;
         }
 
@@ -2964,7 +2964,7 @@ void __cdecl EvtDropItem(uint32_t uid, uint32_t weaponUid, uint32_t at)
         return;
 
     if (*(void *const *)(uintptr_t)ADDR_MP_SESSION
-        && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+        && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(obj + OBJ_OFF_ARMY)))
         return;
 
@@ -3027,7 +3027,7 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
     if (!target)
         return;
 
-    slot = CommSlotForArmy(*(void **)(uintptr_t)ADDR_COMM_OBJECT,
+    slot = AM2_THE_COMM->CommSlotForArmy(
                            (int16_t)army);
     list = ((uint8_t **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[slot];
 
@@ -3036,7 +3036,7 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
             (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
 
         if (!obj) {
-            ListRemoveAt(list, i);
+            ((AM2_Rec *)list)->ListRemoveAt(i);
             continue;           /* no step: the shifted-down entry is next */
         }
 
@@ -3131,7 +3131,7 @@ int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
                                 + (uint32_t)a * COMM_PLAYER_STRIDE
                                 + COMM_SLOT_OFF_TAKEN))
             return 0;
-        return CommSlotHasPlayer((void *)comm, a) ? 1 : 2;
+        return ((AM2_Comm *)(void *)comm)->CommSlotHasPlayer(a) ? 1 : 2;
     }
 
     case AM2_OPERAND_ISALLY:
@@ -3143,8 +3143,7 @@ int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
         return AllyFlag(a, b) ? 1 : 0;
 
     case AM2_OPERAND_TEAMSCORE:
-        return CommTeamScore(
-                   *(void *const *)(uintptr_t)ADDR_COMM_OBJECT, a);
+        return AM2_THE_COMM->CommTeamScore(a);
 
     default:
         return a;
@@ -3675,7 +3674,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * through its comm SLOT and single-player passes the army itself. */
         EvtType2ActionC(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                         (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) != 0
-                            ? CommSlotForArmy(kCommObject, act->army)
+                            ? ((AM2_Comm *)kCommObject)->CommSlotForArmy(act->army)
                             : act->army);
         return;
 
@@ -3756,11 +3755,11 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * multiplayer; the fifth is CommArmyOfSlot of the same field, always.
          * They are not the same call and not the same direction. */
         army = ((*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) != 0)
-             ? CommSlotForArmy(kCommObject, act->army)
+             ? ((AM2_Comm *)kCommObject)->CommSlotForArmy(act->army)
              : act->army;
 
         CreateVehicle(act->n0, act->text, (int16_t)at, (int16_t)(at >> 16),
-                      CommArmyOfSlot(kCommObject, act->army), army,
+                      ((AM2_Comm *)kCommObject)->CommArmyOfSlot(act->army), army,
                       0, 0, 0, 0);
         return;
     }
@@ -3774,7 +3773,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
 
         unit = (uint8_t *)CreateTrooper(act->text, (int16_t)at,
                                         (int16_t)(at >> 16),
-                                        CommArmyOfSlot(kCommObject,
+                                        ((AM2_Comm *)kCommObject)->CommArmyOfSlot(
                                                        act->army),
                                         act->army, 0, 0, 0, 1, 0);
         if (unit == 0)

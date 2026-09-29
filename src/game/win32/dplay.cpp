@@ -238,32 +238,35 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommGetSessionDesc()
 {
     void *comm = this;
 
-    LPDIRECTPLAY4A dp   = *DirectPlaySlot(comm);
-    void         **slot = (void **)((uint8_t *)comm + COMM_OFF_SESSION_DESC);
+    /* The interface and the slot are re-read at every use. */
+#define DP   (*DirectPlaySlot(comm))
+#define SLOT (*(void **)((uint8_t *)comm + COMM_OFF_SESSION_DESC))
     DWORD          size;
     HRESULT        hr;
 
-    if (!dp)
+    if (!DP)
         return 0;
 
     /* Whatever was fetched last time goes first -- on the game's heap, so
      * through the game's free. */
-    if (*slot) {
-        orig_free(*slot);
-        *slot = NULL;
+    if (SLOT) {
+        orig_free(SLOT);
+        SLOT = NULL;
     }
 
     /* DirectPlay will not say how big the description is except by refusing to
      * write it, so ask once with no buffer and read the size out of the
      * complaint. Anything other than that complaint is the final answer. */
-    hr = IDirectPlayX_GetSessionDesc(dp, NULL, &size);
+    hr = IDirectPlayX_GetSessionDesc(DP, NULL, &size);
     if (hr == (HRESULT)DPERR_BUFFERTOOSMALL) {
-        *slot = orig_malloc(size);
-        if (!*slot)
+        SLOT = orig_malloc(size);
+        if (!SLOT)
             return 0;
-        hr = IDirectPlayX_GetSessionDesc(*DirectPlaySlot(comm), *slot, &size);
+        hr = IDirectPlayX_GetSessionDesc(DP, SLOT, &size);
     }
     return hr == DP_OK;
+#undef DP
+#undef SLOT
 }
 
 /* ---- the comm object's own lifetime ------------------------------------
@@ -692,7 +695,7 @@ BOOL FAR PASCAL EnumPlayersCb(DPID dpId, DWORD dwPlayerType, LPCDPNAME lpName,
 
     if (dpId != *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID)) {
         if (n < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT))
-            CommSetSlotRemote(comm, n);
+            ((AM2_Comm *)comm)->CommSetSlotRemote(n);
         CommRegisterSelf(dpId);
     }
 
@@ -772,7 +775,7 @@ BOOL FAR PASCAL EnumSessionsCb(LPCDPSESSIONDESC2 lpThisSD, LPDWORD lpdwTimeOut,
         strcpy(row, lpThisSD->lpszSessionNameA);
     }
 
-    ListAdd(g_sessionList, row, rec);
+    ((AM2_Rec *)g_sessionList)->ListAdd(row, rec);
     return TRUE;
 }
 
@@ -886,7 +889,7 @@ BOOL FAR PASCAL EnumConnectionsCb(LPCGUID lpguidSP, LPVOID lpConnection,
         return TRUE;
     memcpy(copy, lpConnection, dwConnectionSize);
 
-    ListAdd(g_connectionList, lpName->lpszShortNameA, copy);
+    ((AM2_Rec *)g_connectionList)->ListAdd(lpName->lpszShortNameA, copy);
     return TRUE;
 }
 
@@ -915,7 +918,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommEnumConnections(void *list)
 
     /* Read back through the global rather than the argument, as the original
      * does -- they are the same object, but only because nothing reassigned it. */
-    ListAdd(g_connectionList,
+    ((AM2_Rec *)g_connectionList)->ListAdd(
                   "Play Against Computer Only", NULL);
     return 1;
 }
@@ -2085,9 +2088,9 @@ void __cdecl SendGameStartMsg(void)
 
         desc = *(void **)(comm + COMM_OFF_SESSION_DESC);
         *(uint32_t *)((uint8_t *)desc + 4) |= AM2_SESSION_FLAGS_START;
-        CommSetSessionDesc(comm, desc, 0);
+        ((AM2_Comm *)comm)->CommSetSessionDesc(desc, 0);
 
-        CommSend(comm, 0, 1, msg, (uint32_t)*(const int32_t *)(msg + 4));
+        ((AM2_Comm *)comm)->CommSend(0, 1, msg, (uint32_t)*(const int32_t *)(msg + 4));
     }
 
     /* Reached by the host AND by the already-started case. */
@@ -3317,7 +3320,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
 
                 /* Yes, when the slot is EMPTY, and -1 is what goes in. */
                 if (id == -1) {
-                    CommRemovePlayer(comm, id);
+                    ((AM2_Comm *)comm)->CommRemovePlayer(id);
                     comm = g_commObject;
                 }
             }
@@ -3335,7 +3338,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
                      + COMM_OFF_PLAYER_SLOTS) = (int32_t)m->dpId;
 
         comm = g_commObject;
-        CommSetSlotRemote(comm,
+        ((AM2_Comm *)comm)->CommSetSlotRemote(
                           *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT));
 
         if ((int32_t)strlen(m->dpnName.lpszShortNameA) < AM2_COMM_NAME_MAX) {
@@ -3369,7 +3372,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
             CommGetSessionDesc(comm);
             desc = *(uint8_t **)(g_commObject + COMM_OFF_SESSION_DESC);
             *(uint32_t *)(desc + 4) |= AM2_SESSION_FULL_FLAGS;
-            CommSetSessionDesc(g_commObject, desc, 0);
+            ((AM2_Comm *)g_commObject)->CommSetSessionDesc(desc, 0);
         }
 
         CommRegisterSelf((uint32_t)m->dpId);
@@ -3494,7 +3497,7 @@ void __cdecl ProcessResendQueue(void)
 
             MsgSlotA2(flow, *(const uint32_t *)(buf + PACKET_OFF_SEQ));
 
-            hr = CommSend(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT, id, 0,
+            hr = AM2_THE_COMM->CommSend(id, 0,
                           buf, *(const uint32_t *)(buf + PACKET_OFF_LEN));
 
             if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
@@ -3739,7 +3742,7 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
         }
     }
 
-    hr = CommSend(*(void *const *)(uintptr_t)ADDR_COMM_OBJECT, (uint32_t)to,
+    hr = AM2_THE_COMM->CommSend((uint32_t)to,
                   (uint32_t)flags, pkt,
                   *(const uint32_t *)(pkt + PACKET_OFF_LEN));
     if (hr >= 0)
