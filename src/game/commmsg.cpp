@@ -433,30 +433,33 @@ void __cdecl ReceivedTeamMsg(void *msg, int32_t dpid)
 
 void __cdecl CommEndSetup(void)
 {
-    uint8_t *comm = (uint8_t *)kCommObj;
-    int32_t  i;
+    int32_t i;
 
+    /* The comm object is re-read from its global at every use. */
+#define comm kCommObj
     /* Only the host decides that setup is over. */
     if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
         return;
 
     /* The count is re-read each time round rather than hoisted. */
     for (i = 0; i < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT); i++) {
-        const uint8_t *rec = comm + (uint32_t)i * COMM_ARMY_RECORD_SIZE;
-
         if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
             am2_log("m_ArmyReady[%d] = %d \n", i,
-                    *(const int32_t *)(rec + COMM_ARMY_OFF_READY));
+                    *(const int32_t *)(comm + (uint32_t)i * COMM_ARMY_RECORD_SIZE
+                                       + COMM_ARMY_OFF_READY));
 
         /* -1 is the only id treated as empty, though 0 is documented as one
          * too -- so a slot holding 0 must be ready. The original's test. */
-        if (*(const int32_t *)(rec + AM2_PLAYER_ID) != -1
-            && !*(const int32_t *)(rec + COMM_ARMY_OFF_READY))
+        if (*(const int32_t *)(comm + (uint32_t)i * COMM_ARMY_RECORD_SIZE
+                               + AM2_PLAYER_ID) != -1
+            && !*(const int32_t *)(comm + (uint32_t)i * COMM_ARMY_RECORD_SIZE
+                                   + COMM_ARMY_OFF_READY))
             return;
     }
 
     if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
         am2_log("Sending EndSetupMessage\n");
+#undef comm
 
     SendGameMsg((void *)(uintptr_t)ADDR_MSG_END_SETUP, 0, 1);
     orig_post_message(*(void **)(uintptr_t)ADDR_HWND, AM2_WM_SETUP_DONE, 0, 0);

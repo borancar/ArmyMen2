@@ -115,16 +115,18 @@ int32_t __cdecl TileOfPoint(uint32_t packed)
 
 uint32_t __cdecl PointOfTile(int32_t tile)
 {
-    int32_t w     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
-    int32_t shift = *(const int16_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
-    uint16_t x, y;
+    AM2_Point p;   /* built in memory -- the original reuses `tile`'s slot */
 
-    x = (uint16_t)((((uint32_t)tile << AM2_TILE_SHIFT)
-                    & (uint32_t)((w << AM2_TILE_SHIFT) - 16)) + 8);
+    /* The globals are read where they are used, mask before index. */
+    p.x = (int16_t)((((uint32_t)*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+                       << AM2_TILE_SHIFT) - 16)
+                    & ((uint32_t)tile << AM2_TILE_SHIFT)) + 8;
     /* A 16-BIT shift of the tile index, then scaled -- the original does
      * `shr ax, cl` and not `shr eax, cl`. */
-    y = (uint16_t)(((uint32_t)((uint16_t)tile >> shift) << AM2_TILE_SHIFT) + 8);
-    return (uint32_t)x | ((uint32_t)y << 16);
+    p.y = (int16_t)((((uint16_t)tile
+                      >> *(const int16_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)
+                     << AM2_TILE_SHIFT) + 8);
+    return *(const uint32_t *)&p;
 }
 
 /* 0x0042B210, five callers -- PointOfTile's two-pointer twin.
@@ -150,13 +152,14 @@ uint32_t __cdecl PointOfTile(int32_t tile)
  */
 void __cdecl TileToXY(int32_t tile, int32_t *x, int32_t *y)
 {
-    int32_t  w     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
-    uint8_t  shift = *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
-    uint32_t t     = (uint32_t)tile & 0xFFFFu;
+    uint32_t t = (uint32_t)tile & 0xFFFFu;
 
-    *x = (int32_t)(((t << AM2_TILE_SHIFT)
-                    & (uint32_t)((w << AM2_TILE_SHIFT) - 16)) + 8);
-    *y = (int32_t)(((t >> shift) << AM2_TILE_SHIFT) + 8);
+    /* The globals are read where they are used, mask before index. */
+    *x = (int32_t)((((uint32_t)*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+                     << AM2_TILE_SHIFT) - 16)
+                   & (t << AM2_TILE_SHIFT)) + 8;
+    *y = (int32_t)(((t >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)
+                    << AM2_TILE_SHIFT) + 8);
 }
 
 /* The three data checksums a multiplayer session compares, 0x004303B0,

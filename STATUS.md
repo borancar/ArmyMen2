@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1017 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1027 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1017:
+  the near-miss sweep, 758 before the row pools. From 758 to 1027:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -176,6 +176,14 @@ main result so far (details in `src/vc6/README.md`):
     register allocation at the call site; a sweep of ~200 call sites matched
     RankPromote, TrooperDropItem, ExitAllFromVehicle and FlushDelayedSends
     with no losses.
+  - **More source shapes**: an else-if chain setting a local ahead of one
+    store compiles to per-arm `mov eax, n; mov [g], eax; ret`
+    (TakeNumberKey, which was a loop); three `case X: return 1;` arms give
+    the `sub; je; dec; je` chain where one arm with three labels gives a
+    range test (CanPickUp); an empty-looking `case 29: return 0;` keeps its
+    own jump-table slot (TypesCompatible); a local AM2_Point is how
+    PointOfTile builds its result in the dead argument slot; `strlen` is the
+    intrinsic, not a helper loop (TitleCaseName).
   - **Two identical functions folded by the linker**: SeqRun has separate
     arms for kinds 2 and 3 that both call 0x00461310. VC6 merges identical
     arms for one callee, so the source had two functions and LINK's

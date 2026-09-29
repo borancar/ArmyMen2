@@ -14506,22 +14506,20 @@ void __attribute__((thiscall)) AM2_Widget::WidgetPaint(RECT clip)
 
 void __attribute__((thiscall)) AM2_Widget::WidgetAddChild(AM2_Widget *child)
 {
-    AM2_Widget *w = this;
-
     AM2_Widget *last;
 
     if (!child)
         return;
 
-    child->parent = w;
+    child->parent = this;
 
-    last = w->firstChild;
-    if (!last) {
+    if (!firstChild) {
         /* No prevSibling written here, and no nextSibling on the new child
          * either -- see the header. */
-        w->firstChild = child;
+        firstChild = child;
         return;
     }
+    last = firstChild;
     while (last->nextSibling)
         last = last->nextSibling;
     last->nextSibling  = child;

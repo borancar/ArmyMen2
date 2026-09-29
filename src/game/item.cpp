@@ -354,7 +354,6 @@ const char *__cdecl UnitClassName(void *unit)
 int32_t __cdecl CanPickUp(void *obj)
 {
     const uint8_t *o = (const uint8_t *)obj;
-    int32_t        code;
 
     if (!ObjIsType4((const AM2_Object *)obj))
         return 0;
@@ -363,11 +362,13 @@ int32_t __cdecl CanPickUp(void *obj)
         > *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS)
         return 0;
 
-    code = **(const int32_t *const *)(o + OBJ_OFF_FIELD_C0);
-
-    switch (code) {
+    /* Three arms that each return 1, not one arm with three labels: that is
+     * the `sub; je; dec; je; dec; je` chain rather than a range test. */
+    switch (**(const int32_t *const *)(o + OBJ_OFF_FIELD_C0)) {
     case 0x1F:
+        return 1;
     case 0x20:
+        return 1;
     case 0x21:
         return 1;
     }

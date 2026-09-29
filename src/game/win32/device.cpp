@@ -346,14 +346,14 @@ int32_t __cdecl InitInput(HWND hWnd)
 #define g_mouseAcquired  (*(int32_t *)(uintptr_t)ADDR_DI_MOUSE_ACQUIRED)
 
 /* Unacquire, then Release, then forget. */
-static void ReleaseDevice(LPDIRECTINPUTDEVICEA *slot)
-{
-    if (!*slot)
-        return;
-    IDirectInputDevice_Unacquire(*slot);
-    IDirectInputDevice_Release(*slot);
-    *slot = NULL;
-}
+/* Written out in place for each device, as the original has it: the global
+ * is re-read for each call rather than held through a pointer. */
+#define RELEASE_DEVICE(dev)                  \
+    if (dev) {                               \
+        IDirectInputDevice_Unacquire(dev);   \
+        IDirectInputDevice_Release(dev);     \
+        (dev) = NULL;                        \
+    }
 
 void __cdecl ShutdownInput(void)
 {
@@ -361,9 +361,9 @@ void __cdecl ShutdownInput(void)
     if (!g_dinput)
         return;
 
-    ReleaseDevice(&g_diMouse);
-    ReleaseDevice(&g_diDevice3);
-    ReleaseDevice(&g_diKeyboard);
+    RELEASE_DEVICE(g_diMouse)
+    RELEASE_DEVICE(g_diDevice3)
+    RELEASE_DEVICE(g_diKeyboard)
 
     /* Unguarded, unlike the devices -- but it was tested at the top. */
     IDirectInput_Release(g_dinput);

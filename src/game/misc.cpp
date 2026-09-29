@@ -96,17 +96,6 @@ extern "C" const int32_t am2_seq_k4_drift_y         = -1;    /* 0x0048CBDC */
 extern "C" const uint32_t am2_seq_k4_hold[4] = { 2, 3, 4, 5 };/* 0x0048CBC8, per-cell hold */
 #endif
 
-/* The original inlines `repne scasb` for length; a plain loop is the same
- * function and the vectors confirm it. */
-static uint32_t StrLen(const char *s)
-{
-    uint32_t n = 0;
-
-    while (s[n])
-        n++;
-    return n;
-}
-
 #include "../inject/patch.h"
 
 uint32_t __cdecl Field53C(const void *p)
@@ -149,8 +138,9 @@ void __cdecl TitleCaseName(char *text)
 {
     int32_t i = 0;
 
-    /* strlen is recomputed each time round, as the original does. */
-    while (i < (int32_t)StrLen(text)) {
+    /* strlen is recomputed each time round, as the original does -- the
+     * intrinsic, which is the `repne scasb` in the image. */
+    while (i < (int32_t)strlen(text)) {
         if (text[i] == '_')
             text[i] = ' ';
 
@@ -274,12 +264,26 @@ int32_t __cdecl CompareTriple(const void *a, const void *b)
 
 int32_t __cdecl TypesCompatible(int32_t a, int32_t b)
 {
+    /* Four cases, not three: 29 has an arm of its own in the jump table
+     * (index 3) that lands on the same `return 0` as the default. The arms
+     * are laid out 9, 10, 8, which is the order they are written in. */
     switch (a) {
-    case 8:  return (b == 29) ? 1 : 0;
-    case 9:  return (b != 9) ? 1 : 0;
-    case 10: return (b == 29 || b == 8) ? 1 : 0;
-    default: return 0;
+    case 9:
+        if (b != 9)
+            return 1;
+        break;
+    case 10:
+        if (b == 29 || b == 8)
+            return 1;
+        break;
+    case 8:
+        if (b == 29)
+            return 1;
+        break;
+    case 29:
+        return 0;
     }
+    return 0;
 }
 
 /* Shared body: `mode` is the value written for the wide facings, `narrow` for
@@ -1406,22 +1410,23 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommWasHereForArmy(int32_t army)
  * which is the log. The -1 arm and the skip arm stay verified by reading. */
 int32_t __attribute__((thiscall)) AM2_Comm::CommSetArmyColour(int32_t slot, int32_t colour)
 {
-    void *comm = this;
+    int32_t held;
 
     if (colour < 0)
         return -1;
 
-    int32_t        held  = ::CommSlotForArmy(comm, colour);
-    const uint8_t *world = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    held = this->CommSlotForArmy(colour);
 
-    if (*(const int32_t *)(world + COMM_OFF_IS_HOST)
+    if (*(const int32_t *)((const uint8_t *)AM2_THE_COMM + COMM_OFF_IS_HOST)
         && (uint32_t)slot < (uint32_t)held) {
-        uint8_t *base = (uint8_t *)comm + AM2_PLAYER_ARMY;
-        int32_t *mine = (int32_t *)(base + (uint32_t)slot * AM2_PLAYER_STRIDE);
+        int32_t *mine = (int32_t *)((uint8_t *)this
+                                    + (uint32_t)slot * AM2_PLAYER_STRIDE
+                                    + AM2_PLAYER_ARMY);
         int32_t  was  = *mine;
 
         *mine = colour;
-        *(int32_t *)(base + (uint32_t)held * AM2_PLAYER_STRIDE) = was;
+        *(int32_t *)((uint8_t *)this + (uint32_t)held * AM2_PLAYER_STRIDE
+                     + AM2_PLAYER_ARMY) = was;
     }
     return slot;
 }
@@ -1496,15 +1501,22 @@ void __attribute__((thiscall)) am2_dtor_AM2_PtrList(AM2_PtrList *l)
  */
 void __cdecl TakeNumberKey(void)
 {
-    static const int32_t kKeys[] = { 2, 3, 4, 5, 6, 7, 8, 9 };
-    int32_t i;
+    int32_t n;
 
-    for (i = 0; i < (int32_t)(sizeof kKeys / sizeof kKeys[0]); i++) {
-        if (IsKeyDown(kKeys[i]) && KeyChanged(kKeys[i])) {
-            *(int32_t *)(uintptr_t)ADDR_NUMBER_KEY_SLOT = i;
-            return;
-        }
-    }
+    /* An else-if chain onto one store, not a loop: VC6 duplicates the store
+     * into each arm, which is the eight `mov eax, n; mov [slot], eax; ret`
+     * the image has. DIK_1..DIK_8 are scancodes 2..9. */
+    if (IsKeyDown(2) && KeyChanged(2))      n = 0;
+    else if (IsKeyDown(3) && KeyChanged(3)) n = 1;
+    else if (IsKeyDown(4) && KeyChanged(4)) n = 2;
+    else if (IsKeyDown(5) && KeyChanged(5)) n = 3;
+    else if (IsKeyDown(6) && KeyChanged(6)) n = 4;
+    else if (IsKeyDown(7) && KeyChanged(7)) n = 5;
+    else if (IsKeyDown(8) && KeyChanged(8)) n = 6;
+    else if (IsKeyDown(9) && KeyChanged(9)) n = 7;
+    else return;
+
+    *(int32_t *)(uintptr_t)ADDR_NUMBER_KEY_SLOT = n;
 }
 
 /* The same spelling device.cpp uses -- PollKeyboard owns these and swaps them
