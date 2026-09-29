@@ -139,7 +139,7 @@ int mapdraw_install(void);
  * Unlocking: the pairing belongs to HudRadarPaint, which Unlocks once at the
  * end. */
 void __cdecl DrawRectFast(const AM2_Rect *r, int32_t colour);
-void __cdecl DrawBlip3(int32_t x, int32_t y, int32_t colour);
+void __cdecl DrawBlip3(int32_t x, int32_t y, uint8_t colour);
 void __cdecl DrawBlipPulse(int32_t x, int32_t y, int32_t colourA,
                            int32_t colourB, int32_t phase);
 void __cdecl DrawBlipSquare(int32_t x, int32_t y, int32_t colourA,

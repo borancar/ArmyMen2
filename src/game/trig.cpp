@@ -121,12 +121,12 @@ void __cdecl BuildTrigTables(void)
 #define g_trigCos ((const float *)(uintptr_t)ADDR_TRIG_COS)
 #define g_trigSin ((const float *)(uintptr_t)ADDR_TRIG_SIN)
 
-float __cdecl Cos8(int32_t heading)
+float __cdecl Cos8(uint8_t heading)
 {
     return g_trigCos[heading & 0xFF];
 }
 
-float __cdecl Sin8(int32_t heading)
+float __cdecl Sin8(uint8_t heading)
 {
     return g_trigSin[heading & 0xFF];
 }

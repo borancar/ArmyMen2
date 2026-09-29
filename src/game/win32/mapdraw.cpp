@@ -1566,7 +1566,7 @@ void __cdecl DrawRectFast(const AM2_Rect *r, int32_t colour)
  * global before each row. Written as a loop; the pitch cannot change under it,
  * since nothing between the stores can call anything.
  */
-void __cdecl DrawBlip3(int32_t x, int32_t y, int32_t colour)
+void __cdecl DrawBlip3(int32_t x, int32_t y, uint8_t colour)
 {
     uint8_t *p;
     int32_t  row;

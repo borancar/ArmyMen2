@@ -176,7 +176,7 @@ char *__cdecl BuildPlacementPath(char *dest, int32_t slot)
  */
 void __cdecl LoadArmyPlacement(int32_t slot)
 {
-    char    path[0x38];
+    char    path[0x40];   /* the frame is 0x44: this and `points` */
     int32_t points;
     int32_t i;
 
@@ -471,7 +471,7 @@ int32_t __cdecl UnitKindMatches(int32_t code, int32_t kind, int32_t n)
  * disagree.
  */
 int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
-                                 int32_t pts, int32_t facing)
+                                 int32_t pts, uint8_t facing)
 {
     void    *comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
     int32_t  tile;
@@ -679,7 +679,7 @@ int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
  * original's -- AllyFlag is stdcall and never reads ecx. Not reproduced,
  * because a register load with no effect has nothing to reproduce. */
 void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
-                            int32_t *points, int32_t facing, int32_t group,
+                            int32_t *points, uint8_t facing, int32_t group,
                             const char *name)
 {
     const uint8_t *rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_UNIT_TYPES))
@@ -1141,7 +1141,7 @@ static inline void PlaceEmplacement(int32_t army, int32_t facing, int32_t kind)
  * original computes, and since the arm is only ever entered with row 0x22 it
  * is the constant 0x3F7 written the long way -- the switch variable happened
  * to be live in a register. Written as the original has it. */
-void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, int32_t facing,
+void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
                                 int32_t army)
 {
     void   *comm = *(void *const *)(uintptr_t)ADDR_ARMY_TABLE;

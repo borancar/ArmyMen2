@@ -241,7 +241,7 @@ void __cdecl InactivateRegion(int32_t region);
 /* 0x0043A0A0. The nearest tile the object's point rule accepts, spiralling
  * outward from the one given. Writes the point back only when its low word is
  * zero; returns the tile, or 0 when a whole ring produced no candidate. */
-uint16_t __cdecl NearestAllowedTile(void *obj, int32_t tile, uint32_t *pt);
+uint16_t __cdecl NearestAllowedTile(void *obj, uint16_t tile, uint32_t *pt);
 
 int32_t __cdecl BeginMoveTo(void *obj, uint32_t *to);
 

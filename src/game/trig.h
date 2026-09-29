@@ -35,8 +35,8 @@ void __cdecl BuildTrigTables(void);
  * only readers of the two forward tables, and the tables are compared byte for
  * byte against the original. A wrong index here would still be a wrong index
  * into a table known to be right. */
-float __cdecl Cos8(int32_t heading);
-float __cdecl Sin8(int32_t heading);
+float __cdecl Cos8(uint8_t heading);
+float __cdecl Sin8(uint8_t heading);
 
 int trig_install(void);
 

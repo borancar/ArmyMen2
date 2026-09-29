@@ -858,7 +858,7 @@ uint16_t __cdecl SettlePointInRegion(int32_t tile, uint32_t *pt)
  * all verified by reading, and the A/B covers them only if some call was
  * refused -- which is exactly what is not known.
  */
-uint16_t __cdecl NearestAllowedTile(void *obj, int32_t tile, uint32_t *pt)
+uint16_t __cdecl NearestAllowedTile(void *obj, uint16_t tile, uint32_t *pt)
 {
     AM2_PointRuleFn rule;
     const uint8_t  *cells;

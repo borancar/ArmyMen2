@@ -487,7 +487,7 @@ void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
 /* 0x0043C000, one caller -- the type-5 stepper, type 5 being the SHOT. Damage
  * everything at a point that this shot can hit, then ask the terrain whether
  * it stops there. Answers one of AM2_SHOT_STRUCK_*. */
-int32_t __cdecl ShotStrike(void *shot, uint32_t at, int32_t height);
+int32_t __cdecl ShotStrike(void *shot, uint32_t at, int16_t height);
 
 /* 0x0045B7E0. The third variant: the same walk with ObjBlockWeight inlined, no
  * height step, and one extra arm -- a trooper blocks only if it is an enemy,
@@ -970,8 +970,8 @@ void __cdecl InitItemHeaderSize(void);
  * point. The first also runs ItemPostCreate and conceals what it drops from
  * a player not allied to the owner; the second does neither. */
 void __cdecl CreateWatchedItem(int32_t unused, void *obj, uint32_t at,
-                               int32_t facing);
+                               uint8_t facing);
 void __cdecl CreateWatchedType(int32_t unused, void *obj, uint32_t at,
-                               int32_t facing);
+                               uint8_t facing);
 
 #endif

@@ -3552,7 +3552,7 @@ int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
  * flagged in ADDR_TILE_FLAGS and of ADDR_CELL_WEIGHTS 15 or more is
  * AM2_SHOT_STRUCK_HARD; everything else is AM2_SHOT_STRUCK_NOTHING.
  */
-int32_t __cdecl ShotStrike(void *shot, uint32_t at, int32_t height)
+int32_t __cdecl ShotStrike(void *shot, uint32_t at, int16_t height)
 {
     uint8_t       *s = (uint8_t *)shot;
     const uint8_t *rec = *(const uint8_t *const *)(s + OBJ_OFF_FIELD_94);
@@ -14171,7 +14171,7 @@ void item_install(void)
  * so what it drops is always visible. Two functions rather than one with a
  * flag, and the difference is behaviour rather than a constant. */
 void __cdecl CreateWatchedItem(int32_t unused, void *obj, uint32_t at,
-                               int32_t facing)
+                               uint8_t facing)
 {
     uint8_t *o = (uint8_t *)obj;
     uint32_t point;
@@ -14206,7 +14206,7 @@ void __cdecl CreateWatchedItem(int32_t unused, void *obj, uint32_t at,
 }
 
 void __cdecl CreateWatchedType(int32_t unused, void *obj, uint32_t at,
-                               int32_t facing)
+                               uint8_t facing)
 {
     uint8_t *o = (uint8_t *)obj;
     AM2_Point point;

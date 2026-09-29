@@ -66,7 +66,7 @@ int32_t __cdecl CanAffordUnit(int32_t type, int32_t points);
  * the rest, and in every case the tile under the point must belong to that
  * slot's army. */
 int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
-                                 int32_t pts, int32_t facing);
+                                 int32_t pts, uint8_t facing);
 
 /* 0x0043A560. Build "<map>_<colour>_place.txt" for one comm slot. Returns
  * `dest`, which is what the original leaves in eax. */
@@ -100,7 +100,7 @@ int32_t __cdecl UnitKindMatches(int32_t code, int32_t kind, int32_t n);
  * cursor as the unit about to be placed: a sprite, up to two overlays, and the
  * colour table each is drawn with. `ok` is what PlacementAllowed just said and
  * changes the colours rather than the sprites. */
-void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, int32_t facing,
+void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
                                 int32_t army);
 
 int place_install(void);
@@ -131,7 +131,7 @@ void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points);
  * which for a pillbox means three objects. Reconstructed; the seam it used to
  * need is gone with it. */
 void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
-                            int32_t *points, int32_t facing, int32_t group,
+                            int32_t *points, uint8_t facing, int32_t group,
                             const char *name);
 
 #define orig_make_placed  MakePlacedUnit
