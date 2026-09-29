@@ -76,6 +76,19 @@ GCC-only (POSIX, inline `__asm__`) and SKIP.  The win32 layer is mostly thiscall
 member functions, which VC6 cannot spell (no `__thiscall` keyword) so they won't
 match even though they compile -- expect a low match rate there.
 
+### The byte-matching loop
+
+- `onefn.py SRC FUNC [--diff]` -- one function beside the original, in
+  seconds (`??0Class` / `??1Class` for constructors and destructors). An
+  empty `--diff` means only relocated slots differ.
+- `permute.py SRC FUNC SPEC.json` -- every source order of a few statements,
+  scored; for the scheduling differences reading cannot explain.
+- `reorder.py SRC --apply` -- installed functions into the original's address
+  order. VC6 infers "cannot throw" only for callees defined earlier in the TU,
+  and that decides unwind frames and states; rerun after adding a function.
+- `relinkos.py` -- the relink build's per-global symbols for the .bss state
+  (run by relink.py itself).
+
 ### What matches piecewise, and what needs the relink
 
 The reconstruction is compiled ONE .obj at a time and compared to the shipped
