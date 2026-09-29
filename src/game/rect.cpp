@@ -79,11 +79,10 @@ int32_t __cdecl PointInRect(const AM2_Rect *r, const AM2_Point *p)
 int32_t __cdecl ClipRect(const AM2_Rect *src, const AM2_Rect *clip,
                          int32_t *x, int32_t *y, AM2_Rect *out)
 {
-    int32_t xoff = *x, yoff = *y;
-    int32_t left   = src->left   + xoff;
-    int32_t right  = src->right  + xoff;
-    int32_t top    = src->top    + yoff;
-    int32_t bottom = src->bottom + yoff;
+    int32_t left   = src->left   + *x;
+    int32_t right  = src->right  + *x;
+    int32_t top    = src->top    + *y;
+    int32_t bottom = src->bottom + *y;
 
     if (clip->left > left) {
         if (right <= clip->left)
