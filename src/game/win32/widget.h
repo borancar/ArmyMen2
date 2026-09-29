@@ -202,9 +202,6 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) OptionsUpdate();
     void __attribute__((thiscall)) HudCmdInvoke(int32_t mode);
     AM2_Widget * __attribute__((thiscall)) DlgSaveListConstruct(const char *bmp, int32_t flag);
-    AM2_Widget * __attribute__((thiscall)) WarMenuConstruct(const char *bmp);
-    AM2_Widget * __attribute__((thiscall)) MpOptionsConstruct(const char *bmp);
-    AM2_Widget * __attribute__((thiscall)) BattleNameConstruct(const char *bmp);
     void __attribute__((thiscall)) ArrowBarShowRow(int32_t row);
     AM2_Widget * __attribute__((thiscall)) MoviesConstruct(const char *bmp);
     void __attribute__((thiscall)) RepaintAncestor(RECT clip);
@@ -321,6 +318,9 @@ AM2_CLASS_VTABLE(AM2_SelectPlayerScreen, VTABLE_SELECT_PLAYER)
 AM2_CLASS_VTABLE(AM2_QuitDialogScreen, VTABLE_QUIT_DIALOG)
 AM2_CLASS_VTABLE(AM2_ReplayDialogScreen, VTABLE_REPLAY_DIALOG)
 AM2_CLASS_VTABLE(AM2_DelPlayerDialogScreen, VTABLE_DELPLAYER_DIALOG)
+AM2_CLASS_VTABLE(AM2_BattleNameScreen, VTABLE_BATTLE_NAME_DLG)
+AM2_CLASS_VTABLE(AM2_MpOptionsScreen, VTABLE_OPTIONS_MENU_MP)
+AM2_CLASS_VTABLE(AM2_WarMenuScreen, VTABLE_WAR_MENU)
 
 /* Installing a constructor or destructor at the original's address. GCC
  * builds install a thiscall thunk (constructors must answer `this` in eax, as
@@ -574,8 +574,9 @@ struct AM2_AudioDialogScreen : AM2_ScreenBase {
     AM2_AudioDialogScreen(const char *bmp, int32_t flag);
     ~AM2_AudioDialogScreen();
 };
-struct AM2_BattleNameScreen : AM2_Widget {
-    uint8_t pad_[AM2_BATTLE_NAME_SIZE - sizeof(AM2_Widget)];
+struct AM2_BattleNameScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_BATTLE_NAME_SIZE - sizeof(AM2_ScreenBase)];
     AM2_BattleNameScreen(const char *bmp);
 };
 struct AM2_CommPanelScreen : AM2_ScreenBase {
@@ -640,8 +641,9 @@ struct AM2_MoviesScreen : AM2_Widget {
     uint8_t pad_[AM2_MOVIES_SIZE - sizeof(AM2_Widget)];
     AM2_MoviesScreen(const char *bmp);
 };
-struct AM2_MpOptionsScreen : AM2_Widget {
-    uint8_t pad_[AM2_MP_OPTIONS_SIZE - sizeof(AM2_Widget)];
+struct AM2_MpOptionsScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_MP_OPTIONS_SIZE - sizeof(AM2_ScreenBase)];
     AM2_MpOptionsScreen(const char *bmp);
 };
 struct AM2_MpPanelScreen : AM2_Widget {
@@ -678,8 +680,9 @@ struct AM2_SelectPlayerScreen : AM2_ScreenBase {
     AM2_SelectPlayerScreen(const char *bmp);
     ~AM2_SelectPlayerScreen();
 };
-struct AM2_WarMenuScreen : AM2_Widget {
-    uint8_t pad_[AM2_WAR_MENU_SIZE - sizeof(AM2_Widget)];
+struct AM2_WarMenuScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_WAR_MENU_SIZE - sizeof(AM2_ScreenBase)];
     AM2_WarMenuScreen(const char *bmp);
 };
 #endif
@@ -2075,7 +2078,7 @@ extern "C++" void __cdecl OpenWarMenu(void);  /* C++: `new` needs its /GX unwind
 /* Original: 0x0042EED0, thiscall, `ret 4`. The war menu's constructor: a
  * blank panel and the three buttons. */
 static inline AM2_Widget * __attribute__((thiscall)) WarMenuConstruct(AM2_Widget *w, const char *bmp)
-{ return w->WarMenuConstruct(bmp); }
+{ return ::new (w) AM2_WarMenuScreen(bmp); }
 
 /* Original: 0x0042FF60. ENTER BATTLE NAME -- two text fields and an OK, which ab.sh multi drives. */
 extern "C++" void __cdecl OpenBattleName(void);  /* C++: `new` needs its /GX unwind frame */
@@ -2163,7 +2166,7 @@ static inline AM2_Widget * __attribute__((thiscall)) ControlsDialogConstruct(AM2
  * the declarative table, then three buttons for a host and one for anyone
  * else. See widget.cpp for the three things that depend on being the host. */
 static inline AM2_Widget * __attribute__((thiscall)) MpOptionsConstruct(AM2_Widget *w, const char *bmp)
-{ return w->MpOptionsConstruct(bmp); }
+{ return ::new (w) AM2_MpOptionsScreen(bmp); }
 
 /* Original: 0x0044F370, thiscall, `ret 8`. AUDIO CONTROLS -- three volume
  * sliders. The only screen whose SHAPE depends on where it was opened from:
@@ -2175,7 +2178,7 @@ static inline AM2_Widget * __attribute__((thiscall)) AudioDialogConstruct(AM2_Wi
  * seeded from the saved names and edit the dialog's own buffers in place,
  * which is why HostBattle can read them back out of globals. See widget.cpp. */
 static inline AM2_Widget * __attribute__((thiscall)) BattleNameConstruct(AM2_Widget *w, const char *bmp)
-{ return w->BattleNameConstruct(bmp); }
+{ return ::new (w) AM2_BattleNameScreen(bmp); }
 
 /* Original: 0x0042E9C0, thiscall. COMM. CHANNEL SELECT -- the connection
  * list, filled by our own CommEnumConnections. Its list box takes ADDR_LOG as
