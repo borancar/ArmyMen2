@@ -17199,19 +17199,17 @@ void __cdecl PointerActionMode6(void *target, uint32_t at)
         if (ot >= AM2_OBJ_TYPE_TROOPER
             && (ot <= AM2_OBJ_TYPE_VEHICLE || ot == AM2_OBJ_TYPE_ROACH)) {
             /* The original hands FormationSlotPoint the address of its own
-             * first argument slot; written as a local initialised from it,
-             * which is the same dword and the same value in and out. */
-            uint32_t slot = (uint32_t)(uintptr_t)target;
-
-            FormationSlotPoint(i, at, o, &slot);
+             * first argument slot -- the target is a packed point, and the
+             * slot is overwritten with this unit's place in the formation. */
+            FormationSlotPoint(i, at, o, (uint32_t *)&target);
 
             ObjAttachTo(o, (void *)0);
             *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 1;
             *(int32_t *)(o + OBJ_OFF_AI_MODE)  = AM2_AI_MODE_IGNORE;
 
-            PointActionA(o, slot);
+            PointActionA(o, (uint32_t)(uintptr_t)target);
 
-            if (*(const int32_t *)o == AM2_OBJ_TYPE_TROOPER) {
+            if (ObjIsType2Inline(o)) {
                 if (GetMenuRow() == AM2_MENU_ROW_8) {
                     *(uint32_t *)(o + OBJ_OFF_UID_56C) =
                         *(const uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID;

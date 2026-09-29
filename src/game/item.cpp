@@ -10112,7 +10112,7 @@ void __cdecl ToggleSelect(void *obj)
  * each loop rather than latched, which is the original's spelling; for the
  * boat loop that is the same 5 it entered with.
  */
-int32_t __cdecl VehicleBlockWeight(void *veh, int32_t facing, uint32_t at,
+int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
                                    int32_t apply)
 {
     uint8_t       *v       = (uint8_t *)veh;
@@ -10332,8 +10332,8 @@ void __cdecl NearestClearVehiclePoint(void *veh, int32_t facing, uint32_t from,
     int32_t    grew = 0;
     uint8_t    snapped;
 
-    snapped = (uint8_t)RoundTo8(facing & 0xFF, AM2_VEHICLE_FACING_BITS);
     *(uint32_t *)out = from;
+    snapped = (uint8_t)RoundTo8(facing & 0xFF, AM2_VEHICLE_FACING_BITS);
 
     for (;;) {
         const uint8_t *entry;
@@ -10348,7 +10348,7 @@ void __cdecl NearestClearVehiclePoint(void *veh, int32_t facing, uint32_t from,
             step = 0;
             if (++dir > 3)
                 dir = 0;
-            if (grew) {
+            if (grew == 1) {
                 leg++;
                 grew = 0;
             } else {

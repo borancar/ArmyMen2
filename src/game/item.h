@@ -310,7 +310,7 @@ int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
  * standing there. TWO nearly identical mask loops, one for the boat and one
  * for everything else, differing in five ways that a merged loop would lose;
  * see the note on the definition. */
-int32_t __cdecl VehicleBlockWeight(void *veh, int32_t facing, uint32_t at,
+int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
                                    int32_t apply);
 
 /* 0x0043CF70. The FOURTH variant, and the only one with a side effect: the

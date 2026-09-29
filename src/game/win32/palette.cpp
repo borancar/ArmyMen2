@@ -229,7 +229,7 @@ void __attribute__((thiscall)) AM2_Movie::SnapshotSystemPalette()
      * approximated to whatever is already realized. */
     for (i = 0; i < SYSTEM_RESERVED; i++)
         g_systemPalette[i].peFlags = 0;
-    for (i = SYSTEM_RESERVED; i < PALETTE_ENTRIES - SYSTEM_RESERVED; i++)
+    for (; i < PALETTE_ENTRIES - SYSTEM_RESERVED; i++)
         g_systemPalette[i].peFlags = PC_NOCOLLAPSE;
     for (; i < PALETTE_ENTRIES; i++)      /* on from where the last one stopped */
         g_systemPalette[i].peFlags = 0;
