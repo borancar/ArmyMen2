@@ -10155,26 +10155,33 @@ void __attribute__((thiscall)) AM2_Widget::MpPanelUpdate()
     AM2_Widget *w = this;
 
     uint8_t     *self = (uint8_t *)w;
-    AM2_Widget **colours = (AM2_Widget **)(self + MP_PANEL_OFF_COLOURS);
-    AM2_Widget **teams   = (AM2_Widget **)(self + MP_PANEL_OFF_TEAMS);
-    AM2_Widget **rows    = (AM2_Widget **)(self + MP_PANEL_OFF_ARMY_ROWS);
-    const int32_t *setting = (const int32_t *)(uintptr_t)ADDR_ARMY_POINTS;
+    /* The panel's arrays are indexed off the panel in place. */
+#define colours ((AM2_Widget **)(self + MP_PANEL_OFF_COLOURS))
+#define teams   ((AM2_Widget **)(self + MP_PANEL_OFF_TEAMS))
+#define rows    ((AM2_Widget **)(self + MP_PANEL_OFF_ARMY_ROWS))
+#define setting ((const int32_t *)(uintptr_t)ADDR_ARMY_POINTS)
     int32_t      i;
 
     ::WidgetUpdateCancel(w);
 
+    /* Each arm stores its constant into both buttons. */
     for (i = 0; i < AM2_PLAYERS_MAX; i++) {
-        const uint8_t *comm = g_commObject;
-        const uint8_t *rec  = comm + (uint32_t)i * AM2_PLAYER_STRIDE;
-        int32_t        off;
-
-        if (*(const uint32_t *)(rec + AM2_PLAYER_ID) > 0)
-            off = (i == g_ourSlot) ? 0 : 1;
-        else
-            off = *(const int32_t *)(comm + COMM_OFF_IS_HOST) ? 0 : 1;
-
-        colours[i]->disabled = off;
-        teams[i]->disabled   = off;
+        if (*(const uint32_t *)((uint32_t)i * AM2_PLAYER_STRIDE + g_commObject
+                                + AM2_PLAYER_ID) > 0) {
+            if (i == g_ourSlot) {
+                colours[i]->disabled = 0;
+                teams[i]->disabled   = 0;
+            } else {
+                colours[i]->disabled = 1;
+                teams[i]->disabled   = 1;
+            }
+        } else if (*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST)) {
+            colours[i]->disabled = 0;
+            teams[i]->disabled   = 0;
+        } else {
+            colours[i]->disabled = 1;
+            teams[i]->disabled   = 1;
+        }
     }
 
     orig_sprintf((char *)(self + MP_PANEL_OFF_SCORE_TEXT),
@@ -10187,6 +10194,10 @@ void __attribute__((thiscall)) AM2_Widget::MpPanelUpdate()
         orig_sprintf(*(char **)(inner + EDIT_OFF_TEXT),
                      "%i", setting[i]);
     }
+#undef colours
+#undef teams
+#undef rows
+#undef setting
 }
 
 void __attribute__((thiscall)) AM2_Widget::MpPanelPaint(RECT clip)

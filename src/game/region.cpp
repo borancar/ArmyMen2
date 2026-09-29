@@ -5800,10 +5800,10 @@ void __cdecl AiHitReact(void *obj, void *out, void *ctx)
     uint8_t       *o = (uint8_t *)obj;
     uint8_t       *w = (uint8_t *)out;
     const uint8_t *c = (const uint8_t *)ctx;
-    uint8_t        hit = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
     int32_t        kind;
 
-    if (!hit)
+    /* The hit direction is read again where it is copied. */
+    if (!*(const uint8_t *)(o + OBJ_OFF_HIT_DIR))
         return;
 
     kind = *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND);
@@ -5816,23 +5816,23 @@ void __cdecl AiHitReact(void *obj, void *out, void *ctx)
              + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
                * RANK_REC_BYTES
              + RANK_REC_OFF_THRESHOLD);
-        uint8_t v = *(const uint8_t *)(c + SIGHTC_OFF_SEED);
-
-        if ((int32_t)v < (limit >> 1)) {
+#define V (*(const uint8_t *)(c + SIGHTC_OFF_SEED))
+        if ((int32_t)V < (limit >> 1)) {
             int32_t slot = *(const int32_t *)(c + SIGHTC_OFF_FIELD_00) * 2
-                           + (v >= 0x80 ? 1 : 0);
+                           + (V >= 0x80 ? 1 : 0);
 
             *(int32_t *)(w + 8) =
                 ((const int32_t *)((void *)(uintptr_t)(ADDR_HIT_POSE_BY_CLASS)))[slot];
-        } else if ((int32_t)v < limit) {
+        } else if ((int32_t)V < limit) {
             *(int32_t *)(w + 8) = AM2_POSE_HIT_HEAVY;
         }
     }
 
     if (!*(const void *const *)(c + SIGHTC_OFF_OBSERVER))
-        w[4] = hit;
+        w[4] = *(const uint8_t *)(o + OBJ_OFF_HIT_DIR);
 
     *(o + OBJ_OFF_HIT_DIR) = 0;
+#undef V
 }
 
 /* AiKeepRange -- original 0x00405100, six call sites in five functions across

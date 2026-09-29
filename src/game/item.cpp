@@ -3279,7 +3279,7 @@ void __cdecl ShooterReact(void *shooter, void *target)
 {
     uint8_t *s = (uint8_t *)shooter;
     uint8_t *t = (uint8_t *)target;
-    int32_t  points = 1;
+    int32_t  points;
 
     if (!s)
         return;
@@ -3292,6 +3292,7 @@ void __cdecl ShooterReact(void *shooter, void *target)
     if (*(const int32_t *)(s + OBJ_OFF_RANK) >= AM2_RANK_MAX)
         return;
 
+    points = 1;
     if (*(const int16_t *)(t + OBJ_OFF_HEALTH) == 0) {
         /* The original's own null test, after the read above. */
         if (t) {
