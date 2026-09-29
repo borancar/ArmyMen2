@@ -2182,23 +2182,28 @@ int32_t __cdecl SaveType5(am2_FILE *fp, void *obj)
  */
 void *__cdecl LoadType6(am2_FILE *fp, const void *hdr)
 {
+    /* The whole object on the stack, the record read in at +0x94, as the
+     * other loaders have it. */
+    struct {
+        uint8_t head[OBJ_OFF_FIELD_94];
+        uint8_t rec[AM2_TYPE6_RECORD_SIZE];
+    } obj;
     const uint8_t *h = (const uint8_t *)hdr;
-    uint8_t        rec[AM2_TYPE6_RECORD_SIZE];
     uint8_t       *made;
 
-    orig_fread(rec, AM2_TYPE6_RECORD_SIZE, 1, fp);
+    orig_fread(obj.rec, AM2_TYPE6_RECORD_SIZE, 1, fp);
 
     made = (uint8_t *)orig_spawn_at(
                *(const int16_t *)(h + OBJ_OFF_POS),
                *(const int16_t *)(h + OBJ_OFF_POS + 2),
-               *(const int32_t *)(rec + TYPE6_REC_OFF_KIND),
+               *(const int32_t *)(obj.rec + TYPE6_REC_OFF_KIND),
                *(const int8_t *)(h + OBJ_OFF_ARMY),
-               *(const uint32_t *)(rec + TYPE6_REC_OFF_UID),
-               *(const int32_t *)(rec + TYPE6_REC_OFF_EXTRA),
+               *(const uint32_t *)(obj.rec + TYPE6_REC_OFF_UID),
+               *(const int32_t *)(obj.rec + TYPE6_REC_OFF_EXTRA),
                0, 1, *(const int32_t *)(h + 4), 0);
 
     memcpy(made, h, (size_t)kItemHeaderSize);
-    memcpy(made + OBJ_OFF_FIELD_94, rec, AM2_TYPE6_RECORD_SIZE);
+    memcpy(made + OBJ_OFF_FIELD_94, obj.rec, AM2_TYPE6_RECORD_SIZE);
     return made;
 }
 
