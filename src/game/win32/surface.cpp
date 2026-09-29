@@ -241,6 +241,10 @@ void __cdecl PresentFrame(void)
         if (hr != DDERR_WASSTILLDRAWING)
             return;
         hr = IDirectDrawSurface_Flip(g_primarySurface, NULL, 0);
+        /* Tested here as well as by the loop: the original leaves through a
+         * `je` and loops with a plain `jmp`. */
+        if (hr == DD_OK)
+            break;
     }
 }
 

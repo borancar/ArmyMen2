@@ -2783,8 +2783,10 @@ am2_FILE *__cdecl OpenSaveForLoad(void)
     if (fp) {
         if (!CheckSaveTag(fp, AM2_SAVETAG_GAMEPROC,
                           "C:\\ArmyMen2\\source\\gameproc.cpp",
-                          AM2_GAMEPROC_TAG_LINE)
-            || !LoadGameProcSection(fp)) {
+                          AM2_GAMEPROC_TAG_LINE))
+            goto fail;      /* one failure block, entered from both tests */
+        if (!LoadGameProcSection(fp)) {
+fail:
             orig_fclose(fp);
             return (am2_FILE *)0;
         }
