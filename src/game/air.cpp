@@ -1585,7 +1585,7 @@ static inline int32_t AbsAngle(uint32_t from, uint32_t to)
     return d < 0 ? -d : d;
 }
 
-static void SightSilhouette(int32_t code, int32_t l, int32_t t, int32_t r,
+static inline void SightSilhouette(int32_t code, int32_t l, int32_t t, int32_t r,
                             int32_t b, int32_t *nx, int32_t *ny,
                             int32_t *fx, int32_t *fy)
 {

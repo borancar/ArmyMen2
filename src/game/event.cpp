@@ -3360,7 +3360,7 @@ extern "C" void __cdecl StartAudioStream(const char *name, int32_t loop);
 /* A value that comes from a named VARIABLE when the action has one and from
  * act->n0 otherwise.  Several arms share this and the original inlines it
  * each time, with the fallback loading only AL. */
-static int32_t ActValueOrVar(const AM2_ScriptAction *act)
+static inline int32_t ActValueOrVar(const AM2_ScriptAction *act)
 {
     int32_t v = 0;
 

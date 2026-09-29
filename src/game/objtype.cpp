@@ -479,7 +479,7 @@ void __cdecl FreeRecordList(void *list)
  * dword -- and MakeAaiRecord takes the rect as its last FOUR arguments, which
  * the original passes by writing them into reserved stack rather than pushing.
  */
-static void AaiBuiltin(void *spr, int16_t a, int16_t b, int32_t c,
+static inline void AaiBuiltin(void *spr, int16_t a, int16_t b, int32_t c,
                        int32_t type, uint32_t key,
                        int32_t l, int32_t t, int32_t r, int32_t bo)
 {
@@ -508,7 +508,7 @@ static void AaiBuiltin(void *spr, int16_t a, int16_t b, int32_t c,
 /* The same, for the three blocks that ALSO give the list its own
  * LISTHDR_OFF_BOX before registering it and whose rect is always the same
  * sixteen-unit square. The singletons above do not touch the list's box. */
-static void AaiBuiltinBoxed(void *spr, int16_t a, int16_t b, int32_t c,
+static inline void AaiBuiltinBoxed(void *spr, int16_t a, int16_t b, int32_t c,
                             int32_t type, uint32_t key)
 {
     uint8_t  rec[AM2_LIST_RECORD_BYTES];

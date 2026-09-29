@@ -1103,7 +1103,7 @@ int32_t __cdecl AnimStepPoint(void *obj, uint8_t heading, int32_t pose,
  * them is two shifts and two masks. The original open-codes this five times
  * and a fifth reading of the same six instructions is five chances to differ.
  */
-static int32_t PathDistXY(int32_t fromTile, int32_t toTile)
+static inline int32_t PathDistXY(int32_t fromTile, int32_t toTile)
 {
     const int32_t w     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
     const int32_t shift = *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT
@@ -1118,7 +1118,7 @@ static int32_t PathDistXY(int32_t fromTile, int32_t toTile)
  * x87 and truncated by _ftol, which REGION_OFF_H already records for the
  * region-level search. Weighted, so inadmissible, so fast and not optimal --
  * the original's choice. */
-static int32_t PathHeuristic(int32_t fromTile, int32_t toTile)
+static inline int32_t PathHeuristic(int32_t fromTile, int32_t toTile)
 {
     return (int32_t)((double)PathDistXY(fromTile, toTile) * 1.5);
 }
@@ -1134,7 +1134,7 @@ static int32_t PathHeuristic(int32_t fromTile, int32_t toTile)
  * get through in the whole per-frame allowance; averaging that with half the
  * current budget and halving is an exponential decay toward it. The `/2*2`
  * rounds down to even and the floor keeps a slow machine searching at all. */
-static void PathChargeFrame(uint32_t startTicks, int32_t considered)
+static inline void PathChargeFrame(uint32_t startTicks, int32_t considered)
 {
     uint32_t elapsed = Ticks() - startTicks;
     int32_t  budget;
@@ -1944,7 +1944,7 @@ int32_t __cdecl ObjBoxAction(void *obj, void *out)
  * Written as a loop over ADDR_TILEMASK_NEIGHBOURS because that is what the
  * original does -- it walks the table with a pointer from 0x00554B84 to
  * 0x00554BD4 -- rather than as twenty adds. */
-static void MarkTileRing(uint8_t *cells, const int32_t *ring, int32_t idx)
+static inline void MarkTileRing(uint8_t *cells, const int32_t *ring, int32_t idx)
 {
     int32_t i;
 
@@ -2230,7 +2230,7 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
  * minus one and y by shifting down ADDR_MAP_ROW_SHIFT, which only agree if
  * the map's width is a power of two -- which is presumably why that shift
  * is stored beside the width. */
-static void ShiftTileCover(int32_t cell, int32_t centre, int32_t delta)
+static inline void ShiftTileCover(int32_t cell, int32_t centre, int32_t delta)
 {
     int32_t  w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
     int32_t  tx = cell & (w - 1);
@@ -4239,7 +4239,7 @@ done:
  * anything an attribute can hold: a tile higher than the viewer raises the
  * running maximum and does not stop the walk, and only the step back down from
  * it by more than AM2_SIGHT_BAND_STEP does. */
-static void AiSightTrace(const uint8_t *o, const uint8_t *seen, uint8_t *rec,
+static inline void AiSightTrace(const uint8_t *o, const uint8_t *seen, uint8_t *rec,
                          const uint8_t *rank, int32_t viewerAttr, int32_t gen)
 {
     uint16_t       buf[AM2_AI_SIGHT_LINE_MAX];
@@ -4543,7 +4543,7 @@ done:
  * breaks into runs of 11, 25, 28, 11 and 11, and against AiAttackBody into a
  * single 28. Four functions doing the same thing, two of them identically.
  * AiSightTrace below is the inner 38 that all four DO share. */
-static int32_t AiCanSee(const uint8_t *o, const uint8_t *seen)
+static inline int32_t AiCanSee(const uint8_t *o, const uint8_t *seen)
 {
     const uint8_t *rank = (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
                           + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
@@ -6386,7 +6386,7 @@ void __cdecl UnrevealArea(int32_t army, uint32_t at)
  * power of two and ADDR_MAP_ROW_SHIFT is its log, so the original does this
  * with a shift and a mask rather than a divide -- four times in RegionFindPath,
  * which is why it is a helper here and inline there. */
-static void RegionTileXY(const uint8_t *r, int32_t *x, int32_t *y)
+static inline void RegionTileXY(const uint8_t *r, int32_t *x, int32_t *y)
 {
     uint32_t tile  = *(const uint16_t *)(r + REGION_OFF_TILE);
     uint32_t shift = (uint32_t)*(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT
@@ -7949,7 +7949,7 @@ typedef int32_t (__cdecl *AM2_GameRandFn)(void);
  * OBJ_OFF_SIGHT_OUT_T2 -- written through the OBJECT, as the original does,
  * rather than through the `sight` argument the two callers happen to point at
  * the same place. */
-static void TrooperFaceTo(uint8_t *o, const AM2_Point *to)
+static inline void TrooperFaceTo(uint8_t *o, const AM2_Point *to)
 {
     uint8_t f = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), to);
 

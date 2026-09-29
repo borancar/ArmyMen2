@@ -1024,7 +1024,7 @@ int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
 #define kPadNumbers ((AM2_PadNumber *)((void *)(uintptr_t)(ADDR_PAD_NUMBERS)))
 
 /* One coordinate of a location: an integer, or `refvar <name>`. */
-static int32_t ScriptCoord(AM2_ScriptCtx *ctx, int32_t *at,
+static inline int32_t ScriptCoord(AM2_ScriptCtx *ctx, int32_t *at,
                            int16_t *lit, int32_t *var)
 {
     AM2_ScriptTok *tok = &ctx->tokens[*at];
@@ -1149,7 +1149,7 @@ static const struct {
 
 /* `padon <name>` and `padoff <name>`, which differ only in the kind and the
  * two messages. */
-static int32_t ScriptPadEvent(AM2_ScriptCtx *ctx, int32_t *at, int32_t *val,
+static inline int32_t ScriptPadEvent(AM2_ScriptCtx *ctx, int32_t *at, int32_t *val,
                               const char *no_name, const char *not_a_pad)
 {
     if (!ScriptStep(ctx, at))
@@ -1449,7 +1449,7 @@ static void ScriptReadEnv(void)
 /* ---------------------------------------------------------- actions ---- */
 
 /* Advance one token. Zero, with the message, at the end of the script. */
-static int32_t ActStep(AM2_ScriptCtx *ctx, int32_t *at)
+static inline int32_t ActStep(AM2_ScriptCtx *ctx, int32_t *at)
 {
     if (++(*at) < ctx->count)
         return 1;
@@ -1467,7 +1467,7 @@ static inline void ActTypeErr(AM2_ScriptCtx *ctx, int32_t *at, int32_t kind)
 
 /* `createtrooper`, `createvehicle`: a location and an army, and the army's
  * own result decides the return. */
-static int32_t ActPlaceAndArmy(AM2_ScriptCtx *ctx, int32_t *at,
+static inline int32_t ActPlaceAndArmy(AM2_ScriptCtx *ctx, int32_t *at,
                                AM2_ScriptAction *act)
 {
     if (!ActStep(ctx, at))
@@ -1481,7 +1481,7 @@ static int32_t ActPlaceAndArmy(AM2_ScriptCtx *ctx, int32_t *at,
 
 /* The weapon a `createtrooper` carries. -1 for one the keyword table has but
  * the trooper table rejects. */
-static int32_t ActWeapon(int32_t id)
+static inline int32_t ActWeapon(int32_t id)
 {
     switch (id) {
     case AM2_TOK_RIFLE:             return 1;
@@ -1499,7 +1499,7 @@ static int32_t ActWeapon(int32_t id)
     }
 }
 
-static int32_t ActChassis(int32_t id)
+static inline int32_t ActChassis(int32_t id)
 {
     switch (id) {
     case AM2_TOK_TANK:              return 1;
@@ -1511,7 +1511,7 @@ static int32_t ActChassis(int32_t id)
     }
 }
 
-static int32_t ActPickup(int32_t id)
+static inline int32_t ActPickup(int32_t id)
 {
     switch (id) {
     case AM2_TOK_BAZOOKA:           return 4;
@@ -1550,7 +1550,7 @@ static int32_t ActPickup(int32_t id)
 
 /* projectile, fire, crush, explosion -- shared by `damage` and
  * `setdamagepad`, and the codes are not in keyword order. */
-static int32_t ActDamageKind(int32_t id)
+static inline int32_t ActDamageKind(int32_t id)
 {
     switch (id) {
     case AM2_TOK_PROJECTILE:        return 2;
@@ -1563,7 +1563,7 @@ static int32_t ActDamageKind(int32_t id)
 
 /* attack, defend, ignore, evade -- shared by `order ... inmode` and
  * `setaimode`, and the codes are neither sequential nor in keyword order. */
-static int32_t ActAiMode(int32_t id)
+static inline int32_t ActAiMode(int32_t id)
 {
     switch (id) {
     case AM2_TOK_ATTACK:            return 6;
@@ -1576,7 +1576,7 @@ static int32_t ActAiMode(int32_t id)
 
 /* A variable name that must already be declared, for the several actions that
  * take one. The message differs per caller, so it comes in. */
-static int32_t ActVarName(AM2_ScriptCtx *ctx, int32_t *at, AM2_ScriptAction *act,
+static inline int32_t ActVarName(AM2_ScriptCtx *ctx, int32_t *at, AM2_ScriptAction *act,
                           const char *undeclared)
 {
     int32_t idx = ScriptFindName((const char *)ctx->tokens[*at].value);
@@ -2545,7 +2545,7 @@ static const uint32_t kPadTriggerBit[27] = {
 /* Where on the map this pad number is, in sixteenths of a cell. Only computed
  * the first time a number is defined -- a second `pad` with the same number
  * joins the existing entry and leaves the centroid alone. */
-static void ScriptPadCentroid(AM2_PadNumber *pn, int32_t number)
+static inline void ScriptPadCentroid(AM2_PadNumber *pn, int32_t number)
 {
     const uint8_t *layer;
     int32_t mask = 0;
@@ -3226,7 +3226,7 @@ const AM2_ScriptName *am2_script_name(int32_t i)
 
 /* Change into one of the game's data directories. Everything the script loader
  * opens is relative to wherever this last left us. */
-static void ScriptSetDataDir(const char *dir)
+static inline void ScriptSetDataDir(const char *dir)
 {
     SetGameDir(dir);
 }

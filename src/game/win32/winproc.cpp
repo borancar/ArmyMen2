@@ -173,7 +173,7 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_sprintf        (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
 
 /* The player's name is the first field of its record. */
-static const char *PlayerName(uint8_t *comm, int32_t slot)
+static inline const char *PlayerName(uint8_t *comm, int32_t slot)
 {
     return (const char *)(comm + COMM_OFF_PLAYERS
                           + (uint32_t)slot * COMM_PLAYER_STRIDE
@@ -182,7 +182,7 @@ static const char *PlayerName(uint8_t *comm, int32_t slot)
 
 /* Ask DirectPlay for the session description again and clear the two bits that
  * close it, so a replacement player can still join. Both halves are ours. */
-static void ReopenSession(uint8_t *comm)
+static inline void ReopenSession(uint8_t *comm)
 {
     void *desc;
 
@@ -198,7 +198,7 @@ static void ReopenSession(uint8_t *comm)
 /* 0x0046C. A player record was destroyed. Three outcomes: in a menu it is a
  * lobby update, in a mission it is either us leaving or somebody else being
  * handed to the AI. */
-static LRESULT OnPlayerDestroyed(WPARAM wParam)
+static inline LRESULT OnPlayerDestroyed(WPARAM wParam)
 {
     uint8_t *comm = g_commObject;
     uint32_t id   = (uint32_t)wParam;
@@ -284,7 +284,7 @@ static LRESULT OnPlayerDestroyed(WPARAM wParam)
 }
 
 /* 0x0046D. The host left and we are the new one. */
-static LRESULT OnHostMigrated(void)
+static inline LRESULT OnHostMigrated(void)
 {
     uint8_t *comm = g_commObject;
     char     text[128];
@@ -310,7 +310,7 @@ static LRESULT OnHostMigrated(void)
 }
 
 /* 0x0046E. The ready/end-setup handshake finished. */
-static LRESULT OnSetupDone(void)
+static inline LRESULT OnSetupDone(void)
 {
     uint8_t *comm = g_commObject;
 
@@ -326,7 +326,7 @@ static LRESULT OnSetupDone(void)
 
 /* Re-measure the drawing rectangle after the window has moved or resized.
  * Windowed asks the window; fullscreen assumes the whole screen. */
-static void RemeasureScreenRect(HWND hWnd)
+static inline void RemeasureScreenRect(HWND hWnd)
 {
     if (g_hWnd) {
         /* Answer discarded -- see the fidelity note. */
@@ -344,13 +344,13 @@ static void RemeasureScreenRect(HWND hWnd)
 
 /* Hand the screen back to GDI. Everything that interrupts an exclusive-mode
  * DirectDraw application funnels through here. */
-static void FlipToGDI(void)
+static inline void FlipToGDI(void)
 {
     if (g_ddraw)
         IDirectDraw_FlipToGDISurface(g_ddraw);
 }
 
-static LRESULT OnPaint(void)
+static inline LRESULT OnPaint(void)
 {
     LPDIRECTDRAWSURFACE gdi;
     PAINTSTRUCT         ps;

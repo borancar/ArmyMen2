@@ -1398,7 +1398,7 @@ static inline void TickMenuAnimation(void)
 
 /* Draw one overlay at the cursor, offset by the cursor sprite's own overlay
  * point and the overlay's. The original writes this out twice. */
-static void DrawMenuOverlaySprite(uint8_t *spr, uint32_t dxAddr, int32_t fld)
+static inline void DrawMenuOverlaySprite(uint8_t *spr, uint32_t dxAddr, int32_t fld)
 {
     const uint8_t *cursor = g_cursorSprite;
     int32_t x, y;

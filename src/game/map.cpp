@@ -1459,7 +1459,7 @@ typedef int32_t (__cdecl *am2_load_atl_fn)(const char *path);
 
 
 /* w*h bytes straight into one global.  Seven of the arms are exactly this. */
-static uint8_t *ReadPlane(am2_FILE *f, uint32_t size, int32_t *consumed)
+static inline uint8_t *ReadPlane(am2_FILE *f, uint32_t size, int32_t *consumed)
 {
     uint8_t *p = (uint8_t *)am2_malloc(size);
 
@@ -1471,7 +1471,7 @@ static uint8_t *ReadPlane(am2_FILE *f, uint32_t size, int32_t *consumed)
 /* MHDR's tail.  Three rectangles, the listener, both map descriptors and the
  * tile deltas, all derived from w and h.  ADDR_CAMERA_Y is field +4 of
  * ADDR_VISIBLE_TILES and is written by the same RectSet as the rest of it. */
-static void DeriveMapGeometry(void)
+static inline void DeriveMapGeometry(void)
 {
     AM2_Rect r;
 
@@ -1576,7 +1576,7 @@ static inline void LoadMapRecords(am2_FILE *f, uint8_t *objs, int32_t first,
 }
 
 /* Allocate and zero a layer the file did not supply. */
-static void DefaultLayerPtr(void **slot, int32_t bytes)
+static inline void DefaultLayerPtr(void **slot, int32_t bytes)
 {
     if (*slot == 0) {
         *slot = am2_malloc(bytes);
@@ -1599,7 +1599,7 @@ typedef void (__cdecl *am2_respawn_pool_fn)(int32_t seed);
  * one packs a sprite key, may have its kind SUBSTITUTED from the weighted
  * respawn pool, preloads its sprite and takes that sprite's own offset into
  * its position before anything is created. */
-static void BuildMapObjects(uint8_t *objs, int32_t count)
+static inline void BuildMapObjects(uint8_t *objs, int32_t count)
 {
     int32_t i;
 

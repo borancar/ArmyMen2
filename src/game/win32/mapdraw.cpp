@@ -644,7 +644,7 @@ static inline AM2_DepthNode *DepthLinkAfter(AM2_DepthNode *at, int32_t n)
     return fresh;
 }
 
-static AM2_DepthNode *DepthAppend(AM2_DepthNode *at, int32_t n)
+static inline AM2_DepthNode *DepthAppend(AM2_DepthNode *at, int32_t n)
 {
     AM2_DepthNode *fresh = &g_depthNodes[n];
 
@@ -655,7 +655,7 @@ static AM2_DepthNode *DepthAppend(AM2_DepthNode *at, int32_t n)
     return fresh;
 }
 
-static void DepthLinkBefore(AM2_DepthNode *at, int32_t n)
+static inline void DepthLinkBefore(AM2_DepthNode *at, int32_t n)
 {
     AM2_DepthNode *fresh = &g_depthNodes[n];
 

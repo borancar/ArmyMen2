@@ -33,7 +33,7 @@
 
 /* The record the current statement is filling. NewObjScript has already
  * incremented the count, so the one being built is the last. */
-static AM2_ObjScript *ScriptCurrentObj(void)
+static inline AM2_ObjScript *ScriptCurrentObj(void)
 {
     return &kObjScripts[*(const int32_t *)((void *)(uintptr_t)(ADDR_CURRENT_OBJ_SCRIPT))
                         - 1];

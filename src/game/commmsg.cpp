@@ -1823,7 +1823,7 @@ typedef int32_t (__cdecl *AM2_SprintfFn)(char *out, const char *fmt, ...);
 
 /* Update the current dialog and repaint it, with no player list sent after --
  * which is what separates this from RepaintDialogAndSendPlayers. */
-static void RepaintDialog(void)
+static inline void RepaintDialog(void)
 {
     void *dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
 
@@ -2839,7 +2839,7 @@ int commmsg_install(void)
  * faithful here. The ORDER is the part worth preserving: the minimum is
  * taken BEFORE the 10,000 ms clamp and the maximum after, so a long stall
  * moves the max to exactly 10,000 and leaves the min alone. */
-static void FlowNoteRoundTrip(uint8_t *flow, uint32_t rtt)
+static inline void FlowNoteRoundTrip(uint8_t *flow, uint32_t rtt)
 {
     uint32_t lo = *(uint32_t *)(flow + FLOW_OFF_RTT_MIN);
 
@@ -2939,7 +2939,7 @@ extern "C" void __cdecl DumpMsgList(void *list);
  * queue. Below the cap the flag goes to 0 and it goes out immediately -- so
  * the same MsgListSetFlag call means opposite things in the two arms, and
  * they reach it through a shared tail in the original. */
-static int32_t FlowRecvNack(uint8_t *node, uint8_t *msg, uint8_t *sender,
+static inline int32_t FlowRecvNack(uint8_t *node, uint8_t *msg, uint8_t *sender,
                             uint8_t *me)
 {
     const uint8_t *comm = (const uint8_t *)
@@ -3023,7 +3023,7 @@ static int32_t FlowRecvNack(uint8_t *node, uint8_t *msg, uint8_t *sender,
  * Slave Session". COMM_OFF_IS_HOST and that wording were established
  * separately and agree, which is what makes this reading better than
  * plausible. */
-static int32_t FlowRecvData(uint8_t *node, uint8_t *msg, uint8_t *sender,
+static inline int32_t FlowRecvData(uint8_t *node, uint8_t *msg, uint8_t *sender,
                             uint8_t *me, uint32_t mask, uint32_t from)
 {
     const uint8_t *comm = (const uint8_t *)

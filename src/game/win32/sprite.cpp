@@ -961,7 +961,7 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
  * and a log line, so the code around it is thoroughly observed and this is a
  * term that does not matter rather than a path that does not run. The clamp
  * stays verified by reading. */
-static int16_t ClampHotSpot(int16_t v)
+static inline int16_t ClampHotSpot(int16_t v)
 {
     return (v > 2048 || v < -2048) ? 0 : v;
 }

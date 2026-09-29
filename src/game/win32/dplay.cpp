@@ -3301,7 +3301,7 @@ int32_t __cdecl DestroyFlow(uint32_t id)
 
 /* Slot 1 with the screen's own rectangle -- frame.cpp's State1Menu spells the
  * identical call, and this is the second site to want it. */
-static void ScreenPaint(void *dlg)
+static inline void ScreenPaint(void *dlg)
 {
     ObjVPaint(dlg, *(const AM2_Rect *)((const uint8_t *)dlg + AM2_DLG_OFF_RECT));
 }

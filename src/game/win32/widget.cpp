@@ -844,7 +844,7 @@ typedef uint32_t (__attribute__((stdcall)) *AM2_TickFn)(void);
 
 typedef void (__cdecl *AM2_ButtonFn)(AM2_Widget *w);
 
-static void ButtonFire(AM2_Widget *w, int32_t off)
+static inline void ButtonFire(AM2_Widget *w, int32_t off)
 {
     AM2_ButtonFn fn = *(AM2_ButtonFn *)((uint8_t *)w + off);
 
@@ -875,7 +875,7 @@ static inline int32_t ThumbShift(int32_t pos, int32_t range, int32_t travel);
  * width and the row's own band, `top + (row - firstRow) * 14 + 4`, height 14
  * -- the same two constants the hover arithmetic divides by, arrived at from
  * the other direction, which is what makes the row geometry certain. */
-static void ListRepaintRow(AM2_Widget *w, int32_t row)
+static inline void ListRepaintRow(AM2_Widget *w, int32_t row)
 {
     uint8_t *self = (uint8_t *)w;
     RECT band;
@@ -1078,7 +1078,7 @@ static inline int32_t EdgeBar(int32_t value, int32_t max)
  * a Lock/Unlock bracket. Returns whether the surface could be locked -- the
  * original ABANDONS THE WHOLE PAINT when a lock fails, rather than skipping
  * the one element, and every one of its four text blocks does that. */
-static int32_t EdgeText(const AM2_Widget *w, int32_t pen, const char *text,
+static inline int32_t EdgeText(const AM2_Widget *w, int32_t pen, const char *text,
                         const RECT *clip)
 {
     RECT     box;
@@ -1103,7 +1103,7 @@ static int32_t EdgeText(const AM2_Widget *w, int32_t pen, const char *text,
 /* The strip's own sprite, drawn at the pen and clipped twice the way every
  * sprite in this tree is. Nothing is drawn if either clip rejects it, and the
  * caller advances the pen either way. */
-static void EdgeSprite(const AM2_Widget *w, int32_t pen, AM2_Sprite *spr,
+static inline void EdgeSprite(const AM2_Widget *w, int32_t pen, AM2_Sprite *spr,
                        const RECT *clip)
 {
     RECT     box;
@@ -1131,7 +1131,7 @@ static void EdgeSprite(const AM2_Widget *w, int32_t pen, AM2_Sprite *spr,
  * AM2_HUD_BAR_X, growing UPWARD from a baseline AM2_HUD_BAR_BASE below the
  * pen. ClearRegion does the fill, so this must not be inside a lock -- see
  * surface.h, where a fill attempted while a lock is held is a silent no-op. */
-static void EdgeBarFill(const AM2_Widget *w, int32_t pen, int32_t percent,
+static inline void EdgeBarFill(const AM2_Widget *w, int32_t pen, int32_t percent,
                         const RECT *clip)
 {
     RECT box;
@@ -2838,7 +2838,7 @@ static inline uint8_t *FollowFindLeader(void)
  * the tail both arms of PlacementScreenClick share, written out twice in the
  * original and once here. The rect goes into the paint slot BY VALUE, the
  * same as HudRepaintOne's call above. */
-static void HudShowPoints(void)
+static inline void HudShowPoints(void)
 {
     AM2_Widget *panel = *(AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_B;
     AM2_Widget *field;
@@ -2916,7 +2916,7 @@ static inline void SpinRepaint(AM2_Widget *edit)
  * only consulted for something we control. It is read with a SIGNED test --
  * `test eax,eax; jl` -- which is what says it is a row index and not a
  * function pointer, and it defaults to -1. */
-static void PointerIdleOverlay(int32_t ours)
+static inline void PointerIdleOverlay(int32_t ours)
 {
     int32_t row = *(const int32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT2;
 
@@ -4063,7 +4063,7 @@ static inline void HudSquadInk(uint8_t *rec, const uint8_t *obj)
 }
 
 /* min(rank + 1, 5) -- the same count HudSquadDetail draws as pips. */
-static int32_t HudSquadPips(const uint8_t *obj)
+static inline int32_t HudSquadPips(const uint8_t *obj)
 {
     int32_t n = *(const int32_t *)(obj + OBJ_OFF_RANK) + 1;
 
@@ -4075,7 +4075,7 @@ static int32_t HudSquadPips(const uint8_t *obj)
  * tooltip; the table is indexed by kind-1 and the compare is UNSIGNED, so
  * kind 0 wraps past the bound and lands on the default with everything
  * above 43. */
-static int32_t HudSquadWeaponIcon(const uint8_t *weapon, const uint8_t *table)
+static inline int32_t HudSquadWeaponIcon(const uint8_t *weapon, const uint8_t *table)
 {
     uint32_t kind = **(const uint32_t *const *)(weapon + OBJ_OFF_FIELD_C0);
 

@@ -3331,7 +3331,7 @@ typedef int32_t (__cdecl *AM2_ShotHitsObjFn)(void *target, int32_t code,
  * different pairs of targets -- so the compiler built the same membership
  * test twice for the same `switch` written twice. Thirty bytes to ask one
  * question; written here as the question. */
-static int32_t ShotCodeChecksArmour(int32_t code)
+static inline int32_t ShotCodeChecksArmour(int32_t code)
 {
     return (code == 1 || code == 7 || code == 8 || code == 9 || code == 10
             || code == 21 || code == 29 || code == 30) ? 1 : 0;
@@ -3340,7 +3340,7 @@ static int32_t ShotCodeChecksArmour(int32_t code)
 /* Does the shot get through `target`'s armour? Only the eight codes above ask;
  * everything else is stopped. Both jump tables end here, once returning 1 for
  * "stopped" and once 0, which is the only difference between them. */
-static int32_t ShotPiercesArmour(const uint8_t *target, const uint8_t *shot)
+static inline int32_t ShotPiercesArmour(const uint8_t *target, const uint8_t *shot)
 {
     const uint8_t *rec;
     uint8_t        need;
@@ -3361,7 +3361,7 @@ static int32_t ShotPiercesArmour(const uint8_t *target, const uint8_t *shot)
  * UNSIGNED against the shot's own +0xB0, and anything else is hit outright.
  * The original writes this out twice, once in each height branch, from the
  * same `sbb`/`neg` idiom. */
-static int32_t ShotBeatsClass(const uint8_t *target, const uint8_t *shot)
+static inline int32_t ShotBeatsClass(const uint8_t *target, const uint8_t *shot)
 {
     uint8_t power = *(const uint8_t *)(shot + OBJ_OFF_SCRIPT_ID);
 
@@ -3375,7 +3375,7 @@ static int32_t ShotBeatsClass(const uint8_t *target, const uint8_t *shot)
 /* Is the target facing within AM2_SHOT_FACING_ARC of the shot? The original
  * takes the absolute value with the `cdq`/`xor`/`sub` idiom, in both height
  * branches, with the arguments in the same order each time. */
-static int32_t ShotFacingArc(const uint8_t *target, const uint8_t *shot)
+static inline int32_t ShotFacingArc(const uint8_t *target, const uint8_t *shot)
 {
     int32_t d = AngleDelta(*(const uint8_t *)(target + OBJ_OFF_FACING),
                            *(const uint8_t *)(shot + OBJ_OFF_FACING));
