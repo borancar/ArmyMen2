@@ -236,33 +236,29 @@ int32_t __cdecl DefParseFloat(float *out, const char *tok)
  * has nothing to store, so the arms differ in form and not in effect. */
 int32_t __cdecl DefParseBoolean(int32_t *out, const char *tok)
 {
-    static const uint32_t kTrue[] = {
-        ADDR_STR_TRUE, ADDR_STR_BOOL_TRUE_LOW, ADDR_STR_BOOL_TRUE_CAP,
-        ADDR_STR_BOOL_UT, ADDR_STR_BOOL_LT, ADDR_STR_BOOL_1
-    };
-    static const uint32_t kFalse[] = {
-        ADDR_STR_FALSE, ADDR_STR_BOOL_FALSE_LOW, ADDR_STR_BOOL_FALSE_CAP,
-        ADDR_STR_BOOL_UF, ADDR_STR_BOOL_LF, ADDR_STR_BOOL_0
-    };
-    uint32_t i;
-
-    if (tok == (const char *)0)
-        return 0;
-
-    for (i = 0; i < sizeof kTrue / sizeof kTrue[0]; i++)
-        if (strcmp(tok, (const char *)((void *)(uintptr_t)(kTrue[i]))) == 0) {
+    /* Six spellings each way, every comparison an inline strcmp. */
+    if (tok) {
+        if (!strcmp(tok, (const char *)(uintptr_t)ADDR_STR_TRUE)
+            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_TRUE_LOW)
+            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_TRUE_CAP)
+            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_UT)
+            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_LT)
+            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_1)) {
             *out = 1;
             return 1;
         }
-
-    for (i = 0; i < sizeof kFalse / sizeof kFalse[0]; i++)
-        if (strcmp(tok, (const char *)((void *)(uintptr_t)(kFalse[i]))) == 0) {
+        if (!strcmp(tok, (const char *)(uintptr_t)ADDR_STR_FALSE)
+            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_FALSE_LOW)
+            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_FALSE_CAP)
+            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_UF)
+            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_LF)
+            || !strcmp(tok, (const char *)(uintptr_t)ADDR_STR_BOOL_0)) {
             *out = 0;
             return 1;
         }
-
-    orig_log("Bad or missing Boolean\n");
-    *out = 0;
+        orig_log("Bad or missing Boolean\n");
+        *out = 0;
+    }
     return 0;
 }
 

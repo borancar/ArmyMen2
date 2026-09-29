@@ -1882,46 +1882,59 @@ int32_t __cdecl SeqRetire(void *ctxv, void *recv)
 {
     uint8_t *ctx = (uint8_t *)ctxv;
     uint8_t *rec = (uint8_t *)recv;
-    int32_t  count = *(const int32_t *)(ctx + SEQ_CTX_OFF_COUNT);
-    int32_t  freed = *(int16_t *)(rec + SEQ_OFF_ID);
-    int32_t  next  = *(int16_t *)(rec + SEQ_OFF_NEXT);
-    int32_t  prev  = *(int16_t *)(rec + SEQ_OFF_PREV);
+    void    *row = *(void **)(rec + SEQ_OFF_ROW);
+    int32_t  next;
     uint8_t *last;
-    void    *row   = *(void **)(rec + SEQ_OFF_ROW);
 
+    /* The records are re-indexed, and the links re-read, at every use. */
+#define REC(n) ((uint32_t)(n) * AM2_SEQ_RECORD_SIZE \
+                + *(uint8_t **)(ctx + SEQ_CTX_OFF_RECORDS))
+#define ID(p)   (*(int16_t *)((p) + SEQ_OFF_ID))
+#define NEXT(p) (*(int16_t *)((p) + SEQ_OFF_NEXT))
+#define PREV(p) (*(int16_t *)((p) + SEQ_OFF_PREV))
+#define TAIL    (*(int32_t *)(ctx + SEQ_CTX_OFF_TAIL))
+#define COUNT   (*(int32_t *)(ctx + SEQ_CTX_OFF_COUNT))
     if ((*(uint32_t *)row & 1) != 0) {
         *(uint32_t *)row &= ~1u;
         RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
     }
 
-    *(int16_t *)(SeqRecord(ctx, prev) + SEQ_OFF_NEXT) = (int16_t)next;
-    if (next > 0)
-        *(int16_t *)(SeqRecord(ctx, next) + SEQ_OFF_PREV) = (int16_t)prev;
-    if (*(const int32_t *)(ctx + SEQ_CTX_OFF_TAIL) == freed)
-        *(int32_t *)(ctx + SEQ_CTX_OFF_TAIL) = prev;
+    next = NEXT(rec);
+    NEXT(REC(PREV(rec))) = (int16_t)next;
+    if (NEXT(rec) > 0)
+        PREV(REC(NEXT(rec))) = PREV(rec);
+    if (TAIL == ID(rec))
+        TAIL = PREV(rec);
 
-    last = SeqRecord(ctx, count);
-    if (freed != count) {
-        int32_t lprev = *(int16_t *)(last + SEQ_OFF_PREV);
-        int32_t lnext = *(int16_t *)(last + SEQ_OFF_NEXT);
+    last = REC(COUNT);
+    if (ID(rec) != COUNT) {
+        int32_t freed;
 
-        *(int16_t *)(SeqRecord(ctx, lprev) + SEQ_OFF_NEXT) = (int16_t)freed;
-        if (lnext > 0)
-            *(int16_t *)(SeqRecord(ctx, lnext) + SEQ_OFF_PREV) = (int16_t)freed;
-        if (next == *(int16_t *)(last + SEQ_OFF_ID))
+        NEXT(REC(PREV(last))) = ID(rec);
+        if (NEXT(last) > 0)
+            PREV(REC(NEXT(last))) = ID(rec);
+        freed = ID(rec);
+        if (next == ID(last))
             next = freed;
 
         memcpy(rec, last, AM2_SEQ_RECORD_SIZE);
         *(void **)(last + SEQ_OFF_ROW) = row;
-        *(int16_t *)(rec + SEQ_OFF_ID) = (int16_t)freed;
-        if (*(const int32_t *)(ctx + SEQ_CTX_OFF_TAIL) == count)
-            *(int32_t *)(ctx + SEQ_CTX_OFF_TAIL) = freed;
+        ID(rec) = (int16_t)freed;
+        if (TAIL == COUNT)
+            TAIL = freed;
     }
 
-    *(int16_t *)(last + SEQ_OFF_NEXT) = -1;
-    *(int16_t *)(last + SEQ_OFF_PREV) = -1;
-    *(int32_t *)(ctx + SEQ_CTX_OFF_COUNT) = count - 1;
+    NEXT(last) = -1;
+    PREV(last) = -1;
+    COUNT--;
+
     return next;
+#undef REC
+#undef ID
+#undef NEXT
+#undef PREV
+#undef TAIL
+#undef COUNT
 }
 
 /* 0x00460FD0. Same two loops as the hardcoded evictor -- drop what the view

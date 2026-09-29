@@ -2395,25 +2395,21 @@ int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
 
     if (*(const uint32_t *)(row + ROW_OFF_STAMP_54)
             > *(const uint32_t *)(r + SEQ_OFF_LIFE)) {
-        uint32_t step = *(const uint32_t *)(r + SEQ_OFF_GATE) + 1;
-        uint32_t cell = *(const uint8_t *)(row + ROW_OFF_CELL);
-
-        *(uint32_t *)(r + SEQ_OFF_GATE) = step;
-
-        if (step > ((const uint32_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_HOLD)))[cell]) {
-            cell++;
-            *(uint8_t *)(row + ROW_OFF_CELL) = (uint8_t)cell;
-
-            if (cell >= AM2_SEQ_K4_CELLS)
+#define GATE (*(uint32_t *)(r + SEQ_OFF_GATE))
+#define CELL (*(uint8_t *)(row + ROW_OFF_CELL))
+        if (++GATE > ((const uint32_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_HOLD)))[CELL]) {
+            if (++CELL >= AM2_SEQ_K4_CELLS)
                 return SeqRetire(ctx, rec);
 
             *(void **)(row + ROW_OFF_SPRITE) =
-                (*(void *const *const *)((void *)(uintptr_t)(ADDR_SEQ_SPRITES_5)))[cell];
+                (*(void *const *const *)((void *)(uintptr_t)(ADDR_SEQ_SPRITES_5)))[CELL];
             *(void **)(row + ROW_OFF_FIELD_2C) =
-                ((void *const *)((void *)(uintptr_t)(ADDR_REMAP_SHADES)))[cell];
+                ((void *const *)((void *)(uintptr_t)(ADDR_REMAP_SHADES)))[CELL];
 
-            *(uint32_t *)(r + SEQ_OFF_GATE) = 1;
+            GATE = 1;
         }
+#undef GATE
+#undef CELL
 
         *(int16_t *)(row + ROW_OFF_Y_ADJUST) +=
             *(const int16_t *)((void *)(uintptr_t)(ADDR_SEQ_K4_RISE));
@@ -2966,53 +2962,56 @@ int misc_install(void)
  * One array with two users is not two concepts; the name is left alone. */
 int32_t __cdecl SeqStepKind6(int32_t at, void *rec, void *ctx)
 {
-    uint8_t *r    = (uint8_t *)rec;
-    uint8_t *row  = *(uint8_t **)(r + SEQ_OFF_ROW);
-    int32_t  life = *(const int32_t *)(r + SEQ_OFF_LIFE);
-    int32_t  tail = *(const int32_t *)(uintptr_t)ADDR_SEQ_TAIL_FRAMES;
-    int32_t  stride = *(const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE;
+    uint8_t *r     = (uint8_t *)rec;
+    uint8_t *row   = *(uint8_t **)(r + SEQ_OFF_ROW);
+    uint32_t life  = *(const uint32_t *)(r + SEQ_OFF_LIFE);
+    uint32_t stamp = *(const uint32_t *)(row + ROW_OFF_STAMP_54);
+
+    /* The tail count, the stride, the advance and the frame delta are
+     * globals, read afresh at every use. */
+#define TAIL    (*(const int32_t *)(uintptr_t)ADDR_SEQ_TAIL_FRAMES)
+#define STRIDE  (*(const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE)
+#define ADVANCE (*(const uint32_t *)(uintptr_t)ADDR_SEQ_ADVANCE_MS)
+#define DELTA   (*(const uint32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
+#define PHASE   (*(uint8_t *)(row + 0x51u))
 
     (void)at;
 
-    if (*(const uint32_t *)(row + ROW_OFF_STAMP_54) > (uint32_t)life)
+    if (stamp > life)
         return SeqRetire(ctx, rec);
 
-    if (*(const uint32_t *)(r + SEQ_OFF_GATE)
-            > *(const uint32_t *)(uintptr_t)ADDR_SEQ_ADVANCE_MS) {
-        int32_t variant = (int32_t)*(const uint8_t *)(r + SEQ_OFF_FLAG4)
-                          * stride;
+    if (*(const uint32_t *)(r + SEQ_OFF_GATE) > ADVANCE) {
+        int32_t variant = *(const uint8_t *)(r + SEQ_OFF_FLAG4) * STRIDE;
 
-        if ((int32_t)*(const uint32_t *)(row + ROW_OFF_STAMP_54) > life - 100) {
-            int32_t per = 100 / tail;
-            int32_t idx = ((int32_t)*(const uint32_t *)(row + ROW_OFF_STAMP_54)
-                           - life + 100) / per;
+        if ((int32_t)stamp > (int32_t)life - 100) {
+            int32_t per = 100 / TAIL;
+            int32_t idx = ((int32_t)stamp - (int32_t)life + 100) / per;
 
-            if (idx >= tail - 1)
-                idx = tail - 1;
-            variant += stride - tail + idx;
+            if (idx >= TAIL - 1)
+                idx = TAIL - 1;
+            variant += STRIDE - TAIL + idx;
         } else {
-            uint8_t phase = (uint8_t)(*(const uint8_t *)(row + 0x51u) + 1);
-
-            *(uint8_t *)(row + 0x51u) = phase;
-            if ((int32_t)phase >= stride - tail)
-                *(uint8_t *)(row + 0x51u) = 0;
-            variant += *(const uint8_t *)(row + 0x51u);
+            if (++PHASE >= STRIDE - TAIL)
+                PHASE = 0;
+            variant += PHASE;
         }
 
         *(uint32_t *)(row + ROW_OFF_SPRITE) =
             (*(uint32_t *const *)(uintptr_t)ADDR_SEQ_SPRITES_7)[variant];
         RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
 
-        *(int32_t *)(r + SEQ_OFF_GATE) -=
-            *(const int32_t *)(uintptr_t)ADDR_SEQ_ADVANCE_MS;
+        *(uint32_t *)(r + SEQ_OFF_GATE) -= ADVANCE;
     }
 
-    *(uint32_t *)(row + ROW_OFF_STAMP_54) +=
-        *(const uint32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
-    *(int32_t *)(r + SEQ_OFF_GATE) +=
-        *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+    *(uint32_t *)(row + ROW_OFF_STAMP_54) += DELTA;
+    *(uint32_t *)(r + SEQ_OFF_GATE) += DELTA;
 
     return *(const int16_t *)(r + SEQ_OFF_NEXT);
+#undef TAIL
+#undef STRIDE
+#undef ADVANCE
+#undef DELTA
+#undef PHASE
 }
 
 
@@ -3151,102 +3150,95 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
  * comment there flagged this as undecided; a second toucher decided it. */
 int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
 {
-    uint8_t       *r    = (uint8_t *)rec;
-    uint8_t       *row  = *(uint8_t **)(r + SEQ_OFF_ROW);
-    const uint8_t *tab;
-    uint32_t       pt;
-    int32_t        tile;
-    int32_t        ground;
+    /* The particle kind's record is re-indexed, and the fields re-read, at
+     * every use. The kind is SEQ_OFF_FLAG4 read as a dword. */
+    typedef struct { int32_t frames; const uint32_t *sprites; uint8_t pad[16]; } Kind;
+#define KIND  (((const Kind *)(uintptr_t)ADDR_PARTICLE_KINDS) \
+               [*(const int32_t *)(r + SEQ_OFF_FLAG4)])
+#define LIFE  (*(int32_t *)(r + SEQ_OFF_LIFE))
+#define STAMP (*(uint32_t *)(row + ROW_OFF_STAMP_54))
+#define PHASE (*(uint8_t *)(row + 0x51u))
+#define Z     (*(int16_t *)(row + 0x20u))
+    uint8_t *r   = (uint8_t *)rec;
+    uint8_t *row = *(uint8_t **)(r + SEQ_OFF_ROW);
 
     (void)at;
 
-    *(uint32_t *)(row + ROW_OFF_STAMP_54) +=
-        *(const uint32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+    STAMP += *(const uint32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
 
-    if (*(const uint32_t *)(row + ROW_OFF_STAMP_54)
-            <= *(const uint32_t *)(r + SEQ_OFF_GATE))
-        goto done;
+    if (STAMP > *(const uint32_t *)(r + SEQ_OFF_GATE)) {
+        uint32_t  pt;
+        int32_t   tile;
+        char      ground;
 
-    tab = (const uint8_t *)(uintptr_t)ADDR_PARTICLE_KINDS
-          + (uint32_t)*(const uint8_t *)(r + SEQ_OFF_FLAG4) * AM2_PARTICLE_KIND_BYTES;
+        if (LIFE != 0) {
+            if (++PHASE >= KIND.frames)
+                PHASE = 0;
+            *(uint32_t *)(row + ROW_OFF_SPRITE) = KIND.sprites[PHASE];
+        }
 
-    if (*(const int32_t *)(r + SEQ_OFF_LIFE) != 0) {
-        uint8_t phase = (uint8_t)(*(const uint8_t *)(row + 0x51u) + 1);
+        *(int16_t *)(row + ROW_OFF_X) +=
+            (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_0C);
+        *(int16_t *)(row + ROW_OFF_X + 2) +=
+            (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_10);
+        Z += (int16_t)LIFE;
 
-        *(uint8_t *)(row + 0x51u) = phase;
-        if ((int32_t)phase >= *(const int32_t *)tab)
-            *(uint8_t *)(row + 0x51u) = 0;
-        *(uint32_t *)(row + ROW_OFF_SPRITE) =
-            (*(uint32_t *const *)(tab + 4))[*(const uint8_t *)(row + 0x51u)];
+        /* The bounds test is on the DRAWN point -- the row's position with
+         * its height subtracted from z -- not on the ground position. */
+        pt = *(const uint32_t *)(row + ROW_OFF_X);
+        *((int16_t *)&pt + 1) -= Z;
+        if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT,
+                         (const AM2_Point *)&pt))
+            return SeqRetire(ctx, rec);
+
+        tile = TileOfPoint(*(const uint32_t *)(row + ROW_OFF_X)) & 0xFFFF;
+        ground = (*(const char *const *)(uintptr_t)ADDR_TILE_ATTRS)[tile];
+
+        if (Z + *(const int32_t *)(r + 0x18u) <= ground) {
+            Z = (int16_t)((int16_t)ground - *(const int16_t *)(r + 0x18u));
+
+            if ((*(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS)[tile] & 1) {
+                CreateExplosion(*(const int16_t *)(row + ROW_OFF_X),
+                                *(const int16_t *)(row + ROW_OFF_X + 2),
+                                0x93, 4, 0, 0, 0, 0, 0, 0);
+                return SeqRetire(ctx, rec);
+            }
+
+            if (LIFE < -4) {
+                int32_t v = -2 + abs(LIFE >> 1);
+
+                if (v >= 7)
+                    v = 7;
+                LIFE = v;
+                STAMP = 0;
+            } else {
+                /* The row is read again for the copy. */
+                uint8_t *old  = *(uint8_t **)(r + SEQ_OFF_ROW);
+                uint8_t *rest = *(uint8_t **)RowPoolAAlloc();
+
+                *(int32_t *)rest = 1;
+                *(uint32_t *)(rest + ROW_OFF_SPRITE) =
+                    *(const uint32_t *)(old + ROW_OFF_SPRITE);
+                *(int16_t *)(rest + ROW_OFF_X) = *(const int16_t *)(old + ROW_OFF_X);
+                *(int16_t *)(rest + ROW_OFF_X + 2) =
+                    *(const int16_t *)(old + ROW_OFF_X + 2);
+                *(uint32_t *)(rest + ROW_OFF_FIELD_2C) =
+                    *(const uint32_t *)(old + ROW_OFF_FIELD_2C);
+                *(int16_t *)(rest + ROW_OFF_FIELD_26) = 2;
+                RowUpdate(rest, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+                return SeqRetire(ctx, rec);
+            }
+        } else {
+            LIFE -= 1;                  /* gravity */
+            STAMP = 0;
+        }
     }
 
-    *(int16_t *)(row + ROW_OFF_X) +=
-        (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_0C);
-    *(int16_t *)(row + ROW_OFF_X + 2) +=
-        (int16_t)*(const int32_t *)(r + SEQ_OFF_FIELD_10);
-    *(int16_t *)(row + 0x20u) +=
-        (int16_t)*(const int32_t *)(r + SEQ_OFF_LIFE);
-
-    /* The bounds test is on the DRAWN point -- the row's position with its
-     * height subtracted from z -- not on the ground position. */
-    pt = *(const uint32_t *)(row + ROW_OFF_X);
-    *((int16_t *)&pt + 1) =
-        (int16_t)(*((const int16_t *)&pt + 1) - *(const int16_t *)(row + 0x20u));
-    if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT,
-                     (const AM2_Point *)&pt))
-        return SeqRetire(ctx, rec);
-
-    tile = TileOfPoint(*(const uint32_t *)(row + ROW_OFF_X)) & 0xFFFF;
-    ground = *(const int8_t *)(
-        *(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS + tile);
-
-    if (*(const int16_t *)(row + 0x20u)
-            + *(const int32_t *)(r + 0x18u) > ground) {
-        *(int32_t *)(r + SEQ_OFF_LIFE) -= 1;   /* gravity */
-        *(uint32_t *)(row + ROW_OFF_STAMP_54) = 0;
-        goto done;
-    }
-
-    *(int16_t *)(row + 0x20u) =
-        (int16_t)(ground - *(const int16_t *)(r + 0x18u));
-
-    if ((*(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS)[tile] & 1) {
-        CreateExplosion(*(const int16_t *)(row + ROW_OFF_X),
-                        *(const int16_t *)(row + ROW_OFF_X + 2),
-                        0x93, 4, 0, 0, 0, 0, 0, 0);
-        return SeqRetire(ctx, rec);
-    }
-
-    if (*(const int32_t *)(r + SEQ_OFF_LIFE) < -4) {
-        int32_t v = *(const int32_t *)(r + SEQ_OFF_LIFE) >> 1;
-
-        if (v < 0)
-            v = -v;
-        v -= 2;
-        if (v >= 7)
-            v = 7;
-        *(int32_t *)(r + SEQ_OFF_LIFE) = v;
-        *(uint32_t *)(row + ROW_OFF_STAMP_54) = 0;
-        goto done;
-    }
-
-    {
-        uint8_t *rest = *(uint8_t **)RowPoolAAlloc();
-
-        *(int32_t *)rest = 1;
-        *(uint32_t *)(rest + ROW_OFF_SPRITE) =
-            *(const uint32_t *)(row + ROW_OFF_SPRITE);
-        *(int16_t *)(rest + ROW_OFF_X) = *(const int16_t *)(row + ROW_OFF_X);
-        *(int16_t *)(rest + ROW_OFF_X + 2) =
-            *(const int16_t *)(row + ROW_OFF_X + 2);
-        *(uint32_t *)(rest + ROW_OFF_FIELD_2C) =
-            *(const uint32_t *)(row + ROW_OFF_FIELD_2C);
-        *(int16_t *)(rest + ROW_OFF_FIELD_26) = 2;
-        RowUpdate(rest, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
-    }
-    return SeqRetire(ctx, rec);
-
-done:
     RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
     return *(const int16_t *)(r + SEQ_OFF_NEXT);
+#undef KIND
+#undef LIFE
+#undef STAMP
+#undef PHASE
+#undef Z
 }
