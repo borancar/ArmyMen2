@@ -693,12 +693,12 @@ void __cdecl RowInit(void *row, void *sprite, int32_t x, int32_t y)
  *
  * Id 0 is refused before the table is touched at all.
  */
-int16_t __cdecl RowAnimField4(const void *row, uint16_t id)
+int32_t __cdecl RowAnimField4(const void *row, uint16_t id)
 {
     const uint8_t       *r = (const uint8_t *)row;
     const AM2_AnimTable *table;
-    int32_t              i = 0;
-    int16_t              value;
+    int32_t              i;
+    int32_t              value;
 
     if ((int16_t)id == *(const int16_t *)(r + ROW_OFF_FRAME))
         return *(const int16_t *)(r + ROW_OFF_FIELD_3C);
@@ -710,6 +710,7 @@ int16_t __cdecl RowAnimField4(const void *row, uint16_t id)
     if (!table)
         return 0;
 
+    i = 0;
     while (i < table->count && table->entries[i].id != (int32_t)(int16_t)id)
         i++;
     if (i >= table->count)
@@ -719,7 +720,7 @@ int16_t __cdecl RowAnimField4(const void *row, uint16_t id)
 
     if (*(const void *const *)(r + ROW_OFF_FIELD_2C)
         == (const void *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)
-        value = (int16_t)(value + value);
+        value += value;
 
     return value;
 }
