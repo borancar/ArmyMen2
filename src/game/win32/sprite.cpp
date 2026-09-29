@@ -1744,13 +1744,17 @@ int32_t __cdecl SpriteSolidAt(AM2_Sprite *spr, AM2_Point at)
 {
     if (!spr->image.rle16)
         return 0;
-    if (spr->format == 1)
+    switch (spr->format) {
+    case 1:
         return MaskPixelSolid32((uint16_t)at.x, (uint16_t)at.y,
                                 spr->image.rle32);
-    if (spr->format == 2 || spr->format == 3)
+    case 2:
+    case 3:
         return MaskPixelSolid((uint16_t)at.x, (uint16_t)at.y,
                               spr->image.rle16);
-    return PointInRect(&spr->bounds, &at);
+    default:
+        return PointInRect(&spr->bounds, &at);
+    }
 }
 
 /* The three animation lookups -- 0x0044BB30, 0x0045D9B0 and 0x0045DA20, and

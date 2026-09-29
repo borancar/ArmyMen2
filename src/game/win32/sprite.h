@@ -27,7 +27,7 @@
 typedef struct AM2_Sprite {
     uint32_t id;                 /* +0x00  0xFFFFFFFF when unregistered */
     int32_t  refs;               /* +0x04  ReleaseSprite frees at zero */
-    uint32_t format;             /* +0x08  1, 2 or 3 selects a software blitter;
+    int32_t  format;             /* +0x08  1, 2 or 3 selects a software blitter;
                                   *        ZERO means `image` is a DirectDraw
                                   *        surface, which is how the teardown
                                   *        below decides between Release and
