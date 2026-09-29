@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1310 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1312 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1310:
+  the near-miss sweep, 758 before the row pools. From 758 to 1312:
   - **GOG's copy-protection patch is applied LAST now** (Boran, 2026-09-29):
     the relink compares against the retail bytes (`RETAIL` in
     `src/vc6/bytematch.py` puts the five `75`s back), VC6 compiles the
@@ -97,6 +97,11 @@ main result so far (details in `src/vc6/README.md`):
     image rewinds a playing sound only when fewer than 0x1130 bytes remain
     (`cmp; jae play`) and otherwise lets it run; the reconstruction had it
     the other way round. Roach, vehicle and kind-7 sounds pass that flag.
+  - **EnsureSpriteAaiRecord writes all twelve bytes of its list entry**
+    (2026-09-29): the third dword is the def-obj record's +0x20, as
+    ChangeObjectFrame's own build path has it. The reconstruction had left
+    it holding stale stack, on a comment that said the original did too;
+    the byte-match's frame-size scan turned it up.
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own

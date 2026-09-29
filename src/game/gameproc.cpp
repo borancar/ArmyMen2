@@ -1959,14 +1959,19 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
  */
 void *__cdecl LoadType1(am2_FILE *fp, const void *hdr)
 {
-    uint8_t   rec[AM2_TYPE1_RECORD_SIZE];
+    /* The whole object on the stack, the record read in at +0x94, as the
+     * other loaders have it. */
+    struct {
+        uint8_t head[OBJ_OFF_FIELD_94];
+        uint8_t rec[AM2_TYPE1_RECORD_SIZE];
+    } whole;
     uint32_t  tag;
     uint8_t  *obj;
     void     *ownRec;
     uint8_t   blockA[16];
     uint8_t   blockB[16];
 
-    orig_fread(rec, AM2_TYPE1_RECORD_SIZE, 1, fp);
+    orig_fread(whole.rec, AM2_TYPE1_RECORD_SIZE, 1, fp);
     orig_fread(&tag, 4, 1, fp);
 
     obj = (uint8_t *)CreateItem(
@@ -1983,7 +1988,7 @@ void *__cdecl LoadType1(am2_FILE *fp, const void *hdr)
     memcpy(blockB, obj + 0x30, sizeof blockB);
 
     memcpy(obj, hdr, (size_t)kItemHeaderSize);
-    memcpy(obj + OBJ_OFF_FIELD_94, rec, AM2_TYPE1_RECORD_SIZE);
+    memcpy(obj + OBJ_OFF_FIELD_94, whole.rec, AM2_TYPE1_RECORD_SIZE);
     *(void **)(obj + OBJ_OFF_FIELD_94) = ownRec;
 
     memcpy(obj + 0x20, blockA, sizeof blockA);
@@ -3055,7 +3060,12 @@ void gameproc_install(void)
 void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber)
 {
     uint8_t  *h = (uint8_t *)hdr;
-    uint8_t   rec[AM2_TYPE1_RECORD_SIZE];
+    /* The whole object on the stack, the record read in at +0x94, as the
+     * other loaders have it. */
+    struct {
+        uint8_t head[OBJ_OFF_FIELD_94];
+        uint8_t rec[AM2_TYPE1_RECORD_SIZE];
+    } obj;
     uint32_t  spriteKey;
     uint32_t  extra;
     uint32_t  cooldown;
@@ -3064,7 +3074,7 @@ void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber)
     uint8_t  *w;
     void     *ownRec;
 
-    orig_fread(rec, AM2_TYPE1_RECORD_SIZE, 1, fp);
+    orig_fread(obj.rec, AM2_TYPE1_RECORD_SIZE, 1, fp);
     orig_fread(&spriteKey, 4, 1, fp);
     orig_fread(&cooldown, 4, 1, fp);
     orig_fread(&unused, 4, 1, fp);
@@ -3093,7 +3103,7 @@ void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber)
 
     ownRec = *(void **)(w + OBJ_OFF_FIELD_94);
     memcpy(w, h, (size_t)*(const int32_t *)(uintptr_t)ADDR_ITEM_HEADER_SIZE);
-    memcpy(w + OBJ_OFF_FIELD_94, rec, AM2_TYPE1_RECORD_SIZE);
+    memcpy(w + OBJ_OFF_FIELD_94, obj.rec, AM2_TYPE1_RECORD_SIZE);
     *(void **)(w + OBJ_OFF_FIELD_94) = ownRec;
 
     *(uint32_t *)(w + 0xC4u) = cooldown;

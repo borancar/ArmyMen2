@@ -957,7 +957,7 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
     void     *rec;
     AM2_Sprite *spr;
     uint8_t  *list;
-    uint8_t   entry[AM2_LIST_RECORD_BYTES];  /* +8 deliberately unset */
+    uint8_t   entry[AM2_LIST_RECORD_BYTES];
     int32_t   i;
 
     if (slot >= 0) {
@@ -999,14 +999,16 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
     if (!spr)
         return -1;
 
-    /* ONLY EIGHT OF THE TWELVE BYTES ARE WRITTEN, and MakeRecordList copies
-     * all twelve -- its `out+8` comes from `in+8`. So the record's third dword
-     * is whatever this frame happened to hold, in the original as much as
-     * here. Not memset: zeroing it would be a different function, and it is
-     * the one part of this record that cannot be reproduced by value. */
+    /* ALL TWELVE BYTES ARE WRITTEN: the third dword is the def record's
+     * +0x20 (`mov eax,[edx+0x20]` from the spilled DefFindObjRec answer).
+     * It was left unset here for a long time, on a misreading that only the
+     * first eight were -- MakeRecordList copies all twelve, so every list
+     * made on this path carried a stale stack dword where the original has
+     * the def's value. */
     *(AM2_Sprite **)entry = spr;
     *(int16_t *)(entry + 4) = 0;
     *(int16_t *)(entry + 6) = 0;
+    *(int32_t *)(entry + 8) = *(const int32_t *)((const uint8_t *)rec + 0x20);
 
     list = (uint8_t *)MakeRecordList(1, entry, (void *)(uintptr_t)key);
     LoadMask(list + LISTHDR_OFF_MASK, set, index, frame);
@@ -1208,14 +1210,10 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
  * is InitObjFromAai's with a different record. That is why it needed six
  * offset names and no new function name at all.
  *
- * THREE DIFFERENCES FROM THOSE TWO, and each is a fact rather than a
- * variation:
- *
- *   THE ENTRY'S THIRD DWORD IS WRITTEN HERE. EnsureSpriteAaiRecord leaves it
- *   holding whatever the stack held and its own note says so; this fills it
- *   from the def-obj record's +0x20, read as a DWORD. So the twelve-byte list
- *   record's last field has a source at last, even though what the two bytes
- *   past DEF_OBJ_REC_OFF_DEPTH mean is still unread.
+ * TWO DIFFERENCES FROM THOSE TWO, and each is a fact rather than a
+ * variation. (The entry's third dword, from the def-obj record's +0x20 read
+ * as a DWORD, was once listed here as a third; EnsureSpriteAaiRecord writes
+ * it the same way, and only our transcription of it had left it unset.)
  *
  *   FLAGS ARE ASSIGNED, NOT OR'd. InitObjFromAai ORs the record's flags in;
  *   this writes them over OBJ_OFF_FLAGS whole. A frame change can therefore
