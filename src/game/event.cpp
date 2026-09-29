@@ -407,20 +407,16 @@ void __cdecl FreeScriptConditions(void)
 
 void __cdecl EventDefaultName(int32_t kind, int32_t number, char *out)
 {
+    /* The arms are laid out 0, 3, 2, 4..8, 1 -- the order they are written. */
     switch (kind) {
     case AM2_EVT_CONTROL:
         sprintf(out, "unnamed Event_Control %d", number);
         break;
-    case 1:
-        /* Nothing produces kind 1, and this is the only place that says so in
-         * code rather than by omission: no name at all, not a placeholder. */
-        out[0] = '\0';
+    case AM2_EVT_PADON:
+        sprintf(out, "unnamed Event_PadActivated %d", number);
         break;
     case AM2_EVT_PADOFF:
         sprintf(out, "unnamed Event_PadDeactivated %d", number);
-        break;
-    case AM2_EVT_PADON:
-        sprintf(out, "unnamed Event_PadActivated %d", number);
         break;
     case AM2_EVT_KILLED:
         sprintf(out, "unnamed Event_ItemDestroyed %d", number);
@@ -436,6 +432,11 @@ void __cdecl EventDefaultName(int32_t kind, int32_t number, char *out)
         break;
     case AM2_EVT_DROPPED:
         sprintf(out, "unnamed Event_ItemDropped %d", number);
+        break;
+    case 1:
+        /* Nothing produces kind 1, and this is the only place that says so in
+         * code rather than by omission: no name at all, not a placeholder. */
+        out[0] = '\0';
         break;
     default:
         /* Both values, in the other order -- kind first here, number first in

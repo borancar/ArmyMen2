@@ -2507,58 +2507,50 @@ void __cdecl FlushDelayedSends(void)
  * which conversation it belongs to; a survey assuming one record per kind
  * would come up four short.
  *
- * Written as a table and a loop rather than forty assignments, the same shape
- * win32/palette.cpp uses for the colours it looks up by name -- and the table
- * was EXTRACTED from the disassembly by script rather than transcribed, which
- * is the lesson tools/posecheck.py records about hand-copied tables.
+ * Forty assignments, as the original has them -- it is straight-line code, not
+ * a loop over a table. The table they were once written as was EXTRACTED from
+ * the disassembly by script rather than transcribed, which is the lesson
+ * tools/posecheck.py records about hand-copied tables.
  *
- * The order is the original's. It looks shuffled at two points because the
- * original loads 8, 0x10, 0xB and 0xC into registers once at the top and then
- * spends them as it goes, so the two halves of 0x004FC3A8 and 0x004FC3B8 are
- * written far apart. Nothing observes the order -- the twenty records are
- * distinct objects -- so they are grouped here.
+ * The order is the image's, including the two records whose halves are
+ * written far apart (0x004FC3A8 and 0x004FC3B8): VC6 keeps statement order
+ * here, so that is how the source had them.
  *
  * Four of the twenty already had names, which is what confirms the layout
  * rather than assuming it: ADDR_MSG_CHAT is kind 3 at 0x108 bytes, a 256-byte
  * line plus a header, and ADDR_MSG_COLOR and ADDR_MSG_TEAM are both 0x0C.
  */
-static const struct {
-    uintptr_t addr;   /* by name: an am2_origstate member under the placed model */
-    int32_t  kind;
-    int32_t  size;
-} kCommMessages[] = {
-    { ADDR_PLAYER_MSG       , 0x08, 0x238 },
-    { ADDR_MSG_KIND01       , 0x01, 0x404 },
-    { ADDR_MSG_KIND02       , 0x02, 0x010 },
-    { ADDR_MSG_CHAT         , 0x03, 0x108 },
-    { ADDR_MSG_KIND04       , 0x04, 0x010 },
-    { ADDR_MSG_GAME_START   , 0x05, 0x194 },
-    { ADDR_MSG_GAME_PAUSE   , 0x06, 0x010 },
-    { ADDR_MSG_READY_TO_LOAD, 0x12, 0x00C },
-    { ADDR_MSG_GAME_READY   , 0x07, 0x00C },
-    { ADDR_MSG_MAP          , 0x0F, 0x010 },
-    { ADDR_MSG_COLOR        , 0x09, 0x00C },
-    { ADDR_MSG_TEAM         , 0x11, 0x00C },
-    { ADDR_MSG_END_SETUP    , 0x0A, 0x008 },
-    { ADDR_MSG_KIND0D       , 0x0D, 0x10C },
-    { ADDR_RESEND_BUF       , 0x0B, 0x400 },
-    { ADDR_ARMY_PACKET      , 0x0B, 0x014 },
-    { ADDR_ARMY_PACKET_B    , 0x0B, 0x014 },
-    { ADDR_RESEND_SCRATCH   , 0x0B, 0x400 },
-    { ADDR_MSG_KIND0C       , 0x0C, 0x010 },
-    { ADDR_MSG_KIND10       , 0x10, 0x014 },
-};
-
 void __cdecl CommInitDefaults(void)
 {
-    uint32_t i;
-
-    for (i = 0; i < sizeof kCommMessages / sizeof kCommMessages[0]; i++) {
-        uint8_t *rec = (uint8_t *)((void *)(uintptr_t)(kCommMessages[i].addr));
-
-        *(int32_t *)(rec + COMMMSG_OFF_KIND) = kCommMessages[i].kind;
-        *(int32_t *)(rec + COMMMSG_OFF_SIZE) = kCommMessages[i].size;
-    }
+#define MSG_KIND(addr, kind) \
+    *(int32_t *)((uint8_t *)(uintptr_t)(addr) + COMMMSG_OFF_KIND) = (kind);
+#define MSG_SIZE(addr, size) \
+    *(int32_t *)((uint8_t *)(uintptr_t)(addr) + COMMMSG_OFF_SIZE) = (size);
+#define MSG_INIT(addr, kind, size) MSG_KIND(addr, kind) MSG_SIZE(addr, size)
+    MSG_KIND(ADDR_PLAYER_MSG       , 0x08)
+    MSG_INIT(ADDR_MSG_KIND01       , 0x01, 0x404)
+    MSG_INIT(ADDR_MSG_KIND02       , 0x02, 0x010)
+    MSG_INIT(ADDR_MSG_CHAT         , 0x03, 0x108)
+    MSG_INIT(ADDR_MSG_KIND04       , 0x04, 0x010)
+    MSG_INIT(ADDR_MSG_GAME_START   , 0x05, 0x194)
+    MSG_SIZE(ADDR_PLAYER_MSG       , 0x238)
+    MSG_INIT(ADDR_MSG_GAME_PAUSE   , 0x06, 0x010)
+    MSG_INIT(ADDR_MSG_READY_TO_LOAD, 0x12, 0x00C)
+    MSG_INIT(ADDR_MSG_GAME_READY   , 0x07, 0x00C)
+    MSG_INIT(ADDR_MSG_MAP          , 0x0F, 0x010)
+    MSG_INIT(ADDR_MSG_COLOR        , 0x09, 0x00C)
+    MSG_INIT(ADDR_MSG_TEAM         , 0x11, 0x00C)
+    MSG_INIT(ADDR_MSG_END_SETUP    , 0x0A, 0x008)
+    MSG_INIT(ADDR_MSG_KIND0D       , 0x0D, 0x10C)
+    MSG_INIT(ADDR_RESEND_BUF       , 0x0B, 0x400)
+    MSG_INIT(ADDR_ARMY_PACKET      , 0x0B, 0x014)
+    MSG_INIT(ADDR_ARMY_PACKET_B    , 0x0B, 0x014)
+    MSG_INIT(ADDR_RESEND_SCRATCH   , 0x0B, 0x400)
+    MSG_INIT(ADDR_MSG_KIND0C       , 0x0C, 0x010)
+    MSG_INIT(ADDR_MSG_KIND10       , 0x10, 0x014)
+#undef MSG_KIND
+#undef MSG_SIZE
+#undef MSG_INIT
 }
 
 

@@ -375,22 +375,17 @@ int32_t __cdecl RowAnimFinished(const void *row)
 {
     const uint8_t  *r = (const uint8_t *)row;
     const AM2_Anim *a;
-    uint8_t         cell;
 
-    if (!(*(const uint8_t *)r & MAPOBJ_FLAG_VISIBLE))
-        return 0;
-
-    a = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
-    if (!a)
-        return 0;
-
-    cell = *(const uint8_t *)(r + ROW_OFF_CELL);
-    if ((int32_t)cell < (int32_t)a->frames - 1)
-        return 0;
-
-    return *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-           >= (uint32_t)(a->cells[cell].hold
-                         + *(const int32_t *)(r + ROW_OFF_STAMP_54));
+    /* One conjunction onto one `return 1`, every failure sharing the
+     * `return 0` -- which is how the image lays it out. */
+    if ((*(const uint8_t *)r & MAPOBJ_FLAG_VISIBLE)
+        && (a = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING)) != 0
+        && (int32_t)*(const uint8_t *)(r + ROW_OFF_CELL) >= (int32_t)a->frames - 1
+        && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+           >= (uint32_t)(a->cells[*(const uint8_t *)(r + ROW_OFF_CELL)].hold
+                         + *(const int32_t *)(r + ROW_OFF_STAMP_54)))
+        return 1;
+    return 0;
 }
 
 /* 0x0040A310, three callers -- the type 2, 3 and 8 frame steppers, so this

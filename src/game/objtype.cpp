@@ -340,70 +340,56 @@ void *__cdecl MakeRecordList(int32_t count, const void *src, void *owner)
  */
 int32_t __cdecl AddRecordList(void *list)
 {
-    uint8_t   *hdr = (uint8_t *)list;
-    uint32_t   owner;
-    int32_t    lo = 0, hi;
-    int32_t    n, slot;
-    uint32_t **pairs;
+    uint32_t owner;
+    int32_t  lo, hi, grown;
 
     if (!list)
         return -1;
 
-    n     = *(const int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT;
-    owner = *(const uint32_t *)(hdr + LISTHDR_OFF_OWNER);
-    hi    = n;
+    /* Every global is re-read where it is used, as the original does. */
+#define COUNT (*(int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT)
+#define CAP   (*(int32_t *)(uintptr_t)ADDR_RECORD_LIST_CAP)
+#define LISTS (*(void ***)(uintptr_t)ADDR_RECORD_LISTS)
+#define INDEX (*(uint32_t **)(uintptr_t)ADDR_RECORD_LIST_INDEX)
+    hi    = COUNT;
+    owner = *(const uint32_t *)((uint8_t *)list + LISTHDR_OFF_OWNER);
+    lo    = 0;
 
-    if (hi > 0) {
-        uint32_t *ix = *(uint32_t **)(uintptr_t)ADDR_RECORD_LIST_INDEX;
+    /* FindRecordList's search: a shifted midpoint, a `while` on hi > lo. */
+    while (hi > lo) {
+        int32_t mid = ((hi - lo) >> 1) + lo;
 
-        do {
-            int32_t mid = lo + (hi - lo) / 2;
-
-            if (ix[mid * 2] == owner)
-                return -1;                  /* already registered */
-            if (ix[mid * 2] > owner)
-                hi = mid;
-            else
-                lo = mid + 1;
-        } while (hi > lo);
+        if (INDEX[mid * 2] == owner)
+            return -1;                      /* already registered */
+        if (INDEX[mid * 2] < owner)
+            lo = mid + 1;
+        else
+            hi = mid;
     }
 
-    if (n + 1 > *(const int32_t *)(uintptr_t)ADDR_RECORD_LIST_CAP) {
-        int32_t cap = *(const int32_t *)(uintptr_t)ADDR_RECORD_LIST_CAP;
-        int32_t grown = n + AM2_RECORD_LIST_GROW;
-        void  **lists;
-        uint32_t *ix;
-
-        lists = (void **)am2_realloc(
-                    *(void **)(uintptr_t)ADDR_RECORD_LISTS,
-                    (size_t)grown * 4);
-        *(void ***)(uintptr_t)ADDR_RECORD_LISTS = lists;
-        memset(lists + cap, 0, AM2_RECORD_LIST_GROW * 4);
-
-        ix = (uint32_t *)am2_realloc(
-                 *(void **)(uintptr_t)ADDR_RECORD_LIST_INDEX,
-                 (size_t)grown * 8);
-        *(uint32_t **)(uintptr_t)ADDR_RECORD_LIST_INDEX = ix;
-        memset(ix + cap * 2, 0, AM2_RECORD_LIST_GROW * 8);
-
-        *(int32_t *)(uintptr_t)ADDR_RECORD_LIST_CAP = grown;
-        n = *(const int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT;
+    if (COUNT + 1 > CAP) {
+        grown = COUNT + AM2_RECORD_LIST_GROW;
+        LISTS = (void **)am2_realloc(LISTS, (size_t)grown * 4);
+        memset(LISTS + CAP, 0, AM2_RECORD_LIST_GROW * 4);
+        INDEX = (uint32_t *)am2_realloc(INDEX, (size_t)grown * 8);
+        memset(INDEX + CAP * 2, 0, AM2_RECORD_LIST_GROW * 8);
+        CAP = grown;
     }
 
-    *(int32_t *)(hdr + LISTHDR_OFF_INDEX) = n;
-    (*(void ***)(uintptr_t)ADDR_RECORD_LISTS)[n] = list;
+    *(int32_t *)((uint8_t *)list + LISTHDR_OFF_INDEX) = COUNT;
+    LISTS[COUNT] = list;
 
-    pairs = (uint32_t **)(uintptr_t)ADDR_RECORD_LIST_INDEX;
-    if (lo < n)
-        orig_memmove(*pairs + (lo + 1) * 2, *pairs + lo * 2,
-                     (size_t)(n - lo) * 8);
+    if (lo < COUNT)
+        orig_memmove(INDEX + (lo + 1) * 2, INDEX + lo * 2,
+                     (size_t)(COUNT - lo) * 8);
 
-    (*pairs)[lo * 2]     = owner;
-    (*pairs)[lo * 2 + 1] = (uint32_t)n;
-
-    slot = n;
-    *(int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT = n + 1;
-    return slot;
+    INDEX[lo * 2]     = owner;
+    INDEX[lo * 2 + 1] = (uint32_t)COUNT;
+    return COUNT++;
+#undef COUNT
+#undef CAP
+#undef LISTS
+#undef INDEX
 }
 
 /* 0x00434100, one caller -- the READ half of AddRecordList above, and the
@@ -425,25 +411,22 @@ int32_t __cdecl AddRecordList(void *list)
  */
 int32_t __cdecl FindRecordList(uint32_t owner)
 {
-    int32_t   lo = 0;
-    int32_t   hi = *(const int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT;
-    uint32_t *ix;
+    int32_t lo = 0;
+    int32_t hi = *(const int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT;
 
-    if (hi <= 0)
-        return -1;
+    /* {owner, list} pairs, sorted by owner; the midpoint is a shift. */
+#define IX (*(const uint32_t *const *)(uintptr_t)ADDR_RECORD_LIST_INDEX)
+    while (hi > lo) {
+        int32_t mid = ((hi - lo) >> 1) + lo;
 
-    ix = *(uint32_t **)(uintptr_t)ADDR_RECORD_LIST_INDEX;
-
-    do {
-        int32_t mid = lo + (hi - lo) / 2;
-
-        if (ix[mid * 2] == owner)
-            return (int32_t)ix[mid * 2 + 1];
-        if (ix[mid * 2] > owner)
-            hi = mid;
-        else
+        if (IX[mid * 2] == owner)
+            return (int32_t)IX[mid * 2 + 1];
+        if (IX[mid * 2] < owner)
             lo = mid + 1;
-    } while (hi > lo);
+        else
+            hi = mid;
+    }
+#undef IX
 
     return -1;
 }
@@ -788,68 +771,56 @@ void *__cdecl MakeAaiRecord(int32_t type, int32_t key, int32_t slot,
  */
 int32_t __cdecl AddAaiRecord(void *rec)
 {
-    uint8_t   *r = (uint8_t *)rec;
-    uint32_t   key;
-    int32_t    lo = 0, hi;
-    int32_t    n, slot;
-    uint32_t **pairs;
+    uint32_t key;
+    int32_t  lo, hi, grown;
 
     if (!rec)
         return -1;
 
-    n   = *(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT;
-    key = *(const uint32_t *)(r + AAIREC_OFF_KEY);
-    hi  = n;
+    /* AddRecordList's twin, over the key table: every global re-read where
+     * it is used, a shifted midpoint, a `while` on hi > lo. */
+#define COUNT (*(int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT)
+#define CAP   (*(int32_t *)(uintptr_t)ADDR_AAI_RECORD_CAP)
+#define RECS  (*(void ***)(uintptr_t)ADDR_AAI_RECORDS)
+#define INDEX (*(uint32_t **)(uintptr_t)ADDR_KEY_TABLE)
+    hi  = COUNT;
+    key = *(const uint32_t *)((uint8_t *)rec + AAIREC_OFF_KEY);
+    lo  = 0;
 
-    if (hi > 0) {
-        uint32_t *ix = *(uint32_t **)(uintptr_t)ADDR_KEY_TABLE;
+    while (hi > lo) {
+        int32_t mid = ((hi - lo) >> 1) + lo;
 
-        do {
-            int32_t mid = lo + (hi - lo) / 2;
-
-            if (ix[mid * 2] == key)
-                return -1;
-            if (ix[mid * 2] > key)
-                hi = mid;
-            else
-                lo = mid + 1;
-        } while (hi > lo);
+        if (INDEX[mid * 2] == key)
+            return -1;
+        if (INDEX[mid * 2] < key)
+            lo = mid + 1;
+        else
+            hi = mid;
     }
 
-    if (n + 1 > *(const int32_t *)(uintptr_t)ADDR_AAI_RECORD_CAP) {
-        int32_t   cap   = *(const int32_t *)(uintptr_t)ADDR_AAI_RECORD_CAP;
-        int32_t   grown = n + AM2_AAI_RECORD_GROW;
-        void    **recs;
-        uint32_t *ix;
-
-        recs = (void **)am2_realloc(*(void **)(uintptr_t)ADDR_AAI_RECORDS,
-                                    (size_t)grown * 4);
-        *(void ***)(uintptr_t)ADDR_AAI_RECORDS = recs;
-        memset(recs + cap, 0, AM2_AAI_RECORD_GROW * 4);
-
-        ix = (uint32_t *)am2_realloc(*(void **)(uintptr_t)ADDR_KEY_TABLE,
-                                     (size_t)grown * 8);
-        *(uint32_t **)(uintptr_t)ADDR_KEY_TABLE = ix;
-        memset(ix + cap * 2, 0, AM2_AAI_RECORD_GROW * 8);
-
-        *(int32_t *)(uintptr_t)ADDR_AAI_RECORD_CAP = grown;
-        n = *(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT;
+    if (COUNT + 1 > CAP) {
+        grown = COUNT + AM2_AAI_RECORD_GROW;
+        RECS = (void **)am2_realloc(RECS, (size_t)grown * 4);
+        memset(RECS + CAP, 0, AM2_AAI_RECORD_GROW * 4);
+        INDEX = (uint32_t *)am2_realloc(INDEX, (size_t)grown * 8);
+        memset(INDEX + CAP * 2, 0, AM2_AAI_RECORD_GROW * 8);
+        CAP = grown;
     }
 
-    *(int32_t *)(r + AAIREC_OFF_SLOT) = n;
-    (*(void ***)(uintptr_t)ADDR_AAI_RECORDS)[n] = rec;
+    *(int32_t *)((uint8_t *)rec + AAIREC_OFF_SLOT) = COUNT;
+    RECS[COUNT] = rec;
 
-    pairs = (uint32_t **)(uintptr_t)ADDR_KEY_TABLE;
-    if (lo < n)
-        orig_memmove(*pairs + (lo + 1) * 2, *pairs + lo * 2,
-                     (size_t)(n - lo) * 8);
+    if (lo < COUNT)
+        orig_memmove(INDEX + (lo + 1) * 2, INDEX + lo * 2,
+                     (size_t)(COUNT - lo) * 8);
 
-    (*pairs)[lo * 2]     = key;
-    (*pairs)[lo * 2 + 1] = (uint32_t)n;
-
-    slot = n;
-    *(int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT = n + 1;
-    return slot;
+    INDEX[lo * 2]     = key;
+    INDEX[lo * 2 + 1] = (uint32_t)COUNT;
+    return COUNT++;
+#undef COUNT
+#undef CAP
+#undef RECS
+#undef INDEX
 }
 
 typedef void (__cdecl *AM2_ObjAfterMoveFn)(void *obj, int32_t a, int32_t b);

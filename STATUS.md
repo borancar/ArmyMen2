@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1042 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1050 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1042:
+  the near-miss sweep, 758 before the row pools. From 758 to 1050:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -184,6 +184,12 @@ main result so far (details in `src/vc6/README.md`):
     own jump-table slot (TypesCompatible); a local AM2_Point is how
     PointOfTile builds its result in the dead argument slot; `strlen` is the
     intrinsic, not a helper loop (TitleCaseName).
+  - **The binary searches share one shape**: `while (hi > lo)` with
+    `mid = ((hi - lo) >> 1) + lo` (a `sar`, no rounding fix-up), `<` taking
+    the low arm, and every global re-read where it is used -- including the
+    count, whose copy in `hi` is what keeps VC6 testing `hi` on entry.
+    FindSlot, FindRecordList, AddRecordList, AddAaiRecord and SpriteRegister
+    all match written that way.
   - **LookupByUID is inlined at several sites** (`LookupByUIDInline`,
     objtable.h): its uninitialised out-slot lands in the caller's dead
     argument slot, which is what ObjDie's frame shows; DeselectAll has it

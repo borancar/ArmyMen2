@@ -615,44 +615,46 @@ AM2_Sprite *__cdecl PreloadSpriteName(const char *name, int32_t flags,
  * arrived at it by wraparound rather than by a multiply. */
 void __cdecl SpriteRegister(AM2_Sprite *spr, uint32_t id)
 {
-    AM2_SpritePair **pairsp  = (AM2_SpritePair **)(uintptr_t)ADDR_SPRITE_REG_PAIRS;
-    AM2_Sprite    ***slotsp  = (AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE;
-    int32_t         *countp  = (int32_t *)(uintptr_t)ADDR_SPRITE_REG_COUNT;
-    int32_t         *capp    = (int32_t *)(uintptr_t)ADDR_SPRITE_REG_CAP;
-    int32_t          lo      = 0;
-    int32_t          hi      = *countp;
-    int32_t          count;
+    int32_t lo, hi, grown;
 
+    /* Every global is re-read where it is used; the midpoint is a shift. */
+#define PAIRS (*(AM2_SpritePair **)(uintptr_t)ADDR_SPRITE_REG_PAIRS)
+#define SLOTS (*(AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_TABLE)
+#define COUNT (*(int32_t *)(uintptr_t)ADDR_SPRITE_REG_COUNT)
+#define CAP   (*(int32_t *)(uintptr_t)ADDR_SPRITE_REG_CAP)
+    hi = COUNT;
+    lo = 0;
     while (hi > lo) {
-        int32_t mid = lo + (hi - lo) / 2;
+        int32_t mid = ((hi - lo) >> 1) + lo;
 
-        if ((*pairsp)[mid].id == id)
+        if (PAIRS[mid].id == id)
             return;
-        if ((*pairsp)[mid].id < id)
+        if (PAIRS[mid].id < id)
             lo = mid + 1;
         else
             hi = mid;
     }
 
-    count = *countp;
-    if (count >= *capp) {
-        int32_t grown = *capp + AM2_SPRITE_REG_GROW;
-
-        *slotsp = (AM2_Sprite **)am2_realloc(*slotsp, (size_t)grown * 4);
-        *pairsp = (AM2_SpritePair *)am2_realloc(*pairsp, (size_t)grown * 8);
-        count   = *countp;
-        *capp   = grown;
+    if (COUNT >= CAP) {
+        grown = CAP + AM2_SPRITE_REG_GROW;
+        SLOTS = (AM2_Sprite **)am2_realloc(SLOTS, (size_t)grown * 4);
+        PAIRS = (AM2_SpritePair *)am2_realloc(PAIRS, (size_t)grown * 8);
+        CAP   = grown;
     }
 
-    (*slotsp)[count] = spr;
+    SLOTS[COUNT] = spr;
 
-    if (lo < count)
-        memmove(&(*pairsp)[lo + 1], &(*pairsp)[lo],
-                (size_t)(count - lo) * sizeof(AM2_SpritePair));
+    if (lo < COUNT)
+        memmove(&PAIRS[lo + 1], &PAIRS[lo],
+                (size_t)(COUNT - lo) * sizeof(AM2_SpritePair));
 
-    (*pairsp)[lo].id   = id;
-    (*pairsp)[lo].slot = count;
-    *countp = count + 1;
+    PAIRS[lo].id   = id;
+    PAIRS[lo].slot = COUNT;
+    COUNT++;
+#undef PAIRS
+#undef SLOTS
+#undef COUNT
+#undef CAP
 }
 
 typedef void (__cdecl *am2_load_shadow_fn)(const char *file, AM2_Sprite *spr);

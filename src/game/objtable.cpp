@@ -34,30 +34,30 @@
 
 int32_t __cdecl FindSlot(uint32_t uid, int32_t *insert_at)
 {
-    const AM2_ObjEntry *tab = g_objTable;
-    int32_t count = g_objCount;
-    int32_t lo = 0, hi = count, mid = 0;
+    int32_t hi, mid, lo;
 
-    /* Guarded do/while: with an empty table `mid` stays 0 and the tail below
-     * reports insertion position 0, which is what the original does. */
-    if (hi > 0) {
-        do {
-            mid = lo + (hi - lo) / 2;
-            if (tab[mid].uid == uid)
-                return mid;
-            if (tab[mid].uid >= uid)
-                hi = mid;
-            else
-                lo = mid + 1;
-        } while (hi > lo);
+    /* With an empty table `mid` stays 0 and the tail below reports insertion
+     * position 0, which is what the original does. The midpoint is a shift
+     * -- `sar`, no rounding fix-up. */
+    hi  = g_objCount;
+    mid = 0;
+    lo  = 0;
+    while (hi > lo) {
+        mid = ((hi - lo) >> 1) + lo;
+        if (g_objTable[mid].uid == uid)
+            return mid;
+        if (g_objTable[mid].uid < uid)
+            lo = mid + 1;
+        else
+            hi = mid;
     }
 
     /* Not found. Report where it would belong, so callers that are inserting
      * do not have to search twice. Three separate exits in the original,
      * distinguished by where the search landed. */
-    if (mid >= count)
-        *insert_at = count;
-    else if (tab[mid].uid < uid)
+    if (mid >= g_objCount)
+        *insert_at = g_objCount;
+    else if (g_objTable[mid].uid < uid)
         *insert_at = mid + 1;
     else
         *insert_at = mid;
