@@ -1747,13 +1747,15 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
 
 void __cdecl ReceivePacket(void *packet, int32_t dpid)
 {
-    uint8_t  *pkt   = (uint8_t *)packet;
-    uint8_t  *comm  = (uint8_t *)kCommObj;
-    int32_t   slot  = ((AM2_Comm *)comm)->CommSlotOfId(dpid);
-    /* The length as it arrived. The loop below decrements the field itself,
-     * and the bogus-length test is against THIS, not against the remainder. */
+    uint8_t  *pkt = (uint8_t *)packet;
+    /* The length as it arrived, read before the slot lookup. The loop below
+     * decrements the field itself, and the bogus-length test is against
+     * THIS, not against the remainder. */
     int32_t   total = *(const int32_t *)(pkt + PACKET_OFF_LEN);
+    int32_t   slot  = AM2_THE_COMM->CommSlotOfId(dpid);
     uint8_t  *p     = pkt + PACKET_HEADER_SIZE;
+    uint16_t  part;
+    int32_t   step;
 
     /* Only the first five packets of a session are logged. */
     if (*(const uint32_t *)(pkt + PACKET_OFF_SEQ) < 5
@@ -1766,11 +1768,13 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
     /* A bad checksum is counted and complained about, and then the packet is
      * walked anyway. */
     if (XorChecksum(pkt)) {
+#define ERRS (*(int32_t *)((uint8_t *)kCommObj \
+                           + (uint32_t)slot * COMM_ARMY_RECORD_SIZE \
+                           + COMM_ARMY_OFF_CHKSUM_ERRS))
         am2_log("Receive Checksum Error from %x seq %d\n",
                 dpid, *(const int32_t *)(pkt + PACKET_OFF_SEQ));
-        comm = (uint8_t *)kCommObj;
-        *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
-                     + COMM_ARMY_OFF_CHKSUM_ERRS) += 1;
+        ERRS = ERRS + 1;
+#undef ERRS
     }
 
     /* UNSIGNED, as the original's `jbe` is. It matters: the bogus-length test
@@ -1780,23 +1784,23 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
      * the packet rather than stopping. Signed here would quietly fix that, and
      * fixing it is not this port's job. */
     while (*(const uint32_t *)(pkt + PACKET_OFF_LEN) > PACKET_HEADER_SIZE) {
-        int32_t part = *(const uint16_t *)p;
+        part = *(const uint16_t *)p;
 
         if (!part) {
             am2_log("Received zero Length Message\n");
             return;
         }
-        if (part >= total) {
+        if ((int32_t)part >= total) {
             am2_log("Received Bogus Length Message, part greater than sum\n");
             return;
         }
 
         ReceiveArmyMsg(p, slot, *(const int32_t *)(pkt + PACKET_OFF_SEQ));
 
-        /* Re-read, after the handler has had the bytes. */
-        part = *(const uint16_t *)p;
-        *(int32_t *)(pkt + PACKET_OFF_LEN) -= part;
-        p += part;
+        /* Re-read, after the handler has had the bytes, and as an int. */
+        step = *(const uint16_t *)p;
+        *(int32_t *)(pkt + PACKET_OFF_LEN) -= step;
+        p += step;
     }
 }
 
@@ -2372,21 +2376,20 @@ const void *__cdecl TroopSubParse(const void *rec, int32_t army)
     uint32_t       head;
     uint8_t       *obj;
 
-    head = ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16)
-         | ((uint32_t)p[2] << 8)  |  (uint32_t)p[3];
-    p += 4;
+    /* Big-endian, a byte and a pointer step at a time. */
+    head  = (uint32_t)*p++ << 24;
+    head |= (uint32_t)*p++ << 16;
+    head |= (uint32_t)*p++ << 8;
+    head |= (uint32_t)*p++;
 
     obj = (uint8_t *)ObjByUidAlias((head & AM2_TROOPSUB_UID_MASK)
                                    | ((uint32_t)army
                                       << AM2_TROOPSUB_ARMY_SHIFT));
 
     if (head & AM2_TROOPSUB_HAS_POS) {
-        uint8_t lox = p[0];
-        uint8_t loy = p[1];
-        uint8_t hi;
-
-        p += 2;
-        hi = *p++;
+        uint8_t lox = *p++;
+        uint8_t loy = *p++;
+        uint8_t hi  = *p++;
 
         *(uint16_t *)(obj + OBJ_OFF_X) =
             (uint16_t)(lox | ((uint16_t)(hi & 0x0Fu) << 8));
@@ -3584,7 +3587,8 @@ void __cdecl RecvVehicle1D(void *msg)
 void __cdecl RecvVehicle1F(void *msg)
 {
     const uint8_t *m = (const uint8_t *)msg;
-    uint8_t       *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    /* The comm object is read at every use. */
+#define comm (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
     uint8_t       *vehicle;
     void          *item;
 
@@ -3630,6 +3634,7 @@ void __cdecl RecvVehicle1F(void *msg)
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
         am2_log((const char *)(uintptr_t)"\tDrop Item already handled (it's my unit)\n");
+#undef comm
 }
 
 /* RecvVehicle1C -- original 0x0045E980, one caller. Message kind 0x1C, the

@@ -478,36 +478,30 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommRemovePlayer(int32_t id)
                                + slot * COMM_PLAYER_STRIDE
                                + COMM_SLOT_OFF_INDEX);
 
-    if (slot < AM2_COMM_PLAYERS) {
-        for (n = AM2_COMM_PLAYERS - slot; n > 0; n--) {
-            uint8_t *dst = me + COMM_OFF_PLAYERS
-                           + (slot + (AM2_COMM_PLAYERS - slot) - n)
-                             * COMM_PLAYER_STRIDE;
-            uint8_t *src = dst + COMM_PLAYER_STRIDE;
+    /* Counted up from the slot; VC6's rotation of it is the image's
+     * count-down walk, and its entry test is the only `slot < 4` there is. */
+    for (n = slot; n < AM2_COMM_PLAYERS; n++) {
+#define DST(off) (*(int32_t *)(me + COMM_OFF_PLAYERS + n * COMM_PLAYER_STRIDE \
+                              + (off)))
+#define SRC(off) (*(const int32_t *)(me + COMM_OFF_PLAYERS \
+                                     + (n + 1) * COMM_PLAYER_STRIDE + (off)))
 
-            *(int32_t *)(dst + COMM_SLOT_OFF_INDEX) =
-                *(const int32_t *)(src + COMM_SLOT_OFF_INDEX);
-            *(int32_t *)(dst + COMM_SLOT_OFF_ID) =
-                *(const int32_t *)(src + COMM_SLOT_OFF_ID);
-            *(int32_t *)(dst + COMM_SLOT_OFF_READY_TO_LOAD) =
-                *(const int32_t *)(src + COMM_SLOT_OFF_READY_TO_LOAD);
-            *(int32_t *)(dst + COMM_SLOT_OFF_READY) =
-                *(const int32_t *)(src + COMM_SLOT_OFF_READY);
-            strcpy((char *)(dst + COMM_SLOT_OFF_NAME),
-                   (const char *)(src + COMM_SLOT_OFF_NAME));
-            *(int32_t *)(dst + COMM_SLOT_OFF_TEAM) =
-                *(const int32_t *)(src + COMM_SLOT_OFF_TEAM);
-            *(int32_t *)(dst + COMM_SLOT_OFF_TAKEN) =
-                *(const int32_t *)(src + COMM_SLOT_OFF_TAKEN);
-            *(int32_t *)dst = *(const int32_t *)src;
-            *(int32_t *)(dst + COMM_SLOT_OFF_UNACKED) =
-                *(const int32_t *)(src + COMM_SLOT_OFF_UNACKED);
-            *(int32_t *)(dst + COMM_SLOT_OFF_FIELD_5C) =
-                *(const int32_t *)(src + COMM_SLOT_OFF_FIELD_5C);
-            *(int32_t *)(dst + COMM_SLOT_OFF_HEARD) =
-                *(const int32_t *)(src + COMM_SLOT_OFF_HEARD);
-        }
+        DST(COMM_SLOT_OFF_INDEX) = SRC(COMM_SLOT_OFF_INDEX);
+        DST(COMM_SLOT_OFF_ID) = SRC(COMM_SLOT_OFF_ID);
+        DST(COMM_SLOT_OFF_READY_TO_LOAD) = SRC(COMM_SLOT_OFF_READY_TO_LOAD);
+        DST(COMM_SLOT_OFF_READY) = SRC(COMM_SLOT_OFF_READY);
+        strcpy((char *)&DST(COMM_SLOT_OFF_NAME),
+               (const char *)&SRC(COMM_SLOT_OFF_NAME));
+        DST(COMM_SLOT_OFF_TEAM) = SRC(COMM_SLOT_OFF_TEAM);
+        DST(COMM_SLOT_OFF_TAKEN) = SRC(COMM_SLOT_OFF_TAKEN);
+        DST(0) = SRC(0);
+        DST(COMM_SLOT_OFF_UNACKED) = SRC(COMM_SLOT_OFF_UNACKED);
+        DST(COMM_SLOT_OFF_FIELD_5C) = SRC(COMM_SLOT_OFF_FIELD_5C);
+        DST(COMM_SLOT_OFF_HEARD) = SRC(COMM_SLOT_OFF_HEARD);
     }
+
+#undef DST
+#undef SRC
 
     comm_u32(me, COMM_OFF_FIELD_364) = 0;
     comm_u32(me, COMM_OFF_FIELD_35C) = 0;
@@ -956,50 +950,55 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSend(uint32_t idTo, uint32_t fla
     void *comm = this;
 
     uint8_t       *self = (uint8_t *)comm;
-    LPDIRECTPLAY4A dp   = *DirectPlaySlot(comm);
-    uint32_t       at, i, n;
-    uint8_t       *other;
+    int32_t        i;
     HRESULT        hr;
 
-    if (!dp)
+    /* The ring index is read from memory at every use, and so is the shared
+     * comm object in the catch-up loop. */
+#define AT comm_u32(self, COMM_OFF_STAT_INDEX)
+    if (!*DirectPlaySlot(comm))
         return 0;
 
     /* Statistics first, whether or not the send goes through. */
-    at = comm_u32(self, COMM_OFF_STAT_INDEX);
-    comm_u32(self, COMM_OFF_STAT_TIMES + at * 4) = GetTickCount();
-    comm_u32(self, COMM_OFF_STAT_SIZES + at * 4) = size;
-    comm_u32(self, COMM_OFF_STAT_BYTES)   += size;
-    comm_u32(self, COMM_OFF_STAT_PACKETS) += 1;
+    comm_u32(self, COMM_OFF_STAT_TIMES + AT * 4) = GetTickCount();
+    comm_u32(self, COMM_OFF_STAT_SIZES + AT * 4) = size;
+    comm_u32(self, COMM_OFF_STAT_BYTES)   = comm_u32(self, COMM_OFF_STAT_BYTES)
+                                            + size;
+    comm_u32(self, COMM_OFF_STAT_PACKETS) = comm_u32(self, COMM_OFF_STAT_PACKETS)
+                                            + 1;
     if (size > comm_u32(self, COMM_OFF_STAT_MAX))
         comm_u32(self, COMM_OFF_STAT_MAX) = size;
-    if (++at >= COMM_STAT_RING)
-        at = 0;
-    comm_u32(self, COMM_OFF_STAT_INDEX) = at;
+    if (++AT >= COMM_STAT_RING)
+        AT = 0;
+#undef AT
 
-    hr = IDirectPlayX_Send(dp, comm_u32(self, COMM_OFF_OUR_PLAYER_ID), idTo,
+    hr = IDirectPlayX_Send(*DirectPlaySlot(comm),
+                           comm_u32(self, COMM_OFF_OUR_PLAYER_ID), idTo,
                            flags, data, size);
 
     if (hr != DP_OK) {
-        uint8_t *cm = g_commObject;
-        int32_t  found = 0;
+        uint8_t *cm;
+        int32_t  n;
+        int32_t  index = -1;
 
         /* Only these two are reported; anything else fails silently. */
-        if (hr == E_INVALIDARG)
-            orig_log("DPLAY ERROR: INVALID PARAMETERS IN SEND TO ID %x\n", idTo);
-        else if (hr == (HRESULT)DPERR_INVALIDPLAYER)
+        if (hr == (HRESULT)DPERR_INVALIDPLAYER)
             orig_log("DPLAY ERROR: INVALID PLAYER IN SEND TO ID %x\n", idTo);
+        else if (hr == E_INVALIDARG)
+            orig_log("DPLAY ERROR: INVALID PARAMETERS IN SEND TO ID %x\n", idTo);
         else
             return 0;
 
-        n = comm_u32(cm, COMM_OFF_PLAYER_COUNT);
+        cm = g_commObject;
+        n  = (int32_t)comm_u32(cm, COMM_OFF_PLAYER_COUNT);
         for (i = 0; i < n; i++) {
             if (comm_u32(cm, COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE
                              + COMM_SLOT_OFF_ID) == idTo) {
-                found = 1;
+                index = i;
                 break;
             }
         }
-        if (!found)
+        if (index == -1)
             orig_log("-- No Players Entry for player id %x\n", idTo);
 
         PostMessageA(g_hwnd, AM2_WM_COMM_SEND_FAILED, (WPARAM)idTo, 0);
@@ -1008,17 +1007,15 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSend(uint32_t idTo, uint32_t fla
 
     /* Sent. Everyone else who is live and reachable is now one packet further
      * behind, and past 30 that is worth raising once. */
-    other = g_commObject;
-    n = comm_u32(other, COMM_OFF_PLAYER_COUNT);
-    for (i = 0; i < n; i++) {
-        uint8_t *slot = self  + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
+    for (i = 0; i < (int32_t)comm_u32(g_commObject, COMM_OFF_PLAYER_COUNT); i++) {
+        uint8_t *slot = self + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
         uint32_t id;
         uint32_t bit;
 
         if (comm_u32(slot, COMM_SLOT_OFF_ID) == 0xFFFFFFFFu)
             continue;
-        id = comm_u32(other, COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE
-                             + COMM_SLOT_OFF_ID);
+        id = comm_u32(g_commObject, COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE
+                                    + COMM_SLOT_OFF_ID);
         if (id == comm_u32(self, COMM_OFF_OUR_PLAYER_ID))
             continue;
         if (!FindPlayerById(id))
@@ -1053,8 +1050,6 @@ static_assert(DPSESSION_MIGRATEHOST == 4, "DPSESSION_MIGRATEHOST");
 
 #define g_ourSlot     (*(int32_t *)(uintptr_t)ADDR_OUR_SLOT)
 
-typedef int32_t (__cdecl *am2_msg_free_fn)(void *list);
-#define orig_msg_list_free  (*(am2_msg_free_fn)ADDR_MSG_LIST_POOL)
 
 #define AM2_MAX_PLAYERS 4
 
@@ -1489,10 +1484,9 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommCreatePlayer(const char *name,
                                                              uint32_t length_)
 {
     void  *comm   = this;
-    HANDLE event  = (HANDLE)event_;
-    DWORD  length = (DWORD)length_;
     uint8_t        *self   = (uint8_t *)comm;
-    uint8_t        *shared = g_commObject;
+    /* The shared comm object is read at every use. */
+#define shared g_commObject
     LPDIRECTPLAY4A  dp;
     DPNAME          who;
     HRESULT         hr;
@@ -1515,11 +1509,11 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommCreatePlayer(const char *name,
     if (!dp)
         return 0;
 
-    if (!event)
-        event = g_defaultPlayerEvent;
+    if (!event_)
+        event_ = (void *)g_defaultPlayerEvent;
 
     hr = IDirectPlayX_CreatePlayer(dp, (LPDPID)(self + COMM_OFF_OUR_PLAYER_ID),
-                                   &who, event, data, length, 0);
+                                   &who, (HANDLE)event_, data, (DWORD)length_, 0);
     if (hr != DP_OK) {
         orig_log("CreatePlayer Failed  returned %x \n", hr);
         return 0;
@@ -1542,10 +1536,14 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommCreatePlayer(const char *name,
                          + COMM_SLOT_OFF_TAKEN) = 1;
     }
 
-    comm_u32(shared, COMM_OFF_IS_HOST)  = 1;
+    /* +0x404, the messages-enabled flag -- NOT the host flag at +0x3D8,
+     * which this wrote until the relink compared the displacement: every
+     * client that created its player would have called itself the host. */
+    comm_u32(shared, COMM_OFF_MSGS_ENABLED) = 1;
     comm_u32(shared, COMM_OFF_JOINED) = 1;
     CommRegisterSelf((DPID)comm_u32(shared, COMM_OFF_OUR_PLAYER_ID));
     return 1;
+#undef shared
 }
 
 /* Take a packet off the wire -- 0x0040E8A0, thiscall, `ret 0x14`.
@@ -1572,36 +1570,38 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommReceive(uint32_t *from_, uint32_
                                                         uint32_t *size_)
 {
     void  *comm  = this;
-    DPID  *from  = (DPID *)from_;
-    DPID  *to    = (DPID *)to_;
-    DWORD  flags = (DWORD)flags_;
-    DWORD *size  = (DWORD *)size_;
     uint8_t        *self = (uint8_t *)comm;
-    LPDIRECTPLAY4A  dp   = *DirectPlaySlot(comm);
-    uint8_t        *shared;
-    uint32_t        at, now;
-    int32_t         slot, i, n;
+    uint32_t        now;
+    int32_t         slot, i;
 
-    if (!dp)
+    /* The ring index and the size are read from memory at every use, and
+     * the catch-up loop re-reads the count and each id from the shared
+     * object -- the image's loads, one for one. */
+#define AT   comm_u32(self, COMM_OFF_RX_INDEX)
+#define SIZE (*(DWORD *)size_)
+    if (!*DirectPlaySlot(comm))
         return 0;
 
-    if (IDirectPlayX_Receive(dp, from, to, flags, data, size) != DP_OK)
+    if (IDirectPlayX_Receive(*DirectPlaySlot(comm), (DPID *)from_, (DPID *)to_,
+                             (DWORD)flags_, data, (DWORD *)size_) != DP_OK)
         return 0;
 
-    at = comm_u32(self, COMM_OFF_RX_INDEX);
-    comm_u32(self, COMM_OFF_RX_SIZES + at * 4) = *size;
-    comm_u32(self, COMM_OFF_RX_BYTES)   += *size;
-    comm_u32(self, COMM_OFF_RX_PACKETS) += 1;
-    if (*size > comm_u32(self, COMM_OFF_RX_MAX))
-        comm_u32(self, COMM_OFF_RX_MAX) = *size;
+    comm_u32(self, COMM_OFF_RX_SIZES + AT * 4) = SIZE;
+    comm_u32(self, COMM_OFF_RX_BYTES)   = comm_u32(self, COMM_OFF_RX_BYTES)
+                                          + SIZE;
+    comm_u32(self, COMM_OFF_RX_PACKETS) = comm_u32(self, COMM_OFF_RX_PACKETS)
+                                          + 1;
+    if (SIZE > comm_u32(self, COMM_OFF_RX_MAX))
+        comm_u32(self, COMM_OFF_RX_MAX) = SIZE;
 
     now = GetTickCount();
-    comm_u32(self, COMM_OFF_RX_TIMES + at * 4) = now;
-    if (++at >= COMM_STAT_RING)
-        at = 0;
-    comm_u32(self, COMM_OFF_RX_INDEX) = at;
+    comm_u32(self, COMM_OFF_RX_TIMES + AT * 4) = now;
+    if (++AT >= COMM_STAT_RING)
+        AT = 0;
+#undef AT
+#undef SIZE
 
-    slot = ::CommSlotOfId(comm, *from);
+    slot = ((AM2_Comm *)comm)->CommSlotOfId(*(DPID *)from_);
 
     /* Type 0x0B is the acknowledgement: it wipes the outstanding count. */
     if (*(uint32_t *)data == COMM_MSG_TYPE_ACK)
@@ -1611,28 +1611,30 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommReceive(uint32_t *from_, uint32_
                    + COMM_SLOT_OFF_HEARD) = now;
 
     /* Anyone who has caught up gets their alarm cleared. */
-    shared = g_commObject;
-    n = (int32_t)comm_u32(shared, COMM_OFF_PLAYER_COUNT);
-    for (i = 0; i < n; i++) {
-        uint32_t id = comm_u32(shared, COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE
-                                       + COMM_SLOT_OFF_ID);
+    for (i = 0; i < (int32_t)comm_u32(g_commObject, COMM_OFF_PLAYER_COUNT); i++) {
+        uint32_t id = comm_u32(g_commObject, COMM_OFF_PLAYERS
+                                             + i * COMM_PLAYER_STRIDE
+                                             + COMM_SLOT_OFF_ID);
         uint32_t bit;
 
         if (id == 0xFFFFFFFFu)
             continue;
         if (id == comm_u32(self, COMM_OFF_OUR_PLAYER_ID))
             continue;
+        bit = 0x800u << i;
         if (comm_u32(self, COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE
                            + COMM_SLOT_OFF_UNACKED) >= COMM_UNACKED_CLEAR)
             continue;
-        bit = 0x800u << i;
         if (GetPauseFlags() & bit)
             UnPauseGame(bit);
     }
 
     /* Room again in the message list: let the senders go. */
     {
-        int32_t free = orig_msg_list_free((void *)(uintptr_t)ADDR_MSG_LIST_POOL);
+        /* MsgField12 on the pool is its count of free buffers. This called
+         * ADDR_MSG_LIST_POOL itself -- the list, as code -- until the relink
+         * showed the image's `call 0x00401040`; cold without a session. */
+        int32_t free = (int32_t)MsgField12((const void *)(uintptr_t)ADDR_MSG_LIST_POOL);
 
         if (free > COMM_FLOW_FREE_OK
                 && (GetPauseFlags() & COMM_FLOW_PAUSED_BIT)) {

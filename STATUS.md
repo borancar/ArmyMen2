@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1174 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1178 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1174:
+  the near-miss sweep, 758 before the row pools. From 758 to 1178:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -134,7 +134,11 @@ main result so far (details in `src/vc6/README.md`):
     0x11), so full sessions are listed; the battle browser marks a session
     "In Progress" on DPSESSION_JOINDISABLED (0x20), not NEWPLAYERSDISABLED
     (0x1); CommOnConnected clamps the maximum buffer against the literal
-    0x400 rather than the field's current value.
+    0x400 rather than the field's current value. CommCreatePlayer sets
+    +0x404 (messages enabled), not +0x3D8 (IS_HOST) -- ours made every
+    client that created its player call itself the host. CommReceive's
+    flow check reads the pool's free count through MsgField12; ours CALLED
+    ADDR_MSG_LIST_POOL, the list itself, as a function.
   - **Signed loop tests mean an index**: a `jl` against a strength-reduced
     cursor is an `int32_t i` loop (OptionsApply, AimMarkerAge), a pointer
     walk gives `jb`. The cursor's bias is the field the body reads first.
