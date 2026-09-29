@@ -9415,123 +9415,125 @@ void __cdecl SelectionClick(void)
     ((int16_t *)&world)[0] = wx;
     ((int16_t *)&world)[1] = wy;
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON) {
-        /* No rubber band at all: a plain click. The three guards are in the
-         * original's order -- inside the viewport, no drag under way, clicking
-         * enabled -- and all three are pure tests, so the order is kept for
-         * fidelity rather than because it can be observed. */
-        if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT,
-                         (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
-            return;
-        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON1)
-            return;
-        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED1)
-            return;
+    if (*(const int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON) {
+        /* A rubber band exists: the let-go arm is laid out first, then the
+         * renormalise while the drag is under way, then the plain click. */
+        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON1) {
+            /* The drag has been let go. */
+            *(int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON = 0;
 
-        e = (uint8_t *)WalkCellAtPoint(
-                &world, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
-                ObjIsSelectable);
-        if (!e)
-            return;
+            e = (uint8_t *)ObjectsInRect(
+                    (const AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT,
+                    (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+                    ObjIsSelectable);
+            if (!e)
+                return;
 
-        if (IsKeyDown(AM2_DIK_LCONTROL) || IsKeyDown(AM2_DIK_RCONTROL)) {
-            int32_t n = *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT;
-            int32_t i;
+            if (!IsKeyDown(AM2_DIK_LCONTROL) && !IsKeyDown(AM2_DIK_RCONTROL))
+                DeselectAll();
 
-            for (i = 0; i < n; i++) {
-                if ((*(uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]
-                    != ((const AM2_Object *)e)->uid)
+            for (; e; e = *(uint8_t *const *)(e + OBJ_OFF_QUERY_NEXT)) {
+                int32_t n = *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT;
+                int32_t i;
+                int32_t seen = 0;
+
+                for (i = 0; i < n; i++)
+                    if ((*(uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]
+                        == ((const AM2_Object *)e)->uid) {
+                        seen = 1;
+                        break;
+                    }
+
+                if (seen)
                     continue;
 
-                /* Found: drop it, unless it is the only one left. */
-                if (n <= 1)
-                    return;
-                ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
-                *(uint32_t *)(e + OBJ_OFF_FLAGS) &=
-                    ~(uint32_t)OBJ_FLAG_SELECTED;
-                /* DESELECTING DETACHES. `push 0; push esi; call 0x458070` is
-                 * ObjAttachTo with a null target -- its pure-detach case -- so
-                 * a unit ctrl-clicked out of the selection also leaves
-                 * whatever it was following. Omitting it leaves the object
-                 * attached with nothing selecting it, which the A/B would show
-                 * only if something later walked that list. */
-                ObjAttachTo(e, (void *)0);
-                OnSelectionChanged(
-                    *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
-                return;
+                /* A type 2/3/8 whose OBJ_OFF_FIELD_94 is set is skipped ENTIRELY --
+                 * the original's `jne` goes past the push to the loop advance, not
+                 * merely past the call below it. Reading it as "skip the call and add
+                 * anyway" selects things the original does not, and no static check
+                 * would see the difference. */
+                if (ObjIsTypeIn238((const AM2_Object *)e)) {
+                    if (*(const void *const *)(e + OBJ_OFF_FIELD_94))
+                        continue;
+                    ObjType2Field548((const AM2_Object *)e);
+                }
+
+                ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->PtrListPush(
+                            (void *)(uintptr_t)((const AM2_Object *)e)->uid);
+                *(uint32_t *)(e + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
             }
-        } else {
-            DeselectAll();
-            SetObjContext(e);
+
+            OnSelectionChanged(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+            return;
         }
+        {
+            int16_t ax = *(const int16_t *)(uintptr_t)ADDR_DRAG_ANCHOR;
+            int16_t ay = *(const int16_t *)(uintptr_t)(ADDR_DRAG_ANCHOR + 2);
+            AM2_Rect *r = (AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT;
 
-        ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->PtrListPush(
-                    (void *)(uintptr_t)((const AM2_Object *)e)->uid);
-        *(uint32_t *)(e + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
-        OnSelectionChanged(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
-        return;
+            r->left   = (ax < wx) ? ax : wx;
+            r->right  = (ax > wx) ? ax : wx;
+            r->top    = (ay < wy) ? ay : wy;
+            r->bottom = (ay > wy) ? ay : wy;
+            return;
+        }
     }
 
-    /* A rubber band exists. While the drag is still under way this only
-     * renormalises the rectangle from the anchor and the cursor -- the min of
-     * each axis into left/top and the max into right/bottom -- and returns. */
-    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON1) {
-        int16_t ax = *(const int16_t *)(uintptr_t)ADDR_DRAG_ANCHOR;
-        int16_t ay = *(const int16_t *)(uintptr_t)(ADDR_DRAG_ANCHOR + 2);
-        AM2_Rect *r = (AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT;
-
-        r->left   = (ax < wx) ? ax : wx;
-        r->right  = (ax > wx) ? ax : wx;
-        r->top    = (ay < wy) ? ay : wy;
-        r->bottom = (ay > wy) ? ay : wy;
+    /* No rubber band at all: a plain click. The three guards are in the
+     * original's order -- inside the viewport, no drag under way, clicking
+     * enabled -- and all three are pure tests, so the order is kept for
+     * fidelity rather than because it can be observed. */
+    if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_BLIT_RECT,
+                     (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
         return;
-    }
+    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON1)
+        return;
+    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED1)
+        return;
 
-    /* The drag has been let go. */
-    *(int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON = 0;
-
-    e = (uint8_t *)ObjectsInRect(
-            (const AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT,
-            (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+    e = (uint8_t *)WalkCellAtPoint(
+            &world, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
             ObjIsSelectable);
     if (!e)
         return;
 
-    if (!IsKeyDown(AM2_DIK_LCONTROL) && !IsKeyDown(AM2_DIK_RCONTROL))
-        DeselectAll();
-
-    for (; e; e = *(uint8_t *const *)(e + OBJ_OFF_QUERY_NEXT)) {
+    if (IsKeyDown(AM2_DIK_LCONTROL) || IsKeyDown(AM2_DIK_RCONTROL)) {
         int32_t n = *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT;
         int32_t i;
-        int32_t seen = 0;
 
-        for (i = 0; i < n; i++)
+        for (i = 0; i < n; i++) {
             if ((*(uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]
-                == ((const AM2_Object *)e)->uid) {
-                seen = 1;
-                break;
-            }
-
-        if (seen)
-            continue;
-
-        /* A type 2/3/8 whose OBJ_OFF_FIELD_94 is set is skipped ENTIRELY --
-         * the original's `jne` goes past the push to the loop advance, not
-         * merely past the call below it. Reading it as "skip the call and add
-         * anyway" selects things the original does not, and no static check
-         * would see the difference. */
-        if (ObjIsTypeIn238((const AM2_Object *)e)) {
-            if (*(const void *const *)(e + OBJ_OFF_FIELD_94))
+                != ((const AM2_Object *)e)->uid)
                 continue;
-            ObjType2Field548((const AM2_Object *)e);
-        }
 
-        ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->PtrListPush(
-                    (void *)(uintptr_t)((const AM2_Object *)e)->uid);
-        *(uint32_t *)(e + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
+            /* Found: drop it, unless it is the only one left. */
+            if (n <= 1)
+                return;
+            ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
+            *(uint32_t *)(e + OBJ_OFF_FLAGS) &=
+                ~(uint32_t)OBJ_FLAG_SELECTED;
+            /* DESELECTING DETACHES. `push 0; push esi; call 0x458070` is
+             * ObjAttachTo with a null target -- its pure-detach case -- so
+             * a unit ctrl-clicked out of the selection also leaves
+             * whatever it was following. Omitting it leaves the object
+             * attached with nothing selecting it, which the A/B would show
+             * only if something later walked that list. */
+            ObjAttachTo(e, (void *)0);
+            OnSelectionChanged(
+                *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+            return;
+        }
+    } else {
+        DeselectAll();
+        SetObjContext(e);
     }
 
+    ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->PtrListPush(
+                (void *)(uintptr_t)((const AM2_Object *)e)->uid);
+    *(uint32_t *)(e + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
     OnSelectionChanged(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+    return;
+
 }
 
 /* TrooperDiedTail's two helpers stay original: both are above the CRT line,
