@@ -173,7 +173,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner);
 
 /* 0x00421750. Evaluate an `if`'s testvar comparisons -- all must pass, none
  * passes trivially, and an unknown operator passes. Six callers. */
-int32_t __cdecl EvalCondTests(const AM2_ScriptCond *c);
+int32_t __cdecl EvalCondTests(const AM2_ScriptCond *c, void *unused);
 /* 0x00421E80 -- every `if` in a mission script, registered once per event
  * term and reached only through the event table. */
 void __cdecl EvtCondition(int32_t bucket, int32_t a2, void *arg, int32_t a4,

@@ -9144,7 +9144,7 @@ typedef struct {
  * Its jump table confirms script.h's operator codes from the far side: 0 '=',
  * 1 '<>', 2 '<', 3 '>', 4 '<=', 5 '>=', in that order, and the 0x1C stride is
  * AM2_ScriptTest's size. Six callers. */
-#define ADDR_EVAL_COND_TESTS     0x00421750u  /* int32_t(AM2_ScriptCond *) */
+#define ADDR_EVAL_COND_TESTS     0x00421750u  /* int32_t(AM2_ScriptCond *, void *unused) */
 /* 0x00421590, two callers. Evaluate one side of a testvar comparison. Eight
  * kinds through a jump table, and THREE OF THEM ARE NAMED BY THE GAME'S OWN
  * VOCABULARY rather than by me: kind 5 asks whether a unit holds a weapon uid,

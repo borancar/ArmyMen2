@@ -193,9 +193,13 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
             return;
 
         if (spr->image.rle16) {
+            /* Cases in the image's order, 3 first. */
             switch (spr->format) {
-            case 1:
-                BlitCopy32(x, y, spr->image.rle32, *clipped);
+            case 3:
+                if (!spr->lut)
+                    BlitCopy16(x, y, spr->image.rle16, *clipped);
+                else
+                    BlitRemap16(x, y, spr->image.rle16, *clipped, spr->lut);
                 break;
             case 2:
                 /* Remapped only when the caller asks for it AND a table
@@ -205,11 +209,8 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
                 else
                     BlitCopy16(x, y, spr->image.rle16, *clipped);
                 break;
-            case 3:
-                if (spr->lut)
-                    BlitRemap16(x, y, spr->image.rle16, *clipped, spr->lut);
-                else
-                    BlitCopy16(x, y, spr->image.rle16, *clipped);
+            case 1:
+                BlitCopy32(x, y, spr->image.rle32, *clipped);
                 break;
             default:
                 break;              /* unknown format: skip to the overlay */
@@ -253,8 +254,9 @@ void __cdecl DrawSpriteClipped(AM2_Sprite *spr, int32_t x, int32_t y,
         }
         dest = (LPDIRECTDRAWSURFACE)g_drawTarget;
 
-        trans = (spr->flags & 1) ? DDBLTFAST_WAIT
-                                 : (DDBLTFAST_WAIT | DDBLTFAST_SRCCOLORKEY);
+        trans = DDBLTFAST_WAIT | DDBLTFAST_SRCCOLORKEY;
+        if (spr->flags & 1)
+            trans = DDBLTFAST_WAIT;
 
         hr = IDirectDrawSurface_BltFast(dest, x, y,
                                         (LPDIRECTDRAWSURFACE)spr->image.surface,

@@ -1486,9 +1486,10 @@ void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
     uint32_t *slotPos   = (uint32_t *)((void *)(uintptr_t)(ADDR_SLOT_POSITIONS));
     uint8_t  *headings  = (uint8_t *)((void *)(uintptr_t)(ADDR_SLOT_HEADINGS));
     const uint8_t *o = (const uint8_t *)obj;
-    uint8_t   heading = 0;
-    int32_t   parent, dist;
-    AM2_Point at;
+    uint8_t   heading;
+    int32_t   parent;
+    int16_t   dist;
+    float     fdist;
 
     if (slot >= AM2_SLOT_MAX || obj == 0)
         return;
@@ -1496,43 +1497,44 @@ void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
     isVehicle[slot] = (*(const int32_t *)o == AM2_OBJ_TYPE_VEHICLE);
 
     if (slot == 0) {
-        AM2_Point lead;
-
         *out = leaderPos;
-        lead = *(const AM2_Point *)&leaderPos;
-        heading = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), &lead);
-    } else {
-        uint8_t angle;
+        heading = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+                               (const AM2_Point *)&leaderPos);
+    } else if (slot < 9) {
+        const uint8_t *rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_SLOT_RECS))
+                             + (uint32_t)slot * AM2_SLOT_REC_BYTES;
 
-        if (slot < 9) {
-            const uint8_t *rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_SLOT_RECS))
-                                 + (uint32_t)slot * AM2_SLOT_REC_BYTES;
-
-            parent = *(const int32_t *)(rec + SLOT_REC_OFF_PARENT);
-            dist   = *(const int16_t *)(rec + SLOT_REC_OFF_DIST);
-            angle  = (uint8_t)(*(const uint8_t *)(rec + SLOT_REC_OFF_ANGLE)
-                               + headings[parent]);
-        } else {
-            int32_t band, index;
-
-            SlotBandHeading(slot, &band, &index, &angle);
-            parent = index;
-            dist   = band * AM2_SLOT_RING_STEP + AM2_SLOT_RING_BASE;
-        }
-
+        /* Each arm places the point itself, through `out`: fmul, then fiadd,
+         * then ftol -- the parent's coordinate is added BEFORE the
+         * truncation. The distance is rounded to float once on the way in
+         * (fild then fstp dword). */
+        parent = *(const int32_t *)(rec + SLOT_REC_OFF_PARENT);
+        *out = slotPos[parent];
+        dist = *(const int16_t *)(rec + SLOT_REC_OFF_DIST);
         if (isVehicle[parent] || isVehicle[slot])
             dist += dist;
+        heading = (uint8_t)(*(const uint8_t *)(rec + SLOT_REC_OFF_ANGLE)
+                            + headings[parent]);
+        fdist = (float)dist;
+        ((int16_t *)out)[0] =
+            (int16_t)(int32_t)(Cos8(heading) * fdist + (float)((int16_t *)out)[0]);
+        ((int16_t *)out)[1] =
+            (int16_t)(int32_t)(Sin8(heading) * fdist + (float)((int16_t *)out)[1]);
+    } else {
+        int32_t band;
 
+        /* The ring's index comes back into `parent` itself -- one
+         * address-taken variable for both arms. */
+        SlotBandHeading(slot, &band, &parent, &heading);
+        dist = (int16_t)(band * AM2_SLOT_RING_STEP + AM2_SLOT_RING_BASE);
+        if (isVehicle[parent] || isVehicle[slot])
+            dist += dist;
         *out = slotPos[parent];
-        at = *(const AM2_Point *)out;
-        /* fmul, then fiadd, then ftol -- the parent's coordinate is added
-         * BEFORE the truncation, not after. The distance is rounded to float
-         * once on the way in (fild then fstp dword), which is why it is cast
-         * rather than left as an int in the product. */
-        at.x = (int16_t)(int32_t)(Cos8(angle) * (float)dist + (float)at.x);
-        at.y = (int16_t)(int32_t)(Sin8(angle) * (float)dist + (float)at.y);
-        *out = *(const uint32_t *)&at;
-        heading = angle;
+        fdist = (float)dist;
+        ((int16_t *)out)[0] =
+            (int16_t)(int32_t)(Cos8(heading) * fdist + (float)((int16_t *)out)[0]);
+        ((int16_t *)out)[1] =
+            (int16_t)(int32_t)(Sin8(heading) * fdist + (float)((int16_t *)out)[1]);
     }
 
     slotPos[slot]  = *out;

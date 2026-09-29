@@ -1578,9 +1578,9 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg)
  * diffing them is what shows it. A `butnot` condition therefore only fires
  * once per matched term rather than rearming cleanly.
  *
- * The second argument to EvalCondTests is DEAD: the original pushes it and
- * the callee reads only its first. Called with one here, which cdecl makes
- * identical.
+ * The second argument to EvalCondTests is DEAD: the original pushes `arg`
+ * and the callee reads only its first. Passed here as the original passes
+ * it.
  */
 void __cdecl EvtCondition(int32_t bucket, int32_t a2, void *arg, int32_t a4,
                           int32_t a5, int32_t a6, int32_t a7,
@@ -1597,35 +1597,35 @@ void __cdecl EvtCondition(int32_t bucket, int32_t a2, void *arg, int32_t a4,
             && FilterMatches(c->events[i].b, c->events[i].c, a2, a5, a4, a7))
             hit = i;
 
-    if (hit < 0 && c->kind != AM2_IF_TIMEABSOLUTE) {
+    if (hit == -1 && c->kind != AM2_IF_TIMEABSOLUTE) {
         orig_log("ERROR: a compound event got called for an event it "
                  "didn't care about\n");
         return;
     }
 
+    /* Arms in the image's layout order. */
     switch (c->kind) {
-    case AM2_IF_PLAIN:
-    case AM2_IF_TIMEABSOLUTE:
-        if (EvalCondTests(c))
-            RunCondActions(c, arg);
-        return;
-
     case AM2_IF_ALLOF:
+        /* The tail is written out on both paths of the first test, as the
+         * image has it. allof DOES clear, with a cursor that walks -- the
+         * loop arm 7 got wrong. */
+#define ALLOF_TAIL()                                                        \
+        if (c->fired != c->nevents)                                         \
+            return;                                                         \
+        if (!EvalCondTests(c, arg))                                         \
+            return;                                                         \
+        for (i = 0; i < c->nevents; i++)                                    \
+            c->events[i].fired = 0;                                         \
+        c->fired = 0;                                                       \
+        RunCondActions(c, arg);                                             \
+        return
         if (!c->events[hit].fired) {
-            c->events[hit].fired = 1;
             c->fired++;
+            c->events[hit].fired = 1;
+            ALLOF_TAIL();
         }
-        if (c->fired != c->nevents)
-            return;
-        if (!EvalCondTests(c))
-            return;
-        /* allof DOES clear, with a cursor that walks -- the loop arm 7 got
-         * wrong. */
-        for (i = 0; i < c->nevents; i++)
-            c->events[i].fired = 0;
-        c->fired = 0;
-        RunCondActions(c, arg);
-        return;
+        ALLOF_TAIL();
+#undef ALLOF_TAIL
 
     case AM2_IF_INORDER:
         if (hit != c->fired)
@@ -1651,61 +1651,38 @@ void __cdecl EvtCondition(int32_t bucket, int32_t a2, void *arg, int32_t a4,
         RunCondActions(c, arg);
         return;
 
-    case AM2_IF_AFTER:
-        /* AN ODD INDEX CANCELS THE PAIR rather than being ignored, which is
-         * how `A after B` enforces its ordering: B, the even one, marks the
-         * pair and A, the odd one, unmarks it. Reading the odd path as a
-         * bare return would have made `after` mean `both`. */
-        if (hit & 1) {
-            if (c->events[hit / 2].fired == 1) {
-                c->events[hit / 2].fired = 0;
-                c->fired--;
-            }
-            return;
-        }
-        if (!c->events[hit / 2].fired) {
-            c->events[hit / 2].fired = 1;
-            c->fired++;
-        }
-        if (c->fired != c->nevents / 2)
-            return;
-        if (!EvalCondTests(c))
-            return;
-        /* NO RESET HERE, unlike allof -- the pair flags stay set, so an
-         * `after` that has been satisfied once fires again on every later
-         * matching event. Different from arm 1 and deliberately not shared
-         * with it. */
-        RunCondActions(c, arg);
-        return;
-
     case AM2_IF_BUTNOT_KEYWORD:
         if (hit == c->nevents - 1) {
             /* The `butnot` term itself: remember it and do nothing else. */
             c->events[hit].fired = 1;
             return;
         }
-        if (!c->events[hit].fired) {
-            c->events[hit].fired = 1;
-            c->fired++;
-        }
-        if (c->fired != c->nevents - 1)
-            return;
-        if (c->events[c->nevents - 1].fired)
-            return;              /* the butnot term HAS fired: refuse */
-        if (!EvalCondTests(c))
-            return;
-        c->fired = 0;
+#define BUTNOT_TAIL()                                                       \
+        if (c->fired != c->nevents - 1)                                     \
+            return;                                                         \
+        if (c->events[c->nevents - 1].fired)                                \
+            return;              /* the butnot term HAS fired: refuse */    \
+        if (!EvalCondTests(c, arg))                                         \
+            return;                                                         \
+        c->fired = 0;                                                       \
+        for (i = 0; i < c->nevents; i++)                                    \
+            c->events[hit].fired = 0;                                       \
+        RunCondActions(c, arg);                                             \
+        return
         /* THE ORIGINAL'S RESET, DEFECT INCLUDED. `ebx` holds the MATCHED
-         * term's byte offset and never advances, so this clears one flag
-         * nevents times and leaves every other term still marked. Arm 1's
-         * otherwise identical loop walks with a cursor stepping 0x10; these
-         * two look the same and are not. The original writes it twice, once
-         * on each of this arm's paths, and both are reproduced by arriving
-         * here. A `butnot` therefore does not rearm cleanly. */
-        for (i = 0; i < c->nevents; i++)
-            c->events[hit].fired = 0;
-        RunCondActions(c, arg);
-        return;
+         * term's byte offset and never advances, so the loop in the tail
+         * clears one flag nevents times and leaves every other term still
+         * marked. Arm 1's otherwise identical loop walks with a cursor
+         * stepping 0x10; these two look the same and are not. The original
+         * writes the tail twice, once on each of this arm's paths, and so
+         * does this. A `butnot` therefore does not rearm cleanly. */
+        if (!c->events[hit].fired) {
+            c->fired++;
+            c->events[hit].fired = 1;
+            BUTNOT_TAIL();
+        }
+        BUTNOT_TAIL();
+#undef BUTNOT_TAIL
 
     case AM2_IF_BUTNOT_STRING:
         /* NOT the same arm as 7, though it reads like it. This one counts
@@ -1719,8 +1696,39 @@ void __cdecl EvtCondition(int32_t bucket, int32_t a2, void *arg, int32_t a4,
         }
         if (c->events[c->nevents - 1].fired)
             return;
-        if (EvalCondTests(c))
+        /* Into the plain arm, as the image lays it out. */
+        /* FALLTHROUGH */
+    case AM2_IF_PLAIN:
+    case AM2_IF_TIMEABSOLUTE:
+        if (EvalCondTests(c, arg))
             RunCondActions(c, arg);
+        return;
+
+    case AM2_IF_AFTER:
+        /* AN ODD INDEX CANCELS THE PAIR rather than being ignored, which is
+         * how `A after B` enforces its ordering: B, the even one, marks the
+         * pair and A, the odd one, unmarks it. Reading the odd path as a
+         * bare return would have made `after` mean `both`. */
+        if (!(hit & 1)) {
+            if (!c->events[hit >> 1].fired) {
+                c->events[hit >> 1].fired = 1;
+                c->fired++;
+            }
+            if (c->fired != c->nevents >> 1)
+                return;
+            if (!EvalCondTests(c, arg))
+                return;
+            /* NO RESET HERE, unlike allof -- the pair flags stay set, so an
+             * `after` that has been satisfied once fires again on every later
+             * matching event. Different from arm 1 and deliberately not shared
+             * with it. */
+            RunCondActions(c, arg);
+            return;
+        }
+        if (c->events[hit >> 1].fired == 1) {
+            c->events[hit >> 1].fired = 0;
+            c->fired--;
+        }
         return;
 
     default:
@@ -2454,8 +2462,9 @@ void __cdecl MissionEnded(int32_t lost)
  *
  * An operator above 5 falls through to the loop's continue, so an unknown
  * comparison PASSES rather than failing. Reproduced. */
-int32_t __cdecl EvalCondTests(const AM2_ScriptCond *c)
+int32_t __cdecl EvalCondTests(const AM2_ScriptCond *c, void *unused)
 {
+    (void)unused;
     /* The test is re-indexed after each call: the tests pointer is read
      * again every time. */
     for (int32_t i = 0; i < c->ntests; i++) {
