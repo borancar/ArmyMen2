@@ -1517,7 +1517,7 @@ static void __cdecl DrawRect(const AM2_Rect *r, uint8_t colour)
  * runs are the short ones, and nothing here settles which. The radar's view
  * box is the only thing drawn by it.
  */
-void __cdecl DrawRectFast(const AM2_Rect *r, int32_t colour)
+void __cdecl DrawRectFast(const AM2_Rect *r, uint8_t colour)
 {
     AM2_Rect  vis;
     uint8_t  *top;
@@ -1717,8 +1717,8 @@ int32_t __cdecl RadarBlipColour(const void *objv, int32_t *blink)
  * radar. Discriminating the colours would need many objects flagged at once,
  * or a static scene.
  */
-void __cdecl DrawBlipPulse(int32_t x, int32_t y, int32_t colourA,
-                                  int32_t colourB, int32_t phase)
+void __cdecl DrawBlipPulse(int32_t x, int32_t y, uint8_t colourA,
+                                  uint8_t colourB, int32_t phase)
 {
     uint8_t *p;
     uint8_t *q;
@@ -1789,8 +1789,8 @@ void __cdecl DrawBlipPulse(int32_t x, int32_t y, int32_t colourA,
  * drive here sets, so the colours are verified by reading. See DrawBlipPulse
  * for why the radar's pixels cannot settle that.
  */
-void __cdecl DrawBlipSquare(int32_t x, int32_t y, int32_t colourA,
-                                   int32_t colourB, int32_t phase)
+void __cdecl DrawBlipSquare(int32_t x, int32_t y, uint8_t colourA,
+                                   uint8_t colourB, int32_t phase)
 {
     uint8_t *p;
     uint8_t *q;

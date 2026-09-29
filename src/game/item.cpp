@@ -11959,9 +11959,9 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
 {
     uint8_t  *o;
     uint8_t  *rows;
-    uint32_t  at;
+    AM2_Point at;
     uint32_t  where;
-    AM2_Rect  box;
+    AM2_Rect  box, r;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION && !remote
         && !AM2_THE_COMM->CommMustBroadcast(army))
@@ -11970,13 +11970,13 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
     o = (uint8_t *)am2_malloc(AM2_TROOPER_BYTES);
     memset(o, 0, AM2_TROOPER_BYTES);
 
-    at = (uint32_t)(uint16_t)(int16_t)x
-       | ((uint32_t)(uint16_t)(int16_t)y << 16);
+    at.x = (int16_t)x;
+    at.y = (int16_t)y;
 
     if (settle)
-        NearestClearPoint(at, &where);
+        NearestClearPoint(*(uint32_t *)&at, &where);
     else
-        where = at;
+        where = *(uint32_t *)&at;
 
     *(uint8_t *)(o + TROOPER_OFF_FACING)  = (uint8_t)facing;
     *(uint8_t *)(o + TROOPER_OFF_FACING2) = (uint8_t)facing;
@@ -12006,10 +12006,9 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
     *(int16_t *)(o + OBJ_OFF_FIELD_574) =
         (int16_t)*(const uint8_t *)(o + TROOPER_OFF_FACING);
 
+    *(int32_t *)(o + OBJ_OFF_AI_MODE) = AM2_TROOPER_AI_MINE;
     /* Read before ObjInitCommon writes it, so this is the memset's zero. */
     *(uint32_t *)(o + TROOPER_OFF_ZERO_B0) = *(const uint32_t *)(o + OBJ_OFF_POS);
-
-    *(int32_t *)(o + OBJ_OFF_AI_MODE) = AM2_TROOPER_AI_MINE;
     if (army != (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
         *(int32_t *)(o + OBJ_OFF_AI_MODE) = AM2_TROOPER_AI_THEIRS;
 
@@ -12038,9 +12037,11 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
         && AM2_THE_COMM->CommMustBroadcast(army))
         SendItemCreate(o);
 
-    RectSet(&box, -0x10, -0x10, 0x10, 0x10);
+    /* Copied out of RectSet's answer into a second local, and that one
+     * passed. */
+    r = *RectSet(&box, -0x10, -0x10, 0x10, 0x10);
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
-                (const void *)((void *)(uintptr_t)(ADDR_TROOPER_ROW_SPEC)), x, y, &box);
+                (const void *)((void *)(uintptr_t)(ADDR_TROOPER_ROW_SPEC)), x, y, &r);
     SetFieldInAll(o + OBJ_OFF_SUBRECORD,
                   *(void **)(o + OBJ_OFF_TABLE_REC_KIND));
 

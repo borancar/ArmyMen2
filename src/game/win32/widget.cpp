@@ -5568,12 +5568,12 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarPaint(RECT clip)
     AM2_Widget *w = this;
 
     const AM2_Rect *view  = (const AM2_Rect *)(uintptr_t)ADDR_SECOND_RECT;
-    int32_t         mapW  = *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X;
-    int32_t         mapH  = *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y;
+    /* The map's extent is read at every use. */
+#define mapW (*(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X)
+#define mapH (*(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)
     const uint8_t  *pal   = (const uint8_t *)(uintptr_t)ADDR_RADAR_COLOURS;
     AM2_Rect        box;
     uint8_t        *obj;
-    int32_t         phase;
 
     ::WidgetPaint(w, clip);
 
@@ -5584,21 +5584,23 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarPaint(RECT clip)
 
     if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
         AM2_Rect lim;
-        int32_t  edge = *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
-                        - AM2_RADAR_RIGHT_MARGIN;
+        int32_t  edge;
 
         lim.left   = w->rect.left;
         lim.top    = w->rect.top;
-        lim.right  = w->rect.right < edge ? w->rect.right : edge;
         lim.bottom = w->rect.bottom;
+        edge       = *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
+                     - AM2_RADAR_RIGHT_MARGIN;
+        lim.right  = w->rect.right < edge ? w->rect.right : edge;
 
         IntersectRect((RECT *)&box, (const RECT *)&box, (const RECT *)&lim);
     }
 
     DrawRectFast(&box, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
 
-    phase = (int32_t)((*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-                       >> AM2_RADAR_PHASE_SHIFT) % AM2_BLIP_PULSE_PHASES);
+    /* The pulse phase is worked out afresh at each blip. */
+#define phase ((int32_t)((*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS \
+                          >> AM2_RADAR_PHASE_SHIFT) % AM2_BLIP_PULSE_PHASES))
 
     for (obj = (uint8_t *)FirstItem(); obj; obj = (uint8_t *)NextItem()) {
         const AM2_Object *o = (const AM2_Object *)obj;
@@ -5648,9 +5650,11 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarPaint(RECT clip)
 
         colour = RadarBlipColour(o, &blink);
 
-        if ((flags & OBJ_FLAG_BIT4) && !blink) {
-            int32_t a = pal[colour * 2];
-            int32_t b = pal[colour * 2 + 1];
+        /* The flags are read again for this test. */
+        if ((*(const uint32_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT4)
+            && !blink) {
+            uint8_t a = pal[colour * 2];
+            uint8_t b = pal[colour * 2 + 1];
 
             if (ObjType2Field548(o))
                 DrawBlipPulse(x, y, a, b, phase);
@@ -5669,6 +5673,9 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarPaint(RECT clip)
     }
 
     UnlockSurface();
+#undef mapW
+#undef mapH
+#undef phase
 }
 
 /* HudSargeConstruct -- original 0x00414DF0, 157 bytes, thiscall. The Sarge
@@ -8121,9 +8128,8 @@ void __attribute__((thiscall)) AM2_Widget::CountButtonPaint(RECT clip)
     uint8_t  ink  = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
     uint8_t  fill = 0;
     int32_t  do_fill = 0;
-    int32_t  focused;
     RECT     vis;
-    char     text[32];
+    char     text[8];           /* the image's frame holds eight bytes */
     int32_t  width;
 
     if (w->disabled) {
@@ -8131,13 +8137,15 @@ void __attribute__((thiscall)) AM2_Widget::CountButtonPaint(RECT clip)
         ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG;
     } else {
         w->sprite = *(AM2_Sprite **)(self + COUNTBTN_OFF_SPR);
-        focused = w->parent && w->parent->focusedChild == w;
 
+        /* The focus is tested inside each arm, and the parent is not
+         * null-tested: a painted button always has one. */
         if (*(const uint8_t *)(self + COUNTBTN_OFF_LIT)) {
-            ink     = *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR;
             do_fill = 1;
-            fill    = (uint8_t)(AM2_COUNT_FILL_LIT + (focused ? 1 : 0));
-        } else if (focused) {
+            ink     = *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR;
+            fill    = (w->parent->focusedChild == w) ? AM2_COUNT_FILL_LIT + 1
+                                                         : AM2_COUNT_FILL_LIT;
+        } else if (w->parent->focusedChild == w) {
             do_fill = 1;
             fill    = AM2_COUNT_FILL_FOCUS;
         }
@@ -11526,6 +11534,7 @@ void __attribute__((thiscall)) AM2_Widget::TextListPaint(RECT clip)
     const uint8_t *src  = *(const uint8_t *const *)(self + LIST_OFF_ROWS);
     RECT           vis;
     int32_t        row;
+    RECT           r;
 
     if (!src)
         return;
@@ -11535,6 +11544,10 @@ void __attribute__((thiscall)) AM2_Widget::TextListPaint(RECT clip)
     if (!IntersectRect(&vis, &clip, &w->rect))
         return;
 
+    /* The left edge is taken once, before the clear, into a RECT whose
+     * other three fields are never written: the image's frame has room for
+     * the whole rectangle and stores only its first dword. */
+    r.left = w->rect.left;
     ClearRegion(&vis, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
 
     src = *(const uint8_t *const *)(self + LIST_OFF_ROWS);
@@ -11542,7 +11555,6 @@ void __attribute__((thiscall)) AM2_Widget::TextListPaint(RECT clip)
     for (row = *(const int32_t *)(self + TEXTLIST_OFF_FIRST);
          row < *(const int32_t *)(src + TEXTLIST_SRC_COUNT);
          row++) {
-        const uint8_t *rec;
         int32_t        first = *(const int32_t *)(self + TEXTLIST_OFF_FIRST);
         int32_t        idx;
         uint8_t        colour;
@@ -11551,10 +11563,10 @@ void __attribute__((thiscall)) AM2_Widget::TextListPaint(RECT clip)
         if (row >= first + *(const int32_t *)(self + TEXTLIST_OFF_VISIBLE))
             return;
 
-        rec = *(const uint8_t *const *)(src + TEXTLIST_SRC_RECORDS)
-              + row * TEXTLIST_REC_SIZE;
-
-        idx    = *(const int32_t *)(rec + TEXTLIST_REC_COLOUR);
+        /* The row's record is indexed afresh for the colour and again,
+         * through the list re-read, for the draw. */
+        idx    = *(const int32_t *)(*(const uint8_t *const *)(src + TEXTLIST_SRC_RECORDS)
+                                    + row * TEXTLIST_REC_SIZE + TEXTLIST_REC_COLOUR);
         colour = *(const uint8_t *)(self + TEXTLIST_OFF_COLOURS + idx * 4);
 
         y = w->rect.top + (row - first) * AM2_TEXT_LIST_ROW_H + AM2_TEXT_LIST_PAD;
@@ -11562,8 +11574,12 @@ void __attribute__((thiscall)) AM2_Widget::TextListPaint(RECT clip)
         if (!LockSurface(g_drawTarget))
             return;
 
-        DrawTextClipped(w->rect.left + AM2_TEXT_LIST_PAD, y,
-                        (const char *)rec, AM2_TEXT_LIST_FONT, vis, colour);
+        DrawTextClipped(r.left + AM2_TEXT_LIST_PAD, y,
+                        (const char *)(*(const uint8_t *const *)
+                                           (*(const uint8_t *const *)(self + LIST_OFF_ROWS)
+                                            + TEXTLIST_SRC_RECORDS)
+                                       + row * TEXTLIST_REC_SIZE),
+                        AM2_TEXT_LIST_FONT, vis, colour);
         UnlockSurface();
 
         src = *(const uint8_t *const *)(self + LIST_OFF_ROWS);
@@ -15597,8 +15613,8 @@ void __attribute__((thiscall)) AM2_Widget::ListDraw(RECT clip)
     AM2_Widget *w = this;
 
     uint8_t            *self = (uint8_t *)w;
-    const AM2_ListRows *rows =
-        *(const AM2_ListRows *const *)(self + LIST_OFF_ROWS);
+    /* The rows are read from the list at every use. */
+#define rows (*(const AM2_ListRows *const *)(self + LIST_OFF_ROWS))
     RECT     paint;
     RECT     rowRect;
     int32_t  idx;
@@ -15608,7 +15624,7 @@ void __attribute__((thiscall)) AM2_Widget::ListDraw(RECT clip)
         return;
 
     ::WidgetScreenRect(w);
-    if (!IntersectRect(&paint, &w->rect, &clip))
+    if (!IntersectRect(&paint, &clip, &w->rect))
         return;
 
     /* The row strip spans the widget's full width; only top and bottom move. */
@@ -15624,26 +15640,30 @@ void __attribute__((thiscall)) AM2_Widget::ListDraw(RECT clip)
     offset = idx * LIST_ROW_STRIDE;
     do {
         int32_t top = *(const int32_t *)(self + LIST_OFF_TOP_ROW);
-        int32_t sel = *(const int32_t *)(self + LIST_OFF_SELECTED);
         int32_t y;
         uint8_t ink;
-        int32_t selectedHere;
 
         if (idx >= top + *(const int32_t *)(self + LIST_OFF_VISIBLE))
             return;
 
-        selectedHere = (idx == sel)
-                       && *(const int32_t *)(self + 0x44) != 0
-                       && *(const int32_t *)(self + 0x4C) == 0;
-
+        /* "This row is the selection, and the list shows it" is asked
+         * afresh each time it matters, the selection re-read with it. */
+#define SELECTED_HERE (idx == *(const int32_t *)(self + LIST_OFF_SELECTED) \
+                       && *(const int32_t *)(self + 0x44) != 0             \
+                       && *(const int32_t *)(self + 0x4C) == 0)
         ink = *(const uint8_t *)(self + LIST_OFF_INK);
-        if (idx == sel && w->flag44)
+        if (idx == *(const int32_t *)(self + LIST_OFF_SELECTED) && w->flag44)
             ink = g_mouseButton[0]
                   ? *(const uint8_t *)(self + LIST_OFF_INK_SEL_DOWN)
                   : *(const uint8_t *)(self + LIST_OFF_INK_SEL);
-        if (idx == *(const int32_t *)(self + LIST_OFF_CHOSEN))
-            ink = selectedHere ? *(const uint8_t *)(self + LIST_OFF_INK_HOT_SEL)
-                               : g_hiliteColour;
+        if (idx == *(const int32_t *)(self + LIST_OFF_CHOSEN)) {
+            if (idx == *(const int32_t *)(self + LIST_OFF_SELECTED)
+                && *(const int32_t *)(self + 0x44) != 0
+                && *(const int32_t *)(self + 0x4C) == 0)
+                ink = *(const uint8_t *)(self + LIST_OFF_INK_HOT_SEL);
+            else
+                ink = g_hiliteColour;
+        }
 
         y = w->rect.top + (idx - top) * LIST_ROW_HEIGHT + LIST_ROW_TOP_MARGIN;
         rowRect.top    = y;
@@ -15653,8 +15673,9 @@ void __attribute__((thiscall)) AM2_Widget::ListDraw(RECT clip)
          * previous row left in it and the text below is drawn against that.
          * The original's defect, and the same shape as LockSurface's Restore
          * path; kept deliberately. */
-        if (IntersectRect(&paint, &clip, &rowRect) && selectedHere)
+        if (IntersectRect(&paint, &clip, &rowRect) && SELECTED_HERE)
             ClearRegion(&paint, g_hiliteColour);
+#undef SELECTED_HERE
 
         if (!LockSurface(g_drawTarget))
             return;
@@ -15665,6 +15686,7 @@ void __attribute__((thiscall)) AM2_Widget::ListDraw(RECT clip)
         idx++;
         offset += LIST_ROW_STRIDE;
     } while (idx < rows->count);
+#undef rows
 }
 
 /* ListUpdate -- original 0x00455340, 1,200 bytes, thiscall, TWO exits.
