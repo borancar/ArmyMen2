@@ -603,24 +603,22 @@ void __cdecl ItemSetBox(void *obj, int32_t left, int32_t top,
                         int32_t right, int32_t bottom)
 {
     uint8_t *o = (uint8_t *)obj;
-    int32_t  x, y;
-    int32_t  w, h, need;
+    int32_t  w, h;
+    int32_t  need;
     int32_t  i;
 
     ItemPreDestroy(o, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
 
-    x = *(const int16_t *)(o + OBJ_OFF_POS);
-    y = *(const int16_t *)(o + OBJ_OFF_POS + 2);
-
+    /* The position is read where it is used, not held. */
     *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 0)  = left;
     *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 4)  = top;
     *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 8)  = right;
     *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 12) = bottom;
 
-    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 0)  = x + left;
-    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 4)  = y + top;
-    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 8)  = x + right;
-    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 12) = y + bottom;
+    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 0)  = *(const int16_t *)(o + OBJ_OFF_POS) + left;
+    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 4)  = *(const int16_t *)(o + OBJ_OFF_POS + 2) + top;
+    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 8)  = *(const int16_t *)(o + OBJ_OFF_POS) + right;
+    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 12) = *(const int16_t *)(o + OBJ_OFF_POS + 2) + bottom;
 
     if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & MAPOBJ_FLAG_VISIBLE))
         return;
@@ -631,25 +629,28 @@ void __cdecl ItemSetBox(void *obj, int32_t left, int32_t top,
         w -= 2;
     if (h > 2)
         h -= 2;
-    need = (int32_t)(uint8_t)(int8_t)((int8_t)((w >> AM2_CELL_SHIFT) + 2)
-                                      * (int8_t)((h >> AM2_CELL_SHIFT) + 2));
+    /* A byte, multiplied as bytes. */
+    need = (uint8_t)((uint8_t)((w >> AM2_CELL_SHIFT) + 2)
+                     * (uint8_t)((h >> AM2_CELL_SHIFT) + 2));
 
     if ((int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT) < need) {
+        /* Sized from the count just stored. */
         *(o + OBJ_OFF_CELL_COUNT) = (uint8_t)need;
         *(void **)(o + OBJ_OFF_CELL_ENTRIES) =
             am2_realloc(*(void **)(o + OBJ_OFF_CELL_ENTRIES),
-                        (size_t)((uint32_t)need * AM2_CELL_ENTRY_STRIDE));
+                        (size_t)((uint32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT)
+                                 * AM2_CELL_ENTRY_STRIDE));
     }
 
+    /* Each entry is re-indexed from the array for every store. */
+#define ENTRY ((uint32_t)i * AM2_CELL_ENTRY_STRIDE + *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES))
     for (i = 0; i < (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); i++) {
-        uint8_t *entry = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES)
-                         + (uint32_t)i * AM2_CELL_ENTRY_STRIDE;
-
-        *(void **)(entry + 0) = obj;
-        *(void **)(entry + 8) = (void *)0;   /* next */
-        *(void **)(entry + 4) = (void *)0;   /* prev */
-        *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = -1;
+        *(void **)(ENTRY + 0) = obj;
+        *(void **)(ENTRY + 8) = (void *)0;   /* next */
+        *(void **)(ENTRY + 4) = (void *)0;   /* prev */
+        *(int32_t *)(ENTRY + CELL_ENTRY_OFF_INDEX) = -1;
     }
+#undef ENTRY
 
     if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
         return;

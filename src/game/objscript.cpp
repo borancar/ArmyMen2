@@ -580,43 +580,26 @@ int32_t __cdecl SaveObjScriptSection(am2_FILE *fp)
  * double free, and the original does not. */
 void __cdecl FreeObjScripts(void)
 {
-    AM2_ObjScript *tab = kObjScripts;
-
-    if (tab == (AM2_ObjScript *)0)
-        goto done;
-
-    if (kObjScriptCount <= 0)
-        goto freetable;
-
-    for (int32_t i = 0; i < kObjScriptCount; i++) {
-        AM2_ObjScript *o = &tab[i];
-
-        if (o->states == (AM2_ObjState *)0)
-            continue;
-
-        for (int32_t j = 0; j < o->statecount; j++) {
-            AM2_ObjState *st = &o->states[j];
-
-            if (st->frames == (AM2_ObjFrame *)0)
-                continue;
-
-            for (int32_t k = 0; k < st->framecount; k++) {
-                AM2_ObjFrame *fr = &st->frames[k];
-
-                if (fr->actions != (AM2_ScriptAction *)0)
-                    am2_free(fr->actions);
+    /* Everything is re-indexed from the table pointer at every use: the
+     * image reads kObjScripts again after each free. */
+    if (kObjScripts) {
+        for (int32_t i = 0; i < kObjScriptCount; i++) {
+            if (kObjScripts[i].states) {
+                for (int32_t j = 0; j < kObjScripts[i].statecount; j++) {
+                    if (kObjScripts[i].states[j].frames) {
+                        for (int32_t k = 0;
+                             k < kObjScripts[i].states[j].framecount; k++)
+                            if (kObjScripts[i].states[j].frames[k].actions)
+                                am2_free(kObjScripts[i].states[j].frames[k].actions);
+                        am2_free(kObjScripts[i].states[j].frames);
+                    }
+                }
+                am2_free(kObjScripts[i].states);
             }
-
-            am2_free(st->frames);
         }
-
-        am2_free(o->states);
+        am2_free(kObjScripts);
     }
 
-freetable:
-    am2_free(tab);
-
-done:
     kObjScripts     = (AM2_ObjScript *)0;
     kObjScriptCount = 0;
     kObjScriptCap   = 0;
