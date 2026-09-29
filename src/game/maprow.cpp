@@ -2064,21 +2064,24 @@ void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
 #define FLAGS (*(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS)
 #define DECAL ((const uint8_t *)(*(void *const *const *)(uintptr_t)ADDR_DECAL_SPRITES)[variant])
     const int32_t *step = (const int32_t *)(uintptr_t)ADDR_TILE_STEP8;
-    uint32_t       point;
+    AM2_Point      point;
+    const uint8_t *flags;
     uint16_t       tile;
     uint8_t       *row;
     int32_t        n;
 
     /* The arguments arrive as dwords and only their low words are used --
      * `mov esi,[esp+0x10]` then `mov word [esp+0x14], si`. */
-    ((int16_t *)&point)[0] = (int16_t)x;
-    ((int16_t *)&point)[1] = (int16_t)z;
-    tile = (uint16_t)TileOfPoint(point);
+    point.x = (int16_t)x;
+    point.y = (int16_t)z;
+    tile = (uint16_t)TileOfPoint(*(uint32_t *)&point);
 
-    if (FLAGS[tile] & 1)
+    /* The flags pointer is read once for the whole neighbourhood. */
+    flags = FLAGS;
+    if (flags[tile] & 1)
         return;
     for (n = 0; n < 8; n++) {
-        if ((&FLAGS[tile])[step[n]] & 1)
+        if ((&flags[tile])[step[n]] & 1)
             return;
     }
 
@@ -2088,8 +2091,8 @@ void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
     *(uint32_t *)(row + ROW_OFF_SPRITE) = (uint32_t)(uintptr_t)DECAL;
     *(int16_t *)(row + ROW_OFF_X)      = (int16_t)x;
     *(int16_t *)(row + ROW_OFF_X + 2)  = (int16_t)z;
-    *(int16_t *)(row + ROW_OFF_FIELD_26) = 2;
     *(uint32_t *)(row + ROW_OFF_FIELD_2C) = *(const uint32_t *)(DECAL + 0x34u);
+    *(int16_t *)(row + ROW_OFF_FIELD_26) = 2;
 
     RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
 #undef FLAGS
