@@ -834,9 +834,16 @@ static inline void EditReleaseFocus(AM2_Widget *w)
 }
 
 /* GetTickCount through the game's own IAT slot, so this module names no Win32
- * type for it. */
+ * type for it -- except under VC6, where it is the import itself: two calls
+ * load the IAT slot into a register once (`call ebx`, ButtonUpdate), which a
+ * read through our pointer cannot reproduce. As armymsg.cpp does. */
 typedef uint32_t (__attribute__((stdcall)) *AM2_TickFn)(void);
+#if defined(_MSC_VER) && !defined(__GNUC__)
+extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
+#define orig_get_tick_count GetTickCount
+#else
 #define orig_get_tick_count (**(AM2_TickFn *)(uintptr_t)IAT_GET_TICK_COUNT)
+#endif
 
 /* 250 ms before a held button starts repeating, 150 ms between repeats. */
 #define BUTTON_REPEAT_DELAY  250u
@@ -14893,83 +14900,84 @@ void __attribute__((thiscall)) AM2_Widget::ButtonUpdate()
 
     ::WidgetScreenRect(w);
 
-    if (!w->parent || w->disabled) {
-        ::WidgetUpdate(w);
-        return;
-    }
+    if (!w->parent || w->disabled)
+        goto update;
 
     w->hovered = PointInRect((const AM2_Rect *)&w->rect,
                                (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT);
-    if (!w->hovered) {
-        BUTTON_DEADLINE(w) = 0;
-        ::WidgetUpdate(w);
-        return;
-    }
+    if (w->hovered) {
+        if (orig_mouse_moved)
+            WidgetVFocus(w, 1);
 
-    if (orig_mouse_moved)
-        WidgetVFocus(w, 1);
+        repeats = *(const int32_t *)(self + BUTTON_OFF_REPEATS);
 
-    repeats = *(const int32_t *)(self + BUTTON_OFF_REPEATS);
-
-    if (!repeats) {
-        /* Plain button: both handlers fire on RELEASE, a press only repaints. */
-        if (!orig_mouse_moved) {
-            ::WidgetUpdate(w);
-            return;
-        }
-        if (g_mouseChanged[0]) {
-            if (!g_mouseButton[0]) {
+        /* Every arm that repaints ends with its OWN repaint, update and
+         * return -- the original has a copy of that tail in each of them. */
+#define BUTTON_FINISH() do { ButtonRepaintSelf(w); ::WidgetUpdate(w); return; } while (0)
+        if (!repeats) {
+            /* Plain button: both handlers fire on RELEASE, a press only
+             * repaints. */
+            if (!orig_mouse_moved)
+                goto update;
+            if (g_mouseChanged[0]) {
+                if (g_mouseButton[0])
+                    BUTTON_FINISH();
                 ButtonFire(w, BUTTON_OFF_ON_LEFT);
                 w->hovered = 0;
+                BUTTON_FINISH();
             }
-            ButtonRepaintSelf(w);
-        } else if (g_mouseChanged[1]) {
-            if (!g_mouseButton[1]) {
+            if (g_mouseChanged[1]) {
+                if (g_mouseButton[1])
+                    BUTTON_FINISH();
                 ButtonFire(w, BUTTON_OFF_ON_RIGHT);
                 w->hovered = 0;
+                BUTTON_FINISH();
             }
-            ButtonRepaintSelf(w);
+            goto update;
         }
-        ::WidgetUpdate(w);
-        return;
-    }
 
-    /* Auto-repeat. The left and right buttons do NOT behave the same: left
-     * arms the deadline on first press without firing, right fires. Kept. */
-    if (g_mouseButton[0]) {
-        if (g_mouseChanged[0]) {
-            BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_DELAY;
-        } else {
-            if (orig_get_tick_count() <= BUTTON_DEADLINE(w)) {
-                ::WidgetUpdate(w);
-                return;
+        /* Auto-repeat. The left and right buttons do NOT behave the same:
+         * left arms the deadline on first press without firing, right
+         * fires. Kept. */
+        if (g_mouseButton[0]) {
+            if (g_mouseChanged[0]) {
+                BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_DELAY;
+                BUTTON_FINISH();
             }
+            if (orig_get_tick_count() <= BUTTON_DEADLINE(w))
+                goto update;
             BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_PERIOD;
             ButtonFire(w, BUTTON_OFF_ON_LEFT);
+            BUTTON_FINISH();
         }
-    } else if (g_mouseChanged[0]) {
-        BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_DELAY;
-        ButtonFire(w, BUTTON_OFF_ON_LEFT);
-    } else if (g_mouseButton[1]) {
-        if (g_mouseChanged[1]) {
+        if (g_mouseChanged[0]) {
             BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_DELAY;
-            ButtonFire(w, BUTTON_OFF_ON_RIGHT);
-        } else {
-            if (orig_get_tick_count() <= BUTTON_DEADLINE(w)) {
-                ::WidgetUpdate(w);
-                return;
+            ButtonFire(w, BUTTON_OFF_ON_LEFT);
+            BUTTON_FINISH();
+        }
+        if (g_mouseButton[1]) {
+            if (g_mouseChanged[1]) {
+                BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_DELAY;
+                ButtonFire(w, BUTTON_OFF_ON_RIGHT);
+                BUTTON_FINISH();
             }
+            if (orig_get_tick_count() <= BUTTON_DEADLINE(w))
+                goto update;
             BUTTON_DEADLINE(w) = orig_get_tick_count() + BUTTON_REPEAT_PERIOD;
             ButtonFire(w, BUTTON_OFF_ON_RIGHT);
+            BUTTON_FINISH();
         }
-    } else {
+#undef BUTTON_FINISH
+
         /* Neither button down: forget the deadline and the hover. */
         BUTTON_DEADLINE(w) = 0;
         w->hovered = 0;
         ::WidgetUpdate(w);
         return;
-    }
-    ButtonRepaintSelf(w);
+    } else
+        BUTTON_DEADLINE(w) = 0;   /* laid out last, into the shared update */
+
+update:
     ::WidgetUpdate(w);
 }
 
