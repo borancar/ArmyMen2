@@ -2960,8 +2960,7 @@ int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind)
 
     const uint8_t *rec;
     void          *hdr;
-    int32_t        x, y, n = 0;
-    int32_t        shift = *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
+    int32_t        x, y, n;
 
     if (slot >= *(const int32_t *)(uintptr_t)ADDR_KEY_TABLE_COUNT)
         return 1;
@@ -2977,18 +2976,22 @@ int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind)
     else
         ListBoxAction(at, hdr, &mask);
 
+    n = 0;
     for (y = mask.r.top; y <= mask.r.bottom; y++) {
-        int32_t tile = (y << shift) + mask.r.left;
+        int32_t tile = (y << *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)
+                       + mask.r.left;
 
-        for (x = mask.r.left; x <= mask.r.right; x++, tile++, n++) {
-            uint32_t index = (uint32_t)tile & 0xFFFFu;
+        for (x = mask.r.left; x <= mask.r.right; n++, tile++, x++) {
+            uint32_t index;
             uint32_t pt;
 
-            if (!(mask.cells[n] & 1))
+            if (!mask.cells[n] || !(mask.cells[n] & 1))
                 continue;
 
-            if (((const uint8_t *)*(void *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
-                    [index] >= AM2_CELL_WEIGHT_STEP)
+            index = (uint32_t)tile & 0xFFFFu;
+            /* SIGNED: `cmp byte, 0xf; jge`. */
+            if (((const int8_t *)*(void *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
+                    [index] >= (int8_t)AM2_CELL_WEIGHT_STEP)
                 return 0;
 
             if (((const uint8_t *)*(void *const *)(uintptr_t)ADDR_TILE_KIND)

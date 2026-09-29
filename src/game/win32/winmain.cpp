@@ -476,19 +476,22 @@ int32_t __cdecl FindGameCD(void)
 {
     char    *drives, *volume, *p;
     uint32_t need;
-    int32_t  found = 0;
+    int32_t  found;
 
     need   = GetLogicalDriveStringsA(0, NULL) + 1;
     drives = (char *)orig_malloc(need);
     GetLogicalDriveStringsA(need, drives);
     volume = (char *)orig_malloc(VOLUME_NAME_MAX + 1);
 
+    found = 0;
     g_cdPresent = 0;
     g_cdPath[0] = '\0';
 
     for (p = drives; *p && found != 1; ) {
         if (GetDriveTypeA(p) == DRIVE_CDROM) {
-            if (g_cdLabel[0] == '\0') {
+            /* The label is a literal, and the original still tests its
+             * address before its first byte. */
+            if (g_cdLabel == NULL || g_cdLabel[0] == '\0') {
                 /* No label to match, so any CD-ROM will do. */
                 found = 1;
             } else if (GetVolumeInformationA(p, volume, VOLUME_NAME_MAX,

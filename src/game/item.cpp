@@ -4438,11 +4438,13 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
                         int32_t suppress)
 {
     uint8_t *o = (uint8_t *)obj;
-    int16_t  owner =
-        (int16_t)*(const int8_t *)(o + AM2_OBJ_OWNER_OFF);
 
+    /* The point is read in halves from its own argument slot, and the owner
+     * widened afresh at each use, as the image does. */
+#define WHERE (*(const AM2_Point *)&where)
+#define OWNER ((int16_t)*(const int8_t *)(o + AM2_OBJ_OWNER_OFF))
     if (g_mpSession && suppress == 0
-        && !((AM2_Comm *)kItemComm)->CommMustBroadcast(owner))
+        && !((AM2_Comm *)kItemComm)->CommMustBroadcast(OWNER))
         return;
 
     if (resurrect) {
@@ -4465,15 +4467,13 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
 
     switch (*(const int32_t *)o) {
     case 2:
-        DeployTrooper(obj, (int16_t)where, (int16_t)(where >> 16),
-                            resurrect);
+        DeployTrooper(obj, WHERE.x, WHERE.y, resurrect);
         break;
     case 3:
-        DeployVehicle(obj, (int16_t)where, (int16_t)(where >> 16),
-                            resurrect);
+        DeployVehicle(obj, WHERE.x, WHERE.y, resurrect);
         break;
     default:
-        PlaceObj(obj, *(const AM2_Point *)&where);
+        PlaceObj(obj, WHERE);
         if (resurrect)
             am2_log("Warning: check if resurrect command works with this "
                     "object type!\n");
@@ -4482,10 +4482,12 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
 
     if (suppress)
         return;
-    if (!((AM2_Comm *)kItemComm)->CommMustBroadcast(owner))
+    if (!((AM2_Comm *)kItemComm)->CommMustBroadcast(OWNER))
         return;
 
     SendItemDeploy(obj, resurrect);
+#undef WHERE
+#undef OWNER
 }
 
 
