@@ -1270,12 +1270,13 @@ void __cdecl ApplyGameSettings(void)
     strcpy((char *)(uintptr_t)ADDR_LIVE_BATTLE_NAME,
                (const char *)(uintptr_t)ADDR_SAVED_BATTLE_NAME);
 
-    *(uint32_t *)(uintptr_t)ADDR_GAME_SETTING_22C =
-        *(const uint32_t *)(uintptr_t)ADDR_HOST_MASK_B;
+    /* In the order that schedules into the image's stores. */
     *(int32_t *)(uintptr_t)ADDR_SCORE_LIMIT =
         *(const int32_t *)(uintptr_t)ADDR_HOST_VALUE_3E8;
     *(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS =
         *(const uint32_t *)(uintptr_t)ADDR_HOST_MASK_A;
+    *(uint32_t *)(uintptr_t)ADDR_GAME_SETTING_22C =
+        *(const uint32_t *)(uintptr_t)ADDR_HOST_MASK_B;
 
     for (i = 0; i < AM2_COMM_SLOTS; i++) {
         pool[i] = AM2_DEFAULT_SCORE_LIMIT;

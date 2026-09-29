@@ -439,12 +439,6 @@ extern uint8_t am2_os_game_over_saved[];  /* 0x00515F8C */
 extern uint8_t am2_os_state_movie[];  /* 0x00515F98 */
 extern uint8_t am2_os_mp_panel_sprites_b[];  /* 0x00515FA0 */
 extern uint8_t am2_os_mp_panel_sprites_b_end[];  /* 0x00515FD4 */
-extern uint8_t am2_os_game_over_flags[];  /* 0x00515FD8 */
-extern uint8_t am2_os_game_setting_22c[];  /* 0x00515FDC */
-extern uint8_t am2_os_army_points[];  /* 0x00515FE0 */
-extern uint8_t am2_os_score_limit[];  /* 0x00515FF0 */
-extern uint8_t am2_os_live_player_name[];  /* 0x00515FF4 */
-extern uint8_t am2_os_live_battle_name[];  /* 0x00516035 */
 extern uint8_t am2_os_host_mask_a[];  /* 0x00516078 */
 extern uint8_t am2_os_host_mask_b[];  /* 0x0051607C */
 extern uint8_t am2_os_host_value_3e8[];  /* 0x00516090 */
@@ -822,8 +816,6 @@ extern uint8_t am2_os_startup_colours_b[];  /* 0x006645A4 */
 #define ADDR_SAVED_BATTLE_NAME ((uintptr_t)(const void *)am2_os_saved_battle_name)
 #undef ADDR_SAVED_PLAYER_NAME
 #define ADDR_SAVED_PLAYER_NAME ((uintptr_t)(const void *)am2_os_saved_player_name)
-#undef ADDR_SCORE_LIMIT
-#define ADDR_SCORE_LIMIT ((uintptr_t)(const void *)am2_os_score_limit)
 #undef ADDR_SCRIPT_CONDITIONS
 #define ADDR_SCRIPT_CONDITIONS ((uintptr_t)(const void *)am2_os_script_conditions)
 #undef ADDR_SCRIPT_CONTEXT
@@ -1584,16 +1576,6 @@ extern uint8_t am2_os_startup_colours_b[];  /* 0x006645A4 */
 #define ADDR_MP_PANEL_SPRITES_B ((uintptr_t)(const void *)am2_os_mp_panel_sprites_b)
 #undef ADDR_MP_PANEL_SPRITES_B_END
 #define ADDR_MP_PANEL_SPRITES_B_END ((uintptr_t)(const void *)am2_os_mp_panel_sprites_b_end)
-#undef ADDR_GAME_OVER_FLAGS
-#define ADDR_GAME_OVER_FLAGS ((uintptr_t)(const void *)am2_os_game_over_flags)
-#undef ADDR_GAME_SETTING_22C
-#define ADDR_GAME_SETTING_22C ((uintptr_t)(const void *)am2_os_game_setting_22c)
-#undef ADDR_ARMY_POINTS
-#define ADDR_ARMY_POINTS ((uintptr_t)(const void *)am2_os_army_points)
-#undef ADDR_LIVE_PLAYER_NAME
-#define ADDR_LIVE_PLAYER_NAME ((uintptr_t)(const void *)am2_os_live_player_name)
-#undef ADDR_LIVE_BATTLE_NAME
-#define ADDR_LIVE_BATTLE_NAME ((uintptr_t)(const void *)am2_os_live_battle_name)
 #undef ADDR_MP_PANEL_SPRITES_A
 #define ADDR_MP_PANEL_SPRITES_A ((uintptr_t)(const void *)am2_os_mp_panel_sprites_a)
 #undef ADDR_MENU_MSG_LIST

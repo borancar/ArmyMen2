@@ -5218,10 +5218,11 @@ void __cdecl SetPointerMode(int32_t mode)
 #define F14  (*(int32_t *)(uintptr_t)ADDR_POINTER_F14)
     *(int32_t *)(uintptr_t)ADDR_POINTER_MODE = mode;
 
-    /* Straight from the record into the globals, then tested from them. */
-    *(int32_t *)(uintptr_t)ADDR_POINTER_F10 = *(const int32_t *)(REC + MODE_OFF_F10);
+    /* Straight from the record into the globals, then tested from them --
+     * in the statement order that schedules into the image's stores. */
     PICK = *(AM2_PointerPickFn const *)(REC + MODE_OFF_PICK);
     ACT  = *(AM2_PointerActionFn const *)(REC + MODE_OFF_ACTION);
+    *(int32_t *)(uintptr_t)ADDR_POINTER_F10 = *(const int32_t *)(REC + MODE_OFF_F10);
     F14  = *(const int32_t *)(REC + MODE_OFF_F14);
     *(int32_t *)(uintptr_t)ADDR_POINTER_OVERLAY = *(const int32_t *)(REC + MODE_OFF_OVERLAY);
 
