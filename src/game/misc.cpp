@@ -171,13 +171,12 @@ int32_t __cdecl IsKind7(const void *p)
     return (*(const int32_t *)p == 7) ? 1 : 0;
 }
 
-uint32_t __cdecl SwapColourBytes(uint32_t colour, uint32_t unused)
+uint32_t __cdecl SwapColourBytes(uint32_t colour)
 {
     const uint8_t *in = (const uint8_t *)&colour;
     uint32_t       out;
     uint8_t       *o = (uint8_t *)&out;
 
-    (void)unused;
     o[3] = 0;
     o[0] = in[2];
     o[1] = in[1];
@@ -1985,29 +1984,25 @@ extern "C" void __cdecl ShowMpResult(int32_t result);
  * multiplayer game, which no drive reaches. */
 void __cdecl MissionNetworked(int32_t army, int32_t teamGame)
 {
-    const uint8_t *comm  = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
-    uint32_t       mine  = *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
-    int32_t        slot  = ((AM2_Comm *)(void *)(uintptr_t)comm)->CommSlotForArmy(army);
-    int32_t        won;
+    /* The comm object and our army are re-read at each use. */
+#define COMM  (*(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
+#define MINE  (*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+#define TEAM(slot) (*(const int32_t *)(COMM + (size_t)(slot) * AM2_PLAYER_STRIDE \
+                                        + COMM_ARMY_OFF_TEAM))
+    int32_t slot = ((AM2_Comm *)(void *)(uintptr_t)COMM)->CommSlotForArmy(army);
+    int32_t won;
 
-    if (teamGame) {
-        int32_t myTeam = *(const int32_t *)(comm + (size_t)mine
-                                            * AM2_PLAYER_STRIDE
-                                            + COMM_ARMY_OFF_TEAM);
-
-        if (myTeam) {
-            int32_t theirTeam =
-                *(const int32_t *)(comm + (size_t)slot * AM2_PLAYER_STRIDE
-                                   + COMM_ARMY_OFF_TEAM);
-
-            won = (myTeam == theirTeam);
-            ShowMpResult(won ? 0 : 1);
-            return;
-        }
+    if (teamGame && TEAM(MINE)) {
+        won = TEAM(MINE) == TEAM(slot);
+        ShowMpResult(!won);
+        return;
     }
 
-    won = (slot == (int32_t)mine);
-    ShowMpResult(won ? 0 : 1);
+    won = slot == (int32_t)MINE;
+    ShowMpResult(!won);
+#undef COMM
+#undef MINE
+#undef TEAM
 }
 
 /* 0x0040F2F0, one caller, thiscall. The DirectPlay id of a comm slot.
@@ -2138,16 +2133,18 @@ typedef int32_t (__cdecl *AM2_RandFn)(void);
  */
 int32_t __cdecl RandomAround(int32_t centre, int32_t spread)
 {
-    int32_t n     = 100 - spread;
-    int32_t total = 0;
+    int32_t n;
+    int32_t total;
     int32_t i;
 
     if (spread == 0)
         return centre;
 
+    n = 100 - spread;
     if (n < 1)
         n = 1;
 
+    total = 0;
     for (i = 0; i < n; i++)
         total += ((AM2_RandFn)((void *)(uintptr_t)(ADDR_GAME_RAND)))() % (centre * 2);
 
@@ -2785,7 +2782,7 @@ int misc_install(void)
                   "ResetPairMask", 2);
     patch_replace(ADDR_IS_KIND_7, (const void *)IsKind7, "IsKind7", 1);
     patch_replace(ADDR_SWAP_COLOUR_BYTES, (const void *)SwapColourBytes,
-                  "SwapColourBytes", 2);
+                  "SwapColourBytes", 1);
     patch_replace(ADDR_NULL_STUB_4, (const void *)NullStub4, "NullStub4", 1);
     patch_replace(ADDR_NULL_STUB, (const void *)NullStub, "NullStub", 0);
     patch_replace(ADDR_RETURN_ZERO, (const void *)ReturnZero, "ReturnZero", 0);

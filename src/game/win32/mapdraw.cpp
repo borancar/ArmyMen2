@@ -492,7 +492,7 @@ void __cdecl RestoreTileSet(void)
             }
             for (i = from; i < 256; i++)
                 remap[i] = NearestPalIndex(g_activePalette,
-                                             SwapColourBytes(header[DIB_PALETTE_INDEX + i], 0),
+                                             SwapColourBytes(header[DIB_PALETTE_INDEX + i]),
                                              (uint32_t)from);
         } else {
             for (i = 0; i < 256; i++)

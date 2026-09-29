@@ -778,27 +778,28 @@ void __cdecl ItemLinkCells(void *obj, void *cells)
 void __cdecl ItemPreDestroy(void *obj, int32_t cells)
 {
     uint8_t *o = (uint8_t *)obj;
-    uint8_t *entries;
     int32_t  i;
 
+    /* The entry table is re-read at each use, as the image does. */
+#define ENTRY(i) (*(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES) \
+                  + (uint32_t)(i) * AM2_CELL_ENTRY_STRIDE)
+#define INDEX(i) (*(int32_t *)(ENTRY(i) + CELL_ENTRY_OFF_INDEX))
     if (!*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT))
         return;
-    entries = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES);
-    if (*(const int32_t *)(entries + CELL_ENTRY_OFF_INDEX) < 0)
+    if (INDEX(0) < 0)
         return;
 
-    for (i = 0; i < (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); i++) {
-        uint8_t *e = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES)
-                     + (uint32_t)i * AM2_CELL_ENTRY_STRIDE;
-        int32_t  at = *(const int32_t *)(e + CELL_ENTRY_OFF_INDEX);
-
-        if (at < 0)
+    for (i = 0; i < *(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); i++) {
+        if (INDEX(i) < 0)
             return;
-        ListUnlink(e, (void **)(*(uint8_t **)((uint8_t *)(uintptr_t)cells
-                                              + CELLS_OFF_HEADS)
-                                + (uint32_t)at * 4));
-        *(int32_t *)(e + CELL_ENTRY_OFF_INDEX) = -1;
+        ListUnlink(ENTRY(i),
+                   (void **)(*(uint8_t **)((uint8_t *)(uintptr_t)cells
+                                           + CELLS_OFF_HEADS)
+                             + (uint32_t)INDEX(i) * 4));
+        INDEX(i) = -1;
     }
+#undef ENTRY
+#undef INDEX
 }
 
 #define kCommDbg \

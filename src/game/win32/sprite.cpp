@@ -1249,7 +1249,7 @@ int32_t __cdecl SpriteSetLoad(const char *name)
              * stack; zero is the same function. */
             for (i = 0; i < 256; i++)
                 remap[i] = NearestPalIndex(display,
-                                           SwapColourBytes(pal[i], 0), 0);
+                                           SwapColourBytes(pal[i]), 0);
         } else {
             for (i = 0; i < 256; i++)
                 remap[i] = (uint8_t)i;

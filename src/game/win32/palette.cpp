@@ -518,8 +518,9 @@ int32_t __cdecl ReadBitmapPalette(const char *path, BITMAPINFO *out)
  * The count is a fixed 256 and does NOT consult biClrUsed, so a file that
  * declared fewer entries still expands whatever the reader left behind them.
  *
- * SwapColourBytes takes a second argument that it never reads, and the
- * original pushes only one; zero here, with the same effect. */
+ * The image reloads the three bytes it has just stored rather than reusing the
+ * value; VC6 forwards the store here whichever way the read is spelled, so
+ * that is still a difference. */
 void __cdecl ExpandPalette(void *dst, const BITMAPINFO *bi)
 {
     uint32_t       *working  = (uint32_t *)dst;
@@ -531,7 +532,7 @@ void __cdecl ExpandPalette(void *dst, const BITMAPINFO *bi)
     for (i = 0; i < AM2_PALETTE_ENTRIES; i++) {
         const uint8_t *b;
 
-        working[i] = SwapColourBytes(src[i], 0);
+        working[i] = SwapColourBytes(src[i]);
 
         /* Read back through bytes, as the original does. */
         b = (const uint8_t *)&working[i];
@@ -669,7 +670,7 @@ void __cdecl PaletteLoaded(void)
         if (active) {
             for (i = 0; i < AM2_PALETTE_ENTRIES; i++)
                 remap[i] = NearestPalIndex(active,
-                                           SwapColourBytes(pal[i], 0), 0);
+                                           SwapColourBytes(pal[i]), 0);
         } else {
             for (i = 0; i < AM2_PALETTE_ENTRIES; i++)
                 remap[i] = (uint8_t)i;

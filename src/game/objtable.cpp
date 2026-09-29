@@ -237,21 +237,16 @@ void *__cdecl FirstItem(void)
 void *__cdecl NextItem(void)
 {
     int32_t count = g_objCount;
-    int32_t i = g_iterCursor + 1;
 
-    g_iterCursor = i;
-    if (i >= count)
+    if (++g_iterCursor >= count)
         return 0;
 
     /* Skip whatever this pass has already handed out. */
-    while (g_objTable[i].stamp == g_iterStamp) {
-        i++;
-        g_iterCursor = i;
-        if (i >= count)
+    while (g_objTable[g_iterCursor].stamp == g_iterStamp)
+        if (++g_iterCursor >= count)
             return 0;
-    }
 
-    g_objTable[i].stamp = g_iterStamp;
+    g_objTable[g_iterCursor].stamp = g_iterStamp;
     return g_objTable[g_iterCursor].obj;
 }
 
