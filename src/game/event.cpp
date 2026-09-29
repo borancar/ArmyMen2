@@ -1124,8 +1124,6 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
     void    *comm = *(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT));
     int32_t  slot = CommSlotForArmy(comm, army);
     uint8_t *list = ((uint8_t **)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[slot];
-    uint16_t x    = (uint16_t)(point & 0xFFFFu);
-    uint16_t y    = (uint16_t)(point >> 16);
     int32_t  i    = 0;
 
     while (i < *(const int32_t *)(list + LIST_OFF_COUNT)) {
@@ -1148,9 +1146,10 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
         }
 
         if (relative) {
-            x = (uint16_t)(x + *(const uint16_t *)(obj + OBJ_OFF_X));
-            y = (uint16_t)(y + *(const uint16_t *)(obj + OBJ_OFF_Y));
-            point = (uint32_t)x | ((uint32_t)y << 16);
+            /* Cumulative across objects, as the original's: each adds into
+             * the argument's halves. */
+            ((AM2_Point *)&point)->x = (int16_t)(((AM2_Point *)&point)->x + *(const int16_t *)(obj + OBJ_OFF_X));
+            ((AM2_Point *)&point)->y = (int16_t)(((AM2_Point *)&point)->y + *(const int16_t *)(obj + OBJ_OFF_Y));
         }
 
         PointActionA(obj, point);
@@ -1189,12 +1188,9 @@ void __cdecl EvtAtPointA(uint32_t uid, uint32_t point, int32_t relative)
         return;
 
     if (relative) {
-        uint16_t x = (uint16_t)(point & 0xFFFFu)
-                   + *(const uint16_t *)(obj + OBJ_OFF_X);
-        uint16_t y = (uint16_t)(point >> 16)
-                   + *(const uint16_t *)(obj + OBJ_OFF_Y);
-
-        point = (uint32_t)x | ((uint32_t)y << 16);
+        /* Added into the argument's own halves. */
+        ((AM2_Point *)&point)->x = (int16_t)(((AM2_Point *)&point)->x + *(const int16_t *)(obj + OBJ_OFF_X));
+        ((AM2_Point *)&point)->y = (int16_t)(((AM2_Point *)&point)->y + *(const int16_t *)(obj + OBJ_OFF_Y));
     }
 
     if (ObjIsType2((const AM2_Object *)obj))
@@ -1215,21 +1211,24 @@ void __cdecl EvtAtPointC(uint32_t uid, uint32_t point, int32_t relative)
     if (obj == (uint8_t *)0)
         return;
 
+    /* The point's halves read as words out of its argument slot; the
+     * relative sum built as a struct (the image puts it in uid's slot). */
+#define PT (*(const AM2_Point *)&point)
     if (relative) {
-        uint16_t x = *(const uint16_t *)(obj + OBJ_OFF_X)
-                   + (uint16_t)(point & 0xFFFFu);
-        uint16_t y = *(const uint16_t *)(obj + OBJ_OFF_Y)
-                   + (uint16_t)(point >> 16);
+        AM2_Point at;
 
-        PointActionC(obj, (uint32_t)x | ((uint32_t)y << 16));
+        at.x = (int16_t)(*(const int16_t *)(obj + OBJ_OFF_X) + PT.x);
+        at.y = (int16_t)(*(const int16_t *)(obj + OBJ_OFF_Y) + PT.y);
+        PointActionC(obj, *(const uint32_t *)&at);
         return;
     }
 
-    if (*(const uint16_t *)(obj + OBJ_OFF_X) == (uint16_t)(point & 0xFFFFu)
-        && *(const uint16_t *)(obj + OBJ_OFF_Y) == (uint16_t)(point >> 16))
+    if (*(const int16_t *)(obj + OBJ_OFF_X) == PT.x
+        && *(const int16_t *)(obj + OBJ_OFF_Y) == PT.y)
         return;
 
     PointActionC(obj, point);
+#undef PT
 }
 
 /* 0x0041F7F0. The "On" wrapper for EvtAtPointC, and the third of that shape:

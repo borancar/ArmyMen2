@@ -5236,30 +5236,28 @@ void __cdecl HudPaint(void)
  */
 void __cdecl SetPointerMode(int32_t mode)
 {
-    const uint8_t *rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_POINTER_MODES))
-                         + (size_t)mode * AM2_POINTER_MODE_SIZE;
-    AM2_PointerPickFn   pick;
-    AM2_PointerActionFn act;
-    int32_t             f14;
-
+#define REC ((const uint8_t *)((void *)(uintptr_t)(ADDR_POINTER_MODES)) \
+             + (size_t)mode * AM2_POINTER_MODE_SIZE)
+#define PICK (*(AM2_PointerPickFn *)(uintptr_t)ADDR_POINTER_PICK)
+#define ACT  (*(AM2_PointerActionFn *)(uintptr_t)ADDR_POINTER_ACTION)
+#define F14  (*(int32_t *)(uintptr_t)ADDR_POINTER_F14)
     *(int32_t *)(uintptr_t)ADDR_POINTER_MODE = mode;
 
-    pick = *(AM2_PointerPickFn const *)(rec + MODE_OFF_PICK);
-    act  = *(AM2_PointerActionFn const *)(rec + MODE_OFF_ACTION);
-    f14  = *(const int32_t *)(rec + MODE_OFF_F14);
+    /* Straight from the record into the globals, then tested from them. */
+    *(int32_t *)(uintptr_t)ADDR_POINTER_F10 = *(const int32_t *)(REC + MODE_OFF_F10);
+    PICK = *(AM2_PointerPickFn const *)(REC + MODE_OFF_PICK);
+    ACT  = *(AM2_PointerActionFn const *)(REC + MODE_OFF_ACTION);
+    F14  = *(const int32_t *)(REC + MODE_OFF_F14);
+    *(int32_t *)(uintptr_t)ADDR_POINTER_OVERLAY = *(const int32_t *)(REC + MODE_OFF_OVERLAY);
 
-    *(AM2_PointerPickFn *)(uintptr_t)ADDR_POINTER_PICK    = pick;
-    *(AM2_PointerActionFn *)(uintptr_t)ADDR_POINTER_ACTION = act;
-    *(int32_t *)(uintptr_t)ADDR_POINTER_F10 =
-        *(const int32_t *)(rec + MODE_OFF_F10);
-    *(int32_t *)(uintptr_t)ADDR_POINTER_F14 = f14;
-    *(int32_t *)(uintptr_t)ADDR_POINTER_OVERLAY =
-        *(const int32_t *)(rec + MODE_OFF_OVERLAY);
-
-    if (!pick && !f14 && act) {
-        act((void *)0, *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+    if (!PICK && !F14 && ACT) {
+        ACT((void *)0, *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
         *(int32_t *)(uintptr_t)ADDR_POINTER_MODE = 0;
     }
+#undef REC
+#undef PICK
+#undef ACT
+#undef F14
 }
 
 /* 0x004144A0, forty-six callers -- the most-called thing left unreconstructed.

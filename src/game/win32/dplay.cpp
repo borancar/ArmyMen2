@@ -2361,20 +2361,29 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSlotOfId(uint32_t id)
  * session. */
 void __cdecl PacketSlotReset(uint32_t slot)
 {
-    uint8_t *rec = (uint8_t *)(uintptr_t)ADDR_PLAYER_RECORDS
-                   + slot * AM2_PLAYER_RECORD_BYTES;
-    static const uint32_t kZeroed[] = {
-        0x00, 0x04, 0x08, 0x0C, 0x10, 0x1C, 0x20, 0x28, 0x30, 0x34,
-        0x38, 0x40, 0x44, 0x48, 0x4C, 0x5C, 0x8C
-    };
-    uint32_t i;
+    /* Written out, in the image's order: the ownership bit goes in fifth. */
+#define REC ((uint8_t *)(uintptr_t)ADDR_PLAYER_RECORDS + slot * AM2_PLAYER_RECORD_BYTES)
+    *(uint32_t *)(REC + 0x00) = 0;
+    *(uint32_t *)(REC + 0x04) = 0;
+    *(uint32_t *)(REC + 0x08) = 0;
+    *(uint32_t *)(REC + 0x0C) = 0;
+    *(uint32_t *)(REC + 0x10) = 0;
+    *(uint32_t *)(REC + PLAYER_REC_OFF_OWN_BIT) = 1u << slot;
+    *(uint32_t *)(REC + 0x1C) = 0;
+    *(uint32_t *)(REC + 0x20) = 0;
+    *(uint32_t *)(REC + 0x28) = 0;
+    *(uint32_t *)(REC + 0x30) = 0;
+    *(uint32_t *)(REC + 0x34) = 0;
+    *(uint32_t *)(REC + 0x8C) = 0;
+    *(uint32_t *)(REC + 0x38) = 0;
+    *(uint32_t *)(REC + 0x40) = 0;
+    *(uint32_t *)(REC + 0x44) = 0;
+    *(uint32_t *)(REC + 0x48) = 0;
+    *(uint32_t *)(REC + 0x4C) = 0;
+    *(uint32_t *)(REC + 0x5C) = 0;
 
-    for (i = 0; i < sizeof kZeroed / sizeof kZeroed[0]; i++)
-        *(uint32_t *)(rec + kZeroed[i]) = 0;
-
-    *(uint32_t *)(rec + PLAYER_REC_OFF_OWN_BIT) = 1u << slot;
-
-    MsgListInit(rec + PLAYER_REC_OFF_MSGS);
+    MsgListInit(REC + PLAYER_REC_OFF_MSGS);
+#undef REC
 }
 /* 0x0040FB80, one caller -- ShowMpResult. EIGHT bytes: it forwards to
  * CommSendLobbyProperty with the property id 2 and returns.
@@ -2594,25 +2603,36 @@ void __attribute__((thiscall)) AM2_Comm::CommReopenSession()
  * The return is `(n ? ~0 : 0) & dst`, i.e. the destination or NULL, which is
  * the caller's way of asking "did you find it" without a second output.
  */
-void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst)
+/* The node carrying `key`, or null -- written out inline where it is used. */
+static inline const uint8_t *MsgListFindKey(const uint8_t *l, int32_t key)
 {
-    uint8_t       *l = (uint8_t *)list;
     const uint8_t *n;
-
-    WaitForSingleObject(*(HANDLE *)(l + MSGLIST_OFF_MUTEX), INFINITE);
+    const uint8_t *hit = 0;
 
     for (n = *(const uint8_t *const *)(l + MSGLIST_OFF_HEAD); n;
          n = *(const uint8_t *const *)(n + MSGNODE_OFF_NEXT))
-        if (*(const int32_t *)(n + MSGNODE_OFF_KEY) == key)
+        if (*(const int32_t *)(n + MSGNODE_OFF_KEY) == key) {
+            hit = n;
             break;
+        }
+    return hit;
+}
 
-    if (n)
-        memcpy(dst, *(const void *const *)(n + MSGNODE_OFF_BODY),
-               *(const uint32_t *)(n + MSGNODE_OFF_BODY_LEN));
+void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst)
+{
+    uint8_t       *l = (uint8_t *)list;
+    const uint8_t *found;
+
+    WaitForSingleObject(*(HANDLE *)(l + MSGLIST_OFF_MUTEX), INFINITE);
+
+    found = MsgListFindKey(l, key);
+    if (found)
+        memcpy(dst, *(const void *const *)(found + MSGNODE_OFF_BODY),
+               *(const uint32_t *)(found + MSGNODE_OFF_BODY_LEN));
 
     ReleaseMutex(*(HANDLE *)(l + MSGLIST_OFF_MUTEX));
 
-    return n ? dst : (void *)0;
+    return found ? dst : (void *)0;
 }
 
 /* MsgListInsert -- original 0x00401150, one caller.
