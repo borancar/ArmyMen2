@@ -13341,19 +13341,15 @@ AM2_SelectPlayerScreen::AM2_SelectPlayerScreen(const char *bmp)
     AM2_Widget *panel;
     AM2_Widget *list;
     AM2_Widget *bar;
-    void       *rows;
-    char        pattern[264];
-    uint8_t     found[0x11C];
+    char        pattern[256];
+    uint8_t     found[0x118];     /* a _finddata_t */
     int32_t     handle;
     AM2_CTOR_VTABLE(w, VTABLE_SELECT_PLAYER);
     ReadCampaignLevels();
     SetGameDir("save");
     g_currentPlayer[0] = '\0';
 
-    rows = orig_operator_new(AM2_ROWS_SIZE);
-    if (rows)
-        rows = RecordCtor(rows, 1);
-    *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = rows;
+    *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = new AM2_Rec(1);
 
     strcpy(pattern, "*");
     handle = orig_findfirst(pattern, found);
@@ -13618,24 +13614,19 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
 {
     AM2_Widget *w = this;
 
-    AM2_Widget *parent = w;
+    AM2_Widget *parent;
     AM2_Widget *list;
     AM2_Widget *bar;
-    void       *rows;
-    AM2_Rect    box;
-    char        path[264];
-    char        pattern[264];
-    uint8_t     found[0x11C];
+    char        path[256];
+    char        pattern[256];
+    uint8_t     found[0x118];     /* a _finddata_t */
     int32_t     handle;
     int32_t     dx = 0x7D;
     int32_t     dy = 0x62;
     AM2_CTOR_VTABLE(w, VTABLE_LOAD_GAME);
     *((char *)w + LOAD_GAME_OFF_NAME) = '\0';
 
-    rows = orig_operator_new(AM2_ROWS_SIZE);
-    if (rows)
-        rows = RecordCtor(rows, 1);
-    *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = rows;
+    *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = new AM2_Rec(1);
 
     orig_sprintf(path, "save\\%s",
                  g_currentPlayer);
@@ -13653,13 +13644,11 @@ AM2_LoadGameScreen::AM2_LoadGameScreen(const char *bmp, int32_t flag)
 
     if (g_gameState == 2) {
         w->flag44 = 1;
+        parent = w;
     } else {
-        AM2_Widget *panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
+        AM2_Widget *panel = new AM2_Panel("02_007_00_loadgame.bmp", 0,
+                                          *RectSet(AM2_TEMP(AM2_Rect), 0x7D, 0x62, 0x186, 0x11C));
 
-        if (panel) {
-            RectSet(&box, 0x7D, 0x62, 0x186, 0x11C);
-            panel = ::PanelConstruct(panel, "02_007_00_loadgame.bmp", 0, box);
-        }
         ::WidgetAddChild(w, panel);
         w->focusedChild = panel;
         panel->flag44 = 1;
