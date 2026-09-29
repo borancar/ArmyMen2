@@ -73,14 +73,12 @@ void *__cdecl LookupByUID(uint32_t uid)
     /* The original passes the address of its own `uid` argument slot as the
      * out-param, reusing one stack dword for both -- safe because FindSlot
      * reads the key into a register before it ever writes through the pointer.
-     * The same trick appears in CheckSaveTag. Kept separate here; the
-     * observable behaviour is identical. */
-    slot = 0;
+     * The same trick appears in CheckSaveTag. Left uninitialised, VC6 puts
+     * it in that slot too. */
     i = FindSlot(uid, &slot);
-    if (i < 0)
-        return 0;
-
-    return g_objTable[i].obj;
+    if (i >= 0)
+        return g_objTable[i].obj;
+    return 0;
 }
 
 /* The records must stay exactly 12 bytes or every index computation above is

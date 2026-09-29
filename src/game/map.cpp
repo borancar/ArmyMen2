@@ -8,6 +8,11 @@
 #include "misc.h"      /* CompareDword, TitleCaseName -- reconstructed */
 #include "definfo.h"   /* DefParseInfoFile -- reconstructed */
 #include "crt.h"       /* am2_log, am2_free */
+/* Under VC6, map.cpp defines TileOfPoint with the sixteen-bit result the
+ * image's `xor ax, ax` shows, while every other file declares it `int` --
+ * the original's own mismatch, harmless under C linkage. GCC keeps one
+ * int32_t declaration: a 16-bit return read as 32 would be undefined. */
+#define AM2_MAP_DEFINES_TILEOFPOINT
 #include "map.h"
 #define kMapSep (" \t\n;,")
 #include "rect.h"      /* AM2_Rect, RectSet, MakePoint */
@@ -89,19 +94,23 @@ uint32_t __cdecl Checksum(const char *path)
     return sum;
 }
 
+#if defined(_MSC_VER)
+extern "C" uint16_t __cdecl TileOfPoint(uint32_t packed)
+#else
 int32_t __cdecl TileOfPoint(uint32_t packed)
+#endif
 {
-    int32_t x = (int16_t)(packed & 0xFFFFu);
-    int32_t y = (int16_t)(packed >> 16);
-
-    if (x < 0 || y < 0)
+    /* The point's halves read as words out of the argument slot. */
+#define PT (*(const AM2_Point *)&packed)
+    if (PT.x < 0 || PT.y < 0)
         return 0;
-    if (x >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X)
+    if (PT.x >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X)
         return 0;
-    if (y >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)
+    if (PT.y >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)
         return 0;
-    return (y >> AM2_TILE_SHIFT) * *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
-           + (x >> AM2_TILE_SHIFT);
+    return (PT.y >> AM2_TILE_SHIFT) * *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+           + (PT.x >> AM2_TILE_SHIFT);
+#undef PT
 }
 
 uint32_t __cdecl PointOfTile(int32_t tile)

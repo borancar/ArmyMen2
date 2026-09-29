@@ -42,7 +42,9 @@ int32_t __cdecl LoadMapSection(am2_FILE *fp);
  * Both coordinates are tested SIGNED as int16 and then again against the map's
  * pixel extents, and the failure path clears only AX, so the result is
  * sixteen bits; every caller stores it as one. */
+#if !(defined(_MSC_VER) && defined(AM2_MAP_DEFINES_TILEOFPOINT))
 int32_t __cdecl TileOfPoint(uint32_t packed);
+#endif
 
 /* 0x0043ED40. How many records ADDR_LEVEL_TABLE holds. */
 int32_t __cdecl LevelCount(void);

@@ -725,26 +725,24 @@ void __cdecl EvtClearAllied(int32_t a, int32_t b)
  * left alone. */
 void __cdecl ScriptSetObjBitmap(int32_t nameidx, int32_t frame)
 {
-    const AM2_ScriptName *e = am2_script_name(nameidx);
     void                 *obj;
 
-    if (e->type != AM2_NAME_TYPE_REF) {
+    if (kScriptNames[nameidx].type != AM2_NAME_TYPE_REF) {
         orig_log("ERROR: ScriptSetObjBitmap was called with %s which is not "
-                 "an item\n", e->name);
+                 "an item\n", kScriptNames[nameidx].name);
         return;
     }
 
-    obj = LookupByUID((uint32_t)e->value);
+    obj = LookupByUID((uint32_t)kScriptNames[nameidx].value);
 
-    if (!ObjIsItem((const AM2_Object *)obj)) {
+    if (ObjIsItem((const AM2_Object *)obj)) {
+        if (!ChangeObjectFrame(obj, frame, 1))
+            orig_log("Error: ChangeObjectFrame returned false when passed %s "
+                     "with index %d\n", kScriptNames[nameidx].name, frame);
+    } else {
         orig_log("ERROR: ScriptSetObjBitmap was called with %s which is not "
-                 "a valid object\n", e->name);
-        return;
+                 "a valid object\n", kScriptNames[nameidx].name);
     }
-
-    if (!ChangeObjectFrame(obj, frame, 1))
-        orig_log("Error: ChangeObjectFrame returned false when passed %s "
-                 "with index %d\n", e->name, frame);
 }
 
 /* ------------------------------------------------ event messages ---- */
@@ -1405,9 +1403,8 @@ void __cdecl EvtObjAction(uint32_t uid)
  * not a uid as orig.h's group comment says. */
 uint32_t __cdecl ResolveUid(int32_t name, uint32_t me)
 {
-    const AM2_ScriptName *e;
-
-    if (name < 0 || name >= am2_script_name_count())
+    /* The name table's globals, read directly. */
+    if (name < 0 || name >= kScriptNameCount)
         return 0;
 
     if (name == *(const int32_t *)((void *)(uintptr_t)(ADDR_SVAR_ME))) {
@@ -1418,12 +1415,10 @@ uint32_t __cdecl ResolveUid(int32_t name, uint32_t me)
         return 0;
     }
 
-    e = am2_script_name(name);
-
-    if (e->type != AM2_NAME_TYPE_REF)
+    if (kScriptNames[name].type != AM2_NAME_TYPE_REF)
         return 0;
 
-    return (uint32_t)e->value;
+    return (uint32_t)kScriptNames[name].value;
 }
 
 /* ------------------------------------------- condition actions ---- */
@@ -1513,8 +1508,7 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg)
         scr = &kObjScripts[id - 1];
 
         for (int32_t i = 0; i < c->nactions; i++) {
-            const AM2_ScriptName *e =
-                am2_script_name(c->actions[i].extra);
+            const AM2_ScriptName *e = &kScriptNames[c->actions[i].extra];
 
             if (e->type != AM2_NAME_TYPE_REF)
                 continue;
@@ -2238,32 +2232,30 @@ void __cdecl EvtShowBitmapNoPause(const char *name)
 void __cdecl ScriptSetObjTable(uint32_t uid, int32_t index)
 {
     uint8_t *obj = (uint8_t *)LookupByUID(uid);
-    uint8_t *sub;
-    void    *rec;
 
     if (obj == (uint8_t *)0)
         return;
 
-    rec = (uint8_t *)((void *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
-        + (uint32_t)index * AM2_OBJ_TABLE_REC_SIZE;
-    sub = obj + OBJ_OFF_SUBRECORD;
-
+#define REC ((uint8_t *)((void *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS)) \
+             + (uint32_t)index * AM2_OBJ_TABLE_REC_SIZE)
+#define SUB (obj + OBJ_OFF_SUBRECORD)
     switch (*(const int32_t *)obj) {
-    case 2:
-        *(void **)(sub + SUBREC_OFF_TABLE_KIND2) = rec;
-        SetFieldInAll(sub, rec);
-        return;
-
-    case 3:
-        *(void **)(sub + SUBREC_OFF_TABLE_KIND3) = rec;
-        SetFieldInAll(sub, rec);
-        return;
-
     default:
         orig_log("Warning: check if this script command works with this "
                  "object type!\n");
         return;
+    case 3:
+        *(void **)(SUB + SUBREC_OFF_TABLE_KIND3) = REC;
+        SetFieldInAll(SUB, REC);
+        return;
+    case 2:
+        *(void **)(SUB + SUBREC_OFF_TABLE_KIND2) = REC;
+        SetFieldInAll(SUB, REC);
+        return;
+
     }
+#undef REC
+#undef SUB
 }
 
 /* ------------------------------------------------ cond tests ---- */
