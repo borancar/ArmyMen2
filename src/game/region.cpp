@@ -558,11 +558,11 @@ typedef void (__cdecl *AM2_SolvePairFn)(int32_t from, int32_t to);
 int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
 {
     const uint8_t *next;
-    int32_t        stride;
+    int16_t        stride;
     int32_t        hops;
     int32_t        at;
 
-    if (from == to)
+    if (to == from)
         return 0;
 
     stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
@@ -575,7 +575,7 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
        inverted version re-solved every solved pair and skipped every unsolved
        one; see ActivateRegion for why nothing here caught it. */
     if ((*(const uint8_t *const *)((void *)(uintptr_t)(ADDR_REGION_COST)))
-            [from * stride + to]
+            [stride * from + to]
         == *(const uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP))) {
         /* already solved */
     } else if (!solve) {
@@ -585,18 +585,17 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
         stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
     }
 
-    next = *(const uint8_t *const *)((void *)(uintptr_t)(ADDR_REGION_NEXT));
     at   = from;
+    next = *(const uint8_t *const *)((void *)(uintptr_t)(ADDR_REGION_NEXT));
     hops = 0;
 
-    for (;;) {
+    do {
         hops++;
         if (at == 0)
             return -1;
-        at = next[at * stride + to];
-        if (at == to)
-            return hops;
-    }
+        at = next[stride * at + to];
+    } while (at != to);
+    return hops;
 }
 
 /* 0x004066B0, two callers. Whether two objects are in the same region or in

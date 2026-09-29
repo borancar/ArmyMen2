@@ -6825,7 +6825,7 @@ void __cdecl UseInventoryItem(void *unit, int32_t slot)
      * test read 0x418 bytes past the slot and CommMustBroadcast got the wrong
      * `this` -- invisible while the slot sat in the carried blob at its VA,
      * flagged by -Warray-bounds once the slot became a sized struct. */
-    uint8_t *comm = *(uint8_t **)((void *)(uintptr_t)(ADDR_COMM_OBJECT));
+#define comm (*(uint8_t **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)))
     uint8_t *item;
     int32_t  ammo;
 
@@ -6851,9 +6851,8 @@ void __cdecl UseInventoryItem(void *unit, int32_t slot)
     if (ammo <= 0)
         return;
 
-    ammo--;
-    *(int32_t *)(item + ITEM_OFF_AMMO) = ammo;
-    if (ammo != 0)
+    /* The stored count is what is tested. */
+    if ((*(int32_t *)(item + ITEM_OFF_AMMO) = ammo - 1) != 0)
         return;
 
     RemoveInventoryItem(u, slot);
@@ -6869,6 +6868,7 @@ void __cdecl UseInventoryItem(void *unit, int32_t slot)
     }
 
     *(uint32_t *)(item + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
+#undef comm
 }
 
 /* TrooperDropItem -- original 0x00448D60, and it names itself in both of its
