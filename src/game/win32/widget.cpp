@@ -14499,8 +14499,8 @@ void __attribute__((thiscall)) AM2_Widget::WidgetPaint(RECT clip)
 
     AM2_Widget *child;
 
+    /* The sprite is read through the widget at each use. */
     if (w->sprite) {
-        AM2_Sprite *spr = w->sprite;
         int32_t     x;
         int32_t     y;
         RECT        visible;
@@ -14511,24 +14511,29 @@ void __attribute__((thiscall)) AM2_Widget::WidgetPaint(RECT clip)
         if (w->flag3C) {
             /* Each side is halved BEFORE the subtraction, which is not the
              * same as halving the difference when exactly one is odd. */
-            x = w->rect.left + ((w->w >> 1) - (spr->bounds.right >> 1));
-            y = w->rect.top  + ((w->h >> 1) - (spr->bounds.bottom >> 1));
+            x = ((w->w >> 1) - (w->sprite->bounds.right >> 1)) + w->rect.left;
+            y = ((w->h >> 1) - (w->sprite->bounds.bottom >> 1)) + w->rect.top;
         } else {
             x = w->rect.left;
             y = w->rect.top;
         }
 
-        /* RECT and AM2_Rect are the same four int32_t; the casts are the price
+        /* A sprite clipped away RETURNS, and its children are not painted:
+         * every failed test here jumps to the epilogue, past the child loop.
+         * RECT and AM2_Rect are the same four int32_t; the casts are the price
          * of the flat half not being allowed to name RECT. */
-        if (IntersectRect(&visible, &w->rect, &clip)
-            && IntersectRect(&visible, (const RECT *)&g_screenClip, &visible)
-            && ClipRect(&spr->bounds, (const AM2_Rect *)&visible, &x, &y,
-                        &part))
-            DrawSpriteClipped(spr, x, y, &part, 0);
+        if (!IntersectRect(&visible, &w->rect, &clip))
+            return;
+        if (!IntersectRect(&visible, (const RECT *)&g_screenClip, &visible))
+            return;
+        if (!ClipRect(&w->sprite->bounds, (const AM2_Rect *)&visible, &x, &y,
+                      &part))
+            return;
+        DrawSpriteClipped(w->sprite, x, y, &part, 0);
     }
 
-    /* Children are painted whether or not the sprite was, and against the
-     * CALLER's clip rather than the intersection worked out above. */
+    /* Children are painted when there is no sprite or it drew, and against
+     * the CALLER's clip rather than the intersection worked out above. */
     for (child = w->firstChild; child; child = child->nextSibling)
         WidgetVPaint(child, clip);
 }
