@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1181 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1184 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1181:
+  the near-miss sweep, 758 before the row pools. From 758 to 1184:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -146,7 +146,11 @@ main result so far (details in `src/vc6/README.md`):
     mechanically (kept only where the hunk count fell); the object-script
     save/load re-read every level of `kObjScripts[i].states[j].frames[k]`,
     and the save writes a struct copy of each action with its length in
-    `text`.
+    `text`. Tables of offsets and loops the image writes out: the radar
+    blips are pixel stores through a per-row pointer (the pitch read again
+    per row, arms laid out 2, 1, 0), FreeMapLayers frees each layer by name,
+    UpdateMouseState handles its three buttons one by one, and the menu
+    cursor's animation tick is inlined into DrawMenuCursor.
   - **Signed loop tests mean an index**: a `jl` against a strength-reduced
     cursor is an `int32_t i` loop (OptionsApply, AimMarkerAge), a pointer
     walk gives `jb`. The cursor's bias is the field the body reads first.

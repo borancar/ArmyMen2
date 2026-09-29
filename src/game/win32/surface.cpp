@@ -1343,11 +1343,14 @@ typedef uint32_t (__cdecl *am2_ticks_fn)(void);
 #define sfld32(s, off) (*(const int32_t *)((const uint8_t *)(s) + (off)))
 #define swr32(s, off)  (*(int32_t *)((uint8_t *)(s) + (off)))
 
-/* Advance the ten-frame cycle if its 200 ms have elapsed. */
-static void TickMenuAnimation(int32_t row)
+/* Advance the ten-frame cycle if its 200 ms have elapsed. Inlined into
+ * DrawMenuCursor in the image, reading the row itself; the sprite store is
+ * guarded by a second `frame >= 0` test the image keeps. */
+static inline void TickMenuAnimation(void)
 {
     uint32_t now;
     int32_t  f;
+    int32_t  row;
 
     if (g_animFrame < 0)
         return;
@@ -1355,7 +1358,8 @@ static void TickMenuAnimation(int32_t row)
     if (now <= g_animNext)
         return;
 
-    f = g_animFrame + 1;
+    f   = g_animFrame + 1;
+    row = g_menuRow;
     g_animFrame = f;
     if (f >= MENU_ANIM_FRAMES) {
         g_animFrame = 0;
@@ -1372,8 +1376,9 @@ static void TickMenuAnimation(int32_t row)
         f = 0;
         g_animFrame = 0;
     }
-    g_cursorSprite = g_menuSprites2[row * MENU_ANIM_FRAMES + f];
-    g_animNext     = now + MENU_ANIM_PERIOD;
+    if (f >= 0)
+        g_cursorSprite = g_menuSprites2[row * MENU_ANIM_FRAMES + f];
+    g_animNext = now + MENU_ANIM_PERIOD;
 }
 
 /* Draw one overlay at the cursor, offset by the cursor sprite's own overlay
@@ -1400,13 +1405,12 @@ void __cdecl DrawMenuCursor(void)
     if (!g_menuEnabled)
         return;
 
+    TickMenuAnimation();
     row = g_menuRow;
-    TickMenuAnimation(row);
 
     if (g_paintObj && !g_presenting) {
         LPDIRECTDRAWSURFACE target = g_drawTarget;
-        AM2_Rect            cur, clipped, shifted;
-        uint8_t            *spr;
+        AM2_Rect            cur, clipped;   /* `clipped` doubles as the shifted rect */
 
         SetDrawTarget(g_backBuffer);
 
@@ -1432,11 +1436,11 @@ void __cdecl DrawMenuCursor(void)
             ObjVPaint(g_paintObj, *(AM2_Rect *)(g_paintObj + 0x14));
         }
 
-        spr = g_cursorSprite;
-        cur.left   = g_curX - sfld16(spr, SPR_OFF_HOTX);
-        cur.top    = g_curY - sfld16(spr, SPR_OFF_HOTY);
-        cur.right  = cur.left + sfld32(spr, SPR_OFF_W);
-        cur.bottom = cur.top  + sfld32(spr, SPR_OFF_H);
+        /* The sprite pointer is read again for each field. */
+        cur.left   = g_curX - sfld16(g_cursorSprite, SPR_OFF_HOTX);
+        cur.top    = g_curY - sfld16(g_cursorSprite, SPR_OFF_HOTY);
+        cur.right  = cur.left + sfld32(g_cursorSprite, SPR_OFF_W);
+        cur.bottom = cur.top  + sfld32(g_cursorSprite, SPR_OFF_H);
 
         /* Save what is about to be covered -- the original's call (0x00413172):
          * the clipped cursor rect stretched UP into the whole 32x32 slot, the
@@ -1456,16 +1460,16 @@ void __cdecl DrawMenuCursor(void)
          * stale. */
         if (IntersectRect((LPRECT)&cur, (const RECT *)g_cursorRect,
                           g_clipRect)) {
-            shifted = cur;
+            clipped = cur;
             if (g_drawTarget == g_primarySurface) {
                 /* The primary is the whole desktop when windowed, so only the
                  * DESTINATION moves; the back buffer it reads from does not. */
-                shifted.left   += g_screenRect.left;
-                shifted.right  += g_screenRect.left;
-                shifted.top    += g_screenRect.top;
-                shifted.bottom += g_screenRect.top;
+                clipped.left   += g_screenRect.left;
+                clipped.right  += g_screenRect.left;
+                clipped.top    += g_screenRect.top;
+                clipped.bottom += g_screenRect.top;
             }
-            IDirectDrawSurface_Blt(g_drawTarget, (LPRECT)&shifted, g_backBuffer,
+            IDirectDrawSurface_Blt(g_drawTarget, (LPRECT)&clipped, g_backBuffer,
                                    (LPRECT)&cur, DDBLT_WAIT, NULL);
         }
     } else {

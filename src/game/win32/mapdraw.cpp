@@ -1661,41 +1661,10 @@ int32_t __cdecl RadarBlipColour(const void *objv, int32_t *blink)
     return colour;
 }
 
-/* The two shapes the pulse below is built from, as offsets around its centre.
- * The centre itself is written directly, since it is a single point and two of
- * the three phases treat it differently. */
-static const int8_t kBlipPlus[4][2] = {
-    { 0, -1}, {-1,  0}, { 1,  0}, { 0,  1}
-};
-static const int8_t kBlipRing[8][2] = {
-    { 0, -2}, {-1, -1}, { 1, -1}, {-2,  0},
-    { 2,  0}, {-1,  1}, { 1,  1}, { 0,  2}
-};
-
-/* The square variant's two shapes: a 5x5 outline and the 3x3 ring inside it,
- * the latter without its centre -- which two of the three phases write
- * separately and the third leaves dark. */
-static const int8_t kBlipSquare[16][2] = {
-    {-2, -2}, {-1, -2}, { 0, -2}, { 1, -2}, { 2, -2},
-    {-2, -1},                               { 2, -1},
-    {-2,  0},                               { 2,  0},
-    {-2,  1},                               { 2,  1},
-    {-2,  2}, {-1,  2}, { 0,  2}, { 1,  2}, { 2,  2}
-};
-static const int8_t kBlipInner[8][2] = {
-    {-1, -1}, { 0, -1}, { 1, -1},
-    {-1,  0},           { 1,  0},
-    {-1,  1}, { 0,  1}, { 1,  1}
-};
-
-static void BlipPoints(uint8_t *centre, int32_t pitch, const int8_t (*pts)[2],
-                       int32_t n, uint8_t colour)
-{
-    int32_t i;
-
-    for (i = 0; i < n; i++)
-        centre[pitch * pts[i][1] + pts[i][0]] = colour;
-}
+/* The two blip shapes below are written out pixel by pixel, as the image
+ * has them -- a diamond ring and a plus for the pulse, a 5x5 outline and the
+ * 3x3 ring inside it for the square -- each row through a pointer built from
+ * the pitch as it stands when that row is reached. */
 
 /* 0x0041CA50, one caller -- the radar's paint, for an object with flag 0x10
  * that is not blinking. A THREE-FRAME PULSE built from two colours:
@@ -1743,7 +1712,7 @@ void __cdecl DrawBlipPulse(int32_t x, int32_t y, int32_t colourA,
                                   int32_t colourB, int32_t phase)
 {
     uint8_t *p;
-    int32_t  pitch;
+    uint8_t *q;
 
     if (x - 2 < 0 || y - 2 < 0)
         return;
@@ -1755,25 +1724,40 @@ void __cdecl DrawBlipPulse(int32_t x, int32_t y, int32_t colourA,
     if (!LockSurface(g_drawTarget))
         return;
 
-    pitch = (int32_t)g_pitch;
-    p     = g_framebuffer + pitch * y + x;
+    /* Every pixel written out through a row pointer, the pitch read again
+     * for each row; the arms are laid out 2, 1, 0. */
+#define ROW(dy) (q = p + (dy) * (int32_t)g_pitch)
+#define RING(c)                                                           \
+    ROW(-2); q[0] = (c);                                                  \
+    ROW(-1); q[-1] = (c); q[1] = (c);                                     \
+    p[-2] = (c); p[2] = (c);                                              \
+    ROW(1);  q[-1] = (c); q[1] = (c);                                     \
+    ROW(2);  q[0] = (c);
+#define PLUS(c)                                                           \
+    ROW(-1); q[0] = (c);                                                  \
+    p[-1] = (c); p[1] = (c);                                              \
+    ROW(1);  q[0] = (c);
+    p = g_framebuffer + (int32_t)g_pitch * y + x;
 
     switch (phase) {
-    case 0:
-        *p = (uint8_t)colourA;
-        BlipPoints(p, pitch, kBlipRing, 8, (uint8_t)colourB);
+    case 2:
+        RING((uint8_t)colourA)
+        PLUS((uint8_t)colourB)
         break;
     case 1:
-        BlipPoints(p, pitch, kBlipPlus, 4, (uint8_t)colourA);
+        PLUS((uint8_t)colourA)
         *p = (uint8_t)colourB;
         break;
-    case 2:
-        BlipPoints(p, pitch, kBlipRing, 8, (uint8_t)colourA);
-        BlipPoints(p, pitch, kBlipPlus, 4, (uint8_t)colourB);
+    case 0:
+        *p = (uint8_t)colourA;
+        RING((uint8_t)colourB)
         break;
     default:
         break;
     }
+#undef ROW
+#undef RING
+#undef PLUS
 }
 
 /* 0x0041C8A0, one caller -- the same radar path as DrawBlipPulse, one branch
@@ -1800,7 +1784,7 @@ void __cdecl DrawBlipSquare(int32_t x, int32_t y, int32_t colourA,
                                    int32_t colourB, int32_t phase)
 {
     uint8_t *p;
-    int32_t  pitch;
+    uint8_t *q;
 
     if (x - 2 < 0 || y - 2 < 0)
         return;
@@ -1812,25 +1796,40 @@ void __cdecl DrawBlipSquare(int32_t x, int32_t y, int32_t colourA,
     if (!LockSurface(g_drawTarget))
         return;
 
-    pitch = (int32_t)g_pitch;
-    p     = g_framebuffer + pitch * y + x;
+    /* Every pixel written out, the pitch read again for each row; the arms
+     * are laid out 2, 1, 0. */
+#define ROW(dy) (q = p + (dy) * (int32_t)g_pitch)
+#define SQUARE(c)                                                         \
+    ROW(-2); q[-2] = (c); q[-1] = (c); q[0] = (c); q[1] = (c); q[2] = (c); \
+    ROW(-1); q[-2] = (c); q[2] = (c);                                     \
+    p[-2] = (c); p[2] = (c);                                              \
+    ROW(1);  q[-2] = (c); q[2] = (c);                                     \
+    ROW(2);  q[-2] = (c); q[-1] = (c); q[0] = (c); q[1] = (c); q[2] = (c);
+#define INNER(c)                                                          \
+    ROW(-1); q[-1] = (c); q[0] = (c); q[1] = (c);                         \
+    p[-1] = (c); p[1] = (c);                                              \
+    ROW(1);  q[-1] = (c); q[0] = (c); q[1] = (c);
+    p = g_framebuffer + (int32_t)g_pitch * y + x;
 
     switch (phase) {
-    case 0:
-        *p = (uint8_t)colourA;
-        BlipPoints(p, pitch, kBlipSquare, 16, (uint8_t)colourB);
+    case 2:
+        SQUARE((uint8_t)colourA)
+        INNER((uint8_t)colourB)
         break;
     case 1:
-        BlipPoints(p, pitch, kBlipInner, 8, (uint8_t)colourA);
+        INNER((uint8_t)colourA)
         *p = (uint8_t)colourB;
         break;
-    case 2:
-        BlipPoints(p, pitch, kBlipSquare, 16, (uint8_t)colourA);
-        BlipPoints(p, pitch, kBlipInner, 8, (uint8_t)colourB);
+    case 0:
+        *p = (uint8_t)colourA;
+        SQUARE((uint8_t)colourB)
         break;
     default:
         break;
     }
+#undef ROW
+#undef SQUARE
+#undef INNER
 }
 
 #define g_viewTarget  (*(AM2_Point *)(uintptr_t)ADDR_VIEW_TARGET)

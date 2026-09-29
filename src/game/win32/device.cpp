@@ -465,16 +465,22 @@ void __cdecl UpdateMouseState(void)
     ((int16_t *)&g_cursorPoint)[1] = (int16_t)g_cursorY;
     ((int16_t *)&g_cursorPoint)[0] = (int16_t)g_cursorX;
 
-    int32_t point = g_cursorPoint;
-
-    for (int32_t n = 0; n < 3; n++) {
-        if (!g_mouseButton[n] || !g_mouseChanged[n])
-            continue;
-
-        g_mousePress[n].point = point;
-        g_mousePress[n].tick  = tick;
-        if (n == 0)
+    /* The three buttons are written out, not looped -- VC6 does not unroll
+     * -- and the left one tests its change flag a second time before it
+     * clears the grab. */
+    if (g_mouseButton[0] && g_mouseChanged[0]) {
+        g_mousePress[0].point = g_cursorPoint;
+        g_mousePress[0].tick  = tick;
+        if (g_mouseChanged[0])
             *(int32_t *)(uintptr_t)ADDR_MOUSE_GRAB = 0;
+    }
+    if (g_mouseButton[1] && g_mouseChanged[1]) {
+        g_mousePress[1].point = g_cursorPoint;
+        g_mousePress[1].tick  = tick;
+    }
+    if (g_mouseButton[2] && g_mouseChanged[2]) {
+        g_mousePress[2].point = g_cursorPoint;
+        g_mousePress[2].tick  = tick;
     }
 
     if (g_mouseChanged[0] || g_mouseChanged[1])

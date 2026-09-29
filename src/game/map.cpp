@@ -1355,12 +1355,7 @@ void __cdecl FreeAaiTables(void);
  * original's, so TILE_COVER stays last. */
 void __cdecl FreeMapLayers(void)
 {
-    static const uint32_t kLayers[] = {
-        ADDR_REGION_NEXT, ADDR_REGION_COST, ADDR_MAP_TILES, ADDR_TILE_ATTRS,
-        ADDR_CELL_WEIGHTS, ADDR_MAP_PADBIT_LAYER, ADDR_MAP_PAD_LAYER,
-        ADDR_TILE_KIND, ADDR_REGION_OF_CELL, ADDR_TILE_FLAGS,
-    };
-    uint32_t i;
+    int32_t i;
 
     FreeMapSurfaces();
 
@@ -1379,21 +1374,29 @@ void __cdecl FreeMapLayers(void)
         *(void **)(uintptr_t)ADDR_REGIONS = 0;
     }
 
-    for (i = 0; i < sizeof kLayers / sizeof kLayers[0]; i++) {
-        void **p = (void **)(uintptr_t)kLayers[i];
-
-        if (*p) {
-            am2_free(*p);
-            *p = 0;
-        }
+    /* Each layer written out, as the image has them; only the reveal
+     * grids are a loop. */
+#define FREE_LAYER(a)                                   \
+    if (*(void **)(uintptr_t)(a)) {                     \
+        am2_free(*(void **)(uintptr_t)(a));             \
+        *(void **)(uintptr_t)(a) = 0;                   \
     }
+    FREE_LAYER(ADDR_REGION_NEXT)
+    FREE_LAYER(ADDR_REGION_COST)
+    FREE_LAYER(ADDR_MAP_TILES)
+    FREE_LAYER(ADDR_TILE_ATTRS)
+    FREE_LAYER(ADDR_CELL_WEIGHTS)
+    FREE_LAYER(ADDR_MAP_PADBIT_LAYER)
+    FREE_LAYER(ADDR_MAP_PAD_LAYER)
+    FREE_LAYER(ADDR_TILE_KIND)
+    FREE_LAYER(ADDR_REGION_OF_CELL)
+    FREE_LAYER(ADDR_TILE_FLAGS)
+#undef FREE_LAYER
 
     for (i = 0; i < AM2_REVEAL_ARMIES; i++) {
-        void **g = (void **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS + i;
-
-        if (*g) {
-            am2_free(*g);
-            *g = 0;
+        if (((void **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[i]) {
+            am2_free(((void **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[i]);
+            ((void **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[i] = 0;
         }
     }
 
