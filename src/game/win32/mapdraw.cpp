@@ -631,48 +631,6 @@ typedef struct AM2_DepthNode {
 #define g_depthCursor (*(AM2_DepthNode **)(uintptr_t)ADDR_DEPTH_CURSOR)
 
 
-/* Link a fresh node in after `at`, before `at`, or at the front, and leave the
- * cursor on it. Three shapes the original writes out four times between them;
- * the only one that needs care is `after`, which the original does NOT guard
- * against a null successor because it is only reached when there is one. */
-static inline AM2_DepthNode *DepthLinkAfter(AM2_DepthNode *at, int32_t n)
-{
-    AM2_DepthNode *fresh = &g_depthNodes[n];
-
-    g_depthCursor = fresh;
-    fresh->prev   = at;
-    fresh->next   = at->next;
-    at->next      = fresh;
-    fresh->next->prev = fresh;
-    return fresh;
-}
-
-static inline AM2_DepthNode *DepthAppend(AM2_DepthNode *at, int32_t n)
-{
-    AM2_DepthNode *fresh = &g_depthNodes[n];
-
-    g_depthCursor = fresh;
-    at->next      = fresh;
-    fresh->prev   = at;
-    fresh->next   = (AM2_DepthNode *)0;
-    return fresh;
-}
-
-static inline void DepthLinkBefore(AM2_DepthNode *at, int32_t n)
-{
-    AM2_DepthNode *fresh = &g_depthNodes[n];
-
-    g_depthCursor = fresh;
-    fresh->prev   = at->prev;
-    fresh->next   = at;
-    at->prev      = fresh;
-
-    if (fresh->prev)
-        fresh->prev->next = fresh;
-    else
-        g_depthHead = n;
-}
-
 /* 0x0040A090 -- draw one map object, and the last piece of the object
  * subsystem.
  *
@@ -769,9 +727,9 @@ void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
 int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
 {
     RECT           hit;
-    int32_t        n;
     int32_t        cmp;
     AM2_DepthNode *at;
+    AM2_DepthNode *head;
 
     if (g_depthCount >= AM2_DEPTH_MAX)
         return 0;
@@ -780,10 +738,9 @@ int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
                        (const RECT *)world))
         return 1;
 
-    n = g_depthCount;
-    g_depthNodes[n].obj = obj;
+    g_depthNodes[g_depthCount].obj = obj;
 
-    if (n == 0) {
+    if (g_depthCount == 0) {
         g_depthHead            = 0;
         g_depthNodes[0].prev   = (AM2_DepthNode *)0;
         g_depthNodes[0].next   = (AM2_DepthNode *)0;
@@ -792,80 +749,111 @@ int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
         return 1;
     }
 
+    /* The four ways a fresh node goes in, each written through the cursor
+     * global and the count re-read, as the original has them -- VC6 shares
+     * each between its two callers. */
+#define FRESH (&g_depthNodes[g_depthCount])
+#define LINK_AFTER(at)                                                      \
+    do {                                                                    \
+        g_depthCursor = FRESH;                                              \
+        g_depthCursor->prev = (at);                                         \
+        g_depthCursor->next = (at)->next;                                   \
+        (at)->next = g_depthCursor;                                         \
+        g_depthCursor->next->prev = g_depthCursor;                          \
+    } while (0)
+#define APPEND(at)                                                          \
+    do {                                                                    \
+        g_depthCursor = FRESH;                                              \
+        (at)->next = g_depthCursor;                                         \
+        g_depthCursor->prev = (at);                                         \
+        g_depthCursor->next = (AM2_DepthNode *)0;                           \
+    } while (0)
+#define LINK_BEFORE(at)                                                     \
+    do {                                                                    \
+        g_depthCursor = FRESH;                                              \
+        g_depthCursor->prev = (at)->prev;                                   \
+        g_depthCursor->next = (at);                                         \
+        (at)->prev = g_depthCursor;                                         \
+        if (g_depthCursor->prev)                                            \
+            g_depthCursor->prev->next = g_depthCursor;                      \
+        else                                                                \
+            g_depthHead = g_depthCount;                                     \
+    } while (0)
+#define AT_FRONT(at)                                                        \
+    do {                                                                    \
+        g_depthCursor = FRESH;                                              \
+        (at)->prev = g_depthCursor;                                         \
+        g_depthCursor->prev = (AM2_DepthNode *)0;                           \
+        g_depthCursor->next = (at);                                         \
+        g_depthHead = g_depthCount++;                                       \
+        return 1;                                                           \
+    } while (0)
+
     if (*(const uint32_t *)obj & OBJ_DEPTH_FLAG_FRONT) {
         for (at = &g_depthNodes[g_depthHead]; at; at = at->next)
             if (*(const uint8_t *)at->obj & OBJ_DEPTH_FLAG_BACK) {
                 g_depthCursor = at;
                 if (at->next)
-                    DepthLinkAfter(at, n);
+                    LINK_AFTER(at);
                 else
-                    DepthAppend(at, n);
-                g_depthCount = n + 1;
-                return 1;
+                    APPEND(at);
+                goto done;
             }
     } else if (*(const uint32_t *)obj & OBJ_DEPTH_FLAG_BACK) {
-        AM2_DepthNode *head = &g_depthNodes[g_depthHead];
-
+        head = &g_depthNodes[g_depthHead];
         for (at = head; at; at = at->next)
             if (*(const uint8_t *)at->obj & OBJ_DEPTH_FLAG_FRONT) {
-                if (at == head) {
-                    /* At the front, and the head moves. */
-                    g_depthCursor = &g_depthNodes[n];
-                    at->prev      = g_depthCursor;
-                    g_depthCursor->prev = (AM2_DepthNode *)0;
-                    g_depthCursor->next = at;
-                    g_depthHead   = n;
-                    g_depthCount  = n + 1;
-                    return 1;
-                }
-                DepthLinkBefore(at, n);
-                g_depthCount = n + 1;
-                return 1;
+                if (at == head)
+                    AT_FRONT(at);   /* at the front, and the head moves */
+                LINK_BEFORE(at);
+                goto done;
             }
     }
 
-    at  = g_depthCursor;
-    cmp = DepthCompare(obj, at->obj);
+    cmp = DepthCompare(obj, g_depthCursor->obj);
 
     if (cmp == 0) {
-        DepthLinkAfter(at, n);
-        g_depthCount = n + 1;
-        return 1;
+        FRESH->prev = g_depthCursor;
+        FRESH->next = g_depthCursor->next;
+        g_depthCursor->next = FRESH;
+        g_depthCursor = FRESH;
+        if (g_depthCursor->next)
+            g_depthCursor->next->prev = g_depthCursor;
+        goto done;
     }
 
     if (cmp < 0) {
-        while (at->prev) {
-            g_depthCursor = at->prev;
+        while (g_depthCursor->prev) {
+            g_depthCursor = g_depthCursor->prev;
             if (DepthCompare(obj, g_depthCursor->obj) >= 0) {
-                DepthLinkAfter(g_depthCursor, n);
-                g_depthCount = n + 1;
-                return 1;
+                at = g_depthCursor;
+                LINK_AFTER(at);
+                goto done;
             }
-            at = g_depthCursor;
-        }
-        /* Off the front. */
-        g_depthCursor       = &g_depthNodes[n];
-        at->prev            = g_depthCursor;
-        g_depthCursor->prev = (AM2_DepthNode *)0;
-        g_depthCursor->next = at;
-        g_depthHead         = n;
-        g_depthCount        = n + 1;
-        return 1;
-    }
-
-    while (at->next) {
-        g_depthCursor = at->next;
-        if (DepthCompare(obj, g_depthCursor->obj) <= 0) {
-            DepthLinkBefore(g_depthCursor, n);
-            g_depthCount = n + 1;
-            return 1;
         }
         at = g_depthCursor;
+        AT_FRONT(at);               /* off the front */
     }
 
-    DepthAppend(at, n);
-    g_depthCount = n + 1;
+    while (g_depthCursor->next) {
+        g_depthCursor = g_depthCursor->next;
+        if (DepthCompare(obj, g_depthCursor->obj) <= 0) {
+            at = g_depthCursor;
+            LINK_BEFORE(at);
+            goto done;
+        }
+    }
+    at = g_depthCursor;
+    APPEND(at);
+
+done:
+    g_depthCount++;
     return 1;
+#undef AT_FRONT
+#undef LINK_BEFORE
+#undef APPEND
+#undef LINK_AFTER
+#undef FRESH
 }
 
 /* 0x0041E440 -- the map's OBJECT painter: collect, sort, draw, and split the

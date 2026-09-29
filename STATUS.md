@@ -161,7 +161,10 @@ main result so far (details in `src/vc6/README.md`):
     line (the constant had been read off its 0x10C frame); LoadOneItem's
     null test is per case and a saved object type outside 1..8 now reads
     through the NULL it produces, as the original does (it had returned
-    NULL). Found by comparing each function's image extent with ours --
+    NULL); DepthInsert's equal-depth insert guards a null successor before
+    linking it back, as the image does (the shared link-after helper it
+    had used did not, and a tail cursor would have written through NULL).
+    Found by comparing each function's image extent with ours --
     `src/vc6/extent.py`, a branch-reachability sweep -- since the relink json
     slices the image to OUR length and hides code we omitted.
   - **A "fix" undone**: a vehicle whose first occupant is not Sarge
