@@ -9282,27 +9282,31 @@ void __cdecl OpenWarMenu(void)
 AM2_DlgBattleJoinScreen::AM2_DlgBattleJoinScreen(const char *bmp)
     : AM2_ScreenBase(bmp, 1)
 {
-    AM2_Widget *w = this;
-
-    uint8_t    *self = (uint8_t *)w;
     AM2_Widget *panel;
     AM2_Widget *kid;
-    AM2_CTOR_VTABLE(w, VTABLE_BATTLE_JOIN);
+    AM2_CTOR_VTABLE(this, VTABLE_BATTLE_JOIN);
     SetGameDir((const char *)(uintptr_t)ADDR_DIR_SCRATCH);
-    strcpy((char *)(self + BATTLEJOIN_OFF_NAME),
+    strcpy((char *)((uint8_t *)this + BATTLEJOIN_OFF_NAME),
            (const char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME);
+    /* No row chosen yet. BattleJoinOk reads -1 as "take the first"; ours
+     * never set it, so a join with no row clicked used allocator garbage
+     * as the session index (0x0042F52C). */
+    *(int32_t *)((uint8_t *)this + BATTLEJOIN_OFF_CHOSEN) = -1;
 
     panel = new AM2_Panel("02_003_00_join.bmp", 0, *RectSet(AM2_TEMP(AM2_Rect), 0x6C, 0x54, 0x1A7, 0x138));
-    ::WidgetAddChild(w, panel);
-    w->focusedChild = panel;
+    ::WidgetAddChild(this, panel);
+    this->focusedChild = panel;
     panel->flag44 = 1;            /* faults on a failed alloc -- original's */
 
     kid = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x26, 0x42, 0xCE, 0x6E), *(void **)(uintptr_t)ADDR_SESSION_OBJECT, (int32_t)(uintptr_t)BattleJoinSelect, (int32_t)(uintptr_t)BattleJoinPoll, 0);
     ::WidgetAddChild(panel, kid);
     WidgetVFocus(kid, 0);
 
-    kid = new AM2_Edit((char *)(self + BATTLEJOIN_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0x26, 0xFF, 0xF3, 0x0E), 1, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR, *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR, (void (__cdecl *)(AM2_Widget *)) BattleJoinOk, 0, 0);
+    kid = new AM2_Edit((char *)((uint8_t *)this + BATTLEJOIN_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0x26, 0xFF, 0xF3, 0x0E), 1, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR, *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR, (void (__cdecl *)(AM2_Widget *)) BattleJoinOk, 0, 0);
     ::WidgetAddChild(panel, kid);
+    /* Letters and digits only, as ENTER NAME's field -- the original sets
+     * it (0x0042F6B5); ours left the permissive default. */
+    *(const char **)((uint8_t *)kid + EDIT_OFF_CHARSET) = g_editCharset;
 
     kid = new AM2_Button("03_007_00_ok.bmp", "03_007_01_ok.bmp", "03_007_02_ok.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x14C, 0x37, 0x4E, 0x20), (void (__cdecl *)(AM2_Widget *)) BattleJoinOk, (void (__cdecl *)(AM2_Widget *))0);
     ::WidgetAddChild(panel, kid);
