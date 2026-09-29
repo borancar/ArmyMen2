@@ -960,14 +960,13 @@ void __fastcall BlitOverlay(int32_t x, int32_t y, const AM2_Rle16 *data,
  * byte COUNT. The parameter is void * here so the call sites need no cast and
  * the width is stated once, in the store.
  *
- * THE RETURN VALUE IS NOT SIMPLY stride * rows, and this is the part that
- * would be easy to tidy into a bug. The original multiplies the destination
- * stride by whatever is in edx, and edx is reloaded from the raw `height`
- * ARGUMENT only inside the two copy loops -- which run only when the width is
- * positive. So a width of zero or less returns stride * the row COUNT, and any
- * other call returns stride * the SIGNED height. The two differ exactly when
- * the height is negative, which is the top-down case. Written as the two
- * cases it is.
+ * THE RETURN VALUE IS stride * the row COUNT in every case. The original
+ * multiplies the destination stride by edx, which the copy loops reload from
+ * the `height` ARGUMENT slot -- but the top-down case has already stored the
+ * NEGATED height back into that slot (`neg edx; mov [esp+0x24], edx`), so the
+ * reload reads the positive count too. This file used to return stride * the
+ * SIGNED height for a top-down image of positive width, from reading the
+ * reload without the store; the byte match settled it (2026-09-29).
  *
  * ITS COUNTER READS 0 AND THAT IS THE BLIND SPOT, not a cold path. All
  * four callers are ours -- three in win32/surface.cpp and one in
@@ -982,49 +981,41 @@ int32_t __cdecl BlitBitmapIn(void *dest, int32_t dstStride, const void *src,
                              int32_t w, int32_t h, const uint8_t *lut,
                              void *keyOut)
 {
-    int32_t        srcStride = (w + 3) & ~3;
-    int32_t        step;
+    int32_t        step = (w + 3) & ~3;
     int32_t        rows;
-    int32_t        scale;
     const uint8_t *s;
-    uint8_t       *d    = (uint8_t *)dest;
-    uint8_t       *dst0 = (uint8_t *)dest;
+    uint8_t       *d = (uint8_t *)dest;
 
+    /* Bottom-up walks back a stride at a time; top-down negates h, and it
+     * is that h the answer is scaled by. */
     if (h > 0) {
-        s    = (const uint8_t *)src + (h - 1) * srcStride;  /* bottom-up */
-        step = -srcStride;
-        rows = h;
+        s    = (const uint8_t *)src + (h - 1) * step;
+        step = -step;
     } else {
-        s    = (const uint8_t *)src;         /* top-down */
-        step = srcStride;
-        rows = -h;
+        s = (const uint8_t *)src;
+        h = -h;
     }
 
-    scale = rows;               /* what the original's edx holds on entry */
+    for (rows = h; rows > 0; rows--) {
+        int32_t i;
 
-    while (rows > 0) {
-        if (w > 0) {
-            int32_t i;
-
-            if (lut)
+        if (lut) {
+            if (w > 0)
                 for (i = 0; i < w; i++)
                     d[i] = lut[s[i]];
-            else
-                for (i = 0; i < w; i++)
-                    d[i] = s[i];
-
-            scale = h;          /* the reload, and only on this path */
+        } else if (w > 0) {
+            for (i = 0; i < w; i++)
+                d[i] = s[i];
         }
 
-        s   += step;
-        d   += dstStride;
-        rows--;
+        s += step;
+        d += dstStride;
     }
 
     if (*(void *const *)(uintptr_t)ADDR_ACTIVE_PALETTE)
-        *(uint8_t *)keyOut = dst0[0];
+        *(uint8_t *)keyOut = *(const uint8_t *)dest;
 
-    return dstStride * scale;
+    return dstStride * h;
 }
 
 int blit_install(void)
