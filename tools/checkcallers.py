@@ -66,7 +66,6 @@ ALLOWED = {
 KNOWN = {
     "MsgSlotB1",            # 0x00403350, caller 0x004014C0 (comm, unreachable here)
     "MsgSlotB2",            # 0x004033B0, caller 0x004014C0
-    "Call4057D0",           # 0x00405D10, caller 0x004062B0
 }
 
 

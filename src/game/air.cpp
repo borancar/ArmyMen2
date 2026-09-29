@@ -1149,17 +1149,18 @@ int32_t __cdecl ObjBlockWeight(void *from, void *obj, int32_t unused,
            > AM2_BLOCK_HEIGHT_STEP)
         return 0;
 
-    if (ObjIsItem((const AM2_Object *)obj))
+    if (ObjIsItem((const AM2_Object *)o))
         return *(const int8_t *)(o + OBJ_OFF_RANK);
 
     /* The distance test only for a 3 or an 8, and only with a mover; every
      * other way out is the full weight, from one shared tail. */
-    if (f && (ObjIsType3((const AM2_Object *)obj)
-              || ObjIsType8((const AM2_Object *)obj))) {
+    if (f && (ObjIsType3((const AM2_Object *)o)
+              || ObjIsType8((const AM2_Object *)o))) {
+        int32_t d = ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
+                               (const AM2_Point *)(o + OBJ_OFF_POS));
+
         if (ApproxDist((const AM2_Point *)&at,
-                       (const AM2_Point *)(o + OBJ_OFF_POS))
-            >= ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
-                          (const AM2_Point *)(o + OBJ_OFF_POS)))
+                       (const AM2_Point *)(o + OBJ_OFF_POS)) >= d)
             return 0;
     }
 

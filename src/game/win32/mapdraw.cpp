@@ -693,9 +693,9 @@ static inline void DepthLinkBefore(AM2_DepthNode *at, int32_t n)
 void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
 {
     uint8_t        *o      = (uint8_t *)obj;
-    const AM2_Rect *bounds = (const AM2_Rect *)(o + OBJ_OFF_BOUNDS);
-    AM2_Rect        src;
+#define bounds ((const AM2_Rect *)(o + OBJ_OFF_BOUNDS))
     RECT            clip;
+    AM2_Rect        src;
     AM2_Sprite     *spr;
     int32_t         x, y;
 
@@ -740,6 +740,7 @@ void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
 #endif
 
     DrawSpriteClipped(spr, x, y, &src, 0);
+#undef bounds
 }
 
 /* 0x0041E160 -- insert one object into the depth list, sorted.

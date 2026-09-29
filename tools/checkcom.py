@@ -107,12 +107,43 @@ def static_helpers(src):
                           src, re.M))
 
 
+def com_macros(src):
+    """{name: COM calls in its expansion} for each function-like #define.
+
+    RestoreLostSurfaces is four RESTORE_IF_LOST lines and ShutdownInput three
+    RELEASE_DEVICE ones; the calls are in the macro, so a direct count of the
+    body saw a quarter of them."""
+    out = {}
+    for m in re.finditer(r"^#define\s+(\w+)\(([^)]*)\)((?:[^\n]*\\\n)*[^\n]*)",
+                         src, re.M):
+        n = len(re.findall(r"\bIDirect\w+_\w+\s*\(", m.group(3)))
+        if n:
+            out[m.group(1)] = n
+    return out
+
+
+# Calls VC6 DUPLICATED: one call in the source, compiled into more than one
+# site, so the image's count is higher than any honest count of the body.
+# Only add one after the byte match proves the source shape.
+#
+# Update3DAudioVolumes' one IDirectSoundBuffer_SetVolume(BUF, vol) follows an
+# if/else that sets `vol`; VC6 copies the call into both arms. The two-call
+# source was 18 hunks from the image, the one-call source matches.
+DUPLICATED = {
+    "Update3DAudioVolumes": 1,
+}
+
+
 def com_calls_including_helpers(src, name, helpers, depth=0):
-    """COM calls in `name`, plus those in the static helpers it calls."""
+    """COM calls in `name`, plus those in the static helpers and COM macros
+    it calls, plus any call VC6 is known to have duplicated."""
     body = body_of(src, name)
     if body is None or depth > 3:
         return 0
     total = len(re.findall(r"\bIDirect\w+_\w+\s*\(", body))
+    total += DUPLICATED.get(name, 0)
+    for macro, per in com_macros(src).items():
+        total += per * len(re.findall(r"\b" + macro + r"\s*\(", body))
     for helper in helpers:
         n = len(re.findall(r"\b" + re.escape(helper) + r"\s*\(", body))
         if n and helper != name:

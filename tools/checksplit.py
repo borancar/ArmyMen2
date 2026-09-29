@@ -20,6 +20,12 @@ inject/win32.h, windows.h or ddraw.h has the types whether it names one or not.
 That is followed transitively through the project's own headers, since a header
 can be the thing that leaks.
 
+VC6-only blocks (`#if defined(_MSC_VER) && !defined(__GNUC__)` up to its
+`#else`/`#endif`) are dropped too. They exist for the relink alone -- armymsg.cpp
+names the GetTickCount import there because two calls through the IAT slot
+load it into a register once, which a read through our pointer cannot
+reproduce -- and no build of the port ever compiles them.
+
     tools/checksplit.py
 """
 
@@ -46,7 +52,32 @@ WIN32_HEADERS = ("inject/win32.h", "windows.h", "ddraw.h", "dsound.h",
 def strip_comments(text):
     text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
     text = re.sub(r"//[^\n]*", " ", text)
-    return text
+    return strip_vc6_only(text)
+
+
+def strip_vc6_only(text):
+    """Drop the VC6-only arm of `#if defined(_MSC_VER) && !defined(__GNUC__)`,
+    keeping any #else arm; nested conditionals are tracked by depth."""
+    out, depth, skipping = [], 0, False
+    for line in text.split("\n"):
+        d = line.strip()
+        if skipping:
+            if d.startswith("#if"):
+                depth += 1
+            elif d.startswith("#endif"):
+                if depth == 0:
+                    skipping = False
+                    continue
+                depth -= 1
+            elif depth == 0 and (d.startswith("#else") or d.startswith("#elif")):
+                skipping = False
+                continue
+            continue
+        if re.match(r"#\s*if\s+defined\(_MSC_VER\)\s*&&\s*!defined\(__GNUC__\)\s*$", d):
+            skipping, depth = True, 0
+            continue
+        out.append(line)
+    return "\n".join(out)
 
 
 def includes(path, seen=None):
