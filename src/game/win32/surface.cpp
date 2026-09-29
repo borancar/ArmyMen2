@@ -493,11 +493,12 @@ int32_t __cdecl ReloadBitmapSurface(LPDIRECTDRAWSURFACE surf, am2_FILE *fp,
 {
     DDSURFACEDESC ddsd;
     uint8_t      *pixels;
+    uint32_t      size = nbytes;  /* a copy: nbytes is passed by address below */
 
     /* The game's heap: the buffer is handed to the game's own fread and freed
      * by the game's own free on every path out of here. */
-    pixels = (uint8_t *)orig_malloc(nbytes);
-    if (orig_fread(pixels, nbytes, 1, fp) != 1) {
+    pixels = (uint8_t *)orig_malloc(size);
+    if (orig_fread(pixels, size, 1, fp) != 1) {
         orig_log("Error sprite from stream in ReloadBitmapSurface().\n");
         orig_free(pixels);
         return 0;
@@ -511,28 +512,26 @@ int32_t __cdecl ReloadBitmapSurface(LPDIRECTDRAWSURFACE surf, am2_FILE *fp,
         return 0;
     }
 
-    if (IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL) != DD_OK) {
-        IDirectDrawSurface_Release(surf);
-        orig_log("Error on Lock in ReloadBitmapSurface()");
-        orig_free(pixels);
-        return 1;
-    }
-
     /* `nbytes` goes in as the byte count and is read back afterwards as the
      * transparent index, so it has to be passed by address and re-read -- see
      * ADDR_BLIT_BITMAP_IN. Caching it across this call would silently key the
-     * surface on the wrong colour. */
-    if (!BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels,
-                             width, height, remap, &nbytes)) {
+     * surface on the wrong colour. The failures are laid out after the
+     * success path and share the log and the release, as the image has
+     * them. */
+    if (IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL) == DD_OK) {
+        if (BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels,
+                         width, height, remap, &nbytes)) {
+            IDirectDrawSurface_Unlock(surf, ddsd.lpSurface);
+            if (!(flags & 1))
+                SetSurfaceColorKey(surf, (uint8_t)nbytes);
+            goto release;
+        }
         IDirectDrawSurface_Release(surf);
-        orig_log("Error on Lock in ReloadBitmapSurface()");
-        orig_free(pixels);
-        return 1;
+    } else {
+        IDirectDrawSurface_Release(surf);
     }
-
-    IDirectDrawSurface_Unlock(surf, ddsd.lpSurface);
-    if (!(flags & 1))
-        SetSurfaceColorKey(surf, (uint8_t)nbytes);
+    orig_log("Error on Lock in ReloadBitmapSurface()");
+release:
     orig_free(pixels);
     return 1;
 }
