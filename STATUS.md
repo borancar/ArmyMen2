@@ -93,6 +93,10 @@ main result so far (details in `src/vc6/README.md`):
     widget (it was unconditional), and HudChatSend treats a line as a cheat
     when `strlen > 1`, not `> 2` -- so `!x` now reaches CheatLine as in the
     image.
+  - **PlaySoundAt's restart flag was inverted** (2026-09-29): with bit 0 the
+    image rewinds a playing sound only when fewer than 0x1130 bytes remain
+    (`cmp; jae play`) and otherwise lets it run; the reconstruction had it
+    the other way round. Roach, vehicle and kind-7 sounds pass that flag.
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own

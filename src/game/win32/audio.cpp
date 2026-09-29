@@ -1401,10 +1401,12 @@ ready:
  * that division.
  *
  * WHETHER TO RESTART IT. Only matters if it is already playing, and `flags`
- * decides: bit 0 restarts unless the buffer is within 0x1130 bytes of the end,
- * on the grounds that it is nearly done anyway; bit 1 refuses to interrupt at
- * all; neither rewinds unconditionally. Then Play, which for an already
- * playing buffer is harmless.
+ * decides: bit 0 rewinds only when the buffer is within 0x1130 bytes of the
+ * end -- `sub; cmp 0x1130; jae play` skips the rewind while more remains, so
+ * a sound well under way is left to run (this was read inverted until the
+ * byte-match, 2026-09-29); bit 1 refuses to interrupt at all; neither rewinds
+ * unconditionally. Then Play, which for an already playing buffer is
+ * harmless.
  *
  * Exercisable at last -- see tools/alsa/asoundrc. Before there was a sound
  * device this could not run, and neither could anything it touches. */
@@ -1423,63 +1425,58 @@ typedef int32_t (__cdecl *am2_points_equal_fn)(const AM2_Point *a,
 #define SOUND_BYTES_PER_MS   22
 #define SOUND_PLAY_CUTOFF    0x258   /* 600 units; beyond this, do not play */
 #define SOUND_NEAR_DISTANCE  0x20    /* used when owner and sound coincide */
-#define SOUND_ALMOST_DONE    0x1130  /* bytes left below which a restart is
-                                      * not worth it */
+#define SOUND_ALMOST_DONE    0x1130  /* bytes left below which bit 0
+                                      * rewinds a playing sound */
 #define SOUND_FLAG_RESTART   1
 #define SOUND_FLAG_NO_INTERRUPT 2
 
-void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t unused,
+void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
                          int16_t x, int16_t y)
 {
-    uint8_t             *slot;
-    LPDIRECTSOUNDBUFFER  buf;
-    DWORD                status;
-    int32_t              volume;
-    AM2_Point            where;
-
-    (void)unused;
+    DWORD            status;
+    DWORD            played;
+    int32_t          volume;
+    int32_t          dist;
+    int32_t          d2;
+    AM2_Point        ear;
+    AM2_Point        where;
+    void            *owner;
+    const AM2_Point *at;
 
     if (!g_audioEnabled)
         return;
     if (index < 0 || index >= SOUND_FIXED_SLOTS)
         return;
 
-    slot = (uint8_t *)(uintptr_t)ADDR_SOUND_SLOTS + index * SOUND_SLOT_STRIDE;
-    if (!*(void **)slot)
+    /* The slot, its record and the buffer are re-read at every use. */
+#define SLOT (((uint8_t *)(uintptr_t)ADDR_SOUND_SLOTS) + index * SOUND_SLOT_STRIDE)
+#define REC  (*(uint8_t **)SLOT)
+#define BUF  (*(LPDIRECTSOUNDBUFFER *)(REC + SOUND_REC_OFF_BUFFER))
+    if (!REC || !BUF)
         return;
-    buf = *(LPDIRECTSOUNDBUFFER *)(*(uint8_t **)slot + SOUND_REC_OFF_BUFFER);
-    if (!buf)
-        return;
 
-    IDirectSoundBuffer_GetStatus(buf, &status);
+    IDirectSoundBuffer_GetStatus(BUF, &status);
 
-    where.x = (int16_t)x;
-    where.y = (int16_t)y;
+    if (x != 0) {
+        /* Both points copied a field at a time before they are measured. */
+        ear.x   = g_listenerPos.x;
+        ear.y   = g_listenerPos.y;
+        where.x = x;
+        where.y = y;
+        dist  = ApproxDist(&ear, &where);
+        owner = LookupOwnerObj(g_defaultOwner);
 
-    if (where.x != 0) {
-        int32_t  dist = ApproxDist(&g_listenerPos, &where);
-        void    *owner = LookupOwnerObj(g_defaultOwner);
-
-        /* An owner that can see gets a say, and only ever a shortening one. */
+        /* An owner that can see gets a say, and only ever a shortening one.
+         * PointsEqual takes both points BY VALUE. */
         if (owner && *(const int16_t *)((uint8_t *)owner + 0x62) > 0) {
-            const AM2_Point *at = (const AM2_Point *)((uint8_t *)owner + OBJ_OFF_POS);
-            int32_t          d2;
-
-            /* BY VALUE. The original pushes [eax+0x12] and the caller's own
-             * packed point, not their addresses -- it keeps the address in a
-             * register at the same time, for ApproxDist below, which is how a
-             * local typedef here came to declare two pointers and pass them.
-             * That compared two ADDRESSES, so the test could never fire and
-             * the near-distance case was dead: no A/B could see it, because
-             * the only thing it changes is a volume. */
+            at = (const AM2_Point *)((uint8_t *)owner + OBJ_OFF_POS);
             if (PointsEqual(*(const uint32_t *)&where, *(const uint32_t *)at))
                 d2 = SOUND_NEAR_DISTANCE;
             else
-                d2 = ApproxDist(at, &where) / 2;
+                d2 = ApproxDist(at, &where) >> 1;
             if (d2 < dist)
                 dist = d2;
         }
-
         if (dist > SOUND_PLAY_CUTOFF)
             return;                       /* too far to bother with */
         volume = g_volumeAtZero - dist * SOUND_3D_FALLOFF;
@@ -1492,39 +1489,32 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t unused,
 
     /* Louder wins, and so does anything whose predecessor has finished. */
     if (!(status & DSBSTATUS_PLAYING) ||
-        GetTickCount() > *(uint32_t *)(slot + SOUND_SLOT_OFF_STARTED)
-                         + *(uint32_t *)(slot + SOUND_SLOT_OFF_BYTES)
+        GetTickCount() > *(uint32_t *)(SLOT + SOUND_SLOT_OFF_STARTED)
+                         + *(uint32_t *)(SLOT + SOUND_SLOT_OFF_BYTES)
                            / SOUND_BYTES_PER_MS ||
-        volume > *(int32_t *)(slot + SOUND_SLOT_OFF_VOLUME)) {
-        IDirectSoundBuffer_SetVolume(
-            *(LPDIRECTSOUNDBUFFER *)(*(uint8_t **)slot + SOUND_REC_OFF_BUFFER),
-            volume);
-        *(int32_t *)(slot + SOUND_SLOT_OFF_VOLUME)  = volume;
-        *(uint32_t *)(slot + SOUND_SLOT_OFF_STARTED) = GetTickCount();
+        volume > *(int32_t *)(SLOT + SOUND_SLOT_OFF_VOLUME)) {
+        IDirectSoundBuffer_SetVolume(BUF, volume);
+        *(int32_t *)(SLOT + SOUND_SLOT_OFF_VOLUME)  = volume;
+        *(uint32_t *)(SLOT + SOUND_SLOT_OFF_STARTED) = GetTickCount();
     }
 
     if (status & DSBSTATUS_PLAYING) {
-        buf = *(LPDIRECTSOUNDBUFFER *)(*(uint8_t **)slot + SOUND_REC_OFF_BUFFER);
-
         if (flags & SOUND_FLAG_RESTART) {
-            DWORD played = 0;
-
-            IDirectSoundBuffer_GetCurrentPosition(buf, &played, NULL);
-            if (*(uint32_t *)(slot + SOUND_SLOT_OFF_BYTES) - played
+            IDirectSoundBuffer_GetCurrentPosition(BUF, &played, NULL);
+            if (*(uint32_t *)(SLOT + SOUND_SLOT_OFF_BYTES) - played
                     < SOUND_ALMOST_DONE)
-                goto play;                /* nearly over; let it finish */
-            IDirectSoundBuffer_SetCurrentPosition(buf, 0);
+                IDirectSoundBuffer_SetCurrentPosition(BUF, 0);
         } else if (flags & SOUND_FLAG_NO_INTERRUPT) {
             return;
         } else {
-            IDirectSoundBuffer_SetCurrentPosition(buf, 0);
+            IDirectSoundBuffer_SetCurrentPosition(BUF, 0);
         }
     }
 
-play:
-    IDirectSoundBuffer_Play(
-        *(LPDIRECTSOUNDBUFFER *)(*(uint8_t **)slot + SOUND_REC_OFF_BUFFER),
-        0, 0, 0);
+    IDirectSoundBuffer_Play(BUF, 0, 0, 0);
+#undef SLOT
+#undef REC
+#undef BUF
 }
 
 /* Stop one dynamic sound, by slot and by name -- 0x0040B860.
