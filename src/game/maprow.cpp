@@ -2051,12 +2051,13 @@ void __cdecl FreeSeqContexts(void)
  * sprite's own +0x34 -- so a decal's remap travels with its artwork. */
 void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
 {
-    const uint8_t *flags = *(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS;
-    const int32_t *step  = (const int32_t *)(uintptr_t)ADDR_TILE_STEP8;
+    /* The tile flags and the decal sprites are read at each use. */
+#define FLAGS (*(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS)
+#define DECAL ((const uint8_t *)(*(void *const *const *)(uintptr_t)ADDR_DECAL_SPRITES)[variant])
+    const int32_t *step = (const int32_t *)(uintptr_t)ADDR_TILE_STEP8;
     uint32_t       point;
     uint16_t       tile;
     uint8_t       *row;
-    const uint8_t *spr;
     int32_t        n;
 
     /* The arguments arrive as dwords and only their low words are used --
@@ -2065,25 +2066,25 @@ void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
     ((int16_t *)&point)[1] = (int16_t)z;
     tile = (uint16_t)TileOfPoint(point);
 
-    if (flags[tile] & 1)
+    if (FLAGS[tile] & 1)
         return;
     for (n = 0; n < 8; n++) {
-        if (*(const uint8_t *)((uintptr_t)&flags[tile] + (uintptr_t)step[n]) & 1)
+        if ((&FLAGS[tile])[step[n]] & 1)
             return;
     }
 
     row = *(uint8_t **)RowPoolAAlloc();
-    spr = (const uint8_t *)
-        (*(void *const *const *)(uintptr_t)ADDR_DECAL_SPRITES)[variant];
 
     *(int32_t *)row = 1;
-    *(uint32_t *)(row + ROW_OFF_SPRITE) = (uint32_t)(uintptr_t)spr;
+    *(uint32_t *)(row + ROW_OFF_SPRITE) = (uint32_t)(uintptr_t)DECAL;
     *(int16_t *)(row + ROW_OFF_X)      = (int16_t)x;
     *(int16_t *)(row + ROW_OFF_X + 2)  = (int16_t)z;
     *(int16_t *)(row + ROW_OFF_FIELD_26) = 2;
-    *(uint32_t *)(row + ROW_OFF_FIELD_2C) = *(const uint32_t *)(spr + 0x34u);
+    *(uint32_t *)(row + ROW_OFF_FIELD_2C) = *(const uint32_t *)(DECAL + 0x34u);
 
     RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+#undef FLAGS
+#undef DECAL
 }
 
 /* SpawnParticle -- original 0x004619F0, four callers. Put one particle at a

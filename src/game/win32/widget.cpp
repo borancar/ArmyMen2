@@ -15537,23 +15537,25 @@ void __attribute__((thiscall)) AM2_Widget::ListTakeFocus(int32_t announce)
     AM2_Widget *w = this;
 
     const uint8_t *self = (const uint8_t *)w;
-    int32_t        sel  = *(const int32_t *)(self + LIST_OFF_SELECTED);
+    int32_t        sel;
+    RECT           strip;
 
     ::WidgetScreenRect(w);
 
-    if (sel >= 0 && announce) {
-        int32_t row = sel - *(const int32_t *)(self + LIST_OFF_TOP_ROW);
-        RECT    strip;
-
-        strip.left   = w->rect.left;
-        strip.top    = w->rect.top + row * LIST_ROW_HEIGHT
+    /* The strip is built before either test, the sides first. */
+    sel          = *(const int32_t *)(self + LIST_OFF_SELECTED);
+    strip.left   = w->rect.left;
+    strip.right  = w->rect.right;
+    if (sel >= 0) {
+        strip.top    = w->rect.top
+                       + (sel - *(const int32_t *)(self + LIST_OFF_TOP_ROW))
+                         * LIST_ROW_HEIGHT
                        + LIST_ROW_TOP_MARGIN;
-        strip.right  = w->rect.right;
         strip.bottom = strip.top + LIST_ROW_HEIGHT;
-
-        WidgetVPaint(w, strip);
+        if (announce)
+            WidgetVPaint(w, strip);
     }
-    ::WidgetTakeFocus(w, announce);
+    w->WidgetTakeFocus(announce);
 }
 
 void __attribute__((thiscall)) AM2_Widget::ListDraw(RECT clip)
