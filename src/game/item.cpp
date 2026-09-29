@@ -8948,10 +8948,10 @@ void __cdecl SetKindFrames(void *obj, int32_t kind)
  *
  * THE ORDER OF THE FOUR rand() CALLS IS PART OF THE FUNCTION. They draw from
  * the image's own LCG, so which draw becomes the delay and which becomes the x
- * decides every spawn -- and C does not sequence argument evaluation, so
- * writing them inline as arguments would be free for the compiler to reorder.
- * They are four locals, assigned in the original's order: delay, then kind,
- * then y, then x.
+ * decides every spawn -- and C does not sequence argument evaluation. The
+ * original writes them inline as arguments and VC6 evaluates right to left:
+ * delay, then kind, then y, then x. Under VC6 they are written that way; for
+ * any other compiler they are four locals assigned in that order.
  *
  * THE SPAN IS 620 x 480 FROM THE VIEW ORIGIN, which is the screen and not the
  * map -- so the barrage lands where the player is looking rather than
@@ -8974,6 +8974,18 @@ void __cdecl SpawnRandomBarrage(void)
     int32_t i;
 
     for (i = 0; i < AM2_BARRAGE_COUNT; i++) {
+#if defined(_MSC_VER) && !defined(__GNUC__)
+        /* The original writes the draws as arguments and relies on VC6's
+         * right-to-left evaluation -- delay, kind, y, x -- which is the code
+         * the image has. Other compilers get the explicit sequence below. */
+        orig_spawn_at(orig_rand() % AM2_BARRAGE_SPAN_X
+                          + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
+                      orig_rand() % AM2_BARRAGE_SPAN_Y
+                          + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y,
+                      kinds[orig_rand() % AM2_BARRAGE_KINDS],
+                      0, 0, AM2_BARRAGE_ARG6,
+                      orig_rand() % AM2_BARRAGE_DELAY_MAX, 0, 0, 0);
+#else
         int32_t delay = orig_rand() % AM2_BARRAGE_DELAY_MAX;
         int32_t kind  = kinds[orig_rand() % AM2_BARRAGE_KINDS];
         int32_t y     = orig_rand() % AM2_BARRAGE_SPAN_Y
@@ -8982,6 +8994,7 @@ void __cdecl SpawnRandomBarrage(void)
                         + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
 
         orig_spawn_at(x, y, kind, 0, 0, AM2_BARRAGE_ARG6, delay, 0, 0, 0);
+#endif
     }
 }
 

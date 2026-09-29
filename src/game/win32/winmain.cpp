@@ -32,11 +32,11 @@
  *   commentary; it just did not know it had a name.
  *
  * A note on argument evaluation. PositionWindow calls GetWindowLongA twice,
- * GetMenu between them, and feeds all three to AdjustWindowRectEx. The second
- * GetWindowLongA has to observe the SetWindowLongA above it, so the order is
- * load-bearing -- and C does not specify the order in which call arguments are
- * evaluated. The temporaries below are not for readability; removing them would
- * let the compiler reorder three Win32 calls against each other.
+ * GetMenu between them, and feeds all three to AdjustWindowRectEx as
+ * arguments, as the original does. The second GetWindowLongA has to observe
+ * the SetWindowLongA above it, which the statement boundary guarantees; the
+ * three queries themselves read without writing, so their relative order
+ * cannot matter.
  */
 
 #include "winmain.h"
@@ -622,42 +622,31 @@ void __cdecl PositionWindow(void)
 {
     RECT r;
 
-    if (!g_windowed) {
-        /* Fullscreen: the drawing rectangle is the screen, at the origin. */
-        SetRect((LPRECT)(uintptr_t)ADDR_SCREEN_RECT, 0, 0, g_screenW, g_screenH);
-        return;
-    }
-
-    /* Turn the borderless popup into an ordinary sizeable window. WS_POPUP and
-     * the three bits about to be set are the only ones cleared, so WS_VISIBLE
-     * survives and the window does not blink out. */
-    {
-        LONG style = GetWindowLongA(g_hWnd, GWL_STYLE);
-        SetWindowLongA(g_hWnd, GWL_STYLE,
-                       (style & 0x7F39FFFF) |
-                       (WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX));
-    }
-
-    /* Grow the requested client size by whatever the new frame costs. */
-    SetRect(&r, 0, 0, g_screenW, g_screenH);
-    {
-        LONG exStyle = GetWindowLongA(g_hWnd, GWL_EXSTYLE);
-        BOOL hasMenu = (GetMenu(g_hWnd) != NULL);
-        LONG style   = GetWindowLongA(g_hWnd, GWL_STYLE);
-
-        AdjustWindowRectEx(&r, style, hasMenu, exStyle);
-    }
-    SetWindowPos(g_hWnd, NULL, 0, 0, r.right - r.left, r.bottom - r.top,
-                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-    SetWindowPos(g_hWnd, HWND_NOTOPMOST, 0, 0, 0, 0,
-                 SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
-
-    /* Drag it back onto the work area if the resize pushed the caption off the
-     * top or left of the desktop. Only those two edges are checked -- running
-     * off the bottom right is left alone. */
-    {
+    if (g_windowed) {
         RECT work;
 
+        /* Turn the borderless popup into an ordinary sizeable window. WS_POPUP
+         * and the three bits about to be set are the only ones cleared, so
+         * WS_VISIBLE survives and the window does not blink out. */
+        SetWindowLongA(g_hWnd, GWL_STYLE,
+                       (GetWindowLongA(g_hWnd, GWL_STYLE) & 0x7F39FFFF) |
+                       (WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX));
+
+        /* Grow the requested client size by whatever the new frame costs. The
+         * three queries are arguments, evaluated after the SetWindowLongA
+         * above, and none of them changes what the others read. */
+        SetRect(&r, 0, 0, g_screenW, g_screenH);
+        AdjustWindowRectEx(&r, GetWindowLongA(g_hWnd, GWL_STYLE),
+                           GetMenu(g_hWnd) != NULL,
+                           GetWindowLongA(g_hWnd, GWL_EXSTYLE));
+        SetWindowPos(g_hWnd, NULL, 0, 0, r.right - r.left, r.bottom - r.top,
+                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(g_hWnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+                     SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+
+        /* Drag it back onto the work area if the resize pushed the caption off
+         * the top or left of the desktop. Only those two edges are checked --
+         * running off the bottom right is left alone. */
         SystemParametersInfoA(SPI_GETWORKAREA, 0, &work, 0);
         GetWindowRect(g_hWnd, &r);
         if (r.left < work.left)
@@ -666,19 +655,22 @@ void __cdecl PositionWindow(void)
             r.top = work.top;
         SetWindowPos(g_hWnd, NULL, r.left, r.top, 0, 0,
                      SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+        /* Publish where the client area ended up, in screen coordinates. Both
+         * corners are converted, which is why the RECT is punned to two POINTs
+         * -- as the original does, and as the identical layout allows. */
+        GetClientRect(g_hWnd, &r);
+        ClientToScreen(g_hWnd, (LPPOINT)&r.left);
+        ClientToScreen(g_hWnd, (LPPOINT)&r.right);
+
+        g_screenRect.left   = r.left;
+        g_screenRect.top    = r.top;
+        g_screenRect.right  = r.right;
+        g_screenRect.bottom = r.bottom;
+    } else {
+        /* Fullscreen: the drawing rectangle is the screen, at the origin. */
+        SetRect((LPRECT)(uintptr_t)ADDR_SCREEN_RECT, 0, 0, g_screenW, g_screenH);
     }
-
-    /* Publish where the client area ended up, in screen coordinates. Both
-     * corners are converted, which is why the RECT is punned to two POINTs --
-     * as the original does, and as the identical layout allows. */
-    GetClientRect(g_hWnd, &r);
-    ClientToScreen(g_hWnd, (LPPOINT)&r.left);
-    ClientToScreen(g_hWnd, (LPPOINT)&r.right);
-
-    g_screenRect.left   = r.left;
-    g_screenRect.top    = r.top;
-    g_screenRect.right  = r.right;
-    g_screenRect.bottom = r.bottom;
 }
 
 int32_t __cdecl InitApplication(HINSTANCE hInstance, int32_t nCmdShow)
