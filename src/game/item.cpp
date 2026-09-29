@@ -3378,12 +3378,9 @@ static inline int32_t ShotBeatsClass(const uint8_t *target, const uint8_t *shot)
  * branches, with the arguments in the same order each time. */
 static inline int32_t ShotFacingArc(const uint8_t *target, const uint8_t *shot)
 {
-    int32_t d = AngleDelta(*(const uint8_t *)(target + OBJ_OFF_FACING),
-                           *(const uint8_t *)(shot + OBJ_OFF_FACING));
-
-    if (d < 0)
-        d = -d;
-    return d < AM2_SHOT_FACING_ARC ? 1 : 0;
+    return abs(AngleDelta(*(const uint8_t *)(target + OBJ_OFF_FACING),
+                          *(const uint8_t *)(shot + OBJ_OFF_FACING)))
+           < AM2_SHOT_FACING_ARC ? 1 : 0;
 }
 
 /* ShotHitsObj -- original 0x0043BCD0, one caller: ShotStrike, for every object
@@ -3435,10 +3432,16 @@ int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
 
     *out = 0;
 
-    if (*(const int8_t *)(t + OBJ_OFF_ARMY) == army) {
-        if (*(const uint32_t *)(t + OBJ_OFF_FLAGS) & OBJ_FLAG_SHOT_PROOF)
-            return 0;
+    /* The army test is asked twice, once for each rule it guards. */
+    if (*(const int8_t *)(t + OBJ_OFF_ARMY) == army
+        && (*(const uint32_t *)(t + OBJ_OFF_FLAGS) & OBJ_FLAG_SHOT_PROOF)) {
+        /* The refusals after the height test come back here, as the image
+         * shares this one block with them. */
+    refuse:
+        return 0;
+    }
 
+    if (*(const int8_t *)(t + OBJ_OFF_ARMY) == army) {
         if (ObjIsTypeIn238((const AM2_Object *)t)) {
             if (ObjIsType2((const AM2_Object *)t)) {
                 int32_t sarge = 0;
@@ -3469,22 +3472,22 @@ int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
         /* Code 2 has no name in orig.h and gets none here; 5 is
          * AM2_SHOT_STRUCK_HARD. Both are refused in this branch only. */
         if (code == 2 || code == AM2_SHOT_STRUCK_HARD)
-            return 0;
+            goto refuse;
 
         if (code == AM2_SHOT_CODE_RANDOM
             && *(const int16_t *)(t + OBJ_OFF_HEALTH) > 0) {
             if (objH >= height + AM2_SHOT_OVER_UNDER)
-                return 0;
+                goto refuse;
             if (*(const int32_t *)(s + OBJ_OFF_FORMATION_SLOT))
-                return 0;
+                goto refuse;
             return 1;
         }
 
         if (!allied && *(const int16_t *)(t + OBJ_OFF_HEALTH) > 0) {
             if (objH >= height + AM2_SHOT_OVER_UNDER)
-                return 0;
+                goto refuse;
             if (*(const int32_t *)(s + OBJ_OFF_FORMATION_SLOT))
-                return 0;
+                goto refuse;
             if (!ObjIsType2((const AM2_Object *)t))
                 return 1;
 
@@ -3496,10 +3499,10 @@ int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
 
         /* Allied, or already dead. */
         if (objH <= height + AM2_SHOT_UNDER_OVER)
-            return 0;
+            goto refuse;
 
         if (ShotCodeChecksArmour(code) && !ShotPiercesArmour(t, s))
-            return 0;
+            goto refuse;
 
         *(int32_t *)(s + OBJ_OFF_FORMATION_SLOT) = 1;
         return 1;
@@ -3515,7 +3518,7 @@ int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
     }
 
     if (ShotCodeChecksArmour(code) && !ShotPiercesArmour(t, s))
-        return 0;
+        goto refuse;
 
     return 1;
 }
