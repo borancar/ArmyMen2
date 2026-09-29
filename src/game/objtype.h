@@ -119,6 +119,20 @@ int32_t __cdecl ObjEventMask(const AM2_Object *obj);
 
 /* Original: 0x00457420. Types 2, 3 and 8 -- the owned non-item types. */
 int32_t __cdecl ObjIsTypeIn238(const AM2_Object *obj);
+/* The same test expanded in place, as ObjAttachTo has it: VC6 drops the null
+ * check wherever the pointer was already tested. */
+static inline int32_t ObjIsTypeIn238Inline(const void *obj)
+{
+    if (obj) {
+        switch (*(const int32_t *)obj) {
+        case 2:
+        case 3:
+        case 8:
+            return 1;
+        }
+    }
+    return 0;
+}
 
 /* Original: 0x00413690. SelectionClick's filter: may a click pick this? */
 int32_t __cdecl ObjIsSelectable(void *o);

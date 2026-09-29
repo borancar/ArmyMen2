@@ -520,139 +520,85 @@ void __cdecl ObjAttachTo(void *subject, void *target)
 {
     uint8_t *s = (uint8_t *)subject;
     uint8_t *t = (uint8_t *)target;
-    void    *comm;
-    int32_t  mp;
+    uint8_t *h;
+    uint8_t *other;
     uint32_t old;
-    int32_t  army;
+    int32_t  i;
 
-    if (subject == target || !subject || !ObjIsTypeIn238((const AM2_Object *)s))
+    if (subject == target || !ObjIsTypeIn238Inline(s))
         return;
 
     old = *(const uint32_t *)(s + OBJ_OFF_FOLLOW_UID);
     *(uint32_t *)(s + OBJ_OFF_TARGET_UID) = 0;
 
-    if (old) {
-        uint8_t *h = (uint8_t *)LookupByUID(old);
-
-        if (h && ObjIsTypeIn238((const AM2_Object *)h)) {
-            uint8_t *list = h + OBJ_OFF_PTR_LIST;
-            int32_t  i = 0;
-
-            while (i < *(const int32_t *)(list + SUBREC_OFF_COUNT)) {
-                uint32_t uid = (*(uint32_t *const *)
-                                (list + SUBREC_OFF_ROWS))[i];
-                uint8_t *other;
-
-                if (uid == ((const AM2_Object *)s)->uid) {
-                    ((AM2_Rec *)list)->ListRemoveAt(i);
-                    continue;           /* the next one shifted into i */
-                }
-
-                other = (uint8_t *)LookupByUID(uid);
-                if (!other) {
-                    ((AM2_Rec *)list)->ListRemoveAt(i);
-                    continue;
-                }
-
-                if (ObjIsTypeIn238((const AM2_Object *)other))
-                    *(int32_t *)(other + OBJ_OFF_FORMATION_SLOT) = i;
-                i++;
+    if (old && (h = (uint8_t *)LookupByUID(old)) != (uint8_t *)0
+        && ObjIsTypeIn238Inline(h)) {
+#define LIST (h + OBJ_OFF_PTR_LIST)
+        i = 0;
+        while (i < *(const int32_t *)(LIST + SUBREC_OFF_COUNT)) {
+            if ((*(uint32_t *const *)(LIST + SUBREC_OFF_ROWS))[i]
+                == ((const AM2_Object *)s)->uid) {
+                ((AM2_Rec *)LIST)->ListRemoveAt(i);
+                continue;               /* the next one shifted into i */
             }
+            other = (uint8_t *)LookupByUID(
+                        (*(uint32_t *const *)(LIST + SUBREC_OFF_ROWS))[i]);
+            if (!other) {
+                ((AM2_Rec *)LIST)->ListRemoveAt(i);
+                continue;
+            }
+            if (ObjIsTypeIn238Inline(other))
+                *(int32_t *)(other + OBJ_OFF_FORMATION_SLOT) = i;
+            i++;
         }
+#undef LIST
     }
 
-    if (!target) {
-        *(int32_t *)(s + OBJ_OFF_FORMATION_SLOT) = 0;
-        *(uint32_t *)(s + OBJ_OFF_FOLLOW_UID) = 0;
-        return;
-    }
+    if (target) {
 
-    /* TWO DIFFERENT GLOBALS, and reading them as one was a real mistake in an
-     * earlier draft of this. `mov ecx,[0x511da0]` at the top is
-     * ADDR_MP_SESSION and it gates both kind-7 arms; the comm object is loaded
-     * separately at 0x4581E6 as the `this` for CommArmyOfSlot. ObjsAreAllied
-     * four hundred lines up gates the same arms on `mp` too, which is what
-     * exposed it -- and NO A/B COULD HAVE: ADDR_MP_SESSION is 0 on every drive
-     * this project has, so both arms are unreachable and a wrong global there
-     * is invisible. */
-    mp   = *(const int32_t *)(uintptr_t)ADDR_MP_SESSION;
-    comm = *(void *const *)(uintptr_t)ADDR_COMM_OBJECT;
-    army = *(const int8_t *)(s + OBJ_OFF_ARMY);
-
-    if (mp
-        && *(const int32_t *)s == AM2_OBJ_TYPE_TROOPER
-        && *(const int32_t *)(s + OBJ_OFF_SOLDIER_KIND) == 7) {
-        if (*(const int32_t *)t == AM2_OBJ_TYPE_TROOPER
-            && *(const int32_t *)(t + OBJ_OFF_SOLDIER_KIND)
-               == 7)
+        /* A kind-7 trooper in a session follows only another kind 7; everything
+         * else asks the whole alliance question, which is ArmyAlliedWithObj
+         * expanded in place. The session flag is ADDR_MP_SESSION, NOT the comm
+         * object -- an earlier draft read them as one, and no A/B could have seen
+         * it: the flag is 0 on every drive this project has. */
+        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+            && ObjIsType2Inline(s)
+            && *(const int32_t *)(s + OBJ_OFF_SOLDIER_KIND) == 7) {
+            if (ObjIsType2Inline(t)
+                && *(const int32_t *)(t + OBJ_OFF_SOLDIER_KIND) == 7)
+                goto attach_and_join;
+        } else if (ArmyAlliedWithObjInline(*(const int8_t *)(s + OBJ_OFF_ARMY),
+                                           t, 0)) {
             goto attach_and_join;
-        goto mode_only;
-    }
+        }
 
-    /* The subject's army is movsx and the target's is a plain `cmp byte`, so
-     * one is signed and the other is not -- ObjsAreAllied spells the pair the
-     * same way. It cannot matter at 4, and it is written as the original reads
-     * it rather than made uniform. */
-    if (army == AM2_ARMY_ALL
-        || *(const uint8_t *)(t + OBJ_OFF_ARMY) == AM2_ARMY_ALL)
-        goto attach_and_join;
-
-    if (*(const int32_t *)t == AM2_OBJ_TYPE_TROOPER) {
-        const uint8_t *kind;
-        int32_t        idx;
-
-        if (comm
-            && *(const int32_t *)(t + OBJ_OFF_SOLDIER_KIND)
-               == 7)
-            goto mode_only;
-
-        kind = *(const uint8_t *const *)(t + SAVED_OFF_TABLE_REC2);
-        /* Spelled exactly as ObjsAreAllied spells it, four hundred lines up
-         * in this same file -- that function is the SAME inlined block and is
-         * already verified, so a second spelling here would be a second place
-         * to be wrong. */
-        if ((const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS
-                + (uint32_t)(((AM2_Comm *)comm)->CommArmyOfSlot(army) << 8)) == kind)
-            goto attach_and_join;
-
-        if (kind == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
-            idx = 0;
-        else if (kind == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x100))
-            idx = 1;
-        else if (kind == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x200))
-            idx = 2;
-        else if (kind == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS + 0x300))
-            idx = 3;
-        else
-            goto mode_only;
-
-        if (AllyFlag(army, ((AM2_Comm *)comm)->CommSlotForArmy(idx)))
-            goto attach_and_join;
-    }
-
-    if (AllyFlag(army, *(const int8_t *)(t + OBJ_OFF_ARMY)))
-        goto attach_and_join;
-
-mode_only:
-    *(int32_t *)(s + OBJ_OFF_AI_MODE) =
-        (army == (int32_t)g_defaultOwner)
-            ? 0 : 6;
-    *(uint32_t *)(s + OBJ_OFF_FOLLOW_UID) =
-        ((const AM2_Object *)t)->uid;
-    return;
+        if (*(const int8_t *)(s + OBJ_OFF_ARMY) != (int32_t)g_defaultOwner) {
+            *(int32_t *)(s + OBJ_OFF_AI_MODE) = 6;
+            *(uint32_t *)(s + OBJ_OFF_FOLLOW_UID) = ((const AM2_Object *)t)->uid;
+            return;
+        }
+        goto own;
 
 attach_and_join:
-    *(int32_t *)(s + OBJ_OFF_AI_MODE) = 3;
-    *(uint32_t *)(s + OBJ_OFF_FOLLOW_UID) =
-        ((const AM2_Object *)t)->uid;
+        *(int32_t *)(s + OBJ_OFF_AI_MODE) = 3;
+        *(uint32_t *)(s + OBJ_OFF_FOLLOW_UID) =
+            ((const AM2_Object *)t)->uid;
 
-    if (ObjIsTypeIn238((const AM2_Object *)t)) {
-        uint8_t *list = t + OBJ_OFF_PTR_LIST;
+        if (ObjIsTypeIn238Inline(t)) {
+            *(int32_t *)(s + OBJ_OFF_FORMATION_SLOT) =
+                *(const int32_t *)(t + OBJ_OFF_PTR_LIST + SUBREC_OFF_COUNT);
+            ((AM2_Rec *)(t + OBJ_OFF_PTR_LIST))->PtrListPush((void *)(uintptr_t)
+                        ((const AM2_Object *)s)->uid);
+        }
+        return;
 
-        *(int32_t *)(s + OBJ_OFF_FORMATION_SLOT) =
-            *(const int32_t *)(list + SUBREC_OFF_COUNT);
-        ((AM2_Rec *)list)->PtrListPush((void *)(uintptr_t)
-                    ((const AM2_Object *)s)->uid);
+own:
+        *(int32_t *)(s + OBJ_OFF_AI_MODE) = 0;
+        *(uint32_t *)(s + OBJ_OFF_FOLLOW_UID) = ((const AM2_Object *)t)->uid;
+        return;
+    } else {
+        *(int32_t *)(s + OBJ_OFF_FORMATION_SLOT) = 0;
+        *(uint32_t *)(s + OBJ_OFF_FOLLOW_UID) = 0;
     }
 }
 

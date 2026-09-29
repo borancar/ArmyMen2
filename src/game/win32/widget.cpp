@@ -9206,19 +9206,17 @@ void __cdecl BattleJoinPoll(AM2_Widget *w)
 void __cdecl BattleJoinOk(void)
 {
     uint8_t      *dlg = *(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT;
-    AM2_ListRows *rows;
-    const char   *name;
     uint8_t      *comm;
     int32_t       row;
 
-    rows = *(AM2_ListRows **)(uintptr_t)ADDR_SESSION_OBJECT;
-
+    /* The session list is re-read at each use, as the image does. */
+#define rows (*(AM2_ListRows **)(uintptr_t)ADDR_SESSION_OBJECT)
     if (*(const int32_t *)(dlg + BATTLEJOIN_OFF_CHOSEN) == -1
             && rows->count == 1)
         *(int32_t *)(dlg + BATTLEJOIN_OFF_CHOSEN) = 0;
 
     row  = *(const int32_t *)(dlg + BATTLEJOIN_OFF_CHOSEN);
-    name = (const char *)(dlg + BATTLEJOIN_OFF_NAME);
+#define name ((const char *)(dlg + BATTLEJOIN_OFF_NAME))
 
     if (row >= 0 && row < rows->count && strlen(name) >= 1
         && CommJoinSession(g_commObject,
@@ -9235,7 +9233,7 @@ void __cdecl BattleJoinOk(void)
                                    + AM2_DPSESSION_OFF_CUR_PLAYERS);
         }
 
-        if (CommCreatePlayer(g_commObject, name, 0, 0, 0)) {
+        if (((AM2_Comm *)g_commObject)->CommCreatePlayer(name, 0, 0, 0)) {
             OnLobbySlave();
             PlaySoundAt(2, 0, 0, 0, 0);
             g_menuRequest    = AM2_MENU_REQUEST_OPTIONS_VIEW;
@@ -9247,6 +9245,8 @@ void __cdecl BattleJoinOk(void)
     }
 
     PlaySoundAt(3, 0, 0, 0, 0);
+#undef rows
+#undef name
 }
 
 AM2_BattleNameScreen::AM2_BattleNameScreen(const char *bmp)
