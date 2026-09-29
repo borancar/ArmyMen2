@@ -13408,9 +13408,10 @@ AM2_EnterNameScreen::AM2_EnterNameScreen(const char *bmp)
     AM2_Widget *panel;
     AM2_Widget *edit;
     AM2_Widget *dot;
-    char       *text = (char *)w + ENTER_NAME_OFF_TEXT;
+    char       *text;
     AM2_CTOR_VTABLE(w, VTABLE_ENTER_NAME);
     SetGameDir("save");
+    text = (char *)w + ENTER_NAME_OFF_TEXT;
     text[0] = '\0';
 
     panel = new AM2_Panel("02_006_00_name.bmp", 0, *RectSet(AM2_TEMP(AM2_Rect), 0x6C, 0xAE, 0x1A7, 0x83));
