@@ -15342,9 +15342,8 @@ AM2_Edit::AM2_Edit(char *buf, int32_t maxChars_, AM2_Rect box, int32_t font_, ui
     arg7C   = b;
     caret   = 0;
     charset = *(const char *const *)(uintptr_t)ADDR_EDIT_CHARSET_DEFAULT;
-    dot     = 0;
-
     *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
+    dot     = 0;
     ::WidgetScreenRect(w);
 }
 
