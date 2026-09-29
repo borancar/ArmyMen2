@@ -163,7 +163,7 @@ static inline int32_t __attribute__((thiscall)) CommCreatePlayer(void *comm, con
 
 /* Original: 0x0040E200. Empty the four player slots and ask DirectPlay to
  * enumerate the session's players into them. Answers 1 on DP_OK. */
-int32_t __cdecl CommEnumPlayers(void);
+/* (now AM2_Comm::CommEnumPlayers, msgslot.h) */
 
 /* Original: 0x004021A0, from CommConstruct. Bring the packet subsystem up:
  * four message lists, 400 buffers, two events and the packet thread. Named

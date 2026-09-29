@@ -125,7 +125,13 @@ int32_t __cdecl ClipRect(const AM2_Rect *src, const AM2_Rect *clip,
  * them back as one dword, which is where the layout comes from. */
 uint32_t __cdecl MakePoint(uint32_t x, uint32_t y)
 {
-    return (x & 0xFFFFu) | ((y & 0xFFFFu) << 16);
+    AM2_Point p;
+
+    /* An AM2_Point returned by value in the original; answered here as the
+     * dword it is, so every ABI this builds for returns it in eax. */
+    p.x = (int16_t)x;
+    p.y = (int16_t)y;
+    return *(uint32_t *)&p;
 }
 
 int32_t __cdecl PointsEqual(uint32_t a, uint32_t b)

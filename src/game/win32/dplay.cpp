@@ -1766,26 +1766,27 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSendLobbyProperty(uint32_t value
  * Reachable since GOG's MULTI-PLAYER patch was undone (2026-09-28); with the
  * button patched out the whole DirectPlay subsystem was unreachable. Verified
  * by reading, like the rest of dplay.cpp. */
-int32_t __cdecl CommEnumPlayers(void)
+/* A comm member that reads the global, not `this` -- see CommClose. */
+int32_t __attribute__((thiscall)) AM2_Comm::CommEnumPlayers()
 {
-    uint8_t       *comm = g_commObject;
-    LPDIRECTPLAY4A dp;
-    int32_t        i;
+    int32_t i;
 
-    dp = *(LPDIRECTPLAY4A *)(comm + COMM_OFF_DPLAY);
-    if (!dp)
+    if (!*(LPDIRECTPLAY4A *)(g_commObject + COMM_OFF_DPLAY))
         return 0;
 
+    /* Every store re-reads the comm global, as the original does: they are
+     * stores through it, so VC6 cannot keep it. */
     for (i = 0; i < 4; i++) {
-        uint8_t *slot = comm + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
-
-        comm_u32(slot, COMM_SLOT_OFF_INDEX) = COMM_SLOT_INDEX_NONE;
-        comm_u32(slot, COMM_SLOT_OFF_ID)    = 0;
-        slot[COMM_SLOT_OFF_NAME]            = 0;
+        comm_u32(g_commObject + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE,
+                 COMM_SLOT_OFF_ID)    = 0;
+        comm_u32(g_commObject + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE,
+                 COMM_SLOT_OFF_INDEX) = COMM_SLOT_INDEX_NONE;
+        (g_commObject + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE)[COMM_SLOT_OFF_NAME] = 0;
     }
     g_commEnumCount = 0;
 
-    return IDirectPlayX_EnumPlayers(dp, *(GUID **)comm,
+    return IDirectPlayX_EnumPlayers(*(LPDIRECTPLAY4A *)(g_commObject + COMM_OFF_DPLAY),
+                                    *(GUID **)g_commObject,
                                     EnumPlayersCb,
                                     (LPVOID)g_hwnd, 0) == DP_OK;
 }
@@ -2491,7 +2492,7 @@ void __cdecl OnLobbySlave(void)
     sd = *(LPDPSESSIONDESC2 *)(comm + COMM_OFF_SESSION_DESC);
     *(int32_t *)(comm + COMM_OFF_PLAYER_COUNT) = (int32_t)sd->dwCurrentPlayers;
 
-    CommEnumPlayers();
+    ((AM2_Comm *)g_commObject)->CommEnumPlayers();
 }
 
 /* CommReopenSession -- original 0x0040FA00, thiscall, one caller.
@@ -3926,7 +3927,7 @@ int dplay_install(void)
                         "MsgListInit", 1);
     rc |= patch_replace(ADDR_EVENT_CLOSE, (const void *)EventClose,
                         "EventClose", 1);
-    rc |= patch_replace(ADDR_COMM_ENUM_PLAYERS, (const void *)CommEnumPlayers,
+    rc |= patch_replace(ADDR_COMM_ENUM_PLAYERS, pmf_addr(&AM2_Comm::CommEnumPlayers),
                         "CommEnumPlayers", 0);
     rc |= patch_replace(ADDR_COMM_GLOBAL_INIT, (const void *)CommGlobalInit,
                         "CommGlobalInit", 1);
