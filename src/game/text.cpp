@@ -152,24 +152,18 @@ int32_t __cdecl TextStackHeight(const char *text, int32_t font)
     const uint8_t *base  = g_fontBase[font * AM2_FONT_BASE_STEP];
     int32_t        total = 0;
 
-    if (*text) {
-        for (;;) {
-            char ch = *text;
+    while (*text) {
+        char ch = *text;
 
-            if (ch == 0x5E) {                     /* '^', and its argument */
-                text++;
-            } else if (ch >= 0x1F) {
-                /* The glyph table indexed afresh, by the signed character. */
-                total += *(const uint16_t *)(base
-                             + g_glyphOffset[font * AM2_FONT_OFFSET_STEP + ch] + 2)
-                         - 3;
-            }
-
-            ch = text[1];
+        if (ch == 0x5E) {                     /* '^', and its argument */
             text++;
-            if (!ch)
-                break;
+        } else if (ch >= 0x1F) {
+            /* The glyph table indexed afresh, by the signed character. */
+            total += *(const uint16_t *)(base
+                         + g_glyphOffset[font * AM2_FONT_OFFSET_STEP + ch] + 2)
+                     - 3;
         }
+        text++;
     }
 
     return total;

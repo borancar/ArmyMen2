@@ -7418,9 +7418,9 @@ void __cdecl StepRowAnim(void *row)
 void __cdecl SetSoldierKind(void *obj, int32_t kind)
 {
     uint8_t *o    = (uint8_t *)obj;
-    uint8_t *row  = *(uint8_t **)(o + OBJ_OFF_ROWS);
     uint8_t *anim = (uint8_t *)(uintptr_t)ADDR_SOLDIER_ANIMS
                     + (uint32_t)kind * AM2_ANIM_TABLE_BYTES;
+    uint8_t *row  = *(uint8_t **)(o + OBJ_OFF_ROWS);
 
     *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = kind;
 
