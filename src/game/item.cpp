@@ -9868,7 +9868,8 @@ void __cdecl TrooperRemotePickupItem(void *troop, void *item, int32_t slot,
 {
     uint8_t *t = (uint8_t *)troop;
     uint8_t *w = (uint8_t *)item;
-    uint8_t *comm;
+    /* The comm object is read at every use. */
+#define comm (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
     int32_t  kind;
     uint8_t *held;
 
@@ -9880,82 +9881,81 @@ void __cdecl TrooperRemotePickupItem(void *troop, void *item, int32_t slot,
                 *(const int16_t *)(t + OBJ_OFF_POS + 2));
     NotifyPickedUp(item, troop);
 
-    comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
         orig_log("TrooperRemotePickupItem %x\n",
                  ((const AM2_Object *)w)->uid);
 
     kind = **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0);
 
-    if (kind == AM2_ITEM_KIND_HOT_TARGET) {
+    /* Nested on `!=`, so the image lays the arms out in reverse: the
+     * weapon paths first, then the medkit, then the hot target. */
+    if (kind != AM2_ITEM_KIND_HOT_TARGET) {
+        if (kind != AM2_ITEM_KIND_MEDKIT) {
+            if (*(const uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4)) {
+                if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                    orig_log("\tTrooperRemotePickupItem: we've got somthing in that slot\n");
+
+                held = (uint8_t *)WeaponByUid(
+                    *(const uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4));
+
+                if (KindInSetB(**(const int32_t *const *)(held + OBJ_OFF_FIELD_C0))
+                    && KindInSetB(**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))) {
+                    *(uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4) =
+                        ((const AM2_Object *)w)->uid;
+                    *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
+                    WeaponRespawn(item);
+                    return;
+                }
+
+                /* Added, then capped against the new item's type. */
+#define CAP ((*(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)) \
+             [ITEMTYPE_OFF_CAPACITY / 4])
+                *(int32_t *)(held + ITEM_OFF_AMMO) =
+                    *(const int32_t *)(held + ITEM_OFF_AMMO) + ammo;
+                if (*(const int32_t *)(held + ITEM_OFF_AMMO) > CAP)
+                    *(int32_t *)(held + ITEM_OFF_AMMO) = CAP;
+#undef CAP
+
+                if (!*(const int32_t *)(w + ITEM_OFF_AMMO)
+                    && *(const int8_t *)(w + OBJ_OFF_ARMY) == 4   /* the neutral army; item.cpp spells it as the literal */
+                    && *(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+                    WeaponRespawn(item);
+                    *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
+                }
+            } else {
+                if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                    orig_log("\tTrooperRemotePickupItem: new weapon\n");
+                *(int32_t *)(w + ITEM_OFF_AMMO) = ammo;
+                *(uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4) =
+                    ((const AM2_Object *)w)->uid;
+                *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
+                WeaponRespawn(item);
+            }
+        } else {
+            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                orig_log("\tTrooperRemotePickupItem:Medkit\n");
+            ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
+                              MedkitHealOne);
+
+            if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+                orig_log("\tTrooperRemotePickupItem %x\n",
+                         ((const AM2_Object *)w)->uid);
+
+            /* The medkit is taken off the map only when this side is the one
+             * that should say so -- CommMustBroadcast on the ITEM's army, not
+             * the trooper's. */
+            if (AM2_THE_COMM->CommMustBroadcast(
+                                  (int16_t)*(const int8_t *)(w + OBJ_OFF_ARMY))) {
+                WeaponRespawn(item);
+                *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
+            }
+        }
+    } else {
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log("\tTrooperRemotePickupItem: HotTarget\n");
         DestroyByType(item);
-        return;
     }
-
-    if (kind == AM2_ITEM_KIND_MEDKIT) {
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            orig_log("\tTrooperRemotePickupItem:Medkit\n");
-        ForEachArmyObject(*(const int8_t *)(t + OBJ_OFF_ARMY),
-                          MedkitHealOne);
-
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            orig_log("\tTrooperRemotePickupItem %x\n",
-                     ((const AM2_Object *)w)->uid);
-
-        /* The medkit is taken off the map only when this side is the one that
-         * should say so -- CommMustBroadcast on the ITEM's army, not the
-         * trooper's. */
-        if (AM2_THE_COMM->CommMustBroadcast(
-                              (int16_t)*(const int8_t *)(w + OBJ_OFF_ARMY))) {
-            WeaponRespawn(item);
-            *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
-        }
-        return;
-    }
-
-    if (!*(const uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4)) {
-        if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-            orig_log("\tTrooperRemotePickupItem: new weapon\n");
-        *(int32_t *)(w + ITEM_OFF_AMMO) = ammo;
-        *(uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4) =
-            ((const AM2_Object *)w)->uid;
-        *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
-        WeaponRespawn(item);
-        return;
-    }
-
-    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-        orig_log("\tTrooperRemotePickupItem: we've got somthing in that slot\n");
-
-    held = (uint8_t *)WeaponByUid(*(const uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4));
-
-    if (KindInSetB(**(const int32_t *const *)(held + OBJ_OFF_FIELD_C0))
-        && KindInSetB(**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))) {
-        *(uint32_t *)(t + TROOPER_OFF_WEAPON_UID + slot * 4) =
-            ((const AM2_Object *)w)->uid;
-        *(int8_t *)(w + OBJ_OFF_ARMY) = *(const int8_t *)(t + OBJ_OFF_ARMY);
-        WeaponRespawn(item);
-        return;
-    }
-
-    {
-        int32_t cap = (*(const int32_t *const *)(w + OBJ_OFF_FIELD_C0))
-                          [ITEMTYPE_OFF_CAPACITY / 4];
-        int32_t now = *(const int32_t *)(held + ITEM_OFF_AMMO) + ammo;
-
-        *(int32_t *)(held + ITEM_OFF_AMMO) = now;
-        if (now > cap)
-            *(int32_t *)(held + ITEM_OFF_AMMO) = cap;
-    }
-
-    if (!*(const int32_t *)(w + ITEM_OFF_AMMO)
-        && *(const int8_t *)(w + OBJ_OFF_ARMY) == 4   /* the neutral army; item.cpp spells it as the literal */
-        && *(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
-        WeaponRespawn(item);
-        *(uint32_t *)(w + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
-    }
+#undef comm
 }
 
 /* ToggleSelect -- original 0x00413710, one caller.
