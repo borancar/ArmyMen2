@@ -162,7 +162,8 @@ void __cdecl CheckBasePath(void)
      * FatalError, and its only string is about a path being too long, which
      * would be a lie; a game that then cannot find its data says so in its own
      * words, and the log line above it names the directory that was asked
-     * for. */
+     * for. Not in the relink: it is the harness's, not the original's. */
+#if !defined(AM2_RELINK)
     {
         const char *dir = getenv("AM2_GAMEDIR");
 
@@ -171,6 +172,7 @@ void __cdecl CheckBasePath(void)
                     "using the launch directory\n",
                     dir, (unsigned long)GetLastError());
     }
+#endif
 
     if (!am2_getcwd((char *)(uintptr_t)ADDR_GAME_DIR, 0xFF))
         FatalError("The base path is longer than 255 characters!\n");

@@ -2221,13 +2221,16 @@ void __cdecl DiedEffectA(void *obj)
 void __cdecl SpawnHitEffect(const uint32_t *at, int32_t rowField2C,
                             int32_t dir, int32_t height)
 {
-    static const int32_t kHitCounts[10] = { 1, 1, 1, 1, 1, 1, 2, 2, 2, 3 };
-    int32_t n = kHitCounts[orig_game_rand() % 10];
+    /* A local array, built on the stack at every call as the image does --
+     * not a static table. */
+    const int32_t hitCounts[10] = { 1, 1, 1, 1, 1, 1, 2, 2, 2, 3 };
+    int32_t n = hitCounts[orig_game_rand() % 10];
 
-    while (n > 0) {
-        SpawnParticle(at, rowField2C, (orig_game_rand() % 3) + 7, 0x0B,
-                      height, -1);
     (void)dir;
+    while (n > 0) {
+        int32_t kind = (orig_game_rand() % 3) + 7;   /* drawn before the pushes */
+
+        SpawnParticle(at, rowField2C, kind, 0x0B, height, -1);
         n--;
     }
 }
