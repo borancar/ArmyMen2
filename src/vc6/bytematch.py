@@ -112,10 +112,14 @@ def resolve_sym(syms, func):
         for s in syms:
             if s.startswith(p) and s[len(p):].isdigit():
                 return s
-    for s in syms:                      # C++ mangled ?name@@...
-        if s.startswith("?" + func + "@"):
-            return s
-    return None
+    # C++ mangled ?name@... -- a class member (?name@Class@@) before a free
+    # function (?name@@), and a defined one before an undefined one. A thiscall
+    # method and the free inline wrapper that forwards to it share the name, and
+    # the header's linkage decides whether the wrapper is mangled at all; the
+    # installed function is the member.
+    cands = [s for s in syms if s.startswith("?" + func + "@")]
+    cands.sort(key=lambda s: (syms[s][0] <= 0, s.startswith("?" + func + "@@")))
+    return cands[0] if cands else None
 
 def func_bytes(secs, syms, sym):
     secnum, value = syms[sym]

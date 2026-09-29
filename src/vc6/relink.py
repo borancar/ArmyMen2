@@ -40,8 +40,10 @@ def resolve_member_first(names, fn):
     method -- and the function installed at the manifest VA is the METHOD, not
     the 13-byte forwarder."""
     if not fn.startswith("??"):
+        # ?fn@Class@@ only: ?fn@@ is a free function of the same name -- the
+        # forwarder itself once its header gives it C++ linkage.
         for s in names:
-            if s.startswith("?" + fn + "@"):
+            if s.startswith("?" + fn + "@") and not s.startswith("?" + fn + "@@"):
                 return s
     return BM.resolve_sym(names, fn)
 

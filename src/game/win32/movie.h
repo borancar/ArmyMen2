@@ -1,13 +1,25 @@
 #ifndef AM2_MOVIE_H
 #define AM2_MOVIE_H
 
+#include <stddef.h>
+#include <stdint.h>
+#include "../../inject/orig.h"
+
 #ifdef __cplusplus   /* thiscall members -- see src/vc6 (byte-match) */
 struct AM2_Movie {
+    uint8_t bytes[AM2_MOVIE_SIZE];  /* opaque: movie.cpp names the fields */
+    /* 0x00444FC0. PlayMovie builds it with `new`, so this is a real
+     * constructor -- the original's `new` carries an EH state for it. */
+    AM2_Movie(const char *name, int32_t wantW, int32_t wantH, int32_t big);
+#if defined(__GNUC__)
+    /* `new` on the game's heap, as AM2_Widget's: StateLeave frees it there. */
+    static void *operator new(size_t n);
+    static void operator delete(void *p);
+#endif
     void __attribute__((thiscall)) MovieStop();
     void __attribute__((thiscall)) MovieSetVolume(int32_t volume);
     void __attribute__((thiscall)) MovieApplyPalette(LPDIRECTDRAWSURFACE surf);
     int32_t __attribute__((thiscall)) MovieStart(void *arg);
-    void * __attribute__((thiscall)) MovieOpen(const char *name, int32_t wantW, int32_t wantH, int32_t big);
     void __attribute__((thiscall)) MovieDrawFrame(void *arg);
     int32_t __attribute__((thiscall)) MoviePoll();
 };
@@ -21,7 +33,10 @@ static inline void __attribute__((thiscall)) MovieApplyPalette(void *movie, LPDI
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
  * compatible so dllmain.c can still call the install hooks. */
-#ifdef __cplusplus
+/* C++ linkage under VC6: it assumes an extern "C" callee cannot throw, and
+ * PlayMovie's `new AM2_Movie` must carry the EH state the original's does
+ * (see rect.h). */
+#if defined(__cplusplus) && !defined(_MSC_VER)
 extern "C" {
 #endif
 
@@ -67,11 +82,6 @@ static inline void __attribute__((thiscall)) MovieDrawFrame(void *movie, void *a
 /* Original: 0x00445600, 2 call sites. Post WM_USER to say the movie ended,
  * which is how a finished cutscene becomes a game state change. */
 void __cdecl MovieFinished(void);
-
-/* Original: 0x00444FC0, 1 call site. Open a .SMK and prepare to play it. A
- * `wantW` of -1 means "whatever size the film is". Returns `this`. */
-static inline void * __attribute__((thiscall)) MovieOpen(void *movie, const char *name, int32_t wantW, int32_t wantH, int32_t big)
-{ return ((AM2_Movie *)movie)->MovieOpen(name, wantW, wantH, big); }
 
 /* Original: 0x00445390, 2 call sites. Draw a frame if Smacker says one is due.
  * Called from the game loop rather than the timer -- both drive playback, and
@@ -125,7 +135,7 @@ static inline int32_t __attribute__((thiscall)) MovieStart(void *movie, void *ar
 
 int movie_install(void);
 
-#ifdef __cplusplus
+#if defined(__cplusplus) && !defined(_MSC_VER)
 }
 #endif
 

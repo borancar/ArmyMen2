@@ -335,8 +335,8 @@ int32_t __attribute__((thiscall)) AM2_Movie::MovieStart(void *arg)
  * only place DirectSound appears outside device.cpp, and it is skipped entirely
  * when there is no DirectSound to hand over -- as here, where there is none.
  *
- * Returns `this`, in the way a C++ constructor-ish method does. */
-void * __attribute__((thiscall)) AM2_Movie::MovieOpen(const char *name, int32_t wantW, int32_t wantH, int32_t big)
+ * A real constructor: PlayMovie builds the object with `new`. */
+AM2_Movie::AM2_Movie(const char *name, int32_t wantW, int32_t wantH, int32_t big)
 {
     void *movie = this;
 
@@ -373,7 +373,8 @@ void * __attribute__((thiscall)) AM2_Movie::MovieOpen(const char *name, int32_t 
     fld(movie, MOVIE_SRC_X, int32_t) = 0;
     fld(movie, MOVIE_SRC_Y, int32_t) = 0;
 
-    smack = smack_open(name, big ? 0x1FE440u : 0x000FE040u, 0xFFFFFFFFu);
+    smack = smack_open(name, fld(movie, MOVIE_BIG, int32_t) ? 0x1FE440u : 0x000FE040u,
+                       0xFFFFFFFFu);
     fld(movie, MOVIE_SMACK, void *) = smack;
 
     if (smack) {
@@ -404,8 +405,20 @@ void * __attribute__((thiscall)) AM2_Movie::MovieOpen(const char *name, int32_t 
      * no stack arguments and ends in a plain `ret`, so our cdecl declaration of
      * it is ABI-identical. */
     SnapshotSystemPalette();
-    return movie;
 }
+
+#if defined(__GNUC__)
+void *AM2_Movie::operator new(size_t n)
+{
+    return ((void *(__cdecl *)(uint32_t))(uintptr_t)ADDR_GAME_OPERATOR_NEW)(n);
+}
+void AM2_Movie::operator delete(void *p)
+{
+    ((void (__cdecl *)(void *))(uintptr_t)ADDR_GAME_DELETE)(p);
+}
+void *__attribute__((thiscall)) am2_ctor_AM2_Movie(void *mem, const char *name, int32_t wantW, int32_t wantH, int32_t big)
+{ return ::new (mem) AM2_Movie(name, wantW, wantH, big); }
+#endif
 
 /* Original: 0x00445600, 2 call sites. Tell the window the movie ended.
  *
@@ -626,7 +639,6 @@ void __cdecl StateLeave(void)
  */
 void __cdecl PlayMovie(const char *name, int32_t big)
 {
-    void   *movie;
     int32_t volume;
 
     if (strncmp("3do", name, 3) == 0
@@ -638,29 +650,24 @@ void __cdecl PlayMovie(const char *name, int32_t big)
 
     if (!FileExists(name)
         || *(const int32_t *)(uintptr_t)ADDR_OPT_NO_MOVIES) {
-        MovieFinished();
+        /* MovieFinished's body, inline here -- the image posts directly at
+         * 0x0042E705 where its other two callers call 0x00445600. */
+        PostMessageA(g_hWnd, WM_USER, 0, 0);
         return;
     }
 
     StateLeave();
 
-    movie = orig_operator_new(AM2_MOVIE_SIZE);
-    if (movie)
-        movie = MovieOpen(movie, name, -1, -1, big);
-
-    /* The original stores whatever the constructor returned, which for an
-     * i386 MSVC constructor is `this`. Written as the pointer rather than as
-     * a second variable, since the two cannot differ. */
-    *(void **)(uintptr_t)ADDR_STATE_MOVIE = movie;
+    *(void **)(uintptr_t)ADDR_STATE_MOVIE = new AM2_Movie(name, -1, -1, big);
 
     ClearSurface(g_primarySurface, 0);
     MovieSetCurrent(*(void **)(uintptr_t)ADDR_STATE_MOVIE);
 
     volume = *(const int32_t *)(uintptr_t)ADDR_VOLUME_VOICE;
-    MovieSetVolume(*(void **)(uintptr_t)ADDR_STATE_MOVIE,
-                   volume > AM2_MOVIE_VOLUME_FLOOR
-                       ? volume * 3 + 0x8000
-                       : 0);
+    if (volume <= AM2_MOVIE_VOLUME_FLOOR)
+        MovieSetVolume(*(void **)(uintptr_t)ADDR_STATE_MOVIE, 0);
+    else
+        MovieSetVolume(*(void **)(uintptr_t)ADDR_STATE_MOVIE, volume * 3 + 0x8000);
     MovieStart(*(void **)(uintptr_t)ADDR_STATE_MOVIE, (void *)0);
 }
 
@@ -798,7 +805,7 @@ int movie_install(void)
                         "StateLeave", 4);
     rc |= patch_replace(ADDR_MOVIE_FINISHED, (const void *)MovieFinished,
                         "MovieFinished", 0);
-    rc |= patch_replace(ADDR_MOVIE_OPEN, pmf_addr(&AM2_Movie::MovieOpen), "MovieOpen", 4);
+    rc |= patch_replace(ADDR_MOVIE_OPEN, AM2_CTOR(AM2_Movie), "MovieOpen", 4);
     rc |= patch_replace(ADDR_MOVIE_START, pmf_addr(&AM2_Movie::MovieStart), "MovieStart", 1);
     rc |= patch_replace(ADDR_PLAY_MOVIE, (const void *)PlayMovie,
                         "PlayMovie", 4);
