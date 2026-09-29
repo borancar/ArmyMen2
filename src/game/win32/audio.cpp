@@ -1870,26 +1870,26 @@ int32_t __cdecl InitWaveSounds(void)
  * than sixteen. */
 void __cdecl FreeDynamicSounds(void)
 {
-    uint8_t **slot;
+    int32_t i;
 
     if (!g_audioEnabled)
         return;
 
-    for (slot = (uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC;
-         slot <= (uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC_LAST;
-         slot++) {
-        uint8_t *snd = *slot;
-
-        if (!snd)
+    /* An index loop over the slots (the image's signed `jle` against the end
+     * address), each slot re-read at every use. */
+#define SLOT (((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)[i])
+    for (i = 0; i <= AM2_SOUND_DYNAMIC_LAST_INDEX; i++) {
+        if (!SLOT)
             continue;
-        if (*(void **)(snd + SOUND_DYN_OFF_BUFFER))
+        if (*(void **)(SLOT + SOUND_DYN_OFF_BUFFER))
             IDirectSoundBuffer_Release(
-                *(LPDIRECTSOUNDBUFFER *)(snd + SOUND_DYN_OFF_BUFFER));
-        if (*(void **)(snd + SOUND_DYN_OFF_DATA))
-            orig_free(*(void **)(snd + SOUND_DYN_OFF_DATA));
-        orig_free(snd);
-        *slot = NULL;
+                *(LPDIRECTSOUNDBUFFER *)(SLOT + SOUND_DYN_OFF_BUFFER));
+        if (*(void **)(SLOT + SOUND_DYN_OFF_DATA))
+            orig_free(*(void **)(SLOT + SOUND_DYN_OFF_DATA));
+        orig_free(SLOT);
+        SLOT = NULL;
     }
+#undef SLOT
 }
 
 /* ------------------------------------------------------ save ---- */
@@ -1993,20 +1993,19 @@ typedef int32_t (__cdecl *AM2_RandFn)(void);
 
 void __cdecl SpeakLine(int32_t group, int32_t owner)
 {
-    const uint8_t     *rec;
-    int32_t            count;
-    const char *const *names;
-
+    struct VoiceGroup { int32_t count; const char *names[4]; };
+#define GROUPS ((const struct VoiceGroup *)(uintptr_t)ADDR_VOICE_GROUPS)
     if ((int32_t)g_defaultOwner != owner)
         return;
 
-    rec = (const uint8_t *)(uintptr_t)ADDR_VOICE_GROUPS
-          + (uint32_t)group * AM2_VOICE_GROUP_STRIDE;
-    count = *(const int32_t *)rec;
-    names = (const char *const *)(rec + 4);
+    {
+        /* Chosen before the call's other arguments are pushed. */
+        int32_t     r    = orig_rand() % GROUPS[group].count;
+        const char *name = GROUPS[group].names[r];
 
-    PlayDynamicSound(names[orig_rand() % count], 0, 0, 0, 0, AM2_VOICE_SLOT,
-                     1, 0);
+        PlayDynamicSound(name, 0, 0, 0, 0, AM2_VOICE_SLOT, 1, 0);
+    }
+#undef GROUPS
 }
 
 /* 0x00448380, two callers -- TrooperPickupItem and

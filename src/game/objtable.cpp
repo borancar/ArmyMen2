@@ -199,7 +199,7 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
  */
 int32_t __cdecl RemoveFromItemList(AM2_Object *obj)
 {
-    int32_t pos = 0;
+    int32_t pos;                    /* uninitialised: it lives in obj's slot */
     int32_t i, tail;
 
     /* Same trick as LookupByUID and CheckSaveTag: the original hands FindSlot
@@ -278,27 +278,25 @@ void *__cdecl ObjByUidAlias(uint32_t uid)
  * global OverlayPrepare seeds its offsets from. */
 void __cdecl SelectUnit(void *obj)
 {
-    uint8_t       *o     = (uint8_t *)obj;
-    int32_t       *rec   = (int32_t *)(uintptr_t)ADDR_SELECTED_UIDS;
-    uint32_t       uid;
-    const uint32_t *items;
-    int32_t        i;
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  i;
 
+    /* The list's count, items and the uid are read again at every use. */
+#define REC ((int32_t *)(uintptr_t)ADDR_SELECTED_UIDS)
     if (!o)
         return;
-    if (rec[1] > AM2_MAX_SELECTED)
+    if (REC[1] > AM2_MAX_SELECTED)
         return;
 
-    uid   = *(const uint32_t *)(o + 4);
-    items = *(const uint32_t *const *)&rec[2];
-    for (i = 0; i < rec[1]; i++)
-        if (items[i] == uid)
+    for (i = 0; i < REC[1]; i++)
+        if ((*(const uint32_t *const *)&REC[2])[i] == *(const uint32_t *)(o + 4))
             return;
 
-    PtrListPush(rec, (void *)(uintptr_t)uid);
+    PtrListPush(REC, (void *)(uintptr_t)*(const uint32_t *)(o + 4));
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
     OnSelectionChanged(*(const uint32_t *)(uintptr_t)
                               ADDR_ZERO_POINT);
+#undef REC
 }
 
 /* 0x00427C80, four callers, and the exact counterpart of SelectUnit above --

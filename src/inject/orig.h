@@ -5035,6 +5035,7 @@
 /* Inclusive: the original's loop is `cmp edi,0x4FA400 / jle`, so the entry AT
  * this address is processed too -- 17 pointers, not 16. */
 #define ADDR_SOUND_DYNAMIC_LAST  0x004FA400u
+#define AM2_SOUND_DYNAMIC_LAST_INDEX 16   /* (LAST - DYNAMIC) / 4: slots 0..16 */
 /* Bulk operations over those two tables. */
 #define ADDR_FREE_DYN_SOUNDS     0x0040B800u  /* void(void) */
 /* 0x0040C7A0, one caller. Free every FIXED sound slot -- ADDR_SOUND_SLOTS to
