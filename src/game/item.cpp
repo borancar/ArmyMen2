@@ -6322,23 +6322,13 @@ typedef void (__cdecl *AM2_StepFn)(void *obj);
 void __cdecl StepType8(void *obj)
 {
     uint8_t *o      = (uint8_t *)obj;
-    uint8_t *facing = o + OBJ_OFF_FIELD_540;
+    uint8_t *facing;
 
     ObjClearRoachFootprint(obj);
-    *facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
+    *(o + OBJ_OFF_FIELD_540) = *(const uint8_t *)(o + OBJ_OFF_FACING);
+    facing = o + OBJ_OFF_FIELD_540;
 
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0) {
-        *(int32_t *)(o + OBJ_OFF_DEATH_STATE)     = 1;
-        *(int32_t *)(o + OBJ_OFF_DEATH_STATE + 4) = 0;
-
-        PlaySoundAt(AM2_ROACH_ALIVE_SOUND, 1, 0,
-                    *(const int16_t *)(o + OBJ_OFF_POS),
-                    *(const int16_t *)(o + OBJ_OFF_POS + 2));
-
-        RoachAliveStepA(obj, facing);
-        RoachAliveStepB(obj, facing);
-
-    } else {
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0) {
         switch (*(const int32_t *)(o + OBJ_OFF_FIELD_530)) {
         case 0:
             DestroyByType(obj);
@@ -6350,17 +6340,30 @@ void __cdecl StepType8(void *obj)
             *(int32_t *)(o + OBJ_OFF_DEATH_STATE) = 6;
             break;
 
-        case 6:
-            if (!RowAnimFinished(*(void **)(o + OBJ_OFF_ROWS)))
+        case 6: {
+            void *row = *(void **)(o + OBJ_OFF_ROWS);
+
+            if (!RowAnimFinished(row))
                 break;
-            RowFaceSprite(*(void **)(o + OBJ_OFF_ROWS));
-            LeaveRemainsRow(*(void **)(o + OBJ_OFF_ROWS));
+            RowFaceSprite(row);
+            LeaveRemainsRow(row);
             DestroyByType(obj);
             break;
+        }
 
         default:
             break;
         }
+    } else {
+        *(int32_t *)(o + OBJ_OFF_DEATH_STATE)     = 1;
+        *(int32_t *)(o + OBJ_OFF_DEATH_STATE + 4) = 0;
+
+        PlaySoundAt(AM2_ROACH_ALIVE_SOUND, 1, 0,
+                    *(const int16_t *)(o + OBJ_OFF_POS),
+                    *(const int16_t *)(o + OBJ_OFF_POS + 2));
+
+        RoachAliveStepA(obj, facing);
+        RoachAliveStepB(obj, facing);
     }
 
     RoachStepTailA(obj, facing);
@@ -6706,8 +6709,6 @@ void __cdecl Type2ActionC(void *obj, int32_t prev)
 void __cdecl StepType1And4(void *obj)
 {
     uint8_t *o = (uint8_t *)obj;
-    uint8_t *rec;
-    uint32_t now;
 
     UpdateObjectScript(obj);
 
@@ -6716,15 +6717,15 @@ void __cdecl StepType1And4(void *obj)
         *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_BIT7;
     }
 
-    rec = *(uint8_t **)(o + OBJ_OFF_FIELD_94);
-    now = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
-
-    if (*(const int32_t *)rec == 0x2A
+    /* The record and the clock are re-read at each use. */
+#define REC (*(uint8_t **)(o + OBJ_OFF_FIELD_94))
+    if (*(const int32_t *)REC == 0x2A
         && *(const int16_t *)(o + OBJ_OFF_HEALTH) > 0) {
 
         if ((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
                 == (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
-            && now >= *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
+            && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+               >= *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
                       + AM2_REVEAL_PERIOD_MS) {
             RevealNearby(*(const AM2_Point *)(o + OBJ_OFF_POS),
                          AM2_REVEAL_NEAR, AM2_REVEAL_FAR);
@@ -6733,8 +6734,7 @@ void __cdecl StepType1And4(void *obj)
         }
 
         {
-            uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS);
-
+#define row (*(uint8_t **)(o + OBJ_OFF_ROWS))
             if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
                     - *(const uint32_t *)(row + ROW_OFF_STAMP_54)
                 > AM2_FRAME_PERIOD_MS) {
@@ -6749,10 +6749,11 @@ void __cdecl StepType1And4(void *obj)
                 *(uint32_t *)(row + ROW_OFF_STAMP_54) =
                     *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
             }
+#undef row
         }
     }
 
-    if (*(const int32_t *)(rec + 8)
+    if (*(const int32_t *)(REC + 8)
             != *(const int32_t *)(uintptr_t)ADDR_WATCHED_TYPE_ID)
         return;
 
@@ -6770,25 +6771,28 @@ void __cdecl StepType1And4(void *obj)
         return;
 
     {
-        int32_t   army = (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY);
-        void     *mine = LookupOwnerObj((uint32_t)army);
+        /* The army re-read at each use; the non-broadcasting client's
+         * `extra` is the zero the comm test answered. */
+#define ARMY ((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY))
+        void     *mine = LookupOwnerObj((uint32_t)ARMY);
         uint32_t  uid  = mine ? ((const AM2_Object *)mine)->uid
                               : ((const AM2_Object *)obj)->uid;
-        int32_t   extra = 0;
+        int32_t   extra;
 
         if (!*(void *const *)(uintptr_t)ADDR_MP_SESSION
-            || AM2_THE_COMM->CommMustBroadcast(
-                                 (int16_t)army))
+            || (extra = AM2_THE_COMM->CommMustBroadcast((int16_t)ARMY)) != 0)
             extra = *(const int32_t *)(uintptr_t)ADDR_SPAWN_EXTRA_6622BC;
 
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
         *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) =
             *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
 
         orig_spawn_at((int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
                       (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2),
-                      AM2_SPAWN_KIND_8B, army, uid, extra, 0, 0, 0, 0);
+                      AM2_SPAWN_KIND_8B, ARMY, uid, extra, 0, 0, 0, 0);
+#undef ARMY
     }
+#undef REC
 }
 
 
