@@ -3118,8 +3118,8 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
         int32_t at = delta + (int32_t)tile;
 
         if (at > 0
-            && at < *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
-                    * *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+            && at < *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
+                    * *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
             && regions[at] > 0
             && weights[at] < (int8_t)AM2_CELL_WEIGHT_STEP) {
             regions[tile] = regions[at];
