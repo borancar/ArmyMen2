@@ -13715,6 +13715,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MPNAME_OFF_FLAG        0x6Cu   /* int32_t, 1 from the panel */
 #define MPNAME_OFF_INK         0x70u   /* uint8_t */
 #define MPNAME_OFF_PAPER       0x71u   /* uint8_t */
+#define AM2_MP_NAME_BYTES      0x74u   /* the panel's allocation */
 
 #define ADDR_MP_COLOUR_CTOR    0x00432E20u /* thiscall, ret 0x0C */
 #define VTABLE_MP_COLOUR       0x0046FA5Cu

@@ -168,7 +168,6 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) DlgGameMenuDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) CommPanelDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) BattleJoinDelete(int32_t flags);
-    void __attribute__((thiscall)) MpNameDestruct();
     AM2_Widget * __attribute__((thiscall)) MpNameDelete(int32_t flags);
     void __attribute__((thiscall)) HudPanelUpdate();
     void __attribute__((thiscall)) HudTopPaint(RECT clip);
@@ -203,9 +202,6 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) HudCmdInvoke(int32_t mode);
     void __attribute__((thiscall)) ArrowBarShowRow(int32_t row);
     void __attribute__((thiscall)) RepaintAncestor(RECT clip);
-    AM2_Widget * __attribute__((thiscall)) MpNameConstruct(const char *text, int32_t left, int32_t top, int32_t width, int32_t height, int32_t flag, uint8_t ink, uint8_t paper, int32_t row);
-    AM2_Widget * __attribute__((thiscall)) MpColourConstruct(int32_t left, int32_t top, int32_t row);
-    AM2_Widget * __attribute__((thiscall)) MpTeamConstruct(int32_t left, int32_t top, int32_t row);
     void __attribute__((thiscall)) MpPanelUpdate();
     void __attribute__((thiscall)) GameMenuUpdate();
     void __attribute__((thiscall)) MpNameSetInk(uint8_t ink);
@@ -293,6 +289,9 @@ AM2_CLASS_VTABLE(AM2_HudSquad, VTABLE_HUD_SQUAD)
 AM2_CLASS_VTABLE(AM2_HudCmd, VTABLE_HUD_COMMANDS)
 AM2_CLASS_VTABLE(AM2_HudEdge, VTABLE_HUD_EDGE_STRIP)
 AM2_CLASS_VTABLE(AM2_CountButton, VTABLE_COUNT_BUTTON)
+AM2_CLASS_VTABLE(AM2_MpName, VTABLE_MP_NAME)
+AM2_CLASS_VTABLE(AM2_MpColour, VTABLE_MP_COLOUR)
+AM2_CLASS_VTABLE(AM2_MpTeam, VTABLE_MP_TEAM)
 AM2_CLASS_VTABLE(AM2_HudPanel, VTABLE_HUD_PANEL)
 AM2_CLASS_VTABLE(AM2_HudTop, VTABLE_HUD_TOP_STRIP)
 AM2_CLASS_VTABLE(AM2_DifficultyDialog, VTABLE_DIFFICULTY_DIALOG)
@@ -517,6 +516,30 @@ struct AM2_HudEdge : AM2_Widget {
     AM2_HudEdge();
     explicit AM2_HudEdge(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_HudEdge();
+};
+
+/* The multiplayer panel's per-row buttons. The name shows a player; the
+ * colour and team buttons are 18x20 swatches beside it. Only the name has a
+ * destructor of its own -- the other two share WidgetDeleteAlt. */
+struct AM2_MpName : AM2_ButtonBase {
+    const char *text;               /* 0x0068  MPNAME_OFF_TEXT */
+    int32_t     flag;               /* 0x006C  MPNAME_OFF_FLAG */
+    uint8_t     ink;                /* 0x0070  MPNAME_OFF_INK */
+    uint8_t     paper;              /* 0x0071  MPNAME_OFF_PAPER */
+    uint8_t     pad72[AM2_MP_NAME_BYTES - 0x72];
+    AM2_MpName(const char *text_, AM2_Rect box, int32_t flag_, uint8_t ink_, uint8_t paper_, int32_t row);
+    explicit AM2_MpName(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
+    ~AM2_MpName();
+};
+struct AM2_MpColour : AM2_ButtonBase {
+    typedef AM2_ButtonBase Base;    /* VC6's C2437: see AM2_TextList */
+    AM2_MpColour(int32_t left, int32_t top, int32_t row);
+    explicit AM2_MpColour(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
+};
+struct AM2_MpTeam : AM2_ButtonBase {
+    typedef AM2_ButtonBase Base;    /* VC6's C2437: see AM2_TextList */
+    AM2_MpTeam(int32_t left, int32_t top, int32_t row);
+    explicit AM2_MpTeam(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
 };
 
 struct AM2_CountButton : AM2_ButtonBase {
@@ -1557,7 +1580,7 @@ static inline void __attribute__((thiscall)) BattleJoinDestruct(AM2_Widget *w)
 static inline AM2_Widget * __attribute__((thiscall)) BattleJoinDelete(AM2_Widget *w, int32_t flags)
 { return w->BattleJoinDelete(flags); }
 static inline void __attribute__((thiscall)) MpNameDestruct(AM2_Widget *w)
-{ w->MpNameDestruct(); }
+{ ((AM2_MpName *)w)->AM2_MpName::~AM2_MpName(); }
 static inline AM2_Widget * __attribute__((thiscall)) MpNameDelete(AM2_Widget *w, int32_t flags)
 { return w->MpNameDelete(flags); }
 
@@ -2408,12 +2431,6 @@ static inline AM2_Widget * __attribute__((thiscall)) LoadGameConstruct(AM2_Widge
 static inline AM2_Widget * __attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w, const char *bmp)
 { return ::new (w) AM2_MpPanelScreen(bmp); }
 
-static inline AM2_Widget * __attribute__((thiscall)) MpNameConstruct(AM2_Widget *w, const char *text, int32_t left, int32_t top, int32_t width, int32_t height, int32_t flag, uint8_t ink, uint8_t paper, int32_t row)
-{ return w->MpNameConstruct(text, left, top, width, height, flag, ink, paper, row); }
-static inline AM2_Widget * __attribute__((thiscall)) MpColourConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t row)
-{ return w->MpColourConstruct(left, top, row); }
-static inline AM2_Widget * __attribute__((thiscall)) MpTeamConstruct(AM2_Widget *w, int32_t left, int32_t top, int32_t row)
-{ return w->MpTeamConstruct(left, top, row); }
 
 /* Their left handlers, 0x00432EC0 and 0x004330E0 -- and what named the two
  * classes. A guest changes nothing locally: it sends and waits. */

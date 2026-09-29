@@ -1427,6 +1427,17 @@ void __attribute__((thiscall)) am2_dtor_AM2_HudEdge(AM2_Widget *w)
 #endif
 
 #if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_MpName(void *mem, const char *text, AM2_Rect box, int32_t flag, uint8_t ink, uint8_t paper, int32_t row)
+{ return ::new (mem) AM2_MpName(text, box, flag, ink, paper, row); }
+void __attribute__((thiscall)) am2_dtor_AM2_MpName(AM2_Widget *w)
+{ ((AM2_MpName *)w)->AM2_MpName::~AM2_MpName(); }
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_MpColour(void *mem, int32_t left, int32_t top, int32_t row)
+{ return ::new (mem) AM2_MpColour(left, top, row); }
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_MpTeam(void *mem, int32_t left, int32_t top, int32_t row)
+{ return ::new (mem) AM2_MpTeam(left, top, row); }
+#endif
+
+#if defined(__GNUC__)
 AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_CountButton(void *mem, int32_t index, int32_t army, AM2_Rect box, int32_t menuRow, int32_t count, void (__cdecl *onToggle)(AM2_Widget *))
 { return ::new (mem) AM2_CountButton(index, army, box, menuRow, count, onToggle); }
 void __attribute__((thiscall)) am2_dtor_AM2_CountButton(AM2_Widget *w)
@@ -2524,43 +2535,6 @@ void __cdecl OnMpName(AM2_Widget *w);
  * ------------------------------------------------------------------ */
 
 
-/* 0x00432E20 and 0x00433030, thiscall `ret 0x0C`. Both are 18 by 20 at a
- * column the caller picks, and the only differences are the vtable, the
- * handlers, and whether the button repeats.
- *
- * The TEAM one has a RIGHT handler and auto-repeat where the COLOUR one has
- * neither, which is the shape difference; the names come from what the
- * handlers do, not from that. */
-static AM2_Widget *MpSmallConstruct(AM2_Widget *w, int32_t left, int32_t top,
-                                    int32_t row, uint32_t vtable,
-                                    uint32_t onLeft, uint32_t onRight,
-                                    int32_t repeats)
-{
-    uint8_t *self = (uint8_t *)w;
-    AM2_Rect box;
-
-    ButtonBaseConstruct(w);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(vtable));
-    RectSet(&box, left, top, AM2_MP_SMALL_W, AM2_MP_SMALL_H);
-    w->x = box.left;
-    w->y = box.top;
-    w->w = box.right;
-    w->h = box.bottom;
-    WidgetScreenRect(w);
-    /* The handlers arrive as ready POINTERS, already through AM2_IMAGE where
-     * they are still the original's: two of the three are ours now, and
-     * applying the slide here would have sent those through the detour. */
-    *(int32_t *)(self + MPBTN_OFF_ROW)        = row;
-    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT)  = onLeft;
-    if (onRight) {
-        *(uint32_t *)(self + BUTTON_OFF_ON_RIGHT) = onRight;
-        *(int32_t *)(self + BUTTON_OFF_REPEATS) = repeats;
-    }
-    return w;
-}
-
-
-
 /* 0x00432EC0 and 0x004330E0: the COLOUR and TEAM buttons' left handlers, and
  * what NAMED those two classes. Both open with the same guard -- a row that is
  * not ours may only be touched by the host, and only within the player count
@@ -3434,11 +3408,11 @@ int widget_install(void)
 
     rc |= patch_replace(ADDR_MP_PANEL_CTOR, AM2_CTOR(AM2_MpPanelScreen),
                         "MpPanelConstruct", 2);
-    rc |= patch_replace(ADDR_MP_NAME_CTOR, pmf_addr(&AM2_Widget::MpNameConstruct),
+    rc |= patch_replace(ADDR_MP_NAME_CTOR, AM2_CTOR(AM2_MpName),
                         "MpNameConstruct", 9);
-    rc |= patch_replace(ADDR_MP_COLOUR_CTOR, pmf_addr(&AM2_Widget::MpColourConstruct),
+    rc |= patch_replace(ADDR_MP_COLOUR_CTOR, AM2_CTOR(AM2_MpColour),
                         "MpColourConstruct", 3);
-    rc |= patch_replace(ADDR_MP_TEAM_CTOR, pmf_addr(&AM2_Widget::MpTeamConstruct),
+    rc |= patch_replace(ADDR_MP_TEAM_CTOR, AM2_CTOR(AM2_MpTeam),
                         "MpTeamConstruct", 3);
 
     rc |= patch_replace(ADDR_LOAD_GAME_CTOR, AM2_CTOR(AM2_LoadGameScreen),
@@ -3744,7 +3718,7 @@ int widget_install(void)
     rc |= patch_replace(ADDR_BATTLE_JOIN_DELETE,
                         pmf_addr(&AM2_Widget::BattleJoinDelete),
                         "BattleJoinDelete", 1);
-    rc |= patch_replace(ADDR_MP_NAME_DESTRUCT, pmf_addr(&AM2_Widget::MpNameDestruct),
+    rc |= patch_replace(ADDR_MP_NAME_DESTRUCT, AM2_DTOR(AM2_MpName),
                         "MpNameDestruct", 1);
     rc |= patch_replace(ADDR_MP_NAME_DELETE, pmf_addr(&AM2_Widget::MpNameDelete),
                         "MpNameDelete", 1);
@@ -7493,7 +7467,13 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::HudTopDelete(int32_t flags)
     return w;
 }
 
-AM2_CLASS_DTOR(MpName, VTABLE_MP_NAME, WidgetDestruct)
+/* 0x00432A60: retag and chain to the widget base -- nothing of its own to
+ * release. */
+AM2_MpName::~AM2_MpName()
+{
+    AM2_CTOR_VTABLE(this, VTABLE_MP_NAME);
+}
+AM2_CLASS_DELETE(MpName)
 
 /* The HUD's own classes. Every name is from the widget dump: `ctl widgets` in
  * a live mission prints a rectangle per node and the screenshot says what is
@@ -9614,21 +9594,17 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
                 am2_sprintf(name, (const char *)((void *)(uintptr_t)(AM2_STR_OPEN_SLOT)));
         }
 
-        child = (AM2_Widget *)orig_operator_new(0x74);
-        names[i] = child
-                 ? ::MpNameConstruct(child, name, 0x18, 40 + i * 32, 0x58, 0x12,
-                                   1,
-                                   *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR,
-                                   *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
-                                   i)
-                 : 0;
+        names[i] = new AM2_MpName(name,
+                                  *RectSet(AM2_TEMP(AM2_Rect), 0x18, 40 + i * 32, 0x58, 0x12),
+                                  1,
+                                  *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR,
+                                  *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
+                                  i);
         ::WidgetAddChild(w, names[i]);
 
-        child = (AM2_Widget *)orig_operator_new(0x68);
-        colours[i] = child ? ::MpColourConstruct(child, 0x86, 39 + i * 32, i) : 0;
+        colours[i] = new AM2_MpColour(0x86, 39 + i * 32, i);
         ::WidgetAddChild(w, colours[i]);
 
-        child = (AM2_Widget *)orig_operator_new(0x68);
         /* 39, not 37. The colour swatch and the team button are two halves
          * of ONE row -- x 0x86 and 0xBF, the same y -- and the original's own
          * tree has both at 39: `r=134,39,152,59` beside `r=191,39,209,59`.
@@ -9639,7 +9615,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * sixteen times and gives up, and every step after it runs against a
          * panel in the wrong state. The pixels were never going to show this;
          * the widget tree did. */
-        teams[i] = child ? ::MpTeamConstruct(child, 0xBF, 39 + i * 32, i) : 0;
+        teams[i] = new AM2_MpTeam(0xBF, 39 + i * 32, i);
         ::WidgetAddChild(w, teams[i]);
 
         /* THE ARMY-POINTS SPINNER -- the fourth quarter of this loop, and the
@@ -11003,33 +10979,26 @@ void __cdecl OpenMpOptions(void)
     g_paintObject = (uint8_t *)new AM2_MpOptionsScreen("01_001_03_mphostoptions.bmp");
 }
 
-/* 0x004329A0, thiscall `ret 0x24` -- NINE stack arguments, and the four in
- * the middle are the rectangle spelled out rather than passed by value, which
- * is what makes this one different from every other widget constructor here.
+/* 0x004329A0, thiscall `ret 0x24` -- nine stack dwords, four of them a
+ * rectangle passed BY VALUE: the constructor copies it into the base as one
+ * struct through `lea ecx, [esi + 4]`, and the panel's call site copies a
+ * local rect onto the stack. It was read as four loose ints once; the ABI
+ * is the same, the copy is not.
  *
  * It writes the rectangle into the base DIRECTLY and then calls
- * WidgetScreenRect, where the others go through RectSet first. Same result,
- * one fewer call. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpNameConstruct(const char *text, int32_t left, int32_t top, int32_t width, int32_t height, int32_t flag, uint8_t ink, uint8_t paper, int32_t row)
+ * WidgetScreenRect, where the others go through RectSet first. */
+AM2_MpName::AM2_MpName(const char *text_, AM2_Rect box, int32_t flag_, uint8_t ink_, uint8_t paper_, int32_t row)
+    : text(text_), flag(flag_), ink(ink_), paper(paper_)
 {
     AM2_Widget *w = this;
 
     uint8_t *self = (uint8_t *)w;
 
-    ::ButtonBaseConstruct(w);
-    *(const char **)(self + MPNAME_OFF_TEXT)  = text;
-    *(int32_t *)(self + MPNAME_OFF_FLAG)      = flag;
-    self[MPNAME_OFF_INK]                      = ink;
-    self[MPNAME_OFF_PAPER]                    = paper;
-    w->x = left;
-    w->y = top;
-    w->w = width;
-    w->h = height;
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_MP_NAME));
+    *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
+    AM2_CTOR_VTABLE(w, VTABLE_MP_NAME);
     ::WidgetScreenRect(w);
     *(uint32_t *)(self + BUTTON_OFF_ON_LEFT) = (uint32_t)(uintptr_t)OnMpName;
     *(int32_t *)(self + MPBTN_OFF_ROW) = row;
-    return w;
 }
 
 /* 0x00432A70, vtable slot 1 of VTABLE_MP_NAME -- one row of the multiplayer
@@ -11247,12 +11216,30 @@ void __cdecl OnMpName(AM2_Widget *w)
     WidgetVPaint(w, w->rect);
 }
 
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpColourConstruct(int32_t left, int32_t top, int32_t row)
+/* 0x00432E20 and 0x00433030, thiscall `ret 0x0C`. Both are 18 by 20 at a
+ * column the caller picks, and the only differences are the vtable, the
+ * handlers, and whether the button repeats.
+ *
+ * The TEAM one has a RIGHT handler and auto-repeat where the COLOUR one has
+ * neither, which is the shape difference; the names come from what the
+ * handlers do, not from that. */
+AM2_MpColour::AM2_MpColour(int32_t left, int32_t top, int32_t row)
 {
     AM2_Widget *w = this;
 
-    return MpSmallConstruct(w, left, top, row, VTABLE_MP_COLOUR,
-                            (uint32_t)(uintptr_t)OnMpColour, 0, 0);
+    uint8_t *self = (uint8_t *)w;
+
+    AM2_CTOR_VTABLE(w, VTABLE_MP_COLOUR);
+    {
+        /* Through a copy: the image loads all four dwords before storing
+         * any, which a direct `= *RectSet(...)` interleaves. */
+        AM2_Rect box = *RectSet(AM2_TEMP(AM2_Rect), left, top,
+                                AM2_MP_SMALL_W, AM2_MP_SMALL_H);
+        *(AM2_Rect *)&w->x = box;
+    }
+    ::WidgetScreenRect(w);
+    *(int32_t *)(self + MPBTN_OFF_ROW)       = row;
+    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT) = (uint32_t)(uintptr_t)OnMpColour;
 }
 
 void __cdecl OnMpColour(AM2_Widget *w)
@@ -11331,13 +11318,25 @@ void __attribute__((thiscall)) AM2_Widget::MpColourPaint(RECT clip)
     ::WidgetPaint(w, clip);
 }
 
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpTeamConstruct(int32_t left, int32_t top, int32_t row)
+AM2_MpTeam::AM2_MpTeam(int32_t left, int32_t top, int32_t row)
 {
     AM2_Widget *w = this;
 
-    return MpSmallConstruct(w, left, top, row, VTABLE_MP_TEAM,
-                            (uint32_t)(uintptr_t)OnMpTeamLeft,
-                            (uint32_t)(uintptr_t)OnMpTeamRight, 1);
+    uint8_t *self = (uint8_t *)w;
+
+    AM2_CTOR_VTABLE(w, VTABLE_MP_TEAM);
+    {
+        /* Through a copy: the image loads all four dwords before storing
+         * any, which a direct `= *RectSet(...)` interleaves. */
+        AM2_Rect box = *RectSet(AM2_TEMP(AM2_Rect), left, top,
+                                AM2_MP_SMALL_W, AM2_MP_SMALL_H);
+        *(AM2_Rect *)&w->x = box;
+    }
+    ::WidgetScreenRect(w);
+    *(int32_t *)(self + MPBTN_OFF_ROW)        = row;
+    *(uint32_t *)(self + BUTTON_OFF_ON_LEFT)  = (uint32_t)(uintptr_t)OnMpTeamLeft;
+    *(uint32_t *)(self + BUTTON_OFF_ON_RIGHT) = (uint32_t)(uintptr_t)OnMpTeamRight;
+    *(int32_t *)(self + BUTTON_OFF_REPEATS)   = 1;
 }
 
 void __cdecl OnMpTeamLeft(AM2_Widget *w)
