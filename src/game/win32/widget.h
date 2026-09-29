@@ -201,14 +201,11 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) MpDialogDestruct();
     void __attribute__((thiscall)) OptionsUpdate();
     void __attribute__((thiscall)) HudCmdInvoke(int32_t mode);
-    AM2_Widget * __attribute__((thiscall)) DlgSaveListConstruct(const char *bmp, int32_t flag);
     void __attribute__((thiscall)) ArrowBarShowRow(int32_t row);
-    AM2_Widget * __attribute__((thiscall)) MoviesConstruct(const char *bmp);
     void __attribute__((thiscall)) RepaintAncestor(RECT clip);
     AM2_Widget * __attribute__((thiscall)) MpNameConstruct(const char *text, int32_t left, int32_t top, int32_t width, int32_t height, int32_t flag, uint8_t ink, uint8_t paper, int32_t row);
     AM2_Widget * __attribute__((thiscall)) MpColourConstruct(int32_t left, int32_t top, int32_t row);
     AM2_Widget * __attribute__((thiscall)) MpTeamConstruct(int32_t left, int32_t top, int32_t row);
-    void __attribute__((thiscall)) MpPanelDestruct();
     void __attribute__((thiscall)) MpPanelUpdate();
     void __attribute__((thiscall)) GameMenuUpdate();
     void __attribute__((thiscall)) MpNameSetInk(uint8_t ink);
@@ -222,7 +219,6 @@ typedef struct AM2_Widget {
     void __attribute__((thiscall)) HudSquadUpdate();
     void __attribute__((thiscall)) HudCmdUpdate();
     void __attribute__((thiscall)) HudChatSend();
-    AM2_Widget * __attribute__((thiscall)) MpPanelConstruct(const char *bmp);
     void __attribute__((thiscall)) MpPreviewSetBitmap(const char *name);
     AM2_Widget * __attribute__((thiscall)) ArrowBarDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) CheckBoxDelete(int32_t flags);
@@ -234,9 +230,7 @@ typedef struct AM2_Widget {
     AM2_Widget * __attribute__((thiscall)) HudSquadDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) HudTopDelete(int32_t flags);
     AM2_Widget * __attribute__((thiscall)) MoviesDelete(int32_t flags);
-    void __attribute__((thiscall)) MoviesDestruct();
     AM2_Widget * __attribute__((thiscall)) SaveListDelete(int32_t flags);
-    void __attribute__((thiscall)) SaveListDestruct();
     /* The ROOT of the original's widget classes: a real constructor
      * (0x00453B00) and destructor (0x00453BC0), so every class built on it
      * gets them implicitly, with the /GX unwind states that come with them.
@@ -321,6 +315,9 @@ AM2_CLASS_VTABLE(AM2_DelPlayerDialogScreen, VTABLE_DELPLAYER_DIALOG)
 AM2_CLASS_VTABLE(AM2_BattleNameScreen, VTABLE_BATTLE_NAME_DLG)
 AM2_CLASS_VTABLE(AM2_MpOptionsScreen, VTABLE_OPTIONS_MENU_MP)
 AM2_CLASS_VTABLE(AM2_WarMenuScreen, VTABLE_WAR_MENU)
+AM2_CLASS_VTABLE(AM2_DlgSaveListScreen, VTABLE_SAVE_LIST)
+AM2_CLASS_VTABLE(AM2_MoviesScreen, VTABLE_MOVIES)
+AM2_CLASS_VTABLE(AM2_MpPanelScreen, VTABLE_MP_PANEL)
 
 /* Installing a constructor or destructor at the original's address. GCC
  * builds install a thiscall thunk (constructors must answer `this` in eax, as
@@ -621,9 +618,11 @@ struct AM2_DlgOverwriteScreen : AM2_ScreenBase {
     AM2_DlgOverwriteScreen(const char *bmp, int32_t flag);
     ~AM2_DlgOverwriteScreen();
 };
-struct AM2_DlgSaveListScreen : AM2_Widget {
-    uint8_t pad_[AM2_SAVE_LIST_SIZE - sizeof(AM2_Widget)];
+struct AM2_DlgSaveListScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_SAVE_LIST_SIZE - sizeof(AM2_ScreenBase)];
     AM2_DlgSaveListScreen(const char *bmp, int32_t flag);
+    ~AM2_DlgSaveListScreen();
 };
 struct AM2_EnterNameScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
@@ -637,18 +636,22 @@ struct AM2_LoadGameScreen : AM2_ScreenBase {
     AM2_LoadGameScreen(const char *bmp, int32_t flag);
     ~AM2_LoadGameScreen();
 };
-struct AM2_MoviesScreen : AM2_Widget {
-    uint8_t pad_[AM2_MOVIES_SIZE - sizeof(AM2_Widget)];
+struct AM2_MoviesScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_MOVIES_SIZE - sizeof(AM2_ScreenBase)];
     AM2_MoviesScreen(const char *bmp);
+    ~AM2_MoviesScreen();
 };
 struct AM2_MpOptionsScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
     uint8_t pad_[AM2_MP_OPTIONS_SIZE - sizeof(AM2_ScreenBase)];
     AM2_MpOptionsScreen(const char *bmp);
 };
-struct AM2_MpPanelScreen : AM2_Widget {
-    uint8_t pad_[AM2_MP_PANEL_SIZE - sizeof(AM2_Widget)];
+struct AM2_MpPanelScreen : AM2_ScreenBase {
+    typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
+    uint8_t pad_[AM2_MP_PANEL_SIZE - sizeof(AM2_ScreenBase)];
     AM2_MpPanelScreen(const char *bmp);
+    ~AM2_MpPanelScreen();
 };
 struct AM2_OptionsMenuScreen : AM2_ScreenBase {
     typedef AM2_ScreenBase Base;    /* VC6's C2437: see AM2_TextList */
@@ -725,11 +728,11 @@ static inline void __attribute__((thiscall)) HudTopDestruct(AM2_Widget *w)
 static inline AM2_Widget * __attribute__((thiscall)) MoviesDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->MoviesDelete(flags); }
 static inline void __attribute__((thiscall)) MoviesDestruct(AM2_Widget *w)
-{ ((AM2_Widget *)w)->MoviesDestruct(); }
+{ ((AM2_MoviesScreen *)w)->AM2_MoviesScreen::~AM2_MoviesScreen(); }
 static inline AM2_Widget * __attribute__((thiscall)) SaveListDelete(AM2_Widget *w, int32_t flags)
 { return ((AM2_Widget *)w)->SaveListDelete(flags); }
 static inline void __attribute__((thiscall)) SaveListDestruct(AM2_Widget *w)
-{ ((AM2_Widget *)w)->SaveListDestruct(); }
+{ ((AM2_DlgSaveListScreen *)w)->AM2_DlgSaveListScreen::~AM2_DlgSaveListScreen(); }
 
 
 /* The base class's vtable, stored by its constructor and restored by its
@@ -1507,7 +1510,7 @@ static inline AM2_Widget * __attribute__((thiscall)) DlgBattleJoinConstruct(AM2_
 /* 0x00453280, thiscall. The SAVE GAME dialog. Creates the player's save
  * folder before listing it. */
 static inline AM2_Widget * __attribute__((thiscall)) DlgSaveListConstruct(AM2_Widget *w, const char *bmp, int32_t flag)
-{ return w->DlgSaveListConstruct(bmp, flag); }
+{ return ::new (w) AM2_DlgSaveListScreen(bmp, flag); }
 
 /* 0x00456300, thiscall. The SPIN control: two arrows and a numeric edit,
  * all laid out from the widget's own rect. */
@@ -2397,7 +2400,7 @@ static inline AM2_Widget * __attribute__((thiscall)) DeleteGameConstruct(AM2_Wid
  * of four, and the only screen that builds its buttons out of SPRITES it
  * loaded itself rather than out of bitmap names. */
 static inline AM2_Widget * __attribute__((thiscall)) MoviesConstruct(AM2_Widget *w, const char *bmp)
-{ return w->MoviesConstruct(bmp); }
+{ return ::new (w) AM2_MoviesScreen(bmp); }
 
 /* Original: 0x004520E0, thiscall. LOAD GAME -- the campaign's save picker,
  * and the second of the two screens built two ways. */
@@ -2411,7 +2414,7 @@ static inline AM2_Widget * __attribute__((thiscall)) LoadGameConstruct(AM2_Widge
  * COMM_OFF_IS_HOST decides which children are greyed, which are built at all,
  * and whether the corner button says START or READY. */
 static inline AM2_Widget * __attribute__((thiscall)) MpPanelConstruct(AM2_Widget *w, const char *bmp)
-{ return w->MpPanelConstruct(bmp); }
+{ return ::new (w) AM2_MpPanelScreen(bmp); }
 
 static inline AM2_Widget * __attribute__((thiscall)) MpNameConstruct(AM2_Widget *w, const char *text, int32_t left, int32_t top, int32_t width, int32_t height, int32_t flag, uint8_t ink, uint8_t paper, int32_t row)
 { return w->MpNameConstruct(text, left, top, width, height, flag, ink, paper, row); }
@@ -2484,7 +2487,7 @@ static inline void __attribute__((thiscall)) MpPanelUpdate(AM2_Widget *w)
 /* 0x00430480, slot 0: release the panel's two GLOBAL sprite arrays and chain
  * to the dialog base. */
 static inline void __attribute__((thiscall)) MpPanelDestruct(AM2_Widget *w)
-{ w->MpPanelDestruct(); }
+{ ((AM2_MpPanelScreen *)w)->AM2_MpPanelScreen::~AM2_MpPanelScreen(); }
 
 /* 0x00430510, 0x00431790, 0x0042FF40. The slots that complete those classes:
  * the two scalar deleting destructors and the panel's paint forward. */

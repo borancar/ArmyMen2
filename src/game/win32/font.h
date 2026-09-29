@@ -82,7 +82,7 @@ int32_t __cdecl BuildFontAlias(int32_t fontIndex);
  * its table entries, and do that for all three. The second is entry 7 of
  * ShutdownSubsystems' ordered teardown -- another of those that is no longer a
  * guess. Neither touches the offsets table, only the size and the base. */
-void __cdecl FreeFont(int32_t fontIndex);
+AM2_CXX void __cdecl FreeFont(int32_t fontIndex);
 void __cdecl FreeAllFonts(void);
 
 /* 0x004468A0, nine callers. How wide a string is in a font, and how tall a

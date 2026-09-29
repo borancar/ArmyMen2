@@ -1599,6 +1599,27 @@ AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_WarMenuScreen(void *mem, cons
 #endif
 
 #if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_DlgSaveListScreen(void *mem, const char *bmp, int32_t flag)
+{ return ::new (mem) AM2_DlgSaveListScreen(bmp, flag); }
+void __attribute__((thiscall)) am2_dtor_AM2_DlgSaveListScreen(AM2_Widget *w)
+{ ((AM2_DlgSaveListScreen *)w)->AM2_DlgSaveListScreen::~AM2_DlgSaveListScreen(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_MoviesScreen(void *mem, const char *bmp)
+{ return ::new (mem) AM2_MoviesScreen(bmp); }
+void __attribute__((thiscall)) am2_dtor_AM2_MoviesScreen(AM2_Widget *w)
+{ ((AM2_MoviesScreen *)w)->AM2_MoviesScreen::~AM2_MoviesScreen(); }
+#endif
+
+#if defined(__GNUC__)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_MpPanelScreen(void *mem, const char *bmp)
+{ return ::new (mem) AM2_MpPanelScreen(bmp); }
+void __attribute__((thiscall)) am2_dtor_AM2_MpPanelScreen(AM2_Widget *w)
+{ ((AM2_MpPanelScreen *)w)->AM2_MpPanelScreen::~AM2_MpPanelScreen(); }
+#endif
+
+#if defined(__GNUC__)
 /* Install thunks: a constructor at its original address must answer `this`
  * in eax, as MSVC's do and the original's callers expect. */
 AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Widget(void *mem)
@@ -1606,24 +1627,6 @@ AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Widget(void *mem)
 void __attribute__((thiscall)) am2_dtor_AM2_Widget(AM2_Widget *w)
 { w->AM2_Widget::~AM2_Widget(); }
 #endif
-
-AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::DlgSaveListConstruct(this, bmp, flag);
-}
-
-AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::MoviesConstruct(this, bmp);
-}
-
-AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
-    : AM2_Widget(AM2_Widget::AM2_NoInit())
-{
-    ::MpPanelConstruct(this, bmp);
-}
 
 
 
@@ -3266,7 +3269,7 @@ int widget_install(void)
     rc |= patch_replace(ADDR_MP_SPIN_CTOR, AM2_CTOR(AM2_MpSpin),
                         "MpSpinConstruct", 2);
     rc |= patch_replace(ADDR_SAVE_LIST_CTOR,
-                        pmf_addr(&AM2_Widget::DlgSaveListConstruct),
+                        AM2_CTOR(AM2_DlgSaveListScreen),
                         "DlgSaveListConstruct", 1);
     rc |= patch_replace(ADDR_BATTLE_JOIN_CTOR,
                         AM2_CTOR(AM2_DlgBattleJoinScreen),
@@ -3477,10 +3480,10 @@ int widget_install(void)
                         "FillListFromRules", 3);
     rc |= patch_replace(ADDR_MP_PANEL_UPDATE, pmf_addr(&AM2_Widget::MpPanelUpdate),
                         "MpPanelUpdate", 1);
-    rc |= patch_replace(ADDR_MP_PANEL_DESTRUCT, pmf_addr(&AM2_Widget::MpPanelDestruct),
+    rc |= patch_replace(ADDR_MP_PANEL_DESTRUCT, AM2_DTOR(AM2_MpPanelScreen),
                         "MpPanelDestruct", 1);
 
-    rc |= patch_replace(ADDR_MP_PANEL_CTOR, pmf_addr(&AM2_Widget::MpPanelConstruct),
+    rc |= patch_replace(ADDR_MP_PANEL_CTOR, AM2_CTOR(AM2_MpPanelScreen),
                         "MpPanelConstruct", 2);
     rc |= patch_replace(ADDR_MP_NAME_CTOR, pmf_addr(&AM2_Widget::MpNameConstruct),
                         "MpNameConstruct", 9);
@@ -3492,7 +3495,7 @@ int widget_install(void)
     rc |= patch_replace(ADDR_LOAD_GAME_CTOR, AM2_CTOR(AM2_LoadGameScreen),
                         "LoadGameConstruct", 1);
 
-    rc |= patch_replace(ADDR_MOVIES_CTOR, pmf_addr(&AM2_Widget::MoviesConstruct),
+    rc |= patch_replace(ADDR_MOVIES_CTOR, AM2_CTOR(AM2_MoviesScreen),
                         "MoviesConstruct", 1);
 
     rc |= patch_replace(ADDR_DELETE_GAME_CTOR,
@@ -3769,7 +3772,7 @@ int widget_install(void)
                         "HudEdgeDestruct", 1);
     rc |= patch_replace(ADDR_HUD_EDGE_DELETE, pmf_addr(&AM2_Widget::HudEdgeDelete),
                         "HudEdgeDelete", 1);
-    rc |= patch_replace(ADDR_MOVIES_DESTRUCT, pmf_addr(&AM2_Widget::MoviesDestruct),
+    rc |= patch_replace(ADDR_MOVIES_DESTRUCT, AM2_DTOR(AM2_MoviesScreen),
                         "MoviesDestruct", 1);
     rc |= patch_replace(ADDR_MOVIES_DELETE, pmf_addr(&AM2_Widget::MoviesDelete),
                         "MoviesDelete", 1);
@@ -3777,7 +3780,7 @@ int widget_install(void)
                         "ArrowBarDestruct", 1);
     rc |= patch_replace(ADDR_ARROWBAR_DELETE, pmf_addr(&AM2_Widget::ArrowBarDelete),
                         "ArrowBarDelete", 1);
-    rc |= patch_replace(ADDR_SAVE_LIST_DESTRUCT, pmf_addr(&AM2_Widget::SaveListDestruct),
+    rc |= patch_replace(ADDR_SAVE_LIST_DESTRUCT, AM2_DTOR(AM2_DlgSaveListScreen),
                         "SaveListDestruct", 1);
     rc |= patch_replace(ADDR_SAVE_LIST_DELETE, pmf_addr(&AM2_Widget::SaveListDelete),
                         "SaveListDelete", 1);
@@ -9526,23 +9529,22 @@ void __cdecl ShowBadMapPreview(AM2_Widget *preview)
  *
  * The MSVC SEH prologue on it is not reproduced; see CLAUDE.md for why that
  * is safe in a program with no throw. */
-void __attribute__((thiscall)) AM2_Widget::MpPanelDestruct()
+AM2_MpPanelScreen::~AM2_MpPanelScreen()
 {
     AM2_Widget *w = this;
 
     AM2_Sprite **p;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_MP_PANEL));
+    AM2_CTOR_VTABLE(w, VTABLE_MP_PANEL);
 
+    /* signed address compares, as the original (`jl`) */
     for (p = (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_A;
-         p < (AM2_Sprite **)(uintptr_t)ADDR_MENU_MSG_LIST; p++)
+         (int32_t)(uintptr_t)p < (int32_t)(uintptr_t)ADDR_MENU_MSG_LIST; p++)
         ReleaseSprite(*p);
 
     for (p = (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_B;
-         p < (AM2_Sprite **)(uintptr_t)ADDR_MP_PANEL_SPRITES_B_END; p++)
+         (int32_t)(uintptr_t)p < (int32_t)(uintptr_t)ADDR_MP_PANEL_SPRITES_B_END; p++)
         ReleaseSprite(*p);
-
-    ::DialogDestruct(w);
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpPanelDelete(int32_t flags)
@@ -9570,16 +9572,15 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpPanelDelete(int32_t flags)
  * The children go into THREE PARALLEL ARRAYS -- names, colours and teams,
  * four of each, contiguous by kind rather than by slot.  MpPanelDestruct
  * walks them that way. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpPanelConstruct(const char *bmp)
+AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
+    : AM2_ScreenBase(bmp, 1)
 {
     AM2_Widget *w = this;
 
     uint8_t   *p = (uint8_t *)w;
     AM2_Rect   r;
     int32_t    i;
-
-    ::ScreenBaseConstruct(w, bmp, 1);
-    *(const void **)p = (const void *)(uintptr_t)VTABLE_MP_PANEL;
+    AM2_CTOR_VTABLE(w, VTABLE_MP_PANEL);
     ReadMpMapList();
 
     /* The four player-colour swatches.  The loop's bound is the address of
@@ -10207,7 +10208,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MpPanelConstruct(const char *
         ::WidgetAddChild(w, child);
     }
 
-    return w;
 }
 
 /* 0x004316D0 -- the multiplayer panel's per-frame update, slot 2.
@@ -11834,26 +11834,20 @@ void __cdecl OpenSelectMap(void)
     g_paintObject = (uint8_t *)new AM2_SelectMapScreen("01_000_00_screen.bmp");
 }
 
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::MoviesConstruct(const char *bmp)
+AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
+    : AM2_ScreenBase(bmp, 1)
 {
     AM2_Widget *w = this;
 
     AM2_Widget  *panel;
     AM2_Widget **slots = (AM2_Widget **)((uint8_t *)w + MOVIES_OFF_BUTTONS);
     AM2_Sprite **spr   = (AM2_Sprite **)((uint8_t *)w + MOVIES_OFF_SPRITES);
-    AM2_Rect     box;
     int32_t      i;
     int32_t      at = 0;
-
-    ::ScreenBaseConstruct(w, bmp, 1);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_MOVIES));
+    AM2_CTOR_VTABLE(w, VTABLE_MOVIES);
     SetGameDir("alpine");
 
-    panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
-    if (panel) {
-        RectSet(&box, 0x43, 0x20, 0x1FA, 0x19F);
-        panel = ::PanelConstruct(panel, "02_012_00_movies.bmp", 0, box);
-    }
+    panel = new AM2_Panel("02_012_00_movies.bmp", 0, *RectSet(AM2_TEMP(AM2_Rect), 0x43, 0x20, 0x1FA, 0x19F));
     ::WidgetAddChild(w, panel);
     panel->flag44 = 1;
 
@@ -11894,7 +11888,6 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MoviesConstruct(const char *b
                    kOnMovieNextPage, (void (__cdecl *)(AM2_Widget *))0));
 
     *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) = (uint32_t)(uintptr_t)kOnMenuBack;
-    return w;
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::MoviesDelete(int32_t flags)
@@ -11919,22 +11912,24 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::MoviesDelete(int32_t flags)
  * The buttons that display them do NOT own them: MakeMovieButton writes
  * BUTTON_OFF_OWNS_SPRITES as 0 for exactly this reason. The screen owns all
  * 24 and this is where they go back. */
-void __attribute__((thiscall)) AM2_Widget::MoviesDestruct()
+AM2_MoviesScreen::~AM2_MoviesScreen()
 {
     AM2_Widget *w = this;
 
     AM2_Sprite **pair;
     int32_t      i;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_MOVIES));
+    AM2_CTOR_VTABLE(w, VTABLE_MOVIES);
 
     pair = (AM2_Sprite **)((uint8_t *)w + MOVIES_OFF_SPRITES);
-    for (i = 0; i < AM2_MOVIE_PAGE_SIZE * 3; i++, pair += 2) {
-        ReleaseSprite(pair[0]);
-        ReleaseSprite(pair[1]);
-    }
+    for (i = 0; i < AM2_MOVIE_PAGE_SIZE * 3; i++) {
+        /* addressed from the pair's SECOND sprite: that is the base the
+         * original's loop register holds ([esi-4], [esi]) */
+        AM2_Sprite **p = pair + i * 2 + 1;
 
-    ::DialogDestruct(w);
+        ReleaseSprite(p[-1]);
+        ReleaseSprite(p[0]);
+    }
 }
 
 /* 0x0044E580. MOVIES' page button: bump the page, wrap past 2, and RETARGET
@@ -14099,21 +14094,19 @@ void __cdecl SaveListOnDelete(AM2_Widget *w)
  * that name back.
  *
  * DLG_OFF_ESCAPE takes CANCEL's handler, as the overwrite prompt's does. */
-AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgSaveListConstruct(const char *bmp, int32_t flag)
+AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
+    : AM2_ScreenBase(bmp, flag)
 {
     AM2_Widget *w = this;
 
     uint8_t    *self = (uint8_t *)w;
     AM2_Widget *edit;
     AM2_Widget *kid;
-    AM2_Rect    box;
     char        dir[AM2_MASK_PATH_MAX];
     char        path[AM2_DLG_TEXT_BYTES];
     uint8_t     find[AM2_FINDDATA_BYTES];
     int32_t     h;
-
-    ::ScreenBaseConstruct(w, bmp, flag);
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_SAVE_LIST));
+    AM2_CTOR_VTABLE(w, VTABLE_SAVE_LIST);
     SetGameDir("save");
 
     /* Make the player's folder if it is missing, or if the name is taken by
@@ -14151,88 +14144,40 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::DlgSaveListConstruct(const ch
     strcpy((char *)(self + SAVELIST_OFF_NAME),
            (const char *)(uintptr_t)ADDR_GAMEPROC_STR_B);
 
-    edit = (AM2_Widget *)orig_operator_new(AM2_HUD_EDIT_BYTES);
-    if (edit)
-        edit = ::EditConstruct(edit, (char *)(self + SAVELIST_OFF_NAME), 0x18,
-                             0xA5, 0x74, 0x98, 0x11, 1,
-                             *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
-                             *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
-                             *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
-                             (void (__cdecl *)(AM2_Widget *))
-                                 SaveListOnSave, 0, 0);
+    edit = new AM2_Edit((char *)(self + SAVELIST_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0xA5, 0x74, 0x98, 0x11), 1, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR, *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR, (void (__cdecl *)(AM2_Widget *)) SaveListOnSave, 0, 0);
     ::WidgetAddChild(w, edit);
     WidgetVFocus(edit, 0);
     *(void **)((uint8_t *)edit + EDIT_OFF_CHARSET) =
         *(void **)(uintptr_t)ADDR_EDIT_CHARSET_PTR;
     *(void **)(self + SAVELIST_OFF_EDIT) = edit;
 
-    kid = (AM2_Widget *)orig_operator_new(AM2_MULTISPRITE_BYTES);
-    if (kid) {
-        RectSet(&box, 0xFC, 0x57, 0x11, 0x10);
-        kid = ::MultiSpriteConstruct(kid, "03_028_00_green.bmp",
-                                   "03_028_01_green.bmp", 1, box);
-    }
+    kid = new AM2_Blinker("03_028_00_green.bmp", "03_028_01_green.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0xFC, 0x57, 0x11, 0x10));
     ::WidgetAddChild(w, kid);
     /* The icon belongs to the EDIT -- EDIT_OFF_DOT, which already had that
      * name from the multiplayer panel's send/receive dots. Same slot, same
      * kind of little MultiSprite beside a text field. */
     *(void **)((uint8_t *)edit + EDIT_OFF_DOT) = kid;
 
-    kid = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_BYTES);
-    if (kid)
-        kid = ::ListBoxConstruct(kid, 0xA5, 0xBD, 0x9A, 0xAA,
-                               *(void **)(self + DLG_OFF_LIST),
-                               (int32_t)(uintptr_t)SaveListOnPick,
-                               0, 1);
+    kid = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0xA5, 0xBD, 0x9A, 0xAA), *(void **)(self + DLG_OFF_LIST), (int32_t)(uintptr_t)SaveListOnPick, 0, 1);
     ::WidgetAddChild(w, kid);
 
     /* The scrollbar takes its rectangle as FOUR ints and the parent BEFORE
      * the sprites. The original still routes the four through RectSet and
      * copies the result back over the same pushes, so they appear twice. */
-    kid = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
-    if (kid)
-        kid = ::ArrowBarConstruct(kid, 0x152, 0xB7, 0x13, 0xBA, w,
-                                "03_010_00_scrollbar.bmp",
-                                "03_010_01_scrollbar.bmp", 0x8C, 0);
+    kid = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x152, 0xB7, 0x13, 0xBA), w, "03_010_00_scrollbar.bmp", "03_010_01_scrollbar.bmp", 0x8C, 0);
     ::WidgetAddChild(w, kid);
 
-    kid = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
-    if (kid) {
-        RectSet(&box, 0x1A0, 0xBA, 0x51, 0x20);
-        kid = ::ButtonConstruct(kid, "03_127_00_save.bmp", "03_127_01_save.bmp",
-                              "03_127_02_save.bmp", 1, box,
-                              (void (__cdecl *)(AM2_Widget *))
-                                  SaveListOnSave,
-                              (void (__cdecl *)(AM2_Widget *))0);
-    }
+    kid = new AM2_Button("03_127_00_save.bmp", "03_127_01_save.bmp", "03_127_02_save.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x1A0, 0xBA, 0x51, 0x20), (void (__cdecl *)(AM2_Widget *)) SaveListOnSave, (void (__cdecl *)(AM2_Widget *))0);
     ::WidgetAddChild(w, kid);
 
-    kid = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
-    if (kid) {
-        RectSet(&box, 0x1A0, 0xE2, 0x51, 0x20);
-        kid = ::ButtonConstruct(kid, "03_012_00_delete.bmp",
-                              "03_012_01_delete.bmp", "03_012_02_delete.bmp",
-                              1, box,
-                              (void (__cdecl *)(AM2_Widget *))
-                                  SaveListOnDelete,
-                              (void (__cdecl *)(AM2_Widget *))0);
-    }
+    kid = new AM2_Button("03_012_00_delete.bmp", "03_012_01_delete.bmp", "03_012_02_delete.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x1A0, 0xE2, 0x51, 0x20), (void (__cdecl *)(AM2_Widget *)) SaveListOnDelete, (void (__cdecl *)(AM2_Widget *))0);
     ::WidgetAddChild(w, kid);
 
-    kid = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
-    if (kid) {
-        RectSet(&box, 0x1A0, 0x108, 0x51, 0x20);
-        kid = ::ButtonConstruct(kid, "03_018_00_cancel.bmp",
-                              "03_018_01_cancel.bmp", "03_018_02_cancel.bmp",
-                              1, box,
-                              SaveListOnCancel,
-                              (void (__cdecl *)(AM2_Widget *))0);
-    }
+    kid = new AM2_Button("03_018_00_cancel.bmp", "03_018_01_cancel.bmp", "03_018_02_cancel.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x1A0, 0x108, 0x51, 0x20), SaveListOnCancel, (void (__cdecl *)(AM2_Widget *))0);
     ::WidgetAddChild(w, kid);
 
     *(void **)(self + DLG_OFF_ESCAPE) =
         (void *)SaveListOnCancel;
-    return w;
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::SaveListDelete(int32_t flags)
@@ -14257,13 +14202,12 @@ AM2_Widget * __attribute__((thiscall)) AM2_Widget::SaveListDelete(int32_t flags)
  * It frees a font without having been seen to build one. That is what the code
  * does; the constructor's font handling is not read yet, and a guess about it
  * would be worth less than the gap. */
-void __attribute__((thiscall)) AM2_Widget::SaveListDestruct()
+AM2_DlgSaveListScreen::~AM2_DlgSaveListScreen()
 {
     AM2_Widget *w = this;
 
-    AM2_VTBL(w) = (void *)((void *)(uintptr_t)(VTABLE_SAVE_LIST));
+    AM2_CTOR_VTABLE(w, VTABLE_SAVE_LIST);
     FreeFont(AM2_SAVE_LIST_FONT);
-    ::DialogDestruct(w);
 }
 
 /* Arm 5. LOAD GAME, and the odd one out: the repaint happens AFTER the
