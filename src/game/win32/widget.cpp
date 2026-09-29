@@ -12622,30 +12622,25 @@ void __cdecl OpenOptionsMenu(void)
 AM2_DeleteGameScreen::AM2_DeleteGameScreen(const char *bmp, int32_t flag)
     : AM2_ScreenBase(bmp, flag)
 {
-    AM2_Widget *w = this;
-
-    AM2_Widget *parent = w;
+    AM2_Widget *parent;
     AM2_Widget *ok;
     AM2_Widget *msg;
     AM2_Widget *dot;
-    AM2_Rect    box;
     int32_t     dx = 0x6C;
     int32_t     dy = 0x98;
-    AM2_CTOR_VTABLE(w, VTABLE_DELETE_GAME);
+    AM2_CTOR_VTABLE(this, VTABLE_DELETE_GAME);
 
     if (g_gameState == 2) {
-        w->flag44 = 1;
+        this->flag44 = 1;
+        parent = this;
     } else {
-        AM2_Widget *panel = (AM2_Widget *)orig_operator_new(AM2_PANEL_SIZE);
+        AM2_Widget *panel = new AM2_Panel("02_011_00_delgame.bmp", 0,
+                                          *RectSet(AM2_TEMP(AM2_Rect), 0x6C, 0x98, 0x1A7, 0xB0));
 
-        if (panel) {
-            RectSet(&box, 0x6C, 0x98, 0x1A7, 0xB0);
-            panel = ::PanelConstruct(panel, "02_011_00_delgame.bmp", 0, box);
-        }
-        ::WidgetAddChild(w, panel);
+        ::WidgetAddChild(this, panel);
         dx = 0;
-        dy = 0;
         panel->flag44 = 1;
+        dy = 0;
         parent = panel;
     }
 
@@ -12669,7 +12664,7 @@ AM2_DeleteGameScreen::AM2_DeleteGameScreen(const char *bmp, int32_t flag)
     ::WidgetAddChild(parent, dot);
     *(AM2_Widget **)((uint8_t *)msg + TYPER_OFF_BLINKER) = dot;
 
-    *(uint32_t *)((uint8_t *)w + DLG_OFF_ESCAPE) =
+    *(uint32_t *)((uint8_t *)this + DLG_OFF_ESCAPE) =
         (uint32_t)(uintptr_t)kOnDelGameCancel;
 }
 
@@ -12786,6 +12781,9 @@ AM2_DlgOverwriteScreen::AM2_DlgOverwriteScreen(const char *bmp, int32_t flag)
 
     icon = new AM2_Blinker("03_029_00_red.bmp", "03_029_01_red.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x8F, 0x12D, 0x11, 0x10));
     ::WidgetAddChild(w, icon);
+    /* The typewriter blinks this dot while it types -- the original links
+     * them (0x00450582); ours never did, so the dot sat still. */
+    *(AM2_Widget **)((uint8_t *)typer + TYPER_OFF_BLINKER) = icon;
 
     /* Escape does what Cancel does. */
     *(void **)((uint8_t *)w + DLG_OFF_ESCAPE) =
