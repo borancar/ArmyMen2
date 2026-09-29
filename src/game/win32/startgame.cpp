@@ -79,9 +79,7 @@ void __cdecl StartSelectedGame(void)
     uint8_t *screen = *(uint8_t **)(g_paintObj + SCREEN_OFF);
     int32_t *list   = *(int32_t **)(screen + SCREEN_OFF_LIST);
     int32_t  index  = *(int32_t *)(screen + SCREEN_OFF_INDEX);
-    uint8_t *rows;
     void    *connection;
-    uint8_t *comm;
     int32_t  i;
 
     /* No list, or nothing sensibly selected, and the button does nothing. */
@@ -92,51 +90,54 @@ void __cdecl StartSelectedGame(void)
 
     PlaySoundAt(2, 0, 0, 0, 0);
 
-    /* { int32 count; Row *rows; } -- the pointer is the second dword. */
-    rows = *(uint8_t **)(list + 1);
-    connection = *(void **)(rows + index * ROW_STRIDE + ROW_OFF_CONNECTION);
+    /* { int32 count; Row *rows; } -- the pointer is the second dword. The comm
+     * object is re-read at every use, as the image does. */
+#define COMM (g_commObject)
+    connection = *(void **)(*(uint8_t **)(list + 1) + index * ROW_STRIDE
+                            + ROW_OFF_CONNECTION);
 
-    if (connection) {
-        /* An existing session: point DirectPlay at it and let the menu know. */
-        comm = g_commObject;
-        if (CommInitializeConnection(comm, connection)) {
-            *(int32_t *)(comm + COMM_OFF_LOCAL) = 0;
+    if (!connection) {
+        /* A local game. The CD check here is the disabled one -- the call
+         * still happens, the answer is still thrown away. */
+        if (!RequireGameCD()) {
+            /* Unreachable as built; see the file comment and cdcheck.h. */
+            g_menuRequest    = REQUEST_REFUSED;
+            g_menuRequestSet = 1;
+            return;
+        }
+
+        *(int32_t *)(COMM + COMM_OFF_LOCAL) = 1;
+
+        /* A DirectPlay object left over from browsing sessions is dropped: a
+         * local game has no use for it and it would otherwise stay
+         * connected. */
+        if (*(void **)(COMM + COMM_OFF_DPLAY))
+            CommDropDirectPlay(COMM);
+
+        /* Slots 1..3 become the computer opponents. Slot 0 is left alone. */
+        for (i = 1; i < 4; i++) {
+            *(int32_t *)(COMM + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE
+                         + COMM_SLOT_OFF_TAKEN) = 1;
+            orig_sprintf((char *)(COMM + COMM_OFF_PLAYERS
+                                  + i * COMM_PLAYER_STRIDE
+                                  + COMM_SLOT_OFF_NAME),
+                         "Computer%d", i);
+        }
+
+        g_menuRequest    = REQUEST_LOCAL;
+        g_menuRequestSet = 1;
+        ApplyGameSettings();
+        *(int32_t *)(COMM + COMM_OFF_IS_HOST) = 1;
+    } else {
+        /* An existing session: point DirectPlay at it and let the menu
+         * know. */
+        if (CommInitializeConnection(COMM, connection)) {
+            *(int32_t *)(COMM + COMM_OFF_LOCAL) = 0;
             g_menuRequest    = REQUEST_JOINED;
             g_menuRequestSet = 1;
         }
-        return;
     }
-
-    /* A local game. The CD check here is the disabled one -- the call still
-     * happens, the answer is still thrown away. */
-    if (!RequireGameCD()) {
-        /* Unreachable as built; see the file comment and cdcheck.h. */
-        g_menuRequest    = REQUEST_REFUSED;
-        g_menuRequestSet = 1;
-        return;
-    }
-
-    comm = g_commObject;
-    *(int32_t *)(comm + COMM_OFF_LOCAL) = 1;
-
-    /* A DirectPlay object left over from browsing sessions is dropped: a local
-     * game has no use for it and it would otherwise stay connected. */
-    if (*(void **)(comm + COMM_OFF_DPLAY))
-        CommDropDirectPlay(comm);
-
-    /* Slots 1..3 become the computer opponents. Slot 0 is left alone. */
-    for (i = 1; i < 4; i++) {
-        uint8_t *slot = comm + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
-
-        *(int32_t *)(slot + COMM_SLOT_OFF_TAKEN) = 1;
-        orig_sprintf((char *)(slot + COMM_SLOT_OFF_NAME),
-                     "Computer%d", i);
-    }
-
-    g_menuRequest    = REQUEST_LOCAL;
-    g_menuRequestSet = 1;
-    ApplyGameSettings();
-    *(int32_t *)(comm + COMM_OFF_IS_HOST) = 1;
+#undef COMM
 }
 
 /* The multiplayer HOST button, 0x0042F310, registered the same way.

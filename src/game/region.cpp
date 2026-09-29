@@ -85,37 +85,28 @@ extern "C" const int32_t am2_hit_pose_by_class[6] = { 12, 13, 14, 15, 16, 17 };
  * cells it was given. */
 void __cdecl AddRegionLink(int32_t cell, int32_t neighbour)
 {
-    const uint8_t *map = kRegionOfCell;
-    int32_t        a   = map[cell];
-    int32_t        b   = map[neighbour];
-    AM2_RegionLink *links;
-    int32_t         n;
+    int32_t a = kRegionOfCell[cell];
+    int32_t b = kRegionOfCell[neighbour];
+    int32_t i;
 
     if (a == 0 || b == 0)
         return;
 
-    n = kNLinks(a);
-
-    for (int32_t i = 0; i < n; i++) {
+    /* Every field store re-reads the region table, the link pointer and
+     * the count, as the image does; the new record is zeroed first. */
+    for (i = 0; i < kNLinks(a); i++) {
         if (kLinks(a)[i].to == b && (uint16_t)kLinks(a)[i].from == cell)
             return;
     }
 
-    links = (AM2_RegionLink *)am2_realloc(kLinks(a),
-                                          (size_t)(n + 1)
-                                          * sizeof(AM2_RegionLink));
-    kLinks(a) = links;
-
-    n = kNLinks(a);
-    links[n].to   = 0;
-    links[n].from = 0;
-    links[n].into = 0;
-
-    links[n].to   = (int16_t)b;
-    links[n].from = (int16_t)cell;
-    links[n].into = (int16_t)neighbour;
-
-    kNLinks(a) = (uint8_t)(n + 1);
+    kLinks(a) = (AM2_RegionLink *)am2_realloc(kLinks(a),
+                                              (kNLinks(a) + 1)
+                                              * sizeof(AM2_RegionLink));
+    memset(&kLinks(a)[kNLinks(a)], 0, sizeof(AM2_RegionLink));
+    kLinks(a)[kNLinks(a)].to   = (int16_t)b;
+    kLinks(a)[kNLinks(a)].from = (int16_t)cell;
+    kLinks(a)[kNLinks(a)].into = (int16_t)neighbour;
+    kNLinks(a)++;
 
     if (kTracePF)
         orig_log("Added Region link from %d to %d\n", a, b);
@@ -5874,16 +5865,19 @@ void __cdecl AiKeepRange(void *obj, void *out, void *ctx)
     uint8_t       *o   = (uint8_t *)obj;
     uint8_t       *w   = (uint8_t *)out;
     const uint8_t *c   = (const uint8_t *)ctx;
-    uint32_t       now = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+    /* The clock is re-read at every use, as the image does. */
+#define now (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS)
 
     if (*(const uint32_t *)(o + OBJ_OFF_DEADLINE_58) > now) {
         if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
                        (const AM2_Point *)(o + OBJ_OFF_FIELD_C0))
-            >= AM2_AI_REACHED_DIST) {
+            < AM2_AI_REACHED_DIST) {
+            *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) = 0;
+        } else {
             AiTrooperStep(obj, out, ctx);
             return;
         }
-        *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) = 0;
     }
 
     if (!*(const void *const *)(c + SIGHTC_OFF_OBSERVER))
@@ -5908,14 +5902,17 @@ void __cdecl AiKeepRange(void *obj, void *out, void *ctx)
                    && *(const int32_t *)(c + SIGHTC_OFF_KIND) != 3
                    && *(const uint8_t *)(c + SIGHTC_OFF_SEED) < 0x10
                    && *(const int32_t *)(c + SIGHTC_OFF_FIELD_00) == 0) {
-            *(int32_t *)(w + 8) =
-                *(const uint8_t *)(c + SIGHTC_OFF_SEED) < 4 ? 7 : 5;
+            if (*(const uint8_t *)(c + SIGHTC_OFF_SEED) < 4)
+                *(int32_t *)(w + 8) = 7;
+            else
+                *(int32_t *)(w + 8) = 5;
         }
     }
 
     if (now - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0)
         >= AM2_AI_TURN_DELAY_MS)
         w[4] = *(const uint8_t *)(c + SIGHTC_OFF_BEARING);
+#undef now
 }
 
 /* AiWalkStep -- original 0x00405D30, two callers. The trooper family's minimal

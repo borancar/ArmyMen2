@@ -2677,9 +2677,9 @@ void *__cdecl MsgListCopyByKey(void *list, int32_t key, void *dst)
  * again, and on the impossible zero falls into a path that releases the mutex
  * and returns the node WITHOUT incrementing MSGLIST_OFF_COUNT. The second test
  * cannot fail -- the first one already established it -- so the list can never
- * end up with a node it has not counted. Not reproduced as a branch, because
- * there is no input that reaches it; recorded here instead, since a reader
- * comparing the two will find one `ret` fewer than the original has.
+ * end up with a node it has not counted. It is the `while (at)` loop's own
+ * exit, and it is there because each insertion counts for itself and then
+ * breaks; VC6 folds the four increments into one block.
  *
  * The tail pointer is maintained only on the two paths that need it -- empty
  * list, and append past the end -- and left alone on the two that insert
@@ -2690,61 +2690,63 @@ void *__cdecl MsgListInsert(void *list, void *node)
     uint8_t *l = (uint8_t *)list;
     uint8_t *n = (uint8_t *)node;
     uint8_t *at;
-    uint32_t key;
 
-    WaitForSingleObject(*(HANDLE *)(l + MSGLIST_OFF_MUTEX), INFINITE);
+#define NEXT(p) (*(uint8_t **)((p) + MSGNODE_OFF_NEXT))
+#define PREV(p) (*(uint8_t **)((p) + MSGNODE_OFF_PREV))
+#define KEY(p)  (*(const uint32_t *)((p) + MSGNODE_OFF_KEY))
+#define HEAD    (*(uint8_t **)(l + MSGLIST_OFF_HEAD))
+#define TAIL    (*(uint8_t **)(l + MSGLIST_OFF_TAIL))
+#define COUNT   (*(int32_t *)(l + MSGLIST_OFF_COUNT))
+#define MUTEX   (*(HANDLE *)(l + MSGLIST_OFF_MUTEX))
+    WaitForSingleObject(MUTEX, INFINITE);
 
-    at = *(uint8_t **)(l + MSGLIST_OFF_HEAD);
-
+    at = HEAD;
     if (!at) {
-        *(uint8_t **)(l + MSGLIST_OFF_HEAD) = n;
-        *(uint8_t **)(l + MSGLIST_OFF_TAIL) = n;
-        *(uint8_t **)(n + MSGNODE_OFF_PREV) = (uint8_t *)0;
-        *(uint8_t **)(n + MSGNODE_OFF_NEXT) = (uint8_t *)0;
+        HEAD = n;
+        TAIL = n;
+        PREV(n) = (uint8_t *)0;
+        NEXT(n) = (uint8_t *)0;
+        COUNT++;
+    } else if (KEY(at) > KEY(n)) {
+        PREV(n) = (uint8_t *)0;
+        NEXT(n) = at;
+        HEAD    = n;
+        PREV(at) = n;
+        COUNT++;
     } else {
-        key = *(const uint32_t *)(n + MSGNODE_OFF_KEY);
-
-        if (*(const uint32_t *)(at + MSGNODE_OFF_KEY) > key) {
-            *(uint8_t **)(n + MSGNODE_OFF_PREV)  = (uint8_t *)0;
-            *(uint8_t **)(n + MSGNODE_OFF_NEXT)  = at;
-            *(uint8_t **)(l + MSGLIST_OFF_HEAD)  = n;
-            *(uint8_t **)(at + MSGNODE_OFF_PREV) = n;
-        } else {
-            for (;;) {
-                uint8_t *next = *(uint8_t **)(at + MSGNODE_OFF_NEXT);
-
-                if (!next) {                    /* past the tail */
-                    *(uint8_t **)(at + MSGNODE_OFF_NEXT) = n;
-                    *(uint8_t **)(n + MSGNODE_OFF_PREV)  = at;
-                    *(uint8_t **)(n + MSGNODE_OFF_NEXT)  = (uint8_t *)0;
-                    *(uint8_t **)(l + MSGLIST_OFF_TAIL)  = n;
-                    break;
-                }
-
-                at = next;
-
-                if (*(const uint32_t *)(at + MSGNODE_OFF_KEY) > key) {
-                    uint8_t *prev = *(uint8_t **)(at + MSGNODE_OFF_PREV);
-
-                    if (prev)
-                        *(uint8_t **)(prev + MSGNODE_OFF_NEXT) = n;
-                    else
-                        *(uint8_t **)(l + MSGLIST_OFF_HEAD) = n;
-
-                    *(uint8_t **)(n + MSGNODE_OFF_PREV)  = prev;
-                    *(uint8_t **)(n + MSGNODE_OFF_NEXT)  = at;
-                    *(uint8_t **)(at + MSGNODE_OFF_PREV) = n;
-                    break;
-                }
+        while (at) {
+            if (KEY(at) > KEY(n)) {
+                if (PREV(at))
+                    NEXT(PREV(at)) = n;
+                else
+                    HEAD = n;
+                PREV(n)  = PREV(at);
+                NEXT(n)  = at;
+                PREV(at) = n;
+                COUNT++;
+                break;
             }
+            if (!NEXT(at)) {                /* past the tail */
+                NEXT(at) = n;
+                PREV(n)  = at;
+                NEXT(n)  = (uint8_t *)0;
+                TAIL     = n;
+                COUNT++;
+                break;
+            }
+            at = NEXT(at);
         }
     }
 
-    *(int32_t *)(l + MSGLIST_OFF_COUNT) += 1;
-
-    ReleaseMutex(*(HANDLE *)(l + MSGLIST_OFF_MUTEX));
-
+    ReleaseMutex(MUTEX);
     return n;
+#undef NEXT
+#undef PREV
+#undef KEY
+#undef HEAD
+#undef TAIL
+#undef COUNT
+#undef MUTEX
 }
 
 /* MsgListTakeFlags -- original 0x00401330, two callers.

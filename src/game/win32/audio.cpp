@@ -1614,65 +1614,68 @@ static_assert(DSBVOLUME_MIN == -10000, "DSBVOLUME_MIN");
 
 void __cdecl Update3DAudioVolumes(void)
 {
-    uint8_t **slot;
+    int32_t     i;
+    DWORD       status;
+    AM2_Point   where;
+    AM2_Point   ear;
+    AM2_Point   at;
+    void       *obj;
+    int32_t     dist;
+    int32_t     vol;
+    LPDIRECTSOUNDBUFFER buf;
 
     if (!g_audioEnabled)
         return;
 
+    /* The record is re-read from its slot at every use, as the image does. */
+#define REC (((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)[i])
+#define BUF (*(LPDIRECTSOUNDBUFFER *)(REC + SOUND_REC_OFF_BUFFER))
     /* From the second slot, not the first -- 0x004FA3C4, not 0x004FA3C0. */
-    for (slot = (uint8_t **)(uintptr_t)(ADDR_SOUND_DYNAMIC + 4);
-         slot < (uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC_LAST;
-         slot++) {
-        uint8_t             *rec = *slot;
-        LPDIRECTSOUNDBUFFER  buf;
-        DWORD                status;
-        AM2_Point            where;
-        uint32_t             owner;
-        int32_t              dist;
-
-        if (!rec)
+    for (i = 1; i < AM2_SOUND_DYNAMIC_LAST_INDEX; i++) {
+        if (!REC)
             continue;
-        buf = *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER);
+        buf = BUF;
         if (!buf)
             continue;
 
         IDirectSoundBuffer_GetStatus(buf, &status);
-        if (!(status & DSBSTATUS_PLAYING)) {
-            *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
-            continue;
-        }
-
-        where = g_defaultPos;
-        owner = *(uint32_t *)(rec + SOUND_REC_OFF_OWNER);
-
-        if (owner) {
-            void *obj = LookupByUID(owner);
-
-            if (!obj) {
-                /* Whatever was making this noise is gone. */
-                *(uint32_t *)(rec + SOUND_REC_OFF_OWNER) = 0;
-                IDirectSoundBuffer_Stop(
-                    *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER));
-                *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
-                continue;
+        if (status & DSBSTATUS_PLAYING) {
+            where = g_defaultPos;
+            if (*(uint32_t *)(REC + SOUND_REC_OFF_OWNER)) {
+                obj = LookupByUID(*(uint32_t *)(REC + SOUND_REC_OFF_OWNER));
+                if (!obj) {
+                    /* Whatever was making this noise is gone. */
+                    *(uint32_t *)(REC + SOUND_REC_OFF_OWNER) = 0;
+                    IDirectSoundBuffer_Stop(BUF);
+                    *(uint32_t *)(REC + SOUND_REC_OFF_ACTIVE) = 0;
+                    continue;
+                }
+                where = *(const AM2_Point *)((uint8_t *)obj + OBJ_OFF_POS);
+            } else if (((const AM2_Point *)(REC + SOUND_REC_OFF_POS))->x != 0) {
+                where = *(const AM2_Point *)(REC + SOUND_REC_OFF_POS);
             }
-            where = *(const AM2_Point *)((uint8_t *)obj + OBJ_OFF_POS);
-        } else if (((const AM2_Point *)(rec + SOUND_REC_OFF_POS))->x != 0) {
-            where = *(const AM2_Point *)(rec + SOUND_REC_OFF_POS);
+
+            /* A zero x means nowhere, and nowhere gets left alone -- note this
+             * path does NOT clear the active flag, unlike the two above. Both
+             * points are copied a field at a time before they are measured. */
+            if (where.x != 0) {
+                ear.x = g_listenerPos.x;
+                ear.y = g_listenerPos.y;
+                at.x  = where.x;
+                at.y  = where.y;
+                dist = ApproxDist(&ear, &at);
+                if (dist > SOUND_3D_CUTOFF)
+                    vol = DSBVOLUME_MIN;
+                else
+                    vol = g_volumeAtZero - dist * SOUND_3D_FALLOFF;
+                IDirectSoundBuffer_SetVolume(BUF, vol);
+            }
+        } else {
+            *(uint32_t *)(REC + SOUND_REC_OFF_ACTIVE) = 0;
         }
-
-        /* A zero x means nowhere, and nowhere gets left alone -- note this
-         * path does NOT clear the active flag, unlike the two above. */
-        if (where.x == 0)
-            continue;
-
-        dist = ApproxDist(&g_listenerPos, &where);
-        if (dist > SOUND_3D_CUTOFF)
-            IDirectSoundBuffer_SetVolume(buf, DSBVOLUME_MIN);
-        else
-            IDirectSoundBuffer_SetVolume(
-                buf, g_volumeAtZero - dist * SOUND_3D_FALLOFF);
     }
+#undef REC
+#undef BUF
 }
 
 /* Load one wave into a DirectSound buffer -- 0x0040C530.
