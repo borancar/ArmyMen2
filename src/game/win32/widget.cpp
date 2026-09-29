@@ -10787,68 +10787,68 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
 {
     AM2_Widget *w = this;
 
-    const uint8_t *rec;
-    int32_t        record = 0;
+    int32_t        record;
     AM2_Widget   **boxes = (AM2_Widget **)((uint8_t *)w + OPTION_PARENT_BOXES);
-    const uint8_t *comm  = g_commObject;
-    int32_t        host  = *(const int32_t *)(comm + COMM_OFF_IS_HOST);
-    AM2_Rect       box;
+    /* Whether we host is read from the comm object at each use. */
+#define host (*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST))
     AM2_CTOR_VTABLE(w, VTABLE_OPTIONS_MENU_MP);
     SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
 
-    for (rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_OPTION_TABLE));
-         rec < (const uint8_t *)((void *)(uintptr_t)(ADDR_OPTION_TABLE_END));
-         rec += AM2_OPTION_STRIDE) {
-        AM2_Widget *cb = (AM2_Widget *)orig_operator_new(AM2_CHECKBOX_SIZE);
-        uint32_t    bit = (uint32_t)OPT_REC(rec, AM2_OPTION_OFF_BIT);
-        uint32_t    mask;
-
-        if (cb) {
-            RectSet(&box, OPT_REC(rec, 0x04), OPT_REC(rec, 0x08), 0xC8, 0x0D);
-            cb = ::CheckBoxConstruct(cb,
-                                   (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK0)),
-                                   (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK1)),
-                                   (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK2)),
-                                   (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK3)),
-                                   box.left, box.top, box.right, box.bottom,
-                                   record,
-                                   *(const char *const *)(rec + 0x20),
-                                   (void (__cdecl *)(AM2_Widget *))
-                                   kOptionsSyncGroup);
-        }
-        boxes[OPT_REC(rec, AM2_OPTION_OFF_WIDGET)] = cb;
+    /* By index, the index doubling as the checkbox's group number: the
+     * image's loop test is a signed `jl` against the strength-reduced
+     * cursor. */
+#define REC(off) (((const int32_t (*)[AM2_OPTION_STRIDE / 4]) \
+                   (uintptr_t)ADDR_OPTION_TABLE)[record][(off) / 4])
+    for (record = 0; record < AM2_OPTION_COUNT; record++) {
+        AM2_Widget *cb = new AM2_CheckBox(
+                (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK0)),
+                (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK1)),
+                (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK2)),
+                (const char *)((void *)(uintptr_t)(AM2_BMP_CHECK3)),
+                *RectSet(AM2_TEMP(AM2_Rect), REC(0x04), REC(0x08), 0xC8, 0x0D),
+                record,
+                (const char *)REC(0x20),
+                (void (__cdecl *)(AM2_Widget *))kOptionsSyncGroup);
+        boxes[REC(AM2_OPTION_OFF_WIDGET)] = cb;
         cb->flag3C = 0;
 
-        mask = OPT_REC(rec, AM2_OPTION_OFF_WHICH) ? g_gameOverFlags
-                                                  : g_gameSetting22C;
-        *((uint8_t *)cb + CHECKBOX_OFF_CHECKED) = (mask & bit) != 0;
+        if (REC(AM2_OPTION_OFF_WHICH))
+            *((uint8_t *)cb + CHECKBOX_OFF_CHECKED) =
+                (g_gameOverFlags & (uint32_t)REC(AM2_OPTION_OFF_BIT)) != 0;
+        else
+            *((uint8_t *)cb + CHECKBOX_OFF_CHECKED) =
+                (g_gameSetting22C & (uint32_t)REC(AM2_OPTION_OFF_BIT)) != 0;
 
         ::WidgetAddChild(w, cb);
         if (!host)
             cb->disabled = 1;
-        record++;
     }
+#undef REC
 
+    /* Asked twice: once for the group pass, again for the buttons. */
     if (host) {
-        for (rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_OPTION_TABLE));
-             rec < (const uint8_t *)((void *)(uintptr_t)(ADDR_OPTION_TABLE_END));
-             rec += AM2_OPTION_STRIDE) {
+#define REC(off) (((const int32_t (*)[AM2_OPTION_STRIDE / 4]) \
+                   (uintptr_t)ADDR_OPTION_TABLE)[record][(off) / 4])
+        for (record = 0; record < AM2_OPTION_COUNT; record++) {
             AM2_Widget *head;
             int32_t     i;
 
-            if (!OPT_REC(rec, AM2_OPTION_OFF_GROUP))
+            if (!REC(AM2_OPTION_OFF_GROUP))
                 continue;
-            head = boxes[OPT_REC(rec, AM2_OPTION_OFF_WIDGET)];
-            for (i = OPT_REC(rec, AM2_OPTION_OFF_FIRST);
-                 i <= OPT_REC(rec, AM2_OPTION_OFF_LAST); i++)
+            head = boxes[REC(AM2_OPTION_OFF_WIDGET)];
+            for (i = REC(AM2_OPTION_OFF_FIRST); i <= REC(AM2_OPTION_OFF_LAST);
+                 i++)
                 boxes[i]->disabled =
                     (*((const uint8_t *)head + CHECKBOX_OFF_CHECKED) == 0);
         }
+#undef REC
+    }
 
+    if (host) {
         {
             AM2_Widget *ok = new AM2_Button((const char *)(uintptr_t)AM2_BMP_OK0, (const char *)(uintptr_t)AM2_BMP_OK1,
                    (const char *)(uintptr_t)AM2_BMP_OK2, 1,
-                   *RectSet(AM2_TEMP(AM2_Rect), 0x219, 0xAE, 0x51, 0x20),
+                   RectMake(0x219, 0xAE, 0x51, 0x20),
                    kOptionsApply, (void (__cdecl *)(AM2_Widget *))0);
 
             ::WidgetAddChild(w, ok);
@@ -10857,22 +10857,23 @@ AM2_MpOptionsScreen::AM2_MpOptionsScreen(const char *bmp)
         }
         ::WidgetAddChild(w, new AM2_Button((const char *)(uintptr_t)AM2_BMP_DEFAULT0, (const char *)(uintptr_t)AM2_BMP_DEFAULT1,
                    (const char *)(uintptr_t)AM2_BMP_DEFAULT2, 1,
-                   *RectSet(AM2_TEMP(AM2_Rect), 0x219, 0xE0, 0x51, 0x20),
+                   RectMake(0x219, 0xE0, 0x51, 0x20),
                    kOptionsDefaults, (void (__cdecl *)(AM2_Widget *))0));
         ::WidgetAddChild(w, new AM2_Button((const char *)(uintptr_t)AM2_BMP_CAN0, (const char *)(uintptr_t)AM2_BMP_CAN1,
                    (const char *)(uintptr_t)AM2_BMP_CAN2, 1,
-                   *RectSet(AM2_TEMP(AM2_Rect), 0x219, 0x112, 0x51, 0x20),
+                   RectMake(0x219, 0x112, 0x51, 0x20),
                    kOptionsRequest, (void (__cdecl *)(AM2_Widget *))0));
     } else {
         AM2_Widget *cancel = new AM2_Button((const char *)(uintptr_t)AM2_BMP_CAN0, (const char *)(uintptr_t)AM2_BMP_CAN1,
                    (const char *)(uintptr_t)AM2_BMP_CAN2, 1,
-                   *RectSet(AM2_TEMP(AM2_Rect), 0x219, 0xAE, 0x51, 0x20),
+                   RectMake(0x219, 0xAE, 0x51, 0x20),
                    kOptionsRequest, (void (__cdecl *)(AM2_Widget *))0);
 
         ::WidgetAddChild(w, cancel);
         w->focusedChild = cancel;
         cancel->flag44 = 1;
     }
+#undef host
 }
 
 void __attribute__((thiscall)) AM2_Widget::MpDialogDestruct()
