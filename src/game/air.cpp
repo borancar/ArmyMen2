@@ -315,8 +315,7 @@ void __cdecl RevealObj(void *obj)
     if (!obj)
         return;
 
-    flags = *(uint32_t *)(o + OBJ_OFF_FLAGS) | OBJ_FLAG_REVEALED;
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) = flags;
+    flags = *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REVEALED;
     if (!(flags & OBJ_FLAG_CONCEALED))
         return;
     *(uint32_t *)(o + OBJ_OFF_FLAGS) = flags & ~(uint32_t)OBJ_FLAG_CONCEALED;

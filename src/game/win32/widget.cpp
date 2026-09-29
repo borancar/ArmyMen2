@@ -2707,16 +2707,19 @@ typedef void (__cdecl *AM2_PointerActionFn)(void *obj, uint32_t at);
  * original does a dword and a word. That measurement is what covers these five,
  * and it is not repeatable now. Sharing a tail and keeping the tool's coverage
  * are in tension; this records which was chosen. */
-static void RecordAimedFire(uint8_t *u, void *target, int32_t withMode)
+static inline void RecordAimedFire(uint8_t *u, void *target, int32_t withMode)
 {
     *(int32_t *)(u + UNIT_OFF_FIRE_ACTIVE) = 1;
     *(uint8_t *)(u + UNIT_OFF_FIRE_F40)    = *(const uint8_t *)(u + 0x40);
     *(int32_t *)(u + UNIT_OFF_FIRE_F588)   = 1;
     *(int32_t *)(u + UNIT_OFF_FIRE_F58C)   = 1;
 
-    *(int16_t *)(u + UNIT_OFF_FIRE_X) = *(const int16_t *)(uintptr_t)ADDR_AIM_X;
-    *(int16_t *)(u + UNIT_OFF_FIRE_Y) = *(const int16_t *)(uintptr_t)ADDR_AIM_Y;
-    *(int16_t *)(u + UNIT_OFF_FIRE_Z) = *(const int16_t *)(uintptr_t)ADDR_AIM_Z;
+    /* {x, y, z} copied as one 6-byte struct: a dword and a word. */
+    {
+        struct AimPoint { int16_t x, y, z; };
+        *(struct AimPoint *)(u + UNIT_OFF_FIRE_X) =
+            *(const struct AimPoint *)(uintptr_t)ADDR_AIM_X;
+    }
 
     *(uint32_t *)(u + UNIT_OFF_FIRE_UID) =
         *(const uint32_t *)((const uint8_t *)target + OBJ_OFF_UID);
@@ -2726,31 +2729,6 @@ static void RecordAimedFire(uint8_t *u, void *target, int32_t withMode)
             *(const int32_t *)(u + OBJ_OFF_POSE);
 }
 
-/* The unit ADDR_WEAPON_OWNER_ID names and the kind of the weapon it holds, or
- * NULL. The five handlers all open with this and then test the kind. */
-static uint8_t *AimedFireUnit(int32_t *kind)
-{
-    uint8_t       *u;
-    const uint8_t *weapon;
-
-    u = (uint8_t *)LookupByUID(
-            *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
-    if (!u)
-        return (uint8_t *)0;
-    if (!ObjIsType2((const AM2_Object *)u))
-        return (uint8_t *)0;
-
-    weapon = (const uint8_t *)WeaponByUid(
-        *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-            + (uint32_t)*(const int32_t *)(uintptr_t)ADDR_WEAPON_SLOT * 4));
-    if (!weapon)
-        return (uint8_t *)0;
-
-    *kind = *(const int32_t *)
-        (*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
-         + ITEMTYPE_OFF_KIND);
-    return u;
-}
 
 
 
@@ -17460,28 +17438,52 @@ void __cdecl PointerDropItem(void *obj, uint32_t at)
  * a single equality. */
 void __cdecl SetWeaponTargetMedic(void *target, uint32_t at)
 {
-    int32_t  kind;
-    uint8_t *u;
+    uint8_t       *u;
+    const uint8_t *weapon;
 
     (void)at;
     if (!target)
         return;
-    u = AimedFireUnit(&kind);
-    if (!u || kind != AM2_ITEM_KIND_MEDI)
+    u = (uint8_t *)LookupByUID(
+            *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
+    if (!u)
+        return;
+    if (!ObjIsType2Inline(u))
+        return;
+
+    weapon = (const uint8_t *)WeaponByUid(
+        *(const uint32_t *)(u + UNIT_OFF_INVENTORY
+            + (uint32_t)*(const int32_t *)(uintptr_t)ADDR_WEAPON_SLOT * 4));
+    if (!weapon)
+        return;
+    if (*(const int32_t *)(*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
+                           + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_MEDI)
         return;
     RecordAimedFire(u, target, 1);
 }
 
 void __cdecl SetWeaponTargetWrench(void *target, uint32_t at)
 {
-    int32_t  kind;
-    uint8_t *u;
+    uint8_t       *u;
+    const uint8_t *weapon;
 
     (void)at;
     if (!target)
         return;
-    u = AimedFireUnit(&kind);
-    if (!u || kind != AM2_ITEM_KIND_WREN)
+    u = (uint8_t *)LookupByUID(
+            *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
+    if (!u)
+        return;
+    if (!ObjIsType2Inline(u))
+        return;
+
+    weapon = (const uint8_t *)WeaponByUid(
+        *(const uint32_t *)(u + UNIT_OFF_INVENTORY
+            + (uint32_t)*(const int32_t *)(uintptr_t)ADDR_WEAPON_SLOT * 4));
+    if (!weapon)
+        return;
+    if (*(const int32_t *)(*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
+                           + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_WREN)
         return;
     RecordAimedFire(u, target, 1);
 }
@@ -17490,21 +17492,28 @@ void __cdecl SetWeaponTargetWrench(void *target, uint32_t at)
  * weapon lookup: the UNIT's own OBJ_OFF_SOLDIER_KIND must be under 6. */
 void __cdecl SetWeaponTargetKind2A(void *target, uint32_t at)
 {
-    int32_t  kind;
-    uint8_t *u;
+    uint8_t       *u;
+    const uint8_t *weapon;
 
     (void)at;
     if (!target)
         return;
     u = (uint8_t *)LookupByUID(
             *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
-    if (!u || !ObjIsType2((const AM2_Object *)u))
+    if (!u)
+        return;
+    if (!ObjIsType2Inline(u))
         return;
     if (*(const int32_t *)(u + OBJ_OFF_SOLDIER_KIND) >= 6)
         return;
 
-    u = AimedFireUnit(&kind);
-    if (!u || kind != AM2_ITEM_KIND_2A)
+    weapon = (const uint8_t *)WeaponByUid(
+        *(const uint32_t *)(u + UNIT_OFF_INVENTORY
+            + (uint32_t)*(const int32_t *)(uintptr_t)ADDR_WEAPON_SLOT * 4));
+    if (!weapon)
+        return;
+    if (*(const int32_t *)(*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
+                           + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_2A)
         return;
     RecordAimedFire(u, target, 1);
 }
@@ -17552,7 +17561,7 @@ void __cdecl SetWeaponTargetAimed(void *target, uint32_t at)
             *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
     if (!u)
         return;
-    if (!ObjIsType2((const AM2_Object *)u))
+    if (!ObjIsType2Inline(u))
         return;
 
     weapon = (const uint8_t *)WeaponByUid(
@@ -17578,14 +17587,26 @@ void __cdecl SetWeaponTargetAimed(void *target, uint32_t at)
  * unit was in survives the order. */
 void __cdecl SetWeaponTargetSweeper(void *target, uint32_t at)
 {
-    int32_t  kind;
-    uint8_t *u;
+    uint8_t       *u;
+    const uint8_t *weapon;
 
     (void)at;
     if (!target)
         return;
-    u = AimedFireUnit(&kind);
-    if (!u || kind != AM2_ITEM_KIND_MSWP)
+    u = (uint8_t *)LookupByUID(
+            *(const uint32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID);
+    if (!u)
+        return;
+    if (!ObjIsType2Inline(u))
+        return;
+
+    weapon = (const uint8_t *)WeaponByUid(
+        *(const uint32_t *)(u + UNIT_OFF_INVENTORY
+            + (uint32_t)*(const int32_t *)(uintptr_t)ADDR_WEAPON_SLOT * 4));
+    if (!weapon)
+        return;
+    if (*(const int32_t *)(*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
+                           + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_MSWP)
         return;
     RecordAimedFire(u, target, 0);
 }

@@ -2399,9 +2399,9 @@ void __cdecl UidRemapClear(void)
     if (g_uidRemap)
         am2_free(g_uidRemap);
 
-    g_uidRemapCap   = 0;
-    g_uidRemapCount = 0;
-    g_uidRemap      = (uint32_t *)0;
+    /* {cap, count, table}: one 12-byte clear, as the image's single
+     * zeroed register stored three times says. */
+    memset((void *)(uintptr_t)ADDR_UID_REMAP_CAP, 0, 12);
 }
 
 void __cdecl UidRemapAdd(uint32_t from, uint32_t to)

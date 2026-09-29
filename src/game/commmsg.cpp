@@ -328,16 +328,15 @@ int32_t __cdecl SendMapMsg(int32_t result, int32_t unused)
     if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
         return 1;
 
-    if (!*(const int32_t *)(comm + AM2_COMM_CONNECTED))
-        return rc;
-
-    rc   = SendGameMsg((void *)(uintptr_t)ADDR_MSG_MAP, 0, 1);
-    comm = kCommObj;
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED)) {
-        /* "Error = %d" prints the ARGUMENT. `rc`, which is the error, is not
-         * printed at all. The original's. */
-        am2_log("SendMapMsg from %x   Error = %d \n",
-                *(const int32_t *)(comm + AM2_COMM_SELF_ID), result);
+    if (*(const int32_t *)(comm + AM2_COMM_CONNECTED)) {
+        rc   = SendGameMsg((void *)(uintptr_t)ADDR_MSG_MAP, 0, 1);
+        comm = kCommObj;
+        if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED)) {
+            /* "Error = %d" prints the ARGUMENT. `rc`, which is the error, is
+             * not printed at all. The original's. */
+            am2_log("SendMapMsg from %x   Error = %d \n",
+                    *(const int32_t *)(comm + AM2_COMM_SELF_ID), result);
+        }
     }
     return rc;
 }
@@ -3322,7 +3321,11 @@ void __cdecl RecvVehicle24(void *msg)
     if (vehicle == 0)
         return;
 
-    BoardVehicle(UidOnWire(*(const uint32_t *)(m + 8)), vehicle);
+    /* The trooper's uid is decoded before the vehicle is pushed. */
+    {
+        uint32_t trooper = UidOnWire(*(const uint32_t *)(m + 8));
+        BoardVehicle(trooper, vehicle);
+    }
 }
 
 /* VehicleUpdateApply -- original 0x0045DF10, one caller: RecvVehicle1B's

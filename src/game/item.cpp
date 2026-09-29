@@ -8419,16 +8419,15 @@ void __cdecl SoldierNameOf(const void *obj, char *out)
  */
 void __cdecl AwardOwnArmyXp(void)
 {
-    void   *list = ((void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[0];
-    int32_t i    = 0;
+    /* Army 0's list, its pointer re-read at every use (Type2ActionAll's twin). */
+#define LIST (((AM2_PtrList *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[0])
+    int32_t i = 0;
 
-    while (i < *(const int32_t *)((const uint8_t *)list + LIST_OFF_COUNT)) {
-        uint8_t *obj = (uint8_t *)LookupByUID(
-            (*(const uint32_t *const *)((const uint8_t *)list
-                                        + LIST_OFF_UIDS))[i]);
+    while (i < LIST->count) {
+        uint8_t *obj = (uint8_t *)LookupByUID(((const uint32_t *)LIST->items)[i]);
 
         if (!obj) {
-            ListRemoveAt(list, i);
+            ListRemoveAt(LIST, i);
             continue;               /* no step: the shifted-down entry is next */
         }
 
@@ -8438,6 +8437,7 @@ void __cdecl AwardOwnArmyXp(void)
 
         i++;
     }
+#undef LIST
 }
 
 /* WeaponClassOf -- original 0x0042AAE0, one caller, which stores the answer
