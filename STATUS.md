@@ -267,7 +267,7 @@ main result so far (details in `src/vc6/README.md`):
     AudioTimerProc, MedkitHealOne and MovieTimerProc are registered rather
     than patched, so the relink's manifest never listed them and every
     reference to them stayed unresolved (`push 0` where the image pushes the
-    address). `bytematch.REGISTERED_FNS` adds them -- five more functions
+    address). `bytematch.REGISTERED_FNS` adds them -- four more functions
     counted, two matching. OurLeaderUnit, which the image inlines at every
     site, is `static inline` in item.h.
   - **Two `else` arms storing the same value are one block in the image**:
