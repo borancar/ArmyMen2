@@ -1915,34 +1915,39 @@ void __cdecl FreeDynamicSounds(void)
  * the same table with `jle` and covers all 17. Reproduced as written. */
 int32_t __cdecl SaveAudioSection(am2_FILE *fp)
 {
-    void **slots = (void **)(uintptr_t)ADDR_SOUND_DYNAMIC;
+    const char *name;
+    int32_t     len;
+    int32_t     i;
 
     WriteSaveTag(fp, AM2_SAVETAG_AUDIO);
 
-    for (int32_t i = 0; i < SOUND_DYNAMIC_SAVED; i++) {
-        uint8_t    *snd  = (uint8_t *)slots[i];
-        const char *name = snd ? *(const char **)(snd + SOUND_REC_OFF_NAME)
-                               : (const char *)0;
-        int32_t     len;
-
-        if (!snd || !name
-            || *(const void **)(snd + SOUND_REC_OFF_BUFFER) == (const void *)0
-            || *(const int32_t *)(snd + SOUND_REC_OFF_ACTIVE) == 0
-            || *(const int32_t *)(snd + SOUND_REC_OFF_LOOPING) == 0
-            || *name == '\0') {
+    /* The record is re-read from its slot at every use, as the image does. */
+#define SND (((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)[i])
+    for (i = 0; i < SOUND_DYNAMIC_SAVED; i++) {
+        if (SND
+            && (name = *(const char **)(SND + SOUND_REC_OFF_NAME)) != NULL
+            && *(const void **)(SND + SOUND_REC_OFF_BUFFER) != (const void *)0
+            && *(const int32_t *)(SND + SOUND_REC_OFF_ACTIVE) != 0
+            && *(const int32_t *)(SND + SOUND_REC_OFF_LOOPING) != 0) {
+            if (*name) {
+                len = (int32_t)strlen(name);
+                orig_fwrite(&len, 4, 1, fp);
+                orig_fwrite(*(const char **)(SND + SOUND_REC_OFF_NAME),
+                            (size_t)len, 1, fp);
+                orig_fwrite(SND + SOUND_REC_OFF_LOOPING,  4, 1, fp);
+                orig_fwrite(SND + SOUND_REC_OFF_POS,      4, 1, fp);
+                orig_fwrite(SND + SOUND_REC_OFF_PRIORITY, 4, 1, fp);
+                orig_fwrite(SND + SOUND_REC_OFF_OWNER,    4, 1, fp);
+            } else {
+                len = 0;
+                orig_fwrite(&len, 4, 1, fp);
+            }
+        } else {
             len = 0;
             orig_fwrite(&len, 4, 1, fp);
-            continue;
         }
-
-        len = (int32_t)strlen(name);
-        orig_fwrite(&len, 4, 1, fp);
-        orig_fwrite(name, (size_t)len, 1, fp);
-        orig_fwrite(snd + SOUND_REC_OFF_LOOPING,  4, 1, fp);
-        orig_fwrite(snd + SOUND_REC_OFF_POS,      4, 1, fp);
-        orig_fwrite(snd + SOUND_REC_OFF_PRIORITY, 4, 1, fp);
-        orig_fwrite(snd + SOUND_REC_OFF_OWNER,    4, 1, fp);
     }
+#undef SND
 
     return 1;
 }

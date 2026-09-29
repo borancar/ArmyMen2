@@ -3741,49 +3741,38 @@ int32_t __cdecl ObjCollidesWith(void *from, void *obj)
 {
     uint8_t *f = (uint8_t *)from;
     uint8_t *o = (uint8_t *)obj;
-    int32_t  step;
 
-    step = (int32_t)*(const int8_t *)(f + OBJ_OFF_HEIGHT_SET)
-         - (int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET);
-    step = abs(step);
-    if (step > AM2_BLOCK_HEIGHT_STEP)
-        return 0;
-
-    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT24) {
-        int32_t kind = *(const int32_t *)(f + VEHICLE_OFF_KIND);
-
-        if (kind == 1 || kind == 2)
-            return 1;
-    }
-
-    if (ObjIsTypeIn238((const AM2_Object *)o)) {
-        if (ObjIsType3((const AM2_Object *)o)
-            && *(const int8_t *)(f + OBJ_OFF_ARMY)
-                   == *(const int8_t *)(o + OBJ_OFF_ARMY))
-            return 0;
-
-        if (!ObjsAreAllied(f, o, 0))
+    /* Every "no" falls to the one return at the end, as the image has it. */
+    if (abs((int32_t)*(const int8_t *)(f + OBJ_OFF_HEIGHT_SET)
+            - (int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET))
+        <= AM2_BLOCK_HEIGHT_STEP) {
+        if ((*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT24)
+            && (*(const int32_t *)(f + VEHICLE_OFF_KIND) == 1
+                || *(const int32_t *)(f + VEHICLE_OFF_KIND) == 2))
             return 1;
 
-        if (*(const uint32_t *)((const uint8_t *)LookupOwnerObj(
-                    *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
-                + OBJ_OFF_RIDING) != ((const AM2_Object *)f)->uid)
-            return 0;
-        if (*(const int32_t *)(f + OBJ_OFF_FIELD_10C))
-            return 0;
-        return 1;
+        if (ObjIsTypeIn238((const AM2_Object *)o)) {
+            if (!ObjIsType3((const AM2_Object *)o)
+                || *(const int8_t *)(f + OBJ_OFF_ARMY)
+                       != *(const int8_t *)(o + OBJ_OFF_ARMY)) {
+                if (!ObjsAreAllied(f, o, 0)
+                    || (*(const uint32_t *)((const uint8_t *)LookupOwnerObj(
+                            *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+                        + OBJ_OFF_RIDING) == ((const AM2_Object *)f)->uid
+                        && !*(const int32_t *)(f + OBJ_OFF_FIELD_10C)))
+                    return 1;
+            }
+        } else if (ObjIsWatchedKind(o)) {
+            if (*(const int8_t *)(f + OBJ_OFF_ARMY)
+                    != *(const int8_t *)(o + OBJ_OFF_ARMY)
+                || *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                       - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
+                   > AM2_COLLIDE_OWN_DELAY)
+                return 1;
+        }
     }
 
-    if (!ObjIsWatchedKind(o))
-        return 0;
-
-    if (*(const int8_t *)(f + OBJ_OFF_ARMY) == *(const int8_t *)(o + OBJ_OFF_ARMY)
-        && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-               - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
-           <= AM2_COLLIDE_OWN_DELAY)
-        return 0;
-
-    return 1;
+    return 0;
 }
 
 /* 0x0045B7E0, three callers, 336 bytes -- the THIRD variant, and the one the

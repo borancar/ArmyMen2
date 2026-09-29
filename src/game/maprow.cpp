@@ -775,31 +775,29 @@ int32_t __cdecl RowAnimField4(const void *row, uint16_t id)
  */
 void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force)
 {
-    uint8_t         *r = (uint8_t *)row;
-    AM2_AnimTable   *t;
-    AM2_AnimEntry   *e;
-    AM2_Anim        *anim;
-    int32_t          f = frame;
-    int32_t          n, i;
-    int32_t          dir, cell;
-    uint8_t          heading;
-    int16_t          v;
+    uint8_t       *r = (uint8_t *)row;
+    AM2_AnimTable *t;
+    int32_t        i;
+    uint8_t        heading;
+    int16_t        v;
 
     if (!force && frame == *(const int16_t *)(r + ROW_OFF_FRAME))
         return;
 
-    if (f == -2)
+    switch (frame) {
+    case -2:
         return;
-    if (f == -1)
+    case -1:
         frame = *(const int16_t *)(r + ROW_OFF_FRAME);
-    else if (f == 0) {
+        break;
+    case 0:
         *(uint32_t *)r &= 0xFFFFFFFEu;
         return;
     }
 
-    t = *(AM2_AnimTable *const *)(r + ROW_OFF_ANIM_NEXT);
-    if (t) {
-        *(AM2_AnimTable **)(r + ROW_OFF_ANIM_CUR)  = t;
+    if (*(AM2_AnimTable *const *)(r + ROW_OFF_ANIM_NEXT)) {
+        *(AM2_AnimTable **)(r + ROW_OFF_ANIM_CUR) =
+            *(AM2_AnimTable *const *)(r + ROW_OFF_ANIM_NEXT);
         *(AM2_AnimTable **)(r + ROW_OFF_ANIM_NEXT) = (AM2_AnimTable *)0;
     }
 
@@ -807,44 +805,37 @@ void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force)
     if (!t)
         return;
 
-    n = t->count;
-    i = 0;
-    if (n > 0) {
-        for (i = 0; i < n; i++)
-            if (t->entries[i].id == (int32_t)frame)
-                break;
-        if (i >= n)
-            i = 0;                      /* not found: entry 0, not a failure */
-    }
+    for (i = 0; i < t->count; i++)
+        if (t->entries[i].id == (int32_t)frame)
+            break;
+    if (i >= t->count)
+        i = 0;                          /* not found: entry 0, not a failure */
 
-    e = &t->entries[i];
-
+    /* The entry and the playing animation are re-read at every use. */
+#define PLAYING (*(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING))
     *(uint8_t *)(r + ROW_OFF_CELL)  = 0;
     *(int16_t *)(r + ROW_OFF_FRAME) = frame;
-    *(AM2_Anim **)(r + ROW_OFF_ANIM_PLAYING) = e->anim;
+    *(AM2_Anim **)(r + ROW_OFF_ANIM_PLAYING) = t->entries[i].anim;
     *(uint8_t *)(r + ROW_OFF_HEADING_BIAS) =
         ((const uint8_t *)((void *)(uintptr_t)(ADDR_FRAME_HEADING_BIAS)))[frame];
-    *(int16_t *)(r + ROW_OFF_ANIM_NEXT_ID) = (int16_t)e->next;
+    *(int16_t *)(r + ROW_OFF_ANIM_NEXT_ID) = (int16_t)t->entries[i].next;
 
-    anim    = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
     heading = (uint8_t)(*(const uint8_t *)(r + ROW_OFF_HEADING)
                         + *(const uint8_t *)(r + ROW_OFF_HEADING_BIAS));
 
-    dir  = (uint8_t)RoundTo8(heading, anim->directionBits);
-    cell = anim->frames * dir + *(const uint8_t *)(r + ROW_OFF_CELL);
-
     RowSetSprite(row,
                  (*(void *const *const *)(uintptr_t)ADDR_SPRITE_LIST)
-                     [anim->cells[cell].sprite],
+                     [PLAYING->cells[PLAYING->frames
+                                     * (int16_t)RoundTo8(heading, PLAYING->directionBits)
+                                     + *(const uint8_t *)(r + ROW_OFF_CELL)].sprite],
                  (void *)(uintptr_t)ADDR_MAP_DESC);
 
-    anim = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
-    v    = anim->field4;
+    v = PLAYING->field4;
     *(int16_t *)(r + ROW_OFF_FIELD_3C) = v;
-
     if (*(const void *const *)(r + MAPOBJ_OFF_LUT)
         == (const void *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)
         *(int16_t *)(r + ROW_OFF_FIELD_3C) = (int16_t)(v + v);
+#undef PLAYING
 }
 
 /* 0x0041D210, two callers -- 0x0042C8C0 builds both descriptors here, from
@@ -1516,24 +1507,26 @@ void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
 {
     uint8_t       *out = (uint8_t *)set;
     const uint8_t *d   = (const uint8_t *)def;
-    int32_t        n   = *(const int32_t *)(d + DEFROWS_OFF_COUNT);
+    uint8_t       *row;
+    const uint8_t *spr;
     int32_t        i;
 
+    /* The count and the spec array are re-read at every use. */
+#define SPEC(i) (*(const uint8_t *const *)(d + DEFROWS_OFF_SPECS) \
+                 + (size_t)(i) * AM2_DEFSPEC_BYTES)
     *(const void **)(out + ROWSET_OFF_DEF)   = def;
-    *(int32_t *)(out + ROWSET_OFF_COUNT)     = n;
+    *(int32_t *)(out + ROWSET_OFF_COUNT)     = *(const int32_t *)(d + DEFROWS_OFF_COUNT);
     *(void **)(out + ROWSET_OFF_ROWS)        =
-        am2_malloc((size_t)n * AM2_OBJ_ROW_STRIDE);
+        am2_malloc((size_t)*(const int32_t *)(d + DEFROWS_OFF_COUNT)
+                   * AM2_OBJ_ROW_STRIDE);
 
     for (i = 0; i < *(const int32_t *)(out + ROWSET_OFF_COUNT); i++) {
-        uint8_t *row = *(uint8_t **)(out + ROWSET_OFF_ROWS)
-                       + (size_t)i * AM2_OBJ_ROW_STRIDE;
-        const uint8_t *spec = *(const uint8_t *const *)(d + DEFROWS_OFF_SPECS)
-                              + (size_t)i * AM2_DEFSPEC_BYTES;
-        const uint8_t *spr;
+        row = *(uint8_t **)(out + ROWSET_OFF_ROWS)
+              + (size_t)i * AM2_OBJ_ROW_STRIDE;
 
-        RowInit(row, *(void *const *)(spec + DEFSPEC_OFF_SPRITE),
-                (int32_t)*(const int16_t *)(spec + DEFSPEC_OFF_DX) + x,
-                (int32_t)*(const int16_t *)(spec + DEFSPEC_OFF_DY) + y);
+        RowInit(row, *(void *const *)(SPEC(i) + DEFSPEC_OFF_SPRITE),
+                (int32_t)*(const int16_t *)(SPEC(i) + DEFSPEC_OFF_DX) + x,
+                (int32_t)*(const int16_t *)(SPEC(i) + DEFSPEC_OFF_DY) + y);
 
         if (x && !(objFlags & OBJ_FLAG_DESTROYED))
             ObjFlagSet0(row);
@@ -1541,13 +1534,14 @@ void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
             ObjFlagClear0(row);
 
         *(int16_t *)(row + ROW_OFF_FIELD_26) =
-            *(const int16_t *)(spec + DEFSPEC_OFF_DEPTH);
+            *(const int16_t *)(SPEC(i) + DEFSPEC_OFF_DEPTH);
 
         spr = *(const uint8_t *const *)(row + ROW_OFF_SPRITE);
         RowAlloc(*(const int32_t *)(spr + SPR_OFF_W),
                  *(const int32_t *)(spr + SPR_OFF_H),
                  row, (void *)(uintptr_t)ADDR_MAP_DESC);
     }
+#undef SPEC
 
     if (*(const int32_t *)(d + DEFROWS_OFF_HAS_SUBREC))
         *(const void **)(out + ROWSET_OFF_SUBREC) = d + DEFROWS_OFF_SUBREC;
