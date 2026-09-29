@@ -500,9 +500,8 @@ static inline void AaiBuiltin(void *spr, int16_t a, int16_t b, int32_t c,
      * `slot`, and passing the pointer instead loads no map at all. */
     slot = AddRecordList(list);
 
-    RectSet(&box, l, t, r, bo);
     AddAaiRecord(MakeAaiRecord(type, (int32_t)key, slot,
-                               box.left, box.top, box.right, box.bottom));
+                               *RectSet(&box, l, t, r, bo)));
 }
 
 /* The same, for the three blocks that ALSO give the list its own
@@ -528,9 +527,8 @@ static inline void AaiBuiltinBoxed(void *spr, int16_t a, int16_t b, int32_t c,
 
     slot = AddRecordList(list);
 
-    RectSet(&box, -0x10, -0x10, 0x10, 0x10);
     AddAaiRecord(MakeAaiRecord(type, (int32_t)key, slot,
-                               box.left, box.top, box.right, box.bottom));
+                               *RectSet(&box, -0x10, -0x10, 0x10, 0x10)));
 }
 
 /* BuildAaiBuiltins -- original 0x00434700, 1,120 bytes, one caller. Empty the
@@ -627,9 +625,8 @@ void __cdecl BuildAaiBuiltins(void)
 
         slot = AddRecordList(list);
 
-        RectSet(&box, -0x10, -0x10, 0x10, 0x10);
         AddAaiRecord(MakeAaiRecord(0x2D, (int32_t)key, slot,
-                                   box.left, box.top, box.right, box.bottom));
+                                   *RectSet(&box, -0x10, -0x10, 0x10, 0x10)));
         key += 0x80;
         i++;
     } while (key < 0x01681600);
@@ -685,7 +682,7 @@ void __cdecl BuildAaiBuiltins(void)
  * ours reaches it by name.
  */
 void *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
-                            int32_t a, int32_t b, int32_t c, int32_t d)
+                            AM2_Rect box)
 {
     uint8_t *rec = (uint8_t *)am2_malloc(AM2_AAI_RECORD_BYTES);
     uint8_t *def;
@@ -699,10 +696,10 @@ void *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
     *(int32_t *)(rec + AAIREC_OFF_KEY)       = key;
     *(int32_t *)(rec + AAIREC_OFF_SLOT)      = -1;  /* AddAaiRecord fills it */
     *(int32_t *)(rec + AAIREC_OFF_LIST_SLOT) = slot;
-    *(int32_t *)(rec + 0x14)                 = a;
-    *(int32_t *)(rec + 0x1C)                 = c;
-    *(int32_t *)(rec + 0x18)                 = b;
-    *(int32_t *)(rec + 0x20)                 = d;
+    *(int32_t *)(rec + 0x14)                 = box.left;
+    *(int32_t *)(rec + 0x1C)                 = box.right;
+    *(int32_t *)(rec + 0x18)                 = box.top;
+    *(int32_t *)(rec + 0x20)                 = box.bottom;
 
     if (type < 0)
         return rec;
@@ -952,12 +949,15 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
  * when it built one. */
 int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
 {
-    uint32_t  key = PackKey((uint32_t)set, (uint32_t)index, (uint32_t)frame);
+    /* PackKey written out, as the image has it. */
+    uint32_t  key = (uint32_t)((((set << 12) + index) << 7) + frame);
     int32_t   slot = KeyLookup(key);
     void     *rec;
     AM2_Sprite *spr;
     uint8_t  *list;
-    uint8_t   entry[AM2_LIST_RECORD_BYTES];
+    /* Room for twenty list records, one used: the image's frame is sized
+     * for the array, and every stack offset follows from it. */
+    uint8_t   entry[20 * AM2_LIST_RECORD_BYTES];
     int32_t   i;
 
     if (slot >= 0) {
@@ -1014,13 +1014,12 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
     LoadMask(list + LISTHDR_OFF_MASK, set, index, frame);
 
     if (!*(const int32_t *)(list + LISTHDR_OFF_MASK + OBJMASK_OFF_BITS)) {
-        AM2_Rect box;
+        AM2_Rect box, r;
 
-        RectSet(&box, -0x10, -0x10, 0x10, 0x10);
-        *(int32_t *)(list + LISTHDR_OFF_BOX_LEFT)   = box.left;
-        *(int32_t *)(list + LISTHDR_OFF_BOX_TOP)    = box.top;
-        *(int32_t *)(list + LISTHDR_OFF_BOX_RIGHT)  = box.right;
-        *(int32_t *)(list + LISTHDR_OFF_BOX_BOTTOM) = box.bottom;
+        /* Copied out of RectSet's answer and then into the list, through
+         * a named local: the image's copy goes via two spill slots. */
+        r = *RectSet(&box, -0x10, -0x10, 0x10, 0x10);
+        *(AM2_Rect *)(list + LISTHDR_OFF_BOX_LEFT) = r;
     }
 
     {
@@ -1030,8 +1029,13 @@ int32_t __cdecl EnsureSpriteAaiRecord(int32_t set, int32_t index, int32_t frame)
         int32_t w  = *(const int32_t *)((const uint8_t *)spr + SPR_OFF_W);
         int32_t h  = *(const int32_t *)((const uint8_t *)spr + SPR_OFF_H);
 
-        return AddAaiRecord(MakeAaiRecord(set, (int32_t)key, s,
-                                          -hx, -hy, w - hx, h - hy));
+        AM2_Rect r;
+
+        r.left   = -hx;
+        r.top    = -hy;
+        r.right  = w + r.left;
+        r.bottom = h + r.top;
+        return AddAaiRecord(MakeAaiRecord(set, (int32_t)key, s, r));
     }
 }
 
@@ -1285,11 +1289,13 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
 
     ItemTeardown(obj);
 
-    loadFlags = (set == AM2_SET_WITH_EXTRA_LOAD_FLAG) ? 0x1080 : 0x1000;
+    loadFlags = 0x1000;
+    if (set == AM2_SET_WITH_EXTRA_LOAD_FLAG)
+        loadFlags = 0x1080;
 
     slot = FindRecordList(key);
     if (slot < 0) {
-        uint8_t    entry[AM2_LIST_RECORD_BYTES];
+        uint8_t    entry[20 * AM2_LIST_RECORD_BYTES];  /* one used */
         AM2_Sprite *spr;
         uint8_t    *list;
 
@@ -1309,13 +1315,10 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
         LoadMask(list + LISTHDR_OFF_MASK, set, index, frame);
 
         if (!*(const int32_t *)(list + LISTHDR_OFF_MASK + OBJMASK_OFF_BITS)) {
-            AM2_Rect box;
+            AM2_Rect box, r;
 
-            RectSet(&box, -0x10, -0x10, 0x10, 0x10);
-            *(int32_t *)(list + LISTHDR_OFF_BOX_LEFT)   = box.left;
-            *(int32_t *)(list + LISTHDR_OFF_BOX_TOP)    = box.top;
-            *(int32_t *)(list + LISTHDR_OFF_BOX_RIGHT)  = box.right;
-            *(int32_t *)(list + LISTHDR_OFF_BOX_BOTTOM) = box.bottom;
+            r = *RectSet(&box, -0x10, -0x10, 0x10, 0x10);
+            *(AM2_Rect *)(list + LISTHDR_OFF_BOX_LEFT) = r;
         }
 
         slot = AddRecordList(list);
@@ -1338,12 +1341,10 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
     *(uint32_t *)(o + OBJ_OFF_FLAGS) =
         *(const uint32_t *)(rec + DEF_OBJ_REC_OFF_FLAGS);
 
-    if (!flag) {
-        *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
-            *(const int16_t *)(rec + DEF_OBJ_REC_OFF_HEALTH);
+    if (!flag)
         *(int16_t *)(o + OBJ_OFF_HEALTH) =
-            *(const int16_t *)(rec + DEF_OBJ_REC_OFF_HEALTH);
-    }
+            *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
+                *(const int16_t *)(rec + DEF_OBJ_REC_OFF_HEALTH);
 
     *(int8_t *)(o + OBJ_OFF_HEIGHT_ADJ) =
         *(const int8_t *)(rec + DEF_OBJ_REC_OFF_HEIGHT_ADJ);
@@ -1379,8 +1380,15 @@ int32_t __cdecl ApplyObjFrame(void *obj, int32_t set, int32_t index,
             if (l != *(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 0)
                 || t != *(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 4)
                 || r != *(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 8)
-                || b != *(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 12))
-                ItemSetBox(obj, l, t, r, b);
+                || b != *(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 12)) {
+                AM2_Rect box;
+
+                box.left   = l;
+                box.top    = t;
+                box.right  = r;
+                box.bottom = b;
+                ItemSetBox(obj, box);
+            }
         }
 
         ApplyObjHeight(obj,

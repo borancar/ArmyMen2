@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "../inject/orig.h"
 #include "objtable.h"
+#include "rect.h"
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
  * compatible so dllmain.c can still call the install hooks. */
@@ -55,10 +56,11 @@ void __cdecl FreeRecordList(void *list);
  * without the insertion -- note the two disagree about what -1 means. */
 int32_t __cdecl FindRecordList(uint32_t owner);
 
-/* 0x004344A0. A 0x40-byte record from seven arguments, seeded from the
- * object.aai record for its (type, key) when the type is not negative. */
+/* 0x004344A0. A 0x40-byte record, seeded from the object.aai record for its
+ * (type, key) when the type is not negative. The box is BY VALUE: every
+ * caller copies a rectangle into the argument area as one block. */
 void *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
-                            int32_t a, int32_t b, int32_t c, int32_t d);
+                            AM2_Rect box);
 
 /* 0x004345A0. Register one of those under its key, writing the slot back into
  * the record. AddRecordList's twin on the table KeyLookup searches -- keyed on

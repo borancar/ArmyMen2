@@ -599,8 +599,7 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
  * shrinks keeps the larger array and the entries past the new box are the
  * ones ItemLinkCells clears.
  */
-void __cdecl ItemSetBox(void *obj, int32_t left, int32_t top,
-                        int32_t right, int32_t bottom)
+void __cdecl ItemSetBox(void *obj, AM2_Rect box)
 {
     uint8_t *o = (uint8_t *)obj;
     int32_t  w, h;
@@ -610,21 +609,21 @@ void __cdecl ItemSetBox(void *obj, int32_t left, int32_t top,
     ItemPreDestroy(o, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
 
     /* The position is read where it is used, not held. */
-    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 0)  = left;
-    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 4)  = top;
-    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 8)  = right;
-    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 12) = bottom;
+    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 0)  = box.left;
+    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 4)  = box.top;
+    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 8)  = box.right;
+    *(int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 12) = box.bottom;
 
-    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 0)  = *(const int16_t *)(o + OBJ_OFF_POS) + left;
-    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 4)  = *(const int16_t *)(o + OBJ_OFF_POS + 2) + top;
-    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 8)  = *(const int16_t *)(o + OBJ_OFF_POS) + right;
-    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 12) = *(const int16_t *)(o + OBJ_OFF_POS + 2) + bottom;
+    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 0)  = *(const int16_t *)(o + OBJ_OFF_POS) + box.left;
+    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 4)  = *(const int16_t *)(o + OBJ_OFF_POS + 2) + box.top;
+    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 8)  = *(const int16_t *)(o + OBJ_OFF_POS) + box.right;
+    *(int32_t *)(o + OBJ_OFF_HIT_RECT + 12) = *(const int16_t *)(o + OBJ_OFF_POS + 2) + box.bottom;
 
     if (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & MAPOBJ_FLAG_VISIBLE))
         return;
 
-    w = right - left;
-    h = bottom - top;
+    w = box.right - box.left;
+    h = box.bottom - box.top;
     if (w > 2)
         w -= 2;
     if (h > 2)

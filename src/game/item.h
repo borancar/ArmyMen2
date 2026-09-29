@@ -12,6 +12,7 @@
 #include "../inject/orig.h"   /* am2_FILE, for the savegame pair */
 #include "image.h"       /* AM2_IMAGE -- the two seams below */
 #include "dist.h"        /* AM2_Point */
+#include "rect.h"        /* AM2_Rect, ItemSetBox's box by value */
 #include "objtable.h"    /* LookupByUID, for OurLeaderUnit */
 
 #ifdef __cplusplus
@@ -639,9 +640,9 @@ void __cdecl FreeSubrecordRows(void *subrecord);
 /* 0x00429B60, one caller. Give the object a new hit box -- four offsets from
  * its own position -- and put it back on the map under it: unlink, write both
  * views of the box, grow and re-initialise the cell entries, relink. The item
- * counterpart of maprow.cpp's RowAlloc. */
-void __cdecl ItemSetBox(void *obj, int32_t left, int32_t top,
-                        int32_t right, int32_t bottom);
+ * counterpart of maprow.cpp's RowAlloc. The box is BY VALUE: ApplyObjFrame
+ * builds it in the argument area. */
+void __cdecl ItemSetBox(void *obj, AM2_Rect box);
 
 /* 0x00429F40, two callers. The other half of ItemPreDestroy: link the object
  * into every cell list its OBJ_OFF_HIT_RECT covers, and clear the entries it
@@ -938,10 +939,8 @@ void __cdecl SelectRankedWeapon(void *unit);
 /* 0x00435440, one caller. Is a point on a solid pixel of the object's FIRST
  * row? Rectangle first, then the sprite's own mask.
  *
- * The point is a `const void *` here rather than an AM2_Point, because this
- * header is included by translation units that do not pull in rect.h and
- * adding that include for one declaration would widen what item.h drags in.
- * The definition casts it back. */
+ * The point is a `const void *` here rather than an AM2_Point; the
+ * definition casts it back. */
 int32_t __cdecl ObjRowsMaskAt(void *obj, const void *pt);
 
 /* 0x004276F0, one caller. The savegame uid fixup: put every type 2's six
