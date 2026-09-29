@@ -1553,32 +1553,16 @@ read:
                                (uint32_t)flags);
 }
 
-/* Allocate and fill one, or give the record back for free()ing. */
-static inline AM2_Sprite *LoadSpriteRecord(int32_t set, int32_t index, int32_t frame,
-                                    int32_t flags)
-{
-    AM2_Sprite *spr = (AM2_Sprite *)orig_malloc(sizeof(AM2_Sprite));
-
-    /* The original zeroes with `rep stosd` for 0x10 dwords and does not check
-     * the allocation, so neither does this. */
-    memset(spr, 0, sizeof(AM2_Sprite));
-
-    if (!SpriteLoadTriple(spr, set, index, frame, flags)) {
-        orig_free(spr);
-        return 0;
-    }
-    return spr;
-}
-
 AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index, int32_t frame,
                                   int32_t flags, int32_t addref)
 {
     uint32_t id = (uint32_t)(((((uint32_t)set << 12) + (uint32_t)index) << 7)
                              + (uint32_t)frame);
     int32_t slot = SpriteSlotOf(id);
+    AM2_Sprite *spr;
 
     if (slot >= 0) {
-        AM2_Sprite *spr = g_spriteTable[slot];
+        spr = g_spriteTable[slot];
 
         /* A registered slot holding no record. Nothing reaches this in any
          * run so far, and the original's handling of it is odd enough to be
@@ -1586,9 +1570,16 @@ AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index, int32_t frame,
          * back without ever storing it in the slot, so the next lookup finds
          * the same empty slot again. Reproduced, not corrected. */
         if (!spr) {
-            spr = LoadSpriteRecord(set, index, frame, flags);
-            if (!spr)
+            /* The record built in place, as the image has it: no second
+             * test of the pointer once the load succeeds. The original zeroes
+             * it with `rep stosd` and does not check the allocation, so
+             * neither does this (here or below). */
+            spr = (AM2_Sprite *)orig_malloc(sizeof(AM2_Sprite));
+            memset(spr, 0, sizeof(AM2_Sprite));
+            if (!SpriteLoadTriple(spr, set, index, frame, flags)) {
+                orig_free(spr);
                 return 0;
+            }
             spr->id = id;
         }
 
@@ -1602,13 +1593,16 @@ AM2_Sprite *__cdecl PreloadSprite(int32_t set, int32_t index, int32_t frame,
         return spr;
     }
 
-    AM2_Sprite *spr = LoadSpriteRecord(set, index, frame, flags);
-    if (!spr)
-        return 0;
-
-    spr->id = id;
-    spr->refs = 1;
-    SpriteRegister(spr, id);
+    spr = (AM2_Sprite *)orig_malloc(sizeof(AM2_Sprite));
+    memset(spr, 0, sizeof(AM2_Sprite));
+    if (!SpriteLoadTriple(spr, set, index, frame, flags)) {
+        orig_free(spr);
+        spr = 0;
+    } else {
+        spr->id = id;
+        spr->refs = 1;
+        SpriteRegister(spr, id);
+    }
     return spr;
 }
 
