@@ -268,8 +268,8 @@ void __cdecl SendChatMsg(char *text, int32_t system)
     if (system)
         sender = 4;
     else
-        sender = (uint8_t)CommArmyOfSlot((void *)kMsgCommObj,
-                                                 (int32_t)g_defaultOwner);
+        sender = (uint8_t)((AM2_Comm *)kMsgCommObj)->CommArmyOfSlot(
+                     (int32_t)g_defaultOwner);
 
     record[AM2_MSG_CHAT_SENDER] = sender;
     SendGameMsg(record, 0, 0);

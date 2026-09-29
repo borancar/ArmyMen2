@@ -863,7 +863,8 @@ typedef int32_t (__cdecl *AM2_SaveGameFn)(const char *name);
  * mtime moving during a two-sided A/B says only that somebody wrote it. */
 void __cdecl MissionStartup(void)
 {
-    char    name[AM2_MISSION_NAME_BYTES];
+    char    name[0x10];     /* "startup%d" */
+    char    save[0x40];     /* "map%d_mission%d.sav" -- a buffer of its own */
     int32_t level = *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX;
     int32_t id;
 
@@ -884,11 +885,11 @@ void __cdecl MissionStartup(void)
     if (*(const int32_t *)(uintptr_t)ADDR_WIN_ENABLED)
         return;
 
-    sprintf(name, "map%d_mission%d.sav",
+    sprintf(save, "map%d_mission%d.sav",
             *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID,
             *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX);
-    SaveGame(name);
-    strcpy((char *)(uintptr_t)ADDR_GAMEPROC_STR_B, name);
+    SaveGame(save);
+    strcpy((char *)(uintptr_t)ADDR_GAMEPROC_STR_B, save);
 }
 
 /* 0x0041E950, one caller, on the per-frame path. Fire every timer that has

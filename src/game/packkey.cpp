@@ -52,10 +52,10 @@ int32_t __cdecl KeyLookup(uint32_t key)
 
         if (g_keyTable[mid].key == key)
             return g_keyTable[mid].value;
-        if (g_keyTable[mid].key > key)
-            hi = mid;
-        else
+        if (g_keyTable[mid].key < key)
             lo = mid + 1;
+        else
+            hi = mid;
     }
     return -1;
 }
