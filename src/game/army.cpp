@@ -689,19 +689,19 @@ attach_and_join:
  */
 int32_t __cdecl ArmyAlliedWithObj(int32_t army, void *b, int32_t useRec3)
 {
-    const uint8_t *ob   = (const uint8_t *)b;
-    void          *comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
-    int32_t        mp   = *(const int32_t *)(uintptr_t)ADDR_MP_SESSION;
+    const uint8_t *ob = (const uint8_t *)b;
     const uint8_t *rec;
     int32_t        idx;
 
+    /* army.h's inline, with every "allied" exit sharing one return. */
     if (army == 4)
-        return 1;
+        goto allied;
     if (*(const uint8_t *)(ob + OBJ_OFF_ARMY) == 4)
-        return 1;
+        goto allied;
 
-    if (b && *(const int32_t *)ob == 2) {
-        if (mp && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7)
+    if (ObjIsType2Inline(b)) {
+        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+            && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7)
             return 0;
 
         rec = (useRec3
@@ -710,8 +710,9 @@ int32_t __cdecl ArmyAlliedWithObj(int32_t army, void *b, int32_t useRec3)
               : *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC2);
 
         if ((const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS
-                + (uint32_t)(((AM2_Comm *)comm)->CommArmyOfSlot(army) << 8)) == rec)
-            return 1;
+                + (uint32_t)((*(AM2_Comm *const *)(uintptr_t)ADDR_COMM_OBJECT)
+                                 ->CommArmyOfSlot(army) << 8)) == rec)
+            goto allied;
 
         if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
             idx = 0;
@@ -724,11 +725,15 @@ int32_t __cdecl ArmyAlliedWithObj(int32_t army, void *b, int32_t useRec3)
         else
             return 0;
 
-        if (AllyFlag(army, ((AM2_Comm *)comm)->CommSlotForArmy(idx)))
-            return 1;
+        if (AllyFlag(army, (*(AM2_Comm *const *)(uintptr_t)ADDR_COMM_OBJECT)
+                               ->CommSlotForArmy(idx)))
+            goto allied;
     }
 
     return AllyFlag(army, *(const int8_t *)(ob + OBJ_OFF_ARMY));
+
+allied:
+    return 1;
 }
 
 /* Three target predicates that share one functions.tsv entry -- 0x00403600,

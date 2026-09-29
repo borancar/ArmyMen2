@@ -654,50 +654,40 @@ int32_t __cdecl AddNameTableName(const char *name, int32_t type, int32_t uid)
 
 char *__cdecl ScriptTokenText(const AM2_ScriptTok *tok, char *out)
 {
-    const char *src;
-
+    /* Each case copies for itself and the one return is shared; VC6
+     * cross-jumps the identical strcpy tails, all but the first. */
     switch (tok->kind) {
     case AM2_TOKEN_UNKNOWN:
         /* A `char *` stored in the image, pointing at the string just past the
          * keyword table -- so BOTH the slot and the pointer it holds are image
-         * addresses and both need the slide. Sliding only the slot reads the
-         * right pointer and then follows it into whatever the test process has
-         * at 0x0048825C, which came back as leftover script text rather than
-         * as a fault. Any pointer stored IN the image needs AM2_IMAGE twice. */
-        src = kUnknownWord;
+         * addresses. */
+        strcpy(out, kUnknownWord);
         break;
 
     case AM2_TOKEN_CONTROL_CHAR:
     case AM2_TOKEN_RESERVED:
-        src = ScriptTokenName((int32_t)(uintptr_t)tok->value);
+        strcpy(out, ScriptTokenName((int32_t)(uintptr_t)tok->value));
         break;
 
     case AM2_TOKEN_INTEGER:
         sprintf(out, "%d", (int32_t)(uintptr_t)tok->value);
-        return out;
+        break;
 
-    case AM2_TOKEN_FLOAT: {
+    case AM2_TOKEN_FLOAT:
         /* The value field holds the float's bits, not a pointer to them. */
-        float f;
-        memcpy(&f, &tok->value, sizeof f);
-        sprintf(out, "%6.2f", (double)f);
-        return out;
-    }
+        sprintf(out, "%6.2f", (double)*(const float *)&tok->value);
+        break;
 
     case AM2_TOKEN_STRING:
-        src = (const char *)tok->value;
+        strcpy(out, (const char *)tok->value);
         break;
 
     case AM2_TOKEN_NAMEREF:
-        src = kScriptNames[(uintptr_t)tok->value].name;
+        strcpy(out, kScriptNames[(uintptr_t)tok->value].name);
         break;
 
-    default:
-        /* Kind 6, and anything above 7, leave `out` untouched. */
-        return out;
+    /* Kind 6, and anything above 7, leave `out` untouched. */
     }
-
-    strcpy(out, src);
     return out;
 }
 
