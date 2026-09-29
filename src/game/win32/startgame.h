@@ -7,12 +7,15 @@
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
  * compatible so dllmain.c can still call the install hooks. */
-#ifdef __cplusplus
+/* C++ linkage under VC6: an extern "C" function gets no /GX unwind frame,
+ * and StartMultiplayerGame's `new AM2_Rec` needs one (see rect.h). */
+#if defined(__cplusplus) && !defined(_MSC_VER)
 extern "C" {
+#endif
+#ifdef __cplusplus
 /* 0x0042F290. The START A WAR button: past the disabled CD check, ask for
  * ENTER BATTLE NAME and mark us host. */
 void __cdecl OnStartWar(AM2_Widget *w);
-
 #endif
 
 /* Original: 0x0042ECF0. The menu's "start the selected game" button handler.
@@ -64,7 +67,7 @@ void __cdecl OnQuit(void);
 
 int startgame_install(void);
 
-#ifdef __cplusplus
+#if defined(__cplusplus) && !defined(_MSC_VER)
 }
 #endif
 

@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 889 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 890 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 889:
+  the near-miss sweep, 758 before the row pools. From 758 to 890:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -83,7 +83,7 @@ main result so far (details in `src/vc6/README.md`):
     function whose original has one needs C++ linkage. The same assumption
     runs down call chains: with rect.h `extern "C"`, the widget base
     constructor looked nothrow, so a `new AM2_Edit` lost its EH state.
-    rect.h and movie.h are C++ linkage under VC6 only (the C harness
+    rect.h, movie.h and startgame.h are C++ linkage under VC6 only (the C harness
     calls them). The movie object is `new AM2_Movie(...)`, as PlayMovie's
     EH frame says; its constructor (MovieOpen) is still a near miss, and
     SnapshotSystemPalette at 0x00445170 is really one of its methods

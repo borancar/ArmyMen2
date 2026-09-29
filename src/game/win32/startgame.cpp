@@ -174,8 +174,6 @@ typedef void *(__cdecl *am2_operator_new_fn)(size_t);
 
 void __cdecl StartMultiplayerGame(void)
 {
-    uint8_t *comm;
-
     PlaySoundAt(2, 0, 0, 0, 0);
 
     /* A compact install leaves the multiplayer maps on the CD. This one is a
@@ -196,24 +194,21 @@ void __cdecl StartMultiplayerGame(void)
     ApplyGameSettings();
     ClearMenuMsgs();
 
-    comm = g_commObject;
-    *(int32_t *)(comm + COMM_OFF_IS_HOST) = 0;
+    *(int32_t *)(g_commObject + COMM_OFF_IS_HOST) = 0;
 
     /* Made once and kept. A failed allocation leaves it null, which the open
      * below then refuses -- the original checks rather than assuming. */
-    if (!g_sessionObject) {
-        void *obj = orig_operator_new(SESSION_OBJECT_SIZE);
-        if (obj)
-            RecordCtor(obj, 1);
-        g_sessionObject = obj;
-    }
+    if (!g_sessionObject)
+        g_sessionObject = new AM2_Rec(1);
 
     /* Hand the screen back to GDI and put the pointer up, or the dialog the
      * session browser shows would be invisible and unclickable. */
     IDirectDraw_FlipToGDISurface(g_ddraw);
     ShowCursor(TRUE);
 
-    if (!CommEnumSessions(comm, g_sessionObject)) {
+    /* The member call itself: through msgslot.h's inline forwarder the
+     * session pointer lands in a different register. */
+    if (!((AM2_Comm *)g_commObject)->CommEnumSessions(g_sessionObject)) {
         g_menuRequest    = REQUEST_REFUSED;
         g_menuRequestSet = 1;
     }
