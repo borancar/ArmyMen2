@@ -112,7 +112,7 @@ typedef int32_t (__cdecl *am2_rand_fn)(void);
  * and back.  They are NOT one function twice: the two differ in the weapon
  * kind, in which template goes into OBJ_OFF_SUBRECORD, and in whether that
  * write happens before or after the swap.  Diffed rather than merged. */
-static void CheatSwapWeapon(void *unit, int32_t kind, void *subrecord,
+static inline void CheatSwapWeapon(void *unit, int32_t kind, void *subrecord,
                             int32_t subrecordFirst)
 {
     uint8_t *u = (uint8_t *)unit;

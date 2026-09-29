@@ -32,7 +32,7 @@
 #if defined(_MSC_VER) && !defined(__GNUC__)
 /* The same two instructions in MSVC's inline-assembler syntax, so the VC6
  * build compiles this file too instead of stubbing the tables to zero. */
-static double x87cos(double a)
+static inline double x87cos(double a)
 {
     double r;
     __asm { fld a }

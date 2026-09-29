@@ -6397,7 +6397,7 @@ static void RegionTileXY(const uint8_t *r, int32_t *x, int32_t *y)
 /* The straight-line distance between two regions, in the units ApproxDistXY
  * answers -- the same call the search makes for both its step cost and its
  * heuristic. */
-static int32_t RegionSpan(const uint8_t *a, const uint8_t *b)
+static inline int32_t RegionSpan(const uint8_t *a, const uint8_t *b)
 {
     int32_t ax, ay, bx, by;
 

@@ -65,35 +65,6 @@ typedef struct AM2_EventEntry {
 #define kEventTable ((AM2_EventEntry **)((void *)(uintptr_t)(ADDR_EVENT_TABLE)))
 #define kImageFn(a)       ((const void *)((void *)(uintptr_t)(a)))
 
-/* The eight that exist whether a script mentions them or not. Each is declared
- * into the name table on the spot -- ScriptNameUid creates the entry when the
- * lookup misses -- so a mission can test `greenwins` without declaring it. */
-static const struct {
-    uint32_t    name;      /* image address of the literal */
-    const void *handler;
-    int32_t     army;
-} kWinConditions[] = {
-    { ADDR_NAME_GREENWINS,     (const void *)EvtArmyWins, 0 },
-    { ADDR_NAME_TANWINS,       (const void *)EvtArmyWins, 1 },
-    { ADDR_NAME_BLUEWINS,      (const void *)EvtArmyWins, 2 },
-    { ADDR_NAME_GREYWINS,      (const void *)EvtArmyWins, 3 },
-    { ADDR_NAME_GREENTEAMWINS, (const void *)EvtTeamWins, 0 },
-    { ADDR_NAME_TANTEAMWINS,   (const void *)EvtTeamWins, 1 },
-    { ADDR_NAME_BLUETEAMWINS,  (const void *)EvtTeamWins, 2 },
-    { ADDR_NAME_GREYTEAMWINS,  (const void *)EvtTeamWins, 3 },
-};
-
-/* The three that are not named at all: nothing looks them up by string, so
- * each takes a fresh uid and the uid is parked in a global for whoever raises
- * it later. */
-static const struct {
-    const void *handler;
-    uint32_t    uidslot;
-} kRuleEvents[] = {
-    { (const void *)EvtRuleA, ADDR_RULE_UID_A },
-    { (const void *)EvtRuleB, ADDR_RULE_UID_B },
-    { (const void *)EvtRuleC, ADDR_RULE_UID_C },
-};
 
 /* 0x0041EE70, 19 call sites.
  *
@@ -174,18 +145,36 @@ void __cdecl DeclareRuleVars(void)
 
     EventClearAll();
 
-    for (uint32_t i = 0; i < sizeof kWinConditions / sizeof kWinConditions[0]; i++)
-        EventRegister(0, ScriptNameUid((const char *)((void *)(uintptr_t)(
-                                   kWinConditions[i].name))),
-                            0, kWinConditions[i].handler,
-                            (void *)(uintptr_t)kWinConditions[i].army, 0);
+    /* Written out one registration at a time, as the image has them.
+     *
+     * The eight win conditions exist whether a script mentions them or not.
+     * Each is declared into the name table on the spot -- ScriptNameUid
+     * creates the entry when the lookup misses -- so a mission can test
+     * `greenwins` without declaring it. The three rule events are not named
+     * at all: each takes a fresh uid, parked in a global for whoever raises
+     * it later. */
+#define WIN(name, handler, army)                                            \
+    EventRegister(0, ScriptNameUid((const char *)(uintptr_t)(name)), 0,     \
+                  (const void *)(handler), (void *)(uintptr_t)(army), 0);
+    WIN(ADDR_NAME_GREENWINS,     EvtArmyWins, 0)
+    WIN(ADDR_NAME_TANWINS,       EvtArmyWins, 1)
+    WIN(ADDR_NAME_BLUEWINS,      EvtArmyWins, 2)
+    WIN(ADDR_NAME_GREYWINS,      EvtArmyWins, 3)
+    WIN(ADDR_NAME_GREENTEAMWINS, EvtTeamWins, 0)
+    WIN(ADDR_NAME_TANTEAMWINS,   EvtTeamWins, 1)
+    WIN(ADDR_NAME_BLUETEAMWINS,  EvtTeamWins, 2)
+    WIN(ADDR_NAME_GREYTEAMWINS,  EvtTeamWins, 3)
+#undef WIN
 
-    for (uint32_t i = 0; i < sizeof kRuleEvents / sizeof kRuleEvents[0]; i++) {
-        int32_t uid = AllocUid();
-
-        *(int32_t *)((void *)(uintptr_t)(kRuleEvents[i].uidslot)) = uid;
-        EventRegister(0, uid, 0, kRuleEvents[i].handler, 0, 0);
+#define RULE(handler, slot) {                                               \
+        int32_t uid = AllocUid();                                           \
+        *(int32_t *)(uintptr_t)(slot) = uid;                                \
+        EventRegister(0, uid, 0, (const void *)(handler), 0, 0);            \
     }
+    RULE(EvtRuleA, ADDR_RULE_UID_A)
+    RULE(EvtRuleB, ADDR_RULE_UID_B)
+    RULE(EvtRuleC, ADDR_RULE_UID_C)
+#undef RULE
 
     /* One registration per event term of every `if`, with the condition itself
      * as the callback's argument -- which is how a fired event finds the
