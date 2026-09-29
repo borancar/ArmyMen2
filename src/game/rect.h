@@ -92,5 +92,25 @@ int rect_install(void);
 #else
 #define AM2_TEMP(T) (&const_cast<T &>(static_cast<const T &>(T())))
 #endif
+
+/* RectSet as the original declared it: returning the rectangle BY VALUE.
+ * MSVC passes a struct return's buffer as a hidden first argument and hands
+ * it back in eax, which is exactly RectSet(&tmp, l, t, r, b) -- so this is
+ * the same function called the way the original's callers call it. The
+ * difference shows in the caller: a copy out of a returned value loads all
+ * four fields before it stores any (AM2_Widget's constructor), where a copy
+ * through `*RectSet(...)` pairs them.
+ *
+ * GCC on Linux i386 has the CALLEE pop that hidden pointer; RectSet does
+ * not, so the pointer type says so. MinGW already follows MSVC. */
+#if defined(__GNUC__) && defined(__i386__)
+#define AM2_AGG_NOPOP __attribute__((callee_pop_aggregate_return(0)))
+#else
+#define AM2_AGG_NOPOP
+#endif
+typedef AM2_Rect (__cdecl AM2_AGG_NOPOP *AM2_RectMakeFn)(int32_t, int32_t,
+                                                         int32_t, int32_t);
+#define RectMake(l, t, r, b) \
+    (((AM2_RectMakeFn)(void *)RectSet)((l), (t), (r), (b)))
 #endif
 #endif /* AM2_RECT_H */

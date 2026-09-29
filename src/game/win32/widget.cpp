@@ -5387,8 +5387,8 @@ void __cdecl DrawTooltip(const char *text, uint8_t colour)
     else
         y = cur[1] + AM2_TIP_BELOW;
 
-    box = *(RECT *)RectSet(AM2_TEMP(AM2_Rect), x, y, x + w + AM2_TIP_PAD,
-                           y + AM2_TIP_HEIGHT);
+    *(AM2_Rect *)&box = RectMake(x, y, x + w + AM2_TIP_PAD,
+                                 y + AM2_TIP_HEIGHT);
 
     /* Outside the lock, and that is not a style choice -- see above. */
     ClearRegion(&box,
@@ -14447,14 +14447,11 @@ AM2_Widget::AM2_Widget()
     AM2_CTOR_VTABLE(w, VTABLE_WIDGET_BASE);
 
     /* Both rectangles are built in a temporary and copied, which is what a
-     * `m_rect = Rect(0,0,0,0)` compiles to when Rect returns by value -- the
-     * original calls RectSet twice into stack slots rather than writing the
-     * eight zeroes directly. Kept in that shape; RectSet is ours. */
-    /* Whole-struct copies out of the pointer RectSet answers -- the
-     * original's `mov ebx, eax` and four loads through it -- not
-     * field-by-field reads of the temporary. */
-    *(AM2_Rect *)&w->x    = *RectSet(AM2_TEMP(AM2_Rect), 0, 0, 0, 0);
-    *(AM2_Rect *)&w->rect = *RectSet(AM2_TEMP(AM2_Rect), 0, 0, 0, 0);
+     * `m_rect = Rect(0,0,0,0)` compiles to when Rect returns by value -- and
+     * it does: RectMake is RectSet called that way (see rect.h). The copy
+     * out of the returned value loads all four fields, then stores. */
+    *(AM2_Rect *)&w->x    = RectMake(0, 0, 0, 0);
+    *(AM2_Rect *)&w->rect = RectMake(0, 0, 0, 0);
 
     w->firstChild  = (AM2_Widget *)0;
     w->parent      = (AM2_Widget *)0;

@@ -1068,7 +1068,7 @@ void __cdecl ComposeFrame(void)
 
     ResetDirtyList();
 
-    src = *RectSet(AM2_TEMP(AM2_Rect), g_blitRect->left, g_blitRect->top,
+    src = RectMake(g_blitRect->left, g_blitRect->top,
                    g_blitRect->right, g_blitRect->bottom);
 
     IDirectDrawSurface_BltFast(g_backBuffer,

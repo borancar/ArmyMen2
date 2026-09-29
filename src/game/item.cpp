@@ -11961,7 +11961,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
     uint8_t  *rows;
     AM2_Point at;
     uint32_t  where;
-    AM2_Rect  box, r;
+    AM2_Rect  r;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION && !remote
         && !AM2_THE_COMM->CommMustBroadcast(army))
@@ -12037,9 +12037,9 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
         && AM2_THE_COMM->CommMustBroadcast(army))
         SendItemCreate(o);
 
-    /* Copied out of RectSet's answer into a second local, and that one
+    /* The rectangle is returned by value into a local, and that one
      * passed. */
-    r = *RectSet(&box, -0x10, -0x10, 0x10, 0x10);
+    r = RectMake(-0x10, -0x10, 0x10, 0x10);
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
                 (const void *)((void *)(uintptr_t)(ADDR_TROOPER_ROW_SPEC)), x, y, &r);
     SetFieldInAll(o + OBJ_OFF_SUBRECORD,
@@ -12052,9 +12052,9 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
                 *(void **)(o + 4));
 
     rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = 0;
     *(const void **)(rows + ROW_OFF_ANIM_CUR) =
         (const void *)(uintptr_t)ADDR_SOLDIER_ANIMS;
-    *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = 0;
     *(int16_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS) + ROW_OFF_FIELD_26) =
         AM2_ROW_FIELD26_INIT;
 

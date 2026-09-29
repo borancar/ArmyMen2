@@ -538,7 +538,7 @@ void __cdecl InitMenuScreen(void)
     g_menuSpritesEnd = *(const uint32_t *)(uintptr_t)ADDR_MENU_SPRITES;
     *(uint32_t *)(uintptr_t)ADDR_MENU_ANIM_NEXT = Ticks() + MENU_ANIM_PERIOD;
 
-    RectSet(&r, 0, 0, 0, 0);
+    r = RectMake(0, 0, 0, 0);
     *(AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_PREV = r;
     *(AM2_Rect *)(uintptr_t)ADDR_MENU_CURSOR_RECT = r;
 

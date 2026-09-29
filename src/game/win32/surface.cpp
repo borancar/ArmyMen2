@@ -1525,9 +1525,9 @@ void __cdecl DrawMenuCursor(void)
         int32_t        hx = sfld16(spr, SPR_OFF_HOTX);
         int32_t        hy = sfld16(spr, SPR_OFF_HOTY);
 
-        RectSet(&r, g_curX - hx, g_curY - hy,
-                g_curX + sfld32(spr, SPR_OFF_W) - hx,
-                g_curY + sfld32(spr, SPR_OFF_H) - hy);
+        r = RectMake(g_curX - hx, g_curY - hy,
+                     g_curX + sfld32(spr, SPR_OFF_W) - hx,
+                     g_curY + sfld32(spr, SPR_OFF_H) - hy);
         *g_cursorRect = r;
     }
 }
