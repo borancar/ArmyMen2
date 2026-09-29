@@ -16055,7 +16055,6 @@ void __attribute__((thiscall)) AM2_Widget::MultiSpritePaint(RECT clip)
     AM2_Widget *w = this;
 
     const uint8_t *self = (const uint8_t *)w;
-    int32_t        idx  = *(const int32_t *)(self + MULTISPR_OFF_INDEX);
     AM2_Sprite    *spr;
     RECT           dest;
     RECT           vis;
@@ -16065,22 +16064,19 @@ void __attribute__((thiscall)) AM2_Widget::MultiSpritePaint(RECT clip)
 
     ::WidgetScreenRect(w);
 
-    spr = *(AM2_Sprite *const *)(self + MULTISPR_OFF_SPRITES + idx * 4);
+    spr = *(AM2_Sprite *const *)(self + MULTISPR_OFF_SPRITES
+                                 + *(const int32_t *)(self + MULTISPR_OFF_INDEX) * 4);
     if (!spr)
         return;
 
     /* Halved AFTER the subtraction, which is not how ::WidgetPaint rounds. */
-    x = w->rect.left
-        + ((w->rect.right - spr->bounds.right - w->rect.left) >> 1);
-    y = w->rect.top
-        + ((w->rect.bottom - *(const int32_t *)(self + MULTISPR_OFF_Y_INSET)
-            - w->rect.top) >> 1)
-        + *(const int32_t *)(self + MULTISPR_OFF_Y_BIAS);
-
-    dest.left   = x;
-    dest.top    = y;
-    dest.right  = x + spr->bounds.right;
-    dest.bottom = y + spr->bounds.bottom;
+    x = dest.left = ((w->rect.right - spr->bounds.right - w->rect.left) >> 1)
+                    + w->rect.left;
+    dest.right = spr->bounds.right + x;
+    y = dest.top = ((w->rect.bottom - *(const int32_t *)(self + MULTISPR_OFF_Y_INSET)
+                     - w->rect.top) >> 1)
+                   + *(const int32_t *)(self + MULTISPR_OFF_Y_BIAS) + w->rect.top;
+    dest.bottom = spr->bounds.bottom + y;
 
     if (!IntersectRect(&vis, &dest, &clip))
         return;

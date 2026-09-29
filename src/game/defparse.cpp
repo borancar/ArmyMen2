@@ -563,38 +563,38 @@ int32_t __cdecl DefCountLinks(int32_t parentkey)
  * "link 33-1" is object type 33, link number 1.
  *
  * The bare Log() is the original's: it pushes no format at all and the callee
- * reads whatever the stack slot above the qsort arguments held. Every observed
- * run has that slot at 0, and the logger is a `ret` in this build, so a
- * literal 0 is passed here -- it reproduces the trace deterministically where
- * reading our own stack garbage would not. */
+ * reads whatever the stack slot above the qsort arguments held. The logger is
+ * a `ret` in this build and gamelog.c validates the pointer, so it is called
+ * with no arguments as SortVehicleDefs calls it -- the bytes want it.
+ *
+ * The key is unpacked at each use rather than held: KeyFieldA and KeyFieldB
+ * are called again for the complaint, as the image does. */
+typedef void (__cdecl *AM2_VoidFn)(void);
+#define orig_log_noargs ((AM2_VoidFn)(uintptr_t)ADDR_LOG)
+
 void __cdecl DefCheckLinks(void)
 {
-    uint32_t last = 0;
+    uint32_t last;
+    int32_t  i;
+    uint8_t *rec;
 
     orig_qsort(kDefLinks, (uint32_t)kDefLinkCount, sizeof(AM2_DefLink),
                (const void *)ComparePair);
 
-    orig_log((const char *)0);
+    orig_log_noargs();
 
-    for (int32_t i = 0; i < kDefLinkCount; i++) {
-        uint32_t key = (uint32_t)kDefLinks[i].parent;
-        uint32_t number, type;
-        uint8_t *rec;
-
-        if (key <= last)
-            continue;
-        last = key;
-
-        number = KeyFieldB(key);
-        type   = KeyFieldA(key);
-        rec    = (uint8_t *)DefFindObjRec((int32_t)type,
-                                                  (int32_t)number, 0);
-
-        if (rec != (uint8_t *)0)
-            *(int32_t *)(rec + DEF_OBJ_REC_OFF_LINKS) = DefCountLinks((int32_t)key);
-        else
-            orig_log("Object AAI record not found for link %02d-%-3d\n",
-                     type, number);
+    last = 0;
+    for (i = 0; i < kDefLinkCount; i++) {
+        if ((uint32_t)kDefLinks[i].parent > last) {
+            last = (uint32_t)kDefLinks[i].parent;
+            rec = (uint8_t *)DefFindObjRec((int32_t)KeyFieldA(last),
+                                           (int32_t)KeyFieldB(last), 0);
+            if (!rec)
+                orig_log("Object AAI record not found for link %02d-%-3d\n",
+                         KeyFieldA(last), KeyFieldB(last));
+            else
+                *(int32_t *)(rec + DEF_OBJ_REC_OFF_LINKS) = DefCountLinks((int32_t)last);
+        }
     }
 }
 

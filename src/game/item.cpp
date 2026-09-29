@@ -2737,51 +2737,49 @@ void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
  * IT CLEARS OBJ_OFF_DEADLINE_58 ON ENTRY, before anything else, so the bite
  * always resets its own timer even if the box turns out to be empty.
  *
- * ONE THING IS DELIBERATELY NOT REPRODUCED, and it is measured rather than
- * waved through. The original hands PlaySoundAt the PACKED point as `x` and
- * the dword starting two bytes into it as `y` -- MSVC put the two int16 in one
- * slot and read it twice at overlapping offsets -- so the upper half of each
- * argument is the other coordinate or whatever the frame held. PlaySoundAt
- * assigns `where.x = (int16_t)x` and `where.y = (int16_t)y`, so both upper
- * halves are discarded and clean arguments cannot differ. Passing the two
- * coordinates plainly.
+ * THE POINT IS STEPPED IN PLACE: the roach's position is copied into a local
+ * point whose halves are then overwritten with the stepped coordinates, and
+ * that point is what the sound and the box are built from. Passing its int16
+ * halves hands PlaySoundAt the PACKED point as `x` and the dword starting two
+ * bytes into it as `y`, which is what VC6 does with an int16 argument; the
+ * callee truncates both, so the upper halves never matter.
  */
 void __cdecl RoachBite(void *roach)
 {
-    uint8_t  *o      = (uint8_t *)roach;
-    int32_t   facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
-    int32_t   x      = *(const int16_t *)(o + OBJ_OFF_POS);
-    int32_t   y      = *(const int16_t *)(o + OBJ_OFF_POS + 2);
-    float     reach  = *(const float *)(uintptr_t)ADDR_ROACH_REACH;
-    const int32_t *box = (const int32_t *)(uintptr_t)ADDR_ROACH_BITE_BOX;
-    AM2_Rect  at;
-    int16_t   toX, toY;
-    uint8_t  *hit;
+    uint8_t   *o = (uint8_t *)roach;
+    AM2_Point  at;
+    AM2_Rect   box;
+    uint8_t    back;
+    uint8_t   *hit;
 
+#define REACH  (*(const float *)(uintptr_t)ADDR_ROACH_REACH)
+#define BOX    (*(const AM2_Rect *)(uintptr_t)ADDR_ROACH_BITE_BOX)
     *(int32_t *)(o + OBJ_OFF_DEADLINE_58) = 0;
+    at = *(const AM2_Point *)(o + OBJ_OFF_POS);
 
-    toX = (int16_t)(int32_t)(Cos8(facing) * reach + (float)x);
-    toY = (int16_t)(int32_t)(Sin8(facing) * reach + (float)y);
+    at.x = (int16_t)(Cos8(*(const uint8_t *)(o + OBJ_OFF_FACING)) * REACH + at.x);
+    at.y = (int16_t)(Sin8(*(const uint8_t *)(o + OBJ_OFF_FACING)) * REACH + at.y);
 
-    PlaySoundAt(AM2_ROACH_BITE_SOUND, 0, 0, toX, toY);
+    PlaySoundAt(AM2_ROACH_BITE_SOUND, 0, 0, at.x, at.y);
 
-    at.left   = toX + box[0];
-    at.top    = toY + box[1];
-    at.right  = toX + box[2];
-    at.bottom = toY + box[3];
+    box.left   = at.x + BOX.left;
+    box.right  = at.x + BOX.right;
+    box.top    = at.y + BOX.top;
+    box.bottom = at.y + BOX.bottom;
+    back = *(const uint8_t *)(o + OBJ_OFF_FACING) + 0x80;
 
-    hit = (uint8_t *)AllObjectsInRect(
-              &at, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
-
-    while (hit) {
+    for (hit = (uint8_t *)AllObjectsInRect(
+                   &box, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+         hit; hit = *(uint8_t **)(hit + OBJ_OFF_QUERY_NEXT)) {
         if (!ObjsAreAllied(o, hit, 0))
             DamageObject(hit,
                          *(const int32_t *)((void *)(uintptr_t)(ADDR_ROACH_DAMAGE)),
                          AM2_ROACH_DAMAGE_KIND,
                          *(const uint32_t *)(o + 4),
-                         (uint8_t)(facing + 0x80), 0);
-        hit = *(uint8_t **)(hit + OBJ_OFF_QUERY_NEXT);
+                         back, 0);
     }
+#undef REACH
+#undef BOX
 }
 
 /* ObjClearRoachFootprint -- original 0x0043CA00, three callers, one of them
@@ -4927,9 +4925,9 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src)
 }
 
 typedef void (__cdecl *AM2_DamageTypeFn)(void *obj, int32_t amount,
-                                         int32_t d, int32_t kind,
+                                         uint8_t d, int32_t kind,
                                          uint32_t attacker);
-typedef void (__cdecl *AM2_DamageItemFn)(void *obj, int32_t amount, int32_t d,
+typedef void (__cdecl *AM2_DamageItemFn)(void *obj, int32_t amount, uint8_t d,
                                          int32_t kind, uint32_t attacker,
                                          int32_t f);
 typedef void (__cdecl *AM2_ObjAttackerFn)(void *obj, void *attacker);
@@ -5157,7 +5155,7 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
  * idiom TrooperFire has; AngleDelta masks both arguments with 0xFF, so the byte
  * is passed clean here.
  */
-void __cdecl DamageTrooper(void *obj, int32_t amount, int32_t d, int32_t kind,
+void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
                            uint32_t attacker)
 {
     uint8_t  *o = (uint8_t *)obj;
@@ -5398,7 +5396,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, int32_t d, int32_t kind,
  * read here. DamageObject passes the same five to all three arms and this one
  * wants four of them.
  */
-void __cdecl DamageVehicle(void *obj, int32_t amount, int32_t d, int32_t kind,
+void __cdecl DamageVehicle(void *obj, int32_t amount, uint8_t d, int32_t kind,
                            uint32_t attacker)
 {
     uint8_t *o = (uint8_t *)obj;
@@ -5749,7 +5747,7 @@ static void __cdecl ObjDeathCleanup(void *obj)
 }
 
 /* Defined below, beside the rest of the damage family. */
-void __cdecl DamageRoach(void *obj, int32_t amount, int32_t dir,
+void __cdecl DamageRoach(void *obj, int32_t amount, uint8_t dir,
                          int32_t kind, uint32_t attackerUid);
 
 /* 0x00428140, nineteen callers. Damage one object: dispatch to the handler for
@@ -5790,7 +5788,7 @@ void __cdecl DamageRoach(void *obj, int32_t amount, int32_t dir,
  * lookup is only ever exercised with uid 0, which takes the no-attacker path
  * and the owner-4 default. */
 void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
-                          uint32_t attackerUid, int32_t extra,
+                          uint32_t attackerUid, uint8_t extra,
                           int32_t suppress)
 {
     uint8_t *o = (uint8_t *)obj;
@@ -6458,7 +6456,7 @@ void __cdecl ObjFrameStep(void *obj)
  * guessed -- the armour is 2 and the wave is 0x32 -- and the direction
  * argument, which ADDR_RECV_DAMAGE independently confirms by computing it from
  * two positions and calling it "dir" in its own trace line. */
-void __cdecl DamageRoach(void *obj, int32_t amount, int32_t dir, int32_t kind,
+void __cdecl DamageRoach(void *obj, int32_t amount, uint8_t dir, int32_t kind,
                          uint32_t attackerUid)
 {
     uint8_t *o = (uint8_t *)obj;
@@ -7214,15 +7212,10 @@ extern "C" const char *const am2_unit_class_names[45] = {   /* 0x00489B44 */
  * index into ADDR_WEAPON_POSE_FRAMES, which the caller turns into a frame.
  *
  * TWO TABLES, BOTH INSIDE THE FUNCTION'S OWN 208 BYTES. One byte per weapon
- * code 1..0x2B picks one of four arms, and the arms are a jump table. Written
- * out as a switch over the arm rather than as the jump: the compiler chose the
- * table, the source did not, and three of the four arms are two lines.
- *
- * The 43 arm bytes are reproduced verbatim. They are not derivable -- there is
- * no pattern in {0,3,3,0,3,3,0,0,0,0,3...} beyond "most weapons take the
- * default" -- and inventing an `if` chain that happened to agree on the codes
- * the game ships would be the same mistake as reading a table's bounds from
- * its data.
+ * code 1..0x2B picks one of four arms, and the arms are a jump table. Both are
+ * VC6's lowering of a switch over the weapon CODE, which is how it is written:
+ * the case labels are the codes whose byte is not the default arm, read off
+ * the 43 bytes at 0x0044953C, and VC6 regenerates those bytes from them.
  *
  * ADDR_POSE_BY_CLASS IS NOT ADDR_WEAPON_POSE_FRAMES, which sits 0x1A0 bytes
  * earlier. The default arm reads the first, not the second, and orig.h's note
@@ -7239,48 +7232,34 @@ extern "C" const char *const am2_unit_class_names[45] = {   /* 0x00489B44 */
  */
 int32_t __cdecl WeaponPoseIndex(void *obj, void *weapon)
 {
-    /* The arm each weapon code selects, verbatim from 0x0044953C. */
-    static const uint8_t arm_of_code[AM2_WEAPON_CODE_MAX] = {
-        0, 3, 3, 0, 3, 3, 0, 0, 0, 0, 3, 3, 3, 3, 3,
-        3, 3, 3, 3, 3, 3, 3, 3, 1, 1, 1, 3, 3, 0, 0,
-        3, 3, 3, 3, 3, 3, 3, 3, 1, 1, 3, 3, 2
-    };
-    const uint8_t *o     = (const uint8_t *)obj;
-    int32_t        cls   = ClassifyByCode74(obj);
-    int32_t        armed;
-    int32_t        code;
+    const uint8_t *o   = (const uint8_t *)obj;
+    int32_t        cls = ClassifyByCode74(obj);
 
-    if (!weapon)
-        return ((const int32_t *)((void *)(uintptr_t)(ADDR_POSE_BY_CLASS)))[cls];
+#define ARMED (*(const int32_t *)(o + OBJ_OFF_FIELD_578))
+    if (weapon) {
+        switch (**(const int32_t *const *)((const uint8_t *)weapon
+                                           + OBJ_OFF_FIELD_C0)) {
+        case 24: case 25: case 26: case 39: case 40:
+            switch (cls) {
+            case 1:  return ARMED ? AM2_POSE_KNEEL_ARMED_B : AM2_POSE_KNEEL;
+            case 2:  return AM2_POSE_CLASS2;
+            default: return AM2_POSE_STAND;
+            }
 
-    code = **(const int32_t *const *)((const uint8_t *)weapon
-                                      + OBJ_OFF_FIELD_C0) - 1;
-    if ((uint32_t)code >= AM2_WEAPON_CODE_MAX)
-        return ((const int32_t *)((void *)(uintptr_t)(ADDR_POSE_BY_CLASS)))[cls];
+        case 1: case 4: case 7: case 8: case 9: case 10: case 29: case 30:
+            switch (cls) {
+            case 1:  return ARMED ? AM2_POSE_KNEEL_ARMED_A : AM2_POSE_KNEEL;
+            case 2:  return AM2_POSE_CLASS2;
+            default: return ARMED ? AM2_POSE_STAND_ARMED : AM2_POSE_STAND;
+            }
 
-    armed = *(const int32_t *)(o + OBJ_OFF_FIELD_578) != 0;
-
-    switch (arm_of_code[code]) {
-    case 0:
-        if (cls == 1)
-            return armed ? AM2_POSE_KNEEL_ARMED_A : AM2_POSE_KNEEL;
-        if (cls == 2)
-            return AM2_POSE_CLASS2;
-        return armed ? AM2_POSE_STAND_ARMED : AM2_POSE_STAND;
-
-    case 1:
-        if (cls == 1)
-            return armed ? AM2_POSE_KNEEL_ARMED_B : AM2_POSE_KNEEL;
-        if (cls == 2)
-            return AM2_POSE_CLASS2;
-        return AM2_POSE_STAND;
-
-    case 2:
-        return AM2_POSE_STAND;
-
-    default:
-        return ((const int32_t *)((void *)(uintptr_t)(ADDR_POSE_BY_CLASS)))[cls];
+        case 43:
+            return AM2_POSE_STAND;
+        }
     }
+#undef ARMED
+
+    return ((const int32_t *)((void *)(uintptr_t)(ADDR_POSE_BY_CLASS)))[cls];
 }
 
 /* SetAnimFrame is maprow.cpp's now; the image seam that stood here went
@@ -7522,16 +7501,21 @@ void __cdecl SetSoldierKind(void *obj, int32_t kind)
  */
 void __cdecl SoldierKindForWeapon(void *unit, uint32_t code)
 {
+    int32_t kind;
+
+    /* One call after the switch, which VC6 copies into every arm; the arms
+     * are in the image in this order, not in case order. */
     switch (code) {
+    case 4:  kind = 1; break;
+    case 2:  kind = 2; break;
+    case 3:  kind = 3; break;
+    case 5:  kind = 4; break;
+    case 20: kind = 5; break;
+    case 43: kind = 7; break;
     case 0:  return;                        /* writes nothing; see above */
-    case 2:  SetSoldierKind(unit, 2); return;
-    case 3:  SetSoldierKind(unit, 3); return;
-    case 4:  SetSoldierKind(unit, 1); return;
-    case 5:  SetSoldierKind(unit, 4); return;
-    case 20: SetSoldierKind(unit, 5); return;
-    case 43: SetSoldierKind(unit, 7); return;
-    default: SetSoldierKind(unit, 0); return;
+    default: kind = 0; break;
     }
+    SetSoldierKind(unit, kind);
 }
 
 /* ApplyObjFrame is reconstructed, in objtype.cpp, and called by name. The
@@ -12515,7 +12499,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, uint32_t at,
  * CommMustBroadcast refuses, therefore cannot be told from the other. Both
  * reproduced; the test is dead as written and it is not ours to remove.
  */
-void __cdecl DamageItem(void *obj, int32_t amount, int32_t extra, int32_t kind,
+void __cdecl DamageItem(void *obj, int32_t amount, uint8_t extra, int32_t kind,
                         uint32_t attacker, int32_t inChain)
 {
     uint8_t       *o = (uint8_t *)obj;

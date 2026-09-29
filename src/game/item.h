@@ -162,7 +162,7 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
                         int32_t suppress);
 
 void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
-                          uint32_t attackerUid, int32_t extra,
+                          uint32_t attackerUid, uint8_t extra,
                           int32_t suppress);
 
 /* Original: 0x00428370, eight callers. Heal `obj` by `pct` percent of its
@@ -508,10 +508,10 @@ void __cdecl NextInventorySlot(void *obj);
  * "DamageTrooper: droping armor uid:%x". Take `amount` off a trooper, through
  * its ARMOUR if it is carrying any, and run the death tail if that empties it.
  * `d` is the direction the hit came from. */
-void __cdecl DamageTrooper(void *obj, int32_t amount, int32_t d, int32_t kind,
+void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
                            uint32_t attacker);
 
-void __cdecl DamageVehicle(void *obj, int32_t amount, int32_t d, int32_t kind,
+void __cdecl DamageVehicle(void *obj, int32_t amount, uint8_t d, int32_t kind,
                            uint32_t attacker);
 
 void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
@@ -849,7 +849,7 @@ void __cdecl DamageItemChain(void *obj, int32_t amount, int32_t d,
  * or destruction and whatever the item leaves behind. The last argument is
  * DamageItemChain's recursion guard -- clear, a chain head delegates to it
  * and a chain child does nothing. */
-void __cdecl DamageItem(void *obj, int32_t amount, int32_t extra, int32_t kind,
+void __cdecl DamageItem(void *obj, int32_t amount, uint8_t extra, int32_t kind,
                         uint32_t attacker, int32_t inChain);
 
 /* 0x0044A3C0, one caller. The negated overlay Y of the sprite the object's
