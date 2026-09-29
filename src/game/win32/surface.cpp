@@ -178,12 +178,8 @@ int32_t __cdecl ClearSurface(LPDIRECTDRAWSURFACE surf, uint32_t colour)
 {
     RECT    dest;
     DDBLTFX fx;
-    HRESULT hr;
 
-    dest.left   = g_screenRect.left;
-    dest.top    = g_screenRect.top;
-    dest.right  = g_screenRect.right;
-    dest.bottom = g_screenRect.bottom;
+    dest = *(const RECT *)&g_screenRect;
 
     /* Only dwSize and the fill colour are written; the rest of the DDBLTFX is
      * left as it lies, as in the original, because DDBLT_COLORFILL is the only
@@ -193,9 +189,11 @@ int32_t __cdecl ClearSurface(LPDIRECTDRAWSURFACE surf, uint32_t colour)
 
     /* The primary is the entire desktop in windowed mode, so it is filled
      * through the screen rectangle. Everything else is ours entirely. */
-    hr = IDirectDrawSurface_Blt(surf, (surf == g_primarySurface) ? &dest : NULL,
-                                NULL, NULL, DDBLT_COLORFILL | DDBLT_WAIT, &fx);
-    return hr == DD_OK;
+    if (surf == g_primarySurface)
+        return IDirectDrawSurface_Blt(surf, &dest, NULL, NULL,
+                                      DDBLT_COLORFILL | DDBLT_WAIT, &fx) == DD_OK;
+    return IDirectDrawSurface_Blt(surf, NULL, NULL, NULL,
+                                  DDBLT_COLORFILL | DDBLT_WAIT, &fx) == DD_OK;
 }
 
 static_assert(DDBLTFAST_WAIT == 0x10, "DDBLTFAST_WAIT");

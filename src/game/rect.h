@@ -80,4 +80,17 @@ int rect_install(void);
 }
 #endif
 
+
+#ifdef __cplusplus
+/* The address of a fresh temporary, for code that fills one through a
+ * pointer: the original passes `*RectSet(&tmp, ...)` with no named local --
+ * a base constructor's argument, a rect copied out of the return. `&T()` is
+ * MSVC's extension and is what reproduces it; GCC spells the same lvalue
+ * through a cast. */
+#if defined(_MSC_VER) && !defined(__GNUC__)
+#define AM2_TEMP(T) (&T())
+#else
+#define AM2_TEMP(T) (&const_cast<T &>(static_cast<const T &>(T())))
+#endif
+#endif
 #endif /* AM2_RECT_H */

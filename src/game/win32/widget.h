@@ -253,15 +253,7 @@ typedef struct AM2_Widget {
 } AM2_Widget;
 
 #ifdef __cplusplus
-/* The address of a fresh temporary, for a mem-initializer that fills one
- * through a pointer: the original's screen base passes `*RectSet(&tmp, ...)`
- * to its base constructor with no named local. `&T()` is MSVC's extension
- * and is what reproduces it; GCC spells the same lvalue through a cast. */
-#if defined(_MSC_VER) && !defined(__GNUC__)
-#define AM2_TEMP(T) (&T())
-#else
-#define AM2_TEMP(T) (&const_cast<T &>(static_cast<const T &>(T())))
-#endif
+/* AM2_TEMP -- the address of a fresh temporary -- is rect.h's. */
 /* Which original vtable each class's constructor and destructor install --
  * the compiler's ??_7Class@@6B@ in the polymorphic (relink) build, which
  * src/vc6/relink.py maps to that address. Expands to nothing. */

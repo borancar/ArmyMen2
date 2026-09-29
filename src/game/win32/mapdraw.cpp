@@ -119,10 +119,11 @@ void __cdecl BlitMapBackdrop(AM2_Rect world)
 {
     RECT src;
 
-    src.left   = world.left   - (g_cameraX << TILE_SHIFT);
-    src.top    = world.top    - (g_cameraY << TILE_SHIFT);
-    src.right  = world.right  - (g_cameraX << TILE_SHIFT);
-    src.bottom = world.bottom - (g_cameraY << TILE_SHIFT);
+    /* The far edges as the near ones plus the extent, as the image has it. */
+    src.left   = world.left - (g_cameraX << TILE_SHIFT);
+    src.top    = world.top  - (g_cameraY << TILE_SHIFT);
+    src.right  = world.right  - world.left + src.left;
+    src.bottom = world.bottom - world.top  + src.top;
 
     IDirectDrawSurface_BltFast(g_offscreen,
                                (DWORD)(world.left - g_viewX),
@@ -562,16 +563,6 @@ extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
 #define g_backBuffer (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_BACK_BUFFER)
 
 typedef void (__cdecl *am2_void_fn)(void);
-
-/* Save `n` dwords from `src` to `dst`. The original writes the nine stores out
- * one at a time, interleaved; they are independent, so a loop is the same
- * thing. */
-static void SavePrev(void *dst, const void *src, int32_t dwords)
-{
-    int32_t i;
-    for (i = 0; i < dwords; i++)
-        ((uint32_t *)dst)[i] = ((const uint32_t *)src)[i];
-}
 
 #define g_shakeTime    (*(int32_t *)(uintptr_t)ADDR_SHAKE_TIME)
 #define g_shakePhaseX  (*(float *)(uintptr_t)ADDR_SHAKE_PHASE_X)
@@ -1071,8 +1062,8 @@ void __cdecl ComposeFrame(void)
 
     ResetDirtyList();
 
-    RectSet(&src, g_blitRect->left, g_blitRect->top,
-            g_blitRect->right, g_blitRect->bottom);
+    src = *RectSet(AM2_TEMP(AM2_Rect), g_blitRect->left, g_blitRect->top,
+                   g_blitRect->right, g_blitRect->bottom);
 
     IDirectDrawSurface_BltFast(g_backBuffer,
                                (DWORD)g_blitRect->left,
@@ -1080,12 +1071,12 @@ void __cdecl ComposeFrame(void)
                                g_offscreen, (LPRECT)&src, DDBLTFAST_WAIT);
 
     /* This frame becomes last frame. */
-    SavePrev((void *)(uintptr_t)ADDR_LISTENER_POS_PREV,
-             (const void *)(uintptr_t)ADDR_LISTENER_POS, 1);
-    SavePrev((void *)(uintptr_t)ADDR_VIEW_RECT_PREV,
-             (const void *)(uintptr_t)ADDR_VIEW_ORIGIN_X, 4);
-    SavePrev((void *)(uintptr_t)ADDR_SECOND_RECT_PREV,
-             (const void *)(uintptr_t)ADDR_SECOND_RECT, 4);
+    *(AM2_Point *)(uintptr_t)ADDR_LISTENER_POS_PREV =
+        *(const AM2_Point *)(uintptr_t)ADDR_LISTENER_POS;
+    *(AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT_PREV =
+        *(const AM2_Rect *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
+    *(AM2_Rect *)(uintptr_t)ADDR_SECOND_RECT_PREV =
+        *(const AM2_Rect *)(uintptr_t)ADDR_SECOND_RECT;
 
     g_fullRedraw = 0;
 }
