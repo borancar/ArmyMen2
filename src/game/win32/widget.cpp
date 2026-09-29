@@ -938,8 +938,8 @@ static inline int32_t ListRowIsDead(const AM2_ListRows *rows, int32_t row)
  * places the original emits the same six-argument call -- on reaching a `|`
  * and once more for whatever is left after the last one. Returns 0 if the
  * surface would not lock, which is the original's early return. */
-static int32_t TyperDrawLine(AM2_Widget *w, const char *line, int32_t y,
-                             RECT clip, uint8_t ink)
+static inline int32_t TyperDrawLine(AM2_Widget *w, const char *line, int32_t y,
+                                    RECT clip, uint8_t ink)
 {
     if (!LockSurface(g_drawTarget))
         return 0;
@@ -5804,11 +5804,23 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
         case 0x1A:
             SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
             break;
-        case 0x23: case 0x24: case 0x25: case 0x26:
-            /* One shape, four comparands: 0x23 wants 0, 0x24 wants 1, and so
-             * on. The original gives 0x23 no test of its own and jumps into
-             * 0x26's. */
-            if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != kind - 0x23)
+        /* One shape, four comparands, written as four arms: 0x23 wants 0,
+         * 0x24 wants 1, and so on. The compiler gives 0x23 no test of its
+         * own and jumps into 0x26's. */
+        case 0x23:
+            if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 0)
+                SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
+            break;
+        case 0x24:
+            if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 1)
+                SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
+            break;
+        case 0x25:
+            if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 2)
+                SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
+            break;
+        case 0x26:
+            if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 3)
                 SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
             break;
         case 0x29: {
@@ -16581,12 +16593,11 @@ void __attribute__((thiscall)) AM2_Widget::TyperPaint(RECT clip)
 
     const uint8_t *self = (const uint8_t *)w;
     const char    *text = (const char *)(self + TYPER_OFF_TEXT);
-    int32_t        shown;
     uint8_t        ink;
     RECT           visible;
     char           line[0x3F0];
-    int32_t        count = 0;
-    int32_t        yoff  = 0;
+    int32_t        count;
+    int32_t        yoff;
     int32_t        i;
 
     ::WidgetScreenRect(w);
@@ -16595,12 +16606,11 @@ void __attribute__((thiscall)) AM2_Widget::TyperPaint(RECT clip)
     if (!IntersectRect(&visible, &clip, &w->rect))
         return;
 
-    shown = *(const int32_t *)(self + TYPER_OFF_SHOWN);
+    /* The count shown is read again on every pass. */
     ink   = g_whiteInk;
-    if (shown <= 0)
-        return;
-
-    for (i = 0; i < shown; i++) {
+    yoff  = 0;
+    count = 0;
+    for (i = 0; i < *(const int32_t *)(self + TYPER_OFF_SHOWN); i++) {
         if (text[i] == '|') {
             line[count] = 0;
             if (!TyperDrawLine(w, line, w->rect.top + yoff, clip, ink))
@@ -16615,8 +16625,7 @@ void __attribute__((thiscall)) AM2_Widget::TyperPaint(RECT clip)
     if (count > 0) {
         line[count] = 0;
         TyperDrawLine(w, line, w->rect.top + yoff, clip, ink);
-    }
-}
+    }}
 
 void __attribute__((thiscall)) AM2_Widget::TyperUpdate()
 {
