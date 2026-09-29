@@ -270,14 +270,17 @@ void __cdecl LoadVehicleAnims(void)
      * stays 0 and BuildVehicleMask runs five times rather than six. And the
      * boat is given the JEEP's turret, which reads like a mistake and is
      * reproduced as it stands. */
-    static const char *const kPaths[AM2_VEHICLE_ANIM_TABLES][2] = {
+#define EMPTY ((const char *)(uintptr_t)ADDR_DIR_SCRATCH)   /* the shared "" */
+    /* A local array, built on the stack at every call as the image does. */
+    const char *kPaths[AM2_VEHICLE_ANIM_TABLES][2] = {
         { "jeep.ani",      "jeepturret.ani" },
         { "tank.ani",      "tankturret.ani" },
         { "halftrack.ani", "halfturret.ani" },
-        { "truck.ani",     ""               },
-        { "",              ""               },
+        { "truck.ani",     EMPTY            },
+        { EMPTY,           EMPTY            },
         { "boat.ani",      "jeepturret.ani" },
     };
+#undef EMPTY
     int32_t i;
 
     SetGameDir(AM2_ANI_DIR);
