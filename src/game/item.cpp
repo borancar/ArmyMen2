@@ -8302,25 +8302,30 @@ const char *__cdecl ItemTypeName(uint32_t kind)
  * that safe. The other two have the same shape and this one makes it a
  * pattern rather than a pair.
  *
- * The list is a {capacity, count, items} triple, and both the count and the
- * items pointer are re-read inside the loop rather than hoisted -- the
- * removal can move both.
+ * 0x004F9ED0 holds a POINTER to a {capacity, count, items} list, not the
+ * list itself -- the relink caught ours reading the count from 0x004F9ED4,
+ * which is the next slot's list pointer. It is ADDR_ARMY_OBJ_LISTS[1]: army
+ * 1's object list, written through the array index by InitArmyObjLists,
+ * which is why no instruction names 0x004F9ED0 but these. The one caller is
+ * the `night of the walking dead` cheat. The list pointer, its count and its
+ * items are all re-read inside the loop rather than hoisted -- the removal
+ * can move them.
  *
  * Type2ActionA is ours, five hundred lines down in this same file, and is
  * called by name; checkseams caught the orig_ macro that went in first out of
  * habit. Second time in this session.
  */
+#define g_type2List (*(AM2_PtrList *const *)(uintptr_t)ADDR_TYPE2_ACTION_LIST)
 void __cdecl Type2ActionAll(void)
 {
     int32_t i = 0;
 
-    while (i < ((const int32_t *)(uintptr_t)ADDR_TYPE2_ACTION_LIST)[1]) {
+    while (i < g_type2List->count) {
         uint8_t *obj = (uint8_t *)LookupByUID(
-            (*(const uint32_t *const *)((const uint8_t *)(uintptr_t)
-                 ADDR_TYPE2_ACTION_LIST + 8))[i]);
+            ((const uint32_t *)g_type2List->items)[i]);
 
         if (!obj) {
-            ListRemoveAt((void *)(uintptr_t)ADDR_TYPE2_ACTION_LIST, i);
+            ListRemoveAt(g_type2List, i);
             continue;   /* no step: the shifted-down entry is next */
         }
 
@@ -8331,6 +8336,7 @@ void __cdecl Type2ActionAll(void)
         i++;
     }
 }
+#undef g_type2List
 
 /* SoldierNameOf -- original 0x004475C0, two callers, both in the HUD.
  *

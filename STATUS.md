@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 876 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 880 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 876:
+  the near-miss sweep, 758 before the row pools. From 758 to 880:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -112,6 +112,13 @@ main result so far (details in `src/vc6/README.md`):
     everywhere except the row address.
   - **ObjConceal fixed**: an object with BIT4 set that is not a type-2
     keeps REVEALED (ours cleared it).
+  - **Wrong globals, found by comparing the relink's resolved addresses**
+    (onefn masks relocations, so it cannot see these): the HudTop
+    constructor tests ADDR_MP_SESSION, not ADDR_NET_GAME; OnAppActivated
+    raises ADDR_FULL_REDRAW, not ADDR_APP_ACTIVE; Type2ActionAll (the
+    `night of the walking dead` cheat) walks the list that
+    ADDR_ARMY_OBJ_LISTS[1] points to, where ours read the pointer array
+    as the list. The rest of that scan was layout and operand order.
   - **Parked**: the five copy-protection call sites (OnStartWar and four
     more) cannot match while the reference keeps GOG's `jmp`s -- a policy
     question, not a source one; MultiSpritePaint and OverlayPrepare

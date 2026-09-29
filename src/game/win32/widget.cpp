@@ -7375,10 +7375,11 @@ void __attribute__((thiscall)) AM2_Widget::HudCommandsPaint(RECT clip)
  * data: the checkbox it may add loads 18_001_0N_chatto.bmp.
  *
  * MULTIPLAYER CHANGES ITS SHAPE TWICE, from one flag read at the top and
- * again at the bottom. ADDR_NET_GAME picks the base sprite's FRAME (0 or 1)
- * and the button's x (2 or 0x10), and the typing cursor and the scroll width
- * are both derived from that x rather than being constants -- TYPED_X is
- * x + 0x19 and VIEW_W is 0x258 - x. So the widget is narrower and indented in
+ * again at the bottom. ADDR_MP_SESSION (0x00511DA0 -- not ADDR_NET_GAME,
+ * which this read until the relink compared addresses) picks the base
+ * sprite's FRAME (0 or 1) and the button's x (2 or 0x10), and the typing
+ * cursor and the scroll width are both derived from that x rather than
+ * being constants -- TYPED_X is x + 0x19 and VIEW_W is 0x258 - x. So the widget is narrower and indented in
  * a network game, and one global decides it.
  *
  * THREE PRELOADS, THREE EARLY EXITS. Each stores its result and then bails to
@@ -7405,7 +7406,7 @@ AM2_HudTop::AM2_HudTop()
     int32_t     i;
     AM2_CTOR_VTABLE(w, VTABLE_HUD_TOP_STRIP);
 
-    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME == 0) {
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0) {
         frame = 0;
         *(int32_t *)(self + HUDLOG_OFF_BUTTON_X) = 2;
     } else {
@@ -7455,7 +7456,7 @@ AM2_HudTop::AM2_HudTop()
     if (!spr)
         return;
 
-    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME != 0) {
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0) {
         const uint8_t *comm = *(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
         uint32_t       me   = g_defaultOwner;
 
@@ -8975,30 +8976,32 @@ int32_t __cdecl HudPanelWidth(void)
  * RestoreTileSet is unreachable. */
 void __cdecl OnAppActivated(void)
 {
-    *(int32_t *)(uintptr_t)ADDR_APP_ACTIVE = 1;
+    /* A full redraw is requested, not activity: ADDR_APP_ACTIVE, which this
+     * set until the relink compared addresses, is WndProc's to raise. */
+    *(int32_t *)(uintptr_t)ADDR_FULL_REDRAW = 1;
     RestoreLostSurfaces();
 
     if (*(const int32_t *)(uintptr_t)ADDR_GAME_STATE == 2)
         RefreshScreen();
 
     if (g_paintObject) {
-        AM2_Widget *w = (AM2_Widget *)g_paintObject;
-
         SetDrawTarget(g_primarySurface);
-        WidgetVPaint(w, w->rect);
-        WidgetVPaint(w, w->rect);
+        WidgetVPaint((AM2_Widget *)g_paintObject,
+                     ((AM2_Widget *)g_paintObject)->rect);
+        WidgetVPaint((AM2_Widget *)g_paintObject,
+                     ((AM2_Widget *)g_paintObject)->rect);
     }
 
     if (g_currentBitmap) {
-        void   *bmp = g_currentBitmap;
-        int32_t w   = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_W);
-        int32_t h   = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_H);
-        int32_t x   = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W - w) >> 1;
-        int32_t y   = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H - h) >> 1;
+        int32_t x, y;
 
         SetDrawTarget(g_primarySurface);
-        DrawSprite((AM2_Sprite *)bmp, x, y, 0);
-        DrawSprite((AM2_Sprite *)bmp, x, y, 0);
+        x = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
+             - *(const int32_t *)((uint8_t *)g_currentBitmap + SPR_OFF_W)) >> 1;
+        y = (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H
+             - *(const int32_t *)((uint8_t *)g_currentBitmap + SPR_OFF_H)) >> 1;
+        DrawSprite((AM2_Sprite *)g_currentBitmap, x, y, 0);
+        DrawSprite((AM2_Sprite *)g_currentBitmap, x, y, 0);
     }
 }
 

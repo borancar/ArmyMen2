@@ -11126,9 +11126,11 @@ typedef struct {
 #define ADDR_STR_NEWLINE         0x00473104u  /* "\n" */
 /* 0x00417AB0, one caller. Walk a uid list, drop the entries that no longer
  * resolve, and run ADDR_TYPE2_ACTION_A on every live type 2 that is not
- * destroyed. The list is a {capacity, count, items} triple. */
+ * destroyed. The list is a {capacity, count, items} triple reached through
+ * the pointer at ADDR_TYPE2_ACTION_LIST. */
 #define ADDR_TYPE2_ACTION_ALL    0x00417AB0u  /* void(void) */
-#define ADDR_TYPE2_ACTION_LIST   0x004F9ED0u  /* {cap, count, uids} */
+/* ADDR_ARMY_OBJ_LISTS[1] -- army 1's list pointer, spelled as the image does. */
+#define ADDR_TYPE2_ACTION_LIST   0x004F9ED0u  /* AM2_PtrList * */
 /* 0x00423620, two callers, both save-game dialogs. Does this file begin with
  * a save tag? Two are accepted: AM2_SAVETAG_GAMEPROC and one more. */
 #define ADDR_FILE_HAS_SAVE_TAG   0x00423620u  /* int32_t(const char *path) */

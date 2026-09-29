@@ -294,13 +294,12 @@ void __cdecl RestoreSpriteSurface(AM2_Sprite *spr)
     }
 
     if (g_optDf) {
-        if (SpriteRebuildDf(spr, flags))
-            return;
+        if (!SpriteRebuildDf(spr, flags))
+            orig_log("unable to restore sprite %x.\n", spr->id);
     } else {
-        if (SpriteRebuildAlt(spr, flags))
-            return;
+        if (!SpriteRebuildAlt(spr, flags))
+            orig_log("unable to restore sprite %x.\n", spr->id);
     }
-    orig_log("unable to restore sprite %x.\n", spr->id);
 }
 
 /* ---- sprite lifetime ---------------------------------------------------
