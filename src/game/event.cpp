@@ -346,15 +346,15 @@ void __cdecl EvtSetAiMode(uint32_t uid, int32_t mode)
  * event.cpp is on the flat side of the split and must name no Win32 or COM
  * type -- the same reason script.cpp declares PreloadSprite itself. */
 extern "C" void __cdecl PlayDynamicSound(const char *name, int32_t loop,
-                                         int32_t unused, int32_t x, int32_t y,
+                                         int32_t unused, int16_t x, int16_t y,
                                          int32_t slot, int32_t priority,
                                          uint32_t owner);
 
 void __cdecl EvtPlaySoundAt(const char *name, uint32_t point, int32_t slot,
                             int32_t priority, int32_t loop)
 {
-    PlayDynamicSound(name, loop, 0, (int32_t)(point & 0xFFFFu),
-                     (int32_t)(point >> 16), slot, priority, 0);
+    PlayDynamicSound(name, loop, 0, ((const AM2_Point *)&point)->x,
+                     ((const AM2_Point *)&point)->y, slot, priority, 0);
 }
 
 void __cdecl EvtPlaySoundOn(const char *name, uint32_t owner, int32_t slot,

@@ -630,18 +630,7 @@ typedef int32_t (__cdecl *AM2_GameRandFn)(void);
  * 0x00461E4F cannot run through this caller, and it is written out only
  * because the original has it. Reading the three arms without the mask would
  * describe a behaviour the function never produces. */
-static const int32_t kDiedBurstAngle[7] = { 64, -64, -1, 0, -100, -154, -1 };
-
-static const int32_t kDiedBurstMask[8][7] = {
-    { 1, 1, 0, 0, 0, 0, 0 },
-    { 0, 0, 0, 0, 1, 1, 0 },
-    { 0, 1, 0, 1, 1, 0, 0 },
-    { 0, 1, 0, 1, 1, 1, 0 },
-    { 0, 0, 0, 1, 0, 0, 0 },
-    { 0, 0, 0, 1, 1, 1, 0 },
-    { 1, 0, 0, 0, 1, 1, 0 },
-    { 1, 1, 0, 0, 1, 1, 0 },
-};
+/* The two tables are DiedEffectB's locals: see there. */
 
 /* 0x0040A050, two callers. Clear a map object and give it a sprite, a
  * position and the default palette.
@@ -2264,6 +2253,19 @@ void __cdecl SpawnHitEffect(const uint32_t *at, int32_t rowField2C,
 void __cdecl DiedEffectB(const uint32_t *at, int32_t facing,
                          int32_t rowField2C, int32_t height)
 {
+    /* Both tables are built on the stack at every call -- the image stores
+     * them element by element -- and the loop walks them by pointer. */
+    int32_t kDiedBurstMask[8][7] = {
+        { 1, 1, 0, 0, 0, 0, 0 },
+        { 0, 0, 0, 0, 1, 1, 0 },
+        { 0, 1, 0, 1, 1, 0, 0 },
+        { 0, 1, 0, 1, 1, 1, 0 },
+        { 0, 0, 0, 1, 0, 0, 0 },
+        { 0, 0, 0, 1, 1, 1, 0 },
+        { 1, 0, 0, 0, 1, 1, 0 },
+        { 1, 1, 0, 0, 1, 1, 0 },
+    };
+    int32_t kDiedBurstAngle[7] = { 64, -64, -1, 0, -100, -154, -1 };
     int32_t sector = (facing + 0x10) >> 5;
     int32_t i;
 
@@ -2273,26 +2275,25 @@ void __cdecl DiedEffectB(const uint32_t *at, int32_t facing,
     for (i = 0; i < 7; i++) {
         int32_t angle;
 
-        if (kDiedBurstMask[sector][i] == 0)
-            continue;
-
-        angle = kDiedBurstAngle[i];
-        if (angle == -1) {
-            /* Unreachable through this caller; see the header. */
-            SpawnParticle(at, rowField2C, i, 7, height, -1);
-            continue;
+        if (kDiedBurstMask[sector][i]) {
+            angle = kDiedBurstAngle[i];
+            if (angle != -1) {
+                /* The stored angle is a DELTA on the sector, wrapped into a
+                 * byte -- and the wrap is one add or one subtract because
+                 * the table's values keep the sum inside +/- one turn. */
+                angle += sector;
+                if (angle < 0) {
+                    SpawnParticle(at, rowField2C, i, 7, height, angle + 0x100);
+                } else {
+                    if (angle >= 0x100)
+                        angle -= 0x100;
+                    SpawnParticle(at, rowField2C, i, 7, height, angle);
+                }
+            } else {
+                /* Unreachable through this caller; see the header. */
+                SpawnParticle(at, rowField2C, i, 7, height, -1);
+            }
         }
-
-        /* The stored angle is a DELTA on the sector, wrapped into a byte --
-         * and the wrap is one add or one subtract because the table's values
-         * keep the sum inside +/- one turn. */
-        angle += sector;
-        if (angle < 0)
-            angle += 0x100;
-        else if (angle >= 0x100)
-            angle -= 0x100;
-
-        SpawnParticle(at, rowField2C, i, 7, height, angle);
     }
 }
 

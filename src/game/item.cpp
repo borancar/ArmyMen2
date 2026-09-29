@@ -4479,7 +4479,7 @@ void __cdecl DeployItem(void *obj, uint32_t where, int32_t resurrect,
 /* PlayDynamicSound is reconstructed, in win32/audio.cpp. Declared here for the
  * reason this file already declares PlaySoundAt above. */
 extern "C" void __cdecl PlayDynamicSound(const char *name, int32_t loop,
-                                         int32_t unused, int32_t x, int32_t y,
+                                         int32_t unused, int16_t x, int16_t y,
                                          int32_t slot, int32_t priority,
                                          uint32_t owner);
 

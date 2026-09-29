@@ -719,15 +719,34 @@ int32_t __cdecl DefGameParse(int32_t cmd, char *line)
     if (!DefParseNumber(&value, orig_strtok(line, kSep)))
         return 2;
 
-    if (cmd < AM2_DEF_CMD_GAME_FIRST || cmd > AM2_DEF_CMD_GAME_LAST) {
+    /* A jump table over the twenty: the first twelve are cases that do
+     * nothing -- the original drops them on the floor -- and each of the last
+     * eight stores its own constant. */
+    switch (cmd) {
+    case 0x3B: break;
+    case 0x3C: break;
+    case 0x3D: break;
+    case 0x3E: break;
+    case 0x3F: break;
+    case 0x40: break;
+    case 0x41: break;
+    case 0x42: break;
+    case 0x43: break;
+    case 0x44: break;
+    case 0x45: break;
+    case 0x46: break;
+    case 0x47: kGameConst[0] = value; break;
+    case 0x48: kGameConst[1] = value; break;
+    case 0x49: kGameConst[2] = value; break;
+    case 0x4A: kGameConst[3] = value; break;
+    case 0x4B: kGameConst[4] = value; break;
+    case 0x4C: kGameConst[5] = value; break;
+    case 0x4D: kGameConst[6] = value; break;
+    case 0x4E: kGameConst[7] = value; break;
+    default:
         orig_log("DefGameParse: Bad Game Constant Type\n");
         return 3;
     }
-
-    if (cmd >= AM2_DEF_CMD_ROACH_FIRST)
-        kGameConst[cmd - AM2_DEF_CMD_ROACH_FIRST] = value;
-
-    /* else: one of the twelve the original drops on the floor */
     return 0;
 }
 

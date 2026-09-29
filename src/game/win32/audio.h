@@ -160,7 +160,7 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t unused,
 /* 0x0040B8F0. A named wave at a map position, with a slot and a priority.
  * WndProc reaches it for the comm messages that carry a sound. */
 void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
-                              int32_t x, int32_t y, int32_t slot,
+                              int16_t x, int16_t y, int32_t slot,
                               int32_t priority, uint32_t owner);
 
 /* 0x0040BFF0, 35 callers. Say one of a group's lines, chosen at random, and

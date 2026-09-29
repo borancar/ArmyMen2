@@ -23,7 +23,7 @@
  * and never sets the upper bits of the register it loads into. */
 extern "C" void __cdecl HudMessage(const char *text, uint8_t colour);
 extern "C" void __cdecl PlayDynamicSound(const char *name, int32_t loop,
-                                         int32_t unused, int32_t x, int32_t y,
+                                         int32_t unused, int16_t x, int16_t y,
                                          int32_t slot, int32_t pri,
                                          uint32_t owner);
 

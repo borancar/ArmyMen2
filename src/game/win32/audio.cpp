@@ -1176,7 +1176,7 @@ int32_t __cdecl ReadWaveFile(int32_t unused, const char *name,
 #define g_dynamic     ((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)
 
 void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
-                              int32_t x, int32_t y, int32_t slot,
+                              int16_t x, int16_t y, int32_t slot,
                               int32_t priority, uint32_t owner)
 {
     uint8_t   *rec;
