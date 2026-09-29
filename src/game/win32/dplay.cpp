@@ -1986,6 +1986,19 @@ void __cdecl EventClose(void *holder)
     h[0] = 0;
 }
 
+/* THE PACKET POOL IS ONE 0x64000-BYTE TABLE, and the standalone had it as
+ * two symbols: am2_comm_block from +0xA0, running on into am2_origstate's
+ * head pad. Placed at the original VAs (the GCC build) the two abut; under
+ * VC6 LINK they land wherever, am2_comm_block ABOVE am2_origstate, so the
+ * old `while (data < END)` walk ran zero times and a 400-buffer walk
+ * (the image's) wrote 400KB past the block. The runnable VC6 image gets the
+ * pool as one array; the relink still measures against the original's. */
+#if defined(_MSC_VER) && defined(AM2_STANDALONE) && !defined(AM2_RELINK)
+static uint8_t am2_packet_pool[0x64000];
+#undef ADDR_PACKET_BUFFERS
+#define ADDR_PACKET_BUFFERS ((uintptr_t)(const void *)am2_packet_pool)
+#endif
+
 int32_t __cdecl StartPacketThread(void)
 {
     /* Indexed: the image's outer test is a signed `jl` on the buffer
