@@ -2395,24 +2395,25 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
  * eight facings; the row index is that times the column count. */
 int32_t __cdecl TimedDirFrame(void *rows, int32_t dir)
 {
-    uint8_t *r    = (uint8_t *)rows;
-    int32_t  cols = *(const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS;
-    uint32_t elapsed;
+    /* The grid's width is re-read at each use, as the image does. */
+#define COLS (*(const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS)
+    uint8_t *r = (uint8_t *)rows;
+    int32_t  elapsed;
     int32_t  col;
-    int32_t  band;
 
-    elapsed = (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-               - *(const uint32_t *)(r + ROW_OFF_STAMP_54)) / 200u;
+    elapsed = (int32_t)((*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                         - *(const uint32_t *)(r + ROW_OFF_STAMP_54)) / 200u);
 
-    col = (int32_t)elapsed;
-    if (col >= cols - 1)
-        col = cols - 1;
+    col = COLS - 1;
+    if (elapsed < col)
+        col = elapsed;
 
-    band = RoundTo8((uint32_t)dir & 0xFFu, 3) & 0xFF;
     *(uint32_t *)(r + ROW_OFF_SPRITE) =
-        (*(uint32_t *const *)(uintptr_t)ADDR_SPRITE_GRID)[band * cols + col];
+        (*(uint32_t *const *)(uintptr_t)ADDR_SPRITE_GRID)
+            [(RoundTo8((uint32_t)dir & 0xFFu, 3) & 0xFF) * COLS + col];
 
-    return col < cols - 1;
+    return col < COLS - 1;
+#undef COLS
 }
 
 /* GameSrand -- original 0x00464416, two callers, three instructions. MSVC's

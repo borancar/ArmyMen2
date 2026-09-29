@@ -9325,40 +9325,43 @@ void __cdecl RemapInventoryUids(void)
 {
     uint8_t *obj;
 
+#define REMAP ((const uint32_t (*)[2])*(const uint32_t (**)[2])(uintptr_t)ADDR_UID_REMAP)
     for (obj = (uint8_t *)FirstItem(); obj; obj = (uint8_t *)NextItem()) {
-        uint32_t flags = *(const uint32_t *)(obj + OBJ_OFF_FLAGS);
-        int32_t  slot;
+        int32_t slot;
 
-        if (!(flags & OBJ_FLAG_NEEDS_REMAP))
+        if (!(*(const uint32_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_NEEDS_REMAP))
             continue;
 
-        *(uint32_t *)(obj + OBJ_OFF_FLAGS) = flags & ~OBJ_FLAG_NEEDS_REMAP;
+        *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_NEEDS_REMAP;
 
-        if (*(const int32_t *)obj != 2)
-            continue;
+        switch (*(const int32_t *)obj) {
+        case 2:
+            for (slot = 0; slot < AM2_INVENTORY_SLOTS; slot++) {
+                uint32_t *here = (uint32_t *)(obj + UNIT_OFF_INVENTORY
+                                              + (size_t)slot * 4);
+                uint32_t  uid = *here;
+                int32_t   i;
 
-        for (slot = 0; slot < AM2_INVENTORY_SLOTS; slot++) {
-            uint32_t *here = (uint32_t *)(obj + UNIT_OFF_INVENTORY
-                                          + (size_t)slot * 4);
-            int32_t   i;
+                if (!uid)
+                    continue;
 
-            if (!*here)
-                continue;
+                {
+                    const uint32_t (*map)[2] = REMAP;
 
-            for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_UID_REMAP_COUNT;
-                 i++) {
-                const uint32_t (*map)[2] =
-                    *(const uint32_t (**)[2])(uintptr_t)ADDR_UID_REMAP;
-
-                if (map[i][0] == *here) {
-                    *here = map[i][1];
-                    break;
+                    for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_UID_REMAP_COUNT;
+                         i++) {
+                        if (uid == map[i][0]) {
+                            *here = map[i][1];
+                            break;
+                        }
+                    }
                 }
             }
+            *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
+            break;
         }
-
-        *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
     }
+#undef REMAP
 }
 
 /* SetPointerMode is reconstructed, in win32/widget.cpp with the rest of the

@@ -1560,8 +1560,6 @@ void __cdecl DrawRectFast(const AM2_Rect *r, int32_t colour)
 void __cdecl DrawBlip3(int32_t x, int32_t y, uint8_t colour)
 {
     uint8_t *p;
-    int32_t  row;
-    int32_t  col;
 
     x--;
     y--;
@@ -1576,11 +1574,17 @@ void __cdecl DrawBlip3(int32_t x, int32_t y, uint8_t colour)
     if (!LockSurface(g_drawTarget))
         return;
 
-    p = g_framebuffer + (int32_t)g_pitch * y + x;
-
-    for (row = 0; row < AM2_BLIP3_SIZE; row++)
-        for (col = 0; col < AM2_BLIP3_SIZE; col++)
-            p[(int32_t)g_pitch * row + col] = (uint8_t)colour;
+    /* The nine stores written out, the pitch re-read for each row's. */
+    p = (int32_t)g_pitch * y + g_framebuffer + x;
+    p[0] = colour;
+    p[1] = colour;
+    p[2] = colour;
+    p[(int32_t)g_pitch]     = colour;
+    p[(int32_t)g_pitch + 1] = colour;
+    p[(int32_t)g_pitch + 2] = colour;
+    p[(int32_t)g_pitch * 2]     = colour;
+    p[(int32_t)g_pitch * 2 + 1] = colour;
+    p[(int32_t)g_pitch * 2 + 2] = colour;
 }
 
 /* 0x004149B0, one caller -- the radar's paint. WHAT COLOUR IS THIS BLIP, and

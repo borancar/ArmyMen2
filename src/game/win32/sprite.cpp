@@ -323,22 +323,19 @@ static_assert(sizeof(AM2_Sprite) == 0x40, "AM2_Sprite is 64 bytes");
  * bit is reachable. */
 int32_t __cdecl SpriteSlotOf(uint32_t id)
 {
-    const uint32_t *tab = g_spriteRegPairs;
-    int32_t         lo  = 0;
-    int32_t         hi  = g_spriteRegCount;
+    int32_t lo = 0;
+    int32_t hi = g_spriteRegCount;
+    int32_t mid;
 
-    if (hi <= 0)
-        return -1;
-    do {
-        int32_t mid = lo + ((hi - lo) >> 1);
-
-        if (tab[(uint32_t)mid * 2] == id)
-            return (int32_t)tab[(uint32_t)mid * 2 + 1];
-        if (tab[(uint32_t)mid * 2] > id)
-            hi = mid;
-        else
+    while (hi > lo) {
+        mid = ((hi - lo) >> 1) + lo;
+        if (g_spriteRegPairs[(uint32_t)mid * 2] == id)
+            return (int32_t)g_spriteRegPairs[(uint32_t)mid * 2 + 1];
+        if (g_spriteRegPairs[(uint32_t)mid * 2] < id)
             lo = mid + 1;
-    } while (hi > lo);
+        else
+            hi = mid;
+    }
     return -1;
 }
 

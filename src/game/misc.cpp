@@ -192,9 +192,9 @@ int32_t __cdecl ReturnOne(void *fp, void *obj) { (void)fp; (void)obj; return 1; 
 int32_t __cdecl ReverseBlocks(void *dst, const void *src, int32_t total,
                               int32_t count)
 {
-    uint8_t       *d = (uint8_t *)dst;
+    uint8_t       *d;
     const uint8_t *s;
-    int32_t        n, i, j;
+    int32_t        n, i;
 
     /* The division comes BEFORE the count test in the original, so a count of
      * zero faults on the idiv rather than returning. Keeping that order means
@@ -204,14 +204,14 @@ int32_t __cdecl ReverseBlocks(void *dst, const void *src, int32_t total,
     n = total / count;
     s = (const uint8_t *)src + (int32_t)(count - 1) * n;
 
-    if (count <= 0)
+    if (count > 0) {
+        d = (uint8_t *)dst;
+        for (i = 0; i < count; i++) {
+            memcpy(d, s, (size_t)n);
+            d += n;
+            s -= n;
+        }
         return 1;
-
-    for (i = 0; i < count; i++) {
-        for (j = 0; j < n; j++)
-            d[j] = s[j];
-        d += n;
-        s -= n;
     }
     return 1;
 }
@@ -1694,17 +1694,14 @@ void __attribute__((thiscall)) AM2_Rec::ListRemoveAt(int32_t index)
     void *rec = this;
 
     int32_t *r = (int32_t *)rec;
-    int32_t  count;
 
     if (index >= r[1])
         return;
-    count = r[1] - 1;
-    r[1] = count;
-    if (index < count)
+    if (index < --r[1])
         memmove((void **)r[2] + index, (void **)r[2] + index + 1,
-                (size_t)(count - index) * 4);
-    if (count + AM2_PTR_LIST_SLACK < r[0])
-        ::PtrListShrink(rec);
+                (size_t)(r[1] - index) * 4);
+    if (r[1] + AM2_PTR_LIST_SLACK < r[0])
+        ((AM2_Rec *)rec)->PtrListShrink();
 }
 
 void __attribute__((thiscall)) AM2_Rec::ClearPtrList()
