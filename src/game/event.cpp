@@ -2448,13 +2448,15 @@ void __cdecl MissionEnded(int32_t lost)
  * comparison PASSES rather than failing. Reproduced. */
 int32_t __cdecl EvalCondTests(const AM2_ScriptCond *c)
 {
+    /* The test is re-indexed after each call: the tests pointer is read
+     * again every time. */
     for (int32_t i = 0; i < c->ntests; i++) {
-        const AM2_ScriptTest *t = &c->tests[i];
-        int32_t left  = EvalOperand(t->left[0], t->left[1], t->left[2]);
-        int32_t right = EvalOperand(t->right[0], t->right[1],
-                                          t->right[2]);
+        int32_t left  = EvalOperand(c->tests[i].left[0], c->tests[i].left[1],
+                                    c->tests[i].left[2]);
+        int32_t right = EvalOperand(c->tests[i].right[0], c->tests[i].right[1],
+                                    c->tests[i].right[2]);
 
-        switch (t->op) {
+        switch (c->tests[i].op) {
         case 0: if (left != right) return 0; break;
         case 1: if (left == right) return 0; break;
         case 2: if (left >= right) return 0; break;

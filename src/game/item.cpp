@@ -3940,35 +3940,38 @@ int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
  * exactly, which is the correct outcome -- and if I have misread the two
  * adjacent stack slots, nothing here would tell me.
  */
-int32_t __cdecl MaskBlockWeight(int32_t kind, int32_t heading, uint32_t at)
+int32_t __cdecl MaskBlockWeight(int32_t kind, uint8_t heading, uint32_t at)
 {
-    const uint8_t *rec;
-    int32_t        dir   = (uint8_t)RoundTo8(heading & 0xFF, 5);
-    int32_t        total = 0;
-    int32_t        i;
+    typedef struct { int16_t x, y; } Pt;
+    int32_t  total = 0;
+    int32_t  i;
+    uint32_t slot;
 
-    rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_VEHICLE_MASK - 4))
-          + (size_t)(kind * AM2_VEHICLE_MASK_DIRS + dir)
-            * AM2_VEHICLE_MASK_STRIDE;
-
-    for (i = 0; i < *(const int32_t *)rec; i++) {
-        const int16_t *pt = (const int16_t *)(rec + 4) + i * 2;
-        uint32_t       here;
-        void          *chain;
+    /* The heading is rounded in place, and the count and the points are
+     * re-indexed from the table's base at every use. */
+    heading = (uint8_t)RoundTo8(heading, 5);
+    slot    = (uint32_t)(kind * AM2_VEHICLE_MASK_DIRS + heading)
+              * AM2_VEHICLE_MASK_STRIDE;
+#define COUNT (*(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_VEHICLE_MASK - 4)) + slot))
+#define PTS   ((const Pt *)((const uint8_t *)((void *)(uintptr_t)(ADDR_VEHICLE_MASK)) + slot))
+    for (i = 0; i < COUNT; i++) {
+        Pt    here;
+        void *chain;
 
         /* Both halves of the packed base, summed with the mask offset. */
-        here = (uint32_t)(uint16_t)(int16_t)((int16_t)(at & 0xFFFFu) + pt[0])
-             | ((uint32_t)(uint16_t)(int16_t)((int16_t)(at >> 16) + pt[1])
-                << 16);
+        here.x = PTS[i].x + ((const Pt *)&at)->x;
+        here.y = PTS[i].y + ((const Pt *)&at)->y;
 
         /* NOTE: the BASE point, not `here`. */
         chain = (uint8_t *)ObjectsAtPoint(&at,
                                       (void *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC)));
 
         total += (kind == AM2_MASK_CHAIN_KIND)
-                 ? BlockWeightChain((void *)0, here, chain, at)
-                 : BlockWeightTroops((void *)0, here, chain, at);
+                 ? BlockWeightChain((void *)0, *(uint32_t *)&here, chain, at)
+                 : BlockWeightTroops((void *)0, *(uint32_t *)&here, chain, at);
     }
+#undef COUNT
+#undef PTS
 
     return total;
 }
