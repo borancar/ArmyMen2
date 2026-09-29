@@ -10036,17 +10036,21 @@ int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan, int32_t *out)
  * has no preceding call and cleans exactly three. Three, from the image. */
 static inline int32_t Step3NextCandidate(uint8_t *o)
 {
-    int32_t n = *(const int32_t *)(o + 0x574) ;
-    int32_t base = *(const int32_t *)(o + 0x570);
+    int32_t n = *(const int32_t *)(o + 0x574);
+    int32_t r;
 
-    return (n & 1) ? ((base - (n >> 1)) & 7) : ((base + (n >> 1)) & 7);
+    if (n & 1)
+        r = (*(const int32_t *)(o + 0x570) - (n >> 1)) & 7;
+    else
+        r = (*(const int32_t *)(o + 0x570) + (n >> 1)) & 7;
+    return r;
 }
 
 void __cdecl Step3ChooseFacing(void *obj, void *out)
 {
     uint8_t *o = (uint8_t *)obj;
     int32_t  local;
-    int32_t  tries;
+    int32_t  tries = 0;
 
     /* THREE early returns at 0x0045C8D0, and only the last was reconstructed.
      * Missing the second drove the AI candidate search on the PLAYER's
@@ -10066,63 +10070,71 @@ void __cdecl Step3ChooseFacing(void *obj, void *out)
      * so the counter drifted and picked different candidate facings a few
      * frames later. Only the SEARCH-LOOP exits below, and the short-interval
      * arm's own clear exit, return without the reset. (vehmove2-6591.txt.) */
-    #define AM2_STEP3_STOP_SEARCH() do {                                       \
-        *(int32_t *)(o + 0x570u) = 0;                                         \
-        *(int32_t *)(o + 0x574u) = 0;                                         \
-        return;                                                                \
-    } while (0)
 
     /* A networked client only steers a vehicle it owns. */
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
         && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
-        AM2_STEP3_STOP_SEARCH();
+        goto stop;
 
     /* A vehicle a player is riding is steered by the player, not the AI
      * candidate search below -- unless FIELD_10C says otherwise. */
     if (ListFirstField548(obj) != 0
         && *(const int32_t *)(o + OBJ_OFF_FIELD_10C) == 0)
-        AM2_STEP3_STOP_SEARCH();
+        goto stop;
 
     /* Nothing to decide when the record already wants the current facing and
      * its state says so. */
     if (*(const uint8_t *)out == *(const uint8_t *)(o + OBJ_OFF_FACING)
         && *(const int32_t *)((const uint8_t *)out + 0x08u) == 1)
-        AM2_STEP3_STOP_SEARCH();
+        goto stop;
 
     if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-        - *(const uint32_t *)(o + 0x56Cu) >= 0x4B0u) {
-        /* Past the interval: test the heading as it stands first. The clear
-         * exit resets the search state (0x0045CA05 -> 0x0045CA85). */
+        - *(const uint32_t *)(o + 0x56Cu) < 0x4B0u) {
+        SetFacing08(Step3NextCandidate(o), o, out);
         if (!Step3TurnBlocked(o, out, &local))
-            AM2_STEP3_STOP_SEARCH();
+            return;
+        *(uint32_t *)(o + 0x56Cu) =
+            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+
+        /* The search. Seven attempts, fanning out alternately either side of
+         * the base heading; the counter is PERSISTENT in the object, so a
+         * vehicle that gave up last frame resumes where it left off rather
+         * than starting over. Each arm has its own copy of the loop. */
+        for (;;) {
+            *(int32_t *)(o + 0x574u) += 1;
+            SetFacing08(Step3NextCandidate(o), o, out);
+            if (!Step3TurnBlocked(o, out, &local))
+                return;
+            tries++;
+            if (tries >= 7)
+                return;
+        }
+    }
+
+    /* Past the interval: test the heading as it stands first. The clear exit
+     * resets the search state (0x0045CA05 -> 0x0045CA85). */
+    if (Step3TurnBlocked(o, out, &local)) {
         *(uint32_t *)(o + 0x56Cu) =
             *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
         if (*(const int32_t *)(o + 0x570u) == 0)
             *(int32_t *)(o + 0x570u) = FacingFromDelta08(out, local);
-        tries = 0;
-    } else {
-        tries = 0;
-        SetFacing08(Step3NextCandidate(o), o, out);
-        if (!Step3TurnBlocked(o, out, &local))
-            return;
-        *(uint32_t *)(o + 0x56Cu) =
-            *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+        for (;;) {
+            *(int32_t *)(o + 0x574u) += 1;
+            SetFacing08(Step3NextCandidate(o), o, out);
+            if (!Step3TurnBlocked(o, out, &local))
+                return;
+            tries++;
+            if (tries >= 7)
+                return;
+        }
     }
 
-    /* The search. Seven attempts, fanning out alternately either side of the
-     * base heading; the counter is PERSISTENT in the object, so a vehicle
-     * that gave up last frame resumes where it left off rather than starting
-     * over. */
-    for (;;) {
-        *(int32_t *)(o + 0x574u) += 1;
-        SetFacing08(Step3NextCandidate(o), o, out);
-        if (!Step3TurnBlocked(o, out, &local))
-            return;
-        if (++tries >= 7)
-            return;
-    }
-    #undef AM2_STEP3_STOP_SEARCH
+    /* 0x0045CA85: the reset, reached by goto from the three early exits and
+     * as the fall-out of a clear heading past the interval. */
+stop:
+    *(int32_t *)(o + 0x570u) = 0;
+    *(int32_t *)(o + 0x574u) = 0;
 }
 
 /* 0x0045CAB0, one caller. Decide the vehicle's turn STATE from the gap
