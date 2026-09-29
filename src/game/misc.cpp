@@ -1277,7 +1277,7 @@ void __cdecl ApplyGameSettings(void)
     *(uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS =
         *(const uint32_t *)(uintptr_t)ADDR_HOST_MASK_A;
 
-    for (i = 0; pool + i < (int32_t *)(uintptr_t)ADDR_SCORE_LIMIT; i++) {
+    for (i = 0; i < AM2_COMM_SLOTS; i++) {
         pool[i] = AM2_DEFAULT_SCORE_LIMIT;
         *(int32_t *)(comm + COMM_OFF_PLAYERS
                      + (size_t)i * AM2_COMM_SLOT_STRIDE
