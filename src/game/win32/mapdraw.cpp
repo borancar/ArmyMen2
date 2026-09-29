@@ -2926,7 +2926,7 @@ int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out)
 {
     const uint8_t   *v = (const uint8_t *)vehicle;
     const AM2_Point *pos = (const AM2_Point *)(v + OBJ_OFF_POS);
-    const uint8_t   *weights = *(const uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS;
+    const int8_t    *weights = *(const int8_t **)(uintptr_t)ADDR_CELL_WEIGHTS;  /* signed, as the image's `jge` */
     AM2_Rect  box;
     AM2_Rect  clipped;
     int32_t   x = pos->x;

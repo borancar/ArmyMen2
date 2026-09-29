@@ -165,7 +165,8 @@ main result so far (details in `src/vc6/README.md`):
     linking it back, as the image does (the shared link-after helper it
     had used did not, and a tail cursor would have written through NULL);
     StepType6's crater-spawn test reads the cell weight SIGNED, as the
-    image's `jl` does (a weight byte >= 0x80 no longer counts as blocked).
+    image's `jl` does (a weight byte >= 0x80 no longer counts as blocked),
+    and so does BoatExitPoint's passability test (the image's `jge`).
     Found by comparing each function's image extent with ours --
     `src/vc6/extent.py`, a branch-reachability sweep -- since the relink json
     slices the image to OUR length and hides code we omitted.
