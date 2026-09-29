@@ -2223,9 +2223,10 @@ void __cdecl DiedEffectA(void *obj)
 
     n = (orig_game_rand() % 5) + 6;
     while (n > 0) {
+        int32_t kind = (orig_game_rand() % 3) + 7;
+
         SpawnParticle((const uint32_t *)(o + OBJ_OFF_POS),
-                      *(const int32_t *)(o + 0x52Cu),
-                      (orig_game_rand() % 3) + 7, 9,
+                      *(const int32_t *)(o + 0x52Cu), kind, 9,
                       *(const int8_t *)(o + 0x65u), -1);
         n--;
     }
