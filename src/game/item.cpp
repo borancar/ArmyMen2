@@ -3325,7 +3325,7 @@ void __cdecl ShooterReact(void *shooter, void *target)
 }
 
 typedef int32_t (__cdecl *AM2_ShotHitsObjFn)(void *target, int32_t code,
-                                             int32_t army, int32_t height,
+                                             int32_t army, int16_t height,
                                              void *shot, int32_t *out);
 /* THE SET OF CODES THE IMAGE SPELLS AS A JUMP TABLE. Two of them, in fact,
  * with IDENTICAL thirty-byte index arrays at 0x0043BFB0 and 0x0043BFD8 and
@@ -3426,7 +3426,7 @@ static inline int32_t ShotFacingArc(const uint8_t *target, const uint8_t *shot)
  * interleaved them.
  */
 int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
-                            int32_t height, void *shot, int32_t *out)
+                            int16_t height, void *shot, int32_t *out)
 {
     uint8_t *t = (uint8_t *)target;
     uint8_t *s = (uint8_t *)shot;
@@ -3558,10 +3558,10 @@ int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
 int32_t __cdecl ShotStrike(void *shot, uint32_t at, int16_t height)
 {
     uint8_t       *s = (uint8_t *)shot;
-    const uint8_t *rec = *(const uint8_t *const *)(s + OBJ_OFF_FIELD_94);
-    int32_t        code = *(const int32_t *)(rec + TYPEREC_OFF_CODE);
+    /* The type record is re-read through the shot at each use. */
+#define REC (*(const uint8_t *const *)(s + OBJ_OFF_FIELD_94))
+    int32_t        code = *(const int32_t *)(REC + TYPEREC_OFF_CODE);
     uint8_t       *o;
-    uint16_t       tile;
     int32_t        scratch;
 
     o = (uint8_t *)ObjectsAtPoint(&at, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
@@ -3591,28 +3591,28 @@ int32_t __cdecl ShotStrike(void *shot, uint32_t at, int16_t height)
             continue;
 
         *(int32_t *)(s + OBJ_OFF_FIELD_44) =
-            20 - *(const int32_t *)(rec + TYPEREC_OFF_FIELD_08);
+            20 - *(const int32_t *)(REC + TYPEREC_OFF_FIELD_08);
     }
 
-    tile = *(const uint16_t *)(s + OBJ_OFF_TILE);
+/* The shot's TILE, re-read at each use. */
+#define TILE (*(const uint16_t *)(s + OBJ_OFF_TILE))
 
+    /* Nested onto the struck-ground return the image lays out last. */
     if ((int16_t)*(const int8_t *)((*(const uint8_t *const *)
-                                        (uintptr_t)ADDR_TILE_ATTRS) + tile)
-        < (int16_t)height)
-        return AM2_SHOT_STRUCK_GROUND;
-
-    if (code == 3) {
+                                        (uintptr_t)ADDR_TILE_ATTRS) + TILE)
+        >= (int16_t)height) {
+        if (code != 3) {
+            if (((*(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS)[TILE] & 1)
+                && (*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)[TILE] >= 0x0F)
+                return AM2_SHOT_STRUCK_HARD;
+            return AM2_SHOT_STRUCK_NOTHING;
+        }
         *(int32_t *)(s + OBJ_OFF_FIELD_44) =
-            20 - *(const int32_t *)(rec + TYPEREC_OFF_FIELD_08);
-        return AM2_SHOT_STRUCK_GROUND;
+            20 - *(const int32_t *)(REC + TYPEREC_OFF_FIELD_08);
     }
-
-    if (!((*(const uint8_t *const *)(uintptr_t)ADDR_TILE_FLAGS)[tile] & 1))
-        return AM2_SHOT_STRUCK_NOTHING;
-    if ((*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)[tile] < 0x0F)
-        return AM2_SHOT_STRUCK_NOTHING;
-
-    return AM2_SHOT_STRUCK_HARD;
+    return AM2_SHOT_STRUCK_GROUND;
+#undef TILE
+#undef REC
 }
 
 /* ApplyShotDamage -- original 0x0043BBE0, one caller, 240 bytes. What a shot
@@ -3654,7 +3654,7 @@ int32_t __cdecl ShotStrike(void *shot, uint32_t at, int16_t height)
  * as the attacker and LookupByUID resolves it four instructions later.
  */
 void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
-                             int32_t unusedB, int32_t doubled)
+                             int16_t unusedB, int32_t doubled)
 {
     const uint8_t *sh  = (const uint8_t *)shot;
     const uint8_t *rec = *(const uint8_t *const *)(sh + OBJ_OFF_FIELD_94);

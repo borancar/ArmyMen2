@@ -523,7 +523,7 @@ void __cdecl DamageVehicle(void *obj, int32_t amount, uint8_t d, int32_t kind,
                            uint32_t attacker);
 
 void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
-                             int32_t unusedB, int32_t doubled);
+                             int16_t unusedB, int32_t doubled);
 
 /* 0x0043C000, one caller -- the type-5 stepper, type 5 being the SHOT. Damage
  * everything at a point that this shot can hit, then ask the terrain whether
