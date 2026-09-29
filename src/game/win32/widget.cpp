@@ -1071,7 +1071,7 @@ static inline int32_t EdgeText(const AM2_Widget *w, int32_t pen, const char *tex
     RECT     vis;
     int32_t  mid = w->rect.left + (w->rect.right - w->rect.left) / 2;
 
-    RectSet((AM2_Rect *)&box, w->rect.left, pen,
+    *(AM2_Rect *)&box = RectMake(w->rect.left, pen,
             w->rect.right, w->rect.bottom);
 
     if (!IntersectRect(&vis, &box, clip))
@@ -1098,7 +1098,7 @@ static inline void EdgeSprite(const AM2_Widget *w, int32_t pen, AM2_Sprite *spr,
     int32_t  x;
     int32_t  y;
 
-    RectSet((AM2_Rect *)&box, w->rect.left, pen,
+    *(AM2_Rect *)&box = RectMake(w->rect.left, pen,
             w->rect.right, spr->bounds.bottom + pen);
 
     if (!IntersectRect(&vis, &box, clip))
@@ -1123,8 +1123,7 @@ static inline void EdgeBarFill(const AM2_Widget *w, int32_t pen, int32_t percent
     RECT box;
     RECT vis;
 
-    RectSet((AM2_Rect *)&box,
-            w->rect.left + AM2_HUD_BAR_X,
+    *(AM2_Rect *)&box = RectMake(w->rect.left + AM2_HUD_BAR_X,
             pen + AM2_HUD_BAR_BASE - percent,
             w->rect.left + AM2_HUD_BAR_X + AM2_HUD_BAR_W,
             pen + AM2_HUD_BAR_BASE);
@@ -7775,8 +7774,8 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
                                                  + HUDLOG_OFF_BUTTON_X);
         int32_t top  = w->rect.top;
 
-        RectSet((AM2_Rect *)&hot, left, top,
-                left + AM2_HUD_BUTTON_W, top + AM2_HUD_BUTTON_H);
+        *(AM2_Rect *)&hot = RectMake(left, top, left + AM2_HUD_BUTTON_W,
+                                     top + AM2_HUD_BUTTON_H);
     }
 
     grab = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
@@ -8791,13 +8790,13 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
 
     uint8_t    *self = (uint8_t *)w;
     AM2_Sprite *spr  = *(AM2_Sprite **)(self + EDGE_OFF_SPRITE);
-    RECT        vis;
     int32_t     pen;
 
-    if (!IntersectRect(&vis, (const RECT *)(uintptr_t)ADDR_SCREEN_CLIP, &clip))
+    /* Clipped in place: the by-value clip is the intersection from here. */
+    if (!IntersectRect(&clip, (const RECT *)(uintptr_t)ADDR_SCREEN_CLIP, &clip))
         return;
 
-    ::WidgetPaint(w, vis);
+    ::WidgetPaint(w, clip);
 
     pen = w->rect.top + 2;
 
@@ -8865,8 +8864,8 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
             RECT    box;
             RECT    vis;
 
-            RectSet((AM2_Rect *)&box, w->rect.left, w->rect.top,
-                    w->rect.right, w->rect.bottom);
+            *(AM2_Rect *)&box = RectMake(w->rect.left, w->rect.top,
+                                         w->rect.right, w->rect.bottom);
             if (IntersectRect(&vis, &box, &clip)
                 && LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)) {
                 DrawTextVertical(mid + 1, pen, text, 1, vis,
