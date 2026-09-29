@@ -3017,8 +3017,7 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
 {
     void    *target;
     int32_t  slot;
-    uint8_t *list;
-    int32_t  i = 0;
+    int32_t  i;
 
     if (uid < AM2_UID_COUNTER_START)
         return;
@@ -3027,26 +3026,27 @@ void __cdecl EvtArmyAttach(int32_t army, int32_t filter, uint32_t uid)
     if (!target)
         return;
 
-    slot = AM2_THE_COMM->CommSlotForArmy(
-                           (int16_t)army);
-    list = ((uint8_t **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[slot];
+    slot = AM2_THE_COMM->CommSlotForArmy(army);
 
-    while (i < *(const int32_t *)(list + LIST_OFF_COUNT)) {
+    /* The army's list is re-read from the table at every use. */
+#define LIST (((uint8_t **)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[slot])
+    i = 0;
+    while (i < *(const int32_t *)(LIST + LIST_OFF_COUNT)) {
         uint8_t *obj = (uint8_t *)LookupByUID(
-            (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
+            (*(const uint32_t *const *)(LIST + LIST_OFF_UIDS))[i]);
 
         if (!obj) {
-            ((AM2_Rec *)list)->ListRemoveAt(i);
+            ((AM2_Rec *)LIST)->ListRemoveAt(i);
             continue;           /* no step: the shifted-down entry is next */
         }
 
         if (!(*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
             && ObjIsTypeIn238((const AM2_Object *)obj)
-            && (filter == AM2_ATTACH_ANY || ObjFieldA(obj) == (uint32_t)filter))
+            && (filter == AM2_ATTACH_ANY || (uint32_t)filter == ObjFieldA(obj)))
             ObjAttachTo(obj, target);
-
         i++;
     }
+#undef LIST
 }
 
 /* The comm object's team score, still original. */

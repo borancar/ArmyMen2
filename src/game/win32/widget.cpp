@@ -11131,16 +11131,16 @@ uint8_t __cdecl MpNameInk(int32_t row)
  * the ready pair. */
 uint8_t __cdecl MpNamePaper(int32_t row)
 {
-    const uint8_t *comm   = g_commObject;
-    const uint8_t *player = comm + (uint32_t)row * AM2_PLAYER_STRIDE;
-
-    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST)
-        && !*(const int32_t *)(player + COMM_ARMY_OFF_MAP_OK))
+    /* The player record is addressed afresh at each use. */
+#define PLAYER(off) (*(const int32_t *)(g_commObject + (uint32_t)row * AM2_PLAYER_STRIDE + (off)))
+    if (*(const int32_t *)(g_commObject + COMM_OFF_IS_HOST)
+        && !PLAYER(COMM_ARMY_OFF_MAP_OK))
         return *(const uint8_t *)(uintptr_t)ADDR_COLOUR_NO_MAP;
 
-    return *(const int32_t *)(player + COMM_ARMY_OFF_READY_TO_LOAD)
+    return PLAYER(COMM_ARMY_OFF_READY_TO_LOAD)
                ? *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG
                : *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR;
+#undef PLAYER
 }
 
 /* 0x00432D40, thiscall, two instructions: the row name's ink setter. It is a
@@ -14811,19 +14811,14 @@ void __attribute__((thiscall)) AM2_Widget::ButtonPaint(RECT clip)
     uint8_t *self = (uint8_t *)w;
 
     if (w->parent) {
-        if (w->parent->focusedChild != w) {
-            w->sprite = *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL);
+        if (w->parent->focusedChild == w) {
+            if ((w->hovered && (g_mouseButton[0] || g_mouseChanged[0]))
+                || IsKeyDown(AM2_DIK_RETURN))
+                w->sprite = *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_PRESSED);
+            else
+                w->sprite = *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_FOCUS);
         } else {
-            int32_t pressed = 0;
-
-            if (w->hovered && (g_mouseButton[0] || g_mouseChanged[0]))
-                pressed = 1;
-            else if (IsKeyDown(AM2_DIK_RETURN))
-                pressed = 1;
-
-            w->sprite = pressed
-                ? *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_PRESSED)
-                : *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_FOCUS);
+            w->sprite = *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL);
         }
     }
     ::WidgetPaint(w, clip);
@@ -17275,7 +17270,7 @@ void __cdecl VehicleDismountAll(void *a, void *b)
     veh = *(uint8_t **)(uintptr_t)ADDR_OBJ_CTX_OBJ_A;
     if (!veh)
         return;
-    if (*(const int32_t *)veh != AM2_OBJ_TYPE_VEHICLE)
+    if (!ObjIsType3Inline(veh))
         return;
     if ((int32_t)Field53C(veh) <= 0)
         return;
@@ -17287,7 +17282,7 @@ void __cdecl VehicleDismountAll(void *a, void *b)
         uint8_t *o = (uint8_t *)LookupByUID(
             (*(const uint32_t *const *)(veh + OBJ_OFF_FIELD_540))[1]);
 
-        if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER)
+        if (ObjIsType2Inline(o))
             ObjAttachTo(o, driver);
 
         if (!ExitOneFromVehicle(1, veh))

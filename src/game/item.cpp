@@ -1537,17 +1537,19 @@ done:
 void __cdecl ApplyObjHeight(void *obj, int32_t height)
 {
     uint8_t *o = (uint8_t *)obj;
-    uint8_t *rows;
 
     am2_height_log("ApplyObjHeight", obj, height);
 
+    /* TileAttrAt's body, inline. */
     if (height == 0)
-        height = TileAttrAt(*(const uint16_t *)(o + OBJ_OFF_TILE));
+        height = *(const int8_t *)(g_tileAttrs + *(const uint16_t *)(o + OBJ_OFF_TILE));
 
+    /* The row pointer is re-read at every use. */
+#define ROWS (*(uint8_t **)(o + OBJ_OFF_ROWS))
     switch (*(const int32_t *)o) {
     case 1:
     case 4:
-        ApplyHeightItem(o, height);
+        ApplyHeightItem(o, (int16_t)height);
         return;
 
     case 2:
@@ -1556,11 +1558,10 @@ void __cdecl ApplyObjHeight(void *obj, int32_t height)
 
     case 3:
         *(o + OBJ_OFF_HEIGHT_SET) = (uint8_t)height;
-        rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
-        *(int16_t *)(rows + OBJ_OFF_DEPTH_LAYER) =
+        *(int16_t *)(ROWS + OBJ_OFF_DEPTH_LAYER) =
             (int16_t)ScaleBy32Blocks((int8_t)height);
         if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
-            *(int16_t *)(rows + AM2_OBJ_ROW_STRIDE + OBJ_OFF_DEPTH_LAYER) =
+            *(int16_t *)(ROWS + AM2_OBJ_ROW_STRIDE + OBJ_OFF_DEPTH_LAYER) =
                 (int16_t)ScaleBy32Blocks(
                     *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
         return;
@@ -1572,9 +1573,9 @@ void __cdecl ApplyObjHeight(void *obj, int32_t height)
         break;
     }
 
-    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
-    *(int16_t *)(rows + OBJ_OFF_DEPTH_LAYER) =
+    *(int16_t *)(ROWS + OBJ_OFF_DEPTH_LAYER) =
         (int16_t)ScaleBy32Blocks((int8_t)height);
+#undef ROWS
 }
 
 /* 0x00447E50, one caller -- VehicleDied's twin, and the same first move: take
@@ -7479,11 +7480,10 @@ void __cdecl SetSoldierKind(void *obj, int32_t kind)
                                           (o + UNIT_OFF_INVENTORY_SEL) * 4));
 
             if (w) {
-                int32_t pose = WeaponPoseIndex(obj, w);
-
                 SetAnimFrame(*(uint8_t **)(o + OBJ_OFF_ROWS),
-                                    (int16_t)((const int32_t *)(uintptr_t)
-                                        ADDR_WEAPON_POSE_FRAMES)[pose], 1);
+                             (int16_t)((const int32_t *)(uintptr_t)
+                                 ADDR_WEAPON_POSE_FRAMES)[WeaponPoseIndex(obj, w)],
+                             1);
             } else {
                 SetAnimFrame(*(uint8_t **)(o + OBJ_OFF_ROWS), 1, 1);
             }
@@ -14206,18 +14206,6 @@ void __cdecl CreateWatchedType(int32_t unused, void *obj, uint32_t at,
     (void)unused;
 }
 
-/* The ammo filter, generated from the image at 0x0045F270 rather than
- * transcribed: a byte per weapon key selecting one of two arms. Fifteen keys
- * take -1 and fourteen take the caller's quantity, and the split is not a
- * range -- 1 is infinite, 2..7 are counted, 8..10 infinite, 11..12 counted,
- * 13..21 infinite, 22..26 counted, 27 infinite, 28 counted, 29 infinite. A
- * hand-written condition over that would be six comparisons and is exactly
- * the shape DirtyCollect's eighty-one arms got wrong. */
-static const uint8_t kWeaponAmmoIsFinite[29] = {
-    0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0
-};
-
 /* CreateWeapon -- original 0x0045F0C0, eight-plus callers, and it names
  * itself: "CreateWeapon: %s, %d, %d, (%d,%d), %d, %d, %d, %x". The last of
  * the four object creators; the other three have been reconstructed for some
@@ -14231,8 +14219,7 @@ static const uint8_t kWeaponAmmoIsFinite[29] = {
  *
  * A KEY OUTSIDE 1..29 TAKES THE COUNTED ARM, and that includes key 0: the
  * original does `dec eax; cmp eax, 0x1C; ja` so 0 wraps to 0xFFFFFFFF and
- * fails the unsigned compare. Reproduced with an explicit range test, which
- * is the same answer and says so.
+ * fails the unsigned compare. A switch reproduces that.
  *
  * THE DEFINITION CAN OVERRIDE BOTH. A negative +0x18 in the missile def
  * forces -1 whatever the table said; a zero ammo becomes 3; and in a
@@ -14287,10 +14274,21 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
           + (uint32_t)kb * AM2_MISSILE_DEF_REC_SIZE;
     *(const uint8_t **)(o + 0xC0u) = def;
 
-    if (kb >= 1 && kb <= 29 && !kWeaponAmmoIsFinite[kb - 1])
+    /* The ammo filter is a switch, compiled to a byte-indexed table at
+     * 0x0045F270 over keys 1..29: fifteen keys take -1 and every other key
+     * (and anything outside 1..29) takes the caller's quantity. The split is
+     * not a range -- 1 infinite, 2..7 counted, 8..10 infinite, 11..12
+     * counted, 13..21 infinite, 22..26 counted, 27 infinite, 28 counted,
+     * 29 infinite -- and the case list is read from that table. */
+    switch (kb) {
+    case 1:  case 8:  case 9:  case 10: case 13: case 14: case 15: case 16:
+    case 17: case 18: case 19: case 20: case 21: case 27: case 29:
         ammo = -1;
-    else
+        break;
+    default:
         ammo = quantity;
+        break;
+    }
 
     if (*(const int32_t *)(def + 0x18u) < 0)
         ammo = -1;

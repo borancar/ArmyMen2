@@ -258,7 +258,6 @@ void __cdecl SubrecHideRows(void *subrec)
  */
 void *__cdecl MakeRecordList(int32_t count, const void *src, void *owner)
 {
-    const uint8_t *in;
     uint8_t       *hdr;
     uint8_t       *recs;
     int32_t        i;
@@ -276,18 +275,18 @@ void *__cdecl MakeRecordList(int32_t count, const void *src, void *owner)
     *(void **)(hdr + LISTHDR_OFF_RECORDS) = recs;
     memset(recs, 0, (size_t)count * AM2_LIST_RECORD_BYTES);
 
-    in = (const uint8_t *)src;
+    /* The record array is re-read for every field, as the original does. */
+#define OUT(i) (*(uint8_t **)(hdr + LISTHDR_OFF_RECORDS) \
+                + (uint32_t)(i) * AM2_LIST_RECORD_BYTES)
+#define IN(i)  ((const uint8_t *)src + (uint32_t)(i) * AM2_LIST_RECORD_BYTES)
     for (i = 0; i < count; i++) {
-        uint8_t *out = *(uint8_t **)(hdr + LISTHDR_OFF_RECORDS)
-                       + (uint32_t)i * AM2_LIST_RECORD_BYTES;
-
-        *(int32_t *)(out + 0) = *(const int32_t *)(in + 0);
-        *(int16_t *)(out + 4) = *(const int16_t *)(in + 4);
-        *(int16_t *)(out + 6) = *(const int16_t *)(in + 6);
-        *(int32_t *)(out + 8) = *(const int32_t *)(in + 8);
-
-        in += AM2_LIST_RECORD_BYTES;
+        *(int32_t *)(OUT(i) + 0) = *(const int32_t *)(IN(i) + 0);
+        *(int16_t *)(OUT(i) + 4) = *(const int16_t *)(IN(i) + 4);
+        *(int16_t *)(OUT(i) + 6) = *(const int16_t *)(IN(i) + 6);
+        *(int32_t *)(OUT(i) + 8) = *(const int32_t *)(IN(i) + 8);
     }
+#undef OUT
+#undef IN
 
     return hdr;
 }

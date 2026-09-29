@@ -294,34 +294,32 @@ void __cdecl ResetToTitle(void)
 {
     /* Two different globals, and it matters which way round: the command-line
      * option is the SOURCE and the level's own copy is the destination. */
-    char *mapname = (char *)(uintptr_t)ADDR_MAP_NAME;
-
-    strcpy(mapname, (const char *)(uintptr_t)ADDR_OPT_MAP_NAME);
-    if (!mapname[0])
-        strcpy(mapname, *(const char *const *)(uintptr_t)ADDR_MAP_NAME_DEFAULT);
+    strcpy((char *)(uintptr_t)ADDR_MAP_NAME, (const char *)(uintptr_t)ADDR_OPT_MAP_NAME);
+    if (!((const char *)(uintptr_t)ADDR_MAP_NAME)[0])
+        strcpy((char *)(uintptr_t)ADDR_MAP_NAME,
+               *(const char *const *)(uintptr_t)ADDR_MAP_NAME_DEFAULT);
     strcpy((char *)(uintptr_t)ADDR_MP_SCRIPT_NAME,
            *(const char *const *)(uintptr_t)ADDR_MP_SCRIPT_DEFAULT);
 
-    uint8_t *palette = *(uint8_t **)(uintptr_t)ADDR_ACTIVE_PALETTE;
-
-    BuildRgb332Palette(palette);
-    SetGamePalette(palette);
+    /* The palette pointer is re-read for each call. */
+    BuildRgb332Palette(*(uint8_t **)(uintptr_t)ADDR_ACTIVE_PALETTE);
+    SetGamePalette(*(uint8_t **)(uintptr_t)ADDR_ACTIVE_PALETTE);
 
     if (*(const int32_t *)(uintptr_t)ADDR_OPT_DF) {
         SpriteSetLoad("title");
         SpriteSetLoad("shared");
     }
 
-    /* By name, not by raw VA: under the placed model each is an am2_origstate
-     * member. The game-over snapshot is int32[3], cleared element by element. */
-    static const uintptr_t kCleared[] = {
-        ADDR_MP_SESSION,
-        ADDR_GAME_OVER_SOURCE, ADDR_GAME_OVER_SOURCE + 4u, ADDR_GAME_OVER_SOURCE + 8u,
-        ADDR_OBJ_CTX_OBJ, ADDR_OBJ_CTX_VAL, ADDR_OBJ_CTX_OBJ_PREV,
-        ADDR_OBJ_CTX_VAL_PREV, ADDR_INPUT_SUPPRESS,
-    };
-    for (uint32_t i = 0; i < sizeof kCleared / sizeof kCleared[0]; i++)
-        *(int32_t *)(uintptr_t)kCleared[i] = 0;
+    /* The game-over snapshot is int32[3], cleared element by element. */
+    *(int32_t *)(uintptr_t)ADDR_MP_SESSION                    = 0;
+    ((int32_t *)(uintptr_t)ADDR_GAME_OVER_SOURCE)[0]          = 0;
+    ((int32_t *)(uintptr_t)ADDR_GAME_OVER_SOURCE)[1]          = 0;
+    ((int32_t *)(uintptr_t)ADDR_GAME_OVER_SOURCE)[2]          = 0;
+    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_OBJ                   = 0;
+    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL                   = 0;
+    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_OBJ_PREV              = 0;
+    *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_PREV              = 0;
+    *(int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS                = 0;
 
     ResetHostState();
     LoadOptions();
