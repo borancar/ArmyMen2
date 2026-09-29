@@ -706,7 +706,7 @@ typedef void (__cdecl *AM2_MsgHandlerFn)(void *msg, int32_t dpid);
 extern "C" void __cdecl HudMessage(const char *text, int32_t colour);
 /* MenuMessage is reconstructed below; this forward declaration is here
  * because the two callers in this file come before it. */
-void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator);
+void __cdecl MenuMessage(const char *text, uint8_t colour, int32_t indicator);
 
 
 #define AM2_MSG_TYPE   0        /* the first dword: what the arm is chosen on */
@@ -2162,7 +2162,7 @@ extern "C" {
 }
 
 
-void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator)
+void __cdecl MenuMessage(const char *text, uint8_t colour, int32_t indicator)
 {
     uint8_t *log = *(uint8_t **)(uintptr_t)ADDR_MENU_MSG_LIST;
     uint8_t *screen;
@@ -2171,7 +2171,7 @@ void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator)
     if (!log)
         return;
 
-    ((AM2_Rec *)log)->ListAdd(text, (void *)(uintptr_t)((uint32_t)colour & 0xFFu));
+    ((AM2_Rec *)log)->ListAdd(text, (void *)(uintptr_t)colour);
     if (*(const int32_t *)log > AM2_MENU_MSG_MAX)
         ListDropOldest(log);
 

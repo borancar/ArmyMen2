@@ -1,5 +1,6 @@
 /* defparse.cpp -- see defparse.h. */
 #include <stdint.h>
+#include <string.h>
 
 #include "defparse.h"
 #include "image.h"
@@ -203,7 +204,6 @@ void __cdecl DefAddTrooperRec(const void *rec)
 {
     uint8_t *tab = (uint8_t *)kDefTrooperRecs;
     int32_t  cap;
-    int32_t  n;
 
     if (tab == (uint8_t *)0) {
         tab = (uint8_t *)am2_malloc(AM2_DEF_LINK_INITIAL
@@ -223,12 +223,9 @@ void __cdecl DefAddTrooperRec(const void *rec)
         kDefTrooperRecs = tab;
     }
 
-    n = kDefTrooperCount;
-    for (int32_t i = 0; i < (int32_t)(AM2_DEF_TROOPER_REC_SIZE / 4); i++)
-        ((int32_t *)(tab + n * AM2_DEF_TROOPER_REC_SIZE))[i] =
-            ((const int32_t *)rec)[i];
-
-    kDefTrooperCount = n + 1;
+    memcpy(tab + kDefTrooperCount * AM2_DEF_TROOPER_REC_SIZE, rec,
+           AM2_DEF_TROOPER_REC_SIZE);
+    kDefTrooperCount++;
 }
 
 /* DefTrooperLine -- original 0x0044CDA0, 464 bytes, NINE exits.

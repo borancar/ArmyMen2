@@ -57,6 +57,18 @@ int32_t __cdecl FindSlot(uint32_t uid, int32_t *insert_at);
 
 /* Original: 0x00427820. Returns the registered object for `uid`, or NULL. */
 void *__cdecl LookupByUID(uint32_t uid);
+/* The same body expanded in place, which is how several callers have it: the
+ * out-slot is uninitialised, so VC6 puts it in a dead argument slot of the
+ * caller where there is one (ObjDie) and a stack local where not. */
+static inline void *LookupByUIDInline(uint32_t uid)
+{
+    int32_t slot;
+    int32_t i = FindSlot(uid, &slot);
+
+    if (i >= 0)
+        return g_objTable[i].obj;
+    return 0;
+}
 
 /* 0x0044BA60, 14 callers. A cdecl wrapper for the line above and nothing else,
  * passing its one argument straight through. Reconstructed as the wrapper it

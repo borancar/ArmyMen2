@@ -5814,24 +5814,17 @@ void __cdecl DamageObject(void *obj, int32_t amount, int32_t kind,
     uint8_t *o = (uint8_t *)obj;
     void    *attacker;
     int16_t  attackerOwner;
-    int32_t  slot;
-    int32_t  insertAt;
 
     if (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
         return;
 
-    slot = FindSlot(attackerUid, &insertAt);
-    if (slot >= 0)
-        attacker = g_objTable[slot].obj;
-    else
-        attacker = (void *)0;
+    attacker = LookupByUIDInline(attackerUid);
 
     if (attacker) {
         attackerOwner =
             (int16_t)*(const int8_t *)((const uint8_t *)attacker
                                        + AM2_OBJ_OWNER_OFF);
     } else {
-        attacker      = (void *)0;
         attackerOwner = 4;
     }
 
@@ -6413,16 +6406,10 @@ void __cdecl StepType1And4(void *obj);
  *
  * TYPE 2 IS THE ONLY ARM WITHOUT THE DESTROYED GUARD. In the original the
  * check sits INSIDE seven of the eight arms and type 2 simply does not have
- * it. Here it is hoisted to one test before the switch, written as
- * `type != 1 && destroyed` -- equivalent, because the seven arms that have it
- * all do the same thing with it and return, and it is the only difference
- * between them.
- *
- * So the ASYMMETRY is reproduced while the duplication is not. That is worth
- * being exact about: one `test` missing from one arm out of eight is precisely
- * the shape of thing a tidy rewrite unifies away, and no frame comparison
- * would ever notice. Hoisting keeps it in one place where it can be read;
- * dropping the `type != 1` would lose it.
+ * it, and so it does here -- one `test` missing from one arm out of eight is
+ * precisely the shape of thing a tidy rewrite unifies away, and no frame
+ * comparison would ever notice. (It was once hoisted above the switch as
+ * `type != 1 && destroyed`, equivalent but not the original's code.)
  *
  * That asymmetry is NOT exercised, though: it only shows when a destroyed
  * type 2 is stepped, and nothing in these drives destroys anything. Verified
@@ -6434,7 +6421,6 @@ void __cdecl StepType1And4(void *obj);
 void __cdecl ObjFrameStep(void *obj)
 {
     uint8_t *o = (uint8_t *)obj;
-    uint32_t type;
 
     *(uint32_t *)(o + OBJ_OFF_PREV_POS) = *(const uint32_t *)(o + OBJ_OFF_POS);
 
@@ -6442,22 +6428,20 @@ void __cdecl ObjFrameStep(void *obj)
         && !(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG8_BIT40))
         return;
 
-    type = *(const uint32_t *)o - 1u;
-    if (type > 7u)
-        return;
-
-    if (type != 1u && (*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED))
-        return;
-
-    switch (type) {
-    case 0: case 3: StepType1And4(obj);     break;   /* ours already */
-    case 1:         StepType2(obj);         break;   /* ours now */
-    case 2:         StepType3(obj);         break;   /* ours now */
-    case 4:         StepType5(obj);   break;
-    case 5:         StepType6(obj);         break;   /* ours now */
-    case 6:         ObjMarkIfOverdue(obj);  break;   /* ours already */
-    default:        StepType8(obj);         break;
+    /* Every arm but type 2's tests OBJ_FLAG_DESTROYED itself: the test is
+     * written into each case, not hoisted above the switch. */
+#define LIVE (!(*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED))
+    switch (*(const int32_t *)o) {
+    case 1:
+    case 4: if (LIVE) StepType1And4(obj);    break;
+    case 2:           StepType2(obj);        break;
+    case 3: if (LIVE) StepType3(obj);        break;
+    case 5: if (LIVE) StepType5(obj);        break;
+    case 6: if (LIVE) StepType6(obj);        break;
+    case 7: if (LIVE) ObjMarkIfOverdue(obj); break;
+    case 8: if (LIVE) StepType8(obj);        break;
     }
+#undef LIVE
 }
 
 /* 0x0043D280, one caller -- DamageObject's type 8 arm. A roach takes a hit.
@@ -7075,13 +7059,7 @@ typedef void (__cdecl *AM2_VehicleDiedFn)(void *obj, uint32_t by);
 void __cdecl ObjDie(void *obj, int32_t kind, uint32_t by)
 {
     uint8_t *o = (uint8_t *)obj;
-    int32_t  insertAt = 0;
-    int32_t  slot     = FindSlot(by, &insertAt);
-    void    *attacker = NULL;
-
-    if (slot >= 0)
-        attacker = ((AM2_ObjEntry *)(uintptr_t)
-                        *(void *const *)(uintptr_t)ADDR_OBJ_TABLE)[slot].obj;
+    void    *attacker = LookupByUIDInline(by);
 
     *(int16_t *)(o + OBJ_OFF_HEALTH) = 0;
 
@@ -8035,15 +8013,11 @@ void __cdecl DeselectAll(void)
     int32_t  i   = 0;
 
     while (i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT) {
-        int32_t   at;
-        int32_t   slot;
         uint8_t  *obj;
 
-        slot = FindSlot((*(const uint32_t *const *)(sel + 8))[i], &at);
-        obj  = slot >= 0
-               ? (uint8_t *)(*(AM2_ObjEntry *const *)
-                                 (uintptr_t)ADDR_OBJ_TABLE)[slot].obj
-               : (uint8_t *)0;
+        /* LookupByUID's body inline, twice, each with an out-slot of its own. */
+        obj = (uint8_t *)LookupByUIDInline(
+                  (*(const uint32_t *const *)(sel + 8))[i]);
 
         if (!obj) {
             ((AM2_Rec *)sel)->ListRemoveAt(i);       /* and do NOT advance i */
@@ -8053,19 +8027,14 @@ void __cdecl DeselectAll(void)
         *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
 
         if (ObjIsTypeIn238((const AM2_Object *)obj)) {
-            int32_t s2 = FindSlot(*(const uint32_t *)(obj + OBJ_OFF_FOLLOW_UID),
-                                  &at);
+            void   *other = LookupByUIDInline(
+                *(const uint32_t *)(obj + OBJ_OFF_FOLLOW_UID));
 
-            if (s2 >= 0) {
-                void *other = (*(AM2_ObjEntry *const *)
-                                   (uintptr_t)ADDR_OBJ_TABLE)[s2].obj;
-
-                if (other
-                    && ArmyAlliedWithObj(
-                           (int32_t)*(const uint32_t *)
-                               (uintptr_t)ADDR_DEFAULT_OWNER, other, 0))
-                    ObjAttachTo(obj, (void *)0);
-            }
+            if (other
+                && ArmyAlliedWithObj(
+                       (int32_t)*(const uint32_t *)
+                           (uintptr_t)ADDR_DEFAULT_OWNER, other, 0))
+                ObjAttachTo(obj, (void *)0);
         }
 
         i++;
@@ -11470,7 +11439,7 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint)
     int32_t   mode = 1;
     int32_t   aiMode = 8;
     int32_t   maxRank = -1;
-    int32_t   i, slot;
+    int32_t   i;
 
     (void)unusedPoint;
 
@@ -11482,11 +11451,7 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint)
 
     for (i = 0; i < *(const int32_t *)(list + SUBREC_OFF_COUNT); ) {
         const uint32_t *uids = *(const uint32_t **)(list + SUBREC_OFF_ROWS);
-        uint8_t        *obj = 0;
-
-        slot = FindSlot(uids[i], &slot);
-        if (slot >= 0)
-            obj = (uint8_t *)g_objTable[slot].obj;
+        uint8_t        *obj = (uint8_t *)LookupByUIDInline(uids[i]);
 
         if (obj == 0) {
             ((AM2_Rec *)list)->ListRemoveAt(i);

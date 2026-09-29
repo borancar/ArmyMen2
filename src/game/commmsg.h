@@ -94,7 +94,7 @@ void __cdecl TrooperFireSend(void *trooper, void *weapon);
  * argument picks WHICH of the panel's two indicators blinks, and is not a
  * boolean. Announce is the pair -- log it locally, broadcast it -- and both
  * ends stamp colour 4, the system colour. */
-void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator);
+void __cdecl MenuMessage(const char *text, uint8_t colour, int32_t indicator);
 void __cdecl Announce(const char *text);
 
 /* 0x00401240, five callers. Find the node with a given key and set or clear

@@ -10466,13 +10466,15 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
 void __cdecl OnChatEnter(AM2_Widget *w)
 {
     uint8_t *self = (uint8_t *)w;
-    char    *text = *(char **)(self + EDIT_OFF_TEXT);
-    int32_t  army = ((AM2_Comm *)(void *)g_commObject)->CommArmyOfSlot(
+    /* A byte local, pushed as a whole dword; the text is re-read each use. */
+    uint8_t  army = (uint8_t)((AM2_Comm *)(void *)g_commObject)->CommArmyOfSlot(
                                            (int32_t)g_defaultOwner);
+#define CHAT_TEXT (*(char **)(self + EDIT_OFF_TEXT))
 
-    MenuMessage(text, (int32_t)(uint8_t)army, 0);
-    SendChatMsg(text, 0);
-    strcpy(text, (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+    MenuMessage(CHAT_TEXT, army, 0);
+    SendChatMsg(CHAT_TEXT, 0);
+    strcpy(CHAT_TEXT, (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+#undef CHAT_TEXT
     WidgetVPaint(w, w->rect);
 }
 
