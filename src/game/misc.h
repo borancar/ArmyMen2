@@ -83,6 +83,10 @@ static inline void ObjVPaint(void *o, AM2_Rect r)
 { (((AM2_VObj *)o)->*((AM2_VObjPaintPmf *)*(void **)o)[1])(r); }
 static inline void ObjVUpdate(void *o)
 { (((AM2_VObj *)o)->*((AM2_VObjUpdatePmf *)*(void **)o)[2])(); }
+/* slot 0 as a no-argument call answering an int (a movie's poll) */
+typedef int32_t (AM2_VObj::*AM2_VObjPollPmf)();
+static inline int32_t ObjVPoll(void *o)
+{ return (((AM2_VObj *)o)->*((AM2_VObjPollPmf *)*(void **)o)[0])(); }
 #else
 typedef void (__attribute__((thiscall)) *AM2_VObjPaintFn)(void *o, AM2_Rect r);
 typedef void (__attribute__((thiscall)) *AM2_VObjUpdateFn)(void *o);
@@ -93,6 +97,9 @@ static inline void ObjVPaint(void *o, AM2_Rect r)
 { ((AM2_VObjPaintFn *)*(void **)o)[1](o, r); }
 static inline void ObjVUpdate(void *o)
 { ((AM2_VObjUpdateFn *)*(void **)o)[2](o); }
+typedef int32_t (__attribute__((thiscall)) *AM2_VObjPollFn)(void *o);
+static inline int32_t ObjVPoll(void *o)
+{ return ((AM2_VObjPollFn *)*(void **)o)[0](o); }
 #endif
 /* An object's own pointer lists: the two thiscall clears (misc.cpp). */
 struct AM2_ObjLists {

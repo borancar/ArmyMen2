@@ -673,11 +673,9 @@ void __cdecl State1Frame(void)
 
         void *obj = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
 
-        if (obj) {
-            void **vtable = *(void ***)obj;
-
-            ((void (__attribute__((thiscall)) *)(void *))vtable[2])(obj);
-        }
+        /* its update virtual, as the thiscall the original makes */
+        if (obj)
+            ObjVUpdate(obj);
     }
 
     State1Common();

@@ -522,18 +522,16 @@ void __cdecl MovieSetCurrent(void *movie)
 void __cdecl MovieStepCurrent(void)
 {
     void *movie = g_movieCurrent;
-    void **vtable;
 
     if (!movie)
         return;
     /* Object, then table, then slot -- three levels, and the middle one is
-     * easy to lose. Slot 0 is MoviePoll. */
-    vtable = *(void ***)movie;
-    (*(int32_t (__attribute__((thiscall)) *)(void *))vtable[0])(movie);
-    /* Re-read the global, as the original does: the call above could have
-     * cleared it. */
-    if (g_movieCurrent)
-        *(int32_t *)((uint8_t *)g_movieCurrent + MOVIE_OFF_FLAG_14) = 0;
+     * easy to lose. Slot 0 is MoviePoll, called thiscall as the original. */
+    ObjVPoll(movie);
+    /* Re-read the global, as the original does -- but NOT tested again: the
+     * original stores through it unconditionally (end of 0x00445630), so a poll
+     * that cleared it would fault there too. It never does. */
+    *(int32_t *)((uint8_t *)g_movieCurrent + MOVIE_OFF_FLAG_14) = 0;
 }
 
 void __cdecl MovieEndCurrent(void)
