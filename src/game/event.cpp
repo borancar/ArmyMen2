@@ -1126,8 +1126,8 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
     int32_t  i    = 0;
 
     while (i < *(const int32_t *)(list + LIST_OFF_COUNT)) {
-        const uint32_t *uids = *(const uint32_t **)(list + LIST_OFF_UIDS);
-        uint8_t        *obj  = (uint8_t *)LookupByUID(uids[i]);
+        uint8_t *obj = (uint8_t *)LookupByUID(
+            (*(const uint32_t **)(list + LIST_OFF_UIDS))[i]);
 
         if (obj == (uint8_t *)0) {
             ListRemoveAt(list, i);
@@ -2089,17 +2089,18 @@ void __cdecl EvtFlag40Set(int32_t name, uint32_t me)
  * defect recorded there does not apply. */
 void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
 {
-    void    *comm = *(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT));
-    int32_t  slot = CommSlotForArmy(comm, army);
-    uint8_t *list = ((uint8_t **)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[slot];
-    int32_t  i    = 0;
+    uint8_t **lists = (uint8_t **)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS));
+    int32_t   slot  = CommSlotForArmy(*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)),
+                                      army);
+    int32_t   i     = 0;
 
-    while (i < *(const int32_t *)(list + LIST_OFF_COUNT)) {
-        const uint32_t *uids = *(const uint32_t **)(list + LIST_OFF_UIDS);
-        uint8_t        *obj  = (uint8_t *)LookupByUID(uids[i]);
+    /* The list pointer is re-read from the table at every use. */
+    while (i < *(const int32_t *)(lists[slot] + LIST_OFF_COUNT)) {
+        uint8_t *obj = (uint8_t *)LookupByUID(
+            (*(const uint32_t **)(lists[slot] + LIST_OFF_UIDS))[i]);
 
         if (obj == (uint8_t *)0) {
-            ListRemoveAt(list, i);
+            ListRemoveAt(lists[slot], i);
             continue;
         }
 
@@ -2113,7 +2114,7 @@ void __cdecl EvtArmySetField(int32_t army, int32_t filter, int32_t value)
             continue;
         }
 
-        if (filter != -1 && (int32_t)ObjFieldA(obj) != filter) {
+        if (filter != -1 && filter != (int32_t)ObjFieldA(obj)) {
             i++;
             continue;
         }

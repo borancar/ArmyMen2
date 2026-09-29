@@ -91,9 +91,8 @@ void *__cdecl LookupOwnerObj(uint32_t owner)
 
     list = (void **)g_armyObjLists[army];
     for (i = 0; i < *(const int32_t *)((uint8_t *)list + LIST_OFF_COUNT); i++) {
-        const uint32_t *uids =
-            *(const uint32_t **)((uint8_t *)list + LIST_OFF_UIDS);
-        AM2_Object *obj = (AM2_Object *)LookupByUID(uids[i]);
+        AM2_Object *obj = (AM2_Object *)LookupByUID(
+            (*(const uint32_t **)((uint8_t *)list + LIST_OFF_UIDS))[i]);
 
         if (obj && obj->type == AM2_OBJ_TYPE_2
             && *(int32_t *)((uint8_t *)obj + OBJ_OFF_LEADS))
@@ -112,9 +111,8 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj))
 
     /* No range check on `army` here, where ArmyLeader has one. */
     while (i < *(const int32_t *)((uint8_t *)list + LIST_OFF_COUNT)) {
-        const uint32_t *uids =
-            *(const uint32_t **)((uint8_t *)list + LIST_OFF_UIDS);
-        AM2_Object     *obj = (AM2_Object *)LookupByUID(uids[i]);
+        AM2_Object     *obj = (AM2_Object *)LookupByUID(
+            (*(const uint32_t **)((uint8_t *)list + LIST_OFF_UIDS))[i]);
         uint8_t        *raw = (uint8_t *)obj;
 
         if (!obj) {
@@ -317,9 +315,8 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
 
     for (seat = *(const int32_t *)(v + VEHICLE_OFF_PTR_LIST + 4) - 1;
          seat >= 0; seat--) {
-        const uint32_t *uids =
-            *(const uint32_t **)(v + VEHICLE_OFF_PTR_LIST + 8);
-        void    *rider = LookupByUID(uids[seat]);
+        void    *rider = LookupByUID(
+            (*(const uint32_t **)(v + VEHICLE_OFF_PTR_LIST + 8))[seat]);
         int32_t  kind;
 
         if (!ExitOneFromVehicle(seat, vehicle)
@@ -347,7 +344,7 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
 
         {
             AM2_Object *dmg   = (AM2_Object *)LookupByUID(damageOwner);
-            int32_t     army  = dmg ? (int32_t)dmg->owner : AM2_ARMY_ALL;
+            int16_t     army  = dmg ? (int16_t)dmg->owner : AM2_ARMY_ALL;
 
             if (g_mpSession
                 && !CommMustBroadcast(*(void **)(uintptr_t)ADDR_COMM_OBJECT,

@@ -1973,9 +1973,8 @@ void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
         *(const int32_t *)(m + AM2_MSG_VALUE);
 
     /* OUR record, not the sender's. */
-    comm = (uint8_t *)kCommObj;
     q = (uint8_t *)FindPlayerById(
-            *(const uint32_t *)(comm + AM2_COMM_SELF_ID));
+            *(const uint32_t *)((uint8_t *)kCommObj + AM2_COMM_SELF_ID));
     if (!q)
         return;
 
@@ -2187,9 +2186,12 @@ void __cdecl MenuMessage(const char *text, int32_t colour, int32_t indicator)
     chatbox = *(uint8_t **)(screen + MP_PANEL_OFF_CHATBOX);
     ObjVPaint(chatbox, *(const AM2_Rect *)(chatbox + 0x14));
 
-    BlinkerStart(*(void **)(screen + (indicator ? MP_PANEL_OFF_BLINKER_1
-                                                : MP_PANEL_OFF_BLINKER_0)),
-                 AM2_BLINK_PERIOD, AM2_BLINK_FLASHES);
+    if (indicator)
+        (*(AM2_BlinkerOps **)(screen + MP_PANEL_OFF_BLINKER_1))
+            ->BlinkerStart(AM2_BLINK_PERIOD, AM2_BLINK_FLASHES);
+    else
+        (*(AM2_BlinkerOps **)(screen + MP_PANEL_OFF_BLINKER_0))
+            ->BlinkerStart(AM2_BLINK_PERIOD, AM2_BLINK_FLASHES);
 }
 
 /* 0x00430120. The local half and the remote half of one announcement, and
@@ -3661,8 +3663,8 @@ void __cdecl RecvVehicle1C(void *msg)
     if (veh == 0)
         return;
 
-    *(int32_t *)(veh + UNIT_OFF_FIRE_ACTIVE) = 1;
     *(uint8_t *)(veh + OBJ_OFF_FIELD_530)    = *(const uint8_t *)(m + 0x12);
+    *(int32_t *)(veh + UNIT_OFF_FIRE_ACTIVE) = 1;
     *(int16_t *)(veh + UNIT_OFF_FIRE_X)      = *(const int16_t *)(m + 0x0C);
     *(int16_t *)(veh + UNIT_OFF_FIRE_Y)      = *(const int16_t *)(m + 0x0E);
     *(int16_t *)(veh + UNIT_OFF_FIRE_Z)      = *(const int16_t *)(m + 0x10);

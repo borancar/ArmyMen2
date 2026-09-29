@@ -1557,7 +1557,7 @@ uint32_t __cdecl UnitTypeCost(int32_t type)
 
 void __cdecl ConsumeKey(int32_t dik)
 {
-    uint32_t k = (uint32_t)dik & 0xFFu;
+    uint8_t k = (uint8_t)dik;
 
     g_prevKeys[k] = g_curKeys[k];
     g_keyPressed[k] = 0;
@@ -2189,12 +2189,9 @@ void __cdecl MovieBuildName(char *dst, const char *name)
 int32_t __cdecl SeqStepKind2(int32_t at, void *rec, void *ctx)
 {
     uint8_t *row = *(uint8_t **)((uint8_t *)rec + SEQ_OFF_ROW);
-    uint32_t n   = *(const uint32_t *)(row + ROW_OFF_STAMP_54) + 1;
 
     (void)at;
-    *(uint32_t *)(row + ROW_OFF_STAMP_54) = n;
-
-    if (n > 1)
+    if (++*(uint32_t *)(row + ROW_OFF_STAMP_54) > 1)
         return SeqRetire(ctx, rec);
 
     RowUpdate(row, 1, (void *)(uintptr_t)ADDR_MAP_DESC);

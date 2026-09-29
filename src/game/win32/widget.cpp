@@ -10967,10 +10967,10 @@ void __cdecl OptionsApply(AM2_Widget *button)
 void __cdecl OptionsRequest(void)
 {
     PlaySoundAt(2, 0, 0, 0, 0);
-    g_menuRequestSet = 1;
     g_menuRequest = *(const int32_t *)(g_commObject + COMM_OFF_IS_HOST)
                     ? AM2_MENU_REQUEST_OPTIONS
                     : AM2_MENU_REQUEST_OPTIONS_VIEW;
+    g_menuRequestSet = 1;
 }
 
 void __cdecl OptionsSyncGroup(AM2_Widget *header)
@@ -11145,11 +11145,11 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
  * working value, which is why the prototype is uint8_t. */
 uint8_t __cdecl MpNameInk(int32_t row)
 {
-    const uint8_t *comm = g_commObject;
-    uint32_t       id   = *(const uint32_t *)(comm
-                                              + (uint32_t)row * AM2_PLAYER_STRIDE
-                                              + AM2_PLAYER_ID);
-    int32_t        ms   = PlayerLatency(id);
+    const uint8_t *comm;
+    uint32_t       id;
+    int32_t        ms   = PlayerLatency(*(const uint32_t *)(g_commObject
+                                          + (uint32_t)row * AM2_PLAYER_STRIDE
+                                          + AM2_PLAYER_ID));
     uint8_t        ink  = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
     const uint8_t *player;
 
@@ -13264,7 +13264,7 @@ void __cdecl OnRecruit(AM2_Widget *w)
 void __cdecl OnDeletePlayer(AM2_Widget *w)
 {
     (void)w;
-    if (!strlen(g_currentPlayer)) {
+    if (strlen(g_currentPlayer) < 1) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
@@ -13280,7 +13280,7 @@ void __cdecl OnSelectPlayer(AM2_Widget *w)
     void *level = (void *)0;
 
     (void)w;
-    if (strlen(g_currentPlayer))
+    if (strlen(g_currentPlayer) >= 1)
         level = FindLevelRecord(1);
     if (!level) {
         PlaySoundAt(3, 0, 0, 0, 0);
@@ -13476,12 +13476,13 @@ void __cdecl LoadGameRow(AM2_Widget *list, AM2_ListRows *rows,
  * from the first row -- so DELETE works on a screen nobody has clicked. */
 void __cdecl OnLoadGameDelete(AM2_Widget *w)
 {
-    const char *name = (const char *)g_paintObject + LOAD_GAME_OFF_NAME;
+    const char *name;
 
     (void)w;
     if (!g_paintObject)
         return;
-    if (!strlen(name)) {
+    name = (const char *)g_paintObject + LOAD_GAME_OFF_NAME;
+    if (strlen(name) < 1) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
@@ -13548,7 +13549,7 @@ void __cdecl OnLoadGameLoad(AM2_Widget *w)
     if (!g_paintObject)
         return;
     name = (const char *)g_paintObject + LOAD_GAME_OFF_NAME;
-    if (!strlen(name)) {
+    if (strlen(name) < 1) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }

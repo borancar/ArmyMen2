@@ -1532,9 +1532,9 @@ void __cdecl DrawRectFast(const AM2_Rect *r, int32_t colour)
                        (const RECT *)(uintptr_t)ADDR_SCREEN_CLIP))
         return;
 
+    width  = vis.right - vis.left + 1;
     top    = g_framebuffer + (int32_t)g_pitch * vis.top    + vis.left;
     bottom = g_framebuffer + (int32_t)g_pitch * vis.bottom + vis.left;
-    width  = vis.right - vis.left + 1;
 
     memset(top,    (uint8_t)colour, (size_t)width);
     memset(bottom, (uint8_t)colour, (size_t)width);
