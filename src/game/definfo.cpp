@@ -579,7 +579,7 @@ int definfo_install(void)
  * between the two sees an empty table rather than a live count over freed
  * memory. Writing the three stores together after the free would be tidier
  * and would lose that. */
-static void FreeDefTable(void **recs, int32_t *count, int32_t *other)
+static inline void FreeDefTable(void **recs, int32_t *count, int32_t *other)
 {
     void *p = *recs;
 

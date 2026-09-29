@@ -107,7 +107,7 @@ extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
 
 #define kCommObj (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
 
-static void SendValueMsg(uintptr_t record, int32_t value, const char *fmt)
+static inline void SendValueMsg(uintptr_t record, int32_t value, const char *fmt)
 {
     const uint8_t *comm = kCommObj;
 

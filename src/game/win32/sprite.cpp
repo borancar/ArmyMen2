@@ -2644,22 +2644,21 @@ void __cdecl FreeSpriteGroupsC(void)
  * unconditionally, the third skips a NULL record, and this one returns at
  * once if the whole grid is NULL. Same job, three shapes, and a helper across
  * any two of them erases the difference. */
-static void LoadGrid(const int32_t *rowsAt, const int32_t *colsAt,
+static inline void LoadGrid(const int32_t *rowsAt, const int32_t *colsAt,
                      AM2_Sprite ***gridAt, int32_t indexBase)
 {
-    int32_t rows = *rowsAt;
-    int32_t cols = *colsAt;
     AM2_Sprite **grid;
     int32_t row, col;
 
-    grid = (AM2_Sprite **)am2_malloc((size_t)(rows * cols)
+    /* The dimensions are globals, re-read at every use as the original does. */
+    grid = (AM2_Sprite **)am2_malloc((size_t)(*rowsAt * *colsAt)
                                      * sizeof(AM2_Sprite *));
     *gridAt = grid;
-    memset(grid, 0, (size_t)(rows * cols) * sizeof(AM2_Sprite *));
+    memset(grid, 0, (size_t)(*rowsAt * *colsAt) * sizeof(AM2_Sprite *));
 
-    for (row = 0; row < rows; row++)
-        for (col = 0; col < cols; col++)
-            grid[row * cols + col] =
+    for (row = 0; row < *rowsAt; row++)
+        for (col = 0; col < *colsAt; col++)
+            (*gridAt)[row * *colsAt + col] =
                 PreloadSprite(AM2_SPRITEGRP_SET, indexBase + row,
                               col, AM2_SPRITEGRP_C_FLAGS, 1);
 }
