@@ -5956,15 +5956,17 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
     else if (*(const int32_t *)((const uint8_t *)*(AM2_Widget *const *)
                                     (uintptr_t)ADDR_HUD_WIDGET_B
                                 + HUDPANEL_OFF_OPEN)) {
+/* The row's record, indexed afresh at each use: a local pointer moves the
+ * loop's induction bias off the record base. */
+#define SARGE_REC (self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE)
         for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
-            const uint8_t *rec = self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE;
             AM2_Rect       cell;
             uint32_t       uid;
 
 /* The row's sprite, looked up again at each use. */
 #define SARGE_SPR (*(AM2_Sprite **)(self + HUDSARGE_OFF_SPRITES \
-                    + *(const int32_t *)(rec + HUDSARGE_REC_INDEX) * 4))
-            if (*(const int32_t *)(rec + HUDSARGE_REC_INDEX) < 0)
+                    + *(const int32_t *)(SARGE_REC + HUDSARGE_REC_INDEX) * 4))
+            if (*(const int32_t *)(SARGE_REC + HUDSARGE_REC_INDEX) < 0)
                 continue;
             if (!SARGE_SPR)
                 continue;
@@ -6015,6 +6017,7 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
         }
     }
 
+#undef SARGE_REC
     /* Pass three: rebuild every record from the inventory. */
     for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
         const uint8_t *item;
@@ -6129,21 +6132,23 @@ void __attribute__((thiscall)) AM2_Widget::HudSargePaint(RECT clip)
         DrawSpriteClipped(SARGE_SPRITE, x, y, &part, 0);
 #undef SARGE_SPRITE
 
-        if (*(const int32_t *)(rec + HUDSARGE_REC_COUNT) < 0)
-            continue;
+        /* A row with no count still reaches the unlock, having taken no lock;
+         * UnlockSurface ignores that, so it is harmless, and it is the
+         * original's shape. */
+        if (*(const int32_t *)(rec + HUDSARGE_REC_COUNT) >= 0) {
+            if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+                return;
 
-        if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
-            return;
+            ((int32_t (__cdecl *)(char *, const char *, ...))
+                ((void *)(uintptr_t)(ADDR_GAME_SPRINTF)))(
+                    text, "%d", *(const int32_t *)(rec + HUDSARGE_REC_COUNT));
 
-        ((int32_t (__cdecl *)(char *, const char *, ...))
-            ((void *)(uintptr_t)(ADDR_GAME_SPRINTF)))(
-                text, "%d", *(const int32_t *)(rec + HUDSARGE_REC_COUNT));
-
-        width = AM2_HUD_SARGE_CELL_W
-                - TextExtent(text, AM2_HUD_SARGE_FONT, (int32_t *)0);
-        DrawText(width + box.left,
-                 box.top + AM2_HUD_SARGE_TEXT_DY,
-                 text, AM2_HUD_SARGE_FONT, 0, AM2_HUD_SARGE_INK);
+            width = AM2_HUD_SARGE_CELL_W
+                    - TextExtent(text, AM2_HUD_SARGE_FONT, (int32_t *)0);
+            DrawText(width + box.left,
+                     box.top + AM2_HUD_SARGE_TEXT_DY,
+                     text, AM2_HUD_SARGE_FONT, 0, AM2_HUD_SARGE_INK);
+        }
 
         UnlockSurface();
     }
@@ -7279,18 +7284,18 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
         if (*(const int32_t *)(CTX + UNIT_OFF_INVENTORY_SEL) > 0)
             slots[2] = 3;
     } else if (ObjIsType3((const AM2_Object *)CTX)) {
-        /* A vehicle offers Sarge's two only when he is its first occupant,
-         * and nothing otherwise. The image's `jmp` into the trooper arm's
-         * null test arrives with eax already 0 -- jump threading, not a
-         * shared ending -- which this once read as "a vehicle without Sarge
-         * gets the trooper commands". */
+        /* A vehicle offers Sarge's two when he is its first occupant, and
+         * otherwise the trooper's three: the image's `je 0x004173F6` lands
+         * on the trooper arm's first store, past its type test. */
         if (ObjType2Field548((const AM2_Object *)ListFirstObj(CTX))) {
             slots[0] = 1;
             slots[1] = 2;
-        }
+        } else
+            goto trooper;
     } else if (CTX) {
         switch (*(const int32_t *)CTX) {
         case AM2_OBJ_TYPE_TROOPER:
+        trooper:
             slots[0] = 4;
             slots[1] = 5;
             slots[2] = 6;
@@ -7614,39 +7619,41 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
  * offset for them is exactly the mistake CLAUDE.md warns about. */
 void __cdecl HudChatChar(uint32_t ch, uint32_t lo, uint32_t hi)
 {
-    AM2_Widget *w = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A;
     int32_t     len;
 
     (void)lo;
     (void)hi;
-    if (!w) {
+/* The chat widget, read from its global at each use: with a local the
+ * stores' address operands come out the other way round. */
+#define CHAT_W (*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A)
+    if (!CHAT_W) {
         orig_log("Error: Key handler not freed\n");
         return;
     }
 
-    len = (int32_t)strlen((char *)w + HUDLOG_OFF_TYPED);
+    len = (int32_t)strlen((char *)CHAT_W + HUDLOG_OFF_TYPED);
 
     /* Two shared exits -- the refusal sound and the click -- which is why
      * this is an if/else ladder rather than early returns. */
     if (ch >= 0x20 && ch < 0x80) {
         if (len < AM2_HUD_CHAT_TYPED_MAX) {
-            ((char *)w)[HUDLOG_OFF_TYPED + len] = (char)ch;
-            ((char *)*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A)
-                [HUDLOG_OFF_TYPED + len + 1] = 0;
+            ((char *)CHAT_W)[HUDLOG_OFF_TYPED + len] = (char)ch;
+            ((char *)CHAT_W)[HUDLOG_OFF_TYPED + len + 1] = 0;
             PlaySoundAt(0, 0, 0, 0, 0);
         } else {
             PlaySoundAt(3, 0, 0, 0, 0);
         }
     } else if (ch == 8) {               /* backspace */
         if (len > 0) {
-            ((char *)w)[HUDLOG_OFF_TYPED + len - 1] = 0;
+            ((char *)CHAT_W)[HUDLOG_OFF_TYPED + len - 1] = 0;
             PlaySoundAt(0, 0, 0, 0, 0);
         } else {
             PlaySoundAt(3, 0, 0, 0, 0);
         }
     } else if (ch == 0xD) {             /* RETURN -- a tail call there */
-        HudChatSend(w);
+        HudChatSend(CHAT_W);
     }
+#undef CHAT_W
 }
 
 /* 0x00418660. The top strip's own update, and the counterpart to the paint

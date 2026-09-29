@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 869 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 876 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 869:
+  the near-miss sweep, 758 before the row pools. From 758 to 876:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -93,19 +93,29 @@ main result so far (details in `src/vc6/README.md`):
     bar volume (not BarVolume's silence substitute); LoadType3 passes the
     saved slot as CreateVehicle's `table` (it read +0x494); the build-menu
     tooltips pair each name with its own button's rectangle (they were one
-    button to the right); a vehicle without Sarge first offers no commands
-    (ours offered the trooper's three); partly clipped HUD command icons
+    button to the right); partly clipped HUD command icons
     draw at ClipRect's adjusted position; a missing squad pip sprite skips
     that pip instead of ending the row; the Typer wraps at a 0x100-byte
     line (the constant had been read off its 0x10C frame).
+  - **A "fix" undone**: a vehicle whose first occupant is not Sarge
+    offers the trooper's three commands. Relink 869 briefly made it offer
+    nothing, from a branch target misread as the trooper arm's null test;
+    `je 0x004173F6` lands on its first store.
   - **Close but not matched**: HudSargeUpdate and HudTopPaint are within
     a few instructions; HudEdgeUpdate's two switches follow the
     original's jump tables and what remains is register choice.
+  - **`[a + b]` operand order follows how the base is spelled**: a local
+    alias of a parameter or global (`o = (uint8_t *)obj`, `w = g_widget`)
+    flips `rows + i*stride` and `[w + len]`. Casting the parameter or
+    re-reading the global at each use matches SubrecHideRows, ObjConceal,
+    DestroyObjCommon and HudChatChar; StepObjRows needs the alias
+    everywhere except the row address.
+  - **ObjConceal fixed**: an object with BIT4 set that is not a type-2
+    keeps REVEALED (ours cleared it).
   - **Parked**: the five copy-protection call sites (OnStartWar and four
     more) cannot match while the reference keeps GOG's `jmp`s -- a policy
-    question, not a source one; a `rows + i*stride` operand order
-    (SubrecHideRows, StepObjRows, ObjConceal, DestroyObjCommon) no source
-    form tried reproduces; MultiSpritePaint and OverlayPrepare scheduling.
+    question, not a source one; MultiSpritePaint and OverlayPrepare
+    scheduling; HudTopPaint's two swapped loads.
 
   From 719 to 758:
   - **The title screen and the remaining openers match**, and the relink's

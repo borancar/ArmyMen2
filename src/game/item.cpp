@@ -4212,18 +4212,17 @@ void __cdecl DestroyType8(void *obj)
  * sends nothing. */
 void __cdecl DestroyObjCommon(void *obj)
 {
-    uint8_t *o = (uint8_t *)obj;
     uint32_t next;
     int32_t  insertAt;
     int32_t  i;
 
     if (!obj)
         return;
-    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG8_BLOCKED)
+    if (*(const uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) & OBJ_FLAG8_BLOCKED)
         return;
 
-    for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
-        uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS)
+    for (i = 0; i < *(const int32_t *)((uint8_t *)obj + OBJ_OFF_ROW_COUNT); i++) {
+        uint8_t *row = *(uint8_t **)((uint8_t *)obj + OBJ_OFF_ROWS)
                        + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
         ObjFlagClear0(row);
@@ -4233,15 +4232,15 @@ void __cdecl DestroyObjCommon(void *obj)
     if (ObjIsItem((const AM2_Object *)obj))
         ItemTeardown(obj);
 
-    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & 1u)
+    if (*(const uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) & 1u)
         ItemPreDestroyAlias(obj, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
 
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG8_BLOCKED;
+    *(uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) |= OBJ_FLAG8_BLOCKED;
 
     if (!ObjIsItem((const AM2_Object *)obj))
         return;
 
-    next = *(const uint32_t *)(o + OBJ_OFF_CHAIN_UID);
+    next = *(const uint32_t *)((uint8_t *)obj + OBJ_OFF_CHAIN_UID);
     while (next) {
         int32_t  slot = FindSlot(next, &insertAt);
         uint8_t *cur  = (slot >= 0) ? (uint8_t *)g_objTable[slot].obj : 0;
@@ -7860,9 +7859,12 @@ void __cdecl StepObjRows(void *obj)
     uint8_t *o = (uint8_t *)obj;
     int32_t  i;
 
+    /* The row address goes through the parameter and everything else through
+     * `o`. Observed, not understood: with `o` throughout, or with no `o` at
+     * all, VC6 emits `i*stride + rows` where the image has `rows + i*stride`. */
     for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++)
-        StepRowAnim(*(uint8_t **)(o + OBJ_OFF_ROWS)
-                           + (uint32_t)i * AM2_OBJ_ROW_STRIDE);
+        StepRowAnim(*(uint8_t **)((uint8_t *)obj + OBJ_OFF_ROWS)
+                    + (uint32_t)i * AM2_OBJ_ROW_STRIDE);
 
     if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0)
         *(int32_t *)(o + OBJ_OFF_FIELD_44) =

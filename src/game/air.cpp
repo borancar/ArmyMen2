@@ -358,32 +358,29 @@ void __cdecl RevealObj(void *obj)
  * one, which needs a typed cheat code this project does not drive. */
 void __cdecl ObjConceal(void *obj, int32_t force)
 {
-    uint8_t *o = (uint8_t *)obj;
-    uint32_t flags;
     int32_t  i;
 
     if (!obj)
         return;
 
-    flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS);
-    if (flags & OBJ_FLAG_CONCEALED)
+    if (*(const uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) & OBJ_FLAG_CONCEALED)
         return;
 
-    if (!(flags & OBJ_FLAG_BIT4)
-        || !ObjIsType2((const AM2_Object *)obj)
-        || *(const int32_t *)(o + OBJ_OFF_FIELD_530) != 5) {
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) =
-            *(const uint32_t *)(o + OBJ_OFF_FLAGS)
-            & ~(uint32_t)OBJ_FLAG_REVEALED;
-    }
+    /* A BIT4 object keeps REVEALED unless it is a type-2 whose +0x530 is not
+     * 5: the image's failed ObjIsType2 jumps past the clear (0x00429671). */
+    if (!(*(const uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT4))
+        *(uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_REVEALED;
+    else if (ObjIsType2((const AM2_Object *)obj)
+             && *(const int32_t *)((uint8_t *)obj + OBJ_OFF_FIELD_530) != 5)
+        *(uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_REVEALED;
 
     if (*(const int32_t *)(uintptr_t)ADDR_FOG_OF_WAR && !force)
         return;
 
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_CONCEALED;
+    *(uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS) |= OBJ_FLAG_CONCEALED;
 
-    for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
-        uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS)
+    for (i = 0; i < *(const int32_t *)((uint8_t *)obj + OBJ_OFF_ROW_COUNT); i++) {
+        uint8_t *row = *(uint8_t **)((uint8_t *)obj + OBJ_OFF_ROWS)
                        + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
 
         *(uint32_t *)row |= (uint32_t)ROW_FLAG_REMOVED;

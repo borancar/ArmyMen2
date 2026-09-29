@@ -228,11 +228,12 @@ int32_t __cdecl Type2Field5A4Set(const AM2_Object *obj)
  */
 void __cdecl SubrecHideRows(void *subrec)
 {
-    uint8_t *sr = (uint8_t *)subrec;
     int32_t  i;
 
-    for (i = 0; i < *(const int32_t *)(sr + SUBREC_OFF_COUNT); i++)
-        ObjFlagClear0(*(uint8_t **)(sr + SUBREC_OFF_ROWS)
+    /* The parameter itself, cast at each use: a local copy of it turns the
+     * row address into `i*stride + rows` rather than `rows + i*stride`. */
+    for (i = 0; i < *(const int32_t *)((uint8_t *)subrec + SUBREC_OFF_COUNT); i++)
+        ObjFlagClear0(*(uint8_t **)((uint8_t *)subrec + SUBREC_OFF_ROWS)
                       + (uint32_t)i * AM2_OBJ_ROW_STRIDE);
 }
 
