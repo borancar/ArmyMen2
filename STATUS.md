@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1343 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1344 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1343:
+  the near-miss sweep, 758 before the row pools. From 758 to 1344:
   - **A member array re-read after every store** (KeyRowUpdate): the
     dialog's row pointers are `parent->rows[i]` through a typed struct, not a
     local `rows[i]` copy -- the image reloads the element after each store.
@@ -163,7 +163,9 @@ main result so far (details in `src/vc6/README.md`):
     through the NULL it produces, as the original does (it had returned
     NULL); DepthInsert's equal-depth insert guards a null successor before
     linking it back, as the image does (the shared link-after helper it
-    had used did not, and a tail cursor would have written through NULL).
+    had used did not, and a tail cursor would have written through NULL);
+    StepType6's crater-spawn test reads the cell weight SIGNED, as the
+    image's `jl` does (a weight byte >= 0x80 no longer counts as blocked).
     Found by comparing each function's image extent with ours --
     `src/vc6/extent.py`, a branch-reachability sweep -- since the relink json
     slices the image to OUR length and hides code we omitted.

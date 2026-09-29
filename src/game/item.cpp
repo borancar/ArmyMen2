@@ -11845,7 +11845,6 @@ void __cdecl StepType6(void *obj)
 {
     uint8_t   *o = (uint8_t *)obj;
     uint8_t   *victim;
-    AM2_Point *pos = (AM2_Point *)(o + OBJ_OFF_POS);
 
     if (*(const uint32_t *)(o + BLAST_OFF_DUE_MS) > 0) {
         if (*(const uint32_t *)(o + BLAST_OFF_DUE_MS)
@@ -11856,7 +11855,9 @@ void __cdecl StepType6(void *obj)
     }
 
     if (*(const int32_t *)(o + BLAST_OFF_SOUND_PENDING) != 0) {
-        PlaySoundAt(AM2_BLAST_SOUND, 0, 0, pos->x, pos->y);
+        PlaySoundAt(AM2_BLAST_SOUND, 0, 0,
+                    *(const int16_t *)(o + OBJ_OFF_POS),
+                    *(const int16_t *)(o + OBJ_OFF_POS + 2));
         *(int32_t *)(o + BLAST_OFF_SOUND_PENDING) = 0;
     }
 
@@ -11870,34 +11871,40 @@ void __cdecl StepType6(void *obj)
         for (; victim != 0;
              victim = *(uint8_t **)(victim + OBJ_OFF_QUERY_NEXT)) {
             int32_t dmg = *(const int32_t *)(o + BLAST_OFF_DAMAGE);
-            int32_t kind = 1;
 
             if (ObjIsType2((const AM2_Object *)victim)
                 && ClassifyByCode74(victim) == 2)
                 dmg = *(const int32_t *)(o + BLAST_OFF_DAMAGE) >> 1;
 
+            /* One call per kind, as the image has them; the direction is a
+             * byte. */
             if (*(const int32_t *)(o + OBJ_OFF_FIELD_94) != 0x89
                 && (orig_rand() & 0x255) >= 0x40)
-                kind = 3;
-
-            DamageObject(victim, dmg, kind,
-                         *(const uint32_t *)(o + BLAST_OFF_SOURCE_UID),
-                         orig_rand() % 0xFF + 1, 0);
+                DamageObject(victim, dmg, 3,
+                             *(const uint32_t *)(o + BLAST_OFF_SOURCE_UID),
+                             (uint8_t)(orig_rand() % 0xFF + 1), 0);
+            else
+                DamageObject(victim, dmg, 1,
+                             *(const uint32_t *)(o + BLAST_OFF_SOURCE_UID),
+                             (uint8_t)(orig_rand() % 0xFF + 1), 0);
         }
 
         *(int32_t *)(o + BLAST_OFF_DAMAGE) = 0;
 
         if (*(const int32_t *)(o + BLAST_OFF_MODE) >= 5) {
+            /* x through the point, y straight off the object -- the image
+             * reads them that way. */
+            AM2_Point *pos = (AM2_Point *)(o + OBJ_OFF_POS);
             int32_t  spin = orig_rand() % 6;
-            int32_t  tile;
+            uint16_t tile;
 
-            PlaceGroundDecal(pos->x, pos->y, spin);
-            tile = TileOfPoint(*(const uint32_t *)pos) & 0xFFFF;
+            PlaceGroundDecal(pos->x, *(const int16_t *)(o + OBJ_OFF_POS + 2), spin);
+            tile = (uint16_t)TileOfPoint(*(const uint32_t *)pos);
 
             if ((( *(const uint8_t **)(uintptr_t)ADDR_TILE_FLAGS)[tile] & 1)
-                && (*(const uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS)[tile]
-                   >= AM2_BLOCK_CLEAR)
-                orig_spawn_at(pos->x, pos->y, 0x90,
+                && (*(const int8_t **)(uintptr_t)ADDR_CELL_WEIGHTS)[tile]
+                   >= AM2_BLOCK_CLEAR)     /* signed, as the image's `jl` */
+                orig_spawn_at(pos->x, *(const int16_t *)(o + OBJ_OFF_POS + 2), 0x90,
                               *(const int8_t *)(o + OBJ_OFF_ARMY),
                               *(const uint32_t *)(o + BLAST_OFF_SOURCE_UID),
                               0, 0xC8, 0, 0, 0);
