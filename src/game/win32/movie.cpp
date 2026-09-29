@@ -120,6 +120,42 @@ typedef void (__stdcall *am2_smack_volumepan_fn)(void *smack, uint32_t trackFlag
 #define smack_wait      (*(am2_smack_ddtype_fn *)(uintptr_t)ADDR_IAT_SMACK_WAIT)
 #define smack_ddtype    (*(am2_smack_ddtype_fn *)(uintptr_t)ADDR_IAT_SMACK_DDTYPE)
 #define smack_use_dsound (*(am2_smack_use_dsound_fn *)(uintptr_t)ADDR_IAT_SMACK_USE_DSOUND)
+#if defined(_MSC_VER)
+/* Under VC6 the imports are what the original declared: dllimport, so a
+ * function called repeatedly has its IAT slot loaded into a register once. */
+extern "C" {
+__declspec(dllimport) void __stdcall SmackVolumePan(void *smack, uint32_t trackFlags,
+                                                   uint32_t volume, uint32_t pan);
+__declspec(dllimport) void __stdcall SmackToBuffer(void *smack, uint32_t left, uint32_t top,
+                                                  uint32_t pitch, uint32_t destHeight,
+                                                  void *dest, uint32_t flags);
+__declspec(dllimport) void __stdcall SmackDoFrame(void *smack);
+__declspec(dllimport) void __stdcall SmackNextFrame(void *smack);
+__declspec(dllimport) uint32_t __stdcall SmackWait(void *smack);
+__declspec(dllimport) void __stdcall SmackClose(void *smack);
+__declspec(dllimport) void __stdcall SmackSoundUseDirectSound(void *dsound);
+__declspec(dllimport) void *__stdcall SmackOpen(const char *name, uint32_t flags, uint32_t extra);
+__declspec(dllimport) uint32_t __stdcall SmackDDSurfaceType(void *surface);
+}
+#undef smack_volumepan
+#undef smack_tobuffer
+#undef smack_doframe
+#undef smack_nextframe
+#undef smack_wait
+#undef smack_close
+#undef smack_use_dsound
+#undef smack_open
+#undef smack_ddtype
+#define smack_volumepan  SmackVolumePan
+#define smack_tobuffer   SmackToBuffer
+#define smack_doframe    SmackDoFrame
+#define smack_nextframe  SmackNextFrame
+#define smack_wait(s)    SmackWait((void *)(s))
+#define smack_close      SmackClose
+#define smack_use_dsound SmackSoundUseDirectSound
+#define smack_open       SmackOpen
+#define smack_ddtype(s)  SmackDDSurfaceType((void *)(s))
+#endif
 
 /* Smack handle fields used only by the opener. */
 #define SMACK_WIDTH   0x004u
@@ -220,15 +256,17 @@ void __attribute__((thiscall)) AM2_Movie::MovieSetVolume(int32_t volume)
 {
     void *movie = this;
 
-    uint32_t track;
-    int32_t  i;
-
     if (!g_movieSoundReady)
         return;
 
-    for (i = 0, track = SMACK_TRACK_FIRST; i < SMACK_TRACK_COUNT; i++, track <<= 1)
-        smack_volumepan(fld(movie, MOVIE_SMACK, void *), track,
-                        (uint32_t)volume, SMACK_PAN_CENTRE);
+    /* Seven calls written out, one per track bit -- no loop in the image. */
+    smack_volumepan(fld(movie, MOVIE_SMACK, void *), 0x0002000u, (uint32_t)volume, SMACK_PAN_CENTRE);
+    smack_volumepan(fld(movie, MOVIE_SMACK, void *), 0x0004000u, (uint32_t)volume, SMACK_PAN_CENTRE);
+    smack_volumepan(fld(movie, MOVIE_SMACK, void *), 0x0008000u, (uint32_t)volume, SMACK_PAN_CENTRE);
+    smack_volumepan(fld(movie, MOVIE_SMACK, void *), 0x0010000u, (uint32_t)volume, SMACK_PAN_CENTRE);
+    smack_volumepan(fld(movie, MOVIE_SMACK, void *), 0x0020000u, (uint32_t)volume, SMACK_PAN_CENTRE);
+    smack_volumepan(fld(movie, MOVIE_SMACK, void *), 0x0040000u, (uint32_t)volume, SMACK_PAN_CENTRE);
+    smack_volumepan(fld(movie, MOVIE_SMACK, void *), 0x0080000u, (uint32_t)volume, SMACK_PAN_CENTRE);
 }
 
 /* Original: 0x00445320, 2 call sites. Push the film's palette to the display.
@@ -401,10 +439,10 @@ AM2_Movie::AM2_Movie(const char *name, int32_t wantW, int32_t wantH, int32_t big
     fld(movie, MOVIE_DD_TYPE, uint32_t) =
         smack_ddtype(fld(movie, MOVIE_SURFACE, LPDIRECTDRAWSURFACE));
 
-    /* Called with `this` in ecx, and ignores it -- it reads only globals, takes
-     * no stack arguments and ends in a plain `ret`, so our cdecl declaration of
-     * it is ABI-identical. */
-    SnapshotSystemPalette();
+    /* A member: called with `this` in ecx, which it ignores. Being C++ is
+     * also what makes this constructor one that may throw, which is why
+     * PlayMovie's `new` carries an EH state. */
+    this->SnapshotSystemPalette();
 }
 
 #if defined(__GNUC__)

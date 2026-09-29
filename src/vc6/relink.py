@@ -182,7 +182,9 @@ def import_va(sym, imap):
     if not sym.startswith("__imp_"):
         return None
     core = sym[len("__imp_"):].lstrip("_").split("@")[0]
-    return imap.get(core)
+    # A DLL that exports decorated stdcall names (smackw32: _SmackOpen@12) is
+    # imported under the decorated name itself.
+    return imap.get(core, imap.get(sym[len("__imp_"):]))
 
 
 def parse_coff_full(path):

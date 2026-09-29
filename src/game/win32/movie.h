@@ -17,6 +17,9 @@ struct AM2_Movie {
     static void operator delete(void *p);
 #endif
     void __attribute__((thiscall)) MovieStop();
+    /* 0x00445170, in the movie's own address band and called with the movie
+     * in ecx: a member that ignores `this`. Defined in palette.cpp. */
+    void __attribute__((thiscall)) SnapshotSystemPalette();
     void __attribute__((thiscall)) MovieSetVolume(int32_t volume);
     void __attribute__((thiscall)) MovieApplyPalette(LPDIRECTDRAWSURFACE surf);
     int32_t __attribute__((thiscall)) MovieStart(void *arg);

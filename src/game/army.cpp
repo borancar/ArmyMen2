@@ -775,10 +775,9 @@ int32_t __cdecl ObjIsOurs(void *obj, int32_t allies)
 
     if (army == mine)
         return 1;
-    if (!allies)
-        return 0;
-
-    return AllyFlag(army, mine) ? 1 : 0;
+    if (allies && AllyFlag(army, mine))
+        return 1;
+    return 0;
 }
 
 /* ObjIsLiveTarget -- original 0x00403660, one call site (which the aligned

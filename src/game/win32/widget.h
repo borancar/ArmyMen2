@@ -322,6 +322,7 @@ AM2_CLASS_VTABLE(AM2_MpPanelScreen, VTABLE_MP_PANEL)
  * original's address) are in misc.h, which the flat half shares. */
 
 struct AM2_Panel : AM2_Widget {
+    typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_Panel[AM2_PANEL_SIZE - sizeof(AM2_Widget)];
     AM2_Panel(const char *bmp, int32_t flag, AM2_Rect box);
     explicit AM2_Panel(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
@@ -329,6 +330,7 @@ struct AM2_Panel : AM2_Widget {
 };
 
 struct AM2_ScreenBase : AM2_Panel {
+    typedef AM2_Panel Base;       /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_ScreenBase[0x64 - sizeof(AM2_Panel)];
     AM2_ScreenBase(const char *bmp, int32_t flag);
     explicit AM2_ScreenBase(AM2_Widget::AM2_NoInit n) : AM2_Panel(n) { }
@@ -336,6 +338,7 @@ struct AM2_ScreenBase : AM2_Panel {
 };
 
 struct AM2_Label : AM2_Widget {
+    typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
     const char *text;               /* 0x0058  LABEL_OFF_TEXT */
     int32_t     font;               /* 0x005C  LABEL_OFF_FONT */
     uint8_t     ink;                /* 0x0060  LABEL_OFF_INK */
@@ -366,6 +369,7 @@ struct AM2_ButtonBase : AM2_Widget {
 };
 
 struct AM2_Button : AM2_ButtonBase {
+    typedef AM2_ButtonBase Base;  /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_Button[AM2_BUTTON_SIZE - sizeof(AM2_ButtonBase)];
     AM2_Button(const char *b0, const char *b1, const char *b2, int32_t flag, AM2_Rect box, void (__cdecl *onLeft)(AM2_Widget *), void (__cdecl *onRight)(AM2_Widget *));
     explicit AM2_Button(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
@@ -376,6 +380,7 @@ struct AM2_Button : AM2_ButtonBase {
  * arrow constructor exists in the image; each `new` site carries the Button
  * call, the vtable store and the owner store itself. */
 struct AM2_Arrow : AM2_Button {
+    typedef AM2_Button Base;      /* VC6's C2437: see AM2_TextList */
     AM2_Widget *owner;              /* 0x0078  ARROW_OFF_OWNER */
     AM2_Arrow(AM2_Widget *owner_, AM2_Rect box, const char *b1, const char *b2,
               void (__cdecl *onLeft)(AM2_Widget *))
@@ -388,6 +393,7 @@ struct AM2_Arrow : AM2_Button {
 };
 
 struct AM2_CheckBox : AM2_ButtonBase {
+    typedef AM2_ButtonBase Base;  /* VC6's C2437: see AM2_TextList */
     AM2_Sprite *sprOn;              /* 0x0068  CHECKBOX_OFF_SPR_ON */
     AM2_Sprite *sprOff;             /* 0x006C  CHECKBOX_OFF_SPR_OFF */
     AM2_Sprite *sprOnFoc;           /* 0x0070  CHECKBOX_OFF_SPR_ON_FOC */
@@ -409,6 +415,7 @@ struct AM2_CheckBox : AM2_ButtonBase {
 };
 
 struct AM2_ListBox : AM2_Widget {
+    typedef AM2_Widget Base;        /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_ListBox[AM2_LISTBOX_SIZE - sizeof(AM2_Widget)];
     AM2_ListBox(AM2_Rect box, void *rows, int32_t callback, int32_t arg6C, int32_t ownsRows);
     explicit AM2_ListBox(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
@@ -426,6 +433,7 @@ struct AM2_TextList : AM2_ListBox {
 };
 
 struct AM2_ArrowBar : AM2_Widget {
+    typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_ArrowBar[AM2_ARROWBAR_SIZE - sizeof(AM2_Widget)];
     AM2_ArrowBar(AM2_Rect box, AM2_Widget *parent, const char *b0, const char *b1, int32_t span, int32_t flag50);
     explicit AM2_ArrowBar(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
@@ -433,6 +441,7 @@ struct AM2_ArrowBar : AM2_Widget {
 };
 
 struct AM2_ScrollBar : AM2_Widget {
+    typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_ScrollBar[AM2_SCROLLBAR_SIZE - sizeof(AM2_Widget)];
     AM2_ScrollBar(AM2_Rect box, AM2_Widget *parent, int32_t span);
     explicit AM2_ScrollBar(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
@@ -440,6 +449,7 @@ struct AM2_ScrollBar : AM2_Widget {
 };
 
 struct AM2_Edit : AM2_Widget {
+    typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
     char       *text;               /* 0x0058  EDIT_OFF_TEXT */
     int32_t     maxChars;           /* 0x005C  EDIT_OFF_MAX */
     int32_t     font;               /* 0x0060  EDIT_OFF_FONT */
@@ -467,6 +477,7 @@ struct AM2_MpSpin : AM2_Widget {
 };
 
 struct AM2_Blinker : AM2_Panel {
+    typedef AM2_Panel Base;       /* VC6's C2437: see AM2_TextList */
     AM2_Sprite *sprite0;            /* 0x0060  MULTISPR_OFF_SPRITE0, the first bitmap's */
     AM2_Sprite *sprites[2];         /* 0x0064  MULTISPR_OFF_SPRITES */
     int32_t     index;              /* 0x006C  MULTISPR_OFF_INDEX */
@@ -484,6 +495,7 @@ struct AM2_Typer : AM2_Widget {
 };
 
 struct AM2_HudRadar : AM2_Widget {
+    typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_HudRadar[AM2_HUD_RADAR_BYTES - sizeof(AM2_Widget)];
     AM2_HudRadar();
     explicit AM2_HudRadar(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
@@ -491,6 +503,7 @@ struct AM2_HudRadar : AM2_Widget {
 };
 
 struct AM2_HudSarge : AM2_Widget {
+    typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_HudSarge[AM2_HUD_SARGE_BYTES - sizeof(AM2_Widget)];
     AM2_HudSarge();
     explicit AM2_HudSarge(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
@@ -498,6 +511,7 @@ struct AM2_HudSarge : AM2_Widget {
 };
 
 struct AM2_HudSquad : AM2_Widget {
+    typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_HudSquad[AM2_HUD_SQUAD_BYTES - sizeof(AM2_Widget)];
     AM2_HudSquad();
     explicit AM2_HudSquad(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
@@ -505,6 +519,7 @@ struct AM2_HudSquad : AM2_Widget {
 };
 
 struct AM2_HudCmd : AM2_Widget {
+    typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_HudCmd[AM2_HUD_CMD_BYTES - sizeof(AM2_Widget)];
     AM2_HudCmd();
     explicit AM2_HudCmd(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
@@ -512,6 +527,7 @@ struct AM2_HudCmd : AM2_Widget {
 };
 
 struct AM2_HudEdge : AM2_Widget {
+    typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_HudEdge[AM2_HUD_C_BYTES - sizeof(AM2_Widget)];
     AM2_HudEdge();
     explicit AM2_HudEdge(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
@@ -522,6 +538,7 @@ struct AM2_HudEdge : AM2_Widget {
  * colour and team buttons are 18x20 swatches beside it. Only the name has a
  * destructor of its own -- the other two share WidgetDeleteAlt. */
 struct AM2_MpName : AM2_ButtonBase {
+    typedef AM2_ButtonBase Base;  /* VC6's C2437: see AM2_TextList */
     const char *text;               /* 0x0068  MPNAME_OFF_TEXT */
     int32_t     flag;               /* 0x006C  MPNAME_OFF_FLAG */
     uint8_t     ink;                /* 0x0070  MPNAME_OFF_INK */
@@ -543,6 +560,7 @@ struct AM2_MpTeam : AM2_ButtonBase {
 };
 
 struct AM2_CountButton : AM2_ButtonBase {
+    typedef AM2_ButtonBase Base;  /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_CountButton[AM2_COUNT_BUTTON_BYTES - sizeof(AM2_ButtonBase)];
     AM2_CountButton(int32_t index, int32_t army, AM2_Rect box, int32_t menuRow, int32_t count, void (__cdecl *onToggle)(AM2_Widget *));
     explicit AM2_CountButton(AM2_Widget::AM2_NoInit n) : AM2_ButtonBase(n) { }
@@ -550,6 +568,7 @@ struct AM2_CountButton : AM2_ButtonBase {
 };
 
 struct AM2_HudPanel : AM2_Widget {
+    typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_HudPanel[AM2_HUD_B_BYTES - sizeof(AM2_Widget)];
     AM2_HudPanel();
     explicit AM2_HudPanel(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
@@ -557,6 +576,7 @@ struct AM2_HudPanel : AM2_Widget {
 };
 
 struct AM2_HudTop : AM2_Widget {
+    typedef AM2_Widget Base;      /* VC6's C2437: see AM2_TextList */
     uint8_t pad_AM2_HudTop[AM2_HUD_A_BYTES - sizeof(AM2_Widget)];
     AM2_HudTop();
     explicit AM2_HudTop(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }

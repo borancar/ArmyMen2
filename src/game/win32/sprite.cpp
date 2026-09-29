@@ -431,17 +431,21 @@ void __cdecl ReleaseSprite(AM2_Sprite *spr)
 #define g_menuSpritesEnd (*(uint32_t *)(uintptr_t)ADDR_MENU_SPRITES_END)
 #define g_menuSurface  (*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MENU_SURFACE)
 
-#define MENU_SPRITE_COUNT \
-    ((ADDR_MENU_SPRITES_END - ADDR_MENU_SPRITES) / sizeof(AM2_Sprite *))
+#define MENU_SPRITE_COUNT 190   /* (ADDR_MENU_SPRITES_END - ADDR_MENU_SPRITES) / 4 */
 
 void __cdecl FreeMenuSprites(void)
 {
-    uint32_t i;
+    /* 19 rows of ten: the image's inner counter of ten inside an outer
+     * bound check is this two-dimensional walk. */
+    AM2_Sprite *(*rows)[10] = (AM2_Sprite *(*)[10])(uintptr_t)ADDR_MENU_SPRITES;
+    int32_t     i, j;
 
-    for (i = 0; i < MENU_SPRITE_COUNT; i++) {
-        if (g_menuSprites[i]) {
-            ReleaseSprite(g_menuSprites[i]);
-            g_menuSprites[i] = NULL;
+    for (i = 0; i < MENU_SPRITE_COUNT / 10; i++) {
+        for (j = 0; j < 10; j++) {
+            if (rows[i][j]) {
+                ReleaseSprite(rows[i][j]);
+                rows[i][j] = NULL;
+            }
         }
     }
     g_menuSpritesEnd = 0;

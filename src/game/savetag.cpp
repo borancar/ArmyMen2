@@ -38,15 +38,15 @@ static const char kSaveReadError[] =
 int32_t __cdecl CheckSaveTag(am2_FILE *fp, uint32_t expected,
                              const char *file, int32_t line)
 {
-    uint32_t tag = (uint32_t)(uintptr_t)fp;
+    uint32_t tag;                   /* lives in the dead fp slot */
 
     orig_fread(&tag, 4, 1, fp);
 
-    if (tag == expected)
-        return 1;
-
-    orig_log(kSaveReadError, file, line);
-    return 0;
+    if (tag != expected) {
+        orig_log(kSaveReadError, file, line);
+        return 0;
+    }
+    return 1;
 }
 
 void __cdecl WriteSaveTag(am2_FILE *fp, uint32_t tag)

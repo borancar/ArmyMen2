@@ -141,19 +141,19 @@ uint8_t __cdecl Log2Mask(int32_t value)
 #define g_atanSin ((const int8_t *)(uintptr_t)ADDR_TRIG_ATAN_SIN)
 #define g_atanCos ((const int8_t *)(uintptr_t)ADDR_TRIG_ATAN_COS)
 
-uint8_t __cdecl AngleOfDelta(int32_t dx, int32_t dy)
+/* The bodies the original writes out at each use: abs() -- VC6's cdq/xor/sub
+ * intrinsic -- and the steeper axis tested first. */
+static inline uint8_t AngleOfDeltaBody(int32_t dx, int32_t dy)
 {
-    int32_t adx = dx < 0 ? -dx : dx;
-    int32_t ady = dy < 0 ? -dy : dy;
     uint8_t h;
 
-    if (adx > ady) {
-        h = (uint8_t)g_atanCos[(dy << 9) / dx];
-    } else {
+    if (abs(dx) <= abs(dy)) {
         if (dx == 0)
             /* Straight up or straight down, and nothing to divide by. */
             return dy < 0 ? 0u : 0x80u;
         h = (uint8_t)g_atanSin[(dx << 9) / dy];
+    } else {
+        h = (uint8_t)g_atanCos[(dy << 9) / dx];
     }
     /* Eight-bit add, so it wraps inside the byte. */
     if (dx > 0)
@@ -161,13 +161,29 @@ uint8_t __cdecl AngleOfDelta(int32_t dx, int32_t dy)
     return h;
 }
 
+static inline int32_t ApproxDistAbs(int32_t dx, int32_t dy)
+{
+    int32_t adx = abs(dx);
+    int32_t ady = abs(dy);
+    int32_t lo  = adx < ady ? adx : ady;
+
+    return ady - (lo >> 1) + adx;
+}
+
+uint8_t __cdecl AngleOfDelta(int32_t dx, int32_t dy)
+{
+    return AngleOfDeltaBody(dx, dy);
+}
+
 extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
 
 uint8_t __cdecl AngleBetween(const AM2_Point *from, const AM2_Point *to)
 {
     /* Inlined in the original; one copy here. */
-    uint8_t h = AngleOfDelta((int32_t)to->x - (int32_t)from->x,
-                             (int32_t)to->y - (int32_t)from->y);
+    int32_t dx = (int32_t)to->x - (int32_t)from->x;
+    int32_t dy = (int32_t)to->y - (int32_t)from->y;
+    uint8_t h  = AngleOfDeltaBody(dx, dy);
+#if !defined(AM2_RELINK)
     /* AM2_TRACE_ANGLE=1 logs every call with its pump; the hybrid's dev
      * loader installs the same log over the original, so the two games'
      * calls compare line for line. Cached: this runs thousands of times a
@@ -179,6 +195,7 @@ uint8_t __cdecl AngleBetween(const AM2_Point *from, const AM2_Point *to)
         fprintf(stderr, "ANGLE pump %u from=(%d,%d) to=(%d,%d) -> %d\n",
                 (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
                 from->x, from->y, to->x, to->y, h);
+#endif
     return h;
 }
 
@@ -187,8 +204,11 @@ void __cdecl DistAndAngle(const AM2_Point *a, const AM2_Point *b,
 {
     /* Both inlined in the original, and both to the instruction. The distance
      * goes out first. */
-    *dist  = ApproxDist(a, b);
-    *angle = AngleBetween(a, b);
+    int32_t dx = (int32_t)b->x - (int32_t)a->x;
+    int32_t dy = (int32_t)b->y - (int32_t)a->y;
+
+    *dist  = ApproxDistAbs(dx, dy);
+    *angle = AngleOfDeltaBody(dx, dy);
 }
 
 int dist_install(void)

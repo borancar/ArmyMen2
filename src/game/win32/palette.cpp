@@ -33,6 +33,8 @@
  */
 
 #include "palette.h"
+#include "movie.h"      /* AM2_Movie::SnapshotSystemPalette */
+#include "../pmf.h"
 #include "../gamedir.h"  /* SetGameDir -- the chdir, reconstructed */
 #include "../image.h"  /* AM2_IMAGE */
 #include "../misc.h"   /* ColourDistance -- pure, so it lives in the flat half */
@@ -212,7 +214,7 @@ void __cdecl RealizeSystemPalette(const uint32_t *palette)
     }
 }
 
-void __cdecl SnapshotSystemPalette(void)
+void __attribute__((thiscall)) AM2_Movie::SnapshotSystemPalette()
 {
     HDC     dc = GetDC(g_hWnd);
     int32_t i;
@@ -229,7 +231,7 @@ void __cdecl SnapshotSystemPalette(void)
         g_systemPalette[i].peFlags = 0;
     for (i = SYSTEM_RESERVED; i < PALETTE_ENTRIES - SYSTEM_RESERVED; i++)
         g_systemPalette[i].peFlags = PC_NOCOLLAPSE;
-    for (i = PALETTE_ENTRIES - SYSTEM_RESERVED; i < PALETTE_ENTRIES; i++)
+    for (; i < PALETTE_ENTRIES; i++)      /* on from where the last one stopped */
         g_systemPalette[i].peFlags = 0;
 
     ReleaseDC(g_hWnd, dc);
@@ -820,7 +822,7 @@ int palette_install(void)
                         "CalibratePalette", 1);
     rc |= patch_replace(ADDR_REALIZE_PALETTE, (const void *)RealizeSystemPalette,
                         "RealizeSystemPalette", 1);
-    rc |= patch_replace(ADDR_SNAPSHOT_PALETTE, (const void *)SnapshotSystemPalette,
+    rc |= patch_replace(ADDR_SNAPSHOT_PALETTE, pmf_addr(&AM2_Movie::SnapshotSystemPalette),
                         "SnapshotSystemPalette", 0);
     rc |= patch_replace(ADDR_READ_BMP_PALETTE, (const void *)ReadBitmapPalette,
                         "ReadBitmapPalette", 1);

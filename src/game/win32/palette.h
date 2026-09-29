@@ -57,7 +57,7 @@ void __cdecl RealizeSystemPalette(const uint32_t *palette);
  * which tells GDI to give each one a palette slot of its own instead of folding
  * it onto the nearest colour already realized. The twenty at the ends keep
  * flags of 0 and map onto the system colours as usual. */
-void __cdecl SnapshotSystemPalette(void);
+/* SnapshotSystemPalette (0x00445170) is AM2_Movie's -- see movie.h. */
 
 /* Original: 0x0041B0E0, 5 call sites. Install a palette: create the
  * DirectDraw palette, attach it to the primary, and rebuild the seven remap
