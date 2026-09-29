@@ -731,40 +731,31 @@ int32_t __cdecl ScriptIsStatementStart(const AM2_ScriptCtx *ctx,
  * Returns the token on success, NULL after logging. *at is advanced either
  * way, which is what lets a failed handler leave ReadScript somewhere sane.
  */
-AM2_ScriptTok *ScriptExpect(AM2_ScriptCtx *ctx, int32_t *at,
-                                   int32_t kind)
-{
-    if (++(*at) >= ctx->count) {
-        am2_log("Unexpected end of script.\n");
-        return 0;
-    }
-
-    AM2_ScriptTok *tok = &ctx->tokens[*at];
-    if (tok->kind != kind) {
-        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
-                ctx->tokens[*at].line,
-                ScriptTokenText(tok, kScriptWord),
-                kKindName(kind));
-        return 0;
-    }
-    return tok;
-}
 
 int32_t __cdecl ScriptPreloadSprite(AM2_ScriptCtx *ctx, int32_t *at)
 {
-    int32_t arg[3];
+    int32_t        flags = 0x1000;
+    AM2_ScriptTok *tok;
+    int32_t        set, index, frame;
 
-    for (int32_t i = 0; i < 3; i++) {
-        AM2_ScriptTok *tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
-        if (!tok)
-            return 0;
-        arg[i] = (int32_t)(uintptr_t)tok->value;
-    }
+    /* The three arguments are read one after another, each through its own
+     * copy of ScriptExpect. */
+    if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
+        return 0;
+    tok = &ctx->tokens[*at];
+    set = (int32_t)(uintptr_t)tok->value;
+    if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
+        return 0;
+    tok = &ctx->tokens[*at];
+    index = (int32_t)(uintptr_t)tok->value;
+    if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
+        return 0;
+    tok = &ctx->tokens[*at];
+    frame = (int32_t)(uintptr_t)tok->value;
 
     /* The fourth is optional, and the index advances past the third whether or
      * not it is there -- so a missing one leaves *at on whatever follows and
      * ReadScript dispatches that normally. */
-    int32_t flags = 0x1000;
     (*at)++;
     if (*at < ctx->count &&
         ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
@@ -772,15 +763,16 @@ int32_t __cdecl ScriptPreloadSprite(AM2_ScriptCtx *ctx, int32_t *at)
         (*at)++;
     }
 
-    PreloadSprite(arg[0], arg[1], arg[2], flags, 1);
+    PreloadSprite(set, index, frame, flags, 1);
     return 1;
 }
 
 int32_t __cdecl ScriptVariable(AM2_ScriptCtx *ctx, int32_t *at)
 {
-    AM2_ScriptTok *tok = ScriptExpect(ctx, at, AM2_TOKEN_STRING);
-    if (!tok)
+    AM2_ScriptTok *tok;
+    if (!ScriptExpect(ctx, at, AM2_TOKEN_STRING))
         return 0;
+    tok = &ctx->tokens[*at];
 
     if (ScriptFindName((const char *)tok->value) >= 0) {
         am2_log("Line [%4d]:  Duplicate variable name.\n",
@@ -796,9 +788,9 @@ int32_t __cdecl ScriptVariable(AM2_ScriptCtx *ctx, int32_t *at)
     ctx->tokens[*at].kind = AM2_TOKEN_NAMEREF;
     ctx->tokens[*at].value = (void *)(uintptr_t)slot;
 
-    tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
-    if (!tok)
+    if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
         return 0;
+    tok = &ctx->tokens[*at];
 
     kScriptNames[slot].value = (int32_t)(uintptr_t)tok->value;
     (*at)++;
@@ -2610,9 +2602,10 @@ static void ScriptPadCentroid(AM2_PadNumber *pn, int32_t number)
 
 int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
 {
-    AM2_ScriptTok *tok = ScriptExpect(ctx, at, AM2_TOKEN_STRING);
-    if (!tok)
+    AM2_ScriptTok *tok;
+    if (!ScriptExpect(ctx, at, AM2_TOKEN_STRING))
         return 0;
+    tok = &ctx->tokens[*at];
 
     if (ScriptFindName((const char *)tok->value) >= 0) {
         am2_log("Line [%4d]:  Duplicate pad name.\n", ctx->tokens[*at].line);
@@ -2626,9 +2619,9 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
     ctx->tokens[*at].kind = AM2_TOKEN_NAMEREF;
     ctx->tokens[*at].value = (void *)(uintptr_t)name;
 
-    tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
-    if (!tok)
+    if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
         return 0;
+    tok = &ctx->tokens[*at];
 
     int32_t number = (int32_t)(uintptr_t)tok->value;
     if (number < 0 || number >= 0x100) {
@@ -2729,14 +2722,14 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
             ctx->tokens[*at].kind == AM2_TOKEN_RESERVED &&
             (int32_t)(uintptr_t)ctx->tokens[*at].value == AM2_TOK_DELAY) {
 
-            tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
-            if (!tok)
+            if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
                 return 0;
+            tok = &ctx->tokens[*at];
             pad->delay0 = (int32_t)(uintptr_t)tok->value;
 
-            tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
-            if (!tok)
+            if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
                 return 0;
+            tok = &ctx->tokens[*at];
             pad->delay1 = (int32_t)(uintptr_t)tok->value;
             (*at)++;
         }

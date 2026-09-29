@@ -142,14 +142,14 @@ int32_t __cdecl ScriptObjFrame(AM2_ScriptCtx *ctx, int32_t *at)
         return 0;
     }
 
-    tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
-    if (!tok)
+    if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
         return 0;
+    tok = &ctx->tokens[*at];
     frame->a = (int32_t)(uintptr_t)tok->value;
 
-    tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
-    if (!tok)
+    if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
         return 0;
+    tok = &ctx->tokens[*at];
     frame->b = (int32_t)(uintptr_t)tok->value;
     (*at)++;
 
@@ -192,9 +192,9 @@ int32_t __cdecl ScriptObjState(AM2_ScriptCtx *ctx, int32_t *at)
         return 0;
     }
 
-    tok = ScriptExpect(ctx, at, AM2_TOKEN_STRING);
-    if (!tok)
+    if (!ScriptExpect(ctx, at, AM2_TOKEN_STRING))
         return 0;
+    tok = &ctx->tokens[*at];
 
     int32_t name = ScriptFindName((const char *)tok->value);
     if (name < 0)
@@ -293,9 +293,9 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
         }
         target->u.cls[0] = (uint16_t)(uintptr_t)tok->value;
 
-        tok = ScriptExpect(ctx, at, AM2_TOKEN_INTEGER);
-        if (!tok)
+        if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
             return 0;
+        tok = &ctx->tokens[*at];
         target->u.cls[1] = (uint16_t)(uintptr_t)tok->value;
         (*at)++;
 

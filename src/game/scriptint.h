@@ -56,8 +56,27 @@ extern "C" {
 #define kObjScriptCap    (*(int32_t *)((void *)(uintptr_t)(ADDR_OBJ_SCRIPT_CAP)))
 
 /* Advance one token and check its kind, with the two messages the original
- * writes out at every argument. NULL after logging; *at moves either way. */
-AM2_ScriptTok *ScriptExpect(AM2_ScriptCtx *ctx, int32_t *at, int32_t kind);
+ * writes out at every argument; *at moves either way. Not a function in the
+ * image: its body is at every call site. It answers 1 or 0 rather than the
+ * token, and the caller indexes the token itself -- a constant the inliner
+ * can fold into the caller's test, which is how the image has no null test
+ * after it. */
+static inline int32_t ScriptExpect(AM2_ScriptCtx *ctx, int32_t *at,
+                                   int32_t kind)
+{
+    if (++(*at) >= ctx->count) {
+        am2_log("Unexpected end of script.\n");
+        return 0;
+    }
+    if (ctx->tokens[*at].kind != kind) {
+        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                ctx->tokens[*at].line,
+                ScriptTokenText(&ctx->tokens[*at], kScriptWord),
+                kKindName(kind));
+        return 0;
+    }
+    return 1;
+}
 
 /* One action, through the dump switch. objscript.cpp's frame blocks and
  * script.cpp's `if` both append actions, so both go through here. */
