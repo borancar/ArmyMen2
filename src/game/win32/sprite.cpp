@@ -1493,62 +1493,64 @@ int32_t __cdecl SpriteRebuildAlt(AM2_Sprite *spr, int32_t flags)
  * and the response is to free both blocks and zero them. Reproduced. */
 int32_t __cdecl SpriteRebuildDf(AM2_Sprite *spr, int32_t flags)
 {
-    const AM2_SpriteDirEntry *dir;
     uint8_t  *sset;
-    am2_FILE *fp;
     int32_t   slot;
     int32_t   value;
-    int32_t   len = 0;
-    int32_t   i;
-    int32_t   ok = 0;
+    /* The header is read and thrown away into two scratch words -- the
+     * first three fields into the one that finally takes the length, the
+     * next two into the other, as the image does. */
+    int32_t   len;
+    int32_t   skip;
 
     if (!spr->image.rle16)
         return SpriteLoadFromDataFile(spr, (int32_t)KeyFieldA(spr->id),
                                       (int32_t)KeyFieldB(spr->id),
                                       (int32_t)KeyFieldC(spr->id), flags);
 
+    /* Nested onto the one `return 0` the image shares. */
     sset = (uint8_t *)SpriteSetForKey(spr->id);
-    if (!sset)
-        return 0;
-
-    slot = SpriteDirIndex(sset, spr->id);
-    if (slot < 0)
-        return 0;
-
-    fp  = SET_FILE(sset);
-    dir = SET_DIR(sset);
-
-    if (orig_fseek(fp, (int32_t)dir[slot].offset, 0) != 0) {
-        orig_log("Error seeking to location %d in data file.\n",
-                 dir[slot].offset);
-    } else {
-        orig_fread(&value, 4, 1, fp);
-        if ((uint32_t)value == spr->id) {
-            /* The header again, discarded: width, height, flags, hot, file.
-             * The sixth read is the one that matters. */
-            for (i = 0; i < 5; i++)
-                orig_fread(&value, 4, 1, fp);
-            orig_fread(&len, 4, 1, fp);
-            if (len > 0 && spr->format == 0)
-                ok = 1;
-        } else {
-            orig_log("Error in validating object in data file.\n");
+    if (sset) {
+        slot = SpriteDirIndex(sset, spr->id);
+        if (slot >= 0) {
+            /* Laid out as the image has it: a failed seek logs and falls
+             * into the release, and the read that succeeds is out of line. */
+            if (orig_fseek(SET_FILE(sset), (int32_t)SET_DIR(sset)[slot].offset,
+                           0))
+                orig_log("Error seeking to location %d in data file.\n",
+                         SET_DIR(sset)[slot].offset);
+            else
+                goto read;
+        release:
+            if (spr->image.rle16)
+                orig_free(spr->image.rle16);
+            if (spr->overlay)
+                orig_free(spr->overlay);
+            spr->image.rle16 = 0;
+            spr->overlay     = 0;
         }
     }
+    return 0;
 
-    if (!ok) {
-        if (spr->image.rle16)
-            orig_free(spr->image.rle16);
-        if (spr->overlay)
-            orig_free(spr->overlay);
-        spr->image.rle16 = 0;
-        spr->overlay     = 0;
-        return 0;
+read:
+    orig_fread(&value, 4, 1, SET_FILE(sset));
+    if (spr->id != (uint32_t)value) {
+        orig_log("Error in validating object in data file.\n");
+        goto release;
     }
-
-    return ReloadBitmapSurface(spr->image.surface, fp, (uint32_t)len,
-                               spr->bounds.right, spr->bounds.bottom,
-                               sset + SPRITE_SET_OFF_REMAP, (uint32_t)flags);
+    orig_fread(&len, 4, 1, SET_FILE(sset));
+    orig_fread(&len, 4, 1, SET_FILE(sset));
+    orig_fread(&len, 4, 1, SET_FILE(sset));
+    orig_fread(&skip, 4, 1, SET_FILE(sset));
+    orig_fread(&skip, 4, 1, SET_FILE(sset));
+    orig_fread(&len, 4, 1, SET_FILE(sset));
+    if (len <= 0 || spr->format != 0)
+        goto release;
+    return ReloadBitmapSurface(spr->image.surface, SET_FILE(sset),
+                               (uint32_t)len,
+                               spr->bounds.right,
+                               spr->bounds.bottom,
+                               sset + SPRITE_SET_OFF_REMAP,
+                               (uint32_t)flags);
 }
 
 /* Allocate and fill one, or give the record back for free()ing. */
