@@ -1835,10 +1835,10 @@ int32_t __cdecl BlockWeightAt(void *from, uint32_t at, uint32_t ref)
         total += AM2_BLOCK_FULL;
 
     if (from) {
-        int32_t d = (int32_t)(int8_t)TileAttrAt(tile)
-                  - (int32_t)(int8_t)TileAttrAt(
-                        *(const uint16_t *)((const uint8_t *)from
-                                            + OBJ_OFF_TILE));
+        /* TileAttrAt's body, inline for both tiles as the image has it. */
+        int32_t d = *(const int8_t *)(g_tileAttrs + ((uint32_t)tile & 0xFFFFu))
+                  - *(const int8_t *)(g_tileAttrs
+                        + *(const uint16_t *)((const uint8_t *)from + OBJ_OFF_TILE));
 
         if (d < 0)
             d = -d;
@@ -3972,7 +3972,9 @@ int32_t __cdecl MaskBlockWeight(int32_t kind, int32_t heading, uint32_t at)
  * mission is a thin path and the frame does not show what they decide. */
 uint8_t __cdecl HeightAtPoint(uint32_t packedPoint)
 {
-    int8_t  best = (int8_t)TileAttrAt((uint32_t)TileOfPoint(packedPoint));
+    /* TileAttrAt's body, inline as the image has it. */
+    int8_t  best = *(const int8_t *)(g_tileAttrs
+                                     + ((uint32_t)TileOfPoint(packedPoint) & 0xFFFFu));
     uint8_t *o   = (uint8_t *)ObjectsAtPoint(
                        &packedPoint, (void *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC)));
 

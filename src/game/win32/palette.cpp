@@ -463,8 +463,9 @@ int32_t __cdecl ReadBitmapPalette(const char *path, BITMAPINFO *out)
     if (!fp)
         return 0;
 
-    orig_fread(&fh, sizeof(fh), 1, fp);
-    orig_fread(&out->bmiHeader, sizeof(out->bmiHeader), 1, fp);
+    /* One-byte items, `sizeof` of them: the image pushes 1 as the size. */
+    orig_fread(&fh, 1, sizeof(fh), fp);
+    orig_fread(&out->bmiHeader, 1, sizeof(out->bmiHeader), fp);
 
     if (out->bmiHeader.biBitCount != 8) {
         orig_fclose(fp);
@@ -607,12 +608,11 @@ void __cdecl CyclePalette(void)
 
     *(uint32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_STAMP = now;
 
-    i = *(const int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_INDEX + 1;
-    *(int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_INDEX = i;
-    if (i >= *(const int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_COUNT) {
-        i = 0;
-        *(int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_INDEX = 0;
-    }
+#define IDX (*(int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_INDEX)
+    if (++IDX >= *(const int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_COUNT)
+        IDX = 0;
+    i = IDX;
+#undef IDX
 
     {
         uint32_t which = ((const uint32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_SEQ)[i];
