@@ -1,5 +1,6 @@
 /* air.cpp -- see air.h. */
 #include <stdint.h>
+#include <stdlib.h>   /* abs */
 
 #include "air.h"
 #include "rect.h"     /* AM2_Rect, Clamp */
@@ -1139,32 +1140,27 @@ int32_t __cdecl ObjBlockWeight(void *from, void *obj, int32_t unused,
     if (o == f)
         return 0;
 
-    if (f) {
-        int32_t d = (int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
-                  - (int32_t)*(const int8_t *)(f + OBJ_OFF_HEIGHT_SET);
-
-        if (d < 0)
-            d = -d;
-        if (d > AM2_BLOCK_HEIGHT_STEP)
-            return 0;
-    }
+    if (f
+        && abs((int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
+               - (int32_t)*(const int8_t *)(f + OBJ_OFF_HEIGHT_SET))
+           > AM2_BLOCK_HEIGHT_STEP)
+        return 0;
 
     if (ObjIsItem((const AM2_Object *)obj))
         return *(const int8_t *)(o + OBJ_OFF_RANK);
 
-    if (!f)
-        return AM2_BLOCK_FULL;
+    /* The distance test only for a 3 or an 8, and only with a mover; every
+     * other way out is the full weight, from one shared tail. */
+    if (f && (ObjIsType3((const AM2_Object *)obj)
+              || ObjIsType8((const AM2_Object *)obj))) {
+        if (ApproxDist((const AM2_Point *)&at,
+                       (const AM2_Point *)(o + OBJ_OFF_POS))
+            >= ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
+                          (const AM2_Point *)(o + OBJ_OFF_POS)))
+            return 0;
+    }
 
-    if (!ObjIsType3((const AM2_Object *)obj)
-        && !ObjIsType8((const AM2_Object *)obj))
-        return AM2_BLOCK_FULL;
-
-    if (ApproxDist((const AM2_Point *)&at, (const AM2_Point *)(o + OBJ_OFF_POS))
-        < ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
-                     (const AM2_Point *)(o + OBJ_OFF_POS)))
-        return AM2_BLOCK_FULL;
-
-    return 0;
+    return AM2_BLOCK_FULL;
 }
 
 /* 0x00406550, two callers. Turn a thing's own code -- the dword its

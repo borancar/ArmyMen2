@@ -2575,14 +2575,6 @@ void __cdecl DrawEffectLayer(void)
     }
 }
 
-/* The `cdq; xor; sub` the original spells out twice, written once. Not a
- * helper the original has -- it inlines both -- but writing the idiom twice
- * is how one of the two comes to be missing its `sub`. */
-static int32_t AbsInt(int32_t v)
-{
-    return v < 0 ? -v : v;
-}
-
 /* StartShake -- original 0x0042B2E0, one caller.
  *
  * Start a screen shake. Each of the four fields takes the MAXIMUM of what is
@@ -2630,10 +2622,11 @@ void __cdecl StartShake(int32_t ms, int32_t stepX, int32_t stepY, int32_t amp)
     if (ms > *(const int32_t *)(uintptr_t)ADDR_SHAKE_TIME)
         *(int32_t *)(uintptr_t)ADDR_SHAKE_TIME = ms;
 
-    if (AbsInt(stepX) > AbsInt(*(const int32_t *)(uintptr_t)ADDR_SHAKE_STEP_X))
+    /* abs() is the `cdq; xor; sub` the image has, twice per axis. */
+    if (abs(stepX) > abs(*(const int32_t *)(uintptr_t)ADDR_SHAKE_STEP_X))
         *(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_X = stepX;
 
-    if (AbsInt(stepY) > AbsInt(*(const int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y))
+    if (abs(stepY) > abs(*(const int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y))
         *(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y = stepY;
 
     if (amp > *(const int32_t *)(uintptr_t)ADDR_SHAKE_AMPLITUDE)

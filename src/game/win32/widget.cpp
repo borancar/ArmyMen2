@@ -14666,33 +14666,24 @@ void __attribute__((thiscall)) AM2_Widget::WidgetRepaint()
 {
     AM2_Widget *w = this;
 
-    AM2_Widget *target = w;
-
     /* First and unconditionally, before anything is decided -- which is where
-     * the original puts it. Nothing the walk below reads is this field, so the
-     * order is unobservable; matching it costs nothing and saves having to
-     * have established that. */
+     * the original puts it. */
     w->flag44 = 0;
 
     if (w->unknown48) {
-        AM2_Widget *up = w->parent;
+        AM2_Widget *up;
 
         /* The nearest ancestor with a sprite -- something with a backdrop
-         * to repaint over. */
-        while (up) {
+         * to repaint over -- is painted from inside the walk, its own call. */
+        for (up = w->parent; up; up = up->parent) {
             if (up->sprite) {
-                target = up;
-                break;
+                WidgetVPaint(up, w->rect);
+                return;
             }
-            up = up->parent;
         }
     }
 
-    /* One dereference, not two: the struct field IS the table address, so
-     * indexing it gives the slot. Writing this as a nested cast off the
-     * object is how the movie object's dispatch was got wrong -- see the
-     * `obj -> table -> slot` note in CLAUDE.md. */
-    WidgetVPaint(target, w->rect);
+    WidgetVPaint(w, w->rect);
 }
 
 void __attribute__((thiscall)) AM2_Widget::WidgetTakeFocus(int32_t announce)

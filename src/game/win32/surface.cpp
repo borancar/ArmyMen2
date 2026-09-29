@@ -312,17 +312,17 @@ typedef void (__cdecl *am2_void_fn)(void);
 
 /* IsLost answers DD_OK when the surface is fine, so a non-zero result is the
  * thing to act on. */
-static void RestoreIfLost(LPDIRECTDRAWSURFACE surf)
-{
-    if (surf && IDirectDrawSurface_IsLost(surf) != DD_OK)
+/* Written out in place for each surface, the global re-read for each call,
+ * as the original has it. */
+#define RESTORE_IF_LOST(surf)                                   \
+    if ((surf) && IDirectDrawSurface_IsLost(surf) != DD_OK)     \
         IDirectDrawSurface_Restore(surf);
-}
 
 void __cdecl RestoreLostSurfaces(void)
 {
-    RestoreIfLost(g_primarySurface);
-    RestoreIfLost(g_offscreen);
-    RestoreIfLost(g_mapCache);
+    RESTORE_IF_LOST(g_primarySurface)
+    RESTORE_IF_LOST(g_offscreen)
+    RESTORE_IF_LOST(g_mapCache)
 
     /* The map keeps its surface in a descriptor, and only wants it restored
      * while the flag at +8 is clear. */

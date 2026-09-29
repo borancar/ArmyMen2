@@ -1177,7 +1177,6 @@ void __cdecl RecvTrooperFire(void *msg)
     uint32_t weaponUid = UidOnWire(*(const uint32_t *)(m + 0x14));
     uint8_t *unit;
     uint8_t *weapon;
-    int32_t  i;
 
     unit = (uint8_t *)ObjByUidAlias(troopUid);
     if (!unit)
@@ -1202,13 +1201,17 @@ void __cdecl RecvTrooperFire(void *msg)
     *(uint32_t *)(unit + UNIT_OFF_FIRE_UID)        = targetUid;
     *(uint32_t *)(unit + UNIT_OFF_FIRE_WEAPON_UID) = weaponUid;
 
-    for (i = 0; i < AM2_INVENTORY_SLOTS; i++) {
-        if (*(const uint32_t *)(unit + UNIT_OFF_INVENTORY + i * 4)
-            == weaponUid) {
-            *(int32_t *)(unit + TROOPER_OFF_WEAPON) = i;
-            break;
-        }
-    }
+    /* Six tests written out, an else-if chain, not a loop. */
+#define INV(n) (*(const uint32_t *)(unit + UNIT_OFF_INVENTORY + (n) * 4))
+#define SEL    (*(int32_t *)(unit + TROOPER_OFF_WEAPON))
+    if (INV(0) == weaponUid)      SEL = 0;
+    else if (INV(1) == weaponUid) SEL = 1;
+    else if (INV(2) == weaponUid) SEL = 2;
+    else if (INV(3) == weaponUid) SEL = 3;
+    else if (INV(4) == weaponUid) SEL = 4;
+    else if (INV(5) == weaponUid) SEL = 5;
+#undef INV
+#undef SEL
 
     *(uint8_t *)(unit + TROOPER_OFF_FIRE_FLAG) =
         *(const uint8_t *)(m + 0x18);
