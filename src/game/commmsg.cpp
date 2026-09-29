@@ -1017,8 +1017,8 @@ void __cdecl AppendTroopState(void *msg, void *obj)
     if (dy < 0) dy = -dy;
 
     {
-        uint8_t *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
-
+        /* The comm object is read at every use. */
+#define comm ((uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT))
         interval = *(const uint32_t *)(comm + COMM_OFF_SEND_INTERVAL);
         if (*(const int32_t *)(o + OBJ_OFF_SARGE) && interval > 1)
             interval = 1;
@@ -1120,6 +1120,7 @@ void __cdecl AppendTroopState(void *msg, void *obj)
      * session, which this machine cannot open. Found by reading the vehicle
      * sibling at 0x0045DAA0, which does the identical dance. */
     *(uint16_t *)m += (uint16_t)(out - outStart);
+#undef comm
 }
 
 
@@ -1674,7 +1675,8 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
 {
     uint8_t  *m    = (uint8_t *)msg;
     uint8_t  *comm = (uint8_t *)kCommObj;
-    uint32_t  uid;
+    /* The uid is read from the message at every use. */
+#define uid (*(const uint32_t *)(m + AM2_ARMYMSG_UID))
     int32_t   army;
     int32_t   kind;
 
@@ -1683,7 +1685,6 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
     if (!*(const int32_t *)(comm + COMM_OFF_MSGS_ENABLED))
         return;
 
-    uid = *(const uint32_t *)(m + AM2_ARMYMSG_UID);
     if (!ArmyInPlay(comm, uid)) {
         am2_log("ignoring message from defunct army\n");
         return;
@@ -1715,34 +1716,37 @@ void __cdecl ReceiveArmyMsg(void *msg, int32_t slot, int32_t seq)
         break;   /* 4, and anything the table does not cover */
     }
 
-    switch (*(const uint16_t *)(m + AM2_ARMYMSG_TYPE)) {
-    case 4:
+    /* An if-chain on the 16-bit type, not a switch, every arm returning. */
+    if (*(const uint16_t *)(m + AM2_ARMYMSG_TYPE) == 4) {
         am2_log("Received GAME_LOST_MESSAGE\n");
         RecordGameOver(army);
         return;
-
-    case 5:
+    }
+    if (*(const uint16_t *)(m + AM2_ARMYMSG_TYPE) == 5) {
         am2_log("Received GAME_WON_MESSAGE\n");
-        /* With winning disabled, a win is recorded exactly as a loss. */
-        if (!*(const int32_t *)(uintptr_t)ADDR_WIN_ENABLED) {
+        /* With winning disabled, a win is recorded exactly as a loss. Our
+         * own win is recorded as winner 1. */
+        if (*(const int32_t *)(uintptr_t)ADDR_WIN_ENABLED) {
+            *(int32_t *)(uintptr_t)ADDR_GAME_WINNER = 1;
+            if ((int32_t)g_defaultOwner != army)
+                *(int32_t *)(uintptr_t)ADDR_GAME_WINNER = army;
+            *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST  = AM2_MENU_REQUEST_GAME_OVER;
+            *(int32_t *)(uintptr_t)ADDR_STATE_PENDING = 1;
+        } else {
             RecordGameOver(army);
-            return;
         }
-        RecordGameOver((int32_t)g_defaultOwner == army ? 1 : army);
-        return;
-
-    case 0x20:
-        EventMessageReceive((const AM2_EventMsg *)m);
-        return;
-
-    default:
-        am2_log("Unknown Army Msg Item Type %d, msgtype:%d, item uid: %x; "
-                "msgsize: %d\n",
-                kind, *(const uint16_t *)(m + AM2_ARMYMSG_TYPE),
-                UidOnWire(uid),
-                *(const uint16_t *)(m + AM2_ARMYMSG_SIZE));
         return;
     }
+    if (*(const uint16_t *)(m + AM2_ARMYMSG_TYPE) == 0x20) {
+        EventMessageReceive((const AM2_EventMsg *)m);
+        return;
+    }
+    am2_log("Unknown Army Msg Item Type %d, msgtype:%d, item uid: %x; "
+            "msgsize: %d\n",
+            kind, *(const uint16_t *)(m + AM2_ARMYMSG_TYPE),
+            UidOnWire(uid),
+            *(const uint16_t *)(m + AM2_ARMYMSG_SIZE));
+#undef uid
 }
 
 void __cdecl ReceivePacket(void *packet, int32_t dpid)

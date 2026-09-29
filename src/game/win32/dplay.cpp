@@ -3010,7 +3010,8 @@ int32_t __cdecl CommGlobalInit(void)
  */
 void __cdecl SendPlayerMsg(int32_t arg)
 {
-    uint8_t *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    /* The comm object is read at every use. */
+#define comm (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
     uint8_t *msg  = (uint8_t *)(uintptr_t)ADDR_PLAYER_MSG;
     int32_t  i;
 
@@ -3085,13 +3086,13 @@ void __cdecl SendPlayerMsg(int32_t arg)
             *(const uint32_t *)(slot + COMM_OFF_PLAYER_SLOTS);
         *(int32_t *)(rec + MSGREC_OFF_FIELD_04) =
             *(const int32_t *)(slot + COMM_OFF_SLOT_FIELD_210);
-        *(int32_t *)(rec + MSGREC_OFF_ZERO) = 0;
-        *(int32_t *)(rec + MSGREC_OFF_POINTS) =
-            ((const int32_t *)(uintptr_t)ADDR_ARMY_POINTS)[i];
         *(int32_t *)(rec + MSGREC_OFF_FIELD_54) =
             *(const int32_t *)(slot + COMM_OFF_SLOT_FIELD_258);
         *(int32_t *)(rec + MSGREC_OFF_FIELD_58) =
             *(const int32_t *)(slot + COMM_OFF_SLOT_FIELD_270);
+        *(int32_t *)(rec + MSGREC_OFF_ZERO) = 0;
+        *(int32_t *)(rec + MSGREC_OFF_POINTS) =
+            ((const int32_t *)(uintptr_t)ADDR_ARMY_POINTS)[i];
         *(int32_t *)(rec + MSGREC_OFF_FIELD_5C) =
             *(const int32_t *)(slot + COMM_OFF_SLOT_FIELD_25C);
 
@@ -3106,6 +3107,7 @@ void __cdecl SendPlayerMsg(int32_t arg)
     }
 
     SendGameMsg(msg, 0, 1);
+#undef comm
 }
 
 /* DestroyFlow -- original 0x004029B0, 544 bytes, seven callers. Tear down one
@@ -3159,7 +3161,8 @@ void __cdecl SendPlayerMsg(int32_t arg)
  */
 int32_t __cdecl DestroyFlow(uint32_t id)
 {
-    uint8_t *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    /* The comm object is read at every use. */
+#define comm ((uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT))
     uint8_t *flow;
     uint8_t *mine;
     int32_t  seq;
@@ -3244,6 +3247,7 @@ int32_t __cdecl DestroyFlow(uint32_t id)
     }
 
     return 0;
+#undef comm
 }
 
 /* CommSystemMessage -- original 0x00410090, one caller: the message drain. The
@@ -3305,7 +3309,8 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
 {
     const DPMSG_CREATEPLAYERORGROUP *m =
         (const DPMSG_CREATEPLAYERORGROUP *)msg;
-    uint8_t *comm = g_commObject;
+    /* The comm object is read at every use. */
+#define comm ((uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT))
     int32_t  slot;
     uint32_t t0;
 
@@ -3322,14 +3327,12 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE)) {
             orig_log("CreatePlayer to=%x, name = %s id = %x\n",
                      to, m->dpnName.lpszShortNameA, m->dpId);
-            comm = g_commObject;
         }
 
         slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
         *(int32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
                      + COMM_OFF_SLOT_FIELD_25C) = 1;
 
-        comm = g_commObject;
         if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
             /* The short path: register and repaint, nothing else. */
             CommRegisterSelf((uint32_t)m->dpId);
@@ -3349,7 +3352,6 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
                 /* Yes, when the slot is EMPTY, and -1 is what goes in. */
                 if (id == -1) {
                     ((AM2_Comm *)comm)->CommRemovePlayer(id);
-                    comm = g_commObject;
                 }
             }
         }
@@ -3360,17 +3362,14 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
                      + COMM_OFF_PLAYER_SLOTS) =
             *(const int32_t *)(comm + COMM_OFF_OUR_PLAYER_ID);
 
-        comm = g_commObject;
         slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
         *(int32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
                      + COMM_OFF_PLAYER_SLOTS) = (int32_t)m->dpId;
 
-        comm = g_commObject;
         ((AM2_Comm *)comm)->CommSetSlotRemote(
                           *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT));
 
         if ((int32_t)strlen(m->dpnName.lpszShortNameA) < AM2_COMM_NAME_MAX) {
-            comm = g_commObject;
             strcpy((char *)(comm
                             + *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT)
                                   * AM2_COMM_SLOT_STRIDE
@@ -3378,21 +3377,17 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
                    m->dpnName.lpszShortNameA);
         }
 
-        comm = g_commObject;
         slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
         *(uint32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
                       + COMM_OFF_SLOT_JOINED_MS) = GetTickCount();
 
-        comm = g_commObject;
         slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
         *(int32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
                      + COMM_OFF_SLOT_FIELD_278) = 0;
 
-        comm = g_commObject;
         *(int32_t *)(comm + COMM_OFF_PLAYER_COUNT) =
             *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT) + 1;
 
-        comm = g_commObject;
         if (*(const uint32_t *)(comm + COMM_OFF_PLAYER_COUNT)
             >= (uint32_t)AM2_COMM_ARMY_COUNT) {
             uint8_t *desc;
@@ -3444,6 +3439,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
                  m->dwType, m->dwType, 0);
         return;
     }
+#undef comm
 }
 
 /* ProcessResendQueue -- original 0x00403050, 560 bytes, one caller. Drain up
@@ -3829,7 +3825,9 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
 void __cdecl CheckPlayerTimeout(void)
 {
     uint32_t  paused = GetPauseFlags();
-    uint8_t  *comm;
+    /* The comm object and each slot are read at every use. */
+#define comm (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
+#define slot (comm + COMM_OFF_PLAYERS + (uint32_t)i * COMM_PLAYER_STRIDE)
     uint32_t  now;
     int32_t   i;
 
@@ -3839,15 +3837,11 @@ void __cdecl CheckPlayerTimeout(void)
         || !(paused & AM2_PAUSE_LEFT_A_ALL))
         return;
 
-    comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
 
     if (comm_u32(comm, COMM_OFF_IS_HOST)) {
         now  = GetTickCount();
-        comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
 
         for (i = 0; i < (int32_t)comm_u32(comm, COMM_OFF_PLAYER_COUNT); i++) {
-            uint8_t *slot = comm + COMM_OFF_PLAYERS
-                            + (uint32_t)i * COMM_PLAYER_STRIDE;
             int32_t  id   = (int32_t)comm_u32(slot, COMM_SLOT_OFF_ID);
 
             if (id == -1 || id == (int32_t)comm_u32(comm, COMM_OFF_OUR_PLAYER_ID))
@@ -3876,11 +3870,8 @@ void __cdecl CheckPlayerTimeout(void)
     }
 
     now  = GetTickCount();
-    comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
 
     for (i = 0; i < (int32_t)comm_u32(comm, COMM_OFF_PLAYER_COUNT); i++) {
-        uint8_t *slot = comm + COMM_OFF_PLAYERS
-                        + (uint32_t)i * COMM_PLAYER_STRIDE;
 
         if (comm_u32(slot, COMM_SLOT_OFF_ID)
                 != comm_u32(comm, COMM_OFF_PLAYER_MADE))
@@ -3899,27 +3890,27 @@ void __cdecl CheckPlayerTimeout(void)
             *(uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT = now;
         }
 
-        if (!comm_u32(comm, COMM_OFF_TIMEOUTS_ON)) {
-            *(uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT = 0;
-            continue;
-        }
+        if (comm_u32(comm, COMM_OFF_TIMEOUTS_ON)) {
+            if (comm_u32(comm, COMM_OFF_LOBBIED)) {
+                RequestState(AM2_STATE_MP_LOBBY);
+            } else {
+                RequestState(AM2_STATE_MENU);
+                /* The request code without the pending flag, which every
+                 * other writer of this pair sets. Reproduced. */
+                *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST = AM2_MENU_REQUEST_TITLE;
+            }
 
-        if (comm_u32(comm, COMM_OFF_LOBBIED)) {
-            RequestState(AM2_STATE_MP_LOBBY);
+            if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) {
+                AM2_THE_COMM->CommDropSession();
+                AM2_THE_COMM->CommReportStats();
+                AM2_THE_COMM->CommResetStats();
+            }
         } else {
-            RequestState(AM2_STATE_MENU);
-            /* The request code without the pending flag, which every other
-             * writer of this pair sets. Reproduced. */
-            *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST = AM2_MENU_REQUEST_TITLE;
+            *(uint32_t *)(uintptr_t)ADDR_TIMEOUT_LOGGED_AT = 0;
         }
-
-        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) {
-            CommDropSession(comm);
-            CommReportStats(comm);
-            CommResetStats(comm);
-        }
-        comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
     }
+#undef comm
+#undef slot
 }
 
 int dplay_install(void)

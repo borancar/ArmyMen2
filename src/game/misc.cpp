@@ -1269,7 +1269,8 @@ int32_t __attribute__((thiscall)) AM2_Comm::GetArmyScore(int32_t slot)
  * disassembly is mostly string primitives and no calls. */
 void __cdecl ApplyGameSettings(void)
 {
-    uint8_t *comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+    /* The comm object is read at every use. */
+#define comm ((uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT))
     int32_t *pool = (int32_t *)(uintptr_t)ADDR_ARMY_POINTS;
     int32_t  i;
 
@@ -1313,6 +1314,7 @@ void __cdecl ApplyGameSettings(void)
         *(char *)(uintptr_t)ADDR_MP_SCRIPT_NAME = '\0';
         *(char *)(uintptr_t)ADDR_MAP_NAME       = '\0';
     }
+#undef comm
 }
 
 /* CommTeamScore -- original 0x0040F990, thiscall. What the `teamscore`

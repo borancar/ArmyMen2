@@ -1838,7 +1838,8 @@ void __cdecl PausedFrameStep(void)
     static const uint32_t kPauseBitsC[4] =
         { 0x20000u, 0x40000u, 0x80000u, 0x100000u };
 
-    uint8_t       *comm;
+    /* The comm object is read at every use. */
+#define comm (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
     const int16_t *xy;
     int32_t        active = 0;
     int32_t        slot;
@@ -1847,7 +1848,6 @@ void __cdecl PausedFrameStep(void)
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
         return;
 
-    comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
 
     for (n = 0; n < 4; n++) {
         if (*(const int32_t *)(comm + COMM_OFF_SLOT_FIELD_25C
@@ -1996,4 +1996,5 @@ void __cdecl PausedFrameStep(void)
                         *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
         UnlockSurface();
     }
+#undef comm
 }

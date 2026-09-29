@@ -1631,7 +1631,8 @@ void __cdecl SendVehicleEnter(void *vehicle, void *unit)
 {
     uint8_t  *veh  = (uint8_t *)vehicle;
     uint8_t  *unt  = (uint8_t *)unit;
-    uint8_t  *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    /* The comm object is read at every use. */
+#define comm ((uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT))
     struct { AM2_ArmyMsgHdr hdr; uint32_t unitUid; } msg;
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
@@ -1651,6 +1652,7 @@ void __cdecl SendVehicleEnter(void *vehicle, void *unit)
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
         am2_log((const char *)(uintptr_t)"-->Vehicle Enter Sent: Vehicle: %x, item: %x\n",
                 UidOnWire(msg.hdr.uid), UidOnWire(msg.unitUid));
+#undef comm
 }
 
 /* SendVehicleFire -- original 0x0045E220, one caller: Step3Drive, once a shot
@@ -1675,7 +1677,8 @@ void __cdecl SendVehicleEnter(void *vehicle, void *unit)
 void __cdecl SendVehicleFire(void *vehicle)
 {
     uint8_t  *veh  = (uint8_t *)vehicle;
-    uint8_t  *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    /* The comm object is read at every use. */
+#define comm ((uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT))
     struct {
         AM2_ArmyMsgHdr hdr;
         uint32_t       target;
@@ -1711,6 +1714,7 @@ void __cdecl SendVehicleFire(void *vehicle)
                 (uint32_t)*(const uint8_t *)(veh + OBJ_OFF_FIELD_530),
                 (int32_t)msg.x, (int32_t)msg.y, (int32_t)msg.z,
                 msg.target);
+#undef comm
 }
 
 /* VehicleUpdateAppend -- original 0x0045DAA0, 1136 bytes, one caller. The
@@ -2088,7 +2092,8 @@ void __cdecl SendVehicleWantItem(void *vehicle, void *item, int32_t request,
 {
     uint8_t  *veh  = (uint8_t *)vehicle;
     uint8_t  *itm  = (uint8_t *)item;
-    uint8_t  *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    /* The comm object is read at every use. */
+#define comm ((uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT))
     struct {
         AM2_ArmyMsgHdr hdr;
         uint32_t       itemUid;
@@ -2134,6 +2139,7 @@ void __cdecl SendVehicleWantItem(void *vehicle, void *item, int32_t request,
     else if (request == 3)
         am2_log((const char *)(uintptr_t)"Send DO_DROP item %x ammo %d\n",
                 *(const uint32_t *)(itm + OBJ_OFF_UID), quant);
+#undef comm
 }
 
 /* Forward-declared rather than included: DrawSeqBar lives in win32/surface.h

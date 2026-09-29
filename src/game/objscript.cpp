@@ -522,41 +522,48 @@ int32_t __cdecl UpdateObjectScript(void *obj)
  * format travels; see savetag.cpp. */
 int32_t __cdecl SaveObjScriptSection(am2_FILE *fp)
 {
+    /* Every level of the chain is read again at every use, as in the loader;
+     * the action goes out as a struct copy whose `text` holds the length. */
+#define O  kObjScripts[i]
+#define ST O.states[j]
+#define FR ST.frames[k]
+#define AC FR.actions[m]
+    int32_t i, j, k, m;
+
     WriteSaveTag(fp, AM2_SAVETAG_OBJSCRIPT);
     WriteSaveTag(fp, (uint32_t)kObjScriptCount);   /* a count, not a tag */
 
-    for (int32_t i = 0; i < kObjScriptCount; i++) {
-        AM2_ObjScript *o = &kObjScripts[i];
+    for (i = 0; i < kObjScriptCount; i++) {
+        orig_fwrite(&O, AM2_OBJ_SCRIPT_REC_SIZE, 1, fp);
 
-        orig_fwrite(o, AM2_OBJ_SCRIPT_REC_SIZE, 1, fp);
+        for (j = 0; j < O.statecount; j++) {
+            orig_fwrite(&ST, AM2_OBJ_STATE_REC_SIZE, 1, fp);
 
-        for (int32_t j = 0; j < o->statecount; j++) {
-            AM2_ObjState *st = &o->states[j];
+            for (k = 0; k < ST.framecount; k++) {
+                orig_fwrite(&FR, AM2_OBJ_FRAME_REC_SIZE, 1, fp);
 
-            orig_fwrite(st, AM2_OBJ_STATE_REC_SIZE, 1, fp);
+                for (m = 0; m < FR.actioncount; m++) {
+                    AM2_ScriptAction copy = AC;
 
-            for (int32_t k = 0; k < st->framecount; k++) {
-                AM2_ObjFrame *fr = &st->frames[k];
+                    if (copy.text)
+                        *(int32_t *)&copy.text = (int32_t)strlen(AC.text);
+                    else
+                        *(int32_t *)&copy.text = 0;
+                    orig_fwrite(&copy, sizeof copy, 1, fp);
 
-                orig_fwrite(fr, AM2_OBJ_FRAME_REC_SIZE, 1, fp);
-
-                for (int32_t m = 0; m < fr->actioncount; m++) {
-                    const AM2_ScriptAction *a = &fr->actions[m];
-                    uint8_t copy[sizeof(AM2_ScriptAction)];
-                    int32_t len = a->text ? (int32_t)strlen(a->text) : 0;
-
-                    memcpy(copy, a, sizeof copy);
-                    *(int32_t *)(copy + offsetof(AM2_ScriptAction, text)) = len;
-                    orig_fwrite(copy, sizeof copy, 1, fp);
-
-                    if (len > 0)
-                        orig_fwrite(a->text, (size_t)len, 1, fp);
+                    if (*(int32_t *)&copy.text > 0)
+                        orig_fwrite(AC.text, (size_t)*(int32_t *)&copy.text,
+                                    1, fp);
                 }
             }
         }
     }
 
     return 1;
+#undef O
+#undef ST
+#undef FR
+#undef AC
 }
 
 /* 0x004368D0. Free every level of the object-script table and clear the three
@@ -635,6 +642,8 @@ int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
     AM2_ScriptCtx *ctx = (AM2_ScriptCtx *)((void *)(uintptr_t)(ADDR_SCRIPT_CONTEXT));
     char           buf[2048];
     int32_t        count;
+    int32_t        n;
+    int32_t        i, j, k, m;
 
     FreeObjScripts();
 
@@ -656,63 +665,60 @@ int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
         kObjScripts, (size_t)count * sizeof(AM2_ObjScript));
     memset(kObjScripts, 0, (size_t)count * sizeof(AM2_ObjScript));
 
-    for (int32_t i = 0; i < kObjScriptCount; i++) {
-        AM2_ObjScript *o = &kObjScripts[i];
+    /* Every level of the chain is read again at every use -- the image
+     * reloads kObjScripts before each access -- and one count local serves
+     * all four levels. */
+#define O  kObjScripts[i]
+#define ST O.states[j]
+#define FR ST.frames[k]
+#define AC FR.actions[m]
+    for (i = 0; i < kObjScriptCount; i++) {
+        orig_fread(&O, AM2_OBJ_SCRIPT_REC_SIZE, 1, fp);
 
-        orig_fread(o, AM2_OBJ_SCRIPT_REC_SIZE, 1, fp);
-
-        if (o->statecount == 0) {
-            o->statecap = 0;
-            o->states   = (AM2_ObjState *)0;
+        n = O.statecount;
+        if (n == 0) {
+            O.statecap = 0;
+            O.states   = (AM2_ObjState *)0;
             continue;
         }
 
-        o->states = (AM2_ObjState *)am2_malloc(
-            (size_t)o->statecount * sizeof(AM2_ObjState));
-        memset(o->states, 0, (size_t)o->statecount * sizeof(AM2_ObjState));
+        O.states = (AM2_ObjState *)am2_malloc((size_t)n * sizeof(AM2_ObjState));
+        memset(O.states, 0, (size_t)n * sizeof(AM2_ObjState));
 
-        for (int32_t j = 0; j < o->statecount; j++) {
-            AM2_ObjState *st = &o->states[j];
+        for (j = 0; j < O.statecount; j++) {
+            orig_fread(&ST, AM2_OBJ_STATE_REC_SIZE, 1, fp);
 
-            orig_fread(st, AM2_OBJ_STATE_REC_SIZE, 1, fp);
-
-            if (st->framecount == 0) {
-                st->framecap = 0;
-                st->frames   = (AM2_ObjFrame *)0;
+            n = ST.framecount;
+            if (n == 0) {
+                ST.framecap = 0;
+                ST.frames   = (AM2_ObjFrame *)0;
                 continue;
             }
 
-            st->frames = (AM2_ObjFrame *)am2_malloc(
-                (size_t)st->framecount * sizeof(AM2_ObjFrame));
-            memset(st->frames, 0,
-                   (size_t)st->framecount * sizeof(AM2_ObjFrame));
+            ST.frames = (AM2_ObjFrame *)am2_malloc(
+                (size_t)n * sizeof(AM2_ObjFrame));
+            memset(ST.frames, 0, (size_t)n * sizeof(AM2_ObjFrame));
 
-            for (int32_t k = 0; k < st->framecount; k++) {
-                AM2_ObjFrame *fr = &st->frames[k];
+            for (k = 0; k < ST.framecount; k++) {
+                orig_fread(&FR, AM2_OBJ_FRAME_REC_SIZE, 1, fp);
 
-                orig_fread(fr, AM2_OBJ_FRAME_REC_SIZE, 1, fp);
-
-                if (fr->actioncount == 0) {
-                    fr->actioncap = 0;
-                    fr->actions   = (AM2_ScriptAction *)0;
+                n = FR.actioncount;
+                if (n == 0) {
+                    FR.actioncap = 0;
+                    FR.actions   = (AM2_ScriptAction *)0;
                     continue;
                 }
 
-                fr->actions = (AM2_ScriptAction *)am2_malloc(
-                    (size_t)fr->actioncount * sizeof(AM2_ScriptAction));
-                memset(fr->actions, 0,
-                       (size_t)fr->actioncount * sizeof(AM2_ScriptAction));
+                FR.actions = (AM2_ScriptAction *)am2_malloc(
+                    (size_t)n * sizeof(AM2_ScriptAction));
+                memset(FR.actions, 0, (size_t)n * sizeof(AM2_ScriptAction));
 
-                for (int32_t m = 0; m < fr->actioncount; m++) {
-                    AM2_ScriptAction *a = &fr->actions[m];
-                    int32_t          *textslot;
-                    int32_t           len, idx;
+                for (m = 0; m < FR.actioncount; m++) {
+                    int32_t len, idx;
 
-                    orig_fread(a, (size_t)sizeof(AM2_ScriptAction), 1, fp);
+                    orig_fread(&AC, (size_t)sizeof(AM2_ScriptAction), 1, fp);
 
-                    textslot = (int32_t *)((uint8_t *)a
-                                           + offsetof(AM2_ScriptAction, text));
-                    len = *textslot;
+                    len = *(int32_t *)&AC.text;
                     if (len <= 0)
                         continue;
 
@@ -721,11 +727,15 @@ int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
 
                     idx = ctx->count;
                     ScriptAddToken(ctx, AM2_TOKEN_STRING, buf, 0);
-                    a->text = (char *)ctx->tokens[idx].value;
+                    AC.text = (char *)ctx->tokens[idx].value;
                 }
             }
         }
     }
+#undef O
+#undef ST
+#undef FR
+#undef AC
 
     return 1;
 }
