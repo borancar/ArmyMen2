@@ -1997,13 +1997,10 @@ void __cdecl MissionNetworked(int32_t army, int32_t teamGame)
     int32_t slot = ((AM2_Comm *)(void *)(uintptr_t)COMM)->CommSlotForArmy(army);
     int32_t won;
 
-    if (teamGame && TEAM(MINE)) {
+    if (teamGame && TEAM(MINE))
         won = TEAM(MINE) == TEAM(slot);
-        ShowMpResult(!won);
-        return;
-    }
-
-    won = slot == (int32_t)MINE;
+    else
+        won = slot == (int32_t)MINE;
     ShowMpResult(!won);
 #undef COMM
 #undef MINE
@@ -2139,6 +2136,7 @@ typedef int32_t (__cdecl *AM2_RandFn)(void);
 int32_t __cdecl RandomAround(int32_t centre, int32_t spread)
 {
     int32_t n;
+    int32_t range;
     int32_t total;
     int32_t i;
 
@@ -2149,9 +2147,10 @@ int32_t __cdecl RandomAround(int32_t centre, int32_t spread)
     if (n < 1)
         n = 1;
 
+    range = centre * 2;
     total = 0;
     for (i = 0; i < n; i++)
-        total += ((AM2_RandFn)((void *)(uintptr_t)(ADDR_GAME_RAND)))() % (centre * 2);
+        total += ((AM2_RandFn)((void *)(uintptr_t)(ADDR_GAME_RAND)))() % range;
 
     return total / n;
 }

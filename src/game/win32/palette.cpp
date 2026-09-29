@@ -523,22 +523,16 @@ int32_t __cdecl ReadBitmapPalette(const char *path, BITMAPINFO *out)
  * that is still a difference. */
 void __cdecl ExpandPalette(void *dst, const BITMAPINFO *bi)
 {
-    uint32_t       *working  = (uint32_t *)dst;
-    uint32_t       *pristine = (uint32_t *)((uint8_t *)dst
-                                            + AM2_PALETTE_PRISTINE);
-    const uint32_t *src = (const uint32_t *)bi->bmiColors;
-    int32_t         i;
+    uint32_t *p = (uint32_t *)dst;
+    int32_t   i;
 
+    /* The pristine copy is read back out of the working entry a byte at a
+     * time, through RGB(). */
     for (i = 0; i < AM2_PALETTE_ENTRIES; i++) {
-        const uint8_t *b;
-
-        working[i] = SwapColourBytes(src[i]);
-
-        /* Read back through bytes, as the original does. */
-        b = (const uint8_t *)&working[i];
-        pristine[i] = (uint32_t)b[0]
-                    | ((uint32_t)b[1] << 8)
-                    | ((uint32_t)b[2] << 16);
+        p[i] = SwapColourBytes(*(const uint32_t *)&bi->bmiColors[i]);
+        p[i + AM2_PALETTE_PRISTINE / 4] = RGB(((uint8_t *)&p[i])[0],
+                                              ((uint8_t *)&p[i])[1],
+                                              ((uint8_t *)&p[i])[2]);
     }
 }
 

@@ -1946,27 +1946,33 @@ void __cdecl SeqEvict(void *ctxv)
 
     /* The record is addressed afresh at each use, and the walk is a
      * do-while: the head's first link is taken without a test. */
-    i = *(int16_t *)(SeqRecord(ctx, 0) + SEQ_OFF_NEXT);
+#define RECB(n) (*(uint8_t **)(ctx + SEQ_CTX_OFF_RECORDS) \
+                 + (uint32_t)(n) * AM2_SEQ_RECORD_SIZE)
+#define RECO(n) ((uint32_t)(n) * AM2_SEQ_RECORD_SIZE \
+                 + *(uint8_t **)(ctx + SEQ_CTX_OFF_RECORDS))
+    i = *(int16_t *)(RECB(0) + SEQ_OFF_NEXT);
     do {
         uint8_t scratch[16];
 
         if (!orig_intersect_rect(scratch,
                                  (const void *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
-                                 *(uint8_t **)(SeqRecord(ctx, i) + SEQ_OFF_ROW)
+                                 *(uint8_t **)(RECB(i) + SEQ_OFF_ROW)
                                      + ROW_OFF_RECT)) {
-            i = SeqRetire(ctx, SeqRecord(ctx, i));
+            i = SeqRetire(ctx, RECB(i));
             if (--left <= 0)
                 break;
         } else {
-            i = *(int16_t *)(SeqRecord(ctx, i) + SEQ_OFF_NEXT);
+            i = *(int16_t *)(RECB(i) + SEQ_OFF_NEXT);
         }
     } while (i > 0);
 
-    i = *(int16_t *)(SeqRecord(ctx, 0) + SEQ_OFF_NEXT);
+    i = *(int16_t *)(RECB(0) + SEQ_OFF_NEXT);
     while (left > 0) {
-        i = SeqRetire(ctx, SeqRecord(ctx, i));
+        i = SeqRetire(ctx, RECO(i));
         left--;
     }
+#undef RECB
+#undef RECO
 }
 
 /* 0x00461070. THE THRESHOLD IS `count > capacity - margin`, not
@@ -1977,7 +1983,6 @@ void __cdecl SeqEvict(void *ctxv)
 void *__cdecl SeqAlloc(void *ctxv)
 {
     uint8_t *ctx = (uint8_t *)ctxv;
-    uint8_t *rec;
     int32_t  i;
 
     if (*(const int32_t *)(ctx + SEQ_CTX_OFF_COUNT)
@@ -1985,19 +1990,21 @@ void *__cdecl SeqAlloc(void *ctxv)
           - *(const int32_t *)(ctx + SEQ_CTX_OFF_MARGIN))
         SeqEvict(ctx);
 
-    i = *(const int32_t *)(ctx + SEQ_CTX_OFF_COUNT) + 1;
-    *(int32_t *)(ctx + SEQ_CTX_OFF_COUNT) = i;
-    rec = SeqRecord(ctx, i);
+    i = ++*(int32_t *)(ctx + SEQ_CTX_OFF_COUNT);
 
-    *(int16_t *)(rec + SEQ_OFF_ID) = (int16_t)i;
-    *(int16_t *)(rec + SEQ_OFF_PREV) =
+    /* Each record is re-indexed from the records base at every use. */
+#define REC(n) ((uint32_t)(n) * AM2_SEQ_RECORD_SIZE \
+                + *(uint8_t **)(ctx + SEQ_CTX_OFF_RECORDS))
+    *(int16_t *)(REC(i) + SEQ_OFF_ID) = (int16_t)i;
+    *(int16_t *)(REC(i) + SEQ_OFF_PREV) =
         (int16_t)*(const int32_t *)(ctx + SEQ_CTX_OFF_TAIL);
-    *(int16_t *)(rec + SEQ_OFF_NEXT) = -1;
-    *(int16_t *)(SeqRecord(ctx, *(const int32_t *)(ctx + SEQ_CTX_OFF_TAIL))
+    *(int16_t *)(REC(i) + SEQ_OFF_NEXT) = -1;
+    *(int16_t *)(REC(*(const int32_t *)(ctx + SEQ_CTX_OFF_TAIL))
                  + SEQ_OFF_NEXT) = (int16_t)i;
     *(int32_t *)(ctx + SEQ_CTX_OFF_TAIL) = i;
 
-    return rec;
+    return REC(i);
+#undef REC
 }
 
 /* 0x004610E0. The whole row/seq subsystem coming up: both hardcoded pools,

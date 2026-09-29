@@ -5,6 +5,7 @@
 #include "../../inject/win32.h"
 
 #include <stdint.h>
+#include <stdlib.h>   /* abs */
 
 #include "movie.h"   /* MovieStepCurrent, states 0 and 3 */
 #include "frame.h"
@@ -1679,8 +1680,11 @@ void __cdecl PollMovieSkipKey(void)
         if (IsKeyDown(key) || !KeyChanged(key))
             continue;
 
-        if (GetTickCount() - *(const uint32_t *)(uintptr_t)ADDR_STATE0_TICK
-                > AM2_MOVIE_SKIP_HOLDOFF_MS) {
+        /* abs() of the COMPARISON, not of the difference: the parenthesis
+         * is misplaced in the original, which compiles the unsigned test and
+         * then takes abs of its 0 or 1. The same answer either way. */
+        if (abs(GetTickCount() - *(const uint32_t *)(uintptr_t)ADDR_STATE0_TICK
+                > AM2_MOVIE_SKIP_HOLDOFF_MS)) {
             MovieEndCurrent();
             LatchKeyState();
             return;
