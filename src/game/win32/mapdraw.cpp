@@ -2663,38 +2663,40 @@ void __cdecl StartShake(int32_t ms, int32_t stepX, int32_t stepY, int32_t amp)
  */
 void __cdecl ShakeAt(const AM2_Point *at, int32_t strength)
 {
-    int32_t        centreX, centreY, dist, index;
-    uint32_t       centre;
-    double         scale;
-    const int32_t *preset;
+    typedef struct { int32_t a, b, c, d; } Preset;
+    AM2_Point centre;
+    int32_t   dist, index;
+    float     scale;
 
     if (strength <= 0)
         return;
     if (strength > AM2_SHAKE_STRENGTH_MAX)
         strength = AM2_SHAKE_STRENGTH_MAX;
 
-    centreX = *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
-    centreX += (*(const int32_t *)(uintptr_t)ADDR_VIEW_FAR_X - centreX) / 2;
-    centreY = *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y;
-    centreY += (*(const int32_t *)(uintptr_t)ADDR_VIEW_FAR_Y - centreY) / 2;
+    /* The middle of the view, halved with a shift. */
+    centre.x = (int16_t)(((*(const int32_t *)(uintptr_t)ADDR_VIEW_FAR_X
+                           - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X) >> 1)
+                         + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X);
+    centre.y = (int16_t)(((*(const int32_t *)(uintptr_t)ADDR_VIEW_FAR_Y
+                           - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y) >> 1)
+                         + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
 
-    centre = (uint32_t)(uint16_t)(int16_t)centreX
-           | ((uint32_t)(uint16_t)(int16_t)centreY << 16);
-
-    dist = ApproxDist(at, (const AM2_Point *)&centre);
+    dist = ApproxDist(at, &centre);
     if (dist >= AM2_SHAKE_FAR)
         return;
 
-    scale = (dist > AM2_SHAKE_NEAR)
-          ? (double)(AM2_SHAKE_FAR - dist) * AM2_SHAKE_FALLOFF
-          : 1.0;
+    scale = 1.0f;
+    if (dist > AM2_SHAKE_NEAR)
+        scale = (AM2_SHAKE_FAR - dist) * AM2_SHAKE_FALLOFF;
 
-    index = (int32_t)((double)strength * scale);
+    index = (int32_t)(strength * scale);
     if (index < 1)
         return;
 
-    preset = (const int32_t *)(uintptr_t)ADDR_SHAKE_PRESETS + index * 4;
-    StartShake(preset[0], preset[1], preset[2], preset[3]);
+    StartShake(((const Preset *)(uintptr_t)ADDR_SHAKE_PRESETS)[index].a,
+               ((const Preset *)(uintptr_t)ADDR_SHAKE_PRESETS)[index].b,
+               ((const Preset *)(uintptr_t)ADDR_SHAKE_PRESETS)[index].c,
+               ((const Preset *)(uintptr_t)ADDR_SHAKE_PRESETS)[index].d);
 }
 
 /* 0x0042A240, three callers, 400 bytes. Every object in a world rectangle,

@@ -775,9 +775,7 @@ typedef void (__cdecl *AM2_ConsumeKeyFn)(int32_t dik);
 /* A byte read GCC's -Wuninitialized cannot follow; see AM2_KeyRow. */
 static __attribute__((noinline)) uint8_t am2_stale_byte(const uint8_t *p) { return *p; }
 #endif
-
-#define AM2_DIK_UP     0xC8
-#define AM2_DIK_DOWN   0xD0
+/* AM2_DIK_UP and AM2_DIK_DOWN are orig.h's. */
 
 /* The 640x480 screen rectangle, spelled exactly as sprite.cpp and text.cpp
  * spell it so it stays one definition rather than a drift. */
@@ -2321,35 +2319,30 @@ static inline void ArrowBarScroll(AM2_Widget *arrow, int32_t delta)
 {
     AM2_Widget *bar  = *(AM2_Widget **)((uint8_t *)arrow + ARROW_OFF_OWNER);
     AM2_Widget *list = *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST);
-    uint8_t    *l;
-    uint8_t    *b;
-    const AM2_Sprite *thumb;
-    int32_t     top;
-    int32_t     visible;
-    int32_t     count;
 
+    /* The list's fields and the bar's are read afresh at every use. */
+#define TOP     (*(int32_t *)((uint8_t *)list + LIST_OFF_TOP_ROW))
+#define VISIBLE (*(const int32_t *)((uint8_t *)list + LIST_OFF_VISIBLE))
+#define COUNT   (**(const int32_t *const *)((uint8_t *)list + LIST_OFF_ROWS))
+#define THUMB   (*(const AM2_Sprite *const *)((uint8_t *)bar + ARROWBAR_OFF_SPRITE0))
     if (!list)
         return;
-    l = (uint8_t *)list;
-    b = (uint8_t *)bar;
-    top     = *(const int32_t *)(l + LIST_OFF_TOP_ROW);
-    visible = *(const int32_t *)(l + LIST_OFF_VISIBLE);
-    count   = **(const int32_t *const *)(l + LIST_OFF_ROWS);
-
-    if (delta < 0 ? top <= 0 : top >= count - visible)
+    if (delta < 0 ? TOP <= 0 : TOP >= COUNT - VISIBLE)
         return;
 
     PlaySoundAt(1, 0, 0, 0, 0);
-    top += delta;
-    *(int32_t *)(l + LIST_OFF_TOP_ROW) = top;
+    TOP += delta;
     WidgetVPaint(list, list->rect);
 
-    thumb = *(const AM2_Sprite *const *)(b + ARROWBAR_OFF_SPRITE0);
-    *(int32_t *)(b + ARROWBAR_OFF_SHIFT) =
-        ThumbShift(top, count - visible,
-                   *(const int32_t *)(b + ARROWBAR_OFF_SPAN)
-                   - thumb->bounds.bottom);
+    *(int32_t *)((uint8_t *)bar + ARROWBAR_OFF_SHIFT) =
+        ThumbShift(TOP, COUNT - VISIBLE,
+                   *(const int32_t *)((uint8_t *)bar + ARROWBAR_OFF_SPAN)
+                   - THUMB->bounds.bottom);
     RepaintAncestor(bar, bar->rect);
+#undef TOP
+#undef VISIBLE
+#undef COUNT
+#undef THUMB
 }
 
 
@@ -2559,19 +2552,10 @@ typedef void (__cdecl *AM2_SendIntFn)(int32_t v);
 /* SendColorMsg and SendTeamMsg are ours -- msgslot.cpp -- so they are called
  * by name; CommSendPlayers is not. */
 
-/* The guard both share: our own row is always ours to change. */
-static int32_t MpRowEditable(void *comm, int32_t row)
-{
-    const uint8_t *c = (const uint8_t *)comm;
-
-    if (g_ourSlot == row)
-        return 1;
-    if (!*(const int32_t *)(c + COMM_OFF_IS_HOST))
-        return 0;
-    /* The host may edit the rows PAST the human player count -- the computer
-     * slots -- and not the rows belonging to other people.  `jl` returns. */
-    return row >= *(const int32_t *)(c + COMM_OFF_PLAYER_COUNT);
-}
+/* The guard all three share, which each expands in place (it is not a
+ * function in the image): our own row is always ours to change, and the host
+ * may edit the rows PAST the human player count -- the computer slots -- and
+ * not the rows belonging to other people. */
 
 
 
@@ -11183,7 +11167,7 @@ void __attribute__((thiscall)) AM2_Widget::MpNameSetInk(uint8_t ink)
  * computer player, and when it turns one ON it names it -- which is where
  * the "Computer1", "Computer2" in a multiplayer roster come from.
  *
- * The row test is the one MpRowEditable makes, without the "or it is mine"
+ * The row test is the colour and team handlers' guard, without the "or it is mine"
  * arm: a name may only be toggled on a row past the human player count. */
 void __cdecl OnMpName(AM2_Widget *w)
 {
@@ -11246,48 +11230,48 @@ AM2_MpColour::AM2_MpColour(int32_t left, int32_t top, int32_t row)
 
 void __cdecl OnMpColour(AM2_Widget *w)
 {
+#define comm ((uint8_t *)g_commObject)
     uint8_t *screen = g_paintObject;
-    void    *comm   = g_commObject;
     int32_t  row    = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
     int32_t *sel;
     int32_t  next;
     int32_t  army;
     int32_t  i;
 
-    if (!MpRowEditable(comm, row))
-        return;
-    /* Row 3 is not colourable and the test is on the row read BEFORE the
-     * guard, which is the same value either way. */
-    if (row == 3)
-        return;
+    /* the shared guard expanded in place, and row 3 -- not colourable --
+     * refused with it; the body is inside. */
+    if ((g_ourSlot == row
+         || (*(const int32_t *)(comm + COMM_OFF_IS_HOST)
+             && row >= *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT)))
+        && row != 3) {
+        sel = (int32_t *)(screen + MP_PANEL_OFF_COLOUR_SEL);
+        if (sel[row] == -1)
+            sel[row] = row;
 
-    sel = (int32_t *)(screen + MP_PANEL_OFF_COLOUR_SEL);
-    if (sel[row] == -1)
-        sel[row] = row;
+        row  = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
+        next = sel[row] + 1;
+        if (next >= AM2_PLAYERS_MAX)
+            next = row + 1;
+        sel[row] = next;
 
-    row  = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
-    next = sel[row] + 1;
-    if (next >= AM2_PLAYERS_MAX)
-        next = row + 1;
-    sel[row] = next;
+        army = ((AM2_Comm *)comm)->CommArmyOfSlot(next);
+        if (*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+            ((AM2_Comm *)comm)->CommSetArmyColour(
+                                 *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW),
+                                 army);
+            PlaySoundAt(2, 0, 0, 0, 0);
+            SendPlayerMsg(0);
 
-    army = ((AM2_Comm *)comm)->CommArmyOfSlot(next);
-    if (!*(const int32_t *)((const uint8_t *)comm + COMM_OFF_IS_HOST)) {
-        SendColorMsg(army);
-        return;
+            for (i = 0; i < AM2_PLAYERS_MAX; i++) {
+                AM2_Widget *b = ((AM2_Widget **)(screen + MP_PANEL_OFF_COLOURS))[i];
+
+                WidgetVPaint(b, b->rect);
+            }
+        } else {
+            SendColorMsg(army);
+        }
     }
-
-    ((AM2_Comm *)comm)->CommSetArmyColour(
-                         *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW),
-                         army);
-    PlaySoundAt(2, 0, 0, 0, 0);
-    SendPlayerMsg(0);
-
-    for (i = 0; i < AM2_PLAYERS_MAX; i++) {
-        AM2_Widget *b = ((AM2_Widget **)(screen + MP_PANEL_OFF_COLOURS))[i];
-
-        WidgetVPaint(b, b->rect);
-    }
+#undef comm
 }
 
 /* 0x00432FC0, slot 1 of VTABLE_MP_COLOUR -- the sibling of MpTeamPaint, and
@@ -11343,29 +11327,31 @@ AM2_MpTeam::AM2_MpTeam(int32_t left, int32_t top, int32_t row)
 
 void __cdecl OnMpTeamLeft(AM2_Widget *w)
 {
-    void    *comm = g_commObject;
+#define comm ((uint8_t *)g_commObject)
     int32_t  row  = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
     int32_t *team;
     int32_t  next;
 
-    if (!MpRowEditable(comm, row))
-        return;
+    /* the shared guard expanded in place, the body inside it. */
+    if (g_ourSlot == row
+        || (*(const int32_t *)(comm + COMM_OFF_IS_HOST)
+            && row >= *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT))) {
+        team = (int32_t *)(comm + (uint32_t)row * AM2_PLAYER_STRIDE
+                           + COMM_ARMY_OFF_TEAM);
+        next = *team + 1;
+        if (next > AM2_MP_TEAM_MAX)
+            next = 0;
 
-    team = (int32_t *)((uint8_t *)comm + (uint32_t)row * AM2_PLAYER_STRIDE
-                       + COMM_ARMY_OFF_TEAM);
-    next = *team + 1;
-    if (next > AM2_MP_TEAM_MAX)
-        next = 0;
-
-    if (!*(const int32_t *)((const uint8_t *)comm + COMM_OFF_IS_HOST)) {
-        SendTeamMsg(next);
-        return;
+        if (*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+            *team = next;
+            PlaySoundAt(2, 0, 0, 0, 0);
+            SendPlayerMsg(0);
+            WidgetVPaint(w, w->rect);
+        } else {
+            SendTeamMsg(next);
+        }
     }
-
-    *team = next;
-    PlaySoundAt(2, 0, 0, 0, 0);
-    SendPlayerMsg(0);
-    WidgetVPaint(w, w->rect);
+#undef comm
 }
 
 /* 0x00433190 -- the TEAM button's right half.  Identical to the left except
@@ -11373,29 +11359,31 @@ void __cdecl OnMpTeamLeft(AM2_Widget *w)
  * to 0.  Everything after the arithmetic is shared. */
 void __cdecl OnMpTeamRight(AM2_Widget *w)
 {
-    void    *comm = g_commObject;
+#define comm ((uint8_t *)g_commObject)
     int32_t  row  = *(const int32_t *)((uint8_t *)w + MPBTN_OFF_ROW);
     int32_t *team;
     int32_t  next;
 
-    if (!MpRowEditable(comm, row))
-        return;
+    /* the shared guard expanded in place, the body inside it. */
+    if (g_ourSlot == row
+        || (*(const int32_t *)(comm + COMM_OFF_IS_HOST)
+            && row >= *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT))) {
+        team = (int32_t *)(comm + (uint32_t)row * AM2_PLAYER_STRIDE
+                           + COMM_ARMY_OFF_TEAM);
+        next = *team - 1;
+        if (next < 0)
+            next = AM2_MP_TEAM_MAX;
 
-    team = (int32_t *)((uint8_t *)comm + (uint32_t)row * AM2_PLAYER_STRIDE
-                       + COMM_ARMY_OFF_TEAM);
-    next = *team - 1;
-    if (next < 0)
-        next = AM2_MP_TEAM_MAX;
-
-    if (!*(const int32_t *)((const uint8_t *)comm + COMM_OFF_IS_HOST)) {
-        SendTeamMsg(next);
-        return;
+        if (*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+            *team = next;
+            PlaySoundAt(2, 0, 0, 0, 0);
+            SendPlayerMsg(0);
+            WidgetVPaint(w, w->rect);
+        } else {
+            SendTeamMsg(next);
+        }
     }
-
-    *team = next;
-    PlaySoundAt(2, 0, 0, 0, 0);
-    SendPlayerMsg(0);
-    WidgetVPaint(w, w->rect);
+#undef comm
 }
 
 /* 0x00433240, slot 1 of VTABLE_MP_TEAM -- the TEAM button's painter. Choose
