@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1158 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1174 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1158:
+  the near-miss sweep, 758 before the row pools. From 758 to 1174:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -121,6 +121,20 @@ main result so far (details in `src/vc6/README.md`):
     OptionsDefaults; ArrowBarFollowEnd/ShowRow are one `sub` early;
     MakeAaiRecord's early exits share the loop's tail where the image
     gives them their own; AimStartB keeps its point pointer in `edi`.
+  - **The comm layer re-reads the comm object at every use**: sixteen
+    send/receive/DirectPlay functions matched once `g_commObject` (and the
+    message fields, the running enumeration count, the DirectPlay pointer)
+    were macros instead of locals. The slot loops in CommConstruct and
+    CommDropDirectPlay index the slot rather than walking a pointer.
+    MsgListSetFlag's per-path releases are ONE `break`-then-release tail
+    that VC6 duplicates; MsgListTakeFlags keeps the found node apart from
+    the cursor and returns `found ? taken : 0`.
+  - **Multiplayer fixes found on the way** (no drive reaches them):
+    CommEnumSessions asks for DPENUMSESSIONS_ALL, not AVAILABLE (0x12, ours
+    0x11), so full sessions are listed; the battle browser marks a session
+    "In Progress" on DPSESSION_JOINDISABLED (0x20), not NEWPLAYERSDISABLED
+    (0x1); CommOnConnected clamps the maximum buffer against the literal
+    0x400 rather than the field's current value.
   - **Signed loop tests mean an index**: a `jl` against a strength-reduced
     cursor is an `int32_t i` loop (OptionsApply, AimMarkerAge), a pointer
     walk gives `jb`. The cursor's bias is the field the body reads first.

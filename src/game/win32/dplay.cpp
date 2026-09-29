@@ -530,7 +530,7 @@ void * __attribute__((thiscall)) AM2_Comm::CommConstruct()
 
     uint8_t *self = (uint8_t *)comm;
     uint32_t now;
-    int32_t  i;
+    uint32_t i;
 
     StartPacketThread();
     CommInitDefaults();
@@ -539,22 +539,22 @@ void * __attribute__((thiscall)) AM2_Comm::CommConstruct()
     comm_u32(self, 0x3EC) = 0;
     comm_u32(self, 0x3F4) = 0;
 
+#define SLOT (self + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE)
     for (i = 0; i < 4; i++) {
-        uint8_t *slot = self + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
-
-        comm_u32(slot, 0x00) = 0;
-        comm_u32(slot, 0x64) = 0;
-        comm_u32(slot, 0x68) = 0;
-        comm_u32(slot, 0x04) = (uint32_t)i;
-        comm_u32(slot, 0x54) = 0;
-        comm_u32(slot, 0x08) = 0;
-        comm_u32(slot, 0x50) = 0;
-        comm_u32(slot, 0x4C) = 0;
-        comm_u32(slot, 0x58) = 0;
-        comm_u32(slot, 0x5C) = 0;
-        comm_u32(slot, 0x60) = now;
-        memset(slot + 0x0C, 0, 0x40);
+        comm_u32(SLOT, 0x00) = 0;
+        comm_u32(SLOT, 0x64) = 0;
+        comm_u32(SLOT, 0x68) = 0;
+        comm_u32(SLOT, 0x04) = i;
+        comm_u32(SLOT, 0x54) = 0;
+        comm_u32(SLOT, 0x08) = 0;
+        comm_u32(SLOT, 0x50) = 0;
+        comm_u32(SLOT, 0x4C) = 0;
+        comm_u32(SLOT, 0x58) = 0;
+        comm_u32(SLOT, 0x5C) = 0;
+        comm_u32(SLOT, 0x60) = now;
+        memset(SLOT + 0x0C, 0, 0x40);
     }
+#undef SLOT
 
     comm_u32(self, 0x008) = 0;
     comm_u32(self, 0x408) = now;
@@ -665,13 +665,13 @@ static_assert(DPENUMSESSIONS_ASYNC == 0x10, "DPENUMSESSIONS_ASYNC");
 BOOL FAR PASCAL EnumPlayersCb(DPID dpId, DWORD dwPlayerType, LPCDPNAME lpName,
                               DWORD dwFlags, LPVOID lpContext)
 {
-    uint8_t *comm = g_commObject;
-    uint8_t *slot;
-    int32_t  n;
-
+    /* The comm object and the running count are read at every use. */
+#define COMM ((uint8_t *)g_commObject)
+#define SLOT (COMM + COMM_OFF_PLAYERS \
+              + (size_t)g_commEnumCount * AM2_COMM_SLOT_STRIDE)
     (void)dwPlayerType;
 
-    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
+    if (*(const int32_t *)(COMM + COMM_OFF_VERBOSE))
         orig_log("InitJoin dpId = %x PlayerName = %s (%s), Flags = %x , context = %x slot = %d \n",
                  dpId, lpName->lpszLongNameA, lpName->lpszShortNameA,
                  dwFlags, lpContext, g_commEnumCount);
@@ -679,28 +679,27 @@ BOOL FAR PASCAL EnumPlayersCb(DPID dpId, DWORD dwPlayerType, LPCDPNAME lpName,
     orig_log("%s's dpid: %d\n",
              lpName->lpszShortNameA, dpId);
 
-    if (dpId == *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID)) {
+    if (dpId == *(const uint32_t *)(COMM + COMM_OFF_OUR_PLAYER_ID)) {
         *(int32_t *)(uintptr_t)ADDR_OUR_SLOT      = g_commEnumCount;
         *(int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER = g_commEnumCount;
     }
 
-    n    = g_commEnumCount;
-    slot = comm + COMM_OFF_PLAYERS + (size_t)n * AM2_COMM_SLOT_STRIDE;
+    *(uint32_t *)(SLOT + COMM_SLOT_OFF_ID)    = dpId;
+    *(int32_t *)(SLOT + COMM_SLOT_OFF_TAKEN)  = 1;
+    *(int32_t *)(SLOT + COMM_SLOT_OFF_INDEX)  = g_commEnumCount;
 
-    *(uint32_t *)(slot + COMM_SLOT_OFF_ID)    = dpId;
-    *(int32_t *)(slot + COMM_SLOT_OFF_TAKEN)  = 1;
-    *(int32_t *)(slot + COMM_SLOT_OFF_INDEX)  = n;
-
-    if (dpId != *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID)) {
-        if (n < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT))
-            ((AM2_Comm *)comm)->CommSetSlotRemote(n);
+    if (dpId != *(const uint32_t *)(COMM + COMM_OFF_OUR_PLAYER_ID)) {
+        if (g_commEnumCount < *(const int32_t *)(COMM + COMM_OFF_PLAYER_COUNT))
+            AM2_THE_COMM->CommSetSlotRemote(g_commEnumCount);
         CommRegisterSelf(dpId);
     }
 
-    strcpy((char *)(slot + COMM_SLOT_OFF_NAME), lpName->lpszShortNameA);
+    strcpy((char *)(SLOT + COMM_SLOT_OFF_NAME), lpName->lpszShortNameA);
 
     g_commEnumCount++;
     return TRUE;
+#undef COMM
+#undef SLOT
 }
 
 
@@ -723,7 +722,7 @@ BOOL FAR PASCAL EnumPlayersCb(DPID dpId, DWORD dwPlayerType, LPCDPNAME lpName,
  * fields are lifted straight out of DPSESSIONDESC2 rather than guessed at.
  *
  * AND AN IN-PROGRESS SESSION IS SHOWN BUT CANNOT BE PICKED, which is where
- * this meets the list box. When DPSESSION_NEWPLAYERSDISABLED is set the row
+ * this meets the list box. When DPSESSION_JOINDISABLED (0x20) is set the row
  * text is built as '^', an ink byte, the session name and "  --  In
  * Progress"; otherwise it is the plain name. ListUpdate refuses to select any
  * row whose first character is '^' -- LIST_ROW_DEAD -- so the two ends of
@@ -748,13 +747,8 @@ BOOL FAR PASCAL EnumSessionsCb(LPCDPSESSIONDESC2 lpThisSD, LPDWORD lpdwTimeOut,
     (void)lpdwTimeOut;
     (void)lpContext;
 
-    if (!g_sessionList)
+    if (!g_sessionList || (dwFlags & DPESC_TIMEDOUT) || !lpThisSD)
         return FALSE;
-    if (dwFlags & DPESC_TIMEDOUT)
-        return FALSE;
-    if (!lpThisSD)
-        return FALSE;
-
     rec = (uint8_t *)orig_malloc(AM2_SESSION_REC_BYTES);
     if (!rec)
         return FALSE;
@@ -763,7 +757,10 @@ BOOL FAR PASCAL EnumSessionsCb(LPCDPSESSIONDESC2 lpThisSD, LPDWORD lpdwTimeOut,
     *(uint32_t *)(rec + SESSION_REC_OFF_CUR) = lpThisSD->dwCurrentPlayers;
     *(uint32_t *)(rec + SESSION_REC_OFF_MAX) = lpThisSD->dwMaxPlayers;
 
-    if (lpThisSD->dwFlags & DPSESSION_NEWPLAYERSDISABLED) {
+    /* JOINDISABLED (0x20), which is what the host sets once the game has
+     * started; ours tested NEWPLAYERSDISABLED (0x1) until the relink
+     * compared the constant. */
+    if (lpThisSD->dwFlags & DPSESSION_JOINDISABLED) {
         row[0] = LIST_ROW_DEAD;
         row[1] = (char)*(const uint8_t *)(uintptr_t)ADDR_LIST_INK_HOT_SEL;
         row[2] = '\0';
@@ -785,15 +782,13 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommEnumSessions(void *list)
     void *comm = this;
 
     DPSESSIONDESC2  desc;
-    LPDIRECTPLAY4A  dp;
     const GUID     *app;
-    HRESULT         hr;
 
-    /* Nowhere to put the answers, or nothing to ask. */
+    /* Nowhere to put the answers, or nothing to ask. The DirectPlay pointer
+     * is read from the object again for the call. */
     if (!list)
         return 0;
-    dp = *DirectPlaySlot(comm);
-    if (!dp)
+    if (!*DirectPlaySlot(comm))
         return 0;
 
     RecordReset(list);
@@ -808,11 +803,14 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommEnumSessions(void *list)
     if (app)
         desc.guidApplication = *app;
 
-    hr = IDirectPlayX_EnumSessions(dp, &desc, 0,
-                                   EnumSessionsCb,
-                                   g_enumContext,
-                                   DPENUMSESSIONS_AVAILABLE | DPENUMSESSIONS_ASYNC);
-    return hr == DP_OK;
+    /* ALL, not AVAILABLE: the image asks for 0x12, so sessions that are not
+     * accepting players are listed too. Ours asked for 0x11 until the relink
+     * compared the push. */
+    return IDirectPlayX_EnumSessions(*DirectPlaySlot(comm), &desc, 0,
+                                     EnumSessionsCb,
+                                     g_enumContext,
+                                     DPENUMSESSIONS_ALL | DPENUMSESSIONS_ASYNC)
+           == DP_OK;
 }
 
 /* Ask DirectPlay which transports are available, and offer them as menu rows.
@@ -1066,20 +1064,19 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommOpenSession(const char *name)
 
     uint8_t        *comm = g_commObject;
     DPSESSIONDESC2  desc;
-    LPDIRECTPLAY4A  dp;
     const GUID     *app;
 
     /* Only a networked game needs a session. */
     if (!comm_u32(comm, COMM_OFF_LOCAL)) {
-        dp = *DirectPlaySlot(comm);
-        if (!dp)
+        /* Tested here, read again for the call. */
+        if (!*DirectPlaySlot(comm))
             return 0;
 
         memset(&desc, 0, sizeof desc);
         desc.dwSize        = sizeof desc;
         desc.dwFlags       = DPSESSION_MIGRATEHOST;
-        desc.dwMaxPlayers  = AM2_MAX_PLAYERS;
         desc.lpszSessionNameA = (LPSTR)name;
+        desc.dwMaxPlayers  = AM2_MAX_PLAYERS;
         /* Our own slot's index field, carried across as user data. Only the
          * host reaches this branch, so "ours" and "the host's" are the same
          * slot here -- which is how the global came to be misnamed. */
@@ -1090,7 +1087,8 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommOpenSession(const char *name)
         if (app)
             desc.guidApplication = *app;
 
-        if (IDirectPlayX_Open(dp, &desc, DPOPEN_CREATE) != DP_OK)
+        if (IDirectPlayX_Open(*DirectPlaySlot(comm), &desc, DPOPEN_CREATE)
+                != DP_OK)
             return 0;
     }
 
@@ -1109,8 +1107,9 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommOpenSession(const char *name)
  *
  * The defaults it trims are the ones CommConstruct writes -- 0x400 for the
  * maximum and 0x3E4 for the working size -- and the two agree without being
- * made to. Neither is raised, only lowered: a provider that can carry more than
- * 1024 bytes does not get to.
+ * made to. The maximum is compared with the LITERAL 0x400, not with the field
+ * (so a second connection could raise it back up to that), the working size
+ * with the field. The comm object is read again at every use.
  *
  * The 0x14 subtracted from the working size is DirectPlay's own per-message
  * overhead, left in the number rather than accounted for anywhere else.
@@ -1144,42 +1143,42 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommOnConnected()
 {
     void *self = this;
 
-    LPDIRECTPLAY4A dp   = *DirectPlaySlot(self);
-    uint8_t       *comm = g_commObject;
-    LPDPCAPS       caps = (LPDPCAPS)(comm + COMM_OFF_CAPS);
-    uint32_t       usable;
-
-    if (!dp)
+#define COMM ((uint8_t *)g_commObject)
+#define CAPS ((LPDPCAPS)(COMM + COMM_OFF_CAPS))
+    if (!*DirectPlaySlot(self))
         return 0;
 
-    caps->dwSize = sizeof *caps;
-    if (IDirectPlayX_GetCaps(dp, caps, 0) != DP_OK)
+    CAPS->dwSize = sizeof(DPCAPS);
+    if (IDirectPlayX_GetCaps(*DirectPlaySlot(self), CAPS, 0) != DP_OK)
         return 0;
 
     if (g_commDebug(self)) {
         orig_log("DPLAY CAPS: \n");
-        orig_log("   MaxPacketSize %8d \n", caps->dwMaxBufferSize);
-        orig_log("   HeaderSize    %8d \n", caps->dwHeaderLength);
-        orig_log("   Latency       %8d \n", caps->dwLatency);
-        orig_log("   TimeOut       %8d \n", caps->dwTimeout);
-        orig_log((const char *)(uintptr_t)
-                 ((caps->dwFlags & DPCAPS_GUARANTEEDSUPPORTED)
-                  ? ADDR_STR_CAPS_GUAR_YES : ADDR_STR_CAPS_GUAR_NO));
+        orig_log("   MaxPacketSize %8d \n", CAPS->dwMaxBufferSize);
+        orig_log("   HeaderSize    %8d \n", CAPS->dwHeaderLength);
+        orig_log("   Latency       %8d \n", CAPS->dwLatency);
+        orig_log("   TimeOut       %8d \n", CAPS->dwTimeout);
+        if (CAPS->dwFlags & DPCAPS_GUARANTEEDSUPPORTED)
+            orig_log((const char *)(uintptr_t)ADDR_STR_CAPS_GUAR_YES);
+        else
+            orig_log((const char *)(uintptr_t)ADDR_STR_CAPS_GUAR_NO);
     }
 
-    /* Lowered to fit the provider, never raised past what was asked for. */
-    if (caps->dwMaxBufferSize < comm_u32(comm, COMM_OFF_BUFFER_MAX))
-        comm_u32(comm, COMM_OFF_BUFFER_MAX) = caps->dwMaxBufferSize;
+    if (CAPS->dwMaxBufferSize < 0x400u)
+        comm_u32(COMM, COMM_OFF_BUFFER_MAX) = CAPS->dwMaxBufferSize;
 
-    usable = caps->dwMaxBufferSize - DPLAY_MESSAGE_OVERHEAD;
-    if (usable < comm_u32(comm, COMM_OFF_BUFFER_DEFAULT))
-        comm_u32(comm, COMM_OFF_BUFFER_DEFAULT) = usable;
+    if (CAPS->dwMaxBufferSize - DPLAY_MESSAGE_OVERHEAD
+            < comm_u32(COMM, COMM_OFF_BUFFER_DEFAULT))
+        comm_u32(COMM, COMM_OFF_BUFFER_DEFAULT) =
+            CAPS->dwMaxBufferSize - DPLAY_MESSAGE_OVERHEAD;
 
     if (g_commDebug(self))
         orig_log(" Max Buffer Size = %d Default buffer size to %d bytes\n",
-                 comm_u32(comm, COMM_OFF_BUFFER_MAX),
-                 comm_u32(comm, COMM_OFF_BUFFER_DEFAULT));
+                 comm_u32(COMM, COMM_OFF_BUFFER_MAX),
+                 comm_u32(COMM, COMM_OFF_BUFFER_DEFAULT));
     return 1;
+#undef COMM
+#undef CAPS
 }
 
 /* Give the connection back -- 0x0040EA40, thiscall, and the last of the
@@ -1208,9 +1207,6 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommDropDirectPlay()
 
     uint8_t             *self = (uint8_t *)comm;
     LPDIRECTPLAY4A      *dp    = DirectPlaySlot(comm);
-    LPDIRECTPLAYLOBBY3A *lobby =
-        (LPDIRECTPLAYLOBBY3A *)(self + COMM_OFF_LOBBY);
-    uint32_t             ours;
     int32_t              i;
 
     if (comm_u32(self, COMM_OFF_SESSION_DESC)) {
@@ -1232,39 +1228,41 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommDropDirectPlay()
     comm_u32(self, COMM_OFF_PLAYER_COUNT) = 1;   /* just us again */
     comm_u32(self, 0x3E4) = 0;
 
-    ours = comm_u32(self, COMM_OFF_OUR_PLAYER_ID);
-
+    /* Our id is read from the object at each use, and the slots are
+     * indexed, as in CommConstruct. */
+#define SLOT (self + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE)
     for (i = 0; i < 4; i++) {
-        uint8_t *slot = self + COMM_OFF_PLAYERS + i * COMM_PLAYER_STRIDE;
-        uint32_t id;
-
-        comm_u32(slot, 0x00) = 0;
-        comm_u32(slot, 0x64) = 0;
-        comm_u32(slot, 0x68) = 0;
-        comm_u32(slot, 0x50) = 0;
-        comm_u32(slot, 0x4C) = 0;
-        comm_u32(slot, 0x04) = (uint32_t)i;
-        comm_u32(slot, 0x54) = 0;
+        comm_u32(SLOT, 0x00) = 0;
+        comm_u32(SLOT, 0x64) = 0;
+        comm_u32(SLOT, 0x68) = 0;
+        comm_u32(SLOT, 0x50) = 0;
+        comm_u32(SLOT, 0x4C) = 0;
+        comm_u32(SLOT, 0x04) = (uint32_t)i;
+        comm_u32(SLOT, 0x54) = 0;
 
         /* Remote players are destroyed; ours is left for the call below. */
-        id = comm_u32(slot, COMM_SLOT_OFF_ID);
-        if (id && id != ours)
-            DestroyFlow(id);
-        comm_u32(slot, COMM_SLOT_OFF_ID) = 0;
+        if (comm_u32(SLOT, COMM_SLOT_OFF_ID)
+            && comm_u32(SLOT, COMM_SLOT_OFF_ID)
+               != comm_u32(self, COMM_OFF_OUR_PLAYER_ID))
+            DestroyFlow(comm_u32(SLOT, COMM_SLOT_OFF_ID));
+        comm_u32(SLOT, COMM_SLOT_OFF_ID) = 0;
 
-        comm_u32(slot, 0x58) = 0;
-        comm_u32(slot, 0x5C) = 0;
-        comm_u32(slot, 0x60) = GetTickCount();
-        memset(slot + 0x0C, 0, 0x40);
+        comm_u32(SLOT, 0x58) = 0;
+        comm_u32(SLOT, 0x5C) = 0;
+        comm_u32(SLOT, 0x60) = GetTickCount();
+        memset(SLOT + 0x0C, 0, 0x40);
     }
+#undef SLOT
 
-    DestroyFlow(ours);
+    DestroyFlow(comm_u32(self, COMM_OFF_OUR_PLAYER_ID));
     comm_u32(self, COMM_OFF_OUR_PLAYER_ID) = 0;
 
-    if (*lobby) {
-        IDirectPlayLobby_Release(*lobby);
-        *lobby = NULL;
+#define LOBBY (*(LPDIRECTPLAYLOBBY3A *)(self + COMM_OFF_LOBBY))
+    if (LOBBY) {
+        IDirectPlayLobby_Release(LOBBY);
+        LOBBY = NULL;
     }
+#undef LOBBY
 
     UnPauseGame(COMM_DROP_EVENT_MASK);
     g_defaultOwner      = 0;
@@ -1990,9 +1988,12 @@ void __cdecl EventClose(void *holder)
 
 int32_t __cdecl StartPacketThread(void)
 {
-    uint8_t *rec  = g_packetRecords;
-    uint8_t *data = (uint8_t *)(uintptr_t)ADDR_PACKET_BUFFERS;
-    int32_t  i;
+    /* Indexed: the image's outer test is a signed `jl` on the buffer
+     * cursor the two indexes strength-reduce to. */
+#define REC(i) (g_packetRecords + (uint32_t)(i) * PACKET_RECORD_STRIDE)
+#define BUF    ((uint32_t *)(uintptr_t)ADDR_PACKET_BUFFERS)
+    int32_t i;
+    int32_t j;
 
     if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_POOL)) return 0;
     if (!MsgListInit((void *)(uintptr_t)ADDR_MSG_LIST_B))    return 0;
@@ -2005,19 +2006,21 @@ void __cdecl PacketSlotReset(uint32_t slot);
     /* A fixed seed, so every run fills the buffers identically. */
     GameSrand(0);
 
-    while (data < (uint8_t *)(uintptr_t)ADDR_PACKET_BUFFERS_END) {
-        uint32_t *w = (uint32_t *)data;
+    /* 400 buffers: ADDR_PACKET_BUFFERS_END - ADDR_PACKET_BUFFERS is 0x64000,
+     * spelled as a number because the relink places those two as symbols. */
+    for (i = 0; i < 400; i++) {
+        *(uint32_t *)(REC(i) + PACKET_REC_OFF_SIZE) = PACKET_BUFFER_BYTES;
+        *(uint32_t **)(REC(i) + PACKET_REC_OFF_DATA) =
+            &BUF[i * (int32_t)(PACKET_BUFFER_BYTES / 4)];
 
-        *(uint32_t *)(rec + PACKET_REC_OFF_SIZE) = PACKET_BUFFER_BYTES;
-        *(uint32_t **)(rec + PACKET_REC_OFF_DATA) = w;
+        for (j = 0; j < (int32_t)(PACKET_BUFFER_BYTES / 4); j++)
+            BUF[i * (int32_t)(PACKET_BUFFER_BYTES / 4) + j] =
+                (uint32_t)orig_rand();
 
-        for (i = 0; i < (int32_t)(PACKET_BUFFER_BYTES / 4); i++)
-            *w++ = (uint32_t)orig_rand();
-
-        MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, rec);
-        rec  += PACKET_RECORD_STRIDE;
-        data  = (uint8_t *)w;
+        MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, REC(i));
     }
+#undef REC
+#undef BUF
 
     *(HANDLE *)(uintptr_t)ADDR_PACKET_EVENT_A =
         CreateEventA(NULL, FALSE, FALSE, NULL);
@@ -2036,7 +2039,8 @@ void __cdecl PacketSlotReset(uint32_t slot);
                                   (LPTHREAD_START_ROUTINE)RecvThreadProc,
                                   NULL, 0,
                                   (LPDWORD)(uintptr_t)ADDR_PACKET_THREAD_ID);
-    if (!g_packetThread) {
+    /* An unsigned `<= 0` in the image (`ja` past the failure). */
+    if ((uintptr_t)g_packetThread <= 0u) {
         orig_log("Error launching packet thread\n", 0, 0, 0);
         return 0;
     }
@@ -2054,43 +2058,43 @@ typedef void (__cdecl *AM2_RequestStateFn)(int32_t state);
 
 void __cdecl SendGameStartMsg(void)
 {
-    uint8_t *comm;
+    /* The comm object is read at every use. */
+#define COMM ((uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT))
+#define DESC (*(uint8_t **)(COMM + COMM_OFF_SESSION_DESC))
     uint8_t *msg = (uint8_t *)(uintptr_t)ADDR_MSG_GAME_START;
 
     /* NOT gated on the verbosity field, unlike the rest of this group. */
     orig_log("SendGameStartMsg\n");
 
-    comm = (uint8_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT);
-
-    if (!*(const int32_t *)(comm + COMM_OFF_LOCAL)) {
-        int32_t seed;
-        void   *desc;
+    if (!*(const int32_t *)(COMM + COMM_OFF_LOCAL)) {
+        int32_t  seed;
+        uint8_t *desc;
 
         /* Host only; a client does nothing at all, not even the tail. */
-        if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+        if (!*(const int32_t *)(COMM + COMM_OFF_IS_HOST))
             return;
 
-        *(int32_t *)(msg + 8) = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
-        *(int32_t *)(msg + 12) = *(const int32_t *)(comm + AM2_START_SELF_ID);
+        *(int32_t *)(msg + 8) = *(const int32_t *)(COMM + COMM_OFF_PLAYER_COUNT);
+        *(int32_t *)(msg + 12) = *(const int32_t *)(COMM + AM2_START_SELF_ID);
 
         /* The shared seed: read once here and sent, so every machine agrees. */
         seed = orig_crt_time((int32_t *)0);
         *(int32_t *)(uintptr_t)ADDR_GAME_SEED      = seed;
         *(int32_t *)(uintptr_t)ADDR_GAME_SEED_SENT = seed;
 
-        if (*(const int32_t *)(comm + AM2_START_COMM_LOG))
+        if (*(const int32_t *)(COMM + AM2_START_COMM_LOG))
             /* "Seed is %d" with a literal 0 -- the original never prints the
              * seed it just chose. Kept. */
             orig_log("SendGameStartMsg for %d  Players: Seed is %d \n",
-                    *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT), 0);
+                    *(const int32_t *)(COMM + COMM_OFF_PLAYER_COUNT), 0);
 
-        CommGetSessionDesc(comm);
+        AM2_THE_COMM->CommGetSessionDesc();
 
-        desc = *(void **)(comm + COMM_OFF_SESSION_DESC);
-        *(uint32_t *)((uint8_t *)desc + 4) |= AM2_SESSION_FLAGS_START;
-        ((AM2_Comm *)comm)->CommSetSessionDesc(desc, 0);
+        desc = DESC;
+        *(uint32_t *)(desc + 4) |= AM2_SESSION_FLAGS_START;
+        AM2_THE_COMM->CommSetSessionDesc(desc, 0);
 
-        ((AM2_Comm *)comm)->CommSend(0, 1, msg, (uint32_t)*(const int32_t *)(msg + 4));
+        AM2_THE_COMM->CommSend(0, 1, msg, (uint32_t)*(const int32_t *)(msg + 4));
     }
 
     /* Reached by the host AND by the already-started case. */
@@ -2098,6 +2102,8 @@ void __cdecl SendGameStartMsg(void)
     RequestState(2);
     *(int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE = 1;
     *(int32_t *)(uintptr_t)ADDR_NET_GAME         = 1;
+#undef COMM
+#undef DESC
 }
 
 
@@ -2751,31 +2757,35 @@ void *__cdecl MsgListInsert(void *list, void *node)
  */
 int32_t __cdecl MsgListTakeFlags(void *list, void *dst)
 {
-    uint8_t       *l    = (uint8_t *)list;
-    const uint32_t want = *(const uint32_t *)(uintptr_t)ADDR_MSG_WANTED_FLAGS;
-    uint8_t       *n;
-    uint32_t       taken = 0;
+    /* The wanted mask is read afresh on every pass, the node found is kept
+     * apart from the cursor, and the result is `found ? taken : 0`. */
+#define WANT (*(const uint32_t *)(uintptr_t)ADDR_MSG_WANTED_FLAGS)
+    uint8_t  *l     = (uint8_t *)list;
+    uint8_t  *n;
+    uint8_t  *found;
+    uint32_t  taken = 0;
 
     WaitForSingleObject(*(HANDLE *)(l + MSGLIST_OFF_MUTEX), INFINITE);
+    found = 0;
 
     for (n = *(uint8_t **)(l + MSGLIST_OFF_HEAD); n;
-         n = *(uint8_t **)(n + MSGNODE_OFF_NEXT))
-        if (*(const uint32_t *)(n + MSGNODE_OFF_FLAGS) & want)
+         n = *(uint8_t **)(n + MSGNODE_OFF_NEXT)) {
+        if (*(const uint32_t *)(n + MSGNODE_OFF_FLAGS) & WANT) {
+            found = n;
+            taken = *(const uint32_t *)(n + MSGNODE_OFF_FLAGS) & WANT;
+            *(uint32_t *)(n + MSGNODE_OFF_FLAGS) &= ~WANT;
             break;
-
-    if (n) {
-        uint32_t flags = *(const uint32_t *)(n + MSGNODE_OFF_FLAGS);
-
-        taken = flags & want;
-        *(uint32_t *)(n + MSGNODE_OFF_FLAGS) = flags & ~want;
-
-        memcpy(dst, *(const void *const *)(n + MSGNODE_OFF_BODY),
-               *(const uint32_t *)(n + MSGNODE_OFF_BODY_LEN));
+        }
     }
+
+    if (found)
+        memcpy(dst, *(const void *const *)(found + MSGNODE_OFF_BODY),
+               *(const uint32_t *)(found + MSGNODE_OFF_BODY_LEN));
 
     ReleaseMutex(*(HANDLE *)(l + MSGLIST_OFF_MUTEX));
 
-    return (int32_t)taken;
+    return found ? (int32_t)taken : 0;
+#undef WANT
 }
 
 /* CommPlayerLeft -- original 0x0040F790, two callers, both in WndProc's
@@ -2831,21 +2841,16 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommPlayerLeft(int32_t id)
 
     ::CommClearSlotRemote(c, slot);
 
-    switch (slot) {
-    case 0:
+    /* An else-if chain, not a switch: the image compares 0..3 in turn. A
+     * slot above 3 releases nothing; see above. */
+    if (slot == 0) {
         UnPauseGame(0x800u); UnPauseGame(0x10u); UnPauseGame(0x20000u);
-        break;
-    case 1:
+    } else if (slot == 1) {
         UnPauseGame(0x1000u); UnPauseGame(0x20u); UnPauseGame(0x40000u);
-        break;
-    case 2:
+    } else if (slot == 2) {
         UnPauseGame(0x2000u); UnPauseGame(0x40u); UnPauseGame(0x80000u);
-        break;
-    case 3:
+    } else if (slot == 3) {
         UnPauseGame(0x4000u); UnPauseGame(0x80u); UnPauseGame(0x100000u);
-        break;
-    default:
-        break;                  /* releases nothing; see above */
     }
 
     *(int32_t *)(*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT

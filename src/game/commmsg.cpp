@@ -178,27 +178,29 @@ typedef int32_t (__attribute__((stdcall)) *AM2_PostMessageFn)(void *hwnd,
 void *__cdecl MsgListSetFlag(void *list, int32_t key, int32_t set,
                              uint32_t bits)
 {
-    uint8_t *l = (uint8_t *)list;
+    uint8_t *l     = (uint8_t *)list;
+    uint32_t clear = ~bits;
+    uint8_t *found;
     uint8_t *node;
 
     orig_wait_for_object(*(void **)(l + MSGLIST_OFF_MUTEX), 0xFFFFFFFFu);
+    found = 0;
 
     for (node = *(uint8_t **)(l + MSGLIST_OFF_HEAD); node;
          node = *(uint8_t **)(node + MSGNODE_OFF_NEXT)) {
-        if (*(const int32_t *)(node + PACKET_REC_OFF_KEY) != key)
-            continue;
+        if (*(const int32_t *)(node + PACKET_REC_OFF_KEY) == key) {
+            found = node;
+            if (set)
+                *(uint32_t *)(found + PACKET_REC_OFF_FLAGS) |= bits;
+            else
+                *(uint32_t *)(found + PACKET_REC_OFF_FLAGS) &= clear;
 
-        if (set)
-            *(uint32_t *)(node + PACKET_REC_OFF_FLAGS) |= bits;
-        else
-            *(uint32_t *)(node + PACKET_REC_OFF_FLAGS) &= ~bits;
-
-        orig_release_mutex(*(void **)(l + MSGLIST_OFF_MUTEX));
-        return node;
+            break;
+        }
     }
 
     orig_release_mutex(*(void **)(l + MSGLIST_OFF_MUTEX));
-    return (void *)0;
+    return found;
 }
 
 /* 0x00401050. Append a node to the tail of a mutex-guarded list.
@@ -267,27 +269,28 @@ typedef void (__cdecl *AM2_SendPlayersFn)(int32_t a);
 
 void __cdecl SendGameReadyToLoadMsg(int32_t ready)
 {
-    uint8_t *comm = (uint8_t *)kCommObj;
-    int32_t  slot;
-    void    *dlg;
+    /* The comm object is read at every use. */
+#define COMM ((uint8_t *)kCommObj)
+    void *dlg;
 
     /* Clients only -- the exact mirror of the host-only receive. */
-    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (*(const int32_t *)(COMM + COMM_OFF_IS_HOST))
         return;
 
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
         am2_log("SendGameReadyToLoadMsg\n %s", ready ? "TRUE" : "FALSE");
 
-    slot = ((AM2_Comm *)comm)->CommSlotOfId(
-                                *(const int32_t *)(comm + AM2_COMM_SELF_ID));
-    *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
+    *(int32_t *)(COMM + (uint32_t)AM2_THE_COMM->CommSlotOfId(
+                            *(const int32_t *)(COMM + AM2_COMM_SELF_ID))
+                        * COMM_ARMY_RECORD_SIZE
                  + COMM_ARMY_OFF_READY_TO_LOAD) = ready;
 
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
         am2_log("Setting m_ArmyReadyToLoad[%d] to %s\n",
-                ((AM2_Comm *)comm)->CommSlotOfId(
-                                     *(const int32_t *)(comm + AM2_COMM_SELF_ID)),
+                AM2_THE_COMM->CommSlotOfId(
+                    *(const int32_t *)(COMM + AM2_COMM_SELF_ID)),
                 ready ? "TRUE" : "FALSE");
+#undef COMM
 
     *(int32_t *)((uint8_t *)(uintptr_t)ADDR_MSG_READY_TO_LOAD + AM2_MSG_VALUE)
         = ready;
@@ -343,35 +346,37 @@ int32_t __cdecl SendMapMsg(int32_t result, int32_t unused)
 
 void __cdecl ReceivedMapMsg(void *msg, int32_t dpid)
 {
-    uint8_t *comm = (uint8_t *)kCommObj;
-    int32_t  value;
-    int32_t  slot;
+    /* The comm object and the message's value are read at every use. */
+#define COMM  ((uint8_t *)kCommObj)
+#define VALUE (*(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE))
+    int32_t slot;
 
-    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (!*(const int32_t *)(COMM + COMM_OFF_IS_HOST))
         return;
 
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
         am2_log("ReceivedMapMsg from %x  Result = %d (4 is nominal) \n",
-                dpid, *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE));
+                dpid, VALUE);
 
-    slot  = ((AM2_Comm *)comm)->CommSlotOfId(dpid);
-    value = *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE);
+    slot = AM2_THE_COMM->CommSlotOfId(dpid);
 
     /* From the table at 0x00411998, in table order. 5 and 7 fall through to
      * the same nothing as anything above 8. */
-    switch (value) {
+    switch (VALUE) {
     case 0:
-        *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
+        *(int32_t *)(COMM + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
                      + COMM_ARMY_OFF_MAP_OK) = 1;
         break;
     case 1: case 2: case 3: case 4: case 6: case 8:
-        *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
+        *(int32_t *)(COMM + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
                      + COMM_ARMY_OFF_MAP_OK) = 0;
         PlaySoundAt(3, 0, 0, 0, 0);
         break;
     default:
         break;
     }
+#undef COMM
+#undef VALUE
 }
 
 /* The tail both receivers share: repaint the current dialog, then tell
@@ -533,29 +538,28 @@ void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid)
 
 void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
 {
-    uint8_t *comm = (uint8_t *)kCommObj;
-    int32_t  value;
-    int32_t  slot;
-    void    *dlg;
+    /* The comm object and the message's value are read at every use. */
+#define COMM  ((uint8_t *)kCommObj)
+#define VALUE (*(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE))
+    void *dlg;
 
     /* Host only. */
-    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (!*(const int32_t *)(COMM + COMM_OFF_IS_HOST))
         return;
 
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
         am2_log("ReceiveGameReadyToLoadMsg\n");
 
-    value = *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE);
-    slot  = ((AM2_Comm *)comm)->CommSlotOfId(dpid);
-    *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
-                 + COMM_ARMY_OFF_READY_TO_LOAD) = value;
+    *(int32_t *)(COMM + (uint32_t)AM2_THE_COMM->CommSlotOfId(dpid)
+                        * COMM_ARMY_RECORD_SIZE
+                 + COMM_ARMY_OFF_READY_TO_LOAD) = VALUE;
 
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED)) {
+    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED)) {
         /* The lookup runs a SECOND time here; the original does not reuse the
          * slot it just computed. */
         am2_log("Setting m_ArmyReadyToLoad[%d] to %s\n",
-                ((AM2_Comm *)comm)->CommSlotOfId(dpid),
-                value ? "TRUE" : "FALSE");
+                AM2_THE_COMM->CommSlotOfId(dpid),
+                VALUE ? "TRUE" : "FALSE");
     }
 
     /* Repaint the lobby through the widget layer's update-then-paint pair. */
@@ -567,6 +571,8 @@ void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
     }
 
     SendPlayerMsg(0);
+#undef COMM
+#undef VALUE
 }
 
 void __cdecl ReceiveEndSetupMsg(void)
@@ -748,17 +754,20 @@ typedef void (__cdecl *AM2_RequestStateFn)(int32_t state);
 
 void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
 {
-    uint8_t *comm = (uint8_t *)kCommObj;
-    int32_t  ok   = 1;
-    int32_t  i;
+    /* The comm object and each record's id are read at every use. */
+#define COMM ((uint8_t *)kCommObj)
+#define ID   (*(const uint32_t *)(COMM + (uint32_t)i * COMM_ARMY_RECORD_SIZE \
+                                  + AM2_PLAYER_ID))
+    int32_t ok = 1;
+    int32_t i;
 
     (void)dpid;   /* the dispatcher passes it; this one never reads it. */
 
     /* The host sent this; it does not receive it. */
-    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+    if (*(const int32_t *)(COMM + COMM_OFF_IS_HOST))
         return;
 
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED)) {
+    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED)) {
         /* "Seed is %d" pushes a literal 0 here as well as in the send half, so
          * the seed this function is about is never in either log. */
         am2_log("ReceiveStartGameMsg for %d Players.  Seed is %d \n",
@@ -766,95 +775,87 @@ void __cdecl ReceiveStartGameMsg(void *msg, int32_t dpid)
     }
 
     /* The count is re-read every iteration, as everywhere else in this file. */
-    for (i = 0; i < *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT); i++) {
-        uint32_t id = *(const uint32_t *)(comm
-                                          + (uint32_t)i * COMM_ARMY_RECORD_SIZE
-                                          + AM2_PLAYER_ID);
-
-        if ((int32_t)id == *(const int32_t *)(comm + AM2_COMM_SELF_ID))
+    for (i = 0; i < *(const int32_t *)(COMM + COMM_OFF_PLAYER_COUNT); i++) {
+        if ((int32_t)ID == *(const int32_t *)(COMM + AM2_COMM_SELF_ID))
             continue;
 
         /* 7 is a result code, not a map. The second argument is the id, which
          * SendMapMsg does not read. */
-        if (!SendMapMsg(7, (int32_t)id)) {
+        if (!SendMapMsg(7, (int32_t)ID)) {
             ok = 0;
-            am2_log("DPLAY ERROR SENDING TO %x\n", id);
+            am2_log("DPLAY ERROR SENDING TO %x\n", ID);
         }
 
         /* Only if this player has no queue yet. Both tests re-read the id from
          * the record rather than reusing the one above. */
-        if (!FindPlayerById(id) && !CommRegisterSelf(id)) {
+        if (!FindPlayerById(ID) && !CommRegisterSelf(ID)) {
             ok = 0;
-            am2_log("FlowQ creation Failure %x\n", id);
+            am2_log("FlowQ creation Failure %x\n", ID);
         }
     }
 
     /* Checked once, after every player -- so one failure stops the game for
      * all of them. A zero player count skips this test entirely. */
-    if (!ok) {
-        CommGetSessionDesc(comm);
+    if (ok) {
+        /* Nothing in the image handles 0x0469. */
+        orig_post_message(*(void **)(uintptr_t)ADDR_HWND, AM2_WM_START_GAME, 0, 0);
+        SendGamePause(1, 0x10000);
+        RequestState(2);
+        *(int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE = 1;
+        *(int32_t *)(uintptr_t)ADDR_NET_GAME         = 1;
+        *(int32_t *)(uintptr_t)ADDR_GAME_SEED =
+            *(const int32_t *)((const uint8_t *)msg + MSG_START_OFF_SEED);
+    } else {
+        AM2_THE_COMM->CommGetSessionDesc();
         am2_log("Error in start\n");
-        return;
     }
-
-    /* Nothing in the image handles 0x0469. */
-    orig_post_message(*(void **)(uintptr_t)ADDR_HWND, AM2_WM_START_GAME, 0, 0);
-    SendGamePause(1, 0x10000);
-    RequestState(2);
-    *(int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE = 1;
-    *(int32_t *)(uintptr_t)ADDR_NET_GAME         = 1;
-    *(int32_t *)(uintptr_t)ADDR_GAME_SEED =
-        *(const int32_t *)((const uint8_t *)msg + MSG_START_OFF_SEED);
+#undef COMM
+#undef ID
 }
 
 
 #define AM2_MSG_PAUSE  8        /* non-zero: pause. zero: resume. */
 #define AM2_MSG_FLAGS  0x0C
 
-/* One block of RemoteGamePause. Four explicit compares on the slot, exactly as
- * the original writes them -- a slot above 3 falls out with no call made and
- * the mask left alone, which is why the caller keeps it across both blocks. */
-static uint32_t ApplyPauseBlock(int32_t slot, int32_t pause, uint32_t base)
-{
-    uint32_t bit;
-
-    if (slot == 0)      bit = base;
-    else if (slot == 1) bit = base << 1;
-    else if (slot == 2) bit = base << 2;
-    else if (slot == 3) bit = base << 3;
-    else                return 0;
-
-    if (pause)
-        PauseGame(bit);
-    else
-        UnPauseGame(bit);
-    return bit;
-}
+/* RemoteGamePause writes each block out: four explicit compares on the
+ * slot for the pause arm and four more for the resume arm, the resume calls
+ * cross-jumped by the compiler into one. A slot above 3 falls out with no
+ * call made and the mask left alone. The message is read at every use. */
+#define PAUSE_BLOCK(base)                                                   \
+    if (*(const int32_t *)(m + AM2_MSG_PAUSE)) {                            \
+        if (slot == 0)      { mask = (base);      PauseGame(mask); }        \
+        else if (slot == 1) { mask = (base) << 1; PauseGame(mask); }        \
+        else if (slot == 2) { mask = (base) << 2; PauseGame(mask); }        \
+        else if (slot == 3) { mask = (base) << 3; PauseGame(mask); }        \
+    } else {                                                                \
+        if (slot == 0)      { mask = (base);      UnPauseGame(mask); }      \
+        else if (slot == 1) { mask = (base) << 1; UnPauseGame(mask); }      \
+        else if (slot == 2) { mask = (base) << 2; UnPauseGame(mask); }      \
+        else if (slot == 3) { mask = (base) << 3; UnPauseGame(mask); }      \
+    }
 
 void __cdecl RemoteGamePause(void *msg, int32_t dpid)
 {
     const uint8_t *m    = (const uint8_t *)msg;
-    const uint8_t *comm = kCommObj;
-    int32_t        slot = ((AM2_Comm *)(void *)comm)->CommPlayerSlot(dpid);
-    int32_t        pause = *(const int32_t *)(m + AM2_MSG_PAUSE);
-    uint32_t       flags = *(const uint32_t *)(m + AM2_MSG_FLAGS);
-    uint32_t       mask  = 0;
+    uint32_t       mask = 0;
+    int32_t        slot = AM2_THE_COMM->CommPlayerSlot(dpid);
 
     /* Both blocks run if the message asks for both, and the second overwrites
      * the mask the log will print. */
-    if (flags & MSG_PAUSE_FLAG_A)
-        mask = ApplyPauseBlock(slot, pause, PAUSE_BIT_A_SLOT0);
-    if (flags & MSG_PAUSE_FLAG_B)
-        mask = ApplyPauseBlock(slot, pause, PAUSE_BIT_B_SLOT0);
+    if (*(const uint32_t *)(m + AM2_MSG_FLAGS) & MSG_PAUSE_FLAG_A) {
+        PAUSE_BLOCK(PAUSE_BIT_A_SLOT0)
+    }
+    if (*(const uint32_t *)(m + AM2_MSG_FLAGS) & MSG_PAUSE_FLAG_B) {
+        PAUSE_BLOCK(PAUSE_BIT_B_SLOT0)
+    }
 
-    comm = kCommObj;
-    if (!*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED) || !mask)
-        return;
-
-    am2_log("RemoteGamePause from %x; playerIndex== %d paused = %d "
-            "pauseflags = %x (%x) (msg Pause=%x)\n",
-            dpid, slot, pause, GetPauseFlags(), mask, flags);
+    if (*(const int32_t *)(kCommObj + AM2_COMM_LOG_ENABLED) && mask)
+        am2_log("RemoteGamePause from %x; playerIndex== %d paused = %d "
+                "pauseflags = %x (%x) (msg Pause=%x)\n",
+                dpid, slot, *(const int32_t *)(m + AM2_MSG_PAUSE),
+                GetPauseFlags(), mask, *(const uint32_t *)(m + AM2_MSG_FLAGS));
 }
+#undef PAUSE_BLOCK
 
 typedef int32_t (__cdecl *AM2_KindFn)(uint32_t wire);
 typedef int32_t (__cdecl *AM2_FilterFn)(void *msg, int32_t army);
@@ -2637,55 +2638,42 @@ void __cdecl SendChatTo(char *text, int32_t slot)
  * top skips only the tuning. */
 void __cdecl CommTuneChangeLimit(void)
 {
-    uint8_t       *comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
-    const uint8_t *self;
-    uint32_t       seq;
-    uint32_t       sent;
-    uint32_t       limit;
+    /* The comm object is read at every use. */
+#define COMM  (*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT)
+#define LIMIT (*(uint32_t *)(COMM + COMM_OFF_ENOUGH_CHANGE_LIMIT))
+    uint32_t seq;
+    uint32_t sent;
 
-    self = (const uint8_t *)FindPlayerById(
-               *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID));
-    seq  = *(const uint32_t *)(self + FLOW_OFF_SEQUENCE);
+    seq = *(const uint32_t *)((const uint8_t *)FindPlayerById(
+              *(const uint32_t *)(COMM + COMM_OFF_OUR_PLAYER_ID))
+          + FLOW_OFF_SEQUENCE);
 
     if (*(const uint32_t *)(uintptr_t)ADDR_BANDWIDTH_LAST_SEQ < seq) {
-        comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
-        sent = (uint32_t)CommRecentTotal(comm);
+        sent = (uint32_t)AM2_THE_COMM->CommRecentTotal();
 
         if (sent > AM2_BANDWIDTH_HIGH) {
-            comm  = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
-            limit = *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT);
-            limit += (sent > AM2_BANDWIDTH_VERY_HIGH) ? 2u : 1u;
-            *(uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT) = limit;
-
-            comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
+            if (sent > AM2_BANDWIDTH_VERY_HIGH)
+                LIMIT += 2u;
+            else
+                LIMIT += 1u;
             *(uint32_t *)(uintptr_t)ADDR_BANDWIDTH_LAST_SEQ = seq;
-            orig_log("Exceeded bandwidth (%d), enoughChangeLimit increased to %d\n", sent,
-                     *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT));
-            comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
-
-        } else {
-            comm  = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
-            limit = *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT);
-
-            if (limit > *(const uint32_t *)(uintptr_t)ADDR_CHANGE_LIMIT_FLOOR
-                    && sent < AM2_BANDWIDTH_LOW) {
-                *(uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT) = limit - 1u;
-
-                comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
-                *(uint32_t *)(uintptr_t)ADDR_BANDWIDTH_LAST_SEQ = seq;
-                orig_log("Less than half bandwidth (%d), enoughChangeLimit decreased to %d\n", sent,
-                         *(const uint32_t *)(comm
-                                             + COMM_OFF_ENOUGH_CHANGE_LIMIT));
-                comm = *(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
-            }
+            orig_log("Exceeded bandwidth (%d), enoughChangeLimit increased to %d\n",
+                     sent, LIMIT);
+        } else if (LIMIT > *(const uint32_t *)(uintptr_t)ADDR_CHANGE_LIMIT_FLOOR
+                   && sent < AM2_BANDWIDTH_LOW) {
+            LIMIT -= 1u;
+            *(uint32_t *)(uintptr_t)ADDR_BANDWIDTH_LAST_SEQ = seq;
+            orig_log("Less than half bandwidth (%d), enoughChangeLimit decreased to %d\n",
+                     sent, LIMIT);
         }
 
-        *(uint32_t *)(comm + COMM_OFF_SEND_INTERVAL) =
-            *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT) + 1u;
+        *(uint32_t *)(COMM + COMM_OFF_SEND_INTERVAL) = LIMIT + 1u;
     }
 
     TellEachSlot();
     SendAllVehicleUpdates();
+#undef COMM
+#undef LIMIT
 }
 
 int commmsg_install(void)
