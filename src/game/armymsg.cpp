@@ -965,17 +965,17 @@ void __cdecl RecvDamage(void *msg)
  */
 void __cdecl ItemPostCreate(int32_t army, uint32_t where)
 {
-    int32_t tile;
+    uint16_t tile;
     int32_t x, y, x0, x1, y0, y1;
     int32_t other;
 
     if (army >= AM2_COMM_SLOTS)
         return;
 
-    tile = TileOfPoint(where) & 0xFFFF;
+    tile = (uint16_t)TileOfPoint(where);
 
     x = tile & (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W - 1);
-    y = tile >> *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
+    y = tile >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
 
     x0 = Clamp(x - AM2_REVEAL_RADIUS, 0,
                *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W - 1);
@@ -987,8 +987,6 @@ void __cdecl ItemPostCreate(int32_t army, uint32_t where)
                *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H - 1);
 
     for (other = 0; other < AM2_COMM_SLOTS; other++) {
-        uint8_t *grid =
-            ((uint8_t *const *)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[other];
         int32_t  at;
         int32_t  row;
 
@@ -1002,7 +1000,9 @@ void __cdecl ItemPostCreate(int32_t army, uint32_t where)
             int32_t col;
 
             for (col = x0; col <= x1; col++) {
-                grid[at & 0xFFFF]++;
+                /* The grid pointer is re-read at every tile. */
+                ((uint8_t *const *)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[other]
+                    [at & 0xFFFF]++;
                 at++;
             }
 

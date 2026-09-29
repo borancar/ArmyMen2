@@ -2319,8 +2319,8 @@ void __cdecl WeaponRespawn(void *obj)
     uint8_t  *comm;
     uint32_t  flags;
     int32_t   kind;
-    int32_t   quantity = 0;
-    const char *name = 0;
+    int32_t   quantity;       /* both arms below write it */
+    const char *name;
     void     *made;
 
     if (!ObjIsType4((const AM2_Object *)obj))
@@ -2345,10 +2345,13 @@ void __cdecl WeaponRespawn(void *obj)
 
         if (!*(const int32_t *)(rec + 0x28))
             return;
-        quantity = *(const int32_t *)(o + ITEM_OFF_AMMO);
         kind     = *(const int32_t *)(rec + ITEMTYPE_OFF_KIND);
+        quantity = *(const int32_t *)(o + ITEM_OFF_AMMO);
     }
 
+    /* The creation flags are taken before the name is looked up. */
+    flags = *(const uint32_t *)(o + OBJ_OFF_FLAGS) | 4u;
+    name = 0;
     if (*(const int32_t *)(o + ITEM_OFF_NAME_INDEX) > 0)
         name = *(const char *const *)
                    ((const uint8_t *)*(void *const *)
@@ -2365,8 +2368,7 @@ void __cdecl WeaponRespawn(void *obj)
                               KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                               (uint32_t)kind, 0),
                               *(const uint32_t *)(o + OBJ_OFF_POS),
-                              (int32_t)(*(const uint32_t *)(o + OBJ_OFF_FLAGS)
-                                        | 4u),
+                              (int32_t)flags,
                               quantity, 0, 0);
 
     if (made)
@@ -5410,7 +5412,6 @@ void __cdecl DamageVehicle(void *obj, int32_t amount, uint8_t d, int32_t kind,
                            uint32_t attacker)
 {
     uint8_t *o = (uint8_t *)obj;
-    int32_t  armour;
     uint32_t at;
 
     (void)kind;
@@ -5419,10 +5420,10 @@ void __cdecl DamageVehicle(void *obj, int32_t amount, uint8_t d, int32_t kind,
     *(uint32_t *)(o + OBJ_OFF_HIT_TIME) =
         *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
 
-    armour = *(const int32_t *)(o + VEHICLE_OFF_ARMOUR);
-    if (amount <= armour
+    /* The armour is read afresh at every use. */
+    if (amount <= *(const int32_t *)(o + VEHICLE_OFF_ARMOUR)
         && (int32_t)(orig_game_rand() & 0xFF) < amount * 8)
-        amount = armour + 1;
+        amount = *(const int32_t *)(o + VEHICLE_OFF_ARMOUR) + 1;
 
     if (*(const int32_t *)(o + VEHICLE_OFF_ARMOUR) > amount)
         return;
@@ -5441,15 +5442,17 @@ void __cdecl DamageVehicle(void *obj, int32_t amount, uint8_t d, int32_t kind,
                               *(const uint8_t *)(o + OBJ_OFF_HIT_DIR),
                               *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) {
-        if (!AM2_THE_COMM->CommMustBroadcast(
+    /* Two tests of the session, not an if/else: the image reads it again
+     * after the broadcast check. */
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && !AM2_THE_COMM->CommMustBroadcast(
                                *(const int8_t *)(o + OBJ_OFF_ARMY)))
-            return;
-    } else if (*(const int32_t *)(uintptr_t)ADDR_CHEAT_INVULNERABLE
-               && *(const int8_t *)(o + OBJ_OFF_ARMY)
-                  == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
         return;
-    }
+    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && *(const int32_t *)(uintptr_t)ADDR_CHEAT_INVULNERABLE
+        && *(const int8_t *)(o + OBJ_OFF_ARMY)
+           == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+        return;
 
     *(int16_t *)(o + OBJ_OFF_HEALTH) =
         (int16_t)(*(const int16_t *)(o + OBJ_OFF_HEALTH) - (int16_t)amount);

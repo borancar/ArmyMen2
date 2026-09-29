@@ -2858,17 +2858,22 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommPlayerLeft(int32_t id)
 
     ::CommClearSlotRemote(c, slot);
 
-    /* An else-if chain, not a switch: the image compares 0..3 in turn. A
-     * slot above 3 releases nothing; see above. */
-    if (slot == 0) {
-        UnPauseGame(0x800u); UnPauseGame(0x10u); UnPauseGame(0x20000u);
-    } else if (slot == 1) {
-        UnPauseGame(0x1000u); UnPauseGame(0x20u); UnPauseGame(0x40000u);
-    } else if (slot == 2) {
-        UnPauseGame(0x2000u); UnPauseGame(0x40u); UnPauseGame(0x80000u);
-    } else if (slot == 3) {
-        UnPauseGame(0x4000u); UnPauseGame(0x80u); UnPauseGame(0x100000u);
-    }
+    /* Three else-if chains, one per mask, not a switch: VC6 threads the
+     * second and third through the first, which is why the image compares
+     * 0..3 once and then makes three calls per arm, each popped on its own.
+     * A slot above 3 releases nothing; see above. */
+    if (slot == 0)      UnPauseGame(0x800u);
+    else if (slot == 1) UnPauseGame(0x1000u);
+    else if (slot == 2) UnPauseGame(0x2000u);
+    else if (slot == 3) UnPauseGame(0x4000u);
+    if (slot == 0)      UnPauseGame(0x10u);
+    else if (slot == 1) UnPauseGame(0x20u);
+    else if (slot == 2) UnPauseGame(0x40u);
+    else if (slot == 3) UnPauseGame(0x80u);
+    if (slot == 0)      UnPauseGame(0x20000u);
+    else if (slot == 1) UnPauseGame(0x40000u);
+    else if (slot == 2) UnPauseGame(0x80000u);
+    else if (slot == 3) UnPauseGame(0x100000u);
 
     *(int32_t *)(*(uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
                  + (size_t)slot * COMM_PLAYER_STRIDE + COMM_ARMY_OFF_READY) = 1;
