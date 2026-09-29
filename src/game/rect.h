@@ -6,8 +6,12 @@
 #include "dist.h"
 
 /* The harness in src/inject is C; these are C++. Keep the linkage
- * compatible so dllmain.c can still call the install hooks. */
-#ifdef __cplusplus
+ * compatible so dllmain.c can still call the install hooks -- except under
+ * VC6, which assumes an extern "C" function cannot throw. The original's
+ * rect.cpp was C++, so its callers (the widget base constructor, and through
+ * it every widget constructor) may throw, and a `new` of them carries an EH
+ * state; with C linkage VC6 drops it. */
+#if defined(__cplusplus) && !defined(_MSC_VER)
 extern "C" {
 #endif
 
@@ -72,7 +76,7 @@ int32_t __cdecl PointsDiffer(uint32_t a, uint32_t b);
 
 int rect_install(void);
 
-#ifdef __cplusplus
+#if defined(__cplusplus) && !defined(_MSC_VER)
 }
 #endif
 

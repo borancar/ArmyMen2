@@ -8489,16 +8489,14 @@ void __attribute__((thiscall)) AM2_Widget::HudPanelUpdate()
 
     if (*(const int32_t *)(self + HUDPANEL_OFF_OPEN)) {
         if (w->x > *(const int32_t *)(self + HUDPANEL_OFF_STOP)) {
-            w->x -= (int32_t)((double)*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
-                              * *(const float *)((void *)(uintptr_t)(ADDR_HUD_SLIDE_OPEN)));
+            w->x -= (int32_t)(*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC * 320.0f);
             if (w->x < *(const int32_t *)(self + HUDPANEL_OFF_STOP))
                 w->x = *(const int32_t *)(self + HUDPANEL_OFF_STOP);
             *(int32_t *)(uintptr_t)(ADDR_BLIT_RECT + 8) = w->x;
         }
     } else if (w->x < *(const int32_t *)(uintptr_t)ADDR_SCREEN_W
                        - HudPanelWidth()) {
-        w->x -= (int32_t)((double)*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
-                          * *(const float *)((void *)(uintptr_t)(ADDR_HUD_SLIDE_SHUT)));
+        w->x -= (int32_t)(*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC * -320.0f);
         if (w->x > *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - HudPanelWidth())
             w->x = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W - HudPanelWidth();
         *(int32_t *)(uintptr_t)(ADDR_BLIT_RECT + 8) = w->x;
@@ -16383,6 +16381,7 @@ void __attribute__((thiscall)) AM2_Widget::ScrollBarPaint(RECT clip)
  * edit is wired and is not a transcription slip: the pushes are in that
  * order and the counts agree either way. */
 AM2_MpSpin::AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row)
+    : handler(commit)
 {
     AM2_Widget *w = this;
 
@@ -16399,7 +16398,6 @@ AM2_MpSpin::AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int3
      * slot +0x5C, and the height read at +0x44 fixes the row, which also puts
      * `parent` at +0x58 -- the slot the three AddChild calls take their
      * `this` from, confirming that change from a second direction. */
-    *(void **)(self + SPIN_OFF_HANDLER) = (void *)commit;
     AM2_CTOR_VTABLE(w, VTABLE_MP_SPIN);
     *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
     ::WidgetScreenRect(w);

@@ -461,7 +461,8 @@ struct AM2_Edit : AM2_Widget {
 
 struct AM2_MpSpin : AM2_Widget {
     typedef AM2_Widget Base;        /* VC6's C2437: see AM2_TextList */
-    uint8_t pad_AM2_MpSpin[AM2_MP_SPIN_SIZE - sizeof(AM2_Widget)];
+    uint8_t pad_AM2_MpSpin[SPIN_OFF_HANDLER - sizeof(AM2_Widget)];
+    void  (__cdecl *handler)(AM2_Widget *);   /* SPIN_OFF_HANDLER */
     AM2_MpSpin(AM2_Rect box, int32_t value, int32_t lo, int32_t hi, int32_t step, AM2_Widget *parent, void (__cdecl *commit)(AM2_Widget *), int32_t c0, int32_t c1, int32_t c2, int32_t row);
     explicit AM2_MpSpin(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
 };

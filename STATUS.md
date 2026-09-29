@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 880 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 882 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 880:
+  the near-miss sweep, 758 before the row pools. From 758 to 882:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -80,7 +80,13 @@ main result so far (details in `src/vc6/README.md`):
     `new` of it, the vehicle record's compiler-written destructor, and the
     savegame loaders' stack objects all take their shape from that.
   - **VC6 emits no unwind frame inside an `extern "C"` function** -- a
-    function whose original has one needs C++ linkage.
+    function whose original has one needs C++ linkage. The same assumption
+    runs down call chains: with rect.h `extern "C"`, the widget base
+    constructor looked nothrow, so a `new AM2_Edit` lost its EH state.
+    rect.h is C++ linkage under VC6 only (the C harness calls it).
+  - **Member initializers run before the vptr store**: MpSpin's commit
+    handler is a `: handler(commit)` member, which is why the original
+    stores it ahead of the vtable.
   - **Recurring source shapes**, each found more than once: a switch VC6
     compiled to range tests or byte-index tables (MapCode, ObjNextKind538);
     an inlined ObjIsType2/3 (null check and `sete` included); `max()`/`min()`
