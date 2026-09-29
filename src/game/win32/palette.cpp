@@ -289,45 +289,33 @@ typedef void (__cdecl *am2_realize_fn)(const uint32_t *palette);
 
 typedef void (__cdecl *am2_void_fn)(void);
 
-/* Was a private helper here with the reserved-block threshold hardcoded at 9.
- * 0x0041B820 is that function and takes the threshold as a fifth argument; the
- * 23 call sites in this file all pass 9. */
-static inline uint8_t MatchRGB(const void *pal, uint32_t r, uint32_t g, uint32_t b)
-{
-    return NearestPalIndexRGB((const uint32_t *)pal, r, g, b, 9);
-}
+/* The palette entry nearest the colour in `c`, above the reserved block: the
+ * loop builds one PALETTEENTRY on the stack and passes it as a dword, as
+ * NearestPalIndexRGB does inside -- written out here, not called. */
+#define MATCH_ENTRY(c) NearestPalIndex((const uint32_t *)pal, *(const uint32_t *)&(c), 9)
 
-/* Every colour the engine looks up by name, in the original's order. Each slot
- * is spelled by its ADDR_ name, not its raw VA: under the placed model those
- * are am2_origstate members, so the table holds relocated addresses and works
- * wherever the struct lands. (A few names are aliases for the same colour
- * byte -- KIND7_NAMES, LIST_INK_HOT_SEL, VARIATION_END -- same address.) */
-static const struct { uintptr_t addr; uint32_t r, g, b; } kNamedColours[] = {
-    { ADDR_BACKGROUND_COLOUR,  0x00, 0x00, 0x00 }, { ADDR_COLOUR_WHITE,       0xFF, 0xFF, 0xFF },
-    { ADDR_COLOUR_STALE,       0xC0, 0xC0, 0xC0 }, { ADDR_VIEW_RECT_COLOUR,   0x00, 0xFF, 0x00 },
-    { ADDR_HUD_MESSAGE_COLOUR, 0xDA, 0x4E, 0x00 }, { ADDR_COLOUR_BLUE,        0x00, 0x00, 0xFF },
-    { ADDR_KIND7_NAMES,        0xAC, 0xE8, 0x00 }, { ADDR_LIST_INK_HOT_SEL,   0x88, 0x88, 0x88 },
-    { ADDR_COLOUR_BELOW_BG,    0x00, 0x84, 0x00 }, { ADDR_COLOUR_NO_MAP,      0xAC, 0x00, 0x00 },
-    { ADDR_COLOUR_DARK_BLUE,   0x00, 0x00, 0xAC }, { ADDR_VARIATION_END,      0x88, 0xC0, 0x00 },
-    { ADDR_COLOUR_LAG_MID,     0xFF, 0xFF, 0x00 }, { ADDR_COLOUR_LIGHT_GREEN, 0x69, 0xA9, 0x52 },
-    { ADDR_COLOUR_DARK_GREEN,  0x32, 0x71, 0x26 }, { ADDR_COLOUR_CREAM,       0xEF, 0xD9, 0xA0 },
-    { ADDR_COLOUR_OLIVE,       0x65, 0x57, 0x30 }, { ADDR_COLOUR_LIGHT_BLUE,  0x92, 0xB8, 0xDF },
-    { ADDR_COLOUR_STEEL_BLUE,  0x32, 0x5D, 0x8A }, { ADDR_COLOUR_LIGHT_GREY,  0xAB, 0xAB, 0xAB },
-    { ADDR_COLOUR_DARK_GREY,   0x54, 0x54, 0x54 }, { ADDR_COLOUR_WHITE_B,     0xFF, 0xFF, 0xFF },
-    { ADDR_COLOUR_BLACK,       0x00, 0x00, 0x00 },
-};
+/* Every colour the engine looks up by name, in the original's order, each a
+ * call of its own. Each slot is spelled by its ADDR_ name, not its raw VA:
+ * under the placed model those are am2_origstate members. (A few names are
+ * aliases for the same colour byte -- KIND7_NAMES, LIST_INK_HOT_SEL,
+ * VARIATION_END -- same address.) */
+#define NAMED(addr, r, g, b) \
+    (*(uint8_t *)(uintptr_t)(addr) = NearestPalIndexRGB((const uint32_t *)pal, r, g, b, 9))
 
 void __cdecl SetGamePalette(uint8_t *pal)
 {
-    static const double kShade[4] = { 0.4, 0.5, 0.6, 0.85 };
     LPDIRECTDRAWPALETTE *held;
-    uint32_t             i, k;
+    int32_t              i, k;
+    PALETTEENTRY         c;
+    uint8_t              r, g, b, v;
 
     if (!pal)
         return;
 
     ReleasePalette(pal);
-    pal[0] = pal[1] = pal[2] = 0;
+    pal[0] = 0;
+    pal[1] = 0;
+    pal[2] = 0;
     RealizeSystemPalette((const uint32_t *)pal);
 
     held = (LPDIRECTDRAWPALETTE *)(pal + PALETTE_HOLDER_OFF);
@@ -347,53 +335,90 @@ void __cdecl SetGamePalette(uint8_t *pal)
         CalibratePalette((uint32_t *)pal);
 
     /* Four 256-byte blocks, back to back. */
-    g_remapShades[0] = (uint8_t *)(uintptr_t)ADDR_REMAP_SHADE_STORE;
+    g_remapShades[0] = (uint8_t *)(((uintptr_t)ADDR_REMAP_SHADE_STORE + 3) & ~3u);
     for (k = 1; k < 4; k++)
         g_remapShades[k] = g_remapShades[k - 1] + PALETTE_ENTRIES;
 
-    for (i = 0; i < PALETTE_ENTRIES; i++) {
-        uint32_t r = pal[i * 4 + 0], g = pal[i * 4 + 1], b = pal[i * 4 + 2];
-        uint8_t  cr, cg, cb;
+    i = 0;
+    {
+        double shade[4] = { 0.4, 0.5, 0.6, 0.85 };
 
-        g_remapIdent[i] = (uint8_t)i;
+        for (; i < PALETTE_ENTRIES; i++) {
+            g_remapIdent[i] = (uint8_t)i;
+            r = pal[i * 4 + 0];
+            g = pal[i * 4 + 1];
+            b = pal[i * 4 + 2];
 
-        /* Already dark enough that 70% would not change the match. */
-        if (r <= REMAP_DARK_LIMIT && g <= REMAP_DARK_LIMIT
-            && b <= REMAP_DARK_LIMIT)
-            g_remapDark[i] = (uint8_t)i;
-        else
-            g_remapDark[i] = MatchRGB(pal, (uint32_t)(r * DARK_SCALE),
-                                      (uint32_t)(g * DARK_SCALE),
-                                      (uint32_t)(b * DARK_SCALE));
+            /* Already dark enough that 70% would not change the match. */
+            if (r <= REMAP_DARK_LIMIT && g <= REMAP_DARK_LIMIT
+                && b <= REMAP_DARK_LIMIT)
+                v = (uint8_t)i;
+            else {
+                c.peRed   = (uint8_t)(r * DARK_SCALE);
+                c.peGreen = (uint8_t)(g * DARK_SCALE);
+                c.peBlue  = (uint8_t)(b * DARK_SCALE);
+                v = MATCH_ENTRY(c);
+            }
+            g_remapDark[i] = v;
 
-        /* Dark colours are lifted, light ones darkened -- one table doing
-         * "make this stand out" in both directions. */
-        if (r <= REMAP_LIFT_LIMIT && g <= REMAP_LIFT_LIMIT
-            && b <= REMAP_LIFT_LIMIT) {
-            cr = (r + REMAP_LIFT < 0xFF) ? (uint8_t)(r + REMAP_LIFT) : 0xFF;
-            cg = (g + REMAP_LIFT < 0xFF) ? (uint8_t)(g + REMAP_LIFT) : 0xFF;
-            cb = (b + REMAP_LIFT < 0xFF) ? (uint8_t)(b + REMAP_LIFT) : 0xFF;
-        } else {
-            cr = (uint8_t)(r * DARK_SCALE);
-            cg = (uint8_t)(g * DARK_SCALE);
-            cb = (uint8_t)(b * DARK_SCALE);
+            /* Dark colours are lifted, light ones darkened -- one table doing
+             * "make this stand out" in both directions. */
+            if (r <= REMAP_LIFT_LIMIT && g <= REMAP_LIFT_LIMIT
+                && b <= REMAP_LIFT_LIMIT) {
+                c.peRed   = (uint8_t)(r + REMAP_LIFT < 0xFF ? r + REMAP_LIFT : 0xFF);
+                c.peGreen = (uint8_t)(g + REMAP_LIFT < 0xFF ? g + REMAP_LIFT : 0xFF);
+                c.peBlue  = (uint8_t)(b + REMAP_LIFT < 0xFF ? b + REMAP_LIFT : 0xFF);
+            } else {
+                c.peRed   = (uint8_t)(r * DARK_SCALE);
+                c.peGreen = (uint8_t)(g * DARK_SCALE);
+                c.peBlue  = (uint8_t)(b * DARK_SCALE);
+            }
+            g_remapBright[i] = MATCH_ENTRY(c);
+
+            /* Two colours by parity, so a run of indices alternates. */
+            if (i & 1) {
+                c.peRed   = 0xD6;
+                c.peGreen = 0xEF;
+                c.peBlue  = 0x29;
+            } else {
+                c.peRed   = 0xFF;
+                c.peGreen = 0xFF;
+                c.peBlue  = 0x00;
+            }
+            g_remapTint[i] = MATCH_ENTRY(c);
+
+            for (k = 0; k < 4; k++) {
+                c.peRed   = (uint8_t)(r * shade[k]);
+                c.peGreen = (uint8_t)(g * shade[k]);
+                c.peBlue  = (uint8_t)(b * shade[k]);
+                *(i + g_remapShades[k]) = MATCH_ENTRY(c);
+            }
         }
-        g_remapBright[i] = MatchRGB(pal, cr, cg, cb);
-
-        /* Two colours by parity, so a run of indices alternates. */
-        g_remapTint[i] = (i & 1) ? MatchRGB(pal, 0xD6, 0xEF, 0x29)
-                                 : MatchRGB(pal, 0xFF, 0xFF, 0x00);
-
-        for (k = 0; k < 4; k++)
-            g_remapShades[k][i] = MatchRGB(pal, (uint32_t)(r * kShade[k]),
-                                           (uint32_t)(g * kShade[k]),
-                                           (uint32_t)(b * kShade[k]));
     }
 
-    for (i = 0; i < sizeof kNamedColours / sizeof kNamedColours[0]; i++)
-        *(uint8_t *)(uintptr_t)kNamedColours[i].addr =
-            MatchRGB(pal, kNamedColours[i].r, kNamedColours[i].g,
-                     kNamedColours[i].b);
+    NAMED(ADDR_BACKGROUND_COLOUR,  0x00, 0x00, 0x00);
+    NAMED(ADDR_COLOUR_WHITE,       0xFF, 0xFF, 0xFF);
+    NAMED(ADDR_COLOUR_STALE,       0xC0, 0xC0, 0xC0);
+    NAMED(ADDR_VIEW_RECT_COLOUR,   0x00, 0xFF, 0x00);
+    NAMED(ADDR_HUD_MESSAGE_COLOUR, 0xDA, 0x4E, 0x00);
+    NAMED(ADDR_COLOUR_BLUE,        0x00, 0x00, 0xFF);
+    NAMED(ADDR_KIND7_NAMES,        0xAC, 0xE8, 0x00);
+    NAMED(ADDR_LIST_INK_HOT_SEL,   0x88, 0x88, 0x88);
+    NAMED(ADDR_COLOUR_BELOW_BG,    0x00, 0x84, 0x00);
+    NAMED(ADDR_COLOUR_NO_MAP,      0xAC, 0x00, 0x00);
+    NAMED(ADDR_COLOUR_DARK_BLUE,   0x00, 0x00, 0xAC);
+    NAMED(ADDR_VARIATION_END,      0x88, 0xC0, 0x00);
+    NAMED(ADDR_COLOUR_LAG_MID,     0xFF, 0xFF, 0x00);
+    NAMED(ADDR_COLOUR_LIGHT_GREEN, 0x69, 0xA9, 0x52);
+    NAMED(ADDR_COLOUR_DARK_GREEN,  0x32, 0x71, 0x26);
+    NAMED(ADDR_COLOUR_CREAM,       0xEF, 0xD9, 0xA0);
+    NAMED(ADDR_COLOUR_OLIVE,       0x65, 0x57, 0x30);
+    NAMED(ADDR_COLOUR_LIGHT_BLUE,  0x92, 0xB8, 0xDF);
+    NAMED(ADDR_COLOUR_STEEL_BLUE,  0x32, 0x5D, 0x8A);
+    NAMED(ADDR_COLOUR_LIGHT_GREY,  0xAB, 0xAB, 0xAB);
+    NAMED(ADDR_COLOUR_DARK_GREY,   0x54, 0x54, 0x54);
+    NAMED(ADDR_COLOUR_WHITE_B,     0xFF, 0xFF, 0xFF);
+    NAMED(ADDR_COLOUR_BLACK,       0x00, 0x00, 0x00);
 
     PaletteLoaded();
 }
