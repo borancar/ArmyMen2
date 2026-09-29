@@ -7336,11 +7336,10 @@ void __cdecl StepRowAnim(void *row)
 {
     uint8_t        *r = (uint8_t *)row;
     const AM2_Anim *anim;
-    const AM2_AnimCell *cell;
     int32_t         idx;
     int32_t         hold;
-    uint32_t        now;
-    int32_t         at;
+    uint8_t         dir;
+    int16_t         step;
 
     if (!(*(const uint8_t *)(r + MAPOBJ_OFF_FLAGS) & 1))
         return;
@@ -7358,50 +7357,47 @@ void __cdecl StepRowAnim(void *row)
     if (!anim)
         return;
 
-    idx = anim->frames
-          * (uint8_t)RoundTo8((uint8_t)(*(const uint8_t *)(r + ROW_OFF_HEADING_BIAS)
-                                        + *(const uint8_t *)(r + ROW_OFF_HEADING)),
-                              anim->directionBits)
-          + *(const uint8_t *)(r + ROW_OFF_CELL);
+    dir = (uint8_t)(*(const uint8_t *)(r + ROW_OFF_HEADING_BIAS)
+                    + *(const uint8_t *)(r + ROW_OFF_HEADING));
+    step = RoundTo8(dir, anim->directionBits);
+    idx  = anim->frames * step + *(const uint8_t *)(r + ROW_OFF_CELL);
 
-    cell = &anim->cells[idx];
-
+    /* The cell is re-indexed from the animation, and the clock read, at
+     * every use. */
+#define CELLP (&anim->cells[idx])
+#define NOW   (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS)
     {
         /* TWO dereferences: the global holds the array. Written with one on
          * the first attempt and the game left at the first mission -- the
          * exact failure CLAUDE.md records for `obj -> table -> slot`, which I
          * had read and still made. */
-        void *want = kSpriteList[cell->sprite];
+        void *want = kSpriteList[CELLP->sprite];
 
         if (*(void *const *)(r + ROW_OFF_SPRITE) != want)
             RowSetSprite(r, want, (void *)(uintptr_t)ADDR_MAP_DESC);
     }
 
-    hold = cell->hold;
+    hold = CELLP->hold;
     if (*(const void *const *)(r + MAPOBJ_OFF_LUT)
             == (const void *)((void *)(uintptr_t)(ADDR_ROW_LUT_DOUBLES)))
         hold >>= 1;
 
-    now = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
-    if (now < *(const uint32_t *)(r + ROW_OFF_STAMP_54) + (uint32_t)hold)
+    if (NOW < (uint32_t)hold + *(const uint32_t *)(r + ROW_OFF_STAMP_54))
         return;
 
-    at = (uint8_t)(*(const uint8_t *)(r + ROW_OFF_CELL) + 1);
-    *(uint8_t *)(r + ROW_OFF_CELL) = (uint8_t)at;
-
-    if ((int16_t)at < anim->frames) {
-        *(uint32_t *)(r + ROW_OFF_STAMP_54) = now;
-        return;
+    if ((int16_t)++*(uint8_t *)(r + ROW_OFF_CELL) >= anim->frames) {
+        if (*(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID) != AM2_ROW_ANIM_HOLD) {
+            *(uint8_t *)(r + ROW_OFF_CELL)      = 0;
+            *(uint32_t *)(r + ROW_OFF_STAMP_54) = NOW;
+            SetAnimFrame(r, *(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID), 0);
+        } else {
+            --*(uint8_t *)(r + ROW_OFF_CELL);
+        }
+    } else {
+        *(uint32_t *)(r + ROW_OFF_STAMP_54) = NOW;
     }
-
-    if (*(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID) == AM2_ROW_ANIM_HOLD) {
-        *(uint8_t *)(r + ROW_OFF_CELL) = (uint8_t)(at - 1);
-        return;
-    }
-
-    *(uint8_t *)(r + ROW_OFF_CELL)      = 0;
-    *(uint32_t *)(r + ROW_OFF_STAMP_54) = now;
-    SetAnimFrame(r, *(const int16_t *)(r + ROW_OFF_ANIM_NEXT_ID), 0);
+#undef CELLP
+#undef NOW
 }
 
 /* 0x00449570, ten callers -- the only writer of OBJ_OFF_SOLDIER_KIND, and the
