@@ -301,22 +301,9 @@ void __cdecl SetStreamVolume(int32_t unused, int32_t pan)
 
 static_assert(DSBSTATUS_PLAYING == 1, "DSBSTATUS_PLAYING");
 
-/* Stop the buffer if it is playing. Asking first because Stop on an idle
- * buffer also rewinds it, and these are stopped in places that do not want
- * that. */
-static void StopIfPlaying(LPDIRECTSOUNDBUFFER buf)
-{
-    /* Initialised, which the original does not bother to do -- it tests
-     * whatever GetStatus left. Identical unless GetStatus fails without
-     * writing, in which case the original tests stack garbage and this does
-     * not stop the buffer. Deliberate, and the only place in this file that
-     * departs from the original at all. */
-    DWORD status = 0;
-
-    IDirectSoundBuffer_GetStatus(buf, &status);
-    if (status & DSBSTATUS_PLAYING)
-        IDirectSoundBuffer_Stop(buf);
-}
+/* StopAllSounds asks each buffer's status before stopping it, because Stop
+ * on an idle buffer also rewinds it, and these are stopped in places that
+ * do not want that. */
 
 void __cdecl FreeSound(void *snd)
 {
@@ -332,46 +319,62 @@ void __cdecl FreeSound(void *snd)
 
 void __cdecl StopAllSounds(void)
 {
-    uint8_t **slot;
-    void    **dyn;
+    /* Both walks by index and the stop-if-playing test written in, every
+     * pointer read again from its slot. The status is NOT initialised in
+     * the image -- a GetStatus that fails without writing leaves stack
+     * garbage to test -- and that is reproduced for the VC6 build only; the
+     * others keep StopIfPlaying's zero. */
+#define SLOTSND(i) (((uint8_t *(*)[SOUND_SLOT_STRIDE / 4]) \
+                     (uintptr_t)ADDR_SOUND_SLOTS)[i][0])
+#define DYN(i)     (((uint8_t **)(uintptr_t)ADDR_SOUND_DYNAMIC)[i])
+#define SBUF(p)    sfld(p, SOUND_BUFFER, LPDIRECTSOUNDBUFFER)
+#if defined(_MSC_VER)
+    DWORD   status;
+#else
+    DWORD   status = 0;
+#endif
+    int32_t i;
 
-    /* The fixed slots are borrowed, not owned -- stop them and leave them. */
-    for (slot = (uint8_t **)(uintptr_t)ADDR_SOUND_SLOTS;
-         slot < (uint8_t **)(uintptr_t)ADDR_SOUND_SLOTS_END;
-         slot = (uint8_t **)((uint8_t *)slot + SOUND_SLOT_STRIDE)) {
-        void *snd = *slot;
-
-        if (snd && sfld(snd, SOUND_BUFFER, LPDIRECTSOUNDBUFFER))
-            StopIfPlaying(sfld(snd, SOUND_BUFFER, LPDIRECTSOUNDBUFFER));
+    /* The fixed slots are borrowed, not owned -- stop them and leave them.
+     * 56 of them: ADDR_SOUND_SLOTS_END - ADDR_SOUND_SLOTS is 0x380. */
+    for (i = 0; i < 56; i++) {
+        if (SLOTSND(i) && SBUF(SLOTSND(i))) {
+            IDirectSoundBuffer_GetStatus(SBUF(SLOTSND(i)), &status);
+            if (status & DSBSTATUS_PLAYING)
+                IDirectSoundBuffer_Stop(SBUF(SLOTSND(i)));
+        }
     }
 
-    /* The dynamic ones were allocated for one use, so they go entirely. This
-     * is FreeSound's body written out rather than called -- the original does
+    /* The dynamic ones were allocated for one use, so they go entirely --
+     * seventeen, the last at ADDR_SOUND_DYNAMIC_LAST inclusive. This is
+     * FreeSound's body written out rather than called -- the original does
      * the same, and it also clears the flag at +0x18 on the way, which
      * FreeSound does not. */
-    for (dyn = (void **)(uintptr_t)ADDR_SOUND_DYNAMIC;
-         dyn <= (void **)(uintptr_t)ADDR_SOUND_DYNAMIC_LAST; dyn++) {
-        void *snd = *dyn;
+    for (i = 0; i <= 16; i++) {
+        uint8_t *snd = DYN(i);
 
         if (!snd)
             continue;
 
-        if (sfld(snd, SOUND_BUFFER, LPDIRECTSOUNDBUFFER)) {
-            LPDIRECTSOUNDBUFFER buf = sfld(snd, SOUND_BUFFER, LPDIRECTSOUNDBUFFER);
-
-            StopIfPlaying(buf);
+        if (SBUF(snd)) {
+            IDirectSoundBuffer_GetStatus(SBUF(snd), &status);
+            if (status & DSBSTATUS_PLAYING)
+                IDirectSoundBuffer_Stop(SBUF(snd));
             sfld(snd, SOUND_FLAG, int32_t) = 0;
-            IDirectSoundBuffer_Release(buf);
-            sfld(snd, SOUND_BUFFER, LPDIRECTSOUNDBUFFER) = NULL;
+            IDirectSoundBuffer_Release(SBUF(snd));
+            SBUF(snd) = NULL;
         }
         if (sfld(snd, SOUND_DATA, void *))
             orig_free(sfld(snd, SOUND_DATA, void *));
         sfld(snd, SOUND_DATA, void *) = NULL;
         orig_free(snd);
-        *dyn = NULL;
+        DYN(i) = NULL;
     }
 
     StopAudioStream();
+#undef SLOTSND
+#undef DYN
+#undef SBUF
 }
 
 /* 0x0040C7A0, one caller. Free every fixed sound slot and then the dynamic
