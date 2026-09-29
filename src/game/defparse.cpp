@@ -265,19 +265,37 @@ int32_t __cdecl DefTrooperLine(int32_t cmd, char *line)
 {
     int32_t rec[AM2_DEF_TROOPER_REC_DWORDS];
 
-    if (cmd < AM2_DEF_TROOPERLEVEL1
-        || cmd > AM2_DEF_TROOPERLEVEL1 + AM2_RANK_COUNT - 1) {
+    /* A switch with an arm per rank, and the seven number fields parsed one
+     * after another, each with its own failure code: the image has neither
+     * the subtraction nor the loop. */
+    switch (cmd) {
+    case AM2_DEF_TROOPERLEVEL1 + 0: rec[0] = 0; break;
+    case AM2_DEF_TROOPERLEVEL1 + 1: rec[0] = 1; break;
+    case AM2_DEF_TROOPERLEVEL1 + 2: rec[0] = 2; break;
+    case AM2_DEF_TROOPERLEVEL1 + 3: rec[0] = 3; break;
+    case AM2_DEF_TROOPERLEVEL1 + 4: rec[0] = 4; break;
+    case AM2_DEF_TROOPERLEVEL1 + 5: rec[0] = 5; break;
+    case AM2_DEF_TROOPERLEVEL1 + 6: rec[0] = 6; break;
+    case AM2_DEF_TROOPERLEVEL1 + 7: rec[0] = 7; break;
+    default:
         orig_log("Bad Trooper Type\n");
         return 1;
     }
-    rec[0] = cmd - AM2_DEF_TROOPERLEVEL1;
 
     if (!DefParseNumber(&rec[1], am2_strtok(line, kSep)))
         return 2;
-
-    for (int32_t i = 2; i < AM2_DEF_TROOPER_REC_DWORDS; i++)
-        if (!DefParseNumber(&rec[i], am2_strtok((char *)0, kSep)))
-            return i + 1;
+    if (!DefParseNumber(&rec[2], am2_strtok((char *)0, kSep)))
+        return 3;
+    if (!DefParseNumber(&rec[3], am2_strtok((char *)0, kSep)))
+        return 4;
+    if (!DefParseNumber(&rec[4], am2_strtok((char *)0, kSep)))
+        return 5;
+    if (!DefParseNumber(&rec[5], am2_strtok((char *)0, kSep)))
+        return 6;
+    if (!DefParseNumber(&rec[6], am2_strtok((char *)0, kSep)))
+        return 7;
+    if (!DefParseNumber(&rec[7], am2_strtok((char *)0, kSep)))
+        return 8;
 
     DefAddTrooperRec(rec);
     return 0;
@@ -345,8 +363,7 @@ int32_t __cdecl DefObjLine(int32_t cmd, char *line)
 {
     int32_t rec[AM2_DEF_OBJ_REC_DWORDS];
 
-    for (int32_t i = 0; i < AM2_DEF_OBJ_REC_DWORDS; i++)
-        rec[i] = 0;
+    memset(rec, 0, sizeof rec);
 
     rec[0] = DefObjParse(cmd);
     if (rec[0] < 0) {
@@ -354,28 +371,39 @@ int32_t __cdecl DefObjLine(int32_t cmd, char *line)
         return 1;
     }
 
+    /* Each field parsed in turn, not a loop -- the image has them written out. */
     if (!DefParseNumber(&rec[1], am2_strtok(line, kSep)))
         return 2;
-
-    for (int32_t i = 2; i <= 11; i++) {
-        const char *tok = am2_strtok((char *)0, kSep);
-        /* THE NINTH FIELD IS A FLOAT: the call at 0x00435DB2 is DefParseFloat
-         * where the other twelve are DefParseNumber. It is the object's
-         * depth SLOPE, which DepthCompare projects with -- read as a number
-         * the sign's -0.35 became 0 and the hut's 2.06 became 2, so the
-         * port drew a sign post over Sarge's rifle where the original draws
-         * the rifle over the post. Found by tools/sidebyside.py on a walk
-         * past the rifle range sign, settled by logging both comparators'
-         * inputs (AM2_TRACE_DEPTH). Same lesson as DefWeaponLine's booleans:
-         * the parse blocks are identical except for the call target. */
-        int32_t ok = (i == 9) ? DefParseFloat((float *)&rec[9], tok)
-                              : DefParseNumber(&rec[i], tok);
-        if (!ok)
-            return i + 1;
-
-        if (i == 3)
-            rec[3] = 0;      /* parsed, checked, discarded -- see above */
-    }
+    if (!DefParseNumber(&rec[2], am2_strtok((char *)0, kSep)))
+        return 3;
+    if (!DefParseNumber(&rec[3], am2_strtok((char *)0, kSep)))
+        return 4;
+    rec[3] = 0;      /* parsed, checked, discarded -- see above */
+    if (!DefParseNumber(&rec[4], am2_strtok((char *)0, kSep)))
+        return 5;
+    if (!DefParseNumber(&rec[5], am2_strtok((char *)0, kSep)))
+        return 6;
+    if (!DefParseNumber(&rec[6], am2_strtok((char *)0, kSep)))
+        return 7;
+    if (!DefParseNumber(&rec[7], am2_strtok((char *)0, kSep)))
+        return 8;
+    if (!DefParseNumber(&rec[8], am2_strtok((char *)0, kSep)))
+        return 9;
+    /* THE NINTH FIELD IS A FLOAT: the call at 0x00435DB2 is DefParseFloat
+     * where the other twelve are DefParseNumber. It is the object's
+     * depth SLOPE, which DepthCompare projects with -- read as a number
+     * the sign's -0.35 became 0 and the hut's 2.06 became 2, so the
+     * port drew a sign post over Sarge's rifle where the original draws
+     * the rifle over the post. Found by tools/sidebyside.py on a walk
+     * past the rifle range sign, settled by logging both comparators'
+     * inputs (AM2_TRACE_DEPTH). Same lesson as DefWeaponLine's booleans:
+     * the parse blocks are identical except for the call target. */
+    if (!DefParseFloat((float *)&rec[9], am2_strtok((char *)0, kSep)))
+        return 10;
+    if (!DefParseNumber(&rec[10], am2_strtok((char *)0, kSep)))
+        return 11;
+    if (!DefParseNumber(&rec[11], am2_strtok((char *)0, kSep)))
+        return 12;
 
     if (DefParseNumber(&rec[12], am2_strtok((char *)0, kSep)))
         (void)DefParseNumber(&rec[13], am2_strtok((char *)0, kSep));
@@ -830,26 +858,6 @@ int32_t __cdecl DefVehicleLine(int32_t code, char *line)
 }
 
 
-/* THE KEYWORD-TO-KIND MAP, GENERATED FROM THE IMAGE'S JUMP TABLE RATHER THAN
- * TRANSCRIBED, and it is not the identity.
- *
- * Entry k is the arm for code k+1, and every arm does one thing: store a small
- * integer. Forty-two of them store k. TWO DO NOT -- entry 31 stores 32 and
- * entry 32 stores 31 -- so `vehicleammo` (code 32) and `vehiclearmor` (code
- * 33) get each other's kind index. Writing this as `cmd - 1`, which is what
- * forty-two of the forty-four arms say, would have been wrong for exactly
- * those two and invisible to every check this project has: the def tables are
- * loaded before any A/B takes its first screenshot, and nothing compares them.
- *
- * Decoded by reading each table entry's target and its immediate, which is the
- * rule DirtyCollect's eighty-one arms established -- emit the mapping from the
- * table, never from the order the arms are laid out in. */
-static const int32_t kWeaponKind[44] = {
-     0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,
-    11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
-    22, 23, 24, 25, 26, 27, 28, 29, 30, 32, 31,
-    33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
-};
 
 /* DefWeaponLine -- original 0x004602F0, and the .aai keyword table registers
  * it for forty-four weapon keywords. Thirteen dwords, which is
@@ -878,39 +886,101 @@ static const int32_t kWeaponKind[44] = {
 int32_t __cdecl DefWeaponLine(int32_t cmd, char *line)
 {
     int32_t rec[AM2_MISSILE_DEF_REC_SIZE / 4];
-    int32_t i;
 
-    if (cmd < 1 || cmd > 44) {
+    /* A switch with an arm per keyword, and the twelve fields parsed one
+     * after another: the image has neither a table lookup nor a loop.
+     *
+     * THE KEYWORD-TO-KIND MAP IS NOT THE IDENTITY. Every arm stores a small
+     * integer, forty-two of them `cmd - 1` -- but code 32 stores 32 and code
+     * 33 stores 31, so `vehicleammo` and `vehiclearmor` get each other's kind
+     * index. Decoded from each jump-table entry's target and its immediate,
+     * never from the order the arms are laid out in. */
+    switch (cmd) {
+    case  1: rec[0] =  0; break;
+    case  2: rec[0] =  1; break;
+    case  3: rec[0] =  2; break;
+    case  4: rec[0] =  3; break;
+    case  5: rec[0] =  4; break;
+    case  6: rec[0] =  5; break;
+    case  7: rec[0] =  6; break;
+    case  8: rec[0] =  7; break;
+    case  9: rec[0] =  8; break;
+    case 10: rec[0] =  9; break;
+    case 11: rec[0] = 10; break;
+    case 12: rec[0] = 11; break;
+    case 13: rec[0] = 12; break;
+    case 14: rec[0] = 13; break;
+    case 15: rec[0] = 14; break;
+    case 16: rec[0] = 15; break;
+    case 17: rec[0] = 16; break;
+    case 18: rec[0] = 17; break;
+    case 19: rec[0] = 18; break;
+    case 20: rec[0] = 19; break;
+    case 21: rec[0] = 20; break;
+    case 22: rec[0] = 21; break;
+    case 23: rec[0] = 22; break;
+    case 24: rec[0] = 23; break;
+    case 25: rec[0] = 24; break;
+    case 26: rec[0] = 25; break;
+    case 27: rec[0] = 26; break;
+    case 28: rec[0] = 27; break;
+    case 29: rec[0] = 28; break;
+    case 30: rec[0] = 29; break;
+    case 31: rec[0] = 30; break;
+    case 32: rec[0] = 32; break;
+    case 33: rec[0] = 31; break;
+    case 34: rec[0] = 33; break;
+    case 35: rec[0] = 34; break;
+    case 36: rec[0] = 35; break;
+    case 37: rec[0] = 36; break;
+    case 38: rec[0] = 37; break;
+    case 39: rec[0] = 38; break;
+    case 40: rec[0] = 39; break;
+    case 41: rec[0] = 40; break;
+    case 42: rec[0] = 41; break;
+    case 43: rec[0] = 42; break;
+    case 44: rec[0] = 43; break;
+    default:
         orig_log("Bad Weapon Type\n");
         return 1;
     }
-    rec[0] = kWeaponKind[cmd - 1];
 
     if (!DefParseNumber(&rec[1], am2_strtok(line, kSep)))
         return 2;
-
-    for (i = 2; i < (int32_t)(AM2_MISSILE_DEF_REC_SIZE / 4); i++) {
-        const char *tok = am2_strtok((char *)0, kSep);
-        /* FIELDS 4 AND 5 LAND IN EACH OTHER'S SLOT. The fourth number is
-         * stored at rec[5] and the fifth at rec[4]: in the original every
-         * parse block is `lea` of the slot, `push`, `call`, and those two
-         * blocks take the `lea` on the other side of a push from their
-         * neighbours -- `lea edx,[esp+0x1c]` before the push at 0x0046059F
-         * is +0x14, `lea eax,[esp+0x1c]` after it at 0x004605C7 is +0x10.
-         * Read as twelve numbers in order, the rifle's range (the file's
-         * fourth field, 250) went to rec[4] where the item-type builder
-         * reads rec[5]: the port's rifle had range 0, and its first shot
-         * detonated on Sarge's own position. Found by tools/sidebyside.py
-         * on the first shot anyone fired in the port, reproduced from the
-         * recorded input, and settled by espmap --site on the two blocks. */
-        int32_t     slot = (i == 4) ? 5 : (i == 5) ? 4 : i;
-        int32_t     ok  = (i == 7 || i == 10)
-                          ? DefParseBoolean(&rec[slot], tok)
-                          : DefParseNumber(&rec[slot], tok);
-
-        if (!ok)
-            return i + 1;
-    }
+    /* FIELDS 4 AND 5 LAND IN EACH OTHER'S SLOT. The fourth number is
+     * stored at rec[5] and the fifth at rec[4]: in the original every
+     * parse block is `lea` of the slot, `push`, `call`, and those two
+     * blocks take the `lea` on the other side of a push from their
+     * neighbours -- `lea edx,[esp+0x1c]` before the push at 0x0046059F
+     * is +0x14, `lea eax,[esp+0x1c]` after it at 0x004605C7 is +0x10.
+     * Read as twelve numbers in order, the rifle's range (the file's
+     * fourth field, 250) went to rec[4] where the item-type builder
+     * reads rec[5]: the port's rifle had range 0, and its first shot
+     * detonated on Sarge's own position. Found by tools/sidebyside.py
+     * on the first shot anyone fired in the port, reproduced from the
+     * recorded input, and settled by espmap --site on the two blocks. */
+    if (!DefParseNumber(&rec[2], am2_strtok((char *)0, kSep)))
+        return 3;
+    if (!DefParseNumber(&rec[3], am2_strtok((char *)0, kSep)))
+        return 4;
+    if (!DefParseNumber(&rec[5], am2_strtok((char *)0, kSep)))
+        return 5;
+    if (!DefParseNumber(&rec[4], am2_strtok((char *)0, kSep)))
+        return 6;
+    if (!DefParseNumber(&rec[6], am2_strtok((char *)0, kSep)))
+        return 7;
+    if (!DefParseBoolean(&rec[7], am2_strtok((char *)0, kSep)))
+        return 8;
+    if (!DefParseNumber(&rec[8], am2_strtok((char *)0, kSep)))
+        return 9;
+    if (!DefParseNumber(&rec[9], am2_strtok((char *)0, kSep)))
+        return 10;
+    if (!DefParseBoolean(&rec[10], am2_strtok((char *)0, kSep)))
+        return 11;
+    if (!DefParseNumber(&rec[11], am2_strtok((char *)0, kSep)))
+        return 12;
+    if (!DefParseNumber(&rec[12], am2_strtok((char *)0, kSep)))
+        return 13;
 
     AddMissileDef(rec);
     return 0;
