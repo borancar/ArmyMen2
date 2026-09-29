@@ -117,43 +117,36 @@ int32_t __cdecl DefLinkParse(int32_t cmd, char *line)
  * number and is written plainly here. */
 void __cdecl DefAddObjRec(const int32_t *rec)
 {
-    int32_t *tab = (int32_t *)kDefObjRecs;
-    int32_t  cap;
-    int32_t  n;
+    /* The globals are read in place, the table and count again after each
+     * compare, and the record goes in as one 56-byte struct copy. */
+    typedef struct { int32_t d[AM2_DEF_OBJ_REC_DWORDS]; } AM2_DefObjRec;
+#define TAB ((int32_t *)kDefObjRecs)
+    int32_t i;
 
-    if (tab == (int32_t *)0) {
-        tab = (int32_t *)am2_malloc(AM2_DEF_LINK_INITIAL
-                                    * AM2_DEF_OBJ_REC_SIZE);
-        cap = AM2_DEF_LINK_INITIAL;
-        kDefObjRecs   = tab;
-        kDefObjRecCap = cap;
-    } else {
-        cap = kDefObjRecCap;
+    if (!kDefObjRecs) {
+        kDefObjRecs   = (int32_t *)am2_malloc(AM2_DEF_LINK_INITIAL
+                                              * AM2_DEF_OBJ_REC_SIZE);
+        kDefObjRecCap = AM2_DEF_LINK_INITIAL;
     }
 
-    n = kDefObjRecCount;
-
-    if (n >= cap) {
-        cap += AM2_DEF_LINK_GROW;
-        kDefObjRecCap = cap;
-        tab = (int32_t *)am2_realloc(tab,
-                                     (size_t)cap * AM2_DEF_OBJ_REC_SIZE);
-        kDefObjRecs = tab;
-        n = kDefObjRecCount;
+    if (kDefObjRecCount >= kDefObjRecCap) {
+        kDefObjRecCap += AM2_DEF_LINK_GROW;
+        kDefObjRecs = (int32_t *)am2_realloc(
+            kDefObjRecs, (size_t)kDefObjRecCap * AM2_DEF_OBJ_REC_SIZE);
     }
 
-    for (int32_t i = 0; i < n; i++) {
-        if (CompareTriple(&tab[i * AM2_DEF_OBJ_REC_DWORDS], rec) == 0) {
+    for (i = 0; i < kDefObjRecCount; i++) {
+        if (CompareTriple(&TAB[i * AM2_DEF_OBJ_REC_DWORDS], rec) == 0) {
             orig_log("duplicate record in object.aai file %d-%d\n",
                      rec[0], rec[1]);
             return;
         }
     }
 
-    for (int32_t i = 0; i < AM2_DEF_OBJ_REC_DWORDS; i++)
-        tab[n * AM2_DEF_OBJ_REC_DWORDS + i] = rec[i];
-
-    kDefObjRecCount = n + 1;
+    *(AM2_DefObjRec *)&TAB[kDefObjRecCount * AM2_DEF_OBJ_REC_DWORDS] =
+        *(const AM2_DefObjRec *)rec;
+    kDefObjRecCount++;
+#undef TAB
 }
 
 /* 0x0044CCC0 and 0x0044CF70, the append and the free of a THIRD def table.

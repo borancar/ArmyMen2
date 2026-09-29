@@ -492,7 +492,10 @@ int32_t __cdecl SaveScriptSection(am2_FILE *fp)
 int32_t __cdecl LoadScriptSection(am2_FILE *fp)
 {
     char    name[AM2_SCRIPT_NAME_BUF];
-    int32_t meta[3];
+    /* The three fields that follow the name in both the file and the
+     * table entry, in the same order. */
+    typedef struct { int32_t type, value, refs; } AM2_NameMeta;
+    AM2_NameMeta meta;
     int32_t count;
 
     if (!CheckSaveTag(fp, AM2_SAVETAG_SCRIPT,
@@ -504,15 +507,14 @@ int32_t __cdecl LoadScriptSection(am2_FILE *fp)
 
     orig_fread(&count, 4, 1, fp);
 
-    for (int32_t i = 0; i < count; i++) {
-        int32_t         len;
-        AM2_ScriptName *e;
-        size_t          n;
+    /* Counted down on `count` itself; nothing indexes by the pass. */
+    for (; count > 0; count--) {
+        int32_t len;
 
         orig_fread(&len, 4, 1, fp);
         orig_fread(name, (size_t)len, 1, fp);
-        orig_fread(meta, 0xC, 1, fp);
         name[len] = 0;
+        orig_fread(&meta, 0xC, 1, fp);
 
         /* Ten at a time, the same step AddNameTableName uses. */
         if (kScriptNameCount >= kScriptNameCap) {
@@ -521,15 +523,23 @@ int32_t __cdecl LoadScriptSection(am2_FILE *fp)
                 kScriptNames, (size_t)kScriptNameCap * sizeof(AM2_ScriptName));
         }
 
-        e    = &kScriptNames[kScriptNameCount];
-        n    = strlen(name) + 1;
-        e->name = (char *)am2_malloc(n);
-        memcpy(e->name, name, n);
-        e->type  = meta[0];
-        e->value = meta[1];
-        e->refs  = meta[2];
+        /* Re-indexed at every use, strlen and strcpy, as AddNameTableName. */
+#define E kScriptNames[kScriptNameCount]
+        E.name = (char *)am2_malloc(strlen(name) + 1);
+        strcpy(E.name, name);
+        /* type, value and refs arrive and land as one 12-byte block. */
+        *(AM2_NameMeta *)&E.type = meta;
         kScriptNameCount++;
+#undef E
     }
+
+    /* The two builtins a save must not freeze: they take the settings as
+     * they are NOW, not as they were saved. Ours returned without these
+     * until the relink showed the two calls. */
+    SetVarValueByName("difficulty",
+                      *(const int32_t *)(uintptr_t)ADDR_DIFFICULTY);
+    SetVarValueByName("systemspeed",
+                      *(const int32_t *)(uintptr_t)ADDR_FAST_MACHINE);
     return 1;
 }
 
@@ -588,32 +598,37 @@ int32_t __cdecl AddNameTableName(const char *name, int32_t type, int32_t uid)
             kScriptNames, (size_t)kScriptNameCap * sizeof(AM2_ScriptName));
     }
 
-    AM2_ScriptName *e = &kScriptNames[kScriptNameCount];
-
-    /* strlen+1, because the `repne scasb` that sizes the block counts the
-     * terminator -- the same arithmetic that caught ParseNumber out. */
-    size_t len = strlen(name) + 1;
-    e->name = (char *)am2_malloc(len);
-    memcpy(e->name, name, len);
-    e->refs = 1;
-    e->type = type;
+    /* The entry is re-indexed at every use; the name is sized by strlen
+     * and copied by strcpy, two `repne scasb` walks as the image has. */
+#define E kScriptNames[kScriptNameCount]
+    E.name = (char *)am2_malloc(strlen(name) + 1);
+    strcpy(E.name, name);
+    E.refs = 1;
+    E.type = type;
 
     switch (type) {
     case 0:
-        e->value = AllocUid();
+        E.value = AllocUid();
         break;
+    /* Three arms, identical, merged by the compiler -- written as one they
+     * compile to a range test where the image has a four-slot table. */
     case 1:
+        E.value = uid;
+        break;
     case 2:
+        E.value = uid;
+        break;
     case 3:
-        e->value = uid;
+        E.value = uid;
         break;
     default:
         am2_log("AddNameTableName: invalid type; %s has type %d and uid %d\n",
                 name, type, uid);
         /* Stored anyway, and the count still advances. */
-        e->value = uid;
+        E.value = uid;
         break;
     }
+#undef E
 
     return kScriptNameCount++;
 }
