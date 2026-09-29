@@ -7880,7 +7880,6 @@ void __cdecl SetUnitPose(void *obj, int32_t pose)
     int32_t  cur = *(const int32_t *)(o + OBJ_OFF_POSE);
     int32_t  interrupt;
     int32_t  pending;
-    int32_t  frame;
 
     if (cur == pose)
         return;
@@ -7888,14 +7887,14 @@ void __cdecl SetUnitPose(void *obj, int32_t pose)
     interrupt = (cur == 1);
 
     switch (pose) {
-    case 0:
-    case 32: case 33: case 34: case 35: case 36:
-        interrupt = 1;
-        break;
     case 5:
     case 8:  case 9:  case 10: case 11:
     case 12: case 13: case 14: case 15:
         *(int32_t *)(o + OBJ_OFF_POSE_PENDING) = pose;
+        break;
+    case 0:
+    case 32: case 33: case 34: case 35: case 36:
+        interrupt = 1;
         break;
     default:
         break;                          /* includes every pose above 0x24 */
@@ -7920,9 +7919,9 @@ void __cdecl SetUnitPose(void *obj, int32_t pose)
 
     *(int32_t *)(o + OBJ_OFF_POSE) = pose;
 
-    frame = ((const int32_t *)((void *)(uintptr_t)(ADDR_WEAPON_POSE_FRAMES)))[pose];
-
-    switch (frame) {
+    /* The frame table is read again for the call, as the image does. */
+#define FRAME (((const int32_t *)((void *)(uintptr_t)(ADDR_WEAPON_POSE_FRAMES)))[pose])
+    switch (FRAME) {
     case 10: case 12: case 14: case 19:
     case 49: case 50: case 51:
         *(uint8_t *)(o + OBJ_OFF_HEIGHT_ADJ) = 0x10;
@@ -7936,7 +7935,8 @@ void __cdecl SetUnitPose(void *obj, int32_t pose)
         break;
     }
 
-    SetAnimFrame(row, (int16_t)frame, 0);
+    SetAnimFrame(row, (int16_t)FRAME, 0);
+#undef FRAME
 }
 
 /* orig_on_selection_changed is orig.h's; objtable.cpp uses the same one. */

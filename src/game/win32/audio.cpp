@@ -996,7 +996,8 @@ int32_t __cdecl ParseWave(void *file, LPWAVEFORMATEX *fmt, void **samples,
 {
     const uint8_t *p = (const uint8_t *)file;
     const uint8_t *end;
-    uint32_t       size;
+    uint32_t       riff, size, wave;
+    uint32_t       id, len;
 
     if (fmt)
         *fmt = (LPWAVEFORMATEX)0;
@@ -1005,26 +1006,33 @@ int32_t __cdecl ParseWave(void *file, LPWAVEFORMATEX *fmt, void **samples,
     if (length)
         *length = 0;
 
-    size = *(const uint32_t *)(p + 4);
-    if (*(const uint32_t *)p != AM2_RIFF_TAG_RIFF) {
+    /* A dword at a time, the cursor stepped by four after each. */
+    riff = *(const uint32_t *)p;
+    p += 4;
+    size = *(const uint32_t *)p;
+    p += 4;
+    wave = *(const uint32_t *)p;
+    p += 4;
+
+    if (riff != AM2_RIFF_TAG_RIFF) {
         orig_log("not a riff compatible file!\n");
         return 0;
     }
-    if (*(const uint32_t *)(p + 8) != AM2_RIFF_TAG_WAVE) {
+    if (wave != AM2_RIFF_TAG_WAVE) {
         orig_log("not a wave file!\n");
         return 0;
     }
 
-    end = (const uint8_t *)file + size + 8;
-    p  += 12;
+    end = p + size - 4;
 
     while (p < end) {
-        uint32_t id  = *(const uint32_t *)p;
-        uint32_t len = *(const uint32_t *)(p + 4);
+        id = *(const uint32_t *)p;
+        p += 4;
+        len = *(const uint32_t *)p;
+        p += 4;
 
-        p += 8;
-
-        if (id == AM2_RIFF_TAG_FMT) {
+        switch (id) {
+        case AM2_RIFF_TAG_FMT:
             if (fmt && *fmt == (LPWAVEFORMATEX)0) {
                 if (len < AM2_WAVEFMT_MIN) {
                     orig_log("Invalid header for wave file\n");
@@ -1032,12 +1040,13 @@ int32_t __cdecl ParseWave(void *file, LPWAVEFORMATEX *fmt, void **samples,
                 }
                 *fmt = (LPWAVEFORMATEX)p;
                 /* Return only when nothing else asked for is still empty. */
-                if (!samples || *samples != (void *)0) {
-                    if (!length || *length != 0)
-                        return 1;
-                }
+                if ((!samples || *samples != (void *)0)
+                    && (!length || *length != 0))
+                    return 1;
             }
-        } else if (id == AM2_RIFF_TAG_DATA) {
+            break;
+
+        case AM2_RIFF_TAG_DATA:
             if ((samples && *samples == (void *)0)
                 || (length && *length == 0)) {
                 if (samples)
@@ -1047,6 +1056,7 @@ int32_t __cdecl ParseWave(void *file, LPWAVEFORMATEX *fmt, void **samples,
                 if (!fmt || *fmt != (LPWAVEFORMATEX)0)
                     return 1;
             }
+            break;
         }
 
         p += (len + 1) & ~1u;
