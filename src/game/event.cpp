@@ -1470,23 +1470,23 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg)
 
     switch (c->mode) {
     case 0:
-        if (c->nactions <= 0)
-            return;
         for (int32_t i = 0; i < c->nactions; i++)
             CondRunAction(c, i, arg);
         return;
 
-    case 1:
-        CondRunAction(c, orig_rand() % c->nactions, arg);
-        return;
+    case 1: {
+        int32_t pick = orig_rand() % c->nactions;
 
-    case 2: {
-        int32_t at = *(const int8_t *)&c->cursor;
-
-        CondRunAction(c, at, arg);
-        *(int8_t *)&c->cursor = (int8_t)((at + 1) % c->nactions);
+        CondRunAction(c, pick, arg);
         return;
     }
+
+    case 2:
+        /* The cursor is re-read after the action has run. */
+        CondRunAction(c, *(const int8_t *)&c->cursor, arg);
+        *(int8_t *)&c->cursor =
+            (int8_t)((*(const int8_t *)&c->cursor + 1) % c->nactions);
+        return;
 
     case 3: {
         uint8_t       *obj;
