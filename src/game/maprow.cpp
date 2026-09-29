@@ -176,22 +176,741 @@ static int32_t DepthCompareBody(void *a, void *b)
 /* AM2_TRACE_DEPTH=1: the same line the hybrid's dev loader logs over the
  * original, so the two games' comparisons diff at a pump. */
 extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
-int32_t __cdecl DepthCompare(void *a, void *b)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+int maprow_install(void)
 {
-    int32_t r = DepthCompareBody(a, b);
-    static int32_t trace = -1;
-    if (trace < 0)
-        trace = getenv("AM2_TRACE_DEPTH") != 0;
-    if (trace && a && b && AM2_TRACE_ON()) {
-        const uint8_t *pa = (const uint8_t *)a, *pb = (const uint8_t *)b;
-        fprintf(stderr, "DEPTH pump %u a=(l%d s%g %d,%d) b=(l%d s%g %d,%d) -> %d\n",
-                (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
-                *(const int16_t *)(pa + OBJ_OFF_DEPTH_LAYER), (double)*(const float *)(pa + OBJ_OFF_DEPTH_SLOPE),
-                *(const int16_t *)(pa + ROW_OFF_X), *(const int16_t *)(pa + ROW_OFF_Y),
-                *(const int16_t *)(pb + OBJ_OFF_DEPTH_LAYER), (double)*(const float *)(pb + OBJ_OFF_DEPTH_SLOPE),
-                *(const int16_t *)(pb + ROW_OFF_X), *(const int16_t *)(pb + ROW_OFF_Y), r);
+    int rc = 0;
+
+    rc |= patch_replace(ADDR_BUILD_ROWS_FROM_DEF,
+                        (const void *)BuildRowsFromDef,
+                        "BuildRowsFromDef", 2);
+    rc |= patch_replace(ADDR_ROW_ANIM_FIELD4, (const void *)RowAnimField4,
+                        "RowAnimField4", 2);
+    rc |= patch_replace(ADDR_BUILD_ROW_SET, (const void *)BuildRowSet,
+                        "BuildRowSet", 6);
+
+    rc |= patch_replace(ADDR_SET_ANIM_FRAME, (const void *)SetAnimFrame,
+                        "SetAnimFrame", 11);
+
+    rc |= patch_replace(ADDR_DEPTH_COMPARE, (const void *)DepthCompare,
+                        "DepthCompare", 2);
+    rc |= patch_replace(ADDR_DEPTH_LINK, (const void *)DepthLink,
+                        "DepthLink", 2);
+    rc |= patch_replace(ADDR_DEPTH_RESORT, (const void *)DepthResort,
+                        "DepthResort", 2);
+    rc |= patch_replace(ADDR_ROW_ALLOC, (const void *)RowAlloc,
+                        "RowAlloc", 4);
+    rc |= patch_replace(ADDR_ROW_REGISTER_ALL, (const void *)RowRegisterAll,
+                        "RowRegisterAll", 2);
+    rc |= patch_replace(ADDR_ROW_UPDATE, (const void *)RowUpdate,
+                        "RowUpdate", 3);
+    rc |= patch_replace(ADDR_MAP_DESC_FREE, (const void *)MapDescFree,
+                        "MapDescFree", 3);
+    rc |= patch_replace(ADDR_MAP_DESC_INIT, (const void *)MapDescInit,
+                        "MapDescInit", 2);
+    rc |= patch_replace(ADDR_ROW_INIT, (const void *)RowInit, "RowInit", 2);
+    rc |= patch_replace(ADDR_ROW_SET_SPRITE, (const void *)RowSetSprite,
+                        "RowSetSprite", 3);
+    rc |= patch_replace(ADDR_ROWPOOL_A_INIT, (const void *)RowPoolAInit,
+                        "RowPoolAInit", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_B_INIT, (const void *)RowPoolBInit,
+                        "RowPoolBInit", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_A_FREE, (const void *)RowPoolAFree,
+                        "RowPoolAFree", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_B_FREE, (const void *)RowPoolBFree,
+                        "RowPoolBFree", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_A_RELEASE, (const void *)RowPoolARelease,
+                        "RowPoolARelease", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_B_RELEASE, (const void *)RowPoolBRelease,
+                        "RowPoolBRelease", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_A_EVICT, (const void *)RowPoolAEvict,
+                        "RowPoolAEvict", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_B_EVICT, (const void *)RowPoolBEvict,
+                        "RowPoolBEvict", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_A_ALLOC, (const void *)RowPoolAAlloc,
+                        "RowPoolAAlloc", 1);
+    rc |= patch_replace(ADDR_ROWPOOL_B_ALLOC, (const void *)RowPoolBAlloc,
+                        "RowPoolBAlloc", 1);
+    rc |= patch_replace(ADDR_SEQ_CTX_INIT, (const void *)SeqCtxInit,
+                        "SeqCtxInit", 1);
+    rc |= patch_replace(ADDR_SEQ_CTX_FREE, (const void *)SeqCtxFree,
+                        "SeqCtxFree", 1);
+    rc |= patch_replace(ADDR_SEQ_RETIRE, (const void *)SeqRetire,
+                        "SeqRetire", 1);
+    rc |= patch_replace(ADDR_SEQ_EVICT, (const void *)SeqEvict,
+                        "SeqEvict", 1);
+    rc |= patch_replace(ADDR_SEQ_ALLOC, (const void *)SeqAlloc,
+                        "SeqAlloc", 1);
+    rc |= patch_replace(ADDR_RESPAWN_KIND_ALLOWED,
+                        (const void *)RespawnKindAllowed,
+                        "RespawnKindAllowed", 2);
+    rc |= patch_replace(ADDR_SEQ_SUBSYSTEM_INIT,
+                        (const void *)SeqSubsystemInit,
+                        "SeqSubsystemInit", 1);
+    rc |= patch_replace(ADDR_FREE_SEQ_CONTEXTS, (const void *)FreeSeqContexts,
+                        "FreeSeqContexts", 2);
+    rc |= patch_replace(ADDR_RANDOM_RESPAWN_KIND,
+                        (const void *)RandomRespawnKind,
+                        "RandomRespawnKind", 2);
+    rc |= patch_replace(ADDR_LEAVE_REMAINS_ROW, (const void *)LeaveRemainsRow,
+                        "LeaveRemainsRow", 1);
+    rc |= patch_replace(ADDR_TIMED_DIR_FRAME, (const void *)TimedDirFrame,
+                        "TimedDirFrame", 2);
+    rc |= patch_replace(ADDR_GAME_SRAND, (const void *)GameSrand,
+                        "GameSrand", 1);
+    rc |= patch_replace(ADDR_SPAWN_PARTICLE, (const void *)SpawnParticle,
+                        "SpawnParticle", 6);
+    rc |= patch_replace(ADDR_DIED_EFFECT_A, (const void *)DiedEffectA,
+                        "DiedEffectA", 1);
+    rc |= patch_replace(ADDR_SPAWN_HIT_EFFECT, (const void *)SpawnHitEffect,
+                        "SpawnHitEffect", 3);
+    rc |= patch_replace(ADDR_DIED_EFFECT_B, (const void *)DiedEffectB,
+                        "DiedEffectB", 4);
+    rc |= patch_replace(ADDR_SEQ_START_DIR_EFFECT,
+                        (const void *)SeqStartDirEffect,
+                        "SeqStartDirEffect", 6);
+    rc |= patch_replace(ADDR_PLACE_GROUND_DECAL,
+                        (const void *)PlaceGroundDecal,
+                        "PlaceGroundDecal", 3);
+    rc |= patch_replace(ADDR_BUILD_RESPAWN_POOL,
+                        (const void *)BuildRespawnPool,
+                        "BuildRespawnPool", 1);
+    return rc;
+}
+
+/* The two 12-byte ROW POOLS -- see orig.h above ADDR_ROWPOOL_A_COUNT for the
+ * layout and for why it tiles. Fifteen functions in the image implement five
+ * roles three times: once hardcoded per pool, and once generically over a seq
+ * context. These are the hardcoded pair.
+ *
+ * A SLOT IS A HANDLE ONTO A PERMANENT ROW. The initialiser mallocs one
+ * 0x60-byte row per slot and nothing frees it until teardown; allocate and
+ * release only shuffle which slot holds which. That is why the allocator
+ * never writes ROWPOOL_OFF_ROW and its callers dereference it immediately. */
+struct AM2_RowSlot {
+    void   *row;
+    int16_t id;
+    int16_t prev;
+    int16_t next;
+    int16_t pad;
+};
+
+/* {count; tail; slots[]} -- one aggregate per pool, which is why a store
+ * into a slot makes VC6 read the tail again but not the count it holds. */
+struct AM2_RowPoolA {
+    int32_t     count;
+    int32_t     tail;
+    AM2_RowSlot slots[AM2_ROWPOOL_A_CAP + AM2_ROWPOOL_A_BUDGET];
+};
+struct AM2_RowPoolB {
+    int32_t     count;
+    int32_t     tail;
+    AM2_RowSlot slots[AM2_ROWPOOL_B_CAP + AM2_ROWPOOL_B_BUDGET];
+};
+#define g_rowPoolA  (*(AM2_RowPoolA *)(uintptr_t)ADDR_ROWPOOL_A_COUNT)
+#define g_rowPoolB  (*(AM2_RowPoolB *)(uintptr_t)ADDR_ROWPOOL_B_COUNT)
+
+/* Each role is written once, inline, and each pool's function passes its own
+ * globals and constants -- after inlining they are immediates and absolute
+ * addresses, which is what the two emitted copies hold. */
+
+/* 0x00460800 (pool A) and 0x00460AC0 (pool B). Zero the header, make entry 0
+ * the head sentinel, and give every slot its permanent row.
+ *
+ * The row is zeroed with `mov ecx, 0x18; rep stosd` -- 24 DWORDS, which is
+ * the 0x60 bytes and not 0x18 of them.
+ *
+ * AND EACH ROW IS THEN REGISTERED WITH RowAlloc, which the first version of
+ * this omitted -- `ab.sh bootcamp` came back with 37% of the frame wrong and
+ * an identical log, the map-load-truncated signature. The malloc gives the
+ * row STRUCT its 0x60 bytes; RowAlloc gives it its extent, and the two pools
+ * differ there: 0x60 square for A, 0x80 square for B.
+ *
+ * Its arguments are cleaned by a single `add esp, 0x14` that also cleans the
+ * malloc's -- five dwords for two calls -- which is the cdecl shape CLAUDE.md
+ * warns makes a call's arity unreadable from the cleanup alone. */
+static inline void RowPoolInit(int32_t *count, int32_t *tail,
+                               AM2_RowSlot *slots, int32_t n, int32_t dim)
+{
+    int32_t i;
+
+    *tail = 0;
+    *count = 0;
+
+    for (i = 0; i < n; i++) {
+        void *row;
+
+        slots[i].id = (int16_t)i;
+        slots[i].next = -1;
+        slots[i].prev = -1;
+        row = am2_malloc(AM2_ROWPOOL_ROW_BYTES);
+        slots[i].row = row;
+        memset(row, 0, AM2_ROWPOOL_ROW_BYTES);
+        RowAlloc(dim, dim, row, (void *)(uintptr_t)ADDR_MAP_DESC);
     }
-    return r;
+}
+
+/* 0x00460860 (pool A) and 0x00460B30 (pool B). The ONLY place a row is freed.
+ * Walks every slot -- not the list -- because a released slot still owns its
+ * row, so following the links would leak every slot not currently linked. */
+static inline void RowPoolTeardown(int32_t *count, int32_t *tail,
+                                   AM2_RowSlot *slots, int32_t n)
+{
+    int32_t i;
+
+    for (i = 0; i < n; i++) {
+        if (slots[i].row != 0) {
+            RowRelease(slots[i].row, (void *)(uintptr_t)ADDR_MAP_DESC);
+            am2_free(slots[i].row);
+            slots[i].row = 0;
+        }
+        slots[i].next = -1;
+        slots[i].prev = -1;
+    }
+
+    *tail = 0;
+    *count = 0;
+}
+
+/* 0x00460A60 (pool A) and 0x00460D30 (pool B). The two are ONE function
+ * emitted twice: with the six parameters substituted they are 18 instructions
+ * each and differ in two, both the evict call and the branch over it.
+ *
+ * The cap test is `jle`, so SIGNED, and it is not a refusal -- over the cap it
+ * evicts and then allocates anyway. This function always returns a slot. */
+static inline AM2_RowSlot *RowPoolAlloc(int32_t *count, int32_t *tail,
+                                        AM2_RowSlot *slots, int32_t cap,
+                                        void (*evict)(void))
+{
+    int32_t i;
+
+    if (*count > cap)
+        evict();
+
+    i = ++*count;
+    slots[i].id = (int16_t)i;
+    slots[i].prev = (int16_t)*tail;
+    slots[i].next = -1;
+
+    /* Link the previous tail to us. Entry 0 is the head sentinel, so this is
+     * correct with an empty list too: tail is 0 and entry 0's next takes the
+     * new index. */
+    slots[*tail].next = (int16_t)i;
+    *tail = i;
+
+    return &slots[i];
+}
+
+/* 0x004608C0 (pool A) and 0x00460B90 (pool B). One function emitted twice:
+ * masked of constants the two are 82 instructions each and IDENTICAL,
+ * similarity 1.000.
+ *
+ * FOUR ROLES, and the last one is the trap. It
+ *   1. clears bit 0 of the row and calls RowUpdate, if the bit was set;
+ *   2. unlinks the entry both ways;
+ *   3. COMPACTS -- swaps the last entry into the freed slot, exchanging the
+ *      rows so every slot keeps owning one;
+ *   4. ANSWERS THE NEXT INDEX, corrected for the swap.
+ *
+ * Every other call site discards the answer, so `void(entry *)` is what the
+ * function looks like -- and the evictor's second loop depends on it, taking
+ * the new head from each release. Written as void, that loop would spin on a
+ * stale index or index by an address.
+ *
+ * The correction in step 4 matters on its own: if the entry that FOLLOWED the
+ * released one happened to be the last, the swap moved it and its old index
+ * is stale. Without the fixup a walker follows a dangling index one time in
+ * N, which is exactly the kind of defect no drive here would surface. */
+static inline int32_t RowPoolRelease(int32_t *count, int32_t *tail,
+                                     AM2_RowSlot *slots, AM2_RowSlot *e)
+{
+    void        *row = e->row;
+    int32_t      next;
+    AM2_RowSlot *last;
+
+    if ((*(uint32_t *)row & 1) != 0) {
+        *(uint32_t *)row &= ~1u;
+        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+    }
+
+    /* Unlink. The head sentinel is entry 0, so prev is always a real slot. */
+    next = e->next;
+    slots[e->prev].next = (int16_t)next;
+    if (e->next > 0)
+        slots[e->next].prev = e->prev;
+    if (*tail == e->id)
+        *tail = e->prev;
+
+    /* Compact: the last entry moves down into the hole, and the freed slot's
+     * row goes up to the vacated one. A MOVE rather than a swap would leak a
+     * row per release and alias two entries onto one. */
+    last = &slots[*count];
+    if (e->id != *count) {
+        int32_t freed;
+
+        slots[last->prev].next = e->id;
+        if (last->next > 0)
+            slots[last->next].prev = e->id;
+        /* The original compares the saved `next` against the LAST ENTRY'S OWN
+         * id (movsx from last+4 at 0x00460970), not against `count`. Those
+         * are the same number whenever the pool is consistent, and using the
+         * field is what the image does -- reproduce that rather than the
+         * arithmetic that happens to agree with it. */
+        freed = e->id;
+        if (next == last->id)
+            next = freed;
+
+        *e = *last;
+        last->row = row;
+        e->id = (int16_t)freed;
+        if (*tail == *count)
+            *tail = freed;
+    }
+
+    last->next = -1;
+    last->prev = -1;
+    (*count)--;
+    return next;
+}
+/* 0x004609D0 (pool A) and 0x00460CA0 (pool B). One function twice: with the
+ * six parameters substituted they are 46 and 47 instructions and only EIGHT
+ * differ, every one a branch displacement off by exactly 2 -- the imm32/imm8
+ * encoding of the capacity propagating. Not a rewrite; a re-emission.
+ *
+ * TWO LOOPS, and reading only the first gives a tidy visibility cache that
+ * misses what happens when the pool is full of things you can SEE:
+ *
+ *   1. walk the list from the head; release any entry whose row rectangle no
+ *      longer meets the view; stop after `budget` releases or at the end.
+ *   2. if the budget was NOT used up, release from the head `budget` more
+ *      times REGARDLESS of any rectangle -- the pressure valve.
+ *
+ * The IntersectRect goes through the game's own IAT thunk, not an import of
+ * ours, for the same reason device.cpp calls the DirectInput thunk: an import
+ * in am2hook.dll would resolve through OUR IAT. (Here it is only USER32 and
+ * nothing hooks it, so this is convention rather than necessity -- but the
+ * convention is what keeps the rule legible.)
+ *
+ * Loop 2 takes its next index from the RELEASE'S RETURN VALUE. The original
+ * loads the entry ADDRESS into eax, calls, and branches back to the lea --
+ * which reads as indexing by an address until you notice `call` clobbers eax
+ * with the answer. A version that walked saved indices would be wrong the
+ * moment the compaction moved an entry. */
+#ifdef _MSC_VER
+/* Under VC6 it is the import itself: the compiler treats an import slot as
+ * constant and hoists it into ebp for the loop, as the original does, where a
+ * load through a cast address is reloaded at every call. */
+extern "C" __declspec(dllimport) int32_t __stdcall IntersectRect(
+    void *dst, const void *a, const void *b);
+#define orig_intersect_rect IntersectRect
+#else
+typedef int32_t (__stdcall *AM2_IntersectRectFn)(void *dst, const void *a,
+                                                 const void *b);
+#define orig_intersect_rect \
+    (*(AM2_IntersectRectFn *)((void *)(uintptr_t)(ADDR_IAT_INTERSECT_RECT)))
+#endif
+
+static inline void RowPoolEvict(int32_t *count, AM2_RowSlot *slots,
+                                int32_t cap, int32_t budget,
+                                int32_t (*release)(void *))
+{
+    uint8_t scratch[16];
+    int32_t left;
+    int32_t i;
+
+    if (*count <= cap)
+        return;
+
+    left = budget;
+    i = slots[0].next;
+    do {
+        if (!orig_intersect_rect(scratch,
+                                 (const void *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
+                                 (const uint8_t *)slots[i].row + ROW_OFF_RECT)) {
+            i = release(&slots[i]);
+            if (--left <= 0)
+                break;
+        } else {
+            i = slots[i].next;
+        }
+    } while (i > 0);
+
+    /* The pressure valve: still over, so drop from the head regardless. */
+    i = slots[0].next;
+    for (; left > 0; left--)
+        i = release(&slots[i]);
+}
+
+
+/* ---- The SEQ contexts: the same five roles, parameterised ----------------
+ *
+ * These are the third implementation of the row-pool algorithm and the only
+ * one that is a REWRITE rather than a re-emission -- 0.222 similarity against
+ * the hardcoded pair, which diff at 1.000 against each other.
+ *
+ * Records are 48 bytes here, not 12, and the array is a POINTER at
+ * SEQ_CTX_OFF_RECORDS rather than being inline -- so the same conceptual
+ * field is one dereference deep in this shape and zero in the other.
+ *
+ * AND THE SLACK IS SOMEWHERE ELSE. The hardcoded pools carry `budget` spare
+ * slots above their capacity; a context carries none, and its margin is
+ * subtracted from the eviction threshold instead. Writing this from the
+ * hardcoded version's outline would overrun the array. */
+static inline uint8_t *SeqRecord(const uint8_t *ctx, int32_t i)
+{
+    return *(uint8_t **)(uintptr_t)(ctx + SEQ_CTX_OFF_RECORDS)
+           + (int32_t)(i * AM2_SEQ_RECORD_SIZE);
+}
+
+
+
+
+
+
+/* ---- The respawn pool: two small functions off the map-load path --------- */
+
+/* region.cpp spells this the same way; ADDR_GAME_RAND is above the nominal
+ * CRT line but is the game's own LCG, not libc's. */
+typedef int32_t (__cdecl *AM2_GameRandFn)(void);
+#define orig_game_rand ((AM2_GameRandFn)(uintptr_t)((void *)(uintptr_t)(ADDR_GAME_RAND)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* DiedEffectB -- original 0x00461C30, one caller. The directional death
+ * burst: up to seven particles thrown outward, chosen by which way the thing
+ * was facing.
+ *
+ * ITS TWO TABLES ARE BUILT ON THE STACK, one dword at a time, across sixty
+ * instructions of the prologue. They are DECODED from that instruction
+ * stream here rather than transcribed -- the rule DirtyCollect's eighty-one
+ * arms established -- because a hand-read of sixty scattered `mov [esp+N],
+ * reg` with three different registers holding 1, 0 and -1 is exactly the
+ * transcription this project has got wrong before.
+ *
+ * THE FACING BECOMES A SECTOR: `(facing + 0x10) >> 5`, so the byte angle is
+ * rounded to one of eight, and a result outside 0..7 returns without
+ * spawning. The +0x10 is half a sector, which makes it round rather than
+ * truncate -- the same idiom SeqStartDirEffect uses with a different divisor.
+ *
+ * AND THE RANDOM ARM IS UNREACHABLE FROM HERE, which only the decoded tables
+ * show. Two of the seven angles are -1, the value SpawnParticle reads as
+ * "pick a direction at random" -- and columns 2 and 6, the ones carrying
+ * them, are ZERO IN ALL EIGHT ROWS. So the `if (angle == -1)` arm at
+ * 0x00461E4F cannot run through this caller, and it is written out only
+ * because the original has it. Reading the three arms without the mask would
+ * describe a behaviour the function never produces. */
+static const int32_t kDiedBurstAngle[7] = { 64, -64, -1, 0, -100, -154, -1 };
+
+static const int32_t kDiedBurstMask[8][7] = {
+    { 1, 1, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 1, 1, 0 },
+    { 0, 1, 0, 1, 1, 0, 0 },
+    { 0, 1, 0, 1, 1, 1, 0 },
+    { 0, 0, 0, 1, 0, 0, 0 },
+    { 0, 0, 0, 1, 1, 1, 0 },
+    { 1, 0, 0, 0, 1, 1, 0 },
+    { 1, 1, 0, 0, 1, 1, 0 },
+};
+
+/* 0x0040A050, two callers. Clear a map object and give it a sprite, a
+ * position and the default palette.
+ *
+ * FILED HERE RATHER THAN BY BAND. It sits in air.cpp..audio.cpp, which is a
+ * different translation unit from this file's 0x0041Dxxx -- but its 0x60
+ * bytes are AM2_OBJ_ROW_STRIDE and the three fields it writes are the row's
+ * sprite, packed position and palette, so it is the row family's constructor
+ * and nothing else. That TU is already split three ways in this tree
+ * (objflag.cpp, anim.cpp, win32/mapdraw.cpp), so one more split costs
+ * nothing and filing it away from its family would.
+ *
+ * The clear is the whole 0x60 and the writes follow it, so every other field
+ * really is zero on the way out -- including the flags, which means bit 0 is
+ * CLEAR and the object is not drawn until somebody sets it.
+ *
+ * It runs 1,612 times in one Boot Camp mission and the palette line is still
+ * NOT checked: nulling it leaves `bootcamp` at 76 pixels, inside the band.
+ * Every object that reaches the screen has had its own palette written in by
+ * then -- which is what MAPOBJ_OFF_PALETTE's note in orig.h already says
+ * happens immediately before a draw. Warm code, undiscriminated line. */
+void __cdecl RowInit(void *row, void *sprite, int32_t x, int32_t y)
+{
+    uint8_t *r = (uint8_t *)row;
+
+    memset(r, 0, AM2_OBJ_ROW_STRIDE);
+    *(void **)(r + ROW_OFF_SPRITE) = sprite;
+    *(uint32_t *)(r + ROW_OFF_X)   = MakePoint((uint32_t)x, (uint32_t)y);
+    *(void **)(r + MAPOBJ_OFF_PALETTE) =
+        *(void *const *)(uintptr_t)ADDR_DEFAULT_PALETTE;
+}
+
+/* RowAnimField4 -- original 0x0040A130, two callers.
+ *
+ * This is the reader ROW_OFF_FIELD_2C's block in orig.h predicted from the
+ * writing side: look an animation up in the row's current table by id, take
+ * its AM2_Anim::field4, and DOUBLE it when the row's lut is the one that
+ * doubles. Every other lut takes the value unchanged, which is exactly what
+ * the comparison against ADDR_ROW_LUT_DOUBLES says.
+ *
+ * THE LUT IS COMPARED BY ADDRESS, not by anything in it. There is one lut that
+ * doubles and the test is `row->lut == that table`, so a second doubling lut
+ * could not be added without touching this function.
+ *
+ * THE FIRST TEST IS A SHORTCUT AND IT DOES NOT GO THROUGH THE TABLE. An id
+ * equal to the row's own ROW_OFF_FRAME answers ROW_OFF_FIELD_3C directly --
+ * the value already cached on the row -- and is NOT doubled. So the same id
+ * gives two different answers depending on whether the row happens to be
+ * showing it. Reproduced; it is the whole reason the cached field exists.
+ *
+ * A MISS FALLS BACK TO ENTRY 0 RATHER THAN FAILING, and does so without
+ * checking the count, so a table with no entries is read out of bounds. That
+ * is the same last-resort LoadAnimTable has and the same lack of a guard;
+ * anim.h says no shipped file reaches it there, and nothing here changes that.
+ *
+ * Id 0 is refused before the table is touched at all.
+ */
+int16_t __cdecl RowAnimField4(const void *row, uint16_t id)
+{
+    const uint8_t       *r = (const uint8_t *)row;
+    const AM2_AnimTable *table;
+    int32_t              i = 0;
+    int16_t              value;
+
+    if ((int16_t)id == *(const int16_t *)(r + ROW_OFF_FRAME))
+        return *(const int16_t *)(r + ROW_OFF_FIELD_3C);
+
+    if (!id)
+        return 0;
+
+    table = *(const AM2_AnimTable *const *)(r + ROW_OFF_ANIM_CUR);
+    if (!table)
+        return 0;
+
+    while (i < table->count && table->entries[i].id != (int32_t)(int16_t)id)
+        i++;
+    if (i >= table->count)
+        i = 0;                  /* not found: entry 0, count unchecked */
+
+    value = (int16_t)table->entries[i].anim->field4;
+
+    if (*(const void *const *)(r + ROW_OFF_FIELD_2C)
+        == (const void *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)
+        value = (int16_t)(value + value);
+
+    return value;
+}
+
+/* 0x0040A1A0, eleven callers. Put a row on an animation frame: pick up the
+ * animation whose entry id matches, reset it to cell 0, and set the sprite the
+ * new cell asks for.
+ *
+ * FOUR OF THE FRAME VALUES ARE NOT FRAMES. -2 returns at once, -1 means "the
+ * frame it is already on", 0 clears bit 0 of the row's first dword and returns
+ * without touching the animation at all, and only then is the value an id to
+ * look up. So a caller can say "stop", "again" or "nothing" through the same
+ * argument, and a reconstruction that range-checked the id would swallow three
+ * of the four.
+ *
+ * `force` is only consulted for the early-out: without it, asking for the
+ * frame the row is already on returns immediately. With it, everything below
+ * runs again -- which is what restarts an animation from cell 0.
+ *
+ * A PENDING TABLE IS TAKEN UP HERE AND NOWHERE ELSE. ROW_OFF_ANIM_NEXT, when
+ * set, becomes ROW_OFF_ANIM_CUR and is cleared; that is the only consumer of
+ * the field, so a table queued by anyone else waits for the next frame change.
+ *
+ * THE SEARCH FALLS BACK TO ENTRY 0 RATHER THAN FAILING. An id that is not in
+ * the table takes entry 0 and the row is still told it is on the requested
+ * frame -- ROW_OFF_FRAME is written from the argument, not from the entry
+ * found. Reproduced; a not-found that returned early would leave the row on
+ * its old animation and is the obvious tidier version.
+ *
+ * The heading it draws with is ROW_OFF_HEADING plus a per-FRAME bias byte from
+ * ADDR_FRAME_HEADING_BIAS, added as an 8-bit value so it wraps. That table is
+ * zero almost everywhere: index 19 holds 0xC0, three quarters of a turn, so
+ * exactly one animation is drawn facing backwards and the table exists for it.
+ * The sum then goes through RoundTo8 with the animation's own directionBits,
+ * which is how an 8-bit heading becomes one of 1, 2, 8, 16 or 32 directions.
+ *
+ * The cell index is `frames * direction + cell`, which is the direction-major
+ * layout anim.h records, and the sprite is that cell's id through
+ * ADDR_SPRITE_LIST.
+ *
+ * THE LAST TWO LINES ARE A SPECIAL CASE FOR ONE LUT. ROW_OFF_FIELD_3C takes
+ * the animation's field4, DOUBLED when the row's MAPOBJ_OFF_LUT is
+ * ADDR_ROW_LUT_DOUBLES and not otherwise. The comparison is on the LUT's
+ * ADDRESS, not its contents. What makes that lut special is not established
+ * here; six sites compare against it and none of them says.
+ *
+ * MEASURED AT 11,698 CALLS on a driven Boot Camp mission, which makes this the
+ * best-covered thing landed in a while -- every animating row on screen goes
+ * through it every time its frame changes. The four special frame values, the
+ * fallback to entry 0 and the heading bias are all on that path; the LUT
+ * special case is the one arm a run cannot be assumed to reach, since it needs
+ * a row using that particular lut.
+ *
+ * Landing it also took RowSetSprite's counter down to 146: those are the calls
+ * from its OTHER callers, since this one now calls by name. The usual cost,
+ * named here so the drop is not read as a regression.
+ */
+void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force)
+{
+    uint8_t         *r = (uint8_t *)row;
+    AM2_AnimTable   *t;
+    AM2_AnimEntry   *e;
+    AM2_Anim        *anim;
+    int32_t          f = frame;
+    int32_t          n, i;
+    int32_t          dir, cell;
+    uint8_t          heading;
+    int16_t          v;
+
+    if (!force && frame == *(const int16_t *)(r + ROW_OFF_FRAME))
+        return;
+
+    if (f == -2)
+        return;
+    if (f == -1)
+        frame = *(const int16_t *)(r + ROW_OFF_FRAME);
+    else if (f == 0) {
+        *(uint32_t *)r &= 0xFFFFFFFEu;
+        return;
+    }
+
+    t = *(AM2_AnimTable *const *)(r + ROW_OFF_ANIM_NEXT);
+    if (t) {
+        *(AM2_AnimTable **)(r + ROW_OFF_ANIM_CUR)  = t;
+        *(AM2_AnimTable **)(r + ROW_OFF_ANIM_NEXT) = (AM2_AnimTable *)0;
+    }
+
+    t = *(AM2_AnimTable *const *)(r + ROW_OFF_ANIM_CUR);
+    if (!t)
+        return;
+
+    n = t->count;
+    i = 0;
+    if (n > 0) {
+        for (i = 0; i < n; i++)
+            if (t->entries[i].id == (int32_t)frame)
+                break;
+        if (i >= n)
+            i = 0;                      /* not found: entry 0, not a failure */
+    }
+
+    e = &t->entries[i];
+
+    *(uint8_t *)(r + ROW_OFF_CELL)  = 0;
+    *(int16_t *)(r + ROW_OFF_FRAME) = frame;
+    *(AM2_Anim **)(r + ROW_OFF_ANIM_PLAYING) = e->anim;
+    *(uint8_t *)(r + ROW_OFF_HEADING_BIAS) =
+        ((const uint8_t *)((void *)(uintptr_t)(ADDR_FRAME_HEADING_BIAS)))[frame];
+    *(int16_t *)(r + ROW_OFF_ANIM_NEXT_ID) = (int16_t)e->next;
+
+    anim    = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
+    heading = (uint8_t)(*(const uint8_t *)(r + ROW_OFF_HEADING)
+                        + *(const uint8_t *)(r + ROW_OFF_HEADING_BIAS));
+
+    dir  = (uint8_t)RoundTo8(heading, anim->directionBits);
+    cell = anim->frames * dir + *(const uint8_t *)(r + ROW_OFF_CELL);
+
+    RowSetSprite(row,
+                 (*(void *const *const *)(uintptr_t)ADDR_SPRITE_LIST)
+                     [anim->cells[cell].sprite],
+                 (void *)(uintptr_t)ADDR_MAP_DESC);
+
+    anim = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
+    v    = anim->field4;
+    *(int16_t *)(r + ROW_OFF_FIELD_3C) = v;
+
+    if (*(const void *const *)(r + MAPOBJ_OFF_LUT)
+        == (const void *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)
+        *(int16_t *)(r + ROW_OFF_FIELD_3C) = (int16_t)(v + v);
+}
+
+/* 0x0041D210, two callers -- 0x0042C8C0 builds both descriptors here, from
+ * the map's world extent, one after the other.
+ *
+ * THE GRID IS SQUARE IN COLS. The allocation is `cols << shift` entries with
+ * `shift` = Log2Mask(cols), so it is cols * cols when cols is a power of two;
+ * MAPDESC_OFF_ROWS never enters the sizing at all. That settles something
+ * RowRegisterAll already had a comment about: clamping its bottom edge to
+ * cols - 1 rather than rows - 1 is not a slip, it is the bound the grid
+ * actually has. The largest cell that clamp can produce is
+ * ((cols-1) << shift) + cols - 1, exactly one short of the allocation.
+ *
+ * Log2Mask answers 0 for anything that is not a power of two, which would
+ * make the grid one row of `cols` and the indexing fold into it. No map ships
+ * that way; the extents are read from the map file and the game divides them
+ * by 256 to get here.
+ *
+ * SHARPLY CHECKED, unlike most of what has landed lately. One added to the
+ * shift puts `bootcamp` at 10,097 differing pixels against a budget of 500 --
+ * every object registers in the wrong cell and the frame says so. Measured,
+ * because a clean A/B over code that turns out to be undiscriminated is worth
+ * nothing and this file has just had two of those. */
+void __cdecl MapDescInit(void *desc, int32_t w, int32_t h)
+{
+    uint8_t *d = (uint8_t *)desc;
+    int32_t  cols, shift, bytes;
+    void    *cells;
+
+    MapDescFree(d);
+
+    cols = w >> AM2_CELL_SHIFT;
+    *(int32_t *)(d + MAPDESC_OFF_COLS) = cols;
+    *(int32_t *)(d + MAPDESC_OFF_ROWS) = h >> AM2_CELL_SHIFT;
+
+    shift = Log2Mask(cols);
+    *(int32_t *)(d + MAPDESC_OFF_SHIFT) = shift;
+
+    bytes = (cols << shift) << 2;
+    cells = am2_malloc((size_t)bytes);
+    *(void **)(d + MAPDESC_OFF_CELLS) = cells;
+    memset(cells, 0, (size_t)bytes);
+}
+
+/* 0x0041D270, three callers. Drop the descriptor's grid and zero its shape.
+ *
+ * The three shape fields are cleared AFTER the free and the pointer is
+ * cleared between them, which is the original's order and observable by
+ * nothing. */
+void __cdecl MapDescFree(void *desc)
+{
+    uint8_t *d     = (uint8_t *)desc;
+    void    *cells = *(void **)(d + MAPDESC_OFF_CELLS);
+
+    if (cells) {
+        am2_free(cells);
+        *(void **)(d + MAPDESC_OFF_CELLS) = (void *)0;
+    }
+
+    *(int32_t *)(d + MAPDESC_OFF_COLS)  = 0;
+    *(int32_t *)(d + MAPDESC_OFF_ROWS)  = 0;
+    *(int32_t *)(d + MAPDESC_OFF_SHIFT) = 0;
 }
 
 /* 0x0041D2B0, six callers. Give a row its entry buffer and put it on the map.
@@ -273,82 +992,66 @@ int32_t __cdecl RowAlloc(int32_t w, int32_t h, void *row, void *desc)
     return bytes;
 }
 
-/* 0x0041D980, one caller. The counterpart of RowUnregisterAll: link every cell
- * the row's CURRENT rectangle covers, from entries that are assumed not to be
- * in any list yet.
+/* 0x0041D3D0, three callers. Put a new sprite on a row.
  *
- * It shares RowUpdate's cell arithmetic exactly -- including the clamp of the
- * BOTTOM edge against COLS-1 rather than ROWS-1, which is the same quirk in the
- * same shape and is what makes it convincing as a deliberate copy in the
- * original rather than a slip in one of them.
+ * IT REBUILDS ONLY WHEN THE NEW SPRITE NEEDS MORE CELLS. The count is the
+ * arithmetic RowAlloc uses on the sprite's bounds -- and NOT the same types.
+ * RowAlloc multiplies two int8 and stores a byte in ROW_OFF_OWNS; this
+ * multiplies two int32 and compares against that byte. A sprite big enough to
+ * overflow the byte looks larger here than the row can ever record, so it
+ * takes the rebuild arm every time. Both halves are the original's, and
+ * reconciling them would change one.
  *
- * Two differences from RowUpdate and both follow from the assumption. There is
- * no unlink and no re-sort, because nothing here is already placed; and the
- * surplus entries at the end are cleared harder -- cell to -1 AND both list
- * links to zero -- where RowUpdate only marks the cell, because RowUpdate has
- * just unlinked them and this has not.
+ * THE REBUILD ARM SWAPS THE SPRITE IN THE MIDDLE. It clears bit 0, updates,
+ * releases the row, THEN stores the new sprite, sets bit 0 again, and calls
+ * RowAlloc with the bounds read back out of the row rather than out of the
+ * argument -- so the order matters and a reconstruction that stored the
+ * sprite first would size the buffer from the same sprite by accident and
+ * agree until something else changed the field between.
  *
- * Measured: 1,587 calls in a Boot Camp mission. Reconstructing it also closed
- * the subsystem: DepthLink's counter went from 2,758 to 0, because this was
- * its last caller that was still the original's. Every counter inside this
- * file now reads 0 except RowUpdate, which is the only member of the family
- * with callers outside it. That is what a finished subsystem looks like from
- * the counters, and it is indistinguishable from a broken one unless the
- * numbers before it are on record -- which is why they are, here and in the
- * commit. */
-void __cdecl RowRegisterAll(void *row, void *desc)
+ * Both arms keep the OLD sprite in ROW_OFF_PREV_SPRITE, which is what
+ * RowUpdate compares against, and both end in a RowUpdate. A null sprite
+ * returns having touched nothing.
+ */
+void __cdecl RowSetSprite(void *row, void *sprite, void *desc)
 {
     uint8_t *r = (uint8_t *)row;
-    int32_t  cl, ct, cr, cb;
-    int32_t  cols, rows, cell, stride, used;
+    uint8_t *spr = (uint8_t *)sprite;
+    int32_t  w, h, need;
 
-    if (ROW_FLD(r, 0, uint32_t) & ROW_FLAG_REMOVED)
+    if (!spr)
         return;
 
-    cl = ROW_FLD(r, ROW_OFF_RECT + 0,  int32_t) >> 8;
-    ct = ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t) >> 8;
-    cr = ROW_FLD(r, ROW_OFF_RECT + 8,  int32_t) >> 8;
-    cb = ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) >> 8;
+    w = *(const int32_t *)(spr + SPRITE_OFF_BOUNDS + 8);
+    h = *(const int32_t *)(spr + SPRITE_OFF_BOUNDS + 12);
+    if (w > 2)
+        w -= 2;
+    if (h > 2)
+        h -= 2;
+    need = ((h >> 8) + 2) * ((w >> 8) + 2);
 
-    cols = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t);
-    rows = ROW_FLD(desc, MAPDESC_OFF_ROWS, int32_t);
+    if (need > (int32_t)r[ROW_OFF_OWNS]) {
+        uint8_t *now;
 
-    if (cb < 0 || ct > rows - 1 || cr < 0 || cl > cols - 1)
+        ObjFlagClear0(r);
+        RowUpdate(r, 0, desc);
+        RowRelease(r, desc);
+
+        ROW_FLD(r, ROW_OFF_PREV_SPRITE, void *) =
+            ROW_FLD(r, ROW_OFF_SPRITE, void *);
+        ROW_FLD(r, ROW_OFF_SPRITE, void *) = spr;
+        ObjFlagSet0(r);
+
+        now = ROW_FLD(r, ROW_OFF_SPRITE, uint8_t *);
+        RowAlloc(*(const int32_t *)(now + SPRITE_OFF_BOUNDS + 8),
+                 *(const int32_t *)(now + SPRITE_OFF_BOUNDS + 12), r, desc);
+        RowUpdate(r, 0, desc);
         return;
-
-    if (cl <= 0)
-        cl = 0;
-    if (ct <= 0)
-        ct = 0;
-    if (cr >= cols - 1)
-        cr = cols - 1;
-    if (cb >= cols - 1)          /* COLS, not ROWS -- as in RowUpdate */
-        cb = cols - 1;
-
-    used   = 0;
-    cell   = (ct << ROW_FLD(desc, MAPDESC_OFF_SHIFT, int32_t)) + cl;
-    stride = cols - cr + cl - 1;
-
-    for (; ct <= cb; ct++, cell += stride) {
-        int32_t x;
-
-        for (x = cl; x <= cr; x++, cell++, used++) {
-            uint8_t *entry = ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *)
-                             + (uint32_t)used * ROW_ENTRY_BYTES;
-
-            ROW_FLD(entry, ROW_ENTRY_OFF_CELL, int32_t) = cell;
-            DepthLink(entry, MAPDESC_CELL(desc, cell));
-        }
     }
 
-    for (; used < (int32_t)r[ROW_OFF_OWNS]; used++) {
-        uint8_t *entry = ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *)
-                         + (uint32_t)used * ROW_ENTRY_BYTES;
-
-        ROW_FLD(entry, ROW_ENTRY_OFF_CELL, int32_t) = -1;
-        ROW_FLD(entry, DEPTH_OFF_NEXT, uint32_t)    = 0;
-        ROW_FLD(entry, DEPTH_OFF_PREV, uint32_t)    = 0;
-    }
+    ROW_FLD(r, ROW_OFF_PREV_SPRITE, void *) = ROW_FLD(r, ROW_OFF_SPRITE, void *);
+    ROW_FLD(r, ROW_OFF_SPRITE, void *) = spr;
+    RowUpdate(r, 0, desc);
 }
 
 /* 0x0041D480, THIRTY-SEVEN callers -- the centre of this subsystem. Bring one
@@ -520,6 +1223,24 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
         ROW_FLD(r, ROW_OFF_SPRITE, void *);
 }
 
+int32_t __cdecl DepthCompare(void *a, void *b)
+{
+    int32_t r = DepthCompareBody(a, b);
+    static int32_t trace = -1;
+    if (trace < 0)
+        trace = getenv("AM2_TRACE_DEPTH") != 0;
+    if (trace && a && b && AM2_TRACE_ON()) {
+        const uint8_t *pa = (const uint8_t *)a, *pb = (const uint8_t *)b;
+        fprintf(stderr, "DEPTH pump %u a=(l%d s%g %d,%d) b=(l%d s%g %d,%d) -> %d\n",
+                (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u),
+                *(const int16_t *)(pa + OBJ_OFF_DEPTH_LAYER), (double)*(const float *)(pa + OBJ_OFF_DEPTH_SLOPE),
+                *(const int16_t *)(pa + ROW_OFF_X), *(const int16_t *)(pa + ROW_OFF_Y),
+                *(const int16_t *)(pb + OBJ_OFF_DEPTH_LAYER), (double)*(const float *)(pb + OBJ_OFF_DEPTH_SLOPE),
+                *(const int16_t *)(pb + ROW_OFF_X), *(const int16_t *)(pb + ROW_OFF_Y), r);
+    }
+    return r;
+}
+
 /* 0x0041D8F0, two callers. Link a node that is NOT yet in the list into its
  * sorted place. The primitive under DepthInsert, which is a different address
  * and takes an object and a world rectangle instead.
@@ -575,6 +1296,84 @@ void __cdecl DepthLink(void *node, void **head)
     DEPTH_NEXT(e) = n;
     DEPTH_PREV(n) = e;
     DEPTH_NEXT(n) = (uint8_t *)0;
+}
+
+/* 0x0041D980, one caller. The counterpart of RowUnregisterAll: link every cell
+ * the row's CURRENT rectangle covers, from entries that are assumed not to be
+ * in any list yet.
+ *
+ * It shares RowUpdate's cell arithmetic exactly -- including the clamp of the
+ * BOTTOM edge against COLS-1 rather than ROWS-1, which is the same quirk in the
+ * same shape and is what makes it convincing as a deliberate copy in the
+ * original rather than a slip in one of them.
+ *
+ * Two differences from RowUpdate and both follow from the assumption. There is
+ * no unlink and no re-sort, because nothing here is already placed; and the
+ * surplus entries at the end are cleared harder -- cell to -1 AND both list
+ * links to zero -- where RowUpdate only marks the cell, because RowUpdate has
+ * just unlinked them and this has not.
+ *
+ * Measured: 1,587 calls in a Boot Camp mission. Reconstructing it also closed
+ * the subsystem: DepthLink's counter went from 2,758 to 0, because this was
+ * its last caller that was still the original's. Every counter inside this
+ * file now reads 0 except RowUpdate, which is the only member of the family
+ * with callers outside it. That is what a finished subsystem looks like from
+ * the counters, and it is indistinguishable from a broken one unless the
+ * numbers before it are on record -- which is why they are, here and in the
+ * commit. */
+void __cdecl RowRegisterAll(void *row, void *desc)
+{
+    uint8_t *r = (uint8_t *)row;
+    int32_t  cl, ct, cr, cb;
+    int32_t  cols, rows, cell, stride, used;
+
+    if (ROW_FLD(r, 0, uint32_t) & ROW_FLAG_REMOVED)
+        return;
+
+    cl = ROW_FLD(r, ROW_OFF_RECT + 0,  int32_t) >> 8;
+    ct = ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t) >> 8;
+    cr = ROW_FLD(r, ROW_OFF_RECT + 8,  int32_t) >> 8;
+    cb = ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) >> 8;
+
+    cols = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t);
+    rows = ROW_FLD(desc, MAPDESC_OFF_ROWS, int32_t);
+
+    if (cb < 0 || ct > rows - 1 || cr < 0 || cl > cols - 1)
+        return;
+
+    if (cl <= 0)
+        cl = 0;
+    if (ct <= 0)
+        ct = 0;
+    if (cr >= cols - 1)
+        cr = cols - 1;
+    if (cb >= cols - 1)          /* COLS, not ROWS -- as in RowUpdate */
+        cb = cols - 1;
+
+    used   = 0;
+    cell   = (ct << ROW_FLD(desc, MAPDESC_OFF_SHIFT, int32_t)) + cl;
+    stride = cols - cr + cl - 1;
+
+    for (; ct <= cb; ct++, cell += stride) {
+        int32_t x;
+
+        for (x = cl; x <= cr; x++, cell++, used++) {
+            uint8_t *entry = ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *)
+                             + (uint32_t)used * ROW_ENTRY_BYTES;
+
+            ROW_FLD(entry, ROW_ENTRY_OFF_CELL, int32_t) = cell;
+            DepthLink(entry, MAPDESC_CELL(desc, cell));
+        }
+    }
+
+    for (; used < (int32_t)r[ROW_OFF_OWNS]; used++) {
+        uint8_t *entry = ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *)
+                         + (uint32_t)used * ROW_ENTRY_BYTES;
+
+        ROW_FLD(entry, ROW_ENTRY_OFF_CELL, int32_t) = -1;
+        ROW_FLD(entry, DEPTH_OFF_NEXT, uint32_t)    = 0;
+        ROW_FLD(entry, DEPTH_OFF_PREV, uint32_t)    = 0;
+    }
 }
 
 /* 0x0041DB90, one caller -- ADDR_ROW_UPDATE. Put one node back into depth
@@ -677,401 +1476,6 @@ void __cdecl DepthResort(void *node, void **head)
     *head = n;
 }
 
-/* 0x0041D270, three callers. Drop the descriptor's grid and zero its shape.
- *
- * The three shape fields are cleared AFTER the free and the pointer is
- * cleared between them, which is the original's order and observable by
- * nothing. */
-void __cdecl MapDescFree(void *desc)
-{
-    uint8_t *d     = (uint8_t *)desc;
-    void    *cells = *(void **)(d + MAPDESC_OFF_CELLS);
-
-    if (cells) {
-        am2_free(cells);
-        *(void **)(d + MAPDESC_OFF_CELLS) = (void *)0;
-    }
-
-    *(int32_t *)(d + MAPDESC_OFF_COLS)  = 0;
-    *(int32_t *)(d + MAPDESC_OFF_ROWS)  = 0;
-    *(int32_t *)(d + MAPDESC_OFF_SHIFT) = 0;
-}
-
-/* 0x0041D210, two callers -- 0x0042C8C0 builds both descriptors here, from
- * the map's world extent, one after the other.
- *
- * THE GRID IS SQUARE IN COLS. The allocation is `cols << shift` entries with
- * `shift` = Log2Mask(cols), so it is cols * cols when cols is a power of two;
- * MAPDESC_OFF_ROWS never enters the sizing at all. That settles something
- * RowRegisterAll already had a comment about: clamping its bottom edge to
- * cols - 1 rather than rows - 1 is not a slip, it is the bound the grid
- * actually has. The largest cell that clamp can produce is
- * ((cols-1) << shift) + cols - 1, exactly one short of the allocation.
- *
- * Log2Mask answers 0 for anything that is not a power of two, which would
- * make the grid one row of `cols` and the indexing fold into it. No map ships
- * that way; the extents are read from the map file and the game divides them
- * by 256 to get here.
- *
- * SHARPLY CHECKED, unlike most of what has landed lately. One added to the
- * shift puts `bootcamp` at 10,097 differing pixels against a budget of 500 --
- * every object registers in the wrong cell and the frame says so. Measured,
- * because a clean A/B over code that turns out to be undiscriminated is worth
- * nothing and this file has just had two of those. */
-void __cdecl MapDescInit(void *desc, int32_t w, int32_t h)
-{
-    uint8_t *d = (uint8_t *)desc;
-    int32_t  cols, shift, bytes;
-    void    *cells;
-
-    MapDescFree(d);
-
-    cols = w >> AM2_CELL_SHIFT;
-    *(int32_t *)(d + MAPDESC_OFF_COLS) = cols;
-    *(int32_t *)(d + MAPDESC_OFF_ROWS) = h >> AM2_CELL_SHIFT;
-
-    shift = Log2Mask(cols);
-    *(int32_t *)(d + MAPDESC_OFF_SHIFT) = shift;
-
-    bytes = (cols << shift) << 2;
-    cells = am2_malloc((size_t)bytes);
-    *(void **)(d + MAPDESC_OFF_CELLS) = cells;
-    memset(cells, 0, (size_t)bytes);
-}
-
-/* 0x0040A050, two callers. Clear a map object and give it a sprite, a
- * position and the default palette.
- *
- * FILED HERE RATHER THAN BY BAND. It sits in air.cpp..audio.cpp, which is a
- * different translation unit from this file's 0x0041Dxxx -- but its 0x60
- * bytes are AM2_OBJ_ROW_STRIDE and the three fields it writes are the row's
- * sprite, packed position and palette, so it is the row family's constructor
- * and nothing else. That TU is already split three ways in this tree
- * (objflag.cpp, anim.cpp, win32/mapdraw.cpp), so one more split costs
- * nothing and filing it away from its family would.
- *
- * The clear is the whole 0x60 and the writes follow it, so every other field
- * really is zero on the way out -- including the flags, which means bit 0 is
- * CLEAR and the object is not drawn until somebody sets it.
- *
- * It runs 1,612 times in one Boot Camp mission and the palette line is still
- * NOT checked: nulling it leaves `bootcamp` at 76 pixels, inside the band.
- * Every object that reaches the screen has had its own palette written in by
- * then -- which is what MAPOBJ_OFF_PALETTE's note in orig.h already says
- * happens immediately before a draw. Warm code, undiscriminated line. */
-void __cdecl RowInit(void *row, void *sprite, int32_t x, int32_t y)
-{
-    uint8_t *r = (uint8_t *)row;
-
-    memset(r, 0, AM2_OBJ_ROW_STRIDE);
-    *(void **)(r + ROW_OFF_SPRITE) = sprite;
-    *(uint32_t *)(r + ROW_OFF_X)   = MakePoint((uint32_t)x, (uint32_t)y);
-    *(void **)(r + MAPOBJ_OFF_PALETTE) =
-        *(void *const *)(uintptr_t)ADDR_DEFAULT_PALETTE;
-}
-
-/* 0x0041D3D0, three callers. Put a new sprite on a row.
- *
- * IT REBUILDS ONLY WHEN THE NEW SPRITE NEEDS MORE CELLS. The count is the
- * arithmetic RowAlloc uses on the sprite's bounds -- and NOT the same types.
- * RowAlloc multiplies two int8 and stores a byte in ROW_OFF_OWNS; this
- * multiplies two int32 and compares against that byte. A sprite big enough to
- * overflow the byte looks larger here than the row can ever record, so it
- * takes the rebuild arm every time. Both halves are the original's, and
- * reconciling them would change one.
- *
- * THE REBUILD ARM SWAPS THE SPRITE IN THE MIDDLE. It clears bit 0, updates,
- * releases the row, THEN stores the new sprite, sets bit 0 again, and calls
- * RowAlloc with the bounds read back out of the row rather than out of the
- * argument -- so the order matters and a reconstruction that stored the
- * sprite first would size the buffer from the same sprite by accident and
- * agree until something else changed the field between.
- *
- * Both arms keep the OLD sprite in ROW_OFF_PREV_SPRITE, which is what
- * RowUpdate compares against, and both end in a RowUpdate. A null sprite
- * returns having touched nothing.
- */
-void __cdecl RowSetSprite(void *row, void *sprite, void *desc)
-{
-    uint8_t *r = (uint8_t *)row;
-    uint8_t *spr = (uint8_t *)sprite;
-    int32_t  w, h, need;
-
-    if (!spr)
-        return;
-
-    w = *(const int32_t *)(spr + SPRITE_OFF_BOUNDS + 8);
-    h = *(const int32_t *)(spr + SPRITE_OFF_BOUNDS + 12);
-    if (w > 2)
-        w -= 2;
-    if (h > 2)
-        h -= 2;
-    need = ((h >> 8) + 2) * ((w >> 8) + 2);
-
-    if (need > (int32_t)r[ROW_OFF_OWNS]) {
-        uint8_t *now;
-
-        ObjFlagClear0(r);
-        RowUpdate(r, 0, desc);
-        RowRelease(r, desc);
-
-        ROW_FLD(r, ROW_OFF_PREV_SPRITE, void *) =
-            ROW_FLD(r, ROW_OFF_SPRITE, void *);
-        ROW_FLD(r, ROW_OFF_SPRITE, void *) = spr;
-        ObjFlagSet0(r);
-
-        now = ROW_FLD(r, ROW_OFF_SPRITE, uint8_t *);
-        RowAlloc(*(const int32_t *)(now + SPRITE_OFF_BOUNDS + 8),
-                 *(const int32_t *)(now + SPRITE_OFF_BOUNDS + 12), r, desc);
-        RowUpdate(r, 0, desc);
-        return;
-    }
-
-    ROW_FLD(r, ROW_OFF_PREV_SPRITE, void *) = ROW_FLD(r, ROW_OFF_SPRITE, void *);
-    ROW_FLD(r, ROW_OFF_SPRITE, void *) = spr;
-    RowUpdate(r, 0, desc);
-}
-
-/* 0x0040A1A0, eleven callers. Put a row on an animation frame: pick up the
- * animation whose entry id matches, reset it to cell 0, and set the sprite the
- * new cell asks for.
- *
- * FOUR OF THE FRAME VALUES ARE NOT FRAMES. -2 returns at once, -1 means "the
- * frame it is already on", 0 clears bit 0 of the row's first dword and returns
- * without touching the animation at all, and only then is the value an id to
- * look up. So a caller can say "stop", "again" or "nothing" through the same
- * argument, and a reconstruction that range-checked the id would swallow three
- * of the four.
- *
- * `force` is only consulted for the early-out: without it, asking for the
- * frame the row is already on returns immediately. With it, everything below
- * runs again -- which is what restarts an animation from cell 0.
- *
- * A PENDING TABLE IS TAKEN UP HERE AND NOWHERE ELSE. ROW_OFF_ANIM_NEXT, when
- * set, becomes ROW_OFF_ANIM_CUR and is cleared; that is the only consumer of
- * the field, so a table queued by anyone else waits for the next frame change.
- *
- * THE SEARCH FALLS BACK TO ENTRY 0 RATHER THAN FAILING. An id that is not in
- * the table takes entry 0 and the row is still told it is on the requested
- * frame -- ROW_OFF_FRAME is written from the argument, not from the entry
- * found. Reproduced; a not-found that returned early would leave the row on
- * its old animation and is the obvious tidier version.
- *
- * The heading it draws with is ROW_OFF_HEADING plus a per-FRAME bias byte from
- * ADDR_FRAME_HEADING_BIAS, added as an 8-bit value so it wraps. That table is
- * zero almost everywhere: index 19 holds 0xC0, three quarters of a turn, so
- * exactly one animation is drawn facing backwards and the table exists for it.
- * The sum then goes through RoundTo8 with the animation's own directionBits,
- * which is how an 8-bit heading becomes one of 1, 2, 8, 16 or 32 directions.
- *
- * The cell index is `frames * direction + cell`, which is the direction-major
- * layout anim.h records, and the sprite is that cell's id through
- * ADDR_SPRITE_LIST.
- *
- * THE LAST TWO LINES ARE A SPECIAL CASE FOR ONE LUT. ROW_OFF_FIELD_3C takes
- * the animation's field4, DOUBLED when the row's MAPOBJ_OFF_LUT is
- * ADDR_ROW_LUT_DOUBLES and not otherwise. The comparison is on the LUT's
- * ADDRESS, not its contents. What makes that lut special is not established
- * here; six sites compare against it and none of them says.
- *
- * MEASURED AT 11,698 CALLS on a driven Boot Camp mission, which makes this the
- * best-covered thing landed in a while -- every animating row on screen goes
- * through it every time its frame changes. The four special frame values, the
- * fallback to entry 0 and the heading bias are all on that path; the LUT
- * special case is the one arm a run cannot be assumed to reach, since it needs
- * a row using that particular lut.
- *
- * Landing it also took RowSetSprite's counter down to 146: those are the calls
- * from its OTHER callers, since this one now calls by name. The usual cost,
- * named here so the drop is not read as a regression.
- */
-void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force)
-{
-    uint8_t         *r = (uint8_t *)row;
-    AM2_AnimTable   *t;
-    AM2_AnimEntry   *e;
-    AM2_Anim        *anim;
-    int32_t          f = frame;
-    int32_t          n, i;
-    int32_t          dir, cell;
-    uint8_t          heading;
-    int16_t          v;
-
-    if (!force && frame == *(const int16_t *)(r + ROW_OFF_FRAME))
-        return;
-
-    if (f == -2)
-        return;
-    if (f == -1)
-        frame = *(const int16_t *)(r + ROW_OFF_FRAME);
-    else if (f == 0) {
-        *(uint32_t *)r &= 0xFFFFFFFEu;
-        return;
-    }
-
-    t = *(AM2_AnimTable *const *)(r + ROW_OFF_ANIM_NEXT);
-    if (t) {
-        *(AM2_AnimTable **)(r + ROW_OFF_ANIM_CUR)  = t;
-        *(AM2_AnimTable **)(r + ROW_OFF_ANIM_NEXT) = (AM2_AnimTable *)0;
-    }
-
-    t = *(AM2_AnimTable *const *)(r + ROW_OFF_ANIM_CUR);
-    if (!t)
-        return;
-
-    n = t->count;
-    i = 0;
-    if (n > 0) {
-        for (i = 0; i < n; i++)
-            if (t->entries[i].id == (int32_t)frame)
-                break;
-        if (i >= n)
-            i = 0;                      /* not found: entry 0, not a failure */
-    }
-
-    e = &t->entries[i];
-
-    *(uint8_t *)(r + ROW_OFF_CELL)  = 0;
-    *(int16_t *)(r + ROW_OFF_FRAME) = frame;
-    *(AM2_Anim **)(r + ROW_OFF_ANIM_PLAYING) = e->anim;
-    *(uint8_t *)(r + ROW_OFF_HEADING_BIAS) =
-        ((const uint8_t *)((void *)(uintptr_t)(ADDR_FRAME_HEADING_BIAS)))[frame];
-    *(int16_t *)(r + ROW_OFF_ANIM_NEXT_ID) = (int16_t)e->next;
-
-    anim    = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
-    heading = (uint8_t)(*(const uint8_t *)(r + ROW_OFF_HEADING)
-                        + *(const uint8_t *)(r + ROW_OFF_HEADING_BIAS));
-
-    dir  = (uint8_t)RoundTo8(heading, anim->directionBits);
-    cell = anim->frames * dir + *(const uint8_t *)(r + ROW_OFF_CELL);
-
-    RowSetSprite(row,
-                 (*(void *const *const *)(uintptr_t)ADDR_SPRITE_LIST)
-                     [anim->cells[cell].sprite],
-                 (void *)(uintptr_t)ADDR_MAP_DESC);
-
-    anim = *(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING);
-    v    = anim->field4;
-    *(int16_t *)(r + ROW_OFF_FIELD_3C) = v;
-
-    if (*(const void *const *)(r + MAPOBJ_OFF_LUT)
-        == (const void *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)
-        *(int16_t *)(r + ROW_OFF_FIELD_3C) = (int16_t)(v + v);
-}
-
-/* 0x00434DA0, six callers. Build a ROW SET: one block of `count` rows, each
- * placed at its spec's offset from a base position and given an entry buffer
- * sized from the spec, with a bounding rect copied into the header.
- *
- * A SPEC IS FOUR int32 -- x, y, w, h -- and the two halves go to different
- * places: x and y are OFFSETS, added to the base the caller passes, and w and
- * h are a size handed straight to RowAlloc. Nothing in the spec is a sprite;
- * RowInit is given a null one, so every row starts blank and whatever draws it
- * sets the sprite later.
- *
- * The header is 0x20 bytes and only four things go in it: a zeroed dword at
- * +0, the count, the block, another zeroed dword at +0x0C, and sixteen bytes
- * of rect at +0x10. The two zeroed dwords are written explicitly rather than
- * left over from an allocation, so they are the caller's to read.
- *
- * THE ALLOCATION IS NOT CHECKED and neither is RowAlloc's answer, which is an
- * int32 the original discards. A count of zero allocates zero bytes, skips the
- * loop and still writes the header, so an empty set is a legal thing to build.
- *
- * The loop re-reads BOTH the count and the block pointer from the header every
- * iteration. Neither can change -- RowAlloc allocates the row's own buffer,
- * not this block -- and both re-reads are kept, because writing them as
- * loop-invariant reads would be asserting that rather than transcribing it.
- *
- * MEASURED AT 11 CALLS on a driven Boot Camp mission. RowAlloc reads 2,498
- * on the same run, which is its OTHER callers -- ours reaches it by name --
- * so nothing here says how many rows those eleven sets held, and whether
- * any of them had a count of zero is not established either. The header
- * writes and the loop are compared; the empty-set case is not claimed.
- */
-void __cdecl BuildRowSet(void *set, int32_t count, const void *specs,
-                         int32_t dx, int32_t dy, const void *rect)
-{
-    uint8_t *h = (uint8_t *)set;
-    int32_t  i;
-
-    *(int32_t *)h = 0;
-    *(int32_t *)(h + ROWSET_OFF_COUNT) = count;
-    *(void **)(h + ROWSET_OFF_ROWS) =
-        am2_malloc((size_t)count * AM2_OBJ_ROW_STRIDE);
-
-    for (i = 0; i < *(const int32_t *)(h + ROWSET_OFF_COUNT); i++) {
-        const int32_t *spec =
-            (const int32_t *)((const uint8_t *)specs
-                              + (size_t)i * AM2_ROW_SPEC_BYTES);
-        uint8_t *row = *(uint8_t *const *)(h + ROWSET_OFF_ROWS)
-                       + (size_t)i * AM2_OBJ_ROW_STRIDE;
-
-        RowInit(row, (void *)0, spec[0] + dx, spec[1] + dy);
-        ObjFlagSet0(row);
-        RowAlloc(spec[2], spec[3], row, (void *)((void *)(uintptr_t)(ADDR_MAP_DESC)));
-    }
-
-    *(int32_t *)(h + 0x0C) = 0;
-    memcpy(h + ROWSET_OFF_RECT, rect, 16);
-}
-
-/* RowAnimField4 -- original 0x0040A130, two callers.
- *
- * This is the reader ROW_OFF_FIELD_2C's block in orig.h predicted from the
- * writing side: look an animation up in the row's current table by id, take
- * its AM2_Anim::field4, and DOUBLE it when the row's lut is the one that
- * doubles. Every other lut takes the value unchanged, which is exactly what
- * the comparison against ADDR_ROW_LUT_DOUBLES says.
- *
- * THE LUT IS COMPARED BY ADDRESS, not by anything in it. There is one lut that
- * doubles and the test is `row->lut == that table`, so a second doubling lut
- * could not be added without touching this function.
- *
- * THE FIRST TEST IS A SHORTCUT AND IT DOES NOT GO THROUGH THE TABLE. An id
- * equal to the row's own ROW_OFF_FRAME answers ROW_OFF_FIELD_3C directly --
- * the value already cached on the row -- and is NOT doubled. So the same id
- * gives two different answers depending on whether the row happens to be
- * showing it. Reproduced; it is the whole reason the cached field exists.
- *
- * A MISS FALLS BACK TO ENTRY 0 RATHER THAN FAILING, and does so without
- * checking the count, so a table with no entries is read out of bounds. That
- * is the same last-resort LoadAnimTable has and the same lack of a guard;
- * anim.h says no shipped file reaches it there, and nothing here changes that.
- *
- * Id 0 is refused before the table is touched at all.
- */
-int16_t __cdecl RowAnimField4(const void *row, uint16_t id)
-{
-    const uint8_t       *r = (const uint8_t *)row;
-    const AM2_AnimTable *table;
-    int32_t              i = 0;
-    int16_t              value;
-
-    if ((int16_t)id == *(const int16_t *)(r + ROW_OFF_FRAME))
-        return *(const int16_t *)(r + ROW_OFF_FIELD_3C);
-
-    if (!id)
-        return 0;
-
-    table = *(const AM2_AnimTable *const *)(r + ROW_OFF_ANIM_CUR);
-    if (!table)
-        return 0;
-
-    while (i < table->count && table->entries[i].id != (int32_t)(int16_t)id)
-        i++;
-    if (i >= table->count)
-        i = 0;                  /* not found: entry 0, count unchecked */
-
-    value = (int16_t)table->entries[i].anim->field4;
-
-    if (*(const void *const *)(r + ROW_OFF_FIELD_2C)
-        == (const void *)(uintptr_t)ADDR_ROW_LUT_DOUBLES)
-        value = (int16_t)(value + value);
-
-    return value;
-}
-
 /* BuildRowsFromDef -- original 0x00434C90, two callers, and BuildRowSet's
  * sibling one entry earlier in the image.
  *
@@ -1156,419 +1560,221 @@ void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
     memcpy(out + ROWSET_OFF_RECT, d + DEFROWS_OFF_RECT, 16);
 }
 
-int maprow_install(void)
-{
-    int rc = 0;
-
-    rc |= patch_replace(ADDR_BUILD_ROWS_FROM_DEF,
-                        (const void *)BuildRowsFromDef,
-                        "BuildRowsFromDef", 2);
-    rc |= patch_replace(ADDR_ROW_ANIM_FIELD4, (const void *)RowAnimField4,
-                        "RowAnimField4", 2);
-    rc |= patch_replace(ADDR_BUILD_ROW_SET, (const void *)BuildRowSet,
-                        "BuildRowSet", 6);
-
-    rc |= patch_replace(ADDR_SET_ANIM_FRAME, (const void *)SetAnimFrame,
-                        "SetAnimFrame", 11);
-
-    rc |= patch_replace(ADDR_DEPTH_COMPARE, (const void *)DepthCompare,
-                        "DepthCompare", 2);
-    rc |= patch_replace(ADDR_DEPTH_LINK, (const void *)DepthLink,
-                        "DepthLink", 2);
-    rc |= patch_replace(ADDR_DEPTH_RESORT, (const void *)DepthResort,
-                        "DepthResort", 2);
-    rc |= patch_replace(ADDR_ROW_ALLOC, (const void *)RowAlloc,
-                        "RowAlloc", 4);
-    rc |= patch_replace(ADDR_ROW_REGISTER_ALL, (const void *)RowRegisterAll,
-                        "RowRegisterAll", 2);
-    rc |= patch_replace(ADDR_ROW_UPDATE, (const void *)RowUpdate,
-                        "RowUpdate", 3);
-    rc |= patch_replace(ADDR_MAP_DESC_FREE, (const void *)MapDescFree,
-                        "MapDescFree", 3);
-    rc |= patch_replace(ADDR_MAP_DESC_INIT, (const void *)MapDescInit,
-                        "MapDescInit", 2);
-    rc |= patch_replace(ADDR_ROW_INIT, (const void *)RowInit, "RowInit", 2);
-    rc |= patch_replace(ADDR_ROW_SET_SPRITE, (const void *)RowSetSprite,
-                        "RowSetSprite", 3);
-    rc |= patch_replace(ADDR_ROWPOOL_A_INIT, (const void *)RowPoolAInit,
-                        "RowPoolAInit", 1);
-    rc |= patch_replace(ADDR_ROWPOOL_B_INIT, (const void *)RowPoolBInit,
-                        "RowPoolBInit", 1);
-    rc |= patch_replace(ADDR_ROWPOOL_A_FREE, (const void *)RowPoolAFree,
-                        "RowPoolAFree", 1);
-    rc |= patch_replace(ADDR_ROWPOOL_B_FREE, (const void *)RowPoolBFree,
-                        "RowPoolBFree", 1);
-    rc |= patch_replace(ADDR_ROWPOOL_A_RELEASE, (const void *)RowPoolARelease,
-                        "RowPoolARelease", 1);
-    rc |= patch_replace(ADDR_ROWPOOL_B_RELEASE, (const void *)RowPoolBRelease,
-                        "RowPoolBRelease", 1);
-    rc |= patch_replace(ADDR_ROWPOOL_A_EVICT, (const void *)RowPoolAEvict,
-                        "RowPoolAEvict", 1);
-    rc |= patch_replace(ADDR_ROWPOOL_B_EVICT, (const void *)RowPoolBEvict,
-                        "RowPoolBEvict", 1);
-    rc |= patch_replace(ADDR_ROWPOOL_A_ALLOC, (const void *)RowPoolAAlloc,
-                        "RowPoolAAlloc", 1);
-    rc |= patch_replace(ADDR_ROWPOOL_B_ALLOC, (const void *)RowPoolBAlloc,
-                        "RowPoolBAlloc", 1);
-    rc |= patch_replace(ADDR_SEQ_CTX_INIT, (const void *)SeqCtxInit,
-                        "SeqCtxInit", 1);
-    rc |= patch_replace(ADDR_SEQ_CTX_FREE, (const void *)SeqCtxFree,
-                        "SeqCtxFree", 1);
-    rc |= patch_replace(ADDR_SEQ_RETIRE, (const void *)SeqRetire,
-                        "SeqRetire", 1);
-    rc |= patch_replace(ADDR_SEQ_EVICT, (const void *)SeqEvict,
-                        "SeqEvict", 1);
-    rc |= patch_replace(ADDR_SEQ_ALLOC, (const void *)SeqAlloc,
-                        "SeqAlloc", 1);
-    rc |= patch_replace(ADDR_RESPAWN_KIND_ALLOWED,
-                        (const void *)RespawnKindAllowed,
-                        "RespawnKindAllowed", 2);
-    rc |= patch_replace(ADDR_SEQ_SUBSYSTEM_INIT,
-                        (const void *)SeqSubsystemInit,
-                        "SeqSubsystemInit", 1);
-    rc |= patch_replace(ADDR_FREE_SEQ_CONTEXTS, (const void *)FreeSeqContexts,
-                        "FreeSeqContexts", 2);
-    rc |= patch_replace(ADDR_RANDOM_RESPAWN_KIND,
-                        (const void *)RandomRespawnKind,
-                        "RandomRespawnKind", 2);
-    rc |= patch_replace(ADDR_LEAVE_REMAINS_ROW, (const void *)LeaveRemainsRow,
-                        "LeaveRemainsRow", 1);
-    rc |= patch_replace(ADDR_TIMED_DIR_FRAME, (const void *)TimedDirFrame,
-                        "TimedDirFrame", 2);
-    rc |= patch_replace(ADDR_GAME_SRAND, (const void *)GameSrand,
-                        "GameSrand", 1);
-    rc |= patch_replace(ADDR_SPAWN_PARTICLE, (const void *)SpawnParticle,
-                        "SpawnParticle", 6);
-    rc |= patch_replace(ADDR_DIED_EFFECT_A, (const void *)DiedEffectA,
-                        "DiedEffectA", 1);
-    rc |= patch_replace(ADDR_SPAWN_HIT_EFFECT, (const void *)SpawnHitEffect,
-                        "SpawnHitEffect", 3);
-    rc |= patch_replace(ADDR_DIED_EFFECT_B, (const void *)DiedEffectB,
-                        "DiedEffectB", 4);
-    rc |= patch_replace(ADDR_SEQ_START_DIR_EFFECT,
-                        (const void *)SeqStartDirEffect,
-                        "SeqStartDirEffect", 6);
-    rc |= patch_replace(ADDR_PLACE_GROUND_DECAL,
-                        (const void *)PlaceGroundDecal,
-                        "PlaceGroundDecal", 3);
-    rc |= patch_replace(ADDR_BUILD_RESPAWN_POOL,
-                        (const void *)BuildRespawnPool,
-                        "BuildRespawnPool", 1);
-    return rc;
-}
-
-/* The two 12-byte ROW POOLS -- see orig.h above ADDR_ROWPOOL_A_COUNT for the
- * layout and for why it tiles. Fifteen functions in the image implement five
- * roles three times: once hardcoded per pool, and once generically over a seq
- * context. These are the hardcoded pair.
+/* 0x00434DA0, six callers. Build a ROW SET: one block of `count` rows, each
+ * placed at its spec's offset from a base position and given an entry buffer
+ * sized from the spec, with a bounding rect copied into the header.
  *
- * A SLOT IS A HANDLE ONTO A PERMANENT ROW. The initialiser mallocs one
- * 0x60-byte row per slot and nothing frees it until teardown; allocate and
- * release only shuffle which slot holds which. That is why the allocator
- * never writes ROWPOOL_OFF_ROW and its callers dereference it immediately. */
-struct AM2_RowPool {
-    volatile int32_t *count;
-    volatile int32_t *tail;
-    uint8_t          *entries;
-    int32_t           capacity;   /* the eviction threshold */
-    int32_t           budget;     /* how many one eviction pass may free */
-    int32_t           slots;      /* capacity + budget; the array's real size */
-    int32_t           rowDim;     /* RowAlloc's w and h -- 0x60 A, 0x80 B */
-};
-
-static uint8_t *RowPoolEntry(const AM2_RowPool *p, int32_t i)
-{
-    return p->entries + (int32_t)(i * AM2_ROWPOOL_ENTRY_BYTES);
-}
-
-/* 0x00460800 (pool A) and 0x00460AC0 (pool B). Zero the header, make entry 0
- * the head sentinel, and give every slot its permanent row.
+ * A SPEC IS FOUR int32 -- x, y, w, h -- and the two halves go to different
+ * places: x and y are OFFSETS, added to the base the caller passes, and w and
+ * h are a size handed straight to RowAlloc. Nothing in the spec is a sprite;
+ * RowInit is given a null one, so every row starts blank and whatever draws it
+ * sets the sprite later.
  *
- * The row is zeroed with `mov ecx, 0x18; rep stosd` -- 24 DWORDS, which is
- * the 0x60 bytes and not 0x18 of them.
+ * The header is 0x20 bytes and only four things go in it: a zeroed dword at
+ * +0, the count, the block, another zeroed dword at +0x0C, and sixteen bytes
+ * of rect at +0x10. The two zeroed dwords are written explicitly rather than
+ * left over from an allocation, so they are the caller's to read.
  *
- * AND EACH ROW IS THEN REGISTERED WITH RowAlloc, which the first version of
- * this omitted -- `ab.sh bootcamp` came back with 37% of the frame wrong and
- * an identical log, the map-load-truncated signature. The malloc gives the
- * row STRUCT its 0x60 bytes; RowAlloc gives it its extent, and the two pools
- * differ there: 0x60 square for A, 0x80 square for B.
+ * THE ALLOCATION IS NOT CHECKED and neither is RowAlloc's answer, which is an
+ * int32 the original discards. A count of zero allocates zero bytes, skips the
+ * loop and still writes the header, so an empty set is a legal thing to build.
  *
- * Its arguments are cleaned by a single `add esp, 0x14` that also cleans the
- * malloc's -- five dwords for two calls -- which is the cdecl shape CLAUDE.md
- * warns makes a call's arity unreadable from the cleanup alone. */
-static void RowPoolInit(const AM2_RowPool *p)
-{
-    int32_t i;
-
-    *p->tail = 0;
-    *p->count = 0;
-
-    for (i = 0; i < p->slots; i++) {
-        uint8_t *e = RowPoolEntry(p, i);
-        uint8_t *row;
-
-        *(int16_t *)(e + ROWPOOL_OFF_ID) = (int16_t)i;
-        *(int16_t *)(e + ROWPOOL_OFF_PREV) = -1;
-        *(int16_t *)(e + ROWPOOL_OFF_NEXT) = -1;
-
-        row = (uint8_t *)am2_malloc(AM2_ROWPOOL_ROW_BYTES);
-        *(void **)(e + ROWPOOL_OFF_ROW) = row;
-        memset(row, 0, AM2_ROWPOOL_ROW_BYTES);
-        RowAlloc(p->rowDim, p->rowDim, row, (void *)(uintptr_t)ADDR_MAP_DESC);
-    }
-}
-
-/* 0x00460860 (pool A) and 0x00460B30 (pool B). The ONLY place a row is freed.
- * Walks every slot -- not the list -- because a released slot still owns its
- * row, so following the links would leak every slot not currently linked. */
-static void RowPoolTeardown(const AM2_RowPool *p)
-{
-    int32_t i;
-
-    for (i = 0; i < p->slots; i++) {
-        uint8_t *e = RowPoolEntry(p, i);
-        void *row = *(void **)(e + ROWPOOL_OFF_ROW);
-
-        if (row != 0) {
-            RowRelease(row, (void *)(uintptr_t)ADDR_MAP_DESC);
-            am2_free(row);
-            *(void **)(e + ROWPOOL_OFF_ROW) = 0;
-        }
-        *(int16_t *)(e + ROWPOOL_OFF_NEXT) = -1;
-        *(int16_t *)(e + ROWPOOL_OFF_PREV) = -1;
-    }
-
-    *p->tail = 0;
-    *p->count = 0;
-}
-
-/* 0x00460A60 (pool A) and 0x00460D30 (pool B). The two are ONE function
- * emitted twice: with the six parameters substituted they are 18 instructions
- * each and differ in two, both the evict call and the branch over it.
+ * The loop re-reads BOTH the count and the block pointer from the header every
+ * iteration. Neither can change -- RowAlloc allocates the row's own buffer,
+ * not this block -- and both re-reads are kept, because writing them as
+ * loop-invariant reads would be asserting that rather than transcribing it.
  *
- * The cap test is `jle`, so SIGNED, and it is not a refusal -- over the cap it
- * evicts and then allocates anyway. This function always returns a slot. */
-static uint8_t *RowPoolAlloc(const AM2_RowPool *p, void (*evict)(void))
+ * MEASURED AT 11 CALLS on a driven Boot Camp mission. RowAlloc reads 2,498
+ * on the same run, which is its OTHER callers -- ours reaches it by name --
+ * so nothing here says how many rows those eleven sets held, and whether
+ * any of them had a count of zero is not established either. The header
+ * writes and the loop are compared; the empty-set case is not claimed.
+ */
+void __cdecl BuildRowSet(void *set, int32_t count, const void *specs,
+                         int32_t dx, int32_t dy, const void *rect)
 {
-    uint8_t *e;
+    uint8_t *h = (uint8_t *)set;
     int32_t  i;
 
-    if (*p->count > p->capacity)
-        evict();
+    *(int32_t *)h = 0;
+    *(int32_t *)(h + ROWSET_OFF_COUNT) = count;
+    *(void **)(h + ROWSET_OFF_ROWS) =
+        am2_malloc((size_t)count * AM2_OBJ_ROW_STRIDE);
 
-    i = *p->count + 1;
-    *p->count = i;
-    e = RowPoolEntry(p, i);
+    for (i = 0; i < *(const int32_t *)(h + ROWSET_OFF_COUNT); i++) {
+        const int32_t *spec =
+            (const int32_t *)((const uint8_t *)specs
+                              + (size_t)i * AM2_ROW_SPEC_BYTES);
+        uint8_t *row = *(uint8_t *const *)(h + ROWSET_OFF_ROWS)
+                       + (size_t)i * AM2_OBJ_ROW_STRIDE;
 
-    *(int16_t *)(e + ROWPOOL_OFF_ID) = (int16_t)i;
-    *(int16_t *)(e + ROWPOOL_OFF_PREV) = (int16_t)*p->tail;
-    *(int16_t *)(e + ROWPOOL_OFF_NEXT) = -1;
-
-    /* Link the previous tail to us. Entry 0 is the head sentinel, so this is
-     * correct with an empty list too: tail is 0 and entry 0's next takes the
-     * new index. */
-    *(int16_t *)(RowPoolEntry(p, *p->tail) + ROWPOOL_OFF_NEXT) = (int16_t)i;
-    *p->tail = i;
-
-    return e;
-}
-
-static const AM2_RowPool kRowPoolA = {
-    (volatile int32_t *)(uintptr_t)ADDR_ROWPOOL_A_COUNT,
-    (volatile int32_t *)(uintptr_t)ADDR_ROWPOOL_A_TAIL,
-    (uint8_t *)(uintptr_t)ADDR_ROWPOOL_A_ENTRIES,
-    AM2_ROWPOOL_A_CAP, AM2_ROWPOOL_A_BUDGET,
-    AM2_ROWPOOL_A_CAP + AM2_ROWPOOL_A_BUDGET, 0x60
-};
-
-static const AM2_RowPool kRowPoolB = {
-    (volatile int32_t *)(uintptr_t)ADDR_ROWPOOL_B_COUNT,
-    (volatile int32_t *)(uintptr_t)ADDR_ROWPOOL_B_TAIL,
-    (uint8_t *)(uintptr_t)ADDR_ROWPOOL_B_ENTRIES,
-    AM2_ROWPOOL_B_CAP, AM2_ROWPOOL_B_BUDGET,
-    AM2_ROWPOOL_B_CAP + AM2_ROWPOOL_B_BUDGET, 0x80
-};
-
-void __cdecl RowPoolAInit(void) { RowPoolInit(&kRowPoolA); }
-void __cdecl RowPoolBInit(void) { RowPoolInit(&kRowPoolB); }
-void __cdecl RowPoolAFree(void) { RowPoolTeardown(&kRowPoolA); }
-void __cdecl RowPoolBFree(void) { RowPoolTeardown(&kRowPoolB); }
-/* 0x004608C0 (pool A) and 0x00460B90 (pool B). One function emitted twice:
- * masked of constants the two are 82 instructions each and IDENTICAL,
- * similarity 1.000.
- *
- * FOUR ROLES, and the last one is the trap. It
- *   1. clears bit 0 of the row and calls RowUpdate, if the bit was set;
- *   2. unlinks the entry both ways;
- *   3. COMPACTS -- swaps the last entry into the freed slot, exchanging the
- *      rows so every slot keeps owning one;
- *   4. ANSWERS THE NEXT INDEX, corrected for the swap.
- *
- * Every other call site discards the answer, so `void(entry *)` is what the
- * function looks like -- and the evictor's second loop depends on it, taking
- * the new head from each release. Written as void, that loop would spin on a
- * stale index or index by an address.
- *
- * The correction in step 4 matters on its own: if the entry that FOLLOWED the
- * released one happened to be the last, the swap moved it and its old index
- * is stale. Without the fixup a walker follows a dangling index one time in
- * N, which is exactly the kind of defect no drive here would surface. */
-static int32_t RowPoolRelease(const AM2_RowPool *p, uint8_t *e)
-{
-    int32_t  count = *p->count;
-    int32_t  freed = *(int16_t *)(e + ROWPOOL_OFF_ID);
-    int32_t  next  = *(int16_t *)(e + ROWPOOL_OFF_NEXT);
-    int32_t  prev  = *(int16_t *)(e + ROWPOOL_OFF_PREV);
-    uint8_t *last;
-    void    *row;
-
-    row = *(void **)(e + ROWPOOL_OFF_ROW);
-    if ((*(uint32_t *)row & 1) != 0) {
-        *(uint32_t *)row &= ~1u;
-        RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+        RowInit(row, (void *)0, spec[0] + dx, spec[1] + dy);
+        ObjFlagSet0(row);
+        RowAlloc(spec[2], spec[3], row, (void *)((void *)(uintptr_t)(ADDR_MAP_DESC)));
     }
 
-    /* Unlink. The head sentinel is entry 0, so prev is always a real slot. */
-    *(int16_t *)(RowPoolEntry(p, prev) + ROWPOOL_OFF_NEXT) = (int16_t)next;
-    if (next > 0)
-        *(int16_t *)(RowPoolEntry(p, next) + ROWPOOL_OFF_PREV) = (int16_t)prev;
-    if (*p->tail == freed)
-        *p->tail = prev;
+    *(int32_t *)(h + 0x0C) = 0;
+    memcpy(h + ROWSET_OFF_RECT, rect, 16);
+}
 
-    /* Compact: the last entry moves down into the hole, and the freed slot's
-     * row goes up to the vacated one. A MOVE rather than a swap would leak a
-     * row per release and alias two entries onto one. */
-    last = RowPoolEntry(p, count);
-    if (freed != count) {
-        int32_t lprev = *(int16_t *)(last + ROWPOOL_OFF_PREV);
-        int32_t lnext = *(int16_t *)(last + ROWPOOL_OFF_NEXT);
+/* 0x004600F0. May this weapon kind respawn?
+ *
+ * PERMISSIVE ON THREE OF FOUR PATHS -- it answers 1 unless a multiplayer
+ * session is up AND the kind carries a mask AND that mask misses the game-over
+ * flags. Since ADDR_MP_SESSION is 0 on every drive this project has, the
+ * refusing exit cannot execute here and is verified by reading. */
+int32_t __cdecl RespawnKindAllowed(int32_t kind)
+{
+    uint32_t mask;
 
-        *(int16_t *)(RowPoolEntry(p, lprev) + ROWPOOL_OFF_NEXT) = (int16_t)freed;
-        if (lnext > 0)
-            *(int16_t *)(RowPoolEntry(p, lnext) + ROWPOOL_OFF_PREV) = (int16_t)freed;
-        /* The original compares the saved `next` against the LAST ENTRY'S OWN
-         * id (movsx from last+4 at 0x00460970), not against `count`. Those
-         * are the same number whenever the pool is consistent, and using the
-         * field is what the image does -- reproduce that rather than the
-         * arithmetic that happens to agree with it. */
-        if (next == *(int16_t *)(last + ROWPOOL_OFF_ID))
-            next = freed;
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
+        && (mask = ((const uint32_t *)(uintptr_t)ADDR_RESPAWN_KIND_MASK)[kind]) != 0
+        && (*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS & mask) == 0)
+        return 0;
+    return 1;
+}
 
-        *(void **)(e + ROWPOOL_OFF_ROW)   = *(void **)(last + ROWPOOL_OFF_ROW);
-        *(int32_t *)(e + ROWPOOL_OFF_ID)  = *(int32_t *)(last + ROWPOOL_OFF_ID);
-        *(int32_t *)(e + ROWPOOL_OFF_NEXT)= *(int32_t *)(last + ROWPOOL_OFF_NEXT);
-        *(void **)(last + ROWPOOL_OFF_ROW) = row;
-        *(int16_t *)(e + ROWPOOL_OFF_ID)   = (int16_t)freed;
-        if (*p->tail == count)
-            *p->tail = freed;
+/* BuildRespawnPool -- original 0x00460120, one caller. Build the weighted bag
+ * a respawn is drawn from: seed the RNG, throw the old bag away, and write
+ * each allowed kind into a fresh one as many times as its weight.
+ *
+ * TWO PASSES OVER THE SAME PREDICATE, and that is the design rather than
+ * waste: the first totals the weights so the bag can be allocated exactly, the
+ * second fills it. RespawnKindAllowed is therefore called twice per kind and
+ * must be free of side effects for the two passes to agree -- which they must,
+ * or the fill runs off the end of a bag sized by the count.
+ *
+ * THE TABLE IT WALKS IS 0x0066205C, and walking it is what showed that a dozen
+ * globals in orig.h are fields of it rather than separate variables; see the
+ * note there. This function reads only each record's FIRST dword, so the
+ * bound and the stride are transcribed exactly rather than turned into a
+ * record count -- what the rest of each record holds is not established, and a
+ * count would assert it.
+ *
+ * The bag is int32 entries of KIND INDEX, not pointers, so a draw is one
+ * random index into a flat array -- which is what makes the weighting work
+ * without any per-draw arithmetic. */
+void __cdecl BuildRespawnPool(int32_t seed)
+{
+    const uint8_t *rec;
+    int32_t        kind;
+    int32_t        total = 0;
+    int32_t        at    = 0;
+    int32_t       *bag;
+
+    GameSrand(seed);
+
+    if (*(void **)(uintptr_t)ADDR_RESPAWN_KINDS != 0)
+        am2_free(*(void **)(uintptr_t)ADDR_RESPAWN_KINDS);
+
+    kind = 0;
+    for (rec = (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE;
+         rec < (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE_END;
+         rec += AM2_SPAWN_KIND_STRIDE, kind++) {
+        if (RespawnKindAllowed(kind))
+            total += *(const int32_t *)rec;
     }
 
-    *(int16_t *)(last + ROWPOOL_OFF_NEXT) = -1;
-    *(int16_t *)(last + ROWPOOL_OFF_PREV) = -1;
-    *p->count = count - 1;
-    return next;
-}
-/* 0x004609D0 (pool A) and 0x00460CA0 (pool B). One function twice: with the
- * six parameters substituted they are 46 and 47 instructions and only EIGHT
- * differ, every one a branch displacement off by exactly 2 -- the imm32/imm8
- * encoding of the capacity propagating. Not a rewrite; a re-emission.
- *
- * TWO LOOPS, and reading only the first gives a tidy visibility cache that
- * misses what happens when the pool is full of things you can SEE:
- *
- *   1. walk the list from the head; release any entry whose row rectangle no
- *      longer meets the view; stop after `budget` releases or at the end.
- *   2. if the budget was NOT used up, release from the head `budget` more
- *      times REGARDLESS of any rectangle -- the pressure valve.
- *
- * The IntersectRect goes through the game's own IAT thunk, not an import of
- * ours, for the same reason device.cpp calls the DirectInput thunk: an import
- * in am2hook.dll would resolve through OUR IAT. (Here it is only USER32 and
- * nothing hooks it, so this is convention rather than necessity -- but the
- * convention is what keeps the rule legible.)
- *
- * Loop 2 takes its next index from the RELEASE'S RETURN VALUE. The original
- * loads the entry ADDRESS into eax, calls, and branches back to the lea --
- * which reads as indexing by an address until you notice `call` clobbers eax
- * with the answer. A version that walked saved indices would be wrong the
- * moment the compaction moved an entry. */
-typedef int32_t (__stdcall *AM2_IntersectRectFn)(void *dst, const void *a,
-                                                 const void *b);
-#define orig_intersect_rect \
-    (*(AM2_IntersectRectFn *)((void *)(uintptr_t)(ADDR_IAT_INTERSECT_RECT)))
+    bag = (int32_t *)am2_malloc((size_t)total * 4);
+    *(int32_t *)(uintptr_t)ADDR_RESPAWN_KIND_COUNT = total;
+    *(int32_t **)(uintptr_t)ADDR_RESPAWN_KINDS = bag;
 
-static void RowPoolEvict(const AM2_RowPool *p)
-{
-    int32_t left = p->budget;
-    int32_t i;
-
-    if (*p->count <= p->capacity)
-        return;
-
-    i = *(int16_t *)(RowPoolEntry(p, 0) + ROWPOOL_OFF_NEXT);
-    while (i > 0 && left > 0) {
-        uint8_t *e = RowPoolEntry(p, i);
-        uint8_t  scratch[16];
-        void    *row = *(void **)(e + ROWPOOL_OFF_ROW);
-
-        if (!orig_intersect_rect(scratch,
-                                 (const void *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
-                                 (const uint8_t *)row + ROW_OFF_RECT)) {
-            i = RowPoolRelease(p, e);
-            left--;
+    kind = 0;
+    for (rec = (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE;
+         rec < (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE_END;
+         rec += AM2_SPAWN_KIND_STRIDE, kind++) {
+        if (!RespawnKindAllowed(kind))
             continue;
-        }
-        i = *(int16_t *)(e + ROWPOOL_OFF_NEXT);
+        for (int32_t n = 0; n < *(const int32_t *)rec; n++)
+            (*(int32_t **)(uintptr_t)ADDR_RESPAWN_KINDS)[at++] = kind;
     }
+}
 
-    /* The pressure valve: still over, so drop from the head regardless. */
-    i = *(int16_t *)(RowPoolEntry(p, 0) + ROWPOOL_OFF_NEXT);
-    while (left > 0) {
-        i = RowPoolRelease(p, RowPoolEntry(p, i));
-        left--;
-    }
+/* 0x004601D0. Pick a respawn kind at random.
+ *
+ * IT HAS TWO OUTPUTS AND ONE OF THEM IS THE RETURN VALUE, which reading the
+ * body alone misses: eax takes the chosen kind at 0x004601E1 and is never
+ * written again, and 0x0042D1FA passes it straight to EnsureSpriteAaiRecord.
+ * The OTHER caller discards it and uses only the out-pointer -- so one call
+ * site would have confirmed the wrong reading.
+ *
+ * The division is `cdq; idiv`, SIGNED. MSVC's rand cannot answer negative so
+ * it cannot matter, but writing it unsigned is a different function for an
+ * input the original accepts.
+ *
+ * And 0x00662060 is NOT a table: it is ADDR_MISSILE_DEFS + 0x30, with the
+ * lea/lea pair computing kind * AM2_MISSILE_DEF_BYTES. It has exactly the
+ * shape of a fresh base-plus-stride array. */
+int32_t __cdecl RandomRespawnKind(int32_t *out)
+{
+    int32_t r = orig_game_rand()
+                % *(const int32_t *)(uintptr_t)ADDR_RESPAWN_KIND_COUNT;
+    int32_t kind = (*(int32_t *const *)(uintptr_t)ADDR_RESPAWN_KINDS)[r];
+
+    *out = *(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_MISSILE_DEFS))
+                               + kind * AM2_MISSILE_DEF_BYTES
+                               + MISSILEDEF_OFF_FIELD_30);
+    return kind;
+}
+
+void __cdecl RowPoolAInit(void)
+{
+    RowPoolInit(&g_rowPoolA.count, &g_rowPoolA.tail, g_rowPoolA.slots,
+                AM2_ROWPOOL_A_CAP + AM2_ROWPOOL_A_BUDGET, 0x60);
+}
+
+void __cdecl RowPoolAFree(void)
+{
+    RowPoolTeardown(&g_rowPoolA.count, &g_rowPoolA.tail, g_rowPoolA.slots,
+                    AM2_ROWPOOL_A_CAP + AM2_ROWPOOL_A_BUDGET);
 }
 
 int32_t __cdecl RowPoolARelease(void *e)
 {
-    return RowPoolRelease(&kRowPoolA, (uint8_t *)e);
+    return RowPoolRelease(&g_rowPoolA.count, &g_rowPoolA.tail, g_rowPoolA.slots,
+                          (AM2_RowSlot *)e);
 }
-int32_t __cdecl RowPoolBRelease(void *e)
+
+void __cdecl RowPoolAEvict(void)
 {
-    return RowPoolRelease(&kRowPoolB, (uint8_t *)e);
+    RowPoolEvict(&g_rowPoolA.count, g_rowPoolA.slots, AM2_ROWPOOL_A_CAP,
+                 AM2_ROWPOOL_A_BUDGET, RowPoolARelease);
 }
-void __cdecl RowPoolAEvict(void);
-void __cdecl RowPoolBEvict(void);
 
 void *__cdecl RowPoolAAlloc(void)
 {
-    return RowPoolAlloc(&kRowPoolA, RowPoolAEvict);
+    return RowPoolAlloc(&g_rowPoolA.count, &g_rowPoolA.tail, g_rowPoolA.slots,
+                        AM2_ROWPOOL_A_CAP, RowPoolAEvict);
 }
+
+void __cdecl RowPoolBInit(void)
+{
+    RowPoolInit(&g_rowPoolB.count, &g_rowPoolB.tail, g_rowPoolB.slots,
+                AM2_ROWPOOL_B_CAP + AM2_ROWPOOL_B_BUDGET, 0x80);
+}
+
+void __cdecl RowPoolBFree(void)
+{
+    RowPoolTeardown(&g_rowPoolB.count, &g_rowPoolB.tail, g_rowPoolB.slots,
+                    AM2_ROWPOOL_B_CAP + AM2_ROWPOOL_B_BUDGET);
+}
+
+int32_t __cdecl RowPoolBRelease(void *e)
+{
+    return RowPoolRelease(&g_rowPoolB.count, &g_rowPoolB.tail, g_rowPoolB.slots,
+                          (AM2_RowSlot *)e);
+}
+
+void __cdecl RowPoolBEvict(void)
+{
+    RowPoolEvict(&g_rowPoolB.count, g_rowPoolB.slots, AM2_ROWPOOL_B_CAP,
+                 AM2_ROWPOOL_B_BUDGET, RowPoolBRelease);
+}
+
 void *__cdecl RowPoolBAlloc(void)
 {
-    return RowPoolAlloc(&kRowPoolB, RowPoolBEvict);
-}
-void __cdecl RowPoolAEvict(void) { RowPoolEvict(&kRowPoolA); }
-void __cdecl RowPoolBEvict(void) { RowPoolEvict(&kRowPoolB); }
-
-/* ---- The SEQ contexts: the same five roles, parameterised ----------------
- *
- * These are the third implementation of the row-pool algorithm and the only
- * one that is a REWRITE rather than a re-emission -- 0.222 similarity against
- * the hardcoded pair, which diff at 1.000 against each other.
- *
- * Records are 48 bytes here, not 12, and the array is a POINTER at
- * SEQ_CTX_OFF_RECORDS rather than being inline -- so the same conceptual
- * field is one dereference deep in this shape and zero in the other.
- *
- * AND THE SLACK IS SOMEWHERE ELSE. The hardcoded pools carry `budget` spare
- * slots above their capacity; a context carries none, and its margin is
- * subtracted from the eviction threshold instead. Writing this from the
- * hardcoded version's outline would overrun the array. */
-static inline uint8_t *SeqRecord(const uint8_t *ctx, int32_t i)
-{
-    return *(uint8_t **)(uintptr_t)(ctx + SEQ_CTX_OFF_RECORDS)
-           + (int32_t)(i * AM2_SEQ_RECORD_SIZE);
+    return RowPoolAlloc(&g_rowPoolB.count, &g_rowPoolB.tail, g_rowPoolB.slots,
+                        AM2_ROWPOOL_B_CAP, RowPoolBEvict);
 }
 
 /* 0x00460D90. Five arguments -- the caller pushes 0x20, 0x20, 0x28, 0xC8 and
@@ -1780,58 +1986,6 @@ void *__cdecl SeqAlloc(void *ctxv)
     return rec;
 }
 
-/* ---- The respawn pool: two small functions off the map-load path --------- */
-
-/* region.cpp spells this the same way; ADDR_GAME_RAND is above the nominal
- * CRT line but is the game's own LCG, not libc's. */
-typedef int32_t (__cdecl *AM2_GameRandFn)(void);
-#define orig_game_rand ((AM2_GameRandFn)(uintptr_t)((void *)(uintptr_t)(ADDR_GAME_RAND)))
-
-
-/* 0x004600F0. May this weapon kind respawn?
- *
- * PERMISSIVE ON THREE OF FOUR PATHS -- it answers 1 unless a multiplayer
- * session is up AND the kind carries a mask AND that mask misses the game-over
- * flags. Since ADDR_MP_SESSION is 0 on every drive this project has, the
- * refusing exit cannot execute here and is verified by reading. */
-int32_t __cdecl RespawnKindAllowed(int32_t kind)
-{
-    uint32_t mask;
-
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
-        && (mask = ((const uint32_t *)(uintptr_t)ADDR_RESPAWN_KIND_MASK)[kind]) != 0
-        && (*(const uint32_t *)(uintptr_t)ADDR_GAME_OVER_FLAGS & mask) == 0)
-        return 0;
-    return 1;
-}
-
-/* 0x004601D0. Pick a respawn kind at random.
- *
- * IT HAS TWO OUTPUTS AND ONE OF THEM IS THE RETURN VALUE, which reading the
- * body alone misses: eax takes the chosen kind at 0x004601E1 and is never
- * written again, and 0x0042D1FA passes it straight to EnsureSpriteAaiRecord.
- * The OTHER caller discards it and uses only the out-pointer -- so one call
- * site would have confirmed the wrong reading.
- *
- * The division is `cdq; idiv`, SIGNED. MSVC's rand cannot answer negative so
- * it cannot matter, but writing it unsigned is a different function for an
- * input the original accepts.
- *
- * And 0x00662060 is NOT a table: it is ADDR_MISSILE_DEFS + 0x30, with the
- * lea/lea pair computing kind * AM2_MISSILE_DEF_BYTES. It has exactly the
- * shape of a fresh base-plus-stride array. */
-int32_t __cdecl RandomRespawnKind(int32_t *out)
-{
-    int32_t r = orig_game_rand()
-                % *(const int32_t *)(uintptr_t)ADDR_RESPAWN_KIND_COUNT;
-    int32_t kind = (*(int32_t *const *)(uintptr_t)ADDR_RESPAWN_KINDS)[r];
-
-    *out = *(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_MISSILE_DEFS))
-                               + kind * AM2_MISSILE_DEF_BYTES
-                               + MISSILEDEF_OFF_FIELD_30);
-    return kind;
-}
-
 /* 0x004610E0. The whole row/seq subsystem coming up: both hardcoded pools,
  * then both contexts. Reached from ADDR_STATE2_ENTER, so entering a mission
  * runs it.
@@ -1858,160 +2012,6 @@ void __cdecl FreeSeqContexts(void)
     SeqCtxFree((void *)(uintptr_t)ADDR_SEQ_CTX_A);
     RowPoolBFree();
     RowPoolAFree();
-}
-
-/* LeaveRemainsRow -- original 0x00461EA0, three callers. Take a row from pool
- * B and leave a copy of a dying object's row behind on the map.
- *
- * FOUR FIELDS, NOT A COPY. It takes the sprite, the x and the remap pointer
- * off the source row and nothing else -- so the remains inherit what they
- * look like and where they are, and inherit none of the animation state, the
- * depth links or the owner. A memcpy of the record would be shorter and
- * would be a different function.
- *
- * ROW_OFF_FIELD_26 IS FORCED TO 3 rather than copied, which is what makes the
- * new row remains rather than a second live row; the source's own value is
- * never read.
- *
- * The pool allocator's answer is DEREFERENCED ONCE before use --
- * `call RowPoolBAlloc; mov eax,[eax]` -- so it hands back a slot holding the
- * row, not the row. Reading it as the row writes the sprite over the slot
- * pointer, which is the obj -> table -> slot shape CLAUDE.md records taking
- * the game down on its first run. */
-void __cdecl LeaveRemainsRow(const void *src)
-{
-    const uint8_t *s = (const uint8_t *)src;
-    uint8_t       *r = *(uint8_t **)RowPoolBAlloc();
-
-    *(int32_t *)r = 1;
-    *(uint32_t *)(r + ROW_OFF_SPRITE) = *(const uint32_t *)(s + ROW_OFF_SPRITE);
-    *(uint32_t *)(r + ROW_OFF_X)      = *(const uint32_t *)(s + ROW_OFF_X);
-    *(uint32_t *)(r + ROW_OFF_FIELD_2C) =
-        *(const uint32_t *)(s + ROW_OFF_FIELD_2C);
-    *(int16_t *)(r + ROW_OFF_FIELD_26) = 3;
-
-    RowUpdate(r, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
-}
-
-/* TimedDirFrame -- original 0x00461F90, two callers, both in the missile
- * layer. Pick a sprite out of the grid from a DIRECTION and the time elapsed
- * since the row was stamped, write it into the row, and answer whether the
- * sequence has more frames left.
- *
- * THE DIVISION IS BY 200 AND IS WRITTEN AS A MULTIPLY. `mov eax, 0x51EB851F;
- * mul ecx; shr edx, 6` is the compiler's reciprocal for /200: 0x51EB851F is
- * round(2^37/100), the `mul` leaves the product's high dword in edx (a >>32),
- * and `shr edx, 6` takes it down a further six for a total shift of 38 --
- * 0x51EB851F / 2^38 is exactly 1/200. So the frame advances FIVE times a
- * second, not ten. The `shr 6` was first misread as /100 (one shift short,
- * the reciprocal for /100 is the same constant with `shr 5`); it cost a
- * one-frame-early flame, the port advancing a def-3 trail's column at
- * elapsed 100 where the original waits for 200. No constant in the function
- * says 200 either -- the shift is the whole of it.
- *
- * IT CLAMPS THE COLUMN AND THEN REPORTS THE CLAMP. The elapsed frame is
- * pinned to cols-1, and the return value is `col < cols - 1` computed from
- * the CLAMPED value -- so it answers false on the last frame and forever
- * after, which is what makes it usable as "is this animation still running".
- * Returning the unclamped comparison would answer true once more.
- *
- * The direction goes through RoundTo8 with three bits, so the grid's rows are
- * eight facings; the row index is that times the column count. */
-int32_t __cdecl TimedDirFrame(void *rows, int32_t dir)
-{
-    uint8_t *r    = (uint8_t *)rows;
-    int32_t  cols = *(const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS;
-    uint32_t elapsed;
-    int32_t  col;
-    int32_t  band;
-
-    elapsed = (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-               - *(const uint32_t *)(r + ROW_OFF_STAMP_54)) / 200u;
-
-    col = (int32_t)elapsed;
-    if (col >= cols - 1)
-        col = cols - 1;
-
-    band = RoundTo8((uint32_t)dir & 0xFFu, 3) & 0xFF;
-    *(uint32_t *)(r + ROW_OFF_SPRITE) =
-        (*(uint32_t *const *)(uintptr_t)ADDR_SPRITE_GRID)[band * cols + col];
-
-    return col < cols - 1;
-}
-
-/* GameSrand -- original 0x00464416, two callers, three instructions. MSVC's
- * `srand`: store the seed and nothing else.
- *
- * IT SITS BELOW THE CRT FRONTIER BY TEN BYTES -- tools/crt.py puts the real
- * boundary at 0x00464420, which is ADDR_GAME_RAND itself -- so it counts as
- * game code by position while being CRT by every other measure. Reconstructed
- * anyway, and the reason is not tidiness: our srand has to write the same
- * global the IMAGE's rand reads, because that rand stays original. Replacing
- * this with libc's would silently give the two a different sequence, and
- * BuildRespawnPool below seeds it deliberately.
- *
- * The pairing is checkable rather than assumed: ADDR_GAME_RAND's body reads
- * and writes ADDR_RAND_SEED with the LCG constants, and this writes the same
- * address. */
-void __cdecl GameSrand(int32_t seed)
-{
-    *(uint32_t *)(uintptr_t)ADDR_RAND_SEED = (uint32_t)seed;
-}
-
-/* BuildRespawnPool -- original 0x00460120, one caller. Build the weighted bag
- * a respawn is drawn from: seed the RNG, throw the old bag away, and write
- * each allowed kind into a fresh one as many times as its weight.
- *
- * TWO PASSES OVER THE SAME PREDICATE, and that is the design rather than
- * waste: the first totals the weights so the bag can be allocated exactly, the
- * second fills it. RespawnKindAllowed is therefore called twice per kind and
- * must be free of side effects for the two passes to agree -- which they must,
- * or the fill runs off the end of a bag sized by the count.
- *
- * THE TABLE IT WALKS IS 0x0066205C, and walking it is what showed that a dozen
- * globals in orig.h are fields of it rather than separate variables; see the
- * note there. This function reads only each record's FIRST dword, so the
- * bound and the stride are transcribed exactly rather than turned into a
- * record count -- what the rest of each record holds is not established, and a
- * count would assert it.
- *
- * The bag is int32 entries of KIND INDEX, not pointers, so a draw is one
- * random index into a flat array -- which is what makes the weighting work
- * without any per-draw arithmetic. */
-void __cdecl BuildRespawnPool(int32_t seed)
-{
-    const uint8_t *rec;
-    int32_t        kind;
-    int32_t        total = 0;
-    int32_t        at    = 0;
-    int32_t       *bag;
-
-    GameSrand(seed);
-
-    if (*(void **)(uintptr_t)ADDR_RESPAWN_KINDS != 0)
-        am2_free(*(void **)(uintptr_t)ADDR_RESPAWN_KINDS);
-
-    kind = 0;
-    for (rec = (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE;
-         rec < (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE_END;
-         rec += AM2_SPAWN_KIND_STRIDE, kind++) {
-        if (RespawnKindAllowed(kind))
-            total += *(const int32_t *)rec;
-    }
-
-    bag = (int32_t *)am2_malloc((size_t)total * 4);
-    *(int32_t *)(uintptr_t)ADDR_RESPAWN_KIND_COUNT = total;
-    *(int32_t **)(uintptr_t)ADDR_RESPAWN_KINDS = bag;
-
-    kind = 0;
-    for (rec = (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE;
-         rec < (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE_END;
-         rec += AM2_SPAWN_KIND_STRIDE, kind++) {
-        if (!RespawnKindAllowed(kind))
-            continue;
-        for (int32_t n = 0; n < *(const int32_t *)rec; n++)
-            (*(int32_t **)(uintptr_t)ADDR_RESPAWN_KINDS)[at++] = kind;
-    }
 }
 
 /* PlaceGroundDecal -- original 0x00461950, one caller. Drop a decal row on the
@@ -2074,71 +2074,6 @@ void __cdecl PlaceGroundDecal(int32_t x, int32_t z, int32_t variant)
     *(uint32_t *)(row + ROW_OFF_FIELD_2C) = *(const uint32_t *)(spr + 0x34u);
 
     RowUpdate(row, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
-}
-
-/* SeqStartDirEffect -- original 0x00461EE0, five callers, all in FireWeapon.
- * Start a sequence effect whose frame is chosen by DIRECTION: take a context
- * from the B pool, pick the sprite for the angle out of sprite group C, and
- * fill in the row the context carries.
- *
- * ITS TABLE IS SPRITE GROUP C, WHICH THIS TREE ALREADY DESCRIBES. The
- * addressing is `[esi + 0x0048CA08]` with esi = group * 12, and 0x0048CA08 is
- * ADDR_SPRITE_GROUPS_C with AM2_SPRITEGRP_C_BYTES of 0x0C -- so the three
- * fields it reads are SPRITEGRP_C_OFF_COUNT, SPRITEGRP_C_OFF_SPRITES and the
- * unnamed one at +8. Every part of that was already established by the
- * loader; nothing here needed a new name, which is what grepping for the
- * existing spelling is for.
- *
- * THE COUNT IS A DIRECTION COUNT. `0x100 / count` is the angle step, and
- * `(step/2 + angle) / step` rounds the byte angle to the nearest of them --
- * the half-step being what makes it round rather than truncate. The
- * `if (frame >= count) frame -= count` after it is the wrap for angles that
- * round up past the last direction, which is a single subtraction because
- * they can only ever overshoot by one.
- *
- * THE Z GOES IN ONE HIGHER THAN IT ARRIVES. `mov eax,[esp+0xc]; inc eax`
- * before the store to ROW_OFF_X + 2, and nothing else adjusts it. Reproduced;
- * it is the original's and the only place in this pair of functions where a
- * coordinate is not passed straight through.
- *
- * The row is the CONTEXT'S, not a fresh one -- SeqAlloc hands back a context
- * whose +0x1C already points at a row -- so this fills a row it did not
- * allocate and must not free. */
-void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
-                               int32_t group, uint32_t ownerUid,
-                               int32_t field26)
-{
-    uint8_t       *ctx = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_B);
-    const uint8_t *grp = (const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C
-                         + (uint32_t)group * AM2_SPRITEGRP_C_BYTES;
-    int32_t        count = *(const int32_t *)(grp + SPRITEGRP_C_OFF_COUNT);
-    int32_t        step  = 0x100 / count;
-    int32_t        frame;
-    uint8_t       *row;
-
-    *(uint8_t *)(ctx + 4)     = (uint8_t)group;
-    *(uint32_t *)(ctx + 0x24) = ownerUid;
-    *(int32_t *)ctx           = 2;
-    *(int32_t *)(ctx + 0x0C)  = 0;
-    *(int32_t *)(ctx + 0x10)  = 0;
-
-    frame = ((step >> 1) + angle) / step;
-    if (frame >= count)
-        frame -= count;
-    *(int32_t *)(ctx + 0x14) = frame;
-    *(int32_t *)(ctx + 8)    = *(const int32_t *)(grp + 8);
-
-    row = *(uint8_t **)(ctx + 0x1C);
-    *(uint8_t *)(row + 0x51)  = 0;
-    *(uint32_t *)(row + ROW_OFF_STAMP_54) = 0;
-    *(int32_t *)row           = 1;
-    *(uint32_t *)(row + ROW_OFF_SPRITE) =
-        ((uint32_t *const *)(grp + SPRITEGRP_C_OFF_SPRITES))[0][frame];
-    *(int16_t *)(row + ROW_OFF_X)        = (int16_t)x;
-    *(int16_t *)(row + ROW_OFF_X + 2)    = (int16_t)(z + 1);
-    *(int16_t *)(row + 0x20)             = 0;
-    *(uint32_t *)(row + ROW_OFF_FIELD_2C) = 0;
-    *(int16_t *)(row + ROW_OFF_FIELD_26) = (int16_t)field26;
 }
 
 /* SpawnParticle -- original 0x004619F0, four callers. Put one particle at a
@@ -2286,42 +2221,6 @@ void __cdecl SpawnHitEffect(const uint32_t *at, int32_t rowField2C,
     }
 }
 
-/* DiedEffectB -- original 0x00461C30, one caller. The directional death
- * burst: up to seven particles thrown outward, chosen by which way the thing
- * was facing.
- *
- * ITS TWO TABLES ARE BUILT ON THE STACK, one dword at a time, across sixty
- * instructions of the prologue. They are DECODED from that instruction
- * stream here rather than transcribed -- the rule DirtyCollect's eighty-one
- * arms established -- because a hand-read of sixty scattered `mov [esp+N],
- * reg` with three different registers holding 1, 0 and -1 is exactly the
- * transcription this project has got wrong before.
- *
- * THE FACING BECOMES A SECTOR: `(facing + 0x10) >> 5`, so the byte angle is
- * rounded to one of eight, and a result outside 0..7 returns without
- * spawning. The +0x10 is half a sector, which makes it round rather than
- * truncate -- the same idiom SeqStartDirEffect uses with a different divisor.
- *
- * AND THE RANDOM ARM IS UNREACHABLE FROM HERE, which only the decoded tables
- * show. Two of the seven angles are -1, the value SpawnParticle reads as
- * "pick a direction at random" -- and columns 2 and 6, the ones carrying
- * them, are ZERO IN ALL EIGHT ROWS. So the `if (angle == -1)` arm at
- * 0x00461E4F cannot run through this caller, and it is written out only
- * because the original has it. Reading the three arms without the mask would
- * describe a behaviour the function never produces. */
-static const int32_t kDiedBurstAngle[7] = { 64, -64, -1, 0, -100, -154, -1 };
-
-static const int32_t kDiedBurstMask[8][7] = {
-    { 1, 1, 0, 0, 0, 0, 0 },
-    { 0, 0, 0, 0, 1, 1, 0 },
-    { 0, 1, 0, 1, 1, 0, 0 },
-    { 0, 1, 0, 1, 1, 1, 0 },
-    { 0, 0, 0, 1, 0, 0, 0 },
-    { 0, 0, 0, 1, 1, 1, 0 },
-    { 1, 0, 0, 0, 1, 1, 0 },
-    { 1, 1, 0, 0, 1, 1, 0 },
-};
-
 void __cdecl DiedEffectB(const uint32_t *at, int32_t facing,
                          int32_t rowField2C, int32_t height)
 {
@@ -2355,4 +2254,167 @@ void __cdecl DiedEffectB(const uint32_t *at, int32_t facing,
 
         SpawnParticle(at, rowField2C, i, 7, height, angle);
     }
+}
+
+/* LeaveRemainsRow -- original 0x00461EA0, three callers. Take a row from pool
+ * B and leave a copy of a dying object's row behind on the map.
+ *
+ * FOUR FIELDS, NOT A COPY. It takes the sprite, the x and the remap pointer
+ * off the source row and nothing else -- so the remains inherit what they
+ * look like and where they are, and inherit none of the animation state, the
+ * depth links or the owner. A memcpy of the record would be shorter and
+ * would be a different function.
+ *
+ * ROW_OFF_FIELD_26 IS FORCED TO 3 rather than copied, which is what makes the
+ * new row remains rather than a second live row; the source's own value is
+ * never read.
+ *
+ * The pool allocator's answer is DEREFERENCED ONCE before use --
+ * `call RowPoolBAlloc; mov eax,[eax]` -- so it hands back a slot holding the
+ * row, not the row. Reading it as the row writes the sprite over the slot
+ * pointer, which is the obj -> table -> slot shape CLAUDE.md records taking
+ * the game down on its first run. */
+void __cdecl LeaveRemainsRow(const void *src)
+{
+    const uint8_t *s = (const uint8_t *)src;
+    uint8_t       *r = *(uint8_t **)RowPoolBAlloc();
+
+    *(int32_t *)r = 1;
+    *(uint32_t *)(r + ROW_OFF_SPRITE) = *(const uint32_t *)(s + ROW_OFF_SPRITE);
+    *(uint32_t *)(r + ROW_OFF_X)      = *(const uint32_t *)(s + ROW_OFF_X);
+    *(uint32_t *)(r + ROW_OFF_FIELD_2C) =
+        *(const uint32_t *)(s + ROW_OFF_FIELD_2C);
+    *(int16_t *)(r + ROW_OFF_FIELD_26) = 3;
+
+    RowUpdate(r, 0, (void *)(uintptr_t)ADDR_MAP_DESC);
+}
+
+/* SeqStartDirEffect -- original 0x00461EE0, five callers, all in FireWeapon.
+ * Start a sequence effect whose frame is chosen by DIRECTION: take a context
+ * from the B pool, pick the sprite for the angle out of sprite group C, and
+ * fill in the row the context carries.
+ *
+ * ITS TABLE IS SPRITE GROUP C, WHICH THIS TREE ALREADY DESCRIBES. The
+ * addressing is `[esi + 0x0048CA08]` with esi = group * 12, and 0x0048CA08 is
+ * ADDR_SPRITE_GROUPS_C with AM2_SPRITEGRP_C_BYTES of 0x0C -- so the three
+ * fields it reads are SPRITEGRP_C_OFF_COUNT, SPRITEGRP_C_OFF_SPRITES and the
+ * unnamed one at +8. Every part of that was already established by the
+ * loader; nothing here needed a new name, which is what grepping for the
+ * existing spelling is for.
+ *
+ * THE COUNT IS A DIRECTION COUNT. `0x100 / count` is the angle step, and
+ * `(step/2 + angle) / step` rounds the byte angle to the nearest of them --
+ * the half-step being what makes it round rather than truncate. The
+ * `if (frame >= count) frame -= count` after it is the wrap for angles that
+ * round up past the last direction, which is a single subtraction because
+ * they can only ever overshoot by one.
+ *
+ * THE Z GOES IN ONE HIGHER THAN IT ARRIVES. `mov eax,[esp+0xc]; inc eax`
+ * before the store to ROW_OFF_X + 2, and nothing else adjusts it. Reproduced;
+ * it is the original's and the only place in this pair of functions where a
+ * coordinate is not passed straight through.
+ *
+ * The row is the CONTEXT'S, not a fresh one -- SeqAlloc hands back a context
+ * whose +0x1C already points at a row -- so this fills a row it did not
+ * allocate and must not free. */
+void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
+                               int32_t group, uint32_t ownerUid,
+                               int32_t field26)
+{
+    uint8_t       *ctx = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_B);
+    const uint8_t *grp = (const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C
+                         + (uint32_t)group * AM2_SPRITEGRP_C_BYTES;
+    int32_t        count = *(const int32_t *)(grp + SPRITEGRP_C_OFF_COUNT);
+    int32_t        step  = 0x100 / count;
+    int32_t        frame;
+    uint8_t       *row;
+
+    *(uint8_t *)(ctx + 4)     = (uint8_t)group;
+    *(uint32_t *)(ctx + 0x24) = ownerUid;
+    *(int32_t *)ctx           = 2;
+    *(int32_t *)(ctx + 0x0C)  = 0;
+    *(int32_t *)(ctx + 0x10)  = 0;
+
+    frame = ((step >> 1) + angle) / step;
+    if (frame >= count)
+        frame -= count;
+    *(int32_t *)(ctx + 0x14) = frame;
+    *(int32_t *)(ctx + 8)    = *(const int32_t *)(grp + 8);
+
+    row = *(uint8_t **)(ctx + 0x1C);
+    *(uint8_t *)(row + 0x51)  = 0;
+    *(uint32_t *)(row + ROW_OFF_STAMP_54) = 0;
+    *(int32_t *)row           = 1;
+    *(uint32_t *)(row + ROW_OFF_SPRITE) =
+        ((uint32_t *const *)(grp + SPRITEGRP_C_OFF_SPRITES))[0][frame];
+    *(int16_t *)(row + ROW_OFF_X)        = (int16_t)x;
+    *(int16_t *)(row + ROW_OFF_X + 2)    = (int16_t)(z + 1);
+    *(int16_t *)(row + 0x20)             = 0;
+    *(uint32_t *)(row + ROW_OFF_FIELD_2C) = 0;
+    *(int16_t *)(row + ROW_OFF_FIELD_26) = (int16_t)field26;
+}
+
+/* TimedDirFrame -- original 0x00461F90, two callers, both in the missile
+ * layer. Pick a sprite out of the grid from a DIRECTION and the time elapsed
+ * since the row was stamped, write it into the row, and answer whether the
+ * sequence has more frames left.
+ *
+ * THE DIVISION IS BY 200 AND IS WRITTEN AS A MULTIPLY. `mov eax, 0x51EB851F;
+ * mul ecx; shr edx, 6` is the compiler's reciprocal for /200: 0x51EB851F is
+ * round(2^37/100), the `mul` leaves the product's high dword in edx (a >>32),
+ * and `shr edx, 6` takes it down a further six for a total shift of 38 --
+ * 0x51EB851F / 2^38 is exactly 1/200. So the frame advances FIVE times a
+ * second, not ten. The `shr 6` was first misread as /100 (one shift short,
+ * the reciprocal for /100 is the same constant with `shr 5`); it cost a
+ * one-frame-early flame, the port advancing a def-3 trail's column at
+ * elapsed 100 where the original waits for 200. No constant in the function
+ * says 200 either -- the shift is the whole of it.
+ *
+ * IT CLAMPS THE COLUMN AND THEN REPORTS THE CLAMP. The elapsed frame is
+ * pinned to cols-1, and the return value is `col < cols - 1` computed from
+ * the CLAMPED value -- so it answers false on the last frame and forever
+ * after, which is what makes it usable as "is this animation still running".
+ * Returning the unclamped comparison would answer true once more.
+ *
+ * The direction goes through RoundTo8 with three bits, so the grid's rows are
+ * eight facings; the row index is that times the column count. */
+int32_t __cdecl TimedDirFrame(void *rows, int32_t dir)
+{
+    uint8_t *r    = (uint8_t *)rows;
+    int32_t  cols = *(const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS;
+    uint32_t elapsed;
+    int32_t  col;
+    int32_t  band;
+
+    elapsed = (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+               - *(const uint32_t *)(r + ROW_OFF_STAMP_54)) / 200u;
+
+    col = (int32_t)elapsed;
+    if (col >= cols - 1)
+        col = cols - 1;
+
+    band = RoundTo8((uint32_t)dir & 0xFFu, 3) & 0xFF;
+    *(uint32_t *)(r + ROW_OFF_SPRITE) =
+        (*(uint32_t *const *)(uintptr_t)ADDR_SPRITE_GRID)[band * cols + col];
+
+    return col < cols - 1;
+}
+
+/* GameSrand -- original 0x00464416, two callers, three instructions. MSVC's
+ * `srand`: store the seed and nothing else.
+ *
+ * IT SITS BELOW THE CRT FRONTIER BY TEN BYTES -- tools/crt.py puts the real
+ * boundary at 0x00464420, which is ADDR_GAME_RAND itself -- so it counts as
+ * game code by position while being CRT by every other measure. Reconstructed
+ * anyway, and the reason is not tidiness: our srand has to write the same
+ * global the IMAGE's rand reads, because that rand stays original. Replacing
+ * this with libc's would silently give the two a different sequence, and
+ * BuildRespawnPool below seeds it deliberately.
+ *
+ * The pairing is checkable rather than assumed: ADDR_GAME_RAND's body reads
+ * and writes ADDR_RAND_SEED with the LCG constants, and this writes the same
+ * address. */
+void __cdecl GameSrand(int32_t seed)
+{
+    *(uint32_t *)(uintptr_t)ADDR_RAND_SEED = (uint32_t)seed;
 }

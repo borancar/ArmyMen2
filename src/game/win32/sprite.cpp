@@ -2499,27 +2499,30 @@ int sprite_install(void)
  * which is what makes the pair idempotent: a freed group keeps its count and
  * reloads at the same size. Guarding the loader on the COUNT instead would
  * compile, read as equivalent, and never reload anything after a teardown. */
-static void LoadGroupRange(uint8_t *base, const uint8_t *end)
+struct AM2_SpriteGroup {
+    int32_t      index;      /* SPRITEGRP_OFF_INDEX */
+    int32_t      count;      /* SPRITEGRP_OFF_COUNT */
+    AM2_Sprite **sprites;    /* SPRITEGRP_OFF_SPRITES */
+    uint8_t      rest[AM2_SPRITEGRP_BYTES - 12];
+};
+
+static inline void LoadGroupRange(AM2_SpriteGroup *groups, int32_t n)
 {
-    uint8_t *r;
+    int32_t k, i;
 
-    for (r = base; r < end;
-         r += AM2_SPRITEGRP_BYTES) {
-        int32_t n = *(const int32_t *)(r + SPRITEGRP_OFF_COUNT);
-        AM2_Sprite **slots;
-        int32_t i;
-
-        if (*(void **)(r + SPRITEGRP_OFF_SPRITES) != 0)
+    for (k = 0; k < n; k++) {
+        if (groups[k].sprites != 0)
             continue;
 
-        slots = (AM2_Sprite **)am2_malloc((size_t)n * sizeof(AM2_Sprite *));
-        *(void **)(r + SPRITEGRP_OFF_SPRITES) = slots;
-        memset(slots, 0, (size_t)n * sizeof(AM2_Sprite *));
+        groups[k].sprites = (AM2_Sprite **)am2_malloc(
+            (size_t)groups[k].count * sizeof(AM2_Sprite *));
+        memset(groups[k].sprites, 0,
+               (size_t)groups[k].count * sizeof(AM2_Sprite *));
 
-        for (i = 0; i < n; i++)
-            slots[i] = PreloadSprite(AM2_SPRITEGRP_SET,
-                                     *(const int32_t *)(r + SPRITEGRP_OFF_INDEX),
-                                     i, AM2_SPRITEGRP_FLAGS, 1);
+        for (i = 0; i < groups[k].count; i++)
+            groups[k].sprites[i] = PreloadSprite(AM2_SPRITEGRP_SET,
+                                                 groups[k].index, i,
+                                                 AM2_SPRITEGRP_FLAGS, 1);
     }
 }
 
@@ -2528,23 +2531,16 @@ static void LoadGroupRange(uint8_t *base, const uint8_t *end)
  * itself, so a group that was never loaded still gets free(NULL) and a
  * redundant null store. Written as `if (slots) { ... }` it would be tidier
  * and would change the call count. */
-static void FreeGroupRange(uint8_t *base, const uint8_t *end)
+static inline void FreeGroupRange(AM2_SpriteGroup *groups, int32_t n)
 {
-    uint8_t *r;
+    int32_t k, i;
 
-    for (r = base; r < end;
-         r += AM2_SPRITEGRP_BYTES) {
-        AM2_Sprite **slots = *(AM2_Sprite ***)(r + SPRITEGRP_OFF_SPRITES);
-
-        if (slots != 0) {
-            int32_t n = *(const int32_t *)(r + SPRITEGRP_OFF_COUNT);
-            int32_t i;
-
-            for (i = 0; i < n; i++)
-                ReleaseSprite(slots[i]);
-        }
-        am2_free(slots);
-        *(void **)(r + SPRITEGRP_OFF_SPRITES) = 0;
+    for (k = 0; k < n; k++) {
+        if (groups[k].sprites != 0)
+            for (i = 0; i < groups[k].count; i++)
+                ReleaseSprite(groups[k].sprites[i]);
+        am2_free(groups[k].sprites);
+        groups[k].sprites = 0;
     }
 }
 
@@ -2554,23 +2550,23 @@ static void FreeGroupRange(uint8_t *base, const uint8_t *end)
  * functions despite sitting under a perfectly uniform dispatcher. */
 void __cdecl LoadSpriteGroups(void)
 {
-    LoadGroupRange((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS,
-                   (const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_END);
+    LoadGroupRange((AM2_SpriteGroup *)(uintptr_t)ADDR_SPRITE_GROUPS,
+                   (int32_t)((ADDR_SPRITE_GROUPS_END - ADDR_SPRITE_GROUPS) / AM2_SPRITEGRP_BYTES));
 }
 void __cdecl FreeSpriteGroups(void)
 {
-    FreeGroupRange((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS,
-                   (const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_END);
+    FreeGroupRange((AM2_SpriteGroup *)(uintptr_t)ADDR_SPRITE_GROUPS,
+                   (int32_t)((ADDR_SPRITE_GROUPS_END - ADDR_SPRITE_GROUPS) / AM2_SPRITEGRP_BYTES));
 }
 void __cdecl LoadSpriteGroupsB(void)
 {
-    LoadGroupRange((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_B,
-                   (const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_B_END);
+    LoadGroupRange((AM2_SpriteGroup *)(uintptr_t)ADDR_SPRITE_GROUPS_B,
+                   (int32_t)((ADDR_SPRITE_GROUPS_B_END - ADDR_SPRITE_GROUPS_B) / AM2_SPRITEGRP_BYTES));
 }
 void __cdecl FreeSpriteGroupsB(void)
 {
-    FreeGroupRange((uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_B,
-                   (const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_B_END);
+    FreeGroupRange((AM2_SpriteGroup *)(uintptr_t)ADDR_SPRITE_GROUPS_B,
+                   (int32_t)((ADDR_SPRITE_GROUPS_B_END - ADDR_SPRITE_GROUPS_B) / AM2_SPRITEGRP_BYTES));
 }
 
 /* 0x00462BE0. The third group table's loader. NOT a copy of the first two --
@@ -2583,29 +2579,33 @@ void __cdecl FreeSpriteGroupsB(void)
  * downward, the natural move is to correct this one too -- and it would put
  * the table four bytes early. The absence of a negative displacement is the
  * evidence, and it is only visible in this body. */
+struct AM2_SpriteGroupC {
+    int32_t      count;      /* SPRITEGRP_C_OFF_COUNT */
+    AM2_Sprite **sprites;    /* SPRITEGRP_C_OFF_SPRITES */
+    uint8_t      rest[AM2_SPRITEGRP_C_BYTES - 8];
+};
+#define g_spriteGroupsC ((AM2_SpriteGroupC *)(uintptr_t)ADDR_SPRITE_GROUPS_C)
+#define AM2_SPRITEGRP_C_COUNT \
+    ((int32_t)((ADDR_SPRITE_GROUPS_C_END - ADDR_SPRITE_GROUPS_C) \
+               / AM2_SPRITEGRP_C_BYTES))
+
 void __cdecl LoadSpriteGroupsC(void)
 {
-    uint8_t *r;
-    int32_t  group = 0;
+    int32_t k, i;
 
-    for (r = (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C;
-         r < (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C_END;
-         r += AM2_SPRITEGRP_C_BYTES, group++) {
-        int32_t n = *(const int32_t *)(r + SPRITEGRP_C_OFF_COUNT);
-        AM2_Sprite **slots;
-        int32_t i;
-
-        if (*(void **)(r + SPRITEGRP_C_OFF_SPRITES) != 0)
+    for (k = 0; k < AM2_SPRITEGRP_C_COUNT; k++) {
+        if (g_spriteGroupsC[k].sprites != 0)
             continue;
 
-        slots = (AM2_Sprite **)am2_malloc((size_t)n * sizeof(AM2_Sprite *));
-        *(void **)(r + SPRITEGRP_C_OFF_SPRITES) = slots;
-        memset(slots, 0, (size_t)n * sizeof(AM2_Sprite *));
+        g_spriteGroupsC[k].sprites = (AM2_Sprite **)am2_malloc(
+            (size_t)g_spriteGroupsC[k].count * sizeof(AM2_Sprite *));
+        memset(g_spriteGroupsC[k].sprites, 0,
+               (size_t)g_spriteGroupsC[k].count * sizeof(AM2_Sprite *));
 
-        for (i = 0; i < n; i++)
-            slots[i] = PreloadSprite(AM2_SPRITEGRP_SET,
-                                     AM2_SPRITEGRP_C_BASE + group, i,
-                                     AM2_SPRITEGRP_C_FLAGS, 1);
+        for (i = 0; i < g_spriteGroupsC[k].count; i++)
+            g_spriteGroupsC[k].sprites[i] =
+                PreloadSprite(AM2_SPRITEGRP_SET, AM2_SPRITEGRP_C_BASE + k, i,
+                              AM2_SPRITEGRP_C_FLAGS, 1);
     }
 }
 
@@ -2615,22 +2615,17 @@ void __cdecl LoadSpriteGroupsC(void)
  * difference between ten free(NULL) calls per teardown and none. */
 void __cdecl FreeSpriteGroupsC(void)
 {
-    uint8_t *r;
+    int32_t k, n, i;
 
-    for (r = (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C;
-         r < (uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C_END;
-         r += AM2_SPRITEGRP_C_BYTES) {
-        AM2_Sprite **slots = *(AM2_Sprite ***)(r + SPRITEGRP_C_OFF_SPRITES);
-        int32_t n, i;
-
-        if (slots == 0)
+    for (k = 0; k < AM2_SPRITEGRP_C_COUNT; k++) {
+        if (g_spriteGroupsC[k].sprites == 0)
             continue;
 
-        n = *(const int32_t *)(r + SPRITEGRP_C_OFF_COUNT);
+        n = g_spriteGroupsC[k].count;
         for (i = 0; i < n; i++)
-            ReleaseSprite(slots[i]);
-        am2_free(slots);
-        *(void **)(r + SPRITEGRP_C_OFF_SPRITES) = 0;
+            ReleaseSprite(g_spriteGroupsC[k].sprites[i]);
+        am2_free(g_spriteGroupsC[k].sprites);
+        g_spriteGroupsC[k].sprites = 0;
     }
 }
 
@@ -2645,7 +2640,11 @@ void __cdecl FreeSpriteGroupsC(void)
  * unconditionally, the third skips a NULL record, and this one returns at
  * once if the whole grid is NULL. Same job, three shapes, and a helper across
  * any two of them erases the difference. */
-static inline void LoadGrid(const int32_t *rowsAt, const int32_t *colsAt,
+/* COLS FIRST in the parameter list: VC6 orders the two loads of rows * cols by
+ * the inlined helper's parameter order -- not the expression's, not the
+ * symbols' names or definition order, all three tried -- and the original
+ * loads cols first. */
+static inline void LoadGrid(const int32_t *colsAt, const int32_t *rowsAt,
                      AM2_Sprite ***gridAt, int32_t indexBase)
 {
     AM2_Sprite **grid;
@@ -2664,22 +2663,19 @@ static inline void LoadGrid(const int32_t *rowsAt, const int32_t *colsAt,
                               col, AM2_SPRITEGRP_C_FLAGS, 1);
 }
 
-static void FreeGrid(const int32_t *rowsAt, const int32_t *colsAt,
-                     AM2_Sprite ***gridAt)
+static inline void FreeGrid(const int32_t *rowsAt, const int32_t *colsAt,
+                            AM2_Sprite ***gridAt)
 {
-    AM2_Sprite **grid = *gridAt;
-    int32_t rows, cols, row, col;
+    int32_t row, col;
 
-    if (grid == 0)
+    if (*gridAt == 0)
         return;
 
-    rows = *rowsAt;
-    cols = *colsAt;
-    for (row = 0; row < rows; row++)
-        for (col = 0; col < cols; col++)
-            ReleaseSprite(grid[row * cols + col]);
+    for (row = 0; row < *rowsAt; row++)
+        for (col = 0; col < *colsAt; col++)
+            ReleaseSprite((*gridAt)[*colsAt * row + col]);
 
-    am2_free(grid);
+    am2_free(*gridAt);
     *gridAt = 0;
 }
 
@@ -2695,41 +2691,41 @@ static void FreeGrid(const int32_t *rowsAt, const int32_t *colsAt,
  *
  * The divide is `cdq; sub; sar` -- SIGNED, so a negative bound rounds toward
  * zero where a shift would not. */
+#define g_decalSprites     (*(AM2_Sprite ***)(uintptr_t)ADDR_DECAL_SPRITES)
+#define g_decalSpriteCount (*(int32_t *)(uintptr_t)ADDR_DECAL_SPRITE_COUNT)
+
 void __cdecl LoadDecalSprites(void)
 {
-    int32_t n = *(const int32_t *)(uintptr_t)ADDR_DECAL_SPRITE_COUNT;
-    AM2_Sprite **slots;
     int32_t i;
 
-    slots = (AM2_Sprite **)am2_malloc((size_t)n * sizeof(AM2_Sprite *));
-    *(void **)(uintptr_t)ADDR_DECAL_SPRITES = slots;
-    memset(slots, 0, (size_t)n * sizeof(AM2_Sprite *));
+    g_decalSprites = (AM2_Sprite **)am2_malloc((size_t)g_decalSpriteCount
+                                               * sizeof(AM2_Sprite *));
+    memset(g_decalSprites, 0, (size_t)g_decalSpriteCount * sizeof(AM2_Sprite *));
 
-    for (i = 0; i < n; i++) {
-        AM2_Sprite *spr = PreloadSprite(AM2_SPRITEGRP_SET,
-                                        AM2_DECAL_SPRITE_INDEX, i,
-                                        AM2_SPRITE_FLAGS_FLAT, 1);
-        slots[i] = spr;
-        if (spr != 0) {
-            spr->hotX = (int16_t)(spr->bounds.right / 2);
-            spr->hotY = (int16_t)(spr->bounds.right / 2);
+    for (i = 0; i < g_decalSpriteCount; i++) {
+        g_decalSprites[i] = PreloadSprite(AM2_SPRITEGRP_SET,
+                                          AM2_DECAL_SPRITE_INDEX, i,
+                                          AM2_SPRITE_FLAGS_FLAT, 1);
+        if (g_decalSprites[i] != 0) {
+            g_decalSprites[i]->hotX =
+                (int16_t)(g_decalSprites[i]->bounds.right / 2);
+            g_decalSprites[i]->hotY =
+                (int16_t)(g_decalSprites[i]->bounds.right / 2);
         }
     }
 }
 
 void __cdecl FreeDecalSprites(void)
 {
-    AM2_Sprite **slots = *(AM2_Sprite ***)(uintptr_t)ADDR_DECAL_SPRITES;
-    int32_t n, i;
+    int32_t i;
 
-    if (slots == 0)
+    if (g_decalSprites == 0)
         return;
 
-    n = *(const int32_t *)(uintptr_t)ADDR_DECAL_SPRITE_COUNT;
-    for (i = 0; i < n; i++)
-        ReleaseSprite(slots[i]);
-    am2_free(slots);
-    *(void **)(uintptr_t)ADDR_DECAL_SPRITES = 0;
+    for (i = 0; i < g_decalSpriteCount; i++)
+        ReleaseSprite(g_decalSprites[i]);
+    am2_free(g_decalSprites);
+    g_decalSprites = 0;
 }
 
 /* 0x00462EA0 and 0x00462F10. The seq kind-5 sprites, the same flat shape at
@@ -2740,33 +2736,34 @@ void __cdecl FreeDecalSprites(void)
  * ADDR_SEQ_SPRITE_5_COUNT has NO WRITER in the image and reads 4, so the two
  * agree permanently. Written with the loop bound spelled the way each half
  * spells it, because the two are different facts that happen to coincide. */
+#define g_seqSprites5     (*(AM2_Sprite ***)(uintptr_t)ADDR_SEQ_SPRITES_5)
+#define g_seqSprite5Count (*(int32_t *)(uintptr_t)ADDR_SEQ_SPRITE_5_COUNT)
+
 void __cdecl LoadSeqSprites5(void)
 {
-    int32_t n = *(const int32_t *)(uintptr_t)ADDR_SEQ_SPRITE_5_COUNT;
-    AM2_Sprite **slots;
     int32_t i;
 
-    slots = (AM2_Sprite **)am2_malloc((size_t)n * sizeof(AM2_Sprite *));
-    *(void **)(uintptr_t)ADDR_SEQ_SPRITES_5 = slots;
-    memset(slots, 0, (size_t)n * sizeof(AM2_Sprite *));
+    g_seqSprites5 = (AM2_Sprite **)am2_malloc((size_t)g_seqSprite5Count
+                                              * sizeof(AM2_Sprite *));
+    memset(g_seqSprites5, 0, (size_t)g_seqSprite5Count * sizeof(AM2_Sprite *));
 
-    for (i = 0; i < n; i++)
-        slots[i] = PreloadSprite(AM2_SPRITEGRP_SET, AM2_SEQ_SPRITE_5_INDEX, i,
-                                 AM2_SPRITE_FLAGS_FLAT, 1);
+    for (i = 0; i < g_seqSprite5Count; i++)
+        g_seqSprites5[i] = PreloadSprite(AM2_SPRITEGRP_SET,
+                                         AM2_SEQ_SPRITE_5_INDEX, i,
+                                         AM2_SPRITE_FLAGS_FLAT, 1);
 }
 
 void __cdecl FreeSeqSprites5(void)
 {
-    AM2_Sprite **slots = *(AM2_Sprite ***)(uintptr_t)ADDR_SEQ_SPRITES_5;
     int32_t i;
 
-    if (slots == 0)
+    if (g_seqSprites5 == 0)
         return;
 
     for (i = 0; i < 4; i++)          /* the original's literal, not the count */
-        ReleaseSprite(slots[i]);
-    am2_free(slots);
-    *(void **)(uintptr_t)ADDR_SEQ_SPRITES_5 = 0;
+        ReleaseSprite(g_seqSprites5[i]);
+    am2_free(g_seqSprites5);
+    g_seqSprites5 = 0;
 }
 
 /* The two grid subsystems. Pair 7 diffs 1.000 against pair 4 on BOTH halves,
@@ -2776,8 +2773,8 @@ void __cdecl FreeSeqSprites5(void)
  * among the rest. */
 void __cdecl LoadSpriteGrid(void)
 {
-    LoadGrid((const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_ROWS,
-             (const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS,
+    LoadGrid((const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_COLS,
+             (const int32_t *)(uintptr_t)ADDR_SPRITE_GRID_ROWS,
              (AM2_Sprite ***)(uintptr_t)ADDR_SPRITE_GRID,
              AM2_SPRITE_GRID_BASE);
 }
@@ -2789,8 +2786,8 @@ void __cdecl FreeSpriteGrid(void)
 }
 void __cdecl LoadSeqGrid(void)
 {
-    LoadGrid((const int32_t *)(uintptr_t)ADDR_SEQ_GRID_ROWS,
-             (const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE,
+    LoadGrid((const int32_t *)(uintptr_t)AM2_SEQ_VARIANT_STRIDE,
+             (const int32_t *)(uintptr_t)ADDR_SEQ_GRID_ROWS,
              (AM2_Sprite ***)(uintptr_t)ADDR_SEQ_SPRITES_7,
              AM2_SEQ_GRID_BASE);
 }
@@ -2818,117 +2815,97 @@ void __cdecl FreeSeqGrid(void)
  *
  * Pair 6's releaser has the same literal 0x10 with `jl` instead of `jle` and
  * is correct for its four. One bit apart, one leaks and one does not. */
+#define g_markSprites     (*(AM2_Sprite ***)(uintptr_t)ADDR_MARK_SPRITES)
+#define g_markSpriteCount (*(int32_t *)(uintptr_t)ADDR_MARK_SPRITE_COUNT)
+#define g_mpMarkGrid      (*(AM2_Sprite ***)(uintptr_t)ADDR_MP_MARK_GRID)
+#define g_mpMarkCols      (*(int32_t *)(uintptr_t)ADDR_MP_MARK_COLS)
+#define g_mpMarkA         (*(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_A)
+#define g_mpMarkB         (*(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_B)
+#define g_mpMarkC         (*(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_C)
+#define g_mpTeamSprites   (*(AM2_Sprite ***)(uintptr_t)ADDR_MP_TEAM_SPRITES)
+
 void __cdecl LoadMarkSprites(void)
 {
-    int32_t n = *(const int32_t *)(uintptr_t)ADDR_MARK_SPRITE_COUNT;
-    AM2_Sprite **slots;
-    int32_t i, row, col, cols;
+    int32_t i, row, col;
 
-    slots = (AM2_Sprite **)am2_malloc((size_t)n * sizeof(AM2_Sprite *));
-    *(void **)(uintptr_t)ADDR_MARK_SPRITES = slots;
-    memset(slots, 0, (size_t)n * sizeof(AM2_Sprite *));
+    g_markSprites = (AM2_Sprite **)am2_malloc((size_t)g_markSpriteCount
+                                              * sizeof(AM2_Sprite *));
+    memset(g_markSprites, 0, (size_t)g_markSpriteCount * sizeof(AM2_Sprite *));
 
-    for (i = 0; i < n; i++) {
-        AM2_Sprite *spr = PreloadSprite(AM2_SPRITEGRP_SET, 0x1F4, i,
-                                        AM2_SPRITE_FLAGS_FLAT, 1);
-        slots[i] = spr;
-        if (spr != 0) {
-            spr->palette = *(void *const *)(uintptr_t)ADDR_REMAP_BRIGHT;
-            spr->hotX = (int16_t)(spr->bounds.right / 2);
-            spr->hotY = 0;
+    for (i = 0; i < g_markSpriteCount; i++) {
+        g_markSprites[i] = PreloadSprite(AM2_SPRITEGRP_SET, 0x1F4, i,
+                                         AM2_SPRITE_FLAGS_FLAT, 1);
+        if (g_markSprites[i] != 0) {
+            g_markSprites[i]->palette =
+                *(void *const *)(uintptr_t)ADDR_REMAP_BRIGHT;
+            g_markSprites[i]->hotX =
+                (int16_t)(g_markSprites[i]->bounds.right / 2);
+            g_markSprites[i]->hotY = 0;
         }
     }
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
         return;
 
-    cols = *(const int32_t *)(uintptr_t)ADDR_MP_MARK_COLS;
-    {
-        AM2_Sprite **grid =
-            (AM2_Sprite **)am2_malloc((size_t)cols * 4 * sizeof(AM2_Sprite *));
+    g_mpMarkGrid = (AM2_Sprite **)am2_malloc((size_t)g_mpMarkCols * 4
+                                             * sizeof(AM2_Sprite *));
+    memset(g_mpMarkGrid, 0, (size_t)g_mpMarkCols * 4 * sizeof(AM2_Sprite *));
+    for (row = 0; row < 4; row++)
+        for (col = 0; col < g_mpMarkCols; col++)
+            g_mpMarkGrid[g_mpMarkCols * row + col] =
+                PreloadSprite(AM2_SPRITEGRP_SET, AM2_MP_MARK_GRID_BASE + row,
+                              col, 1, 1);
 
-        *(void **)(uintptr_t)ADDR_MP_MARK_GRID = grid;
-        memset(grid, 0, (size_t)cols * 4 * sizeof(AM2_Sprite *));
-        for (row = 0; row < 4; row++)
-            for (col = 0; col < cols; col++)
-                grid[cols * row + col] =
-                    PreloadSprite(AM2_SPRITEGRP_SET,
-                                  AM2_MP_MARK_GRID_BASE + row, col, 1, 1);
-    }
+    g_mpMarkA = PreloadSprite(AM2_SPRITEGRP_SET, 0x389, 0, 0, 1);
+    g_mpMarkB = PreloadSprite(AM2_SPRITEGRP_SET, 0x389, 1, 0, 1);
+    g_mpMarkC = PreloadSprite(AM2_SPRITEGRP_SET, 0x38A, 0, 0, 1);
 
-    *(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_A =
-        PreloadSprite(AM2_SPRITEGRP_SET, 0x389, 0, 0, 1);
-    *(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_B =
-        PreloadSprite(AM2_SPRITEGRP_SET, 0x389, 1, 0, 1);
-    *(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_C =
-        PreloadSprite(AM2_SPRITEGRP_SET, 0x38A, 0, 0, 1);
-
-    {
-        AM2_Sprite **team = (AM2_Sprite **)am2_malloc(0x34);
-
-        *(void **)(uintptr_t)ADDR_MP_TEAM_SPRITES = team;
-        for (i = 0; i <= 12; i++)
-            team[i] = PreloadSprite(AM2_MP_TEAM_SPRITE_SET, 0x17, i, 1, 1);
-    }
+    g_mpTeamSprites = (AM2_Sprite **)am2_malloc(0x34);
+    for (i = 0; i <= 12; i++)
+        g_mpTeamSprites[i] = PreloadSprite(AM2_MP_TEAM_SPRITE_SET, 0x17, i,
+                                           1, 1);
 }
 
 void __cdecl FreeMarkSprites(void)
 {
-    AM2_Sprite **slots = *(AM2_Sprite ***)(uintptr_t)ADDR_MARK_SPRITES;
-    AM2_Sprite  *spr;
-    int32_t      i, row, col, cols;
+    int32_t i, row, col;
 
-    if (slots != 0) {
-        int32_t n = *(const int32_t *)(uintptr_t)ADDR_MARK_SPRITE_COUNT;
-
-        for (i = 0; i < n; i++)
-            ReleaseSprite(slots[i]);
-        am2_free(slots);
-        *(void **)(uintptr_t)ADDR_MARK_SPRITES = 0;
+    if (g_markSprites != 0) {
+        for (i = 0; i < g_markSpriteCount; i++)
+            ReleaseSprite(g_markSprites[i]);
+        am2_free(g_markSprites);
+        g_markSprites = 0;
     }
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
         return;
 
-    {
-        AM2_Sprite **grid = *(AM2_Sprite ***)(uintptr_t)ADDR_MP_MARK_GRID;
-
-        if (grid != 0) {
-            cols = *(const int32_t *)(uintptr_t)ADDR_MP_MARK_COLS;
-            for (row = 0; row < 4; row++)
-                for (col = 0; col < cols; col++)
-                    ReleaseSprite(grid[cols * row + col]);
-            am2_free(grid);
-            *(void **)(uintptr_t)ADDR_MP_MARK_GRID = 0;
-        }
+    if (g_mpMarkGrid != 0) {
+        for (row = 0; row < 4; row++)
+            for (col = 0; col < g_mpMarkCols; col++)
+                ReleaseSprite(g_mpMarkGrid[g_mpMarkCols * row + col]);
+        am2_free(g_mpMarkGrid);
+        g_mpMarkGrid = 0;
     }
 
-    spr = *(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_A;
-    if (spr != 0)
-        ReleaseSprite(spr);
-    spr = *(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_B;
-    if (spr != 0)
-        ReleaseSprite(spr);
-    spr = *(AM2_Sprite **)(uintptr_t)ADDR_MP_MARK_C;
-    if (spr != 0)
-        ReleaseSprite(spr);
+    if (g_mpMarkA != 0)
+        ReleaseSprite(g_mpMarkA);
+    if (g_mpMarkB != 0)
+        ReleaseSprite(g_mpMarkB);
+    if (g_mpMarkC != 0)
+        ReleaseSprite(g_mpMarkC);
 
-    {
-        AM2_Sprite **team = *(AM2_Sprite ***)(uintptr_t)ADDR_MP_TEAM_SPRITES;
-
-        if (team != 0) {
-            /* FIVE, not thirteen. The original walks a byte offset with
-             * `cmp esi, 0x10; jle`, so 0, 4, 8, 12 and 16 -- and the loader
-             * filled all thirteen. Eight leak per teardown, and it is the
-             * original's. Note pair 6's releaser has the same 0x10 with `jl`
-             * and is exactly right for its four. */
-            for (i = 0; i <= 4; i++)
-                ReleaseSprite(team[i]);
-            am2_free(team);
-            *(void **)(uintptr_t)ADDR_MP_TEAM_SPRITES = 0;
-        }
+    if (g_mpTeamSprites != 0) {
+        /* FIVE, not thirteen. The original walks a byte offset with
+         * `cmp esi, 0x10; jle`, so 0, 4, 8, 12 and 16 -- and the loader
+         * filled all thirteen. Eight leak per teardown, and it is the
+         * original's. Note pair 6's releaser has the same 0x10 with `jl`
+         * and is exactly right for its four. */
+        for (i = 0; i <= 4; i++)
+            ReleaseSprite(g_mpTeamSprites[i]);
+        am2_free(g_mpTeamSprites);
+        g_mpTeamSprites = 0;
     }
-    /* The three singles are NOT nulled by the original -- only released. */
 }
 
 /* 0x00463330 and 0x00463360. The sprite subsystems up and down, in mirrored
