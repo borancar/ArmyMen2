@@ -648,32 +648,34 @@ void __cdecl CyclePalette(void)
 
 void __cdecl PaletteLoaded(void)
 {
-    static const uintptr_t kSets[3] = {
+    /* The three sets are a table on the stack, walked by pointer. */
+    uintptr_t sets[3] = {
         ADDR_SPRITE_SET_TITLE, ADDR_SPRITE_SET_SHARED, ADDR_SPRITE_SET_THIRD
     };
     int32_t n;
 
     for (n = 0; n < 3; n++) {
-        uint8_t        *set   = (uint8_t *)kSets[n];
-        const uint32_t *pal   = (const uint32_t *)(set + SPRITE_SET_OFF_PALETTE);
-        uint8_t        *remap = set + SPRITE_SET_OFF_REMAP;
-        uint8_t        *ten   = set + SPRITE_SET_OFF_REMAP10;
-        const uint32_t *active = g_activePalette;
-        int32_t         i;
+        uint8_t *set = (uint8_t *)sets[n];
+        int32_t  i;
 
-        if (active) {
-            for (i = 0; i < AM2_PALETTE_ENTRIES; i++)
-                remap[i] = NearestPalIndex(active,
-                                           SwapColourBytes(pal[i]), 0);
+        /* The active palette is re-read at each use. */
+        if (g_activePalette) {
+            for (i = 0; i < AM2_PALETTE_ENTRIES; i++) {
+                uint32_t c = SwapColourBytes(((const uint32_t *)
+                                 (set + SPRITE_SET_OFF_PALETTE))[i]);
+
+                set[SPRITE_SET_OFF_REMAP + i] =
+                    NearestPalIndex(g_activePalette, c, 0);
+            }
         } else {
             for (i = 0; i < AM2_PALETTE_ENTRIES; i++)
-                remap[i] = (uint8_t)i;
+                set[SPRITE_SET_OFF_REMAP + i] = (uint8_t)i;
         }
 
         for (i = 0; i < AM2_PALETTE_RESERVED; i++)
-            ten[i] = (uint8_t)i;
+            set[SPRITE_SET_OFF_REMAP10 + i] = (uint8_t)i;
         for (i = AM2_PALETTE_RESERVED; i < AM2_PALETTE_ENTRIES; i++)
-            ten[i] = remap[i];
+            set[SPRITE_SET_OFF_REMAP10 + i] = set[SPRITE_SET_OFF_REMAP + i];
     }
 }
 

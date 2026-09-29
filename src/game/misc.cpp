@@ -718,39 +718,30 @@ int32_t __cdecl BitmapBitSet(const void *base, int32_t x, int32_t y,
 
 int32_t __cdecl ObjMaskBitAt(const void *obj, const AM2_Point *at)
 {
+    /* The bit for each column within its byte, built on the stack. */
+    uint8_t        bit[8] = { 0x80, 0x40, 0x20, 0x10, 8, 4, 2, 1 };
     const uint8_t *o = (const uint8_t *)obj;
     const uint8_t *m;
-    const uint8_t *bits;
-    int32_t        x, y, w, h, stride;
+    int32_t        x, y, w;
 
-    if (!obj)
-        return 0;
-    m = *(const uint8_t *const *)(o + OBJ_OFF_HIT_MASK);
-    if (!m)
-        return 0;
+    if (o) {
+        m = *(const uint8_t *const *)(o + OBJ_OFF_HIT_MASK);
+        if (m) {
+            x = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X)
+                - ((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT))->left + at->x;
+            y = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y)
+                - ((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT))->top + at->y;
 
-    x = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_X)
-        - ((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT))->left + at->x;
-    y = *(const int16_t *)(m + OBJMASK_OFF_ORIGIN_Y)
-        - ((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT))->top + at->y;
-
-    /* Tested in this order, and each bound is loaded only once its coordinate
-     * has passed the zero test -- reproduced as written. */
-    if (x < 0)
-        return 0;
-    w = *(const int16_t *)(m + OBJMASK_OFF_WIDTH);
-    if (x >= w)
-        return 0;
-    if (y < 0)
-        return 0;
-    h = *(const int16_t *)(m + OBJMASK_OFF_HEIGHT);
-    if (y >= h)
-        return 0;
-
-    stride = ((w + 31) >> 3) & ~3;
-    bits   = *(const uint8_t *const *)(m + OBJMASK_OFF_BITS);
-
-    return bits[stride * y + (x >> 3)] & (0x80 >> (x & 7));
+            /* Each bound is loaded only once its coordinate has passed the
+             * zero test. */
+            if (x >= 0 && x < (w = *(const int16_t *)(m + OBJMASK_OFF_WIDTH))
+                && y >= 0 && y < *(const int16_t *)(m + OBJMASK_OFF_HEIGHT))
+                return (*(const uint8_t *const *)(m + OBJMASK_OFF_BITS))
+                           [(((w + 31) >> 3) & ~3) * y + (x >> 3)]
+                       & bit[x & 7];
+        }
+    }
+    return 0;
 }
 
 
@@ -813,32 +804,31 @@ void __cdecl ListUnlink(void *node, void **head)
 #undef NEXT
 }
 
-/* The remap loop walks dst with the register it was handed, so at `ret` eax is
- * dst + count on the table path and plain dst on the other two. Both callers
- * discard it and recompute `dst += count` themselves, so the prototype is
- * void. */
-void __cdecl RemapBytes(void *dst, const void *src, const void *table,
-                        int32_t count)
+/* The remap loop walks dst itself, so the answer is dst + count on the table
+ * path and plain dst on the other two. Both callers discard it and recompute
+ * `dst += count` themselves.
+ *
+ * The copy is VC6's intrinsic memcpy -- `rep movsd` then `rep movsb`, which
+ * copies FORWARD. dst and src are only known to be different, not disjoint,
+ * and memcpy is undefined on overlap elsewhere, so GCC gets the same forward
+ * copy spelled as a dword loop and a byte loop. */
+uint8_t *__cdecl RemapBytes(uint8_t *dst, const uint8_t *src,
+                            const uint8_t *table, int32_t count)
 {
-    uint8_t       *d = (uint8_t *)dst;
-    const uint8_t *s = (const uint8_t *)src;
-    const uint8_t *m = (const uint8_t *)table;
-
-    if (m) {
-        if (count <= 0)
-            return;
-        do {
-            *d++ = m[*s++];
-        } while (--count);
-        return;
-    }
-
-    if (d == s)
-        return;
-
-    {
-        uint32_t words = (uint32_t)count >> 2;
-        uint32_t bytes = (uint32_t)count & 3;
+    if (table) {
+        if (count > 0) {
+            do {
+                *dst++ = table[*src++];
+            } while (--count);
+        }
+    } else if (dst != src) {
+#ifdef _MSC_VER
+        memcpy(dst, src, count);
+#else
+        uint8_t       *d     = dst;
+        const uint8_t *s     = src;
+        uint32_t       words = (uint32_t)count >> 2;
+        uint32_t       bytes = (uint32_t)count & 3;
 
         while (words--) {
             *(uint32_t *)d = *(const uint32_t *)s;
@@ -847,7 +837,9 @@ void __cdecl RemapBytes(void *dst, const void *src, const void *table,
         }
         while (bytes--)
             *d++ = *s++;
+#endif
     }
+    return dst;
 }
 
 int32_t __cdecl SetFieldInAll(void *record, void *value)

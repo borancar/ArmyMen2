@@ -1844,28 +1844,30 @@ void __cdecl SeqCtxFree(void *ctxv)
     uint8_t *ctx = (uint8_t *)ctxv;
     int32_t  i;
 
-    if (*(void **)(ctx + SEQ_CTX_OFF_RECORDS) == 0)
-        return;
-
-    for (i = 0; i < *(const int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY); i++) {
-        uint8_t *rec = SeqRecord(ctx, i);
-        void    *row = *(void **)(rec + SEQ_OFF_ROW);
-
-        if (row != 0) {
-            RowRelease(row, (void *)(uintptr_t)ADDR_MAP_DESC);
-            am2_free(row);
-            *(void **)(rec + SEQ_OFF_ROW) = 0;
+    /* The record is re-indexed and its row re-read at every use. */
+#define REC(n) ((uint32_t)(n) * AM2_SEQ_RECORD_SIZE \
+                + *(uint8_t **)(ctx + SEQ_CTX_OFF_RECORDS))
+#define ROW(n) (*(void **)(REC(n) + SEQ_OFF_ROW))
+    if (*(void **)(ctx + SEQ_CTX_OFF_RECORDS) != 0) {
+        for (i = 0; i < *(const int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY); i++) {
+            if (ROW(i) != 0) {
+                RowRelease(ROW(i), (void *)(uintptr_t)ADDR_MAP_DESC);
+                am2_free(ROW(i));
+                ROW(i) = 0;
+            }
+            *(int16_t *)(REC(i) + SEQ_OFF_NEXT) = -1;
+            *(int16_t *)(REC(i) + SEQ_OFF_PREV) = -1;
         }
-        *(int16_t *)(rec + SEQ_OFF_NEXT) = -1;
-        *(int16_t *)(rec + SEQ_OFF_PREV) = -1;
-    }
 
-    am2_free(*(void **)(ctx + SEQ_CTX_OFF_RECORDS));
-    *(void **)(ctx + SEQ_CTX_OFF_RECORDS)  = 0;
-    *(int32_t *)(ctx + SEQ_CTX_OFF_TAIL)     = 0;
-    *(int32_t *)(ctx + SEQ_CTX_OFF_COUNT)    = 0;
-    *(int32_t *)(ctx + SEQ_CTX_OFF_MARGIN)   = 0;
-    *(int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY) = 0;
+        am2_free(*(void **)(ctx + SEQ_CTX_OFF_RECORDS));
+        *(void **)(ctx + SEQ_CTX_OFF_RECORDS)  = 0;
+        *(int32_t *)(ctx + SEQ_CTX_OFF_TAIL)     = 0;
+        *(int32_t *)(ctx + SEQ_CTX_OFF_COUNT)    = 0;
+        *(int32_t *)(ctx + SEQ_CTX_OFF_MARGIN)   = 0;
+        *(int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY) = 0;
+    }
+#undef REC
+#undef ROW
 }
 
 /* 0x00460EC0. THE CONTEXT IS THE FIRST ARGUMENT and the record the second --

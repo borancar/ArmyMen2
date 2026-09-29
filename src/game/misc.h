@@ -553,17 +553,18 @@ void __cdecl ListUnlink(void *node, void **head);
  *                   sites mask it to a byte first (`and edi, 0xFF`), which is
  *                   why that has never mattered.
  *
- * Reproduced as a dword loop then a byte loop rather than as memcpy, because
- * `rep movs` copies FORWARD and memcpy is undefined on overlap; dst and src
- * are only known to be different, not disjoint. */
+ * VC6 compiles it as its intrinsic memcpy -- that `rep movs`, which copies
+ * FORWARD. memcpy is undefined on overlap elsewhere and dst and src are only
+ * known to be different, not disjoint, so GCC gets a dword loop then a byte
+ * loop. */
 /* 0x0042E310. Read a sprite's {set, index, frame} back out of a filename in
  * the "%02d_%03d_%02d_*.bmp" convention. All three outputs are cleared before
  * either test. */
 int32_t __cdecl ParseSpriteName(const char *name, int32_t *set,
                                 int32_t *index, int32_t *frame);
 
-void __cdecl RemapBytes(void *dst, const void *src, const void *table,
-                        int32_t count);
+uint8_t *__cdecl RemapBytes(uint8_t *dst, const uint8_t *src,
+                            const uint8_t *table, int32_t count);
 
 /* 0x00434E90. Writes `value` into the dword at +0x2C of every element of an
  * array the record describes -- base at +8, count at +4, elements 0x60 apart.
