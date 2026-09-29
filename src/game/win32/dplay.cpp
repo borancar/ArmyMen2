@@ -185,7 +185,10 @@ void __cdecl CommShutdown(void)
 #define g_commEnumCount (*(int32_t *)(uintptr_t)ADDR_COMM_ENUM_COUNT)
 #define g_hwnd          (*(HWND *)(uintptr_t)ADDR_HWND)
 
-int32_t __cdecl CommClose(void)
+/* A comm member that ignores `this`: its callers load ecx with the comm
+ * object and the body reads the global instead (0x0040DCF0), as AllyFlag
+ * does. */
+int32_t __attribute__((thiscall)) AM2_Comm::CommClose()
 {
     LPDIRECTPLAY4A dp = *DirectPlaySlot(g_commObject);
 
@@ -3885,7 +3888,7 @@ int dplay_install(void)
                         "CreateDirectPlayLobby", 1);
     rc |= patch_replace(ADDR_COMM_SHUTDOWN, (const void *)CommShutdown,
                         "CommShutdown", 0);
-    rc |= patch_replace(ADDR_COMM_CLOSE, (const void *)CommClose, "CommClose", 0);
+    rc |= patch_replace(ADDR_COMM_CLOSE, pmf_addr(&AM2_Comm::CommClose), "CommClose", 0);
     rc |= patch_replace(ADDR_COMM_INIT_CONN, pmf_addr(&AM2_Comm::CommInitializeConnection),
                         "CommInitializeConnection", 1);
     rc |= patch_replace(ADDR_COMM_SET_SESSION, pmf_addr(&AM2_Comm::CommSetSessionDesc),

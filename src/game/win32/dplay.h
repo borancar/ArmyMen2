@@ -52,7 +52,7 @@ void __cdecl CommShutdown(void);
  *
  * Answers 1 when there was no session to close, which is the same answer as
  * closing one successfully -- the caller only wants to know it can carry on. */
-int32_t __cdecl CommClose(void);
+/* (now AM2_Comm::CommClose, msgslot.h) */
 
 /* Original: 0x0040DD90. Point the DirectPlay object at a connection.
  *

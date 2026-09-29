@@ -149,6 +149,33 @@ def mask(b, relocs, n):
                 b[off + k] = 0
     return b
 
+# ---- the reference image ---------------------------------------------------
+
+# GOG's own binary patches this project undoes for good, byte by byte: the
+# reconstruction reproduces the RETAIL code, so that is what it is compared
+# with. Only the MULTI-PLAYER one (Boran, 2026-09-28; src/inject/restore.c,
+# docs/binarypatches.md): 0x0044D8FE is `je` in retail, `jmp` in GOG's build,
+# which skips building the title screen's MULTI-PLAYER button. The copy
+# protection patches stay as shipped.
+RETAIL = {0x0044D8FE: 0x74}
+
+
+class RetailImage:
+    """am2.Image with RETAIL laid over it."""
+    def __init__(self):
+        self._img = am2.Image()
+
+    def __getattr__(self, name):
+        return getattr(self._img, name)
+
+    def read(self, va, n):
+        b = bytearray(self._img.read(va, n))
+        for at, v in RETAIL.items():
+            if va <= at < va + n:
+                b[at - va] = v
+        return bytes(b)
+
+
 # ---- manifest -----------------------------------------------------------
 
 def manifest():
@@ -220,7 +247,7 @@ def main():
     for f, fn, va in man:
         byfile[f].append((fn, va))
 
-    img = am2.Image()
+    img = RetailImage()
     res = collections.Counter()
     per = {}
     diffs = []

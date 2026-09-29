@@ -11636,48 +11636,66 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
 
 void __cdecl OpenTitleScreen(void)
 {
-    AM2_Widget *screen;
-    uint32_t    i;
+    AM2_Widget *btn;
 
     CloseCurrentScreen();
     SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
-    CommClose();
+    ((AM2_Comm *)g_commObject)->CommClose();
     CommDropDirectPlay(g_commObject);
     g_mpSession = 0;
     *(char *)(uintptr_t)ADDR_GAMEPROC_BLOCK = '\0';
     *(char *)(uintptr_t)ADDR_GAMEPROC_STR_B = '\0';
 
-    screen = (AM2_Widget *)orig_operator_new(AM2_TITLE_SCREEN_SIZE);
-    if (screen)
-        screen = ScreenBaseConstruct(screen, "01_000_00_screen.bmp", 1);
-    g_paintObject = (uint8_t *)screen;
-    screen->flag44 = 1;
+    /* No local: the screen is reached through g_paintObject throughout,
+     * as the original re-reads it. */
+    g_paintObject = (uint8_t *)new AM2_ScreenBase("01_000_00_screen.bmp", 1);
+    ((AM2_Widget *)g_paintObject)->flag44 = 1;
 
-    for (i = 0; i < sizeof kTitleButtons / sizeof kTitleButtons[0]; i++) {
-        const AM2_TitleButton *b = &kTitleButtons[i];
-        AM2_Widget            *btn;
-
-        btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
-        if (btn) {
-            AM2_Rect box;
-
-            RectSet(&box, AM2_TITLE_BUTTON_LEFT, b->top,
-                    AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT);
-            btn = ButtonConstruct(btn, (const char *)((void *)(uintptr_t)(b->bmp[0])),
-                                  (const char *)((void *)(uintptr_t)(b->bmp[1])),
-                                  (const char *)((void *)(uintptr_t)(b->bmp[2])), 0, box,
-                                  b->handler,
-                                  (void (__cdecl *)(AM2_Widget *))0);
-        }
-        WidgetAddChild(screen, btn);
-        /* Only the FIRST button, and only here: the original reloads the
-         * screen from its global and writes 0x34 once, after BOOT CAMP goes
-         * in. So the title screen opens with BOOT CAMP focused and every
-         * other row unfocused -- which is the one line the seven blocks do
-         * not share, and exactly the kind of line a loop swallows. */
-        if (i == 0)
-            screen->focusedChild = btn;
-    }
+    /* Seven buttons, written out as the original's seven blocks; the first
+     * takes the focus. */
+    btn = new AM2_Button((const char *)(uintptr_t)AM2_BMP_03_102_00, (const char *)(uintptr_t)AM2_BMP_03_102_01,
+                         (const char *)(uintptr_t)AM2_BMP_03_102_02, 0,
+                         *RectSet(AM2_TEMP(AM2_Rect), AM2_TITLE_BUTTON_LEFT, 0x0082,
+                                  AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT),
+                         kOnBootCamp, (void (__cdecl *)(AM2_Widget *))0);
+    ::WidgetAddChild((AM2_Widget *)g_paintObject, btn);
+    ((AM2_Widget *)g_paintObject)->focusedChild = btn;
+    btn = new AM2_Button((const char *)(uintptr_t)AM2_BMP_03_100_00, (const char *)(uintptr_t)AM2_BMP_03_100_01,
+                         (const char *)(uintptr_t)AM2_BMP_03_100_02, 0,
+                         *RectSet(AM2_TEMP(AM2_Rect), AM2_TITLE_BUTTON_LEFT, 0x00AA,
+                                  AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT),
+                         kOnSinglePlayer, (void (__cdecl *)(AM2_Widget *))0);
+    ::WidgetAddChild((AM2_Widget *)g_paintObject, btn);
+    btn = new AM2_Button((const char *)(uintptr_t)AM2_BMP_03_101_00, (const char *)(uintptr_t)AM2_BMP_03_101_01,
+                         (const char *)(uintptr_t)AM2_BMP_03_101_02, 0,
+                         *RectSet(AM2_TEMP(AM2_Rect), AM2_TITLE_BUTTON_LEFT, 0x00D2,
+                                  AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT),
+                         kOnMultiPlayer, (void (__cdecl *)(AM2_Widget *))0);
+    ::WidgetAddChild((AM2_Widget *)g_paintObject, btn);
+    btn = new AM2_Button((const char *)(uintptr_t)AM2_BMP_03_103_00, (const char *)(uintptr_t)AM2_BMP_03_103_01,
+                         (const char *)(uintptr_t)AM2_BMP_03_103_02, 0,
+                         *RectSet(AM2_TEMP(AM2_Rect), AM2_TITLE_BUTTON_LEFT, 0x00FA,
+                                  AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT),
+                         kOnOptionsMenu, (void (__cdecl *)(AM2_Widget *))0);
+    ::WidgetAddChild((AM2_Widget *)g_paintObject, btn);
+    btn = new AM2_Button((const char *)(uintptr_t)AM2_BMP_03_104_00, (const char *)(uintptr_t)AM2_BMP_03_104_01,
+                         (const char *)(uintptr_t)AM2_BMP_03_104_02, 0,
+                         *RectSet(AM2_TEMP(AM2_Rect), AM2_TITLE_BUTTON_LEFT, 0x0122,
+                                  AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT),
+                         kOnMovies, (void (__cdecl *)(AM2_Widget *))0);
+    ::WidgetAddChild((AM2_Widget *)g_paintObject, btn);
+    btn = new AM2_Button((const char *)(uintptr_t)AM2_BMP_03_105_00, (const char *)(uintptr_t)AM2_BMP_03_105_01,
+                         (const char *)(uintptr_t)AM2_BMP_03_105_02, 0,
+                         *RectSet(AM2_TEMP(AM2_Rect), AM2_TITLE_BUTTON_LEFT, 0x014A,
+                                  AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT),
+                         kOnCredits, (void (__cdecl *)(AM2_Widget *))0);
+    ::WidgetAddChild((AM2_Widget *)g_paintObject, btn);
+    btn = new AM2_Button((const char *)(uintptr_t)AM2_BMP_03_106_00, (const char *)(uintptr_t)AM2_BMP_03_106_01,
+                         (const char *)(uintptr_t)AM2_BMP_03_106_02, 0,
+                         *RectSet(AM2_TEMP(AM2_Rect), AM2_TITLE_BUTTON_LEFT, 0x0172,
+                                  AM2_TITLE_BUTTON_WIDTH, AM2_TITLE_BUTTON_HEIGHT),
+                         kOnQuit, (void (__cdecl *)(AM2_Widget *))0);
+    ::WidgetAddChild((AM2_Widget *)g_paintObject, btn);
 }
 
 /* 0x0044DB90, one caller. The image has those same three instructions as a
@@ -14444,20 +14462,19 @@ void __attribute__((thiscall)) AM2_Widget::WidgetScreenRect()
     AM2_Widget *w = this;
 
     const AM2_Widget *parent = w->parent;
-    int32_t           left;
-    int32_t           top;
 
+    /* Each arm stores all four edges itself, as the original's two exits do. */
     if (parent) {
-        left = parent->rect.left + w->x;
-        top  = parent->rect.top  + w->y;
+        w->rect.left   = parent->rect.left + w->x;
+        w->rect.right  = w->rect.left + w->w;
+        w->rect.top    = parent->rect.top + w->y;
+        w->rect.bottom = w->rect.top + w->h;
     } else {
-        left = w->x;
-        top  = w->y;
+        w->rect.left   = w->x;
+        w->rect.right  = w->rect.left + w->w;
+        w->rect.top    = w->y;
+        w->rect.bottom = w->rect.top + w->h;
     }
-    w->rect.left   = left;
-    w->rect.right  = left + w->w;
-    w->rect.top    = top;
-    w->rect.bottom = top  + w->h;
 }
 
 void __attribute__((thiscall)) AM2_Widget::WidgetPaint(RECT clip)

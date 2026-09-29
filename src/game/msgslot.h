@@ -503,6 +503,8 @@ struct AM2_Comm {
     int32_t __attribute__((thiscall)) CommAllPlayersReady();
     /* defined in army.cpp */
     int32_t __attribute__((thiscall)) AllyFlag(int32_t a, int32_t b);
+    /* defined in win32/dplay.cpp; reads the comm global, not `this` */
+    int32_t __attribute__((thiscall)) CommClose();
     int32_t __attribute__((thiscall)) ArmyInPlay(uint32_t uid);
     void * __attribute__((thiscall)) CommConstruct();
     int32_t __attribute__((thiscall)) CommCreateDirectPlay(void *connection);

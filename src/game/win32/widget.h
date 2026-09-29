@@ -2291,7 +2291,7 @@ static inline AM2_Widget * __attribute__((thiscall)) TyperConstruct(AM2_Widget *
  * that builds its screen inline rather than calling a constructor. It also
  * holds the binary patch that removes MULTI-PLAYER, which a reconstruction
  * cannot honour; see widget.cpp. */
-void __cdecl OpenTitleScreen(void);
+AM2_CXX void __cdecl OpenTitleScreen(void);
 
 /* The OPTIONS menu's four buttons and CONFIRM GAME EXIT's OK: 0x0044E670,
  * 0x0044FD40, 0x0044FD70, 0x0044FDA0 and 0x0044EE30. */

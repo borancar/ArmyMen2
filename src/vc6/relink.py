@@ -232,7 +232,7 @@ def main():
     byfile = collections.defaultdict(list)
     for f, fn, va in man:
         byfile[f].append((fn, va))
-    img = am2.Image()
+    img = BM.RetailImage()
 
     # ---- pass 1: compile every TU, record each reconstructed function's
     # COFF symbol name and its real VA, to build the global symbol->VA table.
