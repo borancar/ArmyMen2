@@ -581,55 +581,47 @@ int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
  */
 int32_t __cdecl IsPlacedUnit(void *obj, int32_t army)
 {
+    /* Nested positively onto one `return found`, the kinds laid out 3, 2, 1,
+     * and the type table walked by index (a signed `jl`). */
+#define TYPE(i, off) (((const int32_t (*)[AM2_UNIT_TYPE_STRIDE / 4]) \
+                       (uintptr_t)ADDR_UNIT_TYPES)[i][(off) / 4])
     uint8_t *o = (uint8_t *)obj;
     int32_t  found = 0;
     int32_t  slot;
-    const uint8_t *rec;
+    int32_t  i;
 
-    if (!ObjIsTypeIn238((const AM2_Object *)obj)
-        && !ObjIsItem((const AM2_Object *)obj))
-        return 0;
+    if (ObjIsTypeIn238((const AM2_Object *)obj)
+        || ObjIsItem((const AM2_Object *)obj)) {
+        if (*(const int8_t *)(o + OBJ_OFF_ARMY) == army) {
+            switch (*(const int32_t *)o) {
+            case 3:
+                return 1;
 
-    if (*(const int8_t *)(o + OBJ_OFF_ARMY) != army)
-        return 0;
+            case 2:
+                if (!*(const int32_t *)(o + OBJ_OFF_SARGE)
+                    && !*(const int32_t *)(o + OBJ_OFF_FIELD_94))
+                    return 1;
+                break;
 
-    switch (*(const int32_t *)o) {
-    case 2:
-        if (*(const int32_t *)(o + OBJ_OFF_SARGE))
-            return 0;
-        if (*(const int32_t *)(o + OBJ_OFF_FIELD_94))
-            return 0;
-        return 1;
+            case 1:
+                slot = AM2_THE_COMM->CommArmyOfSlot(army);
 
-    case 3:
-        return 1;
-
-    case 1:
-        break;
-
-    default:
-        return 0;
+                for (i = 0; i < AM2_UNIT_TYPE_COUNT; i++) {
+                    if (!TYPE(i, UNIT_TYPE_OFF_TROOPER)
+                        && !TYPE(i, UNIT_TYPE_OFF_VEHICLE)
+                        && UnitKindMatches(
+                               *(const int32_t *)(*(const uint8_t *const *)
+                                                      (o + OBJ_OFF_FIELD_94)
+                                                  + TYPEREC_OFF_FIELD_08),
+                               TYPE(i, UNIT_TYPE_OFF_KIND), slot))
+                        found = 1;
+                }
+                return found;
+            }
+        }
     }
-
-    slot = AM2_THE_COMM->CommArmyOfSlot(army);
-
-    for (rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_UNIT_TYPES));
-         rec < (const uint8_t *)((void *)(uintptr_t)(ADDR_UNIT_TYPES))
-               + AM2_UNIT_TYPE_COUNT * AM2_UNIT_TYPE_STRIDE;
-         rec += AM2_UNIT_TYPE_STRIDE) {
-        if (*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER)
-            || *(const int32_t *)(rec + UNIT_TYPE_OFF_VEHICLE))
-            continue;
-
-        if (UnitKindMatches(
-                *(const int32_t *)(*(const uint8_t *const *)
-                                       (o + OBJ_OFF_FIELD_94)
-                                   + TYPEREC_OFF_FIELD_08),
-                *(const int32_t *)(rec + UNIT_TYPE_OFF_KIND), slot))
-            found = 1;
-    }
-
     return found;
+#undef TYPE
 }
 
 /* MakePlacedUnit -- original 0x0043ACF0, two callers: the manual placement

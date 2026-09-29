@@ -12966,20 +12966,20 @@ int32_t __cdecl KeyNameIndexOf(uint8_t scancode)
 
 int32_t __cdecl FindPressedKey(void)
 {
-    const AM2_KeyName *e   = (const AM2_KeyName *)((void *)(uintptr_t)(ADDR_KEY_NAME_TABLE));
-    const AM2_KeyName *end = (const AM2_KeyName *)((void *)(uintptr_t)(ADDR_KEY_NAME_TABLE_END));
-    int32_t            idx = 0;
+    /* Walked by index (a signed `jl`), the scancode's low byte read from the
+     * record again for each query. */
+#define KEY(i) (((const AM2_KeyName *)(uintptr_t)ADDR_KEY_NAME_TABLE)[i])
+    int32_t i;
 
-    for (; e < end; e++, idx++) {
-        /* Changed AND now down: the pressing edge. Only the low byte of the
-         * record is the scancode as far as the queries are concerned -- they
-         * mask to 8 bits themselves -- and the original loads it as a byte. */
-        int32_t dik = (int32_t)(uint8_t)e->dik;
-
-        if (KeyChanged(dik) && IsKeyDown(dik))
-            return idx;
+    /* 95 records: ADDR_KEY_NAME_TABLE_END - ADDR_KEY_NAME_TABLE is 0x2F8,
+     * spelled as a number because the relink places the two as symbols. */
+    for (i = 0; i < 95; i++) {
+        /* Changed AND now down: the pressing edge. */
+        if (KeyChanged((uint8_t)KEY(i).dik) && IsKeyDown((uint8_t)KEY(i).dik))
+            return i;
     }
     return -1;
+#undef KEY
 }
 
 /* 0x00450C50, thiscall, `ret 0x2C`. The key-capture ROW -- the class the

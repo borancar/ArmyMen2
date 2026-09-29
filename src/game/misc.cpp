@@ -1542,13 +1542,13 @@ void __cdecl TakeNumberKey(void)
 #define g_curKeys  (*(uint8_t **)(uintptr_t)ADDR_KEYS_NOW_PTR)
 #define g_prevKeys (*(uint8_t **)(uintptr_t)ADDR_KEYS_PREV_PTR)
 
-int32_t __cdecl IsKeyDown(int32_t dik)
+int32_t __cdecl IsKeyDown(uint8_t dik)
 {
     /* 0x80, not 1: the original masks and returns, and never normalises. */
     return g_curKeys[(uint32_t)dik & 0xFFu] & 0x80;
 }
 
-int32_t __cdecl KeyChanged(int32_t dik)
+int32_t __cdecl KeyChanged(uint8_t dik)
 {
     /* Bit 7 of the xor. As signed bytes, shifted unsigned: the image loads
      * them without extending and masks with 1, which only a char operand

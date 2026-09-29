@@ -903,8 +903,8 @@ static inline void __attribute__((thiscall)) ClearPtrList(void *rec)
  * ADDR_NUMBER_KEY_SLOT, lowest key first, on a fresh press. */
 void __cdecl TakeNumberKey(void);
 
-int32_t __cdecl IsKeyDown(int32_t dik);
-int32_t __cdecl KeyChanged(int32_t dik);
+int32_t __cdecl IsKeyDown(uint8_t dik);
+int32_t __cdecl KeyChanged(uint8_t dik);
 
 /* 0x00427430 and 0x004274D0, the other two of the keyboard four.
  *
