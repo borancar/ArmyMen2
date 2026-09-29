@@ -248,20 +248,14 @@ void __cdecl StartMultiplayerGame(void)
 #define g_paintObject (*(uint8_t **)(uintptr_t)ADDR_PAINT_OBJECT)
 #define g_ddraw       (*(LPDIRECTDRAW *)(uintptr_t)ADDR_DIRECTDRAW)
 
-/* strcpy, which is what the original inlines as scasb-then-movsd. */
-static inline void CopyName(char *dst, const char *src)
-{
-    while ((*dst++ = *src++) != 0)
-        ;
-}
 
 void __cdecl HostBattle(void)
 {
     uint8_t    *dlg    = g_paintObject;
     const char *battle = (const char *)(dlg + DLG_OFF_BATTLE_NAME);
-    const char *player = (const char *)(dlg + DLG_OFF_PLAYER_NAME);
+#define player ((const char *)(dlg + DLG_OFF_PLAYER_NAME))
 
-    if (!*battle || !*player) {
+    if (strlen(battle) < 1 || strlen(player) < 1) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
@@ -273,21 +267,22 @@ void __cdecl HostBattle(void)
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
-    if (!CommCreatePlayer(g_commObject, player, NULL, NULL, 0)) {
+    if (!((AM2_Comm *)g_commObject)->CommCreatePlayer(player, 0, 0, 0)) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
 
     /* The host is always slot 0. */
-    CopyName((char *)(g_commObject + COMM_OFF_PLAYERS + COMM_SLOT_OFF_NAME),
-             player);
+    strcpy((char *)(g_commObject + COMM_OFF_PLAYERS + COMM_SLOT_OFF_NAME),
+           player);
 
     PlaySoundAt(2, 0, 0, 0, 0);
     g_menuRequest    = REQUEST_HOSTED;
     g_menuRequestSet = 1;
 
-    CopyName((char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME, player);
-    CopyName((char *)(uintptr_t)ADDR_SAVED_BATTLE_NAME, battle);
+    strcpy((char *)(uintptr_t)ADDR_SAVED_PLAYER_NAME, player);
+    strcpy((char *)(uintptr_t)ADDR_SAVED_BATTLE_NAME, battle);
+#undef player
 }
 
 /* ------------------------------------------------------------------ *
@@ -441,29 +436,25 @@ typedef int32_t (__cdecl *am2_mkdir_fn)(const char *);
  */
 void __cdecl OnEnterNameOk(void)
 {
-    uint8_t    *dlg = g_paintObject;
+    uint8_t    *dlg;
     const char *name;
     char        path[0x100];
-    uint8_t     find[0x120];
+    uint8_t     find[0x118];            /* a _finddata_t */
     void       *level;
     int32_t     handle;
-    int32_t     n;
 
-    if (!dlg)
+    if ((dlg = g_paintObject) == (uint8_t *)0)
         return;
 
     name = (const char *)(dlg + DLG_OFF_BATTLE_NAME);
-    for (n = 0; name[n]; n++)
-        ;
-
-    level = (n < 1) ? (void *)0 : FindLevelRecord(BOOTCAMP_LEVEL_ID);
-    if (!level) {
+    level = strlen(name) < 1 ? (void *)0 : FindLevelRecord(BOOTCAMP_LEVEL_ID);
+    if (level == (void *)0) {
         PlaySoundAt(3, 0, 0, 0, 0);
         return;
     }
 
     SetGameDir("save");
-    CopyName(path, name);
+    strcpy(path, name);
 
     handle = orig_findfirst(path, find);
     if (handle != -1) {
@@ -476,7 +467,7 @@ void __cdecl OnEnterNameOk(void)
     /* widget.cpp already names this address g_currentPlayer, which is what
      * it holds: a second `g_` name here would be an alias, and the ratchet
      * caught it. Written inline instead. */
-    CopyName((char *)(uintptr_t)ADDR_GAMEPROC_BLOCK, name);
+    strcpy((char *)(uintptr_t)ADDR_GAMEPROC_BLOCK, name);
     PlaySoundAt(2, 0, 0, 0, 0);
     SelectLevel(level);
     g_levelId    = 1;

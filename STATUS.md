@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1279 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1282 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1279:
+  the near-miss sweep, 758 before the row pools. From 758 to 1282:
   - **GOG's copy-protection patch is applied LAST now** (Boran, 2026-09-29):
     the relink compares against the retail bytes (`RETAIL` in
     `src/vc6/bytematch.py` puts the five `75`s back), VC6 compiles the
@@ -88,6 +88,11 @@ main result so far (details in `src/vc6/README.md`):
     extra row. The reconstruction had indexed the rows; it now reproduces
     the image. `where` is an AM2_Point by value. Lockstep unchanged (Boot
     Camp's one PlaceObj is on a one-row object).
+  - **Two menu behaviours the byte-match corrected** (2026-09-29):
+    RefreshMapSelection plays its error sound only when there is a preview
+    widget (it was unconditional), and HudChatSend treats a line as a cheat
+    when `strlen > 1`, not `> 2` -- so `!x` now reaches CheatLine as in the
+    image.
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own

@@ -7510,16 +7510,17 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
 
     cb = *(uint8_t **)(b + HUD_A_OFF_CHECKBOX);
     if (cb && *(const uint8_t *)(cb + CHECKBOX_OFF_CHECKED)) {
-        const uint8_t *comm = *(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT;
-        int32_t        i;
+        int32_t i;
+        int32_t id;
 
+        /* The comm object is re-read for every slot. */
         for (i = 0; i < AM2_COMM_SLOTS; i++) {
-            int32_t id = *(const int32_t *)(comm + COMM_OFF_PLAYERS
-                             + (size_t)i * AM2_COMM_SLOT_STRIDE
-                             + COMM_SLOT_OFF_ID);
-
             if ((uint32_t)i == g_defaultOwner)
                 continue;
+            id = *(const int32_t *)(*(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
+                                    + COMM_OFF_PLAYERS
+                                    + (size_t)i * AM2_COMM_SLOT_STRIDE
+                                    + COMM_SLOT_OFF_ID);
             if (id == 0 || id == -1)
                 continue;
             if (!AllyFlag((int32_t)g_defaultOwner,
@@ -7533,7 +7534,7 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
     }
 
     /* A line beginning `!` is a cheat -- outside a session only. */
-    if (line[0] == '!' && strlen(line) - 1 > 1) {
+    if (line[0] == '!' && strlen(line) > 1) {
         strcpy(cheat, line + 1);
         if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
             CheatLine(cheat);
@@ -9376,8 +9377,11 @@ void __cdecl FillListFromRules(const char *path, void *panel)
  * The two halves are then the same shape with opposite answers. If <map>.amm
  * is there: point the thumbnail at <map>_prev.bmp, repaint it, take the three
  * checksums, and mark OUR army as having the map. If it is not: clear the
- * thumbnail, play sound 3, and mark our army as not having it -- and the map
- * checksum, alone of the three, is zeroed rather than left.
+ * thumbnail and play sound 3 -- both only when there IS a preview, so the
+ * three panel-less callers fail silently (byte-matching found the sound
+ * inside the test; it had been unconditional here) -- and mark our army as
+ * not having it; the map checksum, alone of the three, is zeroed rather
+ * than left.
  *
  * ADDR_LEVEL_INDEX is set to zero on both paths, which is "<map>.txt".
  *
@@ -9389,6 +9393,7 @@ void __cdecl RefreshMapSelection(void)
 {
     AM2_Widget *preview = (AM2_Widget *)0;
     char        path[0x100];
+    char        prev[0x100];
 
     if (g_paintObject != (uint8_t *)0
         && g_gameState == AM2_STATE_MENU
@@ -9399,35 +9404,37 @@ void __cdecl RefreshMapSelection(void)
     orig_sprintf(path, "%s.amm",
                  (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)));
 
-    if (!FileExists(path)) {
-        if (preview)
+    if (FileExists(path)) {
+        SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
+
+        if (preview) {
+            orig_sprintf(prev, "%s_prev.bmp",
+                         (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)));
+            MpPreviewSetBitmap(preview, prev);
+            WidgetVPaint(preview, preview->rect);
+        }
+
+        g_rulesChecksum    = RulesChecksum();
+        g_mpScriptChecksum = MpScriptChecksum();
+        g_mapChecksum      = MapChecksum();
+
+        *(int32_t *)((uint8_t *)g_commObject
+                     + (uint32_t)g_defaultOwner * AM2_PLAYER_STRIDE
+                     + COMM_ARMY_OFF_MAP_OK) = 1;
+        g_levelIndex = 0;
+    } else {
+        /* The error sound is inside the preview test: with no preview
+         * widget the failure is silent. */
+        if (preview) {
             ShowBadMapPreview(preview);
-        PlaySoundAt(3, 0, 0, 0, 0);
+            PlaySoundAt(3, 0, 0, 0, 0);
+        }
         g_mapChecksum = 0;
         *(int32_t *)((uint8_t *)g_commObject
                      + (uint32_t)g_defaultOwner * AM2_PLAYER_STRIDE
                      + COMM_ARMY_OFF_MAP_OK) = 0;
         g_levelIndex = 0;
-        return;
     }
-
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
-
-    if (preview) {
-        orig_sprintf(path, "%s_prev.bmp",
-                     (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)));
-        MpPreviewSetBitmap(preview, path);
-        WidgetVPaint(preview, preview->rect);
-    }
-
-    g_rulesChecksum    = RulesChecksum();
-    g_mpScriptChecksum = MpScriptChecksum();
-    g_mapChecksum      = MapChecksum();
-
-    *(int32_t *)((uint8_t *)g_commObject
-                 + (uint32_t)g_defaultOwner * AM2_PLAYER_STRIDE
-                 + COMM_ARMY_OFF_MAP_OK) = 1;
-    g_levelIndex = 0;
 }
 
 /* 0x00430330 -- the thumbnail when the map is not installed. The literal is
