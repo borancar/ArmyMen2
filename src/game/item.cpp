@@ -11536,6 +11536,22 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint)
     }
 }
 
+/* KindInSetB as its callers in the image's own translation unit have it:
+ * the switch expanded in place. */
+static inline int32_t KindInSetBInline(int32_t kind)
+{
+    switch (kind) {
+    case 1:
+    case 7:
+    case 8:
+    case 9:
+    case 10:
+    case 29:
+        return 1;
+    }
+    return 0;
+}
+
 /* 0x004335F0, two callers. Can this unit pick this weapon up, and into which
  * of its AM2_WEAPON_SLOTS slots? The slot goes to `slot`; `already` is set to
  * 1 for the one case that means "this is the weapon you are holding".
@@ -11580,43 +11596,39 @@ int32_t __cdecl CanPickUpWeapon(void *weapon, void *unit, int32_t *slot,
     }
 
     *slot = 0;
-    if (*(const uint32_t *)(u + OBJ_OFF_WEAPON_UID) == 0)
-        return 1;
-
-    for (;;) {
-        uint8_t *other = (uint8_t *)WeaponByUid(
-            *(const uint32_t *)(u + OBJ_OFF_WEAPON_UID
-                                + (uint32_t)*slot * 4u));
+#define INV(n) (*(uint32_t *)(u + OBJ_OFF_WEAPON_UID + (uint32_t)(n) * 4u))
+    while (INV(*slot)) {
+        uint8_t *other = (uint8_t *)WeaponByUid(INV(*slot));
 
         if (other == 0) {
             /* A slot naming a weapon that no longer exists is emptied. */
-            *(uint32_t *)(u + OBJ_OFF_WEAPON_UID
-                          + (uint32_t)*slot * 4u) = 0;
+            INV(*slot) = 0;
             return 1;
         }
 
         if (*(const int32_t *)(other + OBJ_OFF_FIELD_94)
             == *(const int32_t *)(w + OBJ_OFF_FIELD_94)) {
-            /* Both arms of the original's test compute this; see orig.h. */
-            return *(const int32_t *)(other + OBJ_OFF_TARGET_UID) > 0;
+            /* Two arms on the candidate's count, and both answer the same
+             * test of the held weapon's; see orig.h. */
+            if (*(const int32_t *)(w + OBJ_OFF_TARGET_UID) <= -1)
+                return *(const int32_t *)(other + OBJ_OFF_TARGET_UID) > 0;
+            else
+                return *(const int32_t *)(other + OBJ_OFF_TARGET_UID) > 0;
         }
 
-        if (AM2_ITEM_KIND_IS_SPECIAL(**(const int32_t **)
-                                     (other + OBJ_OFF_FIELD_C0))
-            && AM2_ITEM_KIND_IS_SPECIAL(**(const int32_t **)
-                                        (w + OBJ_OFF_FIELD_C0)))
+        /* KindInSetB's switch, expanded here as the image has it. */
+        if (KindInSetBInline(**(const int32_t **)(other + OBJ_OFF_FIELD_C0))
+            && KindInSetBInline(**(const int32_t **)(w + OBJ_OFF_FIELD_C0)))
             return TypesCompatible(**(const int32_t **)
                                    (other + OBJ_OFF_FIELD_C0),
                                    **(const int32_t **)
                                    (w + OBJ_OFF_FIELD_C0)) != 0;
 
-        ++*slot;
-        if (*slot >= AM2_WEAPON_SLOTS)
+        if (++*slot >= AM2_WEAPON_SLOTS)
             return 0;
-        if (*(const uint32_t *)(u + OBJ_OFF_WEAPON_UID
-                                + (uint32_t)*slot * 4u) == 0)
-            return 1;
     }
+    return 1;
+#undef INV
 }
 
 /* CreateExplosion -- original 0x00422860, twenty-three callers and one of them
