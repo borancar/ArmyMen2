@@ -1796,7 +1796,7 @@ static inline AM2_Sprite *AnimSpriteAt(const AM2_Anim *a, uint32_t heading)
     return g_spriteList[a->cells[(int32_t)a->frames * facing].sprite];
 }
 
-AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind, uint32_t heading)
+AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind, uint8_t heading)
 {
     const AM2_AnimTable *t = &g_soldierAnims[kind];
     int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_STAND);
@@ -1806,7 +1806,7 @@ AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind, uint32_t heading)
     return AnimSpriteAt(t->entries[i].anim, heading);
 }
 
-AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind, uint32_t heading)
+AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind, uint8_t heading)
 {
     const AM2_AnimTable *t = &g_vehicleAnims[kind];
     int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_VEHICLE);
@@ -1823,7 +1823,7 @@ AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind, uint32_t heading)
  * And it opens with `lea esi, [eax*8 + 0x65A2A8]; test esi, esi; jne` -- a
  * null test on the address of a global plus an index, which cannot be zero.
  * Reproduced for the bytes; it never fires. */
-AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind, uint32_t heading)
+AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind, uint8_t heading)
 {
     const AM2_AnimTable *t = &g_turretAnims[kind];
     int32_t              i;

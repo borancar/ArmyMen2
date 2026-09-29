@@ -1056,11 +1056,11 @@ void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points)
  * which a `void *` stand-in would not. */
 struct AM2_Sprite;
 AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind,
-                                                 uint32_t heading);
+                                                 uint8_t heading);
 AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind,
-                                                 uint32_t heading);
+                                                 uint8_t heading);
 AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind,
-                                                uint32_t heading);
+                                                uint8_t heading);
 
 AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
                                                   int32_t b);
@@ -1070,11 +1070,11 @@ AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
 /* A vehicle: hull on the cursor, turret on overlay A, same kind and heading.
  * Kinds 1, 2, 0, 3, 5 over rows 0x18..0x1C -- four is absent, and the jump
  * table is what says so rather than the arms. Neither arm touches the ink. */
-static inline void PlaceVehicle(int32_t kind, int32_t facing)
+static inline void PlaceVehicle(int32_t kind, uint8_t facing)
 {
-    SET_CURSOR(VehicleAnimSprite(kind, (uint32_t)facing));
+    SET_CURSOR(VehicleAnimSprite(kind, facing));
     *(void **)(uintptr_t)ADDR_MENU_OVERLAY_A =
-        TurretAnimSprite(kind, (uint32_t)facing);
+        TurretAnimSprite(kind, facing);
 }
 
 /* One sprite out of a set, by the key PackKey builds. Every arm below that is
@@ -1091,7 +1091,7 @@ static inline AM2_Sprite *PlaceSprite(uint32_t set, uint32_t id)
  * and 10*army + 11, so each army owns a run of ten. Both sprite slots have
  * their ink cleared; overlay B's is left as the head set it, which is the
  * asymmetry that makes the manning soldier the player's colour. */
-static inline void PlaceEmplacement(int32_t army, int32_t facing, int32_t kind)
+static inline void PlaceEmplacement(int32_t army, uint8_t facing, int32_t kind)
 {
     SET_CURSOR(PlaceSprite(0x26, (uint32_t)(army * 5 + 5) * 2));
     *(uint8_t **)(uintptr_t)ADDR_MENU_INK = (uint8_t *)0;
@@ -1099,7 +1099,7 @@ static inline void PlaceEmplacement(int32_t army, int32_t facing, int32_t kind)
         PlaceSprite(0x26, (uint32_t)(army * 5) * 2 + 11);
     *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = (uint8_t *)0;
     *(void **)(uintptr_t)ADDR_MENU_OVERLAY_B =
-        SoldierAnimSprite(kind, (uint32_t)facing);
+        SoldierAnimSprite(kind, facing);
 }
 
 /* PlaceCursorPrepare -- original 0x004127B0, two callers, both of them arms of
@@ -1144,8 +1144,9 @@ static inline void PlaceEmplacement(int32_t army, int32_t facing, int32_t kind)
 void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
                                 int32_t army)
 {
-    void   *comm = *(void *const *)(uintptr_t)ADDR_ARMY_TABLE;
-    int32_t owner = (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
+    /* The comm object and our slot are re-read for each lookup. */
+#define COMM  (*(void *const *)(uintptr_t)ADDR_ARMY_TABLE)
+#define OWNER ((int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
     uint8_t *ink;
 
     /* The three draw offsets, zeroed from the image's own {0,0}. */
@@ -1164,13 +1165,13 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
 
     if (ok) {
         ink = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
-              + ((uint32_t)((AM2_Comm *)comm)->CommArmyOfSlot(owner) << 8);
+              + ((uint32_t)((AM2_Comm *)COMM)->CommArmyOfSlot(OWNER) << 8);
         *(uint8_t **)(uintptr_t)ADDR_MENU_INK = ink;
         ink = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
-              + ((uint32_t)((AM2_Comm *)comm)->CommArmyOfSlot(owner) << 8);
+              + ((uint32_t)((AM2_Comm *)COMM)->CommArmyOfSlot(OWNER) << 8);
         *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = ink;
         ink = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
-              + ((uint32_t)((AM2_Comm *)comm)->CommArmyOfSlot(owner) << 8);
+              + ((uint32_t)((AM2_Comm *)COMM)->CommArmyOfSlot(OWNER) << 8);
     } else {
         ink = (uint8_t *)(uintptr_t)ADDR_FLAME_RECORD;
         *(uint8_t **)(uintptr_t)ADDR_MENU_INK           = ink;
@@ -1178,20 +1179,22 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
     }
     *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_B_INK = ink;
 
+#undef COMM
+#undef OWNER
     switch (row) {
-    /* The five foot soldiers. The kind is the arm's whole content and the
-     * numbering is the jump table's, not the layout's. */
-    case 0x13: SET_CURSOR(SoldierAnimSprite(0, (uint32_t)facing)); break;
-    case 0x14: SET_CURSOR(SoldierAnimSprite(2, (uint32_t)facing)); break;
-    case 0x15: SET_CURSOR(SoldierAnimSprite(4, (uint32_t)facing)); break;
-    case 0x16: SET_CURSOR(SoldierAnimSprite(3, (uint32_t)facing)); break;
-    case 0x17: SET_CURSOR(SoldierAnimSprite(1, (uint32_t)facing)); break;
+    /* The five foot soldiers. The kind is the arm's whole content; the arms
+     * are in the image's layout order, the numbering is the jump table's. */
+    case 0x13: SET_CURSOR(SoldierAnimSprite(0, facing)); break;
+    case 0x17: SET_CURSOR(SoldierAnimSprite(1, facing)); break;
+    case 0x15: SET_CURSOR(SoldierAnimSprite(4, facing)); break;
+    case 0x14: SET_CURSOR(SoldierAnimSprite(2, facing)); break;
+    case 0x16: SET_CURSOR(SoldierAnimSprite(3, facing)); break;
 
     /* The five vehicles, each a hull on the cursor and a turret on overlay A.
      * Kinds 0, 1, 2, 3, 5 -- four is missing and the table is what says so. */
     case 0x18: PlaceVehicle(1, facing); break;
-    case 0x19: PlaceVehicle(2, facing); break;
     case 0x1A: PlaceVehicle(0, facing); break;
+    case 0x19: PlaceVehicle(2, facing); break;
     case 0x1B: PlaceVehicle(3, facing); break;
     case 0x1C: PlaceVehicle(5, facing); break;
 

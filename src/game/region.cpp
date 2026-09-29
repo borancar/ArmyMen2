@@ -973,7 +973,7 @@ uint16_t __cdecl NearestAllowedTile(void *obj, uint16_t tile, uint32_t *pt)
  * intermediate `speed * frameSeconds` IS stored to a float by the original --
  * `fst dword` -- so that one is a float here too rather than a double.
  */
-int32_t __cdecl MoveStepPoint(void *obj, int32_t heading, int32_t turn,
+int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, int32_t turn,
                               int32_t speed, int32_t unused, int32_t flip,
                               void *outPt)
 {
@@ -1062,7 +1062,7 @@ int32_t __cdecl MoveStepPoint(void *obj, int32_t heading, int32_t turn,
  * at the object's position, and a row with no animation table answers 0 with
  * the same point. The difference matters to the caller and not to the point.
  */
-int32_t __cdecl AnimStepPoint(void *obj, int32_t heading, int32_t pose,
+int32_t __cdecl AnimStepPoint(void *obj, uint8_t heading, int32_t pose,
                               void *outPt, int32_t fast)
 {
     uint8_t   *o    = (uint8_t *)obj;

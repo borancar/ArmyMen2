@@ -243,7 +243,7 @@ uint32_t __cdecl Field53C(const void *p);
  * back as 0x1FF, because only the low byte is forced. Reconstructing this as
  * `min(sum, 255)` would be tidier and would not be this function. The compare
  * is signed, so a negative `add` returns the negative sum untouched. */
-int32_t __cdecl AddByteSat(uint32_t base, int32_t add);
+int32_t __cdecl AddByteSat(uint8_t base, int32_t add);
 
 /* 0x0043E150. Subtracts the dwords two pointers address, which is the shape of
  * a qsort comparator -- and the difference, not the sign, so it overflows for

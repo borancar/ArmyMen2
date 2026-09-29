@@ -312,9 +312,9 @@ int32_t __cdecl SpriteSolidAt(AM2_Sprite *spr, AM2_Point at);
  * for vehicles and turrets), the heading rounded to one of its directions, frame
  * 0. See the note in sprite.cpp for what they settle about anim.h, and for the
  * one way the turret version differs. */
-AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind, uint32_t heading);
-AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind, uint32_t heading);
-AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind, uint32_t heading);
+AM2_Sprite *__cdecl SoldierAnimSprite(int32_t kind, uint8_t heading);
+AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind, uint8_t heading);
+AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind, uint8_t heading);
 
 #ifdef __cplusplus
 extern "C"

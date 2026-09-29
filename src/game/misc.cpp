@@ -104,7 +104,7 @@ uint32_t __cdecl Field53C(const void *p)
     return *(const uint32_t *)((const uint8_t *)p + 0x53C);
 }
 
-int32_t __cdecl AddByteSat(uint32_t base, int32_t add)
+int32_t __cdecl AddByteSat(uint8_t base, int32_t add)
 {
     int32_t sum = (int32_t)(base & 0xFFu) + add;
 
