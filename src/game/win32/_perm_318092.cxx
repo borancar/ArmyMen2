@@ -15415,11 +15415,11 @@ AM2_Edit::AM2_Edit(char *buf, int32_t maxChars_, AM2_Rect box, int32_t font_, ui
     arg78    = a;
 
     AM2_CTOR_VTABLE(w, VTABLE_EDIT);
-    caret   = 0;
-    arg7C   = b;
     dot     = 0;
     onEnter = onEnter_;
     charset = *(const char *const *)(uintptr_t)ADDR_EDIT_CHARSET_DEFAULT;
+    caret   = 0;
+    arg7C   = b;
 
     *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
     ::WidgetScreenRect(w);

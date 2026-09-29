@@ -9097,28 +9097,21 @@ AM2_CommPanelScreen::AM2_CommPanelScreen(const char *bmp)
     AM2_Widget *panel;
     AM2_Widget *list;
     AM2_Widget *bar;
-    void       *rows;
     AM2_CTOR_VTABLE(w, VTABLE_COMM_PANEL);
     SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
 
-    rows = orig_operator_new(AM2_ROWS_SIZE);
-    if (rows)
-        rows = RecordCtor(rows, 1);
-    *(void **)((uint8_t *)w + COMMPANEL_OFF_ROWS) = rows;
-    CommEnumConnections(g_commObject, rows);
+    *(void **)((uint8_t *)w + COMMPANEL_OFF_ROWS) = new AM2_Rec(1);
+    CommEnumConnections(g_commObject, *(void **)((uint8_t *)w + COMMPANEL_OFF_ROWS));
 
     panel = new AM2_Panel("02_001_00_commpanel.bmp", 0, *RectSet(AM2_TEMP(AM2_Rect), 0x40, 0x62, 0x200, 0x11C));
     ::WidgetAddChild(w, panel);
+    w->focusedChild = panel;          /* missing until the bytes said so */
     panel->flag44 = 1;
 
     list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0x2A, 0x44, 0x11F, 0xAA), *(void **)((uint8_t *)w + COMMPANEL_OFF_ROWS), (int32_t)((void *)(uintptr_t)(ADDR_LOG)), 0, 1);
     *(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST) = list;
     ::WidgetAddChild(panel, list);
-    {
-        AM2_Widget *l = *(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST);
-
-        WidgetVFocus(l, 0);
-    }
+    WidgetVFocus(*(AM2_Widget **)((uint8_t *)w + COMMPANEL_OFF_LIST), 0);
 
     bar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x15E, 0x3C, 0x13, 0xBA), panel, (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)), (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)), 0x92, 0);
     ::WidgetAddChild(panel, bar);
