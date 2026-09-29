@@ -364,24 +364,22 @@ int32_t __cdecl IsKind14Or22(int32_t kind)
     return (kind == 14 || kind == 22) ? 1 : 0;
 }
 
-/* Read out of the index table at 0x0040D820 mapped through the three arms at
- * 0x0040D814, which return 1, 2 and 0. Index 0 is code 7. */
-static const uint8_t kCode74Class[64] = {
-    1, 2, 0, 1, 2, 1, 2, 1, 2, 0, 0, 0, 1, 2, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 2, 2, 2,
-    0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1,
-};
-
+/* A switch over codes 7..70 with three arms -- 1, 2, and 0 for the rest --
+ * which VC6 compiles to the byte index table at 0x0040D820 and the jump
+ * table at 0x0040D814. Written as the switch it is. */
 int32_t __cdecl ClassifyByCode74(const void *obj)
 {
     const uint8_t *sub = *(const uint8_t *const *)((const uint8_t *)obj + 0x74);
-    int32_t        code = *(const int16_t *)(sub + 0x4C);   /* movsx: signed */
-    uint32_t       i = (uint32_t)(code - 7);
 
-    if (i > 0x3F)
-        return 0;
-    return kCode74Class[i];
+    switch (*(const int16_t *)(sub + 0x4C)) {     /* movsx: signed */
+    case 7: case 10: case 12: case 14: case 19: case 42: case 43: case 45:
+    case 49: case 50: case 51: case 70:
+        return 1;
+    case 8: case 11: case 13: case 15: case 20: case 52: case 53: case 54:
+    case 59: case 68:
+        return 2;
+    }
+    return 0;
 }
 
 /* 0x0045EE20. Accepts 2-6, 11-12, 21-26, 30, 35-42. Biased by 2 over a

@@ -139,22 +139,20 @@ uint32_t __cdecl GetPlayerMask(uint32_t id)
 {
     void *q = FindPlayerById(id);
 
-    if (!q) {
-        am2_log("ERROR: GetPlayerMask: No Flowq for %X\n", id);
-        return 0;
-    }
-    return *(uint32_t *)((uint8_t *)q + AM2_FLOW_PLAYER_MASK);
+    if (q)
+        return *(uint32_t *)((uint8_t *)q + AM2_FLOW_PLAYER_MASK);
+    am2_log("ERROR: GetPlayerMask: No Flowq for %X\n", id);
+    return 0;
 }
 
 uint32_t __cdecl GetReSendMask(uint32_t id)
 {
     void *q = FindPlayerById(id);
 
-    if (!q) {
-        am2_log("ERROR: GetReSendMask: No Flowq for %X\n", id);
-        return 0;
-    }
-    return *(uint32_t *)((uint8_t *)q + AM2_FLOW_RESEND_MASK);
+    if (q)
+        return *(uint32_t *)((uint8_t *)q + AM2_FLOW_RESEND_MASK);
+    am2_log("ERROR: GetReSendMask: No Flowq for %X\n", id);
+    return 0;
 }
 
 #define AM2_ARMY_STRIDE 112u
