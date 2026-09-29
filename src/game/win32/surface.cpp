@@ -586,31 +586,16 @@ static_assert((DDBLT_COLORFILL | DDBLT_WAIT) == 0x01000400, "colour fill");
 #define SEQ_BAR_HEIGHT 16
 #define SEQ_BAR_SCALE  60
 
-/* Every fill is the same shape: a rectangle and a colour. */
-static void SeqBarFill(int32_t left, int32_t top, int32_t right, int32_t bottom,
-                       uint32_t colour)
-{
-    RECT    dest;
-    DDBLTFX fx;
-
-    dest.left   = left;
-    dest.top    = top;
-    dest.right  = right;
-    dest.bottom = bottom;
-
-    /* Only dwSize and the colour are set, as elsewhere in this file:
-     * DDBLT_COLORFILL reads nothing else. */
-    fx.dwSize      = sizeof fx;
-    fx.dwFillColor = colour;
-
-    if (IDirectDrawSurface_Blt(g_backBuffer, &dest, NULL, NULL,
-                               DDBLT_COLORFILL | DDBLT_WAIT, &fx) != DD_OK)
-        orig_log("Couldn't Blt Seq Pixels\n");
-}
 
 void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint8_t colour,
                         int32_t value, int32_t base)
 {
+    /* One rectangle and one DDBLTFX, updated between the three fills -- the
+     * image has the fill written out three times, not a helper. Only dwSize
+     * and the colour are set: DDBLT_COLORFILL reads nothing else. */
+    RECT    dest;
+    DDBLTFX fx;
+    uint8_t c;
     int32_t filled = ((value - base) * SEQ_BAR_HEIGHT) / SEQ_BAR_SCALE;
     int32_t mark;
 
@@ -618,16 +603,32 @@ void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint8_t colour,
         filled = SEQ_BAR_HEIGHT;
 
     /* The empty bar. */
-    SeqBarFill(x, bottom - (SEQ_BAR_HEIGHT - 1), x + SEQ_BAR_WIDTH, bottom + 1,
-               g_backgroundColour);
+    dest.left   = x;
+    dest.top    = bottom - (SEQ_BAR_HEIGHT - 1);
+    dest.right  = x + SEQ_BAR_WIDTH;
+    dest.bottom = bottom + 1;
+    fx.dwSize      = sizeof fx;
+    fx.dwFillColor = g_backgroundColour;
+    if (IDirectDrawSurface_Blt(g_backBuffer, &dest, NULL, NULL,
+                               DDBLT_COLORFILL | DDBLT_WAIT, &fx) != DD_OK)
+        orig_log("Couldn't Blt Seq Pixels\n");
+
     /* However much of it is full. */
-    SeqBarFill(x, bottom - filled, x + SEQ_BAR_WIDTH, bottom + 1,
-               colour & 0xFF);
+    dest.top       = bottom - filled;
+    fx.dwFillColor = colour;
+    if (IDirectDrawSurface_Blt(g_backBuffer, &dest, NULL, NULL,
+                               DDBLT_COLORFILL | DDBLT_WAIT, &fx) != DD_OK)
+        orig_log("Couldn't Blt Seq Pixels\n");
 
     /* And the marker, which disappears into the fill once the fill reaches it. */
     mark = base % SEQ_BAR_HEIGHT;
-    SeqBarFill(x, bottom - mark, x + SEQ_BAR_WIDTH, bottom - mark + 1,
-               (mark > filled) ? (colour & 0xFF) : g_backgroundColour);
+    dest.top    = bottom - mark;
+    dest.bottom = bottom - mark + 1;
+    c = (mark > filled) ? colour : g_backgroundColour;
+    fx.dwFillColor = c;
+    if (IDirectDrawSurface_Blt(g_backBuffer, &dest, NULL, NULL,
+                               DDBLT_COLORFILL | DDBLT_WAIT, &fx) != DD_OK)
+        orig_log("Couldn't Blt Seq Pixels\n");
 }
 
 /* Let the map go -- 0x0042D390.
@@ -677,31 +678,44 @@ static_assert((DDBLT_WAIT | DDBLT_ASYNC) == 0x01000200, "the blit flags");
 void __attribute__((thiscall)) AM2_Bitmap::BlitCentred(LPDIRECTDRAWSURFACE dest)
 {
     void *self = this;
+    RECT  to, from;
 
-    const int32_t *desc =
-        *(const int32_t **)((uint8_t *)self + BLIT_SRC_OFF_DESC);
-    LPDIRECTDRAWSURFACE src =
-        *(LPDIRECTDRAWSURFACE *)((uint8_t *)self + BLIT_SRC_OFF_SURFACE);
-    int32_t width  = desc[1];
-    int32_t height = desc[2];
-    RECT    to, from;
-
-    to.left = (g_screenClip->right - g_screenClip->left - width) / 2;
-    to.top  = (g_screenClip->bottom - g_screenClip->top - height) / 2;
+    /* The descriptor's width and height are read afresh at every use, and
+     * the centring halves an UNSIGNED difference. */
+#define DESC   (*(const int32_t **)((uint8_t *)self + BLIT_SRC_OFF_DESC))
+#define WIDTH  (DESC[1])
+#define HEIGHT (DESC[2])
     if (dest == g_primarySurface) {
-        to.left += g_originDx;
-        to.top  += g_originDy;
+        to.left = (uint32_t)(g_screenClip->right - g_screenClip->left - WIDTH) / 2
+                  + g_originDx;
+        to.top  = (uint32_t)(g_screenClip->bottom - g_screenClip->top - HEIGHT) / 2
+                  + g_originDy;
+    } else {
+        to.left = (uint32_t)(g_screenClip->right - g_screenClip->left - WIDTH) / 2;
+        to.top  = (uint32_t)(g_screenClip->bottom - g_screenClip->top - HEIGHT) / 2;
     }
-    to.right  = to.left + width;
-    to.bottom = to.top + height;
+    to.right  = WIDTH + to.left;
+    to.bottom = HEIGHT + to.top;
 
     from.left   = 0;
     from.top    = 0;
-    from.right  = width;
-    from.bottom = height;
+    from.right  = WIDTH;
+    from.bottom = HEIGHT;
 
-    IDirectDrawSurface_Blt(dest, &to, src, &from,
-                           DDBLT_WAIT | DDBLT_ASYNC, NULL);
+    /* Two arms on the current movie's field at +0x10, and both make the
+     * same call: VC6 merges them and leaves the test in the image with
+     * nothing reading it. */
+    if (*(const int32_t *)(*(const uint8_t *const *)(uintptr_t)ADDR_MOVIE_CURRENT + 0x10))
+        IDirectDrawSurface_Blt(dest, &to,
+                               *(LPDIRECTDRAWSURFACE *)((uint8_t *)self + BLIT_SRC_OFF_SURFACE),
+                               &from, DDBLT_WAIT | DDBLT_ASYNC, NULL);
+    else
+        IDirectDrawSurface_Blt(dest, &to,
+                               *(LPDIRECTDRAWSURFACE *)((uint8_t *)self + BLIT_SRC_OFF_SURFACE),
+                               &from, DDBLT_WAIT | DDBLT_ASYNC, NULL);
+#undef DESC
+#undef WIDTH
+#undef HEIGHT
 }
 
 /* Turn a loaded bitmap into something drawable -- 0x0041BE80.
