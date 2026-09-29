@@ -2139,8 +2139,13 @@ void __cdecl SpawnParticle(const uint32_t *at, int32_t rowField2C,
                            int32_t angle)
 {
     uint8_t       *ctx;
+    /* The kind's record, indexed in place. */
+    typedef struct {
+        int32_t frames; const uint32_t *sprites; int32_t x, y, z, pad;
+    } Kind;
+#define KIND (((const Kind *)(uintptr_t)ADDR_PARTICLE_KINDS)[kind])
+    int32_t        half;
     uint8_t       *row;
-    const uint8_t *rec;
 
     if (!PointInRect((const AM2_Rect *)(uintptr_t)ADDR_MAP_BOUNDS_LEFT,
                      (const AM2_Point *)at))
@@ -2148,39 +2153,50 @@ void __cdecl SpawnParticle(const uint32_t *at, int32_t rowField2C,
 
     ctx = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_A);
 
+    /* The row is read through the record at every use. */
+#define ROW (*(uint8_t **)(ctx + 0x1C))
     *(int32_t *)ctx       = 0;
     *(int32_t *)(ctx + 4) = kind;
-    row = *(uint8_t **)(ctx + 0x1C);
-    *(uint8_t *)(row + 0x51) = 0;
-    *(uint32_t *)(row + ROW_OFF_STAMP_54) = 0;
+    *(uint8_t *)(ROW + 0x51) = 0;
+    *(uint32_t *)(ROW + ROW_OFF_STAMP_54) = 0;
 
+    half = speed >> 1;
     if (angle < 0) {
-        *(int32_t *)(ctx + 0x0C) = (orig_game_rand() % speed) - (speed >> 1);
-        *(int32_t *)(ctx + 0x10) = (orig_game_rand() % speed) - (speed >> 1);
+        *(int32_t *)(ctx + 0x0C) = (orig_game_rand() % speed) - half;
+        *(int32_t *)(ctx + 0x10) = (orig_game_rand() % speed) - half;
     } else {
-        *(int32_t *)(ctx + 0x0C) = (int32_t)(Cos8(angle) * (float)speed);
-        *(int32_t *)(ctx + 0x10) = (int32_t)(Sin8(angle) * (float)speed);
+        /* The speed as a float, once. */
+        float f = (float)speed;
+
+        *(int32_t *)(ctx + 0x0C) = (int32_t)(Cos8(angle) * f);
+        *(int32_t *)(ctx + 0x10) = (int32_t)(Sin8(angle) * f);
     }
 
-    *(int32_t *)(ctx + 0x14) = (orig_game_rand() % (speed >> 1)) + (speed >> 1);
-    *(int32_t *)(ctx + 0x18) = height;
-    *(int32_t *)(ctx + 8)    = (orig_game_rand() % 0x4B) + 0x19;
+    *(int32_t *)(ctx + 0x14) = (orig_game_rand() % half) + half;
+    {
+        int32_t r = orig_game_rand() % 0x4B;
+
+        *(int32_t *)(ctx + 0x18) = height;
+        *(int32_t *)(ctx + 8)    = r + 0x19;
+    }
     *(int32_t *)(ctx + 0x24) = 0;
 
-    rec = (const uint8_t *)(uintptr_t)ADDR_PARTICLE_KINDS
-          + (uint32_t)kind * AM2_PARTICLE_KIND_BYTES;
 
+    /* The row read once more, for the rest. */
+    row = ROW;
     *(int32_t *)row = 1;
     *(uint32_t *)(row + ROW_OFF_SPRITE) =
-        **(uint32_t *const *)(rec + PARTICLE_OFF_SPRITES);
+        *KIND.sprites;
     *(int16_t *)(row + ROW_OFF_X) =
-        (int16_t)(*(const int16_t *)(rec + 8) + *(const int16_t *)at);
+        (int16_t)(*(const int16_t *)&KIND.x + *(const int16_t *)at);
     *(int16_t *)(row + ROW_OFF_X + 2) =
-        (int16_t)(*(const int16_t *)(rec + 0x0C)
+        (int16_t)(*(const int16_t *)&KIND.y
                   + *(const int16_t *)((const uint8_t *)at + 2));
-    *(int16_t *)(row + 0x20)             = *(const int16_t *)(rec + 0x10);
+    *(int16_t *)(row + 0x20)             = *(const int16_t *)&KIND.z;
     *(int16_t *)(row + ROW_OFF_FIELD_26) = 0;
     *(int32_t *)(row + ROW_OFF_FIELD_2C) = rowField2C;
+#undef ROW
+#undef KIND
 }
 
 /* DiedEffectA -- original 0x00461B20, one caller. The death spray: six
