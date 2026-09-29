@@ -352,7 +352,7 @@ void __cdecl SendObjDestroyed(const void *obj)
  * The two logs are gated on COMM_OFF_VERBOSE and the SEND is not, so a quiet
  * build still sends and simply says nothing.
  */
-void __cdecl TrooperDropItemSend(void *unit, void *item, int32_t slot,
+void __cdecl TrooperDropItemSend(void *unit, void *item, int8_t slot,
                                  int32_t quantity, uint32_t at)
 {
     uint8_t  msg[AM2_MSG_DROP_ITEM_LEN];
@@ -370,15 +370,15 @@ void __cdecl TrooperDropItemSend(void *unit, void *item, int32_t slot,
         return;
 
     *(uint16_t *)(msg + 0) = AM2_MSG_DROP_ITEM_LEN;
-    *(uint16_t *)(msg + 2) = AM2_MSG_TROOPER_DROP_ITEM;
     *(uint32_t *)(msg + MSG_DROP_OFF_TROOPER) =
         UidOnWire(((const AM2_Object *)u)->uid);
+    *(uint16_t *)(msg + 2) = AM2_MSG_TROOPER_DROP_ITEM;
     *(uint32_t *)(msg + MSG_DROP_OFF_ITEM) =
         UidOnWire(((const AM2_Object *)it)->uid);
     *(uint32_t *)(msg + MSG_DROP_OFF_AT)      = at;
-    *(int32_t *)(msg + MSG_DROP_OFF_REQUEST)  = AM2_DO_DROP;
+    *(int32_t *)(msg + MSG_DROP_OFF_SLOT)     = slot;
     *(int32_t *)(msg + MSG_DROP_OFF_QUANT)    = quantity;
-    *(int32_t *)(msg + MSG_DROP_OFF_SLOT)     = (int32_t)(int8_t)slot;
+    *(int32_t *)(msg + MSG_DROP_OFF_REQUEST)  = AM2_DO_DROP;
 
     ArmyMessageSend(msg);
 
@@ -418,7 +418,7 @@ void __cdecl TrooperDropItemSend(void *unit, void *item, int32_t slot,
  * which is the same shape the other three functions in this family have.
  */
 void __cdecl TrooperWantItemSend(void *trooper, void *item, int32_t request,
-                                 int32_t slot, int32_t quantity)
+                                 int8_t slot, int32_t quantity)
 {
     uint8_t  msg[AM2_MSG_DROP_ITEM_LEN];
     uint8_t *t = (uint8_t *)trooper;
@@ -434,16 +434,16 @@ void __cdecl TrooperWantItemSend(void *trooper, void *item, int32_t request,
         return;
 
     *(uint16_t *)(msg + 0) = AM2_MSG_DROP_ITEM_LEN;
-    *(uint16_t *)(msg + 2) = AM2_MSG_TROOPER_WANT_ITEM;
     *(uint32_t *)(msg + MSG_DROP_OFF_TROOPER) =
         UidOnWire(((const AM2_Object *)t)->uid);
+    *(uint16_t *)(msg + 2) = AM2_MSG_TROOPER_WANT_ITEM;
     *(uint32_t *)(msg + MSG_DROP_OFF_ITEM) =
         UidOnWire(((const AM2_Object *)it)->uid);
     *(uint32_t *)(msg + MSG_DROP_OFF_AT) =
         *(const uint32_t *)(it + OBJ_OFF_POS);
     *(int32_t *)(msg + MSG_DROP_OFF_REQUEST) = request;
+    *(int32_t *)(msg + MSG_DROP_OFF_SLOT)    = slot;
     *(int32_t *)(msg + MSG_DROP_OFF_QUANT)   = quantity;
-    *(int32_t *)(msg + MSG_DROP_OFF_SLOT)    = (int32_t)(int8_t)slot;
 
     ArmyMessageSend(msg);
 
@@ -1061,7 +1061,6 @@ void __cdecl SendItemCreate(void *obj)
     uint8_t        msg[AM2_MSG_ITEM_CREATE_LEN];
     int32_t        nameidx;
     const char    *name;
-    int32_t        type;
 
     if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
         return;
@@ -1079,22 +1078,19 @@ void __cdecl SendItemCreate(void *obj)
     else
         *(char *)(msg + MSG_CREATE_OFF_NAME) = '\0';
 
-    type = *(const int32_t *)o;
-    *(uint16_t *)(msg + MSG_CREATE_OFF_TYPE) = (uint16_t)type;
     *(uint32_t *)(msg + MSG_CREATE_OFF_A) =
         *(const uint32_t *)(o + OBJ_OFF_POS);
-    memcpy(msg + MSG_CREATE_OFF_BLOCK, o + OBJ_OFF_BOX_OFFSETS,
-           AM2_OBJ_BOX_BYTES);
+    /* The type is read twice: a word for the message, a dword for the
+     * switch. */
+    *(uint16_t *)(msg + MSG_CREATE_OFF_TYPE) = *(const uint16_t *)o;
+    /* The four box offsets, a dword at a time. */
+    ((int32_t *)(msg + MSG_CREATE_OFF_BLOCK))[0] = ((const int32_t *)(o + OBJ_OFF_BOX_OFFSETS))[0];
+    ((int32_t *)(msg + MSG_CREATE_OFF_BLOCK))[1] = ((const int32_t *)(o + OBJ_OFF_BOX_OFFSETS))[1];
+    ((int32_t *)(msg + MSG_CREATE_OFF_BLOCK))[2] = ((const int32_t *)(o + OBJ_OFF_BOX_OFFSETS))[2];
+    ((int32_t *)(msg + MSG_CREATE_OFF_BLOCK))[3] = ((const int32_t *)(o + OBJ_OFF_BOX_OFFSETS))[3];
     *(uint32_t *)(msg + MSG_CREATE_OFF_C) =
         *(const uint32_t *)(o + OBJ_OFF_FLAGS);
-
-    switch (type) {
-    case AM2_OBJ_TYPE_ITEM:
-        *(int32_t *)(msg + MSG_CREATE_OFF_D) =
-            *(const int32_t *)(*(const uint8_t *const *)
-                                   (o + OBJ_OFF_FIELD_94) + 8);
-        break;
-
+    switch (*(const int32_t *)o) {
     case AM2_OBJ_TYPE_TROOPER:
         if (*(const int32_t *)(o + OBJ_OFF_SARGE))
             *(uint16_t *)(msg + MSG_CREATE_OFF_SUBTYPE) =
@@ -1117,6 +1113,12 @@ void __cdecl SendItemCreate(void *obj)
             **(const uint16_t *const *)(o + OBJ_OFF_FIELD_C0);
         *(uint32_t *)(msg + MSG_CREATE_OFF_D) =
             *(const uint32_t *)(o + OBJ_OFF_TARGET_UID);
+        break;
+
+    case AM2_OBJ_TYPE_ITEM:
+        *(int32_t *)(msg + MSG_CREATE_OFF_D) =
+            *(const int32_t *)(*(const uint8_t *const *)
+                                   (o + OBJ_OFF_FIELD_94) + 8);
         break;
 
     default:

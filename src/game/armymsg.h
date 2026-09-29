@@ -46,7 +46,7 @@ void __cdecl TellOneSlot(int32_t slot);
  * every time, and its second log puts the uids through UidOnWire a SECOND
  * time -- harmless only because that function is the identity here. See
  * armymsg.cpp. */
-void __cdecl TrooperDropItemSend(void *unit, void *item, int32_t slot,
+void __cdecl TrooperDropItemSend(void *unit, void *item, int8_t slot,
                                  int32_t quantity, uint32_t at);
 
 /* 0x0044BFA0, two callers, one of them the kind-0x19 receiver turning a WANT
@@ -54,7 +54,7 @@ void __cdecl TrooperDropItemSend(void *unit, void *item, int32_t slot,
  * the ITEM's position and the request as an argument. Its four log lines are
  * what name AM2_WANT_PICKUP, AM2_WANT_DROP, AM2_DO_PICKUP and AM2_DO_DROP. */
 void __cdecl TrooperWantItemSend(void *trooper, void *item, int32_t request,
-                                 int32_t slot, int32_t quantity);
+                                 int8_t slot, int32_t quantity);
 
 #endif
 
