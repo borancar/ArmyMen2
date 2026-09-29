@@ -1664,38 +1664,37 @@ int32_t __cdecl RespawnKindAllowed(int32_t kind)
  * without any per-draw arithmetic. */
 void __cdecl BuildRespawnPool(int32_t seed)
 {
-    const uint8_t *rec;
-    int32_t        kind;
-    int32_t        total = 0;
-    int32_t        at    = 0;
-    int32_t       *bag;
+    /* The kind records, 0x34 bytes each, their first field the count. */
+#define KINDS 44   /* (ADDR_SPAWN_KIND_TABLE_END - ADDR_SPAWN_KIND_TABLE) / 0x34 */
+#define COUNT(k) (*(const int32_t *)((const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE \
+                                     + (uint32_t)(k) * AM2_SPAWN_KIND_STRIDE))
+    int32_t  kind;
+    int32_t  total;
+    int32_t  at;
+    int32_t  n;
+    int32_t *bag;
 
     GameSrand(seed);
 
     if (*(void **)(uintptr_t)ADDR_RESPAWN_KINDS != 0)
         am2_free(*(void **)(uintptr_t)ADDR_RESPAWN_KINDS);
 
-    kind = 0;
-    for (rec = (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE;
-         rec < (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE_END;
-         rec += AM2_SPAWN_KIND_STRIDE, kind++) {
+    total = 0;
+    for (kind = 0; kind < (int32_t)KINDS; kind++)
         if (RespawnKindAllowed(kind))
-            total += *(const int32_t *)rec;
-    }
+            total += COUNT(kind);
 
     bag = (int32_t *)am2_malloc((size_t)total * 4);
     *(int32_t *)(uintptr_t)ADDR_RESPAWN_KIND_COUNT = total;
+    at = 0;
     *(int32_t **)(uintptr_t)ADDR_RESPAWN_KINDS = bag;
 
-    kind = 0;
-    for (rec = (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE;
-         rec < (const uint8_t *)(uintptr_t)ADDR_SPAWN_KIND_TABLE_END;
-         rec += AM2_SPAWN_KIND_STRIDE, kind++) {
-        if (!RespawnKindAllowed(kind))
-            continue;
-        for (int32_t n = 0; n < *(const int32_t *)rec; n++)
-            (*(int32_t **)(uintptr_t)ADDR_RESPAWN_KINDS)[at++] = kind;
-    }
+    for (kind = 0; kind < (int32_t)KINDS; kind++)
+        if (RespawnKindAllowed(kind))
+            for (n = 0; n < COUNT(kind); n++)
+                (*(int32_t **)(uintptr_t)ADDR_RESPAWN_KINDS)[at++] = kind;
+#undef KINDS
+#undef COUNT
 }
 
 /* 0x004601D0. Pick a respawn kind at random.

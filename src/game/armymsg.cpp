@@ -744,16 +744,13 @@ void __cdecl SendItemDeploy(const void *item, int32_t arg)
     uint8_t        msg[AM2_MSG_ITEM_DEPLOY_LEN];
     const uint8_t *it = (const uint8_t *)item;
     const uint8_t *comm;
-    uint32_t       uid;
 
     if (!*(void *const *)(uintptr_t)ADDR_MP_SESSION)
         return;
 
-    uid = *(const uint32_t *)(it + 4);
-
     *(uint16_t *)(msg + 0)    = AM2_MSG_ITEM_DEPLOY_LEN;
     *(uint16_t *)(msg + 2)    = AM2_MSG_ITEM_DEPLOY;
-    *(uint32_t *)(msg + 4)    = UidOnWire(uid);
+    *(uint32_t *)(msg + 4)    = UidOnWire(*(const uint32_t *)(it + 4));
     *(uint32_t *)(msg + 8)    = *(const uint32_t *)(it + OBJ_OFF_POS);
     *(uint8_t  *)(msg + 0x0C) = *(const uint8_t *)(it + OBJ_OFF_FACING);
     *(uint8_t  *)(msg + 0x0D) = (uint8_t)arg;
@@ -763,7 +760,7 @@ void __cdecl SendItemDeploy(const void *item, int32_t arg)
     comm = kComm;
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
         orig_log("itemDeployMessageSend: uid=%x, pos=(%d,%d), facing=%d\n",
-                 uid,
+                 *(const uint32_t *)(it + 4),
                  (int32_t)*(const int16_t *)(it + OBJ_OFF_POS),
                  (int32_t)*(const int16_t *)(it + OBJ_OFF_POS + 2),
                  (int32_t)*(const uint8_t *)(it + OBJ_OFF_FACING));

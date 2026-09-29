@@ -80,25 +80,25 @@ void __cdecl WriteSaveTag(am2_FILE *fp, uint32_t tag)
  */
 int32_t __cdecl SaveScriptName(am2_FILE *fp, const void *rec)
 {
-    int32_t index = *(const int32_t *)((const uint8_t *)rec
-                                       + SCRIPT_REF_OFF_NAME_INDEX);
-    const char *name;
-    uint32_t    n;
+    /* The index and the name are re-read at each use, as the image does. */
+#define INDEX (*(const int32_t *)((const uint8_t *)rec + SCRIPT_REF_OFF_NAME_INDEX))
+#define NAME  ((*(const AM2_ScriptName *const *)(uintptr_t)ADDR_SCRIPT_NAMES)[INDEX].name)
+    uint32_t n;
 
-    if (index < 0) {
+    if (INDEX < 0) {
         WriteSaveTag(fp, AM2_SAVETAG_NO_NAME);
         return 1;
     }
 
-    name = (*(const AM2_ScriptName *const *)(uintptr_t)ADDR_SCRIPT_NAMES)
-               [index].name;
-    n    = (uint32_t)strlen(name) + 1;
+    n = (uint32_t)strlen(NAME) + 1;
 
     WriteSaveTag(fp, AM2_SAVETAG_NAME);
     WriteSaveTag(fp, n);
-    orig_fwrite(name, n, 1, fp);
+    orig_fwrite(NAME, n, 1, fp);
 
     return 1;
+#undef INDEX
+#undef NAME
 }
 
 

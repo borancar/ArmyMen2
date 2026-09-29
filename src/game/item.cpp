@@ -14173,9 +14173,10 @@ void __cdecl CreateWatchedItem(int32_t unused, void *obj, uint32_t at,
     uint32_t point;
     void    *item;
 
-    ((int16_t *)&point)[0] = (int16_t)((int32_t)(int16_t)(at & 0xFFFF)
+    /* `at` is a packed point, read a half at a time from its slot. */
+    ((int16_t *)&point)[0] = (int16_t)(((const AM2_Point *)&at)->x
                                        - (int32_t)(Cos8(facing) * AM2_WATCH_DROP_SCALE));
-    ((int16_t *)&point)[1] = (int16_t)((int32_t)(int16_t)(at >> 16)
+    ((int16_t *)&point)[1] = (int16_t)(((const AM2_Point *)&at)->y
                                        - (int32_t)(Sin8(facing) * AM2_WATCH_DROP_SCALE));
 
     item = CreateItem((char *)(uintptr_t)ADDR_DIR_SCRATCH,
@@ -14204,18 +14205,19 @@ void __cdecl CreateWatchedType(int32_t unused, void *obj, uint32_t at,
                                int32_t facing)
 {
     uint8_t *o = (uint8_t *)obj;
-    uint32_t point;
+    AM2_Point point;
     void    *item;
 
-    ((int16_t *)&point)[0] = (int16_t)((int32_t)(int16_t)(at & 0xFFFF)
+    /* `at` is a packed point, read a half at a time from its slot. */
+    point.x = (int16_t)(((const AM2_Point *)&at)->x
                                        - (int32_t)(Cos8(facing) * AM2_WATCH_DROP_SCALE));
-    ((int16_t *)&point)[1] = (int16_t)((int32_t)(int16_t)(at >> 16)
+    point.y = (int16_t)(((const AM2_Point *)&at)->y
                                        - (int32_t)(Sin8(facing) * AM2_WATCH_DROP_SCALE));
 
     item = CreateItem((char *)(uintptr_t)ADDR_DIR_SCRATCH,
                       *(const int8_t *)(o + OBJ_OFF_ARMY),
                       *(const int32_t *)(uintptr_t)ADDR_WATCHED_TYPE_ID,
-                      point, 1, 0, 0);
+                      *(uint32_t *)&point, 1, 0, 0);
     if (item == 0)
         return;
 
