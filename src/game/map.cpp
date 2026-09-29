@@ -1046,10 +1046,12 @@ void __cdecl AddLevelRecord(const void *record)
         count = *(const int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT));
     }
 
-    memcpy(table + (size_t)count * AM2_LEVEL_RECORD_SIZE, record,
-           AM2_LEVEL_RECORD_SIZE);
+    /* The count is read again for the copy and incremented in place. */
+    memcpy(table + (size_t)*(const int32_t *)(uintptr_t)ADDR_LEVEL_TABLE_COUNT
+                       * AM2_LEVEL_RECORD_SIZE,
+           record, AM2_LEVEL_RECORD_SIZE);
 
-    *(int32_t *)((void *)(uintptr_t)(ADDR_LEVEL_TABLE_COUNT)) = count + 1;
+    (*(int32_t *)(uintptr_t)ADDR_LEVEL_TABLE_COUNT)++;
 }
 
 /* The `rules` / `rulemap` trio -- originals 0x0043EA30, 0x0043EAC0 and
@@ -1226,10 +1228,12 @@ void __cdecl AddNameRecord(const void *record)
         count = *(const int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT));
     }
 
-    memcpy(table + (size_t)count * AM2_NAME_RECORD_SIZE, record,
-           AM2_NAME_RECORD_SIZE);
+    /* The count is read again for the copy and incremented in place. */
+    memcpy(table + (size_t)*(const int32_t *)(uintptr_t)ADDR_NAME_TABLE_COUNT
+                       * AM2_NAME_RECORD_SIZE,
+           record, AM2_NAME_RECORD_SIZE);
 
-    *(int32_t *)((void *)(uintptr_t)(ADDR_NAME_TABLE_COUNT)) = count + 1;
+    (*(int32_t *)(uintptr_t)ADDR_NAME_TABLE_COUNT)++;
 }
 
 /* AmmChecksum -- original 0x0042C350, one caller.

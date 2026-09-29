@@ -62,27 +62,27 @@ void __cdecl ResetDirtyList(void)
 void __cdecl AddDirtyRect(int32_t left, int32_t top, int32_t right,
                           int32_t bottom)
 {
-    uint8_t *recs = (uint8_t *)((void *)(uintptr_t)(ADDR_DIRTY_RECTS));
-    uint16_t tail = *(const uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL));
-    uint16_t next = (uint16_t)(tail + 1);
-    uint8_t *rec;
+    /* The record array indexed afresh for every store, as the image does. */
+    struct Rec { int32_t l, t, r, b; uint16_t prev, next; };
+#define RECS ((struct Rec *)((void *)(uintptr_t)(ADDR_DIRTY_RECTS)))
+#define TAIL (*(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)))
+    uint16_t next = (uint16_t)(TAIL + 1);
 
     if (next >= AM2_DEPTH_MAX) {
         *(int32_t *)((void *)(uintptr_t)(ADDR_FULL_REDRAW)) = 1;
         return;
     }
 
-    rec = recs + (uint32_t)next * AM2_DIRTY_RECORD_SIZE;
-    ((int32_t *)rec)[0] = left;
-    ((int32_t *)rec)[1] = top;
-    ((int32_t *)rec)[2] = right;
-    ((int32_t *)rec)[3] = bottom;
-    *(uint16_t *)(rec + DIRTY_OFF_NEXT) = 0;
-    *(uint16_t *)(rec + DIRTY_OFF_PREV) = tail;
-
-    *(uint16_t *)(recs + (uint32_t)tail * AM2_DIRTY_RECORD_SIZE
-                  + DIRTY_OFF_NEXT) = next;
-    *(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)) = next;
+    RECS[next].l    = left;
+    RECS[next].t    = top;
+    RECS[next].r    = right;
+    RECS[next].b    = bottom;
+    RECS[next].next = 0;
+    RECS[next].prev = TAIL;
+    RECS[TAIL].next = next;
+    TAIL = next;
+#undef RECS
+#undef TAIL
 }
 
 int dirty_install(void)

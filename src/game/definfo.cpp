@@ -642,11 +642,9 @@ void __cdecl AddVehicleDef(const void *rec)
         n = *(const int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT;
     }
 
-    for (int32_t i = 0; i < (int32_t)(AM2_VEHICLE_DEF_REC_SIZE / 4); i++)
-        ((int32_t *)(tab + n * AM2_VEHICLE_DEF_REC_SIZE))[i] =
-            ((const int32_t *)rec)[i];
+    memcpy(tab + n * AM2_VEHICLE_DEF_REC_SIZE, rec, AM2_VEHICLE_DEF_REC_SIZE);
 
-    *(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT = n + 1;
+    (*(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT)++;
 }
 
 /* AddMissileDef -- original 0x00460200, one caller. The same append for the
@@ -692,11 +690,9 @@ void __cdecl AddMissileDef(const void *rec)
         n = *(const int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT;
     }
 
-    for (int32_t i = 0; i < (int32_t)(AM2_MISSILE_DEF_REC_SIZE / 4); i++)
-        ((int32_t *)(tab + n * AM2_MISSILE_DEF_REC_SIZE))[i] =
-            ((const int32_t *)rec)[i];
+    memcpy(tab + n * AM2_MISSILE_DEF_REC_SIZE, rec, AM2_MISSILE_DEF_REC_SIZE);
 
-    *(int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT = n + 1;
+    (*(int32_t *)(uintptr_t)ADDR_DEF_MISSILE_COUNT)++;
 }
 
 /* The image's bsearch and the dword comparator both def-find uses. Neither is

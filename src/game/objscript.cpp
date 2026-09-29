@@ -41,44 +41,53 @@ static AM2_ObjScript *ScriptCurrentObj(void)
 
 AM2_ScriptAction *__cdecl ObjFrameNewAction(AM2_ObjFrame *f)
 {
-    if (f->actioncap <= f->actioncount) {
+    /* The count is read once up front and used for the return; the memset
+     * after the realloc reads it again, as the original does. */
+    int32_t n = f->actioncount;
+
+    if (f->actioncap <= n) {
         int32_t cap = f->actioncap + 5;
         f->actions = (AM2_ScriptAction *)am2_realloc(
             f->actions, (size_t)cap * sizeof(AM2_ScriptAction));
         memset(&f->actions[f->actioncount], 0, 5 * sizeof(AM2_ScriptAction));
         f->actioncap = cap;
     }
-    AM2_ScriptAction *p = &f->actions[f->actioncount];
-    f->actioncount++;
-    return p;
+    f->actioncount = n + 1;
+    return &f->actions[n];
 }
 
 AM2_ObjFrame *__cdecl ObjStateNewFrame(AM2_ObjState *s)
 {
-    if (s->framecap <= s->framecount) {
+    /* The count is read once up front and used for the return; the memset
+     * after the realloc reads it again, as the original does. */
+    int32_t n = s->framecount;
+
+    if (s->framecap <= n) {
         int32_t cap = s->framecap + 10;
         s->frames = (AM2_ObjFrame *)am2_realloc(
             s->frames, (size_t)cap * sizeof(AM2_ObjFrame));
         memset(&s->frames[s->framecount], 0, 10 * sizeof(AM2_ObjFrame));
         s->framecap = cap;
     }
-    AM2_ObjFrame *p = &s->frames[s->framecount];
-    s->framecount++;
-    return p;
+    s->framecount = n + 1;
+    return &s->frames[n];
 }
 
 AM2_ObjState *__cdecl ObjScriptNewState(AM2_ObjScript *o)
 {
-    if (o->statecap <= o->statecount) {
+    /* The count is read once up front and used for the return; the memset
+     * after the realloc reads it again, as the original does. */
+    int32_t n = o->statecount;
+
+    if (o->statecap <= n) {
         int32_t cap = o->statecap + 5;
         o->states = (AM2_ObjState *)am2_realloc(
             o->states, (size_t)cap * sizeof(AM2_ObjState));
         memset(&o->states[o->statecount], 0, 5 * sizeof(AM2_ObjState));
         o->statecap = cap;
     }
-    AM2_ObjState *p = &o->states[o->statecount];
-    o->statecount++;
-    return p;
+    o->statecount = n + 1;
+    return &o->states[n];
 }
 
 /* The fourth of the same shape, and the only one whose capacity, count and
@@ -91,7 +100,9 @@ AM2_ObjState *__cdecl ObjScriptNewState(AM2_ObjScript *o)
  * ids the scripts carry are one-based, and this is where that comes from. */
 AM2_ObjScript *__cdecl NewObjScript(void)
 {
-    if (kObjScriptCap <= kObjScriptCount) {
+    int32_t n = kObjScriptCount;
+
+    if (kObjScriptCap <= n) {
         int32_t cap = kObjScriptCap + 20;
         kObjScripts = (AM2_ObjScript *)am2_realloc(
             kObjScripts, (size_t)cap * sizeof(AM2_ObjScript));
@@ -99,9 +110,8 @@ AM2_ObjScript *__cdecl NewObjScript(void)
                20 * sizeof(AM2_ObjScript));
         kObjScriptCap = cap;
     }
-    AM2_ObjScript *p = &kObjScripts[kObjScriptCount];
-    kObjScriptCount++;
-    return p;
+    kObjScriptCount = n + 1;
+    return &kObjScripts[n];
 }
 
 int32_t __cdecl ScriptCompare(int32_t a, int32_t op, int32_t b)

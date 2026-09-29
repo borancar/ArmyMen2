@@ -14329,19 +14329,23 @@ void __attribute__((thiscall)) AM2_Rec::RecordReset()
     void *rec = this;
 
     int32_t *r     = (int32_t *)rec;
-    uint8_t *rows  = (uint8_t *)(uintptr_t)r[1];
     int32_t  i;
 
-    if (r[2] && rows) {
+    /* No null test on the rows: a list that owns its values and has a
+     * count always has rows. The rows pointer is re-read at each use. */
+    if (r[2]) {
         for (i = 0; i < r[0]; i++) {
-            void *own = *(void **)(rows + (uint32_t)i * AM2_LIST_ROW_STRIDE
+            /* Through `this` rather than `r`: the operand order of the row
+             * address follows which name spells the base (see StepObjRows). */
+            void *own = *(void **)((uint8_t *)(uintptr_t)((int32_t *)this)[1]
+                                   + (uint32_t)i * AM2_LIST_ROW_STRIDE
                                    + AM2_LIST_ROW_VALUE);
             if (own)
                 am2_free(own);
         }
     }
     r[0] = 0;
-    am2_free(rows);
+    am2_free((void *)(uintptr_t)r[1]);
     r[1] = 0;
 }
 

@@ -411,16 +411,15 @@ int32_t __cdecl PointRuleBoat(int32_t tile)
 /* 0x00437DB0 -- everything else, and a null object. */
 int32_t __cdecl PointRuleDefault(int32_t tile)
 {
-    const uint16_t t    = (uint16_t)tile;
-    const int32_t  army = *(const int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY;
-
-    if (army < AM2_COMM_SLOTS
-        && ((const int8_t *const *)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[army][t]
-               > 0)
+#define ARMY (*(const int32_t *)(uintptr_t)ADDR_POINT_RULE_ARMY)
+    if (ARMY < AM2_COMM_SLOTS
+        && ((const int8_t *const *)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[ARMY]
+               [(uint16_t)tile] > 0)
         return 1;
+#undef ARMY
 
     /* `setge` on the byte, not a branch -- the original's own tail. */
-    return (*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)[t]
+    return (*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint16_t)tile]
            >= (int8_t)AM2_BLOCK_FULL;
 }
 

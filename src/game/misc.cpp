@@ -834,19 +834,11 @@ void __cdecl RemapBytes(void *dst, const void *src, const void *table,
 int32_t __cdecl SetFieldInAll(void *record, void *value)
 {
     uint8_t *r = (uint8_t *)record;
-    int32_t  i = 0;
-    uint32_t off = 0;
+    int32_t  i;
 
-    if (*(const int32_t *)(r + 4) <= 0)
-        return 0;
-
-    do {
-        uint8_t *base = *(uint8_t **)(r + 8);   /* re-read, as the original */
-
-        i++;
-        *(void **)(base + off + 0x2C) = value;
-        off += 0x60;
-    } while (i < *(const int32_t *)(r + 4));
+    /* The rows pointer is re-read every iteration, as the original does. */
+    for (i = 0; i < *(const int32_t *)(r + 4); i++)
+        *(void **)(*(uint8_t **)(r + 8) + i * 0x60 + 0x2C) = value;
 
     return i;
 }
@@ -1858,19 +1850,19 @@ typedef int32_t (__cdecl *AM2_SeqStepFn)(int32_t at, void *rec, void *ctx);
  * 856 patch lines, 856 from checkpatches. */
 void __cdecl AiTakeAbandoned(void)
 {
-    const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
-    int32_t        army;
+#define COMM (*(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
+    int32_t army;
 
     for (army = 0; army < AM2_COMM_ARMY_COUNT; army++) {
-        const uint8_t *rec = comm + (uint32_t)army * AM2_PLAYER_STRIDE;
-
-        if (!*(const int32_t *)(rec + COMM_ARMY_OFF_WAS_HERE))
+        if (!*(const int32_t *)(COMM + (uint32_t)army * AM2_PLAYER_STRIDE
+                                + COMM_ARMY_OFF_WAS_HERE))
             continue;
-        if (CommSlotHasPlayer((void *)(uintptr_t)comm, army))
+        if (CommSlotHasPlayer((void *)(uintptr_t)COMM, army))
             continue;
 
         LoadArmyPlacement(army);
     }
+#undef COMM
 }
 
 /* 0x00461930, one caller -- the per-frame path. Run the seq walker over both
