@@ -169,17 +169,16 @@ int32_t __cdecl DefParseNumber(int32_t *out, const char *tok)
 {
     char *end;
 
-    if (tok == (const char *)0)
-        return 0;
+    if (tok) {
+        *out = am2_strtol(tok, &end, 0);
 
-    *out = am2_strtol(tok, &end, 0);
-
-    if (end == tok) {
-        orig_log("Bad or missing number\n");
-        return 0;
+        if (end == tok) {
+            orig_log("Bad or missing number\n");
+            return 0;
+        }
+        return 1;
     }
-
-    return 1;
+    return 0;
 }
 
 /* 0x0041A290. DefParseNumber's float twin, sixty-four bytes further along.
@@ -279,15 +278,11 @@ int32_t __cdecl DefParseBoolean(int32_t *out, const char *tok)
  * 0x5F reaches DefLinkParse through the handler in the same row. */
 int32_t __cdecl DefFindKeyword(const char *name)
 {
-    const AM2_DefKeyword *e = kDefKeywords;
-    int32_t               i = 0;
+    int32_t i;
 
-    while (e->name[0] != '\0') {
-        if (strcmp(name, e->name) == 0)
+    for (i = 0; kDefKeywords[i].name[0] != '\0'; i++)
+        if (strcmp(name, kDefKeywords[i].name) == 0)
             return i;
-        e++;
-        i++;
-    }
 
     return -1;
 }

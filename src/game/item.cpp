@@ -4611,14 +4611,14 @@ void __cdecl FlameTick(void)
 void __cdecl PadAdvanceDeadlines(void)
 {
     AM2_Pad *pads = (AM2_Pad *)(uintptr_t)ADDR_PADS;
-    uint32_t now  = *(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS));
     int32_t  n    = *(const int32_t *)(uintptr_t)ADDR_PAD_COUNT;
     int32_t  i;
 
     for (i = 0; i < n; i++) {
         if (pads[i].period <= 0)
             continue;
-        if (now > (uint32_t)pads[i].dueAt)
+        if (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS))
+                > (uint32_t)pads[i].dueAt)
             pads[i].dueAt += pads[i].period;
     }
 }

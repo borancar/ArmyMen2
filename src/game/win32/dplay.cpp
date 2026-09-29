@@ -2428,8 +2428,8 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommRecentTotal()
     void *comm = this;
 
     const uint8_t *c     = (const uint8_t *)comm;
-    uint32_t       now   = GetTickCount();
     int32_t        total = 0;
+    uint32_t       now   = GetTickCount();
     int32_t        i;
 
     for (i = 0; i < AM2_STAT_SLOTS; i++) {

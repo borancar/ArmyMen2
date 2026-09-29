@@ -1263,17 +1263,15 @@ extern "C" const int32_t am2_menu_save_slot[4] = { 0, 0, 32, 32 };
  * the address. */
 void __cdecl OverlayPrepare(int32_t row, int32_t force)
 {
-    uint32_t now;
     uint32_t origin;
 
     if (row < 0 || row >= MENU_ROW_DIRECT)
         return;
 
-    now = g_gameClockMs;
-    if (!g_netGame && !force && g_menuRowStamp == now)
+    if (!g_netGame && !force && g_menuRowStamp == g_gameClockMs)
         return;
 
-    g_menuRowStamp = now;
+    g_menuRowStamp = g_gameClockMs;
     if (g_menuRow == row)
         return;
 
