@@ -2682,24 +2682,32 @@ uint32_t __cdecl ActionPoint(const AM2_ScriptAction *act, uint32_t me)
     void *obj;
 
     if (act->xvar != 0) {
-        int32_t x = 0;
-        int32_t y = 0;
+        /* One value read twice into, not zeroed first: GetVarValue leaves
+         * `v` alone for a name that is not a variable, so the image reads
+         * whatever its stack slot held (the dead `act` argument). The port
+         * starts it at 0 instead, as this reconstruction always has; VC6 is
+         * given the original's uninitialised read. The point is built a half
+         * at a time. */
+#if defined(_MSC_VER)
+        int32_t   v;
+#else
+        int32_t   v = 0;
+#endif
+        AM2_Point p;
 
-        GetVarValue(act->xvar, &x);
-        GetVarValue(act->yvar, &y);
-
-        return (uint32_t)(uint16_t)x | ((uint32_t)(uint16_t)y << 16);
+        GetVarValue(act->xvar, &v);
+        p.x = (int16_t)v;
+        GetVarValue(act->yvar, &v);
+        p.y = (int16_t)v;
+        return *(const uint32_t *)&p;
     }
 
-    if (act->u.pos.x != 0)
-        return (uint32_t)act->u.both;
-
-    obj = LookupByUID(ResolveUid(act->target, me));
-
-    if (obj == (void *)0)
-        return (uint32_t)act->u.both;
-
-    return *(const uint32_t *)((const uint8_t *)obj + OBJ_OFF_POS);
+    if (act->u.pos.x == 0) {
+        obj = LookupByUID(ResolveUid(act->target, me));
+        if (obj)
+            return *(const uint32_t *)((const uint8_t *)obj + OBJ_OFF_POS);
+    }
+    return (uint32_t)act->u.both;
 }
 
 /* ------------------------------------------------------ raise ---- */

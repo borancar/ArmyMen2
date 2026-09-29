@@ -964,15 +964,15 @@ int32_t __cdecl RowAlloc(int32_t w, int32_t h, void *row, void *desc)
     bytes = (int32_t)r[ROW_OFF_OWNS] * (int32_t)ROW_ENTRY_BYTES;
     ROW_FLD(r, ROW_OFF_BUFFER, void *) = am2_malloc((uint32_t)bytes);
 
+    /* The buffer pointer is re-read for every field, as the image does. */
+#define ENTRY (ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *) + (uint32_t)i * ROW_ENTRY_BYTES)
     for (i = 0; i < (int32_t)r[ROW_OFF_OWNS]; i++) {
-        uint8_t *entry = ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *)
-                         + (uint32_t)i * ROW_ENTRY_BYTES;
-
-        ROW_FLD(entry, DEPTH_OFF_OBJ, void *)       = r;
-        ROW_FLD(entry, DEPTH_OFF_NEXT, uint32_t)    = 0;
-        ROW_FLD(entry, DEPTH_OFF_PREV, uint32_t)    = 0;
-        ROW_FLD(entry, ROW_ENTRY_OFF_CELL, int32_t) = -1;
+        ROW_FLD(ENTRY, DEPTH_OFF_OBJ, void *)       = r;
+        ROW_FLD(ENTRY, DEPTH_OFF_NEXT, uint32_t)    = 0;
+        ROW_FLD(ENTRY, DEPTH_OFF_PREV, uint32_t)    = 0;
+        ROW_FLD(ENTRY, ROW_ENTRY_OFF_CELL, int32_t) = -1;
     }
+#undef ENTRY
 
     spr = ROW_FLD(r, ROW_OFF_SPRITE, uint8_t *);
     if (!spr) {

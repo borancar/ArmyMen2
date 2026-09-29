@@ -1545,8 +1545,7 @@ play:
  * Unexercised: no audio device. */
 void __cdecl StopNamedSound(const char *name, int32_t index)
 {
-    uint8_t             *rec;
-    LPDIRECTSOUNDBUFFER  buf;
+    uint8_t *rec;
 
     if (!g_audioEnabled)
         return;
@@ -1557,29 +1556,29 @@ void __cdecl StopNamedSound(const char *name, int32_t index)
     if (!rec)
         return;
 
-    buf = *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER);
-
-    if (*name == '\0') {
-        /* Stop whatever is there, and only touch the flag if there was one. */
-        if (!buf)
-            return;
-        IDirectSoundBuffer_Stop(buf);
-        *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
-        return;
-    }
-
-    {
+    /* The buffer is re-read at each use, as the image does. */
+#define buf (*(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER))
+    if (*name != '\0') {
         const char *held = *(const char **)(rec + SOUND_REC_OFF_NAME);
 
         if (!held)
             return;
         if (strcmp(name, held) != 0)
             return;      /* the slot has been reused; not ours to stop */
+
+        if (buf)
+            IDirectSoundBuffer_Stop(buf);
+        *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
+        return;
     }
 
-    if (buf)
-        IDirectSoundBuffer_Stop(buf);
+    /* No name: stop whatever is there, and only touch the flag if there was
+     * one. */
+    if (!buf)
+        return;
+    IDirectSoundBuffer_Stop(buf);
     *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 0;
+#undef buf
 }
 
 /* Follow the sounds around -- 0x0040BCF0.
