@@ -420,26 +420,31 @@ void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)
  */
 int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3)
 {
-    const uint8_t *oa   = (const uint8_t *)a;
-    const uint8_t *ob   = (const uint8_t *)b;
-    void          *comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
-    int32_t        mp   = *(const int32_t *)(uintptr_t)ADDR_MP_SESSION;
+    const uint8_t *oa = (const uint8_t *)a;
+    const uint8_t *ob = (const uint8_t *)b;
     const uint8_t *rec;
     int32_t        army, idx;
 
-    if (mp && a && *(const int32_t *)oa == 2
-        && *(const int32_t *)(oa + OBJ_OFF_SOLDIER_KIND) == 7)
-        return (b && *(const int32_t *)ob == 2
-                && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7);
+    /* The kind-7 pair rule, then ArmyAlliedWithObj's body with the army
+     * taken from the first object; every "allied" exit shares one return. */
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        && ObjIsType2Inline(a)
+        && *(const int32_t *)(oa + OBJ_OFF_SOLDIER_KIND) == 7) {
+        if (ObjIsType2Inline(b)
+            && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7)
+            goto allied;
+        return 0;
+    }
 
     army = *(const int8_t *)(oa + OBJ_OFF_ARMY);
     if (army == 4)
-        return 1;
+        goto allied;
     if (*(const uint8_t *)(ob + OBJ_OFF_ARMY) == 4)
-        return 1;
+        goto allied;
 
-    if (b && *(const int32_t *)ob == 2) {
-        if (mp && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7)
+    if (ObjIsType2Inline(b)) {
+        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+            && *(const int32_t *)(ob + OBJ_OFF_SOLDIER_KIND) == 7)
             return 0;
 
         rec = (useRec3
@@ -448,8 +453,9 @@ int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3)
               : *(const uint8_t *const *)(ob + SAVED_OFF_TABLE_REC2);
 
         if ((const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS
-                + (uint32_t)(((AM2_Comm *)comm)->CommArmyOfSlot(army) << 8)) == rec)
-            return 1;
+                + (uint32_t)((*(AM2_Comm *const *)(uintptr_t)ADDR_COMM_OBJECT)
+                                 ->CommArmyOfSlot(army) << 8)) == rec)
+            goto allied;
 
         if (rec == (const uint8_t *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
             idx = 0;
@@ -462,11 +468,15 @@ int32_t __cdecl ObjsAreAllied(void *a, void *b, int32_t useRec3)
         else
             return 0;
 
-        if (AllyFlag(army, ((AM2_Comm *)comm)->CommSlotForArmy(idx)))
-            return 1;
+        if (AllyFlag(army, (*(AM2_Comm *const *)(uintptr_t)ADDR_COMM_OBJECT)
+                               ->CommSlotForArmy(idx)))
+            goto allied;
     }
 
     return AllyFlag(army, *(const int8_t *)(ob + OBJ_OFF_ARMY));
+
+allied:
+    return 1;
 }
 
 /* ObjAttachTo -- original 0x00458070, 640 bytes, twenty callers. Detach an
