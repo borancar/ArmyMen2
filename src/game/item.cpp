@@ -3098,7 +3098,7 @@ int32_t __cdecl BlockWeightRoute(void *from, uint32_t at, void *chain,
         } else if (f
                    && (dh = *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
                             - *(const int8_t *)(f + OBJ_OFF_HEIGHT_SET),
-                       (dh < 0 ? -dh : dh) > AM2_BLOCK_HEIGHT_STEP)) {
+                       abs(dh) > AM2_BLOCK_HEIGHT_STEP)) {
             w = 0;
             ask = 0;
         } else if (ObjIsItem((const AM2_Object *)o)) {
@@ -3739,8 +3739,7 @@ int32_t __cdecl ObjCollidesWith(void *from, void *obj)
 
     step = (int32_t)*(const int8_t *)(f + OBJ_OFF_HEIGHT_SET)
          - (int32_t)*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET);
-    if (step < 0)
-        step = -step;
+    step = abs(step);
     if (step > AM2_BLOCK_HEIGHT_STEP)
         return 0;
 
@@ -10130,8 +10129,7 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
 
                     hp    = *(const int32_t *)(v + OBJ_OFF_FIELD_568);
                     speed = *(const int32_t *)(v + OBJ_OFF_FIELD_44);
-                    if (speed < 0)
-                        speed = -speed;
+                    speed = abs(speed);
 
                     if (ObjIsType2((const AM2_Object *)o))
                         ;                       /* a trooper takes all of it */
@@ -10181,7 +10179,7 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
                         && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
                            > *(const uint32_t *)(v + OBJ_OFF_DEADLINE_58)) {
                         int32_t hp = *(const int32_t *)(v + OBJ_OFF_FIELD_568);
-                        int32_t s  = speed < 0 ? -speed : speed;
+                        int32_t s  = abs(speed);
 
                         *(uint32_t *)(v + OBJ_OFF_DEADLINE_58) =
                             *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
@@ -10208,7 +10206,7 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
                     }
 
                     /* Reached whether or not it was hit. */
-                    speed = speed < 0 ? -speed : speed;
+                    speed = abs(speed);
                     if (speed > AM2_VEHICLE_NOISY_SPEED
                         && (ObjIsType3((const AM2_Object *)o)
                             || (ObjIsItem((const AM2_Object *)o)

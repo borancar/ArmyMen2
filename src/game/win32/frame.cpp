@@ -1586,31 +1586,31 @@ void __cdecl RefreshDraw(void)
 void __cdecl Substate34Escape(void)
 {
     if (*(const int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET) {
-        const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
-
         FreeBitmap(&g_currentBitmap);
         RequestState(1);
-        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 0;
+        /* The comm object is read after the calls. */
         *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST =
-            *(const int32_t *)(comm + COMM_OFF_IS_HOST) ? AM2_MENU_REQ_MP_HOST
-                                                        : AM2_MENU_REQ_MP_JOIN;
+            *(const int32_t *)(*(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT
+                               + COMM_OFF_IS_HOST)
+                ? AM2_MENU_REQ_MP_HOST : AM2_MENU_REQ_MP_JOIN;
+        *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 0;
         return;
     }
 
     if (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY) {
-        void *bmp = g_currentBitmap;
-
+        /* The bitmap global is read again after the target is set. */
+#define BMP ((uint8_t *)g_currentBitmap)
         *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 0;
-        if (bmp) {
-            int32_t w = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_W);
-            int32_t h = *(const int32_t *)((uint8_t *)bmp + SPR_OFF_H);
-
+        if (BMP) {
             SetDrawTarget(g_primarySurface);
-            DrawSprite((AM2_Sprite *)bmp,
-                       (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W - w) >> 1,
-                       (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H - h) >> 1,
+            DrawSprite((AM2_Sprite *)BMP,
+                       (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
+                        - *(const int32_t *)(BMP + SPR_OFF_W)) >> 1,
+                       (*(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_H
+                        - *(const int32_t *)(BMP + SPR_OFF_H)) >> 1,
                        0);
         }
+#undef BMP
     }
 
     if (!IsKeyDown(AM2_DIK_ESCAPE) && KeyChanged(AM2_DIK_ESCAPE)) {

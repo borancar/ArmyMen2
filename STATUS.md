@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1193 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1198 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1193:
+  the near-miss sweep, 758 before the row pools. From 758 to 1198:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -163,6 +163,12 @@ main result so far (details in `src/vc6/README.md`):
     calls to our seven), LoadEventSection registers once per kind. The
     scan has false positives where a function's byte range in the json
     runs on into the next one.
+  - **`abs()` is the `cdq; xor eax, edx; sub eax, edx` idiom**: a scan of
+    the near misses for that triple found eleven functions spelling it
+    `if (x < 0) x = -x` or a ternary; SightScan went from 74 hunks to 27.
+    ScriptParseNumber compares plain (signed) chars and recomputes strlen
+    each pass; ScriptRunLine zeroes its context with a memset (the zero in
+    a register for the struct, an immediate for the other local).
   - **Signed loop tests mean an index**: a `jl` against a strength-reduced
     cursor is an `int32_t i` loop (OptionsApply, AimMarkerAge), a pointer
     walk gives `jb`. The cursor's bias is the field the body reads first.

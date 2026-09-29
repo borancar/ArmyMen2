@@ -592,7 +592,7 @@ void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
 
     if (ObjIsType3((const AM2_Object *)leader)) {
         int32_t delta = AngleDelta(facing, leaderFacing);
-        int32_t mag   = delta < 0 ? -delta : delta;
+        int32_t mag   = abs(delta);
 
         if (mag < 0x40) {
             facing = (uint8_t)(facing + (delta < 0 ? 0xC3 : 0x3D));
@@ -681,7 +681,7 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
 
     if (ObjIsType3((const AM2_Object *)leader)) {
         int32_t delta = AngleDelta(facing, leaderFacing);
-        int32_t mag   = delta < 0 ? -delta : delta;
+        int32_t mag   = abs(delta);
 
         if (mag < 0x40) {
             facing = (uint8_t)(facing + (delta < 0 ? 0xC3 : 0x3D));

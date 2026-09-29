@@ -16317,19 +16317,17 @@ void __attribute__((thiscall)) AM2_Widget::ScrollBarPaint(RECT clip)
 
     /* The subtraction happens first and the halving after, which rounds the
      * other way from ::WidgetPaint's centring on an odd difference. */
-    x = w->rect.left
+    /* The box is the sprite placed at (x, y), and it is what the clip is taken
+     * against -- not the widget's own rectangle, which is what ::WidgetPaint
+     * uses. A bar shifted past its track is clipped by its own extent. Each
+     * axis is finished before the next is started. */
+    x = box.left = w->rect.left
         + ((w->rect.right - *(const int32_t *)(self + SCROLLBAR_OFF_SPAN)
             - w->rect.left) >> 1)
         + *(const int32_t *)(self + SCROLLBAR_OFF_SHIFT);
-    y = w->rect.top
-        + ((w->rect.bottom - bar->bounds.bottom - w->rect.top) >> 1);
-
-    /* The box is the sprite placed at (x, y), and it is what the clip is taken
-     * against -- not the widget's own rectangle, which is what ::WidgetPaint
-     * uses. A bar shifted past its track is clipped by its own extent. */
-    box.left   = x;
-    box.top    = y;
     box.right  = bar->bounds.right + x;
+    y = box.top = w->rect.top
+        + ((w->rect.bottom - bar->bounds.bottom - w->rect.top) >> 1);
     box.bottom = bar->bounds.bottom + y;
 
     /* One IntersectRect, where ::WidgetPaint does two -- this one never meets

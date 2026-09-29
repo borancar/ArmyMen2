@@ -1625,23 +1625,26 @@ int32_t __cdecl RadarBlipColour(const void *objv, int32_t *blink)
     colour = AM2_THE_COMM->CommArmyOfSlot(
                             *(const int8_t *)(self + OBJ_OFF_ARMY));
 
+    /* Two four-way switches, and the key read again for the second test. */
+#define KEY (*(const uint32_t *)(*(const uint8_t *const *)(self + OBJ_OFF_FIELD_94) + 8))
     if (ObjIsType4(obj)) {
-        uint32_t kind = **(const uint32_t *const *)(self + OBJ_OFF_FIELD_C0)
-                        - AM2_RADAR_KIND_FIRST;
-
-        if (kind <= 3)
-            colour = (int32_t)kind;
+        switch (**(const int32_t *const *)(self + OBJ_OFF_FIELD_C0)) {
+        case AM2_RADAR_KIND_FIRST + 0: colour = 0; break;
+        case AM2_RADAR_KIND_FIRST + 1: colour = 1; break;
+        case AM2_RADAR_KIND_FIRST + 2: colour = 2; break;
+        case AM2_RADAR_KIND_FIRST + 3: colour = 3; break;
+        }
     } else if (ObjIsItem(obj)) {
-        uint32_t key = *(const uint32_t *)
-            (*(const uint8_t *const *)(self + OBJ_OFF_FIELD_94) + 8);
-
-        if (KeyFieldA(key) == AM2_RADAR_KEY_TAG) {
-            uint32_t slot = KeyFieldB(key) - AM2_RADAR_KEY_FIRST;
-
-            if (slot <= 3)
-                colour = (int32_t)slot;
+        if (KeyFieldA(KEY) == AM2_RADAR_KEY_TAG) {
+            switch (KeyFieldB(KEY)) {
+            case AM2_RADAR_KEY_FIRST + 0: colour = 0; break;
+            case AM2_RADAR_KEY_FIRST + 1: colour = 1; break;
+            case AM2_RADAR_KEY_FIRST + 2: colour = 2; break;
+            case AM2_RADAR_KEY_FIRST + 3: colour = 3; break;
+            }
         }
     }
+#undef KEY
 
     *blink = 0;
 

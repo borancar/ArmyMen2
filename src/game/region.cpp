@@ -1,6 +1,7 @@
 /* region.cpp -- see region.h. */
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>   /* abs -- the cdq/xor/sub idiom */
 
 #include "misc.h"   /* CollapseEqualDeltas -- reconstructed */
 #include "rect.h"   /* Clamp -- reconstructed */
@@ -4044,8 +4045,7 @@ void __cdecl AiAttackBody(void *obj, void *out, void *ctx)
         bearing = (uint8_t)AngleOfDelta(dx, dy);
 
         delta = AngleDelta(facing, bearing);
-        if (delta < 0)
-            delta = -delta;
+        delta = abs(delta);
         if (delta > *(const int32_t *)(rank + RANK_REC_OFF_FIELD_04)) {
             if (dist < *(const int32_t *)(rank + RANK_REC_OFF_FIELD_08))
                 goto engage;
@@ -4405,8 +4405,7 @@ void __cdecl AiEngageStep(void *obj, void *out, void *ctx)
         bearing = (uint8_t)AngleOfDelta(dx, dy);
 
         delta = AngleDelta(facing, bearing);
-        if (delta < 0)
-            delta = -delta;
+        delta = abs(delta);
         if (delta > *(const int32_t *)(rank + RANK_REC_OFF_FIELD_04)) {
             if (dist < *(const int32_t *)(rank + RANK_REC_OFF_FIELD_08))
                 goto in_sight;
@@ -5295,8 +5294,7 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
             candBearing = (uint8_t)AngleOfDelta(dx, dy);
 
             delta = AngleDelta(look, candBearing);
-            if (delta < 0)
-                delta = -delta;
+            delta = abs(delta);
             {
                 const uint8_t *rank =
                     (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
@@ -6104,15 +6102,12 @@ void __cdecl ConsiderSightingB(void *seen, void *out, const void *sight)
         if (range > 0
             && range < *(const int32_t *)(c + SIGHTB_OFF_MAX_RANGE)) {
 
-            delta = AngleDelta(*(const uint8_t *)(o + SIGHTBOUT_OFF_BEARING),
-                               *(const uint8_t *)(c + SIGHT_OFF_BEARING));
-            if (delta < 0)
-                delta = -delta;
+            delta = abs(AngleDelta(*(const uint8_t *)(o + SIGHTBOUT_OFF_BEARING),
+                                   *(const uint8_t *)(c + SIGHT_OFF_BEARING)));
 
             if ((uint8_t)delta < AM2_SIGHT_CONE_B) {
-                const uint8_t *observer =
-                    *(const uint8_t *const *)(c + SIGHT_OFF_OBSERVER);
-
+                /* The observer is read from the record at every use. */
+#define observer (*(const uint8_t *const *)(c + SIGHT_OFF_OBSERVER))
                 *(int32_t *)(o + SIGHTOUT_OFF_HIT) = 1;
 
                 if (observer) {
@@ -6132,6 +6127,7 @@ void __cdecl ConsiderSightingB(void *seen, void *out, const void *sight)
                             + AM2_REVEAL_MS;
                     }
                 }
+#undef observer
             }
         }
     }
@@ -8486,7 +8482,7 @@ settle_facing:
             int32_t ours   = (int8_t)*(const uint8_t *)(o + OBJ_OFF_HEIGHT_SET);
             int32_t d      = theirs - ours;
 
-            if ((d < 0 ? -d : d) <= AM2_TROOPER_STEP_UP)
+            if (abs(d) <= AM2_TROOPER_STEP_UP)
                 speed = theirs;
         }
 
@@ -10403,8 +10399,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
                               (const AM2_Point *)&target) < 0xC0) {
                 int32_t d = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
                                        *(const uint8_t *)r);
-                if (d < 0)
-                    d = -d;
+                d = abs(d);
                 if (d > 0x40)
                     *(int32_t *)(r + 0x0Cu) = 1;
             }
@@ -10693,8 +10688,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
                 && *(const int8_t *)(p + 0x98u) < 0) {
                 int32_t d = *(const int8_t *)(p + 0x65u)
                             - *(const int8_t *)(o + 0x65u);
-                if (d < 0)
-                    d = -d;
+                d = abs(d);
                 if (d <= 0x10)
                     tileArg = *(const int8_t *)(p + 0x65u);
             }

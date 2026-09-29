@@ -132,12 +132,8 @@ void __cdecl ScriptResetTokens(AM2_ScriptCtx *ctx)
 
 int32_t __cdecl ScriptParseNumber(const char *text, int32_t *ival, float *fval)
 {
-    uint8_t c = (uint8_t)text[0];
-    if (c != '-' && (c < '0' || c > '9'))
-        return 0;
-
-    /* The original recomputes strlen on every iteration; the value cannot
-     * change, so it is hoisted.
+    /* Plain (signed) chars, compared with `jl`/`jle`, and strlen taken again
+     * on every pass, as the image does.
      *
      * The bound is `i < len`, so every character but the first is examined.
      * Getting this wrong is easy and I did: `repne scasb` from ecx = -1 counts
@@ -145,11 +141,16 @@ int32_t __cdecl ScriptParseNumber(const char *text, int32_t *ival, float *fval)
      * follows gives len -- not len-1. With the off-by-one, "1." came out as
      * the integer 1 where the original gives the float 1.0, which is what the
      * shipped text caught. */
-    int32_t len = (int32_t)strlen(text);
-    int32_t dots = 0;
+    char    c = text[0];
+    int32_t dots;
+    int32_t i;
 
-    for (int32_t i = 1; i < len; i++) {
-        c = (uint8_t)text[i];
+    if (c != '-' && (c < '0' || c > '9'))
+        return 0;
+
+    dots = 0;
+    for (i = 1; i < (int32_t)strlen(text); i++) {
+        c = text[i];
         if (c >= '0' && c <= '9')
             continue;
         if (c != '.')
@@ -3455,9 +3456,9 @@ int32_t __cdecl ScriptRunLine(const char *line)
     AM2_ScriptAction act;
     int32_t          at = 0;
 
-    ctx.capacity = 0;
-    ctx.count    = 0;
-    ctx.tokens   = 0;
+    /* A memset, which is what puts the zero in a register for the three
+     * fields and leaves `at` an immediate. */
+    memset(&ctx, 0, sizeof ctx);
 
     ScriptResetTokens(&ctx);
     ScriptNextToken(line, &ctx, 0);
