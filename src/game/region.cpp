@@ -6018,7 +6018,6 @@ void __cdecl ConsiderSighting(void *seen, void *out, const void *sight)
     uint8_t       *s = (uint8_t *)seen;
     uint8_t       *o = (uint8_t *)out;
     const uint8_t *c = (const uint8_t *)sight;
-    const uint8_t *observer;
     int32_t        range;
     int32_t        delta;
 
@@ -6031,16 +6030,15 @@ void __cdecl ConsiderSighting(void *seen, void *out, const void *sight)
     if (range <= 0 || range >= *(const int32_t *)(c + SIGHT_OFF_MAX_RANGE))
         return;
 
-    delta = AngleDelta(*(const uint8_t *)(s + OBJ_OFF_FIELD_530),
-                       *(const uint8_t *)(c + SIGHT_OFF_BEARING));
-    if (delta < 0)
-        delta = -delta;
+    delta = abs(AngleDelta(*(const uint8_t *)(s + OBJ_OFF_FIELD_530),
+                           *(const uint8_t *)(c + SIGHT_OFF_BEARING)));
     if ((uint8_t)delta > AM2_SIGHT_CONE)
         return;
 
     *(int32_t *)(o + SIGHTOUT_OFF_HIT) = 1;
 
-    observer = *(const uint8_t *const *)(c + SIGHT_OFF_OBSERVER);
+    /* The observer is read from the record at every use. */
+#define observer (*(const uint8_t *const *)(c + SIGHT_OFF_OBSERVER))
     if (!observer)
         return;
 
@@ -6059,6 +6057,7 @@ void __cdecl ConsiderSighting(void *seen, void *out, const void *sight)
     RevealObj(s);
     *(int32_t *)(s + OBJ_OFF_REVEALED_UNTIL) =
         *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + AM2_REVEAL_MS;
+#undef observer
 }
 
 /* ConsiderSightingB -- original 0x00408580, one caller, and
@@ -6175,7 +6174,8 @@ void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight)
     uint8_t       *s = (uint8_t *)seen;
     uint8_t       *o = (uint8_t *)out;
     const uint8_t *c = (const uint8_t *)sight;
-    int32_t        maxRange = *(const int32_t *)(c + SIGHTC_OFF_MAX_RANGE);
+    /* The range cap is read from the record at every use. */
+#define maxRange (*(const int32_t *)(c + SIGHTC_OFF_MAX_RANGE))
 
     if (*(const int32_t *)(c + SIGHTC_OFF_WEAPON)
         && *(const int32_t *)(c + SIGHTC_OFF_READY)) {
@@ -6183,17 +6183,13 @@ void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight)
 
         if (range > 0 && range < maxRange) {
             int32_t delta =
-                AngleDelta(*(const uint8_t *)(o + SIGHTCOUT_OFF_BEARING),
-                           *(const uint8_t *)(c + SIGHTC_OFF_BEARING));
-
-            if (delta < 0)
-                delta = -delta;
+                abs(AngleDelta(*(const uint8_t *)(o + SIGHTCOUT_OFF_BEARING),
+                               *(const uint8_t *)(c + SIGHTC_OFF_BEARING)));
 
             if ((uint8_t)delta < AM2_SIGHT_CONE_B
                 || maxRange == AM2_SIGHT_OMNI_RANGE) {
-                const uint8_t *observer =
-                    *(const uint8_t *const *)(c + SIGHTC_OFF_OBSERVER);
-
+                /* The observer is read from the record at every use. */
+#define observer (*(const uint8_t *const *)(c + SIGHTC_OFF_OBSERVER))
                 *(int32_t *)(o + SIGHTCOUT_OFF_HIT) = 1;
 
                 if (observer) {
@@ -6214,6 +6210,7 @@ void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight)
                             + AM2_REVEAL_MS;
                     }
                 }
+#undef observer
             }
         }
     }
@@ -6228,6 +6225,7 @@ void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight)
         *(int32_t *)(o + SIGHTCOUT_OFF_SEEN)  = 1;
         *(int32_t *)(s + OBJ_OFF_FIELD_578)   = 1;
     }
+#undef maxRange
 }
 
 /* SealMapEdges -- original 0x0042BCF0, one caller.
