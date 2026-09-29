@@ -4483,36 +4483,38 @@ void __cdecl AimMarkerAge(void)
  */
 void __cdecl AimStart(uint32_t uid, int8_t army, uint32_t at)
 {
-    int32_t   i = army;
-    int16_t  *pt = (int16_t *)((uint8_t *)((void *)(uintptr_t)(ADDR_AIM_POINT_A))
-                               + (uint32_t)i * 4);
+    int32_t   off = (int32_t)army * 4;
     uint32_t  hit;
     uint8_t  *o;
 
-    ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_LIVE_A)))[i] = 1;
-    *(uint32_t *)pt = at;
+    /* Four parallel per-army tables, indexed through one scaled offset. */
+#define AIM(addr) (*(int32_t *)((uint8_t *)((void *)(uintptr_t)(addr)) + off))
+#define PT        ((int16_t *)((uint8_t *)((void *)(uintptr_t)(ADDR_AIM_POINT_A)) + off))
+    AIM(ADDR_AIM_LIVE_A) = 1;
+    AIM(ADDR_AIM_POINT_A) = (int32_t)at;
 
-    if (!((int32_t *)((void *)(uintptr_t)(ADDR_AIM_STAMP_A)))[i])
-        ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_STAMP_A)))[i] =
-            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
+    if (!AIM(ADDR_AIM_STAMP_A))
+        AIM(ADDR_AIM_STAMP_A) = *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
         && !AM2_THE_COMM->CommMustBroadcast(
                               (int16_t)army)) {
-        ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_DEADLINE_A)))[i] =
+        AIM(ADDR_AIM_DEADLINE_A) =
             *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
             + AM2_AIM_LIFE_REMOTE_MS;
         return;
     }
 
-    ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_DEADLINE_A)))[i] =
+    AIM(ADDR_AIM_DEADLINE_A) =
         *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
         + *(const int32_t *)(uintptr_t)ADDR_AIM_LIFE_HALF_A * 2 - 1;
 
     ((int16_t *)&hit)[0] =
-        (int16_t)(*(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X + pt[0]);
+        (int16_t)(*(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X + PT[0]);
     ((int16_t *)&hit)[1] =
-        (int16_t)(pt[1] + *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
+        (int16_t)(PT[1] + *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
+#undef AIM
+#undef PT
 
     o = (uint8_t *)ObjectsHitByPoint(&hit,
                                      (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
@@ -4552,7 +4554,6 @@ void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at)
 #define POINTS ((AM2_Point *)(uintptr_t)ADDR_AIM_POINT_B)
     int32_t    i  = army;
     AM2_Point *pt = &POINTS[i];
-    int32_t    deadline;
 
     ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_LIVE_B)))[i] = 1;
     *(uint32_t *)pt = at;
@@ -4563,14 +4564,14 @@ void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at)
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
         && !AM2_THE_COMM->CommMustBroadcast(
-                              (int16_t)army)) {
-        deadline = *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-                   + AM2_AIM_LIFE_REMOTE_MS;
-    } else {
-        deadline = *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-                   + *(const int32_t *)(uintptr_t)ADDR_AIM_LIFE_HALF_B * 2 - 1;
-    }
-    ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_DEADLINE_B)))[i] = deadline;
+                              (int16_t)army))
+        ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_DEADLINE_B)))[i] =
+            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            + AM2_AIM_LIFE_REMOTE_MS;
+    else
+        ((int32_t *)((void *)(uintptr_t)(ADDR_AIM_DEADLINE_B)))[i] =
+            *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+            + *(const int32_t *)(uintptr_t)ADDR_AIM_LIFE_HALF_B * 2 - 1;
 
     orig_spawn_at_aim(pt->x + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
                       POINTS[i].y + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y,

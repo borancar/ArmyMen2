@@ -1839,8 +1839,9 @@ int32_t __cdecl InitWaveSounds(void)
     /* The directory is probed and the answer thrown away, exactly as written. */
     SetGameDir(*(const char **)(uintptr_t)ADDR_WAVE_DIR);
 
+    /* The slot is indexed afresh at each use, as the image does. */
+#define slot (g_soundSlots + i * SOUND_SLOT_STRIDE)
     for (i = 0; i < (int32_t)WAVE_COUNT; i++) {
-        uint8_t *slot = g_soundSlots + i * SOUND_SLOT_STRIDE;
         DSBCAPS  caps;
 
         if (!LoadWaveSound((void **)slot, g_dsound, g_waveNames[i])) {
@@ -1860,6 +1861,7 @@ int32_t __cdecl InitWaveSounds(void)
             &caps);
         *(uint32_t *)(slot + SOUND_SLOT_OFF_BYTES) = caps.dwBufferBytes;
     }
+#undef slot
     return 1;
 }
 
