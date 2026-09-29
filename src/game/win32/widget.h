@@ -466,7 +466,7 @@ struct AM2_Edit : AM2_Widget {
     void      (__cdecl *onEnter)(AM2_Widget *);   /* 0x0074  EDIT_OFF_ON_ENTER */
     int32_t     arg78;              /* 0x0078  EDIT_OFF_ARG78 */
     int32_t     arg7C;              /* 0x007C  EDIT_OFF_ARG7C */
-    AM2_Edit(char *buf, int32_t maxChars, AM2_Rect box, int32_t font, int32_t inkFocus, int32_t ink, int32_t paper, void (__cdecl *onEnter)(AM2_Widget *), int32_t a, int32_t b);
+    AM2_Edit(char *buf, int32_t maxChars, AM2_Rect box, int32_t font, uint8_t inkFocus, uint8_t ink, uint8_t paper, void (__cdecl *onEnter)(AM2_Widget *), int32_t a, int32_t b);
     explicit AM2_Edit(AM2_Widget::AM2_NoInit n) : AM2_Widget(n) { }
     ~AM2_Edit();
 };

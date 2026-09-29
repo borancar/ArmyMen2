@@ -1381,7 +1381,7 @@ void __attribute__((thiscall)) am2_dtor_AM2_ScrollBar(AM2_Widget *w)
 #endif
 
 #if defined(__GNUC__)
-AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Edit(void *mem, char *buf, int32_t maxChars, AM2_Rect box, int32_t font, int32_t inkFocus, int32_t ink, int32_t paper, void (__cdecl *onEnter)(AM2_Widget *), int32_t a, int32_t b)
+AM2_Widget *__attribute__((thiscall)) am2_ctor_AM2_Edit(void *mem, char *buf, int32_t maxChars, AM2_Rect box, int32_t font, uint8_t inkFocus, uint8_t ink, uint8_t paper, void (__cdecl *onEnter)(AM2_Widget *), int32_t a, int32_t b)
 { return ::new (mem) AM2_Edit(buf, maxChars, box, font, inkFocus, ink, paper, onEnter, a, b); }
 void __attribute__((thiscall)) am2_dtor_AM2_Edit(AM2_Widget *w)
 { ((AM2_Edit *)w)->AM2_Edit::~AM2_Edit(); }
@@ -11826,23 +11826,19 @@ AM2_SelectMapScreen::AM2_SelectMapScreen(const char *bmp)
     AM2_Widget *panel;
     AM2_Widget *list;
     AM2_Widget *bar;
-    void       *rows;
     int32_t     i;
     AM2_CTOR_VTABLE(w, VTABLE_SELECT_MAP);
     ReadCampaignLevels();
 
-    rows = orig_operator_new(AM2_ROWS_SIZE);
-    if (rows)
-        rows = RecordCtor(rows, 1);
-    *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = rows;
+    *(void **)((uint8_t *)w + COMMPANEL_OFF_LIST) = new AM2_Rec(1);
 
-    for (i = 1; i - 1 < g_levelCount; i++) {
-        uint8_t *rec = (uint8_t *)FindLevelRecord(i);
+for (i = 0; i < LevelCount(); i++) {
+        uint8_t *rec = (uint8_t *)FindLevelRecord(i + 1);
 
         if (rec) {
             int32_t *id = (int32_t *)am2_malloc(sizeof *id);
 
-            *id = i;
+            *id = i + 1;
             ListAdd(*(void **)((uint8_t *)w + COMMPANEL_OFF_LIST),
                     (const char *)(rec + LEVEL_OFF_NAME), id);
         }
@@ -15402,16 +15398,16 @@ void __attribute__((thiscall)) AM2_Widget::WidgetUpdateCancel()
  * EDIT_OFF_CHARSET afterwards. That is exactly what ENTER BATTLE NAME does
  * with the letters-and-digits set at 0x00485308, so the two sets are a
  * default and an override rather than two unrelated tables. */
-AM2_Edit::AM2_Edit(char *buf, int32_t maxChars_, AM2_Rect box, int32_t font_, int32_t inkFocus_, int32_t ink_, int32_t paper_, void (__cdecl *onEnter_)(AM2_Widget *), int32_t a, int32_t b)
+AM2_Edit::AM2_Edit(char *buf, int32_t maxChars_, AM2_Rect box, int32_t font_, uint8_t inkFocus_, uint8_t ink_, uint8_t paper_, void (__cdecl *onEnter_)(AM2_Widget *), int32_t a, int32_t b)
 {
     AM2_Widget *w = this;
 
     text     = buf;
     maxChars = maxChars_;
     font     = font_;
-    inkFocus = (uint8_t)inkFocus_;
-    ink      = (uint8_t)ink_;
-    paper    = (uint8_t)paper_;
+    inkFocus = inkFocus_;
+    ink      = ink_;
+    paper    = paper_;
     arg78    = a;
 
     AM2_CTOR_VTABLE(w, VTABLE_EDIT);
