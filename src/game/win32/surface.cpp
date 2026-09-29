@@ -786,8 +786,8 @@ void *__cdecl ReadDibChunk(am2_FILE *fp, void *header)
     int32_t           size;
     void             *pixels;
 
-    orig_fread(&fh, sizeof(fh), 1, fp);
-    orig_fread(&bi->bmiHeader, sizeof(bi->bmiHeader), 1, fp);
+    orig_fread(&fh, 1, sizeof(fh), fp);
+    orig_fread(&bi->bmiHeader, 1, sizeof(bi->bmiHeader), fp);
 
     if (bi->bmiHeader.biBitCount > 8) {
         orig_log("Too many colors in bitmap.\n");
@@ -797,19 +797,18 @@ void *__cdecl ReadDibChunk(am2_FILE *fp, void *header)
     if (bi->bmiHeader.biClrUsed == 0)
         bi->bmiHeader.biClrUsed = 1u << bi->bmiHeader.biBitCount;
 
-    orig_fread(bi->bmiColors, bi->bmiHeader.biClrUsed * 4, 1, fp);
+    orig_fread(bi->bmiColors, 1, bi->bmiHeader.biClrUsed * 4, fp);
     orig_fseek(fp, base + (int32_t)fh.bfOffBits, SEEK_SET);
 
     size = (int32_t)bi->bmiHeader.biSizeImage;
     if (!size) {
-        int32_t row;
-
+        /* The row width is worked in `size` itself. */
         if (bi->bmiHeader.biBitCount == 8)
-            row = bi->bmiHeader.biWidth + 3;
+            size = bi->bmiHeader.biWidth + 3;
         else
-            row = (bi->bmiHeader.biWidth + 7) / 8;
+            size = (bi->bmiHeader.biWidth + 7) / 8;
 
-        size = (row & ~3) * bi->bmiHeader.biHeight;
+        size = (size & ~3) * bi->bmiHeader.biHeight;
     }
 
     pixels = orig_malloc((size_t)size);
@@ -818,7 +817,7 @@ void *__cdecl ReadDibChunk(am2_FILE *fp, void *header)
         return (void *)0;
     }
 
-    orig_fread(pixels, (size_t)size, 1, fp);
+    orig_fread(pixels, 1, (size_t)size, fp);
     return pixels;
 }
 
