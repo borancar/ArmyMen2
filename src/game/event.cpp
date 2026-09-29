@@ -2148,11 +2148,11 @@ void __cdecl EvtObjPair(uint32_t uidA, uint32_t uidB)
 typedef void (__cdecl *AM2_FreeBitmapFn)(void **slot);
 /* Forward-declared rather than reached through win32/sprite.h, the same way
    commmsg.cpp declares HudMessage: this module is flat and that header names
-   Win32 types. `extern "C"` because every header in this tree is -- and note
-   the definition returns AM2_Sprite *, which cannot be spelled here, so this
-   says void *. The two agree on a 32-bit pointer ABI and nothing checks it;
-   said plainly rather than left for someone to find. */
-void *__cdecl LoadBitmap(const char *name, int32_t flags);
+   Win32 types. The return type is spelled as the definition's, AM2_Sprite *,
+   through an incomplete struct: MSVC mangles the return type into the name,
+   so a `void *` here links under GCC and is unresolved under VC6's LINK. */
+struct AM2_Sprite;
+struct AM2_Sprite *__cdecl LoadBitmap(const char *name, int32_t flags);
 
 /* 0x0041F600 and 0x0041F650. Put a full-screen bitmap up, pausing or not.
  *

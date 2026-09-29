@@ -137,6 +137,45 @@ def compile_all(standalone=False):
     return objs, fails
 
 
+# SMACKW32.DLL has no import library in the SDK, and movie.cpp calls it through
+# dllimport (as the original does, so the relink matches).  The DLL exports the
+# DECORATED names (`_SmackOpen@12`), so the import library LINK -lib makes from
+# a .def -- which records "strip the underscore" (name type 2) for a stdcall
+# name -- would ask the loader for `SmackOpen@12`.  Each short import object's
+# name type is patched to 1, import by the exact symbol name.
+SMACK_IMPORTS = ["SmackVolumePan@16", "SmackToBuffer@28", "SmackDoFrame@4",
+                 "SmackNextFrame@4", "SmackWait@4", "SmackClose@4",
+                 "SmackSoundUseDirectSound@4", "SmackOpen@12",
+                 "SmackDDSurfaceType@4"]
+
+
+def make_smack_lib():
+    import struct
+    with open(os.path.join(OUTDIR, "smackw32.def"), "w") as f:
+        f.write("LIBRARY smackw32.dll\nEXPORTS\n")
+        for n in SMACK_IMPORTS:
+            f.write("  %s\n" % n)
+    with open(os.path.join(OUTDIR, "smack.rsp"), "w") as f:
+        f.write("/NOLOGO\n/DEF:smackw32.def\n/MACHINE:IX86\n/OUT:SMACKW32.LIB\n")
+    env = dict(os.environ, LIB=LIBDIR, VC6_ROOT=VC6_ROOT)
+    subprocess.run([HOST, LINK, "-lib", "@smack.rsp"], env=env, cwd=OUTDIR,
+                   capture_output=True, text=True)
+    path = os.path.join(OUTDIR, "SMACKW32.LIB")
+    d = bytearray(open(path, "rb").read())
+    i = 0
+    while True:
+        i = d.find(b"\x00\x00\xff\xff", i)
+        if i < 0:
+            break
+        ver, mach = struct.unpack_from("<HH", d, i + 4)
+        if ver == 0 and mach == 0x14C:
+            typ = struct.unpack_from("<H", d, i + 18)[0]
+            struct.pack_into("<H", d, i + 18, (typ & ~0x1C) | (1 << 2))
+        i += 4
+    open(path, "wb").write(bytes(d))
+    return "SMACKW32.LIB"
+
+
 def run_link(objs, blob):
     out = os.path.join(OUTDIR, "ArmyMen2.exe")
     try:
@@ -158,7 +197,7 @@ def run_link(objs, blob):
             f.write(os.path.basename(o) + "\n")
         f.write(os.path.basename(blob) + "\n")
         f.write("/LIBPATH:\"%s\"\n" % LIBDIR)
-        f.write("\n".join(IMPORT_LIBS) + "\n")
+        f.write("\n".join(IMPORT_LIBS + [make_smack_lib()]) + "\n")
     args = [HOST, LINK, "@link.rsp"]
     env = dict(os.environ)
     env["LIB"] = LIBDIR

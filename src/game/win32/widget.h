@@ -1096,7 +1096,11 @@ typedef void (__attribute__((thiscall)) *AM2_WidgetFocusFn)(AM2_Widget *w,
  * at any of the ~77 call sites. GCC keeps the function-pointer call, which
  * its thiscall attribute already makes exact. */
 typedef void (__attribute__((thiscall)) *AM2_WidgetUpdateFn)(AM2_Widget *w);
-#if defined(_MSC_VER) && !defined(__GNUC__)
+/* Not in the runnable VC6 image (AM2_VCALL_PMF, src/vc6/include/stdint.h):
+ * its vtables hold the header's forwarders -- cdecl under VC6, which cannot
+ * spell thiscall -- so its calls must be cdecl too. A PMF call there left
+ * `this` in ecx and the forwarder read the clip's left edge as the widget. */
+#if defined(_MSC_VER) && !defined(__GNUC__) && defined(AM2_VCALL_PMF)
 typedef AM2_Widget *(AM2_Widget::*AM2_WidgetDeletePmf)(int32_t flags);
 typedef void (AM2_Widget::*AM2_WidgetPaintPmf)(RECT clip);
 typedef void (AM2_Widget::*AM2_WidgetUpdatePmf)();

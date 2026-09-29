@@ -314,12 +314,43 @@ extern "C" void vc6_trace(const char *fmt, ...)
     fclose(f);
 }
 
+/* A crash under explorer's virtual desktop leaves no backtrace -- winedbg's
+ * output goes nowhere -- so the image records its own: the fault, the
+ * registers, and every stack dword that points into the image's code, which
+ * build/vc6sa/ArmyMen2.map turns into the call chain.  C:\\vc6crash.txt,
+ * appended; always on, since it costs nothing until something faults. */
+static LONG WINAPI vc6_crash(EXCEPTION_POINTERS *ep)
+{
+    FILE *f = fopen("C:\\vc6crash.txt", "a");
+    if (f) {
+        const CONTEXT *c = ep->ContextRecord;
+        const IMAGE_NT_HEADERS *nt = (const IMAGE_NT_HEADERS *)
+            ((const uint8_t *)GetModuleHandleA(NULL)
+             + ((const IMAGE_DOS_HEADER *)GetModuleHandleA(NULL))->e_lfanew);
+        uintptr_t lo = (uintptr_t)GetModuleHandleA(NULL) + nt->OptionalHeader.BaseOfCode;
+        uintptr_t hi = lo + nt->OptionalHeader.SizeOfCode;
+        const uint32_t *sp = (const uint32_t *)c->Esp;
+        int i;
+
+        fprintf(f, "code=%08lx eip=%08lx esp=%08lx ebp=%08lx\n",
+                ep->ExceptionRecord->ExceptionCode, c->Eip, c->Esp, c->Ebp);
+        fprintf(f, "eax=%08lx ebx=%08lx ecx=%08lx edx=%08lx esi=%08lx edi=%08lx\n",
+                c->Eax, c->Ebx, c->Ecx, c->Edx, c->Esi, c->Edi);
+        for (i = 0; i < 2048 && !IsBadReadPtr(sp + i, 4); i++)
+            if (sp[i] >= lo && sp[i] < hi)
+                fprintf(f, "  [esp+%04x] %08x\n", i * 4, sp[i]);
+        fclose(f);
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
 namespace {
 struct Vc6RunProbe {
     Vc6RunProbe()
     {
         if (getenv("VC6RUN_PROBE")) { fprintf(stderr, "vc6run: static-init reached\n"); fflush(stderr); }
         am2_bind_imports();   /* fill am2_iat before anything calls through it */
+        SetUnhandledExceptionFilter(vc6_crash);
         if (getenv("VC6RUN_WATCH")) {
             DWORD tid;
             CreateThread(NULL, 0, vc6_watch, NULL, 0, &tid);

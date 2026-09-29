@@ -115,7 +115,9 @@ void __attribute__((thiscall)) am2_dtor_AM2_PtrList(AM2_PtrList *l);
  * opaque class (one code pointer; see widget.h's WidgetV* for the why), the
  * function-pointer call under GCC. */
 struct AM2_VObj { };
-#if defined(_MSC_VER) && !defined(__GNUC__)
+/* Not in the runnable VC6 image, as widget.h's WidgetV*: its vtables hold
+ * cdecl forwarders (AM2_VCALL_PMF, src/vc6/include/stdint.h). */
+#if defined(_MSC_VER) && !defined(__GNUC__) && defined(AM2_VCALL_PMF)
 typedef void (AM2_VObj::*AM2_VObjPaintPmf)(AM2_Rect r);
 typedef void (AM2_VObj::*AM2_VObjUpdatePmf)();
 typedef void *(AM2_VObj::*AM2_VObjDeletePmf)(int32_t flags);

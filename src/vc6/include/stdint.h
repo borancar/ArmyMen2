@@ -32,6 +32,14 @@
  * two-argument form (the real GCC build still enforces every one).  A bare `;`
  * is a valid empty declaration at file scope, so the check simply vanishes. */
 #define static_assert(cond, msg)
+/* Virtual calls go through a pointer-to-member (a thiscall, as the original's)
+ * everywhere EXCEPT the runnable image (AM2_STANDALONE without AM2_RELINK):
+ * its vtables are the am2_vtable_* arrays of the headers' forwarders, which
+ * VC6 compiles as cdecl, so its calls must be cdecl function-pointer calls.
+ * See widget.h's WidgetV* and misc.h's ObjV*. */
+#if !defined(AM2_STANDALONE) || defined(AM2_RELINK)
+#define AM2_VCALL_PMF 1
+#endif
 #endif
 typedef signed char        int8_t;
 typedef unsigned char      uint8_t;

@@ -739,7 +739,10 @@ int32_t __cdecl DefGameParse(int32_t cmd, char *line)
  * cannot live in the flat half -- and this module cannot include movie.h for
  * the same reason. Declared instead, the way commmsg.cpp declares the comm
  * methods and the widget helpers it needs. */
-extern "C" void __cdecl StateLeave(void);
+#if !defined(_MSC_VER)
+extern "C"
+#endif
+void __cdecl StateLeave(void);  /* movie.h's linkage: C++ under VC6 */
 
 void __cdecl SetGameOver(int32_t state)
 {
