@@ -470,39 +470,38 @@ int32_t __cdecl UpdateObjectScript(void *obj)
 
     AM2_ObjScript *scr = &kObjScripts[id - 1];
 
-    if (scr == (AM2_ObjScript *)0)
-        return 1;
+    /* Nested on success; the bad state is the one arm that answers 0. */
+    if (scr != (AM2_ObjScript *)0
+        && *(const uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) < kScriptTiming) {
+        int32_t st = *(const int32_t *)(o + OBJ_OFF_SCRIPT_STATE);
 
-    if (*(const uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) >= kScriptTiming)
-        return 1;
+        if (st <= scr->statecount && st >= 0) {
+            int32_t       fr    = *(const int32_t *)(o + OBJ_OFF_SCRIPT_FRAME) + 1;
+            AM2_ObjState *state = &scr->states[st];
 
-    int32_t st = *(const int32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+            if (fr < state->framecount) {
+                *(int32_t *)(o + OBJ_OFF_SCRIPT_FRAME) = fr;
 
-    if (st > scr->statecount || st < 0) {
-        orig_log("UpdateObjectScript: bad state index\n");
-        return 0;
+                AM2_ObjFrame *frame = &state->frames[fr];
+
+                if (!ChangeObjectFrame(obj, frame->b, 1))
+                    orig_log("ChangeObjectFrame failed in UpdateObjectScript\n");
+
+                *(int32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
+                    frame->a + (int32_t)kScriptTiming;
+
+                void *owner = *(void **)(o + OBJ_OFF_OWNER);
+
+                /* The action array is re-read, and the count, each pass. */
+                for (int32_t i = 0; i < frame->actioncount; i++)
+                    RunScriptAction(&frame->actions[i], owner);
+                return 1;
+            }
+        } else {
+            orig_log("UpdateObjectScript: bad state index\n");
+            return 0;
+        }
     }
-
-    AM2_ObjState *state = &scr->states[st];
-    int32_t       fr    = *(const int32_t *)(o + OBJ_OFF_SCRIPT_FRAME) + 1;
-
-    if (fr >= state->framecount)
-        return 1;
-
-    *(int32_t *)(o + OBJ_OFF_SCRIPT_FRAME) = fr;
-
-    AM2_ObjFrame *frame = &state->frames[fr];
-
-    if (!ChangeObjectFrame(obj, frame->b, 1))
-        orig_log("ChangeObjectFrame failed in UpdateObjectScript\n");
-
-    *(int32_t *)(o + OBJ_OFF_SCRIPT_NEXT) = frame->a + (int32_t)kScriptTiming;
-
-    void *owner = *(void **)(o + OBJ_OFF_OWNER);
-
-    for (int32_t i = 0; i < frame->actioncount; i++)
-        RunScriptAction(&frame->actions[i], owner);
-
     return 1;
 }
 
