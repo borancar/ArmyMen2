@@ -453,12 +453,11 @@ int32_t __cdecl UnitKindMatches(int32_t code, int32_t kind, int32_t n)
  * function can pass and that last comparison still refuses, so the tile the
  * cursor is over has to belong to you.
  *
- * ONE BRANCH IS NOT REPRODUCED AND CANNOT FIRE. `cmp ax, 0xFFFF` followed by
- * `ja` is taken only when a sixteen-bit value exceeds 0xFFFF. The bytes are
- * `66 3d ff ff / 0f 87`, so it is `ja` and not `jae` or `je`; VC6 emitted a
- * comparison it could have folded. Writing it out would only draw a
- * compiler warning saying the same thing. Same treatment as
- * UpdateMouseState's unreachable `je`, and the comment is the record.
+ * ONE BRANCH CANNOT FIRE. `cmp ax, 0xFFFF` followed by `ja` is taken only
+ * when a sixteen-bit value exceeds 0xFFFF. The bytes are `66 3d ff ff /
+ * 0f 87`, so it is `ja` and not `jae` or `je`; VC6 emitted a comparison it
+ * could have folded. It is written out (with GCC's range warning silenced
+ * around it) because the image has it.
  *
  * THE WEIGHT CHECK IS SHARED AND HALF THE ARMS JUMP PAST IT. Arms 0..9, 13,
  * 14 and 17 reach `cmp ebx, 0xF`; the rest go straight to the tile test. It
@@ -467,35 +466,38 @@ int32_t __cdecl UnitKindMatches(int32_t code, int32_t kind, int32_t n)
  * AM2_BLOCK_FULL.
  *
  * CommArmyOfSlot IS CALLED TWICE on every arm that needs the army -- once for
- * the tile kind and once inside the arm. One local here; the two calls cannot
- * disagree.
+ * the tile kind and once inside the arm -- and so it is here, since the image
+ * lays the calls out that way. The two calls cannot disagree.
  */
 int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
                                  int32_t pts, uint8_t facing)
 {
-    void    *comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
     int32_t  tile;
     int32_t  army;
     int32_t  kind;
-    int32_t  weight = 0;
+    int32_t  weight;
     int32_t  rec;
 
     if (!CanAffordUnit(type, pts))
-        return 0;
+        goto fail;
 
     tile = TileOfPoint(where);
-    /* `cmp ax, 0xFFFF; ja` sits here and cannot be taken -- see above. */
+    /* `cmp ax, 0xFFFF; ja` -- vacuous, and the original's; see above. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wtype-limits"
+#endif
+    if ((uint16_t)tile > (uint16_t)0xFFFF)
+        goto fail;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
-    army = ((AM2_Comm *)comm)->CommArmyOfSlot(slot);
-    kind = (army + 1) * AM2_TILE_KIND_ARMY_STEP;
+#define ARMY() (((AM2_Comm *)*(void **)(uintptr_t)ADDR_COMM_OBJECT)->CommArmyOfSlot(slot))
+    kind = (ARMY() + 1) * AM2_TILE_KIND_ARMY_STEP;
+    weight = 0;
 
     switch ((uint32_t)type) {
-    /* The five soldiers, and the mine. */
-    case 0: case 1: case 2: case 3: case 4: case 17:
-        weight = BlockWeightAt((void *)0, *(const AM2_Point *)&where,
-                               *(const AM2_Point *)&where);
-        break;
-
     /* The five vehicles, each passing its record's own kind. */
     case 5: weight = MaskBlockWeight(1, facing, where); break;
     case 6: weight = MaskBlockWeight(0, facing, where); break;
@@ -505,13 +507,15 @@ int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
 
     /* riflepill, bazookapill, mgpill -- one set between them. */
     case 10: case 11: case 12:
-        rec = EnsureSpriteAaiRecord(0x26, (army + 1) * 10, 0);
+        army = ARMY();
+        rec = EnsureSpriteAaiRecord(0x26, army * 10 + 10, 0);
         if (rec != -1 && !CanPlaceAt(where, rec, kind))
             return 0;
         break;
 
     case 13:  /* medtent */
-        rec = EnsureSpriteAaiRecord(0x20, (army + 1) * 10, 0);
+        army = ARMY();
+        rec = EnsureSpriteAaiRecord(0x20, army * 10 + 10, 0);
         if (rec != -1 && !CanPlaceAt(where, rec, kind))
             weight = AM2_BLOCK_FULL;
         rec = EnsureSpriteAaiRecord(0x20, army * 10 + 11, 0);
@@ -520,7 +524,8 @@ int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
         break;
 
     case 14:  /* garage */
-        rec = EnsureSpriteAaiRecord(0x21, (army + 1) * 10, 0);
+        army = ARMY();
+        rec = EnsureSpriteAaiRecord(0x21, army * 10 + 10, 0);
         if (rec != -1 && !CanPlaceAt(where, rec, kind))
             weight = AM2_BLOCK_FULL;
         rec = EnsureSpriteAaiRecord(0x21, army * 10 + 12, 0);
@@ -530,25 +535,36 @@ int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
 
     case 15:  /* radar */
         rec = EnsureSpriteAaiRecord(0x2A, 1, 0);
-        if (rec != -1 && !CanPlaceAt(where, rec, kind))
-            return 0;
-        break;
+        if (rec == -1 || CanPlaceAt(where, rec, kind))
+            break;
+        /* The one `return 0` every refusal shares, laid out here. */
+    fail:
+        return 0;
 
     case 16:  /* aagun */
-        rec = EnsureSpriteAaiRecord(0x1F, (army + 1) * 10, 0);
+        army = ARMY();
+        rec = EnsureSpriteAaiRecord(0x1F, army * 10 + 10, 0);
         if (rec != -1 && !CanPlaceAt(where, rec, kind))
-            return 0;
+            goto fail;
+        break;
+
+    /* The five soldiers, and the mine -- laid out last in the image. */
+    case 0: case 1: case 2: case 3: case 4: case 17:
+        weight = BlockWeightAt((void *)0, *(const AM2_Point *)&where,
+                               *(const AM2_Point *)&where);
         break;
 
     default:
         break;
     }
+#undef ARMY
 
     if (weight >= AM2_BLOCK_FULL)
-        return 0;
+        goto fail;
 
     return ((const uint8_t *)*(void *const *)(uintptr_t)ADDR_TILE_KIND)
                [(uint32_t)tile & 0xFFFFu] == (uint32_t)kind ? 1 : 0;
+
 }
 
 /* IsPlacedUnit -- original 0x0043B0A0, one caller, which is the manual
