@@ -6267,38 +6267,41 @@ void __cdecl ConsiderSightingC(void *seen, void *out, const void *sight)
  */
 void __cdecl SealMapEdges(void)
 {
-    int32_t  w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
-    int32_t  h = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H;
-    int8_t  *weights = *(int8_t **)(uintptr_t)ADDR_CELL_WEIGHTS;
-    uint8_t *flags;
-    int32_t  x, y, i;
+    /* The map size and both tables are read afresh at every use. */
+#define W       (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W)
+#define H       (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H)
+#define WEIGHTS (*(int8_t **)(uintptr_t)ADDR_CELL_WEIGHTS)
+#define FLAGS   (*(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS)
+    int32_t x, y, i;
 
-    for (x = 0; x < w; x++) {
-        weights[x]                 = (int8_t)AM2_CELL_WEIGHT_STEP;
-        weights[(h - 1) * w + x]   = (int8_t)AM2_CELL_WEIGHT_STEP;
+    for (x = 0; x < W; x++) {
+        WEIGHTS[x]               = (int8_t)AM2_CELL_WEIGHT_STEP;
+        WEIGHTS[(H - 1) * W + x] = (int8_t)AM2_CELL_WEIGHT_STEP;
     }
 
-    for (y = 1; y < h; y++) {
-        weights[w * y - 1] = (int8_t)AM2_CELL_WEIGHT_STEP;
-        weights[w * y]     = (int8_t)AM2_CELL_WEIGHT_STEP;
+    for (y = 1; y < H; y++) {
+        WEIGHTS[W * y - 1] = (int8_t)AM2_CELL_WEIGHT_STEP;
+        WEIGHTS[W * y]     = (int8_t)AM2_CELL_WEIGHT_STEP;
     }
 
-    flags = *(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS;
+    for (i = 0, y = 0; y < H; y++) {
+        for (x = 0; x < W; i++, x++) {
+            if (FLAGS[i] & AM2_TILE_OPEN)
+                WEIGHTS[i] = (int8_t)AM2_CELL_WEIGHT_STEP;
 
-    for (i = 0, y = 0; y < h; y++) {
-        for (x = 0; x < w; x++, i++) {
-            if (flags[i] & AM2_TILE_OPEN)
-                weights[i] = (int8_t)AM2_CELL_WEIGHT_STEP;
-
-            if (weights[i] >= (int8_t)AM2_CELL_WEIGHT_STEP)
-                flags[i] |= AM2_TILE_BLOCKS;
+            if (WEIGHTS[i] >= (int8_t)AM2_CELL_WEIGHT_STEP)
+                FLAGS[i] |= AM2_TILE_BLOCKS;
 
             /* `h - AM2_EDGE_MARGIN` on BOTH axes -- see above. */
-            if (!(y >= AM2_EDGE_MARGIN && y <= h - AM2_EDGE_MARGIN
-                  && x >= AM2_EDGE_MARGIN && x <= h - AM2_EDGE_MARGIN))
-                flags[i] |= AM2_TILE_NEAR_EDGE;
+            if (!(y >= AM2_EDGE_MARGIN && y <= H - AM2_EDGE_MARGIN
+                  && x >= AM2_EDGE_MARGIN && x <= H - AM2_EDGE_MARGIN))
+                FLAGS[i] |= AM2_TILE_NEAR_EDGE;
         }
     }
+#undef W
+#undef H
+#undef WEIGHTS
+#undef FLAGS
 }
 
 /* UnrevealArea -- original 0x0043A330, one caller.

@@ -962,34 +962,33 @@ void __cdecl CollapseEqualDeltas(uint16_t *values, int32_t *count)
     uint16_t *wr   = values;
     int32_t   i    = 1;
 
-    if (n <= 1) {
-        *count = 1;
-        return;
-    }
+    /* No early exit: a count of one or less falls through to the same
+     * store, with kept still zero. */
+    if (n > 1) {
+        do {
+            int32_t delta, j;
 
-    do {
-        int32_t delta, j;
+            /* Advanced before use, so the first pass writes values[1] and reads
+             * values[0] behind it. */
+            wr++;
+            delta = (int32_t)values[i] - (int32_t)wr[-1];
+            kept++;
 
-        /* Advanced before use, so the first pass writes values[1] and reads
-         * values[0] behind it. */
-        wr++;
-        delta = (int32_t)values[i] - (int32_t)wr[-1];
-        kept++;
+            for (j = i + 1; j < n; j++) {
+                if ((int32_t)values[i + 1] - (int32_t)values[i] != delta)
+                    break;
+                i++;
+            }
 
-        for (j = i + 1; j < n; j++) {
-            if ((int32_t)values[i + 1] - (int32_t)values[i] != delta)
-                break;
             i++;
-        }
+            *wr = values[i - 1];
 
-        i++;
-        *wr = values[i - 1];
-
-        /* Re-read, as the original does. Nothing in the loop writes it, so it
-         * cannot change -- unless the caller passed a count that lives inside
-         * the array, and reproducing the read costs nothing. */
-        n = *count;
-    } while (i < n);
+            /* Re-read, as the original does. Nothing in the loop writes it, so it
+             * cannot change -- unless the caller passed a count that lives inside
+             * the array, and reproducing the read costs nothing. */
+            n = *count;
+        } while (i < n);
+    }
 
     *count = kept + 1;
 }

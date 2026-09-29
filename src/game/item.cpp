@@ -2911,28 +2911,28 @@ void __cdecl ObjClearRoachFootprint(void *obj)
 int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
                                 int32_t unused)
 {
-    uint32_t       slot  = (uint32_t)(dir & 0xFF) * AM2_MASK_STRIDE;
-    const int32_t *count = (const int32_t *)
-        ((const uint8_t *)((void *)(uintptr_t)(ADDR_ROACH_MASK_COUNT)) + slot);
-    const int16_t *pts = (const int16_t *)
-        ((const uint8_t *)((void *)(uintptr_t)(ADDR_ROACH_MASK)) + slot);
-    int32_t total = 0;
-    int32_t i;
+    typedef struct { int16_t x, y; } Pt;
+    int32_t     total = 0;
+    uint32_t    slot  = (uint32_t)(dir & 0xFF) * AM2_MASK_STRIDE;
+    int32_t     i;
 
-    if (*count <= 0)
-        return 0;
+    /* The count is re-read on every pass; the point is built from the
+     * halves of `at` read out of its argument slot. */
+#define COUNT (*(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_ROACH_MASK_COUNT)) + slot))
+#define PTS   ((const Pt *)((const uint8_t *)((void *)(uintptr_t)(ADDR_ROACH_MASK)) + slot))
+    for (i = 0; i < COUNT; i++) {
+        Pt    pt;
+        void *chain;
 
-    for (i = 0; i < *count; i++) {
-        uint32_t pt;
-        void    *chain;
+        pt.x = PTS[i].x + ((const Pt *)&at)->x;
+        pt.y = PTS[i].y + ((const Pt *)&at)->y;
 
-        pt = (uint32_t)(uint16_t)((uint16_t)at + (uint16_t)pts[i * 2])
-             | ((uint32_t)(uint16_t)((uint16_t)(at >> 16)
-                                     + (uint16_t)pts[i * 2 + 1]) << 16);
-
-        chain = ObjectsAtPoint(&pt, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
-        total += BlockWeightDamaging(from, pt, chain, at, unused);
+        chain = ObjectsAtPoint((const uint32_t *)&pt,
+                               (void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+        total += BlockWeightDamaging(from, *(uint32_t *)&pt, chain, at, unused);
     }
+#undef COUNT
+#undef PTS
 
     return total;
 }
