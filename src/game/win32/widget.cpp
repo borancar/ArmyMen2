@@ -15093,13 +15093,12 @@ void __attribute__((thiscall)) AM2_Widget::CheckboxPaint(RECT clip)
     AM2_Widget *w = this;
 
     uint8_t    *self    = (uint8_t *)w;
-    int32_t     focused = w->parent && w->parent->focusedChild == w;
-    int32_t     checked = *(const uint8_t *)(self + CHECKBOX_OFF_CHECKED);
-    const char *caption;
+    uint8_t     checked = *(const uint8_t *)(self + CHECKBOX_OFF_CHECKED);
     RECT        vis;
-    uint8_t     ink;
+    uint32_t    ink;
 
-    if (focused) {
+    /* The parent is not null-tested: a painted box always has one. */
+    if (w->parent->focusedChild == w) {
         if (checked) {
             w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON_FOC);
             ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_ON_FOC);
@@ -15129,8 +15128,8 @@ void __attribute__((thiscall)) AM2_Widget::CheckboxPaint(RECT clip)
 
     ::WidgetPaint(w, clip);
 
-    caption = *(const char *const *)(self + CHECKBOX_OFF_CAPTION);
-    if (!caption)
+    /* The caption is read again for the draw. */
+    if (!*(const char *const *)(self + CHECKBOX_OFF_CAPTION))
         return;
 
     if (!IntersectRect(&vis, &clip, &w->rect))
@@ -15140,7 +15139,8 @@ void __attribute__((thiscall)) AM2_Widget::CheckboxPaint(RECT clip)
         return;
 
     DrawTextClipped(w->rect.left + AM2_CHECKBOX_TEXT_X, w->rect.top,
-                    caption, AM2_TEXT_LIST_FONT, vis, ink);
+                    *(const char *const *)(self + CHECKBOX_OFF_CAPTION),
+                    AM2_TEXT_LIST_FONT, vis, ink);
     UnlockSurface();
 }
 

@@ -7189,9 +7189,12 @@ typedef struct {
 #define AM2_LEVEL_STR_BYTES      0x40u  /* the record's string field size */
 /* The probe buffer MissionEnded builds "<tileset><n>.txt" in, and the
  * _finddata_t beside it. Both are the original's stack sizes, taken off the
- * `sub esp, 0x218` and the two `lea`s into it. */
-#define AM2_LEVEL_PROBE_BUF      0x10
-#define AM2_FIND_DATA_BYTES      0x110
+ * `sub esp, 0x218` and the two `lea`s into it: the find data sits 0x100
+ * above the path, and 0x118 is the 32-bit _finddata_t (five dwords and a
+ * 260-byte name). They were 0x10 and 0x110 until the relink's frame-size
+ * scan; the 16-byte path could not hold a long map name. */
+#define AM2_LEVEL_PROBE_BUF      0x100
+#define AM2_FIND_DATA_BYTES      0x118
 #define ADDR_STR_GRAVE_MOVIE     0x00478810u /* "grave", the fallback */
 #define ADDR_STR_LEVEL_FILE_FMT  0x00478818u /* "%s%d.txt" */
 /* What the loss path leaves in ADDR_MENU_REQUEST. Nothing else in the image

@@ -102,6 +102,10 @@ main result so far (details in `src/vc6/README.md`):
     ChangeObjectFrame's own build path has it. The reconstruction had left
     it holding stale stack, on a comment that said the original did too;
     the byte-match's frame-size scan turned it up.
+  - **MissionEnded's probe buffers were undersized** (2026-09-29): the path
+    it formats "<map><n>.txt" into is 0x100 bytes in the image, not 0x10,
+    and the _finddata_t beside it 0x118, not 0x110 -- a map name of eleven
+    characters or more overran the stack. Same scan.
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
