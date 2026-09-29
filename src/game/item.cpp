@@ -9582,7 +9582,6 @@ typedef void (__cdecl *AM2_DiedEffectAFn)(void *obj);
 void __cdecl TrooperDiedTail(void *obj, int32_t kind)
 {
     uint8_t *o = (uint8_t *)obj;
-    int32_t  anim;
     int32_t  noise = 5;
     int32_t  big = 6;                     /* ebx, the soldier-kind threshold */
 
@@ -9593,56 +9592,71 @@ void __cdecl TrooperDiedTail(void *obj, int32_t kind)
 
     /* THE CLEAR IS NOT PART OF THE ARM. +0x5A4 being set clears it and falls
      * into kind 3's block at 0x447F12; kind 3 reached through the TABLE enters
-     * at 0x447F12 directly and does NOT clear it. Writing the two as one
+     * at 0x447F12 directly and does NOT clear it. The block sits inside the
+     * test, where the original lays it out, and case 3 jumps into it. Writing the two as one
      * condition clears the field on a path the original leaves alone. */
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_5A4)) {
         *(int32_t *)(o + OBJ_OFF_FIELD_5A4) = 0;
-        goto arm3;
-    }
-
-    switch (kind) {
-    case 3:
     arm3:
         *(int32_t *)(o + OBJ_OFF_FIELD_584) = 0;
         *(int32_t *)(o + OBJ_OFF_SIGHT_OUT_T2) = 1;
         noise = 5;
         DiedEffectA(o);
         goto tail;
+    }
 
-    case 1:
-        anim = (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= big)
-                   ? 0x21 : 0x20;
-        noise = big;
-        break;
-    case 2: {
-        anim = ((const int32_t *)((void *)(uintptr_t)(ADDR_DEATH_ANIM_BY_CODE)))
-                   [ClassifyByCode74(o)];
+#define DEATH_ANIM(o) (((const int32_t *)((void *)(uintptr_t)(ADDR_DEATH_ANIM_BY_CODE))) \
+                           [ClassifyByCode74(o)])
+    /* Every arm writes FIELD_584 itself. Kinds 1, 2 and 3 finish their own
+     * stores and go to the tail; 4, 5 and the default share the last two. */
+    switch (kind) {
+    case 3:
+        goto arm3;
+
+    case 2:
+        *(int32_t *)(o + OBJ_OFF_FIELD_584) = DEATH_ANIM(o);
+        *(int32_t *)(o + OBJ_OFF_SIGHT_OUT_T2) = 1;
         noise = 5;
-        if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) < big && anim == 0x21)
+        if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) < big
+            && *(const int32_t *)(o + OBJ_OFF_FIELD_584) == 0x21)
             DiedEffectB((const uint32_t *)(o + OBJ_OFF_POS),
                             *(const uint8_t *)(o + OBJ_OFF_FACING),
                             *(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND),
                             *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
-        break;
-    }
+        goto tail;
+
+    case 1:
+        if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= big) {
+            *(int32_t *)(o + OBJ_OFF_FIELD_584) = 0x21;
+            *(int32_t *)(o + OBJ_OFF_SIGHT_OUT_T2) = 1;
+            noise = big;
+        } else {
+            *(int32_t *)(o + OBJ_OFF_FIELD_584) = 0x20;
+            *(int32_t *)(o + OBJ_OFF_SIGHT_OUT_T2) = 1;
+            noise = big;
+        }
+        goto tail;
+
     case 4:
-        anim = (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= big)
-                   ? 0x21 : 0x24;
+        if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= big)
+            *(int32_t *)(o + OBJ_OFF_FIELD_584) = 0x21;
+        else
+            *(int32_t *)(o + OBJ_OFF_FIELD_584) = 0x24;
         break;
     case 5:
-        anim = (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= big)
-                   ? 0x21
-                   : ((const int32_t *)((void *)(uintptr_t)(ADDR_DEATH_ANIM_BY_CODE)))
-                         [ClassifyByCode74(o)];
+        if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= big)
+            *(int32_t *)(o + OBJ_OFF_FIELD_584) = 0x21;
+        else
+            *(int32_t *)(o + OBJ_OFF_FIELD_584) = DEATH_ANIM(o);
         break;
     default:
-        anim = ((const int32_t *)((void *)(uintptr_t)(ADDR_DEATH_ANIM_BY_CODE)))
-                   [ClassifyByCode74(o)];
+        *(int32_t *)(o + OBJ_OFF_FIELD_584) = DEATH_ANIM(o);
         break;
     }
+#undef DEATH_ANIM
 
-    *(int32_t *)(o + OBJ_OFF_FIELD_584) = anim;
     *(int32_t *)(o + OBJ_OFF_SIGHT_OUT_T2) = 1;
+    noise = 5;
 
 tail:
     if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 7)

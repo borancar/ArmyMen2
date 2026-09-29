@@ -2340,37 +2340,62 @@ void *__cdecl LoadOneItem(am2_FILE *fp, int32_t arg)
     footprint = *(const uint32_t *)(hdr + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON;
     *(uint32_t *)(hdr + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
 
+    /* Each loader's null test is inside its own case. DEFAULT HAS NONE: a
+     * type outside 1..8 falls to the tail with `made` still NULL and reads
+     * its flags through it -- the original's, and reproduced. */
     switch (*(const int32_t *)hdr) {
-    case 1:  made = (uint8_t *)LoadType1(fp, hdr);            break;
-    case 2:  made = (uint8_t *)LoadType2(fp, (void *)hdr, arg); break;
-    case 3:  made = (uint8_t *)LoadType3(fp, hdr);      break;
+    case 1:
+        made = (uint8_t *)LoadType1(fp, hdr);
+        if (!made)
+            return NULL;
+        break;
+    case 2:
+        made = (uint8_t *)LoadType2(fp, (void *)hdr, arg);
+        if (!made)
+            return NULL;
+        break;
+    case 3:
+        made = (uint8_t *)LoadType3(fp, hdr);
+        if (!made)
+            return NULL;
+        break;
     /* THREE arguments, like case 2 and unlike the other six. The seam this
      * replaced declared two -- AM2_LoadObjFn, shared with the readers that
      * really do take two -- so the renumber flag was never passed and case 4
      * read whatever was on the stack for it. The call site settles it: it
      * pushes three and cleans 0xC. */
-    case 4:  made = (uint8_t *)LoadType4(fp, (void *)hdr, arg); break;
-    case 5:  made = (uint8_t *)LoadType5(fp, hdr);      break;
-    case 6:  made = (uint8_t *)LoadType6(fp, hdr);      break;
-    case 7:  made = (uint8_t *)LoadType7(fp, hdr);            break;
-    case 8:  made = (uint8_t *)LoadType8(fp, hdr);      break;
-    default: break;
+    case 4:
+        made = (uint8_t *)LoadType4(fp, (void *)hdr, arg);
+        if (!made)
+            return NULL;
+        break;
+    case 5:
+        made = (uint8_t *)LoadType5(fp, hdr);
+        if (!made)
+            return NULL;
+        break;
+    case 6:
+        made = (uint8_t *)LoadType6(fp, hdr);
+        if (!made)
+            return NULL;
+        break;
+    case 7:
+        made = (uint8_t *)LoadType7(fp, hdr);
+        if (!made)
+            return NULL;
+        break;
+    case 8:
+        made = (uint8_t *)LoadType8(fp, hdr);
+        if (!made)
+            return NULL;
+        break;
     }
-    if (!made)
-        return NULL;
 
-    {
-        uint32_t flags = *(const uint32_t *)(made + OBJ_OFF_FLAGS);
-
-        if (footprint)
-            flags |= OBJ_FLAG_FOOTPRINT_ON;
-        else
-            flags &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
-        *(uint32_t *)(made + OBJ_OFF_FLAGS) = flags;
-
-        *(uint32_t *)(made + OBJ_OFF_FLAGS) =
-            flags & ~(uint32_t)OBJ_FLAG_SELECTED;
-    }
+    if (footprint)
+        *(uint32_t *)(made + OBJ_OFF_FLAGS) |= OBJ_FLAG_FOOTPRINT_ON;
+    else
+        *(uint32_t *)(made + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
+    *(uint32_t *)(made + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_SELECTED;
 
     ApplyObjHeight(made,
                           (int32_t)*(const int8_t *)(made + OBJ_OFF_HEIGHT_SET));

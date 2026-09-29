@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1333 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1334 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1333:
+  the near-miss sweep, 758 before the row pools. From 758 to 1334:
   - **A member array re-read after every store** (KeyRowUpdate): the
     dialog's row pointers are `parent->rows[i]` through a typed struct, not a
     local `rows[i]` copy -- the image reloads the element after each store.
@@ -158,7 +158,12 @@ main result so far (details in `src/vc6/README.md`):
     button to the right); partly clipped HUD command icons
     draw at ClipRect's adjusted position; a missing squad pip sprite skips
     that pip instead of ending the row; the Typer wraps at a 0x100-byte
-    line (the constant had been read off its 0x10C frame).
+    line (the constant had been read off its 0x10C frame); LoadOneItem's
+    null test is per case and a saved object type outside 1..8 now reads
+    through the NULL it produces, as the original does (it had returned
+    NULL). Found by comparing each function's image extent with ours --
+    `src/vc6/extent.py`, a branch-reachability sweep -- since the relink json
+    slices the image to OUR length and hides code we omitted.
   - **A "fix" undone**: a vehicle whose first occupant is not Sarge
     offers the trooper's three commands. Relink 869 briefly made it offer
     nothing, from a branch target misread as the trooper arm's null test;
