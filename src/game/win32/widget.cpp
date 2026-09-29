@@ -2311,9 +2311,11 @@ static inline void ReturnToOptions(void)
 /* The thumb's offset along the bar, in both classes' own terms. The original
  * computes it in x87 and rounds through _ftol, which truncates toward zero;
  * both operands are non-negative here, so a C cast is the same function. */
-static int32_t ThumbShift(int32_t pos, int32_t range, int32_t travel)
+static inline int32_t ThumbShift(int32_t pos, int32_t range, int32_t travel)
 {
-    return (int32_t)((double)pos / (double)range * (double)travel);
+    /* the range divides as an int (fidiv), the travel is converted -- the
+     * original's two spellings */
+    return (int32_t)((float)pos / range * (double)travel);
 }
 
 /* 0x004557F0 and 0x004558B0. The list scrolls by one row; the guards are the
@@ -16196,6 +16198,7 @@ void __attribute__((thiscall)) AM2_Widget::ArrowBarShowRow(int32_t row)
         /* already visible -- nothing stored, and still repainted */
     }
 
+    list = *(AM2_Widget **)(b + ARROWBAR_OFF_LIST);   /* re-read, as the original */
     WidgetVPaint(list, list->rect);
 
     list    = *(AM2_Widget **)(b + ARROWBAR_OFF_LIST);
