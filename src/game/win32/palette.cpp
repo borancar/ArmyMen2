@@ -507,7 +507,9 @@ int32_t __cdecl ReadBitmapPalette(const char *path, BITMAPINFO *out)
     if (out->bmiHeader.biClrUsed == 0)
         out->bmiHeader.biClrUsed = AM2_PALETTE_ENTRIES;
 
-    orig_fread(out->bmiColors, 4, out->bmiHeader.biClrUsed, fp);
+    /* Four items of biClrUsed bytes each -- size and count the other way
+     * round from the palette's shape, and the same bytes either way. */
+    orig_fread(out->bmiColors, out->bmiHeader.biClrUsed, 4, fp);
     orig_fclose(fp);
     return 1;
 }

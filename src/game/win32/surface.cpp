@@ -602,12 +602,13 @@ void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint8_t colour,
     if (filled > SEQ_BAR_HEIGHT)
         filled = SEQ_BAR_HEIGHT;
 
-    /* The empty bar. */
+    /* The empty bar. The statement order is the one VC6 schedules into
+     * the image's stores, not the fields' order. */
     dest.left   = x;
-    dest.top    = bottom - (SEQ_BAR_HEIGHT - 1);
-    dest.right  = x + SEQ_BAR_WIDTH;
-    dest.bottom = bottom + 1;
     fx.dwSize      = sizeof fx;
+    dest.top    = bottom - (SEQ_BAR_HEIGHT - 1);
+    dest.bottom = bottom + 1;
+    dest.right  = x + SEQ_BAR_WIDTH;
     fx.dwFillColor = g_backgroundColour;
     if (IDirectDrawSurface_Blt(g_backBuffer, &dest, NULL, NULL,
                                DDBLT_COLORFILL | DDBLT_WAIT, &fx) != DD_OK)

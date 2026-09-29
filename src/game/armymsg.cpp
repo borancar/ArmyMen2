@@ -1079,14 +1079,14 @@ void __cdecl SendItemCreate(void *obj)
 
     *(uint32_t *)(msg + MSG_CREATE_OFF_A) =
         *(const uint32_t *)(o + OBJ_OFF_POS);
-    /* The type is read twice: a word for the message, a dword for the
-     * switch. */
-    *(uint16_t *)(msg + MSG_CREATE_OFF_TYPE) = *(const uint16_t *)o;
-    /* The four box offsets, a dword at a time. */
+    /* The four box offsets a dword at a time, and the type last -- the
+     * order that schedules into the image's. The type is read twice: a
+     * word for the message, a dword for the switch. */
     ((int32_t *)(msg + MSG_CREATE_OFF_BLOCK))[0] = ((const int32_t *)(o + OBJ_OFF_BOX_OFFSETS))[0];
-    ((int32_t *)(msg + MSG_CREATE_OFF_BLOCK))[1] = ((const int32_t *)(o + OBJ_OFF_BOX_OFFSETS))[1];
     ((int32_t *)(msg + MSG_CREATE_OFF_BLOCK))[2] = ((const int32_t *)(o + OBJ_OFF_BOX_OFFSETS))[2];
+    ((int32_t *)(msg + MSG_CREATE_OFF_BLOCK))[1] = ((const int32_t *)(o + OBJ_OFF_BOX_OFFSETS))[1];
     ((int32_t *)(msg + MSG_CREATE_OFF_BLOCK))[3] = ((const int32_t *)(o + OBJ_OFF_BOX_OFFSETS))[3];
+    *(uint16_t *)(msg + MSG_CREATE_OFF_TYPE) = *(const uint16_t *)o;
     *(uint32_t *)(msg + MSG_CREATE_OFF_C) =
         *(const uint32_t *)(o + OBJ_OFF_FLAGS);
     switch (*(const int32_t *)o) {

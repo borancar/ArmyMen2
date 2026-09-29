@@ -462,18 +462,19 @@ void __cdecl UpdateMouseState(void)
     g_cursorX = Clamp(g_cursorX, g_screenClip.left, g_screenClip.right - 1);
     g_cursorY = Clamp(g_cursorY, g_screenClip.top, g_screenClip.bottom - 1);
 
-    ((int16_t *)&g_cursorPoint)[1] = (int16_t)g_cursorY;
+    /* x first here schedules y's store first, as the image has it. */
     ((int16_t *)&g_cursorPoint)[0] = (int16_t)g_cursorX;
+    ((int16_t *)&g_cursorPoint)[1] = (int16_t)g_cursorY;
 
     /* The three buttons are written out, not looped -- VC6 does not unroll
-     * -- and the left one tests its change flag a second time before it
-     * clears the grab. */
+     * -- and the left one's whole condition is asked a second time for the
+     * grab clear: the image branches on the change flag again there. */
     if (g_mouseButton[0] && g_mouseChanged[0]) {
         g_mousePress[0].point = g_cursorPoint;
         g_mousePress[0].tick  = tick;
-        if (g_mouseChanged[0])
-            *(int32_t *)(uintptr_t)ADDR_MOUSE_GRAB = 0;
     }
+    if (g_mouseButton[0] && g_mouseChanged[0])
+        *(int32_t *)(uintptr_t)ADDR_MOUSE_GRAB = 0;
     if (g_mouseButton[1] && g_mouseChanged[1]) {
         g_mousePress[1].point = g_cursorPoint;
         g_mousePress[1].tick  = tick;
