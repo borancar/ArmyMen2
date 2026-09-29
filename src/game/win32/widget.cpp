@@ -5303,7 +5303,7 @@ void __cdecl SetPointerMode(int32_t mode)
  * word above -- the x chaining, the float truncation, the escape composition,
  * the ten-character cap -- is verified by reading and by nothing else.
  */
-void __cdecl HudMessage(const char *text, int32_t colour)
+void __cdecl HudMessage(const char *text, uint8_t colour)
 {
     /* The HUD widget and its row count are read afresh at every use, as
      * the original does. */

@@ -3319,7 +3319,7 @@ int event_install(void)
 /* ---- RunScriptAction --------------------------------------------------- */
 /* HudMessage lives behind win32/widget.h, which reaches windows.h; event.cpp
  * is flat, so it is declared rather than included. */
-extern "C" void __cdecl HudMessage(const char *text, int32_t colour);
+extern "C" void __cdecl HudMessage(const char *text, uint8_t colour);
 extern "C" void __cdecl StartAudioStream(const char *name, int32_t loop);
 
 #define AM2_CHEAT_ITEM_GROUP  0x2D

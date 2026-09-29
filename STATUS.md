@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1078 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1081 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1078:
+  the near-miss sweep, 758 before the row pools. From 758 to 1081:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -233,6 +233,11 @@ main result so far (details in `src/vc6/README.md`):
   - **Helpers the original inlined** are `static inline` now -- SendValueMsg,
     FreeDefTable, LoadGrid, and twelve others whose callers all got closer;
     ten tried the same way made callers worse and stay out of line.
+  - **Identical arm tails are VC6's, not a helper's**: CheatLine's nineteen
+    item cheats each write the CreateWeapon call out and the compiler
+    cross-jumps them into one tail. HudMessage's colour is a byte parameter
+    (callers push the register with no zero-extension), and the `doctor
+    doctor` callback at 0x00417A90 is installed so the relink can place it.
   - **Comm methods that ignore `this`**: CommClose and CommEnumPlayers are
     AM2_Comm members -- their callers load ecx with the comm object.
   - **Virtual calls from flat code must be pointer-to-member calls**

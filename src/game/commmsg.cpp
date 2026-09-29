@@ -703,7 +703,7 @@ typedef void (__cdecl *AM2_MsgHandlerFn)(void *msg, int32_t dpid);
    flat half and that header names Win32 types. The definition is in
    win32/widget.cpp, whose header is `extern "C"` like every other, so this
    has to be too or the two mangle differently and only the linker notices. */
-extern "C" void __cdecl HudMessage(const char *text, int32_t colour);
+extern "C" void __cdecl HudMessage(const char *text, uint8_t colour);
 /* MenuMessage is reconstructed below; this forward declaration is here
  * because the two callers in this file come before it. */
 void __cdecl MenuMessage(const char *text, uint8_t colour, int32_t indicator);

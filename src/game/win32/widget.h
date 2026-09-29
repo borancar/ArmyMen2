@@ -2731,7 +2731,7 @@ void __cdecl SetWeaponTargetSweeper(void *target, uint32_t at);
 
 /* 0x004144A0. Append one line to the HUD's message log. A non-zero colour is
  * written as a '^' escape ahead of the text. */
-void __cdecl HudMessage(const char *text, int32_t colour);
+void __cdecl HudMessage(const char *text, uint8_t colour);
 
 /* 0x0044DB90. Delete whatever screen is up and clear the global -- the same
  * three instructions the five factories open with, as a function. */
