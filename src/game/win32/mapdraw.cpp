@@ -726,6 +726,7 @@ void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
     spr->lut     = *(uint8_t **)(o + MAPOBJ_OFF_LUT);
     spr->palette = *(void **)(o + MAPOBJ_OFF_PALETTE);
 
+#if !defined(AM2_RELINK)   /* harness trace, not the original's */
     {
         /* AM2_TRACE_MAPOBJ=1: one line per draw, the same line the hybrid's
          * dev loader logs over the original, so draw orders compare. */
@@ -740,6 +741,7 @@ void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
                     (long)(clip.left - g_viewRect->left), (long)(clip.top - g_viewRect->top),
                     spr->id, spr->format, spr->flags);
     }
+#endif
 
     DrawSpriteClipped(spr,
                       clip.left - g_viewRect->left,

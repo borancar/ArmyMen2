@@ -155,6 +155,7 @@ void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y, int32_t mode)
     if (!ClipRect(&spr->bounds, &g_screenClip, &x, &y, &clipped))
         return;
 
+#if !defined(AM2_RELINK)   /* harness trace, not the original's */
     {
         /* AM2_TRACE_SPRITE=1: one line per draw, the same line the hybrid's
          * dev loader logs over the original. */
@@ -166,6 +167,7 @@ void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y, int32_t mode)
                     (unsigned)(am2_host_pump_number ? am2_host_pump_number() : 0u), spr->id, spr->format, spr->flags,
                     x, y, clipped.left, clipped.top, clipped.right, clipped.bottom, mode);
     }
+#endif
 
     DrawSpriteClipped(spr, x, y, &clipped, mode);
 }

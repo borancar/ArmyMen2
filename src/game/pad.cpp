@@ -140,7 +140,7 @@ void __cdecl PadNumberEnter(void *obj, void *padNumber)
                                  obj)) {
             EventNotify(AM2_PAD_NOTIFY_ENTER,
                         *(const int32_t *)(pad + PAD_OFF_ID),
-                        obj ? ((const AM2_Object *)obj)->uid : 0,
+                        ((const AM2_Object *)obj)->uid,
                         0, 0, 0, 0, 0, 0, 0);
         }
         i++;
@@ -177,7 +177,7 @@ void __cdecl PadNumberLeave(void *obj, void *padNumber)
                                  obj)) {
             EventNotify(AM2_PAD_NOTIFY_LEAVE,
                         *(const int32_t *)(pad + PAD_OFF_ID),
-                        obj ? ((const AM2_Object *)obj)->uid : 0,
+                        ((const AM2_Object *)obj)->uid,
                         0, 0, 0, 0, 0, 0, 0);
         }
         i++;

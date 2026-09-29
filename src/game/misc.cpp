@@ -3073,8 +3073,8 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
             uint8_t *obj;
 
             box.left   = *(const int16_t *)(row + ROW_OFF_X) - 0x28;
-            box.top    = *(const int16_t *)(row + ROW_OFF_X + 2) - 0x40;
             box.right  = *(const int16_t *)(row + ROW_OFF_X) + 0x28;
+            box.top    = *(const int16_t *)(row + ROW_OFF_X + 2) - 0x40;
             box.bottom = *(const int16_t *)(row + ROW_OFF_X + 2) + 0x10;
 
             obj = (uint8_t *)AllObjectsInRect(

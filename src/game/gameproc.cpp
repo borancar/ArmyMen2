@@ -520,7 +520,7 @@ int32_t __cdecl LoadDefaultCof(void)
 {
     am2_FILE *fp;
     uint32_t  tag;
-    int32_t   green = 0;
+    int32_t   green;
 
     SetGameDir("save");
 
@@ -538,6 +538,7 @@ int32_t __cdecl LoadDefaultCof(void)
 
     UidRemapClear();
 
+    green = 0;
     orig_fread(&tag, 4, 1, fp);
     while (tag == AM2_SAVE_RECORD_MARK) {
         uint8_t *obj = (uint8_t *)LoadOneItem(fp, 1);
@@ -547,7 +548,7 @@ int32_t __cdecl LoadDefaultCof(void)
 
             if (max > 0 && *(const int16_t *)(obj + OBJ_OFF_HEALTH) > 0) {
                 *(int16_t *)(obj + OBJ_OFF_HEALTH) = max;
-                if (*(const int32_t *)obj == AM2_OBJ_TYPE_TROOPER)
+                if (ObjIsType2Inline(obj))
                     green++;
             }
             LoadScriptName(fp, obj);

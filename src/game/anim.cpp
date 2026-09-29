@@ -179,10 +179,12 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
             table->entries[k].borrowed = 1;
         }
 
+#if !defined(AM2_RELINK)   /* harness trace, not the original's */
     if (am2_dump_anims < 0)
         am2_dump_anims = getenv("AM2_DUMP_ANIMS") != 0;
     if (am2_dump_anims)
         DumpAnimTable(table);
+#endif
 }
 
 /* The `.ani` directory, and the flags each group is loaded with. `from` is

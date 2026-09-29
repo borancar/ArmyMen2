@@ -111,7 +111,13 @@ static int32_t DepthProject(int32_t dx, float slope, int32_t y)
  * order is total: two objects at the same place still have a fixed order and
  * the sort cannot loop. Answering 0 would have been the obvious thing and it
  * is not what this does -- 0 is reserved for a null argument. */
+#if defined(AM2_RELINK)
+/* The relink has no trace wrapper: the body IS DepthCompare. */
+#define DepthCompareBody DepthCompare
+int32_t __cdecl DepthCompareBody(void *a, void *b)
+#else
 static int32_t DepthCompareBody(void *a, void *b)
+#endif
 {
     const uint8_t *pa = (const uint8_t *)a;
     const uint8_t *pb = (const uint8_t *)b;
@@ -1223,6 +1229,7 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
         ROW_FLD(r, ROW_OFF_SPRITE, void *);
 }
 
+#if !defined(AM2_RELINK)   /* the harness's trace wrapper */
 int32_t __cdecl DepthCompare(void *a, void *b)
 {
     int32_t r = DepthCompareBody(a, b);
@@ -1240,6 +1247,7 @@ int32_t __cdecl DepthCompare(void *a, void *b)
     }
     return r;
 }
+#endif
 
 /* 0x0041D8F0, two callers. Link a node that is NOT yet in the list into its
  * sorted place. The primitive under DepthInsert, which is a different address

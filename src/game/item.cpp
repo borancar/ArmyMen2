@@ -23,6 +23,10 @@
  * which is how a 50-vs-0 depth divergence is traced to its setter. The object
  * position is logged so a specific object is greppable; window-gated by
  * AM2_TRACE_FROM/TO. */
+#if defined(AM2_RELINK)
+/* Harness code: not in the original, so not in the relink either. */
+#define am2_height_log(name, obj, hin) ((void)0)
+#else
 extern "C" uint32_t am2_host_pump_number(void) __attribute__((weak));
 extern "C" int32_t am2_trace_window(void) __attribute__((weak));
 static void am2_height_log(const char *name, const void *obj, int32_t hin)
@@ -36,6 +40,7 @@ static void am2_height_log(const char *name, const void *obj, int32_t hin)
                 *(const int16_t *)(o + OBJ_OFF_POS), *(const int16_t *)(o + OBJ_OFF_Y),
                 *(const uint16_t *)(o + OBJ_OFF_TILE), hin, *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
 }
+#endif
 
 /* ShakeAt lives in win32/mapdraw.h and item.cpp is flat, so it is declared
  * here the way script.cpp declares PreloadSprite. Its signature names no Win32
@@ -1318,7 +1323,7 @@ typedef void (__cdecl *AM2_ObjOnlyFn)(void *obj);
  * The parent is guarded on having a def record and the children are not: a
  * child with a null OBJ_OFF_FIELD_94 faults. Both the original's.
  */
-void __cdecl ApplyHeightItem(void *obj, int32_t height)
+void __cdecl ApplyHeightItem(void *obj, int16_t height)
 {
     uint8_t *o = (uint8_t *)obj;
     uint32_t key;
@@ -2967,22 +2972,18 @@ int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
 
     tile = (uint32_t)TileOfPoint(at) & 0xFFFFu;
     /* The original's guard, and vacuous after the mask above; see the note. */
-    if ((int32_t)tile < 0 || tile > 0xFFFFu)
+    if ((int32_t)tile < 0 || (int32_t)tile > 0xFFFF)
         return 0xFF;
 
     if (g_tileFlags[tile] & AM2_TILE_BLOCKS)
         total += AM2_BLOCK_FULL;
 
     if (from) {
-        int32_t here = *(const int8_t *)
-            (g_tileAttrs + *(const uint16_t *)((const uint8_t *)from
-                                               + OBJ_OFF_TILE));
-        int32_t there = *(const int8_t *)(g_tileAttrs + tile);
-        int32_t step  = there - here;
-
-        if (step < 0)
-            step = -step;
-        if (step > AM2_BLOCK_HEIGHT_STEP)
+        /* TileAttrAt's body, inline for both tiles as BlockWeightAt's is. */
+        if (abs(*(const int8_t *)(g_tileAttrs + tile)
+                - *(const int8_t *)(g_tileAttrs
+                      + *(const uint16_t *)((const uint8_t *)from + OBJ_OFF_TILE)))
+            > AM2_BLOCK_HEIGHT_STEP)
             total += AM2_BLOCK_FULL;
     }
 
@@ -8155,8 +8156,9 @@ void __cdecl EnterVehicle(void *unit, void *vehicle)
     *(uint32_t *)(u + OBJ_OFF_RIDING) = ((const AM2_Object *)vehicle)->uid;
     ((AM2_Rec *)(v + VEHICLE_OFF_PTR_LIST))->PtrListPush((void *)(uintptr_t)uid);
 
-    n = *(const int32_t *)(v + VEHICLE_OFF_PTR_LIST + 4);
-    if (*(const int32_t *)(u + OBJ_OFF_SARGE) && n > 1) {
+    /* The count is read after the SARGE test, not before. */
+    if (*(const int32_t *)(u + OBJ_OFF_SARGE)
+        && (n = *(const int32_t *)(v + VEHICLE_OFF_PTR_LIST + 4)) > 1) {
         /* Re-read between the two stores, as the original does. */
         (*(uint32_t **)(v + VEHICLE_OFF_PTR_LIST + 8))[n - 1] =
             (*(uint32_t *const *)(v + VEHICLE_OFF_PTR_LIST + 8))[0];
@@ -14296,6 +14298,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
         ammo = 3;
     *(int32_t *)(o + 0xCCu) = ammo;
 
+#if !defined(AM2_RELINK)   /* harness trace, not the original's */
     {
         static int32_t tw = -1;
         if (tw < 0) tw = getenv("AM2_TRACE_WEAPON") != 0;
@@ -14305,6 +14308,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
                     *(const int16_t *)(o + OBJ_OFF_POS), *(const int16_t *)(o + OBJ_OFF_Y),
                     kb, quantity, ammo);
     }
+#endif
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
         && ammo > *(const int32_t *)(def + 0x18u)

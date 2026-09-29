@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1002 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1010 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1002:
+  the near-miss sweep, 758 before the row pools. From 758 to 1010:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -144,7 +144,14 @@ main result so far (details in `src/vc6/README.md`):
     shows. Reproduced.
   - **Harness code kept out of the relink**: ReportError's standalone log
     and device.cpp's input-injection hooks are `AM2_STANDALONE &&
-    !AM2_RELINK`, so the comparison sees the original's bodies.
+    !AM2_RELINK`, so the comparison sees the original's bodies. So are the
+    AM2_TRACE_* hooks inside DrawSprite, DrawMapObject, ApplyHeightItem,
+    ApplyObjHeight, CreateWeapon and LoadAnimTable; DepthCompare's trace
+    wrapper is dropped and its body is the function.
+  - **PadNumberEnter/Leave take the object's uid unguarded**, as the
+    original does (ours substituted 0 for a null object).
+  - **ApplyHeightItem's height is an int16**: the original reads the
+    argument as a word and sign-extends it.
   - **Smacker is dllimport under VC6**: repeated calls to an import load
     its IAT slot into a register, which a call through our pointer macro
     cannot reproduce. `relink.py` now resolves decorated import names
