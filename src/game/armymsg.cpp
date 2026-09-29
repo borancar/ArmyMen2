@@ -583,27 +583,23 @@ void __cdecl TellOneSlot(int32_t slot)
  * and nothing in a Boot Camp mission is. Verified by reading. */
 void __cdecl ItemGoneMessageSend(const void *obj)
 {
-    uint8_t         msg[AM2_MSG_OBJ_DESTROYED_LEN];
-    const uint8_t  *comm;
-    uint32_t        uid;
-    int32_t         type;
+    uint8_t msg[AM2_MSG_OBJ_DESTROYED_LEN];
 
+    /* The type and uid are read from the object again at each use. */
     if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION)
         return;
 
-    type = *(const int32_t *)obj;
-    if (type <= 0 || type > 4)
+    if (*(const int32_t *)obj <= 0 || *(const int32_t *)obj > 4)
         return;
-
-    uid = *(const uint32_t *)((const uint8_t *)obj + 4);
 
     *(uint16_t *)(msg + 0) = AM2_MSG_OBJ_DESTROYED_LEN;
     *(uint16_t *)(msg + 2) = AM2_MSG_ITEM_GONE;
-    *(uint32_t *)(msg + 4) = UidOnWire(uid);
+    *(uint32_t *)(msg + 4) = UidOnWire(*(const uint32_t *)((const uint8_t *)obj + 4));
 
-    comm = (const uint8_t *)kComm;
-    if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
-        orig_log("itemGoneMessageSend uid %x item_type %d\n", uid, type);
+    if (*(const int32_t *)((const uint8_t *)kComm + COMM_OFF_VERBOSE))
+        orig_log("itemGoneMessageSend uid %x item_type %d\n",
+                 *(const uint32_t *)((const uint8_t *)obj + 4),
+                 *(const int32_t *)obj);
 
     ArmyMessageSend(msg);
 }

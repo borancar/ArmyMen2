@@ -392,44 +392,44 @@ static void RepaintDialogAndSendPlayers(void)
 
 void __cdecl ReceivedColorMsg(void *msg, int32_t dpid)
 {
-    uint8_t *comm = (uint8_t *)kCommObj;
-    int32_t  slot;
+#define COMM ((uint8_t *)kCommObj)
+    if (*(const int32_t *)(COMM + COMM_OFF_IS_HOST)) {
+        int32_t slot;
 
-    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
-        return;
+        if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
+            am2_log("ReceivedColorMsg from %x  Color =%d \n",
+                    dpid, *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE));
 
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
-        am2_log("ReceivedColorMsg from %x  Color =%d \n",
-                dpid, *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE));
-
-    slot = CommSlotOfId(comm, dpid);
-    if (CommSetArmyColour(
-            comm, slot,
-            *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE)) == -1)
-        return;
-
-    RepaintDialogAndSendPlayers();
+        slot = CommSlotOfId(COMM, dpid);
+        if (CommSetArmyColour(
+                COMM, slot,
+                *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE)) != -1)
+            RepaintDialogAndSendPlayers();
+    }
+#undef COMM
 }
 
 void __cdecl ReceivedTeamMsg(void *msg, int32_t dpid)
 {
-    uint8_t *comm = (uint8_t *)kCommObj;
-    int32_t  slot;
+#define COMM ((uint8_t *)kCommObj)
+    /* comm is re-read at each use; the body sits inside the host test, so
+     * the registers are saved before it. */
+    if (*(const int32_t *)(COMM + COMM_OFF_IS_HOST)) {
+        int32_t slot;
 
-    if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
-        return;
+        if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
+            am2_log("ReceivedTeamMsg from %x  Team =%d \n",
+                    dpid, *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE));
 
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
-        am2_log("ReceivedTeamMsg from %x  Team =%d \n",
-                dpid, *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE));
+        slot = CommSlotOfId(COMM, dpid);
+        /* Written straight in, with none of the colour half's checking. */
+        *(int32_t *)(COMM + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
+                     + COMM_ARMY_OFF_TEAM)
+            = *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE);
 
-    slot = CommSlotOfId(comm, dpid);
-    /* Written straight in, with none of the colour half's checking. */
-    *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
-                 + COMM_ARMY_OFF_TEAM)
-        = *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE);
-
-    RepaintDialogAndSendPlayers();
+        RepaintDialogAndSendPlayers();
+    }
+#undef COMM
 }
 
 void __cdecl CommEndSetup(void)

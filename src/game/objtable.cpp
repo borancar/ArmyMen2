@@ -312,21 +312,18 @@ void __cdecl SelectUnit(void *obj)
  * SelectUnit's is. */
 void __cdecl DeselectUnit(void *obj)
 {
-    uint8_t        *o    = (uint8_t *)obj;
-    int32_t        *rec  = (int32_t *)(uintptr_t)ADDR_SELECTED_UIDS;
-    const uint32_t *items;
-    uint32_t        uid;
-    int32_t         i    = 0;
+    uint8_t *o = (uint8_t *)obj;
+    int32_t  i;
 
+    /* The list's count, items and the uid are read again at every use. */
+#define REC ((int32_t *)(uintptr_t)ADDR_SELECTED_UIDS)
     if (!o)
         return;
 
-    uid   = *(const uint32_t *)(o + 4);
-    items = *(const uint32_t *const *)&rec[2];
-
-    while (i < rec[1]) {
-        if (items[i] == uid) {
-            ListRemoveAt(rec, i);
+    i = 0;
+    while (i < REC[1]) {
+        if ((*(const uint32_t *const *)&REC[2])[i] == *(const uint32_t *)(o + 4)) {
+            ListRemoveAt(REC, i);
             *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_SELECTED;
         } else {
             i++;
@@ -336,6 +333,7 @@ void __cdecl DeselectUnit(void *obj)
     *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_SELECTED;
     OnSelectionChanged(*(const uint32_t *)(uintptr_t)
                               ADDR_ZERO_POINT);
+#undef REC
 }
 
 int objtable_install(void)
