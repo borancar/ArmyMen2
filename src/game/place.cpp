@@ -1072,7 +1072,7 @@ AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t key, int32_t a,
 /* A vehicle: hull on the cursor, turret on overlay A, same kind and heading.
  * Kinds 1, 2, 0, 3, 5 over rows 0x18..0x1C -- four is absent, and the jump
  * table is what says so rather than the arms. Neither arm touches the ink. */
-static void PlaceVehicle(int32_t kind, int32_t facing)
+static inline void PlaceVehicle(int32_t kind, int32_t facing)
 {
     SET_CURSOR(VehicleAnimSprite(kind, (uint32_t)facing));
     *(void **)(uintptr_t)ADDR_MENU_OVERLAY_A =
@@ -1082,7 +1082,7 @@ static void PlaceVehicle(int32_t kind, int32_t facing)
 /* One sprite out of a set, by the key PackKey builds. Every arm below that is
  * not an animation lookup is this shape, and the two constants never vary:
  * 0x1000 is the set the placement sprites live in and 1 says load it now. */
-static AM2_Sprite *PlaceSprite(uint32_t set, uint32_t id)
+static inline AM2_Sprite *PlaceSprite(uint32_t set, uint32_t id)
 {
     return PreloadSpriteByKey(PackKey(set, id, 0), AM2_PLACE_SPRITE_SET,
                                    1);

@@ -381,7 +381,7 @@ void *__cdecl FindLevelByName(char *name)
  * if it is empty, and the first where being empty is the whole point -- the
  * column means "there isn't one". Evidence, not proof.
  */
-static int32_t TakeMapColumn(char *dst)
+static inline int32_t TakeMapColumn(char *dst)
 {
     char *tok = am2_strtok((char *)0,
                            " \t\n;,");

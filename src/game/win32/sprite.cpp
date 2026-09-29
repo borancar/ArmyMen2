@@ -1768,7 +1768,7 @@ int32_t __cdecl SpriteSolidAt(AM2_Sprite *spr, AM2_Point at)
 /* Written once and used three times, where the original writes it out three
  * times. The index it returns is the caller's business: two of them fall back
  * to entry 0 and one does not. */
-static int32_t AnimIndexOfId(const AM2_AnimTable *t, int32_t id)
+static inline int32_t AnimIndexOfId(const AM2_AnimTable *t, int32_t id)
 {
     int32_t i = 0;
 

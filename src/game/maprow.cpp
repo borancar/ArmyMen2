@@ -1565,7 +1565,7 @@ void __cdecl RowPoolBEvict(void) { RowPoolEvict(&kRowPoolB); }
  * slots above their capacity; a context carries none, and its margin is
  * subtracted from the eviction threshold instead. Writing this from the
  * hardcoded version's outline would overrun the array. */
-static uint8_t *SeqRecord(const uint8_t *ctx, int32_t i)
+static inline uint8_t *SeqRecord(const uint8_t *ctx, int32_t i)
 {
     return *(uint8_t **)(uintptr_t)(ctx + SEQ_CTX_OFF_RECORDS)
            + (int32_t)(i * AM2_SEQ_RECORD_SIZE);

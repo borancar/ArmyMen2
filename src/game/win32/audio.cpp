@@ -215,7 +215,7 @@ static_assert(sizeof(DSBUFFERDESC) == 0x14, "DSBUFFERDESC");
 
 /* Every failure below says which step it was, lets the buffers go and answers
  * 0 -- so the caller only has to check the one result. */
-static int32_t SoundFailed(const char *what)
+static inline int32_t SoundFailed(const char *what)
 {
     orig_log(what);
     ReleaseSoundObjects();

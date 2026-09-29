@@ -92,7 +92,7 @@ static void __cdecl CheatHealOne(void *obj)
  * falls into it, and the other eighteen jump in.  Written as a helper here
  * because that is what it is; see the note above ADDR_CHEAT_ENTRY for why the
  * distinction cost a correction. */
-static void CheatGiveItem(void *unit, int32_t kind, int32_t ammo)
+static inline void CheatGiveItem(void *unit, int32_t kind, int32_t ammo)
 {
     int32_t key = KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, kind, 0);
 

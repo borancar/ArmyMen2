@@ -1454,7 +1454,7 @@ static int32_t ActStep(AM2_ScriptCtx *ctx, int32_t *at)
     return 0;
 }
 
-static void ActTypeErr(AM2_ScriptCtx *ctx, int32_t *at, int32_t kind)
+static inline void ActTypeErr(AM2_ScriptCtx *ctx, int32_t *at, int32_t kind)
 {
     am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
             ctx->tokens[*at].line,
@@ -2787,7 +2787,7 @@ int32_t __cdecl ScriptScanFor(const AM2_ScriptCtx *ctx, int32_t from,
 }
 
 /* True when the token at *at is Reserved with this id. */
-static int ScriptAtWord(const AM2_ScriptCtx *ctx, int32_t at, int32_t id)
+static inline int ScriptAtWord(const AM2_ScriptCtx *ctx, int32_t at, int32_t id)
 {
     const AM2_ScriptTok *t = &ctx->tokens[at];
     return t->kind == AM2_TOKEN_RESERVED &&

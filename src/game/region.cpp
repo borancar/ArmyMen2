@@ -3831,7 +3831,7 @@ void __cdecl AiStepIgnore(void *obj, void *out, const void *ctx)
  * idempotent and writing it once would be indistinguishable. Kept as two calls
  * because "the original does it twice" is a fact about the original, and a
  * reader diffing against the disassembly should find both. */
-static void AiPromoteFound(uint8_t *o, uint8_t *c)
+static inline void AiPromoteFound(uint8_t *o, uint8_t *c)
 {
     uint8_t *found = *(uint8_t **)(c + SIGHT_OFF_FOUND);
 

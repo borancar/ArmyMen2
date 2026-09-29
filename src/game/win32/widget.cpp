@@ -871,7 +871,7 @@ static void ButtonRepaintSelf(AM2_Widget *w)
 
 
 
-static int32_t ThumbShift(int32_t pos, int32_t range, int32_t travel);
+static inline int32_t ThumbShift(int32_t pos, int32_t range, int32_t travel);
 
 /* Repaint ONE row rather than the list. The rectangle is the widget's full
  * width and the row's own band, `top + (row - firstRow) * 14 + 4`, height 14
@@ -2631,7 +2631,7 @@ typedef char *(__cdecl *AM2_FgetsFn)(char *buf, int32_t n, am2_FILE *fp);
 /* The panel's complaint, six times over: grey the map preview and announce
  * the failure against the OFFENDING PLAYER's name, which is our own slot's
  * -- this runs on the machine that is failing the check, not on the host. */
-static void MpComplain(uint8_t *panel, uint32_t fmt)
+static inline void MpComplain(uint8_t *panel, uint32_t fmt)
 {
     char line[AM2_MP_COMPLAINT_BYTES];
 
