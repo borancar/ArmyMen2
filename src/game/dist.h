@@ -35,12 +35,12 @@ int32_t __cdecl ApproxDistXY(int32_t dx, int32_t dy);
  * The vectors caught it on the first run -- AngleDelta(255, 2) is 3, not -253.
  * A function with two returns is not unusual and a disassembly helper that
  * stops at the first one will misread it every time. */
-int32_t __cdecl AngleDelta(uint32_t from, uint32_t to);
+int32_t __cdecl AngleDelta(uint8_t from, uint8_t to);
 
 /* 0x0042DFB0. Rounds an 8-bit value to `bits` significant bits, adding half a
  * step first. The mask to 8 bits happens AFTER the rounding term, so a value
  * carrying past 255 wraps rather than saturating. */
-int32_t __cdecl RoundTo8(int32_t value, uint32_t bits);
+uint8_t __cdecl RoundTo8(int32_t value, uint8_t bits);
 
 /* 0x0042DFE0. The bit index of a power of two in 1..0x8000, and 0 for
  * anything else -- see the note in dist.cpp for how MSVC laid it out and why

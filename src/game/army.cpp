@@ -59,22 +59,21 @@ int32_t __cdecl ArmiesAllied(int32_t a, int32_t b)
 int32_t __cdecl ObjIsFriendly(const void *obj)
 {
     const AM2_Object *o = (const AM2_Object *)obj;
-    int32_t           owner;
+    int8_t            owner;
 
-    if (g_mpSession && obj && o->type == AM2_OBJ_TYPE_2
+    if (g_mpSession && ObjIsType2Inline(obj)
         && *(const int32_t *)((const uint8_t *)o + OBJ_OFF_SOLDIER_KIND) == 7)
         return 0;
 
     /* The null test above guards only the block, and this read is on the path
-     * a null argument takes. The original does the same. */
-    owner = o->owner;
-    if ((uint8_t)owner == AM2_ARMY_ALL)
-        return 1;
-    if (owner == (int32_t)g_defaultOwner)
-        return 1;
-    /* `neg`/`sbb`/`neg` in the original: the matrix entry normalised to 0 or
-     * 1, which ArmiesAllied above does NOT do. */
-    return AllyFlag(owner, (int32_t)g_defaultOwner) != 0;
+     * a null argument takes. The original does the same. The owner is a
+     * byte: compared as one against ARMY_ALL, widened for the rest. */
+    owner = (int8_t)o->owner;
+    if (owner != (int8_t)AM2_ARMY_ALL && owner != (int32_t)g_defaultOwner)
+        /* `neg`/`sbb`/`neg` in the original: the matrix entry normalised to 0
+         * or 1, which ArmiesAllied above does NOT do. */
+        return AllyFlag(owner, (int32_t)g_defaultOwner) != 0;
+    return 1;
 }
 
 void *__cdecl LookupOwnerObj(uint32_t owner)
@@ -123,7 +122,7 @@ void __cdecl ForEachArmyObject(int32_t army, void(__cdecl *fn)(void *obj))
             continue;
         }
         if (!(*(uint8_t *)(raw + OBJ_OFF_FLAGS) & OBJ_FLAG_SKIP)
-            && !(g_mpSession && obj->type == AM2_OBJ_TYPE_2
+            && !(g_mpSession && ObjIsType2Inline(obj)
                  && *(int32_t *)(raw + OBJ_OFF_SOLDIER_KIND) == 7))
             fn(obj);
         i++;
@@ -144,7 +143,6 @@ void __cdecl SetMaxHealth(void *obj, int32_t amount)
     AM2_Object *o   = (AM2_Object *)obj;
     int16_t    *max = (int16_t *)((uint8_t *)o + OBJ_OFF_MAX_HEALTH);
     int32_t     scaled;
-    int32_t     floor;
 
     if (*max > AM2_MAX_HEALTH_CAP)
         return;
@@ -155,8 +153,7 @@ void __cdecl SetMaxHealth(void *obj, int32_t amount)
     }
 
     if (o->owner == (int32_t)g_defaultOwner) {
-        *max = (int16_t)(int32_t)((long double)amount
-                                  * (long double)g_difficultyScale[g_difficulty]);
+        *max = (int16_t)(amount * g_difficultyScale[g_difficulty]);
         return;
     }
 
@@ -166,9 +163,13 @@ void __cdecl SetMaxHealth(void *obj, int32_t amount)
         return;
 
     scaled = (int32_t)((long double)amount * (long double)g_enemyHealthShare);
-    floor  = amount - AM2_HEALTH_PER_ATTEMPT
-                      * (g_levelAttempt / (g_difficulty * 2 + 2));
-    *max = (int16_t)(scaled > floor ? scaled : floor);
+    /* max(scaled, floor), as the macro expands: the floor is computed twice,
+     * once for the test and again for the value, and so is it here. */
+    *max = (int16_t)(scaled > amount - AM2_HEALTH_PER_ATTEMPT
+                                   * (g_levelAttempt / (g_difficulty * 2 + 2))
+                     ? scaled
+                     : amount - AM2_HEALTH_PER_ATTEMPT
+                                * (g_levelAttempt / (g_difficulty * 2 + 2)));
 }
 
 typedef void (__cdecl *AM2_Type238ActionFn)(void *obj, int32_t arg);

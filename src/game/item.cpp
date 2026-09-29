@@ -360,7 +360,13 @@ int32_t __cdecl CanPickUp(void *obj)
 
     code = **(const int32_t *const *)(o + OBJ_OFF_FIELD_C0);
 
-    return code == 0x1F || code == 0x20 || code == 0x21;
+    switch (code) {
+    case 0x1F:
+    case 0x20:
+    case 0x21:
+        return 1;
+    }
+    return 0;
 }
 
 /* 0x00449200, one caller. Put an object into state 5 and give up its ALTERNATE
@@ -1729,13 +1735,14 @@ void __cdecl ObjTileChanged(void *obj, int32_t height, int32_t force)
 void *__cdecl ObjectsHitByPoint(const uint32_t *pt, const void *desc)
 {
     const uint8_t *d = (const uint8_t *)desc;
-    int32_t  cols    = *(const int32_t *)(d + MAPDESC_OFF_COLS);
     int32_t  cx      = (int32_t)*(const int16_t *)pt >> AM2_CELL_SHIFT;
     int32_t  cy      = (int32_t)*((const int16_t *)pt + 1) >> AM2_CELL_SHIFT;
     uint8_t *head    = (uint8_t *)0;
     uint8_t *node;
 
-    if (cx < 0 || cx > cols - 1 || cy < 0 || cy > cols - 1)
+    /* The grid size is read after the first test, as the original does. */
+    if (cx < 0 || cx > *(const int32_t *)(d + MAPDESC_OFF_COLS) - 1
+        || cy < 0 || cy > *(const int32_t *)(d + MAPDESC_OFF_COLS) - 1)
         return (void *)0;
 
     node = ((uint8_t *const *)(*(const uint8_t *const *)
@@ -5711,8 +5718,8 @@ static void __cdecl SendDeathMessage(void *obj, uint32_t attackerUid,
     *(uint16_t *)(msg + 0) = AM2_MSG_DEATH_BYTES;
     *(uint16_t *)(msg + 2) = AM2_MSG_DEATH;
     *(uint32_t *)(msg + 4) = UidOnWire(((const AM2_Object *)obj)->uid);
-    *(uint32_t *)(msg + 8) = UidOnWire(attackerUid);
     msg[12]                = (uint8_t)kind;
+    *(uint32_t *)(msg + 8) = UidOnWire(attackerUid);
 
     ArmyMessageSend(msg);
     am2_log("Send Death Message: uid %x, army %d\n",
@@ -7698,7 +7705,7 @@ void __cdecl RankPromote(void *obj)
     rank++;
     *(int32_t *)(o + OBJ_OFF_RANK) = rank;
 
-    if (*(const int32_t *)o != 2)
+    if (!ObjIsType2Inline(o))
         return;
     if (*(const int32_t *)(o + OBJ_OFF_SARGE))
         return;
@@ -7796,7 +7803,7 @@ void __cdecl Type238Action(void *obj, int32_t award)
         return;
     if (award <= 0)
         return;
-    if (*(const int32_t *)o != 2)
+    if (!ObjIsType2Inline(o))
         return;
     if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) >= 6)
         return;
@@ -8818,15 +8825,13 @@ void *__cdecl HeldWeaponObj(const void *obj)
 {
     const uint8_t *o = (const uint8_t *)obj;
 
-    if (!o)
-        return (void *)0;
-
-    if (*(const int32_t *)o == 2)
+    /* Two inline type tests; the first one's null check is the only one. */
+    if (ObjIsType2Inline(o))
         return WeaponByUid(*(const uint32_t *)
             (o + UNIT_OFF_INVENTORY
              + (size_t)*(const int32_t *)(o + UNIT_OFF_INVENTORY_SEL) * 4));
 
-    if (*(const int32_t *)o == 3)
+    if (ObjIsType3Inline(o))
         return WeaponByUid(*(const uint32_t *)(o + UNIT_OFF_INVENTORY + 4));
 
     return (void *)0;
@@ -8853,7 +8858,7 @@ void __cdecl ObjToAI(void *obj)
 {
     uint8_t *o = (uint8_t *)obj;
 
-    if (!o || *(const int32_t *)o != 2)
+    if (!ObjIsType2Inline(o))
         return;
 
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0)
@@ -9155,9 +9160,9 @@ void __cdecl ResetObjOnCof(void *obj)
 
     ObjAttachTo(o, (void *)0);
 
-    if (!o)                     /* dead: five stores above already used it */
-        return;
-    if (*(const int32_t *)o != 2)
+    /* The inline type test, whose null check is dead here: the five stores
+     * above already used the pointer. */
+    if (!ObjIsType2Inline(o))
         return;
     if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) != 3)
         return;
@@ -10458,7 +10463,7 @@ void __cdecl SetObjContext(void *obj)
         return;
     }
 
-    if (type == 3) {
+    if (ObjIsType3Inline(o)) {
         const uint8_t *inner = (const uint8_t *)ListFirstObj(o);
 
         if (inner && *(const int32_t *)inner == 2
@@ -10467,7 +10472,7 @@ void __cdecl SetObjContext(void *obj)
             SetPointerMode(AM2_POINTER_MODE_SARGE);
             return;
         }
-    } else if (type != 2) {
+    } else if (!ObjIsType2Inline(o)) {
         return;                 /* neither 2 nor 3: the mode is left alone */
     }
 
@@ -10514,13 +10519,14 @@ void *__cdecl WalkCellAtPoint(const uint32_t *pt, const void *desc,
                               int32_t (__cdecl *keep)(void *obj))
 {
     const uint8_t *d = (const uint8_t *)desc;
-    int32_t  cols    = *(const int32_t *)(d + MAPDESC_OFF_COLS);
     int32_t  cx      = (int32_t)*(const int16_t *)pt >> AM2_CELL_SHIFT;
     int32_t  cy      = (int32_t)*((const int16_t *)pt + 1) >> AM2_CELL_SHIFT;
     uint8_t *head    = (uint8_t *)0;
     uint8_t *node;
 
-    if (cx < 0 || cx > cols - 1 || cy < 0 || cy > cols - 1)
+    /* The grid size is read after the first test, as the original does. */
+    if (cx < 0 || cx > *(const int32_t *)(d + MAPDESC_OFF_COLS) - 1
+        || cy < 0 || cy > *(const int32_t *)(d + MAPDESC_OFF_COLS) - 1)
         return (void *)0;
 
     node = ((uint8_t *const *)(*(const uint8_t *const *)
@@ -10905,19 +10911,18 @@ void __cdecl ForEachSelected(void (__cdecl *fn)(void *obj))
             (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
 
         if (!obj) {
+            /* No step: the shifted entry is next. */
             ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
-            continue;                   /* no step: the shifted entry is next */
+        } else {
+            if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED) {
+                /* Steps -- and so skips one. */
+                ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
+                *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
+            } else {
+                fn(obj);
+            }
+            i++;
         }
-
-        if (*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED) {
-            ListRemoveAt((void *)(uintptr_t)ADDR_SELECTED_UIDS, i);
-            *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
-            i++;                        /* steps -- and so skips one */
-            continue;
-        }
-
-        fn(obj);
-        i++;
     }
 }
 

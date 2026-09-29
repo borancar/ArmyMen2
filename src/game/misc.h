@@ -297,9 +297,14 @@ int32_t __cdecl ColourDistance(const void *a, const void *b);
 /* Four that do nothing but return. Reconstructed because they are functions in
  * the original and something calls them; there is nothing else to say. */
 void     __stdcall NullStub4(uint32_t arg);   /* 0x004170E0, `ret 4` */
-void     __cdecl   NullStub(void);            /* 0x0042E170, bare `ret` */
+/* 0x0042E170, a bare `ret` that the line drawers call with the pair they
+ * would swap -- a swap by VALUE, which does nothing and compiled to nothing.
+ * The two arguments are still pushed, so it takes them. */
+void     __cdecl   NullStub(int32_t a, int32_t b);
 int32_t  __cdecl   ReturnZero(void);          /* 0x0042E980 */
-int32_t  __cdecl   ReturnOne(void);           /* 0x004354F0 */
+/* 0x004354F0: type 7's saver, which has nothing to write -- SaveOneItem
+ * calls it with (fp, obj) like the other seven, and it answers 1. */
+int32_t  __cdecl   ReturnOne(void *fp, void *obj);
 
 /* 0x004231A0. Copies `count` blocks of `total / count` bytes from src to dst,
  * taking the SOURCE blocks in reverse order while the destination advances --

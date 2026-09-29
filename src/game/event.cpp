@@ -1058,10 +1058,13 @@ void __cdecl EvtType2ActionC(uint32_t uid, int32_t arg)
  * "heal that object by N percent". */
 void __cdecl EvtObjSet(uint32_t uid, int32_t value)
 {
+    void *obj;
+
     if (uid < AM2_UID_COUNTER_MIN)
         return;
 
-    HealObject(LookupByUID(uid), value, 0);
+    obj = LookupByUID(uid);
+    HealObject(obj, value, 0);
 }
 
 /* 0x0041FEC0. Resurrect a named item, by its own log line.
@@ -1079,17 +1082,19 @@ void __cdecl ScriptResurrectItem(uint32_t uid, uint32_t where)
 {
     uint8_t *obj;
 
+    /* `where` is an AM2_Point by value; its halves are read out of the
+     * argument slot. */
     if (kEventDebug)
         orig_log("ScriptResurrectItem, uid=%x, pos=(%d,%d)\n", uid,
-                 (int32_t)(int16_t)(where & 0xFFFFu),
-                 (int32_t)(int16_t)(where >> 16));
+                 (int32_t)((const AM2_Point *)&where)->x,
+                 (int32_t)((const AM2_Point *)&where)->y);
 
     obj = (uint8_t *)LookupByUID(uid);
 
     if (obj == (uint8_t *)0)
         return;
 
-    if ((uint16_t)where == 0)
+    if (((const AM2_Point *)&where)->x == 0)
         where = *(const uint32_t *)(obj + OBJ_OFF_POS);
 
     DeployItem(obj, where, AM2_DEPLOY_RESURRECT, 0);

@@ -2256,7 +2256,7 @@ int32_t __cdecl SaveOneItem(am2_FILE *fp, void *obj)
     case 4:  if (!SaveType4(fp, obj)) return 0; break;
     case 5:  if (!SaveType5(fp, obj)) return 0; break;
     case 6:  if (!SaveType6(fp, obj)) return 0; break;
-    case 7:  if (!ReturnOne()) return 0; break;   /* the stub; see above */
+    case 7:  if (!ReturnOne(fp, obj)) return 0; break;   /* the stub; see above */
     case 8:  if (!SaveType8(fp, obj)) return 0; break;
     default: break;          /* unknown type: header only, and NOT an error */
     }

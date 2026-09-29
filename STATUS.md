@@ -66,11 +66,44 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 758 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 869 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep. From 719 to 758:
+  the near-miss sweep, 758 before the row pools. From 758 to 869:
+  - **Parameterised helpers the original wrote twice**: the two row pools
+    and the sixteen sprite-loader functions were one helper over a struct
+    of pointers, which VC6 cannot fold. Inline helpers over the pool's own
+    globals, with the pool one aggregate {count; tail; slots[]}, match all
+    ten; the loaders re-read their globals at every use.
+  - **The pointer list is a class** (ctor 0x0042A660, dtor 0x0042A670):
+    `new` of it, the vehicle record's compiler-written destructor, and the
+    savegame loaders' stack objects all take their shape from that.
+  - **VC6 emits no unwind frame inside an `extern "C"` function** -- a
+    function whose original has one needs C++ linkage.
+  - **Recurring source shapes**, each found more than once: a switch VC6
+    compiled to range tests or byte-index tables (MapCode, ObjNextKind538);
+    an inlined ObjIsType2/3 (null check and `sete` included); `max()`/`min()`
+    macro expansions evaluating an operand twice; byte parameters
+    (RoundTo8, AngleDelta); `memset` for a 12-byte clear; globals and
+    array elements re-read at every use rather than held in a local;
+    `strlen(s) < 1` for an emptiness test; a by-value AM2_Point read out of
+    its argument slot; clipping written back over the `clip` parameter.
+  - **Behaviour fixed on the way**: the AUDIO dialog's OK commits the raw
+    bar volume (not BarVolume's silence substitute); LoadType3 passes the
+    saved slot as CreateVehicle's `table` (it read +0x494); the build-menu
+    tooltips pair each name with its own button's rectangle (they were one
+    button to the right); a vehicle without Sarge first offers no commands
+    (ours offered the trooper's three); partly clipped HUD command icons
+    draw at ClipRect's adjusted position; a missing squad pip sprite skips
+    that pip instead of ending the row.
+  - **Parked**: the five copy-protection call sites (OnStartWar and four
+    more) cannot match while the reference keeps GOG's `jmp`s -- a policy
+    question, not a source one; a `rows + i*stride` operand order
+    (SubrecHideRows, StepObjRows, ObjConceal, DestroyObjCommon) no source
+    form tried reproduces; MultiSpritePaint and OverlayPrepare scheduling.
+
+  From 719 to 758:
   - **The title screen and the remaining openers match**, and the relink's
     reference is RETAIL at the one byte where this project undoes GOG's
     MULTI-PLAYER patch for good (`bytematch.RetailImage`).

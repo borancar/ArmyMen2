@@ -252,10 +252,12 @@ void __attribute__((thiscall)) AM2_Movie::MovieApplyPalette(LPDIRECTDRAWSURFACE 
 
     src = (const uint8_t *)fld(movie, MOVIE_SMACK, void *) + SMACK_PALETTE;
 
-    for (i = MOVIE_PALETTE_FIRST; i <= MOVIE_PALETTE_LAST; i++) {
-        dst[i].peRed   = *src++;
-        dst[i].peGreen = *src++;
-        dst[i].peBlue  = *src++;
+    /* Indexed through the global itself, and bounded `< LAST + 1`: both are
+     * what put the loop pointer and its test where the original has them. */
+    for (i = MOVIE_PALETTE_FIRST; i < MOVIE_PALETTE_LAST + 1; i++) {
+        ((LPPALETTEENTRY)(uintptr_t)ADDR_SYSTEM_PALETTE)[i].peRed   = *src++;
+        ((LPPALETTEENTRY)(uintptr_t)ADDR_SYSTEM_PALETTE)[i].peGreen = *src++;
+        ((LPPALETTEENTRY)(uintptr_t)ADDR_SYSTEM_PALETTE)[i].peBlue  = *src++;
     }
 
     IDirectDrawSurface_GetPalette(surf, &pal);

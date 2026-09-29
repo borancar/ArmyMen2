@@ -1645,18 +1645,11 @@ typedef int32_t (__cdecl *AM2_MkdirFn)(const char *);
 /* The build screen's START button. Read out of the image rather than guessed
  * -- "done" was the obvious name for a button at the bottom of a build menu
  * and it is not what the strings say. */
-static const char *const kBuildStartSprites[3] = {
-    "03_016_00_start.bmp", "03_016_01_start.bmp", "03_016_02_start.bmp",
-};
 
 
 
 
 
-static const char *const kChatToSprites[4] = {
-    "18_001_00_chatto.bmp", "18_001_01_chatto.bmp",
-    "18_001_02_chatto.bmp", "18_001_03_chatto.bmp",
-};
 
 
 
@@ -5381,62 +5374,59 @@ void __cdecl SetPointerMode(int32_t mode)
  */
 void __cdecl HudMessage(const char *text, int32_t colour)
 {
-    uint8_t *h = *(uint8_t *const *)(uintptr_t)ADDR_HUD_WIDGET_A;
-    uint8_t *rows;
-    uint8_t *row;
+    /* The HUD widget and its row count are read afresh at every use, as
+     * the original does. */
+#define HM_HUD    (*(uint8_t *const *)(uintptr_t)ADDR_HUD_WIDGET_A)
+#define HM_COUNT  (*(int32_t *)(HM_HUD + HUDLOG_OFF_COUNT))
+#define HM_ROW(n) (HM_HUD + HUDLOG_OFF_ROWS + (n) * AM2_HUD_MSG_SIZE)
     char    *dst;
-    int32_t  n;
     int32_t  x;
-    size_t   len;
 
-    if (!h)
+    if (!HM_HUD)
         return;
 
-    rows = h + HUDLOG_OFF_ROWS;
-
-    if (*(const int32_t *)(h + HUDLOG_OFF_COUNT) >= AM2_HUD_MSG_ROWS) {
+    if (HM_COUNT >= AM2_HUD_MSG_ROWS) {
         int32_t i;
 
         for (i = 0; i < AM2_HUD_MSG_ROWS - 1; i++)
-            memcpy(rows + i * AM2_HUD_MSG_SIZE,
-                   rows + (i + 1) * AM2_HUD_MSG_SIZE,
-                   AM2_HUD_MSG_SIZE);
-        *(int32_t *)(h + HUDLOG_OFF_COUNT) = AM2_HUD_MSG_ROWS - 1;
+            memcpy(HM_ROW(i), HM_ROW(i + 1), AM2_HUD_MSG_SIZE);
+        HM_COUNT = AM2_HUD_MSG_ROWS - 1;
     }
 
-    n   = *(const int32_t *)(h + HUDLOG_OFF_COUNT);
-    row = rows + n * AM2_HUD_MSG_SIZE;
-
     if ((uint8_t)colour) {
-        row[0] = '^';
-        row[1] = (uint8_t)colour;
-        dst    = (char *)row + 2;
+        HM_ROW(HM_COUNT)[0] = '^';
+        HM_ROW(HM_COUNT)[1] = (uint8_t)colour;
+        dst = (char *)HM_ROW(HM_COUNT) + 2;
     } else {
-        dst = (char *)row;
+        dst = (char *)HM_ROW(HM_COUNT);
     }
 
     strcpy(dst, text);
 
-    *(int32_t *)(row + HUDMSG_OFF_WIDTH) = TextExtent(text, 1, (int32_t *)0);
+    *(int32_t *)(HM_ROW(HM_COUNT) + HUDMSG_OFF_WIDTH) =
+        TextExtent(text, 1, (int32_t *)0);
 
-    x = AM2_HUD_MSG_X_MIN;
-    if (n > 0) {
-        const uint8_t *prev = row - AM2_HUD_MSG_SIZE;
-        int32_t        v    = (int32_t)*(const float *)(prev + HUDMSG_OFF_X)
-                              + *(const int32_t *)(prev + HUDMSG_OFF_WIDTH)
-                              + AM2_HUD_MSG_GAP;
-
-        if (v >= AM2_HUD_MSG_X_MIN)
-            x = v;
+    if (HM_COUNT > 0) {
+        x = (int32_t)*(const float *)(HM_ROW(HM_COUNT - 1) + HUDMSG_OFF_X)
+            + *(const int32_t *)(HM_ROW(HM_COUNT - 1) + HUDMSG_OFF_WIDTH)
+            + AM2_HUD_MSG_GAP;
+        if (x < AM2_HUD_MSG_X_MIN)
+            x = AM2_HUD_MSG_X_MIN;
+    } else {
+        x = AM2_HUD_MSG_X_MIN;
     }
-    *(float *)(row + HUDMSG_OFF_X) = (float)x;
+    *(float *)(HM_ROW(HM_COUNT) + HUDMSG_OFF_X) = (float)x;
 
-    *(int32_t *)(h + HUDLOG_OFF_COUNT) = n + 1;
+    HM_COUNT++;
 
-    len = strlen(text);
-    if (len > AM2_HUD_TOTAL_CAP)
-        len = AM2_HUD_TOTAL_CAP;
-    *(int32_t *)(h + HUDLOG_OFF_BLIPS) += (int32_t)len;
+    /* min(strlen(text), cap) as the macro expands: strlen is called again
+     * for the value. */
+    *(int32_t *)(HM_HUD + HUDLOG_OFF_BLIPS) +=
+        (int32_t)(strlen(text) < AM2_HUD_TOTAL_CAP ? strlen(text)
+                                                   : AM2_HUD_TOTAL_CAP);
+#undef HM_ROW
+#undef HM_COUNT
+#undef HM_HUD
 }
 
 /* 0x00414620. A tooltip at the cursor, and the ORDER OF THE THREE STEPS IS THE
@@ -5577,10 +5567,6 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarUpdate()
 {
     AM2_Widget *w = this;
 
-    const AM2_Widget *panel =
-        *(AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_B;
-    AM2_Widget *claim;
-    int32_t     changed;
 
     if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER
         || *(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
@@ -5588,22 +5574,21 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarUpdate()
 
     ::WidgetUpdate(w);
 
-    if (!*(const int32_t *)((const uint8_t *)panel + HUDPANEL_OFF_OPEN))
+    if (!*(const int32_t *)((const uint8_t *)*(AM2_Widget *const *)
+                                (uintptr_t)ADDR_HUD_WIDGET_B
+                            + HUDPANEL_OFF_OPEN))
         return;
 
     if (!PointInRect((const AM2_Rect *)&w->rect, (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
         return;
 
-    claim   = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
-    changed = *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED;
-
-    if (!claim && changed) {
-        claim = w;
+    if (!*(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB
+        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
         *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
-    }
 
-    if ((*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON || changed)
-        && claim == w
+    if ((*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+         || *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+        && *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB == w
         && !*(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS) {
         const int16_t *cur = (const int16_t *)(uintptr_t)ADDR_CURSOR_POINT;
         int32_t       *tgt = (int32_t *)(uintptr_t)ADDR_VIEW_TARGET;
@@ -5624,8 +5609,8 @@ void __attribute__((thiscall)) AM2_Widget::HudRadarUpdate()
         *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET  = 0;
     }
 
-    if (*(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-        - *(const int32_t *)(uintptr_t)ADDR_MOUSE_ACTIVITY > AM2_MOUSE_IDLE_MS)
+    if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_ACTIVITY > AM2_MOUSE_IDLE_MS)
         strcpy((char *)((uint8_t *)*(AM2_Widget **)
                             (uintptr_t)ADDR_HUD_WIDGET_B
                             + HUDPANEL_OFF_CAPTION),
@@ -6086,43 +6071,40 @@ void __attribute__((thiscall)) AM2_Widget::HudSargePaint(RECT clip)
     AM2_Widget *w = this;
 
     const uint8_t *self = (const uint8_t *)w;
-    RECT           vis;
     int32_t        i;
 
-    if (!IntersectRect(&vis, &clip, (const RECT *)((void *)(uintptr_t)(ADDR_SCREEN_CLIP))))
+    /* Clipped in place: the visible part is written over `clip` itself. */
+    if (!IntersectRect(&clip, (const RECT *)((void *)(uintptr_t)(ADDR_SCREEN_CLIP)), &clip))
         return;
 
     for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
-        const int16_t *off = (const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SARGE_OFFSETS))
-                             + i * 2;
         const uint8_t *rec = self + HUDSARGE_OFF_SLOTS
                              + i * HUDSARGE_REC_STRIDE;
-        int32_t        idx = *(const int32_t *)(rec + HUDSARGE_REC_INDEX);
-        AM2_Sprite    *spr;
         AM2_Rect       box, part;
         RECT           hit;
-        int32_t        x, y, count;
-        char           text[16];
+        int32_t        x, y, width;
+        char           text[4];     /* the original's size: a 3-digit count */
 
-        if (idx < 0)
+/* The row's sprite, looked up again at each use as the original does. */
+#define SARGE_SPRITE (*(AM2_Sprite *const *)(self + HUD_OFF_SPRITE0 \
+                        + *(const int32_t *)(rec + HUDSARGE_REC_INDEX) * 4))
+        if (*(const int32_t *)(rec + HUDSARGE_REC_INDEX) < 0)
+            continue;
+        if (!SARGE_SPRITE)
             continue;
 
-        spr = *(AM2_Sprite *const *)(self + HUD_OFF_SPRITE0 + idx * 4);
-        if (!spr)
+        x = box.left = ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SARGE_OFFSETS)))[i * 2]
+                       + w->rect.left;
+        y = box.top  = ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SARGE_OFFSETS)))[i * 2 + 1]
+                       + w->rect.top;
+        box.right  = SARGE_SPRITE->bounds.right + box.left;
+        box.bottom = SARGE_SPRITE->bounds.bottom + box.top;
+
+        if (!IntersectRect(&hit, (const RECT *)&box, &clip))
             continue;
 
-        box.left   = off[0] + w->rect.left;
-        box.top    = off[1] + w->rect.top;
-        box.right  = spr->bounds.right + box.left;
-        box.bottom = spr->bounds.bottom + box.top;
-
-        if (!IntersectRect(&hit, (const RECT *)&box, &vis))
-            continue;
-
-        x = box.left;
-        y = box.top;
-
-        if (!ClipRect(&spr->bounds, (const AM2_Rect *)&vis, &x, &y, &part))
+        /* Against the row's own visible part, and x/y in and out. */
+        if (!ClipRect(&SARGE_SPRITE->bounds, (const AM2_Rect *)&hit, &x, &y, &part))
             continue;
 
         if (*(const int32_t *)(rec + HUDSARGE_REC_HIGHLIGHT) > 0)
@@ -6133,10 +6115,10 @@ void __attribute__((thiscall)) AM2_Widget::HudSargePaint(RECT clip)
          * only because a sarge sprite is never partly outside the clip; the
          * squad panel, whose slots do straddle its edge, is where the same
          * mistake finally showed. */
-        DrawSpriteClipped(spr, x, y, &part, 0);
+        DrawSpriteClipped(SARGE_SPRITE, x, y, &part, 0);
+#undef SARGE_SPRITE
 
-        count = *(const int32_t *)(rec + HUDSARGE_REC_COUNT);
-        if (count < 0)
+        if (*(const int32_t *)(rec + HUDSARGE_REC_COUNT) < 0)
             continue;
 
         if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
@@ -6144,11 +6126,11 @@ void __attribute__((thiscall)) AM2_Widget::HudSargePaint(RECT clip)
 
         ((int32_t (__cdecl *)(char *, const char *, ...))
             ((void *)(uintptr_t)(ADDR_GAME_SPRINTF)))(
-                text, "%d", count);
+                text, "%d", *(const int32_t *)(rec + HUDSARGE_REC_COUNT));
 
-        DrawText(AM2_HUD_SARGE_CELL_W
-                 - TextExtent(text, AM2_HUD_SARGE_FONT, (int32_t *)0)
-                 + box.left,
+        width = AM2_HUD_SARGE_CELL_W
+                - TextExtent(text, AM2_HUD_SARGE_FONT, (int32_t *)0);
+        DrawText(width + box.left,
                  box.top + AM2_HUD_SARGE_TEXT_DY,
                  text, AM2_HUD_SARGE_FONT, 0, AM2_HUD_SARGE_INK);
 
@@ -6901,16 +6883,14 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadPaint(RECT clip)
     AM2_Widget *w = this;
 
     uint8_t        *self = (uint8_t *)w;
-    const int16_t  *grid = (const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SQUAD_SLOT_XY));
-    RECT            vis;
     int32_t         slot;
 
-    if (!IntersectRect(&vis, (const RECT *)(uintptr_t)ADDR_SCREEN_CLIP, &clip))
+    /* Clipped in place: the visible part is written over `clip` itself. */
+    if (!IntersectRect(&clip, (const RECT *)(uintptr_t)ADDR_SCREEN_CLIP, &clip))
         return;
 
+#define REC (self + HUD_SQUAD_RECS + slot * HUD_SQUAD_REC_SIZE)
     for (slot = 0; slot < AM2_HUD_SQUAD_SLOTS; slot++) {
-        const uint8_t *rec = self + HUD_SQUAD_RECS + slot * HUD_SQUAD_REC_SIZE;
-        int32_t        idx = *(const int32_t *)(rec + SQUAD_REC_INDEX);
         int32_t        wide;
         AM2_Sprite    *spr;
         RECT           box;
@@ -6920,24 +6900,27 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadPaint(RECT clip)
         int32_t        y;
         int32_t        i;
 
-        if (idx < 0)
+        if (*(const int32_t *)(REC + SQUAD_REC_INDEX) < 0)
             continue;
 
-        spr = *(AM2_Sprite **)(self + HUD_SQUAD_PAIR_LO + idx * 4);
+        spr = *(AM2_Sprite **)(self + HUD_SQUAD_PAIR_LO
+                               + *(const int32_t *)(REC + SQUAD_REC_INDEX) * 4);
         if (!spr)
             continue;
 
-        wide = *(const int32_t *)(rec + SQUAD_REC_WIDE);
+        wide = *(const int32_t *)(REC + SQUAD_REC_WIDE);
         if (wide)
-            spr = *(AM2_Sprite **)(self + HUD_SQUAD_PAIR_HI + idx * 4);
+            spr = *(AM2_Sprite **)(self + HUD_SQUAD_PAIR_HI
+                                   + *(const int32_t *)(REC + SQUAD_REC_INDEX) * 4);
 
-        x = grid[slot * 2]     + w->rect.left;
-        y = grid[slot * 2 + 1] + w->rect.top;
-
-        box.left   = x;
-        box.top    = y;
-        box.right  = x + spr->bounds.right;
-        box.bottom = y + spr->bounds.bottom;
+        /* The origin is copied as it is computed: x and y go to ClipRect,
+         * which adjusts them; the box keeps the unadjusted pair. */
+        x = box.left = ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SQUAD_SLOT_XY)))[slot * 2]
+                       + w->rect.left;
+        y = box.top  = w->rect.top
+                       + ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SQUAD_SLOT_XY)))[slot * 2 + 1];
+        box.right  = box.left + spr->bounds.right;
+        box.bottom = spr->bounds.bottom + box.top;
 
         /* The wide backdrop, behind the portrait rather than over it. */
         if (wide) {
@@ -6951,11 +6934,11 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadPaint(RECT clip)
              * does not happen: bootcamp came back with a 60x75 block of the
              * map showing through where the original had painted it out. */
             back.left   = box.right;
-            back.top    = y;
             back.right  = box.right - spr->bounds.right + AM2_SQUAD_WIDE_W;
+            back.top    = box.top;
             back.bottom = box.bottom;
 
-            if (IntersectRect(&hit, &back, &vis))
+            if (IntersectRect(&hit, &back, &clip))
                 ClearRegion(&hit,
                             *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
         }
@@ -6966,79 +6949,73 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadPaint(RECT clip)
          * epilogue. Written as `return` for both -- the first slot whose box
          * fell outside the clip killed every slot after it, and bootcamp came
          * back 3,707 pixels wrong inside the squad panel. */
-        if (!IntersectRect(&hit, &box, &vis))
+        if (!IntersectRect(&hit, &box, &clip))
             continue;
 
-        {
-            int32_t cx = box.left;
-            int32_t cy = box.top;
+        if (!ClipRect(&spr->bounds, (const AM2_Rect *)&hit, &x, &y, &part))
+            return;
 
-            if (!ClipRect(&spr->bounds, (const AM2_Rect *)&hit, &cx, &cy, &part))
-                return;
+        if (*(const int32_t *)(REC + SQUAD_REC_HILITE))
+            ClearRegion(&hit, AM2_HUD_SQUAD_HILITE);
 
-            if (*(const int32_t *)(rec + SQUAD_REC_HILITE))
-                ClearRegion(&hit, AM2_HUD_SQUAD_HILITE);
+        /* THE ADJUSTED PAIR, not the box. ClipRect's x and y are IN/OUT
+         * and the original hands DrawSpriteClipped the very slots it wrote
+         * back through -- rect.h says so and this function is the second
+         * place in one session where passing the originals instead drew
+         * the panel wrong. */
+        DrawSpriteClipped(spr, x, y, &part, 0);
 
-            /* THE ADJUSTED PAIR, not the box. ClipRect's x and y are IN/OUT
-             * and the original hands DrawSpriteClipped the very slots it wrote
-             * back through -- rect.h says so and this function is the second
-             * place in one session where passing the originals instead drew
-             * the panel wrong. */
-            DrawSpriteClipped(spr, cx, cy, &part, 0);
-        }
-
-        if (wide) {
-            ::HudSquadDetail(w, *(const int32_t *)(rec + SQUAD_REC_DETAIL_ARG));
+        if (*(const int32_t *)(REC + SQUAD_REC_WIDE)) {
+            ::HudSquadDetail(w, *(const int32_t *)(REC + SQUAD_REC_DETAIL_ARG));
             continue;
         }
 
-        /* The bar under the portrait. */
-        if (*(const int32_t *)(rec + SQUAD_REC_BAR_W) > 0) {
+        /* The bar under the portrait, from the box's own origin. */
+        if (*(const int32_t *)(REC + SQUAD_REC_BAR_W) > 0) {
             RECT bar;
 
-            bar.left   = x + AM2_SQUAD_BAR_X;
-            bar.top    = y + AM2_SQUAD_BAR_TOP;
-            bar.right  = x + *(const int32_t *)(rec + SQUAD_REC_BAR_W);
-            bar.bottom = y + AM2_SQUAD_BAR_BOTTOM;
+            bar.left   = box.left + AM2_SQUAD_BAR_X;
+            bar.right  = *(const int32_t *)(REC + SQUAD_REC_BAR_W) + box.left;
+            bar.top    = box.top + AM2_SQUAD_BAR_TOP;
+            bar.bottom = box.top + AM2_SQUAD_BAR_BOTTOM;
 
-            if (IntersectRect(&hit, &bar, &vis))
-                ClearRegion(&hit, *(const uint8_t *)(rec + SQUAD_REC_BAR_COLOUR));
+            if (IntersectRect(&hit, &bar, &clip))
+                ClearRegion(&hit, *(const uint8_t *)(REC + SQUAD_REC_BAR_COLOUR));
         }
 
-        /* The pips, all one sprite, spaced along the bottom. */
-        for (i = 0; i < *(const int32_t *)(rec + SQUAD_REC_ICONS); i++) {
-            AM2_Sprite *pip = *(AM2_Sprite **)(self + HUD_SQUAD_ICON_SPRITE);
-            RECT        pbox;
-            int32_t     px;
-            int32_t     py;
+        /* The pips, all one sprite, spaced along the bottom. A missing pip
+         * sprite skips to the next pip rather than ending the row, and the
+         * pip box's BOTTOM is taken from its x -- `add ecx, eax` with eax
+         * still px at 0x00416FA7. Both the original's, both reproduced. */
+        for (i = 0; i < *(const int32_t *)(REC + SQUAD_REC_ICONS); i++) {
+            RECT    pbox;
+            int32_t px;
+            int32_t py;
 
-            if (!pip)
-                break;
-
-            px = x + i * AM2_SQUAD_ICON_DX + AM2_SQUAD_ICON_X;
-            py = y + AM2_SQUAD_ICON_Y;
-
-            pbox.left   = px;
-            pbox.top    = py;
-            pbox.right  = px + pip->bounds.right;
-            pbox.bottom = py + pip->bounds.bottom;
-
-            if (!IntersectRect(&hit, &pbox, &vis))
+#define SQUAD_PIP (*(AM2_Sprite **)(self + HUD_SQUAD_ICON_SPRITE))
+            if (!SQUAD_PIP)
                 continue;
 
-            {
-                int32_t cx = px;
-                int32_t cy = py;
+            px = i * AM2_SQUAD_ICON_DX + box.left + AM2_SQUAD_ICON_X;
+            py = box.top + AM2_SQUAD_ICON_Y;
+            pbox.left   = px;
+            pbox.top    = py;
+            pbox.right  = SQUAD_PIP->bounds.right + px;
+            pbox.bottom = SQUAD_PIP->bounds.bottom + px;
 
-                if (!ClipRect(&pip->bounds, (const AM2_Rect *)&hit,
-                              &cx, &cy, &part))
-                    continue;
+            if (!IntersectRect(&hit, &pbox, &clip))
+                continue;
 
-                /* Same contract again, same adjusted pair. */
-                DrawSpriteClipped(pip, cx, cy, &part, 0);
-            }
+            if (!ClipRect(&SQUAD_PIP->bounds, (const AM2_Rect *)&hit,
+                          &px, &py, &part))
+                continue;
+
+            /* Same contract again, same adjusted pair. */
+            DrawSpriteClipped(SQUAD_PIP, px, py, &part, 0);
+#undef SQUAD_PIP
         }
     }
+#undef REC
 }
 
 /* HudCmdConstruct -- original 0x00417040, one caller, thiscall. Builds the
@@ -7067,26 +7044,28 @@ AM2_HudCmd::AM2_HudCmd()
 {
     AM2_Widget *w = this;
 
-    uint8_t *rec;
+    int32_t i;
     AM2_CTOR_VTABLE(w, VTABLE_HUD_COMMANDS);
 
-    /* By pointer, to a signed bound (`jl`) that is the NEXT object -- the
-     * build-menu rectangles start where the seventh record would. */
-    for (rec = (uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPEC));
-         (int32_t)(uintptr_t)rec < (int32_t)(uintptr_t)ADDR_BUILD_MENU_RECTS;
-         rec += AM2_HUD_CMD_SPR_STRIDE) {
-        void *spr = PreloadArmySprite(
+    /* Seven records, indexed; the signed `jl` against the next object is the
+     * index loop strength-reduced -- the build-menu rectangles start where
+     * an eighth record would. */
+    for (i = 0; i < (int32_t)((ADDR_BUILD_MENU_RECTS - ADDR_HUD_CMD_SPEC)
+                              / AM2_HUD_CMD_SPR_STRIDE); i++) {
+        uint8_t *rec = (uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPEC))
+                       + i * AM2_HUD_CMD_SPR_STRIDE;
+
+        *(void **)(rec + HUDCMDSPR_OFF_SPRITE) = PreloadArmySprite(
             *(const int32_t *)(rec + HUDCMDSPR_OFF_SET),
             *(const int32_t *)(rec + HUDCMDSPR_OFF_INDEX),
             *(const int32_t *)(rec + HUDCMDSPR_OFF_FRAME), 0);
-        *(void **)(rec + HUDCMDSPR_OFF_SPRITE) = spr;
-        if (!spr)
+        if (!*(void **)(rec + HUDCMDSPR_OFF_SPRITE))
             return;                 /* the tail below is SKIPPED */
     }
 
-    ((int32_t *)((uint8_t *)w + HUDCMD_OFF_SLOTS))[0] = -1;
-    ((int32_t *)((uint8_t *)w + HUDCMD_OFF_SLOTS))[1] = -1;
-    ((int32_t *)((uint8_t *)w + HUDCMD_OFF_SLOTS))[2] = -1;
+    /* A loop VC6 unrolls, which is what puts these ahead of the rectangle. */
+    for (i = 0; i < 3; i++)
+        ((int32_t *)((uint8_t *)w + HUDCMD_OFF_SLOTS))[i] = -1;
 
     w->x = 0;
     w->y = AM2_HUD_CMD_TOP;
@@ -7206,17 +7185,8 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
 {
     AM2_Widget *w = this;
 
-    /* The scancode each command answers to. Transcribed as PAIRS because the
-     * ladder's order is not the commands' order -- see the note above. */
-    static const struct { int32_t key; int32_t cmd; } kHotkeys[] = {
-        { 0x10, 4 }, { 0x11, 5 }, { 0x12, 6 },
-        { 0x0E, 1 }, { 0x0C, 3 }, { 0x0F, 2 },
-    };
-
     uint8_t *self = (uint8_t *)w;
-    uint8_t *panel;
-    int32_t *slots = (int32_t *)(self + HUDCMD_OFF_SLOTS);
-    uint8_t *obj;
+#define slots ((int32_t *)(self + HUDCMD_OFF_SLOTS))
     int32_t  i;
 
     if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER
@@ -7225,112 +7195,98 @@ void __attribute__((thiscall)) AM2_Widget::HudCmdUpdate()
 
     ::WidgetUpdate(w);
 
-    /* Pass one: the hotkeys, first match wins and the mouse pass is skipped. */
-    for (i = 0; i < (int32_t)(sizeof kHotkeys / sizeof kHotkeys[0]); i++) {
-        if (ActionKeyPressed(kHotkeys[i].key)) {
-            ::HudCmdInvoke(w, kHotkeys[i].cmd);
-            goto refill;
-        }
-    }
-
-    panel = (uint8_t *)*(AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_B;
-
+    /* Pass one: the hotkeys, a ladder in which the first match wins and the
+     * mouse pass is skipped. The scancodes are not in the commands' order. */
+    if (ActionKeyPressed(0x10))
+        ::HudCmdInvoke(w, 4);
+    else if (ActionKeyPressed(0x11))
+        ::HudCmdInvoke(w, 5);
+    else if (ActionKeyPressed(0x12))
+        ::HudCmdInvoke(w, 6);
+    else if (ActionKeyPressed(0x0E))
+        ::HudCmdInvoke(w, 1);
+    else if (ActionKeyPressed(0x0C))
+        ::HudCmdInvoke(w, 3);
+    else if (ActionKeyPressed(0x0F))
+        ::HudCmdInvoke(w, 2);
     /* Pass two: the mouse, but only while the panel is open. */
-    if (*(const int32_t *)(panel + HUDPANEL_OFF_OPEN)) {
-        const int16_t *grid =
-            (const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SQUAD_SLOT_XY));
-
+    else if (*(const int32_t *)((const uint8_t *)*(AM2_Widget *const *)
+                                    (uintptr_t)ADDR_HUD_WIDGET_B
+                                + HUDPANEL_OFF_OPEN)) {
         for (i = 0; i < AM2_HUD_CMD_SLOTS; i++) {
-            int32_t           idx = slots[i];
-            const uint8_t    *spec;
-            const AM2_Sprite *spr;
-            AM2_Rect          cell;
-            AM2_Widget       *grab;
-            int32_t           changed;
+            AM2_Rect cell;
 
-            if (idx < 0)
+/* The slot's sprite spec, looked up again at each use. */
+#define CMD_SPEC(s) ((const uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPEC)) \
+                     + (uint32_t)(s) * AM2_HUD_CMD_SPR_STRIDE)
+            if (slots[i] < 0)
                 continue;
 
-            spec = (const uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPEC))
-                   + (uint32_t)idx * AM2_HUD_CMD_SPR_STRIDE;
-            spr  = *(const AM2_Sprite *const *)(spec + HUDCMDSPR_OFF_SPRITE);
-
-            cell.left   = grid[i * 2]     + w->rect.left;
-            cell.top    = grid[i * 2 + 1] + w->rect.top;
-            cell.right  = spr->bounds.right  + cell.left;
-            cell.bottom = spr->bounds.bottom + cell.top;
+            cell.left   = ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SQUAD_SLOT_XY)))[i * 2]
+                          + w->rect.left;
+            cell.top    = w->rect.top
+                          + ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SQUAD_SLOT_XY)))[i * 2 + 1];
+            cell.right  = (*(const AM2_Sprite *const *)(CMD_SPEC(slots[i]) + HUDCMDSPR_OFF_SPRITE))
+                              ->bounds.right + cell.left;
+            cell.bottom = (*(const AM2_Sprite *const *)(CMD_SPEC(slots[i]) + HUDCMDSPR_OFF_SPRITE))
+                              ->bounds.bottom + cell.top;
 
             if (!PointInRect(&cell,
                              (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
                 continue;
 
-            grab    = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
-            changed = *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED;
-
-            if (!grab && changed) {
-                grab = w;
+            if (!*(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB
+                && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
                 *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
-            }
 
             if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
-                || !changed || grab != w)
+                || !*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
+                || *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB != w)
                 continue;
 
             PlaySoundAt(0, 0, 0, 0, 0);
             SetPointerMode(slots[i]);
 
             /* Re-read the slot: SetPointerMode is handed the same value but
-             * the handler comes from a SECOND load of it, which is what the
-             * original does and costs nothing to keep. */
-            {
-                void (__cdecl *fn)(void) = *(void (__cdecl *const *)(void))(
-                    (const uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPEC))
-                    + (uint32_t)slots[i] * AM2_HUD_CMD_SPR_STRIDE
-                    + HUDCMDSPR_OFF_HANDLER);
-
-                if (fn)
-                    fn();
-            }
+             * the handler comes from a SECOND load of it. */
+            if (*(void (__cdecl *const *)(void))(CMD_SPEC(slots[i])
+                                                 + HUDCMDSPR_OFF_HANDLER))
+                (*(void (__cdecl *const *)(void))(CMD_SPEC(slots[i])
+                                                  + HUDCMDSPR_OFF_HANDLER))();
+#undef CMD_SPEC
         }
     }
 
-refill:
-    /* Pass three: which three commands the current object offers. */
-    slots[0] = -1;
-    slots[1] = -1;
-    slots[2] = -1;
+    /* Pass three: which three commands the current object offers. The
+     * context object is read afresh at each use. */
+#define CTX ((uint8_t *)*(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A)
+    memset(slots, 0xFF, AM2_HUD_CMD_SLOTS * sizeof(int32_t));
 
-    obj = (uint8_t *)*(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A;
-
-    if (ObjType2Field548((const AM2_Object *)obj)) {
+    if (ObjType2Field548((const AM2_Object *)CTX)) {
         slots[0] = 1;
         slots[1] = 2;
-        if (*(const int32_t *)(obj + UNIT_OFF_INVENTORY_SEL) > 0)
+        if (*(const int32_t *)(CTX + UNIT_OFF_INVENTORY_SEL) > 0)
             slots[2] = 3;
-    } else {
-        /* The two remaining arms SHARE AN ENDING in the image: a vehicle
-         * whose first occupant is not Sarge `jmp`s into the middle of the
-         * trooper arm. Written with the flag rather than a goto into a
-         * block, which is the same control flow and compiles. */
-        int32_t trooper = 0;
-
-        if (ObjIsType3((const AM2_Object *)obj)) {
-            if (ObjType2Field548((const AM2_Object *)ListFirstObj(obj))) {
-                slots[0] = 1;
-                slots[1] = 2;
-            } else {
-                trooper = 1;
-            }
-        } else if (obj && *(const int32_t *)obj == AM2_OBJ_TYPE_TROOPER) {
-            trooper = 1;
+    } else if (ObjIsType3((const AM2_Object *)CTX)) {
+        /* A vehicle offers Sarge's two only when he is its first occupant,
+         * and nothing otherwise. The image's `jmp` into the trooper arm's
+         * null test arrives with eax already 0 -- jump threading, not a
+         * shared ending -- which this once read as "a vehicle without Sarge
+         * gets the trooper commands". */
+        if (ObjType2Field548((const AM2_Object *)ListFirstObj(CTX))) {
+            slots[0] = 1;
+            slots[1] = 2;
         }
-
-        if (trooper) {
+    } else if (CTX) {
+        switch (*(const int32_t *)CTX) {
+        case AM2_OBJ_TYPE_TROOPER:
             slots[0] = 4;
             slots[1] = 5;
             slots[2] = 6;
+            break;
         }
     }
+#undef CTX
 
     /* Whichever slot matches the live pointer mode is the highlighted one. */
     *(int32_t *)(self + HUDCMD_OFF_SELECTED) = -1;
@@ -7338,6 +7294,7 @@ refill:
         if (slots[i] == *(const int32_t *)(uintptr_t)ADDR_POINTER_MODE)
             *(int32_t *)(self + HUDCMD_OFF_SELECTED) = i;
     }
+#undef slots
 }
 
 void __attribute__((thiscall)) AM2_Widget::HudCommandsPaint(RECT clip)
@@ -7345,62 +7302,51 @@ void __attribute__((thiscall)) AM2_Widget::HudCommandsPaint(RECT clip)
     AM2_Widget *w = this;
 
     const uint8_t *self = (const uint8_t *)w;
-    RECT           vis;
     int32_t        i;
 
-    if (!IntersectRect(&vis, &clip, (const RECT *)((void *)(uintptr_t)(ADDR_SCREEN_CLIP))))
+    /* Clipped in place: the visible part is written over `clip` itself. */
+    if (!IntersectRect(&clip, (const RECT *)((void *)(uintptr_t)(ADDR_SCREEN_CLIP)), &clip))
         return;
 
     for (i = 0; i < AM2_HUD_CMD_SLOTS; i++) {
-        const int16_t *off = (const int16_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_OFFSETS))
-                             + i * 2;
-        int32_t        slot = *(const int32_t *)(self + HUDCMD_OFF_SLOTS
-                                                 + i * 4);
-        AM2_Sprite    *spr;
+        const int32_t *slot = (const int32_t *)(self + HUDCMD_OFF_SLOTS) + i;
         AM2_Rect       box, part;
         RECT           hit;
         int32_t        x, y;
 
-        if (slot < 0)
+/* The slot's sprite, looked up again at each use as the original does. */
+#define HUDCMD_SPRITE(s) (*(AM2_Sprite **)((uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPRITES)) \
+                                           + (s) * AM2_POINTER_MODE_SIZE))
+        if (*slot < 0)
+            continue;
+        if (!HUDCMD_SPRITE(*slot))
             continue;
 
-        spr = *(AM2_Sprite **)((uint8_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_SPRITES))
-                               + slot * AM2_POINTER_MODE_SIZE);
-        if (!spr)
+        /* The origin is copied as it is computed: ClipRect takes x and y as
+         * inputs as well as outputs -- it offsets the origin-anchored source
+         * by them, clips in screen space and writes back what it trimmed --
+         * and the draw uses its ADJUSTED pair. This drew at the unadjusted
+         * box origin until the byte match read the frame slots: a partly
+         * clipped icon was placed as though nothing had been cut. */
+        x = box.left = ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_OFFSETS)))[i * 2] + w->rect.left;
+        y = box.top  = ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_CMD_OFFSETS)))[i * 2 + 1] + w->rect.top;
+        box.right  = HUDCMD_SPRITE(*slot)->bounds.right + box.left;
+        box.bottom = HUDCMD_SPRITE(*slot)->bounds.bottom + box.top;
+
+        if (!IntersectRect(&hit, (const RECT *)&box, &clip))
             continue;
 
-        box.left   = off[0] + w->rect.left;
-        box.top    = off[1] + w->rect.top;
-        box.right  = spr->bounds.right + box.left;
-        box.bottom = spr->bounds.bottom + box.top;
-
-        if (!IntersectRect(&hit, (const RECT *)&box, &vis))
-            continue;
-
-        /* Exits rather than continues -- see above. */
-        /* CLIPRECT TAKES x AND y AS INPUTS AS WELL AS OUTPUTS, and missing
-         * that is what cost four rounds here. It offsets the origin-anchored
-         * source by them, clips in SCREEN space against `vis`, and writes back
-         * coordinates adjusted for whatever it trimmed. Leaving them
-         * uninitialised -- which is what I did -- adds garbage to
-         * spr->bounds, puts the sprite nowhere near the clip, and returns 0:
-         * the icons never drew at all, in every variant I tried.
-         *
-         * The original makes this visible by writing the origin into TWO
-         * frame slots each (0x34/0x38 and 0x30/0x3c): one copy feeds ClipRect
-         * and is modified, the other survives as the draw position. */
-        x = box.left;
-        y = box.top;
-
-        if (!ClipRect(&spr->bounds, (const AM2_Rect *)&vis, &x, &y, &part))
+        /* Exits rather than continues -- see above. Clipped against the
+         * icon's own visible part, which is what the frame slot holds. */
+        if (!ClipRect(&HUDCMD_SPRITE(*slot)->bounds, (const AM2_Rect *)&hit,
+                      &x, &y, &part))
             return;
 
         if (i == *(const int32_t *)(self + HUDCMD_OFF_SELECTED))
             ClearRegion((const RECT *)&hit, AM2_HUD_CMD_HIGHLIGHT);
 
-        /* The SAVED origin, not ClipRect's adjusted x/y -- the original
-         * pushes frame 0x34 and 0x30, the copies it kept back. */
-        DrawSpriteClipped(spr, box.left, box.top, &part, 0);
+        DrawSpriteClipped(HUDCMD_SPRITE(*slot), x, y, &part, 0);
+#undef HUDCMD_SPRITE
     }
 }
 
@@ -7470,17 +7416,16 @@ AM2_HudTop::AM2_HudTop()
     *(uint32_t *)(self + HUDLOG_OFF_BLIP_AT)    = 0;
 
     for (i = 0; i < AM2_HUDLOG_ROWS; i++) {
-        uint8_t *row = self + HUDLOG_OFF_ROWS
-                     + (size_t)i * AM2_HUDLOG_ROW_STRIDE;
-        row[HUDLOGROW_OFF_TEXT] = 0;
-        *(int32_t *)(row + HUDLOGROW_OFF_FIELD_50) = 0;
+        self[HUDLOG_OFF_ROWS + i * AM2_HUDLOG_ROW_STRIDE + HUDLOGROW_OFF_TEXT] = 0;
+        *(int32_t *)(self + HUDLOG_OFF_ROWS + i * AM2_HUDLOG_ROW_STRIDE
+                     + HUDLOGROW_OFF_FIELD_50) = 0;
     }
 
     *(int32_t *)(self + HUDLOG_OFF_SCROLL) = 0;
     w->x = 0;
     w->y = 0;
-    w->w = spr->bounds.right;
-    w->h = spr->bounds.bottom;
+    w->w = (*(AM2_Sprite **)(self + HUD_OFF_SPRITE0))->bounds.right;
+    w->h = (*(AM2_Sprite **)(self + HUD_OFF_SPRITE0))->bounds.bottom;
     self[HUDLOG_OFF_TYPED] = 0;
     *(int32_t *)(self + HUDLOG_OFF_COUNT) = 0;
 
@@ -7501,10 +7446,16 @@ AM2_HudTop::AM2_HudTop()
         if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
                                + (size_t)me * AM2_COMM_SLOT_STRIDE
                                + COMM_SLOT_OFF_TEAM) != 0) {
-            AM2_Widget *cb = new AM2_CheckBox(kChatToSprites[0], kChatToSprites[1],
-                                              kChatToSprites[2], kChatToSprites[3],
-                                              *RectSet(AM2_TEMP(AM2_Rect), 2, 4, 0x0D, 0x0D),
-                                              0, 0, 0);
+            AM2_Rect    box;
+            AM2_Widget *cb;
+
+            box.left   = 2;
+            box.top    = 4;
+            box.right  = 0x0D;
+            box.bottom = 0x0D;
+            cb = new AM2_CheckBox("18_001_00_chatto.bmp", "18_001_01_chatto.bmp",
+                                  "18_001_02_chatto.bmp", "18_001_03_chatto.bmp",
+                                  box, 0, 0, 0);
 
             *(void **)(self + HUD_A_OFF_CHECKBOX) = cb;
             ::WidgetAddChild(w, cb);
@@ -7653,7 +7604,6 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
 void __cdecl HudChatChar(uint32_t ch, uint32_t lo, uint32_t hi)
 {
     AM2_Widget *w = *(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A;
-    char       *typed;
     int32_t     len;
 
     (void)lo;
@@ -7663,33 +7613,29 @@ void __cdecl HudChatChar(uint32_t ch, uint32_t lo, uint32_t hi)
         return;
     }
 
-    typed = (char *)w + HUDLOG_OFF_TYPED;
-    len   = (int32_t)strlen(typed);
+    len = (int32_t)strlen((char *)w + HUDLOG_OFF_TYPED);
 
+    /* Two shared exits -- the refusal sound and the click -- which is why
+     * this is an if/else ladder rather than early returns. */
     if (ch >= 0x20 && ch < 0x80) {
-        if (len >= AM2_HUD_CHAT_TYPED_MAX) {
+        if (len < AM2_HUD_CHAT_TYPED_MAX) {
+            ((char *)w)[HUDLOG_OFF_TYPED + len] = (char)ch;
+            ((char *)*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A)
+                [HUDLOG_OFF_TYPED + len + 1] = 0;
+            PlaySoundAt(0, 0, 0, 0, 0);
+        } else {
             PlaySoundAt(3, 0, 0, 0, 0);
-            return;
         }
-        typed[len] = (char)ch;
-        ((char *)*(AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_A)
-            [HUDLOG_OFF_TYPED + len + 1] = 0;
-        PlaySoundAt(0, 0, 0, 0, 0);
-        return;
-    }
-
-    if (ch == 8) {                      /* backspace */
-        if (len <= 0) {
+    } else if (ch == 8) {               /* backspace */
+        if (len > 0) {
+            ((char *)w)[HUDLOG_OFF_TYPED + len - 1] = 0;
+            PlaySoundAt(0, 0, 0, 0, 0);
+        } else {
             PlaySoundAt(3, 0, 0, 0, 0);
-            return;
         }
-        typed[len - 1] = 0;
-        PlaySoundAt(0, 0, 0, 0, 0);
-        return;
-    }
-
-    if (ch == 0xD)                      /* RETURN -- a tail call there */
+    } else if (ch == 0xD) {             /* RETURN -- a tail call there */
         HudChatSend(w);
+    }
 }
 
 /* 0x00418660. The top strip's own update, and the counterpart to the paint
@@ -8342,8 +8288,10 @@ AM2_HudPanel::AM2_HudPanel()
     AM2_CTOR_VTABLE(w, VTABLE_HUD_PANEL);
 
     /* The net-game flag is re-read at each use, as the original does. */
-    spr = (AM2_Sprite *)PreloadArmySprite(0x0B, 0,
-              *(const int32_t *)(uintptr_t)ADDR_NET_GAME ? 1 : 0, 1);
+    if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME == 0)
+        spr = (AM2_Sprite *)PreloadArmySprite(0x0B, 0, 0, 1);
+    else
+        spr = (AM2_Sprite *)PreloadArmySprite(0x0B, 0, 1, 1);
     *(void **)(self + HUD_OFF_SPRITE0) = spr;
     if (!spr)
         return;
@@ -8386,8 +8334,7 @@ AM2_HudPanel::AM2_HudPanel()
      * found by reading ADDR_BUILD_ON_TOGGLE, which indexes an 18-row table
      * with +0x78 -- coherent only if that field is the row. */
     {
-        const uint8_t *rec  = (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU));
-        const uint8_t *rect = (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU_RECTS));
+        const uint8_t *menu = (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU));
         AM2_Widget   **slot = (AM2_Widget **)(uintptr_t)ADDR_HUD_WIDGET_TABLE;
         int32_t        army = CommArmyOfSlot(
                                   *(void **)(uintptr_t)ADDR_COMM_OBJECT,
@@ -8396,24 +8343,29 @@ AM2_HudPanel::AM2_HudPanel()
         char          *points;
         int32_t        i;
 
+        /* Indexed at each use. Record i's button takes the rectangle 0x10
+         * before the record (ADDR_BUILD_MENU_RECTS -- see orig.h). */
         for (i = 0; i < AM2_BUILD_MENU_COUNT; i++) {
-            int32_t id   = *(const int32_t *)(rec + BUILD_MENU_OFF_ID);
-            int32_t kind = *(const int32_t *)(rec + BUILD_MENU_OFF_KIND);
-            const int32_t *r = (const int32_t *)rect;
-
             /* ARMY is the sprite FRAME and the row is arg7, not the
             * other way round -- see the note above the loop. */
-            btn = new AM2_CountButton(kind, army, *(const AM2_Rect *)r, i, (int32_t)UnitTypeCost(id), BuildOnToggle);
+            btn = new AM2_CountButton(
+                *(const int32_t *)(menu + i * AM2_BUILD_MENU_STRIDE
+                                   + BUILD_MENU_OFF_KIND),
+                army,
+                *(const AM2_Rect *)(menu + i * AM2_BUILD_MENU_STRIDE
+                                    - (ADDR_BUILD_MENU - ADDR_BUILD_MENU_RECTS)),
+                i,
+                (int32_t)UnitTypeCost(*(const int32_t *)
+                    (menu + i * AM2_BUILD_MENU_STRIDE + BUILD_MENU_OFF_ID)),
+                BuildOnToggle);
             ::WidgetAddChild(w, btn);
-            *slot = btn;
+            slot[i] = btn;
 
             /* Writes through btn even when it is null -- the original's. */
-            if (!CanAffordUnit(id, *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS))
+            if (!CanAffordUnit(*(const int32_t *)(menu + i * AM2_BUILD_MENU_STRIDE
+                                                  + BUILD_MENU_OFF_ID),
+                               *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS))
                 *(int32_t *)((uint8_t *)btn + COUNTBTN_OFF_DISABLED) = 1;
-
-            rec  += AM2_BUILD_MENU_STRIDE;
-            rect += AM2_BUILD_MENU_STRIDE;
-            slot++;
         }
 
         /* The points readout, formatted into the panel's own buffer. */
@@ -8436,7 +8388,7 @@ AM2_HudPanel::AM2_HudPanel()
         *(int32_t *)((uint8_t *)btn + COUNTBTN_OFF_DISABLED) = 1;
         ::WidgetAddChild(w, *(AM2_Widget **)(self + HUDPANEL_OFF_POINTS_FIELD));
 
-        btn = new AM2_Button(kBuildStartSprites[0], kBuildStartSprites[1], kBuildStartSprites[2], 1, *RectSet(AM2_TEMP(AM2_Rect), 0x1F, 0x1A6, 0x51, 0x20), (void (__cdecl *)(AM2_Widget *)) BuildStartHandler, (void (__cdecl *)(AM2_Widget *))0);
+        btn = new AM2_Button("03_016_00_start.bmp", "03_016_01_start.bmp", "03_016_02_start.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x1F, 0x1A6, 0x51, 0x20), (void (__cdecl *)(AM2_Widget *)) BuildStartHandler, (void (__cdecl *)(AM2_Widget *))0);
         ::WidgetAddChild(w, btn);
         w->focusedChild = btn;
         *(int32_t *)((uint8_t *)btn + BUTTON_OFF_FLAG44) = 1;
@@ -8522,13 +8474,11 @@ void __attribute__((thiscall)) AM2_Widget::HudPanelUpdate()
         return;
 
     if (*(const int32_t *)(self + HUDPANEL_OFF_OPEN)) {
-        int32_t stop = *(const int32_t *)(self + HUDPANEL_OFF_STOP);
-
-        if (w->x > stop) {
+        if (w->x > *(const int32_t *)(self + HUDPANEL_OFF_STOP)) {
             w->x -= (int32_t)((double)*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
                               * *(const float *)((void *)(uintptr_t)(ADDR_HUD_SLIDE_OPEN)));
-            if (w->x < stop)
-                w->x = stop;
+            if (w->x < *(const int32_t *)(self + HUDPANEL_OFF_STOP))
+                w->x = *(const int32_t *)(self + HUDPANEL_OFF_STOP);
             *(int32_t *)(uintptr_t)(ADDR_BLIT_RECT + 8) = w->x;
         }
     } else if (w->x < *(const int32_t *)(uintptr_t)ADDR_SCREEN_W
@@ -8543,15 +8493,18 @@ void __attribute__((thiscall)) AM2_Widget::HudPanelUpdate()
     if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
         AM2_Widget *const *slot =
             (AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_TABLE;
-        const uint8_t     *rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU));
+        const uint8_t     *menu = (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU));
+        int32_t            i;
 
-        for (; rec < (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU_END));
-             rec += AM2_BUILD_MENU_STRIDE, slot++) {
-            int32_t id = *(const int32_t *)(rec + BUILD_MENU_OFF_ID);
-
-            (*slot)->disabled =
-                CanAffordUnit(id, *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS)
-                ? 0 : 1;
+        /* Indexed, with an if/else: the signed `jl` and the two stores. */
+        for (i = 0; i < (int32_t)((ADDR_BUILD_MENU_END - ADDR_BUILD_MENU)
+                                  / AM2_BUILD_MENU_STRIDE); i++) {
+            if (CanAffordUnit(*(const int32_t *)(menu + i * AM2_BUILD_MENU_STRIDE
+                                                 + BUILD_MENU_OFF_ID),
+                              *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS))
+                slot[i]->disabled = 0;
+            else
+                slot[i]->disabled = 1;
         }
     }
 
@@ -8569,26 +8522,27 @@ void __attribute__((thiscall)) AM2_Widget::HudPanelPaint(RECT clip)
     ::WidgetPaint(w, clip);
 
     if (*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
-        const uint8_t *rec;
+        int32_t i;
 
-        for (rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU))
-                   + BUILD_MENU_OFF_RECT;
-             rec < (const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU_END))
-                   + BUILD_MENU_OFF_RECT - AM2_BUILD_MENU_STRIDE;
-             rec += AM2_BUILD_MENU_STRIDE) {
+        /* All eighteen buttons, each record's name against the rectangle its
+         * button really uses (ADDR_BUILD_MENU_RECTS -- the table's rects sit
+         * one record early). This walked BUILD_MENU_OFF_RECT, the NEXT
+         * button's, and stopped one short, so every tooltip answered for the
+         * button to the right of the pointer; the byte match found it. The
+         * rectangle is filled in place, right and bottom from left and top. */
+        for (i = 0; i < (int32_t)((ADDR_BUILD_MENU_END - ADDR_BUILD_MENU)
+                                  / AM2_BUILD_MENU_STRIDE); i++) {
             AM2_Rect box;
 
-            RectSet(&box,
-                    ((const int32_t *)rec)[0] + w->rect.left,
-                    ((const int32_t *)rec)[1] + w->rect.top,
-                    ((const int32_t *)rec)[2] + ((const int32_t *)rec)[0]
-                        + w->rect.left,
-                    ((const int32_t *)rec)[3] + ((const int32_t *)rec)[1]
-                        + w->rect.top);
+            box.left   = ((const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU_RECTS)) + i * AM2_BUILD_MENU_STRIDE))[0] + w->rect.left;
+            box.top    = ((const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU_RECTS)) + i * AM2_BUILD_MENU_STRIDE))[1] + w->rect.top;
+            box.right  = ((const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU_RECTS)) + i * AM2_BUILD_MENU_STRIDE))[2] + box.left;
+            box.bottom = ((const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU_RECTS)) + i * AM2_BUILD_MENU_STRIDE))[3] + box.top;
 
             if (PointInRect(&box,
                             (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
-                DrawTooltip((const char *)(rec - BUILD_MENU_OFF_RECT
+                DrawTooltip((const char *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU))
+                                           + i * AM2_BUILD_MENU_STRIDE
                                            + BUILD_MENU_OFF_NAME),
                             *(const uint8_t *)(uintptr_t)
                                 ADDR_BACKGROUND_COLOUR);
@@ -11791,17 +11745,15 @@ AM2_SelectMapScreen::~AM2_SelectMapScreen()
 void __cdecl SelectMapRow(AM2_Widget *list, AM2_ListRows *rows,
                           int32_t selected)
 {
-    const int32_t *id;
     void          *level;
 
     (void)list;
     if (!rows || selected < 0 || selected >= rows->count)
         return;
 
-    id = *(const int32_t *const *)(rows->text
+    level = FindLevelRecord(**(const int32_t *const *)(rows->text
                                    + (uint32_t)selected * AM2_LIST_ROW_STRIDE
-                                   + AM2_LIST_ROW_VALUE);
-    level = FindLevelRecord(*id);
+                                   + AM2_LIST_ROW_VALUE));
     if (!level)
         return;
 
@@ -14047,8 +13999,10 @@ void __cdecl SaveListOnSave(AM2_Widget *w)
     h = orig_findfirst(name, find);
     if (h == -1) {
         /* Nothing of that name: save it and leave. */
+        /* Copied to the global, but SaveGame is handed the dialog's own
+         * buffer: the same text either way. */
         strcpy((char *)((void *)(uintptr_t)(ADDR_GAMEPROC_STR_B)), name);
-        SaveGame((const char *)((void *)(uintptr_t)(ADDR_GAMEPROC_STR_B)));
+        SaveGame(name);
         *(int32_t *)(uintptr_t)ADDR_MENU_REQUEST_SET = 1;
         return;
     }
@@ -16045,16 +15999,15 @@ void __attribute__((thiscall)) AM2_Widget::RepaintAncestor(RECT clip)
 {
     AM2_Widget *w = this;
 
-    AM2_Widget *up = w->parent;
+    AM2_Widget *up;
 
     (void)clip;
-    while (up && !up->sprite)
-        up = up->parent;
-
-    if (up)
-        WidgetVPaint(up, w->rect);
-    else
-        WidgetVPaint(w, w->rect);
+    for (up = w->parent; up; up = up->parent)
+        if (up->sprite) {
+            WidgetVPaint(up, w->rect);
+            return;
+        }
+    WidgetVPaint(w, w->rect);
 }
 
 void __attribute__((thiscall)) AM2_Widget::MultiSpritePaint(RECT clip)

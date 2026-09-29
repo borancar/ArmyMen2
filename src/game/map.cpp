@@ -1279,6 +1279,7 @@ uint32_t __cdecl AmmChecksum(const char *map, const char *)
     char      name[AM2_AMM_NAME_BYTES];
     uint32_t  sum = 0;
     uint32_t  tag;
+    uint32_t  formLen;                   /* its own slot in the frame */
     uint32_t  len;
     am2_FILE *fp;
 
@@ -1292,7 +1293,7 @@ uint32_t __cdecl AmmChecksum(const char *map, const char *)
 
     orig_fread(&tag, 4, 1, fp);
     if (tag == AM2_IFF_FORM) {
-        orig_fread(&len, 4, 1, fp);          /* the FORM length, unread */
+        orig_fread(&formLen, 4, 1, fp);      /* the FORM length, unread */
         orig_fread(&tag, 4, 1, fp);
 
         if (tag == AM2_IFF_MAP) {

@@ -262,22 +262,20 @@ void __cdecl SendTrooperSetWeapon(const void *trooper, uint32_t weaponUid,
 {
     uint8_t         msg[AM2_MSG_TROOPER_WEAPON_LEN];
     const uint8_t  *comm = kComm;
-    uint32_t        uid;
 
     if (!*(void *const *)(comm + COMM_OFF_DPLAY))
         return;
 
-    uid = *(const uint32_t *)((const uint8_t *)trooper + 4);
-
     *(uint16_t *)(msg + 0)    = AM2_MSG_TROOPER_WEAPON_LEN;
     *(uint16_t *)(msg + 2)    = AM2_MSG_TROOPER_WEAPON;
-    *(uint32_t *)(msg + 4)    = UidOnWire(uid);
+    *(uint32_t *)(msg + 4)    =
+        UidOnWire(*(const uint32_t *)((const uint8_t *)trooper + 4));
     *(uint32_t *)(msg + 8)    = UidOnWire(weaponUid);
     *(int32_t  *)(msg + 0x18) = weapon;
 
     ArmyMessageSend(msg);
     orig_log("Send TrooperSetWeapon message, trooper: %08x, weapon:%08x\n",
-             uid, weaponUid);
+             *(const uint32_t *)((const uint8_t *)trooper + 4), weaponUid);
 }
 
 /* 0x0042AA10. Tell the other players an object was destroyed.

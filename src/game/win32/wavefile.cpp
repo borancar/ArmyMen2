@@ -120,8 +120,7 @@ MMRESULT __cdecl WaveOpenFile(char *fileName, HMMIO *phmmioIn,
     if (mmr != MMSYSERR_NOERROR)
         goto cleanup;
 
-    *phmmioIn = hmmio;
-    return MMSYSERR_NOERROR;
+    goto done;
 
 cleanup:
     /* Undo whatever got as far as existing, in the reverse order. */
@@ -129,9 +128,14 @@ cleanup:
         GlobalFree(*ppwfxInfo);
         *ppwfxInfo = NULL;
     }
-    if (hmmio)
+    if (hmmio) {
         mmioClose(hmmio, 0);
-    *phmmioIn = NULL;
+        hmmio = NULL;
+    }
+
+done:
+    /* Success and failure end on the same store: the handle, or null. */
+    *phmmioIn = hmmio;
     return mmr;
 }
 

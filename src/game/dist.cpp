@@ -78,7 +78,7 @@ int32_t __cdecl ApproxDistXY(int32_t dx, int32_t dy)
 }
 
 /* 0x0042DD90. Wraps in BOTH directions -- see the note in dist.h. */
-int32_t __cdecl AngleDelta(uint32_t from, uint32_t to)
+int32_t __cdecl AngleDelta(uint8_t from, uint8_t to)
 {
     int32_t d = (int32_t)(to & 0xFFu) - (int32_t)(from & 0xFFu);
 
@@ -90,7 +90,7 @@ int32_t __cdecl AngleDelta(uint32_t from, uint32_t to)
 }
 
 /* 0x0042DFB0. The mask to 8 bits happens AFTER the rounding term is added. */
-int32_t __cdecl RoundTo8(int32_t value, uint32_t bits)
+uint8_t __cdecl RoundTo8(int32_t value, uint8_t bits)
 {
     uint32_t b = bits & 0xFFu;
     int32_t  rounded = (int32_t)((uint32_t)(value + (1 << (7 - b))) & 0xFFu);

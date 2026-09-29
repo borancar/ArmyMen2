@@ -75,6 +75,22 @@ void __cdecl SubrecHideRows(void *subrec);
 
 /* Original: 0x00457470. */
 int32_t __cdecl ObjIsType2(const AM2_Object *obj);
+/* The same test expanded in place, which is how several callers have it:
+ * the null check survives even where the pointer was used just before, and
+ * the answer is materialised with sete and then tested. */
+static inline int32_t ObjIsType2Inline(const void *obj)
+{
+    if (!obj)
+        return 0;
+    return (*(const int32_t *)obj == 2) ? 1 : 0;
+}
+/* ObjIsType3's, likewise. */
+static inline int32_t ObjIsType3Inline(const void *obj)
+{
+    if (!obj)
+        return 0;
+    return (*(const int32_t *)obj == 3) ? 1 : 0;
+}
 
 /* 0x0044BBA0. True only for a TYPE 2 whose OBJ_OFF_FIELD_5A4 is positive.
  * Type2ActionA refuses to re-arm a unit when this is true. */

@@ -195,9 +195,9 @@ uint32_t __cdecl SwapColourBytes(uint32_t colour, uint32_t unused)
 }
 
 void __stdcall NullStub4(uint32_t arg) { (void)arg; }
-void __cdecl   NullStub(void)          { }
+void __cdecl   NullStub(int32_t a, int32_t b) { (void)a; (void)b; }
 int32_t __cdecl ReturnZero(void)       { return 0; }
-int32_t __cdecl ReturnOne(void)        { return 1; }
+int32_t __cdecl ReturnOne(void *fp, void *obj) { (void)fp; (void)obj; return 1; }
 
 int32_t __cdecl ReverseBlocks(void *dst, const void *src, int32_t total,
                               int32_t count)
@@ -895,11 +895,6 @@ int32_t __cdecl ObjKind538In10To17(const void *obj)
 
 int32_t __cdecl ObjNextKind538(const void *obj, int32_t want)
 {
-    static const uint8_t kArm[0x25] = {
-        0, 2, 2, 2, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-        0, 0, 0, 0, 0,
-    };
     const uint8_t *o    = (const uint8_t *)obj;
     int32_t        cur  = *(const int32_t *)(o + AM2_OBJ_KIND538);
     int32_t        over = *(const int32_t *)(o + AM2_OBJ_KIND53C);
@@ -911,11 +906,17 @@ int32_t __cdecl ObjNextKind538(const void *obj, int32_t want)
         return cur;
 
     skip = (cur == 1) ? 1 : 0;
-    if ((uint32_t)want <= 0x24) {
-        if (kArm[want] == AM2_KIND538_ARM_SKIP)
-            skip = 1;
-        else if (kArm[want] == AM2_KIND538_ARM_OVERRIDE)
-            alt = want;
+    /* A switch, which VC6 compiled into the byte table at 0x0040D8FC and the
+     * three-entry jump table before it; the override arm is written first,
+     * which is where it sits in the image. */
+    switch (want) {
+    case 0x05: case 0x08: case 0x09: case 0x0A: case 0x0B:
+    case 0x0C: case 0x0D: case 0x0E: case 0x0F:
+        alt = want;
+        break;
+    case 0x00: case 0x20: case 0x21: case 0x22: case 0x23: case 0x24:
+        skip = 1;
+        break;
     }
 
     seq = *(const uint8_t *const *)(o + AM2_OBJ_SEQ);

@@ -428,7 +428,8 @@ void __cdecl RowFaceSprite(void *row)
     uint8_t         *r = (uint8_t *)row;
     const AM2_Anim  *a;
     uint8_t          heading;
-    int32_t          dir, cell;
+    int16_t          dir;
+    int32_t          cell;
     AM2_Sprite      *sprite;
 
     if (!(*(const uint8_t *)r & MAPOBJ_FLAG_VISIBLE))
@@ -440,7 +441,7 @@ void __cdecl RowFaceSprite(void *row)
 
     heading = (uint8_t)(*(const uint8_t *)(r + ROW_OFF_HEADING_BIAS)
                         + *(const uint8_t *)(r + ROW_OFF_HEADING));
-    dir     = RoundTo8(heading, a->directionBits) & 0xFF;
+    dir     = RoundTo8(heading, a->directionBits);
     cell    = (dir + 1) * a->frames - 1;
     sprite  = g_spriteList[a->cells[cell].sprite];
 

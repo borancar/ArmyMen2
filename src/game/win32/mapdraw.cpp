@@ -1186,15 +1186,18 @@ void __cdecl RepaintDirtyList(const AM2_Rect *region)
 {
     uint32_t n = *(const uint16_t *)(uintptr_t)ADDR_DIRTY_HEAD;
 
+    /* The record is indexed afresh at each use, as the original does. */
     while (n) {
-        uint8_t *rec = (uint8_t *)(uintptr_t)ADDR_DIRTY_RECTS
-                       + n * AM2_DIRTY_RECORD_SIZE;
-        RECT     hit;
+        RECT hit;
 
-        if (IntersectRect(&hit, (const RECT *)rec, (const RECT *)region))
+        if (IntersectRect(&hit,
+                          (const RECT *)((uint8_t *)(uintptr_t)ADDR_DIRTY_RECTS
+                                         + n * AM2_DIRTY_RECORD_SIZE),
+                          (const RECT *)region))
             RedrawMapRegion((const AM2_Rect *)&hit);
 
-        n = *(const uint16_t *)(rec + DIRTY_OFF_NEXT);
+        n = *(const uint16_t *)((uint8_t *)(uintptr_t)ADDR_DIRTY_RECTS
+                                + n * AM2_DIRTY_RECORD_SIZE + DIRTY_OFF_NEXT);
     }
 }
 
@@ -1394,7 +1397,7 @@ static void __cdecl DrawVLine(int32_t x, int32_t y0, int32_t y1,
     uint8_t *end;
 
     if (y0 > y1)
-        NullStub();
+        NullStub(y0, y1);
 
     if (x < g_screenClip.left || x >= g_screenClip.right)
         return;
@@ -1447,7 +1450,7 @@ static void __cdecl DrawHLine(int32_t y, int32_t x0, int32_t x1,
     int32_t  count;
 
     if (x0 > x1)
-        NullStub();
+        NullStub(x0, x1);
 
     if (y < g_screenClip.top || y >= g_screenClip.bottom)
         return;
