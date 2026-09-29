@@ -1410,20 +1410,27 @@ int32_t __cdecl ScriptArmyColour(AM2_ScriptCtx *ctx, int32_t *at)
         return 0;
     }
 
-    int32_t army;
-    switch ((int32_t)(uintptr_t)tok->value) {
-    case AM2_TOK_GREEN:             army = 0; break;
-    case AM2_TOK_TAN:               army = 1; break;
-    case AM2_TOK_BLUE:              army = 2; break;
-    case AM2_TOK_GREY:              army = 3; break;
-    default:
+    /* One call per colour -- VC6 merges them and leaves the constant
+     * pushes. */
+#define SLOT(n) (((AM2_Comm *)*(void **)((void *)(uintptr_t)(ADDR_ARMY_TABLE)))->CommSlotForArmy(n))
+    int32_t rc;
+    int32_t v = (int32_t)(uintptr_t)tok->value;
+
+    if (v == AM2_TOK_GREEN)
+        rc = SLOT(0);
+    else if (v == AM2_TOK_TAN)
+        rc = SLOT(1);
+    else if (v == AM2_TOK_BLUE)
+        rc = SLOT(2);
+    else if (v == AM2_TOK_GREY)
+        rc = SLOT(3);
+    else {
         am2_log("Line [%4d]:  Expected Army Color instead of '%s'\n",
                 ctx->tokens[*at].line,
                 ScriptTokenText(tok, kScriptWord));
         return -1;
     }
-
-    int32_t rc = ((AM2_Comm *)*(void **)((void *)(uintptr_t)(ADDR_ARMY_TABLE)))->CommSlotForArmy(army);
+#undef SLOT
 
     (*at)++;
     return rc;

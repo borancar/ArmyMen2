@@ -376,11 +376,13 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
 int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
                                   int32_t frame)
 {
-    const AM2_ScriptName *names = kScriptNames;
+    /* The name table is read afresh at every use. */
+#define names kScriptNames
     uint8_t              *obj;
     AM2_ObjScript        *script;
     uintptr_t             at;
     int32_t               state;
+    int32_t               id;
 
     if (nameidx <= 0)
         return 0;
@@ -398,7 +400,8 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
         return 0;
     }
 
-    if (*(const int32_t *)(obj + OBJ_OFF_SCRIPT_ID) <= 0)
+    id = *(const int32_t *)(obj + OBJ_OFF_SCRIPT_ID);
+    if (id <= 0)
         return 0;
 
     /* Written as the original's LEA rather than as `&kObjScripts[id - 1]`,
@@ -406,8 +409,7 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
      * array element and asking whether it is null is something the compiler
      * may fold away, and this check has to survive. */
     at = (uintptr_t)kObjScripts
-       + (uintptr_t)(*(const int32_t *)(obj + OBJ_OFF_SCRIPT_ID) - 1)
-         * sizeof(AM2_ObjScript);
+       + (uintptr_t)(id - 1) * sizeof(AM2_ObjScript);
     script = (AM2_ObjScript *)at;
     if (at == 0) {
         am2_log("Tried to set object script state (%s) in object %s, which "
@@ -430,6 +432,7 @@ int32_t __cdecl SetObjScriptState(int32_t nameidx, int32_t stateName,
 
     UpdateObjectScript(obj);
     return 1;
+#undef names
 }
 
 /* 0x004351C0 and 0x00420410 stay original and are reached by address. The
