@@ -427,9 +427,10 @@ LPDIRECTDRAWSURFACE __cdecl CreateBitmapSurface(am2_FILE *fp, uint32_t nbytes,
     DDSURFACEDESC        ddsd;
     LPDIRECTDRAWSURFACE  surf;
     uint8_t             *pixels;
+    uint32_t             size = nbytes;  /* a copy: nbytes is passed by address below */
 
-    pixels = (uint8_t *)orig_malloc(nbytes);
-    if (orig_fread(pixels, nbytes, 1, fp) != 1) {
+    pixels = (uint8_t *)orig_malloc(size);
+    if (orig_fread(pixels, size, 1, fp) != 1) {
         orig_log("Error sprite from stream in CreateBitmapSurface().\n");
         orig_free(pixels);
         return NULL;
@@ -452,24 +453,22 @@ LPDIRECTDRAWSURFACE __cdecl CreateBitmapSurface(am2_FILE *fp, uint32_t nbytes,
         return NULL;
     }
 
-    if (IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL) != DD_OK) {
+    /* The failures are laid out after the success path and share the log
+     * and the release, as the image has them. */
+    if (IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL) == DD_OK) {
+        if (BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels,
+                         width, height, remap, &nbytes)) {
+            IDirectDrawSurface_Unlock(surf, ddsd.lpSurface);
+            if (!(flags & 1))
+                SetSurfaceColorKey(surf, (uint8_t)nbytes);
+            goto release;
+        }
         IDirectDrawSurface_Release(surf);
-        orig_log("Error on Lock in CreateBitmapSurface()");
-        orig_free(pixels);
-        return surf;
-    }
-
-    if (!BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels,
-                             width, height, remap, &nbytes)) {
+    } else {
         IDirectDrawSurface_Release(surf);
-        orig_log("Error on Lock in CreateBitmapSurface()");
-        orig_free(pixels);
-        return surf;
     }
-
-    IDirectDrawSurface_Unlock(surf, ddsd.lpSurface);
-    if (!(flags & 1))
-        SetSurfaceColorKey(surf, (uint8_t)nbytes);
+    orig_log("Error on Lock in CreateBitmapSurface()");
+release:
     orig_free(pixels);
     return surf;
 }
