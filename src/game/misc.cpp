@@ -430,38 +430,6 @@ int32_t __cdecl KindInSetB(int32_t kind)
     return 0;
 }
 
-/* Shared body. `wide_rows` selects the row table's entry width, which is the
- * only thing that differs between 0x0041CF20 and 0x0041CEC0 -- and it is a
- * genuine difference, not a tidy-up: one reads a word at m+4+y*2 and the other
- * a dword at m+4+y*4. Everything below that line is the same in both. */
-static inline int32_t MaskSolid(uint16_t x, uint16_t y, const void *mask,
-                         int32_t wide_rows)
-{
-    const uint8_t *m = (const uint8_t *)mask;
-    uint16_t       acc = 0;
-    const uint8_t *row;
-
-    if (x > *(const uint16_t *)m || y > *(const uint16_t *)(m + 2))
-        return 0;
-
-    row = m + (wide_rows
-               ? *(const uint32_t *)(m + 4 + (uint32_t)y * 4)
-               : *(const uint16_t *)(m + 4 + (uint32_t)y * 2));
-
-    /* A transparent run that carries acc past x is a miss. */
-    while ((acc = (uint16_t)(acc + *row++)) <= x) {
-        uint8_t run = *row;
-
-        acc = (uint16_t)(acc + run);
-        if (acc >= x)
-            return 1;               /* x fell inside a solid run */
-
-        /* Past the run length byte and the run's own pixels. */
-        row += (uint32_t)run + 1;
-    }
-    return 0;
-}
-
 /* The one the loose arm still needs: MSVC's _findfirst. The packed half was
  * here too until it was reconstructed. */
 typedef int32_t (__cdecl *AM2_FindFirstFn)(const char *pattern, void *data);
@@ -668,14 +636,61 @@ void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)
     *(uint16_t *)(rec + MASKREC_OFF_DESC4) = *(const uint16_t *)(desc + 4);
 }
 
+/* 0x0041CF20 and 0x0041CEC0 differ only in the row table's entry width: one
+ * reads a word at m+4+y*2 and the other a dword at m+4+y*4.  Two functions in
+ * the image, so two here. */
 int32_t __cdecl MaskPixelSolid(uint16_t x, uint16_t y, const void *mask)
 {
-    return MaskSolid(x, y, mask, 0);
+    const uint8_t *m = (const uint8_t *)mask;
+    uint16_t       acc;
+    const uint8_t *row;
+    uint8_t        run, skip;
+
+    if (x > *(const uint16_t *)m || y > *(const uint16_t *)(m + 2))
+        return 0;
+    row = m + *(const uint16_t *)(m + 4 + (uint32_t)y * 2);
+    acc = 0;
+    while (1) {
+        /* A transparent run that carries acc past x is a miss. */
+        skip = *row++;
+        acc += skip;
+        if (acc > x)
+            return 0;
+        run = *row;
+        acc += run;
+        if (acc >= x)
+            return 1;               /* x fell inside a solid run */
+
+        /* Past the run length byte and the run's own pixels. */
+        row += run + 1;
+    }
 }
 
 int32_t __cdecl MaskPixelSolid32(uint16_t x, uint16_t y, const void *mask)
 {
-    return MaskSolid(x, y, mask, 1);
+    const uint8_t *m = (const uint8_t *)mask;
+    uint16_t       acc;
+    const uint8_t *row;
+    uint8_t        run, skip;
+
+    if (x > *(const uint16_t *)m || y > *(const uint16_t *)(m + 2))
+        return 0;
+    row = m + *(const uint32_t *)(m + 4 + (uint32_t)y * 4);
+    acc = 0;
+    while (1) {
+        /* A transparent run that carries acc past x is a miss. */
+        skip = *row++;
+        acc += skip;
+        if (acc > x)
+            return 0;
+        run = *row;
+        acc += run;
+        if (acc >= x)
+            return 1;               /* x fell inside a solid run */
+
+        /* Past the run length byte and the run's own pixels. */
+        row += run + 1;
+    }
 }
 
 /* The other end of the same format: the encoder at 0x00423300 reads its source

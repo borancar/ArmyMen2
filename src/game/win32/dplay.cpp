@@ -2927,10 +2927,18 @@ void __cdecl CommGlobalDtorThunk(void)
  * the reason gameproc.cpp's twin does: the image address holds a detour into
  * this code by the time exit runs, and naming a patched address is exactly
  * what tools/checkseams.py exists to catch. */
+/* A compiler-generated $E function in the original, which VC6 emits
+ * optimised for size: the argument is popped, not added off. */
+#if defined(_MSC_VER)
+#pragma optimize("s", on)
+#endif
 int32_t __cdecl CommGlobalAtExit(void)
 {
     return orig_atexit(CommGlobalDtorThunk);
 }
+#if defined(_MSC_VER)
+#pragma optimize("", on)
+#endif
 
 /* 0x0040DB40. The initialiser-table entry: construct, then register the
  * teardown. Reached only as a dword in that table, never by a call. */

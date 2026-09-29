@@ -863,10 +863,10 @@ void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size)
  *
  * The two differ in ONE thing: the width of a row-table entry, 32 bits or 16.
  * Two exist because a 16-bit offset reaches only 64KB of encoded data, and
- * MakeBitmap picks by pixel count. Everything else is the same function, so
- * it is written once here with the width as an argument -- and reconstructing
- * it CONFIRMS what blit.h could only assume, that the 32-bit variant matches
- * the 16-bit one field for field.
+ * MakeBitmap picks by pixel count. Everything else is the same function --
+ * reconstructing it CONFIRMS what blit.h could only assume, that the 32-bit
+ * variant matches the 16-bit one field for field -- but the image has two
+ * bodies, so this does too.
  *
  * A NEGATIVE height means top-down and a positive one bottom-up, which is the
  * DIB convention arriving intact: with h > 0 the walk starts at the last row
@@ -880,88 +880,132 @@ void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size)
  * row's offset is stored from the START OF THE HEADER, which is what makes
  * the buffer relocatable.
  *
- * The whole thing is built in a 199,000-byte stack buffer and copied into an
+ * The whole thing is built in a 200,000-byte stack buffer and copied into an
  * allocation of exactly the size used. That is the original's shape and the
  * reason the answer is the SIZE rather than the pointer: the pointer goes
  * back through the caller's `dest`. */
-static int32_t EncodeRle(const uint8_t *pixels, void **dest, int32_t w,
-                         int32_t h, const uint8_t *remap, int32_t wide)
+int32_t __cdecl EncodeBig(const void *pixels, void *dest, int32_t w,
+                          int32_t h, const uint8_t *remap)
 {
-    static uint8_t  scratch[AM2_ENCODE_SCRATCH];
-    uint8_t        *table = scratch + 4;
-    uint8_t        *out;
-    const uint8_t  *row;
-    int32_t         stride = (w + 3) & ~3;
-    int32_t         rows;
-    int32_t         r;
-    uint8_t         key;
-    int32_t         size;
+    uint8_t        buf[AM2_ENCODE_SCRATCH];
+    uint32_t     *table;
+    const uint8_t *src;
+    const uint8_t *line;
+    const uint8_t *end;
+    uint8_t       *out;
+    int32_t        stride = (w + 3) & ~3;
+    int32_t        i;
+    int32_t        size;
+    uint8_t        key, skip, run;
 
     if (h > 0) {
-        row     = pixels + (h - 1) * stride;
-        stride  = -stride;
-        rows    = h;
+        src    = (const uint8_t *)pixels + (h - 1) * stride;
+        stride = -stride;
     } else {
-        row     = pixels;
-        rows    = -h;
+        src    = (const uint8_t *)pixels;
+        h      = -h;
     }
+    *(uint16_t *)buf       = (uint16_t)w;
+    *(uint16_t *)(buf + 2) = (uint16_t)h;
+    table = (uint32_t *)(buf + 4);
+    out   = buf + 4 + h * 4;
+    key   = *src;
 
-    key = *row;
-    *(uint16_t *)scratch       = (uint16_t)w;
-    *(uint16_t *)(scratch + 2) = (uint16_t)rows;
-
-    out = table + (size_t)rows * (wide ? 4u : 2u);
-
-    for (r = 0; r < rows; r++) {
-        const uint8_t *p   = row;
-        const uint8_t *end = row + w;
-
-        if (wide)
-            *(uint32_t *)(table + (size_t)r * 4) = (uint32_t)(out - scratch);
-        else
-            *(uint16_t *)(table + (size_t)r * 2) = (uint16_t)(out - scratch);
-
+    i = 0;
+    while (i < h) {
+        table[i] = (uint32_t)(out - buf);
+        line = src;
+        end  = src + w;
         do {
-            uint8_t skip = 0;
-            uint8_t run  = 0;
-
-            while (p != end && *p == key && skip < 0xFF) {
-                p++;
+            skip = 0;
+            while (src != end && *src == key && skip < 0xFF) {
+                src++;
                 skip++;
             }
             *out++ = skip;
 
-            while (p != end && *p != key && run < 0xFF) {
-                p++;
+            run = 0;
+            while (src != end && *src != key && run < 0xFF) {
+                src++;
                 run++;
             }
             *out++ = run;
 
-            if (run) {
-                RemapBytes(out, p - run, remap, run);
+            if (run > 0) {
+                RemapBytes(out, src - run, remap, run);
                 out += run;
             }
-        } while (p != end);
-
-        row += stride;
+        } while (src != end);
+        i++;
+        src = line + stride;
     }
 
-    size  = (int32_t)(out - scratch);
-    *dest = orig_malloc((size_t)size);
-    memcpy(*dest, scratch, (size_t)size);
+    size = (int32_t)(out - buf);
+    *(void **)dest = orig_malloc((size_t)size);
+    memcpy(*(void **)dest, buf, (size_t)size);
     return size;
 }
 
-int32_t __cdecl EncodeBig(const void *pixels, void *dest, int32_t w,
+int32_t __cdecl EncodeSmall(const void *pixels, void *dest, int32_t w,
                           int32_t h, const uint8_t *remap)
 {
-    return EncodeRle((const uint8_t *)pixels, (void **)dest, w, h, remap, 1);
-}
+    uint8_t        buf[AM2_ENCODE_SCRATCH];
+    uint16_t     *table;
+    const uint8_t *src;
+    const uint8_t *line;
+    const uint8_t *end;
+    uint8_t       *out;
+    int32_t        stride = (w + 3) & ~3;
+    int32_t        i;
+    int32_t        size;
+    uint8_t        key, skip, run;
 
-int32_t __cdecl EncodeSmall(const void *pixels, void *dest, int32_t w,
-                            int32_t h, const uint8_t *remap)
-{
-    return EncodeRle((const uint8_t *)pixels, (void **)dest, w, h, remap, 0);
+    if (h > 0) {
+        src    = (const uint8_t *)pixels + (h - 1) * stride;
+        stride = -stride;
+    } else {
+        src    = (const uint8_t *)pixels;
+        h      = -h;
+    }
+    *(uint16_t *)buf       = (uint16_t)w;
+    *(uint16_t *)(buf + 2) = (uint16_t)h;
+    table = (uint16_t *)(buf + 4);
+    out   = buf + 4 + h * 2;
+    key   = *src;
+
+    i = 0;
+    while (i < h) {
+        table[i] = (uint16_t)(out - buf);
+        line = src;
+        end  = src + w;
+        do {
+            skip = 0;
+            while (src != end && *src == key && skip < 0xFF) {
+                src++;
+                skip++;
+            }
+            *out++ = skip;
+
+            run = 0;
+            while (src != end && *src != key && run < 0xFF) {
+                src++;
+                run++;
+            }
+            *out++ = run;
+
+            if (run > 0) {
+                RemapBytes(out, src - run, remap, run);
+                out += run;
+            }
+        } while (src != end);
+        i++;
+        src = line + stride;
+    }
+
+    size = (int32_t)(out - buf);
+    *(void **)dest = orig_malloc((size_t)size);
+    memcpy(*(void **)dest, buf, (size_t)size);
+    return size;
 }
 
 int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,

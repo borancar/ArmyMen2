@@ -2816,10 +2816,18 @@ void __cdecl SelListDestructThunk(void)
  * two are the same registration: the original address holds a detour to this
  * code by the time exit runs. Naming the patched address here would be the lie
  * tools/checkseams.py exists to catch, and it would buy one extra hop. */
+/* A compiler-generated $E function in the original, which VC6 emits
+ * optimised for size: the argument is popped, not added off. */
+#if defined(_MSC_VER)
+#pragma optimize("s", on)
+#endif
 int32_t __cdecl SelListAtExit(void)
 {
     return orig_atexit(SelListDestructThunk);
 }
+#if defined(_MSC_VER)
+#pragma optimize("", on)
+#endif
 
 /* 0x00424890. The initialiser-table entry: construct, then register the
  * teardown. Its only reference in the image is a dword at 0x00473048, so it is

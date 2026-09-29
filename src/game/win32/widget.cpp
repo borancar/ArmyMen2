@@ -2746,56 +2746,49 @@ static inline void RecordAimedFire(uint8_t *u, void *target, int32_t withMode)
  *
  * Its OverlayPrepare force flag is 0 here where PointerPickBoard passes 1 for
  * the same row. Reproduced; nothing here says why they differ. */
-static int32_t PointerFriendTail(uint8_t *o)
+static inline int32_t PointerFriendTail(uint8_t *o)
 {
-    int32_t type;
-
     if (*(const int8_t *)(o + OBJ_OFF_ARMY)
-        != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
-        return 0;
-    if (!o)
-        return 0;
+            == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+        && o) {
+        if (ObjIsType3Inline(o)
+            && !*(const int32_t *)(o + OBJ_OFF_FIELD_94)
+            && *(const int32_t *)(o + OBJ_OFF_POSE_PENDING)
+                   < *(const int32_t *)(o + VEHICLE_OFF_SEATS)) {
+            int32_t i;
+            int32_t none = 1;
 
-    type = *(const int32_t *)o;
+            if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+                || GetTickCount()
+                       - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS
+                   < AM2_CLICK_MS) {
+                for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT;
+                     i++) {
+                    const uint8_t *sel = (const uint8_t *)LookupByUID(
+                        (*(const uint32_t *const *)(uintptr_t)
+                             ADDR_SELECTED_ITEMS)[i]);
 
-    if (type == AM2_OBJ_TYPE_VEHICLE
-        && !*(const int32_t *)(o + OBJ_OFF_FIELD_94)
-        && *(const int32_t *)(o + OBJ_OFF_POSE_PENDING)
-               < *(const int32_t *)(o + VEHICLE_OFF_SEATS)) {
-        int32_t i;
-        int32_t none = 1;
-
-        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
-            && GetTickCount()
-                   - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_PRESS_MS
-               >= AM2_CLICK_MS)
+                    if (ObjIsType3Inline(sel)
+                        && (*(const uint32_t *)(sel + OBJ_OFF_FLAGS)
+                            & OBJ_FLAG_SELECTED))
+                        none = 0;
+                }
+                if (none) {
+                    OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 0);
+                    *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
+                        *(const uint32_t *)(o + OBJ_OFF_UID);
+                }
+            }
             return 0;
-
-        for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; i++) {
-            const uint8_t *sel = (const uint8_t *)LookupByUID(
-                (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
-
-            if (sel && *(const int32_t *)sel == AM2_OBJ_TYPE_VEHICLE
-                && (*(const uint32_t *)(sel + OBJ_OFF_FLAGS)
-                    & OBJ_FLAG_SELECTED))
-                none = 0;
         }
-        if (!none)
-            return 0;
 
-        OverlayPrepare(AM2_OVERLAY_ROW_BOARD, 0);
-        *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
-            *(const uint32_t *)(o + OBJ_OFF_UID);
-        return 0;
+        if (*(const int32_t *)o >= AM2_OBJ_TYPE_TROOPER
+            && (*(const int32_t *)o <= AM2_OBJ_TYPE_VEHICLE
+                || *(const int32_t *)o == AM2_OBJ_TYPE_ROACH)
+            && !*(const int32_t *)(o + OBJ_OFF_FIELD_94))
+            return 1;
     }
-
-    if (type < AM2_OBJ_TYPE_TROOPER)
-        return 0;
-    if (type > AM2_OBJ_TYPE_VEHICLE && type != AM2_OBJ_TYPE_ROACH)
-        return 0;
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_94))
-        return 0;
-    return 1;
+    return 0;
 }
 
 
@@ -5968,56 +5961,61 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
         int32_t        sprite;
         int32_t        ammo;
 
-        if (*(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4)
-            && (item = (const uint8_t *)WeaponByUid(
-                    *(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4))) != 0) {
-            /* Which icon: a switch on the item kind, and the image's jump
-             * table at 0x004154F0 lists the arms in this order. */
-            switch (**(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0)) {
-        case 2: sprite = 2; break;
-        case 3: sprite = 3; break;
-        case 4: sprite = 1; break;
-        case 5: sprite = 4; break;
-        case 10: sprite = 5; break;
-        case 11: sprite = 7; break;
-        case 12: sprite = 6; break;
-        case 15: sprite = 26; break;
-        case 16: sprite = 27; break;
-        case 17: sprite = 28; break;
-        case 18: sprite = 29; break;
-        case 19: sprite = 30; break;
-        case 20: sprite = 8; break;
-        case 26: sprite = 9; break;
-        case 24: sprite = 10; break;
-        case 25: sprite = 11; break;
-        case 23: sprite = 12; break;
-        case 28: sprite = 13; break;
-        case 29: sprite = 14; break;
-        case 30: sprite = 15; break;
-        case 8: sprite = 16; break;
-        case 34: sprite = 17; break;
-        case 35: sprite = 18; break;
-        case 36: sprite = 19; break;
-        case 37: sprite = 20; break;
-        case 38: sprite = 21; break;
-        case 39: sprite = 22; break;
-        case 40: sprite = 23; break;
-        case 41: sprite = 24; break;
-        case 42: sprite = 25; break;
-        default: sprite = 0; break;
+        if (*(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4)) {
+            item = (const uint8_t *)WeaponByUid(
+                *(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4));
+            if (item) {
+                /* Which icon: a switch on the item kind, and the image's jump
+                 * table at 0x004154F0 lists the arms in this order. */
+                switch (**(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0)) {
+                case 2: sprite = 2; break;
+                case 3: sprite = 3; break;
+                case 4: sprite = 1; break;
+                case 5: sprite = 4; break;
+                case 10: sprite = 5; break;
+                case 11: sprite = 7; break;
+                case 12: sprite = 6; break;
+                case 15: sprite = 26; break;
+                case 16: sprite = 27; break;
+                case 17: sprite = 28; break;
+                case 18: sprite = 29; break;
+                case 19: sprite = 30; break;
+                case 20: sprite = 8; break;
+                case 26: sprite = 9; break;
+                case 24: sprite = 10; break;
+                case 25: sprite = 11; break;
+                case 23: sprite = 12; break;
+                case 28: sprite = 13; break;
+                case 29: sprite = 14; break;
+                case 30: sprite = 15; break;
+                case 8: sprite = 16; break;
+                case 34: sprite = 17; break;
+                case 35: sprite = 18; break;
+                case 36: sprite = 19; break;
+                case 37: sprite = 20; break;
+                case 38: sprite = 21; break;
+                case 39: sprite = 22; break;
+                case 40: sprite = 23; break;
+                case 41: sprite = 24; break;
+                case 42: sprite = 25; break;
+                default: sprite = 0; break;
+                }
+                *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_INDEX) = sprite;
+
+                ammo = *(const int32_t *)(item + ITEM_OFF_AMMO);
+                if (ammo > AM2_HUD_SARGE_AMMO_MAX)
+                    ammo = AM2_HUD_SARGE_AMMO_MAX;
+                *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_COUNT) = ammo;
+
+                /* 1 or 2, never a boolean -- see the header comment. */
+                if (i == *(const int32_t *)(obj + UNIT_OFF_INVENTORY_SEL))
+                    *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_READY) =
+                        (ItemIsReady(item) != 0) + 1;
+                else
+                    *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_READY) = 0;
+            } else {
+                *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_INDEX) = -1;
             }
-            *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_INDEX) = sprite;
-
-            ammo = *(const int32_t *)(item + ITEM_OFF_AMMO);
-            if (ammo > AM2_HUD_SARGE_AMMO_MAX)
-                ammo = AM2_HUD_SARGE_AMMO_MAX;
-            *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_COUNT) = ammo;
-
-            /* 1 or 2, never a boolean -- see the header comment. */
-            *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_READY) =
-                i == *(const int32_t *)(obj + UNIT_OFF_INVENTORY_SEL)
-                ? (ItemIsReady(item) != 0) + 1
-                : 0;
         } else {
             *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_INDEX) = -1;
         }
@@ -17701,10 +17699,10 @@ int32_t __cdecl PointerPickMode5(void *obj)
  * object be OURS. So mode 6 offers nothing on an enemy, where modes 4 and 5
  * show the enemy overlay and answer 1.
  *
- * 288 bytes that come to three lines, because the tail was factored out for
- * modes 4 and 5 first. That is the return on the previous two commits rather
- * than a claim about this function being simple -- the original writes the
- * whole tail out again here.
+ * The original writes the whole tail out again here -- inlined, with every
+ * refusal converging on one `return 0` -- which is why the tail is `static
+ * inline` and nested positively. Its register allocation still differs: the
+ * image keeps the object in eax and copies it to ebp for the vehicle arm.
  *
  * The one encoding difference is cosmetic and worth noting so a reader diffing
  * against the others does not stop on it: this tests OBJ_FLAG_SELECTED as
@@ -17714,15 +17712,11 @@ int32_t __cdecl PointerPickMode5(void *obj)
  * Not exercised -- no drive installs a pointer mode above 0. */
 int32_t __cdecl PointerPickMode6(void *obj)
 {
-    uint8_t *o = (uint8_t *)obj;
-
-    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS)
-        & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
-        return 0;
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
-        return 0;
-
-    return PointerFriendTail(o);
+    if (!(*(const uint32_t *)((uint8_t *)obj + OBJ_OFF_FLAGS)
+          & (OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED))
+        && *(const int16_t *)((uint8_t *)obj + OBJ_OFF_HEALTH) != 0)
+        return PointerFriendTail((uint8_t *)obj);
+    return 0;
 }
 
 /* PointerPickMode0 -- original 0x00459420, 912 bytes, the PICK of pointer mode

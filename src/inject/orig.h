@@ -1742,7 +1742,7 @@
 #define ADDR_MAKE_BITMAP     0x0041BE80u  /* int32(src, pixels, dest, remap) */
 #define ADDR_ENCODE_BIG      0x0041BBC0u  /* the >= 60000 pixel encoder */
 #define ADDR_ENCODE_SMALL    0x0041BD20u
-#define AM2_ENCODE_SCRATCH   0x30D58u     /* the encoders' stack buffer */
+#define AM2_ENCODE_SCRATCH   200000u      /* the encoders' stack buffer (frame 0x30D58 less 0x18 of locals) */
 #define ADDR_ACTIVE_PALETTE  0x00477A58u  /* NULL means no remapping */
 /* The state 3 entry action and the three things below it that had no names.
  * State 3 is the MOVIE state, which is what the greyscale palette, the movie
