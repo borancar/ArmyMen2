@@ -205,13 +205,12 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommMustBroadcast(int16_t army)
     if (!g_mpSession)
         return 0;
 
-    /* The neutral army is the host's to speak for. */
-    if (army == 4)
-        return *(const int32_t *)((const uint8_t *)this + COMM_OFF_IS_HOST)
-               != 0;
-
     /* `== 0`, as the original's neg/sbb/inc spells it -- not a logical not. */
-    return this->CommSlotRemote(army) == 0;
+    if (army != 4)
+        return this->CommSlotRemote(army) == 0;
+
+    /* The neutral army is the host's to speak for. */
+    return *(const int32_t *)((const uint8_t *)this + COMM_OFF_IS_HOST) != 0;
 }
 
 /* NOT AM2_PLAYER_STRIDE -- orig.h already has that name on 0x70, the comm

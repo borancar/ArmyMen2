@@ -245,36 +245,36 @@ void __cdecl MissionInput(void)
  * once, and the mission plays normally. */
 void __cdecl FrameClockStep(void)
 {
-    uint32_t *clock   = (uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS));
-    uint32_t *last    = (uint32_t *)(uintptr_t)ADDR_LAST_TICK_MS;
-    int32_t  *deltaMs = (int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+#define CLOCK    (*(uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS)
+#define LAST     (*(uint32_t *)(uintptr_t)ADDR_LAST_TICK_MS)
+#define DELTA_MS (*(int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
     uint32_t  delta;
 
     if (*(const int32_t *)(uintptr_t)ADDR_FIXED_STEP) {
-        *last = *clock;
-        delta = AM2_FIXED_STEP_MS;
-        *deltaMs = (int32_t)delta;
+        LAST     = CLOCK;
+        delta    = AM2_FIXED_STEP_MS;
+        DELTA_MS = (int32_t)delta;
     } else {
         uint32_t now = Ticks();
 
-        delta    = now - *last;
-        *last    = now;
-        *deltaMs = (int32_t)delta;          /* the raw one... */
+        delta    = now - LAST;
+        LAST     = now;
+        DELTA_MS = (int32_t)delta;          /* the raw one... */
         if (delta > AM2_FRAME_DELTA_CAP_MS) {
             delta    = AM2_FRAME_DELTA_CAP_MS;
-            *deltaMs = (int32_t)delta;      /* ...then the clamp over it */
+            DELTA_MS = (int32_t)delta;      /* ...then the clamp over it */
         }
     }
 
-    *clock += delta;
+    CLOCK += delta;
 
-    /* The original converts the delta to a 64-bit integer, multiplies in
-     * DOUBLE precision -- `fmul` against a dword operand widens it -- and
-     * stores a float. Written the same way round rather than as a float
-     * multiply, which would round twice. */
-    *(float *)(uintptr_t)ADDR_FRAME_DELTA_SEC =
-        (float)((double)delta
-                * (double)*(const float *)((void *)(uintptr_t)(ADDR_MS_TO_SEC)));
+    /* The original converts the delta to a 64-bit integer (it is unsigned),
+     * multiplies by a float constant on the x87 stack and stores a float --
+     * `fmul dword ptr [0.001f]`, which a float literal gives. */
+    *(float *)(uintptr_t)ADDR_FRAME_DELTA_SEC = delta * 0.001f;
+#undef CLOCK
+#undef LAST
+#undef DELTA_MS
 }
 
 typedef void  (__cdecl *AM2_VoidFn0)(void);

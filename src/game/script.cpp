@@ -572,15 +572,13 @@ int32_t __cdecl GetVarValue(int32_t index, int32_t *out)
 /* No index check at all, unlike the getter. */
 int32_t __cdecl SetVarValue(int32_t index, int32_t value)
 {
-    AM2_ScriptName *e = &kScriptNames[index];
-
-    if (e->type != AM2_NAME_TYPE_INTEGER) {
-        am2_log("SetVarValue: name %s is not a variable!\n", e->name);
-        return 0;
+    if (kScriptNames[index].type == AM2_NAME_TYPE_INTEGER) {
+        kScriptNames[index].value = value;
+        return 1;
     }
 
-    e->value = value;
-    return 1;
+    am2_log("SetVarValue: name %s is not a variable!\n", kScriptNames[index].name);
+    return 0;
 }
 
 int32_t __cdecl SetVarValueByName(const char *name, int32_t value)

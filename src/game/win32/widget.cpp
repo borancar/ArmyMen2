@@ -2929,25 +2929,19 @@ typedef int32_t (__cdecl *AM2_AtoiFn)(const char *);
  * the edit at 0x7C -- which is read off the three bodies and not from the
  * constructor.
  */
-static void SpinApply(AM2_Widget *spin, int32_t value)
+static inline void SpinApply(AM2_Widget *spin, AM2_Widget *edit, int32_t value)
 {
-    char *text = *(char *const *)((uint8_t *)
-                     *(AM2_Widget *const *)((uint8_t *)spin + SPIN_OFF_EDIT)
-                     + EDIT_OFF_TEXT);
     void (__cdecl *fn)(AM2_Widget *);
 
-    orig_sprintf(text, "%i", value);
+    orig_sprintf(*(char *const *)((uint8_t *)edit + EDIT_OFF_TEXT), "%i", value);
 
     fn = *(void (__cdecl **)(AM2_Widget *))((uint8_t *)spin + SPIN_OFF_HANDLER);
     if (fn)
         fn(spin);
 }
 
-static void SpinRepaint(AM2_Widget *spin)
+static inline void SpinRepaint(AM2_Widget *edit)
 {
-    AM2_Widget *edit =
-        *(AM2_Widget *const *)((uint8_t *)spin + SPIN_OFF_EDIT);
-
     WidgetVPaint(edit, edit->rect);
     PlaySoundAt(0, 0, 0, 0, 0);
 }
@@ -5826,18 +5820,18 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
         case 0x17: {
             int16_t hp = *(const int16_t *)(u + OBJ_OFF_HEALTH);
             if (hp > 0 && hp < *(const int16_t *)(u + OBJ_OFF_MAX_HEALTH))
-                SetWeaponTarget(u, *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+                SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
             break;
         }
         case 0x1A:
-            SetWeaponTarget(u, *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+            SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
             break;
         case 0x23: case 0x24: case 0x25: case 0x26:
             /* One shape, four comparands: 0x23 wants 0, 0x24 wants 1, and so
              * on. The original gives 0x23 no test of its own and jumps into
              * 0x26's. */
             if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != kind - 0x23)
-                SetWeaponTarget(u, *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+                SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
             break;
         case 0x29: {
             uint32_t riding = *(const uint32_t *)(u + OBJ_OFF_RIDING);
@@ -5845,7 +5839,7 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
                 void *veh = LookupType3ByUID(riding);
                 if (veh)
                     SetWeaponTarget(veh,
-                        *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+                        *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
                 else
                     *(uint32_t *)(u + OBJ_OFF_RIDING) = 0;
             }
@@ -16506,15 +16500,13 @@ void __cdecl SpinCommit(AM2_Widget *w)
         *(AM2_Widget *const *)((uint8_t *)spin + SPIN_OFF_EDIT);
     int32_t     v = orig_atoi(*(const char *const *)((const uint8_t *)edit
                                                      + EDIT_OFF_TEXT));
-    int32_t     hi = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MAX);
-    int32_t     lo = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MIN);
 
-    if (v > hi)
-        v = hi;
-    else if (v < lo)
-        v = lo;
+    if (v > *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MAX))
+        v = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MAX);
+    else if (v < *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MIN))
+        v = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MIN);
 
-    SpinApply(spin, v);
+    SpinApply(spin, edit, v);
 }
 
 void __cdecl SpinUp(AM2_Widget *w)
@@ -16526,13 +16518,12 @@ void __cdecl SpinUp(AM2_Widget *w)
     int32_t     v = orig_atoi(*(const char *const *)((const uint8_t *)edit
                                                      + EDIT_OFF_TEXT))
                   + *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_STEP);
-    int32_t     hi = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MAX);
 
-    if (v > hi)
-        v = hi;
+    if (v > *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MAX))
+        v = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MAX);
 
-    SpinApply(spin, v);
-    SpinRepaint(spin);
+    SpinApply(spin, edit, v);
+    SpinRepaint(edit);
 }
 
 void __cdecl SpinDown(AM2_Widget *w)
@@ -16544,13 +16535,12 @@ void __cdecl SpinDown(AM2_Widget *w)
     int32_t     v = orig_atoi(*(const char *const *)((const uint8_t *)edit
                                                      + EDIT_OFF_TEXT))
                   - *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_STEP);
-    int32_t     lo = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MIN);
 
-    if (v < lo)
-        v = lo;
+    if (v < *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MIN))
+        v = *(const int32_t *)((const uint8_t *)spin + SPIN_OFF_MIN);
 
-    SpinApply(spin, v);
-    SpinRepaint(spin);
+    SpinApply(spin, edit, v);
+    SpinRepaint(edit);
 }
 
 AM2_Typer::AM2_Typer(AM2_Rect box, const char *message)

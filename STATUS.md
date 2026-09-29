@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 896 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 905 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 896:
+  the near-miss sweep, 758 before the row pools. From 758 to 905:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -142,6 +142,9 @@ main result so far (details in `src/vc6/README.md`):
     `memset(buf, 0x100, 0)`, so nothing is cleared; VC6 drops the `rep
     stos` and keeps the setup, which is the "unused registers" the image
     shows. Reproduced.
+  - **Harness code kept out of the relink**: ReportError's standalone log
+    and device.cpp's input-injection hooks are `AM2_STANDALONE &&
+    !AM2_RELINK`, so the comparison sees the original's bodies.
   - **Parked**: the five copy-protection call sites (OnStartWar and four
     more) cannot match while the reference keeps GOG's `jmp`s -- a policy
     question, not a source one; MultiSpritePaint and OverlayPrepare

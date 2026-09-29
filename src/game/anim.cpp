@@ -295,15 +295,13 @@ void __cdecl FreeAnimTable(AM2_AnimTable *table)
 {
     int32_t i;
 
+    /* Every access goes through the table: the original reloads entries
+     * and the pointer each time, and a local `e` reorders the address. */
     for (i = 0; i < table->count; i++) {
-        AM2_AnimEntry *e = &table->entries[i];
-
-        if (!e->anim || e->borrowed)
+        if (!table->entries[i].anim || table->entries[i].borrowed)
             continue;
-        if (e->anim->cells)
-            am2_free(e->anim->cells);
-        /* Re-read through the table rather than reusing `e->anim`, as the
-         * original does -- it reloads entries and the pointer for this one. */
+        if (table->entries[i].anim->cells)
+            am2_free(table->entries[i].anim->cells);
         am2_free(table->entries[i].anim);
     }
 

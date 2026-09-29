@@ -6062,7 +6062,7 @@ void __cdecl Type2ActionB(void *obj)
  * pose for one and 0x1F for the other -- is verified by reading.
  * WeaponByUid reads 247,958 on the same run, all of it other callers.
  */
-void __cdecl SetWeaponTarget(void *target, uint32_t at)
+void __cdecl SetWeaponTarget(void *target, AM2_Point at)
 {
     uint8_t *u;
 
@@ -6097,8 +6097,8 @@ void __cdecl SetWeaponTarget(void *target, uint32_t at)
         return;
     }
 
-    *(int16_t *)(u + UNIT_OFF_FIRE_X)    = (int16_t)(at & 0xFFFFu);
-    *(int16_t *)(u + UNIT_OFF_FIRE_Y)    = (int16_t)(at >> 16);
+    *(int16_t *)(u + UNIT_OFF_FIRE_X)    = at.x;
+    *(int16_t *)(u + UNIT_OFF_FIRE_Y)    = at.y;
     *(int16_t *)(u + UNIT_OFF_FIRE_Z)    = 0;
     *(uint32_t *)(u + UNIT_OFF_FIRE_UID) = 0;
     *(int32_t *)(u + UNIT_OFF_FIRE_MODE) = AM2_FIRE_MODE_POINT;
@@ -8464,9 +8464,9 @@ int32_t __cdecl WeaponClassOf(uint32_t uid)
         return 0;
 
     switch (**(const int32_t *const *)(obj + OBJ_OFF_FIELD_C0)) {
+    case 4:  return 1;
     case 2:  return 2;
     case 3:  return 3;
-    case 4:  return 1;
     case 5:  return 4;
     default: return 0;
     }

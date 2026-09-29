@@ -509,7 +509,7 @@ void __cdecl PollMouse(void)
     if (!g_mouseAcquired)
         AcquireMouse();
 
-#ifdef AM2_STANDALONE
+#if defined(AM2_STANDALONE) && !defined(AM2_RELINK)   /* harness input, not the original */
     /* Once per poll, not once per event: input_pump expires timed holds, and
      * calling it inside the drain loop would retire a tap before the game had
      * seen its press. */
@@ -536,7 +536,7 @@ void __cdecl PollMouse(void)
         }
 
         if (count == 0) {
-#ifdef AM2_STANDALONE
+#if defined(AM2_STANDALONE) && !defined(AM2_RELINK)   /* harness input, not the original */
             /* Real events first, injected ones after, which is the order
              * dinput_hook.c appends them in -- injection adds to real input
              * rather than masking it. One at a time because that is the only
@@ -625,17 +625,17 @@ static_assert(DIK_LMENU == 0x38 && DIK_RMENU == 0xB8, "alt scancodes");
 
 /* If `a` is down, make `b` match it; otherwise if `b` is down, make `a` match.
  * The original writes this out three times. */
-static void MirrorModifier(uint8_t *keys, uint32_t a, uint32_t b)
+static inline void MirrorModifier(uint32_t a, uint32_t b)
 {
-    if (keys[a] & KEY_DOWN)
-        keys[b] = keys[a];
-    else if (keys[b] & KEY_DOWN)
-        keys[a] = keys[b];
+    if (g_curKeys[a] & KEY_DOWN)
+        g_curKeys[b] = g_curKeys[a];
+    else if (g_curKeys[b] & KEY_DOWN)
+        g_curKeys[a] = g_curKeys[b];
 }
 
 void __cdecl PollKeyboard(void)
 {
-    uint8_t  *keys, *prev;
+    uint8_t  *keys;
     uint32_t  now;
     int32_t   i;
 
@@ -655,33 +655,33 @@ void __cdecl PollKeyboard(void)
             return;
     }
 
-    keys = g_curKeys;
-#ifdef AM2_STANDALONE
+#if defined(AM2_STANDALONE) && !defined(AM2_RELINK)   /* harness input, not the original */
     /* Before MirrorModifier, so an injected shift mirrors the way a real one
      * does -- the hook overlays inside GetDeviceState, which is upstream of
      * everything below. */
     input_overlay_keyboard(g_curKeys, KEY_STATES);
 #endif
-    MirrorModifier(keys, DIK_LSHIFT, DIK_RSHIFT);
-    MirrorModifier(keys, DIK_LCONTROL, DIK_RCONTROL);
-    MirrorModifier(keys, DIK_LMENU, DIK_RMENU);
+    MirrorModifier(DIK_LSHIFT, DIK_RSHIFT);
+    MirrorModifier(DIK_LCONTROL, DIK_RCONTROL);
+    MirrorModifier(DIK_LMENU, DIK_RMENU);
 
     now = GetTickCount();
     for (i = 0; i < KEY_STATES; i++) {
-        keys = g_curKeys;
-        if (!(keys[i] & KEY_DOWN)) {
+        /* The key buffers are indexed by the scancode as a BYTE (the image
+         * masks the counter with 0xFF), the two per-key arrays by the int. */
+        uint8_t k = (uint8_t)i;
+
+        if (g_curKeys[k] & KEY_DOWN) {
+            if ((g_prevKeys[k] ^ g_curKeys[k]) & KEY_DOWN) {
+                /* Newly down this frame. */
+                g_keyPressed[i] = 1;
+                g_keyRepeat[i]  = now + REPEAT_FIRST_MS;
+            } else if (now > g_keyRepeat[i]) {
+                g_keyPressed[i] = 1;
+                g_keyRepeat[i]  = now + REPEAT_NEXT_MS;
+            }
+        } else
             g_keyPressed[i] = 0;
-            continue;
-        }
-        prev = g_prevKeys;
-        if ((prev[i] ^ keys[i]) & KEY_DOWN) {
-            /* Newly down this frame. */
-            g_keyPressed[i] = 1;
-            g_keyRepeat[i]  = now + REPEAT_FIRST_MS;
-        } else if (now > g_keyRepeat[i]) {
-            g_keyPressed[i] = 1;
-            g_keyRepeat[i]  = now + REPEAT_NEXT_MS;
-        }
     }
 }
 

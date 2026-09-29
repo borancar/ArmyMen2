@@ -51,12 +51,13 @@ int32_t __cdecl ReportError(HRESULT hr, const char *fmt, ...)
 
     /* The step's description, prefixed with the HRESULT that caused it. */
     wsprintfA(g_errorTextDD, "DDERROR %08lx: %s", (unsigned long)hr, g_errorText);
-#ifdef AM2_STANDALONE
+#if defined(AM2_STANDALONE) && !defined(AM2_RELINK)
     /* The standalone build has no harness watching it, and a MessageBox is
      * a poor trace: it shows the FIRST failure and nothing about what came
      * before. Logging it as well costs nothing and is the difference between
      * reading a screenshot and reading a sequence. Guarded, because adding a
-     * line in the injected build would change what tools/ab.sh compares. */
+     * line in the injected build would change what tools/ab.sh compares,
+     * and out of the relink, which compares against the original's bytes. */
     am2_log("%s\n", g_errorTextDD);
 #endif
     MessageBoxA(g_hWnd, g_errorTextDD, "ERROR", 0);

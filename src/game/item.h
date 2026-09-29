@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include "../inject/orig.h"   /* am2_FILE, for the savegame pair */
 #include "image.h"       /* AM2_IMAGE -- the two seams below */
+#include "dist.h"        /* AM2_Point */
 
 #ifdef __cplusplus
 extern "C" {
@@ -647,7 +648,7 @@ void __cdecl SoldierKindForWeapon(void *unit, uint32_t code);
 /* 0x00446E70. A weapon handler: record a fire request on the current unit, at
  * a target object or at a bare point. Writes nothing if a menu row is up, or
  * if the unit does not resolve, is not a type 2, or holds no weapon. */
-void __cdecl SetWeaponTarget(void *target, uint32_t at);
+void __cdecl SetWeaponTarget(void *target, AM2_Point at);
 
 /* 0x00447950. Set UNIT_OFF_FIRE_MODE to 0x25 when the unit has
  * OBJ_OFF_FIELD_5A4 and its OBJ_OFF_DEADLINE_58 is over fifteen seconds old,
