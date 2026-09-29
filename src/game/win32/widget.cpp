@@ -10438,10 +10438,13 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
         WidgetVPaint(box, box->rect);
     }
 
-    maps = *(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX);
-    RecordReset(*(void **)(maps + LIST_OFF_ROWS));
-    *(int32_t *)(maps + LIST_OFF_CHOSEN)  = 0;
-    *(int32_t *)(maps + LIST_OFF_TOP_ROW) = 0;
+    /* The map box is read from the panel for each of these. */
+    RecordReset(*(void **)(*(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX)
+                           + LIST_OFF_ROWS));
+    *(int32_t *)(*(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX)
+                 + LIST_OFF_CHOSEN)  = 0;
+    *(int32_t *)(*(uint8_t **)(panel + MP_PANEL_OFF_MAP_BOX)
+                 + LIST_OFF_TOP_ROW) = 0;
 
     chosen = 0;
     for (i = 0; i < *(const int32_t *)(rec + MP_GAMETYPE_OFF_MAP_COUNT); i++) {
