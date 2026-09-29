@@ -367,22 +367,23 @@ uint32_t __cdecl GetPauseFlags(void)
     return *(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS;
 }
 
-void __cdecl PauseGame(uint32_t bits)
+/* Returns the new mask -- eax holds it on both paths, reloaded after the log. */
+uint32_t __cdecl PauseGame(uint32_t bits)
 {
-    uint32_t *flags = (uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS;
-
-    *flags |= bits;
+#define FLAGS (*(uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS)
+    FLAGS |= bits;
     if (*(const int32_t *)(g_comm + COMM_OFF_VERBOSE))
-        orig_log("PauseGame: %x (set: %x)\n", *flags, bits);
+        orig_log("PauseGame: %x (set: %x)\n", FLAGS, bits);
+    return FLAGS;
 }
 
-void __cdecl UnPauseGame(uint32_t bits)
+uint32_t __cdecl UnPauseGame(uint32_t bits)
 {
-    uint32_t *flags = (uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS;
-
-    *flags &= ~bits;
+    FLAGS &= ~bits;
     if (*(const int32_t *)(g_comm + COMM_OFF_VERBOSE))
-        orig_log("UnPauseGame: %x (reset: %x)\n", *flags, bits);
+        orig_log("UnPauseGame: %x (reset: %x)\n", FLAGS, bits);
+    return FLAGS;
+#undef FLAGS
 }
 
 /* Every comm step in the pre and post is behind the same field. */

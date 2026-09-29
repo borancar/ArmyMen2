@@ -437,39 +437,32 @@ int32_t __cdecl KindInSetB(int32_t kind)
  * only thing that differs between 0x0041CF20 and 0x0041CEC0 -- and it is a
  * genuine difference, not a tidy-up: one reads a word at m+4+y*2 and the other
  * a dword at m+4+y*4. Everything below that line is the same in both. */
-static int32_t MaskSolid(uint32_t x, uint32_t y, const void *mask,
+static inline int32_t MaskSolid(uint16_t x, uint16_t y, const void *mask,
                          int32_t wide_rows)
 {
     const uint8_t *m = (const uint8_t *)mask;
-    uint16_t       xw = (uint16_t)x;
     uint16_t       acc = 0;
     const uint8_t *row;
 
-    if (xw > *(const uint16_t *)m)
-        return 0;
-    if ((uint16_t)y > *(const uint16_t *)(m + 2))
+    if (x > *(const uint16_t *)m || y > *(const uint16_t *)(m + 2))
         return 0;
 
     row = m + (wide_rows
-               ? *(const uint32_t *)(m + 4 + (uint32_t)(uint16_t)y * 4)
-               : *(const uint16_t *)(m + 4 + (uint32_t)(uint16_t)y * 2));
+               ? *(const uint32_t *)(m + 4 + (uint32_t)y * 4)
+               : *(const uint16_t *)(m + 4 + (uint32_t)y * 2));
 
-    for (;;) {
-        uint8_t skip = *row++;
-        uint8_t run;
+    /* A transparent run that carries acc past x is a miss. */
+    while ((acc = (uint16_t)(acc + *row++)) <= x) {
+        uint8_t run = *row;
 
-        acc = (uint16_t)(acc + skip);
-        if (acc > xw)
-            return 0;               /* x fell inside a transparent run */
-
-        run = *row;
         acc = (uint16_t)(acc + run);
-        if (acc >= xw)
+        if (acc >= x)
             return 1;               /* x fell inside a solid run */
 
         /* Past the run length byte and the run's own pixels. */
         row += (uint32_t)run + 1;
     }
+    return 0;
 }
 
 /* The one the loose arm still needs: MSVC's _findfirst. The packed half was
@@ -678,12 +671,12 @@ void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)
     *(uint16_t *)(rec + MASKREC_OFF_DESC4) = *(const uint16_t *)(desc + 4);
 }
 
-int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask)
+int32_t __cdecl MaskPixelSolid(uint16_t x, uint16_t y, const void *mask)
 {
     return MaskSolid(x, y, mask, 0);
 }
 
-int32_t __cdecl MaskPixelSolid32(uint32_t x, uint32_t y, const void *mask)
+int32_t __cdecl MaskPixelSolid32(uint16_t x, uint16_t y, const void *mask)
 {
     return MaskSolid(x, y, mask, 1);
 }
@@ -1531,9 +1524,11 @@ int32_t __cdecl IsKeyDown(int32_t dik)
 
 int32_t __cdecl KeyChanged(int32_t dik)
 {
-    uint32_t k = (uint32_t)dik & 0xFFu;
-
-    return (int32_t)((uint32_t)(g_prevKeys[k] ^ g_curKeys[k]) >> 7);
+    /* Bit 7 of the xor. As signed bytes, shifted unsigned: the image loads
+     * them without extending and masks with 1, which only a char operand
+     * makes necessary; the scancode mask is spelled at each use. */
+    return (uint32_t)((int8_t)g_curKeys[dik & 0xFF]
+                      ^ (int8_t)g_prevKeys[dik & 0xFF]) >> 7 & 1;
 }
 
 void __cdecl FreeIfNotNull(void *p)
@@ -1579,9 +1574,8 @@ void __cdecl ConsumeKey(int32_t dik)
 int32_t __cdecl ActionKeyDown(int32_t action)
 {
     /* No mask on `action` and no bound: the table is indexed raw. */
-    if (g_curKeys[g_keyBindings[action * 2]] & 0x80)
-        return 1;
-    if (g_curKeys[g_keyBindings[action * 2 + 1]] & 0x80)
+    if ((g_curKeys[g_keyBindings[action * 2]] & 0x80)
+        || (g_curKeys[g_keyBindings[action * 2 + 1]] & 0x80))
         return 1;
     return 0;
 }

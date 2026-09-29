@@ -1741,10 +1741,10 @@ int32_t __cdecl SpriteSolidAt(AM2_Sprite *spr, AM2_Point at)
     if (!spr->image.rle16)
         return 0;
     if (spr->format == 1)
-        return MaskPixelSolid32((uint32_t)at.x, (uint32_t)at.y,
+        return MaskPixelSolid32((uint16_t)at.x, (uint16_t)at.y,
                                 spr->image.rle32);
     if (spr->format == 2 || spr->format == 3)
-        return MaskPixelSolid((uint32_t)at.x, (uint32_t)at.y,
+        return MaskPixelSolid((uint16_t)at.x, (uint16_t)at.y,
                               spr->image.rle16);
     return PointInRect(&spr->bounds, &at);
 }
@@ -1772,16 +1772,15 @@ int32_t __cdecl SpriteSolidAt(AM2_Sprite *spr, AM2_Point at)
  * to entry 0 and one does not. */
 static inline int32_t AnimIndexOfId(const AM2_AnimTable *t, int32_t id)
 {
-    int32_t i = 0;
+    int32_t i;
 
-    if (t->count > 0)
-        for (i = 0; i < t->count; i++)
-            if (t->entries[i].id == id)
-                break;
+    for (i = 0; i < t->count; i++)
+        if (t->entries[i].id == id)
+            break;
     return i;
 }
 
-static AM2_Sprite *AnimSpriteAt(const AM2_Anim *a, uint32_t heading)
+static inline AM2_Sprite *AnimSpriteAt(const AM2_Anim *a, uint32_t heading)
 {
     int32_t facing = RoundTo8((int32_t)(heading & 0xFFu), a->directionBits) & 0xFF;
 
@@ -1814,11 +1813,15 @@ AM2_Sprite *__cdecl VehicleAnimSprite(int32_t kind, uint32_t heading)
  *
  * And it opens with `lea esi, [eax*8 + 0x65A2A8]; test esi, esi; jne` -- a
  * null test on the address of a global plus an index, which cannot be zero.
- * Not reproduced; the same shape as UpdateMouseState's unreachable `je`. */
+ * Reproduced for the bytes; it never fires. */
 AM2_Sprite *__cdecl TurretAnimSprite(int32_t kind, uint32_t heading)
 {
     const AM2_AnimTable *t = &g_turretAnims[kind];
-    int32_t              i = AnimIndexOfId(t, AM2_ANIM_ID_VEHICLE);
+    int32_t              i;
+
+    if (!t)
+        return 0;
+    i = AnimIndexOfId(t, AM2_ANIM_ID_VEHICLE);
 
     if (i >= t->count)
         return 0;

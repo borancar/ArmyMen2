@@ -552,21 +552,18 @@ int32_t __cdecl LoadScriptSection(am2_FILE *fp)
 
 int32_t __cdecl GetVarValue(int32_t index, int32_t *out)
 {
-    AM2_ScriptName *e;
-
     if (index <= 0) {
         *out = 0;
         return 0;
     }
 
-    e = &kScriptNames[index];
-    if (e->type != AM2_NAME_TYPE_INTEGER) {
-        am2_log("GetVarValue: name %s is not a variable!\n", e->name);
-        return 0;
+    if (kScriptNames[index].type == AM2_NAME_TYPE_INTEGER) {
+        *out = kScriptNames[index].value;
+        return 1;
     }
 
-    *out = e->value;
-    return 1;
+    am2_log("GetVarValue: name %s is not a variable!\n", kScriptNames[index].name);
+    return 0;
 }
 
 /* No index check at all, unlike the getter. */

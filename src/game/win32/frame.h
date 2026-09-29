@@ -43,8 +43,8 @@ void __cdecl State1Common(void);
  * that move it, both named from their own log lines. Each bit is a reason the
  * game is paused; the frame chain checks the mask before doing work. */
 uint32_t __cdecl GetPauseFlags(void);
-void     __cdecl PauseGame(uint32_t bits);
-void     __cdecl UnPauseGame(uint32_t bits);
+uint32_t __cdecl PauseGame(uint32_t bits);
+uint32_t __cdecl UnPauseGame(uint32_t bits);
 
 void __cdecl PollInput(void);
 void __cdecl FramePre(void);

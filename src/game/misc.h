@@ -432,7 +432,7 @@ int32_t __cdecl KindInSetB(int32_t kind);   /* range 1..29 */
  * than saturating, and the reconstruction accumulates in uint16_t to match.
  * A negative x arrives as a large unsigned word and fails the bounds test,
  * which is why there is no signed check anywhere. */
-int32_t __cdecl MaskPixelSolid(uint32_t x, uint32_t y, const void *mask);
+int32_t __cdecl MaskPixelSolid(uint16_t x, uint16_t y, const void *mask);
 
 /* 0x00435280, two callers. Fill a mask record from {set, index, frame}:
  * SpriteLoadTriple's twin, with the same -df fork and the same glob
@@ -463,7 +463,7 @@ void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame);
  * passes every vector. The word/dword difference is verified by reading the
  * two disassemblies and by nothing else; everything below the row lookup is
  * covered. */
-int32_t __cdecl MaskPixelSolid32(uint32_t x, uint32_t y, const void *mask);
+int32_t __cdecl MaskPixelSolid32(uint16_t x, uint16_t y, const void *mask);
 
 /* 0x004232C0. One bit of the 1bpp bitmap the mask above is encoded FROM --
  * both call sites are in the encoder at 0x00423300, which walks a row

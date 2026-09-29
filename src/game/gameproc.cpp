@@ -2406,18 +2406,15 @@ void __cdecl UidRemapClear(void)
 
 void __cdecl UidRemapAdd(uint32_t from, uint32_t to)
 {
-    int32_t n;
-
     if (g_uidRemapCount >= g_uidRemapCap) {
         g_uidRemapCap += AM2_UID_REMAP_GROW;
         g_uidRemap = (uint32_t *)am2_realloc(
                          g_uidRemap, (size_t)(g_uidRemapCap * 8));
     }
 
-    n = g_uidRemapCount;
-    g_uidRemap[n * 2]     = from;
-    g_uidRemap[n * 2 + 1] = to;
-    g_uidRemapCount       = n + 1;
+    g_uidRemap[g_uidRemapCount * 2]     = from;
+    g_uidRemap[g_uidRemapCount * 2 + 1] = to;
+    g_uidRemapCount++;
 }
 
 /* ---- Six small teardown steps -----------------------------------------

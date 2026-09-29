@@ -9300,11 +9300,11 @@ int32_t __cdecl ObjRowsMaskAt(void *obj, const void *ptv)
 
     switch (*(const int32_t *)(spr + SPR_OFF_FORMAT)) {
     case 1:
-        return MaskPixelSolid32((uint32_t)x, (uint32_t)y,
+        return MaskPixelSolid32((uint16_t)x, (uint16_t)y,
                                 *(const void *const *)(spr + SPR_OFF_IMAGE));
     case 2:
     case 3:
-        return MaskPixelSolid((uint32_t)x, (uint32_t)y,
+        return MaskPixelSolid((uint16_t)x, (uint16_t)y,
                               *(const void *const *)(spr + SPR_OFF_IMAGE));
     default:
         return 1;               /* no software mask: assume solid */
