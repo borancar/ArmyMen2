@@ -921,33 +921,35 @@ void __cdecl MissionStartup(void)
  * recomputes `start` from now is reached by nothing. */
 void __cdecl TimerTick(void)
 {
+#define NOW  (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
+#define LAST (*(uint32_t *)(uintptr_t)ADDR_EVENT_BLOCK)
     AM2_Timer *timers = (AM2_Timer *)(uintptr_t)ADDR_TIMER_TABLE;
-    uint32_t   now    = *(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS));
-    uint32_t  *last   = (uint32_t *)(uintptr_t)ADDR_EVENT_BLOCK;
     int32_t    i;
 
-    if (now - *last < AM2_TIMER_TICK_MS)
+    /* The clock is read again at every use. */
+    if (NOW - LAST < AM2_TIMER_TICK_MS)
         return;
-    *last = now;
+    LAST = NOW;
 
     for (i = 0; i < AM2_TIMER_MAX; i++) {
         AM2_Timer *t = &timers[i];
 
         if (!t->id)
             continue;
-        if (t->start > now)
+        if (t->start > NOW)
             continue;
 
         EventNotify(1, t->id, 0, 0, 0, 0, 0, 0, t->count == 1, 0);
 
         if (--t->count <= 0) {
             t->id = 0;
-            (*(int32_t *)(uintptr_t)ADDR_TIMER_COUNT)--;
+            --*(int32_t *)(uintptr_t)ADDR_TIMER_COUNT;
         } else {
-            t->start = *(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS))
-                       + t->period;
+            t->start = NOW + t->period;
         }
     }
+#undef NOW
+#undef LAST
 }
 
 /* --------------------------------------------- object shims ---- */

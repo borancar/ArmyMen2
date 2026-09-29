@@ -923,7 +923,6 @@ int32_t __cdecl ObjNextKind538(const void *obj, int32_t want)
 void __cdecl BuildRgb332Palette(void *out)
 {
     uint8_t  *quad   = (uint8_t *)out;
-    uint32_t *packed = (uint32_t *)((uint8_t *)out + AM2_RGB332_PACKED);
     int32_t   i;
 
     for (i = 0; i < AM2_RGB332_ENTRIES; i++) {
@@ -939,7 +938,7 @@ void __cdecl BuildRgb332Palette(void *out)
         /* Reassembled from the bytes just stored, not from c0..c2 -- the
          * original reads them back out of the buffer. Same values, and worth
          * saying because it means the two tables cannot disagree. */
-        packed[i] = ((uint32_t)quad[i * 4 + 2] << 16)
+        ((uint32_t *)((uint8_t *)out + AM2_RGB332_PACKED))[i] = ((uint32_t)quad[i * 4 + 2] << 16)
                   | ((uint32_t)quad[i * 4 + 1] << 8)
                   |  (uint32_t)quad[i * 4 + 0];
     }
@@ -2604,8 +2603,10 @@ void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
     *(int32_t *)(seq + SEQ_OFF_OWNER)    = owner;
     *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND7;
     *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
-    *(int32_t *)(seq + SEQ_OFF_LIFE)     = life > 0 ? life : AM2_SEQ_LIFE7;
+    *(int32_t *)(seq + SEQ_OFF_LIFE)     = AM2_SEQ_LIFE7;
     *(int32_t *)(seq + SEQ_OFF_FIELD_0C) = 0;
+    if (life > 0)
+        *(int32_t *)(seq + SEQ_OFF_LIFE) = life;
     *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
 
     row = *(uint8_t **)(seq + SEQ_OFF_ROW);
