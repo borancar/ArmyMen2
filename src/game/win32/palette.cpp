@@ -115,11 +115,13 @@ void __cdecl CalibratePalette(uint32_t *palette)
     if (!LockSurface(g_primarySurface))
         return;
 
-    /* Paint index i at x = i, one row, so every entry is on screen at once. */
+    /* Paint index i at x = i, one row, so every entry is on screen at once.
+     * The buffer and the x origin are read again for every byte. */
     {
-        uint8_t *row = g_frameBuf + (int64_t)(g_originDy + PROBE_ORIGIN) * g_pitch;
+        int32_t row = (g_originDy + PROBE_ORIGIN) * g_pitch;
+
         for (i = 0; i < PALETTE_ENTRIES; i++)
-            row[g_originDx + i + PROBE_ORIGIN] = (uint8_t)i;
+            (g_frameBuf + g_originDx + i)[row + PROBE_ORIGIN] = (uint8_t)i;
     }
 
     /* The strip has to be on the real display before GDI can be asked about
@@ -133,12 +135,17 @@ void __cdecl CalibratePalette(uint32_t *palette)
             for (i = 0; i < PALETTE_ENTRIES; i++) {
                 COLORREF c = GetPixel(dc, g_originDx + i + PROBE_ORIGIN,
                                       g_originDy + PROBE_ORIGIN);
-                /* COLORREF is already 0x00BBGGRR, which is the packing the
-                 * matcher reads. */
-                uint8_t idx = NearestPalIndex(palette,
-                                                 (uint32_t)c & 0x00FFFFFFu, 0);
+                /* Repacked a byte at a time into four bytes whose last is
+                 * never written -- NearestPalIndex reads only the three. */
+                struct { uint8_t r, g, b, pad; } q;
 
-                scratch[i] = palette[idx];
+#ifndef _MSC_VER
+                q.pad = 0;
+#endif
+                q.r = GetRValue(c);
+                q.g = GetGValue(c);
+                q.b = GetBValue(c);
+                scratch[i] = palette[NearestPalIndex(palette, *(uint32_t *)&q, 0)];
                 palette[PALETTE_ENTRIES + i] = (uint32_t)c;
             }
             ReleaseDC(NULL, dc);
