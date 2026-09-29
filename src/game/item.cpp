@@ -8751,15 +8751,20 @@ uint8_t __cdecl JitterFacing(void *obj, uint8_t facing)
 {
     uint8_t jitter = (uint8_t)(orig_rand() % AM2_JITTER_SPREAD
                                + facing - AM2_JITTER_BIAS);
-    uint32_t bits;
+    uint8_t first, second;
 
-    bits = (**(const int32_t *const *)((const uint8_t *)obj
-                                       + OBJ_OFF_FIELD_C0) == 3)
-           ? AM2_JITTER_BITS_3 : AM2_JITTER_BITS_OTHER;
+    /* Two arms with the precision as a constant, not one call with a
+     * variable: the image has both pairs of calls, their tails merged. */
+    if (**(const int32_t *const *)((const uint8_t *)obj + OBJ_OFF_FIELD_C0) == 3) {
+        first  = RoundTo8(facing, AM2_JITTER_BITS_3);
+        second = RoundTo8(jitter, AM2_JITTER_BITS_3);
+    } else {
+        first  = RoundTo8(facing, AM2_JITTER_BITS_OTHER);
+        second = RoundTo8(jitter, AM2_JITTER_BITS_OTHER);
+    }
 
-    if (RoundTo8(facing, bits) != RoundTo8(jitter, bits))
+    if (first != second)
         return facing;
-
     return jitter;
 }
 
@@ -8769,7 +8774,7 @@ uint8_t __cdecl JitterFacing(void *obj, uint8_t facing)
  * last. This is a helper of ours -- the original inlines it both times --
  * and it is one only because writing the conjunction twice is how a
  * polarity gets flipped in one copy. */
-static int32_t RowMidAnimation(const uint8_t *row)
+static inline int32_t RowMidAnimation(const uint8_t *row)
 {
     const AM2_Anim *anim =
         *(const AM2_Anim *const *)(row + ROW_OFF_ANIM_PLAYING);
@@ -8896,7 +8901,7 @@ void __cdecl SetKindFrames(void *obj, int32_t kind)
     if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) <= 1)
         return;
 
-    row += AM2_OBJ_ROW_STRIDE;
+    row = *(uint8_t **)(o + OBJ_OFF_ROWS) + AM2_OBJ_ROW_STRIDE;
 
     if (!RowMidAnimation(row))
         SetAnimFrame(row, AM2_SECOND_ROW_FRAME, 0);

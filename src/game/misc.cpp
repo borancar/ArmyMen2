@@ -1807,19 +1807,15 @@ int32_t __cdecl ActionKeyReleased(int32_t action)
  * on every configuration this project has. */
 int32_t __cdecl DismissKeyReleased(void)
 {
-    static const int32_t keys[4] = {
-        AM2_DIK_SPACE, AM2_DIK_F1, AM2_DIK_ESCAPE, AM2_DIK_RETURN
-    };
-    int32_t i;
-
-    for (i = 0; i < 4; i++) {
-        if (IsKeyDown(keys[i]))
-            continue;
-        if (!KeyChanged(keys[i]))
-            continue;
-        ConsumeKey(keys[i]);
-        return 1;
-    }
+    /* Written out per key, not a loop over a table: the image has the four
+     * tests one after another. */
+#define DISMISS(k) \
+    if (!IsKeyDown(k) && KeyChanged(k)) { ConsumeKey(k); return 1; }
+    DISMISS(AM2_DIK_SPACE)
+    DISMISS(AM2_DIK_F1)
+    DISMISS(AM2_DIK_ESCAPE)
+    DISMISS(AM2_DIK_RETURN)
+#undef DISMISS
     return 0;
 }
 

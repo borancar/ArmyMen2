@@ -20,7 +20,14 @@
 #include "msgslot.h"  /* FindPlayerById, MsgField12 */
 
 typedef uint32_t (__stdcall *AM2_TickFn)(void);
+#if defined(_MSC_VER) && !defined(__GNUC__)
+/* The import itself under VC6: two calls load the IAT slot into a register
+ * once, which a read through our pointer cannot reproduce. */
+extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
+#define orig_get_tick_count GetTickCount
+#else
 #define orig_get_tick_count (*(AM2_TickFn *)((void *)(uintptr_t)(ADDR_IAT_GET_TICK_COUNT)))
+#endif
 
 #define kComm       (*(uint8_t **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)))
 #define kPacket     ((uint8_t *)((void *)(uintptr_t)(ADDR_ARMY_PACKET)))

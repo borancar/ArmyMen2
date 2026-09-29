@@ -7029,7 +7029,7 @@ typedef int32_t  (__cdecl *AM2_ScanFn)(void *obj, void *range, void *bearing,
  * identically, so it is the original's behaviour rather than a slip in one of
  * them -- a single sighting would have read as a typo. Reproduced.
  */
-static uint8_t *SightResolve(uint32_t *uid, uint32_t *dead_clears, void **slot)
+static inline uint8_t *SightResolve(uint32_t *uid, uint32_t *dead_clears, void **slot)
 {
     uint8_t *t;
 
@@ -7118,13 +7118,15 @@ void __cdecl AiBuildContext(void *obj, void *out)
          * twin's 1. An earlier reading had this arm copy the leader's position
          * unconditionally, which left a follower ordered into formation
          * standing where the leader is rather than in its slot. */
+#define LEADER (*(uint8_t **)(s + SIGHT_OFF_LEADER))
         if (ObjsAreAllied(obj, leader, 0)
-            && ObjIsTypeIn238((const AM2_Object *)leader))
-            ResolveFormationPoint(obj, leader,
+            && ObjIsTypeIn238((const AM2_Object *)LEADER))
+            ResolveFormationPoint(obj, LEADER,
                                   (AM2_Point *)(s + SIGHT_OFF_DEST));
         else
             *(uint32_t *)(s + SIGHT_OFF_DEST) =
-                *(const uint32_t *)(leader + OBJ_OFF_POS);
+                *(const uint32_t *)(LEADER + OBJ_OFF_POS);
+#undef LEADER
         DistAndAngle((const AM2_Point *)&anchor,
                      (const AM2_Point *)(s + SIGHT_OFF_DEST),
                      (int32_t *)(s + SIGHT_OFF_LEAD_RANGE),
@@ -7160,17 +7162,20 @@ void __cdecl AiBuildContext(void *obj, void *out)
     if (!w) {
         *(int32_t *)(s + SIGHT_OFF_KIND) = 0;
     } else {
-        const uint8_t *rec = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
-        double         v   = (double)*(const int32_t *)(rec + ITEMTYPE_OFF_RANGE);
-
+        /* The weapon's type record is re-read at every use, and so is the
+         * range: no local holds either. */
+#define REC (*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0))
         *(int32_t *)(s + SIGHT_OFF_KIND) =
-            *(const int32_t *)(rec + ITEMTYPE_OFF_KIND);
-        *(int32_t *)(s + SIGHT_OFF_WANT_RANGE) = (int32_t)(v * kRangeWant);
-        *(int32_t *)(s + SIGHT_OFF_MAX_RANGE)  = (int32_t)(v * kRangeHi);
+            *(const int32_t *)(REC + ITEMTYPE_OFF_KIND);
+        *(int32_t *)(s + SIGHT_OFF_WANT_RANGE) =
+            (int32_t)((double)*(const int32_t *)(REC + ITEMTYPE_OFF_RANGE) * kRangeWant);
+        *(int32_t *)(s + SIGHT_OFF_MAX_RANGE) =
+            (int32_t)((double)*(const int32_t *)(REC + ITEMTYPE_OFF_RANGE) * kRangeHi);
         *(int32_t *)(s + SIGHT_OFF_READY) =
             (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
              - *(const uint32_t *)(w + ITEM_OFF_LAST_USE))
-            > *(const uint32_t *)(rec + ITEMTYPE_OFF_COOLDOWN);
+            > *(const uint32_t *)(REC + ITEMTYPE_OFF_COOLDOWN);
+#undef REC
     }
 
     *(uint8_t *)(s + SIGHT_OFF_SEED) = (uint8_t)orig_region_rand();
@@ -7232,12 +7237,15 @@ void __cdecl RoachBuildContext(void *obj, void *out)
                           (uint32_t *)(o + OBJ_OFF_TARGET_UID),
                           (void **)(s + SIGHT_OFF_LEADER));
     if (leader) {
+        /* Past the test the leader is re-read from its slot in the record. */
+#define LEADER (*(uint8_t **)(s + SIGHT_OFF_LEADER))
         if (ObjIsTypeIn238((const AM2_Object *)leader))
-            ResolveFormationPoint(obj, leader,
+            ResolveFormationPoint(obj, LEADER,
                                   (AM2_Point *)(s + SIGHT_OFF_DEST));
         else
             *(uint32_t *)(s + SIGHT_OFF_DEST) =
-                *(const uint32_t *)(leader + OBJ_OFF_POS);
+                *(const uint32_t *)(LEADER + OBJ_OFF_POS);
+#undef LEADER
 
         DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
                      (const AM2_Point *)(s + SIGHT_OFF_DEST),

@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1033 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1038 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1033:
+  the near-miss sweep, 758 before the row pools. From 758 to 1038:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -188,6 +188,11 @@ main result so far (details in `src/vc6/README.md`):
     objtable.h): its uninitialised out-slot lands in the caller's dead
     argument slot, which is what ObjDie's frame shows; DeselectAll has it
     twice with two slots. DamageObject and OnSelectionChanged use it too.
+  - **Helpers of ours that the original inlined**: SightResolve (both AI
+    context builders, which then re-read the leader from its slot),
+    RowMidAnimation, and DismissKeyReleased's key table (four tests written
+    out). A per-call-site count of callees, ours against the image's, is
+    what finds these: a callee the image never calls is one it inlined.
   - **MenuMessage's colour is a byte parameter**: callers push a whole
     register with garbage above the byte, and the callee masks it.
   - **Two identical functions folded by the linker**: SeqRun has separate
