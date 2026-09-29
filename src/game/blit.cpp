@@ -54,6 +54,676 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(_MSC_VER) && (defined(AM2_STANDALONE) || defined(AM2_RELINK))
+/* THE ORIGINAL'S BLITTERS ARE INLINE ASSEMBLY. Each has an ebp frame -- which
+ * an /O2 build gives only a function containing an __asm block -- and a
+ * `nop` on the label its loop exits to. Under VC6 they are written as the
+ * image has them, so the relink can match them; every other build uses the
+ * C above it describes. The frame slots are named by role: the end of the
+ * row-offset table, the entry being walked, and the destination row start. */
+
+void __fastcall BlitGlyph(int32_t x, int32_t y, const AM2_Rle16 *glyph,
+                          AM2_Rect src, int32_t colour)
+{
+    uint32_t rowEnd, rowAt, dstRow;
+
+    __asm {
+        imul edx, dword ptr [am2_origstate.screen_pitch]
+        add edx, ecx
+        mov eax, dword ptr [ebp + 0x10]
+        mov ecx, dword ptr [ebp + 0x18]
+        add edx, dword ptr [am2_origstate.framebuffer]
+        mov ebx, dword ptr [ebp + 8]
+        mov edi, edx
+        lea edx, [ebx + ecx*2 + 4]
+        lea eax, [ebx + eax*2 + 4]
+        mov rowEnd, edx
+        mov rowAt, eax
+        nop 
+L41c742:
+        cmp edx, eax
+        jbe L41c7d8
+        mov dstRow, edi
+        xor ecx, ecx
+        mov esi, dword ptr [ebp + 8]
+        mov cx, word ptr [eax]
+        xor edx, edx
+        add esi, ecx
+        cmp edx, dword ptr [ebp + 0x14]
+        jae L41c7be
+L41c75e:
+        xor eax, eax
+        mov ecx, edx
+        mov al, byte ptr [esi]
+        mov ebx, dword ptr [ebp + 0xc]
+        inc esi
+        add ecx, eax
+        cmp edx, ebx
+        jb L41c772
+        add edi, eax
+        jmp L41c778
+L41c772:
+        sub ecx, ebx
+        jb L41c778
+        add edi, ecx
+L41c778:
+        add edx, eax
+        xor eax, eax
+        cmp edx, dword ptr [ebp + 0x14]
+        jae L41c7be
+        mov al, byte ptr [esi]
+        mov ecx, edx
+        inc esi
+        add ecx, eax
+        test eax, eax
+        je L41c7ba
+        mov ebx, dword ptr [ebp + 0xc]
+        cmp ecx, ebx
+        jbe L41c7ba
+        mov eax, edx
+        sub ebx, edx
+        jae L41c79b
+        xor ebx, ebx
+L41c79b:
+        add eax, ebx
+        cmp ecx, dword ptr [ebp + 0x14]
+        jbe L41c7a5
+        mov ecx, dword ptr [ebp + 0x14]
+L41c7a5:
+        sub ecx, eax
+        add edx, ebx
+        xor eax, eax
+        add edx, ecx
+        cmp ecx, 0
+        je L41c7ba
+        mov al, byte ptr [ebp + 0x1c]
+        rep stosb 
+        xor eax, eax
+        nop 
+L41c7ba:
+        add edx, eax
+        jmp L41c75e
+L41c7be:
+        mov eax, rowAt
+        mov edi, dstRow
+        mov edx, rowEnd
+        add eax, 2
+        add edi, dword ptr [am2_origstate.screen_pitch]
+        mov rowAt, eax
+        jmp L41c742
+L41c7d8:
+        nop 
+    }
+}
+
+void __fastcall BlitCopy16(int32_t x, int32_t y, const AM2_Rle16 *data,
+                           AM2_Rect src)
+{
+    uint32_t rowEnd, rowAt, dstRow;
+
+    __asm {
+        imul edx, dword ptr [am2_origstate.screen_pitch]
+        add edx, ecx
+        mov eax, dword ptr [ebp + 0x10]
+        mov ecx, dword ptr [ebp + 0x18]
+        add edx, dword ptr [am2_origstate.framebuffer]
+        mov ebx, dword ptr [ebp + 8]
+        mov edi, edx
+        lea edx, [ebx + ecx*2 + 4]
+        lea eax, [ebx + eax*2 + 4]
+        mov rowEnd, edx
+        mov rowAt, eax
+L41c2e1:
+        cmp edx, eax
+        jbe L41c390
+        mov dstRow, edi
+        xor ecx, ecx
+        mov esi, dword ptr [ebp + 8]
+        mov cx, word ptr [eax]
+        xor edx, edx
+        add esi, ecx
+        cmp edx, dword ptr [ebp + 0x14]
+        jae L41c376
+L41c2fd:
+        xor eax, eax
+        mov ecx, edx
+        mov al, byte ptr [esi]
+        mov ebx, dword ptr [ebp + 0xc]
+        inc esi
+        add ecx, eax
+        cmp edx, ebx
+        jb L41c311
+        add edi, eax
+        jmp L41c317
+L41c311:
+        sub ecx, ebx
+        jb L41c317
+        add edi, ecx
+L41c317:
+        add edx, eax
+        xor eax, eax
+        cmp edx, dword ptr [ebp + 0x14]
+        jae L41c376
+        mov al, byte ptr [esi]
+        mov ecx, edx
+        inc esi
+        add ecx, eax
+        test eax, eax
+        je L41c370
+        mov ebx, dword ptr [ebp + 0xc]
+        cmp ecx, ebx
+        jbe L41c370
+        mov eax, edx
+        sub ebx, edx
+        jae L41c33a
+        xor ebx, ebx
+L41c33a:
+        add eax, ebx
+        cmp ecx, dword ptr [ebp + 0x14]
+        jbe L41c344
+        mov ecx, dword ptr [ebp + 0x14]
+L41c344:
+        sub ecx, eax
+        add esi, ebx
+        add edx, ebx
+        mov eax, ecx
+        add edx, ecx
+        mov ebx, edi
+        cmp ecx, 0xc
+        jb L41c36c
+        and ebx, 3
+        je L41c362
+        sub eax, ebx
+        mov ecx, ebx
+        rep movsb 
+        mov ecx, eax
+L41c362:
+        shr ecx, 2
+        and eax, 3
+        rep movsd 
+        mov ecx, eax
+L41c36c:
+        rep movsb 
+        xor eax, eax
+L41c370:
+        add edx, eax
+        add esi, eax
+        jmp L41c2fd
+L41c376:
+        mov eax, rowAt
+        mov edi, dstRow
+        mov edx, rowEnd
+        add eax, 2
+        add edi, dword ptr [am2_origstate.screen_pitch]
+        mov rowAt, eax
+        jmp L41c2e1
+L41c390:
+        nop 
+    }
+}
+
+void __fastcall BlitCopy32(int32_t x, int32_t y, const AM2_Rle32 *data,
+                           AM2_Rect src)
+{
+    uint32_t rowEnd, rowAt, dstRow;
+
+    __asm {
+        imul edx, dword ptr [am2_origstate.screen_pitch]
+        add edx, ecx
+        mov eax, dword ptr [ebp + 0x10]
+        mov ecx, dword ptr [ebp + 0x18]
+        add edx, dword ptr [am2_origstate.framebuffer]
+        mov ebx, dword ptr [ebp + 8]
+        mov edi, edx
+        lea edx, [ebx + ecx*4 + 4]
+        lea eax, [ebx + eax*4 + 4]
+        mov rowEnd, edx
+        mov rowAt, eax
+L41c1f1:
+        cmp edx, eax
+        jbe L41c29d
+        mov dstRow, edi
+        mov esi, dword ptr [ebp + 8]
+        xor edx, edx
+        mov ecx, dword ptr [eax]
+        add esi, ecx
+        cmp edx, dword ptr [ebp + 0x14]
+        jae L41c283
+L41c20a:
+        xor eax, eax
+        mov ecx, edx
+        mov al, byte ptr [esi]
+        mov ebx, dword ptr [ebp + 0xc]
+        inc esi
+        add ecx, eax
+        cmp edx, ebx
+        jb L41c21e
+        add edi, eax
+        jmp L41c224
+L41c21e:
+        sub ecx, ebx
+        jb L41c224
+        add edi, ecx
+L41c224:
+        add edx, eax
+        xor eax, eax
+        cmp edx, dword ptr [ebp + 0x14]
+        jae L41c283
+        mov al, byte ptr [esi]
+        mov ecx, edx
+        inc esi
+        add ecx, eax
+        test eax, eax
+        je L41c27d
+        mov ebx, dword ptr [ebp + 0xc]
+        cmp ecx, ebx
+        jbe L41c27d
+        mov eax, edx
+        sub ebx, edx
+        jae L41c247
+        xor ebx, ebx
+L41c247:
+        add eax, ebx
+        cmp ecx, dword ptr [ebp + 0x14]
+        jbe L41c251
+        mov ecx, dword ptr [ebp + 0x14]
+L41c251:
+        sub ecx, eax
+        add esi, ebx
+        add edx, ebx
+        mov eax, ecx
+        add edx, ecx
+        mov ebx, edi
+        cmp ecx, 0xc
+        jb L41c279
+        and ebx, 3
+        je L41c26f
+        sub eax, ebx
+        mov ecx, ebx
+        rep movsb 
+        mov ecx, eax
+L41c26f:
+        shr ecx, 2
+        and eax, 3
+        rep movsd 
+        mov ecx, eax
+L41c279:
+        rep movsb 
+        xor eax, eax
+L41c27d:
+        add edx, eax
+        add esi, eax
+        jmp L41c20a
+L41c283:
+        mov eax, rowAt
+        mov edi, dstRow
+        mov edx, rowEnd
+        add eax, 4
+        add edi, dword ptr [am2_origstate.screen_pitch]
+        mov rowAt, eax
+        jmp L41c1f1
+L41c29d:
+        nop 
+    }
+}
+
+void __fastcall BlitRemap16(int32_t x, int32_t y, const AM2_Rle16 *data,
+                            AM2_Rect src, const uint8_t *lut)
+{
+    uint32_t rowEnd, rowAt, dstRow;
+
+    __asm {
+        imul edx, dword ptr [am2_origstate.screen_pitch]
+        add edx, ecx
+        mov eax, dword ptr [ebp + 0x10]
+        mov ecx, dword ptr [ebp + 0x18]
+        add edx, dword ptr [am2_origstate.framebuffer]
+        mov ebx, dword ptr [ebp + 8]
+        mov edi, edx
+        lea edx, [ebx + ecx*2 + 4]
+        lea eax, [ebx + eax*2 + 4]
+        mov rowEnd, edx
+        mov rowAt, eax
+L41c3d1:
+        cmp edx, eax
+        jbe L41c474
+        mov dstRow, edi
+        xor ecx, ecx
+        mov esi, dword ptr [ebp + 8]
+        mov cx, word ptr [eax]
+        xor edx, edx
+        add esi, ecx
+        cmp edx, dword ptr [ebp + 0x14]
+        jae L41c45a
+L41c3ed:
+        xor eax, eax
+        mov ecx, edx
+        mov al, byte ptr [esi]
+        mov ebx, dword ptr [ebp + 0xc]
+        inc esi
+        add ecx, eax
+        cmp edx, ebx
+        jb L41c401
+        add edi, eax
+        jmp L41c407
+L41c401:
+        sub ecx, ebx
+        jb L41c407
+        add edi, ecx
+L41c407:
+        add edx, eax
+        xor eax, eax
+        cmp edx, dword ptr [ebp + 0x14]
+        jae L41c45a
+        mov al, byte ptr [esi]
+        mov ecx, edx
+        inc esi
+        add ecx, eax
+        test eax, eax
+        je L41c454
+        mov ebx, dword ptr [ebp + 0xc]
+        cmp ecx, ebx
+        jbe L41c454
+        mov eax, edx
+        sub ebx, edx
+        jae L41c42a
+        xor ebx, ebx
+L41c42a:
+        add eax, ebx
+        cmp ecx, dword ptr [ebp + 0x14]
+        jbe L41c434
+        mov ecx, dword ptr [ebp + 0x14]
+L41c434:
+        sub ecx, eax
+        add esi, ebx
+        add edx, ebx
+        mov ebx, dword ptr [ebp + 0x1c]
+        add edx, ecx
+        xor eax, eax
+L41c441:
+        test ecx, ecx
+        je L41c452
+        mov al, byte ptr [esi]
+        inc esi
+        inc edi
+        dec ecx
+        mov al, byte ptr [ebx + eax]
+        mov byte ptr [edi - 1], al
+        jmp L41c441
+L41c452:
+        xor eax, eax
+L41c454:
+        add edx, eax
+        add esi, eax
+        jmp L41c3ed
+L41c45a:
+        mov eax, rowAt
+        mov edi, dstRow
+        mov edx, rowEnd
+        add eax, 2
+        add edi, dword ptr [am2_origstate.screen_pitch]
+        mov rowAt, eax
+        jmp L41c3d1
+L41c474:
+        nop 
+    }
+}
+
+void __fastcall BlitOverlay(int32_t x, int32_t y, const AM2_Rle16 *data,
+                            AM2_Rect src)
+{
+    uint32_t rowEnd, rowAt, dstRow, spanA, spanB;
+
+    __asm {
+        imul edx, dword ptr [am2_origstate.screen_pitch]
+        add edx, ecx
+        mov eax, dword ptr [ebp + 0x10]
+        mov ecx, dword ptr [ebp + 0x18]
+        add edx, dword ptr [am2_origstate.framebuffer]
+        mov ebx, dword ptr [ebp + 8]
+        mov edi, edx
+        lea edx, [ebx + ecx*2 + 4]
+        lea eax, [ebx + eax*2 + 4]
+        mov rowEnd, edx
+        mov rowAt, eax
+        nop 
+L41c4b2:
+        cmp edx, eax
+        jbe L41c6f8
+        mov dstRow, edi
+        xor ecx, ecx
+        mov esi, dword ptr [ebp + 8]
+        mov cx, word ptr [eax]
+        xor edx, edx
+        add esi, ecx
+        cmp edx, dword ptr [ebp + 0x14]
+        jae L41c6de
+L41c4d2:
+        xor eax, eax
+        mov ecx, edx
+        mov al, byte ptr [esi]
+        mov ebx, dword ptr [ebp + 0xc]
+        inc esi
+        add ecx, eax
+        cmp edx, ebx
+        jb L41c4e6
+        add edi, eax
+        jmp L41c4ec
+L41c4e6:
+        sub ecx, ebx
+        jb L41c4ec
+        add edi, ecx
+L41c4ec:
+        add edx, eax
+        xor eax, eax
+        cmp edx, dword ptr [ebp + 0x14]
+        jae L41c6de
+        mov al, byte ptr [esi]
+        mov ecx, edx
+        inc esi
+        add ecx, eax
+        test eax, eax
+        je L41c6d6
+        mov ebx, dword ptr [ebp + 0xc]
+        cmp ecx, ebx
+        jbe L41c6d6
+        mov eax, edx
+        sub ebx, edx
+        jae L41c51b
+        xor ebx, ebx
+L41c51b:
+        add eax, ebx
+        cmp ecx, dword ptr [ebp + 0x14]
+        jbe L41c525
+        mov ecx, dword ptr [ebp + 0x14]
+L41c525:
+        sub ecx, eax
+        add edx, ebx
+        xor eax, eax
+        add edx, ecx
+        mov spanA, edx
+        mov ebx, edi
+        cmp ecx, 0
+        je L41c6d6
+        and edi, 0xfffffffc
+        and ebx, 3
+        mov edx, dword ptr [am2_origstate.overlay_palette]
+        cmp ebx, 0
+        je L41c630
+        cmp ebx, 1
+        jne L41c5dc
+        cmp ecx, 3
+        jae L41c5b0
+        cmp ecx, 1
+        jne L41c57c
+        xor ebx, ebx
+        xor eax, eax
+        mov bl, byte ptr [edi + 1]
+        add edi, 2
+        mov bl, byte ptr [edx + ebx]
+        mov edx, spanA
+        mov byte ptr [edi - 1], bl
+        jmp L41c4d2
+        nop 
+L41c57c:
+        mov ax, word ptr [edi + 1]
+        mov spanB, ecx
+        xor ebx, ebx
+        xor ecx, ecx
+        mov bl, al
+        mov cl, ah
+        add edi, 3
+        xor eax, eax
+        mov bl, byte ptr [edx + ebx]
+        mov cl, byte ptr [edx + ecx]
+        shl ebx, 8
+        mov edx, spanB
+        add ebx, ecx
+        sub edx, 2
+        mov ecx, edx
+        mov edx, spanA
+        mov word ptr [edi - 2], bx
+        jmp L41c4d2
+        nop 
+L41c5b0:
+        mov eax, dword ptr [edi]
+        xor ebx, ebx
+        mov spanB, ecx
+        mov bl, ah
+        mov ah, byte ptr [edx + ebx]
+        xor ecx, ecx
+        ror eax, 0x10
+        mov bl, ah
+        mov cl, al
+        mov ah, byte ptr [edx + ebx]
+        mov al, byte ptr [edx + ecx]
+        ror eax, 0x10
+        mov ecx, spanB
+        mov dword ptr [edi], eax
+        sub ecx, 3
+        add edi, 4
+        jmp L41c630
+        nop 
+L41c5dc:
+        cmp ebx, 2
+        jne L41c61e
+        cmp ecx, 1
+        jne L41c5fa
+        mov bl, byte ptr [edi + 2]
+        mov bl, byte ptr [edx + ebx]
+        mov byte ptr [edi + 2], bl
+        add edi, 3
+        mov edx, spanA
+        jmp L41c4d2
+L41c5fa:
+        mov ax, word ptr [edi + 2]
+        mov spanB, ecx
+        xor ebx, ebx
+        xor ecx, ecx
+        mov bl, al
+        mov cl, ah
+        mov al, byte ptr [edx + ebx]
+        mov ah, byte ptr [edx + ecx]
+        mov ecx, spanB
+        mov word ptr [edi + 2], ax
+        sub ecx, 2
+        add edi, 4
+        jmp L41c630
+L41c61e:
+        xor ebx, ebx
+        sub ecx, 1
+        mov bl, byte ptr [edi + 3]
+        mov bl, byte ptr [edx + ebx]
+        mov byte ptr [edi + 3], bl
+        add edi, 4
+        nop 
+L41c630:
+        cmp ecx, 3
+        jbe L41c666
+        mov spanB, ecx
+        xor ebx, ebx
+        mov eax, dword ptr [edi]
+        xor ecx, ecx
+        mov bl, al
+        mov cl, ah
+        mov al, byte ptr [edx + ebx]
+        mov ah, byte ptr [edx + ecx]
+        ror eax, 0x10
+        mov bl, al
+        mov cl, ah
+        mov al, byte ptr [edx + ebx]
+        mov ah, byte ptr [edx + ecx]
+        rol eax, 0x10
+        mov ecx, spanB
+        mov dword ptr [edi], eax
+        add edi, 4
+        sub ecx, 4
+        jmp L41c630
+        nop 
+L41c666:
+        cmp ecx, 3
+        jb L41c694
+        mov eax, dword ptr [edi]
+        xor ebx, ebx
+        mov bl, al
+        xor ecx, ecx
+        mov al, byte ptr [edx + ebx]
+        add edi, 3
+        ror eax, 8
+        mov bl, al
+        mov cl, ah
+        mov al, byte ptr [edx + ebx]
+        mov ah, byte ptr [edx + ecx]
+        rol eax, 8
+        mov dword ptr [edi - 3], eax
+        mov edx, spanA
+        jmp L41c4d2
+L41c694:
+        cmp ecx, 1
+        je L41c6ba
+        jb L41c6d0
+        mov eax, dword ptr [edi]
+        add edi, 2
+        xor ebx, ebx
+        xor ecx, ecx
+        mov bl, al
+        mov cl, ah
+        mov al, byte ptr [edx + ebx]
+        mov ah, byte ptr [edx + ecx]
+        mov edx, spanA
+        mov dword ptr [edi - 2], eax
+        jmp L41c4d2
+        nop 
+L41c6ba:
+        xor eax, eax
+        mov al, byte ptr [edi]
+        add edi, 1
+        mov al, byte ptr [edx + eax]
+        mov edx, spanA
+        mov byte ptr [edi - 1], al
+        jmp L41c4d2
+        nop 
+L41c6d0:
+        xor eax, eax
+        mov edx, spanA
+        nop 
+L41c6d6:
+        add edx, eax
+        jmp L41c4d2
+        nop 
+L41c6de:
+        mov eax, rowAt
+        mov edi, dstRow
+        mov edx, rowEnd
+        add eax, 2
+        add edi, dword ptr [am2_origstate.screen_pitch]
+        mov rowAt, eax
+        jmp L41c4b2
+L41c6f8:
+        nop 
+    }
+}
+#else
 extern "C" int32_t am2_trace_window(void) __attribute__((weak));
 #define AM2_TRACE_ON() (!(&am2_trace_window) || am2_trace_window())
 
@@ -262,6 +932,7 @@ void __fastcall BlitOverlay(int32_t x, int32_t y, const AM2_Rle16 *data,
 {
     blit_core(x, y, (const uint8_t *)data, src, 0, FILL_DESTLUT, 0);
 }
+#endif
 
 /* 0x0041BA90, four callers. Copy a DIB's pixels into a locked surface,
  * optionally through a remap table, and report the transparent index.

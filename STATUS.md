@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1088 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1093 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1088:
+  the near-miss sweep, 758 before the row pools. From 758 to 1093:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -243,6 +243,10 @@ main result so far (details in `src/vc6/README.md`):
     VC6). The RLE encoders build in a 200,000-byte STACK buffer (`_chkstk`),
     not a static one, and are two bodies; so are MaskPixelSolid/32, whose
     `while (1)` loop VC6 does not rotate where `for (;;)` would be.
+  - **The five RLE blitters are inline assembly** (an ebp frame in an /O2
+    build, a `nop` on the loop's exit label): under VC6 they are `__asm`
+    bodies transcribed from the image, naming the three globals as
+    `[am2_origstate.member]`; every other build keeps the C.
   - **Two `else` arms storing the same value are one block in the image**:
     HudSargeUpdate's `-1` store is reached from two tests, and writing both
     arms is what puts the loop pointer's bias back on the record's start.
@@ -456,6 +460,19 @@ main result so far (details in `src/vc6/README.md`):
     Xvfb :99 (a virtual desktop gives full colour; the GDI `-w` path went
     black after mission start for stock too), cwd = the game folder, BOOT CAMP
     at (307,142), then Return and space.
+    - **It stopped linking at relink 957 and nothing said so (fixed
+      2026-09-29).** The relink work that matched call shapes also broke the
+      runnable image, which no check builds: Smacker became `dllimport` (no SDK
+      import library -- `link.py` now makes SMACKW32.LIB, patched to import the
+      DLL's DECORATED names), two declarations disagreed with their definitions
+      in ways only MSVC's mangling sees (LoadBitmap's return type, StateLeave's
+      linkage), and virtual calls became pointer-to-member thiscalls while this
+      image's vtables still hold cdecl forwarders -- the title screen faulted
+      in WidgetPaint with the clip's left edge as `this`. `AM2_VCALL_PMF`
+      (src/vc6/include/stdint.h) keeps the PMF calls everywhere but here. A
+      crash now writes `C:\vc6crash.txt` (registers and every code address on
+      the stack; `ArmyMen2.map` names them) -- under explorer's desktop winedbg
+      prints nothing. Boot Camp matches stock again (vcdrive `bootcamp --ab`).
     - **No carried blob.** The `--run` image links NO copy of the original
       data. A `.guard` section (0x270000 bytes, patched to
       CNT_UNINITIALIZED_DATA only, so no access) sits where the original data
