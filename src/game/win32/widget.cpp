@@ -2498,41 +2498,6 @@ static void EditNotifyAndRepaint(void)
  *
  * The three later buttons are gated on how many movies are unlocked, and so
  * is the page button: with fewer than three there is nothing to page to. */
-static AM2_Widget *MakeMovieButton(AM2_Widget *w, AM2_Widget *panel,
-                                   int32_t left, int32_t top, int32_t slot,
-                                   void (__cdecl *handler)(AM2_Widget *))
-{
-    AM2_Widget *btn = (AM2_Widget *)orig_operator_new(AM2_BUTTON_SIZE);
-    AM2_Sprite *const *pair;
-    uint8_t    *self;
-    AM2_Rect    box;
-    int32_t     idx;
-
-    if (btn) {
-        RectSet(&box, left, top, 0x90, 0x90);
-        btn = ButtonConstruct(btn,
-                              (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
-                              (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
-                              (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
-                              1, box, handler,
-                              (void (__cdecl *)(AM2_Widget *))0);
-    }
-
-    idx  = g_moviePage * AM2_MOVIE_PAGE_SIZE + slot;
-    self = (uint8_t *)btn;
-    pair = (AM2_Sprite *const *)((const uint8_t *)w + MOVIES_OFF_SPRITES
-                                 + (uint32_t)idx * 8);
-    *(int32_t *)(self + MOVIE_BUTTON_OFF_INDEX)              = idx;
-    *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_NORMAL)        = pair[1];
-    *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_FOCUS)         = pair[0];
-    *(AM2_Sprite **)(self + BUTTON_OFF_SPRITE_PRESSED)       = pair[0];
-    self[BUTTON_OFF_OWNS_SPRITES]                            = 0;
-    WidgetAddChild(panel, btn);
-    return btn;
-}
-
-
-
 /* ------------------------------------------------------------------ *
  * The save-game family's buttons: ENTER NAME's CANCEL, and LOAD GAME's and
  * DELETE GAME's exits.
@@ -11840,10 +11805,11 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
     AM2_Widget *w = this;
 
     AM2_Widget  *panel;
+    AM2_Widget  *btn;
     AM2_Widget **slots = (AM2_Widget **)((uint8_t *)w + MOVIES_OFF_BUTTONS);
     AM2_Sprite **spr   = (AM2_Sprite **)((uint8_t *)w + MOVIES_OFF_SPRITES);
     int32_t      i;
-    int32_t      at = 0;
+    int32_t      idx;
     AM2_CTOR_VTABLE(w, VTABLE_MOVIES);
     SetGameDir("alpine");
 
@@ -11851,31 +11817,87 @@ AM2_MoviesScreen::AM2_MoviesScreen(const char *bmp)
     ::WidgetAddChild(w, panel);
     panel->flag44 = 1;
 
-    /* Four, then eight, and the two runs of ids are not contiguous. */
+    /* The twelve movies' sprite pairs, off and on: the first four from
+     * index 0xC8, the rest from 0xD2. Each pair is addressed from its
+     * second sprite, which is where the original's loop register points. */
     for (i = 0; i < 4; i++) {
-        spr[at++] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_A + i, 0, 1, 1);
-        spr[at++] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_A + i, 1, 1, 1);
+        AM2_Sprite **p = spr + i * 2 + 1;
+
+        p[-1] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_A + i, 0, 1, 1);
+        p[0]  = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_A + i, 1, 1, 1);
     }
-    for (i = 0; i < 8; i++) {
-        spr[at++] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_B + i, 0, 1, 1);
-        spr[at++] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_B + i, 1, 1, 1);
+    for (i = 4; i < 12; i++) {
+        AM2_Sprite **p = spr + i * 2 + 1;
+
+        p[-1] = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_B - 4 + i, 0, 1, 1);
+        p[0]  = PreloadSprite(AM2_MOVIE_SET, AM2_MOVIE_INDEX_B - 4 + i, 1, 1, 1);
     }
 
-    slots[0] = MakeMovieButton(w, panel, 0x21, 0x35, 0, kOnMoviePlay);
-    panel->focusedChild = slots[0];
+    /* Up to four movie buttons, one per unlocked movie on this page, each
+     * showing its pair; the first is always there and takes the focus. */
+    btn = new AM2_Button((const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                         (const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                         (const char *)(uintptr_t)ADDR_DIR_SCRATCH, 1,
+                         *RectSet(AM2_TEMP(AM2_Rect), 0x21, 0x35, 0x90, 0x90),
+                         kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
+    idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 0;
+    *(int32_t *)((uint8_t *)btn + MOVIE_BUTTON_OFF_INDEX)       = idx;
+    *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_NORMAL)  = spr[idx * 2 + 1];
+    *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_FOCUS)   = spr[idx * 2];
+    *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_PRESSED) = spr[idx * 2];
+    ((uint8_t *)btn)[BUTTON_OFF_OWNS_SPRITES] = 0;
+    ::WidgetAddChild(panel, btn);
+    panel->focusedChild = btn;
+    slots[0] = btn;
     slots[1] = (AM2_Widget *)0;
     slots[2] = (AM2_Widget *)0;
     slots[3] = (AM2_Widget *)0;
 
-    if (g_movieCount > 0)
-        slots[1] = MakeMovieButton(w, panel, 0xD5, 0x35, 1,
-                                   kOnMoviePlay);
-    if (g_movieCount > 1)
-        slots[2] = MakeMovieButton(w, panel, 0x21, 0xE9, 2,
-                                   kOnMoviePlay);
-    if (g_movieCount > 2)
-        slots[3] = MakeMovieButton(w, panel, 0xD5, 0xE9, 3,
-                                   kOnMoviePlay);
+    if (g_movieCount > 0) {
+        btn = new AM2_Button((const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                             (const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                             (const char *)(uintptr_t)ADDR_DIR_SCRATCH, 1,
+                             *RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0x35, 0x90, 0x90),
+                             kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
+        idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 1;
+        *(int32_t *)((uint8_t *)btn + MOVIE_BUTTON_OFF_INDEX)       = idx;
+        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_NORMAL)  = spr[idx * 2 + 1];
+        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_FOCUS)   = spr[idx * 2];
+        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_PRESSED) = spr[idx * 2];
+        ((uint8_t *)btn)[BUTTON_OFF_OWNS_SPRITES] = 0;
+        ::WidgetAddChild(panel, btn);
+        slots[1] = btn;
+    }
+    if (g_movieCount > 1) {
+        btn = new AM2_Button((const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                             (const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                             (const char *)(uintptr_t)ADDR_DIR_SCRATCH, 1,
+                             *RectSet(AM2_TEMP(AM2_Rect), 0x21, 0xE9, 0x90, 0x90),
+                             kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
+        idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 2;
+        *(int32_t *)((uint8_t *)btn + MOVIE_BUTTON_OFF_INDEX)       = idx;
+        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_NORMAL)  = spr[idx * 2 + 1];
+        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_FOCUS)   = spr[idx * 2];
+        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_PRESSED) = spr[idx * 2];
+        ((uint8_t *)btn)[BUTTON_OFF_OWNS_SPRITES] = 0;
+        ::WidgetAddChild(panel, btn);
+        slots[2] = btn;
+    }
+    if (g_movieCount > 2) {
+        btn = new AM2_Button((const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                             (const char *)(uintptr_t)ADDR_DIR_SCRATCH,
+                             (const char *)(uintptr_t)ADDR_DIR_SCRATCH, 1,
+                             *RectSet(AM2_TEMP(AM2_Rect), 0xD5, 0xE9, 0x90, 0x90),
+                             kOnMoviePlay, (void (__cdecl *)(AM2_Widget *))0);
+        idx = g_moviePage * AM2_MOVIE_PAGE_SIZE + 3;
+        *(int32_t *)((uint8_t *)btn + MOVIE_BUTTON_OFF_INDEX)       = idx;
+        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_NORMAL)  = spr[idx * 2 + 1];
+        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_FOCUS)   = spr[idx * 2];
+        *(AM2_Sprite **)((uint8_t *)btn + BUTTON_OFF_SPRITE_PRESSED) = spr[idx * 2];
+        ((uint8_t *)btn)[BUTTON_OFF_OWNS_SPRITES] = 0;
+        ::WidgetAddChild(panel, btn);
+        slots[3] = btn;
+    }
 
     ::WidgetAddChild(panel, new AM2_Button((const char *)(uintptr_t)AM2_BMP_BACK19_0, (const char *)(uintptr_t)AM2_BMP_BACK19_1,
                    (const char *)(uintptr_t)AM2_BMP_BACK19_2, 1,
