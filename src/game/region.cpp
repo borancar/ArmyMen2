@@ -1835,9 +1835,9 @@ int32_t __cdecl MarkOpenTile(uint16_t tile)
  * READING, and the clean A/B says only that nothing regressed. */
 int32_t __cdecl BoxAction(AM2_Rect area, void *out)
 {
-    uint8_t *rec = (uint8_t *)out;
-    int32_t *box = (int32_t *)(rec + TILEMASK_OFF_RECT);
-    uint8_t *cells = rec + TILEMASK_OFF_CELLS;
+    /* The output record is addressed from `out` at every use. */
+#define box   ((int32_t *)((uint8_t *)out + TILEMASK_OFF_RECT))
+#define cells ((uint8_t *)out + TILEMASK_OFF_CELLS)
     int32_t  l;
     int32_t  r;
     int32_t  t;
@@ -1859,13 +1859,13 @@ int32_t __cdecl BoxAction(AM2_Rect area, void *out)
               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
                   - AM2_TILEMASK_MARGIN);
 
-    box[2] = r + AM2_TILEMASK_MARGIN;   /* right, written before left */
-    box[3] = b + AM2_TILEMASK_MARGIN;   /* bottom */
+    box[3] = b + AM2_TILEMASK_MARGIN;   /* bottom, then right, then left */
+    box[2] = r + AM2_TILEMASK_MARGIN;
     box[0] = l - AM2_TILEMASK_MARGIN;
     box[1] = t - AM2_TILEMASK_MARGIN;
 
     memset(cells, AM2_TILEMASK_PAD_CELL,
-           (size_t)((box[2] - box[0] + 1) * (box[3] - box[1] + 1)));
+           (size_t)((box[3] - box[1] + 1) * (box[2] - box[0] + 1)));
 
     stride = box[2] - box[0] + 1;
     for (y = t; y <= b; y++) {
@@ -1874,6 +1874,8 @@ int32_t __cdecl BoxAction(AM2_Rect area, void *out)
         memset(cells + (y - box[1]) * stride - box[0] + l,
                AM2_TILEMASK_BOX_CELL, (size_t)(r - l + 1));
     }
+#undef box
+#undef cells
     return 1;
 }
 
@@ -10190,10 +10192,12 @@ void __cdecl Step3RouteAndBoard(void *obj, void *rec)
      * order swung its manually-aimed gun back to the hull -- the turret facing
      * (o+0x530) then diverged. (0x45d4d9 vs 0x45d51a.) */
     if (*(const uint16_t *)(o + 0xC0u) != 0) {
-        int32_t local;
+        /* The context AiRouteToward is handed and never reads: 0x44 bytes,
+         * the whole of the image's frame. */
+        uint8_t local[0x44];
 
         if (*(const int32_t *)(o + 0x10Cu) != 0) {
-            AiRouteToward(o, o + 0x578u, &local, 1);
+            AiRouteToward(o, o + 0x578u, local, 1);
 
             if (ApproxDist((const AM2_Point *)(o + 0x12u),
                            (const AM2_Point *)(o + 0xC0u)) < 0x30) {
@@ -10204,23 +10208,32 @@ void __cdecl Step3RouteAndBoard(void *obj, void *rec)
         } else {
             uint8_t a = AngleBetween((const AM2_Point *)(o + 0x12u),
                                      (const AM2_Point *)(o + 0xC0u));
-            int32_t d = AngleDelta(a, *(const uint8_t *)(o + OBJ_OFF_FACING));
+            int32_t d;
             int32_t dist;
 
             *r = a;
             *(int32_t *)(r + 0x08u) = 4;
-            if (d < 0)
-                d = -d;                       /* cdq; xor; sub */
+            d = abs(AngleDelta(a, *(const uint8_t *)(o + OBJ_OFF_FACING)));
             dist = ApproxDist((const AM2_Point *)(o + 0x12u),
                               (const AM2_Point *)(o + 0xC0u));
             if (*(const int32_t *)(o + 0x548u) == 0)
                 r[1] = r[0];
 
-            if (dist < 0x40 ? d >= 0x10
-                            : (dist < 0x60 ? d >= 0x20 : d >= 0x40)) {
-                *(int32_t *)(r + 0x10u) = 1;
-                *(int32_t *)(r + 0x14u) = 1;
+            /* Each distance band compares against its own limit and falls
+             * into one shared pair of stores. */
+            if (dist < 0x40) {
+                if (d < 0x10)
+                    goto banded;
+            } else if (dist < 0x60) {
+                if (d < 0x20)
+                    goto banded;
+            } else if (d < 0x40) {
+                goto banded;
             }
+            *(int32_t *)(r + 0x10u) = 1;
+            *(int32_t *)(r + 0x14u) = 1;
+        banded:
+            ;
         }
     }
 
