@@ -72,17 +72,9 @@ int32_t __cdecl IsScriptDelim(uint8_t c)
 
 int32_t __cdecl ScriptLookupToken(const char *word)
 {
-    for (int32_t i = 0; i < AM2_SCRIPT_TOKEN_COUNT; i++) {
-        const char *a = word;
-        const char *b = am2_script_tokens[i].name;
-
-        while (*a && *a == *b) {
-            a++;
-            b++;
-        }
-        if (*a == *b)
+    for (int32_t i = 0; i < AM2_SCRIPT_TOKEN_COUNT; i++)
+        if (strcmp(word, am2_script_tokens[i].name) == 0)
             return am2_script_tokens[i].id;
-    }
     return -1;
 }
 
@@ -314,17 +306,10 @@ int32_t __cdecl ScriptFindName(const char *name)
 {
     int32_t n = kScriptNameCount;
 
-    for (int32_t i = 0; i < n; i++) {
-        const char *a = kScriptNames[i].name;
-        const char *b = name;
-
-        while (*a && *a == *b) {
-            a++;
-            b++;
-        }
-        if (*a == *b)
+    /* strcmp, the intrinsic -- the two-bytes-a-step compare in the image. */
+    for (int32_t i = 0; i < n; i++)
+        if (strcmp(kScriptNames[i].name, name) == 0)
             return i;
-    }
     return -1;
 }
 
@@ -1305,22 +1290,15 @@ int32_t __cdecl ScriptNameUid(const char *name)
     int32_t n = kScriptNameCount;
 
     for (int32_t i = 0; i < n; i++) {
-        const char *a = kScriptNames[i].name;
-        const char *b = name;
-        while (*a && *a == *b) {
-            a++;
-            b++;
-        }
-        if (*a != *b)
-            continue;
-
-        if (kScriptNames[i].type != AM2_NAME_TYPE_OBJECT) {
+        if (strcmp(kScriptNames[i].name, name) == 0) {
+            if (kScriptNames[i].type == AM2_NAME_TYPE_OBJECT) {
+                kScriptNames[i].refs++;
+                return kScriptNames[i].value;
+            }
             am2_log("Duplicate name '%s' used for different types\n",
                     kScriptNames[i].name);
             return 0;
         }
-        kScriptNames[i].refs++;
-        return kScriptNames[i].value;
     }
 
     /* Declaring it fresh does NOT bump the count -- it is left at the 1 that

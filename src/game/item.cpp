@@ -8514,26 +8514,25 @@ int32_t __cdecl ObjOverlayY(const void *obj)
 {
     const uint8_t   *o = (const uint8_t *)obj;
     const uint8_t   *row;
-    const AM2_Anim  *anim;
     int32_t          dir;
-    int32_t          sprite;
 
     if (!o)
         return 0;
     if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) < 1)
         return 0;
 
-    row  = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
-    anim = *(const AM2_Anim *const *)(row + ROW_OFF_ANIM_PLAYING);
-    if (!anim)
+    /* The animation is re-read from the row after the call. */
+    row = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
+#define ANIM (*(const AM2_Anim *const *)(row + ROW_OFF_ANIM_PLAYING))
+    if (!ANIM)
         return 0;
 
-    dir    = RoundTo8(*(const uint8_t *)(o + OBJ_OFF_FACING),
-                      anim->directionBits) & 0xFF;
-    sprite = anim->cells[dir].sprite;
+    dir = RoundTo8(*(const uint8_t *)(o + OBJ_OFF_FACING),
+                   ANIM->directionBits) & 0xFF;
 
     return -(int32_t)*(const int16_t *)
-        ((const uint8_t *)kSpriteList[sprite] + SPR_OFF_OVY);
+        ((const uint8_t *)kSpriteList[ANIM->cells[dir].sprite] + SPR_OFF_OVY);
+#undef ANIM
 }
 
 /* SlotBandHeading -- original 0x00456E20, one caller.
@@ -8542,11 +8541,14 @@ int32_t __cdecl ObjOverlayY(const void *obj)
  * three BANDS it falls in, its index WITHIN that band, and a heading byte off
  * ADDR_SLOT_HEADINGS. Four arguments, three of them out-pointers.
  *
- * The bands are 2, 3 and 4 for slot <= 24, <= 56 and above, and each has its
- * own base -- 9, 25 and 57. The index is `base + (slot - base) / 2`, so two
- * consecutive slots share an index and the pair is told apart by the third
- * output: EVEN adds 16 to the table byte and ODD subtracts 16. That is a
- * heading, and the two members of a pair face 32 apart.
+ * The bands are 2, 3 and 4 for slot <= 24, <= 56 and above. The index is
+ * `(slot - 25) / 2 + 25` and `(slot - 57) / 2 + 57` for the upper two, but
+ * `(slot - 9) / 2 + 1` for the first -- base 9 inside the division and 1
+ * outside it, so band 2 lands on indices 1..8 of the table and not 9..16.
+ * (Ours read `9 + (slot - 9) / 2` until the byte comparison showed the `inc`.)
+ * Two consecutive slots share an index and the pair is told apart by the
+ * third output: EVEN adds 16 to the table byte and ODD subtracts 16. That is
+ * a heading, and the two members of a pair face 32 apart.
  *
  * `*band = 0` FIRST, THEN OVERWRITTEN ON EVERY PATH. There is no arm that
  * leaves it at zero, so the initial store is dead -- reproduced because it is
@@ -8565,28 +8567,28 @@ int32_t __cdecl ObjOverlayY(const void *obj)
 void __cdecl SlotBandHeading(int32_t slot, int32_t *band, int32_t *index,
                              uint8_t *heading)
 {
-    int32_t base;
     int32_t i;
-    uint8_t h;
 
     *band = 0;
 
     if (slot <= 24) {
         *band = 2;
-        base  = 9;
+        i = (slot - 9) / 2 + 1;
     } else if (slot <= 56) {
         *band = 3;
-        base  = 25;
+        i = (slot - 25) / 2 + 25;
     } else {
         *band = 4;
-        base  = 57;
+        i = (slot - 57) / 2 + 57;
     }
-
-    i = base + (slot - base) / 2;
     *index = i;
 
-    h = ((const uint8_t *)(uintptr_t)ADDR_SLOT_HEADINGS)[i];
-    *heading = (uint8_t)((slot & 1) ? h - 0x10 : h + 0x10);
+    /* The table byte is stored, then stored again adjusted. */
+    *heading = ((const uint8_t *)(uintptr_t)ADDR_SLOT_HEADINGS)[*index];
+    if (slot & 1)
+        *heading -= 0x10;
+    else
+        *heading += 0x10;
 }
 
 /* SelectBestWeapon -- original 0x004069B0, one caller.

@@ -1941,20 +1941,23 @@ void __cdecl SeqEvict(void *ctxv)
            - *(const int32_t *)(ctx + SEQ_CTX_OFF_MARGIN))
         return;
 
+    /* The record is addressed afresh at each use, and the walk is a
+     * do-while: the head's first link is taken without a test. */
     i = *(int16_t *)(SeqRecord(ctx, 0) + SEQ_OFF_NEXT);
-    while (i > 0 && left > 0) {
-        uint8_t *rec = SeqRecord(ctx, i);
-        uint8_t  scratch[16];
+    do {
+        uint8_t scratch[16];
 
         if (!orig_intersect_rect(scratch,
                                  (const void *)(uintptr_t)ADDR_VIEW_ORIGIN_X,
-                                 *(uint8_t **)(rec + SEQ_OFF_ROW) + ROW_OFF_RECT)) {
-            i = SeqRetire(ctx, rec);
-            left--;
-            continue;
+                                 *(uint8_t **)(SeqRecord(ctx, i) + SEQ_OFF_ROW)
+                                     + ROW_OFF_RECT)) {
+            i = SeqRetire(ctx, SeqRecord(ctx, i));
+            if (--left <= 0)
+                break;
+        } else {
+            i = *(int16_t *)(SeqRecord(ctx, i) + SEQ_OFF_NEXT);
         }
-        i = *(int16_t *)(rec + SEQ_OFF_NEXT);
-    }
+    } while (i > 0);
 
     i = *(int16_t *)(SeqRecord(ctx, 0) + SEQ_OFF_NEXT);
     while (left > 0) {
