@@ -17016,7 +17016,7 @@ void __cdecl PointerActionMode4(void *target, uint32_t at)
         *(int32_t *)(o + OBJ_OFF_AI_MODE) = 0;
 
         if (tgt
-            && !ArmyAlliedWithObj(
+            && !ArmyAlliedWithObjInline(
                    *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER, tgt, 0)) {
             *(int32_t *)(o + OBJ_OFF_AI_MODE)  = 3;
             *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
@@ -17086,7 +17086,7 @@ void __cdecl PointerActionMode5(void *target, uint32_t at)
         return;
 
     if (tgt
-        && !ArmyAlliedWithObj(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+        && !ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
                               tgt, 0)) {
         PointerActionMode4(tgt, at);   /* an enemy: mode 4's job */
         return;
@@ -17633,7 +17633,7 @@ int32_t __cdecl PointerPickMode4(void *obj)
     if (*(const int8_t *)(o + OBJ_OFF_ARMY) == AM2_ARMY_NEUTRAL)
         return 0;   /* hoisted above the alliance test -- see above */
 
-    if (ArmyAlliedWithObj(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+    if (ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
                           o, 0))
         return PointerFriendTail(o);
 
@@ -17655,7 +17655,7 @@ int32_t __cdecl PointerPickMode5(void *obj)
 
     /* No hoisted refusal: a neutral object reaches the alliance test, which
      * answers ALLIED for army 4. That is the whole difference from mode 4. */
-    if (ArmyAlliedWithObj(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+    if (ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
                           o, 0))
         return PointerFriendTail(o);
 
@@ -17839,7 +17839,7 @@ int32_t __cdecl PointerPickHeal(void *obj)
         && GetMenuRow() != AM2_MENU_ROW_HEAL)
         return 0;
 
-    if (!ArmyAlliedWithObj(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+    if (!ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
                            o, 0))
         return 0;
 
@@ -17909,7 +17909,7 @@ int32_t __cdecl PointerPickRepair(void *obj)
 
     if (*(const int8_t *)(o + OBJ_OFF_ARMY) == AM2_ARMY_NEUTRAL)
         return 0;
-    if (!ArmyAlliedWithObj(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+    if (!ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
                            o, 0))
         return 0;
 
@@ -17989,7 +17989,7 @@ int32_t __cdecl PointerPickEnemyTrooper(void *obj)
         return 0;
 
     /* Allied -- including either side being army 4 -- means no. */
-    if (ArmyAlliedWithObj(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+    if (ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
                           o, 0))
         return 0;
 

@@ -613,40 +613,31 @@ void __cdecl DefCheckLinks(void)
  * A duplicate is complained about and DROPPED; the count does not advance. */
 void __cdecl DefAddLink(const AM2_DefLink *link)
 {
-    AM2_DefLink *tab = kDefLinks;
-    int32_t      cap;
-    int32_t      n;
+    /* The globals are read in place, the table and count again after each
+     * compare -- DefAddObjRec's shape. */
+    int32_t i;
 
-    if (tab == (AM2_DefLink *)0) {
-        tab = (AM2_DefLink *)am2_malloc(AM2_DEF_LINK_INITIAL
-                                        * sizeof(AM2_DefLink));
-        cap = AM2_DEF_LINK_INITIAL;
-        kDefLinks   = tab;
-        kDefLinkCap = cap;
-    } else {
-        cap = kDefLinkCap;
+    if (!kDefLinks) {
+        kDefLinks   = (AM2_DefLink *)am2_malloc(AM2_DEF_LINK_INITIAL
+                                                * sizeof(AM2_DefLink));
+        kDefLinkCap = AM2_DEF_LINK_INITIAL;
     }
 
-    n = kDefLinkCount;
-
-    if (n >= cap) {
-        cap += AM2_DEF_LINK_GROW;
-        kDefLinkCap = cap;
-        tab = (AM2_DefLink *)am2_realloc(tab,
-                                         (size_t)cap * sizeof(AM2_DefLink));
-        kDefLinks = tab;
-        n = kDefLinkCount;
+    if (kDefLinkCount >= kDefLinkCap) {
+        kDefLinkCap += AM2_DEF_LINK_GROW;
+        kDefLinks = (AM2_DefLink *)am2_realloc(
+            kDefLinks, (size_t)kDefLinkCap * sizeof(AM2_DefLink));
     }
 
-    for (int32_t i = 0; i < n; i++) {
-        if (ComparePair(&tab[i], link) == 0) {
+    for (i = 0; i < kDefLinkCount; i++) {
+        if (ComparePair(&kDefLinks[i], link) == 0) {
             orig_log("duplicate link record in object.aai file\n");
             return;
         }
     }
 
-    tab[n] = *link;
-    kDefLinkCount = n + 1;
+    kDefLinks[kDefLinkCount] = *link;
+    kDefLinkCount++;
 }
 
 /* 0x00436080. Find a link by (parent, siblings) -- a bsearch over the table

@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1200 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1201 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1200:
+  the near-miss sweep, 758 before the row pools. From 758 to 1201:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -169,6 +169,11 @@ main result so far (details in `src/vc6/README.md`):
     ScriptParseNumber compares plain (signed) chars and recomputes strlen
     each pass; ScriptRunLine zeroes its context with a memset (the zero in
     a register for the struct, an immediate for the other local).
+  - **The pointer-pick functions have ArmyAlliedWithObj written in**
+    (`ArmyAlliedWithObjInline`, army.h): six of them moved a long way
+    toward the image -- PointerActionMode5 from 123 edits to 20. What they
+    still lack is the image's separate epilogue at every `return 0`, where
+    VC6 merges ours; PointerPickMode0 is worse inlined and keeps the call.
   - **Signed loop tests mean an index**: a `jl` against a strength-reduced
     cursor is an `int32_t i` loop (OptionsApply, AimMarkerAge), a pointer
     walk gives `jb`. The cursor's bias is the field the body reads first.
