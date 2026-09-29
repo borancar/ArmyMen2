@@ -2587,7 +2587,9 @@ void __cdecl SeqAddKind5(const int32_t *at, int32_t owner, int32_t life)
     *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
     *(int32_t *)(seq + SEQ_OFF_FIELD_0C) = 0;
     *(int32_t *)(seq + SEQ_OFF_FIELD_10) = 0;
-    *(int32_t *)(seq + SEQ_OFF_LIFE)     = life > 0 ? life : AM2_SEQ_LIFE5;
+    *(int32_t *)(seq + SEQ_OFF_LIFE)     = AM2_SEQ_LIFE5;
+    if (life > 0)
+        *(int32_t *)(seq + SEQ_OFF_LIFE) = life;
     *(int32_t *)(seq + SEQ_OFF_GATE)     = 1;
 
     row = *(uint8_t **)(seq + SEQ_OFF_ROW);

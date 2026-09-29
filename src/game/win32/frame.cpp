@@ -1460,15 +1460,13 @@ void __cdecl Substate22(void)
  * paths. */
 void __cdecl ShowMpResult(int32_t result)
 {
-    void *comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
-
     UnPauseGame(AM2_MP_RESULT_UNPAUSE);
     SetGameDir("bitmaps");
     SetDrawTarget(g_primarySurface);
 
     PausedFrameStep();
-    CommReportStats(comm);
-    CommPublishResult(comm);
+    CommReportStats(*(void **)(uintptr_t)ADDR_COMM_OBJECT);
+    CommPublishResult(*(void **)(uintptr_t)ADDR_COMM_OBJECT);
 
     if (result == AM2_MP_RESULT_WON) {
         FreeBitmap(&g_currentBitmap);
@@ -1488,7 +1486,7 @@ void __cdecl ShowMpResult(int32_t result)
     *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
 
     orig_log_noargs();
-    CommReopenSession(comm);
+    CommReopenSession(*(void **)(uintptr_t)ADDR_COMM_OBJECT);
 }
 
 

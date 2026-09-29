@@ -927,21 +927,20 @@ void __cdecl FreeSpriteList(void)
 {
     int32_t i;
 
-    /* No array: the count and the capacity are cleared anyway. */
-    if (!g_spriteList) {
+    if (g_spriteList) {
+        /* The count is re-read every iteration, not held. */
+        for (i = 0; i < g_spriteListN; i++)
+            ReleaseSprite(g_spriteList[i]);
+
+        am2_free(g_spriteList);
+        g_spriteList    = (AM2_Sprite **)0;
         g_spriteListN   = 0;
         g_spriteListCap = 0;
-        return;
+    } else {
+        /* No array: the count and the capacity are cleared anyway. */
+        g_spriteListN   = 0;
+        g_spriteListCap = 0;
     }
-
-    /* The count is re-read every iteration, not held. */
-    for (i = 0; i < g_spriteListN; i++)
-        ReleaseSprite(g_spriteList[i]);
-
-    am2_free(g_spriteList);
-    g_spriteList    = (AM2_Sprite **)0;
-    g_spriteListN   = 0;
-    g_spriteListCap = 0;
 }
 
 void __cdecl GrowSpriteList(void)

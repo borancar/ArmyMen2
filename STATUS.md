@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 890 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 896 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 890:
+  the near-miss sweep, 758 before the row pools. From 758 to 896:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -138,6 +138,10 @@ main result so far (details in `src/vc6/README.md`):
     `night of the walking dead` cheat) walks the list that
     ADDR_ARMY_OBJ_LISTS[1] points to, where ours read the pointer array
     as the list. The rest of that scan was layout and operand order.
+  - **InitInput's buffer clears are swapped memsets** --
+    `memset(buf, 0x100, 0)`, so nothing is cleared; VC6 drops the `rep
+    stos` and keeps the setup, which is the "unused registers" the image
+    shows. Reproduced.
   - **Parked**: the five copy-protection call sites (OnStartWar and four
     more) cannot match while the reference keeps GOG's `jmp`s -- a policy
     question, not a source one; MultiSpritePaint and OverlayPrepare

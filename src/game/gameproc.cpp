@@ -1169,7 +1169,6 @@ void __cdecl ResetLevelState(void)
 {
     int32_t  *matrix = (int32_t *)(uintptr_t)ADDR_ALLY_MATRIX;
     uint8_t  *comm;
-    int32_t   interval;
     int32_t   i, j;
 
     *(int32_t *)(uintptr_t)ADDR_LEVEL_FLAG_E30 = 1;
@@ -1188,13 +1187,13 @@ void __cdecl ResetLevelState(void)
     *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_PREV  = 0;
     *(int32_t *)(uintptr_t)ADDR_EVT_ID15_FLAG     = 0;
 
-    interval = *(const int32_t *)(uintptr_t)ADDR_DIFFICULTY * AM2_TICK_PER_STEP
-               + AM2_TICK_BASE_MS;
+    *(int32_t *)(uintptr_t)ADDR_TICK_INTERVAL_MS =
+        *(const int32_t *)(uintptr_t)ADDR_DIFFICULTY * AM2_TICK_PER_STEP
+        + AM2_TICK_BASE_MS;
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0)
-        interval = AM2_TICK_NET_MS;
-
-    *(int32_t *)(uintptr_t)ADDR_TICK_INTERVAL_MS = interval;
-    *(int32_t *)(uintptr_t)ADDR_SECOND_DEADLINE  = interval;
+        *(int32_t *)(uintptr_t)ADDR_TICK_INTERVAL_MS = AM2_TICK_NET_MS;
+    *(int32_t *)(uintptr_t)ADDR_SECOND_DEADLINE =
+        *(const int32_t *)(uintptr_t)ADDR_TICK_INTERVAL_MS;
 
     *(int32_t *)(uintptr_t)ADDR_OUR_LEADER_UID   = 0;
     *(int32_t *)(uintptr_t)ADDR_WEAPON_OWNER_ID  = 0;

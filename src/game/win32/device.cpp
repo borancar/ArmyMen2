@@ -321,13 +321,24 @@ int32_t __cdecl InitInput(HWND hWnd)
 
     /* Rewind the two input cursors to the starts of their buffers.
      *
-     * The original also loads 0x005125C8, 0x00512BD0, 0x100 and 0x400 into
-     * registers here and never uses them -- the leftovers of two cleared
-     * buffers, with the clearing itself gone. edi is restored and eax and ecx
-     * are dead on return, so the register writes are provably unobservable and
-     * only these two stores are kept. */
-    *(uint32_t *)(uintptr_t)ADDR_KEYS_NOW_PTR = ADDR_KEYS_BUFFER_A;
+     * The three clears have memset's last two arguments SWAPPED -- a fill of
+     * 0x100 (or 0x400) over zero bytes -- so nothing is cleared. That is why
+     * the image loads the buffers and sizes into edi and eax and then stores
+     * nothing: with a zero count VC6 drops the `rep stos` and keeps the setup.
+     * Reproduced, since it is the original's behaviour and harmless (the
+     * buffers are .bss, already zero). */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmemset-transposed-args"
+#endif
+    memset((void *)(uintptr_t)ADDR_KEYS_BUFFER_A, 0x100, 0);
+    memset((void *)(uintptr_t)ADDR_KEYS_BUFFER_B, 0x100, 0);
     *(uint32_t *)(uintptr_t)ADDR_KEYS_PREV_PTR = ADDR_KEYS_BUFFER_B;
+    memset((void *)(uintptr_t)ADDR_KEY_PRESSED, 0x400, 0);
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+    *(uint32_t *)(uintptr_t)ADDR_KEYS_NOW_PTR = ADDR_KEYS_BUFFER_A;
     return 1;
 }
 

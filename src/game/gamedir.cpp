@@ -101,7 +101,9 @@ int32_t __cdecl FileHasSaveTag(const char *path)
     orig_fread(&tag, 4, 1, fp);
     orig_fclose(fp);
 
-    return tag == AM2_SAVETAG_GAMEPROC || tag == AM2_SAVETAG_ALT;
+    if (tag == AM2_SAVETAG_GAMEPROC)
+        return 1;
+    return tag == AM2_SAVETAG_ALT;
 }
 
 int gamedir_install(void)

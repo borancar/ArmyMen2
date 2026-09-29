@@ -1687,12 +1687,11 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommJoinSession(const void *instance
         return 0;
 
     {
-        uint8_t          *shared = g_commObject;
         LPDPSESSIONDESC2  sd =
-            *(LPDPSESSIONDESC2 *)(shared + COMM_OFF_SESSION_DESC);
+            *(LPDPSESSIONDESC2 *)(g_commObject + COMM_OFF_SESSION_DESC);
 
         if (sd->dwUser1 == 0)
-            comm_u32(shared, COMM_OFF_PLAYERS + g_ourSlot * COMM_PLAYER_STRIDE + 4)
+            comm_u32(g_commObject, COMM_OFF_PLAYERS + g_ourSlot * COMM_PLAYER_STRIDE + 4)
                 = sd->dwCurrentPlayers;
     }
     return 1;

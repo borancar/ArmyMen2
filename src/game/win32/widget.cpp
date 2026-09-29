@@ -15289,16 +15289,15 @@ void __attribute__((thiscall)) AM2_Widget::WidgetUpdateCancel()
 {
     AM2_Widget *w = this;
 
-    AM2_CancelFn cancel =
-        *(AM2_CancelFn *)((uint8_t *)w + WIDGET_OFF_CANCEL);
-
-    if (cancel
+#define CANCEL (*(AM2_CancelFn *)((uint8_t *)w + WIDGET_OFF_CANCEL))
+    if (CANCEL
         && !IsKeyDown(AM2_DIK_ESCAPE)
         && KeyChanged(AM2_DIK_ESCAPE)) {
         ConsumeKey(AM2_DIK_ESCAPE);
-        cancel(w);
+        CANCEL(w);           /* the field read again, as the original */
         return;
     }
+#undef CANCEL
     ::WidgetUpdate(w);
 }
 
