@@ -2770,18 +2770,16 @@ am2_FILE *__cdecl OpenSaveForLoad(void)
 
     fp = orig_fopen((const char *)(uintptr_t)ADDR_GAMEPROC_STR_B,
                     "rb");
-    if (!fp)
-        return fp;
-
-    if (!CheckSaveTag(fp, AM2_SAVETAG_GAMEPROC,
-                      "C:\\ArmyMen2\\source\\gameproc.cpp",
-                      AM2_GAMEPROC_TAG_LINE)
-        || !LoadGameProcSection(fp)) {
-        orig_fclose(fp);
-        return (am2_FILE *)0;
+    if (fp) {
+        if (!CheckSaveTag(fp, AM2_SAVETAG_GAMEPROC,
+                          "C:\\ArmyMen2\\source\\gameproc.cpp",
+                          AM2_GAMEPROC_TAG_LINE)
+            || !LoadGameProcSection(fp)) {
+            orig_fclose(fp);
+            return (am2_FILE *)0;
+        }
+        orig_fseek(fp, 0, 0);
     }
-
-    orig_fseek(fp, 0, 0);
     return fp;
 }
 

@@ -1795,7 +1795,6 @@ void __cdecl EvtRuleA(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
                       int32_t a5, int32_t a6, int32_t a7, int32_t a8)
 {
     uint8_t *obj;
-    uint32_t at;
 
     (void)a1; (void)a2; (void)a4; (void)a5; (void)a6; (void)a7; (void)a8;
 
@@ -1805,18 +1804,19 @@ void __cdecl EvtRuleA(int32_t a1, int32_t a2, uint32_t uid, int32_t a4,
 
     if (ObjIsType2((const AM2_Object *)obj)
         && *(const int32_t *)(obj + OBJ_OFF_FIELD_94)) {
-        at = *(const uint32_t *)(obj + OBJ_OFF_SPAWN_AT);
         /* SIGNED: the original is `cmp eax,0xf; jge` at 0x004222C0, not jae.
          * Left unsigned, the int32_t promotes and a negative weight would
          * read as huge and take the opposite branch. */
-        if (BlockWeightAt((void *)0, at, at) >= (int32_t)AM2_CELL_WEIGHT_STEP)
+        if (BlockWeightAt((void *)0,
+                          *(const AM2_Point *)(obj + OBJ_OFF_SPAWN_AT),
+                          *(const AM2_Point *)(obj + OBJ_OFF_SPAWN_AT))
+            >= (int32_t)AM2_CELL_WEIGHT_STEP)
             return;
     }
 
-    at = *(const uint32_t *)(obj + OBJ_OFF_SPAWN_AT);
     *(uint8_t *)(obj + OBJ_OFF_FACING) =
         *(const uint8_t *)(obj + OBJ_OFF_SPAWN_FACING);
-    DeployItem(obj, at, 1, 0);
+    DeployItem(obj, *(const uint32_t *)(obj + OBJ_OFF_SPAWN_AT), 1, 0);
 
     if (*(const int8_t *)(obj + OBJ_OFF_ARMY)
         == *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)

@@ -322,8 +322,11 @@ int32_t __cdecl TileAttrAt(uint32_t tile);
 
 /* 0x00448F00. The total obstruction between `from` and the map point `at`:
  * the objects standing there, the tile's own blocking bit, and a height step.
- * `ref` is the reference point ObjBlockWeight compares distances against. */
-int32_t __cdecl BlockWeightAt(void *from, uint32_t at, uint32_t ref);
+ * `ref` is the reference point ObjBlockWeight compares distances against.
+ * Both points are passed BY VALUE: callers copy the one point into two
+ * registers, `mov ecx,eax; push eax; push ecx`, which is VC6 copying two
+ * struct arguments. */
+int32_t __cdecl BlockWeightAt(void *from, AM2_Point at, AM2_Point ref);
 
 /* 0x00448FB0, three call sites, all in ADDR_AI_44AFB0. The SIXTH variant:
  * the walk inlined, WITH BlockWeightAt's height step, no trooper arm, a

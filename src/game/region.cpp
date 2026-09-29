@@ -553,7 +553,7 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
     int32_t        hops;
     int32_t        at;
 
-    if (to == from)
+    if (from == to)
         return 0;
 
     stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
@@ -580,14 +580,15 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
     next = *(const uint8_t *const *)((void *)(uintptr_t)(ADDR_REGION_NEXT));
     hops = 0;
 
-    do {
+    while (1) {
         hops++;
-        if (at == 0)
-            return -1;
+        if (!at)
+            break;
         at = next[stride * at + to];
-    } while (at != to);
-    return hops;
-}
+        if (at == to)
+            return hops;
+    }
+    return -1;}
 
 /* 0x004066B0, two callers. Whether two objects are in the same region or in
  * neighbouring ones.

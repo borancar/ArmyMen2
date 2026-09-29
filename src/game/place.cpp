@@ -492,7 +492,8 @@ int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
     switch ((uint32_t)type) {
     /* The five soldiers, and the mine. */
     case 0: case 1: case 2: case 3: case 4: case 17:
-        weight = BlockWeightAt((void *)0, where, where);
+        weight = BlockWeightAt((void *)0, *(const AM2_Point *)&where,
+                               *(const AM2_Point *)&where);
         break;
 
     /* The five vehicles, each passing its record's own kind. */

@@ -1850,22 +1850,24 @@ void *__cdecl ObjectsHitByPoint(const uint32_t *pt, const void *desc)
  * the tile arm and the height arm are compared by the A/B, the object loop is
  * not entered at all, and the vacuous guard is unreachable by construction.
  */
-int32_t __cdecl BlockWeightAt(void *from, uint32_t at, uint32_t ref)
+int32_t __cdecl BlockWeightAt(void *from, AM2_Point at, AM2_Point ref)
 {
     uint8_t *o;
     int32_t  total = 0;
     uint32_t tile;
 
     o = (uint8_t *)ObjectsAtPoint(
-            &at, (void *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC)));
+            (const uint32_t *)&at,
+            (void *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC)));
 
     for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
-        total += ObjBlockWeight(from, o, (int32_t)at, ref);
+        total += ObjBlockWeight(from, o, *(const int32_t *)&at,
+                                *(const uint32_t *)&ref);
         if (total >= AM2_BLOCK_FULL)
             return total;
     }
 
-    tile = (uint32_t)TileOfPoint(at) & 0xFFFFu;
+    tile = (uint32_t)TileOfPoint(*(const uint32_t *)&at) & 0xFFFFu;
     /* The original's range check, kept and vacuous; see above. */
     if ((int32_t)tile < 0 || (int32_t)tile > 0xFFFF)
         return 0xFF;
@@ -4882,7 +4884,10 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src)
     uint8_t *o = (uint8_t *)obj;
     int16_t  maxHp;
     int16_t  hp;
+    int16_t  next;
 
+#define HEALTH (*(int16_t *)(o + OBJ_OFF_HEALTH))
+#define MAXHP  (*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH))
     if (!obj)
         return;
 
@@ -4891,37 +4896,37 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src)
     else if (pct < 0)
         pct = 0;
 
-    maxHp = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-
+    /* The item arm reads the maximum at each use; the trooper arm holds the
+     * health and then the maximum, in that order. */
     if (ObjIsItem((const AM2_Object *)obj)) {
         if (*(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME) > 0) {
             ChangeObjectFrame(obj, 0, 0);
-            *(int16_t *)(o + OBJ_OFF_HEALTH) = maxHp;
+            HEALTH = MAXHP;
             NotifyHealed(obj, src);
             return;
         }
 
-        hp = *(const int16_t *)(o + OBJ_OFF_HEALTH);
-        if (hp <= 0 || hp >= maxHp)
+        hp = HEALTH;
+        if (hp <= 0 || hp >= MAXHP)
             return;
 
-        *(int16_t *)(o + OBJ_OFF_HEALTH) = maxHp;
+        HEALTH = MAXHP;
         NotifyHealed(obj, src);
         return;
     }
 
-    hp = *(const int16_t *)(o + OBJ_OFF_HEALTH);
+    hp = HEALTH;
     if (hp <= 0)
         return;
 
-    {
-        int16_t next = (int16_t)(((int32_t)maxHp * pct) / 100 + hp);
-
-        *(int16_t *)(o + OBJ_OFF_HEALTH) = next;
-        if (next > maxHp)
-            *(int16_t *)(o + OBJ_OFF_HEALTH) = maxHp;
-    }
+    maxHp = MAXHP;
+    next  = (int16_t)((int32_t)maxHp * pct / 100 + hp);
+    HEALTH = next;
+    if (next > maxHp)
+        HEALTH = maxHp;
     NotifyHealed(obj, src);
+#undef HEALTH
+#undef MAXHP
 }
 
 typedef void (__cdecl *AM2_DamageTypeFn)(void *obj, int32_t amount,
@@ -10345,8 +10350,7 @@ void __cdecl NearestClearPoint(uint32_t from, void *outPt)
         const uint8_t *entry;
 
         if (PointInRect((const AM2_Rect *)((void *)(uintptr_t)(ADDR_MAP_BOUNDS_LEFT)), out)
-            && BlockWeightAt((void *)0, *(const uint32_t *)out,
-                             *(const uint32_t *)out) < AM2_BLOCK_CLEAR)
+            && BlockWeightAt((void *)0, *out, *out) < AM2_BLOCK_CLEAR)
             return;
 
         if (++step >= leg) {
