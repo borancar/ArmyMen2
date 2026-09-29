@@ -871,37 +871,47 @@ void __cdecl DrawSprite(AM2_Sprite *spr, int32_t x, int32_t y,
 void __cdecl RemapSpriteRuns(void *img, int32_t unused, const uint8_t *table,
                              int32_t from)
 {
-    const uint8_t *hdr = (const uint8_t *)img;
-    uint32_t       width;
-    uint32_t       height;
+    uint8_t        scratch;
+    uint16_t       width;
+    uint16_t       height;
+    int32_t        rows;
+    int32_t        cols;
     uint8_t       *p;
 
     (void)unused;   /* pushed by the call site, read by nothing here. */
 
+    /* Each run-header byte goes through `scratch`, which VC6 keeps in a
+     * stack slot, and is widened from there. */
+
     if (!table)
         return;
 
-    height = *(const uint16_t *)(hdr + 2);
-    width  = *(const uint16_t *)(hdr + 0);
+    p      = (uint8_t *)img;
+    height = *(const uint16_t *)(p + 2);
+    width  = *(const uint16_t *)(p + 0);
 
     /* Four bytes of header and then one uint16 per row. */
-    p = (uint8_t *)img + 4 + height * 2;
+    p += 4 + height * 2;
 
     /* The HEIGHT is what is tested, not the width. */
-    if ((int32_t)height <= 0)
+    rows = height;
+    if (rows <= 0)
         return;
 
+    cols = width;
     do {
         int32_t covered = 0;
 
         /* The width is tested once, before the row rather than inside it --
          * it cannot change, and the original checks it exactly here. */
-        if ((int32_t)width > 0) {
+        if (cols > 0) {
             do {
-                int32_t skip = *p++;
-                int32_t run  = *p++;
+                int32_t run;
 
-                covered += skip;
+                scratch = *p++;
+                covered += scratch;
+                scratch = *p++;
+                run = scratch;
                 covered += run;
 
                 for (; run > 0; run--, p++) {
@@ -911,9 +921,9 @@ void __cdecl RemapSpriteRuns(void *img, int32_t unused, const uint8_t *table,
                     if (v >= from)
                         *p = table[v];
                 }
-            } while (covered < (int32_t)width);
+            } while (covered < cols);
         }
-    } while (--height);
+    } while (--rows);
 }
 
 void __cdecl FreeSpriteList(void)

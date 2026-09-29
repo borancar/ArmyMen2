@@ -100,16 +100,34 @@ void __cdecl ScriptAddToken(AM2_ScriptCtx *ctx, int32_t kind,
     if (ctx->count >= ctx->capacity)
         ScriptGrowTokens(ctx);
 
-    AM2_ScriptTok *tok = &ctx->tokens[ctx->count];
-    tok->kind = kind;
-    tok->line = line;
+    /* The new token is re-indexed for every store. */
+    ctx->tokens[ctx->count].kind = kind;
+    ctx->tokens[ctx->count].line = line;
 
-    if (kind == AM2_TOKEN_STRING) {
-        size_t len = strlen((const char *)value) + 1;
-        tok->value = am2_malloc(len);
-        memcpy(tok->value, value, len);
-    } else if (kind >= AM2_TOKEN_CONTROL_CHAR && kind <= AM2_TOKEN_FLOAT) {
-        tok->value = (void *)(uintptr_t)*(const uint32_t *)value;
+    switch (kind) {
+    /* Four identical arms, written apart: VC6 folds shared labels into a
+     * range test, and the image has the jump table. */
+    case AM2_TOKEN_CONTROL_CHAR:
+        ctx->tokens[ctx->count].value =
+            (void *)(uintptr_t)*(const uint32_t *)value;
+        break;
+    case AM2_TOKEN_RESERVED:
+        ctx->tokens[ctx->count].value =
+            (void *)(uintptr_t)*(const uint32_t *)value;
+        break;
+    case AM2_TOKEN_INTEGER:
+        ctx->tokens[ctx->count].value =
+            (void *)(uintptr_t)*(const uint32_t *)value;
+        break;
+    case AM2_TOKEN_FLOAT:
+        ctx->tokens[ctx->count].value =
+            (void *)(uintptr_t)*(const uint32_t *)value;
+        break;
+    case AM2_TOKEN_STRING:
+        ctx->tokens[ctx->count].value =
+            am2_malloc(strlen((const char *)value) + 1);
+        strcpy((char *)ctx->tokens[ctx->count].value, (const char *)value);
+        break;
     }
     /* Kind 0 and kind 6 fall through with the value field left alone. */
 
@@ -788,7 +806,16 @@ int32_t __cdecl ScriptVariable(AM2_ScriptCtx *ctx, int32_t *at)
 }
 
 
-static void ScriptAddEvent(AM2_ScriptCond *c, int32_t a, int32_t b, int32_t d)
+/* True when the token at *at is Reserved with this id. */
+static inline int ScriptAtWord(const AM2_ScriptCtx *ctx, int32_t at, int32_t id)
+{
+    const AM2_ScriptTok *t = &ctx->tokens[at];
+    return t->kind == AM2_TOKEN_RESERVED &&
+           (int32_t)(uintptr_t)t->value == id;
+}
+
+/* Inline: the image has this body at each call site. */
+static inline void ScriptAddEvent(AM2_ScriptCond *c, int32_t a, int32_t b, int32_t d)
 {
     int32_t n = c->nevents++;
     c->events = (AM2_ScriptEvent *)am2_realloc(
@@ -865,10 +892,11 @@ int32_t __cdecl ScriptParseEvents(AM2_ScriptCtx *ctx, int32_t *at,
 {
     for (;;) {
         int32_t k = ctx->tokens[*at].kind;
+        int32_t a, b, c;
+
         if (k != AM2_TOKEN_STRING && k != AM2_TOKEN_RESERVED)
             return 1;
 
-        int32_t a = 0, b = 0, c = 0;
         if (!ScriptParseEvent(ctx, at, &a, &b, &c))
             return 0;                   /* silent -- the callee has spoken */
         ScriptAddEvent(cond, a, b, c);
@@ -878,11 +906,9 @@ int32_t __cdecl ScriptParseEvents(AM2_ScriptCtx *ctx, int32_t *at,
             return 0;
         }
 
-        AM2_ScriptTok *t = &ctx->tokens[*at];
-        if (t->kind != AM2_TOKEN_RESERVED)
-            continue;
-        int32_t id = (int32_t)(uintptr_t)t->value;
-        if (id == AM2_TOK_THEN || id == AM2_TOK_BUTNOT || id == AM2_TOK_TESTVAR)   /* then, butnot, testvar */
+        if (ScriptAtWord(ctx, *at, AM2_TOK_THEN)
+            || ScriptAtWord(ctx, *at, AM2_TOK_BUTNOT)
+            || ScriptAtWord(ctx, *at, AM2_TOK_TESTVAR))
             return 1;
     }
 }
@@ -2749,37 +2775,27 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
 int32_t __cdecl ScriptScanFor(const AM2_ScriptCtx *ctx, int32_t from,
                               int32_t want, int32_t stop)
 {
-    if (from >= ctx->count) {
-        am2_log("Unexpected end of script.\n");
-        return 0;
-    }
+    if (from < ctx->count) {
+        const AM2_ScriptTok *t = &ctx->tokens[from];
 
-    for (int32_t i = from;;) {
-        const AM2_ScriptTok *t = &ctx->tokens[i];
-        if (t->kind == AM2_TOKEN_RESERVED &&
-            (int32_t)(uintptr_t)t->value == want)
-            return 1;
-
-        const AM2_ScriptTok *n = &ctx->tokens[i + 1];
-        i++;
-        if (n->kind == AM2_TOKEN_RESERVED &&
-            (int32_t)(uintptr_t)n->value == stop)
-            return 0;
-        if (i >= ctx->count)
-            break;
+        do {
+            if (t->kind != AM2_TOKEN_RESERVED ||
+                (int32_t)(uintptr_t)t->value != want) {
+                t++;
+                from++;
+                if (t->kind == AM2_TOKEN_RESERVED &&
+                    (int32_t)(uintptr_t)t->value == stop)
+                    return 0;
+            } else {
+                return 1;
+            }
+        } while (from < ctx->count);
     }
 
     am2_log("Unexpected end of script.\n");
     return 0;
 }
 
-/* True when the token at *at is Reserved with this id. */
-static inline int ScriptAtWord(const AM2_ScriptCtx *ctx, int32_t at, int32_t id)
-{
-    const AM2_ScriptTok *t = &ctx->tokens[at];
-    return t->kind == AM2_TOKEN_RESERVED &&
-           (int32_t)(uintptr_t)t->value == id;
-}
 
 int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
 {

@@ -331,29 +331,40 @@ void __cdecl FreeAllFonts(void)
 
 int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
 {
-    uint32_t        off   = (uint32_t)font * ADDR_FONT_STRIDE;
-    const uint8_t  *base  = *(const uint8_t **)((uintptr_t)ADDR_FONT_BASES + off);
-    const uint16_t *table = (const uint16_t *)((uintptr_t)ADDR_GLYPH_OFFSETS + off);
-    int32_t         width = 0;
-    const uint8_t  *p;
+    uint32_t       off   = (uint32_t)font * ADDR_FONT_STRIDE;
+    const uint8_t *base  = *(const uint8_t **)((uintptr_t)ADDR_FONT_BASES + off);
+    int32_t        width = 0;
 
-    for (p = (const uint8_t *)text; *p; p++) {
-        if (*p == '^')          /* an escape; the character after it counts */
-            continue;
-        if ((int8_t)*p < 0x1F)  /* a control, and SIGNED -- so 0x80 and up
-                                 * are skipped too */
-            continue;
-        width += *(const uint16_t *)(base + table[*p]);
+    if (*text) {
+        for (;;) {
+            char ch = *text;
+
+            if (ch == '^') {            /* an escape; the character after it
+                                         * counts */
+                text++;
+            } else if (ch >= 0x1F) {    /* a control, and SIGNED -- so 0x80
+                                         * and up are skipped too */
+                /* The glyph table indexed afresh, by the signed character. */
+                width += *(const uint16_t *)(base
+                             + ((const uint16_t *)(uintptr_t)ADDR_GLYPH_OFFSETS)
+                                   [font * (ADDR_FONT_STRIDE / 2) + ch]);
+            }
+
+            ch = text[1];
+            text++;
+            if (!ch)
+                break;
+        }
     }
 
-    if (!out)
-        return width;
-    out[0] = width;
-    /* The line height is the space glyph's, whatever the string was. */
-    out[1] = *(const uint16_t *)(base
-                                 + *(const uint16_t *)
-                                       ((uintptr_t)ADDR_GLYPH_OFFSET_SPACE + off)
-                                 + 2);
+    if (out) {
+        out[0] = width;
+        /* The line height is the space glyph's, whatever the string was. */
+        out[1] = *(const uint16_t *)(base
+                                     + *(const uint16_t *)
+                                           ((uintptr_t)ADDR_GLYPH_OFFSET_SPACE + off)
+                                     + 2);
+    }
     return width;
 }
 

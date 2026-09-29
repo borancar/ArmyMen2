@@ -3042,23 +3042,25 @@ int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind)
  */
 void __cdecl RebuildTileCover(void)
 {
-    int32_t w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
-    int32_t h = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H;
-    const int8_t *weights;
-    int32_t       y;
+    /* The map size and the weight table are read afresh at every use. */
+#define W       (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W)
+#define H       (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H)
+#define WEIGHTS (*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
+    int32_t y;
 
-    memset(*(void **)(uintptr_t)ADDR_TILE_COVER, 0, (size_t)h * (size_t)w);
+    memset(*(void **)(uintptr_t)ADDR_TILE_COVER, 0, (size_t)(W * H));
 
-    weights = *(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
-
-    for (y = 1; y < h - 1; y++) {
-        int32_t tile = w * y + 1;
+    for (y = 1; y < H - 1; y++) {
+        int32_t tile = W * y + 1;
         int32_t x;
 
-        for (x = 1; x < w - 1; x++, tile++)
-            if (weights[(uint16_t)tile] >= (int8_t)AM2_CELL_WEIGHT_STEP)
+        for (x = 1; x < W - 1; tile++, x++)
+            if (WEIGHTS[(uint16_t)tile] >= (int8_t)AM2_CELL_WEIGHT_STEP)
                 TileCoverAdd((uint16_t)tile);
     }
+#undef W
+#undef H
+#undef WEIGHTS
 }
 
 typedef int32_t (__cdecl *AM2_RegionRandFn)(void);
