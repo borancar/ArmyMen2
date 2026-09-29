@@ -16293,9 +16293,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * with the missile defs. */
 #define TYPE3_REC_OFF_LIST         0x10u   /* {capacity, count, items} */
 #define TYPE3_REC_OFF_LIST_COUNT   0x14u   /* how many uids follow the record */
-#define TYPE3_REC_OFF_ARG5         0x494u  /* CreateVehicle's fifth argument */
 #define TYPE3_REC_OFF_KIND         0x498u  /* -> VEHICLE_OFF_KIND */
-#define TYPE3_REC_OFF_SLOT         0x4A0u  /* a comm slot, not a pointer */
+#define TYPE3_REC_OFF_SLOT         0x4A0u  /* a table index, not a pointer; also
+                                              CreateVehicle's `table` */
 #define TYPE3_REC_OFF_PTR_LIST     0x4A4u  /* -> VEHICLE_OFF_PTR_LIST */
 #define TYPE3_REC_OFF_PTR_COUNT    0x4A8u
 /* What LoadType3 forces into OBJ_OFF_RANK after copying the record over it, so

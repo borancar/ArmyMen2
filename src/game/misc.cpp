@@ -868,12 +868,10 @@ int32_t __cdecl Field51MeetsMin(const void *p)
     const uint8_t *b = (const uint8_t *)p;
     const uint8_t *rec = *(const uint8_t *const *)(b + 0x44);
 
-    if (!rec)
-        return 0;
     /* zero-extended byte, signed 16-bit compare */
-    if ((int16_t)(uint16_t)b[0x51] < *(const int16_t *)(rec + 6))
-        return 0;
-    return 1;
+    if (rec && (int16_t)(uint16_t)b[0x51] >= *(const int16_t *)(rec + 6))
+        return 1;
+    return 0;
 }
 
 int32_t __cdecl ObjKind538In10To17(const void *obj)
@@ -1099,23 +1097,25 @@ void __cdecl ConsumePendingByte(void *src, void *dst, const void *cfg)
     s[0x104] = 0;
 }
 
-static int32_t FacingFromDelta(const void *rec, int32_t delta,
-                               uint32_t off_mode, uint32_t off_flag)
+/* Inline, and in the original's branch order. VC6 materialises each ternary
+ * with the set-instruction of its condition's INVERSE, so the two written
+ * `<=`/`>=` forms are what give the image's setg/setl. */
+static inline int32_t FacingFromDelta(const void *rec, int32_t delta,
+                                      uint32_t off_mode, uint32_t off_flag)
 {
     const uint8_t *r = (const uint8_t *)rec;
 
-    if (*(const int32_t *)(r + off_mode) == 1)
-        return (delta < 0) ? 7 : 2;
-
-    if (*(const int32_t *)(r + off_flag) != 0) {
+    if (*(const int32_t *)(r + off_mode) != 1) {
+        if (*(const int32_t *)(r + off_flag) != 0) {
+            if (delta >= 0x10)
+                return 5;
+            return (delta > -0x10) ? 4 : 3;
+        }
         if (delta >= 0x10)
-            return 5;
-        return (delta > -0x10) ? 4 : 3;
+            return 1;
+        return (delta <= -0x10) ? 7 : 0;
     }
-
-    if (delta >= 0x10)
-        return 1;
-    return (delta > -0x10) ? 0 : 7;
+    return (delta >= 0) ? 2 : 7;
 }
 
 int32_t __cdecl FacingFromDelta08(const void *rec, int32_t delta)
@@ -1454,24 +1454,32 @@ int32_t __cdecl GetMenuRow(void)
     return g_menuRow;
 }
 
-void * __attribute__((thiscall)) AM2_Rec::InitPtrList()
+AM2_PtrList::AM2_PtrList()
 {
-    void *rec = this;
-
-    int32_t *r = (int32_t *)rec;
-
-    r[0] = 0;
-    r[1] = 0;
-    r[2] = 0;
-    return rec;
+    capacity = 0;
+    count    = 0;
+    items    = 0;
 }
 
-void __attribute__((thiscall)) AM2_Rec::ClearPtrListAlias()
+AM2_PtrList::~AM2_PtrList()
 {
-    void *rec = this;
-
-    ::ClearPtrList(rec);
+    ::ClearPtrList(this);
 }
+
+#if defined(__GNUC__)
+void *AM2_PtrList::operator new(size_t n)
+{
+    return ((void *(__cdecl *)(uint32_t))(uintptr_t)ADDR_GAME_OPERATOR_NEW)(n);
+}
+void AM2_PtrList::operator delete(void *p)
+{
+    ((void (__cdecl *)(void *))(uintptr_t)ADDR_GAME_DELETE)(p);
+}
+void *__attribute__((thiscall)) am2_ctor_AM2_PtrList(void *mem)
+{ return ::new (mem) AM2_PtrList(); }
+void __attribute__((thiscall)) am2_dtor_AM2_PtrList(AM2_PtrList *l)
+{ l->AM2_PtrList::~AM2_PtrList(); }
+#endif
 
 /* TakeNumberKey -- original 0x00413A80, one caller. The 1..8 keys latch 0..7
  * into ADDR_NUMBER_KEY_SLOT.
@@ -2708,18 +2716,17 @@ int32_t __cdecl WriteDotString(char *dst)
  * VEHICLE_OFF_PTR_LIST and the common one at OBJ_OFF_PTR_LIST. It is the MSVC
  * member-destructor sequence -- two subobjects taken down in order, with the
  * unwind index stepped between them -- and the 0xA4 half is the same field
- * ClearPtrListAtA4 above reaches on its own.
- *
- * The SEH prologue is not reproduced, per the standing decision. Its only
- * purpose here is to unwind the FIRST list if the second throws, and nothing
- * in this program throws. */
-void __attribute__((thiscall)) AM2_ObjLists::ClearVehicleLists()
+ * ClearPtrListAtA4 above reaches on its own. So it is written as the
+ * destructor it is, with an empty body: the compiler supplies both calls and
+ * the unwind frame (misc.h, AM2_VehicleLists). */
+AM2_VehicleLists::~AM2_VehicleLists()
 {
-    void *obj = this;
-
-    ClearPtrListAlias((uint8_t *)obj + VEHICLE_OFF_PTR_LIST);
-    ClearPtrListAlias((uint8_t *)obj + OBJ_OFF_PTR_LIST);
 }
+
+#if defined(__GNUC__)
+void __attribute__((thiscall)) am2_dtor_AM2_VehicleLists(AM2_VehicleLists *v)
+{ v->AM2_VehicleLists::~AM2_VehicleLists(); }
+#endif
 
 int misc_install(void)
 {
@@ -2868,9 +2875,9 @@ int misc_install(void)
     patch_replace(ADDR_CLEAR_PTR_LIST, pmf_addr(&AM2_Rec::ClearPtrList),
                   "ClearPtrList", 1);
     patch_replace(ADDR_KEY_CHANGED, (const void *)KeyChanged, "KeyChanged", 1);
-    patch_replace(ADDR_INIT_PTR_LIST, pmf_addr(&AM2_Rec::InitPtrList),
+    patch_replace(ADDR_INIT_PTR_LIST, AM2_CTOR(AM2_PtrList),
                   "InitPtrList", 1);
-    patch_replace(ADDR_CLEAR_PTR_LIST_ALIAS, pmf_addr(&AM2_Rec::ClearPtrListAlias),
+    patch_replace(ADDR_CLEAR_PTR_LIST_ALIAS, AM2_DTOR(AM2_PtrList),
                   "ClearPtrListAlias", 1);
     patch_replace(ADDR_LIST_GROW_FIND, pmf_addr(&AM2_Rec::ListGrowFind),
                   "ListGrowFind", 1);
@@ -2901,8 +2908,7 @@ int misc_install(void)
                   "ClearPtrListAtA4", 1);
     patch_replace(ADDR_WRITE_DOT_STRING, (const void *)WriteDotString,
                   "WriteDotString", 1);
-    patch_replace(ADDR_CLEAR_VEHICLE_LISTS,
-                  pmf_addr(&AM2_ObjLists::ClearVehicleLists),
+    patch_replace(ADDR_CLEAR_VEHICLE_LISTS, AM2_DTOR(AM2_VehicleLists),
                   "ClearVehicleLists", 1);
     return 0;
 }

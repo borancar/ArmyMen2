@@ -215,53 +215,33 @@ void __cdecl InitTimer(void)
 /* 0x0040B220. The whole teardown, ending in the mutex.
  *
  * It went in as ReleaseAppMutex, which is its last line and nothing else: the
- * thirteen calls before it are the subsystems coming down in order, and only
- * three of them are identified. They are a table here rather than thirteen
- * invented names in orig.h -- the order is the fact worth keeping, and a name
- * per entry would be a guess per entry.
+ * thirteen calls before it are the subsystems coming down in order. They were
+ * a table here once, when few of them had names; every one is a named
+ * function now, and the original writes them out as thirteen calls, so this
+ * does too.
  *
- * The first is thiscall on a fixed object; the rest take nothing. */
-static const am2_void_fn kTeardown[] = {
-    /* The first five entries are the anim sweeps, and none of them is a guess
-     * any more -- each is a `push <table>; call FreeAnimTable` and the table
-     * says which `.ani` it holds. The fifth read as 432 bytes and "does more
-     * than free" until docs/functions.tsv was checked against the disassembly:
-     * 0x0043C720 is twelve bytes and the rest of that entry is the roach
-     * mask builder next door. A merged entry, exactly as merges.py says. */
-    /* Twelve of the thirteen are ours and go in BY NAME, and this comment was
-     * wrong about that twice over. It said the table was invisible to
-     * tools/checkseams.py "for as long as the table held plain integers" and
-     * then went on holding three -- two of which were reconstructed. So "the
-     * shape says which is which" was false: FreeAllFonts and StateLeaveAlias
-     * looked exactly like the one entry that really is still the original's.
-     *
-     * A bare hex literal is a FIFTH spelling of the seam and the check now has
-     * a rule for it, which is what found these. The comment describing the gate
-     * was sitting one paragraph above the breach.
-     *
-     * The last literal is gone too: 0x00445F40 is FreeSpriteRegistry, and the
-     * whole table is named functions now. It was the sprite registry all
-     * along -- close the file, force-release every sprite, free both tables --
-     * which is exactly what a teardown table's thirteenth entry ought to be,
-     * and could not be seen from the call site. */
-    FreeExplosionAnims, FreeMissileAnims, FreeRoachAnims,
-    FreeVehicleAnims, FreeSoldierAnims,
-    FreeSpriteList,
-    FreeSpriteRegistry,
-    FreeAllFonts,
-    StateLeaveAlias,
-    ShutdownAudio,
-    ShutdownDirectDraw, ShutdownInput,
-};
-
+ * The first five are the anim sweeps -- each a `push <table>; call
+ * FreeAnimTable`, the table saying which `.ani` it holds. 0x0043C720 is
+ * twelve bytes (docs/functions.tsv merges it with the roach mask builder next
+ * door). FreeSpriteRegistry is the thirteenth: close the file, force-release
+ * every sprite, free both tables. The call in front of them is thiscall on
+ * the selection list. */
 void __cdecl ShutdownSubsystems(void)
 {
-    /* And the call in front of the loop is ours too, which the comment above
-     * called "thiscall on a fixed object" and left as an integer. */
     ClearPtrList((void *)(uintptr_t)ADDR_SELECTED_UIDS);
 
-    for (uint32_t i = 0; i < sizeof kTeardown / sizeof kTeardown[0]; i++)
-        kTeardown[i]();
+    FreeExplosionAnims();
+    FreeMissileAnims();
+    FreeRoachAnims();
+    FreeVehicleAnims();
+    FreeSoldierAnims();
+    FreeSpriteList();
+    FreeSpriteRegistry();
+    FreeAllFonts();
+    StateLeaveAlias();
+    ShutdownAudio();
+    ShutdownDirectDraw();
+    ShutdownInput();
 
     ReleaseMutex(*(HANDLE *)(uintptr_t)ADDR_APP_MUTEX);
 }

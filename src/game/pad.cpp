@@ -397,8 +397,8 @@ int32_t __cdecl ObjTileHook(void *obj)
  *
  * Argument 8 is the pad EventRegister stored and argument 2 is the uid to
  * match, which is the convention every handler in event.cpp follows. */
-static void EvtPadRaise(const uint8_t *pad, int32_t want, int32_t payload,
-                        uint32_t field, int32_t type)
+static inline void EvtPadRaise(const uint8_t *pad, int32_t want, int32_t payload,
+                               uint32_t field, int32_t type)
 {
     if (*(const int32_t *)(pad + field) != want)
         return;

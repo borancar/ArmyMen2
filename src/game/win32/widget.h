@@ -319,17 +319,8 @@ AM2_CLASS_VTABLE(AM2_DlgSaveListScreen, VTABLE_SAVE_LIST)
 AM2_CLASS_VTABLE(AM2_MoviesScreen, VTABLE_MOVIES)
 AM2_CLASS_VTABLE(AM2_MpPanelScreen, VTABLE_MP_PANEL)
 
-/* Installing a constructor or destructor at the original's address. GCC
- * builds install a thiscall thunk (constructors must answer `this` in eax, as
- * MSVC's do and the original's callers expect); VC6 never runs install code,
- * and the byte-match manifest reads AM2_CTOR(C)/AM2_DTOR(C) as C's ??0/??1. */
-#if defined(__GNUC__)
-#define AM2_CTOR(Class) ((const void *)am2_ctor_##Class)
-#define AM2_DTOR(Class) ((const void *)am2_dtor_##Class)
-#else
-#define AM2_CTOR(Class) ((const void *)0)
-#define AM2_DTOR(Class) ((const void *)0)
-#endif
+/* AM2_CTOR / AM2_DTOR (installing a constructor or destructor at the
+ * original's address) are in misc.h, which the flat half shares. */
 
 struct AM2_Panel : AM2_Widget {
     uint8_t pad_AM2_Panel[AM2_PANEL_SIZE - sizeof(AM2_Widget)];

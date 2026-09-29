@@ -36,7 +36,6 @@ int32_t __cdecl WalkCellKeepEnemy(void *obj);
 void __cdecl InitRemapsAndLists(void);
 void __cdecl InitStartupColours(void);
 void __cdecl InitStartupColoursB(void);
-void __cdecl InitArmyObjLists(void);
 void __cdecl FreeArmyObjLists(void);
 void __cdecl Call4057D0(int32_t a, int32_t b, int32_t c);
 void __cdecl DefFinish(void);
@@ -120,11 +119,6 @@ int32_t __cdecl SaveItemHeader(am2_FILE *fp, void *obj);
 int32_t __cdecl LoadItemHeader(am2_FILE *fp, void *hdr);
 int32_t __cdecl SaveType1(am2_FILE *fp, void *obj);
 
-/* 0x0043CB60, one caller. The ROACH member of the per-type savegame loader
- * family: read the 0x4CC-byte record, build a roach from the header, paste the
- * record over OBJ_OFF_FIELD_94, and rescale the health across a possibly
- * different maximum. */
-void *__cdecl LoadType8(am2_FILE *fp, const void *hdr);
 
 /* 0x0043B870, one caller -- the MISSILE member of the per-type savegame
  * loader family. Type 5 is a missile: this calls ObjInitCommon with 5 and puts
@@ -170,15 +164,7 @@ int32_t __cdecl SaveType3(am2_FILE *fp, void *obj);
 /* 0x00435500. The type 7 loader, and the only one that reads no file. */
 void *__cdecl LoadType6(am2_FILE *fp, const void *hdr);
 
-/* 0x0045A120, one caller. The VEHICLE loader: rebuild two pointer lists and
- * one table-record pointer out of counts and a comm slot the file carries,
- * then rescale the health against the vehicle definition. */
-void *__cdecl LoadType3(am2_FILE *fp, const void *hdr);
 
-/* 0x004471D0, one caller. The TROOPER loader; its third argument is
- * "renumber", which decides whether the trooper keeps the uid the file gave it
- * or gets a fresh one recorded in the remap table. */
-void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber);
 void *__cdecl LoadType7(am2_FILE *fp, const void *hdr);
 
 void gameproc_install(void);
@@ -262,5 +248,25 @@ void *__cdecl LoadType4(am2_FILE *fp, void *hdr, int32_t renumber);
  * standalone build takes its ADDRESS: the original stored a pointer to it in
  * its own data, and that pointer has to be ours. */
 int32_t __cdecl DefGameParse(int32_t cmd, char *line);
+
+/* C++ linkage, outside the extern block: VC6 emits no unwind frame inside
+ * an extern "C" function, and each of these carries one in the original --
+ * InitArmyObjLists for its `new` of the list class, the three loaders for
+ * the record they build on the stack, whose list members have destructors. */
+void __cdecl InitArmyObjLists(void);
+
+/* 0x0043CB60, one caller. The ROACH member of the per-type savegame loader
+ * family: read the 0x4CC-byte record, build a roach from the header, paste the
+ * record over OBJ_OFF_FIELD_94, and rescale the health across a possibly
+ * different maximum. */
+void *__cdecl LoadType8(am2_FILE *fp, const void *hdr);
+/* 0x0045A120, one caller. The VEHICLE loader: rebuild two pointer lists and
+ * one table-record pointer out of counts and a comm slot the file carries,
+ * then rescale the health against the vehicle definition. */
+void *__cdecl LoadType3(am2_FILE *fp, const void *hdr);
+/* 0x004471D0, one caller. The TROOPER loader; its third argument is
+ * "renumber", which decides whether the trooper keeps the uid the file gave it
+ * or gets a fresh one recorded in the remap table. */
+void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber);
 
 #endif /* AM2_GAMEPROC_H */

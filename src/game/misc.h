@@ -29,8 +29,6 @@ struct AM2_Rec {
     int32_t  count;                 /* +0x00  rows in use */
     void    *rows;                  /* +0x04  the row array */
     int32_t  ownsValues;            /* +0x08  free each row's value on reset */
-    void * __attribute__((thiscall)) InitPtrList();
-    void __attribute__((thiscall)) ClearPtrListAlias();
     void __attribute__((thiscall)) PtrListGrow();
     void __attribute__((thiscall)) PtrListShrink();
     void __attribute__((thiscall)) PtrListPush(void *item);
@@ -62,6 +60,50 @@ static inline void __attribute__((thiscall)) RecordReset(void *rec)
 { ((AM2_Rec *)rec)->RecordReset(); }
 static inline void __attribute__((thiscall)) RecordResetAlias(void *rec)
 { ((AM2_Rec *)rec)->AM2_Rec::~AM2_Rec(); }
+/* The pointer list as a CLASS: 0x0042A660 is its constructor and 0x0042A670
+ * its destructor, and that is what makes the original's `new` of one carry
+ * an unwind frame and the records that embed two of them destroy both in a
+ * compiler-written destructor. The list operations themselves stay on
+ * AM2_Rec, whose layout this shares. */
+struct AM2_PtrList {
+    int32_t  capacity;              /* +0x00 */
+    int32_t  count;                 /* +0x04 */
+    void   **items;                 /* +0x08 */
+    AM2_PtrList();
+    ~AM2_PtrList();
+#if defined(__GNUC__)
+    static void *operator new(size_t n);
+    static void operator delete(void *p);
+#endif
+};
+#if defined(_MSC_VER)
+/* MSVC's explicit constructor call, not placement new: VC6 will not inline
+ * a placement new (it carries an unwind cleanup), and the original's
+ * callers make the constructor call in place. */
+static inline void * __attribute__((thiscall)) InitPtrList(void *rec)
+{ ((AM2_PtrList *)rec)->AM2_PtrList::AM2_PtrList(); return rec; }
+#else
+static inline void * __attribute__((thiscall)) InitPtrList(void *rec)
+{ return ::new (rec) AM2_PtrList(); }
+#endif
+static inline void __attribute__((thiscall)) ClearPtrListAlias(void *rec)
+{ ((AM2_PtrList *)rec)->~AM2_PtrList(); }
+#if defined(__GNUC__)
+void *__attribute__((thiscall)) am2_ctor_AM2_PtrList(void *mem);
+void __attribute__((thiscall)) am2_dtor_AM2_PtrList(AM2_PtrList *l);
+#endif
+
+/* Installing a constructor or destructor at the original's address. GCC
+ * builds install a thiscall thunk (constructors must answer `this` in eax, as
+ * MSVC's do and the original's callers expect); VC6 never runs install code,
+ * and the byte-match manifest reads AM2_CTOR(C)/AM2_DTOR(C) as C's ??0/??1. */
+#if defined(__GNUC__)
+#define AM2_CTOR(Class) ((const void *)am2_ctor_##Class)
+#define AM2_DTOR(Class) ((const void *)am2_dtor_##Class)
+#else
+#define AM2_CTOR(Class) ((const void *)0)
+#define AM2_DTOR(Class) ((const void *)0)
+#endif
 /* Two widget classes' members that flat code calls (commmsg.cpp), so their
  * classes are declared here as opaque ones: VC6 compiles a member thiscall,
  * and has no spelling for a thiscall free function. Defined in widget.cpp,
@@ -101,15 +143,30 @@ typedef int32_t (__attribute__((thiscall)) *AM2_VObjPollFn)(void *o);
 static inline int32_t ObjVPoll(void *o)
 { return ((AM2_VObjPollFn *)*(void **)o)[0](o); }
 #endif
-/* An object's own pointer lists: the two thiscall clears (misc.cpp). */
+/* An object's own pointer lists: the thiscall clear of the common one
+ * (misc.cpp). */
 struct AM2_ObjLists {
     void __attribute__((thiscall)) ClearPtrListAtA4();
-    void __attribute__((thiscall)) ClearVehicleLists();
 };
 static inline void __attribute__((thiscall)) ClearPtrListAtA4(void *obj)
 { ((AM2_ObjLists *)obj)->ClearPtrListAtA4(); }
-static inline void __attribute__((thiscall)) ClearVehicleLists(void *obj)
-{ ((AM2_ObjLists *)obj)->ClearVehicleLists(); }
+/* The same two lists as class members, which is how 0x0045A3F0 comes to be
+ * a compiler-written destructor: a vehicle's own list at +0x538
+ * (VEHICLE_OFF_PTR_LIST) taken down first, then the base's at +0xA4
+ * (OBJ_OFF_PTR_LIST) through the base's implicit, inlined destructor. Only
+ * the lists are modelled; the rest is padding. */
+struct AM2_ObjListsBase {
+    uint8_t     pad_[0xA4];
+    AM2_PtrList ptrList;                /* +0xA4 */
+};
+struct AM2_VehicleLists : AM2_ObjListsBase {
+    uint8_t     padV_[0x538 - 0xA4 - sizeof(AM2_PtrList)];
+    AM2_PtrList riders;                 /* +0x538 */
+    ~AM2_VehicleLists();
+};
+#if defined(__GNUC__)
+void __attribute__((thiscall)) am2_dtor_AM2_VehicleLists(AM2_VehicleLists *v);
+#endif
 /* Likewise the blinker's (win32/widget.h's AM2_Blinker). */
 struct AM2_BlinkerOps {
     void __attribute__((thiscall)) BlinkerStart(uint32_t periodMs, int32_t flips);
@@ -805,10 +862,6 @@ int32_t __cdecl GetMenuRow(void);
  * exactly -- see widget.h -- and it was found by the same sweep rather than by
  * anything going wrong, because nothing has reached that caller yet. */
 #ifdef __cplusplus
-static inline void * __attribute__((thiscall)) InitPtrList(void *rec)
-{ return ((AM2_Rec *)rec)->InitPtrList(); }
-static inline void __attribute__((thiscall)) ClearPtrListAlias(void *rec)
-{ ((AM2_Rec *)rec)->ClearPtrListAlias(); }
 #endif
 
 /* 0x0043CCE0. Empty the pointer list embedded at +0xA4 of the object. */

@@ -1495,14 +1495,25 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr)
  * in CLAUDE.md: nothing in this program throws, VC6's operator new answers
  * NULL rather than throwing, and the registered frame is never consulted.
  */
+/* A whole roach object on the stack -- the header's 0x94 bytes and the
+ * saved record after them -- because that is what the original declares:
+ * its frame is the object's size, and the file is read into it at +0x94.
+ * Only the list at OBJ_OFF_PTR_LIST is modelled; being a class member, it
+ * is what makes the construction and destruction the compiler's. */
+struct AM2_Type8Obj {
+    uint8_t     pad_[0xA4];
+    AM2_PtrList list;                   /* OBJ_OFF_PTR_LIST */
+    uint8_t     rest_[0x94 + AM2_TYPE8_RECORD_SIZE - 0xA4 - sizeof(AM2_PtrList)];
+};
+
 void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
 {
-    uint8_t        rec[AM2_TYPE8_RECORD_SIZE];
+    AM2_Type8Obj   obj;
+    uint8_t       *rec = (uint8_t *)&obj + OBJ_OFF_FIELD_94;
     const uint8_t *h   = (const uint8_t *)hdr;
     uint8_t       *o;
     float          part;
 
-    InitPtrList(rec + 0x10);
     orig_fread(rec, AM2_TYPE8_RECORD_SIZE, 1, fp);
 
     o = (uint8_t *)CreateRoach(
@@ -1518,32 +1529,26 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
     memcpy(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE8_RECORD_SIZE);
 
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0) {
-        int32_t was = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
         int32_t now;
 
-        part = (float)((double)*(const int16_t *)(o + OBJ_OFF_HEALTH)
-                       / (double)was);
+        part = (float)*(const int16_t *)(o + OBJ_OFF_HEALTH)
+               / *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
         SetMaxHealth(o, *(const int32_t *)((void *)(uintptr_t)(ADDR_ROACH_HEALTH)));
 
         now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        *(int16_t *)(o + OBJ_OFF_HEALTH) =
-            (int16_t)(int32_t)((double)now * (double)part);
+        *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)(now * part);
         *(int16_t *)(o + OBJ_OFF_HEALTH) =
             (int16_t)Clamp(*(const int16_t *)(o + OBJ_OFF_HEALTH), 1, now);
     }
 
-    *(int32_t *)(o + OBJ_OFF_PTR_LIST)     = 0;
-    *(int32_t *)(o + OBJ_OFF_PTR_LIST + 4) = 0;
-    *(int32_t *)(o + OBJ_OFF_PTR_LIST + 8) = 0;
+    /* The list the record carried is a stale pointer from the file: the
+     * object's copy is zeroed before anything can free it. */
+    memset(o + OBJ_OFF_PTR_LIST, 0, sizeof(AM2_PtrList));
     ResetObjOnCof(o);
 
     *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_FOOTPRINT_ON;
 
-    *(int32_t *)(rec + 0x10)     = 0;
-    *(int32_t *)(rec + 0x10 + 4) = 0;
-    *(int32_t *)(rec + 0x10 + 8) = 0;
-    ClearPtrListAlias(rec + 0x10);
-
+    memset((void *)&obj.list, 0, sizeof obj.list);
     return o;
 }
 
@@ -1589,17 +1594,24 @@ void *__cdecl LoadType8(am2_FILE *fp, const void *hdr)
  * DELIBERATE DEVIATION -- the MSVC structured-exception frame is not
  * reproduced, per the standing decision.
  */
+/* The trooper's, likewise: the whole object on the stack, the record read
+ * in at +0x94, the one list at OBJ_OFF_PTR_LIST a class member. */
+struct AM2_Type2Obj {
+    uint8_t     pad_[0xA4];
+    AM2_PtrList list;                   /* OBJ_OFF_PTR_LIST */
+    uint8_t     rest_[0x94 + AM2_TYPE2_RECORD_SIZE - 0xA4 - sizeof(AM2_PtrList)];
+};
+
 void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
 {
-    uint8_t  rec[AM2_TYPE2_RECORD_SIZE];
+    AM2_Type2Obj obj;
+    uint8_t *rec = (uint8_t *)&obj + OBJ_OFF_FIELD_94;
     uint8_t *h = (uint8_t *)hdr;
     uint8_t *o;
     int32_t  weaponCode;
     int32_t  uid;
-    int32_t  i, n;
+    int32_t  i;
     float    part;
-
-    InitPtrList(rec + TYPE2_REC_OFF_LIST);
 
     orig_fread(rec, AM2_TYPE2_RECORD_SIZE, 1, fp);
     orig_fread(&weaponCode, 4, 1, fp);
@@ -1654,16 +1666,15 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
         int32_t now;
         int32_t rank = *(const int32_t *)(o + OBJ_OFF_RANK);
 
-        part = (float)((double)*(const int16_t *)(o + OBJ_OFF_HEALTH)
-                       / (double)*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH));
+        part = (float)*(const int16_t *)(o + OBJ_OFF_HEALTH)
+               / *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
         SetMaxHealth(o, *(const int32_t *)((const uint8_t *)
                                            ((void *)(uintptr_t)(ADDR_RANK_RECORDS))
                                            + (uintptr_t)rank * RANK_REC_BYTES
                                            + RANK_REC_OFF_MAX_HEALTH));
 
         now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        *(int16_t *)(o + OBJ_OFF_HEALTH) =
-            (int16_t)(int32_t)((double)now * (double)part);
+        *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)(now * part);
         *(int16_t *)(o + OBJ_OFF_HEALTH) =
             (int16_t)Clamp(*(const int16_t *)(o + OBJ_OFF_HEALTH), 1, now);
     }
@@ -1672,18 +1683,17 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
         (const uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
         + *(const int32_t *)(rec + TYPE2_REC_OFF_SLOT) * AM2_OBJ_TABLE_REC_SIZE;
 
-    *(int32_t *)(o + OBJ_OFF_PTR_LIST)     = 0;
-    *(int32_t *)(o + OBJ_OFF_PTR_LIST + 4) = 0;
-    *(int32_t *)(o + OBJ_OFF_PTR_LIST + 8) = 0;
+    memset(o + OBJ_OFF_PTR_LIST, 0, sizeof(AM2_PtrList));
 
-    n = *(const int32_t *)(rec + TYPE2_REC_OFF_COUNT);
-    for (i = 0; i < n; i++) {
-        orig_fread(&uid, 4, 1, fp);
-        /* Renumbering DROPS the inventory rather than remapping it: the uid
-         * is read and thrown away. The original's own test, not a shortcut. */
-        if (!renumber)
-            PtrListPush(o + OBJ_OFF_PTR_LIST, (void *)(uintptr_t)uid);
-        n = *(const int32_t *)(rec + TYPE2_REC_OFF_COUNT);
+    if (*(const int32_t *)(rec + TYPE2_REC_OFF_COUNT) > 0) {
+        for (i = 0; i < *(const int32_t *)(rec + TYPE2_REC_OFF_COUNT); i++) {
+            orig_fread(&uid, 4, 1, fp);
+            /* Renumbering DROPS the inventory rather than remapping it: the
+             * uid is read and thrown away. The original's own test, not a
+             * shortcut. */
+            if (!renumber)
+                PtrListPush(o + OBJ_OFF_PTR_LIST, (void *)(uintptr_t)uid);
+        }
     }
 
     switch (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)) {
@@ -1696,12 +1706,19 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
         *(int32_t *)(o + OBJ_OFF_SOLDIER_KIND) = 0;
         if (*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH)
             > AM2_TYPE2_KEEP_HEALTH_OVER) {
-            int16_t maxWas = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-            int16_t was    = *(const int16_t *)(o + OBJ_OFF_HEALTH);
+            /* Kept across the call in the stack object's own health fields,
+             * which the original uses as its temporaries. */
+            uint8_t *keep = (uint8_t *)&obj;
 
+            *(int16_t *)(keep + OBJ_OFF_MAX_HEALTH) =
+                *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
+            *(int16_t *)(keep + OBJ_OFF_HEALTH) =
+                *(const int16_t *)(o + OBJ_OFF_HEALTH);
             Type2ActionA(o);
-            *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) = maxWas;
-            *(int16_t *)(o + OBJ_OFF_HEALTH)     = was;
+            *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
+                *(const int16_t *)(keep + OBJ_OFF_MAX_HEALTH);
+            *(int16_t *)(o + OBJ_OFF_HEALTH) =
+                *(const int16_t *)(keep + OBJ_OFF_HEALTH);
         } else {
             Type2ActionA(o);
         }
@@ -1724,16 +1741,13 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
     *(int32_t *)(o + OBJ_OFF_POSE) = 1;
     SetUnitPose(o, *(const int32_t *)(rec + TYPE2_REC_OFF_POSE));
 
-    *(int32_t *)(rec + TYPE2_REC_OFF_LIST)     = 0;
-    *(int32_t *)(rec + TYPE2_REC_OFF_LIST + 4) = 0;
-    *(int32_t *)(rec + TYPE2_REC_OFF_LIST + 8) = 0;
+    memset((void *)&obj.list, 0, sizeof obj.list);
 
     if (*(const int32_t *)(o + OBJ_OFF_SARGE))
         *(uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID =
             *(const uint32_t *)(o + 4);
 
     ResetObjOnCof(o);
-    ClearPtrListAlias(rec + TYPE2_REC_OFF_LIST);
     return o;
 }
 
@@ -1755,10 +1769,12 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
  * are now the object's. LoadType8 does exactly this with its one record; there
  * are two here.
  *
- * THE ARG5 IT PASSES CreateVehicle IS THE ONE FIELD OF THE SEVEN THAT IS NOT
- * ALREADY NAMED. Everything else the record hands over lands on a field this
- * file names -- the kind, the slot, the two lists -- so the record is the
- * object's own tail written out. See TYPE3_REC_OFF_ARG5.
+ * CreateVehicle's `table` is the saved SLOT, the same field the table-record
+ * pointer is rebuilt from below. This read +0x494 -- "the one field not
+ * already named" -- until the byte match put the load 0xC bytes further on:
+ * every field the record hands over lands on one this file names (the kind,
+ * the slot, the two lists), so the record is the object's own tail written
+ * out.
  *
  * IT FORCES OBJ_OFF_RANK TO 5 AFTER copying the record over it, so whatever
  * the file said there is discarded. Reproduced; nothing read says what a rank
@@ -1785,18 +1801,25 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
  * reproduced, per the standing decision in CLAUDE.md and for the reason
  * LoadType8 already records: nothing in this program throws.
  */
+/* The vehicle's: both lists, so the compiler builds and tears down two. */
+struct AM2_Type3Obj {
+    uint8_t     pad_[0xA4];
+    AM2_PtrList list;                   /* OBJ_OFF_PTR_LIST */
+    uint8_t     padV_[0x538 - 0xA4 - sizeof(AM2_PtrList)];
+    AM2_PtrList riders;                 /* VEHICLE_OFF_PTR_LIST */
+    uint8_t     rest_[0x94 + AM2_TYPE3_RECORD_SIZE - 0x538 - sizeof(AM2_PtrList)];
+};
+
 void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
 {
-    uint8_t        rec[AM2_TYPE3_RECORD_SIZE];
+    AM2_Type3Obj   obj;
+    uint8_t       *rec = (uint8_t *)&obj + OBJ_OFF_FIELD_94;
     const uint8_t *h = (const uint8_t *)hdr;
     uint8_t       *o;
     const uint8_t *def;
-    int32_t        i, n;
+    int32_t        i;
     uint32_t       uid;
     float          part;
-
-    InitPtrList(rec + TYPE3_REC_OFF_LIST);
-    InitPtrList(rec + TYPE3_REC_OFF_PTR_LIST);
 
     orig_fread(rec, AM2_TYPE3_RECORD_SIZE, 1, fp);
 
@@ -1804,7 +1827,7 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
                                  (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
                                  *(const int16_t *)(h + OBJ_OFF_POS),
                                  *(const int16_t *)(h + OBJ_OFF_POS + 2),
-                                 *(const int32_t *)(rec + TYPE3_REC_OFF_ARG5),
+                                 *(const int32_t *)(rec + TYPE3_REC_OFF_SLOT),
                                  *(const int8_t *)(h + OBJ_OFF_ARMY),
                                  *(const int32_t *)(h + OBJ_OFF_FLAGS), 1,
                                  *(const int32_t *)(h + 4), 0);
@@ -1822,35 +1845,27 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
         + (*(const int32_t *)(rec + TYPE3_REC_OFF_SLOT)
            * AM2_OBJ_TABLE_REC_SIZE);
 
-    *(int32_t *)(o + OBJ_OFF_PTR_LIST)     = 0;
-    *(int32_t *)(o + OBJ_OFF_PTR_LIST + 4) = 0;
-    *(int32_t *)(o + OBJ_OFF_PTR_LIST + 8) = 0;
+    memset(o + OBJ_OFF_PTR_LIST, 0, sizeof(AM2_PtrList));
 
-    n = *(const int32_t *)(rec + TYPE3_REC_OFF_LIST_COUNT);
-    for (i = 0; i < n; i++) {
-        orig_fread(&uid, 4, 1, fp);
-        PtrListPush(o + OBJ_OFF_PTR_LIST, (void *)(uintptr_t)uid);
-        n = *(const int32_t *)(rec + TYPE3_REC_OFF_LIST_COUNT);
+    if (*(const int32_t *)(rec + TYPE3_REC_OFF_LIST_COUNT) > 0) {
+        for (i = 0; i < *(const int32_t *)(rec + TYPE3_REC_OFF_LIST_COUNT); i++) {
+            orig_fread(&uid, 4, 1, fp);
+            PtrListPush(o + OBJ_OFF_PTR_LIST, (void *)(uintptr_t)uid);
+        }
     }
 
-    *(int32_t *)(o + VEHICLE_OFF_PTR_LIST)     = 0;
-    *(int32_t *)(o + VEHICLE_OFF_PTR_LIST + 4) = 0;
-    *(int32_t *)(o + VEHICLE_OFF_PTR_LIST + 8) = 0;
+    memset(o + VEHICLE_OFF_PTR_LIST, 0, sizeof(AM2_PtrList));
 
-    n = *(const int32_t *)(rec + TYPE3_REC_OFF_PTR_COUNT);
-    for (i = 0; i < n; i++) {
-        orig_fread(&uid, 4, 1, fp);
-        PtrListPush(o + VEHICLE_OFF_PTR_LIST, (void *)(uintptr_t)uid);
-        n = *(const int32_t *)(rec + TYPE3_REC_OFF_PTR_COUNT);
+    if (*(const int32_t *)(rec + TYPE3_REC_OFF_PTR_COUNT) > 0) {
+        for (i = 0; i < *(const int32_t *)(rec + TYPE3_REC_OFF_PTR_COUNT); i++) {
+            orig_fread(&uid, 4, 1, fp);
+            PtrListPush(o + VEHICLE_OFF_PTR_LIST, (void *)(uintptr_t)uid);
+        }
     }
 
     /* Both stack records emptied so the destructors below free nothing. */
-    *(int32_t *)(rec + TYPE3_REC_OFF_LIST)          = 0;
-    *(int32_t *)(rec + TYPE3_REC_OFF_LIST + 4)      = 0;
-    *(int32_t *)(rec + TYPE3_REC_OFF_LIST + 8)      = 0;
-    *(int32_t *)(rec + TYPE3_REC_OFF_PTR_LIST)      = 0;
-    *(int32_t *)(rec + TYPE3_REC_OFF_PTR_LIST + 4)  = 0;
-    *(int32_t *)(rec + TYPE3_REC_OFF_PTR_LIST + 8)  = 0;
+    memset((void *)&obj.list, 0, sizeof obj.list);
+    memset((void *)&obj.riders, 0, sizeof obj.riders);
 
     ResetObjOnCof(o);
 
@@ -1869,13 +1884,12 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) > 0 && def) {
         int32_t now;
 
-        part = (float)((double)*(const int16_t *)(o + OBJ_OFF_HEALTH)
-                       / (double)*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH));
+        part = (float)*(const int16_t *)(o + OBJ_OFF_HEALTH)
+               / *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
         SetMaxHealth(o, *(const int32_t *)(def + VEHDEF_OFF_HEALTH));
 
         now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        *(int16_t *)(o + OBJ_OFF_HEALTH) =
-            (int16_t)(int32_t)((double)now * (double)part);
+        *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)(now * part);
         *(int16_t *)(o + OBJ_OFF_HEALTH) =
             (int16_t)Clamp(*(const int16_t *)(o + OBJ_OFF_HEALTH), 1, now);
     }
@@ -1885,8 +1899,6 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
      * present from a flag the file supplied. */
     *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_FOOTPRINT_ON;
 
-    ClearPtrListAlias(rec + TYPE3_REC_OFF_PTR_LIST);
-    ClearPtrListAlias(rec + TYPE3_REC_OFF_LIST);
     return o;
 }
 
@@ -2543,9 +2555,8 @@ void __cdecl TeardownDefTables(void)
  * THE FREE DOES NOT CLEAR THE SLOTS. It empties each record and frees it, and
  * leaves the array holding dangling pointers -- reproduced, not tidied.
  *
- * The MSVC SEH prologue on the init is NOT reproduced, per the standing
- * decision: nothing in this program throws, VC6's operator new answers null
- * rather than throwing, and this function tests it. */
+ * It is a `new` of the list class, which is where the init's unwind frame
+ * comes from: VC6 wraps the constructor so a throw would free the block. */
 
 void __cdecl InitArmyObjLists(void)
 {
@@ -2553,11 +2564,8 @@ void __cdecl InitArmyObjLists(void)
     int32_t i;
 
     slot = (void **)(uintptr_t)ADDR_ARMY_OBJ_LISTS;
-    for (i = 0; i < AM2_COMM_SLOTS; i++) {
-        void *rec = orig_operator_new(AM2_PTR_LIST_BYTES);
-
-        slot[i] = rec ? InitPtrList(rec) : (void *)0;
-    }
+    for (i = 0; i < AM2_COMM_SLOTS; i++)
+        slot[i] = new AM2_PtrList;
 }
 
 void __cdecl FreeArmyObjLists(void)
