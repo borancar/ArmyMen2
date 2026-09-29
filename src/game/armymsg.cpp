@@ -725,16 +725,15 @@ void __cdecl SendPairMessage(const void *a, const void *b, int32_t byteArg,
     const uint8_t *pb = (const uint8_t *)b;
 
     *(uint16_t *)(msg + 0) = AM2_MSG_PAIR_LEN;
-    *(uint16_t *)(msg + 2) = AM2_MSG_PAIR;
-
     *(uint32_t *)(msg + MSG_PAIR_OFF_A) =
         UidOnWire(*(const uint32_t *)(pa + 4));
+    *(uint16_t *)(msg + 2) = AM2_MSG_PAIR;
     *(uint32_t *)(msg + MSG_PAIR_OFF_B) =
         UidOnWire(*(const uint32_t *)(pb + 4));
     *(uint32_t *)(msg + MSG_PAIR_OFF_POS) =
         *(const uint32_t *)(pb + OBJ_OFF_POS);
-    *(int32_t *)(msg + MSG_PAIR_OFF_ARG)  = arg;
     *(int32_t *)(msg + MSG_PAIR_OFF_BYTE) = (int8_t)byteArg;
+    *(int32_t *)(msg + MSG_PAIR_OFF_ARG)  = arg;
 
     ArmyMessageSend(msg);
 }

@@ -1044,11 +1044,12 @@ void *__cdecl SpriteSetForKey(uint32_t key)
 {
     int32_t set = (int32_t)KeyFieldA(key);
 
-    if (set >= 20)
-        return (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_THIRD));
-    if (set < 1 || set > 9)
+    if (set < 20) {
+        if (set >= 1 && set <= 9)
+            return (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_TITLE));
         return (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_SHARED));
-    return (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_TITLE));
+    }
+    return (void *)((void *)(uintptr_t)(ADDR_SPRITE_SET_THIRD));
 }
 
 /* 0x00423D50. The directory index for a key, or -1.
