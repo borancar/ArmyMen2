@@ -771,6 +771,11 @@ typedef void (__cdecl *AM2_ConsumeKeyFn)(int32_t dik);
 
 /* DirectInput scancodes, which is what every query here is indexed by. */
 #define AM2_DIK_TAB    0x0F
+#if defined(__GNUC__)
+/* A byte read GCC's -Wuninitialized cannot follow; see AM2_KeyRow. */
+static __attribute__((noinline)) uint8_t am2_stale_byte(const uint8_t *p) { return *p; }
+#endif
+
 #define AM2_DIK_UP     0xC8
 #define AM2_DIK_DOWN   0xD0
 
@@ -8189,10 +8194,10 @@ AM2_CountButton::AM2_CountButton(int32_t index, int32_t army, AM2_Rect box, int3
     *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
     ::WidgetScreenRect(w);
 
-    *(int32_t *)(self + COUNTBTN_OFF_COUNT) = count;
-    *(int32_t *)(self + COUNTBTN_OFF_MENU_ROW)  = menuRow;
     w->activate = CountButtonActivate;
     *(void **)(self + COUNTBTN_OFF_ON_TOGGLE) = (void *)onToggle;
+    *(int32_t *)(self + COUNTBTN_OFF_MENU_ROW)  = menuRow;
+    *(int32_t *)(self + COUNTBTN_OFF_COUNT) = count;
 
 }
 
@@ -12120,13 +12125,9 @@ AM2_DifficultyDialog::AM2_DifficultyDialog(const char *bmp)
     *(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST) = list;
     ::WidgetAddChild(panel, list);
 
-    {
-        AM2_Widget *sel = *(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST);
-
-        WidgetVFocus(sel, 0);
-        *(int32_t *)((uint8_t *)sel + LIST_OFF_CHOSEN)      = g_difficulty;
-        *(int32_t *)((uint8_t *)sel + LIST_OFF_SELECTED) = g_difficulty;
-    }
+    WidgetVFocus(*(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST), 0);
+    *(int32_t *)((uint8_t *)*(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST) + LIST_OFF_CHOSEN)   = g_difficulty;
+    *(int32_t *)((uint8_t *)*(AM2_Widget **)((uint8_t *)w + DLG_OFF_LIST) + LIST_OFF_SELECTED) = g_difficulty;
 
     dot = new AM2_Blinker((const char *)((void *)(uintptr_t)(AM2_BMP_RED0)), (const char *)((void *)(uintptr_t)(AM2_BMP_RED1)), 1, *RectSet(AM2_TEMP(AM2_Rect), 0x23, 0x95, 0x11, 0x10));
     ::WidgetAddChild(panel, dot);
@@ -13039,7 +13040,13 @@ AM2_KeyRow::AM2_KeyRow(int32_t nameIndex, const char *caption, AM2_Rect box, int
                        uint8_t ink, uint8_t ink2, uint8_t ink3, uint8_t ink4)
     /* The label's ink is this class's own focInk, READ BEFORE ANYTHING HAS
      * SET IT -- the original passes the stale byte, and overwrites it below. */
+#if defined(__GNUC__)
+    /* the same stale read, through a call GCC cannot see into, so it does
+     * not warn about what the original deliberately does */
+    : AM2_Label(caption, box, font, am2_stale_byte(&focInk), ink3)
+#else
     : AM2_Label(caption, box, font, focInk, ink3)
+#endif
 {
     AM2_Widget *w = this;
 
@@ -13158,25 +13165,19 @@ AM2_ControlsDialogScreen::AM2_ControlsDialogScreen(const char *bmp)
     AM2_Widget   **rows;
     AM2_Widget    *first;
     AM2_Widget    *ok;
-    AM2_Rect       box;
     AM2_CTOR_VTABLE(w, VTABLE_CONTROLS_DIALOG);
     rows = (AM2_Widget **)((uint8_t *)w + KEYROW_PARENT_ROWS);
 
     while (binding < (const uint8_t *)((void *)(uintptr_t)(ADDR_KEY_BINDINGS))
                      + KEYROW_ROW_COUNT * 2) {
         int32_t     index = KeyNameIndexOf(*binding);
-        AM2_Widget *row   = (AM2_Widget *)orig_operator_new(AM2_KEYROW_SIZE);
+        AM2_Widget *row   = new AM2_KeyRow(index,
+                                           *(const char *const *)(names + index * 8 + 4),
+                                           *RectSet(AM2_TEMP(AM2_Rect), place[0], place[1],
+                                                    AM2_KEYROW_WIDTH, AM2_KEYROW_HEIGHT),
+                                           1, g_whiteInk, g_hiliteColour,
+                                           g_backgroundColour, g_backgroundColour);
 
-        if (row) {
-            RectSet(&box, place[0], place[1], AM2_KEYROW_WIDTH,
-                    AM2_KEYROW_HEIGHT);
-            row = ::KeyRowConstruct(row, index,
-                                  *(const char *const *)(names + index * 8
-                                                         + 4),
-                                  box.left, box.top, box.right, box.bottom,
-                                  1, g_whiteInk, g_hiliteColour,
-                                  g_backgroundColour, g_backgroundColour);
-        }
         ::WidgetAddChild(w, row);
         *rows++ = row;
         binding += 2;
@@ -15087,15 +15088,15 @@ AM2_CheckBox::AM2_CheckBox(const char *b0, const char *b1, const char *b2, const
     checked = 0;
     ::WidgetScreenRect(w);
 
+    w->activate = CheckboxToggle;
+    onChange  = onChange_;
+    forcePlain = 0;
     group     = group_;
-    caption   = caption_;
     inkOn     = 0xD4;
     inkOff    = 0xD4;
     inkOnFoc  = 0xFB;
     inkOffFoc = 0xFB;
-    w->activate = CheckboxToggle;
-    onChange  = onChange_;
-    forcePlain = 0;
+    caption   = caption_;
 }
 
 AM2_Widget * __attribute__((thiscall)) AM2_Widget::CheckBoxDelete(int32_t flags)

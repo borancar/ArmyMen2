@@ -89,9 +89,10 @@ static int ScriptVariables(int *passed);
  * teardown is not a pure function and has no vectors -- so a stub satisfies
  * the linker and nothing else. Fourth stub here for the same reason; see
  * LoadSpriteFile above. */
-/* NOT extern "C": sprite.h and gameproc.cpp both declare it as ordinary
- * C++, so the stub has to carry the same mangled name. The stubs below
- * are extern "C" because their declarations are. */
+/* NOT extern "C": sprite.h declares everything as ordinary C++ (the
+ * original's linkage, which decides VC6's unwind frames), so every sprite
+ * stub here carries the C++ mangled name. The other stubs follow their own
+ * declarations. */
 void __cdecl FreeSpriteRegistry(void) { }
 
 /* item.cpp's SetObjContext calls this now that its seam is closed, and it
@@ -173,8 +174,8 @@ void __cdecl ShakeAt(const AM2_Point *, int32_t)
  * extern "C", so C++ linkage. */
 int32_t __cdecl LoadAtlFile(const char *) { return 0; }
 
-extern "C" void *__cdecl SpriteSetForKey(uint32_t) { return (void *)0; }
-extern "C" int32_t __cdecl SpriteDirIndex(void *, uint32_t) { return -1; }
+void *__cdecl SpriteSetForKey(uint32_t) { return (void *)0; }
+int32_t __cdecl SpriteDirIndex(void *, uint32_t) { return -1; }
 
 void __cdecl AimStart(uint32_t, int8_t, uint32_t) {}
 void __cdecl AimStartB(uint32_t, int8_t, uint32_t) {}
@@ -239,15 +240,15 @@ uint32_t __cdecl Ticks(void)
  *
  * They can answer NULL: PlaceCursorPrepare has no vectors and could not -- it
  * writes eleven globals and returns nothing -- so nothing here calls it. */
-extern "C" struct AM2_Sprite *__cdecl SoldierAnimSprite(int32_t, uint32_t)
+struct AM2_Sprite *__cdecl SoldierAnimSprite(int32_t, uint32_t)
 {
     return 0;
 }
-extern "C" struct AM2_Sprite *__cdecl VehicleAnimSprite(int32_t, uint32_t)
+struct AM2_Sprite *__cdecl VehicleAnimSprite(int32_t, uint32_t)
 {
     return 0;
 }
-extern "C" struct AM2_Sprite *__cdecl TurretAnimSprite(int32_t, uint32_t)
+struct AM2_Sprite *__cdecl TurretAnimSprite(int32_t, uint32_t)
 {
     return 0;
 }
@@ -976,7 +977,7 @@ extern "C" int patch_replace(uint32_t, const void *, const char *, int32_t)
  * anything, and that is a wrong answer rather than a link error; worth
  * knowing before adding sprite coverage here. */
 struct AM2_Sprite;
-extern "C" AM2_Sprite *__cdecl PreloadSprite(int32_t, int32_t, int32_t,
+AM2_Sprite *__cdecl PreloadSprite(int32_t, int32_t, int32_t,
                                              int32_t, int32_t)
 {
     return 0;
@@ -986,7 +987,7 @@ extern "C" AM2_Sprite *__cdecl PreloadSprite(int32_t, int32_t, int32_t,
  * the path where the record already exists. Same reasoning as PreloadSprite
  * above, and the same caveat: a vector that reached this would get 0 rather
  * than a sprite, which is a wrong answer and not a link error. */
-extern "C" AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t, int32_t, int32_t)
+AM2_Sprite *__cdecl PreloadSpriteByKey(uint32_t, int32_t, int32_t)
 {
     return 0;
 }
@@ -1029,7 +1030,7 @@ extern "C" void __cdecl AppendTroopState(void *, void *)
  * direct call asked for the module. A stub is the third option, and the right
  * one -- moving EvtShowBitmap out of event.cpp to satisfy a linker would be
  * the tail wagging the dog. */
-extern "C" void __cdecl FreeBitmap(void **)
+void __cdecl FreeBitmap(void **)
 {
 }
 
@@ -1071,7 +1072,7 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *, const void *)
  * reasoning as the stubs around it, and the same route in: this arrived by
  * closing a seam. extern "C" to match the forward declaration air.cpp makes,
  * which is what the widget stub above records as the trap. */
-extern "C" void __cdecl DrawSprite(void *, int32_t, int32_t, int32_t)
+void __cdecl DrawSprite(AM2_Sprite *, int32_t, int32_t, int32_t)
 {
 }
 
@@ -1095,7 +1096,7 @@ int32_t __cdecl SaveAudioSection(am2_FILE *)
  * same reason map.cpp did: item.cpp gained a call into it, and adding the flat
  * module it lives in beats stubbing a flat function. Its own flat dependency,
  * trig.cpp, came with it; only this one crosses into win32. */
-extern "C" void __cdecl ReleaseSprite(AM2_Sprite *)
+void __cdecl ReleaseSprite(AM2_Sprite *)
 {
 }
 
@@ -1107,17 +1108,18 @@ extern "C" void __cdecl ReleaseSprite(AM2_Sprite *)
  * Adding the module they live in was tried FIRST and is not an option here:
  * win32/sprite.cpp pulls in ddraw and the whole point of this harness is that
  * no part of the game runs. Two stubs and a note is the honest shape. */
-extern "C" int32_t __cdecl LoadSpriteFile(const char *, void *, const void *,
-                                          int32_t, uint32_t)
+struct AM2_AnimTable;
+int32_t __cdecl LoadSpriteFile(const char *, struct AM2_AnimTable *,
+                               const struct AM2_AnimTable *, int32_t, uint32_t)
 {
     return 0;
 }
 
-extern "C" void __cdecl BuildVehicleMask(int32_t)
+void __cdecl BuildVehicleMask(int32_t)
 {
 }
 
-extern "C" void __cdecl BuildRoachMask(void)
+void __cdecl BuildRoachMask(void)
 {
 }
 
@@ -1145,7 +1147,7 @@ extern "C" void __cdecl ShowMpResult(int32_t)
    src/inject/win32.h undoes for DrawText and now for this. */
 #undef LoadBitmap
 
-extern "C" void *__cdecl LoadBitmap(const char *, int32_t)
+void *__cdecl LoadBitmap(const char *, int32_t)
 {
     return (void *)0;
 }

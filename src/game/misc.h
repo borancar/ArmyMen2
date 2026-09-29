@@ -25,6 +25,10 @@
 #include <new>
 #endif
 struct AM2_Rec {
+    /* The row list the menus build: 12 bytes, which is what `new` asks for. */
+    int32_t  count;                 /* +0x00  rows in use */
+    void    *rows;                  /* +0x04  the row array */
+    int32_t  ownsValues;            /* +0x08  free each row's value on reset */
     void * __attribute__((thiscall)) InitPtrList();
     void __attribute__((thiscall)) ClearPtrListAlias();
     void __attribute__((thiscall)) PtrListGrow();
