@@ -91,7 +91,7 @@ void __cdecl AiStep(void *obj, void *out);
 /* 0x00428E40, six call sites in five functions. Where would this object be
  * after one frame at that heading and speed? It writes the point and moves
  * nothing. `outPt` is an AM2_Point. */
-int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, int32_t turn,
+int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, uint8_t turn,
                               int32_t speed, int32_t unused, int32_t flip,
                               void *outPt);
 

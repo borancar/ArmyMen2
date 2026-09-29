@@ -973,13 +973,13 @@ uint16_t __cdecl NearestAllowedTile(void *obj, uint16_t tile, uint32_t *pt)
  * intermediate `speed * frameSeconds` IS stored to a float by the original --
  * `fst dword` -- so that one is a float here too rather than a double.
  */
-int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, int32_t turn,
+int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, uint8_t turn,
                               int32_t speed, int32_t unused, int32_t flip,
                               void *outPt)
 {
     uint8_t         *o    = (uint8_t *)obj;
     AM2_Point       *out  = (AM2_Point *)outPt;
-    uint8_t         *rows = (uint8_t *)0;
+    uint8_t         *rows;
     AM2_Anim        *anim;
     uint8_t          head;
     float            step;
@@ -989,6 +989,7 @@ int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, int32_t turn,
     if (!*(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
         return 0;
 
+    rows = (uint8_t *)0;
     if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0)
         rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
 
@@ -996,37 +997,36 @@ int32_t __cdecl MoveStepPoint(void *obj, uint8_t heading, int32_t turn,
     if (!anim)
         return 0;
 
-    head = (uint8_t)heading;
-    if ((*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SNAP_HEADING) && rows) {
-        uint8_t bits = anim->directionBits;
-
-        head = (uint8_t)((uint8_t)RoundTo8(head, bits) << (8 - bits));
-    }
+    /* The shift reads the animation again through the row. */
+    head = heading;
+    if ((*(const uint8_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_SNAP_HEADING) && rows)
+        head = (uint8_t)((uint8_t)RoundTo8(head, anim->directionBits)
+                         << (8 - (*(AM2_Anim **)(rows + ROW_OFF_ANIM_PLAYING))->directionBits));
 
     if (flip)
         head = (uint8_t)(head + 0x80);
-    head = (uint8_t)(head + (uint8_t)turn);
+    head = (uint8_t)(head + turn);
 
     *(uint32_t *)out = *(const uint32_t *)(o + OBJ_OFF_POS);
-    if (!speed)
-        return 1;
-
-    step = (float)speed * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC;
-    if (step >= 0.0f) {
-        if (step < AM2_MOVE_MIN_STEP)
+    if (speed) {
+        /* The float step is compared against DOUBLE constants. */
+        step = (float)speed * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC;
+        if (step >= 0.0 && step < (double)AM2_MOVE_MIN_STEP)
             step = AM2_MOVE_MIN_STEP;
-    } else if (step > -AM2_MOVE_MIN_STEP) {
-        step = -AM2_MOVE_MIN_STEP;
-    }
+        else if (step < 0.0 && step > -(double)AM2_MOVE_MIN_STEP)
+            step = -AM2_MOVE_MIN_STEP;
 
-    out->x = (int16_t)(*(const int16_t *)(o + OBJ_OFF_POS)
-                       + (int32_t)((double)Cos8(head) * (double)step
-                                   + (double)*(const float *)
-                                       (o + OBJ_OFF_SUBPIXEL_X)));
-    out->y = (int16_t)(*(const int16_t *)(o + OBJ_OFF_POS + 2)
-                       + (int32_t)((double)Sin8(head) * (double)step
-                                   + (double)*(const float *)
-                                       (o + OBJ_OFF_SUBPIXEL_Y)));
+        /* Both offsets are worked out before either is stored. */
+        {
+            int32_t dx = (int32_t)((double)Cos8(head) * (double)step
+                                   + (double)*(const float *)(o + OBJ_OFF_SUBPIXEL_X));
+            int32_t dy = (int32_t)((double)Sin8(head) * (double)step
+                                   + (double)*(const float *)(o + OBJ_OFF_SUBPIXEL_Y));
+
+            out->x = (int16_t)(*(const int16_t *)(o + OBJ_OFF_POS) + dx);
+            out->y = (int16_t)(*(const int16_t *)(o + OBJ_OFF_POS + 2) + dy);
+        }
+    }
     return 1;
 }
 
@@ -1073,6 +1073,7 @@ int32_t __cdecl AnimStepPoint(void *obj, uint8_t heading, int32_t pose,
     const AM2_AnimTable *table;
     int32_t              i;
     int32_t              speed;
+    uint8_t              bias;
 
     out->x = *(const int16_t *)(o + OBJ_OFF_POS);
     out->y = *(const int16_t *)(o + OBJ_OFF_POS + 2);
@@ -1084,11 +1085,9 @@ int32_t __cdecl AnimStepPoint(void *obj, uint8_t heading, int32_t pose,
     if (!table)
         return 0;
 
-    i = 0;
-    if (table->count > 0) {
-        while (i < table->count && table->entries[i].id != animId)
-            i++;
-    }
+    for (i = 0; i < table->count; i++)
+        if (table->entries[i].id == animId)
+            break;
     if (i >= table->count)
         i = 0;
 
@@ -1103,9 +1102,9 @@ int32_t __cdecl AnimStepPoint(void *obj, uint8_t heading, int32_t pose,
         == (uint32_t)ADDR_ROW_LUT_DOUBLES)
         speed += speed;
 
-    return MoveStepPoint(obj, heading, ((const uint8_t *)
-                             ((void *)(uintptr_t)(ADDR_FRAME_HEADING_BIAS)))[animId],
-                         speed, 0, 0, out);
+    /* The bias is a byte local, pushed as the byte argument it is. */
+    bias = ((const uint8_t *)((void *)(uintptr_t)(ADDR_FRAME_HEADING_BIAS)))[animId];
+    return MoveStepPoint(obj, heading, bias, speed, 0, 0, out);
 }
 
 /* Tile ids are (row << ADDR_MAP_ROW_SHIFT) | col, so a delta between two of
