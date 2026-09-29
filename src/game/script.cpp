@@ -909,7 +909,7 @@ static inline int32_t ScriptNamedTarget(AM2_ScriptCtx *ctx, int32_t *at,
 }
 
 /* Advance past a word, reporting the end of the script. */
-static int ScriptStep(AM2_ScriptCtx *ctx, int32_t *at)
+static inline int ScriptStep(AM2_ScriptCtx *ctx, int32_t *at)
 {
     if (++(*at) < ctx->count)
         return 1;
@@ -929,41 +929,31 @@ int32_t __cdecl ScriptHitTarget(AM2_ScriptCtx *ctx, int32_t *at, int32_t *mask)
 
     *mask = (int32_t)AM2_HIT_ANY;
 
+    /* One arm per word, each stepping for itself -- the army, then the
+     * kind. */
+#define IS_WORD(t, w) ((t)->kind == AM2_TOKEN_RESERVED \
+                       && (int32_t)(uintptr_t)(t)->value == (w))
+#define ARM(w, bit)                     \
+    if (IS_WORD(tok, w)) {              \
+        if (!ScriptStep(ctx, at))       \
+            return 0;                   \
+        *mask |= (int32_t)(bit);        \
+    }
     tok = &ctx->tokens[*at];
-    int32_t army = 0;
-    if (tok->kind == AM2_TOKEN_RESERVED) {
-        switch ((int32_t)(uintptr_t)tok->value) {
-        case AM2_TOK_GREEN:         army = AM2_HIT_GREEN; break;
-        case AM2_TOK_TAN:           army = AM2_HIT_TAN; break;
-        case AM2_TOK_BLUE:          army = AM2_HIT_BLUE; break;
-        case AM2_TOK_GREY:          army = AM2_HIT_GREY; break;
-        default: break;
-        }
-    }
-    if (army) {
-        if (!ScriptStep(ctx, at))
-            return 0;
-        *mask |= army;
-    } else {
+    ARM(AM2_TOK_GREEN, AM2_HIT_GREEN)
+    else ARM(AM2_TOK_TAN, AM2_HIT_TAN)
+    else ARM(AM2_TOK_BLUE, AM2_HIT_BLUE)
+    else ARM(AM2_TOK_GREY, AM2_HIT_GREY)
+    else
         *mask = (int32_t)AM2_HIT_ALL_ARMIES;
-    }
 
     tok = &ctx->tokens[*at];
-    if (tok->kind == AM2_TOKEN_RESERVED) {
-        int32_t type = 0;
-        switch ((int32_t)(uintptr_t)tok->value) {
-        case AM2_TOK_ITEM:          type = AM2_HIT_ITEM; break;
-        case AM2_TOK_SARGE:         type = AM2_HIT_SARGE; break;
-        case AM2_TOK_TROOPER:       type = AM2_HIT_TROOPER; break;
-        case AM2_TOK_VEHICLE:       type = AM2_HIT_VEHICLE; break;
-        default: break;
-        }
-        if (type) {
-            if (!ScriptStep(ctx, at))
-                return 0;
-            *mask |= type;
-        }
-    }
+    ARM(AM2_TOK_ITEM, AM2_HIT_ITEM)
+    else ARM(AM2_TOK_SARGE, AM2_HIT_SARGE)
+    else ARM(AM2_TOK_TROOPER, AM2_HIT_TROOPER)
+    else ARM(AM2_TOK_VEHICLE, AM2_HIT_VEHICLE)
+#undef ARM
+#undef IS_WORD
 
     /* Unreachable -- see the header. */
     if (*mask == 0) {
@@ -987,25 +977,35 @@ int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
 
     *val = (int32_t)AM2_HIT_ANY;
 
+    /* One arm per colour word, each stepping for itself: green tan blue
+     * grey are the reserved words 16 to 19. */
     tok = &ctx->tokens[*at];
-    int32_t which = -1;
-    if (tok->kind == AM2_TOKEN_RESERVED) {
-        int32_t id = (int32_t)(uintptr_t)tok->value;
-        if (id >= 16 && id <= 19)
-            which = id - 16;                    /* green tan blue grey */
-    }
-    if (which < 0) {
+#define IS_WORD(t, w) ((t)->kind == AM2_TOKEN_RESERVED \
+                       && (int32_t)(uintptr_t)(t)->value == (w))
+    if (IS_WORD(tok, 16)) {
+        if (!ScriptStep(ctx, at))
+            return 0;
+        *army = 0;
+    } else if (IS_WORD(tok, 17)) {
+        if (!ScriptStep(ctx, at))
+            return 0;
+        *army = 1;
+    } else if (IS_WORD(tok, 18)) {
+        if (!ScriptStep(ctx, at))
+            return 0;
+        *army = 2;
+    } else if (IS_WORD(tok, 19)) {
+        if (!ScriptStep(ctx, at))
+            return 0;
+        *army = 3;
+    } else {
         am2_log("Unknown item descriptor for ORDER or SETAIMODE event\n");
         return 0;
     }
-    if (!ScriptStep(ctx, at))
-        return 0;
-    *army = which;
     *form = AM2_ORDER_ARMY;
 
     tok = &ctx->tokens[*at];
-    if (tok->kind == AM2_TOKEN_RESERVED &&
-        (int32_t)(uintptr_t)tok->value == AM2_TOK_GROUP) {        /* group */
+    if (IS_WORD(tok, AM2_TOK_GROUP)) {          /* group */
         if (!ScriptStep(ctx, at))
             return 0;
         *form = AM2_ORDER_GROUP;
@@ -1015,6 +1015,7 @@ int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
     } else {
         *val = -1;
     }
+#undef IS_WORD
     return 1;
 }
 
@@ -3232,18 +3233,22 @@ static void ScriptSetDataDir(const char *dir)
 
 /* Read one script, with the progress line the comm object's verbose flag asks
  * for. The three sites in LoadLevelScript are identical but for the path. */
-static void ScriptReadWithLog(const char *path)
+static inline void ScriptReadWithLog(const char *path)
 {
-    int32_t verbose = *(const int32_t *)(kCommObject + COMM_OFF_VERBOSE) != 0;
+    int32_t ok;
 
-    if (verbose)
+    if (*(const int32_t *)(kCommObject + COMM_OFF_VERBOSE))
         am2_log("reading script %s: ", path);
 
-    int32_t ok = ReadScript(path, (AM2_ScriptCtx *)((void *)(uintptr_t)(ADDR_SCRIPT_CONTEXT)));
+    ok = ReadScript(path, (AM2_ScriptCtx *)((void *)(uintptr_t)(ADDR_SCRIPT_CONTEXT)));
 
     /* Re-read the flag: ReadScript can have changed it. */
-    if (*(const int32_t *)(kCommObject + COMM_OFF_VERBOSE))
-        am2_log(ok ? "worked!\n" : "FAILED!\n");
+    if (*(const int32_t *)(kCommObject + COMM_OFF_VERBOSE)) {
+        if (ok)
+            am2_log("worked!\n");
+        else
+            am2_log("FAILED!\n");
+    }
 }
 
 void __cdecl LoadLevelScript(void)
@@ -3296,37 +3301,38 @@ void __cdecl LoadLevelScript(void)
 #ifndef AM2_STR_COLOUR_GREY
 #define AM2_STR_COLOUR_GREY    0x00485138u  /* grey */
 #endif
-        static const uint32_t kColourName[4] = {
-            AM2_STR_COLOUR_GREEN, AM2_STR_COLOUR_TAN,
-            AM2_STR_COLOUR_BLUE, AM2_STR_COLOUR_GREY,
-        };
-        char aipath[0x40];
+        const char *colour;
+        int32_t     i;
 
         ScriptSetDataDir(kImageStr(ADDR_RULES_DIR_STR));
         sprintf(path, "%s.txt", kMpScriptName);
         ScriptReadWithLog(path);
 
-        for (int32_t i = 0; i < AM2_PLAYERS_MAX; i++) {
-            uint8_t *slot = kCommObject + (size_t)i * AM2_PLAYER_STRIDE;
-
-            if (!*(const int32_t *)(slot + AM2_PLAYER_ACTIVE))
+        for (i = 0; i < AM2_PLAYERS_MAX; i++) {
+#define SLOT (kCommObject + (size_t)i * AM2_PLAYER_STRIDE)
+            if (!*(const int32_t *)(SLOT + AM2_PLAYER_ACTIVE))
                 continue;
             /* A slot a real player still holds needs no AI script. The test
              * is the DirectPlay id, so this reads the opposite way round from
-             * the name it first went in under -- see ADDR_COMM_SLOT_HAS_PLAYER. */
-            if (((AM2_Comm *)kCommObject)->CommSlotHasPlayer(i))
+             * the name it first went in under -- see ADDR_COMM_SLOT_HAS_PLAYER.
+             * Its answer, zero on the way through, is what `colour` holds for
+             * an army above 3: the switch has no default, and the format then
+             * prints from NULL. No slot carries one, and this is the
+             * original's own omission. */
+            if ((colour = (const char *)(uintptr_t)
+                     ((AM2_Comm *)kCommObject)->CommSlotHasPlayer(i)) != 0)
                 continue;
 
-            int32_t army = *(const int32_t *)(slot + AM2_PLAYER_ARMY);
-            /* An army above 3 leaves the pointer at whatever the call above
-             * returned -- zero -- and the format prints from NULL. No slot
-             * carries one, and this is the original's own omission. */
-            const char *colour = 0;
-            if ((uint32_t)army <= 3)
-                colour = (const char *)((void *)(uintptr_t)(kColourName[army]));
+            switch (*(const int32_t *)(SLOT + AM2_PLAYER_ARMY)) {
+            case 0: colour = (const char *)((void *)(uintptr_t)AM2_STR_COLOUR_GREEN); break;
+            case 1: colour = (const char *)((void *)(uintptr_t)AM2_STR_COLOUR_TAN);   break;
+            case 2: colour = (const char *)((void *)(uintptr_t)AM2_STR_COLOUR_BLUE);  break;
+            case 3: colour = (const char *)((void *)(uintptr_t)AM2_STR_COLOUR_GREY);  break;
+            }
+#undef SLOT
 
-            sprintf(aipath, "%s_ai_%s.txt", kMpScriptName, colour);
-            ScriptReadWithLog(aipath);
+            sprintf(path, "%s_ai_%s.txt", kMpScriptName, colour);
+            ScriptReadWithLog(path);
         }
     }
 
