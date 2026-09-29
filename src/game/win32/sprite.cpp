@@ -927,7 +927,9 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
     void     *pixels;
     int32_t   rc;
 
-    if (!name || !name[0])
+    if (!name)
+        return 0;
+    if (!name[0])
         return 0;
 
     fp = orig_fopen(name, "rb");

@@ -554,35 +554,6 @@ void __cdecl State1Enter(void)
     StartAudioStream((void *)"title.wav", 0);
 }
 
-/* The twenty-one screen openers, in MENU MODE order, and every one of them is
- * already reconstructed -- checkseams said so the moment this went in as a
- * table of addresses, which is the fourth spelling of a seam it was extended
- * to catch: a table of plain integers that are function pointers. Written as
- * the openers themselves. */
-typedef void (__cdecl *AM2_OpenScreenFn)(void);
-static AM2_OpenScreenFn const kMenuScreens[AM2_MENU_MODE_MAX] = {
-    OpenTitleScreen,   /*  1 */
-    OpenSelectMap,     /*  2 */
-    OpenSelectPlayer,  /*  3 */
-    OpenEnterName,     /*  4 */
-    OpenLoadGame,      /*  5 */
-    OpenCommPanel,     /*  6 */
-    OpenMpHost,        /*  7 */
-    OpenMpOptions,     /*  8 */
-    OpenMpJoin,        /*  9 */
-    OpenWarMenu,       /* 10 */
-    OpenBattleName,    /* 11 */
-    OpenBattleJoin,    /* 12 */
-    OpenMovies,        /* 13 */
-    OpenOptionsMenu,   /* 14 */
-    OpenControls,      /* 15 */
-    OpenDifficulty,    /* 16 */
-    OpenQuitConfirm,   /* 17 */
-    OpenReplayPrompt,  /* 18 */
-    OpenAudioOptions,  /* 19 */
-    OpenDeletePlayer,  /* 20 */
-    OpenDeleteGame    /* 21 */
-};
 
 
 /* State1Menu -- original 0x00426400, two callers, both in State1Frame below.
@@ -620,16 +591,37 @@ static AM2_OpenScreenFn const kMenuScreens[AM2_MENU_MODE_MAX] = {
 void __cdecl State1Menu(void)
 {
     void   *dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
-    int32_t mode;
 
     if (dlg) {
         ObjVDelete(dlg, 1);
         *(void **)(uintptr_t)ADDR_PAINT_OBJECT = (void *)0;
     }
 
-    mode = *(const int32_t *)(uintptr_t)ADDR_MENU_MODE;
-    if (mode >= 1 && mode <= AM2_MENU_MODE_MAX)
-        kMenuScreens[mode - 1]();
+    /* One arm per screen, in the image's layout order; the case values are
+     * the menu modes. */
+    switch (*(const int32_t *)(uintptr_t)ADDR_MENU_MODE) {
+    case  1: OpenTitleScreen(); break;
+    case  2: OpenSelectMap(); break;
+    case  3: OpenSelectPlayer(); break;
+    case  4: OpenEnterName(); break;
+    case  5: OpenLoadGame(); break;
+    case  6: OpenCommPanel(); break;
+    case 10: OpenWarMenu(); break;
+    case 11: OpenBattleName(); break;
+    case 12: OpenBattleJoin(); break;
+    case  7: OpenMpHost(); break;
+    case  8: OpenMpOptions(); break;
+    case  9: OpenMpJoin(); break;
+    case 13: OpenMovies(); break;
+    case 15: OpenControls(); break;
+    case 21: OpenDeleteGame(); break;
+    case 20: OpenDeletePlayer(); break;
+    case 16: OpenDifficulty(); break;
+    case 17: OpenQuitConfirm(); break;
+    case 18: OpenReplayPrompt(); break;
+    case 19: OpenAudioOptions(); break;
+    case 14: OpenOptionsMenu(); break;
+    }
 
     dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
     if (dlg) {

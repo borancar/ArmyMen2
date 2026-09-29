@@ -7825,36 +7825,28 @@ void __cdecl Type238Action(void *obj, int32_t award)
 
     *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME) += award;
 
-    for (;;) {
-        const uint8_t *rec = (const uint8_t *)(uintptr_t)ADDR_RANK_RECORDS
-                             + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
-                               * RANK_REC_BYTES;
-        int16_t health;
-        int16_t maxHealth;
+    /* The rank's record, indexed afresh at each use. */
+#define RANK_REC ((const uint8_t *)(uintptr_t)ADDR_RANK_RECORDS \
+                  + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK) * RANK_REC_BYTES)
+    while (1) {
+        int32_t grown;
 
         if (*(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME)
-            < *(const int32_t *)(rec + RANK_REC_OFF_XP))
+            < *(const int32_t *)(RANK_REC + RANK_REC_OFF_XP))
             return;
 
         RankPromote(obj);
+        SetMaxHealth(obj, *(const int32_t *)(RANK_REC + RANK_REC_OFF_MAX_HEALTH));
 
-        rec = (const uint8_t *)(uintptr_t)ADDR_RANK_RECORDS
-              + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK) * RANK_REC_BYTES;
-        SetMaxHealth(obj, *(const int32_t *)(rec + RANK_REC_OFF_MAX_HEALTH));
-
-        health    = *(const int16_t *)(o + OBJ_OFF_HEALTH);
-        maxHealth = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        {
-            int32_t grown = (int32_t)health + ((int32_t)health >> 2);
-
-            if (grown >= (int32_t)maxHealth)
-                grown = (int32_t)maxHealth;
-            *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)grown;
-        }
-
+        grown = *(const int16_t *)(o + OBJ_OFF_HEALTH);
+        grown += grown >> 2;
+        if (grown >= *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH))
+            grown = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
+        *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)grown;
         if (*(const int32_t *)(o + OBJ_OFF_RANK) >= AM2_RANK_MAX)
-            return;
+            break;
     }
+#undef RANK_REC
 }
 
 /* 0x00428E00, seven callers. Step every one of the object's rows, then take

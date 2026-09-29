@@ -3482,16 +3482,16 @@ int32_t __cdecl ScriptRunLine(const char *line)
 int32_t __cdecl AddToVar(int32_t index, int32_t delta)
 {
     int32_t v = 0;
+    int32_t ok;
 
-    if (index <= 0)
-        return 0;
-
-    if (!GetVarValue(index, &v))
-        return 0;
-
-    v += delta;
-
-    return SetVarValue(index, v) ? 1 : 0;
+    if (index > 0) {
+        /* The read's answer is kept as a flag and tested after the add. */
+        ok = GetVarValue(index, &v) != 0;
+        v += delta;
+        if (ok && SetVarValue(index, v))
+            return 1;
+    }
+    return 0;
 }
 
 int script_install(void)
