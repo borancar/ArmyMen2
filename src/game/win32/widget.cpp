@@ -1069,7 +1069,7 @@ static const uint8_t kEdgeItemIndex[AM2_ITEM_TYPE_LAST - AM2_ITEM_TYPE_FIRST + 1
  * guard is the original's and it is on the DENOMINATOR being positive, not on
  * the numerator -- an object with zero max health would divide by zero and the
  * game would take the fault, so the check has to stay where it is. */
-static int32_t EdgeBar(int32_t value, int32_t max)
+static inline int32_t EdgeBar(int32_t value, int32_t max)
 {
     return value * AM2_HUD_BAR_WIDTH / max;
 }
@@ -1154,19 +1154,6 @@ static void EdgeBarFill(const AM2_Widget *w, int32_t pen, int32_t percent,
 
 
 
-/* Object type -> sarge sprite index, for types AM2_ITEM_TYPE_FIRST..LAST. The
- * original is a 41-entry jump table whose arms are `mov ecx, imm`, so this is
- * the table read through the arms rather than the arms read in layout order --
- * the same discipline the edge strip's vehicle table needed, and here the two
- * orders genuinely differ: entry 24 lands on the arm that sets 10 while the
- * arm before it sets 8. Zero is the default and several real types map to it. */
-static const uint8_t kSargeSprite[AM2_ITEM_TYPE_LAST - AM2_ITEM_TYPE_FIRST + 1] = {
-     2,  3,  1,  4,  0,  0, 16,  0,  5,  7,
-     6,  0,  0, 26, 27, 28, 29, 30,  8,  0,
-     0, 12, 10, 11,  9,  0, 13, 14, 15,  0,
-     0,  0, 17, 18, 19, 20, 21, 22, 23, 24,
-    25
-};
 
 
 
@@ -5938,7 +5925,6 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
     AM2_Widget *w = this;
 
     uint8_t        *self = (uint8_t *)w;
-    const int16_t  *grid = (const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SARGE_OFFSETS));
     uint8_t        *obj;
     int32_t         i;
 
@@ -5953,116 +5939,141 @@ void __attribute__((thiscall)) AM2_Widget::HudSargeUpdate()
         return;
 
     /* Pass one: the hotkeys, first match wins and nothing else runs. */
-    for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
-        if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + i)) {
-            SelectWeapon(obj, i);
-            goto refill;
+    /* Pass one: the six weapon keys, a ladder whose first match wins and
+     * skips the mouse pass. Pass two: the mouse, while the panel is open. */
+    if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 0))
+        SelectWeapon(obj, 0);
+    else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 1))
+        SelectWeapon(obj, 1);
+    else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 2))
+        SelectWeapon(obj, 2);
+    else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 3))
+        SelectWeapon(obj, 3);
+    else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 4))
+        SelectWeapon(obj, 4);
+    else if (ActionKeyPressed(AM2_ACTION_WEAPON_FIRST + 5))
+        SelectWeapon(obj, 5);
+    else if (*(const int32_t *)((const uint8_t *)*(AM2_Widget *const *)
+                                    (uintptr_t)ADDR_HUD_WIDGET_B
+                                + HUDPANEL_OFF_OPEN)) {
+        for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
+            const uint8_t *rec = self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE;
+            AM2_Rect       cell;
+            uint32_t       uid;
+
+/* The row's sprite, looked up again at each use. */
+#define SARGE_SPR (*(AM2_Sprite **)(self + HUDSARGE_OFF_SPRITES \
+                    + *(const int32_t *)(rec + HUDSARGE_REC_INDEX) * 4))
+            if (*(const int32_t *)(rec + HUDSARGE_REC_INDEX) < 0)
+                continue;
+            if (!SARGE_SPR)
+                continue;
+
+            cell.left   = ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SARGE_OFFSETS)))[i * 2]
+                          + w->rect.left;
+            cell.top    = w->rect.top
+                          + ((const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SARGE_OFFSETS)))[i * 2 + 1];
+            cell.right  = SARGE_SPR->bounds.right  + cell.left;
+            cell.bottom = SARGE_SPR->bounds.bottom + cell.top;
+#undef SARGE_SPR
+
+            if (!PointInRect(&cell, (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+                continue;
+
+            if (!*(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB
+                && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+                *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
+
+            if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+                && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
+                && *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB == w)
+                SelectWeapon(obj, i);
+
+            /* The tooltip, and it is gated on STILLNESS rather than on the
+             * click. ADDR_MOUSE_ACTIVITY is stamped from the clock on any
+             * movement or button change, so this fires while the pointer
+             * rests on a cell. */
+            if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_ACTIVITY
+                > AM2_HUD_TOOLTIP_DWELL) {
+                const uint8_t *item;
+
+                uid = *(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4);
+                if (!uid)
+                    continue;
+
+                item = (const uint8_t *)WeaponByUid(uid);
+                if (!item)
+                    continue;
+
+                strcpy((char *)((uint8_t *)*(AM2_Widget *const *)
+                                    (uintptr_t)ADDR_HUD_WIDGET_B
+                                + HUDPANEL_OFF_CAPTION),
+                       ItemTypeName(
+                           **(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0)));
+            }
         }
     }
 
-    /* Pass two: the mouse, but only while the panel is open. */
-    if (!*(const int32_t *)((const uint8_t *)*(AM2_Widget *const *)
-                                (uintptr_t)ADDR_HUD_WIDGET_B
-                            + HUDPANEL_OFF_OPEN))
-        goto refill;
-
-    for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
-        const uint8_t *rec = self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE;
-        int32_t        idx = *(const int32_t *)(rec + HUDSARGE_REC_INDEX);
-        AM2_Sprite    *spr;
-        AM2_Rect       cell;
-        AM2_Widget    *grab;
-        int32_t        changed;
-        uint32_t       uid;
-
-        if (idx < 0)
-            continue;
-
-        spr = *(AM2_Sprite **)(self + HUDSARGE_OFF_SPRITES + idx * 4);
-        if (!spr)
-            continue;
-
-        cell.left   = grid[i * 2]     + w->rect.left;
-        cell.top    = grid[i * 2 + 1] + w->rect.top;
-        cell.right  = spr->bounds.right  + cell.left;
-        cell.bottom = spr->bounds.bottom + cell.top;
-
-        if (!PointInRect(&cell, (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
-            continue;
-
-        grab    = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
-        changed = *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED;
-
-        if (!grab && changed) {
-            grab = w;
-            *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
-        }
-
-        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
-            && changed && grab == w)
-            SelectWeapon(obj, i);
-
-        /* The tooltip, and it is gated on STILLNESS rather than on the click.
-         * ADDR_MOUSE_ACTIVITY is stamped from the clock on any movement or
-         * button change, so this fires while the pointer rests on a cell. */
-        if ((int32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-                      - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_ACTIVITY)
-            > AM2_HUD_TOOLTIP_DWELL) {
-            const uint8_t *item;
-
-            uid = *(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4);
-            if (!uid)
-                continue;
-
-            item = (const uint8_t *)WeaponByUid(uid);
-            if (!item)
-                continue;
-
-            strcpy((char *)((uint8_t *)*(AM2_Widget *const *)
-                                (uintptr_t)ADDR_HUD_WIDGET_B
-                            + HUDPANEL_OFF_CAPTION),
-                   ItemTypeName(
-                       **(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0)));
-        }
-    }
-
-refill:
     /* Pass three: rebuild every record from the inventory. */
     for (i = 0; i < AM2_HUD_SARGE_ROWS; i++) {
-        uint8_t       *rec = self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE;
-        uint32_t       uid = *(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4);
         const uint8_t *item;
-        uint32_t       kind;
+        int32_t        sprite;
         int32_t        ammo;
 
-        if (!uid) {
-            *(int32_t *)(rec + HUDSARGE_REC_INDEX) = -1;
-            continue;
+        if (*(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4)
+            && (item = (const uint8_t *)WeaponByUid(
+                    *(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4))) != 0) {
+            /* Which icon: a switch on the item kind, and the image's jump
+             * table at 0x004154F0 lists the arms in this order. */
+            switch (**(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0)) {
+        case 2: sprite = 2; break;
+        case 3: sprite = 3; break;
+        case 4: sprite = 1; break;
+        case 5: sprite = 4; break;
+        case 10: sprite = 5; break;
+        case 11: sprite = 7; break;
+        case 12: sprite = 6; break;
+        case 15: sprite = 26; break;
+        case 16: sprite = 27; break;
+        case 17: sprite = 28; break;
+        case 18: sprite = 29; break;
+        case 19: sprite = 30; break;
+        case 20: sprite = 8; break;
+        case 26: sprite = 9; break;
+        case 24: sprite = 10; break;
+        case 25: sprite = 11; break;
+        case 23: sprite = 12; break;
+        case 28: sprite = 13; break;
+        case 29: sprite = 14; break;
+        case 30: sprite = 15; break;
+        case 8: sprite = 16; break;
+        case 34: sprite = 17; break;
+        case 35: sprite = 18; break;
+        case 36: sprite = 19; break;
+        case 37: sprite = 20; break;
+        case 38: sprite = 21; break;
+        case 39: sprite = 22; break;
+        case 40: sprite = 23; break;
+        case 41: sprite = 24; break;
+        case 42: sprite = 25; break;
+        default: sprite = 0; break;
+            }
+            *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_INDEX) = sprite;
+
+            ammo = *(const int32_t *)(item + ITEM_OFF_AMMO);
+            if (ammo > AM2_HUD_SARGE_AMMO_MAX)
+                ammo = AM2_HUD_SARGE_AMMO_MAX;
+            *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_COUNT) = ammo;
+
+            /* 1 or 2, never a boolean -- see the header comment. */
+            *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_READY) =
+                i == *(const int32_t *)(obj + UNIT_OFF_INVENTORY_SEL)
+                ? (ItemIsReady(item) != 0) + 1
+                : 0;
+        } else {
+            *(int32_t *)(self + HUDSARGE_OFF_SLOTS + i * HUDSARGE_REC_STRIDE + HUDSARGE_REC_INDEX) = -1;
         }
-
-        item = (const uint8_t *)WeaponByUid(uid);
-        if (!item) {
-            *(int32_t *)(rec + HUDSARGE_REC_INDEX) = -1;
-            continue;
-        }
-
-        kind = **(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0);
-        *(int32_t *)(rec + HUDSARGE_REC_INDEX) =
-            kind - AM2_ITEM_TYPE_FIRST
-                <= (uint32_t)(AM2_ITEM_TYPE_LAST - AM2_ITEM_TYPE_FIRST)
-            ? kSargeSprite[kind - AM2_ITEM_TYPE_FIRST]
-            : 0;
-
-        ammo = *(const int32_t *)(item + ITEM_OFF_AMMO);
-        if (ammo > AM2_HUD_SARGE_AMMO_MAX)
-            ammo = AM2_HUD_SARGE_AMMO_MAX;
-        *(int32_t *)(rec + HUDSARGE_REC_COUNT) = ammo;
-
-        /* 1 or 2, never a boolean -- see the header comment. */
-        *(int32_t *)(rec + HUDSARGE_REC_READY) =
-            i == *(const int32_t *)(obj + UNIT_OFF_INVENTORY_SEL)
-            ? (ItemIsReady(item) != 0) + 1
-            : 0;
     }
 }
 
@@ -7935,7 +7946,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopPaint(RECT clip)
 
     if (LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)) {
         if (*(const int32_t *)(self + HUDLOG_OFF_TYPING)) {
-            char        line[96];
+            char        line[120];   /* the original's frame */
             const char *typed = (const char *)(self + HUDLOG_OFF_TYPED);
             size_t      n;
 
@@ -7951,21 +7962,20 @@ void __attribute__((thiscall)) AM2_Widget::HudTopPaint(RECT clip)
                      line, 1, 0,
                      *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
         } else {
-            int32_t rows = *(const int32_t *)(self + HUDLOG_OFF_COUNT);
             int32_t i;
 
-            for (i = 0; i < rows; i++) {
+            for (i = 0; i < *(const int32_t *)(self + HUDLOG_OFF_COUNT); i++) {
                 const uint8_t *row = self + HUDLOG_OFF_ROWS
                                      + i * AM2_HUD_MSG_SIZE;
 
-                DrawText((int32_t)((double)
-                             *(const float *)(row + HUDMSG_OFF_X)
-                             - *(const float *)(self + HUDLOG_OFF_SCROLL))
-                             + w->rect.left
-                             + *(const int32_t *)(self + HUDLOG_OFF_TYPED_X),
-                         *(const int32_t *)(self + HUDLOG_OFF_TYPED_Y)
-                             + w->rect.top,
-                         (const char *)row, 1, 0,
+                x = (int32_t)((double)
+                        *(const float *)(row + HUDMSG_OFF_X)
+                        - *(const float *)(self + HUDLOG_OFF_SCROLL))
+                    + w->rect.left
+                    + *(const int32_t *)(self + HUDLOG_OFF_TYPED_X);
+                y = w->rect.top
+                    + *(const int32_t *)(self + HUDLOG_OFF_TYPED_Y);
+                DrawText(x, y, (const char *)row, 1, 0,
                          *(const uint8_t *)(uintptr_t)ADDR_COLOUR_STALE);
             }
         }
@@ -7976,33 +7986,29 @@ void __attribute__((thiscall)) AM2_Widget::HudTopPaint(RECT clip)
     ::WidgetPaint(w, clip);
 
     {
-        AM2_Sprite *spr =
-            *(AM2_Sprite *const *)(self + HUDLOG_OFF_BUTTON_SPRITE);
         AM2_Rect    box, part;
 
-        if (!spr)
+/* The button sprite, read again at each use. */
+#define TOP_SPR (*(AM2_Sprite *const *)(self + HUDLOG_OFF_BUTTON_SPRITE))
+        if (!TOP_SPR)
             return;
 
-        box.left   = *(const int32_t *)(self + HUDLOG_OFF_BUTTON_X)
-                     + w->rect.left;
-        box.top    = w->rect.top;
-        box.right  = spr->bounds.right + box.left;
-        box.bottom = spr->bounds.bottom + box.top;
+        x = box.left = *(const int32_t *)(self + HUDLOG_OFF_BUTTON_X)
+                       + w->rect.left;
+        y = box.top  = w->rect.top;
+        box.right  = TOP_SPR->bounds.right + box.left;
+        box.bottom = TOP_SPR->bounds.bottom + box.top;
 
         if (!IntersectRect(&hit, (const RECT *)&box, &clip))
             return;
 
-        x = box.left;
-        y = box.top;
-
-        if (!ClipRect(&spr->bounds, (const AM2_Rect *)&clip, &x, &y, &part))
+        if (!ClipRect(&TOP_SPR->bounds, (const AM2_Rect *)&hit, &x, &y, &part))
             return;
 
-        /* The ADJUSTED pair. The original reads back the very stack slots it
-         * handed ClipRect as &x and &y. Both forms exist in this binary --
-         * ::HudCommandsPaint below deliberately uses its saved origin instead --
-         * so it has to be read per function rather than assumed. */
-        DrawSpriteClipped(spr, x, y, &part, 0);
+        /* The ADJUSTED pair: the original reads back the very stack slots it
+         * handed ClipRect as &x and &y, as every HUD painter does. */
+        DrawSpriteClipped(TOP_SPR, x, y, &part, 0);
+#undef TOP_SPR
     }
 }
 
@@ -8663,6 +8669,7 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
     AM2_Widget *w = this;
 
     uint8_t       *self = (uint8_t *)w;
+    char          *capB = (char *)(self + EDGE_OFF_CAPTION_B);
     const uint8_t *obj;
     int32_t        i;
 
@@ -8670,22 +8677,19 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
 
     if (PointInRect((const AM2_Rect *)&w->rect,
                     (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)) {
-        AM2_Widget *grab    = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
-        int32_t     changed = *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED;
-
-        if (!grab && changed) {
-            grab = w;
+        if (!*(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB
+            && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
             *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
-        }
 
         if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
-            && changed && grab == w) {
-            uint8_t *panel = (uint8_t *)*(AM2_Widget *const *)
-                                 (uintptr_t)ADDR_HUD_WIDGET_B;
-
+            && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
+            && *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB == w) {
             PlaySoundAt(0, 0, 0, 0, 0);
-            *(int32_t *)(panel + HUDPANEL_OFF_OPEN) =
-                *(const int32_t *)(panel + HUDPANEL_OFF_OPEN) == 0;
+            *(int32_t *)((uint8_t *)*(AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_B
+                         + HUDPANEL_OFF_OPEN) =
+                *(const int32_t *)((const uint8_t *)*(AM2_Widget *const *)
+                                       (uintptr_t)ADDR_HUD_WIDGET_B
+                                   + HUDPANEL_OFF_OPEN) == 0;
         }
     }
 
@@ -8695,7 +8699,7 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
     *(int32_t *)(self + EDGE_OFF_HEALTH_PCT) = 0;
     *(char *)(self + EDGE_OFF_CAPTION_A)     = '\0';
     *(int32_t *)(self + EDGE_OFF_SECOND_PCT) = 0;
-    *(char *)(self + EDGE_OFF_CAPTION_B)     = '\0';
+    *capB                                    = '\0';
     *(int32_t *)(self + EDGE_OFF_AMMO)       = -1;
 
     if (!obj) {
@@ -8711,12 +8715,20 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
     if (*(const uint32_t *)(obj + OBJ_OFF_RIDING)) {
         const uint8_t *veh = (const uint8_t *)LookupType3ByUID(
                                  *(const uint32_t *)(obj + OBJ_OFF_RIDING));
-        uint32_t       kind;
+        const char    *name;
 
         if (veh) {
-            kind = *(const uint32_t *)(veh + VEHICLE_OFF_KIND);
-            strcpy((char *)(self + EDGE_OFF_CAPTION_A),
-                   kind < AM2_VEHICLE_KINDS ? kEdgeVehicle[kind] : "???");
+            /* A switch over string literals, and the image's jump table
+             * (0x00419A18) sends kind 4 to the default. */
+            switch (*(const uint32_t *)(veh + VEHICLE_OFF_KIND)) {
+            case 0:  name = "JEEP"; break;
+            case 1:  name = "TANK"; break;
+            case 2:  name = "H|T";  break;
+            case 3:  name = "CONV"; break;
+            case 5:  name = "BOAT"; break;
+            default: name = "???";  break;
+            }
+            strcpy((char *)(self + EDGE_OFF_CAPTION_A), name);
             *(int32_t *)(self + EDGE_OFF_SECOND_PCT) =
                 EdgeBar(*(const int16_t *)(veh + OBJ_OFF_HEALTH),
                         *(const int16_t *)(veh + OBJ_OFF_MAX_HEALTH));
@@ -8726,38 +8738,63 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgeUpdate()
     }
 
     for (i = 0; i < AM2_INVENTORY_SLOTS; i++) {
-        uint32_t       uid = *(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4);
         const uint8_t *item;
-        const uint8_t *type;
+        const char    *name;
 
-        if (!uid)
+        if (!*(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4))
             break;
 
-        item = (const uint8_t *)WeaponByUid(uid);
+        item = (const uint8_t *)WeaponByUid(
+                   *(const uint32_t *)(obj + UNIT_OFF_INVENTORY + i * 4));
         if (!item)
             continue;
 
-        type = *(const uint8_t *const *)(item + OBJ_OFF_FIELD_C0);
-
         if (i == *(const int32_t *)(obj + UNIT_OFF_INVENTORY_SEL)) {
-            uint32_t kind = *(const uint32_t *)(type + ITEMTYPE_OFF_KIND);
-
             *(int32_t *)(self + EDGE_OFF_AMMO) =
                 *(const int32_t *)(item + ITEM_OFF_AMMO);
 
-            strcpy((char *)(self + EDGE_OFF_CAPTION_B),
-                   kind - AM2_ITEM_TYPE_FIRST
-                       <= (uint32_t)(AM2_ITEM_TYPE_LAST - AM2_ITEM_TYPE_FIRST)
-                   ? kEdgeItem[kEdgeItemIndex[kind - AM2_ITEM_TYPE_FIRST]]
-                   : "???");
+            /* The caption: a switch over string literals, compiled to the
+             * byte table at 0x00419A94 and the jump table before it. The
+             * case order is the arms' order in the image. */
+            switch (**(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0)) {
+                case 2: name = "GREN"; break;
+                case 3: name = "FLAM"; break;
+                case 4: name = "BAZ"; break;
+                case 5: name = "MORT"; break;
+                case 9: name = "RIFLE"; break;
+                case 10: name = "AUTO"; break;
+                case 11: name = "MINE"; break;
+                case 12: name = "EXPL"; break;
+                case 15: case 16: case 17: case 18: case 19: name = "FLAG"; break;
+                case 20: name = "MSWP"; break;
+                case 23: name = "MEDI"; break;
+                case 24: name = "AIRS"; break;
+                case 25: name = "PARA"; break;
+                case 26: name = "RECO"; break;
+                case 27: name = "NOTE"; break;
+                case 28: name = "FLAK"; break;
+                case 8: name = "HvMG"; break;
+                case 29: name = "VULC"; break;
+                case 30: name = "SNIP"; break;
+                case 35: case 36: case 37: case 38: name = "DISG"; break;
+                case 39: name = "MAG"; break;
+                case 40: name = "AERO"; break;
+                case 41: name = "WREN"; break;
+                case 42: name = "M80"; break;
+            default: name = "???"; break;
+            }
+            strcpy(capB, name);
         }
 
         /* Falls through from the branch above, deliberately. */
-        if (*(const uint32_t *)(type + ITEMTYPE_OFF_KIND) == AM2_ITEM_TYPE_ARMOR) {
+        if (**(const uint32_t *const *)(item + OBJ_OFF_FIELD_C0)
+            == AM2_ITEM_TYPE_ARMOR) {
             strcpy((char *)(self + EDGE_OFF_CAPTION_A), "ARMOR");
             *(int32_t *)(self + EDGE_OFF_SECOND_PCT) =
                 EdgeBar(*(const int32_t *)(item + ITEM_OFF_AMMO),
-                        *(const int32_t *)(type + ITEMTYPE_OFF_CAPACITY));
+                        *(const int32_t *)(*(const uint8_t *const *)
+                                               (item + OBJ_OFF_FIELD_C0)
+                                           + ITEMTYPE_OFF_CAPACITY));
         }
     }
 
@@ -16507,38 +16544,34 @@ AM2_Typer::AM2_Typer(AM2_Rect box, const char *message)
     char     line[AM2_TYPER_LINE_MAX];
     int32_t  start = 0;
     int32_t  cur   = 0;
+    const char *space;
+    int32_t  next;
     AM2_CTOR_VTABLE(w, VTABLE_TYPER);
     *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
     ::WidgetScreenRect(w);
     text[0] = '\0';
 
-    for (;;) {
-        const char *space = orig_strchr(message + cur, ' ');
-        int32_t     avail = w->rect.right - w->rect.left - AM2_TYPER_MARGIN;
-        int32_t     next;
-
-        if (!space)
-            break;
+    while ((space = orig_strchr(message + cur, ' ')) != 0) {
         next = (int32_t)(space - message) + 1;
         orig_strncpy(line, message + start, (uint32_t)(next - start));
         line[next - start] = '\0';
-        if (TextExtent(line, 1, (int32_t *)0) <= avail) {
+        if (TextExtent(line, 1, (int32_t *)0)
+            > w->rect.right - w->rect.left - AM2_TYPER_MARGIN) {
+            orig_strncpy(line, message + start, (uint32_t)(cur - start));
+            line[cur - start] = '\0';
+            strcat(text, line);
+            strcat(text, "|");
+            start = cur;
+        } else {
             cur = next;
-            continue;
         }
-        orig_strncpy(line, message + start, (uint32_t)(cur - start));
-        line[cur - start] = '\0';
-        strcat(text, line);
-        strcat(text, "|");
-        start = cur;
     }
 
     /* The tail after the last space, measured once more. */
     {
-        int32_t avail = w->rect.right - w->rect.left - AM2_TYPER_MARGIN;
-
         strcpy(line, message + start);
-        if (TextExtent(line, 1, (int32_t *)0) > avail) {
+        if (TextExtent(line, 1, (int32_t *)0)
+            > w->rect.right - w->rect.left - AM2_TYPER_MARGIN) {
             orig_strncpy(line, message + start, (uint32_t)(cur - start));
             line[cur - start] = '\0';
             strcat(text, line);

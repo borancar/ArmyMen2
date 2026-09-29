@@ -6673,7 +6673,8 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
 #define ADDR_CRT_STRCHR          0x004663B0u /* char *(const char *, int) */
 #define ADDR_STR_LINE_BREAK      0x0048BD8Cu /* "|", not a newline */
 #define AM2_TYPER_MARGIN         12          /* taken off the usable width */
-#define AM2_TYPER_LINE_MAX       0x10Cu      /* the constructor's scratch */
+#define AM2_TYPER_LINE_MAX       0x100u      /* the constructor's scratch line; with its
+                                                three counters, the 0x10C frame */
 
 /* The TITLE SCREEN, 0x0044D730 -- arm 1 of the menu table, and the one arm
  * that is not a factory: it builds the whole screen inline.

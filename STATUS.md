@@ -96,7 +96,11 @@ main result so far (details in `src/vc6/README.md`):
     button to the right); a vehicle without Sarge first offers no commands
     (ours offered the trooper's three); partly clipped HUD command icons
     draw at ClipRect's adjusted position; a missing squad pip sprite skips
-    that pip instead of ending the row.
+    that pip instead of ending the row; the Typer wraps at a 0x100-byte
+    line (the constant had been read off its 0x10C frame).
+  - **Close but not matched**: HudSargeUpdate and HudTopPaint are within
+    a few instructions; HudEdgeUpdate's two switches follow the
+    original's jump tables and what remains is register choice.
   - **Parked**: the five copy-protection call sites (OnStartWar and four
     more) cannot match while the reference keeps GOG's `jmp`s -- a policy
     question, not a source one; a `rows + i*stride` operand order
