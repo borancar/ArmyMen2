@@ -2599,9 +2599,9 @@ void __cdecl SeqAddKind5(const int32_t *at, int32_t owner, int32_t life)
 
     seq = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_A);
 
-    *(int32_t *)(seq + SEQ_OFF_OWNER)    = owner;
     *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND5;
     *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
+    *(int32_t *)(seq + SEQ_OFF_OWNER)    = owner;
     *(int32_t *)(seq + SEQ_OFF_FIELD_0C) = 0;
     *(int32_t *)(seq + SEQ_OFF_FIELD_10) = 0;
     *(int32_t *)(seq + SEQ_OFF_LIFE)     = AM2_SEQ_LIFE5;
@@ -2637,9 +2637,9 @@ void __cdecl SeqAddKind7(const int32_t *at, int32_t owner, int32_t b,
 
     seq = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_A);
 
-    *(int32_t *)(seq + SEQ_OFF_OWNER)    = owner;
     *(int32_t *)(seq + SEQ_OFF_KIND)     = AM2_SEQ_KIND7;
     *(uint8_t *)(seq + SEQ_OFF_FLAG4)    = 0;
+    *(int32_t *)(seq + SEQ_OFF_OWNER)    = owner;
     *(int32_t *)(seq + SEQ_OFF_LIFE)     = AM2_SEQ_LIFE7;
     *(int32_t *)(seq + SEQ_OFF_FIELD_0C) = 0;
     if (life > 0)

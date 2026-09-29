@@ -13121,20 +13121,23 @@ void __attribute__((thiscall)) AM2_Widget::KeyRowUpdate()
 
     /* A key can be bound in one place only: take it off every other row. */
     {
-        AM2_Widget **rows =
-            (AM2_Widget **)((uint8_t *)w->parent + KEYROW_PARENT_ROWS);
+        /* The rows are a member array of the dialog, re-read after every
+         * store -- a local copy of rows[i] makes VC6 keep it in a register. */
+        struct KeyRowParent {
+            uint8_t     pad[KEYROW_PARENT_ROWS];
+            AM2_Widget *rows[KEYROW_ROW_COUNT];
+        };
+        KeyRowParent *parent = (KeyRowParent *)w->parent;
         const char  *none = "None";
         int32_t      i;
 
         for (i = 0; i < KEYROW_ROW_COUNT; i++) {
-            AM2_Widget *other = rows[i];
-
-            if (other == w)
+            if (w == parent->rows[i])
                 continue;
-            if (*(const int32_t *)((uint8_t *)other + KEYROW_OFF_KEY) != key)
+            if (*(const int32_t *)((uint8_t *)parent->rows[i] + KEYROW_OFF_KEY) != key)
                 continue;
-            *(int32_t *)((uint8_t *)other + KEYROW_OFF_KEY)     = 0;
-            *(const char **)((uint8_t *)other + LABEL_OFF_TEXT) = none;
+            *(int32_t *)((uint8_t *)parent->rows[i] + KEYROW_OFF_KEY)     = 0;
+            *(const char **)((uint8_t *)parent->rows[i] + LABEL_OFF_TEXT) = none;
         }
     }
 }
