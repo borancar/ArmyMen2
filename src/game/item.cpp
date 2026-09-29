@@ -6565,9 +6565,9 @@ void __cdecl PointActionA(void *obj, uint32_t point)
 
     NearestAllowedTile(obj, TileOfPoint(point), &point);
 
+    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) = point;
     *(int32_t *)(o + OBJ_OFF_FIELD_EC) =
         (*(const int32_t *)(o + OBJ_OFF_FIELD_F4) > 0) ? 1 : 0;
-    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) = point;
 
     if (*(const int32_t *)(o + OBJ_OFF_AI_MODE) == 3)
         *(int32_t *)(o + OBJ_OFF_AI_MODE) = 1;

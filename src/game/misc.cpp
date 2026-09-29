@@ -800,7 +800,7 @@ void __cdecl ListUnlink(void *node, void **head)
     if (!PREV) {
         *head = NEXT;
         if (NEXT)
-            *(uint8_t **)(NEXT + 4) = PREV;
+            *(uint8_t **)(NEXT + 4) = 0;
     } else {
         *(uint8_t **)(PREV + 8) = NEXT;
         if (NEXT)

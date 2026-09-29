@@ -1795,6 +1795,7 @@ void __cdecl SeqCtxInit(void *ctxv, int32_t capacity, int32_t margin,
 {
     uint8_t *ctx = (uint8_t *)ctxv;
     int32_t  i;
+    uint8_t *row;
 
     *(int32_t *)(ctx + SEQ_CTX_OFF_CAPACITY) = capacity;
     *(int32_t *)(ctx + SEQ_CTX_OFF_MARGIN) = margin;
@@ -1803,19 +1804,22 @@ void __cdecl SeqCtxInit(void *ctxv, int32_t capacity, int32_t margin,
     *(void **)(ctx + SEQ_CTX_OFF_RECORDS) =
         am2_malloc((size_t)(capacity * AM2_SEQ_RECORD_SIZE));
 
+    /* The record is re-indexed and its row re-read at every use. */
+#define REC ((uint32_t)i * AM2_SEQ_RECORD_SIZE \
+             + *(uint8_t **)(ctx + SEQ_CTX_OFF_RECORDS))
+#define ROW (*(uint8_t **)(REC + SEQ_OFF_ROW))
     for (i = 0; i < capacity; i++) {
-        uint8_t *rec = SeqRecord(ctx, i);
-        uint8_t *row;
+        *(int16_t *)(REC + SEQ_OFF_ID) = (int16_t)i;
+        *(int16_t *)(REC + SEQ_OFF_NEXT) = -1;
+        *(int16_t *)(REC + SEQ_OFF_PREV) = -1;
 
-        *(int16_t *)(rec + SEQ_OFF_ID) = (int16_t)i;
-        *(int16_t *)(rec + SEQ_OFF_NEXT) = -1;
-        *(int16_t *)(rec + SEQ_OFF_PREV) = -1;
-
-        row = (uint8_t *)am2_malloc(AM2_ROWPOOL_ROW_BYTES);
-        *(void **)(rec + SEQ_OFF_ROW) = row;
+        ROW = (uint8_t *)am2_malloc(AM2_ROWPOOL_ROW_BYTES);
+        row = ROW;
         memset(row, 0, AM2_ROWPOOL_ROW_BYTES);
         RowAlloc(w, h, row, (void *)(uintptr_t)ADDR_MAP_DESC);
     }
+#undef REC
+#undef ROW
 }
 
 /* 0x00460E30. Free every record's row AND the records array itself, then wipe
