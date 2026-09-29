@@ -1094,6 +1094,7 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
     int32_t  cols, rows, cell, stride, used;
 
     if (!ObjFlagBit0(r)) {
+    unregister:                 /* the off-map test below jumps back here */
         RowUnregisterAll(r, desc);
         return;
     }
@@ -1101,8 +1102,10 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
     if (force == 0
         && ROW_FLD(r, ROW_OFF_X, int16_t) == ROW_FLD(r, ROW_OFF_PREV_X, int16_t)
         && ROW_FLD(r, ROW_OFF_Y, int16_t) == ROW_FLD(r, ROW_OFF_PREV_Y, int16_t)
-        && !(ROW_FLD(r, 0, uint32_t)
-             & (ROW_FLAG_REMOVED | ROW_FLAG_REMOVED_DONE))
+        /* Both clear, spelled as the image compares them: each bit masked
+         * out and the two results compared. */
+        && (ROW_FLD(r, 0, uint32_t) & ROW_FLAG_REMOVED)
+           == (ROW_FLD(r, 0, uint32_t) & ROW_FLAG_REMOVED_DONE)
         && ROW_FLD(r, ROW_OFF_SPRITE, void *)
            == ROW_FLD(r, ROW_OFF_PREV_SPRITE, void *))
         return;
@@ -1141,15 +1144,12 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
     cols = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t);
     rows = ROW_FLD(desc, MAPDESC_OFF_ROWS, int32_t);
 
-    if (cb < 0 || ct > rows - 1 || cr < 0 || cl > cols - 1) {
-        RowUnregisterAll(r, desc);
-        return;
-    }
+    if (cb < 0 || ct > rows - 1 || cr < 0 || cl > cols - 1)
+        goto unregister;
 
-    if (cl <= 0)
-        cl = 0;
-    if (ct <= 0)
-        ct = 0;
+    /* Branchless in the image (setle/dec/and): conditional expressions. */
+    cl = cl <= 0 ? 0 : cl;
+    ct = ct <= 0 ? 0 : ct;
     if (cr >= cols - 1)
         cr = cols - 1;
     if (cb >= cols - 1)          /* COLS, not ROWS -- see above */
