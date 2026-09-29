@@ -10735,16 +10735,12 @@ int32_t __cdecl PickWeaponSlot(void *cand, void *unit, int32_t *slot)
 
     *slot = 0;
 
-    if (!*(const uint32_t *)(u + UNIT_OFF_INVENTORY))
-        return 1;
-
-    for (;;) {
-        uint32_t uid = *(const uint32_t *)(u + UNIT_OFF_INVENTORY
-                                           + (size_t)*slot * 4);
-        uint8_t *w   = (uint8_t *)WeaponByUid(uid);
+#define INV(n) (*(uint32_t *)(u + UNIT_OFF_INVENTORY + (size_t)(n) * 4))
+    while (INV(*slot)) {
+        uint8_t *w = (uint8_t *)WeaponByUid(INV(*slot));
 
         if (!w) {
-            *(uint32_t *)(u + UNIT_OFF_INVENTORY + (size_t)*slot * 4) = 0;
+            INV(*slot) = 0;
             return 1;
         }
 
@@ -10759,17 +10755,13 @@ int32_t __cdecl PickWeaponSlot(void *cand, void *unit, int32_t *slot)
                        **(const int32_t *const *)(c + OBJ_OFF_FIELD_C0))
                    ? 1 : 0;
 
-        (*slot)++;
-
-        if (*slot >= AM2_INVENTORY_SLOTS) {
+        if (++*slot >= AM2_INVENTORY_SLOTS) {
             *slot = AM2_SLOT_ALL_FULL;
             return 1;
         }
-
-        if (!*(const uint32_t *)(u + UNIT_OFF_INVENTORY
-                                 + (size_t)*slot * 4))
-            return 1;
     }
+    return 1;
+#undef INV
 }
 
 /* TryTakeWeapon -- original 0x00406720, two callers, and PickWeaponSlot's only
