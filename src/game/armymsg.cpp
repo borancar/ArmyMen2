@@ -2151,7 +2151,7 @@ void __cdecl SendVehicleWantItem(void *vehicle, void *item, int32_t request,
  * BoatExitPoint, which need opposite answers in the same file. The compiler
  * says nothing; the linker does. */
 extern "C" void __cdecl DrawSeqBar(int32_t x, int32_t bottom,
-                                   uint32_t colour, int32_t value,
+                                   uint8_t colour, int32_t value,
                                    int32_t base);
 
 /* DrawLatencyBar -- original 0x004623D0, one caller. Paint one player's
@@ -2179,11 +2179,10 @@ extern "C" void __cdecl DrawSeqBar(int32_t x, int32_t bottom,
  * THE COORDINATE TABLE IS INDEXED `slot + row * 4`, four players to a row,
  * with a fixed +0x37 and +0x12 added after the lookup -- so the table holds
  * offsets within the panel and not screen positions. */
-void __cdecl DrawLatencyBar(int32_t slot, int32_t row)
+void __cdecl DrawLatencyBar(int32_t row, int32_t slot)
 {
     const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
     const uint8_t *player;
-    const int16_t *xy;
     uint32_t       id;
     int32_t        mean;
     uint8_t        colour;
@@ -2209,9 +2208,9 @@ void __cdecl DrawLatencyBar(int32_t slot, int32_t row)
     if (mean > 1750)
         colour = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
 
-    xy = (const int16_t *)((const uint8_t *)(uintptr_t)ADDR_MP_ROW_COORDS
-                           + (uint32_t)(slot + row * 4) * 4u);
-    DrawSeqBar(xy[0] + 0x37, xy[1] + 0x12, colour,
+    DrawSeqBar(((const AM2_Point *)(uintptr_t)ADDR_MP_ROW_COORDS)[slot + row * 4].x + 0x37,
+               ((const AM2_Point *)(uintptr_t)ADDR_MP_ROW_COORDS)[slot + row * 4].y + 0x12,
+               colour,
                *(const int32_t *)(player + 0x28u),
                *(const int32_t *)(player + 0x30u));
 }

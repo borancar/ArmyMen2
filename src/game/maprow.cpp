@@ -2335,13 +2335,13 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
                                int32_t group, uint32_t ownerUid,
                                int32_t field26)
 {
-    uint8_t       *ctx = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_B);
-    const uint8_t *grp = (const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C
-                         + (uint32_t)group * AM2_SPRITEGRP_C_BYTES;
-    int32_t        count = *(const int32_t *)(grp + SPRITEGRP_C_OFF_COUNT);
-    int32_t        step  = 0x100 / count;
-    int32_t        frame;
-    uint8_t       *row;
+    /* The group's record, indexed afresh at each use as the image does. */
+#define GRP ((const uint8_t *)(uintptr_t)ADDR_SPRITE_GROUPS_C \
+             + (uint32_t)group * AM2_SPRITEGRP_C_BYTES)
+    uint8_t *ctx = (uint8_t *)SeqAlloc((void *)(uintptr_t)ADDR_SEQ_CTX_B);
+    int32_t  step;
+    int32_t  frame;
+    uint8_t *row;
 
     *(uint8_t *)(ctx + 4)     = (uint8_t)group;
     *(uint32_t *)(ctx + 0x24) = ownerUid;
@@ -2349,23 +2349,25 @@ void __cdecl SeqStartDirEffect(int32_t x, int32_t z, int32_t angle,
     *(int32_t *)(ctx + 0x0C)  = 0;
     *(int32_t *)(ctx + 0x10)  = 0;
 
+    step  = 0x100 / *(const int32_t *)(GRP + SPRITEGRP_C_OFF_COUNT);
     frame = ((step >> 1) + angle) / step;
-    if (frame >= count)
-        frame -= count;
+    if (frame >= *(const int32_t *)(GRP + SPRITEGRP_C_OFF_COUNT))
+        frame -= *(const int32_t *)(GRP + SPRITEGRP_C_OFF_COUNT);
     *(int32_t *)(ctx + 0x14) = frame;
-    *(int32_t *)(ctx + 8)    = *(const int32_t *)(grp + 8);
+    *(int32_t *)(ctx + 8)    = *(const int32_t *)(GRP + 8);
 
     row = *(uint8_t **)(ctx + 0x1C);
     *(uint8_t *)(row + 0x51)  = 0;
     *(uint32_t *)(row + ROW_OFF_STAMP_54) = 0;
     *(int32_t *)row           = 1;
     *(uint32_t *)(row + ROW_OFF_SPRITE) =
-        ((uint32_t *const *)(grp + SPRITEGRP_C_OFF_SPRITES))[0][frame];
+        ((uint32_t *const *)(GRP + SPRITEGRP_C_OFF_SPRITES))[0][frame];
     *(int16_t *)(row + ROW_OFF_X)        = (int16_t)x;
     *(int16_t *)(row + ROW_OFF_X + 2)    = (int16_t)(z + 1);
     *(int16_t *)(row + 0x20)             = 0;
     *(uint32_t *)(row + ROW_OFF_FIELD_2C) = 0;
     *(int16_t *)(row + ROW_OFF_FIELD_26) = (int16_t)field26;
+#undef GRP
 }
 
 /* TimedDirFrame -- original 0x00461F90, two callers, both in the missile

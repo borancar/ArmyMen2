@@ -207,7 +207,7 @@ void __cdecl ClearRegion(const RECT *r, uint8_t colour);
  * filled part, and a one-pixel marker at `base % 16`.
  *
  * The filled height is `(value - base) * 16 / 60`, capped at 16. */
-void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint32_t colour,
+void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint8_t colour,
                         int32_t value, int32_t base);
 
 /* FreeMapSurfaces -- original 0x0042D390. Release the map sprite and the cache

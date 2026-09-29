@@ -10700,13 +10700,16 @@ typedef struct {
 #define MASKREC_OFF_DESC_BLOCKS    0x06u  /* uint16, from DIB_OFF_BLOCKS */
 #define MASKREC_OFF_LOADER_OUT     0x08u  /* uint16, LoadDibFlipped writes it */
 #define MASKREC_OFF_BITS           0x0Cu  /* void *, the flipped pixels */
-/* The three stack buffers LoadMask's loose arm uses. The frame is 0x5E0 and
- * the two paths through it are a 0x50-byte directory, a 0x50-byte pattern, a
- * _finddata_t and a DIB descriptor; the sizes are what the offsets between
- * them allow rather than what any field says. */
+/* The stack buffers LoadMask's loose arm uses. The frame is 0x5E0: a
+ * 0x50-byte pattern, a 0x50-byte directory, a _finddata_t and a DIB header
+ * that runs to the end of the frame -- 0x428 bytes, a BITMAPINFO with 256
+ * RGBQUADs, because ReadDibChunk writes the header AND the colour table.
+ * This was 0x1C, what the header's used fields span, and the mask's colours
+ * ran off its end: the stack smash mapdraw.cpp's LoadAtlFile note describes,
+ * in a second place. */
 #define AM2_MASK_PATH_MAX          0x50u
 #define AM2_FINDDATA_BYTES         0x118u
-#define AM2_DIB_DESC_BYTES         0x1Cu
+#define AM2_DIB_DESC_BYTES         0x428u
 #define ADDR_DEF_OBJ_PARSE         0x00435B60u
 /* docs/functions.tsv merges THREE things into the 768-byte entry here:
  * DefObjParse itself (0x00435B60, a jump table over sixteen tokens), the table

@@ -262,15 +262,14 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
 
 uint32_t __cdecl FindEnemyNear(uint32_t where, uint32_t from)
 {
-    int32_t   x = (int32_t)(int16_t)(where & 0xFFFF);
-    int32_t   y = (int32_t)(int16_t)(where >> 16);
     AM2_Rect  box;
     uint8_t  *o;
 
-    box.left   = x - AM2_AIR_ENEMY_RADIUS;
-    box.top    = y - AM2_AIR_ENEMY_RADIUS;
-    box.right  = x + AM2_AIR_ENEMY_RADIUS;
-    box.bottom = y + AM2_AIR_ENEMY_RADIUS;
+    /* `where` is a packed point, read a half at a time from its own slot. */
+    box.left   = ((const AM2_Point *)&where)->x - AM2_AIR_ENEMY_RADIUS;
+    box.right  = ((const AM2_Point *)&where)->x + AM2_AIR_ENEMY_RADIUS;
+    box.top    = ((const AM2_Point *)&where)->y - AM2_AIR_ENEMY_RADIUS;
+    box.bottom = ((const AM2_Point *)&where)->y + AM2_AIR_ENEMY_RADIUS;
 
     o = (uint8_t *)ObjectsInRect(&box, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
                                  (int32_t (__cdecl *)(void *))MeetsAllThree);

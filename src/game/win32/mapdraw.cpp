@@ -311,7 +311,7 @@ typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
  * chunks, same skip-what-you-do-not-know loop, same ReadDibChunk -- and the
  * two share everything but what they do with the result. Reconstructing this
  * from the instruction stream alone cost a broken commit: I sized the DIB
- * header buffer AM2_DIB_DESC_BYTES, which is 0x1C, where ReadDibChunk writes
+ * header buffer AM2_DIB_DESC_BYTES, which was then 0x1C, where ReadDibChunk writes
  * a BITMAPINFO -- a 40-byte header plus up to 256 RGBQUADs. It smashed the
  * stack, the map never loaded, and our side of the A/B stopped logging
  * without even reaching the error path. The original's `sub esp, 0x450` was

@@ -418,7 +418,10 @@ void __cdecl ReceivedTeamMsg(void *msg, int32_t dpid);
  * top of the same test inside the handler they would have called. Type 8 tests
  * the host only to LOG that it should not have received the message, and then
  * calls the handler either way. Everything else does not test at all. */
-void __cdecl CommDispatchMessage(void *msg, int32_t dpid);
+/* Four arguments at its one call site -- the queue node's kind and sequence
+ * after the message and sender -- of which it reads two. */
+void __cdecl CommDispatchMessage(void *msg, int32_t dpid, int32_t kind,
+                                 int32_t last);
 
 
 /* Original: 0x0040F600 and 0x0040F620, thiscall. Set and clear 0x020C of one

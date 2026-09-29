@@ -1939,7 +1939,7 @@ void __cdecl PausedFrameStep(void)
         }
 
         if (((AM2_Comm *)comm)->CommSlotHasPlayer(slot))
-            DrawLatencyBar(slot, active - 1);
+            DrawLatencyBar(active - 1, slot);
         else
             DrawSprite(*(AM2_Sprite *const *)(uintptr_t)ADDR_MP_MARK_C,
                        xy[0] + 0x37, xy[1] + 3, 0);

@@ -610,7 +610,7 @@ static void SeqBarFill(int32_t left, int32_t top, int32_t right, int32_t bottom,
         orig_log("Couldn't Blt Seq Pixels\n");
 }
 
-void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint32_t colour,
+void __cdecl DrawSeqBar(int32_t x, int32_t bottom, uint8_t colour,
                         int32_t value, int32_t base)
 {
     int32_t filled = ((value - base) * SEQ_BAR_HEIGHT) / SEQ_BAR_SCALE;

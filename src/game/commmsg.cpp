@@ -639,7 +639,6 @@ void __cdecl MsgListRemove(void *list, void *node)
     uint8_t *n = (uint8_t *)node;
     uint8_t *prev;
     uint8_t *next;
-    int32_t  count;
 
     orig_wait_for_object(*(void **)(l + MSGLIST_OFF_MUTEX), 0xFFFFFFFFu);
 
@@ -662,28 +661,25 @@ void __cdecl MsgListRemove(void *list, void *node)
         }
     }
 
-    count = *(const int32_t *)(l + MSGLIST_OFF_COUNT) - 1;
-    *(int32_t *)(l + MSGLIST_OFF_COUNT) = count;
-    if (count < 0 || count > AM2_MSGLIST_SANE_MAX)
-        orig_log("RemMsg: Impossible List Size %d \n", count);
+#define COUNT (*(int32_t *)(l + MSGLIST_OFF_COUNT))
+    if (--COUNT < 0 || COUNT > AM2_MSGLIST_SANE_MAX)
+        orig_log("RemMsg: Impossible List Size %d \n", COUNT);
 
     if (l == (uint8_t *)(uintptr_t)ADDR_MSG_LIST_POOL) {
-        if (*(void *const *)(l + MSGLIST_OFF_HEAD)) {
-            /* The pool still has buffers: neither remaining complaint
-             * applies, and the original jumps straight to the unlock. */
-            orig_release_mutex(*(void **)(l + MSGLIST_OFF_MUTEX));
-            return;
-        }
+        /* The pool still has buffers: neither remaining complaint applies,
+         * and the original jumps straight to the unlock. */
+        if (*(void *const *)(l + MSGLIST_OFF_HEAD))
+            goto unlock;
         orig_log("RemMsg has set freelist to EMPTY!! l->numItems = %d\n",
-                 count);
+                 COUNT);
     }
 
-    if (!*(void *const *)(l + MSGLIST_OFF_HEAD)
-        && *(const int32_t *)(l + MSGLIST_OFF_COUNT) > 0)
-        orig_log("Why is list %x empty?  List Size %d \n", l,
-                 *(const int32_t *)(l + MSGLIST_OFF_COUNT));
+    if (!*(void *const *)(l + MSGLIST_OFF_HEAD) && COUNT > 0)
+        orig_log("Why is list %x empty?  List Size %d \n", l, COUNT);
 
+unlock:
     orig_release_mutex(*(void **)(l + MSGLIST_OFF_MUTEX));
+#undef COUNT
 }
 
 void __cdecl ExitGamePostClose(void)
@@ -1989,11 +1985,15 @@ void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
     *(int32_t *)(q + FLOW_OFF_LAG_SPREAD) = *(const int32_t *)(m + 0x10);
 }
 
-void __cdecl CommDispatchMessage(void *msg, int32_t dpid)
+void __cdecl CommDispatchMessage(void *msg, int32_t dpid, int32_t kind,
+                                 int32_t last)
 {
     const uint8_t *comm = kCommObj;
     uint8_t       *m    = (uint8_t *)msg;
     int32_t        type;
+
+    (void)kind;   /* the queue node's kind and sequence: passed, not read */
+    (void)last;
 
     if (!*(const int32_t *)(comm + COMM_OFF_MSGS_ENABLED))
         return;
@@ -2262,15 +2262,15 @@ void __cdecl CommDrainMsgs(void)
     for (node = (uint8_t *)MsgListRemHead((void *)(uintptr_t)ADDR_MSG_LIST_B);
          node;
          node = (uint8_t *)MsgListRemHead((void *)(uintptr_t)ADDR_MSG_LIST_B)) {
+        /* The node: +0x08 kind, +0x0C sequence, +0x20 message, +0x24 sender. */
         int32_t  kind = *(const int32_t *)(node + 0x08);
-        int32_t  last = *(const int32_t *)(node + 0x0C);
         void    *msg  = *(void *const *)(node + 0x20);
-        int32_t  dpid = *(const int32_t *)(node + 0x24);
+        int32_t  last = *(const int32_t *)(node + 0x0C);
 
-        if (kind)
-            CommDispatchMessage(msg, dpid);
+        if (kind == 0)
+            orig_comm_system_msg(msg, *(const int32_t *)(node + 0x24), 0, last);
         else
-            orig_comm_system_msg(msg, dpid, 0, last);
+            CommDispatchMessage(msg, *(const int32_t *)(node + 0x24), kind, last);
 
         MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, node);
     }
