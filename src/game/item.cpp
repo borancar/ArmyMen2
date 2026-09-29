@@ -1962,11 +1962,11 @@ void __cdecl ObjSetRoachFootprint(void *obj)
 {
     uint8_t       *o = (uint8_t *)obj;
     const uint8_t *rows;
-    const AM2_Anim *anim;
     int32_t        dir;
     int32_t        baseX, baseY;
     uint32_t       slot;
     int32_t        i;
+    typedef struct { int16_t x, y; } Pt;
 
     if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON)
         return;
@@ -1974,7 +1974,6 @@ void __cdecl ObjSetRoachFootprint(void *obj)
     ++*(uint16_t *)(uintptr_t)ADDR_ROACH_MARK_STAMP;
 
     rows = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
-    anim = *(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING);
 
     baseX = (*(const int16_t *)(o + OBJ_OFF_POS) >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
@@ -1983,40 +1982,38 @@ void __cdecl ObjSetRoachFootprint(void *obj)
 
     dir = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
                     + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
-                   anim->directionBits) & 0xFF;
+                   (*(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING))->directionBits) & 0xFF;
 
     slot = (uint32_t)dir * AM2_MASK_STRIDE;
 
-    for (i = 0; i < ((const int32_t *)((const uint8_t *)
-             ((void *)(uintptr_t)(ADDR_ROACH_MASK_COUNT)) + slot))[0]; i++) {
-        const int16_t *pts = (const int16_t *)
-            ((const uint8_t *)((void *)(uintptr_t)(ADDR_ROACH_MASK)) + slot);
-        uint32_t  at;
+    /* The count and the points re-indexed from the table, as RoachMaskWeight
+     * reads them. */
+#define COUNT (*(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_ROACH_MASK_COUNT)) + slot))
+#define PTS   ((const Pt *)((const uint8_t *)((void *)(uintptr_t)(ADDR_ROACH_MASK)) + slot))
+    for (i = 0; i < COUNT; i++) {
+        Pt        at;
         uint16_t *mark;
         int32_t   tile;
 
-        ((int16_t *)&at)[0] = (int16_t)(pts[i * 2]
-                                        + *(const int16_t *)(o + OBJ_OFF_POS));
-        ((int16_t *)&at)[1] = (int16_t)(pts[i * 2 + 1]
-                                        + *(const int16_t *)(o + OBJ_OFF_POS
-                                                             + 2));
+        at.x = PTS[i].x + *(const int16_t *)(o + OBJ_OFF_POS);
+        at.y = PTS[i].y + *(const int16_t *)(o + OBJ_OFF_POS + 2);
 
         mark = (uint16_t *)(uintptr_t)ADDR_ROACH_MARK
-               + (((int32_t)((int16_t *)&at)[0] >> AM2_MASK_CELL_SHIFT) - baseX)
-                 * AM2_MASK_WINDOW
-               + (((int32_t)((int16_t *)&at)[1] >> AM2_MASK_CELL_SHIFT)
-                  - baseY);
+               + ((((int32_t)at.y >> AM2_MASK_CELL_SHIFT) - baseY)
+                  + (((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX) * AM2_MASK_WINDOW);
 
         if (*mark == *(const uint16_t *)(uintptr_t)ADDR_ROACH_MARK_STAMP)
             continue;
 
-        tile = TileOfPoint(at);
+        tile = TileOfPoint(*(uint32_t *)&at);
         (*(uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
             += AM2_TILE_COVER_STEP;
         TileCoverAdd((uint16_t)tile);
 
         *mark = *(const uint16_t *)(uintptr_t)ADDR_ROACH_MARK_STAMP;
     }
+#undef COUNT
+#undef PTS
 
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_FOOTPRINT_ON;
 }
@@ -2820,11 +2817,11 @@ void __cdecl ObjClearRoachFootprint(void *obj)
 {
     uint8_t       *o = (uint8_t *)obj;
     const uint8_t *rows;
-    const AM2_Anim *anim;
     int32_t        dir;
     int32_t        baseX, baseY;
     uint32_t       slot;
     int32_t        i;
+    typedef struct { int16_t x, y; } Pt;
 
     if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON))
         return;
@@ -2832,7 +2829,6 @@ void __cdecl ObjClearRoachFootprint(void *obj)
     ++*(uint16_t *)(uintptr_t)ADDR_ROACH_MARK_STAMP;
 
     rows = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
-    anim = *(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING);
 
     baseX = (*(const int16_t *)(o + OBJ_OFF_POS) >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
@@ -2841,40 +2837,38 @@ void __cdecl ObjClearRoachFootprint(void *obj)
 
     dir = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
                     + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
-                   anim->directionBits) & 0xFF;
+                   (*(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING))->directionBits) & 0xFF;
 
     slot = (uint32_t)dir * AM2_MASK_STRIDE;
 
-    for (i = 0; i < ((const int32_t *)((const uint8_t *)
-             ((void *)(uintptr_t)(ADDR_ROACH_MASK_COUNT)) + slot))[0]; i++) {
-        const int16_t *pts = (const int16_t *)
-            ((const uint8_t *)((void *)(uintptr_t)(ADDR_ROACH_MASK)) + slot);
-        uint32_t  at;
+    /* The count and the points re-indexed from the table, as RoachMaskWeight
+     * reads them. */
+#define COUNT (*(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_ROACH_MASK_COUNT)) + slot))
+#define PTS   ((const Pt *)((const uint8_t *)((void *)(uintptr_t)(ADDR_ROACH_MASK)) + slot))
+    for (i = 0; i < COUNT; i++) {
+        Pt        at;
         uint16_t *mark;
         int32_t   tile;
 
-        ((int16_t *)&at)[0] = (int16_t)(pts[i * 2]
-                                        + *(const int16_t *)(o + OBJ_OFF_POS));
-        ((int16_t *)&at)[1] = (int16_t)(pts[i * 2 + 1]
-                                        + *(const int16_t *)(o + OBJ_OFF_POS
-                                                             + 2));
+        at.x = PTS[i].x + *(const int16_t *)(o + OBJ_OFF_POS);
+        at.y = PTS[i].y + *(const int16_t *)(o + OBJ_OFF_POS + 2);
 
         mark = (uint16_t *)(uintptr_t)ADDR_ROACH_MARK
-               + (((int32_t)((int16_t *)&at)[0] >> AM2_MASK_CELL_SHIFT) - baseX)
-                 * AM2_MASK_WINDOW
-               + (((int32_t)((int16_t *)&at)[1] >> AM2_MASK_CELL_SHIFT)
-                  - baseY);
+               + ((((int32_t)at.y >> AM2_MASK_CELL_SHIFT) - baseY)
+                  + (((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX) * AM2_MASK_WINDOW);
 
         if (*mark == *(const uint16_t *)(uintptr_t)ADDR_ROACH_MARK_STAMP)
             continue;
 
-        tile = TileOfPoint(at);
+        tile = TileOfPoint(*(uint32_t *)&at);
         (*(uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
             -= AM2_TILE_COVER_STEP;
         TileCoverSub((uint16_t)tile);
 
         *mark = *(const uint16_t *)(uintptr_t)ADDR_ROACH_MARK_STAMP;
     }
+#undef COUNT
+#undef PTS
 
     *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_FOOTPRINT_ON;
 }
