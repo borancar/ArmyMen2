@@ -873,6 +873,14 @@ void __cdecl MissionStartup(void)
     strcpy((char *)(uintptr_t)ADDR_GAMEPROC_STR_B, save);
 }
 
+/* The count and the table are ONE object in the image: a store into a timer
+ * is a store the compiler has to assume reaches the count, which is why the
+ * image reads the count again after filling a slot. Viewed from the count. */
+typedef struct { int32_t count; AM2_Timer timers[AM2_TIMER_MAX]; } AM2_TimerBlock;
+#define g_timerBlock   (*(AM2_TimerBlock *)((void *)(uintptr_t)(ADDR_TIMER_COUNT)))
+#define g_timerCount   (g_timerBlock.count)
+#define g_timers       (g_timerBlock.timers)
+
 /* 0x0041E950, one caller, on the per-frame path. Fire every timer that has
  * come due, and no more often than once every 100 ms.
  *
@@ -906,7 +914,7 @@ void __cdecl TimerTick(void)
 {
 #define NOW  (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
 #define LAST (*(uint32_t *)(uintptr_t)ADDR_EVENT_BLOCK)
-    AM2_Timer *timers = (AM2_Timer *)(uintptr_t)ADDR_TIMER_TABLE;
+    AM2_Timer *timers = g_timers;
     int32_t    i;
 
     /* The clock is read again at every use. */
@@ -926,7 +934,7 @@ void __cdecl TimerTick(void)
 
         if (--t->count <= 0) {
             t->id = 0;
-            --*(int32_t *)(uintptr_t)ADDR_TIMER_COUNT;
+            --g_timerCount;
         } else {
             t->start = NOW + t->period;
         }
@@ -2839,8 +2847,6 @@ void __cdecl EventTriggerDelayed(int32_t type, int32_t num, int32_t uid,
 
 /* The mission clock and the timer table, all in the image. */
 #define g_gameClockMs  (*(const uint32_t *)((void *)(uintptr_t)(ADDR_GAME_CLOCK_MS)))
-#define g_timerCount   (*(int32_t *)((void *)(uintptr_t)(ADDR_TIMER_COUNT)))
-#define g_timers       ((AM2_Timer *)((void *)(uintptr_t)(ADDR_TIMER_TABLE)))
 
 int32_t __cdecl CreateTimer(uint32_t start, int32_t absolute, uint32_t period,
                             int32_t count, int32_t id, int32_t lowPriority)
@@ -2876,8 +2882,8 @@ int32_t __cdecl CreateTimer(uint32_t start, int32_t absolute, uint32_t period,
 
         /* Catch up rather than fire late: drop the elapsed repeats. */
         skip   = (now - start) / period + 1;
-        count -= (int32_t)skip;
         start += skip * period;
+        count -= (int32_t)skip;
         if (count < 1)
             return AM2_TIMER_NO_ROOM;
         if (start <= now)
