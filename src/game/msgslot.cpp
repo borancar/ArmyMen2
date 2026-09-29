@@ -95,43 +95,39 @@ void __cdecl RingPush32(void *comm, uint32_t value)
 
 void __cdecl CommRemoveKeyed(void *comm, uint32_t key)
 {
-    uint8_t *base  = (uint8_t *)comm;
-    int32_t *count = (int32_t *)(base + AM2_KEYED_COUNT);
-    uint8_t *rec   = base + AM2_KEYED_FIRST;
-    int32_t  i;
+    /* One record: the key, a dword, the kind. The search holds the count;
+     * the move re-reads it; the records shift down as whole-struct copies. */
+    typedef struct { uint32_t key; uint32_t second; uint32_t kind; } AM2_KeyedRec;
+#define RECS  ((AM2_KeyedRec *)((uint8_t *)comm + AM2_KEYED_FIRST))
+#define COUNT (*(int32_t *)((uint8_t *)comm + AM2_KEYED_COUNT))
+    int32_t  n = COUNT;
+    int32_t  i, j;
+    uint32_t kind;
 
-    /* Two tests of the same count, and the original really does make both --
-     * `je` on zero and then `jle`. Only a negative count tells them apart, and
-     * both answer the same way for one; reproduced rather than folded. */
-    if (*count == 0)
-        return;
-    if (*count <= 0)
-        return;
-
-    for (i = 0; i < *count; i++, rec += AM2_KEYED_STRIDE)
-        if (*(uint32_t *)rec == key)
-            break;
-    if (i >= *count)
+    /* Two tests of the same count: `je` on zero here, then the loop's own
+     * entry test, `jle`. Only a negative count tells them apart. */
+    if (n == 0)
         return;
 
-    {
-        uint32_t kind = *(uint32_t *)(rec + AM2_KEYED_KIND);
-        int32_t  j;
+    for (i = 0; i < n; i++) {
+        if (RECS[i].key == key) {
+            j    = i + 1;
+            kind = RECS[i].kind;
+            if (kind > AM2_KEYED_TALLY_MAX)
+                kind = AM2_KEYED_TALLY_MAX;
+            *(int32_t *)((uint8_t *)comm + AM2_KEYED_TALLY + kind * 4) += 1;
 
-        if (kind > AM2_KEYED_TALLY_MAX)
-            kind = AM2_KEYED_TALLY_MAX;
-        *(int32_t *)(base + AM2_KEYED_TALLY + kind * 4) += 1;
+            for (; j < COUNT; j++) {
+                AM2_KeyedRec *src = &RECS[j];
 
-        for (j = i + 1; j < *count; j++) {
-            uint8_t *src = base + AM2_KEYED_FIRST + j * AM2_KEYED_STRIDE;
-            uint8_t *dst = src - AM2_KEYED_STRIDE;
-
-            *(uint32_t *)(dst + 0) = *(uint32_t *)(src + 0);
-            *(uint32_t *)(dst + 4) = *(uint32_t *)(src + 4);
-            *(uint32_t *)(dst + 8) = *(uint32_t *)(src + 8);
+                src[-1] = *src;
+            }
+            COUNT -= 1;
+            return;
         }
-        *count -= 1;
     }
+#undef RECS
+#undef COUNT
 }
 
 /* The record these read is reached through the image's own lookup, which is

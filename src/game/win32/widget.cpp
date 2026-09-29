@@ -10962,11 +10962,13 @@ void __cdecl OptionsSyncGroup(AM2_Widget *header)
     for (i = *(const int32_t *)(rec + AM2_OPTION_OFF_FIRST);
          i <= *(const int32_t *)(rec + AM2_OPTION_OFF_LAST);
          i++) {
-        AM2_Widget *box    = OptionBox(parent, i);
-        uint8_t     ticked = *((const uint8_t *)header + CHECKBOX_OFF_CHECKED);
+        AM2_Widget *box = OptionBox(parent, i);
 
-        *((uint8_t *)box + CHECKBOX_OFF_CHECKED) = ticked;
-        box->disabled = (ticked == 0);
+        /* The header's tick is read again for the disabled test. */
+        *((uint8_t *)box + CHECKBOX_OFF_CHECKED) =
+            *((const uint8_t *)header + CHECKBOX_OFF_CHECKED);
+        box->disabled =
+            (*((const uint8_t *)header + CHECKBOX_OFF_CHECKED) == 0);
         WidgetVPaint(box, box->rect);
     }
 }

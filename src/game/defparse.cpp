@@ -512,7 +512,9 @@ void *__cdecl DefFindObjRec(int32_t type, int32_t a, int32_t b)
     if (hit != (void *)0)
         return hit;
 
+    /* Each retry writes the fields it relies on, `b` again included. */
     key[1] = 0;
+    key[2] = b;
     hit = orig_bsearch(key, kDefObjRecs, (uint32_t)kDefObjRecCount,
                        AM2_DEF_OBJ_REC_SIZE,
                        (const void *)CompareTriple);

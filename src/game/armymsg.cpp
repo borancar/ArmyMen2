@@ -1297,12 +1297,14 @@ void __cdecl DamageBroadcast(void *obj, uint32_t attacker, int32_t amount,
 
     ArmyMessageSend(msg);
 
+    /* The amount logged is the message's word, not the argument. */
     comm = kComm;
     if (!*(const int32_t *)(comm + COMM_OFF_VERBOSE))
         return;
 
     orig_log("Send Damage: uid %x, amount: %d, health: %d, army %d\n",
-             *(const uint32_t *)(o + 4), amount,
+             *(const uint32_t *)(o + 4),
+             (int32_t)*(const int16_t *)(msg + MSG_DAMAGE_OFF_AMOUNT),
              (int32_t)*(const int16_t *)(o + OBJ_OFF_HEALTH),
              UidArmy(attacker));
 }
@@ -1644,8 +1646,8 @@ void __cdecl SendVehicleEnter(void *vehicle, void *unit)
         return;
 
     msg.hdr.len  = AM2_MSG_VEHICLE_ENTER_LEN;
-    msg.hdr.kind = AM2_MSG_VEHICLE_ENTER;
     msg.hdr.uid  = UidOnWire(*(const uint32_t *)(veh + OBJ_OFF_UID));
+    msg.hdr.kind = AM2_MSG_VEHICLE_ENTER;
     msg.unitUid  = UidOnWire(*(const uint32_t *)(unt + OBJ_OFF_UID));
     ArmyMessageSend(&msg);
 
@@ -2113,13 +2115,13 @@ void __cdecl SendVehicleWantItem(void *vehicle, void *item, int32_t request,
         return;
 
     msg.hdr.len  = 0x1C;
-    msg.hdr.kind = 0x1D;
     msg.hdr.uid  = UidOnWire(*(const uint32_t *)(veh + OBJ_OFF_UID));
+    msg.hdr.kind = 0x1D;
     msg.itemUid  = UidOnWire(*(const uint32_t *)(itm + OBJ_OFF_UID));
     msg.itemPos  = *(const uint32_t *)(itm + OBJ_OFF_POS);
     msg.request  = request;
-    msg.quant    = quant;
     msg.slot     = (int32_t)slot;
+    msg.quant    = quant;
     ArmyMessageSend(&msg);
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE) == 0)
