@@ -229,24 +229,24 @@ void __cdecl LoadSoldierAnims(void)
     /* rifleman first and with no fallback, because it IS the fallback for the
      * other eight -- see LoadAnimTable. The zombie and the scientists reserve
      * 0x3C palette entries where everyone else reserves 10. */
-    static const struct {
-        const char *path;
-        int32_t     from;
-    } kMen[] = {
-        { "rifleman.ani",   0x0A }, { "bazookaman.ani", 0x0A },
-        { "grenadier.ani",  0x0A }, { "flamer.ani",     0x0A },
-        { "mortarman.ani",  0x0A }, { "sweeper.ani",    0x0A },
-        { "m80.ani",        0x0A }, { "zombie.ani",     0x3C },
-        { "scientists.ani", 0x3C },
-    };
+    /* Written out per table, as the image has them -- not a loop. */
+#define LOAD_MEN(i, path, from)                                             \
+    if (g_soldierAnims[i].count <= 0)                                       \
+        LoadSpriteFile(path, &g_soldierAnims[i],                            \
+                       (i) ? &g_soldierAnims[0] : 0, from, AM2_ANI_FLAGS_MEN);
     int32_t i;
 
     SetGameDir(AM2_ANI_DIR);
-    for (i = 0; i < AM2_SOLDIER_ANIM_TABLES; i++)
-        if (g_soldierAnims[i].count <= 0)
-            LoadSpriteFile(kMen[i].path, &g_soldierAnims[i],
-                           i ? &g_soldierAnims[0] : 0, kMen[i].from,
-                           AM2_ANI_FLAGS_MEN);
+    LOAD_MEN(0, "rifleman.ani",   0x0A)
+    LOAD_MEN(1, "bazookaman.ani", 0x0A)
+    LOAD_MEN(2, "grenadier.ani",  0x0A)
+    LOAD_MEN(3, "flamer.ani",     0x0A)
+    LOAD_MEN(4, "mortarman.ani",  0x0A)
+    LOAD_MEN(5, "sweeper.ani",    0x0A)
+    LOAD_MEN(6, "m80.ani",        0x0A)
+    LOAD_MEN(7, "zombie.ani",     0x3C)
+    LOAD_MEN(8, "scientists.ani", 0x3C)
+#undef LOAD_MEN
 
     /* Then one link is cut: the animation with id 0x46 in the rifleman's own
      * table gets `next` = -1, where LoadAnimTable would have left whatever the

@@ -12678,6 +12678,18 @@ void __cdecl OpenDeleteGame(void)
     }
 }
 
+/* OpenDeleteGame's folded twin; see widget.h. */
+void __cdecl OpenDeleteGameB(void)
+{
+    CloseCurrentScreen();
+    if (g_gameState == AM2_STATE_MISSION) {
+        RefreshScreen();
+        g_paintObject = (uint8_t *)new AM2_DeleteGameScreen("02_011_00_delgame.bmp", 0);
+    } else {
+        g_paintObject = (uint8_t *)new AM2_DeleteGameScreen("01_000_00_screen.bmp", 1);
+    }
+}
+
 /* DlgOverwriteConstruct -- original 0x00450320, 688 bytes, thiscall `ret 8`.
  * "Are you sure you want to overwrite savefile '%s'?" with OK and CANCEL,
  * the message, and the same red icon the message box uses.

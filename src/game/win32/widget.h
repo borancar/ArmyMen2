@@ -2155,6 +2155,10 @@ extern "C++" void __cdecl OpenAudioOptions(void);  /* C++: `new` needs its /GX u
 
 /* Original: 0x00450250. DELETE GAME. */
 extern "C++" void __cdecl OpenDeleteGame(void);  /* C++: `new` needs its /GX unwind frame */
+/* Its twin, body for body: State2Frame keeps separate arms for sub-states 29
+ * and 30 that both reach 0x00450250, which VC6 emits only for two identical
+ * functions the linker then folded (/OPT:ICF). No address of its own. */
+extern "C++" void __cdecl OpenDeleteGameB(void);
 
 /* Original: 0x00452680. LOAD GAME. Its repaint comes after the construction
  * where its two siblings put it before the allocation; see widget.cpp. */

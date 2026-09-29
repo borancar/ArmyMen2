@@ -687,42 +687,13 @@ void __cdecl State1Frame(void)
 }
 
 /* Nine of the thirteen sub-state arms are one shape -- repaint if the overlay
- * is dirty, then DrawMenuOverlay -- differing only in which painter they call.
- * Those are the table; 22, 32, 33 and 34 are each their own thing and are
- * written out. Arms 29 and 30 really do share a painter.
- *
- * The table is in TABLE order, which is not the order the arms appear in the
- * code: the linker laid the bodies out 27, 28, 26, 29, 30, 31, 25, so reading
- * them top to bottom and numbering as you go gets four of them wrong. Take the
- * order from the jump table at ADDR_SUBSTATE_TABLE. */
-#define AM2_SUBSTATE_PAINTED_FIRST 1     /* arm 23 */
-#define AM2_SUBSTATE_PAINTED_LAST  9     /* arm 31 */
-
-/* FIVE OF THE NINE ARE OURS AND WERE REACHED THROUGH THE IMAGE, which nothing
- * could see while the table held plain integers. A bare hex literal is not an
- * ADDR_ name, so checkseams' "named by address" rule -- whose own docstring
- * claimed to cover "a table of plain integers that are function pointers" --
- * walked straight past all five. It has a rule for the literal now, and this
- * table is why.
- *
- * ALL NINE ARE NAMED, so nothing here reaches the image and the shape says
- * nothing -- there is no mixed case left to read. The rule is for the future:
- * if an arm ever goes back to being the original's, write it as an ADDR_ name
- * cast through AM2_IMAGE and never as a bare integer, because that is the one
- * spelling checkseams could not see and it is how five of these hid. */
-typedef void (__cdecl *AM2_SubStatePainter)(void);
-
-static const AM2_SubStatePainter kSubStatePainter[] = {
-    OpenGameMenu,                                 /* 23 */
-    OpenMessage,                                  /* 24 */
-    OpenSaveGame,                                 /* 25 */
-    OpenLoadGame,                                 /* 26 */
-    OpenAudioOptions,                             /* 27 */
-    OpenControls,                                 /* 28 */
-    OpenDeleteGame,                               /* 29 */
-    OpenDeleteGame,                               /* 30 */
-    OpenOverwriteGame,                            /* 31 */
-};
+ * is dirty, then DrawMenuOverlay -- differing only in which painter they call;
+ * 22, 32, 33 and 34 are each their own thing. They are State2Frame's switch,
+ * written in the order the linker laid the bodies out (27, 28, 26, 29, 30, 31,
+ * 25 among the painted ones) -- the jump table at ADDR_SUBSTATE_TABLE is what
+ * says which arm is which; reading the bodies top to bottom and numbering as
+ * you go gets four of them wrong. Arms 29 and 30 reach the same address
+ * through two folded functions, OpenDeleteGame and OpenDeleteGameB. */
 
 
 /* LevelTeardown -- original 0x004256F0, 160 bytes, one caller, and that caller
@@ -1049,48 +1020,50 @@ void __cdecl State2Frame(void)
         return;
     }
 
-    int32_t skipDispatch = 0;
-
     if (g_stateEntered) {
-        int32_t *once = (int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE;
-
         State2Enter();
-        if (*once) {
+        if (*(int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE) {
             TakeMenuRequest();
-            *once = 0;
+            *(int32_t *)(uintptr_t)ADDR_STATE_ENTER_ONCE = 0;
             return;
         }
-        skipDispatch = GetPauseFlags() != 0;
-    }
-
-    if (skipDispatch)
-        return;
-
-    uint32_t arm = (uint32_t)(g_subState - AM2_SUBSTATE_BASE);
-
-    /* Out of range falls straight through to the flag-8 block below -- the
-     * original's `ja` skips the switch and lands on the common tail, so an
-     * unknown sub-state is not an error. Arm 32 is in range and does the same
-     * nothing, by pointing at that tail in the table. */
-    if (arm == 0) {
-        Substate22();
-    } else if (arm >= AM2_SUBSTATE_PAINTED_FIRST
-               && arm <= AM2_SUBSTATE_PAINTED_LAST) {
-        AM2_SubStatePainter painter =
-            kSubStatePainter[arm - AM2_SUBSTATE_PAINTED_FIRST];
-
-        if (g_overlayDirty)
-            painter();
-        DrawMenuOverlay();
-    } else if (arm == 11) {
-        /* 33 -- ordinary play, and the arm Boot Camp sits in the whole time. */
         if (GetPauseFlags())
-            MissionPausedFrame();
-        else
-            TakeMenuRequest();
-    } else if (arm == 12) {
-        Substate34Escape();
+            return;
     }
+
+    /* The image's switch, arm for arm and in its layout order: 22, 23, 24,
+     * 27, 28, 26, 29, 30, 31, 25, then 33 and 34. Each painted arm repaints
+     * when the overlay is dirty and then draws it; 32 and anything out of
+     * range fall to the common tail. */
+#define PAINTED(painter)            \
+        if (g_overlayDirty)         \
+            painter();              \
+        DrawMenuOverlay();          \
+        break;
+    switch (g_subState) {
+    case 22: Substate22(); break;
+    case 23: PAINTED(OpenGameMenu)
+    case 24: PAINTED(OpenMessage)
+    case 27: PAINTED(OpenAudioOptions)
+    case 28: PAINTED(OpenControls)
+    case 26: PAINTED(OpenLoadGame)
+    case 29: PAINTED(OpenDeleteGame)
+    case 30: PAINTED(OpenDeleteGameB)
+    case 31: PAINTED(OpenOverwriteGame)
+    case 25: PAINTED(OpenSaveGame)
+    case 32: break;
+    case 33:
+        /* Ordinary play, and the arm Boot Camp sits in the whole time. */
+        if (!GetPauseFlags())
+            TakeMenuRequest();
+        else
+            MissionPausedFrame();
+        break;
+    case 34:
+        Substate34Escape();
+        break;
+    }
+#undef PAINTED
 
     if ((GetPauseFlags() & AM2_EVENT_FLAG_8)
         && DismissKeyReleased()) {

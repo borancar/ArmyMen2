@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1076 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1078 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1076:
+  the near-miss sweep, 758 before the row pools. From 758 to 1078:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -210,7 +210,8 @@ main result so far (details in `src/vc6/README.md`):
     arms for one callee, so the source had two functions and LINK's
     /OPT:ICF folded them; SeqStepKind3 is the twin, uninstalled. FreeItem
     is the same: types 1, 5, 6 and 8 have four arms onto 0x0043BBB0, so
-    DestroyPlain5/6/8 are DestroyItemCommon's folded twins.
+    DestroyPlain5/6/8 are DestroyItemCommon's folded twins, and
+    State2Frame's arms 29 and 30 make OpenDeleteGameB OpenDeleteGame's.
   - **A store kept after a strcpy by aliasing**: LoadGameProcSection's two
     flags live inside the saved block, and writing them through the block
     (GAMEPROC_OFF_LOAD_PENDING) is what keeps VC6 from hoisting them above
