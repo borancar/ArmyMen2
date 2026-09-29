@@ -2767,16 +2767,18 @@ int32_t __cdecl ScriptScanFor(const AM2_ScriptCtx *ctx, int32_t from,
                               int32_t want, int32_t stop)
 {
     if (from < ctx->count) {
-        const AM2_ScriptTok *t = &ctx->tokens[from];
+        const AM2_ScriptTok *tok = ctx->tokens;
+        int32_t kind = tok[from].kind;
 
+        /* Each token's kind is read once and carried across the back edge. */
         do {
-            if (t->kind == AM2_TOKEN_RESERVED &&
-                (int32_t)(uintptr_t)t->value == want)
+            if (kind == AM2_TOKEN_RESERVED &&
+                (int32_t)(uintptr_t)tok[from].value == want)
                 return 1;
-            t++;
             from++;
-            if (t->kind == AM2_TOKEN_RESERVED &&
-                (int32_t)(uintptr_t)t->value == stop)
+            kind = tok[from].kind;
+            if (kind == AM2_TOKEN_RESERVED &&
+                (int32_t)(uintptr_t)tok[from].value == stop)
                 return 0;
         } while (from < ctx->count);
     }

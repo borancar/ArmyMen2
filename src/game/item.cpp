@@ -8539,24 +8539,21 @@ int32_t __cdecl ObjOverlayY(const void *obj)
 void __cdecl SlotBandHeading(int32_t slot, int32_t *band, int32_t *index,
                              uint8_t *heading)
 {
-    int32_t i;
-
     *band = 0;
 
     if (slot <= 24) {
         *band = 2;
-        i = (slot - 9) / 2 + 1;
+        *index = (slot - 9) / 2 + 1;
     } else if (slot <= 56) {
         *band = 3;
-        i = (slot - 25) / 2 + 25;
+        *index = (slot - 25) / 2 + 25;
     } else {
         *band = 4;
-        i = (slot - 57) / 2 + 57;
+        *index = (slot - 57) / 2 + 57;
     }
-    *index = i;
 
     /* The table byte is stored, then stored again adjusted. */
-    *heading = ((const uint8_t *)(uintptr_t)ADDR_SLOT_HEADINGS)[i];
+    *heading = ((const uint8_t *)(uintptr_t)ADDR_SLOT_HEADINGS)[*index];
     if (slot & 1)
         *heading -= 0x10;
     else
