@@ -880,18 +880,17 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
     if (!rec)
         return 0;
 
-    *(uint8_t *)(o + OBJ_OFF_ARMY) = (uint8_t)army;
     *(uint32_t *)(o + OBJ_OFF_FLAGS) |=
         (uint32_t)(*(const int32_t *)(rec + AAI_OFF_OR_FLAGS) | orFlags);
+    *(uint8_t *)(o + OBJ_OFF_ARMY) = (uint8_t)army;
 
     ObjInitCommon(o, name, 1, (int32_t)at,
                          (const int32_t *)(rec + AAI_OFF_BOX), a7, a8);
 
     *(const void **)(o + OBJ_OFF_FIELD_94) = rec;
 
-    *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
-        *(const int16_t *)(rec + AAI_OFF_HEALTH);
     *(int16_t *)(o + OBJ_OFF_HEALTH) =
+        *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
         *(const int16_t *)(rec + AAI_OFF_HEALTH);
     *(int8_t *)(o + OBJ_OFF_HEIGHT_ADJ) =
         *(const int8_t *)(rec + AAI_OFF_HEIGHT_ADJ);
@@ -904,8 +903,8 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
     BuildRowsFromDef(o + OBJ_OFF_SUBRECORD,
                      (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)
                          [*(const int32_t *)(rec + AAIREC_OFF_LIST_SLOT)],
-                     (int32_t)(int16_t)at,
-                     (int32_t)(int16_t)(at >> 16),
+                     (int32_t)((const AM2_Point *)&at)->x,
+                     (int32_t)((const AM2_Point *)&at)->y,
                      *(const uint32_t *)(o + OBJ_OFF_FLAGS));
 
     for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++)

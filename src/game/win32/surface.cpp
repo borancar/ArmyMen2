@@ -1186,12 +1186,11 @@ typedef void (__attribute__((thiscall)) *am2_delete_fn)(void *self, int32_t flag
 
 void __cdecl DrawMenuOverlay(void)
 {
-    uint8_t *paint = g_paintObj;
-
+    /* The paint object is re-read at every use, as the image does. */
     if (g_menuPending) {
         /* Going back to the game: drop the overlay and let frames through. */
-        if (paint) {
-            ObjVDelete(paint, 1);
+        if (g_paintObj) {
+            ObjVDelete(g_paintObj, 1);
             g_paintObj = NULL;
         }
         g_subState     = MENU_MODE_PLAYING;
@@ -1203,9 +1202,9 @@ void __cdecl DrawMenuOverlay(void)
 
     if (g_overlayDirty) {
         g_presenting = 0;
-        if (paint) {
+        if (g_paintObj) {
             SetDrawTarget(g_primarySurface);
-            ObjVPaint(paint, *(const AM2_Rect *)(paint + 0x14));
+            ObjVPaint(g_paintObj, *(const AM2_Rect *)(g_paintObj + 0x14));
         }
         /* Keep what was on screen, so the overlay can be drawn over a copy. */
         IDirectDrawSurface_BltFast(g_backBuffer, 0, 0, g_primarySurface,
@@ -1214,8 +1213,8 @@ void __cdecl DrawMenuOverlay(void)
     }
 
     SetDrawTarget(g_backBuffer);
-    if (paint)
-        ObjVUpdate(paint);
+    if (g_paintObj)
+        ObjVUpdate(g_paintObj);
     SetDrawTarget(g_backBuffer);
 
     OverlayPrepare(0, 1);

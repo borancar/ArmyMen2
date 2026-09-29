@@ -31,7 +31,10 @@ extern "C" __declspec(dllimport) unsigned long __stdcall GetTickCount(void);
 
 #define kComm       (*(uint8_t **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)))
 #define kPacket     ((uint8_t *)((void *)(uintptr_t)(ADDR_ARMY_PACKET)))
-#define kPacketLen  (*(int32_t *)((void *)(uintptr_t)(ADDR_ARMY_PACKET_LEN)))
+/* The length is the packet's own +4 field, reached through the packet so
+ * VC6 sees one object: a copy into the packet may overwrite it, and the image
+ * re-reads it after every memcpy. */
+#define kPacketLen  (*(int32_t *)(kPacket + 4))
 
 #define kCommField(off) (*(const int32_t *)(kComm + (off)))
 
@@ -160,13 +163,9 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
 void __cdecl ArmyMessageSend(const void *msg)
 {
     const AM2_ArmyMsgHdr *hdr = (const AM2_ArmyMsgHdr *)msg;
+    uint16_t              len;
 
-    if (kCommField(COMM_OFF_DPLAY) == 0)
-        return;
-
-    for (;;) {
-        uint32_t n;
-
+    while (kCommField(COMM_OFF_DPLAY) != 0) {
         if (kCommField(COMM_OFF_JOINED) == 0)
             return;
 
@@ -175,35 +174,35 @@ void __cdecl ArmyMessageSend(const void *msg)
 
         orig_log((const char *)msg, 1, UidArmy(UidOnWire(hdr->uid)));
 
-        if (hdr->len == 0)
+        len = hdr->len;
+        if (len == 0)
             orig_log("ArmyMessageSend Zero length message \n");
 
-        n = hdr->len;
-
-        if (n + AM2_ARMY_MSG_HDR >= (uint32_t)kCommField(COMM_OFF_BUFFER_MAX))
+        if ((uint32_t)len + AM2_ARMY_MSG_HDR
+            >= (uint32_t)kCommField(COMM_OFF_BUFFER_MAX))
             orig_log("Error msg larger (%d) than Max (%d) in "
-                     "ArmyMessageSend\n", n,
+                     "ArmyMessageSend\n", len,
                      kCommField(COMM_OFF_BUFFER_MAX));
 
-        if (n + (uint32_t)kPacketLen
-            < (uint32_t)kCommField(COMM_OFF_BUFFER_MAX)) {
-            memcpy(kPacket + kPacketLen, msg, n);
-            kPacketLen += (int32_t)n;
-
-            /* Lookahead, not a bounds check: flush when ANOTHER message this
-             * size would pass the threshold. */
-            if ((uint32_t)kPacketLen + n
-                >= (uint32_t)kCommField(COMM_OFF_BUFFER_DEFAULT))
-                ArmyMessageFlush(0);
-
-            return;
+        /* No room: drain the buffer and go round again, re-checking the
+         * session, which a failed send can have closed. */
+        if ((uint32_t)len + (uint32_t)kPacketLen
+            >= (uint32_t)kCommField(COMM_OFF_BUFFER_MAX)) {
+            while (!ArmyMessageFlush(0))
+                orig_log("Send Over Flow, Couldn't Empty Buffer \n");
+            continue;
         }
 
-        while (!ArmyMessageFlush(0))
-            orig_log("Send Over Flow, Couldn't Empty Buffer \n");
+        memcpy(kPacket + kPacketLen, msg, len);
+        kPacketLen += len;
 
-        if (kCommField(COMM_OFF_DPLAY) == 0)
-            return;
+        /* Lookahead, not a bounds check: flush when ANOTHER message this
+         * size would pass the threshold. */
+        if ((uint32_t)kPacketLen + len
+            >= (uint32_t)kCommField(COMM_OFF_BUFFER_DEFAULT))
+            ArmyMessageFlush(0);
+
+        return;
     }
 }
 

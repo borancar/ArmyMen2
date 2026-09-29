@@ -15362,11 +15362,11 @@ void __attribute__((thiscall)) AM2_Widget::EditDraw(RECT clip)
     const uint8_t *self = (const uint8_t *)w;
     char           buf[EDIT_DRAW_BUFFER];
     RECT           paint;
-    int32_t        ink;
+    uint8_t        ink;
 
     ::WidgetScreenRect(w);
 
-    if (!IntersectRect(&paint, &w->rect, &clip))
+    if (!IntersectRect(&paint, &clip, &w->rect))
         return;
 
     ClearRegion(&paint, *(const uint8_t *)(self + EDIT_OFF_PAPER));

@@ -130,7 +130,7 @@ void __cdecl CommDrainMsgs(void);
 
 /* 0x0044BEA0, one caller. Parse one variable-length trooper record from a
  * batch and answer the pointer past it. */
-const void *__cdecl TroopSubParse(const void *rec, int32_t army);
+const void *__cdecl TroopSubParse(const uint8_t *p, int32_t army);
 
 /* 0x004014C0. The flow-control receive path, called from the receive thread
  * for every message on a reliable channel. Dispatches AM2_FLOW_DATA,

@@ -2374,9 +2374,8 @@ void __cdecl TellEachSlot(void)
  * and they do it separately rather than once at the end -- so a record with
  * both fields writes the clock twice.
  */
-const void *__cdecl TroopSubParse(const void *rec, int32_t army)
+const void *__cdecl TroopSubParse(const uint8_t *p, int32_t army)
 {
-    const uint8_t *p = (const uint8_t *)rec;
     uint32_t       head;
     uint8_t       *obj;
 
