@@ -834,7 +834,10 @@ void *__cdecl LoadDibFlipped(const char *path, void *hdr, uint16_t *size)
     void     *dst;
     int32_t   total;
 
-    if (!path || !path[0])
+    /* Two tests, each with its own return. */
+    if (!path)
+        return (void *)0;
+    if (!path[0])
         return (void *)0;
 
     fp = orig_fopen(path, "rb");
