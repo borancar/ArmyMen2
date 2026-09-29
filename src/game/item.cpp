@@ -3663,12 +3663,13 @@ void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
     const uint8_t *rec = *(const uint8_t *const *)(sh + OBJ_OFF_FIELD_94);
     int32_t amount = *(const int32_t *)(rec + TYPEREC_OFF_DAMAGE);
     int32_t code   = *(const int32_t *)(rec + TYPEREC_OFF_CODE);
-    int32_t kind   = AM2_SHOT_DAMAGE_KIND;
+    int32_t kind;
     uint8_t *owner;
 
     (void)unusedA;
     (void)unusedB;
 
+    /* The damage kind is set in each arm; VC6 shares the ordinary one. */
     switch (code) {
     case AM2_SHOT_CODE_RANDOM:
         amount = orig_rand() % (amount + 1) + 1;
@@ -3677,14 +3678,17 @@ void __cdecl ApplyShotDamage(void *target, void *shot, int32_t unusedA,
     case 1: case 7: case 8: case 9: case 10: case 29:
         if (doubled)
             amount += amount;
+        kind = AM2_SHOT_DAMAGE_KIND;
         break;
     case AM2_SHOT_CODE_ANTI_TROOP:
         if (doubled)
             amount += amount;
         if (ObjIsType2((const AM2_Object *)target))
             amount += amount;
+        kind = AM2_SHOT_DAMAGE_KIND;
         break;
     default:
+        kind = AM2_SHOT_DAMAGE_KIND;
         break;
     }
 
