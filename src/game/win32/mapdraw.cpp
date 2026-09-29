@@ -694,14 +694,19 @@ void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
 {
     uint8_t        *o      = (uint8_t *)obj;
     const AM2_Rect *bounds = (const AM2_Rect *)(o + OBJ_OFF_BOUNDS);
-    RECT            clip;
     AM2_Rect        src;
+    RECT            clip;
     AM2_Sprite     *spr;
+    int32_t         x, y;
 
     if (!IntersectRect(&clip, (const RECT *)bounds, (const RECT *)world))
         return;
     if (!(*(const uint8_t *)(o + MAPOBJ_OFF_FLAGS) & MAPOBJ_FLAG_VISIBLE))
         return;
+
+    /* The screen position is worked out before the empty tests. */
+    x = clip.left - g_viewRect->left;
+    y = clip.top  - g_viewRect->top;
 
     src.left   = clip.left   - bounds->left;
     src.top    = clip.top    - bounds->top;
@@ -734,10 +739,7 @@ void __cdecl DrawMapObject(void *obj, const AM2_Rect *world)
     }
 #endif
 
-    DrawSpriteClipped(spr,
-                      clip.left - g_viewRect->left,
-                      clip.top  - g_viewRect->top,
-                      &src, 0);
+    DrawSpriteClipped(spr, x, y, &src, 0);
 }
 
 /* 0x0041E160 -- insert one object into the depth list, sorted.

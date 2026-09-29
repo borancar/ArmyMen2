@@ -1106,10 +1106,14 @@ void __cdecl ScriptResurrectItem(uint32_t uid, uint32_t where)
 void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
                             int32_t relative)
 {
-    void    *comm = *(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT));
-    int32_t  slot = ((AM2_Comm *)comm)->CommSlotForArmy(army);
-    uint8_t *list = ((uint8_t **)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[slot];
-    int32_t  i    = 0;
+    int32_t  i;
+
+    /* The slot goes back into `army`. */
+    army = ((AM2_Comm *)*(void **)((void *)(uintptr_t)(ADDR_COMM_OBJECT)))->CommSlotForArmy(army);
+    i = 0;
+
+    /* The slot's list is re-indexed at every use. */
+#define list (((uint8_t **)((void *)(uintptr_t)(ADDR_ARMY_OBJ_LISTS)))[army])
 
     while (i < *(const int32_t *)(list + LIST_OFF_COUNT)) {
         uint8_t *obj = (uint8_t *)LookupByUID(
@@ -1125,7 +1129,7 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
             continue;
         }
 
-        if (filter != -1 && (int32_t)ObjFieldA(obj) != filter) {
+        if (filter != -1 && filter != (int32_t)ObjFieldA(obj)) {
             i++;
             continue;
         }
@@ -1140,6 +1144,7 @@ void __cdecl EvtArmyAtPoint(int32_t army, int32_t filter, uint32_t point,
         PointActionA(obj, point);
         i++;
     }
+#undef list
 }
 
 /* 0x0041F820 and 0x0041F780. The "At" halves, and they are not the plain
