@@ -9147,6 +9147,7 @@ AM2_DlgBattleJoinScreen::AM2_DlgBattleJoinScreen(const char *bmp)
 {
     AM2_Widget *panel;
     AM2_Widget *kid;
+    AM2_Widget *edit;
     AM2_CTOR_VTABLE(this, VTABLE_BATTLE_JOIN);
     SetGameDir((const char *)(uintptr_t)ADDR_DIR_SCRATCH);
     strcpy((char *)((uint8_t *)this + BATTLEJOIN_OFF_NAME),
@@ -9165,11 +9166,11 @@ AM2_DlgBattleJoinScreen::AM2_DlgBattleJoinScreen(const char *bmp)
     ::WidgetAddChild(panel, kid);
     WidgetVFocus(kid, 0);
 
-    kid = new AM2_Edit((char *)((uint8_t *)this + BATTLEJOIN_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0x26, 0xFF, 0xF3, 0x0E), 1, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR, *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR, (void (__cdecl *)(AM2_Widget *)) BattleJoinOk, 0, 0);
-    ::WidgetAddChild(panel, kid);
+    edit = new AM2_Edit((char *)((uint8_t *)this + BATTLEJOIN_OFF_NAME), 0x18, *RectSet(AM2_TEMP(AM2_Rect), 0x26, 0xFF, 0xF3, 0x0E), 1, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR, *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR, (void (__cdecl *)(AM2_Widget *)) BattleJoinOk, 0, 0);
+    ::WidgetAddChild(panel, edit);
     /* Letters and digits only, as ENTER NAME's field -- the original sets
      * it (0x0042F6B5); ours left the permissive default. */
-    *(const char **)((uint8_t *)kid + EDIT_OFF_CHARSET) = g_editCharset;
+    *(const char **)((uint8_t *)edit + EDIT_OFF_CHARSET) = g_editCharset;
 
     kid = new AM2_Button("03_007_00_ok.bmp", "03_007_01_ok.bmp", "03_007_02_ok.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x14C, 0x37, 0x4E, 0x20), (void (__cdecl *)(AM2_Widget *)) BattleJoinOk, (void (__cdecl *)(AM2_Widget *))0);
     ::WidgetAddChild(panel, kid);
@@ -9179,6 +9180,9 @@ AM2_DlgBattleJoinScreen::AM2_DlgBattleJoinScreen(const char *bmp)
 
     kid = new AM2_Blinker("03_028_00_green.bmp", "03_028_01_green.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0xA6, 0xE2, 0x11, 0x10));
     ::WidgetAddChild(panel, kid);
+    /* The blinker is the name field's dot, as on the save list and ENTER
+     * NAME -- the image's last store; ours left the field without one. */
+    *(AM2_Widget **)((uint8_t *)edit + EDIT_OFF_DOT) = kid;
 }
 
 AM2_CLASS_DELETE(BattleJoin)
@@ -9316,6 +9320,9 @@ AM2_BattleNameScreen::AM2_BattleNameScreen(const char *bmp)
                           *RectSet(AM2_TEMP(AM2_Rect), 0xB3, 0x6A, 0x11, 0x10));
     ::WidgetAddChild(panel, dot);
     *(AM2_Widget **)((uint8_t *)edit + EDIT_OFF_DOT) = dot;
+    /* The second field's charset is stored TWICE -- here as well as before
+     * the dot (0x0042FE32). Harmless, and the original's. */
+    *(const char **)((uint8_t *)edit + EDIT_OFF_CHARSET) = g_editCharset;
 
     ::WidgetAddChild(panel, new AM2_Button((const char *)(uintptr_t)AM2_BMP_OK0, (const char *)(uintptr_t)AM2_BMP_OK1,
                                            (const char *)(uintptr_t)AM2_BMP_OK2, 1,
@@ -14152,7 +14159,9 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
     uint8_t    *self = (uint8_t *)w;
     AM2_Widget *edit;
     AM2_Widget *kid;
-    char        dir[AM2_MASK_PATH_MAX];
+    AM2_Widget *list;
+    AM2_Widget *bar;
+    char        dir[AM2_DLG_TEXT_BYTES];
     char        path[AM2_DLG_TEXT_BYTES];
     uint8_t     find[AM2_FINDDATA_BYTES];
     int32_t     h;
@@ -14175,10 +14184,7 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
                 (const char *)(uintptr_t)ADDR_GAMEPROC_BLOCK);
     SetGameDir(path);
 
-    {
-        void *rec = orig_operator_new(AM2_RECORD_BYTES);
-        *(void **)(self + DLG_OFF_LIST) = rec ? RecordCtor(rec, 1) : (void *)0;
-    }
+    *(void **)(self + DLG_OFF_LIST) = new AM2_Rec(1);
 
     strcpy(dir, "*.sav");
     h = orig_findfirst(dir, find);
@@ -14208,14 +14214,19 @@ AM2_DlgSaveListScreen::AM2_DlgSaveListScreen(const char *bmp, int32_t flag)
      * kind of little MultiSprite beside a text field. */
     *(void **)((uint8_t *)edit + EDIT_OFF_DOT) = kid;
 
-    kid = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0xA5, 0xBD, 0x9A, 0xAA), *(void **)(self + DLG_OFF_LIST), (int32_t)(uintptr_t)SaveListOnPick, 0, 1);
-    ::WidgetAddChild(w, kid);
+    list = new AM2_ListBox(*RectSet(AM2_TEMP(AM2_Rect), 0xA5, 0xBD, 0x9A, 0xAA), *(void **)(self + DLG_OFF_LIST), (int32_t)(uintptr_t)SaveListOnPick, 0, 1);
+    ::WidgetAddChild(w, list);
 
     /* The scrollbar takes its rectangle as FOUR ints and the parent BEFORE
      * the sprites. The original still routes the four through RectSet and
      * copies the result back over the same pushes, so they appear twice. */
-    kid = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x152, 0xB7, 0x13, 0xBA), w, "03_010_00_scrollbar.bmp", "03_010_01_scrollbar.bmp", 0x8C, 0);
-    ::WidgetAddChild(w, kid);
+    bar = new AM2_ArrowBar(*RectSet(AM2_TEMP(AM2_Rect), 0x152, 0xB7, 0x13, 0xBA), w, "03_010_00_scrollbar.bmp", "03_010_01_scrollbar.bmp", 0x8C, 0);
+    ::WidgetAddChild(w, bar);
+    /* The list and its bar know each other -- the image stores both links
+     * at 0x0045365D. Missing here, the save list's scroll bar was wired to
+     * nothing. */
+    *(AM2_Widget **)((uint8_t *)list + LIST_OFF_ARROWBAR) = bar;
+    *(AM2_Widget **)((uint8_t *)bar + ARROWBAR_OFF_LIST) = list;
 
     kid = new AM2_Button("03_127_00_save.bmp", "03_127_01_save.bmp", "03_127_02_save.bmp", 1, *RectSet(AM2_TEMP(AM2_Rect), 0x1A0, 0xBA, 0x51, 0x20), (void (__cdecl *)(AM2_Widget *)) SaveListOnSave, (void (__cdecl *)(AM2_Widget *))0);
     ::WidgetAddChild(w, kid);

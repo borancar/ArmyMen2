@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 886 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 889 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 886:
+  the near-miss sweep, 758 before the row pools. From 758 to 889:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -125,6 +125,12 @@ main result so far (details in `src/vc6/README.md`):
     everywhere except the row address.
   - **ObjConceal fixed**: an object with BIT4 set that is not a type-2
     keeps REVEALED (ours cleared it).
+  - **Screen constructors missing links**: the save-game list's list box
+    and scroll bar now point at each other (ours left the bar wired to
+    nothing), and BATTLE JOIN's blinker is its name field's dot. The save
+    list's directory buffer is 0x100 bytes, not AM2_MASK_PATH_MAX, and
+    ENTER NAME stores its second field's charset twice, as the original
+    does.
   - **Wrong globals, found by comparing the relink's resolved addresses**
     (onefn masks relocations, so it cannot see these): the HudTop
     constructor tests ADDR_MP_SESSION, not ADDR_NET_GAME; OnAppActivated
