@@ -735,16 +735,16 @@ void __cdecl RandomPointToward(const void *target, const void *obj,
     const uint8_t *o = (const uint8_t *)obj;
     const uint8_t *t = (const uint8_t *)target;
     uint8_t        heading;
-    double         d = (double)dist;
+    float          d;
 
     heading = (uint8_t)(AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
                                      (const AM2_Point *)(t + OBJ_OFF_POS))
                         + (orig_air_rand() & 0x3F) - 0x20);
+    d = (float)dist;
 
-    out->x = (int16_t)(int32_t)((double)Cos8(heading) * d
-                                + (double)*(const int16_t *)(o + OBJ_OFF_X));
-    out->y = (int16_t)(int32_t)((double)Sin8(heading) * d
-                                + (double)*(const int16_t *)(o + OBJ_OFF_Y));
+    /* Single precision throughout, as RandomPointAhead. */
+    out->x = (int16_t)(Cos8(heading) * d + *(const int16_t *)(o + OBJ_OFF_X));
+    out->y = (int16_t)(Sin8(heading) * d + *(const int16_t *)(o + OBJ_OFF_Y));
 }
 
 /* RandomPointAhead -- original 0x00404ED0, two callers, and a sibling of the
@@ -775,15 +775,15 @@ void __cdecl RandomPointAhead(void *, const void *obj, int32_t dist,
 {
     const uint8_t *o = (const uint8_t *)obj;
     uint8_t        facing;
-    double         d = (double)dist;
+    float          d;
 
     facing = (uint8_t)((orig_air_rand() & 0x3F)
                        + *(const uint8_t *)(o + OBJ_OFF_FACING) - 0x20);
+    d = (float)dist;
 
-    out->x = (int16_t)(int32_t)((double)Cos8(facing) * d
-                                + (double)*(const int16_t *)(o + OBJ_OFF_X));
-    out->y = (int16_t)(int32_t)((double)Sin8(facing) * d
-                                + (double)*(const int16_t *)(o + OBJ_OFF_Y));
+    /* Single precision throughout: the image adds the position with fiadd. */
+    out->x = (int16_t)(Cos8(facing) * d + *(const int16_t *)(o + OBJ_OFF_X));
+    out->y = (int16_t)(Sin8(facing) * d + *(const int16_t *)(o + OBJ_OFF_Y));
 }
 
 /* 0x00404580, three callers. Place a follower in formation on its leader,

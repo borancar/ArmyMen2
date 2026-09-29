@@ -3212,27 +3212,23 @@ int32_t __cdecl BlockWeightRoute(void *from, uint32_t at, void *chain,
 int32_t __cdecl BlockWeightChain(void *from, uint32_t at, void *chain,
                                  uint32_t ref)
 {
-    uint8_t *o     = (uint8_t *)chain;
     int32_t  total = 0;
-    uint32_t tile;
+    uint16_t tile;
 
-    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
-        total += ObjBlockWeight(from, o, (int32_t)at, ref);
+    for (; chain; chain = *(void **)((uint8_t *)chain + OBJ_OFF_QUERY_NEXT)) {
+        total += ObjBlockWeight(from, chain, (int32_t)at, ref);
         if (total >= AM2_BLOCK_FULL)
             return total;
     }
 
-    tile = (uint32_t)TileOfPoint(at);
-    /* The original's guard, on the low 16 bits and before the mask below.
-       Vacuous; see above. */
-    if ((tile & 0xFFFFu) > 0xFFFFu)
-        return 0xFF;
-    tile &= 0xFFFFu;
-
-    if (!(g_tileFlags[tile] & AM2_TILE_OPEN))
-        total += AM2_BLOCK_FULL;
-
-    return total;
+    /* The original's guard, vacuous on a 16-bit tile; see above. */
+    tile = (uint16_t)TileOfPoint(at);
+    if (tile <= (uint16_t)0xFFFF) {
+        if (!(g_tileFlags[tile] & AM2_TILE_OPEN))
+            total += AM2_BLOCK_FULL;
+        return total;
+    }
+    return 0xFF;
 }
 
 /* The game's own rand, spelled as event.cpp spells it -- through AM2_IMAGE,
@@ -14190,8 +14186,8 @@ void __cdecl CreateWatchedItem(int32_t unused, void *obj, uint32_t at,
     /* The original loads ecx with the comm object first and AllyFlag ignores
      * it -- army.h records that of both existing call sites, and this is a
      * third. Two stack arguments, owner then army. */
-    if (!AllyFlag(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
-                  *(const int8_t *)(o + OBJ_OFF_ARMY)))
+    if (!AM2_THE_COMM->AllyFlag(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                                *(const int8_t *)(o + OBJ_OFF_ARMY)))
         ObjConceal(item, 1);
 
     (void)unused;
