@@ -2169,15 +2169,21 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
 /* `inline` is load-bearing: the original has this body at every call site,
  * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
  * each caller compiled to push/call/pop -- the relink found it. */
+/* One mask record: a count and up to forty cell offsets, AM2_MASK_STRIDE
+ * bytes. */
+typedef struct {
+    int32_t   count;
+    AM2_Point pts[(AM2_MASK_STRIDE - 4) / sizeof(AM2_Point)];
+} AM2_MaskRec;
+static_assert(sizeof(AM2_MaskRec) == AM2_MASK_STRIDE, "mask record size");
+
 static inline void ObjFootprint(void *obj, int32_t set)
 {
     uint8_t        *o = (uint8_t *)obj;
     const uint8_t  *rows;
     const AM2_Anim *anim;
-    int32_t         dir, i, count;
+    int32_t         dir, i;
     int32_t         baseX, baseY;
-    uint32_t        slot;
-    const int16_t  *pts;
 
     if (set) {
         if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_FOOTPRINT_ON)
@@ -2189,11 +2195,10 @@ static inline void ObjFootprint(void *obj, int32_t set)
 
     ++*(uint16_t *)(uintptr_t)ADDR_OBJ_MARK_STAMP;
 
-    rows = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
-    anim = *(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING);
-
     baseX = (*(const int16_t *)(o + OBJ_OFF_POS) >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
+    rows = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
+    anim = *(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING);
     baseY = (*(const int16_t *)(o + OBJ_OFF_POS + 2) >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
 
@@ -2201,36 +2206,27 @@ static inline void ObjFootprint(void *obj, int32_t set)
                     + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
                    anim->directionBits) & 0xFF;
 
-    slot = ((uint32_t)dir
-            + (uint32_t)*(const int32_t *)(o + VEHICLE_OFF_KIND) * 32)
-           * AM2_MASK_STRIDE;
-
-    count = *(const int32_t *)((const uint8_t *)
-                ((void *)(uintptr_t)(ADDR_VEHICLE_MASK_COUNT)) + slot);
-    pts   = (const int16_t *)((const uint8_t *)
-                ((void *)(uintptr_t)(ADDR_VEHICLE_MASK)) + slot);
-
-    for (i = 0; i < count; i++) {
-        uint32_t  at;
+    /* The record is indexed afresh each pass -- the kind and the count
+     * re-read -- as the image walks it. */
+#define MASKREC (((const AM2_MaskRec *)(uintptr_t)ADDR_VEHICLE_MASK_COUNT) \
+                 [*(const int32_t *)(o + VEHICLE_OFF_KIND) * 32 + dir])
+    for (i = 0; i < MASKREC.count; i++) {
+        AM2_Point at;
         uint16_t *mark;
         int32_t   tile;
 
-        ((int16_t *)&at)[0] = (int16_t)(pts[i * 2]
-                                        + *(const int16_t *)(o + OBJ_OFF_POS));
-        ((int16_t *)&at)[1] = (int16_t)(pts[i * 2 + 1]
-                                        + *(const int16_t *)(o + OBJ_OFF_POS
-                                                             + 2));
+        at.x = (int16_t)(MASKREC.pts[i].x + *(const int16_t *)(o + OBJ_OFF_POS));
+        at.y = (int16_t)(MASKREC.pts[i].y + *(const int16_t *)(o + OBJ_OFF_POS + 2));
 
         mark = (uint16_t *)(uintptr_t)ADDR_OBJ_MARK
-               + (((int32_t)((int16_t *)&at)[0] >> AM2_MASK_CELL_SHIFT) - baseX)
+               + (((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX)
                  * AM2_MASK_WINDOW
-               + (((int32_t)((int16_t *)&at)[1] >> AM2_MASK_CELL_SHIFT)
-                  - baseY);
+               + (((int32_t)at.y >> AM2_MASK_CELL_SHIFT) - baseY);
 
-        if (*mark == *(const uint16_t *)(uintptr_t)ADDR_OBJ_MARK_STAMP)
+        if (*(const uint16_t *)(uintptr_t)ADDR_OBJ_MARK_STAMP == *mark)
             continue;
 
-        tile = TileOfPoint(at);
+        tile = TileOfPoint(*(const uint32_t *)&at);
         if (set) {
             (*(uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS)[(uint32_t)tile & 0xFFFF]
                 += AM2_TILE_COVER_STEP;
@@ -2244,6 +2240,7 @@ static inline void ObjFootprint(void *obj, int32_t set)
         *mark = *(const uint16_t *)(uintptr_t)ADDR_OBJ_MARK_STAMP;
     }
 
+#undef MASKREC
     if (set)
         *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_FOOTPRINT_ON;
     else
