@@ -3109,12 +3109,11 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
         return REGIONS[tile];
 
     /* Both tables are read after the rand call, weights first. */
-    ring    = (const int32_t *)(uintptr_t)ADDR_TILE_RING8
-              + (orig_region_rand() & 6);
-    weights = *(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
+    ring    = (const int32_t *)(uintptr_t)ADDR_TILE_RING8 + (orig_region_rand() & 6);
     regions = REGIONS;
-    first   = ring[0];
-    delta   = first;
+    weights = *(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
+    delta   = ring[0];
+    first   = delta;
 
     for (;;) {
         int32_t at = delta + (int32_t)tile;
