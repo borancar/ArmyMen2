@@ -66,11 +66,36 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 719 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 758 of
   1640 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
-  layout, 627 before the widget classes, 686 before the screens. From 686
-  to 719:
+  layout, 627 before the widget classes, 686 before the screens, 719 before
+  the near-miss sweep. From 719 to 758:
+  - **The title screen and the remaining openers match**, and the relink's
+    reference is RETAIL at the one byte where this project undoes GOG's
+    MULTI-PLAYER patch for good (`bytematch.RetailImage`).
+  - **A sweep of near-misses by edit distance** (onefn.py per function):
+    branch polarity, which buffer a statement writes, statement order
+    (permute.py found CheckBox's, OnDifficultyOk's and EvtPushObjCtx's),
+    globals re-read where the original re-reads them, float vs double
+    in x87 expressions (`fidiv` appears only with a float quotient).
+  - **Helpers the original inlined** are `static inline` now -- SendValueMsg,
+    FreeDefTable, LoadGrid, and twelve others whose callers all got closer;
+    ten tried the same way made callers worse and stay out of line.
+  - **Comm methods that ignore `this`**: CommClose and CommEnumPlayers are
+    AM2_Comm members -- their callers load ecx with the comm object.
+  - **Virtual calls from flat code must be pointer-to-member calls**
+    (ObjVUpdate, ObjVPoll): a function pointer cast to thiscall is a cdecl
+    call under VC6, which has no thiscall spelling.
+  - **Our inline forwarders `F(obj, args)` evaluate the object first**; the
+    original's direct member calls evaluate the argument first (SendChatMsg).
+  - **Bugs fixed on the way**: ListGrowFind never stored its incremented
+    count (ours grew the multiplayer game-type list by a garbage row per
+    call); a spinner's typed value skipped SpinCommit; BattleJoin's chosen
+    row was uninitialised and its name field used the wrong charset; the
+    overwrite prompt's dot never blinked; CommPanel never focused its panel.
+
+  From 686 to 719:
   - **Every widget destructor matches**, and 30-odd constructors: the HUD
     classes, KeyRow, the scroll/arrow family, and DifficultyDialog,
     DlgMessage, Quit/Replay/DelPlayer, Options, GameMenu, Audio,
