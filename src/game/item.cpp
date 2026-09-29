@@ -1008,6 +1008,26 @@ void __cdecl DestroyItemCommon(void *item, int32_t unlink)
     am2_free(item);
 }
 
+/* Three more destructors with DestroyItemCommon's body, for types 5, 6 and 8.
+ * The image has one function at 0x0043BBB0, but FreeItem keeps a separate arm
+ * for each of types 1, 5, 6 and 8 that all call it -- which VC6 does not emit
+ * for one callee (it merges identical arms), and does for identical functions
+ * the linker then folds (/OPT:ICF). So the source had four; these are the
+ * three that have no address of their own. */
+#define AM2_PLAIN_DESTROY(name)                                             \
+    static void __cdecl name(void *item, int32_t unlink)                   \
+    {                                                                       \
+        if (!item)                                                          \
+            return;                                                         \
+        FreeSubrecordRows((uint8_t *)item + OBJ_OFF_SUBRECORD);             \
+        DestroyItemObject(item, (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC, unlink); \
+        am2_free(item);                                                     \
+    }
+AM2_PLAIN_DESTROY(DestroyPlain5)
+AM2_PLAIN_DESTROY(DestroyPlain6)
+AM2_PLAIN_DESTROY(DestroyPlain8)
+#undef AM2_PLAIN_DESTROY
+
 void __cdecl DestroyKind7(void *item, int32_t unlink)
 {
     int32_t *live = (int32_t *)(uintptr_t)ADDR_KIND7_COUNT;
@@ -1097,9 +1117,6 @@ int32_t __cdecl FreeItem(void *item, int32_t unlink)
 
     switch (*(const int32_t *)item) {
     case 1:
-    case 5:
-    case 6:
-    case 8:
         DestroyItemCommon(item, unlink);
         return 1;
 
@@ -1117,8 +1134,20 @@ int32_t __cdecl FreeItem(void *item, int32_t unlink)
         DestroyWeapon(item, unlink);
         return 1;
 
+    case 5:
+        DestroyPlain5(item, unlink);
+        return 1;
+
+    case 6:
+        DestroyPlain6(item, unlink);
+        return 1;
+
     case 7:
         DestroyKind7(item, unlink);
+        return 1;
+
+    case 8:
+        DestroyPlain8(item, unlink);
         return 1;
 
     default:
