@@ -145,7 +145,7 @@ void __cdecl CalibratePalette(uint32_t *palette)
                 q.r = GetRValue(c);
                 q.g = GetGValue(c);
                 q.b = GetBValue(c);
-                scratch[i] = palette[NearestPalIndex(palette, *(uint32_t *)&q, 0)];
+                scratch[i] = palette[NearestPalIndex(palette, *(PALETTEENTRY *)&q, 0)];
                 palette[PALETTE_ENTRIES + i] = (uint32_t)c;
             }
             ReleaseDC(NULL, dc);
@@ -299,7 +299,7 @@ typedef void (__cdecl *am2_void_fn)(void);
 /* The palette entry nearest the colour in `c`, above the reserved block: the
  * loop builds one PALETTEENTRY on the stack and passes it as a dword, as
  * NearestPalIndexRGB does inside -- written out here, not called. */
-#define MATCH_ENTRY(c) NearestPalIndex((const uint32_t *)pal, *(const uint32_t *)&(c), 9)
+#define MATCH_ENTRY(c) NearestPalIndex((const uint32_t *)pal, (c), 9)
 
 /* Every colour the engine looks up by name, in the original's order, each a
  * call of its own. Each slot is spelled by its ADDR_ name, not its raw VA:
@@ -443,7 +443,7 @@ void __cdecl SetGamePalette(uint8_t *pal)
  * and answers 0 rather than reading off the end. And the running best starts
  * at a sentinel larger than any real distance, so an all-equal palette
  * answers `from` -- the comparison is strict. */
-uint8_t __cdecl NearestPalIndex(const uint32_t *palette, uint32_t colour,
+uint8_t __cdecl NearestPalIndex(const uint32_t *palette, PALETTEENTRY colour,
                                 uint32_t from)
 {
     int32_t best = AM2_COLOUR_DIST_MAX;
@@ -467,14 +467,14 @@ uint8_t __cdecl NearestPalIndexRGB(const uint32_t *pal, uint8_t r, uint8_t g,
                                    uint8_t b, uint32_t from)
 {
     /* A PALETTEENTRY built in place: the image stores the three bytes into
-     * the dead `r` argument slot and passes the dword, flags byte and all.
+     * the dead `r` argument slot and passes it by value, flags byte and all.
      * NearestPalIndex reads only the three colours. */
     PALETTEENTRY c;
 
     c.peRed   = r;
     c.peGreen = g;
     c.peBlue  = b;
-    return NearestPalIndex(pal, *(const uint32_t *)&c, from);
+    return NearestPalIndex(pal, c, from);
 }
 
 /* 0x00422F60 -- read an 8-bit .bmp's HEADER and palette and nothing else.
@@ -672,7 +672,7 @@ void __cdecl PaletteLoaded(void)
                                  (set + SPRITE_SET_OFF_PALETTE))[i]);
 
                 set[SPRITE_SET_OFF_REMAP + i] =
-                    NearestPalIndex(g_activePalette, c, 0);
+                    NearestPalIndex(g_activePalette, *(PALETTEENTRY *)&c, 0);
             }
         } else {
             for (i = 0; i < AM2_PALETTE_ENTRIES; i++)

@@ -68,8 +68,13 @@ void __cdecl SetGamePalette(uint8_t *palette);
 
 /* 0x0041B7C0. The palette entry nearest `colour`, searching from `from` up --
  * callers use that to protect a reserved block of low entries. `from` is
- * masked to a byte, so 0x100 or more searches nothing and answers 0. */
-uint8_t __cdecl NearestPalIndex(const uint32_t *palette, uint32_t colour,
+ * masked to a byte, so 0x100 or more searches nothing and answers 0.
+ *
+ * The colour is a PALETTEENTRY BY VALUE: NearestPalIndexRGB and
+ * CalibratePalette load the dword their struct lives in after the value
+ * pushed beneath it, which is how VC6 copies a by-value struct and not how
+ * it passes a uint32_t. */
+uint8_t __cdecl NearestPalIndex(const uint32_t *palette, PALETTEENTRY colour,
                                 uint32_t from);
 
 /* 0x0041B820, 25 callers. NearestPalIndex with the three channels apart. The

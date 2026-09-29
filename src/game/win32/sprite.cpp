@@ -1246,9 +1246,11 @@ int32_t __cdecl SpriteSetLoad(const char *name)
              * three for the match. SwapColourBytes reads no second parameter,
              * so what the original leaves in that slot is whatever was on the
              * stack; zero is the same function. */
-            for (i = 0; i < 256; i++)
-                remap[i] = NearestPalIndex(display,
-                                           SwapColourBytes(pal[i]), 0);
+            for (i = 0; i < 256; i++) {
+                uint32_t c = SwapColourBytes(pal[i]);
+
+                remap[i] = NearestPalIndex(display, *(PALETTEENTRY *)&c, 0);
+            }
         } else {
             for (i = 0; i < 256; i++)
                 remap[i] = (uint8_t)i;
@@ -1713,7 +1715,8 @@ int32_t __cdecl LoadSpriteFile(const char *path, AM2_AnimTable *anims,
      * or above `from` -- the same threshold LoadSpriteSet then refuses to
      * rewrite below, so the reserved block is respected twice over. */
     for (i = 0; i < AM2_SPRITE_PALETTE_SIZE; i++)
-        table[i] = NearestPalIndex(g_activePalette, palette[i],
+        table[i] = NearestPalIndex(g_activePalette,
+                                   *(const PALETTEENTRY *)&palette[i],
                                    (uint32_t)from);
 
     /* Taken before the load, so the tail gets the index the new sprites start
