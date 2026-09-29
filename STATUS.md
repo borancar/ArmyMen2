@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1186 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1187 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1186:
+  the near-miss sweep, 758 before the row pools. From 758 to 1187:
   - **Parameterised helpers the original wrote twice**: the two row pools
     and the sixteen sprite-loader functions were one helper over a struct
     of pointers, which VC6 cannot fold. Inline helpers over the pool's own
@@ -157,6 +157,12 @@ main result so far (details in `src/vc6/README.md`):
     re-index `kScriptNames[kScriptNameCount]` at every use and copy with
     strcpy; AddNameTableName's switch has three identical arms (one arm
     with three labels compiles to a range test, not the image's table).
+  - **Call counts, ours against the image's** (`callees.py` over the relink
+    json) find arms the image writes out in full: SaveEventSection's three
+    handler kinds each write their whole record (fifteen WriteSaveTag
+    calls to our seven), LoadEventSection registers once per kind. The
+    scan has false positives where a function's byte range in the json
+    runs on into the next one.
   - **Signed loop tests mean an index**: a `jl` against a strength-reduced
     cursor is an `int32_t i` loop (OptionsApply, AimMarkerAge), a pointer
     walk gives `jb`. The cursor's bias is the field the body reads first.

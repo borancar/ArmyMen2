@@ -523,34 +523,28 @@ int32_t __cdecl LoadEventSection(am2_FILE *fp)
         return 0;
 
     orig_fread(&tag, 4, 1, fp);
-    if (tag != (int32_t)AM2_SAVE_RECORD_MARK)
-        return 1;
-
-    do {
+    while (tag == (int32_t)AM2_SAVE_RECORD_MARK) {
         /* Three dwords. The first is read and dropped -- see event.h. */
         orig_fread(&unused, 4, 1, fp);
         orig_fread(&key, 4, 1, fp);
         orig_fread(&kind, 4, 1, fp);
         (void)unused;
 
-        if (kind == (int32_t)AM2_EVTSAVE_PAD_A ||
-            kind == (int32_t)AM2_EVTSAVE_PAD_B) {
-            AM2_Pad *pad;
-
+        /* One arm per kind, each with its own registration. Both pad arms
+         * write +0x28, which is the ORIGINAL's behaviour and is reproduced:
+         * only the enter handler reads that field, so a restored leave
+         * registration compares +0x2C, which nothing here wrote, and
+         * clobbers the enter uid on the way past. Verified at 0x0042268F
+         * and 0x004226D5 -- the second arm kept the first's displacement.
+         * Not fixed. */
+        if (kind == (int32_t)AM2_EVTSAVE_PAD_A) {
             orig_fread(&idx, 4, 1, fp);
-            pad = &kPads[idx];
-            /* Both arms write +0x28, which is the ORIGINAL's behaviour and
-             * is reproduced: only the enter handler reads that field, so a
-             * restored leave registration compares +0x2C, which nothing here
-             * wrote, and clobbers the enter uid on the way past. Verified at
-             * 0x0042268F and 0x004226D5 -- the second arm kept the first's
-             * displacement. Not fixed. */
-            *(int32_t *)pad->rest = key;        /* +0x28 */
-            EventRegister(0, key, 0,
-                          (kind == (int32_t)AM2_EVTSAVE_PAD_A
-                           ? (const void *)EvtPadOn
-                           : (const void *)EvtPadOff),
-                          pad, 0);
+            *(int32_t *)kPads[idx].rest = key;        /* +0x28 */
+            EventRegister(0, key, 0, (const void *)EvtPadOn, &kPads[idx], 0);
+        } else if (kind == (int32_t)AM2_EVTSAVE_PAD_B) {
+            orig_fread(&idx, 4, 1, fp);
+            *(int32_t *)kPads[idx].rest = key;        /* +0x28 */
+            EventRegister(0, key, 0, (const void *)EvtPadOff, &kPads[idx], 0);
         } else if (kind == (int32_t)AM2_EVTSAVE_OWNED) {
             void *rec = orig_malloc(0x10);
 
@@ -562,7 +556,7 @@ int32_t __cdecl LoadEventSection(am2_FILE *fp)
         }
 
         orig_fread(&tag, 4, 1, fp);
-    } while (tag == (int32_t)AM2_SAVE_RECORD_MARK);
+    }
 
     return 1;
 }
@@ -574,30 +568,36 @@ int32_t __cdecl SaveEventSection(am2_FILE *fp)
     for (int32_t b = 0; b < AM2_EVENT_BUCKETS; b++) {
         for (AM2_EventEntry *e = kEventTable[b]; e; e = e->next) {
             for (AM2_EventHandler *h = e->handlers; h; h = h->next) {
-                uint32_t kind;
-
                 /* Tested in this order, and the two pad arms want an argument
                  * while the owned one does not. A pad handler with a null
-                 * argument falls through every arm and is skipped. */
-                if (h->fn == (const void *)EvtPadOn && h->arg)
-                    kind = AM2_EVTSAVE_PAD_A;
-                else if (h->fn == (const void *)EvtPadOff && h->arg)
-                    kind = AM2_EVTSAVE_PAD_B;
-                else if (h->fn == (const void *)EvtRecordHandler)
-                    kind = AM2_EVTSAVE_OWNED;
-                else
-                    continue;
-
-                WriteSaveTag(fp, AM2_SAVE_RECORD_MARK);
-                WriteSaveTag(fp, (uint32_t)b);       /* the loader drops this */
-                WriteSaveTag(fp, (uint32_t)e->key0);
-                WriteSaveTag(fp, kind);
-
-                if (kind == AM2_EVTSAVE_OWNED)
+                 * argument falls through every arm and is skipped. Each arm
+                 * writes its whole record -- the image has the four tags
+                 * three times over -- and the pad index is an UNSIGNED
+                 * byte difference over the record size. The loader drops
+                 * the bucket number. */
+                if (h->fn == (const void *)EvtPadOn && h->arg) {
+                    WriteSaveTag(fp, AM2_SAVE_RECORD_MARK);
+                    WriteSaveTag(fp, (uint32_t)b);
+                    WriteSaveTag(fp, (uint32_t)e->key0);
+                    WriteSaveTag(fp, AM2_EVTSAVE_PAD_A);
+                    WriteSaveTag(fp, (uint32_t)((uint8_t *)h->arg
+                                                - (uint8_t *)kPads)
+                                     / (uint32_t)sizeof(AM2_Pad));
+                } else if (h->fn == (const void *)EvtPadOff && h->arg) {
+                    WriteSaveTag(fp, AM2_SAVE_RECORD_MARK);
+                    WriteSaveTag(fp, (uint32_t)b);
+                    WriteSaveTag(fp, (uint32_t)e->key0);
+                    WriteSaveTag(fp, AM2_EVTSAVE_PAD_B);
+                    WriteSaveTag(fp, (uint32_t)((uint8_t *)h->arg
+                                                - (uint8_t *)kPads)
+                                     / (uint32_t)sizeof(AM2_Pad));
+                } else if (h->fn == (const void *)EvtRecordHandler) {
+                    WriteSaveTag(fp, AM2_SAVE_RECORD_MARK);
+                    WriteSaveTag(fp, (uint32_t)b);
+                    WriteSaveTag(fp, (uint32_t)e->key0);
+                    WriteSaveTag(fp, AM2_EVTSAVE_OWNED);
                     orig_fwrite(h->arg, 0x10, 1, fp);
-                else
-                    WriteSaveTag(fp,
-                        (uint32_t)((AM2_Pad *)h->arg - kPads));
+                }
             }
         }
     }
