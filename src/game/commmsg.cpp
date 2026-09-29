@@ -431,7 +431,10 @@ void __cdecl ReceivedTeamMsg(void *msg, int32_t dpid)
 #undef COMM
 }
 
-void __cdecl CommEndSetup(void)
+/* The body of CommEndSetup, which its two callers in this file have written
+ * out in place in the image; the function itself is also there for the
+ * outside caller. */
+static inline void CommEndSetupInline(void)
 {
     int32_t i;
 
@@ -465,10 +468,15 @@ void __cdecl CommEndSetup(void)
     orig_post_message(*(void **)(uintptr_t)ADDR_HWND, AM2_WM_SETUP_DONE, 0, 0);
 }
 
+void __cdecl CommEndSetup(void)
+{
+    CommEndSetupInline();
+}
+
 void __cdecl SendGameReadyMsg(int32_t ready)
 {
-    uint8_t *comm = (uint8_t *)kCommObj;
-    int32_t  slot;
+    /* The comm object is re-read at every use, as the image does. */
+#define comm ((uint8_t *)kCommObj)
 
     /* Gated on the verbosity field like the rest of the group -- unlike
      * SendGameStartMsg, whose opening line is not. */
@@ -477,9 +485,9 @@ void __cdecl SendGameReadyMsg(int32_t ready)
 
     /* Our own slot: the id comes from the comm object, where the receive half
      * takes it from the message. */
-    slot = ((AM2_Comm *)comm)->CommSlotOfId(
-                                *(const int32_t *)(comm + AM2_COMM_SELF_ID));
-    *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
+    *(int32_t *)(comm + (uint32_t)((AM2_Comm *)comm)->CommSlotOfId(
+                                *(const int32_t *)(comm + AM2_COMM_SELF_ID))
+                            * COMM_ARMY_RECORD_SIZE
                  + COMM_ARMY_OFF_READY) = ready;
 
     if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED)) {
@@ -497,29 +505,30 @@ void __cdecl SendGameReadyMsg(int32_t ready)
         = ready;
     SendGameMsg((void *)(uintptr_t)ADDR_MSG_GAME_READY, 0, 1);
 
-    CommEndSetup();
+#undef comm
+    CommEndSetupInline();
 }
 
 void __cdecl ReceiveGameReadyMsg(void *msg, int32_t dpid)
 {
-    uint8_t *comm = (uint8_t *)kCommObj;
-    int32_t  value;
-    int32_t  slot;
-
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+    /* The comm object is re-read at every use, as the image does. */
+#define COMM ((uint8_t *)kCommObj)
+#define VALUE (*(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE))
+    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
         am2_log("ReceiveGameReadyMsg\n");
 
-    value = *(const int32_t *)((const uint8_t *)msg + AM2_MSG_VALUE);
-    slot  = ((AM2_Comm *)comm)->CommSlotOfId(dpid);
-    *(int32_t *)(comm + (uint32_t)slot * COMM_ARMY_RECORD_SIZE
-                 + COMM_ARMY_OFF_READY) = value;
+    *(int32_t *)(COMM + (uint32_t)((AM2_Comm *)COMM)->CommSlotOfId(dpid)
+                            * COMM_ARMY_RECORD_SIZE
+                 + COMM_ARMY_OFF_READY) = VALUE;
 
-    if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
+    if (*(const int32_t *)(COMM + AM2_COMM_LOG_ENABLED))
         am2_log("Setting m_ArmyReady[%d] to %s\n",
-                ((AM2_Comm *)comm)->CommSlotOfId(dpid),
-                value ? "TRUE" : "FALSE");
+                ((AM2_Comm *)COMM)->CommSlotOfId(dpid),
+                VALUE ? "TRUE" : "FALSE");
 
-    CommEndSetup();
+    CommEndSetupInline();
+#undef COMM
+#undef VALUE
 }
 
 void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)

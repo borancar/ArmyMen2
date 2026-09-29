@@ -271,8 +271,7 @@ void __cdecl BuildRegionGraph(void);
  * mask: clamp each edge into the map, pad by two tiles, and fill the padded
  * rectangle with 2 and the box itself with 3. `out` is a TILEMASK record.
  * Always answers 1. */
-int32_t __cdecl BoxAction(int32_t left, int32_t top, int32_t right,
-                          int32_t bottom, void *out);
+int32_t __cdecl BoxAction(AM2_Rect area, void *out);
 
 /* 0x00438F80, two callers. Offset the object's box by its position and hand it
  * to BoxAction, when the first row's sprite has a software image. `out` is the

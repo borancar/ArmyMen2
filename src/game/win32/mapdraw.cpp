@@ -584,7 +584,7 @@ static void SavePrev(void *dst, const void *src, int32_t dwords)
 
 /* One axis of the shake: advance the phase, bounce it off +/-amp reversing
  * the step, and answer the whole-pixel offset. */
-static int32_t ShakeAxis(float *phase, int32_t *step, int32_t amp)
+static inline int32_t ShakeAxis(float *phase, int32_t *step, int32_t amp)
 {
     *phase = (float)*step * g_frameDeltaSec + *phase;
 
@@ -1046,9 +1046,7 @@ void __cdecl ScrollDecay(void)
         return;
     }
 
-    amp = g_shakeAmp;
-    if (left <= AM2_SHAKE_FADE_MS)
-        amp = (amp * left) >> 10;
+    amp = left > AM2_SHAKE_FADE_MS ? g_shakeAmp : (g_shakeAmp * left) >> 10;
 
     dx = ShakeAxis(&g_shakePhaseX, &g_shakeStepX, amp);
     g_viewRect->left  += dx;
@@ -1393,7 +1391,7 @@ void __cdecl ScrollView(void)
  * It locks the surface and does NOT unlock it -- the pairing is the caller's,
  * which is why this shows up in the bracket list with only one half. */
 static void __cdecl DrawVLine(int32_t x, int32_t y0, int32_t y1,
-                              int32_t colour)
+                              uint8_t colour)
 {
     uint8_t *p;
     uint8_t *end;
@@ -1446,7 +1444,7 @@ static void __cdecl DrawVLine(int32_t x, int32_t y0, int32_t y1,
  * computed as x1 - x0 + 1 and the clip has already ordered them. An inverted
  * line still cannot reach here: it is dropped by the clip returning early. */
 static void __cdecl DrawHLine(int32_t y, int32_t x0, int32_t x1,
-                              int32_t colour)
+                              uint8_t colour)
 {
     uint8_t *p;
     int32_t  count;
@@ -1485,7 +1483,7 @@ static void __cdecl DrawHLine(int32_t y, int32_t x0, int32_t x1,
  *
  * The original pushes all sixteen arguments and cleans them with one
  * `add esp, 0x40` after the last call. */
-static void __cdecl DrawRect(const AM2_Rect *r, int32_t colour)
+static void __cdecl DrawRect(const AM2_Rect *r, uint8_t colour)
 {
     DrawVLine(r->left,  r->top,  r->bottom, colour);
     DrawVLine(r->right, r->top,  r->bottom, colour);
@@ -1976,11 +1974,10 @@ clamp_eye:
  * The colour is a byte read from its own global rather than passed in. */
 void __cdecl DrawViewRect(void)
 {
-    const AM2_Rect *box = (const AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT;
-    const int32_t   ox  = *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X;
-    const int32_t   oy  = *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y;
-    AM2_Rect        on_screen;
-    int32_t         colour;
+#define BOX ((const AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT)
+#define OX  (*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X)
+#define OY  (*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y)
+    AM2_Rect on_screen;
 
     if (*(const int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON == 0)
         return;
@@ -1988,15 +1985,16 @@ void __cdecl DrawViewRect(void)
     if (!LockSurface(g_drawTarget))
         return;
 
-    on_screen.left   = box->left   - ox;
-    on_screen.top    = box->top    - oy;
-    on_screen.right  = box->right  - ox;
-    on_screen.bottom = box->bottom - oy;
+    on_screen.left   = BOX->left   - OX;
+    on_screen.top    = BOX->top    - OY;
+    on_screen.right  = BOX->right  - OX;
+    on_screen.bottom = BOX->bottom - OY;
 
-    colour = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
-
-    DrawRect(&on_screen, colour);
+    DrawRect(&on_screen, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
     UnlockSurface();
+#undef BOX
+#undef OX
+#undef OY
 }
 
 /* DrawSelection -- original 0x00462120, one caller.

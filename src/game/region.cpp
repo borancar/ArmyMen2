@@ -611,20 +611,22 @@ int32_t __cdecl RegionHops(int32_t from, int32_t to, int32_t solve)
  * and "unsolved" together with "far away". */
 int32_t __cdecl RegionsNear(const void *a, const void *b, int32_t solve)
 {
-    const uint8_t *cells = *(const uint8_t *const *)((void *)(uintptr_t)(ADDR_REGION_OF_CELL));
-    int32_t        rb, ra, hops;
+    /* The region map is re-read after each call, as the image does. */
+#define CELLS (*(const uint8_t *const *)((void *)(uintptr_t)(ADDR_REGION_OF_CELL)))
+    int32_t rb, ra, hops;
 
-    rb = cells[(uint32_t)TileOfPoint(
+    rb = CELLS[(uint32_t)TileOfPoint(
                    *(const uint32_t *)((const uint8_t *)b + OBJ_OFF_POS))
                & 0xFFFFu];
-    ra = cells[(uint32_t)TileOfPoint(
+    ra = CELLS[(uint32_t)TileOfPoint(
                    *(const uint32_t *)((const uint8_t *)a + OBJ_OFF_POS))
                & 0xFFFFu];
+#undef CELLS
 
     hops = RegionHops(rb, ra, solve);
-    if (hops == -1 || hops > 1)
-        return 0;
-    return 1;
+    if (hops != -1 && hops <= 1)
+        return 1;
+    return 0;
 }
 
 /* 0x0042BC70 and 0x0042BCB0, one caller each and adjacent in the image: the
@@ -1768,15 +1770,17 @@ int32_t __cdecl MarkOpenTile(uint16_t tile)
 {
     const int8_t *weights;
     const int8_t *cover;
-    int32_t       weighted = 0;
-    int32_t       covered  = 0;
-    uint32_t      i;
+    int32_t       weighted;
+    int32_t       covered;
+    int32_t       i;
 
     weights = *(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
     if (weights[tile] >= (int8_t)AM2_CELL_WEIGHT_STEP)
         return 0;
 
     cover = *(const int8_t *const *)(uintptr_t)ADDR_TILE_COVER;
+    covered  = 0;
+    weighted = 0;
 
     for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++) {
         int32_t at = (int32_t)tile
@@ -1841,8 +1845,7 @@ int32_t __cdecl MarkOpenTile(uint16_t tile)
  * the no-mask fallback, and everything on this map has a mask. BoxAction's
  * other caller, 0x00438F10, does not run here either. So this is verified by
  * READING, and the clean A/B says only that nothing regressed. */
-int32_t __cdecl BoxAction(int32_t left, int32_t top, int32_t right,
-                          int32_t bottom, void *out)
+int32_t __cdecl BoxAction(AM2_Rect area, void *out)
 {
     uint8_t *rec = (uint8_t *)out;
     int32_t *box = (int32_t *)(rec + TILEMASK_OFF_RECT);
@@ -1855,16 +1858,16 @@ int32_t __cdecl BoxAction(int32_t left, int32_t top, int32_t right,
     int32_t  y;
 
     /* In the original's order: the two x edges, then the two y edges. */
-    l = Clamp(left  >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    l = Clamp(area.left  >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
                   - AM2_TILEMASK_MARGIN);
-    r = Clamp(right >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    r = Clamp(area.right >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
                   - AM2_TILEMASK_MARGIN);
-    t = Clamp(top   >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    t = Clamp(area.top   >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
                   - AM2_TILEMASK_MARGIN);
-    b = Clamp(bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    b = Clamp(area.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
                   - AM2_TILEMASK_MARGIN);
 
@@ -1918,6 +1921,7 @@ int32_t __cdecl ObjBoxAction(void *obj, void *out)
     const uint8_t *spr;
     int32_t        x;
     int32_t        y;
+    AM2_Rect       area;
 
     spr = *(const uint8_t *const *)
               (*(const uint8_t *const *)(o + OBJ_OFF_ROWS) + ROW_OFF_SPRITE);
@@ -1925,17 +1929,17 @@ int32_t __cdecl ObjBoxAction(void *obj, void *out)
         return 0;
     if (!*(const void *const *)(spr + SPR_OFF_IMAGE))
         return 0;
-    if (!(*(const uint8_t *)(spr + SPR_OFF_FLAGS) & SPR_FLAG_SOFTWARE_BITS))
-        return 1;
+    if (*(const uint8_t *)(spr + SPR_OFF_FLAGS) & SPR_FLAG_SOFTWARE_BITS) {
+        x = *(const int16_t *)(o + OBJ_OFF_X);
+        y = *(const int16_t *)(o + OBJ_OFF_Y);
 
-    x = *(const int16_t *)(o + OBJ_OFF_X);
-    y = *(const int16_t *)(o + OBJ_OFF_Y);
-
-    return BoxAction(*(const int32_t *)(o + OBJ_OFF_BOX_LEFT)   + x,
-                     *(const int32_t *)(o + OBJ_OFF_BOX_TOP)    + y,
-                     *(const int32_t *)(o + OBJ_OFF_BOX_RIGHT)  + x,
-                     *(const int32_t *)(o + OBJ_OFF_BOX_BOTTOM) + y,
-                     out);
+        area.left   = *(const int32_t *)(o + OBJ_OFF_BOX_LEFT)   + x;
+        area.right  = *(const int32_t *)(o + OBJ_OFF_BOX_RIGHT)  + x;
+        area.top    = *(const int32_t *)(o + OBJ_OFF_BOX_TOP)    + y;
+        area.bottom = *(const int32_t *)(o + OBJ_OFF_BOX_BOTTOM) + y;
+        return BoxAction(area, out);
+    }
+    return 1;
 }
 
 /* The ring the two markers below OR a 2 into: the 5x5 block around a cell less
@@ -2598,6 +2602,7 @@ int32_t __cdecl ListBoxAction(uint32_t at, void *list, void *out)
     const uint8_t *spr;
     int32_t        x;
     int32_t        y;
+    AM2_Rect       area;
 
     spr = *(const uint8_t *const *)
               (*(const uint8_t *const *)(h + LISTHDR_OFF_RECORDS)
@@ -2606,17 +2611,18 @@ int32_t __cdecl ListBoxAction(uint32_t at, void *list, void *out)
         return 0;
     if (!*(const void *const *)(spr + SPR_OFF_IMAGE))
         return 0;
-    if (!(*(const uint8_t *)(spr + SPR_OFF_FLAGS) & SPR_FLAG_SOFTWARE_BITS))
-        return 1;
+    if (*(const uint8_t *)(spr + SPR_OFF_FLAGS) & SPR_FLAG_SOFTWARE_BITS) {
+        /* `at` is a packed point, read a half at a time from its slot. */
+        x = ((const AM2_Point *)&at)->x;
+        y = ((const AM2_Point *)&at)->y;
 
-    x = (int32_t)(int16_t)(at & 0xFFFFu);
-    y = (int32_t)(int16_t)(at >> 16);
-
-    return BoxAction(*(const int32_t *)(h + LISTHDR_OFF_BOX_LEFT)   + x,
-                     *(const int32_t *)(h + LISTHDR_OFF_BOX_TOP)    + y,
-                     *(const int32_t *)(h + LISTHDR_OFF_BOX_RIGHT)  + x,
-                     *(const int32_t *)(h + LISTHDR_OFF_BOX_BOTTOM) + y,
-                     out);
+        area.left   = *(const int32_t *)(h + LISTHDR_OFF_BOX_LEFT)   + x;
+        area.right  = *(const int32_t *)(h + LISTHDR_OFF_BOX_RIGHT)  + x;
+        area.top    = *(const int32_t *)(h + LISTHDR_OFF_BOX_TOP)    + y;
+        area.bottom = *(const int32_t *)(h + LISTHDR_OFF_BOX_BOTTOM) + y;
+        return BoxAction(area, out);
+    }
+    return 1;
 }
 
 /* ListMaskAction -- original 0x004385A0, 1,072 bytes, one caller.
