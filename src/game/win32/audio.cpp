@@ -2027,45 +2027,17 @@ void __cdecl SpeakLine(int32_t group, int32_t owner)
  * default entries here -- the caller and the table agree. */
 void __cdecl SpeakItemPickupLine(int32_t item, int32_t owner)
 {
+    /* The arms are laid out in this order in the image; the jump table
+     * indexes them by item. */
     switch (item) {
-    case 0x02:
-        SpeakLine(AM2_SPEAK_GRENADES, owner);
-        break;
-    case 0x03:
-        SpeakLine(AM2_SPEAK_FLAMETHROWER, owner);
-        break;
-    case 0x04:
-        SpeakLine(AM2_SPEAK_BAZOOKA, owner);
-        break;
-    case 0x05:
-        SpeakLine(AM2_SPEAK_MORTAR, owner);
-        break;
-    case 0x0B:
-        SpeakLine(AM2_SPEAK_MINES, owner);
-        break;
-    case 0x0C:
-        SpeakLine(AM2_SPEAK_EXPLOSIVES, owner);
-        break;
-    case 0x14:
-        SpeakLine(AM2_SPEAK_MINESWEEPER, owner);
-        break;
     case 0x17:
         SpeakLine(AM2_SPEAK_MEDKIT, owner);
         break;
-    case 0x18:
-        SpeakLine(AM2_SPEAK_AIRSTRIKE, owner);
+    case 0x28:
+        SpeakLine(AM2_SPEAK_AEROSOL, owner);
         break;
-    case 0x19:
-        SpeakLine(AM2_SPEAK_PARATROOPERS, owner);
-        break;
-    case 0x1A:
-        SpeakLine(AM2_SPEAK_RECONN, owner);
-        break;
-    case 0x1C:
-        SpeakLine(AM2_SPEAK_FLAKJACK, owner);
-        break;
-    case 0x1E:
-        SpeakLine(AM2_SPEAK_SNIPERRIFLE, owner);
+    case 0x04:
+        SpeakLine(AM2_SPEAK_BAZOOKA, owner);
         break;
     case 0x23:
     case 0x24:
@@ -2073,17 +2045,47 @@ void __cdecl SpeakItemPickupLine(int32_t item, int32_t owner)
     case 0x26:
         SpeakLine(AM2_SPEAK_DISGUISE, owner);
         break;
-    case 0x27:
-        SpeakLine(AM2_SPEAK_MAGNIFYINGGLASS, owner);
+    case 0x0C:
+        SpeakLine(AM2_SPEAK_EXPLOSIVES, owner);
         break;
-    case 0x28:
-        SpeakLine(AM2_SPEAK_AEROSOL, owner);
+    case 0x03:
+        SpeakLine(AM2_SPEAK_FLAMETHROWER, owner);
         break;
-    case 0x29:
-        SpeakLine(AM2_SPEAK_WRENCH, owner);
+    case 0x02:
+        SpeakLine(AM2_SPEAK_GRENADES, owner);
+        break;
+    case 0x1C:
+        SpeakLine(AM2_SPEAK_FLAKJACK, owner);
         break;
     case 0x2A:
         SpeakLine(AM2_SPEAK_M80S, owner);
+        break;
+    case 0x27:
+        SpeakLine(AM2_SPEAK_MAGNIFYINGGLASS, owner);
+        break;
+    case 0x14:
+        SpeakLine(AM2_SPEAK_MINESWEEPER, owner);
+        break;
+    case 0x05:
+        SpeakLine(AM2_SPEAK_MORTAR, owner);
+        break;
+    case 0x0B:
+        SpeakLine(AM2_SPEAK_MINES, owner);
+        break;
+    case 0x19:
+        SpeakLine(AM2_SPEAK_PARATROOPERS, owner);
+        break;
+    case 0x1A:
+        SpeakLine(AM2_SPEAK_RECONN, owner);
+        break;
+    case 0x18:
+        SpeakLine(AM2_SPEAK_AIRSTRIKE, owner);
+        break;
+    case 0x1E:
+        SpeakLine(AM2_SPEAK_SNIPERRIFLE, owner);
+        break;
+    case 0x29:
+        SpeakLine(AM2_SPEAK_WRENCH, owner);
         break;
     default:
         break;

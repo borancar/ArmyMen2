@@ -381,26 +381,19 @@ void __cdecl EvtPlaySoundOn(const char *name, uint32_t owner, int32_t slot,
  * global pointing at the first record it has not freed. */
 void __cdecl FreeScriptConditions(void)
 {
-    AM2_ScriptCond *cond = kScriptConditions;
+    /* Walked through the list head itself, re-read after every free. */
+    while (kScriptConditions) {
+        AM2_ScriptCond *next = (AM2_ScriptCond *)kScriptConditions->next;
 
-    if (!cond) {
-        kScriptConditions = NULL;
-        return;
-    }
-
-    while (cond) {
-        AM2_ScriptCond *next = (AM2_ScriptCond *)cond->next;
-
-        if (cond->events)
-            am2_free(cond->events);
-        if (cond->tests)
-            am2_free(cond->tests);
-        if (cond->actions)
-            am2_free(cond->actions);
-        am2_free(cond);
+        if (kScriptConditions->events)
+            am2_free(kScriptConditions->events);
+        if (kScriptConditions->tests)
+            am2_free(kScriptConditions->tests);
+        if (kScriptConditions->actions)
+            am2_free(kScriptConditions->actions);
+        am2_free(kScriptConditions);
 
         kScriptConditions = next;
-        cond = next;
     }
     kScriptConditions = NULL;
 }

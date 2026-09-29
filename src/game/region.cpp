@@ -1670,7 +1670,7 @@ int32_t __cdecl BeginMoveTo(void *obj, uint32_t *to)
  *
  * The argument arrives as a dword and is masked to sixteen bits before use.
  */
-static int32_t TileCoverInBounds(uint16_t tile)
+static inline int32_t TileCoverInBounds(uint16_t tile)
 {
     int32_t w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
     int32_t x = (int32_t)tile & (w - 1);
@@ -1686,8 +1686,8 @@ static int32_t TileCoverInBounds(uint16_t tile)
  * Add one to the cover count of a tile and of its twenty neighbours.
  *
  * THE GRID POINTER IS RE-READ ON EVERY NEIGHBOUR. Nothing in the loop can move
- * it, so that is the compiler keeping a register rather than anything
- * defensive; written as one load, which is what it means.
+ * it, so it is not defensive -- it is how the source spelled the global, a
+ * read at each use, and it is written that way here.
  *
  * The count is a byte and nothing clamps it. Twenty-one increments per call
  * with no saturation means a tile covered by more than 255 things wraps to 0
@@ -1696,18 +1696,19 @@ static int32_t TileCoverInBounds(uint16_t tile)
  */
 void __cdecl TileCoverAdd(uint16_t tile)
 {
-    uint8_t *cover;
-    uint32_t i;
+    int32_t i;
 
     if (!TileCoverInBounds(tile))
         return;
 
-    cover = *(uint8_t **)(uintptr_t)ADDR_TILE_COVER;
-    cover[tile]++;
+    /* The grid pointer is re-read for every tile it touches. */
+#define COVER (*(uint8_t **)(uintptr_t)ADDR_TILE_COVER)
+    COVER[tile]++;
 
-    for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++)
-        cover[(int32_t)tile
+    for (i = 0; i < (int32_t)AM2_TILE_NEIGHBOUR_COUNT; i++)
+        COVER[(int32_t)tile
               + ((const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS)[i]]++;
+#undef COVER
 }
 
 /* TileCoverSub -- original 0x00438520, two callers, and TileCoverAdd with
@@ -1725,18 +1726,19 @@ void __cdecl TileCoverAdd(uint16_t tile)
  */
 void __cdecl TileCoverSub(uint16_t tile)
 {
-    uint8_t *cover;
-    uint32_t i;
+    int32_t i;
 
     if (!TileCoverInBounds(tile))
         return;
 
-    cover = *(uint8_t **)(uintptr_t)ADDR_TILE_COVER;
-    cover[tile]--;
+    /* The grid pointer is re-read for every tile it touches. */
+#define COVER (*(uint8_t **)(uintptr_t)ADDR_TILE_COVER)
+    COVER[tile]--;
 
-    for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++)
-        cover[(int32_t)tile
+    for (i = 0; i < (int32_t)AM2_TILE_NEIGHBOUR_COUNT; i++)
+        COVER[(int32_t)tile
               + ((const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS)[i]]--;
+#undef COVER
 }
 
 /* MarkOpenTile -- original 0x0043A4F0, one caller.

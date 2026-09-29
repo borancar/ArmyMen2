@@ -39,14 +39,14 @@ int32_t __cdecl SetGameDir(const char *subdir)
         return 1;
     }
 
-    if (!*(const int32_t *)((void *)(uintptr_t)(ADDR_CD_PRESENT)))
-        return 0;
+    if (*(const int32_t *)((void *)(uintptr_t)(ADDR_CD_PRESENT))) {
+        /* No separator appended -- the fallback base already ends in one. */
+        strcpy(path, (const char *)((void *)(uintptr_t)(ADDR_CD_PATH)));
+        strcat(path, subdir);
 
-    /* No separator appended -- the fallback base already ends in one. */
-    strcpy(path, (const char *)((void *)(uintptr_t)(ADDR_CD_PATH)));
-    strcat(path, subdir);
-
-    return am2_chdir(path) == 0;
+        return am2_chdir(path) == 0;
+    }
+    return 0;
 }
 
 /* 0x00422D80 -- "is this file there", answered by opening it and closing it
