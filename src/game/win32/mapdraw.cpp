@@ -338,7 +338,7 @@ int32_t __cdecl LoadAtlFile(const char *path)
     uint32_t  header[DIB_HEADER_DWORDS];
     uint8_t   rec[AM2_BMP_REC_BYTES];
     am2_FILE *fp;
-    uint32_t  magic, formSize, chunkId, chunkSize;
+    uint32_t  magic, formSize, chunkSize;
     int32_t   offset;
 
     fp = orig_fopen(path, "rb");
@@ -351,20 +351,20 @@ int32_t __cdecl LoadAtlFile(const char *path)
 
     orig_fread(&formSize, 4, 1, fp);
     orig_fread(&magic, 4, 1, fp);
+    offset = AM2_ATL_HEADER_BYTES;
     if (magic != mmioFOURCC('T', 'I', 'L', 'E'))
         goto bad;
 
-    offset = AM2_ATL_HEADER_BYTES;
     do {
         uint8_t *spr;
         void    *pixels;
         int32_t  shift, tw, th;
 
-        orig_fread(&chunkId, 4, 1, fp);
+        orig_fread(&magic, 4, 1, fp);
         orig_fread(&chunkSize, 4, 1, fp);
         offset += AM2_ATL_CHUNK_HEADER;
 
-        if (chunkId != mmioFOURCC('D', 'I', 'B', ' ')) {
+        if (magic != mmioFOURCC('D', 'I', 'B', ' ')) {
             orig_fseek(fp, (int32_t)chunkSize, SEEK_CUR);
             offset += (int32_t)chunkSize;
             continue;
@@ -388,7 +388,7 @@ int32_t __cdecl LoadAtlFile(const char *path)
         MakeBitmap(header, pixels, rec, (const uint8_t *)0);
         am2_free(pixels);
 
-        spr = *(uint8_t **)(uintptr_t)ADDR_MAP_SURFACE;
+#define spr (*(uint8_t **)(uintptr_t)ADDR_MAP_SURFACE)
         *(void **)(spr + 0x10) = *(void *const *)(rec + BMP_OFF_SURFACE);
         *(uint8_t *)(spr + 0x2C) = rec[BMP_OFF_KEY];
         *(int32_t *)(spr + 0x18) = 0;
@@ -404,13 +404,14 @@ int32_t __cdecl LoadAtlFile(const char *path)
             goto bad;
         }
 
-        th = (*(const int32_t *)(uintptr_t)ADDR_SCREEN_H >> AM2_TILE_SHIFT) + 2;
         tw = (*(const int32_t *)(uintptr_t)ADDR_SCREEN_W >> AM2_TILE_SHIFT) + 2;
+        th = (*(const int32_t *)(uintptr_t)ADDR_SCREEN_H >> AM2_TILE_SHIFT) + 2;
         *(int32_t *)(uintptr_t)ADDR_VIEW_TILES_H = th;
         *(int32_t *)(uintptr_t)ADDR_VIEW_TILES_W = tw;
         *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_MAP_CACHE_SURFACE =
             CreateOffscreenSurface(tw << AM2_TILE_SHIFT,
                                    th << AM2_TILE_SHIFT, 0x40, -1);
+#undef spr
     } while (offset < (int32_t)formSize);
 
     orig_fclose(fp);
@@ -434,10 +435,10 @@ void __cdecl RestoreTileSet(void)
     uint32_t   header[DIB_HEADER_DWORDS];
     uint8_t    remap[256];
     char       path[256];
-    uint32_t   scratch;              /* the byte out-param; discarded */
+    uint8_t    scratch;              /* the byte out-param; discarded */
     DDSURFACEDESC desc;
     am2_FILE  *fp;
-    uint32_t   magic, formSize, chunkId, chunkSize;
+    uint32_t   magic, formSize, chunkSize;
     int32_t    offset, i;
 
     /* The answer is discarded, and the call is not optional: SetGameDir
@@ -459,20 +460,20 @@ void __cdecl RestoreTileSet(void)
 
     orig_fread(&formSize, 4, 1, fp);
     orig_fread(&magic, 4, 1, fp);
+    offset = 12;
     if (magic != mmioFOURCC('T', 'I', 'L', 'E'))
         goto bad;
 
-    offset = 12;
     do {
         LPDIRECTDRAWSURFACE surf;
         void    *pixels;
-        int32_t  from = 0;
+        int32_t  from;
 
-        orig_fread(&chunkId, 4, 1, fp);
+        orig_fread(&magic, 4, 1, fp);
         orig_fread(&chunkSize, 4, 1, fp);
         offset += 8;
 
-        if (chunkId != mmioFOURCC('D', 'I', 'B', ' ')) {
+        if (magic != mmioFOURCC('D', 'I', 'B', ' ')) {
             orig_fseek(fp, (int32_t)chunkSize, SEEK_CUR);
             offset += (int32_t)chunkSize;
             continue;
@@ -487,6 +488,7 @@ void __cdecl RestoreTileSet(void)
          * first ten entries are reserved when a flag in the bitmap record is
          * clear, here when a global is set. With no active palette the table
          * is the identity and the reserve is not consulted at all. */
+        from = 0;
         if (g_activePalette) {
             if (g_tilesetReserve) {
                 for (i = 0; i < TILESET_RESERVED; i++)
@@ -508,11 +510,10 @@ void __cdecl RestoreTileSet(void)
         surf = *(LPDIRECTDRAWSURFACE *)(g_mapSprite + MAPSPR_OFF_SURFACE);
         desc.dwSize = sizeof(desc);
         if (IDirectDrawSurface_Lock(surf, NULL, &desc, DDLOCK_WAIT, NULL) == DD_OK) {
-            int32_t width  = *(int32_t *)(g_mapSprite + MAPSPR_OFF_WIDTH);
-            int32_t height = *(int32_t *)(g_mapSprite + MAPSPR_OFF_HEIGHT);
-
             if (BlitBitmapIn(desc.lpSurface, desc.lPitch, pixels,
-                                    width, height, remap, &scratch))
+                             *(int32_t *)(g_mapSprite + MAPSPR_OFF_WIDTH),
+                             *(int32_t *)(g_mapSprite + MAPSPR_OFF_HEIGHT),
+                             remap, &scratch))
                 IDirectDrawSurface_Unlock(surf, desc.lpSurface);
             else
                 orig_log("Error on Lock in RestoreTileSet()");

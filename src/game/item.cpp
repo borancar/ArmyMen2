@@ -5214,8 +5214,8 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
     uint8_t  *o = (uint8_t *)obj;
     uint8_t  *armour = (uint8_t *)0;
     uint32_t  at;
-    int32_t   slot = -1;
-    int32_t   left = 0;      /* the armour's remaining ITEM_OFF_AMMO */
+    int32_t   slot;
+    int32_t   left;          /* the armour's remaining ITEM_OFF_AMMO */
     int32_t   i;
     int32_t   flags;
     int32_t   limit;
@@ -5236,22 +5236,19 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
 
 
     if (kind != 1 && orig_game_rand() % 255 <= AM2_HIT_EFFECT_CHANCE) {
-        int32_t rec;
-
+        /* A kind-7 trooper picks one of four records at random; the pick is
+         * a signed `% 4` of the roll. One call per arm. */
         if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)
-            == AM2_SOLDIER_KIND_ACTION_A) {
-            int32_t pick = orig_game_rand() & 0x80000003;
-
-            if (pick < 0)
-                pick = ((pick - 1) | ~3) + 1;
-            rec = (int32_t)(uintptr_t)((void *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
-                + pick * AM2_OBJ_TABLE_REC_SIZE;
-        } else {
-            rec = *(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND);
-        }
-
-        SpawnHitEffect(&at, rec, *(const uint8_t *)(o + OBJ_OFF_HIT_DIR),
-                              *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
+            == AM2_SOLDIER_KIND_ACTION_A)
+            SpawnHitEffect(&at,
+                           (int32_t)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
+                               + orig_game_rand() % 4 * AM2_OBJ_TABLE_REC_SIZE,
+                           *(const uint8_t *)(o + OBJ_OFF_HIT_DIR),
+                           *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
+        else
+            SpawnHitEffect(&at, *(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND),
+                           *(const uint8_t *)(o + OBJ_OFF_HIT_DIR),
+                           *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET));
     }
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
@@ -5259,21 +5256,22 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
                               (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
         return;
 
+    left   = 0;
+    slot   = -1;
     for (i = 0; i < AM2_INVENTORY_SLOTS; i++) {
         uint32_t uid = ((const uint32_t *)(o + UNIT_OFF_INVENTORY))[i];
-        uint8_t *w;
 
-        if (uid == 0)
-            continue;
-        w = (uint8_t *)WeaponByUid((int32_t)uid);
-        if (w == (uint8_t *)0)
-            continue;
-        if (**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)
-            == (int32_t)AM2_ITEM_TYPE_ARMOR) {
-            armour = w;
-            left   = *(const int32_t *)(w + ITEM_OFF_AMMO);
-            slot   = i;
-            break;
+        if (uid != 0) {
+            uint8_t *w = (uint8_t *)WeaponByUid((int32_t)uid);
+
+            if (w != (uint8_t *)0
+                && **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)
+                   == (int32_t)AM2_ITEM_TYPE_ARMOR) {
+                armour = w;
+                left   = *(const int32_t *)(w + ITEM_OFF_AMMO);
+                slot   = i;
+                break;
+            }
         }
     }
 
@@ -5295,9 +5293,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
         if (slot >= 0) {
         left  -= amount;
 
-        if (left > 0) {
-            *(int32_t *)(armour + ITEM_OFF_AMMO) -= amount;
-        } else {
+        if (left <= 0) {
             RemoveInventoryItem(o, slot);
 
             if (AM2_THE_COMM->CommMustBroadcast(
@@ -5314,6 +5310,8 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
             }
 
             *(uint32_t *)(armour + WEAPON_OFF_FLAGS) |= WEAPON_FLAG_DEAD;
+        } else {
+            *(int32_t *)(armour + ITEM_OFF_AMMO) -= amount;
         }
         }
     }
@@ -5336,12 +5334,15 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
             SpeakLine(AM2_SPEECH_SARGE_HURT,
                       *(const int8_t *)(o + OBJ_OFF_ARMY));
     } else {
-        PlaySoundAt(*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)
-                        == AM2_SOLDIER_KIND_ACTION_A
-                    ? AM2_SND_HURT_KIND7 : AM2_SND_HURT,
-                    flags, 0,
-                    *(const int16_t *)(o + OBJ_OFF_X),
-                    *(const int16_t *)(o + OBJ_OFF_Y));
+        if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)
+            == AM2_SOLDIER_KIND_ACTION_A)
+            PlaySoundAt(AM2_SND_HURT_KIND7, flags, 0,
+                        *(const int16_t *)(o + OBJ_OFF_X),
+                        *(const int16_t *)(o + OBJ_OFF_Y));
+        else
+            PlaySoundAt(AM2_SND_HURT, flags, 0,
+                        *(const int16_t *)(o + OBJ_OFF_X),
+                        *(const int16_t *)(o + OBJ_OFF_Y));
     }
 
     *(int16_t *)(o + OBJ_OFF_HEALTH) =
@@ -5355,9 +5356,9 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
 
         if (*(const int32_t *)(o + OBJ_OFF_FIELD_5A4) != 0) {
             uint8_t *killer = (uint8_t *)LookupByUID(attacker);
-            int32_t  army   = killer != (uint8_t *)0
-                            ? (int32_t)*(const int8_t *)(killer + OBJ_OFF_ARMY)
-                            : AM2_ARMY_NEUTRAL;
+            int16_t  army   = killer != (uint8_t *)0
+                            ? (int16_t)*(const int8_t *)(killer + OBJ_OFF_ARMY)
+                            : (int16_t)AM2_ARMY_NEUTRAL;
 
             CreateExplosion(*(const int16_t *)(o + OBJ_OFF_X),
                             *(const int16_t *)(o + OBJ_OFF_Y),
@@ -5374,15 +5375,16 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
             && *(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
             && ((const uint32_t *)(o + UNIT_OFF_INVENTORY))
                    [AM2_TROOPER_DROP_SLOT] != 0) {
-            const int16_t *step = (const int16_t *)((void *)(uintptr_t)(ADDR_DROP_RING));
-            AM2_Point      where;
+            const int16_t *ring = (const int16_t *)(uintptr_t)ADDR_DROP_RING;
+            AM2_Point        where;
+            int32_t          k = 1;
 
             do {
-                where.x = (int16_t)(step[0] + *(const int16_t *)(o + OBJ_OFF_X));
-                where.y = (int16_t)(step[1] + *(const int16_t *)(o + OBJ_OFF_Y));
+                where.x = (int16_t)(ring[k - 1] + *(const int16_t *)(o + OBJ_OFF_X));
+                where.y = (int16_t)(*(const int16_t *)(o + OBJ_OFF_Y) + ring[k]);
                 TrooperDropItem(o, AM2_TROOPER_DROP_SLOT,
                                 *(const uint32_t *)&where);
-                step += 2;
+                k += 2;
             } while (((const uint32_t *)(o + UNIT_OFF_INVENTORY))
                          [AM2_TROOPER_DROP_SLOT] != 0);
         }
