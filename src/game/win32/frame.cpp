@@ -125,7 +125,6 @@ typedef int32_t (__cdecl *AM2_EventFlag8Fn)(void);
 void __cdecl MissionInput(void)
 {
     int32_t step;
-    int16_t cx, cy;
 
     if (!IsKeyDown(AM2_DIK_ESCAPE) && KeyChanged(AM2_DIK_ESCAPE)) {
         *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
@@ -146,9 +145,11 @@ void __cdecl MissionInput(void)
                 SendGamePause(1, 8);
             }
             if (*(const char *)(uintptr_t)ADDR_LEVEL_SOUND_NAME)
+                /* Slot 0 at priority 1 -- the original's order; this once
+                 * had the two swapped. */
                 PlayDynamicSound(
                     (const char *)(uintptr_t)ADDR_LEVEL_SOUND_NAME,
-                    0, 0, 0, 0, 1, 0, 0);
+                    0, 0, 0, 0, 0, 1, 0);
             LatchKeyState();
         }
     } else if (ActionKeyReleased(AM2_ACTION_SHOW_INFO)) {
@@ -181,11 +182,11 @@ void __cdecl MissionInput(void)
         && *(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
         return;
 
-    step = (int32_t)((double)*(const int32_t *)(uintptr_t)ADDR_VIEW_SPEED
-                     * (double)*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
+    step = (int32_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_SPEED
+                     * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
 
-    cx = *(const int16_t *)(uintptr_t)ADDR_CURSOR_POINT;
-    cy = *(const int16_t *)((uintptr_t)ADDR_CURSOR_POINT + 2);
+#define cx (*(const int16_t *)(uintptr_t)ADDR_CURSOR_POINT)
+#define cy (*(const int16_t *)((uintptr_t)ADDR_CURSOR_POINT + 2))
 
     if (cx > *(const int32_t *)(uintptr_t)ADDR_BITMAP_AREA_W
               - AM2_SCROLL_MARGIN) {
@@ -205,6 +206,8 @@ void __cdecl MissionInput(void)
         *(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET = 0;
         VIEW_TARGET->y = (int16_t)(VIEW_EYE2->y - step);
     }
+#undef cx
+#undef cy
 }
 
 /* 0x00424B20, one caller, on the per-frame path -- and it is THE GAME CLOCK.

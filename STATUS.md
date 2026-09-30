@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1429 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1430 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1429:
+  the near-miss sweep, 758 before the row pools. From 758 to 1430:
   - **PollKeyboard wants its keyboard state aggregated** (0x005127C8..
     0x00512FD0 in relinkos.py's AGGREGATE_RANGES): with it the loop walks
     the deadline and pressed halves with one pointer as the image does, one
@@ -143,6 +143,11 @@ main result so far (details in `src/vc6/README.md`):
     reconstruction tested `army == owner`, so under fog our own drop landed
     hidden and an enemy's in plain view. Found by byte-matching; air passes
     are not driven.
+  - **MissionInput played the level's info sound in the wrong slot**
+    (2026-09-30): the image calls PlayDynamicSound(name, 0, 0, 0, 0, 0, 1, 0)
+    -- slot 0, priority 1 (0x00424D3C pushes ebx=0, esi=1 last-first); the
+    reconstruction passed slot 1 at priority 0. Found by byte-matching; the
+    info key in a mission with a briefing sound reaches it.
   - **MakePlacedUnit swapped the army and the slot in its three creator
     calls** (2026-09-30): the image passes CreateTrooper/CreateVehicle
     `(CommArmyOfSlot(slot), slot)` -- 0x0043AD33 pushes the slot, then the

@@ -5211,7 +5211,7 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
 void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
                            uint32_t attacker)
 {
-    uint8_t  *o = (uint8_t *)obj;
+#define o ((uint8_t *)obj)
     uint8_t  *armour = (uint8_t *)0;
     uint32_t  at;
     int32_t   slot;
@@ -5259,7 +5259,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
     left   = 0;
     slot   = -1;
     for (i = 0; i < AM2_INVENTORY_SLOTS; i++) {
-        uint32_t uid = ((const uint32_t *)(o + UNIT_OFF_INVENTORY))[i];
+#define uid (((const uint32_t *)(o + UNIT_OFF_INVENTORY))[i])
 
         if (uid != 0) {
             uint8_t *w = (uint8_t *)WeaponByUid((int32_t)uid);
@@ -5375,7 +5375,7 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
             && *(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
             && ((const uint32_t *)(o + UNIT_OFF_INVENTORY))
                    [AM2_TROOPER_DROP_SLOT] != 0) {
-            const int16_t *ring = (const int16_t *)(uintptr_t)ADDR_DROP_RING;
+#define ring ((const int16_t *)(uintptr_t)ADDR_DROP_RING)
             AM2_Point        where;
             int32_t          k = 1;
 
@@ -5415,6 +5415,9 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
                         *(const int32_t *)(uintptr_t)ADDR_SPAWN_EXTRA_6628D4,
                         0, 0, 0, 0);
 
+#undef o
+#undef uid
+#undef ring
 }
 
 /* DamageVehicle -- original 0x0045B4D0, one caller, which is DamageObject's

@@ -2222,7 +2222,7 @@ void __cdecl DrawSelection(void)
  */
 void __cdecl AirFrameDraw(void)
 {
-    uint8_t *air = (uint8_t *)(uintptr_t)ADDR_AIR_SAVE_BLOCK;
+#define air ((uint8_t *)(uintptr_t)ADDR_AIR_SAVE_BLOCK)
 #define gauge (*(AM2_Sprite *const *)(uintptr_t)ADDR_AIR_SPRITES_2)
 #define step (*(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
 
@@ -2391,6 +2391,7 @@ void __cdecl AirFrameDraw(void)
 #undef step
 #undef gauge
 #undef leg2
+#undef air
 }
 
 /* DrawEffectLayer -- original 0x004123D0, one caller.
