@@ -279,9 +279,12 @@ void __cdecl BuildRegionGraph(void)
  * starting anywhere in 0..7 runs eight steps without a wrap test. The
  * seventeenth slot is -1 and is outside that scheme.
  *
- * THE ORIGINAL HAS NO LOOP. It is sixty-odd straight-line stores with the
- * compiler juggling six registers, so the grouping here is ours; what makes
- * that safe is an exact oracle rather than a reading. `tools/ringcheck.py`
+ * THE ORIGINAL HAS NO LOOP. It is straight-line stores, the raster table
+ * first, then the neighbours, then the ring copied back out of the raster
+ * table entry by entry -- the image reloads `ring8[5] = decal[5]` from memory
+ * where the register holding it was reused -- and VC6's scheduler interleaves
+ * the sixty-odd stores across six registers. Written in that order it
+ * matches byte for byte; what checks the values is an exact oracle. `tools/ringcheck.py`
  * emulates the original over a range of widths and compares all four tables
  * dword for dword.
  *
@@ -296,17 +299,15 @@ void __cdecl BuildTileDeltas(void)
     int32_t *const ring8 = (int32_t *)(uintptr_t)ADDR_TILE_RING8;
     int32_t *const nb    = (int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS;
     int32_t *const ring4 = (int32_t *)(uintptr_t)ADDR_TILE_RING4;
-    const int32_t  ring[AM2_TILE_RING8_STEPS] = {
-        -1 - w, -w, 1 - w, -1, 1, w + 1, w, w - 1
-    };
-    int32_t i;
 
-    for (i = 0; i < AM2_TILE_RING8_STEPS; i++) {
-        decal[i]                          = ring[i];
-        ring8[i]                          = ring[i];
-        ring8[i + AM2_TILE_RING8_STEPS]   = ring[i];
-    }
-    ring8[AM2_TILE_RING8_SLOTS - 1] = -1;
+    decal[0] = -1 - w;                      /* raster order */
+    decal[1] = -w;
+    decal[2] = 1 - w;
+    decal[3] = -1;
+    decal[4] = 1;
+    decal[5] = w + 1;
+    decal[6] = w;
+    decal[7] = w - 1;
 
     nb[0]  = -1 - 2 * w;                    /* the row two above: three */
     nb[1]  = -2 * w;
@@ -328,6 +329,25 @@ void __cdecl BuildTileDeltas(void)
     nb[17] = 2 * w - 1;                     /* the row two below: three */
     nb[18] = 2 * w;
     nb[19] = 2 * w + 1;
+
+    /* The ring is the raster table twice over, copied from it. */
+    ring8[0]  = decal[0];
+    ring8[1]  = decal[1];
+    ring8[2]  = decal[2];
+    ring8[3]  = decal[3];
+    ring8[4]  = decal[4];
+    ring8[5]  = decal[5];
+    ring8[6]  = decal[6];
+    ring8[7]  = decal[7];
+    ring8[8]  = decal[0];
+    ring8[9]  = decal[1];
+    ring8[10] = decal[2];
+    ring8[11] = decal[3];
+    ring8[12] = decal[4];
+    ring8[13] = decal[5];
+    ring8[14] = decal[6];
+    ring8[15] = decal[7];
+    ring8[16] = -1;
 
     ring4[0] = -w;                          /* north, east, south, west */
     ring4[1] = 1;
