@@ -6784,8 +6784,8 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
      * is left, and a weak unit's full bar is shorter than a strong one's. */
     {
         int16_t max  = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
-        int16_t hp   = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
         int32_t wide = max / 2;
+        int16_t hp   = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
         int32_t fill;
         RECT    box;
         uint8_t bar;

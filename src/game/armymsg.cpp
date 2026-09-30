@@ -1820,8 +1820,8 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
 
     {
         uint32_t age = seq - *(const uint32_t *)(o + VEHICLE_OFF_SENT_FACING_SEQ);
-        uint8_t  f  = *(const uint8_t *)(o + OBJ_OFF_FACING);
         uint8_t  lf = *(const uint8_t *)(o + VEHICLE_OFF_SENT_FACING);
+        uint8_t  f  = *(const uint8_t *)(o + OBJ_OFF_FACING);
 
         if ((age >= interval && f != lf)
             || (age >= coarse && (((uint32_t)lf ^ (uint32_t)f) & 0xFFFFFFF0u))
@@ -1832,10 +1832,10 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
 
     {
         uint32_t age = seq - *(const uint32_t *)(o + VEHICLE_OFF_SENT_GUN_SEQ);
-        uint8_t  g  = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
         uint8_t  lg = *(const uint8_t *)(o + VEHICLE_OFF_SENT_GUN);
+        uint8_t  g  = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
 
-        if ((age >= interval && g != lg)
+        if ((interval <= age && g != lg)
             || (age >= coarse && (((uint32_t)lg ^ (uint32_t)g) & 0xFFFFFFF0u))
             || (age >= interval
                 && g != *(const uint8_t *)(o + VEHICLE_OFF_SENT_INTGUN)))
@@ -1856,8 +1856,8 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
     {
         uint32_t age = seq - *(const uint32_t *)
                            (o + VEHICLE_OFF_SENT_INTGUN_SEQ);
-        uint8_t  v  = *(const uint8_t *)(o + OBJ_OFF_FACING_COPY2);
         uint8_t  lv = *(const uint8_t *)(o + VEHICLE_OFF_SENT_INTGUN);
+        uint8_t  v  = *(const uint8_t *)(o + OBJ_OFF_FACING_COPY2);
 
         if ((age >= interval && v != lv)
             || (age >= coarse && (((uint32_t)lv ^ (uint32_t)v) & 0xFFFFFFF0u)))

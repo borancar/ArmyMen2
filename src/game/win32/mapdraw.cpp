@@ -983,12 +983,12 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep)
 
 subdivide:
     {
-        int32_t   left   = world->left;
         int32_t   top    = world->top;
+        int32_t   left   = world->left;
         int32_t   right  = world->right;
         int32_t   bottom = world->bottom;
-        int32_t   dw     = right - left;
         int32_t   dh     = bottom - top;
+        int32_t   dw     = right - left;
         int32_t   half;
         int32_t   sub;
         AM2_Rect  a;

@@ -5144,8 +5144,8 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
     for (it = keep; it;
          it = *(uint8_t *const *)(it + OBJ_OFF_QUERY_NEXT)) {
         uint8_t *cand       = (uint8_t *)0;
-        int32_t  candRange  = AM2_SIGHT_SCAN_FAR;
         uint8_t  candBearing = 0x80;
+        int32_t  candRange  = AM2_SIGHT_SCAN_FAR;
 
         if (ObjsAreAllied(o, it, 0)) {
             uint8_t *theirs;
