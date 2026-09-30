@@ -2005,9 +2005,9 @@ reproduce the give. See docs/lua.md.
   09-10 OPEN list is fully closed. The only non-passing entry is roachbite-1112,
   whose FIXTURE is stale (empty "default" mission; needs re-recording, above).
   The remaining reconstruction frontier is therefore code paths NO current
-  fixture exercises (other campaign levels, MP, cold branches like the roach
-  has-leader formation block 0x004086FF..0x004089B6) -- found by extending
-  coverage, not by the existing replays.
+  fixture exercises (other campaign levels, MP, cold branches) -- found by extending coverage, not by the existing
+  replays. (The roach has-leader block 0x004086FF..0x004089B6 that was listed
+  here is reconstructed as of 2026-09-30; see below.)
 
 - **CONFIRMED FIXED (2026-09-19): the magnifying-glass 4-px refraction residual
   (DrawEffectLayer, old trap magnifyingglass-7655) no longer reproduces.**
@@ -2234,8 +2234,12 @@ FIXED below when that replay runs identical.
   to 0x00408640 exactly and moved the FOLLOW_UID persist (0x00408A3C) to the
   no-leader arm where the original has it. The live side-by-side now plays all
   of campaign level 1 frame-exact through every roach interaction. The
-  has-leader formation block (0x004086FF..0x004089B6) is a documented remaining
-  gap, cold in every fixture. The older roach fixtures (bazookaroach-8583,
+  has-leader block (0x004086FF..0x004089B6), a documented gap here until
+  2026-09-30, is now reconstructed: it is the AI line-of-sight test
+  (AM2_AI_SIGHT_TEST) with the leader as the target, then route-and-promote-
+  found when out of sight, route-and-promote-leader when in sight beyond
+  WANT_RANGE, else the old promote-leader commit. Still cold in every
+  fixture, so it is checked against the disassembly only. The older roach fixtures (bazookaroach-8583,
   roachbite-1112, roachheap-1575) share this RoachBehaviour root and should be
   re-run to confirm; the OPEN entries below predate this fix.
 

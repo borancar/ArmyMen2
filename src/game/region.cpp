@@ -9075,12 +9075,17 @@ emit:
  * decide what to do.
  *
  * 26 jump targets, none an epilogue, counted and untruncated before writing.
- * A single exit, like every other function in this band.
+ * A single exit, like every other function in this band -- every arm jumps to
+ * the ConsiderSightingB tail, so it is written with `goto tail`.
+ *
+ * Not byte-exact: the out-of-sight arm and the far arm share their routing
+ * code, and VC6 keeps the far arm's copy where the image keeps the later one.
  */
 void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
 {
     uint8_t *o = (uint8_t *)obj;
     uint8_t *c = (uint8_t *)ctx;
+    uint8_t *seen;
 
     /* THE FIVE ARMS AND WHICH ONE CALLS CopyByteIfSet. The original nests the
      * two range tests -- `if (RANGE > 0)` first (0x00408654 `test; jle` to the
@@ -9091,8 +9096,15 @@ void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
      *   far        (RANGE>WANT, 0x00408978)  route, promote found, -> tail
      *   within     (0<RANGE<=WANT, 0x0040866F)  CopyByteIfSet,      -> tail
      *   dest-route (DEST_DIST>12, 0x004086A3)  route, promote found, -> tail
-     *   has-leader (arrived+leader, 0x004089BB)  promote leader,
-     *                                            ConsumePending, CopyByteIfSet
+     *   has-leader (arrived+leader, 0x004086FF)  the AI sight test on the
+     *                                            leader; out of sight, route
+     *                                            to it and promote found
+     *                                            (sharing the far arm's code);
+     *                                            in sight but beyond WANT,
+     *                                            route and promote leader;
+     *                                            else (0x004089BB) promote
+     *                                            leader, ConsumePending,
+     *                                            CopyByteIfSet
      *   no-leader  (arrived, 0x004089F3)  ConsumePending, promote found,
      *                                      CopyByteIfSet, FOLLOW_UID persist
      *
@@ -9120,13 +9132,11 @@ void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
             RoachRouteToward(obj, out, ctx);
             if (*(void **)(c + SIGHT_OFF_FOUND))
                 AM2_ROACH_PROMOTE_FOUND(o, c);
-            ConsiderSightingB(obj, out, ctx);
-            return;
+            goto tail;
         }
         /* Within range: commit the sighting through CopyByteIfSet. */
         CopyByteIfSet((uint32_t)(uintptr_t)obj, (uint8_t *)out, ctx);
-        ConsiderSightingB(obj, out, ctx);
-        return;
+        goto tail;
     }
 
     if (*(const int32_t *)(c + SIGHT_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
@@ -9137,35 +9147,57 @@ void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
         RoachRouteToward(obj, out, ctx);
         if (*(void **)(c + SIGHT_OFF_FOUND))
             AM2_ROACH_PROMOTE_FOUND(o, c);
-        ConsiderSightingB(obj, out, ctx);
-        return;
+        goto tail;
     }
 
     /* Arrived. */
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
         *(const uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_ZERO_POINT));
 
-    if (*(void **)(c + SIGHT_OFF_LEADER)) {
-        /* HAS-LEADER: the original runs a formation-approach block first
-         * (0x004086FF..0x004089B6 -- resolve the formation point, decide
-         * between routing to it and closing on the leader) that is NOT yet
-         * reconstructed. What is here is the promote-leader tail at
-         * 0x004089BB: adopt the leader as the observer, then commit. Cold in
-         * every fixture -- no roach in the recorded sessions follows a leader.
-         * TODO: reconstruct the formation block. */
-        uint8_t *leader = *(uint8_t **)(c + SIGHT_OFF_LEADER);
+#define LEADER (*(uint8_t *const *)(c + SIGHT_OFF_LEADER))
+    /* The leader triple into the observer slot, re-reading the leader. */
+#define PROMOTE_LEADER()                                                      \
+    do {                                                                      \
+        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =                               \
+            *(const uint32_t *)(LEADER + OBJ_OFF_UID);                        \
+        *(void **)(c + SIGHT_OFF_OBSERVER) = LEADER;                          \
+        *(int32_t *)(c + SIGHT_OFF_RANGE) =                                   \
+            *(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE);                     \
+        *(c + SIGHT_OFF_BEARING) = *(c + SIGHT_OFF_LEAD_BEARING);             \
+    } while (0)
+    seen = LEADER;
+    if (seen) {
+        /* HAS-LEADER (0x004086FF): the line-of-sight test the AI steps
+         * share, with the leader as the target. Out of sight, route toward
+         * the leader as the far arm routes toward the observer; in sight
+         * but further than the roach wants to be, route toward it and adopt
+         * it; in sight and near enough, adopt it and commit. */
+        AM2_AI_SIGHT_TEST(leader_seen, leader_unseen);
 
-        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-            *(const uint32_t *)(leader + OBJ_OFF_UID);
-        *(void **)(c + SIGHT_OFF_OBSERVER) = leader;
-        *(int32_t *)(c + SIGHT_OFF_RANGE) =
-            *(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE);
-        *(c + SIGHT_OFF_BEARING) = *(c + SIGHT_OFF_LEAD_BEARING);
+leader_seen:
+        if (*(const int32_t *)(c + SIGHT_OFF_LEAD_RANGE)
+            > *(const int32_t *)(c + ROACHCTX_OFF_WANT_RANGE)) {
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+                *(const uint32_t *)(LEADER + OBJ_OFF_POS);
+            RoachRouteToward(obj, out, ctx);
+            PROMOTE_LEADER();
+            goto tail;
+        }
+        PROMOTE_LEADER();
         ConsumePendingByte(obj, out, ctx);
         CopyByteIfSet((uint32_t)(uintptr_t)obj, (uint8_t *)out, ctx);
-        ConsiderSightingB(obj, out, ctx);
-        return;
+        goto tail;
+
+leader_unseen:
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(LEADER + OBJ_OFF_POS);
+        RoachRouteToward(obj, out, ctx);
+        if (*(void **)(c + SIGHT_OFF_FOUND))
+            AM2_ROACH_PROMOTE_FOUND(o, c);
+        goto tail;
     }
+#undef PROMOTE_LEADER
+#undef LEADER
 
     /* No leader (0x004089F3): take whatever is pending, promote what the scan
      * found, commit it, then persist the FOLLOW_UID -- this arm alone writes
@@ -9178,6 +9210,7 @@ void __cdecl RoachBehaviour(void *obj, void *out, void *ctx)
         *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) =
             *(const uint32_t *)(*(const uint8_t *const *)(c + SIGHT_OFF_OBSERVER)
                                 + OBJ_OFF_UID);
+tail:
     ConsiderSightingB(obj, out, ctx);
 }
 
