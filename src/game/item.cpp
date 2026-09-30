@@ -11001,7 +11001,7 @@ void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
     uint8_t *o = (uint8_t *)obj;
     uint8_t *row0 = (uint8_t *)0;
     uint8_t *anim;
-    int32_t  i;
+    int32_t  i = 0;
 
     (void)unused;   /* the original never reads its third argument */
 
@@ -11014,7 +11014,7 @@ void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
     /* Read off a null row0 when there are no rows -- the original's. */
     anim = *(uint8_t **)(row0 + ROW_OFF_ANIM_PLAYING);
     if (anim != (uint8_t *)0) {
-        const float scale = *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC;
+#define scale (*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC)
         uint8_t     angle = *(const uint8_t *)(o + OBJ_OFF_FACING);
         int32_t     speed;
 
@@ -11118,6 +11118,7 @@ void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
     }
 
     ObjTileChanged(o, tileArg, 0);
+#undef scale
 }
 
 /* 0x0045B9F0, one caller -- the type-3 arm of the deploy dispatcher. Place a

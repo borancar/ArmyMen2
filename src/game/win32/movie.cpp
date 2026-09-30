@@ -478,8 +478,9 @@ void __attribute__((thiscall)) AM2_Movie::MovieDrawFrame(void *arg)
     void *movie = this;
 
     DDSURFACEDESC ddsd;
-    void         *smack = fld(movie, MOVIE_SMACK, void *);
-    LPDIRECTDRAWSURFACE surf = fld(movie, MOVIE_SURFACE, LPDIRECTDRAWSURFACE);
+    /* Both are read off the movie at every use. */
+#define smack (fld(movie, MOVIE_SMACK, void *))
+#define surf  (fld(movie, MOVIE_SURFACE, LPDIRECTDRAWSURFACE))
     HRESULT       hr;
 
     /* The timer does not stop when the window loses focus, so this does. */
@@ -518,7 +519,6 @@ void __attribute__((thiscall)) AM2_Movie::MovieDrawFrame(void *arg)
     BlitCentred(movie, (LPDIRECTDRAWSURFACE)arg);
 
     /* Last frame ends the movie; anything else advances it. */
-    smack = fld(movie, MOVIE_SMACK, void *);
     if (fld(smack, SMACK_FRAME_NUM, uint32_t) ==
         fld(smack, SMACK_FRAMES, uint32_t) - 1) {
         fld(movie, MOVIE_TIMER_RUN, int32_t) = 0;
@@ -526,6 +526,8 @@ void __attribute__((thiscall)) AM2_Movie::MovieDrawFrame(void *arg)
     } else {
         smack_nextframe(smack);
     }
+#undef surf
+#undef smack
 }
 
 /* Original: 0x00445390, 2 call sites. Draw a frame if one is due.
