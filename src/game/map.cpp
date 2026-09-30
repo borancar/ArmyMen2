@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include <stdio.h>
+#include <stdlib.h>   /* abs */
 #include <string.h>
 
 #include "gamedir.h"
