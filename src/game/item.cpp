@@ -2186,7 +2186,6 @@ static inline void ObjFootprint(void *obj, int32_t set)
 {
     uint8_t        *o = (uint8_t *)obj;
     const uint8_t  *rows;
-    const AM2_Anim *anim;
     int32_t         dir, i;
     int32_t         baseX, baseY;
 
@@ -2200,16 +2199,16 @@ static inline void ObjFootprint(void *obj, int32_t set)
 
     ++*(uint16_t *)(uintptr_t)ADDR_OBJ_MARK_STAMP;
 
+    rows = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
     baseX = (*(const int16_t *)(o + OBJ_OFF_POS) >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
-    rows = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
-    anim = *(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING);
     baseY = (*(const int16_t *)(o + OBJ_OFF_POS + 2) >> AM2_MASK_CELL_SHIFT)
             - AM2_MASK_WINDOW_HALF;
 
     dir = RoundTo8((*(const uint8_t *)(rows + ROW_OFF_HEADING_BIAS)
                     + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
-                   anim->directionBits) & 0xFF;
+                   (*(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING))
+                       ->directionBits) & 0xFF;
 
     /* The record is indexed afresh each pass -- the kind and the count
      * re-read -- as the image walks it. */

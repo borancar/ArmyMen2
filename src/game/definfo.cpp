@@ -470,7 +470,6 @@ void __cdecl LoadDefTables(void)
         uint8_t       *rec = (uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
                              + (uint32_t)id * RANK_REC_BYTES;
         const uint8_t *src = (const uint8_t *)DefFindTrooperRec(id);
-        float          pct;
 
         if (src == 0)
             continue;
@@ -485,11 +484,10 @@ void __cdecl LoadDefTables(void)
         /* An integer percentage becomes a rate, with a floor of 1.0 -- and
          * this is the record's only float, which is what confirms the whole
          * permutation. */
-        pct = (float)((long double)*(const int32_t *)(src + RANK_SRC_OFF_FIRE_PCT)
-                      * (long double)*(const float *)((void *)(uintptr_t)(ADDR_F_ONE_HUNDREDTH)));
-        if (pct < *(const float *)((void *)(uintptr_t)(ADDR_F_ONE)))
-            pct = 1.0f;
-        *(float *)(rec + RANK_REC_OFF_FIRE_SCALE) = pct;
+        *(float *)(rec + RANK_REC_OFF_FIRE_SCALE) =
+            (float)*(const int32_t *)(src + RANK_SRC_OFF_FIRE_PCT) * 0.01f;
+        if (*(float *)(rec + RANK_REC_OFF_FIRE_SCALE) < 1.0f)
+            *(float *)(rec + RANK_REC_OFF_FIRE_SCALE) = 1.0f;
 
         *(int32_t *)(rec + RANK_REC_OFF_THRESHOLD) =
             *(const int32_t *)(src + RANK_SRC_OFF_THRESHOLD);
