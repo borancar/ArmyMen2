@@ -12569,7 +12569,7 @@ void __cdecl DamageItem(void *obj, int32_t amount, uint8_t extra, int32_t kind,
     const uint8_t *rec;
     int32_t        armour;
     int32_t        dmg;
-    int32_t        set, index, frame;
+    int32_t        set;
 
     if (!inChain) {
         if (*(const uint32_t *)(o + OBJ_OFF_CHAIN_UID)) {
@@ -12621,7 +12621,7 @@ void __cdecl DamageItem(void *obj, int32_t amount, uint8_t extra, int32_t kind,
     {
         uint32_t       key  = *(const uint32_t *)(rec + AAIREC_OFF_KEY);
         const uint8_t *next;
-        int32_t        alive = 0;
+        int32_t        index, frame;
 
         set   = (int32_t)((key >> AM2_OBJREC_SHIFT_B) & AM2_OBJREC_MASK_B);
         index = (int32_t)((key >> AM2_OBJREC_SHIFT_A) & AM2_OBJREC_MASK_A);
@@ -12629,24 +12629,30 @@ void __cdecl DamageItem(void *obj, int32_t amount, uint8_t extra, int32_t kind,
 
         next = (const uint8_t *)DefFindObjRec(set, index, frame);
 
+        /* The teardown is written out on both failures, as the image has
+         * it: no next frame, and a next frame that would not apply. */
+#define TEARDOWN()                                                          \
+        ItemTeardown(obj);                                                  \
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;              \
+        if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0) {                \
+            ObjFlagClear0(*(void **)(o + OBJ_OFF_ROWS));                    \
+            RowUpdate(*(void **)(o + OBJ_OFF_ROWS), 0,                      \
+                      (void *)(uintptr_t)ADDR_MAP_DESC);                    \
+        }                                                                   \
+        ItemPreDestroyAlias(obj, (int32_t)ADDR_OBJ_MAP_DESC)
+
         /* The answer's own key must BE the frame asked for: DefFindObjRec
          * falls back through three searches and can hand back a near miss. */
-        if (next && *(const int32_t *)(next + AAIREC_OFF_KEY) == frame)
-            alive = ApplyObjFrame(obj, set, index, frame, 0);
-
-        if (!alive) {
-            ItemTeardown(obj);
-            *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REPLACED;
-
-            if (*(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 0) {
-                ObjFlagClear0(*(void **)(o + OBJ_OFF_ROWS));
-                RowUpdate(*(void **)(o + OBJ_OFF_ROWS), 0,
-                          (void *)(uintptr_t)ADDR_MAP_DESC);
+        if (next && *(const int32_t *)(next + AAIREC_OFF_KEY) == frame) {
+            if (!ApplyObjFrame(obj, set, index, frame, 0)) {
+                TEARDOWN();
             }
-
-            ItemPreDestroyAlias(obj, (int32_t)ADDR_OBJ_MAP_DESC);
+        } else {
+            TEARDOWN();
         }
+#undef TEARDOWN
     }
+
 
     if (set != AM2_DAMAGE_ITEM_SET)
         return;
@@ -12682,20 +12688,30 @@ void __cdecl DamageItem(void *obj, int32_t amount, uint8_t extra, int32_t kind,
                                  >> AM2_OBJREC_SHIFT_A) & AM2_OBJREC_MASK_A);
         int32_t leaves, life;
 
-        if (idx == AM2_SPAWN_INDEX_A) {
+        switch (idx) {
+        case AM2_SPAWN_INDEX_A:
             leaves = AM2_SPAWN_KIND_A; life = AM2_SPAWN_LIFE_A;
-        } else if (idx == AM2_SPAWN_INDEX_B) {
+            break;
+        case AM2_SPAWN_INDEX_B:
             leaves = AM2_SPAWN_KIND_B; life = AM2_SPAWN_LIFE_B;
-        } else {
+            break;
+        default:
             leaves = AM2_SPAWN_KIND_C; life = AM2_SPAWN_LIFE_C;
+            break;
         }
 
-        SpawnAt((int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
-                (int32_t)*(const int16_t *)(o + OBJ_OFF_Y),
-                leaves,
-                attacker ? (int32_t)UidArmy(attacker)
-                      : (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
-                ((const AM2_Object *)o)->uid, life, 0, 0, 0, 0);
+
+        if (attacker)
+            SpawnAt((int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
+                    (int32_t)*(const int16_t *)(o + OBJ_OFF_Y),
+                    leaves, (int32_t)UidArmy(attacker),
+                    ((const AM2_Object *)o)->uid, life, 0, 0, 0, 0);
+        else
+            SpawnAt((int32_t)*(const int16_t *)(o + OBJ_OFF_POS),
+                    (int32_t)*(const int16_t *)(o + OBJ_OFF_Y),
+                    leaves, (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
+                    ((const AM2_Object *)o)->uid, life, 0, 0, 0, 0);
+
     }
 }
 
