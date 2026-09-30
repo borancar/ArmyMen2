@@ -1638,12 +1638,12 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     const uint8_t *b = (const uint8_t *)blocker;
     const uint8_t *rank;
     uint8_t       *slots = (uint8_t *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR;
-    int32_t        heading;
+    uint8_t        heading;
     int32_t        hv;
     int32_t        hb;
     int32_t        l, t, r, bo;
     int32_t        vx, vy;
-    int32_t        nx = 0, ny = 0, fx = 0, fy = 0;
+    int32_t        nx, ny, fx, fy;
     int32_t        code;
     int32_t        dist;
     int32_t        arc;
