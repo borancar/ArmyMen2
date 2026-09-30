@@ -3499,18 +3499,15 @@ void __cdecl ProcessResendQueue(void)
     int32_t   drained = 0;
 
     taken = MsgListTakeFlags((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, buf);
-    if (!taken)
-        return;
-
-    for (;;) {
-        int32_t off;
+    while (taken) {
+        int32_t i;
 
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE) && drained == 0)
             orig_log("Entering ProcessResendQueue \n");
 
-        for (off = 0; off < (int32_t)(AM2_COMM_PLAYERS * AM2_COMM_SLOT_STRIDE);
-             off += AM2_COMM_SLOT_STRIDE) {
-            uint32_t id = *(const uint32_t *)(comm + COMM_OFF_PLAYER_SLOTS + off);
+        for (i = 0; i < AM2_COMM_PLAYERS; i++) {
+            uint32_t id = *(const uint32_t *)(comm + COMM_OFF_PLAYER_SLOTS
+                                              + i * AM2_COMM_SLOT_STRIDE);
             uint8_t *flow;
             int32_t  hr;
 
@@ -3555,7 +3552,7 @@ void __cdecl ProcessResendQueue(void)
                 else if ((uint32_t)hr == AM2_DPERR_INVALIDPLAYER)
                     orig_log("DPLAY ERROR: INVALID PLAYER\n");
                 else if ((uint32_t)hr == AM2_DPERR_SENDTOOBIG)
-                    orig_log("DPLAY ERROR: Send too big\n");
+                    orig_log("DPLAY ERROR: Send Too Big\n");
                 return;
             }
         }
@@ -3564,8 +3561,6 @@ void __cdecl ProcessResendQueue(void)
             break;
 
         taken = MsgListTakeFlags((void *)(uintptr_t)ADDR_MSG_LIST_SENDQ, buf);
-        if (!taken)
-            break;
     }
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE) && drained)
