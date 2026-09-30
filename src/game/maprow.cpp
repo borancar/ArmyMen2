@@ -1094,7 +1094,6 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
     int32_t  cols, rows, cell, stride, used;
 
     if (!ObjFlagBit0(r)) {
-    unregister:                 /* the off-map test below jumps back here */
         RowUnregisterAll(r, desc);
         return;
     }
@@ -1144,8 +1143,11 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
     cols = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t);
     rows = ROW_FLD(desc, MAPDESC_OFF_ROWS, int32_t);
 
-    if (cb < 0 || ct > rows - 1 || cr < 0 || cl > cols - 1)
-        goto unregister;
+    if (cb < 0 || ct > rows - 1 || cr < 0 || cl > cols - 1) {
+        RowUnregisterAll(r, desc);
+        return;
+    }
+
 
     /* Branchless in the image (setle/dec/and): conditional expressions. */
     cl = cl <= 0 ? 0 : cl;

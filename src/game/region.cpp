@@ -8129,11 +8129,13 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
         spot.ground = z;
 
         def = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
+        /* The jitter is written in both arms, as the image has it. */
         if (*(const int32_t *)(def + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_MEDI
-            && *(const int32_t *)(def + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_WREN)
+            && *(const int32_t *)(def + ITEMTYPE_OFF_KIND) != AM2_ITEM_KIND_WREN) {
             TrooperFaceTo(o, (const AM2_Point *)(target + OBJ_OFF_POS));
-
-        heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
+            heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
+        } else
+            heading = JitterFacing(w, *(const uint8_t *)(o + OBJ_OFF_FACING));
         fired = FireWeapon(w, o, ObjHeight(o), heading, spot, target);
     } else {
         const uint8_t *at = out + SIGHTCOUT_OFF_X;
