@@ -3503,10 +3503,14 @@ void __cdecl RecvVehicle1D(void *msg)
                 *(const int32_t *)(m + 0x14));
 
     if (*(const int32_t *)(comm + COMM_OFF_IS_HOST) != 0) {
-        if (request == 2 || request == 3)
+        if (request == 2)
+            return;
+        if (request == 3)
             return;
     } else {
-        if (request == 0 || request == 1)
+        if (request == 0)
+            return;
+        if (request == 1)
             return;
     }
 
