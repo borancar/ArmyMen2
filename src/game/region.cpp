@@ -5610,141 +5610,135 @@ typedef void (__cdecl *AM2_AiTrooperStepFn)(void *obj, void *out, void *ctx);
  * this is another writer of a zero and settles nothing.
  *
  * The two arms that turn rather than walk share one tail through a `jmp` into
- * the middle of the first -- the same arm-ends-inside-another shape found
- * twice already today.
+ * the middle of the first: the turn is written in both and VC6 cross-jumps
+ * the second into the first.
+ *
+ * THE HITREACT AND STEP PATHS ARE SIBLINGS OF ONE JOIN: AiKeepRange's and
+ * AiTrooperStep's `add esp` is shared, so the walk/step block sits inside an
+ * `if (0)` that only its labels enter, rather than behind a `goto promote`.
+ * The leader is re-read from the context at every use, never cached.
  */
 void __cdecl AiApproachLeader(void *obj, void *out, void *ctx)
 {
     uint8_t *o = (uint8_t *)obj;
     uint8_t *w = (uint8_t *)out;
     uint8_t *c = (uint8_t *)ctx;
-    uint8_t *lead;
+#define LEAD (*(uint8_t **)(c + SIGHTC_OFF_LEADER))
+#define RANGE (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE))
+#define HEAD_FOR() (*(uint32_t *)(o + OBJ_OFF_FIELD_C0) = \
+                    *(const uint32_t *)(c + SIGHTC_OFF_DEST))
     int32_t  range;
     int32_t  d;
 
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
         *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
-    lead = *(uint8_t **)(c + SIGHTC_OFF_LEADER);
-    if (!lead)
+    if (!LEAD)
         goto hitreact;
 
-    if (!ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), lead, 1))
+    if (!ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), LEAD, 1))
         *(int32_t *)(o + OBJ_OFF_FIELD_110) += 1;
 
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_110) > 0)
-        goto provoked;
-
-    /* ---- not provoked ---- */
-    if (ObjIsItem((const AM2_Object *)lead)
-        && ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), lead, 0)) {
-        if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE) <= AM2_AI_LEAD_NEAR)
-            goto hitreact;
-
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(c + SIGHTC_OFF_DEST);
-        AiTrooperStep(obj, out, ctx);
-
-        if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE) <= AM2_AI_LEAD_CLOSE
-            && *(const int32_t *)(o + OBJ_OFF_FIELD_584) == 2)
-            *(int32_t *)(o + OBJ_OFF_FIELD_584) = 3;
-        goto promote;
-    }
-
-    if (ObjsAreAllied(obj, lead, 0)) {
-        d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                       (const AM2_Point *)(lead + OBJ_OFF_POS));
-        range = *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
-
-        if (range > AM2_AI_LEAD_FAR)
-            goto walk;
-
-        if ((range > d + AM2_AI_LEAD_CLOSE && range > AM2_AI_LEAD_CLOSE)
-            || (d > AM2_AI_LEAD_SPREAD && range > AM2_AI_LEAD_SPREAD)) {
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-                *(const uint32_t *)(c + SIGHTC_OFF_DEST);
-            goto step;
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_110) <= 0) {
+        /* ---- not provoked ---- */
+        if (ObjIsItem((const AM2_Object *)LEAD)
+            && ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), LEAD, 0)) {
+            if (RANGE <= AM2_AI_LEAD_NEAR)
+                goto hitreact;
+            HEAD_FOR();
+            AiTrooperStep(obj, out, ctx);
+            if (RANGE <= AM2_AI_LEAD_CLOSE
+                && *(const int32_t *)(o + OBJ_OFF_FIELD_584) == 2)
+                *(int32_t *)(o + OBJ_OFF_FIELD_584) = 3;
+            goto promote;
         }
 
-        if (!PointsDiffer(*(const uint32_t *)(lead + OBJ_OFF_POS),
-                          *(const uint32_t *)(lead + OBJ_OFF_PREV_POS)))
+        if (ObjsAreAllied(obj, LEAD, 0)) {
+            d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                           (const AM2_Point *)(LEAD + OBJ_OFF_POS));
+            range = RANGE;
+            if (range > AM2_AI_LEAD_FAR)
+                goto walk;
+            if ((range > d + AM2_AI_LEAD_CLOSE && range > AM2_AI_LEAD_CLOSE)
+                || (d > AM2_AI_LEAD_SPREAD && range > AM2_AI_LEAD_SPREAD)) {
+                HEAD_FOR();
+                goto step;
+            }
+            if (!PointsDiffer(*(const uint32_t *)(LEAD + OBJ_OFF_POS),
+                              *(const uint32_t *)(LEAD + OBJ_OFF_PREV_POS)))
+                goto hitreact;
+            HEAD_FOR();
+            AiTrooperStep(obj, out, ctx);
+            if (*(const int32_t *)(w + 8) != 2 && *(const int32_t *)(w + 8) != 3) {
+                w[4] = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+                                    (const AM2_Point *)(c + SIGHTC_OFF_DEST));
+                *(int32_t *)(w + 8) = 2;
+            }
+            goto promote;
+        }
+
+        d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                       (const AM2_Point *)(LEAD + OBJ_OFF_POS));
+        if (d < AM2_AI_LEAD_CLOSE)
             goto hitreact;
-
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(c + SIGHTC_OFF_DEST);
-        AiTrooperStep(obj, out, ctx);
-        goto turn;
-    }
-
-    d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                   (const AM2_Point *)(lead + OBJ_OFF_POS));
-    if (d < AM2_AI_LEAD_CLOSE)
-        goto hitreact;
-    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-        *(const uint32_t *)(c + SIGHTC_OFF_DEST);
-    goto step;
-
-provoked:
-    if (ObjIsItem((const AM2_Object *)lead)
-        && ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), lead, 0)) {
-        range = *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
-        if (range > AM2_AI_LEAD_FAR || range <= AM2_AI_LEAD_NEAR)
-            goto hitreact;
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(c + SIGHTC_OFF_DEST);
+        HEAD_FOR();
         goto step;
     }
 
-    if (ObjsAreAllied(obj, lead, 1)) {
-        if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE) > AM2_AI_LEAD_FAR) {
-            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-                *(const uint32_t *)(c + SIGHTC_OFF_DEST);
+    /* ---- provoked ---- */
+    if (ObjIsItem((const AM2_Object *)LEAD)
+        && ArmyAlliedWithObj(*(const int8_t *)(o + OBJ_OFF_ARMY), LEAD, 0)) {
+        range = RANGE;
+        if (range > AM2_AI_LEAD_FAR || range <= AM2_AI_LEAD_NEAR)
+            goto hitreact;
+        HEAD_FOR();
+        goto step;
+    }
+
+    if (ObjsAreAllied(obj, LEAD, 1)) {
+        if (RANGE > AM2_AI_LEAD_FAR) {
+            HEAD_FOR();
             goto step;
         }
-
-        if (!PointsDiffer(*(const uint32_t *)(lead + OBJ_OFF_POS),
-                          *(const uint32_t *)(lead + OBJ_OFF_PREV_POS)))
+        if (!PointsDiffer(*(const uint32_t *)(LEAD + OBJ_OFF_POS),
+                          *(const uint32_t *)(LEAD + OBJ_OFF_PREV_POS)))
             goto hitreact;
-
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(c + SIGHTC_OFF_DEST);
+        HEAD_FOR();
         AiTrooperStep(obj, out, ctx);
-        goto turn;
+        if (*(const int32_t *)(w + 8) != 2 && *(const int32_t *)(w + 8) != 3) {
+            w[4] = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
+                                (const AM2_Point *)(c + SIGHTC_OFF_DEST));
+            *(int32_t *)(w + 8) = 2;
+        }
+        goto promote;
     }
 
     d = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                   (const AM2_Point *)(lead + OBJ_OFF_POS));
+                   (const AM2_Point *)(LEAD + OBJ_OFF_POS));
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_EC))
         goto walk;
-    if (d < *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE))
-        goto hitreact;
-    if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE) > AM2_AI_LEAD_CLOSE)
+    if (d >= *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)
+        && RANGE > AM2_AI_LEAD_CLOSE)
         goto walk;
-    /* falls into hitreact */
 
 hitreact:
     AiHitReact(obj, out, ctx);
     AM2_SIGHTC_PROMOTE_FOUND(o, c);
     AiKeepRange(obj, out, ctx);
-    goto promote;
-
-turn:
-    if (*(const int32_t *)(w + 8) != 2 && *(const int32_t *)(w + 8) != 3) {
-        w[4] = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
-                            (const AM2_Point *)(c + SIGHTC_OFF_DEST));
-        *(int32_t *)(w + 8) = 2;
-    }
-    goto promote;
-
+    if (0) {
+        /* Entered only by its labels; see the header. */
 walk:
-    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-        *(const uint32_t *)(c + SIGHTC_OFF_DEST);
+        HEAD_FOR();
 step:
-    AiTrooperStep(obj, out, ctx);
+        AiTrooperStep(obj, out, ctx);
+    }
 
 promote:
     AM2_SIGHTC_PROMOTE_FOUND(o, c);
     ConsiderSightingC(obj, out, ctx);
+#undef HEAD_FOR
+#undef RANGE
+#undef LEAD
 }
 
 /* AiHitReact -- original 0x00405050, TEN call sites across the trooper AI
