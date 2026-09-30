@@ -904,33 +904,29 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
     *(uint16_t *)(uintptr_t)ADDR_SCENARIO_COUNT = (uint16_t)count;
 
     for (i = 0; i < count; i++) {
-        uint32_t hdr[AM2_SCENARIO_HDR_BYTES / 4];
+        struct ScenHdr { uint32_t w[AM2_SCENARIO_HDR_BYTES / 4]; } hdr;
         uint8_t *rec;
         int32_t  which;
         int32_t  part;
 
-        hdr[0] = *(const uint32_t *)(p + 0);
-        hdr[1] = *(const uint32_t *)(p + 4);
-        hdr[2] = *(const uint32_t *)(p + 8);
-        hdr[3] = *(const uint32_t *)(p + 12);
+        hdr = *(const struct ScenHdr *)p;
         p += AM2_SCENARIO_HDR_BYTES;
         remaining -= (int32_t)AM2_SCENARIO_HDR_BYTES;
 
-        if (memcmp(hdr, (const void *)"Scenario",
-                   AM2_SCENARIO_TAG_BYTES) != 0)
+        if (strncmp((const char *)&hdr, "Scenario",
+                    AM2_SCENARIO_TAG_BYTES) != 0)
             return 0;
 
-        {
-            uint8_t digit = ((const uint8_t *)hdr)[SCENARIO_HDR_OFF_DIGIT];
 
-            which = digit ? (int32_t)(int8_t)digit - '1' : 0;
+        {
+            uint8_t digit = ((const uint8_t *)&hdr)[SCENARIO_HDR_OFF_DIGIT];
+
+            which = !digit ? 0 : (int32_t)(int8_t)digit - '1';
+
         }
 
         rec = table + (uint32_t)which * AM2_SCENARIO_BYTES;
-        *(uint32_t *)(rec + 0)  = hdr[0];
-        *(uint32_t *)(rec + 4)  = hdr[1];
-        *(uint32_t *)(rec + 8)  = hdr[2];
-        *(uint32_t *)(rec + 12) = hdr[3];
+        *(struct ScenHdr *)rec = hdr;
 
         for (part = 0; part < (int32_t)AM2_SCENARIO_PARTS; part++) {
             int32_t took = ParseScenarioPart(
