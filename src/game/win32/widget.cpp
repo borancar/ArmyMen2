@@ -15726,7 +15726,8 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
     AM2_Widget *w = this;
 
     uint8_t            *self = (uint8_t *)w;
-    const AM2_ListRows *rows;
+    /* The row array is re-read at every use, as the image has it. */
+#define rows (*(const AM2_ListRows *const *)(self + LIST_OFF_ROWS))
     void (__cdecl      *tick)(AM2_Widget *);
     int32_t             wasTop, wasSel, wasChosen;
 
@@ -15737,7 +15738,6 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
     /* A list with no row array RETURNS -- it does not fall through to the
      * repaint tail. The `je` lands on the epilogue, which is the second of
      * this function's two exits. */
-    rows = *(const AM2_ListRows *const *)(self + LIST_OFF_ROWS);
     if (!rows)
         return;
 
@@ -15945,6 +15945,7 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
         PlaySoundAt(AM2_SND_MENU_MOVE, 0, 0, 0, 0);
         ListRepaintRow(w, now);
     }
+#undef rows
 }
 
 void __cdecl OnArrowUp(AM2_Widget *w)
