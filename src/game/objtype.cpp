@@ -474,63 +474,6 @@ void __cdecl FreeRecordList(void *list)
     am2_free(list);
 }
 
-/* One built-in AAI record, which BuildAaiBuiltins below makes eight ways. The
- * list record is twelve bytes -- LISTREC_OFF_SPRITE and then two int16 and a
- * dword -- and MakeAaiRecord takes the rect as its last FOUR arguments, which
- * the original passes by writing them into reserved stack rather than pushing.
- */
-static inline void AaiBuiltin(void *spr, int16_t a, int16_t b, int32_t c,
-                       int32_t type, uint32_t key,
-                       int32_t l, int32_t t, int32_t r, int32_t bo)
-{
-    uint8_t  rec[AM2_LIST_RECORD_BYTES];
-    AM2_Rect box;
-    void    *list;
-    int32_t  slot;
-
-    *(void **)(rec + LISTREC_OFF_SPRITE) = spr;
-    *(int16_t *)(rec + 4) = a;
-    *(int16_t *)(rec + 6) = b;
-    *(int32_t *)(rec + 8) = c;
-
-    list = MakeRecordList(1, rec, (void *)(uintptr_t)key);
-
-    /* The SLOT, not the list. AddRecordList's return value is what
-     * MakeAaiRecord's third parameter takes -- objtype.h has always named it
-     * `slot`, and passing the pointer instead loads no map at all. */
-    slot = AddRecordList(list);
-
-    AddAaiRecord(MakeAaiRecord(type, (int32_t)key, slot,
-                               *RectSet(&box, l, t, r, bo)));
-}
-
-/* The same, for the three blocks that ALSO give the list its own
- * LISTHDR_OFF_BOX before registering it and whose rect is always the same
- * sixteen-unit square. The singletons above do not touch the list's box. */
-static inline void AaiBuiltinBoxed(void *spr, int16_t a, int16_t b, int32_t c,
-                            int32_t type, uint32_t key)
-{
-    uint8_t  rec[AM2_LIST_RECORD_BYTES];
-    AM2_Rect box;
-    void    *list;
-    int32_t  slot;
-
-    *(void **)(rec + LISTREC_OFF_SPRITE) = spr;
-    *(int16_t *)(rec + 4) = a;
-    *(int16_t *)(rec + 6) = b;
-    *(int32_t *)(rec + 8) = c;
-
-    list = MakeRecordList(1, rec, (void *)(uintptr_t)key);
-
-    RectSet(&box, -0x10, -0x10, 0x10, 0x10);
-    *(AM2_Rect *)((uint8_t *)list + LISTHDR_OFF_BOX_LEFT) = box;
-
-    slot = AddRecordList(list);
-
-    AddAaiRecord(MakeAaiRecord(type, (int32_t)key, slot,
-                               *RectSet(&box, -0x10, -0x10, 0x10, 0x10)));
-}
-
 /* BuildAaiBuiltins -- original 0x00434700, 1,120 bytes, one caller. Empty the
  * AAI tables and put back the records the game does not read from object.aai:
  * three singletons, a run of FORTY-FOUR, and two more.
@@ -545,7 +488,7 @@ static inline void AaiBuiltinBoxed(void *spr, int16_t a, int16_t b, int32_t c,
  * I named both a second time before checking, and checkpatches refused them.
  * Third time this session; grep the ADDRESS first.
  *
- * THE RUN OF 44 IS A do-while OVER THE KEY, not over an index: the key starts
+ * THE RUN OF 44 IS A LOOP OVER THE KEY, not over an index: the key starts
  * at 0x01680000 and steps 0x80 to 0x01681600, and the sprite index is carried
  * alongside it. Both are needed, so neither derives from the other here.
  *
@@ -563,8 +506,16 @@ static inline void AaiBuiltinBoxed(void *spr, int16_t a, int16_t b, int32_t c,
  * they are seeded from the object.aai record for their (type, key) where the
  * first three are not.
  *
- * The three that run in a loop also write their rect into the LIST's own
- * LISTHDR_OFF_BOX before registering it, which the singletons do not.
+ * The loop and the last two also write their rect into the LIST's own
+ * LISTHDR_OFF_BOX before registering it, which the first three do not.
+ *
+ * Written out rather than through a helper per block: the image keeps one
+ * record buffer for all of them (the second singleton does not rewrite it),
+ * reads the key back from its global for MakeAaiRecord, and copies the list's
+ * box out of a by-value RectMake while the hit rect goes through
+ * `*RectSet(temp)`. The buffer is TWO records wide -- the frame is 0x4C and
+ * the record sits twelve bytes below its top -- though only the first is
+ * ever written.
  *
  * AM2_AIM_PRELOAD_FLAGS is used for the flag word here. That name came from the
  * aim sprites, which is where 0x1000 was first seen; nothing in this function
@@ -574,70 +525,106 @@ static inline void AaiBuiltinBoxed(void *spr, int16_t a, int16_t b, int32_t c,
  * startup -- its caller is the AAI table load. */
 void __cdecl BuildAaiBuiltins(void)
 {
-    uint8_t  *spr;
-    uint32_t  key;
-    int32_t   i;
+    /* The list record is twelve bytes -- LISTREC_OFF_SPRITE and then two
+     * int16 and a dword -- and the second singleton reuses the first's
+     * without writing it again. */
+#define REC_SPR (*(uint8_t **)(rec + LISTREC_OFF_SPRITE))
+#define REC_A   (*(int16_t *)(rec + 4))
+#define REC_B   (*(int16_t *)(rec + 6))
+#define REC_C   (*(int32_t *)(rec + 8))
+#define KEY(a)  (*(int32_t *)(uintptr_t)(a))
+    uint8_t  rec[AM2_LIST_RECORD_BYTES * 2];   /* only [0] used; see above */
+    void    *list;
+    int32_t  slot;
+    uint32_t key;
+    int32_t  i;
 
     FreeAaiTables();
 
-    spr = (uint8_t *)PreloadSprite(0x13, 0, 0, AM2_AIM_PRELOAD_FLAGS, 1);
-    *(int32_t *)(uintptr_t)ADDR_AAI_KEY_980000 = 0x980000;
-    AaiBuiltin(spr, 0, 0, 1, -1, 0x980000, -0x14, -5, 0x3C, 0x23);
+    REC_SPR = (uint8_t *)PreloadSprite(0x13, 0, 0, AM2_AIM_PRELOAD_FLAGS, 1);
+    REC_A = 0;
+    REC_B = 0;
+    REC_C = 1;
+    KEY(ADDR_AAI_KEY_980000) = 0x980000;
+    list = MakeRecordList(1, rec, (void *)0x980000);
+    slot = AddRecordList(list);
+    AddAaiRecord(MakeAaiRecord(-1, KEY(ADDR_AAI_KEY_980000), slot,
+                               *RectSet(AM2_TEMP(AM2_Rect), -0x14, -5, 0x3C, 0x23)));
 
     /* The SAME record again -- no second load -- under another key. */
-    *(int32_t *)(uintptr_t)ADDR_AAI_KEY_980100 = 0x980100;
-    AaiBuiltin(spr, 0, 0, 1, -1, 0x980100, 0, 0, 1, 1);
+    KEY(ADDR_AAI_KEY_980100) = 0x980100;
+    list = MakeRecordList(1, rec, (void *)0x980100);
+    slot = AddRecordList(list);
+    AddAaiRecord(MakeAaiRecord(-1, KEY(ADDR_AAI_KEY_980100), slot,
+                               *RectSet(AM2_TEMP(AM2_Rect), 0, 0, 1, 1)));
 
-    spr = (uint8_t *)PreloadSprite(0x13, 1, 0, AM2_AIM_PRELOAD_FLAGS, 1);
-    *(int32_t *)(uintptr_t)ADDR_AAI_KEY_980080 = 0x980080;
-    AaiBuiltin(spr, -2, -2, 0x5DC, -1, 0x980080, -2, -2, 2, 2);
+    REC_SPR = (uint8_t *)PreloadSprite(0x13, 1, 0, AM2_AIM_PRELOAD_FLAGS, 1);
+    REC_A = -2;
+    REC_B = -2;
+    REC_C = 0x5DC;
+    KEY(ADDR_AAI_KEY_980080) = 0x980080;
+    list = MakeRecordList(1, rec, (void *)0x980080);
+    slot = AddRecordList(list);
+    AddAaiRecord(MakeAaiRecord(-1, KEY(ADDR_AAI_KEY_980080), slot,
+                               *RectSet(AM2_TEMP(AM2_Rect), -2, -2, 2, 2)));
 
-    i   = 0;
-    key = 0x01680000;
-    do {
-        void    *list;
-        AM2_Rect box;
-        int32_t  slot;
-        uint8_t  rec[AM2_LIST_RECORD_BYTES];
-
-        spr = (uint8_t *)PreloadSprite(0x2D, i, 0, AM2_AIM_PRELOAD_FLAGS, 1);
-        if (!spr)
-            spr = (uint8_t *)PreloadSprite(0x2D, 0x0A, 0,
+    i = 0;
+    for (key = 0x01680000; key < 0x01681600; key += 0x80) {
+        REC_SPR = (uint8_t *)PreloadSprite(0x2D, i, 0,
                                            AM2_AIM_PRELOAD_FLAGS, 1);
+        if (!REC_SPR)
+            REC_SPR = (uint8_t *)PreloadSprite(0x2D, 0x0A, 0,
+                                               AM2_AIM_PRELOAD_FLAGS, 1);
 
         if (key < 0x01680780 || key > 0x01680980) {
-            *(int16_t *)(spr + SPR_OFF_HOTX) =
-                (int16_t)(*(const int32_t *)(spr + SPR_OFF_W) / 2);
-            *(int16_t *)(spr + SPR_OFF_HOTY) =
-                (int16_t)(*(const int32_t *)(spr + SPR_OFF_H) / 2);
+            *(int16_t *)(REC_SPR + SPR_OFF_HOTX) =
+                (int16_t)(*(const int32_t *)(REC_SPR + SPR_OFF_W) / 2);
+            *(int16_t *)(REC_SPR + SPR_OFF_HOTY) =
+                (int16_t)(*(const int32_t *)(REC_SPR + SPR_OFF_H) / 2);
         }
 
-        *(void **)(rec + LISTREC_OFF_SPRITE) = spr;
-        *(int16_t *)(rec + 4) = 0;
-        *(int16_t *)(rec + 6) = 0;
-        *(int32_t *)(rec + 8) = 0x3E8;
-
-        list = MakeRecordList(1, rec, (void *)(uintptr_t)key);
+        REC_A = 0;
+        REC_B = 0;
+        REC_C = 0x3E8;
+        list = MakeRecordList(1, rec, (void *)key);
 
         /* The loop blocks give the LIST its own box; the singletons do not. */
-        RectSet(&box, -0x10, -0x10, 0x10, 0x10);
-        *(AM2_Rect *)((uint8_t *)list + LISTHDR_OFF_BOX_LEFT) = box;
-
+        *(AM2_Rect *)((uint8_t *)list + LISTHDR_OFF_BOX_LEFT) =
+            RectMake(-0x10, -0x10, 0x10, 0x10);
         slot = AddRecordList(list);
-
-        AddAaiRecord(MakeAaiRecord(0x2D, (int32_t)key, slot,
-                                   *RectSet(&box, -0x10, -0x10, 0x10, 0x10)));
-        key += 0x80;
+        AddAaiRecord(MakeAaiRecord(0x2D, key, slot,
+                                   *RectSet(AM2_TEMP(AM2_Rect), -0x10, -0x10, 0x10, 0x10)));
         i++;
-    } while (key < 0x01681600);
+    }
 
-    spr = (uint8_t *)PreloadSprite(0x1D, 0x0B, 0, AM2_AIM_PRELOAD_FLAGS, 1);
-    *(int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND = 0xE80580;
-    AaiBuiltinBoxed(spr, 0, 0, 3, 0x1D, 0xE80580);
+    REC_SPR = (uint8_t *)PreloadSprite(0x1D, 0x0B, 0, AM2_AIM_PRELOAD_FLAGS, 1);
+    REC_A = 0;
+    REC_B = 0;
+    REC_C = 3;
+    KEY(ADDR_CREATE_WATCHED_KIND) = 0xE80580;
+    list = MakeRecordList(1, rec, (void *)0xE80580);
+    *(AM2_Rect *)((uint8_t *)list + LISTHDR_OFF_BOX_LEFT) =
+        RectMake(-0x10, -0x10, 0x10, 0x10);
+    slot = AddRecordList(list);
+    AddAaiRecord(MakeAaiRecord(0x1D, KEY(ADDR_CREATE_WATCHED_KIND), slot,
+                               *RectSet(AM2_TEMP(AM2_Rect), -0x10, -0x10, 0x10, 0x10)));
 
-    spr = (uint8_t *)PreloadSprite(0x1D, 0x0C, 9, AM2_AIM_PRELOAD_FLAGS, 1);
-    *(int32_t *)(uintptr_t)ADDR_WATCHED_TYPE_ID = 0xE80609;
-    AaiBuiltinBoxed(spr, 0, 0, 3, 0x1D, 0xE80609);
+    REC_SPR = (uint8_t *)PreloadSprite(0x1D, 0x0C, 9, AM2_AIM_PRELOAD_FLAGS, 1);
+    REC_A = 0;
+    REC_B = 0;
+    REC_C = 3;
+    KEY(ADDR_WATCHED_TYPE_ID) = 0xE80609;
+    list = MakeRecordList(1, rec, (void *)0xE80609);
+    *(AM2_Rect *)((uint8_t *)list + LISTHDR_OFF_BOX_LEFT) =
+        RectMake(-0x10, -0x10, 0x10, 0x10);
+    slot = AddRecordList(list);
+    AddAaiRecord(MakeAaiRecord(0x1D, KEY(ADDR_WATCHED_TYPE_ID), slot,
+                               *RectSet(AM2_TEMP(AM2_Rect), -0x10, -0x10, 0x10, 0x10)));
+#undef KEY
+#undef REC_C
+#undef REC_B
+#undef REC_A
+#undef REC_SPR
 }
 
 /* 0x004344A0, seven callers, and every one of them hands the result straight
