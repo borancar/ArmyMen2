@@ -9320,6 +9320,8 @@ typedef struct {
 #define AM2_AI_SIGHT_TILE_SPAN   20
 #define AM2_AI_SIGHT_TILE_BASE   16
 #define AM2_AI_SIGHT_LINE_MAX    1016
+/* AiGuardStep's 0x818 frame is six dwords and this buffer exactly. */
+#define AM2_AI_SIGHT_LINE_BUF    1024
 /* AiEngageStep's two arrival thresholds, and they are NOT AM2_AI_ARRIVED_DIST
  * (0x20) or AM2_AI_REACHED_DIST (0xC despite the coincidence): it compares
  * SIGHTC_OFF_DEST_DIST_B against 8 and SIGHTC_OFF_DEST_DIST against 0xC, two

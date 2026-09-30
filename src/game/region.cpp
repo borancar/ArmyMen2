@@ -4820,8 +4820,12 @@ tail:
 }
 
 /* AiGuardStep -- original 0x00405220, 1,424 bytes, one caller. AiPatrolStep's
- * pair: 132 of their instructions are the sight test, now AiCanSee, and 18
- * more are its adopt-the-leader tail. The name is ours, and it comes from the
+ * pair: 132 of their instructions are the sight test, and 18 more are its
+ * adopt-the-leader tail. Here the sight test is written out inline rather
+ * than through AiCanSee: every one of its exits branches straight to the
+ * in-sight or out-of-sight arm, where the helper returned a value; its rank
+ * and direction records are re-indexed at each read; and the frame is its
+ * six dwords and a 1,024-entry line buffer, 0x818 exactly. The name is ours, and it comes from the
  * one thing that distinguishes the two -- this one is on a LEASH.
  *
  * FOUR DIFFERENCES FROM AiPatrolStep, none of them visible in the shape:
@@ -4849,6 +4853,16 @@ void __cdecl AiGuardStep(void *obj, void *out, void *ctx)
     uint8_t *o = (uint8_t *)obj;
     uint8_t *c = (uint8_t *)ctx;
 #define LEAD (*(uint8_t **)(c + SIGHTC_OFF_LEADER))
+#define RANKF(off) (*(const int32_t *)((uintptr_t)ADDR_RANK_RECORDS \
+        + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK) * RANK_REC_BYTES + (off)))
+#define DIRF(T, off) (*(T *)((uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR \
+        + dir * AM2_SIGHT_DIR_STRIDE + (off)))
+#define GEN (*(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION)
+/* The original hands AngleOfDelta the distance as a third argument it does
+ * not read; the push is in the image, so it is reproduced. The cast goes
+ * through void (*)(void) because that is GCC's sanctioned escape. */
+#define ANGLE3(x, y, d) \
+    ((uint8_t (__cdecl *)(int32_t, int32_t, int32_t))(void (*)(void))AngleOfDelta)(x, y, d)
     int32_t  dest;
     uint16_t state;
 
@@ -4908,10 +4922,8 @@ void __cdecl AiGuardStep(void *obj, void *out, void *ctx)
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
-    dest = *(const int32_t *)(c + SIGHTC_OFF_DEST_DIST);
-
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_EC)) {
-        if (dest > AM2_AI_REACHED_DIST) {
+        if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST) > AM2_AI_REACHED_DIST) {
             *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
             AiTrooperStep(obj, out, ctx);
             goto tail;
@@ -4920,7 +4932,7 @@ void __cdecl AiGuardStep(void *obj, void *out, void *ctx)
         goto react;
     }
 
-    if (dest > AM2_AI_PATROL_DETOUR) {
+    if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST) > AM2_AI_PATROL_DETOUR) {
         if (!*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
             *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
                 *(const uint32_t *)(o + OBJ_OFF_SCRIPT_ID);
@@ -4952,33 +4964,125 @@ void __cdecl AiGuardStep(void *obj, void *out, void *ctx)
      * outright. AiPatrolStep keeps the old uid and only fills a null one. */
     *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
 
-    if (!AiCanSee(o, LEAD)) {
-        /* Out of sight: walk toward it, and DO NOT adopt it -- straight to
-         * the react block, as AiPatrolStep's out-of-sight arm skips it too. */
+    {
+        const uint8_t *seen = LEAD;
+        uint8_t        facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
+        int32_t        viewerAttr, dx, dy, dist, highest, mine, his;
+        uint8_t        bearing;
+        uint32_t       dir;
+
+        if (ObjIsType3((const AM2_Object *)o)
+            && *(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
+            facing = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
+
+        viewerAttr = ObjTileAttr((void *)o);
+        dx = (int32_t)*(const int16_t *)(seen + OBJ_OFF_POS)
+             - (int32_t)*(const int16_t *)(o + OBJ_OFF_POS);
+        dy = (int32_t)*(const int16_t *)(seen + OBJ_OFF_POS + 2)
+             - (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2);
+        highest = AM2_AI_SIGHT_FLOOR;
+        dist    = ApproxDistXY(dx, dy);
+        bearing = ANGLE3(dx, dy, dist);
+
+        if (abs(AngleDelta(facing, bearing)) > RANKF(RANK_REC_OFF_FIELD_04)) {
+            if (dist < RANKF(RANK_REC_OFF_FIELD_08))
+                goto seen_it;
+            goto not_seen;
+        }
+
+        dir = (uint32_t)bearing / AM2_SIGHT_DIR_STEP;
+        if (DIRF(int32_t, SIGHTDIR_OFF_TRACE_STAMP) != GEN) {
+            uint16_t buf[AM2_AI_SIGHT_LINE_BUF];
+            int32_t  n, i, reach;
+
+            DIRF(int32_t, SIGHTDIR_OFF_TRACE_STAMP) = GEN;
+            TraceTileLine(*(const uint32_t *)(o + OBJ_OFF_POS),
+                          *(const uint32_t *)(seen + OBJ_OFF_POS), buf, &n);
+
+            for (i = 0; i < n; i++) {
+                int32_t a = (int8_t)(*(const uint8_t *const *)
+                                     (uintptr_t)ADDR_TILE_ATTRS)[buf[i]];
+
+                if (a > viewerAttr)
+                    highest = a;
+                else if (a + AM2_SIGHT_BAND_STEP < highest)
+                    break;
+            }
+
+            reach = i * AM2_AI_SIGHT_TILE_SPAN + AM2_AI_SIGHT_TILE_BASE;
+            if (reach >= RANKF(RANK_REC_OFF_SIGHT_RANGE))
+                reach = RANKF(RANK_REC_OFF_SIGHT_RANGE);
+
+            if (DIRF(int32_t, SIGHTDIR_OFF_STAMP) == GEN) {
+                if (reach < DIRF(int16_t, SIGHTDIR_OFF_LOW))
+                    DIRF(int16_t, SIGHTDIR_OFF_LOW) = (int16_t)reach;
+                if (reach < DIRF(int16_t, SIGHTDIR_OFF_MID))
+                    DIRF(int16_t, SIGHTDIR_OFF_MID) = (int16_t)reach;
+                if (reach < DIRF(int16_t, SIGHTDIR_OFF_HIGH))
+                    DIRF(int16_t, SIGHTDIR_OFF_HIGH) = (int16_t)reach;
+            } else {
+                DIRF(int32_t, SIGHTDIR_OFF_STAMP) = GEN;
+                DIRF(int16_t, SIGHTDIR_OFF_LOW)   = (int16_t)reach;
+                DIRF(int16_t, SIGHTDIR_OFF_MID)   = (int16_t)reach;
+                DIRF(int16_t, SIGHTDIR_OFF_HIGH)  = (int16_t)reach;
+            }
+        }
+
+        if (DIRF(int32_t, SIGHTDIR_OFF_STAMP) == GEN) {
+            mine = ObjHeight((void *)o);
+            his  = ObjHeight((void *)seen);
+            if (his >= mine) {
+                if (dist > DIRF(int16_t, SIGHTDIR_OFF_LOW))
+                    goto not_seen;
+                goto seen_it;
+            }
+            if (his + AM2_SIGHT_BAND_STEP >= mine) {
+                if (dist > DIRF(int16_t, SIGHTDIR_OFF_MID))
+                    goto not_seen;
+                goto seen_it;
+            }
+            if (dist > DIRF(int16_t, SIGHTDIR_OFF_HIGH))
+                goto not_seen;
+        } else {
+            if (dist > RANKF(RANK_REC_OFF_SIGHT_RANGE))
+                goto not_seen;
+        }
+
+        /* In sight: BOTH arms adopt and fall into the react block -- see
+         * the header. */
+seen_it:
+        if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE)
+            >= *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+                *(const uint32_t *)(LEAD + OBJ_OFF_POS);
+            AiTrooperStep(obj, out, ctx);
+            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
+                *(const uint32_t *)(LEAD + OBJ_OFF_UID);
+            *(void **)(c + SIGHTC_OFF_OBSERVER) = LEAD;
+            *(int32_t *)(c + SIGHTC_OFF_RANGE) =
+                *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
+            *(c + SIGHTC_OFF_BEARING) =
+                *(const uint8_t *)(c + SIGHTC_OFF_LEAD_BEARING);
+            goto react;
+        }
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(LEAD + OBJ_OFF_POS);
-        AiTrooperStep(obj, out, ctx);
+            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
+            *(const uint32_t *)(LEAD + OBJ_OFF_UID);
+        *(void **)(c + SIGHTC_OFF_OBSERVER) = LEAD;
+        *(int32_t *)(c + SIGHTC_OFF_RANGE) =
+            *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
+        *(c + SIGHTC_OFF_BEARING) =
+            *(const uint8_t *)(c + SIGHTC_OFF_LEAD_BEARING);
         goto react;
     }
 
-    /* BOTH in-sight arms adopt and fall into the react block -- see the
-     * header. */
-    if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE)
-        >= *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(LEAD + OBJ_OFF_POS);
-        AiTrooperStep(obj, out, ctx);
-    } else {
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
-    }
-
-    *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-        *(const uint32_t *)(LEAD + OBJ_OFF_UID);
-    *(void **)(c + SIGHTC_OFF_OBSERVER) = LEAD;
-    *(int32_t *)(c + SIGHTC_OFF_RANGE) =
-        *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
-    *(c + SIGHTC_OFF_BEARING) = *(const uint8_t *)(c + SIGHTC_OFF_LEAD_BEARING);
+not_seen:
+    /* Out of sight: walk toward it, and DO NOT adopt it -- straight to the
+     * react block, as AiPatrolStep's out-of-sight arm skips it too. */
+    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+        *(const uint32_t *)(LEAD + OBJ_OFF_POS);
+    AiTrooperStep(obj, out, ctx);
 
 react:
     AiHitReact(obj, out, ctx);
@@ -5024,6 +5128,10 @@ tail:
             *(const uint32_t *)(o + OBJ_OFF_TARGET_UID);
 
     ConsiderSightingC(obj, out, ctx);
+#undef ANGLE3
+#undef GEN
+#undef DIRF
+#undef RANKF
 #undef LEAD
 }
 
