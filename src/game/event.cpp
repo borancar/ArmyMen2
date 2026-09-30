@@ -3101,7 +3101,9 @@ int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
 
     case AM2_OPERAND_ITEM_FRAME:
         o = (uint8_t *)LookupByUID(ResolveUid(a, 0));
-        if (!o || !ObjIsItem((const AM2_Object *)o))
+        if (!o)
+            return 0;
+        if (!ObjIsItem((const AM2_Object *)o))
             return 0;
         return *(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME);
 
@@ -3113,7 +3115,9 @@ int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
 
     case AM2_OPERAND_TROOP_STATE:
         o = (uint8_t *)LookupByUID(ResolveUid(a, 0));
-        if (!o || !ObjIsType2((const AM2_Object *)o))
+        if (!o)
+            return 5;
+        if (!ObjIsType2((const AM2_Object *)o))
             return 5;
         return *(const int32_t *)(o + OBJ_OFF_FIELD_530);
 
@@ -3122,7 +3126,9 @@ int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
         int32_t  i;
 
         o = (uint8_t *)LookupByUID(ResolveUid(a, 0));
-        if (!o || !ObjIsType2((const AM2_Object *)o))
+        if (!o)
+            return 0;
+        if (!ObjIsType2((const AM2_Object *)o))
             return 0;
         if (!*(const int32_t *)(o + OBJ_OFF_SARGE))
             return 0;
@@ -3140,11 +3146,12 @@ int32_t __cdecl EvalOperand(int32_t kind, int32_t a, int32_t b)
     case AM2_OPERAND_SLOT_TAKEN: {
         const uint8_t *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
 
-        if (!*(const int32_t *)(comm + COMM_OFF_PLAYERS
-                                + (uint32_t)a * COMM_PLAYER_STRIDE
-                                + COMM_SLOT_OFF_TAKEN))
-            return 0;
-        return ((AM2_Comm *)(void *)comm)->CommSlotHasPlayer(a) ? 1 : 2;
+        if (*(const int32_t *)(comm + COMM_OFF_PLAYERS
+                               + (uint32_t)a * COMM_PLAYER_STRIDE
+                               + COMM_SLOT_OFF_TAKEN))
+            return ((AM2_Comm *)(void *)comm)->CommSlotHasPlayer(a) ? 1 : 2;
+        return 0;
+
     }
 
     case AM2_OPERAND_ISALLY:

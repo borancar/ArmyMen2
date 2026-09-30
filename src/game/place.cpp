@@ -245,31 +245,48 @@ int32_t __cdecl ParsePlaceLine(int32_t cmd, char *line)
     for (type = 0; type < AM2_UNIT_TYPE_COUNT; type++)
         if (!strcmp(typeName, (const char *)(kUnitType(type)
                                              + UNIT_TYPE_OFF_NAME)))
-            break;
-    if (type == AM2_UNIT_TYPE_COUNT)
+            goto found;
+    /* Always true here, and VC6 folds it against the loop test -- but a
+     * conditional return is not merged with the other `return 2`s, which
+     * the image keeps separate. */
+    if (type >= AM2_UNIT_TYPE_COUNT)
         return 2;
+found:
+
+
     if (type == -1)                       /* cannot happen -- see above */
         return 2;
     rec.type = type;
 
+    /* Each refusal returns on its own, and each coordinate is stored into
+     * its half of the packed point as soon as it is read. */
     tok = am2_strtok((char *)0, kSep);
-    if (!tok || !DefParseNumber(&x, tok))
+    if (!tok)
         return 3;
+    if (!DefParseNumber(&x, tok))
+        return 3;
+    ((AM2_Point *)&rec.where)->x = (int16_t)x;
 
     tok = am2_strtok((char *)0, kSep);
-    if (!tok || !DefParseNumber(&y, tok))
+    if (!tok)
         return 4;
-
-    rec.where = ((uint32_t)(uint16_t)y << 16) | (uint16_t)x;
+    if (!DefParseNumber(&y, tok))
+        return 4;
+    ((AM2_Point *)&rec.where)->y = (int16_t)y;
 
     tok = am2_strtok((char *)0, kSep);
-    if (!tok || !DefParseNumber(&facing, tok))
+    if (!tok)
+        return 5;
+    if (!DefParseNumber(&facing, tok))
         return 5;
     rec.facing = (uint8_t)facing;
 
     tok = am2_strtok((char *)0, kSep);
-    if (!tok || !DefParseNumber(&rec.group, tok))
+    if (!tok)
         return 6;
+    if (!DefParseNumber(&rec.group, tok))
+        return 6;
+
 
     tok = am2_strtok(line, kSep);        /* NOT (char *)0 -- see above */
     if (!tok)
