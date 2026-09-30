@@ -640,57 +640,58 @@ void __cdecl TraceTileLine(uint32_t from, uint32_t to,
 {
     /* Both points are packed: x in the low half, y in the high, each signed.
        The original reads them with `movsx`, so the shift is arithmetic. */
-    int32_t tx0 = (int32_t)(int16_t)(from & 0xFFFFu) >> 4;
-    int32_t ty0 = (int32_t)(int16_t)(from >> 16) >> 4;
-    int32_t tx1 = (int32_t)(int16_t)(to & 0xFFFFu) >> 4;
-    int32_t ty1 = (int32_t)(int16_t)(to >> 16) >> 4;
+#define PT(p) (*(const AM2_Point *)&(p))
+    int32_t tx0 = PT(from).x >> 4;
+    int32_t ty0 = PT(from).y >> 4;
+    int32_t tx1 = PT(to).x >> 4;
+    int32_t ty1 = PT(to).y >> 4;
     int32_t dx  = tx1 - tx0;
     int32_t dy  = ty1 - ty0;
-    int32_t adx = (dx < 0 ? -dx : dx) * 2;
-    int32_t ady = (dy < 0 ? -dy : dy) * 2;
-    int32_t stepX = dx >= 0 ? 1 : -1;
-    int32_t stepY = dy >= 0 ? 1 : -1;
+    int32_t adx = abs(dx) * 2;
+    int32_t ady = abs(dy) * 2;
+    int32_t stepX = dx < 0 ? -1 : 1;
+    int32_t stepY = dy < 0 ? -1 : 1;
+
     int32_t stepDown = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W * stepY;
-    int32_t tile = TileOfPoint(from);
-    int32_t err;
+    /* Called as the `int` every file but this one declares it. */
+    int32_t tile = ((int32_t (__cdecl *)(uint32_t))TileOfPoint)(from);
+
     int32_t i;
+#undef PT
 
     *count   = 0;
     tiles[0] = (uint16_t)tile;
-    *count   = 1;
-    i        = 1;
+    i = ++*count;
 
     if (adx > ady) {
-        err = ady - adx / 2;
+        dy = ady - (adx >> 1);
         while (tx0 != tx1) {
-            if (err >= 0) {
+            if (dy >= 0) {
                 tile += stepDown;
-                err  -= adx;
+                dy  -= adx;
             }
-            err  += ady;
+            dy  += ady;
             tx0  += stepX;
             tile += stepX;
 
             tiles[i] = (uint16_t)tile;
-            *count   = i + 1;
-            i        = *count;
+            i = ++*count;
         }
         return;
     }
 
-    err = adx - ady / 2;
+    dy = adx - (ady >> 1);
     while (ty0 != ty1) {
-        if (err >= 0) {
+        if (dy >= 0) {
             tile += stepX;
-            err  -= ady;
+            dy  -= ady;
         }
         tile += stepDown;
         ty0  += stepY;
-        err  += adx;
+        dy  += adx;
 
         tiles[i] = (uint16_t)tile;
-        *count   = i + 1;
-        i        = *count;
+        i = ++*count;
     }
 }
 

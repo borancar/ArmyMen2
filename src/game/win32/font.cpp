@@ -43,10 +43,8 @@ typedef char am2_rle16_header_is_4_bytes[(sizeof(AM2_Rle16) == 4) ? 1 : -1];
 uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
                              int32_t unused)
 {
-    uint8_t       *fb   = g_frameBuf;
-    uint8_t       *base = (uint8_t *)out;
     uint8_t       *w;
-    const uint8_t *rowPix;
+    const uint8_t *p;
     uint32_t       written;
     uint8_t        key;
     int32_t        row;
@@ -56,23 +54,23 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
     out->width  = (uint16_t)width;
     out->height = (uint16_t)height;
 
-    written = (uint32_t)(sizeof *out + height * sizeof out->rowOffset[0]);
-    w       = base + written;
-    rowPix  = fb;
+    written = (uint32_t)(height * sizeof out->rowOffset[0] + sizeof *out);
+    p       = g_frameBuf;
+    w       = (uint8_t *)&out->rowOffset[height];
 
-    key = fb[g_pitch * KEY_ROW];
+    key = p[g_pitch * KEY_ROW];
 
     for (row = 0; row < height; row++) {
-        const uint8_t *p   = rowPix;
-        const uint8_t *end = rowPix + width;
+        const uint8_t *start = p;
+        const uint8_t *end   = p + width;
 
-        out->rowOffset[row] = (uint16_t)(w - base);
+        out->rowOffset[row] = (uint16_t)(w - (uint8_t *)out);
 
         /* Always emits pairs, and always at least one pair per row -- a row
          * that is entirely background still gets its count followed by a zero
          * foreground run. */
         do {
-            uint32_t n = 0;
+            int32_t n = 0;
 
             while (p < end && *p == key && n < RUN_MAX) {
                 p++;
@@ -90,7 +88,7 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
             written++;
         } while (p != end);
 
-        rowPix += g_pitch;
+        p = start + g_pitch;
     }
 
     /* Wipe the scratch square back to the background colour so the next
@@ -98,11 +96,10 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
      * row -- 25 bytes -- for 25 rows. */
     {
         uint8_t *dst = g_frameBuf;
-        int32_t  i, j;
+        int32_t  i;
 
         for (i = 0; i < SCRATCH_SIDE; i++) {
-            for (j = 0; j < SCRATCH_SIDE; j++)
-                dst[j] = key;
+            memset(dst, key, SCRATCH_SIDE);
             dst += g_pitch;
         }
     }

@@ -1624,7 +1624,7 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
 
     for (i = 0; i < count; i++) {
         AM2_Sprite *spr;
-        int16_t     w;
+        int16_t     w, h, x, y;
         int32_t     size;
 
         if (g_spriteListN >= g_spriteListCap)
@@ -1637,25 +1637,25 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
         spr = g_spriteList[g_spriteListN];
         memset(spr, 0, 0x40);
 
-        /* The original reads this one into the FILE pointer's own argument
-         * slot, `fp` being live in a register by then. */
+        /* Each field has its own local, read in pairs and then stored. */
         orig_fread(&w, 2, 1, fp);
-        spr->id          = 0xFFFFFFFFu;
-        spr->bounds.top  = 0;
-        spr->bounds.left = 0;
+        orig_fread(&h, 2, 1, fp);
+        spr->id           = 0xFFFFFFFFu;
+        spr->bounds.top   = 0;
+        spr->bounds.left  = 0;
         spr->bounds.right = w;
-        orig_fread(&w, 2, 1, fp);
-        spr->bounds.bottom = w;
+        spr->bounds.bottom = h;
 
-        orig_fread(&w, 2, 1, fp);
-        spr->hotX = w;
-        orig_fread(&w, 2, 1, fp);
-        spr->hotY = w;
+        orig_fread(&x, 2, 1, fp);
+        orig_fread(&y, 2, 1, fp);
+        spr->hotX = x;
+        spr->hotY = y;
 
-        orig_fread(&w, 2, 1, fp);
-        spr->attachX = w;
-        orig_fread(&w, 2, 1, fp);
-        spr->attachY = w;
+        orig_fread(&x, 2, 1, fp);
+        orig_fread(&y, 2, 1, fp);
+        spr->attachX = x;
+        spr->attachY = y;
+
 
         /* The image, then the overlay -- each a size and that many bytes, and
          * the overlay only if its size is positive. Neither malloc nor either
