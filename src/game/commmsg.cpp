@@ -3487,10 +3487,11 @@ uint8_t *__cdecl VehicleUpdateApply(void *rec, int32_t army)
 void __cdecl RecvVehicle1D(void *msg)
 {
     const uint8_t *m = (const uint8_t *)msg;
-    uint8_t       *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+    /* The comm object and the request are read afresh at every use. */
+#define comm    (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
+#define request (*(const int32_t *)(m + 0x10))
     uint8_t       *vehicle;
     uint8_t       *item;
-    int32_t        request;
 
     if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
         am2_log((const char *)(uintptr_t)"-->Vehicle Want Item Received: Vehicle: %x, item: %x, request: %d, slot: %d, quant: %d \n",
@@ -3500,7 +3501,6 @@ void __cdecl RecvVehicle1D(void *msg)
                 *(const int32_t *)(m + 0x18),
                 *(const int32_t *)(m + 0x14));
 
-    request = *(const int32_t *)(m + 0x10);
     if (*(const int32_t *)(comm + COMM_OFF_IS_HOST) != 0) {
         if (request == 2 || request == 3)
             return;
@@ -3567,6 +3567,8 @@ void __cdecl RecvVehicle1D(void *msg)
             am2_log((const char *)(uintptr_t)"Request drop item received; ammo %d\n",
                     *(const int32_t *)(m + 0x14));
     }
+#undef request
+#undef comm
 }
 
 /* RecvVehicle1F -- original 0x0045E860, one caller. Message kind 0x1F, the
