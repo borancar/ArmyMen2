@@ -1227,9 +1227,7 @@ void __cdecl ScrollMapCache(void)
         return;
     }
 
-    adx = (dx < 0) ? -dx : dx;
-    ady = (dy < 0) ? -dy : dy;
-    if (adx >= g_viewTilesW || ady >= g_viewTilesH) {
+    if ((adx = abs(dx)) >= g_viewTilesW || (ady = abs(dy)) >= g_viewTilesH) {
         PaintMapTiles(g_camera);
         return;
     }
@@ -1239,15 +1237,23 @@ void __cdecl ScrollMapCache(void)
      * always zero, which is what makes this one expression for both
      * directions. */
     {
-        int32_t sx = (dx > 0) ? dx : 0;
-        int32_t sy = (dy > 0) ? dy : 0;
+        int32_t  sx = (dx > 0) ? dx : 0;
+        int32_t  sy = (dy > 0) ? dy : 0;
+        AM2_Rect tiles;
+
+        /* The same rectangle in tiles, sized from the CLAMPED camera rather
+         * than the view -- built only to be handed to the stubbed log. */
+        tiles.left   = sx;
+        tiles.top    = sy;
+        tiles.right  = g_camera->right - adx - g_camera->left + sx;
+        tiles.bottom = g_camera->bottom - ady - g_camera->top + sy;
 
         src.left   = sx << TILE_SHIFT;
         src.top    = sy << TILE_SHIFT;
         src.right  = ((g_viewTilesW - adx) << TILE_SHIFT) + src.left;
         src.bottom = ((g_viewTilesH - ady) << TILE_SHIFT) + src.top;
 
-        orig_log((const char *)&src);   /* stubbed to `ret`, as above */
+        orig_log((const char *)&tiles);   /* stubbed to `ret`, as above */
         IDirectDrawSurface_BltFast(cache,
 
                                    (DWORD)(((dx > 0) ? 0 : -dx) << TILE_SHIFT),

@@ -10718,12 +10718,17 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
 
     /* The map is listed and the totals agree; the FILE still has to be there.
      * This is the second exit that answers 2, for a different reason. */
-    SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
-    am2_sprintf(path, "%s.amm",
-                (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)));
-    if (!FileExists(path)) {
-        MpComplain(panel, ADDR_MSG_NO_MAP);
-        return AM2_MAPCHECK_NO_MAP;
+    {
+        /* Its own buffer, not `path` -- the original's frame has one. */
+        char amm[AM2_MP_COMPLAINT_BYTES];
+
+        SetGameDir((const char *)((void *)(uintptr_t)(ADDR_MAP_FOLDER)));
+        am2_sprintf(amm, "%s.amm",
+                    (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)));
+        if (!FileExists(amm)) {
+            MpComplain(panel, ADDR_MSG_NO_MAP);
+            return AM2_MAPCHECK_NO_MAP;
+        }
     }
 
     if (panel) {

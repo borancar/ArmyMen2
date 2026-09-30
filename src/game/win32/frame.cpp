@@ -1868,17 +1868,19 @@ void __cdecl PausedFrameStep(void)
 #define rec (comm + slot * COMM_PLAYER_STRIDE)
         uint32_t pause;
         int32_t  team;
-        int32_t  mates = 0;
+        int32_t  mates;
         int32_t  variant;
-        int32_t  badge = 0;
+        int32_t  badge;
         int32_t  army;
-        char     buf[64];
-        int32_t  ext[2];
+        char     scoreText[20];
+        char     teamText[20];
+        int32_t  width;
 
         if (*(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_25C) == 0)
             continue;
 
-        team = *(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_258);
+        team  = *(const int32_t *)(rec + COMM_OFF_SLOT_FIELD_258);
+        mates = 0;
         if (team > 0) {
             for (n = 0; n < 4; n++) {
                 const uint8_t *o = comm + COMM_OFF_SLOT_FIELD_258
@@ -1889,7 +1891,10 @@ void __cdecl PausedFrameStep(void)
             }
         }
 
-        variant = (mates <= 1) ? 4 : 3;
+        badge   = 0;
+        variant = 4;
+        if (mates > 1)
+            variant = 3;
         pause = *(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS;
 
         if (slot == *(const int32_t *)(uintptr_t)ADDR_OUR_SLOT) {
@@ -1945,23 +1950,23 @@ void __cdecl PausedFrameStep(void)
         if (variant <= 2)
             continue;
 
-        am2_sprintf(buf, "%d",
+        am2_sprintf(scoreText, "%d",
                     GetArmyScore(comm, slot));
-        TextExtent(buf, 1, ext);
+        width = TextExtent(scoreText, 1, NULL);
         if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
             return;
-        DrawText(xy[0] - ext[0] + 0x32, xy[1] + 4, buf, 1, 0,
+        DrawText(xy[0] - width + 0x32, xy[1] + 4, scoreText, 1, 0,
                  *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
         UnlockSurface();
 
         if (mates > 1) {
-            am2_sprintf(buf, "%d",
+            am2_sprintf(teamText, "%d",
                         ((AM2_Comm *)comm)->CommTeamScore(slot));
-            TextExtent(buf, 1, ext);
+            width = TextExtent(teamText, 1, NULL);
             if (!LockSurface(
                     *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
                 return;
-            DrawText(xy[0] - ext[0] + 0x58, xy[1] + 4, buf, 1, 0,
+            DrawText(xy[0] - width + 0x58, xy[1] + 4, teamText, 1, 0,
                      *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
             UnlockSurface();
         }
@@ -1984,7 +1989,7 @@ void __cdecl PausedFrameStep(void)
     }
 
     if (*(const int32_t *)(uintptr_t)ADDR_INFO_OVERLAY_ON) {
-        char buf[128];
+        char buf[284];
         RECT clip;
 
         am2_sprintf(buf, "Game type: %s, Goal: %d",
