@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1366 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1367 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1366:
+  the near-miss sweep, 758 before the row pools. From 758 to 1367:
   - **PollKeyboard wants its keyboard state aggregated** (0x005127C8..
     0x00512FD0 in relinkos.py's AGGREGATE_RANGES): with it the loop walks
     the deadline and pressed halves with one pointer as the image does, one
@@ -117,6 +117,12 @@ main result so far (details in `src/vc6/README.md`):
     0x0040569C; the reconstruction fell into the adopt. It now skips it, as
     AiPatrolStep's matching arm already did. Guard-post units only; not
     driven.
+  - **AiEngageStep's too-close retreat was a charge** (2026-09-30): the image
+    calls RandomPointToward(self, observer, MAX_RANGE, &c0) -- the observer as
+    the mover, so the point is MAX_RANGE out from the enemy on the line toward
+    the unit, a back-off to its weapon's range. The reconstruction passed the
+    two swapped, a point MAX_RANGE from the unit toward the enemy. Found by
+    byte-matching; not driven.
 
 
   - **Two menu behaviours the byte-match corrected** (2026-09-29):

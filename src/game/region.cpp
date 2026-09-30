@@ -3987,12 +3987,11 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
  * view is blocked in a DIRECTION, and the direction that matters is the one
  * the target lies in.
  *
- * AiAttackBody uses it too, although a register-exact diff finds only a
- * single 28-instruction run in common with the other two: the same source
- * with a different register assignment (bearing in ebx and the rank in ebp
- * there, the other way round here). AiEngageStep's test breaks into runs of
- * 11, 25, 28, 11 and 11 and is not yet shown to be the same source.
- * AiSightTrace below is the inner 38 that all four share. */
+ * AiEngageStep and AiAttackBody use it too, although register-exact diffs
+ * against the first two break theirs into runs of 11, 25, 28, 11 and 11, and a
+ * single 28: the same source around different surroundings -- in AiAttackBody
+ * the bearing lands in ebx and the rank in ebp, the other way round from the
+ * rest. All four match byte for byte on it. */
 #define AI_RANKF(off) (*(const int32_t *)((uintptr_t)ADDR_RANK_RECORDS         \
         + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK) * RANK_REC_BYTES + (off)))
 #define AI_DIRF(T, off) (*(T *)((uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR             \
@@ -4341,23 +4340,50 @@ void __cdecl AiEngageStep(void *obj, void *out, void *ctx)
     uint8_t       *o = (uint8_t *)obj;
     uint8_t       *w = (uint8_t *)out;
     uint8_t       *c = (uint8_t *)ctx;
-    const uint8_t *rank = (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
-                          + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
-                                * RANK_REC_BYTES;
-    uint8_t *seen;
-    uint32_t goalPoint;
-    int32_t  range = *(const int32_t *)(c + SIGHTC_OFF_RANGE);
+    const uint8_t *seen;
+    int32_t        range = *(const int32_t *)(c + SIGHTC_OFF_RANGE);
+    /* The leader and the found object are re-read at every use. Each step
+     * and promotion is written at its site; VC6 cross-jumps the ones whose
+     * registers agree. */
+#define LEAD  (*(uint8_t **)(c + SIGHTC_OFF_LEADER))
+#define FOUND (*(uint8_t **)(c + SIGHTC_OFF_FOUND))
+#define PROMOTE_FOUND()                                                       \
+    do {                                                                      \
+        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =                               \
+            *(const uint32_t *)(FOUND + OBJ_OFF_UID);                         \
+        *(void **)(c + SIGHTC_OFF_OBSERVER) = FOUND;                          \
+        *(int32_t *)(c + SIGHTC_OFF_RANGE) =                                  \
+            *(const int32_t *)(c + SIGHTC_OFF_FOUND_RANGE);                   \
+        *(c + SIGHTC_OFF_BEARING) =                                           \
+            *(const uint8_t *)(c + SIGHTC_OFF_FOUND_BEARING);                 \
+    } while (0)
+#define PROMOTE_LEAD()                                                        \
+    do {                                                                      \
+        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =                               \
+            *(const uint32_t *)(LEAD + OBJ_OFF_UID);                          \
+        *(void **)(c + SIGHTC_OFF_OBSERVER) = LEAD;                           \
+        *(int32_t *)(c + SIGHTC_OFF_RANGE) =                                  \
+            *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);                    \
+        *(c + SIGHTC_OFF_BEARING) =                                           \
+            *(const uint8_t *)(c + SIGHTC_OFF_LEAD_BEARING);                  \
+    } while (0)
 
     if (range > 0) {
         if (range > *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
-            goalPoint = *(const uint32_t *)(
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(
                 *(uint8_t *const *)(c + SIGHTC_OFF_OBSERVER) + OBJ_OFF_POS);
-            goto step_and_promote;
+            AiTrooperStep(obj, out, ctx);
+            if (FOUND)
+                PROMOTE_FOUND();
+            goto done;
         }
         if (range < *(const int32_t *)(c + SIGHTC_OFF_DAMAGE)) {
-            /* Too close for its own weapon: back off to a point that far away
-             * rather than to a computed one. */
-            RandomPointToward(*(void *const *)(c + SIGHTC_OFF_OBSERVER), obj,
+            /* Too close for its own weapon: back off. The OBSERVER is passed
+             * as the mover and this unit as the target, so the point is
+             * MAX_RANGE out from the enemy along the line toward us -- a
+             * retreat to the weapon's range. With the two swapped it is a
+             * point MAX_RANGE from us toward the enemy, a charge. */
+            RandomPointToward(obj, *(void *const *)(c + SIGHTC_OFF_OBSERVER),
                               *(const int32_t *)(c + SIGHTC_OFF_MAX_RANGE),
                               (AM2_Point *)(o + OBJ_OFF_FIELD_C0));
             AiTrooperStep(obj, out, ctx);
@@ -4371,16 +4397,20 @@ void __cdecl AiEngageStep(void *obj, void *out, void *ctx)
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(o + OBJ_OFF_SCRIPT_FRAME);
         AiTrooperStep(obj, out, ctx);
-        if (*(void *const *)(c + SIGHTC_OFF_FOUND))
-            goto promote_found;
+        if (FOUND)
+            PROMOTE_FOUND();
         goto done;
     }
 
     if (*(const int32_t *)(c + SIGHTC_OFF_DEST_DIST) > AM2_AI_ENGAGE_DEST) {
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_FRAME) =
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
-        goalPoint = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        goto step_and_promote;
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+        AiTrooperStep(obj, out, ctx);
+        if (FOUND)
+            PROMOTE_FOUND();
+        goto done;
     }
 
     /* Arrived: forget both remembered points and look for something to do. */
@@ -4389,157 +4419,55 @@ void __cdecl AiEngageStep(void *obj, void *out, void *ctx)
     *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
         *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
-    seen = *(uint8_t *const *)(c + SIGHTC_OFF_LEADER);
-    if (!seen)
-        goto no_leader;
-
-    /* Out of the band the current weapon wants: pick another and rebuild the
-     * weapon half of the context around it. */
-    if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE)
-        > *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
-        SelectRankedWeapon(obj);
-        UnitWeaponInfo(obj, ctx);
-    }
-
-    {
-        uint8_t facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
-        int32_t viewerAttr, dx, dy, dist, delta, gen;
-        uint8_t bearing;
-        uint8_t *rec;
-
-        /* One slot, written twice: a type 3 with more than one row aims with
-         * its turret. */
-        if (ObjIsType3((const AM2_Object *)o)
-            && *(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
-            facing = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
-
-        viewerAttr = ObjTileAttr(o);
-        dx = (int32_t)*(const int16_t *)(seen + OBJ_OFF_POS)
-             - (int32_t)*(const int16_t *)(o + OBJ_OFF_POS);
-        dy = (int32_t)*(const int16_t *)(seen + OBJ_OFF_POS + 2)
-             - (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2);
-        dist    = ApproxDistXY(dx, dy);
-        bearing = (uint8_t)AngleOfDelta(dx, dy);
-
-        delta = AngleDelta(facing, bearing);
-        delta = abs(delta);
-        if (delta > *(const int32_t *)(rank + RANK_REC_OFF_FIELD_04)) {
-            if (dist < *(const int32_t *)(rank + RANK_REC_OFF_FIELD_08))
-                goto in_sight;
-            goto out_of_sight;
+    if (LEAD) {
+        /* Out of the band the current weapon wants: pick another and rebuild
+         * the weapon half of the context around it. */
+        if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE)
+            > *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
+            SelectRankedWeapon(obj);
+            UnitWeaponInfo(obj, ctx);
         }
 
-        /* KEYED ON THE BEARING TO THE TARGET, NOT ON THE VIEWER'S FACING.
-         * Both are bytes in the same units and both are live in registers
-         * here, which is what made `facing` a plausible and wrong reading --
-         * the original indexes with the very register it just passed to
-         * AngleDelta as the SECOND argument. See the note at AM2_AI_SIGHT_TEST. */
-        rec = (uint8_t *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR
-              + ((uint32_t)bearing / AM2_SIGHT_DIR_STEP)
-                    * AM2_SIGHT_DIR_STRIDE;
-        gen = *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
-
-        if (*(const int32_t *)(rec + SIGHTDIR_OFF_TRACE_STAMP) != gen)
-            AiSightTrace(o, seen, rec, rank, viewerAttr, gen);
-
-        if (*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP) != gen) {
-            if (dist <= *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE))
-                goto in_sight;
-            goto out_of_sight;
-        }
-        {
-            int32_t mine = ObjHeight(o);
-            int32_t his  = ObjHeight(seen);
-
-            /* The HIGH arm borrows the LOW arm's compare in the original. */
-            if (his >= mine) {
-                if (dist > *(const int16_t *)(rec + SIGHTDIR_OFF_LOW))
-                    goto out_of_sight;
-            } else if (his + AM2_SIGHT_BAND_STEP < mine) {
-                if (dist > *(const int16_t *)(rec + SIGHTDIR_OFF_HIGH))
-                    goto out_of_sight;
-            } else if (dist > *(const int16_t *)(rec + SIGHTDIR_OFF_MID)) {
-                goto out_of_sight;
-            }
-        }
-    }
+        seen = LEAD;
+        AM2_AI_SIGHT_TEST(in_sight, out_of_sight);
 
 in_sight:
-    seen = *(uint8_t *const *)(c + SIGHTC_OFF_LEADER);
-    if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE)
-        > *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
-        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(seen + OBJ_OFF_POS);
-        AiTrooperStep(obj, out, ctx);
-        goto promote_leader;
-    }
+        if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE)
+            > *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+                *(const uint32_t *)(LEAD + OBJ_OFF_POS);
+            AiTrooperStep(obj, out, ctx);
+            PROMOTE_LEAD();
+            goto done;
+        }
 
-    /* Close enough to act on. An object that is not one of types 2, 3 or 8
-     * has to carry flag 4 to be worth reacting to at all. */
-    if (!ObjIsTypeIn238((const AM2_Object *)seen)
-        && !(*(const uint8_t *)(seen + OBJ_OFF_FLAGS) & 4))
+        /* Close enough to act on. An object that is not one of types 2, 3 or
+         * 8 has to carry flag 4 to be worth reacting to at all. */
+        if (!ObjIsTypeIn238((const AM2_Object *)LEAD)
+            && !(*(const uint8_t *)(LEAD + OBJ_OFF_FLAGS) & 4))
+            goto done;
+
+        PROMOTE_LEAD();
+        AiHitReact(obj, out, ctx);
+        AiKeepRange(obj, out, ctx);
         goto done;
 
-    *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-        *(const uint32_t *)(seen + OBJ_OFF_UID);
-    *(void **)(c + SIGHTC_OFF_OBSERVER) = seen;
-    *(int32_t *)(c + SIGHTC_OFF_RANGE) =
-        *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
-    *(c + SIGHTC_OFF_BEARING) = *(const uint8_t *)(c + SIGHTC_OFF_LEAD_BEARING);
-    AiHitReact(obj, out, ctx);
-    AiKeepRange(obj, out, ctx);
-    goto done;
-
 out_of_sight:
-    seen = *(uint8_t *const *)(c + SIGHTC_OFF_LEADER);
-    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-        *(const uint32_t *)(seen + OBJ_OFF_POS);
-    AiTrooperStep(obj, out, ctx);
-    /* AND FALLS INTO THE OTHER ARM'S TAIL when nothing was found -- so a unit
-     * that cannot see its leader still adopts it as the observer. */
-    if (!*(void *const *)(c + SIGHTC_OFF_FOUND))
-        goto promote_leader;
-
-promote_found:
-    *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = *(const uint32_t *)(
-        *(uint8_t *const *)(c + SIGHTC_OFF_FOUND) + OBJ_OFF_UID);
-    *(void **)(c + SIGHTC_OFF_OBSERVER) =
-        *(void *const *)(c + SIGHTC_OFF_FOUND);
-    *(int32_t *)(c + SIGHTC_OFF_RANGE) =
-        *(const int32_t *)(c + SIGHTC_OFF_FOUND_RANGE);
-    *(c + SIGHTC_OFF_BEARING) =
-        *(const uint8_t *)(c + SIGHTC_OFF_FOUND_BEARING);
-    goto done;
-
-promote_leader:
-    seen = *(uint8_t *const *)(c + SIGHTC_OFF_LEADER);
-    *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-        *(const uint32_t *)(seen + OBJ_OFF_UID);
-    *(void **)(c + SIGHTC_OFF_OBSERVER) = seen;
-    *(int32_t *)(c + SIGHTC_OFF_RANGE) =
-        *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
-    *(c + SIGHTC_OFF_BEARING) = *(const uint8_t *)(c + SIGHTC_OFF_LEAD_BEARING);
-    goto done;
-
-step_and_promote:
-    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = goalPoint;
-    AiTrooperStep(obj, out, ctx);
-    if (*(void *const *)(c + SIGHTC_OFF_FOUND))
-        goto promote_found;
-    goto done;
-
-no_leader:
-    AiHitReact(obj, out, ctx);
-    if (*(void *const *)(c + SIGHTC_OFF_FOUND)) {
-        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = *(const uint32_t *)(
-            *(uint8_t *const *)(c + SIGHTC_OFF_FOUND) + OBJ_OFF_UID);
-        *(void **)(c + SIGHTC_OFF_OBSERVER) =
-            *(void *const *)(c + SIGHTC_OFF_FOUND);
-        *(int32_t *)(c + SIGHTC_OFF_RANGE) =
-            *(const int32_t *)(c + SIGHTC_OFF_FOUND_RANGE);
-        *(c + SIGHTC_OFF_BEARING) =
-            *(const uint8_t *)(c + SIGHTC_OFF_FOUND_BEARING);
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(LEAD + OBJ_OFF_POS);
+        AiTrooperStep(obj, out, ctx);
+        /* A unit that cannot see its leader still adopts it as the observer
+         * when nothing was found. */
+        if (FOUND)
+            PROMOTE_FOUND();
+        else
+            PROMOTE_LEAD();
+        goto done;
     }
+
+    AiHitReact(obj, out, ctx);
+    if (FOUND)
+        PROMOTE_FOUND();
     AiKeepRange(obj, out, ctx);
     if (*(void *const *)(c + SIGHTC_OFF_OBSERVER))
         *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = *(const uint32_t *)(
@@ -4548,6 +4476,10 @@ no_leader:
 done:
     (void)w;
     ConsiderSightingC(obj, out, ctx);
+#undef PROMOTE_LEAD
+#undef PROMOTE_FOUND
+#undef FOUND
+#undef LEAD
 }
 
 /* AiPatrolStep -- original 0x004057D0, 1,344 bytes, three callers, one of them
