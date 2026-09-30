@@ -2116,7 +2116,10 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case 118:                                   /* setgunfacing */
         if (!ActStep(ctx, at))
             return 0;
-        act->code = (id == AM2_TOK_SETFACING) ? 0x20 : 0x21;
+        if (id == AM2_TOK_SETFACING)
+            act->code = 0x20;
+        else
+            act->code = 0x21;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
         if (*at >= ctx->count) {
@@ -2147,10 +2150,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case 135:                                   /* addvar */
         if (!ActStep(ctx, at))
             return 0;
-        if (id == AM2_TOK_SETVAR)
-            act->code = 0x23;
-        else
-            act->code = 0x22;
+        act->code = (id == AM2_TOK_SETVAR) ? 0x23 : 0x22;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
         if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
@@ -2295,7 +2295,10 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
                 return 0;
             }
             /* stand 1, kneel 2, prone 3, none 0. */
-            act->n0 = (m == 3) ? 0 : m + 1;
+            if (m == 3)
+                act->n0 = 0;
+            else
+                act->n0 = m + 1;
         }
         (*at)++;
         return 1;
