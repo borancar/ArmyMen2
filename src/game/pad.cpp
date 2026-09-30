@@ -296,7 +296,7 @@ void __cdecl PadFinalise(void *pad, void *obj)
 int32_t __cdecl ObjTileHook(void *obj)
 {
     uint8_t       *o = (uint8_t *)obj;
-    const uint8_t *padLayer = *(const uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER;
+#define padLayer (*(const uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER)
     const uint8_t *bitLayer;
     uint32_t       tile = *(const uint16_t *)(o + OBJ_OFF_TILE);
     uint32_t       prev;
@@ -313,9 +313,9 @@ int32_t __cdecl ObjTileHook(void *obj)
         if (*(const int32_t *)(num + PADNUM_OFF_PADS) != 0
             && *(const int16_t *)(num + PADNUM_OFF_COUNT) > 0) {
             const int16_t *ids = (const int16_t *)(num + PADNUM_OFF_IDS);
-            int32_t        n = *(const int16_t *)(num + PADNUM_OFF_COUNT);
 
-            for (i = 0; i < n; i++) {
+            /* The count is re-read each pass, as the image compares it. */
+            for (i = 0; i < *(const int16_t *)(num + PADNUM_OFF_COUNT); i++) {
                 const uint8_t *pad = (const uint8_t *)((void *)(uintptr_t)(ADDR_PADS))
                                      + (uint32_t)ids[i] * AM2_PAD_STRIDE;
 
@@ -373,6 +373,7 @@ int32_t __cdecl ObjTileHook(void *obj)
     }
 
     return changed;
+#undef padLayer
 }
 
 
