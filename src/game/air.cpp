@@ -571,7 +571,6 @@ void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
     uint8_t        leaderFacing;
     uint8_t        facing;
     int32_t        dist;
-    int32_t        type;
     uint32_t       shift;
 
     (void)follower;
@@ -579,16 +578,20 @@ void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
     out->x = *(const int16_t *)(l + OBJ_OFF_POS);
     out->y = *(const int16_t *)(l + OBJ_OFF_POS + 2);
 
-    type = *(const int32_t *)l;
-    if (type == 3) {
+    switch (*(const int32_t *)l) {
+    case 3:
         leaderFacing = *(const uint8_t *)(l + OBJ_OFF_FACING);
         shift        = 1;
-    } else if (type == 2 || type == 8) {
+        break;
+    case 2:
+    case 8:
         leaderFacing = *(const uint8_t *)(l + OBJ_OFF_FACING);
         shift        = 0;
-    } else {
+        break;
+    default:
         leaderFacing = 0;
         shift        = 0;
+        break;
     }
 
     facing = (uint8_t)((uint8_t)((uint8_t)(slot + 4) << 4) + leaderFacing);
@@ -596,21 +599,21 @@ void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
 
     if (ObjIsType3((const AM2_Object *)leader)) {
         int32_t delta = AngleDelta(facing, leaderFacing);
-        int32_t mag   = abs(delta);
 
-        if (mag < 0x40) {
-            facing = (uint8_t)(facing + (delta < 0 ? 0xC3 : 0x3D));
-            dist  += 0x20;
+        if (abs(delta) < 0x40) {
+            if (delta < 0)
+                facing += 0xC3;
+            else
+                facing += 0x3D;
+            dist += 0x20;
         }
     }
 
     if (dist > 0) {
-        double d = (double)dist;
+        float d = (float)dist;
 
-        out->x = (int16_t)(int32_t)((double)Cos8(facing) * d
-                                    + (double)out->x);
-        out->y = (int16_t)(int32_t)((double)Sin8(facing) * d
-                                    + (double)out->y);
+        out->x = (int16_t)(int32_t)(Cos8(facing) * d + out->x);
+        out->y = (int16_t)(int32_t)(Sin8(facing) * d + out->y);
 
         out->x = (int16_t)Clamp(out->x, g_mapBoundsLeft, g_mapBoundsRight);
         out->y = (int16_t)Clamp(out->y, g_mapBoundsTop, g_mapBoundsBottom);
@@ -652,7 +655,6 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
     uint8_t        leaderFacing;
     uint8_t        facing;
     int32_t        dist;
-    int32_t        type;
     uint32_t       shift;
 
     if (!follower || !leader)
@@ -666,16 +668,20 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
     out->x = *(const int16_t *)(l + OBJ_OFF_POS);
     out->y = *(const int16_t *)(l + OBJ_OFF_POS + 2);
 
-    type = *(const int32_t *)l;
-    if (type == 3) {
+    switch (*(const int32_t *)l) {
+    case 3:
         leaderFacing = *(const uint8_t *)(l + OBJ_OFF_FACING);
         shift        = 1;
-    } else if (type == 2 || type == 8) {
+        break;
+    case 2:
+    case 8:
         leaderFacing = *(const uint8_t *)(l + OBJ_OFF_FACING);
         shift        = 0;
-    } else {
+        break;
+    default:
         leaderFacing = 0;
         shift        = 0;
+        break;
     }
 
     rec    = (const uint8_t *)((void *)(uintptr_t)(ADDR_FORMATION_SLOTS))
@@ -685,21 +691,22 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
 
     if (ObjIsType3((const AM2_Object *)leader)) {
         int32_t delta = AngleDelta(facing, leaderFacing);
-        int32_t mag   = abs(delta);
 
-        if (mag < 0x40) {
-            facing = (uint8_t)(facing + (delta < 0 ? 0xC3 : 0x3D));
-            dist  += 0x20;
+        if (abs(delta) < 0x40) {
+            if (delta < 0)
+                facing += 0xC3;
+            else
+                facing += 0x3D;
+            dist += 0x20;
         }
     }
 
     if (dist > 0) {
-        double d = (double)dist;
+        float d = (float)dist;
 
-        out->x = (int16_t)(int32_t)((double)Cos8(facing) * d
-                                    + (double)out->x);
-        out->y = (int16_t)(int32_t)((double)Sin8(facing) * d
-                                    + (double)out->y);
+        out->x = (int16_t)(int32_t)(Cos8(facing) * d + out->x);
+        out->y = (int16_t)(int32_t)(Sin8(facing) * d + out->y);
+
 
         out->x = (int16_t)Clamp(out->x, g_mapBoundsLeft, g_mapBoundsRight);
         out->y = (int16_t)Clamp(out->y, g_mapBoundsTop, g_mapBoundsBottom);
