@@ -7259,18 +7259,18 @@ int32_t __cdecl WeaponPoseIndex(void *obj, void *weapon)
     if (weapon) {
         switch (**(const int32_t *const *)((const uint8_t *)weapon
                                            + OBJ_OFF_FIELD_C0)) {
-        case 24: case 25: case 26: case 39: case 40:
-            switch (cls) {
-            case 1:  return ARMED ? AM2_POSE_KNEEL_ARMED_B : AM2_POSE_KNEEL;
-            case 2:  return AM2_POSE_CLASS2;
-            default: return AM2_POSE_STAND;
-            }
-
         case 1: case 4: case 7: case 8: case 9: case 10: case 29: case 30:
             switch (cls) {
             case 1:  return ARMED ? AM2_POSE_KNEEL_ARMED_A : AM2_POSE_KNEEL;
             case 2:  return AM2_POSE_CLASS2;
             default: return ARMED ? AM2_POSE_STAND_ARMED : AM2_POSE_STAND;
+            }
+
+        case 24: case 25: case 26: case 39: case 40:
+            switch (cls) {
+            case 1:  return ARMED ? AM2_POSE_KNEEL_ARMED_B : AM2_POSE_KNEEL;
+            case 2:  return AM2_POSE_CLASS2;
+            default: return AM2_POSE_STAND;
             }
 
         case 43:

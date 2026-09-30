@@ -488,15 +488,14 @@ int32_t __cdecl SaveScriptSection(am2_FILE *fp)
     WriteSaveTag(fp, AM2_SAVETAG_SCRIPT);
     orig_fwrite(&kScriptNameCount, 4, 1, fp);
 
+    /* The table is re-read at every use. Length, then the bytes WITHOUT a
+     * terminator, then the three fields that follow the pointer. */
     for (int32_t i = 0; i < kScriptNameCount; i++) {
-        AM2_ScriptName *e   = &kScriptNames[i];
-        int32_t         len = (int32_t)strlen(e->name);
+        int32_t len = (int32_t)strlen(kScriptNames[i].name);
 
-        /* Length, then the bytes WITHOUT a terminator, then the three fields
-         * that follow the pointer. */
         orig_fwrite(&len, 4, 1, fp);
-        orig_fwrite(e->name, (size_t)len, 1, fp);
-        orig_fwrite(&e->type, 0xC, 1, fp);
+        orig_fwrite(kScriptNames[i].name, (size_t)len, 1, fp);
+        orig_fwrite(&kScriptNames[i].type, 0xC, 1, fp);
     }
     return 1;
 }
@@ -514,7 +513,9 @@ int32_t __cdecl LoadScriptSection(am2_FILE *fp)
     /* The three fields that follow the name in both the file and the
      * table entry, in the same order. */
     typedef struct { int32_t type, value, refs; } AM2_NameMeta;
-    AM2_NameMeta meta;
+    /* A whole table entry on the stack; only the three fields after the
+     * name pointer are read into it. */
+    AM2_ScriptName meta;
     int32_t count;
 
     if (!CheckSaveTag(fp, AM2_SAVETAG_SCRIPT,
@@ -533,7 +534,7 @@ int32_t __cdecl LoadScriptSection(am2_FILE *fp)
         orig_fread(&len, 4, 1, fp);
         orig_fread(name, (size_t)len, 1, fp);
         name[len] = 0;
-        orig_fread(&meta, 0xC, 1, fp);
+        orig_fread(&meta.type, 0xC, 1, fp);
 
         /* Ten at a time, the same step AddNameTableName uses. */
         if (kScriptNameCount >= kScriptNameCap) {
@@ -547,7 +548,7 @@ int32_t __cdecl LoadScriptSection(am2_FILE *fp)
         E.name = (char *)am2_malloc(strlen(name) + 1);
         strcpy(E.name, name);
         /* type, value and refs arrive and land as one 12-byte block. */
-        *(AM2_NameMeta *)&E.type = meta;
+        *(AM2_NameMeta *)&E.type = *(const AM2_NameMeta *)&meta.type;
         kScriptNameCount++;
 #undef E
     }
