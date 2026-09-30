@@ -2982,20 +2982,18 @@ int32_t __cdecl CanPlaceAt(uint32_t at, int32_t slot, int32_t kind)
                        + mask.r.left;
 
         for (x = mask.r.left; x <= mask.r.right; n++, tile++, x++) {
-            uint32_t index;
             uint32_t pt;
 
             if (!mask.cells[n] || !(mask.cells[n] & 1))
                 continue;
 
-            index = (uint32_t)tile & 0xFFFFu;
             /* SIGNED: `cmp byte, 0xf; jge`. */
             if (((const int8_t *)*(void *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
-                    [index] >= (int8_t)AM2_CELL_WEIGHT_STEP)
+                    [(uint16_t)tile] >= (int8_t)AM2_CELL_WEIGHT_STEP)
                 return 0;
 
             if (((const uint8_t *)*(void *const *)(uintptr_t)ADDR_TILE_KIND)
-                    [index] != (uint32_t)kind)
+                    [(uint16_t)tile] != (uint32_t)kind)
                 return 0;
 
             pt = PointOfTile(tile);
@@ -3097,7 +3095,6 @@ typedef int32_t (__cdecl *AM2_RegionRandFn)(void);
 uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
 {
 #define REGIONS (*(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL)
-    uint8_t       *regions;
     const int8_t  *weights;
     const int32_t *ring;
     int32_t        first;
@@ -3108,8 +3105,8 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
 
     /* Both tables are read after the rand call, weights first. */
     ring    = (const int32_t *)(uintptr_t)ADDR_TILE_RING8 + (orig_region_rand() & 6);
-    regions = REGIONS;
     weights = *(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
+
     delta   = ring[0];
     first   = delta;
 
@@ -3119,9 +3116,9 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
         if (at > 0
             && at < *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
                     * *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
-            && regions[at] > 0
+            && REGIONS[at] > 0
             && weights[at] < (int8_t)AM2_CELL_WEIGHT_STEP) {
-            regions[tile] = regions[at];
+            REGIONS[tile] = REGIONS[at];
             return REGIONS[tile];
         }
 

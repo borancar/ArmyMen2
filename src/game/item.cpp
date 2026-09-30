@@ -857,8 +857,13 @@ void __cdecl RowUnregisterAll(void *row, void *desc)
     uint8_t *r = (uint8_t *)row;
     int32_t  i;
 
-    /* The entry buffer is re-read at each use, as the image does. */
-#define ENTRY(i) (*(uint8_t **)(r + ROW_OFF_BUFFER) + (uint32_t)(i) * AM2_CELL_ENTRY_STRIDE)
+    /* The entry buffer is re-read at each use, as the image does, and as an
+     * integer: pointer arithmetic makes the buffer the address's base, and
+     * the image's base is the scaled index. */
+
+#define ENTRY(i) ((uint8_t *)(uintptr_t)(*(const uint32_t *)(r + ROW_OFF_BUFFER) \
+                                         + (uint32_t)(i) * AM2_CELL_ENTRY_STRIDE))
+
 #define CELL(i)  (*(int32_t *)(ENTRY(i) + 0x0C))
     if (!r[ROW_OFF_OWNS])
         return;
