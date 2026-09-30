@@ -12934,10 +12934,16 @@ after_flight:
         if (now - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
             > AM2_MISSILE_SMOKE_MS) {
             *(uint32_t *)(o + OBJ_OFF_DEADLINE_58) = now;
-            CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
-                            *(const int16_t *)(o + OBJ_OFF_POS + 2),
-                            (now % 5) < 3 ? 0x92 : 0x79,
-                            -1, 0, 0, 0, 0, 0, 0);
+            /* One call per kind, as the image has them. */
+            if ((now % 5) < 3)
+                CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
+                                *(const int16_t *)(o + OBJ_OFF_POS + 2),
+                                0x92, -1, 0, 0, 0, 0, 0, 0);
+            else
+                CreateExplosion(*(const int16_t *)(o + OBJ_OFF_POS),
+                                *(const int16_t *)(o + OBJ_OFF_POS + 2),
+                                0x79, -1, 0, 0, 0, 0, 0, 0);
+
         }
         break;
     }
