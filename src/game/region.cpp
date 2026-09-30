@@ -2886,9 +2886,6 @@ void __cdecl UnitWeaponInfo(void *unit, void *out)
     const uint8_t *u = (const uint8_t *)unit;
     uint8_t       *c = (uint8_t *)out;
     const uint8_t *w;
-    const uint8_t *rec;
-    int32_t        kind, range;
-    uint32_t       elapsed;
 
     w = (const uint8_t *)WeaponByUid(*(const uint32_t *)
             (u + UNIT_OFF_INVENTORY
@@ -2901,52 +2898,57 @@ void __cdecl UnitWeaponInfo(void *unit, void *out)
         return;
     }
 
-    rec  = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
-    kind = *(const int32_t *)(rec + ITEMTYPE_OFF_KIND);
+    /* The type record is read through the weapon at every use. The kind is
+     * stored and then read BACK out of the context for the tests below --
+     * except the timed-range test, which asks the record again. */
+#define REC (*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0))
+    *(int32_t *)(c + SIGHTC_OFF_KIND)   = *(const int32_t *)(REC + ITEMTYPE_OFF_KIND);
+    *(int32_t *)(c + SIGHTC_OFF_DAMAGE) = *(const int32_t *)(REC + ITEMTYPE_OFF_DAMAGE);
+#define RANGE (*(const int32_t *)(REC + ITEMTYPE_OFF_RANGE))
 
-    *(int32_t *)(c + SIGHTC_OFF_KIND)   = kind;
-    *(int32_t *)(c + SIGHTC_OFF_DAMAGE) =
-        *(const int32_t *)(rec + ITEMTYPE_OFF_DAMAGE);
-
-    range = *(const int32_t *)(rec + ITEMTYPE_OFF_RANGE);
-
-    if (kind == AM2_WEAPON_KIND_FIXED) {
-        *(int32_t *)(c + SIGHTC_OFF_WANT_RANGE) = range - 4;
-        *(int32_t *)(c + SIGHTC_OFF_MAX_RANGE)  =
-            *(const int32_t *)(rec + ITEMTYPE_OFF_RANGE) + 2;
-    } else if (range == 0) {
+    if (*(const int32_t *)(c + SIGHTC_OFF_KIND) == AM2_WEAPON_KIND_FIXED) {
+        *(int32_t *)(c + SIGHTC_OFF_WANT_RANGE) = RANGE - 4;
+        *(int32_t *)(c + SIGHTC_OFF_MAX_RANGE)  = RANGE + 2;
+    } else if (RANGE == 0) {
         *(int32_t *)(c + SIGHTC_OFF_WANT_RANGE) = AM2_WEAPON_RANGE_NONE;
         *(int32_t *)(c + SIGHTC_OFF_MAX_RANGE)  = AM2_WEAPON_RANGE_NONE;
     } else {
-        double v;
+        /* A copy, which lives in memory for the fild; `range` itself stays
+         * in a register above. */
+        int32_t r = RANGE;
 
-        if (kind == AM2_WEAPON_KIND_TIMED)
-            range = (int32_t)((double)range
-                              * *(const double *)((void *)(uintptr_t)(ADDR_WEAPON_RANGE_K3)));
+        if (*(const int32_t *)(REC + ITEMTYPE_OFF_KIND) == AM2_WEAPON_KIND_TIMED)
+            r = (int32_t)((double)r
+                          * *(const double *)((void *)(uintptr_t)(ADDR_WEAPON_RANGE_K3)));
 
-        v = (double)range;
         *(int32_t *)(c + SIGHTC_OFF_WANT_RANGE) =
-            (int32_t)(v * *(const double *)((void *)(uintptr_t)(ADDR_WEAPON_RANGE_LO)));
+            (int32_t)((double)r
+                      * *(const double *)((void *)(uintptr_t)(ADDR_WEAPON_RANGE_LO)));
         *(int32_t *)(c + SIGHTC_OFF_MAX_RANGE) =
-            (int32_t)(v * *(const double *)((void *)(uintptr_t)(ADDR_WEAPON_RANGE_HI)));
+            (int32_t)((double)r
+                      * *(const double *)((void *)(uintptr_t)(ADDR_WEAPON_RANGE_HI)));
     }
 
-    elapsed = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-              - *(const uint32_t *)(w + ITEM_OFF_LAST_USE);
-
-    if (kind == AM2_WEAPON_KIND_TIMED) {
+    if (*(const int32_t *)(c + SIGHTC_OFF_KIND) == AM2_WEAPON_KIND_TIMED) {
         *(int32_t *)(c + SIGHTC_OFF_READY) =
-            ((uint32_t)*(const int32_t *)(rec + ITEMTYPE_OFF_COOLDOWN)
-             < elapsed) ? 1 : 0;
+            ((uint32_t)*(const int32_t *)(REC + ITEMTYPE_OFF_COOLDOWN)
+             < *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+               - *(const uint32_t *)(w + ITEM_OFF_LAST_USE)) ? 1 : 0;
     } else {
         const uint8_t *rank = (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
             + (uint32_t)*(const int32_t *)(u + OBJ_OFF_RANK) * RANK_REC_BYTES;
-        uint32_t wait = (uint32_t)(double)
-            ((double)(uint32_t)*(const int32_t *)(rec + ITEMTYPE_OFF_COOLDOWN)
-             * (double)*(const float *)(rank + RANK_REC_OFF_FIRE_SCALE));
+        /* The cooldown widened to 64 bits (`fild qword`) and scaled by the
+         * rank's float directly (`fmul dword`). */
+        uint32_t wait = (uint32_t)
+            ((uint32_t)*(const int32_t *)(REC + ITEMTYPE_OFF_COOLDOWN)
+             * *(const float *)(rank + RANK_REC_OFF_FIRE_SCALE));
 
-        *(int32_t *)(c + SIGHTC_OFF_READY) = (wait < elapsed) ? 1 : 0;
+        *(int32_t *)(c + SIGHTC_OFF_READY) =
+            (wait < *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                    - *(const uint32_t *)(w + ITEM_OFF_LAST_USE)) ? 1 : 0;
     }
+#undef RANGE
+#undef REC
 }
 
 
