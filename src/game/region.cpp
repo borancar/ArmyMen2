@@ -4848,52 +4848,61 @@ void __cdecl AiGuardStep(void *obj, void *out, void *ctx)
 {
     uint8_t *o = (uint8_t *)obj;
     uint8_t *c = (uint8_t *)ctx;
-    uint8_t *seen;
-    uint32_t goalPoint;
+#define LEAD (*(uint8_t **)(c + SIGHTC_OFF_LEADER))
     int32_t  dest;
+    uint16_t state;
 
-    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
+    state = *(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE);
+    if (state)
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_ID) =
             *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
     else
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_ID) =
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_F4) > 0)
-        goto engaged;
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_F4) <= 0) {
+        *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 0;
+        dest = *(const int32_t *)(c + SIGHTC_OFF_DEST_DIST);
 
-    *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 0;
-    dest = *(const int32_t *)(c + SIGHTC_OFF_DEST_DIST);
-
-    if (dest > AM2_AI_PATROL_DETOUR) {
-        /* Off the leash: drop the detour, restore the post and go back to it,
-         * forgetting whatever was being chased. */
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
-        goto go_home;
-    }
-
-    if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_NEXT)) {
-        if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
-                       (const AM2_Point *)(o + OBJ_OFF_SCRIPT_NEXT))
-            > AM2_AI_REACHED_DIST) {
-            goalPoint = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT);
-            goto step;
+        if (dest > AM2_AI_PATROL_DETOUR) {
+            /* Off the leash: drop the detour, restore the post and go back to it,
+             * forgetting whatever was being chased. */
+            *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
+                *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            if (!state)
+                *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+                    *(const uint32_t *)(o + OBJ_OFF_SCRIPT_ID);
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+                *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+            AiTrooperStep(obj, out, ctx);
+            *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
+            *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
+            goto tail;
         }
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+
+        if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_NEXT)) {
+            if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
+                           (const AM2_Point *)(o + OBJ_OFF_SCRIPT_NEXT))
+                > AM2_AI_REACHED_DIST) {
+                *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT);
+                AiTrooperStep(obj, out, ctx);
+                goto tail;
+            }
+            *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
+                *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            goto react;
+        }
+
+        if (dest > AM2_AI_REACHED_DIST) {
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+            AiTrooperStep(obj, out, ctx);
+            goto tail;
+        }
+        *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_ID);
         goto react;
     }
 
-    if (dest > AM2_AI_REACHED_DIST) {
-        goalPoint = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-        goto step;
-    }
-    *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-        *(const uint32_t *)(o + OBJ_OFF_SCRIPT_ID);
-    goto react;
-
-engaged:
     if (*(void *const *)(c + SIGHTC_OFF_FOUND)
         && !IsKind7(*(void *const *)(c + SIGHTC_OFF_FOUND)))
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
@@ -4903,59 +4912,70 @@ engaged:
 
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_EC)) {
         if (dest > AM2_AI_REACHED_DIST) {
-            goalPoint = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-            goto step;
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+            AiTrooperStep(obj, out, ctx);
+            goto tail;
         }
         *(int32_t *)(o + OBJ_OFF_FIELD_EC) = 0;
         goto react;
     }
 
-    if (dest > AM2_AI_PATROL_DETOUR)
-        goto go_home;
+    if (dest > AM2_AI_PATROL_DETOUR) {
+        if (!*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
+            *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+                *(const uint32_t *)(o + OBJ_OFF_SCRIPT_ID);
+        *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
+            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
+        AiTrooperStep(obj, out, ctx);
+        *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
+        *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
+        goto tail;
+    }
 
     if (*(const uint16_t *)(o + OBJ_OFF_SCRIPT_NEXT)) {
         if (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
                        (const AM2_Point *)(o + OBJ_OFF_SCRIPT_NEXT))
             > AM2_AI_REACHED_DIST) {
-            goalPoint = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT);
-            goto step;
+            *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT);
+            AiTrooperStep(obj, out, ctx);
+            goto tail;
         }
         *(uint32_t *)(o + OBJ_OFF_SCRIPT_NEXT) =
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
         goto react;
     }
 
-    seen = *(uint8_t *const *)(c + SIGHTC_OFF_LEADER);
-    if (!seen)
+    if (!LEAD)
         goto react;
 
     /* Forget who we were following BEFORE looking, so what is seen replaces it
      * outright. AiPatrolStep keeps the old uid and only fills a null one. */
     *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
 
-    if (!AiCanSee(o, seen)) {
+    if (!AiCanSee(o, LEAD)) {
+        /* Out of sight: walk toward it, and DO NOT adopt it -- straight to
+         * the react block, as AiPatrolStep's out-of-sight arm skips it too. */
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(seen + OBJ_OFF_POS);
+            *(const uint32_t *)(LEAD + OBJ_OFF_POS);
         AiTrooperStep(obj, out, ctx);
-        goto adopt_leader;
+        goto react;
     }
 
-    /* BOTH arms adopt and BOTH fall into the react block -- see the header. */
+    /* BOTH in-sight arms adopt and fall into the react block -- see the
+     * header. */
     if (*(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE)
         >= *(const int32_t *)(c + SIGHTC_OFF_WANT_RANGE)) {
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-            *(const uint32_t *)(seen + OBJ_OFF_POS);
+            *(const uint32_t *)(LEAD + OBJ_OFF_POS);
         AiTrooperStep(obj, out, ctx);
     } else {
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
     }
 
-adopt_leader:
-    seen = *(uint8_t *const *)(c + SIGHTC_OFF_LEADER);
     *(uint32_t *)(o + OBJ_OFF_TARGET_UID) =
-        *(const uint32_t *)(seen + OBJ_OFF_UID);
-    *(void **)(c + SIGHTC_OFF_OBSERVER) = seen;
+        *(const uint32_t *)(LEAD + OBJ_OFF_UID);
+    *(void **)(c + SIGHTC_OFF_OBSERVER) = LEAD;
     *(int32_t *)(c + SIGHTC_OFF_RANGE) =
         *(const int32_t *)(c + SIGHTC_OFF_LEAD_RANGE);
     *(c + SIGHTC_OFF_BEARING) = *(const uint8_t *)(c + SIGHTC_OFF_LEAD_BEARING);
@@ -4988,21 +5008,6 @@ react:
     AiKeepRange(obj, out, ctx);
     goto tail;
 
-go_home:
-    if (!*(const uint16_t *)(o + OBJ_OFF_SCRIPT_STATE))
-        *(uint32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-            *(const uint32_t *)(o + OBJ_OFF_SCRIPT_ID);
-    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
-        *(const uint32_t *)(o + OBJ_OFF_SCRIPT_STATE);
-    AiTrooperStep(obj, out, ctx);
-    *(uint32_t *)(o + OBJ_OFF_FOLLOW_UID) = 0;
-    *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
-    goto tail;
-
-step:
-    *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = goalPoint;
-    AiTrooperStep(obj, out, ctx);
-
 tail:
     if (*(void *const *)(c + SIGHTC_OFF_FOUND)) {
         *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = *(const uint32_t *)(
@@ -5019,6 +5024,7 @@ tail:
             *(const uint32_t *)(o + OBJ_OFF_TARGET_UID);
 
     ConsiderSightingC(obj, out, ctx);
+#undef LEAD
 }
 
 /* ObjectsInRect is reconstructed in win32/mapdraw.cpp and is declared here
