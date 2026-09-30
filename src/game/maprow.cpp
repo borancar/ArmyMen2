@@ -1329,27 +1329,29 @@ void __cdecl DepthLink(void *node, void **head)
 void __cdecl RowRegisterAll(void *row, void *desc)
 {
     uint8_t *r = (uint8_t *)row;
+    /* Each store indexes the buffer afresh; the original holds no entry. */
+#define ENTRY(k) (ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *) \
+                  + (uint32_t)(k) * ROW_ENTRY_BYTES)
     int32_t  cl, ct, cr, cb;
-    int32_t  cols, rows, cell, stride, used;
+    int32_t  cols, cell, stride, used;
 
-    if (ROW_FLD(r, 0, uint32_t) & ROW_FLAG_REMOVED)
+    if (ROW_FLD(r, 0, uint8_t) & ROW_FLAG_REMOVED)
         return;
 
     cl = ROW_FLD(r, ROW_OFF_RECT + 0,  int32_t) >> 8;
     ct = ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t) >> 8;
-    cb = ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) >> 8;
     cr = ROW_FLD(r, ROW_OFF_RECT + 8,  int32_t) >> 8;
+    cb = ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) >> 8;
 
+    /* The grid size is read where it is compared, rows first. */
+    if (cb < 0 || ct > ROW_FLD(desc, MAPDESC_OFF_ROWS, int32_t) - 1 || cr < 0)
+        return;
     cols = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t);
-    rows = ROW_FLD(desc, MAPDESC_OFF_ROWS, int32_t);
-
-    if (cb < 0 || ct > rows - 1 || cr < 0 || cl > cols - 1)
+    if (cl > cols - 1)
         return;
 
-    if (cl <= 0)
-        cl = 0;
-    if (ct <= 0)
-        ct = 0;
+    cl = cl <= 0 ? 0 : cl;
+    ct = ct <= 0 ? 0 : ct;
     if (cr >= cols - 1)
         cr = cols - 1;
     if (cb >= cols - 1)          /* COLS, not ROWS -- as in RowUpdate */
@@ -1363,22 +1365,17 @@ void __cdecl RowRegisterAll(void *row, void *desc)
         int32_t x;
 
         for (x = cl; x <= cr; x++, cell++, used++) {
-            uint8_t *entry = ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *)
-                             + (uint32_t)used * ROW_ENTRY_BYTES;
-
-            ROW_FLD(entry, ROW_ENTRY_OFF_CELL, int32_t) = cell;
-            DepthLink(entry, MAPDESC_CELL(desc, cell));
+            ROW_FLD(ENTRY(used), ROW_ENTRY_OFF_CELL, int32_t) = cell;
+            DepthLink(ENTRY(used), MAPDESC_CELL(desc, cell));
         }
     }
 
     for (; used < (int32_t)r[ROW_OFF_OWNS]; used++) {
-        uint8_t *entry = ROW_FLD(r, ROW_OFF_BUFFER, uint8_t *)
-                         + (uint32_t)used * ROW_ENTRY_BYTES;
-
-        ROW_FLD(entry, ROW_ENTRY_OFF_CELL, int32_t) = -1;
-        ROW_FLD(entry, DEPTH_OFF_NEXT, uint32_t)    = 0;
-        ROW_FLD(entry, DEPTH_OFF_PREV, uint32_t)    = 0;
+        ROW_FLD(ENTRY(used), ROW_ENTRY_OFF_CELL, int32_t) = -1;
+        ROW_FLD(ENTRY(used), DEPTH_OFF_NEXT, uint32_t)    = 0;
+        ROW_FLD(ENTRY(used), DEPTH_OFF_PREV, uint32_t)    = 0;
     }
+#undef ENTRY
 }
 
 /* 0x0041DB90, one caller -- ADDR_ROW_UPDATE. Put one node back into depth
