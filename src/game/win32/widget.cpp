@@ -18079,7 +18079,6 @@ int32_t __cdecl PointerPickBoard(void *obj)
 {
     uint8_t *o = (uint8_t *)obj;
     uint8_t *leader;
-    int32_t  type;
 
     if (!o)
         return 0;
@@ -18091,9 +18090,7 @@ int32_t __cdecl PointerPickBoard(void *obj)
     if (!leader)
         return 0;
 
-    type = *(const int32_t *)o;
-
-    if (type == AM2_OBJ_TYPE_VEHICLE
+    if (ObjIsType3Inline(o)
         && !*(const int32_t *)(o + OBJ_OFF_FIELD_94)
         && *(const int32_t *)(o + OBJ_OFF_POSE_PENDING)
                < *(const int32_t *)(o + VEHICLE_OFF_SEATS)) {
@@ -18108,7 +18105,7 @@ int32_t __cdecl PointerPickBoard(void *obj)
         return 0;   /* a hint, not a yes -- see above */
     }
 
-    if (type != AM2_OBJ_TYPE_TROOPER)
+    if (!ObjIsType2Inline(o))
         return 0;
 
     if (ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),

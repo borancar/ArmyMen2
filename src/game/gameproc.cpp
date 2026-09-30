@@ -387,7 +387,7 @@ void __cdecl SaveOptions(void)
 int32_t __cdecl SaveDefaultCof(void)
 {
     am2_FILE *fp;
-    int32_t   i = 0;
+    int32_t   i;
 
     SetGameDir("save");
 
@@ -400,17 +400,19 @@ int32_t __cdecl SaveDefaultCof(void)
 
     WriteSaveTag(fp, AM2_SAVETAG_COF);
 
+    /* The army's list is re-read through its slot at each use. */
+#define LIST ((uint8_t *)g_armyObjLists[g_defaultOwner])
+    i = 0;
     for (;;) {
-        uint8_t *list = (uint8_t *)g_armyObjLists[g_defaultOwner];
         uint8_t *obj;
 
-        if (i >= *(const int32_t *)(list + LIST_OFF_COUNT))
+        if (i >= *(const int32_t *)(LIST + LIST_OFF_COUNT))
             break;
 
         obj = (uint8_t *)LookupByUID(
-                  ((const uint32_t *)*(void **)(list + LIST_OFF_UIDS))[i]);
+                  ((const uint32_t *)*(void **)(LIST + LIST_OFF_UIDS))[i]);
         if (!obj) {
-            ((AM2_Rec *)list)->ListRemoveAt(i);
+            ((AM2_Rec *)LIST)->ListRemoveAt(i);
             continue;
         }
 
@@ -420,31 +422,27 @@ int32_t __cdecl SaveDefaultCof(void)
             continue;
         }
 
-        if (*(const int32_t *)obj == AM2_OBJ_TYPE_TROOPER) {
+        if (ObjIsType2Inline(obj)) {
             ObjDropAltRecord(obj);
+
             Type238Action(obj, (g_levelId * 5 + 5) * 2);
             *(uint32_t *)(obj + OBJ_OFF_FIELD_C0) =
                 *(const uint32_t *)(uintptr_t)((void *)(uintptr_t)(ADDR_ZERO_POINT));
 
             if (*(const uint32_t *)(obj + OBJ_OFF_RIDING)) {
-                void *rows = *(void **)(obj + OBJ_OFF_ROWS);
-
+                *(uint32_t *)(obj + OBJ_OFF_RIDING) = 0;
                 *(uint32_t *)(obj + OBJ_OFF_FLAGS) &=
                     ~(uint32_t)OBJ_FLAG8_BLOCKED;
-                *(uint32_t *)(obj + OBJ_OFF_RIDING) = 0;
-                ObjFlagSet0(rows);
+                ObjFlagSet0(*(void **)(obj + OBJ_OFF_ROWS));
             }
         }
 
         *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG8_BLOCKED;
 
-        {
-            int32_t type = *(const int32_t *)obj;
-
-            if (type >= AM2_OBJ_TYPE_TROOPER &&
-                (type <= AM2_OBJ_TYPE_VEHICLE || type == AM2_OBJ_TYPE_ROACH) &&
-                *(const int32_t *)(obj + OBJ_OFF_FIELD_94) == 0 &&
-                type == AM2_OBJ_TYPE_TROOPER) {
+        if (ObjIsTypeIn238Inline(obj)
+            && *(const int32_t *)(obj + OBJ_OFF_FIELD_94) == 0) {
+            switch (*(const int32_t *)obj) {
+            case AM2_OBJ_TYPE_TROOPER: {
                 int32_t slot;
 
                 SaveOneItem(fp, obj);
@@ -459,11 +457,15 @@ int32_t __cdecl SaveDefaultCof(void)
                         SaveScriptName(fp, w);
                     }
                 }
+                break;
+            }
             }
         }
 
         i++;
     }
+#undef LIST
+
 
     WriteSaveTag(fp, AM2_SAVE_TAG_END);
     orig_fclose(fp);

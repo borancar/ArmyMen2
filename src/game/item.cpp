@@ -5209,9 +5209,8 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
 
     /* The effect goes at the trooper's position raised by its own height. */
     at = *(const uint32_t *)(o + OBJ_OFF_POS);
-    at = (at & 0xFFFFu)
-       | ((uint32_t)(uint16_t)((int16_t)(at >> 16) - (int16_t)ObjHeight(o))
-          << 16);
+    ((AM2_Point *)&at)->y -= (int16_t)ObjHeight(o);
+
 
     if (kind != 1 && orig_game_rand() % 255 <= AM2_HIT_EFFECT_CHANCE) {
         int32_t rec;
@@ -5349,21 +5348,22 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
         /* Sarge's inventory goes on the ground around him, one item per step
          * of the table, and the loop has no bound past its five entries. */
         if (*(const int32_t *)(o + OBJ_OFF_SARGE) != 0
-            && *(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0) {
+            && *(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
+            && ((const uint32_t *)(o + UNIT_OFF_INVENTORY))
+                   [AM2_TROOPER_DROP_SLOT] != 0) {
             const int16_t *step = (const int16_t *)((void *)(uintptr_t)(ADDR_DROP_RING));
+            AM2_Point      where;
 
-            while (((const uint32_t *)(o + UNIT_OFF_INVENTORY))
-                       [AM2_TROOPER_DROP_SLOT] != 0) {
-                uint32_t where =
-                    (uint32_t)(uint16_t)(int16_t)(step[0]
-                        + *(const int16_t *)(o + OBJ_OFF_X))
-                    | ((uint32_t)(uint16_t)(int16_t)(step[1]
-                        + *(const int16_t *)(o + OBJ_OFF_Y)) << 16);
-
-                TrooperDropItem(o, AM2_TROOPER_DROP_SLOT, where);
+            do {
+                where.x = (int16_t)(step[0] + *(const int16_t *)(o + OBJ_OFF_X));
+                where.y = (int16_t)(step[1] + *(const int16_t *)(o + OBJ_OFF_Y));
+                TrooperDropItem(o, AM2_TROOPER_DROP_SLOT,
+                                *(const uint32_t *)&where);
                 step += 2;
-            }
+            } while (((const uint32_t *)(o + UNIT_OFF_INVENTORY))
+                         [AM2_TROOPER_DROP_SLOT] != 0);
         }
+
     }
 
     if (amount <= 0)
@@ -5378,19 +5378,18 @@ void __cdecl DamageTrooper(void *obj, int32_t amount, uint8_t d, int32_t kind,
         odds  = AM2_GORE_ODDS_KIND13;
     }
 
-    if ((uint8_t)d == 0)
-        return;
-    if (AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING), (uint32_t)d) > limit)
-        return;
-    if ((orig_game_rand() & 0xFF) >= odds)
-        return;
+    /* The angle test is the original's abs() around a comparison -- a no-op
+     * on 0/1, reproduced for the code it makes. */
+    if (d > 0
+        && abs(AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING), d) <= limit)
+        && (orig_game_rand() & 0xFF) < odds)
+        CreateExplosion(*(const int16_t *)(o + OBJ_OFF_X),
+                        *(const int16_t *)(o + OBJ_OFF_Y),
+                        AM2_EXPL_TROOPER_GORE, (int32_t)UidArmy(attacker),
+                        attacker,
+                        *(const int32_t *)(uintptr_t)ADDR_SPAWN_EXTRA_6628D4,
+                        0, 0, 0, 0);
 
-    CreateExplosion(*(const int16_t *)(o + OBJ_OFF_X),
-                    *(const int16_t *)(o + OBJ_OFF_Y),
-                    AM2_EXPL_TROOPER_GORE, (int32_t)UidArmy(attacker),
-                    attacker,
-                    *(const int32_t *)(uintptr_t)ADDR_SPAWN_EXTRA_6628D4,
-                    0, 0, 0, 0);
 }
 
 /* DamageVehicle -- original 0x0045B4D0, one caller, which is DamageObject's
@@ -10196,7 +10195,7 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
             if (apply && list) {
                 for (o = (uint8_t *)list; o != (uint8_t *)0;
                      o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
-                    int32_t speed = *(const int32_t *)(v + OBJ_OFF_FIELD_44);
+                    int32_t speed;
 
                     if (o == v)
                         continue;
@@ -10205,7 +10204,8 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
                         && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
                            > *(const uint32_t *)(v + OBJ_OFF_DEADLINE_58)) {
                         int32_t hp = *(const int32_t *)(v + OBJ_OFF_FIELD_568);
-                        int32_t s  = abs(speed);
+                        int32_t s  = abs(*(const int32_t *)(v + OBJ_OFF_FIELD_44));
+
 
                         *(uint32_t *)(v + OBJ_OFF_DEADLINE_58) =
                             *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
@@ -10225,14 +10225,17 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
                         /* Only reached when something was actually hit: fast
                          * always, and otherwise one time in sixteen. The
                          * original wraps the `setg` in the compiler's abs(),
-                         * which on a 0/1 value is a no-op. */
-                        if (speed > AM2_VEHICLE_NOISY_SPEED
+                         * which on a 0/1 value is a no-op; the speed is read
+                         * afresh here and below. */
+                        if (abs(*(const int32_t *)(v + OBJ_OFF_FIELD_44)
+                                > AM2_VEHICLE_NOISY_SPEED)
                             || (orig_game_rand() & 0xFF) < AM2_VEHICLE_NOISE_ODDS)
                             sound = 1;
                     }
 
                     /* Reached whether or not it was hit. */
-                    speed = abs(speed);
+                    speed = abs(*(const int32_t *)(v + OBJ_OFF_FIELD_44));
+
                     if (speed > AM2_VEHICLE_NOISY_SPEED
                         && (ObjIsType3((const AM2_Object *)o)
                             || (ObjIsItem((const AM2_Object *)o)
