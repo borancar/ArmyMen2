@@ -3041,13 +3041,15 @@ void __cdecl DirtyCollect(const AM2_Rect *r)
     uint8_t  *recs = (uint8_t *)((void *)(uintptr_t)(ADDR_DIRTY_RECTS));
     AM2_Rect  cur;
     AM2_Rect  hit;
-    uint16_t  at;
+    int32_t   at;
 
     if (!IntersectRect((LPRECT)&cur, (const RECT *)r,
                        (const RECT *)((void *)(uintptr_t)(ADDR_VIEW_RECT_PREV))))
         return;
 
-    if ((int32_t)(uint16_t)*(const uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)) + 1
+    /* A dword read masked to the half-word, as the image has it
+     * (`mov edx, [tail]; and edx, 0xFFFF`) -- the same value. */
+    if ((int32_t)(*(const uint32_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)) & 0xFFFF) + 1
         >= AM2_DEPTH_MAX) {
         *(int32_t *)((void *)(uintptr_t)(ADDR_FULL_REDRAW)) = 1;
         return;
@@ -3063,10 +3065,27 @@ void __cdecl DirtyCollect(const AM2_Rect *r)
         if (!IntersectRect((LPRECT)&hit, (const RECT *)&cur, (const RECT *)e))
             continue;
 
-        code = (cur.left   < e->left   ? 0 : cur.left   == e->left   ? 27 : 54)
-             + (cur.top    < e->top    ? 0 : cur.top    == e->top    ?  9 : 18)
-             + (cur.right  < e->right  ? 0 : cur.right  == e->right  ?  3 :  6)
-             + (cur.bottom < e->bottom ? 0 : cur.bottom == e->bottom ?  1 :  2);
+        code = 0;
+        if (cur.left >= e->left)
+            code = cur.left == e->left ? 27 : 54;
+        if (cur.top >= e->top) {
+            if (cur.top == e->top)
+                code += 9;
+            else
+                code += 18;
+        }
+        if (cur.right >= e->right) {
+            if (cur.right == e->right)
+                code += 3;
+            else
+                code += 6;
+        }
+        if (cur.bottom >= e->bottom) {
+            if (cur.bottom == e->bottom)
+                code += 1;
+            else
+                code += 2;
+        }
 
         switch (code) {
         case 0:
@@ -3182,18 +3201,17 @@ void __cdecl DirtyCollect(const AM2_Rect *r)
         continue;
 
     unlink:
-        {
-            uint16_t prev = *(const uint16_t *)((uint8_t *)e + DIRTY_OFF_PREV);
-            uint16_t next = *(const uint16_t *)((uint8_t *)e + DIRTY_OFF_NEXT);
-
-            *(uint16_t *)(recs + (uint32_t)prev * AM2_DIRTY_RECORD_SIZE
-                          + DIRTY_OFF_NEXT) = next;
-            if (!next)
-                *(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)) = prev;
-            else
-                *(uint16_t *)(recs + (uint32_t)next * AM2_DIRTY_RECORD_SIZE
-                              + DIRTY_OFF_PREV) = prev;
-        }
+#define PREV (*(const uint16_t *)((uint8_t *)e + DIRTY_OFF_PREV))
+#define NEXT (*(const uint16_t *)((uint8_t *)e + DIRTY_OFF_NEXT))
+        *(uint16_t *)(recs + (uint32_t)PREV * AM2_DIRTY_RECORD_SIZE
+                      + DIRTY_OFF_NEXT) = NEXT;
+        if (!NEXT)
+            *(uint16_t *)((void *)(uintptr_t)(ADDR_DIRTY_TAIL)) = PREV;
+        else
+            *(uint16_t *)(recs + (uint32_t)NEXT * AM2_DIRTY_RECORD_SIZE
+                          + DIRTY_OFF_PREV) = PREV;
+#undef NEXT
+#undef PREV
     }
 
     AddDirtyRect(cur.left, cur.top, cur.right, cur.bottom);
