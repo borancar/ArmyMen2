@@ -232,16 +232,17 @@ int32_t __cdecl InitDirectSound(void)
         return 0;
     }
 
+    memset(&desc, 0, sizeof desc);
+    desc.dwSize        = sizeof desc;
+    desc.dwFlags       = DSBCAPS_PRIMARYBUFFER | DSBCAPS_CTRL3D;
+    desc.dwBufferBytes = 0;
+    desc.lpwfxFormat   = NULL;
+
     /* Priority rather than exclusive: the game wants to set the primary
      * buffer's format without stopping everyone else making noise. */
     if (IDirectSound_SetCooperativeLevel(g_dsound, g_hWnd, DSSCL_PRIORITY) != DS_OK)
         return SoundFailed("Unable to set direct sound cooperative level\n");
 
-    desc.dwSize        = sizeof desc;
-    desc.dwFlags       = DSBCAPS_PRIMARYBUFFER | DSBCAPS_CTRL3D;
-    desc.dwBufferBytes = 0;
-    desc.dwReserved    = 0;
-    desc.lpwfxFormat   = NULL;
     if (IDirectSound_CreateSoundBuffer(g_dsound, &desc, &g_dsPrimary, NULL) != DS_OK)
         return SoundFailed("Unable to create primary sound buffer\n");
 

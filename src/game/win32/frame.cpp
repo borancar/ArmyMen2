@@ -834,18 +834,18 @@ void __cdecl State2Enter(void)
     ClearBothSurfaces();
     *(int32_t *)(uintptr_t)ADDR_PRESENT_ENABLED = 1;
 
-    if (*(const uint8_t *)(uintptr_t)ADDR_GAMEPROC_BLOCK != 0
-        && *(const uint8_t *)(uintptr_t)ADDR_GAMEPROC_STR_B != 0) {
-        if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING != 0) {
-            save = OpenSaveForLoad();
-            if (!save) {
-                *(int32_t *)(uintptr_t)ADDR_LOAD_PENDING = 0;
-                *(int32_t *)(uintptr_t)ADDR_LEVEL_ID     = 1;
-                *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX  = 1;
-            }
-        }
-    } else {
+    if (*(const uint8_t *)(uintptr_t)ADDR_GAMEPROC_BLOCK == 0)
+        goto no_load;
+    if (*(const uint8_t *)(uintptr_t)ADDR_GAMEPROC_STR_B == 0) {
+    no_load:
         *(int32_t *)(uintptr_t)ADDR_LOAD_PENDING = 0;
+    } else if (*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING != 0) {
+        save = OpenSaveForLoad();
+        if (!save) {
+            *(int32_t *)(uintptr_t)ADDR_LOAD_PENDING = 0;
+            *(int32_t *)(uintptr_t)ADDR_LEVEL_ID     = 1;
+            *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX  = 1;
+        }
     }
 
     SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
@@ -858,13 +858,13 @@ void __cdecl State2Enter(void)
 
     ZeroUnread50C34C();
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0) {
+    if (*(const int32_t *)(uintptr_t)ADDR_OPT_DBG != 0
+        && *(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
+        *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOADING = 1;
+    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0)
         *(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR = 0;
-    } else {
-        if (*(const int32_t *)(uintptr_t)ADDR_OPT_DBG != 0)
-            *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOADING = 1;
+    else
         *(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR = 1;
-    }
 
     ResetItemsAndUids();
     *(int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF = 0;
