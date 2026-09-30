@@ -1493,14 +1493,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                     break;
             }
 
-            if (!(uint16_t)before) {
-                /* Cheapest so far: in front of the head. */
-                *(uint16_t *)(b + PATHNODE_OFF_NEXT) = (uint16_t)head;
-                *(uint16_t *)(b + PATHNODE_OFF_PREV) = 0;
-                *(uint16_t *)(nodes + (head & 0xFFFF) * AM2_PATH_NODE_BYTES
-                              + PATHNODE_OFF_PREV) = (uint16_t)nb;
-                head = nb;
-            } else {
+            if ((uint16_t)before) {
                 uint8_t *p = nodes + (before & 0xFFFF) * AM2_PATH_NODE_BYTES;
                 int32_t  after = *(const uint16_t *)(p + PATHNODE_OFF_NEXT);
 
@@ -1510,6 +1503,13 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                                   + PATHNODE_OFF_PREV) = (uint16_t)nb;
                 *(uint16_t *)(p + PATHNODE_OFF_NEXT) = (uint16_t)nb;
                 *(uint16_t *)(b + PATHNODE_OFF_PREV) = (uint16_t)before;
+            } else {
+                /* Cheapest so far: in front of the head. */
+                *(uint16_t *)(b + PATHNODE_OFF_NEXT) = (uint16_t)head;
+                *(uint16_t *)(b + PATHNODE_OFF_PREV) = 0;
+                *(uint16_t *)(nodes + (head & 0xFFFF) * AM2_PATH_NODE_BYTES
+                              + PATHNODE_OFF_PREV) = (uint16_t)nb;
+                head = nb;
             }
         }
     }
@@ -8465,9 +8465,7 @@ settle_facing:
                                     ADDR_COMM_OBJECT + 0x3D8))
                     goto watched;
             }
-            if (local) {
-                TrooperPickupItem(o, at, slot);
-            } else {
+            if (!local) {
                 /* THE QUANTITY IS COMPUTED HERE, not taken from
                  * CanPickUpWeapon's out-param: it is the item type's capacity
                  * -- or 999 when the type has none -- minus what the weapon
@@ -8511,6 +8509,8 @@ settle_facing:
                     *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
                     + AM2_SIGHT_REVEAL_MS;
                 TrooperWantItemSend(o, at, 0, slot, qty);
+            } else {
+                TrooperPickupItem(o, at, slot);
             }
         }
 

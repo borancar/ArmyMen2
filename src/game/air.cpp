@@ -1663,14 +1663,7 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     if (hb + AM2_SIGHT_OVERHEAD < hv)
         return;
 
-    if (*(const void *const *)(b + OBJ_OFF_HIT_MASK) != (const void *)0) {
-        /* Through the rect, as objtype.cpp reaches the same four fields:
-         * only OBJ_OFF_HIT_RECT has a macro and the other three are its
-         * members, which is the composed-offset case checkoffsetuse lists. */
-        const AM2_Rect *hit = (const AM2_Rect *)(b + OBJ_OFF_HIT_RECT);
-
-        l = hit->left; t = hit->top; r = hit->right; bo = hit->bottom;
-    } else {
+    if (*(const void *const *)(b + OBJ_OFF_HIT_MASK) == (const void *)0) {
         int32_t bx = *(const int16_t *)(b + OBJ_OFF_X);
         int32_t by = *(const int16_t *)(b + OBJ_OFF_Y);
 
@@ -1678,6 +1671,13 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
         r  = *(const int32_t *)(b + OBJ_OFF_BOX_RIGHT)  + bx;
         t  = *(const int32_t *)(b + OBJ_OFF_BOX_TOP)    + by;
         bo = *(const int32_t *)(b + OBJ_OFF_BOX_BOTTOM) + by;
+    } else {
+        /* Through the rect, as objtype.cpp reaches the same four fields:
+         * only OBJ_OFF_HIT_RECT has a macro and the other three are its
+         * members, which is the composed-offset case checkoffsetuse lists. */
+        const AM2_Rect *hit = (const AM2_Rect *)(b + OBJ_OFF_HIT_RECT);
+
+        l = hit->left; t = hit->top; r = hit->right; bo = hit->bottom;
     }
 
     vx = *(const int16_t *)(v + OBJ_OFF_X);

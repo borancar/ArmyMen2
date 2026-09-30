@@ -818,9 +818,7 @@ void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
         }
 
         if (len2) {
-            if (g_readFailed) {
-                fill_silence(ptr2, len2);
-            } else {
+            if (!g_readFailed) {
                 /* The second region does NOT check the return. Original. */
                 WaveReadFile(g_hmmio, len2, (uint8_t *)ptr2, g_dataChunk, &got);
                 if (got < len2) {
@@ -836,6 +834,8 @@ void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
                         mark_stream_end(play);
                     }
                 }
+            } else {
+                fill_silence(ptr2, len2);
             }
         }
     }

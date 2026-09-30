@@ -3881,9 +3881,7 @@ int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
         } else if (ObjIsType2((const AM2_Object *)o)) {
             int32_t skip = 0;
 
-            if (!f) {
-                w = 0;
-            } else {
+            if (f) {
                 if (*(const int8_t *)(f + OBJ_OFF_ARMY)
                     == (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
                     const uint8_t *owner = (const uint8_t *)LookupOwnerObj(
@@ -3898,6 +3896,8 @@ int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
                     w = 0;
                 else
                     w = ObjsAreAllied(f, o, 0) ? AM2_BLOCK_FULL : 0;
+            } else {
+                w = 0;
             }
         } else if (f
                    && (ObjIsType3((const AM2_Object *)o)
@@ -12813,7 +12813,9 @@ void __cdecl StepType5(void *obj)
 
     if (*(const int32_t *)(def + MISSILEDEF_OFF_FIELD_0C)) {
         /* Arced: gravity, and the height floors without stopping the fall. */
-        if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) > 0) {
+        if (*(const int16_t *)(o + MISSILE_OFF_HEIGHT) <= 0) {
+            *(int16_t *)(o + MISSILE_OFF_HEIGHT) = 0;
+        } else {
             float f = *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
                           * *(const float *)(o + MISSILE_OFF_VZ)
                       + *(const float *)(o + MISSILE_OFF_FRAC_H);
@@ -12826,8 +12828,6 @@ void __cdecl StepType5(void *obj)
             *(float *)(o + MISSILE_OFF_VZ) -=
                 *(const float *)(uintptr_t)ADDR_GRAVITY
                 * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC;
-        } else {
-            *(int16_t *)(o + MISSILE_OFF_HEIGHT) = 0;
         }
     } else if (*(const float *)(o + MISSILE_OFF_VZ)
                != *(const float *)(uintptr_t)ADDR_FLOAT_ZERO) {

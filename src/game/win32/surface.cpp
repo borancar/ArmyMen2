@@ -1083,12 +1083,12 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
         *(uint32_t *)(dest + BMP_OFF_FLAGS) = flags;
         dest[BMP_OFF_KEY] = 0;
 
-        if (w * h >= BMP_SOFTWARE_LIMIT) {
-            result = EncodeBig(pixels, dest, w, h, remap);
-            *(uint32_t *)(dest + BMP_OFF_FLAGS) |= 4;
-        } else {
+        if (w * h < BMP_SOFTWARE_LIMIT) {
             result = EncodeSmall(pixels, dest, w, h, remap);
             *(uint32_t *)(dest + BMP_OFF_FLAGS) |= plain ? 8 : 0x10;
+        } else {
+            result = EncodeBig(pixels, dest, w, h, remap);
+            *(uint32_t *)(dest + BMP_OFF_FLAGS) |= 4;
         }
         return result;
     }

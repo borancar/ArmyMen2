@@ -1892,12 +1892,12 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
                     *(const int32_t *)(rec + REC_PLAYER_COLOUR));
 
         /* Done BEFORE the bound check, so a fifth record still lands here. */
-        if (id == *(const int32_t *)(comm + AM2_COMM_SELF_ID)) {
+        if (id != *(const int32_t *)(comm + AM2_COMM_SELF_ID)) {
+            ((AM2_Comm *)comm)->CommSetSlotRemote(i);
+        } else {
             g_ourSlot      = i;
             g_defaultOwner = (uint32_t)i;
             CommClearSlotRemote(comm, i);
-        } else {
-            ((AM2_Comm *)comm)->CommSetSlotRemote(i);
         }
 
         /* Four entries, and the end is the address of the next global. This

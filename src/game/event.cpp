@@ -3666,12 +3666,12 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * read fails rather than falling back to n0. */
         int32_t v;
 
-        if (act->xvar != 0) {
+        if (act->xvar == 0) {
+            v = act->n0;
+        } else {
             v = 0;
             if (GetVarValue(act->xvar, &v) == 0)
                 return;
-        } else {
-            v = act->n0;
         }
         SetVarValue(act->subject, v);
         return;
