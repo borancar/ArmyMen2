@@ -2665,8 +2665,8 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
             n = 0;
             *(int32_t *)&kPadNumbers[number].cx = ZERO_POINT;
             sx = 0;
-            total = MAP_TILES_H * MAP_TILES_W;
             sy = 0;
+            total = MAP_TILES_H * MAP_TILES_W;
             for (i = 0; i < total; i++) {
                 if ((PADBIT_LAYER[i] | kPadBit(number)) != 0) {
                     sx += i % MAP_TILES_H;

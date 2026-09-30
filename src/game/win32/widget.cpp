@@ -15141,8 +15141,8 @@ void __attribute__((thiscall)) AM2_Widget::CheckboxPaint(RECT clip)
         }
     } else {
         if (checked) {
-            w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON);
             ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_ON);
+            w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON);
         } else {
             ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_OFF);
             w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF);

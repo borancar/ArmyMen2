@@ -1139,8 +1139,8 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
     top    = ROW_FLD(r, ROW_OFF_Y, int16_t)
              - ROW_FLD(spr, SPR_OFF_HOTY, int16_t)
              - ROW_FLD(r, ROW_OFF_Y_ADJUST, int16_t);
-    right  = left + ROW_FLD(spr, SPR_OFF_W, int32_t);
     bottom = top + ROW_FLD(spr, SPR_OFF_H, int32_t);
+    right  = left + ROW_FLD(spr, SPR_OFF_W, int32_t);
 
     ROW_FLD(r, ROW_OFF_RECT + 0,  int32_t) = left;
     ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t) = top;
@@ -1337,8 +1337,8 @@ void __cdecl RowRegisterAll(void *row, void *desc)
 
     cl = ROW_FLD(r, ROW_OFF_RECT + 0,  int32_t) >> 8;
     ct = ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t) >> 8;
-    cr = ROW_FLD(r, ROW_OFF_RECT + 8,  int32_t) >> 8;
     cb = ROW_FLD(r, ROW_OFF_RECT + 12, int32_t) >> 8;
+    cr = ROW_FLD(r, ROW_OFF_RECT + 8,  int32_t) >> 8;
 
     cols = ROW_FLD(desc, MAPDESC_OFF_COLS, int32_t);
     rows = ROW_FLD(desc, MAPDESC_OFF_ROWS, int32_t);
@@ -1355,8 +1355,8 @@ void __cdecl RowRegisterAll(void *row, void *desc)
     if (cb >= cols - 1)          /* COLS, not ROWS -- as in RowUpdate */
         cb = cols - 1;
 
-    used   = 0;
     cell   = (ct << ROW_FLD(desc, MAPDESC_OFF_SHIFT, int32_t)) + cl;
+    used   = 0;
     stride = cols - cr + cl - 1;
 
     for (; ct <= cb; ct++, cell += stride) {
@@ -1468,8 +1468,8 @@ void __cdecl DepthResort(void *node, void **head)
                 DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
 
             DEPTH_PREV(n) = e;
-            DEPTH_NEXT(n) = DEPTH_NEXT(e);
             DEPTH_PREV(DEPTH_NEXT(e)) = n;
+            DEPTH_NEXT(n) = DEPTH_NEXT(e);
             DEPTH_NEXT(e) = n;
             return;
         }

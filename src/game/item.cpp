@@ -13578,8 +13578,8 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
             b.y = pt[1];
             d   = ApproxDist(&a, &b);
         } else {
-            a.y = fromP[1];
             d   = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
+            a.y = fromP[1];
         }
 
         lo = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE_MIN);

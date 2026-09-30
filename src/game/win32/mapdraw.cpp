@@ -1947,13 +1947,13 @@ clamp_eye:
         world[3] = vt + h;
         world[2] = vl + w;
 
-        origin[0] = vl - g_blitRect->left;
         origin[1] = vt - g_blitRect->top;
+        origin[0] = vl - g_blitRect->left;
         origin[3] = *(const int32_t *)(uintptr_t)ADDR_SCREEN_H + origin[1];
         origin[2] = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W + origin[0];
 
-        VIEW_EYE->x = (int16_t)vx;
         VIEW_EYE->y = (int16_t)vy;
+        VIEW_EYE->x = (int16_t)vx;
 
         IntersectRect((RECT *)(uintptr_t)ADDR_VIEW_CLIPPED,
                       (const RECT *)origin,

@@ -673,8 +673,8 @@ void __cdecl TraceTileLine(uint32_t from, uint32_t to,
                 tile += stepDown;
                 dy  -= adx;
             }
-            dy  += ady;
             tx0  += stepX;
+            dy  += ady;
             tile += stepX;
 
             tiles[i] = (uint16_t)tile;
@@ -821,8 +821,8 @@ int32_t __cdecl ParseScenarioPart(void *part, const void *at)
         cur += 4;
 
         amount = cur[0];
-        flag   = cur[1];
         mode   = cur[2];
+        flag   = cur[1];
         len    = cur[3];
 
         row[SCEN_ROW_OFF_AMOUNT]   = amount;
@@ -1796,8 +1796,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             consumed += 0xC;
             (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W)      = hdr[0];
             (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H)      = hdr[1];
-            (*(int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)    = Log2Mask(hdr[0]) & 0xFF;
             (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X)     = (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W) << 4;
+            (*(int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)    = Log2Mask(hdr[0]) & 0xFF;
             (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)     = (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H) << 4;
             (*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_SHIFT) = Log2Mask((*(int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X)) & 0xFF;
             if ((*(int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT) < 1) {

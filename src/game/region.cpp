@@ -5092,8 +5092,8 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
                                + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
                                      * RANK_REC_BYTES
                                + RANK_REC_OFF_SIGHT_RANGE);
-    box.left   = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS) - reach;
     box.right  = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS) + reach;
+    box.left   = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS) - reach;
     box.top    = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2) - reach;
     box.bottom = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2) + reach;
 
@@ -5306,8 +5306,8 @@ score:
             continue;
         best        = cand;
         bestRange   = candRange;
-        bestBearing = candBearing;
         slack       = 0;
+        bestBearing = candBearing;
     }
 
 finish:
@@ -8196,8 +8196,8 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
     uint8_t  facing;
     uint32_t stepPoint;
 
-    klass = ClassifyByCode74(o);
     stepPoint = *(const uint32_t *)(o + OBJ_OFF_POS);
+    klass = ClassifyByCode74(o);
     if (!*(const int16_t *)(o + OBJ_OFF_HEALTH))
         goto pose;
 
@@ -9719,8 +9719,8 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
          * off the original's -- invisible to every replay, found by
          * tools/sidebyside.py on a hand-played click, and settled by logging
          * AngleBetween's arguments in both games (AM2_TRACE_ANGLE). */
-        dist    = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &at);
         bearing = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), &aim);
+        dist    = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &at);
         w[4]    = (uint8_t)bearing;
 
         /* Close in, or already facing far enough away, keep the old facing. */

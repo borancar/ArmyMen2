@@ -1998,8 +1998,8 @@ void __cdecl PausedFrameStep(void)
                     *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT);
 
         clip.left   = xy[0];
-        clip.top    = xy[1] + 0x24;
         clip.bottom = xy[1] + 0x24 + 0x14;
+        clip.top    = xy[1] + 0x24;
         clip.right  = xy[0] + 0x190;
         if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
             return;
