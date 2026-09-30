@@ -170,8 +170,10 @@ void __cdecl MsgListRemove(void *list, void *node);
  * 0x046E case does the work.
  *
  * It cannot be exercised here -- the handshake needs a second player -- so it
- * is verified by reading, like the rest of that group. */
-void __cdecl ReceiveEndSetupMsg(void);
+ * is verified by reading, like the rest of that group. It has the family's
+ * (message, sender) parameters and reads neither; CommDispatchMessage passes
+ * both, as every other handler is passed them. */
+void __cdecl ReceiveEndSetupMsg(void *msg, int32_t from);
 
 /* Original: 0x00410E90, "ReceiveGameReadyToLoadMsg". HOST ONLY -- it returns
  * at once unless COMM_OFF_IS_HOST is set, so a client that somehow received
@@ -418,10 +420,12 @@ void __cdecl ReceivedTeamMsg(void *msg, int32_t dpid);
  * top of the same test inside the handler they would have called. Type 8 tests
  * the host only to LOG that it should not have received the message, and then
  * calls the handler either way. Everything else does not test at all. */
-/* Four arguments at its one call site -- the queue node's kind and sequence
- * after the message and sender -- of which it reads two. */
-void __cdecl CommDispatchMessage(void *msg, int32_t dpid, int32_t kind,
-                                 int32_t last);
+/* Four arguments at its one call site -- the queue node's message, length,
+ * sender and addressee, the order CommSystemMessage takes them in -- of which
+ * it reads two: the message, and the SENDER it hands every handler. It once
+ * handed them the length, reading the node's +0x24 as a sender. */
+void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
+                                 int32_t to);
 
 
 /* Original: 0x0040F600 and 0x0040F620, thiscall. Set and clear 0x020C of one

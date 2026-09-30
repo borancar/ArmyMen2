@@ -11476,20 +11476,26 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint)
 {
     uint8_t  *list = (uint8_t *)(uintptr_t)ADDR_SELECTED_UIDS;
     uint8_t  *local;
-    uint8_t  *leader = 0;
-    int32_t   leaderIdx = 0;
-    int32_t   mode = 1;
-    int32_t   aiMode = 8;
-    int32_t   maxRank = -1;
+    uint8_t  *leader;
+    int32_t   leaderIdx;
+    int32_t   mode;
+    int32_t   aiMode;
+    int32_t   maxRank;
     int32_t   i;
 
     (void)unusedPoint;
 
     local = (uint8_t *)LookupOwnerObj(
                 *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
+    mode   = 1;
+    aiMode = 8;
 
     if (*(const int32_t *)(list + SUBREC_OFF_COUNT) <= 0)
         return;
+
+    leaderIdx = 0;
+    leader    = 0;
+    maxRank   = -1;
 
     for (i = 0; i < *(const int32_t *)(list + SUBREC_OFF_COUNT); ) {
         const uint32_t *uids = *(const uint32_t **)(list + SUBREC_OFF_ROWS);
@@ -11500,16 +11506,18 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint)
             continue;
         }
 
+        /* A destroyed unit leaves the selection and loses its SELECTED
+         * flag (0x00427A2C clears 0x400, not the 0x4 it tested). */
         if (*(const uint32_t *)(obj + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED) {
             ((AM2_Rec *)list)->ListRemoveAt(i);
-            *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_DESTROYED;
+            *(uint32_t *)(obj + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_SELECTED;
             continue;
         }
 
         if (ObjIsTypeIn238((const AM2_Object *)obj)) {
             if (ObjType2Field548((const AM2_Object *)obj)) {
-                leader = obj;
                 leaderIdx = i;
+                leader = obj;
                 mode = 0;
                 break;
             }
@@ -11517,8 +11525,8 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint)
                 if (local != 0
                     && *(const uint32_t *)(local + OBJ_OFF_RIDING)
                        == ((const AM2_Object *)obj)->uid) {
-                    leader = obj;
                     leaderIdx = i;
+                    leader = obj;
                     mode = 0;
                     break;
                 }
@@ -11533,8 +11541,8 @@ void __cdecl OnSelectionChanged(uint32_t unusedPoint)
                 }
             } else {
                 if (*(const int32_t *)(obj + OBJ_OFF_RANK) > maxRank) {
-                    maxRank = *(const int32_t *)(obj + OBJ_OFF_RANK);
                     leaderIdx = i;
+                    maxRank = *(const int32_t *)(obj + OBJ_OFF_RANK);
                     leader = obj;
                 }
                 if (aiMode == 8)

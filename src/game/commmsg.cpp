@@ -575,9 +575,12 @@ void __cdecl ReceiveGameReadyToLoadMsg(void *msg, int32_t dpid)
 #undef VALUE
 }
 
-void __cdecl ReceiveEndSetupMsg(void)
+void __cdecl ReceiveEndSetupMsg(void *msg, int32_t from)
 {
     const uint8_t *comm = kCommObj;
+
+    (void)msg;
+    (void)from;
 
     if (*(const int32_t *)(comm + AM2_COMM_LOG_ENABLED))
         am2_log("ReceiveEndSetupMsg\n");
@@ -729,23 +732,22 @@ void __cdecl MenuMessage(const char *text, uint8_t colour, int32_t indicator);
  * in-game HUD. */
 static inline void DispatchChat(const uint8_t *msg)
 {
+    /* The sender byte is read on each path: a byte for MenuMessage's colour,
+     * SIGNED and then shifted left eight for the HUD's table -- a negative
+     * sender would index backwards out of it. The original's, and the table
+     * is 256-byte records of which only the first byte is read. */
     int32_t screen = *(const int32_t *)(uintptr_t)ADDR_MENU_MODE;
-    int32_t sender = (int32_t)*(const int8_t *)(msg + AM2_MSG_SENDER);
 
     if (screen == 7 || screen == 9 || screen == 8) {
-        /* The original loads only DL here and pushes the whole of EDX, so the
-         * top three bytes of that argument are whatever was in the register.
-         * The callee reads a byte; passing the byte is the same call. */
-        MenuMessage((const char *)(msg + AM2_MSG_TEXT), sender, 1);
+        MenuMessage((const char *)(msg + AM2_MSG_TEXT),
+                    *(const uint8_t *)(msg + AM2_MSG_SENDER), 1);
         return;
     }
 
-    /* SIGNED, and then shifted left eight -- a negative sender would index
-     * backwards out of the table. The original's, and the table is 256-byte
-     * records of which only the first byte is read. */
     HudMessage((const char *)(msg + AM2_MSG_TEXT),
-                     *(const uint8_t *)((uintptr_t)ADDR_CHAT_COLOUR_TABLE
-                                        + (uintptr_t)(sender << 8)));
+               *(const uint8_t *)((uintptr_t)ADDR_CHAT_COLOUR_TABLE
+                                  + (uintptr_t)((int32_t)*(const int8_t *)
+                                                (msg + AM2_MSG_SENDER) << 8)));
 }
 
 typedef int32_t (__cdecl *AM2_RegisterSelfFn)(uint32_t dpid);
@@ -2006,23 +2008,26 @@ void __cdecl ReceiveFlowControlMsg(void *msg, int32_t dpid)
     *(int32_t *)(q + FLOW_OFF_LAG_SPREAD) = *(const int32_t *)(m + 0x10);
 }
 
-void __cdecl CommDispatchMessage(void *msg, int32_t dpid, int32_t kind,
-                                 int32_t last)
+void __cdecl CommDispatchMessage(void *msg, int32_t size, int32_t from,
+                                 int32_t to)
 {
     const uint8_t *comm = kCommObj;
     uint8_t       *m    = (uint8_t *)msg;
     int32_t        type;
 
-    (void)kind;   /* the queue node's kind and sequence: passed, not read */
-    (void)last;
+    /* The queue node's length and addressee: passed, not read. Every
+     * handler is given the SENDER, the third argument (0x0040FEE6 and the
+     * rest read [esp+0x10] under one push). */
+    (void)size;
+    (void)to;
 
     if (!*(const int32_t *)(comm + COMM_OFF_MSGS_ENABLED))
         return;
 
     type = *(const int32_t *)(m + AM2_MSG_TYPE);
 
-    /* From the table at 0x00410044, in TYPE order. The arms are laid out in a
-     * different order entirely. */
+    /* The arms in the image's layout order, which is the source order VC6
+     * keeps; the table at 0x00410044 is in TYPE order. */
     switch (type) {
     case 1:
         *(int32_t *)(uintptr_t)ADDR_LAST_MSG_VALUE =
@@ -2030,72 +2035,69 @@ void __cdecl CommDispatchMessage(void *msg, int32_t dpid, int32_t kind,
         *(uint32_t *)(uintptr_t)ADDR_LAST_MSG_CHECKSUM = XorChecksum(m);
         return;
 
-    case 2:
-        /* Known and ignored, in silence -- unlike the unknown arm below. */
-        return;
-
-    case 3:
-        DispatchChat(m);
+    case 11:
+        ReceivePacket(m, from);
+        /* The slot writer's first argument is a PLAYER record here, not the
+         * comm object msgslot.h describes -- FindPlayerById returns one. */
+        MsgSlotB0(FindPlayerById((uint32_t)from),
+                  *(const uint32_t *)(m + AM2_MSG_VALUE));
         return;
 
     case 5:
-        ReceiveStartGameMsg(m, dpid);
-        return;
-
-    case 6:
-        RemoteGamePause(m, dpid);
-        return;
-
-    case 7:
-        ReceiveGameReadyMsg(m, dpid);
+        ReceiveStartGameMsg(m, from);
         return;
 
     case 8:
         /* Tested only to complain; the handler runs either way. */
         if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
             am2_log("Message Error:  Host should not receive PLAYERMSG\n");
-        ReceivePlayerMsg(m, dpid);
+        ReceivePlayerMsg(m, from);
+        return;
+
+    case 15:
+        ReceivedMapMsg(m, from);
         return;
 
     case 9:
         if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
             return;
-        ReceivedColorMsg(m, dpid);
-        return;
-
-    case 10:
-        /* The original pushes the message and the id at this call site even
-         * though the handler takes neither. cdecl, so it is harmless; the
-         * arguments are simply dropped. */
-        ReceiveEndSetupMsg();
-        return;
-
-    case 11:
-        ReceivePacket(m, dpid);
-        /* The slot writer's first argument is a PLAYER record here, not the
-         * comm object msgslot.h describes -- FindPlayerById returns one. */
-        MsgSlotB0(FindPlayerById((uint32_t)dpid),
-                  *(const uint32_t *)(m + AM2_MSG_VALUE));
-        return;
-
-    case 14:
-        ReceiveFlowControlMsg(m, dpid);
-        return;
-
-    case 15:
-        ReceivedMapMsg(m, dpid);
+        ReceivedColorMsg(m, from);
         return;
 
     case 17:
         if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
             return;
-        ReceivedTeamMsg(m, dpid);
+        ReceivedTeamMsg(m, from);
         return;
 
     case 18:
         if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST))
             return;
-        ReceiveGameReadyToLoadMsg(m, dpid);
+        ReceiveGameReadyToLoadMsg(m, from);
+        return;
+
+    case 7:
+        ReceiveGameReadyMsg(m, from);
+        return;
+
+    case 3:
+        DispatchChat(m);
+        return;
+
+    case 6:
+        RemoteGamePause(m, from);
+        return;
+
+    case 10:
+        ReceiveEndSetupMsg(m, from);
+        return;
+
+    case 14:
+        ReceiveFlowControlMsg(m, from);
+        return;
+
+    case 2:
+        /* Known and ignored, in silence -- unlike the unknown arm below. */
         return;
 
     default:
@@ -2260,16 +2262,12 @@ void __cdecl Announce(const char *text)
  * setup only. So AM2_COMM_OFF_ACTIVE is clear in single player and FramePre
  * never calls this at all. Verified by reading; the A/B compares nothing here.
  *
- * The message's +0x08 decides where it goes. Zero routes to the DirectPlay
- * SYSTEM handler with a zero in that argument's place; anything else is a game
- * message and goes to CommDispatchMessage with the field itself.
- *
- * The original pushes FOUR arguments for both and cleans them itself, but the
- * game-message half only ever reads two -- its first is a message pointer and
- * its second a dpid, which is exactly the signature that function was already
- * reconstructed with. So the extra pair is dead on that path and is not
- * reproduced: under cdecl the caller cleans, and a callee cannot observe
- * arguments it does not read. The system handler really does take four.
+ * The message's +0x08 is its SENDER, and it decides where it goes: zero is
+ * DPID_SYSMSG and routes to the DirectPlay SYSTEM handler; anything else is a
+ * game message and goes to CommDispatchMessage. Both are handed (message,
+ * length, sender, addressee) -- the node's +0x20, +0x24, +0x08 and +0x0C.
+ * This once read +0x24 as the sender, and CommDispatchMessage passed it on to
+ * every handler as the player id; it is the message length.
  *
  * The loop re-reads the head after each node rather than snapshotting the
  * list, so a handler that queues more work has it drained in the same pass. */
@@ -2283,15 +2281,21 @@ void __cdecl CommDrainMsgs(void)
     for (node = (uint8_t *)MsgListRemHead((void *)(uintptr_t)ADDR_MSG_LIST_B);
          node;
          node = (uint8_t *)MsgListRemHead((void *)(uintptr_t)ADDR_MSG_LIST_B)) {
-        /* The node: +0x08 kind, +0x0C sequence, +0x20 message, +0x24 sender. */
-        int32_t  kind = *(const int32_t *)(node + 0x08);
-        void    *msg  = *(void *const *)(node + 0x20);
-        int32_t  last = *(const int32_t *)(node + 0x0C);
+        /* The node: +0x08 sender, +0x0C addressee, +0x20 message, +0x24
+         * its length -- what IDirectPlay::Receive filled in. */
+        int32_t  from = *(const int32_t *)(node + MSGNODE_OFF_FROM);
+        void    *msg  = *(void *const *)(node + MSGNODE_OFF_BODY);
+        int32_t  to   = *(const int32_t *)(node + MSGNODE_OFF_TO);
 
-        if (kind == 0)
-            orig_comm_system_msg(msg, *(const int32_t *)(node + 0x24), 0, last);
+        /* DPID_SYSMSG is 0: a system message goes to the system handler. */
+        if (from == 0)
+            orig_comm_system_msg(msg,
+                                 *(const int32_t *)(node + MSGNODE_OFF_BODY_LEN),
+                                 0, to);
         else
-            CommDispatchMessage(msg, *(const int32_t *)(node + 0x24), kind, last);
+            CommDispatchMessage(msg,
+                                *(const int32_t *)(node + MSGNODE_OFF_BODY_LEN),
+                                from, to);
 
         MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, node);
     }

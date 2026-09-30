@@ -3330,7 +3330,7 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
     int32_t  slot;
     uint32_t t0;
 
-    switch ((int32_t)m->dwType) {
+    switch (m->dwType) {
     case DPSYS_DESTROYPLAYERORGROUP:
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log("DestroyPlayer Id=%x, to = %x\n",
@@ -3349,90 +3349,89 @@ void __cdecl CommSystemMessage(void *msg, int32_t size, int32_t from,
         *(int32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
                      + COMM_OFF_SLOT_FIELD_25C) = 1;
 
-        if (!*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
-            /* The short path: register and repaint, nothing else. */
-            CommRegisterSelf((uint32_t)m->dpId);
-            if (*(void **)(uintptr_t)ADDR_PAINT_OBJECT)
-                ScreenPaint(*(void **)(uintptr_t)ADDR_PAINT_OBJECT);
-            return;
-        }
+        if (*(const int32_t *)(comm + COMM_OFF_IS_HOST)) {
+            {
+                int32_t i;
 
-        {
-            int32_t i;
-
-            for (i = 0; i < AM2_COMM_ARMY_COUNT; i++) {
-                int32_t id = *(const int32_t *)(comm
-                                                + i * AM2_COMM_SLOT_STRIDE
-                                                + COMM_OFF_PLAYER_SLOTS);
-
-                /* Yes, when the slot is EMPTY, and -1 is what goes in. */
-                if (id == -1) {
-                    ((AM2_Comm *)comm)->CommRemovePlayer(id);
+                /* Yes, when the slot is EMPTY, and -1 is what goes in --
+                 * the slot read again for the argument. */
+#define SLOT_ID (*(const int32_t *)(comm + i * AM2_COMM_SLOT_STRIDE \
+                                    + COMM_OFF_PLAYER_SLOTS))
+                for (i = 0; i < AM2_COMM_ARMY_COUNT; i++) {
+                    if (SLOT_ID == -1)
+                        ((AM2_Comm *)comm)->CommRemovePlayer(SLOT_ID);
                 }
+#undef SLOT_ID
             }
-        }
 
-        *(int32_t *)(comm
-                     + *(const int32_t *)(uintptr_t)ADDR_OUR_SLOT
-                           * AM2_COMM_SLOT_STRIDE
-                     + COMM_OFF_PLAYER_SLOTS) =
-            *(const int32_t *)(comm + COMM_OFF_OUR_PLAYER_ID);
+            *(int32_t *)(comm
+                         + *(const int32_t *)(uintptr_t)ADDR_OUR_SLOT
+                               * AM2_COMM_SLOT_STRIDE
+                         + COMM_OFF_PLAYER_SLOTS) =
+                *(const int32_t *)(comm + COMM_OFF_OUR_PLAYER_ID);
 
-        slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
-        *(int32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
-                     + COMM_OFF_PLAYER_SLOTS) = (int32_t)m->dpId;
+            slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
+            *(int32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
+                         + COMM_OFF_PLAYER_SLOTS) = (int32_t)m->dpId;
 
-        ((AM2_Comm *)comm)->CommSetSlotRemote(
-                          *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT));
+            ((AM2_Comm *)comm)->CommSetSlotRemote(
+                              *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT));
 
-        if ((int32_t)strlen(m->dpnName.lpszShortNameA) < AM2_COMM_NAME_MAX) {
-            strcpy((char *)(comm
-                            + *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT)
-                                  * AM2_COMM_SLOT_STRIDE
-                            + COMM_OFF_SLOT_NAME),
-                   m->dpnName.lpszShortNameA);
-        }
+            if ((int32_t)strlen(m->dpnName.lpszShortNameA) < AM2_COMM_NAME_MAX) {
+                strcpy((char *)(comm
+                                + *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT)
+                                      * AM2_COMM_SLOT_STRIDE
+                                + COMM_OFF_SLOT_NAME),
+                       m->dpnName.lpszShortNameA);
+            }
 
-        slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
-        *(uint32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
-                      + COMM_OFF_SLOT_JOINED_MS) = GetTickCount();
+            *(uint32_t *)(comm
+                          + *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT)
+                                * AM2_COMM_SLOT_STRIDE
+                          + COMM_OFF_SLOT_JOINED_MS) = GetTickCount();
 
-        slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
-        *(int32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
-                     + COMM_OFF_SLOT_FIELD_278) = 0;
+            slot = *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT);
+            *(int32_t *)(comm + slot * AM2_COMM_SLOT_STRIDE
+                         + COMM_OFF_SLOT_FIELD_278) = 0;
 
-        *(int32_t *)(comm + COMM_OFF_PLAYER_COUNT) =
-            *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT) + 1;
+            *(int32_t *)(comm + COMM_OFF_PLAYER_COUNT) =
+                *(const int32_t *)(comm + COMM_OFF_PLAYER_COUNT) + 1;
 
-        if (*(const uint32_t *)(comm + COMM_OFF_PLAYER_COUNT)
-            >= (uint32_t)AM2_COMM_ARMY_COUNT) {
-            uint8_t *desc;
+            if (*(const uint32_t *)(comm + COMM_OFF_PLAYER_COUNT)
+                >= (uint32_t)AM2_COMM_ARMY_COUNT) {
+                uint8_t *desc;
 
-            CommGetSessionDesc(comm);
-            desc = *(uint8_t **)(g_commObject + COMM_OFF_SESSION_DESC);
-            *(uint32_t *)(desc + 4) |= AM2_SESSION_FULL_FLAGS;
-            ((AM2_Comm *)g_commObject)->CommSetSessionDesc(desc, 0);
-        }
+                CommGetSessionDesc(comm);
+                desc = *(uint8_t **)(g_commObject + COMM_OFF_SESSION_DESC);
+                *(uint32_t *)(desc + 4) |= AM2_SESSION_FULL_FLAGS;
+                ((AM2_Comm *)g_commObject)->CommSetSessionDesc(desc, 0);
+            }
 
-        CommRegisterSelf((uint32_t)m->dpId);
+            CommRegisterSelf((uint32_t)m->dpId);
 
-        if (*(void **)(uintptr_t)ADDR_PAINT_OBJECT) {
-            void *dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
+            if (*(void **)(uintptr_t)ADDR_PAINT_OBJECT) {
+                void *dlg = *(void **)(uintptr_t)ADDR_PAINT_OBJECT;
 
-            ObjVUpdate(dlg);
-            ScreenPaint(*(void **)(uintptr_t)ADDR_PAINT_OBJECT);
-        }
+                ObjVUpdate(dlg);
+                ScreenPaint(*(void **)(uintptr_t)ADDR_PAINT_OBJECT);
+            }
 
-        /* One second with nothing pumped -- see the note above. */
-        t0 = GetTickCount();
-        if (GetTickCount() - t0 < AM2_COMM_JOIN_SETTLE_MS)
+            /* One second with nothing pumped -- see the note above. */
+            t0 = GetTickCount();
             while (GetTickCount() - t0 < AM2_COMM_JOIN_SETTLE_MS)
                 ;
 
-        RefreshMapSelection();
-        SendPlayerMsg(1);
-        PostMessageA(*(HWND *)(uintptr_t)ADDR_HWND, AM2_WM_PLAYER_JOINED,
-                     (WPARAM)m->dpId, (LPARAM)msg);
+            RefreshMapSelection();
+            SendPlayerMsg(1);
+            PostMessageA(*(HWND *)(uintptr_t)ADDR_HWND, AM2_WM_PLAYER_JOINED,
+                         (WPARAM)m->dpId, (LPARAM)msg);
+            return;
+        }
+
+        /* The short path: register and repaint, nothing else. */
+        CommRegisterSelf((uint32_t)m->dpId);
+        if (*(void **)(uintptr_t)ADDR_PAINT_OBJECT)
+            ScreenPaint(*(void **)(uintptr_t)ADDR_PAINT_OBJECT);
         return;
 
     case DPSYS_SESSIONLOST:

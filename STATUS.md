@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1389 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1392 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1389:
+  the near-miss sweep, 758 before the row pools. From 758 to 1392:
   - **PollKeyboard wants its keyboard state aggregated** (0x005127C8..
     0x00512FD0 in relinkos.py's AGGREGATE_RANGES): with it the loop walks
     the deadline and pressed halves with one pointer as the image does, one
@@ -137,6 +137,19 @@ main result so far (details in `src/vc6/README.md`):
     reconstruction packed `row + 0x3D5`, a constant 0x3F7, and its header
     explained why. It now agrees with UnitKindMatches' kind 5. Found by
     byte-matching; placement screen, not driven.
+  - **OnSelectionChanged un-destroyed a destroyed unit** (2026-09-30): a
+    selected unit found DESTROYED (0x4) leaves the selection with its
+    SELECTED flag (0x400) cleared -- 0x00427A2C is `and ah, 0xfb`. The
+    reconstruction cleared DESTROYED instead, reviving the flag word of a
+    dead unit still in the selection. Found by byte-matching; not driven.
+  - **CommDispatchMessage handed every handler the message LENGTH as the
+    sender** (2026-09-30): the queue node is +0x08 sender, +0x0C addressee,
+    +0x20 message, +0x24 length (what IDirectPlay::Receive fills), and both
+    CommDrainMsgs targets get (message, length, sender, addressee). The image
+    dispatches the THIRD argument to every handler (0x0040FEE6 et seq.); the
+    reconstruction dispatched the second, so ReceivePacket, ReceivePlayerMsg
+    and the rest looked players up by byte count. Multiplayer only; found by
+    byte-matching, not driven.
 
 
   - **Two menu behaviours the byte-match corrected** (2026-09-29):
