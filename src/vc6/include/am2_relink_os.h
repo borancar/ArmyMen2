@@ -250,19 +250,6 @@ extern uint8_t am2_os_map_name[];  /* 0x00511A88 */
 extern uint8_t am2_os_map_folder[];  /* 0x00511AC8 */
 extern uint8_t am2_os_movie_to_play[];  /* 0x00511B08 */
 extern uint8_t am2_os_gameproc_str_b[];  /* 0x00511B88 */
-extern uint8_t am2_os_script_reload_path[];  /* 0x00511BC8 */
-extern uint8_t am2_os_mp_script_name[];  /* 0x00511C08 */
-extern uint8_t am2_os_level_str_a[];  /* 0x00511C48 */
-extern uint8_t am2_os_level_str_b[];  /* 0x00511C88 */
-extern uint8_t am2_os_tileset_reserve[];  /* 0x00511CC8 */
-extern uint8_t am2_os_map_checksum_val[];  /* 0x00511CCC */
-extern uint8_t am2_os_mp_script_chksum_val[];  /* 0x00511CD0 */
-extern uint8_t am2_os_rules_checksum_val[];  /* 0x00511CD4 */
-extern uint8_t am2_os_level_str_d[];  /* 0x00511CD8 */
-extern uint8_t am2_os_level_str_c[];  /* 0x00511D18 */
-extern uint8_t am2_os_level_sound_name[];  /* 0x00511D58 */
-extern uint8_t am2_os_level_id[];  /* 0x00511D98 */
-extern uint8_t am2_os_level_index[];  /* 0x00511D9C */
 extern uint8_t am2_os_mp_session[];  /* 0x00511DA0 */
 extern uint8_t am2_os_game_state[];  /* 0x00511DA4 */
 extern uint8_t am2_os_state_entered[];  /* 0x00511DA8 */
@@ -694,18 +681,6 @@ extern uint8_t am2_os_startup_colours_b[];  /* 0x006645A4 */
 #define ADDR_HOST_VALUE_3E8 ((uintptr_t)(const void *)am2_os_host_value_3e8)
 #undef ADDR_HWND
 #define ADDR_HWND ((uintptr_t)(const void *)am2_os_hwnd)
-#undef ADDR_LEVEL_INDEX
-#define ADDR_LEVEL_INDEX ((uintptr_t)(const void *)am2_os_level_index)
-#undef ADDR_LEVEL_SOUND_NAME
-#define ADDR_LEVEL_SOUND_NAME ((uintptr_t)(const void *)am2_os_level_sound_name)
-#undef ADDR_LEVEL_STR_A
-#define ADDR_LEVEL_STR_A ((uintptr_t)(const void *)am2_os_level_str_a)
-#undef ADDR_LEVEL_STR_B
-#define ADDR_LEVEL_STR_B ((uintptr_t)(const void *)am2_os_level_str_b)
-#undef ADDR_LEVEL_STR_C
-#define ADDR_LEVEL_STR_C ((uintptr_t)(const void *)am2_os_level_str_c)
-#undef ADDR_LEVEL_STR_D
-#define ADDR_LEVEL_STR_D ((uintptr_t)(const void *)am2_os_level_str_d)
 #undef ADDR_LEVEL_TABLE
 #define ADDR_LEVEL_TABLE ((uintptr_t)(const void *)am2_os_level_table)
 #undef ADDR_LEVEL_TABLE_CAP
@@ -744,8 +719,6 @@ extern uint8_t am2_os_startup_colours_b[];  /* 0x006645A4 */
 #define ADDR_MISSILE_DEFS ((uintptr_t)(const void *)am2_os_missile_defs)
 #undef ADDR_MOVIE_COUNT
 #define ADDR_MOVIE_COUNT ((uintptr_t)(const void *)am2_os_movie_count)
-#undef ADDR_MP_SCRIPT_NAME
-#define ADDR_MP_SCRIPT_NAME ((uintptr_t)(const void *)am2_os_mp_script_name)
 #undef ADDR_MP_SESSION
 #define ADDR_MP_SESSION ((uintptr_t)(const void *)am2_os_mp_session)
 #undef ADDR_MSG_CHAT
@@ -872,8 +845,6 @@ extern uint8_t am2_os_startup_colours_b[];  /* 0x006645A4 */
 #define ADDR_SVAR_TAN ((uintptr_t)(const void *)am2_os_svar_tan)
 #undef ADDR_SVAR_TANSCORE
 #define ADDR_SVAR_TANSCORE ((uintptr_t)(const void *)am2_os_svar_tanscore)
-#undef ADDR_TILESET_RESERVE
-#define ADDR_TILESET_RESERVE ((uintptr_t)(const void *)am2_os_tileset_reserve)
 #undef ADDR_TILE_LINE_BUF
 #define ADDR_TILE_LINE_BUF ((uintptr_t)(const void *)am2_os_tile_line_buf)
 #undef ADDR_TIMER_COUNT
@@ -1318,16 +1289,6 @@ extern uint8_t am2_os_startup_colours_b[];  /* 0x006645A4 */
 #define ADDR_STATE0_TICK ((uintptr_t)(const void *)am2_os_state0_tick)
 #undef ADDR_MOVIE_TO_PLAY
 #define ADDR_MOVIE_TO_PLAY ((uintptr_t)(const void *)am2_os_movie_to_play)
-#undef ADDR_SCRIPT_RELOAD_PATH
-#define ADDR_SCRIPT_RELOAD_PATH ((uintptr_t)(const void *)am2_os_script_reload_path)
-#undef ADDR_MAP_CHECKSUM_VAL
-#define ADDR_MAP_CHECKSUM_VAL ((uintptr_t)(const void *)am2_os_map_checksum_val)
-#undef ADDR_MP_SCRIPT_CHKSUM_VAL
-#define ADDR_MP_SCRIPT_CHKSUM_VAL ((uintptr_t)(const void *)am2_os_mp_script_chksum_val)
-#undef ADDR_RULES_CHECKSUM_VAL
-#define ADDR_RULES_CHECKSUM_VAL ((uintptr_t)(const void *)am2_os_rules_checksum_val)
-#undef ADDR_LEVEL_ID
-#define ADDR_LEVEL_ID ((uintptr_t)(const void *)am2_os_level_id)
 #undef ADDR_GAME_STATE
 #define ADDR_GAME_STATE ((uintptr_t)(const void *)am2_os_game_state)
 #undef ADDR_STATE_ENTERED

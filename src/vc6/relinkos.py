@@ -41,7 +41,10 @@ AGGREGATES = ("aim_",)
 # alias them, while the loads from the host masks -- a separate object --
 # are scheduled into the copy. Split into separate symbols, VC6 hoists the
 # stores too.
-AGGREGATE_RANGES = ((0x00515FD8, 0x00516078),)
+# The level block 0x00511BC8..0x00511DA0 likewise: MissionEnded's two
+# reload arms re-read ADDR_LEVEL_INDEX after the strcpy into
+# ADDR_SCRIPT_RELOAD_PATH rather than hoisting the load into the copy.
+AGGREGATE_RANGES = ((0x00515FD8, 0x00516078), (0x00511BC8, 0x00511DA0))
 
 
 def _aggregated(va):
