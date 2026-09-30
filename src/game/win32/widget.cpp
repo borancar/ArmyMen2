@@ -17891,9 +17891,10 @@ int32_t __cdecl PointerPickHeal(void *obj)
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH)
         >= *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH))
         return 0;
-    if (!o || *(const int32_t *)o != AM2_OBJ_TYPE_TROOPER)
+    if (!ObjIsType2Inline(o))
         return 0;
     if (*(const uint32_t *)(leader + OBJ_OFF_RIDING)
+
         != *(const uint32_t *)(o + OBJ_OFF_RIDING))
         return 0;
 
@@ -17954,20 +17955,22 @@ int32_t __cdecl PointerPickRepair(void *obj)
                            o, 0))
         return 0;
 
-    if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER)
+    if (ObjIsType2Inline(o))
         return 0;
+
 
     if (ObjIsItem((const AM2_Object *)o)) {
         if (!*(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME)
             && *(const int16_t *)(o + OBJ_OFF_HEALTH)
                    >= *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH))
             return 0;
-    } else if (o && *(const int32_t *)o == AM2_OBJ_TYPE_VEHICLE) {
+    } else if (ObjIsType3Inline(o)) {
         if (*(const int16_t *)(o + OBJ_OFF_HEALTH)
             >= *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH))
             return 0;
     }
     /* Neither an item nor a vehicle: no health test at all -- see above. */
+
 
     leader = OurLeaderUnit();
     if (!leader)
