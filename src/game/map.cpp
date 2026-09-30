@@ -150,9 +150,9 @@ uint32_t __cdecl PointOfTile(int32_t tile)
  * happen and the answer goes somewhere the frame does not show. Same standing
  * as the trig tables had before tools/trigdump.py.
  */
-void __cdecl TileToXY(int32_t tile, int32_t *x, int32_t *y)
+void __cdecl TileToXY(uint16_t tile, int32_t *x, int32_t *y)
 {
-    uint32_t t = (uint32_t)tile & 0xFFFFu;
+    uint32_t t = tile;
 
     /* The globals are read where they are used, mask before index. */
     *x = (int32_t)((((uint32_t)*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W

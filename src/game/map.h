@@ -66,7 +66,7 @@ uint32_t __cdecl PointOfTile(int32_t tile);
 
 /* 0x0042B210. The same answer as PointOfTile, written back as two int32
  * rather than packed into one dword. */
-void __cdecl TileToXY(int32_t tile, int32_t *x, int32_t *y);
+void __cdecl TileToXY(uint16_t tile, int32_t *x, int32_t *y);
 
 /* 0x0043E900. Find a record by name in the name registry; the first search is
  * also the load. */

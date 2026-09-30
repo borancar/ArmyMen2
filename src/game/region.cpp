@@ -1224,7 +1224,7 @@ static inline void PathUnwind(int32_t end, uint16_t *out, int32_t *n)
  * uses the same slot as the x87 scratch both before the loop starts and after
  * it ends. Three lives for one dword. Nothing of that survives here, but it is
  * why the disassembly's esp displacements do not line up with the arguments. */
-int32_t __cdecl FindPath(int32_t from, int32_t to, uint16_t *out, int32_t *n,
+int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                          int32_t unused)
 {
     uint8_t *const nodes  = (uint8_t *)(uintptr_t)ADDR_PATH_NODES;
@@ -1523,8 +1523,9 @@ int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg)
 {
     uint8_t  *o = (uint8_t *)obj;
     uint16_t *route = (uint16_t *)((void *)(uintptr_t)(ADDR_TILE_LINE_BUF));
-    int32_t   n = 0;
+    int32_t   n;       /* FindPath fills it; only read on success */
     int32_t   i;
+    int32_t   x, y;
 
     SetPointRule(obj);
     NearestAllowedTile(obj, TileOfPoint(*at), at);
@@ -1533,7 +1534,7 @@ int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg)
     *(uint16_t *)(o + OBJ_OFF_MOVE_AT)    = 0;
     *(uint16_t *)(o + OBJ_OFF_MOVE_COUNT) = 0;
 
-    if (!FindPath((int32_t)*(const uint16_t *)(o + OBJ_OFF_TILE),
+    if (!FindPath(*(const uint16_t *)(o + OBJ_OFF_TILE),
                         TileOfPoint(*at), route, &n, arg)) {
         *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) =
             *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
@@ -1544,9 +1545,7 @@ int32_t __cdecl PlanPathTo(void *obj, uint32_t *at, int32_t arg)
     CollapseEqualDeltas(route, &n);
 
     for (i = 0; i < n; i++) {
-        int32_t x, y;
-
-        TileToXY((int32_t)route[i], &x, &y);
+        TileToXY(route[i], &x, &y);
         *(uint16_t *)(o + OBJ_OFF_MOVE_FROM + (uint32_t)i * AM2_MOVE_STEP_BYTES)
             = (uint16_t)x;
         *(uint16_t *)(o + OBJ_OFF_MOVE_FROM + (uint32_t)i * AM2_MOVE_STEP_BYTES
@@ -6500,7 +6499,7 @@ static inline uint8_t *RegionAt(int32_t id)
  * model and once against this file: the head-unlink defect above, and
  * ApproxDistXY, whose behaviour dist.cpp's prose had rounded the wrong way.
  */
-int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
+int32_t __cdecl RegionFindPath(uint16_t from, int32_t to, int16_t *path,
                                int32_t *len)
 {
     uint8_t *goal;
