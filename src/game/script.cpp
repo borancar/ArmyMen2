@@ -2453,8 +2453,7 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             return 0;
         }
         act->army = ScriptArmyColour(ctx, at);
-        if (act->army < 0)
-            act->army = 4;
+        act->army = act->army < 0 ? 4 : act->army;
         return 1;
 
     case 180:                                   /* dropitem */

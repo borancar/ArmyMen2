@@ -708,6 +708,9 @@ void __cdecl ItemSetBox(void *obj, AM2_Rect box)
 void __cdecl ItemLinkCells(void *obj, void *cells)
 {
 #define o ((uint8_t *)obj)
+    /* Each store indexes the entry array afresh. */
+#define ENTRY(k) (*(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES) \
+                  + (uint32_t)(k) * AM2_CELL_ENTRY_STRIDE)
     const uint8_t *d = (const uint8_t *)cells;
     int32_t        cl, ct, cr, cb;
     int32_t        cols, rows, shift;
@@ -729,10 +732,8 @@ void __cdecl ItemLinkCells(void *obj, void *cells)
     if (cl > cols - 1)
         return;
 
-    if (cl <= 0)
-        cl = 0;
-    if (ct <= 0)
-        ct = 0;
+    cl = cl <= 0 ? 0 : cl;
+    ct = ct <= 0 ? 0 : ct;
     if (cr >= cols - 1)
         cr = cols - 1;
     if (cb >= cols - 1)          /* COLS, not ROWS -- as in RowRegisterAll */
@@ -747,24 +748,19 @@ void __cdecl ItemLinkCells(void *obj, void *cells)
         int32_t x;
 
         for (x = cl; x <= cr; x++, cell++, used++) {
-            uint8_t *entry = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES)
-                             + (uint32_t)used * AM2_CELL_ENTRY_STRIDE;
-
-            *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = cell;
-            ListPushFront(entry,
+            *(int32_t *)(ENTRY(used) + CELL_ENTRY_OFF_INDEX) = cell;
+            ListPushFront(ENTRY(used),
                           (void **)(*(uint8_t **)(d + MAPDESC_OFF_CELLS)
                                     + (uint32_t)cell * 4));
         }
     }
 
     for (; used < (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); used++) {
-        uint8_t *entry = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES)
-                         + (uint32_t)used * AM2_CELL_ENTRY_STRIDE;
-
-        *(void **)(entry + 4) = (void *)0;   /* prev, as ListPushFront has it */
-        *(void **)(entry + 8) = (void *)0;   /* next */
-        *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = -1;
+        *(int32_t *)(ENTRY(used) + CELL_ENTRY_OFF_INDEX) = -1;
+        *(void **)(ENTRY(used) + 8) = (void *)0;   /* next */
+        *(void **)(ENTRY(used) + 4) = (void *)0;   /* prev, as ListPushFront has it */
     }
+#undef ENTRY
 #undef o
 }
 
