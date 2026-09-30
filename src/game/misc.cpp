@@ -1322,9 +1322,9 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommTeamScore(int32_t slot)
     int32_t        total;
     int32_t        i;
 
-    total = 0;
     team = *(const int32_t *)(players + (size_t)slot * AM2_COMM_SLOT_STRIDE
                               + COMM_SLOT_OFF_TEAM);
+    total = 0;
     if (team == 0)
         return ::GetArmyScore(comm, slot);
 

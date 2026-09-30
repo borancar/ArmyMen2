@@ -3968,15 +3968,18 @@ int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
 int32_t __cdecl MaskBlockWeight(int32_t kind, uint8_t heading, uint32_t at)
 {
     typedef struct { int16_t x, y; } Pt;
-    int32_t  total = 0;
+    int32_t  total;
     int32_t  i;
-    uint32_t slot;
 
-    /* The heading is rounded in place, and the count and the points are
-     * re-indexed from the table's base at every use. */
+    /* The heading is rounded in place -- stored back to the parameter and
+     * read from there -- and the count and the points are re-indexed from
+     * the table's base at every use; there is no slot local. `total` is
+     * zeroed after the rounding, which is what keeps it out of the way of
+     * the call. */
     heading = (uint8_t)RoundTo8(heading, 5);
-    slot    = (uint32_t)(kind * AM2_VEHICLE_MASK_DIRS + heading)
-              * AM2_VEHICLE_MASK_STRIDE;
+    total   = 0;
+#define slot ((uint32_t)(kind * AM2_VEHICLE_MASK_DIRS + heading) \
+              * AM2_VEHICLE_MASK_STRIDE)
 #define COUNT (*(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_VEHICLE_MASK - 4)) + slot))
 #define PTS   ((const Pt *)((const uint8_t *)((void *)(uintptr_t)(ADDR_VEHICLE_MASK)) + slot))
     for (i = 0; i < COUNT; i++) {
@@ -3997,6 +4000,7 @@ int32_t __cdecl MaskBlockWeight(int32_t kind, uint8_t heading, uint32_t at)
     }
 #undef COUNT
 #undef PTS
+#undef slot
 
     return total;
 }
