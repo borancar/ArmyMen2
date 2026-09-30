@@ -705,11 +705,17 @@ int32_t __cdecl RowAnimField4(const void *row, uint16_t id)
     if (!table)
         return 0;
 
-    i = 0;
-    while (i < table->count && table->entries[i].id != (int32_t)(int16_t)id)
-        i++;
-    if (i >= table->count)
-        i = 0;                  /* not found: entry 0, count unchecked */
+    /* Not found: entry 0, count unchecked. A hit is re-tested against the
+     * count, which it cannot fail -- the original's shape. */
+    for (i = 0; i < table->count; i++)
+        if (table->entries[i].id == (int32_t)(int16_t)id)
+            goto found;
+    goto first;
+found:
+    if (i >= table->count) {
+    first:
+        i = 0;
+    }
 
     value = (int16_t)table->entries[i].anim->field4;
 
@@ -805,11 +811,17 @@ void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force)
     if (!t)
         return;
 
+    /* Not found: entry 0, not a failure. A hit is re-tested against the
+     * count, which it cannot fail -- the original's shape. */
     for (i = 0; i < t->count; i++)
         if (t->entries[i].id == (int32_t)frame)
-            break;
-    if (i >= t->count)
-        i = 0;                          /* not found: entry 0, not a failure */
+            goto found;
+    goto first;
+found:
+    if (i >= t->count) {
+    first:
+        i = 0;
+    }
 
     /* The entry and the playing animation are re-read at every use. */
 #define PLAYING (*(AM2_Anim *const *)(r + ROW_OFF_ANIM_PLAYING))

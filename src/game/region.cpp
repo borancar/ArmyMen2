@@ -3267,7 +3267,7 @@ void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
     if (to > 0 && from > 0 && to != from) {
         /* The stride is re-read after RegionSolvePair. */
 #define stride (*(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
-        int32_t link;
+        int16_t link;
 
         *(int16_t *)(o + OBJ_OFF_GOAL_REGION) = (int16_t)to;
 
@@ -3279,13 +3279,16 @@ void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
             && !*(const int32_t *)(o + OBJ_OFF_STUCK_COUNT))
             goto waypoint;
 
-        link = (int16_t)MiddleRegionLink(
-            from, (int16_t)(uint8_t)kRegionNext[(uint32_t)(from * stride + to)]);
+        {
+            int16_t hop = kRegionNext[(uint32_t)(from * stride + to)];
+
+            link = (int16_t)MiddleRegionLink(from, hop);
+        }
         if (link < 0)
             goto waypoint;
 
         {
-            int32_t x = 0, y = 0;
+            int32_t x, y;
 
             TileToXY(kLinks(from)[link].into, &x, &y);
             if (x) {
@@ -3301,12 +3304,11 @@ waypoint:
     if (d > AM2_AI_REPLAN_DIST
         || (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
            >= (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1) {
-        int32_t budget = AM2_AI_PLAN_BUDGET_SHORT;
-
-        if (*(const int16_t *)(o + OBJ_OFF_REGION) != 0 && to != 0)
-            budget = AM2_AI_PLAN_BUDGET_LONG;
+        int32_t budget;
 
         *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
+        budget = (*(const int16_t *)(o + OBJ_OFF_REGION) != 0 && to != 0)
+                 ? AM2_AI_PLAN_BUDGET_LONG : AM2_AI_PLAN_BUDGET_SHORT;
 
         if (!PlanPathTo(obj, (uint32_t *)&pt, budget)) {
             *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
@@ -3326,7 +3328,7 @@ waypoint:
                            *(const uint32_t *)&pt)
                && *(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
                   < *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT)) {
-        uint32_t at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
+        uint16_t at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
 
         *(uint32_t *)&pt =
             *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
@@ -3495,16 +3497,18 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
 
     {
 #define stride (*(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
-        int32_t link;
+        int16_t link;
 
         if (kRegionCost[(uint32_t)(fromRegion * stride + toRegion)]
             != *(const uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)))
             RegionSolvePair(fromRegion, toRegion);
 
-        link = (int16_t)MiddleRegionLink(
-            fromRegion,
-            (int16_t)(uint8_t)kRegionNext[(uint32_t)(fromRegion * stride
-                                                     + toRegion)]);
+        {
+            int16_t hop = kRegionNext[(uint32_t)(fromRegion * stride
+                                                 + toRegion)];
+
+            link = (int16_t)MiddleRegionLink(fromRegion, hop);
+        }
         if (link < 0)
             goto after_region;
 
@@ -3680,7 +3684,7 @@ void __cdecl RoachRouteToward(void *obj, void *out, const void *ctx)
     if (to > 0 && from > 0 && to != from) {
         /* The stride is re-read after RegionSolvePair. */
 #define stride (*(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
-        int32_t link;
+        int16_t link;
 
         *(int16_t *)(o + OBJ_OFF_GOAL_REGION) = (int16_t)to;
 
@@ -3692,13 +3696,16 @@ void __cdecl RoachRouteToward(void *obj, void *out, const void *ctx)
             && !*(const int32_t *)(o + OBJ_OFF_STUCK_COUNT))
             goto waypoint;
 
-        link = (int16_t)MiddleRegionLink(
-            from, (int16_t)(uint8_t)kRegionNext[(uint32_t)(from * stride + to)]);
+        {
+            int16_t hop = kRegionNext[(uint32_t)(from * stride + to)];
+
+            link = (int16_t)MiddleRegionLink(from, hop);
+        }
         if (link < 0)
             goto waypoint;
 
         {
-            int32_t x = 0, y = 0;
+            int32_t x, y;
 
             TileToXY(kLinks(from)[link].into, &x, &y);
             if (x) {
@@ -3714,12 +3721,11 @@ waypoint:
     if (d > AM2_AI_REPLAN_DIST
         || (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
            >= (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1) {
-        int32_t budget = AM2_AI_PLAN_BUDGET_SHORT;
-
-        if (*(const int16_t *)(o + OBJ_OFF_REGION) != 0 && to != 0)
-            budget = AM2_AI_PLAN_BUDGET_LONG;
+        int32_t budget;
 
         *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
+        budget = (*(const int16_t *)(o + OBJ_OFF_REGION) != 0 && to != 0)
+                 ? AM2_AI_PLAN_BUDGET_LONG : AM2_AI_PLAN_BUDGET_SHORT;
 
         if (!PlanPathTo(obj, (uint32_t *)&pt, budget)) {
             *(uint32_t *)(o + OBJ_OFF_ROUTE_GOAL) = *(const uint32_t *)&pt;
@@ -3738,38 +3744,36 @@ waypoint:
     if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
                     *(const uint32_t *)&pt)) {
         if (*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
-            >= *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT)) {
+            < *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT)) {
+            uint16_t at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
+
+            *(uint32_t *)&pt =
+                *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
+
+            while (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &pt)
+                   < AM2_AI_ARRIVED_DIST) {
+                at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
+                if ((int32_t)at
+                    >= (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1)
+                    break;
+
+                at++;
+                *(int16_t *)(o + OBJ_OFF_MOVE_AT) = (int16_t)at;
+                *(uint32_t *)&pt =
+                    *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
+            }
+        } else {
             /* THE ONE STRUCTURAL ADDITION over the trooper's copy: a cursor
              * that has run out resets the path to a zero-length one instead
              * of heading straight off -- and this is the one seeder of the
              * three that does NOT write OBJ_OFF_ROUTE_GOAL. */
-            *(uint32_t *)(o + OBJ_OFF_MOVE_TO)   = *(const uint32_t *)&pt;
             *(uint32_t *)(o + OBJ_OFF_MOVE_FROM) =
                 *(const uint32_t *)(o + OBJ_OFF_POS);
+            *(uint32_t *)(o + OBJ_OFF_MOVE_TO)   = *(const uint32_t *)&pt;
             *(int16_t *)(o + OBJ_OFF_MOVE_END)   = 0;
             *(int16_t *)(o + OBJ_OFF_MOVE_AT)    = 0;
             *(int16_t *)(o + OBJ_OFF_MOVE_COUNT) = 0;
             goto heading;
-        }
-
-        {
-            uint32_t at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
-
-            *(uint32_t *)&pt =
-                *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
-
-        while (ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &pt)
-               < AM2_AI_ARRIVED_DIST) {
-            at = *(const uint16_t *)(o + OBJ_OFF_MOVE_AT);
-            if ((int32_t)at
-                >= (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1)
-                break;
-
-            at++;
-            *(int16_t *)(o + OBJ_OFF_MOVE_AT) = (int16_t)at;
-            *(uint32_t *)&pt =
-                *(const uint32_t *)(o + OBJ_OFF_MOVE_FROM + at * 4);
-        }
         }
     }
 
