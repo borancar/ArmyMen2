@@ -3987,10 +3987,12 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
  * view is blocked in a DIRECTION, and the direction that matters is the one
  * the target lies in.
  *
- * It does NOT extend to the other two members of the family: against
- * AiEngageStep the same region breaks into runs of 11, 25, 28, 11 and 11, and
- * against AiAttackBody into a single 28. AiSightTrace below is the inner 38
- * that all four DO share. */
+ * AiAttackBody uses it too, although a register-exact diff finds only a
+ * single 28-instruction run in common with the other two: the same source
+ * with a different register assignment (bearing in ebx and the rank in ebp
+ * there, the other way round here). AiEngageStep's test breaks into runs of
+ * 11, 25, 28, 11 and 11 and is not yet shown to be the same source.
+ * AiSightTrace below is the inner 38 that all four share. */
 #define AI_RANKF(off) (*(const int32_t *)((uintptr_t)ADDR_RANK_RECORDS         \
         + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK) * RANK_REC_BYTES + (off)))
 #define AI_DIRF(T, off) (*(T *)((uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR             \
