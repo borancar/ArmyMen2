@@ -1045,53 +1045,26 @@ int32_t __cdecl ScriptOrderTarget(AM2_ScriptCtx *ctx, int32_t *at,
 #define kPadCount   (*(int32_t *)((void *)(uintptr_t)(ADDR_PAD_COUNT)))
 #define kPadNumbers ((AM2_PadNumber *)((void *)(uintptr_t)(ADDR_PAD_NUMBERS)))
 
-/* One coordinate of a location: an integer, or `refvar <name>`. */
-static inline int32_t ScriptCoord(AM2_ScriptCtx *ctx, int32_t *at,
-                           int16_t *lit, int32_t *var)
-{
-    AM2_ScriptTok *tok = &ctx->tokens[*at];
-
-    if (tok->kind == AM2_TOKEN_INTEGER) {
-        *lit = (int16_t)(uintptr_t)tok->value;
-        return 1;
-    }
-
-    if (tok->kind != AM2_TOKEN_RESERVED ||
-        (int32_t)(uintptr_t)tok->value != AM2_TOK_REFVAR) {        /* refvar */
-        am2_log("Line [%4d]:  '%s' found, but expected token of type Integer "
-                "or keyword 'RefVar'\n",
-                ctx->tokens[*at].line,
-                ScriptTokenText(tok, kScriptWord));
-        return 0;
-    }
-
-    if (!ScriptStep(ctx, at))
-        return 0;
-
-    int32_t idx = ScriptFindName((const char *)ctx->tokens[*at].value);
-    if (idx == -1 || kScriptNames[idx].type != AM2_NAME_TYPE_INTEGER) {
-        am2_log("Line [%4d]:  expected variable name but variable %s not "
-                "declared\n",
-                ctx->tokens[*at].line, ctx->tokens[*at].value);
-        return 0;
-    }
-    *var = idx;
-    return 1;
-}
-
+/* ScriptLocation: each coordinate is an integer or `refvar <name>`, written
+ * out at both uses because the image's two copies differ. X steps past the
+ * token in each arm, and VC6 cross-jumps the refvar arm into the integer
+ * arm's step; Y steps once after the join. The step past the comma and the
+ * step after Y share one "Unexpected end of script." block. */
 int32_t __cdecl ScriptLocation(AM2_ScriptCtx *ctx, int32_t *at,
                                AM2_ScriptAction *act, int32_t quiet)
 {
+    int32_t idx;
+
     act->relative = 0;
 
-    AM2_ScriptTok *tok = &ctx->tokens[*at];
+#define tok (&ctx->tokens[*at])
 
     if (tok->kind == AM2_TOKEN_CONTROL_CHAR) {
         int32_t id = (int32_t)(uintptr_t)tok->value;
-        if (id != AM2_TOK_LPAREN && id != AM2_TOK_PLUS)        /* '(' or '+' */
-            return 0;                   /* silently, with no message */
+        if (id != AM2_TOK_LPAREN && id != AM2_TOK_PLUS)       /* '(' or '+' */
+            goto fail;                  /* silently, with no message */
 
-        if (id == AM2_TOK_PLUS) {                 /* a leading '+' means relative */
+        if ((int32_t)(uintptr_t)tok->value == AM2_TOK_PLUS) { /* a leading '+' means relative */
             act->relative = 1;
             if (!ScriptStep(ctx, at))
                 return 0;
@@ -1099,39 +1072,80 @@ int32_t __cdecl ScriptLocation(AM2_ScriptCtx *ctx, int32_t *at,
         if (!ScriptStep(ctx, at))       /* past the '(' */
             return 0;
 
-        if (!ScriptCoord(ctx, at, &act->u.pos.x, &act->xvar))
+        if (tok->kind == AM2_TOKEN_INTEGER) {
+            act->u.pos.x = (int16_t)(uintptr_t)tok->value;
+            if (!ScriptStep(ctx, at))
+                return 0;
+        } else if (tok->kind == AM2_TOKEN_RESERVED &&
+                   (int32_t)(uintptr_t)tok->value == AM2_TOK_REFVAR) {
+            if (!ScriptStep(ctx, at))
+                return 0;
+            idx = ScriptFindName((const char *)ctx->tokens[*at].value);
+            if (idx == -1 || kScriptNames[idx].type != AM2_NAME_TYPE_INTEGER) {
+                am2_log("Line [%4d]:  expected variable name but variable %s "
+                        "not declared\n",
+                        ctx->tokens[*at].line, ctx->tokens[*at].value);
+                return 0;
+            }
+            act->xvar = idx;
+            if (!ScriptStep(ctx, at))
+                return 0;
+        } else {
+            am2_log("Line [%4d]:  '%s' found, but expected token of type "
+                    "Integer or keyword 'RefVar'\n",
+                    ctx->tokens[*at].line,
+                    ScriptTokenText(tok, kScriptWord));
             return 0;
-        if (!ScriptStep(ctx, at))
-            return 0;
-
-        tok = &ctx->tokens[*at];
+        }
         if (tok->kind != AM2_TOKEN_CONTROL_CHAR ||
             (int32_t)(uintptr_t)tok->value != AM2_TOK_COMMA) {      /* ',' */
             am2_log("Line [%4d]:  Comma expected in coordinates\n",
                     ctx->tokens[*at].line);
             return 0;
         }
-        if (!ScriptStep(ctx, at))
-            return 0;
 
-        if (!ScriptCoord(ctx, at, &act->u.pos.y, &act->yvar))
-            return 0;
-        if (!ScriptStep(ctx, at))
-            return 0;
+        if (++(*at) >= ctx->count)      /* past the ',' */
+            goto eos;
 
-        tok = &ctx->tokens[*at];
+        if (tok->kind == AM2_TOKEN_INTEGER) {
+            act->u.pos.y = (int16_t)(uintptr_t)tok->value;
+        } else if (tok->kind == AM2_TOKEN_RESERVED &&
+                   (int32_t)(uintptr_t)tok->value == AM2_TOK_REFVAR) {
+            if (!ScriptStep(ctx, at))
+                return 0;
+            idx = ScriptFindName((const char *)ctx->tokens[*at].value);
+            if (idx == -1 || kScriptNames[idx].type != AM2_NAME_TYPE_INTEGER) {
+                am2_log("Line [%4d]:  expected variable name but variable %s "
+                        "not declared\n",
+                        ctx->tokens[*at].line, ctx->tokens[*at].value);
+                return 0;
+            }
+            act->yvar = idx;
+        } else {
+            am2_log("Line [%4d]:  '%s' found, but expected token of type "
+                    "Integer or keyword 'RefVar'\n",
+                    ctx->tokens[*at].line,
+                    ScriptTokenText(tok, kScriptWord));
+            return 0;
+        }
+        if (++(*at) >= ctx->count) {
+eos:
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
         if (tok->kind == AM2_TOKEN_CONTROL_CHAR &&
-            (int32_t)(uintptr_t)tok->value == AM2_TOK_RPAREN) {      /* ')' */
+            (int32_t)(uintptr_t)tok->value == AM2_TOK_RPAREN) {  /* ')' */
             (*at)++;
             return 1;
         }
         am2_log("Line [%4d]:  Close parens expected in coordinates\n",
                 ctx->tokens[*at].line);
+fail:
         return 0;
     }
 
     if (tok->kind == AM2_TOKEN_STRING) {
-        int32_t idx = ScriptFindName((const char *)tok->value);
+        idx = ScriptFindName((const char *)tok->value);
         if (idx >= 0 && kScriptNames[idx].type == AM2_NAME_TYPE_PAD) {          /* a pad */
             int32_t number = kPads[kScriptNames[idx].value].number;
             /* Both centroid words at once, exactly as the original. */
@@ -1147,6 +1161,7 @@ int32_t __cdecl ScriptLocation(AM2_ScriptCtx *ctx, int32_t *at,
     }
 
     return ScriptResolveName(ctx, at, &act->target, quiet) != 0;
+#undef tok
 }
 
 /* ScriptParseEvent: one `case` per event keyword, each written out in full
