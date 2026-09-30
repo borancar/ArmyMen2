@@ -1512,7 +1512,7 @@ void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
     if (slot >= AM2_SLOT_MAX || obj == 0)
         return;
 
-    isVehicle[slot] = (*(const int32_t *)o == AM2_OBJ_TYPE_VEHICLE);
+    isVehicle[slot] = ObjIsType3Inline(o);
 
     if (slot == 0) {
         *out = leaderPos;
@@ -1531,7 +1531,9 @@ void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
         dist = *(const int16_t *)(rec + SLOT_REC_OFF_DIST);
         if (isVehicle[parent] || isVehicle[slot])
             dist += dist;
-        heading = (uint8_t)(*(const uint8_t *)(rec + SLOT_REC_OFF_ANGLE)
+        /* The angle is indexed off the table afresh, not through `rec`. */
+        heading = (uint8_t)(((const uint8_t *)(uintptr_t)ADDR_SLOT_RECS)
+                                [slot * AM2_SLOT_REC_BYTES + SLOT_REC_OFF_ANGLE]
                             + headings[parent]);
         fdist = (float)dist;
         ((int16_t *)out)[0] =
