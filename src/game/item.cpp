@@ -747,7 +747,7 @@ void __cdecl ItemLinkCells(void *obj, void *cells)
     for (; ct <= cb; ct++, cell += stride) {
         int32_t x;
 
-        for (x = cl; x <= cr; x++, cell++, used++) {
+        for (x = cl; x <= cr; x++, used++, cell++) {
             *(int32_t *)(ENTRY(used) + CELL_ENTRY_OFF_INDEX) = cell;
             ListPushFront(ENTRY(used),
                           (void **)(*(uint8_t **)(d + MAPDESC_OFF_CELLS)

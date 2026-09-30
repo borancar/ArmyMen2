@@ -2781,8 +2781,8 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
     wrap = cols - x1 + x0 - 1;
     cell = (y0 << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + x0;
 
-    for (y = y0; y <= y1; y++, cell += wrap) {
-        for (x = x0; x <= x1; x++, cell++) {
+    for (y = y0; y <= y1; cell += wrap, y++) {
+        for (x = x0; x <= x1; cell++, x++) {
             uint8_t *node = ((uint8_t *const *)(*(const uint8_t *const *)
                                  (d + MAPDESC_OFF_CELLS)))[cell];
 
@@ -2889,7 +2889,7 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc)
     cell = (y0 << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + x0;
 
     for (y = y0; y <= y1; y++, cell += wrap) {
-        for (x = x0; x <= x1; x++, cell++) {
+        for (x = x0; x <= x1; cell++, x++) {
             uint8_t *node = ((uint8_t *const *)(*(const uint8_t *const *)
                                  (d + MAPDESC_OFF_CELLS)))[cell];
 

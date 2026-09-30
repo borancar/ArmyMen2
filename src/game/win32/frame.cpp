@@ -1864,7 +1864,7 @@ void __cdecl PausedFrameStep(void)
     xy = (const int16_t *)((const uint8_t *)(uintptr_t)ADDR_MP_ROW_COORDS
                            + (uint32_t)(active - 1) * 16u);
 
-    for (slot = 0; slot < 4; slot++, xy += 2) {
+    for (slot = 0; slot < 4; xy += 2, slot++) {
 #define rec (comm + slot * COMM_PLAYER_STRIDE)
         uint32_t pause;
         int32_t  team;

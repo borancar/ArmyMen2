@@ -1002,7 +1002,7 @@ int32_t __cdecl PlaceScenario(void)
 
         army = ((AM2_Comm *)comm)->CommSlotForArmy(slot);
 
-        for (i = 0; i < n; i++, row += SCEN_ROW_BYTES) {
+        for (i = 0; i < n; row += SCEN_ROW_BYTES, i++) {
             uint8_t *unit;
             int32_t  kind = *(const int32_t *)(row + SCEN_ROW_OFF_KIND);
             int32_t  amount;

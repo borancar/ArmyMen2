@@ -2420,7 +2420,7 @@ void __cdecl ItemTeardown(void *obj)
         int32_t cell = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W * row
                        + rect[0];
 
-        for (x = rect[0]; x <= rect[2]; x++, idx++, cell++) {
+        for (x = rect[0]; x <= rect[2]; idx++, x++, cell++) {
             uint8_t *weights =
                 *(uint8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
             int8_t   h;

@@ -78,7 +78,7 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
 
     penX = x;
 
-    for (i = 0, j = 1; i < len; i++, j++) {
+    for (i = 0, j = 1; i < len; j++, i++) {
         const AM2_Rle16 *glyph;
         AM2_Rect src, out;
         int32_t  dstX, dstY, gw, gh;

@@ -1881,7 +1881,7 @@ void __cdecl ReceivePlayerMsg(void *msg, int32_t dpid)
         *(const int32_t *)(m + MSG_PLAYER_SETTING_22C);
 
     rec = m + MSG_PLAYER_RECORDS;
-    for (i = 0; ; i++, rec += MSG_PLAYER_STRIDE, slotSetting++) {
+    for (i = 0; ; rec += MSG_PLAYER_STRIDE, i++, slotSetting++) {
         uint8_t *slotRec;
         int32_t  id = *(const int32_t *)(rec + REC_PLAYER_ID);
 
