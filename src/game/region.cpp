@@ -1837,41 +1837,38 @@ int32_t __cdecl BoxAction(AM2_Rect area, void *out)
     /* The output record is addressed from `out` at every use. */
 #define box   ((int32_t *)((uint8_t *)out + TILEMASK_OFF_RECT))
 #define cells ((uint8_t *)out + TILEMASK_OFF_CELLS)
-    int32_t  l;
-    int32_t  r;
-    int32_t  t;
-    int32_t  b;
+    AM2_Rect c;
     int32_t  stride;
     int32_t  y;
 
     /* In the original's order: the two x edges, then the two y edges. */
-    l = Clamp(area.left  >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    c.left = Clamp(area.left  >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
                   - AM2_TILEMASK_MARGIN);
-    r = Clamp(area.right >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    c.right = Clamp(area.right >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
                   - AM2_TILEMASK_MARGIN);
-    t = Clamp(area.top   >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    c.top = Clamp(area.top   >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
                   - AM2_TILEMASK_MARGIN);
-    b = Clamp(area.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
+    c.bottom = Clamp(area.bottom >> AM2_TILE_SHIFT, AM2_TILEMASK_MARGIN,
               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
                   - AM2_TILEMASK_MARGIN);
 
-    box[3] = b + AM2_TILEMASK_MARGIN;   /* bottom, then right, then left */
-    box[2] = r + AM2_TILEMASK_MARGIN;
-    box[0] = l - AM2_TILEMASK_MARGIN;
-    box[1] = t - AM2_TILEMASK_MARGIN;
+    box[3] = c.bottom + AM2_TILEMASK_MARGIN;   /* bottom, then right, then left */
+    box[2] = c.right + AM2_TILEMASK_MARGIN;
+    box[0] = c.left - AM2_TILEMASK_MARGIN;
+    box[1] = c.top - AM2_TILEMASK_MARGIN;
 
     memset(cells, AM2_TILEMASK_PAD_CELL,
            (size_t)((box[3] - box[1] + 1) * (box[2] - box[0] + 1)));
 
     stride = box[2] - box[0] + 1;
-    for (y = t; y <= b; y++) {
-        if (l > r)
+    for (y = c.top; y <= c.bottom; y++) {
+        if (c.left > c.right)
             continue;
-        memset(cells + (y - box[1]) * stride - box[0] + l,
-               AM2_TILEMASK_BOX_CELL, (size_t)(r - l + 1));
+        memset(cells + (y - box[1]) * stride - box[0] + c.left,
+               AM2_TILEMASK_BOX_CELL, (size_t)(c.right - c.left + 1));
     }
 #undef box
 #undef cells

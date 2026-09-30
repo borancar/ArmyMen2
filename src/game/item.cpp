@@ -3069,57 +3069,64 @@ int32_t __cdecl BlockWeightDamaging(void *from, uint32_t at, void *chain,
  * it clears +0xC0 and OBJ_OFF_SCRIPT_STATE together, but only when those two
  * already agree.
  *
- * Two argument slots are recycled as scratch in the original and one has its
- * address taken afterwards; nothing observes the frame, so this uses named
- * locals rather than reproducing that. */
-int32_t __cdecl BlockWeightRoute(void *from, uint32_t at, void *chain,
+ * Each pass copies the leg and the target point before their addresses are
+ * taken, which is what puts one copy in the dead `chain` slot; the weight
+ * lives in two variables because the three zero exits skip the copy. */
+int32_t __cdecl BlockWeightRoute(
+void *from, uint32_t at, void *chain,
                                  int32_t *inside)
 {
-    uint8_t *o = (uint8_t *)chain;
+    uint8_t *o;
     uint8_t *f = (uint8_t *)from;
     int32_t  total = 0;
     uint32_t leg;
-    uint32_t tile;
+    int32_t  tile;
+    uint8_t  fl;
 
     *inside = 0;
 
+    leg = *(const uint32_t *)(f + OBJ_OFF_FIELD_C0);
     if (*(const uint16_t *)(f + OBJ_OFF_MOVE_AT)
         < *(const uint16_t *)(f + OBJ_OFF_MOVE_COUNT))
         leg = ((const uint32_t *)(f + OBJ_OFF_MOVE_FROM))
                   [*(const uint16_t *)(f + OBJ_OFF_MOVE_AT)];
-    else
-        leg = *(const uint32_t *)(f + OBJ_OFF_FIELD_C0);
 
-    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
-        int32_t w = AM2_BLOCK_FULL;
-        int32_t ask = 1;
-        int32_t dh;
+    for (o = (uint8_t *)chain; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
+        uint32_t lp = leg;
+        uint32_t ap = at;
+        int32_t  w;
 
-        if (o == f) {
+        if (o == f)
             w = 0;
-            ask = 0;
-        } else if (f
-                   && (dh = *(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
-                            - *(const int8_t *)(f + OBJ_OFF_HEIGHT_SET),
-                       abs(dh) > AM2_BLOCK_HEIGHT_STEP)) {
+        else if (f && abs(*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
+                          - *(const int8_t *)(f + OBJ_OFF_HEIGHT_SET))
+                      > AM2_BLOCK_HEIGHT_STEP)
             w = 0;
-            ask = 0;
-        } else if (ObjIsItem((const AM2_Object *)o)) {
-            w = *(const int8_t *)(o + OBJ_OFF_RANK);
-            ask = w >= AM2_BLOCK_FULL;
-        } else if (f && ObjIsTypeIn238((const AM2_Object *)o)
-                   && ApproxDist((const AM2_Point *)&at,
-                                 (const AM2_Point *)(o + OBJ_OFF_POS))
-                      > ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
-                                   (const AM2_Point *)(o + OBJ_OFF_POS))) {
-            w = 0;
-            ask = 0;
+        else {
+            int32_t wt = AM2_BLOCK_FULL;
+
+            if (ObjIsItem((const AM2_Object *)o)) {
+                wt = *(const int8_t *)(o + OBJ_OFF_RANK);
+                if (wt >= AM2_BLOCK_FULL)
+                    goto ask;
+                goto skip;
+            } else if (f && ObjIsTypeIn238((const AM2_Object *)o)
+                       && ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
+                                     (const AM2_Point *)(o + OBJ_OFF_POS))
+                          < ApproxDist((const AM2_Point *)&ap,
+                                       (const AM2_Point *)(o + OBJ_OFF_POS))) {
+                w = 0;
+                goto add;
+            }
+ask:
+            *inside = PointInRect(
+                (const AM2_Rect *)(o + OBJ_OFF_HIT_RECT),
+                (const AM2_Point *)&lp);
+skip:
+            w = wt;
+
         }
-
-        if (ask)
-            *inside = PointInRect((const AM2_Rect *)(o + OBJ_OFF_HIT_RECT),
-                                  (const AM2_Point *)&leg);
-
+add:
         total += w;
         if (total >= AM2_BLOCK_FULL) {
             if (*inside) {
@@ -3127,7 +3134,7 @@ int32_t __cdecl BlockWeightRoute(void *from, uint32_t at, void *chain,
                 uint16_t cnt = *(const uint16_t *)(f + OBJ_OFF_MOVE_COUNT);
 
                 if (cur < cnt) {
-                    if (cur < (uint16_t)(cnt - 1))
+                    if (cur < cnt - 1)
                         *(uint16_t *)(f + OBJ_OFF_MOVE_AT) =
                             (uint16_t)(cur + 1);
                     else
@@ -3146,14 +3153,17 @@ int32_t __cdecl BlockWeightRoute(void *from, uint32_t at, void *chain,
         }
     }
 
-    tile = (uint32_t)TileOfPoint(at);
-    /* The original's guard, on the low 16 bits and before the mask -- vacuous,
-     * exactly as in BlockWeightChain, and kept for the same reason. */
-    if ((tile & 0xFFFFu) > 0xFFFFu)
+    tile = (uint16_t)TileOfPoint(at);
+    /* The original's guard, on the tile widened to int -- vacuous, exactly as
+     * in BlockWeightChain, and kept for the same reason. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wtype-limits"
+    if (tile < 0 || tile > 0xFFFF)
         return 0xFF;
-    tile &= 0xFFFFu;
+#pragma GCC diagnostic pop
 
-    if (g_tileFlags[tile] & AM2_TILE_BLOCKS)
+    fl = g_tileFlags[tile];
+    if (fl & AM2_TILE_BLOCKS)
         total += AM2_BLOCK_FULL;
 
     /* The second tile term is gated on the MULTIPLAYER session or on this
@@ -3162,11 +3172,11 @@ int32_t __cdecl BlockWeightRoute(void *from, uint32_t at, void *chain,
      * tile costs, standing in one already does not. */
     if ((*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
          || *(const int8_t *)(f + OBJ_OFF_ARMY) == (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
-        && (g_tileFlags[tile] & 2)
+        && (fl & 2)
         && !(g_tileFlags[*(const uint16_t *)(f + OBJ_OFF_TILE)] & 2))
         total += AM2_BLOCK_FULL;
 
-    if ((uint32_t)TileOfPoint(*(const uint32_t *)(f + OBJ_OFF_FIELD_C0))
+    if ((uint16_t)TileOfPoint(*(const uint32_t *)(f + OBJ_OFF_FIELD_C0))
         == tile)
         *inside = 1;
 
@@ -9409,16 +9419,13 @@ extern "C" void __cdecl SetPointerMode(int32_t mode);
  * the drawn viewport -- so a click on the HUD reaches none of this. */
 void __cdecl SelectionClick(void)
 {
-    uint32_t  world;
-    int16_t   wx = (int16_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X
-                             + *(const int32_t *)(uintptr_t)ADDR_CURSOR_POINT);
-    int16_t   wy = (int16_t)(*(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
-                             + *(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT
-                                                             + 2));
+    AM2_Point world;
     uint8_t  *e;
 
-    ((int16_t *)&world)[0] = wx;
-    ((int16_t *)&world)[1] = wy;
+    world.x = (int16_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X
+                        + ((const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)->x);
+    world.y = (int16_t)(*(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
+                        + *(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2));
 
     if (*(const int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON) {
         /* A rubber band exists: the let-go arm is laid out first, then the
@@ -9467,19 +9474,17 @@ void __cdecl SelectionClick(void)
                             (void *)(uintptr_t)((const AM2_Object *)e)->uid);
                 *(uint32_t *)(e + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
             }
-
-            OnSelectionChanged(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
-            return;
+            goto changed;
         }
         {
-            int16_t ax = *(const int16_t *)(uintptr_t)ADDR_DRAG_ANCHOR;
-            int16_t ay = *(const int16_t *)(uintptr_t)(ADDR_DRAG_ANCHOR + 2);
+            const AM2_Point *a = (const AM2_Point *)(uintptr_t)ADDR_DRAG_ANCHOR;
+            const AM2_Point *w = &world;
             AM2_Rect *r = (AM2_Rect *)(uintptr_t)ADDR_VIEW_RECT;
 
-            r->left   = (ax < wx) ? ax : wx;
-            r->right  = (ax > wx) ? ax : wx;
-            r->top    = (ay < wy) ? ay : wy;
-            r->bottom = (ay > wy) ? ay : wy;
+            r->left   = (a->x < w->x) ? a->x : w->x;
+            r->right  = (a->x > w->x) ? a->x : w->x;
+            r->top    = (a->y < w->y) ? a->y : w->y;
+            r->bottom = (a->y > w->y) ? a->y : w->y;
             return;
         }
     }
@@ -9497,7 +9502,7 @@ void __cdecl SelectionClick(void)
         return;
 
     e = (uint8_t *)WalkCellAtPoint(
-            &world, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+            (const uint32_t *)&world, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
             ObjIsSelectable);
     if (!e)
         return;
@@ -9536,8 +9541,8 @@ void __cdecl SelectionClick(void)
     ((AM2_Rec *)(void *)(uintptr_t)ADDR_SELECTED_UIDS)->PtrListPush(
                 (void *)(uintptr_t)((const AM2_Object *)e)->uid);
     *(uint32_t *)(e + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
+changed:
     OnSelectionChanged(*(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
-    return;
 
 }
 
