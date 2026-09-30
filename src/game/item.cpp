@@ -2518,7 +2518,6 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
     const uint8_t  *c = (const uint8_t *)ctrl;
     uint8_t        *o = (uint8_t *)obj;
     const uint8_t  *rows;
-    const AM2_Anim *anim;
     int32_t         speed = 0;
     int32_t         cur, next, here;
     uint8_t         facing;
@@ -2526,30 +2525,32 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
 
     if (*(const int32_t *)(c + ROACHSTEP_OFF_STATE) != 1) {
         int32_t reverse = *(const int32_t *)(c + ROACHSTEP_OFF_FLAG18);
-        double  delta   = (double)*(const float *)
-                              (uintptr_t)ADDR_FRAME_DELTA_SEC;
+        /* The cap is chosen before the direction is tested again, and the
+         * frame's delta is multiplied straight out of its float. */
+        int32_t cap = reverse
+            ? *(const int32_t *)((void *)(uintptr_t)(ADDR_ROACH_REVVEL))
+            : *(const int32_t *)((void *)(uintptr_t)(ADDR_ROACH_FORVEL));
 
         if (reverse) {
-            int32_t cap = *(const int32_t *)((void *)(uintptr_t)(ADDR_ROACH_REVVEL));
-            int32_t v   = (int32_t)((double)*(const int32_t *)
-                                        (o + OBJ_OFF_FIELD_44)
-                                    - (double)*(const int32_t *)
-                                        ((void *)(uintptr_t)(ADDR_ROACH_REVACC)) * delta);
+            int32_t v = (int32_t)((double)*(const int32_t *)(o + OBJ_OFF_FIELD_44)
+                                  - *(const int32_t *)
+                                        ((void *)(uintptr_t)(ADDR_ROACH_REVACC))
+                                    * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
 
             speed = (-cap > v) ? -cap : v;
         } else {
-            int32_t cap = *(const int32_t *)((void *)(uintptr_t)(ADDR_ROACH_FORVEL));
-            int32_t v   = (int32_t)((double)*(const int32_t *)
-                                        ((void *)(uintptr_t)(ADDR_ROACH_FORACC)) * delta
-                                    + (double)*(const int32_t *)
-                                        (o + OBJ_OFF_FIELD_44));
+            int32_t v = (int32_t)(*(const int32_t *)
+                                      ((void *)(uintptr_t)(ADDR_ROACH_FORACC))
+                                    * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
+                                  + (double)*(const int32_t *)(o + OBJ_OFF_FIELD_44));
 
             speed = (cap < v) ? cap : v;
         }
     }
 
     rows = *(const uint8_t *const *)(o + OBJ_OFF_ROWS);
-    anim = *(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING);
+    /* The playing animation is read through the row at every use. */
+#define anim (*(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING))
     if (!anim)
         return 0;
 
@@ -2584,6 +2585,7 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
     MoveStepPoint(obj, facing, 0, speed, 0, 0, (AM2_Point *)&at);
 
     return RoachMaskWeight(obj, next, at, 0) >= here;
+#undef anim
 }
 
 /* RoachStepTailA -- original 0x0043D750, four callers. Commit one roach step:
