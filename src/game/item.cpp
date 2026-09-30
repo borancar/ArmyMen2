@@ -10019,27 +10019,26 @@ void __cdecl ToggleSelect(void *obj)
         ((AM2_Rec *)(uintptr_t)ADDR_SELECTED_UIDS)->PtrListPush(
             (void *)(uintptr_t)o->uid);
         *(uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS) |= OBJ_FLAG_SELECTED;
-        OnSelectionChanged(
-            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
-        return;
-    }
-
-    n = *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT;
-
-    for (i = 0; i < n; i++) {
-        if ((*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]
-            == o->uid) {
-            /* The last selected unit cannot be toggled off, and that
-             * refusal returns WITHOUT OnSelectionChanged -- the one exit
-             * that skips it. */
-            if (n > 1) {
-                ((AM2_Rec *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
-                *(uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
-                ObjAttachTo(o, (void *)0);
-                OnSelectionChanged(
-                    *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+    } else {
+        n = *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT;
+        i = 0;
+        if (n > 0) {
+            for (; i < n; i++) {
+                if ((*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]
+                    == o->uid) {
+                    /* The last selected unit cannot be toggled off, and
+                     * that refusal returns WITHOUT OnSelectionChanged --
+                     * the one exit that skips it. */
+                    if (n > 1) {
+                        ((AM2_Rec *)(uintptr_t)ADDR_SELECTED_UIDS)->ListRemoveAt(i);
+                        *(uint32_t *)((uint8_t *)o + OBJ_OFF_FLAGS) &= ~OBJ_FLAG_SELECTED;
+                        ObjAttachTo(o, (void *)0);
+                        OnSelectionChanged(
+                            *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT);
+                    }
+                    return;
+                }
             }
-            return;
         }
     }
 
