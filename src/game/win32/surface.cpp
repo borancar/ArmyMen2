@@ -427,17 +427,18 @@ LPDIRECTDRAWSURFACE __cdecl CreateBitmapSurface(am2_FILE *fp, uint32_t nbytes,
     DDSURFACEDESC        ddsd;
     LPDIRECTDRAWSURFACE  surf;
     uint8_t             *pixels;
-    uint32_t             size = nbytes;  /* a copy: nbytes is passed by address below */
+    uint8_t              key;    /* the top-left pixel BlitBitmapIn reports */
 
-    pixels = (uint8_t *)orig_malloc(size);
-    if (orig_fread(pixels, size, 1, fp) != 1) {
+    pixels = (uint8_t *)orig_malloc(nbytes);
+    if (orig_fread(pixels, nbytes, 1, fp) != 1) {
         orig_log("Error sprite from stream in CreateBitmapSurface().\n");
         orig_free(pixels);
         return NULL;
     }
 
     /* No caps and no colour key yet -- the key is not known until the copy has
-     * run, and is applied at the end from the same slot the count came in on. */
+     * run, and is applied at the end from `key` -- which the original keeps in
+     * the slot the count came in on. */
     surf = CreateOffscreenSurface(width, height, 0, -1);
     if (!surf) {
         orig_log("Unable to create directdraw surface in CreateBitmapSurface()");
@@ -457,10 +458,10 @@ LPDIRECTDRAWSURFACE __cdecl CreateBitmapSurface(am2_FILE *fp, uint32_t nbytes,
      * and the release, as the image has them. */
     if (IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL) == DD_OK) {
         if (BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels,
-                         width, height, remap, &nbytes)) {
+                         width, height, remap, &key)) {
             IDirectDrawSurface_Unlock(surf, ddsd.lpSurface);
             if (!(flags & 1))
-                SetSurfaceColorKey(surf, (uint8_t)nbytes);
+                SetSurfaceColorKey(surf, key);
             goto release;
         }
         IDirectDrawSurface_Release(surf);
@@ -492,12 +493,12 @@ int32_t __cdecl ReloadBitmapSurface(LPDIRECTDRAWSURFACE surf, am2_FILE *fp,
 {
     DDSURFACEDESC ddsd;
     uint8_t      *pixels;
-    uint32_t      size = nbytes;  /* a copy: nbytes is passed by address below */
+    uint8_t       key;    /* the top-left pixel BlitBitmapIn reports */
 
     /* The game's heap: the buffer is handed to the game's own fread and freed
      * by the game's own free on every path out of here. */
-    pixels = (uint8_t *)orig_malloc(size);
-    if (orig_fread(pixels, size, 1, fp) != 1) {
+    pixels = (uint8_t *)orig_malloc(nbytes);
+    if (orig_fread(pixels, nbytes, 1, fp) != 1) {
         orig_log("Error sprite from stream in ReloadBitmapSurface().\n");
         orig_free(pixels);
         return 0;
@@ -511,18 +512,18 @@ int32_t __cdecl ReloadBitmapSurface(LPDIRECTDRAWSURFACE surf, am2_FILE *fp,
         return 0;
     }
 
-    /* `nbytes` goes in as the byte count and is read back afterwards as the
-     * transparent index, so it has to be passed by address and re-read -- see
-     * ADDR_BLIT_BITMAP_IN. Caching it across this call would silently key the
-     * surface on the wrong colour. The failures are laid out after the
+    /* The transparent index comes back through `key`, a byte local the
+     * original keeps in `nbytes`' own argument slot once the count is spent --
+     * which is why the byte count and the key look like one variable in the
+     * image. See ADDR_BLIT_BITMAP_IN. The failures are laid out after the
      * success path and share the log and the release, as the image has
      * them. */
     if (IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL) == DD_OK) {
         if (BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels,
-                         width, height, remap, &nbytes)) {
+                         width, height, remap, &key)) {
             IDirectDrawSurface_Unlock(surf, ddsd.lpSurface);
             if (!(flags & 1))
-                SetSurfaceColorKey(surf, (uint8_t)nbytes);
+                SetSurfaceColorKey(surf, key);
             goto release;
         }
         IDirectDrawSurface_Release(surf);

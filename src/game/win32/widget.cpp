@@ -11057,11 +11057,13 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
      * which killed the process the first time this ran. The field's own
      * comment was the evidence and it was read as `char[]` anyway. */
     uint8_t       *self = (uint8_t *)w;
-    const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
+#define comm (*(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
 #define slot (*(const int32_t *)(self + MPBTN_OFF_ROW))
 #define rec (comm + slot * AM2_PLAYER_STRIDE)
     RECT           vis;
-    char           dots[64];
+    /* SIXTEEN BYTES, the original's frame. A dot per 7.5 s of silence
+     * means a player unheard for two minutes writes past it; reproduced. */
+    char           dots[16];
 
     ::WidgetScreenRect(w);
 
@@ -11072,7 +11074,7 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
      * condition is `id != 0`, not `id > 0`: a -1 id takes the OCCUPIED branch
      * here even though AM2_PLAYER_ID's own comment calls 0 and -1 both "none".
      * Reproduced as written rather than as the comment reads. */
-    if (*(const int32_t *)(rec + AM2_PLAYER_ID) != 0) {
+    if (*(const uint32_t *)(rec + AM2_PLAYER_ID) > 0) {
         if (*(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS
             & (AM2_MP_PAUSE_BIT0 << slot)) {
             uint32_t now = orig_get_tick_count();
@@ -11087,22 +11089,24 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
 
             am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
                         (const char *)((void *)(uintptr_t)(AM2_STR_NOT_RESPONDING)), dots);
-            ::MpNameSetInk(w, *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
+            w->MpNameSetInk(*(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
             *(uint8_t *)(self + MPNAME_OFF_PAPER) =
                 *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
         } else {
             am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
                         (const char *)((void *)(uintptr_t)(AM2_STR_PCT_S)),
                         rec + COMM_OFF_PLAYERS + COMM_SLOT_OFF_NAME);
-            ::MpNameSetInk(w, MpNameInk(slot));
+            w->MpNameSetInk(MpNameInk(slot));
             *(uint8_t *)(self + MPNAME_OFF_PAPER) = MpNamePaper(slot);
         }
     } else {
-        am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
-                    (const char *)((void *)(uintptr_t)(
-                        *(const int32_t *)(rec + AM2_PLAYER_ACTIVE)
-                        ? AM2_STR_COMPUTER_SLOT : AM2_STR_OPEN_SLOT)));
-        ::MpNameSetInk(w, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
+        if (*(const int32_t *)(rec + AM2_PLAYER_ACTIVE))
+            am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
+                        (const char *)((void *)(uintptr_t)(AM2_STR_COMPUTER_SLOT)));
+        else
+            am2_sprintf(*(char **)(self + MPNAME_OFF_TEXT),
+                        (const char *)((void *)(uintptr_t)(AM2_STR_OPEN_SLOT)));
+        w->MpNameSetInk(*(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
         *(uint8_t *)(self + MPNAME_OFF_PAPER) =
             *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR;
     }
@@ -11119,6 +11123,7 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
     UnlockSurface();
 #undef slot
 #undef rec
+#undef comm
 }
 
 /* 0x00432C50 -- the INK a player row's name is drawn in, chosen by how the
