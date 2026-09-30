@@ -10623,26 +10623,26 @@ int32_t __cdecl WeaponFrameReady(void *obj, void *weapon)
      * it themselves, which is why VC6 keeps a second copy of the call. */
     switch (kind) {
     case 2:
-        if (frame != 9 && frame != 0x0A && frame != 0x0B)
-            return 0;
-        break;
+        if (frame == 9 || frame == 0x0A || frame == 0x0B)
+            break;
+        return 0;
 
     case 1: case 7: case 8: case 9: case 10: case 29: case 30:
         if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > 0)
             return 1;
-        if (frame != 6 && frame != 7 && frame != 0x0D)
-            return 0;
-        break;
+        if (frame == 6 || frame == 7 || frame == 0x0D)
+            break;
+        return 0;
 
     case 4:
-        if (frame != 6 && frame != 7 && frame != 0x2C)
-            return 0;
-        break;
+        if (frame == 6 || frame == 7 || frame == 0x2C)
+            break;
+        return 0;
 
     case 5:
-        if (frame != 0x0C)
-            return 0;
-        break;
+        if (frame == 0x0C)
+            break;
+        return 0;
 
     case 11: case 12:
         if (frame == 0x0C)
@@ -10650,9 +10650,9 @@ int32_t __cdecl WeaponFrameReady(void *obj, void *weapon)
         return 0;
 
     case 43:
-        if (frame != 6)
-            return 0;
-        break;
+        if (frame == 6)
+            break;
+        return 0;
 
     case 3:
         return 1;

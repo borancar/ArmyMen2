@@ -1212,36 +1212,40 @@ int32_t __cdecl ThingCode(const void *who, const void *owner)
 {
     const uint8_t *w = (const uint8_t *)who;
     const uint8_t *o = (const uint8_t *)owner;
-    int32_t        code = **(const int32_t *const *)(w + OBJ_OFF_FIELD_C0);
+    int32_t        result = 0;
 
-    switch (code) {
-    case 2:               return 8;
-    case 3: case 4: case 5:  return 0x10;
-    case 6: case 7:       return 0x20;
-    case 8: case 25: case 30: return 0x30;
-    case 10: case 28:     return 0x1E;
-    case 15:              return AM2_NOT_AT_FLAG_BASE;
-    case 16: return AtFlagBase(w, o, 0,
-                               "gflagbase");
-    case 17: return AtFlagBase(w, o, 1,
-                               "tflagbase");
-    case 18: return AtFlagBase(w, o, 2,
-                               "bflagbase");
-    case 19: return AtFlagBase(w, o, 3,
-                               "grflagbase");
-    case 21:              return 0x21;
+    /* Cases in the image's layout order; the answer for an unlisted code is
+     * the zero preset before the switch. */
+    switch (**(const int32_t *const *)(w + OBJ_OFF_FIELD_C0)) {
+    case 2:               result = 8; break;
+    case 3: case 4: case 5:  result = 0x10; break;
+    case 6: case 7:       result = 0x20; break;
+    case 21:              result = 0x21; break;
+    case 29:              result = 0x40; break;
     case 22: {
         int32_t max    = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
         int32_t health = *(const int16_t *)(o + OBJ_OFF_HEALTH);
 
-        return health >= max / 2 ? 8 : 0x20;
+        result = health < max / 2 ? 0x20 : 8;
+
+        break;
     }
-    case 23:              return 0;   /* explicit, unlike the default below */
-    case 24: case 39: case 40: return 0x60;
-    case 26:              return 1;
-    case 29:              return 0x40;
-    default:              return 0;
+    case 23:              result = 0; break;  /* explicit, though the preset is 0 too */
+    case 8: case 25: case 30: result = 0x30; break;
+    case 26:              result = 1; break;
+    case 10: case 28:     result = 0x1E; break;
+    case 24: case 39: case 40: result = 0x60; break;
+    case 15:              result = AM2_NOT_AT_FLAG_BASE; break;
+    case 16: result = AtFlagBase(w, o, 0,
+                               "gflagbase"); break;
+    case 17: result = AtFlagBase(w, o, 1,
+                               "tflagbase"); break;
+    case 18: result = AtFlagBase(w, o, 2,
+                               "bflagbase"); break;
+    case 19: result = AtFlagBase(w, o, 3,
+                               "grflagbase"); break;
     }
+    return result;
 }
 
 /* 0x0041A1B0, two callers -- both arms of the cheat table at 0x00417B80.
