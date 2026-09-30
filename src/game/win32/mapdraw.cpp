@@ -198,7 +198,8 @@ void __cdecl PaintMapTiles(const AM2_Rect *tiles)
     LPDIRECTDRAWSURFACE dest = g_mapCacheSurf;
     LPDIRECTDRAWSURFACE sheet;
     AM2_Rect            clipped;
-    int32_t             row, top;
+    RECT                to, from;
+    int32_t             row, left;
 
     if (!dest)
         return;
@@ -210,36 +211,37 @@ void __cdecl PaintMapTiles(const AM2_Rect *tiles)
                        (const RECT *)g_visibleTiles))
         return;
 
-    /* Tile coordinates become pixels relative to the camera. */
-    top = (clipped.top - g_visibleTiles->top) * MAP_TILE_SIZE;
+    /* Tile coordinates become pixels relative to the camera. The destination
+     * rectangle is itself the loop state: its top and bottom step per row,
+     * its left and right per column, from a saved left edge. */
+    to.top    = (clipped.top - g_visibleTiles->top) * MAP_TILE_SIZE;
+    to.bottom = to.top + MAP_TILE_SIZE;
+    left      = (clipped.left - g_visibleTiles->left) * MAP_TILE_SIZE;
 
     for (row = clipped.top; row < clipped.bottom; row++) {
-        const uint16_t *cell = g_mapTiles
-                             + ((row << g_mapRowShift) + tiles->left);
-        int32_t         left = (clipped.left - g_visibleTiles->left)
-                               * MAP_TILE_SIZE;
+        const uint16_t *cell;
         int32_t         col;
 
+        to.left = left;
+        cell    = g_mapTiles + ((row << g_mapRowShift) + tiles->left);
         for (col = clipped.left; col < clipped.right; col++) {
-            uint16_t idx = *cell;
-            RECT     to, from;
+            int32_t idx;
 
-            to.left   = left;
-            to.top    = top;
-            to.right  = left + MAP_TILE_SIZE;
-            to.bottom = top + MAP_TILE_SIZE;
+            to.right = to.left + MAP_TILE_SIZE;
+            idx      = *cell;   /* widened: the image shifts it with sar */
 
             from.left   = (idx & MAP_SHEET_COLUMNS) * MAP_TILE_SIZE;
-            from.top    = (int32_t)((idx >> 1) & ~0xFu);
+            from.top    = (idx >> 1) & ~0xF;
             from.right  = from.left + MAP_TILE_SIZE;
             from.bottom = from.top + MAP_TILE_SIZE;
 
             IDirectDrawSurface_Blt(dest, &to, sheet, &from, DDBLT_WAIT, NULL);
 
-            left += MAP_TILE_SIZE;
+            to.left += MAP_TILE_SIZE;
             cell++;
         }
-        top += MAP_TILE_SIZE;
+        to.top   += MAP_TILE_SIZE;
+        to.bottom = to.top + MAP_TILE_SIZE;
     }
 }
 
