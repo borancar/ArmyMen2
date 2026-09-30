@@ -6274,7 +6274,7 @@ void __cdecl UnrevealArea(int32_t army, uint32_t at)
     /* The map's size is read from its globals at every use. */
 #define MAP_W (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W)
 #define MAP_H (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H)
-    uint32_t tile;
+    uint16_t tile;
     int32_t  x, y, x0, x1, y0, y1;
 
     if (army >= AM2_REVEAL_ARMIES)
