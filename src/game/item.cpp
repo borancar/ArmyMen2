@@ -3346,8 +3346,13 @@ typedef int32_t (__cdecl *AM2_ShotHitsObjFn)(void *target, int32_t code,
  * question; written here as the question. */
 static inline int32_t ShotCodeChecksArmour(int32_t code)
 {
-    return (code == 1 || code == 7 || code == 8 || code == 9 || code == 10
-            || code == 21 || code == 29 || code == 30) ? 1 : 0;
+    /* A switch in the image: a byte table and a jump table over 1..30. */
+    switch (code) {
+    case 1: case 7: case 8: case 9: case 10: case 21: case 29: case 30:
+        return 1;
+    default:
+        return 0;
+    }
 }
 
 /* Does the shot get through `target`'s armour? Only the eight codes above ask;
