@@ -154,11 +154,11 @@ int objtype_install(void);
 }
 #endif
 
-/* 0x00433880, two callers. Build an object out of an AAI record. Nine
- * arguments; the ninth is never read. */
+/* 0x00433880, two callers. Build an object out of an AAI record. Eight
+ * arguments. */
 int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
                                int32_t index, uint32_t at, int32_t orFlags,
-                               int32_t a7, int32_t a8, int32_t unused);
+                               int32_t a7, int32_t a8);
 
 /* 0x00434F20, three callers. Give an object the appearance of one sprite
  * triple: rebuild its rows from the def-obj record, copy that record's fields

@@ -12435,7 +12435,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
 {
     AM2_DefLink *rec;
     uint8_t     *parent = (uint8_t *)0;
-    uint8_t     *prev   = (uint8_t *)0;
+    uint8_t     *prev;
     int32_t      n      = 0;
     uint8_t     *o;
     int32_t      slot;
@@ -12451,11 +12451,12 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
     if (rec) {
         char child[AM2_CHILD_NAME_BUF];
 
+        prev   = (uint8_t *)0;
         do {
-            AM2_Point pt;
+            AM2_Point pt = at;
 
-            pt.x = (int16_t)((uint16_t)at.x + (uint16_t)rec->dx);
-            pt.y = (int16_t)((uint16_t)at.y + (uint16_t)rec->dy);
+            pt.x += rec->dx;
+            pt.y += rec->dy;
 
             if (!parent) {
                 parent = (uint8_t *)CreateItem(name, army, rec->child, pt,
@@ -12504,39 +12505,39 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
     index = (int32_t)(((uint32_t)key >> AM2_OBJREC_SHIFT_A) & AM2_OBJREC_MASK_A);
     frame = (int32_t)((uint32_t)key & AM2_OBJREC_MASK_B);
 
+    o    = (uint8_t *)0;
     slot = EnsureSpriteAaiRecord(set, index, frame);
-    if (slot < 0)
-        return (void *)0;
+    if (slot >= 0) {
+        o = (uint8_t *)am2_malloc(AM2_ITEM_BYTES);
+        memset(o, 0, AM2_ITEM_BYTES);
 
-    o = (uint8_t *)am2_malloc(AM2_ITEM_BYTES);
-    memset(o, 0, AM2_ITEM_BYTES);
+        if (!InitObjFromAai(o, name, army, slot, *(uint32_t *)&at, orFlags, remote,
+                            (int32_t)uid)) {
+            am2_free(o);
+            return (void *)0;
+        }
 
-    if (!InitObjFromAai(o, name, army, slot, *(uint32_t *)&at, orFlags, remote,
-                        (int32_t)uid, 0)) {
-        am2_free(o);
-        return (void *)0;
+        for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++)
+            RowUpdate(*(uint8_t **)(o + OBJ_OFF_ROWS)
+                          + (uint32_t)i * AM2_OBJ_ROW_STRIDE,
+                      0, (void *)(uintptr_t)ADDR_MAP_DESC);
+
+        if (orFlags & OBJ_FLAG_CONCEALED) {
+            *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_CONCEALED;
+            ObjConceal(o, 1);
+        }
+
+        if (ObjIsWatchedKind(o) && *(const int8_t *)(o + OBJ_OFF_ARMY) < 4)
+            ItemPostCreate((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
+                           *(const uint32_t *)(o + OBJ_OFF_POS));
+
+        *(int32_t *)(o + OBJ_OFF_FORMATION_SLOT) = frame;
+
+        if (remote == 0
+            && AM2_THE_COMM->CommMustBroadcast(
+                                 (int16_t)army))
+            SendItemCreate(o);
     }
-
-    for (i = 0; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++)
-        RowUpdate(*(uint8_t **)(o + OBJ_OFF_ROWS)
-                      + (uint32_t)i * AM2_OBJ_ROW_STRIDE,
-                  0, (void *)(uintptr_t)ADDR_MAP_DESC);
-
-    if (orFlags & OBJ_FLAG_CONCEALED) {
-        *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_CONCEALED;
-        ObjConceal(o, 1);
-    }
-
-    if (ObjIsWatchedKind(o) && *(const int8_t *)(o + OBJ_OFF_ARMY) < 4)
-        ItemPostCreate((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY),
-                       *(const uint32_t *)(o + OBJ_OFF_POS));
-
-    *(int32_t *)(o + OBJ_OFF_FORMATION_SLOT) = frame;
-
-    if (remote == 0
-        && AM2_THE_COMM->CommMustBroadcast(
-                             (int16_t)army))
-        SendItemCreate(o);
 
     return o;
 }
@@ -14338,7 +14339,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
     o = (uint8_t *)am2_malloc(AM2_WEAPON_BYTES);
     memset(o, 0, 0x35u * 4u);
 
-    if (!InitObjFromAai(o, (char *)name, army, key, at, flags, remote, uid, 0)) {
+    if (!InitObjFromAai(o, (char *)name, army, key, at, flags, remote, uid)) {
         if (*(const int32_t *)(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT
                                + COMM_OFF_VERBOSE))
             am2_log("CreateWeapon\n");

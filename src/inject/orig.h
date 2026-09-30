@@ -4331,7 +4331,7 @@
  *
  * ITS THIRD ARGUMENT IS NEVER READ. Every caller pushes four and the body
  * touches frame+4, +8 and +16; frame+12 -- the sight context -- is not
- * among them. Fourth unused parameter in this tree. */
+ * among them. Third unused parameter in this tree. */
 #define ADDR_AI_ROUTE_TOWARD   0x00407190u  /* void(obj, out, ctx, int32) */
 /* Its two remembered regions, both int16 and both named from writers.
  * PREV_REGION is set to 0xFFFF in two places and stored into after a compare
@@ -18200,8 +18200,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AAI_OFF_ROW_FIELD28        0x34u
 #define ROW_OFF_FIELD_28           0x28u
 /* 0x00433880, two callers. Build an object out of an AAI record: flags, army,
- * the common init, health, the row set, and a post-move. NINE arguments and
- * the ninth is never read. */
+ * the common init, health, the row set, and a post-move. Eight arguments --
+ * it was read as nine from an `add esp, 0x24` that also pops the malloc
+ * argument pushed before the call. */
 #define ADDR_INIT_OBJ_FROM_AAI     0x00433880u
 /* TWO OF THIS PROTOTYPE'S SEVEN PARAMETERS WERE NAMED WRONG, AND THE WRONG
  * NAMES HAD BEEN COPIED INTO TWO PRIVATE TYPEDEFS THAT DISAGREED WITH EACH

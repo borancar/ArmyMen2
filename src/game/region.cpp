@@ -3205,7 +3205,7 @@ uint16_t __cdecl TileRegionOrBorrow(uint16_t tile)
  *
  * THE THIRD ARGUMENT IS NEVER READ. All nine callers push four; the body
  * touches frame+4, +8 and +16 and never frame+12, which is the sight context
- * every other function in this band wants. Fourth unused parameter in the
+ * every other function in this band wants. Third unused parameter in the
  * tree, and the signature keeps it because the call sites do.
  *
  * THE FIRST ARGUMENT'S SLOT IS THE WORKING POINT. The original copies the

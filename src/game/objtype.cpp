@@ -823,11 +823,9 @@ typedef void (__cdecl *AM2_ObjAfterMoveFn)(void *obj, int32_t a, int32_t b);
  * index is out of range or its slot is empty -- and one of its callers frees
  * the object on that 0.
  *
- * NINE ARGUMENTS AND THE NINTH IS NEVER READ. Both call sites push nine and
- * `add esp, 0x24` confirms it; every stack read in the body lands on one of
- * the first eight. Third unused parameter in this tree after
- * RandomPointAhead's first and AmmChecksum's second, and as with those the
- * signature keeps it because the call sites do.
+ * EIGHT ARGUMENTS. Both call sites push eight; the `add esp, 0x24` after
+ * each also pops the malloc argument pushed before it, which is what once
+ * made this read as nine.
  *
  * EVERY FIELD NAME ON THE AAI RECORD COMES FROM WHERE IT LANDS. +0x2C is
  * copied to OBJ_OFF_MAX_HEALTH and OBJ_OFF_HEALTH in the same breath, so it is
@@ -851,7 +849,7 @@ typedef void (__cdecl *AM2_ObjAfterMoveFn)(void *obj, int32_t a, int32_t b);
  */
 int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
                                int32_t index, uint32_t at, int32_t orFlags,
-                               int32_t a7, int32_t a8, int32_t)
+                               int32_t a7, int32_t a8)
 {
 #define o ((uint8_t *)obj)
     const uint8_t *rec;
