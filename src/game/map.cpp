@@ -401,8 +401,9 @@ void *__cdecl FindLevelByName(char *name)
     if (!tok)                                                                 \
         return (missing);                                                     \
     if (!strcmp("none", tok))                                                 \
-        tok = (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH));                \
-    strcpy((dst), tok)
+        strcpy((dst), (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));       \
+    else                                                                      \
+        strcpy((dst), tok)
 
 /* DefMapLine -- original 0x0043E2C0, 1,520 bytes, and its only reference in
  * the image is the parser table at 0x00477468: it is the handler for the
@@ -520,7 +521,7 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
         return 11;
 
     col = 12;
-    for (i = 0; i < 3; i++, col++) {
+    for (i = 0; i < 3; col++, i++) {
         /* Not the column macro: here each arm has its own strcpy. */
         tok = am2_strtok((char *)0, " \t\n;,");
         if (!tok)

@@ -1087,9 +1087,9 @@ int32_t __cdecl AnimStepPoint(void *obj, uint8_t heading, int32_t pose,
 {
     uint8_t   *o    = (uint8_t *)obj;
     AM2_Point *out  = (AM2_Point *)outPt;
-#define rows (*(uint8_t **)(o + OBJ_OFF_ROWS))
     int32_t    animId =
         ((const int32_t *)((void *)(uintptr_t)(ADDR_WEAPON_POSE_FRAMES)))[pose];
+    uint8_t   *rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
     const AM2_AnimTable *table;
     int32_t              i;
     int32_t              speed;
@@ -1105,11 +1105,18 @@ int32_t __cdecl AnimStepPoint(void *obj, uint8_t heading, int32_t pose,
     if (!table)
         return 0;
 
+    /* A miss falls straight to the first entry; a hit is still tested against
+     * the count, which it cannot fail -- the original's shape, dead test and
+     * all. */
     for (i = 0; i < table->count; i++)
         if (table->entries[i].id == animId)
-            break;
-    if (i >= table->count)
+            goto found;
+    goto first;
+found:
+    if (i >= table->count) {
+    first:
         i = 0;
+    }
 
     if (fast) {
         speed = (int32_t)(AM2_ANIM_FAST_STEP
@@ -1125,7 +1132,6 @@ int32_t __cdecl AnimStepPoint(void *obj, uint8_t heading, int32_t pose,
     /* The bias is a byte local, pushed as the byte argument it is. */
     bias = ((const uint8_t *)((void *)(uintptr_t)(ADDR_FRAME_HEADING_BIAS)))[animId];
     return MoveStepPoint(obj, heading, bias, speed, 0, 0, out);
-#undef rows
 }
 
 /* Tile ids are (row << ADDR_MAP_ROW_SHIFT) | col, so a delta between two of
