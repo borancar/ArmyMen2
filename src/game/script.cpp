@@ -882,17 +882,33 @@ int32_t __cdecl ScriptParseEvents(AM2_ScriptCtx *ctx, int32_t *at,
 
         if (!ScriptParseEvent(ctx, at, &a, &b, &c))
             return 0;                   /* silent -- the callee has spoken */
-        ScriptAddEvent(cond, a, b, c);
+        {
+            int32_t n = cond->nevents++;
+
+            cond->events = (AM2_ScriptEvent *)am2_realloc(
+                cond->events, (size_t)cond->nevents * sizeof(AM2_ScriptEvent));
+            cond->events[n].a     = a;
+            cond->events[n].b     = b;
+            cond->events[n].c     = c;
+            cond->events[n].fired = 0;
+        }
 
         if (*at >= ctx->count) {
             am2_log("Unexpected end of script.\n");
             return 0;
         }
 
-        if (ScriptAtWord(ctx, *at, AM2_TOK_THEN)
-            || ScriptAtWord(ctx, *at, AM2_TOK_BUTNOT)
-            || ScriptAtWord(ctx, *at, AM2_TOK_TESTVAR))
-            return 1;
+        {
+            const AM2_ScriptTok *t = &ctx->tokens[*at];
+
+            if ((t->kind == AM2_TOKEN_RESERVED
+                 && (int32_t)(uintptr_t)t->value == AM2_TOK_THEN)
+                || (t->kind == AM2_TOKEN_RESERVED
+                    && (int32_t)(uintptr_t)t->value == AM2_TOK_BUTNOT)
+                || (t->kind == AM2_TOKEN_RESERVED
+                    && (int32_t)(uintptr_t)t->value == AM2_TOK_TESTVAR))
+                return 1;
+        }
     }
 }
 
