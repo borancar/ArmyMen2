@@ -1040,7 +1040,7 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
      *
      * Written from the flag rather than from the register, with the `?:` arms
      * swapped to keep that half identical. */
-    int32_t   reserve = (flags & BMP_FLAG_RESERVE10) != 0;
+    int32_t   plain   = !(flags & BMP_FLAG_RESERVE10);
     int32_t   w, h, i;
 
     /* Copy the geometry across first; the original does this before anything
@@ -1051,9 +1051,10 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
     *(uint32_t *)(dest + 0x10)           = src[7];
 
     if (!remap) {
-        int32_t from = 0;
+        uint8_t from = 0;
 
-        if (reserve) {
+        remap = table;
+        if (!plain) {
             for (i = 0; i < BMP_RESERVED_ENTRIES; i++)
                 table[i] = (uint8_t)i;
             from = BMP_RESERVED_ENTRIES;
@@ -1070,7 +1071,6 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
             for (i = from; i < 256; i++)
                 table[i] = (uint8_t)i;
         }
-        remap = table;
     }
 
     w = (int32_t)*(uint32_t *)(dest + BMP_OFF_WIDTH);
@@ -1088,7 +1088,7 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
             *(uint32_t *)(dest + BMP_OFF_FLAGS) |= 4;
         } else {
             result = EncodeSmall(pixels, dest, w, h, remap);
-            *(uint32_t *)(dest + BMP_OFF_FLAGS) |= reserve ? 0x10 : 8;
+            *(uint32_t *)(dest + BMP_OFF_FLAGS) |= plain ? 8 : 0x10;
         }
         return result;
     }
