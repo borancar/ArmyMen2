@@ -11367,9 +11367,7 @@ void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
 {
     uint8_t       *o = (uint8_t *)obj;
     const int32_t *grid = (const int32_t *)desc;
-    const int32_t *box;
-    int32_t       *hit;
-    int32_t        x, y, left, top, right, bottom;
+    int32_t        x, y, left, top;
     int32_t        cl, ct, cr, cb, row, col, idx;
 
     if (force == 0
@@ -11379,25 +11377,23 @@ void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
 
     x = *(const int16_t *)(o + OBJ_OFF_X);
     y = *(const int16_t *)(o + OBJ_OFF_Y);
-    box = (const int32_t *)(o + OBJ_OFF_BOX_OFFSETS);
-    hit = (int32_t *)(o + OBJ_OFF_HIT_RECT);
+#define box(i) (*(const int32_t *)(o + OBJ_OFF_BOX_OFFSETS + 4 * (i)))
+#define hit(i) (*(int32_t *)(o + OBJ_OFF_HIT_RECT + 4 * (i)))
 
-    left   = x + box[0];
-    top    = y + box[1];
-    right  = x + box[2];
-    bottom = y + box[3];
-    hit[0] = left;
-    hit[1] = top;
-    hit[2] = right;
-    hit[3] = bottom;
+    left   = x + box(0);
+    top    = y + box(1);
+    hit(0) = left;
+    hit(1) = top;
+    hit(2) = x + box(2);
+    hit(3) = y + box(3);
 
     if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0))
         return;
 
     cl = left   >> AM2_CELL_SHIFT;
     ct = top    >> AM2_CELL_SHIFT;
-    cr = (left + (box[2] - box[0]))   >> AM2_CELL_SHIFT;
-    cb = (top  + (box[3] - box[1]))   >> AM2_CELL_SHIFT;
+    cr = ((box(2) - box(0)) + left) >> AM2_CELL_SHIFT;
+    cb = ((box(3) - box(1)) + top)  >> AM2_CELL_SHIFT;
 
     /* Off the grid in any direction is an unregister, not a clamp. */
     if (cb < 0 || ct > grid[1] - 1 || cr < 0 || cl > grid[0] - 1) {
@@ -11405,10 +11401,12 @@ void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
         return;
     }
 
-    if (cl < 0) cl = 0;
-    if (ct < 0) ct = 0;
-    if (cr > grid[0] - 1) cr = grid[0] - 1;
-    if (cb > grid[0] - 1) cb = grid[0] - 1;
+    /* Branchless in the image (setle/dec/and): a ternary, not an if. The
+     * bottom is clamped against the WIDTH, grid[0], as the image does. */
+    cl = cl > 0 ? cl : 0;
+    ct = ct > 0 ? ct : 0;
+    if (cr >= grid[0] - 1) cr = grid[0] - 1;
+    if (cb >= grid[0] - 1) cb = grid[0] - 1;
 
     idx = 0;
     for (row = ct; row <= cb; row++) {
@@ -11445,6 +11443,8 @@ void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
                                     + (uint32_t)was * 4u));
         *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = -1;
     }
+#undef hit
+#undef box
 }
 
 /* 0x00427990, eight callers. The selection changed: drop what is gone,
