@@ -10322,7 +10322,7 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
  * ever on a crowded map is the same thing that stops the other -- the step
  * arithmetic is sixteen bits, so a long enough walk wraps the coordinate.
  */
-void __cdecl NearestClearVehiclePoint(void *veh, int32_t facing, uint32_t from,
+void __cdecl NearestClearVehiclePoint(void *veh, uint8_t facing, uint32_t from,
                                       void *outPt)
 {
     AM2_Point *out = (AM2_Point *)outPt;
@@ -11150,11 +11150,11 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
     uint8_t   height;
     int32_t   i;
 
+    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_DESTROYED;
+
     at.x = (int16_t)x;
     at.y = (int16_t)y;
     where = *(const uint32_t *)&at;
-
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) &= ~(uint32_t)OBJ_FLAG_DESTROYED;
 
     NearestClearVehiclePoint(o, *(const uint8_t *)(o + OBJ_OFF_FACING),
                              where, &at);
@@ -11175,17 +11175,14 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
     for (i = 1; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
         uint8_t       *r = *(uint8_t **)(o + OBJ_OFF_ROWS)
                            + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
-        const uint8_t *spr;
 
+        /* The sprite is read through the object's rows at each use. */
+#define SPR0 (*(const uint8_t *const *)(*(uint8_t *const *)(o + OBJ_OFF_ROWS) \
+                                       + ROW_OFF_SPRITE))
         *(uint32_t *)(r + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
-        spr = *(const uint8_t **)(row0 + ROW_OFF_SPRITE);
-        *(int16_t *)(r + ROW_OFF_X) = (int16_t)
-            (*(const int16_t *)(r + ROW_OFF_X)
-             + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X));
-        spr = *(const uint8_t **)(row0 + ROW_OFF_SPRITE);
-        *(int16_t *)(r + ROW_OFF_Y) = (int16_t)
-            (*(const int16_t *)(r + ROW_OFF_Y)
-             + *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y));
+        *(int16_t *)(r + ROW_OFF_X) += *(const int16_t *)(SPR0 + SPRITE_OFF_ATTACH_X);
+        *(int16_t *)(r + ROW_OFF_Y) += *(const int16_t *)(SPR0 + SPRITE_OFF_ATTACH_Y);
+#undef SPR0
         ObjFlagSet0(r);
         RowUpdate(r, 0, (void *)((void *)(uintptr_t)(ADDR_MAP_DESC)));
     }

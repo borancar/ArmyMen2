@@ -962,7 +962,7 @@ void __cdecl NearestClearPoint(uint32_t from, void *out);
 /* 0x0045B930, one caller. The same spiral asking a different question: walk out
  * until THAT VEHICLE fits at the point facing that way. `outPt` is an
  * AM2_Point, and it has no give-up either. */
-void __cdecl NearestClearVehiclePoint(void *veh, int32_t facing,
+void __cdecl NearestClearVehiclePoint(void *veh, uint8_t facing,
                                       uint32_t from, void *outPt);
 
 void __cdecl SetObjContext(void *obj);
