@@ -111,6 +111,12 @@ main result so far (details in `src/vc6/README.md`):
     where the image asks CommMustBroadcast of the unit's army, and its mine
     test asks it of the MINE's army, not the unit's. All multiplayer-only;
     found by `$T/callscan2.py`-style comparison of direct call targets.
+  - **AiGuardStep's out-of-sight arm adopted the leader** (2026-09-30): the
+    image steps toward an unseen leader and goes straight to the react block
+    (0x00405671 -> 0x004056BA), skipping the TARGET_UID/observer adopt at
+    0x0040569C; the reconstruction fell into the adopt. It now skips it, as
+    AiPatrolStep's matching arm already did. Guard-post units only; not
+    driven.
 
 
   - **Two menu behaviours the byte-match corrected** (2026-09-29):
