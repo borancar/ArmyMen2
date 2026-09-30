@@ -753,71 +753,73 @@ typedef int32_t (__cdecl *AM2_PointRuleFn)(uint16_t tile);
  */
 uint16_t __cdecl SettlePointInRegion(int32_t tile, uint32_t *pt)
 {
-    AM2_PointRuleFn rule;
-    const uint8_t  *cells;
-    int32_t         region;
-    int32_t         w, h, shift;
-    int32_t         x, y, dir, step, leg, tried;
+    int32_t  region;
+    uint32_t cell;
 
     SetPointRule((void *)0);
 
-    cells  = *(const uint8_t *const *)(uintptr_t)ADDR_REGION_OF_CELL;
-    region = cells[tile & 0xFFFF];
+    /* As NearestAllowedTile: the rule, the map's size, its row shift and the
+     * cell table are read from their globals at every use. */
+#define CELLS (*(const uint8_t *const *)(uintptr_t)ADDR_REGION_OF_CELL)
+#define RULE  (*(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE)
+#define MAP_W (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W)
+#define MAP_H (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H)
+#define SHIFT (*(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)
+    cell   = tile & 0xFFFF;
+    region = CELLS[tile & 0xFFFF];
 
-    rule = *(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE;
-    if (!rule(tile))
+    if (!RULE(tile))
         return (uint16_t)tile;
 
-    w     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
-    h     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H;
-    shift = *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
+    {
+        int32_t x, y, dir, step, leg, tried;
 
-    x     = (tile & 0xFFFF) & (w - 1);
-    y     = (int32_t)((uint32_t)(tile & 0xFFFF) >> shift);
-    dir   = 0;
-    step  = 0;
-    leg   = 1;
-    tried = 0;
+        x     = cell & (MAP_W - 1);
+        y     = (int32_t)(cell >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT);
+        dir   = 0;
+        step  = 0;
+        leg   = 1;
+        tried = 0;
 
-    for (;;) {
-        x += ((const int32_t *)((void *)(uintptr_t)(ADDR_SPIRAL_DX)))[dir];
-        y += ((const int32_t *)((void *)(uintptr_t)(ADDR_SPIRAL_DY)))[dir];
+        for (;;) {
+            x += ((const int32_t *)((void *)(uintptr_t)(ADDR_SPIRAL_DX)))[dir];
+            y += ((const int32_t *)((void *)(uintptr_t)(ADDR_SPIRAL_DY)))[dir];
 
-        if (x > 0 && x < w && y > 0 && y < h) {
-            int32_t cand = (y << shift) + x;
-            int32_t ok   = 1;
+            if (x > 0 && x < MAP_W && y > 0 && y < MAP_H) {
+                int32_t cand = (y << SHIFT) + x;
 
-            if (region != 0) {
-                int32_t r = cells[cand & 0xFFFF];
+                if (region != 0 && CELLS[cand & 0xFFFF] != 0
+                    && CELLS[cand & 0xFFFF] != region)
+                    goto next;          /* another region's tile */
 
-                if (r != 0 && r != region)
-                    ok = 0;
-            }
-
-            if (ok) {
                 tried = 1;
-                rule  = *(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE;
-                if (!rule(cand)) {
+                if (!RULE(cand)) {
                     *pt = PointOfTile(cand);
                     return (uint16_t)cand;
                 }
             }
+
+next:
+            if (++step < leg)
+                continue;
+
+            if (dir == 3) {
+                if (!tried && region > 0)
+                    return 0;
+                tried = 0;
+            }
+
+            if (dir % 2)
+                leg++;
+            dir  = (dir + 1) % 4;
+            step = 0;
         }
-
-        if (++step < leg)
-            continue;
-
-        if (dir == 3) {
-            if (!tried && region > 0)
-                return 0;
-            tried = 0;
-        }
-
-        if (dir & 1)
-            leg++;
-        dir  = (dir + 1) & 3;
-        step = 0;
     }
+#undef SHIFT
+#undef MAP_H
+#undef MAP_W
+#undef RULE
+#undef CELLS
 }
 
 /* 0x0043A0A0, six callers. The nearest tile the object's point rule will
