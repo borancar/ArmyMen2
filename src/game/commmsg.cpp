@@ -988,7 +988,7 @@ void __cdecl AppendTroopState(void *msg, void *obj)
     uint8_t  *out;
     uint8_t  *outStart;
     uint32_t  seq;   /* the sending player's +0x94, a SEQUENCE not a clock */
-    uint32_t  flags = 0;
+    uint32_t  flags;
     uint32_t  interval;
     int32_t   dx, dy;
     int16_t   px, py, lx, ly;
@@ -1008,10 +1008,10 @@ void __cdecl AppendTroopState(void *msg, void *obj)
         return;
 
     px = *(const int16_t *)(o + OBJ_OFF_POS);
-    py = *(const int16_t *)(o + OBJ_OFF_POS + 2);
     lx = *(const int16_t *)(o + TROOPER_OFF_SENT_POS);
-    ly = *(const int16_t *)(o + TROOPER_OFF_SENT_POS + 2);
+    py = *(const int16_t *)(o + OBJ_OFF_POS + 2);
     dx = px - lx;
+    ly = *(const int16_t *)(o + TROOPER_OFF_SENT_POS + 2);
     dy = py - ly;
     if (dx < 0) dx = -dx;
     if (dy < 0) dy = -dy;
@@ -1030,6 +1030,7 @@ void __cdecl AppendTroopState(void *msg, void *obj)
          * still reaches the coarse test. It cannot pass it (dx and dy are then
          * zero), so an `else if` would answer the same; written as the branch
          * runs rather than as the answer it happens to give. */
+        flags = 0;
         if (age >= interval && (px != lx || py != ly))
             flags = 0x80000000u;
         else if (age >= *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT)
@@ -1039,12 +1040,13 @@ void __cdecl AppendTroopState(void *msg, void *obj)
         {
             uint32_t age = seq - *(const uint32_t *)
                                (o + TROOPER_OFF_SENT_FACING_T);
-            uint8_t  f  = *(const uint8_t *)(o + OBJ_OFF_FACING);
-            uint8_t  lf = *(const uint8_t *)(o + TROOPER_OFF_SENT_FACING);
-
-            if ((age >= interval && f != lf)
+#define F  (*(const uint8_t *)(o + OBJ_OFF_FACING))
+#define LF (*(const uint8_t *)(o + TROOPER_OFF_SENT_FACING))
+            if ((age >= interval && F != LF)
                 || (age >= *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT)
-                    && ((uint32_t)(lf ^ f) & 0xFFFFFFF0u)))
+                    && (((uint32_t)LF ^ (uint32_t)F) & 0xFFFFFFF0u)))
+#undef F
+#undef LF
                 flags |= 0x40000000u;
         }
 
@@ -1076,20 +1078,21 @@ void __cdecl AppendTroopState(void *msg, void *obj)
     }
 
     if (flags & 0x80000000u) {
-        int16_t x, y;
-
         /* Clamped to twelve bits IN THE OBJECT, not just on the wire. */
         if (*(const int16_t *)(o + OBJ_OFF_POS) > 0xFFF)
             *(int16_t *)(o + OBJ_OFF_POS) = 0xFFF;
         if (*(const int16_t *)(o + OBJ_OFF_POS + 2) > 0xFFF)
             *(int16_t *)(o + OBJ_OFF_POS + 2) = 0xFFF;
 
-        x = *(const int16_t *)(o + OBJ_OFF_POS);
-        y = *(const int16_t *)(o + OBJ_OFF_POS + 2);
-        *out++ = (uint8_t)x;
-        *out++ = (uint8_t)y;
-        *out++ = (uint8_t)(((((uint8_t)(x >> 8)) ^ ((uint8_t)(y >> 4))) & 0x0F)
-                           ^ ((uint8_t)(y >> 4)));
+        /* The position re-read from the object at each use. */
+#define X (*(const int16_t *)(o + OBJ_OFF_POS))
+#define Y (*(const int16_t *)(o + OBJ_OFF_POS + 2))
+        *out++ = (uint8_t)X;
+        *out++ = (uint8_t)Y;
+        *out++ = (uint8_t)(((((uint8_t)(X >> 8)) ^ ((uint8_t)(Y >> 4))) & 0x0F)
+                           ^ ((uint8_t)(Y >> 4)));
+#undef X
+#undef Y
 
         *(uint32_t *)(o + TROOPER_OFF_SENT_POS) =
             *(const uint32_t *)(o + OBJ_OFF_POS);
