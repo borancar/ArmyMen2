@@ -7383,7 +7383,10 @@ void __cdecl AiStepAttach(void *obj, void *out)
         && *(const int32_t *)(ctx + SIGHTC_OFF_DEST_DIST) < AM2_AI_REACHED_DIST) {
         int32_t   army = *(const int32_t *)(o + OBJ_OFF_FIELD_5A4) - 1;
         uint8_t  *rec  = (uint8_t *)LookupOwnerObj((uint32_t)army);
-        uint32_t  from = rec ? *(const uint32_t *)(rec + 4) : 0;
+        uint32_t  from = 0;
+
+        if (rec)
+            from = *(const uint32_t *)(rec + 4);
 
         if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
             && !AM2_THE_COMM->CommMustBroadcast(
@@ -7399,10 +7402,12 @@ void __cdecl AiStepAttach(void *obj, void *out)
             *(const uint32_t *)(ctx + SIGHTC_OFF_DEST);
         AiTrooperStep(obj, out, ctx);
 
-        *(int32_t *)(w + SIGHTCOUT_OFF_STATE) =
-            (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-             - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58))
-            > AM2_AI_STATE_MS ? AM2_AI_STATE_STALE : AM2_AI_STATE_RECENT;
+        if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)
+            > AM2_AI_STATE_MS)
+            *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = AM2_AI_STATE_STALE;
+        else
+            *(int32_t *)(w + SIGHTCOUT_OFF_STATE) = AM2_AI_STATE_RECENT;
     }
 
     *(uint16_t *)(o + OBJ_OFF_REGION) =
