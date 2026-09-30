@@ -988,12 +988,16 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSend(uint32_t idTo, uint32_t fla
         int32_t  index = -1;
 
         /* Only these two are reported; anything else fails silently. */
-        if (hr == (HRESULT)DPERR_INVALIDPLAYER)
+        switch (hr) {
+        case (HRESULT)DPERR_INVALIDPLAYER:
             orig_log("DPLAY ERROR: INVALID PLAYER IN SEND TO ID %x\n", idTo);
-        else if (hr == E_INVALIDARG)
+            break;
+        case E_INVALIDARG:
             orig_log("DPLAY ERROR: INVALID PARAMETERS IN SEND TO ID %x\n", idTo);
-        else
-            return 0;
+            break;
+        default:
+            goto failed;        /* the one `return 0` below */
+        }
 
         cm = g_commObject;
         n  = (int32_t)comm_u32(cm, COMM_OFF_PLAYER_COUNT);
@@ -1008,6 +1012,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommSend(uint32_t idTo, uint32_t fla
             orig_log("-- No Players Entry for player id %x\n", idTo);
 
         PostMessageA(g_hwnd, AM2_WM_COMM_SEND_FAILED, (WPARAM)idTo, 0);
+failed:
         return 0;
     }
 
