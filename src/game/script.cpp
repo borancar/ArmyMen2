@@ -812,17 +812,19 @@ static inline void ScriptAddEvent(AM2_ScriptCond *c, int32_t a, int32_t b, int32
 int32_t __cdecl ScriptResolveName(AM2_ScriptCtx *ctx, int32_t *at,
                                   int32_t *out, int32_t quiet)
 {
-    AM2_ScriptTok *tok = &ctx->tokens[*at];
+    /* The token is addressed afresh at every use. */
+#define tok (&ctx->tokens[*at])
 
     if (tok->kind == AM2_TOKEN_RESERVED) {
-        uint32_t g = 0;
+        /* Each arm reads its own variable into *out. */
+#define SVAR(a) (*(const int32_t *)((void *)(uintptr_t)(a)))
         switch ((int32_t)(uintptr_t)tok->value) {
-        case 15: g = ADDR_SVAR_ID15;  break;   /* no keyword maps here */
-        case AM2_TOK_GREEN:         g = ADDR_SVAR_GREEN; break;
-        case AM2_TOK_TAN:           g = ADDR_SVAR_TAN;   break;
-        case AM2_TOK_BLUE:          g = ADDR_SVAR_BLUE;  break;
-        case AM2_TOK_GREY:          g = ADDR_SVAR_GREY;  break;
-        case AM2_TOK_ME:            g = ADDR_SVAR_ME;    break;
+        case 15:            *out = SVAR(ADDR_SVAR_ID15);  break;   /* no keyword maps here */
+        case AM2_TOK_GREEN: *out = SVAR(ADDR_SVAR_GREEN); break;
+        case AM2_TOK_TAN:   *out = SVAR(ADDR_SVAR_TAN);   break;
+        case AM2_TOK_BLUE:  *out = SVAR(ADDR_SVAR_BLUE);  break;
+        case AM2_TOK_GREY:  *out = SVAR(ADDR_SVAR_GREY);  break;
+        case AM2_TOK_ME:    *out = SVAR(ADDR_SVAR_ME);    break;
         default:
             if (!quiet)
                 am2_log("Line [%4d]:  Unexpected use of reserved word\n",
@@ -830,14 +832,16 @@ int32_t __cdecl ScriptResolveName(AM2_ScriptCtx *ctx, int32_t *at,
                         ScriptTokenText(tok, kScriptWord));
             return 0;
         }
-        *out = *(const int32_t *)((void *)(uintptr_t)(g));
+#undef SVAR
         (*at)++;
         return 1;
     }
 
-    if (tok->kind != AM2_TOKEN_STRING) {
-        if (quiet)
+    /* Quiet is asked first, and the kind in each arm. */
+    if (quiet) {
+        if (tok->kind != AM2_TOKEN_STRING)
             return 0;
+    } else if (tok->kind != AM2_TOKEN_STRING) {
         am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
                 ctx->tokens[*at].line,
                 ScriptTokenText(tok, kScriptWord),
@@ -848,7 +852,10 @@ int32_t __cdecl ScriptResolveName(AM2_ScriptCtx *ctx, int32_t *at,
     int32_t idx = ScriptFindName((const char *)tok->value);
     *out = idx;
 
-    if (idx >= 0) {
+    if (idx < 0) {
+        *out = AddNameTableName((const char *)ctx->tokens[*at].value,
+                                    AM2_NAME_TYPE_REF, 0);
+    } else {
         int32_t type = kScriptNames[idx].type;
         if (type != AM2_NAME_TYPE_REF && type != AM2_NAME_TYPE_INTEGER) {
             am2_log("Line [%4d]:  Name '%s' already used for another type.\n",
@@ -856,9 +863,6 @@ int32_t __cdecl ScriptResolveName(AM2_ScriptCtx *ctx, int32_t *at,
                     ScriptTokenText(tok, kScriptWord));
             return 0;
         }
-    } else {
-        *out = AddNameTableName((const char *)ctx->tokens[*at].value,
-                                    AM2_NAME_TYPE_REF, 0);
     }
 
     /* Either way the token becomes a kind-7 reference and gives up its
@@ -868,6 +872,7 @@ int32_t __cdecl ScriptResolveName(AM2_ScriptCtx *ctx, int32_t *at,
     ctx->tokens[*at].value = (void *)(uintptr_t)*out;
     (*at)++;
     return 1;
+#undef tok
 }
 
 int32_t __cdecl ScriptParseEvents(AM2_ScriptCtx *ctx, int32_t *at,
