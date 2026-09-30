@@ -2918,15 +2918,14 @@ void __cdecl UnitWeaponInfo(void *unit, void *out)
         int32_t r = RANGE;
 
         if (*(const int32_t *)(REC + ITEMTYPE_OFF_KIND) == AM2_WEAPON_KIND_TIMED)
-            r = (int32_t)((double)r
-                          * *(const double *)((void *)(uintptr_t)(ADDR_WEAPON_RANGE_K3)));
+            r = (int32_t)((double)r * 1.2);
 
-        *(int32_t *)(c + SIGHTC_OFF_WANT_RANGE) =
-            (int32_t)((double)r
-                      * *(const double *)((void *)(uintptr_t)(ADDR_WEAPON_RANGE_LO)));
-        *(int32_t *)(c + SIGHTC_OFF_MAX_RANGE) =
-            (int32_t)((double)r
-                      * *(const double *)((void *)(uintptr_t)(ADDR_WEAPON_RANGE_HI)));
+        /* LITERALS, not the named doubles at ADDR_WEAPON_RANGE_K3/_LO/_HI
+         * (which hold the same values): a compiler constant cannot alias the
+         * WANT store, so VC6 hoists the HI multiply above it, as the image
+         * does. Through the named globals it may not. */
+        *(int32_t *)(c + SIGHTC_OFF_WANT_RANGE) = (int32_t)((double)r * 0.9);
+        *(int32_t *)(c + SIGHTC_OFF_MAX_RANGE)  = (int32_t)((double)r * 1.1);
     }
 
     if (*(const int32_t *)(c + SIGHTC_OFF_KIND) == AM2_WEAPON_KIND_TIMED) {
