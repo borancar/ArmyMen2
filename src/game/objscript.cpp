@@ -490,13 +490,17 @@ int32_t __cdecl UpdateObjectScript(void *obj)
         int32_t st = *(const int32_t *)(o + OBJ_OFF_SCRIPT_STATE);
 
         if (st <= scr->statecount && st >= 0) {
-            int32_t       fr    = *(const int32_t *)(o + OBJ_OFF_SCRIPT_FRAME) + 1;
             AM2_ObjState *state = &scr->states[st];
 
-            if (fr < state->framecount) {
-                *(int32_t *)(o + OBJ_OFF_SCRIPT_FRAME) = fr;
+            /* The frame is read off the object at each use -- the index
+             * after the store is the new frame. */
+            if (*(const int32_t *)(o + OBJ_OFF_SCRIPT_FRAME) + 1
+                < state->framecount) {
+                *(int32_t *)(o + OBJ_OFF_SCRIPT_FRAME) =
+                    *(const int32_t *)(o + OBJ_OFF_SCRIPT_FRAME) + 1;
 
-                AM2_ObjFrame *frame = &state->frames[fr];
+                AM2_ObjFrame *frame =
+                    &state->frames[*(const int32_t *)(o + OBJ_OFF_SCRIPT_FRAME)];
 
                 if (!ChangeObjectFrame(obj, frame->b, 1))
                     orig_log("ChangeObjectFrame failed in UpdateObjectScript\n");

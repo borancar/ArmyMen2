@@ -2223,7 +2223,7 @@ void __cdecl AirFrameDraw(void)
     uint8_t *air = (uint8_t *)(uintptr_t)ADDR_AIR_SAVE_BLOCK;
     AM2_Sprite *gauge =
         *(AM2_Sprite *const *)(uintptr_t)ADDR_AIR_SPRITES_2;
-    int32_t  step = *(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
+#define step (*(const int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)
 
     /* Nothing to draw the gauge with means nothing to draw at all -- the
      * original gives up before it even takes the lock. */
@@ -2384,6 +2384,7 @@ void __cdecl AirFrameDraw(void)
     }
 
     UnlockSurface();
+#undef step
 }
 
 /* DrawEffectLayer -- original 0x004123D0, one caller.

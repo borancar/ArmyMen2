@@ -1862,7 +1862,7 @@ void __cdecl PausedFrameStep(void)
                            + (uint32_t)(active - 1) * 16u);
 
     for (slot = 0; slot < 4; slot++, xy += 2) {
-        uint8_t *rec = comm + slot * COMM_PLAYER_STRIDE;
+#define rec (comm + slot * COMM_PLAYER_STRIDE)
         uint32_t pause;
         int32_t  team;
         int32_t  mates = 0;
@@ -2000,4 +2000,5 @@ void __cdecl PausedFrameStep(void)
         UnlockSurface();
     }
 #undef comm
+#undef rec
 }

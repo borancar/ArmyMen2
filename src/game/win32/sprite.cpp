@@ -1237,7 +1237,7 @@ int32_t __cdecl SpriteSetLoad(const char *name)
     orig_fread(set + SPRITE_SET_OFF_PALETTE, 4, 0x100, fp);
 
     {
-        const uint32_t *pal = (const uint32_t *)(set + SPRITE_SET_OFF_PALETTE);
+#define pal ((const uint32_t *)(set + SPRITE_SET_OFF_PALETTE))
         uint8_t        *remap = set + SPRITE_SET_OFF_REMAP;
         const uint32_t *display = *(const uint32_t *const *)
                                       (uintptr_t)ADDR_ACTIVE_PALETTE;
@@ -1273,6 +1273,7 @@ int32_t __cdecl SpriteSetLoad(const char *name)
         orig_fread(SET_DIR(set), (size_t)count * 8, 1, fp);
     }
     return 1;
+#undef pal
 }
 
 /* 0x00423FE0. Fill a sprite record from the packed data file.

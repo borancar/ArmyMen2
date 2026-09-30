@@ -2285,7 +2285,7 @@ void __cdecl CommDrainMsgs(void)
          * its length -- what IDirectPlay::Receive filled in. */
         int32_t  from = *(const int32_t *)(node + MSGNODE_OFF_FROM);
         void    *msg  = *(void *const *)(node + MSGNODE_OFF_BODY);
-        int32_t  to   = *(const int32_t *)(node + MSGNODE_OFF_TO);
+#define to (*(const int32_t *)(node + MSGNODE_OFF_TO))
 
         /* DPID_SYSMSG is 0: a system message goes to the system handler. */
         if (from == 0)
@@ -2299,6 +2299,7 @@ void __cdecl CommDrainMsgs(void)
 
         MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, node);
     }
+#undef to
 }
 
 /* 0x00401210. Drain one message list into another, head first, until the

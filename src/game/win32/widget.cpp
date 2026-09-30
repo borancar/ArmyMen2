@@ -4406,7 +4406,7 @@ void __cdecl AimMarkerAge(void)
     /* Indexed, not a walked pointer: the image's loop test is a signed jl. */
 #define LIVE(off)  (((int32_t *)(uintptr_t)ADDR_AIM_LIVE_A)[army + (off) / 4])
 #define XY(off)    (((int16_t *)(uintptr_t)ADDR_AIM_LIVE_A)[army * 2 + (off) / 2])
-    int32_t  cursorX = *(const int32_t *)(uintptr_t)ADDR_CURSOR_X;
+#define cursorX (*(const int32_t *)(uintptr_t)ADDR_CURSOR_X)
     int32_t  cursorY = *(const int32_t *)(uintptr_t)ADDR_CURSOR_Y;
     int32_t  owner   = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
     uint32_t now     = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
@@ -4448,6 +4448,7 @@ void __cdecl AimMarkerAge(void)
     }
 #undef LIVE
 #undef XY
+#undef cursorX
 }
 
 /* AimStart -- original 0x00412230, one caller, which is FireWeapon. The A half
@@ -4956,7 +4957,7 @@ void __cdecl HudPostUpdate(void)
                           (const AM2_Point *)(uintptr_t)ADDR_DRAG_ANCHOR)
                    > AM2_DRAG_DEAD_ZONE) {
             int16_t ax = ((const int16_t *)(uintptr_t)ADDR_DRAG_ANCHOR)[0];
-            int16_t ay = ((const int16_t *)(uintptr_t)ADDR_DRAG_ANCHOR)[1];
+#define ay (((const int16_t *)(uintptr_t)ADDR_DRAG_ANCHOR)[1])
             int16_t px = ((const int16_t *)&at)[0];
             int16_t py = ((const int16_t *)&at)[1];
 
@@ -5109,6 +5110,7 @@ tail:
     if (GetMenuRow() == 1)
         return;
     PointerIdleOverlay(ours);
+#undef ay
 }
 
 /* 0x00414370, one caller -- the per-frame path. HudPaint's twin: the same
@@ -8797,7 +8799,7 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
     AM2_Widget *w = this;
 
     uint8_t    *self = (uint8_t *)w;
-    AM2_Sprite *spr  = *(AM2_Sprite **)(self + EDGE_OFF_SPRITE);
+#define spr (*(AM2_Sprite **)(self + EDGE_OFF_SPRITE))
     int32_t     pen;
 
     /* Clipped in place: the by-value clip is the intersection from here. */
@@ -8882,6 +8884,7 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
             }
         }
     }
+#undef spr
 }
 
 /* 0x0041A170, three callers. The width of ADDR_HUD_WIDGET_C, or 0 when there
@@ -11054,7 +11057,7 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
      * comment was the evidence and it was read as `char[]` anyway. */
     uint8_t       *self = (uint8_t *)w;
     const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
-    int32_t        slot = *(const int32_t *)(self + MPBTN_OFF_ROW);
+#define slot (*(const int32_t *)(self + MPBTN_OFF_ROW))
     const uint8_t *rec  = comm + slot * AM2_PLAYER_STRIDE;
     RECT           vis;
     char           dots[64];
@@ -11113,6 +11116,7 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
                     *(const int32_t *)(self + MPNAME_OFF_FLAG),
                     vis, *(const uint8_t *)(self + MPNAME_OFF_INK));
     UnlockSurface();
+#undef slot
 }
 
 /* 0x00432C50 -- the INK a player row's name is drawn in, chosen by how the

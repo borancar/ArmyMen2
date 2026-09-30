@@ -853,7 +853,7 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
                                int32_t index, uint32_t at, int32_t orFlags,
                                int32_t a7, int32_t a8, int32_t)
 {
-    uint8_t       *o = (uint8_t *)obj;
+#define o ((uint8_t *)obj)
     const uint8_t *rec;
     int32_t        i;
 
@@ -898,6 +898,7 @@ int32_t __cdecl InitObjFromAai(void *obj, char *name, int32_t army,
 
     ObjAfterMove(o, 0, 0);
     return 1;
+#undef o
 }
 
 

@@ -1087,7 +1087,7 @@ int32_t __cdecl AnimStepPoint(void *obj, uint8_t heading, int32_t pose,
 {
     uint8_t   *o    = (uint8_t *)obj;
     AM2_Point *out  = (AM2_Point *)outPt;
-    uint8_t   *rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+#define rows (*(uint8_t **)(o + OBJ_OFF_ROWS))
     int32_t    animId =
         ((const int32_t *)((void *)(uintptr_t)(ADDR_WEAPON_POSE_FRAMES)))[pose];
     const AM2_AnimTable *table;
@@ -1125,6 +1125,7 @@ int32_t __cdecl AnimStepPoint(void *obj, uint8_t heading, int32_t pose,
     /* The bias is a byte local, pushed as the byte argument it is. */
     bias = ((const uint8_t *)((void *)(uintptr_t)(ADDR_FRAME_HEADING_BIAS)))[animId];
     return MoveStepPoint(obj, heading, bias, speed, 0, 0, out);
+#undef rows
 }
 
 /* Tile ids are (row << ADDR_MAP_ROW_SHIFT) | col, so a delta between two of
@@ -1258,7 +1259,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
     uint8_t *const nodes  = (uint8_t *)(uintptr_t)ADDR_PATH_NODES;
     const uint8_t *region = *(const uint8_t *const *)(uintptr_t)
                                 ADDR_REGION_OF_CELL;
-    const int32_t *const step = (const int32_t *)(uintptr_t)ADDR_TILE_STEP8;
+#define step ((const int32_t *)(uintptr_t)ADDR_TILE_STEP8)
     AM2_PointRuleFn rule;
     uint32_t startTicks;
     int32_t  considered = 0;
@@ -1509,6 +1510,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 
     PathChargeFrame(startTicks, considered);
     return 0;
+#undef step
 }
 
 /* PlanPathTo -- original 0x00439D60, three callers: the trooper AI's common
@@ -3486,7 +3488,7 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
         goto after_region;
 
     {
-        int16_t stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
+#define stride (*(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
         int32_t link;
 
         if (kRegionCost[(uint32_t)(fromRegion * stride + toRegion)]
@@ -3609,6 +3611,7 @@ walk:
         *(int32_t *)(w + 8) = 3;
 
     *(int32_t *)(o + OBJ_OFF_FIELD_578) = 0;
+#undef stride
 }
 
 /* RoachRouteToward -- original 0x00408210, three callers, all of them
@@ -8000,7 +8003,7 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
         if (o != (uint8_t *)0
             && *(const int32_t *)(o + OBJ_OFF_FIELD_530)
                != AM2_TROOP_STATE_NONE) {
-            void *rec = *(void *const *)(o + OBJ_OFF_TABLE_REC_SLOT);
+#define rec (*(void *const *)(o + OBJ_OFF_TABLE_REC_SLOT))
 
             *(int32_t *)(o + OBJ_OFF_FIELD_530) = AM2_TROOP_STATE_NONE;
             *(void **)(o + OBJ_OFF_TABLE_REC_KIND) = rec;
@@ -8126,6 +8129,7 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
 
     if (fired)
         UseInventoryItem(o, *(const int32_t *)(o + UNIT_OFF_INVENTORY_SEL));
+#undef rec
 }
 
 /* UpdateTrooperAction -- original 0x0044AFB0, 2,080 bytes, four callers, all
@@ -9735,7 +9739,7 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
             } else {
                 int32_t b = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
                                          &aim);
-                int32_t face = *(const uint8_t *)(o + OBJ_OFF_FACING);
+#define face (*(const uint8_t *)(o + OBJ_OFF_FACING))
 
                 w[4] = (uint8_t)b;
                 if (AM2_CHEAT_ABS((b & 0xFF) - face) < 0x10) {
@@ -9883,6 +9887,7 @@ tail:
     } else {
         *(int32_t *)(o + OBJ_OFF_MOVE_STATE_ALT) = 0;
     }
+#undef face
 }
 
 /* 0x0045C6E0, four callers, all in ADDR_STEP3_45C8D0. Choose the vehicle's
@@ -9912,7 +9917,7 @@ tail:
 int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan, int32_t *out)
 {
     const uint8_t *p = (const uint8_t *)plan;
-    uint8_t *o = (uint8_t *)obj;
+#define o ((uint8_t *)obj)
     uint8_t *row;
     int32_t speed;
     int32_t limit;
@@ -9993,6 +9998,7 @@ int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan, int32_t *out)
     MoveStepPoint(o, (uint8_t)(*out + *(const uint8_t *)(o + OBJ_OFF_FACING)),
                   0, speed, 0, 0, &pt);
     return VehicleBlockWeight(o, thenFacing, *(const uint32_t *)&pt, 1) > 0x0E;
+#undef o
 }
 
 /* 0x0045C8D0, two callers in StepType3. Choose the vehicle's facing for this
@@ -11028,7 +11034,7 @@ void __cdecl Step3Input(void *obj, void *rec)
      * its definition's interval, and the same test is written three times
      * for the three ways to ask for a shot. --- */
     {
-        const uint8_t *def = *(const uint8_t *const *)(weapon + 0xC0u);
+#define def (*(const uint8_t *const *)(weapon + 0xC0u))
         uint32_t since = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
                          - *(const uint32_t *)(weapon + 0xC4u);
 
@@ -11068,4 +11074,5 @@ void __cdecl Step3Input(void *obj, void *rec)
                 *(int32_t *)(r + 4) = 1;
         }
     }
+#undef def
 }

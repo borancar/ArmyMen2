@@ -3724,7 +3724,7 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
     *(int32_t *)(uintptr_t)ADDR_SEND_ROLL = roll;
 
     if (mine) {
-        int32_t pct = *(const int32_t *)(mine + FLOW_OFF_LOSS_PCT);
+#define pct (*(const int32_t *)(mine + FLOW_OFF_LOSS_PCT))
 
         if (*(const int32_t *)(mine + FLOW_OFF_LOSS_BURST) != 0) {
             /* Drop the LAST `pct` of every hundred packets to this player --
@@ -3806,6 +3806,7 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
     *(int32_t *)(uintptr_t)ADDR_EXIT_GAME_FLAG = 1;
     ExitGamePostClose();
     return hr;
+#undef pct
 }
 
 

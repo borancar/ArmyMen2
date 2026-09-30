@@ -989,7 +989,7 @@ void __cdecl RemapRleRuns(void *rle, void *unused, int32_t wide,
                           const void *table)
 {
     uint8_t  *base   = (uint8_t *)rle;
-    uint16_t  width  = *(const uint16_t *)base;
+#define width (*(const uint16_t *)base)
     uint16_t  height = *(const uint16_t *)(base + 2);
     uint8_t  *row    = base + 4;
     uint8_t  *end;
@@ -1033,6 +1033,7 @@ void __cdecl RemapRleRuns(void *rle, void *unused, int32_t wide,
             }
         }
     }
+#undef width
 }
 
 int32_t __cdecl FilterMatches(int32_t wantA, int32_t wantB,

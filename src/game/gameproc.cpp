@@ -992,7 +992,7 @@ int32_t __cdecl PlaceScenario(void)
         uint8_t *part = scen + SCENARIO_OFF_PARTS
                       + (size_t)slot * SCENARIO_PART_BYTES;
         uint8_t *row  = *(uint8_t **)(part + SCENARIO_PART_OFF_ROWS);
-        int32_t  n    = *(const int16_t *)(part + SCENARIO_PART_OFF_COUNT);
+#define n (*(const int16_t *)(part + SCENARIO_PART_OFF_COUNT))
         int32_t  army;
         int32_t  i;
 
@@ -1179,6 +1179,7 @@ int32_t __cdecl PlaceScenario(void)
         }
     }
     return 1;
+#undef n
 }
 
 void __cdecl ResetLevelState(void)

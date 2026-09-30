@@ -650,7 +650,7 @@ void __cdecl FormationPointFar(void *follower, void *leader, AM2_Point *out,
 void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
                             int32_t slot)
 {
-    const uint8_t *l = (const uint8_t *)leader;
+#define l ((const uint8_t *)leader)
     const uint8_t *rec;
     uint8_t        leaderFacing;
     uint8_t        facing;
@@ -714,6 +714,7 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
 
     SettlePointInRegion(TileOfPoint(*(const uint32_t *)out),
                         (uint32_t *)out);
+#undef l
 }
 
 typedef int32_t (__cdecl *AM2_AirRandFn)(void);
@@ -1746,7 +1747,7 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
 
         if (*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP)
             != *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION) {
-            int32_t range = *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE);
+#define range (*(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE))
 
             *(int32_t *)(rec + SIGHTDIR_OFF_STAMP) =
                 *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
@@ -1778,6 +1779,7 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
         if (*(const int16_t *)(rec + SIGHTDIR_OFF_HIGH) > d)
             *(int16_t *)(rec + SIGHTDIR_OFF_HIGH) = d;
     }
+#undef range
 }
 
 #define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)

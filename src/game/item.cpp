@@ -707,7 +707,7 @@ void __cdecl ItemSetBox(void *obj, AM2_Rect box)
  */
 void __cdecl ItemLinkCells(void *obj, void *cells)
 {
-    uint8_t       *o = (uint8_t *)obj;
+#define o ((uint8_t *)obj)
     const uint8_t *d = (const uint8_t *)cells;
     int32_t        cl, ct, cr, cb;
     int32_t        cols, rows, shift;
@@ -765,6 +765,7 @@ void __cdecl ItemLinkCells(void *obj, void *cells)
         *(void **)(entry + 8) = (void *)0;   /* next */
         *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = -1;
     }
+#undef o
 }
 
 /* 0x0042A0A0. Unlink an object from every cell list it is registered in,
@@ -2521,7 +2522,7 @@ reset:
 int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
 {
     const uint8_t  *c = (const uint8_t *)ctrl;
-    uint8_t        *o = (uint8_t *)obj;
+#define o ((uint8_t *)obj)
     const uint8_t  *rows;
     int32_t         speed = 0;
     int32_t         cur, next, here;
@@ -2591,6 +2592,7 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
 
     return RoachMaskWeight(obj, next, at, 0) >= here;
 #undef anim
+#undef o
 }
 
 /* RoachStepTailA -- original 0x0043D750, four callers. Commit one roach step:
@@ -2648,7 +2650,7 @@ void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
 
     speed = 0;
     if (*(const int32_t *)(c + ROACHSTEP_OFF_STATE) != 1) {
-        int32_t reverse = *(const int32_t *)(c + ROACHSTEP_OFF_FLAG18);
+#define reverse (*(const int32_t *)(c + ROACHSTEP_OFF_FLAG18))
         uint32_t stuck;
 
         cap = reverse ? 80 : 130;
@@ -2743,6 +2745,7 @@ void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
     ObjMoveAlongFacing(obj, 0, 0, 0);
 #undef c
 #undef anim
+#undef reverse
 }
 
 /* RoachBite -- original 0x0043D330, one caller: the roach's per-frame step,
@@ -7361,7 +7364,7 @@ int32_t __cdecl WeaponPoseIndex(void *obj, void *weapon)
 
 void __cdecl StepRowAnim(void *row)
 {
-    uint8_t        *r = (uint8_t *)row;
+#define r ((uint8_t *)row)
     const AM2_Anim *anim;
     int32_t         idx;
     int32_t         hold;
@@ -7425,6 +7428,7 @@ void __cdecl StepRowAnim(void *row)
     }
 #undef CELLP
 #undef NOW
+#undef r
 }
 
 /* 0x00449570, ten callers -- the only writer of OBJ_OFF_SOLDIER_KIND, and the
@@ -11144,7 +11148,7 @@ void __cdecl ObjMoveAlongFacing(void *obj, int32_t tileArg, int32_t unused,
 void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
                            int32_t resurrect)
 {
-    uint8_t  *o = (uint8_t *)obj;
+#define o ((uint8_t *)obj)
     uint8_t  *row0;
     AM2_Point at;
     uint32_t  where;
@@ -11216,9 +11220,9 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
 
         /* Re-stamped after the clear, and this is why the clear must come
          * first: 0x578 and 0x579 are inside it. */
+        *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
         *(o + OBJ_OFF_FIELD_578)    = *(const uint8_t *)(o + OBJ_OFF_FACING);
         *(o + OBJ_OFF_FACING_COPY2) = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
-        *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
         *(int32_t *)(o + OBJ_OFF_FIELD_580) = 1;
         *(int32_t *)(o + OBJ_OFF_FIELD_584) = 0;
         *(int32_t *)(o + OBJ_OFF_FIELD_58C) = 0;
@@ -11228,6 +11232,7 @@ void __cdecl DeployVehicle(void *obj, int32_t x, int32_t y,
 
     SetKindFrames(o, 1);
     ObjSetFootprint(o);
+#undef o
 }
 
 /* 0x00449250, one caller -- the type-2 arm of the deploy dispatcher. Place a
@@ -11368,7 +11373,7 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
  * CLAUDE.md records a defect from calling it with pointers instead. */
 void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
 {
-    uint8_t       *o = (uint8_t *)obj;
+#define o ((uint8_t *)obj)
     const int32_t *grid = (const int32_t *)desc;
     int32_t        x, y, left, top;
     int32_t        cl, ct, cr, cb, row, col, idx;
@@ -11448,6 +11453,7 @@ void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
     }
 #undef hit
 #undef box
+#undef o
 }
 
 /* 0x00427990, eight callers. The selection changed: drop what is gone,
@@ -12348,7 +12354,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
      * FIRST row's sprite attachment point -- rows[0]'s sprite, not its own. */
     for (i = 1; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
         uint8_t       *r   = rows + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
-        const uint8_t *spr = *(const uint8_t *const *)(rows + ROW_OFF_SPRITE);
+#define spr (*(const uint8_t *const *)(rows + ROW_OFF_SPRITE))
 
         *(uint32_t *)(r + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
         *(int16_t *)(r + ROW_OFF_X) += *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X);
@@ -12360,6 +12366,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
         ObjSetFootprint(o);
 
     return o;
+#undef spr
 }
 
 /* CreateItem -- original 0x00433980, 672 bytes, NINE callers. The type-1 arm
@@ -12591,7 +12598,7 @@ void *__cdecl CreateItem(char *name, int32_t army, int32_t key, AM2_Point at,
 void __cdecl DamageItem(void *obj, int32_t amount, uint8_t extra, int32_t kind,
                         uint32_t attacker, int32_t inChain)
 {
-    uint8_t       *o = (uint8_t *)obj;
+#define o ((uint8_t *)obj)
     const uint8_t *rec;
     int32_t        armour;
     int32_t        dmg;
@@ -12739,6 +12746,7 @@ void __cdecl DamageItem(void *obj, int32_t amount, uint8_t extra, int32_t kind,
                     ((const AM2_Object *)o)->uid, life, 0, 0, 0, 0);
 
     }
+#undef o
 }
 
 /* 0x00461F90 is above the CRT line and stays original -- the same typedef
@@ -12783,7 +12791,7 @@ typedef int32_t (__cdecl *AM2_TimedDirFrame5Fn)(void *rows, int32_t dir);
  * missile keeps its trajectory and the sprite stops sinking. */
 void __cdecl StepType5(void *obj)
 {
-    uint8_t *o = (uint8_t *)obj;
+#define o ((uint8_t *)obj)
     uint8_t *def;
     uint8_t *rows;
     int32_t  outcome = 6;
@@ -13086,6 +13094,7 @@ expire:
 
 gone:
     *(int32_t *)(o + OBJ_OFF_FLAGS) |= 2;
+#undef o
 }
 
 /* TrooperPickupItem -- original 0x00448540, one caller, and it NAMES ITSELF
@@ -13138,7 +13147,7 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
 {
 #define comm (*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT)
     uint8_t       *t = (uint8_t *)trooper;
-    uint8_t       *w = (uint8_t *)item;
+#define w ((uint8_t *)item)
     int32_t        kind;
     uint8_t       *held;
 
@@ -13294,6 +13303,7 @@ void __cdecl TrooperPickupItem(void *trooper, void *item, int32_t slot)
 #undef AMMO
 #undef CAP
 #undef comm
+#undef w
 }
 
 /* Forward-declared rather than included. AimStart and AimStartB live in

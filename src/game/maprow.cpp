@@ -1087,7 +1087,7 @@ void __cdecl RowSetSprite(void *row, void *sprite, void *desc)
  * reads 2,758 because it has a second caller that is still the original's. */
 void __cdecl RowUpdate(void *row, int32_t force, void *desc)
 {
-    uint8_t *r = (uint8_t *)row;
+#define r ((uint8_t *)row)
     uint8_t *spr;
     int32_t  left, top, right, bottom;
     int32_t  cl, ct, cr, cb;
@@ -1209,6 +1209,7 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
     ROW_FLD(r, ROW_OFF_PREV_X, uint32_t) = ROW_FLD(r, ROW_OFF_X, uint32_t);
     ROW_FLD(r, ROW_OFF_PREV_SPRITE, void *) =
         ROW_FLD(r, ROW_OFF_SPRITE, void *);
+#undef r
 }
 
 #if !defined(AM2_RELINK)   /* the harness's trace wrapper */
@@ -1507,7 +1508,7 @@ void __cdecl DepthResort(void *node, void **head)
 void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
                               uint32_t objFlags)
 {
-    uint8_t       *out = (uint8_t *)set;
+#define out ((uint8_t *)set)
     const uint8_t *d   = (const uint8_t *)def;
     uint8_t       *row;
     const uint8_t *spr;
@@ -1551,6 +1552,7 @@ void __cdecl BuildRowsFromDef(void *set, const void *def, int32_t x, int32_t y,
         *(const void **)(out + ROWSET_OFF_SUBREC) = (const void *)0;
 
     memcpy(out + ROWSET_OFF_RECT, d + DEFROWS_OFF_RECT, 16);
+#undef out
 }
 
 /* 0x00434DA0, six callers. Build a ROW SET: one block of `count` rows, each
@@ -1926,7 +1928,7 @@ int32_t __cdecl SeqRetire(void *ctxv, void *recv)
  * no longer meets, then drop from the head regardless if that freed too few. */
 void __cdecl SeqEvict(void *ctxv)
 {
-    uint8_t *ctx = (uint8_t *)ctxv;
+#define ctx ((uint8_t *)ctxv)
     int32_t  left = *(const int32_t *)(ctx + SEQ_CTX_OFF_MARGIN);
     int32_t  i;
 
@@ -1973,6 +1975,7 @@ void __cdecl SeqEvict(void *ctxv)
     }
 #undef RECB
 #undef RECO
+#undef ctx
 }
 
 /* 0x00461070. THE THRESHOLD IS `count > capacity - margin`, not

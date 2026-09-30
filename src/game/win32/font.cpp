@@ -411,7 +411,7 @@ void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
     offsets = (const uint16_t *)(record + 4);
 
     for (i = 0, col = 1; i < len; i++, col++) {
-        uint8_t          ch = (uint8_t)text[i];
+#define ch ((uint8_t)text[i])
         const AM2_Rle16 *glyph;
         AM2_Rect         src;
         AM2_Rect         mid;
@@ -451,6 +451,7 @@ void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
 
         penX += width;
     }
+#undef ch
 }
 
 

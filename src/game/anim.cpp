@@ -104,7 +104,7 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
     memset(table->entries, 0, (size_t)(table->count * 16));
 
     for (i = 0; i < table->count; i++) {
-        AM2_AnimEntry *e = &table->entries[i];
+#define e (&table->entries[i])
 
         orig_fread(&w, 2, 1, fp);
         e->id = w;
@@ -185,6 +185,7 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
     if (am2_dump_anims)
         DumpAnimTable(table);
 #endif
+#undef e
 }
 
 /* The `.ani` directory, and the flags each group is loaded with. `from` is
