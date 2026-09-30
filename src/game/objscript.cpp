@@ -640,7 +640,6 @@ int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
 {
     AM2_ScriptCtx *ctx = (AM2_ScriptCtx *)((void *)(uintptr_t)(ADDR_SCRIPT_CONTEXT));
     char           buf[2048];
-    int32_t        count;
     int32_t        n;
     int32_t        i, j, k, m;
 
@@ -650,23 +649,23 @@ int32_t __cdecl LoadObjScriptSection(am2_FILE *fp)
                       "C:\\ArmyMen2\\source\\objscript.cpp", 0x68))
         return 0;
 
-    orig_fread(&count, 4, 1, fp);
-    kObjScriptCount = count;
-    kObjScriptCap   = count;
+    orig_fread(&n, 4, 1, fp);
+    kObjScriptCount = n;
+    kObjScriptCap   = n;
 
-    if (count == 0) {
+    if (n == 0) {
         kObjScriptCap = 0;
         kObjScripts   = (AM2_ObjScript *)0;
         return 1;
     }
 
     kObjScripts = (AM2_ObjScript *)am2_realloc(
-        kObjScripts, (size_t)count * sizeof(AM2_ObjScript));
-    memset(kObjScripts, 0, (size_t)count * sizeof(AM2_ObjScript));
+        kObjScripts, (size_t)n * sizeof(AM2_ObjScript));
+    memset(kObjScripts, 0, (size_t)n * sizeof(AM2_ObjScript));
 
     /* Every level of the chain is read again at every use -- the image
-     * reloads kObjScripts before each access -- and one count local serves
-     * all four levels. */
+     * reloads kObjScripts before each access -- and the one count local the
+     * top-level count was read into serves all four levels. */
 #define O  kObjScripts[i]
 #define ST O.states[j]
 #define FR ST.frames[k]

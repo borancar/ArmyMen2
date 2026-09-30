@@ -1164,10 +1164,12 @@ static inline void PlaceEmplacement(int32_t army, uint8_t facing, int32_t kind)
  * hoisted: CommArmyOfSlot is thiscall on the comm object and the original did
  * not common them up, so hoisting is a change to the call count for no gain.
  *
- * ROW 0x22's SECOND SPRITE IS INDEXED BY THE ROW. `row + 0x3D5` is what the
- * original computes, and since the arm is only ever entered with row 0x22 it
- * is the constant 0x3F7 written the long way -- the switch variable happened
- * to be live in a register. Written as the original has it. */
+ * ROW 0x22's SECOND SPRITE IS INDEXED BY THE ARMY: `army + 0x3D5` in set
+ * 0x2B, read from the fourth argument's slot (0x00412C27, `[esp+0x28]` under
+ * six pushes). This was once written `row + 0x3D5` -- a constant 0x3F7 --
+ * and the note here explained why the ROW made sense; it was the stack depth
+ * that had been miscounted. It agrees with UnitKindMatches' kind 5, whose
+ * third candidate is the same n + 0x3D5 in set 0x2B with n an army. */
 void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
                                 int32_t army)
 {
@@ -1277,9 +1279,9 @@ void __cdecl PlaceCursorPrepare(int32_t row, int32_t ok, uint8_t facing,
     case 0x22:
         SET_CURSOR(PlaceSprite(0x2A, 1));
         *(uint8_t **)(uintptr_t)ADDR_MENU_INK = (uint8_t *)0;
-        /* `row + 0x3D5`, which is 0x3F7 -- see the header. */
+        /* `army + 0x3D5` -- see the header. */
         *(void **)(uintptr_t)ADDR_MENU_OVERLAY_A =
-            PlaceSprite(0x2B, (uint32_t)row + 0x3D5);
+            PlaceSprite(0x2B, (uint32_t)army + 0x3D5);
         *(uint8_t **)(uintptr_t)ADDR_MENU_OVERLAY_A_INK = (uint8_t *)0;
         break;
 
