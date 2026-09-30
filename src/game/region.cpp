@@ -3484,7 +3484,9 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
         (void)TileRegionOrBorrow((uint16_t)fromTile);
     if (!toRegion)
         (void)TileRegionOrBorrow((uint16_t)toTile);
-    if (!fromRegion || !toRegion)
+    if (!fromRegion)
+        goto no_region;
+    if (!toRegion)
         goto no_region;
 
     /* The region hop, skipped when we are already routing to this goal from

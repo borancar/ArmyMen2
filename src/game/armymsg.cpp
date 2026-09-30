@@ -1421,7 +1421,9 @@ void __cdecl RecvTrooperWantItem(void *msg)
                  *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
 
     if (*(const int32_t *)(kComm + COMM_OFF_IS_HOST)) {
-        if (request == AM2_DO_PICKUP || request == AM2_DO_DROP)
+        if (request == AM2_DO_PICKUP)
+            return;
+        if (request == AM2_DO_DROP)
             return;
     } else {
         if (request == AM2_WANT_PICKUP || request == AM2_WANT_DROP)

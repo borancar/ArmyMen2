@@ -1660,7 +1660,9 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED)
         return 0;
     int32_t id = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-    if (id < 64 || id > 186)
+    if (id < 64)
+        return 0;
+    if (id > 186)
         return 0;
 
     switch (id) {
