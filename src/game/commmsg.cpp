@@ -1791,25 +1791,30 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
      * REMAINS is accepted and drives this field negative -- and a negative
      * length read unsigned is enormous, so the walk carries on off the end of
      * the packet rather than stopping. Signed here would quietly fix that, and
-     * fixing it is not this port's job. */
-    while (*(const uint32_t *)(pkt + PACKET_OFF_LEN) > PACKET_HEADER_SIZE) {
-        part = *(const uint16_t *)p;
+     * fixing it is not this port's job.
+     *
+     * Shaped as the image lays it out: the length tested once on entry and
+     * again after each part, the zero-part test as the loop's own condition,
+     * and the zero complaint as the code after the loop -- the same walk as a
+     * `while (length)` with both refusals inside, but only this form puts the
+     * zero test at the bottom of the rotated loop. */
+    if (*(const uint32_t *)(pkt + PACKET_OFF_LEN) > PACKET_HEADER_SIZE) {
+        while ((part = *(const uint16_t *)p) != 0) {
+            if ((int32_t)part >= total) {
+                am2_log("Received Bogus Length Message, part greater than sum\n");
+                return;
+            }
 
-        if (!part) {
-            am2_log("Received zero Length Message\n");
-            return;
+            ReceiveArmyMsg(p, slot, *(const int32_t *)(pkt + PACKET_OFF_SEQ));
+
+            /* Re-read, after the handler has had the bytes, and as an int. */
+            step = *(const uint16_t *)p;
+            p += step;
+            *(int32_t *)(pkt + PACKET_OFF_LEN) -= step;
+            if (*(const uint32_t *)(pkt + PACKET_OFF_LEN) <= PACKET_HEADER_SIZE)
+                return;
         }
-        if ((int32_t)part >= total) {
-            am2_log("Received Bogus Length Message, part greater than sum\n");
-            break;          /* into the loop's own exit, as the image has it */
-        }
-
-        ReceiveArmyMsg(p, slot, *(const int32_t *)(pkt + PACKET_OFF_SEQ));
-
-        /* Re-read, after the handler has had the bytes, and as an int. */
-        step = *(const uint16_t *)p;
-        *(int32_t *)(pkt + PACKET_OFF_LEN) -= step;
-        p += step;
+        am2_log("Received zero Length Message\n");
     }
 }
 
