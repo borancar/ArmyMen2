@@ -1417,14 +1417,6 @@ extern uint8_t am2_os_startup_colours_b[];  /* 0x006645A4 */
 #define ADDR_KEYS_BUFFER_A ((uintptr_t)(const void *)am2_os_keys_buffer_a)
 #undef ADDR_KEYS_BUFFER_B
 #define ADDR_KEYS_BUFFER_B ((uintptr_t)(const void *)am2_os_keys_buffer_b)
-#undef ADDR_KEYS_NOW_PTR
-#define ADDR_KEYS_NOW_PTR ((uintptr_t)(const void *)am2_os_keys_now_ptr)
-#undef ADDR_KEYS_PREV_PTR
-#define ADDR_KEYS_PREV_PTR ((uintptr_t)(const void *)am2_os_keys_prev_ptr)
-#undef ADDR_KEY_REPEAT_AT
-#define ADDR_KEY_REPEAT_AT ((uintptr_t)(const void *)am2_os_key_repeat_at)
-#undef ADDR_KEY_PRESSED
-#define ADDR_KEY_PRESSED ((uintptr_t)(const void *)am2_os_key_pressed)
 #undef ADDR_DINPUT
 #define ADDR_DINPUT ((uintptr_t)(const void *)am2_os_dinput)
 #undef ADDR_DI_MOUSE

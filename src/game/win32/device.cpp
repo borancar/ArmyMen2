@@ -691,7 +691,9 @@ void __cdecl PollKeyboard(void)
         uint8_t k = (uint8_t)i;
 
         if (g_curKeys[k] & KEY_DOWN) {
-            if ((g_prevKeys[k] ^ g_curKeys[k]) & KEY_DOWN) {
+            /* Read as signed chars -- DirectInput's `char[256]` state -- which
+             * is why the image XORs whole registers rather than bytes. */
+            if (((int8_t)g_prevKeys[k] ^ (int8_t)g_curKeys[k]) & KEY_DOWN) {
                 /* Newly down this frame. */
                 g_keyPressed[i] = 1;
                 g_keyRepeat[i]  = now + REPEAT_FIRST_MS;
