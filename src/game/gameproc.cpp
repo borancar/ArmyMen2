@@ -1307,7 +1307,6 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
     uint8_t *w = (uint8_t *)weapon;
     uint8_t *b = (uint8_t *)source;
     uint8_t *o;
-    uint8_t *rows;
     int32_t  def;
     int32_t  frame;
 
@@ -1326,7 +1325,15 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
     *(uint8_t *)(o + OBJ_OFF_SCRIPT_ID) = (uint8_t)scriptId;
 
     def = **(const int32_t *const *)(o + OBJ_OFF_FIELD_94);
-    frame = (def == 2 || def == 5) ? AM2_MISSILE_FRAME_A : AM2_MISSILE_FRAME_B;
+    switch (def) {
+    case 2:
+    case 5:
+        frame = AM2_MISSILE_FRAME_A;
+        break;
+    default:
+        frame = AM2_MISSILE_FRAME_B;
+        break;
+    }
 
     *(int8_t *)(o + OBJ_OFF_ARMY) = *(const int8_t *)(w + OBJ_OFF_ARMY);
     ObjInitCommon(o, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
@@ -1336,7 +1343,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
 
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
                 (const void *)((void *)(uintptr_t)(ADDR_MISSILE_ROW_SPEC)),
-                (int16_t)at, (int16_t)(at >> 16),
+                (int16_t)at, ((const AM2_Point *)&at)->y,
                 (const void *)(uintptr_t)ADDR_ZERO_RECT);
 
     *(int32_t *)(o + MISSILE_OFF_GROUND) = a5;
@@ -1363,7 +1370,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
         }
     }
 
-    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
+#define rows (*(uint8_t **)(o + OBJ_OFF_ROWS))
 
     if (**(const int32_t *const *)(o + OBJ_OFF_FIELD_94) == 3) {
         *(const void **)(rows + ROW_OFF_ANIM_CUR) = (const void *)0;
@@ -1402,6 +1409,7 @@ void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
     *(uint8_t *)(rows + ROW_OFF_HEADING) = (uint8_t)heading;
     SetAnimFrame(rows, (int16_t)frame, 1);
     return o;
+#undef rows
 }
 
 /* LoadType5 -- original 0x0043B870, one caller, and the MISSILE member of the

@@ -137,6 +137,14 @@ main result so far (details in `src/vc6/README.md`):
     reconstruction packed `row + 0x3D5`, a constant 0x3F7, and its header
     explained why. It now agrees with UnitKindMatches' kind 5. Found by
     byte-matching; placement screen, not driven.
+  - **MakePlacedUnit swapped the army and the slot in its three creator
+    calls** (2026-09-30): the image passes CreateTrooper/CreateVehicle
+    `(CommArmyOfSlot(slot), slot)` -- 0x0043AD33 pushes the slot, then the
+    comm call's result -- as every other caller of both does; the
+    reconstruction passed `(slot, CommArmyOfSlot(slot))`. Invisible wherever
+    the comm slot and the army coincide, as in single player. Found by
+    byte-matching; the creators' facing parameter is a byte, which is why
+    the image pushes it unmasked.
   - **OnSelectionChanged un-destroyed a destroyed unit** (2026-09-30): a
     selected unit found DESTROYED (0x4) leaves the selection with its
     SELECTED flag (0x400) cleared -- 0x00427A2C is `and ah, 0xfb`. The

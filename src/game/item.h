@@ -406,7 +406,7 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
  * animation table, exactly when ADDR_TURRET_ANIMS[kind] is non-empty. */
 void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
                             int32_t table, int32_t army, int32_t flags,
-                            int32_t remote, uint32_t uid, int32_t facing);
+                            int32_t remote, uint32_t uid, uint8_t facing);
 
 /* VehicleDefFind is reconstructed; definfo.h declares it. */
 
@@ -415,7 +415,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
  * broadcast for; `settle` routes the point through NearestClearPoint. */
 void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
                             int32_t army, int32_t flags, int32_t remote,
-                            uint32_t uid, int32_t settle, int32_t facing);
+                            uint32_t uid, int32_t settle, uint8_t facing);
 
 void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
                           int32_t army, int32_t flags, int32_t a7,

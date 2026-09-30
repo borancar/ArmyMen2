@@ -12018,7 +12018,7 @@ void __cdecl StepType6(void *obj)
  * project has met before. */
 void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
                             int32_t army, int32_t flags, int32_t remote,
-                            uint32_t uid, int32_t settle, int32_t facing)
+                            uint32_t uid, int32_t settle, uint8_t facing)
 {
     uint8_t  *o;
     uint8_t  *rows;
@@ -12178,7 +12178,7 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
  * a single-player game, or has a live player in its comm slot. */
 void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
                             int32_t table, int32_t army, int32_t flags,
-                            int32_t remote, uint32_t uid, int32_t facing)
+                            int32_t remote, uint32_t uid, uint8_t facing)
 {
     uint8_t       *o;
     const uint8_t *def;

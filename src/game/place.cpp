@@ -708,9 +708,9 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
                             int32_t *points, uint8_t facing, int32_t group,
                             const char *name)
 {
-    const uint8_t *rec = (const uint8_t *)((void *)(uintptr_t)(ADDR_UNIT_TYPES))
-                         + (uintptr_t)type * AM2_UNIT_TYPE_STRIDE;
-    const int32_t  kind = *(const int32_t *)(rec + UNIT_TYPE_OFF_KIND);
+#define rec ((const uint8_t *)((void *)(uintptr_t)(ADDR_UNIT_TYPES)) \
+             + (uintptr_t)type * AM2_UNIT_TYPE_STRIDE)
+#define kind (*(const int32_t *)(rec + UNIT_TYPE_OFF_KIND))
     uint8_t       *made;
     uint8_t       *weapon;
     uint8_t       *rows;
@@ -719,8 +719,9 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
 
     if (*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER)) {
         made = (uint8_t *)CreateTrooper(
-                   (char *)name, (int16_t)where, (int16_t)(where >> 16), slot,
-                   AM2_THE_COMM->CommArmyOfSlot(slot),
+                   (char *)name, ((const AM2_Point *)&where)->x,
+                   ((const AM2_Point *)&where)->y,
+                   AM2_THE_COMM->CommArmyOfSlot(slot), slot,
                    0, 0, 0, 1, facing);
         ObjSetFieldA(made, (uint32_t)group);
 
@@ -752,8 +753,9 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
 
         made = (uint8_t *)CreateVehicle(
                    kind, (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
-                   (int16_t)where, (int16_t)(where >> 16), slot,
-                   AM2_THE_COMM->CommArmyOfSlot(slot),
+                   ((const AM2_Point *)&where)->x,
+                   ((const AM2_Point *)&where)->y,
+                   AM2_THE_COMM->CommArmyOfSlot(slot), slot,
                    0, 0, 0, facing);
 
         rows = *(uint8_t **)(made + OBJ_OFF_ROWS);
@@ -834,8 +836,9 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
 
             occupant = (uint8_t *)CreateTrooper(
                            (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)),
-                           (int16_t)where, (int16_t)(where >> 16), slot,
-                           AM2_THE_COMM->CommArmyOfSlot(slot),
+                           ((const AM2_Point *)&where)->x,
+                           ((const AM2_Point *)&where)->y,
+                           AM2_THE_COMM->CommArmyOfSlot(slot), slot,
                            0, 0, 0, 1, facing);
             ObjSetFieldA(occupant, (uint32_t)group);
 
@@ -874,6 +877,8 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
                            *(const int8_t *)(occupant + OBJ_OFF_HEIGHT_SET), 1);
         }
     }
+#undef kind
+#undef rec
 }
 
 /* RefundPlacedUnit -- original 0x0043B160, one caller: the manual placement
