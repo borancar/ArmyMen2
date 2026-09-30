@@ -1886,16 +1886,18 @@ void __cdecl BuildRoachMask(void)
         int32_t     count = 0;
         int32_t     x, y;
 
-        for (y = AM2_MASK_STEP; y < spr->bounds.bottom;
+        /* x and y are the block CENTRES, as the image's bounds show: it tests
+         * `bottom - 8` and `right - 8`, and samples centre-8 .. centre+8. */
+        for (y = AM2_MASK_STEP / 2; y < spr->bounds.bottom - AM2_MASK_STEP / 2;
              y += AM2_MASK_STEP)
-            for (x = AM2_MASK_STEP; x < spr->bounds.right;
+            for (x = AM2_MASK_STEP / 2; x < spr->bounds.right - AM2_MASK_STEP / 2;
                  x += AM2_MASK_STEP) {
                 int32_t solid = 0;
                 int32_t sx, sy;
 
-                for (sy = y - AM2_MASK_STEP; sy < y;
+                for (sy = y - AM2_MASK_STEP / 2; sy < y + AM2_MASK_STEP / 2;
                      sy += AM2_MASK_SAMPLE)
-                    for (sx = x - AM2_MASK_STEP; sx < x;
+                    for (sx = x - AM2_MASK_STEP / 2; sx < x + AM2_MASK_STEP / 2;
                          sx += AM2_MASK_SAMPLE) {
                         AM2_Point p;
 
@@ -1907,8 +1909,8 @@ void __cdecl BuildRoachMask(void)
 
                 if (solid < AM2_ROACH_MASK_MIN_SOLID)
                     continue;
-                found[count].x = (int16_t)(x - spr->hotX - 8);
-                found[count].y = (int16_t)(y - spr->hotY - 8);
+                found[count].x = (int16_t)(x - spr->hotX);
+                found[count].y = (int16_t)(y - spr->hotY);
                 count++;
             }
 
@@ -1970,13 +1972,18 @@ void __cdecl BuildVehicleMask(int32_t kind)
 
         spr = g_spriteList[a->cells[(int32_t)a->frames * dir].sprite];
 
-        for (y = AM2_MASK_STEP; y < spr->bounds.bottom; y += AM2_MASK_STEP)
-            for (x = AM2_MASK_STEP; x < spr->bounds.right; x += AM2_MASK_STEP) {
+        /* Block centres, as BuildRoachMask. */
+        for (y = AM2_MASK_STEP / 2; y < spr->bounds.bottom - AM2_MASK_STEP / 2;
+             y += AM2_MASK_STEP)
+            for (x = AM2_MASK_STEP / 2; x < spr->bounds.right - AM2_MASK_STEP / 2;
+                 x += AM2_MASK_STEP) {
                 int32_t solid = 0;
                 int32_t sx, sy;
 
-                for (sy = y - AM2_MASK_STEP; sy < y; sy += AM2_MASK_SAMPLE)
-                    for (sx = x - AM2_MASK_STEP; sx < x; sx += AM2_MASK_SAMPLE) {
+                for (sy = y - AM2_MASK_STEP / 2; sy < y + AM2_MASK_STEP / 2;
+                     sy += AM2_MASK_SAMPLE)
+                    for (sx = x - AM2_MASK_STEP / 2; sx < x + AM2_MASK_STEP / 2;
+                         sx += AM2_MASK_SAMPLE) {
                         AM2_Point p;
 
                         p.x = (int16_t)sx;
@@ -1987,8 +1994,8 @@ void __cdecl BuildVehicleMask(int32_t kind)
 
                 if (solid < AM2_VEHICLE_MASK_MIN_SOLID)
                     continue;
-                found[count].x = (int16_t)(x - spr->hotX - 8);
-                found[count].y = (int16_t)(y - spr->hotY - 8);
+                found[count].x = (int16_t)(x - spr->hotX);
+                found[count].y = (int16_t)(y - spr->hotY);
                 count++;
             }
 
