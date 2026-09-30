@@ -13419,8 +13419,8 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
     rows = *(uint8_t **)(u + OBJ_OFF_ROWS);
     if (*(const int32_t *)(u + OBJ_OFF_ROW_COUNT) > 1) {
         from = *(const uint32_t *)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_X);
-        spr  = *(uint8_t **)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_SPRITE);
         dir  = *(const int16_t *)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_26);
+        spr  = *(uint8_t **)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_SPRITE);
     } else {
         from = *(const uint32_t *)(u + OBJ_OFF_POS);
         spr  = *(uint8_t **)(rows + ROW_OFF_SPRITE);
@@ -13579,8 +13579,8 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
             a.y = fromP[1];
         }
 
-        lo = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE_MIN);
         hi = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
+        lo = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE_MIN);
         clamped = d;
         if (d < lo)
             clamped = lo;

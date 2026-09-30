@@ -674,8 +674,8 @@ void __cdecl TraceTileLine(uint32_t from, uint32_t to,
                 dy  -= adx;
             }
             tx0  += stepX;
-            dy  += ady;
             tile += stepX;
+            dy  += ady;
 
             tiles[i] = (uint16_t)tile;
             i = ++*count;

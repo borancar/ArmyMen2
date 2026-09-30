@@ -2175,8 +2175,8 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
     /* The original stores these in register-scheduling order rather than in
      * index order; the values are what matters and they are written out here
      * in the order the walk reads them. */
-    ring[0]  = -2 * w - 1;
     ring[1]  = -2 * w;
+    ring[0]  = -2 * w - 1;
     ring[2]  = -2 * w + 1;
     ring[3]  = -w - 2;
     ring[4]  = -w - 1;
@@ -2191,8 +2191,8 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
     ring[13] = w - 1;
     ring[14] = w;
     ring[15] = w + 1;
-    ring[16] = w + 2;
     ring[17] = 2 * w - 1;
+    ring[16] = w + 2;
     ring[18] = 2 * w;
     ring[19] = 2 * w + 1;
 

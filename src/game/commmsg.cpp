@@ -3169,8 +3169,8 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
         return 0;
     }
 
-    msg = *(uint8_t **)(node + MSGNODE_OFF_BODY);
     mine = *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID);
+    msg = *(uint8_t **)(node + MSGNODE_OFF_BODY);
 
     switch (*(const uint32_t *)msg) {
     case AM2_FLOW_DATA:
