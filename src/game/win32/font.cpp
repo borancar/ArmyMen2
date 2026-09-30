@@ -128,7 +128,8 @@ uint32_t __cdecl EncodeGlyph(AM2_Rle16 *out, int32_t width, int32_t height,
 uint32_t __cdecl RenderGlyph(int32_t unused, char ch, HFONT font,
                              AM2_Rle16 *out, int32_t space)
 {
-    LPDIRECTDRAWSURFACE surf = g_backBuffer;
+    /* The back buffer is read from its global at every use. */
+#define surf g_backBuffer
     HDC                 hdc;
     SIZE                size;
     char                buf[2];
@@ -160,6 +161,7 @@ uint32_t __cdecl RenderGlyph(int32_t unused, char ch, HFONT font,
     UnlockSurface();
 
     return written;
+#undef surf
 }
 
 /* Original: 0x00446450. Ask GDI for a font to render glyphs from.
