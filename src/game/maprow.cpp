@@ -1421,10 +1421,10 @@ void __cdecl DepthResort(void *node, void **head)
             e = DEPTH_NEXT(e);
             if (DepthCompare(DEPTH_OBJ(n), DEPTH_OBJ(e)) <= 0) {
                 /* Unlink, then insert before `e`. */
-                if (DEPTH_PREV(n))
-                    DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
-                else
+                if (!DEPTH_PREV(n))
                     *head = DEPTH_NEXT(n);
+                else
+                    DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
                 DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
 
                 DEPTH_PREV(n) = DEPTH_PREV(e);
@@ -1436,10 +1436,15 @@ void __cdecl DepthResort(void *node, void **head)
         }
 
         /* Ran off the end: unlink and append after `e`, the last node. */
-        if (DEPTH_PREV(n))
-            DEPTH_NEXT(DEPTH_PREV(n)) = DEPTH_NEXT(n);
-        else
-            *head = DEPTH_NEXT(n);
+        {
+            uint8_t *pv = DEPTH_PREV(n);
+            uint8_t *nx = DEPTH_NEXT(n);
+
+            if (!pv)
+                *head = nx;
+            else
+                DEPTH_NEXT(pv) = nx;
+        }
         DEPTH_PREV(DEPTH_NEXT(n)) = DEPTH_PREV(n);
 
         DEPTH_PREV(n) = e;
