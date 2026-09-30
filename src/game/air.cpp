@@ -907,12 +907,16 @@ void __cdecl RemapSpriteRuns(void *img, int32_t unused, const uint8_t *table,
     /* Four bytes of header and then one uint16 per row. */
     p += 4 + height * 2;
 
-    /* The HEIGHT is what is tested, not the width. */
-    rows = height;
-    if (rows <= 0)
-        return;
+    /* The HEIGHT is what is tested, not the width -- through a temporary,
+     * so the row counter's store to its stack slot comes after the test. */
+    {
+        int32_t h = height;
 
-    cols = width;
+        if (h <= 0)
+            return;
+        cols = width;
+        rows = h;
+    }
     do {
         int32_t covered = 0;
 
