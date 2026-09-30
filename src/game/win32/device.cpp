@@ -494,21 +494,24 @@ void __cdecl UpdateMouseState(void)
 
 /* One button event. `changed` is against the previous state rather than a
  * simple "went down", so a release marks it too -- and only a release clears
- * the claim the menus set. */
-static inline void MouseButton(int32_t n, uint32_t data)
-{
-    int32_t was = g_mouseButton[n];
-    int32_t now;
-
-    if (data & BUTTON_DOWN) {
-        now = 1;
-    } else {
-        now = 0;
-        g_mouseClaimed[n] = 0;
-    }
-    g_mouseButton[n]  = now;
-    g_mouseChanged[n] = (now != was);
-}
+ * the claim the menus set. A macro, and the button stored in each arm: that
+ * is what lets VC6 copy the join into both arms for buttons 0 and 1 as the
+ * image has it (an inline function or a join-side store keeps one join). */
+#define MouseButton(n, data)                                                  \
+    do {                                                                      \
+        int32_t was_ = g_mouseButton[n];                                      \
+        int32_t now_;                                                         \
+                                                                              \
+        if ((data) & BUTTON_DOWN) {                                           \
+            now_ = 1;                                                         \
+            g_mouseButton[n] = now_;                                          \
+        } else {                                                              \
+            now_ = 0;                                                         \
+            g_mouseClaimed[n] = 0;                                            \
+            g_mouseButton[n] = now_;                                          \
+        }                                                                     \
+        g_mouseChanged[n] = (now_ != was_);                                   \
+    } while (0)
 
 void __cdecl PollMouse(void)
 {

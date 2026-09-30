@@ -14312,8 +14312,8 @@ void *__cdecl CreateWeapon(const char *name, int32_t army, int32_t key,
 
     if (*(const int32_t *)(uintptr_t)ADDR_DEBUG_ITEMLIST)
         am2_log("CreateWeapon: %s, %d, %d, (%d,%d), %d, %d, %d, %x\n", name, army,
-                key, (int32_t)(int16_t)(at & 0xFFFF),
-                (int32_t)(int16_t)(at >> 16), flags, quantity, remote, uid);
+                key, (int32_t)((const AM2_Point *)&at)->x,
+                (int32_t)((const AM2_Point *)&at)->y, flags, quantity, remote, uid);
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0 && remote == 0
         && !AM2_THE_COMM->CommMustBroadcast(
