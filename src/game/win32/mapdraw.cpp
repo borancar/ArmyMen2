@@ -1244,7 +1244,9 @@ void __cdecl ScrollMapCache(void)
         src.right  = ((g_viewTilesW - adx) << TILE_SHIFT) + src.left;
         src.bottom = ((g_viewTilesH - ady) << TILE_SHIFT) + src.top;
 
+        orig_log((const char *)&src);   /* stubbed to `ret`, as above */
         IDirectDrawSurface_BltFast(cache,
+
                                    (DWORD)(((dx > 0) ? 0 : -dx) << TILE_SHIFT),
                                    (DWORD)(((dy > 0) ? 0 : -dy) << TILE_SHIFT),
                                    cache, (LPRECT)&src, DDBLTFAST_WAIT);
