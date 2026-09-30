@@ -1505,20 +1505,21 @@ void __cdecl RunCondActions(AM2_ScriptCond *c, void *arg)
         scr = &kObjScripts[id - 1];
 
         for (int32_t i = 0; i < c->nactions; i++) {
-            const AM2_ScriptName *e = &kScriptNames[c->actions[i].extra];
-
-            if (e->type != AM2_NAME_TYPE_REF)
+            /* The entry is indexed afresh at each use, as the image does. */
+#define E (kScriptNames[c->actions[i].extra])
+            if (E.type != AM2_NAME_TYPE_REF)
                 continue;
 
-            if (e->value >= scr->statecount) {
+            if (E.value >= scr->statecount) {
                 orig_log("Tried to switch on invalid state.\n");
                 continue;
             }
 
-            if (*(const int32_t *)(obj + OBJ_OFF_SCRIPT_STATE) == e->value) {
+            if (*(const int32_t *)(obj + OBJ_OFF_SCRIPT_STATE) == E.value) {
                 CondRunAction(c, i, arg);
                 return;
             }
+#undef E
         }
         return;
     }

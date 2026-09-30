@@ -191,124 +191,118 @@ int32_t __cdecl ScriptParseNumber(const char *text, int32_t *ival, float *fval)
  * is scanned -- which is why AddToken copies it for kind 5. 0x40 bytes: the
  * length check is against 0x3F and the terminator goes one past. */
 
+/* The CRT's _strlwr, called rather than open-coded, as map.cpp and
+ * objtype.cpp do. */
+typedef char *(__cdecl *AM2_StrlwrFn)(char *);
+#define orig_strlwr ((AM2_StrlwrFn)((void *)(uintptr_t)(ADDR_CRT_STRLWR)))
+
+/* The character under the cursor is read again at every test, as the image
+ * reads it; the three token calls with a pointer to a local are made from
+ * separate statements that VC6 cross-jumps into one call. */
 void __cdecl ScriptNextToken(const char *line, AM2_ScriptCtx *ctx,
                              int32_t lineno)
 {
     int32_t at = 0;
+    int32_t n, found, id, ival;
+    float   fval;
 
-    if (line[0] == 0)
-        return;
-
-    do {
-        uint8_t c = (uint8_t)line[at];
-
+    while (line[at] != 0) {
         /* `\` and `/` both end the line. The scripts write `//`, but the
          * second slash is never examined. */
-        if (c == '\\' || c == '/')
+        if (line[at] == '\\' || line[at] == '/')
             return;
 
-        if (IsBlank(c)) {
-            while (IsBlank((uint8_t)line[at + 1]))
+        if (IsBlank((uint8_t)line[at])) {
+            while (IsBlank((uint8_t)line[at]))
                 at++;
+        } else if (line[at] == '"') {
+            n = 0;
             at++;
-            continue;
-        }
-
-        if (c == '"') {
-            int32_t n = 0;
-            at++;
-            while ((c = (uint8_t)line[at]) != 0 && c != '"') {
-                kScriptWord[n++] = (char)c;
+            while (line[at] != 0 && line[at] != '"') {
+                kScriptWord[n] = line[at];
+                n++;
                 at++;
             }
             if (line[at] == '"')
                 at++;
             kScriptWord[n] = 0;
             ScriptAddToken(ctx, AM2_TOKEN_STRING, kScriptWord, lineno);
-            continue;
-        }
-
-        if (c == '\n')
+        } else if (line[at] == '\n') {
             return;
-
-        if (IsScriptDelim(c)) {
-            kScriptWord[0] = (char)c;
+        } else if (IsScriptDelim((uint8_t)line[at])) {
+            kScriptWord[0] = line[at];
             kScriptWord[1] = 0;
 
             /* `<`, `>` and `=` may pair with a following `=` or `>`, which is
              * where `<=`, `>=` and `<>` come from. Nothing checks that the
              * first character is one of those three, so `,=` and `(>` would
              * pair too -- and then fail the lookup and vanish. */
-            uint8_t next = (uint8_t)line[at + 1];
-            if (next == '=' || next == '>') {
-                kScriptWord[1] = (char)next;
+            if (line[at + 1] == '=' || line[at + 1] == '>') {
+                kScriptWord[1] = line[at + 1];
                 kScriptWord[2] = 0;
                 at++;
             }
 
-            int32_t id = ScriptLookupToken(kScriptWord);
-            if (id >= 0 && id <= 0xD)
-                ScriptAddToken(ctx, AM2_TOKEN_CONTROL_CHAR, &id, lineno);
+            found = ScriptLookupToken(kScriptWord);
+            if (found >= 0) {
+                id = found;
+                if (id <= 0xD)
+                    ScriptAddToken(ctx, AM2_TOKEN_CONTROL_CHAR, &id, lineno);
+            }
             /* An id above 13 is dropped here rather than emitted, which is the
              * mirror of the word path below. No delimiter has one. */
             at++;
-            continue;
-        }
-
-        /* A bare word: everything up to a blank, a newline, end of line or a
-         * delimiter. */
-        int32_t n = 0;
-        while (!IsBlank((uint8_t)line[at])) {
-            c = (uint8_t)line[at];
-            if (c == '\n' || c == 0 || IsScriptDelim(c))
-                break;
-
-            if (n < 0x3F) {
-                kScriptWord[n] = (char)c;
-            } else if (n == 0x3F) {
-                /* Faithfully wrong: the original passes kScriptWord[0x3F] --
-                 * one sign-extended character -- where the format wants a
-                 * string, so the message prints garbage for %s. Reproduced
-                 * rather than corrected; nothing in the shipped scripts has a
-                 * token this long, so it has almost certainly never printed. */
-                am2_log("Line [%4d]: Token too long truncating to: %s\n",
-                    lineno, (int32_t)(signed char)kScriptWord[0x3F]);
+        } else {
+            /* A bare word: everything up to a blank, a newline, end of line
+             * or a delimiter. */
+            n = 0;
+            while (!IsBlank((uint8_t)line[at]) && line[at] != '\n' &&
+                   line[at] != 0 && !IsScriptDelim((uint8_t)line[at])) {
+                if (n < 0x3F) {
+                    kScriptWord[n] = line[at];
+                } else if (n == 0x3F) {
+                    /* Faithfully wrong: the original passes kScriptWord[0x3F]
+                     * -- one sign-extended character -- where the format
+                     * wants a string, so the message prints garbage for %s.
+                     * Reproduced rather than corrected; nothing in the
+                     * shipped scripts has a token this long, so it has almost
+                     * certainly never printed. */
+                    am2_log("Line [%4d]: Token too long truncating to: %s\n",
+                            lineno, (int32_t)(signed char)kScriptWord[0x3F]);
+                }
+                n++;
+                at++;
             }
-            n++;
-            at++;
-        }
-        kScriptWord[n] = 0;
+            kScriptWord[n] = 0;
 
-        /* _strlwr, because the keyword table is lower case throughout. */
-        for (char *p = kScriptWord; *p; p++)
-            if (*p >= 'A' && *p <= 'Z')
-                *p = (char)(*p + 0x20);
+            /* Lower case, because the keyword table is lower case
+             * throughout. */
+            orig_strlwr(kScriptWord);
 
-        int32_t id = ScriptLookupToken(kScriptWord);
-        if (id >= 0) {
-            ScriptAddToken(ctx,
-                           id <= 0xD ? AM2_TOKEN_CONTROL_CHAR
-                                     : AM2_TOKEN_RESERVED,
-                           &id, lineno);
-            continue;
+            found = ScriptLookupToken(kScriptWord);
+            if (found >= 0) {
+                id = found;
+                if (id <= 0xD)
+                    ScriptAddToken(ctx, AM2_TOKEN_CONTROL_CHAR, &id, lineno);
+                else
+                    ScriptAddToken(ctx, AM2_TOKEN_RESERVED, &id, lineno);
+            } else {
+                /* ival and fval are not initialised: ScriptParseNumber writes
+                 * the one its answer names. */
+                switch (ScriptParseNumber(kScriptWord, &ival, &fval)) {
+                case 0:
+                    ScriptAddToken(ctx, AM2_TOKEN_STRING, kScriptWord, lineno);
+                    break;
+                case 1:
+                    ScriptAddToken(ctx, AM2_TOKEN_INTEGER, &ival, lineno);
+                    break;
+                case 2:
+                    ScriptAddToken(ctx, AM2_TOKEN_FLOAT, &fval, lineno);
+                    break;
+                }
+            }
         }
-
-        int32_t ival = 0;
-        float fval = 0.0f;
-        switch (ScriptParseNumber(kScriptWord, &ival, &fval)) {
-        case 0:
-            ScriptAddToken(ctx, AM2_TOKEN_STRING, kScriptWord, lineno);
-            break;
-        case 1:
-            ScriptAddToken(ctx, AM2_TOKEN_INTEGER, &ival, lineno);
-            break;
-        case 2:
-            ScriptAddToken(ctx, AM2_TOKEN_FLOAT, &fval, lineno);
-            break;
-        default:
-            break;      /* unreachable; the original drops the token */
-        }
-    } while (line[at] != 0);
+    }
 }
 
 const char *__cdecl ScriptTokenName(int32_t id)
