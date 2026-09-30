@@ -81,7 +81,7 @@ extern "C" int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags);
 int32_t __cdecl ArmyMessageFlush(int32_t least)
 {
     uint8_t *me;
-    int32_t  payload, seq, i, off;
+    int32_t  payload, seq, i;
     uint32_t elapsed;
 
     if (kCommField(COMM_OFF_JOINED) == 0)
@@ -112,11 +112,10 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
     seq = *(const int32_t *)(me + FLOW_OFF_SEQUENCE);
     *(int32_t *)((void *)(uintptr_t)(ADDR_ARMY_PACKET_SEQ)) = seq;
 
-    for (i = 0, off = 0;
-         i < kCommField(COMM_OFF_PLAYER_COUNT);
-         i++, off += (int32_t)AM2_COMM_SLOT_STRIDE) {
-        int32_t id = *(const int32_t *)(kComm + COMM_OFF_PLAYER_SLOTS + off);
-
+    for (i = 0; i < kCommField(COMM_OFF_PLAYER_COUNT); i++) {
+        /* The slot is read afresh at every use. */
+#define id (*(const int32_t *)(kComm + COMM_OFF_PLAYER_SLOTS \
+                               + i * (int32_t)AM2_COMM_SLOT_STRIDE))
         if (id == kCommField(COMM_OFF_OUR_PLAYER_ID) || id == -1)
             continue;
 
@@ -135,6 +134,7 @@ int32_t __cdecl ArmyMessageFlush(int32_t least)
             && kCommField(COMM_OFF_VERBOSE))
             orig_log("Sending Flow Packet seq %d to %x \n",
                      *(const int32_t *)(me + FLOW_OFF_SEQUENCE), id);
+#undef id
     }
 
     *(int32_t *)(me + FLOW_OFF_SEQUENCE) += 1;
@@ -1407,9 +1407,8 @@ void __cdecl SendVehicleExit(void *vehicle, void *occupant)
 void __cdecl RecvTrooperWantItem(void *msg)
 {
     const uint8_t *m = (const uint8_t *)msg;
-    int32_t        request = *(const int32_t *)(m + MSG_DROP_OFF_REQUEST);
-    int32_t        slot;                 /* the original's own argument slot */
-    int32_t        unused = 0;
+    /* The request is read from the message at every use. */
+#define request (*(const int32_t *)(m + MSG_DROP_OFF_REQUEST))
     uint8_t       *t;
     uint8_t       *w;
 
@@ -1468,6 +1467,10 @@ void __cdecl RecvTrooperWantItem(void *msg)
         return;
 
     if (request == AM2_DO_PICKUP) {
+        /* `slot` lands in the message argument's dead slot. */
+        int32_t slot;
+        int32_t unused = 0;
+
         if (*(const int32_t *)(kComm + COMM_OFF_VERBOSE))
             orig_log("Tell pickup item received; ammo %d\n",
                      *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
@@ -1536,6 +1539,7 @@ void __cdecl RecvTrooperWantItem(void *msg)
             orig_log("Request drop item received; ammo %d\n",
                      *(const int32_t *)(m + MSG_DROP_OFF_QUANT));
     }
+#undef request
 }
 
 int armymsg_install(void)
@@ -2131,16 +2135,16 @@ void __cdecl SendVehicleWantItem(void *vehicle, void *item, int32_t request,
      * the same two values, so what differs between them is only the text. */
     if (request == 0)
         am2_log((const char *)(uintptr_t)"Send WANT_PICKUP item %x ammo %d\n",
-                *(const uint32_t *)(itm + OBJ_OFF_UID), quant);
+                *(const uint32_t *)(itm + OBJ_OFF_UID), msg.quant);
     else if (request == 1)
         am2_log((const char *)(uintptr_t)"Send WANT_DROP item %x ammo %d \n",
-                *(const uint32_t *)(itm + OBJ_OFF_UID), quant);
+                *(const uint32_t *)(itm + OBJ_OFF_UID), msg.quant);
     else if (request == 2)
         am2_log((const char *)(uintptr_t)"Send DO_PICKUP item %x ammo %d\n",
-                *(const uint32_t *)(itm + OBJ_OFF_UID), quant);
+                *(const uint32_t *)(itm + OBJ_OFF_UID), msg.quant);
     else if (request == 3)
         am2_log((const char *)(uintptr_t)"Send DO_DROP item %x ammo %d\n",
-                *(const uint32_t *)(itm + OBJ_OFF_UID), quant);
+                *(const uint32_t *)(itm + OBJ_OFF_UID), msg.quant);
 #undef comm
 }
 
