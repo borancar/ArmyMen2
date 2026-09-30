@@ -8120,6 +8120,7 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
     uint8_t *o = (uint8_t *)obj;
     uint8_t *w = (uint8_t *)out;
     uint8_t *at;
+    uint8_t *veh;
     int32_t  klass;
     int32_t  settled;          /* the facing has been stable long enough */
     int32_t  turned  = 0;      /* a turn was enforced this step */
@@ -8220,16 +8221,14 @@ have_facing:
      * unless one of them applies. */
     {
         uint32_t claimed = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
-        uint8_t *p       = at;
 
+        veh = at;
         if (!claimed)
             goto no_route;
-        while (p) {
-            if (*(const uint32_t *)(p + OBJ_OFF_UID) == claimed) {
-                EnterVehicle(o, p);
-                return;
-            }
-            p = *(uint8_t *const *)(p + OBJ_OFF_QUERY_NEXT);
+        while (veh) {
+            if (*(const uint32_t *)(veh + OBJ_OFF_UID) == claimed)
+                goto board;
+            veh = *(uint8_t *const *)(veh + OBJ_OFF_QUERY_NEXT);
         }
     }
 
@@ -8267,14 +8266,12 @@ sweep:
                 break;
             {
                 uint32_t claimed = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
-                uint8_t *p       = claimed ? at : (uint8_t *)0;
 
-                while (p) {
-                    if (*(const uint32_t *)(p + OBJ_OFF_UID) == claimed) {
-                        EnterVehicle(o, p);
-                        return;
-                    }
-                    p = *(uint8_t *const *)(p + OBJ_OFF_QUERY_NEXT);
+                veh = claimed ? at : (uint8_t *)0;
+                while (veh) {
+                    if (*(const uint32_t *)(veh + OBJ_OFF_UID) == claimed)
+                        goto board;
+                    veh = *(uint8_t *const *)(veh + OBJ_OFF_QUERY_NEXT);
                 }
             }
             if (++i >= tries)
@@ -8307,6 +8304,11 @@ sweep:
         turned = 1;
         goto settle_facing;
     }
+
+board:
+    /* Both searches board from here: one EnterVehicle in the image. */
+    EnterVehicle(o, veh);
+    return;
 
 no_route:
     /* Nothing walkable ahead and nothing claimed. Four reasons to stop where
