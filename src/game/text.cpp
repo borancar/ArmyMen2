@@ -149,21 +149,21 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
  * zero, and no caller passes a string ending that way. */
 int32_t __cdecl TextStackHeight(const char *text, int32_t font)
 {
-    const uint8_t *base  = g_fontBase[font * AM2_FONT_BASE_STEP];
     int32_t        total = 0;
+    const uint8_t *base  = g_fontBase[font * AM2_FONT_BASE_STEP];
+    int32_t        i;
 
-    while (*text) {
-        char ch = *text;
-
-        if (ch == 0x5E) {                     /* '^', and its argument */
-            text++;
-        } else if (ch >= 0x1F) {
+    /* Indexed rather than walked, so the character is read again after the
+     * loop's own test. */
+    for (i = 0; text[i]; i++) {
+        if (text[i] == 0x5E) {                /* '^', and its argument */
+            i++;
+        } else if (text[i] >= 0x1F) {
             /* The glyph table indexed afresh, by the signed character. */
             total += *(const uint16_t *)(base
-                         + g_glyphOffset[font * AM2_FONT_OFFSET_STEP + ch] + 2)
+                         + g_glyphOffset[font * AM2_FONT_OFFSET_STEP + text[i]] + 2)
                      - 3;
         }
-        text++;
     }
 
     return total;
