@@ -330,16 +330,16 @@ void __cdecl FreeAllFonts(void)
 
 int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
 {
+    int32_t        width = 0;
     uint32_t       off   = (uint32_t)font * ADDR_FONT_STRIDE;
     const uint8_t *base  = *(const uint8_t **)((uintptr_t)ADDR_FONT_BASES + off);
-    int32_t        width = 0;
+    int32_t        i;
 
-    while (*text) {
-        char ch = *text;
-
+    for (i = 0; text[i]; i++) {
+#define ch (text[i])
         if (ch == '^') {                /* an escape; the character after it
                                          * counts */
-            text++;
+            i++;
         } else if (ch >= 0x1F) {        /* a control, and SIGNED -- so 0x80
                                          * and up are skipped too */
             /* The glyph table indexed afresh, by the signed character. */
@@ -347,7 +347,7 @@ int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
                          + ((const uint16_t *)(uintptr_t)ADDR_GLYPH_OFFSETS)
                                [font * (ADDR_FONT_STRIDE / 2) + ch]);
         }
-        text++;
+#undef ch
     }
 
     if (out) {
