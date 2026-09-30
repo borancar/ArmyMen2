@@ -123,6 +123,14 @@ main result so far (details in `src/vc6/README.md`):
     the unit, a back-off to its weapon's range. The reconstruction passed the
     two swapped, a point MAX_RANGE from the unit toward the enemy. Found by
     byte-matching; not driven.
+  - **ScriptIf stepped past a leading `butnot`, and freed on a wrong token
+    kind** (2026-09-30): the image's keyword switch (0x004435B0, table at
+    0x00443E24) sends 47 to the no-step default with ALLOF/INORDER's
+    neighbours stepping only for 46/48/49/50; the reconstruction stepped for
+    the whole 46..50 range. The image's "found, but expected token of type"
+    arms (REPEAT/COUNT's number, onobjstate's name) return without freeing
+    the record, as ScriptExpect does; the reconstruction freed it. Found by
+    byte-matching; the shipped scripts never lead with `butnot`.
 
 
   - **Two menu behaviours the byte-match corrected** (2026-09-29):

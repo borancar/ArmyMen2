@@ -792,16 +792,19 @@ static inline int ScriptAtWord(const AM2_ScriptCtx *ctx, int32_t at, int32_t id)
 }
 
 /* Inline: the image has this body at each call site. */
-static inline void ScriptAddEvent(AM2_ScriptCond *c, int32_t a, int32_t b, int32_t d)
-{
-    int32_t n = c->nevents++;
-    c->events = (AM2_ScriptEvent *)am2_realloc(
-        c->events, (size_t)c->nevents * sizeof(AM2_ScriptEvent));
-    c->events[n].a = a;
-    c->events[n].b = b;
-    c->events[n].c = d;
-    c->events[n].fired = 0;
-}
+/* Append one event to a condition. A macro, not an inline function: the
+ * image stores the caller's own locals, where an inline's by-value
+ * parameters are copies VC6 spills first. */
+#define SCRIPT_ADD_EVENT(C, A, B, D)                                        \
+    do {                                                                    \
+        int32_t n_ = (C)->nevents++;                                        \
+        (C)->events = (AM2_ScriptEvent *)am2_realloc(                       \
+            (C)->events, (size_t)(C)->nevents * sizeof(AM2_ScriptEvent));   \
+        (C)->events[n_].a = (A);                                            \
+        (C)->events[n_].b = (B);                                            \
+        (C)->events[n_].c = (D);                                            \
+        (C)->events[n_].fired = 0;                                          \
+    } while (0)
 
 int32_t __cdecl ScriptResolveName(AM2_ScriptCtx *ctx, int32_t *at,
                                   int32_t *out, int32_t quiet)
@@ -2828,143 +2831,155 @@ int32_t __cdecl ScriptScanFor(const AM2_ScriptCtx *ctx, int32_t from,
 
 int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
 {
-    int32_t a = 0, b = 0, c3 = 0;
-    AM2_ScriptAction act;
     int32_t objname = 0;
+    int32_t a, b, c3;
+    int32_t na, nb, nc;     /* the butnot event's own */
+    AM2_ScriptAction act;
+    AM2_ScriptCond *cond;
 
-    if (++(*at) >= ctx->count) {
-        am2_log("Unexpected end of script.\n");
-        return 0;
+    /* The token is addressed afresh at every use, and a keyword test reads
+     * the kind again each time. Three shapes of step, each where the image
+     * has it: to the shared end-of-script block, to the second one inside
+     * the action list, or with its own message (ScriptStep). */
+#define TOK         (&ctx->tokens[*at])
+#define IS_WORD(w)  (TOK->kind == AM2_TOKEN_RESERVED \
+                     && (int32_t)(uintptr_t)TOK->value == (w))
+#define STEP_EOS()  if (++(*at) >= ctx->count) goto end_of_script
+#define STEP_LATE() if (++(*at) >= ctx->count) goto end_of_script_late
+#define STEP_OWN()  if (!ScriptStep(ctx, at)) return 0
+/* A wrong token kind logs and returns WITHOUT freeing the record -- another
+ * of the original's leaks. */
+#define WANT_KIND(K)                                                        \
+    if (TOK->kind != (K)) {                                                 \
+        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n", \
+                ctx->tokens[*at].line, ScriptTokenText(TOK, kScriptWord),   \
+                kKindName(K));                                              \
+        return 0;                                                           \
     }
 
-    AM2_ScriptCond *cond = (AM2_ScriptCond *)am2_malloc(sizeof *cond);
+    STEP_EOS();
+
+    cond = (AM2_ScriptCond *)am2_malloc(sizeof *cond);
     memset(cond, 0, sizeof *cond);
 
-    if (ScriptAtWord(ctx, *at, AM2_TOK_TIMEABSOLUTE)) {           /* timeabsolute */
+    if (IS_WORD(AM2_TOK_TIMEABSOLUTE)) {
         cond->kind = AM2_IF_TIMEABSOLUTE;
-        if (++(*at) >= ctx->count)
-            goto end_of_script;
-
-        AM2_ScriptTok *t = &ctx->tokens[*at];
-        if (t->kind != AM2_TOKEN_INTEGER) {
+        STEP_EOS();
+        if (TOK->kind != AM2_TOKEN_INTEGER) {
             am2_log("Line [%4d]:  Exptected number after TIMEABSOLUTE\n",
-                    t->line);
+                    TOK->line);
             goto fail;
         }
-        cond->number = (int32_t)(uintptr_t)t->value;
+        cond->number = (int32_t)(uintptr_t)TOK->value;
         if (cond->number < 1) {
             am2_log("Line [%4d]:  TIMEABSOLUTE time must be positive\n",
                     ctx->tokens[*at].line);
             goto fail;
         }
-        if (++(*at) >= ctx->count)
-            goto end_of_script;
+        STEP_OWN();
 
     } else if (ScriptScanFor(ctx, *at, AM2_TOK_AFTER, AM2_TOK_THEN)) {
         /* An `<event> after <event>` chain. */
         cond->kind = AM2_IF_AFTER;
-        for (;;) {
-            int32_t k = ctx->tokens[*at].kind;
-            if (k != AM2_TOKEN_STRING && k != AM2_TOKEN_RESERVED)
-                break;
-
+        while (TOK->kind == AM2_TOKEN_STRING || TOK->kind == AM2_TOKEN_RESERVED) {
             if (!ScriptParseEvent(ctx, at, &a, &b, &c3))
                 goto fail_nofree;
-            ScriptAddEvent(cond, a, b, c3);
+            SCRIPT_ADD_EVENT(cond, a, b, c3);
 
-            if (!ScriptAtWord(ctx, *at, AM2_TOK_AFTER)) {
+            if (!IS_WORD(AM2_TOK_AFTER)) {
                 am2_log("Line [%4d]:  Missing 'after' in if-statement.\n",
                         ctx->tokens[*at].line);
                 goto fail;
             }
-            if (++(*at) >= ctx->count)
-                goto end_of_script_late;
+            STEP_LATE();
 
             if (!ScriptParseEvent(ctx, at, &a, &b, &c3))
                 goto fail_nofree;
-            ScriptAddEvent(cond, a, b, c3);
+            SCRIPT_ADD_EVENT(cond, a, b, c3);
 
-            if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED)
-                continue;
-            if (ScriptAtWord(ctx, *at, AM2_TOK_THEN) || ScriptAtWord(ctx, *at, AM2_TOK_TESTVAR))
-                break;                          /* then, or testvar */
-            if (!ScriptAtWord(ctx, *at, AM2_TOK_AND))    /* and */
-                continue;
-            if (++(*at) >= ctx->count)
-                goto end_of_script_late;
+            if (IS_WORD(AM2_TOK_THEN) || IS_WORD(AM2_TOK_TESTVAR))
+                break;
+            if (IS_WORD(AM2_TOK_AND))
+                STEP_LATE();
         }
 
-    } else if (ctx->tokens[*at].kind == AM2_TOKEN_RESERVED) {
-        int32_t id = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        int wants_of = 0;
-
-        switch (id) {
-        case AM2_TOK_ALLOF:         cond->kind = AM2_IF_ALLOF; break;
-        case AM2_TOK_INORDER:       cond->kind = AM2_IF_INORDER; break;
-        case AM2_TOK_COUNT:         cond->kind = AM2_IF_COUNT; wants_of = 1; break;
-        case AM2_TOK_REPEAT:        cond->kind = AM2_IF_REPEAT; wants_of = 1; break;
-        default: cond->kind = AM2_IF_PLAIN; break;         /* butnot, and anything else */
-        }
-
-        if (id >= 46 && id <= 50) {
-            if (++(*at) >= ctx->count)
-                goto end_of_script;
-
-            if (wants_of) {
-                AM2_ScriptTok *t = &ctx->tokens[*at];
-                if (t->kind != AM2_TOKEN_INTEGER)
-                    goto want_integer;
-                cond->number = (int32_t)(uintptr_t)t->value;
-                if (++(*at) >= ctx->count)
-                    goto end_of_script;
-
-                if (!ScriptAtWord(ctx, *at, AM2_TOK_OF)) {      /* of */
-                    am2_log("Line [%4d]:  Missing 'of' in if-repeat "
-                            "statement.\n", ctx->tokens[*at].line);
-                    goto fail;
-                }
-                if (++(*at) >= ctx->count)
-                    goto end_of_script_late;
+    } else if (TOK->kind == AM2_TOKEN_RESERVED) {
+        switch ((int32_t)(uintptr_t)TOK->value) {
+        case AM2_TOK_ALLOF:
+            cond->kind = AM2_IF_ALLOF;
+            STEP_OWN();
+            break;
+        case AM2_TOK_INORDER:
+            cond->kind = AM2_IF_INORDER;
+            STEP_OWN();
+            break;
+        case AM2_TOK_REPEAT:
+            cond->kind = AM2_IF_REPEAT;
+            STEP_EOS();
+            WANT_KIND(AM2_TOKEN_INTEGER)
+            cond->number = (int32_t)(uintptr_t)TOK->value;
+            STEP_OWN();
+            if (!IS_WORD(AM2_TOK_OF)) {
+                am2_log("Line [%4d]:  Missing 'of' in if-repeat statement.\n",
+                        TOK->line);
+                goto fail;
             }
+            STEP_OWN();
+            break;
+        case AM2_TOK_COUNT:
+            cond->kind = AM2_IF_COUNT;
+            STEP_EOS();
+            WANT_KIND(AM2_TOKEN_INTEGER)
+            cond->number = (int32_t)(uintptr_t)TOK->value;
+            STEP_EOS();
+            if (!IS_WORD(AM2_TOK_OF)) {
+                am2_log("Line [%4d]:  Missing 'of' in if-repeat statement.\n",
+                        TOK->line);
+                goto fail;
+            }
+            STEP_OWN();
+            break;
+        default:                        /* butnot, and anything else */
+            cond->kind = AM2_IF_PLAIN;
+            break;
         }
 
         if (!ScriptParseEvents(ctx, at, cond))
             goto fail;
 
-        if (ScriptAtWord(ctx, *at, AM2_TOK_BUTNOT)) {       /* butnot */
+        if (IS_WORD(AM2_TOK_BUTNOT)) {
             cond->kind = AM2_IF_BUTNOT_KEYWORD;
-            if (++(*at) >= ctx->count)
-                goto end_of_script;
-            if (!ScriptParseEvent(ctx, at, &a, &b, &c3))
+            STEP_EOS();
+            if (!ScriptParseEvent(ctx, at, &na, &nb, &nc))
                 goto fail_nofree;
-            ScriptAddEvent(cond, a, b, c3);
-            if (*at >= ctx->count)
-                goto end_of_script;
+            SCRIPT_ADD_EVENT(cond, na, nb, nc);
+            if (*at >= ctx->count) {
+                am2_log("Unexpected end of script.\n");
+                return 0;
+            }
         }
 
-    } else if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
+    } else if (TOK->kind == AM2_TOKEN_STRING) {
         cond->kind = AM2_IF_PLAIN;
         if (!ScriptParseEvents(ctx, at, cond))
             goto fail;
 
-        if (ScriptAtWord(ctx, *at, AM2_TOK_BUTNOT)) {       /* butnot */
+        if (IS_WORD(AM2_TOK_BUTNOT)) {
             cond->kind = AM2_IF_BUTNOT_STRING;
-            if (++(*at) >= ctx->count)
-                goto end_of_script;
-            if (!ScriptParseEvent(ctx, at, &a, &b, &c3))
+            STEP_EOS();
+            if (!ScriptParseEvent(ctx, at, &na, &nb, &nc))
                 goto fail_nofree;
-            ScriptAddEvent(cond, a, b, c3);
+            SCRIPT_ADD_EVENT(cond, na, nb, nc);
             if (*at >= ctx->count)
                 goto end_of_script;
         }
     }
 
     /* ---- testvar ---- */
-    if (ScriptAtWord(ctx, *at, AM2_TOK_TESTVAR)) {
-        if (++(*at) >= ctx->count)
-            goto end_of_script;
+    if (IS_WORD(AM2_TOK_TESTVAR)) {
+        STEP_EOS();
 
-        while (!ScriptAtWord(ctx, *at, AM2_TOK_THEN)) {   /* until `then` */
+        while (!IS_WORD(AM2_TOK_THEN)) {        /* until `then` */
             AM2_ScriptTest test;
             memset(&test, 0, sizeof test);
 
@@ -2974,35 +2989,42 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
             if (*at >= ctx->count)
                 goto end_of_script_late;
 
-            AM2_ScriptTok *t = &ctx->tokens[*at];
-            if (t->kind != AM2_TOKEN_CONTROL_CHAR)
-                goto bad_operator;
-            switch ((int32_t)(uintptr_t)t->value) {
-            case AM2_TOK_LT:        test.op = AM2_CMP_LT; break;
-            case AM2_TOK_LE:        test.op = AM2_CMP_LE; break;
-            case AM2_TOK_EQ:        test.op = AM2_CMP_EQ; break;
-            case AM2_TOK_GT:        test.op = AM2_CMP_GT; break;
-            case AM2_TOK_GE:        test.op = AM2_CMP_GE; break;
-            case AM2_TOK_NE:        test.op = AM2_CMP_NE; break;
-            default: goto bad_operator;
+            /* One test per operator, the kind read again with each. */
+#define IS_CTRL(c) (TOK->kind == AM2_TOKEN_CONTROL_CHAR \
+                    && (int32_t)(uintptr_t)TOK->value == (c))
+            if (IS_CTRL(AM2_TOK_LT))
+                test.op = AM2_CMP_LT;
+            else if (IS_CTRL(AM2_TOK_LE))
+                test.op = AM2_CMP_LE;
+            else if (IS_CTRL(AM2_TOK_EQ))
+                test.op = AM2_CMP_EQ;
+            else if (IS_CTRL(AM2_TOK_GT))
+                test.op = AM2_CMP_GT;
+            else if (IS_CTRL(AM2_TOK_GE))
+                test.op = AM2_CMP_GE;
+            else if (IS_CTRL(AM2_TOK_NE))
+                test.op = AM2_CMP_NE;
+            else {
+                am2_log("Line [%4d]:  Unrecognized operator in testvar "
+                        "clause.\n", ctx->tokens[*at].line);
+                goto fail;
             }
+#undef IS_CTRL
 
-            if (++(*at) >= ctx->count)
-                goto end_of_script_late;
+            STEP_LATE();
             if (!ScriptParseValue(ctx, at, &test.right[0], &test.right[1],
                                   &test.right[2]))
                 goto fail;
             if (*at >= ctx->count)
                 goto end_of_script_late;
 
-            t = &ctx->tokens[*at];
-            if (t->kind != AM2_TOKEN_RESERVED)
-                goto incomplete;
-            int32_t id = (int32_t)(uintptr_t)t->value;
-            if (id != AM2_TOK_THEN && id != AM2_TOK_AND)           /* then, and */
-                goto incomplete;
-            if (id == AM2_TOK_AND && ++(*at) >= ctx->count)
-                goto end_of_script_late;
+            if (!IS_WORD(AM2_TOK_THEN) && !IS_WORD(AM2_TOK_AND)) {
+                am2_log("Line [%4d]:  Incomplete testvar clause.\n",
+                        ctx->tokens[*at].line);
+                goto fail;
+            }
+            if (IS_WORD(AM2_TOK_AND))
+                STEP_LATE();
 
             int32_t n = cond->ntests++;
             cond->tests = (AM2_ScriptTest *)am2_realloc(
@@ -3012,112 +3034,85 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
     }
 
     /* ---- then ---- */
-    if (!ScriptAtWord(ctx, *at, AM2_TOK_THEN)) {
-        am2_log("Line [%4d]:  Missing 'then' in if-statement.\n",
-                ctx->tokens[*at].line);
+    if (!IS_WORD(AM2_TOK_THEN)) {
+        am2_log("Line [%4d]:  Missing 'then' in if-statement.\n", TOK->line);
         goto fail;
     }
-    if (++(*at) >= ctx->count)
-        goto end_of_script;
+    STEP_EOS();
 
-    if (ctx->tokens[*at].kind == AM2_TOKEN_RESERVED) {
-        int32_t id = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        if (id == AM2_TOK_RANDOM) {                         /* random */
-            cond->mode = AM2_THEN_RANDOM;
-            if (++(*at) >= ctx->count)
-                goto end_of_script;
-        } else if (id == AM2_TOK_SEQUENTIAL) {                  /* sequential */
-            cond->mode = AM2_THEN_SEQUENTIAL;
-            if (++(*at) >= ctx->count)
-                goto end_of_script;
-        } else if (id == AM2_TOK_ONOBJSTATE) {                  /* onobjstate */
-            cond->mode = AM2_THEN_ONOBJSTATE;
-            if (++(*at) >= ctx->count)
-                goto end_of_script;
-            if (!ScriptResolveName(ctx, at, &cond->objstate, 0))
-                goto fail;
-        } else {
-            cond->mode = AM2_THEN_NONE;
+    if (IS_WORD(AM2_TOK_RANDOM)) {
+        cond->mode = AM2_THEN_RANDOM;
+        goto then_step;
+    } else if (IS_WORD(AM2_TOK_SEQUENTIAL)) {
+        cond->mode = AM2_THEN_SEQUENTIAL;
+then_step:
+        if (++(*at) >= ctx->count) {
+end_of_script:
+            /* The original leaks the record on every "Unexpected end of
+             * script" path -- only the messages that route through
+             * 0x00443E03 reach the free. Kept, because a script that takes
+             * one of these is already being rejected and the process is
+             * about to log and carry on. */
+            am2_log("Unexpected end of script.\n");
+            return 0;
         }
+    } else if (IS_WORD(AM2_TOK_ONOBJSTATE)) {
+        cond->mode = AM2_THEN_ONOBJSTATE;
+        STEP_OWN();
+        if (!ScriptResolveName(ctx, at, &cond->objstate, 0))
+            goto fail;
     } else {
         cond->mode = AM2_THEN_NONE;
     }
 
     /* ---- the action list ---- */
-    for (;;) {
+    /* The first action is written out apart from the rest: its array is
+     * malloc'd (0x00443C89), where the later ones grow it by realloc. */
+    if (cond->mode == AM2_THEN_ONOBJSTATE) {
+        WANT_KIND(AM2_TOKEN_STRING)
+        objname = ScriptFindName((const char *)TOK->value);
+        if (objname < 0)
+            objname = AddNameTableName((const char *)ctx->tokens[*at].value,
+                                       AM2_NAME_TYPE_REF, 0);
+        if (++(*at) >= ctx->count) {
+end_of_script_late:
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+    }
+    if (!ScriptAction(ctx, at, &act))
+        goto fail;
+    if (cond->mode == AM2_THEN_ONOBJSTATE)
+        act.extra = objname;
+    cond->nactions = 1;
+    cond->actions = (AM2_ScriptAction *)am2_malloc(sizeof act);
+    cond->actions[0] = act;
+
+    while (*at < ctx->count && TOK->kind == AM2_TOKEN_CONTROL_CHAR
+           && (int32_t)(uintptr_t)TOK->value == AM2_TOK_COMMA) {    /* ',' */
+        STEP_LATE();
         if (cond->mode == AM2_THEN_ONOBJSTATE) {
-            AM2_ScriptTok *t = &ctx->tokens[*at];
-            if (t->kind != AM2_TOKEN_STRING)
-                goto want_string;
-            objname = ScriptFindName((const char *)t->value);
+            WANT_KIND(AM2_TOKEN_STRING)
+            objname = ScriptFindName((const char *)TOK->value);
             if (objname < 0)
                 objname = AddNameTableName(
-                    (const char *)ctx->tokens[*at].value,
-                    AM2_NAME_TYPE_REF, 0);
-            if (++(*at) >= ctx->count)
-                goto end_of_script_late;
+                    (const char *)ctx->tokens[*at].value, AM2_NAME_TYPE_REF, 0);
+            STEP_LATE();
         }
-
         if (!ScriptAction(ctx, at, &act))
             goto fail;
         if (cond->mode == AM2_THEN_ONOBJSTATE)
             act.extra = objname;
-
-        int32_t n = cond->nactions++;
-        /* The first array by malloc (0x00443326), growth by realloc: the
-         * same heap either way, but AM2_TRACE_HEAP diffs the CALLS. */
-        cond->actions = cond->actions
-            ? (AM2_ScriptAction *)am2_realloc(cond->actions, (size_t)cond->nactions * sizeof act)
-            : (AM2_ScriptAction *)am2_malloc((size_t)cond->nactions * sizeof act);
-        cond->actions[n] = act;
-
-        if (*at >= ctx->count)
-            break;
-        AM2_ScriptTok *t = &ctx->tokens[*at];
-        if (t->kind != AM2_TOKEN_CONTROL_CHAR ||
-            (int32_t)(uintptr_t)t->value != AM2_TOK_COMMA)   /* ',' */
-            break;
-        if (++(*at) >= ctx->count)
-            goto end_of_script_late;
+        cond->nactions++;
+        cond->actions = (AM2_ScriptAction *)am2_realloc(
+            cond->actions, (size_t)cond->nactions * sizeof act);
+        cond->actions[cond->nactions - 1] = act;
     }
 
     /* Newest first. */
     cond->next = kScriptConds;
     kScriptConds = cond;
     return 1;
-
-want_integer:
-    am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
-            ctx->tokens[*at].line,
-            ScriptTokenText(&ctx->tokens[*at], kScriptWord),
-            kKindName(AM2_TOKEN_INTEGER));
-    goto fail;
-
-want_string:
-    am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
-            ctx->tokens[*at].line,
-            ScriptTokenText(&ctx->tokens[*at], kScriptWord),
-            kKindName(AM2_TOKEN_STRING));
-    goto fail;
-
-bad_operator:
-    am2_log("Line [%4d]:  Unrecognized operator in testvar clause.\n",
-            ctx->tokens[*at].line);
-    goto fail;
-
-incomplete:
-    am2_log("Line [%4d]:  Incomplete testvar clause.\n",
-            ctx->tokens[*at].line);
-    goto fail;
-
-end_of_script_late:
-end_of_script:
-    /* The original leaks the record on every "Unexpected end of script" path
-     * -- only the messages that route through 0x00443E03 reach the free. Kept,
-     * because a script that takes one of these is already being rejected and
-     * the process is about to log and carry on. */
-    am2_log("Unexpected end of script.\n");
-    return 0;
 
 fail:
     am2_free(cond);
@@ -3127,6 +3122,12 @@ fail_nofree:
     /* A failing event parse returns without freeing -- 0x00443E14 skips the
      * free that 0x00443E0B does. Another original leak, reproduced. */
     return 0;
+#undef TOK
+#undef IS_WORD
+#undef STEP_EOS
+#undef STEP_LATE
+#undef STEP_OWN
+#undef WANT_KIND
 }
 
 /* No statement handler is left original. Each takes the context and a pointer
