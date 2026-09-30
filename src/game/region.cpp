@@ -9874,11 +9874,10 @@ int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan, int32_t *out)
 {
     const uint8_t *p = (const uint8_t *)plan;
     uint8_t *o = (uint8_t *)obj;
-    uint8_t *row = *(uint8_t **)(o + OBJ_OFF_ROWS);
+    uint8_t *row;
     int32_t speed;
     int32_t limit;
-    int32_t want;
-    int32_t nowFacing, thenFacing;
+    uint8_t nowFacing, thenFacing;
     uint32_t elapsed;
     int32_t commit;
     AM2_Point pt;
@@ -9892,7 +9891,6 @@ int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan, int32_t *out)
     speed = 0;
     if (*(const int32_t *)(p + 0x08u) != 1) {
         int32_t want_speed;
-        float   rate;
 
         want_speed = *(const int32_t *)(p + 0x0Cu) != 0
                      ? *(const int32_t *)(o + VEHICLE_OFF_FIELD_55C)
@@ -9904,53 +9902,56 @@ int32_t __cdecl Step3TurnBlocked(void *obj, const void *plan, int32_t *out)
         if (*(const int32_t *)(p + 0x10u) != 0)
             want_speed >>= 1;
 
-        rate = *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
-               * (float)*(const int32_t *)(o + VEHICLE_OFF_ACCEL_RATE);
-
         /* A FLOOR in the first arm and a CEILING in the second. The original
          * compares jle and jge; swapping them is invisible whenever the
-         * desired speed is already inside the band. */
+         * desired speed is already inside the band. Each arm scales the
+         * acceleration by the frame's float delta itself (int * float). */
         if (*(const int32_t *)(p + 0x0Cu) != 0) {
-            limit = (int32_t)((float)*(const int32_t *)(o + OBJ_OFF_FIELD_44)
-                              - rate);
-            speed = (want_speed <= limit) ? limit : want_speed;
+            limit = (int32_t)((double)*(const int32_t *)(o + OBJ_OFF_FIELD_44)
+                              - *(const int32_t *)(o + VEHICLE_OFF_ACCEL_RATE)
+                                * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC);
+            speed = (want_speed > limit) ? want_speed : limit;
         } else {
-            limit = (int32_t)(rate
-                              + (float)*(const int32_t *)(o + OBJ_OFF_FIELD_44));
-            speed = (want_speed >= limit) ? limit : want_speed;
+            limit = (int32_t)(*(const int32_t *)(o + VEHICLE_OFF_ACCEL_RATE)
+                                * *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
+                              + (double)*(const int32_t *)(o + OBJ_OFF_FIELD_44));
+            speed = (want_speed < limit) ? want_speed : limit;
         }
     }
 
-    want = Clamp(AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
-                           *(const uint8_t *)(p + 0x00u)),
-                 -8, 8);
-    *out = want;
+    row = *(uint8_t **)(o + OBJ_OFF_ROWS);
 
-    {
-        const AM2_Anim *anim = *(const AM2_Anim *const *)(row
-                                                          + ROW_OFF_ANIM_PLAYING);
-        int32_t base = (*(const uint8_t *)(row + ROW_OFF_HEADING_BIAS)
-                        + *(const uint8_t *)(row + ROW_OFF_HEADING)) & 0xFF;
+    /* Written through `out` twice, as RoachStepAllowed does: the raw delta,
+     * then its clamp. The animation is read through the row at each use,
+     * and the two facings are bytes. */
+    *out = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING),
+                      *(const uint8_t *)(p + 0x00u));
+    *out = Clamp(*out, -8, 8);
 
-        nowFacing = RoundTo8(base, anim->directionBits);
-        thenFacing = RoundTo8((base + *out) & 0xFF, anim->directionBits);
-    }
+#define ANIM (*(const AM2_Anim *const *)(row + ROW_OFF_ANIM_PLAYING))
+    nowFacing  = (uint8_t)RoundTo8((*(const uint8_t *)(row + ROW_OFF_HEADING_BIAS)
+                                    + *(const uint8_t *)(row + ROW_OFF_HEADING)) & 0xFF,
+                                   ANIM->directionBits);
+    thenFacing = (uint8_t)RoundTo8((*(const uint8_t *)(row + ROW_OFF_HEADING_BIAS)
+                                    + *(const uint8_t *)(row + ROW_OFF_HEADING)
+                                    + *out) & 0xFF,
+                                   ANIM->directionBits);
+#undef ANIM
 
     if (nowFacing != thenFacing) {
         commit = (*(const int32_t *)(o + OBJ_OFF_FIELD_5A8) != 0
-                  || (uint8_t)thenFacing
-                     != *(const uint8_t *)(o + OBJ_OFF_FIELD_5A4));
+                  || thenFacing != *(const uint8_t *)(o + OBJ_OFF_FIELD_5A4));
         elapsed = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
                   - *(const uint32_t *)(row + ROW_OFF_TURN_STAMP);
 
         if ((elapsed > *(const uint32_t *)(o + VEHICLE_OFF_TURN_INTERVAL)
              && commit) || elapsed > 0x320)
-            *(uint8_t *)(o + OBJ_OFF_FIELD_5A4) = (uint8_t)nowFacing;
+            *(uint8_t *)(o + OBJ_OFF_FIELD_5A4) = nowFacing;
         else
             *out = 0;
     }
 
-    MoveStepPoint(o, (*(const uint8_t *)(o + OBJ_OFF_FACING) + *out) & 0xFF,
+    MoveStepPoint(o, (uint8_t)(*out + *(const uint8_t *)(o + OBJ_OFF_FACING)),
                   0, speed, 0, 0, &pt);
     return VehicleBlockWeight(o, thenFacing, *(const uint32_t *)&pt, 1) > 0x0E;
 }
