@@ -523,8 +523,10 @@ void __cdecl InitMenuScreen(void)
                               - AM2_GLYPH_DIGIT_BIAS);
     }
 
-    rows = (*(const int32_t *)(uintptr_t)ADDR_GAME_STATE == 2)
-           ? AM2_MENU_SPRITE_ROWS : 0;
+    if (*(const int32_t *)(uintptr_t)ADDR_GAME_STATE == 2)
+        rows = AM2_MENU_SPRITE_ROWS;
+    else
+        rows = 0;
 
     for (row = 0; row <= rows; row++) {
         AM2_Sprite **dst = (AM2_Sprite **)(uintptr_t)ADDR_MENU_SPRITES + row * 10;

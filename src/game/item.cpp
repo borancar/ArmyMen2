@@ -5143,8 +5143,10 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
         return 1;
 
     case 5: case 11: case 12:                       /* MORT, MINE, EXPL */
-        *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
-            (cls > 0 && cls <= 2) ? AM2_POSE_KNEEL : AM2_POSE_CARRY;
+        if (cls > 0 && cls <= 2)
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_KNEEL;
+        else
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_CARRY;
         return 1;
 
     case 24: case 25: case 26: case 39: case 40:  /* AIRS PARA RECO MAG AERO */

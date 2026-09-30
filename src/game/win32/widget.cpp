@@ -4966,7 +4966,10 @@ void __cdecl HudPostUpdate(void)
             /* Signed 16-bit compares, sign-extended into the rect's int32s. */
             ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[0] = ax < px ? ax : px;
             ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[2] = ax > px ? ax : px;
-            ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[1] = ay < py ? ay : py;
+            if (ay < py)
+                ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[1] = ay;
+            else
+                ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[1] = py;
             ((int32_t *)(uintptr_t)ADDR_VIEW_RECT)[3] = ay > py ? ay : py;
         }
     }
@@ -6480,8 +6483,10 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
         } else if (ObjIsType3((const AM2_Object *)obj)) {
             uint32_t kind = *(const uint32_t *)(obj + VEHICLE_OFF_KIND);
 
-            *(int32_t *)(rec + SQUAD_REC_INDEX) =
-                kind < AM2_HUD_SQUAD_VEHICLE_KINDS ? kVehicleIcon[kind] : 0;
+            if (kind < AM2_HUD_SQUAD_VEHICLE_KINDS)
+                *(int32_t *)(rec + SQUAD_REC_INDEX) = kVehicleIcon[kind];
+            else
+                *(int32_t *)(rec + SQUAD_REC_INDEX) = 0;
             *(uint32_t *)(rec + SQUAD_REC_DETAIL_ARG) =
                 *(const uint32_t *)(obj + OBJ_OFF_UID);
             HudSquadBar(rec, obj);

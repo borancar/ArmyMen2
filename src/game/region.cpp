@@ -8337,7 +8337,10 @@ sweep:
             {
                 uint32_t claimed = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
 
-                veh = claimed ? at : (uint8_t *)0;
+                if (claimed)
+                    veh = at;
+                else
+                    veh = (uint8_t *)0;
                 while (veh) {
                     if (*(const uint32_t *)(veh + OBJ_OFF_UID) == claimed)
                         goto board;
@@ -9609,7 +9612,10 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
 
     /* FIRE. One weapon code answers a different action from all the others. */
     if (ActionKeyDown(0)) {
-        *(int32_t *)(w + 8) = (code == 0x14) ? 0x26 : 2;
+        if (code == 0x14)
+            *(int32_t *)(w + 8) = 0x26;
+        else
+            *(int32_t *)(w + 8) = 2;
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&g_defaultPos;
         moved = 1;
         OverlayPrepare(1, 1);
