@@ -392,61 +392,52 @@ int32_t __cdecl TextExtent(const char *text, int32_t font, int32_t out[2])
 void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
                              int32_t font, RECT clip, int32_t colour)
 {
-    const uint8_t *record;
-    const uint16_t *offsets;
     int32_t         len;
     int32_t         i;
-    int32_t         col;
-    int32_t         penX = x;
+    int32_t         penX;
 
     if (!*(const int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
         return;
 
-    len = (int32_t)strlen(text);
-    if (len <= 0)
-        return;
+    len  = (int32_t)strlen(text);
+    penX = x;
 
-    record  = (const uint8_t *)(uintptr_t)ADDR_GLYPH_SIZE
-              + (size_t)font * ADDR_FONT_STRIDE;
-    offsets = (const uint16_t *)(record + 4);
-
-    for (i = 0, col = 1; i < len; i++, col++) {
-#define ch ((uint8_t)text[i])
+    for (i = 0; i < len; i++) {
+#define ch (text[i])
         const AM2_Rle16 *glyph;
         AM2_Rect         src;
         AM2_Rect         mid;
-        AM2_Rect         out;
         int32_t          dx;
         int32_t          dy;
-        int32_t          width;
+        uint16_t         width;
+        uint16_t         height;
 
-        if (ch == '^' && col < len) {
+        if (ch == '^' && i + 1 < len) {
             colour = (int32_t)(int8_t)text[i + 1];
             i++;
-            col++;
             continue;
         }
 
-        glyph = (const AM2_Rle16 *)(*(const uint8_t *const *)(record + 0x204)
-                                    + offsets[ch]);
-        width = glyph->width;
+        glyph = (const AM2_Rle16 *)(font_base(font) + font_offsets(font)[(int32_t)(int8_t)ch]);
+        width  = glyph->width;
+        height = glyph->height;
 
         src.left   = 0;
         src.top    = 0;
         src.right  = width;
-        src.bottom = glyph->height;
+        src.bottom = height;
 
         dx = penX;
         dy = y;
 
         if (ClipRect(&src, (const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP,
                      &dx, &dy, &mid)
-            && ClipRect(&mid, (const AM2_Rect *)&clip, &dx, &dy, &out)) {
+            && ClipRect(&mid, (const AM2_Rect *)&clip, &dx, &dy, &src)) {
             if (g_drawTarget == g_primarySurface) {
                 dx += *(const int32_t *)(uintptr_t)ADDR_ORIGIN_DX;
                 dy += *(const int32_t *)(uintptr_t)ADDR_ORIGIN_DY;
             }
-            BlitGlyph(dx, dy, glyph, out, colour);
+            BlitGlyph(dx, dy, glyph, src, colour);
         }
 
         penX += width;
@@ -476,51 +467,43 @@ void __cdecl DrawTextClipped(int32_t x, int32_t y, const char *text,
  *   because the two live in different files.
  *
  * The original reuses its own `font` and `y` argument slots as the in/out pair
- * ClipRect needs. That is an MSVC register-allocation artefact and not
- * behaviour: both values are read into locals before the loop starts. Written
- * with real locals here.
+ * ClipRect needs, and the first clip's source rectangle as the second clip's
+ * output. Both are MSVC placing block-scoped locals, not behaviour: `dx`/`dy`
+ * and `src` are ordinary locals here and VC6 lays them out the same way.
+ *
+ * The glyph index is the PLAIN char, so a byte above 0x7F indexes the offset
+ * table backwards. Both painters do it; reproduced.
  */
 void __cdecl DrawTextVertical(int32_t x, int32_t y, const char *text,
                               int32_t font, RECT clip, int32_t colour)
 {
-    const uint8_t  *record;
-    const uint16_t *offsets;
     int32_t         len;
     int32_t         i;
-    int32_t         col;
-    int32_t         penY = y;
+    int32_t         penY;
 
     if (!*(const int32_t *)(uintptr_t)ADDR_SURFACE_LOCKED)
         return;
 
-    len = (int32_t)strlen(text);
-    if (len <= 0)
-        return;
+    len  = (int32_t)strlen(text);
+    penY = y;
 
-    record  = (const uint8_t *)(uintptr_t)ADDR_GLYPH_SIZE
-              + (size_t)font * ADDR_FONT_STRIDE;
-    offsets = (const uint16_t *)(record + 4);
-
-    for (i = 0, col = 1; i < len; i++, col++) {
-        uint8_t          ch = (uint8_t)text[i];
+    for (i = 0; i < len; i++) {
+#define ch (text[i])
         const AM2_Rle16 *glyph;
         AM2_Rect         src;
         AM2_Rect         mid;
-        AM2_Rect         out;
         int32_t          dx;
         int32_t          dy;
-        int32_t          width;
-        int32_t          height;
+        uint16_t         width;
+        uint16_t         height;
 
-        if (ch == '^' && col < len) {
+        if (ch == '^' && i + 1 < len) {
             colour = (int32_t)(int8_t)text[i + 1];
             i++;
-            col++;
             continue;
         }
 
-        glyph  = (const AM2_Rle16 *)(*(const uint8_t *const *)(record + 0x204)
-                                     + offsets[ch]);
+        glyph  = (const AM2_Rle16 *)(font_base(font) + font_offsets(font)[(int32_t)(int8_t)ch]);
         width  = glyph->width;
         height = glyph->height;
 
@@ -529,21 +512,22 @@ void __cdecl DrawTextVertical(int32_t x, int32_t y, const char *text,
         src.right  = width;
         src.bottom = height;
 
-        dx = x - width / 2;
+        dx = x - src.right / 2;
         dy = penY;
 
         if (ClipRect(&src, (const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP,
                      &dx, &dy, &mid)
-            && ClipRect(&mid, (const AM2_Rect *)&clip, &dx, &dy, &out)) {
+            && ClipRect(&mid, (const AM2_Rect *)&clip, &dx, &dy, &src)) {
             if (g_drawTarget == g_primarySurface) {
                 dx += *(const int32_t *)(uintptr_t)ADDR_ORIGIN_DX;
                 dy += *(const int32_t *)(uintptr_t)ADDR_ORIGIN_DY;
             }
-            BlitGlyph(dx, dy, glyph, out, colour);
+            BlitGlyph(dx, dy, glyph, src, colour);
         }
 
         penY += height - AM2_GLYPH_STACK_KERN;
     }
+#undef ch
 }
 
 

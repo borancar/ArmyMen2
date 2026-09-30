@@ -1288,6 +1288,7 @@ void __cdecl ScrollMapCache(void)
 void __cdecl ScrollView(void)
 {
     AM2_Rect now, was, common, strip;
+    int32_t  toX, toY;
 
     IntersectRect((LPRECT)&now, (const RECT *)g_viewRect,
                   (const RECT *)g_mapBounds);
@@ -1301,20 +1302,19 @@ void __cdecl ScrollView(void)
         return;
     }
 
+    /* The source rectangle is built in `strip`, which is not needed until
+     * the exposed bands below -- and built whether or not it is used. */
+    strip.left   = common.left   - was.left;
+    strip.top    = common.top    - was.top;
+    strip.right  = common.right  - was.left;
+    strip.bottom = common.bottom - was.top;
+    toX = common.left - now.left;
+    toY = common.top  - now.top;
+
     /* Only worth moving if it actually moved. */
-    if (now.left != was.left || now.top != was.top) {
-        AM2_Rect src;
-
-        src.left   = common.left   - was.left;
-        src.top    = common.top    - was.top;
-        src.right  = common.right  - was.left;
-        src.bottom = common.bottom - was.top;
-
-        IDirectDrawSurface_BltFast(g_offscreen,
-                                   (DWORD)(common.left - now.left),
-                                   (DWORD)(common.top  - now.top),
-                                   g_offscreen, (LPRECT)&src, DDBLTFAST_WAIT);
-    }
+    if (now.left != was.left || now.top != was.top)
+        IDirectDrawSurface_BltFast(g_offscreen, (DWORD)toX, (DWORD)toY,
+                                   g_offscreen, (LPRECT)&strip, DDBLTFAST_WAIT);
 
     RepaintDirtyList(&common);
 
@@ -1322,8 +1322,8 @@ void __cdecl ScrollView(void)
      * next strip will use. */
     if (was.top < now.top) {
         strip.left   = now.left;
-        strip.top    = common.bottom;
         strip.right  = now.right;
+        strip.top    = common.bottom;
         strip.bottom = now.bottom;
         RedrawMapRegion(&strip);
         strip.top    = now.top;
