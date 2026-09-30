@@ -2085,7 +2085,6 @@ void __cdecl DrawSelection(void)
         uint8_t *obj = (uint8_t *)LookupByUID(
             (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
         int32_t  x, y, wide, drop, fill;
-        int16_t  hp, max;
         RECT     box;
         uint8_t  ink;
 
@@ -2130,8 +2129,8 @@ void __cdecl DrawSelection(void)
             }
         }
 
-        max = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
-        hp  = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
+#define max (*(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH))
+#define hp  (*(const int16_t *)(obj + OBJ_OFF_HEALTH))
 
         if (max / 2 < wide)
             wide = max / 2;
@@ -2148,17 +2147,17 @@ void __cdecl DrawSelection(void)
         box.bottom = y + drop + 4;
         ClearRegion(&box, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
 
+        box.left   = x;
+        box.top    = y + drop + 1;
+        box.right  = x + fill;
+        box.bottom = y + drop + 3;
+
         if (hp <= (int16_t)(max >> 2))
             ink = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
         else if (hp <= (int16_t)(max >> 1))
             ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
         else
             ink = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
-
-        box.left   = x;
-        box.top    = y + drop + 1;
-        box.right  = x + fill;
-        box.bottom = y + drop + 3;
         ClearRegion(&box, ink);
 
         box.left  = x + fill;
@@ -2166,6 +2165,8 @@ void __cdecl DrawSelection(void)
         ClearRegion(&box, *(const uint8_t *)(uintptr_t)ADDR_LIST_INK_HOT_SEL);
 
         i++;
+#undef max
+#undef hp
     }
 
     UnlockSurface();
@@ -2240,10 +2241,9 @@ void __cdecl AirFrameDraw(void)
             *(const uint32_t *)(air + AIR_OFF_EXTRA));
 
         if (*(const int16_t *)(obj + OBJ_OFF_HEALTH) > 0) {
-            uint8_t *row = *(uint8_t **)(obj + OBJ_OFF_ROWS);
-            int32_t  now = *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
-
-            if (now - *(const int32_t *)(row + ROW_OFF_STAMP_54)
+            if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                    - *(const uint32_t *)(*(uint8_t **)(obj + OBJ_OFF_ROWS)
+                                          + ROW_OFF_STAMP_54)
                     > AM2_AIR_CYCLE_STEP_MS) {
                 int32_t f = *(const int32_t *)(obj + OBJ_OFF_FORMATION_SLOT) + 1;
 
@@ -2275,9 +2275,9 @@ void __cdecl AirFrameDraw(void)
 
     /* --- the gauge, on AIR_OFF_ACTIVE ----------------------------------- */
     if (*(const int32_t *)(air + AIR_OFF_ACTIVE) > 0) {
-        int32_t t     = *(const int32_t *)(air + AIR_OFF_ACTIVE);
-        int32_t track = *(const int32_t *)(uintptr_t)ADDR_AIR_SPRITES_EDGE;
-        int32_t span  = *(const int32_t *)(uintptr_t)ADDR_AIR_GAUGE_MS;
+#define t     (*(const int32_t *)(air + AIR_OFF_ACTIVE))
+#define track (*(const int32_t *)(uintptr_t)ADDR_AIR_SPRITES_EDGE)
+#define span  (*(const int32_t *)(uintptr_t)ADDR_AIR_GAUGE_MS)
         int32_t x, y;
 
         y = (int32_t)((double)*(const int32_t *)(uintptr_t)ADDR_AIR_GAUGE_Y0
@@ -2315,12 +2315,15 @@ void __cdecl AirFrameDraw(void)
             AirSupportPop();
         }
     }
+#undef t
+#undef track
+#undef span
 
     /* --- the aircraft, on AIR_OFF_FLAG_A -------------------------------- */
     if (*(const int32_t *)(air + AIR_OFF_FLAG_A) > 0) {
         int32_t t     = *(const int32_t *)(air + AIR_OFF_FLAG_A);
         int32_t leg1  = *(const int32_t *)(uintptr_t)ADDR_AIR_LEG1_MS;
-        int32_t leg2  = *(const int32_t *)(uintptr_t)ADDR_AIR_LEG2_MS;
+#define leg2 (*(const int32_t *)(uintptr_t)ADDR_AIR_LEG2_MS)
         int32_t frame = 0;
         int32_t x, y;
 
@@ -2346,15 +2349,15 @@ void __cdecl AirFrameDraw(void)
              * rounded to nearest by the half-divisor added before the divide.
              * That is where frame 6 goes missing. */
             half /= 2;
-            if (into >= half)
-                frame = (half / 2 + (into - half) * 2) / half + 7;
-            else
+            if (into < half)
                 frame = (half / 2 + into * 5) / half + 1;
+            else
+                frame = (half / 2 + (into - half) * 2) / half + 7;
 
             orig_log("Air frame %d, pt %d,%d\n",
                      frame, x, y);
         } else {
-            int32_t into = t - leg2;
+#define into (t - leg2)
             int32_t span = *(const int32_t *)(uintptr_t)ADDR_AIR_RUN_MS - leg2;
 
             x = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_AWAY_X
@@ -2362,6 +2365,7 @@ void __cdecl AirFrameDraw(void)
             y = *(const int16_t *)(uintptr_t)ADDR_AIR_PATH_TURN_Y_OUT
                 - *(const int32_t *)(uintptr_t)ADDR_AIR_LEG3_DY * into / span;
             frame = AM2_AIR_FRAMES - 1;
+#undef into
         }
 
         {
@@ -2385,6 +2389,7 @@ void __cdecl AirFrameDraw(void)
     UnlockSurface();
 #undef step
 #undef gauge
+#undef leg2
 }
 
 /* DrawEffectLayer -- original 0x004123D0, one caller.

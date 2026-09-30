@@ -1200,12 +1200,10 @@ void __cdecl SpriteSetFree(void *set)
 int32_t __cdecl SpriteSetLoad(const char *name)
 {
     uint8_t  *set;
-    uint32_t  want = 0;
-    uint32_t  id   = 0;
+    uint32_t  want;
+    uint32_t  id = 0;
     char      file[0x100];
-    am2_FILE *fp;
     int32_t   i;
-    int32_t   count;
 
     SetGameDir((const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
 
@@ -1226,7 +1224,7 @@ int32_t __cdecl SpriteSetLoad(const char *name)
                  SET_NAME(set));
         return 0;
     }
-    fp = SET_FILE(set);
+#define fp SET_FILE(set)
 
     orig_fread(&id, 4, 1, fp);
     if (id != want) {
@@ -1238,9 +1236,8 @@ int32_t __cdecl SpriteSetLoad(const char *name)
 
     {
 #define pal ((const uint32_t *)(set + SPRITE_SET_OFF_PALETTE))
-        uint8_t        *remap = set + SPRITE_SET_OFF_REMAP;
-        const uint32_t *display = *(const uint32_t *const *)
-                                      (uintptr_t)ADDR_ACTIVE_PALETTE;
+#define remap (set + SPRITE_SET_OFF_REMAP)
+#define display (*(const uint32_t *const *)(uintptr_t)ADDR_ACTIVE_PALETTE)
 
         if (display) {
             /* The original pushes ONE argument here, not two -- `add esp, 0x10`
@@ -1265,7 +1262,7 @@ int32_t __cdecl SpriteSetLoad(const char *name)
     }
 
     orig_fread(set + SPRITE_SET_OFF_DIR_COUNT, 4, 1, fp);
-    count = SET_COUNT(set);
+#define count SET_COUNT(set)
     if (count > 0) {
         SET_DIR(set) = (AM2_SpriteDirEntry *)
                            orig_malloc((size_t)count * 8);
@@ -1274,6 +1271,10 @@ int32_t __cdecl SpriteSetLoad(const char *name)
     }
     return 1;
 #undef pal
+#undef fp
+#undef display
+#undef remap
+#undef count
 }
 
 /* 0x00423FE0. Fill a sprite record from the packed data file.

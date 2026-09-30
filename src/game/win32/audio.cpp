@@ -481,9 +481,9 @@ void __cdecl ShutdownAudio(void)
  * original does. */
 void __cdecl RefillAudioBuffer(void)
 {
-    void    *ptr1 = NULL, *ptr2 = NULL;
-    DWORD    len1 = 0, len2 = 0;
-    uint32_t got  = 0;
+    void    *ptr1, *ptr2;
+    DWORD    len1, len2;
+    uint32_t got;
 
     if (IDirectSoundBuffer_Lock(g_buffer, 0, g_bufferSize, &ptr1, &len1,
                                 &ptr2, &len2, 0) != DS_OK) {
@@ -516,15 +516,18 @@ void __cdecl RefillAudioBuffer(void)
             WaveReadFile(g_hmmio, remaining, dest, g_dataChunk, &got);
         } while (got < remaining);
     } else {
-        uint8_t silence = (g_waveFormat->wBitsPerSample == 8) ? SILENCE_8BIT : 0;
-
         g_atEnd      = 1;
         g_validBytes = got;
-        memset((uint8_t *)ptr1 + got, silence, len1 - got);
+        memset((uint8_t *)ptr1 + got,
+               (uint8_t)((g_waveFormat->wBitsPerSample == 8) ? SILENCE_8BIT : 0),
+               len1 - got);
     }
 
 unlock:
-    IDirectSoundBuffer_Unlock(g_buffer, ptr1, len1, ptr2, len2);
+    /* The second length goes back as 0 whatever Lock said -- the original's
+     * own argument. The whole buffer is always locked from offset 0, so there
+     * is no wrapped second region for it to matter to. */
+    IDirectSoundBuffer_Unlock(g_buffer, ptr1, len1, ptr2, 0);
     g_cursorA = 0;
     g_cursorB = 0;
 }
@@ -1444,12 +1447,9 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
                          int16_t x, int16_t y)
 {
     DWORD            status;
-    DWORD            played;
     int32_t          volume;
     int32_t          dist;
     int32_t          d2;
-    AM2_Point        ear;
-    AM2_Point        where;
     void            *owner;
     const AM2_Point *at;
 
@@ -1468,6 +1468,9 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
     IDirectSoundBuffer_GetStatus(BUF, &status);
 
     if (x != 0) {
+        AM2_Point ear;
+        AM2_Point where;
+
         /* Both points copied a field at a time before they are measured. */
         ear.x   = g_listenerPos.x;
         ear.y   = g_listenerPos.y;
@@ -1510,6 +1513,8 @@ void __cdecl PlaySoundAt(int32_t index, int32_t flags, int32_t /* unused */,
 
     if (status & DSBSTATUS_PLAYING) {
         if (flags & SOUND_FLAG_RESTART) {
+            DWORD played;
+
             IDirectSoundBuffer_GetCurrentPosition(BUF, &played, NULL);
             if (*(uint32_t *)(SLOT + SOUND_SLOT_OFF_BYTES) - played
                     < SOUND_ALMOST_DONE)
