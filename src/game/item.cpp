@@ -2628,10 +2628,9 @@ int32_t __cdecl RoachStepAllowed(void *obj, const void *ctrl, int32_t *turn)
 void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
 {
     uint8_t        *o = (uint8_t *)obj;
-    const uint8_t  *c = (const uint8_t *)ctrl;
+#define c ((const uint8_t *)ctrl)
     uint8_t        *rows;
-    const AM2_Anim *anim;
-    int32_t         speed = 0;
+    int32_t         speed;
     int32_t         cap   = 0;
     int32_t         turn, cur, next, here;
     uint8_t         facing;
@@ -2642,41 +2641,43 @@ void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
            > *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS)
         RoachBite(obj);
 
+    speed = 0;
     if (*(const int32_t *)(c + ROACHSTEP_OFF_STATE) != 1) {
         int32_t reverse = *(const int32_t *)(c + ROACHSTEP_OFF_FLAG18);
-        double  delta   = (double)*(const float *)
-                              (uintptr_t)ADDR_FRAME_DELTA_SEC;
-        int32_t stuck;
+        uint32_t stuck;
 
         cap = reverse ? 80 : 130;
 
+        /* The frame's delta is multiplied by FLOAT constants straight out
+         * of its float, `fld dword; fmul dword`. */
         if (reverse) {
-            int32_t v = (int32_t)((double)*(const int32_t *)
-                                      (o + OBJ_OFF_FIELD_44)
-                                  - delta * 80.0);
+            int32_t v = (int32_t)(*(const int32_t *)(o + OBJ_OFF_FIELD_44)
+                                  - *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
+                                    * 80.0f);
 
             speed = (-cap > v) ? -cap : v;
         } else {
-            int32_t v = (int32_t)(delta * 100.0
-                                  + (double)*(const int32_t *)
-                                      (o + OBJ_OFF_FIELD_44));
+            int32_t v = (int32_t)(*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
+                                    * 100.0f
+                                  + (double)*(const int32_t *)(o + OBJ_OFF_FIELD_44));
 
             speed = (cap < v) ? cap : v;
         }
 
-        stuck = *(const int32_t *)(o + OBJ_OFF_STUCK_COUNT);
-        if (stuck != 0 && speed != 0) {
-            int32_t shove = stuck * speed;
-
+        stuck = *(const uint32_t *)(o + OBJ_OFF_STUCK_COUNT);
+        if (stuck > 0 && speed != 0) {
+            /* The product is formed in each arm. */
             if (reverse)
-                speed = (-cap > shove) ? -cap : shove;
+                speed = (-cap > (int32_t)stuck * speed)
+                        ? -cap : (int32_t)stuck * speed;
             else
-                speed = (cap < shove) ? cap : shove;
+                speed = (cap < (int32_t)stuck * speed)
+                        ? cap : (int32_t)stuck * speed;
         }
     }
 
     rows = *(uint8_t *const *)(o + OBJ_OFF_ROWS);
-    anim = *(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING);
+#define anim (*(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING))
     if (!anim)
         return;
 
@@ -2721,8 +2722,8 @@ void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
                     *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
             n = *(const int32_t *)(o + OBJ_OFF_STUCK_COUNT) + 1;
         } else {
-            *(uint32_t *)(o + OBJ_OFF_STUCK_SINCE) = 0;
             n = 0;
+            *(uint32_t *)(o + OBJ_OFF_STUCK_SINCE) = n;
         }
         *(int32_t *)(o + OBJ_OFF_STUCK_COUNT) = n;
     }
@@ -2730,10 +2731,13 @@ void __cdecl RoachStepTailA(void *obj, uint8_t *ctrl)
     *(uint8_t *)(o + OBJ_OFF_FACING) = facing;
     *(int32_t *)(o + OBJ_OFF_FIELD_44) = speed;
     SetObjField530(obj, *(const int32_t *)(c + ROACHSTEP_OFF_STATE));
-    *(uint8_t *)(rows + ROW_OFF_HEADING) = *(const uint8_t *)(o + OBJ_OFF_FACING);
+    (*(uint8_t *const *)(o + OBJ_OFF_ROWS))[ROW_OFF_HEADING] =
+        *(const uint8_t *)(o + OBJ_OFF_FACING);
     StepObjRows(obj);
     *(int32_t *)(o + OBJ_OFF_FIELD_44) = speed;
     ObjMoveAlongFacing(obj, 0, 0, 0);
+#undef c
+#undef anim
 }
 
 /* RoachBite -- original 0x0043D330, one caller: the roach's per-frame step,
