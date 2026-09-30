@@ -788,18 +788,21 @@ void __cdecl ListUnlink(void *node, void **head)
     /* Each link is read again at each use. */
 #define PREV (*(uint8_t **)((uint8_t *)node + 4))
 #define NEXT (*(uint8_t **)((uint8_t *)node + 8))
+    /* Each arm clears the node's own links and returns. */
     if (!PREV) {
         *head = NEXT;
         if (NEXT)
             *(uint8_t **)(NEXT + 4) = 0;
-    } else {
-        *(uint8_t **)(PREV + 8) = NEXT;
-        if (NEXT)
-            *(uint8_t **)(NEXT + 4) = PREV;
+        NEXT = 0;
+        PREV = 0;
+        return;
     }
-
+    *(uint8_t **)(PREV + 8) = NEXT;
+    if (NEXT)
+        *(uint8_t **)(NEXT + 4) = PREV;
     NEXT = 0;
     PREV = 0;
+
 #undef PREV
 #undef NEXT
 }
