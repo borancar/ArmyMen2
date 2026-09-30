@@ -1033,7 +1033,7 @@ void __cdecl AppendTroopState(void *msg, void *obj)
          * zero), so an `else if` would answer the same; written as the branch
          * runs rather than as the answer it happens to give. */
         flags = 0;
-        if (age >= interval && (px != lx || py != ly))
+        if (age >= interval && (lx != px || py != ly))
             flags = 0x80000000u;
         else if (age >= *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT)
                  && (dx > 8 || dy > 8))

@@ -1903,7 +1903,7 @@ int32_t __cdecl BoxAction(AM2_Rect area, void *out)
 
     stride = box[2] - box[0] + 1;
     for (y = c.top; y <= c.bottom; y++) {
-        if (c.left > c.right)
+        if (c.right < c.left)
             continue;
         memset(cells + (y - box[1]) * stride - box[0] + c.left,
                AM2_TILEMASK_BOX_CELL, (size_t)(c.right - c.left + 1));
@@ -5110,7 +5110,7 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
     while (it) {
         uint8_t *next;
 
-        if (it == o) {
+        if (o == it) {
             it = *(uint8_t *const *)(it + OBJ_OFF_QUERY_NEXT);
             continue;
         }

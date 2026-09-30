@@ -1020,7 +1020,7 @@ void __cdecl RemapRleRuns(void *rle, void *unused, int32_t wide,
         for (end = base + 4 + (uint32_t)height * 2; row < end; row += 2) {
             p   = base + *(const uint16_t *)row;
             acc = 0;
-            while (acc < width) {
+            while (width > acc) {
                 acc = (uint16_t)(acc + *p);
                 p++;
                 run = *p;

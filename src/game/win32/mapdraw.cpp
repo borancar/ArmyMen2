@@ -2868,7 +2868,7 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc)
     int32_t        wrap;
     RECT           hit;
 
-    if (r->left < 0
+    if (0 > r->left
         || r->right >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_X
         || r->top < 0
         || r->bottom >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)

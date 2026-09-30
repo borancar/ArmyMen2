@@ -2649,7 +2649,7 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
                 total = MAP_TILES_H * MAP_TILES_W;
                 sy = 0;
                 for (i = 0; i < total; i++) {
-                    if ((int32_t)PAD_LAYER[i] == number) {
+                    if (number == (int32_t)PAD_LAYER[i]) {
                         sx += i % MAP_TILES_H;
                         sy += i / MAP_TILES_H;
                         n++;

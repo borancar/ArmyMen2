@@ -73,7 +73,7 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
         return;
 
     len = (int32_t)strlen(str);
-    if (len <= 0)
+    if (0 >= len)
         return;
 
     penX = x;

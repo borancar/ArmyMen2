@@ -722,7 +722,7 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
     uint8_t   fileHdr[AM2_BMPFILE_HDR_BYTES];
     uint8_t   infoHdr[AM2_BMPINFO_HDR_BYTES];
     uint8_t   palette[0x400];
-    uint8_t   stream[0x8000];
+    uint8_t   stream[0x7D00];
     am2_FILE *fp;
     int32_t   base;
     uint8_t  *pixels;
@@ -767,7 +767,7 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
 
     height = *(const int32_t *)(infoHdr + BMPINFO_OFF_HEIGHT);
     width  = *(const int32_t *)(infoHdr + BMPINFO_OFF_WIDTH);
-    stride = bytes / height;
+    stride = (int32_t)((uint32_t)bytes / (uint32_t)height);
 
     *(int16_t *)(stream + 0) = (int16_t)width;
     *(int16_t *)(stream + 2) = (int16_t)height;
@@ -790,7 +790,7 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
             *out++ = n;
 
             n = 0;
-            while (x < width && n < AM2_RLE_RUN_MAX
+            while (width > x && n < AM2_RLE_RUN_MAX
                    && BitmapBitSet(pixels, x, row, height, stride)) {
                 x++;
                 n++;
@@ -1346,7 +1346,7 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
                  dir[slot].offset);
     } else {
         orig_fread(&value, 4, 1, fp);
-        if ((uint32_t)value == key)
+        if (key == (uint32_t)value)
             ok = 1;
         else
             orig_log("Error in validating object in data file.\n");
