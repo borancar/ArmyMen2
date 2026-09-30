@@ -9640,9 +9640,6 @@ void __cdecl TrooperDiedTail(void *obj, int32_t kind)
     /* Every arm writes FIELD_584 itself. Kinds 1, 2 and 3 finish their own
      * stores and go to the tail; 4, 5 and the default share the last two. */
     switch (kind) {
-    case 3:
-        goto arm3;
-
     case 2:
         *(int32_t *)(o + OBJ_OFF_FIELD_584) = DEATH_ANIM(o);
         *(int32_t *)(o + OBJ_OFF_SIGHT_OUT_T2) = 1;
@@ -9682,6 +9679,8 @@ void __cdecl TrooperDiedTail(void *obj, int32_t kind)
     default:
         *(int32_t *)(o + OBJ_OFF_FIELD_584) = DEATH_ANIM(o);
         break;
+    case 3:
+        goto arm3;
     }
 #undef DEATH_ANIM
 
