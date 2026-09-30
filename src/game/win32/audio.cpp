@@ -1993,8 +1993,8 @@ int32_t __cdecl LoadAudioSection(am2_FILE *fp)
         orig_fread(&priority, 4, 1, fp);
         orig_fread(&owner, 4, 1, fp);
 
-        PlayDynamicSound(name, loop, 0, (int32_t)(pos & 0xFFFFu),
-                         (int32_t)(pos >> 16), i, priority, owner);
+        PlayDynamicSound(name, loop, 0, (*(const AM2_Point *)&pos).x,
+                         (*(const AM2_Point *)&pos).y, i, priority, owner);
     }
 
     return 1;
