@@ -1128,28 +1128,7 @@ void __cdecl TakeMenuRequest(void)
         return;
     }
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY) {
-        if (*(const int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD) {
-            int32_t dbg = *(const int32_t *)(uintptr_t)ADDR_OPT_DBG;
-
-            if (dbg)
-                *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOADING = 1;
-
-            ReadScript((const char *)(uintptr_t)ADDR_SCRIPT_RELOAD_PATH,
-                       (AM2_ScriptCtx *)(uintptr_t)ADDR_SCRIPT_CONTEXT);
-            DeclareRuleVars();
-            MissionStartup();
-
-            *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 0;
-            if (!dbg)
-                return;
-
-            *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOADING = 0;
-            *(int32_t *)(uintptr_t)ADDR_MENU_MODE = AM2_SUBSTATE_INFO_BITMAP;
-            *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
-            return;
-        }
-    } else {
+    if (*(const int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY) {
         if (!*(const int32_t *)(uintptr_t)ADDR_LOAD_PENDING) {
             *(int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS = 0;
             *(uint32_t *)(uintptr_t)ADDR_CLOCK_BASE_MS =
@@ -1169,6 +1148,24 @@ void __cdecl TakeMenuRequest(void)
         *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 0;
         *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 0;
         *(int32_t *)(uintptr_t)ADDR_LOAD_PENDING  = 0;
+    } else if (*(const int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD) {
+        /* The option is read afresh after the reload, not held. */
+        if (*(const int32_t *)(uintptr_t)ADDR_OPT_DBG)
+            *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOADING = 1;
+
+        ReadScript((const char *)(uintptr_t)ADDR_SCRIPT_RELOAD_PATH,
+                   (AM2_ScriptCtx *)(uintptr_t)ADDR_SCRIPT_CONTEXT);
+        DeclareRuleVars();
+        MissionStartup();
+
+        *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 0;
+        if (!*(const int32_t *)(uintptr_t)ADDR_OPT_DBG)
+            return;
+
+        *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOADING = 0;
+        *(int32_t *)(uintptr_t)ADDR_MENU_MODE = AM2_SUBSTATE_INFO_BITMAP;
+        *(int32_t *)(uintptr_t)ADDR_OVERLAY_DIRTY = 1;
+        return;
     }
 
     if (!*(const int32_t *)(uintptr_t)ADDR_NET_GAME) {
