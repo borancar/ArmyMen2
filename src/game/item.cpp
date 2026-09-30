@@ -11718,15 +11718,16 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
                               int32_t unused, uint32_t uid, int32_t facing)
 {
     uint8_t  *o = (uint8_t *)am2_malloc(AM2_EXPLOSION_BYTES);
-    uint8_t  *rows;
     uint32_t  at;
-    int16_t   depth = AM2_EXPL_DEPTH_DEFAULT;
+    int16_t   depth;
     int32_t   tile;
 
     memset(o, 0, AM2_EXPLOSION_BYTES);
 
     ((int16_t *)&at)[0] = (int16_t)x;
     ((int16_t *)&at)[1] = (int16_t)y;
+    depth = AM2_EXPL_DEPTH_DEFAULT;
+
 
     if (kind == AM2_EXPL_KIND_PAIR_LOW) {
         CreateExplosion(x, y + AM2_EXPL_PAIR_DY, AM2_EXPL_KIND_PAIR_HIGH,
@@ -11748,29 +11749,26 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
     switch (kind) {
     case 0x78: case 0x82: case 0x8C: case 0x94:
         *(int32_t *)(o + BLAST_OFF_MODE) = AM2_BLAST_MODE_16;
-        memcpy(o + BLAST_OFF_RECT,
-               (const void *)((void *)(uintptr_t)(ADDR_EXPLOSION_AREA_16)),
-               sizeof(AM2_Rect));
-        MakeKind7(at, 4, *(const int8_t *)(o + OBJ_OFF_ARMY), facing, 0, 0);
+        *(AM2_Rect *)(o + BLAST_OFF_RECT) =
+            *(const AM2_Rect *)((void *)(uintptr_t)(ADDR_EXPLOSION_AREA_16));
         *(int32_t *)(o + BLAST_OFF_SOUND_PENDING) = 1;
+        MakeKind7(at, 4, *(const int8_t *)(o + OBJ_OFF_ARMY), facing, 0, 0);
         break;
 
     case 0x81: case 0x95:
         *(int32_t *)(o + BLAST_OFF_MODE) = AM2_BLAST_MODE_24;
-        memcpy(o + BLAST_OFF_RECT,
-               (const void *)((void *)(uintptr_t)(ADDR_EXPLOSION_AREA_24)),
-               sizeof(AM2_Rect));
-        MakeKind7(at, 4, *(const int8_t *)(o + OBJ_OFF_ARMY), facing, 0, 0);
+        *(AM2_Rect *)(o + BLAST_OFF_RECT) =
+            *(const AM2_Rect *)((void *)(uintptr_t)(ADDR_EXPLOSION_AREA_24));
         *(int32_t *)(o + BLAST_OFF_SOUND_PENDING) = 1;
+        MakeKind7(at, 4, *(const int8_t *)(o + OBJ_OFF_ARMY), facing, 0, 0);
         break;
 
     case 0x83: case 0x8A: case 0x8B:
         *(int32_t *)(o + BLAST_OFF_MODE) = AM2_BLAST_MODE_32;
-        memcpy(o + BLAST_OFF_RECT,
-               (const void *)((void *)(uintptr_t)(ADDR_EXPLOSION_AREA_32)),
-               sizeof(AM2_Rect));
-        MakeKind7(at, 4, *(const int8_t *)(o + OBJ_OFF_ARMY), facing, 0, 0);
+        *(AM2_Rect *)(o + BLAST_OFF_RECT) =
+            *(const AM2_Rect *)((void *)(uintptr_t)(ADDR_EXPLOSION_AREA_32));
         *(int32_t *)(o + BLAST_OFF_SOUND_PENDING) = 1;
+        MakeKind7(at, 4, *(const int8_t *)(o + OBJ_OFF_ARMY), facing, 0, 0);
         break;
 
     case 0x7B:
@@ -11801,17 +11799,19 @@ void *__cdecl CreateExplosion(int32_t x, int32_t y, int32_t kind, int32_t army,
 
     tile = TileOfPoint(at);
     *(uint8_t *)(o + OBJ_OFF_HEIGHT_SET) =
-        (uint8_t)((*(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS)[tile]
+        (uint8_t)((*(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS)
+                      [(uint16_t)tile]
                   + AM2_EXPL_HEIGHT_BIAS);
 
     BuildRowSet(o + OBJ_OFF_SUBRECORD, 1,
                 (const void *)((void *)(uintptr_t)(ADDR_EXPLOSION_ROW_SPEC)), x, y,
                 (const void *)(uintptr_t)ADDR_ZERO_RECT);
 
-    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
-    *(const void **)(rows + ROW_OFF_ANIM_CUR) =
+    /* The rows are read through the object at each store. */
+    *(const void **)(*(uint8_t **)(o + OBJ_OFF_ROWS) + ROW_OFF_ANIM_CUR) =
         (const void *)(uintptr_t)ADDR_EXPLOSION_ANIMS;
-    *(int16_t *)(rows + ROW_OFF_FIELD_26) = depth;
+    *(int16_t *)(*(uint8_t **)(o + OBJ_OFF_ROWS) + ROW_OFF_FIELD_26) = depth;
+
 
     if (delay > 0)
         SubrecHideRows(o + OBJ_OFF_SUBRECORD);
