@@ -8249,8 +8249,8 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
      * long the facing has been stable; a trooper that has just turned keeps
      * the facing it turned to. */
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !AM2_THE_COMM->CommArmyOfSlot(
-                           (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY))) {
+        && !AM2_THE_COMM->CommMustBroadcast(
+                           (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))) {
         settled = 1;
     } else {
         settled = (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
@@ -8441,8 +8441,8 @@ no_route:
         *(w + 4) = facing;
         speed  = 0;
     } else if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-               && !AM2_THE_COMM->CommArmyOfSlot(
-                                  (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY))
+               && !AM2_THE_COMM->CommMustBroadcast(
+                                  (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))
                && ObjType2Field548((const AM2_Object *)o)) {
         *(int32_t *)(w + 8) = 1;
         turned = 1;
@@ -8497,9 +8497,11 @@ settle_facing:
 
                 local = 0;
                 if (*(const int32_t *)((const uint8_t *)comm + 0x3D8)
-                    && ((AM2_Comm *)comm)->CommArmyOfSlot(slot))
+                    && ((AM2_Comm *)comm)->CommMustBroadcast(
+                           (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
                     local = 1;
-                else if (!AM2_THE_COMM->CommArmyOfSlot(0)
+                else if (!AM2_THE_COMM->CommMustBroadcast(
+                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))
                          || *(const int32_t *)(
                                 (const uint8_t *)*(void *const *)(uintptr_t)
                                     ADDR_COMM_OBJECT + 0x3D8))
@@ -8563,8 +8565,9 @@ watched:
                     PlaySoundAt(AM2_SND_MINE_FOUND, 0, 0, 0, 0);
                 }
             } else if ((!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-                        || AM2_THE_COMM->CommArmyOfSlot(
-                               (int8_t)*(const uint8_t *)(o + OBJ_OFF_ARMY)))
+                        || AM2_THE_COMM->CommMustBroadcast(
+                               (int16_t)*(const int8_t *)(at + OBJ_OFF_ARMY)))
+
                        && (*(const uint8_t *)(o + OBJ_OFF_ARMY)
                                != *(const uint8_t *)(at + OBJ_OFF_ARMY)
                            || (uint32_t)(*(const uint32_t *)(uintptr_t)

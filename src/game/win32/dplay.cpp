@@ -3207,7 +3207,7 @@ int32_t __cdecl DestroyFlow(uint32_t id)
     DrainMsgList(flow + FLOW_OFF_QUEUE);
 
     if (id != *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID)) {
-        uint32_t mask = GetReSendMask(id);
+        uint32_t mask = GetPlayerMask(id);
 
         if (*(const int32_t *)(comm + COMM_OFF_VERBOSE))
             orig_log(" Simulating Acks for  seq %d thru %d\n",
@@ -3249,17 +3249,20 @@ int32_t __cdecl DestroyFlow(uint32_t id)
         }
     }
 
-    for (i = 0; i < AM2_PLAYER_RECORDS; i++) {
-        uint8_t *rec = (uint8_t *)(uintptr_t)ADDR_PLAYER_RECORDS
-                       + i * AM2_PLAYER_RECORD_BYTES;
+    {
+        struct PlayerRec { uint8_t bytes[AM2_PLAYER_RECORD_BYTES]; };
+#define RECAT(n) (((struct PlayerRec *)(uintptr_t)ADDR_PLAYER_RECORDS)[n].bytes)
 
-        if (*(const uint32_t *)rec == id) {
-            *(uint32_t *)rec = 0;
-            return 1;
-        }
+        for (i = 0; i < AM2_PLAYER_RECORDS; i++)
+            if (*(const uint32_t *)RECAT(i) == id) {
+                *(uint32_t *)RECAT(i) = 0;
+                return 1;
+            }
+#undef RECAT
     }
 
     return 0;
+
 #undef comm
 }
 

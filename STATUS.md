@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1358 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1359 of
   1645 byte-identical (2026-09-29), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1358:
+  the near-miss sweep, 758 before the row pools. From 758 to 1359:
   - **PollKeyboard wants its keyboard state aggregated** (0x005127C8..
     0x00512FD0 in relinkos.py's AGGREGATE_RANGES): with it the loop walks
     the deadline and pressed halves with one pointer as the image does, one
@@ -104,6 +104,14 @@ main result so far (details in `src/vc6/README.md`):
     point. The reconstruction had used a fresh copy per unit; it now
     reproduces the chain. Not driven (mode 5 is the move-without-engaging
     order).
+  - **Two wrong callees the call-target scan found** (2026-09-30): DestroyFlow
+    simulated the departed player's acks against GetReSendMask (+0x18) where
+    the image passes GetPlayerMask (+0x14); UpdateTrooperAction asked
+    CommArmyOfSlot at four sites -- one with the pickup `slot`, one with 0 --
+    where the image asks CommMustBroadcast of the unit's army, and its mine
+    test asks it of the MINE's army, not the unit's. All multiplayer-only;
+    found by `$T/callscan2.py`-style comparison of direct call targets.
+
 
   - **Two menu behaviours the byte-match corrected** (2026-09-29):
     RefreshMapSelection plays its error sound only when there is a preview
