@@ -150,6 +150,11 @@ main result so far (details in `src/vc6/README.md`):
     reconstruction dispatched the second, so ReceivePacket, ReceivePlayerMsg
     and the rest looked players up by byte count. Multiplayer only; found by
     byte-matching, not driven.
+  - **StepType3's kind-5 death ran both tails on a destroyed vehicle**
+    (2026-09-30): after the sound and DestroyByType the image returns
+    (0x0045D7D0 is the epilogue), skipping Step3Drive and the footprint
+    reset; the reconstruction went on to both. Found by byte-matching; not
+    driven.
 
 
   - **Two menu behaviours the byte-match corrected** (2026-09-29):
