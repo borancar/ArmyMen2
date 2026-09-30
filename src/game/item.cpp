@@ -10632,8 +10632,10 @@ int32_t __cdecl WeaponFrameReady(void *obj, void *weapon)
     kind  = **(const int32_t *const *)((uint8_t *)weapon + OBJ_OFF_FIELD_C0);
     frame = *(const int16_t *)(row + ROW_OFF_FRAME);
 
-    /* Every rule but one breaks to the shared test; kinds 11 and 12 make
-     * it themselves, which is why VC6 keeps a second copy of the call. */
+    /* Most rules break to the shared test; kinds 5, 11 and 12 make it
+     * themselves, which is why VC6 keeps a second copy of the call -- and
+     * why kind 5's arm cross-jumps into kind 43's tail rather than keeping
+     * a `return 0` of its own. */
     switch (kind) {
     case 2:
         if (frame == 9 || frame == 0x0A || frame == 0x0B)
@@ -10654,7 +10656,7 @@ int32_t __cdecl WeaponFrameReady(void *obj, void *weapon)
 
     case 5:
         if (frame == 0x0C)
-            break;
+            return Field51MeetsMin(row);
         return 0;
 
     case 11: case 12:
