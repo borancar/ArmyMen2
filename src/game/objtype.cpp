@@ -701,38 +701,38 @@ void *__cdecl MakeAaiRecord(int32_t type, uint32_t key, int32_t slot,
     *(int32_t *)(rec + 0x18)                 = box.top;
     *(int32_t *)(rec + 0x20)                 = box.bottom;
 
-    if (type < 0)
-        return rec;
+    /* One return for every path; the negative type skips the definition
+     * and the list. */
+    if (type >= 0) {
+        def = (uint8_t *)DefFindObjRec(type, (key >> 7) & 0x3FF, key & 0x7F);
+        if (def) {
+            *(int32_t *)(rec + 0x24) = *(const int32_t *)(rec + AAIREC_OFF_TYPE);
+            *(int32_t *)(rec + 0x28) = *(const int32_t *)(def + 0x10);
+            *(int16_t *)(rec + 0x2C) = *(const int16_t *)(def + 0x14);
+            *(uint8_t *)(rec + 0x2E) = *(const uint8_t *)(def + 0x18);
+            *(uint8_t *)(rec + 0x2F) = *(const uint8_t *)(def + 0x1C);
+            *(int16_t *)(rec + 0x30) = *(const int16_t *)(def + 0x20);
+            *(int32_t *)(rec + 0x34) = *(const int32_t *)(def + 0x24);
+            /* Out of order, and deliberately: +0x38 takes +0x30, +0x3A takes
+               +0x28. */
+            *(int16_t *)(rec + 0x38) = *(const int16_t *)(def + 0x30);
+            *(int16_t *)(rec + 0x3A) = *(const int16_t *)(def + 0x28);
+            *(uint8_t *)(rec + 0x3C) = *(const uint8_t *)(def + 0x34);
+        }
 
-    def = (uint8_t *)DefFindObjRec(type, (key >> 7) & 0x3FF, key & 0x7F);
-    if (def) {
-        *(int32_t *)(rec + 0x24) = *(const int32_t *)(rec + AAIREC_OFF_TYPE);
-        *(int32_t *)(rec + 0x28) = *(const int32_t *)(def + 0x10);
-        *(int16_t *)(rec + 0x2C) = *(const int16_t *)(def + 0x14);
-        *(uint8_t *)(rec + 0x2E) = *(const uint8_t *)(def + 0x18);
-        *(uint8_t *)(rec + 0x2F) = *(const uint8_t *)(def + 0x1C);
-        *(int16_t *)(rec + 0x30) = *(const int16_t *)(def + 0x20);
-        *(int32_t *)(rec + 0x34) = *(const int32_t *)(def + 0x24);
-        /* Out of order, and deliberately: +0x38 takes +0x30, +0x3A takes
-           +0x28. */
-        *(int16_t *)(rec + 0x38) = *(const int16_t *)(def + 0x30);
-        *(int16_t *)(rec + 0x3A) = *(const int16_t *)(def + 0x28);
-        *(uint8_t *)(rec + 0x3C) = *(const uint8_t *)(def + 0x34);
+        if (slot > 0) {
+            /* The count and the record array are read afresh each pass: the
+             * store could alias either. */
+            uint8_t *list = (uint8_t *)
+                (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)[slot];
+            int32_t  i;
+
+            for (i = 0; i < *(const int32_t *)(list + LISTHDR_OFF_COUNT); i++)
+                *(int32_t *)(*(uint8_t *const *)(list + LISTHDR_OFF_RECORDS)
+                             + i * AM2_LIST_RECORD_BYTES + 8) =
+                    (int32_t)*(const uint16_t *)(rec + 0x30);
+        }
     }
-
-    if (slot > 0) {
-        /* The count and the record array are read afresh each pass: the
-         * store could alias either. */
-        uint8_t *list = (uint8_t *)
-            (*(void *const *const *)(uintptr_t)ADDR_RECORD_LISTS)[slot];
-        int32_t  i;
-
-        for (i = 0; i < *(const int32_t *)(list + LISTHDR_OFF_COUNT); i++)
-            *(int32_t *)(*(uint8_t *const *)(list + LISTHDR_OFF_RECORDS)
-                         + i * AM2_LIST_RECORD_BYTES + 8) =
-                (int32_t)*(const uint16_t *)(rec + 0x30);
-    }
-
     return rec;
 }
 
