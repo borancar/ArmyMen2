@@ -8889,7 +8889,9 @@ tail:
 void __cdecl StepType3(void *obj)
 {
     uint8_t *o   = (uint8_t *)obj;
-    uint8_t *out = o + OBJ_OFF_FIELD_578;
+    /* The record at OBJ_OFF_FIELD_578 is addressed from the object at each
+     * use. */
+#define out (o + OBJ_OFF_FIELD_578)
 
     /* 0x0045D66B is `jne 0x0045D94D` -- the bare epilogue, PAST both tails.
      * A destroyed vehicle runs neither, and in particular never re-sets its
@@ -8900,7 +8902,7 @@ void __cdecl StepType3(void *obj)
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0)
         ObjClearFootprint(obj);
 
-    if (*(const int32_t *)(o + OBJ_OFF_REVEALED_UNTIL) > 0
+    if (*(const uint32_t *)(o + OBJ_OFF_REVEALED_UNTIL) > 0
         && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
            > *(const uint32_t *)(o + OBJ_OFF_REVEALED_UNTIL)) {
         if (!ObjIsFriendly(obj))
@@ -8928,72 +8930,70 @@ void __cdecl StepType3(void *obj)
         *(int32_t *)(o + TROOPER_OFF_LOCAL_TARGET) = 0;
     }
 
-    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0)
-        goto alive;
-
-    /* Dead. Kind 0 is destroyed outright (0x0045D7D4: clear the gate, then
-     * DestroyByType, then the second tail); this used to send it to the
-     * attach arm. Only kind 5 runs the destruction sequence. */
-    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 0) {
-        *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
-        DestroyByType(obj);
-        goto post;
-    }
-    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) != 5)
-        goto post;
-    {
-        void *row = *(void **)(o + OBJ_OFF_ROWS);
-
-        if (!RowAnimFinished(row))
-            goto post;
-        RowFaceSprite(row);
-
-        /* EVERY arm destroys the vehicle after its kind's death effect. The
-         * original's jump table (0x0045D74C -> 0x0045D954) sends kinds 0-3 and
-         * the default (kind 4 / >5) to a shared LeaveRemainsRow + DestroyByType
-         * tail at 0x0045D777, and kind 5 to a DestroyByType with NO remains at
-         * 0x0045D7AE. Playing the sound and stopping left a dead vehicle of
-         * kind 0/1/2/3/5 undestroyed -- OBJ_FLAG_DESTROYED (set only inside
-         * DestroyObjCommon, 0x00429399) stayed clear, so a half-track killed in
-         * a minefield kept taking damage the original ignores. The table's
-         * order is for the SOUNDS, not the arms. See the header. */
-        switch (*(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND)) {
-        case 0:
-            PlaySoundAt(AM2_SND_VEH_KIND0, 0, 0,
-                        *(const int16_t *)(o + OBJ_OFF_POS),
-                        *(const int16_t *)(o + OBJ_OFF_POS + 2));
-            break;
-        case 1:
-            PlaySoundAt(AM2_SND_VEH_KIND1, 0, 0,
-                        *(const int16_t *)(o + OBJ_OFF_POS),
-                        *(const int16_t *)(o + OBJ_OFF_POS + 2));
-            break;
-        case 2: case 3:
-            PlaySoundAt(AM2_SND_VEH_KIND23, 0, 0,
-                        *(const int16_t *)(o + OBJ_OFF_POS),
-                        *(const int16_t *)(o + OBJ_OFF_POS + 2));
-            break;
-        case 5:
-            /* Sound, then destroy with NO remains row (0x0045D7AE). */
-            PlaySoundAt(AM2_SND_VEH_KIND5, 0, 0,
-                        *(const int16_t *)(o + OBJ_OFF_POS),
-                        *(const int16_t *)(o + OBJ_OFF_POS + 2));
+    if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0) {
+        /* Dead. Kind 0 is destroyed outright (0x0045D7D4: clear the gate, then
+         * DestroyByType, then the second tail); this used to send it to the
+         * attach arm. Only kind 5 runs the destruction sequence. */
+        if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == 0) {
             *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
             DestroyByType(obj);
             goto post;
-        default:
-            /* kind 4 and anything above 5: no sound. */
-            break;
         }
+        if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) != 5)
+            goto post;
+        {
+            void *row = *(void **)(o + OBJ_OFF_ROWS);
 
-        /* Kinds 0, 1, 2, 3 and the default share this tail (0x0045D777). */
-        *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
-        LeaveRemainsRow(row);
-        DestroyByType(obj);
+            if (!RowAnimFinished(row))
+                goto post;
+            RowFaceSprite(row);
+
+            /* EVERY arm destroys the vehicle after its kind's death effect. The
+             * original's jump table (0x0045D74C -> 0x0045D954) sends kinds 0-3 and
+             * the default (kind 4 / >5) to a shared LeaveRemainsRow + DestroyByType
+             * tail at 0x0045D777, and kind 5 to a DestroyByType with NO remains at
+             * 0x0045D7AE. Playing the sound and stopping left a dead vehicle of
+             * kind 0/1/2/3/5 undestroyed -- OBJ_FLAG_DESTROYED (set only inside
+             * DestroyObjCommon, 0x00429399) stayed clear, so a half-track killed in
+             * a minefield kept taking damage the original ignores. The table's
+             * order is for the SOUNDS, not the arms. See the header. */
+            switch (*(const int32_t *)(o + OBJ_OFF_TABLE_REC_KIND)) {
+            case 0:
+                PlaySoundAt(AM2_SND_VEH_KIND0, 0, 0,
+                            *(const int16_t *)(o + OBJ_OFF_POS),
+                            *(const int16_t *)(o + OBJ_OFF_POS + 2));
+                break;
+            case 1:
+                PlaySoundAt(AM2_SND_VEH_KIND1, 0, 0,
+                            *(const int16_t *)(o + OBJ_OFF_POS),
+                            *(const int16_t *)(o + OBJ_OFF_POS + 2));
+                break;
+            case 2: case 3:
+                PlaySoundAt(AM2_SND_VEH_KIND23, 0, 0,
+                            *(const int16_t *)(o + OBJ_OFF_POS),
+                            *(const int16_t *)(o + OBJ_OFF_POS + 2));
+                break;
+            case 5:
+                /* Sound, then destroy with NO remains row (0x0045D7AE). */
+                PlaySoundAt(AM2_SND_VEH_KIND5, 0, 0,
+                            *(const int16_t *)(o + OBJ_OFF_POS),
+                            *(const int16_t *)(o + OBJ_OFF_POS + 2));
+                *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
+                DestroyByType(obj);
+                goto post;
+            default:
+                /* kind 4 and anything above 5: no sound. */
+                break;
+            }
+
+            /* Kinds 0, 1, 2, 3 and the default share this tail (0x0045D777). */
+            *(int32_t *)(o + OBJ_OFF_FIELD_59C) = 0;
+            LeaveRemainsRow(row);
+            DestroyByType(obj);
+        }
+        goto post;
     }
-    goto post;
 
-alive:
     /* 0x0045D7E8 compares the FIELD_59C the seed block loaded, not the
      * record: a vehicle past its first frame with the gate set goes
      * straight to the facing chooser. The reconstruction tested the record's
@@ -9086,6 +9086,7 @@ emit:
      * `0x821` on two vehicles in the object dump. */
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) != 0)
         ObjSetFootprint(obj);
+#undef out
 }
 
 
