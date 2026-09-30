@@ -8719,7 +8719,8 @@ pose:
 void __cdecl StepType2(void *obj)
 {
     uint8_t *o   = (uint8_t *)obj;
-    uint8_t *out = o + OBJ_OFF_SIGHT_OUT_T2;
+    /* The sight record is addressed from the object at each use. */
+#define out (o + OBJ_OFF_SIGHT_OUT_T2)
     uint8_t *w;
 
     /* The held weapon's uid is read TWICE in the original, once inside each
@@ -8765,7 +8766,7 @@ void __cdecl StepType2(void *obj)
         *(int32_t *)(out + SIGHTCOUT_OFF_UID) = 0;
     }
 
-    if (*(const int32_t *)(o + OBJ_OFF_REVEALED_UNTIL) > 0
+    if (*(const uint32_t *)(o + OBJ_OFF_REVEALED_UNTIL) > 0
         && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
            > *(const uint32_t *)(o + OBJ_OFF_REVEALED_UNTIL)) {
         if (!ObjIsFriendly(obj))
@@ -8858,6 +8859,7 @@ tail:
     UpdateTrooperAction(obj, w, out);
 
 #undef AM2_STEP2_HELD_UID
+#undef out
 }
 
 
