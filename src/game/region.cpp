@@ -1770,13 +1770,15 @@ int32_t __cdecl MarkOpenTile(uint16_t tile)
     weighted = 0;
 
     for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++) {
-        int32_t at = (int32_t)tile
-                     + ((const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS)[i];
+        /* The neighbour is recomputed at each use, offset first. */
+#define AT (((const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS)[i] + tile)
 
-        if (weights[at] >= (int8_t)AM2_CELL_WEIGHT_STEP)
+        if (weights[AT] >= (int8_t)AM2_CELL_WEIGHT_STEP)
             weighted++;
-        if (cover[at] >= 1)
+        if (cover[AT] >= 1)
             covered++;
+#undef AT
+
     }
 
     if (weighted < 1)
