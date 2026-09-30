@@ -269,7 +269,8 @@ int32_t __cdecl GenerateObjScriptFromTokens(AM2_ScriptCtx *ctx, int32_t *at)
 
         target->form = AM2_OBJSCRIPT_OBJECT;
 
-        int32_t name = 0;
+        /* Not initialised: ScriptResolveName writes it on every success. */
+        int32_t name;
         if (!ScriptResolveName(ctx, at, &name, 0))
             return 0;
 
