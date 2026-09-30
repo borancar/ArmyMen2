@@ -137,26 +137,7 @@ int32_t __cdecl ScaleBy32Blocks(int32_t v)
 
 void __cdecl TitleCaseName(char *text)
 {
-    int32_t i = 0;
-
-    /* strlen is recomputed each time round, as the original does -- the
-     * intrinsic, which is the `repne scasb` in the image. */
-    while (i < (int32_t)strlen(text)) {
-        if (text[i] == '_')
-            text[i] = ' ';
-
-        if (i > 0) {
-            char prev = text[i - 1];
-
-            if (prev == ' ' || prev == '.') {
-                if (text[i] >= 'a' && text[i] <= 'z')
-                    text[i] = (char)(text[i] - 0x20);
-            }
-        } else if (text[i] >= 'a' && text[i] <= 'z') {
-            text[i] = (char)(text[i] - 0x20);
-        }
-        i++;
-    }
+    TitleCaseNameInline(text);
 }
 
 void __cdecl ResetPairMask(uint32_t *a, uint32_t *b)

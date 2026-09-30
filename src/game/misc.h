@@ -8,6 +8,7 @@
 #define AM2_MISC_H
 
 #include <stdint.h>
+#include <string.h> /* strlen, for TitleCaseNameInline */
 
 #include "dist.h"   /* AM2_Point, which ObjMaskBitAt takes */
 #include "rect.h"   /* AM2_Rect, for the flat virtual-call dispatchers */
@@ -266,6 +267,32 @@ int32_t __cdecl ScaleBy32Blocks(int32_t v);
  * That is the original's and is kept -- the strings are short and matching the
  * instruction count is worth more here than the better loop. */
 void __cdecl TitleCaseName(char *text);
+
+/* The same body, for the one site that has it inline: DefMapLine carries it
+ * instruction for instruction where DefRulesLine calls 0x0042E510. */
+static inline void TitleCaseNameInline(char *text)
+{
+    int32_t i = 0;
+
+    /* strlen is recomputed each time round, as the original does -- the
+     * intrinsic, which is the `repne scasb` in the image. */
+    while (i < (int32_t)strlen(text)) {
+        if (text[i] == '_')
+            text[i] = ' ';
+
+        if (i > 0) {
+            char prev = text[i - 1];
+
+            if (prev == ' ' || prev == '.') {
+                if (text[i] >= 'a' && text[i] <= 'z')
+                    text[i] = (char)(text[i] - 0x20);
+            }
+        } else if (text[i] >= 'a' && text[i] <= 'z') {
+            text[i] = (char)(text[i] - 0x20);
+        }
+        i++;
+    }
+}
 
 /* 0x0042F120. Stores -1 through both pointers, then clears three bits of the
  * first: *a ends as 0xFFDBFFFD, *b as 0xFFFFFFFF. Written as two stores and an

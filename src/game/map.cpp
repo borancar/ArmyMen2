@@ -393,18 +393,16 @@ void *__cdecl FindLevelByName(char *name)
  * if it is empty, and the first where being empty is the whole point -- the
  * column means "there isn't one". Evidence, not proof.
  */
-static inline int32_t TakeMapColumn(char *dst)
-{
-    char *tok = am2_strtok((char *)0,
-                           " \t\n;,");
-
-    if (!tok)
-        return 0;
-    if (!strcmp(tok, "none"))
-        tok = (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH));
-    strcpy(dst, tok);
-    return 1;
-}
+/* A macro rather than an inline function: each column's missing-token exit
+ * is a `return` in the image, laid out inline after the test, where a helper
+ * returning a flag leaves VC6 materialising it. */
+#define TAKE_MAP_COLUMN(dst, missing)                                         \
+    tok = am2_strtok((char *)0, " \t\n;,");                                   \
+    if (!tok)                                                                 \
+        return (missing);                                                     \
+    if (!strcmp("none", tok))                                                 \
+        tok = (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH));                \
+    strcpy((dst), tok)
 
 /* DefMapLine -- original 0x0043E2C0, 1,520 bytes, and its only reference in
  * the image is the parser table at 0x00477468: it is the handler for the
@@ -498,7 +496,7 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
      * It was about to be written a second time; misc.cpp has had it under its
      * own address all along. Fourth near-miss of this kind, and the first
      * caught by reading rather than by a tool. */
-    TitleCaseName((char *)rec + LEVEL_OFF_NAME);
+    TitleCaseNameInline((char *)rec + LEVEL_OFF_NAME);
 
     tok = am2_strtok((char *)0,
                      " \t\n;,");
@@ -508,18 +506,12 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
            "data\\");
     strcat((char *)rec + LEVEL_OFF_FOLDER, tok);
 
-    if (!TakeMapColumn((char *)rec + LEVEL_OFF_WIN_MOVIE))
-        return 5;
-    if (!TakeMapColumn((char *)rec + LEVEL_OFF_LOAD_SCREEN))
-        return 6;
-    if (!TakeMapColumn((char *)rec + LEVEL_OFF_LOAD_MUSIC))
-        return 7;
-    if (!TakeMapColumn((char *)rec + LEVEL_OFF_BRIEFING))
-        return 8;
-    if (!TakeMapColumn((char *)rec + LEVEL_OFF_BRIEF_SFX))
-        return 9;
-    if (!TakeMapColumn((char *)rec + LEVEL_OFF_STRAT_MAP))
-        return 10;
+    TAKE_MAP_COLUMN((char *)rec + LEVEL_OFF_WIN_MOVIE, 5);
+    TAKE_MAP_COLUMN((char *)rec + LEVEL_OFF_LOAD_SCREEN, 6);
+    TAKE_MAP_COLUMN((char *)rec + LEVEL_OFF_LOAD_MUSIC, 7);
+    TAKE_MAP_COLUMN((char *)rec + LEVEL_OFF_BRIEFING, 8);
+    TAKE_MAP_COLUMN((char *)rec + LEVEL_OFF_BRIEF_SFX, 9);
+    TAKE_MAP_COLUMN((char *)rec + LEVEL_OFF_STRAT_MAP, 10);
 
     /* No null check -- see above. */
     if (!DefParseBoolean((int32_t *)(rec + LEVEL_OFF_CYCLE),
@@ -528,10 +520,19 @@ int32_t __cdecl DefMapLine(int32_t cmd, char *line)
         return 11;
 
     col = 12;
-    for (i = 0; i < 3; i++, col++)
-        if (!TakeMapColumn((char *)rec + LEVEL_OFF_LOSE_MOVIES
-                           + (uint32_t)i * AM2_LEVEL_MOVIE_BYTES))
+    for (i = 0; i < 3; i++, col++) {
+        /* Not the column macro: here each arm has its own strcpy. */
+        tok = am2_strtok((char *)0, " \t\n;,");
+        if (!tok)
             return col;
+        if (!strcmp("none", tok))
+            strcpy((char *)rec + LEVEL_OFF_LOSE_MOVIES
+                   + (uint32_t)i * AM2_LEVEL_MOVIE_BYTES,
+                   (char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+        else
+            strcpy((char *)rec + LEVEL_OFF_LOSE_MOVIES
+                   + (uint32_t)i * AM2_LEVEL_MOVIE_BYTES, tok);
+    }
 
     *(int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX) = 0;
     tok = am2_strtok((char *)0,
