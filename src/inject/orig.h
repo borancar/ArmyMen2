@@ -3659,8 +3659,9 @@
 #define ADDR_AIR_DROP_FACINGS    0x00473F80u  /* uint8_t[3] */
 #define AM2_AIR_DROP_COUNT       3
 #define AM2_AIR_DROP_FLAG        0x8000  /* always set on the trooper flags */
-#define AM2_AIR_DROP_REVEAL      0x0200  /* added when the drop is ours and
-                                          * the fog is off */
+#define AM2_AIR_DROP_CONCEAL     0x0200  /* OBJ_FLAG_CONCEALED: added when
+                                          * the drop is NOT the default
+                                          * owner's and the fog is on */
 #define AM2_AIR_DROP_WEAPON_KEY  0x2Du   /* KeyLookupTriple(0x2D, 1, 0) */
 #define AM2_AIR_PASS_MAX         8
 #define AIR_OFF_FLAG_A           0x240u  /* int32_t, set and cleared together */

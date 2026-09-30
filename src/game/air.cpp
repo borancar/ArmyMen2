@@ -1793,24 +1793,26 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
  * SoldierKindForWeapon is asked what kind suits the weapon that was just
  * made, so making the weapon first is required and not incidental.
  *
- * The flag word is 0x8000 always, plus 0x200 when the drop is for the
- * DEFAULT OWNER and the fog of war is off. ADDR_FOG_OF_WAR is 0 when fog is
- * ON, so the test reads inverted and is not: `!= 0` there means no fog, and
- * the extra bit is what reveals the drop. Both halves of that had to be read
- * from orig.h's note on the global rather than from the compare.
+ * The flag word is 0x8000 always, plus 0x200 -- OBJ_FLAG_CONCEALED -- when
+ * the drop is NOT for the default owner and the fog of war is ON
+ * (ADDR_FOG_OF_WAR is 0 when fog is on). 0x00409557 skips the bit when the
+ * army IS the owner, and 0x0040955F when the fog word is non-zero. So an
+ * enemy drop lands hidden under fog; ours never does. This said the
+ * opposite -- "for the default owner", "reveals the drop" -- and the code
+ * followed it, concealing our own paratroopers until the byte-match read
+ * the branch.
  *
  * A NULL WEAPON SKIPS THE WHOLE TAIL but still leaves the trooper on the map
  * -- the guard is around the four calls, not around the creation. */
 void __cdecl AirPassStrike(uint32_t at, int32_t army)
 {
-    const int16_t *off  = (const int16_t *)(uintptr_t)ADDR_AIR_DROP_OFFSETS;
-    const uint8_t *face = (const uint8_t *)(uintptr_t)ADDR_AIR_DROP_FACINGS;
-    void          *comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
-    int32_t        flags = 0;
-    int32_t        i;
+#define OFF  ((const int16_t *)(uintptr_t)ADDR_AIR_DROP_OFFSETS)
+#define FACE ((const uint8_t *)(uintptr_t)ADDR_AIR_DROP_FACINGS)
+    int32_t flags = 0;
+    int32_t i;
 
-    if (army == (int32_t)g_defaultOwner && g_fogOfWar == 0)
-        flags = AM2_AIR_DROP_REVEAL;
+    if (army != (int32_t)g_defaultOwner && g_fogOfWar == 0)
+        flags = AM2_AIR_DROP_CONCEAL;
     flags |= AM2_AIR_DROP_FLAG;
 
     for (i = 0; i < AM2_AIR_DROP_COUNT; i++) {
@@ -1818,9 +1820,9 @@ void __cdecl AirPassStrike(uint32_t at, int32_t army)
         void *weapon;
 
         trooper = CreateTrooper((char *)(uintptr_t)ADDR_DIR_SCRATCH,
-                                (int16_t)at + off[i * 2],
-                                (int16_t)(at >> 16) + off[i * 2 + 1],
-                                ((AM2_Comm *)comm)->CommArmyOfSlot(army),
+                                ((const AM2_Point *)&at)->x + OFF[i * 2],
+                                ((const AM2_Point *)&at)->y + OFF[i * 2 + 1],
+                                AM2_THE_COMM->CommArmyOfSlot(army),
                                 army, flags, 0, 0, 1, 0);
 
         weapon = CreateWeapon((const char *)(uintptr_t)ADDR_DIR_SCRATCH, army,
@@ -1832,13 +1834,15 @@ void __cdecl AirPassStrike(uint32_t at, int32_t army)
 
         *(uint32_t *)((uint8_t *)trooper + OBJ_OFF_WEAPON_UID) =
             *(const uint32_t *)((const uint8_t *)weapon + OBJ_OFF_UID);
-        *((uint8_t *)trooper + OBJ_OFF_FACING) = face[i];
+        *((uint8_t *)trooper + OBJ_OFF_FACING) = FACE[i];
 
         SoldierKindForWeapon(trooper,
             **(const uint32_t **)((const uint8_t *)weapon + OBJ_OFF_FIELD_C0));
         SendTrooperSetWeapon(trooper,
             *(const uint32_t *)((const uint8_t *)weapon + OBJ_OFF_UID), 0);
     }
+#undef FACE
+#undef OFF
 }
 
 

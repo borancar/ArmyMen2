@@ -1109,8 +1109,8 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
         }
     }
 
-    x = (int16_t)(at & 0xFFFFu);
-    y = (int16_t)(at >> 16);
+    x = ((const AM2_Point *)&at)->x;
+    y = ((const AM2_Point *)&at)->y;
     *(int16_t *)(o + OBJ_OFF_POS) = x;
     *(int16_t *)(o + OBJ_OFF_POS + 2) = y;
     *(uint16_t *)(o + OBJ_OFF_TILE) =
