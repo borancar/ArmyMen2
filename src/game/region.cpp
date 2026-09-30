@@ -3258,7 +3258,8 @@ void __cdecl AiRouteToward(void *obj, void *out, const void *ctx,
     }
 
     if (to > 0 && from > 0 && to != from) {
-        int16_t stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
+        /* The stride is re-read after RegionSolvePair. */
+#define stride (*(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
         int32_t link;
 
         *(int16_t *)(o + OBJ_OFF_GOAL_REGION) = (int16_t)to;
@@ -3356,6 +3357,7 @@ heading:
             *(int32_t *)(w + 0x10) = 1;
         *(int32_t *)(w + 0x14) = 1;
     }
+#undef stride
 }
 
 /* AiTrooperStep -- original 0x004049C0, 1,168 bytes, twenty-six call sites
@@ -3668,7 +3670,8 @@ void __cdecl RoachRouteToward(void *obj, void *out, const void *ctx)
     }
 
     if (to > 0 && from > 0 && to != from) {
-        int16_t stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
+        /* The stride is re-read after RegionSolvePair. */
+#define stride (*(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
         int32_t link;
 
         *(int16_t *)(o + OBJ_OFF_GOAL_REGION) = (int16_t)to;
@@ -3772,6 +3775,7 @@ heading:
 
     w[0] = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS), &pt);
     *(int32_t *)(w + 0x14) = 2;
+#undef stride
 }
 
 /* AiStepIgnore -- original 0x00407BF0, one caller, which is the AI mode
