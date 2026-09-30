@@ -2104,7 +2104,7 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
     const uint8_t  *o     = (const uint8_t *)obj;
     uint8_t        *rec   = (uint8_t *)out;
     int32_t        *box   = (int32_t *)(rec + TILEMASK_OFF_RECT);
-    uint8_t        *cells = rec + TILEMASK_OFF_CELLS;
+    uint8_t        *cells;
     int32_t        *ring  = (int32_t *)(uintptr_t)ADDR_TILEMASK_NEIGHBOURS;
     const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
                                 ((void *)(uintptr_t)(ADDR_BIT_FROM_N));
@@ -2169,6 +2169,7 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
                        - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
 
     w = box[2] - box[0] + 1;
+    cells = rec + TILEMASK_OFF_CELLS;
     memset(cells, 0, (size_t)((box[3] - box[1] + 1) * w));
 
     /* The original stores these in register-scheduling order rather than in
@@ -2703,7 +2704,7 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     const uint8_t  *h     = (const uint8_t *)hdr;
     uint8_t        *rec   = (uint8_t *)out;
     int32_t        *box   = (int32_t *)(rec + TILEMASK_OFF_RECT);
-    uint8_t        *cells = rec + TILEMASK_OFF_CELLS;
+    uint8_t        *cells;
     int32_t        *ring  = (int32_t *)(uintptr_t)ADDR_TILEMASK_NEIGHBOURS;
     const uint8_t  *tab   = (const uint8_t *)(uintptr_t)
                                 ((void *)(uintptr_t)(ADDR_BIT_FROM_N));
@@ -2777,6 +2778,7 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
                        - AM2_TILEMASK_MARGIN) - AM2_TILEMASK_MARGIN;
 
     w = box[2] - box[0] + 1;
+    cells = rec + TILEMASK_OFF_CELLS;
     memset(cells, 0, (size_t)((box[3] - box[1] + 1) * w));
 
     ring[1]  = -2 * w;
@@ -3414,7 +3416,7 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
     uint8_t  *o    = (uint8_t *)obj;
     uint8_t  *w    = (uint8_t *)out;
     uint8_t  *dest = o + OBJ_OFF_FIELD_C0;
-    uint8_t  *pos  = o + OBJ_OFF_POS;
+    uint8_t  *pos;
     AM2_Point pt;                    /* the original's first argument slot */
     int32_t   fromTile, toTile;
     int32_t   fromRegion, toRegion;
@@ -3425,6 +3427,7 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
         return;
 
     /* Arrived. The deadline is cleared so the next goal may plan at once. */
+    pos = o + OBJ_OFF_POS;
     if (ApproxDist((const AM2_Point *)dest, (const AM2_Point *)pos)
         < AM2_AI_TROOPER_ARRIVED) {
         *(int32_t *)(o + OBJ_OFF_MOVE_UNTIL) = 0;
@@ -7751,10 +7754,9 @@ void __cdecl Type2PlayerStep(void *obj, void *out)
 {
     uint8_t *o    = (uint8_t *)obj;
     uint8_t *w    = (uint8_t *)out;
-    uint8_t *dest = o + OBJ_OFF_FIELD_C0;
+    uint8_t *dest;
     uint8_t  ctx[AM2_SIGHTC_BYTES];
     uint32_t uid;
-    int32_t  frame;
     int32_t  i;
 
     /* The class, into the field AiTrooperStep reads. See the note above on
@@ -7780,6 +7782,7 @@ void __cdecl Type2PlayerStep(void *obj, void *out)
         }
     }
 
+    dest = o + OBJ_OFF_FIELD_C0;
     if (*(const int16_t *)dest != 0) {
         if (*(const int32_t *)(o + OBJ_OFF_FIELD_10C)) {
             AiTrooperStep(obj, o + OBJ_OFF_SIGHT_OUT_T2, ctx);
@@ -7814,11 +7817,9 @@ void __cdecl Type2PlayerStep(void *obj, void *out)
             (HeldWeaponCode(obj) == AM2_POSE_WEAPON_CODE)
                 ? AM2_POSE_INDEX_SPECIAL : AM2_POSE_INDEX_DEFAULT;
 
-    frame = *(const int16_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_WEAPON_POSE_FRAMES))
-                               + (uint32_t)*(const int32_t *)(w + 8) * 4);
-
     if (RowAnimField4(*(const void *const *)(o + OBJ_OFF_ROWS),
-                      (uint16_t)frame) <= 0)
+                      (uint16_t)*(const int16_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_WEAPON_POSE_FRAMES))
+                               + (uint32_t)*(const int32_t *)(w + 8) * 4)) <= 0)
         return;
 
     /* Button zero's press tick -- ADDR_MOUSE_PRESS + 4; win32/device.cpp

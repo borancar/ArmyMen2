@@ -3870,12 +3870,12 @@ int32_t __cdecl ObjCollidesWith(void *from, void *obj)
 int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
                                   uint32_t ref)
 {
-    uint8_t *o     = (uint8_t *)chain;
+    uint8_t *o;
     uint8_t *f     = (uint8_t *)from;
     int32_t  total = 0;
     uint32_t tile;
 
-    for (; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
+    for (o = (uint8_t *)chain; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
         int32_t w = AM2_BLOCK_FULL;
 
         if (o == f) {
@@ -13389,7 +13389,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
 {
     uint8_t  *w   = (uint8_t *)weapon;
     uint8_t  *u   = (uint8_t *)unit;
-    uint8_t  *tgt = (uint8_t *)target;
+    uint8_t  *tgt;
     int16_t  *pt  = (int16_t *)&spot.at;
     uint8_t  *rows;
     uint8_t  *spr;
@@ -13407,6 +13407,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
     if (spot.ground == 0)
         spot.ground = (int16_t)height;
 
+    tgt = (uint8_t *)target;
     if (pt[0] == 0 && tgt) {
         pt[0] = *(const int16_t *)(tgt + OBJ_OFF_POS);
         pt[1] = *(const int16_t *)(tgt + OBJ_OFF_POS + 2);

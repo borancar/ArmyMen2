@@ -1339,7 +1339,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommLobbyStart()
     void *comm = this;
 
     uint8_t             *self  = (uint8_t *)comm;
-    LPDIRECTPLAYLOBBY3A *lobby = (LPDIRECTPLAYLOBBY3A *)(self + COMM_OFF_LOBBY);
+    LPDIRECTPLAYLOBBY3A *lobby;
     uint8_t             *shared;
     LPDPLCONNECTION      conn;
     LPDPSESSIONDESC2     sd;
@@ -1355,6 +1355,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommLobbyStart()
 
     /* Answers 0 or 1, never negative, so this test can only ever pass -- the
      * original's, kept. */
+    lobby = (LPDIRECTPLAYLOBBY3A *)(self + COMM_OFF_LOBBY);
     if (CreateDirectPlayLobby(lobby) < 0) {
         *lobby = NULL;
         return 0;

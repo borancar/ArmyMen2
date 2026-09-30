@@ -298,7 +298,7 @@ int32_t __cdecl ObjTileHook(void *obj)
     uint8_t       *o = (uint8_t *)obj;
 #define padLayer (*(const uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER)
     const uint8_t *bitLayer;
-    uint32_t       tile = *(const uint16_t *)(o + OBJ_OFF_TILE);
+    uint32_t tile;
     uint32_t       prev;
     int32_t        changed = 0;
     uint8_t        curPad = 0, prevPad = 0;
@@ -306,6 +306,7 @@ int32_t __cdecl ObjTileHook(void *obj)
     int32_t        i;
 
     /* The damage pass, before the early exit. */
+    tile = *(const uint16_t *)(o + OBJ_OFF_TILE);
     if (padLayer != 0 && padLayer[tile] > 0) {
         const uint8_t *num = (const uint8_t *)((void *)(uintptr_t)(ADDR_PAD_NUMBERS))
                              + (uint32_t)padLayer[tile] * AM2_PAD_NUMBER_STRIDE;

@@ -779,8 +779,8 @@ void __cdecl BuildRemapTables(void)
     const uint8_t  *pal  = (const uint8_t *)(uintptr_t)ADDR_PALETTE_COPY;
     uint8_t        *obj  = (uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS;
     uint8_t        *ramp = (uint8_t *)(uintptr_t)ADDR_ARMY_RAMP_TABLES;
-    uint8_t       **table = (uint8_t **)(uintptr_t)ADDR_VARIATION_TABLE;
-    uint8_t        *block = (uint8_t *)(uintptr_t)ADDR_VARIATION_BLOCKS;
+    uint8_t       **table;
+    int32_t         block;
     int32_t         army;
     int32_t         i;
 
@@ -789,11 +789,12 @@ void __cdecl BuildRemapTables(void)
         uint8_t *rmp = ramp + (uint32_t)army * AM2_OBJ_TABLE_REC_SIZE;
 
         for (i = 0; i < AM2_REMAP_COLOURS; i++) {
-            const uint8_t *c = pal + ((uint32_t)base[army] + (uint32_t)i) * 4;
+            uint32_t c = ((uint32_t)base[army] + (uint32_t)i) * 4;
 
             rec[i] = NearestPalIndexRGB(
                 *(const uint32_t *const *)(uintptr_t)ADDR_ACTIVE_PALETTE,
-                c[0], c[1], c[2], AM2_PAL_REMAP_FROM);
+                pal[c], pal[c + 1], pal[c + 2],
+                AM2_PAL_REMAP_FROM);
         }
         for (i = AM2_REMAP_COLOURS; i < (int32_t)AM2_OBJ_TABLE_REC_SIZE; i++)
             rec[i] = (uint8_t)i;
@@ -804,10 +805,12 @@ void __cdecl BuildRemapTables(void)
             rmp[i] = (uint8_t)i;
     }
 
-    while (block < (uint8_t *)(uintptr_t)ADDR_VARIATION_END) {
+    table = (uint8_t **)(uintptr_t)ADDR_VARIATION_TABLE;
+    block = (int32_t)ADDR_VARIATION_BLOCKS;
+    while (block < (int32_t)ADDR_VARIATION_END) {
         int32_t row;
 
-        *table = block;
+        *table = (uint8_t *)(uintptr_t)block;
 
         for (row = 0; row < AM2_VARIATION_ROWS; row++) {
             int32_t pick = orig_rand() % AM2_ARMY_PAL_BASES;

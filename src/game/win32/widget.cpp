@@ -15126,33 +15126,34 @@ void __attribute__((thiscall)) AM2_Widget::CheckboxPaint(RECT clip)
     AM2_Widget *w = this;
 
     uint8_t    *self    = (uint8_t *)w;
-    uint8_t     checked = *(const uint8_t *)(self + CHECKBOX_OFF_CHECKED);
     RECT        vis;
     uint32_t    ink;
+
+#define checked (*(const uint8_t *)(self + CHECKBOX_OFF_CHECKED))
 
     /* The parent is not null-tested: a painted box always has one. */
     if (w->parent->focusedChild == w) {
         if (checked) {
-            ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_ON_FOC);
             w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON_FOC);
+            ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_ON_FOC);
         } else {
-            ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_OFF_FOC);
             w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF_FOC);
+            ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_OFF_FOC);
         }
     } else {
         if (checked) {
-            ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_ON);
             w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON);
+            ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_ON);
         } else {
-            ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_OFF);
             w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF);
+            ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_OFF);
         }
     }
 
     /* Undoes the FOCUS, not the check. */
     if (*(const uint8_t *)(self + CHECKBOX_OFF_FORCE_PLAIN) && checked) {
-        ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_ON);
         w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON);
+        ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_ON);
     }
 
     /* Ink only -- the sprite stays, so a disabled box still reads as ticked. */
@@ -15175,6 +15176,7 @@ void __attribute__((thiscall)) AM2_Widget::CheckboxPaint(RECT clip)
                     *(const char *const *)(self + CHECKBOX_OFF_CAPTION),
                     AM2_TEXT_LIST_FONT, vis, ink);
     UnlockSurface();
+#undef checked
 }
 
 /* 0x00454980, thiscall, `ret 0x18`. The PANEL: a widget whose whole job is to
