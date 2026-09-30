@@ -508,8 +508,7 @@ int32_t __cdecl SaveItems(am2_FILE *fp)
 int32_t __cdecl LoadItems(am2_FILE *fp)
 {
     uint32_t mark;
-    int32_t  count = 0;
-    int32_t  i;
+    int32_t  count;
 
     /* DELIBERATE DEVIATION FROM THE ORIGINAL -- the only one in this tree,
      * and it is confined to the LOAD path on purpose. See CLAUDE.md.
@@ -537,13 +536,19 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
      * the load leaves every other path byte-for-byte as it was, which is what
      * keeps `ab.sh combat` and the rest out of the blast radius.
      *
-     * Revert this and tools/loadcheck.sh fails again. */
+     * Revert this and tools/loadcheck.sh fails again.
+     *
+     * Not in the relink build, which stands for the original's bytes. */
+#if !defined(AM2_RELINK)
+    int32_t i;
+
     if (*(void *const *)((const uint8_t *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC))
                          + MAPDESC_OFF_CELLS)) {
         for (i = 0; i < g_objCount; i++)
             ItemPreDestroy(g_objTable[i].obj,
                            (int32_t)(uintptr_t)ADDR_OBJ_MAP_DESC);
     }
+#endif
 
     /* Before the tag check, and before `fp` is even read. */
     ItemsReset();
@@ -552,6 +557,7 @@ int32_t __cdecl LoadItems(am2_FILE *fp)
                       "C:\\ArmyMen2\\source\\item.cpp", 0x4A8))
         return 0;
 
+    count = 0;
     orig_fread(&mark, 4, 1, fp);
     while (mark == AM2_SAVE_RECORD_MARK) {
         LoadOneItem(fp, 0);
