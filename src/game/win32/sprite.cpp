@@ -810,8 +810,8 @@ int32_t __cdecl LoadShadowBmp(const char *path, AM2_Sprite *spr)
         int16_t hx = *(const int16_t *)(infoHdr + BMPINFO_OFF_XPELS);
         int16_t hy = *(const int16_t *)(infoHdr + BMPINFO_OFF_YPELS);
 
-        spr->bounds.left   = 0;
         spr->bounds.top    = 0;
+        spr->bounds.left   = 0;
         spr->bounds.right  = width;
         spr->bounds.bottom = height;
 

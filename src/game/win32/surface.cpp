@@ -1487,8 +1487,8 @@ void __cdecl DrawMenuCursor(void)
                 /* The primary is the whole desktop when windowed, so only the
                  * DESTINATION moves; the back buffer it reads from does not. */
                 clipped.left   += g_screenRect.left;
-                clipped.right  += g_screenRect.left;
                 clipped.top    += g_screenRect.top;
+                clipped.right  += g_screenRect.left;
                 clipped.bottom += g_screenRect.top;
             }
             IDirectDrawSurface_Blt(g_drawTarget, (LPRECT)&clipped, g_backBuffer,

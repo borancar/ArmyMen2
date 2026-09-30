@@ -1893,9 +1893,9 @@ int32_t __cdecl BoxAction(AM2_Rect area, void *out)
               *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
                   - AM2_TILEMASK_MARGIN);
 
-    box[3] = c.bottom + AM2_TILEMASK_MARGIN;   /* bottom, then right, then left */
-    box[2] = c.right + AM2_TILEMASK_MARGIN;
+    box[3] = c.bottom + AM2_TILEMASK_MARGIN;   /* bottom, then left, then right */
     box[0] = c.left - AM2_TILEMASK_MARGIN;
+    box[2] = c.right + AM2_TILEMASK_MARGIN;
     box[1] = c.top - AM2_TILEMASK_MARGIN;
 
     memset(cells, AM2_TILEMASK_PAD_CELL,
@@ -2779,8 +2779,8 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     w = box[2] - box[0] + 1;
     memset(cells, 0, (size_t)((box[3] - box[1] + 1) * w));
 
-    ring[0]  = -2 * w - 1;
     ring[1]  = -2 * w;
+    ring[0]  = -2 * w - 1;
     ring[2]  = -2 * w + 1;
     ring[3]  = -w - 2;
     ring[4]  = -w - 1;
@@ -2795,8 +2795,8 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     ring[13] = w - 1;
     ring[14] = w;
     ring[15] = w + 1;
-    ring[16] = w + 2;
     ring[17] = 2 * w - 1;
+    ring[16] = w + 2;
     ring[18] = 2 * w;
     ring[19] = 2 * w + 1;
 
@@ -8071,8 +8071,8 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
     if (target != (uint8_t *)0) {
         int16_t z;
 
-        spot.at.x = ((const AM2_Point *)(target + OBJ_OFF_POS))->x;
         spot.at.y = ((const AM2_Point *)(target + OBJ_OFF_POS))->y;
+        spot.at.x = ((const AM2_Point *)(target + OBJ_OFF_POS))->x;
         z = (int16_t)(int8_t)((uint8_t)ObjHeight(target) - AM2_FIRE_HEIGHT_DROP);
 
         *(uint16_t *)(o + UNIT_OFF_FIRE_X) = (uint16_t)spot.at.x;

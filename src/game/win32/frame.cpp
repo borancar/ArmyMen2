@@ -1976,8 +1976,8 @@ void __cdecl PausedFrameStep(void)
 
             clip.left   = xy[0];
             clip.top    = xy[1] + 0x14;
-            clip.right  = xy[0] + 0x6E;
             clip.bottom = xy[1] + 0x14 + 0x14;
+            clip.right  = xy[0] + 0x6E;
             if (!LockSurface(
                     *(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
                 return;
@@ -1999,8 +1999,8 @@ void __cdecl PausedFrameStep(void)
 
         clip.left   = xy[0];
         clip.top    = xy[1] + 0x24;
-        clip.right  = xy[0] + 0x190;
         clip.bottom = xy[1] + 0x24 + 0x14;
+        clip.right  = xy[0] + 0x190;
         if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
             return;
         DrawTextClipped(xy[0] + 2, xy[1] + 0x24 + 2, buf, 1, clip,

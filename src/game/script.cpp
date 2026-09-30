@@ -1756,8 +1756,8 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             return 0;
         }
         act->code = 7;
-        act->text = (char *)ctx->tokens[*at].value;
         act->n0 = 0;
+        act->text = (char *)ctx->tokens[*at].value;
         act->n1 = 1;
         act->extra = 0;
         if (++(*at) >= ctx->count)
@@ -2645,8 +2645,8 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
                  * the scan. */
                 n = 0;
                 *(int32_t *)&kPadNumbers[number].cx = ZERO_POINT;
-                total = MAP_TILES_H * MAP_TILES_W;
                 sx = 0;
+                total = MAP_TILES_H * MAP_TILES_W;
                 sy = 0;
                 for (i = 0; i < total; i++) {
                     if ((int32_t)PAD_LAYER[i] == number) {
@@ -2664,8 +2664,8 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
         } else if (PADBIT_LAYER) {
             n = 0;
             *(int32_t *)&kPadNumbers[number].cx = ZERO_POINT;
-            total = MAP_TILES_H * MAP_TILES_W;
             sx = 0;
+            total = MAP_TILES_H * MAP_TILES_W;
             sy = 0;
             for (i = 0; i < total; i++) {
                 if ((PADBIT_LAYER[i] | kPadBit(number)) != 0) {

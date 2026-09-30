@@ -909,8 +909,8 @@ void __cdecl DrawMapObjects(const AM2_Rect *world, void *desc, int32_t deep)
     g_depthDC    = 0;
 
     l = world->left   >> AM2_CELL_SHIFT;
-    t = world->top    >> AM2_CELL_SHIFT;
     r = world->right  >> AM2_CELL_SHIFT;
+    t = world->top    >> AM2_CELL_SHIFT;
     b = world->bottom >> AM2_CELL_SHIFT;
 
     if (b < 0)
@@ -995,8 +995,8 @@ subdivide:
         AM2_Rect  c;
 
         if (dw > dh) {
-            sub  = (dw <= AM2_SUBDIVIDE_FLOOR) ? deep : 1;
             half = left + dw / 2;
+            sub  = (dw <= AM2_SUBDIVIDE_FLOOR) ? deep : 1;
 
             a.left = left;   a.top = top;    a.right  = half;  a.bottom = bottom;
             c.left = half + 1; c.top = top;  c.right  = right;
@@ -1215,8 +1215,8 @@ void __cdecl ScrollMapCache(void)
 
     g_camera->left   = Clamp(g_camera->left,   0, g_mapTilesW - 1);
     g_camera->right  = Clamp(g_camera->right,  0, g_mapTilesW - 1);
-    g_camera->top    = Clamp(g_camera->top,    0, g_mapTilesH - 1);
     g_camera->bottom = Clamp(g_camera->bottom, 0, g_mapTilesH - 1);
+    g_camera->top    = Clamp(g_camera->top,    0, g_mapTilesH - 1);
 
     if (g_fullRedraw) {
         PaintMapTiles(g_camera);
@@ -1282,11 +1282,11 @@ void __cdecl ScrollMapCache(void)
     if (dy == 0)
         return;
     if (dy > 0) {
-        wide.top    = g_camera->bottom - dy;
         wide.bottom = g_camera->bottom;
+        wide.top    = g_camera->bottom - dy;
     } else {
-        wide.top    = g_camera->top;
         wide.bottom = g_camera->top - dy;
+        wide.top    = g_camera->top;
     }
     PaintMapTiles(&wide);
 }
@@ -1944,13 +1944,13 @@ clamp_eye:
 
         world[0] = vl;
         world[1] = vt;
-        world[2] = vl + w;
         world[3] = vt + h;
+        world[2] = vl + w;
 
         origin[0] = vl - g_blitRect->left;
         origin[1] = vt - g_blitRect->top;
-        origin[2] = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W + origin[0];
         origin[3] = *(const int32_t *)(uintptr_t)ADDR_SCREEN_H + origin[1];
+        origin[2] = *(const int32_t *)(uintptr_t)ADDR_SCREEN_W + origin[0];
 
         VIEW_EYE->x = (int16_t)vx;
         VIEW_EYE->y = (int16_t)vy;
@@ -2118,8 +2118,8 @@ void __cdecl DrawSelection(void)
             - *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y;
 
         if (ObjIsType2((const AM2_Object *)obj)) {
-            wide = AM2_MARK_TROOPER_W;
             drop = AM2_MARK_TROOPER_DY;
+            wide = AM2_MARK_TROOPER_W;
         } else {
             wide = AM2_MARK_WIDE_W;
 
@@ -2876,8 +2876,8 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc)
     x0 = r->left >= 0 ? r->left >> AM2_CELL_SHIFT : 0;
     y0 = r->top  >= 0 ? r->top  >> AM2_CELL_SHIFT : 0;
 
-    cols = *(const int32_t *)(d + MAPDESC_OFF_COLS);
     x1   = r->right >> AM2_CELL_SHIFT;
+    cols = *(const int32_t *)(d + MAPDESC_OFF_COLS);
     if (cols - 1 < x1)
         x1 = cols - 1;
     y1 = r->bottom >> AM2_CELL_SHIFT;
@@ -3120,8 +3120,8 @@ void __cdecl DirtyCollect(const AM2_Rect *r)
             goto unlink;
 
         case 9:
-            cur.right = e->right;
             e->top = cur.bottom;
+            cur.right = e->right;
             break;
 
         case 10:

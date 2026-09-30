@@ -15133,26 +15133,26 @@ void __attribute__((thiscall)) AM2_Widget::CheckboxPaint(RECT clip)
     /* The parent is not null-tested: a painted box always has one. */
     if (w->parent->focusedChild == w) {
         if (checked) {
-            w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON_FOC);
             ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_ON_FOC);
+            w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON_FOC);
         } else {
-            w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF_FOC);
             ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_OFF_FOC);
+            w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF_FOC);
         }
     } else {
         if (checked) {
             w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON);
             ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_ON);
         } else {
-            w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF);
             ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_OFF);
+            w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_OFF);
         }
     }
 
     /* Undoes the FOCUS, not the check. */
     if (*(const uint8_t *)(self + CHECKBOX_OFF_FORCE_PLAIN) && checked) {
-        w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON);
         ink = *(const uint8_t *)(self + CHECKBOX_OFF_INK_ON);
+        w->sprite = *(AM2_Sprite **)(self + CHECKBOX_OFF_SPR_ON);
     }
 
     /* Ink only -- the sprite stays, so a disabled box still reads as ticked. */
