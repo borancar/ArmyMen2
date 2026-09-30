@@ -6659,46 +6659,48 @@ int32_t __cdecl RegionFindPath(uint16_t from, int32_t to, int16_t *path,
  */
 void __cdecl RegionSolvePair(int32_t from, int32_t to)
 {
-    int32_t  len;
-    int16_t  path[AM2_REGION_PATH_MAX];
-    uint8_t *next  = *(uint8_t *const *)(uintptr_t)ADDR_REGION_NEXT;
-    uint8_t *cost  = *(uint8_t *const *)(uintptr_t)ADDR_REGION_COST;
-    int32_t  stride;
-    uint8_t  stamp;
-    int32_t  i, j;
+    int32_t len;
+    int16_t path[AM2_REGION_PATH_MAX];
+    int32_t i, j;
 
+    /* Every table and the stride are read from their globals at each
+     * store. */
+#define NEXT   (*(uint8_t *const *)(uintptr_t)ADDR_REGION_NEXT)
+#define COST   (*(uint8_t *const *)(uintptr_t)ADDR_REGION_COST)
+#define STRIDE (*(const int16_t *)(uintptr_t)ADDR_REGION_STRIDE)
+#define STAMP  (*(const uint8_t *)(uintptr_t)ADDR_REGION_STAMP)
     if (!*(const int32_t *)((const uint8_t *)
               *(void *const *)(uintptr_t)ADDR_REGIONS
               + (uint32_t)to * AM2_REGION_SIZE + REGION_OFF_ACTIVE))
         return;
 
     if (!RegionFindPath(from, to, path, &len)) {
-        stride = *(const int16_t *)(uintptr_t)ADDR_REGION_STRIDE;
-        stamp  = *(const uint8_t *)(uintptr_t)ADDR_REGION_STAMP;
-
-        next[from * stride + to] = 0;
-        next[to * stride + from] = 0;
+        (NEXT + from * STRIDE)[to] = 0;
+        (NEXT + to * STRIDE)[from] = 0;
 
         /* Both of these are cost[from][to]; the original writes it twice. */
-        cost[from * stride + to] = stamp;
-        cost[from * stride + to] = stamp;
+        (COST + from * STRIDE)[to] = STAMP;
+        (COST + from * STRIDE)[to] = STAMP;
         return;
     }
 
-    stride = *(const int16_t *)(uintptr_t)ADDR_REGION_STRIDE;
-    stamp  = *(const uint8_t *)(uintptr_t)ADDR_REGION_STAMP;
-
-    for (i = 1; i < len; i++)
-        for (j = i; j < len; j++) {
-            next[path[i - 1] * stride + path[j]] = (uint8_t)path[i];
-            cost[path[i - 1] * stride + path[j]] = stamp;
+    for (i = 0; i < len - 1; i++)
+        for (j = i + 1; j < len; j++) {
+            (NEXT + path[i] * STRIDE)[path[j]] = (uint8_t)path[i + 1];
+            (COST + path[i] * STRIDE)[path[j]] = STAMP;
         }
 
+    /* Walked from the hop below i downwards; the same cells as an upward
+     * walk and the same values in each. */
     for (i = len - 1; i > 0; i--)
-        for (j = i; j > 0; j--) {
-            next[path[i] * stride + path[i - j]] = (uint8_t)path[i - 1];
-            cost[path[i] * stride + path[i - j]] = stamp;
+        for (j = i - 1; j >= 0; j--) {
+            (NEXT + path[i] * STRIDE)[path[j]] = (uint8_t)path[i - 1];
+            (COST + path[i] * STRIDE)[path[j]] = STAMP;
         }
+#undef STAMP
+#undef STRIDE
+#undef COST
+#undef NEXT
 }
 
 
