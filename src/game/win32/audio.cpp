@@ -922,6 +922,11 @@ int32_t __cdecl FillSoundBuffer(LPDIRECTSOUNDBUFFER buf, const uint8_t *data,
  *
  * Off unless asked for, and it writes through the harness logger rather than
  * the game's, so it cannot be mistaken for 1999 debug output. */
+#if defined(AM2_RELINK)
+/* Harness-only: the byte-match relink compiles it out, as the original has
+ * no such call. */
+#define sound_dump(name, data, len) ((void)0)
+#else
 static int sound_dump_on(void)
 {
     static int on = -1;
@@ -946,6 +951,7 @@ static void sound_dump(const char *name, const uint8_t *data, uint32_t len)
     }
     hooklog("sound: %-20s %7u bytes  fnv1a=%08x", name, len, hash);
 }
+#endif
 
 /* Shared by the three playback functions below: where the ear is, the two
  * volume levels, the object lookup and the wave reader. */
@@ -1193,11 +1199,20 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
                               int32_t priority, uint32_t owner)
 {
     uint8_t   *rec;
-    AM2_Point  where;
-    int32_t    dist = 0;
     int32_t    volume;
     DWORD      status;
     DWORD      looping;
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+    DSBUFFERDESC desc = { 0 };
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+    void      *raw = NULL;
+    int32_t    dist = 0;
+    void      *owned;
 
     (void)unused;
 
@@ -1219,10 +1234,15 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
         }
     }
 
-    where.x = (int16_t)x;
-    where.y = (int16_t)y;
-    if (where.x != 0)
-        dist = ApproxDist(&g_listenerPos, &where);
+    if (x != 0) {
+        AM2_Point ear, where;
+
+        ear.x   = g_listenerPos.x;
+        ear.y   = g_listenerPos.y;
+        where.x = x;
+        where.y = y;
+        dist = ApproxDist(&ear, &where);
+    }
 
     rec = g_dynamic[slot];
 
@@ -1291,26 +1311,20 @@ void __cdecl PlayDynamicSound(const char *name, int32_t loop, int32_t unused,
     }
 
     {
-        DSBUFFERDESC  desc;
-        void         *raw = NULL;
-        void         *owned = NULL;
         char         *copy;
-        size_t        n;
 
         *(void **)(rec + SOUND_REC_OFF_BUFFER)   = NULL;
         *(void **)(rec + SOUND_REC_OFF_NAME)     = NULL;
         *(void **)(rec + SOUND_REC_OFF_OWNER_DS) = NULL;
 
-        n = strlen(name) + 1;
-        copy = (char *)orig_malloc(n);
+        copy = (char *)orig_malloc(strlen(name) + 1);
         *(void **)(rec + SOUND_REC_OFF_NAME) = copy;
         if (!copy) {
             orig_log("Unable to allocate memory for wave name\n");
             goto drop_record;
         }
-        memcpy(copy, name, n);
+        strcpy(*(char **)(rec + SOUND_REC_OFF_NAME), name);
 
-        memset(&desc, 0, sizeof desc);
         if (!ReadWaveFile(0, name, &desc.lpwfxFormat, &raw,
                             &desc.dwBufferBytes, &owned)) {
             orig_log("Unable to load wave file %s\n", name);
@@ -1360,7 +1374,7 @@ ready:
     volume = (slot == 0 || slot == SOUND_VOICE_SLOT_HI)
              ? g_voiceVolume : g_volumeAtZero;
 
-    if (where.x != 0) {
+    if (x != 0) {
         if (dist > SOUND_3D_CUTOFF)
             volume = DSBVOLUME_MIN;
         else
@@ -1386,7 +1400,9 @@ ready:
         *(uint32_t *)(rec + SOUND_REC_OFF_ACTIVE) = 1;
     }
 
-    looping = (loop == 1) ? DSBPLAY_LOOPING : 0;
+    looping = 0;
+    if (loop == 1)
+        looping = DSBPLAY_LOOPING;
     *(uint32_t *)(rec + SOUND_REC_OFF_LOOPING) = looping;
     IDirectSoundBuffer_Play(
         *(LPDIRECTSOUNDBUFFER *)(rec + SOUND_REC_OFF_BUFFER), 0, 0, looping);
@@ -1713,10 +1729,16 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
 {
     uint8_t      *rec;
     char         *nameCopy;
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+    DSBUFFERDESC  desc = { 0 };
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
     void         *raw = NULL;      /* the samples, freed once uploaded */
     void         *owned = NULL;    /* the reader's own block, freed either way */
-    DSBUFFERDESC  desc;
-    size_t        n;
 
     rec = (uint8_t *)orig_malloc(SOUND_RECORD_SIZE);
     *slot = rec;
@@ -1729,18 +1751,13 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
     *(void **)(rec + SOUND_REC_OFF_NAME)   = NULL;
     *(void **)(rec + SOUND_REC_OFF_OWNER_DS)  = NULL;
 
-    n = strlen(name) + 1;
-    nameCopy = (char *)orig_malloc(n);
+    nameCopy = (char *)orig_malloc(strlen(name) + 1);
     *(void **)(rec + SOUND_REC_OFF_NAME) = nameCopy;
     if (!nameCopy) {
         orig_log("Unable to allocate memory for wave name\n");
-        orig_free(rec);
-        *slot = NULL;
-        return 0;
+        goto drop_record;
     }
-    memcpy(nameCopy, name, n);
-
-    memset(&desc, 0, sizeof desc);
+    strcpy(*(char **)(rec + SOUND_REC_OFF_NAME), name);
 
     /* Straight into the descriptor: the format and the length are the reader's
      * answers, not ours. */
@@ -1772,7 +1789,9 @@ int32_t __cdecl LoadWaveSound(void **slot, LPDIRECTSOUND ds, const char *name)
         goto give_up;
     }
 
-    *(void **)(rec + SOUND_REC_OFF_OWNER_DS) = NULL;
+    /* The device that made the buffer -- the original stores it here; this
+     * once stored NULL. */
+    *(LPDIRECTSOUND *)(rec + SOUND_REC_OFF_OWNER_DS) = ds;
     orig_free(owned);
     return 1;
 
@@ -1781,7 +1800,8 @@ give_up:
         orig_free(owned);
     if (*(void **)(rec + SOUND_REC_OFF_NAME))
         orig_free(*(void **)(rec + SOUND_REC_OFF_NAME));
-    orig_free(rec);
+drop_record:
+    orig_free(*slot);
     *slot = NULL;
     return 0;
 }
