@@ -8668,7 +8668,9 @@ void __cdecl StepType2(void *obj)
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) == 0) {
         int32_t pose = *(const int32_t *)(o + OBJ_OFF_POSE);
 
-        if (pose > 0x1F && pose <= 0x24) {
+        /* The image tests pose for zero first (`test eax,eax; je` at
+         * 0x0044B909), redundant with the range below but in the program. */
+        if (pose != 0 && pose > 0x1F && pose <= 0x24) {
             void *row = *(void **)(o + OBJ_OFF_ROWS);
 
             if (!RowAnimFinished(row))
