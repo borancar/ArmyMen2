@@ -5835,7 +5835,7 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
     *(int32_t *)(u + UNIT_OFF_INVENTORY_SEL) = slot;
     SelectInventorySlot(u, slot);
 
-    if (*(const uint8_t *)(u + OBJ_OFF_FLAGS + 1) & 4)
+    if (*(const uint32_t *)(u + OBJ_OFF_FLAGS) & OBJ_FLAG_SELECTED)
         return;
 
     DeselectAll();

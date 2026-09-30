@@ -576,11 +576,10 @@ int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
     }
 #undef ARMY
 
-    if (weight >= AM2_BLOCK_FULL)
-        goto fail;
-
-    return ((const uint8_t *)*(void *const *)(uintptr_t)ADDR_TILE_KIND)
-               [(uint32_t)tile & 0xFFFFu] == (uint32_t)kind ? 1 : 0;
+    if (weight < AM2_BLOCK_FULL)
+        return ((const uint8_t *)*(void *const *)(uintptr_t)ADDR_TILE_KIND)
+                   [(uint32_t)tile & 0xFFFFu] == (uint32_t)kind ? 1 : 0;
+    goto fail;
 
 }
 
