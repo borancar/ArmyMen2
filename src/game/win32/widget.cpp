@@ -4407,7 +4407,7 @@ void __cdecl AimMarkerAge(void)
 #define LIVE(off)  (((int32_t *)(uintptr_t)ADDR_AIM_LIVE_A)[army + (off) / 4])
 #define XY(off)    (((int16_t *)(uintptr_t)ADDR_AIM_LIVE_A)[army * 2 + (off) / 2])
 #define cursorX (*(const int32_t *)(uintptr_t)ADDR_CURSOR_X)
-    int32_t  cursorY = *(const int32_t *)(uintptr_t)ADDR_CURSOR_Y;
+#define cursorY (*(const int32_t *)(uintptr_t)ADDR_CURSOR_Y)
     int32_t  owner   = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
     uint32_t now     = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
     int32_t  army;
@@ -4449,6 +4449,7 @@ void __cdecl AimMarkerAge(void)
 #undef LIVE
 #undef XY
 #undef cursorX
+#undef cursorY
 }
 
 /* AimStart -- original 0x00412230, one caller, which is FireWeapon. The A half
@@ -11058,7 +11059,7 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
     uint8_t       *self = (uint8_t *)w;
     const uint8_t *comm = *(const uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
 #define slot (*(const int32_t *)(self + MPBTN_OFF_ROW))
-    const uint8_t *rec  = comm + slot * AM2_PLAYER_STRIDE;
+#define rec (comm + slot * AM2_PLAYER_STRIDE)
     RECT           vis;
     char           dots[64];
 
@@ -11117,6 +11118,7 @@ void __attribute__((thiscall)) AM2_Widget::MpNamePaint(RECT clip)
                     vis, *(const uint8_t *)(self + MPNAME_OFF_INK));
     UnlockSurface();
 #undef slot
+#undef rec
 }
 
 /* 0x00432C50 -- the INK a player row's name is drawn in, chosen by how the

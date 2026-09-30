@@ -10814,7 +10814,7 @@ void __cdecl Step3Input(void *obj, void *rec)
             *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
 
         if (unit != 0) {
-            int32_t sel = *(const int32_t *)(unit + UNIT_OFF_INVENTORY_SEL);
+#define sel (*(const int32_t *)(unit + UNIT_OFF_INVENTORY_SEL))
 
             /* `[unit + sel*4 + 0x550]` in the image, which is NOT a second
              * array: UNIT_OFF_INVENTORY is 0x54C, so the compiler folded the
@@ -11075,4 +11075,5 @@ void __cdecl Step3Input(void *obj, void *rec)
         }
     }
 #undef def
+#undef sel
 }
