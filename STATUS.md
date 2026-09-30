@@ -97,6 +97,14 @@ main result so far (details in `src/vc6/README.md`):
     extra row. The reconstruction had indexed the rows; it now reproduces
     the image. `where` is an AM2_Point by value. Lockstep unchanged (Boot
     Camp's one PlaceObj is on a one-row object).
+  - **PointerActionMode5 chains its formation slots** (2026-09-30): the image
+    passes the address of its own `at` argument as FormationSlotPoint's out
+    slot and re-reads `at` as the next unit's base, so each selected unit's
+    slot is computed from the previous unit's slot, not from the clicked
+    point. The reconstruction had used a fresh copy per unit; it now
+    reproduces the chain. Not driven (mode 5 is the move-without-engaging
+    order).
+
   - **Two menu behaviours the byte-match corrected** (2026-09-29):
     RefreshMapSelection plays its error sound only when there is a preview
     widget (it was unconditional), and HudChatSend treats a line as a cheat

@@ -17066,7 +17066,7 @@ void __cdecl PointerActionMode4(void *target, uint32_t at)
             PointActionA(o, slot);
         }
 
-        if (*(const int32_t *)o == AM2_OBJ_TYPE_TROOPER) {
+        if (ObjIsType2Inline(o)) {
             if (GetMenuRow() == AM2_MENU_ROW_8) {
                 *(uint32_t *)(o + OBJ_OFF_UID_56C) =
                     *(const uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID;
@@ -17137,9 +17137,9 @@ void __cdecl PointerActionMode5(void *target, uint32_t at)
         return;
 
     for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; ) {
+        uint32_t home = at;   /* this pass's point; `at` becomes the slot */
         uint8_t *o = (uint8_t *)LookupByUID(
             (*(const uint32_t *const *)(uintptr_t)ADDR_SELECTED_ITEMS)[i]);
-        uint32_t slot;
         int32_t  ot;
 
         if (!o) {
@@ -17157,21 +17157,22 @@ void __cdecl PointerActionMode5(void *target, uint32_t at)
         /* Set before the call, unlike the other two. */
         *(int32_t *)(o + OBJ_OFF_AI_MODE) = 1;
 
-        /* The original passes the address of its `at` argument slot; the
-         * original value stays in a register and is used below. */
-        slot = at;
-        FormationSlotPoint(i, at, o, &slot);
+        /* The original passes the address of its `at` argument slot and
+         * never restores it, so each unit's slot is computed from the one
+         * before it -- the chain is the original's, reproduced. The value
+         * from before the call stays in a register for the row-8 order. */
+        FormationSlotPoint(i, home, o, &at);
 
         /* Ordered PointActionA then ObjAttachTo -- the reverse of modes 4
          * and 6. */
-        PointActionA(o, slot);
+        PointActionA(o, at);
         ObjAttachTo(o, (void *)0);
 
-        if (*(const int32_t *)o == AM2_OBJ_TYPE_TROOPER) {
+        if (ObjIsType2Inline(o)) {
             if (GetMenuRow() == AM2_MENU_ROW_8) {
                 *(uint32_t *)(o + OBJ_OFF_UID_56C) =
                     *(const uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID;
-                PointActionA(o, at);
+                PointActionA(o, home);
             } else {
                 *(uint32_t *)(o + OBJ_OFF_UID_56C) = 0;
             }
