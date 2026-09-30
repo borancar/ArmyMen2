@@ -934,9 +934,9 @@ void __cdecl MakePlacedUnit(uint32_t where, int32_t type, int32_t slot,
  */
 void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points)
 {
-    uint8_t *o    = (uint8_t *)obj;
     int32_t  cost = 0;
-    int32_t  i;
+    uint8_t *o    = (uint8_t *)obj;
+    int32_t  i = 0;
 
     if (!ObjIsTypeIn238((const AM2_Object *)o)
         && !ObjIsItem((const AM2_Object *)o))
@@ -989,10 +989,11 @@ void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points)
     case AM2_OBJ_TYPE_ITEM: {
         int32_t army = AM2_THE_COMM->CommArmyOfSlot(
                                       slot);
-        int32_t found = -1;
         int32_t kind;
 
-        for (i = 0; i < AM2_UNIT_TYPE_COUNT; i++) {
+        /* `i` is still the zero it was declared with: the image counts from
+         * the register it has held 0 in since entry. */
+        for (; i < AM2_UNIT_TYPE_COUNT; i++) {
             const uint8_t *rec = kUnitType(i);
 
             if (*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER)
@@ -1002,22 +1003,20 @@ void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points)
                     *(const int32_t *)(
                         *(const uint8_t *const *)(o + OBJ_OFF_FIELD_94)
                         + AAIREC_OFF_KEY),
-                    *(const int32_t *)(rec + UNIT_TYPE_OFF_KIND), army)) {
-                found = i;
-                break;
-            }
+                    *(const int32_t *)(rec + UNIT_TYPE_OFF_KIND), army))
+                goto found;
         }
-        if (found < 0)
-            return;
+        return;
+found:
 
         /* Climb to the root of the chain -- see the note above. */
         while (*(const uint32_t *)(o + OBJ_OFF_CHAIN_PARENT_UID))
             o = (uint8_t *)LookupByUID(
                 *(const uint32_t *)(o + OBJ_OFF_CHAIN_PARENT_UID));
 
-        kind = *(const int32_t *)(kUnitType(found) + UNIT_TYPE_OFF_KIND);
+        kind = *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_KIND);
         if (kind < AM2_PILLBOX_KIND_FIRST || kind > AM2_PILLBOX_KIND_LAST) {
-            cost = *(const int32_t *)(kUnitType(found) + UNIT_TYPE_OFF_COST);
+            cost = *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_COST);
             break;
         }
 
