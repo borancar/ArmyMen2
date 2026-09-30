@@ -6255,46 +6255,59 @@ void __cdecl SealMapEdges(void)
  */
 void __cdecl UnrevealArea(int32_t army, uint32_t at)
 {
-    int32_t w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
-    int32_t h = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H;
-    uint32_t tile = (uint32_t)TileOfPoint(at) & 0xFFFFu;
-    int32_t x = (int32_t)(tile & (uint32_t)(w - 1));
-    int32_t y = (int32_t)(tile >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT);
-    int32_t x0, x1, y0, y1, slot;
+    /* The map's size is read from its globals at every use. */
+#define MAP_W (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W)
+#define MAP_H (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H)
+    uint32_t tile;
+    int32_t  x, y, x0, x1, y0, y1;
 
     if (army >= AM2_REVEAL_ARMIES)
         return;
 
-    x0 = Clamp(x - AM2_REVEAL_RADIUS, 0, w - 1);
-    x1 = Clamp(x + AM2_REVEAL_RADIUS, 0, w - 1);
-    y0 = Clamp(y - AM2_REVEAL_RADIUS, 0, h - 1);
-    y1 = Clamp(y + AM2_REVEAL_RADIUS, 0, h - 1);
+    tile = (uint32_t)TileOfPoint(at) & 0xFFFFu;
+    x    = (int32_t)(tile & (uint32_t)(MAP_W - 1));
+    y    = (int32_t)(tile >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT);
 
-    for (slot = 0; slot < AM2_REVEAL_ARMIES; slot++) {
-        uint8_t *grid;
-        int32_t  at_i;
-        int32_t  rows;
+    x0 = Clamp(x - AM2_REVEAL_RADIUS, 0, MAP_W - 1);
+    x1 = Clamp(x + AM2_REVEAL_RADIUS, 0, MAP_W - 1);
+    y0 = Clamp(y - AM2_REVEAL_RADIUS, 0, MAP_H - 1);
+    y1 = Clamp(y + AM2_REVEAL_RADIUS, 0, MAP_H - 1);
 
-        if (!ArmiesAllied(army, slot))
-            continue;
+    {
+        int32_t slot;
 
-        grid = ((uint8_t **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[slot];
-        at_i = h * y0 + x0;         /* height for the corner; see above */
+        for (slot = 0; slot < AM2_REVEAL_ARMIES; slot++) {
+            int32_t at_i;
+            int32_t rows;
 
-        if (y0 > y1)
-            continue;
+            if (!ArmiesAllied(army, slot))
+                continue;
 
-        for (rows = y1 - y0 + 1; rows; rows--) {
-            if (x0 <= x1) {
-                int32_t cols = x1 - x0 + 1;
+            at_i = MAP_H * y0 + x0;     /* height for the corner; see above */
 
-                for (; cols; cols--, at_i++)
-                    grid[(uint32_t)at_i & 0xFFFFu]--;
-            }
+            if (y0 > y1)
+                continue;
 
-            at_i += w - x1 + x0 - 1;   /* width for the stride; see above */
+            /* Both counts are at least one once the bounds are checked, so
+             * both loops test at the bottom; the grid is re-read per cell. */
+            rows = y1 - y0 + 1;
+            do {
+                if (x0 <= x1) {
+                    int32_t cols = x1 - x0 + 1;
+
+                    do {
+                        ((uint8_t **)(uintptr_t)ADDR_TILE_REVEAL_GRIDS)[slot]
+                            [(uint32_t)at_i & 0xFFFFu]--;
+                        at_i++;
+                    } while (--cols);
+                }
+
+                at_i += MAP_W - x1 + x0 - 1;   /* width for the stride */
+            } while (--rows);
         }
     }
+#undef MAP_H
+#undef MAP_W
 }
 
 /* One region's x and y, from the tile index it carries. The map's width is a
