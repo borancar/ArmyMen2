@@ -7528,9 +7528,9 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
                                     + COMM_SLOT_OFF_ID);
             if (id == 0 || id == -1)
                 continue;
-            if (!AllyFlag((int32_t)g_defaultOwner,
-                          AM2_THE_COMM->CommSlotOfId(
-                                       (uint32_t)id)))
+            if (!AM2_THE_COMM->AllyFlag((int32_t)g_defaultOwner,
+                                        AM2_THE_COMM->CommSlotOfId(
+                                                     (uint32_t)id)))
                 continue;
             SendChatTo(line, i);
         }
@@ -7540,7 +7540,7 @@ void __attribute__((thiscall)) AM2_Widget::HudChatSend()
 
     /* A line beginning `!` is a cheat -- outside a session only. */
     if (line[0] == '!' && strlen(line) > 1) {
-        strcpy(cheat, line + 1);
+        strcpy(cheat, (char *)(b + HUDLOG_OFF_TYPED + 1));
         if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION == 0)
             CheatLine(cheat);
     }
