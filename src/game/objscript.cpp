@@ -147,8 +147,19 @@ int32_t __cdecl ScriptObjFrame(AM2_ScriptCtx *ctx, int32_t *at)
     tok = &ctx->tokens[*at];
     frame->a = (int32_t)(uintptr_t)tok->value;
 
-    if (!ScriptExpect(ctx, at, AM2_TOKEN_INTEGER))
+    /* The second argument's end-of-script test is written out: its block is
+     * the one the comma skip below cross-jumps into, `xor eax, eax` late. */
+    if (++(*at) >= ctx->count) {
+        am2_log("Unexpected end of script.\n");
         return 0;
+    }
+    if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
+        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
+                ctx->tokens[*at].line,
+                ScriptTokenText(&ctx->tokens[*at], kScriptWord),
+                kKindName(AM2_TOKEN_INTEGER));
+        return 0;
+    }
     tok = &ctx->tokens[*at];
     frame->b = (int32_t)(uintptr_t)tok->value;
     (*at)++;
@@ -156,11 +167,13 @@ int32_t __cdecl ScriptObjFrame(AM2_ScriptCtx *ctx, int32_t *at)
     while (!ScriptIsStatementStart(ctx, at)) {
         /* `state` and `frame` both end this frame's action list. */
         AM2_ScriptTok *t = &ctx->tokens[*at];
-        if (t->kind == AM2_TOKEN_RESERVED) {
-            int32_t id = (int32_t)(uintptr_t)t->value;
-            if (id == AM2_TOK_STATE || id == AM2_TOK_FRAME)
-                break;
-        }
+        /* The kind is tested again for the second word -- the image's
+         * `cmp ecx, ecx` after the first compare. */
+        if ((t->kind == AM2_TOKEN_RESERVED
+             && (int32_t)(uintptr_t)t->value == AM2_TOK_STATE)
+            || (t->kind == AM2_TOKEN_RESERVED
+                && (int32_t)(uintptr_t)t->value == AM2_TOK_FRAME))
+            break;
 
         if (!ScriptAction(ctx, at, &act))
             return 0;
