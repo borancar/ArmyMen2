@@ -7471,27 +7471,26 @@ void __cdecl SetSoldierKind(void *obj, int32_t kind)
     }
 
     *(int32_t *)(o + OBJ_OFF_FIELD_578) = 0;
-    if (kind != 7)
-        return;
+    if (kind == 7) {
+        *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_8000;
 
-    *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_8000;
+        {
+            int32_t n = orig_rand() % AM2_KIND7_NAME_COUNT + 1;
 
-    {
-        int32_t n = orig_rand() % AM2_KIND7_NAME_COUNT + 1;
+            *(int32_t *)(o + OBJ_OFF_FIELD_5A8) = n;
+            *(int32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
+                *(const int32_t *)(uintptr_t)ADDR_ZERO_POINT;
 
-        *(int32_t *)(o + OBJ_OFF_FIELD_5A8) = n;
-        *(int32_t *)(o + OBJ_OFF_SCRIPT_STATE) =
-            *(const int32_t *)(uintptr_t)ADDR_ZERO_POINT;
+            if (n > 0)
+                SetFieldInAll(o + OBJ_OFF_SUBRECORD,
+                                      ((void *const *)(uintptr_t)
+                                           ADDR_KIND7_NAMES)[n]);
+        }
 
-        if (n > 0)
-            SetFieldInAll(o + OBJ_OFF_SUBRECORD,
-                                  ((void *const *)(uintptr_t)
-                                       ADDR_KIND7_NAMES)[n]);
+        *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)
+            ((double)*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH)
+             * *(const double *)(uintptr_t)AM2_CONST_1_5);
     }
-
-    *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)
-        ((double)*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH)
-         * *(const double *)(uintptr_t)AM2_CONST_1_5);
 }
 
 /* 0x00449660, sixteen callers. Set a unit's soldier kind from the code of the

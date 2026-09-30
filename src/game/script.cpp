@@ -1128,119 +1128,108 @@ int32_t __cdecl ScriptLocation(AM2_ScriptCtx *ctx, int32_t *at,
     return ScriptResolveName(ctx, at, &act->target, quiet) != 0;
 }
 
-/* The five `<verb> <target> [by <target>]` events, which differ only in the
- * kind they record and the two messages they print. */
-static const struct {
-    int32_t     id;
-    int32_t     kind;
-    const char *missing;
-    const char *missing_by;
-} kScriptEvents[5] = {
-    { AM2_TOK_KILLED,   AM2_EVT_KILLED, "Line [%4d]:  Expected item name after KILLED\n",
-             "Line [%4d]:  Expected item name after KILLED ... BY\n" },
-    { AM2_TOK_HIT,      AM2_EVT_HIT, "Line [%4d]:  Expected item name after HIT\n",
-             "Line [%4d]:  Expected item name after HIT ... BY\n" },
-    { AM2_TOK_HEALED,   AM2_EVT_HEALED, "Line [%4d]:  Expected item name after HEALED\n",
-             "Line [%4d]:  Expected item name after HEALED ... BY\n" },
-    { AM2_TOK_PICKEDUP, AM2_EVT_PICKEDUP, "Line [%4d]:  Expected item name after PICKEDUP\n",
-             "Line [%4d]:  Expected item name after PICKEDUP ... BY\n" },
-    { AM2_TOK_DROPPED,  AM2_EVT_DROPPED, "Line [%4d]:  Expected item name after DROPPED\n",
-             "Line [%4d]:  Expected item name after DROPPED ... BY\n" },
-};
-
-/* `padon <name>` and `padoff <name>`, which differ only in the kind and the
- * two messages. */
-static inline int32_t ScriptPadEvent(AM2_ScriptCtx *ctx, int32_t *at, int32_t *val,
-                              const char *no_name, const char *not_a_pad)
-{
-    if (!ScriptStep(ctx, at))
-        return 0;
-
-    AM2_ScriptTok *tok = &ctx->tokens[*at];
-    if (tok->kind != AM2_TOKEN_STRING) {
-        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
-                ctx->tokens[*at].line,
-                ScriptTokenText(tok, kScriptWord),
-                kKindName(AM2_TOKEN_STRING));
-        return 0;
+/* ScriptParseEvent: one `case` per event keyword, each written out in full
+ * as the image has them -- the five `<verb> <target> [by <target>]` events and
+ * the two pad events differ only in the kind they record and the messages
+ * they print, which is what the macros carry. */
+#define PAD_EVENT(K, NO_NAME, NOT_A_PAD)                                    \
+    *kind = (K);                                                            \
+    if (!ScriptStep(ctx, at))                                               \
+        return 0;                                                           \
+    tok = &ctx->tokens[*at];                                                \
+    if (tok->kind != AM2_TOKEN_STRING)                                      \
+        goto wrong_type;                                                    \
+    idx = ScriptFindName((const char *)tok->value);                         \
+    if (idx < 0) {                                                          \
+        am2_log(NO_NAME, ctx->tokens[*at].line);                            \
+        return 0;                                                           \
+    }                                                                       \
+    /* Type 1 is what `pad` declares. */                                    \
+    if (kScriptNames[idx].type != AM2_NAME_TYPE_PAD) {                      \
+        am2_log(NOT_A_PAD, ctx->tokens[*at].line);                          \
+        return 0;                                                           \
     }
-
-    int32_t idx = ScriptFindName((const char *)tok->value);
-    if (idx < 0) {
-        am2_log(no_name, ctx->tokens[*at].line);
-        return 0;
-    }
-    /* Type 1 is what `pad` declares. */
-    if (kScriptNames[idx].type != AM2_NAME_TYPE_PAD) {
-        am2_log(not_a_pad, ctx->tokens[*at].line);
-        return 0;
-    }
-
-    *val = kScriptNames[idx].value;
-    (*at)++;
-    return 1;
-}
+/* `by <target>` is optional; without it *val2 keeps the zero written on
+ * entry. */
+#define HIT_EVENT(K, MISSING, MISSING_BY)                                   \
+    *kind = (K);                                                            \
+    if (!ScriptStep(ctx, at))                                               \
+        return 0;                                                           \
+    if (!ScriptHitTarget(ctx, at, val)) {                                   \
+        am2_log(MISSING, ctx->tokens[*at].line);                            \
+        return 0;                                                           \
+    }                                                                       \
+    tok = &ctx->tokens[*at];                                                \
+    if (tok->kind != AM2_TOKEN_RESERVED                                     \
+        || (int32_t)(uintptr_t)tok->value != AM2_TOK_BY)                    \
+        return 1;                                                           \
+    if (!ScriptStep(ctx, at))                                               \
+        return 0;                                                           \
+    if (!ScriptHitTarget(ctx, at, val2)) {                                  \
+        am2_log(MISSING_BY, ctx->tokens[*at].line);                         \
+        return 0;                                                           \
+    }                                                                       \
+    return 1
 
 int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
                                  int32_t *kind, int32_t *val, int32_t *val2)
 {
+    AM2_ScriptTok *tok;
+    int32_t        idx;
+
     *val2 = 0;
 
-    AM2_ScriptTok *tok = &ctx->tokens[*at];
-
+    tok = &ctx->tokens[*at];
     if (tok->kind == AM2_TOKEN_RESERVED) {
-        int32_t id = (int32_t)(uintptr_t)tok->value;
-
-        if (id == AM2_TOK_PADON) {                                 /* padon */
-            *kind = AM2_EVT_PADON;
-            return ScriptPadEvent(ctx, at, val,
-                                  "Line [%4d]:  Name required after PADON\n",
-                                  "Line [%4d]:  PADON name was not a pad\n");
-        }
-        if (id == AM2_TOK_PADOFF) {                                 /* padoff */
-            *kind = AM2_EVT_PADOFF;
-            return ScriptPadEvent(ctx, at, val,
-                                  "Line [%4d]:  Name required after PADOFF\n",
-                                  "Line [%4d]:  PADOFF name was not a pad\n");
-        }
-
-        for (uint32_t i = 0; i < 5; i++) {
-            if (kScriptEvents[i].id != id)
-                continue;
-
-            *kind = kScriptEvents[i].kind;
-            if (!ScriptStep(ctx, at))
-                return 0;
-
-            if (!ScriptHitTarget(ctx, at, val)) {
-                am2_log(kScriptEvents[i].missing, ctx->tokens[*at].line);
-                return 0;
-            }
-
-            /* `by <target>` is optional; without it *val2 keeps the zero
-             * written on entry. */
-            tok = &ctx->tokens[*at];
-            if (tok->kind != AM2_TOKEN_RESERVED ||
-                (int32_t)(uintptr_t)tok->value != AM2_TOK_BY)
-                return 1;
-
-            if (!ScriptStep(ctx, at))
-                return 0;
-            if (!ScriptHitTarget(ctx, at, val2)) {
-                am2_log(kScriptEvents[i].missing_by, ctx->tokens[*at].line);
-                return 0;
-            }
+        switch ((int32_t)(uintptr_t)tok->value) {
+        case AM2_TOK_PADON:
+            PAD_EVENT(AM2_EVT_PADON,
+                      "Line [%4d]:  Name required after PADON\n",
+                      "Line [%4d]:  PADON name was not a pad\n");
+        pad_found:
+            /* The two pad events share this tail. */
+            *val = kScriptNames[idx].value;
+            (*at)++;
             return 1;
+        case AM2_TOK_PADOFF:
+            PAD_EVENT(AM2_EVT_PADOFF,
+                      "Line [%4d]:  Name required after PADOFF\n",
+                      "Line [%4d]:  PADOFF name was not a pad\n");
+            goto pad_found;
+        case AM2_TOK_KILLED:
+            HIT_EVENT(AM2_EVT_KILLED,
+                      "Line [%4d]:  Expected item name after KILLED\n",
+                      "Line [%4d]:  Expected item name after KILLED ... BY\n");
+        case AM2_TOK_HIT:
+            HIT_EVENT(AM2_EVT_HIT,
+                      "Line [%4d]:  Expected item name after HIT\n",
+                      "Line [%4d]:  Expected item name after HIT ... BY\n");
+        case AM2_TOK_HEALED:
+            HIT_EVENT(AM2_EVT_HEALED,
+                      "Line [%4d]:  Expected item name after HEALED\n",
+                      "Line [%4d]:  Expected item name after HEALED ... BY\n");
+        case AM2_TOK_PICKEDUP:
+            HIT_EVENT(AM2_EVT_PICKEDUP,
+                      "Line [%4d]:  Expected item name after PICKEDUP\n",
+                      "Line [%4d]:  Expected item name after PICKEDUP ... BY\n");
+        case AM2_TOK_DROPPED:
+            HIT_EVENT(AM2_EVT_DROPPED,
+                      "Line [%4d]:  Expected item name after DROPPED\n",
+                      "Line [%4d]:  Expected item name after DROPPED ... BY\n");
+        default:
+            am2_log("Line [%4d]:  Unexpected reserved word in if statement.\n",
+                    tok->line);
+            return 0;
         }
-
-        am2_log("Line [%4d]:  Unexpected reserved word in if statement.\n",
-                ctx->tokens[*at].line);
-        return 0;
     }
 
-    /* A bare name: the event is that object, whatever happens to it. */
+    /* A bare name: the event is that object, whatever happens to it. The
+     * token is taken afresh from the cursor. */
     *kind = AM2_EVT_CONTROL;
+    tok = &ctx->tokens[*at];
     if (tok->kind != AM2_TOKEN_STRING) {
+
+wrong_type:
         am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
                 ctx->tokens[*at].line,
                 ScriptTokenText(tok, kScriptWord),
@@ -1254,6 +1243,8 @@ int32_t __cdecl ScriptParseEvent(AM2_ScriptCtx *ctx, int32_t *at,
     (*at)++;
     return 1;
 }
+#undef PAD_EVENT
+#undef HIT_EVENT
 
 int32_t __cdecl ScriptParseValue(AM2_ScriptCtx *ctx, int32_t *at,
                                  int32_t *kind, int32_t *a, int32_t *b)
