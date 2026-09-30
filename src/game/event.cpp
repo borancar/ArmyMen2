@@ -445,25 +445,24 @@ void __cdecl SaveScriptCond(am2_FILE *fp, const AM2_ScriptCond *cond)
     orig_fwrite(cond, 0x30, 1, fp);
 
     for (i = 0; i < cond->nevents; i++)
-        orig_fwrite((const uint8_t *)cond->events + i * 0x10, 0x10, 1, fp);
+        orig_fwrite(&cond->events[i], 0x10, 1, fp);
 
     for (i = 0; i < cond->nactions; i++) {
-        const uint8_t *act = (const uint8_t *)cond->actions + i * 0x48;
-        const char    *text = *(char *const *)(act + 0x30);
-        uint8_t        copy[0x48];
-        int32_t        len = text ? (int32_t)strlen(text) : 0;
+        /* A copy of the action, whose text slot carries the length instead
+         * of the pointer. */
+        AM2_ScriptAction copy = cond->actions[i];
 
-        memcpy(copy, act, sizeof copy);
-        /* The pointer slot carries the length instead. */
-        *(int32_t *)(copy + 0x30) = len;
-
-        orig_fwrite(copy, 0x48, 1, fp);
-        if (len > 0)
-            orig_fwrite(text, (size_t)len, 1, fp);
+        *(int32_t *)&copy.text = cond->actions[i].text
+                                     ? (int32_t)strlen(cond->actions[i].text)
+                                     : 0;
+        orig_fwrite(&copy, 0x48, 1, fp);
+        if (*(const int32_t *)&copy.text > 0)
+            orig_fwrite(cond->actions[i].text,
+                        (size_t)*(const int32_t *)&copy.text, 1, fp);
     }
 
     for (i = 0; i < cond->ntests; i++)
-        orig_fwrite((const uint8_t *)cond->tests + i * 0x1C, 0x1C, 1, fp);
+        orig_fwrite(&cond->tests[i], 0x1C, 1, fp);
 }
 
 #define orig_fread  (*(am2_fread_fn)ADDR_FREAD)
@@ -471,7 +470,7 @@ void __cdecl SaveScriptCond(am2_FILE *fp, const AM2_ScriptCond *cond)
 
 #define kScriptContext (*(AM2_ScriptCtx *)((void *)(uintptr_t)(ADDR_SCRIPT_CONTEXT)))
 
-void __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond)
+int32_t __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond)
 {
     char    buf[0x800];
     int32_t i;
@@ -484,32 +483,34 @@ void __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond)
     if (cond->nevents > 0)
         cond->events = (AM2_ScriptEvent *)orig_malloc((size_t)cond->nevents * 0x10);
     for (i = 0; i < cond->nevents; i++)
-        orig_fread((uint8_t *)cond->events + i * 0x10, 0x10, 1, fp);
+        orig_fread(&cond->events[i], 0x10, 1, fp);
 
     if (cond->nactions > 0)
         cond->actions = (AM2_ScriptAction *)orig_malloc((size_t)cond->nactions * 0x48);
     for (i = 0; i < cond->nactions; i++) {
-        uint8_t *act = (uint8_t *)cond->actions + i * 0x48;
-        int32_t  len;
+        int32_t len;
 
-        orig_fread(act, 0x48, 1, fp);
-        len = *(const int32_t *)(act + 0x30);
+        orig_fread(&cond->actions[i], 0x48, 1, fp);
+        /* The text slot holds the length on disk. */
+        len = (int32_t)(uintptr_t)cond->actions[i].text;
         if (len > 0) {
-            int32_t at = kScriptContext.count;
+            int32_t at;
 
             orig_fread(buf, (size_t)len, 1, fp);
             buf[len] = '\0';
             /* Kind 5 is the one that owns a malloc'd copy, so the token list
              * becomes the string's owner. `at` is read before the append. */
+            at = kScriptContext.count;
             ScriptAddToken(&kScriptContext, AM2_TOKEN_STRING, buf, 0);
-            *(char **)(act + 0x30) = (char *)kScriptContext.tokens[at].value;
+            cond->actions[i].text = (char *)kScriptContext.tokens[at].value;
         }
     }
 
     if (cond->ntests > 0)
         cond->tests = (AM2_ScriptTest *)orig_malloc((size_t)cond->ntests * 0x1C);
     for (i = 0; i < cond->ntests; i++)
-        orig_fread((uint8_t *)cond->tests + i * 0x1C, 0x1C, 1, fp);
+        orig_fread(&cond->tests[i], 0x1C, 1, fp);
+    return 1;
 }
 
 #define kPads ((AM2_Pad *)((void *)(uintptr_t)(ADDR_PADS)))
@@ -517,6 +518,7 @@ void __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond)
 int32_t __cdecl LoadEventSection(am2_FILE *fp)
 {
     int32_t tag, unused, key, kind, idx;
+    AM2_Pad *pad;
 
     if (!CheckSaveTag(fp, AM2_SAVETAG_EVENT,
                       "C:\\ArmyMen2\\source\\event.cpp", 0xCCA))
@@ -539,12 +541,14 @@ int32_t __cdecl LoadEventSection(am2_FILE *fp)
          * Not fixed. */
         if (kind == (int32_t)AM2_EVTSAVE_PAD_A) {
             orig_fread(&idx, 4, 1, fp);
-            *(int32_t *)kPads[idx].rest = key;        /* +0x28 */
-            EventRegister(0, key, 0, (const void *)EvtPadOn, &kPads[idx], 0);
+            pad = &kPads[idx];
+            *(int32_t *)pad->rest = key;              /* +0x28 */
+            EventRegister(0, key, 0, (const void *)EvtPadOn, pad, 0);
         } else if (kind == (int32_t)AM2_EVTSAVE_PAD_B) {
             orig_fread(&idx, 4, 1, fp);
-            *(int32_t *)kPads[idx].rest = key;        /* +0x28 */
-            EventRegister(0, key, 0, (const void *)EvtPadOff, &kPads[idx], 0);
+            pad = &kPads[idx];
+            *(int32_t *)pad->rest = key;              /* +0x28 */
+            EventRegister(0, key, 0, (const void *)EvtPadOff, pad, 0);
         } else if (kind == (int32_t)AM2_EVTSAVE_OWNED) {
             void *rec = orig_malloc(0x10);
 
@@ -1926,15 +1930,17 @@ void __cdecl EventTriggerImmediate(int32_t type, int32_t num1, uint32_t uid1,
                                    int32_t remote)
 {
     AM2_EventEntry *e;
-    AM2_EventEntry *prev = (AM2_EventEntry *)0;
-    int32_t         sent = 0;
+    AM2_EventEntry *prev;
+    int32_t         sent;
 
     if (kEventDebug)
         orig_log("EventTriggerImmediate: type %d, num: %d, uid: %x, "
                  "removeevent: %d, remote: %d\n",
                  type, num1, uid1, removeevent, remote);
 
+    sent = 0;
     e = kEventTable[type];
+    prev = (AM2_EventEntry *)0;
 
     while (e != (AM2_EventEntry *)0) {
         /* The entry's key pair is the CRITERIA, the event's numbers the
@@ -1962,7 +1968,7 @@ void __cdecl EventTriggerImmediate(int32_t type, int32_t num1, uint32_t uid1,
             continue;
         }
 
-        if (kEventTable[type] == e) {
+        if (e == kEventTable[type]) {
             kEventTable[type] = e->next;
             FreeEventEntry(e);
             e = kEventTable[type];
@@ -2323,7 +2329,7 @@ void __cdecl MissionEnded(int32_t lost)
     int32_t  h;
     uint8_t *rec;
     uint8_t *next;
-    int32_t  movie = 0;
+    int32_t  movie;
 
     *(int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS = 0;
 
@@ -2334,61 +2340,14 @@ void __cdecl MissionEnded(int32_t lost)
                     *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX + 1);
 
         h = orig_findfirst(path, found);
-        if (h != -1) {
-            orig_findclose(h);
-            *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 1;
-            strcpy((char *)(uintptr_t)ADDR_SCRIPT_RELOAD_PATH, path);
-            *(int32_t *)(uintptr_t)ADDR_ATTEMPT_COUNT = 0;
-            *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX += 1;
-            return;
-        }
+        if (h == -1) {
+            movie = 0;
 
-        rec = (uint8_t *)FindLevelRecord(
-                  *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID);
-        if (!rec) {
-            RequestState(1);
-            return;
-        }
+            rec = (uint8_t *)FindLevelRecord(
+                      *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID);
+            if (!rec)
+                goto no_next;
 
-        if (*(const char *)(rec + LEVEL_OFF_WIN_MOVIE)) {
-            strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY,
-                   (const char *)(rec + LEVEL_OFF_WIN_MOVIE));
-            movie = 1;
-        }
-        if (*(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX)
-            > *(const int32_t *)(uintptr_t)ADDR_MOVIE_COUNT) {
-            *(int32_t *)(uintptr_t)ADDR_MOVIE_COUNT =
-                *(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX);
-            SaveOptions();
-        }
-        if (!movie) {
-            RequestState(1);
-            return;
-        }
-
-        RequestState(3);
-        *(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG = 1;
-        return;
-    }
-
-    if (!lost && *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID > 0) {
-        SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
-        am2_sprintf(path, "%s%d.txt",
-                    (const char *)(uintptr_t)ADDR_MAP_NAME,
-                    *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX + 1);
-
-        h = orig_findfirst(path, found);
-        if (h != -1) {
-            orig_findclose(h);
-            *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 1;
-            strcpy((char *)(uintptr_t)ADDR_SCRIPT_RELOAD_PATH, path);
-            *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX += 1;
-            return;
-        }
-
-        rec = (uint8_t *)FindLevelRecord(
-                  *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID);
-        if (rec) {
             if (*(const char *)(rec + LEVEL_OFF_WIN_MOVIE)) {
                 strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY,
                        (const char *)(rec + LEVEL_OFF_WIN_MOVIE));
@@ -2400,27 +2359,75 @@ void __cdecl MissionEnded(int32_t lost)
                     *(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX);
                 SaveOptions();
             }
-        }
+            if (!movie)
+                goto no_next;
 
-        next = (uint8_t *)FindLevelRecord(
-                   *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID + 1);
-        SaveDefaultCof();
-
-        *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX   = 1;
-        *(int32_t *)(uintptr_t)ADDR_LEVEL_ID     += 1;
-        *(int32_t *)(uintptr_t)ADDR_ATTEMPT_COUNT = 0;
-        SelectLevel(next);
-
-        if (movie) {
             RequestState(3);
-            *(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG = (next != 0) + 1;
+            *(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG = 1;
             return;
         }
-        if (next) {
-            RequestState(2);
+
+        orig_findclose(h);
+        *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 1;
+        *(int32_t *)(uintptr_t)ADDR_ATTEMPT_COUNT = 0;
+        strcpy((char *)(uintptr_t)ADDR_SCRIPT_RELOAD_PATH, path);
+        *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX += 1;
+        return;
+    }
+
+    if (!lost && *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID > 0) {
+        SetGameDir((const char *)(uintptr_t)ADDR_MAP_FOLDER);
+        am2_sprintf(path, "%s%d.txt",
+                    (const char *)(uintptr_t)ADDR_MAP_NAME,
+                    *(const int32_t *)(uintptr_t)ADDR_LEVEL_INDEX + 1);
+
+        h = orig_findfirst(path, found);
+        if (h == -1) {
+            movie = 0;
+
+            rec = (uint8_t *)FindLevelRecord(
+                      *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID);
+            if (rec) {
+                if (*(const char *)(rec + LEVEL_OFF_WIN_MOVIE)) {
+                    strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY,
+                           (const char *)(rec + LEVEL_OFF_WIN_MOVIE));
+                    movie = 1;
+                }
+                if (*(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX)
+                    > *(const int32_t *)(uintptr_t)ADDR_MOVIE_COUNT) {
+                    *(int32_t *)(uintptr_t)ADDR_MOVIE_COUNT =
+                        *(const int32_t *)(rec + LEVEL_OFF_MOVIE_INDEX);
+                    SaveOptions();
+                }
+            }
+
+            next = (uint8_t *)FindLevelRecord(
+                       *(const int32_t *)(uintptr_t)ADDR_LEVEL_ID + 1);
+            SaveDefaultCof();
+
+            *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX   = 1;
+            *(int32_t *)(uintptr_t)ADDR_LEVEL_ID     += 1;
+            *(int32_t *)(uintptr_t)ADDR_ATTEMPT_COUNT = 0;
+            SelectLevel(next);
+
+            if (movie) {
+                RequestState(3);
+                *(int32_t *)(uintptr_t)ADDR_GAME_STATE_ARG = (next != 0) + 1;
+                return;
+            }
+            if (next) {
+                RequestState(2);
+                return;
+            }
+no_next:
+            RequestState(1);
             return;
         }
-        RequestState(1);
+
+        orig_findclose(h);
+        *(int32_t *)(uintptr_t)ADDR_SCRIPT_RELOAD = 1;
+        strcpy((char *)(uintptr_t)ADDR_SCRIPT_RELOAD_PATH, path);
+        *(int32_t *)(uintptr_t)ADDR_LEVEL_INDEX += 1;
         return;
     }
 
@@ -2431,8 +2438,11 @@ void __cdecl MissionEnded(int32_t lost)
 
     if (rec && strlen((const char *)(rec + LEVEL_OFF_LOSE_MOVIES))) {
         do {
-            uint32_t pick = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-                            % AM2_LOSE_MOVIE_COUNT;
+            /* The clock is read again on every pass -- the image does not
+             * hoist it, so an empty pick waits for the clock to move on. */
+            uint32_t pick =
+                *(volatile const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                % AM2_LOSE_MOVIE_COUNT;
 
             strcpy((char *)(uintptr_t)ADDR_MOVIE_TO_PLAY,
                    (const char *)(rec + LEVEL_OFF_LOSE_MOVIES

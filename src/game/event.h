@@ -476,8 +476,9 @@ void __cdecl SaveScriptCond(am2_FILE *fp, const AM2_ScriptCond *cond);
  * rather than with the action.
  *
  * The buffer is 0x800 bytes and the length is whatever the file says, so a
- * corrupt save overruns the stack. That is the original's behaviour. */
-void __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond);
+ * corrupt save overruns the stack. That is the original's behaviour. It
+ * answers 1, always, and the one caller ignores it. */
+int32_t __cdecl LoadScriptCond(am2_FILE *fp, AM2_ScriptCond *cond);
 
 /* 0x004225E0. Read the event.cpp section of a save file back, re-registering
  * every event it holds. Returns 0 if the section tag is wrong, 1 otherwise --
