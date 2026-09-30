@@ -1086,27 +1086,26 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
         orig_strlwr(name);
         strcpy(tried, name);
 
-        for (;;) {
+        {
             int32_t index = ScriptFindName(tried);
 
-            if (index < 0) {
-                *(int32_t *)(o + SCRIPT_REF_OFF_NAME_INDEX) =
-                    AddNameTableName(tried, AM2_NAME_TYPE_REF,
-                                     *(const int32_t *)
-                                         (o + SCRIPT_REF_OFF_VALUE));
-                break;
+            while (index >= 0) {
+                if (kScriptNames[index].value == 0) {
+                    *(int32_t *)(o + SCRIPT_REF_OFF_NAME_INDEX) = index;
+                    kScriptNames[index].value =
+                        *(const int32_t *)(o + SCRIPT_REF_OFF_VALUE);
+                    goto named;
+                }
+                am2_sprintf(tried, (const char *)((void *)(uintptr_t)(AM2_STR_UNIQUE_SUFFIX)),
+                            name, n++);
+                index = ScriptFindName(tried);
             }
-
-            if (kScriptNames[index].value == 0) {
-                *(int32_t *)(o + SCRIPT_REF_OFF_NAME_INDEX) = index;
-                kScriptNames[index].value =
-                    *(const int32_t *)(o + SCRIPT_REF_OFF_VALUE);
-                break;
-            }
-
-            am2_sprintf(tried, (const char *)((void *)(uintptr_t)(AM2_STR_UNIQUE_SUFFIX)),
-                        name, n++);
+            *(int32_t *)(o + SCRIPT_REF_OFF_NAME_INDEX) =
+                AddNameTableName(tried, AM2_NAME_TYPE_REF,
+                                 *(const int32_t *)(o + SCRIPT_REF_OFF_VALUE));
         }
+named:
+        ;
     }
 
     x = ((const AM2_Point *)&at)->x;
