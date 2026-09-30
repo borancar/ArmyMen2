@@ -252,7 +252,6 @@ extern "C" int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out);
 int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle)
 {
     uint8_t  *v = (uint8_t *)vehicle;
-    uint8_t  *seats;
     uint8_t  *occupant;
     uint32_t  at;
 
@@ -264,7 +263,8 @@ int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle)
                               *(const int8_t *)(v + OBJ_OFF_ARMY)))
         return 0;
 
-    seats = v + VEHICLE_OFF_PTR_LIST;
+    /* The seat list is addressed from the vehicle at each use. */
+#define seats (v + VEHICLE_OFF_PTR_LIST)
     if (*(const int32_t *)(seats + SUBREC_OFF_COUNT) < seat)
         return 0;
 
@@ -282,10 +282,11 @@ int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle)
             return 0;
         }
     } else {
-        at = (uint32_t)(uint16_t)(*(const int16_t *)(v + OBJ_OFF_POS)
-                                  - AM2_VEHICLE_EXIT_OFFSET)
-             | ((uint32_t)(uint16_t)(*(const int16_t *)(v + OBJ_OFF_POS + 2)
-                                     - AM2_VEHICLE_EXIT_OFFSET) << 16);
+        /* Two halfword stores into the point, as the image makes them. */
+        ((AM2_Point *)&at)->x = (int16_t)(*(const int16_t *)(v + OBJ_OFF_POS)
+                                          - AM2_VEHICLE_EXIT_OFFSET);
+        ((AM2_Point *)&at)->y = (int16_t)(*(const int16_t *)(v + OBJ_OFF_POS + 2)
+                                          - AM2_VEHICLE_EXIT_OFFSET);
     }
 
     *(int32_t *)(occupant + OBJ_OFF_RIDING) = 0;
@@ -307,6 +308,7 @@ int32_t __cdecl ExitOneFromVehicle(int32_t seat, void *vehicle)
     }
 
     return 1;
+#undef seats
 }
 
 void __cdecl ExitAllFromVehicle(void *vehicle, uint32_t damageOwner)

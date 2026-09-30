@@ -2935,12 +2935,14 @@ int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out)
 {
     const uint8_t   *v = (const uint8_t *)vehicle;
     const AM2_Point *pos = (const AM2_Point *)(v + OBJ_OFF_POS);
-    const int8_t    *weights = *(const int8_t **)(uintptr_t)ADDR_CELL_WEIGHTS;  /* signed, as the image's `jge` */
     AM2_Rect  box;
     AM2_Rect  clipped;
+    AM2_Point corner;
+    uint32_t  here;
     int32_t   x = pos->x;
-    int32_t   y = pos->y;
-    int32_t   startTile, endTile, tile, row, lastRow, best, shift;
+    int32_t   y = *(const int16_t *)(v + OBJ_OFF_POS + 2);
+    int32_t   startTile, endTile, tile, best, d, col, row;
+    uint32_t  first, last;
 
     box.left   = x - AM2_BOAT_EXIT_RANGE;
     box.top    = y - AM2_BOAT_EXIT_RANGE;
@@ -2951,49 +2953,52 @@ int32_t __cdecl BoatExitPoint(void *vehicle, uint32_t *out)
                   (const RECT *)(uintptr_t)ADDR_MAP_BOUNDS,
                   (const RECT *)&box);
 
-    /* Both corners are packed as two int16 -- the LOW words of the clipped
-     * rectangle -- and handed to TileOfPoint by value. */
-    startTile = TileOfPoint((uint32_t)(uint16_t)clipped.left
-                            | ((uint32_t)(uint16_t)clipped.top << 16));
-    endTile   = TileOfPoint((uint32_t)(uint16_t)clipped.right
-                            | ((uint32_t)(uint16_t)clipped.bottom << 16));
+    /* Each corner is packed from the LOW words of the clipped rectangle into
+     * one point and handed to TileOfPoint by value. */
+    corner.x = (int16_t)clipped.left;
+    corner.y = (int16_t)clipped.top;
+    startTile = TileOfPoint(*(const uint32_t *)&corner);
+    corner.x = (int16_t)clipped.right;
+    corner.y = (int16_t)clipped.bottom;
+    endTile = TileOfPoint(*(const uint32_t *)&corner);
 
-    startTile &= 0xFFFF;
-    endTile   &= 0xFFFF;
-    shift = *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT & 0xFFFF;
-
-    row     = startTile >> shift;
-    lastRow = endTile >> shift;
-    if (row > lastRow)
-        return 0;
-
-    best = AM2_BOAT_EXIT_MAX;
+    /* The rows and columns come from the low words; the row advance below
+     * uses the tiles as TileOfPoint returned them. The row shift and the map
+     * width are read again at every use. */
+#define SHIFT (*(const uint32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT & 0xFFFF)
+#define MAP_W (*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W)
+    best  = AM2_BOAT_EXIT_MAX;
+    first = (uint32_t)startTile & 0xFFFF;
+    last  = (uint32_t)endTile & 0xFFFF;
+    row   = (int32_t)(first >> SHIFT);
+    if (row <= (int32_t)(last >> SHIFT)) {
     tile = startTile;
-
     do {
-        int32_t mapW = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
-        int32_t col  = (mapW - 1) & startTile;
-
-        while (col <= ((mapW - 1) & endTile)) {
-            if (weights[tile & 0xFFFF] < AM2_BLOCK_CLEAR) {
-                uint32_t here = PointOfTile(tile);
-                int32_t  d = ApproxDist((const AM2_Point *)&here, pos);
-
+        for (col = (MAP_W - 1) & first; col <= (int32_t)((MAP_W - 1) & last);
+             col++) {
+            /* Signed, as the image's `jge`. */
+            if ((*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
+                    [tile & 0xFFFF] < AM2_BLOCK_CLEAR) {
+                here = PointOfTile(tile);
+                d = ApproxDist((const AM2_Point *)&here, pos);
                 if (d < best) {
-                    best = d;
                     *out = PointOfTile(tile);
+                    best = d;
                 }
             }
-            mapW = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
             tile++;
-            col++;
         }
 
-        tile += ((mapW - 1) & startTile) - ((mapW - 1) & endTile) + mapW - 1;
+        tile += ((MAP_W - 1) & startTile) - ((MAP_W - 1) & endTile) + MAP_W - 1;
         row++;
-    } while (row <= lastRow);
+    } while (row <= (int32_t)(last >> SHIFT));
+    if (best < AM2_BOAT_EXIT_MAX)
+        return 1;
+    }
+#undef SHIFT
+#undef MAP_W
 
-    return best < AM2_BOAT_EXIT_MAX;
+    return 0;
 }
 
 /* DirtyCollect -- original 0x0041DD90, three callers, all of them row code:
