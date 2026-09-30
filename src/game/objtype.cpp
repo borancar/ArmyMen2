@@ -1070,7 +1070,7 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
     uint8_t        *o = (uint8_t *)obj;
     const AM2_Rect *b = (const AM2_Rect *)box;
     char            tried[AM2_SCRIPT_UNIQUE_BUF];
-    int32_t         n = 1;
+    int32_t         n;
     int32_t         bytes = 0;
     int16_t         x, y;
 
@@ -1082,6 +1082,7 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
     if (!name || !*name) {
         *(int32_t *)(o + SCRIPT_REF_OFF_NAME_INDEX) = -1;
     } else {
+        n = 1;
         orig_strlwr(name);
         strcpy(tried, name);
 
@@ -1104,8 +1105,7 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
             }
 
             am2_sprintf(tried, (const char *)((void *)(uintptr_t)(AM2_STR_UNIQUE_SUFFIX)),
-                        name, n);
-            n++;
+                        name, n++);
         }
     }
 
@@ -1117,18 +1117,20 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
         (uint16_t)TileOfPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
 
     {
-        AM2_Rect *keep = (AM2_Rect *)(o + OBJ_OFF_BOX_OFFSETS);
-        AM2_Rect *hit  = (AM2_Rect *)(o + OBJ_OFF_HIT_RECT);
+#define keep ((AM2_Rect *)(o + OBJ_OFF_BOX_OFFSETS))
+#define hit  ((AM2_Rect *)(o + OBJ_OFF_HIT_RECT))
 
         keep->left   = b->left;
-        keep->top    = b->top;
         keep->right  = b->right;
+        keep->top    = b->top;
         keep->bottom = b->bottom;
 
         hit->left   = b->left + x;
         hit->top    = b->top + y;
         hit->right  = b->right + x;
         hit->bottom = b->bottom + y;
+#undef hit
+#undef keep
     }
 
     /* THE NO-CELLS EXIT IS AN EARLY RETURN, not a skipped block. `test al,1 /
@@ -1143,9 +1145,7 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
     {
         int32_t  w = b->right - b->left;
         int32_t  h = b->bottom - b->top;
-        uint8_t  count;
         int32_t  i;
-        uint8_t *cells;
 
         if (w > 2)
             w -= 2;
@@ -1160,14 +1160,13 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
             int8_t hc = (int8_t)((int8_t)h + 2);
             int8_t wc = (int8_t)((int8_t)w + 2);
 
-            count = (uint8_t)(int8_t)(hc * wc);
+            *(uint8_t *)(o + OBJ_OFF_CELL_COUNT) = (uint8_t)(int8_t)(hc * wc);
         }
-        *(uint8_t *)(o + OBJ_OFF_CELL_COUNT) = count;
 
-        bytes = (int32_t)count * 0x10;
+        bytes = (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT) * 0x10;
         *(void **)(o + OBJ_OFF_CELL_ENTRIES) = am2_malloc((size_t)bytes);
 
-        cells = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES);
+#define cells (*(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES))
         for (i = 0; i < *(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); i++) {
             *(void **)(cells + i * 0x10) = obj;
             *(int32_t *)(cells + i * 0x10 + 8) = 0;
@@ -1180,6 +1179,7 @@ int32_t __cdecl ObjInitCommon(void *obj, char *name, int32_t type,
         ItemLinkCells(obj, (void *)((void *)(uintptr_t)(ADDR_OBJ_MAP_DESC)));
 
     return bytes;
+#undef cells
 }
 
 
