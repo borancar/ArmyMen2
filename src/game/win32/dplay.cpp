@@ -343,25 +343,30 @@ typedef void (__cdecl *am2_comm_void_fn)(void);
  */
 int32_t __cdecl CommRegisterSelf(uint32_t id)
 {
-    uint8_t *table = (uint8_t *)(uintptr_t)ADDR_PLAYER_RECORDS;
-    uint8_t *end   = (uint8_t *)(uintptr_t)ADDR_DEFAULT_PLAYER_EVT;
+    /* The records are an array indexed by slot; the answer is a variable
+     * the failure path returns unchanged. */
+    struct PlayerRec { uint8_t bytes[AM2_PLAYER_RECORD_BYTES]; };
+#define NRECS AM2_PLAYER_RECORDS
+#define RECAT(i) (((struct PlayerRec *)(uintptr_t)ADDR_PLAYER_RECORDS)[i].bytes)
+    int32_t  result = 0;
     uint8_t *rec;
     int32_t  slot;
     uint32_t own, want;
 
-    for (rec = table; rec < end; rec += AM2_PLAYER_RECORD_BYTES)
-        if (*(const uint32_t *)rec == id)
+    for (slot = 0; slot < NRECS; slot++)
+        if (*(const uint32_t *)RECAT(slot) == id)
             return 1;
 
-    slot = 0;
-    for (rec = table; rec < end; rec += AM2_PLAYER_RECORD_BYTES, slot++)
-        if (*(const uint32_t *)rec == 0)
-            break;
+    for (slot = 0; slot < NRECS; slot++)
+        if (*(const uint32_t *)RECAT(slot) == 0)
+            goto found;
+    orig_log("Create FlowQ failed for ID %x \n", id);
+    return result;
 
-    if (rec >= end) {
-        orig_log("Create FlowQ failed for ID %x \n", id);
-        return 0;
-    }
+found:
+    rec = RECAT(slot);
+#undef NRECS
+#undef RECAT
 
     if (comm_u32(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT,
                  COMM_OFF_VERBOSE) != 0)
@@ -417,7 +422,8 @@ int32_t __cdecl CommRegisterSelf(uint32_t id)
         }
     }
 
-    return 1;
+    result = 1;
+    return result;
 }
 
 
