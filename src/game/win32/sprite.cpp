@@ -498,7 +498,6 @@ void __cdecl InitMenuScreen(void)
      * one 256 bytes, and neither is up while the other is. */
     uint8_t       *digits  = (uint8_t *)(uintptr_t)ADDR_FLAME_RECORD;
     uint8_t       *shades  = (uint8_t *)(uintptr_t)ADDR_PALETTE_GLYPHS;
-    const uint8_t *palette;
     AM2_Rect       r;
     int32_t        i, row, frame, rows;
 
@@ -509,8 +508,8 @@ void __cdecl InitMenuScreen(void)
     for (i = 10; i < 256; i++)
         digits[i] = (uint8_t)i;
 
-    palette = *(const uint8_t *const *)(uintptr_t)ADDR_ACTIVE_PALETTE;
-
+    /* The palette pointer is read afresh for every entry. */
+#define palette (*(const uint8_t *const *)(uintptr_t)ADDR_ACTIVE_PALETTE)
     for (i = 0; i < 256; i++) {
         int32_t hi = palette[i * 4];
 
@@ -522,6 +521,7 @@ void __cdecl InitMenuScreen(void)
         shades[i] = (uint8_t)(Clamp(10 - (hi + 4) / AM2_GLYPH_SHADE_STEP, 0, 9)
                               - AM2_GLYPH_DIGIT_BIAS);
     }
+#undef palette
 
     if (*(const int32_t *)(uintptr_t)ADDR_GAME_STATE == 2)
         rows = AM2_MENU_SPRITE_ROWS;
