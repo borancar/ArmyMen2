@@ -131,6 +131,12 @@ main result so far (details in `src/vc6/README.md`):
     arms (REPEAT/COUNT's number, onobjstate's name) return without freeing
     the record, as ScriptExpect does; the reconstruction freed it. Found by
     byte-matching; the shipped scripts never lead with `butnot`.
+  - **PlaceCursorPrepare's row 0x22 overlay was the wrong sprite**
+    (2026-09-30): the image packs `army + 0x3D5` in set 0x2B (0x00412C27
+    reads the fourth argument, `[esp+0x28]` under six pushes); the
+    reconstruction packed `row + 0x3D5`, a constant 0x3F7, and its header
+    explained why. It now agrees with UnitKindMatches' kind 5. Found by
+    byte-matching; placement screen, not driven.
 
 
   - **Two menu behaviours the byte-match corrected** (2026-09-29):
