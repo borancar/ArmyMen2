@@ -1166,9 +1166,9 @@ void __cdecl SendItemCreate(void *obj)
 void __cdecl RecvItemCreate(void *msg)
 {
     const uint8_t *m    = (const uint8_t *)msg;
+    const char    *name = NULL;
     uint32_t       uid  = UidOnWire(*(const uint32_t *)(m + MSG_CREATE_OFF_UID));
     int32_t        army = (int32_t)UidArmy(uid);
-    const char    *name = NULL;
     void          *made;
 
     orig_log("==> Receive Item Create [uid:%08x, item type: %d, subtype: %d\n", uid,
@@ -1180,24 +1180,6 @@ void __cdecl RecvItemCreate(void *msg)
         name = (const char *)(m + MSG_CREATE_OFF_NAME);
 
     switch (*(const int16_t *)(m + MSG_CREATE_OFF_TYPE)) {
-    case 1:
-        /* The const goes away because ObjInitCommon lower-cases the name in
-         * place two levels down -- so this really does rewrite the RECEIVED
-         * MESSAGE's own bytes, which is what the original does. */
-        made = CreateItem((char *)(uintptr_t)name, army,
-                          *(const int32_t *)(m + MSG_CREATE_OFF_D),
-                          *(const AM2_Point *)(m + MSG_CREATE_OFF_A),
-                          *(const int32_t *)(m + MSG_CREATE_OFF_C),
-                          1, uid);
-        if (*(const int32_t *)(m + MSG_CREATE_OFF_D)
-            != *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND)
-            return;
-        /* ARMY first, not the object -- see ItemPostCreate above. */
-        ItemPostCreate(army, *(const uint32_t *)(m + MSG_CREATE_OFF_A));
-        if (!AllyFlag(*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER, army))
-            ObjConceal(made, 1);
-        return;
-
     case 2:
         made = orig_create_trooper(
                    (char *)(uintptr_t)name,
@@ -1240,6 +1222,24 @@ void __cdecl RecvItemCreate(void *msg)
             *(const int32_t *)(m + MSG_CREATE_OFF_C),
             *(const int32_t *)(m + MSG_CREATE_OFF_D),
             1, uid);
+        return;
+
+    case 1:
+        /* The const goes away because ObjInitCommon lower-cases the name in
+         * place two levels down -- so this really does rewrite the RECEIVED
+         * MESSAGE's own bytes, which is what the original does. */
+        made = CreateItem((char *)(uintptr_t)name, army,
+                          *(const int32_t *)(m + MSG_CREATE_OFF_D),
+                          *(const AM2_Point *)(m + MSG_CREATE_OFF_A),
+                          *(const int32_t *)(m + MSG_CREATE_OFF_C),
+                          1, uid);
+        if (*(const int32_t *)(m + MSG_CREATE_OFF_D)
+            != *(const int32_t *)(uintptr_t)ADDR_CREATE_WATCHED_KIND)
+            return;
+        /* ARMY first, not the object -- see ItemPostCreate above. */
+        ItemPostCreate(army, *(const uint32_t *)(m + MSG_CREATE_OFF_A));
+        if (!(*(AM2_Comm *const *)(uintptr_t)ADDR_COMM_OBJECT)->AllyFlag(*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER, army))
+            ObjConceal(made, 1);
         return;
 
     default:
