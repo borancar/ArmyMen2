@@ -1161,9 +1161,11 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
     }
 
 
-    /* Branchless in the image (setle/dec/and): conditional expressions. */
+    /* The left edge is branchless in the image (setle/dec/and, a conditional
+     * expression); the top edge is a plain test. */
     cl = cl <= 0 ? 0 : cl;
-    ct = ct <= 0 ? 0 : ct;
+    if (ct <= 0)
+        ct = 0;
     if (cr >= cols - 1)
         cr = cols - 1;
     if (cb >= cols - 1)          /* COLS, not ROWS -- see above */

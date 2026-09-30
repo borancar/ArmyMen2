@@ -2147,7 +2147,10 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case 135:                                   /* addvar */
         if (!ActStep(ctx, at))
             return 0;
-        act->code = (id == AM2_TOK_SETVAR) ? 0x23 : 0x22;
+        if (id == AM2_TOK_SETVAR)
+            act->code = 0x23;
+        else
+            act->code = 0x22;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
         if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
