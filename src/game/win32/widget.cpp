@@ -7742,7 +7742,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
                            + AM2_HUD_MSG_GAP);
         }
 
-        if (*(const uint32_t *)(self + HUDLOG_OFF_REWIND_AT)) {
+        if (*(const uint32_t *)(self + HUDLOG_OFF_REWIND_AT) > 0) {
             if (Ticks() > *(const uint32_t *)(self + HUDLOG_OFF_REWIND_AT))
                 *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) = 0;
 

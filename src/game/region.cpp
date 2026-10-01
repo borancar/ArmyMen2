@@ -1349,7 +1349,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 
         /* Pop, and detach the new head's back link. */
         head = *(const uint16_t *)(c + PATHNODE_OFF_NEXT);
-        if ((uint16_t)head)
+        if ((uint16_t)head > 0)
             *(uint16_t *)(nodes + (head & 0xFFFF) * AM2_PATH_NODE_BYTES
                           + PATHNODE_OFF_PREV) = 0;
         *(uint8_t *)(c + PATHNODE_OFF_STATE) = 2;
@@ -10640,7 +10640,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
         /* Both tables generated from the image; see the header note on
          * states 2 and 3 sharing an arm and state 4 being silent. */
         if (kind == 2 || kind == 3 || kind == 4 || kind == 6 || kind == 7) {
-            if ((uint32_t)state <= 5) {
+            if (5 >= (uint32_t)state) {
                 static const int32_t kTracked[6] =
                     { 0x18, 0x17, 0x19, 0x19, -1, 0x1A };
                 snd = kTracked[state];
