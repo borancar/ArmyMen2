@@ -125,6 +125,12 @@ main result so far (details in `src/vc6/README.md`):
     image found two more: the clear pass resets HILITE (not the uid, which
     it leaves alone), and a vanished rider is removed from the vehicle's
     list AND stepped past, so the next rider is skipped for that frame.
+    MpPanelScreen's score limit is a spinner for the host OR a label for a
+    joiner (one child, its +0x50 cleared); ours gave the host both. The
+    per-row joiner-disable arm at 0x00430849 is still deliberately left
+    out (see the note in the constructor): the image clears names[i]'s
+    +0x50 and sets +0x4C on the spinner's three children (+0x58/+0x5C/
+    +0x60) -- not on names[i] -- if anyone revisits the measurement.
   - **Two wrong callees the call-target scan found** (2026-09-30): DestroyFlow
     simulated the departed player's acks against GetReSendMask (+0x18) where
     the image passes GetPlayerMask (+0x14); UpdateTrooperAction asked

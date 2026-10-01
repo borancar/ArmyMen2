@@ -9966,6 +9966,37 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         }
     }
 
+    /* THE SCORE LIMIT: a spinner when hosting, a read-only label of the same
+     * number otherwise -- ONE child either way, which is added and has its
+     * +0x50 cleared. This built the label for the host as well, so a host's
+     * panel had a child the original's does not. The label shows the
+     * panel's own text buffer, which it does not own. */
+    {
+        AM2_Widget *child;
+
+        if (*(const int32_t *)(*(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
+                               + COMM_OFF_IS_HOST))
+            child = new AM2_MpSpin(*RectSet(&r, 0x22B, 0x2F, 0x4A, 0x18),
+                                   *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT,
+                                   0x64, 0x2706, 0x64, w,
+                                   MpCommitScore,
+                                   *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
+                                   *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
+                                   *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
+                                   0);
+        else {
+            am2_sprintf((char *)(p + MP_PANEL_OFF_SCORE_TEXT),
+                        "%i",
+                        *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT);
+            child = new AM2_Label((const char *)(p + MP_PANEL_OFF_SCORE_TEXT),
+                                  *RectSet(&r, 0x22B, 0x35, 0x21, 0x0E), 2,
+                                  *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
+                                  *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
+        }
+        ::WidgetAddChild(w, child);
+        *(int32_t *)((uint8_t *)child + 0x50) = 0;
+    }
+
     /* THE MAP LIST, in the field that actually holds it. It has to come AFTER
      * the game box, because the game box is what writes ADDR_MP_SCRIPT_NAME
      * and this lookup is by that name -- run the other way round it searches
@@ -10045,41 +10076,6 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         }
     }
 
-    /* THE SCORE SPINNER is built ONLY when hosting -- a joiner has no such
-     * child, so the two roles give the panel different child counts. */
-    if (*(const int32_t *)(*(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
-                           + COMM_OFF_IS_HOST) != 0) {
-        AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x84);
-
-        if (child)
-            ::new (child) AM2_MpSpin(*RectSet(&r, 0x22B, 0x2F, 0x4A, 0x18),
-                            *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT,
-                            0x64, 0x2706, 0x64, w,
-                            MpCommitScore,
-                            *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
-                            *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
-                            *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
-                            0);
-        ::WidgetAddChild(w, child);
-    }
-
-    /* The score limit as TEXT, in the panel's own buffer, shown by a label
-     * that does not own it. */
-    am2_sprintf((char *)(p + MP_PANEL_OFF_SCORE_TEXT),
-                "%i",
-                *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT);
-    {
-        AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x64);
-
-        if (child)
-            ::LabelConstruct(child, (const char *)(p + MP_PANEL_OFF_SCORE_TEXT),
-                           0x22B, 0x35, 0x21, 0x0E, 2,
-                           *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
-                           *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
-        ::WidgetAddChild(w, child);
-        *(int32_t *)((uint8_t *)child + 0x50) = 0;
-    }
-
     /* THE MAP PREVIEW, with a fallback that also moves the data directory.
      * Neither move is undone; the panel leaves the directory where the
      * fallback put it, unlike LoadMap which restores its own. */
@@ -10109,29 +10105,24 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
      * starts the game and everyone else declares themselves ready, so the
      * two never coexist. */
     {
-        AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x78);
-        int32_t     host  = *(const int32_t *)(
-                                *(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
-                                + COMM_OFF_IS_HOST);
+        AM2_Widget *child;
 
-        if (child) {
-            if (host)
-                ::ButtonConstruct(child,
-                                "03_016_00_start.bmp",
-                                "03_016_01_start.bmp",
-                                "03_016_02_start.bmp", 1,
-                                *RectSet(&r, 0x21F, 0x11A, 0x51, 0x20),
-                                OnMpLaunch,
-                                0);
-            else
-                ::ButtonConstruct(child,
-                                "03_030_00_ready.bmp",
-                                "03_030_01_ready.bmp",
-                                "03_030_02_ready.bmp", 1,
-                                *RectSet(&r, 0x21F, 0x11A, 0x51, 0x20),
-                                (void (__cdecl *)(AM2_Widget *))MpReadyToLoad,
-                                0);
-        }
+        /* Two allocations, one per arm, as the image has them. */
+        if (*(const int32_t *)(*(const uint8_t **)(uintptr_t)ADDR_COMM_OBJECT
+                               + COMM_OFF_IS_HOST))
+            child = new AM2_Button("03_016_00_start.bmp",
+                                   "03_016_01_start.bmp",
+                                   "03_016_02_start.bmp", 1,
+                                   *RectSet(&r, 0x21F, 0x11A, 0x51, 0x20),
+                                   (void (__cdecl *)(AM2_Widget *))OnMpLaunch,
+                                   (void (__cdecl *)(AM2_Widget *))0);
+        else
+            child = new AM2_Button("03_030_00_ready.bmp",
+                                   "03_030_01_ready.bmp",
+                                   "03_030_02_ready.bmp", 1,
+                                   *RectSet(&r, 0x21F, 0x11A, 0x51, 0x20),
+                                   (void (__cdecl *)(AM2_Widget *))MpReadyToLoad,
+                                   (void (__cdecl *)(AM2_Widget *))0);
         ::WidgetAddChild(w, child);
     }
 
