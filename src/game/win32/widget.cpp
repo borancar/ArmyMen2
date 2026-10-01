@@ -15975,28 +15975,22 @@ void __attribute__((thiscall)) AM2_Widget::ListUpdate()
     /* The window held still, so repaint only what changed -- the band that
      * lost the highlight and the band that gained it. */
     if (*(const int32_t *)(self + LIST_OFF_SELECTED) != wasSel) {
-        int32_t now;
-
         if (wasSel >= 0)
             ListRepaintRow(w, wasSel);
 
-        now = *(const int32_t *)(self + LIST_OFF_SELECTED);
-        if (now < 0)
+        if (*(const int32_t *)(self + LIST_OFF_SELECTED) < 0)
             return;
         PlaySoundAt(AM2_SND_MENU_MOVE, 0, 0, 0, 0);
-        ListRepaintRow(w, now);
+        ListRepaintRow(w, *(const int32_t *)(self + LIST_OFF_SELECTED));
 
     } else if (*(const int32_t *)(self + LIST_OFF_CHOSEN) != wasChosen) {
-        int32_t now;
-
         if (wasChosen >= 0)
             ListRepaintRow(w, wasChosen);
 
-        now = *(const int32_t *)(self + LIST_OFF_CHOSEN);
-        if (now < 0)
+        if (*(const int32_t *)(self + LIST_OFF_CHOSEN) < 0)
             return;
         PlaySoundAt(AM2_SND_MENU_MOVE, 0, 0, 0, 0);
-        ListRepaintRow(w, now);
+        ListRepaintRow(w, *(const int32_t *)(self + LIST_OFF_CHOSEN));
     }
 #undef rows
 }
