@@ -4897,11 +4897,10 @@ void __cdecl HudPostUpdate(void)
     void    *leader;
     void    *obj;
     void    *weapon;
-    int32_t  ours   = 0;   /* the context object is ours to command */
-    int32_t  aiming = 0;   /* an aim overlay was prepared this frame */
+    int32_t  ours;         /* the context object is ours to command */
+    int32_t  aiming;       /* an aim overlay was prepared this frame */
     int32_t  repeat = 0;   /* the held weapon keeps acting while held */
     AM2_PointerPickFn   pick;
-    AM2_PointerActionFn act;
 
     if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER)
         return;
@@ -4985,6 +4984,7 @@ void __cdecl HudPostUpdate(void)
     }
 
     /* ---- the two key arms --------------------------------------------- */
+    aiming = 0;
     if (ActionKeyDown(AM2_ACTION_0A) || ActionKeyDown(AM2_ACTION_06)) {
         void *ctx = *(void *const *)(uintptr_t)ADDR_OBJ_CTX_OBJ_A;
 
@@ -5033,6 +5033,7 @@ void __cdecl HudPostUpdate(void)
         uint32_t ctx = *(const uint32_t *)(uintptr_t)ADDR_OBJ_CTX_VAL_A;
         uint32_t us  = *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID;
 
+        ours = 0;
         if (us && ctx == us)
             ours = 1;
         if (leader
@@ -5042,6 +5043,14 @@ void __cdecl HudPostUpdate(void)
     }
 
     /* ---- the fan-out --------------------------------------------------- */
+    /* The world point is built AGAIN here, the same two adds as at the top,
+     * straight into the same slot. */
+    ((int16_t *)&at)[0] =
+        (int16_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X
+                  + (int32_t)*(const uint32_t *)(uintptr_t)ADDR_CURSOR_POINT);
+    ((int16_t *)&at)[1] =
+        (int16_t)(*(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
+                  + *(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2));
     obj = ObjectsHitByPoint(&at, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
     for (; obj; obj = *(void *const *)((const uint8_t *)obj
                                        + OBJ_OFF_QUERY_NEXT)) {
@@ -5059,61 +5068,65 @@ void __cdecl HudPostUpdate(void)
             goto hit_generic;
     }
 
-    /* Nothing under the pointer. */
+    /* Nothing under the pointer: the same arms again, written out for
+     * themselves and handing the actions a null object. */
+#define SLOT1   (*(AM2_PointerActionFn *)(uintptr_t)ADDR_WEAPON_FN_SLOT1)
+#define ACTION  (*(AM2_PointerActionFn *)(uintptr_t)ADDR_POINTER_ACTION)
+#define CHANGED (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+#define BUTTON  (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
     if (ours && *(const int32_t *)(uintptr_t)ADDR_WEAPON_FN_SLOT3) {
-        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
-            goto click_ours;
-        goto held_ours;
+        if (CHANGED) {
+            if (BUTTON || !SLOT1)
+                goto claim;
+            SLOT1((void *)0, at);
+            goto tail;
+        }
+        if (!repeat)
+            goto tail;
+        if (!BUTTON)
+            goto idle;
+        if (SLOT1)
+            SLOT1((void *)0, at);
+        goto tail;
     }
-    if (*(void *const *)(uintptr_t)ADDR_POINTER_F14 && !aiming
-        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
-        goto click_generic;
+    if (*(void *const *)(uintptr_t)ADDR_POINTER_F14 && !aiming && CHANGED) {
+        if (BUTTON || !ACTION)
+            goto claim;
+        ACTION(obj, at);
+    }
     goto tail;
 
 hit_ours:
-    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
-        goto held_ours;
-click_ours:
-    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
-        goto claim;
-    act = *(AM2_PointerActionFn *)(uintptr_t)ADDR_WEAPON_FN_SLOT1;
-    if (!act)
-        goto claim;
-    act(obj, at);
-    goto tail;
-
-held_ours:
+    if (CHANGED) {
+        if (BUTTON || !SLOT1)
+            goto claim;
+        SLOT1(obj, at);
+        goto tail;
+    }
     /* The button did not change, so this is a hold. Only a weapon whose kind
      * record allows repeating gets to act again. */
     if (!repeat)
         goto tail;
-    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON) {
-        PointerIdleOverlay(ours);
-        return;
-    }
-    act = *(AM2_PointerActionFn *)(uintptr_t)ADDR_WEAPON_FN_SLOT1;
-    if (act)
-        act(obj, at);
+    if (!BUTTON)
+        goto idle;
+    if (SLOT1)
+        SLOT1(obj, at);
     goto tail;
 
 hit_generic:
-    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+    if (!CHANGED)
         goto tail;
-click_generic:
-    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
+    if (BUTTON || !ACTION)
         goto claim;
-    act = *(AM2_PointerActionFn *)(uintptr_t)ADDR_POINTER_ACTION;
-    if (!act)
-        goto claim;
-    act(obj, at);
+    ACTION(obj, at);
     goto tail;
 
 claim:
     *(int32_t *)(uintptr_t)ADDR_MOUSE_CLAIMED = 1;
 
 tail:
-    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
-        && !*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED) {
+    if (!BUTTON && !CHANGED) {
+idle:
         PointerIdleOverlay(ours);
         return;
     }
@@ -5124,6 +5137,10 @@ tail:
     if (GetMenuRow() == 1)
         return;
     PointerIdleOverlay(ours);
+#undef SLOT1
+#undef ACTION
+#undef CHANGED
+#undef BUTTON
 #undef ay
 }
 
