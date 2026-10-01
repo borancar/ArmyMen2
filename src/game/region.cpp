@@ -6337,32 +6337,23 @@ void __cdecl UnrevealArea(int32_t army, uint32_t at)
 #undef MAP_W
 }
 
-/* One region's x and y, from the tile index it carries. The map's width is a
- * power of two and ADDR_MAP_ROW_SHIFT is its log, so the original does this
- * with a shift and a mask rather than a divide -- four times in RegionFindPath,
- * which is why it is a helper here and inline there. */
-static inline void RegionTileXY(const uint8_t *r, int32_t *x, int32_t *y)
-{
-    uint32_t tile  = *(const uint16_t *)(r + REGION_OFF_TILE);
-    uint32_t shift = (uint32_t)*(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT
-                     & 0xFFFFu;
-
-    *y = (int32_t)(tile >> shift);
-    *x = (int32_t)(tile
-                   & (uint32_t)(*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W
-                                - 1));
-}
-
 /* The straight-line distance between two regions, in the units ApproxDistXY
  * answers -- the same call the search makes for both its step cost and its
- * heuristic. */
+ * heuristic. The map's width is a power of two and ADDR_MAP_ROW_SHIFT is its
+ * log, so x and y come out of the tile index by a mask and a shift, written
+ * as one expression the way the original computes it, inline, three times
+ * in RegionFindPath. */
 static inline int32_t RegionSpan(const uint8_t *a, const uint8_t *b)
 {
-    int32_t ax, ay, bx, by;
-
-    RegionTileXY(a, &ax, &ay);
-    RegionTileXY(b, &bx, &by);
-    return ApproxDistXY(bx - ax, by - ay);
+#define TILE(r) ((uint32_t)*(const uint16_t *)((r) + REGION_OFF_TILE))
+#define SHIFT   ((uint32_t)*(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT    \
+                 & 0xFFFFu)
+#define WMASK   ((uint32_t)(*(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W - 1))
+    return ApproxDistXY((int32_t)((TILE(b) & WMASK) - (TILE(a) & WMASK)),
+                        (int32_t)((TILE(b) >> SHIFT) - (TILE(a) >> SHIFT)));
+#undef TILE
+#undef SHIFT
+#undef WMASK
 }
 
 static inline uint8_t *RegionAt(int32_t id)
@@ -6454,201 +6445,183 @@ static inline uint8_t *RegionAt(int32_t id)
  * model and once against this file: the head-unlink defect above, and
  * ApproxDistXY, whose behaviour dist.cpp's prose had rounded the wrong way.
  */
-int32_t __cdecl RegionFindPath(uint16_t from, int32_t to, int16_t *path,
+int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
                                int32_t *len)
 {
-    uint8_t *goal;
-    uint8_t *start;
-    uint8_t *cur;
-    uint8_t *nb;
+/* The search's working pointers are GLOBALS and the original goes through
+ * them at every use -- every field store below is a reload of the global
+ * in the image. */
+#define GOAL  (*(uint8_t **)(uintptr_t)ADDR_REGION_GOAL)
+#define HEAD  (*(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD)
+#define CUR   (*(uint8_t **)(uintptr_t)ADDR_REGION_CURRENT)
+#define NB    (*(uint8_t **)(uintptr_t)ADDR_REGION_NEIGHBOUR)
+#define WALK  (*(uint8_t **)(uintptr_t)ADDR_REGION_WALK)
+#define PREV  (*(uint8_t **)(uintptr_t)ADDR_REGION_INSERT_PREV)
+#define GEN   (*(int32_t *)(uintptr_t)ADDR_REGION_GENERATION)
+#define I32(r, off) (*(int32_t *)((r) + (off)))
+#define PTR(r, off) (*(uint8_t **)((r) + (off)))
     int32_t  edges = 0;
     int32_t  i;
-    int32_t  off;
+    int32_t  g;
+    int32_t  h;
+    int16_t *slot;
 
-    if (!*(const int32_t *)(RegionAt(to) + REGION_OFF_ACTIVE))
+    if (!I32(RegionAt(to), REGION_OFF_ACTIVE))
         return 0;
-    if (!*(const int32_t *)(RegionAt(from) + REGION_OFF_ACTIVE))
+    if (!I32(RegionAt(from), REGION_OFF_ACTIVE))
         return 0;
-
-    goal  = RegionAt(to);
-    start = RegionAt(from);
 
     if (*(const int32_t *)(uintptr_t)ADDR_REGION_SEARCH_STATE == -1) {
-        *(uint8_t **)(uintptr_t)ADDR_REGION_GOAL      = goal;
-        *(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD = start;
-        *(int32_t *)(uintptr_t)ADDR_REGION_GENERATION += 1;
+        GOAL = RegionAt(to);
+        HEAD = RegionAt(from);
+        GEN += 1;
 
-        *(int32_t *)(start + REGION_OFF_G) = 0;
+        I32(HEAD, REGION_OFF_G) = 0;
         /* _ftol in the original; a C cast truncates toward zero the same
          * way and the value cannot be negative here. */
-        *(int32_t *)(start + REGION_OFF_H) = (int32_t)
-            ((double)RegionSpan(start, goal)
+        I32(HEAD, REGION_OFF_H) = (int32_t)
+            ((double)RegionSpan(HEAD, GOAL)
              * *(const double *)(uintptr_t)AM2_CONST_1_5);
-        *(int32_t *)(start + REGION_OFF_DEPTH)  = 0;
-        *(uint16_t *)(start + REGION_OFF_STAMP) =
-            (uint16_t)*(const int32_t *)(uintptr_t)ADDR_REGION_GENERATION;
-        *(uint8_t *)(start + REGION_OFF_STATE)  = AM2_REGION_STATE_OPEN;
-        *(void **)(start + REGION_OFF_PREV)     = (void *)0;
-        *(void **)(start + REGION_OFF_NEXT)     = (void *)0;
-        *(void **)(start + REGION_OFF_PARENT)   = (void *)0;
+        I32(HEAD, REGION_OFF_DEPTH) = 0;
+        *(uint16_t *)(HEAD + REGION_OFF_STAMP) = (uint16_t)GEN;
+        *(uint8_t *)(HEAD + REGION_OFF_STATE)  = AM2_REGION_STATE_OPEN;
+        PTR(HEAD, REGION_OFF_PREV)   = (uint8_t *)0;
+        PTR(HEAD, REGION_OFF_NEXT)   = (uint8_t *)0;
+        PTR(HEAD, REGION_OFF_PARENT) = (uint8_t *)0;
     } else {
         /* Dead -- see above. Written out because the original has it. */
-        *(void **)(uintptr_t)ADDR_REGION_OPEN_HEAD =
-            *(void *const *)(uintptr_t)ADDR_REGION_RESUME_NODE;
-        to = *(const int32_t *)(uintptr_t)ADDR_REGION_RESUME_GOALID;
+        HEAD = *(uint8_t *const *)(uintptr_t)ADDR_REGION_RESUME_NODE;
+        to   = *(const int32_t *)(uintptr_t)ADDR_REGION_RESUME_GOALID;
         *(int32_t *)(uintptr_t)ADDR_REGION_SEARCH_STATE = -1;
     }
 
     for (;;) {
-        uint8_t *next;
-
-        cur = *(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD;
-        if (!cur)
+        if (!HEAD)
             return 0;
 
-        *(uint8_t **)(uintptr_t)ADDR_REGION_CURRENT = cur;
-        next = *(uint8_t **)(cur + REGION_OFF_NEXT);
-        *(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD = next;
-        if (next)
-            *(void **)(next + REGION_OFF_PREV) = (void *)0;
+        CUR  = HEAD;
+        HEAD = PTR(HEAD, REGION_OFF_NEXT);
+        if (HEAD)
+            PTR(HEAD, REGION_OFF_PREV) = (uint8_t *)0;
 
-        *(uint8_t *)(cur + REGION_OFF_STATE) = AM2_REGION_STATE_CLOSED;
+        *(uint8_t *)(CUR + REGION_OFF_STATE) = AM2_REGION_STATE_CLOSED;
 
-        if (*(const int16_t *)(cur + REGION_OFF_ID) == (int16_t)to)
+        if (*(const int16_t *)(CUR + REGION_OFF_ID) == to)
             break;
 
-        off = 0;
-        for (i = 0; i < *(const uint8_t *)(cur + REGION_OFF_NLINKS);
-             i++, off += AM2_REGION_LINK_SIZE) {
-            const int16_t *links =
-                *(const int16_t *const *)(cur + REGION_OFF_LINKS);
-            int32_t g;
-            int32_t h;
-            uint8_t state;
-
+        /* The link count and table are read through the region's ID, not
+         * through CUR -- the same record, reached the long way. */
+        for (i = 0;
+             i < *(const uint8_t *)(RegionAt(*(const int16_t *)
+                                        (CUR + REGION_OFF_ID))
+                                    + REGION_OFF_NLINKS);
+             i++) {
             edges++;
 
-            nb = RegionAt(*(const int16_t *)((const uint8_t *)links + off));
-            if (!*(const int32_t *)(nb + REGION_OFF_ACTIVE))
+            if (!I32(RegionAt(*(const int16_t *)
+                         (PTR(RegionAt(*(const int16_t *)(CUR + REGION_OFF_ID)),
+                              REGION_OFF_LINKS) + i * AM2_REGION_LINK_SIZE)),
+                     REGION_OFF_ACTIVE))
                 continue;
 
-            *(uint8_t **)(uintptr_t)ADDR_REGION_NEIGHBOUR = nb;
+            NB = RegionAt(*(const int16_t *)
+                     (PTR(RegionAt(*(const int16_t *)(CUR + REGION_OFF_ID)),
+                          REGION_OFF_LINKS) + i * AM2_REGION_LINK_SIZE));
 
-            g = *(const int32_t *)(cur + REGION_OFF_G)
-                + RegionSpan(cur, nb) * AM2_REGION_STEP_WEIGHT;
-            h = (int32_t)((double)RegionSpan(nb, goal)
+            g = I32(CUR, REGION_OFF_G)
+                + RegionSpan(CUR, NB) * AM2_REGION_STEP_WEIGHT;
+            h = (int32_t)((double)RegionSpan(NB, GOAL)
                           * *(const double *)(uintptr_t)AM2_CONST_1_5);
 
-            if (*(const uint16_t *)(nb + REGION_OFF_STAMP)
-                != (uint16_t)*(const int32_t *)
-                       (uintptr_t)ADDR_REGION_GENERATION) {
-                *(uint16_t *)(nb + REGION_OFF_STAMP) =
-                    (uint16_t)*(const int32_t *)
-                        (uintptr_t)ADDR_REGION_GENERATION;
-                *(int32_t *)(nb + REGION_OFF_G)     = g;
-                *(int32_t *)(nb + REGION_OFF_H)     = h;
-                *(uint8_t **)(nb + REGION_OFF_PARENT) = cur;
-                *(int32_t *)(nb + REGION_OFF_DEPTH) =
-                    *(const int32_t *)(cur + REGION_OFF_DEPTH) + 1;
-                *(uint8_t *)(nb + REGION_OFF_STATE) = AM2_REGION_STATE_OPEN;
-            } else {
-                state = *(const uint8_t *)(nb + REGION_OFF_STATE);
-
-                if (state & AM2_REGION_STATE_OPEN) {
-                    uint8_t *p;
-                    uint8_t *n;
-
-                    if (g >= *(const int32_t *)(nb + REGION_OFF_G))
+            /* The stamp is widened, not GEN narrowed: past 0xFFFF searches
+             * no stamp matches and every node looks fresh. */
+            if (*(const uint16_t *)(NB + REGION_OFF_STAMP) == GEN) {
+                if (*(const uint8_t *)(NB + REGION_OFF_STATE)
+                    & AM2_REGION_STATE_OPEN) {
+                    if (g >= I32(NB, REGION_OFF_G))
                         continue;
 
                     /* h is NOT rewritten here -- see above. */
-                    *(uint8_t **)(nb + REGION_OFF_PARENT) = cur;
-                    *(int32_t *)(nb + REGION_OFF_G)       = g;
-                    *(int32_t *)(nb + REGION_OFF_DEPTH)   =
-                        *(const int32_t *)(cur + REGION_OFF_DEPTH) + 1;
+                    PTR(NB, REGION_OFF_PARENT) = CUR;
+                    I32(NB, REGION_OFF_G)      = g;
+                    I32(NB, REGION_OFF_DEPTH)  = I32(CUR, REGION_OFF_DEPTH) + 1;
 
-                    /* Unlink, so the insertion below can place it again. */
-                    p = *(uint8_t **)(nb + REGION_OFF_PREV);
-                    n = *(uint8_t **)(nb + REGION_OFF_NEXT);
-                    if (p)
-                        *(uint8_t **)(p + REGION_OFF_NEXT) = n;
+                    /* Unlink, so the insertion below can place it again -- and
+                     * at the head it drops the whole list (see above). */
+                    if (PTR(NB, REGION_OFF_PREV))
+                        PTR(PTR(NB, REGION_OFF_PREV), REGION_OFF_NEXT) =
+                            PTR(NB, REGION_OFF_NEXT);
                     else
-                        *(void **)(uintptr_t)ADDR_REGION_OPEN_HEAD =
-                            (void *)0;
-                    if (n)
-                        *(uint8_t **)(n + REGION_OFF_PREV) = p;
-                } else if (state & AM2_REGION_STATE_CLOSED) {
+                        HEAD = (uint8_t *)0;
+                    if (PTR(NB, REGION_OFF_NEXT))
+                        PTR(PTR(NB, REGION_OFF_NEXT), REGION_OFF_PREV) =
+                            PTR(NB, REGION_OFF_PREV);
+                } else if (*(const uint8_t *)(NB + REGION_OFF_STATE)
+                           & AM2_REGION_STATE_CLOSED) {
                     continue;
                 }
+            } else {
+                *(uint16_t *)(NB + REGION_OFF_STAMP) = (uint16_t)GEN;
+                I32(NB, REGION_OFF_G)        = g;
+                I32(NB, REGION_OFF_H)        = h;
+                PTR(NB, REGION_OFF_PARENT)   = CUR;
+                I32(NB, REGION_OFF_DEPTH)    = I32(CUR, REGION_OFF_DEPTH) + 1;
+                *(uint8_t *)(NB + REGION_OFF_STATE) = AM2_REGION_STATE_OPEN;
             }
 
-            /* Insert nb into the open list, sorted by g+h ascending. */
-            {
-                uint8_t *head =
-                    *(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD;
-                uint8_t *walk;
-                uint8_t *prev = (uint8_t *)0;
-                int32_t  f    = *(const int32_t *)(nb + REGION_OFF_G)
-                                + *(const int32_t *)(nb + REGION_OFF_H);
+            /* Insert NB into the open list, sorted by g+h ascending. */
+            if (!HEAD) {
+                HEAD = NB;
+                PTR(NB, REGION_OFF_NEXT)   = (uint8_t *)0;
+                PTR(HEAD, REGION_OFF_PREV) = (uint8_t *)0;
+                continue;
+            }
 
-                if (!head) {
-                    *(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD = nb;
-                    *(void **)(nb + REGION_OFF_NEXT) = (void *)0;
-                    *(void **)(nb + REGION_OFF_PREV) = (void *)0;
-                    continue;
-                }
+            for (WALK = HEAD, PREV = (uint8_t *)0; WALK;
+                 WALK = PTR(WALK, REGION_OFF_NEXT)) {
+                if (I32(WALK, REGION_OFF_H) + I32(WALK, REGION_OFF_G)
+                    >= I32(NB, REGION_OFF_H) + I32(NB, REGION_OFF_G))
+                    break;
+                PREV = WALK;
+            }
 
-                for (walk = head; walk;
-                     walk = *(uint8_t **)(walk + REGION_OFF_NEXT)) {
-                    *(uint8_t **)(uintptr_t)ADDR_REGION_WALK = walk;
-                    if (*(const int32_t *)(walk + REGION_OFF_H)
-                        + *(const int32_t *)(walk + REGION_OFF_G) >= f)
-                        break;
-                    prev = walk;
-                    *(uint8_t **)(uintptr_t)ADDR_REGION_INSERT_PREV = prev;
-                }
-
-                if (prev) {
-                    uint8_t *after = *(uint8_t **)(prev + REGION_OFF_NEXT);
-
-                    *(uint8_t **)(nb + REGION_OFF_NEXT) = after;
-                    if (after)
-                        *(uint8_t **)(after + REGION_OFF_PREV) = nb;
-                    *(uint8_t **)(prev + REGION_OFF_NEXT) = nb;
-                    *(uint8_t **)(nb + REGION_OFF_PREV)   = prev;
-                } else {
-                    /* At the head. The original writes the OLD head's prev
-                     * through ADDR_REGION_OPEN_HEAD before moving it, which is
-                     * the same store written the long way round. */
-                    *(uint8_t **)(nb + REGION_OFF_NEXT) = head;
-                    *(void **)(nb + REGION_OFF_PREV)    = (void *)0;
-                    *(uint8_t **)(head + REGION_OFF_PREV) = nb;
-                    *(uint8_t **)(uintptr_t)ADDR_REGION_OPEN_HEAD = nb;
-                }
+            if (PREV) {
+                PTR(NB, REGION_OFF_NEXT) = PTR(PREV, REGION_OFF_NEXT);
+                if (PTR(NB, REGION_OFF_NEXT))
+                    PTR(PTR(NB, REGION_OFF_NEXT), REGION_OFF_PREV) = NB;
+                PTR(PREV, REGION_OFF_NEXT) = NB;
+                PTR(NB, REGION_OFF_PREV)   = PREV;
+            } else {
+                PTR(NB, REGION_OFF_NEXT)   = HEAD;
+                PTR(NB, REGION_OFF_PREV)   = (uint8_t *)0;
+                PTR(HEAD, REGION_OFF_PREV) = NB;
+                HEAD = NB;
             }
         }
     }
 
-    /* Found: `cur` is the goal. */
-    *(uint8_t **)(uintptr_t)ADDR_REGION_WALK = cur;
-    if (*(const int32_t *)(cur + REGION_OFF_DEPTH) >= AM2_REGION_DEPTH_MAX)
+    /* Found: CUR is the goal. */
+    WALK = CUR;
+    if (I32(CUR, REGION_OFF_DEPTH) >= AM2_REGION_DEPTH_MAX)
         return 0;
 
-    *len = *(const int32_t *)(cur + REGION_OFF_DEPTH) + 1;
+    *len = I32(CUR, REGION_OFF_DEPTH) + 1;
 
-    {
-        uint8_t *walk = *(uint8_t **)(uintptr_t)ADDR_REGION_WALK;
-        int16_t *slot = path + *(const int32_t *)(cur + REGION_OFF_DEPTH);
-
-        while (walk) {
-            *slot-- = *(const int16_t *)(walk + REGION_OFF_ID);
-            walk = *(uint8_t **)(walk + REGION_OFF_PARENT);
-            *(uint8_t **)(uintptr_t)ADDR_REGION_WALK = walk;
-        }
-    }
+    for (slot = path + I32(CUR, REGION_OFF_DEPTH); WALK;
+         WALK = PTR(WALK, REGION_OFF_PARENT))
+        *slot-- = *(const int16_t *)(WALK + REGION_OFF_ID);
 
     (void)edges;
     return 1;
+#undef GOAL
+#undef HEAD
+#undef CUR
+#undef NB
+#undef WALK
+#undef PREV
+#undef GEN
+#undef I32
+#undef PTR
 }
 
 /* RegionSolvePair -- original 0x00438300, four callers. Solve the route from

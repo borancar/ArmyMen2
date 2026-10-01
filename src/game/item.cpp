@@ -5011,9 +5011,9 @@ typedef void (__cdecl *AM2_HitEffectFn)(const void *at, int32_t slot,
  * ObjCodeUnmapped's five zero entries. Two tables in two functions agreeing on
  * one set of five is better evidence than either alone.
  *
- * THREE THINGS RECUR AND ARE WRITTEN ONCE. `Braced` is the nine-pose set plus
- * soldier kind 7 -- tested identically in five arms, which is what makes it a
- * set rather than a chain of compares. `Aimed` is the (seen && ready) pick
+ * THREE THINGS RECUR. `Braced` is the nine-pose set plus soldier kind 7 --
+ * tested identically in five arms, each a chain of ten compares in the image,
+ * so it is a macro and not a table walk. `Aimed` is the (seen && ready) pick
  * between two poses. And the "not braced" arms all land on the same two poses
  * whatever the weapon, which is what says those two are "get into a stance"
  * rather than anything about the weapon.
@@ -5033,130 +5033,147 @@ typedef void (__cdecl *AM2_HitEffectFn)(const void *at, int32_t slot,
  * cases and every input is an argument or a plain field -- and that oracle is
  * not written yet.
  */
-static inline int32_t PoseIsBraced(const uint8_t *o)
-{
-    static const int32_t kBraced[] = {
-        0x19, 0x1C, 0x13, 0x1A, 0x1D, 0x14, 0x06, 0x1E, 0x15,
-    };
-    int32_t pose = *(const int32_t *)(o + OBJ_OFF_POSE);
-    int32_t i;
-
-    for (i = 0; i < (int32_t)(sizeof kBraced / sizeof kBraced[0]); i++)
-        if (pose == kBraced[i])
-            return 1;
-
-    return *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)
-           == AM2_SOLDIER_KIND_ACTION_A;
-}
-
 int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
                                int32_t ready)
 {
     const uint8_t *o   = (const uint8_t *)obj;
     uint8_t       *out = (uint8_t *)sight;
     int32_t        cls;
-    int32_t        kind;
-    int32_t        aimed;
 
-    if (o == (const uint8_t *)0)
-        return 0;
-    if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
-        return 0;
-    if (Type2Field5A4Set((const AM2_Object *)o))
-        return 0;
-    if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)
-        == AM2_SOLDIER_KIND_ACTION_B)
-        return 0;
+    /* FOUR REFUSALS, one test, and the `return 0` they share is the last
+     * thing in the function. */
+    if (o != (const uint8_t *)0
+        && !(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_DESTROYED)
+        && !Type2Field5A4Set((const AM2_Object *)o)
+        && *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)
+           != AM2_SOLDIER_KIND_ACTION_B) {
+        cls = ClassifyByCode74(o);
 
-    cls  = ClassifyByCode74(o);
-    kind = **(const int32_t *const *)((const uint8_t *)weapon
-                                      + OBJ_OFF_FIELD_C0);
-    aimed = *(const int32_t *)(out + SIGHTCOUT_OFF_SEEN) != 0 && ready != 0;
+    /* `Braced` is the nine-pose set plus soldier kind 7, written out as a chain
+     * of compares in every arm that asks it; `Aimed` is the (seen && ready)
+     * pick between two poses. */
+#define POSE  (*(const int32_t *)(o + OBJ_OFF_POSE))
+#define BRACED (POSE == 0x19 || POSE == 0x1C || POSE == 0x13 || POSE == 0x1A  \
+                    || POSE == 0x1D || POSE == 0x14 || POSE == 0x06             \
+                    || POSE == 0x1E || POSE == 0x15                             \
+                    || *(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND)             \
+                           == AM2_SOLDIER_KIND_ACTION_A)
+#define AIMED(a, b) (*(const int32_t *)(out + SIGHTCOUT_OFF_SEEN) && ready \
+                         ? (a) : (b))
+#define STATE (*(int32_t *)(out + SIGHTCOUT_OFF_STATE))
 
-    switch (kind) {
-    case 1:  case 7:  case 8:  case 9:  case 10:
-    case 29: case 30:                        /* HvMG, RIFLE, AUTO, VULC, SNIP */
-        if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > 0)
-            return 1;
-        if (cls == 2) {
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_CLASS2_ARMED;
-        } else if (cls == 1) {
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
-                PoseIsBraced(o)
-                ? (aimed ? AM2_POSE_GUN_KNEEL : AM2_POSE_KNEEL_ARMED_A)
-                : AM2_POSE_RAISE_KNEEL;
-        } else {
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
-                PoseIsBraced(o)
-                ? (aimed ? AM2_POSE_GUN_STAND : AM2_POSE_STAND_ARMED)
-                : AM2_POSE_RAISE_STAND;
+        switch (**(const int32_t *const *)((const uint8_t *)weapon
+                                           + OBJ_OFF_FIELD_C0)) {
+        case 3:                                                        /* FLAM */
+            if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > 0)
+                return 1;
+            switch (cls) {
+            case 1:
+                STATE = AM2_POSE_FLAME_KNEEL;
+                break;
+            case 2:
+                STATE = AM2_POSE_FLAME_CLASS2;
+                break;
+            }
+            /* class 0 writes nothing at all, which no other arm does. */
+            break;
+
+        case 2:                                                        /* GREN */
+            switch (cls) {
+            case 1:
+                if (BRACED)
+                    STATE = AIMED(AM2_POSE_GRENADE_KNEEL, AM2_POSE_KNEEL_ARMED_A);
+                else
+                    STATE = AM2_POSE_RAISE_KNEEL;
+                break;
+            case 2:
+                STATE = AM2_POSE_KNEEL;
+                break;
+            default:
+                if (BRACED)
+                    STATE = AIMED(AM2_POSE_GRENADE_STAND, AM2_POSE_STAND_ARMED);
+                else
+                    STATE = AM2_POSE_RAISE_STAND;
+                break;
+            }
+            break;
+
+        case 1:  case 7:  case 8:  case 9:  case 10:
+        case 29: case 30:                        /* HvMG, RIFLE, AUTO, VULC, SNIP */
+            if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > 0)
+                return 1;
+            switch (cls) {
+            case 1:
+                if (BRACED)
+                    STATE = AIMED(AM2_POSE_GUN_KNEEL, AM2_POSE_KNEEL_ARMED_A);
+                else
+                    STATE = AM2_POSE_RAISE_KNEEL;
+                break;
+            case 2:
+                STATE = AM2_POSE_CLASS2_ARMED;
+                break;
+            default:
+                if (BRACED)
+                    STATE = AIMED(AM2_POSE_GUN_STAND, AM2_POSE_STAND_ARMED);
+                else
+                    STATE = AM2_POSE_RAISE_STAND;
+                break;
+            }
+            break;
+
+        case 4:                                                        /* BAZ */
+            switch (cls) {
+            case 1:
+                if (BRACED)
+                    STATE = AIMED(AM2_POSE_GUN_KNEEL, AM2_POSE_KNEEL_ARMED_A);
+                else
+                    STATE = AM2_POSE_RAISE_KNEEL;
+                break;
+            case 2:
+                STATE = AM2_POSE_KNEEL;
+                break;
+            default:
+                if (BRACED)
+                    STATE = AIMED(AM2_POSE_GUN_STAND, AM2_POSE_STAND_ARMED);
+                else
+                    STATE = AM2_POSE_RAISE_STAND;
+                break;
+            }
+            break;
+
+        case 5: case 11: case 12:                       /* MORT, MINE, EXPL */
+            if (cls > 0 && cls <= 2)
+                STATE = AM2_POSE_KNEEL;
+            else
+                STATE = AM2_POSE_CARRY;
+            break;
+
+        case 24: case 25: case 26: case 39: case 40:  /* AIRS PARA RECO MAG AERO */
+            if (cls > 0 && cls <= 2)
+                STATE = AM2_POSE_KNEEL_ARMED_B;
+            else
+                STATE = AM2_POSE_CARRY;
+            break;
+
+        case 43:
+            STATE = AM2_POSE_GUN_STAND;
+            break;
+
+        case 6:  case 13: case 14: case 15: case 16: case 17: case 18:
+        case 19: case 20: case 21: case 22: case 23: case 27: case 28:
+        case 31: case 32: case 33: case 34: case 35: case 36: case 37:
+        case 38: case 41: case 42:
+        default:
+            /* Twenty-four kinds and everything out of range: no pose at all. */
+            break;
         }
-        return 1;
-
-    case 2:                                                        /* GREN */
-        if (cls == 2) {
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_KNEEL;
-        } else if (cls == 1) {
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
-                PoseIsBraced(o)
-                ? (aimed ? AM2_POSE_GRENADE_KNEEL : AM2_POSE_KNEEL_ARMED_A)
-                : AM2_POSE_RAISE_KNEEL;
-        } else {
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
-                PoseIsBraced(o)
-                ? (aimed ? AM2_POSE_GRENADE_STAND : AM2_POSE_STAND_ARMED)
-                : AM2_POSE_RAISE_STAND;
-        }
-        return 1;
-
-    case 3:                                                        /* FLAM */
-        if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > 0)
-            return 1;
-        if (cls == 1)
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_FLAME_KNEEL;
-        else if (cls == 2)
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_FLAME_CLASS2;
-        /* class 0 writes nothing at all, which no other arm does. */
-        return 1;
-
-    case 4:                                                        /* BAZ */
-        if (cls == 2) {
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_KNEEL;
-        } else if (cls == 1) {
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
-                PoseIsBraced(o)
-                ? (aimed ? AM2_POSE_GUN_KNEEL : AM2_POSE_KNEEL_ARMED_A)
-                : AM2_POSE_RAISE_KNEEL;
-        } else {
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
-                PoseIsBraced(o)
-                ? (aimed ? AM2_POSE_GUN_STAND : AM2_POSE_STAND_ARMED)
-                : AM2_POSE_RAISE_STAND;
-        }
-        return 1;
-
-    case 5: case 11: case 12:                       /* MORT, MINE, EXPL */
-        if (cls > 0 && cls <= 2)
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_KNEEL;
-        else
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_CARRY;
-        return 1;
-
-    case 24: case 25: case 26: case 39: case 40:  /* AIRS PARA RECO MAG AERO */
-        if (cls > 0 && cls <= 2)
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_KNEEL_ARMED_B;
-        else
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_CARRY;
-        return 1;
-
-    case 43:
-        *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_GUN_STAND;
-        return 1;
-
-    default:
-        /* Twenty-four kinds and everything out of range: no pose at all. */
         return 1;
     }
+    return 0;
+#undef POSE
+#undef BRACED
+#undef AIMED
+#undef STATE
 }
 
 /* DamageTrooper -- original 0x00447A40, 1040 bytes, one caller, which is

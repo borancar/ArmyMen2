@@ -323,7 +323,7 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx);
 int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                          int32_t unused);
 
-int32_t __cdecl RegionFindPath(uint16_t from, int32_t to, int16_t *path,
+int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
                                int32_t *len);
 
 /* 0x00439320, six callers. Take an object's footprint back off the map:
