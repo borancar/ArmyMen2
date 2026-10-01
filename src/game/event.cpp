@@ -3512,8 +3512,8 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * moves one object to another; failing that, the literal point the
          * script wrote is used.  The middle test is fireweapon's guard used
          * to SELECT rather than to refuse. */
-        uint32_t uid = ResolveUid(act->subject, (uint32_t)(uintptr_t)owner);
-
+        /* The subject is resolved afresh at each call, as the image does. */
+#define UID ResolveUid(act->subject, (uint32_t)(uintptr_t)owner)
         if (act->xvar > 0) {
             int32_t vx = 0, vy = 0;
             AM2_Point p;
@@ -3522,17 +3522,18 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
             GetVarValue(act->yvar, &vy);
             p.x = (int16_t)vx;
             p.y = (int16_t)vy;
-            EvtAtPointC(uid, *(const uint32_t *)&p, act->relative);
+            EvtAtPointC(UID, *(const uint32_t *)&p, act->relative);
             return;
         }
         if (act->relative == 0 && act->u.pos.x == 0) {
-            EvtAtObjPosC(uid,
+            EvtAtObjPosC(UID,
                          ResolveUid(act->target, (uint32_t)(uintptr_t)owner),
                          0);
             return;
         }
-        EvtAtPointC(uid, act->u.both, act->relative);
+        EvtAtPointC(UID, act->u.both, act->relative);
         return;
+#undef UID
     }
 
     case 0x1B:                                  /* suspendai */
@@ -3754,14 +3755,13 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * read fails rather than falling back to n0. */
         int32_t v;
 
-        if (act->xvar == 0) {
-            v = act->n0;
-        } else {
-            v = 0;
+        if (act->xvar != 0) {
             if (GetVarValue(act->xvar, &v) == 0)
                 return;
+            SetVarValue(act->subject, v);
+            return;
         }
-        SetVarValue(act->subject, v);
+        SetVarValue(act->subject, act->n0);
         return;
     }
 
@@ -3793,9 +3793,16 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         SetObjScriptState(act->target, act->subject, act->n0);
         return;
 
-    case 0x22:                                  /* addtovar */
-        AddToVar(act->subject, ActValueOrVar(act));
+    case 0x22: {                                /* addtovar */
+        /* Not ActValueOrVar: the value starts as n0 and the variable read
+         * writes over it, so a failed read leaves n0 rather than 0. */
+        int32_t v = act->n0;
+
+        if (act->xvar > 0)
+            GetVarValue(act->xvar, &v);
+        AddToVar(act->subject, v);
         return;
+    }
 
     case 0x24: {                                /* setobjbitmap */
         /* THE VARIABLE IS READ AND THROWN AWAY. Both branches call with
