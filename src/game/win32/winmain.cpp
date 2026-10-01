@@ -612,10 +612,11 @@ static inline void ParseCommandLine(char *cmdLine)
     g_mapName[0] = '\0';
     p = strstr(cmdLine, "-map:");
     if (p) {
-        int8_t  c = (int8_t)p[5];
+        int8_t  c;
         int32_t i = 0;
 
         p += 5;
+        c = (int8_t)*p;
         while (c > 0x20) {
             g_mapName[i++] = (char)c;
             c = (int8_t)p[1];
