@@ -1622,6 +1622,7 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
 {
     int32_t count;
     int32_t i;
+    int32_t overlaySize;
 
     if (orig_fread(&count, 4, 1, fp), count <= 0)
         return;
@@ -1669,7 +1670,6 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
         orig_fread(spr->image.rle16, (size_t)size, 1, fp);
 
         {
-            int32_t overlaySize;
 
             orig_fread(&overlaySize, 4, 1, fp);
             if (overlaySize > 0) {

@@ -1266,7 +1266,6 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
     const uint8_t *region = *(const uint8_t *const *)(uintptr_t)
                                 ADDR_REGION_OF_CELL;
 #define step ((const int32_t *)(uintptr_t)ADDR_TILE_STEP8)
-    AM2_PointRuleFn rule;
     uint32_t startTicks;
     int32_t  considered = 0;
     int32_t  fromTile, toTile, goal, goalTile;
@@ -1339,7 +1338,6 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 
     goalTile   = goal & 0xFFFF;
     goalRegion = region[goalTile];
-    rule       = *(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE;
 
     while ((uint16_t)head) {
         uint8_t *c;
@@ -1392,7 +1390,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 
             if (nb <= 0 || nb >= AM2_PATH_TILES)
                 continue;
-            if (rule(nb))
+            if ((*(AM2_PointRuleFn *)(uintptr_t)ADDR_POINT_RULE)(nb))
                 continue;
             nbRegion = region[nb];
             if (nbRegion != 0 && nbRegion != startRegion
@@ -1449,8 +1447,8 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                 /* Unlink so the improved node can be re-inserted in order.
                  * THE HEAD CASE LOSES THE LIST: the original writes 0 rather
                  * than the successor. Reproduced -- see the header. */
-                prev = *(const uint16_t *)(b + PATHNODE_OFF_PREV);
                 next = *(const uint16_t *)(b + PATHNODE_OFF_NEXT);
+                prev = *(const uint16_t *)(b + PATHNODE_OFF_PREV);
                 if (prev)
                     *(uint16_t *)(nodes + prev * AM2_PATH_NODE_BYTES
                                   + PATHNODE_OFF_NEXT) = (uint16_t)next;
@@ -10596,8 +10594,8 @@ void __cdecl Step3Drive(void *obj, void *rec)
                 } else if (*(const uint16_t *)(r + 0x18u) != 0) {
                     /* Firing at a POINT: same spread, no target object. */
                     *(uint32_t *)&spot.at = *(const uint32_t *)(r + 0x18u);
-                    fireTarget = 0;
                     spot.ground = *(const int16_t *)(r + 0x1Cu);
+                    fireTarget = 0;
                     heading = (uint8_t)(*(const uint8_t *)(o + 0x530u)
                                         + (orig_step3_rand() % 5) - 2);
                 } else {
@@ -10817,6 +10815,7 @@ void __cdecl Step3Input(void *obj, void *rec)
     uint8_t  *o = (uint8_t *)obj;
     uint8_t  *r = (uint8_t *)rec;
     uint8_t  *weapon;
+    uint8_t   bearing;
     uint32_t  cursorWorld = 0;  /* view origin + cursor, a packed point */
     uint32_t  gunPos;           /* the turret's point, or the hull's */
     int32_t   dist = 0;         /* arg1's slot, reused */
@@ -10882,7 +10881,6 @@ void __cdecl Step3Input(void *obj, void *rec)
     if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
             > *(const uint32_t *)(o + OBJ_OFF_FIELD_FC)) {
         int32_t range, allied, other;
-        uint8_t bearing;
 
         SightScan(o, &range, &bearing, &allied, &other, 0);
     }
