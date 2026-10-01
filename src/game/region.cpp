@@ -1138,22 +1138,27 @@ found:
  * them is two shifts and two masks. The original open-codes this five times
  * and a fifth reading of the same six instructions is five chances to differ.
  */
-static inline int32_t PathDistXY(int32_t fromTile, int32_t toTile)
+static inline int32_t PathDistXY(uint32_t fromTile, uint32_t toTile)
 {
-    const int32_t w     = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
-    const int32_t shift = *(const int32_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT
-                          & 0xFFFF;
-    const int32_t mask  = w - 1;
-
-    return ApproxDistXY((toTile & mask) - (fromTile & mask),
-                        (toTile >> shift) - (fromTile >> shift));
+    return ApproxDistXY((int32_t)((toTile
+                                   & (*(const uint32_t *)(uintptr_t)
+                                          ADDR_MAP_TILES_W - 1))
+                                  - (fromTile
+                                     & (*(const uint32_t *)(uintptr_t)
+                                            ADDR_MAP_TILES_W - 1))),
+                        (int32_t)((toTile
+                                   >> (*(const uint32_t *)(uintptr_t)
+                                           ADDR_MAP_ROW_SHIFT & 0xFFFF))
+                                  - (fromTile
+                                     >> (*(const uint32_t *)(uintptr_t)
+                                             ADDR_MAP_ROW_SHIFT & 0xFFFF))));
 }
 
 /* The heuristic both A* layers use: that distance scaled by 1.5 through the
  * x87 and truncated by _ftol, which REGION_OFF_H already records for the
  * region-level search. Weighted, so inadmissible, so fast and not optimal --
  * the original's choice. */
-static inline int32_t PathHeuristic(int32_t fromTile, int32_t toTile)
+static inline int32_t PathHeuristic(uint32_t fromTile, uint32_t toTile)
 {
     return (int32_t)((double)PathDistXY(fromTile, toTile) * 1.5);
 }
@@ -1254,23 +1259,21 @@ static inline void PathUnwind(int32_t end, uint16_t *out, int32_t *n)
  * restores have exactly one reference each in the image, which is that read.
  * See orig.h.
  *
- * A NOTE ON THE FRAME. The original keeps `head` in ARGUMENT 0's stack slot,
- * which it can because `from` has been copied into a register by then -- and it
- * uses the same slot as the x87 scratch both before the loop starts and after
- * it ends. Three lives for one dword. Nothing of that survives here, but it is
- * why the disassembly's esp displacements do not line up with the arguments. */
+ * A NOTE ON THE FRAME. The open list's head IS `from`: the original reuses
+ * the parameter, keeping it in edi and in ARGUMENT 0's stack slot, and the
+ * same slot doubles as the x87 scratch before the loop starts and after it
+ * ends. Written the same way here, which is what puts the frame at 0x30. */
 int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                          int32_t unused)
 {
     uint8_t *const nodes  = (uint8_t *)(uintptr_t)ADDR_PATH_NODES;
-    const uint8_t *region = *(const uint8_t *const *)(uintptr_t)
-                                ADDR_REGION_OF_CELL;
+#define region (*(const uint8_t *const *)(uintptr_t)ADDR_REGION_OF_CELL)
 #define step ((const int32_t *)(uintptr_t)ADDR_TILE_STEP8)
     uint32_t startTicks;
     int32_t  considered = 0;
     int32_t  fromTile, toTile, goal, goalTile;
     int32_t  startRegion, goalRegion;
-    int32_t  head, cur, curTile;
+    int32_t  cur, curTile;
     int32_t  i;
 
     (void)unused;
@@ -1327,67 +1330,50 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
         *(uint16_t *)(s + PATHNODE_OFF_NEXT)   = 0;
         *(uint16_t *)(s + PATHNODE_OFF_PARENT) = 0;
 
-        head = from;
         goal = to;
     } else {
         /* Dead: see the header. Nothing writes either global, and the gate
          * above cannot be anything but -1. */
         goal = *(const int32_t *)(uintptr_t)ADDR_PATH_RESUME_GOAL;
-        head = *(const int32_t *)(uintptr_t)ADDR_PATH_RESUME_HEAD;
+        from = (uint16_t)*(const int32_t *)(uintptr_t)ADDR_PATH_RESUME_HEAD;
         *(int32_t *)(uintptr_t)ADDR_PATH_RESUME = -1;
     }
 
     goalTile   = goal & 0xFFFF;
     goalRegion = region[goalTile];
 
-    while ((uint16_t)head) {
+    while ((uint16_t)from) {
         uint8_t *c;
 
-        cur     = head;
+        cur     = from;
         curTile = cur & 0xFFFF;
         c       = nodes + curTile * AM2_PATH_NODE_BYTES;
 
-        /* Pop, and detach the new head's back link. */
-        head = *(const uint16_t *)(c + PATHNODE_OFF_NEXT);
-        if ((uint16_t)head > 0)
-            *(uint16_t *)(nodes + (head & 0xFFFF) * AM2_PATH_NODE_BYTES
+        /* Pop, and detach the new head's back link. `from` IS the head. */
+        from = *(const uint16_t *)(c + PATHNODE_OFF_NEXT);
+        if ((uint16_t)from > 0)
+            *(uint16_t *)(nodes + (from & 0xFFFF) * AM2_PATH_NODE_BYTES
                           + PATHNODE_OFF_PREV) = 0;
         *(uint8_t *)(c + PATHNODE_OFF_STATE) = 2;
 
-        if (considered > *(const int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES) {
-            /* Out of budget. Keep what was found if it got closer than the
-             * start was -- `jbe`, so equal counts as progress. */
-            if (PathHeuristic(curTile, toTile)
-                <= PathHeuristic(fromTile, toTile)) {
-                PathUnwind(cur, out, n);
-                PathChargeFrame(startTicks, considered);
-                return 1;
-            }
-            PathChargeFrame(startTicks, considered);
-            return 0;
-        }
+        if (considered > *(const int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES)
+            goto budget;
 
-        if ((uint16_t)cur == (uint16_t)goal) {
-            PathUnwind(cur, out, n);
-            PathChargeFrame(startTicks, considered);
-            return 1;
-        }
-        /* The region shortcut, and it needs BOTH guards: a goal region of zero
-         * means nothing, and a start already in the goal's region would make
-         * every tile an arrival. */
-        if (goalRegion > 0 && startRegion != goalRegion
-            && region[curTile] == goalRegion) {
-            PathUnwind(cur, out, n);
-            PathChargeFrame(startTicks, considered);
-            return 1;
-        }
+        /* The goal, or the region shortcut, which needs BOTH guards: a goal
+         * region of zero means nothing, and a start already in the goal's
+         * region would make every tile an arrival. */
+        if ((uint16_t)cur == (uint16_t)goal
+            || (goalRegion > 0 && startRegion != goalRegion
+                && region[curTile] == goalRegion))
+            goto found;
 
         considered += AM2_TILE_STEP8_COUNT;
 
         for (i = 0; i < AM2_TILE_STEP8_COUNT; i++) {
             int32_t  nb = curTile + step[i];
             uint8_t *b;
-            int32_t  nbRegion, g, h, prev, next, walk, before, fNew;
+            int32_t  nbRegion, g, h, prev, next, fNew;
+            uint16_t walk, before;
 
             if (nb <= 0 || nb >= AM2_PATH_TILES)
                 continue;
@@ -1454,17 +1440,18 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                     *(uint16_t *)(nodes + prev * AM2_PATH_NODE_BYTES
                                   + PATHNODE_OFF_NEXT) = (uint16_t)next;
                 else
-                    head = 0;
+                    from = 0;
                 if (next)
                     *(uint16_t *)(nodes + next * AM2_PATH_NODE_BYTES
                                   + PATHNODE_OFF_PREV) = (uint16_t)prev;
             }
 
             /* Insert, sorted by g+h ascending. */
-            if (!(uint16_t)head) {
+            before = 0;
+            if (!from) {
                 *(uint16_t *)(b + PATHNODE_OFF_NEXT) = 0;
+                from = (uint16_t)nb;
                 *(uint16_t *)(b + PATHNODE_OFF_PREV) = 0;
-                head = nb;
                 continue;
             }
 
@@ -1474,47 +1461,64 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
              * nothing at all -- so a node re-inserted after an improvement is
              * ordered by its NEW g against its OLD h. Using the locals here
              * would be tidier and would sort a different list. */
-            fNew   = *(const uint16_t *)(b + PATHNODE_OFF_H)
-                     + *(const uint16_t *)(b + PATHNODE_OFF_G);
-            before = 0;
-            walk   = head;
-            for (;;) {
-                const uint8_t *q = nodes + (walk & 0xFFFF)
-                                               * AM2_PATH_NODE_BYTES;
-                int32_t fq = *(const uint16_t *)(q + PATHNODE_OFF_H)
-                             + *(const uint16_t *)(q + PATHNODE_OFF_G);
+            walk = from;
+            if (walk > 0) {
+                fNew = *(const uint16_t *)(b + PATHNODE_OFF_H)
+                       + *(const uint16_t *)(b + PATHNODE_OFF_G);
+                do {
+                    const uint8_t *q = nodes + (walk & 0xFFFF)
+                                                   * AM2_PATH_NODE_BYTES;
 
-                if (fq >= fNew)
-                    break;
-                before = walk;
-                walk   = *(const uint16_t *)(q + PATHNODE_OFF_NEXT);
-                if (!(uint16_t)walk)
-                    break;
+                    if (*(const uint16_t *)(q + PATHNODE_OFF_H)
+                        + *(const uint16_t *)(q + PATHNODE_OFF_G) >= fNew)
+                        break;
+                    before = walk;
+                    walk   = *(const uint16_t *)(q + PATHNODE_OFF_NEXT);
+                } while (walk > 0);
             }
 
-            if ((uint16_t)before) {
+            if (before > 0) {
                 uint8_t *p = nodes + (before & 0xFFFF) * AM2_PATH_NODE_BYTES;
-                int32_t  after = *(const uint16_t *)(p + PATHNODE_OFF_NEXT);
+                uint16_t after = *(const uint16_t *)(p + PATHNODE_OFF_NEXT);
 
-                *(uint16_t *)(b + PATHNODE_OFF_NEXT) = (uint16_t)after;
-                if (after)
-                    *(uint16_t *)(nodes + after * AM2_PATH_NODE_BYTES
+                *(uint16_t *)(b + PATHNODE_OFF_NEXT) = after;
+                if (after > 0)
+                    *(uint16_t *)(nodes + (after & 0xFFFF) * AM2_PATH_NODE_BYTES
                                   + PATHNODE_OFF_PREV) = (uint16_t)nb;
                 *(uint16_t *)(p + PATHNODE_OFF_NEXT) = (uint16_t)nb;
-                *(uint16_t *)(b + PATHNODE_OFF_PREV) = (uint16_t)before;
+                *(uint16_t *)(b + PATHNODE_OFF_PREV) = before;
             } else {
                 /* Cheapest so far: in front of the head. */
-                *(uint16_t *)(b + PATHNODE_OFF_NEXT) = (uint16_t)head;
+                *(uint16_t *)(b + PATHNODE_OFF_NEXT) = from;
                 *(uint16_t *)(b + PATHNODE_OFF_PREV) = 0;
-                *(uint16_t *)(nodes + (head & 0xFFFF) * AM2_PATH_NODE_BYTES
+                *(uint16_t *)(nodes + (from & 0xFFFF) * AM2_PATH_NODE_BYTES
                               + PATHNODE_OFF_PREV) = (uint16_t)nb;
-                head = nb;
+                from = (uint16_t)nb;
             }
         }
     }
 
+    goto fail;
+
+budget:
+    /* Out of budget. Keep what was found if it got closer than the start
+     * was -- `jbe` on the two heuristics as WORDS (`cmp di, ax`), so equal
+     * counts as progress. Otherwise it shares the exhausted list's zero. */
+    if ((uint16_t)PathHeuristic(curTile, toTile)
+        <= (uint16_t)PathHeuristic(fromTile, toTile)) {
+        PathUnwind(cur, out, n);
+        goto ok;
+    }
+fail:
     PathChargeFrame(startTicks, considered);
     return 0;
+
+found:
+    PathUnwind(cur, out, n);
+ok:
+    PathChargeFrame(startTicks, considered);
+    return 1;
+#undef region
 #undef step
 }
 

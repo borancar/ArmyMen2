@@ -145,9 +145,9 @@ void *__cdecl LoadType5(am2_FILE *fp, void *hdr);
  * missile.ani and an ordinary SetAnimFrame. */
 void *__cdecl CreateMissile(void *weapon, void *source, uint32_t at,
                             int32_t heading, int32_t a5, int32_t a6,
-                            int32_t repairFrame, int32_t speedScale,
+                            int32_t repairFrame, float speedScale,
                             int32_t initUnused, uint32_t uid,
-                            int32_t scriptId);
+                            uint8_t scriptId);
 
 /* 0x00433D60, one caller. SaveType1's counterpart: read the 0x2C record and
  * the tag, build the item from the tag, then overwrite most of it from the

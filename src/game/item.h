@@ -280,7 +280,7 @@ typedef struct {
 /* Reconstructed now, so the seam is gone and the eight call sites reach it
  * directly. The typedef went with it: its whole purpose was to give the
  * indirect call a shape. */
-int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
+int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
                            int32_t heading, AM2_FireSpot spot, void *target);
 
 /* 0x00428950 and 0x00428BB0. The item section of a savegame, both named by
@@ -987,7 +987,8 @@ int32_t __cdecl WeaponFrameReady(void *obj, void *weapon);
  * self-consistent either way, and its one caller was still original, so no
  * A/B and no counter could reach it. The caller also pushes the firer's army
  * and position, which the body never reads. */
-void __cdecl SetObjTablePair(int32_t kind, uint32_t uid);
+void __cdecl SetObjTablePair(int32_t kind, uint32_t uid, int8_t army,
+                             uint32_t at);
 
 
 /* 0x00406800, one caller. Which inventory slot should take this weapon, and
@@ -1008,9 +1009,9 @@ void __cdecl InitItemHeaderSize(void);
 /* 0x0045F300 and 0x0045F3C0. Drop an item ten units along a facing from a
  * point. The first also runs ItemPostCreate and conceals what it drops from
  * a player not allied to the owner; the second does neither. */
-void __cdecl CreateWatchedItem(int32_t unused, void *obj, uint32_t at,
+void __cdecl CreateWatchedItem(void *weapon, void *obj, uint32_t at,
                                uint8_t facing);
-void __cdecl CreateWatchedType(int32_t unused, void *obj, uint32_t at,
+void __cdecl CreateWatchedType(void *weapon, void *obj, uint32_t at,
                                uint8_t facing);
 
 #endif

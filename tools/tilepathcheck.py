@@ -1,5 +1,10 @@
 """Check FindPath's tile-level A* against the original, with no game running.
 
+    ./.venv/bin/python tools/tilepathcheck.py [RELINK_JSON]
+
+With a relink JSON (src/vc6/relink.py --json) our relinked FindPath runs
+beside the original on every case as well.
+
 tools/pathcheck.py does this for the layer ABOVE -- RegionFindPath, over a
 region graph -- and everything it says about why applies here twice over.
 FindPath's one caller is PlanPathTo, which CLAUDE.md records as unexercised;
@@ -508,6 +513,26 @@ def main():
     bad = 0
     n = 0
 
+    # With a relink JSON (src/vc6/relink.py --json), OUR FindPath runs too,
+    # placed at the original's VA in a second emulator (never one emulator
+    # swapping code -- Unicorn caches translated blocks), and must give the
+    # original's answer on every case. That is the check of the C; the model
+    # above checks only the reading of the original.
+    ours = None
+    if len(sys.argv) > 1:
+        import json
+        ent = next(e for e in json.load(open(sys.argv[1]))
+                   if e['fn'] == 'FindPath')
+        code = bytearray.fromhex(ent['ours'])
+        # The relink leaves constant-pool references unresolved ("wild"):
+        # FindPath's only ones are the heuristic's 1.5, a double at
+        # 0x0046FA98 in the image, each an `fmul qword ptr [disp32]`.
+        for o in ent['wild'][::4]:
+            assert code[o - 2:o] == b"\xdc\x0d", "wild %#x is not fmul" % o
+            struct.pack_into("<I", code, o, 0x0046FA98)
+        ours = Emu()
+        ours.uc.mem_write(ADDR, bytes(code))
+
     for name, m, frm, to in cases():
         got = run(emu, m, frm, to)
         want = model(m, frm, to)
@@ -519,6 +544,11 @@ def main():
         if got != want:
             bad += 1
             print("  %-16s -> original %r, model %r" % (name, got, want))
+        if ours is not None:
+            mine = run(ours, m, frm, to)
+            if mine != got:
+                bad += 1
+                print("  %-16s -> original %r, ours %r" % (name, got, mine))
 
     print("tilepathcheck: %d cases, %d disagree" % (n, bad))
     return 1 if bad else 0

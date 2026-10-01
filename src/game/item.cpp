@@ -10732,11 +10732,14 @@ int32_t __cdecl WeaponFrameReady(void *obj, void *weapon)
  *
  * A uid that does not resolve does nothing at all, silently.
  */
-void __cdecl SetObjTablePair(int32_t kind, uint32_t uid)
+void __cdecl SetObjTablePair(int32_t kind, uint32_t uid, int8_t army,
+                             uint32_t at)
 {
     uint8_t *o = (uint8_t *)ObjByUidAlias(uid);
     int32_t  slot;
 
+    (void)army;
+    (void)at;
     if (!o)
         return;
 
@@ -13342,19 +13345,6 @@ void __cdecl AimStartB(uint32_t uid, int8_t army, uint32_t at);
 #define g_sweepDistance     (*(int32_t *)(uintptr_t)ADDR_SWEEP_DISTANCE)
 #define g_sweepDamage       (*(int32_t *)(uintptr_t)ADDR_SWEEP_DAMAGE)
 
-/* The literal 1.0f every flat arm hands CreateMissile, and the bit pattern
- * the two lobbed ones compute. CreateMissile's speedScale parameter is an
- * int32_t carrying float bits -- see MISSILE_OFF_SPEED_SCALE -- so the
- * conversion is a reinterpret and not a cast. */
-#define AM2_FLOAT_ONE 0x3F800000
-
-static inline int32_t AM2_FLOAT_BITS(float f)
-{
-    int32_t bits;
-    __builtin_memcpy(&bits, &f, sizeof bits);
-    return bits;
-}
-
 /* MSVC's _ftol truncates toward zero, which is what the x87 control word is
  * set to here and what a C cast does. */
 #define AM2_FTOL(x) ((int32_t)(x))
@@ -13398,21 +13388,19 @@ static inline int32_t AM2_FLOAT_BITS(float f)
  * scale where the flat ones pass 1.0f. Factoring the shape and parameterising
  * the differences is how AiStepTrack and AiStepDefend would have lost a real
  * behavioural difference. */
-int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
+int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
                            int32_t facing, AM2_FireSpot spot, void *target)
 {
-    uint8_t  *w   = (uint8_t *)weapon;
     uint8_t  *u   = (uint8_t *)unit;
-    uint8_t  *tgt;
     int16_t  *pt  = (int16_t *)&spot.at;
-    uint8_t  *rows;
     uint8_t  *spr;
-    uint8_t  *def;
     uint32_t  from;         /* the packed spot.at the shot leaves from */
     int16_t  *fromP = (int16_t *)&from;
     int32_t   dir;
     uint32_t  kind;
     uint8_t   seed;
+    AM2_Point a, b;
+    int32_t   d, clamped;
 
     /* Both halves of the aggregate default. A zero height comes from the
      * height argument, which every caller computes with ObjFieldB or
@@ -13421,7 +13409,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
     if (spot.ground == 0)
         spot.ground = (int16_t)height;
 
-    tgt = (uint8_t *)target;
+#define tgt ((uint8_t *)target)
     if (pt[0] == 0 && tgt) {
         pt[0] = *(const int16_t *)(tgt + OBJ_OFF_POS);
         pt[1] = *(const int16_t *)(tgt + OBJ_OFF_POS + 2);
@@ -13434,16 +13422,17 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
      * 0x60 + ROW_OFF_SPRITE, 0x60 + ROW_OFF_X and 0x60 + ROW_OFF_FIELD_26,
      * which is what identifies them as row 1 rather than as fields of their
      * own. Nothing new had to be named for this function. */
-    rows = *(uint8_t **)(u + OBJ_OFF_ROWS);
+#define rows (*(uint8_t **)(u + OBJ_OFF_ROWS))
     if (*(const int32_t *)(u + OBJ_OFF_ROW_COUNT) > 1) {
         from = *(const uint32_t *)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_X);
-        dir  = *(const int16_t *)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_26);
         spr  = *(uint8_t **)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_SPRITE);
+        dir  = *(const int16_t *)(rows + AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_26);
     } else {
         from = *(const uint32_t *)(u + OBJ_OFF_POS);
         spr  = *(uint8_t **)(rows + ROW_OFF_SPRITE);
         dir  = *(const int16_t *)(rows + ROW_OFF_FIELD_26);
     }
+#undef rows
 
     /* Types 2, 3 and 8 stamp the clock and take the trooper's own fire flag;
      * everything else takes a fresh random byte. It ends up as CreateMissile's
@@ -13455,7 +13444,8 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
         seed = (uint8_t)orig_game_rand();
     }
 
-    def  = *(uint8_t **)(w + OBJ_OFF_FIELD_C0);
+    /* The def is re-read through the weapon at every use, as the image does. */
+#define def (*(uint8_t **)((uint8_t *)weapon + OBJ_OFF_FIELD_C0))
     kind = (uint32_t)(*(const int32_t *)def) - 1u;
     if (kind > 0x2Au)
         return 0;
@@ -13481,8 +13471,9 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
         PlaySoundAt(7, 0, 0, fromP[0], fromP[1]);
         SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 0,
                           *(const uint32_t *)(u + OBJ_OFF_UID), dir);
+        seed = (uint8_t)AddByteSat(seed, 0x20);
         CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
-                      AM2_FLOAT_ONE, 0, 0, AddByteSat(seed, 0x20));
+                      1.0f, 0, 0, seed);
         return 0;
 
     /* arm 16 -- 0x0045F5BC. Same shape and sound as arm 0, but the facing is
@@ -13493,7 +13484,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
         SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 0,
                           *(const uint32_t *)(u + OBJ_OFF_UID), dir);
         CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
-                      AM2_FLOAT_ONE, 0, 0,
+                      1.0f, 0, 0,
                       (int32_t)(uint8_t)(0xFF - (seed & 3)));
         return 1;
 
@@ -13505,8 +13496,9 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
         PlaySoundAt(8, 0, 0, fromP[0], fromP[1]);
         SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 0,
                           *(const uint32_t *)(u + OBJ_OFF_UID), dir);
+        seed = (uint8_t)AddByteSat(seed, 0x10);
         CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
-                      AM2_FLOAT_ONE, 0, 0, AddByteSat(seed, 0x10));
+                      1.0f, 0, 0, seed);
         return 0;
 
     /* arm 15 -- 0x0045F6AA. */
@@ -13515,8 +13507,9 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
         PlaySoundAt(0x0A, 0, 0, fromP[0], fromP[1]);
         SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 0,
                           *(const uint32_t *)(u + OBJ_OFF_UID), dir);
+        seed = (uint8_t)AddByteSat(seed, 0x0A);
         CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
-                      AM2_FLOAT_ONE, 0, 0, AddByteSat(seed, 0x0A));
+                      1.0f, 0, 0, seed);
         return 0;
 
     /* arm 6 -- 0x0045F744. The only arm using effect group 3. */
@@ -13525,8 +13518,9 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
         PlaySoundAt(9, 0, 0, fromP[0], fromP[1]);
         SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 3,
                           *(const uint32_t *)(u + OBJ_OFF_UID), dir);
+        seed = (uint8_t)AddByteSat(seed, 0x0A);
         CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
-                      AM2_FLOAT_ONE, 0, 0, AddByteSat(seed, 0x0A));
+                      1.0f, 0, 0, seed);
         return 1;
 
     /* arm 3 -- 0x0045F7E1. No facing bias: the seed goes through unchanged. */
@@ -13536,7 +13530,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
         SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 1,
                           *(const uint32_t *)(u + OBJ_OFF_UID), dir);
         CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
-                      AM2_FLOAT_ONE, 0, 0, seed);
+                      1.0f, 0, 0, seed);
         return 1;
 
     /* arm 5 -- 0x0045F86D. */
@@ -13546,7 +13540,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
         SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 1,
                           *(const uint32_t *)(u + OBJ_OFF_UID), dir);
         CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
-                      AM2_FLOAT_ONE, 0, 0, seed);
+                      1.0f, 0, 0, seed);
         return 1;
 
     /* arms 1 and 4, written out twice as the image has them -- 0x0045F8FA and 0x0045FA43, the LOBBED shots and the only
@@ -13564,35 +13558,26 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
      * rather than over the head. With no target spot.at the distance IS the
      * maximum, so the scale is exactly 1.0 and the shot is flat. */
     case 2: {
-        AM2_Point a, b;
-        int32_t   d, lo, hi, clamped;
-        float     scale;
+        AM2_Point b2;
 
         fromP[1] = (int16_t)(fromP[1] - 0x10);
         PlaySoundAt(0x0C, 0, 0, fromP[0], fromP[1]);
 
-        a.x = fromP[0];
         if (pt[0] > 0) {
+            a = *(const AM2_Point *)&from;
             a.y = (int16_t)AM2_FTOL((double)pt[1]
                                     - (double)(pt[1] - fromP[1]) * AM2_FW_ARC_K
                                     + AM2_FW_ARC_BIAS);
-            b.x = pt[0];
-            b.y = pt[1];
-            d   = ApproxDist(&a, &b);
-        } else {
-            d   = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
-            a.y = fromP[1];
-        }
+            b2 = *(const AM2_Point *)pt;
+            d = ApproxDist(&a, &b2);
+        } else
+            d = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
 
-        hi = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
-        lo = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE_MIN);
         clamped = d;
-        if (d < lo)
-            clamped = lo;
-        else if (d > hi)
-            clamped = hi;
-
-        scale = (float)clamped / (float)hi;
+        if (d < *(const int32_t *)(def + MISSILEDEF_OFF_RANGE_MIN))
+            clamped = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE_MIN);
+        else if (d > *(const int32_t *)(def + MISSILEDEF_OFF_RANGE))
+            clamped = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
 
         /* THE FIFTH ARGUMENT IS THE LAUNCH HEIGHT, NOT THE RANGE. At
          * 0x0045F9B7 the original loads `movsx ecx, word [esp+0x3c]`, and
@@ -13611,55 +13596,50 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
          * since nothing in the suite throws anything. */
         CreateMissile(weapon, unit, from, facing,
                       height, spot.ground, 1,
-                      AM2_FLOAT_BITS(scale), 0, 0, seed);
+                      (float)clamped
+                          / *(const int32_t *)(def + MISSILEDEF_OFF_RANGE),
+                      0, 0, seed);
         return 1;
     }
 
     /* arm 2 -- 0x0045F9E0. The only arm passing PlaySoundAt a non-zero second
-     * argument on the flat path, and it starts no directional effect at all. */
+     * argument on the flat path, and it starts no directional effect at all.
+     * It also passes the HEIGHT for both a5 and a6 (`push eax; push eax` at
+     * 0x0045FA24), never spot.ground -- a ground the caller supplied is
+     * ignored here, and the missile starts level. */
     case 3:
         AM2_FW_MUZZLE();
         PlaySoundAt(0x0E, 1, 0, fromP[0], fromP[1]);
-        CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
-                      AM2_FLOAT_ONE, 0, 0, seed);
+        CreateMissile(weapon, unit, from, facing, height, height, 0,
+                      1.0f, 0, 0, seed);
         return 1;
 
-    case 5: {
-        AM2_Point a, b;
-        int32_t   d, lo, hi, clamped;
-        float     scale;
-
+    case 5:
         PlaySoundAt(0x0D, 0, 0, fromP[0], fromP[1]);
 
-        a.x = fromP[0];
         if (pt[0] > 0) {
+            a = *(const AM2_Point *)&from;
             a.y = (int16_t)AM2_FTOL((double)pt[1]
                                     - (double)(pt[1] - fromP[1]) * AM2_FW_ARC_K
                                     + AM2_FW_ARC_BIAS);
-            b.x = pt[0];
-            b.y = pt[1];
-            d   = ApproxDist(&a, &b);
-        } else {
-            d   = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
-            a.y = fromP[1];
-        }
+            b = *(const AM2_Point *)pt;
+            d = ApproxDist(&a, &b);
+        } else
+            d = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
 
-        hi = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
-        lo = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE_MIN);
         clamped = d;
-        if (d < lo)
-            clamped = lo;
-        else if (d > hi)
-            clamped = hi;
-
-        scale = (float)clamped / (float)hi;
+        if (d < *(const int32_t *)(def + MISSILEDEF_OFF_RANGE_MIN))
+            clamped = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE_MIN);
+        else if (d > *(const int32_t *)(def + MISSILEDEF_OFF_RANGE))
+            clamped = *(const int32_t *)(def + MISSILEDEF_OFF_RANGE);
 
         /* The fifth argument is the launch height; see case 2. */
         CreateMissile(weapon, unit, from, facing,
                       height, spot.ground, 1,
-                      AM2_FLOAT_BITS(scale), 0, 0, seed);
+                      (float)clamped
+                          / *(const int32_t *)(def + MISSILEDEF_OFF_RANGE),
+                      0, 0, seed);
         return 1;
-    }
 
     /* arms 8 and 9 -- 0x0045FB23 and 0x0045FB6E. Not missiles at all: they
      * place a watched object at the muzzle. Arm 9 plays no sound. */
@@ -13670,13 +13650,13 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
          * pushes `[esi+0x40]` (OBJ_OFF_FACING) at 0x0045FB4E, and
          * CreateWatchedItem uses it only to drop the charge Cos8/Sin8 behind the
          * muzzle. Passing the army planted every mine due east. */
-        CreateWatchedItem(0, unit, from,
+        CreateWatchedItem(weapon, unit, from,
                           *(const uint8_t *)(u + OBJ_OFF_FACING));
         return 1;
 
     case 12:
         AM2_FW_MUZZLE();
-        CreateWatchedType(0, unit, from,
+        CreateWatchedType(weapon, unit, from,
                           *(const uint8_t *)(u + OBJ_OFF_FACING));
         return 1;
 
@@ -13689,22 +13669,26 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
      * five explicit zeros, not an artefact of the push-list extractor, which
      * is what it looked like the first time it was read. Arm 11 jumps into
      * that same call, so it is a shared refusal and not this arm's alone. */
-    case 35: case 36: case 37: case 38: {
-        int32_t newKind;
+    case 35: case 36: case 37: case 38:
         if (!tgt)
-            tgt = u;
-        newKind = *(const int32_t *)def - 0x23;
-        if (!ObjIsType2((const AM2_Object *)tgt)
-            || *(const int32_t *)(tgt + OBJ_OFF_FIELD_530) == newKind) {
+            target = u;
+        if (!ObjIsType2((const AM2_Object *)tgt)) {
+            PlaySoundAt(0, 0, 0, 0, 0);
+            return 0;
+        }
+        if (*(const int32_t *)(tgt + OBJ_OFF_FIELD_530)
+            == *(const int32_t *)def - 0x23) {
             PlaySoundAt(0, 0, 0, 0, 0);
             return 0;
         }
         PlaySoundAt(0x14, 0, 0,
                     *(const int16_t *)(tgt + OBJ_OFF_POS),
                     *(const int16_t *)(tgt + OBJ_OFF_POS + 2));
-        SetObjTablePair(newKind, *(const uint32_t *)(tgt + OBJ_OFF_UID));
+        SetObjTablePair(*(const int32_t *)def - 0x23,
+                        *(const uint32_t *)(tgt + OBJ_OFF_UID),
+                        *(const int8_t *)(u + OBJ_OFF_ARMY),
+                        *(const uint32_t *)(u + OBJ_OFF_POS));
         return 1;
-    }
 
     /* arms 12, 13, 14 -- 0x0045FC2A, 0x0045FC56, 0x0045FC82. Air support, and
      * the three differ ONLY in the speech line and the mode. Three arms this
@@ -13730,8 +13714,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
      * sound and which of the two they call. */
     case 39:
         PlaySoundAt(0x2B, 1, 0,
-                    (int32_t)*(const uint32_t *)&spot.at,
-                    (int32_t)(*(const uint32_t *)&spot.at >> 16));
+                    pt[0], pt[1]);
         pt[0] = (int16_t)(pt[0] - *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X);
         pt[1] = (int16_t)(pt[1] - *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
         AimStart(*(const uint32_t *)(u + OBJ_OFF_UID),
@@ -13740,8 +13723,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
 
     case 40:
         PlaySoundAt(0x2C, 1, 0,
-                    (int32_t)*(const uint32_t *)&spot.at,
-                    (int32_t)(*(const uint32_t *)&spot.at >> 16));
+                    pt[0], pt[1]);
         pt[0] = (int16_t)(pt[0] - *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X);
         pt[1] = (int16_t)(pt[1] - *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
         AimStartB(*(const uint32_t *)(u + OBJ_OFF_UID),
@@ -13820,9 +13802,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
      * failed the type test and a search that finds nothing leaves the ORIGINAL
      * target to be detonated. Writing `target = NULL` before the loop is the
      * obvious tidy-up and changes the behaviour. */
-    case 20: {
-        uint8_t *found = tgt;
-
+    case 20:
         if (!(tgt && *(const int32_t *)tgt == 1
               && *(const int32_t *)(*(uint8_t **)(tgt + OBJ_OFF_FIELD_94) + 8)
                  == g_createWatchedKind)) {
@@ -13833,30 +13813,33 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
             fromP[1] = (int16_t)AM2_FTOL(
                 Sin8(*(const uint8_t *)(u + OBJ_OFF_FACING)) * AM2_FW_STEP
                 + fromP[1]);
-            for (o = (uint8_t *)ObjectsAtPoint(&from,
-                     (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
-                 o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
-                if (*(const int32_t *)o == 1
-                    && *(const int32_t *)(*(uint8_t **)(o + OBJ_OFF_FIELD_94) + 8)
-                       == g_createWatchedKind) {
-                    found = o;
-                    break;
+            o = (uint8_t *)ObjectsAtPoint(&from,
+                    (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
+            if (o)
+                for (;;) {
+                    if (*(const int32_t *)o == 1
+                        && *(const int32_t *)(*(uint8_t **)(o + OBJ_OFF_FIELD_94) + 8)
+                           == g_createWatchedKind) {
+                        target = o;
+                        break;
+                    }
+                    o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT);
+                    if (!o)
+                        break;
                 }
-            }
         }
 
-        if (!found)
+        if (!tgt)
             return 0;
 
         PlaySoundAt(0x10, 0, 0,
-                    *(const int16_t *)(found + OBJ_OFF_POS),
-                    *(const int16_t *)(found + OBJ_OFF_POS + 2));
-        *(int32_t *)(found + OBJ_OFF_FLAGS) |= 2;
-        CreateExplosion(*(const int16_t *)(found + OBJ_OFF_POS),
-                        *(const int16_t *)(found + OBJ_OFF_POS + 2),
+                    *(const int16_t *)(tgt + OBJ_OFF_POS),
+                    *(const int16_t *)(tgt + OBJ_OFF_POS + 2));
+        *(int32_t *)(tgt + OBJ_OFF_FLAGS) |= 2;
+        CreateExplosion(*(const int16_t *)(tgt + OBJ_OFF_POS),
+                        *(const int16_t *)(tgt + OBJ_OFF_POS + 2),
                         0x79, 4, 0, 0, 0, 0, 0, 0);
         return 0;
-    }
 
     /* arm 22 -- 0x0045FF8E, the sweep. Steps out from the FIRER's own position
      * -- not the muzzle -- by ADDR_SWEEP_DISTANCE scaled, collects everything
@@ -13866,22 +13849,21 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
      * step is zero and the damage is zero. See ADDR_SWEEP_DISTANCE. */
     case 43: {
         uint8_t  *o;
-        uint32_t  at;
-        int16_t  *atP = (int16_t *)&at;
+        AM2_Point at;
         uint32_t  attacker;
 
         PlaySoundAt(0x34, 0, 0,
                     *(const int16_t *)(u + OBJ_OFF_POS),
                     *(const int16_t *)(u + OBJ_OFF_POS + 2));
 
-        atP[0] = (int16_t)AM2_FTOL(
-            Cos8(facing) * (double)g_sweepDistance * AM2_FW_SWEEP_K
+        at.x = (int16_t)AM2_FTOL(
+            Cos8(facing) * g_sweepDistance * AM2_FW_SWEEP_K
             + *(const int16_t *)(u + OBJ_OFF_POS));
-        atP[1] = (int16_t)AM2_FTOL(
-            Sin8(facing) * (double)g_sweepDistance * AM2_FW_SWEEP_K
+        at.y = (int16_t)AM2_FTOL(
+            Sin8(facing) * g_sweepDistance * AM2_FW_SWEEP_K
             + *(const int16_t *)(u + OBJ_OFF_POS + 2));
 
-        o = (uint8_t *)ObjectsHitByPoint(&at,
+        o = (uint8_t *)ObjectsHitByPoint((const uint32_t *)&at,
                 (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
 
         attacker = *(const uint32_t *)(u + OBJ_OFF_UID);
@@ -13902,6 +13884,8 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
     default:
         return 0;
     }
+#undef tgt
+#undef def
 }
 
 
@@ -14284,7 +14268,7 @@ void item_install(void)
  * when the owner is not allied to the local player. The second does neither,
  * so what it drops is always visible. Two functions rather than one with a
  * flag, and the difference is behaviour rather than a constant. */
-void __cdecl CreateWatchedItem(int32_t unused, void *obj, uint32_t at,
+void __cdecl CreateWatchedItem(void *weapon, void *obj, uint32_t at,
                                uint8_t facing)
 {
     uint8_t *o = (uint8_t *)obj;
@@ -14316,10 +14300,10 @@ void __cdecl CreateWatchedItem(int32_t unused, void *obj, uint32_t at,
                                 *(const int8_t *)(o + OBJ_OFF_ARMY)))
         ObjConceal(item, 1);
 
-    (void)unused;
+    (void)weapon;
 }
 
-void __cdecl CreateWatchedType(int32_t unused, void *obj, uint32_t at,
+void __cdecl CreateWatchedType(void *weapon, void *obj, uint32_t at,
                                uint8_t facing)
 {
     uint8_t *o = (uint8_t *)obj;
@@ -14342,7 +14326,7 @@ void __cdecl CreateWatchedType(int32_t unused, void *obj, uint32_t at,
     *(uint8_t *)((uint8_t *)item + 0x65u) = *(const uint8_t *)(o + 0x65u);
     ObjTileChanged(item, *(const int8_t *)((uint8_t *)item + 0x65u), 1);
 
-    (void)unused;
+    (void)weapon;
 }
 
 /* CreateWeapon -- original 0x0045F0C0, eight-plus callers, and it names
