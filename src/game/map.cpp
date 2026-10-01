@@ -1869,8 +1869,16 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             bytes = (w * h) << 1;
             if (bytes == 0)
                 break;
-            if (w != (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W) || h != (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H)) { bad_size = 1; break; }
-            if ((int32_t)size != bytes + 0x14)        { bad_size = 1; break; }
+            /* Both refusals are FATAL and skip nothing, each with its own
+             * line -- not the planes' "chunksize/targetsize different". */
+            if (w != (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W) || h != (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H)) {
+                am2_log("tile layer size different from map size\n");
+                goto bad;
+            }
+            if ((int32_t)size != bytes + 0x14) {
+                am2_log("mismatched chunk and target size\n");
+                goto bad;
+            }
             *(uint8_t **)(uintptr_t)ADDR_MAP_TILES = ReadPlane(f, (uint32_t)bytes, &consumed);
             tlayDone++;
             break;
@@ -1917,9 +1925,15 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             break;
         }
 
+        /* A size mismatch is FATAL: the chunk is skipped and then the whole
+         * load fails. Only a chunk this loader does not want (2) is skipped
+         * and the walk carries on. */
+        if (bad_size == 1) {
+            am2_log("chunksize/targetsize different\n");
+            orig_map_fseek(f, (int32_t)size, 1);
+            goto bad;
+        }
         if (bad_size != 0) {
-            if (bad_size == 1)
-                am2_log("chunksize/targetsize different\n");
             orig_map_fseek(f, (int32_t)size, 1);
             consumed += (int32_t)size;
         }
