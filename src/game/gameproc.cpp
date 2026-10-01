@@ -980,14 +980,13 @@ static inline int32_t ScenRowWeapon(int32_t kind)
 int32_t __cdecl PlaceScenario(void)
 {
     uint8_t *scen = *(uint8_t **)(uintptr_t)ADDR_SCENARIOS;
-    void    *comm;
     int32_t  slot;
 
     if (!scen)
         return 0;
 
-    comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
-
+    /* The comm object is read afresh at each use. */
+#define comm (*(void **)(uintptr_t)ADDR_COMM_OBJECT)
     for (slot = 0; slot < AM2_COMM_SLOTS; slot++) {
         uint8_t *part = scen + SCENARIO_OFF_PARTS
                       + (size_t)slot * SCENARIO_PART_BYTES;
@@ -1180,6 +1179,7 @@ int32_t __cdecl PlaceScenario(void)
     }
     return 1;
 #undef n
+#undef comm
 }
 
 void __cdecl ResetLevelState(void)

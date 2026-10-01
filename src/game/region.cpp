@@ -5215,7 +5215,7 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
          * code -- a normalised diff finds no shared run of ten. */
         {
             uint8_t  look = *(const uint8_t *)(o + OBJ_OFF_FACING);
-            int32_t  viewerAttr, dx, dy, delta, gen;
+            int32_t  viewerAttr, dx, dy, delta;
             uint8_t *rec;
 
             if (ObjIsType3((const AM2_Object *)o)
@@ -5249,12 +5249,10 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
                 rec = (uint8_t *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR
                       + ((uint32_t)candBearing / AM2_SIGHT_DIR_STEP)
                             * AM2_SIGHT_DIR_STRIDE;
-                gen = *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
+                if (*(const int32_t *)(rec + SIGHTDIR_OFF_TRACE_STAMP) != AI_SIGHT_GEN)
+                    AiSightTrace(o, it, rec, rank, viewerAttr, AI_SIGHT_GEN);
 
-                if (*(const int32_t *)(rec + SIGHTDIR_OFF_TRACE_STAMP) != gen)
-                    AiSightTrace(o, it, rec, rank, viewerAttr, gen);
-
-                if (*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP) != gen) {
+                if (*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP) != AI_SIGHT_GEN) {
                     if (candRange
                         > *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE))
                         continue;
@@ -10598,8 +10596,8 @@ void __cdecl Step3Drive(void *obj, void *rec)
                 } else if (*(const uint16_t *)(r + 0x18u) != 0) {
                     /* Firing at a POINT: same spread, no target object. */
                     *(uint32_t *)&spot.at = *(const uint32_t *)(r + 0x18u);
-                    spot.ground = *(const int16_t *)(r + 0x1Cu);
                     fireTarget = 0;
+                    spot.ground = *(const int16_t *)(r + 0x1Cu);
                     heading = (uint8_t)(*(const uint8_t *)(o + 0x530u)
                                         + (orig_step3_rand() % 5) - 2);
                 } else {
@@ -10611,8 +10609,8 @@ void __cdecl Step3Drive(void *obj, void *rec)
 
                     *(uint32_t *)&spot.at = *(const uint32_t *)(r + 0x18u);
                     spot.ground = *(const int16_t *)(r + 0x1Cu);
-                    fireTarget = 0;
                     heading = (uint8_t)(gunFacing << (8 - dirs));
+                    fireTarget = 0;
                 }
 
                 FireWeapon(weapon, o, height, heading, spot, fireTarget);
@@ -10733,7 +10731,8 @@ void __cdecl Step3Drive(void *obj, void *rec)
                     *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + 0x7D0u;
 
                 if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0) {
-                    void *comm = *(void **)(uintptr_t)ADDR_COMM_OBJECT;
+                    /* The comm object is read afresh at each use. */
+#define comm (*(void **)(uintptr_t)ADDR_COMM_OBJECT)
 
                     /* Two broadcast questions, not one: the first refuses
                      * outright when the host flag at +0x3D8 is set AND we
@@ -10744,6 +10743,7 @@ void __cdecl Step3Drive(void *obj, void *rec)
                         && ((AM2_Comm *)comm)->CommMustBroadcast((int16_t)*(const int8_t *)(o + 0x10u))
                         && *(const int32_t *)((uint8_t *)comm + 0x3D8u) == 0)
                         SendVehicleWantItem(o, p, 0, 0, 0);
+#undef comm
                 }
             }
 

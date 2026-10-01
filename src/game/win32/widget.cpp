@@ -11635,10 +11635,9 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
         BlinkerStart(*(AM2_Widget **)((uint8_t *)edit + EDIT_OFF_DOT),
                      0x46, 1);
         PlaySoundAt(0, 0, 0, 0, 0);
-        edit = g_focusedEdit;
     }
 
-    self = (uint8_t *)edit;
+    self = (uint8_t *)g_focusedEdit;
     text = *(char **)(self + EDIT_OFF_TEXT);
     len  = (int32_t)strlen(text);
 
@@ -11648,9 +11647,8 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
                                    *(const int32_t *)(self + EDIT_OFF_FONT), 0)
                         + EDIT_TEXT_MARGIN;
 
-        edit = g_focusedEdit;
-        self = (uint8_t *)edit;
-        if (width > edit->w
+        self = (uint8_t *)g_focusedEdit;
+        if (width > g_focusedEdit->w
             || len >= *(const int32_t *)(self + EDIT_OFF_MAX) - 1) {
             PlaySoundAt(2, 0, 0, 0, 0);
             return;
@@ -11677,7 +11675,7 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
             *(void (__cdecl *const *)(AM2_Widget *))(self + EDIT_OFF_ON_ENTER);
 
         if (onEnter)
-            onEnter(edit);
+            onEnter(g_focusedEdit);
         return;
     }
 

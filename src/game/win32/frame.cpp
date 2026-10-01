@@ -1866,7 +1866,6 @@ void __cdecl PausedFrameStep(void)
 
     for (slot = 0; slot < 4; xy += 2, slot++) {
 #define rec (comm + slot * COMM_PLAYER_STRIDE)
-        uint32_t pause;
         int32_t  team;
         int32_t  mates;
         int32_t  variant;
@@ -1895,8 +1894,9 @@ void __cdecl PausedFrameStep(void)
         variant = 4;
         if (mates > 1)
             variant = 3;
-        pause = *(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS;
 
+        /* The pause flags are read afresh at each test. */
+#define pause (*(const uint32_t *)(uintptr_t)ADDR_PAUSE_FLAGS)
         if (slot == *(const int32_t *)(uintptr_t)ADDR_OUR_SLOT) {
             if (pause & 8u)
                 badge = 1;
@@ -2009,4 +2009,5 @@ void __cdecl PausedFrameStep(void)
     }
 #undef comm
 #undef rec
+#undef pause
 }
