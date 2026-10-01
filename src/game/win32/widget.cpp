@@ -11627,46 +11627,39 @@ void __cdecl OpenMpJoin(void)
 
 void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
 {
-    AM2_Widget *edit = g_focusedEdit;
-    uint8_t    *self;
-    char       *text;
-    int32_t     len;
+    int32_t len;
 
+    /* The focused field is read from its global at every use -- VC6 shares
+     * the loads between calls and reloads after each, as the image does --
+     * which also covers the blinker moving the focus. */
+#define FOCUS ((uint8_t *)g_focusedEdit)
     (void)lo;
     (void)hi;
-    if (!edit) {
+    if (!g_focusedEdit) {
         orig_log("Error: Key handler not freed\n");
         return;
     }
 
     /* A field with a blinker beside it restarts it on every keystroke, and
-     * plays wave 0 while it does. The global is re-read afterwards because
-     * the blinker's own code can move the focus. */
-    if (*(AM2_Widget **)((uint8_t *)edit + EDIT_OFF_DOT)) {
-        BlinkerStart(*(AM2_Widget **)((uint8_t *)edit + EDIT_OFF_DOT),
-                     0x46, 1);
+     * plays wave 0 while it does. */
+    if (*(AM2_Widget **)(FOCUS + EDIT_OFF_DOT)) {
+        BlinkerStart(*(AM2_Widget **)(FOCUS + EDIT_OFF_DOT), 0x46, 1);
         PlaySoundAt(0, 0, 0, 0, 0);
     }
 
-    self = (uint8_t *)g_focusedEdit;
-    text = *(char **)(self + EDIT_OFF_TEXT);
-    len  = (int32_t)strlen(text);
+    len = (int32_t)strlen(*(const char *const *)(FOCUS + EDIT_OFF_TEXT));
 
     if (ch >= 0x20 && ch < 0x80 && ch != '^'
-        && strchr(*(const char *const *)(self + EDIT_OFF_CHARSET), (int)ch)) {
-        int32_t width = TextExtent(*(const char *const *)(self + EDIT_OFF_TEXT),
-                                   *(const int32_t *)(self + EDIT_OFF_FONT), 0)
-                        + EDIT_TEXT_MARGIN;
-
-        self = (uint8_t *)g_focusedEdit;
-        if (width > g_focusedEdit->w
-            || len >= *(const int32_t *)(self + EDIT_OFF_MAX) - 1) {
+        && orig_strchr(*(const char *const *)(FOCUS + EDIT_OFF_CHARSET), (int)ch)) {
+        if (TextExtent(*(const char *const *)(FOCUS + EDIT_OFF_TEXT),
+                       *(const int32_t *)(FOCUS + EDIT_OFF_FONT), 0)
+                + EDIT_TEXT_MARGIN > g_focusedEdit->w
+            || len >= *(const int32_t *)(FOCUS + EDIT_OFF_MAX) - 1) {
             PlaySoundAt(2, 0, 0, 0, 0);
             return;
         }
-        text = *(char **)(self + EDIT_OFF_TEXT);
-        text[len]     = (char)ch;
-        text[len + 1] = '\0';
+        (*(char **)(FOCUS + EDIT_OFF_TEXT))[len]     = (char)ch;
+        (*(char **)(FOCUS + EDIT_OFF_TEXT))[len + 1] = '\0';
         EditNotifyAndRepaint();
         return;
     }
@@ -11676,19 +11669,20 @@ void __cdecl EditCharHandler(uint32_t ch, uint32_t lo, uint32_t hi)
             PlaySoundAt(2, 0, 0, 0, 0);
             return;
         }
-        text[len - 1] = '\0';
+        (*(char **)(FOCUS + EDIT_OFF_TEXT))[len - 1] = '\0';
         EditNotifyAndRepaint();
         return;
     }
 
     if (ch == 0x0D) {
         void (__cdecl *onEnter)(AM2_Widget *) =
-            *(void (__cdecl *const *)(AM2_Widget *))(self + EDIT_OFF_ON_ENTER);
+            *(void (__cdecl *const *)(AM2_Widget *))(FOCUS + EDIT_OFF_ON_ENTER);
 
         if (onEnter)
             onEnter(g_focusedEdit);
         return;
     }
+#undef FOCUS
 
     if (ch != 9)
         PlaySoundAt(3, 0, 0, 0, 0);

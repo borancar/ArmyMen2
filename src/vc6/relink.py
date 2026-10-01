@@ -301,7 +301,10 @@ def main():
     # ADDR_X to AM2_SA(am2_sa_y) (operator new/delete, the logger, the DirectX
     # creators), so a call compiles to a direct e8 at am2_sa_y -- which stands
     # for the original function at ADDR_X.
-    sa = re.compile(r"#define\s+(ADDR_[A-Z0-9_]+)\s+AM2_SA\((am2_sa_[A-Za-z0-9_]+)\)")
+    # The CRT stand-ins (crt_*) the same way: ADDR_CRT_STRCHR -> crt_strchr
+    # is the game CRT's strchr at its own VA. Unmapped, a call to one was an
+    # unresolved e8 and the function could never match.
+    sa = re.compile(r"#define\s+(ADDR_[A-Z0-9_]+)\s+AM2_SA\(((?:am2_sa_|crt_)[A-Za-z0-9_]+)\)")
     for line in open(os.path.join(BM.REPO, "src/inject/standalone.h")):
         m = sa.match(line.strip())
         if m and m.group(1) in addr:
