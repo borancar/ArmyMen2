@@ -121,63 +121,71 @@ static int32_t DepthCompareBody(void *a, void *b)
 {
     const uint8_t *pa = (const uint8_t *)a;
     const uint8_t *pb = (const uint8_t *)b;
-    int16_t        la, lb;
-    float          sa, sb;
-    int32_t        ax, ay, bx, by;
+    int32_t        p;
 
+    /* Every field is read where it is used, as the image does. */
+#define LA (*(const int16_t *)(pa + OBJ_OFF_DEPTH_LAYER))
+#define LB (*(const int16_t *)(pb + OBJ_OFF_DEPTH_LAYER))
+#define SA (*(const float *)(pa + OBJ_OFF_DEPTH_SLOPE))
+#define SB (*(const float *)(pb + OBJ_OFF_DEPTH_SLOPE))
+#define AX ((int32_t)*(const int16_t *)(pa + ROW_OFF_X))
+#define AY ((int32_t)*(const int16_t *)(pa + ROW_OFF_Y))
+#define BX ((int32_t)*(const int16_t *)(pb + ROW_OFF_X))
+#define BY ((int32_t)*(const int16_t *)(pb + ROW_OFF_Y))
     if (!pa || !pb)
         return 0;
 
-    la = *(const int16_t *)(pa + OBJ_OFF_DEPTH_LAYER);
-    lb = *(const int16_t *)(pb + OBJ_OFF_DEPTH_LAYER);
-    if (la > 0 && lb > 0) {
-        if (la > lb)
+    if (LA > 0 && LB > 0) {
+        if (LA > LB)
             return 1;
-        if (la < lb)
+        if (LA < LB)
             return -1;
     }
 
-    sa = *(const float *)(pa + OBJ_OFF_DEPTH_SLOPE);
-    sb = *(const float *)(pb + OBJ_OFF_DEPTH_SLOPE);
-    ax = *(const int16_t *)(pa + ROW_OFF_X);
-    ay = *(const int16_t *)(pa + ROW_OFF_Y);
-    bx = *(const int16_t *)(pb + ROW_OFF_X);
-    by = *(const int16_t *)(pb + ROW_OFF_Y);
+    if (SA != 0.0f) {
+        if (SB != 0.0f) {
+            int32_t aInFront = DepthProject(BX - AX, SA, AY) > BY ? 1 : 0;
 
-    if (sa != 0.0f && sb != 0.0f) {
-        int32_t fromA = DepthProject(bx - ax, sa, ay);
-        int32_t fromB = DepthProject(ax - bx, sb, by);
-        int32_t aInFront = (fromA > by) ? 1 : 0;
-
-        if (ay > fromB && aInFront)
+            p = DepthProject(AX - BX, SB, BY);
+            if (AY > p && aInFront)
+                return 1;
+            if (AY < p && !aInFront)
+                return -1;
+            /* They disagree: plain y decides. */
+        } else {
+            /* Only A has a slope, so only A's projection is available. */
+            p = DepthProject(BX - AX, SA, AY);
+            if (p > BY)
+                return 1;
+            if (p < BY)
+                return -1;
+            return (pb < pa) ? 1 : -1;
+        }
+    } else if (SB != 0.0f) {
+        p = DepthProject(AX - BX, SB, BY);
+        if (AY > p)
             return 1;
-        if (ay < fromB && !aInFront)
+        if (AY < p)
             return -1;
-        /* They disagree: plain y decides. */
-    } else if (sa != 0.0f) {
-        /* Only A has a slope, so only A's projection is available. */
-        if (DepthProject(bx - ax, sa, ay) > by)
-            return 1;
-        if (DepthProject(bx - ax, sa, ay) == by)
-            return (pb < pa) ? 1 : -1;
-        return -1;
-    } else if (sb != 0.0f) {
-        int32_t fromB = DepthProject(ax - bx, sb, by);
-
-        if (ay > fromB)
-            return 1;
-        if (ay == fromB)
-            return (pb < pa) ? 1 : -1;
-        return -1;
+        return (pb < pa) ? 1 : -1;
     }
 
-    if ((int16_t)ay > (int16_t)by)
+    if (*(const int16_t *)(pa + ROW_OFF_Y) > *(const int16_t *)(pb + ROW_OFF_Y))
         return 1;
-    if ((int16_t)ay < (int16_t)by)
+    if (*(const int16_t *)(pa + ROW_OFF_Y) < *(const int16_t *)(pb + ROW_OFF_Y))
         return -1;
 
     return (pb < pa) ? 1 : -1;
+#undef LA
+#undef LB
+#undef SA
+#undef SB
+#undef AX
+#undef AY
+#undef BX
+#undef BY
 }
+
 
 /* AM2_TRACE_DEPTH=1: the same line the hybrid's dev loader logs over the
  * original, so the two games' comparisons diff at a pump. */

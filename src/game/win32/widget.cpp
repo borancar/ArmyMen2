@@ -17683,7 +17683,9 @@ void __cdecl PointerSelect(void *obj, uint32_t at)
  * OBJ_OFF_FIELD_530 test, which is the arm ArmyAlliedWithObj takes for 0.
  *
  * A FOE gets the enemy overlay row and answers 1. A FRIEND falls into the
- * shared tail above. The opening refusals are the same in both: destroyed or
+ * shared tail above. The foe arm is written first, under the negated test:
+ * that is the image's layout, and it lets the opening refusals share the
+ * tail's `return 0`. The opening refusals are the same in both: destroyed or
  * concealed -- one `test` against OBJ_FLAG_DESTROYED | OBJ_FLAG_CONCEALED --
  * and zero health.
  *
@@ -17701,14 +17703,14 @@ int32_t __cdecl PointerPickMode4(void *obj)
     if (*(const int8_t *)(o + OBJ_OFF_ARMY) == AM2_ARMY_NEUTRAL)
         return 0;   /* hoisted above the alliance test -- see above */
 
-    if (ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
-                          o, 0))
-        return PointerFriendTail(o);
-
-    OverlayPrepare(AM2_OVERLAY_ROW_ENEMY, 1);
-    *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
-        *(const uint32_t *)(o + OBJ_OFF_UID);
-    return 1;
+    if (!ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                           o, 0)) {
+        OverlayPrepare(AM2_OVERLAY_ROW_ENEMY, 1);
+        *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
+            *(const uint32_t *)(o + OBJ_OFF_UID);
+        return 1;
+    }
+    return PointerFriendTail(o);
 }
 
 int32_t __cdecl PointerPickMode5(void *obj)
@@ -17723,14 +17725,14 @@ int32_t __cdecl PointerPickMode5(void *obj)
 
     /* No hoisted refusal: a neutral object reaches the alliance test, which
      * answers ALLIED for army 4. That is the whole difference from mode 4. */
-    if (ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
-                          o, 0))
-        return PointerFriendTail(o);
-
-    OverlayPrepare(AM2_OVERLAY_ROW_ENEMY, 1);
-    *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
-        *(const uint32_t *)(o + OBJ_OFF_UID);
-    return 1;
+    if (!ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                           o, 0)) {
+        OverlayPrepare(AM2_OVERLAY_ROW_ENEMY, 1);
+        *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
+            *(const uint32_t *)(o + OBJ_OFF_UID);
+        return 1;
+    }
+    return PointerFriendTail(o);
 }
 
 /* PointerPickMode6 -- original 0x00459300, 288 bytes, mode 6's PICK.
