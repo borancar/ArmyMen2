@@ -116,6 +116,11 @@ main result so far (details in `src/vc6/README.md`):
     EvtArmyAtPoint/EvtAtObjPosB instead of the one resolved unit. Also:
     LoadMap fails on a chunk-size mismatch, Step3Drive's two skipped calls
     are back. Found by counting each callee's calls, image against ours.
+  - **HudSquadDetail was 0x37E bytes short** (2026-10-01): a size scan
+    (ours vs the image's unpadded extent) caught what call counts could
+    not. The vehicle readout's armour is clamped to 99 before `%d mm`, which
+    the transcription dropped; the stat tables are stack locals and the
+    speed table has no uninitialised slot -- it is {5,3,4,4,2,4}.
   - **Two wrong callees the call-target scan found** (2026-09-30): DestroyFlow
     simulated the departed player's acks against GetReSendMask (+0x18) where
     the image passes GetPlayerMask (+0x14); UpdateTrooperAction asked
