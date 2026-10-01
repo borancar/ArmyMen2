@@ -131,6 +131,15 @@ main result so far (details in `src/vc6/README.md`):
     out (see the note in the constructor): the image clears names[i]'s
     +0x50 and sets +0x4C on the spinner's three children (+0x58/+0x5C/
     +0x60) -- not on names[i] -- if anyone revisits the measurement.
+  - **ScriptParseActionRecon rewritten from the image and checked under
+    Unicorn** (2026-10-01): tools/actcheck.py runs the original and our
+    relinked bytes side by side over every action in the shipped scripts
+    (13,122) and over error shapes; all agree. The table-driven version it
+    replaces was wrong on six inputs no shipped script contains: facings and
+    fire bearings are cut to a byte, setfacing steps over a non-number,
+    setitemowner steps past its number, setobjstate/makesmoke/createpowerup
+    read their trailing number unbounded, createpowerup ends silently, and
+    createroach/ally/setforcecolor return whether the army parsed.
   - **Two wrong callees the call-target scan found** (2026-09-30): DestroyFlow
     simulated the departed player's acks against GetReSendMask (+0x18) where
     the image passes GetPlayerMask (+0x14); UpdateTrooperAction asked

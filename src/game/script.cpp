@@ -1507,13 +1507,6 @@ static inline int32_t ActStep(AM2_ScriptCtx *ctx, int32_t *at)
     return 0;
 }
 
-static inline void ActTypeErr(AM2_ScriptCtx *ctx, int32_t *at, int32_t kind)
-{
-    am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n",
-            ctx->tokens[*at].line,
-            ScriptTokenText(&ctx->tokens[*at], kScriptWord),
-            kKindName(kind));
-}
 
 /* `createtrooper`, `createvehicle`: a location and an army, and the army's
  * own result decides the return. */
@@ -1529,116 +1522,6 @@ static inline int32_t ActPlaceAndArmy(AM2_ScriptCtx *ctx, int32_t *at,
     return army >= 0;
 }
 
-/* The weapon a `createtrooper` carries. -1 for one the keyword table has but
- * the trooper table rejects. */
-static inline int32_t ActWeapon(int32_t id)
-{
-    switch (id) {
-    case AM2_TOK_RIFLE:             return 1;
-    case AM2_TOK_BAZOOKA:           return 4;
-    case AM2_TOK_GRENADE:           return 2;
-    case AM2_TOK_FLAMER:            return 3;
-    case AM2_TOK_MORTAR:            return 5;
-    case AM2_TOK_AUTORIFLE:         return 10;
-    case AM2_TOK_SWEEPER:           return 20;
-    case AM2_TOK_VULCAN:            return 29;
-    case AM2_TOK_SNIPER:            return 30;
-    default:  return -1;    /* flak, yours, explosive, detonator, lure,
-                             * heavymg -- weapons the powerup table has and
-                             * this one does not */
-    }
-}
-
-static inline int32_t ActChassis(int32_t id)
-{
-    switch (id) {
-    case AM2_TOK_TANK:              return 1;
-    case AM2_TOK_JEEP:              return 0;
-    case AM2_TOK_HALFTRACK:         return 2;
-    case AM2_TOK_CONVOY:            return 3;
-    case AM2_TOK_BOAT:              return 5;
-    default: return -1;     /* `vehicle` itself is not a chassis */
-    }
-}
-
-static inline int32_t ActPickup(int32_t id)
-{
-    switch (id) {
-    case AM2_TOK_BAZOOKA:           return 4;
-    case AM2_TOK_GRENADE:           return 2;
-    case AM2_TOK_FLAMER:            return 3;
-    case AM2_TOK_MORTAR:            return 5;
-    case AM2_TOK_AUTORIFLE:         return 10;
-    case AM2_TOK_FLAK:              return 28;
-    case AM2_TOK_MINE:              return 11;
-    case AM2_TOK_EXPLOSIVE:         return 12;
-    case AM2_TOK_SWEEPER:           return 20;
-    case AM2_TOK_LURE:              return 14;
-    case AM2_TOK_VULCAN:            return 29;
-    case AM2_TOK_HEAVYMG:           return 8;
-    case AM2_TOK_SNIPER:            return 30;
-    case AM2_TOK_VEHICLEAMMO:       return 32;
-    case AM2_TOK_VEHICLEARMOR:      return 31;
-    case AM2_TOK_VEHICLENITRO:      return 33;
-    case AM2_TOK_CAMOUFLAGE:        return 34;
-    case AM2_TOK_DISGUISEGREEN:     return 35;
-    case AM2_TOK_DISGUISETAN:       return 36;
-    case AM2_TOK_DISGUISEBLUE:      return 37;
-    case AM2_TOK_DISGUISEGREY:      return 38;
-    case AM2_TOK_MAGNIFYING:        return 39;
-    case AM2_TOK_AEROSOL:           return 40;
-    case AM2_TOK_M80:               return 42;
-    case AM2_TOK_MEDPACK:           return 23;
-    case AM2_TOK_MEDKIT:            return 22;
-    case AM2_TOK_AIRSTRIKE:         return 24;
-    case AM2_TOK_PARATROOPERS:      return 25;
-    case AM2_TOK_RECON:             return 26;
-    case AM2_TOK_WRENCH:            return 41;
-    default:  return -1;    /* `detonator` is not a pickup */
-    }
-}
-
-/* projectile, fire, crush, explosion -- shared by `damage` and
- * `setdamagepad`, and the codes are not in keyword order. */
-static inline int32_t ActDamageKind(int32_t id)
-{
-    switch (id) {
-    case AM2_TOK_PROJECTILE:        return 2;
-    case AM2_TOK_FIRE:              return 1;
-    case AM2_TOK_CRUSH:             return 4;
-    case AM2_TOK_EXPLOSION:         return 3;
-    default:  return -1;
-    }
-}
-
-/* attack, defend, ignore, evade -- shared by `order ... inmode` and
- * `setaimode`, and the codes are neither sequential nor in keyword order. */
-static inline int32_t ActAiMode(int32_t id)
-{
-    switch (id) {
-    case AM2_TOK_ATTACK:            return 6;
-    case AM2_TOK_DEFEND:            return 7;
-    case AM2_TOK_IGNORE:            return 2;
-    case AM2_TOK_EVADE:             return 5;
-    default:  return -1;
-    }
-}
-
-/* A variable name that must already be declared, for the several actions that
- * take one. The message differs per caller, so it comes in. */
-static inline int32_t ActVarName(AM2_ScriptCtx *ctx, int32_t *at, AM2_ScriptAction *act,
-                          const char *undeclared)
-{
-    int32_t idx = ScriptFindName((const char *)ctx->tokens[*at].value);
-    if (idx < 0 || kScriptNames[idx].type != AM2_NAME_TYPE_INTEGER) {
-        am2_log(undeclared, ctx->tokens[*at].line, ctx->tokens[*at].value);
-        return 0;
-    }
-    act->xvar = idx;
-    (*at)++;
-    return 1;
-}
-
 /* 0x00440D70. One act, into a 0x48-byte record.
  *
  * 59 keywords behind a byte-index dispatch, four of which dispatch again.
@@ -1650,26 +1533,68 @@ static inline int32_t ActVarName(AM2_ScriptCtx *ctx, int32_t *at, AM2_ScriptActi
  * Failures split three ways and it matters which: some log and return 0, some
  * return 0 in silence because the callee has already spoken, and several
  * return 1 having simply stopped early -- an optional argument that was not
- * there. */
+ * there.
+ *
+ * Transcribed case by case from the image, in its layout order, and checked
+ * against it under Unicorn on every action in the shipped scripts plus a set
+ * of error shapes (tools/actcheck.py). That pass found six answers the
+ * earlier, table-driven version got wrong: setfacing/setgunfacing step over a
+ * token that is neither a number nor `refvar`; a facing or a fireweapon/
+ * unitfire bearing is cut to a byte; setitemowner steps past its number;
+ * createroach, ally/unally and setforcecolor return whether the army parsed;
+ * setobjstate, makesmoke/makeflame and createpowerup read their trailing
+ * number with no bounds test; createpowerup ends silently at end of script;
+ * createexplosion tests the bound before each step, not after. */
 static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
                                       AM2_ScriptAction *act)
 {
+/* Every case is written out for itself, as the image has them: the token
+ * step, the kind test with its own error, the store. VC6 folds the identical
+ * tails together; the end-of-script message is the one shared block, and it
+ * falls into the default `return 0`. */
+#define TOK       (ctx->tokens[*at])
+#define TOKVAL    ((int32_t)(uintptr_t)TOK.value)
+#define STEP()    if (++(*at) >= ctx->count) goto eos
+#define TYPEERR(K)                                                          \
+    {                                                                       \
+        am2_log("Line [%4d]:  '%s' found, but expected token of type %s\n", \
+                TOK.line, ScriptTokenText(&TOK, kScriptWord), kKindName(K)); \
+        return 0;                                                           \
+    }
+#define WANT(K)   if (TOK.kind != (K)) TYPEERR(K)
+/* `name` must be a declared variable: its index goes to xvar. */
+#define VARNAME(MSG)                                                        \
+    {                                                                       \
+        int32_t v = ScriptFindName((const char *)TOK.value);                \
+        if (v < 0 || kScriptNames[v].type != AM2_NAME_TYPE_INTEGER) {           \
+            am2_log(MSG, TOK.line, (const char *)TOK.value);                \
+            return 0;                                                       \
+        }                                                                   \
+        act->xvar = v;                                                      \
+        (*at)++;                                                            \
+    }
+/* The same, as setvar and addvar test it: against -1 exactly. */
+#define VARNAME_EQ(MSG)                                                     \
+    {                                                                       \
+        int32_t v = ScriptFindName((const char *)TOK.value);                \
+        if (v == -1 || kScriptNames[v].type != AM2_NAME_TYPE_INTEGER) {     \
+            am2_log(MSG, TOK.line, (const char *)TOK.value);                \
+            return 0;                                                       \
+        }                                                                   \
+        act->xvar = v;                                                      \
+        (*at)++;                                                            \
+    }
+
     memset(act, 0, sizeof *act);
     act->uid = -2;
 
-    if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED)
-        return 0;
-    int32_t id = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-    if (id < 64)
-        return 0;
-    if (id > 186)
+    if (TOK.kind != AM2_TOKEN_RESERVED)
         return 0;
 
-    switch (id) {
+    switch (TOKVAL) {
 
     case AM2_TOK_SETCAMERAFOCUS:
-        if (!ActStep(ctx, at))
-            return 0;
+        STEP();
         act->code = 0x1D;
         return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
 
@@ -1679,380 +1604,384 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         return 1;
 
     case AM2_TOK_SUSPENDAI:
-    case AM2_TOK_REVIVEAI:
-        if (!ActStep(ctx, at))
-            return 0;
-        act->code = (id == AM2_TOK_SUSPENDAI) ? 0x1B : 0x1C;
-        if (ctx->tokens[*at].kind == AM2_TOKEN_STRING)
+        STEP();
+        act->code = 0x1B;
+        if (TOK.kind == AM2_TOKEN_STRING)
             return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
-        /* No name means everyone, which is the same built-in uid the
-         * resolver's unreachable id-15 arm would have given. */
+        /* No name means everyone. */
         act->subject = *(const int32_t *)((void *)(uintptr_t)(ADDR_SVAR_ID15));
         return 1;
 
+    case AM2_TOK_REVIVEAI:
+        STEP();
+        act->code = 0x1C;
+        if (TOK.kind == AM2_TOKEN_STRING)
+            return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
+        act->subject = *(const int32_t *)((void *)(uintptr_t)(ADDR_SVAR_ID15));
+        return 1;
+
+    /* The record keeps the token's own string. Nothing copies it and nothing
+     * frees it here. */
     case AM2_TOK_SHOWMESSAGE:
-    case AM2_TOK_SHOWBITMAP:
-    case AM2_TOK_SHOWBITMAPNOPAUSE:
-    case AM2_TOK_SHOWFAILURE:
-    case AM2_TOK_SHOWPDA:
-    case AM2_TOK_SETBRIEFING:
-    case AM2_TOK_SETBRIEFVO:
-    case AM2_TOK_SETSTRATMAP:       {
-        if (!ActStep(ctx, at))
-            return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
-            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
-            return 0;
-        }
-        static const struct { int32_t id, code; } kShow[] = {
-            { 64, 1 }, { 65, 2 }, { 66, 3 }, { 71, 4 }, { 72, 5 },
-            { 151, 0x27 }, { 152, 0x28 }, { 153, 0x29 },
-        };
-        for (uint32_t i = 0; i < sizeof kShow / sizeof kShow[0]; i++)
-            if (kShow[i].id == id)
-                act->code = kShow[i].code;
-        /* The record keeps the token's own string. Nothing copies it and
-         * nothing frees it here. */
-        act->text = (char *)ctx->tokens[*at].value;
+        STEP();
+        WANT(AM2_TOKEN_STRING)
+        act->code = 1;
+        act->text = (char *)TOK.value;
         (*at)++;
         return 1;
-    }
 
-    case 67:                                    /* playsound */
-        if (!ActStep(ctx, at))
-            return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
-            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
-            return 0;
-        }
+    case AM2_TOK_SHOWBITMAP:
+        STEP();
+        WANT(AM2_TOKEN_STRING)
+        act->code = 2;
+        act->text = (char *)TOK.value;
+        (*at)++;
+        return 1;
+
+    case AM2_TOK_SHOWBITMAPNOPAUSE:
+        STEP();
+        WANT(AM2_TOKEN_STRING)
+        act->code = 3;
+        act->text = (char *)TOK.value;
+        (*at)++;
+        return 1;
+
+    case AM2_TOK_SHOWFAILURE:
+        STEP();
+        WANT(AM2_TOKEN_STRING)
+        act->code = 4;
+        act->text = (char *)TOK.value;
+        (*at)++;
+        return 1;
+
+    case AM2_TOK_SHOWPDA:
+        STEP();
+        WANT(AM2_TOKEN_STRING)
+        act->code = 5;
+        act->text = (char *)TOK.value;
+        (*at)++;
+        return 1;
+
+    case AM2_TOK_PLAYSOUND:
+        STEP();
+        WANT(AM2_TOKEN_STRING)
         act->code = 6;
-        act->text = (char *)ctx->tokens[*at].value;
+        act->text = (char *)TOK.value;
         act->n0 = 0;
         act->n1 = 1;
         act->extra = 0;
         if (++(*at) >= ctx->count)
             return 1;
         ScriptLocation(ctx, at, act, 1);
-        if (*at >= ctx->count ||
-            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+        if (*at >= ctx->count || TOK.kind != AM2_TOKEN_INTEGER)
             return 1;
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        if (++(*at) >= ctx->count ||
-            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+        act->n0 = TOKVAL;
+        if (++(*at) >= ctx->count || TOK.kind != AM2_TOKEN_INTEGER)
             return 1;
-        act->n1 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        act->n1 = TOKVAL;
         /* No bounds check before this one, unlike the two above. */
         if (ctx->tokens[++(*at)].kind != AM2_TOKEN_INTEGER)
             return 1;
-        act->extra = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        act->extra = TOKVAL;
         (*at)++;
         return 1;
 
-    case 68:                                    /* playitemsound */
-        if (!ActStep(ctx, at))
-            return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
-            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
-            return 0;
-        }
+    case AM2_TOK_PLAYITEMSOUND:
+        STEP();
+        WANT(AM2_TOKEN_STRING)
         act->code = 7;
+        act->text = (char *)TOK.value;
         act->n0 = 0;
-        act->text = (char *)ctx->tokens[*at].value;
         act->n1 = 1;
         act->extra = 0;
         if (++(*at) >= ctx->count)
             return 1;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count ||
-            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+        if (*at >= ctx->count || TOK.kind != AM2_TOKEN_INTEGER)
             return 1;
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        if (++(*at) >= ctx->count ||
-            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+        act->n0 = TOKVAL;
+        if (++(*at) >= ctx->count || TOK.kind != AM2_TOKEN_INTEGER)
             return 1;
-        act->n1 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        act->n1 = TOKVAL;
         if (ctx->tokens[++(*at)].kind != AM2_TOKEN_INTEGER)
             return 1;
-        act->extra = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        act->extra = TOKVAL;
         (*at)++;
         return 1;
 
-    case 69:                                    /* playmusic */
-        if (!ActStep(ctx, at))
-            return 0;
+    case AM2_TOK_PLAYMUSIC:
+        STEP();
         act->code = 8;
         act->text = 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING)
+        if (TOK.kind != AM2_TOKEN_STRING)
             return 1;
-        act->text = (char *)ctx->tokens[*at].value;
-        if (++(*at) >= ctx->count ||
-            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+        act->text = (char *)TOK.value;
+        if (++(*at) >= ctx->count || TOK.kind != AM2_TOKEN_INTEGER)
             return 1;
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        act->n0 = TOKVAL;
         (*at)++;
         return 1;
 
-    case 70:                                    /* tracevar */
-        if (!ActStep(ctx, at))
-            return 0;
+    case AM2_TOK_TRACEVAR:
+        STEP();
         act->code = 9;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
-            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
-            return 0;
-        }
-        return ActVarName(ctx, at, act,
-            "Line [%4d]:  expected variable name in TRACEVAR but variable "
-            "%s not declared\n");
-    case 78:                                    /* trigger */
-        if (!ActStep(ctx, at))
-            return 0;
-        /* The uid lands at +0x00, over the -2 the record opens with, and the
-         * zero at +0x04 -- the call pushes the record and then the record
-         * plus four. */
+        WANT(AM2_TOKEN_STRING)
+        VARNAME("Line [%4d]:  expected variable name in TRACEVAR but variable "
+                "%s not declared\n")
+        return 1;
+
+    case AM2_TOK_TRIGGER:
+        STEP();
+        /* The uid lands at +0x00 and the zero at +0x04 -- the call pushes
+         * the record and then the record plus four. */
         return ScriptObjectUid(ctx, at, &act->uid2, &act->uid) != 0;
 
-    case 79:                                    /* triggerdelay */
-        if (!ActStep(ctx, at))
-            return 0;
-        if (ctx->tokens[*at].kind == AM2_TOKEN_RESERVED &&
-            (int32_t)(uintptr_t)ctx->tokens[*at].value == AM2_TOK_REFVAR) {   /* refvar */
-            if (!ActStep(ctx, at))
-                return 0;
-            if (!ActVarName(ctx, at, act,
-                    "Line [%4d]:  expected variable name but variable %s not "
-                    "declared\n"))
-                return 0;
-        } else if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
-            act->delay = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+    case AM2_TOK_TRIGGERDELAY:
+        STEP();
+        if (TOK.kind == AM2_TOKEN_RESERVED && TOKVAL == AM2_TOK_REFVAR) {
+            STEP();
+            VARNAME("Line [%4d]:  expected variable name but variable %s not "
+                    "declared\n")
+        } else if (TOK.kind == AM2_TOKEN_INTEGER) {
+            act->delay = TOKVAL;
             if (act->delay < 0) {
                 am2_log("Line[%4d]:  Negative time set for a TRIGGERDELAY.\n",
-                        ctx->tokens[*at].line);
+                        TOK.line);
                 return 0;
             }
             (*at)++;
-        } else {
-            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
-            return 0;
-        }
+        } else
+            TYPEERR(AM2_TOKEN_INTEGER)
         if (*at >= ctx->count) {
             am2_log("Unexpected end of script.\n");
             return 0;
         }
         return ScriptObjectUid(ctx, at, &act->uid2, &act->uid) != 0;
 
-    case 80:                                    /* createtrooper */
-        if (!ActStep(ctx, at))
-            return 0;
+    case AM2_TOK_CREATETROOPER:
+        STEP();
         act->code = 0x0D;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
-            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
+        WANT(AM2_TOKEN_STRING)
+        act->text = (char *)TOK.value;
+        STEP();
+        WANT(AM2_TOKEN_RESERVED)
+        switch (TOKVAL) {
+        case AM2_TOK_RIFLE:     act->item = 1;    break;
+        case AM2_TOK_BAZOOKA:   act->item = 4;    break;
+        case AM2_TOK_GRENADE:   act->item = 2;    break;
+        case AM2_TOK_FLAMER:    act->item = 3;    break;
+        case AM2_TOK_MORTAR:    act->item = 5;    break;
+        case AM2_TOK_AUTORIFLE: act->item = 10;   break;
+        case AM2_TOK_VULCAN:    act->item = 29;   break;
+        case AM2_TOK_SNIPER:    act->item = 30;   break;
+        case AM2_TOK_SWEEPER:   act->item = 20;   break;
+        default:
+            /* flak, yours, explosive, detonator, lure, heavymg -- weapons
+             * the powerup table has and this one does not */
+            am2_log("Line [%4d]:  Illegal weapon type '%s'\n",
+                    TOK.line, ScriptTokenText(&TOK, kScriptWord));
             return 0;
-        }
-        act->text = (char *)ctx->tokens[*at].value;
-        if (!ActStep(ctx, at))
-            return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
-            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
-            return 0;
-        }
-        {
-            int32_t w = ActWeapon((int32_t)(uintptr_t)ctx->tokens[*at].value);
-            if (w < 0) {
-                am2_log("Line [%4d]:  Illegal weapon type '%s'\n",
-                        ctx->tokens[*at].line,
-                        ScriptTokenText(&ctx->tokens[*at], kScriptWord));
-                return 0;
-            }
-            act->item = w;
         }
         return ActPlaceAndArmy(ctx, at, act);
 
-    case 114:                                   /* createpowerup */
-        if (!ActStep(ctx, at))
+    case AM2_TOK_CREATEVEHICLE:
+        STEP();
+        act->code = 0x0F;
+        WANT(AM2_TOKEN_STRING)
+        act->text = (char *)TOK.value;
+        STEP();
+        WANT(AM2_TOKEN_RESERVED)
+        switch (TOKVAL) {
+        case AM2_TOK_JEEP:      act->n0 = 0;      break;
+        case AM2_TOK_TANK:      act->n0 = 1;      break;
+        case AM2_TOK_HALFTRACK: act->n0 = 2;      break;
+        case AM2_TOK_CONVOY:    act->n0 = 3;      break;
+        case AM2_TOK_BOAT:      act->n0 = 5;      break;
+        default:                /* `vehicle` itself is not a chassis */
+            am2_log("Line [%4d]:  Illegal vehicle type '%s'\n",
+                    TOK.line, ScriptTokenText(&TOK, kScriptWord));
             return 0;
+        }
+        return ActPlaceAndArmy(ctx, at, act);
+
+    case AM2_TOK_CREATEPOWERUP:
+        STEP();
         act->code = 0x10;
         /* The name is optional here, unlike the other two creates. */
-        if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
-            act->text = (char *)ctx->tokens[*at].value;
-            if (!ActStep(ctx, at))
-                return 0;
+        if (TOK.kind != AM2_TOKEN_RESERVED) {
+            WANT(AM2_TOKEN_STRING)
+            act->text = (char *)TOK.value;
+            STEP();
         }
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
-            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
+        WANT(AM2_TOKEN_RESERVED)
+        switch (TOKVAL) {
+        case AM2_TOK_BAZOOKA:       act->item = 4;    break;
+        case AM2_TOK_GRENADE:       act->item = 2;    break;
+        case AM2_TOK_FLAMER:        act->item = 3;    break;
+        case AM2_TOK_MORTAR:        act->item = 5;    break;
+        case AM2_TOK_AUTORIFLE:     act->item = 10;   break;
+        case AM2_TOK_FLAK:          act->item = 28;   break;
+        case AM2_TOK_MINE:          act->item = 11;   break;
+        case AM2_TOK_EXPLOSIVE:     act->item = 12;   break;
+        case AM2_TOK_SWEEPER:       act->item = 20;   break;
+        case AM2_TOK_MEDPACK:       act->item = 23;   break;
+        case AM2_TOK_MEDKIT:        act->item = 22;   break;
+        case AM2_TOK_LURE:          act->item = 14;   break;
+        case AM2_TOK_AIRSTRIKE:     act->item = 24;   break;
+        case AM2_TOK_PARATROOPERS:  act->item = 25;   break;
+        case AM2_TOK_RECON:         act->item = 26;   break;
+        case AM2_TOK_VULCAN:        act->item = 29;   break;
+        case AM2_TOK_HEAVYMG:       act->item = 8;    break;
+        case AM2_TOK_SNIPER:        act->item = 30;   break;
+        case AM2_TOK_VEHICLEAMMO:   act->item = 32;   break;
+        case AM2_TOK_VEHICLEARMOR:  act->item = 31;   break;
+        case AM2_TOK_VEHICLENITRO:  act->item = 33;   break;
+        case AM2_TOK_CAMOUFLAGE:    act->item = 34;   break;
+        case AM2_TOK_DISGUISEGREEN: act->item = 35;   break;
+        case AM2_TOK_DISGUISETAN:   act->item = 36;   break;
+        case AM2_TOK_DISGUISEBLUE:  act->item = 37;   break;
+        case AM2_TOK_DISGUISEGREY:  act->item = 38;   break;
+        case AM2_TOK_MAGNIFYING:    act->item = 39;   break;
+        case AM2_TOK_AEROSOL:       act->item = 40;   break;
+        case AM2_TOK_WRENCH:        act->item = 41;   break;
+        case AM2_TOK_M80:           act->item = 42;   break;
+        default:                    /* `detonator` is not a pickup */
+            am2_log("Line [%4d]:  Illegal powerup type '%s'\n",
+                    TOK.line, ScriptTokenText(&TOK, kScriptWord));
             return 0;
         }
-        {
-            int32_t p = ActPickup((int32_t)(uintptr_t)ctx->tokens[*at].value);
-            if (p < 0) {
-                am2_log("Line [%4d]:  Illegal powerup type '%s'\n",
-                        ctx->tokens[*at].line,
-                        ScriptTokenText(&ctx->tokens[*at], kScriptWord));
-                return 0;
-            }
-            act->item = p;
-        }
-        if (!ActStep(ctx, at))
+        /* Running out here is fine and silent. */
+        if (++(*at) >= ctx->count)
             return 1;
         if (!ScriptLocation(ctx, at, act, 0))
             return 0;
-        if (*at >= ctx->count ||
-            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+        /* No bounds check before this read. */
+        if (TOK.kind != AM2_TOKEN_INTEGER)
             return 1;
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        act->n0 = TOKVAL;
         (*at)++;
         return 1;
 
-    case 113:                                   /* createvehicle */
-        if (!ActStep(ctx, at))
-            return 0;
-        act->code = 0x0F;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
-            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
-            return 0;
-        }
-        act->text = (char *)ctx->tokens[*at].value;
-        if (!ActStep(ctx, at))
-            return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
-            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
-            return 0;
-        }
-        {
-            int32_t c = ActChassis((int32_t)(uintptr_t)ctx->tokens[*at].value);
-            if (c < 0) {
-                am2_log("Line [%4d]:  Illegal vehicle type '%s'\n",
-                        ctx->tokens[*at].line,
-                        ScriptTokenText(&ctx->tokens[*at], kScriptWord));
-                return 0;
-            }
-            act->n0 = c;
-        }
-        return ActPlaceAndArmy(ctx, at, act);
-
-    case 115:                                   /* createexplosion */
-        if (!ActStep(ctx, at))
-            return 0;
+    case AM2_TOK_CREATEEXPLOSION:
+        STEP();
         act->code = 0x0E;
         if (!ScriptLocation(ctx, at, act, 0))
             return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
-            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
-            return 0;
-        }
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = TOKVAL;
         if (act->n0 < 0x78 || act->n0 > 0x95) {
-            am2_log("Line[%4d]:  Invalid explosion type.\n",
-                    ctx->tokens[*at].line);
+            am2_log("Line[%4d]:  Invalid explosion type.\n", TOK.line);
             act->n0 = 0x7F;
         }
         act->n1 = 0;
         act->army = 4;
-        if (++(*at) >= ctx->count ||
-            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+        /* The bound is tested BEFORE the step, each time. */
+        if (*at >= ctx->count)
             return 1;
-        act->n1 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        if (++(*at) >= ctx->count)
+        (*at)++;
+        if (TOK.kind != AM2_TOKEN_INTEGER)
             return 1;
+        act->n1 = TOKVAL;
+        if (*at >= ctx->count)
+            return 1;
+        (*at)++;
         act->army = ScriptArmyColour(ctx, at);
-        if (act->army < 0)
-            act->army = 4;
+        if (act->army >= 0)
+            return 1;
+        act->army = 4;
         return 1;
 
-    case 116:                                   /* createroach */
-        if (!ActStep(ctx, at))
-            return 0;
+    case AM2_TOK_CREATEROACH:
+        STEP();
         act->code = 0x11;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
-            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
-            return 0;
-        }
-        act->text = (char *)ctx->tokens[*at].value;
-        if (!ActStep(ctx, at))
-            return 0;
+        WANT(AM2_TOKEN_STRING)
+        act->text = (char *)TOK.value;
+        STEP();
         if (!ScriptLocation(ctx, at, act, 0))
             return 0;
         act->army = ScriptArmyColour(ctx, at);
-        return 1;
+        return act->army >= 0;
 
-    case 138:                                   /* setobjstate */
-        if (!ActStep(ctx, at))
-            return 0;
+    case AM2_TOK_SETOBJSTATE:
+        STEP();
         act->code = 0x25;
         /* The object at +0x1C and the state at +0x18 -- the other way round
          * from how the statement reads. */
         if (!ScriptResolveName(ctx, at, &act->target, 0))
             return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
-            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
-            return 0;
-        }
-        {
-            int32_t st = ScriptFindName((const char *)ctx->tokens[*at].value);
-            if (st < 0)
-                st = AddNameTableName((const char *)ctx->tokens[*at].value,
-                                      AM2_NAME_TYPE_REF, 0);
-            act->subject = st;
-        }
-        if (++(*at) >= ctx->count ||
-            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+        WANT(AM2_TOKEN_STRING)
+        act->subject = ScriptFindName((const char *)TOK.value);
+        if (act->subject < 0)
+            act->subject = AddNameTableName((const char *)TOK.value,
+                                            AM2_NAME_TYPE_REF, 0);
+        (*at)++;
+        /* No bounds check before this read. */
+        if (TOK.kind != AM2_TOKEN_INTEGER)
             return 1;
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        act->n0 = TOKVAL;
         (*at)++;
         return 1;
 
-    case 137:                                   /* setobjbmp    */
-    case 124:                                   /* heal         */
-    case 123:                                   /* setmaxhealth */
-        if (!ActStep(ctx, at))
-            return 0;
-        act->code = (id == AM2_TOK_SETOBJBMP) ? 0x24 : (id == AM2_TOK_HEAL) ? 0x0A : 0x0B;
+    case AM2_TOK_SETOBJBMP:
+        STEP();
+        act->code = 0x24;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count) {
-            am2_log("Unexpected end of script.\n");
-            return 0;
-        }
-        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
-            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
-            return 0;
-        }
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (*at >= ctx->count)
+            goto eos;
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = TOKVAL;
         (*at)++;
         return 1;
 
-    case 125:                                   /* damage */
-        if (!ActStep(ctx, at))
+    case AM2_TOK_HEAL:
+        STEP();
+        act->code = 0x0A;
+        if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
+        if (*at >= ctx->count)
+            goto eos;
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = TOKVAL;
+        (*at)++;
+        return 1;
+
+    case AM2_TOK_SETMAXHEALTH:
+        STEP();
+        act->code = 0x0B;
+        if (!ScriptResolveName(ctx, at, &act->subject, 0))
+            return 0;
+        if (*at >= ctx->count)
+            goto eos;
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = TOKVAL;
+        (*at)++;
+        return 1;
+
+    case AM2_TOK_DAMAGE:
+        STEP();
         act->code = 0x0C;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count) {
-            am2_log("Unexpected end of script.\n");
-            return 0;
-        }
-        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
-            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
-            return 0;
-        }
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        act->extra = 0;
-        if (++(*at) >= ctx->count ||
-            ctx->tokens[*at].kind != AM2_TOKEN_RESERVED)
-            return 1;
-        {
-            int32_t k = ActDamageKind(
-                (int32_t)(uintptr_t)ctx->tokens[*at].value);
-            if (k < 0)
-                return 1;
-            act->extra = k;
-        }
+        if (*at >= ctx->count)
+            goto eos;
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = TOKVAL;
         (*at)++;
+        act->extra = 0;
+        if (*at >= ctx->count || TOK.kind != AM2_TOKEN_RESERVED)
+            return 1;
+        switch (TOKVAL) {
+        case AM2_TOK_PROJECTILE: act->extra = 2; (*at)++; return 1;
+        case AM2_TOK_FIRE:       act->extra = 1; (*at)++; return 1;
+        case AM2_TOK_CRUSH:      act->extra = 4; (*at)++; return 1;
+        case AM2_TOK_EXPLOSION:  act->extra = 3; (*at)++; return 1;
+        }
         return 1;
 
-    case 143:                                   /* deploy */
-        if (!ActStep(ctx, at))
-            return 0;
+    case AM2_TOK_DEPLOY:
+        STEP();
         act->code = 0x12;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
@@ -2063,15 +1992,13 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         ScriptLocation(ctx, at, act, 1);
         return 1;
 
-    case 144:                                   /* undeploy */
-        if (!ActStep(ctx, at))
-            return 0;
+    case AM2_TOK_UNDEPLOY:
+        STEP();
         act->code = 0x13;
         return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
 
-    case 145:                                   /* resurrect */
-        if (!ActStep(ctx, at))
-            return 0;
+    case AM2_TOK_RESURRECT:
+        STEP();
         act->code = 0x14;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
@@ -2080,394 +2007,377 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         ScriptLocation(ctx, at, act, 1);      /* as `deploy` */
         return 1;
 
-    case 146:                                   /* ally   */
-    case 147:                                   /* unally */
-        if (!ActStep(ctx, at))
-            return 0;
-        act->code = (id == AM2_TOK_ALLY) ? 0x15 : 0x16;
+    case AM2_TOK_ALLY:
+        STEP();
+        act->code = 0x15;
         act->subject = ScriptArmyColour(ctx, at);
         if (act->subject < 0)
             return 0;
         act->target = ScriptArmyColour(ctx, at);
-        return 1;
+        return act->target >= 0;
 
-    case 148:                                   /* setforcecolor */
-        if (!ActStep(ctx, at))
+    case AM2_TOK_UNALLY:
+        STEP();
+        act->code = 0x16;
+        act->subject = ScriptArmyColour(ctx, at);
+        if (act->subject < 0)
             return 0;
+        act->target = ScriptArmyColour(ctx, at);
+        return act->target >= 0;
+
+    case AM2_TOK_SETFORCECOLOR:
+        STEP();
         act->code = 0x17;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
         act->target = ScriptArmyColour(ctx, at);
-        return 1;
+        return act->target >= 0;
 
-    case 77:                                    /* moveitem */
-        if (!ActStep(ctx, at))
-            return 0;
+    case AM2_TOK_MOVEITEM:
+        STEP();
         act->code = 0x1F;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count) {
-            am2_log("Unexpected end of script.\n");
-            return 0;
-        }
-        return ScriptLocation(ctx, at, act, 0) != 0;
+        if (*at < ctx->count)
+            goto place;
+eos:
+        am2_log("Unexpected end of script.\n");
+        /* fall through */
+    default:
+        /* Every other reserved word in 64..186 -- the weapons, the pickups,
+         * the AI modes and the poses. They are arguments, not actions. */
+        return 0;
 
-    case 117:                                   /* setfacing    */
-    case 118:                                   /* setgunfacing */
-        if (!ActStep(ctx, at))
-            return 0;
-        if (id == AM2_TOK_SETFACING)
-            act->code = 0x20;
-        else
-            act->code = 0x21;
-        if (!ScriptResolveName(ctx, at, &act->subject, 0))
-            return 0;
-        if (*at >= ctx->count) {
-            am2_log("Unexpected end of script.\n");
-            return 0;
-        }
-        if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
-            act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-            (*at)++;
-            return 1;
-        }
-        /* A facing may be `refvar <name>` instead of a literal. Anything
-         * else is accepted and leaves the field at zero. */
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED ||
-            (int32_t)(uintptr_t)ctx->tokens[*at].value != AM2_TOK_REFVAR)
-            return 1;
-        if (!ActStep(ctx, at))
-            return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
-            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
-            return 0;
-        }
-        return ActVarName(ctx, at, act,
-            "Line [%4d]:  expected variable name but variable %s not "
-            "declared\n");
-
-    case 134:                                   /* setvar */
-    case 135:                                   /* addvar */
-        if (!ActStep(ctx, at))
-            return 0;
-        if (id == AM2_TOK_SETVAR)
-            act->code = 0x23;
-        else
-            act->code = 0x22;
-        if (!ScriptResolveName(ctx, at, &act->subject, 0))
-            return 0;
-        if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
-            act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-            (*at)++;
-            return 1;
-        }
-        if (id == AM2_TOK_ADDVAR && ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
-            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
-            return 0;
-        }
-        return ActVarName(ctx, at, act,
-            id == AM2_TOK_SETVAR
-                ? "Line [%4d]:  expected variable name in SetVar but "
-                  "variable %s not declared\n"
-                : "Line [%4d]:  expected variable name in AddVar but "
-                  "variable %s not declared\n");
-
-    case 149:                                   /* activateregion   */
-    case 150:                                   /* inactivateregion */
-        if (!ActStep(ctx, at))
-            return 0;
-        act->code = 0x26;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
-            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
-            return 0;
-        }
-        act->n0 = (id == AM2_TOK_ACTIVATEREGION);
-        act->subject = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        (*at)++;
-        return 1;
-
-    case 154:                                   /* setaimode */
-        if (!ActStep(ctx, at))
-            return 0;
-        act->code = 0x2A;
-        if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
+    case AM2_TOK_ORDER:
+        STEP();
+        if (TOK.kind == AM2_TOKEN_STRING) {
             if (!ScriptResolveName(ctx, at, &act->subject, 0))
                 return 0;
             act->extra = 0;
         } else if (!ScriptOrderTarget(ctx, at, &act->extra, &act->subject,
-                                      &act->army)) {
+                                      &act->army))
             return 0;
-        }
-        if (*at >= ctx->count) {
-            am2_log("Unexpected end of script.\n");
-            return 0;
-        }
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
-            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
-            return 0;
-        }
-        {
-            int32_t m = ActAiMode((int32_t)(uintptr_t)ctx->tokens[*at].value);
-            if (m < 0) {
-                am2_log("Line [%4d]:  Expected {attack|defend|ignore|evade} "
-                        "in setaimode\n", ctx->tokens[*at].line);
-                return 0;
-            }
-            act->n0 = m;
-        }
-        (*at)++;
-        return 1;
-
-    case 159:                                   /* setaipose */
-        if (!ActStep(ctx, at))
-            return 0;
-        act->code = 0x2B;
-        if (!ScriptResolveName(ctx, at, &act->subject, 0))
-            return 0;
-        if (*at >= ctx->count) {
-            am2_log("Unexpected end of script.\n");
-            return 0;
-        }
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
-            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
-            return 0;
-        }
-        {
-            int32_t m = (int32_t)(uintptr_t)ctx->tokens[*at].value - 160;
-            if (m < 0 || m > 3) {
-                am2_log("Line [%4d]:  Expected {stand|kneel|prone|none} in "
-                        "setaipose\n", ctx->tokens[*at].line);
-                return 0;
-            }
-            /* stand 1, kneel 2, prone 3, none 0. */
-            if (m == 3)
-                act->n0 = 0;
-            else
-                act->n0 = m + 1;
-        }
-        (*at)++;
-        return 1;
-
-    case 119: {                                 /* order */
-        if (!ActStep(ctx, at))
-            return 0;
-        if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
-            if (!ScriptResolveName(ctx, at, &act->subject, 0))
-                return 0;
-            act->extra = 0;
-        } else {
-            if (!ScriptOrderTarget(ctx, at, &act->extra, &act->subject,
-                                   &act->army))
-                return 0;
-        }
-        if (*at >= ctx->count) {
-            am2_log("Unexpected end of script.\n");
-            return 0;
-        }
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
-            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
-            return 0;
-        }
-        /* `order <who> follow <whom>` or `order <who> <somewhere>`. */
-        int32_t verb = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        if (verb == AM2_TOK_FOLLOW) {                      /* follow */
-            if (!ActStep(ctx, at))
-                return 0;
+        if (*at >= ctx->count)
+            goto eos;
+        WANT(AM2_TOKEN_RESERVED)
+        /* `order <who> follow <whom>` or `order <who> goto <somewhere>`. */
+        switch (TOKVAL) {
+        case AM2_TOK_FOLLOW:
+            STEP();
             act->code = 0x19;
             if (!ScriptResolveName(ctx, at, &act->target, 0))
                 return 0;
-        } else if (verb == AM2_TOK_GOTO) {               /* moveto */
-            if (!ActStep(ctx, at))
-                return 0;
+            break;
+        case AM2_TOK_GOTO:
+            STEP();
             act->code = 0x18;
             if (!ScriptLocation(ctx, at, act, 0))
                 return 0;
-        } else {
+            break;
+        default:
             return 0;
         }
         act->n0 = -1;
-        if (*at >= ctx->count ||
-            ctx->tokens[*at].kind != AM2_TOKEN_RESERVED ||
-            (int32_t)(uintptr_t)ctx->tokens[*at].value != AM2_TOK_INMODE)   /* inmode */
+        /* No bounds check before this read. */
+        if (TOK.kind != AM2_TOKEN_RESERVED || TOKVAL != AM2_TOK_INMODE)
             return 1;
-        if (!ActStep(ctx, at))
-            return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
-            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
-            return 0;
+        STEP();
+        WANT(AM2_TOKEN_RESERVED)
+        switch (TOKVAL) {
+        case AM2_TOK_ATTACK: (*at)++; act->n0 = 6; return 1;
+        case AM2_TOK_DEFEND: (*at)++; act->n0 = 7; return 1;
+        case AM2_TOK_IGNORE: (*at)++; act->n0 = 2; return 1;
+        case AM2_TOK_EVADE:  (*at)++; act->n0 = 5; return 1;
         }
-        {
-            int32_t m = ActAiMode((int32_t)(uintptr_t)ctx->tokens[*at].value);
-            if (m < 0)
-                return 0;
-            act->n0 = m;
+        return 0;
+
+    case AM2_TOK_SETFACING:
+        STEP();
+        act->code = 0x20;
+        if (!ScriptResolveName(ctx, at, &act->subject, 0))
+            return 0;
+        if (*at >= ctx->count)
+            goto eos;
+        if (TOK.kind == AM2_TOKEN_INTEGER) {
+            /* A facing is a byte: the value is stored, then cut to one. */
+            act->n0 = TOKVAL;
+            act->n0 = (uint8_t)act->n0;
+            (*at)++;
+            return 1;
         }
+        /* A facing may be `refvar <name>` instead of a literal. Anything
+         * else is stepped over and leaves the field at zero. */
+        if (TOK.kind != AM2_TOKEN_RESERVED || TOKVAL != AM2_TOK_REFVAR) {
+            (*at)++;
+            return 1;
+        }
+        STEP();
+        WANT(AM2_TOKEN_STRING)
+        VARNAME("Line [%4d]:  expected variable name but variable %s not "
+                "declared\n")
+        return 1;
+
+    case AM2_TOK_SETGUNFACING:
+        STEP();
+        act->code = 0x21;
+        if (!ScriptResolveName(ctx, at, &act->subject, 0))
+            return 0;
+        if (*at >= ctx->count)
+            goto eos;
+        if (TOK.kind == AM2_TOKEN_INTEGER) {
+            act->n0 = TOKVAL;
+            act->n0 = (uint8_t)act->n0;
+            (*at)++;
+            return 1;
+        }
+        if (TOK.kind != AM2_TOKEN_RESERVED || TOKVAL != AM2_TOK_REFVAR) {
+            (*at)++;
+            return 1;
+        }
+        STEP();
+        WANT(AM2_TOKEN_STRING)
+        VARNAME("Line [%4d]:  expected variable name but variable %s not "
+                "declared\n")
+        return 1;
+
+    case AM2_TOK_SETVAR:
+        STEP();
+        act->code = 0x23;
+        if (!ScriptResolveName(ctx, at, &act->subject, 0))
+            return 0;
+        if (TOK.kind == AM2_TOKEN_INTEGER) {
+            act->n0 = TOKVAL;
+            (*at)++;
+            return 1;
+        }
+        VARNAME_EQ("Line [%4d]:  expected variable name in SetVar but "
+                   "variable %s not declared\n")
+        return 1;
+
+    case AM2_TOK_ADDVAR:
+        STEP();
+        act->code = 0x22;
+        if (!ScriptResolveName(ctx, at, &act->subject, 0))
+            return 0;
+        if (TOK.kind == AM2_TOKEN_INTEGER) {
+            act->n0 = TOKVAL;
+            (*at)++;
+            return 1;
+        }
+        WANT(AM2_TOKEN_STRING)
+        VARNAME_EQ("Line [%4d]:  expected variable name in AddVar but "
+                   "variable %s not declared\n")
+        return 1;
+
+    case AM2_TOK_ACTIVATEREGION:
+        STEP();
+        act->code = 0x26;
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = 1;
+        act->subject = TOKVAL;
         (*at)++;
         return 1;
-    }
 
-    case 164:                                   /* setspeed */
-        if (!ActStep(ctx, at))
+    case AM2_TOK_INACTIVATEREGION:
+        STEP();
+        act->code = 0x26;
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = 0;
+        act->subject = TOKVAL;
+        (*at)++;
+        return 1;
+
+    case AM2_TOK_SETBRIEFING:
+        STEP();
+        act->code = 0x27;
+        WANT(AM2_TOKEN_STRING)
+        act->text = (char *)TOK.value;
+        (*at)++;
+        return 1;
+
+    case AM2_TOK_SETBRIEFVO:
+        STEP();
+        act->code = 0x28;
+        WANT(AM2_TOKEN_STRING)
+        act->text = (char *)TOK.value;
+        (*at)++;
+        return 1;
+
+    case AM2_TOK_SETSTRATMAP:
+        STEP();
+        act->code = 0x29;
+        WANT(AM2_TOKEN_STRING)
+        act->text = (char *)TOK.value;
+        (*at)++;
+        return 1;
+
+    case AM2_TOK_SETAIMODE:
+        STEP();
+        act->code = 0x2A;
+        if (TOK.kind == AM2_TOKEN_STRING) {
+            if (!ScriptResolveName(ctx, at, &act->subject, 0))
+                return 0;
+            act->extra = 0;
+        } else if (!ScriptOrderTarget(ctx, at, &act->extra, &act->subject,
+                                      &act->army))
             return 0;
+        if (*at >= ctx->count)
+            goto eos;
+        WANT(AM2_TOKEN_RESERVED)
+        switch (TOKVAL) {
+        case AM2_TOK_ATTACK: (*at)++; act->n0 = 6; return 1;
+        case AM2_TOK_DEFEND: (*at)++; act->n0 = 7; return 1;
+        case AM2_TOK_IGNORE: (*at)++; act->n0 = 2; return 1;
+        case AM2_TOK_EVADE:  (*at)++; act->n0 = 5; return 1;
+        }
+        am2_log("Line [%4d]:  Expected {attack|defend|ignore|evade} "
+                "in setaimode\n", TOK.line);
+        return 0;
+
+    case AM2_TOK_SETAIPOSE:
+        STEP();
+        act->code = 0x2B;
+        if (!ScriptResolveName(ctx, at, &act->subject, 0))
+            return 0;
+        if (*at >= ctx->count)
+            goto eos;
+        WANT(AM2_TOKEN_RESERVED)
+        /* stand 1, kneel 2, prone 3, none 0. */
+        switch (TOKVAL) {
+        case AM2_TOK_STAND: (*at)++; act->n0 = 1; return 1;
+        case AM2_TOK_KNEEL: (*at)++; act->n0 = 2; return 1;
+        case AM2_TOK_PRONE: (*at)++; act->n0 = 3; return 1;
+        case AM2_TOK_NONE:  (*at)++; act->n0 = 0; return 1;
+        }
+        am2_log("Line [%4d]:  Expected {stand|kneel|prone|none} in "
+                "setaipose\n", TOK.line);
+        return 0;
+
+    case AM2_TOK_SETSPEED:
+        STEP();
         act->code = 0x2C;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count) {
-            am2_log("Unexpected end of script.\n");
-            return 0;
+        if (*at >= ctx->count)
+            goto eos;
+        WANT(AM2_TOKEN_RESERVED)
+        switch (TOKVAL) {
+        case AM2_TOK_SLOW:   (*at)++; act->n0 = 1; return 1;
+        case AM2_TOK_NORMAL: (*at)++; act->n0 = 0; return 1;
         }
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
-            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
-            return 0;
-        }
-        {
-            int32_t v = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-            if (v == AM2_TOK_SLOW)                       /* slow   */
-                act->n0 = 1;
-            else if (v == AM2_TOK_NORMAL)                  /* normal */
-                act->n0 = 0;
-            else {
-                am2_log("Line [%4d]:  Expected {slow|normal} in setspeed\n",
-                        ctx->tokens[*at].line);
-                return 0;
-            }
-        }
-        (*at)++;
-        return 1;
+        am2_log("Line [%4d]:  Expected {slow|normal} in setspeed\n",
+                TOK.line);
+        return 0;
 
-    case 173:                                   /* setitemflag */
-        if (!ActStep(ctx, at))
-            return 0;
+    case AM2_TOK_SETNPC:
+        STEP();
+        act->code = 0x2D;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count) {
-            am2_log("Unexpected end of script.\n");
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = TOKVAL;
+        (*at)++;
+        return 1;
+
+    case AM2_TOK_SETITEMFLAG:
+        STEP();
+        if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        }
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
-            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
-            return 0;
-        }
-        if ((int32_t)(uintptr_t)ctx->tokens[*at].value != AM2_TOK_STRATEGIC) {  /* strategic */
+        if (*at >= ctx->count)
+            goto eos;
+        WANT(AM2_TOKEN_RESERVED)
+        if (TOKVAL != AM2_TOK_STRATEGIC) {
             am2_log("Line [%4d]:  Expected {strategic} in setitemflag\n",
-                    ctx->tokens[*at].line);
+                    TOK.line);
             return 0;
         }
-        if (!ActStep(ctx, at))
-            return 0;
+        STEP();
         act->code = 0x33;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
-            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
-            return 0;
-        }
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = TOKVAL;
         (*at)++;
         return 1;
 
-    case 167:                                   /* setnpc    */
-    case 176:                                   /* addexp    */
-    case 185:                                   /* setuilock */
-        if (!ActStep(ctx, at))
-            return 0;
-        act->code = (id == AM2_TOK_SETNPC) ? 0x2D : (id == AM2_TOK_ADDEXP) ? 0x35 : 0x39;
-        if (id != AM2_TOK_SETUILOCK && !ScriptResolveName(ctx, at, &act->subject, 0))
-            return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
-            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
-            return 0;
-        }
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+    case AM2_TOK_SETUILOCK:
+        STEP();
+        act->code = 0x39;
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = TOKVAL;
         (*at)++;
         return 1;
 
-    case 186:                                   /* setdamagepad */
-        if (!ActStep(ctx, at))
-            return 0;
+    case AM2_TOK_SETDAMAGEPAD:
+        STEP();
         act->code = 0x3A;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
-            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
-            return 0;
-        }
+        WANT(AM2_TOKEN_STRING)
         {
-            int32_t p = ScriptFindName((const char *)ctx->tokens[*at].value);
+            int32_t p = ScriptFindName((const char *)TOK.value);
+
             if (p < 0) {
                 am2_log("Line [%4d]:  Name required after SetDamagePad\n",
-                        ctx->tokens[*at].line);
+                        TOK.line);
                 return 0;
             }
             if (kScriptNames[p].type != AM2_NAME_TYPE_PAD) {
                 am2_log("Line [%4d]:  SetDamagePad name was not a pad\n",
-                        ctx->tokens[*at].line);
+                        TOK.line);
                 return 0;
             }
             /* The pad it resolves to, not the name-table index. */
             act->subject = kScriptNames[p].value;
         }
-        if (!ActStep(ctx, at))
-            return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
-            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
-            return 0;
-        }
-        act->n1 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        if (!ActStep(ctx, at))
-            return 0;
+        STEP();
+        WANT(AM2_TOKEN_INTEGER)
+        act->n1 = TOKVAL;
+        STEP();
         act->n0 = 0;
-        if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
-            act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (TOK.kind == AM2_TOKEN_INTEGER) {
+            act->n0 = TOKVAL;
             (*at)++;
         }
         act->extra = 0;
-        if (*at >= ctx->count ||
-            ctx->tokens[*at].kind != AM2_TOKEN_RESERVED)
+        if (*at >= ctx->count || TOK.kind != AM2_TOKEN_RESERVED)
             return 1;
-        {
-            int32_t k = ActDamageKind(
-                (int32_t)(uintptr_t)ctx->tokens[*at].value);
-            if (k < 0)
-                return 1;
-            act->extra = k;
+        switch (TOKVAL) {
+        case AM2_TOK_PROJECTILE: act->extra = 2; (*at)++; return 1;
+        case AM2_TOK_FIRE:       act->extra = 1; (*at)++; return 1;
+        case AM2_TOK_CRUSH:      act->extra = 4; (*at)++; return 1;
+        case AM2_TOK_EXPLOSION:  act->extra = 3; (*at)++; return 1;
         }
-        (*at)++;
         return 1;
 
-    case 175:                                   /* setitemowner */
-        if (!ActStep(ctx, at))
-            return 0;
+    case AM2_TOK_SETITEMOWNER:
+        STEP();
         act->code = 0x34;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count) {
-            am2_log("Unexpected end of script.\n");
-            return 0;
-        }
-        if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
+        if (*at >= ctx->count)
+            goto eos;
+        if (TOK.kind == AM2_TOKEN_INTEGER) {
             act->n0 = 4;
+            (*at)++;
             return 1;
         }
         act->n0 = ScriptArmyColour(ctx, at);
-        return act->n0 >= 0;
-
-    case 168:                                   /* setm80 */
-        if (!ActStep(ctx, at))
+        if (act->n0 < 0)
             return 0;
+        return 1;
+
+    case AM2_TOK_SETM80:
+        STEP();
         act->code = 0x2E;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count) {
-            am2_log("Unexpected end of script.\n");
-            return 0;
-        }
+        if (*at >= ctx->count)
+            goto eos;
         act->army = ScriptArmyColour(ctx, at);
-        if (act->army < 0)
-            act->army = 4;
-        else
-            act->army = act->army;
+        if (act->army >= 0)
+            return 1;
+        act->army = 4;
         return 1;
 
-    case 180:                                   /* dropitem */
-        if (!ActStep(ctx, at))
-            return 0;
+    case AM2_TOK_DROPITEM:
+        STEP();
         act->code = 0x38;
         /* The item goes to +0x40 and whoever drops it to +0x18, which is the
          * other way round from every other two-name action. */
@@ -2475,59 +2385,96 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             return 0;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at >= ctx->count) {
-            am2_log("Unexpected end of script.\n");
-            return 0;
-        }
-        return ScriptLocation(ctx, at, act, 0) != 0;
+        if (*at < ctx->count)
+            goto place;
+        goto eos;
 
-    case 169:                                   /* setzombie    */
-    case 170:                                   /* setscientist */
-        if (!ActStep(ctx, at))
-            return 0;
-        act->code = (id == AM2_TOK_SETZOMBIE) ? 0x2F : 0x30;
+    case AM2_TOK_SETZOMBIE:
+        STEP();
+        act->code = 0x2F;
         return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
 
-    case 171:                                   /* makesmoke */
-    case 172:                                   /* makeflame */
-        if (!ActStep(ctx, at))
-            return 0;
-        act->code = (id == AM2_TOK_MAKESMOKE) ? 0x31 : 0x32;
+    case AM2_TOK_SETSCIENTIST:
+        STEP();
+        act->code = 0x30;
+        return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
+
+    case AM2_TOK_MAKESMOKE:
+        STEP();
+        act->code = 0x31;
         if (!ScriptLocation(ctx, at, act, 0))
             return 0;
-        if (*at >= ctx->count ||
-            ctx->tokens[*at].kind != AM2_TOKEN_INTEGER)
+        /* No bounds check before this read. */
+        if (TOK.kind != AM2_TOKEN_INTEGER)
             return 1;
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        act->n0 = TOKVAL;
         (*at)++;
         return 1;
 
-    case 177:                                   /* fireweapon */
-    case 178:                                   /* unitfire   */
-        if (!ActStep(ctx, at))
+    case AM2_TOK_MAKEFLAME:
+        STEP();
+        act->code = 0x32;
+        if (!ScriptLocation(ctx, at, act, 0))
             return 0;
-        act->code = (id == AM2_TOK_FIREWEAPON) ? 0x36 : 0x37;
+        if (TOK.kind != AM2_TOKEN_INTEGER)
+            return 1;
+        act->n0 = TOKVAL;
+        (*at)++;
+        return 1;
+
+    case AM2_TOK_ADDEXP:
+        STEP();
+        act->code = 0x35;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (id == AM2_TOK_FIREWEAPON && !ScriptResolveName(ctx, at, &act->army, 0))
+        WANT(AM2_TOKEN_INTEGER)
+        act->n0 = TOKVAL;
+        (*at)++;
+        return 1;
+
+    case AM2_TOK_FIREWEAPON:
+        STEP();
+        act->code = 0x36;
+        if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
-        if (*at < ctx->count &&
-            ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
-            act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (!ScriptResolveName(ctx, at, &act->army, 0))
+            return 0;
+        /* A bearing is a byte: the value is stored, then cut to one. */
+        if (TOK.kind == AM2_TOKEN_INTEGER) {
+            act->n0 = TOKVAL;
+            act->n0 = (uint8_t)act->n0;
             if (++(*at) >= ctx->count) {
                 am2_log("Unexpected end of script.\n");
                 return 0;
             }
-        } else {
+        } else
             act->n0 = -1;
-        }
-        return ScriptLocation(ctx, at, act, 0) != 0;
+        goto place;
 
-    default:
-        /* Every other reserved word in 64..186 -- the weapons, the pickups,
-         * the AI modes and the poses. They are arguments, not actions. */
-        return 0;
+    case AM2_TOK_UNITFIRE:
+        STEP();
+        act->code = 0x37;
+        if (!ScriptResolveName(ctx, at, &act->subject, 0))
+            return 0;
+        if (TOK.kind == AM2_TOKEN_INTEGER) {
+            act->n0 = TOKVAL;
+            act->n0 = (uint8_t)act->n0;
+            if (++(*at) >= ctx->count) {
+                am2_log("Unexpected end of script.\n");
+                return 0;
+            }
+        } else
+            act->n0 = -1;
+place:
+        return ScriptLocation(ctx, at, act, 0) != 0;
     }
+#undef TOK
+#undef TOKVAL
+#undef STEP
+#undef TYPEERR
+#undef WANT
+#undef VARNAME
+#undef VARNAME_EQ
 }
 
 /* AM2_PROBE_NOACTION runs the ORIGINAL action parser under our ReadScript and
