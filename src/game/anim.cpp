@@ -94,12 +94,14 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
 {
     int32_t i;
     int32_t k;
+    int32_t count;
     int16_t w;
 
     /* The count, then that many 16-byte entries, allocated and cleared before
      * anything is read into them -- which is what makes the "did anyone fill
      * this in" tests below work. */
-    orig_fread(&table->count, 4, 1, fp);
+    orig_fread(&count, 4, 1, fp);
+    table->count = count;
     table->entries = (AM2_AnimEntry *)am2_malloc((size_t)(table->count * 16));
     memset(table->entries, 0, (size_t)(table->count * 16));
 
@@ -116,19 +118,19 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
          * animation, anything else borrows one. */
         orig_fread(&w, 2, 1, fp);
         if (w == 1) {
-            AM2_Anim *a;
-            int32_t   cells;
+            int16_t   cells;
             int32_t   j;
 
+            /* The animation is reached through the entry at every store. */
+#define a (e->anim)
             e->borrowed = 0;
-            a = (AM2_Anim *)am2_malloc(16);
-            e->anim = a;
+            e->anim = (AM2_Anim *)am2_malloc(16);
 
             orig_fread(&w, 2, 1, fp);
             a->frames = w;
             orig_fread(&w, 2, 1, fp);
             a->directions = w;
-            a->directionBits = Log2Mask(a->directions);
+            a->directionBits = Log2Mask(w);
             orig_fread(&w, 2, 1, fp);
             a->field4 = w;
             a->zero9 = 0;
@@ -138,7 +140,7 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
             /* Computed 16-bit and sign-extended afterwards, exactly as the
              * original does -- so a grid big enough to overflow an int16 would
              * come out negative and skip both the allocation and the loop. */
-            cells = (int16_t)(a->directions * a->frames);
+            cells = (int16_t)(a->directions * a->frames);  /* int16 throughout */
             if (cells > 0)
                 a->cells = (AM2_AnimCell *)am2_malloc((size_t)cells * 4);
 
@@ -155,6 +157,7 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
                 if (a->cells[j].sprite >= g_spriteListN)
                     am2_log("Error!  %d\n", a->cells[j].sprite);
             }
+#undef a
         } else {
             e->borrowed = 1;
             if (fallback) {
