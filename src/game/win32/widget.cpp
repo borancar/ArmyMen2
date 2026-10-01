@@ -5796,9 +5796,6 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
                 SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
             break;
         }
-        case 0x1A:
-            SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
-            break;
         /* One shape, four comparands, written as four arms: 0x23 wants 0,
          * 0x24 wants 1, and so on. The compiler gives 0x23 no test of its
          * own and jumps into 0x26's. */
@@ -5806,6 +5803,11 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
             if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 0)
                 SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
             break;
+
+        case 0x1A:
+            SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
+            break;
+
         case 0x24:
             if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 1)
                 SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
@@ -6471,8 +6473,10 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
              * why they are written out separately. */
             weapon = (const uint8_t *)WeaponByUid(
                          *(const uint32_t *)(obj + OBJ_OFF_WEAPON_UID));
-            *(int32_t *)(rec + SQUAD_REC_INDEX) =
-                weapon ? HudSquadWeaponIcon(weapon, kWeaponIcon) : 1;
+            if (weapon)
+                *(int32_t *)(rec + SQUAD_REC_INDEX) = HudSquadWeaponIcon(weapon, kWeaponIcon);
+            else
+                *(int32_t *)(rec + SQUAD_REC_INDEX) = 1;
             *(uint32_t *)(rec + SQUAD_REC_DETAIL_ARG) =
                 *(const uint32_t *)(obj + OBJ_OFF_UID);
             HudSquadBar(rec, obj);
@@ -6617,8 +6621,8 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
     if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
         return;
 
-    x = w->rect.left;
     y = w->rect.top;
+    x = w->rect.left;
 
 #define SQD_TEXT(dx, dy, s) DrawText(x + (dx), y + (dy), (s), 0, 0, ink)
 

@@ -6627,8 +6627,8 @@ int32_t __cdecl RegionFindPath(uint16_t from, int32_t to, int16_t *path,
     *len = *(const int32_t *)(cur + REGION_OFF_DEPTH) + 1;
 
     {
-        int16_t *slot = path + *(const int32_t *)(cur + REGION_OFF_DEPTH);
         uint8_t *walk = *(uint8_t **)(uintptr_t)ADDR_REGION_WALK;
+        int16_t *slot = path + *(const int32_t *)(cur + REGION_OFF_DEPTH);
 
         while (walk) {
             *slot-- = *(const int16_t *)(walk + REGION_OFF_ID);
@@ -8638,7 +8638,7 @@ pose:
         uint16_t now  = reg[*(const uint16_t *)(o + OBJ_OFF_TILE)];
         uint16_t was  = reg[*(const int32_t *)(o + OBJ_OFF_PREV_TILE)];
 
-        if (now != was && now != *(const uint16_t *)(o + OBJ_OFF_PREV_REGION))
+        if (was != now && now != *(const uint16_t *)(o + OBJ_OFF_PREV_REGION))
             *(uint16_t *)(o + OBJ_OFF_PREV_REGION) = was;
     }
 }

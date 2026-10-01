@@ -3466,12 +3466,6 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         }
         return;
 
-    case 0x06:                                  /* playsound */
-        if (act->text != 0)
-            EvtPlaySoundAt(act->text, ActionPoint(act, (uint32_t)(uintptr_t)owner),
-                           act->n0, act->n1, act->extra);
-        return;
-
     case 0x07:                                  /* playsoundon */
         if (act->text != 0) {
             /* ActionPoint's answer is DISCARDED -- eax is overwritten by n0
@@ -3483,6 +3477,12 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                            ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                            act->n0, act->n1, act->extra);
         }
+        return;
+
+    case 0x06:                                  /* playsound */
+        if (act->text != 0)
+            EvtPlaySoundAt(act->text, ActionPoint(act, (uint32_t)(uintptr_t)owner),
+                           act->n0, act->n1, act->extra);
         return;
 
     case 0x08:                                  /* playmusic */
@@ -3530,6 +3530,10 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
     }
 
+    case 0x1B:                                  /* suspendai */
+        EvtFlag40Clear(act->subject, (uint32_t)(uintptr_t)owner);
+        return;
+
     case 0x1D:                                  /* setcamerafocus */
         EvtPushObjCtx(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
         return;
@@ -3540,17 +3544,8 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         g_objCtxSetPrev = g_objCtxSet;
         return;
 
-    case 0x1B:                                  /* suspendai */
-        EvtFlag40Clear(act->subject, (uint32_t)(uintptr_t)owner);
-        return;
-
     case 0x1C:                                  /* reviveai */
         EvtFlag40Set(act->subject, (uint32_t)(uintptr_t)owner);
-        return;
-
-    case 0x0C:
-        EvtGuardedAction(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                         act->n0, act->extra);
         return;
 
     case 0x0A:                                  /* setobjstate-ish */
@@ -3647,6 +3642,11 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
     }
 
+    case 0x0C:
+        EvtGuardedAction(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                         act->n0, act->extra);
+        return;
+
     case 0x10:                                  /* createweapon at a point */
         at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
         if ((int16_t)at == 0)
@@ -3675,12 +3675,12 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     case 0x18: {                                /* setaimode + move */
         uint32_t uid = ResolveUid(act->subject, (uint32_t)(uintptr_t)owner);
 
-        if (act->extra != 0) {
-            if (act->n0 >= 0)
-                EvtArmySetField(act->army, act->subject, act->n0);
-        } else {
+        if (!(act->extra != 0)) {
             if (act->n0 >= 0)
                 EvtSetAiMode(uid, act->n0);
+        } else {
+            if (act->n0 >= 0)
+                EvtArmySetField(act->army, act->subject, act->n0);
         }
 
         /* The same three paths as `moveto`, in the A variants. */
@@ -3737,10 +3737,6 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
     }
 
-    case 0x22:                                  /* addtovar */
-        AddToVar(act->subject, ActValueOrVar(act));
-        return;
-
     case 0x19: {                                /* setaimode + attach */
         /* The same head as 0x18 and a completely different tail: no point
          * handling at all, just a pair of objects or an army attach. */
@@ -3767,6 +3763,10 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * campaign A/B reports as "SetObjScriptState was called with
          * rr_burner_low which is not a valid object". */
         SetObjScriptState(act->target, act->subject, act->n0);
+        return;
+
+    case 0x22:                                  /* addtovar */
+        AddToVar(act->subject, ActValueOrVar(act));
         return;
 
     case 0x24: {                                /* setobjbitmap */
@@ -3908,15 +3908,6 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                                       (uint32_t)(uintptr_t)owner));
         return;
 
-    case 0x37:                                  /* unitfire at an object */
-        /* The same three-test refusal as 0x36, and the same me=0 on the
-         * subject where the target uses the owner. */
-        if (act->xvar > 0 || act->relative != 0 || act->u.pos.x != 0)
-            return;
-        UnitFireAtObject(ResolveUid(act->subject, 0), act->n0,
-                         ResolveUid(act->target, (uint32_t)(uintptr_t)owner));
-        return;
-
     case 0x3A: {                                /* setdamagepad */
         uint8_t *pad;
 
@@ -3940,6 +3931,15 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         }
         return;
     }
+
+    case 0x37:                                  /* unitfire at an object */
+        /* The same three-test refusal as 0x36, and the same me=0 on the
+         * subject where the target uses the owner. */
+        if (act->xvar > 0 || act->relative != 0 || act->u.pos.x != 0)
+            return;
+        UnitFireAtObject(ResolveUid(act->subject, 0), act->n0,
+                         ResolveUid(act->target, (uint32_t)(uintptr_t)owner));
+        return;
 
     case 0x1A:                                  /* the empty action */
         return;

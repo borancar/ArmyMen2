@@ -110,8 +110,7 @@ void __cdecl LoadAnimTable(am2_FILE *fp, AM2_AnimTable *table, int32_t base,
         e->id = w;
         orig_fread(&w, 2, 1, fp);
         e->next = w;
-        if (e->next == 0)
-            e->next = -2;
+        e->next = e->next == 0 ? -2 : e->next;
 
         /* The kind. Only 0 and 1 appear in any shipped file: 1 carries an
          * animation, anything else borrows one. */

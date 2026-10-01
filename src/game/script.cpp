@@ -1868,33 +1868,6 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         }
         return ActPlaceAndArmy(ctx, at, act);
 
-    case 113:                                   /* createvehicle */
-        if (!ActStep(ctx, at))
-            return 0;
-        act->code = 0x0F;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
-            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
-            return 0;
-        }
-        act->text = (char *)ctx->tokens[*at].value;
-        if (!ActStep(ctx, at))
-            return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
-            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
-            return 0;
-        }
-        {
-            int32_t c = ActChassis((int32_t)(uintptr_t)ctx->tokens[*at].value);
-            if (c < 0) {
-                am2_log("Line [%4d]:  Illegal vehicle type '%s'\n",
-                        ctx->tokens[*at].line,
-                        ScriptTokenText(&ctx->tokens[*at], kScriptWord));
-                return 0;
-            }
-            act->n0 = c;
-        }
-        return ActPlaceAndArmy(ctx, at, act);
-
     case 114:                                   /* createpowerup */
         if (!ActStep(ctx, at))
             return 0;
@@ -1929,6 +1902,33 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         (*at)++;
         return 1;
+
+    case 113:                                   /* createvehicle */
+        if (!ActStep(ctx, at))
+            return 0;
+        act->code = 0x0F;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_STRING) {
+            ActTypeErr(ctx, at, AM2_TOKEN_STRING);
+            return 0;
+        }
+        act->text = (char *)ctx->tokens[*at].value;
+        if (!ActStep(ctx, at))
+            return 0;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
+            return 0;
+        }
+        {
+            int32_t c = ActChassis((int32_t)(uintptr_t)ctx->tokens[*at].value);
+            if (c < 0) {
+                am2_log("Line [%4d]:  Illegal vehicle type '%s'\n",
+                        ctx->tokens[*at].line,
+                        ScriptTokenText(&ctx->tokens[*at], kScriptWord));
+                return 0;
+            }
+            act->n0 = c;
+        }
+        return ActPlaceAndArmy(ctx, at, act);
 
     case 115:                                   /* createexplosion */
         if (!ActStep(ctx, at))
@@ -2150,7 +2150,10 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
     case 135:                                   /* addvar */
         if (!ActStep(ctx, at))
             return 0;
-        act->code = (id == AM2_TOK_SETVAR) ? 0x23 : 0x22;
+        if (id == AM2_TOK_SETVAR)
+            act->code = 0x23;
+        else
+            act->code = 0x22;
         if (!ScriptResolveName(ctx, at, &act->subject, 0))
             return 0;
         if (ctx->tokens[*at].kind == AM2_TOKEN_INTEGER) {
@@ -2182,64 +2185,6 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         act->subject = (int32_t)(uintptr_t)ctx->tokens[*at].value;
         (*at)++;
         return 1;
-
-    case 119: {                                 /* order */
-        if (!ActStep(ctx, at))
-            return 0;
-        if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
-            if (!ScriptResolveName(ctx, at, &act->subject, 0))
-                return 0;
-            act->extra = 0;
-        } else {
-            if (!ScriptOrderTarget(ctx, at, &act->extra, &act->subject,
-                                   &act->army))
-                return 0;
-        }
-        if (*at >= ctx->count) {
-            am2_log("Unexpected end of script.\n");
-            return 0;
-        }
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
-            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
-            return 0;
-        }
-        /* `order <who> follow <whom>` or `order <who> <somewhere>`. */
-        int32_t verb = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        if (verb == AM2_TOK_FOLLOW) {                      /* follow */
-            if (!ActStep(ctx, at))
-                return 0;
-            act->code = 0x19;
-            if (!ScriptResolveName(ctx, at, &act->target, 0))
-                return 0;
-        } else if (verb == AM2_TOK_GOTO) {               /* moveto */
-            if (!ActStep(ctx, at))
-                return 0;
-            act->code = 0x18;
-            if (!ScriptLocation(ctx, at, act, 0))
-                return 0;
-        } else {
-            return 0;
-        }
-        act->n0 = -1;
-        if (*at >= ctx->count ||
-            ctx->tokens[*at].kind != AM2_TOKEN_RESERVED ||
-            (int32_t)(uintptr_t)ctx->tokens[*at].value != AM2_TOK_INMODE)   /* inmode */
-            return 1;
-        if (!ActStep(ctx, at))
-            return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
-            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
-            return 0;
-        }
-        {
-            int32_t m = ActAiMode((int32_t)(uintptr_t)ctx->tokens[*at].value);
-            if (m < 0)
-                return 0;
-            act->n0 = m;
-        }
-        (*at)++;
-        return 1;
-    }
 
     case 154:                                   /* setaimode */
         if (!ActStep(ctx, at))
@@ -2303,6 +2248,64 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         (*at)++;
         return 1;
 
+    case 119: {                                 /* order */
+        if (!ActStep(ctx, at))
+            return 0;
+        if (ctx->tokens[*at].kind == AM2_TOKEN_STRING) {
+            if (!ScriptResolveName(ctx, at, &act->subject, 0))
+                return 0;
+            act->extra = 0;
+        } else {
+            if (!ScriptOrderTarget(ctx, at, &act->extra, &act->subject,
+                                   &act->army))
+                return 0;
+        }
+        if (*at >= ctx->count) {
+            am2_log("Unexpected end of script.\n");
+            return 0;
+        }
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
+            return 0;
+        }
+        /* `order <who> follow <whom>` or `order <who> <somewhere>`. */
+        int32_t verb = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        if (verb == AM2_TOK_FOLLOW) {                      /* follow */
+            if (!ActStep(ctx, at))
+                return 0;
+            act->code = 0x19;
+            if (!ScriptResolveName(ctx, at, &act->target, 0))
+                return 0;
+        } else if (verb == AM2_TOK_GOTO) {               /* moveto */
+            if (!ActStep(ctx, at))
+                return 0;
+            act->code = 0x18;
+            if (!ScriptLocation(ctx, at, act, 0))
+                return 0;
+        } else {
+            return 0;
+        }
+        act->n0 = -1;
+        if (*at >= ctx->count ||
+            ctx->tokens[*at].kind != AM2_TOKEN_RESERVED ||
+            (int32_t)(uintptr_t)ctx->tokens[*at].value != AM2_TOK_INMODE)   /* inmode */
+            return 1;
+        if (!ActStep(ctx, at))
+            return 0;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED) {
+            ActTypeErr(ctx, at, AM2_TOKEN_RESERVED);
+            return 0;
+        }
+        {
+            int32_t m = ActAiMode((int32_t)(uintptr_t)ctx->tokens[*at].value);
+            if (m < 0)
+                return 0;
+            act->n0 = m;
+        }
+        (*at)++;
+        return 1;
+    }
+
     case 164:                                   /* setspeed */
         if (!ActStep(ctx, at))
             return 0;
@@ -2332,22 +2335,6 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         (*at)++;
         return 1;
 
-    case 167:                                   /* setnpc    */
-    case 176:                                   /* addexp    */
-    case 185:                                   /* setuilock */
-        if (!ActStep(ctx, at))
-            return 0;
-        act->code = (id == AM2_TOK_SETNPC) ? 0x2D : (id == AM2_TOK_ADDEXP) ? 0x35 : 0x39;
-        if (id != AM2_TOK_SETUILOCK && !ScriptResolveName(ctx, at, &act->subject, 0))
-            return 0;
-        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
-            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
-            return 0;
-        }
-        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
-        (*at)++;
-        return 1;
-
     case 173:                                   /* setitemflag */
         if (!ActStep(ctx, at))
             return 0;
@@ -2369,6 +2356,22 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
         if (!ActStep(ctx, at))
             return 0;
         act->code = 0x33;
+        if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
+            ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
+            return 0;
+        }
+        act->n0 = (int32_t)(uintptr_t)ctx->tokens[*at].value;
+        (*at)++;
+        return 1;
+
+    case 167:                                   /* setnpc    */
+    case 176:                                   /* addexp    */
+    case 185:                                   /* setuilock */
+        if (!ActStep(ctx, at))
+            return 0;
+        act->code = (id == AM2_TOK_SETNPC) ? 0x2D : (id == AM2_TOK_ADDEXP) ? 0x35 : 0x39;
+        if (id != AM2_TOK_SETUILOCK && !ScriptResolveName(ctx, at, &act->subject, 0))
+            return 0;
         if (ctx->tokens[*at].kind != AM2_TOKEN_INTEGER) {
             ActTypeErr(ctx, at, AM2_TOKEN_INTEGER);
             return 0;
@@ -2456,7 +2459,10 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
             return 0;
         }
         act->army = ScriptArmyColour(ctx, at);
-        act->army = act->army < 0 ? 4 : act->army;
+        if (act->army < 0)
+            act->army = 4;
+        else
+            act->army = act->army;
         return 1;
 
     case 180:                                   /* dropitem */

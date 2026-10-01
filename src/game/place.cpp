@@ -576,9 +576,13 @@ int32_t __cdecl PlacementAllowed(uint32_t where, int32_t type, int32_t slot,
     }
 #undef ARMY
 
+    /* Both refusals fall to one `return 0` here; the goto after it is dead
+     * but keeps the image's layout. */
     if (weight < AM2_BLOCK_FULL)
-        return ((const uint8_t *)*(void *const *)(uintptr_t)ADDR_TILE_KIND)
-                   [(uint32_t)tile & 0xFFFFu] == (uint32_t)kind ? 1 : 0;
+        if (((const uint8_t *)*(void *const *)(uintptr_t)ADDR_TILE_KIND)
+                [(uint32_t)tile & 0xFFFFu] == (uint32_t)kind)
+            return 1;
+    return 0;
     goto fail;
 
 }
