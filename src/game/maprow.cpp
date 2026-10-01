@@ -786,6 +786,7 @@ void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force)
     int32_t        i;
     uint8_t        heading;
     int16_t        v;
+    int16_t        dir;
 
     if (!force && frame == *(const int16_t *)(r + ROW_OFF_FRAME))
         return;
@@ -818,7 +819,7 @@ void __cdecl SetAnimFrame(void *row, int16_t frame, int32_t force)
             goto found;
     goto first;
 found:
-    if (i >= t->count) {
+    if (t->count <= i) {
     first:
         i = 0;
     }
@@ -835,10 +836,10 @@ found:
     heading = (uint8_t)(*(const uint8_t *)(r + ROW_OFF_HEADING)
                         + *(const uint8_t *)(r + ROW_OFF_HEADING_BIAS));
 
+    dir = RoundTo8(heading, PLAYING->directionBits);
     RowSetSprite(row,
                  (*(void *const *const *)(uintptr_t)ADDR_SPRITE_LIST)
-                     [PLAYING->cells[PLAYING->frames
-                                     * (int16_t)RoundTo8(heading, PLAYING->directionBits)
+                     [PLAYING->cells[dir * PLAYING->frames
                                      + *(const uint8_t *)(r + ROW_OFF_CELL)].sprite],
                  (void *)(uintptr_t)ADDR_MAP_DESC);
 
