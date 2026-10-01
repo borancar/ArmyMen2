@@ -3369,6 +3369,7 @@ int event_install(void)
  * is flat, so it is declared rather than included. */
 extern "C" void __cdecl HudMessage(const char *text, uint8_t colour);
 extern "C" void __cdecl StartAudioStream(const char *name, int32_t loop);
+extern "C" void __cdecl StopAudioStream(void);
 
 #define AM2_CHEAT_ITEM_GROUP  0x2D
 
@@ -3486,8 +3487,12 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x08:                                  /* playmusic */
+        /* No file name STOPS the music: the image's else arm calls
+         * StopAudioStream, which this case did not. */
         if (act->text != 0)
             StartAudioStream(act->text, act->n0);
+        else
+            StopAudioStream();
         return;
 
     case 0x09: {                                /* showvar */
@@ -3672,19 +3677,43 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                     act->army, 0, 0, 0);
         return;
 
-    case 0x18: {                                /* setaimode + move */
-        uint32_t uid = ResolveUid(act->subject, (uint32_t)(uintptr_t)owner);
+    case 0x18:                                  /* setaimode + move */
+        /* Two complete arms, not one with a branch at the top: with `extra`
+         * clear it is one unit, resolved afresh at every call; with it set
+         * it is a whole ARMY, and the move goes through the army variants
+         * too -- EvtArmyAtPoint and EvtAtObjPosB -- not only the mode. The
+         * army arm used to move the single resolved unit. */
+        if (act->extra == 0) {
+            if (act->n0 >= 0)
+                EvtSetAiMode(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                             act->n0);
+            /* The same three paths as `moveto`, in the A variants. */
+            if (act->xvar > 0) {
+                int32_t vx = 0, vy = 0;
+                AM2_Point p;
 
-        if (!(act->extra != 0)) {
-            if (act->n0 >= 0)
-                EvtSetAiMode(uid, act->n0);
-        } else {
-            if (act->n0 >= 0)
-                EvtArmySetField(act->army, act->subject, act->n0);
+                GetVarValue(act->xvar, &vx);
+                GetVarValue(act->yvar, &vy);
+                p.x = (int16_t)vx;
+                p.y = (int16_t)vy;
+                EvtAtPointA(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                            *(const uint32_t *)&p, act->relative);
+                return;
+            }
+            if (act->relative == 0 && act->u.pos.x == 0) {
+                EvtAtObjPosA(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                             ResolveUid(act->target, (uint32_t)(uintptr_t)owner),
+                             0);
+                return;
+            }
+            EvtAtPointA(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                        act->u.both, act->relative);
+            return;
         }
 
-        /* The same three paths as `moveto`, in the A variants. */
-        if (act->xvar > 0) {
+        if (act->n0 >= 0)
+            EvtArmySetField(act->army, act->subject, act->n0);
+        if (act->xvar != 0) {
             int32_t vx = 0, vy = 0;
             AM2_Point p;
 
@@ -3692,18 +3721,17 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
             GetVarValue(act->yvar, &vy);
             p.x = (int16_t)vx;
             p.y = (int16_t)vy;
-            EvtAtPointA(uid, *(const uint32_t *)&p, act->relative);
+            EvtArmyAtPoint(act->army, act->subject, *(const uint32_t *)&p,
+                           act->relative);
             return;
         }
         if (act->relative == 0 && act->u.pos.x == 0) {
-            EvtAtObjPosA(uid,
-                         ResolveUid(act->target, (uint32_t)(uintptr_t)owner),
-                         0);
+            EvtAtObjPosB(act->army, act->subject,
+                         ResolveUid(act->target, (uint32_t)(uintptr_t)owner), 0);
             return;
         }
-        EvtAtPointA(uid, act->u.both, act->relative);
+        EvtArmyAtPoint(act->army, act->subject, act->u.both, act->relative);
         return;
-    }
 
     /* Two arms of one shape: a value that comes from a VARIABLE when one is
      * named and from act->n0 otherwise.  The callees take an int8_t, and the
@@ -3932,11 +3960,16 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
     }
 
-    case 0x37:                                  /* unitfire at an object */
-        /* The same three-test refusal as 0x36, and the same me=0 on the
-         * subject where the target uses the owner. */
-        if (act->xvar > 0 || act->relative != 0 || act->u.pos.x != 0)
+    case 0x37:                                  /* unitfire at a point or object */
+        /* 0x36's two arms with the unit's own weapon: a named POINT fires
+         * there (0x00420260), otherwise at the named object. The point arm
+         * used to be a refusal here, so `unitfire` at a point did nothing.
+         * The same me=0 on the subject where the target uses the owner. */
+        if (act->xvar > 0 || act->relative != 0 || act->u.pos.x != 0) {
+            UnitFireAtPoint(ResolveUid(act->subject, 0), act->n0,
+                            ActionPoint(act, (uint32_t)(uintptr_t)owner));
             return;
+        }
         UnitFireAtObject(ResolveUid(act->subject, 0), act->n0,
                          ResolveUid(act->target, (uint32_t)(uintptr_t)owner));
         return;

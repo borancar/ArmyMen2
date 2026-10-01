@@ -108,6 +108,14 @@ main result so far (details in `src/vc6/README.md`):
     point. The reconstruction had used a fresh copy per unit; it now
     reproduces the chain. Not driven (mode 5 is the move-without-engaging
     order).
+  - **Missing calls the per-function call-count scan found** (2026-10-01):
+    three script actions in RunScriptAction were short. `playmusic` with no
+    file name now stops the stream, as the image does; `unitfire` at a point
+    fires the unit's own weapon there instead of doing nothing; and the
+    army form of `setaimode + move` moves the whole army through
+    EvtArmyAtPoint/EvtAtObjPosB instead of the one resolved unit. Also:
+    LoadMap fails on a chunk-size mismatch, Step3Drive's two skipped calls
+    are back. Found by counting each callee's calls, image against ours.
   - **Two wrong callees the call-target scan found** (2026-09-30): DestroyFlow
     simulated the departed player's acks against GetReSendMask (+0x18) where
     the image passes GetPlayerMask (+0x14); UpdateTrooperAction asked
