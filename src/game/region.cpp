@@ -3434,8 +3434,8 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
     }
 
     if (!*(const int32_t *)(o + OBJ_OFF_FIELD_5A4)
-        && *(const int32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-               > *(const int32_t *)(o + OBJ_OFF_DEADLINE_58))
+        && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+               > *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58))
         *(int32_t *)(o + OBJ_OFF_DEADLINE_58) = 0;
 
     *(uint32_t *)&pt = *(const uint32_t *)dest;
@@ -3471,7 +3471,7 @@ void __cdecl AiTrooperStep(void *obj, void *out, const void *ctx)
      * enemy squad's blips drifting a tile (sessions/radartroop-2164). */
     if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
                     *(const uint32_t *)&pt)
-        && *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) != 0
+        && *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) > 0
         && (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
            < (int32_t)*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) - 1)
         goto after_region;
@@ -3529,7 +3529,7 @@ after_region:
      * test skip the re-plan; see the header. */
     if (PointsEqual(*(const uint32_t *)(o + OBJ_OFF_ROUTE_GOAL),
                     *(const uint32_t *)&pt)) {
-        if (*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT)
+        if (*(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT) > 0
             && *(const uint16_t *)(o + OBJ_OFF_MOVE_AT)
                    < *(const uint16_t *)(o + OBJ_OFF_MOVE_COUNT))
             goto walk;
