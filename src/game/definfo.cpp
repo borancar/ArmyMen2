@@ -402,7 +402,6 @@ int32_t __cdecl DefParseInfoFile(const char *path)
  * zeros instead of as the previous level's data. */
 void __cdecl LoadDefTables(void)
 {
-    uint8_t *dst;
     int32_t  id;
 
     DefFreeTables();
@@ -439,10 +438,11 @@ void __cdecl LoadDefTables(void)
 
     /* The missile definitions. Thirteen dwords per entry, five of them moved:
      * 0x10 and 0x14 swap, and 0x1C -> 0x24 -> 0x20 -> 0x1C. */
-    dst = (uint8_t *)((void *)(uintptr_t)(ADDR_MISSILE_DEFS));
-    for (id = 0; id < AM2_MISSILE_DEF_COUNT;
-         id++, dst += AM2_MISSILE_DEF_BYTES) {
+    /* Indexed by id; VC6 walks it as a pointer and tests the pointer. */
+    for (id = 0; id < AM2_MISSILE_DEF_COUNT; id++) {
         const uint8_t *src;
+#define dst ((uint8_t *)((void *)(uintptr_t)(ADDR_MISSILE_DEFS)) \
+             + id * AM2_MISSILE_DEF_BYTES)
 
         memset(dst, 0, AM2_MISSILE_DEF_BYTES);
         src = (const uint8_t *)MissileDefFind(id);
@@ -462,6 +462,7 @@ void __cdecl LoadDefTables(void)
         *(uint32_t *)(dst + 0x28) = *(const uint32_t *)(src + 0x28);
         *(uint32_t *)(dst + 0x2C) = *(const uint32_t *)(src + 0x2C);
         *(uint32_t *)(dst + 0x30) = *(const uint32_t *)(src + 0x30);
+#undef dst
     }
 
     /* The rank records. A projection of a 0x20-byte parsed record onto a
@@ -477,10 +478,13 @@ void __cdecl LoadDefTables(void)
         if (src == 0)
             continue;
 
-        *(int32_t *)(rec + RANK_REC_OFF_SIGHT_RANGE) =
-            *(const int32_t *)(src + RANK_SRC_OFF_SIGHT_RANGE);
+        /* In the parsed record's order, which scatters them. */
+        *(int32_t *)(rec + RANK_REC_OFF_MAX_HEALTH) =
+            *(const int32_t *)(src + RANK_SRC_OFF_MAX_HEALTH);
         *(int32_t *)(rec + RANK_REC_OFF_FIELD_04) =
             *(const int32_t *)(src + RANK_SRC_OFF_FIELD_04);
+        *(int32_t *)(rec + RANK_REC_OFF_SIGHT_RANGE) =
+            *(const int32_t *)(src + RANK_SRC_OFF_SIGHT_RANGE);
         *(int32_t *)(rec + RANK_REC_OFF_FIELD_08) =
             *(const int32_t *)(src + RANK_SRC_OFF_FIELD_08);
 
@@ -494,8 +498,6 @@ void __cdecl LoadDefTables(void)
 
         *(int32_t *)(rec + RANK_REC_OFF_THRESHOLD) =
             *(const int32_t *)(src + RANK_SRC_OFF_THRESHOLD);
-        *(int32_t *)(rec + RANK_REC_OFF_MAX_HEALTH) =
-            *(const int32_t *)(src + RANK_SRC_OFF_MAX_HEALTH);
         *(int32_t *)(rec + RANK_REC_OFF_XP) =
             *(const int32_t *)(src + RANK_SRC_OFF_XP);
     }
