@@ -6882,6 +6882,8 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadPaint(RECT clip)
         AM2_Sprite    *spr;
         RECT           box;
         RECT           hit;
+        RECT           back;     /* loop scope: the original stores
+                                  * back.left before loading the width */
         AM2_Rect       part;
         int32_t        x;
         int32_t        y;
@@ -6911,7 +6913,6 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadPaint(RECT clip)
 
         /* The wide backdrop, behind the portrait rather than over it. */
         if (wide) {
-            RECT back;
 
             /* From the portrait's RIGHT EDGE out to x + AM2_SQUAD_WIDE_W --
              * the original computes the far edge by taking spr->bounds.right
