@@ -131,6 +131,15 @@ main result so far (details in `src/vc6/README.md`):
     out (see the note in the constructor): the image clears names[i]'s
     +0x50 and sets +0x4C on the spinner's three children (+0x58/+0x5C/
     +0x60) -- not on names[i] -- if anyone revisits the measurement.
+  - **HudEdgePaint rebuilt from the image** (2026-10-02): the health and
+    second bars are filled UNCLIPPED (the image does no IntersectRect before
+    ClearRegion; ours clipped them), every text block clips against the whole
+    widget rect rather than a box starting at the pen, and the ammo count is
+    formatted only once its box is known visible, into a 4-byte buffer.
+    RunScriptAction: the deferral, moveto, setaimode and the two
+    variable-or-n0 arms read their variable WITHOUT zeroing it first (a
+    failed read passes stack garbage, as the original does), and
+    setdamagepad is the switch's last arm.
   - **ScriptParseActionRecon rewritten from the image and checked under
     Unicorn** (2026-10-01): tools/actcheck.py runs the original and our
     relinked bytes side by side over every action in the shipped scripts

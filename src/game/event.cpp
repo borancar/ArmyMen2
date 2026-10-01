@@ -3385,20 +3385,6 @@ extern "C" void __cdecl StopAudioStream(void);
 #define g_objCtxSet      (*(const int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET)
 #define g_objCtxSetPrev  (*(int32_t *)(uintptr_t)ADDR_OBJ_CTX_SET_PREV)
 
-/* A value that comes from a named VARIABLE when the action has one and from
- * act->n0 otherwise.  Several arms share this and the original inlines it
- * each time, with the fallback loading only AL. */
-static inline int32_t ActValueOrVar(const AM2_ScriptAction *act)
-{
-    int32_t v = 0;
-
-    if (act->xvar > 0) {
-        GetVarValue(act->xvar, &v);
-        return v;
-    }
-    return act->n0;
-}
-
 /* 0x00420410. Run one parsed action against an owner.
  *
  * IT MOSTLY DOES NOT RUN THE ACTION. An action whose uid is not -2 is handed
@@ -3415,19 +3401,19 @@ static inline int32_t ActValueOrVar(const AM2_ScriptAction *act)
  * deferral: it is the one action that means "do nothing here". */
 void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
 {
-    uint32_t at;
+    AM2_Point at;
 
     if (act->uid != -2 && act->code != 0x1A) {
-        int32_t delay = act->delay;
-
         if (act->xvar > 0) {
-            int32_t v = 0;
+            int32_t v;
 
             GetVarValue(act->xvar, &v);
-            delay = v;
+            EventNotify(act->uid2, act->uid, (uint32_t)(uintptr_t)owner,
+                        0, 0, 0, 0, v, 0, 0);
+            return;
         }
         EventNotify(act->uid2, act->uid, (uint32_t)(uintptr_t)owner,
-                    0, 0, 0, 0, delay, 0, 0);
+                    0, 0, 0, 0, act->delay, 0, 0);
         return;
     }
 
@@ -3481,9 +3467,11 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x06:                                  /* playsound */
-        if (act->text != 0)
-            EvtPlaySoundAt(act->text, ActionPoint(act, (uint32_t)(uintptr_t)owner),
+        if (act->text != 0) {
+            *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+            EvtPlaySoundAt(act->text, *(const uint32_t *)&at,
                            act->n0, act->n1, act->extra);
+        }
         return;
 
     case 0x08:                                  /* playmusic */
@@ -3496,7 +3484,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x09: {                                /* showvar */
-        int32_t v = 0;
+        int32_t v;
         char    text[0x40];
 
         if (GetVarValue(act->xvar, &v) == 0)
@@ -3515,13 +3503,13 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         /* The subject is resolved afresh at each call, as the image does. */
 #define UID ResolveUid(act->subject, (uint32_t)(uintptr_t)owner)
         if (act->xvar > 0) {
-            int32_t vx = 0, vy = 0;
+            int32_t v;
             AM2_Point p;
 
-            GetVarValue(act->xvar, &vx);
-            GetVarValue(act->yvar, &vy);
-            p.x = (int16_t)vx;
-            p.y = (int16_t)vy;
+            GetVarValue(act->xvar, &v);
+            p.x = (int16_t)v;
+            GetVarValue(act->yvar, &v);
+            p.y = (int16_t)v;
             EvtAtPointC(UID, *(const uint32_t *)&p, act->relative);
             return;
         }
@@ -3594,12 +3582,12 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     case 0x0D: {                                /* createtrooper */
         uint8_t *unit, *weapon;
 
-        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
-        if ((int16_t)at == 0)
+        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if (at.x == 0)
             return;
 
-        unit = (uint8_t *)CreateTrooper(act->text, (int16_t)at,
-                                        (int16_t)(at >> 16),
+        unit = (uint8_t *)CreateTrooper(act->text, at.x,
+                                        at.y,
                                         ((AM2_Comm *)kCommObject)->CommArmyOfSlot(
                                                        act->army),
                                         act->army, 0, 0, 0, 1, 0);
@@ -3628,22 +3616,19 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     }
 
     case 0x0F: {                                /* createvehicle */
-        int32_t army;
-
-        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
-        if ((int16_t)at == 0)
+        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if (at.x == 0)
             return;
 
         /* TWO DIFFERENT MAPPINGS OF act->army IN ONE ARM. The sixth argument
          * is the army itself in single-player and its comm SLOT in
          * multiplayer; the fifth is CommArmyOfSlot of the same field, always.
          * They are not the same call and not the same direction. */
-        army = ((*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) != 0)
-             ? ((AM2_Comm *)kCommObject)->CommSlotForArmy(act->army)
-             : act->army;
-
-        CreateVehicle(act->n0, act->text, (int16_t)at, (int16_t)(at >> 16),
-                      ((AM2_Comm *)kCommObject)->CommArmyOfSlot(act->army), army,
+        CreateVehicle(act->n0, act->text, at.x, at.y,
+                      ((AM2_Comm *)kCommObject)->CommArmyOfSlot(act->army),
+                      ((*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) != 0)
+                          ? ((AM2_Comm *)kCommObject)->CommSlotForArmy(act->army)
+                          : act->army,
                       0, 0, 0, 0);
         return;
     }
@@ -3654,27 +3639,27 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x10:                                  /* createweapon at a point */
-        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
-        if ((int16_t)at == 0)
+        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if (at.x == 0)
             return;
         CreateWeapon(act->text, 4,
                               KeyLookupTriple(AM2_CHEAT_ITEM_GROUP, act->item, 0),
-                              at, 0, act->n0, 0, 0);
+                              *(const uint32_t *)&at, 0, act->n0, 0, 0);
         return;
 
     case 0x0E:                                  /* createexplosion */
-        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
-        if ((int16_t)at == 0)
+        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if (at.x == 0)
             return;
-        CreateExplosion((int16_t)at, (int16_t)(at >> 16), act->n0,
+        CreateExplosion(at.x, at.y, act->n0,
                         act->army, 0, act->n1, 0, 0, 0, 0);
         return;
 
     case 0x11:                                  /* createroach */
-        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
-        if ((int16_t)at == 0)
+        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if (at.x == 0)
             return;
-        CreateRoach(0, act->text, (int16_t)at, (int16_t)(at >> 16),
+        CreateRoach(0, act->text, at.x, at.y,
                     act->army, 0, 0, 0);
         return;
 
@@ -3690,13 +3675,13 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                              act->n0);
             /* The same three paths as `moveto`, in the A variants. */
             if (act->xvar > 0) {
-                int32_t vx = 0, vy = 0;
+                int32_t v;
                 AM2_Point p;
 
-                GetVarValue(act->xvar, &vx);
-                GetVarValue(act->yvar, &vy);
-                p.x = (int16_t)vx;
-                p.y = (int16_t)vy;
+                GetVarValue(act->xvar, &v);
+                p.x = (int16_t)v;
+                GetVarValue(act->yvar, &v);
+                p.y = (int16_t)v;
                 EvtAtPointA(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                             *(const uint32_t *)&p, act->relative);
                 return;
@@ -3715,13 +3700,13 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         if (act->n0 >= 0)
             EvtArmySetField(act->army, act->subject, act->n0);
         if (act->xvar != 0) {
-            int32_t vx = 0, vy = 0;
+            int32_t v;
             AM2_Point p;
 
-            GetVarValue(act->xvar, &vx);
-            GetVarValue(act->yvar, &vy);
-            p.x = (int16_t)vx;
-            p.y = (int16_t)vy;
+            GetVarValue(act->xvar, &v);
+            p.x = (int16_t)v;
+            GetVarValue(act->yvar, &v);
+            p.y = (int16_t)v;
             EvtArmyAtPoint(act->army, act->subject, *(const uint32_t *)&p,
                            act->relative);
             return;
@@ -3738,19 +3723,40 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
      * named and from act->n0 otherwise.  The callees take an int8_t, and the
      * original's fallback loads only AL -- so the upper bits it pushes are
      * whatever was in eax.  Writing the parameter as a byte is what makes
-     * that harmless, and is why the header's int8_t matters. */
-    case 0x20:
-        EvtSetByte40(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                     (int8_t)ActValueOrVar(act));
-        return;
+     * that harmless, and is why the header's int8_t matters.  Each is two
+     * whole calls, whose identical tails the compiler merges; `v` is not
+     * initialised, so a failed variable read passes stack garbage, as the
+     * original does. */
+    case 0x20: {
+        int32_t v;
 
-    case 0x21:
-        EvtSetByte530(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                      (int8_t)ActValueOrVar(act));
+        if (act->xvar > 0) {
+            GetVarValue(act->xvar, &v);
+            EvtSetByte40(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                         (int8_t)v);
+            return;
+        }
+        EvtSetByte40(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                     (int8_t)act->n0);
         return;
+    }
+
+    case 0x21: {
+        int32_t v;
+
+        if (act->xvar > 0) {
+            GetVarValue(act->xvar, &v);
+            EvtSetByte530(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                          (int8_t)v);
+            return;
+        }
+        EvtSetByte530(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                      (int8_t)act->n0);
+        return;
+    }
 
     case 0x23: {                                /* setvar */
-        /* NOT ActValueOrVar: this one tests xvar for NON-ZERO where its
+        /* NOT the 0x20/0x21 shape: this one tests xvar for NON-ZERO where its
          * neighbours test for positive, and it REFUSES outright when the
          * read fails rather than falling back to n0. */
         int32_t v;
@@ -3768,19 +3774,18 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     case 0x19: {                                /* setaimode + attach */
         /* The same head as 0x18 and a completely different tail: no point
          * handling at all, just a pair of objects or an army attach. */
-        if (act->extra != 0) {
+        if (act->extra == 0) {
             if (act->n0 >= 0)
-                EvtArmySetField(act->army, act->subject, act->n0);
-            EvtArmyAttach(act->army, act->subject,
-                          ResolveUid(act->target,
-                                     (uint32_t)(uintptr_t)owner));
+                EvtSetAiMode(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                             act->n0);
+            EvtObjPair(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                       ResolveUid(act->target, (uint32_t)(uintptr_t)owner));
             return;
         }
         if (act->n0 >= 0)
-            EvtSetAiMode(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                         act->n0);
-        EvtObjPair(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                   ResolveUid(act->target, (uint32_t)(uintptr_t)owner));
+            EvtArmySetField(act->army, act->subject, act->n0);
+        EvtArmyAttach(act->army, act->subject,
+                      ResolveUid(act->target, (uint32_t)(uintptr_t)owner));
         return;
     }
 
@@ -3794,7 +3799,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x22: {                                /* addtovar */
-        /* Not ActValueOrVar: the value starts as n0 and the variable read
+        /* Not the 0x20/0x21 shape: the value starts as n0 and the variable read
          * writes over it, so a failed read leaves n0 rather than 0. */
         int32_t v = act->n0;
 
@@ -3864,14 +3869,17 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                      act->n0);
         return;
 
-    case 0x2E:
+    case 0x2E: {
         /* Both paths call the same function; multiplayer maps the army
          * through its comm SLOT and single-player passes the army itself. */
+        int32_t army = act->army;
+
+        if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0)
+            army = ((AM2_Comm *)kCommObject)->CommSlotForArmy(army);
         EvtType2ActionC(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                        (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) != 0
-                            ? ((AM2_Comm *)kCommObject)->CommSlotForArmy(act->army)
-                            : act->army);
+                        army);
         return;
+    }
 
     case 0x38:
         EvtDropItem(ResolveUid(act->army, (uint32_t)(uintptr_t)owner),
@@ -3892,15 +3900,15 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x31:                                  /* by point, not by uid */
-        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
-        if ((int16_t)at != 0)
-            EvtByRefA((int32_t)at, act->n0);
+        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if (at.x != 0)
+            EvtByRefA(*(const int32_t *)&at, act->n0);
         return;
 
     case 0x32:
-        at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
-        if ((int16_t)at != 0)
-            EvtByRefB((int32_t)at, act->n0);
+        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if (at.x != 0)
+            EvtByRefB(*(const int32_t *)&at, act->n0);
         return;
 
     case 0x33:
@@ -3943,6 +3951,20 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                                       (uint32_t)(uintptr_t)owner));
         return;
 
+    case 0x37:                                  /* unitfire at a point or object */
+        /* 0x36's two arms with the unit's own weapon: a named POINT fires
+         * there (0x00420260), otherwise at the named object. The point arm
+         * used to be a refusal here, so `unitfire` at a point did nothing.
+         * The same me=0 on the subject where the target uses the owner. */
+        if (act->xvar > 0 || act->relative != 0 || act->u.pos.x != 0) {
+            UnitFireAtPoint(ResolveUid(act->subject, 0), act->n0,
+                            ActionPoint(act, (uint32_t)(uintptr_t)owner));
+            return;
+        }
+        UnitFireAtObject(ResolveUid(act->subject, 0), act->n0,
+                         ResolveUid(act->target, (uint32_t)(uintptr_t)owner));
+        return;
+
     case 0x3A: {                                /* setdamagepad */
         /* The pad is indexed afresh at every store, as the image does. */
 #define pad ((uint8_t *)(uintptr_t)ADDR_PADS \
@@ -3966,20 +3988,6 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 #undef pad
     }
-
-    case 0x37:                                  /* unitfire at a point or object */
-        /* 0x36's two arms with the unit's own weapon: a named POINT fires
-         * there (0x00420260), otherwise at the named object. The point arm
-         * used to be a refusal here, so `unitfire` at a point did nothing.
-         * The same me=0 on the subject where the target uses the owner. */
-        if (act->xvar > 0 || act->relative != 0 || act->u.pos.x != 0) {
-            UnitFireAtPoint(ResolveUid(act->subject, 0), act->n0,
-                            ActionPoint(act, (uint32_t)(uintptr_t)owner));
-            return;
-        }
-        UnitFireAtObject(ResolveUid(act->subject, 0), act->n0,
-                         ResolveUid(act->target, (uint32_t)(uintptr_t)owner));
-        return;
 
     case 0x1A:                                  /* the empty action */
         return;

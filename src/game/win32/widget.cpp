@@ -1066,80 +1066,6 @@ static inline int32_t EdgeBar(int32_t value, int32_t max)
 }
 
 
-/* One vertical text element of the edge strip: a full-height box at the pen,
- * intersected with the clip, and the string drawn down the middle of it inside
- * a Lock/Unlock bracket. Returns whether the surface could be locked -- the
- * original ABANDONS THE WHOLE PAINT when a lock fails, rather than skipping
- * the one element, and every one of its four text blocks does that. */
-static inline int32_t EdgeText(const AM2_Widget *w, int32_t pen, const char *text,
-                        const RECT *clip)
-{
-    RECT     box;
-    RECT     vis;
-    int32_t  mid = w->rect.left + (w->rect.right - w->rect.left) / 2;
-
-    *(AM2_Rect *)&box = RectMake(w->rect.left, pen,
-            w->rect.right, w->rect.bottom);
-
-    if (!IntersectRect(&vis, &box, clip))
-        return 1;
-
-    if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
-        return 0;
-
-    DrawTextVertical(mid, pen, text, 1, vis,
-                     *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
-    UnlockSurface();
-    return 1;
-}
-
-/* The strip's own sprite, drawn at the pen and clipped twice the way every
- * sprite in this tree is. Nothing is drawn if either clip rejects it, and the
- * caller advances the pen either way. */
-static inline void EdgeSprite(const AM2_Widget *w, int32_t pen, AM2_Sprite *spr,
-                       const RECT *clip)
-{
-    RECT     box;
-    RECT     vis;
-    AM2_Rect part;
-    int32_t  x;
-    int32_t  y;
-
-    *(AM2_Rect *)&box = RectMake(w->rect.left, pen,
-            w->rect.right, spr->bounds.bottom + pen);
-
-    if (!IntersectRect(&vis, &box, clip))
-        return;
-
-    x = w->rect.left;
-    y = pen;
-
-    if (!ClipRect(&spr->bounds, (const AM2_Rect *)&vis, &x, &y, &part))
-        return;
-
-    DrawSpriteClipped(spr, x, y, &part, 0);
-}
-
-/* A bar, which is a filled rectangle and not a sprite: eight pixels wide at
- * AM2_HUD_BAR_X, growing UPWARD from a baseline AM2_HUD_BAR_BASE below the
- * pen. ClearRegion does the fill, so this must not be inside a lock -- see
- * surface.h, where a fill attempted while a lock is held is a silent no-op. */
-static inline void EdgeBarFill(const AM2_Widget *w, int32_t pen, int32_t percent,
-                        const RECT *clip)
-{
-    RECT box;
-    RECT vis;
-
-    *(AM2_Rect *)&box = RectMake(w->rect.left + AM2_HUD_BAR_X,
-            pen + AM2_HUD_BAR_BASE - percent,
-            w->rect.left + AM2_HUD_BAR_X + AM2_HUD_BAR_W,
-            pen + AM2_HUD_BAR_BASE);
-
-    if (!IntersectRect(&vis, &box, clip))
-        return;
-
-    ClearRegion(&vis, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
-}
 
 
 
@@ -8789,8 +8715,45 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
     AM2_Widget *w = this;
 
     uint8_t    *self = (uint8_t *)w;
-#define spr (*(AM2_Sprite **)(self + EDGE_OFF_SPRITE))
+    RECT        box;
+    RECT        vis;
+    AM2_Rect    part;
+    int32_t     x;
+    int32_t     y;
+    char        text[4];
     int32_t     pen;
+
+/* A text block: the WHOLE widget rect against the clip, the string drawn at
+ * (x, y) inside a Lock/Unlock bracket. An invisible box skips the draw; a
+ * failed lock abandons the paint. */
+#define EDGE_TEXT(s)                                                         \
+    *(AM2_Rect *)&box = RectMake(w->rect.left, w->rect.top,                  \
+                                 w->rect.right, w->rect.bottom);             \
+    if (IntersectRect(&vis, &box, &clip)) {                                  \
+        if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)) \
+            return;                                                          \
+        DrawTextVertical(x, y, (s), 1, vis,                                  \
+                         *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);    \
+        UnlockSurface();                                                     \
+    }
+/* A sprite at the pen, clipped twice. */
+#define EDGE_SPRITE(s)                                                       \
+    y = pen;                                                                 \
+    x = w->rect.left;                                                        \
+    *(AM2_Rect *)&box = RectMake(x, pen, w->rect.right,                      \
+                                 (s)->bounds.bottom + pen);                  \
+    if (IntersectRect(&vis, &box, &clip)                                     \
+        && ClipRect(&(s)->bounds, (const AM2_Rect *)&vis, &x, &y, &part))    \
+        DrawSpriteClipped((s), x, y, &part, 0);
+/* A bar growing UPWARD from AM2_HUD_BAR_BASE below the pen, filled with
+ * no clip at all -- unlike the text and the sprite beside it. */
+#define EDGE_BAR(pct)                                                        \
+    *(AM2_Rect *)&box = RectMake(w->rect.left + AM2_HUD_BAR_X,               \
+            pen + AM2_HUD_BAR_BASE - (pct),                                  \
+            w->rect.left + AM2_HUD_BAR_X + AM2_HUD_BAR_W,                    \
+            pen + AM2_HUD_BAR_BASE);                                         \
+    ClearRegion(&box, *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR);
+#define spr (*(AM2_Sprite **)(self + EDGE_OFF_SPRITE))
 
     /* Clipped in place: the by-value clip is the intersection from here. */
     if (!IntersectRect(&clip, (const RECT *)(uintptr_t)ADDR_SCREEN_CLIP, &clip))
@@ -8798,83 +8761,78 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
 
     ::WidgetPaint(w, clip);
 
-    pen = w->rect.top + 2;
-
     /* SARGE, then the strip sprite under it, then the trooper's health. */
-    if (!EdgeText(w, pen, (const char *)((void *)(uintptr_t)(AM2_HUD_STR_SARGE)), &clip))
-        return;
+    pen = w->rect.top + 2;
+    x = w->rect.left + (w->rect.right - w->rect.left) / 2;
+    y = pen;
+    EDGE_TEXT((const char *)((void *)(uintptr_t)(AM2_HUD_STR_SARGE)))
     pen += TextStackHeight((const char *)((void *)(uintptr_t)(AM2_HUD_STR_SARGE)), 1)
            + AM2_HUD_EDGE_GAP;
 
-    EdgeSprite(w, pen, spr, &clip);
-    EdgeBarFill(w, pen, *(const int32_t *)(self + EDGE_OFF_HEALTH_PCT), &clip);
+    EDGE_SPRITE(spr)
+    EDGE_BAR(*(const int32_t *)(self + EDGE_OFF_HEALTH_PCT))
     pen += spr->bounds.bottom + AM2_HUD_EDGE_GAP_BAR;
 
     /* The vehicle or the armour, if there is one, with its own bar. */
-    if (*(const char *)(self + EDGE_OFF_CAPTION_A)) {
+    {
         const char *cap = (const char *)(self + EDGE_OFF_CAPTION_A);
 
-        if (!EdgeText(w, pen, cap, &clip))
-            return;
-        pen += TextStackHeight(cap, 1) + AM2_HUD_EDGE_GAP;
+        if (*cap) {
+            y = pen;
+            x = w->rect.left + (w->rect.right - w->rect.left) / 2;
+            EDGE_TEXT(cap)
+            pen += TextStackHeight(cap, 1) + AM2_HUD_EDGE_GAP;
 
-        EdgeSprite(w, pen, spr, &clip);
-        EdgeBarFill(w, pen, *(const int32_t *)(self + EDGE_OFF_SECOND_PCT),
-                    &clip);
-        pen += spr->bounds.bottom + AM2_HUD_EDGE_GAP_BAR;
+            EDGE_SPRITE(spr)
+            EDGE_BAR(*(const int32_t *)(self + EDGE_OFF_SECOND_PCT))
+            pen += spr->bounds.bottom + AM2_HUD_EDGE_GAP_BAR;
+        }
     }
 
     /* The item in hand, and its ammo if it counts any. */
     if (!*(const char *)(self + EDGE_OFF_CAPTION_B))
         return;
 
-    {
-        const char *cap = (const char *)(self + EDGE_OFF_CAPTION_B);
-
-        if (!EdgeText(w, pen, cap, &clip))
-            return;
-        pen += TextStackHeight(cap, 1) + AM2_HUD_EDGE_GAP;
-    }
+    y = pen;
+    x = w->rect.left + (w->rect.right - w->rect.left) / 2;
+    EDGE_TEXT((const char *)(self + EDGE_OFF_CAPTION_B))
+    pen += TextStackHeight((const char *)(self + EDGE_OFF_CAPTION_B), 1)
+           + AM2_HUD_EDGE_GAP;
 
     if (*(const int32_t *)(self + EDGE_OFF_AMMO) < 0)
         return;
 
-    {
-        AM2_Sprite *ammo = *(AM2_Sprite **)(self + EDGE_OFF_AMMO_SPRITE);
-        int32_t     n    = *(const int32_t *)(self + EDGE_OFF_AMMO);
-        char        text[16];
+    EDGE_SPRITE(*(AM2_Sprite **)(self + EDGE_OFF_AMMO_SPRITE))
 
-        EdgeSprite(w, pen, ammo, &clip);
-        pen += 3;
+    /* The count is centered ONE PIXEL RIGHT of the widget middle
+     * (`lea eax,[eax+ecx+1]`), three pixels down; the labels above use the
+     * plain mid. Missing it drew every ammo count one pixel left
+     * (sessions/hudcount-2823.txt). Clamped HERE and not by the update: over
+     * AM2_HUD_AMMO_MAX it draws "**", otherwise "%02d" through the game's own
+     * sprintf, formatted only once the box is known to be visible. */
+    pen += 3;
+    y = pen;
+    x = w->rect.left + (w->rect.right - w->rect.left) / 2 + 1;
+    *(AM2_Rect *)&box = RectMake(w->rect.left, w->rect.top,
+                                 w->rect.right, w->rect.bottom);
+    if (!IntersectRect(&vis, &box, &clip))
+        return;
 
-        if (n > AM2_HUD_AMMO_MAX)
-            strcpy(text, (const char *)((void *)(uintptr_t)(AM2_HUD_STR_AMMO_OVER)));
-        else
-            am2_sprintf(text, (const char *)((void *)(uintptr_t)(AM2_HUD_STR_AMMO_FMT)), n);
+    if (*(const int32_t *)(self + EDGE_OFF_AMMO) > AM2_HUD_AMMO_MAX)
+        strcpy(text, (const char *)((void *)(uintptr_t)(AM2_HUD_STR_AMMO_OVER)));
+    else
+        am2_sprintf(text, (const char *)((void *)(uintptr_t)(AM2_HUD_STR_AMMO_FMT)),
+                    *(const int32_t *)(self + EDGE_OFF_AMMO));
 
-        /* NOT EdgeText: the count is centered ONE PIXEL RIGHT of the widget
-         * middle. The original (HUD_EDGE_PAINT+0x5B1) computes the same mid as
-         * EdgeText -- `left + (right-left)/2` -- but then `lea eax,[eax+ecx+1]`
-         * adds one, and draws the count there over the widget rect clipped to
-         * the caller's. The labels above use the plain mid; only the count
-         * carries the +1, so it cannot share EdgeText. Missing it drew every
-         * ammo count one pixel left (sessions/hudcount-2823.txt). */
-        {
-            int32_t mid = w->rect.left + (w->rect.right - w->rect.left) / 2;
-            RECT    box;
-            RECT    vis;
-
-            *(AM2_Rect *)&box = RectMake(w->rect.left, w->rect.top,
-                                         w->rect.right, w->rect.bottom);
-            if (IntersectRect(&vis, &box, &clip)
-                && LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET)) {
-                DrawTextVertical(mid + 1, pen, text, 1, vis,
-                                 *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
-                UnlockSurface();
-            }
-        }
-    }
+    if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
+        return;
+    DrawTextVertical(x, y, text, 1, vis,
+                     *(const uint8_t *)(uintptr_t)ADDR_COLOUR_WHITE);
+    UnlockSurface();
 #undef spr
+#undef EDGE_BAR
+#undef EDGE_SPRITE
+#undef EDGE_TEXT
 }
 
 /* 0x0041A170, three callers. The width of ADDR_HUD_WIDGET_C, or 0 when there
