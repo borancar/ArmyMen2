@@ -12201,7 +12201,6 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     uint8_t       *rows;
     const uint8_t *turret;
     uint32_t       at;
-    int32_t        rowCount;
     int32_t        weaponKind;
     int32_t        i;
 
@@ -12267,9 +12266,9 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
 
     turret = (const uint8_t *)((void *)(uintptr_t)(ADDR_TURRET_ANIMS))
            + (uint32_t)kind * AM2_ANIM_TABLE_BYTES;
-    rowCount = (*(const int32_t *)turret > 0) ? 2 : 1;
+    table = (*(const int32_t *)turret > 0) ? 2 : 1;   /* the row count, in table's slot */
 
-    BuildRowSet(o + OBJ_OFF_SUBRECORD, rowCount,
+    BuildRowSet(o + OBJ_OFF_SUBRECORD, table,
                 (const void *)((void *)(uintptr_t)(ADDR_VEHICLE_ROW_SPEC)), x, y,
                 (const void *)((void *)(uintptr_t)(ADDR_VEHICLE_BOX)));
     SetFieldInAll(o + OBJ_OFF_SUBRECORD,
@@ -12342,7 +12341,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     *(uint32_t *)rows |= ROW_FLAG_BIT8 | ROW_FLAG_BIT6;
     *(uint32_t *)(rows + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
 
-    if (rowCount > 1) {
+    if (table > 1) {
         uint8_t *turretRow = rows + AM2_OBJ_ROW_STRIDE;
 
         *(const void **)(turretRow + ROW_OFF_ANIM_CUR) = turret;
