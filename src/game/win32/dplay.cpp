@@ -3624,7 +3624,7 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
 {
     uint8_t *comm = *(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT;
     uint8_t *pkt  = (uint8_t *)msg;
-    uint8_t *flow = 0;      /* the DESTINATION's record; only looked up for 0x0B */
+    uint8_t *flow;          /* the DESTINATION's record; only looked up for 0x0B */
     uint8_t *mine;
     uint8_t *node;
     int32_t  roll;
@@ -3639,6 +3639,7 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
     if (*(const int32_t *)(comm + COMM_OFF_SAW_KIND_31) != 0)
         return (int32_t)AM2_DPERR_SESSIONLOST;
 
+    flow = 0;   /* set after the refusals, as the image does */
     if (*(const uint32_t *)(pkt + COMMMSG_OFF_KIND) == AM2_COMMMSG_KIND_FLOW) {
         uint32_t mask = GetPlayerMask((uint32_t)to);
 
@@ -3653,9 +3654,9 @@ int32_t __cdecl SendGameMsg(void *msg, int32_t to, int32_t flags)
                 return (int32_t)AM2_E_OUTOFMEMORY;
             }
 
-            *(uint32_t *)(node + MSGNODE_OFF_FLAGS) = mask;
             *(uint32_t *)(node + MSGNODE_OFF_KEY) =
                 *(const uint32_t *)(pkt + PACKET_OFF_SEQ);
+            *(uint32_t *)(node + MSGNODE_OFF_FLAGS) = mask;
             *(uint32_t *)(node + MSGNODE_OFF_STAMP) = GetTickCount();
 
             if (*(const uint32_t *)(pkt + PACKET_OFF_LEN)
