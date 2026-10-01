@@ -1289,15 +1289,16 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
         return 0;
     }
 
-    /* Both bounds are tested twice over: the low word must be non-zero and the
-     * masked value under AM2_PATH_TILES. The second can never fire after the
+    /* Both bounds are tested twice over: the low word must be non-zero (as an
+     * unsigned `<= 0`, the image's `jbe`) and the masked value under
+     * AM2_PATH_TILES. The second can never fire after the
      * mask; reproduced because it is there. */
-    if (!(uint16_t)from)
+    if (from <= 0)
         return 0;
     fromTile = from & 0xFFFF;
     if (fromTile >= AM2_PATH_TILES)
         return 0;
-    if (!(uint16_t)to)
+    if ((uint16_t)to <= 0)
         return 0;
     toTile = to & 0xFFFF;
     if (toTile >= AM2_PATH_TILES)
