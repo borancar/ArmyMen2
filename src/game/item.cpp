@@ -4928,7 +4928,6 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src)
     uint8_t *o = (uint8_t *)obj;
     int16_t  maxHp;
     int16_t  hp;
-    int16_t  next;
 
 #define HEALTH (*(int16_t *)(o + OBJ_OFF_HEALTH))
 #define MAXHP  (*(const int16_t *)(o + OBJ_OFF_MAX_HEALTH))
@@ -4940,34 +4939,28 @@ void __cdecl HealObject(void *obj, int32_t pct, void *src)
     else if (pct < 0)
         pct = 0;
 
-    /* The item arm reads the maximum at each use; the trooper arm holds the
-     * health and then the maximum, in that order. */
+    /* One NotifyHealed at the end, which VC6 copies into each arm. The item
+     * arm reads the maximum at each use; the trooper arm holds the health and
+     * the maximum, and tests the stored sum against the held maximum. */
     if (ObjIsItem((const AM2_Object *)obj)) {
         if (*(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME) > 0) {
             ChangeObjectFrame(obj, 0, 0);
-            HEALTH = MAXHP;
-            NotifyHealed(obj, src);
-            return;
+        } else {
+            hp = HEALTH;
+            if (hp <= 0 || hp >= MAXHP)
+                return;
         }
-
+        HEALTH = MAXHP;
+    } else {
         hp = HEALTH;
-        if (hp <= 0 || hp >= MAXHP)
+        if (hp <= 0)
             return;
 
-        HEALTH = MAXHP;
-        NotifyHealed(obj, src);
-        return;
+        maxHp = MAXHP;
+        HEALTH = (int16_t)((int32_t)maxHp * pct / 100 + hp);
+        if (HEALTH > maxHp)
+            HEALTH = maxHp;
     }
-
-    hp = HEALTH;
-    if (hp <= 0)
-        return;
-
-    maxHp = MAXHP;
-    next  = (int16_t)((int32_t)maxHp * pct / 100 + hp);
-    HEALTH = next;
-    if (next > maxHp)
-        HEALTH = maxHp;
     NotifyHealed(obj, src);
 #undef HEALTH
 #undef MAXHP
