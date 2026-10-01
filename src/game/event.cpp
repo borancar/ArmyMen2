@@ -3461,11 +3461,6 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
             g_overlayDirty = 1;
         }
         return;
-    case 0x06:                                  /* playsound */
-        if (act->text != 0)
-            EvtPlaySoundAt(act->text, ActionPoint(act, (uint32_t)(uintptr_t)owner),
-                           act->n0, act->n1, act->extra);
-        return;
     case 0x07:                                  /* playsoundon */
         if (act->text != 0) {
             /* ActionPoint's answer is DISCARDED -- eax is overwritten by n0
@@ -3478,9 +3473,16 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                            act->n0, act->n1, act->extra);
         }
         return;
+
     case 0x08:                                  /* playmusic */
         if (act->text != 0)
             StartAudioStream(act->text, act->n0);
+        return;
+
+    case 0x06:                                  /* playsound */
+        if (act->text != 0)
+            EvtPlaySoundAt(act->text, ActionPoint(act, (uint32_t)(uintptr_t)owner),
+                           act->n0, act->n1, act->extra);
         return;
 
     case 0x0A:                                  /* setobjstate-ish */
@@ -3490,29 +3492,34 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         EvtSetWord60(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                      act->n0);
         return;
-    case 0x0C:
-        EvtGuardedAction(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                         act->n0, act->extra);
-        return;
-
     case 0x12:                                  /* dropitem */
         EvtDeployItem(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                       ActionPoint(act, (uint32_t)(uintptr_t)owner));
         return;
+
     case 0x13:
         EvtObjAction(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
         return;
+
     case 0x14:
         ScriptResurrectItem(ResolveUid(act->subject,
                                        (uint32_t)(uintptr_t)owner),
                             ActionPoint(act, (uint32_t)(uintptr_t)owner));
         return;
+
     case 0x15:                                  /* ally */
         EvtSetAllied(act->subject, act->target);
         return;
+
     case 0x16:                                  /* unally */
         EvtClearAllied(act->subject, act->target);
         return;
+
+    case 0x0C:
+        EvtGuardedAction(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                         act->n0, act->extra);
+        return;
+
     case 0x17:
         ScriptSetObjTable(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                           act->target);
@@ -3523,16 +3530,27 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
     case 0x1B:                                  /* suspendai */
         EvtFlag40Clear(act->subject, (uint32_t)(uintptr_t)owner);
         return;
-    case 0x1C:                                  /* reviveai */
-        EvtFlag40Set(act->subject, (uint32_t)(uintptr_t)owner);
-        return;
     case 0x1D:                                  /* setcamerafocus */
         EvtPushObjCtx(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
         return;
+
+    case 0x1C:                                  /* reviveai */
+        EvtFlag40Set(act->subject, (uint32_t)(uintptr_t)owner);
+        return;
+
     case 0x1E:                                  /* restorecamerafocus */
         g_objCtxObj = g_objCtxObjPrev;
         g_objCtxVal = g_objCtxValPrev;
         g_objCtxSetPrev = g_objCtxSet;
+        return;
+
+    case 0x26:                                  /* activateregion */
+        if (act->subject < (int32_t)g_regionStride) {
+            if (act->n0 != 0)
+                ActivateRegion(act->subject);
+            else
+                InactivateRegion(act->subject);
+        }
         return;
 
     case 0x25:                                  /* setobjscriptstate */
@@ -3543,14 +3561,6 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
          * rr_burner_low which is not a valid object". */
         SetObjScriptState(act->target, act->subject, act->n0);
         return;
-    case 0x26:                                  /* activateregion */
-        if (act->subject < (int32_t)g_regionStride) {
-            if (act->n0 != 0)
-                ActivateRegion(act->subject);
-            else
-                InactivateRegion(act->subject);
-        }
-        return;
 
     case 0x2B:
         EvtSetField540(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
@@ -3560,13 +3570,15 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         EvtSetModeF0(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                      act->n0);
         return;
+    case 0x2F:
+        EvtType2ActionA(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
+        return;
+
     case 0x2D:
         EvtSetMode94(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
                      act->n0);
         return;
-    case 0x2F:
-        EvtType2ActionA(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
-        return;
+
     case 0x30:
         EvtType2ActionB(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
         return;

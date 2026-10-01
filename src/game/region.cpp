@@ -10594,8 +10594,8 @@ void __cdecl Step3Drive(void *obj, void *rec)
                 } else if (*(const uint16_t *)(r + 0x18u) != 0) {
                     /* Firing at a POINT: same spread, no target object. */
                     *(uint32_t *)&spot.at = *(const uint32_t *)(r + 0x18u);
-                    fireTarget = 0;
                     spot.ground = *(const int16_t *)(r + 0x1Cu);
+                    fireTarget = 0;
                     heading = (uint8_t)(*(const uint8_t *)(o + 0x530u)
                                         + (orig_step3_rand() % 5) - 2);
                 } else {

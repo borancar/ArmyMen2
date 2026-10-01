@@ -1140,8 +1140,8 @@ void __cdecl RowUpdate(void *row, int32_t force, void *desc)
     top    = ROW_FLD(r, ROW_OFF_Y, int16_t)
              - ROW_FLD(spr, SPR_OFF_HOTY, int16_t)
              - ROW_FLD(r, ROW_OFF_Y_ADJUST, int16_t);
-    right  = left + ROW_FLD(spr, SPR_OFF_W, int32_t);
     bottom = top + ROW_FLD(spr, SPR_OFF_H, int32_t);
+    right  = left + ROW_FLD(spr, SPR_OFF_W, int32_t);
 
     ROW_FLD(r, ROW_OFF_RECT + 0,  int32_t) = left;
     ROW_FLD(r, ROW_OFF_RECT + 4,  int32_t) = top;

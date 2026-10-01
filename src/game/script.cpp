@@ -1667,16 +1667,16 @@ static int32_t ScriptParseActionRecon(AM2_ScriptCtx *ctx, int32_t *at,
 
     switch (id) {
 
-    case AM2_TOK_RESTORECAMERAFOCUS:
-        (*at)++;
-        act->code = 0x1E;
-        return 1;
-
     case AM2_TOK_SETCAMERAFOCUS:
         if (!ActStep(ctx, at))
             return 0;
         act->code = 0x1D;
         return ScriptResolveName(ctx, at, &act->subject, 0) != 0;
+
+    case AM2_TOK_RESTORECAMERAFOCUS:
+        (*at)++;
+        act->code = 0x1E;
+        return 1;
 
     case AM2_TOK_SUSPENDAI:
     case AM2_TOK_REVIVEAI:
@@ -2912,12 +2912,12 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
 
     } else if (TOK->kind == AM2_TOKEN_RESERVED) {
         switch ((int32_t)(uintptr_t)TOK->value) {
-        case AM2_TOK_ALLOF:
-            cond->kind = AM2_IF_ALLOF;
-            STEP_OWN();
-            break;
         case AM2_TOK_INORDER:
             cond->kind = AM2_IF_INORDER;
+            STEP_OWN();
+            break;
+        case AM2_TOK_ALLOF:
+            cond->kind = AM2_IF_ALLOF;
             STEP_OWN();
             break;
         case AM2_TOK_REPEAT:

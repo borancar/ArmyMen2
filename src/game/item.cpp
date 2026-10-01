@@ -5081,6 +5081,22 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
     aimed = *(const int32_t *)(out + SIGHTCOUT_OFF_SEEN) != 0 && ready != 0;
 
     switch (kind) {
+    case 2:                                                        /* GREN */
+        if (cls == 2) {
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_KNEEL;
+        } else if (cls == 1) {
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
+                PoseIsBraced(o)
+                ? (aimed ? AM2_POSE_GRENADE_KNEEL : AM2_POSE_KNEEL_ARMED_A)
+                : AM2_POSE_RAISE_KNEEL;
+        } else {
+            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
+                PoseIsBraced(o)
+                ? (aimed ? AM2_POSE_GRENADE_STAND : AM2_POSE_STAND_ARMED)
+                : AM2_POSE_RAISE_STAND;
+        }
+        return 1;
+
     case 1:  case 7:  case 8:  case 9:  case 10:
     case 29: case 30:                        /* HvMG, RIFLE, AUTO, VULC, SNIP */
         if (*(const int32_t *)(o + OBJ_OFF_FIELD_44) > 0)
@@ -5096,22 +5112,6 @@ int32_t __cdecl SelectFirePose(void *obj, void *weapon, void *sight,
             *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
                 PoseIsBraced(o)
                 ? (aimed ? AM2_POSE_GUN_STAND : AM2_POSE_STAND_ARMED)
-                : AM2_POSE_RAISE_STAND;
-        }
-        return 1;
-
-    case 2:                                                        /* GREN */
-        if (cls == 2) {
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) = AM2_POSE_KNEEL;
-        } else if (cls == 1) {
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
-                PoseIsBraced(o)
-                ? (aimed ? AM2_POSE_GRENADE_KNEEL : AM2_POSE_KNEEL_ARMED_A)
-                : AM2_POSE_RAISE_KNEEL;
-        } else {
-            *(int32_t *)(out + SIGHTCOUT_OFF_STATE) =
-                PoseIsBraced(o)
-                ? (aimed ? AM2_POSE_GRENADE_STAND : AM2_POSE_STAND_ARMED)
                 : AM2_POSE_RAISE_STAND;
         }
         return 1;
@@ -13461,17 +13461,6 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
 
     switch (kind + 1u) {
 
-    /* arm 0 -- 0x0045F523. Falls THROUGH into the shared refusal epilogue, so
-     * it answers 0 even though it fires: the weapon is not consumed. */
-    case 1: case 9:
-        AM2_FW_MUZZLE();
-        PlaySoundAt(7, 0, 0, fromP[0], fromP[1]);
-        SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 0,
-                          *(const uint32_t *)(u + OBJ_OFF_UID), dir);
-        CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
-                      AM2_FLOAT_ONE, 0, 0, AddByteSat(seed, 0x20));
-        return 0;
-
     /* arm 16 -- 0x0045F5BC. Same shape and sound as arm 0, but the facing is
      * a SPREAD rather than a kick: 0xFF - (seed & 3), four adjacent values. */
     case 30:
@@ -13484,16 +13473,15 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
                       (int32_t)(uint8_t)(0xFF - (seed & 3)));
         return 1;
 
-    /* arm 7 -- 0x0045F650. Its own sound, then it JUMPS into arm 0's tail at
-     * 0x0045F578 with 0x10 pushed instead of 0x20 -- so it shares arm 0's
-     * CreateMissile and arm 0's return of 0. An arm that ends inside another. */
-    case 10:
+    /* arm 0 -- 0x0045F523. Falls THROUGH into the shared refusal epilogue, so
+     * it answers 0 even though it fires: the weapon is not consumed. */
+    case 1: case 9:
         AM2_FW_MUZZLE();
-        PlaySoundAt(8, 0, 0, fromP[0], fromP[1]);
+        PlaySoundAt(7, 0, 0, fromP[0], fromP[1]);
         SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 0,
                           *(const uint32_t *)(u + OBJ_OFF_UID), dir);
         CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
-                      AM2_FLOAT_ONE, 0, 0, AddByteSat(seed, 0x10));
+                      AM2_FLOAT_ONE, 0, 0, AddByteSat(seed, 0x20));
         return 0;
 
     /* arm 15 -- 0x0045F6AA. */
@@ -13515,6 +13503,18 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int32_t height,
         CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
                       AM2_FLOAT_ONE, 0, 0, AddByteSat(seed, 0x0A));
         return 1;
+
+    /* arm 7 -- 0x0045F650. Its own sound, then it JUMPS into arm 0's tail at
+     * 0x0045F578 with 0x10 pushed instead of 0x20 -- so it shares arm 0's
+     * CreateMissile and arm 0's return of 0. An arm that ends inside another. */
+    case 10:
+        AM2_FW_MUZZLE();
+        PlaySoundAt(8, 0, 0, fromP[0], fromP[1]);
+        SeqStartDirEffect(fromP[0], fromP[1], facing & 0xFF, 0,
+                          *(const uint32_t *)(u + OBJ_OFF_UID), dir);
+        CreateMissile(weapon, unit, from, facing, height, spot.ground, 0,
+                      AM2_FLOAT_ONE, 0, 0, AddByteSat(seed, 0x10));
+        return 0;
 
     /* arm 3 -- 0x0045F7E1. No facing bias: the seed goes through unchanged. */
     case 4:
