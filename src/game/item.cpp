@@ -12210,11 +12210,11 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
 {
     uint8_t       *o;
     const uint8_t *def;
-    uint8_t       *rows;
     const uint8_t *turret;
-    uint32_t       at;
+    AM2_Point      at;
     int32_t        weaponKind;
     int32_t        i;
+    int32_t        nrows;
 
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION && !remote
         && !AM2_THE_COMM->CommMustBroadcast(
@@ -12230,8 +12230,8 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     o = (uint8_t *)am2_malloc(AM2_VEHICLE_BYTES);
     memset(o, 0, AM2_VEHICLE_BYTES);
 
-    at = (uint32_t)(uint16_t)(int16_t)x
-       | ((uint32_t)(uint16_t)(int16_t)y << 16);
+    at.x = (int16_t)x;
+    at.y = (int16_t)y;
 
     *(uint8_t *)(o + OBJ_OFF_FACING)      = (uint8_t)facing;
     *(uint8_t *)(o + TROOPER_OFF_FACING2) = (uint8_t)facing;
@@ -12254,11 +12254,11 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     /* Not the player's own. Two different questions depending on the session:
      * without one it is the army against ADDR_DEFAULT_OWNER, with one it is
      * whether that comm slot holds a live player. */
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) {
-        if (!AM2_THE_COMM->CommSlotHasPlayer(army))
+    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION) {
+        if ((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
+            != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
             *(int32_t *)(o + OBJ_OFF_FIELD_94) = 1;
-    } else if ((int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
-               != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
+    } else if (!AM2_THE_COMM->CommSlotHasPlayer(army)) {
         *(int32_t *)(o + OBJ_OFF_FIELD_94) = 1;
     }
 
@@ -12267,7 +12267,7 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     *(uint8_t *)(o + OBJ_OFF_HEIGHT_ADJ) = (uint8_t)
         ((const int32_t *)((void *)(uintptr_t)(ADDR_VEHICLE_HEIGHT_BY_KIND)))[kind];
 
-    ObjInitCommon(o, name, AM2_OBJ_TYPE_VEHICLE, at,
+    ObjInitCommon(o, name, AM2_OBJ_TYPE_VEHICLE, *(const uint32_t *)&at,
                   (const int32_t *)((void *)(uintptr_t)(ADDR_VEHICLE_BOX)), remote, uid);
 
     *(uint32_t *)(o + TROOPER_OFF_SPAWN_POS) =
@@ -12276,11 +12276,13 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
         (const uint8_t *)((void *)(uintptr_t)(ADDR_OBJ_TABLE_RECORDS))
         + (uint32_t)table * AM2_OBJ_TABLE_REC_SIZE;
 
+    nrows = 1;
     turret = (const uint8_t *)((void *)(uintptr_t)(ADDR_TURRET_ANIMS))
            + (uint32_t)kind * AM2_ANIM_TABLE_BYTES;
-    table = (*(const int32_t *)turret > 0) ? 2 : 1;   /* the row count, in table's slot */
+    if (*(const int32_t *)turret > 0)
+        nrows = 2;
 
-    BuildRowSet(o + OBJ_OFF_SUBRECORD, table,
+    BuildRowSet(o + OBJ_OFF_SUBRECORD, nrows,
                 (const void *)((void *)(uintptr_t)(ADDR_VEHICLE_ROW_SPEC)), x, y,
                 (const void *)((void *)(uintptr_t)(ADDR_VEHICLE_BOX)));
     SetFieldInAll(o + OBJ_OFF_SUBRECORD,
@@ -12314,21 +12316,19 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
     *(uint8_t *)(o + OBJ_OFF_HEIGHT_SET) =
         HeightAtPoint(*(const uint32_t *)(o + OBJ_OFF_POS));
 
-    weaponKind = -1;
-    if ((uint32_t)kind <= 5u) {
-        switch (kind) {
-        case 0:  weaponKind = AM2_VEHICLE_WEAPON_KIND0; break;
-        case 1:  weaponKind = AM2_VEHICLE_WEAPON_KIND1; break;
-        case 2:  weaponKind = AM2_VEHICLE_WEAPON_KIND2; break;
-        case 5:  weaponKind = AM2_VEHICLE_WEAPON_KIND5; break;
-        default: break;              /* kinds 3 and 4 carry no weapon */
-        }
+    /* Kinds 3 and 4 carry no weapon and skip the whole block, as does
+     * anything past 5. The arms are in the image's layout order. */
+    switch (kind) {
+    case 1:  weaponKind = AM2_VEHICLE_WEAPON_KIND1; break;
+    case 0:  weaponKind = AM2_VEHICLE_WEAPON_KIND0; break;
+    case 2:  weaponKind = AM2_VEHICLE_WEAPON_KIND2; break;
+    case 5:  weaponKind = AM2_VEHICLE_WEAPON_KIND5; break;
+    default: goto no_weapon;
     }
 
-    if (weaponKind >= 0
-        && (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-            || AM2_THE_COMM->CommMustBroadcast(
-                                 (int16_t)army))) {
+    if (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+        || AM2_THE_COMM->CommMustBroadcast(
+                             (int16_t)army)) {
         void *w = CreateWeapon((char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)), army,
                                KeyLookupTriple(AM2_WEAPON_KEY_KIND,
                                                (uint32_t)weaponKind, 0),
@@ -12340,45 +12340,46 @@ void *__cdecl CreateVehicle(int32_t kind, char *name, int32_t x, int32_t y,
                 *(const int32_t *)((const uint8_t *)w + OBJ_OFF_UID);
     }
 
+no_weapon:
     if (!remote
         && AM2_THE_COMM->CommMustBroadcast(
                              (int16_t)army))
         SendItemCreate(o);
 
-    rows = *(uint8_t **)(o + OBJ_OFF_ROWS);
-    *(const void **)(rows + ROW_OFF_ANIM_CUR) =
+    /* The rows are re-read from the object for every store. */
+#define ROWS (*(uint8_t **)(o + OBJ_OFF_ROWS))
+    *(const void **)(ROWS + ROW_OFF_ANIM_CUR) =
         (const uint8_t *)((void *)(uintptr_t)(ADDR_VEHICLE_ANIMS))
         + (uint32_t)kind * AM2_ANIM_TABLE_BYTES;
-    *(int16_t *)(rows + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
-    *(uint32_t *)rows |= ROW_FLAG_BIT8 | ROW_FLAG_BIT6;
-    *(uint32_t *)(rows + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
+    *(int16_t *)(ROWS + ROW_OFF_FIELD_26) = AM2_ROW_FIELD26_INIT;
+    *(uint32_t *)ROWS |= ROW_FLAG_BIT8 | ROW_FLAG_BIT6;
+    *(uint32_t *)(ROWS + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
 
-    if (table > 1) {
-        uint8_t *turretRow = rows + AM2_OBJ_ROW_STRIDE;
-
-        *(const void **)(turretRow + ROW_OFF_ANIM_CUR) = turret;
-        *(int16_t *)(turretRow + ROW_OFF_FIELD_26) =
-            *(const int16_t *)(rows + ROW_OFF_FIELD_26);
-        *(uint32_t *)turretRow |= ROW_FLAG_BIT5;
+    if (nrows > 1) {
+        *(const void **)(ROWS + AM2_OBJ_ROW_STRIDE + ROW_OFF_ANIM_CUR) = turret;
+        *(int16_t *)(ROWS + AM2_OBJ_ROW_STRIDE + ROW_OFF_FIELD_26) =
+            *(const int16_t *)(ROWS + ROW_OFF_FIELD_26);
+        *(uint32_t *)(ROWS + AM2_OBJ_ROW_STRIDE) |= ROW_FLAG_BIT5;
     }
 
     if ((flags & (int32_t)OBJ_FLAG_CONCEALED) || !ObjIsFriendly(o))
         ObjConceal(o, 0);
 
     SetKindFrames(o, 1);
-    RowUpdate(rows, 1, (void *)(uintptr_t)ADDR_MAP_DESC);
+    RowUpdate(ROWS, 1, (void *)(uintptr_t)ADDR_MAP_DESC);
 
     /* Every row past the first is placed at the object's position plus the
      * FIRST row's sprite attachment point -- rows[0]'s sprite, not its own. */
     for (i = 1; i < *(const int32_t *)(o + OBJ_OFF_ROW_COUNT); i++) {
-        uint8_t       *r   = rows + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
-#define spr (*(const uint8_t *const *)(rows + ROW_OFF_SPRITE))
+        uint8_t *r = ROWS + (uint32_t)i * AM2_OBJ_ROW_STRIDE;
+#define spr (*(const uint8_t *const *)(ROWS + ROW_OFF_SPRITE))
 
         *(uint32_t *)(r + ROW_OFF_X) = *(const uint32_t *)(o + OBJ_OFF_POS);
         *(int16_t *)(r + ROW_OFF_X) += *(const int16_t *)(spr + SPRITE_OFF_ATTACH_X);
         *(int16_t *)(r + ROW_OFF_Y) += *(const int16_t *)(spr + SPRITE_OFF_ATTACH_Y);
         RowUpdate(r, 1, (void *)(uintptr_t)ADDR_MAP_DESC);
     }
+#undef ROWS
 
     if (*(const int32_t *)(uintptr_t)ADDR_STATE_ENTERED == 0)
         ObjSetFootprint(o);
