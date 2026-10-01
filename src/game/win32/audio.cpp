@@ -650,8 +650,10 @@ int32_t __cdecl OpenAudioStream(const char *name)
  *
  * RE-ENTRANCY IS THE FIRST THING IT DOES. InterlockedExchange(&flag, 1) returns
  * what was there, so a non-zero answer means another tick is still inside and
- * this one returns immediately. Every exit path clears it. That is also why the
- * function is written with one exit label rather than early returns.
+ * this one returns immediately. Every exit path clears it: the three before
+ * the Lock each clear it and return themselves, the later ones share one
+ * label -- the image has a separate clear-and-return for each early exit,
+ * through the cached InterlockedExchange, and one shared one after.
  *
  * Two asymmetries between the two lock regions are the original's, not slips.
  * The first region checks WaveReadFile's return and posts the end-of-stream
@@ -696,13 +698,12 @@ static_assert(DSBPLAY_LOOPING == 1, "DSBPLAY_LOOPING");
 
 #define g_hwnd        (*(HWND *)(uintptr_t)ADDR_HWND)
 
-/* 0x80 for unsigned 8-bit PCM, 0 for signed 16-bit. The original derives it
- * branchlessly with setne/dec/and and smears it across a dword; the four
- * places it does so are identical, so it is one helper here. */
-static void fill_silence(void *dest, uint32_t bytes)
-{
-    memset(dest, (g_waveFormat->wBitsPerSample == 8) ? SILENCE_8BIT : 0, bytes);
-}
+/* 0x80 for unsigned 8-bit PCM, 0 for signed 16-bit, smeared over the region
+ * by an inline memset. The original writes it out at all four sites. */
+#define AUDIO_SILENCE(dest, bytes) \
+    memset((dest),                                                          \
+           (uint8_t)((g_waveFormat->wBitsPerSample == 8) ? SILENCE_8BIT : 0), \
+           (bytes))
 
 /* The end-of-file bookkeeping the original writes out twice, once per region:
  * mark the stream ended, and record how much of the buffer is still real as the
@@ -710,35 +711,34 @@ static void fill_silence(void *dest, uint32_t bytes)
  * play cursor and not the write cursor -- the original reads the slot
  * GetCurrentPosition filled with the former -- which is what makes the number
  * mean "samples still to be heard". */
-static void mark_stream_end(uint32_t playCursor)
-{
-    g_atEnd = 1;
-    g_validBytes = (playCursor > (uint32_t)g_cursorB)
-                 ? g_bufferSize - playCursor + (uint32_t)g_cursorB
-                 : (uint32_t)g_cursorB - playCursor;
-}
+#define AUDIO_MARK_END(playCursor)                                          \
+    do {                                                                    \
+        g_atEnd = 1;                                                        \
+        if ((playCursor) > (uint32_t)g_cursorB)                             \
+            g_validBytes = g_bufferSize - (playCursor)                      \
+                           + (uint32_t)g_cursorB;                           \
+        else                                                                \
+            g_validBytes = (uint32_t)g_cursorB - (playCursor);              \
+    } while (0)
 
 /* Rewind to the start of the `data` chunk and keep reading until `bytes` of
  * `dest` are full, however many times round the file that takes. */
-static void refill_looping(uint8_t *dest, uint32_t bytes, uint32_t got)
-{
-    do {
-        dest  += got;
-        bytes -= got;
-        WaveStartDataRead(&g_hmmio, g_dataChunk, g_riffChunk);
-        WaveReadFile(g_hmmio, bytes, dest, g_dataChunk, &got);
-    } while (got < bytes);
-}
+#define AUDIO_REFILL(dest, bytes)                                           \
+    do {                                                                    \
+        (dest)  += got;                                                     \
+        (bytes) -= got;                                                     \
+        WaveStartDataRead(&g_hmmio, g_dataChunk, g_riffChunk);              \
+        WaveReadFile(g_hmmio, (bytes), (dest), g_dataChunk, &got);          \
+    } while (got < (bytes))
 
 void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
                              DWORD_PTR dw1, DWORD_PTR dw2)
 {
-    void    *ptr1 = NULL, *ptr2 = NULL;
-    DWORD    len1 = 0, len2 = 0;
-    DWORD    status = 0, statusAgain, play = 0, write = 0;
-    uint32_t avail, toWrite, got = 0;
-    int32_t  restored = 0;          /* see the note above -- the original's is
-                                       uninitialised on the common path */
+    int32_t  restored = 0;
+    void    *ptr1, *ptr2;
+    DWORD    len1, len2;
+    DWORD    status = 0, statusAgain, play, write;
+    uint32_t avail, toWrite, got;
 
     (void)uID; (void)uMsg; (void)dwUser; (void)dw1; (void)dw2;
 
@@ -747,8 +747,10 @@ void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
 
     IDirectSoundBuffer_GetStatus(g_playBuffer, &status);
     if (status & DSBSTATUS_BUFFERLOST) {
-        if (IDirectSoundBuffer_Restore(g_playBuffer) != DS_OK)
-            goto done;
+        if (IDirectSoundBuffer_Restore(g_playBuffer) != DS_OK) {
+            InterlockedExchange(&g_inCallback, 0);
+            return;
+        }
         restored  = 1;
         g_cursorB = 0;
     }
@@ -758,8 +760,10 @@ void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
     IDirectSoundBuffer_GetCurrentPosition(g_playBuffer, &play, &write);
 
     /* Nothing has been consumed since last time, and nothing was lost. */
-    if (play == (DWORD)g_cursorB && !restored)
-        goto done;
+    if (play == (DWORD)g_cursorB && !restored) {
+        InterlockedExchange(&g_inCallback, 0);
+        return;
+    }
 
     /* Ended, and the last real samples have now played out. Tell the game
      * once. */
@@ -768,12 +772,14 @@ void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
             g_readFailed = 1;
             PostMessageA(g_hwnd, AUDIO_STREAM_DONE, 0, 0);
         }
-        goto done;
+        InterlockedExchange(&g_inCallback, 0);
+        return;
     }
 
-    avail = (play >= (DWORD)g_cursorB)
-          ? play - (uint32_t)g_cursorB
-          : g_bufferSize - (uint32_t)g_cursorB + play;
+    if (play < (DWORD)g_cursorB)
+        avail = g_bufferSize - (uint32_t)g_cursorB + play;
+    else
+        avail = play - (uint32_t)g_cursorB;
 
     /* A restored buffer has lost every sample in it, so rewrite all of it. */
     toWrite    = restored ? g_bufferSize : avail;
@@ -782,38 +788,58 @@ void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
     if (g_atEnd && g_validBytes) {
         /* Past the end of the file: keep the buffer fed with silence and count
          * down what is still real ahead of the play cursor. */
-        g_validBytes = (avail > g_validBytes) ? 0 : g_validBytes - avail;
+        if (avail > g_validBytes)
+            g_validBytes = 0;
+        else
+            g_validBytes -= avail;
 
         if (IDirectSoundBuffer_Lock(g_playBuffer, (DWORD)g_cursorB, toWrite,
                                     &ptr1, &len1, &ptr2, &len2, 0) != DS_OK)
             goto done;
 
-        fill_silence(ptr1, len1);
+        AUDIO_SILENCE(ptr1, len1);
         if (ptr2 && len2)
-            fill_silence(ptr2, len2);
+            AUDIO_SILENCE(ptr2, len2);
+
+        /* The tail below, written out again for this arm. */
+        IDirectSoundBuffer_Unlock(g_playBuffer, ptr1, len1, ptr2, len2);
+
+        g_cursorB += (int32_t)toWrite;
+        if ((uint32_t)g_cursorB >= g_bufferSize)
+            g_cursorB -= (int32_t)g_bufferSize;
+
+        if (restored)
+            IDirectSoundBuffer_Play(g_playBuffer, 0, 0, DSBPLAY_LOOPING);
+        goto done;
     } else {
         if (IDirectSoundBuffer_Lock(g_playBuffer, (DWORD)g_cursorB, toWrite,
                                     &ptr1, &len1, &ptr2, &len2, 0) != DS_OK)
             goto done;
 
         if (len1) {
-            if (g_readFailed) {
-                fill_silence(ptr1, len1);
-            } else if (WaveReadFile(g_hmmio, len1, (uint8_t *)ptr1,
-                                    g_dataChunk, &got) != 0) {
-                /* Only the first region reports a read failure. */
-                if (!g_readFailed) {
-                    g_readFailed = 1;
-                    PostMessageA(g_hwnd, AUDIO_STREAM_DONE, 0, 0);
+            if (!g_readFailed) {
+                if (WaveReadFile(g_hmmio, len1, (uint8_t *)ptr1,
+                                 g_dataChunk, &got) != 0) {
+                    /* Only the first region reports a read failure. */
+                    if (!g_readFailed) {
+                        g_readFailed = 1;
+                        PostMessageA(g_hwnd, AUDIO_STREAM_DONE, 0, 0);
+                    }
+                    goto done;
                 }
-                goto done;
-            } else if (got < len1) {
-                if (g_looping)
-                    refill_looping((uint8_t *)ptr1, len1, got);
-                else {
-                    fill_silence((uint8_t *)ptr1 + got, len1 - got);
-                    mark_stream_end(play);
+                if (got < len1) {
+                    if (!g_looping) {
+                        AUDIO_SILENCE((uint8_t *)ptr1 + got, len1 - got);
+                        AUDIO_MARK_END(play);
+                    } else {
+                        uint8_t *dest = (uint8_t *)ptr1;
+                        uint32_t rest = len1;
+
+                        AUDIO_REFILL(dest, rest);
+                    }
                 }
+            } else {
+                AUDIO_SILENCE(ptr1, len1);
             }
         }
 
@@ -822,20 +848,23 @@ void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
                 /* The second region does NOT check the return. Original. */
                 WaveReadFile(g_hmmio, len2, (uint8_t *)ptr2, g_dataChunk, &got);
                 if (got < len2) {
-                    if (g_looping)
-                        refill_looping((uint8_t *)ptr2, len2, got);
-                    else {
+                    if (!g_looping) {
                         /* THE WHOLE REGION, from its start -- not from `got`
                          * as region 1 does. The original has `sub ecx,edx` and
                          * `lea edi,[edx+esi]` in the first fill and neither in
                          * this one, so the samples just read are overwritten
                          * with silence. Kept; see the note at the top. */
-                        fill_silence(ptr2, len2);
-                        mark_stream_end(play);
+                        AUDIO_SILENCE(ptr2, len2);
+                        AUDIO_MARK_END(play);
+                    } else {
+                        uint8_t *dest = (uint8_t *)ptr2;
+                        uint32_t rest = len2;
+
+                        AUDIO_REFILL(dest, rest);
                     }
                 }
             } else {
-                fill_silence(ptr2, len2);
+                AUDIO_SILENCE(ptr2, len2);
             }
         }
     }
@@ -852,6 +881,9 @@ void CALLBACK AudioTimerProc(UINT uID, UINT uMsg, DWORD_PTR dwUser,
 done:
     InterlockedExchange(&g_inCallback, 0);
 }
+#undef AUDIO_SILENCE
+#undef AUDIO_MARK_END
+#undef AUDIO_REFILL
 
 /* Put sample data into a DirectSound buffer -- 0x0040C440.
  *
