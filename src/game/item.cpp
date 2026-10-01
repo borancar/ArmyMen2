@@ -11329,10 +11329,14 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
         *(int32_t *)(o + OBJ_OFF_FIELD_568) = 0;
         SetUnitPose(o, 1);
 
-        if (*(const int32_t *)(o + OBJ_OFF_FIELD_530) != AM2_DEPLOY_KIND_DONE) {
-            int32_t slot = *(const int32_t *)(o + OBJ_OFF_TABLE_REC_SLOT);
+        /* The null test is the inlined state setter's own, as ItemTeardown's
+         * copy of it has: `o` cannot be null here. */
+        if (o != (uint8_t *)0
+            && *(const int32_t *)(o + OBJ_OFF_FIELD_530) != AM2_DEPLOY_KIND_DONE) {
+            int32_t slot;
 
             *(int32_t *)(o + OBJ_OFF_FIELD_530) = AM2_DEPLOY_KIND_DONE;
+            slot = *(const int32_t *)(o + OBJ_OFF_TABLE_REC_SLOT);
             *(int32_t *)(o + OBJ_OFF_TABLE_REC_KIND) = slot;
             *(int32_t *)(o + OBJ_OFF_TABLE_REC_SLOT) = 0;
             SetFieldInAll(o + OBJ_OFF_SUBRECORD, (void *)(uintptr_t)slot);
