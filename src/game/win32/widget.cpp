@@ -17821,7 +17821,6 @@ int32_t __cdecl PointerPickMode0(void *obj)
     uint8_t       *leader;
     const uint8_t *weapon;
     const uint8_t *ride;
-    int32_t        owner;
     uint32_t       uid;
 
     if (ObjIsWatchedKind(o))
@@ -17829,47 +17828,54 @@ int32_t __cdecl PointerPickMode0(void *obj)
     if (*(const int8_t *)(o + OBJ_OFF_ARMY) == AM2_ARMY_NEUTRAL)
         return 0;
 
-    owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
-    if (owner == AM2_ARMY_NEUTRAL)
-        return PointerFriendTail(o);
-    if (ArmyAlliedWithObj(owner, o, 0))
-        return PointerFriendTail(o);
-
-    /* An enemy. */
-    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON && GetMenuRow() != 1)
-        return 0;
-
-    leader = OurLeaderUnit();
-    if (!leader)
-        return 0;
-
-    if (*(const uint32_t *)(leader + OBJ_OFF_RIDING)) {
-        ride = (const uint8_t *)LookupType3ByUID(
-            *(const uint32_t *)(leader + OBJ_OFF_RIDING));
-        uid = *(const uint32_t *)(ride + VEHICLE_OFF_WEAPON_UID);
-        if (uid == 0)
+    /* ArmyAlliedWithObj written in place: its own army-4 test is the
+     * neutral-owner case. The enemy arm comes first, the friend tail last,
+     * as the image lays them out. */
+    if (!ArmyAlliedWithObjInline(*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                                 o, 0)) {
+        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON && GetMenuRow() != 1)
             return 0;
-    } else {
-        uid = *(const uint32_t *)(leader + UNIT_OFF_INVENTORY
-            + (uint32_t)*(const int32_t *)(leader + UNIT_OFF_INVENTORY_SEL) * 4);
+
+        leader = OurLeaderUnit();
+        if (!leader)
+            return 0;
+
+        /* The reach test and the hint, written out in both arms as the
+         * image has them; the distance is taken before the reach. */
+#define AIM_HINT()                                                          \
+        do {                                                                \
+            if (!weapon)                                                    \
+                return 0;                                                   \
+            if (ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),         \
+                           (const AM2_Point *)(o + OBJ_OFF_X))              \
+                > *(const int32_t *)                                        \
+                      (*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0) \
+                       + ITEMTYPE_OFF_RANGE)                                \
+                  * *(const double *)(uintptr_t)ADDR_WEAPON_RANGE_K3)       \
+                return 0;                                                   \
+            OverlayPrepare(AM2_OVERLAY_ROW_FIRE, 1);                        \
+            *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =                \
+                *(const uint32_t *)(o + OBJ_OFF_UID);                       \
+            return 0;   /* a hint, not a yes -- see above */                \
+        } while (0)
+
+        if (*(const uint32_t *)(leader + OBJ_OFF_RIDING)) {
+            ride = (const uint8_t *)LookupType3ByUID(
+                *(const uint32_t *)(leader + OBJ_OFF_RIDING));
+            uid = *(const uint32_t *)(ride + VEHICLE_OFF_WEAPON_UID);
+            if (uid <= 0)
+                return 0;
+            weapon = (const uint8_t *)WeaponByUid(uid);
+            AIM_HINT();
+        }
+
+        weapon = (const uint8_t *)WeaponByUid(
+            *(const uint32_t *)(leader + UNIT_OFF_INVENTORY
+                + (uint32_t)*(const int32_t *)(leader + UNIT_OFF_INVENTORY_SEL) * 4));
+        AIM_HINT();
+#undef AIM_HINT
     }
-
-    weapon = (const uint8_t *)WeaponByUid(uid);
-    if (!weapon)
-        return 0;
-
-    if ((double)*(const int32_t *)
-            (*(const uint8_t *const *)(weapon + OBJ_OFF_FIELD_C0)
-             + ITEMTYPE_OFF_RANGE)
-            * *(const double *)(uintptr_t)ADDR_WEAPON_RANGE_K3
-        < (double)ApproxDist((const AM2_Point *)(leader + OBJ_OFF_X),
-                             (const AM2_Point *)(o + OBJ_OFF_X)))
-        return 0;
-
-    OverlayPrepare(AM2_OVERLAY_ROW_FIRE, 1);
-    *(uint32_t *)(uintptr_t)ADDR_POINTER_HOVER_UID =
-        *(const uint32_t *)(o + OBJ_OFF_UID);
-    return 0;   /* a hint, not a yes -- see above */
+    return PointerFriendTail(o);
 }
 
 /* PointerPickHeal -- original 0x004597B0, the first of the two functions in the
