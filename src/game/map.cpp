@@ -808,10 +808,8 @@ int32_t __cdecl ParseScenarioPart(void *part, const void *at)
 
     for (i = 0; i < count; i++) {
         uint8_t *row = rows + (uint32_t)i * SCEN_ROW_BYTES;
-        uint8_t  amount;
-        uint8_t  flag;
-        uint8_t  mode;
-        uint8_t  len;
+        const uint8_t *q;
+        int8_t         len;
 
         *(uint32_t *)(row + SCEN_ROW_OFF_KIND) = *(const uint32_t *)cur;
         cur += 4;
@@ -820,25 +818,23 @@ int32_t __cdecl ParseScenarioPart(void *part, const void *at)
         *(uint16_t *)(row + SCEN_ROW_OFF_POS + 2) = *(const uint16_t *)cur;
         cur += 4;
 
-        amount = cur[0];
-        mode   = cur[2];
-        flag   = cur[1];
-        len    = cur[3];
-
-        row[SCEN_ROW_OFF_AMOUNT]   = amount;
-        row[SCEN_ROW_OFF_FLAG]     = (uint8_t)(flag == 0 ? 1 : 0);
-        row[SCEN_ROW_OFF_FIELD_12] = mode;
+        /* Four bytes read one at a time through a walking pointer. */
+        q = cur;
+        row[SCEN_ROW_OFF_AMOUNT]   = *q++;
+        row[SCEN_ROW_OFF_FLAG]     = (uint8_t)(*q++ == 0 ? 1 : 0);
+        row[SCEN_ROW_OFF_FIELD_12] = *q;
         row[SCEN_ROW_OFF_FIELD_68] = 0;
+        q++;
         *(uint32_t *)(row + SCEN_ROW_OFF_AT) =
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
-        if (mode == 0)
+        if (!row[SCEN_ROW_OFF_FIELD_12])
             row[SCEN_ROW_OFF_FIELD_12] = 1;
 
-        if (len != 0) {
-            strcpy((char *)(row + SCEN_ROW_OFF_NAME),
-                   (const char *)(cur + 4));
-            took += (int32_t)(int8_t)len;
-            cur   = cur + 4 + (int32_t)(int8_t)len;
+        len = (int8_t)*q++;
+        if (len) {
+            strcpy((char *)(row + SCEN_ROW_OFF_NAME), (const char *)q);
+            took += len;
+            cur   = q + len;
         } else {
             row[SCEN_ROW_OFF_NAME] = 0;
             cur += 4;
