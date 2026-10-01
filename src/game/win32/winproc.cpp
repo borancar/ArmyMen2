@@ -173,6 +173,11 @@ typedef void (__cdecl *am2_sound_fn)(const char *name, int32_t loop, int32_t a,
 #define orig_sprintf        (*(am2_sprintf_fn)ADDR_GAME_SPRINTF)
 
 /* The player's name is the first field of its record. */
+#if defined(_MSC_VER) && !defined(__GNUC__)
+#define AM2_WP_INLINE static __forceinline
+#else
+#define AM2_WP_INLINE static inline
+#endif
 static inline const char *PlayerName(uint8_t *comm, int32_t slot)
 {
     return (const char *)(comm + COMM_OFF_PLAYERS
@@ -182,8 +187,9 @@ static inline const char *PlayerName(uint8_t *comm, int32_t slot)
 
 /* Ask DirectPlay for the session description again and clear the two bits that
  * close it, so a replacement player can still join. Both halves are ours. */
-static inline void ReopenSession(uint8_t *comm)
+AM2_WP_INLINE void ReopenSession(void)
 {
+#define comm ((uint8_t *)g_commObject)
     void *desc;
 
     CommGetSessionDesc(comm);
@@ -193,14 +199,16 @@ static inline void ReopenSession(uint8_t *comm)
     *(uint32_t *)((uint8_t *)desc + 4) &= ~0x21u;
     if (((AM2_Comm *)comm)->CommSetSessionDesc(desc, 0) < 0)
         orig_log("Set Session Failed to reopen Session\n");
+#undef comm
 }
 
 /* 0x0046C. A player record was destroyed. Three outcomes: in a menu it is a
  * lobby update, in a mission it is either us leaving or somebody else being
  * handed to the AI. */
-static inline LRESULT OnPlayerDestroyed(WPARAM wParam)
+AM2_WP_INLINE LRESULT OnPlayerDestroyed(WPARAM wParam)
 {
-    uint8_t *comm = g_commObject;
+    /* The comm object is read from its global at every use. */
+#define comm ((uint8_t *)g_commObject)
     uint32_t id   = (uint32_t)wParam;
     int32_t  slot;
     char     text[128];
@@ -250,43 +258,50 @@ static inline LRESULT OnPlayerDestroyed(WPARAM wParam)
 
         if (*(const uint32_t *)(comm + COMM_OFF_PLAYER_COUNT) < 4
             && *(const int32_t *)(comm + COMM_OFF_IS_HOST))
-            ReopenSession(comm);
+            ReopenSession();
         return 1;
     }
 
-    if (id == *(const uint32_t *)(comm + COMM_OFF_PLAYER_MADE)) {
-        /* It was us. Leave and show the multiplayer result screen. */
-        ((AM2_Comm *)comm)->CommPlayerLeft(id);
+    if (id != *(const uint32_t *)(comm + COMM_OFF_PLAYER_MADE)) {
+        int32_t left;
+
+        slot = ((AM2_Comm *)comm)->CommPlayerSlot(id);
+        /* The flow goes BEFORE the setup is ended: the departure's result is
+         * held across DestroyFlow and tested after it. */
+        left = ((AM2_Comm *)comm)->CommPlayerLeft(id);
         DestroyFlow(id);
-        ShowMpResult(2);
+        if (left && g_gameState == 2 && g_netGame
+            && *(const int32_t *)(comm + COMM_OFF_IS_HOST))
+            CommEndSetup();
+
+        if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
+            /* Not a sprite: hand the departed player's units to the AI. Both
+             * halves are ours now -- the walk and the callback -- so the callback
+             * goes in by NAME. It was ADDR_OBJ_TO_AI cast to a pointer while it
+             * was still the original's, which is exactly the fourth spelling of a
+             * seam checkseams was taught to catch: nothing on that line looked
+             * like a call. See army.h. */
+            ForEachArmyObject(slot, ObjToAI);
+
+        orig_sprintf(text, "Player %s has left the game - now AI controlled.",
+                     PlayerName(comm, slot));
+        HudMessage(text, g_hudColour);
         return 1;
     }
 
-    slot = ((AM2_Comm *)comm)->CommPlayerSlot(id);
-    if (((AM2_Comm *)comm)->CommPlayerLeft(id) && g_gameState == 2 && g_netGame
-        && *(const int32_t *)(comm + COMM_OFF_IS_HOST))
-        CommEndSetup();
+    /* It was us. Leave and show the multiplayer result screen. */
+    ((AM2_Comm *)comm)->CommPlayerLeft(id);
     DestroyFlow(id);
-
-    if (*(const int32_t *)(comm + COMM_OFF_IS_HOST))
-        /* Not a sprite: hand the departed player's units to the AI. Both
-         * halves are ours now -- the walk and the callback -- so the callback
-         * goes in by NAME. It was ADDR_OBJ_TO_AI cast to a pointer while it
-         * was still the original's, which is exactly the fourth spelling of a
-         * seam checkseams was taught to catch: nothing on that line looked
-         * like a call. See army.h. */
-        ForEachArmyObject(slot, ObjToAI);
-
-    orig_sprintf(text, "Player %s has left the game - now AI controlled.",
-                 PlayerName(comm, slot));
-    HudMessage(text, g_hudColour);
+    ShowMpResult(2);
     return 1;
+#undef comm
 }
 
 /* 0x0046D. The host left and we are the new one. */
-static inline LRESULT OnHostMigrated(void)
+AM2_WP_INLINE LRESULT OnHostMigrated(void)
 {
-    uint8_t *comm = g_commObject;
+    /* The comm object is read from its global at every use. */
+#define comm ((uint8_t *)g_commObject)
     char     text[128];
 
     *(int32_t *)(comm + COMM_OFF_IS_HOST) = 1;
@@ -297,7 +312,7 @@ static inline LRESULT OnHostMigrated(void)
     }
 
     if (*(const uint32_t *)(comm + COMM_OFF_PLAYER_COUNT) < 4)
-        ReopenSession(comm);
+        ReopenSession();
 
     orig_sprintf(text, "Player %s is now the host.",
                  PlayerName(comm, g_ourSlot));
@@ -307,12 +322,14 @@ static inline LRESULT OnHostMigrated(void)
         MenuMessage(text, 4, 1);
     SendChatMsg(text, 1);
     return 1;
+#undef comm
 }
 
 /* 0x0046E. The ready/end-setup handshake finished. */
-static inline LRESULT OnSetupDone(void)
+AM2_WP_INLINE LRESULT OnSetupDone(void)
 {
-    uint8_t *comm = g_commObject;
+    /* The comm object is read from its global at every use. */
+#define comm ((uint8_t *)g_commObject)
 
     g_netGame = 0;
     SetFogOfWar((int32_t)((g_gameOverFlags >> 18) & 1u));
@@ -322,6 +339,7 @@ static inline LRESULT OnSetupDone(void)
     CommResetStats(comm);
     CommSessionOver(comm);
     return 1;
+#undef comm
 }
 
 /* Re-measure the drawing rectangle after the window has moved or resized.
@@ -462,21 +480,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     case AM2_WM_PLAYER_GONE:
         return OnPlayerDestroyed(wParam);
 
-    case AM2_WM_SETUP_DONE:
-        return OnSetupDone();
-
-    case AM2_WM_HOST_CHANGED:
-        return OnHostMigrated();
-
     case AM2_WM_STREAM_DONE:
         /* AudioTimerProc posts this when a stream runs out. Stop it and then
          * let DefWindowProcA have the message, which is what the original
          * does -- it falls through rather than returning. */
         StopAudioStream();
         break;
-
     default:
         break;
+
+    case AM2_WM_SETUP_DONE:
+        return OnSetupDone();
+
+    case AM2_WM_HOST_CHANGED:
+        return OnHostMigrated();
     }
 
     return DefWindowProcA(hWnd, uMsg, wParam, lParam);

@@ -292,7 +292,10 @@ main result so far (details in `src/vc6/README.md`):
     +0x404 (messages enabled), not +0x3D8 (IS_HOST) -- ours made every
     client that created its player call itself the host. CommReceive's
     flow check reads the pool's free count through MsgField12; ours CALLED
-    ADDR_MSG_LIST_POOL, the list itself, as a function.
+    ADDR_MSG_LIST_POOL, the list itself, as a function. WndProc's
+    mid-mission PLAYER_GONE destroys the departed player's flow BEFORE it
+    may end the setup (it held CommPlayerLeft's answer across DestroyFlow);
+    ours ended the setup first.
   - **Globals held in locals, found by counting**: a scan of each near
     miss for absolute loads the image makes more often than ours
     (`rereads.py` over the relink json) lists the functions that re-read a
