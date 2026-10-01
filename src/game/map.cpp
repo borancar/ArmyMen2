@@ -1779,9 +1779,16 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
         goto bad;
     consumed = 0xC;
 
-    do {
-        int32_t bad_size = 0;
+    /* A size mismatch is FATAL: the chunk is skipped and then the whole
+     * load fails. Written out at each site, as the image has it. */
+#define MISMATCH()                                                          \
+    do {                                                                    \
+        am2_log("chunksize/targetsize different\n");                        \
+        orig_map_fseek(f, (int32_t)size, 1);                                \
+        goto bad;                                                           \
+    } while (0)
 
+    do {
         orig_map_fread(&tag, 4, 1, f);
         orig_map_fread(&size, 4, 1, f);
         consumed += 8;
@@ -1791,7 +1798,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
         case AM2_IFF_MHDR: {
             int32_t hdr[3];
 
-            if (size != 0xC) { bad_size = 1; break; }
+            if (size != 0xC) MISMATCH();
             orig_map_fread(hdr, 0xC, 1, f);
             consumed += 0xC;
             (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W)      = hdr[0];
@@ -1810,31 +1817,31 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
 
         /* Seven planes, one shape.  Only the global differs. */
         case AM2_IFF_NPAD:
-            if ((int32_t)size != plane) { bad_size = 1; break; }
+            if ((int32_t)size != plane) MISMATCH();
             *(uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER = ReadPlane(f, size, &consumed);
             break;
         case AM2_IFF_BPAD:
-            if ((int32_t)size != plane) { bad_size = 1; break; }
+            if ((int32_t)size != plane) MISMATCH();
             *(uint8_t **)(uintptr_t)ADDR_MAP_PADBIT_LAYER = ReadPlane(f, size, &consumed);
             break;
         case AM2_IFF_MOVE:
-            if ((int32_t)size != plane) { bad_size = 1; break; }
+            if ((int32_t)size != plane) MISMATCH();
             *(uint8_t **)(uintptr_t)ADDR_CELL_WEIGHTS = ReadPlane(f, size, &consumed);
             break;
         case AM2_IFF_OWNR:
-            if ((int32_t)size != plane) { bad_size = 1; break; }
+            if ((int32_t)size != plane) MISMATCH();
             *(uint8_t **)(uintptr_t)ADDR_TILE_KIND = ReadPlane(f, size, &consumed);
             break;
         case AM2_IFF_TRIG:
-            if ((int32_t)size != plane) { bad_size = 1; break; }
+            if ((int32_t)size != plane) MISMATCH();
             *(uint8_t **)(uintptr_t)ADDR_TILE_FLAGS = ReadPlane(f, size, &consumed);
             break;
         case AM2_IFF_REGN:
-            if ((int32_t)size != plane) { bad_size = 1; break; }
+            if ((int32_t)size != plane) MISMATCH();
             *(uint8_t **)(uintptr_t)ADDR_REGION_OF_CELL = ReadPlane(f, size, &consumed);
             break;
         case AM2_IFF_ELEV:
-            if ((int32_t)size != plane) { bad_size = 1; break; }
+            if ((int32_t)size != plane) MISMATCH();
             *(uint8_t **)(uintptr_t)ADDR_TILE_ATTRS = ReadPlane(f, size, &consumed);
             break;
 
@@ -1842,7 +1849,8 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
         case AM2_IFF_SCEN: {
             uint8_t *tmp = (uint8_t *)am2_malloc(size);
 
-            if (tmp == 0) { bad_size = 2; break; }
+            if (tmp == 0)
+                goto skip;
             orig_map_fread(tmp, size, 1, f);
             consumed += (int32_t)size;
             ParseScenarios(tmp, (int32_t)size);
@@ -1855,7 +1863,11 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
         case AM2_IFF_TLAY: {
             int32_t hdr[5], w, h, bytes;
 
-            if (tlayDone > 0) { bad_size = 2; break; }
+            if (tlayDone > 0) {         /* only the first is taken */
+                orig_map_fseek(f, (int32_t)size, 1);
+                consumed += (int32_t)size;
+                break;
+            }
             orig_map_fread(hdr, 0x14, 1, f);
             consumed += 0x14;
             /* The two the original reads are hdr[1] and hdr[2].  Its `lea`
@@ -1921,22 +1933,14 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
         }
 
         default:
-            bad_size = 2;
+            /* A chunk this loader does not want: skipped, and the walk
+             * carries on. */
+        skip:
+            orig_map_fseek(f, (int32_t)size, 1);
+            consumed += (int32_t)size;
             break;
         }
 
-        /* A size mismatch is FATAL: the chunk is skipped and then the whole
-         * load fails. Only a chunk this loader does not want (2) is skipped
-         * and the walk carries on. */
-        if (bad_size == 1) {
-            am2_log("chunksize/targetsize different\n");
-            orig_map_fseek(f, (int32_t)size, 1);
-            goto bad;
-        }
-        if (bad_size != 0) {
-            orig_map_fseek(f, (int32_t)size, 1);
-            consumed += (int32_t)size;
-        }
     } while (consumed < (int32_t)formSize);
 
     /* Nine layers every consumer may assume exists. */
@@ -2007,6 +2011,7 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
     SetGameDir(((char *)(uintptr_t)ADDR_MAP_BLOCK));
     return 1;
 
+#undef MISMATCH
 bad:
     am2_log("Error in loadmap()\n");
     orig_map_fclose(f);
