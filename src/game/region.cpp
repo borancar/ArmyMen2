@@ -8999,13 +8999,11 @@ void __cdecl StepType3(void *obj)
          * frame ends at the chooser. */
         if (!first) {
             ((AM2_Rec *)(o + OBJ_OFF_POSE))->ListRemoveAt(0);
-            Step3ChooseFacing(obj, out);
-            goto post;
+            goto choose;
         }
         /* An order already in the record's second word: chooser only. */
         if (*(const int32_t *)(out + SIGHTCOUT_OFF_BEARING) != 0) {
-            Step3ChooseFacing(obj, out);
-            goto post;
+            goto choose;
         }
 
         /* The player's vehicle reads the keys and the mouse and routes;
@@ -9016,8 +9014,7 @@ void __cdecl StepType3(void *obj)
         } else {
             AiStep(obj, out);
         }
-        Step3ChooseFacing(obj, out);
-        goto post;
+        goto choose;
     }
 
     if (*(const int32_t *)(o + OBJ_OFF_FIELD_94)) {
