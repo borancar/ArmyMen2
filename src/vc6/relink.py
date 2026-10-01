@@ -307,8 +307,16 @@ def main():
     sa = re.compile(r"#define\s+(ADDR_[A-Z0-9_]+)\s+AM2_SA\(((?:am2_sa_|crt_)[A-Za-z0-9_]+)\)")
     for line in open(os.path.join(BM.REPO, "src/inject/standalone.h")):
         m = sa.match(line.strip())
+        # The ORIGINAL function's VA wins: the placed build's symbol table
+        # also lists these stand-ins, at wherever the native build put their
+        # code -- which once sent every `new` in a widget constructor to
+        # 0x00453D50.
+        # They go into sym_va as well, ahead of the discovery pass below,
+        # which reads call targets out of the image's bytes and once learned
+        # operator new as AddChild from a site where ours was misaligned.
         if m and m.group(1) in addr:
-            placed.setdefault(m.group(2), addr[m.group(1)])
+            placed[m.group(2)] = addr[m.group(1)]
+            sym_va["_" + m.group(2)] = addr[m.group(1)]
     sym_va["_am2_origstate"] = 0x0048E000
     # The relink build's per-global view of am2_origstate (src/vc6/relinkos.py):
     # am2_os_<member> is that member's own VA. Regenerated here so it cannot lag
