@@ -5035,15 +5035,15 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
                         int32_t *nAllied, int32_t *nOther, int32_t flags)
 {
     uint8_t *o = (uint8_t *)obj;
-    uint8_t *keep = (uint8_t *)0;
-    uint8_t *best = (uint8_t *)0;
-    uint8_t *alt  = (uint8_t *)0;
+    uint8_t *keep;
+    uint8_t *best;
+    uint8_t *alt;
     uint8_t *it;
-    int32_t  bestRange   = AM2_SIGHT_SCAN_FAR;
-    int32_t  bestScore   = 0;
-    uint8_t  bestBearing = 0x80;
-    uint8_t  slack       = 0x80;
-    int32_t  solve       = 1;
+    int32_t  bestRange;
+    int32_t  bestScore;
+    uint8_t  bestBearing;
+    uint8_t  slack;
+    int32_t  solve;
     uint8_t  facing;
     int32_t  reach;
     AM2_Rect box;
@@ -5051,6 +5051,15 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
     if (*(const int32_t *)(uintptr_t)ADDR_PERFRAME_COUNT_A
         > AM2_SIGHT_SCANS_PER_FRAME)
         return (void *)0;
+
+    keep        = (uint8_t *)0;
+    best        = (uint8_t *)0;
+    alt         = (uint8_t *)0;
+    bestRange   = AM2_SIGHT_SCAN_FAR;
+    bestScore   = 0;
+    bestBearing = 0x80;
+    slack       = 0x80;
+    solve       = 1;
 
     *outRange   = 0;
     *outBearing = 0;
@@ -5325,12 +5334,13 @@ finish:
                                    (const AM2_Point *)(best + OBJ_OFF_POS));
         return best;
     }
+    /* One return for the fallback and for nothing at all: `alt` is null
+     * when there is neither. */
     if (alt) {
         *outRange   = bestRange;
         *outBearing = bestBearing;
-        return alt;
     }
-    return (void *)0;
+    return alt;
 }
 
 /* AiStepFollow -- original 0x00407C80, one caller. Mode 3, and the name comes
