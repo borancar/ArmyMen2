@@ -28,6 +28,7 @@
 #include "item.h"     /* OnSelectionChanged -- reconstructed */
 #include "misc.h"      /* PtrListPush -- reconstructed */
 #include "image.h"
+#include "crt.h"       /* am2_realloc */
 #include "../inject/patch.h"
 
 #include <stdint.h>
@@ -100,36 +101,48 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
 {
     uint32_t *counter;
     uint32_t  owner;
+    uint32_t  id;       /* the uid registered; `uid` is only the request */
+#if defined(_MSC_VER) && !defined(__GNUC__)
+    int32_t   pos;      /* uninitialised in the original; see the note below */
+#else
     int32_t   pos = 0;
+#endif
 
     if (uid == 0) {
-        uint32_t src;
-
+        /* Each arm builds the uid itself; the original has no shared
+         * owner variable here. */
         switch (obj->type) {
         case 0: case 5: case 6: case 7:
-            src = g_defaultOwner;
+            counter = &g_uidCounter[g_defaultOwner & 7];
+            id = (g_defaultOwner << AM2_UID_OWNER_SHIFT) | *counter;
+            (*counter)++;
             break;
-        default:                    /* 1-4, 8, and the >8 fall-through */
-            src = (uint32_t)(int32_t)obj->owner;
+        case 1: case 2: case 3: case 4: case 8:
+        own:
+            counter = &g_uidCounter[(uint32_t)(int32_t)obj->owner & 7];
+            /* The original shifts the unmasked value; only three bits
+             * survive, so this matches. */
+            id = ((uint32_t)(int32_t)obj->owner << AM2_UID_OWNER_SHIFT)
+               | *counter;
+            (*counter)++;
             break;
+        default:
+            /* The > 8 fall-through. Its own label keeps 1-4 and 8 in the
+             * nine-entry jump table the image has. */
+            goto own;
         }
-        owner   = src & 7;
-        counter = &g_uidCounter[owner];
-        /* The original shifts the unmasked value; only three bits survive, so
-         * this matches. */
-        uid = (src << AM2_UID_OWNER_SHIFT) | *counter;
-        (*counter)++;
     } else {
         uint32_t next, need;
 
-        owner   = (uint32_t)(uint8_t)obj->owner & 7;
-        counter = &g_uidCounter[owner];
+        owner = (uint32_t)(uint8_t)obj->owner & 7;
 
         if (g_debugItemList)
             orig_log("AddToItemList: newuid=%x, ownerindex=%d, gCurrentUID=%x\n",
-                     uid, owner, *counter);
+                     uid, owner, g_uidCounter[owner]);
+        counter = &g_uidCounter[owner];
 
         /* Keep the counter ahead of any UID handed to us. */
+        id   = uid;
         next = *counter + 1;
         need = (uid & AM2_UID_COUNTER_MASK) + 1;
         *counter = (next > need) ? next : need;
@@ -149,29 +162,39 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
          * is presumably why it was never noticed. Not fixed here: matching the
          * original's behaviour matters more than its intent.
          */
-        for (;;) {
+        {
             uint32_t probe = ((uint32_t)(int32_t)obj->owner << AM2_UID_OWNER_SHIFT)
                            | *counter;
-            int32_t i = FindSlot(probe, &pos);
 
-            if (i < 0 || g_objTable[i].obj == 0)
-                break;
-            orig_log("searching for free uid!\n");
-            (*counter)++;
+            /* Its own insertion point, not the one the insert below uses. */
+            int32_t at;
+
+            for (;;) {
+                int32_t i = FindSlot(probe, &at);
+
+                if (i < 0 || g_objTable[i].obj == 0)
+                    break;
+                /* The next probe is built from the counter BEFORE it steps,
+                 * so the first retry asks for the same uid again. */
+                probe = ((uint32_t)(int32_t)obj->owner << AM2_UID_OWNER_SHIFT)
+                      | *counter;
+                orig_log("searching for free uid!\n");
+                (*counter)++;
+            }
         }
     }
 
-    obj->uid = uid;
+    obj->uid = id;
 
     /* Return value ignored by the original: it only wants the insertion point.
      * Note FindSlot writes *pos only when it returns -1, so registering a UID
      * that is already present would insert at a stale position. Callers are
      * expected to supply fresh UIDs. */
-    FindSlot(uid, &pos);
+    FindSlot(id, &pos);
 
     if (g_objCount >= g_objCap) {
         g_objCap += 100;
-        g_objTable = (AM2_ObjEntry *)orig_realloc(
+        g_objTable = (AM2_ObjEntry *)am2_realloc(
             g_objTable, (size_t)g_objCap * sizeof(AM2_ObjEntry));
     }
 
@@ -180,13 +203,13 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
                      (size_t)(g_objCount - pos) * sizeof(AM2_ObjEntry));
 
     g_objCount++;
-    g_objTable[pos].uid   = uid;
+    g_objTable[pos].uid   = id;
     g_objTable[pos].obj   = obj;
     /* Zero, not the current stamp: a newly registered object should be visited
      * by a walk already in progress rather than skipped by it. */
     g_objTable[pos].stamp = 0;
 
-    return uid;
+    return id;
 }
 
 /* RemoveFromItemList -- reconstructed from 0x00428590.
