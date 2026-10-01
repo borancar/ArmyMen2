@@ -6360,6 +6360,7 @@ void __cdecl StepType8(void *obj)
 {
     uint8_t *o      = (uint8_t *)obj;
     uint8_t *facing;
+    void    *row;
 
     ObjClearRoachFootprint(obj);
     *(o + OBJ_OFF_FIELD_540) = *(const uint8_t *)(o + OBJ_OFF_FACING);
@@ -6372,21 +6373,20 @@ void __cdecl StepType8(void *obj)
             break;
 
         case 5:
-            if (!RowAnimFinished(*(void **)(o + OBJ_OFF_ROWS)))
+            row = *(void **)(o + OBJ_OFF_ROWS);
+            if (!RowAnimFinished(row))
                 break;
             *(int32_t *)(o + OBJ_OFF_DEATH_STATE) = 6;
             break;
 
-        case 6: {
-            void *row = *(void **)(o + OBJ_OFF_ROWS);
-
+        case 6:
+            row = *(void **)(o + OBJ_OFF_ROWS);
             if (!RowAnimFinished(row))
                 break;
             RowFaceSprite(row);
             LeaveRemainsRow(row);
             DestroyByType(obj);
             break;
-        }
 
         default:
             break;
