@@ -3944,12 +3944,11 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
 
     case 0x3A: {                                /* setdamagepad */
-        uint8_t *pad;
-
+        /* The pad is indexed afresh at every store, as the image does. */
+#define pad ((uint8_t *)(uintptr_t)ADDR_PADS \
+             + (size_t)act->subject * AM2_PAD_STRIDE)
         if (act->subject < 0 || act->subject >= g_padCount)
             return;
-        pad = (uint8_t *)(uintptr_t)ADDR_PADS
-            + (size_t)act->subject * AM2_PAD_STRIDE;
         *(int32_t *)(pad + PAD_OFF_DAMAGE)      = act->n1;
         *(int32_t *)(pad + 0x38)                = act->n0;
         *(int32_t *)(pad + PAD_OFF_DAMAGE_KIND) = act->extra;
@@ -3965,6 +3964,7 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
             *(int32_t *)(num + PADNUM_OFF_PADS) = 1;
         }
         return;
+#undef pad
     }
 
     case 0x37:                                  /* unitfire at a point or object */
