@@ -470,6 +470,13 @@ def main():
                     if tgt_va is None and tgt_name.startswith("__ehhandler$") \
                             and typ == IMAGE_REL_I386_DIR32:
                         tgt_va = ehhandler_va(img, va + roff)
+                    # Some constructors reach their handler stub through a
+                    # local `$L` label in its own section rather than the
+                    # named symbol; the same stub-shape check settles it.
+                    if tgt_va is None and tgt_name.startswith("$L") \
+                            and typ == IMAGE_REL_I386_DIR32 \
+                            and symlist[symidx][1] != secnum:
+                        tgt_va = ehhandler_va(img, va + roff)
                     if tgt_va is None:
                         unresolved_hist[tgt_name] += 1
                         for k in range(4):
