@@ -2720,7 +2720,6 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     int32_t         bw;
     int32_t         w;
     int32_t         rowbits;
-    int32_t         rowbytes;
     int32_t         phase;
     int32_t         splitOdd;
     int32_t         k;
@@ -2802,7 +2801,7 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
     ring[19] = 2 * w + 1;
 
     rowbits  = (rw - lw) + 31 - ((rw - lw + 31) % 32);
-    rowbytes = rowbits >> 3;
+    rw = rowbits >> 3;
     if (rowbits == 0)
         return 0;
 
@@ -2819,8 +2818,8 @@ int32_t __cdecl ListMaskAction(uint32_t at, void *hdr, void *out)
             - (box[0] + AM2_TILEMASK_MARGIN) + 1;
 
     for (y = tw; y < bw; y += 8) {
-        int32_t off = (y - my - oy) * rowbytes;
-        int32_t end = off + rowbytes;
+        int32_t off = (y - my - oy) * rw;
+        int32_t end = off + rw;
         int32_t col = AM2_TILEMASK_MARGIN;
         int32_t idx = ((y >> AM2_TILE_SHIFT) - box[1]) * w
                       + AM2_TILEMASK_MARGIN;

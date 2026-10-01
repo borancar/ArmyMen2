@@ -1651,7 +1651,6 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     int32_t        steps;
     uint8_t        a0;
     uint8_t        a1;
-    uint8_t        dir;
 
     heading = *(const uint8_t *)(v + OBJ_OFF_FACING);
     if (ObjIsType3((const AM2_Object *)v)
@@ -1738,11 +1737,11 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
         return;
 
     steps = ((int32_t)(int16_t)span + 3) >> 2;
-    dir   = a0;
+    heading = a0;    /* the facing's local, reused as the sweep cursor */
 
-    for (; steps > 0; steps--, dir = (uint8_t)(dir + AM2_SIGHT_DIR_STEP)) {
+    for (; steps > 0; steps--, heading = (uint8_t)(heading + AM2_SIGHT_DIR_STEP)) {
         uint8_t *rec = slots
-                     + (uint32_t)((dir & 0xFF) >> 2) * AM2_SIGHT_DIR_STRIDE;
+                     + (uint32_t)((heading & 0xFF) >> 2) * AM2_SIGHT_DIR_STRIDE;
         int16_t  d   = (int16_t)dist;
 
         if (*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP)
