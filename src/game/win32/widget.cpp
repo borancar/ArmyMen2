@@ -4021,62 +4021,65 @@ typedef int32_t (__cdecl *AM2_StrncmpFn)(const char *, const char *, size_t);
 
 
 /* The bar and the ink, which the original writes out FIVE times -- once per
- * arm of the refill and again for each arm of the passenger loop. Factored
- * only after diffing them: every copy scales health by 41 and clamps at 41,
- * and every copy runs the same three-colour ladder off the same three bytes.
- * The copies differ solely in addressing (the passenger loop caches the field
- * pointers in its frame) and in the pip count, which is the caller's. Two of
- * the five already share their tail in the image, so factoring those is not
- * even a change. The AiStepTrack rule is about not flattening a REAL
- * difference; this is the case where there is none, and it was checked. */
-static inline void HudSquadBar(uint8_t *rec, const uint8_t *obj)
-{
-    int16_t max = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
-    int16_t hp  = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
-    int32_t w   = 0;
-
-    if (max > 0) {
-        w = (int32_t)hp * AM2_HUD_SQUAD_BAR_MAX / max;
-        if (w > AM2_HUD_SQUAD_BAR_MAX)
-            w = AM2_HUD_SQUAD_BAR_MAX;
-    }
-    *(int32_t *)(rec + SQUAD_REC_BAR_W) = w;
-}
-
-static inline void HudSquadInk(uint8_t *rec, const uint8_t *obj)
-{
-    int16_t max = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
-    int16_t hp  = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
-    uint8_t ink;
-
-    if (hp <= (int16_t)(max >> 2))
-        ink = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
-    else if (hp <= (int16_t)(max >> 1))
-        ink = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
-    else
-        ink = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
-
-    *(uint8_t *)(rec + SQUAD_REC_BAR_COLOUR) = ink;
-}
-
+ * arm of the refill and again for each arm of the passenger loop. They are
+ * macros over the record's FIELD, not functions over a record pointer: the
+ * image indexes the panel afresh for every store (`self + slot*0x20 + 0xBC`
+ * and `(slot+6)*0x20 + self` for the uid), and in the passenger loop VC6
+ * strength-reduces each field to a pointer of its own. Every copy scales
+ * health by 41 and clamps at 41, and every copy runs the same three-colour
+ * ladder off the same three bytes. */
+#define SQUAD_HP(o)    (*(const int16_t *)((o) + OBJ_OFF_HEALTH))
+#define SQUAD_MAXHP(o) (*(const int16_t *)((o) + OBJ_OFF_MAX_HEALTH))
+#define SQUAD_BAR(field, o)                                                   \
+    if (SQUAD_MAXHP(o) > 0) {                                                 \
+        int32_t bw = SQUAD_HP(o) * AM2_HUD_SQUAD_BAR_MAX / SQUAD_MAXHP(o);    \
+        if (bw > AM2_HUD_SQUAD_BAR_MAX)                                       \
+            bw = AM2_HUD_SQUAD_BAR_MAX;                                       \
+        (field) = bw;                                                         \
+    } else                                                                    \
+        (field) = 0
+#define SQUAD_INK(field, o)                                                   \
+    if (SQUAD_HP(o) <= (int16_t)(SQUAD_MAXHP(o) >> 2))                        \
+        (field) = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;       \
+    else if (SQUAD_HP(o) <= (int16_t)(SQUAD_MAXHP(o) >> 1))                   \
+        (field) = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;           \
+    else                                                                      \
+        (field) = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR
 /* min(rank + 1, 5) -- the same count HudSquadDetail draws as pips. */
-static inline int32_t HudSquadPips(const uint8_t *obj)
-{
-    int32_t n = *(const int32_t *)(obj + OBJ_OFF_RANK) + 1;
+#define SQUAD_PIPS(o)                                                         \
+    (*(const int32_t *)((o) + OBJ_OFF_RANK) + 1 >= AM2_HUD_SQUAD_PIPS_MAX     \
+         ? AM2_HUD_SQUAD_PIPS_MAX : *(const int32_t *)((o) + OBJ_OFF_RANK) + 1)
 
-    return n < AM2_HUD_SQUAD_PIPS_MAX ? n : AM2_HUD_SQUAD_PIPS_MAX;
+/* The weapon's icon, a SWITCH in the original (two copies of the byte index
+ * and jump table follow the function, at 0x004162AC/0x00416290 and
+ * 0x0041630C/0x004162F0). The kind is the first dword of the item's
+ * OBJ_OFF_FIELD_C0 record, the same reach HudSargeUpdate uses for its
+ * tooltip. Only kinds 2, 3, 4, 5 and 43 get an icon of their own; kind 1 is
+ * a case of its own that answers what the default does. */
+static inline int32_t HudSquadWeaponIcon(const uint8_t *weapon)
+{
+    switch (**(const int32_t *const *)(weapon + OBJ_OFF_FIELD_C0)) {
+    case 1:  return 1;
+    case 2:  return 3;
+    case 3:  return 4;
+    case 4:  return 2;
+    case 5:  return 5;
+    case 43: return 6;
+    default: return 1;
+    }
 }
 
-/* The weapon's icon. The kind is the first dword of the item's
- * OBJ_OFF_FIELD_C0 record, the same reach HudSargeUpdate uses for its
- * tooltip; the table is indexed by kind-1 and the compare is UNSIGNED, so
- * kind 0 wraps past the bound and lands on the default with everything
- * above 43. */
-static inline int32_t HudSquadWeaponIcon(const uint8_t *weapon, const uint8_t *table)
+/* The vehicle's icon: kinds 0..3 and 5, with 4 falling to the default. */
+static inline int32_t HudSquadVehicleIcon(const uint8_t *veh)
 {
-    uint32_t kind = **(const uint32_t *const *)(weapon + OBJ_OFF_FIELD_C0);
-
-    return (kind - 1) < AM2_HUD_SQUAD_WEAPON_KINDS ? table[kind - 1] : 1;
+    switch (*(const int32_t *)(veh + VEHICLE_OFF_KIND)) {
+    case 0:  return 7;
+    case 1:  return 8;
+    case 2:  return 9;
+    case 3:  return 10;
+    case 5:  return 11;
+    default: return 0;
+    }
 }
 
 
@@ -6255,28 +6258,9 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
 {
     AM2_Widget *w = this;
 
-    /* GENERATED FROM THE IMAGE, not transcribed -- the DirtyCollect rule.
-     * kWeaponIcon is the 43-byte index at 0x004162AC resolved through the
-     * seven-entry jump table at 0x00416290, and it is a FILTER rather than a
-     * dispatch: only kinds 2, 3, 4, 5 and 43 get an icon of their own and
-     * the other 38 all answer 1. kVehicleIcon is the six-entry table at
-     * 0x004162D8. The passenger loop repeats the weapon pair at
-     * 0x0041630C/0x004162F0; diffed byte for byte, and the two indices are
-     * identical and the two jump tables map to the same six values, so one
-     * table serves both. */
-    static const uint8_t kWeaponIcon[AM2_HUD_SQUAD_WEAPON_KINDS] = {
-        1, 3, 4, 2, 5, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 6,
-    };
-    static const uint8_t kVehicleIcon[AM2_HUD_SQUAD_VEHICLE_KINDS] = {
-        7, 8, 9, 10, 0, 11,
-    };
-
-    uint8_t *self = (uint8_t *)w;
-    uint8_t *panel;
-    int32_t  i, slot;
+    uint8_t    *self = (uint8_t *)w;
+    uint8_t    *obj;
+    int32_t     i, slot;
 
     if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER
         || *(const int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
@@ -6284,37 +6268,50 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
 
     ::WidgetUpdate(w);
 
-    panel = (uint8_t *)*(AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_B;
+/* The panel is read from its global at every use, the records indexed at
+ * every store. */
+#define PANEL   (*(uint8_t *const *)(uintptr_t)ADDR_HUD_WIDGET_B)
+#define REC(n, f) (*(int32_t *)(self + HUD_SQUAD_RECS                          \
+                                 + (n) * HUD_SQUAD_REC_SIZE + (f)))
+#define INKOF(n) (*(uint8_t *)(self + HUD_SQUAD_RECS                          \
+                               + (n) * HUD_SQUAD_REC_SIZE                      \
+                               + SQUAD_REC_BAR_COLOUR))
+/* Who holds the mouse, then whether this is a release over us. Each click
+ * arm runs it for itself; the weapon arm's misses fall into the generic
+ * arm's copy, which answers the same way. */
+#define MOUSE_GRAB (*(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB)
+#define CHANGED    (*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+#define GRAB()                                                                \
+        if (!MOUSE_GRAB && CHANGED)                                           \
+            MOUSE_GRAB = w;
+#define CLICKED (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON              \
+                 && CHANGED && MOUSE_GRAB == w)
 
     /* Pass one: the mouse, but only while the panel is open. */
-    if (*(const int32_t *)(panel + HUDPANEL_OFF_OPEN)) {
-        const int16_t *grid =
-            (const int16_t *)((void *)(uintptr_t)(ADDR_HUD_SQUAD_SLOT_XY));
-
+    if (*(const int32_t *)(PANEL + HUDPANEL_OFF_OPEN)) {
         for (i = 0; i < AM2_HUD_SQUAD_SLOTS; i++) {
-            uint8_t          *rec = self + HUD_SQUAD_RECS
-                                    + i * HUD_SQUAD_REC_SIZE;
-            int32_t           idx = *(const int32_t *)(rec + SQUAD_REC_INDEX);
             const AM2_Sprite *spr;
             AM2_Rect          cell;
-            uint8_t          *obj;
-            AM2_Widget       *grab;
             AM2_PointerPickFn pick;
-            int32_t           changed, clicked;
-            const char       *hover;
 
-            if (idx < 0)
+            if (REC(i, SQUAD_REC_INDEX) < 0)
                 continue;
 
             /* SQUAD_REC_WIDE picks which of the two sprite arrays the
              * portrait comes from -- ::HudSquadPaint's own choice. */
-            spr = *(const AM2_Sprite *const *)(
-                      self + (*(const int32_t *)(rec + SQUAD_REC_WIDE)
-                                  ? HUD_SQUAD_PAIR_HI : HUD_SQUAD_PAIR_LO)
-                      + idx * 4);
+            if (REC(i, SQUAD_REC_WIDE))
+                spr = *(const AM2_Sprite *const *)(self + HUD_SQUAD_PAIR_HI
+                          + REC(i, SQUAD_REC_INDEX) * 4);
+            else
+                spr = *(const AM2_Sprite *const *)(self + HUD_SQUAD_PAIR_LO
+                          + REC(i, SQUAD_REC_INDEX) * 4);
 
-            cell.left   = grid[i * 2]     + w->rect.left;
-            cell.top    = grid[i * 2 + 1] + w->rect.top;
+            cell.left   = ((const int16_t *)((void *)(uintptr_t)
+                              (ADDR_HUD_SQUAD_SLOT_XY)))[i * 2]
+                          + w->rect.left;
+            cell.top    = w->rect.top
+                          + ((const int16_t *)((void *)(uintptr_t)
+                              (ADDR_HUD_SQUAD_SLOT_XY)))[i * 2 + 1];
             cell.right  = spr->bounds.right  + cell.left;
             cell.bottom = spr->bounds.bottom + cell.top;
 
@@ -6323,20 +6320,9 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                 continue;
 
             obj = (uint8_t *)LookupByUID(
-                      *(const uint32_t *)(rec + SQUAD_REC_DETAIL_ARG));
-            if (!obj || *(const int16_t *)(obj + OBJ_OFF_HEALTH) == 0)
+                      (uint32_t)REC(i, SQUAD_REC_DETAIL_ARG));
+            if (!obj || SQUAD_HP(obj) == 0)
                 continue;
-
-            grab    = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
-            changed = *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED;
-
-            if (!grab && changed) {
-                grab = w;
-                *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
-            }
-
-            clicked = !*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
-                      && changed && grab == w;
 
             pick = *(AM2_PointerPickFn *)(uintptr_t)ADDR_WEAPON_FN_SLOT0;
 
@@ -6345,7 +6331,8 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                  * object and its packed position to the second hook and
                  * ABANDONS the rest of the grid -- the original jumps clear
                  * of the loop, straight to the clear-down. */
-                if (clicked) {
+                GRAB();
+                if (CLICKED) {
                     AM2_PointerActionFn act;
 
                     PlaySoundAt(0, 0, 0, 0, 0);
@@ -6355,88 +6342,85 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                         act(obj, *(const uint32_t *)(obj + OBJ_OFF_POS));
                     break;
                 }
-            } else if (*(const int32_t *)(rec + SQUAD_REC_EJECT)) {
-                if (clicked) {
+            } else if (REC(i, SQUAD_REC_EJECT)) {
+                /* A PASSENGER of the vehicle in slot 0: clicking him finds
+                 * him in its VEHICLE_OFF_PTR_LIST and gets him out. */
+                GRAB();
+                if (CLICKED) {
                     uint8_t *veh;
+                    int32_t  k;
 
                     PlaySoundAt(0, 0, 0, 0, 0);
-                    veh = (uint8_t *)LookupByUID(*(const uint32_t *)(
-                              self + HUD_SQUAD_RECS + SQUAD_REC_DETAIL_ARG));
+                    veh = (uint8_t *)LookupByUID(
+                              (uint32_t)REC(0, SQUAD_REC_DETAIL_ARG));
                     if (ObjIsType3((const AM2_Object *)veh)) {
-                        int32_t n = *(const int32_t *)(
-                            veh + VEHICLE_OFF_PTR_LIST + 4);
-                        int32_t k = 0;
-
-                        if (n > 0) {
-                            const uint32_t *riders = *(const uint32_t *const *)(
-                                veh + VEHICLE_OFF_PTR_LIST + 8);
-                            uint32_t uid =
-                                *(const uint32_t *)(obj + OBJ_OFF_UID);
-
-                            while (riders[k] != uid && ++k < n)
-                                ;
-                        }
-                        /* The original tests this for NEGATIVE, which a
-                         * running total that only increments cannot be.
-                         * Reproduced; it costs one compare. */
+                        for (k = 0;
+                             k < *(const int32_t *)(veh + VEHICLE_OFF_PTR_LIST + 4);
+                             k++)
+                            if ((*(const uint32_t *const *)(
+                                    veh + VEHICLE_OFF_PTR_LIST + 8))[k]
+                                == *(const uint32_t *)(obj + OBJ_OFF_UID))
+                                break;
+                        /* Tested for NEGATIVE, which a count that only
+                         * increments cannot be. Reproduced. */
                         if (k >= 0)
                             ExitOneFromVehicle(k, veh);
                     }
                 }
-            } else if (clicked && ObjIsTypeIn238((const AM2_Object *)obj)) {
+                goto tooltip;
+            }
+
+            GRAB();
+            if (CLICKED && ObjIsTypeIn238((const AM2_Object *)obj)) {
                 PlaySoundAt(0, 0, 0, 0, 0);
                 ToggleSelect(obj);
                 *(int32_t *)(uintptr_t)ADDR_VIEW_SNAP = 1;
             }
 
+        tooltip:
             /* The tooltip, gated on STILLNESS rather than on the click, and
-             * written into the PANEL's caption, which empties every frame. */
-            if ((int32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-                          - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_ACTIVITY)
+             * written into the PANEL's caption, which empties every frame.
+             * The interval is compared UNSIGNED. */
+            if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+                    - *(const uint32_t *)(uintptr_t)ADDR_MOUSE_ACTIVITY
                 <= AM2_HUD_TOOLTIP_DWELL)
                 continue;
 
             if (ObjType2Field548((const AM2_Object *)obj)) {
-                hover = "Sarge";
+                strcpy((char *)(PANEL + HUDPANEL_OFF_CAPTION), "Sarge");
             } else if (ObjIsType2((const AM2_Object *)obj)) {
-                int32_t n = *(const int32_t *)(obj + ITEM_OFF_NAME_INDEX);
-
-                if (n < 0) {
+                if (*(const int32_t *)(obj + ITEM_OFF_NAME_INDEX) >= 0)
+                    strcpy((char *)(PANEL + HUDPANEL_OFF_CAPTION),
+                           *(const char *const *)(
+                               (const uint8_t *)*(void *const *)
+                                   (uintptr_t)ADDR_SCRIPT_NAMES
+                               + (uint32_t)*(const int32_t *)
+                                     (obj + ITEM_OFF_NAME_INDEX)
+                                 * AM2_NAME_TABLE_STRIDE));
+                else
                     /* The OBJECT is first -- see ADDR_SOLDIER_NAME_OF. */
                     SoldierNameOf(obj,
-                                  (char *)(panel + HUDPANEL_OFF_CAPTION));
-                    continue;
-                }
-                hover = *(const char *const *)(
-                    (const uint8_t *)*(void *const *)
-                        (uintptr_t)ADDR_SCRIPT_NAMES
-                    + (uint32_t)n * AM2_NAME_TABLE_STRIDE);
+                                  (char *)(PANEL + HUDPANEL_OFF_CAPTION));
             } else if (ObjIsType3((const AM2_Object *)obj)) {
-                hover = VehicleKindName(obj);
-            } else {
-                continue;
+                strcpy((char *)(PANEL + HUDPANEL_OFF_CAPTION),
+                       VehicleKindName(obj));
             }
-
-            strcpy((char *)(panel + HUDPANEL_OFF_CAPTION), hover);
         }
 
-        /* Pass two: every record back to empty before the refill. */
+        /* Pass two: every record back to empty before the refill -- the
+         * index, WIDE, HILITE and EJECT. The uid is left as it was. */
         for (i = 0; i < AM2_HUD_SQUAD_SLOTS; i++) {
-            uint8_t *rec = self + HUD_SQUAD_RECS + i * HUD_SQUAD_REC_SIZE;
-
-            *(int32_t *)(rec + SQUAD_REC_INDEX)      = -1;
-            *(int32_t *)(rec + SQUAD_REC_DETAIL_ARG) = 0;
-            *(int32_t *)(rec + SQUAD_REC_WIDE)       = 0;
-            *(int32_t *)(rec + SQUAD_REC_EJECT)      = 0;
+            REC(i, SQUAD_REC_INDEX)  = -1;
+            REC(i, SQUAD_REC_WIDE)   = 0;
+            REC(i, SQUAD_REC_HILITE) = 0;
+            REC(i, SQUAD_REC_EJECT)  = 0;
         }
     }
 
     /* Pass three: refill from the selection, at most twelve. */
+    i = 0;
     slot = 0;
-    for (i = 0; i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT; ) {
-        uint8_t *obj;
-        uint8_t *rec;
-
+    while (i < *(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT) {
         if (slot >= AM2_HUD_SQUAD_SLOTS)
             break;
 
@@ -6454,18 +6438,15 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
             && *(const int32_t *)(obj + OBJ_OFF_FIELD_94))
             goto next;
 
-        rec = self + HUD_SQUAD_RECS + slot * HUD_SQUAD_REC_SIZE;
-
         if (ObjType2Field548((const AM2_Object *)obj)) {
             if (*(const int32_t *)(obj + OBJ_OFF_RIDING))
                 goto next;
 
-            *(int32_t *)(rec + SQUAD_REC_INDEX) = 0;
-            *(uint32_t *)(rec + SQUAD_REC_DETAIL_ARG) =
-                *(const uint32_t *)(obj + OBJ_OFF_UID);
-            HudSquadBar(rec, obj);
-            *(int32_t *)(rec + SQUAD_REC_ICONS) = AM2_HUD_SQUAD_PIPS_MAX;
-            HudSquadInk(rec, obj);
+            REC(slot, SQUAD_REC_INDEX) = 0;
+            REC(slot, SQUAD_REC_DETAIL_ARG) = *(const int32_t *)(obj + OBJ_OFF_UID);
+            SQUAD_BAR(REC(slot, SQUAD_REC_BAR_W), obj);
+            SQUAD_INK(INKOF(slot), obj);
+            REC(slot, SQUAD_REC_ICONS) = AM2_HUD_SQUAD_PIPS_MAX;
             slot++;
 
         } else if (ObjIsType2((const AM2_Object *)obj)) {
@@ -6475,91 +6456,77 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
                 goto next;
 
             /* NO WEAPON STILL FILLS THE SLOT, with icon 1 -- where the
-             * passenger loop below SKIPS such a unit outright. That is a
-             * real difference between two otherwise identical arms and is
-             * why they are written out separately. */
+             * passenger loop below SKIPS such a unit outright. */
             weapon = (const uint8_t *)WeaponByUid(
                          *(const uint32_t *)(obj + OBJ_OFF_WEAPON_UID));
             if (weapon)
-                *(int32_t *)(rec + SQUAD_REC_INDEX) = HudSquadWeaponIcon(weapon, kWeaponIcon);
+                REC(slot, SQUAD_REC_INDEX) = HudSquadWeaponIcon(weapon);
             else
-                *(int32_t *)(rec + SQUAD_REC_INDEX) = 1;
-            *(uint32_t *)(rec + SQUAD_REC_DETAIL_ARG) =
-                *(const uint32_t *)(obj + OBJ_OFF_UID);
-            HudSquadBar(rec, obj);
-            HudSquadInk(rec, obj);
-            *(int32_t *)(rec + SQUAD_REC_ICONS) = HudSquadPips(obj);
+                REC(slot, SQUAD_REC_INDEX) = 1;
+            REC(slot, SQUAD_REC_DETAIL_ARG) = *(const int32_t *)(obj + OBJ_OFF_UID);
+            SQUAD_BAR(REC(slot, SQUAD_REC_BAR_W), obj);
+            SQUAD_INK(INKOF(slot), obj);
+            REC(slot, SQUAD_REC_ICONS) = SQUAD_PIPS(obj);
             slot++;
 
         } else if (ObjIsType3((const AM2_Object *)obj)) {
-            uint32_t kind = *(const uint32_t *)(obj + VEHICLE_OFF_KIND);
+            int32_t k;
 
-            if (kind < AM2_HUD_SQUAD_VEHICLE_KINDS)
-                *(int32_t *)(rec + SQUAD_REC_INDEX) = kVehicleIcon[kind];
-            else
-                *(int32_t *)(rec + SQUAD_REC_INDEX) = 0;
-            *(uint32_t *)(rec + SQUAD_REC_DETAIL_ARG) =
-                *(const uint32_t *)(obj + OBJ_OFF_UID);
-            HudSquadBar(rec, obj);
-            *(int32_t *)(rec + SQUAD_REC_ICONS) = 0;
-            HudSquadInk(rec, obj);
+            REC(slot, SQUAD_REC_INDEX) = HudSquadVehicleIcon(obj);
+            REC(slot, SQUAD_REC_DETAIL_ARG) = *(const int32_t *)(obj + OBJ_OFF_UID);
+            SQUAD_BAR(REC(slot, SQUAD_REC_BAR_W), obj);
+            REC(slot, SQUAD_REC_ICONS) = 0;
+            SQUAD_INK(INKOF(slot), obj);
             slot++;
 
             /* A LONE vehicle brings its riders with it, and they start at
-             * slot 6 whatever the vehicle itself landed on. */
+             * slot 6 whatever the vehicle itself landed on. A rider that no
+             * longer resolves is removed AND stepped past, so the one that
+             * slid into its place is skipped this frame. */
             if (*(const int32_t *)(uintptr_t)ADDR_SELECTED_COUNT == 1) {
-                int32_t k;
-
                 slot = AM2_HUD_SQUAD_SLOTS / 2;
                 for (k = 0;
-                     k < *(const int32_t *)(obj + VEHICLE_OFF_PTR_LIST + 4); ) {
+                     k < *(const int32_t *)(obj + VEHICLE_OFF_PTR_LIST + 4);
+                     k++) {
                     uint8_t *rider = (uint8_t *)LookupByUID(
                         (*(const uint32_t *const *)(
                              obj + VEHICLE_OFF_PTR_LIST + 8))[k]);
-                    uint8_t *rrec;
 
                     if (!rider) {
                         ((AM2_Rec *)(obj + VEHICLE_OFF_PTR_LIST))->ListRemoveAt(k);
                         continue;
                     }
-                    if (*(const int16_t *)(rider + OBJ_OFF_HEALTH) == 0)
-                        goto nextRider;
+                    if (SQUAD_HP(rider) == 0)
+                        continue;
                     if (ObjIsTypeIn238((const AM2_Object *)rider)
                         && *(const int32_t *)(rider + OBJ_OFF_FIELD_94))
-                        goto nextRider;
-
-                    rrec = self + HUD_SQUAD_RECS + slot * HUD_SQUAD_REC_SIZE;
+                        continue;
 
                     if (ObjType2Field548((const AM2_Object *)rider)) {
-                        *(int32_t *)(rrec + SQUAD_REC_INDEX) = 0;
-                        *(uint32_t *)(rrec + SQUAD_REC_DETAIL_ARG) =
-                            *(const uint32_t *)(rider + OBJ_OFF_UID);
-                        *(int32_t *)(rrec + SQUAD_REC_EJECT) = 1;
-                        HudSquadBar(rrec, rider);
-                        *(int32_t *)(rrec + SQUAD_REC_ICONS) =
-                            AM2_HUD_SQUAD_PIPS_MAX;
-                        HudSquadInk(rrec, rider);
+                        REC(slot, SQUAD_REC_INDEX) = 0;
+                        REC(slot, SQUAD_REC_DETAIL_ARG) =
+                            *(const int32_t *)(rider + OBJ_OFF_UID);
+                        REC(slot, SQUAD_REC_EJECT) = 1;
+                        SQUAD_BAR(REC(slot, SQUAD_REC_BAR_W), rider);
+                        REC(slot, SQUAD_REC_ICONS) = AM2_HUD_SQUAD_PIPS_MAX;
+                        SQUAD_INK(INKOF(slot), rider);
                         slot++;
                     } else if (ObjIsType2((const AM2_Object *)rider)) {
                         const uint8_t *weapon = (const uint8_t *)WeaponByUid(
                             *(const uint32_t *)(rider + OBJ_OFF_WEAPON_UID));
 
                         if (!weapon)
-                            goto nextRider;
+                            continue;
 
-                        *(int32_t *)(rrec + SQUAD_REC_INDEX) =
-                            HudSquadWeaponIcon(weapon, kWeaponIcon);
-                        *(uint32_t *)(rrec + SQUAD_REC_DETAIL_ARG) =
-                            *(const uint32_t *)(rider + OBJ_OFF_UID);
-                        *(int32_t *)(rrec + SQUAD_REC_EJECT) = 1;
-                        HudSquadBar(rrec, rider);
-                        *(int32_t *)(rrec + SQUAD_REC_ICONS) =
-                            HudSquadPips(rider);
-                        HudSquadInk(rrec, rider);
+                        REC(slot, SQUAD_REC_INDEX) = HudSquadWeaponIcon(weapon);
+                        REC(slot, SQUAD_REC_DETAIL_ARG) =
+                            *(const int32_t *)(rider + OBJ_OFF_UID);
+                        REC(slot, SQUAD_REC_EJECT) = 1;
+                        SQUAD_BAR(REC(slot, SQUAD_REC_BAR_W), rider);
+                        REC(slot, SQUAD_REC_ICONS) = SQUAD_PIPS(rider);
+                        SQUAD_INK(INKOF(slot), rider);
                         slot++;
                     }
-                nextRider:
-                    k++;
                 }
             }
         }
@@ -6570,9 +6537,15 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadUpdate()
 
     /* Slot 1 still empty means exactly one thing is selected, so slot 0 goes
      * WIDE and the grid becomes the ::HudSquadDetail readout. */
-    if (*(const int32_t *)(self + HUD_SQUAD_RECS + HUD_SQUAD_REC_SIZE
-                           + SQUAD_REC_INDEX) < 0)
-        *(int32_t *)(self + HUD_SQUAD_RECS + SQUAD_REC_WIDE) = 1;
+    if (REC(1, SQUAD_REC_INDEX) < 0)
+        REC(0, SQUAD_REC_WIDE) = 1;
+#undef PANEL
+#undef REC
+#undef INKOF
+#undef GRAB
+#undef CLICKED
+#undef MOUSE_GRAB
+#undef CHANGED
 }
 
 /* HudSquadDetail -- original 0x00416340, 2,643 bytes, thiscall, one exit.

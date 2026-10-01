@@ -121,6 +121,10 @@ main result so far (details in `src/vc6/README.md`):
     not. The vehicle readout's armour is clamped to 99 before `%d mm`, which
     the transcription dropped; the stat tables are stack locals and the
     speed table has no uninitialised slot -- it is {5,3,4,4,2,4}.
+    The same scan put HudSquadUpdate 0x218 short, and rewriting it from the
+    image found two more: the clear pass resets HILITE (not the uid, which
+    it leaves alone), and a vanished rider is removed from the vehicle's
+    list AND stepped past, so the next rider is skipped for that frame.
   - **Two wrong callees the call-target scan found** (2026-09-30): DestroyFlow
     simulated the departed player's acks against GetReSendMask (+0x18) where
     the image passes GetPlayerMask (+0x14); UpdateTrooperAction asked
