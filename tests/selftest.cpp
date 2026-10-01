@@ -213,6 +213,7 @@ extern "C" void __cdecl TrooperFireSend(void *, void *)
 extern "C" void __cdecl HudMessage(const char *, int32_t) { }
 extern "C" void __cdecl OverlayPrepare(int32_t, int32_t) { }
 extern "C" void __cdecl StartAudioStream(const char *, int32_t) { }
+extern "C" void __cdecl StopAudioStream(void) { }
 /* region.cpp's FindPath charges its search to the frame clock now that
  * 0x004395B0 is ours, and Ticks lives in win32/winmain.cpp -- a performance
  * counter and GetTickCount, neither of which this link can carry. Twelfth
