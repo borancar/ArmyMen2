@@ -218,7 +218,7 @@ static inline LRESULT OnPlayerDestroyed(WPARAM wParam)
 
     if (g_gameState == 1 || (g_gameState == 2 && g_subState == 0x22)) {
         /* Lobby: copy the name out before the record is recycled. */
-        char name[128];
+        char name[100];
 
         slot = ((AM2_Comm *)comm)->CommPlayerSlot(id);
         strcpy(name, PlayerName(comm, slot));
@@ -377,16 +377,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg) {
 
-    case WM_DESTROY:
-        ShutdownSubsystems();
-        PostQuitMessage(0);
-        break;
-
-    case WM_MOVE:
-    case WM_SIZE:
-        RemeasureScreenRect(hWnd);
-        break;
-
     case WM_ACTIVATE:
         /* Only the low half is the activation state. Losing activation is the
          * cue to release the display; gaining it needs nothing. */
@@ -397,24 +387,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         FlipToGDI();
         break;
 
+    case WM_MOVE:
+    case WM_SIZE:
+        RemeasureScreenRect(hWnd);
+        break;
+
+    case WM_DESTROY:
+        ShutdownSubsystems();
+        PostQuitMessage(0);
+        break;
+
     case WM_PAINT:
         if (!g_ddraw || !g_paintObject)
             break;
         return OnPaint();
-
-    case WM_ACTIVATEAPP:
-        /* The frame tick reads this global and does nothing while it is clear,
-         * so this is what stops the game simulating in the background. */
-        g_appActive = (int32_t)wParam;
-        if (!wParam)
-            break;
-        OnAppActivated();
-        break;
-
-    case WM_SETCURSOR:
-        /* The game draws its own pointer into the surface. */
-        SetCursor(NULL);
-        return 1;
 
     case WM_CHAR:
         /* PumpMessage records the last message it dispatched, so a WM_CHAR
@@ -427,16 +413,32 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                       (uint32_t)lParam >> 16);
         return 0;
 
+    case WM_SETCURSOR:
+        /* The game draws its own pointer into the surface. */
+        SetCursor(NULL);
+        return 1;
+
+    case WM_ACTIVATEAPP:
+        /* The frame tick reads this global and does nothing while it is clear,
+         * so this is what stops the game simulating in the background. */
+        g_appActive = (int32_t)wParam;
+        if (!wParam)
+            break;
+        OnAppActivated();
+        break;
+
     case WM_SYSCOMMAND:
         /* Swallow the screen saver outright; give the display back before
          * letting a monitor power-down through. */
-        if (wParam == SC_SCREENSAVE)
+        switch (wParam) {
+        case SC_SCREENSAVE:
             return 1;
-        if (wParam != SC_MONITORPOWER)
+        case SC_MONITORPOWER:
+            if (!g_ddraw)
+                break;
+            FlipToGDI();
             break;
-        if (!g_ddraw)
-            break;
-        FlipToGDI();
+        }
         break;
 
     case AM2_WM_STATE_ADVANCE:
@@ -460,11 +462,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     case AM2_WM_PLAYER_GONE:
         return OnPlayerDestroyed(wParam);
 
-    case AM2_WM_HOST_CHANGED:
-        return OnHostMigrated();
-
     case AM2_WM_SETUP_DONE:
         return OnSetupDone();
+
+    case AM2_WM_HOST_CHANGED:
+        return OnHostMigrated();
 
     case AM2_WM_STREAM_DONE:
         /* AudioTimerProc posts this when a stream runs out. Stop it and then
