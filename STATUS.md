@@ -301,7 +301,9 @@ main result so far (details in `src/vc6/README.md`):
     answered 0 and let the caller queue everything unordered -- and the
     NACK arm returned its node to the incoming list instead of the pool.
     Written out from the image (2026-10-01); still a near miss on register
-    allocation and one shared log call.
+    allocation and one shared log call. The lobby panel's constructor also
+    ends with MpPanelUpdate and scrolls the chat list to its last row, which
+    ours did not (same day, found the same way).
   - **Globals held in locals, found by counting**: a scan of each near
     miss for absolute loads the image makes more often than ours
     (`rereads.py` over the relink json) lists the functions that re-read a

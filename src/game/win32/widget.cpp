@@ -9662,8 +9662,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
          * what the update displays. */
         child = (AM2_Widget *)orig_operator_new(0x84);
         rows[i] = child
-                ? ::MpSpinConstruct(child, 0xF0, 37 + i * 32, 0x4C,
-                                  0x17 + (i == 3),
+                ? ::new (child) AM2_MpSpin(*RectSet(&r, 0xF0, 37 + i * 32, 0x4C, 0x17 + (i == 3)),
                                   ((const int32_t *)(uintptr_t)
                                        ADDR_ARMY_POINTS)[i],
                                   0, 0x1388, 0x64, w, MpCommitPoints,
@@ -9736,7 +9735,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         rows = rows ? RecordCtor(rows, 0) : (void *)0;
 
         child = (AM2_Widget *)orig_operator_new(0x98);
-        *slot = child ? ::ListBoxConstruct(child, 0x16, 0xC8, 0xFA, 0x5A,
+        *slot = child ? ::new (child) AM2_ListBox(*RectSet(&r, 0x16, 0xC8, 0xFA, 0x5A),
                                          rows, 0, 0, 1)
                       : 0;
         /* UNGUARDED, and that is the original: it stores the result -- null
@@ -9751,7 +9750,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
         child = (AM2_Widget *)orig_operator_new(0x78);
         if (child)
-            ::ArrowBarConstruct(child, 0x121, 0xC2, 0x13, 0x68, w,
+            ::new (child) AM2_ArrowBar(*RectSet(&r, 0x121, 0xC2, 0x13, 0x68), w,
                               (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                               (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                               0x40, 1);
@@ -9802,8 +9801,8 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x80);
 
         if (child)
-            ::EditConstruct(child, (char *)(p + 0xE4), 0x3C,
-                          0x17, 0x153, 0xF7, 0x10, 1,
+            ::new (child) AM2_Edit((char *)(p + 0xE4), 0x3C,
+                          *RectSet(&r, 0x17, 0x153, 0xF7, 0x10), 1,
                           *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR,
                           *(const uint8_t *)(uintptr_t)ADDR_COLOUR_BELOW_BG,
                           *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR,
@@ -9831,7 +9830,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
         /* ADDR_LOG as the callback is not a mistake: it is a bare `ret` in
          * this build, so the list is built with a do-nothing notifier. */
-        *slot = child ? ::TextListConstruct(child, 0x14, 0x17B, 0xFC, 0x43,
+        *slot = child ? ::new (child) AM2_TextList(*RectSet(&r, 0x14, 0x17B, 0xFC, 0x43),
                                           *(void **)(uintptr_t)
                                               ADDR_MENU_MSG_LIST,
                                           (int32_t)ADDR_LOG, 0)
@@ -9863,7 +9862,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             AM2_Widget *bar = (AM2_Widget *)orig_operator_new(0x78);
 
             if (bar)
-                bar = ::ArrowBarConstruct(bar, 0x121, 0x172, 0x13, 0x55, w,
+                bar = ::new (bar) AM2_ArrowBar(*RectSet(&r, 0x121, 0x172, 0x13, 0x55), w,
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                         0x2C, 1);
@@ -9879,6 +9878,29 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
 
                 *(int32_t *)(cb + 0x58) = *(const int32_t *)rows - 1;
             }
+
+            /* AND THE LAST ROW IS SCROLLED INTO VIEW, with the thumb put
+             * where that leaves it -- ArrowBarShowRow's arithmetic without
+             * its repaint, written out here. Without it a reopened lobby
+             * showed the OLDEST chat lines and a thumb at the top. */
+#define CB      ((uint8_t *)*slot)
+#define HOT     (*(int32_t *)(CB + 0x58))
+#define TOP     (*(int32_t *)(CB + LIST_OFF_TOP_ROW))
+#define VISIBLE (*(const int32_t *)(CB + LIST_OFF_VISIBLE))
+#define COUNT   (**(const int32_t *const *)(CB + LIST_OFF_ROWS))
+            if (HOT >= TOP + VISIBLE)
+                TOP = HOT - VISIBLE + 1;
+            *(int32_t *)((uint8_t *)bar + ARROWBAR_OFF_SHIFT) =
+                ThumbShift(TOP, COUNT - VISIBLE,
+                           *(const int32_t *)((uint8_t *)bar + ARROWBAR_OFF_SPAN)
+                           - (*(const AM2_Sprite *const *)((uint8_t *)bar
+                                                           + ARROWBAR_OFF_SPRITE0))
+                                 ->bounds.bottom);
+#undef CB
+#undef HOT
+#undef TOP
+#undef VISIBLE
+#undef COUNT
         }
     }
 
@@ -9948,7 +9970,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         }
 
         child = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_BYTES);
-        *slot = child ? ::ListBoxConstruct(child, 0x152, 0x35, 0x97, 0x42, rows,
+        *slot = child ? ::new (child) AM2_ListBox(*RectSet(&r, 0x152, 0x35, 0x97, 0x42), rows,
                                          (int32_t)(uintptr_t)OnMpGameType,
                                          0, 1)
                       : (AM2_Widget *)0;
@@ -9962,7 +9984,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             AM2_Widget *bar = (AM2_Widget *)orig_operator_new(0x78);
 
             if (bar)
-                bar = ::ArrowBarConstruct(bar, 0x1FA, 0x2E, 0x13, 0x50, w,
+                bar = ::new (bar) AM2_ArrowBar(*RectSet(&r, 0x1FA, 0x2E, 0x13, 0x50), w,
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                         0x2A, 1);
@@ -10028,7 +10050,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         }
 
         child = (AM2_Widget *)orig_operator_new(AM2_LISTBOX_BYTES);
-        *slot = child ? ::ListBoxConstruct(child, 0x154, 0xAD, 0xF6, 0x48, rows,
+        *slot = child ? ::new (child) AM2_ListBox(*RectSet(&r, 0x154, 0xAD, 0xF6, 0x48), rows,
                                          (int32_t)(uintptr_t)OnMpMapPick, 0, 1)
                       : (AM2_Widget *)0;
         ::WidgetAddChild(w, *slot);
@@ -10041,7 +10063,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
             AM2_Widget *bar = (AM2_Widget *)orig_operator_new(0x78);
 
             if (bar)
-                bar = ::ArrowBarConstruct(bar, 0x25B, 0xA6, 0x13, 0x57, w,
+                bar = ::new (bar) AM2_ArrowBar(*RectSet(&r, 0x25B, 0xA6, 0x13, 0x57), w,
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR0)),
                                         (const char *)((void *)(uintptr_t)(AM2_BMP_SCROLLBAR1)),
                                         0x2F, 1);
@@ -10060,7 +10082,7 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         AM2_Widget *child = (AM2_Widget *)orig_operator_new(0x84);
 
         if (child)
-            ::MpSpinConstruct(child, 0x22B, 0x2F, 0x4A, 0x18,
+            ::new (child) AM2_MpSpin(*RectSet(&r, 0x22B, 0x2F, 0x4A, 0x18),
                             *(const int32_t *)(uintptr_t)ADDR_SCORE_LIMIT,
                             0x64, 0x2706, 0x64, w,
                             MpCommitScore,
@@ -10170,6 +10192,8 @@ AM2_MpPanelScreen::AM2_MpPanelScreen(const char *bmp)
         ::WidgetAddChild(w, child);
     }
 
+    /* And the panel brings itself up to date once before its first frame. */
+    w->MpPanelUpdate();
 }
 
 /* 0x004316D0 -- the multiplayer panel's per-frame update, slot 2.
