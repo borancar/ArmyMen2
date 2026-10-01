@@ -1793,13 +1793,18 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
      * the packet rather than stopping. Signed here would quietly fix that, and
      * fixing it is not this port's job.
      *
-     * Shaped as the image lays it out: the length tested once on entry and
-     * again after each part, the zero-part test as the loop's own condition,
-     * and the zero complaint as the code after the loop -- the same walk as a
-     * `while (length)` with both refusals inside, but only this form puts the
-     * zero test at the bottom of the rotated loop. */
+     * Shaped as the image lays it out: an endless loop with three returns.
+     * VC6 copies the zero-part test to the loop's entry and bottom, and the
+     * length exits share the epilogue that follows the bogus complaint --
+     * a `while (part != 0)` with the zero complaint after the loop sends
+     * them to the zero complaint's epilogue instead. */
     if (*(const uint32_t *)(pkt + PACKET_OFF_LEN) > PACKET_HEADER_SIZE) {
-        while ((part = *(const uint16_t *)p) != 0) {
+        for (;;) {
+            part = *(const uint16_t *)p;
+            if (part == 0) {
+                am2_log("Received zero Length Message\n");
+                return;
+            }
             if ((int32_t)part >= total) {
                 am2_log("Received Bogus Length Message, part greater than sum\n");
                 return;
@@ -1814,7 +1819,6 @@ void __cdecl ReceivePacket(void *packet, int32_t dpid)
             if (*(const uint32_t *)(pkt + PACKET_OFF_LEN) <= PACKET_HEADER_SIZE)
                 return;
         }
-        am2_log("Received zero Length Message\n");
     }
 }
 
