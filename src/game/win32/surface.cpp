@@ -1028,7 +1028,6 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
                            uint8_t *dest, const uint8_t *remap)
 {
     uint8_t   table[256];
-    uint32_t  flags   = *(uint32_t *)(dest + BMP_OFF_FLAGS);
     /* The original keeps ONE register for this and reads it both ways round,
      * which is how the sense got transcribed wrong. `ebp` is
      * `(flags & 0x80) == 0`, and the branch that builds the table jumps PAST
@@ -1038,8 +1037,9 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
      *
      * Written from the flag rather than from the register, with the `?:` arms
      * swapped to keep that half identical. */
-    int32_t   plain   = !(flags & BMP_FLAG_RESERVE10);
-    int32_t   w, h, i;
+    int32_t   plain   = !(*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_RESERVE10);
+    int32_t   i;
+    int32_t   result = 0;   /* every exit returns it, the failures too */
 
     /* Copy the geometry across first; the original does this before anything
      * can fail, so the record is consistent even on the error paths. */
@@ -1071,21 +1071,23 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
         }
     }
 
-    w = (int32_t)*(uint32_t *)(dest + BMP_OFF_WIDTH);
-    h = (int32_t)*(uint32_t *)(dest + BMP_OFF_HEIGHT);
+    /* The geometry is read back from the record at each use. */
+#define W ((int32_t)*(uint32_t *)(dest + BMP_OFF_WIDTH))
+#define H ((int32_t)*(uint32_t *)(dest + BMP_OFF_HEIGHT))
 
-    if (flags & BMP_FLAG_SOFTWARE) {
-        int32_t result;
-
-        flags &= ~BMP_FLAG_SOFTWARE;
-        *(uint32_t *)(dest + BMP_OFF_FLAGS) = flags;
+    /* The flags are read from the record at every use. */
+    if (*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SOFTWARE) {
+        *(uint32_t *)(dest + BMP_OFF_FLAGS) &= ~BMP_FLAG_SOFTWARE;
         dest[BMP_OFF_KEY] = 0;
 
-        if (w * h < BMP_SOFTWARE_LIMIT) {
-            result = EncodeSmall(pixels, dest, w, h, remap);
-            *(uint32_t *)(dest + BMP_OFF_FLAGS) |= plain ? 8 : 0x10;
+        if (W * H < BMP_SOFTWARE_LIMIT) {
+            result = EncodeSmall(pixels, dest, W, H, remap);
+            if (!plain)
+                *(uint32_t *)(dest + BMP_OFF_FLAGS) |= 0x10;
+            else
+                *(uint32_t *)(dest + BMP_OFF_FLAGS) |= 8;
         } else {
-            result = EncodeBig(pixels, dest, w, h, remap);
+            result = EncodeBig(pixels, dest, W, H, remap);
             *(uint32_t *)(dest + BMP_OFF_FLAGS) |= 4;
         }
         return result;
@@ -1094,15 +1096,21 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
     {
         DDSURFACEDESC       ddsd;
         DDSCAPS             want;
-        DWORD               total = 0, freeVid = 0;
-        LPDIRECTDRAWSURFACE surf = NULL;
-        int32_t             copied;
+        DWORD               total, freeVid;
+        LPDIRECTDRAWSURFACE surf;
 
+        /* Only the fields asked for are written; the original does not clear
+         * the rest of the description. The native build clears it anyway so
+         * the platform layer never reads stack garbage. */
+#if !defined(_MSC_VER) || defined(__GNUC__)
         memset(&ddsd, 0, sizeof ddsd);
+        total = freeVid = 0;
+        surf = NULL;
+#endif
         ddsd.dwSize   = sizeof ddsd;
         ddsd.dwFlags  = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH;
-        ddsd.dwWidth  = (DWORD)w;
-        ddsd.dwHeight = (DWORD)h;
+        ddsd.dwWidth  = (DWORD)W;
+        ddsd.dwHeight = (DWORD)H;
         ddsd.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
         want.dwCaps = DDSCAPS_OFFSCREENPLAIN;
 
@@ -1110,40 +1118,41 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
          * so by failing. */
         if (!(*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SYSMEM)) {
             IDirectDraw2_GetAvailableVidMem(g_ddraw2obj, &want, &total, &freeVid);
-            if (freeVid < (DWORD)(w * h))
+            if (freeVid < (DWORD)(W * H))
                 *(uint32_t *)(dest + BMP_OFF_FLAGS) |= BMP_FLAG_SYSMEM;
         }
         if (*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SYSMEM)
             ddsd.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
 
+        /* One "CreateSurface failed" for both attempts; the retry in system
+         * memory is only worth making when video memory was what we asked
+         * for. */
         if (IDirectDraw2_CreateSurface(g_ddraw2obj, &ddsd, &surf, NULL) != DD_OK) {
-            if (*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SYSMEM) {
-                orig_log("CreateSurface failed in MakeBitmap()\n");
-                return 0;
+            if (!(*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_SYSMEM)) {
+                orig_log("Failed to put surface into video memory!\n");
+                *(uint32_t *)(dest + BMP_OFF_FLAGS) |= BMP_FLAG_SYSMEM;
+                ddsd.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
+                if (IDirectDraw2_CreateSurface(g_ddraw2obj, &ddsd, &surf, NULL)
+                        == DD_OK)
+                    goto made;
             }
-            /* Only worth saying when video memory was what we asked for. */
-            orig_log("Failed to put surface into video memory!\n");
-            *(uint32_t *)(dest + BMP_OFF_FLAGS) |= BMP_FLAG_SYSMEM;
-            ddsd.ddsCaps.dwCaps |= DDSCAPS_SYSTEMMEMORY;
-            if (IDirectDraw2_CreateSurface(g_ddraw2obj, &ddsd, &surf, NULL) != DD_OK) {
-                orig_log("CreateSurface failed in MakeBitmap()\n");
-                return 0;
-            }
+            orig_log("CreateSurface failed in MakeBitmap()\n");
+            return 0;
         }
-
+    made:
         IDirectDrawSurface_Restore(surf);
         if (IDirectDrawSurface_Lock(surf, NULL, &ddsd, DDLOCK_WAIT, NULL) != DD_OK) {
             IDirectDrawSurface_Release(surf);
-            orig_log("Error on Lock in DDCopyBitmap()");
-            return 0;
+            goto lockfail;
         }
 
-        copied = BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels, w, h,
-                                     remap, (uint32_t *)(dest + BMP_OFF_KEY));
-        if (!copied) {
+        result = BlitBitmapIn(ddsd.lpSurface, ddsd.lPitch, pixels, W, H,
+                              remap, (uint32_t *)(dest + BMP_OFF_KEY));
+        if (!result) {
             IDirectDrawSurface_Release(surf);
+        lockfail:
             orig_log("Error on Lock in DDCopyBitmap()");
-            return 0;
+            return result;
         }
 
         IDirectDrawSurface_Unlock(surf, ddsd.lpSurface);
@@ -1151,8 +1160,10 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
 
         if (!(*(uint32_t *)(dest + BMP_OFF_FLAGS) & BMP_FLAG_NO_COLORKEY))
             SetSurfaceColorKey(surf, dest[BMP_OFF_KEY]);
-        return copied;
+        return result;
     }
+#undef W
+#undef H
 }
 
 /* Show or dismiss the menu overlay -- 0x00425AF0.
