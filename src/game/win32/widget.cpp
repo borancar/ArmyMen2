@@ -2836,17 +2836,18 @@ static inline uint8_t *FollowFindLeader(void)
  * same as HudRepaintOne's call above. */
 static inline void HudShowPoints(void)
 {
-    AM2_Widget *panel = *(AM2_Widget *const *)(uintptr_t)ADDR_HUD_WIDGET_B;
+    /* The panel is read from its global at each use, as the image does. */
+#define PANEL (*(uint8_t *const *)(uintptr_t)ADDR_HUD_WIDGET_B)
     AM2_Widget *field;
 
-    am2_sprintf((char *)panel + HUDPANEL_OFF_POINTS_TEXT,
+    am2_sprintf((char *)PANEL + HUDPANEL_OFF_POINTS_TEXT,
                 "%i",
                 *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS);
 
-    field = *(AM2_Widget **)((uint8_t *)panel + HUDPANEL_OFF_POINTS_FIELD);
+    field = *(AM2_Widget **)(PANEL + HUDPANEL_OFF_POINTS_FIELD);
 
-    WidgetVPaint(field,
-                                                             field->rect);
+    WidgetVPaint(field, field->rect);
+#undef PANEL
 }
 
 
@@ -4750,20 +4751,86 @@ void __cdecl PlacementScreenClick(uint32_t at)
 {
     void   *obj;
     int32_t army;
-    int32_t type;
     int32_t ok;
+
+    /* The selected type, read from the build table at each use. */
+#define TYPE (*(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU)) \
+                                 + (uintptr_t)AM2_BUILD_MENU_STRIDE                    \
+                                       * (uintptr_t)*(const int32_t *)(uintptr_t)      \
+                                             ADDR_HUD_INDEX                            \
+                                 + BUILD_MENU_OFF_ID))
 
     /* The argument's own slot becomes the point -- see above. */
     ((int16_t *)&at)[0] =
-        (int16_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X
-                  + (int32_t)*(const uint32_t *)(uintptr_t)ADDR_CURSOR_POINT);
+        (int16_t)((int32_t)*(const uint32_t *)(uintptr_t)ADDR_CURSOR_POINT
+                  + *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X);
     ((int16_t *)&at)[1] =
-        (int16_t)(*(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
-                  + *(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2));
+        (int16_t)(*(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2)
+                  + *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
 
     obj = ObjectsHitByPoint(&at, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
 
-    if (!*(const int32_t *)(uintptr_t)ADDR_HUD_DIRTY) {
+    if (*(const int32_t *)(uintptr_t)ADDR_HUD_DIRTY) {
+        /* ---- buying ---- */
+        if (ActionKeyDown(AM2_ACTION_LEFT))
+            *(uint8_t *)(uintptr_t)ADDR_PLACE_FACING += AM2_PLACE_FACING_STEP;
+        else if (ActionKeyDown(AM2_ACTION_RIGHT))
+            *(uint8_t *)(uintptr_t)ADDR_PLACE_FACING -= AM2_PLACE_FACING_STEP;
+
+        TakeNumberKey();
+
+        army = AM2_THE_COMM->CommArmyOfSlot(
+                              (int32_t)*(const uint32_t *)(uintptr_t)
+                                  ADDR_DEFAULT_OWNER);
+
+        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON1
+            && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED1) {
+            HudRepaintOne();
+            return;
+        }
+
+        ok = PlacementAllowed(at, TYPE,
+                              (int32_t)*(const uint32_t *)(uintptr_t)
+                                  ADDR_DEFAULT_OWNER,
+                              *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS,
+                              *(const uint8_t *)(uintptr_t)ADDR_PLACE_FACING);
+
+        /* Two calls that differ in one argument; VC6 pushes the shared army
+         * once, above the branch. */
+        if (!ok) {
+            PlaceCursorPrepare(*(const int32_t *)(uintptr_t)ADDR_HUD_INDEX
+                                  + AM2_PLACE_CURSOR_ROW_BASE,
+                              0, *(const uint8_t *)(uintptr_t)ADDR_PLACE_FACING,
+                              army);
+            return;
+        }
+        PlaceCursorPrepare(*(const int32_t *)(uintptr_t)ADDR_HUD_INDEX
+                              + AM2_PLACE_CURSOR_ROW_BASE,
+                          1, *(const uint8_t *)(uintptr_t)ADDR_PLACE_FACING,
+                          army);
+
+        /* Down here the button must be UP -- see the note above. */
+        if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
+            return;
+        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
+            return;
+
+        orig_make_placed(at, TYPE,
+                         (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
+                         (int32_t *)(uintptr_t)ADDR_OUR_POINTS,
+                         *(const uint8_t *)(uintptr_t)ADDR_PLACE_FACING,
+                         *(const int32_t *)(uintptr_t)ADDR_NUMBER_KEY_SLOT,
+                         (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
+
+        HudShowPoints();
+
+        if (*(const int32_t *)(uintptr_t)ADDR_OUR_POINTS
+            < (int32_t)UnitTypeCost(TYPE))
+            HudRepaintOne();
+
+        if (!*(const int32_t *)(uintptr_t)ADDR_PLACE_FLAG_4FCF88)
+            HudRepaintOne();
+    } else {
         /* ---- selling ---- */
         if (!obj
             || !IsPlacedUnit(obj,
@@ -4786,68 +4853,8 @@ void __cdecl PlacementScreenClick(uint32_t at)
                          (int32_t *)(uintptr_t)ADDR_OUR_POINTS);
 
         HudShowPoints();
-        return;
     }
-
-    /* ---- buying ---- */
-    if (ActionKeyDown(AM2_ACTION_LEFT))
-        *(uint8_t *)(uintptr_t)ADDR_PLACE_FACING += AM2_PLACE_FACING_STEP;
-    else if (ActionKeyDown(AM2_ACTION_RIGHT))
-        *(uint8_t *)(uintptr_t)ADDR_PLACE_FACING -= AM2_PLACE_FACING_STEP;
-
-    TakeNumberKey();
-
-    army = AM2_THE_COMM->CommArmyOfSlot(
-                          (int32_t)*(const uint32_t *)(uintptr_t)
-                              ADDR_DEFAULT_OWNER);
-
-    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON1
-        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED1) {
-        HudRepaintOne();
-        return;
-    }
-
-    type = *(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_BUILD_MENU))
-                              + (uintptr_t)AM2_BUILD_MENU_STRIDE
-                                    * (uintptr_t)*(const int32_t *)(uintptr_t)
-                                          ADDR_HUD_INDEX
-                              + BUILD_MENU_OFF_ID);
-
-    ok = PlacementAllowed(at, type,
-                          (int32_t)*(const uint32_t *)(uintptr_t)
-                              ADDR_DEFAULT_OWNER,
-                          *(const int32_t *)(uintptr_t)ADDR_OUR_POINTS,
-                          *(const uint8_t *)(uintptr_t)ADDR_PLACE_FACING);
-
-    PlaceCursorPrepare(*(const int32_t *)(uintptr_t)ADDR_HUD_INDEX
-                          + AM2_PLACE_CURSOR_ROW_BASE,
-                      ok ? 1 : 0,
-                      *(const uint8_t *)(uintptr_t)ADDR_PLACE_FACING, army);
-
-    if (!ok)
-        return;
-
-    /* Down here the button must be UP -- see the note above. */
-    if (*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON)
-        return;
-    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED)
-        return;
-
-    orig_make_placed(at, type,
-                     (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER,
-                     (int32_t *)(uintptr_t)ADDR_OUR_POINTS,
-                     *(const uint8_t *)(uintptr_t)ADDR_PLACE_FACING,
-                     *(const int32_t *)(uintptr_t)ADDR_NUMBER_KEY_SLOT,
-                     (const char *)((void *)(uintptr_t)(ADDR_DIR_SCRATCH)));
-
-    HudShowPoints();
-
-    if (*(const int32_t *)(uintptr_t)ADDR_OUR_POINTS
-        < (int32_t)UnitTypeCost(type))
-        HudRepaintOne();
-
-    if (!*(const int32_t *)(uintptr_t)ADDR_PLACE_FLAG_4FCF88)
-        HudRepaintOne();
+#undef TYPE
 }
 
 /* 0x00413E70, 1,280 bytes, one caller: the per-frame mouse dispatch, and the

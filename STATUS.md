@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1450 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1451 of
   1645 byte-identical (2026-10-01), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1450:
+  the near-miss sweep, 758 before the row pools. From 758 to 1451:
   - **PollKeyboard's keyboard state is aggregated** (0x005127C8..
     0x00512FD0 in relinkos.py's AGGREGATE_RANGES): the loop re-reads the
     current buffer pointer every key and walks the deadline and pressed
@@ -295,7 +295,13 @@ main result so far (details in `src/vc6/README.md`):
     ADDR_MSG_LIST_POOL, the list itself, as a function. WndProc's
     mid-mission PLAYER_GONE destroys the departed player's flow BEFORE it
     may end the setup (it held CommPlayerLeft's answer across DestroyFlow);
-    ours ended the setup first.
+    ours ended the setup first. FlowRecvMessage (0x004014C0) was a third of
+    the image: the DATA arm never delivered in order, advanced
+    NEXT_EXPECTED, queued out-of-order messages or nacked a gap -- it
+    answered 0 and let the caller queue everything unordered -- and the
+    NACK arm returned its node to the incoming list instead of the pool.
+    Written out from the image (2026-10-01); still a near miss on register
+    allocation and one shared log call.
   - **Globals held in locals, found by counting**: a scan of each near
     miss for absolute loads the image makes more often than ours
     (`rereads.py` over the relink json) lists the functions that re-read a
