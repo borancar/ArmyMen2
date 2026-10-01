@@ -7687,10 +7687,8 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
     AM2_Widget *button  = (AM2_Widget *)(self + HUDLOG_OFF_BUTTON_SPRITE);
     AM2_Widget *grab    = *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB;
     float      *scroll  = (float *)(self + HUDLOG_OFF_SCROLL);
-    float       step    = *(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC
-                          * AM2_HUD_SCROLL_PPS;
     RECT        hot;
-    int32_t     i, n;
+    int32_t     i;
     float       acc;
 
     /* The frame after a press on the button was released. */
@@ -7702,97 +7700,87 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
 
     ::WidgetUpdate(w);
 
-    if (*(const int32_t *)(self + HUDLOG_OFF_TYPING)) {
-        if (PointInRect((const AM2_Rect *)&w->rect,
-                        (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
-            *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
-        else
-            w->focusedChild = NULL;
-
-        /* A RELEASE anywhere sends the line. The typing test below is the
-         * original's and is already known true. */
-        if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
-            && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
-            && *(const int32_t *)(self + HUDLOG_OFF_TYPING))
-            ::HudChatSend(w);
-        return;
-    }
-
-    if (*(const int32_t *)(self + HUDLOG_OFF_JUST_SENT)) {
-        *(int32_t *)(self + HUDLOG_OFF_JUST_SENT) = 0;
-    } else if (ActionKeyPressed(AM2_ACTION_CONSOLE)) {
-        PlaySoundAt(0, 0, 0, 0, 0);
-        g_charHandler = HudChatChar;   /* ours now, not the image */
-        *(int32_t *)(self + HUDLOG_OFF_TYPING) = 1;
-    } else {
-        if (*(const int32_t *)(self + HUDLOG_OFF_BLIPS) > 0
-            && Ticks() > *(const uint32_t *)(self + HUDLOG_OFF_BLIP_AT)) {
-            uint32_t jitter;
-
+    if (!*(const int32_t *)(self + HUDLOG_OFF_TYPING)) {
+        /* The typing case below is laid out last in the image. */
+        if (*(const int32_t *)(self + HUDLOG_OFF_JUST_SENT)) {
+            *(int32_t *)(self + HUDLOG_OFF_JUST_SENT) = 0;
+        } else if (ActionKeyPressed(AM2_ACTION_CONSOLE)) {
             PlaySoundAt(0, 0, 0, 0, 0);
-            /* rand first, then the clock: the original's order, and the LCG
-             * state is the image's, so the sequence is shared. */
-            jitter = (uint32_t)orig_rand() & AM2_HUD_BLIP_JITTER;
-            *(uint32_t *)(self + HUDLOG_OFF_BLIP_AT) =
-                jitter + Ticks() + AM2_HUD_BLIP_MS;
-            *(int32_t *)(self + HUDLOG_OFF_BLIPS) -= 1;
+            g_charHandler = HudChatChar;   /* ours now, not the image */
+            *(int32_t *)(self + HUDLOG_OFF_TYPING) = 1;
+        } else {
+            if (*(const int32_t *)(self + HUDLOG_OFF_BLIPS) > 0
+                && Ticks() > *(const uint32_t *)(self + HUDLOG_OFF_BLIP_AT)) {
+                uint32_t jitter;
+
+                PlaySoundAt(0, 0, 0, 0, 0);
+                /* rand first, then the clock: the original's order, and the LCG
+                 * state is the image's, so the sequence is shared. */
+                jitter = (uint32_t)orig_rand() & AM2_HUD_BLIP_JITTER;
+                *(uint32_t *)(self + HUDLOG_OFF_BLIP_AT) =
+                    jitter + Ticks() + AM2_HUD_BLIP_MS;
+                *(int32_t *)(self + HUDLOG_OFF_BLIPS) -= 1;
+            }
+
+            /* The step and the row count are recomputed at every use. */
+#define STEP (*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC * AM2_HUD_SCROLL_PPS)
+#define COUNT (*(const int32_t *)(self + HUDLOG_OFF_COUNT))
+            acc = 0.0f;
+            for (i = 0; i < COUNT; i++) {
+                uint8_t *row = self + HUDLOG_OFF_ROWS + i * AM2_HUD_MSG_SIZE;
+                float   *x   = (float *)(row + HUDMSG_OFF_X);
+
+                if (*x > acc) {
+                    *x -= STEP;
+                    if (*x < acc)
+                        *x = acc;
+                }
+                acc += (float)(*(const int32_t *)(row + HUDMSG_OFF_WIDTH)
+                               + AM2_HUD_MSG_GAP);
+            }
+
+            if (*(const uint32_t *)(self + HUDLOG_OFF_REWIND_AT) > 0) {
+                if (Ticks() > *(const uint32_t *)(self + HUDLOG_OFF_REWIND_AT))
+                    *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) = 0;
+
+                *scroll -= STEP;
+                if (*scroll < 0.0f)
+                    *scroll = 0.0f;
+            } else if (acc > (float)*(const int32_t *)(self + HUDLOG_OFF_VIEW_W)) {
+                float target = (float)*(const int32_t *)(self + HUDLOG_OFF_VIEW_W);
+                float first;
+
+                for (i = COUNT - 1; i >= 0; i--) {
+                    int32_t width = *(const int32_t *)
+                        (self + HUDLOG_OFF_ROWS + i * AM2_HUD_MSG_SIZE
+                         + HUDMSG_OFF_WIDTH);
+
+                    if (target - (float)width < 0.0)
+                        break;
+                    target -= (float)(width + AM2_HUD_MSG_GAP);
+                }
+                if (++i < 0)
+                    i = 0;
+
+                first = *(const float *)(self + HUDLOG_OFF_ROWS
+                                         + i * AM2_HUD_MSG_SIZE + HUDMSG_OFF_X);
+                if (*scroll > first) {
+                    float v = *scroll - STEP;
+                    *scroll = first > v ? first : v;
+                } else if (*scroll < first) {
+                    float v = *scroll + STEP;
+                    *scroll = first < v ? first : v;
+                }
+            }
         }
 
-        acc = 0.0f;
-        n   = *(const int32_t *)(self + HUDLOG_OFF_COUNT);
-        for (i = 0; i < n; i++) {
-            uint8_t *row = self + HUDLOG_OFF_ROWS + i * AM2_HUD_MSG_SIZE;
-            float   *x   = (float *)(row + HUDMSG_OFF_X);
-
-            if (*x > acc) {
-                *x -= step;
-                if (*x < acc)
-                    *x = acc;
-            }
-            acc += (float)(*(const int32_t *)(row + HUDMSG_OFF_WIDTH)
-                           + AM2_HUD_MSG_GAP);
-        }
-
-        if (*(const uint32_t *)(self + HUDLOG_OFF_REWIND_AT) > 0) {
-            if (Ticks() > *(const uint32_t *)(self + HUDLOG_OFF_REWIND_AT))
-                *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) = 0;
-
-            *scroll -= step;
-            if (*scroll < 0.0f)
-                *scroll = 0.0f;
-        } else if (acc > (float)*(const int32_t *)(self + HUDLOG_OFF_VIEW_W)) {
-            float target = (float)*(const int32_t *)(self + HUDLOG_OFF_VIEW_W);
-            float first;
-
-            for (i = n - 1; i >= 0; i--) {
-                int32_t width = *(const int32_t *)
-                    (self + HUDLOG_OFF_ROWS + i * AM2_HUD_MSG_SIZE
-                     + HUDMSG_OFF_WIDTH);
-
-                if (target - (float)width < 0.0)
-                    break;
-                target -= (float)(width + AM2_HUD_MSG_GAP);
-            }
-            if (++i < 0)
-                i = 0;
-
-            first = *(const float *)(self + HUDLOG_OFF_ROWS
-                                     + i * AM2_HUD_MSG_SIZE + HUDMSG_OFF_X);
-            if (*scroll > first) {
-                float v = *scroll - step;
-                *scroll = first > v ? first : v;
-            } else if (*scroll < first) {
-                float v = *scroll + step;
-                *scroll = first < v ? first : v;
-            }
-        }
-    }
-
+#undef STEP
+#undef COUNT
     *(AM2_Sprite **)(self + HUDLOG_OFF_BUTTON_SPRITE) = NULL;
 
-    if (!PointInRect((const AM2_Rect *)&w->rect,
-                     (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)) {
-        w->focusedChild = NULL;
+        if (!PointInRect((const AM2_Rect *)&w->rect,
+                         (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)) {
+            w->focusedChild = NULL;
         return;
     }
 
@@ -7836,6 +7824,21 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
     *(uint32_t *)(self + HUDLOG_OFF_REWIND_AT) = Ticks() + AM2_HUD_REWIND_TAP_MS;
     *(AM2_Sprite **)(self + HUDLOG_OFF_BUTTON_SPRITE) =
         *(AM2_Sprite **)(self + HUDLOG_OFF_SPRITE_DOWN);
+        return;
+    }
+
+    if (PointInRect((const AM2_Rect *)&w->rect,
+                    (const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT))
+        *(AM2_Widget **)(uintptr_t)ADDR_MOUSE_GRAB = w;
+    else
+        w->focusedChild = NULL;
+
+    /* A RELEASE anywhere sends the line. The typing test below is the
+     * original's and is already known true. */
+    if (!*(const int32_t *)(uintptr_t)ADDR_MOUSE_BUTTON
+        && *(const int32_t *)(uintptr_t)ADDR_MOUSE_CHANGED
+        && *(const int32_t *)(self + HUDLOG_OFF_TYPING))
+        ::HudChatSend(w);
 }
 
 /* 0x004194E0. The panel's painter: the base, then at most one tooltip.
