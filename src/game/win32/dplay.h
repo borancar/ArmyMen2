@@ -36,12 +36,13 @@ void __cdecl DumpMsgList(void *list);
  * success, 0 on any failure. A null connection is not an error: it creates the
  * object and stops there, which is what enumerating providers wants. */
 
-/* Original: 0x0040DDD0. Create the IDirectPlayLobby3A. stdcall, one argument.
+/* Original: 0x0040DDD0, AM2_Comm::CreateDirectPlayLobby (msgslot.h). Create
+ * the IDirectPlayLobby3A. A thiscall member that never reads `this`: its one
+ * caller loads ecx before the call, and the body only ever uses its argument.
  *
  * Writes the interface through the pointer whether or not it succeeded -- the
  * local it uses is zeroed first, so a failure stores NULL rather than leaving
  * the caller's pointer untouched. Returns 1 on success. */
-int32_t __stdcall CreateDirectPlayLobby(LPDIRECTPLAYLOBBY3A *out);
 
 /* Original: 0x004020A0. Shut the comm subsystem down: destroy the four
  * mutex-guarded message lists, signal the packet thread's event, collect its
@@ -185,10 +186,11 @@ void __cdecl EventClose(void *holder);
  * anything, with the comm object already in ecx from the field it just read. */
 
 /* 0x0040F130 and 0x0040FB70, one caller each and both named in orig.h before
- * they were written. The first sets the lobby flag at comm+0x404; the second
- * is a thiscall that tail-calls CommSendLobbyProperty with 1, which is the
- * value that says the session is over. */
-void __cdecl CommMarkLobbied(void);
+ * they were written. The first sets the lobby flag at comm+0x404 -- an
+ * AM2_Comm member (msgslot.h) whose caller loads ecx, though the body goes
+ * through the global; the second is a thiscall that tail-calls
+ * CommSendLobbyProperty with 1, which is the value that says the session is
+ * over. */
 
 /* 0x0040F380, thiscall. Clears the four 30-sample traffic rings and the six
  * bandwidth counters, and restarts the window they are measured over. The two

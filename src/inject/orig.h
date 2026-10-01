@@ -2988,7 +2988,7 @@
 #define ADDR_COMM_EVENT          0x0048D8F8u  /* HANDLE, signalled to stop the thread */
 #define ADDR_COMM_EVENT_2        0x0048D8FCu  /* HANDLE */
 #define ADDR_PACKET_THREAD       0x004F48D8u  /* HANDLE */
-#define ADDR_CREATE_LOBBY        0x0040DDD0u  /* int32 __stdcall(LPDIRECTPLAYLOBBY3A *) */
+#define ADDR_CREATE_LOBBY        0x0040DDD0u  /* int32 thiscall(comm, LPDIRECTPLAYLOBBY3A *) */
 #define ADDR_CLSID_DIRECTPLAY    0x0046F6D8u  /* CLSID_DirectPlay */
 #define ADDR_IID_DIRECTPLAY4A    0x0046F6C8u  /* IID_IDirectPlay4A */
 #define ADDR_CLSID_DPLAY_LOBBY   0x0046F778u  /* CLSID_DirectPlayLobby */

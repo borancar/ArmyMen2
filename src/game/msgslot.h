@@ -516,6 +516,9 @@ struct AM2_Comm {
     int32_t __attribute__((thiscall)) ArmyInPlay(uint32_t uid);
     void * __attribute__((thiscall)) CommConstruct();
     int32_t __attribute__((thiscall)) CommCreateDirectPlay(void *connection);
+    /* `this` is never read; the caller passes it all the same. */
+    int32_t __attribute__((thiscall)) CreateDirectPlayLobby(void *out);
+    void __attribute__((thiscall)) CommMarkLobbied();
     void __attribute__((thiscall)) CommDestruct();
     int32_t __attribute__((thiscall)) CommDropDirectPlay();
     int32_t __attribute__((thiscall)) CommDropSession();

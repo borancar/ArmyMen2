@@ -125,9 +125,9 @@ FUNCS = [
      "opens `push ecx` to allocate the DWORD that GetExitCodeThread fills in; "
      "ecx on entry is never read, so cdecl -- the third instance of this idiom"),
     (0x0040DD20, "CommCreateDirectPlay", "thiscall"),
-    (0x0040DDD0, "CreateDirectPlayLobby", "stdcall",
-     "opens `push ecx` to allocate one local, then overwrites the slot with 0 "
-     "before anything reads it -- ecx on entry is dead, so stdcall"),
+    (0x0040DDD0, "CreateDirectPlayLobby", "thiscall",
+     "opens `push ecx` to allocate one local and never reads `this`, but its "
+     "one caller loads ecx first (0x0040ED42): an AM2_Comm member"),
     (0x0041C710, "BlitGlyph",          "fastcall"),
     (0x0041C2B0, "BlitCopy16",         "fastcall"),
     (0x0041C1C0, "BlitCopy32",         "fastcall"),

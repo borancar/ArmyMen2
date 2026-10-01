@@ -1,7 +1,7 @@
 /* DirectPlay object creation -- reconstructed from ArmyMen2.exe.
  *
  *   CommCreateDirectPlay    0x0040DD20  1 call site, thiscall
- *   CreateDirectPlayLobby   0x0040DDD0  1 call site, stdcall
+ *   CreateDirectPlayLobby   0x0040DDD0  1 call site, thiscall
  *
  * These are the only two CoCreateInstance sites in the game and, between them,
  * its entire outward network surface. See dplay.h for why that surface is two
@@ -125,9 +125,10 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommCreateDirectPlay(void *connectio
     return hr == S_OK;
 }
 
-int32_t __stdcall CreateDirectPlayLobby(LPDIRECTPLAYLOBBY3A *out)
+int32_t __attribute__((thiscall)) AM2_Comm::CreateDirectPlayLobby(void *outv)
 {
-    LPDIRECTPLAYLOBBY3A lobby = NULL;
+    LPDIRECTPLAYLOBBY3A *out   = (LPDIRECTPLAYLOBBY3A *)outv;
+    LPDIRECTPLAYLOBBY3A  lobby = NULL;
     HRESULT             hr;
 
     hr = CoCreateInstance(kCLSID_DirectPlayLobby, NULL, CLSCTX_INPROC_SERVER,
@@ -1323,14 +1324,16 @@ typedef void (__cdecl *am2_lobby_void_fn)(void);
 static inline void LobbyGiveUp(uint8_t *self)
 {
     LPDIRECTPLAYLOBBY3A *lobby = (LPDIRECTPLAYLOBBY3A *)(self + COMM_OFF_LOBBY);
+    void                *buf;
 
-    if (*lobby) {
-        IDirectPlayLobby_Release(*lobby);
-        *lobby = NULL;
-        if (comm_u32(self, COMM_OFF_LOBBY_BUF)) {
-            orig_free(*(void **)(self + COMM_OFF_LOBBY_BUF));
-            comm_u32(self, COMM_OFF_LOBBY_BUF) = 0;
-        }
+    /* The caller has already tested *lobby; this does not test it again. */
+
+    IDirectPlayLobby_Release(*lobby);
+    buf = *(void **)(self + COMM_OFF_LOBBY_BUF);
+    *lobby = NULL;
+    if (buf) {
+        orig_free(buf);
+        *(void **)(self + COMM_OFF_LOBBY_BUF) = (void *)0;
     }
 }
 
@@ -1342,8 +1345,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommLobbyStart()
     LPDIRECTPLAYLOBBY3A *lobby;
     uint8_t             *shared;
     LPDPLCONNECTION      conn;
-    LPDPSESSIONDESC2     sd;
-    LPDIRECTPLAY2A       dp2 = NULL;
+    LPDIRECTPLAY2A       dp2;          /* Connect writes it; never zeroed */
     DPCAPS               caps;
     DWORD                size = LOBBY_CONN_BUF_SIZE;
     HRESULT              hr;
@@ -1356,7 +1358,7 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommLobbyStart()
     /* Answers 0 or 1, never negative, so this test can only ever pass -- the
      * original's, kept. */
     lobby = (LPDIRECTPLAYLOBBY3A *)(self + COMM_OFF_LOBBY);
-    if (CreateDirectPlayLobby(lobby) < 0) {
+    if (((AM2_Comm *)self)->CreateDirectPlayLobby(lobby) < 0) {
         *lobby = NULL;
         return 0;
     }
@@ -1393,23 +1395,25 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommLobbyStart()
 
     /* Disabled in this build; the refusal below cannot run. */
     if (!RequireGameCD()) {
-        LobbyGiveUp(self);
+        if (*lobby)
+            LobbyGiveUp(self);
         return 0;
     }
 
-    /* The launcher chose the transport; the game chooses the rest. */
-    conn = *(LPDPLCONNECTION *)(self + COMM_OFF_LOBBY_BUF);
-    sd = conn->lpSessionDesc;
-    sd->dwUser1      = 1;
-    sd->dwUser2      = 2;
-    sd->dwUser3      = 3;
-    sd->dwUser4      = 4;
-    sd->dwFlags      = DPSESSION_MIGRATEHOST;
-    sd->dwMaxPlayers = AM2_MAX_PLAYERS;
+    /* The launcher chose the transport; the game chooses the rest. The
+     * buffer is re-read from the comm object for every field. */
+#define SD ((*(LPDPLCONNECTION *)(self + COMM_OFF_LOBBY_BUF))->lpSessionDesc)
+    SD->dwUser1      = 1;
+    SD->dwUser2      = 2;
+    SD->dwUser3      = 3;
+    SD->dwUser4      = 4;
+    SD->dwFlags      = DPSESSION_MIGRATEHOST;
+    SD->dwMaxPlayers = AM2_MAX_PLAYERS;
+#undef SD
 
     if (IDirectPlayLobby_SetConnectionSettings(
             *(LPDIRECTPLAYLOBBY3A *)(g_commObject + COMM_OFF_LOBBY),
-            0, 0, conn) < 0)
+            0, 0, *(LPDPLCONNECTION *)(self + COMM_OFF_LOBBY_BUF)) < 0)
         return 0;
 
     orig_log("Lobby start: about to call m_pLobby->Connect\n");
@@ -1429,11 +1433,10 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommLobbyStart()
             return 0;
     }
 
-    shared = g_commObject;
-    comm_u32(shared, 0x3E0) = 0;
+    comm_u32(g_commObject, 0x3E0) = 0;
     caps.dwSize = sizeof caps;
-    IDirectPlayX_GetCaps(*DirectPlaySlot(shared), &caps, 0);
-    comm_u32(shared, COMM_OFF_IS_HOST) = (caps.dwFlags >> 1) & 1;
+    IDirectPlayX_GetCaps(*DirectPlaySlot(g_commObject), &caps, 0);
+    comm_u32(g_commObject, COMM_OFF_IS_HOST) = (caps.dwFlags >> 1) & 1;
 
     conn = *(LPDPLCONNECTION *)(self + COMM_OFF_LOBBY_BUF);
     playerName = conn->lpPlayerName->lpszShortNameA;
@@ -1449,13 +1452,15 @@ int32_t __attribute__((thiscall)) AM2_Comm::CommLobbyStart()
     if (::CommCreatePlayer(g_commObject, playerName, NULL, NULL, 0) < 0)
         return 0;
 
-    orig_log((const char *)(uintptr_t)
-             (comm_u32(g_commObject, COMM_OFF_IS_HOST)
-              ? ADDR_STR_LOBBY_AS_HOST : ADDR_STR_LOBBY_AS_SLAVE),
-             comm_u32(g_commObject, COMM_OFF_OUR_PLAYER_ID));
+    if (comm_u32(g_commObject, COMM_OFF_IS_HOST))
+        orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_AS_HOST,
+                 comm_u32(g_commObject, COMM_OFF_OUR_PLAYER_ID));
+    else
+        orig_log((const char *)(uintptr_t)ADDR_STR_LOBBY_AS_SLAVE,
+                 comm_u32(g_commObject, COMM_OFF_OUR_PLAYER_ID));
 
     comm_u32(g_commObject, COMM_OFF_LOBBIED) = 1;
-    CommMarkLobbied();
+    ((AM2_Comm *)g_commObject)->CommMarkLobbied();
 
     if (!comm_u32(g_commObject, COMM_OFF_IS_HOST)) {
         OnLobbySlave();
@@ -2142,7 +2147,7 @@ void __cdecl SendGameStartMsg(void)
  * offset's name is the one already used elsewhere in the tree, so it is the
  * one used here -- adding a third would be the mistake checkglobals exists to
  * stop. */
-void __cdecl CommMarkLobbied(void)
+void __attribute__((thiscall)) AM2_Comm::CommMarkLobbied()
 {
     *(int32_t *)(g_commObject + COMM_OFF_MSGS_ENABLED) = 1;
 }
@@ -3938,7 +3943,8 @@ int dplay_install(void)
                         "CommSystemMessage", 1);
     rc |= patch_replace(ADDR_COMM_CREATE_DPLAY, pmf_addr(&AM2_Comm::CommCreateDirectPlay),
                         "CommCreateDirectPlay", 1);
-    rc |= patch_replace(ADDR_CREATE_LOBBY, (const void *)CreateDirectPlayLobby,
+    rc |= patch_replace(ADDR_CREATE_LOBBY,
+                        pmf_addr(&AM2_Comm::CreateDirectPlayLobby),
                         "CreateDirectPlayLobby", 1);
     rc |= patch_replace(ADDR_COMM_SHUTDOWN, (const void *)CommShutdown,
                         "CommShutdown", 0);
@@ -4038,7 +4044,8 @@ int dplay_install(void)
                         "CommPlayerSlot", 2);
     rc |= patch_replace(ADDR_COMM_DROP_SESSION, pmf_addr(&AM2_Comm::CommDropSession),
                         "CommDropSession", 1);
-    rc |= patch_replace(ADDR_COMM_MARK_LOBBIED, (const void *)CommMarkLobbied,
+    rc |= patch_replace(ADDR_COMM_MARK_LOBBIED,
+                        pmf_addr(&AM2_Comm::CommMarkLobbied),
                         "CommMarkLobbied", 0);
     rc |= patch_replace(ADDR_COMM_SESSION_OVER, pmf_addr(&AM2_Comm::CommSessionOver),
                         "CommSessionOver", 1);
