@@ -10342,7 +10342,9 @@ typedef int32_t (__cdecl *AM2_Step3RandFn)(void);
  * it reads arg2, which the early `je` into that same address settles: at
  * that jump esp is untouched, so [esp+0x34] is unambiguously E+8.
  *
- * TWO CALLS ARE DELIBERATELY NOT REPRODUCED, for opposite reasons.
+ * TWO CALLS WERE LONG LEFT OUT and are now in, for byte-matching: the log
+ * under _MSC_VER only, the AngleBetween in both aimed arms. What follows is
+ * why each was safe to omit.
  *
  * The first is the pickup refusal at 0x0045D3E8, which calls 0x0045CAA0 with
  * two arguments and NO format string. That address is a bare `ret` in this
@@ -10574,8 +10576,6 @@ void __cdecl Step3Drive(void *obj, void *rec)
             if (weapon != 0) {
                 uint8_t     *aimed;
                 AM2_FireSpot spot;
-                void        *fireTarget;
-                int32_t      heading;
                 int32_t      height;
 
                 *(uint32_t *)(weapon + 0xC4u) =
@@ -10589,36 +10589,42 @@ void __cdecl Step3Drive(void *obj, void *rec)
                     *(uint8_t *)(o + 0x529u) = (uint8_t)orig_step3_rand();
                 }
 
+                /* FireWeapon is called in each arm, its heading an argument
+                 * expression; VC6 shares the calls' common tail. */
                 aimed = (uint8_t *)LookupByUID(*(const uint32_t *)(r + 0x20u));
                 if (aimed != 0) {
                     /* Firing at an OBJECT: the spot is its position and its
                      * ground height, and the heading gets a +/-2 spread. */
                     *(uint32_t *)&spot.at = *(const uint32_t *)(aimed + 0x12u);
                     spot.ground = *(const int16_t *)(aimed + 0x42u);
-                    fireTarget = aimed;
-                    heading = (uint8_t)(*(const uint8_t *)(o + 0x530u)
-                                        + (orig_step3_rand() % 5) - 2);
+                    /* Asked and discarded, in both aimed arms. */
+                    (void)AngleBetween((const AM2_Point *)(o + 0x12u),
+                                       (const AM2_Point *)(aimed + 0x12u));
+                    FireWeapon(weapon, o, height,
+                               (uint8_t)(*(const uint8_t *)(o + 0x530u)
+                                         + (orig_step3_rand() % 5) - 2),
+                               spot, aimed);
                 } else if (*(const uint16_t *)(r + 0x18u) != 0) {
                     /* Firing at a POINT: same spread, no target object. */
+                    (void)AngleBetween((const AM2_Point *)(o + 0x12u),
+                                       (const AM2_Point *)(r + 0x18u));
                     *(uint32_t *)&spot.at = *(const uint32_t *)(r + 0x18u);
                     spot.ground = *(const int16_t *)(r + 0x1Cu);
-                    fireTarget = 0;
-                    heading = (uint8_t)(*(const uint8_t *)(o + 0x530u)
-                                        + (orig_step3_rand() % 5) - 2);
+                    FireWeapon(weapon, o, height,
+                               (uint8_t)(*(const uint8_t *)(o + 0x530u)
+                                         + (orig_step3_rand() % 5) - 2),
+                               spot, 0);
                 } else {
                     /* Firing straight ahead: no spread at all, and the
                      * heading is the gun facing scaled to the animation's
                      * direction count rather than a raw byte. */
-                    uint32_t dirs =
-                        *(const uint8_t *)(*(uint8_t *const *)animRec + 8);
-
                     *(uint32_t *)&spot.at = *(const uint32_t *)(r + 0x18u);
                     spot.ground = *(const int16_t *)(r + 0x1Cu);
-                    heading = (uint8_t)(gunFacing << (8 - dirs));
-                    fireTarget = 0;
+                    FireWeapon(weapon, o, height,
+                               (uint8_t)(gunFacing
+                                         << (8 - *(const uint8_t *)(*(uint8_t *const *)animRec + 8))),
+                               spot, 0);
                 }
-
-                FireWeapon(weapon, o, height, heading, spot, fireTarget);
 
                 if (AM2_THE_COMM->CommMustBroadcast(
                                       (int16_t)*(const int8_t *)(o + 0x10u)))
@@ -10735,21 +10741,28 @@ void __cdecl Step3Drive(void *obj, void *rec)
                 *(uint32_t *)(p + 0xC8u) =
                     *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS + 0x7D0u;
 
-                if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0) {
-                    /* The comm object is read afresh at each use. */
+                /* The comm object is read afresh at each use. */
 #define comm (*(void **)(uintptr_t)ADDR_COMM_OBJECT)
 
-                    /* Two broadcast questions, not one: the first refuses
-                     * outright when the host flag at +0x3D8 is set AND we
-                     * would broadcast, and only the second decides whether
-                     * a WANT is actually sent. */
-                    if (!(*(const int32_t *)((uint8_t *)comm + 0x3D8u) != 0
-                          && ((AM2_Comm *)comm)->CommMustBroadcast((int16_t)*(const int8_t *)(o + 0x10u)))
-                        && ((AM2_Comm *)comm)->CommMustBroadcast((int16_t)*(const int8_t *)(o + 0x10u))
+                /* Two broadcast questions, not one: the first refuses
+                 * outright when the host flag at +0x3D8 is set AND we would
+                 * broadcast, and only the second decides whether a WANT is
+                 * actually sent. */
+                if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION != 0
+                    && !(*(const int32_t *)((uint8_t *)comm + 0x3D8u) != 0
+                         && ((AM2_Comm *)comm)->CommMustBroadcast((int16_t)*(const int8_t *)(o + 0x10u)))) {
+                    if (((AM2_Comm *)comm)->CommMustBroadcast((int16_t)*(const int8_t *)(o + 0x10u))
                         && *(const int32_t *)((uint8_t *)comm + 0x3D8u) == 0)
                         SendVehicleWantItem(o, p, 0, 0, 0);
-#undef comm
+                } else {
+                    /* The refusal's log, two arguments and no format, to the
+                     * bare `ret` at ADDR_LOG. Emitted only under VC6, where
+                     * that address really is the `ret`; see the header. */
+#ifdef _MSC_VER
+                    ((void (__cdecl *)(void *, void *))(uintptr_t)ADDR_LOG)(o, p);
+#endif
                 }
+#undef comm
             }
 
             /* A repair pad under the vehicle heals it, at most every 500 ms. */
