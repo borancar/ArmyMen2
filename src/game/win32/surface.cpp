@@ -786,8 +786,8 @@ void *__cdecl ReadDibChunk(am2_FILE *fp, void *header)
 {
     BITMAPFILEHEADER  fh;
     BITMAPINFO       *bi   = (BITMAPINFO *)header;
-    int32_t           base = (int32_t)orig_ftell(fp);
-    int32_t           size;
+    /* One local for the file offset and then the pixel size. */
+    int32_t           size = (int32_t)orig_ftell(fp);
     void             *pixels;
 
     orig_fread(&fh, 1, sizeof(fh), fp);
@@ -802,7 +802,7 @@ void *__cdecl ReadDibChunk(am2_FILE *fp, void *header)
         bi->bmiHeader.biClrUsed = 1u << bi->bmiHeader.biBitCount;
 
     orig_fread(bi->bmiColors, 1, bi->bmiHeader.biClrUsed * 4, fp);
-    orig_fseek(fp, base + (int32_t)fh.bfOffBits, SEEK_SET);
+    orig_fseek(fp, size + (int32_t)fh.bfOffBits, SEEK_SET);
 
     size = (int32_t)bi->bmiHeader.biSizeImage;
     if (!size) {
@@ -816,12 +816,10 @@ void *__cdecl ReadDibChunk(am2_FILE *fp, void *header)
     }
 
     pixels = orig_malloc((size_t)size);
-    if (!pixels) {
+    if (!pixels)
         orig_log("malloc failed in ReadBitmap()\n");
-        return (void *)0;
-    }
-
-    orig_fread(pixels, 1, (size_t)size, fp);
+    else
+        orig_fread(pixels, 1, (size_t)size, fp);
     return pixels;
 }
 
