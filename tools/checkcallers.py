@@ -59,14 +59,11 @@ ALLOWED = {
 # the gate is green on what is known and RED on anything new -- the ratchet
 # checkglobals.py uses, and for the same reason. This set may only go down.
 #
-# MsgSlotB1 and MsgSlotB2 are the tell that this is a missing dispatch arm
-# rather than a dead function: MsgSlotB0 and MsgSlotA2 sit beside them, share
-# the caller, and ARE called. Fixing them means reading 0x004014C0's arms
-# against our reconstruction of it, which is comm code no drive here reaches.
-KNOWN = {
-    "MsgSlotB1",            # 0x00403350, caller 0x004014C0 (comm, unreachable here)
-    "MsgSlotB2",            # 0x004033B0, caller 0x004014C0
-}
+# MsgSlotB1 and MsgSlotB2 were here, and were the tell that a dispatch arm
+# was missing rather than a function dead: FlowRecvMessage (0x004014C0) had
+# never had its DATA arm's delivery half written. Byte-matching it against
+# the image found that, and the set went to empty.
+KNOWN = set()
 
 
 def patched_names():
