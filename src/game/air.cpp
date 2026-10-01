@@ -1601,35 +1601,18 @@ void __cdecl FormationSlotPoint(int32_t slot, uint32_t leaderPos, void *obj,
  * -- and which end gets clipped depends on which was inside. Both outside is a
  * refusal. A span that comes out at or below zero is a refusal too.
  *
- * The original hands AngleOfDelta a THIRD argument it does not read; cdecl and
- * caller-cleaned, so it is unobservable and is not reproduced.
+ * The original hands AngleOfDelta a THIRD argument it does not read -- the
+ * distance it has just computed. cdecl and caller-cleaned, so unobservable,
+ * but the push is in the image and so it is reproduced, through the same
+ * cast region.cpp's AI_ANGLE3 uses.
  */
+#define AngleOfDelta3(x, y, d)                                                 \
+    ((uint8_t (__cdecl *)(int32_t, int32_t, int32_t))(void (*)(void))AngleOfDelta)(x, y, d)
 /* AngleDelta's answer with the compiler's abs() over it -- `cdq; xor; sub`,
  * which the original spells out at all four sites. */
 static inline int32_t AbsAngle(uint32_t from, uint32_t to)
 {
-    int32_t d = AngleDelta(from, to);
-
-    return d < 0 ? -d : d;
-}
-
-static inline void SightSilhouette(int32_t code, int32_t l, int32_t t, int32_t r,
-                            int32_t b, int32_t *nx, int32_t *ny,
-                            int32_t *fx, int32_t *fy)
-{
-    /* Generated from the byte table at 0x00403AE0 and the jump table at
-     * 0x00403ABC; the eight codes not listed share the refusal exit. */
-    switch (code) {
-    case 0:  *nx = l; *ny = b; *fx = r; *fy = t; return;  /* left,  above  */
-    case 1:  *nx = l; *ny = t; *fx = r; *fy = t; return;  /* inside above  */
-    case 2:  *nx = l; *ny = b; *fx = l; *fy = t; return;  /* left,  level  */
-    case 5:  *nx = l; *ny = t; *fx = r; *fy = b; return;  /* right, above  */
-    case 7:  *nx = r; *ny = t; *fx = r; *fy = b; return;  /* right, level  */
-    case 10: *nx = r; *ny = b; *fx = l; *fy = t; return;  /* left,  below  */
-    case 11: *nx = r; *ny = b; *fx = l; *fy = b; return;  /* inside below  */
-    case 15: *nx = r; *ny = t; *fx = l; *fy = b; return;  /* right, below  */
-    default: return;
-    }
+    return abs(AngleDelta(from, to));
 }
 
 void __cdecl AddSightBlocker(void *viewer, void *blocker)
@@ -1642,8 +1625,9 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     int32_t        hv;
     int32_t        hb;
     int32_t        l, t, r, bo;
-    int32_t        vx, vy;
-    int32_t        nx, ny, fx, fy;
+    int16_t        vx, vy;
+    AM2_Point      close;       /* a struct, so it lives in the frame */
+    int16_t        fx, fy;
     int32_t        code;
     int32_t        dist;
     int32_t        arc;
@@ -1682,36 +1666,54 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     vx = *(const int16_t *)(v + OBJ_OFF_X);
     vy = *(const int16_t *)(v + OBJ_OFF_Y);
 
-    code = (l < vx ? 1 : 0) | (t < vy ? 2 : 0)
-         | (r < vx ? 4 : 0) | (bo < vy ? 8 : 0);
+    /* The outcode, one test at a time. */
+    code = 0;
+    if (l < vx)
+        code = 1;
+    if (t < vy)
+        code |= 2;
+    if (r < vx)
+        code |= 4;
+    if (bo < vy)
+        code |= 8;
 
+    /* The two silhouette corners, by outcode (the byte table at 0x00403AE0
+     * and the jump table at 0x00403ABC). Seven of the eight codes not listed
+     * cannot happen with l <= r and t <= b; the eighth, code 3, is the
+     * viewer standing INSIDE the box. */
     switch (code) {
-    case 0: case 1: case 2: case 5: case 7: case 10: case 11: case 15:
-        break;
+    case 0:  close.x = l; close.y = bo; fx = r; fy = t;  break;  /* left,  above  */
+    case 1:  close.x = l; close.y = t;  fx = r; fy = t;  break;  /* inside above  */
+    case 2:  close.x = l; close.y = bo; fx = l; fy = t;  break;  /* left,  level  */
+    case 5:  close.x = l; close.y = t;  fx = r; fy = bo; break;  /* right, above  */
+    case 7:  close.x = r; close.y = t;  fx = r; fy = bo; break;  /* right, level  */
+    case 10: close.x = r; close.y = bo; fx = l; fy = t;  break;  /* left,  below  */
+    case 11: close.x = r; close.y = bo; fx = l; fy = bo; break;  /* inside below  */
+    case 15: close.x = r; close.y = t;  fx = l; fy = bo; break;  /* right, below  */
     default:
-        /* Seven of these cannot happen with l <= r and t <= b; the eighth,
-         * code 3, is the viewer standing INSIDE the box. */
         return;
     }
-    SightSilhouette(code, l, t, r, bo, &nx, &ny, &fx, &fy);
 
     {
-        int32_t dx0 = (int16_t)(nx - vx);
-        int32_t dy0 = (int16_t)(ny - vy);
-        int32_t dx1 = (int16_t)(fx - vx);
-        int32_t dy1 = (int16_t)(fy - vy);
+        int32_t dx0 = (int16_t)(close.x - vx);
+        int32_t dy0 = (int16_t)(close.y - vy);
+        int32_t dx1 = (int16_t)(fx - *(const int16_t *)(v + OBJ_OFF_X));
+        int32_t dy1 = (int16_t)(fy - *(const int16_t *)(v + OBJ_OFF_Y));
         int32_t d0  = ApproxDistXY(dx0, dy0);
         int32_t d1;
 
-        a0 = AngleOfDelta(dx0, dy0);
+        a0 = AngleOfDelta3(dx0, dy0, d0);
         d1 = ApproxDistXY(dx1, dy1);
-        a1 = AngleOfDelta(dx1, dy1);
+        a1 = AngleOfDelta3(dx1, dy1, d1);
         /* The original pads the silhouette distance by one tile once (the
          * `add esi,0x10` at 0x004038AD), and every later use -- the range
          * check below and the band stores in the loop -- reads the padded
          * value.  The pad was previously applied only in the range check,
          * leaving the cache bands one tile short. */
-        dist = (d0 > d1 ? d0 : d1) + AM2_SIGHT_DIST_PAD;
+        dist = d1;
+        if (d0 > d1)
+            dist = d0;
+        dist += AM2_SIGHT_DIST_PAD;
     }
 
     rank = (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
@@ -1780,6 +1782,7 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     }
 #undef range
 }
+#undef AngleOfDelta3
 
 #define g_defaultOwner (*(uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
 #define g_fogOfWar     (*(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR)
