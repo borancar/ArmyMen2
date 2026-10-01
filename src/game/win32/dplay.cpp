@@ -349,7 +349,6 @@ int32_t __cdecl CommRegisterSelf(uint32_t id)
 #define NRECS AM2_PLAYER_RECORDS
 #define RECAT(i) (((struct PlayerRec *)(uintptr_t)ADDR_PLAYER_RECORDS)[i].bytes)
     int32_t  result = 0;
-    uint8_t *rec;
     int32_t  slot;
     uint32_t own, want;
 
@@ -364,9 +363,9 @@ int32_t __cdecl CommRegisterSelf(uint32_t id)
     return result;
 
 found:
-    rec = RECAT(slot);
-#undef NRECS
-#undef RECAT
+    /* Every store indexes the array afresh rather than holding a record
+     * pointer: the image addresses each field as table + slot*stride. */
+#define rec RECAT(slot)
 
     if (comm_u32(*(uint8_t *const *)(uintptr_t)ADDR_COMM_OBJECT,
                  COMM_OFF_VERBOSE) != 0)
@@ -412,15 +411,16 @@ found:
                  COMM_OFF_IS_HOST);
 
     {
-        uint32_t *a = (uint32_t *)(rec + PLAYER_REC_OFF_RING_A);
-        uint32_t *b = (uint32_t *)(rec + PLAYER_REC_OFF_RING_B);
-        int32_t   i;
+        int32_t i;
 
         for (i = 0; i < AM2_PLAYER_RING_LEN; i++) {
-            a[i] = 0;
-            b[i] = 0;
+            ((uint32_t *)(rec + PLAYER_REC_OFF_RING_A))[i] = 0;
+            ((uint32_t *)(rec + PLAYER_REC_OFF_RING_B))[i] = 0;
         }
     }
+#undef rec
+#undef NRECS
+#undef RECAT
 
     result = 1;
     return result;
