@@ -2940,11 +2940,11 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
         me     = (uint8_t *)FindPlayerById(MINE);
         if (!sender) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", FROM);
-            goto unknown;
+            break;
         }
         if (!me) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", MINE);
-            goto unknown;
+            break;
         }
         mask = GetPlayerMask(FROM);
         now  = orig_get_tick_count();
@@ -3032,14 +3032,11 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
         me     = (uint8_t *)FindPlayerById(MINE);
         if (!sender) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", FROM);
-            goto unknown;
+            break;
         }
         if (!me) {
             am2_log("Interrupt Level Can't find FlowQ for %x\n", MINE);
-            /* The one `return 0` every lookup failure and the default
-             * share, laid out here. */
-        unknown:
-            return 0;
+            break;
         }
         if (VERBOSE)
             am2_log("GOT NACK: seq %d thru %d from %d (%x)  nxtSeq = %d \n",
@@ -3348,10 +3345,8 @@ int32_t __cdecl FlowRecvMessage(void *nodev)
             expected++;
         }
         return 1;
-
-    default:
-        goto unknown;
     }
+    return 0;
 
 pool:
     MsgListAdd((void *)(uintptr_t)ADDR_MSG_LIST_POOL, node);

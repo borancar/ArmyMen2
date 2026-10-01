@@ -6609,18 +6609,23 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
 {
     AM2_Widget *w = this;
 
-    static const double kSoldierHeight[AM2_SQUAD_KIND_COUNT] = {
+    /* All three tables are LOCALS, built on the stack a dword at a time
+     * before anything is looked up -- the reason for the aligned frame. The
+     * speed table is six initialised ints, {5, 3, 4, 4, 2, 4}; VC6 stores the
+     * three 4s first from one register, which once read as a slot left
+     * uninitialised. */
+    double   height[AM2_SQUAD_KIND_COUNT] = {
         4.4, 4.8, 4.3, 4.4, 4.0, 4.5, 4.4, 4.9, 3.9
     };
-    static const double kSoldierWeight[AM2_SQUAD_KIND_COUNT] = {
+    double   weight[AM2_SQUAD_KIND_COUNT] = {
         2.3, 2.6, 2.3, 2.4, 2.1, 2.4, 2.3, 2.5, 2.2
     };
-    uint8_t      *b   = (uint8_t *)w;
-    const int32_t ink = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
-    uint8_t      *obj;
-    char          line[AM2_SQUAD_TEXT_BYTES];
-    char          name[AM2_SQUAD_TEXT_BYTES];
-    int32_t       x, y, a, c, kind;
+    int32_t  speed[6] = { 5, 3, 4, 4, 2, 4 };
+    uint8_t *obj;
+    char     line[AM2_SQUAD_TEXT_BYTES];
+    char     name[AM2_SQUAD_TEXT_BYTES];
+    int32_t  a, c;
+    RECT     box;
 
     obj = (uint8_t *)LookupByUID((uint32_t)uid);
     if (!obj)
@@ -6628,10 +6633,18 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
     if (!LockSurface(*(LPDIRECTDRAWSURFACE *)(uintptr_t)ADDR_DRAW_TARGET))
         return;
 
-    y = w->rect.top;
-    x = w->rect.left;
-
-#define SQD_TEXT(dx, dy, s) DrawText(x + (dx), y + (dy), (s), 0, 0, ink)
+    /* The rectangle and the ink are read afresh for every string. */
+#define SQD_TEXT(dx, dy, s) DrawText(w->rect.left + (dx), w->rect.top + (dy), \
+                                     (s), 0, 0,                               \
+                                     *(const uint8_t *)(uintptr_t)            \
+                                         ADDR_VIEW_RECT_COLOUR)
+#define SQD_HP()                                                              \
+        a = *(const int16_t *)(obj + OBJ_OFF_HEALTH) < AM2_SQUAD_HP_CAP       \
+            ? *(const int16_t *)(obj + OBJ_OFF_HEALTH) : AM2_SQUAD_HP_CAP;    \
+        c = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH) < AM2_SQUAD_HP_CAP   \
+            ? *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH) : AM2_SQUAD_HP_CAP;\
+        am2_sprintf(line, "%3d/%3d", a, c);                                   \
+        SQD_TEXT(SQD_VALUE_X, SQD_ROW_HP, line)
 
     if (ObjType2Field548((const AM2_Object *)obj)) {
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, "Sarge");
@@ -6642,53 +6655,38 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_3,    "MV:");
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_3,    "2 cm/s");
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_HP,   "HP:");
-
-        a = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
-        if (a >= AM2_SQUAD_HP_CAP) a = AM2_SQUAD_HP_CAP;
-        c = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
-        if (c >= AM2_SQUAD_HP_CAP) c = AM2_SQUAD_HP_CAP;
-        am2_sprintf(line, "%3d/%3d", a, c);
-        SQD_TEXT(SQD_VALUE_X, SQD_ROW_HP, line);
+        SQD_HP();
 
     } else if (ObjIsType2((const AM2_Object *)obj)) {
-        int32_t script = *(const int32_t *)(obj + ITEM_OFF_NAME_INDEX);
-        int32_t named  = 0;
-
-        if (script >= 0) {
-            const char *s = *(const char *const *)
-                ((const uint8_t *)*(void *const *)
-                     (uintptr_t)ADDR_SCRIPT_NAMES
-                 + (uint32_t)script * AM2_NAME_TABLE_STRIDE);
-            /* Show the scripted name UNLESS it is an internal "green..." id
-             * (e.g. "greensarge1"), which falls through to a personal name.
-             * The original jumps to the SoldierNameOf path when the name
-             * STARTS WITH "green" (0x004166FE: strncmp; je 0x0041677F), so the
-             * script name is used when it does NOT -- the sense was inverted
-             * here, which hid a custom name like "wildblood" behind a random
-             * soldier name. */
-            if (orig_strncmp(s, "green",
-                              5) != 0) {
-                strcpy(name, s);
-                TitleCaseName(name);
-                SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, name);
-                named = 1;
-            }
+        /* The scripted name UNLESS it is an internal "green..." id (e.g.
+         * "greensarge1"): the original jumps to the SoldierNameOf path when
+         * the name STARTS WITH "green" (0x004166FE: strncmp; je 0x0041677F).
+         * The sense was once inverted here, which hid a custom name like
+         * "wildblood" behind a random soldier name. */
+#define SCRIPT_NAME (*(const char *const *)                                   \
+            ((const uint8_t *)*(void *const *)(uintptr_t)ADDR_SCRIPT_NAMES     \
+             + (uint32_t)*(const int32_t *)(obj + ITEM_OFF_NAME_INDEX)        \
+               * AM2_NAME_TABLE_STRIDE))
+        if (*(const int32_t *)(obj + ITEM_OFF_NAME_INDEX) >= 0
+            && orig_strncmp(SCRIPT_NAME, "green", 5) != 0) {
+            strcpy(name, SCRIPT_NAME);
+            TitleCaseName(name);
+            SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, name);
+        } else if (*(const int32_t *)(obj + OBJ_OFF_NAME_INDEX) >= 0) {
+            SoldierNameOf(obj, name);
+            SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, name);
+        } else {
+            SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, UnitClassName(obj));
         }
-        if (!named) {
-            if (*(const int32_t *)(obj + OBJ_OFF_NAME_INDEX) >= 0) {
-                SoldierNameOf(obj, name);
-                SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, name);
-            } else {
-                SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, UnitClassName(obj));
-            }
-        }
+#undef SCRIPT_NAME
 
-        kind = *(const int32_t *)(obj + OBJ_OFF_SOLDIER_KIND);
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_1, "HT:");
-        am2_sprintf(line, "%3.1lf cm", kSoldierHeight[kind]);
+        am2_sprintf(line, "%3.1lf cm",
+                    height[*(const int32_t *)(obj + OBJ_OFF_SOLDIER_KIND)]);
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_1, line);
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_2, "WT:");
-        am2_sprintf(line, "%3.1lf g", kSoldierWeight[kind]);
+        am2_sprintf(line, "%3.1lf g",
+                    weight[*(const int32_t *)(obj + OBJ_OFF_SOLDIER_KIND)]);
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_2, line);
 
         a = *(const int32_t *)(obj + OBJ_OFF_REPAIR_FRAME);
@@ -6702,75 +6700,59 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_3, line);
 
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_HP, "HP:");
-        a = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
-        if (a >= AM2_SQUAD_HP_CAP) a = AM2_SQUAD_HP_CAP;
-        c = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
-        if (c >= AM2_SQUAD_HP_CAP) c = AM2_SQUAD_HP_CAP;
-        am2_sprintf(line, "%3d/%3d", a, c);
-        SQD_TEXT(SQD_VALUE_X, SQD_ROW_HP, line);
+        SQD_HP();
 
-        /* Rank pips: rank + 1 of them, capped at five. */
-        if (*(void *const *)(b + HUD_SQUAD_ICON_SPRITE)) {
+        /* Rank pips: rank + 1 of them, capped at five, each clipped from a
+         * fresh {0, 0, w, h} of the pip sprite. */
+        if (*(void *const *)((uint8_t *)w + HUD_SQUAD_ICON_SPRITE)) {
             int32_t n = *(const int32_t *)(obj + OBJ_OFF_RANK) + 1;
             int32_t i;
 
-            if (n > AM2_SQUAD_MAX_PIPS)
+            if (n >= AM2_SQUAD_MAX_PIPS)
                 n = AM2_SQUAD_MAX_PIPS;
             for (i = 0; i < n; i++) {
-                AM2_Sprite *pip = *(AM2_Sprite **)(b + HUD_SQUAD_ICON_SPRITE);
-                AM2_Rect    out;
-                int32_t     px = x + SQD_PIP_X + i * AM2_SQUAD_PIP_STEP;
-                int32_t     py = y + SQD_PIP_Y;
+#define PIP (*(AM2_Sprite **)((uint8_t *)w + HUD_SQUAD_ICON_SPRITE))
+                AM2_Rect out;
+                int32_t  px = i * AM2_SQUAD_PIP_STEP + w->rect.left + SQD_PIP_X;
+                int32_t  py = w->rect.top + SQD_PIP_Y;
 
-                if (ClipRect(&pip->bounds,
+                out.left   = 0;
+                out.top    = 0;
+                out.right  = PIP->bounds.right;
+                out.bottom = PIP->bounds.bottom;
+                if (ClipRect(&PIP->bounds,
                              (const AM2_Rect *)(uintptr_t)ADDR_SCREEN_CLIP,
                              &px, &py, &out))
-                    DrawSpriteClipped(pip, px, py, &out, 0);
+                    DrawSpriteClipped(PIP, px, py, &out, 0);
+#undef PIP
             }
         }
 
     } else if (ObjIsType3((const AM2_Object *)obj)) {
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_NAME, VehicleKindName(obj));
 
+        /* Armour is clamped to two digits; nothing else here is. */
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_1, "AR:");
-        am2_sprintf(line, "%d mm",
-                    *(const int32_t *)(obj + VEHICLE_OFF_ARMOUR));
+        a = *(const int32_t *)(obj + VEHICLE_OFF_ARMOUR);
+        if (a >= 99) a = 99;
+        am2_sprintf(line, "%d mm", a);
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_1, line);
 
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_2, "CR:");
         am2_sprintf(line, "%d", *(const int32_t *)(obj + VEHICLE_OFF_SEATS));
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_2, line);
 
+        /* MV is the per-kind speed table, indexed by VEHICLE_OFF_KIND. */
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_3, "MV:");
-        /* MV is not the raw VEHICLE_OFF_KIND -- the kind INDEXES a per-kind
-         * speed table the original builds on its stack and prints `table[kind]`
-         * (::HudSquadDetail 0x00416bc7: `mov edx,[esi+0x52c];
-         * mov eax,[esp+edx*4+0x58]`). The stack slots are filled at the top of
-         * the function (0x00416352/0x004164f2, all at one esp level): eax=4 to
-         * +0x28/+0x2c/+0x34, then +0x2c<-5, +0x30<-3, +0x3c<-2. The read base
-         * is esp+0x58 = that level's +0x2c, so table[kind] reads
-         * +0x2c,+0x30,+0x34,+0x38,+0x3c,+0x40 -> {5, 3, 4, (uninit), 2, ...}.
-         * The +0x38 slot the table code never writes is a stable 4 in play, so
-         * kind 3 (the convoy truck) reads 4 and kind 0 (the jeep) reads 5.
-         * The base was read as +0x28 at first, which drew the jeep "4 cm/s"
-         * where the original draws 5 -- both bases happen to give the truck 4.
-         * Kinds past 4 are unseen; +0x40 is given 4. */
-        {
-            static const int32_t kVehicleSpeed[6] = { 5, 3, 4, 4, 2, 4 };
-            int32_t kind = *(const int32_t *)(obj + VEHICLE_OFF_KIND);
-            am2_sprintf(line, "%d cm/s", kVehicleSpeed[kind]);
-        }
+        am2_sprintf(line, "%d cm/s",
+                    speed[*(const int32_t *)(obj + VEHICLE_OFF_KIND)]);
         SQD_TEXT(SQD_VALUE_X, SQD_ROW_3, line);
 
         SQD_TEXT(SQD_LABEL_X, SQD_ROW_HP, "HP:");
-        a = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
-        if (a >= AM2_SQUAD_HP_CAP) a = AM2_SQUAD_HP_CAP;
-        c = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
-        if (c >= AM2_SQUAD_HP_CAP) c = AM2_SQUAD_HP_CAP;
-        am2_sprintf(line, "%3d/%3d", a, c);
-        SQD_TEXT(SQD_VALUE_X, SQD_ROW_HP, line);
+        SQD_HP();
     }
 
+#undef SQD_HP
 #undef SQD_TEXT
     UnlockSurface();
 
@@ -6799,39 +6781,36 @@ void __attribute__((thiscall)) AM2_Widget::HudSquadDetail(int32_t uid)
      * much health a unit has in absolute terms and not merely what fraction
      * is left, and a weak unit's full bar is shorter than a strong one's. */
     {
-        int16_t max  = *(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH);
-        int32_t wide = max / 2;
-        int16_t hp   = *(const int16_t *)(obj + OBJ_OFF_HEALTH);
+#define MAXHP (*(const int16_t *)(obj + OBJ_OFF_MAX_HEALTH))
+#define HP    (*(const int16_t *)(obj + OBJ_OFF_HEALTH))
+        int32_t wide = MAXHP / 2 < SQD_BAR_MAX_W ? MAXHP / 2 : SQD_BAR_MAX_W;
         int32_t fill;
-        RECT    box;
         uint8_t bar;
 
-        if (wide >= SQD_BAR_MAX_W)
-            wide = SQD_BAR_MAX_W;
+        fill = HP > 0 ? HP * wide / MAXHP : wide;
 
-        fill = hp > 0 ? hp * wide / max : wide;
-
-        box.left   = x + SQD_BAR_X;
-        box.top    = y + SQD_BAR_Y;
-        box.right  = x + wide + SQD_BAR_X + 3;
-        box.bottom = y + SQD_BAR_Y + 5;
+        box.left   = w->rect.left + SQD_BAR_X;
+        box.right  = wide + w->rect.left + SQD_BAR_X + 3;
+        box.top    = w->rect.top + SQD_BAR_Y;
+        box.bottom = w->rect.top + SQD_BAR_Y + 5;
         ClearRegion(&box, *(const uint8_t *)(uintptr_t)ADDR_BACKGROUND_COLOUR);
 
         box.left   += 1;
-        box.top    += 1;
         box.right   = box.left + wide + 1;
+        box.top    += 1;
         box.bottom -= 1;
         ClearRegion(&box, *(const uint8_t *)(uintptr_t)ADDR_LIST_INK_HOT_SEL);
+        box.right = box.left + fill;
 
-        if (hp <= (int16_t)(max >> 2))
+        if (HP <= (int16_t)(MAXHP >> 2))
             bar = *(const uint8_t *)(uintptr_t)ADDR_HUD_MESSAGE_COLOUR;
-        else if (hp <= (int16_t)(max >> 1))
+        else if (HP <= (int16_t)(MAXHP >> 1))
             bar = *(const uint8_t *)(uintptr_t)ADDR_COLOUR_LAG_MID;
         else
             bar = *(const uint8_t *)(uintptr_t)ADDR_VIEW_RECT_COLOUR;
-
-        box.right = box.left + fill;
         ClearRegion(&box, bar);
+#undef MAXHP
+#undef HP
     }
 
 #undef SQD_BAR_X
