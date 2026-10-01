@@ -312,13 +312,16 @@ int32_t __cdecl DefDispatchFile(am2_FILE *fp)
     if (fp == (am2_FILE *)0)
         return 0;
 
-    while (orig_fgets(raw, AM2_DEF_LINE_MAX, fp) != (char *)0) {
+    for (;;) {
         const AM2_DefKeyword *e;
         char                 *tok;
         char                 *rest;
         int32_t               idx;
         int32_t (__cdecl *handler)(int32_t, char *);
 
+        /* Tested at the top, once: the image reads each line from one call. */
+        if (orig_fgets(raw, AM2_DEF_LINE_MAX, fp) == (char *)0)
+            break;
         strcpy(work, raw);
         orig_strlwr(work);
         lineno++;
