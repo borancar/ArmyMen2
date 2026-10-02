@@ -1217,8 +1217,7 @@ native (0xCC `.origgap`, nothing in the ELF reads them -- 0 src refs, 0 blob dwo
 point in): the bitmap loader's errors ("ERROR: invalid file size in %s.",
 "ERROR: %s not in 1-bit mode") at 0x00478950..0x00478CDC, and the
 region-activation debug line plus the `%s.atl`/`%s.amm` file-name format strings
-(their `ADDR_FMT_ATL`/`ADDR_FMT_DOT_AMM` macros appear only in orig.h -- the
-original loader used them, the reconstruction does not) at 0x00486220..0x00486444.
+(the original loader used them, the reconstruction does not) at 0x00486220..0x00486444.
 Declared dead as `BITMAP_LOADER_DEBUG` and `REGION_DEBUG_AND_FMT`: 1,369 ranges /
 48,094 bytes.
 

@@ -701,7 +701,7 @@ void __cdecl PaletteLoaded(void)
  *
  * THE SIX NAME STRINGS RUN BACKWARDS IN THE IMAGE. palette5.bmp is at the low
  * address and palette0.bmp at the high one, sixteen bytes apart, so the
- * original walked a single blob pointer DOWNWARD: `ADDR_STR_PALETTE0 -
+ * original walked a single blob pointer DOWNWARD: `0x00486288 (palette0.bmp) -
  * i * stride`, reading palette0 then palette1 .. palette5 from consecutive
  * blob slots. Folding the base to a `.rodata` literal ("palette0.bmp") silently
  * broke that -- the arithmetic then walked off the front of one C literal into

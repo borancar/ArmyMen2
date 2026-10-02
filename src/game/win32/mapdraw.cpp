@@ -52,7 +52,7 @@ extern "C" int32_t am2_trace_window(void) __attribute__((weak));
  * with `base + index*4`. orig.h calls it int32[4][4], but ShakeAt's index is
  * (strength*scale) with strength clamped to 10, so it reaches row 10 -- the
  * documented "indexes PAST" behaviour. The rows continue as a real pattern to
- * index 10 (string data begins just after, at ADDR_STR_PALETTE0), so the
+ * index 10 (string data begins just after, at palette0.bmp, 0x00486288), so the
  * faithful extent is 11 rows of 4 = int32[44]. Each row is {period, dx, dy,
  * decay}; row 0 is all-zero and the `< 1` index test skips it. */
 extern "C" const int32_t am2_shake_presets[44] = {

@@ -151,8 +151,7 @@ _DEAD_TABLE_DECL = [
     # 0 blob dwords point in -- checked): the bitmap loader's error messages
     # ("ERROR: invalid file size in %s.", "ERROR: %s not in 1-bit mode"), and the
     # region-activation debug line plus the %s.atl/%s.amm file-name format strings
-    # (their ADDR_FMT_ATL/ADDR_FMT_DOT_AMM macros appear only in orig.h -- the
-    # original loader used them; the reconstruction does not).
+    # (the original loader used them; the reconstruction does not).
     (0x00478950, 0x00478CDC, "BITMAP_LOADER_DEBUG"),
     (0x00486220, 0x00486444, "REGION_DEBUG_AND_FMT"),
     # The script.cpp module's string pool, between the (dead) SCRIPT_TOKENS table

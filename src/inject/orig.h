@@ -188,10 +188,6 @@
  * byte, or -1. Only the low byte is compared, which is all a DirectInput
  * scancode is. */
 #define ADDR_KEY_NAME_INDEX_OF  0x00450BF0u  /* int32_t(uint8_t scancode) */
-/* The string a key row shows when it is bound to nothing. There is a second
- * copy of "None" at 0x0048A134 inside the table itself; this is the one the
- * duplicate-clearing loop stores. */
-#define ADDR_STR_NONE           0x0048AF1Cu
 /* 0x00450C10: index of the key that has just gone down, or -1. */
 #define ADDR_FIND_PRESSED_KEY   0x00450C10u /* int32_t(void) */
 /* 0x00450D50, thiscall, slot 2 of the key-capture row. */
@@ -378,7 +374,6 @@
                                                * dialog's DLG_OFF_ESCAPE */
 #define ADDR_OPEN_OVERWRITE_GAME 0x004506A0u /* void(void) */
 #define AM2_OVERWRITE_SIZE       0x64u
-#define ADDR_STR_OVRGAME_BMP     0x0048B96Cu /* "02_018_00_ovrgame.bmp" */
 /* DelPlayer -- 02_010_00_delplayer */
 #define ADDR_DLG_DELPLAYER_DELETE         0x004509E0u
 #define ADDR_DLG_DELPLAYER_DESTRUCT       0x00450A00u
@@ -451,7 +446,6 @@
 #define AM2_GAMEMENU_HEIGHT      0x19
 #define ADDR_OPEN_GAME_MENU      0x00452F50u /* void(void) */
 #define AM2_GAMEMENU_SIZE        0x68u
-#define ADDR_STR_BLANK_BMP       0x00486F90u /* "00_999_99_blank.bmp" */
 /* 0x00454F00, thiscall, vtable slot 1 of the vtable at 0x0046FCAC. The static
  * label's painter -- reached BOTH through that slot and by one direct call
  * from the panel that owns the label. */
@@ -1516,7 +1510,6 @@
 #define VTABLE_SAVE_LIST         0x0046FC0Cu
 #define ADDR_OPEN_SAVE_GAME      0x00453890u /* void(void) */
 #define AM2_SAVE_LIST_SIZE       0xACu
-#define ADDR_STR_SAVEGAME_BMP    0x0048BC98u /* "02_008_00_savegame.bmp" */
 /* 0x00453280, thiscall `ret 8` -- the SAVE GAME dialog: an edit for the
  * name, the list of existing saves, a scrollbar, and SAVE / DELETE / CANCEL.
  *
@@ -1725,8 +1718,7 @@
 #define ADDR_LOAD_TILESET_PALETTES 0x0042B120u /* void(void) */
 /* The six file names, 16 bytes apart and laid out BACKWARDS: palette5.bmp is
  * at the low address and palette0.bmp at the high one, so walking forward from
- * ADDR_STR_PALETTE0 goes DOWN. Index i is ADDR_STR_PALETTE0 - i * 0x10. */
-#define ADDR_STR_PALETTE0        0x00486288u  /* "palette0.bmp" */
+ * palette0.bmp (0x00486288) goes DOWN. Index i is 0x00486288 - i * 0x10. */
 #define AM2_PALETTE_NAME_STRIDE  0x10u
 #define ADDR_SET_SURF_COLORKEY 0x0041B970u  /* void(surface *, uint8_t key) */
 #define PALETTE_HOLDER_OFF     0x800u       /* where the DD palette hangs */
@@ -1747,7 +1739,6 @@
 /* The state 3 entry action and the three things below it that had no names.
  * State 3 is the MOVIE state, which is what the greyscale palette, the movie
  * filename and the Smacker object below settle between them. */
-#define ADDR_STR_GREYSCALE_BMP   0x0048523Cu  /* "avi\\greyscale.bmp" */
 /* 0x0041ADB0, four callers. Clears the PRIMARY and the BACK BUFFER to
  * ADDR_BACKGROUND_COLOUR -- two ClearSurface calls and nothing else. */
 #define ADDR_CLEAR_BOTH_SURFACES 0x0041ADB0u  /* void(void) */
@@ -1881,7 +1872,6 @@
 /* 0x0043DAA0, one caller. Fill one 0x0C-byte part from the buffer and answer
  * how many bytes it took. Reconstructed. */
 #define ADDR_PARSE_SCENARIO_PART 0x0043DAA0u  /* int32(void *part, void *at) */
-#define ADDR_STR_SCENARIO        0x00487C20u  /* "Scenario", memcmp'd, 8 bytes */
 #define AM2_SCENARIO_TAG_BYTES   8u
 #define AM2_SCENARIO_HDR_BYTES   0x10u
 #define SCENARIO_HDR_OFF_DIGIT   8u    /* '1'..'4'; the record it selects */
@@ -2248,10 +2238,7 @@
 #define ADDR_LOAD_DIB_FLIPPED 0x00423200u /* void *(const char *, void *, uint16_t *) */
 #define DIB_OFF_BLOCKS        0x08u   /* int32_t, ReverseBlocks' block count */
 #define DIB_OFF_SIZE          0x14u   /* int32_t, total bytes -- the listed size */
-#define ADDR_MSG_TILESET_OPEN 0x00486310u /* "Unable to open tileset" */
-#define ADDR_MSG_TILESET_LOCK 0x004862ECu /* "Error on Lock in RestoreTileSet()" */
 #define ADDR_MSG_TILESET_LOAD 0x004862D4u /* "Error in loadtileset()" */
-#define ADDR_FMT_ATL          0x00486328u /* "%s.atl" */
 #define ADDR_PRESENT_ENABLED 0x004FA030u /* int32_t */
 #define ADDR_LOCK_SURFACE   0x0041B9A0u  /* int32_t(IDirectDrawSurface*) */
 #define ADDR_UNLOCK_SURFACE 0x0041BA40u  /* int32_t(void) */
@@ -2322,7 +2309,6 @@
  * name now. "Pixel format byte" was the actively misleading one; it is not a
  * pixel format. */
 #define ADDR_BACKGROUND_COLOUR   0x00502AD9u  /* uint8_t */
-#define ADDR_STR_SEQ_BLT_FAIL    0x0048CBE8u  /* "Couldn't Blt Seq Pixels\n" */
 /* SEQ is the program's own word for this band, and that string is where it
  * comes from -- so the record walker below is named with it rather than with
  * something invented. What a "seq" IS remains unestablished.
@@ -2455,8 +2441,6 @@
 #define ADDR_CLEAR_SPRITE        0x00445E40u  /* void(AM2_Sprite *) */
 #define ADDR_SPRITE_SLOT_OF      0x00445990u  /* int32(uint32 id); <0 when absent */
 #define ADDR_SPRITE_TABLE        0x006598C4u  /* AM2_Sprite ** */
-#define ADDR_STR_RELEASE_WRONG   0x00489768u  /* "Error in release: Wrong sprite!\n" */
-#define ADDR_STR_RELEASE_MISSING 0x00489740u  /* "Error in release: Sprite not found!\n" */
 /* The three ways a sprite's pixels are put back after its surface is restored.
  * All stay original; which one applies is decided in RestoreSpriteSurface. */
 #define ADDR_SPRITE_RELOAD_NAMED 0x004456B0u  /* int32(spr, const char *, flags) */
@@ -2466,8 +2450,6 @@
  * DEFAULT and the loose-file arm is what the switch selects. */
 #define ADDR_SPRITE_REBUILD_DF   0x004243B0u  /* int32(spr, flags), the default */
 #define ADDR_SPRITE_REBUILD_ALT  0x00445C00u  /* int32(spr, flags), under -df */
-#define ADDR_STR_RESTORE_FAIL_S  0x004897ACu  /* "unable to restore sprite %s.\n" */
-#define ADDR_STR_RESTORE_FAIL_X  0x0048978Cu  /* "unable to restore sprite %x.\n" */
 #define ADDR_OVERLAY_PALETTE     0x004FE1A4u  /* void *, set before the overlay blit */
 #define ADDR_DEFAULT_PALETTE     0x004FE084u  /* void *, used when the sprite has none */
 
@@ -3083,8 +3065,6 @@
  * the game paused", and each bit is a reason it is. */
 #define ADDR_PAUSE_GAME          0x004267C0u  /* void(uint32 bits); ORs in */
 #define ADDR_UNPAUSE_GAME        0x00426800u  /* void(uint32 bits); ANDs out */
-#define ADDR_STR_PAUSE_GAME      0x00485250u  /* "PauseGame: %x (set: %x)\n" */
-#define ADDR_STR_UNPAUSE_GAME    0x0048526Cu  /* "UnPauseGame: %x (reset: %x)\n" */
 #define COMM_DROP_EVENT_MASK     0x1E78F0u    /* what the teardown clears */
 #define ADDR_STR_RELEASING_COMM  0x00475434u  /* "Releasing Comm Connection \n" */
 /* The once-only latch on the NO BUFFERS report. CommNoBuffers logs and posts
@@ -3847,10 +3827,6 @@
  * and the other three sit together; that split is the linker's. */
 #define ADDR_STR_GREEN           0x00476A68u
 #define ADDR_STR_TAN             0x00485148u
-#define ADDR_STR_BLUE            0x00485140u
-#define ADDR_STR_GREY            0x00485138u
-#define ADDR_FMT_PLACE_FILE      0x00487B68u  /* "%s_%s_place.txt" */
-#define ADDR_STR_PLACE_NO_NAME   0x00485B00u  /* "-", the files own placeholder */
 /* The placement table: the records, how many, and how many fit. Freed and
  * rebuilt for each army. The grow is 32 to start and +8 a time. */
 #define ADDR_PLACEMENTS          0x00654C7Cu  /* AM2_Placement * */
@@ -3936,9 +3912,6 @@
 #define AM2_MP_RESULT_WON        0
 #define AM2_MP_RESULT_LOST       1
 #define AM2_MP_RESULT_HOST_LEFT  2
-#define ADDR_STR_MP_WON          0x004852A8u  /* "mpwon.bmp" */
-#define ADDR_STR_MP_LOST         0x0048529Cu  /* "mplost.bmp" */
-#define ADDR_STR_MP_HOST_LEFT    0x0048528Cu  /* "mphostleft.bmp" */
 /* 0x0040FB80, thiscall, and CORRECTED. This said "formats a string and hands
  * it to ADDR_COMM_SEND_PROPERTY -- 48 bytes and nothing else in it". The
  * function is EIGHT bytes: `push 2; call ADDR_COMM_SEND_PROPERTY; ret`. The
@@ -4138,7 +4111,6 @@
  * is "%s is ready.". Non-host only, and refused once the slot is already
  * flagged. */
 #define ADDR_MP_READY_TO_LOAD    0x00431920u  /* void(void) */
-#define ADDR_STR_IS_READY        0x00487240u  /* "%s is ready." */
 /* A SCROLLING LIST OF COLOURED TEXT LINES, five slots like every widget here:
  * its own destructor and paint, the base's update, focus and repaint. Built at
  * 0x00433290 from 0x00430C95, on the screen that also loads
@@ -5465,9 +5437,6 @@ typedef void (__cdecl *am2_exit_fn)(int32_t);
 /* ADDR_SAVE_OPTIONS is already defined further down, from the menu side --
  * checkoffsets refused the second one. The strings and constants it needs are
  * here because this is where the file's CONTENTS are described. */
-#define ADDR_STR_OPTIONS_CFG     0x0048B448u  /* "Options.cfg" */
-#define ADDR_MODE_W              0x0048B3CCu  /* "w" -- TEXT mode, not "wb" */
-#define ADDR_STR_OPTIONS_NOWRITE 0x0048B420u
 #define ADDR_CRT_CHMOD           0x00466359u  /* int32(const char *, int32) */
 #define AM2_CHMOD_RW             0x180        /* _S_IREAD | _S_IWRITE */
 #define ADDR_CRT_FFLUSH          0x00465A96u  /* int32(FILE *) */
@@ -5763,14 +5732,6 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
 #define ADDR_SCRIPT_RESET        0x0043F2F0u  /* void(ctx *) */
 #define ADDR_SCRIPT_LOOKUP_TOKEN 0x0043EEE0u  /* int32_t(const char *word) */
 
-/* Where the ORIGINAL's keyword table is: 185 {const char *, int32_t} pairs,
- * the bounds being ScriptLookupToken's own -- it walks from the first and
- * stops at the second. The reconstruction no longer reads it; the table is
- * written out in game/scripttokens.h and generated from here, so these stay
- * as the record of where it came from and as what tools/scripttokens.py
- * reads. Nothing in the image writes it. */
-#define ADDR_SCRIPT_TOKENS       0x00487C90u
-#define ADDR_SCRIPT_TOKENS_END   0x00488258u
 #define ADDR_SCRIPT_ADD_TOKEN    0x0043F370u  /* void(ctx, kind, value, line) */
 #define ADDR_SCRIPT_WORD_BUF     0x00656354u  /* char[0x40], the scratch word */
 #define ADDR_SCRIPT_FREE_TOKEN   0x0043F000u  /* void(token *) */
@@ -6006,7 +5967,7 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
  * THE MAP PREVIEW HAS A FALLBACK AND IT MOVES THE DATA DIRECTORY TWICE.
  * SetGameDir(ADDR_MAP_FOLDER), then sprintf the preview's name from
  * ADDR_MAP_NAME and test it with FileExists; if it is missing,
- * SetGameDir("bitmaps") and use ADDR_STR_BAD_MP_PREV instead. The Panel is
+ * SetGameDir("bitmaps") and use the stock bad-preview bitmap instead. The Panel is
  * then built with whichever name survived.
  *
  * So this constructor changes the current directory as well as selecting a
@@ -6295,13 +6256,6 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
 #define AM2_MP_OPTIONS_SIZE      0x110u
 /* Called after the host panel is built, and only by that factory: it repaints
  * the panel from the current session. Still original. */
-#define ADDR_STR_MPHOST_BMP      0x004871C4u  /* "01_001_00_mphost.bmp" */
-#define ADDR_STR_MPJOIN_BMP      0x00487408u  /* "01_002_00_mpjoin.bmp" */
-#define ADDR_STR_MPHOSTOPTS_BMP  0x004873C0u  /* "01_001_03_mphostoptions.bmp" */
-/* The plain screen factories: close, allocate, construct, store. Sizes and
- * constructors are docs/screens.md's, which reads them out of the image. */
-#define ADDR_STR_SCREEN_BMP      0x00485224u  /* "01_000_00_screen.bmp" */
-#define ADDR_STR_CONTROLS_BMP    0x0048B9DCu  /* "01_003_00_controls.bmp" */
 /* The five factories whose constructors take TWO arguments -- a backdrop and
  * a flag -- because the screen exists in two contexts. `cmp [ADDR_GAME_STATE],
  * 2` picks between them: in a mission the screen gets its own backdrop and a
@@ -6318,14 +6272,10 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
 #define ADDR_OPEN_AUDIO_OPTIONS  0x0044F9E0u  /* void(void) */
 #define ADDR_AUDIO_OPTIONS_CTOR  0x0044F370u  /* thiscall obj *(obj, bmp, f) */
 #define AM2_AUDIO_OPTIONS_SIZE   0x7Cu
-#define ADDR_STR_AUDIO_BMP       0x0048B7C4u  /* "02_013_00_audio.bmp" */
 #define ADDR_OPEN_DELETE_GAME    0x00450250u  /* void(void) */
 #define ADDR_DELETE_GAME_CTOR    0x0044FE50u  /* thiscall obj *(obj, bmp, f) */
 #define AM2_DELETE_GAME_SIZE     0x64u
-#define ADDR_STR_DELGAME_BMP     0x0048B918u  /* "02_011_00_delgame.bmp" */
 #define VTABLE_DELETE_GAME       0x0046FB44u
-#define ADDR_STR_DELGAME_ASK     0x0048B8ECu  /* "Are you sure ... delete this
-                                               * game?" */
 /* Still the original's, and the CANCEL doubles as the screen's escape. */
 #define ADDR_ON_DELGAME_OK       0x004501E0u
 #define ADDR_ON_DELGAME_CANCEL   0x00450180u
@@ -6362,7 +6312,6 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
 #define ADDR_ON_REPLAY_OK        0x0044F1B0u
 #define ADDR_ON_DELPLAYER_OK     0x00450A60u
 #define ADDR_ON_DELPLAYER_CANCEL 0x00450A10u
-#define ADDR_STR_ALPINE          0x0048B710u /* "alpine", the data dir they chdir to */
 
 /* The other three widget constructors these need. Each takes its rectangle by
  * value like the button's, and each `ret` confirms the argument list:
@@ -6391,10 +6340,6 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
                                               * int32, int32, int32) */
 #define AM2_LISTBOX_SIZE         0x98u
 #define AM2_ROWS_SIZE            0x0Cu       /* the three-field record */
-#define ADDR_STR_DIFFICULTY_BMP  0x0048B730u /* "02_014_00_difficulty.bmp" */
-#define ADDR_STR_EASY            0x0048B728u
-#define ADDR_STR_MEDIUM          0x0048B720u
-#define ADDR_STR_HARD            0x0048B718u
 /* Where the dialog keeps its list, and where the list keeps its blinker. */
 #define DLG_OFF_LIST             0x64u
 /* The list's scrollbar, and the bar's own back-pointer to the list is
@@ -6467,11 +6412,9 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
 #define ADDR_COLOUR_BELOW_BG     0x00502AD8u /* uint8_t */
 #define AM2_BMP_GREEN0           0x0048701Cu /* 03_028_0N_green.bmp */
 #define AM2_BMP_GREEN1           0x00487030u
-#define ADDR_STR_BATTLE_PANEL    0x00487094u /* "02_002_00_host.bmp" */
 
 /* COMM. CHANNEL SELECT, 0x0042E9C0 -- the connection list. */
 #define VTABLE_COMM_PANEL        0x0046F9D0u
-#define ADDR_STR_COMMPANEL_BMP   0x00486EACu /* "02_001_00_commpanel.bmp" */
 /* Its destructor pair, the same two instructions as the fifteen dialogs --
  * stamp my own vtable, jump to the dialog base's. Reached whenever the
  * channel list closes, which the `multi` and `mpoptions` drives both do. */
@@ -6500,9 +6443,7 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
                                               * on "campaign.txt", with the
                                               * same "Couldn't parse %s!" as
                                               * ReadMpMapsFile */
-#define ADDR_STR_SAVE_DIR        0x004851CCu /* "save" */
 #define ADDR_STR_GLOB_ALL        0x0048BAA0u /* "*" */
-#define ADDR_STR_SELECTPLAYER_BMP 0x0048BA84u
 #define ADDR_ON_RECRUIT          0x00451300u
 #define ADDR_ON_SELECT_PLAYER    0x00451380u
 #define ADDR_ON_DELETE_PLAYER    0x00451330u
@@ -6746,9 +6687,6 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
 #define ADDR_NAME_TABLE_COUNT     0x00656348u
 #define ADDR_NAME_TABLE_CAP       0x0065634Cu
 #define ADDR_FREE_LEVEL_TABLES    0x0043E8B0u  /* void(void) */
-#define ADDR_STR_CAMPAIGN_TXT     0x00487C34u  /* "campaign.txt" */
-#define ADDR_STR_MPMAPS_TXT       0x00487C44u  /* "mpmaps.txt" */
-#define ADDR_STR_BOOTCAMP_TXT     0x00487C50u  /* "bootcamp.txt" */
 #define ADDR_FMT_COULDNT_PARSE    0x00473D7Cu  /* "Couldn't parse %s!\n" */
 /* 0x0043E1F0: bsearch the level table -- 0x30C-byte records at
  * ADDR_LEVEL_TABLE, count at ADDR_LEVEL_TABLE_COUNT -- for the one whose
@@ -6817,11 +6755,6 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
 /* 0x0043E2C0, 1,520 bytes, referenced only from the parser table at 0x00477468
  * as the handler for `MAP` -- command 0x60. */
 #define ADDR_DEF_MAP_LINE         0x0043E2C0u  /* int32_t(int32_t cmd, char *) */
-#define ADDR_STR_NONE_LOWER       0x0048540Cu  /* "none"; ADDR_STR_NONE is
-                                                * "None" and a different
-                                                * string in a different table */
-#define ADDR_STR_DATA_BACKSLASH   0x00487C2Cu  /* "data\\"; ADDR_STR_DATA_DIR
-                                                * is "data" with no separator */
 #define ADDR_LEVEL_STR_A          0x00511C48u  /* char[0x40] */
 #define ADDR_LEVEL_STR_B          0x00511C88u  /* char[0x40] */
 #define ADDR_LEVEL_STR_C          0x00511D18u  /* char[0x40] */
@@ -6884,10 +6817,7 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
 #define ADDR_DIR_SCRATCH         0x004F96B8u /* char[] */
 #define ADDR_LOAD_GAME_CTOR      0x004520E0u  /* thiscall obj *(obj, bmp, f) */
 #define AM2_LOAD_GAME_SIZE       0xA8u
-#define ADDR_STR_LOADGAME_BMP    0x0048BB38u  /* "02_007_00_loadgame.bmp" */
 #define VTABLE_LOAD_GAME         0x0046FBD0u
-#define ADDR_STR_SAVE_PLAYER_FMT 0x004851E4u  /* "save\\%s" */
-#define ADDR_STR_GLOB_SAV        0x0048BB50u  /* "*.sav" */
 /* The screen's copy of the chosen save's name, seeded from the first row. */
 #define LOAD_GAME_OFF_NAME       0x68u
 /* Its four buttons and the row callback, all still the original's. */
@@ -6909,10 +6839,6 @@ typedef struct { const char *face; int32_t height; uint16_t style; } AM2_FontDes
  * free site, and ADDR_SPRITE_DROP_NAMED, named from a call site: right about
  * what it saw, wrong about what the field is. */
 #define ADDR_PENDING_CONFIRM     0x00659F58u /* char[] */
-#define ADDR_STR_DOT_SAV         0x0048BC54u  /* ".sav" */
-/* "Save\\%s" -- the per-player save folder, used by every handler that has to
- * chdir into it: DlgOverwriteOk, OnDelGameOk and OnDelPlayerOk. */
-#define ADDR_STR_SAVE_DIR_FMT    0x0048B930u
 #define ADDR_STR_ANY_FILE        0x0048B9D8u  /* "*.*" */
 /* Two CRT wrappers identified from the imports they call, which is the
  * strongest evidence there is: 0x0046646C calls KERNEL32 DeleteFileA and
@@ -6948,13 +6874,11 @@ typedef struct {
  * ".sav" off a name for display, and to ask whether a typed name has any
  * extension at all. */
 #define ADDR_CRT_STRSTR          0x00464D40u  /* char *(const char *, const char *) */
-/* Its prompt, and the name says the global is not only the DELETE dialog's:
+/* The DELETE prompt's buffer is not only the DELETE dialog's:
  * "Are you sure you want to overwrite savefile '%s'?" takes the same buffer.
  * Left named for the first consumer found; both dialogs stage their target
  * name in it. */
-#define ADDR_STR_OVERWRITE_ASK   0x0048B938u /* char[] */
 #define AM2_DLG_TEXT_BYTES       0x100u      /* the constructors' stack buffer */
-#define ADDR_STR_DATA_DIR        0x0048BAB8u /* "data" */
 /* The in-mission overlay mode DELETE GAME asks with. Its CANCEL goes back to
  * AM2_MENU_MODE_LOAD (0x1A) when it came from here and to 0x19
  * otherwise -- computed with `sete` and `add 0x19` rather than written.
@@ -7015,7 +6939,6 @@ typedef struct {
 #define ADDR_OPEN_MP_SELECT_MAP  0x0044DF20u  /* void(void) */
 #define ADDR_MP_SELECT_MAP_CTOR  0x0044DBB0u  /* thiscall obj *(obj, bmp) */
 #define VTABLE_SELECT_MAP        0x0046FAB8u
-#define ADDR_STR_SELECTMAP_BMP   0x0048B668u /* "02_004_00_selectmap.bmp" */
 /* 0x0044DEA0: SELECT MAP's row callback, still the original's. */
 #define ADDR_SELECT_MAP_ROW      0x0044DEA0u
 /* A level record's display name, which is what the list shows. The record's
@@ -7031,7 +6954,6 @@ typedef struct {
 #define ADDR_ENTER_NAME_CTOR     0x00451AF0u  /* thiscall obj *(obj, bmp) */
 #define AM2_ENTER_NAME_SIZE      0x84u
 #define VTABLE_ENTER_NAME        0x0046FBBCu
-#define ADDR_STR_NAME_BMP        0x0048BAA4u /* "02_006_00_name.bmp" */
 /* The screen's own name buffer -- the edit box writes straight into it, and
  * the screen is 0x84 bytes so it has 0x20 to work with against a limit of
  * 0x18. Still the original's two handlers either side of it. */
@@ -7103,7 +7025,6 @@ typedef struct {
  * this a confirmation rather than a second reading. */
 #define ADDR_MOVIES_DELETE       0x0044E4F0u /* thiscall obj *(obj, flags) */
 #define ADDR_MOVIES_DESTRUCT     0x0044E510u /* thiscall void(obj) */
-#define ADDR_STR_MOVIES_BMP      0x0048B6F8u /* "02_012_00_movies.bmp" */
 /* Twelve thumbnail PAIRS at 0x0064, three pages of four, and the four button
  * pointers after them at 0x00C4. The sprite ids are set 3, indices 0xC8..0xCB
  * and then 0xD2..0xD9 -- a gap the screen does not care about, because the
@@ -7416,11 +7337,7 @@ typedef struct {
  * directory in front. Entry 24 is ADDR_DIR_SCRATCH, so one set's directory is
  * whatever was last written there. */
 #define ADDR_SPRITE_SET_DIRS      0x00489554u  /* const char *[] */
-#define ADDR_STR_FMT_DIR_SUB      0x00489738u  /* "%s\\%s" */
 #define ADDR_STR_FMT_S            0x004852B4u  /* "%s" */
-#define ADDR_STR_GLOB_BMP         0x00489720u  /* "%02d_%03d_%02d_*.bmp" */
-#define ADDR_STR_GLOB_SHA         0x00489708u  /* "%02d_%03d_%02d_*.sha" */
-#define ADDR_STR_SPRITE_MISSING   0x004896ECu  /* "Sprite file not found %s\n" */
 #define ADDR_SPRITE_REGISTER      0x004459E0u  /* void(spr, id) */
 #define ADDR_SCRIPT_PAD           0x004440E0u  /* keyword 26 */
 
@@ -7449,7 +7366,6 @@ typedef struct {
  * images, which is what makes the item count certain. */
 #define ADDR_PAD_NUMBER_ENTER     0x004376C0u  /* void(obj, AM2_PadNumber *) */
 #define ADDR_PAD_NUMBER_LEAVE     0x00437770u
-#define ADDR_STR_PAD_UNDERFLOW    0x004877C0u
 /* AM2_Pad's fields, named from what PadFinalise does with them. The pad is a
  * TRIGGER: a value, an operator and a threshold that ScriptCompare answers,
  * an "inside" flag, and two event ids with a uid slot each -- one for
@@ -7540,17 +7456,6 @@ typedef struct {
 #define ADDR_SVAR_DIFFICULTY      0x0065649Cu
 #define ADDR_SVAR_SYSTEMSPEED     0x00656470u
 #define ADDR_SVAR_NUMGREEN        0x00656350u
-/* The six names' own strings. `all` is the one ADDR_SVAR_ID15 holds the index
- * of, which is what makes that global's comment concrete: the id is
- * unreachable through the resolver's jump table and the NAME is `all`. */
-#define ADDR_STR_SVAR_ALL         0x00488900u
-/* The four colour names are ADDR_STR_GREEN, ADDR_STR_TAN, ADDR_STR_BLUE and
- * ADDR_STR_GREY, already in this file -- the alias ratchet refused a second
- * set the moment they were added, which is the rule doing its job on the very
- * commit that documents it. */
-#define ADDR_STR_SVAR_ME          0x004887C8u
-#define ADDR_STR_DIFFICULTY       0x00488898u
-#define ADDR_STR_SYSTEMSPEED      0x0048888Cu
 /* The uids the five keywords stand for. `all` and `green` are the SAME value;
  * see script.cpp. */
 #define AM2_SVAR_UID_ALL          0x64
@@ -7633,9 +7538,6 @@ typedef struct {
  * foreign owner, overwritten by an unconditional = 1 later with no read
  * between. Two siblings with one dead assignment is a template artefact, not a
  * misreading -- which is what makes reproducing it the right call. */
-#define ADDR_FMT_DEPLOY_TROOPER  0x0048A4ACu
-        /* "DeployTrooper: uid:%x, pos=(%d,%d)\n" -- and the uid it
-         * prints is OBJ_OFF_OWNER at +4, which the log calls a uid. */
 #define OBJ_OFF_WEAPON_UID       0x54Cu  /* handed to WeaponByUid */
 #define OBJ_OFF_FIELD_568        0x568u
 #define OBJ_OFF_FIELD_574        0x574u  /* int16_t, the facing widened */
@@ -7813,8 +7715,6 @@ typedef struct {
                                                * is NOT a guess: it logs
                                                * "DamageTrooper: droping armor
                                                * uid:%x". Reconstructed. */
-#define ADDR_STR_DROPPING_ARMOR  0x0048A248u  /* the misspelling is the
-                                               * original's */
 /* Its own constants. The soldier kind is left as a NUMBER: 3 gets a damage
  * discount here and is the only kind the gore roll applies to, and neither
  * says what it is -- the three kinds LoadType2 gives their own arm are 6, 7
@@ -7950,9 +7850,6 @@ typedef struct {
  * and each selecting a different scoreboard badge. Decoded from the image;
  * the branches that read them look identical. */
 #define ADDR_MP_PAUSE_BITS_A      0x0048C7A8u  /* {0x10,0x20,0x40,0x80} */
-#define ADDR_MP_PAUSE_BITS_B      0x0048C7B8u  /* {0x800..0x4000} */
-#define ADDR_MP_PAUSE_BITS_C      0x0048C7C8u  /* {0x20000..0x100000} */
-#define ADDR_STR_GAME_TYPE_GOAL   0x0048CC04u
 #define ADDR_MP_MARK_A            0x00664594u  /* AM2_Sprite * */
 #define ADDR_MP_MARK_B            0x00664598u
 #define ADDR_MP_MARK_C            0x0066459Cu
@@ -8574,9 +8471,6 @@ typedef struct {
  * consumer that does real work, dead on this data set. Not patched out of the
  * binary like the CD checks; simply never satisfied. */
 #define ADDR_HAVE_DEFAULT_COF    0x00511DDCu  /* int32_t */
-#define ADDR_STR_DEFAULT_COF     0x004851C0u  /* "default.cof" */
-#define ADDR_STR_UNIT_CPP        0x0048BDD8u  /* "C:\\ArmyMen2\\source\\unit.cpp" */
-#define ADDR_STR_NUMGREEN        0x004888F4u  /* the script variable it sets */
 /* docs/00-recon.md already maps this tag to unit.cpp, from the survey of every
  * CheckSaveTag site; this is the call it was recovered from. */
 #define AM2_SAVETAG_COF          0x06660668u  /* CheckSaveTag's expected tag */
@@ -8658,13 +8552,10 @@ typedef struct {
 /* 0x00444EF0, two callers, one of them the per-frame path. Raise the level's
  * "startupN" script event and then autosave. */
 #define ADDR_MISSION_STARTUP     0x00444EF0u  /* void(void) */
-#define ADDR_STR_STARTUP_FMT     0x00489540u  /* "startup%d" */
-#define ADDR_STR_MISSION_SAV_FMT 0x0048952Cu  /* "map%d_mission%d.sav" */
 #define AM2_MISSION_NAME_BYTES   0x50  /* int32_t(const char *) */
 #define ADDR_GAMEPROC_BLOCK      0x00511A68u  /* also a string; see below */
 #define AM2_GAMEPROC_SAVE_SIZE   0x438u       /* 1080 bytes, and its own tag */
 #define ADDR_GAMEPROC_STR_B      0x00511B88u  /* a second string inside it */
-#define ADDR_STR_GAMEPROC_CPP    0x004851ECu  /* "C:\\ArmyMen2\\source\\gameproc.cpp" */
 /* 0x00425950, one caller. Open the current save for reading, verify its
  * gameproc section, rewind it, and hand back the open FILE -- or close it and
  * answer NULL. The two names it needs are both inside ADDR_GAMEPROC_BLOCK. */
@@ -8682,7 +8573,6 @@ typedef struct {
 #define ADDR_FREE_SCRIPT_NAMES   0x0043F030u  /* void(void), 3 callers */
 #define ADDR_SAVE_SCRIPT_SECTION 0x0043F0A0u  /* int32_t(FILE *) */
 #define ADDR_LOAD_SCRIPT_SECTION 0x0043F150u  /* int32_t(FILE *) */
-#define ADDR_STR_SCRIPT_CPP      0x004888A4u  /* "C:\\ArmyMen2\\source\\script.cpp" */
 #define AM2_SAVETAG_SCRIPT       0x06660002u
 
 #define ADDR_SAVE_EVENT_SECTION  0x00422470u  /* int32_t(FILE *) */
@@ -8690,7 +8580,6 @@ typedef struct {
 #define ADDR_LOAD_PAD_SECTION    0x00437AE0u  /* int32_t(FILE *) */
 #define ADDR_RESET_PADS          0x004373C0u  /* void(void), 2 callers */
 #define ADDR_RESET_PADS_ALIAS    0x004373F0u  /* void(void), one jmp to it */
-#define ADDR_STR_PAD_CPP         0x004877F8u  /* "C:\\ArmyMen2\\source\\pad.cpp" */
 #define AM2_SAVETAG_PAD          0x06660005u
 #define AM2_PAD_NUMBERS_BYTES    0x4C00u      /* 256 entries of 76 */
 #define AM2_PADS_BYTES           0x9000u      /* 512 entries of 72 */
@@ -8713,7 +8602,6 @@ typedef struct {
 #define ADDR_MAP_BLOCK           0x00514D90u  /* char[] first, 416 bytes total */
 #define AM2_MAP_SAVE_SIZE        0xECu        /* 236 bytes, the saved prefix */
 #define AM2_SAVETAG_MAP          0x06660009u
-#define ADDR_STR_MAP_CPP         0x00486410u  /* "C:\\ArmyMen2\\source\\map.cpp" */
 /* 0x0042DBB0, "Checksum of %s " and "is %x " -- its own name. Seven callers,
  * and it sits immediately after the two map save/load functions, which is the
  * evidence for filing it in map.cpp: the band alone only says
@@ -8953,7 +8841,6 @@ typedef struct {
 /* 0x0045DAA0, one caller, and it names itself in the message above. Build a
  * DELTA update for one vehicle and append it to a message buffer whose first
  * word is its length. Returns nothing; the buffer's length is the output. */
-#define ADDR_STR_VEHICLE_UPDATE_APPEND 0x0048BFDCu
 #define ADDR_VEHICLE_UPDATE_APPEND 0x0045DAA0u /* void(msg, vehicle) -- the
                                                   caller pushes the vehicle
                                                   then the buffer */
@@ -9493,7 +9380,6 @@ typedef struct {
  * the current directory, so a surface lost after the game has chdir'd into a
  * map directory can still be rebuilt. */
 #define ADDR_LOAD_BITMAP          0x004462F0u  /* void *(const char *, int32) */
-#define ADDR_STR_LOAD_SPRITE_FAIL 0x004897CCu  /* "Unable to load sprite %s\n" */
 #define ADDR_CRT_ATOI             0x004660A7u  /* int32_t(const char *) */
 #define ADDR_PARSE_SPRITE_NAME    0x0042E310u  /* int32_t(name, int32*x3) */
 /* The pseudo-SET a bitmap loaded by plain filename is registered under. The
@@ -9501,7 +9387,6 @@ typedef struct {
  * does not parse still lands in the same key space as one that does. */
 #define AM2_SPRITE_SET_BY_NAME    99
 #define ADDR_STR_BITMAPS_DIR      0x00478670u  /* "bitmaps" */
-#define ADDR_STR_MAPWAIT_BMP      0x0048520Cu  /* "mapwait.bmp" */
 /* 0x16 is 22, which is AM2_SUBSTATE_BASE -- the FIRST arm of the thirteen-entry
  * sub-state table, and one of the nine that repaint when the overlay is dirty
  * and then call DrawMenuOverlay. The flag it raises alongside is
@@ -10695,8 +10580,6 @@ typedef struct {
  * under `-df` -- by globbing `<map>\<set>\masks\%02d_%03d_%02d_*.msk` for a
  * loose file. Reconstructed. */
 #define ADDR_LOAD_MASK             0x00435280u  /* void(out, set, idx, frame) */
-#define ADDR_STR_FMT_MASK_DIR      0x00487448u  /* "%s\\%s\\masks" */
-#define ADDR_STR_GLOB_MSK          0x00487430u  /* "%02d_%03d_%02d_*.msk" */
 #define AM2_SPRITE_SET_MAP_FIRST   0x14  /* below this LoadMask's -df arm gives up */
 /* The record both halves fill. Only the loose arm is read here, so the two
  * words are named for WHERE THEY COME FROM rather than for what they mean:
@@ -11346,7 +11229,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* Frees every level of the object-script table and is what the loader calls
  * first. Three callers. Reconstructed, so the loader calls it directly. */
 #define ADDR_FREE_OBJ_SCRIPTS       0x004368D0u  /* void(void) */
-#define ADDR_STR_OBJSCRIPT_CPP      0x0048758Cu  /* "C:\\ArmyMen2\\source\\objscript.cpp" */
 #define AM2_SAVETAG_OBJSCRIPT       0x06660008u
 #define AM2_OBJ_STATE_REC_SIZE      16u
 #define AM2_OBJ_FRAME_REC_SIZE      20u
@@ -11597,7 +11479,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_FIRE_WEAPON_AT_OBJECT 0x004201A0u /* void(wpn,unit,head,uid) */
 #define ADDR_UNIT_FIRE_AT_POINT    0x00420260u /* void(unit,head,at) */
 #define ADDR_UNIT_FIRE_AT_OBJECT   0x00420300u /* void(unit,head,uid) */
-#define ADDR_STR_NOT_A_WEAPON     0x0048C6E0u  /* "uid wasn't a weapon!\n" */
 #define AM2_OBJ_TYPE_WEAPON       4
 /* 0x00447990, "RemoveInventoryItem": take one slot out of a unit's six-entry
  * weapon inventory. 0x00449860 selects a slot -- it writes the index to
@@ -12222,12 +12103,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_STR_MODE_R          0x00478950u  /* "r" */
 #define ADDR_STR_RULES_DIR       0x004774ACu  /* "rules" */
 #define ADDR_STR_AAI_DIR         0x00473D9Cu  /* "aai" */
-#define ADDR_FMT_DOT_TXT         0x00485178u  /* "%s.txt" */
-#define ADDR_FMT_DOT_AMM         0x00486330u  /* "%s.amm" */
-#define ADDR_FMT_PREV_BMP        0x004870A8u  /* "%s_prev.bmp" */
-#define ADDR_STR_GAME_AAI        0x004870E8u  /* "game.aai" */
-#define ADDR_STR_OBJECT_AAI      0x004870DCu  /* "object.aai" */
-#define ADDR_STR_TROOP_AAI       0x004870D0u  /* "troop.aai" */
 #define ADDR_STR_VEHICLE_AAI     0x00473D64u  /* "vehicle.aai" */
 /* The image carries the .aai names TWICE. The lowercase set above, at
  * 0x004870xx, and the mixed-case set LoadDefTables uses, here -- and the two
@@ -12299,7 +12174,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define RANK_SRC_OFF_FIRE_PCT    0x14u
 #define RANK_SRC_OFF_THRESHOLD   0x18u
 #define RANK_SRC_OFF_XP          0x1Cu
-#define ADDR_STR_WEAPON_AAI      0x004870C4u  /* "weapon.aai" */
 #define ADDR_RULES_CHECKSUM_VAL  0x00511CD4u  /* uint32_t, the rules total */
 #define ADDR_MP_SCRIPT_CHKSUM_VAL 0x00511CD0u /* uint32_t */
 #define ADDR_MAP_CHECKSUM_VAL    0x00511CCCu  /* uint32_t */
@@ -12312,7 +12186,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define PREVIEW_OFF_SPRITE       0x58   /* AM2_Sprite *, the class's own copy */
 #define PREVIEW_OFF_FLAGS        0x5C   /* int32_t, passed to the loader */
 #define ADDR_SHOW_BAD_PREVIEW    0x00430330u  /* void(AM2_Widget *) */
-#define ADDR_STR_BAD_MP_PREV     0x004870B4u  /* "bad_mp_prev.bmp" */
 /* Was ADDR_MP_PANEL_REFRESH, which is where OpenMpHost calls it and not what
  * it does: three of its four callers have no panel at all. Renamed, not
  * aliased. */
@@ -12328,12 +12201,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * the buffer a mission's script fills -- so "act2" and "portal" are reached from
  * script data and not from any literal in the image. */
 #define ADDR_STR_MOVIE_3DO       0x0048658Cu  /* "3do" */
-#define ADDR_STR_MOVIE_CREDITS   0x00486584u  /* "credits" */
-#define ADDR_STR_MOVIE_ACT2      0x004865A4u  /* "act2" */
-#define ADDR_STR_MOVIE_ACT1      0x004865ACu  /* "act1", pooled AFTER act2 */
-#define ADDR_STR_MOVIE_PORTAL    0x0048659Cu  /* "portal" */
 #define ADDR_STR_MOVIE_SMALL     0x00486598u  /* "sml" */
-#define ADDR_STR_MOVIE_EXT       0x00486590u  /* ".smk" */
 /* operator new's argument in PlayMovie, and the volume floor below which the
  * film is played silent. */
 #define AM2_MOVIE_SIZE           0xC4
@@ -12433,9 +12301,7 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * it tests: every player whose AM2_PLAYER_ID is neither 0 nor -1 must have it
  * set, and an empty table answers yes. Reconstructed; both measured at 0,
  * since their caller is on the multiplayer start path. */
-/* The two the launch button announces, and the panel's launch handler. */
-#define ADDR_MSG_VERSION_MISMATCH 0x00487210u
-#define ADDR_MSG_HOST_WAITING     0x004871DCu
+/* The panel's launch handler. */
 #define ADDR_MP_ON_LAUNCH         0x00431850u /* void(AM2_Widget *) */
 #define ADDR_ALL_PLAYERS_AGREED  0x0040F8A0u  /* thiscall int32(comm) */
 #define ADDR_ALL_PLAYERS_READY   0x0040F8E0u  /* thiscall int32(comm) */
@@ -13458,25 +13324,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* IT NAMES ITSELF -- "-->Trooper Want Item Received" -- so this is the
  * kind-0x19 receiver for TrooperWantItemSend, and the two together are the
  * whole pickup protocol. Reconstructed as RecvTrooperWantItem; see
- * armymsg.cpp. Its five strings: */
+ * armymsg.cpp. */
 #define ADDR_RECV_TROOPER_WANT_ITEM 0x0044C680u  /* void(void *msg) */
-#define ADDR_STR_WANT_RECV_HDR     0x0048ACF8u
-/* ADDR_STR_RECV_DROP_GONE already names 0x0048ACC0 -- the two receivers
- * share the one "but we handled it" line. Grepped the ADDRESS, and the
- * ratchet caught it when I had only grepped the name. */
-#define ADDR_STR_TELL_PICKUP       0x0048AC9Cu
-#define ADDR_STR_TELL_DROP         0x0048AC78u
-#define ADDR_STR_REQ_PICKUP_OK     0x0048AC48u
-#define ADDR_STR_REQ_PICKUP_DENY   0x0048AC20u
-#define ADDR_STR_REQ_DROP          0x0048ABF8u
 /* Reconstructed. The receiver for the message TrooperDropItemSend sends, so
  * the sender, this and TrooperDropItem itself are one closed group now. Four
  * log lines, all gated on COMM_OFF_VERBOSE. */
 #define ADDR_RECV_TROOP_DROP_ITEM 0x0044C9C0u /* eTROOPER_DROP_ITEM_MESSAGE */
-#define ADDR_STR_RECV_DROP_HDR    0x0048ADACu
-#define ADDR_STR_RECV_DROP_GONE   0x0048ACC0u
-#define ADDR_STR_RECV_DROP_DONE   0x0048AD80u
-#define ADDR_STR_RECV_DROP_MINE   0x0048AD54u
 /* 0x0044BFA0, two callers -- one of them the kind-0x19 RECEIVER, which
  * re-sends. The same 0x1C-byte record TrooperDropItemSend fills, under kind
  * 0x19 instead of 0x21, with two differences: the point comes from the ITEM's
@@ -13484,11 +13337,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * rather than the literal DO_DROP. Reconstructed. */
 #define ADDR_TROOPER_WANT_ITEM_SEND 0x0044BFA0u /* void(troop,item,req,slot,q) */
 #define AM2_MSG_TROOPER_WANT_ITEM 0x19u
-#define ADDR_STR_WANT_SEND_HDR    0x0048A900u
-#define ADDR_STR_WANT_PICKUP      0x0048A8DCu
-#define ADDR_STR_WANT_DROP        0x0048A8B8u
-#define ADDR_STR_DO_PICKUP        0x0048A898u
-#define ADDR_STR_DO_DROP          0x0048A878u
 /* Reconstructed. The receiver for eTROOPER_SET_WEAPON_MESSAGE, and the twin
  * of armymsg.cpp's SendTrooperSetWeapon: put the weapon's uid in the
  * trooper's inventory SLOT, set the soldier kind from the weapon's code, and
@@ -13498,15 +13346,9 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MSG_SETWEAPON_OFF_TROOPER  0x04u
 #define MSG_SETWEAPON_OFF_WEAPON   0x08u
 #define MSG_SETWEAPON_OFF_SLOT     0x18u  /* the inventory slot, 0..5 */
-#define ADDR_STR_RECV_SETW_LINK    0x0048AB14u
-#define ADDR_STR_RECV_SETW_NO_TROOP 0x0048AAD8u
-#define ADDR_STR_RECV_SETW_NO_WEAP 0x0048AA9Cu
 #define AM2_MSG_TROOPER_DROP_ITEM 0x21u
 #define AM2_MSG_TROOP_FIRST       0x16u
 #define AM2_MSG_TROOP_LAST        0x22u
-#define ADDR_STR_UNKNOWN_TROOP_MSG 0x0048AB5Cu
-#define ADDR_STR_GOT_DROP_ITEM     0x0048ABC0u
-#define ADDR_STR_GOT_SET_WEAPON    0x0048AB88u
 #define ADDR_VEHICLE_MSG_RECV    0x0045E590u  /* void(msg *, int32_t army) */
 /* Reconstructed. Eleven arms over message kinds 0x1B..0x25, and the four in
  * the middle -- 0x20 through 0x23 -- fall to the "unknown" log rather than to
@@ -13527,14 +13369,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * VehicleUpdateAppend writes, and returns the cursor past what it consumed,
  * which is what makes the batch loop terminate. */
 #define ADDR_VEHICLE_UPDATE_APPLY 0x0045DF10u /* uint8_t *(rec, int32 army) */
-#define ADDR_STR_VEHICLE_UNPACK 0x0048C0A0u
-#define ADDR_STR_VEHICLE_ENTER_RECV 0x0048C3ECu
-#define ADDR_STR_VEH_WANT_ITEM_RECV 0x0048C2DCu
-#define ADDR_STR_VEH_DROP_ITEM_RECV 0x0048C338u
-#define ADDR_STR_VEHICLE_ENTER_SENT 0x0048C1ECu
-#define ADDR_STR_VEHICLE_FIRE_SEND 0x0048C1A0u
-#define ADDR_STR_VEHICLE_FIRE_RECV 0x0048C394u
-#define ADDR_STR_VEH_WANT_ITEM_SEND 0x0048C148u
 #define ADDR_RECV_VEHICLE_1C     0x0045E980u  /* void(msg *) */
 #define ADDR_RECV_VEHICLE_1D     0x0045E630u
 #define ADDR_RECV_VEHICLE_1E     0x0045E810u
@@ -13547,17 +13381,14 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * OBJ_OFF_RIDING, and give it the vehicle's OBJ_OFF_HEIGHT_SET so it steps out
  * at the right height. Reconstructed. */
 #define ADDR_VEHICLE_TAKE_OUT    0x0045ADD0u  /* void(uint32_t uid, void *veh) */
-#define ADDR_STR_VEH_EXIT_RECV   0x0048C424u
 #define AM2_MSG_VEHICLE_FIRST    0x1Bu
 #define AM2_MSG_VEHICLE_LAST     0x25u
-#define ADDR_STR_UNKNOWN_VEH_MSG 0x0048C2ACu
 /* Who won, written only by the two game-over arms of the army dispatcher. */
 /* 0x0044D110, one caller. Read Options.cfg back into the settings globals.
  * 395 bytes, and the first function of a merged entry -- see ADDR_WIN_ENABLED
  * below for what the rest of that entry does. */
 #define ADDR_LOAD_OPTIONS        0x0044D110u  /* void(void) */
 #define AM2_OPTIONS_MIN_BYTES    0x24   /* the seek that proves it is whole */
-#define ADDR_STR_OPTIONS_NOREAD  0x0048B454u /* "Failed to open Options.cfg\n" */
 #define AM2_VOLUME_SENTINEL      (-2000)
 #define AM2_VOLUME_SILENT        (-10000)
 #define ADDR_GAME_WINNER         0x00512300u  /* int32_t */
@@ -14113,16 +13944,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_MP_ON_MAP_PICK      0x00431D80u  /* void(w, rows, row) */
 #define ADDR_GAME_OPERATOR_NEW   0x00464900u  /* void *(size_t); MSVC operator new */
 #define ADDR_START_MULTIPLAYER   0x0042F310u  /* void(void), a button handler */
-#define ADDR_MP_DATA_PROBE       0x0048700Cu  /* "data\\mpalpine" */
-#define ADDR_DATA_MISSING_TEXT   0x00486FA4u  /* "...multi-player with a compact installation." */
-#define ADDR_DATA_MISSING_CAPTION 0x00486FFCu /* "Data Missing" */
 #define ADDR_MENU_REQUEST_SET    0x00511DC4u  /* int32_t, non-zero when one is pending */
 
 /* Copies the pending settings block at 0x00516xxx over the active one at
  * 0x00515Fxx, resets the comm slots and copies the two player-name strings.
  * Named for what its body does; stays original. */
 #define ADDR_APPLY_GAME_SETTINGS 0x0042F170u  /* void(void) */
-#define ADDR_FMT_COMPUTER_N      0x00486EC4u  /* "Computer%d" */
 #define ADDR_START_SELECTED_GAME 0x0042ECF0u  /* void(void), a button handler */
 #define COMM_OFF_TRACE           0x470u
 #define COMM_OFF_LOG             0x474u
@@ -14318,7 +14145,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_AIM_Z               0x0051256Cu  /* int16_t -> UNIT_OFF_FIRE_Z */
 #define ADDR_DBL_MS_PER_SEC      0x0046F990u  /* 1000.0 */
 #define ADDR_DBL_MAX_PERIOD      0x0046F988u  /* 1.0 -- worse than 1 kHz loses */
-#define ADDR_STR_HIGH_PERF       0x00485438u  /* "Using High Performance Counter\n" */
 /* Was ADDR_SHUTDOWN_OBJ, which named the ONE teardown call site rather than
  * the object. It is a {capacity, count, items} ptr list of object UIDs, capped
  * at 64 and deduplicated on the way in, and adding to it also sets bit 0x400
@@ -14547,7 +14373,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * fonts, and start title.wav. Then decide which menu to open. */
 #define ADDR_STATE1_ENTER        0x004262E0u
 #define ADDR_DIR_TITLE_PTR       0x004852D0u  /* const char *, "01-title" */
-#define ADDR_STR_TITLE_WAV       0x00485218u
 /* Was ADDR_INIT_DIGIT_TABLE, "fills 0x004FCDF8" -- one of the five things it
  * does. It frees the old menu sprites, builds TWO byte tables, loads the digit
  * sprites when the game is in state 2, resets the menu cursor's two rects and
@@ -14616,10 +14441,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * pass, and what State2Enter's view snap reads back. */
 #define ADDR_LEADER_POS          0x00511E50u  /* {int16 x, int16 y} */
 #define ADDR_LEADER_FACING       0x00511E54u  /* uint8_t */
-#define ADDR_STR_LEVEL_PAL       0x004851D4u  /* "palette.bmp" */
-#define ADDR_STR_LOADING_BMP     0x004851ACu  /* "load_default.bmp" */
-#define ADDR_STR_ATTEMPT         0x0048519Cu  /* "Attempt# %d\n" */
-#define ADDR_STR_REGION_DATA     0x00485180u  /* "calculating region data..." */
 #define ADDR_SUBSTATE22          0x00425C10u
 /* Sub-state 33's other arm: the one that runs while the game is PAUSED, where
  * ADDR_TAKE_MENU_REQUEST runs when it is not. Named for the body rather than
@@ -14688,7 +14509,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define ADDR_CD_PRESENT          0x00512588u  /* int32_t */
 #define ADDR_CD_FOUND_FLAG       0x00512594u  /* int32_t, set alongside it */
 #define ADDR_CD_PATH             0x00512464u  /* char[], the drive root */
-#define ADDR_CD_LABEL            0x004852B8u  /* "ARMYMEN2" */
 #define ADDR_GAME_STRICMP        0x00465F90u  /* the game's own CRT */
 #define ADDR_GAME_SPRINTF        0x00464CE2u
 #define ADDR_RESET_TO_TITLE      0x004249C0u
@@ -16131,7 +15951,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * until one is not AM2_SAVE_ITEM_MARK. docs/savetags.tsv already had the
  * loader's site -- item.cpp line 1192, tag 0x06660007 -- from the string it
  * passes CheckSaveTag. */
-#define ADDR_STR_ITEM_CPP    0x00485C58u  /* "C:\\ArmyMen2\\source\\item.cpp" */
 #define ADDR_SAVE_ITEMS     0x00428950u  /* int32_t(FILE *) */
 #define ADDR_LOAD_ITEMS     0x00428BB0u  /* int32_t(FILE *) */
 /* The nine functions ADDR_SAVE_ONE_ITEM dispatches to -- a header and one per
@@ -16633,7 +16452,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* The SENDER for the same code, and it names itself the same way:
  * "itemDeployMessageSend: uid=%x, pos=(%d,%d), facing=%d". Sixteen bytes. */
 #define AM2_MSG_ITEM_DEPLOY_LEN  0x10u
-#define ADDR_STR_SEND_ITEM_DEPLOY 0x00485E3Cu
 #define ADDR_RECV_OBJ_DESTROYED  0x0042AF00u
 #define ADDR_RECV_DAMAGE         0x0042ADA0u
 #define ADDR_RECV_ITEM_CREATE    0x0042AFA0u
@@ -16704,9 +16522,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * and the alias ratchet refused both in one run. The first is also SaveType3's
  * opening call, which is worth knowing: a SAVE function clearing a footprint
  * is not what the name suggests either function is for. */
-#define ADDR_STR_RECV_ITEM_GONE  0x00485F20u
-#define ADDR_STR_RECV_DEATH      0x00485EF0u
-#define ADDR_STR_RECV_ITEM_DEPLOY 0x00485F3Cu
 /* The deploy message's own layout, confirmed from BOTH ends: SendItemDeploy
  * packs these offsets and RecvItemDeploy reads the same ones. The byte at
  * 0x0D reaches DeployItem's `resurrect` parameter, which is what finally
@@ -16715,7 +16530,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MSG_DEPLOY_OFF_POS       8u    /* packed point; x at +8, y at +0x0A */
 #define MSG_DEPLOY_OFF_FACING    0x0Cu /* uint8_t */
 #define MSG_DEPLOY_OFF_RESURRECT 0x0Du /* uint8_t */
-#define ADDR_STR_RECV_DAMAGE     0x00485EB0u
 /* The damage message. It carries no direction: the receiver computes one with
  * ADDR_ANGLE_BETWEEN from the position at MSG_DAMAGE_OFF_POS to the victim's
  * own, masked to a byte.
@@ -16736,8 +16550,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MSG_DAMAGE_OFF_AMOUNT    0x10u /* int16_t */
 #define MSG_DAMAGE_OFF_KIND      0x12u /* uint8_t */
 #define AM2_MSG_DAMAGE_LEN       0x14u
-#define ADDR_STR_SEND_DAMAGE     0x00485DB0u
-#define ADDR_STR_RECV_ITEM_CREATE 0x00485F78u
 /* The item-create message and the four creators it dispatches to. The switch
  * is on MSG_CREATE_OFF_TYPE and the four arms map onto the object types this
  * project already knows: 1 item, 2 trooper, 3 vehicle, 4 weapon.
@@ -16836,8 +16648,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * for recording the gap precisely instead. */
 #define ADDR_CREATE_WEAPON       0x0045F0C0u  /* type 4; names itself */
 #define AM2_WEAPON_BYTES         0xD4u    /* malloc size; 0x35 dwords cleared */
-#define ADDR_STR_CREATE_WEAPON   0x0048C708u
-#define ADDR_STR_CREATE_WEAPON_FAIL 0x0048C6F8u
 /* 0x00448280, 256 bytes, EIGHT callers -- the multiplayer weapon RESPAWN, read
  * but not reconstructed. Its four gates are all guards and each one is worth
  * knowing before trying to exercise it: the object must be ObjIsType4, there
@@ -17626,22 +17436,17 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x0042AB50, FOUR callers -- the four creators, one per object type, which is
  * the same fourfold split RecvItemCreate dispatches on. Reconstructed. */
 #define ADDR_SEND_ITEM_CREATE    0x0042AB50u  /* void(void *obj) */
-#define ADDR_STR_SEND_ITEM_CREATE 0x00485E74u
 #define AM2_TROOPER_SARGE_SUBTYPE 0x0A
 #define AM2_TROOPER_SUBTYPE_LEADS 0xA  /* then SetLeadsAndAct runs */
 #define AM2_WEAPON_KEY_KIND      0x2D  /* KeyLookupTriple's first argument */
-#define ADDR_STR_ITEM_GONE_SEND  0x00485E10u
 #define AM2_MSG_OBJ_DESTROYED    0x10u
 #define AM2_MSG_OBJ_DESTROYED_LEN 8u
-#define ADDR_STR_SEND_TROOPER_WEAPON 0x0048AA60u
 #define AM2_MSG_TROOPER_WEAPON   0x22u
 #define AM2_MSG_TROOPER_WEAPON_LEN 0x1Cu
 /* The message ADDR_VEHICLE_DROP_OCCUPANT sends -- twelve bytes, with the
  * header's uid the VEHICLE and the dword after it the occupant. */
 #define AM2_MSG_VEHICLE_EXIT     0x25u
 #define AM2_MSG_VEHICLE_EXIT_LEN 0x0Cu
-#define ADDR_STR_VEH_EXIT_SEND   0x0048C27Cu
-#define ADDR_STR_VEH_EXIT_SENT   0x0048C24Cu
 /* A 3-bit field at bit 18 of the object's word at +8, get and set. Named for
  * its position rather than its meaning; src/game/item.h records what points at
  * an army index and what argues against it. */
@@ -17919,7 +17724,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 /* 0x0045E300, and it names itself: "<--Vehicle Enter Send: Vehicle: %x,
  * item: %x". The counterpart of SendVehicleExit, one kind lower. */
 #define ADDR_SEND_VEHICLE_ENTER    0x0045E300u  /* void(vehicle, unit) */
-#define ADDR_STR_VEHICLE_ENTER_SEND 0x0048C21Cu
 #define AM2_MSG_VEHICLE_ENTER      0x24u
 #define AM2_MSG_VEHICLE_ENTER_LEN  0x0Cu
 /* 0x0045E0D0, and it names itself: "<--Vehicle Want Item Send: Vehicle: %x,
@@ -17985,8 +17789,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define AM2_VEHICLE_BYTES          0x5DCu
 #define AM2_VEHICLE_RANK           6
 #define AM2_VEHICLE_WEAPON_FLAGS   4
-#define ADDR_STR_VEHICLE_NO_AAI    0x0048BFB0u /* "Vehicle aai entry not found
-                                                * for type %d" */
 /* Two more bits of a ROW's flags word, named for the bit as ROW_FLAG_BIT8 is
  * and for the same reason: CreateVehicle sets 6 and 8 together on the hull row
  * and 5 alone on the turret, and nothing read so far says what any of them

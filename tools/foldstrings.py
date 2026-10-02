@@ -37,7 +37,7 @@ FOLD = [
     # char* -- folded so the port carries its own literal (e.g. STR_FMT_S "%s",
     # used to build filenames, whose blob copy going missing broke the title).
     "STR_NEWLINE", "STR_AAI_DIR", "STR_DOT", "STR_DEF_FILE_MODE", "STR_TAN",
-    "STR_FMT_S", "STR_MOVIE_CREDITS", "STR_MOVIE_3DO", "STR_MOVIE_SMALL",
+    "STR_FMT_S", "STR_MOVIE_3DO", "STR_MOVIE_SMALL",
     "STR_ANY_FILE", "STR_GLOB_ALL", "STR_LINE_BREAK", "MODE_WB",
     "STR_KERNEL32", "STR_USER32", "STR_MESSAGEBOXA",
     "STR_ISPROCESSORFEATUREPRESENT",

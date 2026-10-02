@@ -14,8 +14,6 @@
 #define ADDR_STR_TAN ((uintptr_t)(const char *)"tan")
 #undef ADDR_STR_FMT_S
 #define ADDR_STR_FMT_S ((uintptr_t)(const char *)"%s")
-#undef ADDR_STR_MOVIE_CREDITS
-#define ADDR_STR_MOVIE_CREDITS ((uintptr_t)(const char *)"credits")
 #undef ADDR_STR_MOVIE_3DO
 #define ADDR_STR_MOVIE_3DO ((uintptr_t)(const char *)"3do")
 #undef ADDR_STR_MOVIE_SMALL
