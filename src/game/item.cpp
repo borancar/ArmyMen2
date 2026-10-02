@@ -3378,10 +3378,11 @@ static inline int32_t ShotPiercesArmour(const uint8_t *target, const uint8_t *sh
 
     rec  = *(const uint8_t *const *)(target + OBJ_OFF_FIELD_94);
     need = *(const uint8_t *)(rec + TYPEREC_OFF_FIELD_3C);
-    if (!need)
+    if (need <= 0)
         return 1;
-
-    return *(const uint8_t *)(shot + OBJ_OFF_SCRIPT_ID) >= need ? 1 : 0;
+    if (*(const uint8_t *)(shot + OBJ_OFF_SCRIPT_ID) < need)
+        return 0;
+    return 1;
 }
 
 /* The two exits that ask what the target's class makes of the shot: a class 1
@@ -3391,13 +3392,14 @@ static inline int32_t ShotPiercesArmour(const uint8_t *target, const uint8_t *sh
  * same `sbb`/`neg` idiom. */
 static inline int32_t ShotBeatsClass(const uint8_t *target, const uint8_t *shot)
 {
-    uint8_t power = *(const uint8_t *)(shot + OBJ_OFF_SCRIPT_ID);
-
+    /* The shot's power is read inside each case, not before the switch. */
+#define power (*(const uint8_t *)(shot + OBJ_OFF_SCRIPT_ID))
     switch (ClassifyByCode74(target)) {
     case 1:  return power > AM2_SHOT_PIERCE_CLASS1 ? 1 : 0;
     case 2:  return power > AM2_SHOT_PIERCE_CLASS2 ? 1 : 0;
     default: return 1;
     }
+#undef power
 }
 
 /* Is the target facing within AM2_SHOT_FACING_ARC of the shot? The original
@@ -3471,12 +3473,14 @@ int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
     if (*(const int8_t *)(t + OBJ_OFF_ARMY) == army) {
         if (ObjIsTypeIn238((const AM2_Object *)t)) {
             if (ObjIsType2((const AM2_Object *)t)) {
-                int32_t sarge = 0;
+                int32_t sarge;
 
                 if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
                     && *(const int32_t *)(t + OBJ_OFF_SOLDIER_KIND)
                        == AM2_SARGE_SOLDIER_KIND)
                     sarge = 1;
+                else
+                    sarge = 0;
 
                 if (!Type2Field5A4Set((const AM2_Object *)t) && !sarge
                     && code != AM2_SHOT_CODE_RANDOM)
@@ -3529,7 +3533,7 @@ int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
             goto refuse;
 
         if (ShotCodeChecksArmour(code) && !ShotPiercesArmour(t, s))
-            goto refuse;
+            return 0;
 
         *(int32_t *)(s + OBJ_OFF_FORMATION_SLOT) = 1;
         return 1;
@@ -3545,7 +3549,7 @@ int32_t __cdecl ShotHitsObj(void *target, int32_t code, int32_t army,
     }
 
     if (ShotCodeChecksArmour(code) && !ShotPiercesArmour(t, s))
-        goto refuse;
+        return 0;
 
     return 1;
 }

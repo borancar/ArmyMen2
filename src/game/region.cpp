@@ -2587,26 +2587,28 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
                        + rect[0];
 
         for (x = rect[0]; x <= rect[2]; x++, idx++, cell++) {
-            uint8_t *weights =
-                *(uint8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
+#define weights (*(uint8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
+            uint16_t tile;
             int8_t   h;
             int8_t   nh;
 
-            if (!(cells[idx] & 1))
+            if (!cells[idx] || !(cells[idx] & 1))
                 continue;
 
-            h  = (int8_t)weights[cell & 0xFFFF];
+            tile = (uint16_t)cell;
+            h  = (int8_t)weights[tile];
             nh = (int8_t)(h + height);
 
             if (h <= 15 && nh >= 15)
-                ShiftTileCover(cell, 1, 1);
-            else if (h >= 15 && nh < 15)
-                ShiftTileCover(cell, -2, -1);   /* `add dl, 0xFE`: two off the centre */
+                ShiftTileCoverUp(tile);
+            else if (nh < 15 && h >= 15)
+                ShiftTileCover(tile, -2, -1);   /* `add dl, 0xFE`: two off the centre */
 
-            weights[cell & 0xFFFF] = (uint8_t)nh;
+            weights[tile] = (uint8_t)nh;
+#undef weights
 
             if (damage) {
-                int32_t   ox = 0, oy = 0;
+                int32_t   ox, oy;     /* TileToXY writes both */
                 uint32_t  at;
                 uint8_t  *hit;
 
