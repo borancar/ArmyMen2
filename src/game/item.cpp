@@ -12926,19 +12926,20 @@ void __cdecl StepType5(void *obj)
     while (travel > 0.0) {
         float   d = travel < AM2_MISSILE_SUBSTEP ? travel
                                                  : AM2_MISSILE_SUBSTEP;
-        float   fx, fy;
         int32_t nx, ny;
 
-        fx = Cos8(*(const uint8_t *)(o + OBJ_OFF_FACING)) * d
-             + *(const float *)(o + MISSILE_OFF_FRAC_X);
-        fy = Sin8(*(const uint8_t *)(o + OBJ_OFF_FACING)) * d
-             + *(const float *)(o + MISSILE_OFF_FRAC_Y);
-        nx = (int32_t)fx;
-        ny = (int32_t)fy;
+        /* The fractions are accumulated in place and truncated from the
+         * fields themselves. */
+        *(float *)(o + MISSILE_OFF_FRAC_X) +=
+            Cos8(*(const uint8_t *)(o + OBJ_OFF_FACING)) * d;
+        *(float *)(o + MISSILE_OFF_FRAC_Y) +=
+            Sin8(*(const uint8_t *)(o + OBJ_OFF_FACING)) * d;
+        nx = (int32_t)*(const float *)(o + MISSILE_OFF_FRAC_X);
+        ny = (int32_t)*(const float *)(o + MISSILE_OFF_FRAC_Y);
         *(int16_t *)(o + OBJ_OFF_POS)     += (int16_t)nx;
         *(int16_t *)(o + OBJ_OFF_POS + 2) += (int16_t)ny;
-        *(float *)(o + MISSILE_OFF_FRAC_X) = fx - (float)nx;
-        *(float *)(o + MISSILE_OFF_FRAC_Y) = fy - (float)ny;
+        *(float *)(o + MISSILE_OFF_FRAC_X) -= (float)nx;
+        *(float *)(o + MISSILE_OFF_FRAC_Y) -= (float)ny;
 
         *(int32_t *)(o + MISSILE_OFF_FLOWN) += (int32_t)d;
 
