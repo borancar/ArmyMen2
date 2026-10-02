@@ -16328,7 +16328,7 @@ void __attribute__((thiscall)) AM2_Widget::ScrollBarPaint(RECT clip)
         + *(const int32_t *)(self + SCROLLBAR_OFF_SHIFT);
     box.right  = bar->bounds.right + x;
     y = box.top = w->rect.top
-        + ((w->rect.bottom - bar->bounds.bottom - w->rect.top) >> 1);
+        + ((w->rect.bottom - w->rect.top - bar->bounds.bottom) >> 1);
     box.bottom = bar->bounds.bottom + y;
 
     /* One IntersectRect, where ::WidgetPaint does two -- this one never meets

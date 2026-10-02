@@ -619,8 +619,7 @@ static inline void ParseCommandLine(char *cmdLine)
         c = (int8_t)*p;
         while (c > 0x20) {
             g_mapName[i++] = (char)c;
-            c = (int8_t)p[1];
-            p++;
+            c = (int8_t)*++p;
         }
         g_mapName[i] = '\0';
     }

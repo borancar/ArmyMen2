@@ -10350,18 +10350,17 @@ void __cdecl Step3Drive(void *obj, void *rec)
     int32_t   speed = 0;          /* ebp, spilled to E-28 */
     int32_t   tileArg = 0;        /* E-4, zeroed at entry and read once */
     uint32_t  step = 0;           /* E-20, MoveStepPoint's out point */
-    uint8_t   facing = 0;         /* E-24, after it stops holding the turn */
-    uint8_t   gunFacing = 0;      /* E-16 */
-    uint8_t  *animRec = 0;        /* E-12 */
+    uint8_t   facing;             /* E-24, after it stops holding the turn */
+    uint8_t   gunFacing;          /* E-16 */
+    uint8_t  *animRec;            /* E-12 */
 
     if (*(const uint16_t *)(o + 0x62u) != 0) {
         uint8_t  *gun = (uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS);
         uint32_t  target;
         int32_t   turn;
         int32_t   noTarget;
-        int32_t   first;
-        int32_t   second;
-        uint32_t  bits;
+        uint8_t   first;
+        uint8_t   second;
 
         if (*(const int32_t *)(o + 0x52Cu) == 5)
             Step3TurnState(o, o + 0x578u);
@@ -10372,11 +10371,12 @@ void __cdecl Step3Drive(void *obj, void *rec)
                      -8, 8);
 
         animRec = gun + 0x44u;
-        bits = *(const uint8_t *)(*(uint8_t *const *)animRec + 8);
         first  = RoundTo8((*(const uint8_t *)(gun + 0x5Cu)
-                           + *(const uint8_t *)(gun + 0x50u)) & 0xFF, bits);
+                           + *(const uint8_t *)(gun + 0x50u)) & 0xFF,
+                          *(const uint8_t *)(*(uint8_t *const *)animRec + 8));
         second = RoundTo8((*(const uint8_t *)(gun + 0x5Cu) + turn
-                           + *(const uint8_t *)(gun + 0x50u)) & 0xFF, bits);
+                           + *(const uint8_t *)(gun + 0x50u)) & 0xFF,
+                          *(const uint8_t *)(*(uint8_t *const *)animRec + 8));
 
         /* A sprite change is rate-limited: it needs either the per-vehicle
          * interval at +0x564 to have elapsed, or 800 ms outright. The
@@ -10385,20 +10385,20 @@ void __cdecl Step3Drive(void *obj, void *rec)
          * what was last committed. */
         if (first != second) {
             int32_t changed = (*(const int32_t *)(o + 0x5A8u) != 0
-                               || (uint8_t)second != *(const uint8_t *)(o + 0x5A4u));
+                               || second != *(const uint8_t *)(o + 0x5A4u));
             uint32_t age = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
                            - *(const uint32_t *)(gun + 0x58u);
 
             if ((age > *(const uint32_t *)(o + 0x564u) && changed)
                 || age > 0x320u) {
-                *(uint8_t *)(o + 0x5A4u) = (uint8_t)first;
+                *(uint8_t *)(o + 0x5A4u) = first;
                 *(uint32_t *)(gun + 0x58u) =
                     *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
             } else {
                 turn = 0;
             }
         }
-        gunFacing = (uint8_t)second;
+        gunFacing = second;
 
         facing = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING) + turn);
 
@@ -10518,13 +10518,12 @@ void __cdecl Step3Drive(void *obj, void *rec)
                           turn - 0x0F, turn + 0x0F);
 
             animRec = turret + 0x44u;
-            bits = *(const uint8_t *)(*(uint8_t *const *)animRec + 8);
             first  = RoundTo8((*(const uint8_t *)(turret + 0x5Cu)
                                + *(const uint8_t *)(turret + 0x50u)) & 0xFF,
-                              bits);
+                              *(const uint8_t *)(*(uint8_t *const *)animRec + 8));
             second = RoundTo8((*(const uint8_t *)(turret + 0x5Cu) + swing
                                + *(const uint8_t *)(turret + 0x50u)) & 0xFF,
-                              bits);
+                              *(const uint8_t *)(*(uint8_t *const *)animRec + 8));
 
             if (first != second) {
                 uint32_t now = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS;
@@ -10545,9 +10544,10 @@ void __cdecl Step3Drive(void *obj, void *rec)
 
             *(uint8_t *)(o + 0x530u) =
                 (uint8_t)(*(const uint8_t *)(o + 0x530u) + swing);
-            gunFacing = (uint8_t)RoundTo8(
+            gunFacing = RoundTo8(
                 (*(const uint8_t *)(turret + 0x5Cu) + swing
-                 + *(const uint8_t *)(turret + 0x50u)) & 0xFF, bits);
+                 + *(const uint8_t *)(turret + 0x50u)) & 0xFF,
+                *(const uint8_t *)(*(uint8_t *const *)animRec + 8));
         }
 
         /* --- firing --- */
@@ -10626,31 +10626,31 @@ void __cdecl Step3Drive(void *obj, void *rec)
     *(int32_t *)(o + OBJ_OFF_FIELD_44) = speed;
     SetKindFrames(o, *(const int32_t *)(r + 8));
 
+    /* The engine sound for the state, two tables of it -- wheeled (kind 1)
+     * and tracked (kinds 2, 3, 4, 6, 7) -- where states 2 and 3 share an arm
+     * and state 4 is silent. Each arm is its own call, which VC6 merges. */
+#define ENGINE(snd) PlaySoundAt((snd), 1, 0, *(const int16_t *)(o + 0x12u), \
+                                *(const int16_t *)(o + 0x14u))
     if (ListFirstField548(o)) {
-        int32_t kind  = *(const int32_t *)(o + 0x544u);
-        int32_t state = *(const int32_t *)(o + 0x52Cu);
-        int32_t snd   = -1;
+        int32_t kind = *(const int32_t *)(o + 0x544u);
 
-        /* Both tables generated from the image; see the header note on
-         * states 2 and 3 sharing an arm and state 4 being silent. */
         if (kind == 2 || kind == 3 || kind == 4 || kind == 6 || kind == 7) {
-            if (5 >= (uint32_t)state) {
-                static const int32_t kTracked[6] =
-                    { 0x18, 0x17, 0x19, 0x19, -1, 0x1A };
-                snd = kTracked[state];
+            switch (*(const int32_t *)(o + 0x52Cu)) {
+            case 1:          ENGINE(0x17); break;
+            case 0:          ENGINE(0x18); break;
+            case 2: case 3:  ENGINE(0x19); break;
+            case 5:          ENGINE(0x1A); break;
             }
         } else if (kind == 1) {
-            if ((uint32_t)state <= 5) {
-                static const int32_t kWheeled[6] =
-                    { 0x1C, 0x1B, 0x1D, 0x1D, -1, 0x1E };
-                snd = kWheeled[state];
+            switch (*(const int32_t *)(o + 0x52Cu)) {
+            case 1:          ENGINE(0x1B); break;
+            case 0:          ENGINE(0x1C); break;
+            case 2: case 3:  ENGINE(0x1D); break;
+            case 5:          ENGINE(0x1E); break;
             }
         }
-
-        if (snd >= 0)
-            PlaySoundAt(snd, 1, 0, *(const int16_t *)(o + 0x12u),
-                        *(const int16_t *)(o + 0x14u));
     }
+#undef ENGINE
 
     *(uint8_t *)((uint8_t *)*(void *const *)(o + OBJ_OFF_ROWS) + 0x50u) =
         *(const uint8_t *)(o + OBJ_OFF_FACING);
