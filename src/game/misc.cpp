@@ -990,9 +990,9 @@ void __cdecl RemapRleRuns(void *rle, void *unused, int32_t wide,
                           const void *table)
 {
     uint8_t  *base   = (uint8_t *)rle;
-#define width (*(const uint16_t *)base)
+    uint16_t  width  = *(const uint16_t *)base;
     uint16_t  height = *(const uint16_t *)(base + 2);
-    uint8_t  *row    = base + 4;
+    uint8_t  *row;
     uint8_t  *end;
     uint8_t  *p;
     uint16_t  acc;
@@ -1002,14 +1002,14 @@ void __cdecl RemapRleRuns(void *rle, void *unused, int32_t wide,
 
     (void)unused;
     if (wide == 1) {
-        for (end = base + 4 + (uint32_t)height * 4; row < end; row += 4) {
+        for (row = base + 4, end = base + 4 + (uint32_t)height * 4;
+             row < end; row += 4) {
             p   = base + *(const uint32_t *)row;
             acc = 0;
             while (acc < width) {
-                acc = (uint16_t)(acc + *p);
-                p++;
-                run = *p;
-                p++;
+                run = *p++;
+                acc = (uint16_t)(acc + run);
+                run = *p++;
                 acc = (uint16_t)(acc + run);
                 for (i = 0; i < run; i++) {
                     *p = map[*p];
@@ -1018,14 +1018,14 @@ void __cdecl RemapRleRuns(void *rle, void *unused, int32_t wide,
             }
         }
     } else {
-        for (end = base + 4 + (uint32_t)height * 2; row < end; row += 2) {
+        for (row = base + 4, end = base + 4 + (uint32_t)height * 2;
+             row < end; row += 2) {
             p   = base + *(const uint16_t *)row;
             acc = 0;
             while (acc < width) {
-                acc = (uint16_t)(acc + *p);
-                p++;
-                run = *p;
-                p++;
+                run = *p++;
+                acc = (uint16_t)(acc + run);
+                run = *p++;
                 acc = (uint16_t)(acc + run);
                 for (i = 0; i < run; i++) {
                     *p = map[*p];
@@ -1034,7 +1034,6 @@ void __cdecl RemapRleRuns(void *rle, void *unused, int32_t wide,
             }
         }
     }
-#undef width
 }
 
 int32_t __cdecl FilterMatches(int32_t wantA, int32_t wantB,

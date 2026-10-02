@@ -66,11 +66,19 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1465 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1469 of
   1645 byte-identical (2026-10-02), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1465:
+  the near-miss sweep, 758 before the row pools. From 758 to 1469:
+  - **RemapRleRuns, AiStepAttach, SpriteReloadNamed, ItemTeardown**
+    (2026-10-02): `width` a local and `row` initialised in each loop header;
+    the army list re-read after rand(); the hot-spot clamp applied to the
+    stored FIELD; and in ItemTeardown a 0x1010-byte tile mask (the
+    0x1020 constant was the image's whole frame, not the mask), the rank read
+    before the attribute compare, a uint16 tile, and the add arm's cover walk
+    as its own inline. ObjTileHook's damage pass indexes the pad layer with
+    no null test, as the image does.
   - **ObjectsInRect and AllObjectsInRect** (2026-10-02): the clip is x0,
     x1, y0, y1 in that order -- the low clamps as `(v >> 8) < 0 ? 0 : v >> 8`
     (the image's `test reg, 0xFFFFFF00`), x1 as an if/else, y1 as a ternary,

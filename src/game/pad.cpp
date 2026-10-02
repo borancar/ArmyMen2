@@ -305,9 +305,10 @@ int32_t __cdecl ObjTileHook(void *obj)
     uint8_t        curPad = 0, prevPad = 0;
     int32_t        i;
 
-    /* The damage pass, before the early exit. */
+    /* The damage pass, before the early exit. The original indexes the
+     * pad layer here WITHOUT the null test both later passes make. */
     tile = *(const uint16_t *)(o + OBJ_OFF_TILE);
-    if (padLayer != 0 && padLayer[tile] > 0) {
+    if (padLayer[tile] > 0) {
         const uint8_t *num = (const uint8_t *)((void *)(uintptr_t)(ADDR_PAD_NUMBERS))
                              + (uint32_t)padLayer[tile] * AM2_PAD_NUMBER_STRIDE;
 
@@ -315,8 +316,10 @@ int32_t __cdecl ObjTileHook(void *obj)
             && *(const int16_t *)(num + PADNUM_OFF_COUNT) > 0) {
             const int16_t *ids = (const int16_t *)(num + PADNUM_OFF_IDS);
 
-            /* The count is re-read each pass, as the image compares it. */
-            for (i = 0; i < *(const int16_t *)(num + PADNUM_OFF_COUNT); i++) {
+            /* The count is re-read each pass, as the image compares it; the
+             * test above stands for the first. */
+            i = 0;
+            do {
                 const uint8_t *pad = (const uint8_t *)((void *)(uintptr_t)(ADDR_PADS))
                                      + (uint32_t)ids[i] * AM2_PAD_STRIDE;
 
@@ -327,12 +330,13 @@ int32_t __cdecl ObjTileHook(void *obj)
                                  *(const int32_t *)(pad + PAD_OFF_DAMAGE),
                                  *(const int32_t *)(pad + PAD_OFF_DAMAGE_KIND),
                                  0, 0, 0);
-            }
+            } while (++i < *(const int16_t *)(num + PADNUM_OFF_COUNT));
         }
     }
 
+    /* The tile is read from the object again for the compare. */
     prev = *(const uint32_t *)(o + OBJ_OFF_PREV_TILE);
-    if (tile == prev)
+    if (*(const uint16_t *)(o + OBJ_OFF_TILE) == prev)
         return 0;
 
     /* The eight-bit layer. */

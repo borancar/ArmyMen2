@@ -2271,12 +2271,12 @@ int32_t __cdecl ObjHitMaskAction(void *obj, void *out)
  * minus one and y by shifting down ADDR_MAP_ROW_SHIFT, which only agree if
  * the map's width is a power of two -- which is presumably why that shift
  * is stored beside the width. */
-static inline void ShiftTileCover(int32_t cell, int32_t centre, int32_t delta)
+static inline void ShiftTileCover(uint16_t cell, int32_t centre, int32_t delta)
 {
     int32_t  w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
-    int32_t  tx = cell & (w - 1);
-    int32_t  ty = cell >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT;
-    uint8_t *cover;
+    int32_t  tx = (int32_t)((uint32_t)cell & (uint32_t)(w - 1));
+    int32_t  ty = (int32_t)((uint32_t)cell
+                            >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT);
     const int32_t *n;
     int32_t  i;
 
@@ -2287,16 +2287,40 @@ static inline void ShiftTileCover(int32_t cell, int32_t centre, int32_t delta)
                  - AM2_TILEMASK_MARGIN)
         return;
 
-    cover = *(uint8_t *const *)(uintptr_t)ADDR_TILE_COVER;
-    cover[cell] = (uint8_t)(cover[cell] + centre);
+#define COVER (*(uint8_t **)(uintptr_t)ADDR_TILE_COVER)
+    COVER[cell] = (uint8_t)(COVER[cell] + centre);
 
     n = (const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS;
-    for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++) {
-        uint8_t *p = *(uint8_t *const *)(uintptr_t)ADDR_TILE_COVER
-                     + cell + n[i];
+    for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++)
+        COVER[n[i] + cell] += (uint8_t)delta;
+#undef COVER
+}
 
-        *p = (uint8_t)(*p + delta);
-    }
+/* The add arm as ItemTeardown inlines it: the same body with the amounts
+ * fixed at one, which VC6 schedules differently from the general form. */
+static inline void ShiftTileCoverUp(uint16_t cell)
+{
+    int32_t  w = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W;
+    int32_t  tx = (int32_t)((uint32_t)cell & (uint32_t)(w - 1));
+    int32_t  ty = (int32_t)((uint32_t)cell
+                            >> *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT);
+    const int32_t *n;
+    int32_t  i;
+
+    if (tx < AM2_TILEMASK_MARGIN || tx >= w - AM2_TILEMASK_MARGIN)
+        return;
+    if (ty < AM2_TILEMASK_MARGIN
+        || ty >= *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_H
+                 - AM2_TILEMASK_MARGIN)
+        return;
+
+#define COVER (*(uint8_t **)(uintptr_t)ADDR_TILE_COVER)
+    COVER[cell] = (uint8_t)(COVER[cell] + 1);
+
+    n = (const int32_t *)(uintptr_t)ADDR_TILE_NEIGHBOURS;
+    for (i = 0; i < AM2_TILE_NEIGHBOUR_COUNT; i++)
+        COVER[cell + n[i]]++;
+#undef COVER
 }
 
 /* ItemTeardown -- original 0x00439320, 656 bytes, six callers. Take an
@@ -2404,12 +2428,11 @@ void __cdecl ItemTeardown(void *obj)
      * non-zero above. `mov dl,[esi+0x65]` feeds only the compare;
      * `movsx eax,[esi+0x98]` is stored to a local and reloaded at the
      * subtraction. */
+    height = *(const int8_t *)(o + OBJ_OFF_RANK);
     if (*(const int8_t *)(o + OBJ_OFF_HEIGHT_SET)
         > (int8_t)(*(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS)
               [*(const uint16_t *)(o + OBJ_OFF_TILE)])
         return;
-
-    height = *(const int8_t *)(o + OBJ_OFF_RANK);
     if (!height)
         return;
 
@@ -2424,24 +2447,27 @@ void __cdecl ItemTeardown(void *obj)
         int32_t cell = *(const int32_t *)(uintptr_t)ADDR_MAP_TILES_W * row
                        + rect[0];
 
-        for (x = rect[0]; x <= rect[2]; idx++, x++, cell++) {
-            uint8_t *weights =
-                *(uint8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
+        for (x = rect[0]; x <= rect[2]; idx++, cell++, x++) {
+#define weights (*(uint8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
+            uint16_t tile;
             int8_t   h;
             int8_t   nh;
 
-            if (!(cells[idx] & 1))
+            /* Tested twice: non-zero, then bit 0. */
+            if (!cells[idx] || !(cells[idx] & 1))
                 continue;
 
-            h  = (int8_t)weights[cell & 0xFFFF];
+            tile = (uint16_t)cell;
+            h  = (int8_t)weights[tile];
             nh = (int8_t)(h - height);
 
             if (h <= 15 && nh >= 15)
-                ShiftTileCover(cell, 1, 1);
-            else if (h >= 15 && nh < 15)
-                ShiftTileCover(cell, -1, -1);
+                ShiftTileCoverUp(tile);
+            else if (nh < 15 && h >= 15)
+                ShiftTileCover(tile, -1, -1);
 
-            weights[cell & 0xFFFF] = (uint8_t)nh;
+            weights[tile] = (uint8_t)nh;
+#undef weights
         }
     }
 
@@ -7346,17 +7372,16 @@ void __cdecl AiStepAttach(void *obj, void *out)
               && (uint8_t)r)) {
             int32_t army = (r & 1) ? (int32_t)*(const int8_t *)(o + OBJ_OFF_ARMY)
                                    : (r >> 1) % 4;
-            uint8_t *list = (uint8_t *)g_armyObjLists[army];
-
+            /* The list is re-read from the table after the rand() call. */
+#define list ((uint8_t *)g_armyObjLists[army])
             if (*(const int32_t *)(list + LIST_OFF_COUNT) > 0) {
                 /* The modulus is taken from `army`'s count and the array from
                  * the object's OWN army. See the header: reproduced. */
                 int32_t idx = orig_region_rand()
                               % *(const int32_t *)(list + LIST_OFF_COUNT);
-                uint8_t *own =
-                    (uint8_t *)g_armyObjLists[*(const int8_t *)(o + OBJ_OFF_ARMY)];
                 uint8_t *t = (uint8_t *)LookupByUID(
-                    ((const uint32_t *)*(void **)(own + LIST_OFF_UIDS))[idx]);
+                    (*(const uint32_t *const *)((uint8_t *)g_armyObjLists
+                        [*(const int8_t *)(o + OBJ_OFF_ARMY)] + LIST_OFF_UIDS))[idx]);
 
                 if (t
                     && ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
@@ -7364,6 +7389,7 @@ void __cdecl AiStepAttach(void *obj, void *out)
                        < AM2_AI_ATTACH_RANGE)
                     ObjAttachTo(obj, t);
             }
+#undef list
         }
     }
 
@@ -7371,8 +7397,8 @@ void __cdecl AiStepAttach(void *obj, void *out)
          - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_58)) > AM2_AI_IDLE_TIMEOUT_MS
         && *(const int32_t *)(ctx + SIGHTC_OFF_DEST_DIST) < AM2_AI_REACHED_DIST) {
         int32_t   army = *(const int32_t *)(o + OBJ_OFF_FIELD_5A4) - 1;
-        uint8_t  *rec  = (uint8_t *)LookupOwnerObj((uint32_t)army);
         uint32_t  from = 0;
+        uint8_t  *rec  = (uint8_t *)LookupOwnerObj((uint32_t)army);
 
         if (rec)
             from = *(const uint32_t *)(rec + 4);

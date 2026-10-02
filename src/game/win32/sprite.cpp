@@ -965,10 +965,10 @@ int32_t __cdecl LoadBitmapDescriptor(const char *name, void *out)
  * and a log line, so the code around it is thoroughly observed and this is a
  * term that does not matter rather than a path that does not run. The clamp
  * stays verified by reading. */
-static inline int16_t ClampHotSpot(int16_t v)
-{
-    return (v > 2048 || v < -2048) ? 0 : v;
-}
+/* Applied to the FIELD after it is stored: the image writes the raw value
+ * and then overrides it with zero, a pair of fields at a time. */
+#define ClampHotSpot(f) \
+    do { if ((f) > 2048 || (f) < -2048) (f) = 0; } while (0)
 
 /* 0x004456B0. Reload a sprite from a named bitmap.
  *
@@ -1010,10 +1010,14 @@ int32_t __cdecl SpriteReloadNamed(AM2_Sprite *spr, const char *name,
     x = *(const int32_t *)(rec + BMP_OFF_HOT_X);
     y = *(const int32_t *)(rec + BMP_OFF_HOT_Y);
 
-    spr->hotX  = ClampHotSpot((int16_t)x);
-    spr->hotY  = ClampHotSpot((int16_t)y);
-    spr->attachX = ClampHotSpot((int16_t)(x >> 16));
-    spr->attachY = ClampHotSpot((int16_t)(y >> 16));
+    spr->hotX = (int16_t)x;
+    spr->hotY = (int16_t)y;
+    ClampHotSpot(spr->hotX);
+    ClampHotSpot(spr->hotY);
+    spr->attachX = (int16_t)(x >> 16);
+    spr->attachY = (int16_t)(y >> 16);
+    ClampHotSpot(spr->attachX);
+    ClampHotSpot(spr->attachY);
 
     merged = (*(const uint32_t *)(rec + BMP_OFF_FLAGS) & 0x1Cu)
              | ((uint32_t)flags & 1u);

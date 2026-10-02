@@ -1997,10 +1997,11 @@
 #define AM2_TILEMASK_MARGIN      2      /* tiles added on every side */
 #define AM2_TILEMASK_PAD_CELL    2      /* what the margin is filled with */
 #define AM2_TILEMASK_BOX_CELL    3      /* and the box; bit 0 is what is read */
-/* The frame ItemTeardown reserves for one, through __chkstk. CanPlaceAt
- * reserves 0x1018 for the same structure; the difference is frame alignment,
- * not layout, and this is the larger of the two so it holds either. */
-#define AM2_TILEMASK_BYTES       0x1020u
+/* The rect and a 64x64 cell grid. ItemTeardown's frame is 0x1020 and
+ * CanPlaceAt's 0x1018 because each also holds a few scalars beside it; at
+ * 0x1020 the reconstructions' frames came out 16 bytes larger than the
+ * image's. */
+#define AM2_TILEMASK_BYTES       0x1010u
 /* 0x004389D0, 1056 bytes, two callers -- ObjBoxAction's twin for an object
  * that HAS an OBJ_OFF_HIT_MASK, which on every map this project can drive is
  * all of them. Still original; region.cpp records that ObjBoxAction and
