@@ -2887,6 +2887,146 @@ extern const uint8_t am2_logpalette_hdr_small[4];
 #undef ADDR_ARMY_PACKET_B
 #define ADDR_ARMY_PACKET_B ((uintptr_t)(const void *)&am2_origstate.army_packet_b)
 
+/* The CRT's working globals (0x006645AC..0x00665C50): the MSVC 6 runtime's
+ * .bss, already reserved as members at the end of am2_origstate and reached
+ * by number until now. Same addresses, named. */
+#undef ADDR_CRT_ADJUST_FDIV
+#define ADDR_CRT_ADJUST_FDIV ((uintptr_t)(const void *)am2_origstate.crt_adjust_fdiv)
+#undef ADDR_CRT_TIME_DST_CACHE
+#define ADDR_CRT_TIME_DST_CACHE ((uintptr_t)(const void *)am2_origstate.crt_time_dst_cache)
+#undef ADDR_CRT_TIME_SYSTIME_CACHE
+#define ADDR_CRT_TIME_SYSTIME_CACHE ((uintptr_t)(const void *)am2_origstate.crt_time_systime_cache)
+#undef ADDR_CRT_STRTOK_NEXT
+#define ADDR_CRT_STRTOK_NEXT ((uintptr_t)(const void *)am2_origstate.crt_strtok_next)
+#undef ADDR_CRT_AENVPTR
+#define ADDR_CRT_AENVPTR ((uintptr_t)(const void *)am2_origstate.crt_aenvptr)
+#undef ADDR_CRT_ERROR_MODE
+#define ADDR_CRT_ERROR_MODE ((uintptr_t)(const void *)am2_origstate.crt_error_mode)
+#undef ADDR_CRT_CFTOG_PFLT
+#define ADDR_CRT_CFTOG_PFLT ((uintptr_t)(const void *)am2_origstate.crt_cftog_pflt)
+#undef ADDR_CRT_CFTOG_ACTIVE
+#define ADDR_CRT_CFTOG_ACTIVE ((uintptr_t)(const void *)am2_origstate.crt_cftog_active)
+#undef ADDR_CRT_CFTOG_MAGNITUDE
+#define ADDR_CRT_CFTOG_MAGNITUDE ((uintptr_t)(const void *)am2_origstate.crt_cftog_magnitude)
+#undef ADDR_CRT_CFTOG_EXPANSION
+#define ADDR_CRT_CFTOG_EXPANSION ((uintptr_t)(const void *)am2_origstate.crt_cftog_expansion)
+#undef ADDR_CRT_PNHHEAP
+#define ADDR_CRT_PNHHEAP ((uintptr_t)(const void *)am2_origstate.crt_pnhheap)
+#undef ADDR_CRT_NEWMODE
+#define ADDR_CRT_NEWMODE ((uintptr_t)(const void *)am2_origstate.crt_newmode)
+#undef ADDR_CRT_ERRNO
+#define ADDR_CRT_ERRNO ((uintptr_t)(const void *)am2_origstate.crt_errno)
+#undef ADDR_CRT_DOSERRNO
+#define ADDR_CRT_DOSERRNO ((uintptr_t)(const void *)am2_origstate.crt_doserrno)
+#undef ADDR_CRT_UMASKVAL
+#define ADDR_CRT_UMASKVAL ((uintptr_t)(const void *)am2_origstate.crt_umaskval)
+#undef ADDR_CRT_OSVER
+#define ADDR_CRT_OSVER ((uintptr_t)(const void *)am2_origstate.crt_osver)
+#undef ADDR_CRT_WINVER
+#define ADDR_CRT_WINVER ((uintptr_t)(const void *)am2_origstate.crt_winver)
+#undef ADDR_CRT_WINMAJOR
+#define ADDR_CRT_WINMAJOR ((uintptr_t)(const void *)am2_origstate.crt_winmajor)
+#undef ADDR_CRT_WINMINOR
+#define ADDR_CRT_WINMINOR ((uintptr_t)(const void *)am2_origstate.crt_winminor)
+#undef ADDR_CRT_ARGC
+#define ADDR_CRT_ARGC ((uintptr_t)(const void *)am2_origstate.crt_argc)
+#undef ADDR_CRT_ARGV
+#define ADDR_CRT_ARGV ((uintptr_t)(const void *)am2_origstate.crt_argv)
+#undef ADDR_CRT_ENVIRON
+#define ADDR_CRT_ENVIRON ((uintptr_t)(const void *)am2_origstate.crt_environ)
+#undef ADDR_CRT_WENVIRON
+#define ADDR_CRT_WENVIRON ((uintptr_t)(const void *)am2_origstate.crt_wenviron)
+#undef ADDR_CRT_PGMPTR
+#define ADDR_CRT_PGMPTR ((uintptr_t)(const void *)am2_origstate.crt_pgmptr)
+#undef ADDR_CRT_EXIT_RETCALLER
+#define ADDR_CRT_EXIT_RETCALLER ((uintptr_t)(const void *)am2_origstate.crt_exit_retcaller)
+#undef ADDR_CRT_EXIT_STARTED
+#define ADDR_CRT_EXIT_STARTED ((uintptr_t)(const void *)am2_origstate.crt_exit_started)
+#undef ADDR_CRT_EXIT_DONE
+#define ADDR_CRT_EXIT_DONE ((uintptr_t)(const void *)am2_origstate.crt_exit_done)
+#undef ADDR_CRT_LC_HANDLE_CTYPE
+#define ADDR_CRT_LC_HANDLE_CTYPE ((uintptr_t)(const void *)am2_origstate.crt_lc_handle_ctype)
+#undef ADDR_CRT_LC_CODEPAGE
+#define ADDR_CRT_LC_CODEPAGE ((uintptr_t)(const void *)am2_origstate.crt_lc_codepage)
+#undef ADDR_CRT_CFLUSH
+#define ADDR_CRT_CFLUSH ((uintptr_t)(const void *)am2_origstate.crt_cflush)
+#undef ADDR_CRT_PGMNAME
+#define ADDR_CRT_PGMNAME ((uintptr_t)(const void *)am2_origstate.crt_pgmname)
+#undef ADDR_CRT_ENV_KIND
+#define ADDR_CRT_ENV_KIND ((uintptr_t)(const void *)am2_origstate.crt_env_kind)
+#undef ADDR_CRT_MSGBANNER_HOOK
+#define ADDR_CRT_MSGBANNER_HOOK ((uintptr_t)(const void *)am2_origstate.crt_msgbanner_hook)
+#undef ADDR_CRT_FLTOUT_RAW
+#define ADDR_CRT_FLTOUT_RAW ((uintptr_t)(const void *)am2_origstate.crt_fltout_raw)
+#undef ADDR_CRT_STRFLT
+#define ADDR_CRT_STRFLT ((uintptr_t)(const void *)am2_origstate.crt_strflt)
+#undef ADDR_CRT_COMMODE
+#define ADDR_CRT_COMMODE ((uintptr_t)(const void *)am2_origstate.crt_commode)
+#undef ADDR_CRT_SEH_OLD_FILTER
+#define ADDR_CRT_SEH_OLD_FILTER ((uintptr_t)(const void *)am2_origstate.crt_seh_old_filter)
+#undef ADDR_CRT_TZ_API_USED
+#define ADDR_CRT_TZ_API_USED ((uintptr_t)(const void *)am2_origstate.crt_tz_api_used)
+#undef ADDR_CRT_TZ_INFO
+#define ADDR_CRT_TZ_INFO ((uintptr_t)(const void *)am2_origstate.crt_tz_info)
+#undef ADDR_CRT_LAST_TZ
+#define ADDR_CRT_LAST_TZ ((uintptr_t)(const void *)am2_origstate.crt_last_tz)
+#undef ADDR_CRT_TZSET_DONE
+#define ADDR_CRT_TZSET_DONE ((uintptr_t)(const void *)am2_origstate.crt_tzset_done)
+#undef ADDR_CRT_MBCP_FROM_SYSTEM
+#define ADDR_CRT_MBCP_FROM_SYSTEM ((uintptr_t)(const void *)am2_origstate.crt_mbcp_from_system)
+#undef ADDR_CRT_MSGBOX_FN
+#define ADDR_CRT_MSGBOX_FN ((uintptr_t)(const void *)am2_origstate.crt_msgbox_fn)
+#undef ADDR_CRT_GETACTIVEWINDOW_FN
+#define ADDR_CRT_GETACTIVEWINDOW_FN ((uintptr_t)(const void *)am2_origstate.crt_getactivewindow_fn)
+#undef ADDR_CRT_GETLASTACTIVEPOPUP_FN
+#define ADDR_CRT_GETLASTACTIVEPOPUP_FN ((uintptr_t)(const void *)am2_origstate.crt_getlastactivepopup_fn)
+#undef ADDR_CRT_FMODE
+#define ADDR_CRT_FMODE ((uintptr_t)(const void *)am2_origstate.crt_fmode)
+#undef ADDR_CRT_MBCODEPAGE
+#define ADDR_CRT_MBCODEPAGE ((uintptr_t)(const void *)am2_origstate.crt_mbcodepage)
+#undef ADDR_CRT_MBULINFO
+#define ADDR_CRT_MBULINFO ((uintptr_t)(const void *)am2_origstate.crt_mbulinfo)
+#undef ADDR_CRT_ISMBCODEPAGE
+#define ADDR_CRT_ISMBCODEPAGE ((uintptr_t)(const void *)am2_origstate.crt_ismbcodepage)
+#undef ADDR_CRT_MBCASEMAP
+#define ADDR_CRT_MBCASEMAP ((uintptr_t)(const void *)am2_origstate.crt_mbcasemap)
+#undef ADDR_CRT_MBCTYPE
+#define ADDR_CRT_MBCTYPE ((uintptr_t)(const void *)am2_origstate.crt_mbctype)
+#undef ADDR_CRT_MBLCID
+#define ADDR_CRT_MBLCID ((uintptr_t)(const void *)am2_origstate.crt_mblcid)
+#undef ADDR_CRT_PIOB
+#define ADDR_CRT_PIOB ((uintptr_t)(const void *)am2_origstate.crt_piob)
+#undef ADDR_CRT_NSTREAM
+#define ADDR_CRT_NSTREAM ((uintptr_t)(const void *)am2_origstate.crt_nstream)
+#undef ADDR_CRT_PIOINFO
+#define ADDR_CRT_PIOINFO ((uintptr_t)(const void *)am2_origstate.crt_pioinfo)
+#undef ADDR_CRT_NHANDLE
+#define ADDR_CRT_NHANDLE ((uintptr_t)(const void *)am2_origstate.crt_nhandle)
+#undef ADDR_CRT_ENV_INITIALIZED
+#define ADDR_CRT_ENV_INITIALIZED ((uintptr_t)(const void *)am2_origstate.crt_env_initialized)
+#undef ADDR_CRT_MBCTABLE_INIT
+#define ADDR_CRT_MBCTABLE_INIT ((uintptr_t)(const void *)am2_origstate.crt_mbctable_init)
+#undef ADDR_CRT_ONEXITEND
+#define ADDR_CRT_ONEXITEND ((uintptr_t)(const void *)am2_origstate.crt_onexitend)
+#undef ADDR_CRT_ONEXITBEGIN
+#define ADDR_CRT_ONEXITBEGIN ((uintptr_t)(const void *)am2_origstate.crt_onexitbegin)
+#undef ADDR_CRT_SBH_SIZE_HEADER_LIST
+#define ADDR_CRT_SBH_SIZE_HEADER_LIST ((uintptr_t)(const void *)am2_origstate.crt_sbh_size_header_list)
+#undef ADDR_CRT_SBH_IND_GROUP_DEFER
+#define ADDR_CRT_SBH_IND_GROUP_DEFER ((uintptr_t)(const void *)am2_origstate.crt_sbh_ind_group_defer)
+#undef ADDR_CRT_SBH_PHEADER_SCAN
+#define ADDR_CRT_SBH_PHEADER_SCAN ((uintptr_t)(const void *)am2_origstate.crt_sbh_pheader_scan)
+#undef ADDR_CRT_SBH_PHEADER_DEFER
+#define ADDR_CRT_SBH_PHEADER_DEFER ((uintptr_t)(const void *)am2_origstate.crt_sbh_pheader_defer)
+#undef ADDR_CRT_SBH_CNT_HEADER_LIST
+#define ADDR_CRT_SBH_CNT_HEADER_LIST ((uintptr_t)(const void *)am2_origstate.crt_sbh_cnt_header_list)
+#undef ADDR_CRT_SBH_PHEADER_LIST
+#define ADDR_CRT_SBH_PHEADER_LIST ((uintptr_t)(const void *)am2_origstate.crt_sbh_pheader_list)
+#undef ADDR_CRT_CRTHEAP
+#define ADDR_CRT_CRTHEAP ((uintptr_t)(const void *)am2_origstate.crt_crtheap)
+#undef ADDR_CRT_ACMDLN
+#define ADDR_CRT_ACMDLN ((uintptr_t)(const void *)am2_origstate.crt_acmdln)
+
 
 /* The relink build (VC6, AM2_RELINK) re-points every am2_origstate redirect
  * above at a per-global symbol, so each reads as the original's lone global;
