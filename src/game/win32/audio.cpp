@@ -589,19 +589,22 @@ int32_t __cdecl OpenAudioStream(const char *name)
     /* WaveOpenFile takes a mutable pointer -- mmioOpen's first argument is
      * `LPSTR`, not `LPCSTR`, and the reader passes it straight through. */
     if (WaveOpenFile((char *)name, &g_hmmio, &g_waveFormat, g_riffChunk) != 0)
-        return -1;
+        goto fail;
 
-    if (g_waveFormat->wFormatTag != WAVE_FORMAT_PCM
-        || WaveStartDataRead(&g_hmmio, g_dataChunk, g_riffChunk) != 0) {
+    if (g_waveFormat->wFormatTag != WAVE_FORMAT_PCM)
+        goto close;
+    if (WaveStartDataRead(&g_hmmio, g_dataChunk, g_riffChunk) != 0) {
+close:
         WaveCloseReadFile(&g_hmmio, &g_waveFormat);
+fail:
         return -1;
     }
 
+    memset(&desc, 0, sizeof(desc));
     desc.dwSize        = sizeof(desc);
     desc.dwFlags       = DSBCAPS_CTRLFREQUENCY | DSBCAPS_CTRLPAN
                        | DSBCAPS_CTRLVOLUME | DSBCAPS_GETCURRENTPOSITION2;
     desc.dwBufferBytes = g_waveFormat->nSamplesPerSec * STREAM_SECONDS;
-    desc.dwReserved    = 0;
     desc.lpwfxFormat   = g_waveFormat;
 
     hr = IDirectSound_CreateSoundBuffer(g_dsound, &desc, &g_buffer, NULL);
@@ -614,13 +617,12 @@ int32_t __cdecl OpenAudioStream(const char *name)
         return (int32_t)hr;
 
     g_bufferSize = caps.dwBufferBytes;
-    g_atEnd      = 0;
-    g_playBuffer = g_buffer;
-    g_validBytes = 0;
-
     /* A quarter of the buffer's duration in milliseconds. StartAudioStream
      * shifts it right by two again before handing it to timeSetEvent. */
     g_period = (caps.dwBufferBytes * 1000u / g_waveFormat->nAvgBytesPerSec) >> 2;
+    g_atEnd      = 0;
+    g_playBuffer = g_buffer;
+    g_validBytes = 0;
 
     RefillAudioBuffer();
 

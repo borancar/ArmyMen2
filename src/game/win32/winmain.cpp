@@ -475,12 +475,12 @@ typedef int32_t (__cdecl *am2_sprintf_fn)(char *, const char *, ...);
 int32_t __cdecl FindGameCD(void)
 {
     char    *drives, *volume, *p;
-    uint32_t need;
+    uint32_t len;
     int32_t  found;
 
-    need   = GetLogicalDriveStringsA(0, NULL) + 1;
-    drives = (char *)orig_malloc(need);
-    GetLogicalDriveStringsA(need, drives);
+    len    = GetLogicalDriveStringsA(0, NULL);
+    drives = (char *)orig_malloc(len + 1);
+    GetLogicalDriveStringsA(len + 1, drives);
     volume = (char *)orig_malloc(VOLUME_NAME_MAX + 1);
 
     found = 0;
@@ -495,12 +495,15 @@ int32_t __cdecl FindGameCD(void)
                 /* No label to match, so any CD-ROM will do. */
                 found = 1;
             } else if (GetVolumeInformationA(p, volume, VOLUME_NAME_MAX,
-                                             NULL, NULL, NULL, NULL, 0) &&
-                       orig_stricmp(g_cdLabel, volume) == 0) {
-                found         = 1;
-                g_cdPresent   = 1;
-                g_cdFoundFlag = 1;
-                orig_sprintf(g_cdPath, "%s", p);
+                                             NULL, NULL, NULL, NULL, 0)) {
+                if (orig_stricmp(g_cdLabel, volume) != 0) {
+                    found = 0;
+                } else {
+                    found         = 1;
+                    g_cdPresent   = 1;
+                    g_cdFoundFlag = 1;
+                    orig_sprintf(g_cdPath, "%s", p);
+                }
             } else {
                 found = 0;
             }

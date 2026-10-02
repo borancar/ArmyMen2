@@ -66,11 +66,18 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1459 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1463 of
   1645 byte-identical (2026-10-02), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1459:
+  the near-miss sweep, 758 before the row pools. From 758 to 1463:
+  - **Four from source shape alone** (2026-10-02): OpenAudioStream zeroes its
+    DSBUFFERDESC with memset before the field writes and routes both early
+    failures into the close block's return; CreateOffscreenSurface stores the
+    caps then overrides them under the system-memory flag, computed after
+    GetSurfaceDesc; ReadDibChunk writes the round-and-multiply out in both
+    arms (VC6 merges the tail); FindGameCD keeps the bare length and nests
+    the label compare.
   - **PollKeyboard's keyboard state is aggregated** (0x005127C8..
     0x00512FD0 in relinkos.py's AGGREGATE_RANGES): the loop re-reads the
     current buffer pointer every key and walks the deadline and pressed

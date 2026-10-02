@@ -126,8 +126,7 @@ LPDIRECTDRAWSURFACE __cdecl CreateOffscreenSurface(int32_t width, int32_t height
     DDSURFACEDESC       ddsd;
     LPDIRECTDRAWSURFACE surf;
     HRESULT             hr;
-    /* The only bit of `caps` anyone looks at: "system memory, no argument". */
-    const int32_t       forceSystem = caps & DDSCAPS_OFFSCREENPLAIN;
+    int32_t             forceSystem;
 
     /* Ask the primary what it looks like, then change only the size and the
      * caps. This is how the new surface ends up in the same pixel format
@@ -140,12 +139,14 @@ LPDIRECTDRAWSURFACE __cdecl CreateOffscreenSurface(int32_t width, int32_t height
         return NULL;
     }
 
+    /* The only bit of `caps` anyone looks at: "system memory, no argument". */
+    forceSystem = caps & DDSCAPS_OFFSCREENPLAIN;
     ddsd.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT;
-    ddsd.ddsCaps.dwCaps = forceSystem
-        ? (DDSCAPS_OFFSCREENPLAIN | DDSCAPS_SYSTEMMEMORY)
-        : DDSCAPS_OFFSCREENPLAIN;
-    ddsd.dwWidth  = (DWORD)width;
+    ddsd.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
+    if (forceSystem)
+        ddsd.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN | DDSCAPS_SYSTEMMEMORY;
     ddsd.dwHeight = (DWORD)height;
+    ddsd.dwWidth  = (DWORD)width;
 
     hr = IDirectDraw2_CreateSurface(g_ddraw2, &ddsd, &surf, NULL);
     if (hr) {
@@ -806,13 +807,12 @@ void *__cdecl ReadDibChunk(am2_FILE *fp, void *header)
 
     size = (int32_t)bi->bmiHeader.biSizeImage;
     if (!size) {
-        /* The row width is worked in `size` itself. */
+        /* Each arm rounds and multiplies for itself; VC6 merges the common
+         * `& ~3` and multiply into one tail, which is what the image has. */
         if (bi->bmiHeader.biBitCount == 8)
-            size = bi->bmiHeader.biWidth + 3;
+            size = ((bi->bmiHeader.biWidth + 3) & ~3) * bi->bmiHeader.biHeight;
         else
-            size = (bi->bmiHeader.biWidth + 7) / 8;
-
-        size = (size & ~3) * bi->bmiHeader.biHeight;
+            size = (((bi->bmiHeader.biWidth + 7) / 8) & ~3) * bi->bmiHeader.biHeight;
     }
 
     pixels = orig_malloc((size_t)size);
