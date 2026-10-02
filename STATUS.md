@@ -66,11 +66,15 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1463 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1465 of
   1645 byte-identical (2026-10-02), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1463:
+  the near-miss sweep, 758 before the row pools. From 758 to 1465:
+  - **ObjectsInRect and AllObjectsInRect** (2026-10-02): the clip is x0,
+    x1, y0, y1 in that order -- the low clamps as `(v >> 8) < 0 ? 0 : v >> 8`
+    (the image's `test reg, 0xFFFFFF00`), x1 as an if/else, y1 as a ternary,
+    which VC6 turns into a store and a conditional override.
   - **Four from source shape alone** (2026-10-02): OpenAudioStream zeroes its
     DSBUFFERDESC with memset before the field writes and routes both early
     failures into the close block's return; CreateOffscreenSurface stores the

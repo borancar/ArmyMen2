@@ -1188,9 +1188,10 @@ static inline void PathChargeFrame(uint32_t startTicks, int32_t considered)
                         / elapsed);
     budget += *(const int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES / 2;
     budget  = (int32_t)((uint32_t)budget >> 1) * 2;
-    if (budget <= AM2_PATH_MIN_NODES)
-        budget = AM2_PATH_MIN_NODES;
+    /* Stored, then overridden: the floor is an unsigned compare. */
     *(int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES = budget;
+    if ((uint32_t)budget <= AM2_PATH_MIN_NODES)
+        *(int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES = AM2_PATH_MIN_NODES;
 }
 
 /* Walk PARENT back from `end` and write the tiles into `out` FORWARDS, by

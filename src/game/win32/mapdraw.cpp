@@ -2765,16 +2765,15 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
         || r->top >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)
         return (void *)0;
 
-    x0 = r->left >= 0 ? r->left >> AM2_CELL_SHIFT : 0;
-    y0 = r->top  >= 0 ? r->top  >> AM2_CELL_SHIFT : 0;
-
+    x0 = (r->left >> AM2_CELL_SHIFT) < 0 ? 0 : r->left >> AM2_CELL_SHIFT;
     cols = *(const int32_t *)(d + MAPDESC_OFF_COLS);
-    x1   = r->right >> AM2_CELL_SHIFT;
-    if (cols - 1 < x1)
+    if (cols - 1 < (r->right >> AM2_CELL_SHIFT))
         x1 = cols - 1;
-    y1 = r->bottom >> AM2_CELL_SHIFT;
-    if (*(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1 < y1)
-        y1 = *(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1;
+    else
+        x1 = r->right >> AM2_CELL_SHIFT;
+    y0 = (r->top >> AM2_CELL_SHIFT) < 0 ? 0 : r->top >> AM2_CELL_SHIFT;
+    y1 = *(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1 < (r->bottom >> AM2_CELL_SHIFT)
+         ? *(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1 : r->bottom >> AM2_CELL_SHIFT;
 
     /* What to add to the cell index at the end of a row to land on x0 of the
      * next one. The row's own walk has already advanced it x1 - x0 + 1 times. */
@@ -2851,7 +2850,7 @@ void *__cdecl ObjectsInRect(const AM2_Rect *r, const void *desc,
  * edge is answered by one and refused outright by the other.
  *
  * That has a consequence inside the body. With left and top known
- * non-negative, the two clamps below -- the `>= 0 ?` on each of x0 and y0 --
+ * non-negative, the two clamps below -- the `< 0 ? 0 :` on each of x0 and y0 --
  * can never take their zero arm. The original still emits both, in the same
  * `test reg, 0xFFFFFF00` form as the sibling, so they are written out here
  * rather than folded away: "the original checks and the check is vacuous" is
@@ -2874,21 +2873,20 @@ void *__cdecl AllObjectsInRect(const AM2_Rect *r, const void *desc)
         || r->bottom >= *(const int32_t *)(uintptr_t)ADDR_MAP_EXTENT_Y)
         return (void *)0;
 
-    x0 = r->left >= 0 ? r->left >> AM2_CELL_SHIFT : 0;
-    y0 = r->top  >= 0 ? r->top  >> AM2_CELL_SHIFT : 0;
-
-    x1   = r->right >> AM2_CELL_SHIFT;
+    x0 = (r->left >> AM2_CELL_SHIFT) < 0 ? 0 : r->left >> AM2_CELL_SHIFT;
     cols = *(const int32_t *)(d + MAPDESC_OFF_COLS);
-    if (cols - 1 < x1)
+    if (cols - 1 < (r->right >> AM2_CELL_SHIFT))
         x1 = cols - 1;
-    y1 = r->bottom >> AM2_CELL_SHIFT;
-    if (*(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1 < y1)
-        y1 = *(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1;
+    else
+        x1 = r->right >> AM2_CELL_SHIFT;
+    y0 = (r->top >> AM2_CELL_SHIFT) < 0 ? 0 : r->top >> AM2_CELL_SHIFT;
+    y1 = *(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1 < (r->bottom >> AM2_CELL_SHIFT)
+         ? *(const int32_t *)(d + MAPDESC_OFF_ROWS) - 1 : r->bottom >> AM2_CELL_SHIFT;
 
     wrap = cols - x1 + x0 - 1;
     cell = (y0 << *(const int32_t *)(d + MAPDESC_OFF_SHIFT)) + x0;
 
-    for (y = y0; y <= y1; y++, cell += wrap) {
+    for (y = y0; y <= y1; cell += wrap, y++) {
         for (x = x0; x <= x1; cell++, x++) {
             uint8_t *node = ((uint8_t *const *)(*(const uint8_t *const *)
                                  (d + MAPDESC_OFF_CELLS)))[cell];
