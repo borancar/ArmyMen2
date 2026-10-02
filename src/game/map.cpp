@@ -885,7 +885,6 @@ int32_t __cdecl ParseScenarioPart(void *part, const void *at)
  */
 int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
 {
-    const uint8_t *p = at;
     int32_t        count;
     uint8_t       *table;
     int32_t        i;
@@ -893,8 +892,8 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
     *(int32_t *)(uintptr_t)ADDR_SCENARIO_UNREAD = 0;
     *(uint8_t **)(uintptr_t)ADDR_SCENARIOS      = (uint8_t *)0;
 
-    count = *(const int32_t *)p;
-    p += 4;
+    count = *(const int32_t *)at;
+    at += 4;
     remaining -= 4;
 
     table = (uint8_t *)orig_malloc((size_t)count * AM2_SCENARIO_BYTES);
@@ -907,8 +906,8 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
         int32_t  which;
         int32_t  part;
 
-        hdr = *(const struct ScenHdr *)p;
-        p += AM2_SCENARIO_HDR_BYTES;
+        hdr = *(const struct ScenHdr *)at;
+        at += AM2_SCENARIO_HDR_BYTES;
         remaining -= (int32_t)AM2_SCENARIO_HDR_BYTES;
 
         if (strncmp((const char *)&hdr, "Scenario",
@@ -929,9 +928,9 @@ int32_t __cdecl ParseScenarios(const uint8_t *at, int32_t remaining)
         for (part = 0; part < (int32_t)AM2_SCENARIO_PARTS; part++) {
             int32_t took = ParseScenarioPart(
                 rec + SCENARIO_OFF_PARTS
-                    + (uint32_t)part * SCENARIO_PART_BYTES, p);
+                    + (uint32_t)part * SCENARIO_PART_BYTES, at);
 
-            p += took;
+            at += took;
             remaining -= took;
         }
     }

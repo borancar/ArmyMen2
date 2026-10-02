@@ -1319,13 +1319,11 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
                                        int32_t index, int32_t frame,
                                        int32_t flags)
 {
-    const AM2_SpriteDirEntry *dir;
     uint8_t  *sset;
-    am2_FILE *fp;
     uint32_t  key;
     int32_t   slot;
+    int32_t   got;
     int32_t   value;
-    int32_t   len;
     int32_t   ok = 0;
 
     spr->image.rle16 = 0;
@@ -1340,15 +1338,16 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
     if (slot < 0)
         return 0;
 
-    fp  = SET_FILE(sset);
-    dir = SET_DIR(sset);
+    /* The file is re-read from the set at every call. */
+#define fp SET_FILE(sset)
+#define dir SET_DIR(sset)
 
     if (orig_fseek(fp, (int32_t)dir[slot].offset, 0) != 0) {
         orig_log("Error seeking to location %d in data file.\n",
                  dir[slot].offset);
     } else {
-        orig_fread(&value, 4, 1, fp);
-        if (key == (uint32_t)value)
+        orig_fread(&got, 4, 1, fp);
+        if (key == (uint32_t)got)
             ok = 1;
         else
             orig_log("Error in validating object in data file.\n");
@@ -1394,33 +1393,35 @@ int32_t __cdecl SpriteLoadFromDataFile(AM2_Sprite *spr, int32_t set,
     orig_fread(&spr->hotX, 4, 1, fp);
     orig_fread(&spr->attachX, 4, 1, fp);
 
-    orig_fread(&len, 4, 1, fp);
-    if (len > 0) {
+    orig_fread(&value, 4, 1, fp);
+    if (value > 0) {
         if (spr->format == 0) {
             spr->image.surface =
-                CreateBitmapSurface(fp, (uint32_t)len, spr->bounds.right,
+                CreateBitmapSurface(fp, (uint32_t)value, spr->bounds.right,
                                     spr->bounds.bottom,
                                     sset + SPRITE_SET_OFF_REMAP,
                                     (uint32_t)flags);
         } else {
-            spr->image.rle16 = (AM2_Rle16 *)orig_malloc((size_t)len);
-            orig_fread(spr->image.rle16, (size_t)len, 1, fp);
+            spr->image.rle16 = (AM2_Rle16 *)orig_malloc((size_t)value);
+            orig_fread(spr->image.rle16, (size_t)value, 1, fp);
             if (spr->format == 3)
-                RemapRleRuns(spr->image.rle16, (void *)(uintptr_t)len, 3,
+                RemapRleRuns(spr->image.rle16, (void *)(uintptr_t)value, 3,
                              sset + SPRITE_SET_OFF_REMAP10);
             else
-                RemapRleRuns(spr->image.rle16, (void *)(uintptr_t)len,
+                RemapRleRuns(spr->image.rle16, (void *)(uintptr_t)value,
                              (int32_t)spr->format,
                              sset + SPRITE_SET_OFF_REMAP);
         }
     }
 
-    orig_fread(&len, 4, 1, fp);
-    if (len > 0) {
-        spr->overlay = (AM2_Rle16 *)orig_malloc((size_t)len);
-        orig_fread(spr->overlay, (size_t)len, 1, fp);
+    orig_fread(&value, 4, 1, fp);
+    if (value > 0) {
+        spr->overlay = (AM2_Rle16 *)orig_malloc((size_t)value);
+        orig_fread(spr->overlay, (size_t)value, 1, fp);
     }
     return 1;
+#undef dir
+#undef fp
 }
 
 /* 0x00445C00. Put a lost sprite's pixels back from LOOSE files.
