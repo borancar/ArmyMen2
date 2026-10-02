@@ -3863,6 +3863,46 @@ int32_t __cdecl ObjCollidesWith(void *from, void *obj)
  * counter cannot see these calls. It reads 2 on the same run and those two are
  * its other callers. The arm is compared by the A/B and counted by nothing.
  */
+/* One object's weight, inlined into BlockWeightTroops: the image returns the
+ * constant arms straight in eax and keeps the default in a register of its
+ * own, and its by-value `ref` is the copy homed in the caller's dead slot. */
+static inline int32_t TroopBlockWeight(const uint8_t *f, uint8_t *o,
+                                       uint32_t ref)
+{
+    int32_t w = AM2_BLOCK_FULL;
+
+    if (o == f)
+        return 0;
+    if (ObjIsItem((const AM2_Object *)o)) {
+        w = *(const int8_t *)(o + OBJ_OFF_RANK);
+    } else if (ObjIsType2((const AM2_Object *)o)) {
+        /* Every refusal lands on one `return 0`. */
+        if (!f)
+            goto zero;
+        if (*(const int8_t *)(f + OBJ_OFF_ARMY)
+            == (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
+            && *(const uint32_t *)((const uint8_t *)LookupOwnerObj(
+                   *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER)
+                   + OBJ_OFF_RIDING)
+               == ((const AM2_Object *)f)->uid
+            && *(const int32_t *)(f + OBJ_OFF_FIELD_10C) == 0)
+            goto zero;
+        if (ObjsAreAllied((void *)f, o, 0))
+            return AM2_BLOCK_FULL;
+    zero:
+        return 0;
+    } else if (f
+               && (ObjIsType3((const AM2_Object *)o)
+                   || ObjIsType8((const AM2_Object *)o))) {
+        if (ApproxDist((const AM2_Point *)&ref,
+                       (const AM2_Point *)(o + OBJ_OFF_POS))
+            >= ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
+                          (const AM2_Point *)(o + OBJ_OFF_POS)))
+            return 0;
+    }
+    return w;
+}
+
 int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
                                   uint32_t ref)
 {
@@ -3872,42 +3912,7 @@ int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
     uint32_t tile;
 
     for (o = (uint8_t *)chain; o; o = *(uint8_t **)(o + OBJ_OFF_QUERY_NEXT)) {
-        int32_t w = AM2_BLOCK_FULL;
-
-        if (o == f) {
-            w = 0;
-        } else if (ObjIsItem((const AM2_Object *)o)) {
-            w = *(const int8_t *)(o + OBJ_OFF_RANK);
-        } else if (ObjIsType2((const AM2_Object *)o)) {
-            int32_t skip = 0;
-
-            if (f) {
-                if (*(const int8_t *)(f + OBJ_OFF_ARMY)
-                    == (int32_t)*(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
-                    const uint8_t *owner = (const uint8_t *)LookupOwnerObj(
-                        *(const uint32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
-
-                    if (*(const uint32_t *)(owner + OBJ_OFF_RIDING)
-                            == ((const AM2_Object *)f)->uid
-                        && *(const int32_t *)(f + OBJ_OFF_FIELD_10C) == 0)
-                        skip = 1;
-                }
-                if (skip)
-                    w = 0;
-                else
-                    w = ObjsAreAllied(f, o, 0) ? AM2_BLOCK_FULL : 0;
-            } else {
-                w = 0;
-            }
-        } else if (f
-                   && (ObjIsType3((const AM2_Object *)o)
-                       || ObjIsType8((const AM2_Object *)o))) {
-            if (ApproxDist((const AM2_Point *)&ref,
-                           (const AM2_Point *)(o + OBJ_OFF_POS))
-                >= ApproxDist((const AM2_Point *)(f + OBJ_OFF_POS),
-                              (const AM2_Point *)(o + OBJ_OFF_POS)))
-                w = 0;
-        }
+        int32_t w = TroopBlockWeight(f, o, ref);
 
         total += w;
         if (total >= AM2_BLOCK_FULL)
@@ -3915,15 +3920,14 @@ int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
     }
 
     tile = (uint32_t)TileOfPoint(at);
-    /* The same vacuous guard BlockWeightChain carries, spelled the same way. */
-    if ((tile & 0xFFFFu) > 0xFFFFu)
-        return 0xFF;
-    tile &= 0xFFFFu;
-
-    if (g_tileFlags[tile] & AM2_TILE_BLOCKS)
-        total += AM2_BLOCK_FULL;
-
-    return total;
+    /* The same vacuous guard BlockWeightChain carries, here as a word
+     * compare before the mask. */
+    if ((uint16_t)tile <= 0xFFFFu) {
+        if (g_tileFlags[(uint16_t)tile] & AM2_TILE_BLOCKS)
+            total += AM2_BLOCK_FULL;
+        return total;
+    }
+    return 0xFF;
 }
 
 /* 0x0045BBB0, five callers. Sum the block weight over a vehicle mask's points.
@@ -8494,7 +8498,7 @@ int32_t __cdecl WeaponClassOf(uint32_t uid)
  * head is never consulted -- it is the NEXT pointer that continues, which is
  * why a linked item's OBJ_OFF_CHAIN_UID does not start a second walk.
  */
-void __cdecl DamageItemChain(void *obj, int32_t amount, int32_t d,
+void __cdecl DamageItemChain(void *obj, int32_t amount, uint8_t d,
                              int32_t kind, uint32_t attacker)
 {
     uint8_t *o = (uint8_t *)obj;
@@ -12624,7 +12628,6 @@ void __cdecl DamageItem(void *obj, int32_t amount, uint8_t extra, int32_t kind,
                         uint32_t attacker, int32_t inChain)
 {
 #define o ((uint8_t *)obj)
-    const uint8_t *rec;
     int32_t        armour;
     int32_t        dmg;
     int32_t        set;
@@ -12641,18 +12644,22 @@ void __cdecl DamageItem(void *obj, int32_t amount, uint8_t extra, int32_t kind,
     if (*(const int16_t *)(o + OBJ_OFF_HEALTH) <= 0)
         return;
 
-    rec    = *(const uint8_t *const *)(o + OBJ_OFF_FIELD_94);
+    /* The record is re-read from the object at each use. */
+#define rec (*(const uint8_t *const *)(o + OBJ_OFF_FIELD_94))
     armour = *(const int16_t *)(rec + AAIREC_OFF_ARMOUR);
-    dmg    = amount;
 
     if (kind == 1) {
         if (armour < 0)
             armour = 0;
-        if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_IMMUNE_KIND1)
+        if (*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_IMMUNE_KIND1) {
             dmg = 0;
+            goto have;
+        }
     }
+    dmg = amount;
+have:
 
-    dmg -= (armour < 0) ? -armour : armour;
+    dmg -= abs(armour);
     if (dmg <= 0)
         return;
 
@@ -12771,6 +12778,7 @@ void __cdecl DamageItem(void *obj, int32_t amount, uint8_t extra, int32_t kind,
                     ((const AM2_Object *)o)->uid, life, 0, 0, 0, 0);
 
     }
+#undef rec
 #undef o
 }
 

@@ -66,11 +66,14 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1469 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1470 of
   1645 byte-identical (2026-10-02), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1469:
+  the near-miss sweep, 758 before the row pools. From 758 to 1470:
+  - **DamageItem** (2026-10-02): the record re-read at each use, the armour
+    through abs(), the immune case on a shared label, and DamageItemChain's
+    pass-through direction a byte (it stays matched).
   - **RemapRleRuns, AiStepAttach, SpriteReloadNamed, ItemTeardown**
     (2026-10-02): `width` a local and `row` initialised in each loop header;
     the army list re-read after rand(); the hot-spot clamp applied to the

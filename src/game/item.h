@@ -849,7 +849,7 @@ int32_t __cdecl WeaponClassOf(uint32_t uid);
 
 /* 0x00435650, one caller -- DamageItem itself. Damage an item and then every
  * item in the chain hanging off it. */
-void __cdecl DamageItemChain(void *obj, int32_t amount, int32_t d,
+void __cdecl DamageItemChain(void *obj, int32_t amount, uint8_t d,
                              int32_t kind, uint32_t attacker);
 
 /* 0x004356C0, three callers. DamageObject's type-1 arm: armour off the hit,
