@@ -13741,11 +13741,6 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
  * which is the only state in which CheckMapRules has widgets to update. */
 #define AM2_MENU_MODE_MP_PANEL    9
 #define AM2_MP_COMPLAINT_BYTES    0x100u
-#define ADDR_MSG_NO_RULES        0x004872F4u
-#define ADDR_MSG_BAD_INSTALL     0x004872BCu
-#define ADDR_MSG_BAD_RULES       0x0048729Cu
-#define ADDR_MSG_BAD_MAP         0x00487284u
-#define ADDR_MSG_NO_MAP          0x004872DCu
 /* Offsets into the player message. The per-player records start at 0x00A8 and
  * are 0x60 apart; the original addresses them from 0x00AC, so the id reads as
  * rec[-4]. */

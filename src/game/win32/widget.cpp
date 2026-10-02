@@ -2497,7 +2497,7 @@ typedef char *(__cdecl *AM2_FgetsFn)(char *buf, int32_t n, am2_FILE *fp);
 /* The panel's complaint, six times over: grey the map preview and announce
  * the failure against the OFFENDING PLAYER's name, which is our own slot's
  * -- this runs on the machine that is failing the check, not on the host. */
-static inline void MpComplain(uint8_t *panel, uint32_t fmt)
+static inline void MpComplain(uint8_t *panel, const char *fmt)
 {
     char line[AM2_MP_COMPLAINT_BYTES];
 
@@ -2505,7 +2505,7 @@ static inline void MpComplain(uint8_t *panel, uint32_t fmt)
         return;
 
     ShowBadMapPreview(*(AM2_Widget **)(panel + MP_PANEL_OFF_PREVIEW));
-    am2_sprintf(line, (const char *)((void *)(uintptr_t)(fmt)),
+    am2_sprintf(line, fmt,
                 (const char *)(g_commObject + COMM_OFF_PLAYERS
                     + (size_t)*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER
                       * AM2_COMM_SLOT_STRIDE + COMM_SLOT_OFF_NAME));
@@ -10554,7 +10554,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
     rec = (const uint8_t *)ScriptListFind(
               (char *)((void *)(uintptr_t)(ADDR_MP_SCRIPT_NAME)));
     if (!rec) {
-        MpComplain(panel, ADDR_MSG_NO_RULES);
+        MpComplain(panel, "%s does not have rules.");
         return AM2_MAPCHECK_NO_RULES;
     }
 
@@ -10612,7 +10612,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
     }
 
     if (chosen == -1) {
-        MpComplain(panel, ADDR_MSG_NO_MAP);
+        MpComplain(panel, "%s does not have map.");
         return AM2_MAPCHECK_NO_MAP;
     }
 
@@ -10624,18 +10624,18 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
     }
 
     if (RulesChecksum() != rulesSum) {
-        MpComplain(panel, ADDR_MSG_BAD_INSTALL);
+        MpComplain(panel, "%s has a damaged installation.");
         return AM2_MAPCHECK_BAD_INSTALL;
     }
 
     SelectLevel(FindLevelByName((char *)((void *)(uintptr_t)(ADDR_MAP_NAME))));
 
     if (MpScriptChecksum() != scriptSum) {
-        MpComplain(panel, ADDR_MSG_BAD_RULES);
+        MpComplain(panel, "%s has a damaged rules file.");
         return AM2_MAPCHECK_BAD_RULES;
     }
     if (MapChecksum() != mapSum) {
-        MpComplain(panel, ADDR_MSG_BAD_MAP);
+        MpComplain(panel, "%s has a damaged map.");
         return AM2_MAPCHECK_BAD_MAP;
     }
 
@@ -10649,7 +10649,7 @@ int32_t __cdecl CheckMapRules(uint32_t rulesSum, uint32_t scriptSum,
         am2_sprintf(amm, "%s.amm",
                     (const char *)((void *)(uintptr_t)(ADDR_MAP_NAME)));
         if (!FileExists(amm)) {
-            MpComplain(panel, ADDR_MSG_NO_MAP);
+            MpComplain(panel, "%s does not have map.");
             return AM2_MAPCHECK_NO_MAP;
         }
     }

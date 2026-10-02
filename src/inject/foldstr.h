@@ -106,16 +106,6 @@
 #define ADDR_NAME_BLUETEAMWINS ((uintptr_t)(const char *)"blueteamwins")
 #undef ADDR_NAME_GREYTEAMWINS
 #define ADDR_NAME_GREYTEAMWINS ((uintptr_t)(const char *)"greyteamwins")
-#undef ADDR_MSG_BAD_MAP
-#define ADDR_MSG_BAD_MAP ((uintptr_t)(const char *)"%s has a damaged map.")
-#undef ADDR_MSG_BAD_RULES
-#define ADDR_MSG_BAD_RULES ((uintptr_t)(const char *)"%s has a damaged rules file.")
-#undef ADDR_MSG_BAD_INSTALL
-#define ADDR_MSG_BAD_INSTALL ((uintptr_t)(const char *)"%s has a damaged installation.")
-#undef ADDR_MSG_NO_MAP
-#define ADDR_MSG_NO_MAP ((uintptr_t)(const char *)"%s does not have map.")
-#undef ADDR_MSG_NO_RULES
-#define ADDR_MSG_NO_RULES ((uintptr_t)(const char *)"%s does not have rules.")
 #undef ADDR_STR_ISPROCESSORFEATUREPRESENT
 #define ADDR_STR_ISPROCESSORFEATUREPRESENT ((uintptr_t)(const char *)"IsProcessorFeaturePresent")
 #undef AM2_BMP_02_009_00

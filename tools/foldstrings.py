@@ -3,8 +3,7 @@
 
 A handful of strings are still read out of the carried blob by the
 reconstruction -- CRT import names and runtime-error banners, the CD-required
-message, the multiplayer status/log lines, the team-win event names, the
-bad-map/rules panel messages. Each is used ONLY as a string (never as an
+message, the multiplayer status/log lines, the team-win event names. Each is used ONLY as a string (never as an
 address: a loop bound like ADDR_OPTION_TABLE_END, which shares this shape, is
 deliberately NOT here). Redirecting the macro to a C literal in the native/SA
 build makes those reads hit the binary's own .rodata, and the blob's copies go
@@ -57,8 +56,6 @@ FOLD = [
     "NAME_GREENWINS", "NAME_TANWINS", "NAME_BLUEWINS", "NAME_GREYWINS",
     "NAME_GREENTEAMWINS", "NAME_TANTEAMWINS", "NAME_BLUETEAMWINS",
     "NAME_GREYTEAMWINS",
-    "MSG_BAD_MAP", "MSG_BAD_RULES", "MSG_BAD_INSTALL",
-    "MSG_NO_MAP", "MSG_NO_RULES",
 ]
 
 # The FULL-name macros to fold (any prefix), resolved from orig.h, widget.h and
