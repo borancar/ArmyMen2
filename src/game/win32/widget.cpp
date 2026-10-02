@@ -2714,44 +2714,6 @@ static inline int32_t PointerFriendTail(uint8_t *o)
 
 
 
-/* The inlined "our leader" helper whose fallback is dead, which orig.h
- * documents in full above ADDR_POINTER_MODES -- it lists eight sites and two
- * of them, 0x00457E61 and 0x00457F7F, are this function's. Written once here
- * rather than inlined twice, and spelled as a local compared against the
- * global it came from, which is what the source said and the only form a
- * compiler takes without a tautological-compare warning. */
-static inline uint8_t *FollowFindLeader(void)
-{
-    int32_t owner = *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER;
-
-    if (owner != *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER) {
-        /* Dead -- see above. */
-        const uint8_t *list;
-        int32_t        i;
-
-        if (owner < 0 || owner >= AM2_COMM_SLOTS)
-            return (uint8_t *)0;
-
-        list = (const uint8_t *)
-            ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
-
-        for (i = 0; i < *(const int32_t *)(list + LIST_OFF_COUNT); i++) {
-            uint8_t *o = (uint8_t *)LookupByUID(
-                (*(const uint32_t *const *)(list + LIST_OFF_UIDS))[i]);
-
-            if (o && *(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
-                && *(const int32_t *)(o + OBJ_OFF_SARGE))
-                return o;
-
-            list = (const uint8_t *)
-                ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)[owner];
-        }
-        return (uint8_t *)0;
-    }
-
-    return (uint8_t *)LookupByUID(
-        *(const uint32_t *)(uintptr_t)ADDR_OUR_LEADER_UID);
-}
 
 
 
@@ -16868,7 +16830,7 @@ void __cdecl PointerActionFollow(void *obj, uint32_t at)
     SpeakLine(AM2_SPEAK_OVERHERE,
               *(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER);
 
-    leader = FollowFindLeader();
+    leader = OurLeaderUnit();
     if (!leader)
         return;
 
@@ -16886,7 +16848,6 @@ void __cdecl PointerActionFollow(void *obj, uint32_t at)
             ((void *const *)(uintptr_t)ADDR_ARMY_OBJ_LISTS)
                 [*(const int32_t *)(uintptr_t)ADDR_DEFAULT_OWNER];
         uint8_t *o;
-        int32_t  type;
 
         if (i >= *(const int32_t *)(list + LIST_OFF_COUNT))
             return;
@@ -16906,34 +16867,32 @@ void __cdecl PointerActionFollow(void *obj, uint32_t at)
             || *(const int16_t *)(o + OBJ_OFF_HEALTH) == 0)
             goto next;
 
-        type = *(const int32_t *)o;
-
         /* Sarge himself is selected and never attached to anything. */
-        if (type == AM2_OBJ_TYPE_TROOPER && *(const int32_t *)(o + OBJ_OFF_SARGE)) {
+        if (*(const int32_t *)o == AM2_OBJ_TYPE_TROOPER
+            && *(const int32_t *)(o + OBJ_OFF_SARGE)) {
             SelectUnit(o);
             goto next;
         }
 
-        /* The vehicle our leader is riding is selected, not ordered. */
-        if (type == AM2_OBJ_TYPE_VEHICLE) {
-            uint8_t *riding = FollowFindLeader();
-
-            if (riding
-                && *(const uint32_t *)(riding + OBJ_OFF_RIDING)
-                   == *(const uint32_t *)(o + OBJ_OFF_UID)) {
-                SelectUnit(o);
-                goto next;
-            }
+        /* The vehicle our leader is riding is selected, not ordered. The
+         * leader is looked up again and NOT tested: the original reads its
+         * riding uid straight off whatever comes back. */
+        if (ObjIsType3Inline(o)
+            && *(const uint32_t *)(OurLeaderUnit() + OBJ_OFF_RIDING)
+               == *(const uint32_t *)(o + OBJ_OFF_UID)) {
+            SelectUnit(o);
+            goto next;
         }
 
-        if (type < AM2_OBJ_TYPE_TROOPER)
+        if (*(const int32_t *)o < AM2_OBJ_TYPE_TROOPER)
             goto next;
-        if (type > AM2_OBJ_TYPE_VEHICLE && type != AM2_OBJ_TYPE_ROACH)
+        if (*(const int32_t *)o > AM2_OBJ_TYPE_VEHICLE
+            && *(const int32_t *)o != AM2_OBJ_TYPE_ROACH)
             goto next;
         if (*(const int32_t *)(o + OBJ_OFF_FIELD_94))
             goto next;
         /* An empty vehicle has nobody to give the order to. */
-        if (type == AM2_OBJ_TYPE_VEHICLE
+        if (ObjIsType3Inline(o)
             && *(const int32_t *)(o + VEHICLE_OFF_PTR_LIST + 4) == 0)
             goto next;
 
