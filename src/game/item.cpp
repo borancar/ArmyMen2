@@ -11396,7 +11396,7 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
 void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
 {
 #define o ((uint8_t *)obj)
-    const int32_t *grid = (const int32_t *)desc;
+#define grid ((const int32_t *)desc)
     int32_t        x, y, left, top;
     int32_t        cl, ct, cr, cb, row, col, idx;
 
@@ -11443,39 +11443,41 @@ void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
         int32_t cell = (row << grid[2]) + cl;
 
         for (col = cl; col <= cr; col++, cell++, idx++) {
-            uint8_t *entry = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES)
-                             + (uint32_t)idx * AM2_CELL_ENTRY_STRIDE;
+#define entry (*(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES) \
+               + (uint32_t)idx * AM2_CELL_ENTRY_STRIDE)
             int32_t  was = *(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX);
 
-            if (was == cell)
-                continue;
-            if (was >= 0)
-                ListUnlink(entry,
-                           (void **)(*(uint8_t **)((uint8_t *)desc + CELLS_OFF_HEADS)
-                                     + (uint32_t)was * 4u));
-            *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = cell;
-            ListPushFront(entry,
-                          (void **)(*(uint8_t **)((uint8_t *)desc + CELLS_OFF_HEADS)
-                                    + (uint32_t)cell * 4u));
+            if (was < 0 || was != cell) {
+                if (was >= 0)
+                    ListUnlink(entry,
+                               (void **)(*(uint8_t **)((uint8_t *)desc + CELLS_OFF_HEADS)
+                                         + (uint32_t)was * 4u));
+                *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = cell;
+                ListPushFront(entry,
+                              (void **)(*(uint8_t **)((uint8_t *)desc + CELLS_OFF_HEADS)
+                                        + (uint32_t)cell * 4u));
+            }
+#undef entry
         }
     }
 
     /* Whatever the object was linked into beyond the cells it now covers is
      * released, and -1 written back so a second pass sees it unlinked. */
     for (; idx < (int32_t)*(const uint8_t *)(o + OBJ_OFF_CELL_COUNT); idx++) {
-        uint8_t *entry = *(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES)
-                         + (uint32_t)idx * AM2_CELL_ENTRY_STRIDE;
-        int32_t  was = *(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX);
-
-        if (was < 0)
+#define entry (*(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES) \
+               + (uint32_t)idx * AM2_CELL_ENTRY_STRIDE)
+        if (*(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX) < 0)
             return;
         ListUnlink(entry, (void **)(*(uint8_t **)((uint8_t *)desc + CELLS_OFF_HEADS)
-                                    + (uint32_t)was * 4u));
+                                    + (uint32_t)*(const int32_t *)(entry
+                                                  + CELL_ENTRY_OFF_INDEX) * 4u));
         *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = -1;
+#undef entry
     }
 #undef hit
 #undef box
 #undef o
+#undef grid
 }
 
 /* 0x00427990, eight callers. The selection changed: drop what is gone,
