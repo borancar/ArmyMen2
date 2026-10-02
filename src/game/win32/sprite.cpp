@@ -1624,12 +1624,11 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
     int32_t i;
     int32_t overlaySize;
 
-    if (orig_fread(&count, 4, 1, fp), count <= 0)
-        return;
+    orig_fread(&count, 4, 1, fp);
 
     for (i = 0; i < count; i++) {
         AM2_Sprite *spr;
-        int16_t     w, h, x, y;
+        int16_t     w, h, xy[2];
         int32_t     size;
 
         if (g_spriteListN >= g_spriteListCap)
@@ -1651,15 +1650,15 @@ void __cdecl LoadSpriteSet(am2_FILE *fp, const uint8_t *table, int32_t from,
         spr->bounds.right = w;
         spr->bounds.bottom = h;
 
-        orig_fread(&x, 2, 1, fp);
-        orig_fread(&y, 2, 1, fp);
-        spr->hotX = x;
-        spr->hotY = y;
+        orig_fread(&xy[0], 2, 1, fp);
+        orig_fread(&xy[1], 2, 1, fp);
+        spr->hotX = xy[0];
+        spr->hotY = xy[1];
 
-        orig_fread(&x, 2, 1, fp);
-        orig_fread(&y, 2, 1, fp);
-        spr->attachX = x;
-        spr->attachY = y;
+        orig_fread(&xy[0], 2, 1, fp);
+        orig_fread(&xy[1], 2, 1, fp);
+        spr->attachX = xy[0];
+        spr->attachY = xy[1];
 
 
         /* The image, then the overlay -- each a size and that many bytes, and

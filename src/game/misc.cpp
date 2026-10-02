@@ -512,13 +512,11 @@ int32_t __cdecl LoadMaskPacked(void *out, int32_t set, int32_t index,
 {
     uint8_t *rec = (uint8_t *)out;
     uint8_t *ss;
-    am2_FILE *fp;
     uint32_t key;
     uint32_t got;
     int32_t  dir;
     int32_t  scratch;
-    int32_t  size;
-    int32_t  where;
+    int32_t  junk;
 
     *(void **)(rec + MASKREC_OFF_BITS) = (void *)0;
 
@@ -531,7 +529,8 @@ int32_t __cdecl LoadMaskPacked(void *out, int32_t set, int32_t index,
     if (dir < 0)
         return 0;
 
-    fp = *(am2_FILE **)(ss + SPRITE_SET_OFF_FILE);
+    /* The file is re-read from the sprite set at every call. */
+#define fp (*(am2_FILE **)(ss + SPRITE_SET_OFF_FILE))
 
     if (orig_fseek_m(fp, ((const int32_t *)(*(void **)(ss + SPRITE_SET_OFF_DIR)))
                        [dir * 2 + 1], 0) != 0) {
@@ -553,19 +552,20 @@ int32_t __cdecl LoadMaskPacked(void *out, int32_t set, int32_t index,
     *(uint16_t *)(rec + MASKREC_OFF_DESC_BLOCKS) = (uint16_t)scratch;
 
     orig_fread_m(&scratch, 4, 1, fp);   /* three reads whose values are dropped */
-    orig_fread_m(&scratch, 4, 1, fp);   /* and whose SIDE EFFECT on the file    */
-    orig_fread_m(&scratch, 4, 1, fp);   /* position is the point of them        */
+    orig_fread_m(&junk, 4, 1, fp);      /* and whose SIDE EFFECT on the file    */
+    orig_fread_m(&junk, 4, 1, fp);      /* position is the point of them        */
 
-    orig_fread_m(&where, 4, 1, fp);
-    orig_fseek_m(fp, where, 1);
-    orig_fread_m(&where, 4, 1, fp);
-    orig_fseek_m(fp, where, 1);
+    /* The same variable carries the two skips and the size after them. */
+    orig_fread_m(&scratch, 4, 1, fp);
+    orig_fseek_m(fp, scratch, 1);
+    orig_fread_m(&scratch, 4, 1, fp);
+    orig_fseek_m(fp, scratch, 1);
 
-    orig_fread_m(&size, 4, 1, fp);
-    if (size > 0) {
-        void *bits = am2_malloc((size_t)size);
+    orig_fread_m(&scratch, 4, 1, fp);
+    if (scratch > 0) {
+        void *bits = am2_malloc((size_t)scratch);
         *(void **)(rec + MASKREC_OFF_BITS) = bits;
-        orig_fread_m(bits, (size_t)size, 1, fp);
+        orig_fread_m(bits, (size_t)scratch, 1, fp);
     }
     return 1;
 
@@ -574,6 +574,7 @@ fail:
         am2_free(*(void **)(rec + MASKREC_OFF_BITS));
     *(void **)(rec + MASKREC_OFF_BITS) = (void *)0;
     return 0;
+#undef fp
 }
 
 void __cdecl LoadMask(void *out, int32_t set, int32_t index, int32_t frame)

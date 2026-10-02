@@ -66,11 +66,11 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1457 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1458 of
   1645 byte-identical (2026-10-02), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1457:
+  the near-miss sweep, 758 before the row pools. From 758 to 1458:
   - **PollKeyboard's keyboard state is aggregated** (0x005127C8..
     0x00512FD0 in relinkos.py's AGGREGATE_RANGES): the loop re-reads the
     current buffer pointer every key and walks the deadline and pressed
