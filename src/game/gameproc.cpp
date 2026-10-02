@@ -943,11 +943,13 @@ void __cdecl SelectInventorySlot(void *unit, int32_t slot);
 static inline int32_t ScenRowWeapon(int32_t kind)
 {
     switch (kind) {
+    case 0:  return 1;
     case 1:  return 2;
     case 2:  return 3;
     case 3:  return 4;
+    case 4:  return 1;
     case 5:  return 5;
-    default: return 1;   /* kinds 0 and 4, and everything past 5 */
+    default: return 1;   /* everything past 5 */
     }
 }
 
@@ -1003,8 +1005,9 @@ int32_t __cdecl PlaceScenario(void)
 
         for (i = 0; i < n; row += SCEN_ROW_BYTES, i++) {
             uint8_t *unit;
-            int32_t  kind = *(const int32_t *)(row + SCEN_ROW_OFF_KIND);
+#define kind (*(const int32_t *)(row + SCEN_ROW_OFF_KIND))
             int32_t  amount;
+            int32_t  flags;
 
             if (*(const int16_t *)(row + SCEN_ROW_OFF_POS) <= 0)
                 continue;
@@ -1025,6 +1028,9 @@ int32_t __cdecl PlaceScenario(void)
              * levels leave ADDR_HAVE_DEFAULT_COF at 0 and this arm never runs.
              * The LookupOwnerObj call is the original's and its result is
              * discarded there too. */
+            flags = 0;
+            if (!*(const uint8_t *)(row + SCEN_ROW_OFF_FLAG))
+                flags = 4;
             if (*(const int32_t *)(uintptr_t)ADDR_HAVE_DEFAULT_COF
                 && (uint32_t)army == g_defaultOwner) {
                 if (kind == AM2_SCEN_KIND_LEADER) {
@@ -1059,7 +1065,7 @@ int32_t __cdecl PlaceScenario(void)
                        *(const int16_t *)(row + SCEN_ROW_OFF_POS),
                        *(const int16_t *)(row + SCEN_ROW_OFF_POS + 2),
                        ((AM2_Comm *)comm)->CommArmyOfSlot(army), army,
-                       *(const uint8_t *)(row + SCEN_ROW_OFF_FLAG) ? 0 : 4,
+                       flags,
                        1, 0, 1, 0);
 
             /* SCEN_ROW_OFF_AMOUNT, clamped up to 1, into OBJ_OFF_FACING_COPY.
@@ -1069,9 +1075,8 @@ int32_t __cdecl PlaceScenario(void)
              * lands in it. Six other sites write 0xF8; settling it means
              * reading one of them, which this commit does not. Reproduced
              * with the offsets as they stand and the conflict recorded. */
-            amount = *(const uint8_t *)(row + SCEN_ROW_OFF_AMOUNT);
-            if (amount < 1)
-                amount = 1;
+            amount = *(const uint8_t *)(row + SCEN_ROW_OFF_AMOUNT) < 1
+                         ? 1 : *(const uint8_t *)(row + SCEN_ROW_OFF_AMOUNT);
             *(unit + OBJ_OFF_FACING_COPY) = (uint8_t)amount;
 
             if (kind == AM2_SCEN_KIND_LEADER) {
@@ -1180,6 +1185,7 @@ int32_t __cdecl PlaceScenario(void)
     return 1;
 #undef n
 #undef comm
+#undef kind
 }
 
 void __cdecl ResetLevelState(void)

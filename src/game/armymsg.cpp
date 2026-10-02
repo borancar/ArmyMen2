@@ -1765,7 +1765,7 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
     uint8_t  *o = (uint8_t *)obj;
     uint8_t  *m = (uint8_t *)msg;
     uint8_t  *out, *outStart;
-    uint32_t  seq, flags = 0, interval, coarse;
+    uint32_t  seq, flags = 0, interval;
     int32_t   dx, dz;
     uint8_t   action;
 
@@ -1774,7 +1774,7 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
     seq = *(const uint32_t *)((const uint8_t *)FindPlayerById(
               *(const uint32_t *)(comm + COMM_OFF_OUR_PLAYER_ID))
               + FLOW_OFF_SEQUENCE);
-    coarse = *(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT);
+#define coarse (*(const uint32_t *)(comm + COMM_OFF_ENOUGH_CHANGE_LIMIT))
 
     dx = *(const int16_t *)(o + OBJ_OFF_POS)
          - *(const int16_t *)(o + VEHICLE_OFF_SENT_POS);
@@ -1792,13 +1792,12 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
     {
         uint32_t age = seq - *(const uint32_t *)(o + VEHICLE_OFF_SENT_POS_SEQ);
 
-        if (age >= interval
-            && (*(const int16_t *)(o + OBJ_OFF_POS)
-                    != *(const int16_t *)(o + VEHICLE_OFF_SENT_POS)
-                || *(const int16_t *)(o + OBJ_OFF_POS + 2)
-                    != *(const int16_t *)(o + VEHICLE_OFF_SENT_POS + 2)))
-            flags = 0x80000000u;
-        else if (age >= coarse && (dx > 8 || dz > 8))
+        if ((age >= interval
+             && (*(const int16_t *)(o + OBJ_OFF_POS)
+                     != *(const int16_t *)(o + VEHICLE_OFF_SENT_POS)
+                 || *(const int16_t *)(o + OBJ_OFF_POS + 2)
+                     != *(const int16_t *)(o + VEHICLE_OFF_SENT_POS + 2)))
+            || (age >= coarse && (dx > 8 || dz > 8)))
             flags = 0x80000000u;
     }
 
@@ -1820,49 +1819,58 @@ void __cdecl VehicleUpdateAppend(void *msg, void *obj)
 
     {
         uint32_t age = seq - *(const uint32_t *)(o + VEHICLE_OFF_SENT_FACING_SEQ);
-        uint8_t  lf = *(const uint8_t *)(o + VEHICLE_OFF_SENT_FACING);
-        uint8_t  f  = *(const uint8_t *)(o + OBJ_OFF_FACING);
+#define lf (*(const uint8_t *)(o + VEHICLE_OFF_SENT_FACING))
+#define f  (*(const uint8_t *)(o + OBJ_OFF_FACING))
 
         if ((age >= interval && f != lf)
             || (age >= coarse && (((uint32_t)lf ^ (uint32_t)f) & 0xFFFFFFF0u))
             || (age >= interval
                 && f != *(const uint8_t *)(o + VEHICLE_OFF_SENT_INTFACING)))
             flags |= 0x40000000u;
+#undef f
+#undef lf
     }
 
     {
         uint32_t age = seq - *(const uint32_t *)(o + VEHICLE_OFF_SENT_GUN_SEQ);
-        uint8_t  lg = *(const uint8_t *)(o + VEHICLE_OFF_SENT_GUN);
-        uint8_t  g  = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
+#define lg (*(const uint8_t *)(o + VEHICLE_OFF_SENT_GUN))
+#define g  (*(const uint8_t *)(o + OBJ_OFF_FIELD_530))
 
-        if ((interval <= age && g != lg)
+        if ((age >= interval && g != lg)
             || (age >= coarse && (((uint32_t)lg ^ (uint32_t)g) & 0xFFFFFFF0u))
             || (age >= interval
                 && g != *(const uint8_t *)(o + VEHICLE_OFF_SENT_INTGUN)))
             flags |= 0x40000000u;
+#undef g
+#undef lg
     }
 
     {
         uint32_t age = seq - *(const uint32_t *)
                            (o + VEHICLE_OFF_SENT_INTFACING_SEQ);
-        uint8_t  v  = *(const uint8_t *)(o + OBJ_OFF_FIELD_578);
-        uint8_t  lv = *(const uint8_t *)(o + VEHICLE_OFF_SENT_INTFACING);
+#define v  (*(const uint8_t *)(o + OBJ_OFF_FIELD_578))
+#define lv (*(const uint8_t *)(o + VEHICLE_OFF_SENT_INTFACING))
 
         if ((age >= interval && v != lv)
             || (age >= coarse && (((uint32_t)lv ^ (uint32_t)v) & 0xFFFFFFF0u)))
             flags |= 0x20000000u;
+#undef lv
+#undef v
     }
 
     {
         uint32_t age = seq - *(const uint32_t *)
                            (o + VEHICLE_OFF_SENT_INTGUN_SEQ);
-        uint8_t  lv = *(const uint8_t *)(o + VEHICLE_OFF_SENT_INTGUN);
-        uint8_t  v  = *(const uint8_t *)(o + OBJ_OFF_FACING_COPY2);
+#define lv (*(const uint8_t *)(o + VEHICLE_OFF_SENT_INTGUN))
+#define v  (*(const uint8_t *)(o + OBJ_OFF_FACING_COPY2))
 
         if ((age >= interval && v != lv)
             || (age >= coarse && (((uint32_t)lv ^ (uint32_t)v) & 0xFFFFFFF0u)))
             flags |= 0x20000000u;
+#undef v
+#undef lv
     }
+#undef coarse
 
     if (!flags)
         return;
