@@ -13831,9 +13831,12 @@ typedef void *(__cdecl *AM2_BsearchFn)(const void *key, const void *base,
 #define MP_GAMETYPE_OFF_MAP_COUNT  0xC4u
 #define MP_GAMETYPE_OFF_MAPS       0xC8u
 #define AM2_MP_MAP_NAME_BYTES      0x40u
-/* The original's whole local frame is 0x40 and two dwords of it are the loop
- * counters, so the path buffer is the 0x38 between them. */
+/* CheckMapRules' rules-path buffer. */
 #define AM2_MP_RULES_PATH          0x38u
+/* OnMpGameType's: its whole frame is 0x40 and is all buffer -- the loop
+ * counters live in dead argument slots, so the path is 0x40 rather than
+ * 0x38 plus two dwords. */
+#define AM2_MP_GAMETYPE_PATH       0x40u
 /* 0x00431A30 -- the row-pick callback GAME_BOX is constructed with. Its only
  * reference is that constructor argument; nothing calls it. */
 #define ADDR_MP_ON_GAME_TYPE   0x00431A30u /* void(w, AM2_ListRows *, int32) */

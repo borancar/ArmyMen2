@@ -944,12 +944,13 @@ void __cdecl CollapseEqualDeltas(uint16_t *values, int32_t *count)
 {
     int32_t   n    = *count;
     int32_t   kept = 0;
-    uint16_t *wr   = values;
+    uint16_t *wr;
     int32_t   i    = 1;
 
     /* No early exit: a count of one or less falls through to the same
      * store, with kept still zero. */
     if (n > 1) {
+        wr = values;
         do {
             int32_t delta, j;
 

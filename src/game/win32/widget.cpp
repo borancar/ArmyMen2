@@ -10329,7 +10329,7 @@ void __cdecl OnMpGameType(AM2_Widget *w, AM2_ListRows *rows, int32_t row)
     uint8_t       *panel;
     const uint8_t *rec;
     uint8_t       *maps;
-    char           path[AM2_MP_RULES_PATH];
+    char           path[AM2_MP_GAMETYPE_PATH];
     int32_t        i;
     int32_t        chosen;
 
