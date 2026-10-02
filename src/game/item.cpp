@@ -3922,7 +3922,14 @@ int32_t __cdecl BlockWeightTroops(void *from, uint32_t at, void *chain,
     tile = (uint32_t)TileOfPoint(at);
     /* The same vacuous guard BlockWeightChain carries, here as a word
      * compare before the mask. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wtype-limits"
+#endif
     if ((uint16_t)tile <= 0xFFFFu) {
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
         if (g_tileFlags[(uint16_t)tile] & AM2_TILE_BLOCKS)
             total += AM2_BLOCK_FULL;
         return total;

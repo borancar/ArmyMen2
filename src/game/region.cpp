@@ -9463,7 +9463,7 @@ typedef void (__cdecl *am2_char_fn)(uint32_t wparam, int32_t lo, int32_t hi);
  *
  * Found by reading a compiler warning ('orig_get_tick_count' redefined) that
  * a `grep -E 'error'` had been discarding all session. */
-#define AM2_CHEAT_ABS(v)  ((v) < 0 ? -(v) : (v))
+#define AM2_CHEAT_ABS(v)  abs(v)
 
 #define g_charHandler (*(am2_char_fn *)(uintptr_t)ADDR_CHAR_HANDLER)
 #define g_inputSuppress (*(int32_t *)(uintptr_t)ADDR_INPUT_SUPPRESS)
@@ -9893,8 +9893,10 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
             *(int32_t *)(o + OBJ_OFF_DEADLINE_D0) = 0;
             *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 1;
             *(uint16_t *)(o + OBJ_OFF_PREV_REGION) = 0xFFFF;
-            *(int32_t *)(o + OBJ_OFF_UID_56C) =
-                (GetMenuRow() == 8) ? (int32_t)g_pointerHoverUid : 0;
+            if (GetMenuRow() == 8)
+                *(int32_t *)(o + OBJ_OFF_UID_56C) = (int32_t)g_pointerHoverUid;
+            else
+                *(int32_t *)(o + OBJ_OFF_UID_56C) = 0;
         }
         if (g_mouseButton[0] == 0)
             goto tail;
@@ -9911,8 +9913,10 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
 
     *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
     *(uint32_t *)(o + OBJ_OFF_FIELD_C0) = *(const uint32_t *)&at;
-    *(int32_t *)(o + OBJ_OFF_UID_56C) =
-        (GetMenuRow() == 8) ? (int32_t)g_pointerHoverUid : 0;
+    if (GetMenuRow() == 8)
+        *(int32_t *)(o + OBJ_OFF_UID_56C) = (int32_t)g_pointerHoverUid;
+    else
+        *(int32_t *)(o + OBJ_OFF_UID_56C) = 0;
 
 tail:
     /* The run key, last, and it can PROMOTE the action chosen above. */
