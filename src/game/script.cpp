@@ -928,7 +928,7 @@ static inline int32_t ScriptNamedTarget(AM2_ScriptCtx *ctx, int32_t *at,
 }
 
 /* Advance past a word, reporting the end of the script. */
-static inline int ScriptStep(AM2_ScriptCtx *ctx, int32_t *at)
+static inline int32_t ScriptStep(AM2_ScriptCtx *ctx, int32_t *at)
 {
     if (++(*at) < ctx->count)
         return 1;
@@ -2836,7 +2836,10 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
                     ctx->tokens[*at].line);
             goto fail;
         }
-        STEP_OWN();
+        if (++(*at) < ctx->count)
+            goto then_word;
+        am2_log("Unexpected end of script.\n");
+        return 0;
 
     } else if (ScriptScanFor(ctx, *at, AM2_TOK_AFTER, AM2_TOK_THEN)) {
         /* An `<event> after <event>` chain. */
@@ -2994,6 +2997,7 @@ int32_t __cdecl ScriptIf(AM2_ScriptCtx *ctx, int32_t *at)
     }
 
     /* ---- then ---- */
+then_word:
     if (!IS_WORD(AM2_TOK_THEN)) {
         am2_log("Line [%4d]:  Missing 'then' in if-statement.\n", TOK->line);
         goto fail;

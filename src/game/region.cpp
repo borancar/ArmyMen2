@@ -5056,26 +5056,26 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
         > AM2_SIGHT_SCANS_PER_FRAME)
         return (void *)0;
 
-    keep        = (uint8_t *)0;
-    best        = (uint8_t *)0;
-    alt         = (uint8_t *)0;
-    bestRange   = AM2_SIGHT_SCAN_FAR;
-    bestScore   = 0;
-    bestBearing = 0x80;
-    slack       = 0x80;
-    solve       = 1;
-
-    *outRange   = 0;
-    *outBearing = 0;
-    *nAllied    = 0;
-    *nOther     = 0;
-
     /* One slot written twice: a type 3 with more than one row aims with its
      * turret. Two displacements four apart, one dword. */
     facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
     if (ObjIsType3((const AM2_Object *)o)
         && *(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
         facing = *(const uint8_t *)(o + OBJ_OFF_FIELD_530);
+
+    *outRange   = 0;
+    *outBearing = 0;
+    *nAllied    = 0;
+    *nOther     = 0;
+
+    keep        = (uint8_t *)0;
+    best        = (uint8_t *)0;
+    bestRange   = AM2_SIGHT_SCAN_FAR;
+    bestBearing = 0x80;
+    slack       = 0x80;
+    bestScore   = 0;
+    alt         = (uint8_t *)0;
+    solve       = 1;
 
     /* A weapon already earmarked stays the fallback while it is still there,
      * not flagged gone, reachable, and worth taking. */
@@ -5111,9 +5111,12 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
     box.top    = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2) - reach;
     box.bottom = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2) + reach;
 
-    it = (uint8_t *)ObjectsInRect(
-        &box, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
-        flags ? ObjIsHittable : ObjIsLiveTarget);
+    if (flags)
+        it = (uint8_t *)ObjectsInRect(&box, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+                                      ObjIsHittable);
+    else
+        it = (uint8_t *)ObjectsInRect(&box, (void *)(uintptr_t)ADDR_OBJ_MAP_DESC,
+                                      ObjIsLiveTarget);
     if (!it)
         goto finish;
 
@@ -5158,68 +5161,28 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
         uint8_t  candBearing = 0x80;
         int32_t  candRange  = AM2_SIGHT_SCAN_FAR;
 
-        if (ObjsAreAllied(o, it, 0)) {
-            uint8_t *theirs;
-
-            if (!ObjIsTypeIn238((const AM2_Object *)it)) {
-                /* Not a unit: a dropped weapon worth walking to. */
-                if (!flags || !ObjIsType4((const AM2_Object *)it))
-                    continue;
-                DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
-                             (const AM2_Point *)(it + OBJ_OFF_POS),
-                             &candRange, &candBearing);
-                if (!RegionsNear(it, o, solve)) {
-                    solve = 0;
-                    continue;
-                }
-                solve = 0;
-                {
-                    int32_t n = TryTakeWeapon(it, o);
-
-                    if (n <= bestScore)
-                        continue;
-                    alt         = it;
-                    bestScore   = n;
-                    bestRange   = candRange;
-                    bestBearing = candBearing;
-                }
-                continue;
-            }
-
-            ++*nAllied;
-            if (!*(const uint32_t *)(it + OBJ_OFF_TARGET_UID))
-                continue;
-            theirs = (uint8_t *)LookupByUID(
-                *(const uint32_t *)(it + OBJ_OFF_TARGET_UID));
-            cand = theirs;
-            if (!theirs) {
-                *(uint32_t *)(it + OBJ_OFF_TARGET_UID) = 0;
-                goto score;                 /* cand is null; score refuses */
-            }
-            if (*(const int16_t *)(theirs + OBJ_OFF_HEALTH) <= 0
-                || (*(const int32_t *)(theirs + OBJ_OFF_FLAGS) & 0x204)) {
-                *(uint32_t *)(it + OBJ_OFF_TARGET_UID) = 0;
-                continue;
-            }
-            if (ObjsAreAllied(o, theirs, 0))
-                continue;
-            DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
-                         (const AM2_Point *)(theirs + OBJ_OFF_POS),
-                         &candRange, &candBearing);
-            /* Only mode 1 adopts an ally's target, and only close by. */
-            if (*(const int32_t *)(o + OBJ_OFF_AI_MODE) != 1)
-                goto score;
-            if (candRange > AM2_AI_PATROL_DETOUR)
-                continue;
-            goto score;
-        }
+        if (ObjsAreAllied(o, it, 0))
+            goto allied;
 
         if (IsKind7(it)) {
             candBearing = AngleBetween((const AM2_Point *)(o + OBJ_OFF_POS),
                                        (const AM2_Point *)(it + OBJ_OFF_POS));
             candRange   = AM2_SIGHT_KIND7_RANGE;
             cand        = it;
-            goto score;
+score:
+            if (!cand)
+                continue;
+            ++*nOther;
+            ++*(int32_t *)(o + OBJ_OFF_FIELD_F4);
+            /* Discarded two instructions later; a call, so it counts. */
+            (void)AngleDelta(facing, candBearing);
+            if (candRange >= bestRange + slack)
+                continue;
+            best        = cand;
+            bestRange   = candRange;
+            slack       = 0;
+            bestBearing = candBearing;
+            continue;
         }
 
         /* The sight test, inline. Same shape as AM2_AI_SIGHT_TEST and NOT the same
@@ -5307,19 +5270,61 @@ in_sight:
                 + AM2_SIGHT_REVEAL_MS;
         }
 
-score:
-        if (!cand)
+        goto score;
+
+allied:
+        if (ObjIsTypeIn238((const AM2_Object *)it)) {
+            uint8_t *theirs;
+
+            ++*nAllied;
+            if (!*(const uint32_t *)(it + OBJ_OFF_TARGET_UID))
+                continue;
+            theirs = (uint8_t *)LookupByUID(
+                *(const uint32_t *)(it + OBJ_OFF_TARGET_UID));
+            cand = theirs;
+            if (!theirs) {
+                *(uint32_t *)(it + OBJ_OFF_TARGET_UID) = 0;
+                goto score;                 /* cand is null; score refuses */
+            }
+            if (*(const int16_t *)(theirs + OBJ_OFF_HEALTH) <= 0
+                || (*(const int32_t *)(theirs + OBJ_OFF_FLAGS) & 0x204)) {
+                *(uint32_t *)(it + OBJ_OFF_TARGET_UID) = 0;
+                continue;
+            }
+            if (ObjsAreAllied(o, theirs, 0))
+                continue;
+            DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
+                         (const AM2_Point *)(theirs + OBJ_OFF_POS),
+                         &candRange, &candBearing);
+            /* Only mode 1 adopts an ally's target, and only close by. */
+            if (*(const int32_t *)(o + OBJ_OFF_AI_MODE) != 1)
+                goto score;
+            if (candRange > AM2_AI_PATROL_DETOUR)
+                continue;
+            goto score;
+        }
+
+        /* Not a unit: a dropped weapon worth walking to. */
+        if (!flags || !ObjIsType4((const AM2_Object *)it))
             continue;
-        ++*nOther;
-        ++*(int32_t *)(o + OBJ_OFF_FIELD_F4);
-        /* Discarded two instructions later; a call, so it counts. */
-        (void)AngleDelta(facing, candBearing);
-        if (candRange >= bestRange + slack)
+        DistAndAngle((const AM2_Point *)(o + OBJ_OFF_POS),
+                     (const AM2_Point *)(it + OBJ_OFF_POS),
+                     &candRange, &candBearing);
+        if (!RegionsNear(it, o, solve)) {
+            solve = 0;
             continue;
-        best        = cand;
-        bestRange   = candRange;
-        slack       = 0;
-        bestBearing = candBearing;
+        }
+        solve = 0;
+        {
+            int32_t n = TryTakeWeapon(it, o);
+
+            if (n <= bestScore)
+                continue;
+            alt         = it;
+            bestScore   = n;
+            bestRange   = candRange;
+            bestBearing = candBearing;
+        }
     }
 
 finish:
