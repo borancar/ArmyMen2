@@ -66,11 +66,19 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1470 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1472 of
   1645 byte-identical (2026-10-02), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1470:
+  the near-miss sweep, 758 before the row pools. From 758 to 1472:
+  - **InitDirectDraw and the AM2_Movie constructor** (2026-10-02): a
+    ternary feeding a call or a store is an if/else in the image -- two
+    SetCooperativeLevel calls, two smack_open calls -- and the movie stores
+    its vtable and clears ACTIVE before the parameters. Step3Input took the
+    same treatment (two facing stores, abs() on the aim, `steered` set first,
+    the SightScan outs at function scope; 128 -> 19). checkcom now credits
+    the scan's undercount where the sweep found the uncounted call inside
+    the original (InitDirectDraw's `call [ebx+0x54]` at 0x0041AAEA).
   - **DamageItem** (2026-10-02): the record re-read at each use, the armour
     through abs(), the immune case on a shared label, and DamageItemChain's
     pass-through direction a byte (it stays matched).

@@ -254,13 +254,19 @@ def main():
         if ours != theirs:
             with_helpers = com_calls_including_helpers(
                 src, name, static_helpers(src))
-            differ.append((name, fname, theirs, ours, with_helpers))
+            differ.append((name, fname, theirs, ours, with_helpers, va))
 
     # The scan's own blind spot, re-measured rather than remembered. Use the
     # full reconstructed set, not just patch_replace: WndProc and
     # AudioTimerProc are registered rather than detoured and would otherwise
     # look outstanding.
     missed = sweep_missed(img, merged, sizes, merges.reconstructed())
+    # The sweep's misses, per owning function: where the reconstruction makes
+    # more COM calls than the scan saw and the sweep found that many unrecorded
+    # vtable-shaped calls inside the original, the scan undercounted there.
+    # InitDirectDraw's `call [ebx+0x54]` at 0x0041AAEA is one: the vtable
+    # register is loaded before a branch, so comcalls.py never sees it.
+    missed_in = collections.Counter(fn for _site, fn, _ours in missed)
     if missed:
         left = [m for m in missed if not m[2]]
         print(f"{len(missed)} vtable-shaped call(s) the scan did not record, "
@@ -280,8 +286,12 @@ def main():
         print("every reconstruction makes as many COM calls as its original")
         return 0
 
+    def scan_short(d):
+        return d[4] > d[2] and missed_in.get(d[5], 0) >= d[4] - d[2]
+
     by_helper = [d for d in differ if d[4] == d[2]]
-    by_scan = [d for d in differ if d[4] != d[2] and d[3] > d[2]]
+    by_scan = [d for d in differ
+               if d[4] != d[2] and (d[3] > d[2] or scan_short(d))]
     unexplained = [d for d in differ if d not in by_helper and d not in by_scan]
 
     print(f"{len(differ)} of {len(patched)} differ on a direct count: "
@@ -289,10 +299,11 @@ def main():
           f"{len(by_scan)} by the scan's\nknown undercount, "
           f"{len(unexplained)} unexplained\n")
     print(f"{'function':<24} {'file':<20} {'orig':>5} {'ours':>5} {'+helpers':>9}  note")
-    for name, fname, theirs, ours, total in differ:
+    for d in differ:
+        name, fname, theirs, ours, total = d[:5]
         if total == theirs:
             why = "accounted for"
-        elif ours > theirs:
+        elif ours > theirs or scan_short(d):
             why = "comcalls lost the vtable register at a branch"
         else:
             why = "READ THIS ONE"

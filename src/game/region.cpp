@@ -10845,11 +10845,12 @@ void __cdecl Step3Input(void *obj, void *rec)
     uint8_t  *r = (uint8_t *)rec;
     uint8_t  *weapon;
     uint8_t   bearing;
-    uint32_t  cursorWorld = 0;  /* view origin + cursor, a packed point */
+    uint32_t  cursorWorld;      /* view origin + cursor, a packed point */
     uint32_t  gunPos;           /* the turret's point, or the hull's */
     int32_t   dist = 0;         /* arg1's slot, reused */
     int32_t   aimDelta = 0;
     int32_t   steered = 0;
+    int32_t   range, allied, other;   /* SightScan's discarded outs */
 
     if (*(void *const *)(uintptr_t)ADDR_CHAR_HANDLER != 0)
         return;
@@ -10909,8 +10910,6 @@ void __cdecl Step3Input(void *obj, void *rec)
      * reading NextInventorySlot's header records for its call. */
     if (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
             > *(const uint32_t *)(o + OBJ_OFF_FIELD_FC)) {
-        int32_t range, allied, other;
-
         SightScan(o, &range, &bearing, &allied, &other, 0);
     }
 
@@ -10924,12 +10923,14 @@ void __cdecl Step3Input(void *obj, void *rec)
         *(int32_t *)(r + 0x10u) = 1;
         if (*(const int32_t *)(o + 0x52Cu) != 1)
             *(int32_t *)(r + 8) = AM2_VEH_STATE_TURNING;
-        *r = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
-                       + (ActionKeyDown(AM2_ACTION_01) ? 8 : -8));
+        if (ActionKeyDown(AM2_ACTION_01))
+            *r = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING) + 8);
+        else
+            *r = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING) - 8);
+        steered = 1;
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
         *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
-        steered = 1;
     }
 
     if (ActionKeyDown(AM2_ACTION_LEFT) && !ActionKeyDown(AM2_ACTION_RIGHT)) {
@@ -10937,12 +10938,14 @@ void __cdecl Step3Input(void *obj, void *rec)
         *(int32_t *)(r + 0x10u) = 1;
         if (*(const int32_t *)(o + 0x52Cu) != 1)
             *(int32_t *)(r + 8) = AM2_VEH_STATE_TURNING;
-        *r = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
-                       + (ActionKeyDown(AM2_ACTION_01) ? -8 : 8));
+        if (ActionKeyDown(AM2_ACTION_01))
+            *r = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING) - 8);
+        else
+            *r = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING) + 8);
+        steered = 1;
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
         *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
-        steered = 1;
     }
 
     /* Both movement keys clear the destination, so a key cancels a mouse
@@ -10951,20 +10954,20 @@ void __cdecl Step3Input(void *obj, void *rec)
     if (ActionKeyDown(AM2_ACTION_00)) {
         *(int32_t *)(r + 8) = AM2_VEH_STATE_TURNING;
         *(int32_t *)(r + 0x10u) = 0;
+        steered = 1;
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
         *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
-        steered = 1;
     }
 
     if (ActionKeyDown(AM2_ACTION_01)) {
         *(int32_t *)(r + 8) = AM2_VEH_STATE_TURNING;
         *(int32_t *)(r + 0x10u) = 0;
         *(int32_t *)(r + 0x0Cu) = 1;
+        steered = 1;
         *(uint32_t *)(o + OBJ_OFF_FIELD_C0) =
             *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
         *(int32_t *)(o + OBJ_OFF_FIELD_10C) = 0;
-        steered = 1;
     }
 
     /* The turret swings a fixed 0x0F either way and the sound plays only in
@@ -11062,7 +11065,7 @@ void __cdecl Step3Input(void *obj, void *rec)
                 /* AND IF IT IS BEHIND YOU AND CLOSE, BACK UP INSTEAD of
                  * turning round: the heading gains 0x80 -- half a turn -- and
                  * the reverse flag goes on. */
-                if ((aimDelta < 0 ? -aimDelta : aimDelta) > 0x64
+                if (abs(aimDelta) > 0x64
                     && dist < 0x80) {
                     *(int32_t *)(r + 0x0Cu) = 1;
                     *r = (uint8_t)(*r + 0x80);
@@ -11086,8 +11089,9 @@ void __cdecl Step3Input(void *obj, void *rec)
      * for the three ways to ask for a shot. --- */
     {
 #define def (*(const uint8_t *const *)(weapon + 0xC0u))
-        uint32_t since = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-                         - *(const uint32_t *)(weapon + 0xC4u);
+        /* The time since the last shot is worked out at each test. */
+#define since (*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS \
+               - *(const uint32_t *)(weapon + 0xC4u))
 
         if (ActionKeyDown(AM2_ACTION_09)) {
             /* Held: only an automatic weapon repeats, which is what the
@@ -11119,12 +11123,11 @@ void __cdecl Step3Input(void *obj, void *rec)
                 return;
             }
 
-            since = *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
-                    - *(const uint32_t *)(weapon + 0xC4u);
             if (since > *(const uint32_t *)(def + 4))
                 *(int32_t *)(r + 4) = 1;
         }
     }
+#undef since
 #undef def
 #undef sel
 }

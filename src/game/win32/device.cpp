@@ -210,9 +210,11 @@ HRESULT __cdecl InitDirectDraw(HWND hWnd)
     if (hr)
         return hr;
 
-    hr = IDirectDraw2_SetCooperativeLevel(
-             g_ddraw2, hWnd,
-             g_windowed ? DDSCL_NORMAL : (DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN));
+    if (g_windowed)
+        hr = IDirectDraw2_SetCooperativeLevel(g_ddraw2, hWnd, DDSCL_NORMAL);
+    else
+        hr = IDirectDraw2_SetCooperativeLevel(g_ddraw2, hWnd,
+                                              DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN);
     if (hr)
         return hr;
 

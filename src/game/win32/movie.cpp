@@ -366,12 +366,11 @@ AM2_Movie::AM2_Movie(const char *name, int32_t wantW, int32_t wantH, int32_t big
 
     void *smack;
 
-    fld(movie, MOVIE_WANT_H, int32_t) = wantH;
-    fld(movie, MOVIE_BIG, int32_t)    = big;
-    fld(movie, MOVIE_WANT_W, int32_t) = wantW;
-
     fld(movie, MOVIE_VTABLE, uint32_t)    = ADDR_MOVIE_VTABLE;
     fld(movie, MOVIE_ACTIVE, int32_t)     = 0;
+    fld(movie, MOVIE_BIG, int32_t)        = big;
+    fld(movie, MOVIE_WANT_W, int32_t)     = wantW;
+    fld(movie, MOVIE_WANT_H, int32_t)     = wantH;
     fld(movie, MOVIE_TIMER_RUN, int32_t)  = 0;
     fld(movie, MOVIE_SIZED, int32_t)      = 0;
     fld(movie, MOVIE_UNKNOWN14, int32_t)  = 0;
@@ -397,8 +396,10 @@ AM2_Movie::AM2_Movie(const char *name, int32_t wantW, int32_t wantH, int32_t big
     fld(movie, MOVIE_SRC_X, int32_t) = 0;
     fld(movie, MOVIE_SRC_Y, int32_t) = 0;
 
-    smack = smack_open(name, fld(movie, MOVIE_BIG, int32_t) ? 0x1FE440u : 0x000FE040u,
-                       0xFFFFFFFFu);
+    if (fld(movie, MOVIE_BIG, int32_t))
+        smack = smack_open(name, 0x1FE440u, 0xFFFFFFFFu);
+    else
+        smack = smack_open(name, 0x000FE040u, 0xFFFFFFFFu);
     fld(movie, MOVIE_SMACK, void *) = smack;
 
     if (smack) {
