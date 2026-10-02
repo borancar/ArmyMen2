@@ -72,16 +72,17 @@ void __cdecl DrawText(int32_t x, int32_t y, const char *str,
     if (!g_surfaceLocked)
         return;
 
-    len = (int32_t)strlen(str);
+    len  = (int32_t)strlen(str);
+    penX = x;
+    i    = 0;
     if (0 >= len)
         return;
 
-    penX = x;
-
-    for (i = 0, j = 1; i < len; j++, i++) {
+    for (j = 1; i < len; i++, j++) {
         const AM2_Rle16 *glyph;
         AM2_Rect src, out;
-        int32_t  dstX, dstY, gw, gh;
+        int32_t  dstX, dstY;
+        uint16_t gw, gh;
         uint16_t offset;
         uint8_t  ch = (uint8_t)str[i];
 

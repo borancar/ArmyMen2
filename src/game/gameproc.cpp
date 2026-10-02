@@ -1162,17 +1162,13 @@ int32_t __cdecl PlaceScenario(void)
                 && *(const void *const *)(obj + OBJ_OFF_FIELD_94) == (void *)0
                 && *(const int32_t *)obj == 2
                 && *(const int32_t *)(obj + OBJ_OFF_SARGE) == 0) {
-                uint32_t at;
+                AM2_Point p;
 
                 *(uint32_t *)(obj + OBJ_OFF_SCRIPT_STATE) =
                     *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
-                {
-                    AM2_Point p;
-                    FormationPoint(obj, lead, &p, formed);
-                    at = ((uint32_t)(uint16_t)p.y << 16)
-                       | (uint32_t)(uint16_t)p.x;
-                }
-                *(uint32_t *)(obj + OBJ_OFF_POS) = at;
+                FormationPoint(obj, lead, &p, formed);
+                /* The point is copied as one dword. */
+                *(uint32_t *)(obj + OBJ_OFF_POS) = *(const uint32_t *)&p;
                 *(uint8_t *)(obj + OBJ_OFF_FACING) =
                     *(const uint8_t *)(uintptr_t)ADDR_LEADER_FACING;
                 ObjTileChanged(obj, 0, 0);
