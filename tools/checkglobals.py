@@ -100,6 +100,10 @@ def main():
             if not m:
                 continue
             name, body = m.group(1), m.group(2)
+            # globals.h binds a name once per build; only the injected
+            # binding goes through the address, and it is the one compared.
+            if rel == "src/game/globals.h" and not ADDR.search(body):
+                continue
             where = "%s:%d" % (rel, n)
             by_name[name][body].append(where)
             found = ADDR.search(body)

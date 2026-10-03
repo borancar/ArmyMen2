@@ -1189,22 +1189,6 @@ static inline void PathChargeFrame(uint32_t startTicks, int32_t considered)
         *(int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES = AM2_PATH_MIN_NODES;
 }
 
-/* One A* node, ADDR_PATH_NODES[AM2_PATH_TILES], indexed by tile. The
- * original addresses it as an array of these -- `[tile*16 + base + field]`
- * -- not through a pointer to the element. */
-typedef struct {
-    uint16_t g;         /* PATHNODE_OFF_G,      cost from the start */
-    uint16_t h;         /* PATHNODE_OFF_H,      ApproxDistXY * 1.5 */
-    uint16_t depth;     /* PATHNODE_OFF_DEPTH,  hops from the start */
-    uint16_t stamp;     /* PATHNODE_OFF_STAMP,  the search generation */
-    uint16_t parent;    /* PATHNODE_OFF_PARENT, the came-from tile */
-    uint16_t prev;      /* PATHNODE_OFF_PREV,   open-list links, by g+h */
-    uint16_t next;      /* PATHNODE_OFF_NEXT */
-    uint8_t  state;     /* PATHNODE_OFF_STATE,  1 open, 2 closed */
-    uint8_t  pad;
-} AM2_PathNode;
-#define PATHNODE(t) (((AM2_PathNode *)(uintptr_t)ADDR_PATH_NODES)[t])
-
 /* Walk PARENT back from `end` and write the tiles into `out` FORWARDS, by
  * filling from index depth downwards. `*n` is depth + 1, so it counts the
  * start tile as well as every step. The loop stops on a zero tile, which is
@@ -1214,11 +1198,11 @@ static inline void PathUnwind(uint16_t end, uint16_t *out, int32_t *n)
 {
     uint16_t *p;
 
-    *n = PATHNODE(end).depth + 1;
-    p  = out + PATHNODE(end).depth;
+    *n = g_pathNodes[end].depth + 1;
+    p  = out + g_pathNodes[end].depth;
     while (end > 0) {
         *p-- = end;
-        end  = PATHNODE(end).parent;
+        end  = g_pathNodes[end].parent;
     }
 }
 
@@ -1322,15 +1306,15 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
          * uint16 and nothing resets it, so it wraps; the original's. */
         ++*(uint16_t *)(uintptr_t)ADDR_PATH_GENERATION;
 
-        PATHNODE(fromTile).g      = 0;
-        PATHNODE(fromTile).h      = (uint16_t)PathHeuristic(fromTile, toTile);
-        PATHNODE(fromTile).depth  = 0;
-        PATHNODE(fromTile).stamp  =
+        g_pathNodes[fromTile].g      = 0;
+        g_pathNodes[fromTile].h      = (uint16_t)PathHeuristic(fromTile, toTile);
+        g_pathNodes[fromTile].depth  = 0;
+        g_pathNodes[fromTile].stamp  =
             *(const uint16_t *)(uintptr_t)ADDR_PATH_GENERATION;
-        PATHNODE(fromTile).state  = 1;
-        PATHNODE(fromTile).prev   = 0;
-        PATHNODE(fromTile).next   = 0;
-        PATHNODE(fromTile).parent = 0;
+        g_pathNodes[fromTile].state  = 1;
+        g_pathNodes[fromTile].prev   = 0;
+        g_pathNodes[fromTile].next   = 0;
+        g_pathNodes[fromTile].parent = 0;
 
         goal = to;
     } else {
@@ -1349,10 +1333,10 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
         curTile = cur & 0xFFFF;
 
         /* Pop, and detach the new head's back link. `from` IS the head. */
-        from = PATHNODE(curTile).next;
+        from = g_pathNodes[curTile].next;
         if (0 < (uint16_t)from)
-            PATHNODE(from & 0xFFFF).prev = 0;
-        PATHNODE(curTile).state = 2;
+            g_pathNodes[from & 0xFFFF].prev = 0;
+        g_pathNodes[curTile].state = 2;
 
         if (considered > *(const int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES)
             goto budget;
@@ -1387,7 +1371,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
              * on the full register. */
             g = PathDistXY(curTile, nb) * 2;
             g = (int32_t)(((uint32_t)g & 0xFFFF0000u)
-                          | (uint16_t)((uint32_t)g + PATHNODE(curTile).g));
+                          | (uint16_t)((uint32_t)g + g_pathNodes[curTile].g));
             {
                 uint8_t f = (*(const uint8_t *const *)(uintptr_t)
                                  ADDR_TILE_FLAGS)[nb];
@@ -1398,7 +1382,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             }
             h = PathHeuristic(nb, goalTile);
 
-#define b PATHNODE(nb)
+#define b g_pathNodes[nb]
             if (b.stamp != *(const uint16_t *)(uintptr_t)ADDR_PATH_GENERATION) {
                 /* Never seen this search: claim it and fall through to the
                  * insert with the current head. */
@@ -1406,7 +1390,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                 b.g      = (uint16_t)g;
                 b.h      = (uint16_t)h;
                 b.parent = (uint16_t)cur;
-                b.depth  = (uint16_t)(PATHNODE(curTile).depth + 1);
+                b.depth  = (uint16_t)(g_pathNodes[curTile].depth + 1);
                 b.state  = 1;
             } else if (!(b.state & 1)) {
                 /* Seen, and not open. Closed nodes are done with; anything
@@ -1420,7 +1404,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 
                 b.parent = (uint16_t)cur;
                 b.g      = (uint16_t)g;
-                b.depth  = (uint16_t)(PATHNODE(curTile).depth + 1);
+                b.depth  = (uint16_t)(g_pathNodes[curTile].depth + 1);
 
                 /* Unlink so the improved node can be re-inserted in order.
                  * THE HEAD CASE LOSES THE LIST: the original writes 0 rather
@@ -1428,11 +1412,11 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                 next = b.next;
                 prev = b.prev;
                 if (prev)
-                    PATHNODE(prev).next = (uint16_t)next;
+                    g_pathNodes[prev].next = (uint16_t)next;
                 else
                     from = 0;
                 if (next)
-                    PATHNODE(next).prev = (uint16_t)prev;
+                    g_pathNodes[next].prev = (uint16_t)prev;
             }
 
             /* Insert, sorted by g+h ascending. */
@@ -1454,11 +1438,11 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             if (walk > 0) {
                 fNew = b.h + b.g;
                 do {
-                    if (PATHNODE(walk & 0xFFFF).h + PATHNODE(walk & 0xFFFF).g
+                    if (g_pathNodes[walk & 0xFFFF].h + g_pathNodes[walk & 0xFFFF].g
                         >= fNew)
                         break;
                     before = walk;
-                    walk   = PATHNODE(walk & 0xFFFF).next;
+                    walk   = g_pathNodes[walk & 0xFFFF].next;
                 } while (walk > 0);
             }
 
@@ -1466,15 +1450,15 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                 /* Cheapest so far: in front of the head. */
                 b.next = from;
                 b.prev = 0;
-                PATHNODE(from & 0xFFFF).prev = (uint16_t)nb;
+                g_pathNodes[from & 0xFFFF].prev = (uint16_t)nb;
                 from = (uint16_t)nb;
             } else {
-                uint16_t after = PATHNODE(before & 0xFFFF).next;
+                uint16_t after = g_pathNodes[before & 0xFFFF].next;
 
                 b.next = after;
                 if (after > 0)
-                    PATHNODE(after & 0xFFFF).prev = (uint16_t)nb;
-                PATHNODE(before & 0xFFFF).next = (uint16_t)nb;
+                    g_pathNodes[after & 0xFFFF].prev = (uint16_t)nb;
+                g_pathNodes[before & 0xFFFF].next = (uint16_t)nb;
                 b.prev = before;
             }
         }

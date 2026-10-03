@@ -66,6 +66,22 @@ REDIRECT = re.compile(r"^#define (ADDR_\w+) \(\(uintptr_t\)\(const void \*\)&?am
 PIN = re.compile(r"offsetof\(struct AM2_OrigState, (\w+)\) == 0x([0-9A-Fa-f]+)u? - 0x0048E000u")
 
 
+MEMBER = re.compile(r"^\s+(\w+)\s+(\w+)((?:\[[^\]]*\])*);", re.M)
+
+
+def typed_members():
+    """member -> (type, is_array) for the members origstate.h declares with
+    a type from globaltypes.h. Those get a typed extern here, so the game
+    code's typed global names (globals.h) have something to bind to; every
+    other member stays the incomplete uint8_t[] the codegen note above wants."""
+    types = set(re.findall(r"\}\s*(AM2_\w+);",
+                           open(os.path.join(REPO, "src", "game", "globaltypes.h")).read()))
+    src = open(os.path.join(REPO, "src", "game", "origstate.h")).read()
+    body = src[src.index("struct AM2_OrigState {"):]
+    return {m.group(2): (m.group(1), bool(m.group(3)))
+            for m in MEMBER.finditer(body) if m.group(1) in types}
+
+
 def member_vas():
     """member -> VA, from origstate.cpp's static_asserts."""
     src = open(os.path.join(REPO, "src", "game", "origstate.cpp")).read()
@@ -106,11 +122,18 @@ def render():
            "#ifndef AM2_RELINK_OS_H",
            "#define AM2_RELINK_OS_H",
            "",
+           "",
            "#ifdef __cplusplus",
            'extern "C" {',
            "#endif",
            ]
-    out += ["extern uint8_t am2_os_%s[];  /* 0x%08X */" % (m, vas[m]) for m in members]
+    typed = typed_members()
+    for m in members:
+        if m in typed:
+            t, arr = typed[m]
+            out.append("extern %s am2_os_%s%s;  /* 0x%08X */" % (t, m, "[]" if arr else "", vas[m]))
+        else:
+            out.append("extern uint8_t am2_os_%s[];  /* 0x%08X */" % (m, vas[m]))
     out += ["#ifdef __cplusplus", "}", "#endif", ""]
     for a, m in reds:
         out += ["#undef %s" % a, "#define %s ((uintptr_t)(const void *)am2_os_%s)" % (a, m)]

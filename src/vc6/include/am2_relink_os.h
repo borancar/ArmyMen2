@@ -6,6 +6,7 @@
 #ifndef AM2_RELINK_OS_H
 #define AM2_RELINK_OS_H
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -475,7 +476,7 @@ extern uint8_t am2_os_region_resume_node[];  /* 0x0053C4C8 */
 extern uint8_t am2_os_tile_ring4[];  /* 0x00554B70 */
 extern uint8_t am2_os_path_resume_goal[];  /* 0x00554B80 */
 extern uint8_t am2_os_tilemask_neighbours[];  /* 0x00554B84 */
-extern uint8_t am2_os_path_nodes[];  /* 0x00554BD8 */
+extern AM2_PathNode am2_os_path_nodes[];  /* 0x00554BD8 */
 extern uint8_t am2_os_tile_neighbours[];  /* 0x00654BD8 */
 extern uint8_t am2_os_region_current[];  /* 0x00654C28 */
 extern uint8_t am2_os_region_generation[];  /* 0x00654C2C */

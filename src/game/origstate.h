@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "globaltypes.h"
 
 struct AM2_OS_DepthNode {          /* ADDR_DEPTH_NODES, 12 bytes, {obj,prev,next} */
     void *obj, *prev, *next;
@@ -580,7 +581,7 @@ struct AM2_OrigState {
     int32_t tile_ring4[4];  /* 0x00554B70 */
     uint8_t path_resume_goal[4];  /* 0x00554B80 */
     uint8_t tilemask_neighbours[84];  /* 0x00554B84 */
-    uint8_t path_nodes[65536][16];  /* 0x00554BD8, [0x10000] nodes of 16 bytes */
+    AM2_PathNode path_nodes[65536];  /* 0x00554BD8 */
     int32_t tile_neighbours[20];  /* 0x00654BD8 */
     uint8_t region_current[4];  /* 0x00654C28 */
     uint8_t region_generation[4];  /* 0x00654C2C */
