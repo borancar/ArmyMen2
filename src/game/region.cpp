@@ -8420,20 +8420,13 @@ no_route:
         turned = 1;
         speed  = 0;
         *(w + 4) = facing;
-    } else if (*(const int32_t *)(w + 0x0C)) {
-        *(int32_t *)(w + 8) = 1;
-        turned = 1;
-        *(w + 4) = facing;
-        speed  = 0;
-    } else if (!found) {
-        *(int32_t *)(w + 8) = 1;
-        turned = 1;
-        *(w + 4) = facing;
-        speed  = 0;
-    } else if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-               && !AM2_THE_COMM->CommMustBroadcast(
-                                  (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))
-               && ObjType2Field548((const AM2_Object *)o)) {
+    } else if (*(const int32_t *)(w + 0x0C)
+               || !found
+               || (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+                   && !AM2_THE_COMM->CommMustBroadcast(
+                          (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))
+                   && ObjType2Field548((const AM2_Object *)o))) {
+        /* One block; VC6 copies it into each of the three tests. */
         *(int32_t *)(w + 8) = 1;
         turned = 1;
         *(w + 4) = facing;
@@ -9001,54 +8994,45 @@ void __cdecl StepType3(void *obj)
      * player or the AI: every truck sat where the mission placed it and the
      * player's keys did nothing once Sarge had boarded. Found by loading one
      * save in the native build and in the original and holding D. */
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_59C) != 0)
-        goto choose;
+    if (*(const int32_t *)(o + OBJ_OFF_FIELD_59C) == 0
+        && (!*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
+            || AM2_THE_COMM->CommMustBroadcast(
+                   (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))) {
+        /* No occupant: the attach arm (0x0045D894), laid out after this one. */
+        if (*(const int32_t *)(o + OBJ_OFF_POSE + LIST_OFF_COUNT) > 0) {
+            uint8_t *first = (uint8_t *)LookupByUID(
+                ((const uint32_t *)*(void **)(o + OBJ_OFF_POSE + LIST_OFF_UIDS))[0]);
 
-    if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
-        && !AM2_THE_COMM->CommMustBroadcast(
-                              (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY)))
-        goto choose;
-
-    /* No occupant: the attach arm (0x0045D894), laid out after this one. */
-    if (*(const int32_t *)(o + OBJ_OFF_POSE + LIST_OFF_COUNT) > 0) {
-        uint8_t *first = (uint8_t *)LookupByUID(
-            ((const uint32_t *)*(void **)(o + OBJ_OFF_POSE + LIST_OFF_UIDS))[0]);
-
-        /* A first occupant that no longer resolves is removed, and the
-         * frame ends at the chooser. */
-        if (!first) {
-            ((AM2_Rec *)(o + OBJ_OFF_POSE))->ListRemoveAt(0);
-            goto choose;
-        }
-        /* An order already in the record's second word: chooser only. */
-        if (*(const int32_t *)(out + SIGHTCOUT_OFF_BEARING) != 0) {
-            goto choose;
-        }
-
-        /* The player's vehicle reads the keys and the mouse and routes;
-         * anyone else's runs the AI. Both then choose a facing. */
-        if (ObjType2Field548((const AM2_Object *)first)) {
-            Step3Input(obj, out);
-            Step3RouteAndBoard(obj, out);
-        } else {
+            /* A first occupant that no longer resolves is removed; an order
+             * already in the record's second word skips the input. Every
+             * case then chooses a facing -- one call, whose short join VC6
+             * copies into each arm ahead of the shared call at 0x0045D8D6. */
+            if (!first)
+                ((AM2_Rec *)(o + OBJ_OFF_POSE))->ListRemoveAt(0);
+            else if (*(const int32_t *)(out + SIGHTCOUT_OFF_BEARING) == 0) {
+                /* The player's vehicle reads the keys and the mouse and
+                 * routes; anyone else's runs the AI. */
+                if (ObjType2Field548((const AM2_Object *)first)) {
+                    Step3Input(obj, out);
+                    Step3RouteAndBoard(obj, out);
+                } else
+                    AiStep(obj, out);
+            }
+            Step3ChooseFacing(obj, out);
+        } else if (*(const int32_t *)(o + OBJ_OFF_FIELD_94)) {
             AiStep(obj, out);
+            Step3ChooseFacing(obj, out);
+        } else {
+            ObjAttachTo(obj, NULL);
+            *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
+            *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
         }
-        goto choose;
-    }
-
-    if (*(const int32_t *)(o + OBJ_OFF_FIELD_94)) {
-        AiStep(obj, out);
-        Step3ChooseFacing(obj, out);
     } else {
-        ObjAttachTo(obj, NULL);
-        *(uint16_t *)(o + OBJ_OFF_FIELD_C0)     = 0;
-        *(uint16_t *)(o + OBJ_OFF_FIELD_C0 + 2) = 0;
+        /* 0x0045D8CF: the gate set, or a remote vehicle -- the chooser
+         * alone. Laid out last, so it falls into the second tail and the
+         * arms above share its call. */
+        Step3ChooseFacing(obj, out);
     }
-    goto post;
-
-choose:
-    /* 0x0045D8CF/0x0045D8D6: every alive path but the attach arm's. */
-    Step3ChooseFacing(obj, out);
 
 post:
     /* The second tail. Everything above reaches it. */

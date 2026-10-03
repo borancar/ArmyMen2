@@ -66,11 +66,18 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1479 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1480 of
   1645 byte-identical (2026-10-03), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1479:
+  the near-miss sweep, 758 before the row pools. From 758 to 1480:
+  - **StepType3 matches: VC6 copies a short join into its predecessors**
+    (2026-10-03). Arms ending `lea eax,[out]; push eax; jmp <shared call>`
+    are ONE Step3ChooseFacing after the occupant if/else -- VC6 duplicates
+    a jump-ended join into each predecessor -- and the shared call itself
+    is an `else` arm laid out last (`if (gate == 0 && local) {...} else
+    choose`), not a `goto choose` label. UpdateTrooperAction's three stop
+    arms are likewise one `||` block copied three times (442 -> 420).
   - **ViewUpdate wrote the glide back into the target** (2026-10-03): the
     stepped point went into ADDR_VIEW_TARGET every frame, so a glide ended
     after one step unless something re-aimed it. The image keeps it in two
