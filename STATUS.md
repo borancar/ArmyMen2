@@ -71,6 +71,15 @@ main result so far (details in `src/vc6/README.md`):
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools. From 758 to 1480:
+  - **Global tables are arrays of structs** (2026-10-03): FindPath's path
+    nodes are AM2_PathNode[0x10000] indexed by tile, as the image addresses
+    them (`[tile*16 + base + field]`), not through an element pointer
+    (487 -> 478; the start node's stores now match); SightScan's rank and
+    per-direction sight records likewise (532 -> 454).
+  - **UpdateTrooperAction walked a separate cursor** (2026-10-03): the
+    claimed-vehicle search in the route sweep walks `at` itself in the image,
+    so an exhausted sweep with a claimed vehicle reaches the item walk with
+    nothing to walk; ours kept the last swept cell's objects in `at`.
   - **StepType3 matches: VC6 copies a short join into its predecessors**
     (2026-10-03). Arms ending `lea eax,[out]; push eax; jmp <shared call>`
     are ONE Step3ChooseFacing after the occupant if/else -- VC6 duplicates

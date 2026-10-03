@@ -1189,26 +1189,36 @@ static inline void PathChargeFrame(uint32_t startTicks, int32_t considered)
         *(int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES = AM2_PATH_MIN_NODES;
 }
 
+/* One A* node, ADDR_PATH_NODES[AM2_PATH_TILES], indexed by tile. The
+ * original addresses it as an array of these -- `[tile*16 + base + field]`
+ * -- not through a pointer to the element. */
+typedef struct {
+    uint16_t g;         /* PATHNODE_OFF_G,      cost from the start */
+    uint16_t h;         /* PATHNODE_OFF_H,      ApproxDistXY * 1.5 */
+    uint16_t depth;     /* PATHNODE_OFF_DEPTH,  hops from the start */
+    uint16_t stamp;     /* PATHNODE_OFF_STAMP,  the search generation */
+    uint16_t parent;    /* PATHNODE_OFF_PARENT, the came-from tile */
+    uint16_t prev;      /* PATHNODE_OFF_PREV,   open-list links, by g+h */
+    uint16_t next;      /* PATHNODE_OFF_NEXT */
+    uint8_t  state;     /* PATHNODE_OFF_STATE,  1 open, 2 closed */
+    uint8_t  pad;
+} AM2_PathNode;
+#define PATHNODE(t) (((AM2_PathNode *)(uintptr_t)ADDR_PATH_NODES)[t])
+
 /* Walk PARENT back from `end` and write the tiles into `out` FORWARDS, by
  * filling from index depth downwards. `*n` is depth + 1, so it counts the
  * start tile as well as every step. The loop stops on a zero tile, which is
  * the start node's PARENT -- tile 0 cannot be a path element, which is the
  * same thing the entry guard relies on when it refuses a zero argument. */
-static inline void PathUnwind(int32_t end, uint16_t *out, int32_t *n)
+static inline void PathUnwind(uint16_t end, uint16_t *out, int32_t *n)
 {
-    uint8_t *const nodes = (uint8_t *)(uintptr_t)ADDR_PATH_NODES;
-    int32_t        depth = *(const uint16_t *)(nodes
-                                               + (end & 0xFFFF)
-                                                     * AM2_PATH_NODE_BYTES
-                                               + PATHNODE_OFF_DEPTH);
-    uint16_t      *p     = out + depth;
+    uint16_t *p;
 
-    *n = depth + 1;
-    while ((uint16_t)end) {
-        *p-- = (uint16_t)end;
-        end  = *(const uint16_t *)(nodes
-                                   + (end & 0xFFFF) * AM2_PATH_NODE_BYTES
-                                   + PATHNODE_OFF_PARENT);
+    *n = PATHNODE(end).depth + 1;
+    p  = out + PATHNODE(end).depth;
+    while (end > 0) {
+        *p-- = end;
+        end  = PATHNODE(end).parent;
     }
 }
 
@@ -1262,7 +1272,6 @@ static inline void PathUnwind(int32_t end, uint16_t *out, int32_t *n)
 int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                          int32_t unused)
 {
-    uint8_t *const nodes  = (uint8_t *)(uintptr_t)ADDR_PATH_NODES;
 #define region (*(const uint8_t *const *)(uintptr_t)ADDR_REGION_OF_CELL)
 #define step ((const int32_t *)(uintptr_t)ADDR_TILE_STEP8)
     uint32_t startTicks;
@@ -1307,24 +1316,21 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
     startTicks  = Ticks();
 
     if (*(const int32_t *)(uintptr_t)ADDR_PATH_RESUME == -1) {
-        uint8_t *const s = nodes + fromTile * AM2_PATH_NODE_BYTES;
-
         /* Bumped BEFORE it is stamped, so the start node carries the new
          * generation and every other node's stamp is stale by construction --
          * which is what makes a 1 MB array usable without clearing it. It is a
          * uint16 and nothing resets it, so it wraps; the original's. */
         ++*(uint16_t *)(uintptr_t)ADDR_PATH_GENERATION;
 
-        *(uint16_t *)(s + PATHNODE_OFF_G)      = 0;
-        *(uint16_t *)(s + PATHNODE_OFF_H)      =
-            (uint16_t)PathHeuristic(fromTile, toTile);
-        *(uint16_t *)(s + PATHNODE_OFF_DEPTH)  = 0;
-        *(uint16_t *)(s + PATHNODE_OFF_STAMP)  =
+        PATHNODE(fromTile).g      = 0;
+        PATHNODE(fromTile).h      = (uint16_t)PathHeuristic(fromTile, toTile);
+        PATHNODE(fromTile).depth  = 0;
+        PATHNODE(fromTile).stamp  =
             *(const uint16_t *)(uintptr_t)ADDR_PATH_GENERATION;
-        *(uint8_t *)(s + PATHNODE_OFF_STATE)   = 1;
-        *(uint16_t *)(s + PATHNODE_OFF_PREV)   = 0;
-        *(uint16_t *)(s + PATHNODE_OFF_NEXT)   = 0;
-        *(uint16_t *)(s + PATHNODE_OFF_PARENT) = 0;
+        PATHNODE(fromTile).state  = 1;
+        PATHNODE(fromTile).prev   = 0;
+        PATHNODE(fromTile).next   = 0;
+        PATHNODE(fromTile).parent = 0;
 
         goal = to;
     } else {
@@ -1339,18 +1345,14 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
     goalRegion = region[goalTile];
 
     while ((uint16_t)from) {
-        uint8_t *c;
-
         cur     = from;
         curTile = cur & 0xFFFF;
-        c       = nodes + curTile * AM2_PATH_NODE_BYTES;
 
         /* Pop, and detach the new head's back link. `from` IS the head. */
-        from = *(const uint16_t *)(c + PATHNODE_OFF_NEXT);
+        from = PATHNODE(curTile).next;
         if (0 < (uint16_t)from)
-            *(uint16_t *)(nodes + (from & 0xFFFF) * AM2_PATH_NODE_BYTES
-                          + PATHNODE_OFF_PREV) = 0;
-        *(uint8_t *)(c + PATHNODE_OFF_STATE) = 2;
+            PATHNODE(from & 0xFFFF).prev = 0;
+        PATHNODE(curTile).state = 2;
 
         if (considered > *(const int32_t *)(uintptr_t)ADDR_PATH_MAX_NODES)
             goto budget;
@@ -1367,7 +1369,6 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 
         for (i = 0; i < AM2_TILE_STEP8_COUNT; i++) {
             int32_t  nb = curTile + step[i];
-            uint8_t *b;
             int32_t  nbRegion, g, h, prev, next, fNew;
             uint16_t walk, before;
 
@@ -1386,9 +1387,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
              * on the full register. */
             g = PathDistXY(curTile, nb) * 2;
             g = (int32_t)(((uint32_t)g & 0xFFFF0000u)
-                          | (uint16_t)((uint32_t)g
-                                       + *(const uint16_t *)(c
-                                                    + PATHNODE_OFF_G)));
+                          | (uint16_t)((uint32_t)g + PATHNODE(curTile).g));
             {
                 uint8_t f = (*(const uint8_t *const *)(uintptr_t)
                                  ADDR_TILE_FLAGS)[nb];
@@ -1399,55 +1398,49 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
             }
             h = PathHeuristic(nb, goalTile);
 
-            b = nodes + nb * AM2_PATH_NODE_BYTES;
-            if (*(const uint16_t *)(b + PATHNODE_OFF_STAMP)
-                != *(const uint16_t *)(uintptr_t)ADDR_PATH_GENERATION) {
+#define b PATHNODE(nb)
+            if (b.stamp != *(const uint16_t *)(uintptr_t)ADDR_PATH_GENERATION) {
                 /* Never seen this search: claim it and fall through to the
                  * insert with the current head. */
-                *(uint16_t *)(b + PATHNODE_OFF_STAMP) =
-                    *(const uint16_t *)(uintptr_t)ADDR_PATH_GENERATION;
-                *(uint16_t *)(b + PATHNODE_OFF_G)      = (uint16_t)g;
-                *(uint16_t *)(b + PATHNODE_OFF_H)      = (uint16_t)h;
-                *(uint16_t *)(b + PATHNODE_OFF_PARENT) = (uint16_t)cur;
-                *(uint16_t *)(b + PATHNODE_OFF_DEPTH)  =
-                    (uint16_t)(*(const uint16_t *)(c + PATHNODE_OFF_DEPTH) + 1);
-                *(uint8_t *)(b + PATHNODE_OFF_STATE)   = 1;
-            } else if (!(*(const uint8_t *)(b + PATHNODE_OFF_STATE) & 1)) {
+                b.stamp  = *(const uint16_t *)(uintptr_t)ADDR_PATH_GENERATION;
+                b.g      = (uint16_t)g;
+                b.h      = (uint16_t)h;
+                b.parent = (uint16_t)cur;
+                b.depth  = (uint16_t)(PATHNODE(curTile).depth + 1);
+                b.state  = 1;
+            } else if (!(b.state & 1)) {
                 /* Seen, and not open. Closed nodes are done with; anything
                  * else falls through to the insert, which cannot happen while
                  * STATE only ever holds 1 or 2. */
-                if (*(const uint8_t *)(b + PATHNODE_OFF_STATE) & 2)
+                if (b.state & 2)
                     continue;
             } else {
-                if ((uint16_t)g >= *(const uint16_t *)(b + PATHNODE_OFF_G))
+                if ((uint16_t)g >= b.g)
                     continue;   /* already there by a cheaper route */
 
-                *(uint16_t *)(b + PATHNODE_OFF_PARENT) = (uint16_t)cur;
-                *(uint16_t *)(b + PATHNODE_OFF_G)      = (uint16_t)g;
-                *(uint16_t *)(b + PATHNODE_OFF_DEPTH)  =
-                    (uint16_t)(*(const uint16_t *)(c + PATHNODE_OFF_DEPTH) + 1);
+                b.parent = (uint16_t)cur;
+                b.g      = (uint16_t)g;
+                b.depth  = (uint16_t)(PATHNODE(curTile).depth + 1);
 
                 /* Unlink so the improved node can be re-inserted in order.
                  * THE HEAD CASE LOSES THE LIST: the original writes 0 rather
                  * than the successor. Reproduced -- see the header. */
-                next = *(const uint16_t *)(b + PATHNODE_OFF_NEXT);
-                prev = *(const uint16_t *)(b + PATHNODE_OFF_PREV);
+                next = b.next;
+                prev = b.prev;
                 if (prev)
-                    *(uint16_t *)(nodes + prev * AM2_PATH_NODE_BYTES
-                                  + PATHNODE_OFF_NEXT) = (uint16_t)next;
+                    PATHNODE(prev).next = (uint16_t)next;
                 else
                     from = 0;
                 if (next)
-                    *(uint16_t *)(nodes + next * AM2_PATH_NODE_BYTES
-                                  + PATHNODE_OFF_PREV) = (uint16_t)prev;
+                    PATHNODE(next).prev = (uint16_t)prev;
             }
 
             /* Insert, sorted by g+h ascending. */
             before = 0;
             if (!from) {
-                *(uint16_t *)(b + PATHNODE_OFF_NEXT) = 0;
+                b.next = 0;
                 from = (uint16_t)nb;
-                *(uint16_t *)(b + PATHNODE_OFF_PREV) = 0;
+                b.prev = 0;
                 continue;
             }
 
@@ -1459,37 +1452,30 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
              * would be tidier and would sort a different list. */
             walk = from;
             if (walk > 0) {
-                fNew = *(const uint16_t *)(b + PATHNODE_OFF_H)
-                       + *(const uint16_t *)(b + PATHNODE_OFF_G);
+                fNew = b.h + b.g;
                 do {
-                    const uint8_t *q = nodes + (walk & 0xFFFF)
-                                                   * AM2_PATH_NODE_BYTES;
-
-                    if (*(const uint16_t *)(q + PATHNODE_OFF_H)
-                        + *(const uint16_t *)(q + PATHNODE_OFF_G) >= fNew)
+                    if (PATHNODE(walk & 0xFFFF).h + PATHNODE(walk & 0xFFFF).g
+                        >= fNew)
                         break;
                     before = walk;
-                    walk   = *(const uint16_t *)(q + PATHNODE_OFF_NEXT);
+                    walk   = PATHNODE(walk & 0xFFFF).next;
                 } while (walk > 0);
             }
 
             if (!(before > 0)) {
                 /* Cheapest so far: in front of the head. */
-                *(uint16_t *)(b + PATHNODE_OFF_NEXT) = from;
-                *(uint16_t *)(b + PATHNODE_OFF_PREV) = 0;
-                *(uint16_t *)(nodes + (from & 0xFFFF) * AM2_PATH_NODE_BYTES
-                              + PATHNODE_OFF_PREV) = (uint16_t)nb;
+                b.next = from;
+                b.prev = 0;
+                PATHNODE(from & 0xFFFF).prev = (uint16_t)nb;
                 from = (uint16_t)nb;
             } else {
-                uint8_t *p = nodes + (before & 0xFFFF) * AM2_PATH_NODE_BYTES;
-                uint16_t after = *(const uint16_t *)(p + PATHNODE_OFF_NEXT);
+                uint16_t after = PATHNODE(before & 0xFFFF).next;
 
-                *(uint16_t *)(b + PATHNODE_OFF_NEXT) = after;
+                b.next = after;
                 if (after > 0)
-                    *(uint16_t *)(nodes + (after & 0xFFFF) * AM2_PATH_NODE_BYTES
-                                  + PATHNODE_OFF_PREV) = (uint16_t)nb;
-                *(uint16_t *)(p + PATHNODE_OFF_NEXT) = (uint16_t)nb;
-                *(uint16_t *)(b + PATHNODE_OFF_PREV) = before;
+                    PATHNODE(after & 0xFFFF).prev = (uint16_t)nb;
+                PATHNODE(before & 0xFFFF).next = (uint16_t)nb;
+                b.prev = before;
             }
         }
     }
@@ -1514,6 +1500,7 @@ found:
 ok:
     PathChargeFrame(startTicks, considered);
     return 1;
+#undef b
 #undef region
 #undef step
 }
@@ -3634,10 +3621,9 @@ walk:
     /* Indexed by the AI context's class -- SIGHTC_OFF_FIELD_00, which
      * TrooperBuildContext fills from ClassifyByCode74, so 0, 1 or 2. */
     *(int32_t *)(w + 8) =
-        ((const int32_t *)((void *)(uintptr_t)(
-             *(const int32_t *)(o + OBJ_OFF_MOVE_STATE_ALT)
-                 ? ADDR_AI_MOVE_STATE_ALT
-                 : ADDR_AI_MOVE_STATE)))[*(const int32_t *)ctx];
+        *(const int32_t *)(o + OBJ_OFF_MOVE_STATE_ALT)
+            ? ((const int32_t *)(uintptr_t)ADDR_AI_MOVE_STATE_ALT)[*(const int32_t *)ctx]
+            : ((const int32_t *)(uintptr_t)ADDR_AI_MOVE_STATE)[*(const int32_t *)ctx];
     if (*(const int32_t *)(o + OBJ_OFF_SOLDIER_KIND) == AM2_AI_KIND_FORCES_ALT)
         *(int32_t *)(w + 8) = 3;
 
@@ -4327,15 +4313,38 @@ done:
  * anything an attribute can hold: a tile higher than the viewer raises the
  * running maximum and does not stop the walk, and only the step back down from
  * it by more than AM2_SIGHT_BAND_STEP does. */
-static inline void AiSightTrace(const uint8_t *o, const uint8_t *seen, uint8_t *rec,
-                         const uint8_t *rank, int32_t viewerAttr, int32_t gen)
+/* The rank records and the per-direction sight cache are arrays of records,
+ * and SightScan indexes them as arrays -- `[rank*28 + 0x473DC0 + field]`,
+ * `[dir*16 + 0x4F8FB8 + field]` -- rather than through element pointers. */
+typedef struct {
+    int32_t sight_range;    /* RANK_REC_OFF_SIGHT_RANGE */
+    int32_t field_04;       /* RANK_REC_OFF_FIELD_04, the view half-arc */
+    int32_t field_08;       /* RANK_REC_OFF_FIELD_08, the out-of-arc range */
+    float   fire_scale;     /* RANK_REC_OFF_FIRE_SCALE */
+    int32_t threshold;      /* RANK_REC_OFF_THRESHOLD */
+    int32_t max_health;     /* RANK_REC_OFF_MAX_HEALTH */
+    int32_t xp;             /* RANK_REC_OFF_XP */
+} AM2_RankRec;
+typedef struct {
+    int16_t low;            /* SIGHTDIR_OFF_LOW */
+    int16_t mid;            /* SIGHTDIR_OFF_MID */
+    int16_t high;           /* SIGHTDIR_OFF_HIGH */
+    int16_t pad;
+    int32_t stamp;          /* SIGHTDIR_OFF_STAMP */
+    int32_t trace_stamp;    /* SIGHTDIR_OFF_TRACE_STAMP */
+} AM2_SightDirRec;
+#define RANKREC(r)  (((const AM2_RankRec *)(uintptr_t)ADDR_RANK_RECORDS)[r])
+#define SIGHTDIR(d) (((AM2_SightDirRec *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR)[d])
+
+static inline void AiSightTrace(const uint8_t *o, const uint8_t *seen, uint32_t dir,
+                                int32_t viewerAttr, int32_t gen)
 {
     uint16_t       buf[AM2_AI_SIGHT_LINE_MAX];
     const uint8_t *attrs = *(const uint8_t *const *)(uintptr_t)ADDR_TILE_ATTRS;
     int32_t        highest = AM2_AI_SIGHT_FLOOR;
     int32_t        n = 0, i = 0, reach;
 
-    *(int32_t *)(rec + SIGHTDIR_OFF_TRACE_STAMP) = gen;
+    SIGHTDIR(dir).trace_stamp = gen;
     TraceTileLine(*(const uint32_t *)(o + OBJ_OFF_POS),
                   *(const uint32_t *)(seen + OBJ_OFF_POS), buf, &n);
 
@@ -4350,21 +4359,23 @@ static inline void AiSightTrace(const uint8_t *o, const uint8_t *seen, uint8_t *
     }
 
     reach = i * AM2_AI_SIGHT_TILE_SPAN + AM2_AI_SIGHT_TILE_BASE;
-    if (reach >= *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE))
-        reach = *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE);
+#define rank RANKREC(*(const int32_t *)(o + OBJ_OFF_RANK))
+    if (reach >= rank.sight_range)
+        reach = rank.sight_range;
+#undef rank
 
-    if (*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP) == gen) {
-        if (reach < *(const int16_t *)(rec + SIGHTDIR_OFF_LOW))
-            *(int16_t *)(rec + SIGHTDIR_OFF_LOW) = (int16_t)reach;
-        if (reach < *(const int16_t *)(rec + SIGHTDIR_OFF_MID))
-            *(int16_t *)(rec + SIGHTDIR_OFF_MID) = (int16_t)reach;
-        if (reach < *(const int16_t *)(rec + SIGHTDIR_OFF_HIGH))
-            *(int16_t *)(rec + SIGHTDIR_OFF_HIGH) = (int16_t)reach;
+    if (SIGHTDIR(dir).stamp == gen) {
+        if (reach < SIGHTDIR(dir).low)
+            SIGHTDIR(dir).low = (int16_t)reach;
+        if (reach < SIGHTDIR(dir).mid)
+            SIGHTDIR(dir).mid = (int16_t)reach;
+        if (reach < SIGHTDIR(dir).high)
+            SIGHTDIR(dir).high = (int16_t)reach;
     } else {
-        *(int32_t *)(rec + SIGHTDIR_OFF_STAMP) = gen;
-        *(int16_t *)(rec + SIGHTDIR_OFF_LOW)   = (int16_t)reach;
-        *(int16_t *)(rec + SIGHTDIR_OFF_MID)   = (int16_t)reach;
-        *(int16_t *)(rec + SIGHTDIR_OFF_HIGH)  = (int16_t)reach;
+        SIGHTDIR(dir).stamp = gen;
+        SIGHTDIR(dir).low   = (int16_t)reach;
+        SIGHTDIR(dir).mid   = (int16_t)reach;
+        SIGHTDIR(dir).high  = (int16_t)reach;
     }
 }
 
@@ -5116,10 +5127,7 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
     ++*(int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
     orig_log_one(o);
 
-    reach = *(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
-                               + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
-                                     * RANK_REC_BYTES
-                               + RANK_REC_OFF_SIGHT_RANGE);
+    reach = RANKREC(*(const int32_t *)(o + OBJ_OFF_RANK)).sight_range;
     box.right  = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS) + reach;
     box.left   = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS) - reach;
     box.top    = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2) - reach;
@@ -5204,7 +5212,7 @@ score:
         {
             uint8_t  look = *(const uint8_t *)(o + OBJ_OFF_FACING);
             int32_t  viewerAttr, dx, dy, delta;
-            uint8_t *rec;
+            uint32_t dir;
 
             if (ObjIsType3((const AM2_Object *)o)
                 && *(const int32_t *)(o + OBJ_OFF_ROW_COUNT) > 1)
@@ -5220,48 +5228,36 @@ score:
 
             delta = AngleDelta(look, candBearing);
             delta = abs(delta);
-            {
-                const uint8_t *rank =
-                    (const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS))
-                    + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
-                          * RANK_REC_BYTES;
-
-                if (delta > *(const int32_t *)(rank + RANK_REC_OFF_FIELD_04)) {
-                    if (candRange
-                        >= *(const int32_t *)(rank + RANK_REC_OFF_FIELD_08))
-                        continue;
-                    goto in_sight;
-                }
-
-                /* Keyed on the BEARING, not the facing -- see orig.h. */
-                rec = (uint8_t *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR
-                      + ((uint32_t)candBearing / AM2_SIGHT_DIR_STEP)
-                            * AM2_SIGHT_DIR_STRIDE;
-                if (*(const int32_t *)(rec + SIGHTDIR_OFF_TRACE_STAMP) != AI_SIGHT_GEN)
-                    AiSightTrace(o, it, rec, rank, viewerAttr, AI_SIGHT_GEN);
-
-                if (!(*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP) != AI_SIGHT_GEN)) {
-                    int32_t mine = ObjHeight(o);
-                    int32_t his  = ObjHeight(it);
-
-                    if (his >= mine) {
-                        if (candRange
-                            > *(const int16_t *)(rec + SIGHTDIR_OFF_LOW))
-                            continue;
-                    } else if (his + AM2_SIGHT_BAND_STEP < mine) {
-                        if (candRange
-                            > *(const int16_t *)(rec + SIGHTDIR_OFF_HIGH))
-                            continue;
-                    } else if (candRange
-                               > *(const int16_t *)(rec + SIGHTDIR_OFF_MID)) {
-                        continue;
-                    }
-                } else {
-                    if (candRange
-                        > *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE))
-                        continue;
-                }
+#define rank RANKREC(*(const int32_t *)(o + OBJ_OFF_RANK))
+            if (delta > rank.field_04) {
+                if (candRange >= rank.field_08)
+                    continue;
+                goto in_sight;
             }
+
+            /* Keyed on the BEARING, not the facing -- see orig.h. */
+            dir = (uint32_t)candBearing / AM2_SIGHT_DIR_STEP;
+            if (SIGHTDIR(dir).trace_stamp != AI_SIGHT_GEN)
+                AiSightTrace(o, it, dir, viewerAttr, AI_SIGHT_GEN);
+
+            if (!(SIGHTDIR(dir).stamp != AI_SIGHT_GEN)) {
+                int32_t mine = ObjHeight(o);
+                int32_t his  = ObjHeight(it);
+
+                if (his >= mine) {
+                    if (candRange > SIGHTDIR(dir).low)
+                        continue;
+                } else if (his + AM2_SIGHT_BAND_STEP < mine) {
+                    if (candRange > SIGHTDIR(dir).high)
+                        continue;
+                } else if (candRange > SIGHTDIR(dir).mid) {
+                    continue;
+                }
+            } else {
+                if (candRange > rank.sight_range)
+                    continue;
+            }
+#undef rank
         }
 
 in_sight:
@@ -8211,7 +8207,6 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
     uint8_t *o = (uint8_t *)obj;
     uint8_t *w = (uint8_t *)out;
     uint8_t *at;
-    uint8_t *veh;
     int32_t  klass;
     int32_t  turned  = 0;      /* a turn was enforced this step */
     int32_t  speed   = 0;
@@ -8221,6 +8216,7 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
     int32_t  inside;           /* BlockWeightRoute's containment, slot +0x30, never read */
     uint8_t  facing;
     uint32_t stepPoint;
+    int32_t  d;                /* the enforced turn's delta, taken first */
 
     stepPoint = *(const uint32_t *)(o + OBJ_OFF_POS);
     klass = ClassifyByCode74(o);
@@ -8274,10 +8270,9 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
     /* An enforced turn, at most one a second and only so far: the delta
      * between where the trooper faces and where it is being sent decides
      * which way, and OBJ_OFF_FIELD_D6 remembers how far it has been pushed. */
+    d = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING), facing);
     if ((uint32_t)*(const int32_t *)(o + OBJ_OFF_STUCK_COUNT)
         > (uint32_t)*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS) {
-        int32_t d = AngleDelta(*(const uint8_t *)(o + OBJ_OFF_FACING), facing);
-
         if (d > AM2_TROOPER_TURN_ARC) {
             facing = (uint8_t)(*(const uint8_t *)(o + OBJ_OFF_FACING)
                                + AM2_TROOPER_TURN_STEP);
@@ -8309,18 +8304,22 @@ have_facing:
      * swept around; with nothing claimed there is nothing to board and
      * 0x0044B159 goes to the stop arms -- which come BACK here to sweep
      * unless one of them applies. */
+    /* THE SEARCH WALKS `at` ITSELF, here and in the sweep (0x0044B163,
+     * 0x0044B216: `mov edi, [edi+0x68]`), so a claimed vehicle that is not
+     * in the list leaves `at` null. That is what an exhausted sweep then
+     * hands the item walk below: nothing, where a separate cursor had left
+     * the last swept cell's objects to be picked over. */
     {
         uint32_t claimed = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
 
-        veh = at;
         if (!claimed)
             goto no_route;
         while (1) {
-            if (!veh)
+            if (!at)
                 break;
-            if (*(const uint32_t *)(veh + OBJ_OFF_UID) == claimed)
+            if (*(const uint32_t *)(at + OBJ_OFF_UID) == claimed)
                 goto board;
-            veh = *(uint8_t *const *)(veh + OBJ_OFF_QUERY_NEXT);
+            at = *(uint8_t *const *)(at + OBJ_OFF_QUERY_NEXT);
         }
     }
 
@@ -8360,16 +8359,13 @@ sweep:
                 uint32_t claimed = *(const uint32_t *)(o + OBJ_OFF_UID_56C);
 
                 if (claimed)
-                    veh = at;
-                else
-                    veh = (uint8_t *)0;
-                while (1) {
-                    if (!veh)
-                        break;
-                    if (*(const uint32_t *)(veh + OBJ_OFF_UID) == claimed)
-                        goto board;
-                    veh = *(uint8_t *const *)(veh + OBJ_OFF_QUERY_NEXT);
-                }
+                    while (1) {
+                        if (!at)
+                            break;
+                        if (*(const uint32_t *)(at + OBJ_OFF_UID) == claimed)
+                            goto board;
+                        at = *(uint8_t *const *)(at + OBJ_OFF_QUERY_NEXT);
+                    }
             }
             if (++i >= tries)
                 break;
@@ -8404,7 +8400,7 @@ sweep:
 
 board:
     /* Both searches board from here: one EnterVehicle in the image. */
-    EnterVehicle(o, veh);
+    EnterVehicle(o, at);
     return;
 
 no_route:

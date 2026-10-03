@@ -1878,11 +1878,11 @@ void *__cdecl LoadType3(am2_FILE *fp, const void *hdr)
 
     memcpy(o + OBJ_OFF_FIELD_94, rec, AM2_TYPE3_RECORD_SIZE);
 
-    *(int32_t *)(o + OBJ_OFF_RANK) = AM2_TYPE3_LOAD_RANK;
     *(const uint8_t **)(o + OBJ_OFF_TABLE_REC_SLOT) =
         (const uint8_t *)(uintptr_t)ADDR_OBJ_TABLE_RECORDS
         + (*(const int32_t *)(rec + TYPE3_REC_OFF_SLOT)
            * AM2_OBJ_TABLE_REC_SIZE);
+    *(int32_t *)(o + OBJ_OFF_RANK) = AM2_TYPE3_LOAD_RANK;
 
     memset(o + OBJ_OFF_PTR_LIST, 0, sizeof(AM2_PtrList));
 
