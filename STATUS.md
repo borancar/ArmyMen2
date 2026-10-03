@@ -71,6 +71,20 @@ main result so far (details in `src/vc6/README.md`):
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools. From 758 to 1477:
+  - **An exact scorer, and what it found** (2026-10-03): every per-function
+    scorer masked absolute operands, so WHICH global an instruction reads was
+    invisible -- LoadMap's plane size was H*W where the image has W*H (57
+    instructions), and the cursor-plus-view sums read their operands the
+    other way round. `$T/xsc.py SRC` resolves one TU the way the relink does
+    (from a saved symbol table, `$T/rl1.py SAVE=/LOAD=/ONLY=`) in under a
+    second. The hill climb rerun with it over all 162 diffs moved ~30
+    functions closer (ObjHitMaskAction 372->338, ListDraw 86->65,
+    DrawEffectLayer 285->231, ScriptParseActionRecon 910->843) but closed
+    none; uncache, for-header and case-order passes found nothing more.
+    What is left is VC6's own choice -- register ties, tail merging of
+    identical return blocks, goto-target placement -- that no source
+    spelling tried in the lab moves. Rich @comp.id says 8168, which may only
+    record the front end; a service-pack c2.dll is the open suspect.
   - **Unrotated loops are `while (1) { if (!cond) break; ... }`**
     (2026-10-03): VC6 duplicates a loop's test at the bottom for `while
     (cond)`, `for`, `for (;;)` with breaks, and goto loops alike; the image's
