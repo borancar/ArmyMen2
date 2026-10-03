@@ -1861,7 +1861,7 @@ void __cdecl BuildRoachMask(void)
     if (a->directions <= 0)
         return;
 
-    out = g_roachMask;
+    out = (uint8_t *)g_roachMasks[0].pts;
     for (facing = 0; facing < a->directions; facing++) {
         AM2_Sprite *spr = (*(AM2_Sprite ** *)&g_spriteList)[a->cells[(int32_t)a->frames * facing]
                                         .sprite];
@@ -1897,12 +1897,12 @@ void __cdecl BuildRoachMask(void)
                 count++;
             }
 
-        /* The count sits one dword BELOW the points, exactly as the original
-         * writes it through `[ebp-4]`. Getting this wrong by one dword put the
-         * whole table over the global at 0x00654CA4 with every point still
-         * correct, and `bootcamp` and `mission` were both clean on it -- the
-         * mis-centred trig table again. tools/maskdump.py is what caught
-         * it. */
+        /* The original walks a pointer to each record's POINTS and writes
+         * the count one dword below it, through `[ebp-4]`.
+         * Getting this wrong by one dword put the whole table over the global
+         * at 0x00654CA4 with every point still correct, and `bootcamp` and
+         * `mission` were both clean on it -- the mis-centred trig table
+         * again. tools/maskdump.py is what caught it. */
         *(int32_t *)(out - 4) = count;
         memcpy(out, found, (size_t)count * 4);
         out += AM2_MASK_STRIDE;
@@ -1945,7 +1945,6 @@ void __cdecl BuildVehicleMask(int32_t kind)
         AM2_Point   found[AM2_MASK_POINTS];
         int32_t     count = 0;
         int32_t     x, y;
-        uint8_t    *out;
 
         if (g_traceVeh)
             am2_log("vehicle mask direction: %d\n", dir);
@@ -1979,10 +1978,9 @@ void __cdecl BuildVehicleMask(int32_t kind)
                 count++;
             }
 
-        out = g_vehicleMask
-              + (size_t)(kind * AM2_VEHICLE_MASK_DIRS + dir) * AM2_MASK_STRIDE;
-        *(int32_t *)(out - 4) = count;
-        memcpy(out, found, (size_t)count * 4);
+        g_vehicleMasks[kind * AM2_VEHICLE_MASK_DIRS + dir].count = count;
+        memcpy(g_vehicleMasks[kind * AM2_VEHICLE_MASK_DIRS + dir].pts, found,
+               (size_t)count * 4);
     }
 }
 

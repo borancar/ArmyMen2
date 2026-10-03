@@ -258,7 +258,7 @@
 #define g_fogOfWar               (*(int32_t *)(uintptr_t)ADDR_FOG_OF_WAR)  /* 0x00476FB0 */
 #define g_fontBase               ((uint8_t **)(uintptr_t)ADDR_FONT_BASES)  /* 0x00659AD4 */
 #define g_fontDescs              ((AM2_FontDesc *)(uintptr_t)ADDR_FONT_DESCS)  /* 0x004897E8 */
-#define g_formationSlots         ((uint8_t *)(uintptr_t)ADDR_FORMATION_SLOTS)  /* 0x00473EA0 */
+#define g_formationSlots         ((AM2_FormationSlot *)(uintptr_t)ADDR_FORMATION_SLOTS)  /* 0x00473EA0 */
 #define g_frameBuf               (*(uint8_t **)(uintptr_t)ADDR_FRAMEBUFFER)  /* 0x004FE1A8 */
 #define g_frameDeltaMs           (*(int32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS)  /* 0x00511E08 */
 #define g_frameDeltaSec          (*(float *)(uintptr_t)ADDR_FRAME_DELTA_SEC)  /* 0x00511E10 */
@@ -539,7 +539,7 @@
 #define g_padCount               (*(int32_t *)(uintptr_t)ADDR_PAD_COUNT)  /* 0x00511DF8 */
 #define g_padNumbers             ((uint8_t *)(uintptr_t)ADDR_PAD_NUMBERS)  /* 0x0051F198 */
 #define g_pads                   ((uint8_t *)(uintptr_t)ADDR_PADS)  /* 0x00516198 */
-#define g_paintObject            (*(void **)(uintptr_t)ADDR_PAINT_OBJECT)  /* 0x0065A058 */
+#define g_paintObject            (*(uint8_t * *)(uintptr_t)ADDR_PAINT_OBJECT)  /* 0x0065A058 */
 #define g_paletteCopy            ((void *)(uintptr_t)ADDR_PALETTE_COPY)  /* 0x005022C8 */
 #define g_paletteCycleCount      (*(int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_COUNT)  /* 0x00486164 */
 #define g_paletteCycleIndex      (*(int32_t *)(uintptr_t)ADDR_PALETTE_CYCLE_INDEX)  /* 0x00486160 */
@@ -597,7 +597,7 @@
 #define g_radarColours           ((uint8_t *)(uintptr_t)ADDR_RADAR_COLOURS)  /* 0x004FCF5C */
 #define g_randSeed               (*(uint32_t *)(uintptr_t)ADDR_RAND_SEED)  /* 0x0048CC1C */
 #define g_rankExpTable           ((uint8_t *)(uintptr_t)ADDR_RANK_EXP_TABLE)  /* 0x00473DD8 */
-#define g_rankRecords            ((uint8_t *)(uintptr_t)ADDR_RANK_RECORDS)  /* 0x00473DC0 */
+#define g_rankRecords            ((AM2_RankRec *)(uintptr_t)ADDR_RANK_RECORDS)  /* 0x00473DC0 */
 #define g_readFailed             (*(int32_t *)(uintptr_t)ADDR_AUDIO_READ_FAILED)  /* 0x004FA458 */
 #define g_recordListCap          (*(int32_t *)(uintptr_t)ADDR_RECORD_LIST_CAP)  /* 0x00516138 */
 #define g_recordListCount        (*(int32_t *)(uintptr_t)ADDR_RECORD_LIST_COUNT)  /* 0x0051613C */
@@ -620,12 +620,12 @@
 #define g_regionStamp            (*(uint8_t *)(uintptr_t)ADDR_REGION_STAMP)  /* 0x00514EF8 */
 #define g_regionStride           (*(int16_t *)(uintptr_t)ADDR_REGION_STRIDE)  /* 0x00514EEC */
 #define g_regionWalk             (*(uint8_t **)(uintptr_t)ADDR_REGION_WALK)  /* 0x00523DD4 */
-#define g_remapBright            (*(void **)(uintptr_t)ADDR_REMAP_BRIGHT)  /* 0x00507230 */
+#define g_remapBright            (*(uint8_t **)(uintptr_t)ADDR_REMAP_BRIGHT)  /* 0x00507230 */
 #define g_remapBrightBuf         ((uint8_t *)(uintptr_t)ADDR_REMAP_BRIGHT_BUF)  /* 0x004FE09C */
 #define g_remapDark              (*(uint8_t **)(uintptr_t)ADDR_REMAP_DARK)  /* 0x004FE084 */
 #define g_remapIdent             (*(uint8_t **)(uintptr_t)ADDR_REMAP_IDENTITY)  /* 0x004FD764 */
 #define g_remapIdentityBuf       ((uint8_t *)(uintptr_t)ADDR_REMAP_IDENTITY_BUF)  /* 0x00507238 */
-#define g_remapShades            (*(void **)(uintptr_t)ADDR_REMAP_SHADES)  /* 0x004FE2B0 */
+#define g_remapShades            ((uint8_t **)(uintptr_t)ADDR_REMAP_SHADES)  /* 0x004FE2B0 */
 #define g_remapShadeStore        ((uint8_t *)(uintptr_t)ADDR_REMAP_SHADE_STORE)  /* 0x00502CEC */
 #define g_remapTint              (*(uint8_t **)(uintptr_t)ADDR_REMAP_TINT)  /* 0x0047826C */
 #define g_repairHealPct          (*(int32_t *)(uintptr_t)ADDR_REPAIR_HEAL_PCT)  /* 0x006628A0 */
@@ -644,8 +644,7 @@
 #define g_roachHealth            (*(int32_t *)(uintptr_t)ADDR_ROACH_HEALTH)  /* 0x00487BAC */
 #define g_roachMark              ((uint16_t *)(uintptr_t)ADDR_ROACH_MARK)  /* 0x00656128 */
 #define g_roachMarkStamp         (*(uint16_t *)(uintptr_t)ADDR_ROACH_MARK_STAMP)  /* 0x00656328 */
-#define g_roachMask              ((uint8_t *)(uintptr_t)ADDR_ROACH_MASK)  /* 0x00654CAC */
-#define g_roachMaskCount         ((uint8_t *)(uintptr_t)ADDR_ROACH_MASK_COUNT)  /* 0x00654CA8 */
+#define g_roachMasks             ((AM2_MaskRec *)(uintptr_t)ADDR_ROACH_MASK_COUNT)  /* 0x00654CA8 */
 #define g_roachMaskDirs          (*(int32_t *)(uintptr_t)ADDR_ROACH_MASK_DIRECTIONS)  /* 0x00654CA0 */
 #define g_roachReach             (*(float *)(uintptr_t)ADDR_ROACH_REACH)  /* 0x0046FAA8 */
 #define g_roachRevacc            (*(int32_t *)(uintptr_t)ADDR_ROACH_REVACC)  /* 0x00487BC4 */
@@ -714,7 +713,7 @@
 #define g_shakeStepX             (*(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_X)  /* 0x00514E6C */
 #define g_shakeStepY             (*(int32_t *)(uintptr_t)ADDR_SHAKE_STEP_Y)  /* 0x00514E74 */
 #define g_shakeTime              (*(int32_t *)(uintptr_t)ADDR_SHAKE_TIME)  /* 0x00514E64 */
-#define g_sightBlockByDir        ((uint8_t *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR)  /* 0x004F8FB8 */
+#define g_sightBlockByDir        ((AM2_SightDirRec *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR)  /* 0x004F8FB8 */
 #define g_sightGeneration        (*(int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION)  /* 0x004F93C0 */
 #define g_sightRangeWant         (*(double *)(uintptr_t)ADDR_SIGHT_RANGE_WANT)  /* 0x0046F2F8 */
 #define g_slotHeadings           ((uint8_t *)(uintptr_t)ADDR_SLOT_HEADINGS)  /* 0x0065A068 */
@@ -850,8 +849,7 @@
 #define g_vehicleDefCount        (*(int32_t *)(uintptr_t)ADDR_VEHICLE_DEF_COUNT)  /* 0x00662028 */
 #define g_vehicleDefs            (*(uint8_t **)(uintptr_t)ADDR_VEHICLE_DEFS)  /* 0x00662024 */
 #define g_vehicleHeightByKind    ((int32_t *)(uintptr_t)ADDR_VEHICLE_HEIGHT_BY_KIND)  /* 0x0048BDF8 */
-#define g_vehicleMask            ((uint8_t *)(uintptr_t)ADDR_VEHICLE_MASK)  /* 0x0065A2F4 */
-#define g_vehicleMaskCount       ((AM2_MaskRec *)(uintptr_t)ADDR_VEHICLE_MASK_COUNT)  /* 0x0065A2F0 */
+#define g_vehicleMasks           ((AM2_MaskRec *)(uintptr_t)ADDR_VEHICLE_MASK_COUNT)  /* 0x0065A2F0 */
 #define g_vehicleMaskDirs        ((int32_t *)(uintptr_t)ADDR_VEHICLE_MASK_DIRECTIONS)  /* 0x0065A2D8 */
 #define g_vehicleNames           ((char **)(uintptr_t)ADDR_VEHICLE_NAMES)  /* 0x0048BE50 */
 #define g_vehicleRowSpec         ((void *)(uintptr_t)ADDR_VEHICLE_ROW_SPEC)  /* 0x0048BE20 */

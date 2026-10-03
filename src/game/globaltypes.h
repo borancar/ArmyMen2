@@ -24,4 +24,48 @@ typedef struct AM2_PathNode {
     uint8_t  pad;       /* +0x0F */
 } AM2_PathNode;
 
+/* One rank's record, ADDR_RANK_RECORDS[AM2_RANK_COUNT], 28 bytes. The image
+ * indexes it `[rank*28 + 0x473DC0 + field]`. DefFillRankRecords fills it from
+ * the trooper definitions. */
+typedef struct AM2_RankRec {
+    int32_t sight_range;    /* +0x00 RANK_REC_OFF_SIGHT_RANGE */
+    int32_t field_04;       /* +0x04 RANK_REC_OFF_FIELD_04, the view half-arc */
+    int32_t field_08;       /* +0x08 RANK_REC_OFF_FIELD_08, the out-of-arc range */
+    float   fire_scale;     /* +0x0C RANK_REC_OFF_FIRE_SCALE */
+    int32_t threshold;      /* +0x10 RANK_REC_OFF_THRESHOLD */
+    int32_t max_health;     /* +0x14 RANK_REC_OFF_MAX_HEALTH */
+    int32_t xp;             /* +0x18 RANK_REC_OFF_XP */
+} AM2_RankRec;
+
+/* The per-direction sight cache, ADDR_SIGHT_BLOCK_BY_DIR, one 16-byte record
+ * per four headings, indexed `[dir*16 + 0x4F8FB8 + field]`. */
+typedef struct AM2_SightDirRec {
+    int16_t low;            /* +0x00 SIGHTDIR_OFF_LOW */
+    int16_t mid;            /* +0x02 SIGHTDIR_OFF_MID */
+    int16_t high;           /* +0x04 SIGHTDIR_OFF_HIGH */
+    int16_t pad;
+    int32_t stamp;          /* +0x08 SIGHTDIR_OFF_STAMP */
+    int32_t trace_stamp;    /* +0x0C SIGHTDIR_OFF_TRACE_STAMP */
+} AM2_SightDirRec;
+
+/* One of the twelve squad positions, ADDR_FORMATION_SLOTS[AM2_FORMATION_SLOTS],
+ * 6 bytes: a facing relative to the leader and a distance. FormationPoint
+ * indexes it `[slot*6 + 0x473EA0 + field]`. */
+typedef struct AM2_FormationSlot {
+    uint8_t facing;         /* +0x00 */
+    uint8_t pad;
+    int16_t dist;           /* +0x02 48, 64, 96 or 128 */
+    int16_t pad2;
+} AM2_FormationSlot;
+
+/* One footprint mask: a count and up to forty point offsets, 0xA4 bytes
+ * (AM2_MASK_STRIDE). The roach's table is one record per direction at
+ * ADDR_ROACH_MASK_COUNT; the vehicles' is [kind*32 + dir] at
+ * ADDR_VEHICLE_MASK_COUNT. The image reaches a point as
+ * `[(rec*41 + i)*4 + base + 4]`, which is this record indexed. */
+typedef struct AM2_MaskRec {
+    int32_t count;
+    struct { int16_t x, y; } pts[40];
+} AM2_MaskRec;
+
 #endif /* AM2_GLOBALTYPES_H */

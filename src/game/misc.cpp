@@ -2332,7 +2332,7 @@ void __cdecl SeqAddKind4(const int32_t *at, int32_t yAdjust)
     *(int32_t *)(row + ROW_OFF_X)        = *at;
     *(int16_t *)(row + ROW_OFF_Y_ADJUST) = (int16_t)yAdjust;
     *(void **)(row + ROW_OFF_FIELD_2C)   =
-        g_remapShades;
+        g_remapShades[0];
     *(int16_t *)(row + ROW_OFF_FIELD_26) = AM2_SEQ_DEPTH_BIAS;
 }
 
@@ -2384,7 +2384,7 @@ int32_t __cdecl SeqStepKind4(int32_t at, void *rec, void *ctx)
             *(void **)(row + ROW_OFF_SPRITE) =
                 (g_seqSprites5)[CELL];
             *(void **)(row + ROW_OFF_FIELD_2C) =
-                (&g_remapShades)[CELL];
+                g_remapShades[CELL];
 
             GATE = 1;
         }

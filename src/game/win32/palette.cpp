@@ -294,8 +294,8 @@ typedef void (__cdecl *am2_void_fn)(void);
  * under the placed model those are am2_origstate members. (A few names are
  * aliases for the same colour byte -- KIND7_NAMES, LIST_INK_HOT_SEL,
  * VARIATION_END -- same address.) */
-#define NAMED(addr, r, g, b) \
-    (*(uint8_t *)(uintptr_t)(addr) = NearestPalIndexRGB((const uint32_t *)pal, r, g, b, 9))
+#define NAMED(var, r, g, b) \
+    (*(uint8_t *)&(var) = NearestPalIndexRGB((const uint32_t *)pal, r, g, b, 9))
 
 void __cdecl SetGamePalette(uint8_t *pal)
 {
@@ -330,9 +330,9 @@ void __cdecl SetGamePalette(uint8_t *pal)
         CalibratePalette((uint32_t *)pal);
 
     /* Four 256-byte blocks, back to back. */
-    ((uint8_t * *)&g_remapShades)[0] = (uint8_t *)((((uintptr_t)g_remapShadeStore) + 3) & ~3u);
+    g_remapShades[0] = (uint8_t *)((((uintptr_t)g_remapShadeStore) + 3) & ~3u);
     for (k = 1; k < 4; k++)
-        ((uint8_t * *)&g_remapShades)[k] = ((uint8_t * *)&g_remapShades)[k - 1] + PALETTE_ENTRIES;
+        g_remapShades[k] = g_remapShades[k - 1] + PALETTE_ENTRIES;
 
     i = 0;
     {
@@ -368,7 +368,7 @@ void __cdecl SetGamePalette(uint8_t *pal)
                 c.peGreen = (uint8_t)(g * DARK_SCALE);
                 c.peBlue  = (uint8_t)(b * DARK_SCALE);
             }
-            (*(uint8_t * *)&g_remapBright)[i] = MATCH_ENTRY(c);
+            g_remapBright[i] = MATCH_ENTRY(c);
 
             /* Two colours by parity, so a run of indices alternates. */
             if (i & 1) {
@@ -386,34 +386,34 @@ void __cdecl SetGamePalette(uint8_t *pal)
                 c.peRed   = (uint8_t)(r * shade[k]);
                 c.peGreen = (uint8_t)(g * shade[k]);
                 c.peBlue  = (uint8_t)(b * shade[k]);
-                *(i + ((uint8_t * *)&g_remapShades)[k]) = MATCH_ENTRY(c);
+                *(i + g_remapShades[k]) = MATCH_ENTRY(c);
             }
         }
     }
 
-    NAMED(((uintptr_t)&g_backgroundColour),  0x00, 0x00, 0x00);
-    NAMED(((uintptr_t)&g_whiteInk),       0xFF, 0xFF, 0xFF);
-    NAMED(((uintptr_t)&g_colourStale),       0xC0, 0xC0, 0xC0);
-    NAMED(((uintptr_t)&g_hiliteColour),   0x00, 0xFF, 0x00);
-    NAMED(((uintptr_t)&g_hudColour), 0xDA, 0x4E, 0x00);
-    NAMED(((uintptr_t)&g_colourBlue),        0x00, 0x00, 0xFF);
-    NAMED(((uintptr_t)g_kind7Names),        0xAC, 0xE8, 0x00);
-    NAMED(((uintptr_t)&g_listInkHotSel),   0x88, 0x88, 0x88);
-    NAMED(((uintptr_t)&g_colourBelowBg),    0x00, 0x84, 0x00);
-    NAMED(((uintptr_t)&g_colourNoMap),      0xAC, 0x00, 0x00);
-    NAMED(((uintptr_t)g_colourDarkBlue),   0x00, 0x00, 0xAC);
-    NAMED(((uintptr_t)g_variationEnd),      0x88, 0xC0, 0x00);
-    NAMED(((uintptr_t)&g_colourLagMid),     0xFF, 0xFF, 0x00);
-    NAMED(((uintptr_t)&g_colourLightGreen), 0x69, 0xA9, 0x52);
-    NAMED(((uintptr_t)&g_colourDarkGreen),  0x32, 0x71, 0x26);
-    NAMED(((uintptr_t)&g_colourCream),       0xEF, 0xD9, 0xA0);
-    NAMED(((uintptr_t)&g_colourOlive),       0x65, 0x57, 0x30);
-    NAMED(((uintptr_t)&g_colourLightBlue),  0x92, 0xB8, 0xDF);
-    NAMED(((uintptr_t)&g_colourSteelBlue),  0x32, 0x5D, 0x8A);
-    NAMED(((uintptr_t)&g_colourLightGrey),  0xAB, 0xAB, 0xAB);
-    NAMED(((uintptr_t)&g_colourDarkGrey),   0x54, 0x54, 0x54);
-    NAMED(((uintptr_t)&g_colourWhiteB),     0xFF, 0xFF, 0xFF);
-    NAMED(((uintptr_t)&g_colourBlack),       0x00, 0x00, 0x00);
+    NAMED(g_backgroundColour,  0x00, 0x00, 0x00);
+    NAMED(g_whiteInk,       0xFF, 0xFF, 0xFF);
+    NAMED(g_colourStale,       0xC0, 0xC0, 0xC0);
+    NAMED(g_hiliteColour,   0x00, 0xFF, 0x00);
+    NAMED(g_hudColour, 0xDA, 0x4E, 0x00);
+    NAMED(g_colourBlue,        0x00, 0x00, 0xFF);
+    NAMED(g_kind7Names[0],        0xAC, 0xE8, 0x00);
+    NAMED(g_listInkHotSel,   0x88, 0x88, 0x88);
+    NAMED(g_colourBelowBg,    0x00, 0x84, 0x00);
+    NAMED(g_colourNoMap,      0xAC, 0x00, 0x00);
+    NAMED(g_colourDarkBlue[0],   0x00, 0x00, 0xAC);
+    NAMED(g_variationEnd[0],      0x88, 0xC0, 0x00);
+    NAMED(g_colourLagMid,     0xFF, 0xFF, 0x00);
+    NAMED(g_colourLightGreen, 0x69, 0xA9, 0x52);
+    NAMED(g_colourDarkGreen,  0x32, 0x71, 0x26);
+    NAMED(g_colourCream,       0xEF, 0xD9, 0xA0);
+    NAMED(g_colourOlive,       0x65, 0x57, 0x30);
+    NAMED(g_colourLightBlue,  0x92, 0xB8, 0xDF);
+    NAMED(g_colourSteelBlue,  0x32, 0x5D, 0x8A);
+    NAMED(g_colourLightGrey,  0xAB, 0xAB, 0xAB);
+    NAMED(g_colourDarkGrey,   0x54, 0x54, 0x54);
+    NAMED(g_colourWhiteB,     0xFF, 0xFF, 0xFF);
+    NAMED(g_colourBlack,       0x00, 0x00, 0x00);
 
     PaletteLoaded();
 }

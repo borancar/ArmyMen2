@@ -1170,7 +1170,7 @@ int32_t __cdecl MakeBitmap(const uint32_t *src, const void *pixels,
 typedef void (__cdecl *am2_overlay_draw_fn)(void);
 typedef void (__attribute__((thiscall)) *am2_delete_fn)(void *self, int32_t flag);
 
-#define g_paintObj      (*(uint8_t * *)&g_paintObject)
+#define g_paintObj      (g_paintObject)
 #define g_screenRectPtr ((LPRECT)((uintptr_t)&g_screenRect))
 
 void __cdecl DrawMenuOverlay(void)
@@ -1266,7 +1266,7 @@ extern "C" const int32_t am2_menu_save_slot[4] = { 0, 0, 32, 32 };
 #endif
 #define g_cursorRect    ((AM2_Rect *)g_menuCursorRect)
 #define g_cursorPrev    ((AM2_Rect *)g_menuCursorPrev)
-#define g_paintObj      (*(uint8_t * *)&g_paintObject)
+#define g_paintObj      (g_paintObject)
 #define g_clipRect      ((const RECT *)g_screenClip)
 #define g_overlayA      (*(uint8_t * *)&g_menuOverlayA)
 #define g_overlayB      (*(uint8_t * *)&g_menuOverlayB)
@@ -1575,7 +1575,7 @@ void __cdecl InitDefaultPalette(void)
 
 void __cdecl InitRemapBright(void)
 {
-    *(uint8_t * *)&g_remapBright =
+    g_remapBright =
         (uint8_t *)((((uintptr_t)g_remapBrightBuf) + 3u) & ~3u);
 }
 

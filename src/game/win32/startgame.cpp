@@ -37,7 +37,7 @@
 
 #include <stdint.h>
 
-#define g_paintObj      (*(uint8_t * *)&g_paintObject)
+#define g_paintObj      (g_paintObject)
 
 typedef void (__cdecl *am2_play_sound_fn)(int32_t, int32_t, int32_t, int32_t,
                                           int32_t);
@@ -244,7 +244,7 @@ void __cdecl StartMultiplayerGame(void)
 
 void __cdecl HostBattle(void)
 {
-    uint8_t    *dlg    = (*(uint8_t * *)&g_paintObject);
+    uint8_t    *dlg    = (g_paintObject);
     const char *battle = (const char *)(dlg + DLG_OFF_BATTLE_NAME);
 #define player ((const char *)(dlg + DLG_OFF_PLAYER_NAME))
 
@@ -432,7 +432,7 @@ void __cdecl OnEnterNameOk(void)
     void       *level;
     int32_t     handle;
 
-    if ((dlg = (*(uint8_t * *)&g_paintObject)) == (uint8_t *)0)
+    if ((dlg = (g_paintObject)) == (uint8_t *)0)
         return;
 
     name = (const char *)(dlg + DLG_OFF_BATTLE_NAME);

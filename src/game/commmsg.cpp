@@ -2207,7 +2207,7 @@ void __cdecl MenuMessage(const char *text, uint8_t colour, int32_t indicator)
     if (g_subState == AM2_MENU_MODE_NO_CHAT)
         return;
 
-    screen = *(uint8_t * *)&g_paintObject;
+    screen = g_paintObject;
     if (!screen)
         return;
 

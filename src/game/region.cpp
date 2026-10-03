@@ -2923,13 +2923,13 @@ void __cdecl UnitWeaponInfo(void *unit, void *out)
              < g_gameClockMs
                - *(const uint32_t *)(w + ITEM_OFF_LAST_USE)) ? 1 : 0;
     } else {
-        const uint8_t *rank = g_rankRecords
-            + (uint32_t)*(const int32_t *)(u + OBJ_OFF_RANK) * RANK_REC_BYTES;
+        const AM2_RankRec *rank =
+            &g_rankRecords[*(const int32_t *)(u + OBJ_OFF_RANK)];
         /* The cooldown widened to 64 bits (`fild qword`) and scaled by the
          * rank's float directly (`fmul dword`). */
         uint32_t wait = (uint32_t)
             ((uint32_t)*(const int32_t *)(REC + ITEMTYPE_OFF_COOLDOWN)
-             * *(const float *)(rank + RANK_REC_OFF_FIRE_SCALE));
+             * rank->fire_scale);
 
         *(int32_t *)(c + SIGHTC_OFF_READY) =
             (wait < g_gameClockMs
@@ -4021,10 +4021,8 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
  * single 28: the same source around different surroundings -- in AiAttackBody
  * the bearing lands in ebx and the rank in ebp, the other way round from the
  * rest. All four match byte for byte on it. */
-#define AI_RANKF(off) (*(const int32_t *)(((uintptr_t)g_rankRecords)         \
-        + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK) * RANK_REC_BYTES + (off)))
-#define AI_DIRF(T, off) (*(T *)(((uintptr_t)g_sightBlockByDir)             \
-        + dir * AM2_SIGHT_DIR_STRIDE + (off)))
+#define AI_RANK (g_rankRecords[*(const int32_t *)(o + OBJ_OFF_RANK)])
+#define AI_DIR  (g_sightBlockByDir[dir])
 #define AI_SIGHT_GEN (g_sightGeneration)
 /* The original hands AngleOfDelta the distance as a third argument it does
  * not read; the push is in the image, so it is reproduced. The cast goes
@@ -4051,18 +4049,18 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
     dist    = ApproxDistXY(dx, dy);                                           \
     bearing = AI_ANGLE3(dx, dy, dist);                                        \
                                                                               \
-    if (abs(AngleDelta(facing, bearing)) > AI_RANKF(RANK_REC_OFF_FIELD_04)) { \
-        if (dist < AI_RANKF(RANK_REC_OFF_FIELD_08))                           \
+    if (abs(AngleDelta(facing, bearing)) > AI_RANK.field_04) { \
+        if (dist < AI_RANK.field_08)                           \
             goto SEEN_IT;                                                     \
         goto NOT_SEEN;                                                        \
     }                                                                         \
                                                                               \
     dir = (uint32_t)bearing / AM2_SIGHT_DIR_STEP;                             \
-    if (AI_DIRF(int32_t, SIGHTDIR_OFF_TRACE_STAMP) != AI_SIGHT_GEN) {         \
+    if (AI_DIR.trace_stamp != AI_SIGHT_GEN) {         \
         uint16_t buf[AM2_AI_SIGHT_LINE_BUF];                                  \
         int32_t  n, i, reach;                                                 \
                                                                               \
-        AI_DIRF(int32_t, SIGHTDIR_OFF_TRACE_STAMP) = AI_SIGHT_GEN;            \
+        AI_DIR.trace_stamp = AI_SIGHT_GEN;            \
         TraceTileLine(*(const uint32_t *)(o + OBJ_OFF_POS),                   \
                       *(const uint32_t *)(seen + OBJ_OFF_POS), buf, &n);      \
                                                                               \
@@ -4077,41 +4075,41 @@ void __cdecl AiStepTrack(void *obj, void *out, void *ctx)
         }                                                                     \
                                                                               \
         reach = i * AM2_AI_SIGHT_TILE_SPAN + AM2_AI_SIGHT_TILE_BASE;          \
-        if (reach >= AI_RANKF(RANK_REC_OFF_SIGHT_RANGE))                      \
-            reach = AI_RANKF(RANK_REC_OFF_SIGHT_RANGE);                       \
+        if (reach >= AI_RANK.sight_range)                      \
+            reach = AI_RANK.sight_range;                       \
                                                                               \
-        if (AI_DIRF(int32_t, SIGHTDIR_OFF_STAMP) == AI_SIGHT_GEN) {           \
-            if (reach < AI_DIRF(int16_t, SIGHTDIR_OFF_LOW))                   \
-                AI_DIRF(int16_t, SIGHTDIR_OFF_LOW) = (int16_t)reach;          \
-            if (reach < AI_DIRF(int16_t, SIGHTDIR_OFF_MID))                   \
-                AI_DIRF(int16_t, SIGHTDIR_OFF_MID) = (int16_t)reach;          \
-            if (reach < AI_DIRF(int16_t, SIGHTDIR_OFF_HIGH))                  \
-                AI_DIRF(int16_t, SIGHTDIR_OFF_HIGH) = (int16_t)reach;         \
+        if (AI_DIR.stamp == AI_SIGHT_GEN) {           \
+            if (reach < AI_DIR.low)                   \
+                AI_DIR.low = (int16_t)reach;          \
+            if (reach < AI_DIR.mid)                   \
+                AI_DIR.mid = (int16_t)reach;          \
+            if (reach < AI_DIR.high)                  \
+                AI_DIR.high = (int16_t)reach;         \
         } else {                                                              \
-            AI_DIRF(int32_t, SIGHTDIR_OFF_STAMP) = AI_SIGHT_GEN;              \
-            AI_DIRF(int16_t, SIGHTDIR_OFF_LOW)   = (int16_t)reach;            \
-            AI_DIRF(int16_t, SIGHTDIR_OFF_MID)   = (int16_t)reach;            \
-            AI_DIRF(int16_t, SIGHTDIR_OFF_HIGH)  = (int16_t)reach;            \
+            AI_DIR.stamp = AI_SIGHT_GEN;              \
+            AI_DIR.low   = (int16_t)reach;            \
+            AI_DIR.mid   = (int16_t)reach;            \
+            AI_DIR.high  = (int16_t)reach;            \
         }                                                                     \
     }                                                                         \
                                                                               \
-    if (AI_DIRF(int32_t, SIGHTDIR_OFF_STAMP) == AI_SIGHT_GEN) {               \
+    if (AI_DIR.stamp == AI_SIGHT_GEN) {               \
         mine = ObjHeight((void *)o);                                          \
         his  = ObjHeight((void *)seen);                                       \
         if (his >= mine) {                                                    \
-            if (dist > AI_DIRF(int16_t, SIGHTDIR_OFF_LOW))                    \
+            if (dist > AI_DIR.low)                    \
                 goto NOT_SEEN;                                                \
             goto SEEN_IT;                                                     \
         }                                                                     \
         if (his + AM2_SIGHT_BAND_STEP >= mine) {                              \
-            if (dist > AI_DIRF(int16_t, SIGHTDIR_OFF_MID))                    \
+            if (dist > AI_DIR.mid)                    \
                 goto NOT_SEEN;                                                \
             goto SEEN_IT;                                                     \
         }                                                                     \
-        if (dist > AI_DIRF(int16_t, SIGHTDIR_OFF_HIGH))                       \
+        if (dist > AI_DIR.high)                       \
             goto NOT_SEEN;                                                    \
     } else {                                                                  \
-        if (dist > AI_RANKF(RANK_REC_OFF_SIGHT_RANGE))                        \
+        if (dist > AI_RANK.sight_range)                        \
             goto NOT_SEEN;                                                    \
     }                                                                         \
                                                                               \
@@ -4289,28 +4287,9 @@ done:
  * anything an attribute can hold: a tile higher than the viewer raises the
  * running maximum and does not stop the walk, and only the step back down from
  * it by more than AM2_SIGHT_BAND_STEP does. */
-/* The rank records and the per-direction sight cache are arrays of records,
- * and SightScan indexes them as arrays -- `[rank*28 + 0x473DC0 + field]`,
+/* The rank records and the per-direction sight cache (globaltypes.h) are
+ * arrays of records, and SightScan indexes them as arrays -- `[rank*28 + 0x473DC0 + field]`,
  * `[dir*16 + 0x4F8FB8 + field]` -- rather than through element pointers. */
-typedef struct {
-    int32_t sight_range;    /* RANK_REC_OFF_SIGHT_RANGE */
-    int32_t field_04;       /* RANK_REC_OFF_FIELD_04, the view half-arc */
-    int32_t field_08;       /* RANK_REC_OFF_FIELD_08, the out-of-arc range */
-    float   fire_scale;     /* RANK_REC_OFF_FIRE_SCALE */
-    int32_t threshold;      /* RANK_REC_OFF_THRESHOLD */
-    int32_t max_health;     /* RANK_REC_OFF_MAX_HEALTH */
-    int32_t xp;             /* RANK_REC_OFF_XP */
-} AM2_RankRec;
-typedef struct {
-    int16_t low;            /* SIGHTDIR_OFF_LOW */
-    int16_t mid;            /* SIGHTDIR_OFF_MID */
-    int16_t high;           /* SIGHTDIR_OFF_HIGH */
-    int16_t pad;
-    int32_t stamp;          /* SIGHTDIR_OFF_STAMP */
-    int32_t trace_stamp;    /* SIGHTDIR_OFF_TRACE_STAMP */
-} AM2_SightDirRec;
-#define RANKREC(r)  (((const AM2_RankRec *)g_rankRecords)[r])
-#define SIGHTDIR(d) (((AM2_SightDirRec *)g_sightBlockByDir)[d])
 
 static inline void AiSightTrace(const uint8_t *o, const uint8_t *seen, uint32_t dir,
                                 int32_t viewerAttr, int32_t gen)
@@ -4320,7 +4299,7 @@ static inline void AiSightTrace(const uint8_t *o, const uint8_t *seen, uint32_t 
     int32_t        highest = AM2_AI_SIGHT_FLOOR;
     int32_t        n = 0, i = 0, reach;
 
-    SIGHTDIR(dir).trace_stamp = gen;
+    g_sightBlockByDir[dir].trace_stamp = gen;
     TraceTileLine(*(const uint32_t *)(o + OBJ_OFF_POS),
                   *(const uint32_t *)(seen + OBJ_OFF_POS), buf, &n);
 
@@ -4335,23 +4314,23 @@ static inline void AiSightTrace(const uint8_t *o, const uint8_t *seen, uint32_t 
     }
 
     reach = i * AM2_AI_SIGHT_TILE_SPAN + AM2_AI_SIGHT_TILE_BASE;
-#define rank RANKREC(*(const int32_t *)(o + OBJ_OFF_RANK))
+#define rank g_rankRecords[*(const int32_t *)(o + OBJ_OFF_RANK)]
     if (reach >= rank.sight_range)
         reach = rank.sight_range;
 #undef rank
 
-    if (SIGHTDIR(dir).stamp == gen) {
-        if (reach < SIGHTDIR(dir).low)
-            SIGHTDIR(dir).low = (int16_t)reach;
-        if (reach < SIGHTDIR(dir).mid)
-            SIGHTDIR(dir).mid = (int16_t)reach;
-        if (reach < SIGHTDIR(dir).high)
-            SIGHTDIR(dir).high = (int16_t)reach;
+    if (g_sightBlockByDir[dir].stamp == gen) {
+        if (reach < g_sightBlockByDir[dir].low)
+            g_sightBlockByDir[dir].low = (int16_t)reach;
+        if (reach < g_sightBlockByDir[dir].mid)
+            g_sightBlockByDir[dir].mid = (int16_t)reach;
+        if (reach < g_sightBlockByDir[dir].high)
+            g_sightBlockByDir[dir].high = (int16_t)reach;
     } else {
-        SIGHTDIR(dir).stamp = gen;
-        SIGHTDIR(dir).low   = (int16_t)reach;
-        SIGHTDIR(dir).mid   = (int16_t)reach;
-        SIGHTDIR(dir).high  = (int16_t)reach;
+        g_sightBlockByDir[dir].stamp = gen;
+        g_sightBlockByDir[dir].low   = (int16_t)reach;
+        g_sightBlockByDir[dir].mid   = (int16_t)reach;
+        g_sightBlockByDir[dir].high  = (int16_t)reach;
     }
 }
 
@@ -5103,7 +5082,7 @@ void *__cdecl SightScan(void *obj, int32_t *outRange, uint8_t *outBearing,
     ++g_sightGeneration;
     orig_log_one(o);
 
-    reach = RANKREC(*(const int32_t *)(o + OBJ_OFF_RANK)).sight_range;
+    reach = g_rankRecords[*(const int32_t *)(o + OBJ_OFF_RANK)].sight_range;
     box.right  = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS) + reach;
     box.left   = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS) - reach;
     box.top    = (int32_t)*(const int16_t *)(o + OBJ_OFF_POS + 2) - reach;
@@ -5204,7 +5183,7 @@ score:
 
             delta = AngleDelta(look, candBearing);
             delta = abs(delta);
-#define rank RANKREC(*(const int32_t *)(o + OBJ_OFF_RANK))
+#define rank g_rankRecords[*(const int32_t *)(o + OBJ_OFF_RANK)]
             if (delta > rank.field_04) {
                 if (candRange >= rank.field_08)
                     continue;
@@ -5213,20 +5192,20 @@ score:
 
             /* Keyed on the BEARING, not the facing -- see orig.h. */
             dir = (uint32_t)candBearing / AM2_SIGHT_DIR_STEP;
-            if (SIGHTDIR(dir).trace_stamp != AI_SIGHT_GEN)
+            if (g_sightBlockByDir[dir].trace_stamp != AI_SIGHT_GEN)
                 AiSightTrace(o, it, dir, viewerAttr, AI_SIGHT_GEN);
 
-            if (!(SIGHTDIR(dir).stamp != AI_SIGHT_GEN)) {
+            if (!(g_sightBlockByDir[dir].stamp != AI_SIGHT_GEN)) {
                 int32_t mine = ObjHeight(o);
                 int32_t his  = ObjHeight(it);
 
                 if (his >= mine) {
-                    if (candRange > SIGHTDIR(dir).low)
+                    if (candRange > g_sightBlockByDir[dir].low)
                         continue;
                 } else if (his + AM2_SIGHT_BAND_STEP < mine) {
-                    if (candRange > SIGHTDIR(dir).high)
+                    if (candRange > g_sightBlockByDir[dir].high)
                         continue;
-                } else if (candRange > SIGHTDIR(dir).mid) {
+                } else if (candRange > g_sightBlockByDir[dir].mid) {
                     continue;
                 }
             } else {
@@ -5741,11 +5720,8 @@ void __cdecl AiHitReact(void *obj, void *out, void *ctx)
         *(int32_t *)(w + 8) = AM2_POSE_KIND7;
     } else if (kind != 8
                && *(const int32_t *)(c + SIGHTC_OFF_KIND) != 3) {
-        int32_t limit = *(const int32_t *)
-            (g_rankRecords
-             + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
-               * RANK_REC_BYTES
-             + RANK_REC_OFF_THRESHOLD);
+        int32_t limit =
+            g_rankRecords[*(const int32_t *)(o + OBJ_OFF_RANK)].threshold;
 #define V (*(const uint8_t *)(c + SIGHTC_OFF_SEED))
         if ((int32_t)V < (limit >> 1)) {
             int32_t slot = *(const int32_t *)(c + SIGHTC_OFF_FIELD_00) * 2
@@ -7526,7 +7502,7 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
             *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
             *(void **)(c + SIGHTC_OFF_OBSERVER)   = NULL;
         } else {
-            const uint8_t *rank;
+            const AM2_RankRec *rank;
 
             DistAndAngle((const AM2_Point *)&anchor,
                          (const AM2_Point *)(
@@ -7535,12 +7511,10 @@ void __cdecl TrooperBuildContext(void *obj, void *ctx, int32_t sarge)
                          (int32_t *)(c + SIGHTC_OFF_RANGE),
                          c + SIGHTC_OFF_BEARING);
 
-            rank = g_rankRecords
-                   + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK)
-                     * RANK_REC_BYTES;
+            rank = &g_rankRecords[*(const int32_t *)(o + OBJ_OFF_RANK)];
 
             if (*(const int32_t *)(c + SIGHTC_OFF_RANGE)
-                > (*(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE) << 1))
+                > (rank->sight_range << 1))
                 *(uint32_t *)(o + OBJ_OFF_TARGET_UID) = 0;
         }
     }

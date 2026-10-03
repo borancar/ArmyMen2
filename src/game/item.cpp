@@ -1971,7 +1971,6 @@ void __cdecl ObjSetRoachFootprint(void *obj)
     const uint8_t *rows;
     int32_t        dir;
     int32_t        baseX, baseY;
-    uint32_t       slot;
     int32_t        i;
     typedef struct { int16_t x, y; } Pt;
 
@@ -1991,12 +1990,10 @@ void __cdecl ObjSetRoachFootprint(void *obj)
                     + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
                    (*(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING))->directionBits) & 0xFF;
 
-    slot = (uint32_t)dir * AM2_MASK_STRIDE;
-
     /* The count and the points re-indexed from the table, as RoachMaskWeight
      * reads them. */
-#define COUNT (*(const int32_t *)(g_roachMaskCount + slot))
-#define PTS   ((const Pt *)(g_roachMask + slot))
+#define COUNT (g_roachMasks[dir].count)
+#define PTS   (g_roachMasks[dir].pts)
     for (i = 0; i < COUNT; i++) {
         Pt        at;
         uint16_t *mark;
@@ -2006,10 +2003,10 @@ void __cdecl ObjSetRoachFootprint(void *obj)
         at.y = PTS[i].y + *(const int16_t *)(o + OBJ_OFF_POS + 2);
 
         mark = g_roachMark
-               + ((((int32_t)at.y >> AM2_MASK_CELL_SHIFT) - baseY)
-                  + (((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX) * AM2_MASK_WINDOW);
+               + (((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX) * AM2_MASK_WINDOW
+               + (((int32_t)at.y >> AM2_MASK_CELL_SHIFT) - baseY);
 
-        if (*mark == g_roachMarkStamp)
+        if (g_roachMarkStamp == *mark)
             continue;
 
         tile = TileOfPoint(*(uint32_t *)&at);
@@ -2175,12 +2172,6 @@ void *__cdecl CreateRoach(int32_t kind, char *name, int32_t x, int32_t y,
 /* `inline` is load-bearing: the original has this body at every call site,
  * and VC6's /O2 (/Ob1) inlines only functions declared inline. Out of line,
  * each caller compiled to push/call/pop -- the relink found it. */
-/* One mask record: a count and up to forty cell offsets, AM2_MASK_STRIDE
- * bytes. */
-typedef struct {
-    int32_t   count;
-    AM2_Point pts[(AM2_MASK_STRIDE - 4) / sizeof(AM2_Point)];
-} AM2_MaskRec;
 static_assert(sizeof(AM2_MaskRec) == AM2_MASK_STRIDE, "mask record size");
 
 static inline void ObjFootprint(void *obj, int32_t set)
@@ -2213,7 +2204,7 @@ static inline void ObjFootprint(void *obj, int32_t set)
 
     /* The record is indexed afresh each pass -- the kind and the count
      * re-read -- as the image walks it. */
-#define MASKREC ((g_vehicleMaskCount) \
+#define MASKREC ((g_vehicleMasks) \
                  [*(const int32_t *)(o + VEHICLE_OFF_KIND) * 32 + dir])
     for (i = 0; i < MASKREC.count; i++) {
         AM2_Point at;
@@ -2228,7 +2219,7 @@ static inline void ObjFootprint(void *obj, int32_t set)
                  * AM2_MASK_WINDOW
                + (((int32_t)at.y >> AM2_MASK_CELL_SHIFT) - baseY);
 
-        if (g_objMarkStamp == *mark)
+        if (*mark == g_objMarkStamp)
             continue;
 
         tile = TileOfPoint(*(const uint32_t *)&at);
@@ -2837,7 +2828,6 @@ void __cdecl ObjClearRoachFootprint(void *obj)
     const uint8_t *rows;
     int32_t        dir;
     int32_t        baseX, baseY;
-    uint32_t       slot;
     int32_t        i;
     typedef struct { int16_t x, y; } Pt;
 
@@ -2857,12 +2847,10 @@ void __cdecl ObjClearRoachFootprint(void *obj)
                     + *(const uint8_t *)(rows + ROW_OFF_HEADING)) & 0xFF,
                    (*(const AM2_Anim *const *)(rows + ROW_OFF_ANIM_PLAYING))->directionBits) & 0xFF;
 
-    slot = (uint32_t)dir * AM2_MASK_STRIDE;
-
     /* The count and the points re-indexed from the table, as RoachMaskWeight
      * reads them. */
-#define COUNT (*(const int32_t *)(g_roachMaskCount + slot))
-#define PTS   ((const Pt *)(g_roachMask + slot))
+#define COUNT (g_roachMasks[dir].count)
+#define PTS   (g_roachMasks[dir].pts)
     for (i = 0; i < COUNT; i++) {
         Pt        at;
         uint16_t *mark;
@@ -2872,10 +2860,10 @@ void __cdecl ObjClearRoachFootprint(void *obj)
         at.y = PTS[i].y + *(const int16_t *)(o + OBJ_OFF_POS + 2);
 
         mark = g_roachMark
-               + ((((int32_t)at.y >> AM2_MASK_CELL_SHIFT) - baseY)
-                  + (((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX) * AM2_MASK_WINDOW);
+               + (((int32_t)at.x >> AM2_MASK_CELL_SHIFT) - baseX) * AM2_MASK_WINDOW
+               + (((int32_t)at.y >> AM2_MASK_CELL_SHIFT) - baseY);
 
-        if (*mark == g_roachMarkStamp)
+        if (g_roachMarkStamp == *mark)
             continue;
 
         tile = TileOfPoint(*(uint32_t *)&at);
@@ -2931,8 +2919,8 @@ int32_t __cdecl RoachMaskWeight(void *from, int32_t dir, uint32_t at,
 
     /* The count is re-read on every pass; the point is built from the
      * halves of `at` read out of its argument slot. */
-#define COUNT (*(const int32_t *)(g_roachMaskCount + slot))
-#define PTS   ((const Pt *)(g_roachMask + slot))
+#define COUNT (*(const int32_t *)((const uint8_t *)g_roachMasks + slot))
+#define PTS   ((const Pt *)((const uint8_t *)g_roachMasks[0].pts + slot))
     for (i = 0; i < COUNT; i++) {
         Pt    pt;
         void *chain;
@@ -3993,8 +3981,8 @@ int32_t __cdecl MaskBlockWeight(int32_t kind, uint8_t heading, uint32_t at)
     total   = 0;
 #define slot ((uint32_t)(kind * AM2_VEHICLE_MASK_DIRS + heading) \
               * AM2_VEHICLE_MASK_STRIDE)
-#define COUNT (*(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(((uintptr_t)g_vehicleMask) - 4)) + slot))
-#define PTS   ((const Pt *)(g_vehicleMask + slot))
+#define COUNT (*(const int32_t *)((const uint8_t *)g_vehicleMasks + slot))
+#define PTS   ((const Pt *)((const uint8_t *)g_vehicleMasks[0].pts + slot))
     for (i = 0; i < COUNT; i++) {
         Pt    here;
         void *chain;
@@ -7834,17 +7822,16 @@ void __cdecl Type238Action(void *obj, int32_t award)
     *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME) += award;
 
     /* The rank's record, indexed afresh at each use. */
-#define RANK_REC (g_rankRecords \
-                  + (uint32_t)*(const int32_t *)(o + OBJ_OFF_RANK) * RANK_REC_BYTES)
+#define RANK_REC (g_rankRecords[*(const int32_t *)(o + OBJ_OFF_RANK)])
     while (1) {
         int32_t grown;
 
         if (*(const int32_t *)(o + OBJ_OFF_REPAIR_FRAME)
-            < *(const int32_t *)(RANK_REC + RANK_REC_OFF_XP))
+            < RANK_REC.xp)
             return;
 
         RankPromote(obj);
-        SetMaxHealth(obj, *(const int32_t *)(RANK_REC + RANK_REC_OFF_MAX_HEALTH));
+        SetMaxHealth(obj, RANK_REC.max_health);
 
         grown = *(const int16_t *)(o + OBJ_OFF_HEALTH);
         grown += grown >> 2;
@@ -10132,8 +10119,6 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
                                    int32_t apply)
 {
     uint8_t       *v       = (uint8_t *)veh;
-    const int32_t *counts  = (const int32_t *)g_vehicleMaskCount;
-    const uint8_t *masks   = g_vehicleMask;
     int32_t        weight  = 0;
     int32_t        sound   = 0;
     int32_t        facing8;
@@ -10141,14 +10126,10 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
     int32_t        i;
     int32_t        rec;
     void          *list;
+    AM2_Point      pt;
     uint8_t       *o;
 
-#define AM2_MASK_REC(n) \
-    (*(const int32_t *)((const uint8_t *)counts + (uint32_t)(n) \
-                        * AM2_VEHICLE_MASK_STRIDE))
-#define AM2_MASK_PT(n, k) \
-    ((const int16_t *)(masks + (uint32_t)(n) * AM2_VEHICLE_MASK_STRIDE \
-                       + (uint32_t)(k) * 4))
+#define AM2_MASK_REC(n) (g_vehicleMasks[n].count)
 
     if (*(const int32_t *)(v + VEHICLE_OFF_KIND) == AM2_VEHICLE_KIND_BOAT) {
         facing8 = facing & 0xFF;
@@ -10158,11 +10139,8 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
 
         i = 0;
         do {
-            const int16_t *p = AM2_MASK_PT(rec, i);
-            AM2_Point      pt;
-
-            pt.x = (int16_t)(p[0] + ((const AM2_Point *)&at)->x);
-            pt.y = (int16_t)(p[1] + ((const AM2_Point *)&at)->y);
+            pt.x = (int16_t)(g_vehicleMasks[rec].pts[i].x + ((const AM2_Point *)&at)->x);
+            pt.y = (int16_t)(g_vehicleMasks[rec].pts[i].y + ((const AM2_Point *)&at)->y);
 
             /* &base, and that is the one byte the two loops differ in. */
             list = ObjectsAtPoint(&at,
@@ -10214,11 +10192,8 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
     if (AM2_MASK_REC(rec) > 0) {
         i = 0;
         do {
-            const int16_t *p = AM2_MASK_PT(rec, i);
-            AM2_Point      pt;
-
-            pt.x = (int16_t)(p[0] + ((const AM2_Point *)&at)->x);
-            pt.y = (int16_t)(p[1] + ((const AM2_Point *)&at)->y);
+            pt.x = (int16_t)(g_vehicleMasks[rec].pts[i].x + ((const AM2_Point *)&at)->x);
+            pt.y = (int16_t)(g_vehicleMasks[rec].pts[i].y + ((const AM2_Point *)&at)->y);
 
             list = ObjectsAtPoint((const uint32_t *)&pt,
                                   g_objMapDesc);
@@ -10313,7 +10288,6 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
     return answer;
 
 #undef AM2_MASK_REC
-#undef AM2_MASK_PT
 }
 
 /* NearestClearVehiclePoint -- original 0x0045B930, one caller. The same square
@@ -12092,10 +12066,8 @@ void *__cdecl CreateTrooper(char *name, int32_t x, int32_t y, int32_t slot,
         *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_REVEALED;
 
     *(int16_t *)(o + OBJ_OFF_MAX_HEALTH) =
-        *(const int16_t *)(g_rankRecords
-                           + RANK_REC_OFF_MAX_HEALTH);
-    SetMaxHealth(o, *(const int32_t *)(g_rankRecords
-                                       + RANK_REC_OFF_MAX_HEALTH));
+        *(const int16_t *)&g_rankRecords[0].max_health;
+    SetMaxHealth(o, g_rankRecords[0].max_health);
     *(int16_t *)(o + OBJ_OFF_HEALTH) = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
     *(int16_t *)(o + OBJ_OFF_FIELD_574) =
         (int16_t)*(const uint8_t *)(o + TROOPER_OFF_FACING);

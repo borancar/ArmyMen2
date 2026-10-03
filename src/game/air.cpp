@@ -647,7 +647,6 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
                             int32_t slot)
 {
 #define l ((const uint8_t *)leader)
-    const uint8_t *rec;
     uint8_t        leaderFacing;
     uint8_t        facing;
     int32_t        dist;
@@ -680,10 +679,9 @@ void __cdecl FormationPoint(void *follower, void *leader, AM2_Point *out,
         break;
     }
 
-    rec    = g_formationSlots
-             + (uint32_t)slot * AM2_FORMATION_SLOT_STRIDE;
-    dist   = (int32_t)*(const int16_t *)(rec + 2) << shift;
-    facing = (uint8_t)(*rec + leaderFacing);
+    /* Facing first, then distance, each indexing the table afresh. */
+    facing = (uint8_t)(g_formationSlots[slot].facing + leaderFacing);
+    dist   = (int32_t)g_formationSlots[slot].dist << shift;
 
     if (ObjIsType3((const AM2_Object *)leader)) {
         int32_t delta = AngleDelta(facing, leaderFacing);
@@ -1611,7 +1609,7 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
 {
     const uint8_t *v = (const uint8_t *)viewer;
     const uint8_t *b = (const uint8_t *)blocker;
-    const uint8_t *rank;
+    const AM2_RankRec *rank;
     uint8_t        heading;
     int32_t        hv;
     int32_t        hb;
@@ -1709,14 +1707,13 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
         dist += AM2_SIGHT_DIST_PAD;
     }
 
-    rank = g_rankRecords
-         + (uint32_t)*(const int32_t *)(v + OBJ_OFF_RANK) * RANK_REC_BYTES;
+    rank = &g_rankRecords[*(const int32_t *)(v + OBJ_OFF_RANK)];
 
     if ((int32_t)(int16_t)dist
-        > *(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE))
+        > rank->sight_range)
         return;
 
-    arc = *(const uint8_t *)(rank + RANK_REC_OFF_FIELD_04);
+    arc = *(const uint8_t *)&rank->field_04;
 
     if (AbsAngle(heading, a0) < arc) {
         if (AbsAngle(heading, a1) > arc)
@@ -1739,49 +1736,43 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     do {
         uint32_t idx = (uint32_t)(a0 & 0xFF) >> 2;
 
-#define REC(off) (*(int16_t *)(((uintptr_t)g_sightBlockByDir)   \
-                               + idx * AM2_SIGHT_DIR_STRIDE + (off)))
-#define STAMP    (*(int32_t *)(((uintptr_t)g_sightBlockByDir)   \
-                               + idx * AM2_SIGHT_DIR_STRIDE + SIGHTDIR_OFF_STAMP))
-#define range (*(const int32_t *)(g_rankRecords \
-        + (uint32_t)*(const int32_t *)(v + OBJ_OFF_RANK) * RANK_REC_BYTES   \
-        + RANK_REC_OFF_SIGHT_RANGE))
+#define REC   (g_sightBlockByDir[idx])
+#define range (g_rankRecords[*(const int32_t *)(v + OBJ_OFF_RANK)].sight_range)
 
-        if (STAMP != gen) {
-            STAMP = gen;
+        if (REC.stamp != gen) {
+            REC.stamp = gen;
 
             if (hb > hv) {
-                REC(SIGHTDIR_OFF_LOW) = d;
-                REC(SIGHTDIR_OFF_MID) = d;
+                REC.low = d;
+                REC.mid = d;
             } else if (hb + AM2_SIGHT_BAND_STEP >= hv) {
-                REC(SIGHTDIR_OFF_LOW) = (int16_t)range;
-                REC(SIGHTDIR_OFF_MID) = d;
+                REC.low = (int16_t)range;
+                REC.mid = d;
             } else {
-                REC(SIGHTDIR_OFF_LOW) = (int16_t)range;
-                REC(SIGHTDIR_OFF_MID) = (int16_t)range;
+                REC.low = (int16_t)range;
+                REC.mid = (int16_t)range;
             }
-            REC(SIGHTDIR_OFF_HIGH) = d;
+            REC.high = d;
         } else if (hb > hv) {
             /* Already stamped this generation: keep the nearest per band. */
-            if (REC(SIGHTDIR_OFF_LOW) > d)
-                REC(SIGHTDIR_OFF_LOW) = d;
-            if (REC(SIGHTDIR_OFF_MID) > d)
-                REC(SIGHTDIR_OFF_MID) = d;
-            if (REC(SIGHTDIR_OFF_HIGH) > d)
-                REC(SIGHTDIR_OFF_HIGH) = d;
+            if (REC.low > d)
+                REC.low = d;
+            if (REC.mid > d)
+                REC.mid = d;
+            if (REC.high > d)
+                REC.high = d;
         } else if (hb + AM2_SIGHT_BAND_STEP >= hv) {
-            if (REC(SIGHTDIR_OFF_MID) > d)
-                REC(SIGHTDIR_OFF_MID) = d;
-            if (REC(SIGHTDIR_OFF_HIGH) > d)
-                REC(SIGHTDIR_OFF_HIGH) = d;
+            if (REC.mid > d)
+                REC.mid = d;
+            if (REC.high > d)
+                REC.high = d;
         } else {
-            if (REC(SIGHTDIR_OFF_HIGH) > d)
-                REC(SIGHTDIR_OFF_HIGH) = d;
+            if (REC.high > d)
+                REC.high = d;
         }
         a0 = (uint8_t)(a0 + AM2_SIGHT_DIR_STEP);
     } while (--steps);
 #undef range
-#undef STAMP
 #undef REC
 }
 #undef AngleOfDelta3

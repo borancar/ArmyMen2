@@ -1696,9 +1696,7 @@ void *__cdecl LoadType2(am2_FILE *fp, void *hdr, int32_t renumber)
 
         part = (float)*(const int16_t *)(o + OBJ_OFF_HEALTH)
                / *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
-        SetMaxHealth(o, *(const int32_t *)(g_rankRecords
-                                           + (uintptr_t)rank * RANK_REC_BYTES
-                                           + RANK_REC_OFF_MAX_HEALTH));
+        SetMaxHealth(o, g_rankRecords[rank].max_health);
 
         now = *(const int16_t *)(o + OBJ_OFF_MAX_HEALTH);
         *(int16_t *)(o + OBJ_OFF_HEALTH) = (int16_t)(int32_t)(now * part);

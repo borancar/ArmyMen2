@@ -467,34 +467,33 @@ void __cdecl LoadDefTables(void)
      * [ptr - 4], which is why ADDR_RANK_RECORDS is where it is. Written here
      * against the record base, which is the same addresses. */
     for (id = 0; id < AM2_RANK_COUNT; id++) {
-        uint8_t       *rec = g_rankRecords
-                             + (uint32_t)id * RANK_REC_BYTES;
+        AM2_RankRec   *rec = &g_rankRecords[id];
         const uint8_t *src = (const uint8_t *)DefFindTrooperRec(id);
 
         if (src == 0)
             continue;
 
         /* In the parsed record's order, which scatters them. */
-        *(int32_t *)(rec + RANK_REC_OFF_MAX_HEALTH) =
+        rec->max_health =
             *(const int32_t *)(src + RANK_SRC_OFF_MAX_HEALTH);
-        *(int32_t *)(rec + RANK_REC_OFF_FIELD_04) =
+        rec->field_04 =
             *(const int32_t *)(src + RANK_SRC_OFF_FIELD_04);
-        *(int32_t *)(rec + RANK_REC_OFF_SIGHT_RANGE) =
+        rec->sight_range =
             *(const int32_t *)(src + RANK_SRC_OFF_SIGHT_RANGE);
-        *(int32_t *)(rec + RANK_REC_OFF_FIELD_08) =
+        rec->field_08 =
             *(const int32_t *)(src + RANK_SRC_OFF_FIELD_08);
 
         /* An integer percentage becomes a rate, with a floor of 1.0 -- and
          * this is the record's only float, which is what confirms the whole
          * permutation. */
-        *(float *)(rec + RANK_REC_OFF_FIRE_SCALE) =
+        rec->fire_scale =
             (float)*(const int32_t *)(src + RANK_SRC_OFF_FIRE_PCT) * 0.01f;
-        if (*(float *)(rec + RANK_REC_OFF_FIRE_SCALE) < 1.0f)
-            *(float *)(rec + RANK_REC_OFF_FIRE_SCALE) = 1.0f;
+        if (rec->fire_scale < 1.0f)
+            rec->fire_scale = 1.0f;
 
-        *(int32_t *)(rec + RANK_REC_OFF_THRESHOLD) =
+        rec->threshold =
             *(const int32_t *)(src + RANK_SRC_OFF_THRESHOLD);
-        *(int32_t *)(rec + RANK_REC_OFF_XP) =
+        rec->xp =
             *(const int32_t *)(src + RANK_SRC_OFF_XP);
     }
 }
