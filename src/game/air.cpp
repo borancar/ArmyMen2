@@ -1620,7 +1620,6 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     const uint8_t *v = (const uint8_t *)viewer;
     const uint8_t *b = (const uint8_t *)blocker;
     const uint8_t *rank;
-    uint8_t       *slots = (uint8_t *)(uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR;
     uint8_t        heading;
     int32_t        hv;
     int32_t        hb;
@@ -1630,9 +1629,11 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     int16_t        fx, fy;
     int32_t        code;
     int32_t        dist;
-    int32_t        arc;
+    uint8_t        arc;
     int32_t        span;
-    int32_t        steps;
+    uint32_t       steps;
+    int32_t        gen;
+    int16_t        d;
     uint8_t        a0;
     uint8_t        a1;
 
@@ -1660,16 +1661,16 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
          * members, which is the composed-offset case checkoffsetuse lists. */
         const AM2_Rect *hit = (const AM2_Rect *)(b + OBJ_OFF_HIT_RECT);
 
-        l = hit->left; t = hit->top; r = hit->right; bo = hit->bottom;
+        l = hit->left; r = hit->right; t = hit->top; bo = hit->bottom;
     }
 
     vx = *(const int16_t *)(v + OBJ_OFF_X);
-    vy = *(const int16_t *)(v + OBJ_OFF_Y);
 
     /* The outcode, one test at a time. */
     code = 0;
     if (l < vx)
         code = 1;
+    vy = *(const int16_t *)(v + OBJ_OFF_Y);
     if (t < vy)
         code |= 2;
     if (r < vx)
@@ -1695,14 +1696,14 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     }
 
     {
-        int32_t dx0 = (int16_t)(close.x - vx);
         int32_t dy0 = (int16_t)(close.y - vy);
-        int32_t dx1 = (int16_t)(fx - *(const int16_t *)(v + OBJ_OFF_X));
-        int32_t dy1 = (int16_t)(fy - *(const int16_t *)(v + OBJ_OFF_Y));
+        int32_t dx0 = (int16_t)(close.x - vx);
         int32_t d0  = ApproxDistXY(dx0, dy0);
-        int32_t d1;
+        int32_t dx1, dy1, d1;
 
         a0 = AngleOfDelta3(dx0, dy0, d0);
+        dx1 = (int16_t)(fx - *(const int16_t *)(v + OBJ_OFF_X));
+        dy1 = (int16_t)(fy - *(const int16_t *)(v + OBJ_OFF_Y));
         d1 = ApproxDistXY(dx1, dy1);
         a1 = AngleOfDelta3(dx1, dy1, d1);
         /* The original pads the silhouette distance by one tile once (the
@@ -1738,49 +1739,58 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     if ((int16_t)span <= 0)
         return;
 
-    steps = ((int32_t)(int16_t)span + 3) >> 2;
-    heading = a0;    /* the facing's local, reused as the sweep cursor */
+    gen   = *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
+    steps = ((uint32_t)(int32_t)(int16_t)span + 3) >> 2;
+    d     = (int16_t)dist;
 
-    for (; steps > 0; steps--, heading = (uint8_t)(heading + AM2_SIGHT_DIR_STEP)) {
-        uint8_t *rec = slots
-                     + (uint32_t)((heading & 0xFF) >> 2) * AM2_SIGHT_DIR_STRIDE;
-        int16_t  d   = (int16_t)dist;
+    /* a0 itself is the sweep cursor, one record (four headings) a step. */
+    do {
+        uint32_t idx = (uint32_t)(a0 & 0xFF) >> 2;
 
-        if (*(const int32_t *)(rec + SIGHTDIR_OFF_STAMP)
-            != *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION) {
-#define range (*(const int32_t *)(rank + RANK_REC_OFF_SIGHT_RANGE))
+#define REC(off) (*(int16_t *)((uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR   \
+                               + idx * AM2_SIGHT_DIR_STRIDE + (off)))
+#define STAMP    (*(int32_t *)((uintptr_t)ADDR_SIGHT_BLOCK_BY_DIR   \
+                               + idx * AM2_SIGHT_DIR_STRIDE + SIGHTDIR_OFF_STAMP))
+#define range (*(const int32_t *)((const uint8_t *)((void *)(uintptr_t)(ADDR_RANK_RECORDS)) \
+        + (uint32_t)*(const int32_t *)(v + OBJ_OFF_RANK) * RANK_REC_BYTES   \
+        + RANK_REC_OFF_SIGHT_RANGE))
 
-            *(int32_t *)(rec + SIGHTDIR_OFF_STAMP) =
-                *(const int32_t *)(uintptr_t)ADDR_SIGHT_GENERATION;
+        if (STAMP != gen) {
+            STAMP = gen;
 
             if (hb > hv) {
-                *(int16_t *)(rec + SIGHTDIR_OFF_LOW) = d;
-                *(int16_t *)(rec + SIGHTDIR_OFF_MID) = d;
+                REC(SIGHTDIR_OFF_LOW) = d;
+                REC(SIGHTDIR_OFF_MID) = d;
             } else if (hb + AM2_SIGHT_BAND_STEP >= hv) {
-                *(int16_t *)(rec + SIGHTDIR_OFF_LOW) = (int16_t)range;
-                *(int16_t *)(rec + SIGHTDIR_OFF_MID) = d;
+                REC(SIGHTDIR_OFF_LOW) = (int16_t)range;
+                REC(SIGHTDIR_OFF_MID) = d;
             } else {
-                *(int16_t *)(rec + SIGHTDIR_OFF_LOW) = (int16_t)range;
-                *(int16_t *)(rec + SIGHTDIR_OFF_MID) = (int16_t)range;
+                REC(SIGHTDIR_OFF_LOW) = (int16_t)range;
+                REC(SIGHTDIR_OFF_MID) = (int16_t)range;
             }
-            *(int16_t *)(rec + SIGHTDIR_OFF_HIGH) = d;
-            continue;
-        }
-
-        /* Already stamped this generation: keep the nearest per band. */
-        if (hb > hv) {
-            if (*(const int16_t *)(rec + SIGHTDIR_OFF_LOW) > d)
-                *(int16_t *)(rec + SIGHTDIR_OFF_LOW) = d;
-            if (*(const int16_t *)(rec + SIGHTDIR_OFF_MID) > d)
-                *(int16_t *)(rec + SIGHTDIR_OFF_MID) = d;
+            REC(SIGHTDIR_OFF_HIGH) = d;
+        } else if (hb > hv) {
+            /* Already stamped this generation: keep the nearest per band. */
+            if (REC(SIGHTDIR_OFF_LOW) > d)
+                REC(SIGHTDIR_OFF_LOW) = d;
+            if (REC(SIGHTDIR_OFF_MID) > d)
+                REC(SIGHTDIR_OFF_MID) = d;
+            if (REC(SIGHTDIR_OFF_HIGH) > d)
+                REC(SIGHTDIR_OFF_HIGH) = d;
         } else if (hb + AM2_SIGHT_BAND_STEP >= hv) {
-            if (*(const int16_t *)(rec + SIGHTDIR_OFF_MID) > d)
-                *(int16_t *)(rec + SIGHTDIR_OFF_MID) = d;
+            if (REC(SIGHTDIR_OFF_MID) > d)
+                REC(SIGHTDIR_OFF_MID) = d;
+            if (REC(SIGHTDIR_OFF_HIGH) > d)
+                REC(SIGHTDIR_OFF_HIGH) = d;
+        } else {
+            if (REC(SIGHTDIR_OFF_HIGH) > d)
+                REC(SIGHTDIR_OFF_HIGH) = d;
         }
-        if (*(const int16_t *)(rec + SIGHTDIR_OFF_HIGH) > d)
-            *(int16_t *)(rec + SIGHTDIR_OFF_HIGH) = d;
-    }
+        a0 = (uint8_t)(a0 + AM2_SIGHT_DIR_STEP);
+    } while (--steps);
 #undef range
+#undef STAMP
+#undef REC
 }
 #undef AngleOfDelta3
 
