@@ -8772,8 +8772,8 @@ void __attribute__((thiscall)) AM2_Widget::HudEdgePaint(RECT clip)
      * AM2_HUD_AMMO_MAX it draws "**", otherwise "%02d" through the game's own
      * sprintf, formatted only once the box is known to be visible. */
     pen += 3;
-    y = pen;
     x = w->rect.left + (w->rect.right - w->rect.left) / 2 + 1;
+    y = pen;
     *(AM2_Rect *)&box = RectMake(w->rect.left, w->rect.top,
                                  w->rect.right, w->rect.bottom);
     if (!IntersectRect(&vis, &box, &clip))
