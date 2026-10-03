@@ -1157,23 +1157,28 @@ int32_t __cdecl PlaceScenario(void)
                 ((AM2_Rec *)list)->ListRemoveAt(i);
                 continue;
             }
+            /* The script state is reset for every unit the first three tests
+             * pass -- BEFORE the type and Sarge tests (0x0043E0D5 stores it
+             * ahead of `sub eax,2; jne`). Only a non-Sarge type 2 is formed
+             * up. */
             if (!(*(const uint8_t *)(obj + OBJ_OFF_FLAGS) & 4)
                 && ObjIsTypeIn238((const AM2_Object *)obj)
-                && *(const void *const *)(obj + OBJ_OFF_FIELD_94) == (void *)0
-                && *(const int32_t *)obj == 2
-                && *(const int32_t *)(obj + OBJ_OFF_SARGE) == 0) {
-                AM2_Point p;
-
+                && *(const void *const *)(obj + OBJ_OFF_FIELD_94) == (void *)0) {
                 *(uint32_t *)(obj + OBJ_OFF_SCRIPT_STATE) =
                     *(const uint32_t *)(uintptr_t)ADDR_ZERO_POINT;
-                FormationPoint(obj, lead, &p, formed);
-                /* The point is copied as one dword. */
-                *(uint32_t *)(obj + OBJ_OFF_POS) = *(const uint32_t *)&p;
-                *(uint8_t *)(obj + OBJ_OFF_FACING) =
-                    *(const uint8_t *)(uintptr_t)ADDR_LEADER_FACING;
-                ObjTileChanged(obj, 0, 0);
-                SetUnitPose(obj, 1);
-                formed++;
+                if (*(const int32_t *)obj == 2
+                    && *(const int32_t *)(obj + OBJ_OFF_SARGE) == 0) {
+                    AM2_Point p;
+
+                    FormationPoint(obj, lead, &p, formed);
+                    /* The point is copied as one dword. */
+                    *(uint32_t *)(obj + OBJ_OFF_POS) = *(const uint32_t *)&p;
+                    *(uint8_t *)(obj + OBJ_OFF_FACING) =
+                        *(const uint8_t *)(uintptr_t)ADDR_LEADER_FACING;
+                    ObjTileChanged(obj, 0, 0);
+                    SetUnitPose(obj, 1);
+                    formed++;
+                }
             }
             i++;
         }
