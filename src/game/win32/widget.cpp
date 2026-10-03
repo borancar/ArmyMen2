@@ -4806,8 +4806,8 @@ void __cdecl HudPostUpdate(void)
         (int16_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X
                   + (int32_t)*(const uint32_t *)(uintptr_t)ADDR_CURSOR_POINT);
     ((int16_t *)&at)[1] =
-        (int16_t)(*(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
-                  + *(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2));
+        (int16_t)(*(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2)
+                  + *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
 
     /* The test is on the CURSOR against the view rectangle, not on the world
      * point just built -- ADDR_BLIT_RECT is in screen space. */
@@ -4937,8 +4937,8 @@ void __cdecl HudPostUpdate(void)
         (int16_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X
                   + (int32_t)*(const uint32_t *)(uintptr_t)ADDR_CURSOR_POINT);
     ((int16_t *)&at)[1] =
-        (int16_t)(*(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
-                  + *(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2));
+        (int16_t)(*(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2)
+                  + *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
     obj = ObjectsHitByPoint(&at, (const void *)(uintptr_t)ADDR_OBJ_MAP_DESC);
     for (; obj; obj = *(void *const *)((const uint8_t *)obj
                                        + OBJ_OFF_QUERY_NEXT)) {

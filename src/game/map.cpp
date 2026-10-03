@@ -1733,8 +1733,8 @@ static inline void BuildMapObjects(uint8_t *objs, int32_t count)
  * after the walk if the file did not supply them, so every consumer
  * downstream may assume its layer exists. Two of the nine have no chunk arm
  * at all and are created only here. */
-#define MAP_PLANE ((*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H) \
-                   * (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W))
+#define MAP_PLANE ((*(int32_t *)(uintptr_t)ADDR_MAP_TILES_W) \
+                   * (*(int32_t *)(uintptr_t)ADDR_MAP_TILES_H))
 /* Allocate and zero a layer the file did not supply; the size is re-read
  * for each of the two uses, as the original does. */
 #define DEFAULT_LAYER(slot)                     \

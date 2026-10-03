@@ -9571,8 +9571,9 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
     /* The image adds the packed dwords and keeps the low half for x, then the
      * two high words for y -- the same idiom the cheat console's jumpjets arm
      * uses, and written as halves here for the same reason. */
-    at.x  = (int16_t)((int16_t)g_viewRect->left + (int16_t)g_cursorPoint);
-    at.y  = (int16_t)((int16_t)g_viewRect->top + (int16_t)(g_cursorPoint >> 16));
+    at.x  = (int16_t)(g_viewRect->left + g_cursorPoint);
+    at.y  = (int16_t)(*(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2)
+                      + *(const int16_t *)&g_viewRect->top);
     dist  = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS), &at);
     /* THE WHOLE POINT IS COPIED AND ONLY ITS Y IS THEN REPLACED. 0x0044A4F2
      * loads slot +0x10 as a DWORD and 0x0044A4FB stores it into slot +0x0C,
@@ -11015,8 +11016,8 @@ void __cdecl Step3Input(void *obj, void *rec)
                 *(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X
                 + *(const int32_t *)(uintptr_t)ADDR_CURSOR_POINT);
             ((int16_t *)&cursorWorld)[1] = (int16_t)(
-                *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
-                + *(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2));
+                *(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2)
+                + *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
 
             dist = ApproxDist((const AM2_Point *)(o + OBJ_OFF_POS),
                               (const AM2_Point *)&cursorWorld);

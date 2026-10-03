@@ -9481,8 +9481,8 @@ void __cdecl SelectionClick(void)
 
     world.x = (int16_t)(*(const int32_t *)(uintptr_t)ADDR_VIEW_ORIGIN_X
                         + ((const AM2_Point *)(uintptr_t)ADDR_CURSOR_POINT)->x);
-    world.y = (int16_t)(*(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y
-                        + *(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2));
+    world.y = (int16_t)(*(const int16_t *)(uintptr_t)(ADDR_CURSOR_POINT + 2)
+                        + *(const int16_t *)(uintptr_t)ADDR_VIEW_ORIGIN_Y);
 
     if (*(const int32_t *)(uintptr_t)ADDR_VIEW_RECT_ON) {
         /* A rubber band exists: the let-go arm is laid out first, then the
