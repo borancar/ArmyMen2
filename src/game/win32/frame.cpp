@@ -1861,8 +1861,9 @@ void __cdecl PausedFrameStep(void)
             active++;
     }
 
+    active--;
     xy = (const int16_t *)((const uint8_t *)(uintptr_t)ADDR_MP_ROW_COORDS
-                           + (uint32_t)(active - 1) * 16u);
+                           + (uint32_t)active * 16u);
 
     for (slot = 0; slot < 4; xy += 2, slot++) {
 #define rec (comm + slot * COMM_PLAYER_STRIDE)
@@ -1942,7 +1943,7 @@ void __cdecl PausedFrameStep(void)
         }
 
         if (((AM2_Comm *)comm)->CommSlotHasPlayer(slot))
-            DrawLatencyBar(active - 1, slot);
+            DrawLatencyBar(active, slot);
         else
             DrawSprite(*(AM2_Sprite *const *)(uintptr_t)ADDR_MP_MARK_C,
                        xy[0] + 0x37, xy[1] + 3, 0);
