@@ -6528,7 +6528,7 @@ int32_t __cdecl RegionFindPath(int32_t from, int32_t to, int16_t *path,
         *(int32_t *)(uintptr_t)ADDR_REGION_SEARCH_STATE = -1;
     }
 
-    for (;;) {
+    while (1) {
         if (!HEAD)
             return 0;
 
@@ -8307,7 +8307,9 @@ have_facing:
         veh = at;
         if (!claimed)
             goto no_route;
-        while (veh) {
+        while (1) {
+            if (!veh)
+                break;
             if (*(const uint32_t *)(veh + OBJ_OFF_UID) == claimed)
                 goto board;
             veh = *(uint8_t *const *)(veh + OBJ_OFF_QUERY_NEXT);
@@ -8338,7 +8340,7 @@ sweep:
          * SAVED pose from ObjNextKind538 (slot +0x2c), not the state. */
         int32_t i = 1;
 
-        for (;;) {
+        while (1) {
             facing = (uint8_t)(facing + (uint8_t)step[i - 1]);
             AnimStepPoint(o, facing, pose, &stepPoint, 0);
             at = (uint8_t *)ObjectsAtPoint(&stepPoint,

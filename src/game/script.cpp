@@ -2650,7 +2650,9 @@ int32_t __cdecl ScriptPad(AM2_ScriptCtx *ctx, int32_t *at)
     }
 
     /* Trigger words, until one that is not a trigger word. */
-    while (ctx->tokens[*at].kind == AM2_TOKEN_RESERVED) {
+    while (1) {
+        if (ctx->tokens[*at].kind != AM2_TOKEN_RESERVED)
+            break;
         switch ((int32_t)(uintptr_t)ctx->tokens[*at].value) {
         case AM2_TOK_EVERYTHING:    PAD.trigger |= (int32_t)AM2_PADTRIG_EVERYTHING; break;
         case AM2_TOK_SARGE:         PAD.trigger |= (int32_t)AM2_PADTRIG_SARGE;      break;
@@ -3128,7 +3130,9 @@ int32_t __cdecl ReadScript(const char *path, AM2_ScriptCtx *ctx)
     int32_t at = ctx->count;    /* resume past whatever is already parsed */
 
     if (ok) {
-        while (!orig_feof(fh) && orig_fgets(line, (int32_t)sizeof line, fh)) {
+        while (1) {
+            if (orig_feof(fh)) break;
+            if (orig_fgets(line, (int32_t)sizeof line, fh) == 0) break;
             ScriptNextToken(line, ctx, lines);
             lines++;
         }

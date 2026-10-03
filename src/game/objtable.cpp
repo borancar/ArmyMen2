@@ -172,7 +172,7 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
             /* Its own insertion point, not the one the insert below uses. */
             int32_t at;
 
-            for (;;) {
+            while (1) {
                 int32_t i = FindSlot(probe, &at);
 
                 if (i < 0 || g_objTable[i].obj == 0)

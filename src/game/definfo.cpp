@@ -312,12 +312,10 @@ int32_t __cdecl DefDispatchFile(am2_FILE *fp)
     if (fp == (am2_FILE *)0)
         return 0;
 
-    for (;;) {
-        const AM2_DefKeyword *e;
+    while (1) {
         char                 *tok;
         char                 *rest;
         int32_t               idx;
-        int32_t (__cdecl *handler)(int32_t, char *);
 
         /* Tested at the top, once: the image reads each line from one call. */
         if (orig_fgets(raw, AM2_DEF_LINE_MAX, fp) == (char *)0)
@@ -336,18 +334,16 @@ int32_t __cdecl DefDispatchFile(am2_FILE *fp)
         rest = tok + strlen(tok) + 1;
 
         idx = DefFindKeyword(tok);
-        if (idx < 0) {
+        if (idx == -1) {
             orig_log("Invalid Command: line %d token %s \n%s\n",
                      lineno, tok, raw);
             orig_fclose(fp);
             return 0;
         }
 
-        e       = &kDefKeywords[idx];
-        handler = (int32_t (__cdecl *)(int32_t, char *))e->handler;
-
-        if (handler != (int32_t (__cdecl *)(int32_t, char *))0)
-            rc = handler(e->value, rest);
+        if (kDefKeywords[idx].handler != 0)
+            rc = ((int32_t (__cdecl *)(int32_t, char *))kDefKeywords[idx].handler)(
+                     kDefKeywords[idx].value, rest);
 
         if (rc != 0) {
             orig_log("Invalid table entry: line %d, token #%d\n%s\n",

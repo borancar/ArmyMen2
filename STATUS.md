@@ -66,11 +66,19 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1474 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1477 of
   1645 byte-identical (2026-10-03), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1474:
+  the near-miss sweep, 758 before the row pools. From 758 to 1477:
+  - **Unrotated loops are `while (1) { if (!cond) break; ... }`**
+    (2026-10-03): VC6 duplicates a loop's test at the bottom for `while
+    (cond)`, `for`, `for (;;)` with breaks, and goto loops alike; the image's
+    loops that test once at the top and close with a `jmp` are `while (1)`
+    with the test as an in-body break (and, for a counted loop, the step
+    written last in the body). ReadScript, DefDispatchFile and the AM2_Typer
+    constructor now match; `$T/w1pass.py`/`w2pass.py` applied it across the
+    rest wherever the distance dropped.
   - **PlaceScenario's .cof form-up pass** (2026-10-03): the original clears
     OBJ_OFF_SCRIPT_STATE for every listed unit that passes the flag, type
     2/3/8 and field-94 tests -- before it asks "type 2 and not Sarge" -- so

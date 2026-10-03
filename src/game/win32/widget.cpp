@@ -16491,15 +16491,19 @@ AM2_Typer::AM2_Typer(AM2_Rect box, const char *message)
     char    *text = (char *)((uint8_t *)w + TYPER_OFF_TEXT);
     char     line[AM2_TYPER_LINE_MAX];
     int32_t  start = 0;
-    int32_t  cur   = 0;
+    int32_t  cur;
     const char *space;
     int32_t  next;
     AM2_CTOR_VTABLE(w, VTABLE_TYPER);
     *(AM2_Rect *)&w->x = box;           /* one struct copy, as the original */
     ::WidgetScreenRect(w);
     text[0] = '\0';
+    cur = 0;
 
-    while ((space = orig_strchr(message + cur, ' ')) != 0) {
+    while (1) {
+        space = orig_strchr(message + cur, ' ');
+        if (space == 0)
+            break;
         next = (int32_t)(space - message) + 1;
         orig_strncpy(line, message + start, (uint32_t)(next - start));
         line[next - start] = '\0';

@@ -838,7 +838,9 @@ int32_t __cdecl DepthInsert(void *obj, const AM2_Rect *world)
         AT_FRONT(at);               /* off the front */
     }
 
-    while (g_depthCursor->next) {
+    while (1) {
+        if (!g_depthCursor->next)
+            break;
         g_depthCursor = g_depthCursor->next;
         if (DepthCompare(obj, g_depthCursor->obj) <= 0) {
             at = g_depthCursor;
