@@ -159,30 +159,24 @@ void __cdecl BuildRegionGraph(void)
     int32_t x, y;
     int32_t tile;
 
-    const int8_t *weights;
+#define weights (*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
 
-    if (!kRegionOfCell
-        || !*(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
+    if (!kRegionOfCell || !weights)
         return;
-
-    weights = *(const int8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS;
 
     tile = *(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_W)) * AM2_REGION_MARGIN
            + AM2_REGION_MARGIN;
 
     for (y = AM2_REGION_MARGIN;
          y < *(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_H)) - AM2_REGION_MARGIN;
-         y++, tile += AM2_REGION_MARGIN * 2) {
+         tile += AM2_REGION_MARGIN * 2, y++) {
         for (x = AM2_REGION_MARGIN;
              x < *(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_W))
                  - AM2_REGION_MARGIN;
-             x++, tile++) {
-            uint32_t at = (uint32_t)tile & 0xFFFFu;
+             tile++, x++) {
+            uint16_t at = (uint16_t)tile;
             int32_t  region = kRegionOfCell[at];
-            int32_t  ox = 0, oy = 0;
-            uint8_t *r;
-            int32_t  w;
-            int32_t  n;
+            int32_t  ox, oy;
 
             /* Called for nothing -- see the note above. */
             TileToXY(tile, &ox, &oy);
@@ -197,17 +191,17 @@ void __cdecl BuildRegionGraph(void)
                 continue;
 
             if (region >= *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE))) {
-                int32_t old = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
-
+#define old ((int32_t)*(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
                 kRegions = (uint8_t *)am2_realloc(kRegions,
                     (size_t)(region + 1) * AM2_REGION_SIZE);
                 memset(kRegions + (uint32_t)old * AM2_REGION_SIZE, 0,
                        (size_t)(region - old + 1) * AM2_REGION_SIZE);
+#undef old
                 *(int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)) =
                     (int16_t)(region + 1);
             }
 
-            r = kRegions + (uint32_t)region * AM2_REGION_SIZE;
+#define r (kRegions + (uint32_t)region * AM2_REGION_SIZE)
             if (!*(const int32_t *)(r + REGION_OFF_ACTIVE)) {
                 *(int32_t *)(r + REGION_OFF_ACTIVE) = 1;
                 *(int16_t *)(r + REGION_OFF_ID)     = (int16_t)region;
@@ -218,36 +212,34 @@ void __cdecl BuildRegionGraph(void)
                              ((void *)(uintptr_t)(AM2_STR_ACTIVATING_REGION)), region);
             }
 
+#undef r
             /* Up, left, right, down -- four inlined tests in the original
              * and four here, in its order. Each is linked when its region
              * differs and its weight is under AM2_BLOCK_FULL. */
-            w = *(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_W));
+#define w ((uint32_t)*(const int32_t *)((void *)(uintptr_t)(ADDR_MAP_TILES_W)))
 
-            n = (int32_t)(at - (uint32_t)w);
-            if ((int32_t)kRegionOfCell[n] != region
-                && weights[n] < AM2_BLOCK_FULL)
-                AddRegionLink((int32_t)at, n);
+            if ((int32_t)kRegionOfCell[at - w] != region
+                && weights[at - w] < AM2_BLOCK_FULL)
+                AddRegionLink((int32_t)at, (int32_t)(at - w));
 
-            n = (int32_t)at - 1;
-            if ((int32_t)kRegionOfCell[n] != region
-                && weights[n] < AM2_BLOCK_FULL)
-                AddRegionLink((int32_t)at, n);
+            if ((int32_t)kRegionOfCell[at - 1] != region
+                && weights[at - 1] < AM2_BLOCK_FULL)
+                AddRegionLink((int32_t)at, (int32_t)(at - 1));
 
-            n = (int32_t)at + 1;
-            if ((int32_t)kRegionOfCell[n] != region
-                && weights[n] < AM2_BLOCK_FULL)
-                AddRegionLink((int32_t)at, n);
+            if ((int32_t)kRegionOfCell[at + 1] != region
+                && weights[at + 1] < AM2_BLOCK_FULL)
+                AddRegionLink((int32_t)at, (int32_t)(at + 1));
 
-            n = (int32_t)(at + (uint32_t)w);
-            if ((int32_t)kRegionOfCell[n] != region
-                && weights[n] < AM2_BLOCK_FULL)
-                AddRegionLink((int32_t)at, n);
+            if ((int32_t)kRegionOfCell[at + w] != region
+                && weights[at + w] < AM2_BLOCK_FULL)
+                AddRegionLink((int32_t)at, (int32_t)(at + w));
+#undef w
         }
     }
 
     {
-        int32_t stride = *(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE));
-        size_t  bytes  = (size_t)(stride * stride);
+#define stride ((int32_t)*(const int16_t *)((void *)(uintptr_t)(ADDR_REGION_STRIDE)))
+#define bytes  ((size_t)(stride * stride))
 
         kRegionNext = (uint8_t *)am2_malloc(bytes);
         memset(kRegionNext, 0, bytes);
@@ -256,7 +248,10 @@ void __cdecl BuildRegionGraph(void)
         memset(kRegionCost, 0, bytes);
 
         *(uint8_t *)((void *)(uintptr_t)(ADDR_REGION_STAMP)) = 1;
+#undef bytes
+#undef stride
     }
+#undef weights
 }
 
 /* BuildTileDeltas -- original 0x00437B60, one caller: the map loader. Fill the
