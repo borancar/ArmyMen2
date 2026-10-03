@@ -1696,8 +1696,8 @@ void __cdecl AddSightBlocker(void *viewer, void *blocker)
     }
 
     {
-        int32_t dy0 = (int16_t)(close.y - vy);
         int32_t dx0 = (int16_t)(close.x - vx);
+        int32_t dy0 = (int16_t)(close.y - vy);
         int32_t d0  = ApproxDistXY(dx0, dy0);
         int32_t dx1, dy1, d1;
 
