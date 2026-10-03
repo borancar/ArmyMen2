@@ -3453,6 +3453,14 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         }
         return;
 
+    case 0x06:                                  /* playsound */
+        if (act->text != 0) {
+            *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+            EvtPlaySoundAt(act->text, *(const uint32_t *)&at,
+                           act->n0, act->n1, act->extra);
+        }
+        return;
+
     case 0x07:                                  /* playsoundon */
         if (act->text != 0) {
             /* ActionPoint's answer is DISCARDED -- eax is overwritten by n0
@@ -3462,14 +3470,6 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
             ActionPoint(act, (uint32_t)(uintptr_t)owner);
             EvtPlaySoundOn(act->text,
                            ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                           act->n0, act->n1, act->extra);
-        }
-        return;
-
-    case 0x06:                                  /* playsound */
-        if (act->text != 0) {
-            *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
-            EvtPlaySoundAt(act->text, *(const uint32_t *)&at,
                            act->n0, act->n1, act->extra);
         }
         return;
@@ -3528,8 +3528,8 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         EvtFlag40Clear(act->subject, (uint32_t)(uintptr_t)owner);
         return;
 
-    case 0x1D:                                  /* setcamerafocus */
-        EvtPushObjCtx(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
+    case 0x0A:                                  /* setobjstate-ish */
+        EvtObjSet(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner), act->n0);
         return;
 
     case 0x1E:                                  /* restorecamerafocus */
@@ -3538,17 +3538,12 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         g_objCtxSetPrev = g_objCtxSet;
         return;
 
+    case 0x1D:                                  /* setcamerafocus */
+        EvtPushObjCtx(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
+        return;
+
     case 0x1C:                                  /* reviveai */
         EvtFlag40Set(act->subject, (uint32_t)(uintptr_t)owner);
-        return;
-
-    case 0x0A:                                  /* setobjstate-ish */
-        EvtObjSet(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner), act->n0);
-        return;
-
-    case 0x0B:
-        EvtSetWord60(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                     act->n0);
         return;
 
     case 0x12:                                  /* dropitem */
@@ -3556,8 +3551,9 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                       ActionPoint(act, (uint32_t)(uintptr_t)owner));
         return;
 
-    case 0x13:
-        EvtObjAction(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
+    case 0x0B:
+        EvtSetWord60(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                     act->n0);
         return;
 
     case 0x14:
@@ -3566,12 +3562,12 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                             ActionPoint(act, (uint32_t)(uintptr_t)owner));
         return;
 
-    case 0x15:                                  /* ally */
-        EvtSetAllied(act->subject, act->target);
+    case 0x13:
+        EvtObjAction(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
         return;
 
-    case 0x16:                                  /* unally */
-        EvtClearAllied(act->subject, act->target);
+    case 0x15:                                  /* ally */
+        EvtSetAllied(act->subject, act->target);
         return;
 
     case 0x17:
@@ -3632,6 +3628,10 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
                       0, 0, 0, 0);
         return;
     }
+
+    case 0x16:                                  /* unally */
+        EvtClearAllied(act->subject, act->target);
+        return;
 
     case 0x0C:
         EvtGuardedAction(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
@@ -3741,20 +3741,6 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         return;
     }
 
-    case 0x21: {
-        int32_t v;
-
-        if (act->xvar > 0) {
-            GetVarValue(act->xvar, &v);
-            EvtSetByte530(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                          (int8_t)v);
-            return;
-        }
-        EvtSetByte530(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
-                      (int8_t)act->n0);
-        return;
-    }
-
     case 0x23: {                                /* setvar */
         /* NOT the 0x20/0x21 shape: this one tests xvar for NON-ZERO where its
          * neighbours test for positive, and it REFUSES outright when the
@@ -3768,6 +3754,20 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
             return;
         }
         SetVarValue(act->subject, act->n0);
+        return;
+    }
+
+    case 0x21: {
+        int32_t v;
+
+        if (act->xvar > 0) {
+            GetVarValue(act->xvar, &v);
+            EvtSetByte530(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                          (int8_t)v);
+            return;
+        }
+        EvtSetByte530(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner),
+                      (int8_t)act->n0);
         return;
     }
 
@@ -3798,17 +3798,6 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         SetObjScriptState(act->target, act->subject, act->n0);
         return;
 
-    case 0x22: {                                /* addtovar */
-        /* Not the 0x20/0x21 shape: the value starts as n0 and the variable read
-         * writes over it, so a failed read leaves n0 rather than 0. */
-        int32_t v = act->n0;
-
-        if (act->xvar > 0)
-            GetVarValue(act->xvar, &v);
-        AddToVar(act->subject, v);
-        return;
-    }
-
     case 0x24: {                                /* setobjbitmap */
         /* THE VARIABLE IS READ AND THROWN AWAY. Both branches call with
          * act->n0; the only difference is that a positive xvar gets a
@@ -3819,6 +3808,17 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         if (act->xvar > 0)
             GetVarValue(act->xvar, &ignored);
         ScriptSetObjBitmap(act->subject, act->n0);
+        return;
+    }
+
+    case 0x22: {                                /* addtovar */
+        /* Not the 0x20/0x21 shape: the value starts as n0 and the variable read
+         * writes over it, so a failed read leaves n0 rather than 0. */
+        int32_t v = act->n0;
+
+        if (act->xvar > 0)
+            GetVarValue(act->xvar, &v);
+        AddToVar(act->subject, v);
         return;
     }
 
@@ -3891,18 +3891,18 @@ void __cdecl RunScriptAction(AM2_ScriptAction *act, void *owner)
         g_inputSuppress = (act->n0 != 0) ? 1 : 0;
         return;
 
+    case 0x31:                                  /* by point, not by uid */
+        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
+        if (at.x != 0)
+            EvtByRefA(*(const int32_t *)&at, act->n0);
+        return;
+
     case 0x2F:
         EvtType2ActionA(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
         return;
 
     case 0x30:
         EvtType2ActionB(ResolveUid(act->subject, (uint32_t)(uintptr_t)owner));
-        return;
-
-    case 0x31:                                  /* by point, not by uid */
-        *(uint32_t *)&at = ActionPoint(act, (uint32_t)(uintptr_t)owner);
-        if (at.x != 0)
-            EvtByRefA(*(const int32_t *)&at, act->n0);
         return;
 
     case 0x32:

@@ -5711,10 +5711,6 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
                 SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
             break;
         }
-        case 0x1A:
-            SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
-            break;
-
         /* One shape, four comparands, written as four arms: 0x23 wants 0,
          * 0x24 wants 1, and so on. The compiler gives 0x23 no test of its
          * own and jumps into 0x26's. */
@@ -5722,6 +5718,11 @@ void __cdecl SelectWeapon(void *unit, int32_t slot)
             if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 0)
                 SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
             break;
+
+        case 0x1A:
+            SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);
+            break;
+
         case 0x24:
             if (*(const int32_t *)(u + OBJ_OFF_FIELD_530) != 1)
                 SetWeaponTarget(u, *(const AM2_Point *)(uintptr_t)ADDR_ZERO_POINT);

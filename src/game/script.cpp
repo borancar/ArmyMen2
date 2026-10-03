@@ -2306,6 +2306,23 @@ eos:
         (*at)++;
         return 1;
 
+    case AM2_TOK_SETITEMOWNER:
+        STEP();
+        act->code = 0x34;
+        if (!ScriptResolveName(ctx, at, &act->subject, 0))
+            return 0;
+        if (*at >= ctx->count)
+            goto eos;
+        if (TOK.kind == AM2_TOKEN_INTEGER) {
+            act->n0 = 4;
+            (*at)++;
+            return 1;
+        }
+        act->n0 = ScriptArmyColour(ctx, at);
+        if (act->n0 < 0)
+            return 0;
+        return 1;
+
     case AM2_TOK_SETDAMAGEPAD:
         STEP();
         act->code = 0x3A;
@@ -2344,23 +2361,6 @@ eos:
         case AM2_TOK_CRUSH:      act->extra = 4; (*at)++; return 1;
         case AM2_TOK_EXPLOSION:  act->extra = 3; (*at)++; return 1;
         }
-        return 1;
-
-    case AM2_TOK_SETITEMOWNER:
-        STEP();
-        act->code = 0x34;
-        if (!ScriptResolveName(ctx, at, &act->subject, 0))
-            return 0;
-        if (*at >= ctx->count)
-            goto eos;
-        if (TOK.kind == AM2_TOKEN_INTEGER) {
-            act->n0 = 4;
-            (*at)++;
-            return 1;
-        }
-        act->n0 = ScriptArmyColour(ctx, at);
-        if (act->n0 < 0)
-            return 0;
         return 1;
 
     case AM2_TOK_SETM80:

@@ -1347,7 +1347,7 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
 
         /* Pop, and detach the new head's back link. `from` IS the head. */
         from = *(const uint16_t *)(c + PATHNODE_OFF_NEXT);
-        if ((uint16_t)from > 0)
+        if (0 < (uint16_t)from)
             *(uint16_t *)(nodes + (from & 0xFFFF) * AM2_PATH_NODE_BYTES
                           + PATHNODE_OFF_PREV) = 0;
         *(uint8_t *)(c + PATHNODE_OFF_STATE) = 2;
@@ -1473,7 +1473,14 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                 } while (walk > 0);
             }
 
-            if (before > 0) {
+            if (!(before > 0)) {
+                /* Cheapest so far: in front of the head. */
+                *(uint16_t *)(b + PATHNODE_OFF_NEXT) = from;
+                *(uint16_t *)(b + PATHNODE_OFF_PREV) = 0;
+                *(uint16_t *)(nodes + (from & 0xFFFF) * AM2_PATH_NODE_BYTES
+                              + PATHNODE_OFF_PREV) = (uint16_t)nb;
+                from = (uint16_t)nb;
+            } else {
                 uint8_t *p = nodes + (before & 0xFFFF) * AM2_PATH_NODE_BYTES;
                 uint16_t after = *(const uint16_t *)(p + PATHNODE_OFF_NEXT);
 
@@ -1483,13 +1490,6 @@ int32_t __cdecl FindPath(uint16_t from, int32_t to, uint16_t *out, int32_t *n,
                                   + PATHNODE_OFF_PREV) = (uint16_t)nb;
                 *(uint16_t *)(p + PATHNODE_OFF_NEXT) = (uint16_t)nb;
                 *(uint16_t *)(b + PATHNODE_OFF_PREV) = before;
-            } else {
-                /* Cheapest so far: in front of the head. */
-                *(uint16_t *)(b + PATHNODE_OFF_NEXT) = from;
-                *(uint16_t *)(b + PATHNODE_OFF_PREV) = 0;
-                *(uint16_t *)(nodes + (from & 0xFFFF) * AM2_PATH_NODE_BYTES
-                              + PATHNODE_OFF_PREV) = (uint16_t)nb;
-                from = (uint16_t)nb;
             }
         }
     }
@@ -5204,8 +5204,8 @@ score:
                 continue;
             best        = cand;
             bestRange   = candRange;
-            slack       = 0;
             bestBearing = candBearing;
+            slack       = 0;
             continue;
         }
 

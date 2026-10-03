@@ -1789,6 +1789,15 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
         consumed += 8;
 
         switch (tag) {
+        /* Seven planes, one shape.  Only the global differs. */
+        case AM2_IFF_NPAD:
+            plane = MAP_PLANE;
+            if ((int32_t)size != plane) MISMATCH();
+            *(uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER = (uint8_t *)am2_malloc(plane);
+            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER, plane, 1, f);
+            consumed += plane;
+            break;
+
         case AM2_IFF_MHDR: {
             int32_t hdr[3];
 
@@ -1809,14 +1818,6 @@ int32_t __cdecl LoadMap(const char *base, const char *folder)
             break;
         }
 
-        /* Seven planes, one shape.  Only the global differs. */
-        case AM2_IFF_NPAD:
-            plane = MAP_PLANE;
-            if ((int32_t)size != plane) MISMATCH();
-            *(uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER = (uint8_t *)am2_malloc(plane);
-            orig_map_fread(*(uint8_t **)(uintptr_t)ADDR_MAP_PAD_LAYER, plane, 1, f);
-            consumed += plane;
-            break;
         case AM2_IFF_BPAD:
             plane = MAP_PLANE;
             if ((int32_t)size != plane) MISMATCH();

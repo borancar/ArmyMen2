@@ -1236,8 +1236,8 @@ void __cdecl ScrollMapCache(void)
      * always zero, which is what makes this one expression for both
      * directions. */
     {
-        int32_t  sx = (dx > 0) ? dx : 0;
         int32_t  sy = (dy > 0) ? dy : 0;
+        int32_t  sx = (dx > 0) ? dx : 0;
         AM2_Rect tiles;
 
         /* The same rectangle in tiles, sized from the CLAMPED camera rather

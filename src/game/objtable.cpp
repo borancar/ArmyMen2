@@ -145,7 +145,10 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
         id   = uid;
         next = *counter + 1;
         need = (uid & AM2_UID_COUNTER_MASK) + 1;
-        *counter = (next > need) ? next : need;
+        if (next > need)
+            *counter = next;
+        else
+            *counter = need;
     }
 
     if (*counter > AM2_UID_COUNTER_MAX) {
@@ -192,7 +195,7 @@ uint32_t __cdecl AddToItemList(AM2_Object *obj, uint32_t uid)
      * expected to supply fresh UIDs. */
     FindSlot(id, &pos);
 
-    if (g_objCount >= g_objCap) {
+    if (g_objCap <= g_objCount) {
         g_objCap += 100;
         g_objTable = (AM2_ObjEntry *)am2_realloc(
             g_objTable, (size_t)g_objCap * sizeof(AM2_ObjEntry));

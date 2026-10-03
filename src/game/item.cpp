@@ -11433,8 +11433,8 @@ void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
     if (!(*(const uint32_t *)(o + OBJ_OFF_FLAGS) & OBJ_FLAG_BIT0))
         return;
 
-    cl = left   >> AM2_CELL_SHIFT;
     ct = top    >> AM2_CELL_SHIFT;
+    cl = left   >> AM2_CELL_SHIFT;
     cr = ((box(2) - box(0)) + left) >> AM2_CELL_SHIFT;
     cb = ((box(3) - box(1)) + top)  >> AM2_CELL_SHIFT;
 
@@ -11444,11 +11444,13 @@ void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
         return;
     }
 
-    /* Branchless in the image (setle/dec/and): a ternary, not an if. The
-     * bottom is clamped against the WIDTH, grid[0], as the image does. */
-    cl = cl > 0 ? cl : 0;
+    /* The left clamp is a plain test-and-store in the image; the top's is
+     * branchless (setle/dec/and), a ternary. The bottom is clamped against
+     * the WIDTH, grid[0], as the image does. */
+    if (cl <= 0)
+        cl = 0;
     ct = ct > 0 ? ct : 0;
-    if (cr >= grid[0] - 1) cr = grid[0] - 1;
+    if (grid[0] - 1 <= cr) cr = grid[0] - 1;
     if (cb >= grid[0] - 1) cb = grid[0] - 1;
 
     idx = 0;
@@ -13413,6 +13415,7 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
     uint8_t  *u   = (uint8_t *)unit;
     int16_t  *pt  = (int16_t *)&spot.at;
     uint8_t  *spr;
+    AM2_Point b2;
     uint32_t  from;         /* the packed spot.at the shot leaves from */
     int16_t  *fromP = (int16_t *)&from;
     int32_t   dir;
@@ -13577,8 +13580,6 @@ int32_t __cdecl FireWeapon(void *weapon, void *unit, int16_t height,
      * rather than over the head. With no target spot.at the distance IS the
      * maximum, so the scale is exactly 1.0 and the shot is flat. */
     case 2: {
-        AM2_Point b2;
-
         fromP[1] = (int16_t)(fromP[1] - 0x10);
         PlaySoundAt(0x0C, 0, 0, fromP[0], fromP[1]);
 
