@@ -71,6 +71,14 @@ main result so far (details in `src/vc6/README.md`):
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools. From 758 to 1474:
+  - **Mechanical passes over the 171 that differ** (2026-10-03): the summed
+    normalised distance (`tusc.py`) went 12,801 -> 11,189 with no new exact
+    match. What paid: re-reading a cached global or object field at each use
+    where the image does (`$T/uncache.py`, two dozen functions), the image's
+    case order read from its jump table (RunScriptAction 891 -> 185), for-
+    header comma order, and hill-climbed operand/arm swaps. What did NOT:
+    narrowing local types scored ~60 "wins" and produced no exact match
+    (normalised scoring rewards truncation) -- all reverted.
   - **BuildRegionGraph, AddSightBlocker, ReceivePlayerMsg, LoadMap**
     (2026-10-03): the image re-reads globals at every use where the
     reconstruction cached them in locals -- the weights and region tables,
