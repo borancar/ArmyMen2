@@ -66,11 +66,16 @@ main result so far (details in `src/vc6/README.md`):
   MAPS the image, so `make selftest` (run) needs a placed rebuild (standalone-
   style, or the VC6 standalone) before it passes again; `selftest-link` (compile)
   is unaffected.
-- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1478 of
+- **The whole-image relink (`make vc6-relink`, `src/vc6/relink.py`): 1479 of
   1645 byte-identical (2026-10-03), piecewise 399.** Earlier: 384 at start,
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
-  the near-miss sweep, 758 before the row pools. From 758 to 1478:
+  the near-miss sweep, 758 before the row pools. From 758 to 1479:
+  - **SeqStepKind0 matches; a range check that is a switch** (2026-10-03):
+    the life clamp is `abs(life >> 1) - 2 >= 7 ? 7 : ...` with the
+    expression written twice. Type2PlayerInput's `add eax,-0x18` filter is
+    a five-case switch with a byte index table, not a static lookup table
+    (283 -> 197); HUD edge's old table was already a switch and is gone.
   - **More frame-size fixes** (2026-10-03): RunScriptAction gives every
     variable read its own function-scope slot (frame 0x60 as the image; 347
     -> 189); UpdateTrooperAction reuses its settled flag as the found flag

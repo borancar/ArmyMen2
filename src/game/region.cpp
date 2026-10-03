@@ -9495,9 +9495,6 @@ typedef void (__cdecl *am2_char_fn)(uint32_t wparam, int32_t lo, int32_t hi);
  * cursor. Baked from the image; the values are the original's. checkgap.py
  * cannot see a raw-address `#define`, only ADDR_ macros, which is why this
  * escaped it. Cursor codes: 0x18, 0x19, 0x1A, 0x27, 0x28. */
-static const uint8_t kCursorCodeFilter[17] = {
-    0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0
-};
 
 #define AM2_TURN_REPEAT_MS      0x32
 #define AM2_CLICK_THROTTLE_MS   0x12C
@@ -9816,14 +9813,13 @@ void __cdecl Type2PlayerInput(void *obj, void *weapon, void *out)
                  * spot dereferenced NULL and took the process down. The
                  * original shoots: its object count goes 1612, 1613, 1612.
                  * Fifth instance of the push-shifted slot in this project. */
-                int32_t k = **(int32_t **)((uint8_t *)weapon
-                                           + OBJ_OFF_FIELD_C0) - 0x18;
-
-                if ((uint32_t)k <= 0x10 && kCursorCodeFilter[k] == 0) {
+                switch (**(int32_t **)((uint8_t *)weapon + OBJ_OFF_FIELD_C0)) {
+                case 0x18: case 0x19: case 0x1A: case 0x27: case 0x28:
                     *(uint16_t *)(w + 0x14) =
                         (uint16_t)(g_viewRect->left + g_cursorX);
                     *(uint16_t *)(w + 0x16) =
                         (uint16_t)(g_viewRect->top + g_cursorY);
+                    break;
                 }
             }
             goto tail;

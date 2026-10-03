@@ -1045,17 +1045,6 @@ static const char *const kEdgeItem[] = {
     "???"
 };
 
-/* One byte per object type from AM2_ITEM_TYPE_FIRST to AM2_ITEM_TYPE_LAST.
- * The repeats are the original's: 15..19 all point at FLAG and 35..38 at DISG,
- * and 24 is the default for the types with no caption at all. */
-static const uint8_t kEdgeItemIndex[AM2_ITEM_TYPE_LAST - AM2_ITEM_TYPE_FIRST + 1] = {
-     0,  1,  2,  3, 24, 24,  4,  5,  6,  7,
-     8, 24, 24,  9,  9,  9,  9,  9, 10, 24,
-    24, 11, 12, 13, 14, 15, 16, 17, 18, 24,
-    24, 24, 24, 19, 19, 19, 19, 20, 21, 22,
-    23
-};
-
 /* Every bar in this widget is `value * 90 / max` with one integer divide. The
  * guard is the original's and it is on the DENOMINATOR being positive, not on
  * the numerator -- an object with zero max health would divide by zero and the

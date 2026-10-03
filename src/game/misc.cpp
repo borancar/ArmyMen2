@@ -3136,6 +3136,7 @@ int32_t __cdecl SeqStepKind7(int32_t at, void *rec, void *ctx)
  * comment there flagged this as undecided; a second toucher decided it. */
 int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
 {
+    uint32_t pt;
     /* The particle kind's record is re-indexed, and the fields re-read, at
      * every use. The kind is SEQ_OFF_FLAG4 read as a dword. */
     typedef struct { int32_t frames; const uint32_t *sprites; uint8_t pad[16]; } Kind;
@@ -3153,7 +3154,6 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
     STAMP += *(const uint32_t *)(uintptr_t)ADDR_FRAME_DELTA_MS;
 
     if (STAMP > *(const uint32_t *)(r + SEQ_OFF_GATE)) {
-        uint32_t  pt;
         int32_t   tile;
         char      ground;
 
@@ -3191,11 +3191,7 @@ int32_t __cdecl SeqStepKind0(int32_t at, void *rec, void *ctx)
             }
 
             if (LIFE < -4) {
-                int32_t v = -2 + abs(LIFE >> 1);
-
-                if (v >= 7)
-                    v = 7;
-                LIFE = v;
+                LIFE = abs(LIFE >> 1) - 2 >= 7 ? 7 : abs(LIFE >> 1) - 2;
                 STAMP = 0;
             } else {
                 /* The row is read again for the copy. */
