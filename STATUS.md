@@ -71,6 +71,12 @@ main result so far (details in `src/vc6/README.md`):
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools. From 758 to 1478:
+  - **TrooperFire handed SetFieldInAll a zero** (2026-10-03): it moves the
+    table record from TABLE_REC_SLOT to TABLE_REC_KIND, zeroes the slot, then
+    passed the slot (via a macro that re-reads it) -- always 0. The image
+    passes the record (TABLE_REC_KIND). Found by the frame/argument compare;
+    every trooper leaving a table state had its subrecords cleared instead of
+    pointed at the record.
   - **Frame size is evidence** (2026-10-03): 21 unmatched functions had a
     different `sub esp` from the image. A bigger frame in ours meant the
     original reused a dead variable (ItemLinkCells counts its entries in

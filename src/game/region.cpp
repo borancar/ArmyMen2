@@ -8032,7 +8032,10 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
             *(int32_t *)(o + OBJ_OFF_FIELD_530) = AM2_TROOP_STATE_NONE;
             *(void **)(o + OBJ_OFF_TABLE_REC_KIND) = rec;
             *(void **)(o + OBJ_OFF_TABLE_REC_SLOT) = 0;
-            SetFieldInAll(o + OBJ_OFF_SUBRECORD, rec);
+            /* The record just moved to TABLE_REC_KIND -- the slot was zeroed
+             * on the line above, so re-reading it here would hand on 0. */
+            SetFieldInAll(o + OBJ_OFF_SUBRECORD,
+                          *(void *const *)(o + OBJ_OFF_TABLE_REC_KIND));
         }
         break;
     }
@@ -8122,16 +8125,14 @@ void __cdecl TrooperFire(void *obj, void *held, void *sight)
          * The definition pointer is re-read between the two, which is the
          * original's spelling and not a second value. */
         if (*(const int16_t *)at == 0) {
-            def = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
             *(int16_t *)(o + UNIT_OFF_FIRE_X) = (int16_t)(int32_t)
                 ((long double)Cos8(heading)
-                 * (long double)*(const int32_t *)(def + ITEMTYPE_OFF_RANGE)
+                 * (long double)*(const int32_t *)((*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0)) + ITEMTYPE_OFF_RANGE)
                  + (long double)*(const int16_t *)(o + OBJ_OFF_X));
 
-            def = *(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0);
             *(int16_t *)(o + UNIT_OFF_FIRE_Y) = (int16_t)(int32_t)
                 ((long double)Sin8(heading)
-                 * (long double)*(const int32_t *)(def + ITEMTYPE_OFF_RANGE)
+                 * (long double)*(const int32_t *)((*(const uint8_t *const *)(w + OBJ_OFF_FIELD_C0)) + ITEMTYPE_OFF_RANGE)
                  + (long double)*(const int16_t *)(o + OBJ_OFF_Y));
         }
 
@@ -8198,11 +8199,10 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
     uint8_t *at;
     uint8_t *veh;
     int32_t  klass;
-    int32_t  settled;          /* the facing has been stable long enough */
     int32_t  turned  = 0;      /* a turn was enforced this step */
     int32_t  speed   = 0;
     int32_t  tries;
-    int32_t  found = 0;
+    int32_t  found;            /* the facing is settled, then: anything is here */
     int32_t  pose;
     int32_t  inside;           /* BlockWeightRoute's containment, slot +0x30, never read */
     uint8_t  facing;
@@ -8219,12 +8219,12 @@ void __cdecl UpdateTrooperAction(void *obj, void *weapon, void *out)
     if (*(const int32_t *)(uintptr_t)ADDR_MP_SESSION
         && !AM2_THE_COMM->CommMustBroadcast(
                            (int16_t)*(const int8_t *)(o + OBJ_OFF_ARMY))) {
-        settled = 1;
+        found = 1;
     } else {
-        settled = (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
+        found = (uint32_t)(*(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
                              - *(const uint32_t *)(o + OBJ_OFF_DEADLINE_D0))
                   > AM2_TROOPER_SETTLE_MS;
-        if (!settled)
+        if (!found)
             *(o + OBJ_OFF_FIELD_580) = *(const uint8_t *)(o + OBJ_OFF_FACING);
     }
 
@@ -8411,7 +8411,7 @@ no_route:
         turned = 1;
         *(w + 4) = facing;
         speed  = 0;
-    } else if (!settled) {
+    } else if (!found) {
         *(int32_t *)(w + 8) = 1;
         turned = 1;
         *(w + 4) = facing;
@@ -8440,6 +8440,7 @@ settle_facing:
     /* Everything standing where the trooper is going: an item to step up
      * onto, an item to ask for or take, something watched to reveal or bump,
      * and a healer arm. `found` says whether anything was there at all. */
+    found = 0;
     for (; at; at = *(uint8_t *const *)(at + OBJ_OFF_QUERY_NEXT)) {
         int32_t slot = 0, qty = 0;
 

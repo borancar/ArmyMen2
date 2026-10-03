@@ -7570,6 +7570,7 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
             g_charHandler = HudChatChar;   /* ours now, not the image */
             *(int32_t *)(self + HUDLOG_OFF_TYPING) = 1;
         } else {
+            acc = 0.0f;
             if (*(const int32_t *)(self + HUDLOG_OFF_BLIPS) > 0
                 && Ticks() > *(const uint32_t *)(self + HUDLOG_OFF_BLIP_AT)) {
                 uint32_t jitter;
@@ -7586,7 +7587,6 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
             /* The step and the row count are recomputed at every use. */
 #define STEP (*(const float *)(uintptr_t)ADDR_FRAME_DELTA_SEC * AM2_HUD_SCROLL_PPS)
 #define COUNT (*(const int32_t *)(self + HUDLOG_OFF_COUNT))
-            acc = 0.0f;
             for (i = 0; i < COUNT; i++) {
                 uint8_t *row = self + HUDLOG_OFF_ROWS + i * AM2_HUD_MSG_SIZE;
                 float   *x   = (float *)(row + HUDMSG_OFF_X);
@@ -7629,13 +7629,13 @@ void __attribute__((thiscall)) AM2_Widget::HudTopUpdate()
                                         + i * AM2_HUD_MSG_SIZE + HUDMSG_OFF_X);
                 if (*scroll > *first) {
                     float v = *scroll - STEP;
-                    if (*first > v)
+                    *scroll = *first > v ? *first : v;
+                } else if (*scroll < *first) {
+                    float v = *scroll + STEP;
+                    if (*first < v)
                         *scroll = *first;
                     else
                         *scroll = v;
-                } else if (*scroll < *first) {
-                    float v = *scroll + STEP;
-                    *scroll = *first < v ? *first : v;
                 }
             }
         }
