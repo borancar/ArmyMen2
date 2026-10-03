@@ -2581,7 +2581,7 @@ void __cdecl ObjAfterMove(void *obj, int32_t unused, int32_t damage)
         int32_t cell = (row << *(const uint8_t *)(uintptr_t)ADDR_MAP_ROW_SHIFT)
                        + rect[0];
 
-        for (x = rect[0]; x <= rect[2]; x++, idx++, cell++) {
+        for (x = rect[0]; x <= rect[2]; cell++, idx++, x++) {
 #define weights (*(uint8_t *const *)(uintptr_t)ADDR_CELL_WEIGHTS)
             uint16_t tile;
             int8_t   h;

@@ -1510,18 +1510,17 @@ void __cdecl RecvTrooperWantItem(void *msg)
     }
 
     if (request == AM2_WANT_PICKUP) {
-        int32_t have = *(const int32_t *)(w + OBJ_OFF_TARGET_UID);
         int32_t give;
         int32_t at;
 
-        if (*(const int8_t *)(w + OBJ_OFF_ARMY) != AM2_ARMY_NEUTRAL || !have) {
+        if (*(const int8_t *)(w + OBJ_OFF_ARMY) != AM2_ARMY_NEUTRAL || !*(const int32_t *)(w + OBJ_OFF_TARGET_UID)) {
             orig_log("Request pickup item received & denied\n");
             return;
         }
 
         give = *(const int32_t *)(m + MSG_DROP_OFF_QUANT);
-        if (give >= have)
-            give = have;
+        if (give >= *(const int32_t *)(w + OBJ_OFF_TARGET_UID))
+            give = *(const int32_t *)(w + OBJ_OFF_TARGET_UID);
 
         at = *(const int32_t *)(m + MSG_DROP_OFF_SLOT);
         if (at != -1

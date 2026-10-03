@@ -10255,7 +10255,6 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
                         && *(const uint32_t *)(uintptr_t)ADDR_GAME_CLOCK_MS
                            > *(const uint32_t *)(v + OBJ_OFF_DEADLINE_58)) {
                         int32_t hp = *(const int32_t *)(v + OBJ_OFF_FIELD_568);
-                        int32_t s  = abs(*(const int32_t *)(v + OBJ_OFF_FIELD_44));
 
 
                         *(uint32_t *)(v + OBJ_OFF_DEADLINE_58) =
@@ -10264,7 +10263,7 @@ int32_t __cdecl VehicleBlockWeight(void *veh, uint8_t facing, uint32_t at,
 
                         if (ObjIsType2((const AM2_Object *)o))
                             ;
-                        else if (s > AM2_VEHICLE_CRUSH_SPEED)
+                        else if (abs(*(const int32_t *)(v + OBJ_OFF_FIELD_44)) > AM2_VEHICLE_CRUSH_SPEED)
                             hp /= 3;
                         else
                             hp /= 6;
@@ -11323,7 +11322,6 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
     memset(o + OBJ_OFF_SIGHT_OUT_T2, 0, AM2_DEPLOY_CLEAR_DWORDS * 4u);
 
     if (resurrect != 0) {
-        uint8_t  facing = *(const uint8_t *)(o + OBJ_OFF_FACING);
         void    *weapon;
 
         *(uint32_t *)(o + OBJ_OFF_FLAGS) |= OBJ_FLAG_BIT0;
@@ -11333,9 +11331,9 @@ void __cdecl DeployTrooper(void *obj, int32_t x, int32_t y, int32_t resurrect)
             *(int32_t *)(o + OBJ_OFF_REPAIR_FRAME) = 0;
         }
 
-        *(int16_t *)(o + OBJ_OFF_FIELD_574) = (int16_t)facing;
-        *(o + OBJ_OFF_FACING_COPY) = facing;
-        *(o + OBJ_OFF_FIELD_580)   = facing;
+        *(int16_t *)(o + OBJ_OFF_FIELD_574) = (int16_t)*(const uint8_t *)(o + OBJ_OFF_FACING);
+        *(o + OBJ_OFF_FACING_COPY) = *(const uint8_t *)(o + OBJ_OFF_FACING);
+        *(o + OBJ_OFF_FIELD_580)   = *(const uint8_t *)(o + OBJ_OFF_FACING);
         SetUnitPose(o, 1);
 
         *(int32_t *)(o + OBJ_OFF_RIDING)    = 0;
@@ -11457,16 +11455,15 @@ void __cdecl ObjRemap(void *obj, void *desc, int32_t force)
     for (row = ct; row <= cb; row++) {
         int32_t cell = (row << grid[2]) + cl;
 
-        for (col = cl; col <= cr; col++, cell++, idx++) {
+        for (col = cl; col <= cr; col++, idx++, cell++) {
 #define entry (*(uint8_t **)(o + OBJ_OFF_CELL_ENTRIES) \
                + (uint32_t)idx * AM2_CELL_ENTRY_STRIDE)
-            int32_t  was = *(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX);
 
-            if (was < 0 || was != cell) {
-                if (was >= 0)
+            if (*(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX) < 0 || *(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX) != cell) {
+                if (*(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX) >= 0)
                     ListUnlink(entry,
                                (void **)(*(uint8_t **)((uint8_t *)desc + CELLS_OFF_HEADS)
-                                         + (uint32_t)was * 4u));
+                                         + (uint32_t)*(const int32_t *)(entry + CELL_ENTRY_OFF_INDEX) * 4u));
                 *(int32_t *)(entry + CELL_ENTRY_OFF_INDEX) = cell;
                 ListPushFront(entry,
                               (void **)(*(uint8_t **)((uint8_t *)desc + CELLS_OFF_HEADS)

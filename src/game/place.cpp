@@ -995,16 +995,14 @@ void __cdecl RefundPlacedUnit(void *obj, int32_t slot, int32_t *points)
         /* `i` is still the zero it was declared with: the image counts from
          * the register it has held 0 in since entry. */
         for (; i < AM2_UNIT_TYPE_COUNT; i++) {
-            const uint8_t *rec = kUnitType(i);
-
-            if (*(const int32_t *)(rec + UNIT_TYPE_OFF_TROOPER)
-                || *(const int32_t *)(rec + UNIT_TYPE_OFF_VEHICLE))
+            if (*(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_TROOPER)
+                || *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_VEHICLE))
                 continue;
             if (UnitKindMatches(
                     *(const int32_t *)(
                         *(const uint8_t *const *)(o + OBJ_OFF_FIELD_94)
                         + AAIREC_OFF_KEY),
-                    *(const int32_t *)(rec + UNIT_TYPE_OFF_KIND), army))
+                    *(const int32_t *)(kUnitType(i) + UNIT_TYPE_OFF_KIND), army))
                 goto found;
         }
         return;
