@@ -71,6 +71,12 @@ main result so far (details in `src/vc6/README.md`):
   468 after the global migration, 510 once the VC6 LINK work settled the data
   layout, 627 before the widget classes, 686 before the screens, 719 before
   the near-miss sweep, 758 before the row pools. From 758 to 1474:
+  - **PlaceScenario's .cof form-up pass** (2026-10-03): the original clears
+    OBJ_OFF_SCRIPT_STATE for every listed unit that passes the flag, type
+    2/3/8 and field-94 tests -- before it asks "type 2 and not Sarge" -- so
+    vehicles and Sarge get it cleared too. The reconstruction only cleared
+    it for the units it formed up. Found by reading the image's store order
+    (0x0043E0D5); only reachable with default.cof present.
   - **Mechanical passes over the 171 that differ** (2026-10-03): the summed
     normalised distance (`tusc.py`) went 12,801 -> 11,189 with no new exact
     match. What paid: re-reading a cached global or object field at each use
